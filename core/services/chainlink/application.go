@@ -33,6 +33,8 @@ import (
 	gatewayconnector "github.com/smartcontractkit/chainlink/v2/core/capabilities/gateway_connector"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote"
 	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
+	capStreams "github.com/smartcontractkit/chainlink/v2/core/capabilities/streams"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
@@ -217,6 +219,13 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 	// if a workflow registry address is provided.
 	workflowRegistrySyncer := syncer.NewWorkflowRegistry()
 	srvcs = append(srvcs, workflowRegistrySyncer)
+
+	// Use a recurring trigger with mock data for testing purposes
+	// TODO: proper component shutdown via srvcs()
+	_, err := capStreams.RegisterMockTrigger(globalLogger, opts.CapabilitiesRegistry)
+	if err != nil {
+		return nil, err
+	}
 
 	var externalPeerWrapper p2ptypes.PeerWrapper
 	if cfg.Capabilities().Peering().Enabled() {
