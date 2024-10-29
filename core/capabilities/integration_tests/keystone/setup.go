@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 
 	commoncap "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
@@ -46,9 +47,11 @@ func setupKeystoneDons(ctx context.Context, t *testing.T, lggr logger.SugaredLog
 
 	triggerDon := createKeystoneTriggerDon(ctx, t, lggr, triggerDonInfo, donContext, trigger)
 
-	workflowDon.Start(ctx, t)
-	triggerDon.Start(ctx, t)
-	writeTargetDon.Start(ctx, t)
+	servicetest.Run(t, workflowDon)
+	servicetest.Run(t, triggerDon)
+	servicetest.Run(t, writeTargetDon)
+
+	donContext.WaitForCapabilitiesToBeExposed(t, workflowDon, triggerDon, writeTargetDon)
 
 	return workflowDon, consumer
 }

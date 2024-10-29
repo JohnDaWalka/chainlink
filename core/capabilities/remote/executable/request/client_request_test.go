@@ -12,8 +12,7 @@ import (
 	commoncap "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/target"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/target/request"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable/request"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/transmission"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -80,6 +79,15 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 		Config: transmissionSchedule,
 	}
 
+	registerToWorkflowRequest := commoncap.RegisterToWorkflowRequest{
+		Metadata: commoncap.RegistrationMetadata{
+			WorkflowID:    workflowID1,
+			WorkflowOwner: "0xaa",
+			ReferenceID:   "refID",
+		},
+		Config: transmissionSchedule,
+	}
+
 	m, err := values.NewMap(map[string]any{"response": "response1"})
 	require.NoError(t, err)
 	capabilityResponse := commoncap.CapabilityResponse{
@@ -87,9 +95,6 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 	}
 
 	rawResponse, err := pb.MarshalCapabilityResponse(capabilityResponse)
-	require.NoError(t, err)
-
-	messageID, err := target.GetMessageIDForRequest(capabilityRequest)
 	require.NoError(t, err)
 
 	msg := &types.MessageBody{
@@ -106,7 +111,7 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 		defer cancel()
 
 		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
-		request, err := request.NewClientRequest(ctx, lggr, capabilityRequest, messageID, capInfo,
+		request, err := request.NewClientExecuteRequest(ctx, lggr, capabilityRequest, capInfo,
 			workflowDonInfo, dispatcher, 10*time.Minute)
 		defer request.Cancel(errors.New("test end"))
 
@@ -149,7 +154,7 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 		defer cancel()
 
 		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
-		request, err := request.NewClientRequest(ctx, lggr, capabilityRequest, messageID, capInfo,
+		request, err := request.NewClientExecuteRequest(ctx, lggr, capabilityRequest, capInfo,
 			workflowDonInfo, dispatcher, 10*time.Minute)
 		require.NoError(t, err)
 		defer request.Cancel(errors.New("test end"))
@@ -175,7 +180,7 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 		defer cancel()
 
 		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
-		request, err := request.NewClientRequest(ctx, lggr, capabilityRequest, messageID, capInfo,
+		request, err := request.NewClientExecuteRequest(ctx, lggr, capabilityRequest, capInfo,
 			workflowDonInfo, dispatcher, 10*time.Minute)
 		require.NoError(t, err)
 		defer request.Cancel(errors.New("test end"))
@@ -198,7 +203,7 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 		defer cancel()
 
 		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
-		request, err := request.NewClientRequest(ctx, lggr, capabilityRequest, messageID, capInfo,
+		request, err := request.NewClientExecuteRequest(ctx, lggr, capabilityRequest, capInfo,
 			workflowDonInfo, dispatcher, 10*time.Minute)
 		require.NoError(t, err)
 		defer request.Cancel(errors.New("test end"))
@@ -236,7 +241,7 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 		defer cancel()
 
 		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
-		request, err := request.NewClientRequest(ctx, lggr, capabilityRequest, messageID, capInfo,
+		request, err := request.NewClientExecuteRequest(ctx, lggr, capabilityRequest, capInfo,
 			workflowDonInfo, dispatcher, 10*time.Minute)
 		require.NoError(t, err)
 		defer request.Cancel(errors.New("test end"))
@@ -281,12 +286,12 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("Send second valid message", func(t *testing.T) {
+	t.Run("Execute Request", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
-		request, err := request.NewClientRequest(ctx, lggr, capabilityRequest, messageID, capInfo,
+		request, err := request.NewClientExecuteRequest(ctx, lggr, capabilityRequest, capInfo,
 			workflowDonInfo, dispatcher, 10*time.Minute)
 		require.NoError(t, err)
 		defer request.Cancel(errors.New("test end"))
@@ -304,10 +309,168 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 		require.NoError(t, err)
 
 		response := <-request.ResponseChan()
-		resp := response.Value.Underlying["response"]
+		capResponse, err := pb.UnmarshalCapabilityResponse(response.Result)
+		require.NoError(t, err)
+
+		resp := capResponse.Value.Underlying["response"]
 
 		assert.Equal(t, resp, values.NewString("response1"))
 	})
+
+	t.Run("Register To Workflow Request", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
+		request, err := request.NewClientRegisterToWorkflowRequest(ctx, lggr, registerToWorkflowRequest, capInfo,
+			workflowDonInfo, dispatcher, 10*time.Minute)
+		require.NoError(t, err)
+		defer request.Cancel(errors.New("test end"))
+
+		<-dispatcher.msgs
+		<-dispatcher.msgs
+		assert.Equal(t, 0, len(dispatcher.msgs))
+
+		msg := &types.MessageBody{
+			CapabilityId:    capInfo.ID,
+			CapabilityDonId: capDonInfo.ID,
+			CallerDonId:     workflowDonInfo.ID,
+			Method:          types.MethodRegisterToWorkflow,
+			Payload:         nil,
+			MessageId:       []byte("messageID"),
+		}
+
+		msg.Sender = capabilityPeers[0][:]
+		err = request.OnMessage(ctx, msg)
+		require.NoError(t, err)
+
+		msg.Sender = capabilityPeers[1][:]
+		err = request.OnMessage(ctx, msg)
+		require.NoError(t, err)
+
+		response := <-request.ResponseChan()
+		require.Nil(t, response.Result)
+		require.NoError(t, response.Err)
+	})
+
+	t.Run("Register To Workflow Request with error", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
+		request, err := request.NewClientRegisterToWorkflowRequest(ctx, lggr, registerToWorkflowRequest, capInfo,
+			workflowDonInfo, dispatcher, 10*time.Minute)
+		require.NoError(t, err)
+		defer request.Cancel(errors.New("test end"))
+
+		<-dispatcher.msgs
+		<-dispatcher.msgs
+		assert.Equal(t, 0, len(dispatcher.msgs))
+
+		msg := &types.MessageBody{
+			CapabilityId:    capInfo.ID,
+			CapabilityDonId: capDonInfo.ID,
+			CallerDonId:     workflowDonInfo.ID,
+			Method:          types.MethodRegisterToWorkflow,
+			Payload:         nil,
+			MessageId:       []byte("messageID"),
+			Error:           types.Error_INTERNAL_ERROR,
+			ErrorMsg:        "an error",
+		}
+
+		msg.Sender = capabilityPeers[0][:]
+		err = request.OnMessage(ctx, msg)
+		require.NoError(t, err)
+
+		msg.Sender = capabilityPeers[1][:]
+		err = request.OnMessage(ctx, msg)
+		require.NoError(t, err)
+
+		response := <-request.ResponseChan()
+		require.Nil(t, response.Result)
+		assert.Equal(t, "an error", response.Err.Error())
+	})
+
+	t.Run("Unregister From Workflow Request", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
+		request, err := request.NewClientUnregisterFromWorkflowRequest(ctx, lggr, commoncap.UnregisterFromWorkflowRequest{
+			Metadata: commoncap.RegistrationMetadata{
+				WorkflowID: workflowID1,
+			},
+		}, capInfo, workflowDonInfo, dispatcher, 10*time.Minute)
+		require.NoError(t, err)
+		defer request.Cancel(errors.New("test end"))
+
+		<-dispatcher.msgs
+		<-dispatcher.msgs
+		assert.Equal(t, 0, len(dispatcher.msgs))
+
+		msg := &types.MessageBody{
+			CapabilityId:    capInfo.ID,
+			CapabilityDonId: capDonInfo.ID,
+			CallerDonId:     workflowDonInfo.ID,
+			Method:          types.MethodUnregisterFromWorkflow,
+			Payload:         nil,
+			MessageId:       []byte("messageID"),
+		}
+
+		msg.Sender = capabilityPeers[0][:]
+		err = request.OnMessage(ctx, msg)
+		require.NoError(t, err)
+
+		msg.Sender = capabilityPeers[1][:]
+		err = request.OnMessage(ctx, msg)
+		require.NoError(t, err)
+
+		response := <-request.ResponseChan()
+		require.Nil(t, response.Result)
+		require.NoError(t, response.Err)
+	})
+
+	t.Run("Unregister From Workflow Request with error", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
+		request, err := request.NewClientUnregisterFromWorkflowRequest(ctx, lggr, commoncap.UnregisterFromWorkflowRequest{
+			Metadata: commoncap.RegistrationMetadata{
+				WorkflowID: workflowID1,
+			},
+		}, capInfo, workflowDonInfo, dispatcher, 10*time.Minute)
+		require.NoError(t, err)
+		defer request.Cancel(errors.New("test end"))
+
+		<-dispatcher.msgs
+		<-dispatcher.msgs
+		assert.Equal(t, 0, len(dispatcher.msgs))
+
+		msg := &types.MessageBody{
+			CapabilityId:    capInfo.ID,
+			CapabilityDonId: capDonInfo.ID,
+			CallerDonId:     workflowDonInfo.ID,
+			Method:          types.MethodUnregisterFromWorkflow,
+			Payload:         nil,
+			MessageId:       []byte("messageID"),
+			Error:           types.Error_INTERNAL_ERROR,
+			ErrorMsg:        "an error",
+		}
+
+		msg.Sender = capabilityPeers[0][:]
+		err = request.OnMessage(ctx, msg)
+		require.NoError(t, err)
+
+		msg.Sender = capabilityPeers[1][:]
+		err = request.OnMessage(ctx, msg)
+		require.NoError(t, err)
+
+		response := <-request.ResponseChan()
+		require.Nil(t, response.Result)
+		assert.Equal(t, "an error", response.Err.Error())
+	})
+
 }
 
 type clientRequestTestDispatcher struct {

@@ -1,4 +1,4 @@
-package target_test
+package executable_test
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/target"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable"
 	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/transmission"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -26,7 +26,7 @@ import (
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 )
 
-func Test_RemoteTargetCapability_InsufficientCapabilityResponses(t *testing.T) {
+func Test_RemoteExecutableCapability_InsufficientCapabilityResponses(t *testing.T) {
 	ctx := testutils.Context(t)
 
 	responseTest := func(t *testing.T, responseCh commoncap.CapabilityResponse, responseError error) {
@@ -41,10 +41,30 @@ func Test_RemoteTargetCapability_InsufficientCapabilityResponses(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	testRemoteTarget(ctx, t, capability, 10, 9, 10*time.Millisecond, 10, 10, 10*time.Minute, transmissionSchedule, responseTest)
+	var methods []func(caller commoncap.ExecutableCapability)
+
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		executeCapability(caller, t, ctx, transmissionSchedule, responseTest)
+	})
+
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		registerWorkflow(caller, t, ctx, transmissionSchedule, func(t *testing.T, responseError error) {
+			require.NotNil(t, responseError)
+		})
+	})
+
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		unregisterWorkflow(caller, t, ctx, transmissionSchedule, func(t *testing.T, responseError error) {
+			require.NotNil(t, responseError)
+		})
+	})
+
+	for _, method := range methods {
+		testRemoteExecutableCapability(ctx, t, capability, 10, 9, 10*time.Millisecond, 10, 10, 10*time.Minute, method)
+	}
 }
 
-func Test_RemoteTargetCapability_InsufficientWorkflowRequests(t *testing.T) {
+func Test_RemoteExecutableCapability_InsufficientWorkflowRequests(t *testing.T) {
 	ctx := testutils.Context(t)
 
 	responseTest := func(t *testing.T, responseCh commoncap.CapabilityResponse, responseError error) {
@@ -61,10 +81,30 @@ func Test_RemoteTargetCapability_InsufficientWorkflowRequests(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	testRemoteTarget(ctx, t, capability, 10, 10, 10*time.Millisecond, 10, 9, timeOut, transmissionSchedule, responseTest)
+	var methods []func(caller commoncap.ExecutableCapability)
+
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		executeCapability(caller, t, ctx, transmissionSchedule, responseTest)
+	})
+
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		registerWorkflow(caller, t, ctx, transmissionSchedule, func(t *testing.T, responseError error) {
+			require.NotNil(t, responseError)
+		})
+	})
+
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		unregisterWorkflow(caller, t, ctx, transmissionSchedule, func(t *testing.T, responseError error) {
+			require.NotNil(t, responseError)
+		})
+	})
+
+	for _, method := range methods {
+		testRemoteExecutableCapability(ctx, t, capability, 10, 10, 10*time.Millisecond, 10, 9, timeOut, method)
+	}
 }
 
-func Test_RemoteTargetCapability_TransmissionSchedules(t *testing.T) {
+func Test_RemoteExecutableCapability_TransmissionSchedules(t *testing.T) {
 	ctx := testutils.Context(t)
 
 	responseTest := func(t *testing.T, response commoncap.CapabilityResponse, responseError error) {
@@ -84,18 +124,24 @@ func Test_RemoteTargetCapability_TransmissionSchedules(t *testing.T) {
 
 	capability := &TestCapability{}
 
-	testRemoteTarget(ctx, t, capability, 10, 9, timeOut, 10, 9, timeOut, transmissionSchedule, responseTest)
+	method := func(caller commoncap.ExecutableCapability) {
+		executeCapability(caller, t, ctx, transmissionSchedule, responseTest)
+	}
+	testRemoteExecutableCapability(ctx, t, capability, 10, 9, timeOut, 10, 9, timeOut, method)
 
 	transmissionSchedule, err = values.NewMap(map[string]any{
 		"schedule":   transmission.Schedule_AllAtOnce,
 		"deltaStage": "10ms",
 	})
 	require.NoError(t, err)
+	method = func(caller commoncap.ExecutableCapability) {
+		executeCapability(caller, t, ctx, transmissionSchedule, responseTest)
+	}
 
-	testRemoteTarget(ctx, t, capability, 10, 9, timeOut, 10, 9, timeOut, transmissionSchedule, responseTest)
+	testRemoteExecutableCapability(ctx, t, capability, 10, 9, timeOut, 10, 9, timeOut, method)
 }
 
-func Test_RemoteTargetCapability_DonTopologies(t *testing.T) {
+func Test_RemoteExecutionCapability_DonTopologies(t *testing.T) {
 	ctx := testutils.Context(t)
 
 	responseTest := func(t *testing.T, response commoncap.CapabilityResponse, responseError error) {
@@ -115,26 +161,43 @@ func Test_RemoteTargetCapability_DonTopologies(t *testing.T) {
 
 	capability := &TestCapability{}
 
-	// Test scenarios where the number of submissions is greater than or equal to F + 1
-	testRemoteTarget(ctx, t, capability, 1, 0, timeOut, 1, 0, timeOut, transmissionSchedule, responseTest)
-	testRemoteTarget(ctx, t, capability, 4, 3, timeOut, 1, 0, timeOut, transmissionSchedule, responseTest)
-	testRemoteTarget(ctx, t, capability, 10, 3, timeOut, 1, 0, timeOut, transmissionSchedule, responseTest)
+	var methods []func(caller commoncap.ExecutableCapability)
 
-	testRemoteTarget(ctx, t, capability, 1, 0, timeOut, 1, 0, timeOut, transmissionSchedule, responseTest)
-	testRemoteTarget(ctx, t, capability, 1, 0, timeOut, 4, 3, timeOut, transmissionSchedule, responseTest)
-	testRemoteTarget(ctx, t, capability, 1, 0, timeOut, 10, 3, timeOut, transmissionSchedule, responseTest)
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		executeCapability(caller, t, ctx, transmissionSchedule, responseTest)
+	})
 
-	testRemoteTarget(ctx, t, capability, 4, 3, timeOut, 4, 3, timeOut, transmissionSchedule, responseTest)
-	testRemoteTarget(ctx, t, capability, 10, 3, timeOut, 10, 3, timeOut, transmissionSchedule, responseTest)
-	testRemoteTarget(ctx, t, capability, 10, 9, timeOut, 10, 9, timeOut, transmissionSchedule, responseTest)
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		registerWorkflow(caller, t, ctx, transmissionSchedule, func(t *testing.T, responseError error) {
+			require.NoError(t, responseError)
+		})
+	})
+
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		unregisterWorkflow(caller, t, ctx, transmissionSchedule, func(t *testing.T, responseError error) {
+			require.NoError(t, responseError)
+		})
+	})
+
+	for _, method := range methods {
+
+		// Test scenarios where the number of submissions is greater than or equal to F + 1
+		testRemoteExecutableCapability(ctx, t, capability, 1, 0, timeOut, 1, 0, timeOut, method)
+		testRemoteExecutableCapability(ctx, t, capability, 4, 3, timeOut, 1, 0, timeOut, method)
+		testRemoteExecutableCapability(ctx, t, capability, 10, 3, timeOut, 1, 0, timeOut, method)
+
+		testRemoteExecutableCapability(ctx, t, capability, 1, 0, timeOut, 1, 0, timeOut, method)
+		testRemoteExecutableCapability(ctx, t, capability, 1, 0, timeOut, 4, 3, timeOut, method)
+		testRemoteExecutableCapability(ctx, t, capability, 1, 0, timeOut, 10, 3, timeOut, method)
+
+		testRemoteExecutableCapability(ctx, t, capability, 4, 3, timeOut, 4, 3, timeOut, method)
+		testRemoteExecutableCapability(ctx, t, capability, 10, 3, timeOut, 10, 3, timeOut, method)
+		testRemoteExecutableCapability(ctx, t, capability, 10, 9, timeOut, 10, 9, timeOut, method)
+	}
 }
 
-func Test_RemoteTargetCapability_CapabilityError(t *testing.T) {
+func Test_RemoteExecutionCapability_CapabilityError(t *testing.T) {
 	ctx := testutils.Context(t)
-
-	responseTest := func(t *testing.T, responseCh commoncap.CapabilityResponse, responseError error) {
-		assert.Equal(t, "failed to execute capability: an error", responseError.Error())
-	}
 
 	capability := &TestErrorCapability{}
 
@@ -144,15 +207,33 @@ func Test_RemoteTargetCapability_CapabilityError(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	testRemoteTarget(ctx, t, capability, 10, 9, 10*time.Minute, 10, 9, 10*time.Minute, transmissionSchedule, responseTest)
+	var methods []func(caller commoncap.ExecutableCapability)
+
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		executeCapability(caller, t, ctx, transmissionSchedule, func(t *testing.T, responseCh commoncap.CapabilityResponse, responseError error) {
+			assert.Equal(t, "error executing request: failed to execute capability: an error", responseError.Error())
+		})
+	})
+
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		registerWorkflow(caller, t, ctx, transmissionSchedule, func(t *testing.T, responseError error) {
+			assert.Equal(t, "error executing request: failed to register to workflow: an error", responseError.Error())
+		})
+	})
+
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		unregisterWorkflow(caller, t, ctx, transmissionSchedule, func(t *testing.T, responseError error) {
+			assert.Equal(t, "error executing request: failed to unregister from workflow: an error", responseError.Error())
+		})
+	})
+
+	for _, method := range methods {
+		testRemoteExecutableCapability(ctx, t, capability, 10, 9, 10*time.Minute, 10, 9, 10*time.Minute, method)
+	}
 }
 
-func Test_RemoteTargetCapability_RandomCapabilityError(t *testing.T) {
+func Test_RemoteExecutableCapability_RandomCapabilityError(t *testing.T) {
 	ctx := testutils.Context(t)
-
-	responseTest := func(t *testing.T, response commoncap.CapabilityResponse, responseError error) {
-		assert.Equal(t, "request expired", responseError.Error())
-	}
 
 	capability := &TestRandomErrorCapability{}
 
@@ -162,12 +243,35 @@ func Test_RemoteTargetCapability_RandomCapabilityError(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	testRemoteTarget(ctx, t, capability, 10, 9, 10*time.Millisecond, 10, 9, 10*time.Minute, transmissionSchedule, responseTest)
+	var methods []func(caller commoncap.ExecutableCapability)
+
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		executeCapability(caller, t, ctx, transmissionSchedule, func(t *testing.T, responseCh commoncap.CapabilityResponse, responseError error) {
+			assert.Equal(t, "error executing request: request expired", responseError.Error())
+		})
+	})
+
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		registerWorkflow(caller, t, ctx, transmissionSchedule, func(t *testing.T, responseError error) {
+			assert.Equal(t, "error executing request: request expired", responseError.Error())
+		})
+	})
+
+	methods = append(methods, func(caller commoncap.ExecutableCapability) {
+		unregisterWorkflow(caller, t, ctx, transmissionSchedule, func(t *testing.T, responseError error) {
+			assert.Equal(t, "error executing request: request expired", responseError.Error())
+		})
+	})
+
+	for _, method := range methods {
+		testRemoteExecutableCapability(ctx, t, capability, 10, 9, 10*time.Millisecond, 10, 9, 10*time.Minute,
+			method)
+	}
 }
 
-func testRemoteTarget(ctx context.Context, t *testing.T, underlying commoncap.TargetCapability, numWorkflowPeers int, workflowDonF uint8, workflowNodeTimeout time.Duration,
-	numCapabilityPeers int, capabilityDonF uint8, capabilityNodeResponseTimeout time.Duration, transmissionSchedule *values.Map,
-	responseTest func(t *testing.T, response commoncap.CapabilityResponse, responseError error)) {
+func testRemoteExecutableCapability(ctx context.Context, t *testing.T, underlying commoncap.ExecutableCapability, numWorkflowPeers int, workflowDonF uint8, workflowNodeTimeout time.Duration,
+	numCapabilityPeers int, capabilityDonF uint8, capabilityNodeResponseTimeout time.Duration,
+	method func(caller commoncap.ExecutableCapability)) {
 	lggr := logger.TestLogger(t)
 
 	capabilityPeers := make([]p2ptypes.PeerID, numCapabilityPeers)
@@ -216,17 +320,17 @@ func testRemoteTarget(ctx context.Context, t *testing.T, underlying commoncap.Ta
 	for i := 0; i < numCapabilityPeers; i++ {
 		capabilityPeer := capabilityPeers[i]
 		capabilityDispatcher := broker.NewDispatcherForNode(capabilityPeer)
-		capabilityNode := target.NewServer(&commoncap.RemoteTargetConfig{RequestHashExcludedAttributes: []string{}}, capabilityPeer, underlying, capInfo, capDonInfo, workflowDONs, capabilityDispatcher,
+		capabilityNode := executable.NewServer(&commoncap.RemoteExecutableConfig{RequestHashExcludedAttributes: []string{}}, capabilityPeer, underlying, capInfo, capDonInfo, workflowDONs, capabilityDispatcher,
 			capabilityNodeResponseTimeout, lggr)
 		servicetest.Run(t, capabilityNode)
 		broker.RegisterReceiverNode(capabilityPeer, capabilityNode)
 		capabilityNodes[i] = capabilityNode
 	}
 
-	workflowNodes := make([]commoncap.TargetCapability, numWorkflowPeers)
+	workflowNodes := make([]commoncap.ExecutableCapability, numWorkflowPeers)
 	for i := 0; i < numWorkflowPeers; i++ {
 		workflowPeerDispatcher := broker.NewDispatcherForNode(workflowPeers[i])
-		workflowNode := target.NewClient(capInfo, workflowDonInfo, workflowPeerDispatcher, workflowNodeTimeout, lggr)
+		workflowNode := executable.NewClient(capInfo, workflowDonInfo, workflowPeerDispatcher, workflowNodeTimeout, lggr)
 		servicetest.Run(t, workflowNode)
 		broker.RegisterReceiverNode(workflowPeers[i], workflowNode)
 		workflowNodes[i] = workflowNode
@@ -234,31 +338,13 @@ func testRemoteTarget(ctx context.Context, t *testing.T, underlying commoncap.Ta
 
 	servicetest.Run(t, broker)
 
-	executeInputs, err := values.NewMap(
-		map[string]any{
-			"executeValue1": "aValue1",
-		},
-	)
-
-	require.NoError(t, err)
-
 	wg := &sync.WaitGroup{}
 	wg.Add(len(workflowNodes))
 
 	for _, caller := range workflowNodes {
-		go func(caller commoncap.TargetCapability) {
+		go func(caller commoncap.ExecutableCapability) {
 			defer wg.Done()
-			response, err := caller.Execute(ctx,
-				commoncap.CapabilityRequest{
-					Metadata: commoncap.RequestMetadata{
-						WorkflowID:          workflowID1,
-						WorkflowExecutionID: workflowExecutionID1,
-					},
-					Config: transmissionSchedule,
-					Inputs: executeInputs,
-				})
-
-			responseTest(t, response, err)
+			method(caller)
 		}(caller)
 	}
 
@@ -413,12 +499,28 @@ func (t TestErrorCapability) Execute(ctx context.Context, request commoncap.Capa
 	return commoncap.CapabilityResponse{}, errors.New("an error")
 }
 
+func (t TestErrorCapability) RegisterToWorkflow(ctx context.Context, request commoncap.RegisterToWorkflowRequest) error {
+	return errors.New("an error")
+}
+
+func (t TestErrorCapability) UnregisterFromWorkflow(ctx context.Context, request commoncap.UnregisterFromWorkflowRequest) error {
+	return errors.New("an error")
+}
+
 type TestRandomErrorCapability struct {
 	abstractTestCapability
 }
 
 func (t TestRandomErrorCapability) Execute(ctx context.Context, request commoncap.CapabilityRequest) (commoncap.CapabilityResponse, error) {
 	return commoncap.CapabilityResponse{}, errors.New(uuid.New().String())
+}
+
+func (t TestRandomErrorCapability) RegisterToWorkflow(ctx context.Context, request commoncap.RegisterToWorkflowRequest) error {
+	return errors.New(uuid.New().String())
+}
+
+func (t TestRandomErrorCapability) UnregisterFromWorkflow(ctx context.Context, request commoncap.UnregisterFromWorkflowRequest) error {
+	return errors.New(uuid.New().String())
 }
 
 func NewP2PPeerID(t *testing.T) p2ptypes.PeerID {
@@ -441,4 +543,49 @@ func NewPeerID() string {
 
 func libp2pMagic() []byte {
 	return []byte{0x00, 0x24, 0x08, 0x01, 0x12, 0x20}
+}
+
+func executeCapability(caller commoncap.ExecutableCapability, t *testing.T, ctx context.Context, transmissionSchedule *values.Map, responseTest func(t *testing.T, response commoncap.CapabilityResponse, responseError error)) {
+	executeInputs, err := values.NewMap(
+		map[string]any{
+			"executeValue1": "aValue1",
+		},
+	)
+	require.NoError(t, err)
+	response, err := caller.Execute(ctx,
+		commoncap.CapabilityRequest{
+			Metadata: commoncap.RequestMetadata{
+				WorkflowID:          workflowID1,
+				WorkflowExecutionID: workflowExecutionID1,
+			},
+			Config: transmissionSchedule,
+			Inputs: executeInputs,
+		})
+
+	responseTest(t, response, err)
+}
+
+func registerWorkflow(caller commoncap.ExecutableCapability, t *testing.T, ctx context.Context, transmissionSchedule *values.Map, responseTest func(t *testing.T, responseError error)) {
+
+	err := caller.RegisterToWorkflow(ctx, commoncap.RegisterToWorkflowRequest{
+		Metadata: commoncap.RegistrationMetadata{
+			WorkflowID:  workflowID1,
+			ReferenceID: stepReferenceID1,
+		},
+		Config: transmissionSchedule,
+	})
+
+	responseTest(t, err)
+}
+
+func unregisterWorkflow(caller commoncap.ExecutableCapability, t *testing.T, ctx context.Context, transmissionSchedule *values.Map, responseTest func(t *testing.T, responseError error)) {
+	err := caller.UnregisterFromWorkflow(ctx, commoncap.UnregisterFromWorkflowRequest{
+		Metadata: commoncap.RegistrationMetadata{
+			WorkflowID:  workflowID1,
+			ReferenceID: stepReferenceID1,
+		},
+		Config: transmissionSchedule,
+	})
+
+	responseTest(t, err)
 }
