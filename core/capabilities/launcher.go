@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/target"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable"
 	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/streams"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -293,12 +293,26 @@ func (w *launcher) addRemoteCapabilities(ctx context.Context, myDON registrysync
 				return fmt.Errorf("failed to add trigger shim: %w", err)
 			}
 		case capabilities.CapabilityTypeAction:
-			w.lggr.Warn("no remote client configured for capability type action, skipping configuration")
+			newActionFn := func(info capabilities.CapabilityInfo) (capabilityService, error) {
+				client := executable.NewClient(
+					info,
+					myDON.DON,
+					w.dispatcher,
+					defaultTargetRequestTimeout,
+					w.lggr,
+				)
+				return client, nil
+			}
+
+			err := w.addToRegistryAndSetDispatcher(ctx, capability, remoteDON, newActionFn)
+			if err != nil {
+				return fmt.Errorf("failed to add action shim: %w", err)
+			}
 		case capabilities.CapabilityTypeConsensus:
 			w.lggr.Warn("no remote client configured for capability type consensus, skipping configuration")
 		case capabilities.CapabilityTypeTarget:
 			newTargetFn := func(info capabilities.CapabilityInfo) (capabilityService, error) {
-				client := target.NewClient(
+				client := executable.NewClient(
 					info,
 					myDON.DON,
 					w.dispatcher,
@@ -412,13 +426,40 @@ func (w *launcher) exposeCapabilities(ctx context.Context, myPeerID p2ptypes.Pee
 				return fmt.Errorf("failed to add server-side receiver: %w", err)
 			}
 		case capabilities.CapabilityTypeAction:
-			w.lggr.Warn("no remote client configured for capability type action, skipping configuration")
+			newActionServer := func(capability capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
+				remoteConfig := &capabilities.RemoteExecutableConfig{}
+				if capabilityConfig.RemoteTargetConfig != nil {
+					remoteConfig.RequestHashExcludedAttributes = capabilityConfig.RemoteTargetConfig.RequestHashExcludedAttributes
+				}
+
+				return executable.NewServer(
+					capabilityConfig.RemoteExecutableConfig,
+					myPeerID,
+					capability.(capabilities.ActionCapability),
+					info,
+					don.DON,
+					idsToDONs,
+					w.dispatcher,
+					defaultTargetRequestTimeout,
+					w.lggr,
+				), nil
+			}
+
+			err = w.addReceiver(ctx, capability, don, newActionServer)
+			if err != nil {
+				return fmt.Errorf("failed to add action server-side receiver: %w", err)
+			}
 		case capabilities.CapabilityTypeConsensus:
 			w.lggr.Warn("no remote client configured for capability type consensus, skipping configuration")
 		case capabilities.CapabilityTypeTarget:
 			newTargetServer := func(capability capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
-				return target.NewServer(
-					capabilityConfig.RemoteTargetConfig,
+				remoteConfig := &capabilities.RemoteExecutableConfig{}
+				if capabilityConfig.RemoteTargetConfig != nil {
+					remoteConfig.RequestHashExcludedAttributes = capabilityConfig.RemoteTargetConfig.RequestHashExcludedAttributes
+				}
+
+				return executable.NewServer(
+					remoteConfig,
 					myPeerID,
 					capability.(capabilities.TargetCapability),
 					info,
