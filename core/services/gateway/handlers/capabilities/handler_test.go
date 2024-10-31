@@ -1,6 +1,7 @@
 package capabilities
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,12 +9,17 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	trigger_test_utils "github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/triggertestutils"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
 
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -50,6 +56,7 @@ func setupHandler(t *testing.T) (*handler, *mocks.HTTPClient, *handlermocks.DON,
 		PerSenderBurst: 100,
 	}
 	handlerConfig := HandlerConfig{
+		F:                       1,
 		NodeRateLimiter:         nodeRateLimiterConfig,
 		MaxAllowedMessageAgeSec: 30,
 	}
@@ -427,3 +434,125 @@ func TestHandleComputeActionMessage(t *testing.T) {
 		}, tests.WaitTimeout(t), 100*time.Millisecond)
 	})
 }
+
+// function to convert map of triggerIds to triggerConfigs (which is values.Map) to byte array
+func convertValuesMapToBytes(valuesMap map[string]*values.Map) []byte {
+	var workflowConfigsPB = make(map[string]string)
+	for key, triggerConfig := range valuesMap {
+		configProtoMap := values.ProtoMap(triggerConfig)
+		configProtoBytes, _ := proto.Marshal(configProtoMap)
+		encoded := base64.StdEncoding.EncodeToString(configProtoBytes)
+		workflowConfigsPB[key] = encoded
+	}
+
+	cfgBytes, _ := json.Marshal(workflowConfigsPB)
+	return cfgBytes
+}
+
+// Test that a MethodWebAPITriggerUpdateMetadata message updates gateways metadata for the given workflow node
+func TestHandlerRecieveMetadataMessageFromWorkflowNode(t *testing.T) {
+	handler, _, _, nodes := setupHandler(t)
+	nodeAddr := nodes[0].Address
+	ctx := testutils.Context(t)
+
+	// ctx, cancelContext := context.WithDeadline(ctx, time.Now().Add(10*time.Second))
+	triggerConfig, configMap, _ := trigger_test_utils.NewWorkflowTriggerConfig([]string{address1}, []string{"daily_price_update", "ad_hoc_price_update"})
+	triggerConfig2, configMap2, _ := trigger_test_utils.NewWorkflowTriggerConfig([]string{address1}, []string{"daily_price_update", "ad_hoc_price_update"})
+	triggerConfig3, configMap3, _ := trigger_test_utils.NewWorkflowTriggerConfig([]string{address1}, []string{"daily_price_update"})
+
+	var workflowConfigs = make(map[string]*values.Map)
+	workflowConfigs["foo"] = configMap
+	workflowConfigs["bar"] = configMap2
+	triggerConfigs := make(map[string]webapicap.TriggerConfig)
+	triggerConfigs["foo"] = triggerConfig
+	triggerConfigs["bar"] = triggerConfig2
+	cfgBytes := convertValuesMapToBytes(workflowConfigs)
+
+	// for update tests.
+	var workflowConfigs3 = make(map[string]*values.Map)
+	workflowConfigs3["foo"] = configMap
+	workflowConfigs3["bar"] = configMap3
+	triggerConfigs3 := make(map[string]webapicap.TriggerConfig)
+	triggerConfigs3["foo"] = triggerConfig
+	triggerConfigs3["bar"] = triggerConfig3
+	cfgBytes3 := convertValuesMapToBytes(workflowConfigs3)
+
+	msg := &api.Message{
+		Body: api.MessageBody{
+			MessageId: "123",
+			Method:    MethodWebAPITriggerUpdateMetadata,
+			DonId:     "testDonId",
+			Payload:   cfgBytes,
+		},
+	}
+
+	msg3 := &api.Message{
+		Body: api.MessageBody{
+			MessageId: "123",
+			Method:    MethodWebAPITriggerUpdateMetadata,
+			DonId:     "testDonId2",
+			Payload:   cfgBytes3,
+		},
+	}
+
+	err := handler.HandleNodeMessage(ctx, msg, nodeAddr)
+	require.NoError(t, err)
+	require.NotEmpty(t, handler.triggersConfig.triggersConfigMap["testDonId"])
+	require.NotEmpty(t, handler.triggersConfig.triggersConfigMap["testDonId"].lastUpdatedAt)
+	require.Equal(t, triggerConfigs, handler.triggersConfig.triggersConfigMap["testDonId"].triggersConfig)
+	require.Empty(t, handler.consensusConfig.triggersConfig)
+
+	t.Run("happy case 2 nodes agree", func(t *testing.T) {
+		msg2 := &api.Message{
+			Body: api.MessageBody{
+				MessageId: "123",
+				Method:    MethodWebAPITriggerUpdateMetadata,
+				DonId:     "testDonId2",
+				Payload:   cfgBytes,
+			},
+		}
+		err = handler.HandleNodeMessage(ctx, msg2, nodeAddr)
+		require.NoError(t, err)
+		handler.updateTriggerConsensus()
+		require.NotEmpty(t, handler.triggersConfig.triggersConfigMap["testDonId2"])
+		require.NotEmpty(t, handler.triggersConfig.triggersConfigMap["testDonId2"].lastUpdatedAt)
+		require.Equal(t, triggerConfigs, handler.triggersConfig.triggersConfigMap["testDonId2"].triggersConfig)
+		require.Equal(t, handler.triggersConfig.triggersConfigMap["testDonId"].triggersConfig, handler.consensusConfig.triggersConfig)
+	})
+	t.Run("happy case 2 nodes agree, update 1 node doesn't change consensus", func(t *testing.T) {
+		err = handler.HandleNodeMessage(ctx, msg3, nodeAddr)
+		require.NoError(t, err)
+		handler.updateTriggerConsensus()
+		require.NotEmpty(t, handler.triggersConfig.triggersConfigMap["testDonId2"])
+		require.NotEmpty(t, handler.triggersConfig.triggersConfigMap["testDonId2"].lastUpdatedAt)
+		require.Equal(t, triggerConfigs, handler.triggersConfig.triggersConfigMap["testDonId"].triggersConfig)
+		require.Equal(t, triggerConfigs3, handler.triggersConfig.triggersConfigMap["testDonId2"].triggersConfig)
+		// consensus should not change
+		require.Equal(t, handler.triggersConfig.triggersConfigMap["testDonId"].triggersConfig, handler.consensusConfig.triggersConfig)
+	})
+
+	t.Run("happy case 2 nodes agree, update both nodes changes consensus", func(t *testing.T) {
+		msg4 := &api.Message{
+			Body: api.MessageBody{
+				MessageId: "123",
+				Method:    MethodWebAPITriggerUpdateMetadata,
+				DonId:     "testDonId",
+				Payload:   cfgBytes3,
+			},
+		}
+		err = handler.HandleNodeMessage(ctx, msg3, nodeAddr)
+		require.NoError(t, err)
+		err = handler.HandleNodeMessage(ctx, msg4, nodeAddr)
+		require.NoError(t, err)
+		handler.updateTriggerConsensus()
+		require.NotEmpty(t, handler.triggersConfig.triggersConfigMap["testDonId"])
+		require.NotEmpty(t, handler.triggersConfig.triggersConfigMap["testDonId"].lastUpdatedAt)
+		require.Equal(t, triggerConfigs3, handler.triggersConfig.triggersConfigMap["testDonId"].triggersConfig)
+		require.Equal(t, triggerConfigs3, handler.triggersConfig.triggersConfigMap["testDonId2"].triggersConfig)
+		// consensus should change
+		require.Equal(t, handler.triggersConfig.triggersConfigMap["testDonId"].triggersConfig, handler.consensusConfig.triggersConfig)
+	})
+}
+
+// Other test cases:
+// two nodes updated with equal different value but out of time window so no change.
