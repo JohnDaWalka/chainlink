@@ -513,7 +513,7 @@ contract DualAggregator is OCR2Abstract, OwnerIsCreator, AggregatorV2V3Interface
     uint32 latestAggregatorRoundId = s_hotVars.latestAggregatorRoundId;
 
     // decreasing loop from the latest primary round id
-    for (uint80 round_ = latestAggregatorRoundId; round_ > 0; round_--) {
+    for (uint80 round_ = latestAggregatorRoundId; round_ > 0; --round_) {
       Transmission memory transmission = s_transmissions[uint32(round_)];
 
       // check if this round does not accomplish the cutoff time condition
