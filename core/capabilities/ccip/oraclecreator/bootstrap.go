@@ -22,6 +22,7 @@ import (
 	libocr3 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -123,6 +124,8 @@ func NewBootstrapOracleCreator(
 	lggr logger.Logger,
 	homeChainContractReader types.ContractReader,
 ) cctypes.OracleCreator {
+	commit.PrintSomething()
+
 	return &bootstrapOracleCreator{
 		peerWrapper:             peerWrapper,
 		bootstrapperLocators:    bootstrapperLocators,
