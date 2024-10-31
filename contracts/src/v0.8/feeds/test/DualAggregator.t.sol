@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {PrimaryAggregator} from "../PrimaryAggregator.sol";
+import {DualAggregator} from "../DualAggregator.sol";
 
 import {AccessControllerInterface} from "../../shared/interfaces/AccessControllerInterface.sol";
 import {AggregatorValidatorInterface} from "../../shared/interfaces/AggregatorValidatorInterface.sol";
 import {LinkTokenInterface} from "../../shared/interfaces/LinkTokenInterface.sol";
 import {LinkToken} from "../../shared/token/ERC677/LinkToken.sol";
 
-contract PrimaryAggregatorHarness is PrimaryAggregator {
+contract DualAggregatorHarness is DualAggregator {
   constructor(
     LinkTokenInterface link,
     int192 minAnswer_,
@@ -18,16 +18,20 @@ contract PrimaryAggregatorHarness is PrimaryAggregator {
     AccessControllerInterface billingAccessController,
     AccessControllerInterface requesterAccessController,
     uint8 decimals_,
-    string memory description_
+    string memory description_,
+    address secondaryProxy_,
+    uint32 cutoffTime_
   )
-    PrimaryAggregator(
+    DualAggregator(
       link,
       minAnswer_,
       maxAnswer_,
       billingAccessController,
       requesterAccessController,
       decimals_,
-      description_
+      description_,
+      secondaryProxy_,
+      cutoffTime_
     )
   {}
 
@@ -59,13 +63,33 @@ contract PrimaryAggregatorHarness is PrimaryAggregator {
   function exposed_totalLinkDue() external view returns (uint256 linkDue) {
     return _totalLinkDue();
   }
+
+  function exposed_getSyncPrimaryRound() external view returns (uint80 roundId) {
+    return _getSyncPrimaryRound();
+  }
+
+  // helper function to define the latest round ids
+  function setLatestRoundIds(uint32 _latestAggregatorRoundId, uint32 _latestSecondaryRoundId) public {
+    s_hotVars.latestAggregatorRoundId = _latestAggregatorRoundId;
+    s_hotVars.latestSecondaryRoundId = _latestSecondaryRoundId;
+  }
+
+  // helper function to add a transmission without depending on transmit()
+  function setTransmission(uint32 _roundId, int192 _answer, uint32 _observationsTimestamp, uint32 _recordedTimestamp) public {
+    s_transmissions[_roundId] = Transmission({
+      answer: _answer,
+      observationsTimestamp: _observationsTimestamp,
+      recordedTimestamp: _recordedTimestamp
+    });
+  }
 }
 
-contract PrimaryAggregatorBaseTest is Test {
+contract DualAggregatorBaseTest is Test {
   uint256 internal constant MAX_NUM_ORACLES = 31;
 
   address internal constant BILLING_ACCESS_CONTROLLER_ADDRESS = address(100);
   address internal constant REQUESTER_ACCESS_CONTROLLER_ADDRESS = address(101);
+  address internal constant SECONDARY_PROXY = address(102);
 
   int192 internal constant MIN_ANSWER = 0;
   int192 internal constant MAX_ANSWER = 100;
@@ -73,8 +97,8 @@ contract PrimaryAggregatorBaseTest is Test {
   LinkToken internal s_link;
   LinkTokenInterface internal linkTokenInterface;
 
-  PrimaryAggregator internal aggregator;
-  PrimaryAggregatorHarness internal harness;
+  DualAggregator internal aggregator;
+  DualAggregatorHarness internal harness;
 
   function setUp() public virtual {
     s_link = new LinkToken();
@@ -85,28 +109,32 @@ contract PrimaryAggregatorBaseTest is Test {
       REQUESTER_ACCESS_CONTROLLER_ADDRESS
     );
 
-    aggregator = new PrimaryAggregator(
+    aggregator = new DualAggregator(
       linkTokenInterface,
       MIN_ANSWER,
       MAX_ANSWER,
       _billingAccessController,
       _requesterAccessController,
       18,
-      "TEST"
+      "TEST",
+      SECONDARY_PROXY,
+      0
     );
-    harness = new PrimaryAggregatorHarness(
+    harness = new DualAggregatorHarness(
       linkTokenInterface,
       MIN_ANSWER,
       MAX_ANSWER,
       _billingAccessController,
       _requesterAccessController,
       18,
-      "TEST"
+      "TEST",
+      SECONDARY_PROXY,
+      0
     );
   }
 }
 
-contract ConfiguredPrimaryAggregatorBaseTest is PrimaryAggregatorBaseTest {
+contract ConfiguredDualAggregatorBaseTest is DualAggregatorBaseTest {
   address[] internal signers = new address[](MAX_NUM_ORACLES);
   address[] internal transmitters = new address[](MAX_NUM_ORACLES);
   uint8 internal f = 1;
@@ -138,7 +166,7 @@ contract ConfiguredPrimaryAggregatorBaseTest is PrimaryAggregatorBaseTest {
   }
 }
 
-contract Constructor is PrimaryAggregatorBaseTest {
+contract Constructor is DualAggregatorBaseTest {
   function test_constructor() public view {
     // TODO: add more checks here if we want
     assertEq(aggregator.i_minAnswer(), MIN_ANSWER, "minAnswer not set correctly");
@@ -147,7 +175,7 @@ contract Constructor is PrimaryAggregatorBaseTest {
   }
 }
 
-contract SetConfig is PrimaryAggregatorBaseTest {
+contract SetConfig is DualAggregatorBaseTest {
   event ConfigSet(
     uint32 previousConfigBlockNumber,
     bytes32 configDigest,
@@ -168,7 +196,7 @@ contract SetConfig is PrimaryAggregatorBaseTest {
     uint64 offchainConfigVersion = 1;
     bytes memory offchainConfig = "1";
 
-    vm.expectRevert(PrimaryAggregator.TooManyOracles.selector);
+    vm.expectRevert(DualAggregator.TooManyOracles.selector);
 
     aggregator.setConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig);
   }
@@ -181,7 +209,7 @@ contract SetConfig is PrimaryAggregatorBaseTest {
     uint64 offchainConfigVersion = 1;
     bytes memory offchainConfig = "1";
 
-    vm.expectRevert(PrimaryAggregator.OracleLengthMismatch.selector);
+    vm.expectRevert(DualAggregator.OracleLengthMismatch.selector);
 
     aggregator.setConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig);
   }
@@ -194,7 +222,7 @@ contract SetConfig is PrimaryAggregatorBaseTest {
     uint64 offchainConfigVersion = 1;
     bytes memory offchainConfig = "1";
 
-    vm.expectRevert(PrimaryAggregator.FaultyOracleFTooHigh.selector);
+    vm.expectRevert(DualAggregator.FaultyOracleFTooHigh.selector);
 
     aggregator.setConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig);
   }
@@ -207,7 +235,7 @@ contract SetConfig is PrimaryAggregatorBaseTest {
     uint64 offchainConfigVersion = 1;
     bytes memory offchainConfig = "1";
 
-    vm.expectRevert(PrimaryAggregator.FMustBePositive.selector);
+    vm.expectRevert(DualAggregator.FMustBePositive.selector);
 
     aggregator.setConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig);
   }
@@ -220,7 +248,7 @@ contract SetConfig is PrimaryAggregatorBaseTest {
     uint64 offchainConfigVersion = 1;
     bytes memory offchainConfig = "1";
 
-    vm.expectRevert(PrimaryAggregator.InvalidOnChainConfig.selector);
+    vm.expectRevert(DualAggregator.InvalidOnChainConfig.selector);
 
     aggregator.setConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig);
   }
@@ -237,7 +265,7 @@ contract SetConfig is PrimaryAggregatorBaseTest {
       transmitters[i] = address(uint160(2000 + i));
     }
 
-    vm.expectRevert(PrimaryAggregator.RepeatedSignerAddress.selector);
+    vm.expectRevert(DualAggregator.RepeatedSignerAddress.selector);
 
     aggregator.setConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig);
   }
@@ -254,7 +282,7 @@ contract SetConfig is PrimaryAggregatorBaseTest {
       signers[i] = address(uint160(1000 + i));
     }
 
-    vm.expectRevert(PrimaryAggregator.RepeatedTransmitterAddress.selector);
+    vm.expectRevert(DualAggregator.RepeatedTransmitterAddress.selector);
 
     aggregator.setConfig(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig);
   }
@@ -278,7 +306,7 @@ contract SetConfig is PrimaryAggregatorBaseTest {
   }
 }
 
-contract LatestConfigDetails is PrimaryAggregatorBaseTest {
+contract LatestConfigDetails is DualAggregatorBaseTest {
   address[] internal signers = new address[](MAX_NUM_ORACLES);
   address[] internal transmitters = new address[](MAX_NUM_ORACLES);
   uint8 internal f = 1;
@@ -320,13 +348,13 @@ contract LatestConfigDetails is PrimaryAggregatorBaseTest {
   }
 }
 
-contract GetTransmitters is ConfiguredPrimaryAggregatorBaseTest {
+contract GetTransmitters is ConfiguredDualAggregatorBaseTest {
   function test_ReturnsTransmittersList() public view {
     assertEq(aggregator.getTransmitters(), transmitters, "transmiters list is not the same");
   }
 }
 
-contract SetValidatorConfig is PrimaryAggregatorBaseTest {
+contract SetValidatorConfig is DualAggregatorBaseTest {
   event ValidatorConfigSet(
     AggregatorValidatorInterface indexed previousValidator,
     uint32 previousGasLimit,
@@ -345,7 +373,7 @@ contract SetValidatorConfig is PrimaryAggregatorBaseTest {
   }
 }
 
-contract GetValidatorConfig is PrimaryAggregatorBaseTest {
+contract GetValidatorConfig is DualAggregatorBaseTest {
   AggregatorValidatorInterface internal newValidator = AggregatorValidatorInterface(address(42));
   uint32 internal newGasLimit = 1;
 
@@ -362,7 +390,7 @@ contract GetValidatorConfig is PrimaryAggregatorBaseTest {
   }
 }
 
-contract SetRequesterAccessController is PrimaryAggregatorBaseTest {
+contract SetRequesterAccessController is DualAggregatorBaseTest {
   event RequesterAccessControllerSet(AccessControllerInterface old, AccessControllerInterface current);
 
   AccessControllerInterface internal oldAccessControllerInterface =
@@ -377,7 +405,7 @@ contract SetRequesterAccessController is PrimaryAggregatorBaseTest {
   }
 }
 
-contract GetRequesterAccessController is PrimaryAggregatorBaseTest {
+contract GetRequesterAccessController is DualAggregatorBaseTest {
   AccessControllerInterface internal newAccessControllerInterface = AccessControllerInterface(address(42));
 
   function setUp() public override {
@@ -396,9 +424,9 @@ contract GetRequesterAccessController is PrimaryAggregatorBaseTest {
 }
 
 // TODO: determine if we need this method still
-contract RequestNewRound is ConfiguredPrimaryAggregatorBaseTest {}
+contract RequestNewRound is ConfiguredDualAggregatorBaseTest {}
 
-contract Trasmit is ConfiguredPrimaryAggregatorBaseTest {
+contract Trasmit is ConfiguredDualAggregatorBaseTest {
   uint32 epoch = 0;
   uint32 round = 0;
 
@@ -407,7 +435,7 @@ contract Trasmit is ConfiguredPrimaryAggregatorBaseTest {
   }
 
   function test_RevertIf_UnauthorizedTransmitter() public {
-    vm.expectRevert(PrimaryAggregator.UnauthorizedTransmitter.selector);
+    vm.expectRevert(DualAggregator.UnauthorizedTransmitter.selector);
     bytes32[3] memory reportContext = [
       bytes32(abi.encodePacked("1")),
       bytes32(abi.encodePacked("2")),
@@ -426,7 +454,7 @@ contract Trasmit is ConfiguredPrimaryAggregatorBaseTest {
 
   function test_RevertIf_ConfigDigestMismatch() public {
     vm.startPrank(transmitters[0]);
-    vm.expectRevert(PrimaryAggregator.ConfigDigestMismatch.selector);
+    vm.expectRevert(DualAggregator.ConfigDigestMismatch.selector);
 
     bytes32[3] memory reportContext = [
       bytes32(abi.encodePacked("1")),
@@ -446,7 +474,7 @@ contract Trasmit is ConfiguredPrimaryAggregatorBaseTest {
 
   function test_RevertIf_CalldataLengthMismatch() public {
     vm.startPrank(transmitters[0]);
-    vm.expectRevert(PrimaryAggregator.CalldataLengthMismatch.selector);
+    vm.expectRevert(DualAggregator.CalldataLengthMismatch.selector);
 
     bytes32[3] memory reportContext = [configDigest, bytes32(abi.encodePacked("2")), bytes32(abi.encodePacked("3"))];
     bytes memory report = abi.encodePacked("1");
@@ -462,7 +490,7 @@ contract Trasmit is ConfiguredPrimaryAggregatorBaseTest {
 
   function test_RevertIf_WrongNumberOfSignatures() public {
     vm.startPrank(transmitters[0]);
-    vm.expectRevert(PrimaryAggregator.WrongNumberOfSignatures.selector);
+    vm.expectRevert(DualAggregator.WrongNumberOfSignatures.selector);
 
     bytes memory epochAndRound = abi.encodePacked(bytes27(0), epoch, round);
 
@@ -477,7 +505,7 @@ contract Trasmit is ConfiguredPrimaryAggregatorBaseTest {
 
   function test_RevertIf_SignaturesOutOfRegistration() public {
     vm.startPrank(transmitters[0]);
-    vm.expectRevert(PrimaryAggregator.SignaturesOutOfRegistration.selector);
+    vm.expectRevert(DualAggregator.SignaturesOutOfRegistration.selector);
 
     bytes memory epochAndRound = abi.encodePacked(bytes27(0), uint32(epoch), uint32(round));
     bytes32[3] memory reportContext = [configDigest, bytes32(epochAndRound), bytes32(abi.encodePacked("1"))];
@@ -491,7 +519,7 @@ contract Trasmit is ConfiguredPrimaryAggregatorBaseTest {
 
   function test_RevertIf_SignatureError() public {
     vm.startPrank(transmitters[0]);
-    vm.expectRevert(PrimaryAggregator.SignatureError.selector);
+    vm.expectRevert(DualAggregator.SignatureError.selector);
 
     bytes memory epochAndRound = abi.encodePacked(bytes27(0), uint32(epoch), uint32(round));
     bytes32[3] memory reportContext = [configDigest, bytes32(epochAndRound), bytes32(abi.encodePacked("1"))];
@@ -512,7 +540,7 @@ contract Trasmit is ConfiguredPrimaryAggregatorBaseTest {
   // for some reason it thinks the signers aren't active
   function test_RevertIf_DuplicateSigner() public {
     vm.startPrank(transmitters[0]);
-    vm.expectRevert(PrimaryAggregator.DuplicateSigner.selector);
+    vm.expectRevert(DualAggregator.DuplicateSigner.selector);
 
     bytes memory epochAndRound = abi.encodePacked(bytes27(0), uint32(epoch), uint32(round));
     bytes32[3] memory reportContext = [configDigest, bytes32(epochAndRound), bytes32(abi.encodePacked("1"))];
@@ -534,7 +562,7 @@ contract Trasmit is ConfiguredPrimaryAggregatorBaseTest {
   }
 }
 
-contract TransmittedPrimaryAggregatorBaseTest is ConfiguredPrimaryAggregatorBaseTest {
+contract TransmittedDualAggregatorBaseTest is ConfiguredDualAggregatorBaseTest {
   bytes32[] internal rs;
   bytes32[] internal ss;
   uint32 internal epoch = 0;
@@ -563,9 +591,9 @@ contract TransmittedPrimaryAggregatorBaseTest is ConfiguredPrimaryAggregatorBase
   }
 }
 
-contract LatestTransmissionDetails is TransmittedPrimaryAggregatorBaseTest {
+contract LatestTransmissionDetails is TransmittedDualAggregatorBaseTest {
   function test_RevertIf_NotEOA() public {
-    vm.expectRevert(PrimaryAggregator.OnlyCallableByEOA.selector);
+    vm.expectRevert(DualAggregator.OnlyCallableByEOA.selector);
     aggregator.latestTransmissionDetails();
   }
 
@@ -582,7 +610,7 @@ contract LatestTransmissionDetails is TransmittedPrimaryAggregatorBaseTest {
 }
 
 // TODO: once transmit logic is updated we can test these better
-contract LatestConfigDigestAndEpoch is TransmittedPrimaryAggregatorBaseTest {
+contract LatestConfigDigestAndEpoch is TransmittedDualAggregatorBaseTest {
   function test_ReturnsLatestConfigDigestAndEpoch() public view {
     (bool scanLogs, bytes32 configDigest, uint32 epoch) = aggregator.latestConfigDigestAndEpoch();
 
@@ -605,37 +633,37 @@ contract LatestConfigDigestAndEpoch is TransmittedPrimaryAggregatorBaseTest {
     assertEq(epoch, 1, "epoch not correct");
   }
 }
-contract LatestAnswer is TransmittedPrimaryAggregatorBaseTest {
+contract LatestAnswer is TransmittedDualAggregatorBaseTest {
   function test_ReturnsLatestAnswer() public view {
     assertEq(aggregator.latestAnswer(), 1);
   }
 }
-contract LatestTimestamp is TransmittedPrimaryAggregatorBaseTest {
+contract LatestTimestamp is TransmittedDualAggregatorBaseTest {
   function test_ReturnsLatestTimestamp() public view {
     assertEq(aggregator.latestTimestamp(), 1);
   }
 }
-contract LatestRound is TransmittedPrimaryAggregatorBaseTest {
+contract LatestRound is TransmittedDualAggregatorBaseTest {
   function test_ReturnsLatestRound() public view {
     assertEq(aggregator.latestRound(), 1);
   }
 }
-contract GetAnswer is TransmittedPrimaryAggregatorBaseTest {
+contract GetAnswer is TransmittedDualAggregatorBaseTest {
   function test_ReturnsCorrectAnswer() public view {
     assertEq(aggregator.getAnswer(1), 1);
   }
 }
-contract GetTimestamp is TransmittedPrimaryAggregatorBaseTest {
+contract GetTimestamp is TransmittedDualAggregatorBaseTest {
   function test_ReturnsCorrectTimestamp() public view {
     assertEq(aggregator.getTimestamp(1), 1);
   }
 }
-contract Description is TransmittedPrimaryAggregatorBaseTest {
+contract Description is TransmittedDualAggregatorBaseTest {
   function test_ReturnsCorrectDescription() public view {
     assertEq(aggregator.description(), "TEST");
   }
 }
-contract GetRoundData is TransmittedPrimaryAggregatorBaseTest {
+contract GetRoundData is TransmittedDualAggregatorBaseTest {
   function test_ReturnsCorrectRoundData() public view {
     (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound) = aggregator
       .getRoundData(1);
@@ -647,7 +675,7 @@ contract GetRoundData is TransmittedPrimaryAggregatorBaseTest {
     assertEq(answeredInRound, 1);
   }
 }
-contract LatestRoundData is TransmittedPrimaryAggregatorBaseTest {
+contract LatestRoundData is TransmittedDualAggregatorBaseTest {
   function test_ReturnsLatestRoundData() public view {
     (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound) = aggregator
       .latestRoundData();
@@ -660,7 +688,7 @@ contract LatestRoundData is TransmittedPrimaryAggregatorBaseTest {
   }
 }
 
-contract SetLinkToken is PrimaryAggregatorBaseTest {
+contract SetLinkToken is DualAggregatorBaseTest {
   event LinkTokenSet(LinkTokenInterface indexed oldLinkToken, LinkTokenInterface indexed newLinkToken);
 
   LinkToken internal n_linkToken;
@@ -687,7 +715,7 @@ contract SetLinkToken is PrimaryAggregatorBaseTest {
   }
 }
 
-contract GetLinkToken is PrimaryAggregatorBaseTest {
+contract GetLinkToken is DualAggregatorBaseTest {
   function test_ReturnsLinkToken() public view {
     assertEq(
       address(aggregator.getLinkToken()),
@@ -697,7 +725,7 @@ contract GetLinkToken is PrimaryAggregatorBaseTest {
   }
 }
 
-contract SetBillingAccessController is PrimaryAggregatorBaseTest {
+contract SetBillingAccessController is DualAggregatorBaseTest {
   event BillingAccessControllerSet(AccessControllerInterface old, AccessControllerInterface current);
 
   AccessControllerInterface internal oldBillingAccessController =
@@ -712,7 +740,7 @@ contract SetBillingAccessController is PrimaryAggregatorBaseTest {
   }
 }
 
-contract GetBillingAccessController is PrimaryAggregatorBaseTest {
+contract GetBillingAccessController is DualAggregatorBaseTest {
   function test_ReturnsBillingAccessController() public view {
     assertEq(
       address(aggregator.getBillingAccessController()),
@@ -722,7 +750,7 @@ contract GetBillingAccessController is PrimaryAggregatorBaseTest {
   }
 }
 
-contract SetBilling is PrimaryAggregatorBaseTest {
+contract SetBilling is DualAggregatorBaseTest {
   event BillingSet(
     uint32 maximumGasPriceGwei,
     uint32 reasonableGasPriceGwei,
@@ -740,7 +768,7 @@ contract SetBilling is PrimaryAggregatorBaseTest {
       abi.encode(false)
     );
     vm.startPrank(USER);
-    vm.expectRevert(PrimaryAggregator.OnlyOwnerAndBillingAdminCanCall.selector);
+    vm.expectRevert(DualAggregator.OnlyOwnerAndBillingAdminCanCall.selector);
 
     aggregator.setBilling(0, 0, 0, 0, 0);
   }
@@ -753,7 +781,7 @@ contract SetBilling is PrimaryAggregatorBaseTest {
   }
 }
 
-contract GetBilling is PrimaryAggregatorBaseTest {
+contract GetBilling is DualAggregatorBaseTest {
   function test_ReturnsBillingData() public view {
     (
       uint32 returnedMaxGasPriceGwei,
@@ -771,9 +799,9 @@ contract GetBilling is PrimaryAggregatorBaseTest {
   }
 }
 
-contract WithdrawPayment is ConfiguredPrimaryAggregatorBaseTest {
+contract WithdrawPayment is ConfiguredDualAggregatorBaseTest {
   function test_RevertIf_NotPayee() public {
-    vm.expectRevert(PrimaryAggregator.OnlyPayeeCanWithdraw.selector);
+    vm.expectRevert(DualAggregator.OnlyPayeeCanWithdraw.selector);
 
     aggregator.withdrawPayment(address(42));
   }
@@ -783,7 +811,7 @@ contract WithdrawPayment is ConfiguredPrimaryAggregatorBaseTest {
   }
 }
 
-contract OwedPayment is ConfiguredPrimaryAggregatorBaseTest {
+contract OwedPayment is ConfiguredDualAggregatorBaseTest {
   // TODO: need to figure out a way to toggle the `active` bit on a transmitter
   // right now this is just
   function test_ReturnZeroIfTransmitterNotActive() public view {
@@ -800,7 +828,7 @@ contract OwedPayment is ConfiguredPrimaryAggregatorBaseTest {
   }
 }
 
-contract WithdrawFunds is ConfiguredPrimaryAggregatorBaseTest {
+contract WithdrawFunds is ConfiguredDualAggregatorBaseTest {
   address internal constant USER = address(42);
 
   function test_RevertIf_NotOwner() public {
@@ -810,7 +838,7 @@ contract WithdrawFunds is ConfiguredPrimaryAggregatorBaseTest {
       abi.encode(false)
     );
     vm.startPrank(USER);
-    vm.expectRevert(PrimaryAggregator.OnlyOwnerAndBillingAdminCanCall.selector);
+    vm.expectRevert(DualAggregator.OnlyOwnerAndBillingAdminCanCall.selector);
 
     aggregator.withdrawFunds(USER, 42);
   }
@@ -829,13 +857,13 @@ contract WithdrawFunds is ConfiguredPrimaryAggregatorBaseTest {
       abi.encode(false)
     );
 
-    vm.expectRevert(PrimaryAggregator.InsufficientFunds.selector);
+    vm.expectRevert(DualAggregator.InsufficientFunds.selector);
 
     aggregator.withdrawFunds(USER, 1e9);
   }
 }
 
-contract LinkAvailableForPayment is PrimaryAggregatorBaseTest {
+contract LinkAvailableForPayment is DualAggregatorBaseTest {
   uint256 internal LINK_AMOUNT = 1e9;
 
   function setUp() public override {
@@ -854,7 +882,7 @@ contract LinkAvailableForPayment is PrimaryAggregatorBaseTest {
   }
 }
 
-contract OracleObservationCount is ConfiguredPrimaryAggregatorBaseTest {
+contract OracleObservationCount is ConfiguredDualAggregatorBaseTest {
   function test_ReturnsZeroWhenNoObservations() public view {
     assertEq(aggregator.oracleObservationCount(transmitters[0]), 0, "did not return 0 for observation count");
   }
@@ -864,7 +892,7 @@ contract OracleObservationCount is ConfiguredPrimaryAggregatorBaseTest {
   }
 }
 
-contract SetPayees is ConfiguredPrimaryAggregatorBaseTest {
+contract SetPayees is ConfiguredDualAggregatorBaseTest {
   event PayeeshipTransferred(address indexed transmitter, address indexed previous, address indexed current);
 
   address[] internal payees = transmitters;
@@ -882,7 +910,7 @@ contract SetPayees is ConfiguredPrimaryAggregatorBaseTest {
   }
 }
 
-contract TransferPayeeship is ConfiguredPrimaryAggregatorBaseTest {
+contract TransferPayeeship is ConfiguredDualAggregatorBaseTest {
   event PayeeshipTransferRequested(address indexed transmitter, address indexed current, address indexed proposed);
 
   address[] internal payees = new address[](transmitters.length);
@@ -899,14 +927,14 @@ contract TransferPayeeship is ConfiguredPrimaryAggregatorBaseTest {
   }
 
   function test_RevertIf_SenderNotCurrentPayee() public {
-    vm.expectRevert(PrimaryAggregator.OnlyCurrentPayeeCanUpdate.selector);
+    vm.expectRevert(DualAggregator.OnlyCurrentPayeeCanUpdate.selector);
 
     aggregator.transferPayeeship(address(42), address(43));
   }
 
   function test_RevertIf_SenderIsProposed() public {
     vm.startPrank(payees[0]);
-    vm.expectRevert(PrimaryAggregator.CannotTransferToSelf.selector);
+    vm.expectRevert(DualAggregator.CannotTransferToSelf.selector);
 
     aggregator.transferPayeeship(transmitters[0], payees[0]);
   }
@@ -920,7 +948,7 @@ contract TransferPayeeship is ConfiguredPrimaryAggregatorBaseTest {
   }
 }
 
-contract AcceptPayeeship is ConfiguredPrimaryAggregatorBaseTest {
+contract AcceptPayeeship is ConfiguredDualAggregatorBaseTest {
   event PayeeshipTransferred(address indexed transmitter, address indexed previous, address indexed current);
 
   address[] internal payees = new address[](transmitters.length);
@@ -942,7 +970,7 @@ contract AcceptPayeeship is ConfiguredPrimaryAggregatorBaseTest {
 
   function test_RevertIf_SenderIsNotProposed() public {
     vm.startPrank(address(43));
-    vm.expectRevert(PrimaryAggregator.OnlyProposedPayeesCanAccept.selector);
+    vm.expectRevert(DualAggregator.OnlyProposedPayeesCanAccept.selector);
 
     aggregator.acceptPayeeship(transmitters[0]);
   }
@@ -956,8 +984,63 @@ contract AcceptPayeeship is ConfiguredPrimaryAggregatorBaseTest {
   }
 }
 
-contract TypeAndVersion is PrimaryAggregatorBaseTest {
+contract TypeAndVersion is DualAggregatorBaseTest {
   function test_IsCorrect() public view {
-    assertEq(aggregator.typeAndVersion(), "PrimaryAggregator 1.0.0", "did not return the right type and version");
+    assertEq(aggregator.typeAndVersion(), "DualAggregator 1.0.0", "did not return the right type and version");
+  }
+}
+
+// _getSyncPrimaryRound(): test all the paths
+contract GetSyncPrimaryRound is ConfiguredDualAggregatorBaseTest {
+  function setUp() public override {
+    super.setUp();
+  }
+
+  // helper function to inject 6 transmissions
+  function _injectTransmissions() private {
+    harness.setTransmission(1, 10, 1, 5);
+    harness.setTransmission(2, 10, 6, 10);
+    harness.setTransmission(3, 10, 11, 15);
+    harness.setTransmission(4, 10, 16, 20);
+    harness.setTransmission(5, 10, 21, 25);
+    harness.setTransmission(6, 10, 26, 30);
+  }
+
+  // test with 0 reports transmitted
+  function test_zeroTransmissions() public view {
+    assertEq(harness.exposed_getSyncPrimaryRound(), 0);
+  }
+
+  // test with cutoff time reaching the secondary round id
+  function test_returnSecondaryRoundId() public {
+    _injectTransmissions();
+
+    harness.setLatestRoundIds(6, 2);
+    harness.setCutoffTime(20);
+
+    vm.warp(30);
+    assertEq(harness.exposed_getSyncPrimaryRound(), 2);
+  }
+
+  // test with cutoff time condition matching in round id 4
+  function test_returnSyncFourthRoundId() public {
+    _injectTransmissions();
+
+    harness.setLatestRoundIds(6, 2);
+    harness.setCutoffTime(9);
+
+    vm.warp(30);
+    assertEq(harness.exposed_getSyncPrimaryRound(), 4);
+  }
+
+  // test with cutoff time condition matching in the latest round id
+  function test_returnSyncLatestRoundId() public {
+    _injectTransmissions();
+
+    harness.setLatestRoundIds(6, 2);
+    harness.setCutoffTime(10);
+
+    vm.warp(50);
+    assertEq(harness.exposed_getSyncPrimaryRound(), 6);
   }
 }

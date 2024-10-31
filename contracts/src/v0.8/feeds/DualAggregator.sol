@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {OwnerIsCreator} from "../shared/access/OwnerIsCreator.sol";
 
@@ -9,14 +9,12 @@ import {AggregatorValidatorInterface} from "../shared/interfaces/AggregatorValid
 import {LinkTokenInterface} from "../shared/interfaces/LinkTokenInterface.sol";
 import {OCR2Abstract} from "../shared/ocr2/OCR2Abstract.sol";
 
-import {SiameseAggregatorBase} from "./SiameseAggregatorBase.sol";
-
 // this contract is a port of OCR2Aggregator from `libocr`
 // it is being used for a new feeds based project that is ongoing
 // there will be some modernization that happens to this contract
 // as the project progresses
 // solhint-disable max-states-count
-contract PrimaryAggregator is SiameseAggregatorBase, OCR2Abstract, OwnerIsCreator, AggregatorV2V3Interface {
+contract DualAggregator is OCR2Abstract, OwnerIsCreator, AggregatorV2V3Interface {
   // This contract is divided into sections. Each section defines a set of
   // variables, events, and functions that belong together.
 
@@ -73,6 +71,8 @@ contract PrimaryAggregator is SiameseAggregatorBase, OCR2Abstract, OwnerIsCreato
     // transmission is made to provide callers with contiguous ids for successive
     // reports.
     uint32 latestAggregatorRoundId;
+    // latest transmission round arrived from the Secondary Proxy.
+    uint32 latestSecondaryRoundId;
     // Highest compensated gas price, in gwei uints
     uint32 maximumGasPriceGwei;
     // If gas price is less (in gwei units), transmitter gets half the savings
@@ -113,7 +113,9 @@ contract PrimaryAggregator is SiameseAggregatorBase, OCR2Abstract, OwnerIsCreato
     AccessControllerInterface billingAccessController,
     AccessControllerInterface requesterAccessController,
     uint8 decimals_,
-    string memory description_
+    string memory description_,
+    address secondaryProxy_,
+    uint32 cutoffTime_
   ) {
     s_linkToken = link;
     emit LinkTokenSet(LinkTokenInterface(address(0)), link);
@@ -125,6 +127,8 @@ contract PrimaryAggregator is SiameseAggregatorBase, OCR2Abstract, OwnerIsCreato
     setValidatorConfig(AggregatorValidatorInterface(address(0x0)), 0);
     i_minAnswer = minAnswer_;
     i_maxAnswer = maxAnswer_;
+    s_secondaryProxy = secondaryProxy_;
+    s_cutoffTime = cutoffTime_;
   }
 
   /**
@@ -459,6 +463,76 @@ contract PrimaryAggregator is SiameseAggregatorBase, OCR2Abstract, OwnerIsCreato
 
   /**
    *
+   * Section: Secondary Proxy
+   *
+   */
+
+  // Used to relieve stack pressure in transmit
+  struct Report {
+    int192 juelsPerFeeCoin;
+    uint32 observationsTimestamp;
+    bytes observers; // ith element is the index of the ith observer
+    int192[] observations; // ith element is the ith observation
+  }
+
+  // Transmission records the median answer from the transmit transaction at
+  // time timestamp
+  struct Transmission {
+    int192 answer; // 192 bits ought to be enough for anyone
+    uint32 observationsTimestamp; // when were observations made offchain
+    uint32 recordedTimestamp; // when was report received onchain
+  }
+  mapping(uint32 /* aggregator round ID */ => Transmission) internal s_transmissions;
+
+  // secondary proxy address, used to detect who's calling the contract methods
+  address internal immutable s_secondaryProxy;
+
+  // cutoff time defines the time window in which a secondary report is valid
+  uint32 internal s_cutoffTime;
+
+  /**
+   * @notice emitted when a new cutoff time is set
+   * @param cutoffTime the new defined cutoff time
+   */
+  event CutoffTimeSet(uint32 cutoffTime);
+
+  /**
+   * @notice sets the max time cutoff
+   * @param _cutoffTime new max cutoff timestamp
+   */
+  function setCutoffTime(uint32 _cutoffTime) external onlyOwner() {
+    s_cutoffTime = _cutoffTime;
+    emit CutoffTimeSet(s_cutoffTime);
+  }
+
+  /**
+   * @notice sync data with the primary rounds, return the freshest valid round id
+   */
+  function _getSyncPrimaryRound() internal view returns (uint80 roundId) {
+    // get the latest round id
+    uint32 latestAggregatorRoundId = s_hotVars.latestAggregatorRoundId;
+
+    // decreasing loop from the latest primary round id
+    for (uint80 round_ = latestAggregatorRoundId; round_ > 0; --round_) {
+      Transmission memory transmission = s_transmissions[uint32(round_)];
+
+      // check if this round does not accomplish the cutoff time condition
+      if (transmission.recordedTimestamp + s_cutoffTime < block.timestamp) {
+        return round_;
+      }
+
+      // in case it's the latest secondary round id, return it
+      if (round_ == s_hotVars.latestSecondaryRoundId) {
+        return round_;
+      }
+    }
+    
+    // if the loop couldn't find a match, return the latest secondary round id
+    return s_hotVars.latestSecondaryRoundId;
+  }
+
+  /**
+   *
    * Section: Transmission
    *
    */
@@ -717,8 +791,7 @@ contract PrimaryAggregator is SiameseAggregatorBase, OCR2Abstract, OwnerIsCreato
     s_transmissions[hotVars.latestAggregatorRoundId] = Transmission({
       answer: median,
       observationsTimestamp: report.observationsTimestamp,
-      recordedTimestamp: uint32(block.timestamp),
-      locked: false // TODO: determine if this is the correct value for the new attribute
+      recordedTimestamp: uint32(block.timestamp)
     });
 
     // persist updates to hotVars
@@ -847,7 +920,7 @@ contract PrimaryAggregator is SiameseAggregatorBase, OCR2Abstract, OwnerIsCreato
 
     if (roundId > type(uint32).max) return (0, 0, 0, 0, 0);
     Transmission memory transmission = s_transmissions[uint32(roundId)];
-    if (transmission.locked && transmission.recordedTimestamp == block.timestamp) {
+    if (transmission.recordedTimestamp == block.timestamp) {
       // If latest round is requested before it is unlocked, return with whatever behavior would happen if the round was not yet recorded.
       revert RoundNotFound();
     }
@@ -877,7 +950,7 @@ contract PrimaryAggregator is SiameseAggregatorBase, OCR2Abstract, OwnerIsCreato
     Transmission memory transmission = s_transmissions[latestAggregatorRoundId];
 
     // TODO: update this based on design modifications
-    if (transmission.locked && transmission.recordedTimestamp == block.timestamp) {
+    if (transmission.recordedTimestamp == block.timestamp) {
       transmission = s_transmissions[--latestAggregatorRoundId];
     }
 
@@ -1473,33 +1546,6 @@ contract PrimaryAggregator is SiameseAggregatorBase, OCR2Abstract, OwnerIsCreato
   }
 
   error AggregatorNotAuthorized();
-  /**
-   *
-   * Section: SiameseAggregatorBase
-   *
-   */
-  function recordSiameseReport(Report memory report) public override {
-    // TODO: update this after further design decisions
-    if (msg.sender != s_siameseAggregator) revert AggregatorNotAuthorized();
-
-    uint32 roundId = s_hotVars.latestAggregatorRoundId;
-    Transmission memory transmission = s_transmissions[roundId];
-
-    if (_duplicateReport(report, transmission)) {
-      return;
-    }
-
-    roundId = ++s_hotVars.latestAggregatorRoundId;
-
-    int192 reportAnswer = report.observations[report.observations.length / 2];
-
-    s_transmissions[roundId] = Transmission({
-      answer: reportAnswer,
-      observationsTimestamp: report.observationsTimestamp,
-      recordedTimestamp: uint32(block.timestamp),
-      locked: true
-    }); // Locked when coming through secondary path until at least the next block.
-  }
 
   /**
    *
