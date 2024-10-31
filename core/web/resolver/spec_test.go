@@ -24,7 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
-// Spec are only embedded on the job and are not fetchable by it's own id, so
+// Specs are only embedded on the job and are not fetchable by it's own id, so
 // we test the spec resolvers by fetching a job by id.
 
 func TestResolver_CronSpec(t *testing.T) {
@@ -100,7 +100,7 @@ func TestResolver_DirectRequestSpec(t *testing.T) {
 					DirectRequestSpec: &job.DirectRequestSpec{
 						ContractAddress:          contractAddress,
 						CreatedAt:                f.Timestamp(),
-						EVMChainID:               ubig.NewI(45),
+						EVMChainID:               ubig.NewI(42),
 						MinIncomingConfirmations: clnull.NewUint32(1, true),
 						MinContractPayment:       commonassets.NewLinkFromJuels(1000),
 						Requesters:               models.AddressCollection{requesterAddress},

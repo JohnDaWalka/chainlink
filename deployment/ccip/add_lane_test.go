@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
-// TestAddLane coverss the workflow of adding a lane between two chains and enabling it.
+// TestAddLane covers the workflow of adding a lane between two chains and enabling it.
 // It also covers the case where the onRamp is disabled on the OffRamp contract initially and then enabled.
 func TestAddLane(t *testing.T) {
 	// We add more chains to the chainlink nodes than the number of chains where CCIP is deployed.
