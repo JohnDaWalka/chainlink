@@ -1207,21 +1207,8 @@ func CCIPDefaultTestSetUp(
 		// var chains []test_env.Chain
 		// // For all networks create a chain entry in LocalConfig
 		for _, network := range testConfig.AllNetworks {
-			lane, ok := setUpArgs.LaneContractsByNetwork.Load(network.Name)
-			require.True(t, ok, "Lane contract loading shouldn't fail")
-			laneConfig := lane.(*laneconfig.LaneConfig)
 
-			// Kind of hacky, but we override the net name to match Balthazar's expectation based on the
-			// chain ID for the specific test IDs used. TODO: properly match Balthazar's expectations.
-			name := network.Name
-			switch network.ChainID {
-			case 1337:
-				name = "DevnetAlpha"
-			case 2337:
-				name = "DevnetBeta"
-			case 3337:
-				name = "DevnetGamma"
-			}
+			name := rmnFriendlyChainName(network)
 
 			var stability test_env.StabilityConfig
 			if network.FinalityTag {
@@ -1237,6 +1224,10 @@ func CCIPDefaultTestSetUp(
 					HardConfirmations: 10,
 				}
 			}
+
+			lane, ok := setUpArgs.LaneContractsByNetwork.Load(network.Name)
+			require.True(t, ok, "Lane contract loading shouldn't fail")
+			laneConfig := lane.(*laneconfig.LaneConfig)
 
 			sharedChain := test_env.SharedChain{
 				Name:                         name,
@@ -1279,6 +1270,34 @@ func CCIPDefaultTestSetUp(
 			localConfig.Chains = append(localConfig.Chains, localChain)
 		}
 
+		for _, lane := range setUpArgs.Lanes {
+			forwardLaneConfig := test_env.Lane{
+				Name:                   "V1_5",
+				Type:                   "Evm2EvmV1_5",
+				SourceChainName:        rmnFriendlyChainName(lane.NetworkA),
+				SourceStartBlockNumber: 1,
+				DestChainName:          rmnFriendlyChainName(lane.NetworkB),
+				DestStartBlockNumber:   1,
+				OnRamp:                 lane.ForwardLane.SrcNetworkLaneCfg.SrcContracts[lane.ForwardLane.DestNetworkName].OnRamp,
+				OffRamp:                lane.ForwardLane.DstNetworkLaneCfg.DestContracts[lane.ForwardLane.SourceNetworkName].OffRamp,
+				CommitStore:            lane.ForwardLane.DstNetworkLaneCfg.DestContracts[lane.ForwardLane.SourceNetworkName].CommitStore,
+			}
+			reverseLaneConfig := test_env.Lane{
+				Name:                   "V1_5",
+				Type:                   "Evm2EvmV1_5",
+				SourceChainName:        rmnFriendlyChainName(lane.NetworkB),
+				SourceStartBlockNumber: 1,
+				DestChainName:          rmnFriendlyChainName(lane.NetworkA),
+				DestStartBlockNumber:   1,
+				OnRamp:                 lane.ReverseLane.SrcNetworkLaneCfg.SrcContracts[lane.ReverseLane.DestNetworkName].OnRamp,
+				OffRamp:                lane.ReverseLane.DstNetworkLaneCfg.DestContracts[lane.ReverseLane.SourceNetworkName].OffRamp,
+				CommitStore:            lane.ReverseLane.DstNetworkLaneCfg.DestContracts[lane.ReverseLane.SourceNetworkName].CommitStore,
+			}
+
+			sharedConfig.Lanes = append(sharedConfig.Lanes, forwardLaneConfig)
+			sharedConfig.Lanes = append(sharedConfig.Lanes, reverseLaneConfig)
+		}
+
 		// TODO: make number of nodes configurable
 		for i := 0; i < 4; i++ {
 			nodeName := fmt.Sprintf("%s-%d-%s", "rmn-node", i, uuid.NewString()[0:8])
@@ -1317,6 +1336,21 @@ func CCIPDefaultTestSetUp(
 	}
 	lggr.Info().Msg("Test setup completed")
 	return setUpArgs
+}
+
+// Kind of hacky, but we override the net name to match Balthazar's expectation based on the
+// chain ID for the specific test IDs used. TODO: properly match Balthazar's expectations.
+func rmnFriendlyChainName(network blockchain.EVMNetwork) string {
+	name := network.Name
+	switch network.ChainID {
+	case 1337:
+		name = "DevnetAlpha"
+	case 2337:
+		name = "DevnetBeta"
+	case 3337:
+		name = "DevnetGamma"
+	}
+	return name
 }
 
 // CreateEnvironment creates the environment for the test and registers the test clean-up function to tear down the set-up environment
