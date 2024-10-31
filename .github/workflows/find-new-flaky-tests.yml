@@ -253,7 +253,7 @@ jobs:
         id: set_project_path_pretty
         run: |
           if [ "${{ inputs.projectPath }}" = "." ]; then
-            echo "path=root/go.mod" >> $GITHUB_OUTPUT
+            echo "path=./go.mod" >> $GITHUB_OUTPUT
           else
             echo "path=${{ inputs.projectPath }}/go.mod" >> $GITHUB_OUTPUT
           fi
@@ -391,11 +391,11 @@ jobs:
         if: ${{ fromJson(steps.set_test_results.outputs.failed_tests_count) > 0 && github.event_name == 'pull_request' }}
         uses: actions/github-script@v7
         env:
-          MESSAGE_BODY_1: 'Flaky Test Detector executed for `${{ steps.set_project_path_pretty.outputs.path }}` failed :x:'
+          MESSAGE_BODY_1: '### Flaky Test Detector executed for `${{ steps.set_project_path_pretty.outputs.path }}` failed :x:'
           MESSAGE_BODY_2: 'Ran new or updated tests between `${{ inputs.baseRef }}` and `${{ env.GIT_HEAD_REF }}` (commit: ${{ needs.find-tests.outputs.git_head_sha }}) branches.'
           MESSAGE_BODY_3: ${{ format('[View Details]({0}/{1}/actions/runs/{2})', github.server_url, github.repository, github.run_id) }}
           MESSAGE_BODY_4: '#### Failed Tests'
-          MESSAGE_BODY_5: 'Ran `${{ steps.set_test_results.outputs.all_tests_count }}` tests in total for all affected test packages. Below are the tests identified as flaky, with a pass ratio lower than the `${{ steps.calculate_threshold.outputs.threshold_percentage }}%` threshold:'
+          MESSAGE_BODY_5: 'Ran ${{ steps.set_test_results.outputs.all_tests_count }} tests in total for all affected test packages. Below are the tests identified as flaky, with a pass ratio lower than the ${{ steps.calculate_threshold.outputs.threshold_percentage }}% threshold:'
           MESSAGE_BODY_6: '```'
           MESSAGE_BODY_7: '${{ steps.read_failed_tests.outputs.failed_tests_content }}'
           MESSAGE_BODY_8: '```'
