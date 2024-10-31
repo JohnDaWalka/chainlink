@@ -19,8 +19,8 @@ contract DualAggregatorHarness is DualAggregator {
     AccessControllerInterface requesterAccessController,
     uint8 decimals_,
     string memory description_,
-    address secondaryProxy,
-    uint32 cutoffTime
+    address secondaryProxy_,
+    uint32 cutoffTime_
   )
     DualAggregator(
       link,
@@ -30,8 +30,8 @@ contract DualAggregatorHarness is DualAggregator {
       requesterAccessController,
       decimals_,
       description_,
-      secondaryProxy,
-      cutoffTime
+      secondaryProxy_,
+      cutoffTime_
     )
   {}
 
@@ -142,18 +142,6 @@ contract ConfiguredDualAggregatorBaseTest is DualAggregatorBaseTest {
   uint64 internal offchainConfigVersion = 1;
   bytes internal offchainConfig = "1";
   bytes32 internal configDigest;
-
-  struct HotVars {
-    uint8 f;
-    uint40 latestEpochAndRound;
-    uint32 latestAggregatorRoundId;
-    uint32 latestSecondaryRoundId;
-    uint32 maximumGasPriceGwei;
-    uint32 reasonableGasPriceGwei;
-    uint32 observationPaymentGjuels;
-    uint32 transmissionPaymentGjuels;
-    uint24 accountingGas;
-  }
 
   function setUp() public virtual override {
     super.setUp();

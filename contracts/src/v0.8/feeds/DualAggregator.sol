@@ -114,8 +114,8 @@ contract DualAggregator is OCR2Abstract, OwnerIsCreator, AggregatorV2V3Interface
     AccessControllerInterface requesterAccessController,
     uint8 decimals_,
     string memory description_,
-    address secondaryProxy,
-    uint32 cutoffTime
+    address secondaryProxy_,
+    uint32 cutoffTime_
   ) {
     s_linkToken = link;
     emit LinkTokenSet(LinkTokenInterface(address(0)), link);
@@ -127,8 +127,8 @@ contract DualAggregator is OCR2Abstract, OwnerIsCreator, AggregatorV2V3Interface
     setValidatorConfig(AggregatorValidatorInterface(address(0x0)), 0);
     i_minAnswer = minAnswer_;
     i_maxAnswer = maxAnswer_;
-    s_secondaryProxy = secondaryProxy;
-    s_cutoffTime = cutoffTime;
+    s_secondaryProxy = secondaryProxy_;
+    s_cutoffTime = cutoffTime_;
   }
 
   /**
@@ -516,7 +516,7 @@ contract DualAggregator is OCR2Abstract, OwnerIsCreator, AggregatorV2V3Interface
     for (uint80 round_ = latestAggregatorRoundId; round_ > 0; round_--) {
       Transmission memory transmission = s_transmissions[uint32(round_)];
 
-      // check if this round is the first to not accomplish the cutoff time condition
+      // check if this round does not accomplish the cutoff time condition
       if (transmission.recordedTimestamp + s_cutoffTime < block.timestamp) {
         return round_;
       }
