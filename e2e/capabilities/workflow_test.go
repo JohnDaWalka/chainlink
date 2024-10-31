@@ -24,7 +24,10 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
-	"github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/simple_ocr"
+	capabilities_registry "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/capabilities_registry_1_1_0"
+	feeds_consumer "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/feeds_consumer_1_0_0"
+	forwarder "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/forwarder_1_0_0"
+	ocr3_capability "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/ocr3_capability_1_0_0"
 )
 
 type WorkflowTestConfig struct {
@@ -34,7 +37,7 @@ type WorkflowTestConfig struct {
 }
 
 type OCR3Config struct {
-	Signers               []common.Address
+	Signers               [][]byte
 	Transmitters          []common.Address
 	F                     uint8
 	OnchainConfig         []byte
@@ -128,9 +131,9 @@ func generateOCR3Config(t *testing.T, nodes []*clclient.ChainlinkClient) (*OCR3C
 	// maxDurationShouldAcceptAttestedReport time.Duration,
 	// maxDurationShouldTransmitAcceptedReport time.Duration,
 
-	signerAddresses := []common.Address{}
+	signerAddresses := [][]byte{}
 	for _, signer := range signers {
-		signerAddresses = append(signerAddresses, common.Address(signer))
+		signerAddresses = append(signerAddresses, signer)
 	}
 
 	transmitterAddresses := []common.Address{}
@@ -158,6 +161,25 @@ func TestWorkflow(t *testing.T) {
 		bc, err := blockchain.NewBlockchainNetwork(in.BlockchainA)
 		require.NoError(t, err)
 
+		// connect clients
+		sc, err := seth.NewClientBuilder().
+			WithRpcUrl(bc.Nodes[0].HostWSUrl).
+			WithPrivateKeys([]string{pkey}).
+			Build()
+		require.NoError(t, err)
+
+		capabilitiesRegistryAddress, tx, _, err := capabilities_registry.DeployCapabilitiesRegistry(
+			sc.NewTXOpts(),
+			sc.Client,
+		)
+		require.NoError(t, err)
+		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		require.NoError(t, err)
+		fmt.Println("Deployed capabilities_registry contract at", capabilitiesRegistryAddress.Hex())
+
+		// TODO: When the capabilities registry address is provided:
+		// - NOPs and nodes are added to the registry.
+		// - Nodes are configured to listen to the registry for updates.
 		nodeset, err := ns.NewSharedDBNodeSet(in.NodeSet, bc, "https://example.com") // TODO: Should not be a thing
 		require.NoError(t, err)
 
@@ -166,27 +188,35 @@ func TestWorkflow(t *testing.T) {
 			fmt.Printf("Node P2P %d --> %s\n", i, n.Node.HostP2PURL)
 		}
 
-		// connect clients
-		sc, err := seth.NewClientBuilder().
-			WithRpcUrl(bc.Nodes[0].HostWSUrl).
-			WithPrivateKeys([]string{pkey}).
-			Build()
-		require.NoError(t, err)
-
 		nodeClients, err := clclient.NewCLDefaultClients(nodeset.CLNodes, framework.L)
 		require.NoError(t, err)
 
-		fmt.Println("Setting up KV store capabilities...")
-
-		simpleOCRAddress, tx, KVStoreOCRContract, err := simple_ocr.DeploySimpleOCR(
+		ocr3CapabilityAddress, tx, ocr3CapabilityContract, err := ocr3_capability.DeployOCR3Capability(
 			sc.NewTXOpts(),
 			sc.Client,
 		)
 		require.NoError(t, err)
-		fmt.Println("Deployed Simple OCR contract at", simpleOCRAddress.Hex())
-
 		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
 		require.NoError(t, err)
+		fmt.Println("Deployed ocr3_capability contract at", ocr3CapabilityAddress.Hex())
+
+		forwarderAddress, tx, _, err := forwarder.DeployKeystoneForwarder(
+			sc.NewTXOpts(),
+			sc.Client,
+		)
+		require.NoError(t, err)
+		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		require.NoError(t, err)
+		fmt.Println("Deployed forwarder contract at", forwarderAddress.Hex())
+
+		feedsConsumerAddress, tx, _, err := feeds_consumer.DeployKeystoneFeedsConsumer(
+			sc.NewTXOpts(),
+			sc.Client,
+		)
+		require.NoError(t, err)
+		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		require.NoError(t, err)
+		fmt.Println("Deployed feeds_consumer contract at", feedsConsumerAddress.Hex())
 
 		// Add bootstrap spec to the first node
 		bootstrapNode := nodeClients[0]
@@ -209,10 +239,10 @@ func TestWorkflow(t *testing.T) {
 		
 				[relayConfig]
 				chainID = %s
-			`, simpleOCRAddress, bc.ChainID)
+			`, ocr3CapabilityAddress, bc.ChainID)
 			fmt.Println("Creating bootstrap job spec", bootstrapJobSpec)
-			r, _, err := bootstrapNode.CreateJobRaw(bootstrapJobSpec)
-			require.NoError(t, err)
+			r, _, err2 := bootstrapNode.CreateJobRaw(bootstrapJobSpec)
+			require.NoError(t, err2)
 			require.Equal(t, len(r.Errors), 0)
 			fmt.Printf("Response from bootstrap node: %x\n", r)
 		}()
@@ -232,8 +262,8 @@ func TestWorkflow(t *testing.T) {
 				name = "streams-capabilities"
 				command="/streams"`
 				fmt.Println("Creating standard capabilities job spec", scJobSpec)
-				response, _, err := nodeClient.CreateJobRaw(scJobSpec)
-				require.NoError(t, err)
+				response, _, err2 := nodeClient.CreateJobRaw(scJobSpec)
+				require.NoError(t, err2)
 				require.Equal(t, len(response.Errors), 0)
 				fmt.Printf("Response from node %d: %x\n", i+1, response)
 			}()
@@ -245,7 +275,7 @@ func TestWorkflow(t *testing.T) {
 		fmt.Println("ocr3Config", ocr3Config)
 
 		// Configure KV store OCR contract
-		KVStoreOCRContract.SetConfig(
+		tx, err = ocr3CapabilityContract.SetConfig(
 			sc.NewTXOpts(),
 			ocr3Config.Signers,
 			ocr3Config.Transmitters,
@@ -254,15 +284,14 @@ func TestWorkflow(t *testing.T) {
 			ocr3Config.OffchainConfigVersion,
 			ocr3Config.OffchainConfig,
 		)
+		require.NoError(t, err)
+		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		require.NoError(t, err)
 
 		// Add bootstrap spec
-		// ✅ 2. Deploy KV store OCR contract
-		// ✅ 4. Add boostrap job spec
-		// ✅ 4. Add KV store capabilities (hardocded binaries for now)
-		// ✅ 1. Fetch node keys
-		// ✅ 3. Configure OCR contract
-		// 4.1. Add CRON capabilities
-		// 4.2. EVM target capabilities
-		// 5. TODOs: Have a workflow running and tested
+		// ✅ 1. Deploy mock streams capability
+		// ✅ 2. Add boostrap job spec
+		// 3. Add OCR3 capability
+		// 4. Add chain write capabilities
 	})
 }
