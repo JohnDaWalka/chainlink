@@ -22,7 +22,7 @@ docker_file = "../../core/chainlink.Dockerfile"
 docker_ctx = "../.."
 docker_image_name = "chainlink"
 pull_image = true
-capabilities = ["./kvstore"]
+capabilities = ["./streams"]
 user_config_overrides = """
 [Feature]
 LogPoller = true

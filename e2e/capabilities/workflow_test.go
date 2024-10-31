@@ -190,7 +190,7 @@ func TestWorkflow(t *testing.T) {
 
 		// Add bootstrap spec to the first node
 		bootstrapNode := nodeClients[0]
-		p2pKeys, err := bootstrapNode.MustReadP2PKeys()
+		_, err = bootstrapNode.MustReadP2PKeys()
 		require.NoError(t, err)
 		fmt.Println("P2P keys fetched")
 		var wg sync.WaitGroup
@@ -226,28 +226,11 @@ func TestWorkflow(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				scJobSpec := fmt.Sprintf(`
-					type = "standardcapabilities"
-					schemaVersion = 1
-					name = "%s-capabilities"
-					command="%s"
-
-					[oracle_factory]
-					enabled=true
-					bootstrap_peers = [
-						"%s@%s"
-					]
-					network="%s"
-					chain_id="%s"
-					ocr_contract_address="%s"`,
-					"kvstore",
-					"/kvstore",
-					p2pKeys.Data[0].Attributes.PeerID,
-					strings.TrimPrefix(nodeset.CLNodes[0].Node.HostP2PURL, "http://"),
-					"evm",
-					bc.ChainID,
-					simpleOCRAddress,
-				)
+				scJobSpec := `
+				type = "standardcapabilities"
+				schemaVersion = 1
+				name = "streams-capabilities"
+				command="/streams"`
 				fmt.Println("Creating standard capabilities job spec", scJobSpec)
 				response, _, err := nodeClient.CreateJobRaw(scJobSpec)
 				require.NoError(t, err)
