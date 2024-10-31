@@ -69,6 +69,7 @@ jobs:
       changed_test_files: ${{ steps.find-changed-test-files.outputs.test_files }}
       affected_test_packages: ${{ steps.find-tests.outputs.packages }}
       git_head_sha: ${{ steps.get_commit_sha.outputs.git_head_sha }}
+      git_head_short_sha: ${{ steps.get_commit_sha.outputs.git_short_sha }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
@@ -78,7 +79,11 @@ jobs:
 
       - name: Get commit SHA
         id: get_commit_sha
-        run: echo "git_head_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT          
+        run: |
+          git_head_sha=$(git rev-parse HEAD)
+          git_head_short_sha=$(git rev-parse --short HEAD)
+          echo "git_head_sha=$git_head_sha" >> $GITHUB_OUTPUT
+          echo "git_head_short_sha=$git_head_short_sha" >> $GITHUB_OUTPUT          
 
       - name: Set up Go 1.21.9
         uses: actions/setup-go@v5.0.2
@@ -442,21 +447,21 @@ jobs:
                       "type": "section",
                       "text": {
                         "type": "mrkdwn",
-                        "text": "Flaky Test Detector for `${{ steps.set_project_path_pretty.outputs.path }}` - ${{ contains(join(needs.*.result, ','), 'failure') && 'Failed :x:' || contains(join(needs.*.result, ','), 'cancelled') && 'Was cancelled :warning:' || 'Passed :white_check_mark:' }}"
+                        "text": "Flaky Test Detector for ${{ steps.set_project_path_pretty.outputs.path }} project - ${{ contains(join(needs.*.result, ','), 'failure') && 'Failed :x:' || contains(join(needs.*.result, ','), 'cancelled') && 'Was cancelled :warning:' || 'Passed :white_check_mark:' }}"
                       }
                     },
                     {
                       "type": "section",
                       "text": {
                         "type": "mrkdwn",
-                        "text": "Ran new or updated tests between `${{ inputs.baseRef }}` and `${{ env.GIT_HEAD_REF }}` (commit: `${{ needs.find-tests.outputs.git_head_sha }}`) branches. <${{ inputs.repoUrl }}/compare/${{ inputs.baseRef }}...${{ inputs.headRef }}#files_bucket|See Changes>"
+                        "text": "Ran changed tests between `${{ inputs.baseRef }}` and `${{ env.GIT_HEAD_REF }}` (commit: `${{ needs.find-tests.outputs.git_head_short_sha }}`) branches."
                       }
                     },
                     {
                       "type": "section",
                       "text": {
                         "type": "mrkdwn",
-                        "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+                        "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Flaky Detector Details> | <${{ inputs.repoUrl }}/compare/${{ inputs.baseRef }}...${{ needs.find-tests.outputs.git_head_sha }}#files_bucket|See All Changes>"
                       }
                     }                 
                   ]
