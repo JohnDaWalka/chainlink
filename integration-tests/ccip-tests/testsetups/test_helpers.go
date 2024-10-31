@@ -124,14 +124,13 @@ func NewLocalDevEnvironmentWithRMN(
 
 	// Deploy CCIP contracts.
 	err = ccipdeployment.DeployCCIPContracts(tenv.Env, tenv.Ab, ccipdeployment.DeployCCIPContractConfig{
-		HomeChainSel:       tenv.HomeChainSel,
-		FeedChainSel:       tenv.FeedChainSel,
-		ChainsToDeploy:     tenv.Env.AllChainSelectors(),
-		TokenConfig:        ccipdeployment.NewTestTokenConfig(state.Chains[tenv.FeedChainSel].USDFeeds),
-		MCMSConfig:         ccipdeployment.NewTestMCMSConfig(t, tenv.Env),
-		CapabilityRegistry: state.Chains[tenv.HomeChainSel].CapabilityRegistry.Address(),
-		FeeTokenContracts:  tenv.FeeTokenContracts,
-		OCRSecrets:         deployment.XXXGenerateTestOCRSecrets(),
+		HomeChainSel:        tenv.HomeChainSel,
+		FeedChainSel:        tenv.FeedChainSel,
+		ChainsToDeploy:      tenv.Env.AllChainSelectors(),
+		TokenConfig:         ccipdeployment.NewTestTokenConfig(state.Chains[tenv.FeedChainSel].USDFeeds),
+		MCMSConfig:          ccipdeployment.NewTestMCMSConfig(t, tenv.Env),
+		ExistingAddressBook: tenv.Ab,
+		OCRSecrets:          deployment.XXXGenerateTestOCRSecrets(),
 	})
 	require.NoError(t, err)
 	l := logging.GetTestLogger(t)
