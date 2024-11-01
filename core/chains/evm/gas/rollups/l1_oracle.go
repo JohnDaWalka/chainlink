@@ -2,6 +2,7 @@ package rollups
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"slices"
@@ -56,20 +57,27 @@ func NewL1GasOracle(lggr logger.Logger, ethClient l1OracleClient, chainType chai
 	var l1Oracle L1Oracle
 	var err error
 	if daOracle != nil {
-		switch daOracle.OracleType() {
+		oracleType := daOracle.OracleType()
+		if oracleType == nil {
+			return nil, errors.New("required field OracleType is nil in non-nil DAOracle config")
+		}
+
+		switch *oracleType {
 		case toml.DAOracleOPStack:
 			l1Oracle, err = NewOpStackL1GasOracle(lggr, ethClient, chainType, daOracle)
 		case toml.DAOracleArbitrum:
 			l1Oracle, err = NewArbitrumL1GasOracle(lggr, ethClient)
 		case toml.DAOracleZKSync:
 			l1Oracle = NewZkSyncL1GasOracle(lggr, ethClient)
-		default:
-			err = fmt.Errorf("unsupported DA oracle type %s. Going forward all chain configs should specify an oracle type", daOracle.OracleType())
+		case toml.DAOracleCustomCalldata:
+			l1Oracle, err = NewCustomCalldataDAOracle(lggr, ethClient, chainType, daOracle)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize L1 oracle for chaintype %s: %w", chainType, err)
 		}
-		return l1Oracle, nil
+		if l1Oracle != nil {
+			return l1Oracle, nil
+		}
 	}
 
 	// Going forward all configs should specify a DAOracle config. This is a fall back to maintain backwards compat.
