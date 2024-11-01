@@ -3,6 +3,7 @@ package txm
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -28,5 +29,8 @@ func (k *DummyKeystore) Add(privateKeyString string, address common.Address) err
 }
 
 func (k *DummyKeystore) SignTx(_ context.Context, fromAddress common.Address, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
-	return types.SignTx(tx, types.LatestSignerForChainID(chainID), k.privateKeyMap[fromAddress])
+	if key, exists := k.privateKeyMap[fromAddress]; exists {
+		return types.SignTx(tx, types.LatestSignerForChainID(chainID), key)
+	}
+	return nil, fmt.Errorf("private key for address: %v not found", fromAddress)
 }
