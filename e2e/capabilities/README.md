@@ -22,6 +22,15 @@ go get github.com/smartcontractkit/chainlink-testing-framework/framework/cmd && 
 ctf obs up
 ```
 
+### Local Blockscout stack
+```
+ctf bs up
+```
+Reboot it when you re-run the environment (it can't always handle re-orgs or index the same block numbers if you reboot your network)
+```
+ctf bs r
+```
+
 ### DON + Anvil example
 Add env vars to your `.envrc` and run
 ```
