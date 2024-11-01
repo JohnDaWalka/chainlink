@@ -98,17 +98,17 @@ jobs:
       matrix:
         type:
           - cmd: go_core_tests
-            os: ubuntu22.04-32cores-128GB
+            os: ubuntu22.04-16cores-64GB
             printResults: true
           - cmd: go_core_tests_integration
-            os: ubuntu22.04-32cores-128GB
+            os: ubuntu22.04-16cores-64GB
             printResults: true
           - cmd: go_core_ccip_deployment_tests
-            os: ubuntu22.04-32cores-128GB
+            os: ubuntu22.04-16cores-64GB
             printResults: true
           - cmd: go_core_race_tests
             # use 64cores for certain scheduled runs only
-            os: ${{ needs.run-frequency.outputs.two-per-day-frequency == 'true' && 'ubuntu-latest-64cores-256GB' || 'ubuntu-latest-32cores-128GB' }}
+            os: ${{ needs.run-frequency.outputs.two-per-day-frequency == 'true' && 'ubuntu-latest-64cores-256GB' || 'ubuntu-latest-16cores-64GB' }}
           - cmd: go_core_fuzz
             os: ubuntu22.04-8cores-32GB
     name: Core Tests (${{ matrix.type.cmd }})
