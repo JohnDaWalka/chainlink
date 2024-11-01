@@ -170,22 +170,20 @@ func (t *Txm) setNonce(address common.Address, nonce uint64) {
 	defer t.nonceMapMu.Unlock()
 }
 
-func newBackoff() backoff.Backoff {
+func newBackoff(min time.Duration) backoff.Backoff {
 	return backoff.Backoff{
-		Min:    1 * time.Second,
-		Max:    30 * time.Second,
+		Min:    min,
+		Max:    1 * time.Minute,
 		Jitter: true,
 	}
 }
 
 func (t *Txm) broadcastLoop(address common.Address) {
 	defer t.wg.Done()
-	broadcasterTicker := time.NewTicker(utils.WithJitter(broadcastInterval))
-	defer broadcasterTicker.Stop()
 	ctx, cancel := t.stopCh.NewCtx()
 	defer cancel()
-	backoffT := newBackoff()
-	var backOffCh <-chan time.Time
+	broadcastWithBackoff := newBackoff(1 * time.Second)
+	var broadcastCh <-chan time.Time
 
 	for {
 		start := time.Now()
@@ -196,19 +194,17 @@ func (t *Txm) broadcastLoop(address common.Address) {
 			t.lggr.Debug("Transaction broadcasting time elapsed: ", time.Since(start))
 		}
 		if bo {
-			backOffCh = time.After(backoffT.Duration())
+			broadcastCh = time.After(broadcastWithBackoff.Duration())
 		} else {
-			backoffT = newBackoff()
-			backOffCh = nil
+			broadcastWithBackoff.Reset()
+			broadcastCh = time.After(utils.WithJitter(broadcastInterval))
 		}
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.triggerCh[address]:
-			broadcasterTicker.Reset(utils.WithJitter(broadcastInterval))
-		case <-backOffCh:
-			broadcasterTicker.Reset(utils.WithJitter(broadcastInterval))
-		case <-broadcasterTicker.C:
+			continue
+		case <-broadcastCh:
 			continue
 		}
 	}
@@ -216,21 +212,28 @@ func (t *Txm) broadcastLoop(address common.Address) {
 
 func (t *Txm) backfillLoop(address common.Address) {
 	defer t.wg.Done()
-	backfillTicker := time.NewTicker(utils.WithJitter(t.config.BlockTime))
 	ctx, cancel := t.stopCh.NewCtx()
 	defer cancel()
-	defer backfillTicker.Stop()
+	backfillWithBackoff := newBackoff(t.config.BlockTime)
+	backfillCh := time.After(utils.WithJitter(t.config.BlockTime))
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-backfillTicker.C:
+		case <-backfillCh:
 			start := time.Now()
-			if err := t.backfillTransactions(ctx, address); err != nil {
+			bo, err := t.backfillTransactions(ctx, address)
+			if err != nil {
 				t.lggr.Errorf("Error during backfill: %v", err)
 			} else {
 				t.lggr.Debug("Backfill time elapsed: ", time.Since(start))
+			}
+			if bo {
+				backfillCh = time.After(backfillWithBackoff.Duration())
+			} else {
+				backfillWithBackoff.Reset()
+				backfillCh = time.After(utils.WithJitter(t.config.BlockTime))
 			}
 		}
 	}
@@ -317,15 +320,15 @@ func (t *Txm) sendTransactionWithError(ctx context.Context, tx *types.Transactio
 	return t.txStore.UpdateTransactionBroadcast(ctx, attempt.TxID, tx.Nonce, attempt.Hash, address)
 }
 
-func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) error {
+func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) (bool, error) {
 	latestNonce, err := t.client.NonceAt(ctx, address, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	confirmedTransactionIDs, unconfirmedTransactionIDs, err := t.txStore.MarkTransactionsConfirmed(ctx, latestNonce, address)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if len(confirmedTransactionIDs) > 0 || len(unconfirmedTransactionIDs) > 0 {
 		t.lggr.Infof("Confirmed transaction IDs: %v . Re-orged transaction IDs: %v", confirmedTransactionIDs, unconfirmedTransactionIDs)
@@ -333,32 +336,32 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 
 	tx, unconfirmedCount, err := t.txStore.FetchUnconfirmedTransactionAtNonceWithCount(ctx, latestNonce, address)
 	if err != nil {
-		return err
+		return false, err // TODO: add backoff to optimize requests
 	}
 	if unconfirmedCount == 0 {
 		t.lggr.Debugf("All transactions confirmed for address: %v", address)
-		return nil
+		return true, err
 	}
 
 	if tx == nil || tx.Nonce != latestNonce {
 		t.lggr.Warnf("Nonce gap at nonce: %d - address: %v. Creating a new transaction\n", latestNonce, address)
-		return t.createAndSendEmptyTx(ctx, latestNonce, address)
+		return false, t.createAndSendEmptyTx(ctx, latestNonce, address)
 	} else {
 		if !tx.IsPurgeable && t.stuckTxDetector != nil {
 			isStuck, err := t.stuckTxDetector.DetectStuckTransaction(tx)
 			if err != nil {
-				return err
+				return false, err
 			}
 			if isStuck {
 				tx.IsPurgeable = true
 				t.txStore.MarkUnconfirmedTransactionPurgeable(ctx, tx.Nonce, address)
 				t.lggr.Infof("Marked tx as purgeable. Sending purge attempt for txID: ", tx.ID)
-				return t.createAndSendAttempt(ctx, tx, address)
+				return false, t.createAndSendAttempt(ctx, tx, address)
 			}
 		}
 
 		if tx.AttemptCount >= maxAllowedAttempts {
-			return fmt.Errorf("reached max allowed attempts for txID: %d. TXM won't broadcast any more attempts."+
+			return true, fmt.Errorf("reached max allowed attempts for txID: %d. TXM won't broadcast any more attempts."+
 				"If this error persists, it means the transaction won't be confirmed and the TXM needs to be restarted."+
 				"Look for any error messages from previous attempts that may indicate why this happened, i.e. wallet is out of funds. Tx: %v", tx.ID, tx)
 		}
@@ -366,10 +369,10 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 		if time.Since(tx.LastBroadcastAt) > (t.config.BlockTime*time.Duration(t.config.RetryBlockThreshold)) || tx.LastBroadcastAt.IsZero() {
 			// TODO: add optional graceful bumping strategy
 			t.lggr.Info("Rebroadcasting attempt for txID: ", tx.ID)
-			return t.createAndSendAttempt(ctx, tx, address)
+			return false, t.createAndSendAttempt(ctx, tx, address)
 		}
 	}
-	return nil
+	return false, nil
 }
 
 func (t *Txm) createAndSendEmptyTx(ctx context.Context, latestNonce uint64, address common.Address) error {

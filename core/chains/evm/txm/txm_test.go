@@ -162,8 +162,9 @@ func TestBackfillTransactions(t *testing.T) {
 	t.Run("fails if latest nonce fetching fails", func(t *testing.T) {
 		txm := NewTxm(logger.Test(t), testutils.FixtureChainID, client, ab, storage, config, addresses)
 		client.On("NonceAt", mock.Anything, address, mock.Anything).Return(uint64(0), errors.New("latest nonce fail")).Once()
-		err := txm.backfillTransactions(ctx, address)
+		bo, err := txm.backfillTransactions(ctx, address)
 		assert.Error(t, err)
+		assert.False(t, bo)
 		assert.Contains(t, err.Error(), "latest nonce fail")
 	})
 
@@ -171,8 +172,9 @@ func TestBackfillTransactions(t *testing.T) {
 		txm := NewTxm(logger.Test(t), testutils.FixtureChainID, client, ab, storage, config, addresses)
 		client.On("NonceAt", mock.Anything, address, mock.Anything).Return(uint64(0), nil)
 		storage.On("MarkTransactionsConfirmed", mock.Anything, mock.Anything, address).Return([]uint64{}, []uint64{}, errors.New("marking transactions confirmed failed"))
-		err := txm.backfillTransactions(ctx, address)
+		bo, err := txm.backfillTransactions(ctx, address)
 		assert.Error(t, err)
+		assert.False(t, bo)
 		assert.Contains(t, err.Error(), "marking transactions confirmed failed")
 	})
 }
