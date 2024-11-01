@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"sort"
@@ -23,6 +22,8 @@ type InMemoryStore struct {
 	sync.RWMutex
 	lggr      logger.Logger
 	txIDCount uint64
+	address   common.Address
+	chainID   *big.Int
 
 	UnstartedTransactions   []*types.Transaction
 	UnconfirmedTransactions map[uint64]*types.Transaction
@@ -32,16 +33,18 @@ type InMemoryStore struct {
 	Transactions map[uint64]*types.Transaction
 }
 
-func NewInMemoryStore(lggr logger.Logger) *InMemoryStore {
+func NewInMemoryStore(lggr logger.Logger, address common.Address, chainID *big.Int) *InMemoryStore {
 	return &InMemoryStore{
-		lggr:                    logger.Named(lggr, "InMemoryStore"),
+		lggr:                    logger.Named(lggr, "InMemoryStore."+address.String()),
+		address:                 address,
+		chainID:                 chainID,
 		UnconfirmedTransactions: make(map[uint64]*types.Transaction),
 		ConfirmedTransactions:   make(map[uint64]*types.Transaction),
 		Transactions:            make(map[uint64]*types.Transaction),
 	}
 }
 
-func (m *InMemoryStore) AbandonPendingTransactions(context.Context, common.Address) error {
+func (m *InMemoryStore) AbandonPendingTransactions() {
 	m.Lock()
 	defer m.Unlock()
 
@@ -56,11 +59,9 @@ func (m *InMemoryStore) AbandonPendingTransactions(context.Context, common.Addre
 		m.FatalTransactions = append(m.FatalTransactions, tx)
 	}
 	m.UnconfirmedTransactions = make(map[uint64]*types.Transaction)
-
-	return nil
 }
 
-func (m *InMemoryStore) AppendAttemptToTransaction(_ context.Context, txNonce uint64, attempt *types.Attempt) error {
+func (m *InMemoryStore) AppendAttemptToTransaction(txNonce uint64, attempt *types.Attempt) error {
 	m.Lock()
 	defer m.Unlock()
 
@@ -81,26 +82,26 @@ func (m *InMemoryStore) AppendAttemptToTransaction(_ context.Context, txNonce ui
 	return nil
 }
 
-func (m *InMemoryStore) CountUnstartedTransactions(context.Context, common.Address) (int, error) {
+func (m *InMemoryStore) CountUnstartedTransactions() int {
 	m.RLock()
 	defer m.RUnlock()
 
-	return len(m.UnstartedTransactions), nil
+	return len(m.UnstartedTransactions)
 }
 
-func (m *InMemoryStore) CreateEmptyUnconfirmedTransaction(ctx context.Context, fromAddress common.Address, chainID *big.Int, nonce uint64, limit uint64) (*types.Transaction, error) {
+func (m *InMemoryStore) CreateEmptyUnconfirmedTransaction(nonce uint64, gasLimit uint64) (*types.Transaction, error) {
 	m.Lock()
 	defer m.Unlock()
 
 	m.txIDCount++
 	emptyTx := &types.Transaction{
 		ID:                m.txIDCount,
-		ChainID:           chainID,
+		ChainID:           m.chainID,
 		Nonce:             nonce,
-		FromAddress:       fromAddress,
+		FromAddress:       m.address,
 		ToAddress:         common.Address{},
 		Value:             big.NewInt(0),
-		SpecifiedGasLimit: limit,
+		SpecifiedGasLimit: gasLimit,
 		CreatedAt:         time.Now(),
 		State:             types.TxUnconfirmed,
 	}
@@ -115,7 +116,7 @@ func (m *InMemoryStore) CreateEmptyUnconfirmedTransaction(ctx context.Context, f
 	return emptyTx.DeepCopy(), nil
 }
 
-func (m *InMemoryStore) CreateTransaction(_ context.Context, txRequest *types.TxRequest) (*types.Transaction, error) {
+func (m *InMemoryStore) CreateTransaction(txRequest *types.TxRequest) *types.Transaction {
 	m.Lock()
 	defer m.Unlock()
 
@@ -124,8 +125,8 @@ func (m *InMemoryStore) CreateTransaction(_ context.Context, txRequest *types.Tx
 	tx := &types.Transaction{
 		ID:                m.txIDCount,
 		IdempotencyKey:    txRequest.IdempotencyKey,
-		ChainID:           txRequest.ChainID,
-		FromAddress:       txRequest.FromAddress,
+		ChainID:           m.chainID,
+		FromAddress:       m.address,
 		ToAddress:         txRequest.ToAddress,
 		Value:             txRequest.Value,
 		Data:              txRequest.Data,
@@ -148,10 +149,10 @@ func (m *InMemoryStore) CreateTransaction(_ context.Context, txRequest *types.Tx
 	copy := tx.DeepCopy()
 	m.Transactions[copy.ID] = copy
 	m.UnstartedTransactions = append(m.UnstartedTransactions, copy)
-	return tx, nil
+	return tx
 }
 
-func (m *InMemoryStore) FetchUnconfirmedTransactionAtNonceWithCount(_ context.Context, latestNonce uint64, _ common.Address) (txCopy *types.Transaction, unconfirmedCount int, err error) {
+func (m *InMemoryStore) FetchUnconfirmedTransactionAtNonceWithCount(latestNonce uint64) (txCopy *types.Transaction, unconfirmedCount int) {
 	m.RLock()
 	defer m.RUnlock()
 
@@ -163,7 +164,7 @@ func (m *InMemoryStore) FetchUnconfirmedTransactionAtNonceWithCount(_ context.Co
 	return
 }
 
-func (m *InMemoryStore) MarkTransactionsConfirmed(_ context.Context, latestNonce uint64, _ common.Address) ([]uint64, []uint64, error) {
+func (m *InMemoryStore) MarkTransactionsConfirmed(latestNonce uint64) ([]uint64, []uint64) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -194,10 +195,10 @@ func (m *InMemoryStore) MarkTransactionsConfirmed(_ context.Context, latestNonce
 	}
 	sort.Slice(confirmedTransactionIDs, func(i, j int) bool { return confirmedTransactionIDs[i] < confirmedTransactionIDs[j] })
 	sort.Slice(unconfirmedTransactionIDs, func(i, j int) bool { return unconfirmedTransactionIDs[i] < unconfirmedTransactionIDs[j] })
-	return confirmedTransactionIDs, unconfirmedTransactionIDs, nil
+	return confirmedTransactionIDs, unconfirmedTransactionIDs
 }
 
-func (m *InMemoryStore) MarkUnconfirmedTransactionPurgeable(_ context.Context, nonce uint64) error {
+func (m *InMemoryStore) MarkUnconfirmedTransactionPurgeable(nonce uint64) error {
 	m.Lock()
 	defer m.Unlock()
 
@@ -211,7 +212,7 @@ func (m *InMemoryStore) MarkUnconfirmedTransactionPurgeable(_ context.Context, n
 	return nil
 }
 
-func (m *InMemoryStore) UpdateTransactionBroadcast(_ context.Context, txID uint64, txNonce uint64, attemptHash common.Hash) error {
+func (m *InMemoryStore) UpdateTransactionBroadcast(txID uint64, txNonce uint64, attemptHash common.Hash) error {
 	m.Lock()
 	defer m.Unlock()
 
@@ -232,7 +233,7 @@ func (m *InMemoryStore) UpdateTransactionBroadcast(_ context.Context, txID uint6
 	return nil
 }
 
-func (m *InMemoryStore) UpdateUnstartedTransactionWithNonce(_ context.Context, _ common.Address, nonce uint64) (*types.Transaction, error) {
+func (m *InMemoryStore) UpdateUnstartedTransactionWithNonce(nonce uint64) (*types.Transaction, error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -281,7 +282,7 @@ func (m *InMemoryStore) pruneConfirmedTransactions() []uint64 {
 }
 
 // Error Handler
-func (m *InMemoryStore) DeleteAttemptForUnconfirmedTx(_ context.Context, transactionNonce uint64, attempt *types.Attempt) error {
+func (m *InMemoryStore) DeleteAttemptForUnconfirmedTx(transactionNonce uint64, attempt *types.Attempt) error {
 	m.Lock()
 	defer m.Unlock()
 
@@ -300,22 +301,22 @@ func (m *InMemoryStore) DeleteAttemptForUnconfirmedTx(_ context.Context, transac
 	return fmt.Errorf("attempt with hash: %v for txID: %v was not found", attempt.Hash, attempt.TxID)
 }
 
-func (m *InMemoryStore) MarkTxFatal(context.Context, *types.Transaction) error {
+func (m *InMemoryStore) MarkTxFatal(*types.Transaction) error {
 	return fmt.Errorf("not implemented")
 }
 
 // Orchestrator
-func (m *InMemoryStore) FindTxWithIdempotencyKey(_ context.Context, idempotencyKey *string) (*types.Transaction, error) {
+func (m *InMemoryStore) FindTxWithIdempotencyKey(idempotencyKey *string) *types.Transaction {
 	m.Lock()
 	defer m.Unlock()
 
 	if idempotencyKey != nil {
 		for _, tx := range m.Transactions {
 			if tx.IdempotencyKey != nil && tx.IdempotencyKey == idempotencyKey {
-				return tx.DeepCopy(), nil
+				return tx.DeepCopy()
 			}
 		}
 	}
 
-	return nil, nil
+	return nil
 }

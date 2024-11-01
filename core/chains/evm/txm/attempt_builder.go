@@ -20,23 +20,23 @@ type Keystore interface {
 }
 
 type attemptBuilder struct {
-	chainID   *big.Int
-	priceMax  *assets.Wei // TODO: PriceMax per key level
-	estimator gas.EvmFeeEstimator
-	keystore  Keystore
+	chainID     *big.Int
+	priceMaxMap map[common.Address]*assets.Wei
+	estimator   gas.EvmFeeEstimator
+	keystore    Keystore
 }
 
-func NewAttemptBuilder(chainID *big.Int, priceMax *assets.Wei, estimator gas.EvmFeeEstimator, keystore Keystore) *attemptBuilder {
+func NewAttemptBuilder(chainID *big.Int, priceMaxMap map[common.Address]*assets.Wei, estimator gas.EvmFeeEstimator, keystore Keystore) *attemptBuilder {
 	return &attemptBuilder{
-		chainID:   chainID,
-		priceMax:  priceMax,
-		estimator: estimator,
-		keystore:  keystore,
+		chainID:     chainID,
+		priceMaxMap: priceMaxMap,
+		estimator:   estimator,
+		keystore:    keystore,
 	}
 }
 
 func (a *attemptBuilder) NewAttempt(ctx context.Context, lggr logger.Logger, tx *types.Transaction, dynamic bool) (*types.Attempt, error) {
-	fee, estimatedGasLimit, err := a.estimator.GetFee(ctx, tx.Data, tx.SpecifiedGasLimit, a.priceMax, &tx.FromAddress, &tx.ToAddress)
+	fee, estimatedGasLimit, err := a.estimator.GetFee(ctx, tx.Data, tx.SpecifiedGasLimit, a.priceMaxMap[tx.FromAddress], &tx.FromAddress, &tx.ToAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (a *attemptBuilder) NewAttempt(ctx context.Context, lggr logger.Logger, tx 
 }
 
 func (a *attemptBuilder) NewBumpAttempt(ctx context.Context, lggr logger.Logger, tx *types.Transaction, previousAttempt types.Attempt) (*types.Attempt, error) {
-	bumpedFee, bumpedFeeLimit, err := a.estimator.BumpFee(ctx, previousAttempt.Fee, tx.SpecifiedGasLimit, a.priceMax, nil)
+	bumpedFee, bumpedFeeLimit, err := a.estimator.BumpFee(ctx, previousAttempt.Fee, tx.SpecifiedGasLimit, a.priceMaxMap[tx.FromAddress], nil)
 	if err != nil {
 		return nil, err
 	}
@@ -138,6 +138,7 @@ func (a *attemptBuilder) newDynamicFeeAttempt(ctx context.Context, tx *types.Tra
 		Fee:               gas.EvmFee{DynamicFee: gas.DynamicFee{GasFeeCap: dynamicFee.GasFeeCap, GasTipCap: dynamicFee.GasTipCap}},
 		Hash:              signedTx.Hash(),
 		GasLimit:          estimatedGasLimit,
+		Type:              evmtypes.DynamicFeeTxType,
 		SignedTransaction: signedTx,
 	}
 

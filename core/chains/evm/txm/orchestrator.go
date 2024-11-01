@@ -113,7 +113,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) Close() (merr error) {
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) Trigger(addr common.Address) {
-	if err := o.txm.Trigger(); err != nil {
+	if err := o.txm.Trigger(addr); err != nil {
 		o.lggr.Error(err)
 	}
 }
@@ -132,7 +132,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) RegisterResumeCallback(fn txmgr.ResumeC
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) Reset(addr common.Address, abandon bool) error {
 	ok := o.IfStarted(func() {
-		if err := o.txm.Abandon(); err != nil {
+		if err := o.txm.Abandon(addr); err != nil {
 			o.lggr.Error(err)
 		}
 	})
@@ -146,7 +146,6 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) OnNewLongestChain(ctx context.Context, 
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, request txmgrtypes.TxRequest[common.Address, common.Hash]) (tx txmgrtypes.Tx[*big.Int, common.Address, common.Hash, common.Hash, evmtypes.Nonce, gas.EvmFee], err error) {
-	// TODO: Idempotency
 	var wrappedTx *txmtypes.Transaction
 	wrappedTx, err = o.txStore.FindTxWithIdempotencyKey(context.TODO(), request.IdempotencyKey)
 	if err != nil {
@@ -210,7 +209,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, 
 		if err != nil {
 			return
 		}
-		o.txm.Trigger()
+		o.txm.Trigger(request.FromAddress)
 	}
 
 	sequence := evmtypes.Nonce(wrappedTx.Nonce)
@@ -317,6 +316,6 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) SendNativeToken(ctx context.Context, ch
 	}
 
 	// Trigger the Txm to check for new transaction
-	err = o.txm.Trigger()
+	err = o.txm.Trigger(from)
 	return tx, err
 }

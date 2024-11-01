@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink/v2/common/txmgr"
 	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/chaintype"
@@ -116,17 +117,19 @@ func NewTxmv2(
 	if err != nil {
 		return nil, err
 	}
-	// TXMv2 only supports 1 address for now
-	address := addresses[0]
-	attemptBuilder := txm.NewAttemptBuilder(chainID, fCfg.PriceMaxKey(address), estimator, keyStore)
-	inMemoryStore := storage.NewInMemoryStore(lggr)
+	priceMaxMap := make(map[common.Address]*assets.Wei)
+	for _, address := range addresses {
+		priceMaxMap[address] = fCfg.PriceMaxKey(address)
+	}
+	attemptBuilder := txm.NewAttemptBuilder(chainID, priceMaxMap, estimator, keyStore)
+	inMemoryStore := storage.NewInMemoryStoreManager(lggr, addresses, chainID)
 	config := txm.Config{
 		EIP1559:             fCfg.EIP1559DynamicFees(),
 		BlockTime:           blockTime, //TODO: create new config
 		RetryBlockThreshold: uint16(fCfg.BumpThreshold()),
 		EmptyTxLimitDefault: fCfg.LimitDefault(),
 	}
-	t := txm.NewTxm(lggr, chainID, client, attemptBuilder, inMemoryStore, config, address)
+	t := txm.NewTxm(lggr, chainID, client, attemptBuilder, inMemoryStore, config, addresses)
 	return txm.NewTxmOrchestrator[common.Hash, *evmtypes.Head](lggr, chainID, t, inMemoryStore, fwdMgr), nil
 }
 
