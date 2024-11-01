@@ -172,27 +172,23 @@ contract ConfiguredDualAggregatorBaseTest is DualAggregatorBaseTest {
 
   function _buildReport(
     uint256[] memory requestNumberKeys,
-    string[] memory results,
-    bytes32 epochAndRound,
-    bytes[] memory errors
+    int192[] memory observations,
+    bytes32 epochAndRound
   ) internal view returns (bytes memory report, bytes32[3] memory reportContext) {
     // Build report
-    bytes32[] memory _requestIds = new bytes32[](requestNumberKeys.length);
-    bytes[] memory _results = new bytes[](requestNumberKeys.length);
-    bytes[] memory _errors = new bytes[](requestNumberKeys.length);
-    bytes[] memory _onchainMetadata = new bytes[](requestNumberKeys.length);
-    bytes[] memory _offchainMetadata = new bytes[](requestNumberKeys.length);
-    for (uint256 i = 0; i < requestNumberKeys.length; ++i) {
-      if (keccak256(bytes(results[i])) != keccak256(new bytes(0)) && keccak256(errors[i]) != keccak256(new bytes(0))) {
-        revert("Report can only contain a result OR an error, one must remain empty.");
-      }
-      // _requestIds[i] = s_requests[requestNumberKeys[i]].requestId;
-      _results[i] = bytes(results[i]);
-      _errors[i] = errors[i];
-      // _onchainMetadata[i] = abi.encode(s_requests[requestNumberKeys[i]].commitment);
-      _offchainMetadata[i] = new bytes(0); // No off-chain metadata
-    }
-    report = abi.encode(_results, _errors, _onchainMetadata, _offchainMetadata);
+    // uint32[] memory _timestamps = new uint32[](requestNumberKeys.length);
+    // bytes32[] memory _observers = new bytes32[](requestNumberKeys.length);
+    // bytes[] memory _results = new bytes[](requestNumberKeys.length);
+    // for (uint256 i = 0; i < requestNumberKeys.length; ++i) {
+    //   if (keccak256(bytes(results[i])) != keccak256(new bytes(0)) && keccak256(errors[i]) != keccak256(new bytes(0))) {
+    //     revert("Report can only contain a result OR an error, one must remain empty.");
+    //   }
+    //   _timestamps[i] = block.timestamp;
+    //   _observers[i] = new bytes32(0);
+    //   _results[i] = bytes(results[i]);
+    // }
+    bytes32 observers = bytes32(new bytes(0));
+    report = abi.encode(block.timestamp, observers, observations, int192(0));
     reportContext = [configDigest, epochAndRound, bytes32(abi.encode("0"))];
 
     return (report, reportContext);
@@ -619,25 +615,22 @@ contract Trasmit is ConfiguredDualAggregatorBaseTest {
   function test_HappyPath() public {
     vm.startPrank(transmitters[0]);
 
-    uint256[] memory requestNumberKeys = new uint256[](2);
+    uint256[] memory requestNumberKeys = new uint256[](3);
     requestNumberKeys[0] = 1;
-    requestNumberKeys[1] = 2;
+    requestNumberKeys[1] = 1;
+    requestNumberKeys[2] = 1;
 
-    string[] memory results = new string[](2);
-    results[0] = "0";
-    results[1] = "0";
+    int192[] memory results = new int192[](3);
+    results[0] = 1;
+    results[1] = 1;
+    results[2] = 1;
 
     bytes memory epochAndRound = abi.encodePacked(bytes27(0), uint32(epoch), uint32(round));
-
-    bytes[] memory errors = new bytes[](2);
-    errors[0] = new bytes(0);
-    errors[1] = new bytes(0);
 
     (bytes memory report, bytes32[3] memory reportContext) = _buildReport(
       requestNumberKeys,
       results,
-      bytes32(epochAndRound),
-      errors
+      bytes32(epochAndRound)
     );
 
     uint256[] memory signerPrivateKeys = new uint256[](2);
