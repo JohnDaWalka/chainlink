@@ -122,15 +122,15 @@ func NewTxmv2(
 		priceMaxMap[address] = fCfg.PriceMaxKey(address)
 	}
 	attemptBuilder := txm.NewAttemptBuilder(chainID, priceMaxMap, estimator, keyStore)
-	inMemoryStore := storage.NewInMemoryStoreManager(lggr, addresses, chainID)
+	inMemoryStoreManager := storage.NewInMemoryStoreManager(lggr, addresses, chainID)
 	config := txm.Config{
 		EIP1559:             fCfg.EIP1559DynamicFees(),
 		BlockTime:           blockTime, //TODO: create new config
 		RetryBlockThreshold: uint16(fCfg.BumpThreshold()),
 		EmptyTxLimitDefault: fCfg.LimitDefault(),
 	}
-	t := txm.NewTxm(lggr, chainID, client, attemptBuilder, inMemoryStore, config, addresses)
-	return txm.NewTxmOrchestrator[common.Hash, *evmtypes.Head](lggr, chainID, t, inMemoryStore, fwdMgr), nil
+	t := txm.NewTxm(lggr, chainID, client, attemptBuilder, inMemoryStoreManager, config, addresses)
+	return txm.NewTxmOrchestrator[common.Hash, *evmtypes.Head](lggr, chainID, t, inMemoryStoreManager, fwdMgr), nil
 }
 
 // NewEvmResender creates a new concrete EvmResender

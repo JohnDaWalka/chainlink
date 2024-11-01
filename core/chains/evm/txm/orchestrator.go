@@ -147,7 +147,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) OnNewLongestChain(ctx context.Context, 
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, request txmgrtypes.TxRequest[common.Address, common.Hash]) (tx txmgrtypes.Tx[*big.Int, common.Address, common.Hash, common.Hash, evmtypes.Nonce, gas.EvmFee], err error) {
 	var wrappedTx *txmtypes.Transaction
-	wrappedTx, err = o.txStore.FindTxWithIdempotencyKey(context.TODO(), request.IdempotencyKey)
+	wrappedTx, err = o.txStore.FindTxWithIdempotencyKey(ctx, request.IdempotencyKey)
 	if err != nil {
 		return
 	}
