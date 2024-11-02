@@ -35,7 +35,7 @@ type InMemoryStore struct {
 
 func NewInMemoryStore(lggr logger.Logger, address common.Address, chainID *big.Int) *InMemoryStore {
 	return &InMemoryStore{
-		lggr:                    logger.Named(lggr, "InMemoryStore."+address.String()),
+		lggr:                    logger.Named(lggr, "InMemoryStore"),
 		address:                 address,
 		chainID:                 chainID,
 		UnconfirmedTransactions: make(map[uint64]*types.Transaction),
@@ -140,8 +140,8 @@ func (m *InMemoryStore) CreateTransaction(txRequest *types.TxRequest) *types.Tra
 	}
 
 	if len(m.UnstartedTransactions) == maxQueuedTransactions {
-		m.lggr.Warnf("Unstarted transactions queue reached max limit of: %d. Dropping oldest transaction: %v.",
-			maxQueuedTransactions, m.UnstartedTransactions[0])
+		m.lggr.Warnf("Unstarted transactions queue for address: %v reached max limit of: %d. Dropping oldest transaction: %v.",
+			m.address, maxQueuedTransactions, m.UnstartedTransactions[0])
 		delete(m.Transactions, m.UnstartedTransactions[0].ID)
 		m.UnstartedTransactions = m.UnstartedTransactions[1:maxQueuedTransactions]
 	}
@@ -191,7 +191,8 @@ func (m *InMemoryStore) MarkTransactionsConfirmed(latestNonce uint64) ([]uint64,
 
 	if len(m.ConfirmedTransactions) >= maxQueuedTransactions {
 		prunedTxIDs := m.pruneConfirmedTransactions()
-		m.lggr.Debugf("Confirmed transactions map reached max limit of: %d. Pruned 1/3 of the oldest confirmed transactions. TxIDs: %v", maxQueuedTransactions, prunedTxIDs)
+		m.lggr.Debugf("Confirmed transactions map for address: %v reached max limit of: %d. Pruned 1/3 of the oldest confirmed transactions. TxIDs: %v",
+			m.address, maxQueuedTransactions, prunedTxIDs)
 	}
 	sort.Slice(confirmedTransactionIDs, func(i, j int) bool { return confirmedTransactionIDs[i] < confirmedTransactionIDs[j] })
 	sort.Slice(unconfirmedTransactionIDs, func(i, j int) bool { return unconfirmedTransactionIDs[i] < unconfirmedTransactionIDs[j] })
@@ -238,7 +239,7 @@ func (m *InMemoryStore) UpdateUnstartedTransactionWithNonce(nonce uint64) (*type
 	defer m.Unlock()
 
 	if len(m.UnstartedTransactions) == 0 {
-		m.lggr.Debug("Unstarted transaction queue is empty")
+		m.lggr.Debug("Unstarted transactions queue is empty for address: %v", m.address)
 		return nil, nil
 	}
 
