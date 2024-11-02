@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/AlekSi/pointer"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -46,6 +48,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
 	testutils "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/utils"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_contract"
 )
 
 var (
@@ -1198,117 +1201,8 @@ func CCIPDefaultTestSetUp(
 		}
 	}
 
-	/// TODO make configurable
-	configureRMNNode := true
-	if configureRMNNode {
-		sharedConfig := test_env.RmnNodeSharedConfig{}
-		localConfig := test_env.RmnNodeLocalConfig{}
+	configureAndStartRmnCluster(testConfig, setUpArgs, t, lggr)
 
-		// var chains []test_env.Chain
-		// // For all networks create a chain entry in LocalConfig
-		for _, network := range testConfig.AllNetworks {
-
-			name := rmnFriendlyChainName(network)
-
-			var stability test_env.StabilityConfig
-			if network.FinalityTag {
-				stability = test_env.StabilityConfig{
-					Type:              "FinalityTag",
-					SoftConfirmations: 0,
-				}
-			} else {
-				stability = test_env.StabilityConfig{
-					Type:              "ConfirmationDepth",
-					SoftConfirmations: 0,
-					// Completely arbitrary for the test
-					HardConfirmations: 10,
-				}
-			}
-
-			lane, ok := setUpArgs.LaneContractsByNetwork.Load(network.Name)
-			require.True(t, ok, "Lane contract loading shouldn't fail")
-			laneConfig := lane.(*laneconfig.LaneConfig)
-
-			sharedChain := test_env.SharedChain{
-				Name:                         name,
-				MaxTaggedRootsPerVoteToBless: 10,
-				AfnType:                      "V1_5",
-				AfnContract:                  laneConfig.ARM,
-				InflightTime:                 test_env.Duration{Minutes: 5},
-				// TODO: get this value (or the block interval from where it's deduced) into the network config
-				MaxFreshBlockAge: test_env.Duration{Seconds: 2},
-				UponFinalityViolationVoteToCurseOnOtherChainsWithLegacyContracts: true,
-				Stability: stability,
-				// Fee configs are abitrary. TODO: deduce from network config (expanded if needed)
-				BlessFeeConfig: test_env.FeeConfig{
-					Type: "Eip1559",
-					MaxFeePerGas: &test_env.Gwei{
-						Gwei: 400,
-					},
-					MaxPriorityFeePerGas: &test_env.Gwei{
-						Gwei: 2,
-					},
-				},
-				CurseFeeConfig: test_env.FeeConfig{
-					Type: "Eip1559",
-					MaxFeePerGas: &test_env.Gwei{
-						Gwei: 1000,
-					},
-					MaxPriorityFeePerGas: &test_env.Gwei{
-						Gwei: 200,
-					},
-				},
-			}
-			sharedConfig.Chains = append(sharedConfig.Chains, sharedChain)
-			rpc, err := setUpArgs.Env.LocalCluster.GetRpcProvider(network.ChainID)
-			require.NoError(t, err, "rpc provider should exist")
-
-			localChain := test_env.Chain{
-				Name: name,
-				RPCS: rpc.PrivateHttpUrls(),
-			}
-			localConfig.Chains = append(localConfig.Chains, localChain)
-		}
-
-		for _, lane := range setUpArgs.Lanes {
-			forwardLaneConfig := test_env.Lane{
-				Name:                   "V1_5",
-				Type:                   "Evm2EvmV1_5",
-				SourceChainName:        rmnFriendlyChainName(lane.NetworkA),
-				SourceStartBlockNumber: 1,
-				DestChainName:          rmnFriendlyChainName(lane.NetworkB),
-				DestStartBlockNumber:   1,
-				OnRamp:                 lane.ForwardLane.SrcNetworkLaneCfg.SrcContracts[lane.ForwardLane.DestNetworkName].OnRamp,
-				OffRamp:                lane.ForwardLane.DstNetworkLaneCfg.DestContracts[lane.ForwardLane.SourceNetworkName].OffRamp,
-				CommitStore:            lane.ForwardLane.DstNetworkLaneCfg.DestContracts[lane.ForwardLane.SourceNetworkName].CommitStore,
-			}
-			reverseLaneConfig := test_env.Lane{
-				Name:                   "V1_5",
-				Type:                   "Evm2EvmV1_5",
-				SourceChainName:        rmnFriendlyChainName(lane.NetworkB),
-				SourceStartBlockNumber: 1,
-				DestChainName:          rmnFriendlyChainName(lane.NetworkA),
-				DestStartBlockNumber:   1,
-				OnRamp:                 lane.ReverseLane.SrcNetworkLaneCfg.SrcContracts[lane.ReverseLane.DestNetworkName].OnRamp,
-				OffRamp:                lane.ReverseLane.DstNetworkLaneCfg.DestContracts[lane.ReverseLane.SourceNetworkName].OffRamp,
-				CommitStore:            lane.ReverseLane.DstNetworkLaneCfg.DestContracts[lane.ReverseLane.SourceNetworkName].CommitStore,
-			}
-
-			sharedConfig.Lanes = append(sharedConfig.Lanes, forwardLaneConfig)
-			sharedConfig.Lanes = append(sharedConfig.Lanes, reverseLaneConfig)
-		}
-
-		// TODO: make number of nodes configurable
-		for i := 0; i < 4; i++ {
-			nodeName := fmt.Sprintf("%s-%d-%s", "rmn-node", i, uuid.NewString()[0:8])
-			// TODO make image name/version configurable
-			node, err := test_env.NewRmnNode([]string{setUpArgs.Env.LocalCluster.DockerNetwork.Name}, nodeName, "rmn", "latest", sharedConfig, localConfig)
-			require.NoError(t, err, "building a RMN node should not fail")
-			setUpArgs.Env.LocalCluster.RmnCluster.Nodes = append(setUpArgs.Env.LocalCluster.RmnCluster.Nodes, node)
-		}
-		lggr.Info().Msg("Starting RMN cluster")
-		setUpArgs.Env.LocalCluster.RmnCluster.Start()
-	}
 	// only required for env and RMN set up
 	setUpArgs.LaneContractsByNetwork = nil
 
@@ -1336,6 +1230,149 @@ func CCIPDefaultTestSetUp(
 	}
 	lggr.Info().Msg("Test setup completed")
 	return setUpArgs
+}
+
+func configureAndStartRmnCluster(testConfig *CCIPTestConfig, setUpArgs *CCIPTestSetUpOutputs, t *testing.T, lggr *zerolog.Logger) {
+	sharedConfig := test_env.RmnNodeSharedConfig{}
+	localConfig := test_env.RmnNodeLocalConfig{}
+
+	for _, network := range testConfig.AllNetworks {
+
+		name := rmnFriendlyChainName(network)
+
+		var stability test_env.StabilityConfig
+		if network.FinalityTag {
+			stability = test_env.StabilityConfig{
+				Type:              "FinalityTag",
+				SoftConfirmations: 0,
+			}
+		} else {
+			stability = test_env.StabilityConfig{
+				Type:              "ConfirmationDepth",
+				SoftConfirmations: 0,
+				// Completely arbitrary for the test
+				HardConfirmations: 10,
+			}
+		}
+
+		lane, ok := setUpArgs.LaneContractsByNetwork.Load(network.Name)
+		require.True(t, ok, "Lane contract loading shouldn't fail")
+		laneConfig := lane.(*laneconfig.LaneConfig)
+
+		sharedChain := test_env.SharedChain{
+			Name:                         name,
+			MaxTaggedRootsPerVoteToBless: 10,
+			AfnType:                      "V1_5",
+			AfnContract:                  laneConfig.ARM,
+			InflightTime:                 test_env.Duration{Minutes: 5},
+			// TODO: get this value (or the block interval from where it's deduced) into the network config
+			MaxFreshBlockAge: test_env.Duration{Seconds: 2},
+			UponFinalityViolationVoteToCurseOnOtherChainsWithLegacyContracts: true,
+			Stability: stability,
+			// Fee configs are abitrary. TODO: deduce from network config (expanded if needed)
+			BlessFeeConfig: test_env.FeeConfig{
+				Type: "Eip1559",
+				MaxFeePerGas: &test_env.Gwei{
+					Gwei: 400,
+				},
+				MaxPriorityFeePerGas: &test_env.Gwei{
+					Gwei: 2,
+				},
+			},
+			CurseFeeConfig: test_env.FeeConfig{
+				Type: "Eip1559",
+				MaxFeePerGas: &test_env.Gwei{
+					Gwei: 1000,
+				},
+				MaxPriorityFeePerGas: &test_env.Gwei{
+					Gwei: 200,
+				},
+			},
+		}
+		sharedConfig.Chains = append(sharedConfig.Chains, sharedChain)
+		rpc, err := setUpArgs.Env.LocalCluster.GetRpcProvider(network.ChainID)
+		require.NoError(t, err, "rpc provider should exist")
+
+		localChain := test_env.Chain{
+			Name: name,
+			RPCS: rpc.PrivateHttpUrls(),
+		}
+		localConfig.Chains = append(localConfig.Chains, localChain)
+	}
+
+	for _, lane := range setUpArgs.Lanes {
+		forwardLaneConfig := test_env.Lane{
+			Name:                   "V1_5",
+			Type:                   "Evm2EvmV1_5",
+			SourceChainName:        rmnFriendlyChainName(lane.NetworkA),
+			SourceStartBlockNumber: 1,
+			DestChainName:          rmnFriendlyChainName(lane.NetworkB),
+			DestStartBlockNumber:   1,
+			OnRamp:                 lane.ForwardLane.SrcNetworkLaneCfg.SrcContracts[lane.ForwardLane.DestNetworkName].OnRamp,
+			OffRamp:                lane.ForwardLane.DstNetworkLaneCfg.DestContracts[lane.ForwardLane.SourceNetworkName].OffRamp,
+			CommitStore:            lane.ForwardLane.DstNetworkLaneCfg.DestContracts[lane.ForwardLane.SourceNetworkName].CommitStore,
+		}
+
+		reverseLaneConfig := test_env.Lane{
+			Name:                   "V1_5",
+			Type:                   "Evm2EvmV1_5",
+			SourceChainName:        rmnFriendlyChainName(lane.NetworkB),
+			SourceStartBlockNumber: 1,
+			DestChainName:          rmnFriendlyChainName(lane.NetworkA),
+			DestStartBlockNumber:   1,
+			OnRamp:                 lane.ReverseLane.SrcNetworkLaneCfg.SrcContracts[lane.ReverseLane.DestNetworkName].OnRamp,
+			OffRamp:                lane.ReverseLane.DstNetworkLaneCfg.DestContracts[lane.ReverseLane.SourceNetworkName].OffRamp,
+			CommitStore:            lane.ReverseLane.DstNetworkLaneCfg.DestContracts[lane.ReverseLane.SourceNetworkName].CommitStore,
+		}
+
+		sharedConfig.Lanes = append(sharedConfig.Lanes, forwardLaneConfig)
+		sharedConfig.Lanes = append(sharedConfig.Lanes, reverseLaneConfig)
+	}
+
+	// TODO: make number of nodes configurable
+	for i := 0; i < 4; i++ {
+		nodeName := fmt.Sprintf("%s-%d-%s", "rmn-node", i, uuid.NewString()[0:8])
+		// TODO make image name/version configurable
+		node, err := test_env.NewRmnNode([]string{setUpArgs.Env.LocalCluster.DockerNetwork.Name}, nodeName, "rmn", "latest", sharedConfig, localConfig)
+		require.NoError(t, err, "building a RMN node should not fail")
+		setUpArgs.Env.LocalCluster.RmnCluster.Nodes = append(setUpArgs.Env.LocalCluster.RmnCluster.Nodes, node)
+	}
+	lggr.Info().Msg("Starting RMN cluster")
+	setUpArgs.Env.LocalCluster.RmnCluster.Start()
+
+	// Reconfigure ARM contract with bless/curse addresses
+	for _, lane := range setUpArgs.Lanes {
+		for _, direction := range []*actions.CCIPLane{lane.ForwardLane, lane.ReverseLane} {
+			rmnConfig, err := direction.Source.Common.ARM.Instance.RMNContractCaller.GetConfigDetails(&bind.CallOpts{})
+			require.NoError(t, err, "retrieving config from ARM contract")
+			for _, node := range setUpArgs.Env.LocalCluster.RmnCluster.Nodes {
+				voter := rmn_contract.RMNVoter{
+					BlessWeight: 1,
+					CurseWeight: 1,
+				}
+				name := rmnFriendlyChainName(*direction.SourceChain.GetNetworkConfig())
+				voter.BlessVoteAddr = common.HexToAddress(node.BlessCurseKeys[name].Bless)
+				voter.CurseVoteAddr = common.HexToAddress(node.BlessCurseKeys[name].Curse)
+				rmnConfig.Config.Voters = append(rmnConfig.Config.Voters, voter)
+				lggr.Info().Msgf("Adding voter with curse address %s and bless address %s to %s", voter.CurseVoteAddr.Hex(), voter.BlessVoteAddr.Hex(), name)
+				if direction.SourceChain.NetworkSimulated() {
+					gasEstimations, err := direction.SourceChain.EstimateGas(ethereum.CallMsg{
+						To: &voter.BlessVoteAddr,
+					})
+					require.NoError(t, err, "estimating gas")
+					err = direction.SourceChain.Fund(voter.BlessVoteAddr.Hex(), big.NewFloat(1000), gasEstimations)
+					require.NoError(t, err, "funding  bless addr")
+					err = direction.SourceChain.Fund(voter.CurseVoteAddr.Hex(), big.NewFloat(1000), gasEstimations)
+					require.NoError(t, err, "funding  curse addr")
+				}
+			}
+			common := direction.Source.Common
+			transactOpts, err := common.ChainClient.TransactionOpts(common.ChainClient.GetDefaultWallet())
+			require.NoError(t, err, "retrieving owner transaction options")
+			_, err = common.ARM.Instance.RMNContractTransactor.SetConfig(transactOpts, rmnConfig.Config)
+			require.NoError(t, err, "Updating config with bless/curse addresses")
+		}
+	}
 }
 
 // Kind of hacky, but we override the net name to match Balthazar's expectation based on the
