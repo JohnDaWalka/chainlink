@@ -22,6 +22,7 @@ docker_file = "../../core/chainlink.Dockerfile"
 docker_ctx = "../.."
 docker_image_name = "chainlink"
 pull_image = true
+# capabilities = ["./streams", "./ocr3-capability"]
 capabilities = ["./streams"]
 user_config_overrides = """
 [Feature]

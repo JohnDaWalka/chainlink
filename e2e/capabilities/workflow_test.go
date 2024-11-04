@@ -1,10 +1,15 @@
 package capabilities_test
 
 import (
+	"bytes"
+	"cmp"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -24,11 +29,58 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+
 	capabilities_registry "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/capabilities_registry_1_1_0"
 	feeds_consumer "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/feeds_consumer_1_0_0"
 	forwarder "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/forwarder_1_0_0"
 	ocr3_capability "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/ocr3_capability_1_0_0"
 )
+
+// Copying this to avoid dependency on the core repo
+func GetChainType(chainType string) (uint8, error) {
+	switch chainType {
+	case "evm":
+		return 1, nil
+	// case Solana:
+	// 	return 2, nil
+	// case Cosmos:
+	// 	return 3, nil
+	// case StarkNet:
+	// 	return 4, nil
+	// case Aptos:
+	// 	return 5, nil
+	default:
+		return 0, fmt.Errorf("unexpected chaintype.ChainType: %#v", chainType)
+	}
+}
+
+// Copying this to avoid dependency on the core repo
+func MarshalMultichainPublicKey(ost map[string]types.OnchainPublicKey) (types.OnchainPublicKey, error) {
+	var pubKeys [][]byte
+	for k, pubKey := range ost {
+		typ, err := GetChainType(k)
+		if err != nil {
+			// skipping unknown key type
+			continue
+		}
+		buf := new(bytes.Buffer)
+		if err = binary.Write(buf, binary.LittleEndian, typ); err != nil {
+			return nil, err
+		}
+		length := len(pubKey)
+		if length < 0 || length > math.MaxUint16 {
+			return nil, fmt.Errorf("pubKey doesn't fit into uint16")
+		}
+		if err = binary.Write(buf, binary.LittleEndian, uint16(length)); err != nil { //nolint:gosec
+			return nil, err
+		}
+		_, _ = buf.Write(pubKey)
+		pubKeys = append(pubKeys, buf.Bytes())
+	}
+	// sort keys based on encoded type to make encoding deterministic
+	slices.SortFunc(pubKeys, func(a, b []byte) int { return cmp.Compare(a[0], b[0]) })
+	return bytes.Join(pubKeys, nil), nil
+}
 
 type WorkflowTestConfig struct {
 	BlockchainA        *blockchain.Input `toml:"blockchain_a" validate:"required"`
@@ -45,6 +97,11 @@ type OCR3Config struct {
 	OffchainConfig        []byte
 }
 
+type NodeInfo struct {
+	OcrKeyBundleID     string
+	TransmitterAddress string
+}
+
 func extractKey(value string) string {
 	parts := strings.Split(value, "_")
 	if len(parts) > 1 {
@@ -53,9 +110,13 @@ func extractKey(value string) string {
 	return value
 }
 
-func generateOCR3Config(t *testing.T, nodes []*clclient.ChainlinkClient) (*OCR3Config, error) {
+func generateOCR3Config(
+	t *testing.T,
+	nodes []*clclient.ChainlinkClient,
+) (config *OCR3Config, nodesInfo []NodeInfo) {
 	oracleIdentities := []confighelper.OracleIdentityExtra{}
 	transmissionSchedule := []int{}
+	nodesInfo = make([]NodeInfo, len(nodes))
 
 	for i, node := range nodes {
 		// TODO: Do not provide a bootstrap node to this func
@@ -69,6 +130,8 @@ func generateOCR3Config(t *testing.T, nodes []*clclient.ChainlinkClient) (*OCR3C
 		ocr2Keys, err := node.MustReadOCR2Keys()
 		require.NoError(t, err)
 
+		nodesInfo[i].OcrKeyBundleID = ocr2Keys.Data[0].ID
+
 		firstOCR2Key := ocr2Keys.Data[0].Attributes
 
 		offchainPublicKeyBytes, err := hex.DecodeString(extractKey(firstOCR2Key.OffChainPublicKey))
@@ -77,9 +140,23 @@ func generateOCR3Config(t *testing.T, nodes []*clclient.ChainlinkClient) (*OCR3C
 		copy(offchainPublicKey[:], offchainPublicKeyBytes)
 		oracleIdentity.OffchainPublicKey = offchainPublicKey
 
-		onchainPubkey, err := hex.DecodeString(extractKey(firstOCR2Key.OnChainPublicKey))
+		pubKeys := make(map[string]types.OnchainPublicKey)
+		ethOnchainPubKey, err := hex.DecodeString(extractKey(firstOCR2Key.OnChainPublicKey))
 		require.NoError(t, err)
-		oracleIdentity.OnchainPublicKey = onchainPubkey
+		pubKeys["evm"] = ethOnchainPubKey
+
+		// // add aptos key if present
+		// if n.AptosOnchainPublicKey != "" {
+		// 	aptosPubKey, err := hex.DecodeString(n.AptosOnchainPublicKey)
+		// 	if err != nil {
+		// 		return Orc2drOracleConfig{}, fmt.Errorf("failed to decode AptosOnchainPublicKey: %w", err)
+		// 	}
+		// 	pubKeys[string(chaintype.Aptos)] = aptosPubKey
+		// }
+
+		multichainPubKey, err := MarshalMultichainPublicKey(pubKeys)
+		require.NoError(t, err)
+		oracleIdentity.OnchainPublicKey = multichainPubKey
 
 		sharedSecretEncryptionPublicKeyBytes, err := hex.DecodeString(extractKey(firstOCR2Key.ConfigPublicKey))
 		require.NoError(t, err)
@@ -96,6 +173,7 @@ func generateOCR3Config(t *testing.T, nodes []*clclient.ChainlinkClient) (*OCR3C
 		ethKeys, err := node.MustReadETHKeys()
 		require.NoError(t, err)
 		oracleIdentity.TransmitAccount = types.Account(ethKeys.Data[0].Attributes.Address)
+		nodesInfo[i].TransmitterAddress = ethKeys.Data[0].Attributes.Address
 
 		oracleIdentities = append(oracleIdentities, oracleIdentity)
 	}
@@ -148,7 +226,7 @@ func generateOCR3Config(t *testing.T, nodes []*clclient.ChainlinkClient) (*OCR3C
 		OnchainConfig:         onchainConfig,
 		OffchainConfigVersion: offchainConfigVersion,
 		OffchainConfig:        offchainConfig,
-	}, nil
+	}, nodesInfo
 }
 
 func TestWorkflow(t *testing.T) {
@@ -220,7 +298,7 @@ func TestWorkflow(t *testing.T) {
 
 		// Add bootstrap spec to the first node
 		bootstrapNode := nodeClients[0]
-		_, err = bootstrapNode.MustReadP2PKeys()
+		p2pKeys, err := bootstrapNode.MustReadP2PKeys()
 		require.NoError(t, err)
 		fmt.Println("P2P keys fetched")
 		var wg sync.WaitGroup
@@ -247,6 +325,10 @@ func TestWorkflow(t *testing.T) {
 			fmt.Printf("Response from bootstrap node: %x\n", r)
 		}()
 
+		ocr3Config, nodesInfo := generateOCR3Config(t, nodeClients)
+		fmt.Println("ocr3Config", ocr3Config)
+		fmt.Println("nodesInfo", nodesInfo)
+
 		for i, nodeClient := range nodeClients {
 			// First node is a bootstrap node, so we skip it
 			if i == 0 {
@@ -265,14 +347,52 @@ func TestWorkflow(t *testing.T) {
 				response, _, err2 := nodeClient.CreateJobRaw(scJobSpec)
 				require.NoError(t, err2)
 				require.Equal(t, len(response.Errors), 0)
-				fmt.Printf("Response from node %d: %x\n", i+1, response)
+				fmt.Printf("Response from node %d after streams SC: %x\n", i+1, response)
+
+				consensusJobSpec := fmt.Sprintf(`
+					type = "offchainreporting2"
+					schemaVersion = 1
+					name = "Keystone OCR3 Consensus Capability"
+					contractID = "%s"
+					ocrKeyBundleID = "%s"
+					p2pv2Bootstrappers = [
+						"%s@%s",
+					]
+					relay = "evm"
+					pluginType = "plugin"
+					transmitterID = "%s"
+
+					[relayConfig]
+					chainID = "%s"
+
+					[pluginConfig]
+					command = "/ocr3-capability"
+					ocrVersion = 3
+					pluginName = "ocr-capability"
+					providerType = "ocr3-capability"
+					telemetryType = "plugin"
+
+					[onchainSigningStrategy]
+					strategyName = 'multi-chain'
+					[onchainSigningStrategy.config]
+					evm = "%s"
+					`,
+					ocr3CapabilityAddress,
+					nodesInfo[i].OcrKeyBundleID,
+					p2pKeys.Data[0].Attributes.PeerID,
+					strings.TrimPrefix(nodeset.CLNodes[0].Node.HostP2PURL, "http://"),
+					nodesInfo[i].TransmitterAddress,
+					bc.ChainID,
+					nodesInfo[i].OcrKeyBundleID,
+				)
+				fmt.Println("Creating consensus job spec", consensusJobSpec)
+				response, _, err2 = nodeClient.CreateJobRaw(consensusJobSpec)
+				require.NoError(t, err2)
+				require.Equal(t, len(response.Errors), 0)
+				fmt.Printf("Response from node %d after consensus job: %x\n", i+1, response)
 			}()
 		}
 		wg.Wait()
-
-		ocr3Config, err := generateOCR3Config(t, nodeClients)
-		require.NoError(t, err)
-		fmt.Println("ocr3Config", ocr3Config)
 
 		// Configure KV store OCR contract
 		tx, err = ocr3CapabilityContract.SetConfig(
@@ -288,10 +408,12 @@ func TestWorkflow(t *testing.T) {
 		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
 		require.NoError(t, err)
 
-		// Add bootstrap spec
+		// ✅ Add bootstrap spec
 		// ✅ 1. Deploy mock streams capability
 		// ✅ 2. Add boostrap job spec
-		// 3. Add OCR3 capability
+		// ✅ 3. Add OCR3 capability
+		// ✅ 3. Deploy and configure OCR3 contract
 		// 4. Add chain write capabilities
+		// - Add Keystone workflow
 	})
 }
