@@ -366,7 +366,7 @@ func TestWorkflow(t *testing.T) {
 					chainID = "%s"
 
 					[pluginConfig]
-					command = "/ocr3-capability"
+					command = "/usr/local/bin/chainlink-ocr3-capability"
 					ocrVersion = 3
 					pluginName = "ocr-capability"
 					providerType = "ocr3-capability"
@@ -387,6 +387,7 @@ func TestWorkflow(t *testing.T) {
 				)
 				fmt.Println("Creating consensus job spec", consensusJobSpec)
 				response, _, err2 = nodeClient.CreateJobRaw(consensusJobSpec)
+				fmt.Println("err2", err2)
 				require.NoError(t, err2)
 				require.Equal(t, len(response.Errors), 0)
 				fmt.Printf("Response from node %d after consensus job: %x\n", i+1, response)
