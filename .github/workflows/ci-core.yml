@@ -435,12 +435,12 @@ jobs:
       projectPath: '.'
       baseRef: ${{ github.base_ref }}
       headRef: ${{ github.head_ref }}
-      runThreshold: '1'
+      runThreshold: '0.9'
       runWithRace: true
       findByTestFilesDiff: true
       findByAffectedPackages: false
       slackNotificationAfterTestsChannelId: 'C07TRF65CNS' #flaky-test-detector-notifications
-      extraArgs: '{ "skipped_tests": "TestChainComponents" }'
+      extraArgs: '{ "skipped_tests": "TestChainComponents", "run_count": "5" }'
     secrets:
       SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
 
@@ -454,12 +454,12 @@ jobs:
       projectPath: 'deployment'
       baseRef: ${{ github.base_ref }}
       headRef: ${{ github.head_ref }}
-      runThreshold: '5'
+      runThreshold: '0.9'
       runWithRace: true
       findByTestFilesDiff: true
       findByAffectedPackages: false
       slackNotificationAfterTestsChannelId: 'C07TRF65CNS' #flaky-test-detector-notifications
-      extraArgs: '{ "skipped_tests": "TestAddLane" }'
+      extraArgs: '{ "skipped_tests": "TestAddLane", "run_count": "5"  }'
     secrets:
       SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
 
