@@ -6,7 +6,6 @@ LogPollInterval = '1s' # 1 sec block rate
 NoNewHeadsThreshold = '1m'
 MinIncomingConfirmations = 1
 NoNewFinalizedHeadsThreshold = '45m' # Set slightly higher than mean finality time
-FinalizedBlockOffset = 2
 
 [GasEstimator]
 EIP1559DynamicFees = true
