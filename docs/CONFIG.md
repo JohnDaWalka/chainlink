@@ -6705,8 +6705,8 @@ NoNewHeadsThreshold = '1m0s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
+FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '45m0s'
-FinalizedBlockOffset = 2
 
 [Transactions]
 ForwardersEnabled = false
