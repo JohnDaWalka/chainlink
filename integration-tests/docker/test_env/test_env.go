@@ -184,12 +184,18 @@ func (te *ClusterTestEnv) StartClCluster(nodeConfig *chainlink.Config, count int
 	return te.ClCluster.Start()
 }
 
+// Starts a RMN cluster in the context of the coreqa tool. There's limited value
+// to this, as the RMN nodes will likely enter a reset loop as they expect a very particular
+// set of conditions, such as an already deployed RMN contract on chain, and preexisting, correct
+// shared and local chain config. Still, it may be useful to maintain them in that reset loop
+// until the deployment is done manually (in that case, you should ensure to use a docker image
+// that keeps the RMN binary restarting until these conditions are established.)
 func (te *ClusterTestEnv) StartRmnCluster(count int) error {
 	sharedConfig := RmnNodeSharedConfig{}
 	localConfig := RmnNodeLocalConfig{}
 
-	// TODO: This configuration is not coming from the right places; it's
-	// just hacked together to get the RMN cluster as far as possible without
+	// TODO: This configuration is not too meaningful; it's
+	// just cobbled together to get the RMN cluster as far as possible without
 	// actual contracts deployed on-chain.
 	for i := 0; i < len(te.EVMNetworks); i++ {
 		net := te.EVMNetworks[i]
@@ -207,14 +213,12 @@ func (te *ClusterTestEnv) StartRmnCluster(count int) error {
 		}
 
 		sharedChain := SharedChain{
-			// TODO(pablo): only limited names are allowed, unsure how to engage with simulated networks here.
 			Name:                         name,
 			MaxTaggedRootsPerVoteToBless: 10,
 			AfnType:                      "V1_0",
-			// TODO work out the AFN contract address on this chain. This is a sepolia stub
-			AfnContract:  "0xb4d360459f32dd641ef5a6985ffbac5c4e5521aa",
-			InflightTime: Duration{Minutes: 5},
-			// TODO this should be 2*block interval for the chain. Figure out where to obtain that information
+			// Must be replaced with the AFN contract address on this chain once deployed. This is a sepolia stub
+			AfnContract:      "0xb4d360459f32dd641ef5a6985ffbac5c4e5521aa",
+			InflightTime:     Duration{Minutes: 5},
 			MaxFreshBlockAge: Duration{Seconds: 24},
 			UponFinalityViolationVoteToCurseOnOtherChainsWithLegacyContracts: true,
 			Stability: StabilityConfig{
@@ -247,7 +251,8 @@ func (te *ClusterTestEnv) StartRmnCluster(count int) error {
 			RPCS: te.rpcProviders[net.ChainID].PrivateHttpUrls(),
 		}
 		localConfig.Chains = append(localConfig.Chains, localChain)
-		// No lanes since this is just a barebones test environment.
+		// No lanes since this is just a barebones test environment. Lane config must
+		// be added manually.
 	}
 
 	for i := 0; i < count; i++ {

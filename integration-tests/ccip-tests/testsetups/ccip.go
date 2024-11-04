@@ -517,7 +517,6 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string, override
 		TestGroupInput:      groupCfg,
 		GethResourceProfile: GethResourceProfile,
 	}
-
 	setContractVersion.Do(func() {
 		err := ccipTestConfig.SetContractVersion()
 		if err != nil {

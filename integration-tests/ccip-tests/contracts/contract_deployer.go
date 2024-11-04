@@ -540,16 +540,6 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(tokenAddr str
 	}
 }
 
-// func (e *CCIPContractsDeployer) DeployMockRMNContract() (*common.Address, error) {
-// 	address, _, _, err := e.evmClient.DeployContract("Mock ARM Contract", func(
-// 		auth *bind.TransactOpts,
-// 		_ bind.ContractBackend,
-// 	) (common.Address, *types.Transaction, interface{}, error) {
-// 		return mock_rmn_contract.DeployMockRMNContract(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
-// 	})
-// 	return address, err
-// }
-
 func (e *CCIPContractsDeployer) DeployRMNContract() (*common.Address, error) {
 	address, _, _, err := e.evmClient.DeployContract("RMN Contract", func(
 		auth *bind.TransactOpts,
@@ -558,6 +548,10 @@ func (e *CCIPContractsDeployer) DeployRMNContract() (*common.Address, error) {
 		config := rmn_contract.RMNConfig{
 			Voters: []rmn_contract.RMNVoter{
 				{
+					// This voter is arbitrary, and only set because the contract constructor requires
+					// at least a single voter. Due to the timing of the test setup, the keystsore for
+					// RMN nodes doesn't yet exist at the point of deplying this contract, so we use
+					// a dummy voter before replacing it with the correct ones.
 					BlessVoteAddr: common.HexToAddress("0x396939EC3b0894781F4131F70aaFF7F6C30aB0E7"),
 					CurseVoteAddr: common.HexToAddress("0xb792bD2FD17C376539901a453150d64d9885fDFf"),
 					BlessWeight:   1,

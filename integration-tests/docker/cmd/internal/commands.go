@@ -75,7 +75,7 @@ func init() {
 	)
 	StartNodesCmd.PersistentFlags().Int(
 		RmnNodeCountFlag,
-		2,
+		0,
 		"Number of RMN nodes",
 	)
 }
