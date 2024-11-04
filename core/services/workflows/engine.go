@@ -668,7 +668,7 @@ func (e *Engine) queueIfReady(state store.WorkflowExecution, step *step) {
 }
 
 func (e *Engine) finishExecution(ctx context.Context, executionID string, status string) error {
-	e.logger.With(eIDKey, executionID, "status", status).Info("finishing execution")
+	e.logger.With("status", status).Info("finishing execution")
 	metrics := e.metrics.with("status", status)
 	err := e.executionStates.UpdateStatus(ctx, executionID, status)
 	if err != nil {
