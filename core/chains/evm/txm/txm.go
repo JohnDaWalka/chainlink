@@ -19,10 +19,9 @@ import (
 )
 
 const (
-	broadcastInterval                  time.Duration = 30 * time.Second
-	inFlightTransactionRecheckInterval time.Duration = 1 * time.Second
-	maxInFlightTransactions            uint64        = 16
-	maxAllowedAttempts                 uint16        = 10
+	broadcastInterval       time.Duration = 30 * time.Second
+	maxInFlightTransactions uint64        = 16
+	maxAllowedAttempts      uint16        = 10
 )
 
 type Client interface {
