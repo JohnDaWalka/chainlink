@@ -244,7 +244,7 @@ jobs:
         with:
           name: test-result-${{ needs.find-tests.outputs.workflow_id }}-${{ steps.gen_id.outputs.id }}
           path: test-result.json
-          retention-days: 1          
+          retention-days: 7        
 
   report:
     needs: [find-tests, run-tests]
@@ -304,6 +304,7 @@ jobs:
         with:
           name: failed_tests.json
           path: test_results/failed_tests.json
+          retention-days: 7        
 
       - name: Create ASCII table with failed test results
         if: ${{ fromJson(steps.set_test_results.outputs.failed_tests_count) > 0 }}
