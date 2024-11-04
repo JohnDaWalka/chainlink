@@ -60,9 +60,9 @@ runs:
       # os-id will be "linux-arm64" for an ARM64 linux runner
       run: |
         if [[ "${{ runner.arch }}" == "X64" ]]; then
-          echo "os-id=${{ steps.runner-os.outputs.os-id }}" >> $GITHUB_OUTPUT
+          echo "os-id=${{ runner.os }}" >> $GITHUB_OUTPUT
         else
-          echo "os-id=${{ steps.runner-os.outputs.os-id }}-${{ runner.arch }}" >> $GITHUB_OUTPUT
+          echo "os-id=${{ runner.os }}-${{ runner.arch }}" >> $GITHUB_OUTPUT
         fi
 
     # By default, restore the cache only.
