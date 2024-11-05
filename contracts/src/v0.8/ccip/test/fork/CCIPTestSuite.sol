@@ -5,8 +5,8 @@ import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
-import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
-import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
+import {OffRamp} from "../../offRamp/OffRamp.sol";
+import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {ChainSelectors} from "./ChainSelectors.sol";
 
 import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
@@ -22,8 +22,8 @@ contract CCIPTestSuite is Test {
   using EnumerableSet for EnumerableSet.UintSet;
   using EnumerableSet for EnumerableSet.AddressSet;
 
-  bytes32 internal constant TypeAndVersion1_5_OnRamp = keccak256("EVM2EVMOnRamp 1.5.0");
-  bytes32 internal constant TypeAndVersion1_5_OffRamp = keccak256("EVM2EVMOffRamp 1.5.0");
+  bytes32 internal constant TypeAndVersion1_5_OnRamp = keccak256("OnRamp 1.5.0");
+  bytes32 internal constant TypeAndVersion1_5_OffRamp = keccak256("OffRamp 1.5.0");
 
   uint256 internal constant TOKENS_TO_SEND = 100;
   uint16 internal constant MAX_RETURN_BYTES = 4 + 8 * 32;
@@ -36,10 +36,10 @@ contract CCIPTestSuite is Test {
   bool internal immutable i_fullLogging;
 
   struct RemoteChainConfig {
-    EVM2EVMOnRamp OldOnRamp;
-    EVM2EVMOnRamp NewOnRamp;
-    EVM2EVMOffRamp OldOffRamp;
-    EVM2EVMOffRamp NewOffRamp;
+    OnRamp OldOnRamp;
+    OnRamp NewOnRamp;
+    OffRamp OldOffRamp;
+    OffRamp NewOffRamp;
     address[] tokens;
     address[] oldSuccessfulTokens;
   }
@@ -63,17 +63,17 @@ contract CCIPTestSuite is Test {
 
   function sendTokensSingleLane(
     uint64 remoteChainSelector
-  ) external returns (Internal.EVM2EVMMessage[] memory msgs) {
+  ) external returns (Internal.EVM2AnyRampMessage[] memory msgs) {
     vm.recordLogs();
 
     (uint256 successful,) = _sendTokenToChain(false, remoteChainSelector);
 
     Vm.Log[] memory logs = vm.getRecordedLogs();
-    Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](successful);
+    Internal.EVM2AnyRampMessage[] memory messages = new Internal.EVM2AnyRampMessage[](successful);
     uint256 logsFound = 0;
     for (uint256 i = 0; i < logs.length; ++i) {
-      if (logs[i].topics[0] == EVM2EVMOnRamp.CCIPSendRequested.selector) {
-        messages[logsFound] = abi.decode(logs[i].data, (Internal.EVM2EVMMessage));
+      if (logs[i].topics[0] == OnRamp.CCIPMessageSent.selector) {
+        messages[logsFound] = abi.decode(logs[i].data, (Internal.EVM2AnyRampMessage));
         logsFound++;
       }
     }
@@ -159,7 +159,7 @@ contract CCIPTestSuite is Test {
       }
 
       bool tokenSupportDropped =
-        keccak256(retData) == keccak256(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, token));
+        keccak256(retData) == keccak256(abi.encodeWithSelector(OnRamp.UnsupportedToken.selector, token));
 
       if (!postMigration) {
         s_failedTokensInitially.add(token);
@@ -209,24 +209,22 @@ contract CCIPTestSuite is Test {
   }
 
   function ExecuteMsgs(
-    Internal.EVM2EVMMessage[] memory messages
+    Internal.Any2EVMRampMessage[] memory messages
   ) public {
     if (messages.length == 0) {
       return;
     }
     _loadLatestOffRampData();
 
-    EVM2EVMOffRamp offRamp = s_remoteChainConfigs[messages[0].sourceChainSelector].NewOffRamp;
+    OffRamp offRamp = s_remoteChainConfigs[messages[0].header.sourceChainSelector].NewOffRamp;
 
     vm.startPrank(address(offRamp));
 
     uint256 succeeded = 0;
 
     for (uint256 i = 0; i < messages.length; ++i) {
-      Internal.EVM2EVMMessage memory message = messages[i];
-      bytes memory destTokenAddressBytes =
-        abi.decode(message.sourceTokenData[0], (Internal.SourceTokenData)).destTokenAddress;
-      address destTokenAddress = abi.decode(destTokenAddressBytes, (address));
+      Internal.Any2EVMRampMessage memory message = messages[i];
+      address destTokenAddress = message.tokenAmounts[0].destTokenAddress;
 
       uint256 startingGas = 250_000;
       uint256 maxGasToTest = 250_000;
@@ -236,12 +234,12 @@ contract CCIPTestSuite is Test {
       for (uint256 j = startingGas; j <= maxGasToTest; j += increment) {
         // gasOverrides[0] = uint32(j);
         try offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), gasOverrides) {
-          console2.log(unicode"✅ source_token", message.tokenAmounts[0].token, s_tokenNames[destTokenAddress], j);
+          console2.log(unicode"✅ source_token", destTokenAddress, s_tokenNames[destTokenAddress], j);
           succeeded++;
           break;
         } catch (bytes memory reason) {
           if (j == maxGasToTest) {
-            console2.log(unicode"❌ source_token", message.tokenAmounts[0].token, s_tokenNames[destTokenAddress], j);
+            console2.log(unicode"❌ source_token", destTokenAddress, s_tokenNames[destTokenAddress], j);
             if (startingGas == maxGasToTest) {
               console2.logBytes(reason);
             }
@@ -257,7 +255,7 @@ contract CCIPTestSuite is Test {
     Router.OffRamp[] memory offRamps = i_router.getOffRamps();
     for (uint256 i = 0; i < offRamps.length; ++i) {
       Router.OffRamp memory offRamp = offRamps[i];
-      EVM2EVMOffRamp currentOffRamp = EVM2EVMOffRamp(offRamp.offRamp);
+      OffRamp currentOffRamp = OffRamp(offRamp.offRamp);
       if (keccak256(bytes(currentOffRamp.typeAndVersion())) != TypeAndVersion1_5_OffRamp) {
         continue;
       }
@@ -271,7 +269,7 @@ contract CCIPTestSuite is Test {
     for (uint256 i = 0; i < offRamps.length; ++i) {
       Router.OffRamp memory offRamp = offRamps[i];
 
-      EVM2EVMOnRamp currentOnRamp = EVM2EVMOnRamp(i_router.getOnRamp(offRamp.sourceChainSelector));
+      OnRamp currentOnRamp = OnRamp(i_router.getOnRamp(offRamp.sourceChainSelector));
       // Skip 1.5 lanes for now
       if (keccak256(bytes(currentOnRamp.typeAndVersion())) == TypeAndVersion1_5_OnRamp) {
         continue;
@@ -282,14 +280,18 @@ contract CCIPTestSuite is Test {
       address[] memory tokens = i_router.getSupportedTokens(offRamp.sourceChainSelector);
       for (uint256 j = 0; j < tokens.length; ++j) {
         address token = tokens[j];
-        s_tokenNames[token] = IERC20(token).name();
+        try IERC20(token).name() returns (string memory name) {
+          s_tokenNames[token] = name;
+        } catch {
+          s_tokenNames[token] = "Nameless Token";
+        }
       }
 
       s_remoteChainConfigs[offRamp.sourceChainSelector] = RemoteChainConfig({
-        OldOnRamp: EVM2EVMOnRamp(currentOnRamp),
-        NewOnRamp: EVM2EVMOnRamp(address(0)),
-        OldOffRamp: EVM2EVMOffRamp(offRamp.offRamp),
-        NewOffRamp: EVM2EVMOffRamp(address(0)),
+        OldOnRamp: OnRamp(currentOnRamp),
+        NewOnRamp: OnRamp(address(0)),
+        OldOffRamp: OffRamp(offRamp.offRamp),
+        NewOffRamp: OffRamp(address(0)),
         tokens: tokens,
         oldSuccessfulTokens: new address[](0)
       });

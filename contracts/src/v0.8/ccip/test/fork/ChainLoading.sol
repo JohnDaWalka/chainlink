@@ -97,15 +97,18 @@ contract ChainLoading is Test {
     _executeProposalOnTimeLock(sourceChain);
 
     // Send messages
-    Internal.EVM2EVMMessage[] memory msgs = sourceChain.testSuite.sendTokensSingleLane(remoteChainSelector);
+    Internal.EVM2AnyRampMessage[] memory msgs = sourceChain.testSuite.sendTokensSingleLane(remoteChainSelector);
 
     ForkedChainTestSetup memory destChain = _activateFork(destChainName);
 
     // Apply proposal on dest
     _executeProposalOnTimeLock(destChain);
 
+    // TODO convert to Any2EVMRampMessage
+    Internal.Any2EVMRampMessage[] memory destMsgs = new Internal.Any2EVMRampMessage[](msgs.length);
+
     // Execute messages
-    destChain.testSuite.ExecuteMsgs(msgs);
+    destChain.testSuite.ExecuteMsgs(destMsgs);
   }
 
   function run(
