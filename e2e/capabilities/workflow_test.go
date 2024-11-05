@@ -253,7 +253,44 @@ func TestWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
 		require.NoError(t, err)
-		fmt.Println("Deployed capabilities_registry contract at", capabilitiesRegistryAddress.Hex())
+		fmt.Println("Deployed capabilities_registry contract at", capabilitiesRegistryAddress)
+
+		forwarderAddress, tx, _, err := forwarder.DeployKeystoneForwarder(
+			sc.NewTXOpts(),
+			sc.Client,
+		)
+		require.NoError(t, err)
+		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		require.NoError(t, err)
+		fmt.Println("Deployed forwarder contract at", forwarderAddress)
+
+		in.NodeSet.NodeSpecs[0].Node.UserConfigOverrides = fmt.Sprintf(`
+		[Feature]
+		LogPoller = true
+
+		[OCR2]
+		Enabled = true
+		DatabaseTimeout = '1s'
+
+		[P2P.V2]
+		Enabled = true
+		ListenAddresses = ['0.0.0.0:6690']
+
+		# This is needed for the target capability to be initialized
+		[EVM.Workflow]
+		ForwarderAddress = '%s'
+		GasLimitDefault = 400_000
+
+		# This is needed for external registry
+		[Capabilities.ExternalRegistry]
+		Address = '%s'
+		NetworkID = 'evm'
+		ChainID = '%s'
+		`,
+			forwarderAddress,
+			capabilitiesRegistryAddress,
+			bc.ChainID,
+		)
 
 		// TODO: When the capabilities registry address is provided:
 		// - NOPs and nodes are added to the registry.
@@ -277,15 +314,6 @@ func TestWorkflow(t *testing.T) {
 		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
 		require.NoError(t, err)
 		fmt.Println("Deployed ocr3_capability contract at", ocr3CapabilityAddress.Hex())
-
-		forwarderAddress, tx, _, err := forwarder.DeployKeystoneForwarder(
-			sc.NewTXOpts(),
-			sc.Client,
-		)
-		require.NoError(t, err)
-		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
-		require.NoError(t, err)
-		fmt.Println("Deployed forwarder contract at", forwarderAddress.Hex())
 
 		feedsConsumerAddress, tx, _, err := feeds_consumer.DeployKeystoneFeedsConsumer(
 			sc.NewTXOpts(),
@@ -413,8 +441,16 @@ func TestWorkflow(t *testing.T) {
 		// ✅ 1. Deploy mock streams capability
 		// ✅ 2. Add boostrap job spec
 		// ✅ 3. Add OCR3 capability
+		// 		- ❌ This fails to start successfully
 		// ✅ 3. Deploy and configure OCR3 contract
 		// 4. Add chain write capabilities
+		//  	- Check if they are added (Logs)
+		// 5. Deploy capabilities registry
+		// 		- Add nodes to registry
+		// 		- Add capabilities to registry
+		// ✅ 6. Deploy Forwarder
+		//      - Configure forwarder
+		// ✅ 7. Deploy Feeds Consumer
 		// - Add Keystone workflow
 	})
 }

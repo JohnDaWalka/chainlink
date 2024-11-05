@@ -151,11 +151,15 @@ func (r *Registry) List(_ context.Context) ([]capabilities.BaseCapability, error
 func (r *Registry) Add(ctx context.Context, c capabilities.BaseCapability) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.lggr.Info("DSK: Adding capability")
 
 	info, err := c.Info(ctx)
 	if err != nil {
+
 		return err
 	}
+
+	r.lggr.Infow("DSK: Adding capability", "id", info.ID, "type", info.CapabilityType, "description", info.Description, "version", info.Version())
 
 	switch info.CapabilityType {
 	case capabilities.CapabilityTypeTrigger:
