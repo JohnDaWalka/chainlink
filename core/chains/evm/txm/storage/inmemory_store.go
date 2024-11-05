@@ -239,7 +239,7 @@ func (m *InMemoryStore) UpdateUnstartedTransactionWithNonce(nonce uint64) (*type
 	defer m.Unlock()
 
 	if len(m.UnstartedTransactions) == 0 {
-		m.lggr.Debug("Unstarted transactions queue is empty for address: %v", m.address)
+		m.lggr.Debugf("Unstarted transactions queue is empty for address: %v", m.address)
 		return nil, nil
 	}
 

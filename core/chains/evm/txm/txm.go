@@ -86,7 +86,7 @@ type Txm struct {
 	wg        sync.WaitGroup
 }
 
-func NewTxm(lggr logger.Logger, chainID *big.Int, client Client, attemptBuilder AttemptBuilder, txStore TxStore, config Config, enabledAddresses []common.Address) *Txm {
+func NewTxm(lggr logger.Logger, chainID *big.Int, client Client, attemptBuilder AttemptBuilder, txStore TxStore, stuckTxDetector StuckTxDetector, config Config, enabledAddresses []common.Address) *Txm {
 	return &Txm{
 		lggr:             logger.Sugared(logger.Named(lggr, "Txm")),
 		enabledAddresses: enabledAddresses,
@@ -94,6 +94,7 @@ func NewTxm(lggr logger.Logger, chainID *big.Int, client Client, attemptBuilder 
 		client:           client,
 		attemptBuilder:   attemptBuilder,
 		txStore:          txStore,
+		stuckTxDetector:  stuckTxDetector,
 		config:           config,
 		nonceMap:         make(map[common.Address]uint64),
 		triggerCh:        make(map[common.Address]chan struct{}),
@@ -354,7 +355,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 			if isStuck {
 				tx.IsPurgeable = true
 				t.txStore.MarkUnconfirmedTransactionPurgeable(ctx, tx.Nonce, address)
-				t.lggr.Infof("Marked tx as purgeable. Sending purge attempt for txID: ", tx.ID)
+				t.lggr.Infof("Marked tx as purgeable. Sending purge attempt for txID: %d", tx.ID)
 				return false, t.createAndSendAttempt(ctx, tx, address)
 			}
 		}

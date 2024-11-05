@@ -97,8 +97,8 @@ func NewTxmv2(
 	ds sqlutil.DataSource,
 	chainConfig ChainConfig,
 	fCfg FeeConfig,
+	txConfig config.Transactions,
 	blockTime time.Duration,
-	fwdEnabled bool,
 	client client.Client,
 	lggr logger.Logger,
 	logPoller logpoller.LogPoller,
@@ -106,13 +106,24 @@ func NewTxmv2(
 	estimator gas.EvmFeeEstimator,
 ) (TxManager, error) {
 	var fwdMgr *forwarders.FwdMgr
-	if fwdEnabled {
+	if txConfig.ForwardersEnabled() {
 		fwdMgr = forwarders.NewFwdMgr(ds, client, logPoller, lggr, chainConfig)
 	} else {
 		lggr.Info("ForwarderManager: Disabled")
 	}
 
 	chainID := client.ConfiguredChainID()
+
+	var stuckTxDetector txm.StuckTxDetector
+	if txConfig.AutoPurge().Enabled() {
+		stuckTxDetectorConfig := txm.StuckTxDetectorConfig{
+			BlockTime:             blockTime,
+			StuckTxBlockThreshold: uint16(*txConfig.AutoPurge().Threshold()),
+			DetectionApiUrl:       txConfig.AutoPurge().DetectionApiUrl().Path,
+		}
+		stuckTxDetector = txm.NewStuckTxDetector(lggr, chainConfig.ChainType(), stuckTxDetectorConfig)
+	}
+
 	addresses, err := keyStore.EnabledAddressesForChain(context.TODO(), chainID)
 	if err != nil {
 		return nil, err
@@ -129,7 +140,7 @@ func NewTxmv2(
 		RetryBlockThreshold: uint16(fCfg.BumpThreshold()),
 		EmptyTxLimitDefault: fCfg.LimitDefault(),
 	}
-	t := txm.NewTxm(lggr, chainID, client, attemptBuilder, inMemoryStoreManager, config, addresses)
+	t := txm.NewTxm(lggr, chainID, client, attemptBuilder, inMemoryStoreManager, stuckTxDetector, config, addresses)
 	return txm.NewTxmOrchestrator[common.Hash, *evmtypes.Head](lggr, chainID, t, inMemoryStoreManager, fwdMgr), nil
 }
 
