@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IFeeQuoter} from "../../interfaces/IFeeQuoter.sol";
-
 import {MockV3Aggregator} from "../../../tests/MockV3Aggregator.sol";
 import {FeeQuoter} from "../../FeeQuoter.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -210,7 +208,11 @@ contract FeeQuoterSetup is TokenSetup {
   ) internal pure returns (FeeQuoter.TokenPriceFeedUpdate memory) {
     return FeeQuoter.TokenPriceFeedUpdate({
       sourceToken: sourceToken,
-      feedConfig: FeeQuoter.TokenPriceFeedConfig({dataFeedAddress: dataFeedAddress, tokenDecimals: tokenDecimals})
+      feedConfig: FeeQuoter.TokenPriceFeedConfig({
+        dataFeedAddress: dataFeedAddress,
+        tokenDecimals: tokenDecimals,
+        isEnabled: true
+      })
     });
   }
 
@@ -268,13 +270,14 @@ contract FeeQuoterSetup is TokenSetup {
   ) internal pure virtual {
     assertEq(config1.dataFeedAddress, config2.dataFeedAddress);
     assertEq(config1.tokenDecimals, config2.tokenDecimals);
+    assertEq(config1.isEnabled, config2.isEnabled);
   }
 
-  function _assertTokenPriceFeedConfigUnconfigured(
+  function _assertTokenPriceFeedConfigNotConfigured(
     FeeQuoter.TokenPriceFeedConfig memory config
   ) internal pure virtual {
     _assertTokenPriceFeedConfigEquality(
-      config, FeeQuoter.TokenPriceFeedConfig({dataFeedAddress: address(0), tokenDecimals: 0})
+      config, FeeQuoter.TokenPriceFeedConfig({dataFeedAddress: address(0), tokenDecimals: 0, isEnabled: false})
     );
   }
 

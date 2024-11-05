@@ -7,8 +7,6 @@ import {RMNRemote} from "../../rmn/RMNRemote.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import "forge-std/console.sol";
-
 contract RMNRemoteSetup is BaseTest {
   RMNRemote public s_rmnRemote;
   address public OFF_RAMP_ADDRESS;
@@ -16,19 +14,18 @@ contract RMNRemoteSetup is BaseTest {
   RMNRemote.Signer[] public s_signers;
   Vm.Wallet[] public s_signerWallets;
 
-  Internal.MerkleRoot[] s_merkleRoots;
-  IRMNRemote.Signature[] s_signatures;
-  uint256 internal s_v;
+  Internal.MerkleRoot[] internal s_merkleRoots;
+  IRMNRemote.Signature[] internal s_signatures;
 
-  bytes16 internal constant curseSubj1 = bytes16(keccak256("subject 1"));
-  bytes16 internal constant curseSubj2 = bytes16(keccak256("subject 2"));
+  bytes16 internal constant CURSE_SUBJ_1 = bytes16(keccak256("subject 1"));
+  bytes16 internal constant CURSE_SUBJ_2 = bytes16(keccak256("subject 2"));
   bytes16[] internal s_curseSubjects;
 
   function setUp() public virtual override {
     super.setUp();
     s_rmnRemote = new RMNRemote(1);
     OFF_RAMP_ADDRESS = makeAddr("OFF RAMP");
-    s_curseSubjects = [curseSubj1, curseSubj2];
+    s_curseSubjects = [CURSE_SUBJ_1, CURSE_SUBJ_2];
 
     _setupSigners(10);
   }
@@ -47,13 +44,13 @@ contract RMNRemoteSetup is BaseTest {
       s_signers.pop();
     }
 
-    for (uint256 i = 0; i < numSigners; i++) {
+    for (uint256 i = 0; i < numSigners; ++i) {
       s_signerWallets.push(vm.createWallet(_randomNum()));
     }
 
     _sort(s_signerWallets);
 
-    for (uint256 i = 0; i < numSigners; i++) {
+    for (uint256 i = 0; i < numSigners; ++i) {
       s_signers.push(RMNRemote.Signer({onchainPublicKey: s_signerWallets[i].addr, nodeIndex: uint64(i)}));
     }
   }
@@ -61,8 +58,8 @@ contract RMNRemoteSetup is BaseTest {
   /// @notice generates n merkleRoots and matching valid signatures and populates them into
   /// the shared storage vars
   function _generatePayloadAndSigs(uint256 numUpdates, uint256 numSigs) internal {
-    require(numUpdates > 0, "need at least 1 dest lane update");
-    require(numSigs <= s_signerWallets.length, "cannot generate more sigs than signers");
+    vm.assertTrue(numUpdates > 0, "need at least 1 dest lane update");
+    vm.assertTrue(numSigs <= s_signerWallets.length, "cannot generate more sigs than signers");
 
     // remove any existing merkleRoots and sigs
     while (s_merkleRoots.length > 0) {
@@ -71,18 +68,13 @@ contract RMNRemoteSetup is BaseTest {
     while (s_signatures.length > 0) {
       s_signatures.pop();
     }
-    s_v = 0;
 
     for (uint256 i = 0; i < numUpdates; i++) {
       s_merkleRoots.push(_generateRandomDestLaneUpdate());
     }
 
     for (uint256 i = 0; i < numSigs; i++) {
-      (uint8 v, IRMNRemote.Signature memory sig) = _signDestLaneUpdate(s_merkleRoots, s_signerWallets[i]);
-      s_signatures.push(sig);
-      if (v == 28) {
-        s_v += 1 << i;
-      }
+      s_signatures.push(_signDestLaneUpdate(s_merkleRoots, s_signerWallets[i]));
     }
   }
 
@@ -100,12 +92,11 @@ contract RMNRemoteSetup is BaseTest {
   }
 
   /// @notice signs the provided payload with the provided wallet
-  /// @return sigV v, either 27 of 28
   /// @return sig the signature
   function _signDestLaneUpdate(
     Internal.MerkleRoot[] memory merkleRoots,
     Vm.Wallet memory wallet
-  ) private returns (uint8 sigV, IRMNRemote.Signature memory) {
+  ) private returns (IRMNRemote.Signature memory) {
     (, RMNRemote.Config memory config) = s_rmnRemote.getVersionedConfig();
     bytes32 digest = keccak256(
       abi.encode(
@@ -121,7 +112,14 @@ contract RMNRemoteSetup is BaseTest {
       )
     );
     (uint8 v, bytes32 r, bytes32 s) = vm.sign(wallet, digest);
-    return (v, IRMNRemote.Signature({r: r, s: s}));
+    // RMNRemote only supports sigs with v=27, so adjust if necessary
+    // Any valid ECDSA sig (r, s, v) can be "flipped" into (r, s*, v*) without knowing the private key (where v=27 or 28 for secp256k1)
+    // https://github.com/kadenzipfel/smart-contract-vulnerabilities/blob/master/vulnerabilities/signature-malleability.md
+    if (v == 28) {
+      uint256 N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
+      s = bytes32(N - uint256(s));
+    }
+    return (IRMNRemote.Signature({r: r, s: s}));
   }
 
   /// @notice bubble sort on a storage array of wallets

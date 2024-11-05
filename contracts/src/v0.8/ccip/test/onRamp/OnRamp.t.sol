@@ -5,6 +5,7 @@ import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
 import {IRMNRemote} from "../../interfaces/IRMNRemote.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 
+import {Ownable2Step} from "../../../shared/access/Ownable2Step.sol";
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {FeeQuoter} from "../../FeeQuoter.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -14,7 +15,8 @@ import {USDPriceWith18Decimals} from "../../libraries/USDPriceWith18Decimals.sol
 import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
-import "./OnRampSetup.t.sol";
+import {OnRampHelper} from "../helpers/OnRampHelper.sol";
+import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
@@ -45,7 +47,6 @@ contract OnRamp_constructor is OnRampSetup {
     assertEq("OnRamp 1.6.0-dev", s_onRamp.typeAndVersion());
     assertEq(OWNER, s_onRamp.owner());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR));
-    assertEq(address(s_sourceRouter), address(s_onRamp.getRouter(DEST_CHAIN_SELECTOR)));
   }
 
   function test_Constructor_EnableAllowList_ForwardFromRouter_Reverts() public {
@@ -578,8 +579,8 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = sourceETH;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
-      minFeeUSDCents: 1,
-      maxFeeUSDCents: 0,
+      minFeeUSDCents: 0,
+      maxFeeUSDCents: 1,
       deciBps: 0,
       destGasOverhead: 0,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) + 32,
@@ -764,10 +765,10 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
 
   function test_setDynamicConfig_InvalidConfigOnlyOwner_Revert() public {
     vm.startPrank(STRANGER);
-    vm.expectRevert("Only callable by owner");
+    vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_onRamp.setDynamicConfig(_generateDynamicOnRampConfig(address(2)));
     vm.startPrank(ADMIN);
-    vm.expectRevert("Only callable by owner");
+    vm.expectRevert(Ownable2Step.OnlyCallableByOwner.selector);
     s_onRamp.setDynamicConfig(_generateDynamicOnRampConfig(address(2)));
   }
 
@@ -827,7 +828,7 @@ contract OnRamp_withdrawFeeTokens is OnRampSetup {
       emit OnRamp.FeeTokenWithdrawn(FEE_AGGREGATOR, feeTokens[i], amounts[i]);
     }
 
-    s_onRamp.withdrawFeeTokens();
+    s_onRamp.withdrawFeeTokens(feeTokens);
 
     for (uint256 i = 0; i < feeTokens.length; ++i) {
       assertEq(IERC20(feeTokens[i]).balanceOf(FEE_AGGREGATOR), amounts[i]);
@@ -839,7 +840,7 @@ contract OnRamp_withdrawFeeTokens is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.FeeTokenWithdrawn(FEE_AGGREGATOR, s_sourceFeeToken, s_nopFees[s_sourceFeeToken]);
 
-    s_onRamp.withdrawFeeTokens();
+    s_onRamp.withdrawFeeTokens(s_sourceFeeTokens);
 
     assertEq(IERC20(s_sourceFeeToken).balanceOf(FEE_AGGREGATOR), s_nopFees[s_sourceFeeToken]);
     assertEq(IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp)), 0);
@@ -872,8 +873,11 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
     // supports disabling a lane by setting a router to zero
     vm.expectEmit();
     emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, IRouter(address(0)), false);
+
     s_onRamp.applyDestChainConfigUpdates(configArgs);
-    assertEq(address(0), address(s_onRamp.getRouter(DEST_CHAIN_SELECTOR)));
+
+    (,, address router) = s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    assertEq(address(0), router);
 
     // supports updating and adding lanes simultaneously
     configArgs = new OnRamp.DestChainConfigArgs[](2);
@@ -882,15 +886,24 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
       router: s_sourceRouter,
       allowlistEnabled: false
     });
-    configArgs[1] =
-      OnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999)), allowlistEnabled: false});
+    uint64 newDestChainSelector = 99999;
+    address newRouter = makeAddr("newRouter");
+
+    configArgs[1] = OnRamp.DestChainConfigArgs({
+      destChainSelector: newDestChainSelector,
+      router: IRouter(newRouter),
+      allowlistEnabled: false
+    });
+
     vm.expectEmit();
     emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
     vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(9999, 0, IRouter(address(9999)), false);
+    emit OnRamp.DestChainConfigSet(newDestChainSelector, 0, IRouter(newRouter), false);
+
     s_onRamp.applyDestChainConfigUpdates(configArgs);
-    assertEq(address(s_sourceRouter), address(s_onRamp.getRouter(DEST_CHAIN_SELECTOR)));
-    assertEq(address(9999), address(s_onRamp.getRouter(9999)));
+
+    (,, address newGotRouter) = s_onRamp.getDestChainConfig(newDestChainSelector);
+    assertEq(newRouter, newGotRouter);
 
     // handles empty list
     uint256 numLogs = vm.getRecordedLogs().length;

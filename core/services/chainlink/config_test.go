@@ -1398,8 +1398,16 @@ func TestConfig_full(t *testing.T) {
 		if got.EVM[c].Transactions.AutoPurge.DetectionApiUrl == nil {
 			got.EVM[c].Transactions.AutoPurge.DetectionApiUrl = new(commoncfg.URL)
 		}
+		if got.EVM[c].GasEstimator.DAOracle.OracleType == nil {
+			oracleType := evmcfg.DAOracleOPStack
+			got.EVM[c].GasEstimator.DAOracle.OracleType = &oracleType
+		}
 		if got.EVM[c].GasEstimator.DAOracle.OracleAddress == nil {
 			got.EVM[c].GasEstimator.DAOracle.OracleAddress = new(types.EIP55Address)
+		}
+
+		if got.EVM[c].GasEstimator.DAOracle.CustomGasPriceCalldata == nil {
+			got.EVM[c].GasEstimator.DAOracle.CustomGasPriceCalldata = new(string)
 		}
 	}
 
@@ -1427,7 +1435,7 @@ func TestConfig_Validate(t *testing.T) {
 		- LDAP.RunUserGroupCN: invalid value (<nil>): LDAP ReadUserGroupCN can not be empty
 		- LDAP.RunUserGroupCN: invalid value (<nil>): LDAP RunUserGroupCN can not be empty
 		- LDAP.ReadUserGroupCN: invalid value (<nil>): LDAP ReadUserGroupCN can not be empty
-	- EVM: 9 errors:
+	- EVM: 10 errors:
 		- 1.ChainID: invalid value (1): duplicate - must be unique
 		- 0.Nodes.1.Name: invalid value (foo): duplicate - must be unique
 		- 3.Nodes.4.WSURL: invalid value (ws://dupe.com): duplicate - must be unique
@@ -1483,6 +1491,7 @@ func TestConfig_Validate(t *testing.T) {
 			- ChainID: missing: required for all chains
 			- Nodes: missing: must have at least one node
 		- 5.Transactions.AutoPurge.DetectionApiUrl: invalid value (): must be set for scroll
+		- 6.Nodes: missing: 0th node (primary) must have a valid WSURL when http polling is disabled
 	- Cosmos: 5 errors:
 		- 1.ChainID: invalid value (Malaga-420): duplicate - must be unique
 		- 0.Nodes.1.Name: invalid value (test): duplicate - must be unique
