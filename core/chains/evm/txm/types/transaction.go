@@ -160,8 +160,8 @@ type TxMeta struct {
 	MessageIDs []string `json:"MessageIDs,omitempty"`
 	SeqNumbers []uint64 `json:"SeqNumbers,omitempty"`
 
-	// Dual Transmit
-	DualTransmit bool `json:"DualTransmit,omitempty"`
+	// Dual Broadcast
+	DualBroadcast bool `json:"DualBroadcast,omitempty"`
 }
 
 type QueueingTxStrategy struct {

@@ -37,9 +37,9 @@ func NewStuckTxDetector(lggr logger.Logger, chaintype chaintype.ChainType, confi
 
 func (s *stuckTxDetector) DetectStuckTransaction(tx *types.Transaction) (bool, error) {
 	switch s.chainType {
-	// TODO: add correct chaintype
-	case chaintype.ChainArbitrum:
-		result, err := s.apiBasedDetection(tx)
+	// TODO: rename
+	case chaintype.ChainDualBroadcast:
+		result, err := s.dualBroadcastDetection(tx)
 		if result || err != nil {
 			return result, err
 		}
@@ -52,7 +52,7 @@ func (s *stuckTxDetector) DetectStuckTransaction(tx *types.Transaction) (bool, e
 func (s *stuckTxDetector) timeBasedDetection(tx *types.Transaction) bool {
 	threshold := (s.config.BlockTime * time.Duration(s.config.StuckTxBlockThreshold))
 	if time.Since(tx.LastBroadcastAt) > threshold && !tx.LastBroadcastAt.IsZero() {
-		s.lggr.Debugf("TxID: %v last broadcast was: %v which is more than the configured threshold: %v. Transaction is now considered stuck and will be purged.",
+		s.lggr.Debugf("TxID: %v last broadcast was: %v which is more than the max configured duration: %v. Transaction is now considered stuck and will be purged.",
 			tx.ID, tx.LastBroadcastAt, threshold)
 		return true
 	}
@@ -72,7 +72,7 @@ const (
 	ApiStatusUnknown   = "UNKNOWN"
 )
 
-func (s *stuckTxDetector) apiBasedDetection(tx *types.Transaction) (bool, error) {
+func (s *stuckTxDetector) dualBroadcastDetection(tx *types.Transaction) (bool, error) {
 	for _, attempt := range tx.Attempts {
 		resp, err := http.Get(s.config.DetectionApiUrl + attempt.Hash.String())
 		if err != nil {
