@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -218,6 +219,9 @@ func CreateOCRv2Jobs(
 		}
 	}
 
+	// Initialize map to store job IDs for each chainlink node
+	jobIDs := make(map[*nodeclient.ChainlinkK8sClient][]string)
+
 	for _, ocrInstance := range ocrInstances {
 		bootstrapSpec := &nodeclient.OCR2TaskJobSpec{
 			Name:    fmt.Sprintf("ocr2-bootstrap-%s", ocrInstance.Address()),
@@ -284,9 +288,29 @@ func CreateOCRv2Jobs(
 					P2PV2Bootstrappers:                pq.StringArray{p2pV2Bootstrapper},       // bootstrap node key and address <p2p-key>@bootstrap:6690
 				},
 			}
-			_, err = chainlinkNode.MustCreateJob(ocrSpec)
+			var ocrJob *nodeclient.Job
+			ocrJob, err = chainlinkNode.MustCreateJob(ocrSpec)
 			if err != nil {
 				return fmt.Errorf("creating OCR task job on OCR node have failed: %w", err)
+			}
+			jobIDs[chainlinkNode] = append(jobIDs[chainlinkNode], ocrJob.Data.ID) // Store each job ID per node
+		}
+	}
+	// Verify all jobs have been created for each chainlink node before moving on
+	for chainlinkNode, ids := range jobIDs {
+		for _, jobID := range ids {
+			var retries = 5
+			var delay = time.Second * 2
+
+			for i := 0; i < retries; i++ {
+				_, resp, err := chainlinkNode.ReadJob(jobID)
+				if err == nil && resp.StatusCode == http.StatusOK {
+					break
+				}
+				if i == retries-1 {
+					return fmt.Errorf("failed to verify job creation for node %s, jobID %s after %d retries", chainlinkNode.PodName, jobID, retries)
+				}
+				time.Sleep(delay)
 			}
 		}
 	}
