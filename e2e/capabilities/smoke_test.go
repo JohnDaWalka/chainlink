@@ -3,6 +3,7 @@ package capabilities_test
 import (
 	"fmt"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/chaos"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+	"time"
 )
 
 type Config struct {
@@ -84,5 +86,16 @@ func TestDON(t *testing.T) {
 		require.Equal(t, len(r.Errors), 0)
 		fmt.Printf("error: %v", err)
 		fmt.Println(r)
+
+		_, err = chaos.ExecPumba("stop --duration=1s --restart re2:node0")
+		require.NoError(t, err)
+		time.Sleep(5 * time.Second)
+		_, _, err = c[0].ReadBridges()
+		require.NoError(t, err)
+		_, err = chaos.ExecPumba("stop --duration=1s --restart re2:node1")
+		require.NoError(t, err)
+		time.Sleep(5 * time.Second)
+		_, _, err = c[1].ReadBridges()
+		require.NoError(t, err)
 	})
 }
