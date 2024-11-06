@@ -350,6 +350,8 @@ github.com/smartcontractkit/chainlink-testing-framework/framework v0.1.7 h1:7dc7
 github.com/smartcontractkit/chainlink-testing-framework/framework v0.1.7/go.mod h1:1EOQhjoNTMayAGsYKH+92tgsqDnu+36GbuoRmSLx0OA=
 github.com/smartcontractkit/chainlink-testing-framework/framework v0.1.10-0.20241106155557-a9927b67d9d2 h1:bhYhPSfh/+uontFOuDgkEHc6Zt5VID8RzduzGwYtARY=
 github.com/smartcontractkit/chainlink-testing-framework/framework v0.1.10-0.20241106155557-a9927b67d9d2/go.mod h1:1EOQhjoNTMayAGsYKH+92tgsqDnu+36GbuoRmSLx0OA=
+github.com/smartcontractkit/chainlink-testing-framework/framework v0.1.10 h1:7b9ptXTbRH0vqkm/9rPdNgC2wcMahPmu8TsnDPyxrB4=
+github.com/smartcontractkit/chainlink-testing-framework/framework v0.1.10/go.mod h1:1EOQhjoNTMayAGsYKH+92tgsqDnu+36GbuoRmSLx0OA=
 github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.4 h1:hPI9GhHE1RmIG1oyPeFjED0AhWnNb9JzD74Oq2bO+IQ=
 github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.4/go.mod h1:afY3QmNgeR/VI1pRbGH8g3YXGy7C2RrFOwUzEFvL3L8=
 github.com/status-im/keycard-go v0.2.0 h1:QDLFswOQu1r5jsycloeQh3bVU8n/NatHHaZobtDnDzA=

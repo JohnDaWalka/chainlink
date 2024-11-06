@@ -6,7 +6,7 @@ go 1.22.8
 
 require (
 	github.com/ethereum/go-ethereum v1.14.11
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.1.10-0.20241106155557-a9927b67d9d2
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.1.10
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.4
 	github.com/stretchr/testify v1.9.0
 	github.com/testcontainers/testcontainers-go v0.33.0
