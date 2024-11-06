@@ -3188,8 +3188,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -4871,8 +4871,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -4976,8 +4976,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -6128,8 +6128,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -6764,8 +6764,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -6793,7 +6793,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'arbitrum'
-FinalityDepth = 4350
+FinalityDepth = 10
 FinalityTagEnabled = true
 LinkContractAddress = '0xf97f4df75117a78c1A5a0DBb814Af92458539FB4'
 LogBackfillBatchSize = 1000
@@ -8027,8 +8027,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -8339,8 +8339,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -8585,7 +8585,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'arbitrum'
-FinalityDepth = 4350
+FinalityDepth = 10
 FinalityTagEnabled = false
 LinkContractAddress = '0x615fBe6372676474d9e6933d310469c9b68e9726'
 LogBackfillBatchSize = 1000
@@ -8693,7 +8693,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'arbitrum'
-FinalityDepth = 4350
+FinalityDepth = 10
 FinalityTagEnabled = true
 LinkContractAddress = '0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28'
 LogBackfillBatchSize = 1000
@@ -8801,7 +8801,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'arbitrum'
-FinalityDepth = 4350
+FinalityDepth = 10
 FinalityTagEnabled = true
 LinkContractAddress = '0xE4aB69C077896252FAFBD49EFD26B5D171A32410'
 LogBackfillBatchSize = 1000
@@ -9413,8 +9413,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
