@@ -33,12 +33,14 @@ func TestDeployCCIPContracts(t *testing.T) {
 	require.NotNil(t, s.Chains[feedChainSel].USDFeeds)
 
 	newAddresses := deployment.NewMemoryAddressBook()
+	mcms, err := NewTestMCMSConfig(e)
+	require.NoError(t, err)
 	err = DeployCCIPContracts(e, newAddresses, DeployCCIPContractConfig{
 		HomeChainSel:   homeChainSel,
 		FeedChainSel:   feedChainSel,
 		ChainsToDeploy: e.AllChainSelectors(),
 		TokenConfig:    NewTokenConfig(),
-		MCMSConfig:     NewTestMCMSConfig(t, e),
+		MCMSConfig:     mcms,
 		OCRSecrets:     deployment.XXXGenerateTestOCRSecrets(),
 	})
 	require.NoError(t, err)

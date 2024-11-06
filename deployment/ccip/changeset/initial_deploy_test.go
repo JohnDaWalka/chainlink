@@ -25,13 +25,14 @@ func TestInitialDeploy(t *testing.T) {
 	state, err := ccdeploy.LoadOnchainState(tenv.Env)
 	require.NoError(t, err)
 	require.NotNil(t, state.Chains[tenv.HomeChainSel].LinkToken)
-
+	mcmsCfg, err := ccdeploy.NewTestMCMSConfig(e)
+	require.NoError(t, err)
 	output, err := InitialDeploy(tenv.Env, ccdeploy.DeployCCIPContractConfig{
 		HomeChainSel:   tenv.HomeChainSel,
 		FeedChainSel:   tenv.FeedChainSel,
 		ChainsToDeploy: tenv.Env.AllChainSelectors(),
 		TokenConfig:    ccdeploy.NewTestTokenConfig(state.Chains[tenv.FeedChainSel].USDFeeds),
-		MCMSConfig:     ccdeploy.NewTestMCMSConfig(t, e),
+		MCMSConfig:     mcmsCfg,
 		OCRSecrets:     deployment.XXXGenerateTestOCRSecrets(),
 	})
 	require.NoError(t, err)

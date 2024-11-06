@@ -35,13 +35,14 @@ func TestActiveCandidate(t *testing.T) {
 
 	feeds := state.Chains[tenv.FeedChainSel].USDFeeds
 	tokenConfig := ccdeploy.NewTestTokenConfig(feeds)
-
+	mcmsCfg, err := ccdeploy.NewTestMCMSConfig(e)
+	require.NoError(t, err)
 	output, err := InitialDeploy(tenv.Env, ccdeploy.DeployCCIPContractConfig{
 		HomeChainSel:   tenv.HomeChainSel,
 		FeedChainSel:   tenv.FeedChainSel,
 		ChainsToDeploy: tenv.Env.AllChainSelectors(),
 		TokenConfig:    tokenConfig,
-		MCMSConfig:     ccdeploy.NewTestMCMSConfig(t, e),
+		MCMSConfig:     mcmsCfg,
 		OCRSecrets:     deployment.XXXGenerateTestOCRSecrets(),
 	})
 	require.NoError(t, err)

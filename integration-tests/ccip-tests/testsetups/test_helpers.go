@@ -19,6 +19,16 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
+	"github.com/AlekSi/pointer"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+	"github.com/subosito/gotenv"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc/credentials/insecure"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	ccipdeployment "github.com/smartcontractkit/chainlink/deployment/ccip"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
@@ -30,17 +40,6 @@ import (
 	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
-
-	"github.com/AlekSi/pointer"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"github.com/subosito/gotenv"
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // DeployedLocalDevEnvironment is a helper struct for setting up a local dev environment with docker
@@ -80,9 +79,9 @@ func NewLocalDevEnvironment(t *testing.T, lggr logger.Logger) (ccipdeployment.De
 	chains, err := devenv.NewChains(lggr, envConfig.Chains)
 	require.NoError(t, err)
 	// locate the home chain
-	homeChainSel := envConfig.HomeChainSelector
+	homeChainSel := cfg.CCIP.GetHomeChainSelector()
 	require.NotEmpty(t, homeChainSel, "homeChainSel should not be empty")
-	feedSel := envConfig.FeedChainSelector
+	feedSel := cfg.CCIP.GetFeedChainSelector()
 	require.NotEmpty(t, feedSel, "feedSel should not be empty")
 	replayBlocks, err := ccipdeployment.LatestBlocksByChain(ctx, chains)
 	require.NoError(t, err)
@@ -123,12 +122,14 @@ func NewLocalDevEnvironmentWithRMN(
 
 	// Deploy CCIP contracts.
 	newAddresses := deployment.NewMemoryAddressBook()
+	mcmsCfg, err := ccipdeployment.NewTestMCMSConfig(tenv.Env)
+	require.NoError(t, err)
 	err = ccipdeployment.DeployCCIPContracts(tenv.Env, newAddresses, ccipdeployment.DeployCCIPContractConfig{
 		HomeChainSel:   tenv.HomeChainSel,
 		FeedChainSel:   tenv.FeedChainSel,
 		ChainsToDeploy: tenv.Env.AllChainSelectors(),
 		TokenConfig:    ccipdeployment.NewTestTokenConfig(state.Chains[tenv.FeedChainSel].USDFeeds),
-		MCMSConfig:     ccipdeployment.NewTestMCMSConfig(t, tenv.Env),
+		MCMSConfig:     mcmsCfg,
 		OCRSecrets:     deployment.XXXGenerateTestOCRSecrets(),
 	})
 	require.NoError(t, err)
@@ -324,16 +325,9 @@ func CreateDockerEnv(t *testing.T) (
 	}
 	require.NotEmpty(t, jdConfig, "JD config is empty")
 
-	homeChainSelector, err := cfg.CCIP.GetHomeChainSelector(evmNetworks)
-	require.NoError(t, err, "Error getting home chain selector")
-	feedChainSelector, err := cfg.CCIP.GetFeedChainSelector(evmNetworks)
-	require.NoError(t, err, "Error getting feed chain selector")
-
 	return &devenv.EnvironmentConfig{
-		Chains:            chains,
-		JDConfig:          jdConfig,
-		HomeChainSelector: homeChainSelector,
-		FeedChainSelector: feedChainSelector,
+		Chains:   chains,
+		JDConfig: jdConfig,
 	}, env, cfg
 }
 
@@ -379,7 +373,7 @@ func StartChainlinkNodes(
 			cfg.NodeConfig.ChainConfigTOMLByChainID,
 		)
 
-		toml.Capabilities.ExternalRegistry.NetworkID = ptr.Ptr(relay.NetworkEVM)
+		toml.Capabilities.ExternalRegistry.NetworkID = ptr.Ptr(registryConfig.NetworkType)
 		toml.Capabilities.ExternalRegistry.ChainID = ptr.Ptr(strconv.FormatUint(registryConfig.EVMChainID, 10))
 		toml.Capabilities.ExternalRegistry.Address = ptr.Ptr(registryConfig.Contract.String())
 

@@ -38,13 +38,15 @@ func TestInitialDeployOnLocal(t *testing.T) {
 			DeviationPPB:      cciptypes.NewBigIntFromInt64(1e9),
 		},
 	)
+	mcmsCfg, err := ccdeploy.NewTestMCMSConfig(e)
+	require.NoError(t, err)
 	// Apply migration
 	output, err := changeset.InitialDeploy(tenv.Env, ccdeploy.DeployCCIPContractConfig{
 		HomeChainSel:   tenv.HomeChainSel,
 		FeedChainSel:   tenv.FeedChainSel,
 		ChainsToDeploy: tenv.Env.AllChainSelectors(),
 		TokenConfig:    tokenConfig,
-		MCMSConfig:     ccdeploy.NewTestMCMSConfig(t, e),
+		MCMSConfig:     mcmsCfg,
 		OCRSecrets:     deployment.XXXGenerateTestOCRSecrets(),
 	})
 	require.NoError(t, err)

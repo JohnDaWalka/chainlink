@@ -32,11 +32,13 @@ func TestAddLane(t *testing.T) {
 
 	// Set up CCIP contracts and a DON per chain.
 	newAddresses := deployment.NewMemoryAddressBook()
+	mcms, err := NewTestMCMSConfig(e.Env)
+	require.NoError(t, err)
 	err = DeployCCIPContracts(e.Env, newAddresses, DeployCCIPContractConfig{
 		HomeChainSel:   e.HomeChainSel,
 		FeedChainSel:   e.FeedChainSel,
 		TokenConfig:    tokenConfig,
-		MCMSConfig:     NewTestMCMSConfig(t, e.Env),
+		MCMSConfig:     mcms,
 		ChainsToDeploy: []uint64{chain1, chain2},
 		OCRSecrets:     deployment.XXXGenerateTestOCRSecrets(),
 	})

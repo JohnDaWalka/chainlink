@@ -10,6 +10,7 @@ import (
 	csav1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/csa"
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 )
 
@@ -18,6 +19,13 @@ type JDConfig struct {
 	WSRPC    string
 	Creds    credentials.TransportCredentials
 	NodeInfo []NodeInfo
+}
+
+func (cfg JDConfig) IsEmpty() bool {
+	if cfg.GRPC == "" && cfg.WSRPC == "" {
+		return true
+	}
+	return false
 }
 
 func NewJDConnection(cfg JDConfig) (*grpc.ClientConn, error) {
