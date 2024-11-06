@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/guregu/null.v4"
@@ -193,6 +194,7 @@ func CreateOCRv2Jobs(
 	mockServerValue int, // Value to get from the mock server when querying the path
 	chainId int64, // EVM chain ID
 	forwardingAllowed bool,
+	l zerolog.Logger,
 ) error {
 	// Collect P2P ID
 	bootstrapP2PIds, err := bootstrapNode.MustReadP2PKeys()
@@ -296,20 +298,32 @@ func CreateOCRv2Jobs(
 			jobIDs[chainlinkNode] = append(jobIDs[chainlinkNode], ocrJob.Data.ID) // Store each job ID per node
 		}
 	}
-	// Verify all jobs have been created for each chainlink node before moving on
+	l.Info().Msg("Verify OCRv2 jobs have been created")
 	for chainlinkNode, ids := range jobIDs {
 		for _, jobID := range ids {
-			var retries = 5
-			var delay = time.Second * 2
-
+			var retries = 4
+			var baseDelay = time.Second * 2
 			for i := 0; i < retries; i++ {
 				_, resp, err := chainlinkNode.ReadJob(jobID)
 				if err == nil && resp.StatusCode == http.StatusOK {
+					l.Info().
+						Str("Node", chainlinkNode.PodName).
+						Str("Job ID", jobID).
+						Msg("OCRv2 job successfully created")
 					break
 				}
 				if i == retries-1 {
 					return fmt.Errorf("failed to verify job creation for node %s, jobID %s after %d retries", chainlinkNode.PodName, jobID, retries)
 				}
+
+				delay := baseDelay << i // Exponential delay: baseDelay * 2^i
+				l.Debug().
+					Str("Node", chainlinkNode.PodName).
+					Str("Job ID", jobID).
+					Int("Attempt", i+1).
+					Dur("Delay", delay).
+					Msg("Exponential backoff: Waiting for next retry")
+
 				time.Sleep(delay)
 			}
 		}

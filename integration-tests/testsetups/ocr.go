@@ -462,7 +462,7 @@ func (o *OCRSoakTest) createOCRv1Jobs() error {
 
 // createOCRv2Jobs creates OCRv2 jobs.
 func (o *OCRSoakTest) createOCRv2Jobs() error {
-	err := actions.CreateOCRv2Jobs(o.ocrV2Instances, o.bootstrapNode, o.workerNodes, o.mockServer, o.startingValue, o.seth.ChainID, o.OperatorForwarderFlow)
+	err := actions.CreateOCRv2Jobs(o.ocrV2Instances, o.bootstrapNode, o.workerNodes, o.mockServer, o.startingValue, o.seth.ChainID, o.OperatorForwarderFlow, o.log)
 	if err != nil {
 		return fmt.Errorf("error creating OCRv2 jobs: %w", err)
 	}
