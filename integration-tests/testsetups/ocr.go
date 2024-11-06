@@ -282,7 +282,7 @@ func (o *OCRSoakTest) Setup(ocrTestConfig tt.OcrTestConfig) {
 
 	var forwarders []common.Address
 	if o.OperatorForwarderFlow {
-		o.deployForwarderContracts()
+		_, forwarders = o.deployForwarderContracts()
 	}
 
 	o.setupOCRContracts(ocrTestConfig, forwarders)
@@ -315,8 +315,8 @@ func (o *OCRSoakTest) fundChainlinkNodes() {
 }
 
 // deployForwarderContracts deploys forwarder contracts if OperatorForwarderFlow is enabled.
-func (o *OCRSoakTest) deployForwarderContracts() {
-	operators, forwarders, _ := actions.DeployForwarderContracts(
+func (o *OCRSoakTest) deployForwarderContracts() (operators []common.Address, forwarders []common.Address) {
+	operators, forwarders, _ = actions.DeployForwarderContracts(
 		o.t, o.seth, common.HexToAddress(o.linkContract.Address()), len(o.workerNodes),
 	)
 	require.Equal(o.t, len(o.workerNodes), len(operators), "Number of operators should match number of nodes")
@@ -329,6 +329,7 @@ func (o *OCRSoakTest) deployForwarderContracts() {
 		require.NoError(o.t, err, "Accepting Authorize Receivers on Operator shouldn't fail")
 		actions.TrackForwarder(o.t, o.seth, forwarders[i], o.workerNodes[i])
 	}
+	return operators, forwarders
 }
 
 // setupOCRContracts deploys and configures OCR contracts based on the version and forwarder flow.
@@ -355,8 +356,6 @@ func (o *OCRSoakTest) setupOCRv1Contracts(forwarders []common.Address) {
 		require.NoError(o.t, err, "Error deploying OCR Forwarder contracts")
 		o.createJobsWithForwarder()
 	} else {
-		err = o.createOCRv1Jobs()
-		require.NoError(o.t, err, "Error creating OCR jobs")
 		o.ocrV1Instances, err = actions.SetupOCRv1Contracts(
 			o.log,
 			o.seth,
@@ -365,6 +364,8 @@ func (o *OCRSoakTest) setupOCRv1Contracts(forwarders []common.Address) {
 			contracts.ChainlinkK8sClientToChainlinkNodeWithKeysAndAddress(o.workerNodes),
 		)
 		require.NoError(o.t, err, "Error setting up OCRv1 contracts")
+		err = o.createOCRv1Jobs()
+		require.NoError(o.t, err, "Error creating OCR jobs")
 	}
 
 	o.storeOCRInstancesV1()
