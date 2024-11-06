@@ -1,6 +1,5 @@
 ChainID = '421613'
 ChainType = 'arbitrum'
-FinalityDepth = 4350
 FinalityTagEnabled = true
 NoNewHeadsThreshold = '0'
 OCR.ContractConfirmations = 1
@@ -20,9 +19,6 @@ BumpThreshold = 5
 [GasEstimator.BlockHistory]
 # Force an error if someone set GAS_UPDATER_ENABLED=true by accident; we never want to run the block history estimator on arbitrum
 BlockHistorySize = 0
-
-[GasEstimator.DAOracle]
-OracleType = 'arbitrum'
 
 [NodePool]
 SyncThreshold = 10

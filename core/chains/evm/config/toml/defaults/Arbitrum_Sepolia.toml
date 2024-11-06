@@ -1,8 +1,6 @@
 ChainID = '421614'
-FinalityDepth = 4350
 ChainType = 'arbitrum'
 FinalityTagEnabled = true
-# Not sure why this is used or if it needs to be here (got it from https://github.com/smartcontractkit/ccip/commit/4c07f36580a6ad3efaece6147e2a2abf4bd63422)
 LinkContractAddress = '0xE4aB69C077896252FAFBD49EFD26B5D171A32410'
 NoNewHeadsThreshold = '0'
 OCR.ContractConfirmations = 1
