@@ -97,6 +97,7 @@ func TestDoc(t *testing.T) {
 		docDefaults.Transactions.AutoPurge.Threshold = nil
 		docDefaults.Transactions.AutoPurge.MinAttempts = nil
 
+		// Fallback DA oracle is not set
 		docDefaults.GasEstimator.DAOracle = evmcfg.DAOracle{}
 
 		assertTOML(t, fallbackDefaults, docDefaults)
