@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -443,7 +444,7 @@ func (c *CCIPContracts) SetNopsOnRamp(t *testing.T, nopsAndWeights []evm_2_evm_o
 	tx, err := c.Source.OnRamp.SetNops(c.Source.User, nopsAndWeights)
 	require.NoError(t, err)
 	c.Source.Chain.Commit()
-	_, err = bind.WaitMined(context.Background(), c.Source.Chain, tx)
+	_, err = bind.WaitMined(tests.Context(t), c.Source.Chain, tx)
 	require.NoError(t, err)
 }
 
@@ -516,6 +517,7 @@ func (c *CCIPContracts) DeriveOCR2Config(t *testing.T, oracles []confighelper.Or
 		[]int{1, 1, 1, 1},
 		oracles,
 		rawOffchainConfig,
+		nil,
 		50*time.Millisecond, // Max duration query
 		1*time.Second,       // Max duration observation
 		100*time.Millisecond,
@@ -582,7 +584,7 @@ func (c *CCIPContracts) SetupExecOCR2Config(t *testing.T, execOnchainConfig, exe
 
 func (c *CCIPContracts) SetupOnchainConfig(t *testing.T, commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig []byte) int64 {
 	// Note We do NOT set the payees, payment is done in the OCR2Base implementation
-	blockBeforeConfig, err := c.Dest.Chain.BlockByNumber(context.Background(), nil)
+	blockBeforeConfig, err := c.Dest.Chain.BlockByNumber(tests.Context(t), nil)
 	require.NoError(t, err)
 
 	c.SetupCommitOCR2Config(t, commitOnchainConfig, commitOffchainConfig)
@@ -688,7 +690,7 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		return [20]byte{}, nil, err
 	}
 
-	//native token is used as fee token
+	// native token is used as fee token
 	_, err = c.Source.PriceRegistry.UpdatePrices(c.Source.User, price_registry_1_2_0.InternalPriceUpdates{
 		TokenPriceUpdates: []price_registry_1_2_0.InternalTokenPriceUpdate{
 			{
@@ -1303,8 +1305,8 @@ type ManualExecArgs struct {
 // if the block located has a timestamp greater than the timestamp of mentioned source block
 // it just returns the first block found with lesser timestamp of the source block
 // providing a value of args.DestDeployedAt ensures better performance by reducing the range of block numbers to be traversed
-func (args *ManualExecArgs) ApproxDestStartBlock() error {
-	sourceBlockHdr, err := args.SourceChain.HeaderByNumber(context.Background(), args.SourceStartBlock)
+func (args *ManualExecArgs) ApproxDestStartBlock(ctx context.Context) error {
+	sourceBlockHdr, err := args.SourceChain.HeaderByNumber(ctx, args.SourceStartBlock)
 	if err != nil {
 		return err
 	}
@@ -1314,7 +1316,7 @@ func (args *ManualExecArgs) ApproxDestStartBlock() error {
 	minBlockNum := args.DestDeployedAt
 	closestBlockNum := uint64(math.Floor((float64(maxBlockNum) + float64(minBlockNum)) / 2))
 	var closestBlockHdr *types.Header
-	closestBlockHdr, err = args.DestChain.HeaderByNumber(context.Background(), big.NewInt(int64(closestBlockNum)))
+	closestBlockHdr, err = args.DestChain.HeaderByNumber(ctx, new(big.Int).SetUint64(closestBlockNum))
 	if err != nil {
 		return err
 	}
@@ -1335,7 +1337,7 @@ func (args *ManualExecArgs) ApproxDestStartBlock() error {
 			minBlockNum = blockNum + 1
 		}
 		closestBlockNum = uint64(math.Floor((float64(maxBlockNum) + float64(minBlockNum)) / 2))
-		closestBlockHdr, err = args.DestChain.HeaderByNumber(context.Background(), big.NewInt(int64(closestBlockNum)))
+		closestBlockHdr, err = args.DestChain.HeaderByNumber(ctx, new(big.Int).SetUint64(closestBlockNum))
 		if err != nil {
 			return err
 		}
@@ -1346,7 +1348,7 @@ func (args *ManualExecArgs) ApproxDestStartBlock() error {
 		if closestBlockNum <= 0 {
 			return fmt.Errorf("approx destination blocknumber not found")
 		}
-		closestBlockHdr, err = args.DestChain.HeaderByNumber(context.Background(), big.NewInt(int64(closestBlockNum)))
+		closestBlockHdr, err = args.DestChain.HeaderByNumber(ctx, new(big.Int).SetUint64(closestBlockNum))
 		if err != nil {
 			return err
 		}
@@ -1382,7 +1384,7 @@ func (args *ManualExecArgs) FindSeqNrFromCCIPSendRequested() (uint64, error) {
 	return seqNr, nil
 }
 
-func (args *ManualExecArgs) ExecuteManually() (*types.Transaction, error) {
+func (args *ManualExecArgs) ExecuteManually(ctx context.Context) (*types.Transaction, error) {
 	if args.SourceChainID == 0 ||
 		args.DestChainID == 0 ||
 		args.DestUser == nil {
@@ -1415,7 +1417,7 @@ func (args *ManualExecArgs) ExecuteManually() (*types.Transaction, error) {
 		return nil, err
 	}
 	if args.DestStartBlock < 1 {
-		err = args.ApproxDestStartBlock()
+		err = args.ApproxDestStartBlock(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -1552,7 +1554,8 @@ func (c *CCIPContracts) ExecuteMessage(
 	destStartBlock uint64,
 ) uint64 {
 	t.Log("Executing request manually")
-	sendReqReceipt, err := c.Source.Chain.TransactionReceipt(context.Background(), txHash)
+	ctx := tests.Context(t)
+	sendReqReceipt, err := c.Source.Chain.TransactionReceipt(ctx, txHash)
 	require.NoError(t, err)
 	args := ManualExecArgs{
 		SourceChainID:      c.Source.ChainID,
@@ -1569,11 +1572,11 @@ func (c *CCIPContracts) ExecuteMessage(
 		OnRamp:             c.Source.OnRamp.Address().String(),
 		OffRamp:            c.Dest.OffRamp.Address().String(),
 	}
-	tx, err := args.ExecuteManually()
+	tx, err := args.ExecuteManually(ctx)
 	require.NoError(t, err)
 	c.Dest.Chain.Commit()
 	c.Source.Chain.Commit()
-	rec, err := c.Dest.Chain.TransactionReceipt(context.Background(), tx.Hash())
+	rec, err := c.Dest.Chain.TransactionReceipt(tests.Context(t), tx.Hash())
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), rec.Status, "manual execution failed")
 	t.Logf("Manual Execution completed for seqNum %d", args.SeqNr)

@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/dominikbraun/graph"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
@@ -25,8 +26,6 @@ type workflow struct {
 	graph.Graph[string, *step]
 
 	triggers []*triggerCapability
-
-	spec *sdk.WorkflowSpec
 }
 
 func (w *workflow) walkDo(start string, do func(s *step) error) error {
@@ -53,8 +52,9 @@ func (w *workflow) walkDo(start string, do func(s *step) error) error {
 	return outerErr
 }
 
+// dependents returns all steps that directly depend on the step with the given ref
 func (w *workflow) dependents(start string) ([]*step, error) {
-	steps := []*step{}
+	var steps []*step
 	m, err := w.Graph.AdjacencyMap()
 	if err != nil {
 		return nil, err
@@ -108,7 +108,6 @@ func createWorkflow(wf2 *workflows.DependencyGraph) (*workflow, error) {
 	out := &workflow{
 		id:       wf2.ID,
 		triggers: []*triggerCapability{},
-		spec:     wf2.Spec,
 	}
 
 	for _, t := range wf2.Triggers {

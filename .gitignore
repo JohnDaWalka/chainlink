@@ -33,6 +33,7 @@ tools/clroot/db.sqlite3-wal
 debug.env
 *.txt
 operator_ui/install
+.devenv
 
 # codeship
 *.aes
@@ -52,6 +53,8 @@ race.*
 golangci-lint-output.txt
 /golangci-lint/
 .covdata
+core/services/job/testdata/wasm/testmodule.wasm
+core/services/job/testdata/wasm/testmodule.br
 
 # DB state
 ./db/
@@ -72,6 +75,7 @@ __debug_bin*
 db_dumps/
 .run.id
 integration-tests/**/traces/
+integration-tests/**/integration-tests
 benchmark_report.csv
 benchmark_summary.json
 secrets.toml
@@ -109,3 +113,6 @@ override*.toml
 ocr_soak_report.csv
 
 vendor/*
+
+*.wasm
+contracts/lcov.info

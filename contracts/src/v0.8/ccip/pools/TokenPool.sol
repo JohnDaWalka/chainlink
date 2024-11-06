@@ -5,7 +5,7 @@ import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 
-import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
+import {Ownable2StepMsgSender} from "../../shared/access/Ownable2StepMsgSender.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 
@@ -16,7 +16,7 @@ import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts
 /// @notice Base abstract class with common functions for all token pools.
 /// A token pool serves as isolated place for holding tokens and token specific logic
 /// that may execute as tokens move across the bridge.
-abstract contract TokenPool is IPoolV1, OwnerIsCreator {
+abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.UintSet;
   using RateLimiter for RateLimiter.TokenBucket;
@@ -53,11 +53,12 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
   event RouterUpdated(address oldRouter, address newRouter);
+  event RateLimitAdminSet(address rateLimitAdmin);
 
   struct ChainUpdate {
     uint64 remoteChainSelector; // ──╮ Remote chain selector
     bool allowed; // ────────────────╯ Whether the chain should be enabled
-    bytes remotePoolAddress; //        Address of the remote pool, ABI encoded in the case of a remove EVM chain.
+    bytes remotePoolAddress; //        Address of the remote pool, ABI encoded in the case of a remote EVM chain.
     bytes remoteTokenAddress; //       Address of the remote token, ABI encoded in the case of a remote EVM chain.
     RateLimiter.Config outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain
     RateLimiter.Config inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain
@@ -80,7 +81,7 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
   /// Only takes effect if i_allowlistEnabled is true.
   /// This can be used to ensure only token-issuer specified addresses can
   /// move tokens.
-  EnumerableSet.AddressSet internal s_allowList;
+  EnumerableSet.AddressSet internal s_allowlist;
   /// @dev The address of the router
   IRouter internal s_router;
   /// @dev A set of allowed chain selectors. We want the allowlist to be enumerable to
@@ -112,7 +113,9 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
   }
 
   /// @inheritdoc IPoolV1
-  function isSupportedToken(address token) public view virtual returns (bool) {
+  function isSupportedToken(
+    address token
+  ) public view virtual returns (bool) {
     return token == address(i_token);
   }
 
@@ -130,7 +133,9 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
 
   /// @notice Sets the pool's Router
   /// @param newRouter The new Router
-  function setRouter(address newRouter) public onlyOwner {
+  function setRouter(
+    address newRouter
+  ) public onlyOwner {
     if (newRouter == address(0)) revert ZeroAddressNotAllowed();
     address oldRouter = address(s_router);
     s_router = IRouter(newRouter);
@@ -139,7 +144,9 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
   }
 
   /// @notice Signals which version of the pool interface is supported
-  function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
+  function supportsInterface(
+    bytes4 interfaceId
+  ) public pure virtual override returns (bool) {
     return interfaceId == Pool.CCIP_POOL_V1 || interfaceId == type(IPoolV1).interfaceId
       || interfaceId == type(IERC165).interfaceId;
   }
@@ -157,7 +164,9 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
   /// @param lockOrBurnIn The input to validate.
   /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
   /// for various exploits.
-  function _validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn) internal {
+  function _validateLockOrBurn(
+    Pool.LockOrBurnInV1 memory lockOrBurnIn
+  ) internal {
     if (!isSupportedToken(lockOrBurnIn.localToken)) revert InvalidToken(lockOrBurnIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(lockOrBurnIn.remoteChainSelector)))) revert CursedByRMN();
     _checkAllowList(lockOrBurnIn.originalSender);
@@ -175,7 +184,9 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
   /// @param releaseOrMintIn The input to validate.
   /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
-  function _validateReleaseOrMint(Pool.ReleaseOrMintInV1 memory releaseOrMintIn) internal {
+  function _validateReleaseOrMint(
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn
+  ) internal {
     if (!isSupportedToken(releaseOrMintIn.localToken)) revert InvalidToken(releaseOrMintIn.localToken);
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(releaseOrMintIn.remoteChainSelector)))) revert CursedByRMN();
     _onlyOffRamp(releaseOrMintIn.remoteChainSelector);
@@ -198,14 +209,18 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
   /// @notice Gets the pool address on the remote chain.
   /// @param remoteChainSelector Remote chain selector.
   /// @dev To support non-evm chains, this value is encoded into bytes
-  function getRemotePool(uint64 remoteChainSelector) public view returns (bytes memory) {
+  function getRemotePool(
+    uint64 remoteChainSelector
+  ) public view returns (bytes memory) {
     return s_remoteChainConfigs[remoteChainSelector].remotePoolAddress;
   }
 
   /// @notice Gets the token address on the remote chain.
   /// @param remoteChainSelector Remote chain selector.
   /// @dev To support non-evm chains, this value is encoded into bytes
-  function getRemoteToken(uint64 remoteChainSelector) public view returns (bytes memory) {
+  function getRemoteToken(
+    uint64 remoteChainSelector
+  ) public view returns (bytes memory) {
     return s_remoteChainConfigs[remoteChainSelector].remoteTokenAddress;
   }
 
@@ -222,7 +237,9 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
   }
 
   /// @inheritdoc IPoolV1
-  function isSupportedChain(uint64 remoteChainSelector) public view returns (bool) {
+  function isSupportedChain(
+    uint64 remoteChainSelector
+  ) public view returns (bool) {
     return s_remoteChainSelectors.contains(remoteChainSelector);
   }
 
@@ -243,7 +260,9 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
   /// @dev Only callable by the owner
   /// @param chains A list of chains and their new permission status & rate limits. Rate limits
   /// are only used when the chain is being added through `allowed` being true.
-  function applyChainUpdates(ChainUpdate[] calldata chains) external virtual onlyOwner {
+  function applyChainUpdates(
+    ChainUpdate[] calldata chains
+  ) external virtual onlyOwner {
     for (uint256 i = 0; i < chains.length; ++i) {
       ChainUpdate memory update = chains[i];
       RateLimiter._validateTokenBucketConfig(update.outboundRateLimiterConfig, !update.allowed);
@@ -304,8 +323,11 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
   /// @notice Sets the rate limiter admin address.
   /// @dev Only callable by the owner.
   /// @param rateLimitAdmin The new rate limiter admin address.
-  function setRateLimitAdmin(address rateLimitAdmin) external onlyOwner {
+  function setRateLimitAdmin(
+    address rateLimitAdmin
+  ) external onlyOwner {
     s_rateLimitAdmin = rateLimitAdmin;
+    emit RateLimitAdminSet(rateLimitAdmin);
   }
 
   /// @notice Gets the rate limiter admin address.
@@ -372,14 +394,18 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned onRamp for the given chain on the Router.
-  function _onlyOnRamp(uint64 remoteChainSelector) internal view {
+  function _onlyOnRamp(
+    uint64 remoteChainSelector
+  ) internal view {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!(msg.sender == s_router.getOnRamp(remoteChainSelector))) revert CallerIsNotARampOnRouter(msg.sender);
   }
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned offRamp for the given chain on the Router.
-  function _onlyOffRamp(uint64 remoteChainSelector) internal view {
+  function _onlyOffRamp(
+    uint64 remoteChainSelector
+  ) internal view {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!s_router.isOffRamp(remoteChainSelector, msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
   }
@@ -388,15 +414,17 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
   // │                          Allowlist                           │
   // ================================================================
 
-  function _checkAllowList(address sender) internal view {
+  function _checkAllowList(
+    address sender
+  ) internal view {
     if (i_allowlistEnabled) {
-      if (!s_allowList.contains(sender)) {
+      if (!s_allowlist.contains(sender)) {
         revert SenderNotAllowed(sender);
       }
     }
   }
 
-  /// @notice Gets whether the allowList functionality is enabled.
+  /// @notice Gets whether the allowlist functionality is enabled.
   /// @return true is enabled, false if not.
   function getAllowListEnabled() external view returns (bool) {
     return i_allowlistEnabled;
@@ -405,7 +433,7 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
   /// @notice Gets the allowed addresses.
   /// @return The allowed addresses.
   function getAllowList() external view returns (address[] memory) {
-    return s_allowList.values();
+    return s_allowlist.values();
   }
 
   /// @notice Apply updates to the allow list.
@@ -421,7 +449,7 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
 
     for (uint256 i = 0; i < removes.length; ++i) {
       address toRemove = removes[i];
-      if (s_allowList.remove(toRemove)) {
+      if (s_allowlist.remove(toRemove)) {
         emit AllowListRemove(toRemove);
       }
     }
@@ -430,7 +458,7 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
       if (toAdd == address(0)) {
         continue;
       }
-      if (s_allowList.add(toAdd)) {
+      if (s_allowlist.add(toAdd)) {
         emit AllowListAdd(toAdd);
       }
     }

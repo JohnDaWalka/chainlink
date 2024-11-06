@@ -265,6 +265,7 @@ var aStar = ClientErrors{
 var mantle = ClientErrors{
 	InsufficientEth: regexp.MustCompile(`(: |^)'*insufficient funds for gas \* price \+ value`),
 	Fatal:           regexp.MustCompile(`(: |^)'*invalid sender`),
+	NonceTooLow:     regexp.MustCompile(`(: |^)'*nonce too low`),
 }
 
 var hederaFatal = regexp.MustCompile(`(: |^)(execution reverted)(:|$) | ^Transaction gas limit '(\d+)' exceeds block gas limit '(\d+)' | ^Transaction gas limit provided '(\d+)' is insufficient of intrinsic gas required '(\d+)' | ^Oversized data:|status INVALID_SIGNATURE`)
@@ -390,7 +391,11 @@ func (s *SendError) IsL2Full(configErrors *ClientErrors) bool {
 
 // IsServiceUnavailable indicates if the error was caused by a service being unavailable
 func (s *SendError) IsServiceUnavailable(configErrors *ClientErrors) bool {
-	return s.is(ServiceUnavailable, configErrors)
+	if s == nil || s.err == nil {
+		return false
+	}
+
+	return s.is(ServiceUnavailable, configErrors) || pkgerrors.Is(s.err, commonclient.ErroringNodeError)
 }
 
 // IsTerminallyStuck indicates if a transaction was stuck without any chance of inclusion

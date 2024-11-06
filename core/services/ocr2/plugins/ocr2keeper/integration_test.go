@@ -347,7 +347,8 @@ func runKeeperPluginBasic(t *testing.T) {
 		3,                     // rMax uint8,
 		[]int{1, 1, 1, 1},
 		oracles,
-		offC,                  // reportingPluginConfig []byte,
+		offC, // reportingPluginConfig []byte,
+		nil,
 		20*time.Millisecond,   // Max duration query
 		1600*time.Millisecond, // Max duration observation
 		800*time.Millisecond,
@@ -602,7 +603,8 @@ func TestIntegration_KeeperPluginForwarderEnabled(t *testing.T) {
 		3,                    // rMax uint8,
 		[]int{1, 1, 1, 1},
 		oracles,
-		offC,                // reportingPluginConfig []byte,
+		offC, // reportingPluginConfig []byte,
+		nil,
 		50*time.Millisecond, // Max duration query
 		1*time.Second,       // Max duration observation
 		1*time.Second,
@@ -661,7 +663,7 @@ func TestIntegration_KeeperPluginForwarderEnabled(t *testing.T) {
 	require.NoError(t, err)
 	backend.Commit()
 
-	//Set upkeep to be performed
+	// Set upkeep to be performed
 	_, err = upkeepContract.SetBytesToSend(carrol, payload1)
 	require.NoError(t, err)
 	_, err = upkeepContract.SetShouldPerformUpkeep(carrol, true)

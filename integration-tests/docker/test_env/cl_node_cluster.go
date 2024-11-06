@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/client"
+	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 )
 
 var (
@@ -44,16 +44,15 @@ func (c *ClCluster) Start() error {
 }
 
 func (c *ClCluster) Stop() error {
-	eg := &errgroup.Group{}
+	var eg errgroup.Group
 	nodes := c.Nodes
 	timeout := time.Minute * 1
 
 	for i := 0; i < len(nodes); i++ {
 		nodeIndex := i
 		eg.Go(func() error {
-			err := nodes[nodeIndex].Container.Stop(context.Background(), &timeout)
-			if err != nil {
-				return err
+			if container := nodes[nodeIndex].Container; container != nil {
+				return container.Stop(context.Background(), &timeout)
 			}
 			return nil
 		})
@@ -62,8 +61,8 @@ func (c *ClCluster) Stop() error {
 	return eg.Wait()
 }
 
-func (c *ClCluster) NodeAPIs() []*client.ChainlinkClient {
-	clients := make([]*client.ChainlinkClient, 0)
+func (c *ClCluster) NodeAPIs() []*nodeclient.ChainlinkClient {
+	clients := make([]*nodeclient.ChainlinkClient, 0)
 	for _, c := range c.Nodes {
 		clients = append(clients, c.API)
 	}

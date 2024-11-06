@@ -2,6 +2,8 @@ package integrationhelpers
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -9,32 +11,32 @@ import (
 	"testing"
 	"time"
 
-	configsevm "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
+	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ocr3_config_encoder"
-	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
-
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	"github.com/stretchr/testify/require"
-
+	configsevm "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_home"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_home"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
@@ -85,15 +87,16 @@ const (
 )
 
 type TestUniverse struct {
-	Transactor      *bind.TransactOpts
-	Backend         *backends.SimulatedBackend
-	CapReg          *kcr.CapabilitiesRegistry
-	CcipCfg         *ccip_config.CCIPConfig
-	TestingT        *testing.T
-	LogPoller       logpoller.LogPoller
-	HeadTracker     logpoller.HeadTracker
-	SimClient       client.Client
-	HomeChainReader ccipreader.HomeChain
+	Transactor         *bind.TransactOpts
+	Backend            *backends.SimulatedBackend
+	CapReg             *kcr.CapabilitiesRegistry
+	CCIPHome           *ccip_home.CCIPHome
+	TestingT           *testing.T
+	LogPoller          logpoller.LogPoller
+	HeadTracker        logpoller.HeadTracker
+	SimClient          client.Client
+	HomeChainReader    ccipreader.HomeChain
+	HomeContractReader types.ContractReader
 }
 
 func NewTestUniverse(ctx context.Context, t *testing.T, lggr logger.Logger) TestUniverse {
@@ -109,11 +112,11 @@ func NewTestUniverse(ctx context.Context, t *testing.T, lggr logger.Logger) Test
 	capReg, err := kcr.NewCapabilitiesRegistry(crAddress, backend)
 	require.NoError(t, err)
 
-	ccAddress, _, _, err := ccip_config.DeployCCIPConfig(transactor, backend, crAddress)
+	ccAddress, _, _, err := ccip_home.DeployCCIPHome(transactor, backend, crAddress)
 	require.NoError(t, err)
 	backend.Commit()
 
-	cc, err := ccip_config.NewCCIPConfig(ccAddress, backend)
+	cc, err := ccip_home.NewCCIPHome(ccAddress, backend)
 	require.NoError(t, err)
 
 	db := pgtest.NewSqlxDB(t)
@@ -133,17 +136,19 @@ func NewTestUniverse(ctx context.Context, t *testing.T, lggr logger.Logger) Test
 	require.NoError(t, lp.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, lp.Close()) })
 
-	hcr := NewHomeChainReader(t, lp, headTracker, cl, ccAddress)
+	cr := NewReader(t, lp, headTracker, cl, ccAddress, configsevm.HomeChainReaderConfigRaw)
+	hcr := NewHomeChainReader(t, cr, ccAddress)
 	return TestUniverse{
-		Transactor:      transactor,
-		Backend:         backend,
-		CapReg:          capReg,
-		CcipCfg:         cc,
-		TestingT:        t,
-		SimClient:       cl,
-		LogPoller:       lp,
-		HeadTracker:     headTracker,
-		HomeChainReader: hcr,
+		Transactor:         transactor,
+		Backend:            backend,
+		CapReg:             capReg,
+		CCIPHome:           cc,
+		TestingT:           t,
+		SimClient:          cl,
+		LogPoller:          lp,
+		HeadTracker:        headTracker,
+		HomeChainReader:    hcr,
+		HomeContractReader: cr,
 	}
 }
 
@@ -180,7 +185,7 @@ func (t *TestUniverse) AddCapability(p2pIDs [][32]byte) {
 			Version:               CcipCapabilityVersion,
 			CapabilityType:        0,
 			ResponseType:          0,
-			ConfigurationContract: t.CcipCfg.Address(),
+			ConfigurationContract: t.CCIPHome.Address(),
 		},
 	})
 	require.NoError(t.TestingT, err, "failed to add capability to registry")
@@ -216,6 +221,7 @@ func (t *TestUniverse) AddCapability(p2pIDs [][32]byte) {
 				NodeOperatorId:      nodeOperatorID,
 				Signer:              testutils.Random32Byte(),
 				P2pId:               p2pIDs[i],
+				EncryptionPublicKey: testutils.Random32Byte(),
 				HashedCapabilityIds: [][32]byte{ccipCapabilityID},
 			},
 		})
@@ -231,10 +237,8 @@ func (t *TestUniverse) AddCapability(p2pIDs [][32]byte) {
 	}
 }
 
-func NewHomeChainReader(t *testing.T, logPoller logpoller.LogPoller, headTracker logpoller.HeadTracker, client client.Client, ccAddress common.Address) ccipreader.HomeChain {
-	cr := NewReader(t, logPoller, headTracker, client, ccAddress, configsevm.HomeChainReaderConfigRaw)
-
-	hcr := ccipreader.NewHomeChainReader(cr, logger.TestLogger(t), 500*time.Millisecond, types.BoundContract{
+func NewHomeChainReader(t *testing.T, cr types.ContractReader, ccAddress common.Address) ccipreader.HomeChain {
+	hcr := ccipreader.NewHomeChainReader(cr, logger.TestLogger(t), 50*time.Millisecond, types.BoundContract{
 		Address: ccAddress.String(),
 		Name:    consts.ContractNameCCIPConfig,
 	})
@@ -248,59 +252,186 @@ func (t *TestUniverse) AddDONToRegistry(
 	ccipCapabilityID [32]byte,
 	chainSelector uint64,
 	f uint8,
-	bootstrapP2PID [32]byte,
 	p2pIDs [][32]byte,
 ) {
-	tabi, err := ocr3_config_encoder.IOCR3ConfigEncoderMetaData.GetAbi()
+	tabi, err := ccip_home.CCIPHomeMetaData.GetAbi()
 	require.NoError(t.TestingT, err)
 
-	var (
-		signers      [][]byte
-		transmitters [][]byte
-	)
-	for range p2pIDs {
-		signers = append(signers, testutils.NewAddress().Bytes())
-		transmitters = append(transmitters, testutils.NewAddress().Bytes())
-	}
+	var nodes []ccip_home.CCIPHomeOCR3Node
 
-	var ocr3Configs []ocr3_config_encoder.CCIPConfigTypesOCR3Config
-	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
-		ocr3Configs = append(ocr3Configs, ocr3_config_encoder.CCIPConfigTypesOCR3Config{
-			PluginType:            uint8(pluginType),
-			ChainSelector:         chainSelector,
-			F:                     f,
-			OffchainConfigVersion: 30,
-			OfframpAddress:        testutils.NewAddress().Bytes(),
-			P2pIds:                p2pIDs,
-			Signers:               signers,
-			Transmitters:          transmitters,
-			OffchainConfig:        []byte("offchain config"),
+	for i := range p2pIDs {
+		nodes = append(nodes, ccip_home.CCIPHomeOCR3Node{
+			P2pId:          p2pIDs[i],
+			SignerKey:      testutils.NewAddress().Bytes(),
+			TransmitterKey: testutils.NewAddress().Bytes(),
 		})
 	}
 
-	encodedCall, err := tabi.Pack("exposeOCR3Config", ocr3Configs)
+	// find the max don id, the next DON id will be max + 1.
+	iter, err := t.CapReg.FilterConfigSet(nil, nil)
 	require.NoError(t.TestingT, err)
+	var maxDonID uint32
+	for iter.Next() {
+		if iter.Event.DonId > maxDonID {
+			maxDonID = iter.Event.DonId
+		}
+	}
 
-	// Trim first four bytes to remove function selector.
-	encodedConfigs := encodedCall[4:]
+	donID := maxDonID + 1
 
-	_, err = t.CapReg.AddDON(t.Transactor, p2pIDs, []kcr.CapabilitiesRegistryCapabilityConfiguration{
-		{
-			CapabilityId: ccipCapabilityID,
-			Config:       encodedConfigs,
-		},
-	}, false, false, f)
-	require.NoError(t.TestingT, err)
-	t.Backend.Commit()
+	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
+		ocr3Config := ccip_home.CCIPHomeOCR3Config{
+			PluginType:            uint8(pluginType),
+			ChainSelector:         chainSelector,
+			FRoleDON:              f,
+			OffchainConfigVersion: 30,
+			OfframpAddress:        testutils.NewAddress().Bytes(),
+			RmnHomeAddress:        testutils.NewAddress().Bytes(),
+			Nodes:                 nodes,
+			OffchainConfig:        []byte("offchain config"),
+		}
+		encodedSetCandidateCall, err := tabi.Pack(
+			"setCandidate",
+			donID,
+			ocr3Config.PluginType,
+			ocr3Config,
+			[32]byte{},
+		)
+		require.NoError(t.TestingT, err)
+		// Create DON should be called only once, any subsequent calls should be updating DON
+		if pluginType == cctypes.PluginTypeCCIPCommit {
+			_, err = t.CapReg.AddDON(
+				t.Transactor, p2pIDs, []kcr.CapabilitiesRegistryCapabilityConfiguration{
+					{
+						CapabilityId: ccipCapabilityID,
+						Config:       encodedSetCandidateCall,
+					},
+				},
+				false,
+				false,
+				f,
+			)
+		} else {
+			_, err = t.CapReg.UpdateDON(
+				t.Transactor, donID, p2pIDs, []kcr.CapabilitiesRegistryCapabilityConfiguration{
+					{
+						CapabilityId: ccipCapabilityID,
+						Config:       encodedSetCandidateCall,
+					},
+				},
+				false,
+				f,
+			)
+		}
+
+		require.NoError(t.TestingT, err)
+		t.Backend.Commit()
+
+		configs, err := t.CCIPHome.GetAllConfigs(nil, donID, uint8(pluginType))
+		require.NoError(t.TestingT, err)
+		require.Equal(t.TestingT, ocr3Config, configs.CandidateConfig.Config)
+
+		// get the config digest of the candidate
+		candidateDigest, err := t.CCIPHome.GetCandidateDigest(nil, donID, ocr3Config.PluginType)
+		require.NoError(t.TestingT, err)
+		encodedPromotionCall, err := tabi.Pack(
+			"promoteCandidateAndRevokeActive",
+			donID,
+			ocr3Config.PluginType,
+			candidateDigest,
+			[32]byte{},
+		)
+		require.NoError(t.TestingT, err)
+
+		_, err = t.CapReg.UpdateDON(
+			t.Transactor, donID, p2pIDs, []kcr.CapabilitiesRegistryCapabilityConfiguration{
+				{
+					CapabilityId: ccipCapabilityID,
+					Config:       encodedPromotionCall,
+				},
+			},
+			false,
+			f,
+		)
+
+		require.NoError(t.TestingT, err)
+		t.Backend.Commit()
+
+		configs, err = t.CCIPHome.GetAllConfigs(nil, donID, uint8(pluginType))
+		require.NoError(t.TestingT, err)
+		require.Equal(t.TestingT, ocr3Config, configs.ActiveConfig.Config)
+	}
 }
 
-func SetupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) ccip_config.CCIPConfigTypesChainConfigInfo {
-	return ccip_config.CCIPConfigTypesChainConfigInfo{
+func SetupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) ccip_home.CCIPHomeChainConfigArgs {
+	return ccip_home.CCIPHomeChainConfigArgs{
 		ChainSelector: chainSelector,
-		ChainConfig: ccip_config.CCIPConfigTypesChainConfig{
+		ChainConfig: ccip_home.CCIPHomeChainConfig{
 			Readers: readers,
 			FChain:  fChain,
 			Config:  cfg,
 		},
 	}
+}
+
+func GenerateRMNHomeConfigs(
+	peerID string,
+	offchainPK string,
+	offchainCfg string,
+	chainSelector uint64,
+	f uint64,
+	observerBitmap *big.Int) (rmn_home.RMNHomeStaticConfig, rmn_home.RMNHomeDynamicConfig, error) {
+	peerIDByte, _ := hex.DecodeString(peerID)
+	var peerIDBytes [32]byte
+	copy(peerIDBytes[:], peerIDByte)
+
+	offchainPublicKey, err := hex.DecodeString(offchainPK)
+
+	if err != nil {
+		return rmn_home.RMNHomeStaticConfig{}, rmn_home.RMNHomeDynamicConfig{}, fmt.Errorf("error decoding offchain public key: %w", err)
+	}
+
+	var offchainPublicKeyBytes [32]byte
+	copy(offchainPublicKeyBytes[:], offchainPublicKey)
+
+	staticConfig := rmn_home.RMNHomeStaticConfig{
+		Nodes: []rmn_home.RMNHomeNode{
+			{
+				PeerId:            peerIDBytes,
+				OffchainPublicKey: offchainPublicKeyBytes,
+			},
+		},
+		OffchainConfig: []byte(offchainCfg),
+	}
+
+	dynamicConfig := rmn_home.RMNHomeDynamicConfig{
+		SourceChains: []rmn_home.RMNHomeSourceChain{
+			{
+				ChainSelector:       chainSelector,
+				F:                   f,
+				ObserverNodesBitmap: observerBitmap,
+			},
+		},
+		OffchainConfig: []byte(offchainCfg),
+	}
+	return staticConfig, dynamicConfig, nil
+}
+
+func GenerateExpectedRMNHomeNodesInfo(staticConfig rmn_home.RMNHomeStaticConfig, chainID int) []ccipreader.HomeNodeInfo {
+	expectedCandidateNodesInfo := make([]ccipreader.HomeNodeInfo, 0)
+
+	supportedCandidateSourceChains := mapset.NewSet(ccipocr3.ChainSelector(chainID))
+
+	var counter uint32
+	for _, n := range staticConfig.Nodes {
+		pk := ed25519.PublicKey(n.OffchainPublicKey[:])
+		expectedCandidateNodesInfo = append(expectedCandidateNodesInfo, ccipreader.HomeNodeInfo{
+			ID:                    ccipreader.NodeID(counter),
+			PeerID:                n.PeerId,
+			SupportedSourceChains: supportedCandidateSourceChains,
+			OffchainPublicKey:     &pk,
+		})
+		counter++
+	}
+	return expectedCandidateNodesInfo
 }

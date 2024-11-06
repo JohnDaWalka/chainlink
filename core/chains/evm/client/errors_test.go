@@ -9,6 +9,7 @@ import (
 	pkgerrors "github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
+	commonclient "github.com/smartcontractkit/chainlink/v2/common/client"
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 )
 
@@ -47,6 +48,7 @@ func Test_Eth_Errors(t *testing.T) {
 			{"nonce too low. allowed nonce range: 427 - 447, actual: 426", true, "zkSync"},
 			{"client error nonce too low", true, "tomlConfig"},
 			{"[Request ID: 2e952947-ffad-408b-aed9-35f3ed152001] Nonce too low. Provided nonce: 15, current nonce: 15", true, "hedera"},
+			{"failed to forward tx to sequencer, please try again. Error message: 'nonce too low'", true, "Mantle"},
 		}
 
 		for _, test := range tests {
@@ -247,6 +249,12 @@ func Test_Eth_Errors(t *testing.T) {
 			assert.Equal(t, err.IsServiceUnavailable(clientErrors), test.expect)
 			err = newSendErrorWrapped(test.message)
 			assert.Equal(t, err.IsServiceUnavailable(clientErrors), test.expect)
+		}
+		{
+			err = evmclient.NewSendError(commonclient.ErroringNodeError)
+			assert.True(t, err.IsServiceUnavailable(clientErrors))
+			err = evmclient.NewSendError(fmt.Errorf("failed to send transaction: %w", commonclient.ErroringNodeError))
+			assert.True(t, err.IsServiceUnavailable(clientErrors))
 		}
 	})
 

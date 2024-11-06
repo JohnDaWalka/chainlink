@@ -15,11 +15,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
+	commonclient "github.com/smartcontractkit/chainlink/v2/common/client"
 
 	commonfee "github.com/smartcontractkit/chainlink/v2/common/fee"
 	feetypes "github.com/smartcontractkit/chainlink/v2/common/fee/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/rollups"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 )
@@ -177,7 +177,7 @@ func (f *FeeHistoryEstimator) GetLegacyGas(ctx context.Context, _ []byte, gasLim
 
 // RefreshGasPrice will use eth_gasPrice to fetch and cache the latest gas price from the RPC.
 func (f *FeeHistoryEstimator) RefreshGasPrice() (*assets.Wei, error) {
-	ctx, cancel := f.stopCh.CtxCancel(evmclient.ContextWithDefaultTimeout())
+	ctx, cancel := f.stopCh.CtxWithTimeout(commonclient.QueryTimeout)
 	defer cancel()
 
 	gasPrice, err := f.client.SuggestGasPrice(ctx)
@@ -212,14 +212,14 @@ func (f *FeeHistoryEstimator) GetDynamicFee(ctx context.Context, maxPrice *asset
 		return
 	}
 
-	if fee.FeeCap.Cmp(maxPrice) > 0 {
+	if fee.GasFeeCap.Cmp(maxPrice) > 0 {
 		f.logger.Warnf("estimated maxFeePerGas: %v is greater than the maximum price configured: %v, returning the maximum price instead.",
-			fee.FeeCap, maxPrice)
-		fee.FeeCap = maxPrice
-		if fee.TipCap.Cmp(maxPrice) > 0 {
+			fee.GasFeeCap, maxPrice)
+		fee.GasFeeCap = maxPrice
+		if fee.GasTipCap.Cmp(maxPrice) > 0 {
 			f.logger.Warnf("estimated maxPriorityFeePerGas: %v is greater than the maximum price configured: %v, returning the maximum price instead.",
-				fee.TipCap, maxPrice)
-			fee.TipCap = maxPrice
+				fee.GasTipCap, maxPrice)
+			fee.GasTipCap = maxPrice
 		}
 	}
 
@@ -231,7 +231,7 @@ func (f *FeeHistoryEstimator) GetDynamicFee(ctx context.Context, maxPrice *asset
 // the highest percentile we're willing to pay. A buffer is added on top of the latest baseFee to catch fluctuations in the next
 // blocks. On Ethereum the increase is baseFee * 1.125 per block, however in some chains that may vary.
 func (f *FeeHistoryEstimator) RefreshDynamicPrice() error {
-	ctx, cancel := f.stopCh.CtxCancel(evmclient.ContextWithDefaultTimeout())
+	ctx, cancel := f.stopCh.CtxWithTimeout(commonclient.QueryTimeout)
 	defer cancel()
 
 	// RewardPercentile will be used for maxPriorityFeePerGas estimations and connectivityPercentile to set the highest threshold for bumping.
@@ -256,9 +256,10 @@ func (f *FeeHistoryEstimator) RefreshDynamicPrice() error {
 		priorityFee := big.NewInt(0)
 		priorityFeeThreshold := big.NewInt(0)
 		for _, reward := range feeHistory.Reward {
-			// reward needs to have values for two percentiles
+			// reward needs to have values for two percentiles. Some chains may return an empty slice instead of 0x0 values, so we use
+			// continue instead of throwing an error.
 			if len(reward) < 2 {
-				return fmt.Errorf("reward size incorrect: %d", len(reward))
+				continue
 			}
 			// We'll calculate the average of non-zero priority fees
 			if reward[0].Cmp(big.NewInt(0)) > 0 {
@@ -293,15 +294,15 @@ func (f *FeeHistoryEstimator) RefreshDynamicPrice() error {
 
 	f.dynamicPriceMu.Lock()
 	defer f.dynamicPriceMu.Unlock()
-	f.dynamicPrice.FeeCap = maxFeePerGas
-	f.dynamicPrice.TipCap = maxPriorityFeePerGas
+	f.dynamicPrice.GasFeeCap = maxFeePerGas
+	f.dynamicPrice.GasTipCap = maxPriorityFeePerGas
 	return nil
 }
 
 func (f *FeeHistoryEstimator) getDynamicPrice() (fee DynamicFee, err error) {
 	f.dynamicPriceMu.RLock()
 	defer f.dynamicPriceMu.RUnlock()
-	if f.dynamicPrice.FeeCap == nil || f.dynamicPrice.TipCap == nil {
+	if f.dynamicPrice.GasFeeCap == nil || f.dynamicPrice.GasTipCap == nil {
 		return fee, fmt.Errorf("dynamic price not set")
 	}
 	return f.dynamicPrice, nil
@@ -358,12 +359,12 @@ func (f *FeeHistoryEstimator) BumpDynamicFee(ctx context.Context, originalFee Dy
 
 	// Sanitize original fee input
 	// According to geth's spec we need to bump both maxFeePerGas and maxPriorityFeePerGas for the new attempt to be accepted by the RPC
-	if originalFee.FeeCap == nil ||
-		originalFee.TipCap == nil ||
-		((originalFee.TipCap.Cmp(originalFee.FeeCap)) > 0) ||
-		(originalFee.FeeCap.Cmp(maxPrice) >= 0) {
+	if originalFee.GasFeeCap == nil ||
+		originalFee.GasTipCap == nil ||
+		((originalFee.GasTipCap.Cmp(originalFee.GasFeeCap)) > 0) ||
+		(originalFee.GasFeeCap.Cmp(maxPrice) >= 0) {
 		return bumped, fmt.Errorf("%w: error while retrieving original dynamic fees: (originalFeePerGas: %s - originalPriorityFeePerGas: %s). Maximum price configured: %s",
-			commonfee.ErrBump, originalFee.FeeCap, originalFee.TipCap, maxPrice)
+			commonfee.ErrBump, originalFee.GasFeeCap, originalFee.GasTipCap, maxPrice)
 	}
 
 	currentDynamicPrice, err := f.getDynamicPrice()
@@ -371,10 +372,10 @@ func (f *FeeHistoryEstimator) BumpDynamicFee(ctx context.Context, originalFee Dy
 		return
 	}
 
-	bumpedMaxPriorityFeePerGas := originalFee.TipCap.AddPercentage(f.config.BumpPercent)
-	bumpedMaxFeePerGas := originalFee.FeeCap.AddPercentage(f.config.BumpPercent)
+	bumpedMaxPriorityFeePerGas := originalFee.GasTipCap.AddPercentage(f.config.BumpPercent)
+	bumpedMaxFeePerGas := originalFee.GasFeeCap.AddPercentage(f.config.BumpPercent)
 
-	bumpedMaxPriorityFeePerGas, err = LimitBumpedFee(originalFee.TipCap, currentDynamicPrice.TipCap, bumpedMaxPriorityFeePerGas, maxPrice)
+	bumpedMaxPriorityFeePerGas, err = LimitBumpedFee(originalFee.GasTipCap, currentDynamicPrice.GasTipCap, bumpedMaxPriorityFeePerGas, maxPrice)
 	if err != nil {
 		return bumped, fmt.Errorf("failed to limit maxPriorityFeePerGas: %w", err)
 	}
@@ -385,16 +386,16 @@ func (f *FeeHistoryEstimator) BumpDynamicFee(ctx context.Context, originalFee Dy
 	}
 
 	if bumpedMaxPriorityFeePerGas.Cmp(priorityFeeThreshold) > 0 {
-		return bumped, fmt.Errorf("bumpedMaxPriorityFeePerGas: %s is above market's %sth percentile: %s, bumping is halted",
-			bumpedMaxPriorityFeePerGas, strconv.Itoa(ConnectivityPercentile), priorityFeeThreshold)
+		return bumped, fmt.Errorf("%w: bumpedMaxPriorityFeePerGas: %s is above market's %sth percentile: %s, bumping is halted",
+			commonfee.ErrConnectivity, bumpedMaxPriorityFeePerGas, strconv.Itoa(ConnectivityPercentile), priorityFeeThreshold)
 	}
 
-	bumpedMaxFeePerGas, err = LimitBumpedFee(originalFee.FeeCap, currentDynamicPrice.FeeCap, bumpedMaxFeePerGas, maxPrice)
+	bumpedMaxFeePerGas, err = LimitBumpedFee(originalFee.GasFeeCap, currentDynamicPrice.GasFeeCap, bumpedMaxFeePerGas, maxPrice)
 	if err != nil {
 		return bumped, fmt.Errorf("failed to limit maxFeePerGas: %w", err)
 	}
 
-	bumpedFee := DynamicFee{FeeCap: bumpedMaxFeePerGas, TipCap: bumpedMaxPriorityFeePerGas}
+	bumpedFee := DynamicFee{GasFeeCap: bumpedMaxFeePerGas, GasTipCap: bumpedMaxPriorityFeePerGas}
 	f.logger.Debugw("bumped dynamic fee", "originalFee", originalFee, "marketFee", currentDynamicPrice, "bumpedFee", bumpedFee)
 
 	return bumpedFee, nil

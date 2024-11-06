@@ -1,18 +1,20 @@
 package launcher
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	it "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccip_integration_tests/integrationhelpers"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 
-	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_home"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
@@ -60,15 +62,22 @@ func TestIntegration_Launcher(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, regSyncer.Close()) })
 	t.Cleanup(func() { require.NoError(t, launcher.Close()) })
 
-	chainAConf := it.SetupConfigInfo(it.ChainA, p2pIDs, it.FChainA, []byte("ChainA"))
-	chainBConf := it.SetupConfigInfo(it.ChainB, p2pIDs[1:], it.FChainB, []byte("ChainB"))
-	chainCConf := it.SetupConfigInfo(it.ChainC, p2pIDs[2:], it.FChainC, []byte("ChainC"))
-	inputConfig := []ccip_config.CCIPConfigTypesChainConfigInfo{
+	encodedChainConfig, err := chainconfig.EncodeChainConfig(chainconfig.ChainConfig{
+		GasPriceDeviationPPB:    cciptypes.NewBigIntFromInt64(1000),
+		DAGasPriceDeviationPPB:  cciptypes.NewBigIntFromInt64(1_000_000),
+		OptimisticConfirmations: 1,
+	})
+	require.NoError(t, err)
+
+	chainAConf := it.SetupConfigInfo(it.ChainA, p2pIDs, it.FChainA, encodedChainConfig)
+	chainBConf := it.SetupConfigInfo(it.ChainB, p2pIDs[1:], it.FChainB, encodedChainConfig)
+	chainCConf := it.SetupConfigInfo(it.ChainC, p2pIDs[2:], it.FChainC, encodedChainConfig)
+	inputConfig := []ccip_home.CCIPHomeChainConfigArgs{
 		chainAConf,
 		chainBConf,
 		chainCConf,
 	}
-	_, err = uni.CcipCfg.ApplyChainConfigUpdates(uni.Transactor, nil, inputConfig)
+	_, err = uni.CCIPHome.ApplyChainConfigUpdates(uni.Transactor, nil, inputConfig)
 	require.NoError(t, err)
 	uni.Backend.Commit()
 
@@ -79,12 +88,11 @@ func TestIntegration_Launcher(t *testing.T) {
 		ccipCapabilityID,
 		it.ChainA,
 		it.FChainA,
-		p2pIDs[1],
 		p2pIDs)
 
-	gomega.NewWithT(t).Eventually(func() bool {
+	require.Eventually(t, func() bool {
 		return len(launcher.runningDONIDs()) == 1
-	}, testutils.WaitTimeout(t), testutils.TestInterval).Should(gomega.BeTrue())
+	}, testutils.WaitTimeout(t), testutils.TestInterval)
 }
 
 type oraclePrints struct {
@@ -108,7 +116,7 @@ type oracleCreatorPrints struct {
 	t *testing.T
 }
 
-func (o *oracleCreatorPrints) Create(_ uint32, config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+func (o *oracleCreatorPrints) Create(ctx context.Context, _ uint32, config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
 	pluginType := cctypes.PluginType(config.Config.PluginType)
 	o.t.Logf("Creating plugin oracle (pluginType: %s) with config %+v\n", pluginType, config)
 	return &oraclePrints{pluginType: pluginType, config: config, t: o.t}, nil

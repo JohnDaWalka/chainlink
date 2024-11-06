@@ -15,11 +15,14 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/stretchr/testify/require"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/message_hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // NOTE: these test cases are only EVM <-> EVM.
@@ -43,13 +46,17 @@ func TestMessageHasher_EVM2EVM(t *testing.T) {
 func testHasherEVM2EVM(ctx context.Context, t *testing.T, d *testSetupData, evmExtraArgs evmExtraArgs) {
 	ccipMsg := createEVM2EVMMessage(t, d.contract, evmExtraArgs)
 
-	var tokenAmounts []message_hasher.InternalRampTokenAmount
+	var tokenAmounts []message_hasher.InternalAny2EVMTokenTransfer
 	for _, rta := range ccipMsg.TokenAmounts {
-		tokenAmounts = append(tokenAmounts, message_hasher.InternalRampTokenAmount{
+		destGasAmount, err := abiDecodeUint32(rta.DestExecData)
+		require.NoError(t, err)
+
+		tokenAmounts = append(tokenAmounts, message_hasher.InternalAny2EVMTokenTransfer{
 			SourcePoolAddress: rta.SourcePoolAddress,
-			DestTokenAddress:  rta.DestTokenAddress,
+			DestTokenAddress:  common.BytesToAddress(rta.DestTokenAddress),
 			ExtraData:         rta.ExtraData[:],
 			Amount:            rta.Amount.Int,
+			DestGasAmount:     destGasAmount,
 		})
 	}
 	evmMsg := message_hasher.InternalAny2EVMRampMessage{
@@ -70,7 +77,7 @@ func testHasherEVM2EVM(ctx context.Context, t *testing.T, d *testSetupData, evmE
 	expectedHash, err := d.contract.Hash(&bind.CallOpts{Context: ctx}, evmMsg, ccipMsg.Header.OnRamp)
 	require.NoError(t, err)
 
-	evmMsgHasher := NewMessageHasherV1()
+	evmMsgHasher := NewMessageHasherV1(logger.Test(t))
 	actualHash, err := evmMsgHasher.Hash(ctx, ccipMsg)
 	require.NoError(t, err)
 
@@ -124,11 +131,14 @@ func createEVM2EVMMessage(t *testing.T, messageHasher *message_hasher.MessageHas
 	var tokenAmounts []cciptypes.RampTokenAmount
 	for i := 0; i < len(sourceTokenDatas); i++ {
 		extraData := utils.RandomBytes32()
+		encodedDestExecData, err := utils.ABIEncode(`[{ "type": "uint32" }]`, rand.Uint32())
+		require.NoError(t, err)
 		tokenAmounts = append(tokenAmounts, cciptypes.RampTokenAmount{
 			SourcePoolAddress: abiEncodedAddress(t),
 			DestTokenAddress:  abiEncodedAddress(t),
 			ExtraData:         extraData[:],
 			Amount:            cciptypes.NewBigInt(big.NewInt(0).SetUint64(rand.Uint64())),
+			DestExecData:      encodedDestExecData,
 		})
 	}
 
@@ -186,4 +196,40 @@ func testSetup(t *testing.T) *testSetupData {
 		sb:           simulatedBackend,
 		auth:         transactor,
 	}
+}
+
+func TestMessagerHasher_againstRmnSharedVector(t *testing.T) {
+	const (
+		messageID           = "c6f553ab71282f01324bbdbcc82e22a7e66efbcd108881ecc4cdbd728aed9b1e"
+		onRampAddress       = "0000000000000000000000007a2088a1bfc9d81c55368ae168c2c02570cb814f"
+		dataField           = "68656c6c6f"
+		receiverAddress     = "677df0cb865368207999f2862ece576dc56d8df6"
+		extraArgs           = "181dcf100000000000000000000000000000000000000000000000000000000000030d400000000000000000000000000000000000000000000000000000000000000000"
+		senderAddress       = "f39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+		feeToken            = "9fe46736679d2d9a65f0992f2272de9f3c7fa6e0"
+		sourceChainSelector = 3379446385462418246
+		destChainSelector   = 12922642891491394802
+		expectedMsgHash     = "0x1c61fef7a3dd153943419c1101031316ed7b7a3d75913c34cbe8628033f5924f"
+	)
+
+	h := NewMessageHasherV1(logger.Test(t))
+	msgH, err := h.Hash(context.Background(), cciptypes.Message{
+		Header: cciptypes.RampMessageHeader{
+			MessageID:           cciptypes.Bytes32(common.Hex2Bytes(messageID)),
+			SourceChainSelector: sourceChainSelector,
+			DestChainSelector:   destChainSelector,
+			SequenceNumber:      1,
+			Nonce:               1,
+			MsgHash:             cciptypes.Bytes32{},
+			OnRamp:              common.HexToAddress(onRampAddress).Bytes(),
+		},
+		Sender:       common.HexToAddress(senderAddress).Bytes(),
+		Data:         common.Hex2Bytes(dataField),
+		Receiver:     common.Hex2Bytes(receiverAddress),
+		ExtraArgs:    common.Hex2Bytes(extraArgs),
+		FeeToken:     common.HexToAddress(feeToken).Bytes(),
+		TokenAmounts: []cciptypes.RampTokenAmount{},
+	})
+	require.NoError(t, err)
+	require.Equal(t, expectedMsgHash, msgH.String())
 }

@@ -14,12 +14,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-
-	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	commonclient "github.com/smartcontractkit/chainlink/v2/common/client"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/chaintype"
 )
 
 // Reads L2-specific precompiles and caches the l1GasPrice set by the L2.
@@ -28,7 +25,6 @@ type zkSyncL1Oracle struct {
 	client     l1OracleClient
 	pollPeriod time.Duration
 	logger     logger.SugaredLogger
-	chainType  chaintype.ChainType
 
 	systemContextAddress  string
 	gasPerPubdataMethod   string
@@ -65,7 +61,6 @@ func NewZkSyncL1GasOracle(lggr logger.Logger, ethClient l1OracleClient) *zkSyncL
 		client:     ethClient,
 		pollPeriod: PollPeriod,
 		logger:     logger.Sugared(logger.Named(lggr, "L1GasOracle(zkSync)")),
-		chainType:  chaintype.ChainZkSync,
 
 		systemContextAddress:  SystemContextAddress,
 		gasPerPubdataMethod:   SystemContext_gasPerPubdataByteMethod,
@@ -81,10 +76,6 @@ func NewZkSyncL1GasOracle(lggr logger.Logger, ethClient l1OracleClient) *zkSyncL
 
 func (o *zkSyncL1Oracle) Name() string {
 	return o.logger.Name()
-}
-
-func (o *zkSyncL1Oracle) ChainType(_ context.Context) chaintype.ChainType {
-	return o.chainType
 }
 
 func (o *zkSyncL1Oracle) Start(ctx context.Context) error {
@@ -133,7 +124,7 @@ func (o *zkSyncL1Oracle) refresh() (t *time.Timer) {
 func (o *zkSyncL1Oracle) refreshWithError() (t *time.Timer, err error) {
 	t = time.NewTimer(utils.WithJitter(o.pollPeriod))
 
-	ctx, cancel := o.chStop.CtxCancel(evmclient.ContextWithDefaultTimeout())
+	ctx, cancel := o.chStop.CtxWithTimeout(commonclient.QueryTimeout)
 	defer cancel()
 
 	price, err := o.CalculateL1GasPrice(ctx)
@@ -183,14 +174,6 @@ func (o *zkSyncL1Oracle) GasPrice(_ context.Context) (l1GasPrice *assets.Wei, er
 		return l1GasPrice, fmt.Errorf("gas price is stale")
 	}
 	return
-}
-
-// Gets the L1 gas cost for the provided transaction at the specified block num
-// If block num is not provided, the value on the latest block num is used
-func (o *zkSyncL1Oracle) GetGasCost(ctx context.Context, tx *gethtypes.Transaction, blockNum *big.Int) (*assets.Wei, error) {
-	//Unused method, so not implemented
-	// And its not possible to know gas consumption of a transaction before its executed, since zkSync only posts the state difference
-	return nil, fmt.Errorf("unimplemented")
 }
 
 // GetL2GasPrice calls SystemContract.gasPrice()  on the zksync system precompile contract.

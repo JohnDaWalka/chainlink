@@ -67,11 +67,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   address[] internal s_transmitters;
 
   /// @dev Reverts transaction if config args are invalid
-  modifier checkConfigValid(
-    uint256 _numSigners,
-    uint256 _numTransmitters,
-    uint256 _f
-  ) {
+  modifier checkConfigValid(uint256 _numSigners, uint256 _numTransmitters, uint256 _f) {
     require(_numSigners <= MAX_NUM_ORACLES, "too many signers");
     require(_f > 0, "f must be positive");
     require(_numSigners == _numTransmitters, "oracle addresses out of registration");
@@ -250,7 +246,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   ) private pure {
     // calldata will never be big enough to make this overflow
     uint256 expected = uint256(TRANSMIT_MSGDATA_CONSTANT_LENGTH_COMPONENT) +
-      report.length + // one byte pure entry in _report
+      report.length + // one byte per entry in report
       rs.length *
       32 + // 32 bytes per entry in _rs
       ss.length *

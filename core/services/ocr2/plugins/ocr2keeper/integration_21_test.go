@@ -565,7 +565,7 @@ func listenPerformedN(t *testing.T, backend *backends.SimulatedBackend, registry
 				if iter.Event != nil {
 					t.Logf("[automation-ocr3 | EvmRegistry] upkeep performed event emitted for id %s", iter.Event.Id.String())
 
-					//cache.Store(iter.Event.Id.String(), true)
+					// cache.Store(iter.Event.Id.String(), true)
 					count, ok := cache.Load(iter.Event.Id.String())
 					if !ok {
 						cache.Store(iter.Event.Id.String(), 1)
@@ -716,6 +716,7 @@ func setupNodes(t *testing.T, nodeKeys [5]ethkey.KeyV2, registry *iregistry21.IK
 		[]int{1, 1, 1, 1},     // s []int,
 		oracles,               // oracles []OracleIdentityExtra,
 		rawCfg,                // reportingPluginConfig []byte,
+		nil,
 		20*time.Millisecond,   // maxDurationQuery time.Duration,
 		1600*time.Millisecond, // maxDurationObservation time.Duration,
 		20*time.Millisecond,   // maxDurationShouldAcceptFinalizedReport time.Duration,

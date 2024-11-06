@@ -7,38 +7,40 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	mocks2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 )
 
 func TestOffRamp(t *testing.T) {
-	for _, versionStr := range []string{ccipdata.V1_0_0, ccipdata.V1_2_0} {
+	ctx := tests.Context(t)
+	for _, versionStr := range []string{ccipdata.V1_2_0} {
 		lggr := logger.Test(t)
 		addr := cciptypes.Address(utils.RandomAddress().String())
 		lp := mocks2.NewLogPoller(t)
 
 		expFilterNames := []string{
-			logpoller.FilterName(v1_0_0.EXEC_EXECUTION_STATE_CHANGES, addr),
-			logpoller.FilterName(v1_0_0.EXEC_TOKEN_POOL_ADDED, addr),
-			logpoller.FilterName(v1_0_0.EXEC_TOKEN_POOL_REMOVED, addr),
+			logpoller.FilterName(v1_2_0.ExecExecutionStateChanges, addr),
+			logpoller.FilterName(v1_2_0.ExecTokenPoolAdded, addr),
+			logpoller.FilterName(v1_2_0.ExecTokenPoolRemoved, addr),
 		}
 		versionFinder := newMockVersionFinder(ccipconfig.EVM2EVMOffRamp, *semver.MustParse(versionStr), nil)
 
 		lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil).Times(len(expFilterNames))
-		_, err := NewOffRampReader(lggr, versionFinder, addr, nil, lp, nil, nil, true)
+		_, err := NewOffRampReader(ctx, lggr, versionFinder, addr, nil, lp, nil, nil, true)
 		assert.NoError(t, err)
 
 		for _, f := range expFilterNames {
 			lp.On("UnregisterFilter", mock.Anything, f).Return(nil)
 		}
-		err = CloseOffRampReader(lggr, versionFinder, addr, nil, lp, nil, nil)
+		err = CloseOffRampReader(ctx, lggr, versionFinder, addr, nil, lp, nil, nil)
 		assert.NoError(t, err)
 	}
 }

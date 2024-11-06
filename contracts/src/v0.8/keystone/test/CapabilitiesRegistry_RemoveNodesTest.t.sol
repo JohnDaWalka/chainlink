@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {BaseTest} from "./BaseTest.t.sol";
 import {CapabilitiesRegistry} from "../CapabilitiesRegistry.sol";
+import {INodeInfoProvider} from "../interfaces/INodeInfoProvider.sol";
 
 contract CapabilitiesRegistry_RemoveNodesTest is BaseTest {
   function setUp() public override {
@@ -24,6 +25,7 @@ contract CapabilitiesRegistry_RemoveNodesTest is BaseTest {
       nodeOperatorId: TEST_NODE_OPERATOR_ONE_ID,
       p2pId: P2P_ID,
       signer: NODE_OPERATOR_ONE_SIGNER_ADDRESS,
+      encryptionPublicKey: TEST_ENCRYPTION_PUBLIC_KEY,
       hashedCapabilityIds: hashedCapabilityIds
     });
 
@@ -31,6 +33,7 @@ contract CapabilitiesRegistry_RemoveNodesTest is BaseTest {
       nodeOperatorId: TEST_NODE_OPERATOR_TWO_ID,
       p2pId: P2P_ID_TWO,
       signer: NODE_OPERATOR_TWO_SIGNER_ADDRESS,
+      encryptionPublicKey: TEST_ENCRYPTION_PUBLIC_KEY_TWO,
       hashedCapabilityIds: hashedCapabilityIds
     });
 
@@ -38,6 +41,7 @@ contract CapabilitiesRegistry_RemoveNodesTest is BaseTest {
       nodeOperatorId: TEST_NODE_OPERATOR_THREE_ID,
       p2pId: P2P_ID_THREE,
       signer: NODE_OPERATOR_THREE_SIGNER_ADDRESS,
+      encryptionPublicKey: TEST_ENCRYPTION_PUBLIC_KEY_THREE,
       hashedCapabilityIds: hashedCapabilityIds
     });
 
@@ -60,7 +64,7 @@ contract CapabilitiesRegistry_RemoveNodesTest is BaseTest {
     bytes32[] memory nodes = new bytes32[](1);
     nodes[0] = INVALID_P2P_ID;
 
-    vm.expectRevert(abi.encodeWithSelector(CapabilitiesRegistry.NodeDoesNotExist.selector, INVALID_P2P_ID));
+    vm.expectRevert(abi.encodeWithSelector(INodeInfoProvider.NodeDoesNotExist.selector, INVALID_P2P_ID));
     s_CapabilitiesRegistry.removeNodes(nodes);
   }
 
@@ -69,7 +73,7 @@ contract CapabilitiesRegistry_RemoveNodesTest is BaseTest {
     bytes32[] memory nodes = new bytes32[](1);
     nodes[0] = bytes32("");
 
-    vm.expectRevert(abi.encodeWithSelector(CapabilitiesRegistry.NodeDoesNotExist.selector, bytes32("")));
+    vm.expectRevert(abi.encodeWithSelector(INodeInfoProvider.NodeDoesNotExist.selector, bytes32("")));
     s_CapabilitiesRegistry.removeNodes(nodes);
   }
 
@@ -205,6 +209,7 @@ contract CapabilitiesRegistry_RemoveNodesTest is BaseTest {
       nodeOperatorId: TEST_NODE_OPERATOR_ONE_ID,
       p2pId: P2P_ID,
       signer: NODE_OPERATOR_ONE_SIGNER_ADDRESS,
+      encryptionPublicKey: TEST_ENCRYPTION_PUBLIC_KEY,
       hashedCapabilityIds: hashedCapabilityIds
     });
 

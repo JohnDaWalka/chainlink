@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -11,10 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/jackc/pgx/v4"
 	pkgerrors "github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -323,8 +325,20 @@ func TestORM(t *testing.T) {
 		},
 		{
 			EvmChainId:     ubig.New(th.ChainID),
+			LogIndex:       7,
+			BlockHash:      common.HexToHash("0x1239"),
+			BlockNumber:    int64(17),
+			EventSig:       topic,
+			Topics:         [][]byte{topic[:]},
+			Address:        common.HexToAddress("0x1236"),
+			TxHash:         common.HexToHash("0x1888"),
+			Data:           []byte("hello2 short retention"),
+			BlockTimestamp: time.Now(),
+		},
+		{
+			EvmChainId:     ubig.New(th.ChainID),
 			LogIndex:       8,
-			BlockHash:      common.HexToHash("0x1238"),
+			BlockHash:      common.HexToHash("0x1239"),
 			BlockNumber:    int64(17),
 			EventSig:       topic2,
 			Topics:         [][]byte{topic2[:]},
@@ -365,10 +379,9 @@ func TestORM(t *testing.T) {
 		},
 	}))
 
-	t.Log(latest.BlockNumber)
 	logs, err := o1.SelectLogsByBlockRange(ctx, 1, 17)
 	require.NoError(t, err)
-	require.Len(t, logs, 8)
+	require.Len(t, logs, 9)
 
 	logs, err = o1.SelectLogsByBlockRange(ctx, 10, 10)
 	require.NoError(t, err)
@@ -445,7 +458,7 @@ func TestORM(t *testing.T) {
 	require.Equal(t, 2, len(lgs))
 
 	require.NoError(t, o1.InsertBlock(ctx, common.HexToHash("0x1237"), 16, time.Now(), 0))
-	require.NoError(t, o1.InsertBlock(ctx, common.HexToHash("0x1238"), 17, time.Now(), 0))
+	require.NoError(t, o1.InsertBlock(ctx, common.HexToHash("0x1238"), 17, time.Now(), 17))
 
 	filter0 := logpoller.Filter{
 		Name:      "permanent retention filter",
@@ -483,18 +496,33 @@ func TestORM(t *testing.T) {
 	require.Equal(t, int64(17), latest.BlockNumber)
 	logs, err = o1.SelectLogsByBlockRange(ctx, 1, latest.BlockNumber)
 	require.NoError(t, err)
-	require.Len(t, logs, 8)
+	require.Len(t, logs, 9)
 
 	// Delete expired logs with page limit
 	time.Sleep(2 * time.Millisecond) // just in case we haven't reached the end of the 1ms retention period
-	deleted, err := o1.DeleteExpiredLogs(ctx, 2)
+	deleted, err := o1.DeleteExpiredLogs(ctx, 1)
 	require.NoError(t, err)
-	assert.Equal(t, int64(2), deleted)
+	assert.Equal(t, int64(1), deleted)
 
 	// Delete expired logs without page limit
 	deleted, err = o1.DeleteExpiredLogs(ctx, 0)
 	require.NoError(t, err)
-	assert.Equal(t, int64(2), deleted)
+	assert.Equal(t, int64(1), deleted)
+
+	// Select unmatched logs with page limit
+	ids, err := o1.SelectUnmatchedLogIDs(ctx, 2)
+	require.NoError(t, err)
+	assert.Len(t, ids, 2)
+
+	// Select unmatched logs without page limit
+	ids, err = o1.SelectUnmatchedLogIDs(ctx, 0)
+	require.NoError(t, err)
+	assert.Len(t, ids, 3)
+
+	// Delete logs by row id
+	deleted, err = o1.DeleteLogsByRowID(ctx, ids)
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), deleted)
 
 	// Ensure that both of the logs from the second chain are still there
 	logs, err = o2.SelectLogs(ctx, 0, 100, common.HexToAddress("0x1236"), topic2)
@@ -506,9 +534,9 @@ func TestORM(t *testing.T) {
 
 	logs, err = o1.SelectLogsByBlockRange(ctx, 1, latest.BlockNumber)
 	require.NoError(t, err)
-	// It should have retained the log matching filter0 (due to ret=0 meaning permanent retention) as well as all
-	// 3 logs matching filter12 (ret=1 hour). It should have deleted 3 logs not matching any filter, as well as 1
-	// of the 2 logs matching filter1 (ret=1ms)--the one that doesn't also match filter12.
+	// The only log which should be deleted is the one which matches filter1 (ret=1ms) but not filter12 (ret=1 hour)
+	// Importantly, it shouldn't delete any logs matching only filter0 (ret=0 meaning permanent retention).  Anything
+	// matching filter12 should be kept regardless of what other filters it matches.
 	assert.Len(t, logs, 4)
 
 	// Delete logs after should delete all logs.
@@ -519,16 +547,160 @@ func TestORM(t *testing.T) {
 	assert.Zero(t, len(logs))
 }
 
-type PgxLogger struct {
-	lggr logger.Logger
-}
+func TestORM_SelectExcessLogs(t *testing.T) {
+	t.Parallel()
+	th := SetupTH(t, lpOpts)
+	o1 := th.ORM
+	o2 := th.ORM2
+	ctx := testutils.Context(t)
 
-func NewPgxLogger(lggr logger.Logger) PgxLogger {
-	return PgxLogger{lggr}
-}
+	topic := common.HexToHash("0x1599")
+	topic2 := common.HexToHash("0x1600")
 
-func (l PgxLogger) Log(ctx context.Context, log pgx.LogLevel, msg string, data map[string]interface{}) {
+	blockHashes := []common.Hash{common.HexToHash("0x1234"), common.HexToHash("0x1235"), common.HexToHash("0x1236")}
 
+	// Insert blocks for active chain
+	for i := int64(0); i < 3; i++ {
+		blockNumber := 10 + i
+		require.NoError(t, o1.InsertBlock(ctx, blockHashes[i], blockNumber, time.Now(), blockNumber))
+		b1, err := o1.SelectBlockByHash(ctx, blockHashes[i])
+		require.NoError(t, err)
+		require.Equal(t, blockNumber, b1.BlockNumber)
+	}
+
+	// Insert block from a different chain
+	require.NoError(t, o2.InsertBlock(ctx, common.HexToHash("0x1234"), 17, time.Now(), 17))
+	b, err := o2.SelectBlockByHash(ctx, common.HexToHash("0x1234"))
+	require.NoError(t, err)
+	require.Equal(t, int64(17), b.BlockNumber)
+
+	for i := int64(0); i < 7; i++ {
+		require.NoError(t, o1.InsertLogs(ctx, []logpoller.Log{
+			{
+				EvmChainId:     ubig.New(th.ChainID),
+				LogIndex:       i,
+				BlockHash:      common.HexToHash("0x1234"),
+				BlockNumber:    int64(10),
+				EventSig:       topic,
+				Topics:         [][]byte{topic[:]},
+				Address:        common.HexToAddress("0x1234"),
+				TxHash:         common.HexToHash("0x1888"),
+				Data:           []byte("hello"),
+				BlockTimestamp: time.Now(),
+			},
+			{
+				EvmChainId:     ubig.New(th.ChainID),
+				LogIndex:       i,
+				BlockHash:      common.HexToHash("0x1234"),
+				BlockNumber:    int64(11),
+				EventSig:       topic,
+				Topics:         [][]byte{topic[:]},
+				Address:        common.HexToAddress("0x1235"),
+				TxHash:         common.HexToHash("0x1888"),
+				Data:           []byte("hello"),
+				BlockTimestamp: time.Now(),
+			},
+			{
+				EvmChainId:     ubig.New(th.ChainID),
+				LogIndex:       i,
+				BlockHash:      common.HexToHash("0x1234"),
+				BlockNumber:    int64(12),
+				EventSig:       topic2,
+				Topics:         [][]byte{topic2[:]},
+				Address:        common.HexToAddress("0x1235"),
+				TxHash:         common.HexToHash("0x1888"),
+				Data:           []byte("hello"),
+				BlockTimestamp: time.Now(),
+			},
+		}))
+	}
+
+	logs, err := o1.SelectLogsByBlockRange(ctx, 1, 12)
+	require.NoError(t, err)
+	require.Len(t, logs, 21)
+
+	// Insert a log on a different chain, to make sure
+	// it's not affected by any operations on the chain LogPoller
+	// is managing.
+	require.NoError(t, o2.InsertLogs(ctx, []logpoller.Log{
+		{
+			EvmChainId:     ubig.New(th.ChainID2),
+			LogIndex:       8,
+			BlockHash:      common.HexToHash("0x1238"),
+			BlockNumber:    int64(17),
+			EventSig:       topic2,
+			Topics:         [][]byte{topic2[:]},
+			Address:        common.HexToAddress("0x1236"),
+			TxHash:         common.HexToHash("0x1888"),
+			Data:           []byte("same log on unrelated chain"),
+			BlockTimestamp: time.Now(),
+		},
+	}))
+
+	logs, err = o2.SelectLogsByBlockRange(ctx, 1, 17)
+	require.NoError(t, err)
+	require.Len(t, logs, 1)
+
+	filter1 := logpoller.Filter{
+		Name:        "MaxLogsKept = 0 (addr 1234 topic1)",
+		Addresses:   []common.Address{common.HexToAddress("0x1234")},
+		EventSigs:   types.HashArray{topic},
+		MaxLogsKept: 0,
+	}
+
+	filter12 := logpoller.Filter{ // retain both topic1 and topic2 on contract3 for at least 1ms
+		Name:        "MaxLogsKept = 1 (addr 1235 topic1 & topic2)",
+		Addresses:   []common.Address{common.HexToAddress("0x1235")},
+		EventSigs:   types.HashArray{topic, topic2},
+		Retention:   time.Millisecond,
+		MaxLogsKept: 1,
+	}
+	filter2 := logpoller.Filter{ // retain topic2 on contract3 for at least 1 hour
+		Name:        "MaxLogsKept = 5 (addr 1235 topic2)",
+		Addresses:   []common.Address{common.HexToAddress("0x1235")},
+		EventSigs:   types.HashArray{topic2},
+		MaxLogsKept: 5,
+	}
+
+	// Test inserting filters and reading them back
+	require.NoError(t, o1.InsertFilter(ctx, filter1))
+	require.NoError(t, o1.InsertFilter(ctx, filter12))
+	require.NoError(t, o1.InsertFilter(ctx, filter2))
+
+	filters, err := o1.LoadFilters(ctx)
+	require.NoError(t, err)
+	require.Len(t, filters, 3)
+	assert.Equal(t, filter1, filters["MaxLogsKept = 0 (addr 1234 topic1)"])
+	assert.Equal(t, filter12, filters["MaxLogsKept = 1 (addr 1235 topic1 & topic2)"])
+	assert.Equal(t, filter2, filters["MaxLogsKept = 5 (addr 1235 topic2)"])
+
+	ids, err := o1.SelectUnmatchedLogIDs(ctx, 0)
+	require.NoError(t, err)
+	require.Len(t, ids, 0)
+
+	// Number of excess logs eligible for pruning:
+	// 2 of the 7 matching filter2 + 6 of the 7 matching filter12 but not filter2 = 8 total of 21
+
+	// Test SelectExcessLogIDs with limit less than # blocks
+	// ( should only consider blocks 10 & 11, returning 6 excess events from block 11
+	// but ignoring the 2 in block 12 )
+	ids, err = o1.SelectExcessLogIDs(ctx, 2)
+	require.NoError(t, err)
+	assert.Len(t, ids, 6)
+
+	// Test SelectExcessLogIDs with limit greater than # blocks:
+	ids, err = o1.SelectExcessLogIDs(ctx, 4)
+	require.NoError(t, err)
+	assert.Len(t, ids, 8)
+
+	// Test SelectExcessLogIDs with no limit
+	ids, err = o1.SelectExcessLogIDs(ctx, 10)
+	require.NoError(t, err)
+	assert.Len(t, ids, 8)
+
+	deleted, err := o1.DeleteLogsByRowID(ctx, ids)
+	require.NoError(t, err)
+	assert.Equal(t, int64(8), deleted)
 }
 
 func TestLogPollerFilters(t *testing.T) {
@@ -1140,6 +1312,70 @@ func TestORM_SelectLogsWithSigsByBlockRangeFilter(t *testing.T) {
 	assertion(t, logs, err, startBlock, endBlock)
 }
 
+type mockQueryExecutor struct {
+	mock.Mock
+}
+
+func (m *mockQueryExecutor) Exec(ctx context.Context, r *logpoller.RangeQueryer[uint64], lower, upper int64) (int64, error) {
+	res := m.Called(lower, upper)
+	return int64(res.Int(0)), res.Error(1)
+}
+
+func Test_ExecPagedQuery(t *testing.T) {
+	t.Parallel()
+	ctx := testutils.Context(t)
+	lggr := logger.Test(t)
+	chainID := testutils.NewRandomEVMChainID()
+	db := pgtest.NewSqlxDB(t)
+	o := logpoller.NewORM(chainID, db, lggr)
+
+	m := mockQueryExecutor{}
+
+	queryError := errors.New("some error")
+	m.On("Exec", int64(0), int64(0)).Return(0, queryError).Once()
+
+	// Should handle errors gracefully
+	r := logpoller.NewRangeQueryer(chainID, db, m.Exec)
+	_, err := r.ExecPagedQuery(ctx, 0, 0)
+	assert.ErrorIs(t, err, queryError)
+
+	m.On("Exec", int64(0), int64(60)).Return(4, nil).Once()
+
+	// Query should only get executed once with limitBlock=end if called with limit=0
+	numResults, err := r.ExecPagedQuery(ctx, 0, 60)
+	require.NoError(t, err)
+	assert.Equal(t, int64(4), numResults)
+
+	// Should report actual db errors
+	_, err = r.ExecPagedQuery(ctx, 300, 1000)
+	assert.Error(t, err)
+
+	require.NoError(t, o.InsertBlock(ctx, common.HexToHash("0x1234"), 42, time.Now(), 0))
+
+	m.On("Exec", mock.Anything, mock.Anything).Return(3, nil)
+
+	// Should get called with limitBlock = 342, 642, 942, 1000
+	numResults, err = r.ExecPagedQuery(ctx, 300, 1000)
+	require.NoError(t, err)
+	assert.Equal(t, int64(12), numResults) // 3 results in each of 4 calls
+	m.AssertNumberOfCalls(t, "Exec", 6)    // 4 new calls, plus the prior 2
+	expectedLimitBlocks := [][]int64{{42, 341}, {342, 641}, {642, 941}, {942, 1000}}
+	for _, expected := range expectedLimitBlocks {
+		m.AssertCalled(t, "Exec", expected[0], expected[1])
+	}
+
+	// Should not go all the way to 1000, but stop after ~ 13 results have
+	//  been returned
+	numResults, err = r.ExecPagedQuery(ctx, 15, 1000)
+	require.NoError(t, err)
+	assert.Equal(t, int64(15), numResults)
+	m.AssertNumberOfCalls(t, "Exec", 11)
+	expectedLimitBlocks = [][]int64{{42, 56}, {57, 71}, {72, 86}, {87, 101}, {102, 116}} // upper[n] = 42 + 15 * n - 1 for n = 1, 2, 3, 4, 5, lower[n] = upper[n-1] + 1
+	for _, expected := range expectedLimitBlocks {
+		m.AssertCalled(t, "Exec", expected[0], expected[1])
+	}
+}
+
 func TestORM_DeleteBlocksBefore(t *testing.T) {
 	th := SetupTH(t, lpOpts)
 	o1 := th.ORM
@@ -1294,7 +1530,7 @@ func TestSelectLogsWithSigsExcluding(t *testing.T) {
 	topicC := common.HexToHash("0x000c")
 	topicD := common.HexToHash("0x000d")
 
-	//Insert two logs that mimics an oracle request from 2 different addresses (matching will be on topic index 1)
+	// Insert two logs that mimics an oracle request from 2 different addresses (matching will be on topic index 1)
 	require.NoError(t, orm.InsertLogs(ctx, []logpoller.Log{
 		{
 			EvmChainId:     (*ubig.Big)(th.ChainID),
@@ -1323,19 +1559,19 @@ func TestSelectLogsWithSigsExcluding(t *testing.T) {
 	}))
 	require.NoError(t, orm.InsertBlock(ctx, common.HexToHash("0x1"), 1, time.Now(), 0))
 
-	//Get any requestSigA from addressA that do not have a equivalent responseSigA
+	// Get any requestSigA from addressA that do not have a equivalent responseSigA
 	logs, err := orm.SelectIndexedLogsWithSigsExcluding(ctx, requestSigA, responseSigA, 1, addressA, 0, 3, 0)
 	require.NoError(t, err)
 	require.Len(t, logs, 1)
 	require.Equal(t, logs[0].Data, []byte("requestID-A1"))
 
-	//Get any requestSigB from addressB that do not have a equivalent responseSigB
+	// Get any requestSigB from addressB that do not have a equivalent responseSigB
 	logs, err = orm.SelectIndexedLogsWithSigsExcluding(ctx, requestSigB, responseSigB, 1, addressB, 0, 3, 0)
 	require.NoError(t, err)
 	require.Len(t, logs, 1)
 	require.Equal(t, logs[0].Data, []byte("requestID-B1"))
 
-	//Insert a log that mimics response for requestID-A1
+	// Insert a log that mimics response for requestID-A1
 	require.NoError(t, orm.InsertLogs(ctx, []logpoller.Log{
 		{
 			EvmChainId:     (*ubig.Big)(th.ChainID),
@@ -1352,18 +1588,18 @@ func TestSelectLogsWithSigsExcluding(t *testing.T) {
 	}))
 	require.NoError(t, orm.InsertBlock(ctx, common.HexToHash("0x2"), 2, time.Now(), 0))
 
-	//Should return nothing as requestID-A1 has been fulfilled
+	// Should return nothing as requestID-A1 has been fulfilled
 	logs, err = orm.SelectIndexedLogsWithSigsExcluding(ctx, requestSigA, responseSigA, 1, addressA, 0, 3, 0)
 	require.NoError(t, err)
 	require.Len(t, logs, 0)
 
-	//requestID-B1 should still be unfulfilled
+	// requestID-B1 should still be unfulfilled
 	logs, err = orm.SelectIndexedLogsWithSigsExcluding(ctx, requestSigB, responseSigB, 1, addressB, 0, 3, 0)
 	require.NoError(t, err)
 	require.Len(t, logs, 1)
 	require.Equal(t, logs[0].Data, []byte("requestID-B1"))
 
-	//Insert 3 request from addressC (matching will be on topic index 3)
+	// Insert 3 request from addressC (matching will be on topic index 3)
 	require.NoError(t, orm.InsertLogs(ctx, []logpoller.Log{
 		{
 			EvmChainId:     (*ubig.Big)(th.ChainID),
@@ -1403,7 +1639,7 @@ func TestSelectLogsWithSigsExcluding(t *testing.T) {
 	}))
 	require.NoError(t, orm.InsertBlock(ctx, common.HexToHash("0x3"), 3, time.Now(), 0))
 
-	//Get all unfulfilled requests from addressC, match on topic index 3
+	// Get all unfulfilled requests from addressC, match on topic index 3
 	logs, err = orm.SelectIndexedLogsWithSigsExcluding(ctx, requestSigB, responseSigB, 3, addressC, 0, 4, 0)
 	require.NoError(t, err)
 	require.Len(t, logs, 3)
@@ -1411,7 +1647,7 @@ func TestSelectLogsWithSigsExcluding(t *testing.T) {
 	require.Equal(t, logs[1].Data, []byte("requestID-C2"))
 	require.Equal(t, logs[2].Data, []byte("requestID-C3"))
 
-	//Fulfill requestID-C2
+	// Fulfill requestID-C2
 	require.NoError(t, orm.InsertLogs(ctx, []logpoller.Log{
 		{
 			EvmChainId:     (*ubig.Big)(th.ChainID),
@@ -1427,14 +1663,14 @@ func TestSelectLogsWithSigsExcluding(t *testing.T) {
 		},
 	}))
 
-	//Verify that requestID-C2 is now fulfilled (not returned)
+	// Verify that requestID-C2 is now fulfilled (not returned)
 	logs, err = orm.SelectIndexedLogsWithSigsExcluding(ctx, requestSigB, responseSigB, 3, addressC, 0, 4, 0)
 	require.NoError(t, err)
 	require.Len(t, logs, 2)
 	require.Equal(t, logs[0].Data, []byte("requestID-C1"))
 	require.Equal(t, logs[1].Data, []byte("requestID-C3"))
 
-	//Fulfill requestID-C3
+	// Fulfill requestID-C3
 	require.NoError(t, orm.InsertLogs(ctx, []logpoller.Log{
 		{
 			EvmChainId:     (*ubig.Big)(th.ChainID),
@@ -1450,13 +1686,13 @@ func TestSelectLogsWithSigsExcluding(t *testing.T) {
 		},
 	}))
 
-	//Verify that requestID-C3 is now fulfilled (not returned)
+	// Verify that requestID-C3 is now fulfilled (not returned)
 	logs, err = orm.SelectIndexedLogsWithSigsExcluding(ctx, requestSigB, responseSigB, 3, addressC, 0, 4, 0)
 	require.NoError(t, err)
 	require.Len(t, logs, 1)
 	require.Equal(t, logs[0].Data, []byte("requestID-C1"))
 
-	//Should return no logs as the number of confirmations is not satisfied
+	// Should return no logs as the number of confirmations is not satisfied
 	logs, err = orm.SelectIndexedLogsWithSigsExcluding(ctx, requestSigB, responseSigB, 3, addressC, 0, 4, 3)
 	require.NoError(t, err)
 	require.Len(t, logs, 0)
@@ -1469,7 +1705,7 @@ func TestSelectLogsWithSigsExcluding(t *testing.T) {
 	require.NoError(t, orm.InsertBlock(ctx, common.HexToHash("0x9"), 9, time.Now(), 0))
 	require.NoError(t, orm.InsertBlock(ctx, common.HexToHash("0x10"), 10, time.Now(), 0))
 
-	//Fulfill requestID-C3
+	// Fulfill requestID-C3
 	require.NoError(t, orm.InsertLogs(ctx, []logpoller.Log{
 		{
 			EvmChainId:     (*ubig.Big)(th.ChainID),
@@ -1485,18 +1721,18 @@ func TestSelectLogsWithSigsExcluding(t *testing.T) {
 		},
 	}))
 
-	//All logs for addressC should be fulfilled, query should return 0 logs
+	// All logs for addressC should be fulfilled, query should return 0 logs
 	logs, err = orm.SelectIndexedLogsWithSigsExcluding(ctx, requestSigB, responseSigB, 3, addressC, 0, 10, 0)
 	require.NoError(t, err)
 	require.Len(t, logs, 0)
 
-	//Should return 1 log as it does not satisfy the required number of confirmations
+	// Should return 1 log as it does not satisfy the required number of confirmations
 	logs, err = orm.SelectIndexedLogsWithSigsExcluding(ctx, requestSigB, responseSigB, 3, addressC, 0, 10, 3)
 	require.NoError(t, err)
 	require.Len(t, logs, 1)
 	require.Equal(t, logs[0].Data, []byte("requestID-C1"))
 
-	//Insert 3 more blocks so that the requestID-C1 has enough confirmations
+	// Insert 3 more blocks so that the requestID-C1 has enough confirmations
 	require.NoError(t, orm.InsertBlock(ctx, common.HexToHash("0x11"), 11, time.Now(), 0))
 	require.NoError(t, orm.InsertBlock(ctx, common.HexToHash("0x12"), 12, time.Now(), 0))
 	require.NoError(t, orm.InsertBlock(ctx, common.HexToHash("0x13"), 13, time.Now(), 0))
@@ -1505,19 +1741,19 @@ func TestSelectLogsWithSigsExcluding(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, logs, 0)
 
-	//AddressB should still have an unfulfilled log (requestID-B1)
+	// AddressB should still have an unfulfilled log (requestID-B1)
 	logs, err = orm.SelectIndexedLogsWithSigsExcluding(ctx, requestSigB, responseSigB, 1, addressB, 0, 3, 0)
 	require.NoError(t, err)
 	require.Len(t, logs, 1)
 	require.Equal(t, logs[0].Data, []byte("requestID-B1"))
 
-	//Should return requestID-A1 as the fulfillment event is out of the block range
+	// Should return requestID-A1 as the fulfillment event is out of the block range
 	logs, err = orm.SelectIndexedLogsWithSigsExcluding(ctx, requestSigA, responseSigA, 1, addressA, 0, 1, 10)
 	require.NoError(t, err)
 	require.Len(t, logs, 1)
 	require.Equal(t, logs[0].Data, []byte("requestID-A1"))
 
-	//Should return nothing as requestID-B1 is before the block range
+	// Should return nothing as requestID-B1 is before the block range
 	logs, err = orm.SelectIndexedLogsWithSigsExcluding(ctx, requestSigB, responseSigB, 1, addressB, 2, 13, 0)
 	require.NoError(t, err)
 	require.Len(t, logs, 0)
@@ -1600,7 +1836,7 @@ func TestSelectLatestBlockNumberEventSigsAddrsWithConfs(t *testing.T) {
 			events:              []common.Hash{event1, event2},
 			addrs:               []common.Address{address1, address2},
 			confs:               0,
-			fromBlock:           3,
+			fromBlock:           4,
 			expectedBlockNumber: 0,
 		},
 		{

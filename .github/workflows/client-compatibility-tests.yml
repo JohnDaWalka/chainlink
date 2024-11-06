@@ -48,7 +48,7 @@ jobs:
       dependency_changed: ${{ steps.changes.outputs.dependency_changed }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@v4.2.1
         with:
           fetch-depth: 0
       - name: Check for go.mod changes
@@ -324,7 +324,7 @@ jobs:
     needs: [should-run, select-versions]
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@v4.2.1
         with:
           ref: ${{ needs.select-versions.outputs.chainlink_version }}
       - name: Build Chainlink Image
@@ -338,16 +338,6 @@ jobs:
           check_image_exists: "true"
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-      - name: Collect Metrics
-        id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@d9da21a2747016b3e13de58c7d4115a3d5c97935 # v3.0.1
-        with:
-          id: client-compatablility-build-chainlink
-          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
-          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          this-job-name: Build Chainlink Image
-        continue-on-error: true
 
   get-latest-available-images:
     name: Get Latest EVM Implementation's Images
@@ -386,7 +376,7 @@ jobs:
       - name: Set Up ecrimagefetcher
         shell: bash
         run: |
-          go install github.com/smartcontractkit/chainlink-testing-framework/tools/ecrimagefetcher@v1.0.1
+          go install github.com/smartcontractkit/chainlink-testing-framework/tools/ecrimagefetcher@v1.50.2
       - name: Get latest docker images from ECR
         if: ${{ github.event.inputs.base64TestList == '' }}
         env:
@@ -396,33 +386,33 @@ jobs:
           PATH=$PATH:$(go env GOPATH)/bin
           export PATH          
           if [[ "$ETH_IMPLEMENTATIONS" == *"geth"* ]]; then
-            geth_images=$(ecrimagefetcher 'ethereum/client-go' '^v[0-9]+\.[0-9]+\.[0-9]+$' ${{ env.LATEST_IMAGE_COUNT }})
+            geth_images=$(ecrimagefetcher 'ethereum/client-go' '^v?[0-9]+\.[0-9]+\.[0-9]+$' ${{ env.LATEST_IMAGE_COUNT }})
             echo "GETH_IMAGES=$geth_images" >> $GITHUB_ENV
             echo "Geth latest images: $geth_images"
           fi
 
           if [[ "$ETH_IMPLEMENTATIONS" == *"nethermind"* ]]; then
-            nethermind_images=$(ecrimagefetcher 'nethermind/nethermind' '^[0-9]+\.[0-9]+\.[0-9]+$' ${{ env.LATEST_IMAGE_COUNT }})
+            nethermind_images=$(ecrimagefetcher 'nethermind/nethermind' '^v?[0-9]+\.[0-9]+\.[0-9]+$' ${{ env.LATEST_IMAGE_COUNT }})
             echo "NETHERMIND_IMAGES=$nethermind_images" >> $GITHUB_ENV
             echo "Nethermind latest images: $nethermind_images"
           fi
 
           if [[ "$ETH_IMPLEMENTATIONS" == *"besu"* ]]; then
             # 24.3.3 is ignored as it doesn't support data & input fields in eth_call
-            besu_images=$(ecrimagefetcher 'hyperledger/besu' '^[0-9]+\.[0-9]+(\.[0-9]+)?$' ${{ env.LATEST_IMAGE_COUNT }} ">=24.5.1")
+            besu_images=$(ecrimagefetcher 'hyperledger/besu' '^v?[0-9]+\.[0-9]+(\.[0-9]+)?$' ${{ env.LATEST_IMAGE_COUNT }} ">=24.5.1")
             echo "BESU_IMAGES=$besu_images" >> $GITHUB_ENV
             echo "Besu latest images: $besu_images"
           fi
 
           if [[ "$ETH_IMPLEMENTATIONS" == *"erigon"* ]]; then
             # 2.60.0 and 2.60.1 are ignored as they stopped working with CL node
-            erigon_images=$(ecrimagefetcher 'thorax/erigon' '^v[0-9]+\.[0-9]+\.[0-9]+$' ${{ env.LATEST_IMAGE_COUNT }} "<v2.60.0")
+            erigon_images=$(ecrimagefetcher 'thorax/erigon' '^v?[0-9]+\.[0-9]+\.[0-9]+$' ${{ env.LATEST_IMAGE_COUNT }} "<v2.60.0 || >v2.60.2")
             echo "ERIGON_IMAGES=$erigon_images" >> $GITHUB_ENV
             echo "Erigon latest images: $erigon_images" 
           fi
           
           if [[ "$ETH_IMPLEMENTATIONS" == *"reth"* ]]; then
-            reth_images=$(ecrimagefetcher 'ghcr.io/paradigmxyz/reth' '^v[0-9]+\.[0-9]+\.[0-9]+$' ${{ env.LATEST_IMAGE_COUNT }})
+            reth_images=$(ecrimagefetcher 'ghcr.io/paradigmxyz/reth' '^v?[0-9]+\.[0-9]+\.[0-9]+$' ${{ env.LATEST_IMAGE_COUNT }})
             echo "RETH_IMAGES=$reth_images" >> $GITHUB_ENV
             echo "Reth latest images: $reth_images" 
           fi          
@@ -603,7 +593,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@v4.2.1
         with:
           repository: smartcontractkit/chainlink
           ref: ${{ needs.select-versions.outputs.chainlink_version }}
@@ -669,8 +659,8 @@ jobs:
           E2E_TEST_SELECTED_NETWORK: ${{ env.SELECTED_NETWORKS}}
           E2E_TEST_CHAINLINK_IMAGE: ${{ env.CHAINLINK_IMAGE }}
           E2E_TEST_CHAINLINK_VERSION: ${{ needs.select-versions.outputs.chainlink_image_version }}
-          E2E_TEST_LOKI_TENANT_ID: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
-          E2E_TEST_LOKI_ENDPOINT: https://${{ secrets.GRAFANA_INTERNAL_HOST }}/loki/api/v1/push
+          E2E_TEST_LOKI_TENANT_ID: ${{ secrets.LOKI_TENANT_ID }}
+          E2E_TEST_LOKI_ENDPOINT: ${{ secrets.LOKI_URL }}
           E2E_TEST_LOKI_BASIC_AUTH: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
           E2E_TEST_GRAFANA_DASHBOARD_URL: "/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
           E2E_TEST_GRAFANA_BEARER_TOKEN: ${{ secrets.GRAFANA_INTERNAL_URL_SHORTENER_TOKEN }}
@@ -688,7 +678,7 @@ jobs:
       - name: Show Grafana url in test summary
         if: always()
         uses: smartcontractkit/.github/actions/ctf-show-grafana-in-test-summary@b6e37806737eef87e8c9137ceeb23ef0bff8b1db # ctf-show-grafana-in-test-summary@0.1.0
-    
+
   start-slack-thread:
     name: Start Slack Thread
     if: always() && needs.*.result != 'skipped' && needs.*.result != 'cancelled' && needs.should-run.outputs.should_run == 'true' && (needs.select-versions.outputs.evm_implementations != '' || github.event.inputs.base64TestList != '')
@@ -862,7 +852,7 @@ jobs:
           - runlog
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@v4.2.1
         with:
           ref: ${{ needs.select-versions.outputs.chainlink_version }}
       - name: Get test results for ${{ matrix.product }}

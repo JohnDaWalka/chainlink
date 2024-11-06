@@ -3,7 +3,7 @@ package remote
 import (
 	"context"
 	"errors"
-	sync "sync"
+	"sync"
 	"time"
 
 	commoncap "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
@@ -45,6 +45,11 @@ type triggerEventKey struct {
 type subRegState struct {
 	callback   chan commoncap.TriggerResponse
 	rawRequest []byte
+}
+
+type TriggerSubscriber interface {
+	commoncap.TriggerCapability
+	Receive(ctx context.Context, msg *types.MessageBody)
 }
 
 var _ commoncap.TriggerCapability = &triggerSubscriber{}
@@ -264,5 +269,5 @@ func (s *triggerSubscriber) HealthReport() map[string]error {
 }
 
 func (s *triggerSubscriber) Name() string {
-	return "TriggerSubscriber"
+	return s.lggr.Name()
 }

@@ -9,6 +9,7 @@ import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC165} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 /// @notice Token pool used for tokens on their native chain. This uses a lock and release mechanism.
 /// Because of lock/unlock requiring liquidity, this pool contract also has function to add and remove
@@ -69,8 +70,10 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 
-  // @inheritdoc IERC165
-  function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
+  /// @inheritdoc IERC165
+  function supportsInterface(
+    bytes4 interfaceId
+  ) public pure virtual override returns (bool) {
     return interfaceId == type(ILiquidityContainer).interfaceId || super.supportsInterface(interfaceId);
   }
 
@@ -82,7 +85,9 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
   /// @notice Sets the LiquidityManager address.
   /// @dev Only callable by the owner.
-  function setRebalancer(address rebalancer) external onlyOwner {
+  function setRebalancer(
+    address rebalancer
+  ) external onlyOwner {
     s_rebalancer = rebalancer;
   }
 
@@ -94,7 +99,9 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
   /// @notice Adds liquidity to the pool. The tokens should be approved first.
   /// @param amount The amount of liquidity to provide.
-  function provideLiquidity(uint256 amount) external {
+  function provideLiquidity(
+    uint256 amount
+  ) external {
     if (!i_acceptLiquidity) revert LiquidityNotAccepted();
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
@@ -104,7 +111,9 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
   /// @notice Removed liquidity to the pool. The tokens will be sent to msg.sender.
   /// @param amount The amount of liquidity to remove.
-  function withdrawLiquidity(uint256 amount) external {
+  function withdrawLiquidity(
+    uint256 amount
+  ) external {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
     if (i_token.balanceOf(address(this)) < amount) revert InsufficientLiquidity();

@@ -2041,8 +2041,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -2145,8 +2145,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -2249,8 +2249,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -2353,8 +2353,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -2442,6 +2442,10 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'opstack'
+OracleAddress = '0x420000000000000000000000000000000000000F'
+
 [HeadTracker]
 HistoryDepth = 300
 MaxBufferSize = 3
@@ -2458,8 +2462,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -2562,8 +2566,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -2666,8 +2670,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -2771,8 +2775,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -2814,7 +2818,7 @@ NoNewHeadsThreshold = '30s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 2
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '45s'
 
 [Transactions]
@@ -2875,8 +2879,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -2978,8 +2982,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -3081,8 +3085,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -3227,7 +3231,7 @@ NoNewHeadsThreshold = '30s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 2
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '40s'
 
 [Transactions]
@@ -3288,8 +3292,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -3332,7 +3336,7 @@ NoNewHeadsThreshold = '3m0s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '2m0s'
 
 [Transactions]
@@ -3393,8 +3397,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -3497,8 +3501,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -3601,8 +3605,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -3644,7 +3648,7 @@ NoNewHeadsThreshold = '12m0s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 100
 RPCBlockQueryDelay = 15
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
 [Transactions]
@@ -3705,8 +3709,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -3748,7 +3752,7 @@ NoNewHeadsThreshold = '6m0s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 100
 RPCBlockQueryDelay = 15
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
 [Transactions]
@@ -3809,8 +3813,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -3913,8 +3917,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -3956,7 +3960,7 @@ NoNewHeadsThreshold = '40s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
 [Transactions]
@@ -4001,6 +4005,10 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'opstack'
+OracleAddress = '0x4200000000000000000000000000000000000005'
+
 [HeadTracker]
 HistoryDepth = 400
 MaxBufferSize = 3
@@ -4017,8 +4025,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -4105,6 +4113,9 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'zksync'
+
 [HeadTracker]
 HistoryDepth = 50
 MaxBufferSize = 3
@@ -4121,8 +4132,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -4164,7 +4175,7 @@ NoNewHeadsThreshold = '3m0s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
 [Transactions]
@@ -4190,7 +4201,7 @@ LimitDefault = 500000
 LimitMax = 500000
 LimitMultiplier = '1'
 LimitTransfer = 21000
-EstimateLimit = false
+EstimateLimit = true
 BumpMin = '10 gwei'
 BumpPercent = 20
 BumpThreshold = 0
@@ -4225,8 +4236,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -4268,7 +4279,7 @@ NoNewHeadsThreshold = '3m0s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
 [Transactions]
@@ -4294,7 +4305,7 @@ LimitDefault = 500000
 LimitMax = 500000
 LimitMultiplier = '1'
 LimitTransfer = 21000
-EstimateLimit = false
+EstimateLimit = true
 BumpMin = '10 gwei'
 BumpPercent = 20
 BumpThreshold = 0
@@ -4329,8 +4340,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -4372,7 +4383,7 @@ NoNewHeadsThreshold = '1m0s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
 [Transactions]
@@ -4417,6 +4428,9 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'zksync'
+
 [HeadTracker]
 HistoryDepth = 250
 MaxBufferSize = 3
@@ -4433,8 +4447,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -4476,7 +4490,7 @@ NoNewHeadsThreshold = '1m0s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
 [Transactions]
@@ -4521,6 +4535,9 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'zksync'
+
 [HeadTracker]
 HistoryDepth = 1500
 MaxBufferSize = 3
@@ -4537,8 +4554,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -4626,6 +4643,10 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'opstack'
+OracleAddress = '0x420000000000000000000000000000000000000F'
+
 [HeadTracker]
 HistoryDepth = 300
 MaxBufferSize = 3
@@ -4642,8 +4663,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -4746,8 +4767,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -5058,8 +5079,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -5162,8 +5183,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -5266,8 +5287,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -5309,7 +5330,7 @@ NoNewHeadsThreshold = '30s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '40s'
 
 [Transactions]
@@ -5370,8 +5391,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -5413,7 +5434,7 @@ NoNewHeadsThreshold = '30s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '40s'
 
 [Transactions]
@@ -5474,8 +5495,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -5578,7 +5599,7 @@ LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -5666,6 +5687,10 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'opstack'
+OracleAddress = '0x420000000000000000000000000000000000000F'
+
 [HeadTracker]
 HistoryDepth = 300
 MaxBufferSize = 3
@@ -5682,8 +5707,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -5725,7 +5750,7 @@ NoNewHeadsThreshold = '40s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
 [Transactions]
@@ -5770,6 +5795,10 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'opstack'
+OracleAddress = '0x4200000000000000000000000000000000000005'
+
 [HeadTracker]
 HistoryDepth = 400
 MaxBufferSize = 3
@@ -5786,8 +5815,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -5890,8 +5919,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -5994,8 +6023,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -6202,8 +6231,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -6290,6 +6319,10 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'opstack'
+OracleAddress = '0x420000000000000000000000000000000000000F'
+
 [HeadTracker]
 HistoryDepth = 300
 MaxBufferSize = 3
@@ -6306,8 +6339,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -6349,7 +6382,7 @@ NoNewHeadsThreshold = '3m0s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '2m0s'
 
 [Transactions]
@@ -6410,8 +6443,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -6499,6 +6532,9 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'arbitrum'
+
 [HeadTracker]
 HistoryDepth = 100
 MaxBufferSize = 3
@@ -6515,8 +6551,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -6604,6 +6640,9 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'arbitrum'
+
 [HeadTracker]
 HistoryDepth = 100
 MaxBufferSize = 3
@@ -6620,8 +6659,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -6814,6 +6853,9 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'arbitrum'
+
 [HeadTracker]
 HistoryDepth = 100
 MaxBufferSize = 3
@@ -6830,8 +6872,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -6873,7 +6915,7 @@ NoNewHeadsThreshold = '1m0s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '1m0s'
 
 [Transactions]
@@ -6934,8 +6976,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -6977,7 +7019,7 @@ NoNewHeadsThreshold = '30s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 2
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '1m0s'
 
 [Transactions]
@@ -7038,8 +7080,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -7081,7 +7123,7 @@ NoNewHeadsThreshold = '30s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 2
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '1m0s'
 
 [Transactions]
@@ -7142,8 +7184,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -7185,7 +7227,7 @@ NoNewHeadsThreshold = '1m0s'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '1m0s'
 
 [Transactions]
@@ -7246,8 +7288,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -7274,7 +7316,7 @@ GasLimitDefault = 400000
 AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
-ChainType = 'optimismBedrock'
+ChainType = 'zircuit'
 FinalityDepth = 1000
 FinalityTagEnabled = true
 LinkContractAddress = '0xDEE94506570cA186BC1e3516fCf4fd719C312cCD'
@@ -7337,6 +7379,10 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'opstack'
+OracleAddress = '0x420000000000000000000000000000000000000F'
+
 [HeadTracker]
 HistoryDepth = 2000
 MaxBufferSize = 3
@@ -7353,8 +7399,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -7381,7 +7427,7 @@ GasLimitDefault = 400000
 AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
-ChainType = 'optimismBedrock'
+ChainType = 'zircuit'
 FinalityDepth = 1000
 FinalityTagEnabled = true
 LinkContractAddress = '0x5D6d033B4FbD2190D99D930719fAbAcB64d2439a'
@@ -7444,6 +7490,10 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'opstack'
+OracleAddress = '0x420000000000000000000000000000000000000F'
+
 [HeadTracker]
 HistoryDepth = 2000
 MaxBufferSize = 3
@@ -7460,8 +7510,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -7563,8 +7613,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -7666,8 +7716,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -7769,8 +7819,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -7873,8 +7923,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -8081,8 +8131,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -8184,8 +8234,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -8377,6 +8427,10 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'opstack'
+OracleAddress = '0x420000000000000000000000000000000000000F'
+
 [HeadTracker]
 HistoryDepth = 300
 MaxBufferSize = 3
@@ -8393,8 +8447,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -8482,6 +8536,10 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'opstack'
+OracleAddress = '0x420000000000000000000000000000000000000F'
+
 [HeadTracker]
 HistoryDepth = 300
 MaxBufferSize = 3
@@ -8498,8 +8556,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -8587,6 +8645,9 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'arbitrum'
+
 [HeadTracker]
 HistoryDepth = 100
 MaxBufferSize = 3
@@ -8603,8 +8664,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -8692,6 +8753,9 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'arbitrum'
+
 [HeadTracker]
 HistoryDepth = 100
 MaxBufferSize = 3
@@ -8708,8 +8772,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -8797,6 +8861,9 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'arbitrum'
+
 [HeadTracker]
 HistoryDepth = 100
 MaxBufferSize = 3
@@ -8813,8 +8880,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -8901,6 +8968,10 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'opstack'
+OracleAddress = '0x5300000000000000000000000000000000000002'
+
 [HeadTracker]
 HistoryDepth = 50
 MaxBufferSize = 3
@@ -8917,8 +8988,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -9005,6 +9076,10 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'opstack'
+OracleAddress = '0x5300000000000000000000000000000000000002'
+
 [HeadTracker]
 HistoryDepth = 50
 MaxBufferSize = 3
@@ -9021,8 +9096,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -9125,8 +9200,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -9213,6 +9288,10 @@ TransactionPercentile = 60
 [GasEstimator.FeeHistory]
 CacheTimeout = '10s'
 
+[GasEstimator.DAOracle]
+OracleType = 'opstack'
+OracleAddress = '0x420000000000000000000000000000000000000F'
+
 [HeadTracker]
 HistoryDepth = 300
 MaxBufferSize = 3
@@ -9229,8 +9308,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -9438,8 +9517,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -9542,8 +9621,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [OCR]
@@ -10081,6 +10160,33 @@ TipCapMinimum is the minimum gas tip to use when submitting transactions to the 
 
 (Only applies to EIP-1559 transactions)
 
+## EVM.GasEstimator.DAOracle
+```toml
+[EVM.GasEstimator.DAOracle]
+OracleType = 'opstack' # Example
+OracleAddress = '0x420000000000000000000000000000000000000F' # Example
+CustomGasPriceCalldata = '' # Default
+```
+
+
+### OracleType
+```toml
+OracleType = 'opstack' # Example
+```
+OracleType refers to the oracle family this config belongs to. Currently the available oracle types are: 'opstack', 'arbitrum', 'zksync', and 'custom_calldata'.
+
+### OracleAddress
+```toml
+OracleAddress = '0x420000000000000000000000000000000000000F' # Example
+```
+OracleAddress is the address of the oracle contract.
+
+### CustomGasPriceCalldata
+```toml
+CustomGasPriceCalldata = '' # Default
+```
+CustomGasPriceCalldata is optional and can be set to call a custom gas price function at the given OracleAddress.
+
 ## EVM.GasEstimator.LimitJobType
 ```toml
 [EVM.GasEstimator.LimitJobType]
@@ -10235,8 +10341,8 @@ HistoryDepth = 100 # Default
 ```
 HistoryDepth tracks the top N blocks on top of the latest finalized block to keep in the `heads` database table.
 Note that this can easily result in MORE than `N + finality depth`  records since in the case of re-orgs we keep multiple heads for a particular block height.
-This number should be at least as large as `FinalityDepth`.
-There may be a small performance penalty to setting this to something very large (10,000+)
+Higher values help reduce number of RPC requests performed by TXM's Finalizer and improve TXM's Confirmer reorg protection on restarts.
+At the same time, setting the value too high could lead to higher CPU consumption. The following formula could be used to calculate the optimal value: `expected_downtime_on_restart/block_time`.
 
 ### MaxBufferSize
 ```toml
@@ -10309,8 +10415,8 @@ SyncThreshold = 5 # Default
 LeaseDuration = '0s' # Default
 NodeIsSyncingEnabled = false # Default
 FinalizedBlockPollInterval = '5s' # Default
-EnforceRepeatableRead = false # Default
-DeathDeclarationDelay = '10s' # Default
+EnforceRepeatableRead = true # Default
+DeathDeclarationDelay = '1m' # Default
 NewHeadsPollInterval = '0s' # Default
 ```
 The node pool manages multiple RPC endpoints.
@@ -10387,7 +10493,7 @@ Set to 0 to disable.
 
 ### EnforceRepeatableRead
 ```toml
-EnforceRepeatableRead = false # Default
+EnforceRepeatableRead = true # Default
 ```
 EnforceRepeatableRead defines if Core should only use RPCs whose most recently finalized block is greater or equal to
 `highest finalized block - FinalizedBlockOffset`. In other words, exclude RPCs lagging on latest finalized
@@ -10397,12 +10503,13 @@ Set false to disable
 
 ### DeathDeclarationDelay
 ```toml
-DeathDeclarationDelay = '10s' # Default
+DeathDeclarationDelay = '1m' # Default
 ```
 DeathDeclarationDelay defines the minimum duration an RPC must be in unhealthy state before producing an error log message.
 Larger values might be helpful to reduce the noisiness of health checks like `EnforceRepeatableRead = true', which might be falsely
 trigger declaration of `FinalizedBlockOutOfSync` due to insignificant network delays in broadcasting of the finalized state among RPCs.
-RPC will not be picked to handle a request even if this option is set to a nonzero value.
+Should be greater than `FinalizedBlockPollInterval`.
+Unhealthy RPC will not be picked to handle a request even if this option is set to a nonzero value.
 
 ### NewHeadsPollInterval
 ```toml
@@ -10597,7 +10704,7 @@ Name is a unique (per-chain) identifier for this node.
 ```toml
 WSURL = 'wss://web.socket/test' # Example
 ```
-WSURL is the WS(S) endpoint for this node. Required for primary nodes.
+WSURL is the WS(S) endpoint for this node. Required for primary nodes when `LogBroadcasterEnabled` is `true`
 
 ### HTTPURL
 ```toml
@@ -10795,7 +10902,9 @@ ComputeUnitPriceMin = 0 # Default
 ComputeUnitPriceDefault = 0 # Default
 FeeBumpPeriod = '3s' # Default
 BlockHistoryPollPeriod = '5s' # Default
+BlockHistorySize = 1 # Default
 ComputeUnitLimitDefault = 200_000 # Default
+EstimateComputeUnitLimit = false # Default
 ```
 
 
@@ -10908,11 +11017,137 @@ BlockHistoryPollPeriod = '5s' # Default
 ```
 BlockHistoryPollPeriod is the rate to poll for blocks in the block history fee estimator
 
+### BlockHistorySize
+```toml
+BlockHistorySize = 1 # Default
+```
+BlockHistorySize is the number of blocks to take into consideration when using FeeEstimatorMode = 'blockhistory' to determine compute unit price.
+If set to 1, the compute unit price will be determined by the median of the last block's compute unit prices.
+If set N > 1, the compute unit price will be determined by the average of the medians of the last N blocks' compute unit prices.
+DISCLAIMER: 1:1 ratio between n and RPC calls. It executes once every 'BlockHistoryPollPeriod' value.
+
 ### ComputeUnitLimitDefault
 ```toml
 ComputeUnitLimitDefault = 200_000 # Default
 ```
 ComputeUnitLimitDefault is the compute units limit applied to transactions unless overriden during the txm enqueue
+
+### EstimateComputeUnitLimit
+```toml
+EstimateComputeUnitLimit = false # Default
+```
+EstimateComputeUnitLimit enables or disables compute unit limit estimations per transaction. If estimations return 0 used compute, the ComputeUnitLimitDefault value is used, if set.
+
+## Solana.MultiNode
+```toml
+[Solana.MultiNode]
+Enabled = false # Default
+PollFailureThreshold = 5 # Default
+PollInterval = '10s' # Default
+SelectionMode = 'PriorityLevel' # Default
+SyncThreshold = 5 # Default
+NodeIsSyncingEnabled = false # Default
+LeaseDuration = '1m0s' # Default
+FinalizedBlockPollInterval = '10s' # Default
+EnforceRepeatableRead = true # Default
+DeathDeclarationDelay = '10s' # Default
+NodeNoNewHeadsThreshold = '10s' # Default
+NoNewFinalizedHeadsThreshold = '10s' # Default
+FinalityDepth = 0 # Default
+FinalityTagEnabled = true # Default
+FinalizedBlockOffset = 0 # Default
+```
+
+
+### Enabled
+```toml
+Enabled = false # Default
+```
+Enabled enables the multinode feature.
+
+### PollFailureThreshold
+```toml
+PollFailureThreshold = 5 # Default
+```
+PollFailureThreshold is the number of consecutive poll failures before a node is considered unhealthy.
+
+### PollInterval
+```toml
+PollInterval = '10s' # Default
+```
+PollInterval is the rate to poll for node health.
+
+### SelectionMode
+```toml
+SelectionMode = 'PriorityLevel' # Default
+```
+SelectionMode is the method used to select the next best node to use.
+
+### SyncThreshold
+```toml
+SyncThreshold = 5 # Default
+```
+SyncThreshold is the number of blocks behind the best node that a node can be before it is considered out of sync.
+
+### NodeIsSyncingEnabled
+```toml
+NodeIsSyncingEnabled = false # Default
+```
+NodeIsSyncingEnabled enables the feature to avoid sending transactions to nodes that are syncing. Not relavant for Solana.
+
+### LeaseDuration
+```toml
+LeaseDuration = '1m0s' # Default
+```
+LeaseDuration is the max duration a node can be leased for.
+
+### FinalizedBlockPollInterval
+```toml
+FinalizedBlockPollInterval = '10s' # Default
+```
+FinalizedBlockPollInterval is the rate to poll for the finalized block.
+
+### EnforceRepeatableRead
+```toml
+EnforceRepeatableRead = true # Default
+```
+EnforceRepeatableRead enforces the repeatable read guarantee for multinode.
+
+### DeathDeclarationDelay
+```toml
+DeathDeclarationDelay = '10s' # Default
+```
+DeathDeclarationDelay is the duration to wait before declaring a node dead.
+
+### NodeNoNewHeadsThreshold
+```toml
+NodeNoNewHeadsThreshold = '10s' # Default
+```
+NodeNoNewHeadsThreshold is the duration to wait before declaring a node unhealthy due to no new heads.
+
+### NoNewFinalizedHeadsThreshold
+```toml
+NoNewFinalizedHeadsThreshold = '10s' # Default
+```
+NoNewFinalizedHeadsThreshold is the duration to wait before declaring a node unhealthy due to no new finalized heads.
+
+### FinalityDepth
+```toml
+FinalityDepth = 0 # Default
+```
+FinalityDepth is not used when finality tags are enabled.
+
+### FinalityTagEnabled
+```toml
+FinalityTagEnabled = true # Default
+```
+FinalityTagEnabled enables the use of finality tags.
+
+### FinalizedBlockOffset
+```toml
+FinalizedBlockOffset = 0 # Default
+```
+FinalizedBlockOffset is the offset from the finalized block to use for finality tags.
 
 ## Solana.Nodes
 ```toml

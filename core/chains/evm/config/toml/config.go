@@ -23,7 +23,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 )
 
-var ErrNotFound = errors.New("not found")
+var (
+	ErrNotFound = errors.New("not found")
+)
 
 type HasEVMConfigs interface {
 	EVMConfigs() EVMConfigs
@@ -311,20 +313,43 @@ func (c *EVMConfig) ValidateConfig() (err error) {
 		err = multierr.Append(err, commonconfig.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
 	} else {
 		var hasPrimary bool
-		for _, n := range c.Nodes {
+		var logBroadcasterEnabled bool
+		var newHeadsPollingInterval commonconfig.Duration
+		if c.LogBroadcasterEnabled != nil {
+			logBroadcasterEnabled = *c.LogBroadcasterEnabled
+		}
+
+		if c.NodePool.NewHeadsPollInterval != nil {
+			newHeadsPollingInterval = *c.NodePool.NewHeadsPollInterval
+		}
+
+		for i, n := range c.Nodes {
 			if n.SendOnly != nil && *n.SendOnly {
 				continue
 			}
+
 			hasPrimary = true
-			break
+
+			// if the node is a primary node, then the WS URL is required when
+			//	1. LogBroadcaster is enabled
+			//	2. The http polling is disabled (newHeadsPollingInterval == 0)
+			if n.WSURL == nil || n.WSURL.IsZero() {
+				if logBroadcasterEnabled {
+					err = multierr.Append(err, commonconfig.ErrMissing{Name: "Nodes", Msg: fmt.Sprintf("%vth node (primary) must have a valid WSURL when LogBroadcaster is enabled", i)})
+				} else if newHeadsPollingInterval.Duration() == 0 {
+					err = multierr.Append(err, commonconfig.ErrMissing{Name: "Nodes", Msg: fmt.Sprintf("%vth node (primary) must have a valid WSURL when http polling is disabled", i)})
+				}
+			}
 		}
+
 		if !hasPrimary {
 			err = multierr.Append(err, commonconfig.ErrMissing{Name: "Nodes",
-				Msg: "must have at least one primary node with WSURL"})
+				Msg: "must have at least one primary node"})
 		}
 	}
 
 	err = multierr.Append(err, c.Chain.ValidateConfig())
+	err = multierr.Append(err, c.NodePool.ValidateConfig(c.Chain.FinalityTagEnabled))
 
 	return
 }
@@ -575,6 +600,7 @@ type GasEstimator struct {
 
 	BlockHistory BlockHistoryEstimator `toml:",omitempty"`
 	FeeHistory   FeeHistoryEstimator   `toml:",omitempty"`
+	DAOracle     DAOracle              `toml:",omitempty"`
 }
 
 func (e *GasEstimator) ValidateConfig() (err error) {
@@ -670,6 +696,7 @@ func (e *GasEstimator) setFrom(f *GasEstimator) {
 	e.LimitJobType.setFrom(&f.LimitJobType)
 	e.BlockHistory.setFrom(&f.BlockHistory)
 	e.FeeHistory.setFrom(&f.FeeHistory)
+	e.DAOracle.setFrom(&f.DAOracle)
 }
 
 type GasLimitJobType struct {
@@ -742,6 +769,61 @@ func (u *FeeHistoryEstimator) setFrom(f *FeeHistoryEstimator) {
 	}
 }
 
+type DAOracle struct {
+	OracleType             *DAOracleType
+	OracleAddress          *types.EIP55Address
+	CustomGasPriceCalldata *string
+}
+
+type DAOracleType string
+
+const (
+	DAOracleOPStack        = DAOracleType("opstack")
+	DAOracleArbitrum       = DAOracleType("arbitrum")
+	DAOracleZKSync         = DAOracleType("zksync")
+	DAOracleCustomCalldata = DAOracleType("custom_calldata")
+)
+
+func (o *DAOracle) ValidateConfig() (err error) {
+	if o.OracleType != nil {
+		if *o.OracleType == DAOracleOPStack {
+			if o.OracleAddress == nil {
+				err = multierr.Append(err, commonconfig.ErrMissing{Name: "OracleAddress", Msg: "required for 'opstack' oracle types"})
+			}
+		}
+		if *o.OracleType == DAOracleCustomCalldata {
+			if o.OracleAddress == nil {
+				err = multierr.Append(err, commonconfig.ErrMissing{Name: "OracleAddress", Msg: "required for 'custom_calldata' oracle types"})
+			}
+			if o.CustomGasPriceCalldata == nil {
+				err = multierr.Append(err, commonconfig.ErrMissing{Name: "CustomGasPriceCalldata", Msg: "required for 'custom_calldata' oracle type"})
+			}
+		}
+	}
+	return
+}
+
+func (o DAOracleType) IsValid() bool {
+	switch o {
+	case "", DAOracleOPStack, DAOracleArbitrum, DAOracleZKSync, DAOracleCustomCalldata:
+		return true
+	}
+	return false
+}
+
+func (d *DAOracle) setFrom(f *DAOracle) {
+	if v := f.OracleType; v != nil {
+		d.OracleType = v
+	}
+
+	if v := f.OracleAddress; v != nil {
+		d.OracleAddress = v
+	}
+	if v := f.CustomGasPriceCalldata; v != nil {
+		d.CustomGasPriceCalldata = v
+	}
+}
+
 type KeySpecificConfig []KeySpecific
 
 func (ks KeySpecificConfig) ValidateConfig() (err error) {
@@ -800,7 +882,6 @@ func (t *HeadTracker) setFrom(f *HeadTracker) {
 	if v := f.PersistenceEnabled; v != nil {
 		t.PersistenceEnabled = v
 	}
-
 }
 
 func (t *HeadTracker) ValidateConfig() (err error) {
@@ -931,6 +1012,20 @@ func (p *NodePool) setFrom(f *NodePool) {
 	p.Errors.setFrom(&f.Errors)
 }
 
+func (p *NodePool) ValidateConfig(finalityTagEnabled *bool) (err error) {
+	if finalityTagEnabled != nil && *finalityTagEnabled {
+		if p.FinalizedBlockPollInterval == nil {
+			err = multierr.Append(err, commonconfig.ErrMissing{Name: "FinalizedBlockPollInterval", Msg: "required when FinalityTagEnabled is true"})
+			return
+		}
+		if p.FinalizedBlockPollInterval.Duration() <= 0 {
+			err = multierr.Append(err, commonconfig.ErrInvalid{Name: "FinalizedBlockPollInterval", Value: p.FinalizedBlockPollInterval,
+				Msg: "must be greater than 0"})
+		}
+	}
+	return
+}
+
 type OCR struct {
 	ContractConfirmations              *uint16
 	ContractTransmitterTransmitTimeout *commonconfig.Duration
@@ -976,19 +1071,8 @@ func (n *Node) ValidateConfig() (err error) {
 		err = multierr.Append(err, commonconfig.ErrEmpty{Name: "Name", Msg: "required for all nodes"})
 	}
 
-	var sendOnly bool
-	if n.SendOnly != nil {
-		sendOnly = *n.SendOnly
-	}
-	if n.WSURL == nil {
-		if !sendOnly {
-			err = multierr.Append(err, commonconfig.ErrMissing{Name: "WSURL", Msg: "required for primary nodes"})
-		}
-	} else if n.WSURL.IsZero() {
-		if !sendOnly {
-			err = multierr.Append(err, commonconfig.ErrEmpty{Name: "WSURL", Msg: "required for primary nodes"})
-		}
-	} else {
+	// relax the check here as WSURL can potentially be empty if LogBroadcaster is disabled (checked in EVMConfig Validation)
+	if n.WSURL != nil && !n.WSURL.IsZero() {
 		switch n.WSURL.Scheme {
 		case "ws", "wss":
 		default:

@@ -6,7 +6,7 @@ import {Pool} from "../libraries/Pool.sol";
 import {IERC165} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 /// @notice Shared public interface for multiple V1 pool types.
-/// Each pool type handles a different child token model (lock/unlock, mint/burn.)
+/// Each pool type handles a different child token model e.g. lock/unlock, mint/burn.
 interface IPoolV1 is IERC165 {
   /// @notice Lock tokens into the pool or burn the tokens.
   /// @param lockOrBurnIn Encoded data fields for the processing of tokens on the source chain.
@@ -28,10 +28,14 @@ interface IPoolV1 is IERC165 {
   /// @notice Checks whether a remote chain is supported in the token pool.
   /// @param remoteChainSelector The selector of the remote chain.
   /// @return true if the given chain is a permissioned remote chain.
-  function isSupportedChain(uint64 remoteChainSelector) external view returns (bool);
+  function isSupportedChain(
+    uint64 remoteChainSelector
+  ) external view returns (bool);
 
   /// @notice Returns if the token pool supports the given token.
   /// @param token The address of the token.
   /// @return true if the token is supported by the pool.
-  function isSupportedToken(address token) external view returns (bool);
+  function isSupportedToken(
+    address token
+  ) external view returns (bool);
 }

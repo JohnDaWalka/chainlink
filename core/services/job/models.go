@@ -19,7 +19,6 @@ import (
 
 	commonassets "github.com/smartcontractkit/chainlink-common/pkg/assets"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	pkgworkflows "github.com/smartcontractkit/chainlink-common/pkg/workflows"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 
@@ -186,6 +185,7 @@ type Job struct {
 	CCIPSpecID                    *int32
 	CCIPSpec                      *CCIPSpec
 	CCIPBootstrapSpecID           *int32
+	AdaptiveSendSpec              *AdaptiveSendSpec `toml:"adaptiveSend"`
 	JobSpecErrors                 []SpecError
 	Type                          Type          `toml:"type"`
 	SchemaVersion                 uint32        `toml:"schemaVersion"`
@@ -865,13 +865,14 @@ type WorkflowSpecType string
 
 const (
 	YamlSpec        WorkflowSpecType = "yaml"
-	DefaultSpecType                  = YamlSpec
+	WASMFile        WorkflowSpecType = "wasm_file"
+	DefaultSpecType                  = ""
 )
 
 type WorkflowSpec struct {
 	ID       int32  `toml:"-"`
-	Workflow string `toml:"workflow"` // the raw representation of the workflow
-	Config   string `toml:"config"`   // the raw representation of the config
+	Workflow string `toml:"workflow"`           // the raw representation of the workflow
+	Config   string `toml:"config" db:"config"` // the raw representation of the config
 	// fields derived from the yaml spec, used for indexing the database
 	// note: i tried to make these private, but translating them to the database seems to require them to be public
 	WorkflowID    string           `toml:"-" db:"workflow_id"`    // Derived. Do not modify. the CID of the workflow.
@@ -879,8 +880,10 @@ type WorkflowSpec struct {
 	WorkflowName  string           `toml:"-" db:"workflow_name"`  // Derived. Do not modify. the name of the workflow.
 	CreatedAt     time.Time        `toml:"-"`
 	UpdatedAt     time.Time        `toml:"-"`
-	SpecType      WorkflowSpecType `db:"spec_type"`
+	SpecType      WorkflowSpecType `toml:"spec_type" db:"spec_type"`
 	sdkWorkflow   *sdk.WorkflowSpec
+	rawSpec       []byte
+	config        []byte
 }
 
 var (
@@ -894,12 +897,8 @@ const (
 
 // Validate checks the workflow spec for correctness
 func (w *WorkflowSpec) Validate(ctx context.Context) error {
-	s, err := pkgworkflows.ParseWorkflowSpecYaml(w.Workflow)
+	s, err := w.SDKSpec(ctx)
 	if err != nil {
-		return fmt.Errorf("%w: failed to parse workflow spec %s: %w", ErrInvalidWorkflowYAMLSpec, w.Workflow, err)
-	}
-
-	if _, err = w.SDKSpec(ctx); err != nil {
 		return err
 	}
 
@@ -918,21 +917,91 @@ func (w *WorkflowSpec) SDKSpec(ctx context.Context) (sdk.WorkflowSpec, error) {
 		return *w.sdkWorkflow, nil
 	}
 
-	spec, cid, err := workflowSpecFactory.Spec(ctx, w.Workflow, []byte(w.Config), w.SpecType)
+	workflowSpecFactory, ok := workflowSpecFactories[w.SpecType]
+	if !ok {
+		return sdk.WorkflowSpec{}, fmt.Errorf("unknown spec type %s", w.SpecType)
+	}
+	spec, rawSpec, cid, err := workflowSpecFactory.Spec(ctx, w.Workflow, w.Config)
 	if err != nil {
 		return sdk.WorkflowSpec{}, err
 	}
 	w.sdkWorkflow = &spec
+	w.rawSpec = rawSpec
 	w.WorkflowID = cid
 	return spec, nil
 }
 
+func (w *WorkflowSpec) RawSpec(ctx context.Context) ([]byte, error) {
+	if w.rawSpec != nil {
+		return w.rawSpec, nil
+	}
+
+	workflowSpecFactory, ok := workflowSpecFactories[w.SpecType]
+	if !ok {
+		return nil, fmt.Errorf("unknown spec type %s", w.SpecType)
+	}
+
+	rs, err := workflowSpecFactory.RawSpec(ctx, w.Workflow, w.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	w.rawSpec = rs
+	return rs, nil
+}
+
+func (w *WorkflowSpec) GetConfig(ctx context.Context) ([]byte, error) {
+	if w.config != nil {
+		return w.config, nil
+	}
+
+	workflowSpecFactory, ok := workflowSpecFactories[w.SpecType]
+	if !ok {
+		return nil, fmt.Errorf("unknown spec type %s", w.SpecType)
+	}
+
+	rs, err := workflowSpecFactory.Config(ctx, w.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	w.config = rs
+	return rs, nil
+}
+
+type OracleFactoryConfig struct {
+	Enabled            bool     `toml:"enabled"`
+	BootstrapPeers     []string `toml:"bootstrap_peers"`      // e.g.,["12D3KooWEBVwbfdhKnicois7FTYVsBFGFcoMhMCKXQC57BQyZMhz@localhost:6690"]
+	OCRContractAddress string   `toml:"ocr_contract_address"` // e.g., 0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6
+	ChainID            string   `toml:"chain_id"`             // e.g., "31337"
+	Network            string   `toml:"network"`              // e.g., "evm"
+}
+
+// Value returns this instance serialized for database storage.
+func (ofc OracleFactoryConfig) Value() (driver.Value, error) {
+	return json.Marshal(ofc)
+}
+
+// Scan reads the database value and returns an instance.
+func (ofc *OracleFactoryConfig) Scan(value interface{}) error {
+	if value == nil {
+		return nil // field is nullable
+	}
+
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.Errorf("expected bytes got %T", value)
+	}
+	return json.Unmarshal(b, &ofc)
+}
+
 type StandardCapabilitiesSpec struct {
-	ID        int32
-	CreatedAt time.Time `toml:"-"`
-	UpdatedAt time.Time `toml:"-"`
-	Command   string    `toml:"command"`
-	Config    string    `toml:"config"`
+	ID            int32
+	CreatedAt     time.Time           `toml:"-"`
+	UpdatedAt     time.Time           `toml:"-"`
+	Command       string              `toml:"command" db:"command"`
+	Config        string              `toml:"config" db:"config"`
+	OracleFactory OracleFactoryConfig `toml:"oracle_factory" db:"oracle_factory"`
 }
 
 func (w *StandardCapabilitiesSpec) GetID() string {
@@ -991,4 +1060,27 @@ type CCIPSpec struct {
 	// PluginConfig contains plugin-specific config, like token price pipelines
 	// and RMN network info for offchain blessing.
 	PluginConfig JSONConfig `toml:"pluginConfig"`
+}
+
+type AdaptiveSendSpec struct {
+	TransmitterAddress *evmtypes.EIP55Address `toml:"transmitterAddress"`
+	ContractAddress    *evmtypes.EIP55Address `toml:"contractAddress"`
+	Delay              time.Duration          `toml:"delay"`
+	Metadata           JSONConfig             `toml:"metadata"`
+}
+
+func (o *AdaptiveSendSpec) Validate() error {
+	if o.TransmitterAddress == nil {
+		return errors.New("no AdaptiveSendSpec.TransmitterAddress found")
+	}
+
+	if o.ContractAddress == nil {
+		return errors.New("no AdaptiveSendSpec.ContractAddress found")
+	}
+
+	if o.Delay.Seconds() <= 1 {
+		return errors.New("AdaptiveSendSpec.Delay not set or smaller than 1s")
+	}
+
+	return nil
 }
