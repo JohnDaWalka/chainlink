@@ -38,6 +38,13 @@ func TestInitialDeployOnLocal(t *testing.T) {
 			DeviationPPB:      cciptypes.NewBigIntFromInt64(1e9),
 		},
 	)
+	tokenConfig.UpsertTokenInfo(ccdeploy.WethSymbol,
+		pluginconfig.TokenInfo{
+			AggregatorAddress: cciptypes.UnknownEncodedAddress(feeds[ccdeploy.WethSymbol].Address().String()),
+			Decimals:          ccdeploy.WethDecimals,
+			DeviationPPB:      cciptypes.NewBigIntFromInt64(1e9),
+		},
+	)
 	// Apply migration
 	output, err := changeset.InitialDeploy(tenv.Env, ccdeploy.DeployCCIPContractConfig{
 		HomeChainSel:   tenv.HomeChainSel,
