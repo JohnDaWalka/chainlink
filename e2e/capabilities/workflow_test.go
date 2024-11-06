@@ -278,32 +278,33 @@ func TestWorkflow(t *testing.T) {
 		Enabled = true
 		ListenAddresses = ['0.0.0.0:6690']
 
+		# This is needed for the target capability to be initialized
+		[[EVM]]
+		ChainID = '%s'
+
+		[[EVM.Nodes]]
+		Name = 'anvil'
+		WSURL = '%s'
+		HTTPURL = '%s'
+
+		[EVM.Workflow]
+		FromAddress = '0x1234567890123456789012345678901234567890'
+		ForwarderAddress = '%s'
+		GasLimitDefault = 400_000
+
 		# This is needed for external registry
 		[Capabilities.ExternalRegistry]
 		Address = '%s'
 		NetworkID = 'evm'
 		ChainID = '%s'
 		`,
-			// bc.ChainID,
-			// bc.Nodes[0].HostWSUrl,
-			// bc.Nodes[0].HostHTTPUrl,
-			// forwarderAddress,
+			bc.ChainID,
+			bc.Nodes[0].HostWSUrl,
+			bc.Nodes[0].HostHTTPUrl,
+			forwarderAddress,
 			capabilitiesRegistryAddress,
 			bc.ChainID,
-		)a
-
-		// # This is needed for the target capability to be initialized
-		// [[EVM]]
-		// ChainID = '%s'
-
-		// [[EVM.Nodes]]
-		// Name = 'anvil'
-		// WSURL = '%s'
-		// HTTPURL = '%s'
-
-		// [EVM.Workflow]
-		// ForwarderAddress = '%s'
-		// GasLimitDefault = 400_000
+		)
 
 		fmt.Println("in.NodeSet.NodeSpecs[0].Node.UserConfigOverrides", in.NodeSet.NodeSpecs[0].Node.UserConfigOverrides)
 
