@@ -16,3 +16,6 @@ GasLimit = 10500000
 
 [HeadTracker]
 FinalityTagBypass = false
+
+[NodePool]
+NewHeadsPollInterval = '6s'
