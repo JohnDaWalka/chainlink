@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+	"time"
 )
 
 type Config struct {
@@ -85,6 +86,7 @@ func TestDON(t *testing.T) {
 		// deploy second time
 		_, err = chaos.ExecPumba("rm --volumes=false re2:node.*|postgresql.*")
 		require.NoError(t, err)
+		time.Sleep(20 * time.Second)
 		ns.UpdateNodeConfigs(in.NodeSet, `
 [Log]
 level = 'info'
