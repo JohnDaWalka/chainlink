@@ -84,9 +84,8 @@ func TestDON(t *testing.T) {
 		require.NoError(t, err)
 
 		// deploy second time
-		_, err = chaos.ExecPumba("rm --volumes=false re2:node.*|postgresql.*")
+		_, err = chaos.ExecPumba("rm --volumes=false re2:node.*|postgresql.*", 10*time.Second)
 		require.NoError(t, err)
-		time.Sleep(20 * time.Second)
 		ns.UpdateNodeConfigs(in.NodeSet, `
 [Log]
 level = 'info'
