@@ -13,3 +13,14 @@ time_between_rounds = "2m"
 
 [OCR.Common]
 number_of_contracts = 2
+
+[Network.EVMNetworks.SHIBARIUM_PUPPYNET]
+evm_name = "Shibarium_Puppynet"
+evm_chain_id = 157
+client_implementation = "Ethereum"
+evm_simulated = false
+evm_chainlink_transaction_limit = 5000
+evm_minimum_confirmations = 1
+evm_gas_estimation_buffer = 10000
+evm_supports_eip1559 = true
+evm_default_gas_limit = 6000000
