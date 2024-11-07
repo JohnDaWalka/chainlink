@@ -66,7 +66,7 @@ func TestDON(t *testing.T) {
 		fmt.Println(balance)
 
 		// create jobs using deployed contracts data, this is just an example
-		r, _, err := c[0].CreateJobRaw(`
+		_, _, err = c[0].CreateJobRaw(`
 		type            = "cron"
 		schemaVersion   = 1
 		schedule        = "CRON_TZ=UTC */10 * * * * *" # every 10 secs
@@ -83,19 +83,19 @@ func TestDON(t *testing.T) {
 		   fetch -> parse -> multiply -> encode_tx -> submit_tx
 		"""`)
 		require.NoError(t, err)
-		require.Equal(t, len(r.Errors), 0)
-		fmt.Printf("error: %v", err)
-		fmt.Println(r)
+		time.Sleep(20 * time.Second)
 
-		_, err = chaos.ExecPumba("stop --duration=1s --restart re2:node0")
+		// deploy second time
+		_, err = chaos.ExecPumba("rm --volumes=false re2:node.*|postgresql.*")
 		require.NoError(t, err)
-		time.Sleep(5 * time.Second)
-		_, _, err = c[0].ReadBridges()
+		ns.UpdateNodeConfigs(in.NodeSet, `
+[Log]
+level = 'info'
+`)
+		out, err = ns.NewSharedDBNodeSet(in.NodeSet, bc, dp.BaseURLDocker)
 		require.NoError(t, err)
-		_, err = chaos.ExecPumba("stop --duration=1s --restart re2:node1")
+		jobs, _, err := c[0].ReadJobs()
 		require.NoError(t, err)
-		time.Sleep(5 * time.Second)
-		_, _, err = c[1].ReadBridges()
-		require.NoError(t, err)
+		fmt.Println(jobs)
 	})
 }
