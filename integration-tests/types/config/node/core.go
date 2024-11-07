@@ -90,7 +90,7 @@ func WithPrivateEVMs(networks []blockchain.EVMNetwork, commonChainConfig *evmcfg
 	var evmConfigs []*evmcfg.EVMConfig
 	for _, network := range networks {
 		var evmNodes []*evmcfg.Node
-		for i := range network.URLs {
+		for i := range network.HTTPURLs {
 			evmNodes = append(evmNodes, &evmcfg.Node{
 				Name: ptr.Ptr(fmt.Sprintf("%s-%d", network.Name, i)),
 				// WSURL:   itutils.MustURL(network.URLs[i]),
