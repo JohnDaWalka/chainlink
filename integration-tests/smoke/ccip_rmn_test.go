@@ -61,7 +61,7 @@ func TestRMN(t *testing.T) {
 		})
 	}
 
-	onChainState, err := ccipdeployment.LoadOnchainState(envWithRMN.Env, envWithRMN.Ab)
+	onChainState, err := ccipdeployment.LoadOnchainState(envWithRMN.Env)
 	require.NoError(t, err)
 	t.Logf("onChainState: %#v", onChainState)
 
@@ -184,7 +184,7 @@ func TestRMN(t *testing.T) {
 			require.NoError(t, err)
 			block := latesthdr.Number.Uint64()
 			startBlocks[dest] = &block
-			seqNum := ccipdeployment.TestSendRequest(t, e, onChainState, src, dest, false)
+			seqNum := ccipdeployment.TestSendRequest(t, e, onChainState, src, dest, false, nil)
 			expectedSeqNum[dest] = seqNum
 		}
 	}
