@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
-	"time"
 )
 
 type Config struct {
@@ -61,9 +60,8 @@ func TestDON(t *testing.T) {
 		// interact with contracts
 		i, err := burn_mint_erc677.NewBurnMintERC677(contracts.Addresses[0], sc.Client)
 		require.NoError(t, err)
-		balance, err := i.BalanceOf(sc.NewCallOpts(), contracts.Addresses[0])
+		_, err = i.BalanceOf(sc.NewCallOpts(), contracts.Addresses[0])
 		require.NoError(t, err)
-		fmt.Println(balance)
 
 		// create jobs using deployed contracts data, this is just an example
 		_, _, err = c[0].CreateJobRaw(`
@@ -83,7 +81,6 @@ func TestDON(t *testing.T) {
 		   fetch -> parse -> multiply -> encode_tx -> submit_tx
 		"""`)
 		require.NoError(t, err)
-		time.Sleep(20 * time.Second)
 
 		// deploy second time
 		_, err = chaos.ExecPumba("rm --volumes=false re2:node.*|postgresql.*")
