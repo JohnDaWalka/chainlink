@@ -4,7 +4,7 @@ selected_networks = ["BITLAYER_TESTNET"]
 
 # soak test specific configuration
 [Soak.Common]
-chainlink_node_funding = 0.2 # Funding per node
+chainlink_node_funding = 0.1 # Funding per node
 
 # Note this is for when you are running OCR2 tests
 # To run OCR1 tests use [Soak.OCR] instead
@@ -12,7 +12,7 @@ chainlink_node_funding = 0.2 # Funding per node
 
 # To run OCR1 tests use [Soak.OCR.Common] instead
 [Soak.OCR2.Common]
-test_duration = "72h" # Full duration the test will run 1440 - 1 day, 7200 - 5 days
+test_duration = "48h" # Full duration the test will run 1440 - 1 day, 7200 - 5 days
 
 # To run OCR1 tests use [Soak.OCR.Soak] instead
 [Soak.OCR2.Soak]
