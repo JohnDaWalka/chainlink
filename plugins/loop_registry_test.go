@@ -91,4 +91,7 @@ func TestLoopRegistry_Register(t *testing.T) {
 	require.Equal(t, "http://localhost:9001", envCfg.TelemetryEndpoint)
 	require.Equal(t, loop.OtelAttributes{"foo": "bar"}, envCfg.TelemetryAttributes)
 	require.Equal(t, 0.42, envCfg.TelemetryTraceSampleRatio)
+	// TODO: EmitterBatchProcessor and EmitterExportTimeout to envCfg
+	// require.False(t, true, envCfg.EmitterBatchProcessor)
+	// require.Equal(t, 1*time.Second, envCfg.EmitterExportTimeout)
 }
