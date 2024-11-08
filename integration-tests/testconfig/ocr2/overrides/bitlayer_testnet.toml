@@ -4,7 +4,7 @@ selected_networks = ["BITLAYER_TESTNET"]
 
 # soak test specific configuration
 [Soak.Common]
-chainlink_node_funding = 0.1 # Funding per node
+chainlink_node_funding = 0.2 # Funding per node
 
 # Note this is for when you are running OCR2 tests
 # To run OCR1 tests use [Soak.OCR] instead
