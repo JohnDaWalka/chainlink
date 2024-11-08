@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/clientwrappers"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/storage"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 )
@@ -140,7 +141,13 @@ func NewTxmv2(
 		RetryBlockThreshold: uint16(fCfg.BumpThreshold()),
 		EmptyTxLimitDefault: fCfg.LimitDefault(),
 	}
-	t := txm.NewTxm(lggr, chainID, client, attemptBuilder, inMemoryStoreManager, stuckTxDetector, config, addresses)
+	var c txm.Client
+	if chainConfig.ChainType() == chaintype.ChainDualBroadcast {
+		c = clientwrappers.NewDualBroadcastClient(client, keyStore, txConfig.AutoPurge().DetectionApiUrl())
+	} else {
+		c = clientwrappers.NewChainClient(client)
+	}
+	t := txm.NewTxm(lggr, chainID, c, attemptBuilder, inMemoryStoreManager, stuckTxDetector, config, addresses)
 	return txm.NewTxmOrchestrator[common.Hash, *evmtypes.Head](lggr, chainID, t, inMemoryStoreManager, fwdMgr), nil
 }
 

@@ -86,12 +86,14 @@ func (s *stuckTxDetector) dualBroadcastDetection(tx *types.Transaction) (bool, e
 		var apiResponse ApiResponse
 		err = json.Unmarshal(body, &apiResponse)
 		if err != nil {
-			return false, fmt.Errorf("failed to unmarshal response for txID: %v, attemptHash: %v - %w", tx.ID, attempt.Hash, err)
+			return false, fmt.Errorf("failed to unmarshal response for txID: %v, attemptHash: %v - %w: %s", tx.ID, attempt.Hash, err, string(body))
 		}
 		switch apiResponse.Status {
 		case ApiStatusPending, ApiStatusIncluded:
 			return false, nil
 		case ApiStatusFailed, ApiStatusCancelled:
+			s.lggr.Debugf("TxID: %v with attempHash: %v was marked as failed/cancelled by the RPC. Transaction is now considered stuck and will be purged.",
+				tx.ID, attempt.Hash)
 			return true, nil
 		case ApiStatusUnknown:
 			continue

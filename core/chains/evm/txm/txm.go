@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	evmtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/jpillora/backoff"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -27,7 +26,7 @@ const (
 type Client interface {
 	PendingNonceAt(context.Context, common.Address) (uint64, error)
 	NonceAt(context.Context, common.Address, *big.Int) (uint64, error)
-	SendTransaction(context.Context, *evmtypes.Transaction) error
+	SendTransaction(ctx context.Context, tx *types.Transaction, attempt *types.Attempt) error
 }
 
 type TxStore interface {
@@ -299,7 +298,7 @@ func (t *Txm) createAndSendAttempt(ctx context.Context, tx *types.Transaction, a
 
 func (t *Txm) sendTransactionWithError(ctx context.Context, tx *types.Transaction, attempt *types.Attempt, address common.Address) (err error) {
 	start := time.Now()
-	txErr := t.client.SendTransaction(ctx, attempt.SignedTransaction)
+	txErr := t.client.SendTransaction(ctx, tx, attempt)
 	tx.AttemptCount++
 	t.lggr.Infow("Broadcasted attempt", "tx", tx, "attempt", attempt, "duration", time.Since(start), "txErr: ", txErr)
 	if txErr != nil && t.errorHandler != nil {

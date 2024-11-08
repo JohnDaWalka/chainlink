@@ -161,7 +161,8 @@ type TxMeta struct {
 	SeqNumbers []uint64 `json:"SeqNumbers,omitempty"`
 
 	// Dual Broadcast
-	DualBroadcast bool `json:"DualBroadcast,omitempty"`
+	DualBroadcast       bool   `json:"DualBroadcast,omitempty"`
+	DualBroadcastParams string `json:"DualBroadcastParams,omitempty"`
 }
 
 type QueueingTxStrategy struct {
