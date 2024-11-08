@@ -2,6 +2,7 @@ package plugins
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -54,6 +55,10 @@ func (m mockCfgTelemetry) ResourceAttributes() map[string]string {
 }
 
 func (m mockCfgTelemetry) TraceSampleRatio() float64 { return 0.42 }
+
+func (m mockCfgTelemetry) EmitterBatchProcessor() bool { return false }
+
+func (m mockCfgTelemetry) EmitterExportTimeout() time.Duration { return 0 }
 
 func TestLoopRegistry_Register(t *testing.T) {
 	mockCfgTracing := &mockCfgTracing{}
