@@ -31,6 +31,47 @@ type AbigenArgs struct {
 	Bin, ABI, Out, Type, Pkg string
 }
 
+var zkDeployCode = (`
+
+func DeployZkSync%s(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated.CustomTransaction, *%s, error) {
+	client, ok := backend.(*ethclient.Client)
+	if !ok {
+		return common.Address{}, nil, nil, errors.New("backend is not an ethclient")
+	}
+	fmt.Println("Deploying zksync contract")
+	zksyncClient := zkSyncClient.NewClient(client.Client())
+	fmt.Println("getting wallet")
+	wallet := auth.Context.Value("wallet").(*zkSyncAccounts.Wallet)
+	fmt.Println("got wallet")
+	fmt.Println("getting bytes")
+	decodedBytes := common.FromHex(zkbin)
+	fmt.Println("deploying")
+	hash, err := wallet.DeployWithCreate(nil, zkSyncAccounts.CreateTransaction{Bytecode: decodedBytes})
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	fmt.Println("hash of tx", hash)
+	receipt, err := zksyncClient.WaitMined(context.Background(), hash)
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	tx, _, err := zksyncClient.TransactionByHash(context.Background(), hash)
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	fmt.Println("tx hash", tx.Hash)
+	ethTx := generated.ConvertToTransaction(*tx)
+	address := receipt.ContractAddress
+
+	parsed, err := %sMetaData.GetAbi()
+	contractBind := bind.NewBoundContract(address, *parsed, backend, backend, backend)
+
+	contractReturn := &%s{address: address, abi: *parsed, %sCaller: %sCaller{contract: contractBind}, %sTransactor: %sTransactor{contract: contractBind}, %sFilterer: %sFilterer{contract: contractBind}}
+
+	return address, ethTx, contractReturn, err
+}
+`)
+
 // Abigen calls Abigen  with the given arguments
 //
 // It might seem like a shame, to shell out to another golang program like
@@ -97,9 +138,25 @@ func ImproveAbigenOutput(path string, abiPath string) {
 	}
 	contractName := getContractName(fileNode)
 	fileNode = addContractStructFields(contractName, fileNode)
+
+	// zksync
+	astutil.AddImport(fset, fileNode, "github.com/ethereum/go-ethereum/ethclient")
+	astutil.AddImport(fset, fileNode, "context")
+	astutil.AddNamedImport(fset, fileNode, "zkSyncClient", "github.com/zksync-sdk/zksync2-go/clients")
+	astutil.AddNamedImport(fset, fileNode, "zkSyncAccounts", "github.com/zksync-sdk/zksync2-go/accounts")
+	astutil.AddNamedImport(fset, fileNode, "zktypes", "github.com/zksync-sdk/zksync2-go/types")
+
+	// zksync
+	fileNode = addLineToDeployMethod(contractName, fset, fileNode)
+
 	fileNode = replaceAnonymousStructs(contractName, fileNode)
 	bs = generateCode(fset, fileNode)
 	bs = writeAdditionalMethods(contractName, logNames, abi, bs)
+
+	// zksync
+	result := strings.ReplaceAll(zkDeployCode, "%s", contractName)
+	bs = append(bs, []byte(fmt.Sprintf("%s\n", result))...)
+
 	err = os.WriteFile(path, bs, 0600)
 	if err != nil {
 		Exit("Error while writing improved abigen source", err)
@@ -107,6 +164,7 @@ func ImproveAbigenOutput(path string, abiPath string) {
 
 	fset, fileNode = parseFile(bs)
 	fileNode = writeInterface(contractName, fileNode)
+
 	bs = generateCode(fset, fileNode)
 	bs = addHeader(bs)
 
@@ -162,6 +220,7 @@ func getContractName(fileNode *ast.File) string {
 func addContractStructFields(contractName string, fileNode *ast.File) *ast.File {
 	fileNode = addContractStructFieldsToStruct(contractName, fileNode)
 	fileNode = addContractStructFieldsToConstructor(contractName, fileNode)
+	// zksync
 	fileNode = addContractStructFieldsToDeployMethod(contractName, fileNode)
 	return fileNode
 }
@@ -281,6 +340,14 @@ func addContractStructFieldsToDeployMethod(contractName string, fileNode *ast.Fi
 			return false
 		}
 
+		// zksync
+		x.Type.Results.List[1].Type = &ast.StarExpr{
+			X: &ast.SelectorExpr{
+				X:   &ast.Ident{Name: "generated"},
+				Sel: &ast.Ident{Name: "CustomTransaction"},
+			},
+		}
+
 		for _, stmt := range x.Body.List {
 			returnStmt, is := stmt.(*ast.ReturnStmt)
 			if !is {
@@ -306,7 +373,89 @@ func addContractStructFieldsToDeployMethod(contractName string, fileNode *ast.Fi
 				Value: ast.NewIdent("*parsed"),
 			}
 			lit.Elts = append([]ast.Expr{addressExpr, abiExpr}, lit.Elts...)
+
+			// zksync
+			// convert tx to &CustomTransaction{Transaction: tx, customHash: tx.Hash()}
+			txExpr, ok := returnStmt.Results[1].(*ast.Ident)
+			if !ok {
+				return true
+			}
+			if txExpr.Name != "tx" {
+				return true
+			}
+			txField := &ast.KeyValueExpr{
+				Key:   ast.NewIdent("Transaction"),
+				Value: ast.NewIdent("tx"),
+			}
+			hashField := &ast.KeyValueExpr{
+				Key: ast.NewIdent("CustomHash"),
+				Value: &ast.CallExpr{
+					Fun: &ast.SelectorExpr{
+						X:   ast.NewIdent("tx"),
+						Sel: ast.NewIdent("Hash"),
+					},
+				},
+			}
+			newRet := &ast.CompositeLit{
+				Type: &ast.SelectorExpr{
+					X:   &ast.Ident{Name: "generated"},
+					Sel: &ast.Ident{Name: "CustomTransaction"},
+				},
+				Elts: []ast.Expr{txField, hashField},
+			}
+			pointerRet := &ast.UnaryExpr{Op: token.AND, X: newRet}
+			returnStmt.Results[1] = pointerRet
 		}
+		return false
+	}, nil).(*ast.File)
+}
+
+// Add the fields to the returned struct in the 'Deploy<contractName>' method.
+func addLineToDeployMethod(contractName string, fset *token.FileSet, fileNode *ast.File) *ast.File {
+	return astutil.Apply(fileNode, func(cursor *astutil.Cursor) bool {
+		x, is := cursor.Node().(*ast.FuncDecl)
+		if !is {
+			return true
+		} else if x.Name.Name != "Deploy"+contractName {
+			return false
+		}
+
+		newCode := fmt.Sprintf(`
+		package main
+		func tempFunc() {
+			client, ok := backend.(*ethclient.Client)
+			if !ok {
+				return common.Address{}, nil, nil, errors.New("backend is not an ethclient")
+			}
+			chainId, err := client.ChainID(context.Background())
+			if err != nil {
+				return common.Address{}, nil, nil, err
+			}
+			switch chainId.Uint64() {
+			// this is not sustainable, but it's a quick fix for now
+			case 324, 280, 300:
+				return DeployZkSync%s(auth, backend)
+			}
+		}
+		`, contractName)
+		// Parse the new code snippet as a temporary function to get the statements
+		tempNode, err := parser.ParseFile(fset, "", newCode, parser.ParseComments)
+		if err != nil {
+			panic(err)
+		}
+
+		// Extract the body of the temporary function as statements
+		var newStatements []ast.Stmt
+		for _, decl := range tempNode.Decls {
+			if funcDecl, ok := decl.(*ast.FuncDecl); ok && funcDecl.Name.Name == "tempFunc" {
+				newStatements = funcDecl.Body.List
+				break
+			}
+		}
+		x.Body.List = append(newStatements, x.Body.List...)
+
+		// Prepend the new statement to the function body
+		// x.Body.List = append([]ast.Stmt{assignStmt}, x.Body.List...)
 		return false
 	}, nil).(*ast.File)
 }
