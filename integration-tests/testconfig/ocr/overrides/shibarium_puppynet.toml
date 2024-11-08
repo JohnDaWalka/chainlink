@@ -24,3 +24,5 @@ evm_minimum_confirmations = 1
 evm_gas_estimation_buffer = 10000
 evm_supports_eip1559 = true
 evm_default_gas_limit = 6000000
+evm_urls = ["https://puppynet.shibrpc.com/"]
+evm_http_urls = ["https://puppynet.shibrpc.com/"]
