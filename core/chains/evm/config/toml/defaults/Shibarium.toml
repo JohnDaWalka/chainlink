@@ -1,0 +1,22 @@
+ChainID = '157'
+FinalityDepth = 20
+FinalityTagEnabled = true
+LogPollInterval = '5s'
+NoNewHeadsThreshold = '40s'
+MinIncomingConfirmations = 1
+NoNewFinalizedHeadsThreshold = '3m'
+LogBroadcasterEnabled = false
+
+[GasEstimator]
+EIP1559DynamicFees = true
+PriceMax = '1000 gwei'
+
+[GasEstimator.BlockHistory]
+BlockHistorySize = 60
+
+[NodePool]
+SyncThreshold = 10
+NewHeadsPollInterval = '2s'
+
+[OCR]
+ContractConfirmations = 1
