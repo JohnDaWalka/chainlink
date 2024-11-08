@@ -386,3 +386,9 @@ func adminAddr(addr string) common.Address {
 	}
 	return common.HexToAddress(strings.TrimPrefix(addr, "0x"))
 }
+
+func IsEVMChain(chainSelector uint64) bool {
+	chainFamily, _ := chainsel.GetSelectorFamily(chainSelector)
+
+	return chainFamily == chainsel.FamilyEVM
+}

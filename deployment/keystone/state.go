@@ -45,7 +45,12 @@ func GetContractSets(lggr logger.Logger, req *GetContractSetsRequest) (*GetContr
 	resp := &GetContractSetsResponse{
 		ContractSets: make(map[uint64]ContractSet),
 	}
+
 	for id, chain := range req.Chains {
+		if !IsEVMChain(chain.Selector) {
+			continue
+		}
+
 		addrs, err := req.AddressBook.AddressesForChain(id)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get addresses for chain %d: %w", id, err)

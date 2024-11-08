@@ -55,9 +55,13 @@ func (r ConfigureContractsRequest) Validate() error {
 	if len(r.Dons) == 0 {
 		return errors.New("no DONS")
 	}
-	_, ok := chainsel.ChainBySelector(r.RegistryChainSel)
+	chain, ok := chainsel.ChainBySelector(r.RegistryChainSel)
 	if !ok {
 		return fmt.Errorf("chain %d not found in environment", r.RegistryChainSel)
+	}
+
+	if !IsEVMChain(chain.Selector) {
+		return fmt.Errorf("chain %d is not an EVM chain", r.RegistryChainSel)
 	}
 	return nil
 }
@@ -126,6 +130,10 @@ func DeployContracts(lggr logger.Logger, e *deployment.Environment, chainSel uin
 	adbook := deployment.NewMemoryAddressBook()
 	// deploy contracts on all chains and track the registry and ocr3 contracts
 	for _, chain := range e.Chains {
+		if !IsEVMChain(chain.Selector) {
+			continue
+		}
+
 		lggr.Infow("deploying contracts", "chain", chain.Selector)
 		deployResp, err := deployContractsToChain(lggr, deployContractsRequest{
 			chain:           chain,
