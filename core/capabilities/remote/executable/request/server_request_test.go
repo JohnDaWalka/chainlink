@@ -64,7 +64,7 @@ func Test_ServerRequest_MessageValidation(t *testing.T) {
 		err := sendValidRequest(req, workflowPeers, capabilityPeerID, rawRequest)
 		require.NoError(t, err)
 		err = sendValidRequest(req, workflowPeers, capabilityPeerID, rawRequest)
-		assert.NotNil(t, err)
+		assert.Error(t, err)
 	})
 
 	t.Run("Send message with non calling don peer", func(t *testing.T) {
@@ -87,7 +87,7 @@ func Test_ServerRequest_MessageValidation(t *testing.T) {
 			Payload:         rawRequest,
 		})
 
-		assert.NotNil(t, err)
+		assert.Error(t, err)
 	})
 
 	t.Run("Send message invalid payload", func(t *testing.T) {
@@ -108,8 +108,8 @@ func Test_ServerRequest_MessageValidation(t *testing.T) {
 			Method:          types.MethodExecute,
 			Payload:         append(rawRequest, []byte("asdf")...),
 		})
-		assert.NoError(t, err)
-		assert.Equal(t, 2, len(dispatcher.msgs))
+		require.NoError(t, err)
+		assert.Len(t, dispatcher.msgs, 2)
 		assert.Equal(t, types.Error_INTERNAL_ERROR, dispatcher.msgs[0].Error)
 		assert.Equal(t, types.Error_INTERNAL_ERROR, dispatcher.msgs[1].Error)
 	})
@@ -133,8 +133,8 @@ func Test_ServerRequest_MessageValidation(t *testing.T) {
 			Method:          types.MethodExecute,
 			Payload:         rawRequest,
 		})
-		assert.NoError(t, err)
-		assert.Equal(t, 2, len(dispatcher.msgs))
+		require.NoError(t, err)
+		assert.Len(t, dispatcher.msgs, 2)
 		assert.Equal(t, types.Error_INTERNAL_ERROR, dispatcher.msgs[0].Error)
 		assert.Equal(t, "failed to execute capability: an error", dispatcher.msgs[0].ErrorMsg)
 		assert.Equal(t, types.Error_INTERNAL_ERROR, dispatcher.msgs[1].Error)
@@ -160,8 +160,8 @@ func Test_ServerRequest_MessageValidation(t *testing.T) {
 			Method:          types.MethodExecute,
 			Payload:         rawRequest,
 		})
-		assert.NoError(t, err)
-		assert.Equal(t, 2, len(dispatcher.msgs))
+		require.NoError(t, err)
+		assert.Len(t, dispatcher.msgs, 2)
 		assert.Equal(t, types.Error_OK, dispatcher.msgs[0].Error)
 		assert.Equal(t, types.Error_OK, dispatcher.msgs[1].Error)
 	})
@@ -234,8 +234,8 @@ func Test_ServerRequest_MessageValidation(t *testing.T) {
 			Method:          types.MethodUnregisterFromWorkflow,
 			Payload:         rawRequest,
 		})
-		assert.NoError(t, err)
-		assert.Equal(t, 2, len(dispatcher.msgs))
+		require.NoError(t, err)
+		assert.Len(t, dispatcher.msgs, 2)
 		assert.Equal(t, types.Error_OK, dispatcher.msgs[0].Error)
 		assert.Equal(t, types.Error_OK, dispatcher.msgs[1].Error)
 	})
