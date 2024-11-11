@@ -28,11 +28,36 @@ const headerComment = `// Code generated - DO NOT EDIT.
 // AbigenArgs is the arguments to the abigen executable. E.g., Bin is the -bin
 // arg.
 type AbigenArgs struct {
-	Bin, ABI, Out, Type, Pkg string
+	Bin, ABI, Out, Type, Pkg, ZkBinPath string
 }
 
 var zkDeployCode = (`
+type CustomTransaction struct {
+	*types.Transaction
+	CustomHash common.Hash
+}
 
+func (tx *CustomTransaction) Hash() common.Hash {
+	return tx.CustomHash
+}
+
+func ConvertToTransaction(resp zktypes.TransactionResponse) *CustomTransaction {
+	dtx := &types.DynamicFeeTx{
+		ChainID:   resp.ChainID.ToInt(),
+		Nonce:     uint64(resp.Nonce),
+		GasTipCap: resp.MaxPriorityFeePerGas.ToInt(),
+		GasFeeCap: resp.MaxFeePerGas.ToInt(),
+		To:        &resp.To,
+		Value:     resp.Value.ToInt(),
+		Data:      resp.Data,
+		Gas:       uint64(resp.Gas),
+	}
+
+	// Create the transaction
+	tx := types.NewTx(dtx)
+	customTransaction := CustomTransaction{Transaction: tx, CustomHash: resp.Hash}
+	return &customTransaction
+}
 func DeployZkSync%s(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated.CustomTransaction, *%s, error) {
 	client, ok := backend.(*ethclient.Client)
 	if !ok {
@@ -44,7 +69,7 @@ func DeployZkSync%s(auth *bind.TransactOpts, backend bind.ContractBackend) (comm
 	wallet := auth.Context.Value("wallet").(*zkSyncAccounts.Wallet)
 	fmt.Println("got wallet")
 	fmt.Println("getting bytes")
-	decodedBytes := common.FromHex(zkbin)
+	decodedBytes := common.FromHex(%sZkBin)
 	fmt.Println("deploying")
 	hash, err := wallet.DeployWithCreate(nil, zkSyncAccounts.CreateTransaction{Bytecode: decodedBytes})
 	if err != nil {
@@ -112,10 +137,17 @@ func Abigen(a AbigenArgs) {
 		Exit("failure while building "+a.Pkg+" wrapper, stderr: "+buildResponse.String(), err)
 	}
 
-	ImproveAbigenOutput(a.Out, a.ABI)
+	zkbytes, err := os.ReadFile(a.ZkBinPath)
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+	zkHexString := string(zkbytes)
+
+	ImproveAbigenOutput(a.Out, a.ABI, zkHexString)
 }
 
-func ImproveAbigenOutput(path string, abiPath string) {
+func ImproveAbigenOutput(path string, abiPath string, zkHexString string) {
 	abiBytes, err := os.ReadFile(abiPath)
 	if err != nil {
 		Exit("Error while improving abigen output", err)
@@ -140,22 +172,17 @@ func ImproveAbigenOutput(path string, abiPath string) {
 	fileNode = addContractStructFields(contractName, fileNode)
 
 	// zksync
-	astutil.AddImport(fset, fileNode, "github.com/ethereum/go-ethereum/ethclient")
-	astutil.AddImport(fset, fileNode, "context")
-	astutil.AddNamedImport(fset, fileNode, "zkSyncClient", "github.com/zksync-sdk/zksync2-go/clients")
-	astutil.AddNamedImport(fset, fileNode, "zkSyncAccounts", "github.com/zksync-sdk/zksync2-go/accounts")
-	astutil.AddNamedImport(fset, fileNode, "zktypes", "github.com/zksync-sdk/zksync2-go/types")
-
-	// zksync
-	fileNode = addLineToDeployMethod(contractName, fset, fileNode)
+	fileNode = addZKSyncImports(fset, fileNode)
+	fileNode = addZKSyncBin(fileNode, contractName, zkHexString)
+	fileNode = addZKSyncLogic(contractName, fset, fileNode)
 
 	fileNode = replaceAnonymousStructs(contractName, fileNode)
 	bs = generateCode(fset, fileNode)
 	bs = writeAdditionalMethods(contractName, logNames, abi, bs)
 
 	// zksync
-	result := strings.ReplaceAll(zkDeployCode, "%s", contractName)
-	bs = append(bs, []byte(fmt.Sprintf("%s\n", result))...)
+	zkSyncDeployFunction := strings.ReplaceAll(zkDeployCode, "%s", contractName)
+	bs = append(bs, []byte(fmt.Sprintf("%s\n", zkSyncDeployFunction))...)
 
 	err = os.WriteFile(path, bs, 0600)
 	if err != nil {
@@ -340,14 +367,6 @@ func addContractStructFieldsToDeployMethod(contractName string, fileNode *ast.Fi
 			return false
 		}
 
-		// zksync
-		x.Type.Results.List[1].Type = &ast.StarExpr{
-			X: &ast.SelectorExpr{
-				X:   &ast.Ident{Name: "generated"},
-				Sel: &ast.Ident{Name: "CustomTransaction"},
-			},
-		}
-
 		for _, stmt := range x.Body.List {
 			returnStmt, is := stmt.(*ast.ReturnStmt)
 			if !is {
@@ -411,7 +430,7 @@ func addContractStructFieldsToDeployMethod(contractName string, fileNode *ast.Fi
 }
 
 // Add the fields to the returned struct in the 'Deploy<contractName>' method.
-func addLineToDeployMethod(contractName string, fset *token.FileSet, fileNode *ast.File) *ast.File {
+func addZKSyncLogic(contractName string, fset *token.FileSet, fileNode *ast.File) *ast.File {
 	return astutil.Apply(fileNode, func(cursor *astutil.Cursor) bool {
 		x, is := cursor.Node().(*ast.FuncDecl)
 		if !is {
@@ -454,10 +473,89 @@ func addLineToDeployMethod(contractName string, fset *token.FileSet, fileNode *a
 		}
 		x.Body.List = append(newStatements, x.Body.List...)
 
-		// Prepend the new statement to the function body
-		// x.Body.List = append([]ast.Stmt{assignStmt}, x.Body.List...)
+		// zksync
+		x.Type.Results.List[1].Type = &ast.StarExpr{
+			X: &ast.SelectorExpr{
+				X:   &ast.Ident{Name: "generated"},
+				Sel: &ast.Ident{Name: "CustomTransaction"},
+			},
+		}
+
+		for _, stmt := range x.Body.List {
+			returnStmt, is := stmt.(*ast.ReturnStmt)
+			if !is {
+				continue
+			}
+			if len(returnStmt.Results) < 3 {
+				continue
+			}
+
+			// zksync
+			// convert tx to &CustomTransaction{Transaction: tx, customHash: tx.Hash()}
+			txExpr, ok := returnStmt.Results[1].(*ast.Ident)
+			if !ok {
+				return true
+			}
+			if txExpr.Name != "tx" {
+				return true
+			}
+			txField := &ast.KeyValueExpr{
+				Key:   ast.NewIdent("Transaction"),
+				Value: ast.NewIdent("tx"),
+			}
+			hashField := &ast.KeyValueExpr{
+				Key: ast.NewIdent("CustomHash"),
+				Value: &ast.CallExpr{
+					Fun: &ast.SelectorExpr{
+						X:   ast.NewIdent("tx"),
+						Sel: ast.NewIdent("Hash"),
+					},
+				},
+			}
+			newRet := &ast.CompositeLit{
+				Type: &ast.SelectorExpr{
+					X:   &ast.Ident{Name: "generated"},
+					Sel: &ast.Ident{Name: "CustomTransaction"},
+				},
+				Elts: []ast.Expr{txField, hashField},
+			}
+			pointerRet := &ast.UnaryExpr{Op: token.AND, X: newRet}
+			returnStmt.Results[1] = pointerRet
+		}
+
 		return false
 	}, nil).(*ast.File)
+}
+
+func addZKSyncImports(fset *token.FileSet, fileNode *ast.File) *ast.File {
+	astutil.AddImport(fset, fileNode, "github.com/ethereum/go-ethereum/ethclient")
+	astutil.AddImport(fset, fileNode, "context")
+	astutil.AddNamedImport(fset, fileNode, "zkSyncClient", "github.com/zksync-sdk/zksync2-go/clients")
+	astutil.AddNamedImport(fset, fileNode, "zkSyncAccounts", "github.com/zksync-sdk/zksync2-go/accounts")
+	astutil.AddNamedImport(fset, fileNode, "zktypes", "github.com/zksync-sdk/zksync2-go/types")
+	return fileNode
+}
+
+func addZKSyncBin(fileNode *ast.File, contractName string, zkHexString string) *ast.File {
+	// zksync
+	newVarSpec := &ast.ValueSpec{
+		Names: []*ast.Ident{ast.NewIdent(fmt.Sprintf("%sZkBin", contractName))},
+		Type:  ast.NewIdent("string"),
+		Values: []ast.Expr{
+			&ast.BasicLit{
+				Kind:  token.STRING,
+				Value: fmt.Sprintf("(\"0x%s\")", zkHexString),
+			},
+		},
+	}
+	newVarDecl := &ast.GenDecl{
+		Tok:   token.VAR,
+		Specs: []ast.Spec{newVarSpec},
+	}
+
+	// Insert the new variable declaration at the top of the file (before existing functions)
+	fileNode.Decls = append(fileNode.Decls, newVarDecl)
+	return fileNode
 }
 
 func getLogNames(fileNode *ast.File) []string {
