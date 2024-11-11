@@ -121,9 +121,9 @@ func generateOCR3Config(
 	for i, node := range nodes {
 		// TODO: Do not provide a bootstrap node to this func
 		// We want to skip bootstrap node.
-		if i == 0 {
-			continue
-		}
+		// if i == 0 {
+		// 	continue
+		// }
 		transmissionSchedule = append(transmissionSchedule, 0)
 		oracleIdentity := confighelper.OracleIdentityExtra{}
 		// ocr2
@@ -264,40 +264,39 @@ func TestWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		fmt.Println("Deployed forwarder contract at", forwarderAddress)
 
-		fmt.Println("in.NodeSet.NodeSpecs[0].Node.UserConfigOverrides", in.NodeSet.NodeSpecs[0].Node.UserConfigOverrides)
+		for _, n := range in.NodeSet.NodeSpecs {
+			n.Node.UserConfigOverrides = fmt.Sprintf(`
+			[Feature]
+			LogPoller = true
 
-		in.NodeSet.NodeSpecs[0].Node.UserConfigOverrides = fmt.Sprintf(`
-		[Feature]
-		LogPoller = true
+			[OCR2]
+			Enabled = true
+			DatabaseTimeout = '1s'
 
-		[OCR2]
-		Enabled = true
-		DatabaseTimeout = '1s'
+			[P2P.V2]
+			Enabled = true
+			ListenAddresses = ['0.0.0.0:6690']
 
-		[P2P.V2]
-		Enabled = true
-		ListenAddresses = ['0.0.0.0:6690']
+			# This is needed for the target capability to be initialized
+			[[EVM]]
+			ChainID = '%s'
 
-		[[EVM.Nodes]]
-		Name = 'anvil'
-		WSURL = '%s'
-		HTTPURL = '%s'
-		`,
-			bc.Nodes[0].HostWSUrl,
-			bc.Nodes[0].HostHTTPUrl,
-		)
-
-		fmt.Println("in.NodeSet.NodeSpecs[0].Node.UserConfigOverrides", in.NodeSet.NodeSpecs[0].Node.UserConfigOverrides)
-		fmt.Println("in.NodeSet", in.NodeSet)
-		fmt.Println("nodeClients", len(in.NodeSet.NodeSpecs))
+			[[EVM.Nodes]]
+			Name = 'anvil'
+			WSURL = '%s'
+			HTTPURL = '%s'
+			`,
+				bc.ChainID,
+				bc.Nodes[0].HostWSUrl,
+				bc.Nodes[0].HostHTTPUrl,
+			)
+		}
 
 		// TODO: When the capabilities registry address is provided:
 		// - NOPs and nodes are added to the registry.
 		// - Nodes are configured to listen to the registry for updates.
 		nodeset, err := ns.NewSharedDBNodeSet(in.NodeSet, bc, "https://example.com") // TODO: Should not be a thing
 		require.NoError(t, err)
-
-		fmt.Println("nodeset created")
 
 		for i, n := range nodeset.CLNodes {
 			fmt.Printf("Node %d --> %s\n", i, n.Node.HostURL)
@@ -307,13 +306,7 @@ func TestWorkflow(t *testing.T) {
 		nodeClients, err := clclient.NewCLDefaultClients(nodeset.CLNodes, framework.L)
 		require.NoError(t, err)
 
-		fmt.Println("nodeClients", len(nodeClients))
-
 		ocr3Config, nodesInfo := generateOCR3Config(t, nodeClients)
-		fmt.Println("ocr3Config", ocr3Config)
-		fmt.Println("nodesInfo", nodesInfo)
-
-		fmt.Println("in.NodeSet", in.NodeSet)
 
 		for i, node := range nodeClients {
 			fmt.Println("Node i ", i)
@@ -365,9 +358,7 @@ func TestWorkflow(t *testing.T) {
 			)
 		}
 
-		fmt.Println("in.NodeSet", in.NodeSet)
-
-		_, err = ns.UpgradeNodeSet(in.NodeSet, bc, "https://example.com", 5*time.Second)
+		_, err = ns.UpgradeNodeSet(in.NodeSet, bc, "https://example.com", 15*time.Second)
 		require.NoError(t, err)
 
 		ocr3CapabilityAddress, tx, ocr3CapabilityContract, err := ocr3_capability.DeployOCR3Capability(

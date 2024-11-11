@@ -22,8 +22,6 @@ docker_file = "../../plugins/chainlink.Dockerfile"
 docker_ctx = "../.."
 docker_image_name = "chainlink"
 pull_image = true
-capabilities = ["./streams"]
-user_config_overrides = """"""
 
 [[nodeset.node_specs]]
 
@@ -37,7 +35,6 @@ docker_ctx = "../.."
 docker_image_name = "chainlink"
 pull_image = true
 capabilities = ["./streams"]
-user_config_overrides = """"""
 
 [[nodeset.node_specs]]
 
@@ -51,7 +48,6 @@ docker_ctx = "../.."
 docker_image_name = "chainlink"
 pull_image = true
 capabilities = ["./streams"]
-user_config_overrides = """"""
 
 [[nodeset.node_specs]]
 
@@ -65,7 +61,6 @@ docker_ctx = "../.."
 docker_image_name = "chainlink"
 pull_image = true
 capabilities = ["./streams"]
-user_config_overrides = """"""
 
 [[nodeset.node_specs]]
 
@@ -79,7 +74,3 @@ docker_ctx = "../.."
 docker_image_name = "chainlink"
 pull_image = true
 capabilities = ["./streams"]
-user_config_overrides = """"""
-
-
-
