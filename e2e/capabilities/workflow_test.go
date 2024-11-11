@@ -286,19 +286,7 @@ func TestWorkflow(t *testing.T) {
 			[P2P.V2]
 			Enabled = true
 			ListenAddresses = ['0.0.0.0:6690']
-
-			# This is needed for the target capability to be initialized
-			[[EVM]]
-			ChainID = '%s'
-
-			[[EVM.Nodes]]
-			Name = 'anvil'
-			WSURL = '%s'
-			HTTPURL = '%s'
-			`,
-				bc.ChainID,
-				bc.Nodes[0].HostWSUrl,
-				bc.Nodes[0].HostHTTPUrl,
+`,
 			)
 		}
 
@@ -367,7 +355,7 @@ func TestWorkflow(t *testing.T) {
 			)
 		}
 
-		nodeset, err = ns.UpgradeNodeSet(in.NodeSet, bc, "https://example.com", 30*time.Second)
+		nodeset, err = ns.UpgradeNodeSet(in.NodeSet, bc, "https://example.com", 1*time.Second)
 		require.NoError(t, err)
 		nodeClients, err = clclient.NewCLDefaultClients(nodeset.CLNodes, framework.L)
 		require.NoError(t, err)
