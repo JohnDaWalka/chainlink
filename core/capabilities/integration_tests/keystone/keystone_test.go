@@ -108,7 +108,7 @@ func waitForConsumerReports(ctx context.Context, t *testing.T, consumer *feeds_c
 	for {
 		select {
 		case <-ctxWithTimeout.Done():
-			t.Fatalf("timed out waiting for feed reports, expected %d, received %d", len(triggerFeedReports), feedCount)
+			t.Fatalf("timed out waiting for feeds reports, expected %d, received %d", len(triggerFeedReports), feedCount)
 		case err := <-feedsSub.Err():
 			require.NoError(t, err)
 		case feed := <-feedsReceived:
