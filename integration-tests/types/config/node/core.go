@@ -86,16 +86,23 @@ func NewConfigFromToml(tomlConfig []byte, opts ...NodeConfigOpt) (*chainlink.Con
 	return &cfg, nil
 }
 
-func WithPrivateEVMs(networks []blockchain.EVMNetwork, commonChainConfig *evmcfg.Chain, chainSpecificConfig map[int64]evmcfg.Chain) NodeConfigOpt {
+func WithPrivateEVMs(networks []blockchain.EVMNetwork, commonChainConfig *evmcfg.Chain, chainSpecificConfig map[int64]evmcfg.Chain, forceHttp bool) NodeConfigOpt {
 	var evmConfigs []*evmcfg.EVMConfig
 	for _, network := range networks {
 		var evmNodes []*evmcfg.Node
-		for i := range network.HTTPURLs {
-			evmNodes = append(evmNodes, &evmcfg.Node{
-				Name: ptr.Ptr(fmt.Sprintf("%s-%d", network.Name, i)),
-				// WSURL:   itutils.MustURL(network.URLs[i]),
+		URLs := network.URLs
+		if forceHttp {
+			URLs = network.HTTPURLs
+		}
+		for i := range URLs {
+			node := &evmcfg.Node{
+				Name:    ptr.Ptr(fmt.Sprintf("%s-%d", network.Name, i)),
 				HTTPURL: itutils.MustURL(network.HTTPURLs[i]),
-			})
+			}
+			if !forceHttp {
+				node.WSURL = itutils.MustURL(network.URLs[i])
+			}
+			evmNodes = append(evmNodes, node)
 		}
 		evmConfig := &evmcfg.EVMConfig{
 			ChainID: ubig.New(big.NewInt(network.ChainID)),
@@ -133,7 +140,7 @@ func WithKeySpecificMaxGasPrice(addresses []string, maxGasPriceGWei int64) NodeC
 	}
 }
 
-func BuildChainlinkNodeConfig(nets []blockchain.EVMNetwork, nodeConfig, commonChain string, configByChain map[string]string) (*corechainlink.Config, string, error) {
+func BuildChainlinkNodeConfig(nets []blockchain.EVMNetwork, nodeConfig, commonChain string, configByChain map[string]string, forceHttp bool) (*corechainlink.Config, string, error) {
 	var tomlCfg *corechainlink.Config
 	var err error
 	var commonChainConfig *evmcfg.Chain
@@ -159,9 +166,9 @@ func BuildChainlinkNodeConfig(nets []blockchain.EVMNetwork, nodeConfig, commonCh
 	if nodeConfig == "" {
 		tomlCfg = NewConfig(
 			NewBaseConfig(),
-			WithPrivateEVMs(nets, commonChainConfig, configByChainMap))
+			WithPrivateEVMs(nets, commonChainConfig, configByChainMap, forceHttp))
 	} else {
-		tomlCfg, err = NewConfigFromToml([]byte(nodeConfig), WithPrivateEVMs(nets, commonChainConfig, configByChainMap))
+		tomlCfg, err = NewConfigFromToml([]byte(nodeConfig), WithPrivateEVMs(nets, commonChainConfig, configByChainMap, forceHttp))
 		if err != nil {
 			return nil, "", err
 		}

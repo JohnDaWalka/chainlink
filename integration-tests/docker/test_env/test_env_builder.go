@@ -436,6 +436,7 @@ func (b *CLTestEnvBuilder) Build() (*CLClusterTestEnv, error) {
 				nodeConfigInToml.BaseConfigTOML,
 				nodeConfigInToml.CommonChainConfigTOML,
 				nodeConfigInToml.ChainConfigTOMLByChainID,
+				b.testConfig.GetNetworkConfig().ForceHttp,
 			)
 			if err != nil {
 				return nil, err
@@ -534,6 +535,7 @@ func (b *CLTestEnvBuilder) Build() (*CLClusterTestEnv, error) {
 			nodeConfigInToml.BaseConfigTOML,
 			nodeConfigInToml.CommonChainConfigTOML,
 			nodeConfigInToml.ChainConfigTOMLByChainID,
+			b.testConfig.GetNetworkConfig().ForceHttp,
 		)
 		if err != nil {
 			return nil, err

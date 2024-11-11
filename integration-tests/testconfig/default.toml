@@ -3,9 +3,9 @@
 test_log_collect = false
 
 [Logging.Grafana]
-base_url="https://grafana.ops.prod.cldev.sh"
-base_url_github_ci="http://localhost:8080/primary"
-dashboard_url="/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
+base_url = "https://grafana.ops.prod.cldev.sh"
+base_url_github_ci = "http://localhost:8080/primary"
+dashboard_url = "/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
 
 [Logging.LogStream]
 # supported targets: file, loki, in-memory. if empty no logs will be persisted
@@ -30,6 +30,8 @@ chainlink_node_funding = 0.5
 # slice of networks to use; at lesat one network must be selected; each selected network must either be already defined in the CTF as a known network, or be defined in
 # TOML test files as a new network
 selected_networks = ["simulated"]
+# if set to true, networks will be forced to use HTTP instead of WS
+force_http = false
 
 [PrivateEthereumNetwork]
 # ethereum version to use; eth1 or eth2 (post-merge)
@@ -167,6 +169,9 @@ check_rpc_health_on_start = false
 # feature-flagged expriments: "slow_funds_return" sets funds return priority to 'slow' (core only!);
 # "eip_1559_fee_equalizer" sets the tip/base fee to the higher value in case there's 3+ orders of magnitude difference between them
 experiments_enabled = []
+
+# if set to true, SETH will use HTTP instead of WS. This overrides seth.networks specific urls_secret
+force_http = false
 
 [Seth.nonce_manager]
 # rate-limiting of key syncs, to prevent spamming the node with nonce calls
