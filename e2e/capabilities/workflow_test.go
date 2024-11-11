@@ -278,35 +278,18 @@ func TestWorkflow(t *testing.T) {
 		Enabled = true
 		ListenAddresses = ['0.0.0.0:6690']
 
-		# This is needed for the target capability to be initialized
-		[[EVM]]
-		ChainID = '%s'
-
 		[[EVM.Nodes]]
 		Name = 'anvil'
 		WSURL = '%s'
 		HTTPURL = '%s'
-
-		[EVM.Workflow]
-		FromAddress = '0x1234567890123456789012345678901234567890'
-		ForwarderAddress = '%s'
-		GasLimitDefault = 400_000
-
-		# This is needed for external registry
-		[Capabilities.ExternalRegistry]
-		Address = '%s'
-		NetworkID = 'evm'
-		ChainID = '%s'
 		`,
-			bc.ChainID,
 			bc.Nodes[0].HostWSUrl,
 			bc.Nodes[0].HostHTTPUrl,
-			forwarderAddress,
-			capabilitiesRegistryAddress,
-			bc.ChainID,
 		)
 
 		fmt.Println("in.NodeSet.NodeSpecs[0].Node.UserConfigOverrides", in.NodeSet.NodeSpecs[0].Node.UserConfigOverrides)
+		fmt.Println("in.NodeSet", in.NodeSet)
+		fmt.Println("nodeClients", len(in.NodeSet.NodeSpecs))
 
 		// TODO: When the capabilities registry address is provided:
 		// - NOPs and nodes are added to the registry.
@@ -314,12 +297,77 @@ func TestWorkflow(t *testing.T) {
 		nodeset, err := ns.NewSharedDBNodeSet(in.NodeSet, bc, "https://example.com") // TODO: Should not be a thing
 		require.NoError(t, err)
 
+		fmt.Println("nodeset created")
+
 		for i, n := range nodeset.CLNodes {
 			fmt.Printf("Node %d --> %s\n", i, n.Node.HostURL)
 			fmt.Printf("Node P2P %d --> %s\n", i, n.Node.HostP2PURL)
 		}
 
 		nodeClients, err := clclient.NewCLDefaultClients(nodeset.CLNodes, framework.L)
+		require.NoError(t, err)
+
+		fmt.Println("nodeClients", len(nodeClients))
+
+		ocr3Config, nodesInfo := generateOCR3Config(t, nodeClients)
+		fmt.Println("ocr3Config", ocr3Config)
+		fmt.Println("nodesInfo", nodesInfo)
+
+		fmt.Println("in.NodeSet", in.NodeSet)
+
+		for i, node := range nodeClients {
+			fmt.Println("Node i ", i)
+			fmt.Println("Node ", node)
+			// First node is a bootstrap node, so we skip it
+			if i == 0 {
+				continue
+			}
+
+			in.NodeSet.NodeSpecs[i].Node.UserConfigOverrides = fmt.Sprintf(`
+				[Feature]
+				LogPoller = true
+
+				[OCR2]
+				Enabled = true
+				DatabaseTimeout = '1s'
+
+				[P2P.V2]
+				Enabled = true
+				ListenAddresses = ['0.0.0.0:6690']
+
+				# This is needed for the target capability to be initialized
+				[[EVM]]
+				ChainID = '%s'
+
+				[[EVM.Nodes]]
+				Name = 'anvil'
+				WSURL = '%s'
+				HTTPURL = '%s'
+
+				[EVM.Workflow]
+				FromAddress = '%s'
+				ForwarderAddress = '%s'
+				GasLimitDefault = 400_000
+
+				# This is needed for external registry
+				[Capabilities.ExternalRegistry]
+				Address = '%s'
+				NetworkID = 'evm'
+				ChainID = '%s'
+			`,
+				bc.ChainID,
+				bc.Nodes[0].HostWSUrl,
+				bc.Nodes[0].HostHTTPUrl,
+				nodesInfo[i].TransmitterAddress,
+				forwarderAddress,
+				capabilitiesRegistryAddress,
+				bc.ChainID,
+			)
+		}
+
+		fmt.Println("in.NodeSet", in.NodeSet)
+
+		_, err = ns.UpgradeNodeSet(in.NodeSet, bc, "https://example.com", 5*time.Second)
 		require.NoError(t, err)
 
 		ocr3CapabilityAddress, tx, ocr3CapabilityContract, err := ocr3_capability.DeployOCR3Capability(
@@ -368,10 +416,6 @@ func TestWorkflow(t *testing.T) {
 			require.Equal(t, len(r.Errors), 0)
 			fmt.Printf("Response from bootstrap node: %x\n", r)
 		}()
-
-		ocr3Config, nodesInfo := generateOCR3Config(t, nodeClients)
-		fmt.Println("ocr3Config", ocr3Config)
-		fmt.Println("nodesInfo", nodesInfo)
 
 		for i, nodeClient := range nodeClients {
 			// First node is a bootstrap node, so we skip it

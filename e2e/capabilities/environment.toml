@@ -9,7 +9,7 @@ port = 9111
 
 [nodeset]
 nodes = 5
-override_mode = "all"
+override_mode = "each"
 
 [[nodeset.node_specs]]
 
@@ -23,17 +23,63 @@ docker_ctx = "../.."
 docker_image_name = "chainlink"
 pull_image = true
 capabilities = ["./streams"]
-user_config_overrides = """
-[Feature]
-LogPoller = true
+user_config_overrides = """"""
 
-[OCR2]
-Enabled = true
-DatabaseTimeout = '1s'
+[[nodeset.node_specs]]
 
-[P2P.V2]
-Enabled = true
-ListenAddresses = ['0.0.0.0:6690']
-"""
+[nodeset.node_specs.db]
+image = "postgres:15.6"
+pull_image = true
+
+[nodeset.node_specs.node]
+docker_file = "../../plugins/chainlink.Dockerfile"
+docker_ctx = "../.."
+docker_image_name = "chainlink"
+pull_image = true
+capabilities = ["./streams"]
+user_config_overrides = """"""
+
+[[nodeset.node_specs]]
+
+[nodeset.node_specs.db]
+image = "postgres:15.6"
+pull_image = true
+
+[nodeset.node_specs.node]
+docker_file = "../../plugins/chainlink.Dockerfile"
+docker_ctx = "../.."
+docker_image_name = "chainlink"
+pull_image = true
+capabilities = ["./streams"]
+user_config_overrides = """"""
+
+[[nodeset.node_specs]]
+
+[nodeset.node_specs.db]
+image = "postgres:15.6"
+pull_image = true
+
+[nodeset.node_specs.node]
+docker_file = "../../plugins/chainlink.Dockerfile"
+docker_ctx = "../.."
+docker_image_name = "chainlink"
+pull_image = true
+capabilities = ["./streams"]
+user_config_overrides = """"""
+
+[[nodeset.node_specs]]
+
+[nodeset.node_specs.db]
+image = "postgres:15.6"
+pull_image = true
+
+[nodeset.node_specs.node]
+docker_file = "../../plugins/chainlink.Dockerfile"
+docker_ctx = "../.."
+docker_image_name = "chainlink"
+pull_image = true
+capabilities = ["./streams"]
+user_config_overrides = """"""
+
 
 
