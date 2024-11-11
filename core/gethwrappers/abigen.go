@@ -191,7 +191,6 @@ func ImproveAbigenOutput(path string, abiPath string, zkHexString string) {
 
 	fset, fileNode = parseFile(bs)
 	fileNode = writeInterface(contractName, fileNode)
-
 	bs = generateCode(fset, fileNode)
 	bs = addHeader(bs)
 
@@ -247,7 +246,6 @@ func getContractName(fileNode *ast.File) string {
 func addContractStructFields(contractName string, fileNode *ast.File) *ast.File {
 	fileNode = addContractStructFieldsToStruct(contractName, fileNode)
 	fileNode = addContractStructFieldsToConstructor(contractName, fileNode)
-	// zksync
 	fileNode = addContractStructFieldsToDeployMethod(contractName, fileNode)
 	return fileNode
 }
@@ -392,38 +390,6 @@ func addContractStructFieldsToDeployMethod(contractName string, fileNode *ast.Fi
 				Value: ast.NewIdent("*parsed"),
 			}
 			lit.Elts = append([]ast.Expr{addressExpr, abiExpr}, lit.Elts...)
-
-			// zksync
-			// convert tx to &CustomTransaction{Transaction: tx, customHash: tx.Hash()}
-			txExpr, ok := returnStmt.Results[1].(*ast.Ident)
-			if !ok {
-				return true
-			}
-			if txExpr.Name != "tx" {
-				return true
-			}
-			txField := &ast.KeyValueExpr{
-				Key:   ast.NewIdent("Transaction"),
-				Value: ast.NewIdent("tx"),
-			}
-			hashField := &ast.KeyValueExpr{
-				Key: ast.NewIdent("CustomHash"),
-				Value: &ast.CallExpr{
-					Fun: &ast.SelectorExpr{
-						X:   ast.NewIdent("tx"),
-						Sel: ast.NewIdent("Hash"),
-					},
-				},
-			}
-			newRet := &ast.CompositeLit{
-				Type: &ast.SelectorExpr{
-					X:   &ast.Ident{Name: "generated"},
-					Sel: &ast.Ident{Name: "CustomTransaction"},
-				},
-				Elts: []ast.Expr{txField, hashField},
-			}
-			pointerRet := &ast.UnaryExpr{Op: token.AND, X: newRet}
-			returnStmt.Results[1] = pointerRet
 		}
 		return false
 	}, nil).(*ast.File)
