@@ -110,27 +110,44 @@ func extractKey(value string) string {
 	return value
 }
 
+func getNodesInfo(
+	t *testing.T,
+	nodes []*clclient.ChainlinkClient,
+) (nodesInfo []NodeInfo) {
+	nodesInfo = make([]NodeInfo, len(nodes))
+
+	for i, node := range nodes {
+		ocr2Keys, err := node.MustReadOCR2Keys()
+		require.NoError(t, err)
+		nodesInfo[i].OcrKeyBundleID = ocr2Keys.Data[0].ID
+
+		// eth
+		ethKeys, err := node.MustReadETHKeys()
+		require.NoError(t, err)
+		nodesInfo[i].TransmitterAddress = ethKeys.Data[0].Attributes.Address
+	}
+
+	return nodesInfo
+}
+
 func generateOCR3Config(
 	t *testing.T,
 	nodes []*clclient.ChainlinkClient,
-) (config *OCR3Config, nodesInfo []NodeInfo) {
+) (config *OCR3Config) {
 	oracleIdentities := []confighelper.OracleIdentityExtra{}
 	transmissionSchedule := []int{}
-	nodesInfo = make([]NodeInfo, len(nodes))
 
 	for i, node := range nodes {
 		// TODO: Do not provide a bootstrap node to this func
 		// We want to skip bootstrap node.
-		// if i == 0 {
-		// 	continue
-		// }
+		if i == 0 {
+			continue
+		}
 		transmissionSchedule = append(transmissionSchedule, 0)
 		oracleIdentity := confighelper.OracleIdentityExtra{}
 		// ocr2
 		ocr2Keys, err := node.MustReadOCR2Keys()
 		require.NoError(t, err)
-
-		nodesInfo[i].OcrKeyBundleID = ocr2Keys.Data[0].ID
 
 		firstOCR2Key := ocr2Keys.Data[0].Attributes
 
@@ -173,7 +190,6 @@ func generateOCR3Config(
 		ethKeys, err := node.MustReadETHKeys()
 		require.NoError(t, err)
 		oracleIdentity.TransmitAccount = types.Account(ethKeys.Data[0].Attributes.Address)
-		nodesInfo[i].TransmitterAddress = ethKeys.Data[0].Attributes.Address
 
 		oracleIdentities = append(oracleIdentities, oracleIdentity)
 	}
@@ -203,12 +219,6 @@ func generateOCR3Config(
 	)
 	require.NoError(t, err)
 
-	// maxDurationInitialization *time.Duration,
-	// maxDurationQuery time.Duration,
-	// maxDurationObservation time.Duration,
-	// maxDurationShouldAcceptAttestedReport time.Duration,
-	// maxDurationShouldTransmitAcceptedReport time.Duration,
-
 	signerAddresses := [][]byte{}
 	for _, signer := range signers {
 		signerAddresses = append(signerAddresses, signer)
@@ -226,7 +236,7 @@ func generateOCR3Config(
 		OnchainConfig:         onchainConfig,
 		OffchainConfigVersion: offchainConfigVersion,
 		OffchainConfig:        offchainConfig,
-	}, nodesInfo
+	}
 }
 
 func TestWorkflow(t *testing.T) {
@@ -305,8 +315,7 @@ func TestWorkflow(t *testing.T) {
 
 		nodeClients, err := clclient.NewCLDefaultClients(nodeset.CLNodes, framework.L)
 		require.NoError(t, err)
-
-		ocr3Config, nodesInfo := generateOCR3Config(t, nodeClients)
+		nodesInfo := getNodesInfo(t, nodeClients)
 
 		for i, node := range nodeClients {
 			fmt.Println("Node i ", i)
@@ -358,7 +367,9 @@ func TestWorkflow(t *testing.T) {
 			)
 		}
 
-		_, err = ns.UpgradeNodeSet(in.NodeSet, bc, "https://example.com", 15*time.Second)
+		nodeset, err = ns.UpgradeNodeSet(in.NodeSet, bc, "https://example.com", 30*time.Second)
+		require.NoError(t, err)
+		nodeClients, err = clclient.NewCLDefaultClients(nodeset.CLNodes, framework.L)
 		require.NoError(t, err)
 
 		ocr3CapabilityAddress, tx, ocr3CapabilityContract, err := ocr3_capability.DeployOCR3Capability(
@@ -381,11 +392,8 @@ func TestWorkflow(t *testing.T) {
 
 		// Add bootstrap spec to the first node
 		bootstrapNode := nodeClients[0]
-		p2pKeys, err := bootstrapNode.MustReadP2PKeys()
-		require.NoError(t, err)
-		fmt.Println("P2P keys fetched")
-		var wg sync.WaitGroup
 
+		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -397,7 +405,7 @@ func TestWorkflow(t *testing.T) {
 				contractConfigTrackerPollInterval = "1s"
 				contractConfigConfirmations = 1
 				relay = "evm"
-		
+
 				[relayConfig]
 				chainID = %s
 			`, ocr3CapabilityAddress, bc.ChainID)
@@ -407,6 +415,12 @@ func TestWorkflow(t *testing.T) {
 			require.Equal(t, len(r.Errors), 0)
 			fmt.Printf("Response from bootstrap node: %x\n", r)
 		}()
+
+		ocr3Config := generateOCR3Config(t, nodeClients)
+
+		p2pKeys, err := bootstrapNode.MustReadP2PKeys()
+		require.NoError(t, err)
+		fmt.Println("P2P keys fetched")
 
 		for i, nodeClient := range nodeClients {
 			// First node is a bootstrap node, so we skip it
