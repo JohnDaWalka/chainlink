@@ -416,8 +416,6 @@ func TestWorkflow(t *testing.T) {
 			fmt.Printf("Response from bootstrap node: %x\n", r)
 		}()
 
-		ocr3Config := generateOCR3Config(t, nodeClients)
-
 		p2pKeys, err := bootstrapNode.MustReadP2PKeys()
 		require.NoError(t, err)
 		fmt.Println("P2P keys fetched")
@@ -432,10 +430,11 @@ func TestWorkflow(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				scJobSpec := `
-				type = "standardcapabilities"
-				schemaVersion = 1
-				name = "streams-capabilities"
-				command="/streams"`
+					type = "standardcapabilities"
+					schemaVersion = 1
+					name = "streams-capabilities"
+					command="/streams"
+				`
 				fmt.Println("Creating standard capabilities job spec", scJobSpec)
 				response, _, err2 := nodeClient.CreateJobRaw(scJobSpec)
 				require.NoError(t, err2)
@@ -488,6 +487,7 @@ func TestWorkflow(t *testing.T) {
 		}
 		wg.Wait()
 
+		ocr3Config := generateOCR3Config(t, nodeClients)
 		// Configure KV store OCR contract
 		tx, err = ocr3CapabilityContract.SetConfig(
 			sc.NewTXOpts(),
@@ -506,9 +506,9 @@ func TestWorkflow(t *testing.T) {
 		// ✅ 1. Deploy mock streams capability
 		// ✅ 2. Add boostrap job spec
 		// ✅ 3. Add OCR3 capability
-		// 		- ❌ This fails to start successfully
+		// 		- ✅ This starts successfully (search for "OCREndpointV2: Initialized")
 		// ✅ 3. Deploy and configure OCR3 contract
-		// 4. Add chain write capabilities
+		// ✅ 4. Add chain write capabilities
 		//  	- Check if they are added (Logs)
 		// 5. Deploy capabilities registry
 		// 		- Add nodes to registry
