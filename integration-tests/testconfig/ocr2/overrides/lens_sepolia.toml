@@ -1,6 +1,3 @@
-[ChainlinkImage]
-version = "845a5ca616ad9f974316819cc29102da783307d9"
-
 [Network]
 selected_networks = ["LENS_SEPOLIA"]
 
