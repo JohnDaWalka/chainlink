@@ -26,31 +26,14 @@ import (
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 )
 
-// TODO: use this after the migration
-//type TxmOrchestrator interface {
-//	services.Service
-//	Trigger(addr common.Address)
-//	CreateTransaction(ctx context.Context, txRequest *types.Transaction) (id int64, err error)
-//	GetForwarderForEOA(ctx context.Context, eoa common.Address) (forwarder common.Address, err error)
-//	GetForwarderForEOAOCR2Feeds(ctx context.Context, eoa, ocr2AggregatorID common.Address) (forwarder common.Address, err error)
-//	RegisterResumeCallback(fn ResumeCallback)
-//	SendNativeToken(ctx context.Context, chainID *big.Int, from, to common.Address, value *big.Int, gasLimit uint64) (tx *types.Transaction, err error)
-//	CountTransactionsByState(ctx context.Context, state types.TxState) (count int, err error)
-//	GetTransactionStatus(ctx context.Context, idempotencyKey string) (state commontypes.TransactionStatus, err error)
-//	//Reset(addr ADDR, abandon bool) error // Potentially will be replaced by Abandon
-//
-//	// Testing methods(?)
-//	FindTxesByMetaFieldAndStates(ctx context.Context, metaField string, metaValue string, states []types.TxState, chainID *big.Int) (txs []*types.Transaction, err error)
-//	FindTxesWithMetaFieldByStates(ctx context.Context, metaField string, states []types.TxState, chainID *big.Int) (txs []*types.Transaction, err error)
-//	FindTxesWithMetaFieldByReceiptBlockNum(ctx context.Context, metaField string, blockNum int64, chainID *big.Int) (txs []*types.Transaction, err error)
-//	FindTxesWithAttemptsAndReceiptsByIdsAndState(ctx context.Context, ids []int64, states []types.TxState, chainID *big.Int) (txes []*types.Transaction, err error)
-//	FindEarliestUnconfirmedBroadcastTime(ctx context.Context) (nullv4.Time, error)
-//	FindEarliestUnconfirmedTxAttemptBlock(ctx context.Context) (nullv4.Int, error)
-//}
-
 type OrchestratorTxStore interface {
+	Add(addresses ...common.Address) error
 	FetchUnconfirmedTransactionAtNonceWithCount(context.Context, uint64, common.Address) (*txmtypes.Transaction, int, error)
 	FindTxWithIdempotencyKey(context.Context, *string) (*txmtypes.Transaction, error)
+}
+
+type OrchestratorKeystore interface {
+	EnabledAddressesForChain(ctx context.Context, chainID *big.Int) (addresses []common.Address, err error)
 }
 
 // Generics are necessary to keep TXMv2 backwards compatible
@@ -64,6 +47,7 @@ type Orchestrator[
 	txm            *Txm
 	txStore        OrchestratorTxStore
 	fwdMgr         *forwarders.FwdMgr
+	keystore       OrchestratorKeystore
 	resumeCallback txmgr.ResumeCallback
 }
 
@@ -73,19 +57,31 @@ func NewTxmOrchestrator[BLOCK_HASH types.Hashable, HEAD types.Head[BLOCK_HASH]](
 	txm *Txm,
 	txStore OrchestratorTxStore,
 	fwdMgr *forwarders.FwdMgr,
+	keystore OrchestratorKeystore,
 ) *Orchestrator[BLOCK_HASH, HEAD] {
 	return &Orchestrator[BLOCK_HASH, HEAD]{
-		lggr:    logger.Sugared(logger.Named(lggr, "Orchestrator")),
-		chainID: chainID,
-		txm:     txm,
-		txStore: txStore,
-		fwdMgr:  fwdMgr,
+		lggr:     logger.Sugared(logger.Named(lggr, "Orchestrator")),
+		chainID:  chainID,
+		txm:      txm,
+		txStore:  txStore,
+		keystore: keystore,
+		fwdMgr:   fwdMgr,
 	}
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) Start(ctx context.Context) error {
 	return o.StartOnce("Orchestrator", func() error {
 		var ms services.MultiStart
+		addresses, err := o.keystore.EnabledAddressesForChain(ctx, o.chainID)
+		if err != nil {
+			return err
+		}
+		for _, address := range addresses {
+			err := o.txStore.Add(address)
+			if err != nil {
+				return err
+			}
+		}
 		if err := ms.Start(ctx, o.txm); err != nil {
 			return fmt.Errorf("Orchestrator: Txm failed to start: %w", err)
 		}

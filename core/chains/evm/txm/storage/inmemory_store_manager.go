@@ -14,15 +14,17 @@ import (
 const StoreNotFoundForAddress string = "InMemoryStore for address: %v not found"
 
 type InMemoryStoreManager struct {
+	lggr             logger.Logger
+	chainID          *big.Int
 	InMemoryStoreMap map[common.Address]*InMemoryStore
 }
 
-func NewInMemoryStoreManager(lggr logger.Logger, addresses []common.Address, chainID *big.Int) *InMemoryStoreManager {
+func NewInMemoryStoreManager(lggr logger.Logger, chainID *big.Int) *InMemoryStoreManager {
 	inMemoryStoreMap := make(map[common.Address]*InMemoryStore)
-	for _, address := range addresses {
-		inMemoryStoreMap[address] = NewInMemoryStore(lggr, address, chainID)
-	}
-	return &InMemoryStoreManager{InMemoryStoreMap: inMemoryStoreMap}
+	return &InMemoryStoreManager{
+		lggr:             lggr,
+		chainID:          chainID,
+		InMemoryStoreMap: inMemoryStoreMap}
 }
 
 func (m *InMemoryStoreManager) AbandonPendingTransactions(_ context.Context, fromAddress common.Address) error {
@@ -31,6 +33,16 @@ func (m *InMemoryStoreManager) AbandonPendingTransactions(_ context.Context, fro
 		return nil
 	}
 	return fmt.Errorf(StoreNotFoundForAddress, fromAddress)
+}
+
+func (m *InMemoryStoreManager) Add(addresses ...common.Address) error {
+	for _, address := range addresses {
+		if _, exists := m.InMemoryStoreMap[address]; exists {
+			return fmt.Errorf("address %v already exists in store manager", address)
+		}
+		m.InMemoryStoreMap[address] = NewInMemoryStore(m.lggr, address, m.chainID)
+	}
+	return nil
 }
 
 func (m *InMemoryStoreManager) AppendAttemptToTransaction(_ context.Context, txNonce uint64, fromAddress common.Address, attempt *types.Attempt) error {

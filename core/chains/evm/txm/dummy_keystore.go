@@ -34,3 +34,10 @@ func (k *DummyKeystore) SignTx(_ context.Context, fromAddress common.Address, tx
 	}
 	return nil, fmt.Errorf("private key for address: %v not found", fromAddress)
 }
+
+func (k *DummyKeystore) EnabledAddressesForChain(_ context.Context, _ *big.Int) (addresses []common.Address, err error) {
+	for address := range k.privateKeyMap {
+		addresses = append(addresses, address)
+	}
+	return
+}

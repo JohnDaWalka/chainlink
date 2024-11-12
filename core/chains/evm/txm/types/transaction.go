@@ -78,7 +78,7 @@ func (t *Transaction) DeepCopy() *Transaction {
 }
 
 func (t *Transaction) GetMeta() (*TxMeta, error) {
-	if t.Meta != nil {
+	if t.Meta == nil {
 		return nil, nil
 	}
 	var m TxMeta
