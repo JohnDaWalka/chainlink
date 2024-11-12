@@ -1260,7 +1260,6 @@ func BuildTOMLNodeConfigForK8s(testConfig ctfconfig.GlobalTestConfig, testNetwor
 		nodeConfigInToml.BaseConfigTOML,
 		nodeConfigInToml.CommonChainConfigTOML,
 		nodeConfigInToml.ChainConfigTOMLByChainID,
-		testConfig.GetNetworkConfig().ForceHttp,
 	)
 
 	if err != nil {

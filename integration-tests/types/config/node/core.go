@@ -86,24 +86,33 @@ func NewConfigFromToml(tomlConfig []byte, opts ...NodeConfigOpt) (*chainlink.Con
 	return &cfg, nil
 }
 
-func WithPrivateEVMs(networks []blockchain.EVMNetwork, commonChainConfig *evmcfg.Chain, chainSpecificConfig map[int64]evmcfg.Chain, forceHttp bool) NodeConfigOpt {
+func WithPrivateEVMs(networks []blockchain.EVMNetwork, commonChainConfig *evmcfg.Chain, chainSpecificConfig map[int64]evmcfg.Chain) NodeConfigOpt {
 	var evmConfigs []*evmcfg.EVMConfig
 	for _, network := range networks {
 		var evmNodes []*evmcfg.Node
-		URLs := network.URLs
-		if forceHttp {
-			URLs = network.HTTPURLs
+		httpURLsAvailable := len(network.HTTPURLs) > 0
+		wsURLsAvailable := len(network.URLs) > 0
+
+		urlCount := len(network.HTTPURLs)
+		if wsURLsAvailable {
+			urlCount = len(network.URLs)
 		}
-		for i := range URLs {
+
+		for i := 0; i < urlCount; i++ {
 			node := &evmcfg.Node{
-				Name:    ptr.Ptr(fmt.Sprintf("%s-%d", network.Name, i)),
-				HTTPURL: itutils.MustURL(network.HTTPURLs[i]),
+				Name: ptr.Ptr(fmt.Sprintf("%s-%d", network.Name, i)),
 			}
-			if !forceHttp {
+			// Assign HTTP URL if available
+			if httpURLsAvailable && i < len(network.HTTPURLs) {
+				node.HTTPURL = itutils.MustURL(network.HTTPURLs[i])
+			}
+			// Assign WS URL if available
+			if wsURLsAvailable && i < len(network.URLs) {
 				node.WSURL = itutils.MustURL(network.URLs[i])
 			}
 			evmNodes = append(evmNodes, node)
 		}
+
 		evmConfig := &evmcfg.EVMConfig{
 			ChainID: ubig.New(big.NewInt(network.ChainID)),
 			Nodes:   evmNodes,
@@ -140,7 +149,7 @@ func WithKeySpecificMaxGasPrice(addresses []string, maxGasPriceGWei int64) NodeC
 	}
 }
 
-func BuildChainlinkNodeConfig(nets []blockchain.EVMNetwork, nodeConfig, commonChain string, configByChain map[string]string, forceHttp bool) (*corechainlink.Config, string, error) {
+func BuildChainlinkNodeConfig(nets []blockchain.EVMNetwork, nodeConfig, commonChain string, configByChain map[string]string) (*corechainlink.Config, string, error) {
 	var tomlCfg *corechainlink.Config
 	var err error
 	var commonChainConfig *evmcfg.Chain
@@ -166,9 +175,9 @@ func BuildChainlinkNodeConfig(nets []blockchain.EVMNetwork, nodeConfig, commonCh
 	if nodeConfig == "" {
 		tomlCfg = NewConfig(
 			NewBaseConfig(),
-			WithPrivateEVMs(nets, commonChainConfig, configByChainMap, forceHttp))
+			WithPrivateEVMs(nets, commonChainConfig, configByChainMap))
 	} else {
-		tomlCfg, err = NewConfigFromToml([]byte(nodeConfig), WithPrivateEVMs(nets, commonChainConfig, configByChainMap, forceHttp))
+		tomlCfg, err = NewConfigFromToml([]byte(nodeConfig), WithPrivateEVMs(nets, commonChainConfig, configByChainMap))
 		if err != nil {
 			return nil, "", err
 		}
