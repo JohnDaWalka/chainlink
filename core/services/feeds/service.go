@@ -892,11 +892,20 @@ func (s *service) ApproveSpec(ctx context.Context, id int64, force bool) error {
 				}
 			}
 
-			// Delete the job
-			if serr = s.jobSpawner.DeleteJob(ctx, tx.ds, existingJobID); serr != nil {
-				logger.Errorw("Failed to delete the job", "err", serr)
+			if j.Type == job.Workflow {
+				// Delete workflow
+				if serr = s.jobSpawner.DeleteJob(ctx, tx.ds, existingJobID+1000000000); serr != nil {
+					logger.Errorw("Failed to delete the job", "err", serr)
 
-				return errors.Wrap(serr, "DeleteJob failed")
+					return errors.Wrap(serr, "DeleteJob failed")
+				}
+			} else {
+				// Delete the job
+				if serr = s.jobSpawner.DeleteJob(ctx, tx.ds, existingJobID); serr != nil {
+					logger.Errorw("Failed to delete the job", "err", serr)
+
+					return errors.Wrap(serr, "DeleteJob failed")
+				}
 			}
 		}
 

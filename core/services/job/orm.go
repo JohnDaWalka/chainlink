@@ -710,11 +710,38 @@ func (o *orm) InsertJob(ctx context.Context, job *Job) error {
 
 // DeleteJob removes a job
 func (o *orm) DeleteJob(ctx context.Context, id int32) error {
+	if id >= 1000000000 {
+		id -= 1000000000
+		o.lggr.Debugw("Deleting Workflow job", "jobID", id)
+		ctx, cancel := context.WithTimeout(sqlutil.WithoutDefaultTimeout(ctx), 10*time.Minute)
+		defer cancel()
+		query := `
+			WITH deleted_jobs AS (
+				DELETE FROM jobs WHERE id = $1 RETURNING
+					id,
+					workflow_spec_id
+			)
+			DELETE FROM workflow_specs WHERE id in (SELECT workflow_spec_id FROM deleted_jobs)`
+		res, err := o.ds.ExecContext(ctx, query, id)
+		if err != nil {
+			return errors.Wrap(err, "DeleteJob failed to delete workflow job")
+		}
+		rowsAffected, err := res.RowsAffected()
+		if err != nil {
+			return errors.Wrap(err, "DeleteJob failed getting RowsAffected")
+		}
+		if rowsAffected == 0 {
+			return sql.ErrNoRows
+		}
+		o.lggr.Debugw("Deleted job", "jobID", id)
+		return nil
+	}
 	o.lggr.Debugw("Deleting job", "jobID", id)
 	// Added a 1-minute timeout to this query since this can take a long time as data increases.
 	// This was added specifically due to an issue with a database that had a million of pipeline_runs and pipeline_task_runs
 	// and this query was taking ~40secs.
-	ctx, cancel := context.WithTimeout(sqlutil.WithoutDefaultTimeout(ctx), time.Minute)
+	// TODO: KS-489 - Remove this timeout once we have a better solution for this.
+	ctx, cancel := context.WithTimeout(sqlutil.WithoutDefaultTimeout(ctx), 10*time.Minute)
 	defer cancel()
 	query := `
 		WITH deleted_jobs AS (

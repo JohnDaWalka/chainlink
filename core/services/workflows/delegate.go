@@ -71,6 +71,10 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) ([]job.Ser
 		Binary:         binary,
 		SecretsFetcher: d.secretsFetcher,
 	}
+	if spec.WorkflowSpec.WorkflowID == "924eef66516e5387b6e8ab8cc544685dfe50dfc837996f22beecebced5063961" {
+		cfg.Lggr.Debug("NOT STARTING ENGINE", "workflow_id", spec.WorkflowSpec.WorkflowID, "workflow_owner", spec.WorkflowSpec.WorkflowOwner, "workflow_name", spec.WorkflowSpec.Workflow)
+		return []job.ServiceCtx{}, nil
+	}
 	engine, err := NewEngine(ctx, cfg)
 	if err != nil {
 		return nil, err

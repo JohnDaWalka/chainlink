@@ -275,6 +275,10 @@ func (js *spawner) CreateJob(ctx context.Context, ds sqlutil.DataSource, jb *Job
 
 // Should not get called before Start()
 func (js *spawner) DeleteJob(ctx context.Context, ds sqlutil.DataSource, jobID int32) error {
+	originalJobID := jobID
+	if jobID >= 1000000000 {
+		jobID -= 1000000000
+	}
 	if ds == nil {
 		ds = js.orm.DataSource()
 	}
@@ -315,7 +319,7 @@ func (js *spawner) DeleteJob(ctx context.Context, ds sqlutil.DataSource, jobID i
 	lggr.Debugw("Callback: BeforeDeleteJob done")
 
 	err := sqlutil.Transact(ctx, js.orm.WithDataSource, ds, nil, func(tx ORM) error {
-		err := tx.DeleteJob(ctx, jobID)
+		err := tx.DeleteJob(ctx, originalJobID)
 		if err != nil {
 			js.lggr.Errorw("Error deleting job", "jobID", jobID, "err", err)
 			return err
