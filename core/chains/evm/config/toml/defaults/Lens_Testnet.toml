@@ -1,0 +1,21 @@
+ChainID = '37111'
+ChainType = 'zksync'
+# Lens has batches every 8 hours with a dynamic block time. Using 200 as compat tests gave 30-160 and adding cushioning
+FinalityDepth = 200
+FinalityTagEnabled = false
+# block rate is dynamic, have seen block times as low as 1s
+LogPollInterval = '5s'
+# sufficient time for RPC to be labelled out of sync, since blockRate is pretty fast
+NoNewHeadsThreshold = '10m'
+
+[EVM.GasEstimator]
+# no EIP1559 to ensure our estimator doesnot estimate gas with MaxPriorityFee which will break minFunding requirement 
+EIP1559DynamicFees = false
+LimitDefault = 250_000_000
+Mode = 'FeeHistory'
+# The FeeHistory estimator does not enforce PriceMin, setting it to 0 to not place any limits on the price
+PriceMin = '0'
+BumpPercent = 40
+
+[EVM.HeadTracker]
+HistoryDepth = 250

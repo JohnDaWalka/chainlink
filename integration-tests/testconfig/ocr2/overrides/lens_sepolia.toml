@@ -1,0 +1,29 @@
+[ChainlinkImage]
+version = "845a5ca616ad9f974316819cc29102da783307d9"
+
+[Network]
+selected_networks = ["LENS_SEPOLIA"]
+
+[Soak.Common]
+chainlink_node_funding = 10
+
+[Soak.OCR2]
+[Soak.OCR2.Common]
+test_duration = "24h"
+
+[Soak.OCR2.Soak]
+time_between_rounds = "5m"
+
+[OCR2.Common]
+number_of_contracts = 2
+
+[Network.EVMNetworks.LENS_SEPOLIA]
+evm_name = "LENS_SEPOLIA"
+evm_chain_id = 37111
+client_implementation = "Ethereum"
+evm_simulated = false
+evm_chainlink_transaction_limit = 5000
+evm_minimum_confirmations = 1
+evm_gas_estimation_buffer = 100000
+evm_supports_eip1559 = true
+evm_default_gas_limit = 6000000
