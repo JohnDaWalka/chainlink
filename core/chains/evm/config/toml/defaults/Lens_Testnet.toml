@@ -19,3 +19,6 @@ BumpPercent = 40
 
 [HeadTracker]
 HistoryDepth = 250
+
+[GasEstimator.DAOracle]
+OracleType = 'zksync'
