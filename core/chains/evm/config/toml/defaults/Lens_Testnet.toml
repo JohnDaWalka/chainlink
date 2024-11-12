@@ -8,7 +8,7 @@ LogPollInterval = '5s'
 # sufficient time for RPC to be labelled out of sync, since blockRate is pretty fast
 NoNewHeadsThreshold = '10m'
 
-[EVM.GasEstimator]
+[GasEstimator]
 # no EIP1559 to ensure our estimator doesnot estimate gas with MaxPriorityFee which will break minFunding requirement 
 EIP1559DynamicFees = false
 LimitDefault = 250_000_000
@@ -17,5 +17,5 @@ Mode = 'FeeHistory'
 PriceMin = '0'
 BumpPercent = 40
 
-[EVM.HeadTracker]
+[HeadTracker]
 HistoryDepth = 250
