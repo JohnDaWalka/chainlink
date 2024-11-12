@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/forwarders"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
+	types2 "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
 type roundRobinKeystore interface {
@@ -88,13 +89,14 @@ func NewOCR2FeedsTransmitter(
 	checker txmgr.TransmitCheckerSpec,
 	chainID *big.Int,
 	keystore roundRobinKeystore,
+	dualTransmissionConfig *types2.DualTransmissionConfig,
 ) (Transmitter, error) {
 	// Ensure that a keystore is provided.
 	if keystore == nil {
 		return nil, errors.New("nil keystore provided to transmitter")
 	}
 
-	return &ocr2FeedsTransmitter{
+	baseTransmitter := &ocr2FeedsTransmitter{
 		ocr2Aggregator: ocr2Aggregator,
 		txManagerOCR2:  txm,
 		transmitter: transmitter{
@@ -107,7 +109,17 @@ func NewOCR2FeedsTransmitter(
 			chainID:                     chainID,
 			keystore:                    keystore,
 		},
-	}, nil
+	}
+
+	if dualTransmissionConfig != nil {
+		return &ocr2FeedsDualTransmission{
+			primaryTransmitter:       *baseTransmitter,
+			secondaryContractAddress: dualTransmissionConfig.ContractAddress,
+			secondaryFromAddress:     dualTransmissionConfig.TransmitterAddress,
+			secondaryMeta:            dualTransmissionConfig.Meta,
+		}, nil
+	}
+	return baseTransmitter, nil
 }
 
 func (t *transmitter) CreateEthTransaction(ctx context.Context, toAddress common.Address, payload []byte, txMeta *txmgr.TxMeta) error {
@@ -202,4 +214,38 @@ func (t *ocr2FeedsTransmitter) forwarderAddress(ctx context.Context, eoa, ocr2Ag
 	}
 
 	return forwarderAddress, nil
+}
+
+type ocr2FeedsDualTransmission struct {
+	primaryTransmitter ocr2FeedsTransmitter
+
+	secondaryContractAddress common.Address
+	secondaryFromAddress     common.Address
+	secondaryMeta            map[string]interface{}
+}
+
+func (t *ocr2FeedsDualTransmission) CreateEthTransaction(ctx context.Context, toAddress common.Address, payload []byte, txMeta *txmgr.TxMeta) error {
+	//Primary transmission
+	err := t.primaryTransmitter.CreateEthTransaction(ctx, toAddress, payload, txMeta)
+	if err != nil {
+		return err
+	}
+
+	//Secondary transmission
+	_, err = t.primaryTransmitter.txm.CreateTransaction(ctx, txmgr.TxRequest{
+		FromAddress:    t.secondaryFromAddress,
+		ToAddress:      t.secondaryContractAddress,
+		EncodedPayload: payload,
+		FeeLimit:       t.primaryTransmitter.gasLimit,
+		//ForwarderAddress: forwarderAddress, TODO @george-dorin: should be sent?
+		Strategy: t.primaryTransmitter.strategy,
+		Checker:  t.primaryTransmitter.checker,
+		//Meta:     txMeta, TODO @george-dorin: add dual transmission params
+	})
+
+	return errors.Wrap(err, "skipped secondary transmission")
+}
+
+func (t *ocr2FeedsDualTransmission) FromAddress(ctx context.Context) common.Address {
+	return t.primaryTransmitter.FromAddress(ctx)
 }

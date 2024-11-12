@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	types2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -246,3 +247,29 @@ func (oc *contractTransmitter) HealthReport() map[string]error {
 	return map[string]error{oc.Name(): nil}
 }
 func (oc *contractTransmitter) Name() string { return oc.lggr.Name() }
+
+var _ types2.ContractTransmitter = (*dualContractTransmitter)(nil)
+
+type dualContractTransmitter struct {
+	baseContractTransmitter contractTransmitter
+}
+
+func (d *dualContractTransmitter) secondaryTransmit(ctx context.Context, reportContext types2.ReportContext, report types2.Report, signatures []types2.AttributedOnchainSignature) error {
+	return nil
+}
+
+func (d *dualContractTransmitter) Transmit(ctx context.Context, reportContext types2.ReportContext, report types2.Report, signatures []types2.AttributedOnchainSignature) error {
+	err := d.secondaryTransmit(ctx, reportContext, report, signatures)
+	if err != nil {
+		d.baseContractTransmitter.lggr.Warnw("secondary transmission failed", "err", err)
+	}
+	return d.baseContractTransmitter.Transmit(ctx, reportContext, report, signatures)
+}
+
+func (d *dualContractTransmitter) LatestConfigDigestAndEpoch(ctx context.Context) (configDigest types2.ConfigDigest, epoch uint32, err error) {
+	return d.baseContractTransmitter.LatestConfigDigestAndEpoch(ctx)
+}
+
+func (d *dualContractTransmitter) FromAccount(ctx context.Context) (types2.Account, error) {
+	return d.baseContractTransmitter.FromAccount(ctx)
+}
