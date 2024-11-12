@@ -11,7 +11,7 @@ NoNewHeadsThreshold = '10m'
 [GasEstimator]
 # no EIP1559 to ensure our estimator doesnot estimate gas with MaxPriorityFee which will break minFunding requirement 
 EIP1559DynamicFees = false
-LimitDefault = 250_000_000
+# LimitDefault = 250_000_000
 Mode = 'FeeHistory'
 # The FeeHistory estimator does not enforce PriceMin, setting it to 0 to not place any limits on the price
 PriceMin = '0'
