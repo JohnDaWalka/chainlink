@@ -234,8 +234,20 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, 
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) CountTransactionsByState(ctx context.Context, state txmgrtypes.TxState) (uint32, error) {
-	_, count, err := o.txStore.FetchUnconfirmedTransactionAtNonceWithCount(ctx, 0, common.Address{})
-	return uint32(count), err
+	addresses, err := o.keystore.EnabledAddressesForChain(ctx, o.chainID)
+	if err != nil {
+		return 0, err
+	}
+	total := 0
+	for _, address := range addresses {
+		_, count, err := o.txStore.FetchUnconfirmedTransactionAtNonceWithCount(ctx, 0, address)
+		if err != nil {
+			return 0, err
+		}
+		total += count
+	}
+
+	return uint32(total), err
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) FindEarliestUnconfirmedBroadcastTime(ctx context.Context) (time nullv4.Time, err error) {
