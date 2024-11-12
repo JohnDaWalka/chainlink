@@ -220,7 +220,7 @@ type RelayConfig struct {
 	LLODONID      uint32        `json:"lloDonID" toml:"lloDonID"`
 	LLOConfigMode LLOConfigMode `json:"lloConfigMode" toml:"lloConfigMode"`
 
-	//DualTransmission specific
+	// DualTransmission specific
 	EnableDualTransmission bool                   `json:"enableDualTransmission" toml:"enableDualTransmission"`
 	DualTransmissionConfig DualTransmissionConfig `json:"dualTransmission" toml:"dualTransmission"`
 }

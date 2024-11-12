@@ -41,6 +41,7 @@ func CreateOCRv2JobsLocal(
 	chainId uint64, // EVM chain ID
 	forwardingAllowed bool,
 	enableChainReaderAndCodec bool,
+	enableDualTransmission bool,
 ) error {
 	// Collect P2P ID
 	bootstrapP2PIds, err := bootstrapNode.MustReadP2PKeys()
@@ -106,6 +107,20 @@ func CreateOCRv2JobsLocal(
 				return fmt.Errorf("creating bridge on CL node failed: %w", err)
 			}
 
+			relayConfig := map[string]interface{}{
+				"chainID": chainId,
+			}
+
+			chainlinkNode.PrimaryEthAddress()
+			if enableDualTransmission {
+				relayConfig["enableDualTransmission"] = true
+				relayConfig["dualTransmission"] = evmtypes.DualTransmissionConfig{
+					ContractAddress:    common.Address{},
+					TransmitterAddress: null.StringFrom(nodeTransmitterAddress),
+					Meta:               nil,
+				}
+			}
+
 			ocrSpec := &nodeclient.OCR2TaskJobSpec{
 				Name:              fmt.Sprintf("ocr2-%s", uuid.NewString()),
 				JobType:           "offchainreporting2",
@@ -113,11 +128,9 @@ func CreateOCRv2JobsLocal(
 				ObservationSource: nodeclient.ObservationSourceSpecBridge(bta),
 				ForwardingAllowed: forwardingAllowed,
 				OCR2OracleSpec: job.OCR2OracleSpec{
-					PluginType: "median",
-					Relay:      "evm",
-					RelayConfig: map[string]interface{}{
-						"chainID": chainId,
-					},
+					PluginType:  "median",
+					Relay:       "evm",
+					RelayConfig: relayConfig,
 					PluginConfig: map[string]any{
 						"juelsPerFeeCoinSource": fmt.Sprintf("\"\"\"%s\"\"\"", nodeclient.ObservationSourceSpecBridge(juelsBridge)),
 					},

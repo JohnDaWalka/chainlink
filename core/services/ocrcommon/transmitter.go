@@ -230,6 +230,8 @@ func (t *ocr2FeedsDualTransmission) CreateEthTransaction(ctx context.Context, to
 	if err != nil {
 		return err
 	}
+	txMeta.DualBroadcast = true
+	txMeta.DualBroadcastParams = ""
 
 	//Secondary transmission
 	_, err = t.primaryTransmitter.txm.CreateTransaction(ctx, txmgr.TxRequest{
@@ -237,10 +239,9 @@ func (t *ocr2FeedsDualTransmission) CreateEthTransaction(ctx context.Context, to
 		ToAddress:      t.secondaryContractAddress,
 		EncodedPayload: payload,
 		FeeLimit:       t.primaryTransmitter.gasLimit,
-		//ForwarderAddress: forwarderAddress, TODO @george-dorin: should be sent?
-		Strategy: t.primaryTransmitter.strategy,
-		Checker:  t.primaryTransmitter.checker,
-		//Meta:     txMeta, TODO @george-dorin: add dual transmission params
+		Strategy:       t.primaryTransmitter.strategy,
+		Checker:        t.primaryTransmitter.checker,
+		Meta:           txMeta,
 	})
 
 	return errors.Wrap(err, "skipped secondary transmission")
