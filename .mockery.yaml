@@ -98,6 +98,7 @@ packages:
       Client:
       TxStore:
       AttemptBuilder:
+      Keystore:
   github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr:
     interfaces:
       ChainConfig:

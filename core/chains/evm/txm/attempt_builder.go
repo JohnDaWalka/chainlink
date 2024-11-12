@@ -15,28 +15,28 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/types"
 )
 
-type Keystore interface {
+type AttemptBuilderKeystore interface {
 	SignTx(ctx context.Context, fromAddress common.Address, tx *evmtypes.Transaction, chainID *big.Int) (*evmtypes.Transaction, error)
 }
 
 type attemptBuilder struct {
-	chainID     *big.Int
-	priceMaxMap map[common.Address]*assets.Wei
-	estimator   gas.EvmFeeEstimator
-	keystore    Keystore
+	chainID   *big.Int
+	priceMax  *assets.Wei
+	estimator gas.EvmFeeEstimator
+	keystore  AttemptBuilderKeystore
 }
 
-func NewAttemptBuilder(chainID *big.Int, priceMaxMap map[common.Address]*assets.Wei, estimator gas.EvmFeeEstimator, keystore Keystore) *attemptBuilder {
+func NewAttemptBuilder(chainID *big.Int, priceMax *assets.Wei, estimator gas.EvmFeeEstimator, keystore AttemptBuilderKeystore) *attemptBuilder {
 	return &attemptBuilder{
-		chainID:     chainID,
-		priceMaxMap: priceMaxMap,
-		estimator:   estimator,
-		keystore:    keystore,
+		chainID:   chainID,
+		priceMax:  priceMax,
+		estimator: estimator,
+		keystore:  keystore,
 	}
 }
 
 func (a *attemptBuilder) NewAttempt(ctx context.Context, lggr logger.Logger, tx *types.Transaction, dynamic bool) (*types.Attempt, error) {
-	fee, estimatedGasLimit, err := a.estimator.GetFee(ctx, tx.Data, tx.SpecifiedGasLimit, a.priceMaxMap[tx.FromAddress], &tx.FromAddress, &tx.ToAddress)
+	fee, estimatedGasLimit, err := a.estimator.GetFee(ctx, tx.Data, tx.SpecifiedGasLimit, a.priceMax, &tx.FromAddress, &tx.ToAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (a *attemptBuilder) NewAttempt(ctx context.Context, lggr logger.Logger, tx 
 }
 
 func (a *attemptBuilder) NewBumpAttempt(ctx context.Context, lggr logger.Logger, tx *types.Transaction, previousAttempt types.Attempt) (*types.Attempt, error) {
-	bumpedFee, bumpedFeeLimit, err := a.estimator.BumpFee(ctx, previousAttempt.Fee, tx.SpecifiedGasLimit, a.priceMaxMap[tx.FromAddress], nil)
+	bumpedFee, bumpedFeeLimit, err := a.estimator.BumpFee(ctx, previousAttempt.Fee, tx.SpecifiedGasLimit, a.priceMax, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -58,6 +58,10 @@ type StuckTxDetector interface {
 	DetectStuckTransaction(tx *types.Transaction) (bool, error)
 }
 
+type Keystore interface {
+	EnabledAddressesForChain(ctx context.Context, chainID *big.Int) (addresses []common.Address, err error)
+}
+
 type Config struct {
 	EIP1559             bool
 	BlockTime           time.Duration
@@ -67,15 +71,15 @@ type Config struct {
 
 type Txm struct {
 	services.StateMachine
-	lggr             logger.SugaredLogger
-	enabledAddresses []common.Address
-	chainID          *big.Int
-	client           Client
-	attemptBuilder   AttemptBuilder
-	errorHandler     ErrorHandler
-	stuckTxDetector  StuckTxDetector
-	txStore          TxStore
-	config           Config
+	lggr            logger.SugaredLogger
+	chainID         *big.Int
+	client          Client
+	attemptBuilder  AttemptBuilder
+	errorHandler    ErrorHandler
+	stuckTxDetector StuckTxDetector
+	txStore         TxStore
+	keystore        Keystore
+	config          Config
 
 	nonceMapMu sync.Mutex
 	nonceMap   map[common.Address]uint64
@@ -85,26 +89,30 @@ type Txm struct {
 	wg        sync.WaitGroup
 }
 
-func NewTxm(lggr logger.Logger, chainID *big.Int, client Client, attemptBuilder AttemptBuilder, txStore TxStore, stuckTxDetector StuckTxDetector, config Config, enabledAddresses []common.Address) *Txm {
+func NewTxm(lggr logger.Logger, chainID *big.Int, client Client, attemptBuilder AttemptBuilder, txStore TxStore, stuckTxDetector StuckTxDetector, config Config, keystore Keystore) *Txm {
 	return &Txm{
-		lggr:             logger.Sugared(logger.Named(lggr, "Txm")),
-		enabledAddresses: enabledAddresses,
-		chainID:          chainID,
-		client:           client,
-		attemptBuilder:   attemptBuilder,
-		txStore:          txStore,
-		stuckTxDetector:  stuckTxDetector,
-		config:           config,
-		nonceMap:         make(map[common.Address]uint64),
-		triggerCh:        make(map[common.Address]chan struct{}),
+		lggr:            logger.Sugared(logger.Named(lggr, "Txm")),
+		keystore:        keystore,
+		chainID:         chainID,
+		client:          client,
+		attemptBuilder:  attemptBuilder,
+		txStore:         txStore,
+		stuckTxDetector: stuckTxDetector,
+		config:          config,
+		nonceMap:        make(map[common.Address]uint64),
+		triggerCh:       make(map[common.Address]chan struct{}),
 	}
 }
 
-func (t *Txm) Start(context.Context) error {
+func (t *Txm) Start(ctx context.Context) error {
 	return t.StartOnce("Txm", func() error {
 		t.stopCh = make(chan struct{})
 
-		for _, address := range t.enabledAddresses {
+		addresses, err := t.keystore.EnabledAddressesForChain(ctx, t.chainID)
+		if err != nil {
+			return err
+		}
+		for _, address := range addresses {
 			err := t.startAddress(address)
 			if err != nil {
 				return err

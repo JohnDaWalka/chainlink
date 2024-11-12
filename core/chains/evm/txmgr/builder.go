@@ -10,7 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink/v2/common/txmgr"
 	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/chaintype"
@@ -125,30 +124,17 @@ func NewTxmV2(
 		stuckTxDetector = txm.NewStuckTxDetector(lggr, chainConfig.ChainType(), stuckTxDetectorConfig)
 	}
 
-	addresses, err := keyStore.EnabledAddressesForChain(context.TODO(), chainID)
-	if err != nil {
-		return nil, err
-	}
-	priceMaxMap := make(map[common.Address]*assets.Wei)
-	for _, address := range addresses {
-		priceMaxMap[address] = fCfg.PriceMaxKey(address)
-	}
-	attemptBuilder := txm.NewAttemptBuilder(chainID, priceMaxMap, estimator, keyStore)
-	inMemoryStoreManager := storage.NewInMemoryStoreManager(lggr, addresses, chainID)
+	attemptBuilder := txm.NewAttemptBuilder(chainID, fCfg.PriceMax(), estimator, keyStore)
+	inMemoryStoreManager := storage.NewInMemoryStoreManager(lggr, chainID)
 	config := txm.Config{
 		EIP1559:             fCfg.EIP1559DynamicFees(),
 		BlockTime:           *txmV2Config.BlockTime(),
 		RetryBlockThreshold: uint16(fCfg.BumpThreshold()),
 		EmptyTxLimitDefault: fCfg.LimitDefault(),
 	}
-	var c txm.Client
-	if chainConfig.ChainType() == chaintype.ChainDualBroadcast {
-		c = clientwrappers.NewDualBroadcastClient(client, keyStore, txmV2Config.CustomUrl())
-	} else {
-		c = clientwrappers.NewChainClient(client)
-	}
-	t := txm.NewTxm(lggr, chainID, c, attemptBuilder, inMemoryStoreManager, stuckTxDetector, config, addresses)
-	return txm.NewTxmOrchestrator[common.Hash, *evmtypes.Head](lggr, chainID, t, inMemoryStoreManager, fwdMgr), nil
+	c := clientwrappers.NewChainClient(client)
+	t := txm.NewTxm(lggr, chainID, c, attemptBuilder, inMemoryStoreManager, stuckTxDetector, config, keyStore)
+	return txm.NewTxmOrchestrator[common.Hash, *evmtypes.Head](lggr, chainID, t, inMemoryStoreManager, fwdMgr, keyStore), nil
 }
 
 // NewEvmResender creates a new concrete EvmResender

@@ -47,3 +47,10 @@ func (k *DummyKeystore) SignMessage(ctx context.Context, address common.Address,
 	}
 	return signature, nil
 }
+
+func (k *DummyKeystore) EnabledAddressesForChain(_ context.Context, _ *big.Int) (addresses []common.Address, err error) {
+	for address := range k.privateKeyMap {
+		addresses = append(addresses, address)
+	}
+	return
+}
