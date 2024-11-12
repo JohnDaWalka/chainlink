@@ -132,7 +132,12 @@ func NewTxmV2(
 		RetryBlockThreshold: uint16(fCfg.BumpThreshold()),
 		EmptyTxLimitDefault: fCfg.LimitDefault(),
 	}
-	c := clientwrappers.NewChainClient(client)
+	var c txm.Client
+	if chainConfig.ChainType() == chaintype.ChainDualBroadcast {
+		c = clientwrappers.NewDualBroadcastClient(client, keyStore, txmV2Config.CustomUrl())
+	} else {
+		c = clientwrappers.NewChainClient(client)
+	}
 	t := txm.NewTxm(lggr, chainID, c, attemptBuilder, inMemoryStoreManager, stuckTxDetector, config, keyStore)
 	return txm.NewTxmOrchestrator[common.Hash, *evmtypes.Head](lggr, chainID, t, inMemoryStoreManager, fwdMgr, keyStore, attemptBuilder), nil
 }
