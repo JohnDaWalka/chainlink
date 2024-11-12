@@ -55,20 +55,35 @@ func newEvmTxm(
 	}
 
 	if opts.GenTxManager == nil {
-		txm, err = txmgr.NewTxm(
-			ds,
-			cfg,
-			txmgr.NewEvmTxmFeeConfig(cfg.GasEstimator()),
-			cfg.Transactions(),
-			cfg.NodePool().Errors(),
-			databaseConfig,
-			listenerConfig,
-			client,
-			lggr,
-			logPoller,
-			opts.KeyStore,
-			estimator,
-			headTracker)
+		if cfg.TxmV2().Enabled() {
+			txm, err = txmgr.NewTxmV2(
+				ds,
+				cfg,
+				txmgr.NewEvmTxmFeeConfig(cfg.GasEstimator()),
+				cfg.Transactions(),
+				cfg.TxmV2(),
+				client,
+				lggr,
+				logPoller,
+				opts.KeyStore,
+				estimator,
+			)
+		} else {
+			txm, err = txmgr.NewTxm(
+				ds,
+				cfg,
+				txmgr.NewEvmTxmFeeConfig(cfg.GasEstimator()),
+				cfg.Transactions(),
+				cfg.NodePool().Errors(),
+				databaseConfig,
+				listenerConfig,
+				client,
+				lggr,
+				logPoller,
+				opts.KeyStore,
+				estimator,
+				headTracker)
+		}
 	} else {
 		txm = opts.GenTxManager(chainID)
 	}

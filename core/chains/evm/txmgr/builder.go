@@ -94,12 +94,12 @@ func NewEvmTxm(
 	return txmgr.NewTxm(chainId, cfg, txCfg, keyStore, lggr, checkerFactory, fwdMgr, txAttemptBuilder, txStore, broadcaster, confirmer, resender, tracker, finalizer, client.NewTxError)
 }
 
-func NewTxmv2(
+func NewTxmV2(
 	ds sqlutil.DataSource,
 	chainConfig ChainConfig,
 	fCfg FeeConfig,
 	txConfig config.Transactions,
-	blockTime time.Duration,
+	txmV2Config config.TxmV2,
 	client client.Client,
 	lggr logger.Logger,
 	logPoller logpoller.LogPoller,
@@ -118,9 +118,9 @@ func NewTxmv2(
 	var stuckTxDetector txm.StuckTxDetector
 	if txConfig.AutoPurge().Enabled() {
 		stuckTxDetectorConfig := txm.StuckTxDetectorConfig{
-			BlockTime:             blockTime,
+			BlockTime:             *txmV2Config.BlockTime(),
 			StuckTxBlockThreshold: uint16(*txConfig.AutoPurge().Threshold()),
-			DetectionApiUrl:       txConfig.AutoPurge().DetectionApiUrl().Path,
+			DetectionApiUrl:       txConfig.AutoPurge().DetectionApiUrl().String(),
 		}
 		stuckTxDetector = txm.NewStuckTxDetector(lggr, chainConfig.ChainType(), stuckTxDetectorConfig)
 	}
@@ -137,13 +137,13 @@ func NewTxmv2(
 	inMemoryStoreManager := storage.NewInMemoryStoreManager(lggr, addresses, chainID)
 	config := txm.Config{
 		EIP1559:             fCfg.EIP1559DynamicFees(),
-		BlockTime:           blockTime, //TODO: create new config
+		BlockTime:           *txmV2Config.BlockTime(),
 		RetryBlockThreshold: uint16(fCfg.BumpThreshold()),
 		EmptyTxLimitDefault: fCfg.LimitDefault(),
 	}
 	var c txm.Client
 	if chainConfig.ChainType() == chaintype.ChainDualBroadcast {
-		c = clientwrappers.NewDualBroadcastClient(client, keyStore, txConfig.AutoPurge().DetectionApiUrl())
+		c = clientwrappers.NewDualBroadcastClient(client, keyStore, txmV2Config.CustomUrl())
 	} else {
 		c = clientwrappers.NewChainClient(client)
 	}
