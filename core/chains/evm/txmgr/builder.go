@@ -134,7 +134,7 @@ func NewTxmV2(
 	}
 	c := clientwrappers.NewChainClient(client)
 	t := txm.NewTxm(lggr, chainID, c, attemptBuilder, inMemoryStoreManager, stuckTxDetector, config, keyStore)
-	return txm.NewTxmOrchestrator[common.Hash, *evmtypes.Head](lggr, chainID, t, inMemoryStoreManager, fwdMgr, keyStore), nil
+	return txm.NewTxmOrchestrator[common.Hash, *evmtypes.Head](lggr, chainID, t, inMemoryStoreManager, fwdMgr, keyStore, attemptBuilder), nil
 }
 
 // NewEvmResender creates a new concrete EvmResender
