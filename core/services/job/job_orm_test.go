@@ -2040,7 +2040,7 @@ func TestORM_CreateJob_OCR2_With_DualTransmission(t *testing.T) {
 
 	jobORM := NewTestORM(t, db, pipelineORM, bridgesORM, keyStore)
 
-	//Enabled but no config set
+	// Enabled but no config set
 	enabledDualTransmissionSpec := `
 		enableDualTransmission=true`
 
@@ -2048,7 +2048,7 @@ func TestORM_CreateJob_OCR2_With_DualTransmission(t *testing.T) {
 	require.NoError(t, err)
 	require.ErrorContains(t, jobORM.CreateJob(ctx, &jb), "dual transmission is enabled but no dual transmission config present")
 
-	//contractAddress not set
+	// ContractAddress not set
 	emptyContractAddress := `
 		enableDualTransmission=true
 		[relayConfig.dualTransmission]
@@ -2058,7 +2058,7 @@ func TestORM_CreateJob_OCR2_With_DualTransmission(t *testing.T) {
 	require.NoError(t, err)
 	require.ErrorContains(t, jobORM.CreateJob(ctx, &jb), "invalid contract address in dual transmission config")
 
-	//Transmitter address not set
+	// Transmitter address not set
 	emptyTransmitterAddress := `
 		enableDualTransmission=true
 		[relayConfig.dualTransmission]
@@ -2083,10 +2083,10 @@ func TestORM_CreateJob_OCR2_With_DualTransmission(t *testing.T) {
 
 	jb.OCR2OracleSpec.TransmitterID = null.StringFrom(transmitterID.String())
 
-	//unknown transmitter address
+	// Unknown transmitter address
 	require.ErrorContains(t, jobORM.CreateJob(ctx, &jb), "unknown dual transmission transmitterAddress: no EVM key matching:")
 
-	//Should not error
+	// Should not error
 	keyStore.Eth().XXXTestingOnlyAdd(ctx, dtTransmitterAddress)
 	require.NoError(t, jobORM.CreateJob(ctx, &jb))
 }
