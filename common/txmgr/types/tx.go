@@ -161,8 +161,8 @@ type TxMeta[ADDR types.Hashable, TX_HASH types.Hashable] struct {
 	SeqNumbers []uint64 `json:"SeqNumbers,omitempty"`
 
 	// Dual Broadcast
-	DualBroadcast       bool   `json:"DualBroadcast,omitempty"`
-	DualBroadcastParams string `json:"DualBroadcastParams,omitempty"`
+	DualBroadcast       *bool   `json:"DualBroadcast,omitempty"`
+	DualBroadcastParams *string `json:"DualBroadcastParams,omitempty"`
 }
 
 type TxAttempt[
