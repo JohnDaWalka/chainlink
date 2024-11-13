@@ -93,8 +93,9 @@ func Test_Server_RegisterToWorkflow_RespondsAfterSufficientRequests(t *testing.T
 	for _, caller := range callers {
 		err := caller.RegisterToWorkflow(context.Background(), commoncap.RegisterToWorkflowRequest{
 			Metadata: commoncap.RegistrationMetadata{
-				WorkflowID:  workflowID1,
-				ReferenceID: stepReferenceID1,
+				WorkflowID:    workflowID1,
+				ReferenceID:   stepReferenceID1,
+				WorkflowOwner: workflowOwnerID,
 			},
 		})
 
@@ -120,8 +121,9 @@ func Test_Server_RegisterToWorkflow_Error(t *testing.T) {
 	for _, caller := range callers {
 		err := caller.RegisterToWorkflow(context.Background(), commoncap.RegisterToWorkflowRequest{
 			Metadata: commoncap.RegistrationMetadata{
-				WorkflowID:  workflowID1,
-				ReferenceID: stepReferenceID1,
+				WorkflowID:    workflowID1,
+				ReferenceID:   stepReferenceID1,
+				WorkflowOwner: workflowOwnerID,
 			},
 		})
 
@@ -147,8 +149,9 @@ func Test_Server_UnregisterFromWorkflow_RespondsAfterSufficientRequests(t *testi
 	for _, caller := range callers {
 		err := caller.UnregisterFromWorkflow(context.Background(), commoncap.UnregisterFromWorkflowRequest{
 			Metadata: commoncap.RegistrationMetadata{
-				WorkflowID:  workflowID1,
-				ReferenceID: stepReferenceID1,
+				WorkflowID:    workflowID1,
+				ReferenceID:   stepReferenceID1,
+				WorkflowOwner: workflowOwnerID,
 			},
 		})
 		require.NoError(t, err)

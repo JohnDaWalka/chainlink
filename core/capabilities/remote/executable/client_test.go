@@ -25,6 +25,7 @@ const (
 	stepReferenceID1     = "step1"
 	workflowID1          = "15c631d295ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0"
 	workflowExecutionID1 = "95ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0abbadeed"
+	workflowOwnerID      = "0xAA"
 )
 
 func Test_Client_DonTopologies(t *testing.T) {
@@ -237,8 +238,9 @@ func registerToWorkflowMethod(ctx context.Context, caller commoncap.ExecutableCa
 	responseTest func(t *testing.T, responseError error), t *testing.T) {
 	err := caller.RegisterToWorkflow(ctx, commoncap.RegisterToWorkflowRequest{
 		Metadata: commoncap.RegistrationMetadata{
-			WorkflowID:  workflowID1,
-			ReferenceID: stepReferenceID1,
+			WorkflowID:    workflowID1,
+			ReferenceID:   stepReferenceID1,
+			WorkflowOwner: workflowOwnerID,
 		},
 		Config: transmissionSchedule,
 	})
@@ -250,8 +252,9 @@ func unregisterFromWorkflowMethod(ctx context.Context, caller commoncap.Executab
 	responseTest func(t *testing.T, responseError error), t *testing.T) {
 	err := caller.UnregisterFromWorkflow(ctx, commoncap.UnregisterFromWorkflowRequest{
 		Metadata: commoncap.RegistrationMetadata{
-			WorkflowID:  workflowID1,
-			ReferenceID: stepReferenceID1,
+			WorkflowID:    workflowID1,
+			ReferenceID:   stepReferenceID1,
+			WorkflowOwner: workflowOwnerID,
 		},
 		Config: transmissionSchedule,
 	})
@@ -266,6 +269,7 @@ func executeMethod(ctx context.Context, caller commoncap.ExecutableCapability, t
 			Metadata: commoncap.RequestMetadata{
 				WorkflowID:          workflowID1,
 				WorkflowExecutionID: workflowExecutionID1,
+				WorkflowOwner:       workflowOwnerID,
 			},
 			Config: transmissionSchedule,
 			Inputs: executeInputs,

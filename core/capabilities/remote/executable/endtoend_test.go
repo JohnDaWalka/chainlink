@@ -567,8 +567,9 @@ func executeCapability(ctx context.Context, t *testing.T, caller commoncap.Execu
 func registerWorkflow(ctx context.Context, t *testing.T, caller commoncap.ExecutableCapability, transmissionSchedule *values.Map, responseTest func(t *testing.T, responseError error)) {
 	err := caller.RegisterToWorkflow(ctx, commoncap.RegisterToWorkflowRequest{
 		Metadata: commoncap.RegistrationMetadata{
-			WorkflowID:  workflowID1,
-			ReferenceID: stepReferenceID1,
+			WorkflowID:    workflowID1,
+			ReferenceID:   stepReferenceID1,
+			WorkflowOwner: workflowOwnerID,
 		},
 		Config: transmissionSchedule,
 	})
@@ -579,8 +580,9 @@ func registerWorkflow(ctx context.Context, t *testing.T, caller commoncap.Execut
 func unregisterWorkflow(ctx context.Context, t *testing.T, caller commoncap.ExecutableCapability, transmissionSchedule *values.Map, responseTest func(t *testing.T, responseError error)) {
 	err := caller.UnregisterFromWorkflow(ctx, commoncap.UnregisterFromWorkflowRequest{
 		Metadata: commoncap.RegistrationMetadata{
-			WorkflowID:  workflowID1,
-			ReferenceID: stepReferenceID1,
+			WorkflowID:    workflowID1,
+			ReferenceID:   stepReferenceID1,
+			WorkflowOwner: workflowOwnerID,
 		},
 		Config: transmissionSchedule,
 	})
