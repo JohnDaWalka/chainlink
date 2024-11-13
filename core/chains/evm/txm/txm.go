@@ -362,7 +362,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 			if isStuck {
 				tx.IsPurgeable = true
 				t.txStore.MarkUnconfirmedTransactionPurgeable(ctx, tx.Nonce, address)
-				t.lggr.Infof("Marked tx as purgeable. Sending purge attempt for txID: ", tx.ID)
+				t.lggr.Infof("Marked tx as purgeable. Sending purge attempt for txID: %d", tx.ID)
 				return false, t.createAndSendAttempt(ctx, tx, address)
 			}
 		}

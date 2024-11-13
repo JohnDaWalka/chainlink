@@ -36,6 +36,10 @@ type OrchestratorKeystore interface {
 	EnabledAddressesForChain(ctx context.Context, chainID *big.Int) (addresses []common.Address, err error)
 }
 
+type OrchestratorAttemptBuilder interface {
+	services.Service
+}
+
 // Generics are necessary to keep TXMv2 backwards compatible
 type Orchestrator[
 	BLOCK_HASH types.Hashable,
@@ -48,6 +52,7 @@ type Orchestrator[
 	txStore        OrchestratorTxStore
 	fwdMgr         *forwarders.FwdMgr
 	keystore       OrchestratorKeystore
+	attemptBuilder OrchestratorAttemptBuilder
 	resumeCallback txmgr.ResumeCallback
 }
 
@@ -58,20 +63,25 @@ func NewTxmOrchestrator[BLOCK_HASH types.Hashable, HEAD types.Head[BLOCK_HASH]](
 	txStore OrchestratorTxStore,
 	fwdMgr *forwarders.FwdMgr,
 	keystore OrchestratorKeystore,
+	attemptBuilder OrchestratorAttemptBuilder,
 ) *Orchestrator[BLOCK_HASH, HEAD] {
 	return &Orchestrator[BLOCK_HASH, HEAD]{
-		lggr:     logger.Sugared(logger.Named(lggr, "Orchestrator")),
-		chainID:  chainID,
-		txm:      txm,
-		txStore:  txStore,
-		keystore: keystore,
-		fwdMgr:   fwdMgr,
+		lggr:           logger.Sugared(logger.Named(lggr, "Orchestrator")),
+		chainID:        chainID,
+		txm:            txm,
+		txStore:        txStore,
+		keystore:       keystore,
+		attemptBuilder: attemptBuilder,
+		fwdMgr:         fwdMgr,
 	}
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) Start(ctx context.Context) error {
 	return o.StartOnce("Orchestrator", func() error {
 		var ms services.MultiStart
+		if err := ms.Start(ctx, o.attemptBuilder); err != nil {
+			return fmt.Errorf("Orchestrator: AttemptBuilder failed to start: %w", err)
+		}
 		addresses, err := o.keystore.EnabledAddressesForChain(ctx, o.chainID)
 		if err != nil {
 			return err
@@ -234,8 +244,20 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, 
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) CountTransactionsByState(ctx context.Context, state txmgrtypes.TxState) (uint32, error) {
-	_, count, err := o.txStore.FetchUnconfirmedTransactionAtNonceWithCount(ctx, 0, common.Address{})
-	return uint32(count), err
+	addresses, err := o.keystore.EnabledAddressesForChain(ctx, o.chainID)
+	if err != nil {
+		return 0, err
+	}
+	total := 0
+	for _, address := range addresses {
+		_, count, err := o.txStore.FetchUnconfirmedTransactionAtNonceWithCount(ctx, 0, address)
+		if err != nil {
+			return 0, err
+		}
+		total += count
+	}
+
+	return uint32(total), err
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) FindEarliestUnconfirmedBroadcastTime(ctx context.Context) (time nullv4.Time, err error) {
