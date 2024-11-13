@@ -60,13 +60,17 @@ func (d *DualBroadcastClient) SendTransaction(ctx context.Context, tx *types.Tra
 	if err != nil {
 		return err
 	}
-	if meta!= nil && meta.DualBroadcast && !tx.IsPurgeable {
+	if meta != nil && meta.DualBroadcast != nil && *meta.DualBroadcast && !tx.IsPurgeable {
 		data, err := attempt.SignedTransaction.MarshalBinary()
 		if err != nil {
 			return err
 		}
+		params := ""
+		if meta.DualBroadcastParams != nil {
+			params = *meta.DualBroadcastParams
+		}
 		body := []byte(fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_sendRawTransaction","params":["%s"]}`, hexutil.Encode(data)))
-		if _, err = d.signAndPostMessage(ctx, tx.FromAddress, body, meta.DualBroadcastParams); err != nil {
+		if _, err = d.signAndPostMessage(ctx, tx.FromAddress, body, params); err != nil {
 			return err
 		}
 		return nil
