@@ -217,23 +217,23 @@ func Test_DualTransmitter(t *testing.T) {
 	require.NoError(t, err)
 
 	primaryTxConfirmed := false
-	seconryTxConfirmed := false
+	secondaryTxConfirmed := false
 
 	txm.On("CreateTransaction", mock.Anything, mock.MatchedBy(func(tx txmgr.TxRequest) bool {
-		if tx.FromAddress == fromAddress {
-			//Primary transmission
+		switch tx.FromAddress {
+		case fromAddress:
+			// Primary transmission
 			assert.Equal(t, tx.ToAddress, toAddress, "unexpected primary toAddress")
 			assert.Nil(t, tx.Meta, "Meta should be empty")
 			primaryTxConfirmed = true
-		} else if tx.FromAddress == secondaryFromAddress {
-			//Secondary transmission
+		case secondaryFromAddress:
+			// Secondary transmission
 			assert.Equal(t, tx.ToAddress, secondaryContractAddress, "unexpected secondary toAddress")
 			assert.True(t, tx.Meta.DualBroadcast, "DualBroadcast should be true")
-			assert.Equal(t, tx.Meta.DualBroadcastParams, "key1=value1&key2=value2&key2=value3&key3=value4&key3=value5&key3=value6", "DualBroadcastParams not equal")
-			seconryTxConfirmed = true
-
-		} else {
-			//Should never be reached
+			assert.Equal(t, "key1=value1&key2=value2&key2=value3&key3=value4&key3=value5&key3=value6", tx.Meta.DualBroadcastParams, "DualBroadcastParams not equal")
+			secondaryTxConfirmed = true
+		default:
+			// Should never be reached
 			return false
 		}
 
@@ -243,5 +243,5 @@ func Test_DualTransmitter(t *testing.T) {
 	require.NoError(t, transmitter.CreateEthTransaction(testutils.Context(t), toAddress, payload, nil))
 
 	require.True(t, primaryTxConfirmed)
-	require.True(t, seconryTxConfirmed)
+	require.True(t, secondaryTxConfirmed)
 }

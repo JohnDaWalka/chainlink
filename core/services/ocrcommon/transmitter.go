@@ -226,7 +226,7 @@ type ocr2FeedsDualTransmission struct {
 }
 
 func (t *ocr2FeedsDualTransmission) CreateEthTransaction(ctx context.Context, toAddress common.Address, payload []byte, txMeta *txmgr.TxMeta) error {
-	//Primary transmission
+	// Primary transmission
 	err := t.transmitter.CreateEthTransaction(ctx, toAddress, payload, txMeta)
 	if err != nil {
 		return err
@@ -239,7 +239,7 @@ func (t *ocr2FeedsDualTransmission) CreateEthTransaction(ctx context.Context, to
 	txMeta.DualBroadcast = true
 	txMeta.DualBroadcastParams = t.urlParams()
 
-	//Secondary transmission
+	// Secondary transmission
 	_, err = t.transmitter.txm.CreateTransaction(ctx, txmgr.TxRequest{
 		FromAddress:    t.secondaryFromAddress,
 		ToAddress:      t.secondaryContractAddress,
