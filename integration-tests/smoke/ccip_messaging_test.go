@@ -1,4 +1,4 @@
-package changeset
+package smoke
 
 import (
 	"testing"
@@ -11,7 +11,7 @@ import (
 	ccipdeployment "github.com/smartcontractkit/chainlink/deployment/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/test-go/testify/require"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 )
 
@@ -35,8 +35,6 @@ type messagingTestCaseOutput struct {
 }
 
 func Test_Messaging(t *testing.T) {
-	t.Parallel()
-
 	// Setup 2 chains and a single lane.
 	e := ccipdeployment.NewMemoryEnvironmentWithJobs(t, logger.TestLogger(t), 2, 4)
 	state, err := ccipdeployment.LoadOnchainState(e.Env)
