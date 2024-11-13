@@ -111,6 +111,9 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) Close() (merr error) {
 				merr = errors.Join(merr, fmt.Errorf("Orchestrator failed to stop ForwarderManager: %w", err))
 			}
 		}
+		if err := o.attemptBuilder.Close(); err != nil {
+			merr = errors.Join(merr, fmt.Errorf("Orchestrator failed to stop AttemptBuilder: %w", err))
+		}
 		if err := o.txm.Close(); err != nil {
 			merr = errors.Join(merr, fmt.Errorf("Orchestrator failed to stop Txm: %w", err))
 		}
