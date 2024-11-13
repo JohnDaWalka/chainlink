@@ -2075,6 +2075,9 @@ func TestORM_CreateJob_OCR2_With_DualTransmission(t *testing.T) {
 		[relayConfig.dualTransmission]
 		contractAddress = '0x613a38AC1659769640aaE063C651F48E0250454C' 
 		transmitterAddress = '%s'
+		[relayConfig.dualTransmission.meta]
+		key1 = 'val1'
+		key2 = ['val2','val3']
 		`,
 		dtTransmitterAddress.Address.String())
 
