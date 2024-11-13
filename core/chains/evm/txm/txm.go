@@ -19,7 +19,8 @@ import (
 
 const (
 	broadcastInterval       time.Duration = 30 * time.Second
-	maxInFlightTransactions uint64        = 16
+	maxInFlightTransactions int           = 16
+	maxInFlightSubset       int           = 3
 	maxAllowedAttempts      uint16        = 10
 )
 
@@ -257,8 +258,8 @@ func (t *Txm) broadcastTransaction(ctx context.Context, address common.Address) 
 		// by checking the pending nonce so no more than maxInFlightTransactions/3 can get stuck simultaneously i.e. due
 		// to insufficient balance. We're making this trade-off to avoid storing stuck transactions and making unnecessary
 		// RPC calls. The upper limit is always maxInFlightTransactions regardless of the pending nonce.
-		if unconfirmedCount >= int(maxInFlightTransactions)/3 {
-			if unconfirmedCount > int(maxInFlightTransactions) {
+		if unconfirmedCount >= maxInFlightTransactions/maxInFlightSubset {
+			if unconfirmedCount > maxInFlightTransactions {
 				t.lggr.Warnf("Reached transaction limit: %d for unconfirmed transactions", maxInFlightTransactions)
 				return true, nil
 			}
@@ -343,11 +344,11 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 
 	tx, unconfirmedCount, err := t.txStore.FetchUnconfirmedTransactionAtNonceWithCount(ctx, latestNonce, address)
 	if err != nil {
-		return false, err // TODO: add backoff to optimize requests
+		return false, err
 	}
 	if unconfirmedCount == 0 {
 		t.lggr.Debugf("All transactions confirmed for address: %v", address)
-		return true, err
+		return false, err  // TODO: add backoff to optimize requests
 	}
 
 	if tx == nil || tx.Nonce != latestNonce {
