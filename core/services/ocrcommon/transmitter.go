@@ -2,6 +2,7 @@ package ocrcommon
 
 import (
 	"context"
+	errors2 "errors"
 	"math/big"
 	"net/url"
 	"slices"
@@ -227,20 +228,21 @@ type ocr2FeedsDualTransmission struct {
 
 func (t *ocr2FeedsDualTransmission) CreateEthTransaction(ctx context.Context, toAddress common.Address, payload []byte, txMeta *txmgr.TxMeta) error {
 	// Primary transmission
-	err := t.transmitter.CreateEthTransaction(ctx, toAddress, payload, txMeta)
-	if err != nil {
-		return err
-	}
+	errPrimary := t.transmitter.CreateEthTransaction(ctx, toAddress, payload, txMeta)
+	errPrimary = errors.Wrap(errPrimary, "skipped primary transmission")
 
 	if txMeta == nil {
 		txMeta = &txmgr.TxMeta{}
 	}
 
-	txMeta.DualBroadcast = true
-	txMeta.DualBroadcastParams = t.urlParams()
+	dualBroadcast := true
+	dualBroadcastParams := t.urlParams()
+
+	txMeta.DualBroadcast = &dualBroadcast
+	txMeta.DualBroadcastParams = &dualBroadcastParams
 
 	// Secondary transmission
-	_, err = t.transmitter.txm.CreateTransaction(ctx, txmgr.TxRequest{
+	_, errSecondary := t.transmitter.txm.CreateTransaction(ctx, txmgr.TxRequest{
 		FromAddress:    t.secondaryFromAddress,
 		ToAddress:      t.secondaryContractAddress,
 		EncodedPayload: payload,
@@ -250,7 +252,8 @@ func (t *ocr2FeedsDualTransmission) CreateEthTransaction(ctx context.Context, to
 		Meta:           txMeta,
 	})
 
-	return errors.Wrap(err, "skipped secondary transmission")
+	errSecondary = errors.Wrap(errSecondary, "skipped secondary transmission")
+	return errors2.Join(errPrimary, errSecondary)
 }
 
 func (t *ocr2FeedsDualTransmission) FromAddress(ctx context.Context) common.Address {

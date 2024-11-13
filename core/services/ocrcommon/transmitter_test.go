@@ -229,8 +229,8 @@ func Test_DualTransmitter(t *testing.T) {
 		case secondaryFromAddress:
 			// Secondary transmission
 			assert.Equal(t, tx.ToAddress, secondaryContractAddress, "unexpected secondary toAddress")
-			assert.True(t, tx.Meta.DualBroadcast, "DualBroadcast should be true")
-			assert.Equal(t, "key1=value1&key2=value2&key2=value3&key3=value4&key3=value5&key3=value6", tx.Meta.DualBroadcastParams, "DualBroadcastParams not equal")
+			assert.True(t, *tx.Meta.DualBroadcast, "DualBroadcast should be true")
+			assert.Equal(t, "key1=value1&key2=value2&key2=value3&key3=value4&key3=value5&key3=value6", *tx.Meta.DualBroadcastParams, "DualBroadcastParams not equal")
 			secondaryTxConfirmed = true
 		default:
 			// Should never be reached
