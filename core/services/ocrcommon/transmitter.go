@@ -3,6 +3,7 @@ package ocrcommon
 import (
 	"context"
 	"math/big"
+	"net/url"
 	"slices"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -113,7 +114,7 @@ func NewOCR2FeedsTransmitter(
 
 	if dualTransmissionConfig != nil {
 		return &ocr2FeedsDualTransmission{
-			primaryTransmitter:       *baseTransmitter,
+			transmitter:              *baseTransmitter,
 			secondaryContractAddress: dualTransmissionConfig.ContractAddress,
 			secondaryFromAddress:     dualTransmissionConfig.TransmitterAddress,
 			secondaryMeta:            dualTransmissionConfig.Meta,
@@ -217,30 +218,35 @@ func (t *ocr2FeedsTransmitter) forwarderAddress(ctx context.Context, eoa, ocr2Ag
 }
 
 type ocr2FeedsDualTransmission struct {
-	primaryTransmitter ocr2FeedsTransmitter
+	transmitter ocr2FeedsTransmitter
 
 	secondaryContractAddress common.Address
 	secondaryFromAddress     common.Address
-	secondaryMeta            map[string]interface{}
+	secondaryMeta            map[string][]string
 }
 
 func (t *ocr2FeedsDualTransmission) CreateEthTransaction(ctx context.Context, toAddress common.Address, payload []byte, txMeta *txmgr.TxMeta) error {
 	//Primary transmission
-	err := t.primaryTransmitter.CreateEthTransaction(ctx, toAddress, payload, txMeta)
+	err := t.transmitter.CreateEthTransaction(ctx, toAddress, payload, txMeta)
 	if err != nil {
 		return err
 	}
+
+	if txMeta == nil {
+		txMeta = &txmgr.TxMeta{}
+	}
+
 	txMeta.DualBroadcast = true
-	txMeta.DualBroadcastParams = ""
+	txMeta.DualBroadcastParams = t.urlParams()
 
 	//Secondary transmission
-	_, err = t.primaryTransmitter.txm.CreateTransaction(ctx, txmgr.TxRequest{
+	_, err = t.transmitter.txm.CreateTransaction(ctx, txmgr.TxRequest{
 		FromAddress:    t.secondaryFromAddress,
 		ToAddress:      t.secondaryContractAddress,
 		EncodedPayload: payload,
-		FeeLimit:       t.primaryTransmitter.gasLimit,
-		Strategy:       t.primaryTransmitter.strategy,
-		Checker:        t.primaryTransmitter.checker,
+		FeeLimit:       t.transmitter.gasLimit,
+		Strategy:       t.transmitter.strategy,
+		Checker:        t.transmitter.checker,
 		Meta:           txMeta,
 	})
 
@@ -248,5 +254,15 @@ func (t *ocr2FeedsDualTransmission) CreateEthTransaction(ctx context.Context, to
 }
 
 func (t *ocr2FeedsDualTransmission) FromAddress(ctx context.Context) common.Address {
-	return t.primaryTransmitter.FromAddress(ctx)
+	return t.transmitter.FromAddress(ctx)
+}
+
+func (t *ocr2FeedsDualTransmission) urlParams() string {
+	values := url.Values{}
+	for k, v := range t.secondaryMeta {
+		for _, p := range v {
+			values.Add(k, p)
+		}
+	}
+	return values.Encode()
 }

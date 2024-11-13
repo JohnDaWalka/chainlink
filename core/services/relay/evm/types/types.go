@@ -193,9 +193,9 @@ func (c LLOConfigMode) String() string {
 }
 
 type DualTransmissionConfig struct {
-	ContractAddress    common.Address         `json:"contractAddress" toml:"contractAddress"`
-	TransmitterAddress common.Address         `json:"transmitterAddress" toml:"transmitterAddress"`
-	Meta               map[string]interface{} `json:"meta" toml:"meta"`
+	ContractAddress    common.Address      `json:"contractAddress" toml:"contractAddress"`
+	TransmitterAddress common.Address      `json:"transmitterAddress" toml:"transmitterAddress"`
+	Meta               map[string][]string `json:"meta" toml:"meta"`
 }
 
 type RelayConfig struct {
