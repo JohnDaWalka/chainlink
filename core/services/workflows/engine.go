@@ -1109,7 +1109,7 @@ func (e *Engine) Close() error {
 			innerErr := s.capability.UnregisterFromWorkflow(ctx, reg)
 			if innerErr != nil {
 				return &workflowError{err: innerErr,
-					reason: fmt.Sprintf("failed to unregister capability from workflow: %+v", reg),
+					reason: fmt.Sprintf("failed to unregister capability from  workflow: %+v", reg),
 					labels: map[string]string{
 						platform.KeyWorkflowID: e.workflow.id,
 						platform.KeyStepID:     s.ID,
