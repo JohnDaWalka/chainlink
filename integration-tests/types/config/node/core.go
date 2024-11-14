@@ -91,10 +91,9 @@ func WithPrivateEVMs(networks []blockchain.EVMNetwork, commonChainConfig *evmcfg
 	for _, network := range networks {
 		var evmNodes []*evmcfg.Node
 
+		// The CL node cannot have missing HTTP urls. If there are more WS URLs it will fail validation.
+		// If len(network.HTTPURLs) == 2 then len(network.URLs) must be 2 or less.
 		urlCount := len(network.HTTPURLs)
-		if len(network.URLs) > 0 {
-			urlCount = len(network.URLs)
-		}
 
 		for i := 0; i < urlCount; i++ {
 			node := &evmcfg.Node{
