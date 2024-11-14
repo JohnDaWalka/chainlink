@@ -58,7 +58,8 @@ func ConvertToTransaction(resp zktypes.TransactionResponse) *CustomTransaction {
 	customTransaction := CustomTransaction{Transaction: tx, CustomHash: resp.Hash}
 	return &customTransaction
 }
-func DeployZkSync%s(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated.CustomTransaction, *%s, error) {
+// this should generated.CustomTransaction
+func DeployZkSync%s(auth *bind.TransactOpts, backend bind.ContractBackend, params ...interface{}) (common.Address, *CustomTransaction, *%s, error) {
 	client, ok := backend.(*ethclient.Client)
 	if !ok {
 		return common.Address{}, nil, nil, errors.New("backend is not an ethclient")
@@ -71,7 +72,18 @@ func DeployZkSync%s(auth *bind.TransactOpts, backend bind.ContractBackend) (comm
 	fmt.Println("getting bytes")
 	decodedBytes := common.FromHex(%sZkBin)
 	fmt.Println("deploying")
-	hash, err := wallet.DeployWithCreate(nil, zkSyncAccounts.CreateTransaction{Bytecode: decodedBytes})
+	%sAbi, err := %sMetaData.GetAbi()
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	constructor, err := %sAbi.Pack("", params...)
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	hash, err := wallet.DeployWithCreate(nil, zkSyncAccounts.CreateTransaction{
+		Bytecode: decodedBytes,
+		Calldata: constructor,
+	})
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -85,7 +97,8 @@ func DeployZkSync%s(auth *bind.TransactOpts, backend bind.ContractBackend) (comm
 		return common.Address{}, nil, nil, err
 	}
 	fmt.Println("tx hash", tx.Hash)
-	ethTx := generated.ConvertToTransaction(*tx)
+	// this should generated.ConvertToTransaction
+	ethTx := ConvertToTransaction(*tx)
 	address := receipt.ContractAddress
 
 	parsed, err := %sMetaData.GetAbi()
@@ -395,6 +408,23 @@ func addContractStructFieldsToDeployMethod(contractName string, fileNode *ast.Fi
 	}, nil).(*ast.File)
 }
 
+func updateReturnStatements(funcDecl *ast.FuncDecl, params []ast.Expr) {
+	// Use ast.Inspect to traverse the entire function body
+	ast.Inspect(funcDecl.Body, func(n ast.Node) bool {
+		if returnStmt, ok := n.(*ast.ReturnStmt); ok {
+			fmt.Println("Found return statement")
+			if len(returnStmt.Results) > 0 {
+				if callExpr, ok := returnStmt.Results[0].(*ast.CallExpr); ok {
+					// Update the arguments of the DeployZkSync function call
+					fmt.Println("Updating DeployZkSync function call arguments")
+					callExpr.Args = params
+				}
+			}
+		}
+		return true
+	})
+}
+
 // Add the fields to the returned struct in the 'Deploy<contractName>' method.
 func addZKSyncLogic(contractName string, fset *token.FileSet, fileNode *ast.File) *ast.File {
 	return astutil.Apply(fileNode, func(cursor *astutil.Cursor) bool {
@@ -403,6 +433,14 @@ func addZKSyncLogic(contractName string, fset *token.FileSet, fileNode *ast.File
 			return true
 		} else if x.Name.Name != "Deploy"+contractName {
 			return false
+		}
+
+		// Extract the parameters from the existing function x
+		var params []ast.Expr
+		for _, param := range x.Type.Params.List {
+			for _, name := range param.Names {
+				params = append(params, ast.NewIdent(name.Name))
+			}
 		}
 
 		newCode := fmt.Sprintf(`
@@ -429,10 +467,19 @@ func addZKSyncLogic(contractName string, fset *token.FileSet, fileNode *ast.File
 			panic(err)
 		}
 
+		for _, decl := range tempNode.Decls {
+			if funcDecl, ok := decl.(*ast.FuncDecl); ok && funcDecl.Name.Name == "tempFunc" {
+				fmt.Println("Found function:", funcDecl.Name.Name)
+				// Update return statements
+				updateReturnStatements(funcDecl, params)
+			}
+		}
+
 		// Extract the body of the temporary function as statements
 		var newStatements []ast.Stmt
 		for _, decl := range tempNode.Decls {
 			if funcDecl, ok := decl.(*ast.FuncDecl); ok && funcDecl.Name.Name == "tempFunc" {
+
 				newStatements = funcDecl.Body.List
 				break
 			}
@@ -440,11 +487,14 @@ func addZKSyncLogic(contractName string, fset *token.FileSet, fileNode *ast.File
 		x.Body.List = append(newStatements, x.Body.List...)
 
 		// zksync
+		// x.Type.Results.List[1].Type = &ast.StarExpr{
+		// 	X: &ast.SelectorExpr{
+		// 		X:   &ast.Ident{Name: "generated"},
+		// 		Sel: &ast.Ident{Name: "CustomTransaction"},
+		// 	},
+		// }
 		x.Type.Results.List[1].Type = &ast.StarExpr{
-			X: &ast.SelectorExpr{
-				X:   &ast.Ident{Name: "generated"},
-				Sel: &ast.Ident{Name: "CustomTransaction"},
-			},
+			X: &ast.Ident{Name: "CustomTransaction"},
 		}
 
 		for _, stmt := range x.Body.List {
@@ -479,10 +529,7 @@ func addZKSyncLogic(contractName string, fset *token.FileSet, fileNode *ast.File
 				},
 			}
 			newRet := &ast.CompositeLit{
-				Type: &ast.SelectorExpr{
-					X:   &ast.Ident{Name: "generated"},
-					Sel: &ast.Ident{Name: "CustomTransaction"},
-				},
+				Type: &ast.Ident{Name: "CustomTransaction"},
 				Elts: []ast.Expr{txField, hashField},
 			}
 			pointerRet := &ast.UnaryExpr{Op: token.AND, X: newRet}
