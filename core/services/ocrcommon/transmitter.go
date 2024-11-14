@@ -3,6 +3,7 @@ package ocrcommon
 import (
 	"context"
 	errors2 "errors"
+	"fmt"
 	"math/big"
 	"net/url"
 	"slices"
@@ -229,8 +230,7 @@ type ocr2FeedsDualTransmission struct {
 func (t *ocr2FeedsDualTransmission) CreateEthTransaction(ctx context.Context, toAddress common.Address, payload []byte, txMeta *txmgr.TxMeta) error {
 	// Primary transmission
 	errPrimary := t.transmitter.CreateEthTransaction(ctx, toAddress, payload, txMeta)
-	errPrimary = errors.Wrap(errPrimary, "skipped primary transmission")
-
+	errPrimary = fmt.Errorf("skipped primary transmission: %w", errPrimary)
 	if txMeta == nil {
 		txMeta = &txmgr.TxMeta{}
 	}
