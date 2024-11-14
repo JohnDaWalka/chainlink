@@ -3,14 +3,11 @@
 # Directory to store compiled test binaries
 mkdir -p testsout
 
-TOOLS_PATH=${TOOLS_PATH:-"./tools"}
-GO_LDFLAGS=$(bash ${TOOLS_PATH}/bin/ldflags)
-
 # Find all packages with tests recursively
 testable_packages=$(go list ./... | grep -vE '/vendor|/testsout')
 
 # Set the concurrency limits
-build_concurrency=4
+BUILD_CONCURRENCY=${BUILD_CONCURRENCY:-"4"}
 # run_concurrency=4
 build_jobs=0
 # run_jobs=0
@@ -21,13 +18,13 @@ for pkg in $testable_packages; do
 
     # Compile test binary in the background
     echo "Compiling test for package $pkg"
-    go test -c -o "$output_file" -ldflags "$GO_LDFLAGS" -tags integration -vet=off "$pkg" &
+    go test -c -o "$output_file" -vet=off "$pkg" &
 
     # Increment the build job count
     build_jobs=$((build_jobs + 1))
 
     # If we've reached the build concurrency limit, wait for any job to finish
-    if [[ $build_jobs -ge $build_concurrency ]]; then
+    if [[ $build_jobs -ge $BUILD_CONCURRENCY ]]; then
         wait -n
         build_jobs=$((build_jobs - 1))
     fi
