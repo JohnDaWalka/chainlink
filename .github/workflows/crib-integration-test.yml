@@ -1,11 +1,11 @@
 name: CRIB Integration Tests
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/crib-integration-test.yml"
-  schedule:
-    - cron: "0 1 * * *"
   workflow_call:
+  workflow_dispatch:
+    inputs:
+      image-tag:
+        required: true
+        description: The chainlink docker image tag to test against
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -89,7 +89,7 @@ jobs:
           command: "core-dev-simulated-core-ocr1"
           crib-alert-slack-webhook: ${{ secrets.CRIB_ALERT_SLACK_WEBHOOK }}
           product-image: ${{ secrets.AWS_SDLC_ECR_HOSTNAME }}/chainlink
-          product-image-tag: develop
+          product-image-tag: ${{ inputs.image-tag }}
       - uses: actions/checkout@v4.2.1
       - name: Set up Go
         uses: ./.github/actions/setup-go
