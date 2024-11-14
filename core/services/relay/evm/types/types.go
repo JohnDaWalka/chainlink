@@ -223,8 +223,8 @@ type RelayConfig struct {
 	LLOConfigMode LLOConfigMode `json:"lloConfigMode" toml:"lloConfigMode"`
 
 	// DualTransmission specific
-	EnableDualTransmission bool                   `json:"enableDualTransmission" toml:"enableDualTransmission"`
-	DualTransmissionConfig DualTransmissionConfig `json:"dualTransmission" toml:"dualTransmission"`
+	EnableDualTransmission bool                    `json:"enableDualTransmission" toml:"enableDualTransmission"`
+	DualTransmissionConfig *DualTransmissionConfig `json:"dualTransmission" toml:"dualTransmission"`
 }
 
 var ErrBadRelayConfig = errors.New("bad relay config")
