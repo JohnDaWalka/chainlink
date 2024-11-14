@@ -199,9 +199,7 @@ func (r *server) getMessageHash(msg *types.MessageBody) ([32]byte, error) {
 
 	for _, path := range r.config.RequestHashExcludedAttributes {
 		if req.Inputs != nil {
-			if !req.Inputs.DeleteAtPath(path) {
-				return [32]byte{}, fmt.Errorf("failed to delete attribute from map at path: %s", path)
-			}
+			req.Inputs.DeleteAtPath(path)
 		}
 	}
 
