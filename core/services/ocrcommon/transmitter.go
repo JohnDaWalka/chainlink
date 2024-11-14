@@ -230,7 +230,10 @@ type ocr2FeedsDualTransmission struct {
 func (t *ocr2FeedsDualTransmission) CreateEthTransaction(ctx context.Context, toAddress common.Address, payload []byte, txMeta *txmgr.TxMeta) error {
 	// Primary transmission
 	errPrimary := t.transmitter.CreateEthTransaction(ctx, toAddress, payload, txMeta)
-	errPrimary = fmt.Errorf("skipped primary transmission: %w", errPrimary)
+	if errPrimary != nil {
+		errPrimary = fmt.Errorf("skipped primary transmission: %w", errPrimary)
+	}
+
 	if txMeta == nil {
 		txMeta = &txmgr.TxMeta{}
 	}
