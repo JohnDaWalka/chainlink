@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Directory to store compiled test binaries
+mkdir -p testsout
+
+TOOLS_PATH=${TOOLS_PATH:-"./tools"}
+GO_LDFLAGS=$(bash ${TOOLS_PATH}/bin/ldflags)
+
+# Find all packages with tests recursively
+testable_packages=$(go list ./... | grep -vE '/vendor|/testsout')
+
+# Compile test binaries for each package and handle naming conflicts
+for pkg in $testable_packages; do
+    output_file="testsout/$(echo $pkg | tr '/' '-')-test"  # Transform pkg path to a unique filename
+
+    # Compile test binary
+    echo "Compiling test for package $pkg"
+    go test -c -o "$output_file" -ldflags "$GO_LDFLAGS" -tags integration -vet=off  "$pkg"
+done
+
+# for binary in testsout/*-test; do
+    # echo "Running $binary"
+    # $binary -test.run . || exit 1  # Exit on failure
+# done

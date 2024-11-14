@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Directory to store compiled test binaries
+mkdir -p testsout
+
+TOOLS_PATH=${TOOLS_PATH:-"./tools"}
+GO_LDFLAGS=$(bash ${TOOLS_PATH}/bin/ldflags)
+
+# Find all packages with tests recursively
+testable_packages=$(go list ./... | grep -vE '/vendor|/testsout')
+
+# Set the concurrency limits
+build_concurrency=4
+# run_concurrency=4
+build_jobs=0
+# run_jobs=0
+
+# Compile test binaries for each package with controlled concurrency
+for pkg in $testable_packages; do
+    output_file="testsout/$(echo $pkg | tr '/' '-')-test"  # Transform pkg path to a unique filename
+
+    # Compile test binary in the background
+    echo "Compiling test for package $pkg"
+    go test -c -o "$output_file" -ldflags "$GO_LDFLAGS" -tags integration -vet=off "$pkg" &
+
+    # Increment the build job count
+    build_jobs=$((build_jobs + 1))
+
+    # If we've reached the build concurrency limit, wait for any job to finish
+    if [[ $build_jobs -ge $build_concurrency ]]; then
+        wait -n
+        build_jobs=$((build_jobs - 1))
+    fi
+done
+
+# Wait for all remaining build jobs to complete
+wait
+
+# Run all compiled test binaries with controlled concurrency
+# for binary in testsout/*-test; do
+    # echo "Running $binary"
+    # $binary -test.run . || exit 1 &
+
+    # Increment the run job count
+    # run_jobs=$((run_jobs + 1))
+
+    # If we've reached the run concurrency limit, wait for any job to finish
+    # if [[ $run_jobs -ge $run_concurrency ]]; then
+        # wait -n
+        # run_jobs=$((run_jobs - 1))
+    # fi
+# done
+
+# Wait for all remaining run jobs to complete
+wait

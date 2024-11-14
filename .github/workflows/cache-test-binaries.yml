@@ -1,0 +1,82 @@
+name: Test Binary Caching
+
+# Run on key branches to make sure integration is good, otherwise run on all PR's
+on:
+  pull_request:
+
+
+jobs:
+
+  build-test-binaries:
+    runs-on: ubuntu22.04-32cores-128GB
+    env:
+      # We explicitly have this env var not be "CL_DATABASE_URL" to avoid having it be used by core related tests
+      # when they should not be using it, while still allowing us to DRY up the setup
+      DB_URL: postgresql://postgres:postgres@localhost:5432/chainlink_test?sslmode=disable
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4.2.1
+
+      - name: Change Modtime of Files (cache optimization)
+        shell: bash
+        run: |
+          find . -type f,d -exec touch -r {} -d '1970-01-01T00:00:01' {} \; || true
+      
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          restore-build-cache-only: true
+          # piggy back on go_core_tests for caching
+          build-cache-version: 'go_core_tests'
+
+      - name: Build Test Binaries
+        shell: bash
+        env:
+          OUTPUT_FILE: ./output.txt
+          USE_TEE: false
+          CL_DATABASE_URL: ${{ env.DB_URL }}
+        run: |
+          ./tools/bin/build-test-binaries
+  
+      - name: Debug testsout
+        shell: bash
+        run: |
+          ls -lah ./testsout
+          du -ch ./testsout
+
+  build-test-binaries-concurrent:
+    runs-on: ubuntu22.04-32cores-128GB
+    env:
+      # We explicitly have this env var not be "CL_DATABASE_URL" to avoid having it be used by core related tests
+      # when they should not be using it, while still allowing us to DRY up the setup
+      DB_URL: postgresql://postgres:postgres@localhost:5432/chainlink_test?sslmode=disable
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4.2.1
+
+      - name: Change Modtime of Files (cache optimization)
+        shell: bash
+        run: |
+          find . -type f,d -exec touch -r {} -d '1970-01-01T00:00:01' {} \; || true
+      
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          restore-build-cache-only: true
+          # piggy back on go_core_tests for caching
+          build-cache-version: 'go_core_tests'
+      
+      - name: Build Test Binaries
+        shell: bash
+        env:
+          OUTPUT_FILE: ./output.txt
+          USE_TEE: false
+          CL_DATABASE_URL: ${{ env.DB_URL }}
+        run: |
+          ./tools/bin/build-test-binaries-with-concurrency
+
+      - name: Debug testsout
+        shell: bash
+        run: |
+          ls -lah ./testsout
+          du -ch ./testsout
