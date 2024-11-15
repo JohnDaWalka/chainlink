@@ -1657,12 +1657,14 @@ func (t *Tracing) ValidateConfig() (err error) {
 }
 
 type Telemetry struct {
-	Enabled            *bool
-	CACertFile         *string
-	Endpoint           *string
-	InsecureConnection *bool
-	ResourceAttributes map[string]string `toml:",omitempty"`
-	TraceSampleRatio   *float64
+	Enabled               *bool
+	CACertFile            *string
+	Endpoint              *string
+	InsecureConnection    *bool
+	ResourceAttributes    map[string]string `toml:",omitempty"`
+	TraceSampleRatio      *float64
+	EmitterBatchProcessor *bool
+	EmitterExportTimeout  *commonconfig.Duration
 }
 
 func (b *Telemetry) setFrom(f *Telemetry) {
@@ -1684,6 +1686,12 @@ func (b *Telemetry) setFrom(f *Telemetry) {
 	if v := f.TraceSampleRatio; v != nil {
 		b.TraceSampleRatio = v
 	}
+	if v := f.EmitterBatchProcessor; v != nil {
+		b.EmitterBatchProcessor = v
+	}
+	if v := f.EmitterExportTimeout; v != nil {
+		b.EmitterExportTimeout = v
+	}
 }
 
 func (b *Telemetry) ValidateConfig() (err error) {
@@ -1693,11 +1701,8 @@ func (b *Telemetry) ValidateConfig() (err error) {
 	if b.Endpoint == nil || *b.Endpoint == "" {
 		err = multierr.Append(err, configutils.ErrMissing{Name: "Endpoint", Msg: "must be set when Telemetry is enabled"})
 	}
-	if b.InsecureConnection != nil && *b.InsecureConnection {
-		if build.IsProd() {
-			err = multierr.Append(err, configutils.ErrInvalid{Name: "InsecureConnection", Value: true, Msg: "cannot be used in production builds"})
-		}
-	} else {
+	if b.InsecureConnection == nil || !*b.InsecureConnection {
+		// InsecureConnection is set and false
 		if b.CACertFile == nil || *b.CACertFile == "" {
 			err = multierr.Append(err, configutils.ErrMissing{Name: "CACertFile", Msg: "must be set, unless InsecureConnection is used"})
 		}

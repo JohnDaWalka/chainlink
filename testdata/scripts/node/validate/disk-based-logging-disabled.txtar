@@ -342,6 +342,8 @@ CACertFile = ''
 Endpoint = ''
 InsecureConnection = false
 TraceSampleRatio = 0.01
+EmitterBatchProcessor = true
+EmitterExportTimeout = '1s'
 
 [[EVM]]
 ChainID = '1'
@@ -425,8 +427,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [EVM.OCR]
