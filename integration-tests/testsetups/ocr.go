@@ -395,7 +395,7 @@ func (o *OCRSoakTest) setupOCRv2Contracts(ocrTestConfig tt.OcrTestConfig, forwar
 		o.log, o.seth, ocrTestConfig.GetActiveOCRConfig(), common.HexToAddress(o.linkContract.Address()), transmitters, ocrOffchainOptions,
 	)
 	require.NoError(o.t, err, "Error deploying OCRv2 contracts")
-	err = o.createOCRv2Jobs()
+	err = o.createOCRv2Jobs() // moving this to above `actions.ConfigureOCRv2AggregatorContracts(contractConfig, o.ocrV2Instances)` fixes the issue of trackconfig taking time
 	require.NoError(o.t, err, "Error creating OCR jobs")
 	if !ocrTestConfig.GetActiveOCRConfig().UseExistingOffChainAggregatorsContracts() || (ocrTestConfig.GetActiveOCRConfig().UseExistingOffChainAggregatorsContracts() && ocrTestConfig.GetActiveOCRConfig().ConfigureExistingOffChainAggregatorsContracts()) {
 		contractConfig, err := actions.BuildMedianOCR2Config(o.workerNodes, ocrOffchainOptions)
