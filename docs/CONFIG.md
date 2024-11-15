@@ -10301,6 +10301,7 @@ OCR2CacheTTL = '1m' # Default
 TxTimeout = '1m' # Default
 TxRetryTimeout = '10s' # Default
 TxConfirmTimeout = '30s' # Default
+TxRetentionTimeout = '0s' # Default
 SkipPreflight = true # Default
 Commitment = 'confirmed' # Default
 MaxRetries = 0 # Default
@@ -10369,6 +10370,12 @@ TxRetryTimeout is the duration for tx manager to attempt rebroadcasting to RPC, 
 TxConfirmTimeout = '30s' # Default
 ```
 TxConfirmTimeout is the duration to wait when confirming a tx signature, before discarding as unconfirmed.
+
+### TxRetentionTimeout
+```toml
+TxRetentionTimeout = '0s' # Default
+```
+TxRetentionTimeout is the duration to retain transactions in storage after being marked as finalized or errored. Set to 0 to immediately drop transactions.
 
 ### SkipPreflight
 ```toml

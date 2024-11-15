@@ -85,13 +85,17 @@ func (a *attemptBuilder) newCustomAttempt(
 
 func (a *attemptBuilder) newLegacyAttempt(ctx context.Context, tx *types.Transaction, gasPrice *assets.Wei, estimatedGasLimit uint64) (*types.Attempt, error) {
 	var data []byte
+	var toAddress common.Address
+	value := big.NewInt(0)
 	if !tx.IsPurgeable {
 		data = tx.Data
+		toAddress = tx.ToAddress
+		value = tx.Value
 	}
 	legacyTx := evmtypes.LegacyTx{
 		Nonce:    tx.Nonce,
-		To:       &tx.ToAddress,
-		Value:    tx.Value,
+		To:       &toAddress,
+		Value:    value,
 		Gas:      estimatedGasLimit,
 		GasPrice: gasPrice.ToInt(),
 		Data:     data,
@@ -115,13 +119,17 @@ func (a *attemptBuilder) newLegacyAttempt(ctx context.Context, tx *types.Transac
 
 func (a *attemptBuilder) newDynamicFeeAttempt(ctx context.Context, tx *types.Transaction, dynamicFee gas.DynamicFee, estimatedGasLimit uint64) (*types.Attempt, error) {
 	var data []byte
+	var toAddress common.Address
+	value := big.NewInt(0)
 	if !tx.IsPurgeable {
 		data = tx.Data
+		toAddress = tx.ToAddress
+		value = tx.Value
 	}
 	dynamicTx := evmtypes.DynamicFeeTx{
 		Nonce:     tx.Nonce,
-		To:        &tx.ToAddress,
-		Value:     tx.Value,
+		To:        &toAddress,
+		Value:     value,
 		Gas:       estimatedGasLimit,
 		GasFeeCap: dynamicFee.GasFeeCap.ToInt(),
 		GasTipCap: dynamicFee.GasTipCap.ToInt(),
