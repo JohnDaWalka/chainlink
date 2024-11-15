@@ -104,7 +104,10 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
 
   /// @notice event is emitted whenever a new Config is set
   event ConfigSet(
-    bytes32 indexed configDigest, address[] signers, uint8 f, Common.AddressAndWeight[] recipientAddressesAndWeights
+    bytes32 indexed configDigest,
+    address[] signers,
+    uint8 f,
+    Common.AddressAndWeight[] recipientAddressesAndWeights
   );
 
   /// @notice This event is emitted when a new fee manager is set
@@ -117,9 +120,7 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   /// @param newAccessController The new access controller address
   event AccessControllerSet(address oldAccessController, address newAccessController);
 
-  constructor(
-    address verifierProxy
-  ) ConfirmedOwner(msg.sender) {
+  constructor(address verifierProxy) ConfirmedOwner(msg.sender) {
     if (verifierProxy == address(0)) {
       revert ZeroAddress();
     }
@@ -167,7 +168,8 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
     address fm = s_feeManager;
     if (fm != address(0)) {
       //process the fee and catch the error
-      try IVerifierFeeManager(fm).processFeeBulk{value: msg.value}(donConfigs, signedReports, parameterPayload, sender)
+      try
+        IVerifierFeeManager(fm).processFeeBulk{value: msg.value}(donConfigs, signedReports, parameterPayload, sender)
       {
         //do nothing
       } catch {
@@ -180,8 +182,13 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   }
 
   function _verify(bytes calldata signedReport, address sender) internal returns (bytes memory, bytes32) {
-    (bytes32[3] memory reportContext, bytes memory reportData, bytes32[] memory rs, bytes32[] memory ss, bytes32 rawVs)
-    = abi.decode(signedReport, (bytes32[3], bytes, bytes32[], bytes32[], bytes32));
+    (
+      bytes32[3] memory reportContext,
+      bytes memory reportData,
+      bytes32[] memory rs,
+      bytes32[] memory ss,
+      bytes32 rawVs
+    ) = abi.decode(signedReport, (bytes32[3], bytes, bytes32[], bytes32[], bytes32));
 
     // Signature lengths must match
     if (rs.length != ss.length) revert MismatchedSignatures(rs.length, ss.length);
@@ -297,9 +304,7 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   }
 
   /// @inheritdoc IVerifier
-  function setFeeManager(
-    address feeManager
-  ) external override onlyOwner {
+  function setFeeManager(address feeManager) external override onlyOwner {
     if (!IERC165(feeManager).supportsInterface(type(IVerifierFeeManager).interfaceId)) revert FeeManagerInvalid();
 
     address oldFeeManager = s_feeManager;
@@ -309,9 +314,7 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   }
 
   /// @inheritdoc IVerifier
-  function setAccessController(
-    address accessController
-  ) external override onlyOwner {
+  function setAccessController(address accessController) external override onlyOwner {
     address oldAccessController = s_accessController;
     s_accessController = accessController;
     emit AccessControllerSet(oldAccessController, accessController);
@@ -351,18 +354,14 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
     _;
   }
 
-  modifier checkAccess(
-    address sender
-  ) {
+  modifier checkAccess(address sender) {
     address ac = s_accessController;
     if (address(ac) != address(0) && !IAccessController(ac).hasAccess(sender, msg.data)) revert AccessForbidden();
     _;
   }
 
   /// @inheritdoc IERC165
-  function supportsInterface(
-    bytes4 interfaceId
-  ) public pure override returns (bool) {
+  function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
     return interfaceId == type(IVerifier).interfaceId || interfaceId == type(IVerifierProxyVerifier).interfaceId;
   }
 

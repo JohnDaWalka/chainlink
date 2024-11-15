@@ -100,12 +100,7 @@ contract BaseFeeManagerTest is Test {
 
     feeManagerProxy = new FeeManagerProxy();
     rewardManager = new RewardManager(address(link));
-    feeManager = new FeeManager(
-      address(link),
-      address(native),
-      address(feeManagerProxy),
-      address(rewardManager)
-    );
+    feeManager = new FeeManager(address(link), address(native), address(feeManagerProxy), address(rewardManager));
 
     //link the feeManager to the proxy
     feeManagerProxy.setFeeManager(address(feeManager));

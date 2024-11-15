@@ -76,7 +76,10 @@ contract VerifierVerifyTest is BaseTest {
     signersSubset1[6] = signers[6];
     address[] memory signersAddrSubset1 = _getSignerAddresses(signersSubset1);
     s_verifier.setConfig(
-      bytes32(uint256(1)), signersAddrSubset1, MINIMAL_FAULT_TOLERANCE, new Common.AddressAndWeight[](0)
+      bytes32(uint256(1)),
+      signersAddrSubset1,
+      MINIMAL_FAULT_TOLERANCE,
+      new Common.AddressAndWeight[](0)
     );
 
     // only one signer, signers < MINIMAL_FAULT_TOLERANCE
@@ -102,7 +105,10 @@ contract VerifierVerifyTest is BaseTest {
     signersSubset1[6] = signers[6];
     address[] memory signersAddrSubset1 = _getSignerAddresses(signersSubset1);
     s_verifier.setConfig(
-      bytes32(uint256(1)), signersAddrSubset1, MINIMAL_FAULT_TOLERANCE, new Common.AddressAndWeight[](0)
+      bytes32(uint256(1)),
+      signersAddrSubset1,
+      MINIMAL_FAULT_TOLERANCE,
+      new Common.AddressAndWeight[](0)
     );
 
     // No signers for this report
@@ -127,7 +133,10 @@ contract VerifierVerifyTest is BaseTest {
     signersSubset1[6] = signers[6];
     address[] memory signersAddrSubset1 = _getSignerAddresses(signersSubset1);
     s_verifier.setConfig(
-      bytes32(uint256(1)), signersAddrSubset1, MINIMAL_FAULT_TOLERANCE, new Common.AddressAndWeight[](0)
+      bytes32(uint256(1)),
+      signersAddrSubset1,
+      MINIMAL_FAULT_TOLERANCE,
+      new Common.AddressAndWeight[](0)
     );
     // One signer is repeated
     BaseTest.Signer[] memory signersSubset2 = new BaseTest.Signer[](4);
@@ -157,7 +166,10 @@ contract VerifierVerifyTest is BaseTest {
     signersSubset1[6] = signers[6];
     address[] memory signersAddrSubset1 = _getSignerAddresses(signersSubset1);
     s_verifier.setConfig(
-      bytes32(uint256(1)), signersAddrSubset1, MINIMAL_FAULT_TOLERANCE, new Common.AddressAndWeight[](0)
+      bytes32(uint256(1)),
+      signersAddrSubset1,
+      MINIMAL_FAULT_TOLERANCE,
+      new Common.AddressAndWeight[](0)
     );
 
     // one report whose signer is not in the config

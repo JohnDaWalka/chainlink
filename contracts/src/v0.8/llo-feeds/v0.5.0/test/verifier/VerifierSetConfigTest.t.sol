@@ -15,7 +15,10 @@ contract VerifierSetConfigTest is BaseTest {
     Signer[] memory signers = _getSigners(MAX_ORACLES);
     changePrank(USER);
     s_verifier.setConfig(
-      bytes32(uint256(1)), _getSignerAddresses(signers), FAULT_TOLERANCE, new Common.AddressAndWeight[](0)
+      bytes32(uint256(1)),
+      _getSignerAddresses(signers),
+      FAULT_TOLERANCE,
+      new Common.AddressAndWeight[](0)
     );
   }
 

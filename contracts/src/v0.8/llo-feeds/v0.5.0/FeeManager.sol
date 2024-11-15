@@ -20,12 +20,7 @@ import {IVerifierFeeManager} from "./interfaces/IVerifierFeeManager.sol";
  * @author ad0ll
  * @notice This contract is used for the handling of fees required for users verifying reports.
  */
-contract FeeManager is
-IFeeManager,
-IVerifierFeeManager,
-  ConfirmedOwner,
-  TypeAndVersionInterface
-{
+contract FeeManager is IFeeManager, IVerifierFeeManager, ConfirmedOwner, TypeAndVersionInterface {
   using SafeERC20 for IERC20;
 
   /// @notice list of subscribers and their discounts subscriberDiscounts[subscriber][feedId][token]
@@ -172,9 +167,7 @@ IVerifierFeeManager,
 
   /// @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
-    return
-      interfaceId == type(IFeeManager).interfaceId ||
-      interfaceId == type(IVerifierFeeManager).interfaceId;
+    return interfaceId == type(IFeeManager).interfaceId || interfaceId == type(IVerifierFeeManager).interfaceId;
   }
 
   /// @inheritdoc IVerifierFeeManager
@@ -215,9 +208,7 @@ IVerifierFeeManager,
     //poolIDs are mapped to payloads, so they should be the same length
     if (poolIds.length != payloads.length) revert PoolIdMismatch();
 
-    IFeeManager.FeeAndReward[] memory feesAndRewards = new IFeeManager.FeeAndReward[](
-      payloads.length
-    );
+    IFeeManager.FeeAndReward[] memory feesAndRewards = new IFeeManager.FeeAndReward[](payloads.length);
 
     //keep track of the number of fees to prevent over initialising the FeePayment array within _convertToLinkAndNativeFees
     uint256 numberOfLinkFees;
@@ -234,12 +225,7 @@ IVerifierFeeManager,
       );
 
       if (fee.amount != 0) {
-        feesAndRewards[feesAndRewardsIndex++] = IFeeManager.FeeAndReward(
-          poolIds[i],
-          fee,
-          reward,
-          appliedDiscount
-        );
+        feesAndRewards[feesAndRewardsIndex++] = IFeeManager.FeeAndReward(poolIds[i], fee, reward, appliedDiscount);
 
         unchecked {
           //keep track of some tallys to make downstream calculations more efficient
@@ -433,12 +419,8 @@ IVerifierFeeManager,
     uint256 numberOfLinkFees,
     uint256 numberOfNativeFees
   ) internal {
-    IRewardManager.FeePayment[] memory linkRewards = new IRewardManager.FeePayment[](
-      numberOfLinkFees
-    );
-    IRewardManager.FeePayment[] memory nativeFeeLinkRewards = new IRewardManager.FeePayment[](
-      numberOfNativeFees
-    );
+    IRewardManager.FeePayment[] memory linkRewards = new IRewardManager.FeePayment[](numberOfLinkFees);
+    IRewardManager.FeePayment[] memory nativeFeeLinkRewards = new IRewardManager.FeePayment[](numberOfNativeFees);
 
     uint256 totalNativeFee;
     uint256 totalNativeFeeLinkValue;

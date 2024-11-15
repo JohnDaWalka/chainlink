@@ -11,7 +11,7 @@ import {IVerifierProxyVerifier} from "./interfaces/IVerifierProxyVerifier.sol";
  * @title VerifierProxy
  * @author Michael Fletcher
  * @author ad0ll
- * @notice This contract will be used to route all requests through to the assigned verifier contract. This contract does not support individual feed configurations and is aimed at being a simple proxy for the verifier contract on any chain. 
+ * @notice This contract will be used to route all requests through to the assigned verifier contract. This contract does not support individual feed configurations and is aimed at being a simple proxy for the verifier contract on any chain.
  */
 contract VerifierProxy is IVerifierProxy, ConfirmedOwner, TypeAndVersionInterface {
   /// @notice The active verifier for this proxy

@@ -33,8 +33,11 @@ contract VerifierVerifyBulkTest is BaseTest {
       abi.encodeWithSelector(AccessControllerInterface.hasAccess.selector, USER),
       abi.encode(false)
     );
-    bytes memory signedReport =
-      _generateV3EncodedBlob(s_testReportThree, s_reportContext, _getSigners(FAULT_TOLERANCE + 1));
+    bytes memory signedReport = _generateV3EncodedBlob(
+      s_testReportThree,
+      s_reportContext,
+      _getSigners(FAULT_TOLERANCE + 1)
+    );
 
     bytes[] memory signedReports = new bytes[](2);
     signedReports[0] = signedReport;
@@ -60,7 +63,10 @@ contract VerifierVerifyBulkTest is BaseTest {
     address[] memory signersAddrSubset1 = _getSignerAddresses(signersSubset1);
     // Config1
     s_verifier.setConfig(
-      bytes32(uint256(1)), signersAddrSubset1, MINIMAL_FAULT_TOLERANCE, new Common.AddressAndWeight[](0)
+      bytes32(uint256(1)),
+      signersAddrSubset1,
+      MINIMAL_FAULT_TOLERANCE,
+      new Common.AddressAndWeight[](0)
     );
 
     V3Report memory report = V3Report({
@@ -112,7 +118,10 @@ contract VerifierVerifyBulkTest is BaseTest {
     address[] memory signersAddrSubset1 = _getSignerAddresses(signersSubset1);
     // Config1
     s_verifier.setConfig(
-      bytes32(uint256(1)), signersAddrSubset1, MINIMAL_FAULT_TOLERANCE, new Common.AddressAndWeight[](0)
+      bytes32(uint256(1)),
+      signersAddrSubset1,
+      MINIMAL_FAULT_TOLERANCE,
+      new Common.AddressAndWeight[](0)
     );
 
     BaseTest.Signer[] memory reportSigners = new BaseTest.Signer[](3);

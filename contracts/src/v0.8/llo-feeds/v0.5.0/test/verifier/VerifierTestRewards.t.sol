@@ -35,21 +35,20 @@ contract VerifierBillingTests is VerifierWithFeeManager {
     s_testReport = generateReportAtTimestamp(block.timestamp);
   }
 
-  function generateReportAtTimestamp(
-    uint256 timestamp
-  ) public pure returns (V3Report memory) {
-    return V3Report({
-      feedId: FEED_ID_V3,
-      observationsTimestamp: OBSERVATIONS_TIMESTAMP,
-      validFromTimestamp: uint32(timestamp),
-      nativeFee: uint192(DEFAULT_REPORT_NATIVE_FEE),
-      linkFee: uint192(DEFAULT_REPORT_LINK_FEE),
-      // ask michael about this expires at, is it usually set at what blocks
-      expiresAt: uint32(timestamp) + 500,
-      benchmarkPrice: MEDIAN,
-      bid: BID,
-      ask: ASK
-    });
+  function generateReportAtTimestamp(uint256 timestamp) public pure returns (V3Report memory) {
+    return
+      V3Report({
+        feedId: FEED_ID_V3,
+        observationsTimestamp: OBSERVATIONS_TIMESTAMP,
+        validFromTimestamp: uint32(timestamp),
+        nativeFee: uint192(DEFAULT_REPORT_NATIVE_FEE),
+        linkFee: uint192(DEFAULT_REPORT_LINK_FEE),
+        // ask michael about this expires at, is it usually set at what blocks
+        expiresAt: uint32(timestamp) + 500,
+        benchmarkPrice: MEDIAN,
+        bid: BID,
+        ask: ASK
+      });
   }
 
   function getRecipientAndWeightsGroup2() public pure returns (Common.AddressAndWeight[] memory, address[] memory) {
@@ -150,7 +149,7 @@ contract VerifierBillingTests is VerifierWithFeeManager {
     assertEq(link.balanceOf(address(rewardManager)), 0);
   }
 
-//TODO Is this function still relevant?
+  //TODO Is this function still relevant?
   function test_rewardsAreDistributedAccordingToWeightsUsingHistoricalConfigs() public {
     /*
           Verifies that reports verified with historical give rewards according to the verifying config AddressAndWeight.

@@ -39,21 +39,20 @@ contract MultiVerifierBillingTests is MultipleVerifierWithMultipleFeeManagers {
     changePrank(originalAddr);
   }
 
-  function generateReportAtTimestamp(
-    uint256 timestamp
-  ) public pure returns (V3Report memory) {
-    return V3Report({
-      feedId: FEED_ID_V3,
-      observationsTimestamp: OBSERVATIONS_TIMESTAMP,
-      validFromTimestamp: uint32(timestamp),
-      nativeFee: uint192(DEFAULT_REPORT_NATIVE_FEE),
-      linkFee: uint192(DEFAULT_REPORT_LINK_FEE),
-      // ask michael about this expires at, is it usually set at what blocks
-      expiresAt: uint32(timestamp) + 500,
-      benchmarkPrice: MEDIAN,
-      bid: BID,
-      ask: ASK
-    });
+  function generateReportAtTimestamp(uint256 timestamp) public pure returns (V3Report memory) {
+    return
+      V3Report({
+        feedId: FEED_ID_V3,
+        observationsTimestamp: OBSERVATIONS_TIMESTAMP,
+        validFromTimestamp: uint32(timestamp),
+        nativeFee: uint192(DEFAULT_REPORT_NATIVE_FEE),
+        linkFee: uint192(DEFAULT_REPORT_LINK_FEE),
+        // ask michael about this expires at, is it usually set at what blocks
+        expiresAt: uint32(timestamp) + 500,
+        benchmarkPrice: MEDIAN,
+        bid: BID,
+        ask: ASK
+      });
   }
 
   function payRecipients(bytes32 poolId, address[] memory recipients, address sender) public {
