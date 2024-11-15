@@ -36,8 +36,12 @@ type OrchestratorKeystore interface {
 	EnabledAddressesForChain(ctx context.Context, chainID *big.Int) (addresses []common.Address, err error)
 }
 
-type OrchestratorAttemptBuilder interface {
+type OrchestratorAttemptBuilder[
+	BLOCK_HASH types.Hashable,
+	HEAD types.Head[BLOCK_HASH],
+] interface {
 	services.Service
+	OnNewLongestChain(ctx context.Context, head HEAD)
 }
 
 // Generics are necessary to keep TXMv2 backwards compatible
@@ -52,7 +56,7 @@ type Orchestrator[
 	txStore        OrchestratorTxStore
 	fwdMgr         *forwarders.FwdMgr
 	keystore       OrchestratorKeystore
-	attemptBuilder OrchestratorAttemptBuilder
+	attemptBuilder OrchestratorAttemptBuilder[BLOCK_HASH, HEAD]
 	resumeCallback txmgr.ResumeCallback
 }
 
@@ -63,7 +67,7 @@ func NewTxmOrchestrator[BLOCK_HASH types.Hashable, HEAD types.Head[BLOCK_HASH]](
 	txStore OrchestratorTxStore,
 	fwdMgr *forwarders.FwdMgr,
 	keystore OrchestratorKeystore,
-	attemptBuilder OrchestratorAttemptBuilder,
+	attemptBuilder OrchestratorAttemptBuilder[BLOCK_HASH, HEAD],
 ) *Orchestrator[BLOCK_HASH, HEAD] {
 	return &Orchestrator[BLOCK_HASH, HEAD]{
 		lggr:           logger.Sugared(logger.Named(lggr, "Orchestrator")),
@@ -152,6 +156,12 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) Reset(addr common.Address, abandon bool
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) OnNewLongestChain(ctx context.Context, head HEAD) {
+	ok := o.IfStarted(func() {
+		o.attemptBuilder.OnNewLongestChain(ctx, head)
+	})
+	if !ok {
+		o.lggr.Debugw("Not started; ignoring head", "head", head, "state", o.State())
+	}
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, request txmgrtypes.TxRequest[common.Address, common.Hash]) (tx txmgrtypes.Tx[*big.Int, common.Address, common.Hash, common.Hash, evmtypes.Nonce, gas.EvmFee], err error) {
