@@ -84,7 +84,7 @@ func (mc *moduleCache) reapLoop() {
 func (mc *moduleCache) add(id string, mod *module) {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
-	mod.lastFetchedAt = time.Now()
+	mod.lastFetchedAt = mc.clock.Now()
 	mc.m[id] = mod
 	moduleCacheAddition.Inc()
 }
