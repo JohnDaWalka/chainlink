@@ -352,7 +352,7 @@ func (e *Engine) init(ctx context.Context) {
 		}
 	}
 
-	e.logger.Info("engine initialized")
+	e.logger.Infof("engine initialized for %s", e.workflow.name)
 	logCustMsg(ctx, e.cma, "workflow registered", e.logger)
 	e.afterInit(true)
 }
