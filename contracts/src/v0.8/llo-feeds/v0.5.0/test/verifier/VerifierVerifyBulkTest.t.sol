@@ -12,7 +12,7 @@ contract VerifierVerifyBulkTest is BaseTest {
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_reportContext[0] = bytes32(uint256(1));
+    s_reportContext[0] = DEFAULT_CONFIG_DIGEST;
 
     s_testReportThree = V3Report({
       feedId: FEED_ID_V3,
@@ -63,7 +63,7 @@ contract VerifierVerifyBulkTest is BaseTest {
     address[] memory signersAddrSubset1 = _getSignerAddresses(signersSubset1);
     // Config1
     s_verifier.setConfig(
-      bytes32(uint256(1)),
+      DEFAULT_CONFIG_DIGEST,
       signersAddrSubset1,
       MINIMAL_FAULT_TOLERANCE,
       new Common.AddressAndWeight[](0)

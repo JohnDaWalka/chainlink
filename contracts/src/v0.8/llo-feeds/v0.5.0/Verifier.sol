@@ -132,16 +132,6 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
       revert ZeroAddress();
     }
 
-    // Proxy should support TypeAndVersion as we need to identify which proxy is calling
-    if(!IERC165(verifierProxy).supportsInterface(type(TypeAndVersionInterface).interfaceId))
-      revert VerifierProxyInvalid();
-
-    // If it's the v0.3 Proxy check it implements the V03 Interface
-    if (keccak256(bytes(TypeAndVersionInterface(verifierProxy).typeAndVersion())) == V03_PROXY_TYPE_AND_VERSION) {
-      if(!IERC165(verifierProxy).supportsInterface(type(IVerifierProxyV03).interfaceId))
-        revert VerifierProxyInvalid();
-    }
-
     i_verifierProxy = verifierProxy;
   }
 
@@ -376,8 +366,7 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
     return "Verifier 0.5.0";
   }
 
-  //  /// Utility function to get all configs off-chain
-  // TODO should we expose?
+  /// Utility function to get all configs off-chain
   function getAllConfigs(
     uint256 startIndex,
     uint256 endIndex

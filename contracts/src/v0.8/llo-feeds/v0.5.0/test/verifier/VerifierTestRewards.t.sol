@@ -31,7 +31,7 @@ contract VerifierBillingTests is VerifierWithFeeManager {
 
   function setUp() public virtual override {
     VerifierWithFeeManager.setUp();
-    s_reportContext[0] = bytes32(uint256(1));
+    s_reportContext[0] = DEFAULT_CONFIG_DIGEST;
     s_testReport = generateReportAtTimestamp(block.timestamp);
   }
 
@@ -92,9 +92,9 @@ contract VerifierBillingTests is VerifierWithFeeManager {
     address[] memory signerAddrs = _getSignerAddresses(signers);
     Common.AddressAndWeight[] memory weights = new Common.AddressAndWeight[](1);
     weights[0] = Common.AddressAndWeight(DEFAULT_RECIPIENT_1, ONE_PERCENT * 100);
-    s_verifier.setConfig(bytes32(uint256(1)), signerAddrs, FAULT_TOLERANCE, weights);
+    s_verifier.setConfig(DEFAULT_CONFIG_DIGEST, signerAddrs, FAULT_TOLERANCE, weights);
     bytes memory signedReport = _generateV3EncodedBlob(s_testReport, s_reportContext, signers);
-    bytes32 expectedDonConfigId = _donConfigIdFromConfigData(signerAddrs, FAULT_TOLERANCE);
+    bytes32 expectedDonConfigId = DEFAULT_CONFIG_DIGEST;
 
     _approveLink(address(rewardManager), DEFAULT_REPORT_LINK_FEE, USER);
     _verify(signedReport, address(link), 0, USER);
@@ -123,10 +123,10 @@ contract VerifierBillingTests is VerifierWithFeeManager {
     Signer[] memory signers = _getSigners(MAX_ORACLES);
     address[] memory signerAddrs = _getSignerAddresses(signers);
     (Common.AddressAndWeight[] memory weights, address[] memory recipients) = getRecipientAndWeightsGroup1();
-    s_verifier.setConfig(bytes32(uint256(1)), signerAddrs, FAULT_TOLERANCE, weights);
+    s_verifier.setConfig(DEFAULT_CONFIG_DIGEST, signerAddrs, FAULT_TOLERANCE, weights);
 
     bytes memory signedReport = _generateV3EncodedBlob(s_testReport, s_reportContext, signers);
-    bytes32 expectedDonConfigId = _donConfigIdFromConfigData(signerAddrs, FAULT_TOLERANCE);
+    bytes32 expectedDonConfigId = DEFAULT_CONFIG_DIGEST;
 
     uint256 number_of_reports_verified = 10;
 
@@ -149,7 +149,6 @@ contract VerifierBillingTests is VerifierWithFeeManager {
     assertEq(link.balanceOf(address(rewardManager)), 0);
   }
 
-  //TODO Is this function still relevant?
   function test_rewardsAreDistributedAccordingToWeightsUsingHistoricalConfigs() public {
     /*
           Verifies that reports verified with historical give rewards according to the verifying config AddressAndWeight.
@@ -165,12 +164,12 @@ contract VerifierBillingTests is VerifierWithFeeManager {
     (Common.AddressAndWeight[] memory weights, address[] memory recipients) = getRecipientAndWeightsGroup1();
 
     // Create ConfigA
-    s_verifier.setConfig(bytes32(uint256(1)), signerAddrs, MINIMAL_FAULT_TOLERANCE, weights);
+    s_verifier.setConfig(DEFAULT_CONFIG_DIGEST, signerAddrs, MINIMAL_FAULT_TOLERANCE, weights);
     vm.warp(block.timestamp + 100);
 
     V3Report memory testReportAtT1 = generateReportAtTimestamp(block.timestamp);
     bytes memory signedReportT1 = _generateV3EncodedBlob(testReportAtT1, s_reportContext, signers);
-    bytes32 expectedDonConfigIdA = _donConfigIdFromConfigData(signerAddrs, MINIMAL_FAULT_TOLERANCE);
+    bytes32 expectedDonConfigIdA = DEFAULT_CONFIG_DIGEST;
 
     uint256 number_of_reports_verified = 2;
 
@@ -181,9 +180,10 @@ contract VerifierBillingTests is VerifierWithFeeManager {
     address[] memory signerAddrs2 = _getSignerAddresses(signers2);
     (Common.AddressAndWeight[] memory weights2, address[] memory recipients2) = getRecipientAndWeightsGroup2();
 
+    bytes32 DUMMY_CONFIG_DIGEST = keccak256("DUMMY_CONFIG_DIGEST");
+
     // Create ConfigB
-    s_verifier.setConfig(bytes32(uint256(2)), signerAddrs2, MINIMAL_FAULT_TOLERANCE, weights2);
-    bytes32 expectedDonConfigIdB = _donConfigIdFromConfigData(signerAddrs2, MINIMAL_FAULT_TOLERANCE);
+    s_verifier.setConfig(DUMMY_CONFIG_DIGEST, signerAddrs2, MINIMAL_FAULT_TOLERANCE, weights2);
 
     V3Report memory testReportAtT2 = generateReportAtTimestamp(block.timestamp);
 
@@ -193,6 +193,8 @@ contract VerifierBillingTests is VerifierWithFeeManager {
       _verify(signedReportT1, address(link), 0, USER);
     }
 
+    s_reportContext[0] = DUMMY_CONFIG_DIGEST;
+
     // verifying using ConfigB (report with new timestamp)
     for (uint256 i = 0; i < number_of_reports_verified; i++) {
       _approveLink(address(rewardManager), DEFAULT_REPORT_LINK_FEE, USER);
@@ -201,7 +203,7 @@ contract VerifierBillingTests is VerifierWithFeeManager {
 
     uint256 expected_pool_amount = DEFAULT_REPORT_LINK_FEE * number_of_reports_verified;
     assertEq(rewardManager.s_totalRewardRecipientFees(expectedDonConfigIdA), expected_pool_amount);
-    assertEq(rewardManager.s_totalRewardRecipientFees(expectedDonConfigIdB), expected_pool_amount);
+    assertEq(rewardManager.s_totalRewardRecipientFees(DUMMY_CONFIG_DIGEST), expected_pool_amount);
 
     // check the recipients are paid according to weights
     payRecipients(expectedDonConfigIdA, recipients, ADMIN);
@@ -211,7 +213,7 @@ contract VerifierBillingTests is VerifierWithFeeManager {
       assertEq(link.balanceOf(recipients[i]), expected_pool_amount / 4);
     }
 
-    payRecipients(expectedDonConfigIdB, recipients2, ADMIN);
+    payRecipients(DUMMY_CONFIG_DIGEST, recipients2, ADMIN);
 
     for (uint256 i = 1; i < recipients2.length; i++) {
       // //each recipient should receive 1/4 of the pool

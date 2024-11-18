@@ -28,6 +28,8 @@ contract BaseTest is Test {
 
   uint8 internal constant FAULT_TOLERANCE = 10;
 
+  bytes32 internal DEFAULT_CONFIG_DIGEST = keccak256("DEFAULT_CONFIG_DIGEST");
+
   VerifierProxy internal s_verifierProxy;
   Verifier internal s_verifier;
   FeeManager internal feeManager;

@@ -76,7 +76,7 @@ contract VerifierInterfacesTest is VerifierWithFeeManager {
 
   function setUp() public virtual override {
     VerifierWithFeeManager.setUp();
-    s_reportContext[0] = bytes32(uint256(1));
+    s_reportContext[0] = DEFAULT_CONFIG_DIGEST;
     Signer[] memory signers = _getSigners(MAX_ORACLES);
 
     s_testReport = V3Report({
@@ -93,7 +93,7 @@ contract VerifierInterfacesTest is VerifierWithFeeManager {
     address[] memory signerAddrs = _getSignerAddresses(signers);
     Common.AddressAndWeight[] memory weights = new Common.AddressAndWeight[](1);
     weights[0] = Common.AddressAndWeight(DEFAULT_RECIPIENT_1, ONE_PERCENT * 100);
-    s_verifier.setConfig(bytes32(uint256(1)), signerAddrs, MINIMAL_FAULT_TOLERANCE, weights);
+    s_verifier.setConfig(DEFAULT_CONFIG_DIGEST, signerAddrs, MINIMAL_FAULT_TOLERANCE, weights);
     signedReport = _generateV3EncodedBlob(s_testReport, s_reportContext, signers);
 
     verifier = ITestVerifierProxy(address(s_verifierProxy));

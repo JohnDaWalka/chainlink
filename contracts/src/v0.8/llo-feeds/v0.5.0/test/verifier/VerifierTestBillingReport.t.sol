@@ -10,7 +10,7 @@ contract VerifierBillingTests is VerifierWithFeeManager {
 
   function setUp() public virtual override {
     VerifierWithFeeManager.setUp();
-    s_reportContext[0] = bytes32(uint256(1));
+    s_reportContext[0] = DEFAULT_CONFIG_DIGEST;
     s_testReportThree = V3Report({
       feedId: FEED_ID_V3,
       observationsTimestamp: OBSERVATIONS_TIMESTAMP,
@@ -28,9 +28,9 @@ contract VerifierBillingTests is VerifierWithFeeManager {
     Signer[] memory signers = _getSigners(MAX_ORACLES);
     address[] memory signerAddrs = _getSignerAddresses(signers);
     Common.AddressAndWeight[] memory weights = new Common.AddressAndWeight[](0);
-    s_verifier.setConfig(bytes32(uint256(1)), signerAddrs, FAULT_TOLERANCE, weights);
+    s_verifier.setConfig(DEFAULT_CONFIG_DIGEST, signerAddrs, FAULT_TOLERANCE, weights);
     bytes memory signedReport = _generateV3EncodedBlob(s_testReportThree, s_reportContext, signers);
-    bytes32 expectedDonConfigId = _donConfigIdFromConfigData(signerAddrs, FAULT_TOLERANCE);
+    bytes32 expectedDonConfigId = DEFAULT_CONFIG_DIGEST;
 
     _approveLink(address(rewardManager), DEFAULT_REPORT_LINK_FEE, USER);
     _verify(signedReport, address(link), 0, USER);
@@ -48,7 +48,7 @@ contract VerifierBillingTests is VerifierWithFeeManager {
     Common.AddressAndWeight[] memory weights = new Common.AddressAndWeight[](1);
     weights[0] = Common.AddressAndWeight(signerAddrs[0], ONE_PERCENT * 100);
 
-    s_verifier.setConfig(bytes32(uint256(1)), signerAddrs, FAULT_TOLERANCE, weights);
+    s_verifier.setConfig(DEFAULT_CONFIG_DIGEST, signerAddrs, FAULT_TOLERANCE, weights);
     bytes memory signedReport = _generateV3EncodedBlob(
       s_testReportThree,
       s_reportContext,
@@ -66,7 +66,7 @@ contract VerifierBillingTests is VerifierWithFeeManager {
     address[] memory signerAddrs = _getSignerAddresses(signers);
     Common.AddressAndWeight[] memory weights = new Common.AddressAndWeight[](0);
 
-    s_verifier.setConfig(bytes32(uint256(1)), signerAddrs, FAULT_TOLERANCE, weights);
+    s_verifier.setConfig(DEFAULT_CONFIG_DIGEST, signerAddrs, FAULT_TOLERANCE, weights);
     bytes memory signedReport = _generateV3EncodedBlob(
       s_testReportThree,
       s_reportContext,
@@ -83,7 +83,7 @@ contract VerifierBillingTests is VerifierWithFeeManager {
     address[] memory signerAddrs = _getSignerAddresses(signers);
     Common.AddressAndWeight[] memory weights = new Common.AddressAndWeight[](0);
 
-    s_verifier.setConfig(bytes32(uint256(1)), signerAddrs, FAULT_TOLERANCE, weights);
+    s_verifier.setConfig(DEFAULT_CONFIG_DIGEST, signerAddrs, FAULT_TOLERANCE, weights);
     bytes memory signedReport = _generateV3EncodedBlob(
       s_testReportThree,
       s_reportContext,
@@ -104,11 +104,11 @@ contract VerifierBulkVerifyBillingReport is VerifierWithFeeManager {
   function setUp() public virtual override {
     VerifierWithFeeManager.setUp();
     // setting a DonConfig we can reuse in the rest of tests
-    s_reportContext[0] = bytes32(uint256(1));
+    s_reportContext[0] = DEFAULT_CONFIG_DIGEST;
     Signer[] memory signers = _getSigners(MAX_ORACLES);
     address[] memory signerAddrs = _getSignerAddresses(signers);
     Common.AddressAndWeight[] memory weights = new Common.AddressAndWeight[](0);
-    s_verifier.setConfig(bytes32(uint256(1)), signerAddrs, FAULT_TOLERANCE, weights);
+    s_verifier.setConfig(DEFAULT_CONFIG_DIGEST, signerAddrs, FAULT_TOLERANCE, weights);
   }
 
   function test_verifyWithBulkLink() public {

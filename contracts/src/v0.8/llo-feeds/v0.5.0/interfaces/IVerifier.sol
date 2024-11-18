@@ -37,11 +37,4 @@ interface IVerifier is IERC165 {
    * @param isActive The new config active status
    */
   function setConfigActive(bytes32 configDigest, bool isActive) external;
-
-  //TODO Nested config giving me trouble
-  // /**
-  //  * @notice Returns all DON configurations
-  //  * @return array of DON configurations
-  //  */
-  // function getAllConfigs() external view returns (CommonV5.Config[] memory);
 }
