@@ -12,6 +12,7 @@ import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
  * @title RewardManager
  * @author Michael Fletcher
  * @author Austin Born
+ * @author ad0ll
  * @notice This contract will be used to reward any configured recipients within a pool. Recipients will receive a share of their pool relative to their configured weight.
  */
 contract RewardManager is IRewardManager, ConfirmedOwner, TypeAndVersionInterface {
@@ -39,7 +40,7 @@ contract RewardManager is IRewardManager, ConfirmedOwner, TypeAndVersionInterfac
   uint64 private constant PERCENTAGE_SCALAR = 1e18;
 
   // The fee manager address
-  address public s_feeManagerAddress;
+  mapping(address => address) public s_feeManagerAddressList;
 
   // @notice Thrown whenever the RewardRecipient weights are invalid
   error InvalidWeights();
@@ -75,26 +76,26 @@ contract RewardManager is IRewardManager, ConfirmedOwner, TypeAndVersionInterfac
 
   // @inheritdoc TypeAndVersionInterface
   function typeAndVersion() external pure override returns (string memory) {
-    return "RewardManager 1.1.0";
+    return "RewardManager 0.5.0";
   }
 
   // @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
-    return interfaceId == this.onFeePaid.selector;
+    return interfaceId == type(IRewardManager).interfaceId;
   }
 
   modifier onlyOwnerOrFeeManager() {
-    if (msg.sender != owner() && msg.sender != s_feeManagerAddress) revert Unauthorized();
+    if (msg.sender != s_feeManagerAddressList[msg.sender] && msg.sender != owner()) revert Unauthorized();
     _;
   }
 
   modifier onlyOwnerOrRecipientInPool(bytes32 poolId) {
-    if (msg.sender != owner() && s_rewardRecipientWeights[poolId][msg.sender] == 0) revert Unauthorized();
+    if (s_rewardRecipientWeights[poolId][msg.sender] == 0 && msg.sender != owner()) revert Unauthorized();
     _;
   }
 
   modifier onlyFeeManager() {
-    if (msg.sender != s_feeManagerAddress) revert Unauthorized();
+    if (msg.sender != s_feeManagerAddressList[msg.sender]) revert Unauthorized();
     _;
   }
 
@@ -103,12 +104,12 @@ contract RewardManager is IRewardManager, ConfirmedOwner, TypeAndVersionInterfac
     uint256 totalFeeAmount;
     for (uint256 i; i < payments.length; ++i) {
       unchecked {
-        //the total amount for any ERC-20 asset cannot exceed 2^256 - 1
-        //see https://github.com/OpenZeppelin/openzeppelin-contracts/blob/36bf1e46fa811f0f07d38eb9cfbc69a955f300ce/contracts/token/ERC20/ERC20.sol#L266
-        //for example implementation.
+      //the total amount for any ERC-20 asset cannot exceed 2^256 - 1
+      //see https://github.com/OpenZeppelin/openzeppelin-contracts/blob/36bf1e46fa811f0f07d38eb9cfbc69a955f300ce/contracts/token/ERC20/ERC20.sol#L266
+      //for example implementation.
         s_totalRewardRecipientFees[payments[i].poolId] += payments[i].amount;
 
-        //tally the total payable fees
+      //tally the total payable fees
         totalFeeAmount += payments[i].amount;
       }
     }
@@ -138,25 +139,25 @@ contract RewardManager is IRewardManager, ConfirmedOwner, TypeAndVersionInterfac
       uint256 totalFeesInPot = s_totalRewardRecipientFees[poolId];
 
       unchecked {
-        //avoid unnecessary storage reads if there's no fees in the pot
+      //avoid unnecessary storage reads if there's no fees in the pot
         if (totalFeesInPot == 0) continue;
 
-        //get the claimable amount for this recipient, this calculation will never exceed the amount in the pot
+      //get the claimable amount for this recipient, this calculation will never exceed the amount in the pot
         uint256 claimableAmount = totalFeesInPot - s_totalRewardRecipientFeesLastClaimedAmounts[poolId][recipient];
 
-        //calculate the recipients share of the fees, which is their weighted share of the difference between the last amount they claimed and the current amount in the pot. This can never be more than the total amount in existence
+      //calculate the recipients share of the fees, which is their weighted share of the difference between the last amount they claimed and the current amount in the pot. This can never be more than the total amount in existence
         uint256 recipientShare = (claimableAmount * s_rewardRecipientWeights[poolId][recipient]) / PERCENTAGE_SCALAR;
 
-        //if there's no fees to claim, continue as there's nothing to update
+      //if there's no fees to claim, continue as there's nothing to update
         if (recipientShare == 0) continue;
 
-        //keep track of the total amount claimable, this can never be more than the total amount in existence
+      //keep track of the total amount claimable, this can never be more than the total amount in existence
         claimAmount += recipientShare;
 
-        //set the current total amount of fees in the pot as it's used to calculate future claims
+      //set the current total amount of fees in the pot as it's used to calculate future claims
         s_totalRewardRecipientFeesLastClaimedAmounts[poolId][recipient] = totalFeesInPot;
 
-        //emit event if the recipient has rewards to claim
+      //emit event if the recipient has rewards to claim
         emit RewardsClaimed(poolIds[i], recipient, uint192(recipientShare));
       }
     }
@@ -216,7 +217,7 @@ contract RewardManager is IRewardManager, ConfirmedOwner, TypeAndVersionInterfac
       s_rewardRecipientWeights[poolId][recipientAddress] = recipientWeight;
 
       unchecked {
-        //keep track of the cumulative weight, this cannot overflow as the total weight is restricted at 1e18
+      //keep track of the cumulative weight, this cannot overflow as the total weight is restricted at 1e18
         totalWeight += recipientWeight;
       }
     }
@@ -246,7 +247,7 @@ contract RewardManager is IRewardManager, ConfirmedOwner, TypeAndVersionInterfac
       _claimRewards(newRewardRecipients[i].addr, poolIds);
 
       unchecked {
-        //keep tally of the weights so that the expected collective weight is known
+      //keep tally of the weights so that the expected collective weight is known
         existingTotalWeight += existingWeight;
       }
     }
@@ -271,12 +272,19 @@ contract RewardManager is IRewardManager, ConfirmedOwner, TypeAndVersionInterfac
   }
 
   /// @inheritdoc IRewardManager
-  function setFeeManager(address newFeeManagerAddress) external onlyOwner {
+  function addFeeManager(address newFeeManagerAddress) external onlyOwner {
     if (newFeeManagerAddress == address(0)) revert InvalidAddress();
+    if (s_feeManagerAddressList[newFeeManagerAddress] != address(0)) revert InvalidAddress();
 
-    s_feeManagerAddress = newFeeManagerAddress;
+    s_feeManagerAddressList[newFeeManagerAddress] = newFeeManagerAddress;
 
     emit FeeManagerUpdated(newFeeManagerAddress);
+  }
+
+  /// @inheritdoc IRewardManager
+  function removeFeeManager(address feeManagerAddress) external onlyOwner {
+    if (s_feeManagerAddressList[feeManagerAddress] == address(0)) revert InvalidAddress();
+    delete s_feeManagerAddressList[feeManagerAddress];
   }
 
   /// @inheritdoc IRewardManager
@@ -308,7 +316,7 @@ contract RewardManager is IRewardManager, ConfirmedOwner, TypeAndVersionInterfac
         uint256 totalPoolAmount = s_totalRewardRecipientFees[poolId];
         //if the recipient has any LINK, then add the poolId to the array
         unchecked {
-          //s_totalRewardRecipientFeesLastClaimedAmounts can never exceed total pool amount, and the number of pools can't exceed the max array length
+        //s_totalRewardRecipientFeesLastClaimedAmounts can never exceed total pool amount, and the number of pools can't exceed the max array length
           if (totalPoolAmount - s_totalRewardRecipientFeesLastClaimedAmounts[poolId][recipient] != 0) {
             claimablePoolIds[poolIdArrayIndex++] = poolId;
           }

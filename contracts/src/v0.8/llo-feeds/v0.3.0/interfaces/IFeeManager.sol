@@ -3,9 +3,8 @@ pragma solidity 0.8.19;
 
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC165.sol";
 import {Common} from "../../libraries/Common.sol";
-import {IVerifierFeeManager} from "./IVerifierFeeManager.sol";
 
-interface IFeeManager is IERC165, IVerifierFeeManager {
+interface IFeeManager is IERC165 {
   /**
    * @notice Calculate the applied fee and the reward from a report. If the sender is a subscriber, they will receive a discount.
    * @param subscriber address trying to verify
@@ -35,6 +34,14 @@ interface IFeeManager is IERC165, IVerifierFeeManager {
   function updateSubscriberDiscount(address subscriber, bytes32 feedId, address token, uint64 discount) external;
 
   /**
+   * @notice Adds a subscriber to the fee manager
+   * @param subscriber address of the subscriber
+   * @param token token to apply the discount to
+   * @param discount discount to be applied to the fee
+   */
+  function updateSubscriberGlobalDiscount(address subscriber, address token, uint64 discount) external;
+
+  /**
    * @notice Withdraws any native or LINK rewards to the owner address
    * @param assetAddress address of the asset to withdraw
    * @param recipientAddress address to withdraw to
@@ -53,6 +60,24 @@ interface IFeeManager is IERC165, IVerifierFeeManager {
    * @param configDigest the config digest to pay the deficit for
    */
   function payLinkDeficit(bytes32 configDigest) external;
+
+  /**
+   * @notice Adds the verifier to the list of verifiers able to use the feeManager
+   * @param verifier address of the verifier
+   */
+  function addVerifier(address verifier) external;
+
+  /**
+   * @notice Removes the verifier from the list of verifiers able to use the feeManager
+   * @param verifier address of the verifier
+   */
+  function removeVerifier(address verifier) external;
+
+  /**
+   * @notice Sets the reward manager to the address
+   * @param rewardManager address of the reward manager
+   */
+  function setRewardManager(address rewardManager) external;
 
   /**
    * @notice The structure to hold a fee and reward to verify a report

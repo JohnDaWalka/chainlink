@@ -2,28 +2,32 @@
 pragma solidity 0.8.19;
 
 import {ConfirmedOwner} from "../../shared/access/ConfirmedOwner.sol";
-import {IFeeManager} from "./interfaces/IFeeManager.sol";
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC165.sol";
 import {Common} from "../libraries/Common.sol";
-import {IRewardManager} from "./interfaces/IRewardManager.sol";
 import {IWERC20} from "../../shared/interfaces/IWERC20.sol";
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC20.sol";
 import {Math} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/math/Math.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IRewardManager} from "./interfaces/IRewardManager.sol";
+import {IFeeManager} from "./interfaces/IFeeManager.sol";
 import {IVerifierFeeManager} from "./interfaces/IVerifierFeeManager.sol";
 
 /**
  * @title FeeManager
  * @author Michael Fletcher
  * @author Austin Born
+ * @author ad0ll
  * @notice This contract is used for the handling of fees required for users verifying reports.
  */
-contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
+contract FeeManager is IFeeManager, IVerifierFeeManager, ConfirmedOwner, TypeAndVersionInterface {
   using SafeERC20 for IERC20;
 
   /// @notice list of subscribers and their discounts subscriberDiscounts[subscriber][feedId][token]
   mapping(address => mapping(bytes32 => mapping(address => uint256))) public s_subscriberDiscounts;
+
+  /// @notice map of global discounts
+  mapping(address => mapping(address => uint256)) public s_globalDiscounts;
 
   /// @notice keep track of any subsidised link that is owed to the reward manager.
   mapping(bytes32 => uint256) public s_linkDeficit;
@@ -37,11 +41,11 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
   /// @notice the native token address
   address public immutable i_nativeAddress;
 
-  /// @notice the proxy address
-  address public immutable i_proxyAddress;
+  /// @notice the verifier address
+  mapping(address => address) public s_verifierAddressList;
 
   /// @notice the reward manager address
-  IRewardManager public immutable i_rewardManager;
+  IRewardManager public i_rewardManager;
 
   // @notice the mask to apply to get the report version
   bytes32 private constant REPORT_VERSION_MASK = 0xffff000000000000000000000000000000000000000000000000000000000000;
@@ -78,6 +82,9 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
 
   /// @notice thrown when trying to pay an address that cannot except funds
   error InvalidReceivingAddress();
+
+  /// @notice thrown when trying to bulk verify reports where theres not a matching number of poolIds
+  error PoolIdMismatch();
 
   /// @notice Emitted whenever a subscriber's discount is updated
   /// @param subscriber address of the subscriber to update discounts for
@@ -124,48 +131,43 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
    * @notice Construct the FeeManager contract
    * @param _linkAddress The address of the LINK token
    * @param _nativeAddress The address of the wrapped ERC-20 version of the native token (represents fee in native or wrapped)
-   * @param _proxyAddress The address of the proxy contract
+   * @param _verifierAddress The address of the verifier contract
    * @param _rewardManagerAddress The address of the reward manager contract
    */
   constructor(
     address _linkAddress,
     address _nativeAddress,
-    address _proxyAddress,
+    address _verifierAddress,
     address _rewardManagerAddress
   ) ConfirmedOwner(msg.sender) {
     if (
       _linkAddress == address(0) ||
       _nativeAddress == address(0) ||
-      _proxyAddress == address(0) ||
+      _verifierAddress == address(0) ||
       _rewardManagerAddress == address(0)
     ) revert InvalidAddress();
 
     i_linkAddress = _linkAddress;
     i_nativeAddress = _nativeAddress;
-    i_proxyAddress = _proxyAddress;
+    s_verifierAddressList[_verifierAddress] = _verifierAddress;
     i_rewardManager = IRewardManager(_rewardManagerAddress);
 
     IERC20(i_linkAddress).approve(address(i_rewardManager), type(uint256).max);
   }
 
-  modifier onlyOwnerOrProxy() {
-    if (msg.sender != i_proxyAddress && msg.sender != owner()) revert Unauthorized();
-    _;
-  }
-
-  modifier onlyProxy() {
-    if (msg.sender != i_proxyAddress) revert Unauthorized();
+  modifier onlyVerifier() {
+    if (msg.sender != s_verifierAddressList[msg.sender]) revert Unauthorized();
     _;
   }
 
   /// @inheritdoc TypeAndVersionInterface
   function typeAndVersion() external pure override returns (string memory) {
-    return "FeeManager 2.0.0";
+    return "FeeManager 0.5.0";
   }
 
   /// @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
-    return interfaceId == this.processFee.selector || interfaceId == this.processFeeBulk.selector;
+    return interfaceId == type(IFeeManager).interfaceId || interfaceId == type(IVerifierFeeManager).interfaceId;
   }
 
   /// @inheritdoc IVerifierFeeManager
@@ -173,8 +175,19 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
     bytes calldata payload,
     bytes calldata parameterPayload,
     address subscriber
-  ) external payable override onlyProxy {
-    (Common.Asset memory fee, Common.Asset memory reward, uint256 appliedDiscount) = _processFee(
+  ) external payable {
+    bytes32 poolId = bytes32(payload);
+    processFee(poolId, payload, parameterPayload, subscriber);
+  }
+
+  /// @inheritdoc IVerifierFeeManager
+  function processFee(
+    bytes32 recipient,
+    bytes calldata payload,
+    bytes calldata parameterPayload,
+    address subscriber
+  ) public payable override onlyVerifier {
+    (Common.Asset memory fee, Common.Asset memory reward, uint256 appliedDiscount) = _calculateFee(
       payload,
       parameterPayload,
       subscriber
@@ -186,7 +199,7 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
     }
 
     IFeeManager.FeeAndReward[] memory feeAndReward = new IFeeManager.FeeAndReward[](1);
-    feeAndReward[0] = IFeeManager.FeeAndReward(bytes32(payload), fee, reward, appliedDiscount);
+    feeAndReward[0] = IFeeManager.FeeAndReward(recipient, fee, reward, appliedDiscount);
 
     if (fee.assetAddress == i_linkAddress) {
       _handleFeesAndRewards(subscriber, feeAndReward, 1, 0);
@@ -200,8 +213,28 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
     bytes[] calldata payloads,
     bytes calldata parameterPayload,
     address subscriber
-  ) external payable override onlyProxy {
-    FeeAndReward[] memory feesAndRewards = new IFeeManager.FeeAndReward[](payloads.length);
+  ) external payable override {
+    bytes32[] memory poolIds = new bytes32[](payloads.length);
+
+    for(uint256 i; i < poolIds.length; ++i) {
+      poolIds[i] = bytes32(payloads[i]);
+    }
+
+    processFeeBulk(poolIds, payloads, parameterPayload, subscriber);
+  }
+
+
+  /// @inheritdoc IVerifierFeeManager
+  function processFeeBulk(
+    bytes32[] memory poolIds,
+    bytes[] calldata payloads,
+    bytes calldata parameterPayload,
+    address subscriber
+  ) public payable override onlyVerifier {
+    //poolIDs are mapped to payloads, so they should be the same length
+    if (poolIds.length != payloads.length) revert PoolIdMismatch();
+
+    IFeeManager.FeeAndReward[] memory feesAndRewards = new IFeeManager.FeeAndReward[](payloads.length);
 
     //keep track of the number of fees to prevent over initialising the FeePayment array within _convertToLinkAndNativeFees
     uint256 numberOfLinkFees;
@@ -209,22 +242,19 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
 
     uint256 feesAndRewardsIndex;
     for (uint256 i; i < payloads.length; ++i) {
-      (Common.Asset memory fee, Common.Asset memory reward, uint256 appliedDiscount) = _processFee(
+      if (poolIds[i] == bytes32(0)) revert InvalidAddress();
+
+      (Common.Asset memory fee, Common.Asset memory reward, uint256 appliedDiscount) = _calculateFee(
         payloads[i],
         parameterPayload,
         subscriber
       );
 
       if (fee.amount != 0) {
-        feesAndRewards[feesAndRewardsIndex++] = IFeeManager.FeeAndReward(
-          bytes32(payloads[i]),
-          fee,
-          reward,
-          appliedDiscount
-        );
+        feesAndRewards[feesAndRewardsIndex++] = IFeeManager.FeeAndReward(poolIds[i], fee, reward, appliedDiscount);
 
         unchecked {
-          //keep track of some tallys to make downstream calculations more efficient
+        //keep track of some tallys to make downstream calculations more efficient
           if (fee.assetAddress == i_linkAddress) {
             ++numberOfLinkFees;
           } else {
@@ -282,8 +312,13 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
       revert ExpiredReport();
     }
 
-    //get the discount being applied
+    //check if feed discount has been applied
     uint256 discount = s_subscriberDiscounts[subscriber][feedId][quoteAddress];
+
+    if (discount == 0) {
+      //check if a global discount has been applied
+      discount = s_globalDiscounts[subscriber][quoteAddress];
+    }
 
     //the reward is always set in LINK
     reward.assetAddress = i_linkAddress;
@@ -308,7 +343,7 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
   function setFeeRecipients(
     bytes32 configDigest,
     Common.AddressAndWeight[] calldata rewardRecipientAndWeights
-  ) external onlyOwnerOrProxy {
+  ) external onlyVerifier {
     i_rewardManager.setRewardRecipients(configDigest, rewardRecipientAndWeights);
   }
 
@@ -336,6 +371,17 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
     s_subscriberDiscounts[subscriber][feedId][token] = discount;
 
     emit SubscriberDiscountUpdated(subscriber, feedId, token, discount);
+  }
+
+  function updateSubscriberGlobalDiscount(address subscriber, address token, uint64 discount) external onlyOwner {
+    //make sure the discount is not greater than the total discount that can be applied
+    if (discount > PERCENTAGE_SCALAR) revert InvalidDiscount();
+    //make sure the token is either LINK or native
+    if (token != i_linkAddress && token != i_nativeAddress) revert InvalidAddress();
+
+    s_globalDiscounts[subscriber][token] = discount;
+
+    emit SubscriberDiscountUpdated(subscriber, bytes32(0), token, discount);
   }
 
   /// @inheritdoc IFeeManager
@@ -369,7 +415,7 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
     return REPORT_VERSION_MASK & feedId;
   }
 
-  function _processFee(
+  function _calculateFee(
     bytes calldata payload,
     bytes calldata parameterPayload,
     address subscriber
@@ -395,7 +441,7 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
 
   function _handleFeesAndRewards(
     address subscriber,
-    FeeAndReward[] memory feesAndRewards,
+    IFeeManager.FeeAndReward[] memory feesAndRewards,
     uint256 numberOfLinkFees,
     uint256 numberOfNativeFees
   ) internal {
@@ -446,7 +492,7 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
       IWERC20(i_nativeAddress).deposit{value: totalNativeFee}();
 
       unchecked {
-        //msg.value is always >= to fee.amount
+      //msg.value is always >= to fee.amount
         change = msg.value - totalNativeFee;
       }
     } else {
@@ -466,7 +512,7 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
         // If not enough LINK on this contract to forward for rewards, tally the deficit to be paid by out-of-band LINK
         for (uint256 i; i < nativeFeeLinkRewards.length; ++i) {
           unchecked {
-            //we have previously tallied the fees, any overflows would have already reverted
+          //we have previously tallied the fees, any overflows would have already reverted
             s_linkDeficit[nativeFeeLinkRewards[i].poolId] += nativeFeeLinkRewards[i].amount;
           }
         }
@@ -503,5 +549,34 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
     i_rewardManager.onFeePaid(deficitFeePayment, address(this));
 
     emit LinkDeficitCleared(configDigest, deficit);
+  }
+
+  /// @inheritdoc IFeeManager
+  function addVerifier(address verifierAddress) external onlyOwner {
+    if (verifierAddress == address(0)) revert InvalidAddress();
+    //check doesn't already exist
+    if (s_verifierAddressList[verifierAddress] != address(0)) revert InvalidAddress();
+    s_verifierAddressList[verifierAddress] = verifierAddress;
+  }
+
+  /// @inheritdoc IFeeManager
+  function removeVerifier(address verifierAddress) external onlyOwner {
+    if (verifierAddress == address(0)) revert InvalidAddress();
+    //check doesn't already exist
+    if (s_verifierAddressList[verifierAddress] == address(0)) revert InvalidAddress();
+    delete s_verifierAddressList[verifierAddress];
+  }
+
+  /// @inheritdoc IFeeManager
+  function setRewardManager(address rewardManagerAddress) external onlyOwner {
+    if (rewardManagerAddress == address(0)) revert InvalidAddress();
+
+    if (!IERC165(rewardManagerAddress).supportsInterface(type(IRewardManager).interfaceId)) {
+      revert InvalidAddress();
+    }
+
+    IERC20(i_linkAddress).approve(address(i_rewardManager), 0);
+    i_rewardManager = IRewardManager(rewardManagerAddress);
+    IERC20(i_linkAddress).approve(address(rewardManagerAddress), type(uint256).max);
   }
 }
