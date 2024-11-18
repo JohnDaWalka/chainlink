@@ -12,6 +12,7 @@ import {CommonV5} from "./libraries/CommonV5.sol";
 import {IVerifier} from "./interfaces/IVerifier.sol";
 
 import {IVerifierFeeManager} from "./interfaces/IVerifierFeeManager.sol";
+import {IVerifierProxyV03} from "./interfaces/IVerifierProxyV03.sol";
 import {IVerifierProxy} from "./interfaces/IVerifierProxy.sol";
 import {IVerifierProxyVerifier} from "./interfaces/IVerifierProxyVerifier.sol";
 
@@ -26,10 +27,10 @@ uint256 constant MAX_NUM_ORACLES = 31;
  */
 contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndVersionInterface {
   /// @notice Mapping of configDigest to Config, used to look up the verification configuration for the configDigest of the incoming report
-  mapping(bytes32 => CommonV5.Config) private s_Configs;
+  mapping(bytes32 => CommonV5.Config) private s_configs;
 
   /// @notice Array of all configs, used in a convenience view function that returns all configs
-  CommonV5.Config[] private s_allConfigs;
+  bytes32[] private s_allConfigs;
 
   /// @notice The address of the verifierProxy
   address public s_feeManager;
@@ -37,8 +38,8 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   /// @notice The address of the access controller
   address public s_accessController;
 
-  /// @notice The address of the verifierProxy
-  IVerifierProxy public immutable i_verifierProxy;
+  /// @notice The address of the V0.3 verifierProxy
+  address public immutable i_verifierProxy;
 
   /// @notice This error is thrown whenever trying to set a config
   /// with a fault tolerance of 0
@@ -83,6 +84,9 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   /// not conform to the fee manager interface
   error FeeManagerInvalid();
 
+  /// @notice This error is thrown when the proxy is neither a valid v0.3 or v0.4 proxy
+  error VerifierProxyInvalid();
+
   /// @notice This error is thrown whenever an address tries
   /// to execute a verification that it is not authorized to do so
   error AccessForbidden();
@@ -93,7 +97,8 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   /// @notice This error is thrown when you try to call _setConfig with a configDigest of 0
   error BadConfigDigest();
 
-  error FunctionDeprecated();
+  /// @notice This error is thrown when trying to access a config that is out of bounds externally
+  error InvalidIndex();
 
   /// @notice This event is emitted when a new report is verified.
   /// It is used to keep a historical record of verified reports.
@@ -120,12 +125,24 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   /// @param newAccessController The new access controller address
   event AccessControllerSet(address oldAccessController, address newAccessController);
 
+  bytes32 constant V03_PROXY_TYPE_AND_VERSION = keccak256(bytes("VerifierProxy 2.0.0"));
+
   constructor(address verifierProxy) ConfirmedOwner(msg.sender) {
     if (verifierProxy == address(0)) {
       revert ZeroAddress();
     }
 
-    i_verifierProxy = IVerifierProxy(verifierProxy);
+    // Proxy should support TypeAndVersion as we need to identify which proxy is calling
+    if(!IERC165(verifierProxy).supportsInterface(type(TypeAndVersionInterface).interfaceId))
+      revert VerifierProxyInvalid();
+
+    // If it's the v0.3 Proxy check it implements the V03 Interface
+    if (keccak256(bytes(TypeAndVersionInterface(verifierProxy).typeAndVersion())) == V03_PROXY_TYPE_AND_VERSION) {
+      if(!IERC165(verifierProxy).supportsInterface(type(IVerifierProxyV03).interfaceId))
+        revert VerifierProxyInvalid();
+    }
+
+    i_verifierProxy = verifierProxy;
   }
 
   /// @inheritdoc IVerifierProxyVerifier
@@ -196,7 +213,7 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
     //Must always be at least 1 signer
     if (rs.length == 0) revert NoSigners();
 
-    // The payload is hashed and signed by the configDigest - we need to recover the addresses
+    // The payload is hashed and signed by the oracles - we need to recover the addresses
     bytes32 signedPayload = keccak256(abi.encodePacked(keccak256(reportData), reportContext));
     address[] memory signers = new address[](rs.length);
     for (uint256 i; i < rs.length; ++i) {
@@ -209,8 +226,7 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
     }
 
     // Find the config for this report
-    //TODO should this be storage?
-    CommonV5.Config storage config = s_Configs[reportContext[0]]; //reportContext[0] is the config digest
+    CommonV5.Config storage config = s_configs[reportContext[0]]; //reportContext[0] is the config digest
 
     // Check a config has been set
     if (config.configDigest == bytes32(0)) {
@@ -258,21 +274,19 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
     if (configDigest == bytes32(0)) {
       revert BadConfigDigest();
     }
-    //TODO Check if i_verifierProxy is v0.3 verifier. If it is, then we need to set the config on the verifierProxy
-    // Below doesn't work because interface is different between v0.3 and v0.4
-    // if(i_verifierProxy.typeAndVersion() == "VerifierProxy 0.3.0"){
-    //   i_verifierProxy.setVerifier(bytes32(0), configDigest, recipientAddressesAndWeights); //First param is currentConfigDigest, since all configs are new, this is always 0
-    // }
+
+    // If it's a v0.3 interface, register the verifier
+     if(keccak256(bytes(TypeAndVersionInterface(i_verifierProxy).typeAndVersion())) == V03_PROXY_TYPE_AND_VERSION){
+       IVerifierProxyV03(i_verifierProxy).setVerifier(bytes32(0), configDigest, recipientAddressesAndWeights); //First param is currentConfigDigest, since all configs are new, this is always 0
+     }
 
     // Duplicate addresses would break protocol rules
     if (Common._hasDuplicateAddresses(signers)) {
       revert NonUniqueSignatures();
     }
 
-    // Check the config we're setting isn't already set as the current active config as this will increase search costs unnecessarily when verifying historic reports
-    // TODO TEMPORARILY COMMENTED OUT SO WE CAN SMOKE TEST WITHOUT HAVING TO DEPLOY A NEW CONFIG
-    // UNCOMMENT BEFORE AUDIT
-    if (s_Configs[configDigest].configDigest != bytes32(0)) {
+    // Check the config does not already exist
+    if (s_configs[configDigest].configDigest != bytes32(0)) {
       revert ConfigAlreadyExists(configDigest);
     }
 
@@ -285,20 +299,18 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
     }
 
     // Store the config fields individually instead of struct assignment
-    s_Configs[configDigest].configDigest = configDigest;
-    s_Configs[configDigest].f = f;
-    s_Configs[configDigest].isActive = true;
+    s_configs[configDigest].configDigest = configDigest;
+    s_configs[configDigest].f = f;
+    s_configs[configDigest].isActive = true;
 
     // Generate signers mapping for the config, used to efficiently lookup whether a signer is allowed to appear when verifying a report
     for (uint256 i; i < signers.length; ++i) {
       if (signers[i] == address(0)) revert ZeroAddress();
-      s_Configs[configDigest].oracles[signers[i]] = true;
+      s_configs[configDigest].oracles[signers[i]] = true;
     }
-    // Note: the oracles mapping is already populated above
 
-    //TODO Nested mapping giving me trouble
-    // push the config to the convenience array used in getAllConfigs
-    // s_allConfigs.push(s_Configs[configDigest]);
+    // Keep track of all digests to enable easier querying off-chain
+    s_allConfigs.push(configDigest);
 
     emit ConfigSet(configDigest, signers, f, recipientAddressesAndWeights);
   }
@@ -323,7 +335,7 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   /// @inheritdoc IVerifier
   function setConfigActive(bytes32 configDigest, bool isActive) external onlyOwner {
     // Fetch config
-    CommonV5.Config storage config = s_Configs[configDigest];
+    CommonV5.Config storage config = s_configs[configDigest];
 
     // Check config is set before update
     if (config.configDigest == bytes32(0)) {
@@ -334,12 +346,6 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
     emit ConfigActivated(config.configDigest, isActive);
   }
 
-  //TODO Nested mappings giving me trouble
-  // /// @inheritdoc IVerifier
-  // function getAllConfigs() external view returns (CommonV5.Config[] memory) {
-  //   return s_allConfigs;
-  // }
-
   modifier checkConfigValid(uint256 numSigners, uint256 f) {
     if (f == 0) revert FaultToleranceMustBePositive();
     if (numSigners > MAX_NUM_ORACLES) revert ExcessSigners(numSigners, MAX_NUM_ORACLES);
@@ -348,7 +354,7 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   }
 
   modifier onlyProxy() {
-    if (address(i_verifierProxy) != msg.sender) {
+    if (i_verifierProxy != msg.sender) {
       revert AccessForbidden();
     }
     _;
@@ -368,5 +374,30 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   /// @inheritdoc TypeAndVersionInterface
   function typeAndVersion() external pure override returns (string memory) {
     return "Verifier 0.5.0";
+  }
+
+  //  /// Utility function to get all configs off-chain
+  // TODO should we expose?
+  function getAllConfigs(
+    uint256 startIndex,
+    uint256 endIndex
+  ) external view returns (bytes32[] memory) {
+    // Only EOA can read configs
+    if (msg.sender != tx.origin) revert AccessForbidden();
+
+    // Check bounds
+    if (startIndex > endIndex) revert InvalidIndex();
+    if (endIndex >= s_allConfigs.length) revert InvalidIndex();
+
+    // Calculate size of return array
+    uint256 size = endIndex - startIndex + 1;
+    bytes32[] memory configs = new bytes32[](size);
+
+    // Copy requested range
+    for (uint256 i; i < size; ++i) {
+      configs[i] = s_allConfigs[startIndex + i];
+    }
+
+    return configs;
   }
 }

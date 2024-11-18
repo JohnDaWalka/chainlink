@@ -20,6 +20,19 @@ interface IVerifierFeeManager is IERC165 {
   ) external payable;
 
   /**
+   * @notice Handles fees for a report from the subscriber and manages rewards. PoolId is retrieved from the first 32 bytes of the payload (configDigest).
+   * @param payload report to process the fee for
+   * @param parameterPayload fee payload
+   * @param subscriber address of the fee will be applied
+   */
+  function processFee(
+    bytes calldata payload,
+    bytes calldata parameterPayload,
+    address subscriber
+  ) external payable;
+
+
+  /**
    * @notice Processes the fees for each report in the payload, billing the subscriber and paying the reward manager
    * @param poolIds pool ids of the pool to pay into
    * @param payloads reports to process
@@ -32,6 +45,19 @@ interface IVerifierFeeManager is IERC165 {
     bytes calldata parameterPayload,
     address subscriber
   ) external payable;
+
+  /**
+   * @notice Processes the fees for each report in the payload, billing the subscriber and paying the reward manager. PoolIds are retrieved from the first 32 bytes of each payload (configDigest).
+   * @param payloads reports to process
+   * @param parameterPayload fee payload
+   * @param subscriber address of the user to process fee for
+   */
+  function processFeeBulk(
+    bytes[] calldata payloads,
+    bytes calldata parameterPayload,
+    address subscriber
+  ) external payable;
+
 
   /**
    * @notice Sets the fee recipients according to the fee manager

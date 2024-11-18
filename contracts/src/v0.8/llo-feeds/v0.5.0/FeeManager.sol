@@ -172,11 +172,21 @@ contract FeeManager is IFeeManager, IVerifierFeeManager, ConfirmedOwner, TypeAnd
 
   /// @inheritdoc IVerifierFeeManager
   function processFee(
+    bytes calldata payload,
+    bytes calldata parameterPayload,
+    address subscriber
+  ) external payable {
+    bytes32 poolId = bytes32(payload);
+    processFee(poolId, payload, parameterPayload, subscriber);
+  }
+
+  /// @inheritdoc IVerifierFeeManager
+  function processFee(
     bytes32 recipient,
     bytes calldata payload,
     bytes calldata parameterPayload,
     address subscriber
-  ) external payable override onlyVerifier {
+  ) public payable override onlyVerifier {
     (Common.Asset memory fee, Common.Asset memory reward, uint256 appliedDiscount) = _calculateFee(
       payload,
       parameterPayload,
@@ -200,11 +210,27 @@ contract FeeManager is IFeeManager, IVerifierFeeManager, ConfirmedOwner, TypeAnd
 
   /// @inheritdoc IVerifierFeeManager
   function processFeeBulk(
+    bytes[] calldata payloads,
+    bytes calldata parameterPayload,
+    address subscriber
+  ) external payable override {
+    bytes32[] memory poolIds = new bytes32[](payloads.length);
+
+    for(uint256 i; i < poolIds.length; ++i) {
+        poolIds[i] = bytes32(payloads[i]);
+    }
+
+    processFeeBulk(poolIds, payloads, parameterPayload, subscriber);
+  }
+
+
+  /// @inheritdoc IVerifierFeeManager
+  function processFeeBulk(
     bytes32[] memory poolIds,
     bytes[] calldata payloads,
     bytes calldata parameterPayload,
     address subscriber
-  ) external payable override onlyVerifier {
+  ) public payable override onlyVerifier {
     //poolIDs are mapped to payloads, so they should be the same length
     if (poolIds.length != payloads.length) revert PoolIdMismatch();
 

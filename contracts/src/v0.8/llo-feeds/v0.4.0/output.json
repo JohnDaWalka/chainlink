@@ -1,0 +1,820 @@
+{
+  "compiler": {
+    "version": "0.8.19+commit.7dd6d404"
+  },
+  "language": "Solidity",
+  "output": {
+    "abi": [
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "verifierProxy",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "AccessForbidden"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "BadActivationTime"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "BadVerification"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes24",
+            "name": "donConfigId",
+            "type": "bytes24"
+          }
+        ],
+        "type": "error",
+        "name": "DonConfigAlreadyExists"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "DonConfigDoesNotExist"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "numSigners",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "maxSigners",
+            "type": "uint256"
+          }
+        ],
+        "type": "error",
+        "name": "ExcessSigners"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "FaultToleranceMustBePositive"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "FeeManagerInvalid"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "numSigners",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minSigners",
+            "type": "uint256"
+          }
+        ],
+        "type": "error",
+        "name": "InsufficientSigners"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "rsLength",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "ssLength",
+            "type": "uint256"
+          }
+        ],
+        "type": "error",
+        "name": "MismatchedSignatures"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "NoSigners"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "NonUniqueSignatures"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "ZeroAddress"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "oldAccessController",
+            "type": "address",
+            "indexed": false
+          },
+          {
+            "internalType": "address",
+            "name": "newAccessController",
+            "type": "address",
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "AccessControllerSet",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes24",
+            "name": "donConfigId",
+            "type": "bytes24",
+            "indexed": false
+          },
+          {
+            "internalType": "bool",
+            "name": "isActive",
+            "type": "bool",
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "ConfigActivated",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes24",
+            "name": "donConfigId",
+            "type": "bytes24",
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "ConfigRemoved",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes24",
+            "name": "donConfigId",
+            "type": "bytes24",
+            "indexed": true
+          },
+          {
+            "internalType": "address[]",
+            "name": "signers",
+            "type": "address[]",
+            "indexed": false
+          },
+          {
+            "internalType": "uint8",
+            "name": "f",
+            "type": "uint8",
+            "indexed": false
+          },
+          {
+            "internalType": "struct Common.AddressAndWeight[]",
+            "name": "recipientAddressesAndWeights",
+            "type": "tuple[]",
+            "components": [
+              {
+                "internalType": "address",
+                "name": "addr",
+                "type": "address"
+              },
+              {
+                "internalType": "uint64",
+                "name": "weight",
+                "type": "uint64"
+              }
+            ],
+            "indexed": false
+          },
+          {
+            "internalType": "uint16",
+            "name": "donConfigIndex",
+            "type": "uint16",
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "ConfigSet",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "oldFeeManager",
+            "type": "address",
+            "indexed": false
+          },
+          {
+            "internalType": "address",
+            "name": "newFeeManager",
+            "type": "address",
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "FeeManagerSet",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "from",
+            "type": "address",
+            "indexed": true
+          },
+          {
+            "internalType": "address",
+            "name": "to",
+            "type": "address",
+            "indexed": true
+          }
+        ],
+        "type": "event",
+        "name": "OwnershipTransferRequested",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "from",
+            "type": "address",
+            "indexed": true
+          },
+          {
+            "internalType": "address",
+            "name": "to",
+            "type": "address",
+            "indexed": true
+          }
+        ],
+        "type": "event",
+        "name": "OwnershipTransferred",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes32",
+            "name": "feedId",
+            "type": "bytes32",
+            "indexed": true
+          },
+          {
+            "internalType": "address",
+            "name": "requester",
+            "type": "address",
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "ReportVerified",
+        "anonymous": false
+      },
+      {
+        "inputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "acceptOwnership"
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "i_verifierProxy",
+        "outputs": [
+          {
+            "internalType": "contract IDestinationVerifierProxy",
+            "name": "",
+            "type": "address"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "owner",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "removeLatestConfig"
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "s_accessController",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "s_feeManager",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "accessController",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "setAccessController"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address[]",
+            "name": "signers",
+            "type": "address[]"
+          },
+          {
+            "internalType": "uint8",
+            "name": "f",
+            "type": "uint8"
+          },
+          {
+            "internalType": "struct Common.AddressAndWeight[]",
+            "name": "recipientAddressesAndWeights",
+            "type": "tuple[]",
+            "components": [
+              {
+                "internalType": "address",
+                "name": "addr",
+                "type": "address"
+              },
+              {
+                "internalType": "uint64",
+                "name": "weight",
+                "type": "uint64"
+              }
+            ]
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "setConfig"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "donConfigIndex",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "isActive",
+            "type": "bool"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "setConfigActive"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address[]",
+            "name": "signers",
+            "type": "address[]"
+          },
+          {
+            "internalType": "uint8",
+            "name": "f",
+            "type": "uint8"
+          },
+          {
+            "internalType": "struct Common.AddressAndWeight[]",
+            "name": "recipientAddressesAndWeights",
+            "type": "tuple[]",
+            "components": [
+              {
+                "internalType": "address",
+                "name": "addr",
+                "type": "address"
+              },
+              {
+                "internalType": "uint64",
+                "name": "weight",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "internalType": "uint32",
+            "name": "activationTime",
+            "type": "uint32"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "setConfigWithActivationTime"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "feeManager",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "setFeeManager"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes4",
+            "name": "interfaceId",
+            "type": "bytes4"
+          }
+        ],
+        "stateMutability": "pure",
+        "type": "function",
+        "name": "supportsInterface",
+        "outputs": [
+          {
+            "internalType": "bool",
+            "name": "",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "to",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "transferOwnership"
+      },
+      {
+        "inputs": [],
+        "stateMutability": "pure",
+        "type": "function",
+        "name": "typeAndVersion",
+        "outputs": [
+          {
+            "internalType": "string",
+            "name": "",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes",
+            "name": "signedReport",
+            "type": "bytes"
+          },
+          {
+            "internalType": "bytes",
+            "name": "parameterPayload",
+            "type": "bytes"
+          },
+          {
+            "internalType": "address",
+            "name": "sender",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "payable",
+        "type": "function",
+        "name": "verify",
+        "outputs": [
+          {
+            "internalType": "bytes",
+            "name": "",
+            "type": "bytes"
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes[]",
+            "name": "signedReports",
+            "type": "bytes[]"
+          },
+          {
+            "internalType": "bytes",
+            "name": "parameterPayload",
+            "type": "bytes"
+          },
+          {
+            "internalType": "address",
+            "name": "sender",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "payable",
+        "type": "function",
+        "name": "verifyBulk",
+        "outputs": [
+          {
+            "internalType": "bytes[]",
+            "name": "",
+            "type": "bytes[]"
+          }
+        ]
+      }
+    ],
+    "devdoc": {
+      "kind": "dev",
+      "methods": {
+        "setAccessController(address)": {
+          "params": {
+            "accessController": "The address of the access controller"
+          }
+        },
+        "setConfig(address[],uint8,(address,uint64)[])": {
+          "params": {
+            "f": "number of faulty oracles the system can tolerate",
+            "recipientAddressesAndWeights": "the addresses and weights of all the recipients to receive rewards",
+            "signers": "addresses with which oracles sign the reports"
+          }
+        },
+        "setConfigActive(uint256,bool)": {
+          "params": {
+            "donConfigId": "The ID of the config to update",
+            "isActive": "The new config active status"
+          }
+        },
+        "setConfigWithActivationTime(address[],uint8,(address,uint64)[],uint32)": {
+          "params": {
+            "activationTime": "the time at which the config was activated",
+            "f": "number of faulty oracles the system can tolerate",
+            "recipientAddressesAndWeights": "the addresses and weights of all the recipients to receive rewards",
+            "signers": "addresses with which oracles sign the reports"
+          }
+        },
+        "setFeeManager(address)": {
+          "params": {
+            "feeManager": "The address of the fee manager"
+          }
+        },
+        "supportsInterface(bytes4)": {
+          "details": "Returns true if this contract implements the interface defined by `interfaceId`. See the corresponding https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified[EIP section] to learn more about how these ids are created. This function call must use less than 30 000 gas."
+        },
+        "verify(bytes,bytes,address)": {
+          "details": "Verification is typically only done through the proxy contract so we can't just use msg.sender.",
+          "params": {
+            "parameterPayload": "The encoded parameters to be used in the verification and billing process.",
+            "sender": "The address that requested to verify the contract.Used for logging and applying the fee.",
+            "signedReport": "The encoded data to be verified."
+          },
+          "returns": {
+            "_0": "The encoded verified response."
+          }
+        },
+        "verifyBulk(bytes[],bytes,address)": {
+          "details": "Verification is typically only done through the proxy contract so we can't just use msg.sender.",
+          "params": {
+            "parameterPayload": "The encoded parameters to be used in the verification and billing process.",
+            "sender": "The address that requested to verify the contract. Used for logging and applying the fee.",
+            "signedReports": "The encoded data to be verified."
+          },
+          "returns": {
+            "_0": "The encoded verified responses."
+          }
+        }
+      },
+      "version": 1
+    },
+    "userdoc": {
+      "kind": "user",
+      "methods": {
+        "acceptOwnership()": {
+          "notice": "Allows an ownership transfer to be completed by the recipient."
+        },
+        "i_verifierProxy()": {
+          "notice": "The address of the verifierProxy"
+        },
+        "owner()": {
+          "notice": "Get the current owner"
+        },
+        "removeLatestConfig()": {
+          "notice": "Removes the latest config"
+        },
+        "s_accessController()": {
+          "notice": "The address of the access controller"
+        },
+        "s_feeManager()": {
+          "notice": "The address of the verifierProxy"
+        },
+        "setAccessController(address)": {
+          "notice": "Sets the access controller address"
+        },
+        "setConfig(address[],uint8,(address,uint64)[])": {
+          "notice": "sets off-chain reporting protocol configuration incl. participating oracles"
+        },
+        "setConfigActive(uint256,bool)": {
+          "notice": "Updates the config active status"
+        },
+        "setConfigWithActivationTime(address[],uint8,(address,uint64)[],uint32)": {
+          "notice": "sets off-chain reporting protocol configuration incl. participating oracles"
+        },
+        "setFeeManager(address)": {
+          "notice": "Sets the fee manager address"
+        },
+        "transferOwnership(address)": {
+          "notice": "Allows an owner to begin transferring ownership to a new address."
+        },
+        "verify(bytes,bytes,address)": {
+          "notice": "Verifies that the data encoded has been signed correctly using the signatures included within the payload."
+        },
+        "verifyBulk(bytes[],bytes,address)": {
+          "notice": "Bulk verifies that the data encoded has been signed correctly using the signatures included within the payload."
+        }
+      },
+      "version": 1
+    }
+  },
+  "settings": {
+    "remappings": [
+      "@arbitrum/=node_modules/@arbitrum/",
+      "@eth-optimism/=node_modules/@eth-optimism/",
+      "@openzeppelin/=node_modules/@openzeppelin/",
+      "@scroll-tech/=node_modules/@scroll-tech/",
+      "forge-std/=src/v0.8/vendor/forge-std/src/",
+      "hardhat/=node_modules/hardhat/"
+    ],
+    "optimizer": {
+      "enabled": true,
+      "runs": 1000000
+    },
+    "metadata": {
+      "bytecodeHash": "none"
+    },
+    "compilationTarget": {
+      "src/v0.8/llo-feeds/v0.4.0/DestinationVerifier.sol": "DestinationVerifier"
+    },
+    "evmVersion": "paris",
+    "libraries": {}
+  },
+  "sources": {
+    "src/v0.8/interfaces/TypeAndVersionInterface.sol": {
+      "keccak256": "0x805cc9a91d54db1bea60cb19f38364f1eac2735bddb3476294fb803c2f6b7097",
+      "urls": [
+        "bzz-raw://05762f3335bb50fde2ece5ffbb735f22db35dc9489ea4716a4e731aa0aeee1e1",
+        "dweb:/ipfs/QmNu4sZk9T8PZYMn2BvxECF911hAviCjE2T846Zir8H7RB"
+      ],
+      "license": "MIT"
+    },
+    "src/v0.8/llo-feeds/libraries/Common.sol": {
+      "keccak256": "0xc62ed807abb37c89f59c93eaaf8bd08e9e424c8451614d936247a31468e3e1d3",
+      "urls": [
+        "bzz-raw://7b27a40291586a6b6ae313308d31ab0a994c4c9d1ce542eaf80df1cf8d3c364e",
+        "dweb:/ipfs/QmZEkT2Cy2mQE3WPKtoB9pUJtSdreWXCZ6c4xy8YvbkF5E"
+      ],
+      "license": "MIT"
+    },
+    "src/v0.8/llo-feeds/v0.4.0/DestinationVerifier.sol": {
+      "keccak256": "0x67d621c4b1a813e98df66aa49dbc782dc065609ecbf756a8f9d35e310bac607a",
+      "urls": [
+        "bzz-raw://eaac54ab4bdb5eeca140a97de3d6093970d96b107b9f2c22555e2a43f32c5363",
+        "dweb:/ipfs/QmWWu7cz7f7HENSTWfpK4kJabU4zgx7EwKWZUzK5XjMd67"
+      ],
+      "license": "MIT"
+    },
+    "src/v0.8/llo-feeds/v0.4.0/interfaces/IDestinationVerifier.sol": {
+      "keccak256": "0x3ce59799aa111866c4406aa404a90c2c8db41008ef080829491338da8409bd5a",
+      "urls": [
+        "bzz-raw://feebec4557c6c0251301b7c1ade2ce1e94434a6f4ae246785560da298266fbf7",
+        "dweb:/ipfs/QmduKruDFCM1XmtdMDZi5NevFcnVhG66MiT115SiqBBKgC"
+      ],
+      "license": "MIT"
+    },
+    "src/v0.8/llo-feeds/v0.4.0/interfaces/IDestinationVerifierFeeManager.sol": {
+      "keccak256": "0x55d78909877c0c4d2519aab956cfccabaaa6c0763c58a410acf118f90b1990a6",
+      "urls": [
+        "bzz-raw://99e6fd7693b264db0a173dcb229b8eb8d07c782b685fe21046a21b05e891bcaf",
+        "dweb:/ipfs/QmUajistuCUATFbmXVGtFB9BBM1FqSKAgbxHbsKrF1DYdA"
+      ],
+      "license": "MIT"
+    },
+    "src/v0.8/llo-feeds/v0.4.0/interfaces/IDestinationVerifierProxy.sol": {
+      "keccak256": "0x7774f6c4c32fa6f577c4be6679ca2eecd37617d42a9c235e219e55f281229fb4",
+      "urls": [
+        "bzz-raw://2795aecf936121b7c19d6d367a997f333d875bbb272d6007f446a080752ebf3b",
+        "dweb:/ipfs/QmREk7kKfYDw3ngqVtsnPfAMpcNL53cCAVwJb7zrmj5No5"
+      ],
+      "license": "MIT"
+    },
+    "src/v0.8/llo-feeds/v0.4.0/interfaces/IDestinationVerifierProxyVerifier.sol": {
+      "keccak256": "0x733816deb843e1a96d301727489198fcb6fa8133372e247c1dc14940015f9171",
+      "urls": [
+        "bzz-raw://fbd226966cb1147bce156274a4ed2d8f7c3e892d9de3b9b6f75370e3c4f5e438",
+        "dweb:/ipfs/QmQSgFTGyXUBtJwpvQL7FxqtAFFZtVfyEzLHBBjhtaKKDp"
+      ],
+      "license": "MIT"
+    },
+    "src/v0.8/shared/access/ConfirmedOwner.sol": {
+      "keccak256": "0xdcb0e9135ddbe71ee27ba99fa06656960c66c964cf2ecb29696da1c1427d9861",
+      "urls": [
+        "bzz-raw://f914a1b638300e82d8f5a020a4195235599afebab4ef1e10c6992f3c90e7df3e",
+        "dweb:/ipfs/Qmf2MbuVB16qbCGii3U5cjcBvVjAHHYzKp9voJa2eDch9B"
+      ],
+      "license": "MIT"
+    },
+    "src/v0.8/shared/access/ConfirmedOwnerWithProposal.sol": {
+      "keccak256": "0x2422a055657a87e98be61f8f31abb1824ec50fd0f73949f4e3c6ac877efb6da8",
+      "urls": [
+        "bzz-raw://fde3b9ac3a4c42ea43e2f92b037d32ab20e30818471c6e20d2590147a6c2958a",
+        "dweb:/ipfs/QmQ2ohQP4GnhPUsiWCvCfb1dsoGYDdxSap3dxtnYTV4rmT"
+      ],
+      "license": "MIT"
+    },
+    "src/v0.8/shared/interfaces/IAccessController.sol": {
+      "keccak256": "0x2bdd0e819a586c8a0f326f227157197e3ded4f0e2c75117cc04fded3cb07ed81",
+      "urls": [
+        "bzz-raw://0e27d99e49f62a445fc415eaa7f07b9eb475f1e3fe61e2f1187391e187d7fb8a",
+        "dweb:/ipfs/QmRQdCivLYqH5dv5oox7FV6vK8zYN4hPHEYAjeAort48M2"
+      ],
+      "license": "MIT"
+    },
+    "src/v0.8/shared/interfaces/IOwnable.sol": {
+      "keccak256": "0x885de72b7b4e4f1bf8ba817a3f2bcc37fd9022d342c4ce76782151c30122d767",
+      "urls": [
+        "bzz-raw://17c636625a5d29a140612db496d2cca9fb4b48c673adb0fd7b3957d287e75921",
+        "dweb:/ipfs/QmNoBX8TY424bdQWyQC7y3kpKfgxyWxhLw7KEhhEEoBN9q"
+      ],
+      "license": "MIT"
+    },
+    "src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC165.sol": {
+      "keccak256": "0x34568ee847aaa6b80e18743f8e216a60420c201364cff3b14965835b92681831",
+      "urls": [
+        "bzz-raw://4e4000df7513871b3e8f456f0da0dc3550a72dc010867fd49ab49e8b4d08a7bc",
+        "dweb:/ipfs/QmQCLsQehJCcuc5QRCqEdCogXTdnyhvLzkvs7c3qdNULQV"
+      ],
+      "license": "MIT"
+    },
+    "src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol": {
+      "keccak256": "0xa36a31b4bb17fad88d023474893b3b895fa421650543b1ce5aefc78efbd43244",
+      "urls": [
+        "bzz-raw://0f235b9175d95111f301d729566e214c32559e55a2b0579c947484748e20679d",
+        "dweb:/ipfs/QmSsNBuPejy1wNe2u3JSt2p9wFhrjvBjFrnAaNe1nDNkEA"
+      ],
+      "license": "MIT"
+    }
+  },
+  "version": 1
+}
