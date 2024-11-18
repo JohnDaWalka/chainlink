@@ -10,7 +10,8 @@ import {IDestinationVerifierProxyVerifier} from "./interfaces/IDestinationVerifi
 /**
  * @title DestinationVerifierProxy
  * @author Michael Fletcher
- * @notice This contract will be used to route all requests through to the assigned verifier contract. This contract does not support individual feed configurations and is aimed at being a simple proxy for the verifier contract on any destination chain.
+ * @author ad0ll
+ * @notice This contract will be used to route all requests through to the assigned verifier contract. This contract does not support individual feed configurations and is aimed at being a simple proxy for the verifier contract on any chain.
  */
 contract DestinationVerifierProxy is IDestinationVerifierProxy, ConfirmedOwner, TypeAndVersionInterface {
   /// @notice The active verifier for this proxy
@@ -26,7 +27,7 @@ contract DestinationVerifierProxy is IDestinationVerifierProxy, ConfirmedOwner, 
 
   /// @inheritdoc TypeAndVersionInterface
   function typeAndVersion() external pure override returns (string memory) {
-    return "DestinationVerifierProxy 0.4.0";
+    return "DestinationVerifierProxy 0.5.0";
   }
 
   /// @inheritdoc IDestinationVerifierProxy

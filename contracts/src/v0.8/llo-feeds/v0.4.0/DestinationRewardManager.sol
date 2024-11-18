@@ -12,6 +12,7 @@ import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
  * @title DestinationRewardManager
  * @author Michael Fletcher
  * @author Austin Born
+ * @author ad0ll
  * @notice This contract will be used to reward any configured recipients within a pool. Recipients will receive a share of their pool relative to their configured weight.
  */
 contract DestinationRewardManager is IDestinationRewardManager, ConfirmedOwner, TypeAndVersionInterface {
@@ -75,7 +76,7 @@ contract DestinationRewardManager is IDestinationRewardManager, ConfirmedOwner, 
 
   // @inheritdoc TypeAndVersionInterface
   function typeAndVersion() external pure override returns (string memory) {
-    return "DestinationRewardManager 0.4.0";
+    return "DestinationRewardManager 0.5.0";
   }
 
   // @inheritdoc IERC165

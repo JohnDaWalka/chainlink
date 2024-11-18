@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC165.sol";
 import {Common} from "../../libraries/Common.sol";
 
-interface IDestinationFeeManager is IERC165 {
+interface IDestinationDestinationFeeManager is IERC165 {
   /**
    * @notice Calculate the applied fee and the reward from a report. If the sender is a subscriber, they will receive a discount.
    * @param subscriber address trying to verify

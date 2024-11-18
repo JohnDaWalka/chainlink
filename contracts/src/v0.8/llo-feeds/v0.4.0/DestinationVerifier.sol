@@ -1,15 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {ConfirmedOwner} from "../../shared/access/ConfirmedOwner.sol";
-import {IDestinationVerifier} from "./interfaces/IDestinationVerifier.sol";
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
+import {ConfirmedOwner} from "../../shared/access/ConfirmedOwner.sol";
+
+import {IAccessController} from "../../shared/interfaces/IAccessController.sol";
 import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC165.sol";
 import {Common} from "../libraries/Common.sol";
-import {IAccessController} from "../../shared/interfaces/IAccessController.sol";
-import {IDestinationVerifierProxy} from "./interfaces/IDestinationVerifierProxy.sol";
-import {IDestinationVerifierProxyVerifier} from "./interfaces/IDestinationVerifierProxyVerifier.sol";
+import {CommonV5} from "./libraries/CommonV5.sol";
+
+import {IDestinationVerifier} from "./interfaces/IDestinationVerifier.sol";
+
 import {IDestinationVerifierFeeManager} from "./interfaces/IDestinationVerifierFeeManager.sol";
+import {IDestinationVerifierProxyV03} from "./interfaces/IDestinationVerifierProxyV03.sol";
+import {IDestinationVerifierProxy} from "./interfaces/IDestinationVerifierProxy.sol";
+import {IDestinationVerifierProxyDestinationVerifier} from "./interfaces/IDestinationVerifierProxyDestinationVerifier.sol";
 
 // OCR2 standard
 uint256 constant MAX_NUM_ORACLES = 31;
@@ -17,19 +22,15 @@ uint256 constant MAX_NUM_ORACLES = 31;
 /**
  * @title DestinationVerifier
  * @author Michael Fletcher
- * @notice This contract will be used to verify reports based on the oracle signatures. This is not the source verifier which required individual fee configurations, instead, this checks that a report has been signed by one of the configured oracles.
+ * @author ad0ll
+ * @notice This contract will be used to verify reports based on the oracle signatures. This is not the source verifier which required individual fee configurations, instead, this checks that a report has been signed by one of the configured configDigest.
  */
-contract DestinationVerifier is
-  IDestinationVerifier,
-  IDestinationVerifierProxyVerifier,
-  ConfirmedOwner,
-  TypeAndVersionInterface
-{
-  /// @notice The list of DON configurations by hash(address|donConfigId) - set to true if the signer is part of the config
-  mapping(bytes32 => bool) private s_signerByAddressAndDonConfigId;
+contract DestinationVerifier is IDestinationVerifier, IDestinationVerifierProxyDestinationVerifier, ConfirmedOwner, TypeAndVersionInterface {
+  /// @notice Mapping of configDigest to Config, used to look up the verification configuration for the configDigest of the incoming report
+  mapping(bytes32 => CommonV5.Config) private s_configs;
 
-  /// array of DON configs
-  DonConfig[] private s_donConfigs;
+  /// @notice Array of all configs, used in a convenience view function that returns all configs
+  bytes32[] private s_allConfigs;
 
   /// @notice The address of the verifierProxy
   address public s_feeManager;
@@ -37,8 +38,8 @@ contract DestinationVerifier is
   /// @notice The address of the access controller
   address public s_accessController;
 
-  /// @notice The address of the verifierProxy
-  IDestinationVerifierProxy public immutable i_verifierProxy;
+  /// @notice The address of the V0.3 verifierProxy
+  address public immutable i_verifierProxy;
 
   /// @notice This error is thrown whenever trying to set a config
   /// with a fault tolerance of 0
@@ -58,9 +59,9 @@ contract DestinationVerifier is
   /// @notice This error is thrown whenever a report is submitted with no signatures
   error NoSigners();
 
-  /// @notice This error is thrown whenever a DonConfig already exists
-  /// @param donConfigId The ID of the DonConfig that already exists
-  error DonConfigAlreadyExists(bytes24 donConfigId);
+  /// @notice This error is thrown whenever a Config already exists
+  /// @param configDigest The ID of the Config that already exists
+  error ConfigAlreadyExists(bytes32 configDigest);
 
   /// @notice This error is thrown whenever the R and S signer components
   /// have different lengths
@@ -83,33 +84,35 @@ contract DestinationVerifier is
   /// not conform to the fee manager interface
   error FeeManagerInvalid();
 
+  /// @notice This error is thrown when the proxy is neither a valid v0.3 or v0.4 proxy
+  error DestinationVerifierProxyInvalid();
+
   /// @notice This error is thrown whenever an address tries
   /// to execute a verification that it is not authorized to do so
   error AccessForbidden();
 
   /// @notice This error is thrown whenever a config does not exist
-  error DonConfigDoesNotExist();
+  error ConfigDoesNotExist();
 
-  /// @notice This error is thrown when the activation time is either in the future or less than the current configs
-  error BadActivationTime();
+  /// @notice This error is thrown when you try to call _setConfig with a configDigest of 0
+  error BadConfigDigest();
+
+  /// @notice This error is thrown when trying to access a config that is out of bounds externally
+  error InvalidIndex();
 
   /// @notice This event is emitted when a new report is verified.
   /// It is used to keep a historical record of verified reports.
   event ReportVerified(bytes32 indexed feedId, address requester);
 
   /// @notice This event is emitted whenever a configuration is activated or deactivated
-  event ConfigActivated(bytes24 donConfigId, bool isActive);
+  event ConfigActivated(bytes32 configDigest, bool isActive);
 
-  /// @notice This event is emitted whenever a configuration is removed
-  event ConfigRemoved(bytes24 donConfigId);
-
-  /// @notice event is emitted whenever a new DON Config is set
+  /// @notice event is emitted whenever a new Config is set
   event ConfigSet(
-    bytes24 indexed donConfigId,
+    bytes32 indexed configDigest,
     address[] signers,
     uint8 f,
-    Common.AddressAndWeight[] recipientAddressesAndWeights,
-    uint16 donConfigIndex
+    Common.AddressAndWeight[] recipientAddressesAndWeights
   );
 
   /// @notice This event is emitted when a new fee manager is set
@@ -122,44 +125,38 @@ contract DestinationVerifier is
   /// @param newAccessController The new access controller address
   event AccessControllerSet(address oldAccessController, address newAccessController);
 
-  struct DonConfig {
-    // The ID of the DonConfig
-    bytes24 donConfigId;
-    // Fault tolerance of the DON
-    uint8 f;
-    // Whether the config is active
-    bool isActive;
-    // The time the config was set
-    uint32 activationTime;
-  }
+  bytes32 constant V03_PROXY_TYPE_AND_VERSION = keccak256(bytes("DestinationVerifierProxy 2.0.0"));
 
   constructor(address verifierProxy) ConfirmedOwner(msg.sender) {
     if (verifierProxy == address(0)) {
       revert ZeroAddress();
     }
 
-    i_verifierProxy = IDestinationVerifierProxy(verifierProxy);
+    // Proxy should support TypeAndVersion as we need to identify which proxy is calling
+    if(!IERC165(verifierProxy).supportsInterface(type(TypeAndVersionInterface).interfaceId))
+      revert DestinationVerifierProxyInvalid();
+
+    // If it's the v0.3 Proxy check it implements the V03 Interface
+    if (keccak256(bytes(TypeAndVersionInterface(verifierProxy).typeAndVersion())) == V03_PROXY_TYPE_AND_VERSION) {
+      if(!IERC165(verifierProxy).supportsInterface(type(IDestinationVerifierProxyV03).interfaceId))
+        revert DestinationVerifierProxyInvalid();
+    }
+
+    i_verifierProxy = verifierProxy;
   }
 
-  /// @inheritdoc IDestinationVerifierProxyVerifier
+  /// @inheritdoc IDestinationVerifierProxyDestinationVerifier
   function verify(
     bytes calldata signedReport,
     bytes calldata parameterPayload,
     address sender
   ) external payable override onlyProxy checkAccess(sender) returns (bytes memory) {
-    (bytes memory verifierResponse, bytes32 donConfigId) = _verify(signedReport, sender);
+    (bytes memory verifierResponse, bytes32 configDigest) = _verify(signedReport, sender);
 
     address fm = s_feeManager;
     if (fm != address(0)) {
       //process the fee and catch the error
-      try
-        IDestinationVerifierFeeManager(fm).processFee{value: msg.value}(
-          donConfigId,
-          signedReport,
-          parameterPayload,
-          sender
-        )
-      {
+      try IDestinationVerifierFeeManager(fm).processFee{value: msg.value}(configDigest, signedReport, parameterPayload, sender) {
         //do nothing
       } catch {
         // we purposefully obfuscate the error here to prevent information leaking leading to free verifications
@@ -170,7 +167,7 @@ contract DestinationVerifier is
     return verifierResponse;
   }
 
-  /// @inheritdoc IDestinationVerifierProxyVerifier
+  /// @inheritdoc IDestinationVerifierProxyDestinationVerifier
   function verifyBulk(
     bytes[] calldata signedReports,
     bytes calldata parameterPayload,
@@ -189,12 +186,7 @@ contract DestinationVerifier is
     if (fm != address(0)) {
       //process the fee and catch the error
       try
-        IDestinationVerifierFeeManager(fm).processFeeBulk{value: msg.value}(
-          donConfigs,
-          signedReports,
-          parameterPayload,
-          sender
-        )
+        IDestinationVerifierFeeManager(fm).processFeeBulk{value: msg.value}(donConfigs, signedReports, parameterPayload, sender)
       {
         //do nothing
       } catch {
@@ -233,100 +225,69 @@ contract DestinationVerifier is
       revert BadVerification();
     }
 
-    //We need to know the timestamp the report was generated to lookup the active activeDonConfig
-    uint256 reportTimestamp = _decodeReportTimestamp(reportData);
-
-    // Find the latest config for this report
-    DonConfig memory activeDonConfig = _findActiveConfig(reportTimestamp);
+    // Find the config for this report
+    CommonV5.Config storage config = s_configs[reportContext[0]]; //reportContext[0] is the config digest
 
     // Check a config has been set
-    if (activeDonConfig.donConfigId == bytes24(0)) {
+    if (config.configDigest == bytes32(0)) {
       revert BadVerification();
     }
 
     //check the config is active
-    if (!activeDonConfig.isActive) {
+    if (!config.isActive) {
       revert BadVerification();
     }
 
     //check we have enough signatures
-    if (signers.length <= activeDonConfig.f) {
+    if (signers.length <= config.f) {
       revert BadVerification();
     }
 
-    //check each signer is registered against the active DON
-    bytes32 signerDonConfigKey;
+    //check each signer is registered against the config
     for (uint256 i; i < signers.length; ++i) {
-      signerDonConfigKey = keccak256(abi.encodePacked(signers[i], activeDonConfig.donConfigId));
-      if (!s_signerByAddressAndDonConfigId[signerDonConfigKey]) {
+      if (!config.oracles[signers[i]]) {
         revert BadVerification();
       }
     }
 
     emit ReportVerified(bytes32(reportData), sender);
 
-    return (reportData, activeDonConfig.donConfigId);
-  }
-
-  /// @inheritdoc IDestinationVerifier
-  function setConfigWithActivationTime(
-    address[] memory signers,
-    uint8 f,
-    Common.AddressAndWeight[] memory recipientAddressesAndWeights,
-    uint32 activationTime
-  ) external override checkConfigValid(signers.length, f) onlyOwner {
-    _setConfig(signers, f, recipientAddressesAndWeights, activationTime);
+    return (reportData, config.configDigest);
   }
 
   /// @inheritdoc IDestinationVerifier
   function setConfig(
+    bytes32 configDigest,
     address[] memory signers,
     uint8 f,
     Common.AddressAndWeight[] memory recipientAddressesAndWeights
   ) external override checkConfigValid(signers.length, f) onlyOwner {
-    _setConfig(signers, f, recipientAddressesAndWeights, uint32(block.timestamp));
+    _setConfig(configDigest, signers, f, recipientAddressesAndWeights);
   }
 
   function _setConfig(
+    bytes32 configDigest,
     address[] memory signers,
     uint8 f,
-    Common.AddressAndWeight[] memory recipientAddressesAndWeights,
-    uint32 activationTime
+    Common.AddressAndWeight[] memory recipientAddressesAndWeights
   ) internal {
+    if (configDigest == bytes32(0)) {
+      revert BadConfigDigest();
+    }
+
+    // If it's a v0.3 interface, register the verifier
+     if(keccak256(bytes(TypeAndVersionInterface(i_verifierProxy).typeAndVersion())) == V03_PROXY_TYPE_AND_VERSION){
+       IDestinationVerifierProxyV03(i_verifierProxy).setDestinationVerifier(bytes32(0), configDigest, recipientAddressesAndWeights); //First param is currentConfigDigest, since all configs are new, this is always 0
+     }
+
     // Duplicate addresses would break protocol rules
     if (Common._hasDuplicateAddresses(signers)) {
       revert NonUniqueSignatures();
     }
 
-    //activation time cannot be in the future
-    if (activationTime > block.timestamp) {
-      revert BadActivationTime();
-    }
-
-    // Sort signers to ensure donConfigId is deterministic
-    Common._quickSort(signers, 0, int256(signers.length - 1));
-
-    //DonConfig is made up of hash(signers|f)
-    bytes24 donConfigId = bytes24(keccak256(abi.encodePacked(signers, f)));
-
-    // Register the signers for this DON
-    for (uint256 i; i < signers.length; ++i) {
-      if (signers[i] == address(0)) revert ZeroAddress();
-      /** This index is registered so we can efficiently lookup whether a NOP is part of a config without having to
-                loop through the entire config each verification. It's effectively a DonConfig <-> Signer
-                composite key which keys track of all historic configs for a signer */
-      s_signerByAddressAndDonConfigId[keccak256(abi.encodePacked(signers[i], donConfigId))] = true;
-    }
-
-    // Check the activation time is greater than the latest config
-    uint256 donConfigLength = s_donConfigs.length;
-    if (donConfigLength > 0 && s_donConfigs[donConfigLength - 1].activationTime >= activationTime) {
-      revert BadActivationTime();
-    }
-
-    // Check the config we're setting isn't already set as the current active config as this will increase search costs unnecessarily when verifying historic reports
-    if (donConfigLength > 0 && s_donConfigs[donConfigLength - 1].donConfigId == donConfigId) {
-      revert DonConfigAlreadyExists(donConfigId);
+    // Check the config does not already exist
+    if (s_configs[configDigest].configDigest != bytes32(0)) {
+      revert ConfigAlreadyExists(configDigest);
     }
 
     // We may want to register these later or skip this step in the unlikely scenario they've previously been registered in the RewardsManager
@@ -334,19 +295,29 @@ contract DestinationVerifier is
       if (s_feeManager == address(0)) {
         revert FeeManagerInvalid();
       }
-      IDestinationVerifierFeeManager(s_feeManager).setFeeRecipients(donConfigId, recipientAddressesAndWeights);
+      IDestinationVerifierFeeManager(s_feeManager).setFeeRecipients(configDigest, recipientAddressesAndWeights);
     }
 
-    // push the DonConfig
-    s_donConfigs.push(DonConfig(donConfigId, f, true, activationTime));
+    // Store the config fields individually instead of struct assignment
+    s_configs[configDigest].configDigest = configDigest;
+    s_configs[configDigest].f = f;
+    s_configs[configDigest].isActive = true;
 
-    emit ConfigSet(donConfigId, signers, f, recipientAddressesAndWeights, uint16(donConfigLength));
+    // Generate signers mapping for the config, used to efficiently lookup whether a signer is allowed to appear when verifying a report
+    for (uint256 i; i < signers.length; ++i) {
+      if (signers[i] == address(0)) revert ZeroAddress();
+      s_configs[configDigest].oracles[signers[i]] = true;
+    }
+
+    // Keep track of all digests to enable easier querying off-chain
+    s_allConfigs.push(configDigest);
+
+    emit ConfigSet(configDigest, signers, f, recipientAddressesAndWeights);
   }
 
   /// @inheritdoc IDestinationVerifier
   function setFeeManager(address feeManager) external override onlyOwner {
-    if (!IERC165(feeManager).supportsInterface(type(IDestinationVerifierFeeManager).interfaceId))
-      revert FeeManagerInvalid();
+    if (!IERC165(feeManager).supportsInterface(type(IDestinationVerifierFeeManager).interfaceId)) revert FeeManagerInvalid();
 
     address oldFeeManager = s_feeManager;
     s_feeManager = feeManager;
@@ -362,51 +333,17 @@ contract DestinationVerifier is
   }
 
   /// @inheritdoc IDestinationVerifier
-  function setConfigActive(uint256 donConfigIndex, bool isActive) external onlyOwner {
-    // Config must exist
-    if (donConfigIndex >= s_donConfigs.length) {
-      revert DonConfigDoesNotExist();
-    }
+  function setConfigActive(bytes32 configDigest, bool isActive) external onlyOwner {
+    // Fetch config
+    CommonV5.Config storage config = s_configs[configDigest];
 
-    // Update the config
-    DonConfig storage config = s_donConfigs[donConfigIndex];
+    // Check config is set before update
+    if (config.configDigest == bytes32(0)) {
+      revert ConfigDoesNotExist();
+    }
     config.isActive = isActive;
 
-    emit ConfigActivated(config.donConfigId, isActive);
-  }
-
-  /// @inheritdoc IDestinationVerifier
-  function removeLatestConfig() external onlyOwner {
-    if (s_donConfigs.length == 0) {
-      revert DonConfigDoesNotExist();
-    }
-
-    DonConfig memory config = s_donConfigs[s_donConfigs.length - 1];
-
-    s_donConfigs.pop();
-
-    emit ConfigRemoved(config.donConfigId);
-  }
-
-  function _decodeReportTimestamp(bytes memory reportPayload) internal pure returns (uint256) {
-    (, , uint256 timestamp) = abi.decode(reportPayload, (bytes32, uint32, uint32));
-
-    return timestamp;
-  }
-
-  function _findActiveConfig(uint256 timestamp) internal view returns (DonConfig memory) {
-    DonConfig memory activeDonConfig;
-
-    // 99% of the time the signer config will be the last index, however for historic reports generated by a previous configuration we'll need to cycle back
-    uint256 i = s_donConfigs.length;
-    while (i > 0) {
-      --i;
-      if (s_donConfigs[i].activationTime <= timestamp) {
-        activeDonConfig = s_donConfigs[i];
-        break;
-      }
-    }
-    return activeDonConfig;
+    emit ConfigActivated(config.configDigest, isActive);
   }
 
   modifier checkConfigValid(uint256 numSigners, uint256 f) {
@@ -417,7 +354,7 @@ contract DestinationVerifier is
   }
 
   modifier onlyProxy() {
-    if (address(i_verifierProxy) != msg.sender) {
+    if (i_verifierProxy != msg.sender) {
       revert AccessForbidden();
     }
     _;
@@ -431,13 +368,36 @@ contract DestinationVerifier is
 
   /// @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
-    return
-      interfaceId == type(IDestinationVerifier).interfaceId ||
-      interfaceId == type(IDestinationVerifierProxyVerifier).interfaceId;
+    return interfaceId == type(IDestinationVerifier).interfaceId || interfaceId == type(IDestinationVerifierProxyDestinationVerifier).interfaceId;
   }
 
   /// @inheritdoc TypeAndVersionInterface
   function typeAndVersion() external pure override returns (string memory) {
-    return "DestinationVerifier 0.4.0";
+    return "DestinationVerifier 0.5.0";
+  }
+
+  //  /// Utility function to get all configs off-chain
+  // TODO should we expose?
+  function getAllConfigs(
+    uint256 startIndex,
+    uint256 endIndex
+  ) external view returns (bytes32[] memory) {
+    // Only EOA can read configs
+    if (msg.sender != tx.origin) revert AccessForbidden();
+
+    // Check bounds
+    if (startIndex > endIndex) revert InvalidIndex();
+    if (endIndex >= s_allConfigs.length) revert InvalidIndex();
+
+    // Calculate size of return array
+    uint256 size = endIndex - startIndex + 1;
+    bytes32[] memory configs = new bytes32[](size);
+
+    // Copy requested range
+    for (uint256 i; i < size; ++i) {
+      configs[i] = s_allConfigs[startIndex + i];
+    }
+
+    return configs;
   }
 }
