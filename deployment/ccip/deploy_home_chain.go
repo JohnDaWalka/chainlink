@@ -121,6 +121,77 @@ func DeployCapReg(
 	return capReg, nil
 }
 
+// deployCCIPHome deploys the CCIPHome contract if it is not already deployed
+// and returns a ContractDeploy struct with the address and contract instance.
+func deployCCIPHome(
+	lggr logger.Logger,
+	state CCIPOnChainState,
+	ab deployment.AddressBook,
+	chain deployment.Chain,
+	capReg *deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry],
+) (*deployment.ContractDeploy[*ccip_home.CCIPHome], error) {
+	if chainState, exists := state.Chains[chain.Selector]; exists {
+		if cr := chainState.CCIPHome; cr != nil {
+			lggr.Infow("Found CCIPHome in chain state", "address", cr.Address().String())
+			return &deployment.ContractDeploy[*ccip_home.CCIPHome]{
+				Address: cr.Address(), Contract: cr, Tv: deployment.NewTypeAndVersion(CCIPHome, deployment.Version1_6_0_dev),
+			}, nil
+		}
+	}
+	ccipHome, err := deployment.DeployContract(
+		lggr, chain, ab,
+		func(chain deployment.Chain) deployment.ContractDeploy[*ccip_home.CCIPHome] {
+			ccAddr, tx, cc, err2 := ccip_home.DeployCCIPHome(
+				chain.DeployerKey,
+				chain.Client,
+				capReg.Address,
+			)
+			return deployment.ContractDeploy[*ccip_home.CCIPHome]{
+				Address: ccAddr, Tv: deployment.NewTypeAndVersion(CCIPHome, deployment.Version1_6_0_dev), Tx: tx, Err: err2, Contract: cc,
+			}
+		})
+	if err != nil {
+		lggr.Errorw("Failed to deploy CCIPHome", "err", err)
+		return nil, err
+	}
+	return ccipHome, nil
+}
+
+// deployRMNHome deploys the RMNHome contract if it is not already deployed
+// and returns a ContractDeploy struct with the address and contract instance.
+func deployRMNHome(
+	lggr logger.Logger,
+	state CCIPOnChainState,
+	ab deployment.AddressBook,
+	chain deployment.Chain,
+) (*deployment.ContractDeploy[*rmn_home.RMNHome], error) {
+	if chainState, exists := state.Chains[chain.Selector]; exists {
+		if cr := chainState.RMNHome; cr != nil {
+			lggr.Infow("Found RMNHome in chain state", "address", cr.Address().String())
+			return &deployment.ContractDeploy[*rmn_home.RMNHome]{
+				Address: cr.Address(), Contract: cr, Tv: deployment.NewTypeAndVersion(RMNHome, deployment.Version1_6_0_dev),
+			}, nil
+		}
+	}
+	rmnHome, err := deployment.DeployContract(
+		lggr, chain, ab,
+		func(chain deployment.Chain) deployment.ContractDeploy[*rmn_home.RMNHome] {
+			rmnAddr, tx, rmn, err2 := rmn_home.DeployRMNHome(
+				chain.DeployerKey,
+				chain.Client,
+			)
+			return deployment.ContractDeploy[*rmn_home.RMNHome]{
+				Address: rmnAddr, Tv: deployment.NewTypeAndVersion(RMNHome, deployment.Version1_6_0_dev), Tx: tx, Err: err2, Contract: rmn,
+			}
+		},
+	)
+	if err != nil {
+		lggr.Errorw("Failed to deploy RMNHome", "err", err)
+		return nil, err
+	}
+	return rmnHome, err
+}
+
 func DeployHomeChain(
 	lggr logger.Logger,
 	e deployment.Environment,
@@ -141,40 +212,16 @@ func DeployHomeChain(
 	if err != nil {
 		return nil, err
 	}
-
 	lggr.Infow("deployed/connected to capreg", "addr", capReg.Address)
-	ccipHome, err := deployment.DeployContract(
-		lggr, chain, ab,
-		func(chain deployment.Chain) deployment.ContractDeploy[*ccip_home.CCIPHome] {
-			ccAddr, tx, cc, err2 := ccip_home.DeployCCIPHome(
-				chain.DeployerKey,
-				chain.Client,
-				capReg.Address,
-			)
-			return deployment.ContractDeploy[*ccip_home.CCIPHome]{
-				Address: ccAddr, Tv: deployment.NewTypeAndVersion(CCIPHome, deployment.Version1_6_0_dev), Tx: tx, Err: err2, Contract: cc,
-			}
-		})
+
+	ccipHome, err := deployCCIPHome(lggr, state, ab, chain, capReg)
 	if err != nil {
-		lggr.Errorw("Failed to deploy CCIPHome", "err", err)
 		return nil, err
 	}
 	lggr.Infow("deployed CCIPHome", "addr", ccipHome.Address)
 
-	rmnHome, err := deployment.DeployContract(
-		lggr, chain, ab,
-		func(chain deployment.Chain) deployment.ContractDeploy[*rmn_home.RMNHome] {
-			rmnAddr, tx, rmn, err2 := rmn_home.DeployRMNHome(
-				chain.DeployerKey,
-				chain.Client,
-			)
-			return deployment.ContractDeploy[*rmn_home.RMNHome]{
-				Address: rmnAddr, Tv: deployment.NewTypeAndVersion(RMNHome, deployment.Version1_6_0_dev), Tx: tx, Err: err2, Contract: rmn,
-			}
-		},
-	)
+	rmnHome, err := deployRMNHome(lggr, state, ab, chain)
 	if err != nil {
-		lggr.Errorw("Failed to deploy RMNHome", "err", err)
 		return nil, err
 	}
 	lggr.Infow("deployed RMNHome", "addr", rmnHome.Address)
@@ -964,7 +1011,7 @@ func AddDON(
 	rmnHomeAddress common.Address,
 	offRamp *offramp.OffRamp,
 	feedChainSel uint64,
-	// Token address on Dest chain to aggregate address on feed chain
+// Token address on Dest chain to aggregate address on feed chain
 	tokenInfo map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo,
 	dest deployment.Chain,
 	home deployment.Chain,
