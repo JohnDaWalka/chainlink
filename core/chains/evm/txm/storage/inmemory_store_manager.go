@@ -132,5 +132,5 @@ func (m *InMemoryStoreManager) FindTxWithIdempotencyKey(_ context.Context, idemp
 			return tx, nil
 		}
 	}
-	return nil, fmt.Errorf("key not found")
+	return nil, nil
 }
