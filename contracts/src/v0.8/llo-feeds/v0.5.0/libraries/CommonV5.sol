@@ -14,6 +14,8 @@ library CommonV5 {
     uint8 f;
     // Whether the config is active
     bool isActive;
+    // Number of oracles
+    uint8 oracleCount;
     // Map of signer addresses to configDigest
     mapping(address => bool) oracles;
   }

@@ -29,9 +29,6 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   /// @notice Mapping of configDigest to Config, used to look up the verification configuration for the configDigest of the incoming report
   mapping(bytes32 => CommonV5.Config) private s_configs;
 
-  /// @notice Array of all configs, used in a convenience view function that returns all configs
-  bytes32[] private s_allConfigs;
-
   /// @notice The address of the verifierProxy
   address public s_feeManager;
 
@@ -94,11 +91,8 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   /// @notice This error is thrown whenever a config does not exist
   error ConfigDoesNotExist();
 
-  /// @notice This error is thrown when you try to call _setConfig with a configDigest of 0
-  error BadConfigDigest();
-
-  /// @notice This error is thrown when trying to access a config that is out of bounds externally
-  error InvalidIndex();
+  /// @notice This error is thrown when removing an invalid oracle from a configuration
+  error MismatchedSigners();
 
   /// @notice This event is emitted when a new report is verified.
   /// It is used to keep a historical record of verified reports.
@@ -124,6 +118,9 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   /// @param oldAccessController The old access controller address
   /// @param newAccessController The new access controller address
   event AccessControllerSet(address oldAccessController, address newAccessController);
+
+  /// @notice event is emitted whenever a new Config is removed
+  event ConfigUnset(bytes32 configDigest, address[] signers);
 
   bytes32 constant V03_PROXY_TYPE_AND_VERSION = keccak256(bytes("VerifierProxy 2.0.0"));
 
@@ -248,27 +245,66 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   /// @inheritdoc IVerifier
   function setConfig(
     bytes32 configDigest,
-    address[] memory signers,
+    address[] calldata signers,
     uint8 f,
-    Common.AddressAndWeight[] memory recipientAddressesAndWeights
+    Common.AddressAndWeight[] calldata recipientAddressesAndWeights
   ) external override checkConfigValid(signers.length, f) onlyOwner {
-    _setConfig(configDigest, signers, f, recipientAddressesAndWeights);
+    _setConfig(configDigest, signers, f, recipientAddressesAndWeights, new address[](0));
+  }
+
+  /// @inheritdoc IVerifier
+  function unsetConfig(
+    bytes32 configDigest,
+    address[] calldata signers
+  ) external override onlyOwner {
+    CommonV5.Config storage config = s_configs[configDigest];
+    // Config must exist
+    if (config.configDigest == bytes32(0)) {
+      revert ConfigDoesNotExist();
+    }
+
+    // We must be removing the number of signers that were originally set
+    if(s_configs[configDigest].oracleCount != signers.length){
+      revert MismatchedSigners();
+    }
+
+    for (uint256 i; i < signers.length; ++i) {
+      // Check the signers being removed are not zero address or duplicates
+      if(!config.oracles[signers[i]]){
+        revert MismatchedSigners();
+      }
+
+      delete config.oracles[signers[i]];
+    }
+
+    delete s_configs[configDigest];
+
+    emit ConfigUnset(configDigest, signers);
   }
 
   function _setConfig(
     bytes32 configDigest,
-    address[] memory signers,
+    address[] calldata signers,
     uint8 f,
-    Common.AddressAndWeight[] memory recipientAddressesAndWeights
+    Common.AddressAndWeight[] calldata recipientAddressesAndWeights,
+    address[] memory prevSigners
   ) internal {
     if (configDigest == bytes32(0)) {
-      revert BadConfigDigest();
+      revert ZeroAddress();
     }
 
-    // If it's a v0.3 interface, register the verifier
-     if(keccak256(bytes(TypeAndVersionInterface(i_verifierProxy).typeAndVersion())) == V03_PROXY_TYPE_AND_VERSION){
-       IVerifierProxyV03(i_verifierProxy).setVerifier(bytes32(0), configDigest, recipientAddressesAndWeights); //First param is currentConfigDigest, since all configs are new, this is always 0
-     }
+    // If it's a v0.3 interface, register the verifier and the recipients else recipients are registered through this classes FM
+    if(keccak256(bytes(TypeAndVersionInterface(i_verifierProxy).typeAndVersion())) == V03_PROXY_TYPE_AND_VERSION){
+      IVerifierProxyV03(i_verifierProxy).setVerifier(bytes32(0), configDigest, recipientAddressesAndWeights); //First param is currentConfigDigest, since all configs are new, this is always 0
+    } else {
+      // We may want to register these later or skip this step in the unlikely scenario they've previously been registered in the RewardsManager
+      if (recipientAddressesAndWeights.length != 0) {
+        if (s_feeManager == address(0)) {
+          revert FeeManagerInvalid();
+        }
+        IVerifierFeeManager(s_feeManager).setFeeRecipients(configDigest, recipientAddressesAndWeights);
+      }
+    }
 
     // Duplicate addresses would break protocol rules
     if (Common._hasDuplicateAddresses(signers)) {
@@ -280,18 +316,11 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
       revert ConfigAlreadyExists(configDigest);
     }
 
-    // We may want to register these later or skip this step in the unlikely scenario they've previously been registered in the RewardsManager
-    if (recipientAddressesAndWeights.length != 0) {
-      if (s_feeManager == address(0)) {
-        revert FeeManagerInvalid();
-      }
-      IVerifierFeeManager(s_feeManager).setFeeRecipients(configDigest, recipientAddressesAndWeights);
-    }
-
     // Store the config fields individually instead of struct assignment
     s_configs[configDigest].configDigest = configDigest;
     s_configs[configDigest].f = f;
     s_configs[configDigest].isActive = true;
+    s_configs[configDigest].oracleCount = uint8(signers.length);
 
     // Generate signers mapping for the config, used to efficiently lookup whether a signer is allowed to appear when verifying a report
     for (uint256 i; i < signers.length; ++i) {
@@ -299,15 +328,12 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
       s_configs[configDigest].oracles[signers[i]] = true;
     }
 
-    // Keep track of all digests to enable easier querying off-chain
-    s_allConfigs.push(configDigest);
-
     emit ConfigSet(configDigest, signers, f, recipientAddressesAndWeights);
   }
 
   /// @inheritdoc IVerifier
   function setFeeManager(address feeManager) external override onlyOwner {
-    if (!IERC165(feeManager).supportsInterface(type(IVerifierFeeManager).interfaceId)) revert FeeManagerInvalid();
+    if (address(feeManager) != address(0) && !IERC165(feeManager).supportsInterface(type(IVerifierFeeManager).interfaceId)) revert FeeManagerInvalid();
 
     address oldFeeManager = s_feeManager;
     s_feeManager = feeManager;
@@ -364,29 +390,5 @@ contract Verifier is IVerifier, IVerifierProxyVerifier, ConfirmedOwner, TypeAndV
   /// @inheritdoc TypeAndVersionInterface
   function typeAndVersion() external pure override returns (string memory) {
     return "Verifier 0.5.0";
-  }
-
-  /// Utility function to get all configs off-chain
-  function getAllConfigs(
-    uint256 startIndex,
-    uint256 endIndex
-  ) external view returns (bytes32[] memory) {
-    // Only EOA can read configs
-    if (msg.sender != tx.origin) revert AccessForbidden();
-
-    // Check bounds
-    if (startIndex > endIndex) revert InvalidIndex();
-    if (endIndex >= s_allConfigs.length) revert InvalidIndex();
-
-    // Calculate size of return array
-    uint256 size = endIndex - startIndex + 1;
-    bytes32[] memory configs = new bytes32[](size);
-
-    // Copy requested range
-    for (uint256 i; i < size; ++i) {
-      configs[i] = s_allConfigs[startIndex + i];
-    }
-
-    return configs;
   }
 }

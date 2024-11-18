@@ -20,6 +20,14 @@ interface IVerifier is IERC165 {
   ) external;
 
   /**
+   * @notice unsets off-chain reporting protocol configuration
+   * @param signers addresses with which oracles sign the reports
+   * @param signers within the existing config
+   */
+  function unsetConfig(bytes32 configDigest, address[] calldata signers) external;
+
+
+  /**
    * @notice Sets the fee manager address
    * @param feeManager The address of the fee manager
    */

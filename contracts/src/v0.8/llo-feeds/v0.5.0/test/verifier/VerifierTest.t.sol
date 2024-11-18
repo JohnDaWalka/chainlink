@@ -5,6 +5,7 @@ import {BaseTest} from "./BaseVerifierTest.t.sol";
 import {Verifier} from "../../Verifier.sol";
 import {IVerifier} from "../../interfaces/IVerifier.sol";
 import {IVerifierProxyVerifier} from "../../interfaces/IVerifierProxyVerifier.sol";
+import {Common} from "../../../libraries/Common.sol";
 
 contract VerifierConstructorTest is BaseTest {
   bytes32[3] internal s_reportContext;

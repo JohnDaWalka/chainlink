@@ -214,6 +214,15 @@ contract BaseTest is Test {
     return signers;
   }
 
+  function _getSecondarySigners(uint256 numSigners) internal view returns (Signer[] memory) {
+    Signer[] memory signers = new Signer[](numSigners);
+    for (uint256 i; i < numSigners; i++) {
+      signers[i].signerAddress = vm.addr(i + 2);
+      signers[i].mockPrivateKey = i + 2;
+    }
+    return signers;
+  }
+
   function _getSignerAddresses(Signer[] memory signers) internal pure returns (address[] memory) {
     address[] memory signerAddrs = new address[](signers.length);
     for (uint256 i = 0; i < signerAddrs.length; i++) {

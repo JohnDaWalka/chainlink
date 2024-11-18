@@ -280,4 +280,46 @@ contract VerifierVerifyTest is BaseTest {
      vm.expectRevert(abi.encodeWithSelector(Verifier.BadVerification.selector));
      s_verifierProxy.verify(signedReport, abi.encode(native));
    }
+
+   function test_configUnsetAndSetStillVerifies() public {
+     Signer[] memory signers = _getSigners(MAX_ORACLES);
+     address[] memory signerAddrs = _getSignerAddresses(signers);
+     s_reportContext[0] = DEFAULT_CONFIG_DIGEST;
+
+     s_verifier.setConfig(DEFAULT_CONFIG_DIGEST, signerAddrs, FAULT_TOLERANCE, new Common.AddressAndWeight[](0));
+     s_verifier.unsetConfig(DEFAULT_CONFIG_DIGEST, signerAddrs);
+
+     bytes memory signedReport = _generateV3EncodedBlob(s_testReportThree, s_reportContext, signers);
+
+     vm.expectRevert(abi.encodeWithSelector(Verifier.BadVerification.selector));
+     s_verifierProxy.verify(signedReport, abi.encode(native));
+
+     s_verifier.setConfig(DEFAULT_CONFIG_DIGEST, signerAddrs, FAULT_TOLERANCE, new Common.AddressAndWeight[](0));
+     s_verifierProxy.verify(signedReport, abi.encode(native));
+   }
+
+  function test_configUnsetAndResetWithDifferentKeysDoesNotVerifyWithPreviousKeys() public {
+    Signer[] memory signers = _getSigners(MAX_ORACLES);
+    address[] memory signerAddrs = _getSignerAddresses(signers);
+    s_reportContext[0] = DEFAULT_CONFIG_DIGEST;
+
+    s_verifier.setConfig(DEFAULT_CONFIG_DIGEST, signerAddrs, FAULT_TOLERANCE, new Common.AddressAndWeight[](0));
+    s_verifier.unsetConfig(DEFAULT_CONFIG_DIGEST, signerAddrs);
+
+    bytes memory signedReport = _generateV3EncodedBlob(s_testReportThree, s_reportContext, signers);
+
+    vm.expectRevert(abi.encodeWithSelector(Verifier.BadVerification.selector));
+    s_verifierProxy.verify(signedReport, abi.encode(native));
+
+    Signer[] memory signers2 = _getSecondarySigners(MAX_ORACLES);
+    address[] memory signerAddrs2 = _getSignerAddresses(signers2);
+    s_verifier.setConfig(DEFAULT_CONFIG_DIGEST, signerAddrs2, FAULT_TOLERANCE, new Common.AddressAndWeight[](0));
+
+    vm.expectRevert(abi.encodeWithSelector(Verifier.BadVerification.selector));
+    s_verifierProxy.verify(signedReport, abi.encode(native));
+
+    signedReport = _generateV3EncodedBlob(s_testReportThree, s_reportContext, signers2);
+    s_verifierProxy.verify(signedReport, abi.encode(native));
+
+  }
 }
