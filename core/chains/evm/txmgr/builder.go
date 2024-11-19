@@ -120,7 +120,7 @@ func NewTxmV2(
 		stuckTxDetectorConfig := txm.StuckTxDetectorConfig{
 			BlockTime:             *txmV2Config.BlockTime(),
 			StuckTxBlockThreshold: *txConfig.AutoPurge().Threshold(),
-			DetectionURL:       txConfig.AutoPurge().DetectionApiUrl().String(),
+			DetectionURL:          txConfig.AutoPurge().DetectionApiUrl().String(),
 		}
 		stuckTxDetector = txm.NewStuckTxDetector(lggr, chainConfig.ChainType(), stuckTxDetectorConfig)
 	}
@@ -128,8 +128,9 @@ func NewTxmV2(
 	attemptBuilder := txm.NewAttemptBuilder(chainID, fCfg.PriceMax(), estimator, keyStore)
 	inMemoryStoreManager := storage.NewInMemoryStoreManager(lggr, chainID)
 	config := txm.Config{
-		EIP1559:             fCfg.EIP1559DynamicFees(),
-		BlockTime:           *txmV2Config.BlockTime(),
+		EIP1559:   fCfg.EIP1559DynamicFees(),
+		BlockTime: *txmV2Config.BlockTime(),
+		//nolint:gosec // we want to reuse the existing config until migrations
 		RetryBlockThreshold: uint16(fCfg.BumpThreshold()),
 		EmptyTxLimitDefault: fCfg.LimitDefault(),
 	}
