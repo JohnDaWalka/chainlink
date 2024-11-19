@@ -1011,7 +1011,7 @@ func AddDON(
 	rmnHomeAddress common.Address,
 	offRamp *offramp.OffRamp,
 	feedChainSel uint64,
-// Token address on Dest chain to aggregate address on feed chain
+	// Token address on Dest chain to aggregate address on feed chain
 	tokenInfo map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo,
 	dest deployment.Chain,
 	home deployment.Chain,
