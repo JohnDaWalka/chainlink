@@ -46,7 +46,7 @@ func TestLifecycle(t *testing.T) {
 		txStore := storage.NewInMemoryStoreManager(lggr, testutils.FixtureChainID)
 		assert.NoError(t, txStore.Add(addresses...))
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, txStore, config, keystore)
-		var nonce uint64 = 0
+		var nonce uint64
 		// Start
 		client.On("PendingNonceAt", mock.Anything, address1).Return(nonce, nil).Once()
 		client.On("PendingNonceAt", mock.Anything, address2).Return(nonce, nil).Once()
@@ -80,7 +80,7 @@ func TestTrigger(t *testing.T) {
 		ab := mocks.NewAttemptBuilder(t)
 		config := Config{BlockTime: 1 * time.Minute, RetryBlockThreshold: 10}
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, txStore, config, keystore)
-		var nonce uint64 = 0
+		var nonce uint64
 		// Start
 		client.On("PendingNonceAt", mock.Anything, address).Return(nonce, nil).Once()
 		servicetest.Run(t, txm)
