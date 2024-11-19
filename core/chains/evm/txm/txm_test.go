@@ -57,7 +57,6 @@ func TestLifecycle(t *testing.T) {
 		servicetest.Run(t, txm)
 		tests.AssertLogEventually(t, observedLogs, "Backfill time elapsed")
 	})
-
 }
 
 func TestTrigger(t *testing.T) {
@@ -67,9 +66,10 @@ func TestTrigger(t *testing.T) {
 	keystore := mocks.NewKeystore(t)
 	keystore.On("EnabledAddressesForChain", mock.Anything, mock.Anything).Return([]common.Address{address}, nil)
 	t.Run("Trigger fails if Txm is unstarted", func(t *testing.T) {
-		txm := NewTxm(logger.Test(t), nil, nil, nil, nil, nil, Config{}, keystore)
+		lggr, observedLogs := logger.TestObserved(t, zap.ErrorLevel)
+		txm := NewTxm(lggr, nil, nil, nil, nil, nil, Config{}, keystore)
 		txm.Trigger(address)
-		assert.Error(t, txm.Trigger(address), "Txm unstarted")
+		tests.AssertLogEventually(t, observedLogs, "Txm unstarted")
 	})
 
 	t.Run("executes Trigger", func(t *testing.T) {
@@ -84,7 +84,6 @@ func TestTrigger(t *testing.T) {
 		// Start
 		client.On("PendingNonceAt", mock.Anything, address).Return(nonce, nil).Once()
 		servicetest.Run(t, txm)
-		assert.NoError(t, txm.Trigger(address))
 	})
 }
 
@@ -133,9 +132,10 @@ func TestBroadcastTransaction(t *testing.T) {
 
 		client.On("PendingNonceAt", mock.Anything, address).Return(uint64(1), nil).Once() // LocalNonce: 1, PendingNonce: 1
 		mTxStore.On("UpdateUnstartedTransactionWithNonce", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
-		txm.broadcastTransaction(ctx, address)
+		bo, err = txm.broadcastTransaction(ctx, address)
+		assert.False(t, bo)
+		assert.NoError(t, err)
 		tests.AssertLogCountEventually(t, observedLogs, "Reached transaction limit.", 1)
-
 	})
 
 	t.Run("fails if UpdateUnstartedTransactionWithNonce fails", func(t *testing.T) {
@@ -190,7 +190,7 @@ func TestBroadcastTransaction(t *testing.T) {
 		assert.Equal(t, uint64(9), txm.getNonce(address))
 		tx, err = txStore.FindTxWithIdempotencyKey(tests.Context(t), &IDK)
 		assert.NoError(t, err)
-		assert.Equal(t, 1, len(tx.Attempts))
+		assert.Len(t, tx.Attempts, 1)
 		var zeroTime time.Time
 		assert.Greater(t, tx.LastBroadcastAt, zeroTime)
 		assert.Greater(t, tx.Attempts[0].BroadcastAt, zeroTime)

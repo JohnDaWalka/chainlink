@@ -4,8 +4,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/testutils"
 )
@@ -18,7 +19,7 @@ func TestAdd(t *testing.T) {
 	// Adds a new address
 	err := m.Add(fromAddress)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(m.InMemoryStoreMap))
+	assert.Len(t, m.InMemoryStoreMap, 1)
 
 	// Fails if address exists
 	err = m.Add(fromAddress)
@@ -30,5 +31,5 @@ func TestAdd(t *testing.T) {
 	addresses := []common.Address{fromAddress1, fromAddress2}
 	err = m.Add(addresses...)
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(m.InMemoryStoreMap))
+	assert.Len(t, m.InMemoryStoreMap, 3)
 }

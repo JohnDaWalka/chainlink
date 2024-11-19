@@ -69,7 +69,7 @@ func (t *Transaction) FindAttemptByHash(attemptHash common.Hash) (*Attempt, erro
 
 func (t *Transaction) DeepCopy() *Transaction {
 	copy := *t
-	var attemptsCopy []*Attempt
+	attemptsCopy := make([]*Attempt, 0, len(t.Attempts))
 	for _, attempt := range t.Attempts {
 		attemptsCopy = append(attemptsCopy, attempt.DeepCopy())
 	}
@@ -121,7 +121,7 @@ type TxRequest struct {
 
 	Meta             *sqlutil.JSON // TODO: *TxMeta after migration
 	ForwarderAddress common.Address
-	//QueueingTxStrategy QueueingTxStrategy
+	// QueueingTxStrategy QueueingTxStrategy
 
 	// Pipeline variables - if you aren't calling this from chain tx task within
 	// the pipeline, you don't need these variables
