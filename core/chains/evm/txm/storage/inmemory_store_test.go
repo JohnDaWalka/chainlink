@@ -230,7 +230,7 @@ func TestMarkTransactionsConfirmed(t *testing.T) {
 	t.Run("prunes confirmed transactions map if it reaches the limit", func(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		for i := 0; i < maxQueuedTransactions; i++ {
-			//nolint:gosec
+			//nolint:gosec // this won't overflow
 			_, err := insertConfirmedTransaction(m, uint64(i))
 			assert.NoError(t, err)
 		}
@@ -373,6 +373,7 @@ func TestPruneConfirmedTransactions(t *testing.T) {
 	m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 	total := 5
 	for i := 0; i < total; i++ {
+		//nolint:gosec // this won't overflow
 		_, err := insertConfirmedTransaction(m, uint64(i))
 		assert.NoError(t, err)
 	}

@@ -115,7 +115,7 @@ func TestBroadcastTransaction(t *testing.T) {
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, mTxStore, nil, config, keystore)
 		bo, err := txm.broadcastTransaction(ctx, address)
 		assert.True(t, bo)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		tests.AssertLogEventually(t, observedLogs, "Reached transaction limit")
 	})
 
@@ -164,7 +164,7 @@ func TestBroadcastTransaction(t *testing.T) {
 	t.Run("picks a new tx and creates a new attempt then sends it and updates the broadcast time", func(t *testing.T) {
 		lggr := logger.Test(t)
 		txStore := storage.NewInMemoryStoreManager(lggr, testutils.FixtureChainID)
-		assert.NoError(t, txStore.Add(address))
+		require.NoError(t, txStore.Add(address))
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, txStore, nil, config, keystore)
 		txm.setNonce(address, 8)
 		IDK := "IDK"
@@ -176,7 +176,7 @@ func TestBroadcastTransaction(t *testing.T) {
 			SpecifiedGasLimit: 22000,
 		}
 		tx, err := txm.CreateTransaction(tests.Context(t), txRequest)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		attempt := &types.Attempt{
 			TxID:     tx.ID,
 			Fee:      gas.EvmFee{GasPrice: assets.NewWeiI(1)},
