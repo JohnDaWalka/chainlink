@@ -56,7 +56,7 @@ type ErrorHandler interface {
 }
 
 type StuckTxDetector interface {
-	DetectStuckTransaction(tx *types.Transaction) (bool, error)
+	DetectStuckTransaction(ctx context.Context, tx *types.Transaction) (bool, error)
 }
 
 type Keystore interface {
@@ -66,7 +66,7 @@ type Keystore interface {
 type Config struct {
 	EIP1559             bool
 	BlockTime           time.Duration
-	RetryBlockThreshold uint16
+	RetryBlockThreshold uint64
 	EmptyTxLimitDefault uint64
 }
 
@@ -355,7 +355,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 		return false, t.createAndSendEmptyTx(ctx, latestNonce, address)
 	} else {
 		if !tx.IsPurgeable && t.stuckTxDetector != nil {
-			isStuck, err := t.stuckTxDetector.DetectStuckTransaction(tx)
+			isStuck, err := t.stuckTxDetector.DetectStuckTransaction(ctx, tx)
 			if err != nil {
 				return false, err
 			}

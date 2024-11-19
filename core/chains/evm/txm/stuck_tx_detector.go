@@ -1,6 +1,7 @@
 package txm
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,7 +18,7 @@ import (
 
 type StuckTxDetectorConfig struct {
 	BlockTime             time.Duration
-	StuckTxBlockThreshold uint16
+	StuckTxBlockThreshold uint32
 	DetectionApiUrl       string
 }
 
@@ -35,11 +36,11 @@ func NewStuckTxDetector(lggr logger.Logger, chaintype chaintype.ChainType, confi
 	}
 }
 
-func (s *stuckTxDetector) DetectStuckTransaction(tx *types.Transaction) (bool, error) {
+func (s *stuckTxDetector) DetectStuckTransaction(ctx context.Context, tx *types.Transaction) (bool, error) {
 	switch s.chainType {
 	// TODO: rename
 	case chaintype.ChainDualBroadcast:
-		result, err := s.dualBroadcastDetection(tx)
+		result, err := s.dualBroadcastDetection(ctx, tx)
 		if result || err != nil {
 			return result, err
 		}
@@ -72,17 +73,26 @@ const (
 	ApiStatusUnknown   = "UNKNOWN"
 )
 
-func (s *stuckTxDetector) dualBroadcastDetection(tx *types.Transaction) (bool, error) {
+func (s *stuckTxDetector) dualBroadcastDetection(ctx context.Context, tx *types.Transaction) (bool, error) {
 	for _, attempt := range tx.Attempts {
-		resp, err := http.Get(s.config.DetectionApiUrl + attempt.Hash.String())
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.config.DetectionApiUrl+attempt.Hash.String(), nil)
+		if err != nil {
+			return false, fmt.Errorf("failed to make request for txID: %v, attemptHash: %v - %w", tx.ID, attempt.Hash, err)
+		}
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return false, fmt.Errorf("failed to get transaction status for txID: %v, attemptHash: %v - %w", tx.ID, attempt.Hash, err)
 		}
-		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return false, fmt.Errorf("request %v failed with status: %d", req, resp.StatusCode)
+		}
 		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
 		if err != nil {
 			return false, err
 		}
+
 		var apiResponse ApiResponse
 		err = json.Unmarshal(body, &apiResponse)
 		if err != nil {

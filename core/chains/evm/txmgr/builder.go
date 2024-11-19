@@ -120,7 +120,7 @@ func NewTxmV2(
 	if txConfig.AutoPurge().Enabled() {
 		stuckTxDetectorConfig := txm.StuckTxDetectorConfig{
 			BlockTime:             *txmV2Config.BlockTime(),
-			StuckTxBlockThreshold: uint16(*txConfig.AutoPurge().Threshold()),
+			StuckTxBlockThreshold: *txConfig.AutoPurge().Threshold(),
 			DetectionApiUrl:       txConfig.AutoPurge().DetectionApiUrl().String(),
 		}
 		stuckTxDetector = txm.NewStuckTxDetector(lggr, chainConfig.ChainType(), stuckTxDetectorConfig)
@@ -131,7 +131,7 @@ func NewTxmV2(
 	config := txm.Config{
 		EIP1559:             fCfg.EIP1559DynamicFees(),
 		BlockTime:           *txmV2Config.BlockTime(),
-		RetryBlockThreshold: uint16(fCfg.BumpThreshold()),
+		RetryBlockThreshold: fCfg.BumpThreshold(),
 		EmptyTxLimitDefault: fCfg.LimitDefault(),
 	}
 	var c txm.Client
