@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {BaseTest, BaseTestWithMultipleConfiguredDigests} from "./BaseVerifierTest.t.sol";
-import {Verifier} from "../../../v0.3.0/Verifier.sol";
+import {Verifier} from "../../Verifier.sol";
 import {Common} from "../../../libraries/Common.sol";
 
 contract VerifierSetConfigTest is BaseTest {
@@ -17,6 +17,9 @@ contract VerifierSetConfigTest is BaseTest {
     changePrank(USER);
     s_verifier.setConfig(
       FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       _getSignerAddresses(signers),
       s_offchaintransmitters,
       FAULT_TOLERANCE,
@@ -32,6 +35,9 @@ contract VerifierSetConfigTest is BaseTest {
     vm.expectRevert(abi.encodeWithSelector(Verifier.ExcessSigners.selector, signers.length, MAX_ORACLES));
     s_verifier.setConfig(
       FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       signers,
       s_offchaintransmitters,
       FAULT_TOLERANCE,
@@ -47,6 +53,9 @@ contract VerifierSetConfigTest is BaseTest {
     Signer[] memory signers = _getSigners(MAX_ORACLES);
     s_verifier.setConfig(
       FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       _getSignerAddresses(signers),
       s_offchaintransmitters,
       0,
@@ -67,6 +76,9 @@ contract VerifierSetConfigTest is BaseTest {
     );
     s_verifier.setConfig(
       FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       signers,
       s_offchaintransmitters,
       FAULT_TOLERANCE,
@@ -84,6 +96,9 @@ contract VerifierSetConfigTest is BaseTest {
     vm.expectRevert(abi.encodeWithSelector(Verifier.NonUniqueSignatures.selector));
     s_verifier.setConfig(
       FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       signerAddrs,
       s_offchaintransmitters,
       FAULT_TOLERANCE,
@@ -101,6 +116,9 @@ contract VerifierSetConfigTest is BaseTest {
     vm.expectRevert(abi.encodeWithSelector(Verifier.ZeroAddress.selector));
     s_verifier.setConfig(
       FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       signerAddrs,
       s_offchaintransmitters,
       FAULT_TOLERANCE,
@@ -117,6 +135,9 @@ contract VerifierSetConfigTest is BaseTest {
     s_verifierProxy.initializeVerifier(address(s_verifier));
     s_verifier.setConfig(
       FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       _getSignerAddresses(signers),
       s_offchaintransmitters,
       FAULT_TOLERANCE,
@@ -126,10 +147,10 @@ contract VerifierSetConfigTest is BaseTest {
       new Common.AddressAndWeight[](0)
     );
 
-    bytes32 expectedConfigDigest = _configDigestFromConfigData(
+    bytes32 configDigest = _configDigestFromConfigData(
       FEED_ID,
-      block.chainid,
-      address(s_verifier),
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
       1,
       _getSignerAddresses(signers),
       s_offchaintransmitters,
@@ -139,15 +160,9 @@ contract VerifierSetConfigTest is BaseTest {
       bytes("")
     );
 
-    (uint32 configCount, uint32 blockNumber, bytes32 configDigest) = s_verifier.latestConfigDetails(FEED_ID);
+    (uint32 configCount, uint32 blockNumber) = s_verifier.latestConfigDetails(configDigest);
     assertEq(configCount, 1);
     assertEq(blockNumber, block.number);
-    assertEq(configDigest, expectedConfigDigest);
-
-    (bool scanLogs, bytes32 configDigestTwo, uint32 epoch) = s_verifier.latestConfigDigestAndEpoch(FEED_ID);
-    assertEq(scanLogs, false);
-    assertEq(configDigestTwo, expectedConfigDigest);
-    assertEq(epoch, 0);
   }
 }
 
@@ -157,6 +172,9 @@ contract VerifierSetConfigWhenThereAreMultipleDigestsTest is BaseTestWithMultipl
 
     s_verifier.setConfig(
       FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       _getSignerAddresses(newSigners),
       s_offchaintransmitters,
       4,
@@ -166,7 +184,19 @@ contract VerifierSetConfigWhenThereAreMultipleDigestsTest is BaseTestWithMultipl
       new Common.AddressAndWeight[](0)
     );
 
-    (, , bytes32 configDigest) = s_verifier.latestConfigDetails(FEED_ID);
+    bytes32 configDigest = _configDigestFromConfigData(
+      FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
+      _getSignerAddresses(newSigners),
+      s_offchaintransmitters,
+      4,
+      bytes(""),
+      VERIFIER_VERSION,
+      bytes("")
+    );
+
     address verifierAddr = s_verifierProxy.getVerifier(configDigest);
     assertEq(verifierAddr, address(s_verifier));
   }
@@ -176,6 +206,9 @@ contract VerifierSetConfigWhenThereAreMultipleDigestsTest is BaseTestWithMultipl
 
     s_verifier.setConfig(
       FEED_ID_2,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       _getSignerAddresses(newSigners),
       s_offchaintransmitters,
       4,
@@ -185,12 +218,27 @@ contract VerifierSetConfigWhenThereAreMultipleDigestsTest is BaseTestWithMultipl
       new Common.AddressAndWeight[](0)
     );
 
-    (, , bytes32 configDigest) = s_verifier.latestConfigDetails(FEED_ID_2);
+    bytes32 configDigest = _configDigestFromConfigData(
+      FEED_ID_2,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
+      _getSignerAddresses(newSigners),
+      s_offchaintransmitters,
+      4,
+      bytes(""),
+      VERIFIER_VERSION,
+      bytes("")
+    );
+
     address verifierAddr = s_verifierProxy.getVerifier(configDigest);
     assertEq(verifierAddr, address(s_verifier));
 
     s_verifier_2.setConfig(
       FEED_ID_3,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       _getSignerAddresses(newSigners),
       s_offchaintransmitters,
       4,
@@ -200,18 +248,33 @@ contract VerifierSetConfigWhenThereAreMultipleDigestsTest is BaseTestWithMultipl
       new Common.AddressAndWeight[](0)
     );
 
-    (, , bytes32 configDigest2) = s_verifier_2.latestConfigDetails(FEED_ID_3);
+    bytes32 configDigest2 = _configDigestFromConfigData(
+      FEED_ID_3,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
+      _getSignerAddresses(newSigners),
+      s_offchaintransmitters,
+      4,
+      bytes(""),
+      VERIFIER_VERSION,
+      bytes("")
+    );
+    
     address verifierAddr2 = s_verifierProxy.getVerifier(configDigest2);
     assertEq(verifierAddr2, address(s_verifier_2));
   }
 
   function test_correctlySetsConfigWhenDigestsAreRemoved() public {
-    s_verifier.deactivateConfig(FEED_ID, s_configDigestTwo);
+    s_verifier.deactivateConfig(s_configDigestTwo);
 
     Signer[] memory newSigners = _getSigners(15);
 
     s_verifier.setConfig(
       FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       _getSignerAddresses(newSigners),
       s_offchaintransmitters,
       4,
@@ -223,9 +286,9 @@ contract VerifierSetConfigWhenThereAreMultipleDigestsTest is BaseTestWithMultipl
 
     bytes32 expectedConfigDigest = _configDigestFromConfigData(
       FEED_ID,
-      block.chainid,
-      address(s_verifier),
-      s_numConfigsSet + 1,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       _getSignerAddresses(newSigners),
       s_offchaintransmitters,
       4,
@@ -234,7 +297,20 @@ contract VerifierSetConfigWhenThereAreMultipleDigestsTest is BaseTestWithMultipl
       bytes("")
     );
 
-    (uint32 configCount, uint32 blockNumber, bytes32 configDigest) = s_verifier.latestConfigDetails(FEED_ID);
+    bytes32 configDigest = _configDigestFromConfigData(
+      FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
+      _getSignerAddresses(newSigners),
+      s_offchaintransmitters,
+      4,
+      bytes(""),
+      VERIFIER_VERSION,
+      bytes("")
+    );
+
+    (uint32 configCount, uint32 blockNumber) = s_verifier.latestConfigDetails(configDigest);
 
     assertEq(configCount, s_numConfigsSet + 1);
     assertEq(blockNumber, block.number);

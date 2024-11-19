@@ -52,7 +52,7 @@ contract Verifier is IVerifier, ConfirmedOwner, TypeAndVersionInterface {
     // The block number of the block the last time the configuration was updated.
     uint32 latestConfigBlockNumber;
     // Whether the config is deactivated
-    bool isDeactivated;
+    bool isActive;
     // Fault tolerance
     uint8 f;
     // Map of signer addresses to oracles
@@ -182,13 +182,13 @@ contract Verifier is IVerifier, ConfirmedOwner, TypeAndVersionInterface {
       bytes32 rawVs
     ) = abi.decode(signedReport, (bytes32[3], bytes, bytes32[], bytes32[], bytes32));
 
-    VerifierState storage verifierState = s_verifierStates[reportContext[0]];
-
     // reportContext consists of:
     // reportContext[0]: ConfigDigest
     // reportContext[1]: 27 byte padding, 4-byte epoch and 1-byte round
     // reportContext[2]: ExtraHash
     bytes32 configDigest = reportContext[0];
+
+    VerifierState storage verifierState = s_verifierStates[configDigest];
 
     _validateReport(configDigest, rs, ss, verifierState);
 
@@ -213,7 +213,7 @@ contract Verifier is IVerifier, ConfirmedOwner, TypeAndVersionInterface {
   ) private view {
     uint8 expectedNumSignatures = config.f + 1;
 
-    if (!config.isDeactivated) revert DigestInactive(configDigest);
+    if (!config.isActive) revert DigestInactive(configDigest);
     if (rs.length != expectedNumSignatures) revert IncorrectSignatureCount(rs.length, expectedNumSignatures);
     if (rs.length != ss.length) revert MismatchedSignatures(rs.length, ss.length);
   }
@@ -326,6 +326,7 @@ contract Verifier is IVerifier, ConfirmedOwner, TypeAndVersionInterface {
     verifierState.latestConfigBlockNumber = uint32(block.number);
     verifierState.configCount = configCount;
     verifierState.f = f;
+    verifierState.isActive = true;
 
     for (uint8 i; i < signers.length; ++i) {
       address signerAddr = signers[i];
@@ -405,8 +406,8 @@ contract Verifier is IVerifier, ConfirmedOwner, TypeAndVersionInterface {
       )
     );
     uint256 prefixMask = type(uint256).max << (256 - 16); // 0xFFFF00..00
-    // 0x0006 corresponds to ConfigDigestPrefixMercuryV02 in libocr
-    uint256 prefix = 0x0009 << (256 - 16); // 0x000600..00
+    // 0x0009 corresponds to ConfigDigestPrefixMercuryV02 in libocr
+    uint256 prefix = 0x0009 << (256 - 16); // 0x000900..00
     return bytes32((prefix & prefixMask) | (h & ~prefixMask));
   }
 
@@ -416,7 +417,7 @@ contract Verifier is IVerifier, ConfirmedOwner, TypeAndVersionInterface {
 
     if (configDigest == bytes32("")) revert DigestEmpty();
     if (verifierState.f == 0) revert DigestNotSet(configDigest);
-    verifierState.isDeactivated = false;
+    verifierState.isActive = true;
     emit ConfigActivated(configDigest);
   }
 
@@ -426,7 +427,7 @@ contract Verifier is IVerifier, ConfirmedOwner, TypeAndVersionInterface {
 
     if (configDigest == bytes32("")) revert DigestEmpty();
     if (verifierState.f == 0) revert DigestNotSet(configDigest);
-    verifierState.isDeactivated = true;
+    verifierState.isActive = false;
     emit ConfigDeactivated(configDigest);
   }
 

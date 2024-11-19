@@ -2,24 +2,24 @@
 pragma solidity 0.8.19;
 
 import {BaseTestWithConfiguredVerifierAndFeeManager, BaseTestWithMultipleConfiguredDigests} from "./BaseVerifierTest.t.sol";
-import {Verifier} from "../../../v0.3.0/Verifier.sol";
+import {Verifier} from "../../Verifier.sol";
 
 contract VerifierActivateConfigTest is BaseTestWithConfiguredVerifierAndFeeManager {
   function test_revertsIfNotOwner() public {
     vm.expectRevert("Only callable by owner");
 
     changePrank(address(s_verifierProxy));
-    s_verifier.activateConfig(FEED_ID, bytes32("mock"));
+    s_verifier.activateConfig(bytes32("mock"));
   }
 
   function test_revertsIfDigestIsEmpty() public {
     vm.expectRevert(abi.encodeWithSelector(Verifier.DigestEmpty.selector));
-    s_verifier.activateConfig(FEED_ID, bytes32(""));
+    s_verifier.activateConfig(bytes32(""));
   }
 
   function test_revertsIfDigestNotSet() public {
-    vm.expectRevert(abi.encodeWithSelector(Verifier.DigestNotSet.selector, FEED_ID, bytes32("non-existent-digest")));
-    s_verifier.activateConfig(FEED_ID, bytes32("non-existent-digest"));
+    vm.expectRevert(abi.encodeWithSelector(Verifier.DigestNotSet.selector, bytes32("non-existent-digest")));
+    s_verifier.activateConfig(bytes32("non-existent-digest"));
   }
 }
 
@@ -46,11 +46,11 @@ contract VerifierActivateConfigWithDeactivatedConfigTest is BaseTestWithMultiple
       uint32(block.timestamp)
     );
 
-    s_verifier.deactivateConfig(FEED_ID, s_configDigestTwo);
+    s_verifier.deactivateConfig(s_configDigestTwo);
   }
 
   function test_allowsVerification() public {
-    s_verifier.activateConfig(FEED_ID, s_configDigestTwo);
+    s_verifier.activateConfig(s_configDigestTwo);
     changePrank(address(s_verifierProxy));
 
     bytes memory signedReport = _generateV1EncodedBlob(

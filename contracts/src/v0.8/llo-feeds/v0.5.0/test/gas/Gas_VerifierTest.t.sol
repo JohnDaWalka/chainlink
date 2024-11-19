@@ -19,11 +19,14 @@ contract Verifier_setConfig is BaseTest {
   function testSetConfigSuccess_gas() public {
     s_verifier.setConfig(
       FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       s_signerAddrs,
       s_offchaintransmitters,
       FAULT_TOLERANCE,
       bytes(""),
-      VERIFIER_VERSION,
+      1,
       bytes(""),
       new Common.AddressAndWeight[](0)
     );
@@ -44,7 +47,7 @@ contract Verifier_verifyWithFee is BaseTestWithConfiguredVerifierAndFeeManager {
     //warm the rewardManager
     link.mint(address(this), DEFAULT_NATIVE_MINT_QUANTITY);
     _approveLink(address(rewardManager), DEFAULT_REPORT_LINK_FEE, address(this));
-    (, , bytes32 latestConfigDigest) = s_verifier.latestConfigDetails(FEED_ID);
+    bytes32 latestConfigDigest = v1ConfigDigest;
 
     //mint some tokens to the user
     link.mint(USER, DEFAULT_LINK_MINT_QUANTITY);
@@ -103,7 +106,7 @@ contract Verifier_bulkVerifyWithFee is BaseTestWithConfiguredVerifierAndFeeManag
     //warm the rewardManager
     link.mint(address(this), DEFAULT_NATIVE_MINT_QUANTITY);
     _approveLink(address(rewardManager), DEFAULT_REPORT_LINK_FEE, address(this));
-    (, , bytes32 latestConfigDigest) = s_verifier.latestConfigDetails(FEED_ID);
+    bytes32 latestConfigDigest = v1ConfigDigest;
 
     //mint some tokens to the user
     link.mint(USER, DEFAULT_LINK_MINT_QUANTITY);
@@ -174,7 +177,7 @@ contract Verifier_verify is BaseTestWithConfiguredVerifierAndFeeManager {
       BLOCKNUMBER_LOWER_BOUND,
       uint32(block.timestamp)
     );
-    (, , s_configDigest) = s_verifier.latestConfigDetails(FEED_ID);
+    s_configDigest = v1ConfigDigest;
     bytes32[3] memory reportContext;
     reportContext[0] = s_configDigest;
     reportContext[1] = bytes32(abi.encode(uint32(5), uint8(1)));
@@ -213,7 +216,7 @@ contract Verifier_accessControlledVerify is BaseTestWithConfiguredVerifierAndFee
       BLOCKNUMBER_LOWER_BOUND,
       uint32(block.timestamp)
     );
-    (, , s_configDigest) = s_verifier.latestConfigDetails(FEED_ID);
+    s_configDigest = v1ConfigDigest;
     bytes32[3] memory reportContext;
     reportContext[0] = s_configDigest;
     reportContext[1] = bytes32(abi.encode(uint32(5), uint8(1)));

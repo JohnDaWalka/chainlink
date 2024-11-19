@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {BaseTestWithConfiguredVerifierAndFeeManager} from "./BaseVerifierTest.t.sol";
 import {IVerifier} from "../../interfaces/IVerifier.sol";
-import {VerifierProxy} from "../../../v0.3.0/VerifierProxy.sol";
+import {VerifierProxy} from "../../VerifierProxy.sol";
 import {IERC165} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC165.sol";
 import {Common} from "../../../libraries/Common.sol";
 
@@ -14,7 +14,7 @@ contract VerifierProxyInitializeVerifierTest is BaseTestWithConfiguredVerifierAn
   }
 
   function test_revertsIfDigestAlreadySet() public {
-    (, , bytes32 takenDigest) = s_verifier.latestConfigDetails(FEED_ID);
+    bytes32 takenDigest = v1ConfigDigest;
 
     address maliciousVerifier = address(666);
     bytes32 maliciousDigest = bytes32("malicious-digest");
@@ -32,7 +32,7 @@ contract VerifierProxyInitializeVerifierTest is BaseTestWithConfiguredVerifierAn
   }
 
   function test_updatesVerifierIfVerifier() public {
-    (, , bytes32 prevDigest) = s_verifier.latestConfigDetails(FEED_ID);
+    bytes32 prevDigest = v1ConfigDigest;
     changePrank(address(s_verifier));
     s_verifierProxy.setVerifier(prevDigest, bytes32("new-config"), new Common.AddressAndWeight[](0));
     assertEq(s_verifierProxy.getVerifier(bytes32("new-config")), address(s_verifier));

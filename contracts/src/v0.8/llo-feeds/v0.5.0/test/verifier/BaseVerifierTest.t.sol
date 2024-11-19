@@ -28,6 +28,9 @@ contract BaseTest is Test {
   bytes32 internal constant V2_BITMASK = 0x0002000000000000000000000000000000000000000000000000000000000000;
   bytes32 internal constant V3_BITMASK = 0x0003000000000000000000000000000000000000000000000000000000000000;
 
+  uint256 internal constant SOURCE_CHAIN_ID = 0x1234;
+  address internal constant SOURCE_ADDRESS = address(0x1234);
+
   //version 0 feeds
   bytes32 internal constant FEED_ID = (keccak256("ETH-USD") & V_MASK) | V1_BITMASK;
   bytes32 internal constant FEED_ID_2 = (keccak256("LINK-USD") & V_MASK) | V1_BITMASK;
@@ -205,7 +208,7 @@ contract BaseTest is Test {
       )
     );
     uint256 prefixMask = type(uint256).max << (256 - 16); // 0xFFFF00..00
-    uint256 prefix = 0x0006 << (256 - 16); // 0x000600..00
+    uint256 prefix = 0x0009 << (256 - 16); // 0x000900..00
     return bytes32((prefix & prefixMask) | (h & ~prefixMask));
   }
 
@@ -288,6 +291,9 @@ contract BaseTestWithConfiguredVerifierAndFeeManager is BaseTest {
     s_verifierProxy.initializeVerifier(address(s_verifier));
     s_verifier.setConfig(
       FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       _getSignerAddresses(signers),
       s_offchaintransmitters,
       FAULT_TOLERANCE,
@@ -296,10 +302,25 @@ contract BaseTestWithConfiguredVerifierAndFeeManager is BaseTest {
       bytes(""),
       new Common.AddressAndWeight[](0)
     );
-    (, , v1ConfigDigest) = s_verifier.latestConfigDetails(FEED_ID);
+    
+    v1ConfigDigest = _configDigestFromConfigData(
+      FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
+      _getSignerAddresses(signers),
+      s_offchaintransmitters,
+      FAULT_TOLERANCE,
+      bytes(""),
+      VERIFIER_VERSION,
+      bytes("")
+    );
 
     s_verifier.setConfig(
       FEED_ID_V3,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       _getSignerAddresses(signers),
       s_offchaintransmitters,
       FAULT_TOLERANCE,
@@ -308,7 +329,19 @@ contract BaseTestWithConfiguredVerifierAndFeeManager is BaseTest {
       bytes(""),
       new Common.AddressAndWeight[](0)
     );
-    (, , v3ConfigDigest) = s_verifier.latestConfigDetails(FEED_ID_V3);
+
+    v3ConfigDigest = _configDigestFromConfigData(
+      FEED_ID_V3,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
+      _getSignerAddresses(signers),
+      s_offchaintransmitters,
+      FAULT_TOLERANCE,
+      bytes(""),
+      VERIFIER_VERSION,
+      bytes("")
+    );
 
     link = new ERC20Mock("LINK", "LINK", ADMIN, 0);
     native = new WERC20Mock();
@@ -442,12 +475,15 @@ contract BaseTestWithMultipleConfiguredDigests is BaseTestWithConfiguredVerifier
     BaseTestWithConfiguredVerifierAndFeeManager.setUp();
     Signer[] memory signers = _getSigners(MAX_ORACLES);
 
-    (, , s_configDigestOne) = s_verifier.latestConfigDetails(FEED_ID);
+    s_configDigestOne = v1ConfigDigest;
 
     // Verifier 1, Feed 1, Config 2
     Signer[] memory secondSetOfSigners = _getSigners(8);
     s_verifier.setConfig(
       FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      2,
       _getSignerAddresses(secondSetOfSigners),
       s_offchaintransmitters,
       FAULT_TOLERANCE_TWO,
@@ -456,12 +492,27 @@ contract BaseTestWithMultipleConfiguredDigests is BaseTestWithConfiguredVerifier
       bytes(""),
       new Common.AddressAndWeight[](0)
     );
-    (, , s_configDigestTwo) = s_verifier.latestConfigDetails(FEED_ID);
+
+    s_configDigestTwo = _configDigestFromConfigData(
+      FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      2,
+      _getSignerAddresses(secondSetOfSigners),
+      s_offchaintransmitters,
+      FAULT_TOLERANCE_TWO,
+      bytes(""),
+      2,
+      bytes("")
+    );
 
     // Verifier 1, Feed 1, Config 3
     Signer[] memory thirdSetOfSigners = _getSigners(5);
     s_verifier.setConfig(
       FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      3,
       _getSignerAddresses(thirdSetOfSigners),
       s_offchaintransmitters,
       FAULT_TOLERANCE_THREE,
@@ -470,11 +521,25 @@ contract BaseTestWithMultipleConfiguredDigests is BaseTestWithConfiguredVerifier
       bytes(""),
       new Common.AddressAndWeight[](0)
     );
-    (s_numConfigsSet, , s_configDigestThree) = s_verifier.latestConfigDetails(FEED_ID);
+    s_configDigestThree = _configDigestFromConfigData(
+      FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      3,
+      _getSignerAddresses(thirdSetOfSigners),
+      s_offchaintransmitters,
+      FAULT_TOLERANCE_THREE,
+      bytes(""),
+      3,
+      bytes("")
+    );
 
     // Verifier 1, Feed 2, Config 1
     s_verifier.setConfig(
       FEED_ID_2,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       _getSignerAddresses(signers),
       s_offchaintransmitters,
       FAULT_TOLERANCE,
@@ -483,20 +548,45 @@ contract BaseTestWithMultipleConfiguredDigests is BaseTestWithConfiguredVerifier
       bytes(""),
       new Common.AddressAndWeight[](0)
     );
-    (, , s_configDigestFour) = s_verifier.latestConfigDetails(FEED_ID_2);
+    s_configDigestFour = _configDigestFromConfigData(
+      FEED_ID_2,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
+      _getSignerAddresses(signers),
+      s_offchaintransmitters,
+      FAULT_TOLERANCE,
+      bytes(""),
+      4,
+      bytes("")
+    );
 
     // Verifier 2, Feed 3, Config 1
     s_verifierProxy.initializeVerifier(address(s_verifier_2));
     s_verifier_2.setConfig(
       FEED_ID_3,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
       _getSignerAddresses(signers),
       s_offchaintransmitters,
       FAULT_TOLERANCE,
       bytes(""),
-      VERIFIER_VERSION,
+      5,
       bytes(""),
       new Common.AddressAndWeight[](0)
     );
-    (, , s_configDigestFive) = s_verifier_2.latestConfigDetails(FEED_ID_3);
+    s_configDigestFive = _configDigestFromConfigData(
+      FEED_ID_3,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS,
+      1,
+      _getSignerAddresses(signers),
+      s_offchaintransmitters,
+      FAULT_TOLERANCE,
+      bytes(""),
+      5,
+      bytes("")
+    );
   }
 }

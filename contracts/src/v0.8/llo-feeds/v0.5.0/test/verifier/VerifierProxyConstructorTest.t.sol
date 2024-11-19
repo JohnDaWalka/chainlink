@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {BaseTest} from "./BaseVerifierTest.t.sol";
-import {VerifierProxy} from "../../../v0.3.0/VerifierProxy.sol";
+import {VerifierProxy} from "../../VerifierProxy.sol";
 import {AccessControllerInterface} from "../../../../shared/interfaces/AccessControllerInterface.sol";
 
 contract VerifierProxyConstructorTest is BaseTest {

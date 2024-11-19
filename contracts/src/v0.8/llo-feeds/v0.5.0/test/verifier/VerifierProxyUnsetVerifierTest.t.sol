@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {BaseTest, BaseTestWithConfiguredVerifierAndFeeManager} from "./BaseVerifierTest.t.sol";
-import {VerifierProxy} from "../../../v0.3.0/VerifierProxy.sol";
+import {VerifierProxy} from "../../VerifierProxy.sol";
 
 contract VerifierProxyUnsetVerifierTest is BaseTest {
   function test_revertsIfNotAdmin() public {
@@ -25,7 +25,7 @@ contract VerifierProxyUnsetVerifierWithPreviouslySetVerifierTest is BaseTestWith
 
   function setUp() public override {
     BaseTestWithConfiguredVerifierAndFeeManager.setUp();
-    (, , s_configDigest) = s_verifier.latestConfigDetails(FEED_ID);
+    s_configDigest = v3ConfigDigest;
   }
 
   function test_correctlyUnsetsVerifier() public {
