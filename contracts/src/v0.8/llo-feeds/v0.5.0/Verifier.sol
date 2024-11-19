@@ -389,22 +389,29 @@ contract Verifier is IVerifier, ConfirmedOwner, TypeAndVersionInterface {
     uint64 offchainConfigVersion,
     bytes memory offchainConfig
   ) internal pure returns (bytes32) {
+
+    bytes[] memory signersAsBytes = new bytes[](signers.length);
+    for (uint i; i < signers.length; ++i){
+      signersAsBytes[i] = abi.encodePacked(signers[i]);
+    }
+
     uint256 h = uint256(
-      keccak256(
-        abi.encode(
-          configId,
-          sourceChainId,
-          sourceAddress,
-          configCount,
-          signers,
-          offchainTransmitters,
-          f,
-          onchainConfig,
-          offchainConfigVersion,
-          offchainConfig
+        keccak256(
+          abi.encode(
+            configId,
+            sourceChainId,
+            sourceAddress,
+            configCount,
+            signersAsBytes,
+            offchainTransmitters,
+            f,
+            onchainConfig,
+            offchainConfigVersion,
+            offchainConfig
+          )
         )
-      )
-    );
+      );
+
     uint256 prefixMask = type(uint256).max << (256 - 16); // 0xFFFF00..00
     // 0x0009 corresponds to ConfigDigestPrefixMercuryV02 in libocr
     uint256 prefix = 0x0009 << (256 - 16); // 0x000900..00

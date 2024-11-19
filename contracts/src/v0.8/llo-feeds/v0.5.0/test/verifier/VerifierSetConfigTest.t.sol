@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import {BaseTest, BaseTestWithMultipleConfiguredDigests} from "./BaseVerifierTest.t.sol";
 import {Verifier} from "../../Verifier.sol";
 import {Common} from "../../../libraries/Common.sol";
+import {MockConfigurator} from "../mocks/MockConfigurator.sol";
 
 contract VerifierSetConfigTest is BaseTest {
   function setUp() public virtual override {
@@ -314,6 +315,123 @@ contract VerifierSetConfigWhenThereAreMultipleDigestsTest is BaseTestWithMultipl
 
     assertEq(configCount, s_numConfigsSet + 1);
     assertEq(blockNumber, block.number);
+    assertEq(configDigest, expectedConfigDigest);
+  }
+
+  function test_revertsIfDuplicateConfigIsSet() public {
+    // Set initial config
+    s_verifier.setConfig(
+      FEED_ID,
+      SOURCE_CHAIN_ID, 
+      SOURCE_ADDRESS,
+      1,
+      _getSignerAddresses(_getSigners(15)),
+      s_offchaintransmitters,
+      4,
+      bytes(""),
+      VERIFIER_VERSION,
+      bytes(""),
+      new Common.AddressAndWeight[](0)
+    );
+
+    // Try to set same config again
+    vm.expectRevert(abi.encodeWithSelector(Verifier.NonUniqueSignatures.selector));
+    s_verifier.setConfig(
+      FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS, 
+      1,
+      _getSignerAddresses(_getSigners(15)),
+      s_offchaintransmitters,
+      4,
+      bytes(""),
+      VERIFIER_VERSION,
+      bytes(""),
+      new Common.AddressAndWeight[](0)
+    );
+  }
+
+  function test_incrementalConfigUpdates() public {
+    // Set initial config
+    s_verifier.setConfig(
+      FEED_ID,
+      SOURCE_CHAIN_ID, 
+      SOURCE_ADDRESS,
+      1,
+      _getSignerAddresses(_getSigners(15)),
+      s_offchaintransmitters,
+      4,
+      bytes(""),
+      VERIFIER_VERSION,
+      bytes(""),
+      new Common.AddressAndWeight[](0)
+    );
+
+    // Try to set same config again
+    s_verifier.setConfig(
+      FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS, 
+      2,
+      _getSignerAddresses(_getSigners(15)),
+      s_offchaintransmitters,
+      4,
+      bytes(""),
+      VERIFIER_VERSION,
+      bytes(""),
+      new Common.AddressAndWeight[](0)
+    );
+
+      s_verifier.setConfig(
+      FEED_ID,
+      SOURCE_CHAIN_ID,
+      SOURCE_ADDRESS, 
+      3,
+      _getSignerAddresses(_getSigners(15)),
+      s_offchaintransmitters,
+      4,
+      bytes(""),
+      VERIFIER_VERSION,
+      bytes(""),
+      new Common.AddressAndWeight[](0)
+    );
+  }
+  
+  function test_configDigestMatchesConfiguratorDigest() public {
+     MockConfigurator configurator = new MockConfigurator();
+
+     // Convert addresses to bytes array
+     Signer[] memory signers = _getSigners(15);
+     bytes[] memory signersAsBytes = new bytes[](signers.length);
+     for (uint i; i < signers.length; ++i){
+       signersAsBytes[i] = abi.encodePacked(signers[i].signerAddress);
+     }
+
+     configurator.setStagingConfig(
+      FEED_ID,
+      signersAsBytes,
+      s_offchaintransmitters,
+      4,
+      bytes(""),
+      VERIFIER_VERSION,
+      bytes("")
+    );
+
+    bytes32 expectedConfigDigest = _configDigestFromConfigData(
+      FEED_ID,
+      block.chainid,
+      address(configurator),
+      1,
+      _getSignerAddresses(signers),
+      s_offchaintransmitters,
+      4,
+      bytes(""),
+      VERIFIER_VERSION,
+      bytes("")
+    );
+
+    (,,bytes32 configDigest) = configurator.s_configurationStates(FEED_ID);
+
     assertEq(configDigest, expectedConfigDigest);
   }
 }

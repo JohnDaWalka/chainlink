@@ -191,6 +191,13 @@ contract BaseTest is Test {
     uint64 offchainConfigVersion,
     bytes memory offchainConfig
   ) internal pure returns (bytes32) {
+
+    // Convert addresses to bytes array to match configurator
+    bytes[] memory signersAsBytes = new bytes[](signers.length);
+    for (uint i; i < signers.length; ++i){
+      signersAsBytes[i] = abi.encodePacked(signers[i]);
+    }
+
     uint256 h = uint256(
       keccak256(
         abi.encode(
@@ -198,7 +205,7 @@ contract BaseTest is Test {
           chainId,
           verifierAddr,
           configCount,
-          signers,
+          signersAsBytes,
           offchainTransmitters,
           f,
           onchainConfig,
