@@ -153,13 +153,12 @@ func (t *Txm) CreateTransaction(ctx context.Context, txRequest *types.TxRequest)
 	return
 }
 
-func (t *Txm) Trigger(address common.Address) error {
+func (t *Txm) Trigger(address common.Address) {
 	if !t.IfStarted(func() {
 		t.triggerCh[address] <- struct{}{}
 	}) {
-		return fmt.Errorf("Txm unstarted")
+		t.lggr.Error("Txm unstarted")
 	}
-	return nil
 }
 
 func (t *Txm) Abandon(address common.Address) error {
@@ -348,7 +347,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 	}
 	if unconfirmedCount == 0 {
 		t.lggr.Debugf("All transactions confirmed for address: %v", address)
-		return false, err  // TODO: add backoff to optimize requests
+		return false, err // TODO: add backoff to optimize requests
 	}
 
 	if tx == nil || tx.Nonce != latestNonce {

@@ -67,9 +67,10 @@ func TestTrigger(t *testing.T) {
 	keystore := mocks.NewKeystore(t)
 	keystore.On("EnabledAddressesForChain", mock.Anything, mock.Anything).Return([]common.Address{address}, nil)
 	t.Run("Trigger fails if Txm is unstarted", func(t *testing.T) {
-		txm := NewTxm(logger.Test(t), nil, nil, nil, nil, Config{}, keystore)
+		lggr, observedLogs := logger.TestObserved(t, zap.ErrorLevel)
+		txm := NewTxm(lggr, nil, nil, nil, nil, Config{}, keystore)
 		txm.Trigger(address)
-		assert.Error(t, txm.Trigger(address), "Txm unstarted")
+		tests.AssertLogEventually(t, observedLogs, "Txm unstarted")
 	})
 
 	t.Run("executes Trigger", func(t *testing.T) {
@@ -84,7 +85,6 @@ func TestTrigger(t *testing.T) {
 		// Start
 		client.On("PendingNonceAt", mock.Anything, address).Return(nonce, nil).Once()
 		servicetest.Run(t, txm)
-		assert.NoError(t, txm.Trigger(address))
 	})
 }
 

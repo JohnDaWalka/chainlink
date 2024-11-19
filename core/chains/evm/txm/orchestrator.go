@@ -126,9 +126,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) Close() (merr error) {
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) Trigger(addr common.Address) {
-	if err := o.txm.Trigger(addr); err != nil {
-		o.lggr.Error(err)
-	}
+	o.txm.Trigger(addr)
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) Name() string {
@@ -347,6 +345,6 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) SendNativeToken(ctx context.Context, ch
 	}
 
 	// Trigger the Txm to check for new transaction
-	err = o.txm.Trigger(from)
+	o.txm.Trigger(from)
 	return tx, err
 }
