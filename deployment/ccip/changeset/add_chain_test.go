@@ -73,7 +73,7 @@ func TestAddChainInbound(t *testing.T) {
 
 	//  Deploy contracts to new chain
 	newAddresses = deployment.NewMemoryAddressBook()
-	err = ccipdeployment.DeployPrerequisiteChainContracts(e.Env, newAddresses, []uint64{newChain})
+	err = ccipdeployment.DeployPrerequisiteChainContracts(e.Env, newAddresses, []uint64{newChain}, nil)
 	require.NoError(t, err)
 	require.NoError(t, e.Env.ExistingAddresses.Merge(newAddresses))
 	newAddresses = deployment.NewMemoryAddressBook()
