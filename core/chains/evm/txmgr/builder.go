@@ -120,7 +120,7 @@ func NewTxmV2(
 		stuckTxDetectorConfig := txm.StuckTxDetectorConfig{
 			BlockTime:             *txmV2Config.BlockTime(),
 			StuckTxBlockThreshold: *txConfig.AutoPurge().Threshold(),
-			DetectionApiUrl:       txConfig.AutoPurge().DetectionApiUrl().String(),
+			DetectionURL:       txConfig.AutoPurge().DetectionApiUrl().String(),
 		}
 		stuckTxDetector = txm.NewStuckTxDetector(lggr, chainConfig.ChainType(), stuckTxDetectorConfig)
 	}
@@ -135,7 +135,7 @@ func NewTxmV2(
 	}
 	var c txm.Client
 	if chainConfig.ChainType() == chaintype.ChainDualBroadcast {
-		c = clientwrappers.NewDualBroadcastClient(client, keyStore, txmV2Config.CustomUrl())
+		c = clientwrappers.NewDualBroadcastClient(client, keyStore, txmV2Config.CustomURL())
 	} else {
 		c = clientwrappers.NewChainClient(client)
 	}

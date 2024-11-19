@@ -26,14 +26,14 @@ type DualBroadcastClientKeystore interface {
 type DualBroadcastClient struct {
 	c         client.Client
 	keystore  DualBroadcastClientKeystore
-	customUrl *url.URL
+	customURL *url.URL
 }
 
-func NewDualBroadcastClient(c client.Client, keystore DualBroadcastClientKeystore, customUrl *url.URL) *DualBroadcastClient {
+func NewDualBroadcastClient(c client.Client, keystore DualBroadcastClientKeystore, customURL *url.URL) *DualBroadcastClient {
 	return &DualBroadcastClient{
 		c:         c,
 		keystore:  keystore,
-		customUrl: customUrl,
+		customURL: customURL,
 	}
 }
 
@@ -81,7 +81,7 @@ func (d *DualBroadcastClient) SendTransaction(ctx context.Context, tx *types.Tra
 
 func (d *DualBroadcastClient) signAndPostMessage(ctx context.Context, address common.Address, body []byte, urlParams string) (result string, err error) {
 	bodyReader := bytes.NewReader(body)
-	postReq, err := http.NewRequestWithContext(ctx, http.MethodPost, d.customUrl.String()+"?"+urlParams, bodyReader)
+	postReq, err := http.NewRequestWithContext(ctx, http.MethodPost, d.customURL.String()+"?"+urlParams, bodyReader)
 	if err != nil {
 		return
 	}

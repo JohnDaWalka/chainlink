@@ -9290,7 +9290,7 @@ ResendAfterThreshold controls how long to wait before re-broadcasting a transact
 [EVM.TxmV2]
 Enabled = false # Default
 BlockTime = '10s' # Example
-CustomUrl = 'https://example.api.io' # Example
+CustomURL = 'https://example.api.io' # Example
 ```
 
 
@@ -9306,11 +9306,11 @@ BlockTime = '10s' # Example
 ```
 BlockTime controls the frequency of the backfill loop of TxmV2.
 
-### CustomUrl
+### CustomURL
 ```toml
-CustomUrl = 'https://example.api.io' # Example
+CustomURL = 'https://example.api.io' # Example
 ```
-CustomUrl configures the base url of a custom endpoint used by the ChainDualBroadcast chain type.
+CustomURL configures the base url of a custom endpoint used by the ChainDualBroadcast chain type.
 
 ## EVM.Transactions.AutoPurge
 ```toml
