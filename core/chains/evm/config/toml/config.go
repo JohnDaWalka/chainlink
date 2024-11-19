@@ -477,7 +477,7 @@ func (c *Chain) ValidateConfig() (err error) {
 type TxmV2 struct {
 	Enabled   *bool                  `toml:",omitempty"`
 	BlockTime *commonconfig.Duration `toml:",omitempty"`
-	CustomUrl *commonconfig.URL      `toml:",omitempty"`
+	CustomURL *commonconfig.URL      `toml:",omitempty"`
 }
 
 func (t *TxmV2) setFrom(f *TxmV2) {
@@ -489,8 +489,8 @@ func (t *TxmV2) setFrom(f *TxmV2) {
 		t.BlockTime = f.BlockTime
 	}
 
-	if v := f.CustomUrl; v != nil {
-		t.CustomUrl = f.CustomUrl
+	if v := f.CustomURL; v != nil {
+		t.CustomURL = f.CustomURL
 	}
 }
 

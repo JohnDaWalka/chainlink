@@ -19,7 +19,7 @@ import (
 type StuckTxDetectorConfig struct {
 	BlockTime             time.Duration
 	StuckTxBlockThreshold uint32
-	DetectionApiUrl       string
+	DetectionURL          string
 }
 
 type stuckTxDetector struct {
@@ -60,22 +60,22 @@ func (s *stuckTxDetector) timeBasedDetection(tx *types.Transaction) bool {
 	return false
 }
 
-type ApiResponse struct {
+type APIResponse struct {
 	Status string      `json:"status,omitempty"`
 	Hash   common.Hash `json:"hash,omitempty"`
 }
 
 const (
-	ApiStatusPending   = "PENDING"
-	ApiStatusIncluded  = "INCLUDED"
-	ApiStatusFailed    = "FAILED"
-	ApiStatusCancelled = "CANCELLED"
-	ApiStatusUnknown   = "UNKNOWN"
+	APIStatusPending   = "PENDING"
+	APIStatusIncluded  = "INCLUDED"
+	APIStatusFailed    = "FAILED"
+	APIStatusCancelled = "CANCELLED"
+	APIStatusUnknown   = "UNKNOWN"
 )
 
 func (s *stuckTxDetector) dualBroadcastDetection(ctx context.Context, tx *types.Transaction) (bool, error) {
 	for _, attempt := range tx.Attempts {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.config.DetectionApiUrl+attempt.Hash.String(), nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.config.DetectionURL+attempt.Hash.String(), nil)
 		if err != nil {
 			return false, fmt.Errorf("failed to make request for txID: %v, attemptHash: %v - %w", tx.ID, attempt.Hash, err)
 		}
@@ -93,19 +93,19 @@ func (s *stuckTxDetector) dualBroadcastDetection(ctx context.Context, tx *types.
 			return false, err
 		}
 
-		var apiResponse ApiResponse
+		var apiResponse APIResponse
 		err = json.Unmarshal(body, &apiResponse)
 		if err != nil {
 			return false, fmt.Errorf("failed to unmarshal response for txID: %v, attemptHash: %v - %w: %s", tx.ID, attempt.Hash, err, string(body))
 		}
 		switch apiResponse.Status {
-		case ApiStatusPending, ApiStatusIncluded:
+		case APIStatusPending, APIStatusIncluded:
 			return false, nil
-		case ApiStatusFailed, ApiStatusCancelled:
+		case APIStatusFailed, APIStatusCancelled:
 			s.lggr.Debugf("TxID: %v with attempHash: %v was marked as failed/cancelled by the RPC. Transaction is now considered stuck and will be purged.",
 				tx.ID, attempt.Hash)
 			return true, nil
-		case ApiStatusUnknown:
+		case APIStatusUnknown:
 			continue
 		default:
 			continue

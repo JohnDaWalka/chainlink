@@ -20,6 +20,6 @@ func (t *txmv2Config) BlockTime() *time.Duration {
 	return &d
 }
 
-func (t *txmv2Config) CustomUrl() *url.URL {
-	return t.c.CustomUrl.URL()
+func (t *txmv2Config) CustomURL() *url.URL {
+	return t.c.CustomURL.URL()
 }

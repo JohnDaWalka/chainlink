@@ -106,7 +106,7 @@ type ClientErrors interface {
 type TxmV2 interface {
 	Enabled() bool
 	BlockTime() *time.Duration
-	CustomUrl() *url.URL
+	CustomURL() *url.URL
 }
 
 type Transactions interface {
