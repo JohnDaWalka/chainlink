@@ -10,6 +10,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	ccdeploy "github.com/smartcontractkit/chainlink/deployment/ccip"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
@@ -57,7 +58,7 @@ func Test_CCIPFeeBoosting(t *testing.T) {
 
 		tokenConfig := ccdeploy.NewTestTokenConfig(state.Chains[e.FeedChainSel].USDFeeds)
 		// Apply migration
-		output, err = changeset.InitialDeploy(e.Env, ccdeploy.DeployCCIPContractConfig{
+		output, err = changeset.InitialDeploy(e.Env, ccdeploy.InitialAddChainConfig{
 			HomeChainSel:   e.HomeChainSel,
 			FeedChainSel:   e.FeedChainSel,
 			ChainsToDeploy: allChainSelectors,

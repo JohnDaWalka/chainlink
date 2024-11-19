@@ -74,7 +74,7 @@ func Test_CCIPMessaging(t *testing.T) {
 
 	tokenConfig := ccdeploy.NewTestTokenConfig(state.Chains[e.FeedChainSel].USDFeeds)
 	// Apply migration
-	output, err = changeset.InitialDeploy(e.Env, ccdeploy.DeployCCIPContractConfig{
+	output, err = changeset.InitialDeploy(e.Env, ccdeploy.InitialAddChainConfig{
 		HomeChainSel:   e.HomeChainSel,
 		FeedChainSel:   e.FeedChainSel,
 		ChainsToDeploy: allChainSelectors,

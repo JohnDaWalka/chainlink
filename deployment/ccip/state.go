@@ -2,6 +2,7 @@ package ccipdeployment
 
 import (
 	"fmt"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_transmitter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
@@ -46,10 +47,15 @@ import (
 // CCIPChainState holds a Go binding for all the currently deployed CCIP contracts
 // on a chain. If a binding is nil, it means here is no such contract on the chain.
 type CCIPChainState struct {
-	OnRamp             *onramp.OnRamp
-	OffRamp            *offramp.OffRamp
-	FeeQuoter          *fee_quoter.FeeQuoter
-	RMNProxyNew        *rmn_proxy_contract.RMNProxyContract
+	OnRamp    *onramp.OnRamp
+	OffRamp   *offramp.OffRamp
+	FeeQuoter *fee_quoter.FeeQuoter
+	// This is the new RMNProxy contract that will be used for testing RMNRemote before migration
+	// Initially RMNProxyNew will point to RMNRemote
+	RMNProxyNew *rmn_proxy_contract.RMNProxyContract
+	// Existing RMNProxy contract that is used in production, This already has 1.5 RMN set.
+	// once RMNRemote is tested with RMNProxyNew, as part of migration
+	// RMNProxyExisting will point to RMNRemote. This will switch over CCIP 1.5 to 1.6
 	RMNProxyExisting   *rmn_proxy_contract.RMNProxyContract
 	NonceManager       *nonce_manager.NonceManager
 	TokenAdminRegistry *token_admin_registry.TokenAdminRegistry

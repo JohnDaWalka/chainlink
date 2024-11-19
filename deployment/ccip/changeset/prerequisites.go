@@ -17,13 +17,15 @@ var (
 
 // DeployPrerequisites deploys the pre-requisite contracts for CCIP
 // pre-requisite contracts are the contracts which can be reused from previous versions of CCIP
+// Or the contracts which are already deployed on the chain ( for example, tokens, feeds, etc)
+// Caller should update the environment's address book with the returned addresses.
 func DeployPrerequisites(env deployment.Environment, cfg DeployPrerequisiteConfig) (deployment.ChangesetOutput, error) {
 	err := cfg.Validate()
 	if err != nil {
 		return deployment.ChangesetOutput{}, errors.Wrapf(deployment.ErrInvalidConfig, "%v", err)
 	}
 	ab := deployment.NewMemoryAddressBook()
-	err = ccipdeployment.DeployPrerequisiteChainContracts(env, ab, cfg.ChainSelectors)
+	err = ccipdeployment.DeployPrerequisiteChainContracts(env, ab, cfg.ChainSelectors, cfg.USDCEnabledChainSelectors)
 	if err != nil {
 		env.Logger.Errorw("Failed to deploy prerequisite contracts", "err", err, "addressBook", ab)
 		return deployment.ChangesetOutput{
@@ -38,7 +40,8 @@ func DeployPrerequisites(env deployment.Environment, cfg DeployPrerequisiteConfi
 }
 
 type DeployPrerequisiteConfig struct {
-	ChainSelectors []uint64
+	ChainSelectors            []uint64
+	USDCEnabledChainSelectors []uint64
 	// TODO handle tokens and feeds in prerequisite config
 	Tokens map[ccipdeployment.TokenSymbol]common.Address
 	Feeds  map[ccipdeployment.TokenSymbol]common.Address
@@ -46,6 +49,11 @@ type DeployPrerequisiteConfig struct {
 
 func (c DeployPrerequisiteConfig) Validate() error {
 	for _, cs := range c.ChainSelectors {
+		if err := deployment.IsValidChainSelector(cs); err != nil {
+			return fmt.Errorf("invalid chain selector: %d - %w", cs, err)
+		}
+	}
+	for _, cs := range c.USDCEnabledChainSelectors {
 		if err := deployment.IsValidChainSelector(cs); err != nil {
 			return fmt.Errorf("invalid chain selector: %d - %w", cs, err)
 		}

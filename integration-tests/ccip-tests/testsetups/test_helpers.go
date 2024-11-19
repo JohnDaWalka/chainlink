@@ -151,7 +151,7 @@ func NewLocalDevEnvironmentWithRMN(
 
 	// Deploy CCIP contracts.
 	newAddresses := deployment.NewMemoryAddressBook()
-	err = ccipdeployment.DeployCCIPContracts(tenv.Env, newAddresses, ccipdeployment.DeployCCIPContractConfig{
+	err = ccipdeployment.DeployCCIPContracts(tenv.Env, newAddresses, ccipdeployment.InitialAddChainConfig{
 		HomeChainSel:   tenv.HomeChainSel,
 		FeedChainSel:   tenv.FeedChainSel,
 		ChainsToDeploy: tenv.Env.AllChainSelectors(),

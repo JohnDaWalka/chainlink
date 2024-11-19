@@ -1,16 +1,18 @@
 package ccipdeployment
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_transmitter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
-	"math/big"
 )
 
 func ConfigureUSDCTokenPools(
@@ -117,7 +119,8 @@ func DeployUSDC(
 	lggr logger.Logger,
 	chain deployment.Chain,
 	addresses deployment.AddressBook,
-	state CCIPChainState,
+	rmnProxy common.Address,
+	router common.Address,
 ) (
 	*burn_mint_erc677.BurnMintERC677,
 	*usdc_token_pool.USDCTokenPool,
@@ -212,8 +215,8 @@ func DeployUSDC(
 				messenger.Address,
 				token.Address,
 				[]common.Address{},
-				state.RMNProxyExisting.Address(),
-				state.Router.Address(),
+				rmnProxy,
+				router,
 			)
 			return deployment.ContractDeploy[*usdc_token_pool.USDCTokenPool]{
 				Address:  tokenPoolAddress,

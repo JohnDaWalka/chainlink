@@ -37,13 +37,13 @@ func TestAddChainInbound(t *testing.T) {
 	// We deploy to the rest.
 	initialDeploy := e.Env.AllChainSelectorsExcluding([]uint64{newChain})
 	newAddresses := deployment.NewMemoryAddressBook()
-	err = ccipdeployment.DeployPrerequisiteChainContracts(e.Env, newAddresses, initialDeploy)
+	err = ccipdeployment.DeployPrerequisiteChainContracts(e.Env, newAddresses, initialDeploy, nil)
 	require.NoError(t, err)
 	require.NoError(t, e.Env.ExistingAddresses.Merge(newAddresses))
 
 	tokenConfig := ccipdeployment.NewTestTokenConfig(state.Chains[e.FeedChainSel].USDFeeds)
 	newAddresses = deployment.NewMemoryAddressBook()
-	err = ccipdeployment.DeployCCIPContracts(e.Env, newAddresses, ccipdeployment.DeployCCIPContractConfig{
+	err = ccipdeployment.DeployCCIPContracts(e.Env, newAddresses, ccipdeployment.InitialAddChainConfig{
 		HomeChainSel:   e.HomeChainSel,
 		FeedChainSel:   e.FeedChainSel,
 		ChainsToDeploy: initialDeploy,

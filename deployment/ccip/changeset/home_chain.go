@@ -16,6 +16,7 @@ import (
 var _ deployment.ChangeSet[DeployHomeChainConfig] = DeployHomeChain
 
 // DeployHomeChain is a separate changeset because it is a standalone deployment performed once in home chain for the entire CCIP deployment.
+// Caller should update the environment's address book with the returned addresses.
 func DeployHomeChain(env deployment.Environment, cfg DeployHomeChainConfig) (deployment.ChangesetOutput, error) {
 	err := cfg.Validate()
 	if err != nil {

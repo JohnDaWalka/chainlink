@@ -33,13 +33,13 @@ func TestAddLane(t *testing.T) {
 	feeds := state.Chains[e.FeedChainSel].USDFeeds
 	tokenConfig := NewTestTokenConfig(feeds)
 	newAddresses := deployment.NewMemoryAddressBook()
-	err = DeployPrerequisiteChainContracts(e.Env, newAddresses, e.Env.AllChainSelectors())
+	err = DeployPrerequisiteChainContracts(e.Env, newAddresses, e.Env.AllChainSelectors(), nil)
 	require.NoError(t, err)
 	require.NoError(t, e.Env.ExistingAddresses.Merge(newAddresses))
 
 	// Set up CCIP contracts and a DON per chain.
 	newAddresses = deployment.NewMemoryAddressBook()
-	err = DeployCCIPContracts(e.Env, newAddresses, DeployCCIPContractConfig{
+	err = DeployCCIPContracts(e.Env, newAddresses, InitialAddChainConfig{
 		HomeChainSel:   e.HomeChainSel,
 		FeedChainSel:   e.FeedChainSel,
 		TokenConfig:    tokenConfig,

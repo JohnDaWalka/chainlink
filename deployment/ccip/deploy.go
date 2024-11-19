@@ -68,15 +68,20 @@ var (
 	USDCTokenPool       deployment.ContractType = "USDCTokenPool"
 )
 
-func DeployPrerequisiteChainContracts(e deployment.Environment, ab deployment.AddressBook, selectors []uint64) error {
+func DeployPrerequisiteChainContracts(e deployment.Environment, ab deployment.AddressBook, selectors []uint64, usdcEnabledChains []uint64) error {
 	state, err := LoadOnchainState(e)
 	if err != nil {
 		e.Logger.Errorw("Failed to load existing onchain state", "err")
 		return err
 	}
+	mapUSDCEnabledChains := make(map[uint64]bool)
+	for _, chain := range usdcEnabledChains {
+		mapUSDCEnabledChains[chain] = true
+	}
 	for _, sel := range selectors {
 		chain := e.Chains[sel]
-		err = DeployPrerequisiteContracts(e, ab, state, chain)
+		usdcEnabled, ok := mapUSDCEnabledChains[sel]
+		err = DeployPrerequisiteContracts(e, ab, state, chain, ok && usdcEnabled)
 		if err != nil {
 			return errors.Wrapf(err, "failed to deploy prerequisite contracts for chain %d", sel)
 		}
@@ -86,7 +91,7 @@ func DeployPrerequisiteChainContracts(e deployment.Environment, ab deployment.Ad
 
 // DeployPrerequisiteContracts deploys the contracts that can be ported from previous CCIP version to the new one.
 // This is only required for staging and test environments where the contracts are not already deployed.
-func DeployPrerequisiteContracts(e deployment.Environment, ab deployment.AddressBook, state CCIPOnChainState, chain deployment.Chain) error {
+func DeployPrerequisiteContracts(e deployment.Environment, ab deployment.AddressBook, state CCIPOnChainState, chain deployment.Chain, usdcEnabled bool) error {
 	lggr := e.Logger
 	chainState, chainExists := state.Chains[chain.Selector]
 	var weth9Contract *weth9.WETH9
@@ -266,43 +271,27 @@ func DeployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	} else {
 		e.Logger.Infow("router already deployed", "addr", chainState.Router.Address)
 	}
+	if usdcEnabled {
+		token, pool, messenger, transmitter, err1 := DeployUSDC(e.Logger, chain, ab, rmnProxy.Address(), r.Address())
+		if err1 != nil {
+			return err1
+		}
+		e.Logger.Infow("Deployed USDC contracts",
+			"chainSelector", chain.Selector,
+			"token", token.Address(),
+			"pool", pool.Address(),
+			"transmitter", transmitter.Address(),
+			"messenger", messenger.Address(),
+		)
+	}
 	return nil
 }
 
-type USDCConfig struct {
-	Enabled bool
-	USDCAttestationConfig
-}
-
-type USDCAttestationConfig struct {
-	API         string
-	APITimeout  *commonconfig.Duration
-	APIInterval *commonconfig.Duration
-}
-
-type DeployCCIPContractConfig struct {
-	HomeChainSel   uint64
-	FeedChainSel   uint64
-	ChainsToDeploy []uint64
-	TokenConfig    TokenConfig
-	// I believe it makes sense to have the same signers across all chains
-	// since that's the point MCMS.
-	MCMSConfig MCMSConfig
-	USDCConfig USDCConfig
-	// For setting OCR configuration
-	OCRSecrets deployment.OCRSecrets
-}
-
-// DeployCCIPContracts assumes the following contracts are deployed:
-// - Capability registry
-// - CCIP home
-// - RMN home
-// - Fee tokens on all chains.
-// and present in ExistingAddressBook.
-// It then deploys the rest of the CCIP chain contracts to the selected chains
-// registers the nodes with the capability registry and creates a DON for
-// each new chain. TODO: Might be better to break this down a bit?
-func DeployCCIPContracts(e deployment.Environment, ab deployment.AddressBook, c DeployCCIPContractConfig) error {
+func InitialAddChain(
+	e deployment.Environment,
+	ab deployment.AddressBook,
+	c InitialAddChainConfig,
+) error {
 	if c.OCRSecrets.IsEmpty() {
 		return fmt.Errorf("OCR secrets are empty")
 	}
@@ -331,37 +320,6 @@ func DeployCCIPContracts(e deployment.Environment, ab deployment.AddressBook, c 
 		e.Logger.Errorw("Failed to get rmn home", "err", err)
 		return fmt.Errorf("rmn home not found")
 	}
-
-	usdcConfiguration := make(map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig)
-	for _, chainSel := range c.ChainsToDeploy {
-		chain, exists := e.Chains[chainSel]
-		if !exists {
-			return fmt.Errorf("chain %d not found", chainSel)
-		}
-		if c.USDCConfig.Enabled {
-			token, pool, messenger, transmitter, err1 := DeployUSDC(e.Logger, chain, ab, existingState.Chains[chainSel])
-			if err1 != nil {
-				return err1
-			}
-			e.Logger.Infow("Deployed USDC contracts",
-				"chainSelector", chainSel,
-				"token", token.Address(),
-				"pool", pool.Address(),
-				"transmitter", transmitter.Address(),
-				"messenger", messenger.Address(),
-			)
-
-			usdcConfiguration[cciptypes.ChainSelector(chainSel)] = pluginconfig.USDCCCTPTokenConfig{
-				SourcePoolAddress:            pool.Address().Hex(),
-				SourceMessageTransmitterAddr: transmitter.Address().Hex(),
-			}
-		}
-	}
-	err = DeployChainContractsForChains(e, ab, c.HomeChainSel, c.ChainsToDeploy, c.MCMSConfig)
-	if err != nil {
-		e.Logger.Errorw("Failed to deploy chain contracts", "err", err)
-		return err
-	}
 	for _, chainSel := range c.ChainsToDeploy {
 		chain, _ := e.Chains[chainSel]
 		chainAddresses, err := ab.AddressesForChain(chain.Selector)
@@ -376,8 +334,6 @@ func DeployCCIPContracts(e deployment.Environment, ab deployment.AddressBook, c 
 		}
 
 		tokenInfo := c.TokenConfig.GetTokenInfo(e.Logger, existingState.Chains[chainSel].LinkToken, existingState.Chains[chainSel].Weth9)
-		// TODO: Do we want to extract this?
-		// Add chain config for each chain.
 		_, err = AddChainConfig(
 			e.Logger,
 			e.Chains[c.HomeChainSel],
@@ -388,12 +344,12 @@ func DeployCCIPContracts(e deployment.Environment, ab deployment.AddressBook, c 
 			return err
 		}
 		var tokenDataObserversConf []pluginconfig.TokenDataObserverConfig
-		if c.USDCConfig.Enabled {
+		if enabled, ok := c.USDCConfig.EnabledChainMap()[chainSel]; ok && enabled {
 			tokenDataObserversConf = []pluginconfig.TokenDataObserverConfig{{
 				Type:    pluginconfig.USDCCCTPHandlerType,
 				Version: "1.0",
 				USDCCCTPObserverConfig: &pluginconfig.USDCCCTPObserverConfig{
-					Tokens:                 usdcConfiguration,
+					Tokens:                 c.USDCCCTPTokenConfig,
 					AttestationAPI:         c.USDCConfig.API,
 					AttestationAPITimeout:  c.USDCConfig.APITimeout,
 					AttestationAPIInterval: c.USDCConfig.APIInterval,
@@ -418,6 +374,63 @@ func DeployCCIPContracts(e deployment.Environment, ab deployment.AddressBook, c 
 			e.Logger.Errorw("Failed to add DON", "err", err)
 			return err
 		}
+	}
+
+	return nil
+}
+
+type USDCConfig struct {
+	EnabledChains []uint64
+	USDCAttestationConfig
+}
+
+func (cfg USDCConfig) EnabledChainMap() map[uint64]bool {
+	m := make(map[uint64]bool)
+	for _, chain := range cfg.EnabledChains {
+		m[chain] = true
+	}
+	return m
+}
+
+type USDCAttestationConfig struct {
+	API         string
+	APITimeout  *commonconfig.Duration
+	APIInterval *commonconfig.Duration
+}
+
+type InitialAddChainConfig struct {
+	HomeChainSel   uint64
+	FeedChainSel   uint64
+	ChainsToDeploy []uint64
+	TokenConfig    TokenConfig
+	// I believe it makes sense to have the same signers across all chains
+	// since that's the point MCMS.
+	MCMSConfig MCMSConfig
+	USDCConfig USDCConfig
+	// For setting OCR configuration
+	OCRSecrets          deployment.OCRSecrets
+	USDCCCTPTokenConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig
+}
+
+// DeployCCIPContracts assumes the following contracts are deployed:
+// - Capability registry
+// - CCIP home
+// - RMN home
+// - Fee tokens on all chains.
+// and present in ExistingAddressBook.
+// It then deploys the rest of the CCIP chain contracts to the selected chains
+// registers the nodes with the capability registry and creates a DON for
+// each new chain. TODO: Might be better to break this down a bit?
+func DeployCCIPContracts(e deployment.Environment, ab deployment.AddressBook, c InitialAddChainConfig) error {
+	err := DeployChainContractsForChains(e, ab, c.HomeChainSel, c.ChainsToDeploy, c.MCMSConfig)
+	if err != nil {
+		e.Logger.Errorw("Failed to deploy chain contracts", "err", err)
+		return err
+	}
+	err = InitialAddChain(e, ab, c)
+	if err != nil {
+		e.Logger.Errorw("Failed to add chain", "err", err)
+		return err
 	}
 
 	return nil
@@ -549,7 +562,7 @@ func DeployChainContractsForChains(e deployment.Environment, ab deployment.Addre
 		return err
 	}
 	if cr != CCIPCapabilityID {
-		return fmt.Errorf("capability registry does not support CCIP %s %s", hexutil.Encode(cr[:]), hexutil.Encode(CCIPCapabilityID[:]))
+		return fmt.Errorf("unexpected mismatch between calculated ccip capability id (%s) and expected ccip capability id constant (%s)", hexutil.Encode(cr[:]), hexutil.Encode(CCIPCapabilityID[:]))
 	}
 	capability, err := capReg.GetCapability(nil, CCIPCapabilityID)
 	if err != nil {

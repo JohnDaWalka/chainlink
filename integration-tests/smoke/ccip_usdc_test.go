@@ -9,16 +9,17 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/stretchr/testify/require"
 
 	"golang.org/x/exp/maps"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	ccdeploy "github.com/smartcontractkit/chainlink/deployment/ccip"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
@@ -57,37 +58,44 @@ func TestUSDCTokenTransfer(t *testing.T) {
 	destChain := allChainSelectors[1]
 
 	feeds := state.Chains[tenv.FeedChainSel].USDFeeds
-	tokenConfig := ccdeploy.NewTokenConfig()
-	tokenConfig.UpsertTokenInfo(ccdeploy.LinkSymbol,
-		pluginconfig.TokenInfo{
-			AggregatorAddress: cciptypes.UnknownEncodedAddress(feeds[ccdeploy.LinkSymbol].Address().String()),
-			Decimals:          ccdeploy.LinkDecimals,
-			DeviationPPB:      cciptypes.NewBigIntFromInt64(1e9),
-		},
-	)
 
 	output, err := changeset.DeployPrerequisites(e, changeset.DeployPrerequisiteConfig{
-		ChainSelectors: e.AllChainSelectors(),
+		ChainSelectors:            e.AllChainSelectors(),
+		USDCEnabledChainSelectors: e.AllChainSelectors(),
 	})
 	require.NoError(t, err)
 	require.NoError(t, tenv.Env.ExistingAddresses.Merge(output.AddressBook))
 
+	state, err = ccdeploy.LoadOnchainState(e)
+	require.NoError(t, err)
+	USDCCCTPConfig := make(map[ccipocr3.ChainSelector]pluginconfig.USDCCCTPTokenConfig)
+	for _, chain := range e.AllChainSelectors() {
+		require.NotNil(t, state.Chains[chain].MockUSDCTokenMessenger)
+		require.NotNil(t, state.Chains[chain].MockUSDCTransmitter)
+		require.NotNil(t, state.Chains[chain].USDCTokenPool)
+		USDCCCTPConfig[ccipocr3.ChainSelector(chain)] = pluginconfig.USDCCCTPTokenConfig{
+			SourcePoolAddress:            state.Chains[chain].USDCTokenPool.Address().String(),
+			SourceMessageTransmitterAddr: state.Chains[chain].MockUSDCTransmitter.Address().String(),
+		}
+	}
+
 	// Apply migration
-	output, err = changeset.InitialDeploy(e, ccdeploy.DeployCCIPContractConfig{
+	output, err = changeset.InitialDeploy(e, ccdeploy.InitialAddChainConfig{
 		HomeChainSel:   tenv.HomeChainSel,
 		FeedChainSel:   tenv.FeedChainSel,
 		ChainsToDeploy: e.AllChainSelectors(),
-		TokenConfig:    tokenConfig,
+		TokenConfig:    ccdeploy.NewTestTokenConfig(feeds),
 		MCMSConfig:     ccdeploy.NewTestMCMSConfig(t, e),
 		OCRSecrets:     deployment.XXXGenerateTestOCRSecrets(),
 		USDCConfig: ccdeploy.USDCConfig{
-			Enabled: true,
+			EnabledChains: e.AllChainSelectors(),
 			USDCAttestationConfig: ccdeploy.USDCAttestationConfig{
 				API:         endpoint,
 				APITimeout:  commonconfig.MustNewDuration(time.Second),
 				APIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
 			},
 		},
+		USDCCCTPTokenConfig: USDCCCTPConfig,
 	})
 	require.NoError(t, err)
 	require.NoError(t, e.ExistingAddresses.Merge(output.AddressBook))

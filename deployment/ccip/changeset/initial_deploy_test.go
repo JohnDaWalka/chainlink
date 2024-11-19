@@ -32,7 +32,7 @@ func TestInitialDeploy(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, tenv.Env.ExistingAddresses.Merge(output.AddressBook))
 
-	output, err = InitialDeploy(tenv.Env, ccdeploy.DeployCCIPContractConfig{
+	output, err = InitialDeploy(tenv.Env, ccdeploy.InitialAddChainConfig{
 		HomeChainSel:   tenv.HomeChainSel,
 		FeedChainSel:   tenv.FeedChainSel,
 		ChainsToDeploy: tenv.Env.AllChainSelectors(),

@@ -36,7 +36,7 @@ func TestInitialDeployOnLocal(t *testing.T) {
 	require.NoError(t, tenv.Env.ExistingAddresses.Merge(output.AddressBook))
 
 	// Apply migration
-	output, err = changeset.InitialDeploy(tenv.Env, ccdeploy.DeployCCIPContractConfig{
+	output, err = changeset.InitialDeploy(tenv.Env, ccdeploy.InitialAddChainConfig{
 		HomeChainSel:   tenv.HomeChainSel,
 		FeedChainSel:   tenv.FeedChainSel,
 		ChainsToDeploy: tenv.Env.AllChainSelectors(),
@@ -127,7 +127,7 @@ func TestTokenTransfer(t *testing.T) {
 	require.NoError(t, e.ExistingAddresses.Merge(output.AddressBook))
 
 	// Apply migration
-	output, err = changeset.InitialDeploy(e, ccdeploy.DeployCCIPContractConfig{
+	output, err = changeset.InitialDeploy(e, ccdeploy.InitialAddChainConfig{
 		HomeChainSel:   tenv.HomeChainSel,
 		FeedChainSel:   tenv.FeedChainSel,
 		ChainsToDeploy: e.AllChainSelectors(),

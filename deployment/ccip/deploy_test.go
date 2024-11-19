@@ -44,12 +44,12 @@ func TestDeployCCIPContracts(t *testing.T) {
 	require.NotNil(t, s.Chains[feedChainSel].USDFeeds)
 
 	newAddresses := deployment.NewMemoryAddressBook()
-	err = DeployPrerequisiteChainContracts(e, newAddresses, e.AllChainSelectors())
+	err = DeployPrerequisiteChainContracts(e, newAddresses, e.AllChainSelectors(), nil)
 	require.NoError(t, err)
 	require.NoError(t, e.ExistingAddresses.Merge(newAddresses))
 
 	newAddresses = deployment.NewMemoryAddressBook()
-	err = DeployCCIPContracts(e, newAddresses, DeployCCIPContractConfig{
+	err = DeployCCIPContracts(e, newAddresses, InitialAddChainConfig{
 		HomeChainSel:   homeChainSel,
 		FeedChainSel:   feedChainSel,
 		ChainsToDeploy: e.AllChainSelectors(),
