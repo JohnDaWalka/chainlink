@@ -122,7 +122,7 @@ func NewTxmv2(
 		EmptyTxLimitDefault: fCfg.LimitDefault(),
 	}
 	t := txm.NewTxm(lggr, chainID, client, attemptBuilder, inMemoryStoreManager, config, keyStore)
-	return txm.NewTxmOrchestrator[common.Hash, *evmtypes.Head](lggr, chainID, t, inMemoryStoreManager, fwdMgr, keyStore, attemptBuilder), nil
+	return txm.NewTxmOrchestrator(lggr, chainID, t, inMemoryStoreManager, fwdMgr, keyStore, attemptBuilder), nil
 }
 
 // NewEvmResender creates a new concrete EvmResender
