@@ -60,7 +60,7 @@ func (d *DualBroadcastClient) SendTransaction(ctx context.Context, tx *types.Tra
 	if err != nil {
 		return err
 	}
-	//nolint:gosec
+	//nolint:revive
 	if meta != nil && meta.DualBroadcast != nil && *meta.DualBroadcast && !tx.IsPurgeable {
 		data, err := attempt.SignedTransaction.MarshalBinary()
 		if err != nil {
