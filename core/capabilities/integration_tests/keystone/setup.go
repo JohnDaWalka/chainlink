@@ -11,6 +11,8 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
+
 	commoncap "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/datastreams"
 	v3 "github.com/smartcontractkit/chainlink-common/pkg/types/mercury/v3"
@@ -46,9 +48,11 @@ func setupKeystoneDons(ctx context.Context, t *testing.T, lggr logger.SugaredLog
 
 	triggerDon := createKeystoneTriggerDon(ctx, t, lggr, triggerDonInfo, donContext, trigger)
 
-	workflowDon.Start(ctx, t)
-	triggerDon.Start(ctx, t)
-	writeTargetDon.Start(ctx, t)
+	servicetest.Run(t, workflowDon)
+	servicetest.Run(t, triggerDon)
+	servicetest.Run(t, writeTargetDon)
+
+	donContext.WaitForCapabilitiesToBeExposed(t, workflowDon, triggerDon, writeTargetDon)
 
 	return workflowDon, consumer
 }
@@ -56,7 +60,7 @@ func setupKeystoneDons(ctx context.Context, t *testing.T, lggr logger.SugaredLog
 func createKeystoneTriggerDon(ctx context.Context, t *testing.T, lggr logger.SugaredLogger, triggerDonInfo framework.DonConfiguration,
 	donContext framework.DonContext, trigger framework.TriggerFactory) *framework.DON {
 	triggerDon := framework.NewDON(ctx, t, lggr, triggerDonInfo,
-		[]commoncap.DON{}, donContext)
+		[]commoncap.DON{}, donContext, false)
 
 	triggerDon.AddExternalTriggerCapability(trigger)
 	triggerDon.Initialise()
@@ -65,7 +69,7 @@ func createKeystoneTriggerDon(ctx context.Context, t *testing.T, lggr logger.Sug
 
 func createKeystoneWriteTargetDon(ctx context.Context, t *testing.T, lggr logger.SugaredLogger, targetDonInfo framework.DonConfiguration, donContext framework.DonContext, forwarderAddr common.Address) *framework.DON {
 	writeTargetDon := framework.NewDON(ctx, t, lggr, targetDonInfo,
-		[]commoncap.DON{}, donContext)
+		[]commoncap.DON{}, donContext, false)
 	err := writeTargetDon.AddEthereumWriteTargetNonStandardCapability(forwarderAddr)
 	require.NoError(t, err)
 	writeTargetDon.Initialise()
@@ -76,7 +80,7 @@ func createKeystoneWorkflowDon(ctx context.Context, t *testing.T, lggr logger.Su
 	triggerDonInfo framework.DonConfiguration, targetDonInfo framework.DonConfiguration, donContext framework.DonContext) *framework.DON {
 	workflowDon := framework.NewDON(ctx, t, lggr, workflowDonInfo,
 		[]commoncap.DON{triggerDonInfo.DON, targetDonInfo.DON},
-		donContext)
+		donContext, true)
 
 	workflowDon.AddOCR3NonStandardCapability()
 	workflowDon.Initialise()

@@ -2,6 +2,7 @@ package framework
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"testing"
@@ -12,6 +13,8 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 
@@ -40,18 +43,41 @@ import (
 
 type DonContext struct {
 	EthBlockchain      *EthBlockchain
-	p2pNetwork         *MockRageP2PNetwork
+	p2pNetwork         *FakeRageP2PNetwork
 	capabilityRegistry *CapabilitiesRegistry
 }
 
 func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
 	ethBlockchain := NewEthBlockchain(t, 1000, 1*time.Second)
-	rageP2PNetwork := NewMockRageP2PNetwork(t, 1000)
+	rageP2PNetwork := NewFakeRageP2PNetwork(ctx, t, 1000)
 	capabilitiesRegistry := NewCapabilitiesRegistry(ctx, t, ethBlockchain)
 
 	servicetest.Run(t, rageP2PNetwork)
 	servicetest.Run(t, ethBlockchain)
 	return DonContext{EthBlockchain: ethBlockchain, p2pNetwork: rageP2PNetwork, capabilityRegistry: capabilitiesRegistry}
+}
+
+func (c DonContext) WaitForCapabilitiesToBeExposed(t *testing.T, dons ...*DON) {
+	allExpectedCapabilities := make(map[CapabilityRegistration]bool)
+	for _, don := range dons {
+		caps, err := don.GetExternalCapabilities()
+		require.NoError(t, err)
+		for k, v := range caps {
+			allExpectedCapabilities[k] = v
+		}
+	}
+
+	require.Eventually(t, func() bool {
+		registrations := c.p2pNetwork.GetCapabilityRegistrations()
+
+		for k := range allExpectedCapabilities {
+			if _, ok := registrations[k]; !ok {
+				return false
+			}
+		}
+
+		return true
+	}, 1*time.Minute, 1*time.Second, "timeout waiting for capabilities to be exposed")
 }
 
 type capabilityNode struct {
@@ -64,12 +90,13 @@ type capabilityNode struct {
 }
 
 type DON struct {
+	services.StateMachine
 	t                      *testing.T
 	config                 DonConfiguration
 	lggr                   logger.Logger
 	nodes                  []*capabilityNode
 	standardCapabilityJobs []*job.Job
-	externalCapabilities   []capability
+	publishedCapabilities  []capability
 	capabilitiesRegistry   *CapabilitiesRegistry
 
 	nodeConfigModifiers []func(c *chainlink.Config, node *capabilityNode)
@@ -81,8 +108,18 @@ type DON struct {
 }
 
 func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig DonConfiguration,
-	dependentDONs []commoncap.DON, donContext DonContext) *DON {
+	dependentDONs []commoncap.DON, donContext DonContext, supportsOCR bool) *DON {
 	don := &DON{t: t, lggr: lggr.Named(donConfig.name), config: donConfig, capabilitiesRegistry: donContext.capabilityRegistry}
+
+	protocolRoundInterval := 1 * time.Second
+
+	var newOracleFactoryFn standardcapabilities.NewOracleFactoryFn
+	var libOcr *FakeLibOCR
+	if supportsOCR {
+		// This is required to support the non standard OCR3 capability - will be removed when required OCR3 behaviour is implemented as standard capabilities
+		libOcr = NewFakeLibOCR(t, lggr, donConfig.F, protocolRoundInterval)
+		servicetest.Run(t, libOcr)
+	}
 
 	for i, member := range donConfig.Members {
 		dispatcher := donContext.p2pNetwork.NewDispatcherForNode(member)
@@ -102,10 +139,16 @@ func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig Don
 		}
 		don.nodes = append(don.nodes, cn)
 
+		if supportsOCR {
+			factory := newFakeOracleFactoryFactory(t, lggr, donConfig.KeyBundles[i], len(donConfig.Members), donConfig.F,
+				protocolRoundInterval)
+			newOracleFactoryFn = factory.NewOracleFactory
+		}
+
 		cn.start = func() {
 			node := startNewNode(ctx, t, lggr.Named(donConfig.name+"-"+strconv.Itoa(i)), nodeInfo, donContext.EthBlockchain,
 				donContext.capabilityRegistry.getAddress(), dispatcher,
-				peerWrapper{peer: p2pPeer{member}}, capabilityRegistry,
+				peerWrapper{peer: p2pPeer{member}}, capabilityRegistry, newOracleFactoryFn,
 				donConfig.keys[i], func(c *chainlink.Config) {
 					for _, modifier := range don.nodeConfigModifiers {
 						modifier(c, cn)
@@ -122,12 +165,10 @@ func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig Don
 
 // Initialise must be called after all capabilities have been added to the DONs and before Start is called
 func (d *DON) Initialise() {
-	if len(d.externalCapabilities) > 0 {
-		id := d.capabilitiesRegistry.setupDON(d.config, d.externalCapabilities)
+	id := d.capabilitiesRegistry.setupDON(d.config, d.publishedCapabilities)
 
-		//nolint:gosec // disable G115
-		d.config.DON.ID = uint32(id)
-	}
+	//nolint:gosec // disable G115
+	d.config.DON.ID = uint32(id)
 }
 
 func (d *DON) GetID() uint32 {
@@ -136,6 +177,29 @@ func (d *DON) GetID() uint32 {
 	}
 
 	return d.config.ID
+}
+
+func (d *DON) GetExternalCapabilities() (map[CapabilityRegistration]bool, error) {
+	result := map[CapabilityRegistration]bool{}
+	for _, publishedCapability := range d.publishedCapabilities {
+		if publishedCapability.internalOnly {
+			continue
+		}
+
+		for _, node := range d.nodes {
+			peerIDBytes, err := peerIDToBytes(node.peerID.PeerID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert peer ID to bytes: %w", err)
+			}
+			result[CapabilityRegistration{
+				nodePeerID:      hex.EncodeToString(peerIDBytes[:]),
+				capabilityID:    publishedCapability.registryConfig.LabelledName + "@" + publishedCapability.registryConfig.Version,
+				capabilityDonID: d.GetID(),
+			}] = true
+		}
+	}
+
+	return result, nil
 }
 
 func (d *DON) GetConfigVersion() uint32 {
@@ -150,20 +214,22 @@ func (d *DON) GetPeerIDs() []peer {
 	return d.config.peerIDs
 }
 
-func (d *DON) Start(ctx context.Context, t *testing.T) {
+func (d *DON) Start(ctx context.Context) error {
 	for _, triggerFactory := range d.triggerFactories {
 		for _, node := range d.nodes {
-			trigger := triggerFactory.CreateNewTrigger(t)
-			err := node.registry.Add(ctx, trigger)
-			require.NoError(t, err)
+			trigger := triggerFactory.CreateNewTrigger(d.t)
+			if err := node.registry.Add(ctx, trigger); err != nil {
+				return fmt.Errorf("failed to add trigger: %w", err)
+			}
 		}
 	}
 
 	for _, targetFactory := range d.targetFactories {
 		for _, node := range d.nodes {
-			target := targetFactory.CreateNewTarget(t)
-			err := node.registry.Add(ctx, target)
-			require.NoError(t, err)
+			target := targetFactory.CreateNewTarget(d.t)
+			if err := node.registry.Add(ctx, target); err != nil {
+				return fmt.Errorf("failed to add target: %w", err)
+			}
 		}
 	}
 
@@ -172,18 +238,31 @@ func (d *DON) Start(ctx context.Context, t *testing.T) {
 	}
 
 	if d.addOCR3NonStandardCapability {
-		libocr := NewMockLibOCR(t, d.config.F, 1*time.Second)
-		servicetest.Run(t, libocr)
+		libocr := NewFakeLibOCR(d.t, d.lggr, d.config.F, 1*time.Second)
+		servicetest.Run(d.t, libocr)
 
 		for _, node := range d.nodes {
-			addOCR3Capability(ctx, t, d.lggr, node.registry, libocr, d.config.F, node.KeyBundle)
+			addOCR3Capability(ctx, d.t, d.lggr, node.registry, libocr, d.config.F, node.KeyBundle)
 		}
 	}
 
 	for _, capabilityJob := range d.standardCapabilityJobs {
-		err := d.AddJob(ctx, capabilityJob)
-		require.NoError(t, err)
+		if err := d.AddJob(ctx, capabilityJob); err != nil {
+			return fmt.Errorf("failed to add standard capability job: %w", err)
+		}
 	}
+
+	return nil
+}
+
+func (d *DON) Close() error {
+	for _, node := range d.nodes {
+		if err := node.Stop(); err != nil {
+			return fmt.Errorf("failed to stop node: %w", err)
+		}
+	}
+
+	return nil
 }
 
 const StandardCapabilityTemplateJobSpec = `
@@ -191,7 +270,7 @@ type = "standardcapabilities"
 schemaVersion = 1
 name = "%s"
 command="%s"
-config="%s"
+config=%s
 `
 
 func (d *DON) AddStandardCapability(name string, command string, config string) {
@@ -202,9 +281,28 @@ func (d *DON) AddStandardCapability(name string, command string, config string) 
 	d.standardCapabilityJobs = append(d.standardCapabilityJobs, &capabilitiesSpecJob)
 }
 
+func (d *DON) AddPublishedStandardCapability(name string, command string, config string,
+	defaultCapabilityRequestConfig *pb.CapabilityConfig,
+	registryConfig kcr.CapabilitiesRegistryCapability) {
+	spec := fmt.Sprintf(StandardCapabilityTemplateJobSpec, name, command, config)
+	capabilitiesSpecJob, err := standardcapabilities.ValidatedStandardCapabilitiesSpec(spec)
+	require.NoError(d.t, err)
+
+	d.standardCapabilityJobs = append(d.standardCapabilityJobs, &capabilitiesSpecJob)
+
+	d.publishedCapabilities = append(d.publishedCapabilities, capability{
+		donCapabilityConfig: defaultCapabilityRequestConfig,
+		registryConfig:      registryConfig,
+	})
+}
+
 // TODO - add configuration for remote support - do this for each capability as an option
 func (d *DON) AddTargetCapability(targetFactory TargetFactory) {
 	d.targetFactories = append(d.targetFactories, targetFactory)
+}
+
+func (d *DON) AddTriggerCapability(triggerFactory TriggerFactory) {
+	d.triggerFactories = append(d.triggerFactories, triggerFactory)
 }
 
 func (d *DON) AddExternalTriggerCapability(triggerFactory TriggerFactory) {
@@ -231,7 +329,7 @@ func (d *DON) AddExternalTriggerCapability(triggerFactory TriggerFactory) {
 		},
 	}
 
-	d.externalCapabilities = append(d.externalCapabilities, triggerCapability)
+	d.publishedCapabilities = append(d.publishedCapabilities, triggerCapability)
 }
 
 func (d *DON) AddJob(ctx context.Context, j *job.Job) error {
@@ -265,6 +363,7 @@ func startNewNode(ctx context.Context,
 	dispatcher remotetypes.Dispatcher,
 	peerWrapper p2ptypes.PeerWrapper,
 	localCapabilities *capabilities.Registry,
+	newOracleFactoryFn standardcapabilities.NewOracleFactoryFn,
 	keyV2 ethkey.KeyV2,
 	setupCfg func(c *chainlink.Config),
 ) *cltest.TestApplication {
@@ -279,7 +378,7 @@ func startNewNode(ctx context.Context,
 		}
 	})
 
-	n, err := ethBlockchain.NonceAt(ctx, ethBlockchain.transactionOpts.From, nil)
+	n, err := ethBlockchain.Client().NonceAt(ctx, ethBlockchain.transactionOpts.From, nil)
 	require.NoError(t, err)
 
 	tx := cltest.NewLegacyTransaction(
@@ -290,12 +389,12 @@ func startNewNode(ctx context.Context,
 		nil)
 	signedTx, err := ethBlockchain.transactionOpts.Signer(ethBlockchain.transactionOpts.From, tx)
 	require.NoError(t, err)
-	err = ethBlockchain.SendTransaction(ctx, signedTx)
+	err = ethBlockchain.Client().SendTransaction(ctx, signedTx)
 	require.NoError(t, err)
 	ethBlockchain.Commit()
 
-	return cltest.NewApplicationWithConfigV2AndKeyOnSimulatedBlockchain(t, config, ethBlockchain.SimulatedBackend, nodeInfo,
-		dispatcher, peerWrapper, localCapabilities, keyV2, lggr)
+	return cltest.NewApplicationWithConfigV2AndKeyOnSimulatedBlockchain(t, config, ethBlockchain.Backend, nodeInfo,
+		dispatcher, peerWrapper, newOracleFactoryFn, localCapabilities, keyV2, lggr)
 }
 
 // Functions below this point are for adding non-standard capabilities to a DON, deliberately verbose. Eventually these
@@ -310,9 +409,10 @@ func (d *DON) AddOCR3NonStandardCapability() {
 		CapabilityType: uint8(registrysyncer.ContractCapabilityTypeConsensus),
 	}
 
-	d.externalCapabilities = append(d.externalCapabilities, capability{
+	d.publishedCapabilities = append(d.publishedCapabilities, capability{
 		donCapabilityConfig: newCapabilityConfig(),
 		registryConfig:      ocr,
+		internalOnly:        true,
 	})
 }
 
@@ -344,7 +444,7 @@ func (d *DON) AddEthereumWriteTargetNonStandardCapability(forwarderAddr common.A
 		},
 	}
 
-	d.externalCapabilities = append(d.externalCapabilities, capability{
+	d.publishedCapabilities = append(d.publishedCapabilities, capability{
 		donCapabilityConfig: targetCapabilityConfig,
 		registryConfig:      writeChain,
 	})
@@ -353,7 +453,7 @@ func (d *DON) AddEthereumWriteTargetNonStandardCapability(forwarderAddr common.A
 }
 
 func addOCR3Capability(ctx context.Context, t *testing.T, lggr logger.Logger, capabilityRegistry *capabilities.Registry,
-	libocr *MockLibOCR, donF uint8, ocr2KeyBundle ocr2key.KeyBundle) {
+	libocr *FakeLibOCR, donF uint8, ocr2KeyBundle ocr2key.KeyBundle) {
 	requestTimeout := 10 * time.Minute
 	cfg := ocr3.Config{
 		Logger:            lggr,
@@ -381,6 +481,6 @@ func addOCR3Capability(ctx context.Context, t *testing.T, lggr logger.Logger, ca
 	libocr.AddNode(plugin, transmitter, ocr2KeyBundle)
 }
 
-func Context(tb testing.TB) context.Context {
-	return testutils.Context(tb)
+func Context(tb testing.TB) (ctx context.Context, cancel func()) {
+	return context.WithCancel(testutils.Context(tb))
 }

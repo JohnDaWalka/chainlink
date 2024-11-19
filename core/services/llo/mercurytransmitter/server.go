@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	llotypes "github.com/smartcontractkit/chainlink-common/pkg/types/llo"
+	"github.com/smartcontractkit/chainlink-data-streams/llo"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/wsrpc"
@@ -105,7 +106,7 @@ func (s *server) HealthReport() map[string]error {
 
 func (s *server) runDeleteQueueLoop(stopCh services.StopChan, wg *sync.WaitGroup) {
 	defer wg.Done()
-	runloopCtx, cancel := stopCh.Ctx(context.Background())
+	ctx, cancel := stopCh.NewCtx()
 	defer cancel()
 
 	// Exponential backoff for very rarely occurring errors (DB disconnect etc)
@@ -120,7 +121,7 @@ func (s *server) runDeleteQueueLoop(stopCh services.StopChan, wg *sync.WaitGroup
 		select {
 		case hash := <-s.deleteQueue:
 			for {
-				if err := s.pm.orm.Delete(runloopCtx, [][32]byte{hash}); err != nil {
+				if err := s.pm.orm.Delete(ctx, [][32]byte{hash}); err != nil {
 					s.lggr.Errorw("Failed to delete transmission record", "err", err, "transmissionHash", hash)
 					s.transmitQueueDeleteErrorCount.Inc()
 					select {
@@ -153,7 +154,7 @@ func (s *server) runQueueLoop(stopCh services.StopChan, wg *sync.WaitGroup, donI
 		Factor: 2,
 		Jitter: true,
 	}
-	runloopCtx, cancel := stopCh.Ctx(context.Background())
+	ctx, cancel := stopCh.NewCtx()
 	defer cancel()
 	for {
 		t := s.q.BlockingPop()
@@ -161,12 +162,13 @@ func (s *server) runQueueLoop(stopCh services.StopChan, wg *sync.WaitGroup, donI
 			// queue was closed
 			return
 		}
-		ctx, cancel := context.WithTimeout(runloopCtx, utils.WithJitter(s.transmitTimeout))
-		res, err := s.transmit(ctx, t)
-		cancel()
-		if runloopCtx.Err() != nil {
-			// runloop context is only canceled on transmitter close so we can
-			// exit the runloop here
+		res, err := func(ctx context.Context) (*pb.TransmitResponse, error) {
+			ctx, cancelFn := context.WithTimeout(ctx, utils.WithJitter(s.transmitTimeout))
+			defer cancelFn()
+			return s.transmit(ctx, t)
+		}(ctx)
+		if ctx.Err() != nil {
+			// only canceled on transmitter close so we can exit
 			return
 		} else if err != nil {
 			s.transmitConnectionErrorCount.Inc()
@@ -218,9 +220,7 @@ func (s *server) transmit(ctx context.Context, t *Transmission) (*pb.TransmitRes
 
 	switch t.Report.Info.ReportFormat {
 	case llotypes.ReportFormatJSON:
-		// TODO: exactly how to handle JSON here?
-		// https://smartcontract-it.atlassian.net/browse/MERC-3659
-		fallthrough
+		payload, err = llo.JSONReportCodec{}.Pack(t.ConfigDigest, t.SeqNr, t.Report.Report, t.Sigs)
 	case llotypes.ReportFormatEVMPremiumLegacy:
 		payload, err = evm.ReportCodecPremiumLegacy{}.Pack(t.ConfigDigest, t.SeqNr, t.Report.Report, t.Sigs)
 	default:

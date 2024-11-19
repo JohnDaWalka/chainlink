@@ -3,9 +3,9 @@
 test_log_collect = false
 
 [Logging.Grafana]
-base_url="https://grafana.ops.prod.cldev.sh"
-base_url_github_ci="http://localhost:8080/primary"
-dashboard_url="/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
+base_url = "https://grafana.ops.prod.cldev.sh"
+base_url_github_ci = "http://localhost:8080/primary"
+dashboard_url = "/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
 
 [Logging.LogStream]
 # supported targets: file, loki, in-memory. if empty no logs will be persisted
@@ -525,7 +525,7 @@ evm_chain_id = 5668
 
 [[Seth.networks]]
 name = "LINEA_SEPOLIA"
-chain_id = "59141"
+chain_id = 59141
 transaction_timeout = "10m"
 transfer_gas_fee = 21_000
 gas_price = 200_000_000_000_000
@@ -538,7 +538,7 @@ gas_price_estimation_tx_priority = "standard"
 
 [[Seth.networks]]
 name = "LINEA_MAINNET"
-chain_id = "59144"
+chain_id = 59144
 transaction_timeout = "10m"
 transfer_gas_fee = 21_000
 gas_price = 200_000_000_000_000
@@ -551,7 +551,7 @@ gas_price_estimation_tx_priority = "standard"
 
 [[Seth.networks]]
 name = "ZKSYNC_SEPOLIA"
-chain_id = "300"
+chain_id = 300
 transaction_timeout = "3m"
 transfer_gas_fee = 21_000
 gas_price = 200_000_000_000
@@ -564,7 +564,7 @@ gas_price_estimation_tx_priority = "standard"
 
 [[Seth.networks]]
 name = "ZKSYNC_MAINNET"
-chain_id = "324"
+chain_id = 324
 transaction_timeout = "3m"
 transfer_gas_fee = 21_000
 gas_price = 200_000_000_000

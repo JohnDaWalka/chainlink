@@ -882,6 +882,7 @@ type WorkflowSpec struct {
 	SpecType      WorkflowSpecType `toml:"spec_type" db:"spec_type"`
 	sdkWorkflow   *sdk.WorkflowSpec
 	rawSpec       []byte
+	config        []byte
 }
 
 var (
@@ -948,6 +949,25 @@ func (w *WorkflowSpec) RawSpec(ctx context.Context) ([]byte, error) {
 	return rs, nil
 }
 
+func (w *WorkflowSpec) GetConfig(ctx context.Context) ([]byte, error) {
+	if w.config != nil {
+		return w.config, nil
+	}
+
+	workflowSpecFactory, ok := workflowSpecFactories[w.SpecType]
+	if !ok {
+		return nil, fmt.Errorf("unknown spec type %s", w.SpecType)
+	}
+
+	rs, err := workflowSpecFactory.Config(ctx, w.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	w.config = rs
+	return rs, nil
+}
+
 type OracleFactoryConfig struct {
 	Enabled            bool     `toml:"enabled"`
 	BootstrapPeers     []string `toml:"bootstrap_peers"`      // e.g.,["12D3KooWEBVwbfdhKnicois7FTYVsBFGFcoMhMCKXQC57BQyZMhz@localhost:6690"]
@@ -963,9 +983,13 @@ func (ofc OracleFactoryConfig) Value() (driver.Value, error) {
 
 // Scan reads the database value and returns an instance.
 func (ofc *OracleFactoryConfig) Scan(value interface{}) error {
+	if value == nil {
+		return nil // field is nullable
+	}
+
 	b, ok := value.([]byte)
 	if !ok {
-		return errors.Errorf("expected bytes got %T", b)
+		return errors.Errorf("expected bytes got %T", value)
 	}
 	return json.Unmarshal(b, &ofc)
 }

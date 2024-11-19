@@ -117,7 +117,12 @@ func (c *evmTxmClient) PendingNonceAt(ctx context.Context, fromAddress common.Ad
 }
 
 func (c *evmTxmClient) SequenceAt(ctx context.Context, addr common.Address, blockNum *big.Int) (evmtypes.Nonce, error) {
-	return c.client.SequenceAt(ctx, addr, blockNum)
+	nonce, err := c.client.NonceAt(ctx, addr, blockNum)
+	if nonce > math.MaxInt64 {
+		return 0, fmt.Errorf("overflow for nonce: %d", nonce)
+	}
+	//nolint:gosec // disable G115
+	return evmtypes.Nonce(nonce), err
 }
 
 func (c *evmTxmClient) BatchGetReceipts(ctx context.Context, attempts []TxAttempt) (txReceipt []*evmtypes.Receipt, txErr []error, funcErr error) {
@@ -134,7 +139,7 @@ func (c *evmTxmClient) BatchGetReceipts(ctx context.Context, attempts []TxAttemp
 	}
 
 	if err := c.client.BatchCallContext(ctx, reqs); err != nil {
-		return nil, nil, fmt.Errorf("EthConfirmer#batchFetchReceipts error fetching receipts with BatchCallContext: %w", err)
+		return nil, nil, fmt.Errorf("error fetching receipts with BatchCallContext: %w", err)
 	}
 
 	for _, req := range reqs {
@@ -186,4 +191,8 @@ func (c *evmTxmClient) CallContract(ctx context.Context, a TxAttempt, blockNumbe
 
 func (c *evmTxmClient) HeadByHash(ctx context.Context, hash common.Hash) (*evmtypes.Head, error) {
 	return c.client.HeadByHash(ctx, hash)
+}
+
+func (c *evmTxmClient) BatchCallContext(ctx context.Context, b []rpc.BatchElem) error {
+	return c.client.BatchCallContext(ctx, b)
 }

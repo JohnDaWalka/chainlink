@@ -48,6 +48,7 @@ func Test_Eth_Errors(t *testing.T) {
 			{"nonce too low. allowed nonce range: 427 - 447, actual: 426", true, "zkSync"},
 			{"client error nonce too low", true, "tomlConfig"},
 			{"[Request ID: 2e952947-ffad-408b-aed9-35f3ed152001] Nonce too low. Provided nonce: 15, current nonce: 15", true, "hedera"},
+			{"failed to forward tx to sequencer, please try again. Error message: 'nonce too low'", true, "Mantle"},
 		}
 
 		for _, test := range tests {
@@ -225,6 +226,7 @@ func Test_Eth_Errors(t *testing.T) {
 			{"failed to forward tx to sequencer, please try again. Error message: 'insufficient funds for gas * price + value'", true, "Mantle"},
 			{"[Request ID: 9dd78806-58c8-4e6d-89a8-a60962abe705] Error invoking RPC: transaction 0.0.3041916@1717691931.680570179 failed precheck with status INSUFFICIENT_PAYER_BALANCE", true, "hedera"},
 			{"[Request ID: 6198d2a3-590f-4724-aae5-69fecead0c49] Insufficient funds for transfer", true, "hedera"},
+			{"insufficient funds for gas * price + value: balance 0, tx cost 9327080000000000, overshot 9327080000000000", true, "Geth"},
 		}
 		for _, test := range tests {
 			err = evmclient.NewSendErrorS(test.message)

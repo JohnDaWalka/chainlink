@@ -184,11 +184,18 @@ func (r *ReadType) UnmarshalText(text []byte) error {
 type LLOConfigMode string
 
 const (
-	LLOConfigModeMercury LLOConfigMode = "mercury"
+	LLOConfigModeMercury   LLOConfigMode = "mercury"
+	LLOConfigModeBlueGreen LLOConfigMode = "bluegreen"
 )
 
 func (c LLOConfigMode) String() string {
 	return string(c)
+}
+
+type DualTransmissionConfig struct {
+	ContractAddress    common.Address      `json:"contractAddress" toml:"contractAddress"`
+	TransmitterAddress common.Address      `json:"transmitterAddress" toml:"transmitterAddress"`
+	Meta               map[string][]string `json:"meta" toml:"meta"`
 }
 
 type RelayConfig struct {
@@ -206,12 +213,18 @@ type RelayConfig struct {
 	SendingKeys pq.StringArray `json:"sendingKeys"`
 
 	// Mercury-specific
-	FeedID                  *common.Hash `json:"feedID"`
-	EnableTriggerCapability bool         `json:"enableTriggerCapability"`
+	FeedID                   *common.Hash `json:"feedID"`
+	EnableTriggerCapability  bool         `json:"enableTriggerCapability"`
+	TriggerCapabilityName    string       `json:"triggerCapabilityName"`
+	TriggerCapabilityVersion string       `json:"triggerCapabilityVersion"`
 
 	// LLO-specific
 	LLODONID      uint32        `json:"lloDonID" toml:"lloDonID"`
 	LLOConfigMode LLOConfigMode `json:"lloConfigMode" toml:"lloConfigMode"`
+
+	// DualTransmission specific
+	EnableDualTransmission bool                    `json:"enableDualTransmission" toml:"enableDualTransmission"`
+	DualTransmissionConfig *DualTransmissionConfig `json:"dualTransmission" toml:"dualTransmission"`
 }
 
 var ErrBadRelayConfig = errors.New("bad relay config")
@@ -232,7 +245,7 @@ func NewRelayOpts(args types.RelayArgs) *RelayOpts {
 
 func (o *RelayOpts) RelayConfig() (RelayConfig, error) {
 	var empty RelayConfig
-	//TODO this should be done once and the error should be cached
+	// TODO this should be done once and the error should be cached
 	if o.c == nil {
 		var c RelayConfig
 		err := json.Unmarshal(o.RelayArgs.RelayConfig, &c)

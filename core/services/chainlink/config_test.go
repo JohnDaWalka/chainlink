@@ -556,12 +556,14 @@ func TestConfig_Marshal(t *testing.T) {
 		Release:     ptr("v1.2.3"),
 	}
 	full.Telemetry = toml.Telemetry{
-		Enabled:            ptr(true),
-		CACertFile:         ptr("cert-file"),
-		Endpoint:           ptr("example.com/collector"),
-		InsecureConnection: ptr(true),
-		ResourceAttributes: map[string]string{"Baz": "test", "Foo": "bar"},
-		TraceSampleRatio:   ptr(0.01),
+		Enabled:               ptr(true),
+		CACertFile:            ptr("cert-file"),
+		Endpoint:              ptr("example.com/collector"),
+		InsecureConnection:    ptr(true),
+		ResourceAttributes:    map[string]string{"Baz": "test", "Foo": "bar"},
+		TraceSampleRatio:      ptr(0.01),
+		EmitterBatchProcessor: ptr(true),
+		EmitterExportTimeout:  commoncfg.MustNewDuration(1 * time.Second),
 	}
 	full.EVM = []*evmcfg.EVMConfig{
 		{
@@ -736,23 +738,26 @@ func TestConfig_Marshal(t *testing.T) {
 			ChainID: ptr("mainnet"),
 			Enabled: ptr(false),
 			Chain: solcfg.Chain{
-				BalancePollPeriod:       commoncfg.MustNewDuration(time.Minute),
-				ConfirmPollPeriod:       commoncfg.MustNewDuration(time.Second),
-				OCR2CachePollPeriod:     commoncfg.MustNewDuration(time.Minute),
-				OCR2CacheTTL:            commoncfg.MustNewDuration(time.Hour),
-				TxTimeout:               commoncfg.MustNewDuration(time.Hour),
-				TxRetryTimeout:          commoncfg.MustNewDuration(time.Minute),
-				TxConfirmTimeout:        commoncfg.MustNewDuration(time.Second),
-				SkipPreflight:           ptr(true),
-				Commitment:              ptr("banana"),
-				MaxRetries:              ptr[int64](7),
-				FeeEstimatorMode:        ptr("fixed"),
-				ComputeUnitPriceMax:     ptr[uint64](1000),
-				ComputeUnitPriceMin:     ptr[uint64](10),
-				ComputeUnitPriceDefault: ptr[uint64](100),
-				FeeBumpPeriod:           commoncfg.MustNewDuration(time.Minute),
-				BlockHistoryPollPeriod:  commoncfg.MustNewDuration(time.Minute),
-				ComputeUnitLimitDefault: ptr[uint32](100_000),
+				BalancePollPeriod:        commoncfg.MustNewDuration(time.Minute),
+				ConfirmPollPeriod:        commoncfg.MustNewDuration(time.Second),
+				OCR2CachePollPeriod:      commoncfg.MustNewDuration(time.Minute),
+				OCR2CacheTTL:             commoncfg.MustNewDuration(time.Hour),
+				TxTimeout:                commoncfg.MustNewDuration(time.Hour),
+				TxRetryTimeout:           commoncfg.MustNewDuration(time.Minute),
+				TxConfirmTimeout:         commoncfg.MustNewDuration(time.Second),
+				TxRetentionTimeout:       commoncfg.MustNewDuration(0 * time.Second),
+				SkipPreflight:            ptr(true),
+				Commitment:               ptr("banana"),
+				MaxRetries:               ptr[int64](7),
+				FeeEstimatorMode:         ptr("fixed"),
+				ComputeUnitPriceMax:      ptr[uint64](1000),
+				ComputeUnitPriceMin:      ptr[uint64](10),
+				ComputeUnitPriceDefault:  ptr[uint64](100),
+				FeeBumpPeriod:            commoncfg.MustNewDuration(time.Minute),
+				BlockHistoryPollPeriod:   commoncfg.MustNewDuration(time.Minute),
+				BlockHistorySize:         ptr[uint64](1),
+				ComputeUnitLimitDefault:  ptr[uint32](100_000),
+				EstimateComputeUnitLimit: ptr(false),
 			},
 			MultiNode: solcfg.MultiNodeConfig{
 				MultiNode: solcfg.MultiNode{
@@ -1268,6 +1273,7 @@ OCR2CacheTTL = '1h0m0s'
 TxTimeout = '1h0m0s'
 TxRetryTimeout = '1m0s'
 TxConfirmTimeout = '1s'
+TxRetentionTimeout = '0s'
 SkipPreflight = true
 Commitment = 'banana'
 MaxRetries = 7
@@ -1277,7 +1283,9 @@ ComputeUnitPriceMin = 10
 ComputeUnitPriceDefault = 100
 FeeBumpPeriod = '1m0s'
 BlockHistoryPollPeriod = '1m0s'
+BlockHistorySize = 1
 ComputeUnitLimitDefault = 100000
+EstimateComputeUnitLimit = false
 
 [Solana.MultiNode]
 Enabled = false
@@ -1396,8 +1404,16 @@ func TestConfig_full(t *testing.T) {
 		if got.EVM[c].Transactions.AutoPurge.DetectionApiUrl == nil {
 			got.EVM[c].Transactions.AutoPurge.DetectionApiUrl = new(commoncfg.URL)
 		}
+		if got.EVM[c].GasEstimator.DAOracle.OracleType == nil {
+			oracleType := evmcfg.DAOracleOPStack
+			got.EVM[c].GasEstimator.DAOracle.OracleType = &oracleType
+		}
 		if got.EVM[c].GasEstimator.DAOracle.OracleAddress == nil {
 			got.EVM[c].GasEstimator.DAOracle.OracleAddress = new(types.EIP55Address)
+		}
+
+		if got.EVM[c].GasEstimator.DAOracle.CustomGasPriceCalldata == nil {
+			got.EVM[c].GasEstimator.DAOracle.CustomGasPriceCalldata = new(string)
 		}
 	}
 
@@ -1425,7 +1441,7 @@ func TestConfig_Validate(t *testing.T) {
 		- LDAP.RunUserGroupCN: invalid value (<nil>): LDAP ReadUserGroupCN can not be empty
 		- LDAP.RunUserGroupCN: invalid value (<nil>): LDAP RunUserGroupCN can not be empty
 		- LDAP.ReadUserGroupCN: invalid value (<nil>): LDAP ReadUserGroupCN can not be empty
-	- EVM: 9 errors:
+	- EVM: 10 errors:
 		- 1.ChainID: invalid value (1): duplicate - must be unique
 		- 0.Nodes.1.Name: invalid value (foo): duplicate - must be unique
 		- 3.Nodes.4.WSURL: invalid value (ws://dupe.com): duplicate - must be unique
@@ -1481,6 +1497,7 @@ func TestConfig_Validate(t *testing.T) {
 			- ChainID: missing: required for all chains
 			- Nodes: missing: must have at least one node
 		- 5.Transactions.AutoPurge.DetectionApiUrl: invalid value (): must be set for scroll
+		- 6.Nodes: missing: 0th node (primary) must have a valid WSURL when http polling is disabled
 	- Cosmos: 5 errors:
 		- 1.ChainID: invalid value (Malaga-420): duplicate - must be unique
 		- 0.Nodes.1.Name: invalid value (test): duplicate - must be unique
@@ -1507,7 +1524,11 @@ func TestConfig_Validate(t *testing.T) {
 		- 1: 2 errors:
 			- ChainID: missing: required for all chains
 			- Nodes: missing: must have at least one node
-	- Aptos.0.Enabled: invalid value (1): expected bool`},
+	- Aptos: 2 errors:
+		- 0.Nodes.1.Name: invalid value (primary): duplicate - must be unique
+		- 0: 2 errors:
+			- Enabled: invalid value (1): expected bool
+			- ChainID: missing: required for all chains`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var c Config

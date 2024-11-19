@@ -218,6 +218,15 @@
     },
     {
       "type": "checks",
+      "id": "RetirementReportCache",
+      "attributes": {
+        "name": "RetirementReportCache",
+        "status": "passing",
+        "output": ""
+      }
+    },
+    {
+      "type": "checks",
       "id": "Solana.Bar.Chain",
       "attributes": {
         "name": "Solana.Bar.Chain",
@@ -275,6 +284,15 @@
       "id": "TelemetryManager",
       "attributes": {
         "name": "TelemetryManager",
+        "status": "passing",
+        "output": ""
+      }
+    },
+    {
+      "type": "checks",
+      "id": "WorkflowDBStore",
+      "attributes": {
+        "name": "WorkflowDBStore",
         "status": "passing",
         "output": ""
       }

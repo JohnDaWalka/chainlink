@@ -9,14 +9,15 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/jmoiron/sqlx"
 	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	clcommontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -26,13 +27,11 @@ import (
 	evmtxmgr "github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/chain_reader_tester"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	_ "github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest" // force binding for tx type
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
-
-	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -61,20 +60,24 @@ type EVMChainComponentsInterfaceTesterHelper[T TestingT[T]] interface {
 }
 
 type EVMChainComponentsInterfaceTester[T TestingT[T]] struct {
-	Helper            EVMChainComponentsInterfaceTesterHelper[T]
-	client            client.Client
-	address           string
-	address2          string
-	contractTesters   map[string]*chain_reader_tester.ChainReaderTester
-	chainReaderConfig types.ChainReaderConfig
-	chainWriterConfig types.ChainWriterConfig
-	deployerAuth      *bind.TransactOpts
-	senderAuth        *bind.TransactOpts
-	cr                evm.ChainReaderService
-	cw                evm.ChainWriterService
-	dirtyContracts    bool
-	txm               evmtxmgr.TxManager
-	gasEstimator      gas.EvmFeeEstimator
+	TestSelectionSupport
+	Helper                    EVMChainComponentsInterfaceTesterHelper[T]
+	client                    client.Client
+	address                   string
+	address2                  string
+	contractTesters           map[string]*chain_reader_tester.ChainReaderTester
+	chainReaderConfig         types.ChainReaderConfig
+	chainWriterConfig         types.ChainWriterConfig
+	deployerAuth              *bind.TransactOpts
+	senderAuth                *bind.TransactOpts
+	cr                        evm.ChainReaderService
+	cw                        evm.ChainWriterService
+	dirtyContracts            bool
+	txm                       evmtxmgr.TxManager
+	gasEstimator              gas.EvmFeeEstimator
+	chainReaderConfigSupplier func(t T) types.ChainReaderConfig
+	chainWriterConfigSupplier func(t T) types.ChainWriterConfig
+	dirtyConfig               bool
 }
 
 func (it *EVMChainComponentsInterfaceTester[T]) Setup(t T) {
@@ -96,7 +99,7 @@ func (it *EVMChainComponentsInterfaceTester[T]) Setup(t T) {
 	})
 
 	// can re-use the same chain for tests, just make new contract for each test
-	if it.client != nil {
+	if it.client != nil && !it.dirtyConfig {
 		it.deployNewContracts(t)
 		return
 	}
@@ -107,6 +110,17 @@ func (it *EVMChainComponentsInterfaceTester[T]) Setup(t T) {
 	it.deployerAuth = accounts[0]
 	it.senderAuth = accounts[1]
 
+	it.chainReaderConfig = it.chainReaderConfigSupplier(t)
+	it.GetContractReader(t)
+
+	it.txm = it.Helper.TXM(t, it.client)
+	it.chainWriterConfig = it.chainWriterConfigSupplier(t)
+
+	it.deployNewContracts(t)
+	it.dirtyConfig = false
+}
+
+func (it *EVMChainComponentsInterfaceTester[T]) getChainReaderConfig(t T) types.ChainReaderConfig {
 	testStruct := CreateTestStruct[T](0, it)
 
 	methodTakingLatestParamsReturningTestStructConfig := types.ChainReaderDefinition{
@@ -114,10 +128,13 @@ func (it *EVMChainComponentsInterfaceTester[T]) Setup(t T) {
 		OutputModifications: codec.ModifiersConfig{
 			&codec.RenameModifierConfig{Fields: map[string]string{"NestedDynamicStruct.Inner.IntVal": "I"}},
 			&codec.RenameModifierConfig{Fields: map[string]string{"NestedStaticStruct.Inner.IntVal": "I"}},
+			&codec.AddressBytesToStringModifierConfig{
+				Fields: []string{"AccountStruct.AccountStr"},
+			},
 		},
 	}
 
-	it.chainReaderConfig = types.ChainReaderConfig{
+	return types.ChainReaderConfig{
 		Contracts: map[string]types.ChainContractReader{
 			AnyContractName: {
 				ContractABI: chain_reader_tester.ChainReaderTesterMetaData.ABI,
@@ -144,12 +161,16 @@ func (it *EVMChainComponentsInterfaceTester[T]) Setup(t T) {
 								"OracleID": {Name: "oracleId"},
 								// this is just to illustrate an example, generic names shouldn't really be formatted like this since other chains might not store it in the same way
 								"NestedStaticStruct.Inner.IntVal": {Name: "nestedStaticStruct.Inner.IntVal"},
+								"NestedDynamicStruct.FixedBytes":  {Name: "nestedDynamicStruct.FixedBytes"},
 								"BigField":                        {Name: "bigField"},
 							},
 						},
 						OutputModifications: codec.ModifiersConfig{
 							&codec.RenameModifierConfig{Fields: map[string]string{"NestedDynamicStruct.Inner.IntVal": "I"}},
 							&codec.RenameModifierConfig{Fields: map[string]string{"NestedStaticStruct.Inner.IntVal": "I"}},
+							&codec.AddressBytesToStringModifierConfig{
+								Fields: []string{"AccountStruct.AccountStr"},
+							},
 						},
 					},
 					staticBytesEventName: {
@@ -168,6 +189,11 @@ func (it *EVMChainComponentsInterfaceTester[T]) Setup(t T) {
 					EventWithFilterName: {
 						ChainSpecificName: "Triggered",
 						ReadType:          types.Event,
+						OutputModifications: codec.ModifiersConfig{
+							&codec.AddressBytesToStringModifierConfig{
+								Fields: []string{"AccountStruct.AccountStr"},
+							},
+						},
 					},
 					triggerWithDynamicTopic: {
 						ChainSpecificName: triggerWithDynamicTopic,
@@ -201,17 +227,23 @@ func (it *EVMChainComponentsInterfaceTester[T]) Setup(t T) {
 						InputModifications: codec.ModifiersConfig{
 							&codec.HardCodeModifierConfig{
 								OnChainValues: map[string]any{
-									"BigField": testStruct.BigField.String(),
-									"Account":  hexutil.Encode(testStruct.Account),
+									"BigField":              testStruct.BigField.String(),
+									"AccountStruct.Account": hexutil.Encode(testStruct.AccountStruct.Account),
 								},
 							},
 							&codec.RenameModifierConfig{Fields: map[string]string{"NestedDynamicStruct.Inner.IntVal": "I"}},
 							&codec.RenameModifierConfig{Fields: map[string]string{"NestedStaticStruct.Inner.IntVal": "I"}},
+							&codec.AddressBytesToStringModifierConfig{
+								Fields: []string{"AccountStruct.AccountStr"},
+							},
 						},
 						OutputModifications: codec.ModifiersConfig{
 							&codec.HardCodeModifierConfig{OffChainValues: map[string]any{"ExtraField": AnyExtraValue}},
 							&codec.RenameModifierConfig{Fields: map[string]string{"NestedDynamicStruct.Inner.IntVal": "I"}},
 							&codec.RenameModifierConfig{Fields: map[string]string{"NestedStaticStruct.Inner.IntVal": "I"}},
+							&codec.AddressBytesToStringModifierConfig{
+								Fields: []string{"AccountStruct.AccountStr"},
+							},
 						},
 					},
 				},
@@ -227,10 +259,10 @@ func (it *EVMChainComponentsInterfaceTester[T]) Setup(t T) {
 			},
 		},
 	}
-	it.GetContractReader(t)
-	it.txm = it.Helper.TXM(t, it.client)
+}
 
-	it.chainWriterConfig = types.ChainWriterConfig{
+func (it *EVMChainComponentsInterfaceTester[T]) getChainWriterConfig(t T) types.ChainWriterConfig {
+	return types.ChainWriterConfig{
 		Contracts: map[string]*types.ContractConfig{
 			AnyContractName: {
 				ContractABI: chain_reader_tester.ChainReaderTesterMetaData.ABI,
@@ -305,7 +337,6 @@ func (it *EVMChainComponentsInterfaceTester[T]) Setup(t T) {
 		},
 		MaxGasPrice: assets.NewWei(big.NewInt(1000000000000000000)),
 	}
-	it.deployNewContracts(t)
 }
 
 func (it *EVMChainComponentsInterfaceTester[T]) Name() string {
@@ -317,6 +348,10 @@ func (it *EVMChainComponentsInterfaceTester[T]) GetAccountBytes(i int) []byte {
 	account[i%20] += byte(i)
 	account[(i+3)%20] += byte(i + 3)
 	return account[:]
+}
+
+func (it *EVMChainComponentsInterfaceTester[T]) GetAccountString(i int) string {
+	return common.BytesToAddress(it.GetAccountBytes(i)).Hex()
 }
 
 func (it *EVMChainComponentsInterfaceTester[T]) GetContractReader(t T) clcommontypes.ContractReader {
@@ -440,6 +475,22 @@ func (it *EVMChainComponentsInterfaceTester[T]) MaxWaitTimeForEvents() time.Dura
 	return it.Helper.MaxWaitTimeForEvents()
 }
 
+func (it *EVMChainComponentsInterfaceTester[T]) Init(t T) {
+	it.Helper.Init(t)
+	it.chainWriterConfigSupplier = func(t T) types.ChainWriterConfig { return it.getChainWriterConfig(t) }
+	it.chainReaderConfigSupplier = func(t T) types.ChainReaderConfig { return it.getChainReaderConfig(t) }
+}
+
+func (it *EVMChainComponentsInterfaceTester[T]) SetChainReaderConfigSupplier(chainReaderConfigSupplier func(t T) types.ChainReaderConfig) {
+	it.dirtyConfig = true
+	it.chainReaderConfigSupplier = chainReaderConfigSupplier
+}
+
+func (it *EVMChainComponentsInterfaceTester[T]) SetChainWriterConfigSupplier(chainWriterConfigSupplier func(t T) types.ChainWriterConfig) {
+	it.dirtyConfig = true
+	it.chainWriterConfigSupplier = chainWriterConfigSupplier
+}
+
 func OracleIDsToBytes(oracleIDs [32]commontypes.OracleID) [32]byte {
 	convertedIDs := [32]byte{}
 	for i, id := range oracleIDs {
@@ -462,11 +513,18 @@ func ToInternalType(testStruct TestStruct) chain_reader_tester.TestStruct {
 		DifferentField:      testStruct.DifferentField,
 		OracleId:            byte(testStruct.OracleID),
 		OracleIds:           OracleIDsToBytes(testStruct.OracleIDs),
-		Account:             common.Address(testStruct.Account),
+		AccountStruct:       AccountStructToInternalType(testStruct.AccountStruct),
 		Accounts:            ConvertAccounts(testStruct.Accounts),
 		BigField:            testStruct.BigField,
 		NestedDynamicStruct: MidDynamicToInternalType(testStruct.NestedDynamicStruct),
 		NestedStaticStruct:  MidStaticToInternalType(testStruct.NestedStaticStruct),
+	}
+}
+
+func AccountStructToInternalType(a AccountStruct) chain_reader_tester.AccountStruct {
+	return chain_reader_tester.AccountStruct{
+		Account:    common.Address(a.Account),
+		AccountStr: common.HexToAddress(a.AccountStr),
 	}
 }
 

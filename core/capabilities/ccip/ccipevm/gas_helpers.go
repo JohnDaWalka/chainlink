@@ -1,9 +1,10 @@
 package ccipevm
 
 import (
+	"fmt"
 	"math"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 const (
@@ -26,6 +27,8 @@ const (
 	ExecutionStateProcessingOverheadGas = 2_100 + // COLD_SLOAD_COST for first reading the state
 		20_000 + // SSTORE_SET_GAS for writing from 0 (untouched) to non-zero (in-progress)
 		100 //# SLOAD_GAS = WARM_STORAGE_READ_COST for rewriting from non-zero (in-progress) to non-zero (success/failure)
+	// TODO: investigate the write overhead for v1.6
+	DestGasOverhead = 110_000 + 110_000 + 130_000 // 110K for commit, 110K for RMN, 130K for Exec
 )
 
 func NewGasEstimateProvider() EstimateProvider {
@@ -52,15 +55,31 @@ func bytesForMsgTokens(numTokens int) int {
 
 // CalculateMessageMaxGas computes the maximum gas overhead for a message.
 func (gp EstimateProvider) CalculateMessageMaxGas(msg cciptypes.Message) uint64 {
+	maxGas, err := gp.CalculateMessageMaxGasWithError(msg)
+	if err != nil {
+		panic(err)
+	}
+	return maxGas
+}
+
+// CalculateMessageMaxGasWithError computes the maximum gas overhead for a message.
+func (gp EstimateProvider) CalculateMessageMaxGasWithError(msg cciptypes.Message) (uint64, error) {
 	numTokens := len(msg.TokenAmounts)
 	var data []byte = msg.Data
 	dataLength := len(data)
 
-	// TODO: update interface to return error?
-	// Although this decoding should never fail.
 	messageGasLimit, err := decodeExtraArgsV1V2(msg.ExtraArgs)
 	if err != nil {
-		panic(err)
+		return 0, fmt.Errorf("failed to decode extra args: %w", err)
+	}
+
+	var totalTokenDestGasOverhead uint64
+	for _, rampTokenAmount := range msg.TokenAmounts {
+		tokenDestGasOverhead, err := decodeTokenDestGasOverhead(rampTokenAmount.DestExecData)
+		if err != nil {
+			return 0, fmt.Errorf("failed to decode token dest gas overhead: %w", err)
+		}
+		totalTokenDestGasOverhead += uint64(tokenDestGasOverhead)
 	}
 
 	messageBytes := ConstantMessagePartBytes +
@@ -79,11 +98,13 @@ func (gp EstimateProvider) CalculateMessageMaxGas(msg cciptypes.Message) uint64 
 		adminRegistryOverhead = TokenAdminRegistryWarmupCost
 	}
 
-	return messageGasLimit.Uint64() +
+	return DestGasOverhead +
+		messageGasLimit.Uint64() +
 		messageCallDataGas +
 		ExecutionStateProcessingOverheadGas +
 		SupportsInterfaceCheck +
 		adminRegistryOverhead +
 		rateLimiterOverhead +
-		PerTokenOverheadGas*uint64(numTokens)
+		PerTokenOverheadGas*uint64(numTokens) +
+		totalTokenDestGasOverhead, nil
 }

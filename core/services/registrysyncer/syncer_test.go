@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -48,19 +48,19 @@ var writeChainCapability = kcr.CapabilitiesRegistryCapability{
 	CapabilityType: uint8(3),
 }
 
-func startNewChainWithRegistry(t *testing.T) (*kcr.CapabilitiesRegistry, common.Address, *bind.TransactOpts, *backends.SimulatedBackend) {
+func startNewChainWithRegistry(t *testing.T) (*kcr.CapabilitiesRegistry, common.Address, *bind.TransactOpts, *simulated.Backend) {
 	owner := testutils.MustNewSimTransactor(t)
 
 	i := &big.Int{}
 	oneEth, _ := i.SetString("100000000000000000000", 10)
 	gasLimit := ethconfig.Defaults.Miner.GasCeil * 2 // 60 M blocks
 
-	simulatedBackend := backends.NewSimulatedBackend(core.GenesisAlloc{owner.From: {
+	simulatedBackend := simulated.NewBackend(gethtypes.GenesisAlloc{owner.From: {
 		Balance: oneEth,
-	}}, gasLimit)
+	}}, simulated.WithBlockGasLimit(gasLimit))
 	simulatedBackend.Commit()
 
-	CapabilitiesRegistryAddress, _, CapabilitiesRegistry, err := kcr.DeployCapabilitiesRegistry(owner, simulatedBackend)
+	CapabilitiesRegistryAddress, _, CapabilitiesRegistry, err := kcr.DeployCapabilitiesRegistry(owner, simulatedBackend.Client())
 	require.NoError(t, err, "DeployCapabilitiesRegistry failed")
 
 	fmt.Println("Deployed CapabilitiesRegistry at", CapabilitiesRegistryAddress.Hex())
@@ -90,7 +90,7 @@ func (c *crFactory) NewContractReader(ctx context.Context, cfg []byte) (types.Co
 	return svc, svc.Start(ctx)
 }
 
-func newContractReaderFactory(t *testing.T, simulatedBackend *backends.SimulatedBackend) *crFactory {
+func newContractReaderFactory(t *testing.T, simulatedBackend *simulated.Backend) *crFactory {
 	lggr := logger.TestLogger(t)
 	client := evmclient.NewSimulatedBackendClient(
 		t,
@@ -209,6 +209,7 @@ func TestReader_Integration(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+	sim.Commit()
 
 	nodeSet := [][32]byte{
 		randomWord(),
@@ -254,6 +255,7 @@ func TestReader_Integration(t *testing.T) {
 	}
 	_, err = reg.AddNodes(owner, nodes)
 	require.NoError(t, err)
+	sim.Commit()
 
 	config := &capabilitiespb.CapabilityConfig{
 		DefaultConfig: values.Proto(values.EmptyMap()).GetMapValue(),
@@ -323,7 +325,7 @@ func TestReader_Integration(t *testing.T) {
 	assert.Equal(t, expectedDON, gotDon.DON)
 	assert.Equal(t, configb, gotDon.CapabilityConfigurations[cid].Config)
 
-	nodesInfo := []kcr.CapabilitiesRegistryNodeInfo{
+	nodesInfo := []kcr.INodeInfoProviderNodeInfo{
 		{
 			// The first NodeOperatorId has id 1 since the id is auto-incrementing.
 			NodeOperatorId:      uint32(1),
@@ -360,7 +362,7 @@ func TestReader_Integration(t *testing.T) {
 	}
 
 	assert.Len(t, s.IDsToNodes, 3)
-	assert.Equal(t, map[p2ptypes.PeerID]kcr.CapabilitiesRegistryNodeInfo{
+	assert.Equal(t, map[p2ptypes.PeerID]kcr.INodeInfoProviderNodeInfo{
 		nodeSet[0]: nodesInfo[0],
 		nodeSet[1]: nodesInfo[1],
 		nodeSet[2]: nodesInfo[2],
@@ -385,6 +387,7 @@ func TestSyncer_DBIntegration(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+	sim.Commit()
 
 	nodeSet := [][32]byte{
 		randomWord(),
@@ -426,6 +429,7 @@ func TestSyncer_DBIntegration(t *testing.T) {
 	}
 	_, err = reg.AddNodes(owner, nodes)
 	require.NoError(t, err)
+	sim.Commit()
 
 	config := &capabilitiespb.CapabilityConfig{
 		DefaultConfig: values.Proto(values.EmptyMap()).GetMapValue(),
@@ -455,9 +459,8 @@ func TestSyncer_DBIntegration(t *testing.T) {
 		true,
 		1,
 	)
-	sim.Commit()
-
 	require.NoError(t, err)
+	sim.Commit()
 
 	factory := newContractReaderFactory(t, sim)
 	syncerORM := newORM(t)
@@ -525,7 +528,7 @@ func TestSyncer_LocalNode(t *testing.T) {
 				},
 			},
 		},
-		map[p2ptypes.PeerID]kcr.CapabilitiesRegistryNodeInfo{
+		map[p2ptypes.PeerID]kcr.INodeInfoProviderNodeInfo{
 			workflowDonNodes[0]: {
 				NodeOperatorId:      1,
 				Signer:              randomWord(),

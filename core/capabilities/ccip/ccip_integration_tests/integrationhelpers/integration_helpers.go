@@ -2,6 +2,8 @@ package integrationhelpers
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -9,14 +11,20 @@ import (
 	"testing"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient/simulated"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_home"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_home"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/stretchr/testify/require"
 
 	configsevm "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
@@ -24,7 +32,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_home"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
@@ -80,35 +87,36 @@ const (
 )
 
 type TestUniverse struct {
-	Transactor      *bind.TransactOpts
-	Backend         *backends.SimulatedBackend
-	CapReg          *kcr.CapabilitiesRegistry
-	CCIPHome        *ccip_home.CCIPHome
-	TestingT        *testing.T
-	LogPoller       logpoller.LogPoller
-	HeadTracker     logpoller.HeadTracker
-	SimClient       client.Client
-	HomeChainReader ccipreader.HomeChain
+	Transactor         *bind.TransactOpts
+	Backend            *simulated.Backend
+	CapReg             *kcr.CapabilitiesRegistry
+	CCIPHome           *ccip_home.CCIPHome
+	TestingT           *testing.T
+	LogPoller          logpoller.LogPoller
+	HeadTracker        logpoller.HeadTracker
+	SimClient          client.Client
+	HomeChainReader    ccipreader.HomeChain
+	HomeContractReader types.ContractReader
 }
 
 func NewTestUniverse(ctx context.Context, t *testing.T, lggr logger.Logger) TestUniverse {
 	transactor := testutils.MustNewSimTransactor(t)
-	backend := backends.NewSimulatedBackend(core.GenesisAlloc{
+	backend := simulated.NewBackend(ethtypes.GenesisAlloc{
 		transactor.From: {Balance: assets.Ether(1000).ToInt()},
-	}, 30e6)
+	}, simulated.WithBlockGasLimit(30e6))
 
-	crAddress, _, _, err := kcr.DeployCapabilitiesRegistry(transactor, backend)
+	crAddress, _, _, err := kcr.DeployCapabilitiesRegistry(transactor, backend.Client())
 	require.NoError(t, err)
 	backend.Commit()
 
-	capReg, err := kcr.NewCapabilitiesRegistry(crAddress, backend)
+	capReg, err := kcr.NewCapabilitiesRegistry(crAddress, backend.Client())
 	require.NoError(t, err)
 
-	ccAddress, _, _, err := ccip_home.DeployCCIPHome(transactor, backend, crAddress)
+	ccAddress, _, _, err := ccip_home.DeployCCIPHome(transactor, backend.Client(), crAddress)
 	require.NoError(t, err)
 	backend.Commit()
 
-	cc, err := ccip_home.NewCCIPHome(ccAddress, backend)
+	cc, err := ccip_home.NewCCIPHome(ccAddress, backend.Client())
 	require.NoError(t, err)
 
 	db := pgtest.NewSqlxDB(t)
@@ -128,17 +136,19 @@ func NewTestUniverse(ctx context.Context, t *testing.T, lggr logger.Logger) Test
 	require.NoError(t, lp.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, lp.Close()) })
 
-	hcr := NewHomeChainReader(t, lp, headTracker, cl, ccAddress)
+	cr := NewReader(t, lp, headTracker, cl, ccAddress, configsevm.HomeChainReaderConfigRaw)
+	hcr := NewHomeChainReader(t, cr, ccAddress)
 	return TestUniverse{
-		Transactor:      transactor,
-		Backend:         backend,
-		CapReg:          capReg,
-		CCIPHome:        cc,
-		TestingT:        t,
-		SimClient:       cl,
-		LogPoller:       lp,
-		HeadTracker:     headTracker,
-		HomeChainReader: hcr,
+		Transactor:         transactor,
+		Backend:            backend,
+		CapReg:             capReg,
+		CCIPHome:           cc,
+		TestingT:           t,
+		SimClient:          cl,
+		LogPoller:          lp,
+		HeadTracker:        headTracker,
+		HomeChainReader:    hcr,
+		HomeContractReader: cr,
 	}
 }
 
@@ -227,9 +237,7 @@ func (t *TestUniverse) AddCapability(p2pIDs [][32]byte) {
 	}
 }
 
-func NewHomeChainReader(t *testing.T, logPoller logpoller.LogPoller, headTracker logpoller.HeadTracker, client client.Client, ccAddress common.Address) ccipreader.HomeChain {
-	cr := NewReader(t, logPoller, headTracker, client, ccAddress, configsevm.HomeChainReaderConfigRaw)
-
+func NewHomeChainReader(t *testing.T, cr types.ContractReader, ccAddress common.Address) ccipreader.HomeChain {
 	hcr := ccipreader.NewHomeChainReader(cr, logger.TestLogger(t), 50*time.Millisecond, types.BoundContract{
 		Address: ccAddress.String(),
 		Name:    consts.ContractNameCCIPConfig,
@@ -364,4 +372,66 @@ func SetupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg
 			Config:  cfg,
 		},
 	}
+}
+
+func GenerateRMNHomeConfigs(
+	peerID string,
+	offchainPK string,
+	offchainCfg string,
+	chainSelector uint64,
+	f uint64,
+	observerBitmap *big.Int) (rmn_home.RMNHomeStaticConfig, rmn_home.RMNHomeDynamicConfig, error) {
+	peerIDByte, _ := hex.DecodeString(peerID)
+	var peerIDBytes [32]byte
+	copy(peerIDBytes[:], peerIDByte)
+
+	offchainPublicKey, err := hex.DecodeString(offchainPK)
+
+	if err != nil {
+		return rmn_home.RMNHomeStaticConfig{}, rmn_home.RMNHomeDynamicConfig{}, fmt.Errorf("error decoding offchain public key: %w", err)
+	}
+
+	var offchainPublicKeyBytes [32]byte
+	copy(offchainPublicKeyBytes[:], offchainPublicKey)
+
+	staticConfig := rmn_home.RMNHomeStaticConfig{
+		Nodes: []rmn_home.RMNHomeNode{
+			{
+				PeerId:            peerIDBytes,
+				OffchainPublicKey: offchainPublicKeyBytes,
+			},
+		},
+		OffchainConfig: []byte(offchainCfg),
+	}
+
+	dynamicConfig := rmn_home.RMNHomeDynamicConfig{
+		SourceChains: []rmn_home.RMNHomeSourceChain{
+			{
+				ChainSelector:       chainSelector,
+				F:                   f,
+				ObserverNodesBitmap: observerBitmap,
+			},
+		},
+		OffchainConfig: []byte(offchainCfg),
+	}
+	return staticConfig, dynamicConfig, nil
+}
+
+func GenerateExpectedRMNHomeNodesInfo(staticConfig rmn_home.RMNHomeStaticConfig, chainID int) []ccipreader.HomeNodeInfo {
+	expectedCandidateNodesInfo := make([]ccipreader.HomeNodeInfo, 0)
+
+	supportedCandidateSourceChains := mapset.NewSet(ccipocr3.ChainSelector(chainID))
+
+	var counter uint32
+	for _, n := range staticConfig.Nodes {
+		pk := ed25519.PublicKey(n.OffchainPublicKey[:])
+		expectedCandidateNodesInfo = append(expectedCandidateNodesInfo, ccipreader.HomeNodeInfo{
+			ID:                    ccipreader.NodeID(counter),
+			PeerID:                n.PeerId,
+			SupportedSourceChains: supportedCandidateSourceChains,
+			OffchainPublicKey:     &pk,
+		})
+		counter++
+	}
+	return expectedCandidateNodesInfo
 }

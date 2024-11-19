@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 
@@ -28,13 +29,13 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	commitocr3 "github.com/smartcontractkit/chainlink-ccip/commit"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	execocr3 "github.com/smartcontractkit/chainlink-ccip/execute"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -72,7 +73,6 @@ type pluginOracleCreator struct {
 	homeChainReader       ccipreaderpkg.HomeChain
 	homeChainSelector     cciptypes.ChainSelector
 	relayers              map[types.RelayID]loop.Relayer
-	evmConfigs            toml.EVMConfigs
 }
 
 func NewPluginOracleCreator(
@@ -90,7 +90,6 @@ func NewPluginOracleCreator(
 	bootstrapperLocators []commontypes.BootstrapperLocator,
 	homeChainReader ccipreaderpkg.HomeChain,
 	homeChainSelector cciptypes.ChainSelector,
-	evmConfigs toml.EVMConfigs,
 ) cctypes.OracleCreator {
 	return &pluginOracleCreator{
 		ocrKeyBundles:         ocrKeyBundles,
@@ -107,7 +106,6 @@ func NewPluginOracleCreator(
 		bootstrapperLocators:  bootstrapperLocators,
 		homeChainReader:       homeChainReader,
 		homeChainSelector:     homeChainSelector,
-		evmConfigs:            evmConfigs,
 	}
 }
 
@@ -117,7 +115,7 @@ func (i *pluginOracleCreator) Type() cctypes.OracleType {
 }
 
 // Create implements types.OracleCreator.
-func (i *pluginOracleCreator) Create(donID uint32, config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
 	pluginType := cctypes.PluginType(config.Config.PluginType)
 
 	// Assuming that the chain selector is referring to an evm chain for now.
@@ -136,6 +134,7 @@ func (i *pluginOracleCreator) Create(donID uint32, config cctypes.OCR3ConfigWith
 	}
 
 	contractReaders, chainWriters, err := i.createReadersAndWriters(
+		ctx,
 		destChainID,
 		pluginType,
 		config,
@@ -167,7 +166,8 @@ func (i *pluginOracleCreator) Create(donID uint32, config cctypes.OCR3ConfigWith
 	}
 
 	// TODO: Extract the correct transmitter address from the destsFromAccount
-	factory, transmitter, err := i.createFactoryAndTransmitter(donID, config, destRelayID, contractReaders, chainWriters, destChainWriter, destFromAccounts)
+	factory, transmitter, err := i.createFactoryAndTransmitter(
+		donID, config, destRelayID, contractReaders, chainWriters, destChainWriter, destFromAccounts, publicConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create factory and transmitter: %w", err)
 	}
@@ -223,6 +223,7 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	destChainWriter types.ChainWriter,
 	destFromAccounts []string,
+	publicConfig ocr3confighelper.PublicConfig,
 ) (ocr3types.ReportingPluginFactory[[]byte], ocr3types.ContractTransmitter[[]byte], error) {
 	var factory ocr3types.ReportingPluginFactory[[]byte]
 	var transmitter ocr3types.ContractTransmitter[[]byte]
@@ -231,9 +232,17 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 			return nil, nil, fmt.Errorf("peer wrapper is not started")
 		}
 
-		rmnPeerClient := rmn.NewPeerClient(i.lggr, i.peerWrapper.PeerGroupFactory, i.bootstrapperLocators)
+		i.lggr.Infow("creating rmn peer client",
+			"bootstrapperLocators", i.bootstrapperLocators, "deltaRound", publicConfig.DeltaRound)
 
-		rmnCrypto := ccipevm.NewEVMRMNCrypto()
+		rmnPeerClient := rmn.NewPeerClient(
+			i.lggr.Named("RMNPeerClient"),
+			i.peerWrapper.PeerGroupFactory,
+			i.bootstrapperLocators,
+			publicConfig.DeltaRound,
+		)
+
+		rmnCrypto := ccipevm.NewEVMRMNCrypto(i.lggr.Named("EVMRMNCrypto"))
 
 		factory = commitocr3.NewPluginFactory(
 			i.lggr.
@@ -244,7 +253,7 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 			donID,
 			ccipreaderpkg.OCR3ConfigWithMeta(config),
 			ccipevm.NewCommitPluginCodecV1(),
-			ccipevm.NewMessageHasherV1(),
+			ccipevm.NewMessageHasherV1(i.lggr.Named("MessageHasherV1")),
 			i.homeChainReader,
 			i.homeChainSelector,
 			contractReaders,
@@ -265,7 +274,7 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 			donID,
 			ccipreaderpkg.OCR3ConfigWithMeta(config),
 			ccipevm.NewExecutePluginCodecV1(),
-			ccipevm.NewMessageHasherV1(),
+			ccipevm.NewMessageHasherV1(i.lggr.Named("MessageHasherV1")),
 			i.homeChainReader,
 			ccipevm.NewEVMTokenDataEncoder(),
 			ccipevm.NewGasEstimateProvider(),
@@ -283,6 +292,7 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 }
 
 func (i *pluginOracleCreator) createReadersAndWriters(
+	ctx context.Context,
 	destChainID uint64,
 	pluginType cctypes.PluginType,
 	config cctypes.OCR3ConfigWithMeta,
@@ -324,20 +334,19 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			return nil, nil, fmt.Errorf("failed to get chain selector from chain ID %s: %w", chainID.String(), err1)
 		}
 
-		chainReaderConfig, err1 := getChainReaderConfig(chainID.Uint64(), destChainID, homeChainID, ofc, chainSelector)
+		chainReaderConfig, err1 := getChainReaderConfig(i.lggr, chainID.Uint64(), destChainID, homeChainID, ofc, chainSelector)
 		if err1 != nil {
 			return nil, nil, fmt.Errorf("failed to get chain reader config: %w", err1)
 		}
 
-		// TODO: context.
-		cr, err1 := relayer.NewContractReader(context.Background(), chainReaderConfig)
+		cr, err1 := relayer.NewContractReader(ctx, chainReaderConfig)
 		if err1 != nil {
 			return nil, nil, err1
 		}
 
 		if chainID.Uint64() == destChainID {
 			offrampAddressHex := common.BytesToAddress(config.Config.OfframpAddress).Hex()
-			err2 := cr.Bind(context.Background(), []types.BoundContract{
+			err2 := cr.Bind(ctx, []types.BoundContract{
 				{
 					Address: offrampAddressHex,
 					Name:    consts.ContractNameOffRamp,
@@ -348,13 +357,13 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			}
 		}
 
-		if err2 := cr.Start(context.Background()); err2 != nil {
+		if err2 := cr.Start(ctx); err2 != nil {
 			return nil, nil, fmt.Errorf("failed to start contract reader for chain %s: %w", chainID.String(), err2)
 		}
 
 		cw, err1 := createChainWriter(
+			ctx,
 			chainID,
-			i.evmConfigs,
 			relayer,
 			i.transmitters,
 			execBatchGasLimit)
@@ -362,7 +371,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			return nil, nil, err1
 		}
 
-		if err4 := cw.Start(context.Background()); err4 != nil {
+		if err4 := cw.Start(ctx); err4 != nil {
 			return nil, nil, fmt.Errorf("failed to start chain writer for chain %s: %w", chainID.String(), err4)
 		}
 
@@ -419,6 +428,7 @@ func (i *pluginOracleCreator) getChainID(chainSelector cciptypes.ChainSelector) 
 }
 
 func getChainReaderConfig(
+	lggr logger.Logger,
 	chainID uint64,
 	destChainID uint64,
 	homeChainID uint64,
@@ -433,14 +443,17 @@ func getChainReaderConfig(
 	}
 
 	if !ofc.commitEmpty() && ofc.commit().PriceFeedChainSelector == chainSelector {
+		lggr.Debugw("Adding feed reader config", "chainID", chainID)
 		chainReaderConfig = evmconfig.MergeReaderConfigs(chainReaderConfig, evmconfig.FeedReaderConfig)
 	}
 
-	if isUSDCEnabled(chainID, destChainID, ofc) {
+	if isUSDCEnabled(ofc) {
+		lggr.Debugw("Adding USDC reader config", "chainID", chainID)
 		chainReaderConfig = evmconfig.MergeReaderConfigs(chainReaderConfig, evmconfig.USDCReaderConfig)
 	}
 
 	if chainID == homeChainID {
+		lggr.Debugw("Adding home chain reader config", "chainID", chainID)
 		chainReaderConfig = evmconfig.MergeReaderConfigs(chainReaderConfig, evmconfig.HomeChainReaderConfigRaw)
 	}
 
@@ -452,11 +465,7 @@ func getChainReaderConfig(
 	return marshaledConfig, nil
 }
 
-func isUSDCEnabled(chainID uint64, destChainID uint64, ofc offChainConfig) bool {
-	if chainID == destChainID {
-		return false
-	}
-
+func isUSDCEnabled(ofc offChainConfig) bool {
 	if ofc.execEmpty() {
 		return false
 	}
@@ -465,8 +474,8 @@ func isUSDCEnabled(chainID uint64, destChainID uint64, ofc offChainConfig) bool 
 }
 
 func createChainWriter(
+	ctx context.Context,
 	chainID *big.Int,
-	evmConfigs toml.EVMConfigs,
 	relayer loop.Relayer,
 	transmitters map[types.RelayID][]string,
 	execBatchGasLimit uint64,
@@ -478,14 +487,8 @@ func createChainWriter(
 		fromAddress = common.HexToAddress(transmitter[0])
 	}
 
-	maxGasPrice := getKeySpecificMaxGasPrice(evmConfigs, chainID, fromAddress)
-	if maxGasPrice == nil {
-		return nil, fmt.Errorf("failed to find max gas price for chain %s", chainID.String())
-	}
-
 	chainWriterRawConfig, err := evmconfig.ChainWriterConfigRaw(
 		fromAddress,
-		maxGasPrice,
 		defaultCommitGasLimit,
 		execBatchGasLimit,
 	)
@@ -498,8 +501,7 @@ func createChainWriter(
 		return nil, fmt.Errorf("failed to marshal chain writer config: %w", err)
 	}
 
-	// TODO: context.
-	cw, err := relayer.NewChainWriter(context.Background(), chainWriterConfig)
+	cw, err := relayer.NewChainWriter(ctx, chainWriterConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chain writer for chain %s: %w", chainID.String(), err)
 	}

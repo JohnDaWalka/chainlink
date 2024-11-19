@@ -1,17 +1,17 @@
 package launcher
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	it "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccip_integration_tests/integrationhelpers"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 
-	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_home"
@@ -90,9 +90,9 @@ func TestIntegration_Launcher(t *testing.T) {
 		it.FChainA,
 		p2pIDs)
 
-	gomega.NewWithT(t).Eventually(func() bool {
+	require.Eventually(t, func() bool {
 		return len(launcher.runningDONIDs()) == 1
-	}, testutils.WaitTimeout(t), testutils.TestInterval).Should(gomega.BeTrue())
+	}, testutils.WaitTimeout(t), testutils.TestInterval)
 }
 
 type oraclePrints struct {
@@ -116,7 +116,7 @@ type oracleCreatorPrints struct {
 	t *testing.T
 }
 
-func (o *oracleCreatorPrints) Create(_ uint32, config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+func (o *oracleCreatorPrints) Create(ctx context.Context, _ uint32, config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
 	pluginType := cctypes.PluginType(config.Config.PluginType)
 	o.t.Logf("Creating plugin oracle (pluginType: %s) with config %+v\n", pluginType, config)
 	return &oraclePrints{pluginType: pluginType, config: config, t: o.t}, nil
