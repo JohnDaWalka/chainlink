@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
@@ -39,7 +40,7 @@ func Test_SecretsWorker(t *testing.T) {
 		giveWorkflow   = RegisterWorkflowCMD{
 			Name:       "test-wf",
 			DonID:      donID,
-			Status:     uint8(0),
+			Status:     uint8(1),
 			SecretsURL: giveSecretsURL,
 		}
 		giveContents = "contents"
@@ -58,6 +59,7 @@ func Test_SecretsWorker(t *testing.T) {
 
 	// Deploy a test workflow_registry
 	wfRegistryAddr, _, wfRegistryC, err := workflow_registry_wrapper.DeployWorkflowRegistry(backendTH.ContractsOwner, backendTH.Backend.Client())
+	backendTH.Backend.Commit()
 	require.NoError(t, err)
 
 	lggr.Infof("deployed workflow registry at %s\n", wfRegistryAddr.Hex())
@@ -116,8 +118,8 @@ func Test_SecretsWorker(t *testing.T) {
 	)
 
 	// generate a log event
+	updateAllowedDONs(t, backendTH, wfRegistryC, []uint32{donID}, true)
 	updateAuthorizedAddress(t, backendTH, wfRegistryC, []common.Address{backendTH.ContractsOwner.From}, true)
-	updateAllowedDONs(t, backendTH, wfRegistryC, []uint32{1}, true)
 	registerWorkflow(t, backendTH, wfRegistryC, giveWorkflow)
 
 	servicetest.Run(t, worker)
@@ -144,14 +146,19 @@ func updateAuthorizedAddress(
 	th *testutils.EVMBackendTH,
 	wfRegC *workflow_registry_wrapper.WorkflowRegistry,
 	addresses []common.Address,
-	allowed bool,
+	_ bool,
 ) {
 	t.Helper()
-	_, err := wfRegC.UpdateAuthorizedAddresses(th.ContractsOwner, addresses, allowed)
+	_, err := wfRegC.UpdateAuthorizedAddresses(th.ContractsOwner, addresses, true)
 	require.NoError(t, err, "failed to update authorised addresses")
 	th.Backend.Commit()
 	th.Backend.Commit()
 	th.Backend.Commit()
+	gotAddresses, err := wfRegC.GetAllAuthorizedAddresses(&bind.CallOpts{
+		From: th.ContractsOwner.From,
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, addresses, gotAddresses)
 }
 
 func updateAllowedDONs(
@@ -167,6 +174,11 @@ func updateAllowedDONs(
 	th.Backend.Commit()
 	th.Backend.Commit()
 	th.Backend.Commit()
+	gotDons, err := wfRegC.GetAllAllowedDONs(&bind.CallOpts{
+		From: th.ContractsOwner.From,
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, donIDs, gotDons)
 }
 
 type RegisterWorkflowCMD struct {
