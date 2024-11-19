@@ -68,13 +68,13 @@ func (t *Transaction) FindAttemptByHash(attemptHash common.Hash) (*Attempt, erro
 }
 
 func (t *Transaction) DeepCopy() *Transaction {
-	copy := *t
+	txCopy := *t
 	attemptsCopy := make([]*Attempt, 0, len(t.Attempts))
 	for _, attempt := range t.Attempts {
 		attemptsCopy = append(attemptsCopy, attempt.DeepCopy())
 	}
-	copy.Attempts = attemptsCopy
-	return &copy
+	txCopy.Attempts = attemptsCopy
+	return &txCopy
 }
 
 func (t *Transaction) GetMeta() (*TxMeta, error) {
@@ -102,12 +102,11 @@ type Attempt struct {
 }
 
 func (a *Attempt) DeepCopy() *Attempt {
-	copy := *a
+	txCopy := *a
 	if a.SignedTransaction != nil {
-		signedTransactionCopy := *a.SignedTransaction
-		copy.SignedTransaction = &signedTransactionCopy
+		txCopy.SignedTransaction = a.SignedTransaction.WithoutBlobTxSidecar()
 	}
-	return &copy
+	return &txCopy
 }
 
 type TxRequest struct {

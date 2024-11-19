@@ -153,6 +153,7 @@ func TestCreateTransaction(t *testing.T) {
 		for i := 1; i < maxQueuedTransactions+overshot; i++ {
 			r := &types.TxRequest{}
 			tx := m.CreateTransaction(r)
+			//nolint:gosec // this won't overflow
 			assert.Equal(t, uint64(i), tx.ID)
 		}
 		// total shouldn't exceed maxQueuedTransactions
@@ -160,6 +161,7 @@ func TestCreateTransaction(t *testing.T) {
 		// earliest tx ID should be the same amount of the number of transactions that we dropped
 		tx, err := m.UpdateUnstartedTransactionWithNonce(0)
 		assert.NoError(t, err)
+		//nolint:gosec // this won't overflow
 		assert.Equal(t, uint64(overshot), tx.ID)
 	})
 }
@@ -228,6 +230,7 @@ func TestMarkTransactionsConfirmed(t *testing.T) {
 	t.Run("prunes confirmed transactions map if it reaches the limit", func(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		for i := 0; i < maxQueuedTransactions; i++ {
+			//nolint:gosec
 			_, err := insertConfirmedTransaction(m, uint64(i))
 			assert.NoError(t, err)
 		}

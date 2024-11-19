@@ -118,6 +118,7 @@ func NewTxmv2(
 	config := txm.Config{
 		EIP1559:             fCfg.EIP1559DynamicFees(),
 		BlockTime:           blockTime, //TODO: create new config
+		//nolint:gosec // we want to reuse the existing config until migrations
 		RetryBlockThreshold: uint16(fCfg.BumpThreshold()),
 		EmptyTxLimitDefault: fCfg.LimitDefault(),
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -44,7 +45,7 @@ func TestLifecycle(t *testing.T) {
 	t.Run("tests lifecycle successfully without any transactions", func(t *testing.T) {
 		lggr, observedLogs := logger.TestObserved(t, zap.DebugLevel)
 		txStore := storage.NewInMemoryStoreManager(lggr, testutils.FixtureChainID)
-		assert.NoError(t, txStore.Add(addresses...))
+		require.NoError(t, txStore.Add(addresses...))
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, txStore, config, keystore)
 		var nonce uint64
 		// Start
@@ -102,7 +103,7 @@ func TestBroadcastTransaction(t *testing.T) {
 		mTxStore.On("FetchUnconfirmedTransactionAtNonceWithCount", mock.Anything, mock.Anything, mock.Anything).Return(nil, 0, errors.New("call failed")).Once()
 		txm := NewTxm(logger.Test(t), testutils.FixtureChainID, client, ab, mTxStore, config, keystore)
 		bo, err := txm.broadcastTransaction(ctx, address)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.False(t, bo)
 		assert.Contains(t, err.Error(), "call failed")
 	})
@@ -128,7 +129,7 @@ func TestBroadcastTransaction(t *testing.T) {
 		client.On("PendingNonceAt", mock.Anything, address).Return(uint64(0), nil).Once() // LocalNonce: 1, PendingNonce: 0
 		bo, err := txm.broadcastTransaction(ctx, address)
 		assert.True(t, bo)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		client.On("PendingNonceAt", mock.Anything, address).Return(uint64(1), nil).Once() // LocalNonce: 1, PendingNonce: 1
 		mTxStore.On("UpdateUnstartedTransactionWithNonce", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()

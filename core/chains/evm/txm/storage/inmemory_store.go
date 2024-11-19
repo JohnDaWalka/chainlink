@@ -147,9 +147,9 @@ func (m *InMemoryStore) CreateTransaction(txRequest *types.TxRequest) *types.Tra
 		m.UnstartedTransactions = m.UnstartedTransactions[1:maxQueuedTransactions]
 	}
 
-	copy := tx.DeepCopy()
-	m.Transactions[copy.ID] = copy
-	m.UnstartedTransactions = append(m.UnstartedTransactions, copy)
+	txCopy := tx.DeepCopy()
+	m.Transactions[txCopy.ID] = txCopy
+	m.UnstartedTransactions = append(m.UnstartedTransactions, txCopy)
 	return tx
 }
 
