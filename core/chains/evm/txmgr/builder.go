@@ -130,7 +130,7 @@ func NewTxmV2(
 	config := txm.Config{
 		EIP1559:             fCfg.EIP1559DynamicFees(),
 		BlockTime:           *txmV2Config.BlockTime(),
-		RetryBlockThreshold: fCfg.BumpThreshold(),
+		RetryBlockThreshold: uint16(fCfg.BumpThreshold()),
 		EmptyTxLimitDefault: fCfg.LimitDefault(),
 	}
 	var c txm.Client
@@ -140,7 +140,7 @@ func NewTxmV2(
 		c = clientwrappers.NewChainClient(client)
 	}
 	t := txm.NewTxm(lggr, chainID, c, attemptBuilder, inMemoryStoreManager, stuckTxDetector, config, keyStore)
-	return txm.NewTxmOrchestrator[common.Hash, *evmtypes.Head](lggr, chainID, t, inMemoryStoreManager, fwdMgr, keyStore, attemptBuilder), nil
+	return txm.NewTxmOrchestrator(lggr, chainID, t, inMemoryStoreManager, fwdMgr, keyStore, attemptBuilder), nil
 }
 
 // NewEvmResender creates a new concrete EvmResender
