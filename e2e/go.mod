@@ -6,11 +6,11 @@ go 1.22.8
 
 require (
 	github.com/ethereum/go-ethereum v1.14.11
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.2.3
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.2.6
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.4
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.9.0
-	github.com/testcontainers/testcontainers-go v0.33.0
+	github.com/testcontainers/testcontainers-go v0.34.0
 )
 
 require (
@@ -58,7 +58,7 @@ require (
 	github.com/containerd/containerd v1.7.18 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
-	github.com/cpuguy83/dockercfg v0.3.1 // indirect
+	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/crate-crypto/go-ipa v0.0.0-20240223125850-b1e8a79f509c // indirect
 	github.com/crate-crypto/go-kzg-4844 v1.0.0 // indirect

@@ -12,19 +12,17 @@
   nodes = 5
   override_mode = "each"
 
-  [[nodeset.node_specs]]
+[nodeset.db]
+  image = "postgres:15.6"
 
-    [nodeset.node_specs.db]
-      image = "postgres:15.6"
-      pull_image = true
+  [[nodeset.node_specs]]
 
     [nodeset.node_specs.node]
       docker_ctx = "../.."
       docker_file = "../../plugins/chainlink.Dockerfile"
       docker_image_name = "chainlink"
-      pull_image = true
       user_config_overrides = """
-            [Feature]
+      [Feature]
 			LogPoller = true
 
 			[OCR2]
@@ -38,18 +36,13 @@
 
   [[nodeset.node_specs]]
 
-    [nodeset.node_specs.db]
-      image = "postgres:15.6"
-      pull_image = true
-
     [nodeset.node_specs.node]
       capabilities = ["./streams"]
       docker_ctx = "../.."
       docker_file = "../../plugins/chainlink.Dockerfile"
       docker_image_name = "chainlink"
-      pull_image = true
       user_config_overrides = """
-            [Feature]
+      [Feature]
 			LogPoller = true
 
 			[OCR2]
@@ -63,18 +56,13 @@
 
   [[nodeset.node_specs]]
 
-    [nodeset.node_specs.db]
-      image = "postgres:15.6"
-      pull_image = true
-
     [nodeset.node_specs.node]
       capabilities = ["./streams"]
       docker_ctx = "../.."
       docker_file = "../../plugins/chainlink.Dockerfile"
       docker_image_name = "chainlink"
-      pull_image = true
       user_config_overrides = """
-            [Feature]
+      [Feature]
 			LogPoller = true
 
 			[OCR2]
@@ -88,18 +76,13 @@
 
   [[nodeset.node_specs]]
 
-    [nodeset.node_specs.db]
-      image = "postgres:15.6"
-      pull_image = true
-
     [nodeset.node_specs.node]
       capabilities = ["./streams"]
       docker_ctx = "../.."
       docker_file = "../../plugins/chainlink.Dockerfile"
       docker_image_name = "chainlink"
-      pull_image = true
       user_config_overrides = """
-            [Feature]
+      [Feature]
 			LogPoller = true
 
 			[OCR2]
@@ -113,18 +96,13 @@
 
   [[nodeset.node_specs]]
 
-    [nodeset.node_specs.db]
-      image = "postgres:15.6"
-      pull_image = true
-
     [nodeset.node_specs.node]
       capabilities = ["./streams"]
       docker_ctx = "../.."
       docker_file = "../../plugins/chainlink.Dockerfile"
       docker_image_name = "chainlink"
-      pull_image = true
       user_config_overrides = """
-            [Feature]
+      [Feature]
 			LogPoller = true
 
 			[OCR2]

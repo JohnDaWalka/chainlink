@@ -143,7 +143,7 @@ func generateOCR3Config(
 		if i == 0 {
 			continue
 		}
-		transmissionSchedule = append(transmissionSchedule, 0)
+		transmissionSchedule = append(transmissionSchedule, 1)
 		oracleIdentity := confighelper.OracleIdentityExtra{}
 		// ocr2
 		ocr2Keys, err := node.MustReadOCR2Keys()
@@ -277,7 +277,7 @@ func TestWorkflow(t *testing.T) {
 		// TODO: When the capabilities registry address is provided:
 		// - NOPs and nodes are added to the registry.
 		// - Nodes are configured to listen to the registry for updates.
-		nodeset, err := ns.NewSharedDBNodeSet(in.NodeSet, bc, "https://example.com") // TODO: Should not be a thing
+		nodeset, err := ns.NewSharedDBNodeSet(in.NodeSet, bc) // TODO: Should not be a thing
 		require.NoError(t, err)
 
 		for i, n := range nodeset.CLNodes {
@@ -285,7 +285,7 @@ func TestWorkflow(t *testing.T) {
 			fmt.Printf("Node P2P %d --> %s\n", i, n.Node.HostP2PURL)
 		}
 
-		nodeClients, err := clclient.NewCLDefaultClients(nodeset.CLNodes, framework.L)
+		nodeClients, err := clclient.New(nodeset.CLNodes)
 		require.NoError(t, err)
 		nodesInfo := getNodesInfo(t, nodeClients)
 
@@ -330,8 +330,8 @@ func TestWorkflow(t *testing.T) {
 				ChainID = '%s'
 			`,
 				bc.ChainID,
-				bc.Nodes[0].DockerInternalWSUrl,
-				bc.Nodes[0].DockerInternalHTTPUrl,
+				strings.ReplaceAll(bc.Nodes[0].DockerInternalWSUrl, "127.0.0.1", "0.0.0.0"),
+				strings.ReplaceAll(bc.Nodes[0].DockerInternalHTTPUrl, "127.0.0.1", "0.0.0.0"),
 				nodesInfo[i].TransmitterAddress,
 				forwarderAddress,
 				capabilitiesRegistryAddress,
@@ -339,9 +339,9 @@ func TestWorkflow(t *testing.T) {
 			)
 		}
 
-		nodeset, err = ns.UpgradeNodeSet(in.NodeSet, bc, "https://example.com", 5*time.Second)
+		nodeset, err = ns.UpgradeNodeSet(in.NodeSet, bc, 5*time.Second)
 		require.NoError(t, err)
-		nodeClients, err = clclient.NewCLDefaultClients(nodeset.CLNodes, framework.L)
+		nodeClients, err = clclient.New(nodeset.CLNodes)
 		require.NoError(t, err)
 
 		ocr3CapabilityAddress, tx, ocr3CapabilityContract, err := ocr3_capability.DeployOCR3Capability(
@@ -455,6 +455,65 @@ func TestWorkflow(t *testing.T) {
 				require.NoError(t, err2)
 				require.Equal(t, len(response.Errors), 0)
 				fmt.Printf("Response from node %d after consensus job: %x\n", i+1, response)
+
+				workflowSpec := fmt.Sprintf(`
+type = "workflow"
+schemaVersion = 1
+name = "Keystone CCIP Feeds Workflow"
+forwardingAllowed = false
+workflow = """
+  name: "ccipethsep"
+  owner: "0x00000000000000000000000000000000000000aa"
+  triggers:
+    - id: "mock-streams-trigger@1.0.0"
+      config:
+        maxFrequencyMs: 5000
+        feedIds:
+          - "0x0003fbba4fce42f65d6032b18aee53efdf526cc734ad296cb57565979d883bdd"
+          - "0x0003c317fec7fad514c67aacc6366bf2f007ce37100e3cddcacd0ccaa1f3746d"
+
+  consensus:
+    - id: "offchain_reporting@1.0.0"
+      ref: "ccip_feeds"
+      inputs:
+        observations:
+          - "$(trigger.outputs)"
+      config:
+        report_id: "0001"
+        aggregation_method: "data_feeds"
+        aggregation_config:
+          allowedPartialStaleness: "0.5"
+          feeds:
+            "0x0003fbba4fce42f65d6032b18aee53efdf526cc734ad296cb57565979d883bdd":
+              deviation: "0.05"
+              heartbeat: 3600
+              remappedID: "0x666666666666"
+            "0x0003c317fec7fad514c67aacc6366bf2f007ce37100e3cddcacd0ccaa1f3746d":
+              deviation: "0.05"
+              heartbeat: 3600
+              remappedID: "0x777777777777"
+        encoder: "EVM"
+        encoder_config:
+          abi: "(bytes32 FeedID, uint224 Price, uint32 Timestamp)[] Reports"
+
+  targets:
+    - id: "write_%s@1.0.0"
+      inputs:
+        signed_report: "$(ccip_feeds.outputs)"
+      config:
+        address: "%s"
+        deltaStage: "45s"
+        schedule: "oneAtATime"
+"""`,
+					bc.ChainID,
+					feedsConsumerAddress,
+				)
+				fmt.Println("Adding a workflow spec", workflowSpec)
+				response, _, err2 = nodeClient.CreateJobRaw(workflowSpec)
+				fmt.Println("err2", err2)
+				require.NoError(t, err2)
+				require.Equal(t, len(response.Errors), 0)
+				fmt.Printf("Response from node %d after workflow job spec: %x\n", i+1, response)
 			}()
 		}
 		wg.Wait()
@@ -478,16 +537,16 @@ func TestWorkflow(t *testing.T) {
 		// ✅ 1. Deploy mock streams capability
 		// ✅ 2. Add boostrap job spec
 		// ✅ 3. Add OCR3 capability
-		// 		- ✅ This starts successfully (search for "OCREndpointV2: Initialized")
+		// ✅	- This starts successfully (search for "OCREndpointV2: Initialized")
 		// ✅ 3. Deploy and configure OCR3 contract
 		// ✅ 4. Add chain write capabilities
-		//  	- Check if they are added (Logs)
+		// ✅	- Check if they are added (search for "capability added")
 		// 5. Deploy capabilities registry
 		// 		- Add nodes to registry
 		// 		- Add capabilities to registry
 		// ✅ 6. Deploy Forwarder
 		//      - Configure forwarder
 		// ✅ 7. Deploy Feeds Consumer
-		// - Add Keystone workflow
+		// ✅ 	- Add Keystone workflow (search for "Keystone CCIP Feeds Workflow")
 	})
 }

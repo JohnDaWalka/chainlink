@@ -33,9 +33,7 @@ func TestDON(t *testing.T) {
 	// deploy docker test environment
 	bc, err := blockchain.NewBlockchainNetwork(in.BlockchainA)
 	require.NoError(t, err)
-	dp, err := fake.NewFakeDataProvider(in.MockerDataProvider)
-	require.NoError(t, err)
-	out, err := ns.NewSharedDBNodeSet(in.NodeSet, bc, dp.BaseURLDocker)
+	out, err := ns.NewSharedDBNodeSet(in.NodeSet, bc)
 	require.NoError(t, err)
 	for i, n := range out.CLNodes {
 		fmt.Printf("Node %d --> %s\n", i, n.Node.HostURL)
@@ -56,7 +54,7 @@ func TestDON(t *testing.T) {
 		Build()
 	require.NoError(t, err)
 
-	c, err := clclient.NewCLDefaultClients(out.CLNodes, framework.L)
+	c, err := clclient.New(out.CLNodes)
 	require.NoError(t, err)
 	err = onchain.FundNodes(sc, c, pkey, in.FundingETH)
 	require.NoError(t, err)

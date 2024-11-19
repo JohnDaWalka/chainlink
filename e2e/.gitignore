@@ -31,3 +31,6 @@ promtail-config.yml
 **/compose
 **/compose/*
 **/*cache.toml
+
+# Blockscout
+**/blockscout
