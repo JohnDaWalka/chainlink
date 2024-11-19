@@ -66,7 +66,7 @@ type Keystore interface {
 type Config struct {
 	EIP1559             bool
 	BlockTime           time.Duration
-	RetryBlockThreshold uint64
+	RetryBlockThreshold uint16
 	EmptyTxLimitDefault uint64
 }
 
