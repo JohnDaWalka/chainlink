@@ -150,10 +150,10 @@ func WithReader(reader types.ContractReader) func(*workflowRegistry) {
 
 // NewWorkflowRegistry returns a new workflowRegistry.
 // Only queries for WorkflowRegistryForceUpdateSecretsRequestedV1 events.
-func NewWorkflowRegistry(
+func NewWorkflowRegistry[T ContractReader](
 	lggr logger.Logger,
 	orm WorkflowRegistryDS,
-	reader types.ContractReader,
+	reader T,
 	gateway FetcherFunc,
 	addr string,
 	opts ...func(*workflowRegistry),

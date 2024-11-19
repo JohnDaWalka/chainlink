@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	commonservices "github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/jsonserializable"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
@@ -215,7 +216,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 
 	// TODO: wire this up to config so we only instantiate it
 	// if a workflow registry address is provided.
-	workflowRegistrySyncer := syncer.NewWorkflowRegistry(nil, nil, nil, nil, "")
+	workflowRegistrySyncer := syncer.NewWorkflowRegistry[commontypes.ContractReader](nil, nil, nil, nil, "")
 	srvcs = append(srvcs, workflowRegistrySyncer)
 
 	var externalPeerWrapper p2ptypes.PeerWrapper

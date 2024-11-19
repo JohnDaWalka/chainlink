@@ -25,7 +25,7 @@ func TestWorkflowArtifactsORM_GetAndUpdate(t *testing.T) {
 	giveHash := hex.EncodeToString(giveBytes)
 	giveContent := "some contents"
 
-	gotID, err := orm.Update(ctx, giveURL, giveContent)
+	gotID, err := orm.Create(ctx, giveURL, giveHash, giveContent)
 	require.NoError(t, err)
 
 	url, err := orm.GetSecretsURLByID(ctx, gotID)
@@ -40,7 +40,7 @@ func TestWorkflowArtifactsORM_GetAndUpdate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "some contents", contents)
 
-	_, err = orm.Update(ctx, giveURL, "new contents")
+	_, err = orm.Update(ctx, giveHash, "new contents")
 	require.NoError(t, err)
 
 	contents, err = orm.GetContents(ctx, giveURL)
