@@ -1,6 +1,8 @@
 package changeset
 
 import (
+	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 
 	ccipdeployment "github.com/smartcontractkit/chainlink/deployment/ccip"
@@ -10,14 +12,18 @@ var _ deployment.ChangeSet[ccipdeployment.InitialAddChainConfig] = InitialDeploy
 
 func InitialDeploy(env deployment.Environment, c ccipdeployment.InitialAddChainConfig) (deployment.ChangesetOutput, error) {
 	newAddresses := deployment.NewMemoryAddressBook()
-	err := ccipdeployment.InitialAddChain(env, newAddresses, c)
+	err := ccipdeployment.DeployCCIPContracts(env, newAddresses, c)
 	if err != nil {
-		env.Logger.Errorw("Failed to deploy initial chain", "err", err, "addressBook", newAddresses)
-		return deployment.ChangesetOutput{
-			AddressBook: newAddresses,
-		}, err
+		env.Logger.Errorw("Failed to deploy CCIP contracts", "err", err, "newAddresses", newAddresses)
+		return deployment.ChangesetOutput{AddressBook: newAddresses}, deployment.MaybeDataErr(err)
+	}
+	js, err := ccipdeployment.NewCCIPJobSpecs(env.NodeIDs, env.Offchain)
+	if err != nil {
+		return deployment.ChangesetOutput{AddressBook: newAddresses}, err
 	}
 	return deployment.ChangesetOutput{
+		Proposals:   []timelock.MCMSWithTimelockProposal{},
 		AddressBook: newAddresses,
+		JobSpecs:    js,
 	}, nil
 }
