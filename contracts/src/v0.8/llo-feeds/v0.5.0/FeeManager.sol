@@ -25,6 +25,9 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
   /// @notice list of subscribers and their discounts subscriberDiscounts[subscriber][feedId][token]
   mapping(address => mapping(bytes32 => mapping(address => uint256))) public s_subscriberDiscounts;
 
+  /// @notice map of global discounts
+  mapping(address => mapping(address => uint256)) public s_globalDiscounts;
+
   /// @notice keep track of any subsidised link that is owed to the reward manager.
   mapping(bytes32 => uint256) public s_linkDeficit;
 
@@ -160,7 +163,7 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
 
   /// @inheritdoc TypeAndVersionInterface
   function typeAndVersion() external pure override returns (string memory) {
-    return "FeeManager 2.0.0";
+    return "FeeManager 2.1.0";
   }
 
   /// @inheritdoc IERC165
@@ -285,6 +288,11 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
     //get the discount being applied
     uint256 discount = s_subscriberDiscounts[subscriber][feedId][quoteAddress];
 
+    if (discount == 0) {
+      //check if a global discount has been applied
+      discount = s_globalDiscounts[subscriber][quoteAddress];
+    }
+
     //the reward is always set in LINK
     reward.assetAddress = i_linkAddress;
     reward.amount = Math.ceilDiv(linkQuantity * (PERCENTAGE_SCALAR - discount), PERCENTAGE_SCALAR);
@@ -336,6 +344,17 @@ contract FeeManager is IFeeManager, ConfirmedOwner, TypeAndVersionInterface {
     s_subscriberDiscounts[subscriber][feedId][token] = discount;
 
     emit SubscriberDiscountUpdated(subscriber, feedId, token, discount);
+  }
+
+  function updateSubscriberGlobalDiscount(address subscriber, address token, uint64 discount) external onlyOwner {
+    //make sure the discount is not greater than the total discount that can be applied
+    if (discount > PERCENTAGE_SCALAR) revert InvalidDiscount();
+    //make sure the token is either LINK or native
+    if (token != i_linkAddress && token != i_nativeAddress) revert InvalidAddress();
+
+    s_globalDiscounts[subscriber][token] = discount;
+
+    emit SubscriberDiscountUpdated(subscriber, bytes32(0), token, discount);
   }
 
   /// @inheritdoc IFeeManager

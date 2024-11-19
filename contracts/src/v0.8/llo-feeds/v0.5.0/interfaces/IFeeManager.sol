@@ -55,6 +55,14 @@ interface IFeeManager is IERC165, IVerifierFeeManager {
   function payLinkDeficit(bytes32 configDigest) external;
 
   /**
+   * @notice Adds a subscriber to the fee manager
+   * @param subscriber address of the subscriber
+   * @param token token to apply the discount to
+   * @param discount discount to be applied to the fee
+   */
+  function updateSubscriberGlobalDiscount(address subscriber, address token, uint64 discount) external;
+
+  /**
    * @notice The structure to hold a fee and reward to verify a report
    * @param digest the digest linked to the fee and reward
    * @param fee the fee paid to verify the report
