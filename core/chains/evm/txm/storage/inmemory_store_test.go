@@ -360,7 +360,7 @@ func TestDeleteAttemptForUnconfirmedTx(t *testing.T) {
 		err = m.DeleteAttemptForUnconfirmedTx(nonce, attempt)
 		assert.NoError(t, err)
 
-		assert.Len(t, tx.Attempts, 0)
+		assert.Empty(t, tx.Attempts)
 	})
 }
 
