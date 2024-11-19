@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -148,7 +149,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) Reset(addr common.Address, abandon bool
 		}
 	})
 	if !ok {
-		return fmt.Errorf("Orchestrator not started yet")
+		return errors.New("Orchestrator not started yet")
 	}
 	return nil
 }
@@ -198,9 +199,9 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, 
 
 		var meta *sqlutil.JSON
 		if request.Meta != nil {
-			raw, err := json.Marshal(request.Meta)
-			if err != nil {
-				return tx, err
+			raw, mErr := json.Marshal(request.Meta)
+			if mErr != nil {
+				return tx, mErr
 			}
 			m := sqlutil.JSON(raw)
 			meta = &m
@@ -229,11 +230,14 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, 
 		o.txm.Trigger(request.FromAddress)
 	}
 
-	sequence := evmtypes.Nonce(wrappedTx.Nonce)
+	if wrappedTx.ID > math.MaxInt64 {
+		return tx, fmt.Errorf("overflow for int64: %d", wrappedTx.ID)
+	}
+
 	tx = txmgrtypes.Tx[*big.Int, common.Address, common.Hash, common.Hash, evmtypes.Nonce, gas.EvmFee]{
+		//nolint:gosec // disable G115
 		ID:             int64(wrappedTx.ID),
 		IdempotencyKey: wrappedTx.IdempotencyKey,
-		Sequence:       &sequence,
 		FromAddress:    wrappedTx.FromAddress,
 		ToAddress:      wrappedTx.ToAddress,
 		EncodedPayload: wrappedTx.Data,
@@ -241,9 +245,9 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, 
 		FeeLimit:       wrappedTx.SpecifiedGasLimit,
 		CreatedAt:      wrappedTx.CreatedAt,
 		Meta:           wrappedTx.Meta,
-		//Subject: wrappedTx.Subject,
+		// Subject: wrappedTx.Subject,
 
-		//TransmitChecker: wrappedTx.TransmitChecker,
+		// TransmitChecker: wrappedTx.TransmitChecker,
 		ChainID: wrappedTx.ChainID,
 
 		PipelineTaskRunID: wrappedTx.PipelineTaskRunID,
@@ -268,7 +272,8 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) CountTransactionsByState(ctx context.Co
 		total += count
 	}
 
-	return uint32(total), err
+	//nolint:gosec // disable G115
+	return uint32(total), nil
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) FindEarliestUnconfirmedBroadcastTime(ctx context.Context) (time nullv4.Time, err error) {
@@ -286,9 +291,11 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) FindTxesByMetaFieldAndStates(ctx contex
 func (o *Orchestrator[BLOCK_HASH, HEAD]) FindTxesWithMetaFieldByStates(ctx context.Context, metaField string, states []txmgrtypes.TxState, chainID *big.Int) (txs []*txmgrtypes.Tx[*big.Int, common.Address, common.Hash, common.Hash, evmtypes.Nonce, gas.EvmFee], err error) {
 	return
 }
+
 func (o *Orchestrator[BLOCK_HASH, HEAD]) FindTxesWithMetaFieldByReceiptBlockNum(ctx context.Context, metaField string, blockNum int64, chainID *big.Int) (txs []*txmgrtypes.Tx[*big.Int, common.Address, common.Hash, common.Hash, evmtypes.Nonce, gas.EvmFee], err error) {
 	return
 }
+
 func (o *Orchestrator[BLOCK_HASH, HEAD]) FindTxesWithAttemptsAndReceiptsByIdsAndState(ctx context.Context, ids []int64, states []txmgrtypes.TxState, chainID *big.Int) (txs []*txmgrtypes.Tx[*big.Int, common.Address, common.Hash, common.Hash, evmtypes.Nonce, gas.EvmFee], err error) {
 	return
 }

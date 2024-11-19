@@ -57,7 +57,6 @@ func TestLifecycle(t *testing.T) {
 		servicetest.Run(t, txm)
 		tests.AssertLogEventually(t, observedLogs, "Backfill time elapsed")
 	})
-
 }
 
 func TestTrigger(t *testing.T) {
@@ -133,9 +132,10 @@ func TestBroadcastTransaction(t *testing.T) {
 
 		client.On("PendingNonceAt", mock.Anything, address).Return(uint64(1), nil).Once() // LocalNonce: 1, PendingNonce: 1
 		mTxStore.On("UpdateUnstartedTransactionWithNonce", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
-		txm.broadcastTransaction(ctx, address)
+		bo, err = txm.broadcastTransaction(ctx, address)
+		assert.False(t, bo)
+		assert.NoError(t, err)
 		tests.AssertLogCountEventually(t, observedLogs, "Reached transaction limit.", 1)
-
 	})
 
 	t.Run("fails if UpdateUnstartedTransactionWithNonce fails", func(t *testing.T) {
@@ -190,7 +190,7 @@ func TestBroadcastTransaction(t *testing.T) {
 		assert.Equal(t, uint64(9), txm.getNonce(address))
 		tx, err = txStore.FindTxWithIdempotencyKey(tests.Context(t), &IDK)
 		assert.NoError(t, err)
-		assert.Equal(t, 1, len(tx.Attempts))
+		assert.Len(t, tx.Attempts, 1)
 		var zeroTime time.Time
 		assert.Greater(t, tx.LastBroadcastAt, zeroTime)
 		assert.Greater(t, tx.Attempts[0].BroadcastAt, zeroTime)

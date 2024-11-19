@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/types"
@@ -54,9 +55,7 @@ func TestAbandonPendingTransactions(t *testing.T) {
 		assert.Equal(t, types.TxFatalError, tx2.State)
 		assert.Equal(t, types.TxConfirmed, tx3.State)
 		assert.Equal(t, types.TxConfirmed, tx4.State)
-
 	})
-
 }
 
 func TestAppendAttemptToTransaction(t *testing.T) {
@@ -79,7 +78,7 @@ func TestAppendAttemptToTransaction(t *testing.T) {
 	})
 
 	t.Run("fails if unconfirmed transaction was found but has doesn't match the txID", func(t *testing.T) {
-		var nonce uint64 = 0
+		var nonce uint64
 		newAttempt := &types.Attempt{
 			TxID: 2,
 		}
@@ -87,12 +86,11 @@ func TestAppendAttemptToTransaction(t *testing.T) {
 	})
 
 	t.Run("appends attempt to transaction", func(t *testing.T) {
-		var nonce uint64 = 0
+		var nonce uint64
 		newAttempt := &types.Attempt{
 			TxID: 1,
 		}
 		assert.NoError(t, m.AppendAttemptToTransaction(nonce, newAttempt))
-
 	})
 }
 
@@ -106,7 +104,6 @@ func TestCountUnstartedTransactions(t *testing.T) {
 
 	insertUnstartedTransaction(m)
 	assert.Equal(t, 1, m.CountUnstartedTransactions())
-
 }
 
 func TestCreateEmptyUnconfirmedTransaction(t *testing.T) {
@@ -114,7 +111,8 @@ func TestCreateEmptyUnconfirmedTransaction(t *testing.T) {
 
 	fromAddress := testutils.NewAddress()
 	m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
-	insertUnconfirmedTransaction(m, 0)
+	_, err := insertUnconfirmedTransaction(m, 0)
+	assert.NoError(t, err)
 
 	t.Run("fails if unconfirmed transaction with the same nonce exists", func(t *testing.T) {
 		_, err := m.CreateEmptyUnconfirmedTransaction(0, 0)
@@ -126,7 +124,6 @@ func TestCreateEmptyUnconfirmedTransaction(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, types.TxUnconfirmed, tx.State)
 	})
-
 }
 
 func TestCreateTransaction(t *testing.T) {
@@ -165,7 +162,6 @@ func TestCreateTransaction(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(overshot), tx.ID)
 	})
-
 }
 
 func TestFetchUnconfirmedTransactionAtNonceWithCount(t *testing.T) {
@@ -178,12 +174,12 @@ func TestFetchUnconfirmedTransactionAtNonceWithCount(t *testing.T) {
 	assert.Nil(t, tx)
 	assert.Equal(t, 0, count)
 
-	var nonce uint64 = 0
-	insertUnconfirmedTransaction(m, nonce)
+	var nonce uint64
+	_, err := insertUnconfirmedTransaction(m, nonce)
+	assert.NoError(t, err)
 	tx, count = m.FetchUnconfirmedTransactionAtNonceWithCount(0)
 	assert.Equal(t, tx.Nonce, nonce)
 	assert.Equal(t, 1, count)
-
 }
 
 func TestMarkTransactionsConfirmed(t *testing.T) {
@@ -194,8 +190,8 @@ func TestMarkTransactionsConfirmed(t *testing.T) {
 	t.Run("returns 0 if there are no transactions", func(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		un, cn := m.MarkTransactionsConfirmed(100)
-		assert.Equal(t, len(un), 0)
-		assert.Equal(t, len(cn), 0)
+		assert.Empty(t, un)
+		assert.Empty(t, cn)
 	})
 
 	t.Run("confirms transaction with nonce lower than the latest", func(t *testing.T) {
@@ -211,7 +207,7 @@ func TestMarkTransactionsConfirmed(t *testing.T) {
 		assert.Equal(t, types.TxConfirmed, ctx1.State)
 		assert.Equal(t, types.TxUnconfirmed, ctx2.State)
 		assert.Equal(t, ctxs[0], ctx1.ID)
-		assert.Equal(t, 0, len(utxs))
+		assert.Empty(t, utxs)
 	})
 
 	t.Run("unconfirms transaction with nonce equal to or higher than the latest", func(t *testing.T) {
@@ -255,7 +251,7 @@ func TestMarkUnconfirmedTransactionPurgeable(t *testing.T) {
 	assert.NoError(t, err)
 	err = m.MarkUnconfirmedTransactionPurgeable(0)
 	assert.NoError(t, err)
-	assert.Equal(t, true, tx.IsPurgeable)
+	assert.True(t, tx.IsPurgeable)
 }
 
 func TestUpdateTransactionBroadcast(t *testing.T) {
