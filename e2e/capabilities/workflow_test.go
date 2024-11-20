@@ -380,11 +380,12 @@ func TestWorkflow(t *testing.T) {
 
 				[relayConfig]
 				chainID = %s
+				providerType = "ocr3-capability"
 			`, ocr3CapabilityAddress, bc.ChainID)
 			fmt.Println("Creating bootstrap job spec", bootstrapJobSpec)
 			r, _, err2 := bootstrapNode.CreateJobRaw(bootstrapJobSpec)
 			require.NoError(t, err2)
-			require.Equal(t, len(r.Errors), 0)
+			require.Empty(t, r.Errors)
 			fmt.Printf("Response from bootstrap node: %x\n", r)
 		}()
 
@@ -444,7 +445,7 @@ func TestWorkflow(t *testing.T) {
 					ocr3CapabilityAddress,
 					nodesInfo[i].OcrKeyBundleID,
 					p2pKeys.Data[0].Attributes.PeerID,
-					strings.TrimPrefix(nodeset.CLNodes[0].Node.HostP2PURL, "http://"),
+					strings.TrimPrefix(nodeset.CLNodes[0].Node.DockerP2PUrl, "http://"),
 					nodesInfo[i].TransmitterAddress,
 					bc.ChainID,
 					nodesInfo[i].OcrKeyBundleID,
@@ -453,7 +454,7 @@ func TestWorkflow(t *testing.T) {
 				response, _, err2 = nodeClient.CreateJobRaw(consensusJobSpec)
 				fmt.Println("err2", err2)
 				require.NoError(t, err2)
-				require.Equal(t, len(response.Errors), 0)
+				require.Empty(t, response.Errors)
 				fmt.Printf("Response from node %d after consensus job: %x\n", i+1, response)
 
 				workflowSpec := fmt.Sprintf(`
@@ -462,48 +463,47 @@ schemaVersion = 1
 name = "Keystone CCIP Feeds Workflow"
 forwardingAllowed = false
 workflow = """
-  name: "ccipethsep"
-  owner: "0x00000000000000000000000000000000000000aa"
-  triggers:
-    - id: "mock-streams-trigger@1.0.0"
-      config:
-        maxFrequencyMs: 5000
-        feedIds:
-          - "0x0003fbba4fce42f65d6032b18aee53efdf526cc734ad296cb57565979d883bdd"
-          - "0x0003c317fec7fad514c67aacc6366bf2f007ce37100e3cddcacd0ccaa1f3746d"
-
-  consensus:
-    - id: "offchain_reporting@1.0.0"
-      ref: "ccip_feeds"
-      inputs:
-        observations:
-          - "$(trigger.outputs)"
-      config:
-        report_id: "0001"
-        aggregation_method: "data_feeds"
-        aggregation_config:
-          allowedPartialStaleness: "0.5"
-          feeds:
-            "0x0003fbba4fce42f65d6032b18aee53efdf526cc734ad296cb57565979d883bdd":
-              deviation: "0.05"
-              heartbeat: 3600
-              remappedID: "0x666666666666"
-            "0x0003c317fec7fad514c67aacc6366bf2f007ce37100e3cddcacd0ccaa1f3746d":
-              deviation: "0.05"
-              heartbeat: 3600
-              remappedID: "0x777777777777"
-        encoder: "EVM"
-        encoder_config:
-          abi: "(bytes32 FeedID, uint224 Price, uint32 Timestamp)[] Reports"
-
-  targets:
-    - id: "write_%s@1.0.0"
-      inputs:
-        signed_report: "$(ccip_feeds.outputs)"
-      config:
-        address: "%s"
-        deltaStage: "45s"
-        schedule: "oneAtATime"
+name: ccipethsep
+owner: '0x00000000000000000000000000000000000000aa'
+triggers:
+  - id: mock-streams-trigger@1.0.0
+    config:
+      maxFrequencyMs: 15000
+      feedIds:
+        - '0x0003fbba4fce42f65d6032b18aee53efdf526cc734ad296cb57565979d883bdd'
+        - '0x0003c317fec7fad514c67aacc6366bf2f007ce37100e3cddcacd0ccaa1f3746d'
+consensus:
+  - id: offchain_reporting@1.0.0
+    ref: ccip_feeds
+    inputs:
+      observations:
+        - $(trigger.outputs)
+    config:
+      report_id: '0001'
+      key_id: evm
+      aggregation_method: data_feeds
+      aggregation_config:
+        allowedPartialStaleness: '0.5'
+        feeds:
+          '0x0003fbba4fce42f65d6032b18aee53efdf526cc734ad296cb57565979d883bdd':
+            deviation: '0.05'
+            heartbeat: 3600
+            remappedID: '0x666666666666'
+          '0x0003c317fec7fad514c67aacc6366bf2f007ce37100e3cddcacd0ccaa1f3746d':
+            deviation: '0.05'
+            heartbeat: 3600
+            remappedID: '0x777777777777'
+      encoder: EVM
+      encoder_config:
+        abi: '(bytes32 FeedID, uint224 Price, uint32 Timestamp)[] Reports'
+targets:
+  - id: write_%s@1.0.0
+    inputs:
+      signed_report: $(ccip_feeds.outputs)
+    config:
+      address: '%s'
+      deltaStage: 45s
+      schedule: oneAtATime
 """`,
 					bc.ChainID,
 					feedsConsumerAddress,
@@ -536,6 +536,7 @@ workflow = """
 		// ✅ Add bootstrap spec
 		// ✅ 1. Deploy mock streams capability
 		// ✅ 2. Add boostrap job spec
+		// ✅	- Starts successfully (search for "BootstrapperV2: Started listening")
 		// ✅ 3. Add OCR3 capability
 		// ✅	- This starts successfully (search for "OCREndpointV2: Initialized")
 		// ✅ 3. Deploy and configure OCR3 contract
