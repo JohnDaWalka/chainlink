@@ -1,6 +1,8 @@
 module github.com/smartcontractkit/chainlink/load-tests
 
-go 1.22.8
+go 1.23
+
+toolchain go1.23.0
 
 // Make sure we're working with the latest chainlink libs
 replace github.com/smartcontractkit/chainlink/v2 => ../../
@@ -18,7 +20,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/slack-go/slack v0.15.0
 	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241112140826-0e2daed34ef6
-	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.15-0.20241120102945-bd45ccbfa368
+	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.15-0.20241120164642-930ad02b4f82
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.9
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.50.2
 	github.com/smartcontractkit/chainlink/deployment v0.0.0-00010101000000-000000000000
