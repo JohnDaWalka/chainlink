@@ -177,9 +177,9 @@ func (t *Txm) setNonce(address common.Address, nonce uint64) {
 	defer t.nonceMapMu.Unlock()
 }
 
-func newBackoff(min time.Duration) backoff.Backoff {
+func newBackoff(minDuration time.Duration) backoff.Backoff {
 	return backoff.Backoff{
-		Min:    min,
+		Min:    minDuration,
 		Max:    1 * time.Minute,
 		Jitter: true,
 	}
@@ -353,8 +353,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 	if tx == nil || tx.Nonce != latestNonce {
 		t.lggr.Warnf("Nonce gap at nonce: %d - address: %v. Creating a new transaction\n", latestNonce, address)
 		return false, t.createAndSendEmptyTx(ctx, latestNonce, address)
-		//nolint:revive //linter nonsense
-	} else {
+	} else { //nolint:revive //linter nonsense
 		if !tx.IsPurgeable && t.stuckTxDetector != nil {
 			isStuck, err := t.stuckTxDetector.DetectStuckTransaction(ctx, tx)
 			if err != nil {
