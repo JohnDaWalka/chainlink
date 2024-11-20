@@ -3,6 +3,7 @@ package testsetups
 import (
 	"context"
 	"fmt"
+	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 	"math/big"
 	"math/rand"
 	"os"
@@ -1407,9 +1408,18 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 }
 
 func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestConfig, reportPath string) *environment.Config {
+	testType := testConfig.TestGroupInput.Type
+	nsLabels, err := environment.GetRequiredChainLinkNamespaceLabels(string(tc.CCIP), testType)
+	require.NoError(t, err, "Error creating required chain.link labels for namespace")
+
+	workloadLabels, err := environment.GetRequiredChainLinkWorkloadLabels(string(tc.CCIP), testType)
+	require.NoError(t, err, "Error creating required chain.link labels for workloads")
+
 	envConfig := &environment.Config{
 		NamespacePrefix: envName,
 		Test:            t,
+		Labels:          nsLabels,
+		WorkloadLabels:  workloadLabels,
 		//	PreventPodEviction: true, //TODO: enable this once we have a way to handle pod eviction
 	}
 	if pointer.GetBool(testConfig.TestGroupInput.StoreLaneConfig) {

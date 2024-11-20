@@ -196,6 +196,12 @@ Load Config:
 	loadDuration := time.Duration(*loadedTestConfig.Automation.General.Duration) * time.Second
 	automationDefaultLinkFunds := big.NewInt(0).Mul(big.NewInt(1e18), big.NewInt(int64(10000))) //10000 LINK
 
+	nsLabels, err := environment.GetRequiredChainLinkNamespaceLabels(string(tc.Automation), testType)
+	require.NoError(t, err, "Error creating required chain.link labels for namespace")
+
+	workloadLabels, err := environment.GetRequiredChainLinkWorkloadLabels(string(tc.Automation), testType)
+	require.NoError(t, err, "Error creating required chain.link labels for workloads")
+
 	testEnvironment := environment.New(&environment.Config{
 		TTL: loadDuration.Round(time.Hour) + time.Hour,
 		NamespacePrefix: fmt.Sprintf(
@@ -205,6 +211,8 @@ Load Config:
 		),
 		Test:               t,
 		PreventPodEviction: true,
+		Labels:             nsLabels,
+		WorkloadLabels:     workloadLabels,
 	})
 
 	testEnvironment.

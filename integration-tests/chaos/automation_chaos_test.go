@@ -197,11 +197,19 @@ func TestAutomationChaos(t *testing.T) {
 					t.Parallel()
 					network := networks.MustGetSelectedNetworkConfig(config.Network)[0] // Need a new copy of the network for each test
 
+					nsLabels, err := environment.GetRequiredChainLinkNamespaceLabels(string(tc.Automation), "chaos")
+					require.NoError(t, err, "Error creating required chain.link labels for namespace")
+
+					workloadLabels, err := environment.GetRequiredChainLinkWorkloadLabels(string(tc.Automation), "chaos")
+					require.NoError(t, err, "Error creating required chain.link labels for workloads")
+
 					testEnvironment := environment.
 						New(&environment.Config{
 							NamespacePrefix: fmt.Sprintf("chaos-automation-%s", name),
 							TTL:             time.Hour * 1,
 							Test:            t,
+							Labels:          nsLabels,
+							WorkloadLabels:  workloadLabels,
 						}).
 						AddHelm(testCase.networkChart).
 						AddHelm(testCase.clChart)
