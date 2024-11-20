@@ -124,7 +124,8 @@ func (t *Txm) Start(ctx context.Context) error {
 }
 
 func (t *Txm) startAddress(address common.Address) error {
-	t.triggerCh[address] = make(chan struct{}, 1)
+	triggerCh := make(chan struct{}, 1)
+	t.triggerCh[address] = triggerCh
 	pendingNonce, err := t.client.PendingNonceAt(context.TODO(), address)
 	if err != nil {
 		return err
@@ -132,7 +133,7 @@ func (t *Txm) startAddress(address common.Address) error {
 	t.setNonce(address, pendingNonce)
 
 	t.wg.Add(2)
-	go t.broadcastLoop(address)
+	go t.broadcastLoop(address, triggerCh)
 	go t.backfillLoop(address)
 	return nil
 }
@@ -155,7 +156,11 @@ func (t *Txm) CreateTransaction(ctx context.Context, txRequest *types.TxRequest)
 
 func (t *Txm) Trigger(address common.Address) {
 	if !t.IfStarted(func() {
-		t.triggerCh[address] <- struct{}{}
+		triggerCh, exists := t.triggerCh[address]
+		if !exists {
+			return
+		}
+		triggerCh <- struct{}{}
 	}) {
 		t.lggr.Error("Txm unstarted")
 	}
@@ -185,7 +190,7 @@ func newBackoff(minDuration time.Duration) backoff.Backoff {
 	}
 }
 
-func (t *Txm) broadcastLoop(address common.Address) {
+func (t *Txm) broadcastLoop(address common.Address, triggerCh chan struct{}) {
 	defer t.wg.Done()
 	ctx, cancel := t.stopCh.NewCtx()
 	defer cancel()
@@ -209,7 +214,7 @@ func (t *Txm) broadcastLoop(address common.Address) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.triggerCh[address]:
+		case <-triggerCh:
 			continue
 		case <-broadcastCh:
 			continue
