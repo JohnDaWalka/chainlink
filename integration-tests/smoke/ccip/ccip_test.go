@@ -7,9 +7,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
+	"github.com/smartcontractkit/chainlink/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/testsetups"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
@@ -205,4 +210,105 @@ func TestTokenTransfer(t *testing.T) {
 	balance, err := dstToken.BalanceOf(nil, state.Chains[tenv.FeedChainSel].Receiver.Address())
 	require.NoError(t, err)
 	require.Equal(t, twoCoins, balance)
+}
+
+func TestReorgBelowFinality(t *testing.T) {
+	lggr := logger.TestLogger(t)
+	ctx := ccdeploy.Context(t)
+	tenv, cl, _ := testsetups.NewLocalDevEnvironmentWithDefaultPrice(t, lggr)
+	//tenv := ccdeploy.NewMemoryEnvironment(t, lggr, 2, 4, big.NewInt(1), big.NewInt(1))
+	e := tenv.Env
+	state, err := ccdeploy.LoadOnchainState(e)
+	require.NoError(t, err)
+	output, err := changeset.DeployPrerequisites(e, changeset.DeployPrerequisiteConfig{
+		ChainSelectors: e.AllChainSelectors(),
+	})
+	require.NoError(t, err)
+	require.NoError(t, e.ExistingAddresses.Merge(output.AddressBook))
+
+	// Apply migration
+	output, err = changeset.InitialDeploy(e, ccdeploy.DeployCCIPContractConfig{
+		HomeChainSel:   tenv.HomeChainSel,
+		FeedChainSel:   tenv.FeedChainSel,
+		ChainsToDeploy: e.AllChainSelectors(),
+		TokenConfig:    ccdeploy.NewTestTokenConfig(state.Chains[tenv.FeedChainSel].USDFeeds),
+		MCMSConfig:     ccdeploy.NewTestMCMSConfig(t, e),
+		OCRSecrets:     deployment.XXXGenerateTestOCRSecrets(),
+	})
+	require.NoError(t, err)
+	require.NoError(t, e.ExistingAddresses.Merge(output.AddressBook))
+
+	// Get new state after migration and mock USDC token deployment.
+	state, err = ccdeploy.LoadOnchainState(e)
+	require.NoError(t, err) // Add all lanes
+	// Ensure capreg logs are up to date.
+	ccdeploy.ReplayLogs(t, e.Offchain, tenv.ReplayBlocks)
+	// Apply the jobs.
+	for nodeID, jobs := range output.JobSpecs {
+		for _, job := range jobs {
+			// Note these auto-accept
+			_, err := e.Offchain.ProposeJob(ctx,
+				&jobv1.ProposeJobRequest{
+					NodeId: nodeID,
+					Spec:   job,
+				})
+			require.NoError(t, err)
+		}
+	}
+
+	require.NoError(t, ccdeploy.AddLanesForAll(e, state))
+
+	srcNetwork, err := cl.GetEVMNetworkForChainId(int64(tenv.HomeChainSel))
+	destNetwork, err := cl.GetEVMNetworkForChainId(int64(tenv.FeedChainSel))
+	suite, err := actions.NewReorgSuite(t, ptr.Ptr(logging.GetTestLogger(t)), &actions.ReorgConfig{
+		SrcGethHTTPURL:   srcNetwork.URL,
+		DstGethHTTPURL:   destNetwork.URL,
+		SrcFinalityDepth: srcNetwork.FinalityDepth,
+		DstFinalityDepth: destNetwork.FinalityDepth,
+		FinalityDelta:    5,
+	})
+	require.NoError(t, err)
+
+	// Need to keep track of the block number for each chain so that event subscription can be done from that block.
+	startBlocks := make(map[uint64]*uint64)
+	// Send a message from each chain to every other chain.
+	expectedSeqNum := make(map[uint64]uint64)
+
+	for srcChainSel, srcChain := range e.Chains {
+		for destChainSel, destChain := range e.Chains {
+			if srcChainSel == destChainSel {
+				continue
+			}
+			latesthdr, err := destChain.Client.HeaderByNumber(testcontext.Get(t), nil)
+			require.NoError(t, err)
+			block := latesthdr.Number.Uint64()
+			startBlocks[destChainSel] = &block
+
+			var (
+				receiver = common.LeftPadBytes(state.Chains[srcChainSel].Receiver.Address().Bytes(), 32)
+				data     = []byte("hello world")
+				feeToken = common.HexToAddress("0x0")
+			)
+			msgSentEvent := ccdeploy.TestSendRequest(t, e, state, srcChainSel, destChainSel, false, router.ClientEVM2AnyMessage{
+				Receiver:     receiver,
+				Data:         data,
+				TokenAmounts: nil,
+				FeeToken:     feeToken,
+				ExtraArgs:    nil,
+			})
+			expectedSeqNum[destChainSel] = msgSentEvent.SequenceNumber
+			latest, err := srcChain.Client.HeaderByNumber(testcontext.Get(t), nil)
+			require.NoError(t, err)
+			if latest.Number.Uint64()-msgSentEvent.Raw.BlockNumber > srcNetwork.FinalityDepth {
+				lggr.Warn("Message sent after finality depth")
+			}
+			suite.RunReorg(suite.SrcClient, int(srcNetwork.FinalityDepth-1), "Source", 0)
+		}
+	}
+
+	// Wait for all commit reports to land.
+	ccdeploy.ConfirmCommitForAllWithExpectedSeqNums(t, e, state, expectedSeqNum, startBlocks)
+
+	// Wait for all exec reports to land
+	ccdeploy.ConfirmExecWithSeqNrForAll(t, e, state, expectedSeqNum, startBlocks)
 }
