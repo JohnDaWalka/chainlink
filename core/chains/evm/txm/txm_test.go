@@ -65,7 +65,6 @@ func TestTrigger(t *testing.T) {
 
 	address := testutils.NewAddress()
 	keystore := mocks.NewKeystore(t)
-	keystore.On("EnabledAddressesForChain", mock.Anything, mock.Anything).Return([]common.Address{address}, nil)
 	t.Run("Trigger fails if Txm is unstarted", func(t *testing.T) {
 		lggr, observedLogs := logger.TestObserved(t, zap.ErrorLevel)
 		txm := NewTxm(lggr, nil, nil, nil, nil, Config{}, keystore)
@@ -80,6 +79,7 @@ func TestTrigger(t *testing.T) {
 		client := mocks.NewClient(t)
 		ab := mocks.NewAttemptBuilder(t)
 		config := Config{BlockTime: 1 * time.Minute, RetryBlockThreshold: 10}
+		keystore.On("EnabledAddressesForChain", mock.Anything, mock.Anything).Return([]common.Address{address}, nil)
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, txStore, config, keystore)
 		var nonce uint64
 		// Start

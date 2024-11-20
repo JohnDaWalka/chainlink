@@ -235,6 +235,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, 
 	}
 
 	tx = txmgrtypes.Tx[*big.Int, common.Address, common.Hash, common.Hash, evmtypes.Nonce, gas.EvmFee]{
+		//nolint:gosec // disable G115
 		ID:             int64(wrappedTx.ID),
 		IdempotencyKey: wrappedTx.IdempotencyKey,
 		FromAddress:    wrappedTx.FromAddress,
