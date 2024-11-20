@@ -37,15 +37,6 @@ contract Verifier is IVerifier, ConfirmedOwner, TypeAndVersionInterface {
     Role role;
   }
 
-  struct Config {
-    // Fault tolerance
-    uint8 f;
-    // Marks whether or not a configuration is active
-    bool isActive;
-    // Map of signer addresses to oracles
-    mapping(address => Signer) oracles;
-  }
-
   struct VerifierState {
     // The number of configs for this DON
     uint32 configCount;
@@ -255,7 +246,7 @@ contract Verifier is IVerifier, ConfirmedOwner, TypeAndVersionInterface {
   }
 
   /// @inheritdoc IVerifier
-  function setConfig(
+  function setConfigFromSource(
     bytes32 configId,
     uint256 sourceChainId,
     address sourceAddress,
