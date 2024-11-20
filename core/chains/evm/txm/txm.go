@@ -262,10 +262,9 @@ func (t *Txm) broadcastTransaction(ctx context.Context, address common.Address) 
 				t.lggr.Warnf("Reached transaction limit: %d for unconfirmed transactions", maxInFlightTransactions)
 				return true, nil
 			}
-			//nolint:govet //linter nonsense
-			pendingNonce, err := t.client.PendingNonceAt(ctx, address)
-			if err != nil {
-				return false, err
+			pendingNonce, e := t.client.PendingNonceAt(ctx, address)
+			if e != nil {
+				return false, e
 			}
 			nonce := t.getNonce(address)
 			if nonce > pendingNonce {
@@ -354,6 +353,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 	if tx == nil || tx.Nonce != latestNonce {
 		t.lggr.Warnf("Nonce gap at nonce: %d - address: %v. Creating a new transaction\n", latestNonce, address)
 		return false, t.createAndSendEmptyTx(ctx, latestNonce, address)
+		//nolint:revive //linter nonsense
 	} else {
 		if !tx.IsPurgeable && t.stuckTxDetector != nil {
 			isStuck, err := t.stuckTxDetector.DetectStuckTransaction(tx)
