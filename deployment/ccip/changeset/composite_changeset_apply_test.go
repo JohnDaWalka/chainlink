@@ -1,10 +1,19 @@
 package changeset
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 
+<<<<<<< HEAD:deployment/ccip/changeset/composite_changeset_apply_test.go
+=======
+	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
+
+	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
+
+>>>>>>> b2de0542a6dd1e50ffc3b15b7c16fef4dd059a8f:deployment/ccip/changeset/initial_deploy_test.go
 	"github.com/smartcontractkit/chainlink/deployment"
 	ccdeploy "github.com/smartcontractkit/chainlink/deployment/ccip"
 
@@ -57,6 +66,35 @@ func TestInitialDeploy(t *testing.T) {
 	}
 	tenv.Env, err = ccdeploy.ApplyChangesets(ctx, tenv.Env, changesets)
 	require.NoError(t, err)
+<<<<<<< HEAD:deployment/ccip/changeset/composite_changeset_apply_test.go
+=======
+	require.NoError(t, tenv.Env.ExistingAddresses.Merge(output.AddressBook))
+
+	cfg := make(map[uint64]commontypes.MCMSWithTimelockConfig)
+	for _, chain := range e.AllChainSelectors() {
+		cfg[chain] = commontypes.MCMSWithTimelockConfig{
+			Canceller:         commonchangeset.SingleGroupMCMS(t),
+			Bypasser:          commonchangeset.SingleGroupMCMS(t),
+			Proposer:          commonchangeset.SingleGroupMCMS(t),
+			TimelockExecutors: e.AllDeployerKeys(),
+			TimelockMinDelay:  big.NewInt(0),
+		}
+	}
+	output, err = commonchangeset.DeployMCMSWithTimelock(e, cfg)
+	require.NoError(t, err)
+	require.NoError(t, e.ExistingAddresses.Merge(output.AddressBook))
+
+	output, err = InitialDeploy(tenv.Env, ccdeploy.DeployCCIPContractConfig{
+		HomeChainSel:   tenv.HomeChainSel,
+		FeedChainSel:   tenv.FeedChainSel,
+		ChainsToDeploy: tenv.Env.AllChainSelectors(),
+		TokenConfig:    ccdeploy.NewTestTokenConfig(state.Chains[tenv.FeedChainSel].USDFeeds),
+		OCRSecrets:     deployment.XXXGenerateTestOCRSecrets(),
+	})
+	require.NoError(t, err)
+	// Get new state after migration.
+	require.NoError(t, tenv.Env.ExistingAddresses.Merge(output.AddressBook))
+>>>>>>> b2de0542a6dd1e50ffc3b15b7c16fef4dd059a8f:deployment/ccip/changeset/initial_deploy_test.go
 	state, err = ccdeploy.LoadOnchainState(e)
 	require.NoError(t, err)
 	require.NotNil(t, state.Chains[tenv.HomeChainSel].LinkToken)

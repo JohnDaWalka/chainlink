@@ -18,7 +18,7 @@ var _ deployment.ChangeSet[DeployChainContractsConfig] = DeployChainContracts
 // Caller should update the environment's address book with the returned addresses.
 func DeployChainContracts(env deployment.Environment, c DeployChainContractsConfig) (deployment.ChangesetOutput, error) {
 	newAddresses := deployment.NewMemoryAddressBook()
-	err := ccipdeployment.DeployChainContractsForChains(env, newAddresses, c.HomeChainSelector, c.ChainSelectors, c.MCMSCfg)
+	err := ccipdeployment.DeployChainContractsForChains(env, newAddresses, c.HomeChainSelector, c.ChainSelectors)
 	if err != nil {
 		env.Logger.Errorw("Failed to deploy CCIP contracts", "err", err, "newAddresses", newAddresses)
 		return deployment.ChangesetOutput{AddressBook: newAddresses}, deployment.MaybeDataErr(err)
@@ -33,7 +33,6 @@ func DeployChainContracts(env deployment.Environment, c DeployChainContractsConf
 type DeployChainContractsConfig struct {
 	ChainSelectors    []uint64
 	HomeChainSelector uint64
-	MCMSCfg           ccipdeployment.MCMSConfig
 }
 
 func (c DeployChainContractsConfig) Validate() error {
