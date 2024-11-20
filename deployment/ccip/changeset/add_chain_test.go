@@ -29,7 +29,8 @@ import (
 
 func TestAddChainInbound(t *testing.T) {
 	// 4 chains where the 4th is added after initial deployment.
-	e := ccipdeployment.NewMemoryEnvironmentWithJobs(t, logger.TestLogger(t), 4, 4)
+	lggr := logger.TestLogger(t)
+	e := ccipdeployment.NewMemoryEnvironmentWithJobs(t, lggr, 4, 4)
 	state, err := ccipdeployment.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	// Take first non-home chain as the new chain.
@@ -117,10 +118,11 @@ func TestAddChainInbound(t *testing.T) {
 
 	acceptOwnershipProposal, err := ccipdeployment.GenerateAcceptOwnershipProposal(state, e.HomeChainSel, initialDeploy)
 	require.NoError(t, err)
-	acceptOwnershipExec := ccipdeployment.SignProposal(t, e.Env, acceptOwnershipProposal)
+	acceptOwnershipExec, err := ccipdeployment.SignProposalWithTestSigner(e.Env, acceptOwnershipProposal)
+	require.NoError(t, err)
 	// Apply the accept ownership proposal to all the chains.
 	for _, sel := range initialDeploy {
-		ccipdeployment.ExecuteProposal(t, e.Env, acceptOwnershipExec, state, sel)
+		require.NoError(t, ccipdeployment.ExecuteProposal(e.Env, acceptOwnershipExec, state, sel))
 	}
 	for _, chain := range initialDeploy {
 		owner, err2 := state.Chains[chain].OnRamp.Owner(nil)
@@ -140,7 +142,7 @@ func TestAddChainInbound(t *testing.T) {
 	// Generate and sign inbound proposal to new 4th chain.
 	chainInboundChangeset, err := NewChainInboundChangeset(e.Env, state, e.HomeChainSel, newChain, initialDeploy)
 	require.NoError(t, err)
-	ccipdeployment.ProcessChangeset(t, e.Env, chainInboundChangeset)
+	ccipdeployment.ProcessChangesetProposals(e.Env, chainInboundChangeset)
 
 	// TODO This currently is not working - Able to send the request here but request gets stuck in execution
 	// Send a new message and expect that this is delivered once the chain is completely set up as inbound
@@ -149,17 +151,17 @@ func TestAddChainInbound(t *testing.T) {
 	t.Logf("Executing add don and set candidate proposal for commit plugin on chain %d", newChain)
 	addDonChangeset, err := AddDonAndSetCandidateChangeset(state, e.Env, nodes, deployment.XXXGenerateTestOCRSecrets(), e.HomeChainSel, e.FeedChainSel, newChain, tokenConfig, types.PluginTypeCCIPCommit)
 	require.NoError(t, err)
-	ccipdeployment.ProcessChangeset(t, e.Env, addDonChangeset)
+	ccipdeployment.ProcessChangesetProposals(e.Env, addDonChangeset)
 
 	t.Logf("Executing promote candidate proposal for exec plugin on chain %d", newChain)
 	setCandidateForExecChangeset, err := SetCandidatePluginChangeset(state, e.Env, nodes, deployment.XXXGenerateTestOCRSecrets(), e.HomeChainSel, e.FeedChainSel, newChain, tokenConfig, types.PluginTypeCCIPExec)
 	require.NoError(t, err)
-	ccipdeployment.ProcessChangeset(t, e.Env, setCandidateForExecChangeset)
+	ccipdeployment.ProcessChangesetProposals(e.Env, setCandidateForExecChangeset)
 
 	t.Logf("Executing promote candidate proposal for both commit and exec plugins on chain %d", newChain)
 	donPromoteChangeset, err := PromoteAllCandidatesChangeset(state, e.HomeChainSel, newChain, nodes)
 	require.NoError(t, err)
-	ccipdeployment.ProcessChangeset(t, e.Env, donPromoteChangeset)
+	ccipdeployment.ProcessChangesetProposals(e.Env, donPromoteChangeset)
 
 	// verify if the configs are updated
 	require.NoError(t, ccipdeployment.ValidateCCIPHomeConfigSetUp(

@@ -79,6 +79,17 @@ type Environment struct {
 	MockAdapter       *test_env.Killgrave
 }
 
+func (e Environment) Copy() (Environment, error) {
+	newEnv := e
+	addr := NewMemoryAddressBook()
+	err := addr.Merge(e.ExistingAddresses)
+	if err != nil {
+		return Environment{}, err
+	}
+	newEnv.ExistingAddresses = addr
+	return newEnv, nil
+}
+
 func NewEnvironment(
 	name string,
 	logger logger.Logger,

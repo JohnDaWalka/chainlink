@@ -38,7 +38,7 @@ func TestActiveCandidate(t *testing.T) {
 	feeds := state.Chains[tenv.FeedChainSel].USDFeeds
 	tokenConfig := ccdeploy.NewTestTokenConfig(feeds)
 
-	output, err := InitialDeploy(tenv.Env, ccdeploy.InitialAddChainConfig{
+	output, err := DeployCCIPOnNewChains(tenv.Env, ccdeploy.InitialAddChainConfig{
 		HomeChainSel:   tenv.HomeChainSel,
 		FeedChainSel:   tenv.FeedChainSel,
 		ChainsToDeploy: tenv.Env.AllChainSelectors(),
@@ -114,9 +114,10 @@ func TestActiveCandidate(t *testing.T) {
 	ccdeploy.TransferAllOwnership(t, state, homeCS, e)
 	acceptOwnershipProposal, err := ccdeploy.GenerateAcceptOwnershipProposal(state, homeCS, e.AllChainSelectors())
 	require.NoError(t, err)
-	acceptOwnershipExec := ccdeploy.SignProposal(t, e, acceptOwnershipProposal)
+	acceptOwnershipExec, err := ccdeploy.SignProposalWithTestSigner(e, acceptOwnershipProposal)
+	require.NoError(t, err)
 	for _, sel := range e.AllChainSelectors() {
-		ccdeploy.ExecuteProposal(t, e, acceptOwnershipExec, state, sel)
+		require.NoError(t, ccdeploy.ExecuteProposal(e, acceptOwnershipExec, state, sel))
 	}
 	// Apply the accept ownership proposal to all the chains.
 
@@ -177,8 +178,9 @@ func TestActiveCandidate(t *testing.T) {
 		Batch:           setCommitCandidateOp,
 	}}, "set new candidates on commit plugin", 0)
 	require.NoError(t, err)
-	setCommitCandidateSigned := ccdeploy.SignProposal(t, e, setCommitCandidateProposal)
-	ccdeploy.ExecuteProposal(t, e, setCommitCandidateSigned, state, homeCS)
+	setCommitCandidateSigned, err := ccdeploy.SignProposalWithTestSigner(e, setCommitCandidateProposal)
+	require.NoError(t, err)
+	require.NoError(t, ccdeploy.ExecuteProposal(e, setCommitCandidateSigned, state, homeCS))
 
 	// create the op for the commit plugin as well
 	setExecCandidateOp, err := ccdeploy.SetCandidateOnExistingDon(
@@ -195,8 +197,9 @@ func TestActiveCandidate(t *testing.T) {
 		Batch:           setExecCandidateOp,
 	}}, "set new candidates on commit and exec plugins", 0)
 	require.NoError(t, err)
-	setExecCandidateSigned := ccdeploy.SignProposal(t, e, setExecCandidateProposal)
-	ccdeploy.ExecuteProposal(t, e, setExecCandidateSigned, state, homeCS)
+	setExecCandidateSigned, err := ccdeploy.SignProposalWithTestSigner(e, setExecCandidateProposal)
+	require.NoError(t, err)
+	require.NoError(t, ccdeploy.ExecuteProposal(e, setExecCandidateSigned, state, homeCS))
 
 	// check setup was successful by confirming number of nodes from cap reg
 	donInfo, err = state.Chains[homeCS].CapabilityRegistry.GetDON(nil, donID)
@@ -222,8 +225,9 @@ func TestActiveCandidate(t *testing.T) {
 		Batch:           promoteOps,
 	}}, "promote candidates and revoke actives", 0)
 	require.NoError(t, err)
-	promoteSigned := ccdeploy.SignProposal(t, e, promoteProposal)
-	ccdeploy.ExecuteProposal(t, e, promoteSigned, state, homeCS)
+	promoteSigned, err := ccdeploy.SignProposalWithTestSigner(e, promoteProposal)
+	require.NoError(t, err)
+	require.NoError(t, ccdeploy.ExecuteProposal(e, promoteSigned, state, homeCS))
 	// [NEW ACTIVE, NO CANDIDATE] done promoting
 
 	// [NEW ACTIVE, NO CANDIDATE] check onchain state

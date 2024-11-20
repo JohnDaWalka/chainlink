@@ -502,23 +502,29 @@ func ConfirmRequestOnSourceAndDest(t *testing.T, env deployment.Environment, sta
 	return nil
 }
 
-func ProcessChangeset(t *testing.T, e deployment.Environment, c deployment.ChangesetOutput) {
-
-	// TODO: Add support for jobspecs as well
-
+// TODO : Remove this one to replace with ApplyChangeset
+func ProcessChangesetProposals(e deployment.Environment, c deployment.ChangesetOutput) error {
 	// sign and execute all proposals provided
 	if len(c.Proposals) != 0 {
 		state, err := LoadOnchainState(e)
-		require.NoError(t, err)
+		if err != nil {
+			return fmt.Errorf("failed to load onchain state: %w", err)
+		}
 		for _, prop := range c.Proposals {
 			chains := mapset.NewSet[uint64]()
 			for _, op := range prop.Transactions {
 				chains.Add(uint64(op.ChainIdentifier))
 			}
 
-			signed := SignProposal(t, e, &prop)
+			signed, err := SignProposalWithTestSigner(e, &prop)
+			if err != nil {
+				return fmt.Errorf("failed to sign proposal: %w", err)
+			}
 			for _, sel := range chains.ToSlice() {
-				ExecuteProposal(t, e, signed, state, sel)
+				err := ExecuteProposal(e, signed, state, sel)
+				if err != nil {
+					return fmt.Errorf("failed to execute proposal: %w", err)
+				}
 			}
 		}
 	}
@@ -526,8 +532,11 @@ func ProcessChangeset(t *testing.T, e deployment.Environment, c deployment.Chang
 	// merge address books
 	if c.AddressBook != nil {
 		err := e.ExistingAddresses.Merge(c.AddressBook)
-		require.NoError(t, err)
+		if err != nil {
+			return fmt.Errorf("failed to merge address books: %w", err)
+		}
 	}
+	return nil
 }
 
 func DeployTransferableToken(
@@ -794,4 +803,64 @@ func deployTransferTokenOneEnd(
 	}
 
 	return tokenContract.Contract, tokenPool.Contract, nil
+}
+
+// ApplyChangesets TODO : Move this to deployment package once MCMS is extracted to common
+// ApplyChangesets applies the changeset applications to the environment and returns the updated environment.
+func ApplyChangesets(ctx context.Context, e deployment.Environment, changesetApplications []deployment.ChangesetApplication) (deployment.Environment, error) {
+	currentEnv, err := e.Copy()
+	if err != nil {
+		return e, fmt.Errorf("failed to copy environment: %w", err)
+	}
+	for i, csa := range changesetApplications {
+		out, err := csa.Changeset(currentEnv, csa.Config)
+		if err != nil {
+			return e, fmt.Errorf("failed to apply changeset at index %d: %w", i, err)
+		}
+		if out.AddressBook != nil {
+			err := currentEnv.ExistingAddresses.Merge(out.AddressBook)
+			if err != nil {
+				return e, fmt.Errorf("failed to merge address book: %w", err)
+			}
+		}
+		if out.JobSpecs != nil {
+			for nodeID, jobs := range out.JobSpecs {
+				for _, job := range jobs {
+					// Note these auto-accept
+					_, err := e.Offchain.ProposeJob(ctx,
+						&jobv1.ProposeJobRequest{
+							NodeId: nodeID,
+							Spec:   job,
+						})
+					if err != nil {
+						return e, fmt.Errorf("failed to propose job: %w", err)
+					}
+				}
+			}
+		}
+		if out.Proposals != nil {
+			state, err := LoadOnchainState(e)
+			if err != nil {
+				return deployment.Environment{}, fmt.Errorf("failed to load onchain state: %w", err)
+			}
+			for _, prop := range out.Proposals {
+				chains := mapset.NewSet[uint64]()
+				for _, op := range prop.Transactions {
+					chains.Add(uint64(op.ChainIdentifier))
+				}
+
+				signed, err := SignProposalWithTestSigner(e, &prop)
+				if err != nil {
+					return deployment.Environment{}, fmt.Errorf("failed to sign proposal: %w", err)
+				}
+				for _, sel := range chains.ToSlice() {
+					err := ExecuteProposal(e, signed, state, sel)
+					if err != nil {
+						return deployment.Environment{}, fmt.Errorf("failed to execute proposal: %w", err)
+					}
+				}
+			}
+		}
+	}
+	return currentEnv, nil
 }

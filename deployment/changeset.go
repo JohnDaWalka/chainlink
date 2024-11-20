@@ -3,6 +3,7 @@ package deployment
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 )
@@ -33,3 +34,18 @@ type ChangesetOutput struct {
 // ViewState produces a product specific JSON representation of
 // the on and offchain state of the environment.
 type ViewState func(e Environment) (json.Marshaler, error)
+
+type ChangesetApplication struct {
+	Changeset func(e Environment, config any) (ChangesetOutput, error)
+	Config    any
+}
+
+func WrapChangeSet[C any](fn ChangeSet[C]) func(e Environment, config any) (ChangesetOutput, error) {
+	return func(e Environment, config any) (ChangesetOutput, error) {
+		c, ok := config.(C)
+		if !ok {
+			return ChangesetOutput{}, fmt.Errorf("invalid config type, expected %T", c)
+		}
+		return fn(e, c)
+	}
+}

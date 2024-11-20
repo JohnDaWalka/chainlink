@@ -349,7 +349,7 @@ func InitialAddChain(
 				Type:    pluginconfig.USDCCCTPHandlerType,
 				Version: "1.0",
 				USDCCCTPObserverConfig: &pluginconfig.USDCCCTPObserverConfig{
-					Tokens:                 c.USDCCCTPTokenConfig,
+					Tokens:                 c.USDCConfig.CCTPTokenConfig,
 					AttestationAPI:         c.USDCConfig.API,
 					AttestationAPITimeout:  c.USDCConfig.APITimeout,
 					AttestationAPIInterval: c.USDCConfig.APIInterval,
@@ -382,6 +382,7 @@ func InitialAddChain(
 type USDCConfig struct {
 	EnabledChains []uint64
 	USDCAttestationConfig
+	CCTPTokenConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig
 }
 
 func (cfg USDCConfig) EnabledChainMap() map[uint64]bool {
@@ -408,8 +409,67 @@ type InitialAddChainConfig struct {
 	MCMSConfig MCMSConfig
 	USDCConfig USDCConfig
 	// For setting OCR configuration
-	OCRSecrets          deployment.OCRSecrets
-	USDCCCTPTokenConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig
+	OCRSecrets deployment.OCRSecrets
+}
+
+func (c InitialAddChainConfig) Validate() error {
+	if err := deployment.IsValidChainSelector(c.HomeChainSel); err != nil {
+		return fmt.Errorf("invalid home chain selector: %d - %w", c.HomeChainSel, err)
+	}
+	if err := deployment.IsValidChainSelector(c.FeedChainSel); err != nil {
+		return fmt.Errorf("invalid feed chain selector: %d - %w", c.FeedChainSel, err)
+	}
+	mapChainsToDeploy := make(map[uint64]bool)
+	for _, cs := range c.ChainsToDeploy {
+		mapChainsToDeploy[cs] = true
+		if err := deployment.IsValidChainSelector(cs); err != nil {
+			return fmt.Errorf("invalid chain selector: %d - %w", cs, err)
+		}
+	}
+	for token := range c.TokenConfig.TokenSymbolToInfo {
+		if err := c.TokenConfig.TokenSymbolToInfo[token].Validate(); err != nil {
+			return fmt.Errorf("invalid token config for token %s: %w", token, err)
+		}
+	}
+	if err := c.MCMSConfig.Admin.Validate(); err != nil {
+		return fmt.Errorf("invalid admin MCMS config: %w", err)
+	}
+	if err := c.MCMSConfig.Canceller.Validate(); err != nil {
+		return fmt.Errorf("invalid canceller MCMS config: %w", err)
+	}
+	if err := c.MCMSConfig.Bypasser.Validate(); err != nil {
+		return fmt.Errorf("invalid bypasser MCMS config: %w", err)
+	}
+	if err := c.MCMSConfig.Proposer.Validate(); err != nil {
+		return fmt.Errorf("invalid proposer MCMS config: %w", err)
+	}
+	if len(c.MCMSConfig.Executors) == 0 {
+		return fmt.Errorf("no MCMS executors provided")
+	}
+	if c.OCRSecrets.IsEmpty() {
+		return fmt.Errorf("no OCR secrets provided")
+	}
+	usdcEnabledChainMap := c.USDCConfig.EnabledChainMap()
+	for chain := range usdcEnabledChainMap {
+		if _, exists := mapChainsToDeploy[chain]; !exists {
+			return fmt.Errorf("chain %d is not in chains to deploy", chain)
+		}
+		if err := deployment.IsValidChainSelector(chain); err != nil {
+			return fmt.Errorf("invalid chain selector: %d - %w", chain, err)
+		}
+	}
+	for chain := range c.USDCConfig.CCTPTokenConfig {
+		if _, exists := mapChainsToDeploy[uint64(chain)]; !exists {
+			return fmt.Errorf("chain %d is not in chains to deploy", chain)
+		}
+		if _, exists := usdcEnabledChainMap[uint64(chain)]; !exists {
+			return fmt.Errorf("chain %d is not enabled in USDC config", chain)
+		}
+		if err := deployment.IsValidChainSelector(uint64(chain)); err != nil {
+			return fmt.Errorf("invalid chain selector: %d - %w", chain, err)
+		}
+	}
+	return nil
 }
 
 // DeployCCIPContracts assumes the following contracts are deployed:

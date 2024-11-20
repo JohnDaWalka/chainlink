@@ -81,7 +81,7 @@ func TestUSDCTokenTransfer(t *testing.T) {
 	}
 
 	// Apply migration
-	output, err = changeset.InitialDeploy(e, ccdeploy.InitialAddChainConfig{
+	output, err = changeset.DeployCCIPOnNewChains(e, ccdeploy.InitialAddChainConfig{
 		HomeChainSel:   tenv.HomeChainSel,
 		FeedChainSel:   tenv.FeedChainSel,
 		ChainsToDeploy: e.AllChainSelectors(),
@@ -95,8 +95,8 @@ func TestUSDCTokenTransfer(t *testing.T) {
 				APITimeout:  commonconfig.MustNewDuration(time.Second),
 				APIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
 			},
+			CCTPTokenConfig: USDCCCTPConfig,
 		},
-		USDCCCTPTokenConfig: USDCCCTPConfig,
 	})
 	require.NoError(t, err)
 	require.NoError(t, e.ExistingAddresses.Merge(output.AddressBook))

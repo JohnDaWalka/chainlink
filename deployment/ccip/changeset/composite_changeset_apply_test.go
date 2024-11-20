@@ -5,8 +5,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
-
 	"github.com/smartcontractkit/chainlink/deployment"
 	ccdeploy "github.com/smartcontractkit/chainlink/deployment/ccip"
 
@@ -26,42 +24,44 @@ func TestInitialDeploy(t *testing.T) {
 
 	state, err := ccdeploy.LoadOnchainState(tenv.Env)
 	require.NoError(t, err)
-	output, err := DeployPrerequisites(e, DeployPrerequisiteConfig{
-		ChainSelectors: tenv.Env.AllChainSelectors(),
-	})
+	mcmsCfg := ccdeploy.NewTestMCMSConfig(t, e)
+	changesets := []deployment.ChangesetApplication{
+		{
+			Changeset: deployment.WrapChangeSet(DeployPrerequisites),
+			Config: DeployPrerequisiteConfig{
+				ChainSelectors: tenv.Env.AllChainSelectors(),
+			},
+		},
+		{
+			Changeset: deployment.WrapChangeSet(DeployChainContracts),
+			Config: DeployChainContractsConfig{
+				ChainSelectors:    tenv.Env.AllChainSelectors(),
+				HomeChainSelector: tenv.HomeChainSel,
+				MCMSCfg:           mcmsCfg,
+			},
+		},
+		{
+			Changeset: deployment.WrapChangeSet(InitialAddChain),
+			Config: ccdeploy.InitialAddChainConfig{
+				HomeChainSel:   tenv.HomeChainSel,
+				FeedChainSel:   tenv.FeedChainSel,
+				ChainsToDeploy: tenv.Env.AllChainSelectors(),
+				TokenConfig:    ccdeploy.NewTestTokenConfig(state.Chains[tenv.FeedChainSel].USDFeeds),
+				MCMSConfig:     mcmsCfg,
+				OCRSecrets:     deployment.XXXGenerateTestOCRSecrets(),
+			},
+		},
+		{
+			Changeset: deployment.WrapChangeSet(CCIPCapabilityJobspec),
+		},
+	}
+	tenv.Env, err = ccdeploy.ApplyChangesets(ctx, tenv.Env, changesets)
 	require.NoError(t, err)
-	require.NoError(t, tenv.Env.ExistingAddresses.Merge(output.AddressBook))
-
-	output, err = InitialDeploy(tenv.Env, ccdeploy.InitialAddChainConfig{
-		HomeChainSel:   tenv.HomeChainSel,
-		FeedChainSel:   tenv.FeedChainSel,
-		ChainsToDeploy: tenv.Env.AllChainSelectors(),
-		TokenConfig:    ccdeploy.NewTestTokenConfig(state.Chains[tenv.FeedChainSel].USDFeeds),
-		MCMSConfig:     ccdeploy.NewTestMCMSConfig(t, e),
-		OCRSecrets:     deployment.XXXGenerateTestOCRSecrets(),
-	})
-	require.NoError(t, err)
-	// Get new state after migration.
-	require.NoError(t, tenv.Env.ExistingAddresses.Merge(output.AddressBook))
 	state, err = ccdeploy.LoadOnchainState(e)
 	require.NoError(t, err)
 	require.NotNil(t, state.Chains[tenv.HomeChainSel].LinkToken)
 	// Ensure capreg logs are up to date.
 	ccdeploy.ReplayLogs(t, e.Offchain, tenv.ReplayBlocks)
-
-	// Apply the jobs.
-	for nodeID, jobs := range output.JobSpecs {
-		for _, job := range jobs {
-			// Note these auto-accept
-			_, err := e.Offchain.ProposeJob(ctx,
-				&jobv1.ProposeJobRequest{
-					NodeId: nodeID,
-					Spec:   job,
-				})
-			require.NoError(t, err)
-		}
-	}
-
 	// Add all lanes
 	require.NoError(t, ccdeploy.AddLanesForAll(e, state))
 	// Need to keep track of the block number for each chain so that event subscription can be done from that block.
