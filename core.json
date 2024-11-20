@@ -1,0 +1,6 @@
+{
+  "github.com-smartcontractkit-chainlink-v2-common-txmgr-types-test": "5bc0bd797e86db55ddf081008fa70090f5713b912a7714bd9da4e587cc8dca41",
+  "github.com-smartcontractkit-chainlink-v2-common-client-test": "5d1b713493ae63825aa1e21b538a5b4cb091c68c97316a4c1f0d41fee1395215",
+  "github.com-smartcontractkit-chainlink-v2-core-bridges-test": "bf30da19c860fbda9fe133d043b70b3b69bb0bb18be38ee1985c8385b88bed20",
+  "github.com-smartcontractkit-chainlink-v2-test": "ad0c4109d9254a7f8561e4a4313449ed706a5959215f7c0a0131385eb686ac0b"
+}
