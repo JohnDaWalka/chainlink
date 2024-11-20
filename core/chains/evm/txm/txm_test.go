@@ -39,7 +39,7 @@ func TestLifecycle(t *testing.T) {
 	t.Run("fails to start if initial pending nonce call fails", func(t *testing.T) {
 		txm := NewTxm(logger.Test(t), testutils.FixtureChainID, client, ab, nil, nil, config, keystore)
 		client.On("PendingNonceAt", mock.Anything, address1).Return(uint64(0), errors.New("error")).Once()
-		assert.Error(t, txm.Start(tests.Context(t)))
+		require.Error(t, txm.Start(tests.Context(t)))
 	})
 
 	t.Run("tests lifecycle successfully without any transactions", func(t *testing.T) {
@@ -76,7 +76,7 @@ func TestTrigger(t *testing.T) {
 	t.Run("executes Trigger", func(t *testing.T) {
 		lggr := logger.Test(t)
 		txStore := storage.NewInMemoryStoreManager(lggr, testutils.FixtureChainID)
-		assert.NoError(t, txStore.Add(address))
+		require.NoError(t, txStore.Add(address))
 		client := mocks.NewClient(t)
 		ab := mocks.NewAttemptBuilder(t)
 		config := Config{BlockTime: 1 * time.Minute, RetryBlockThreshold: 10}
@@ -105,7 +105,7 @@ func TestBroadcastTransaction(t *testing.T) {
 		bo, err := txm.broadcastTransaction(ctx, address)
 		require.Error(t, err)
 		assert.False(t, bo)
-		assert.Contains(t, err.Error(), "call failed")
+		require.ErrorContains(t, err, "call failed")
 	})
 
 	t.Run("throws a warning and returns if unconfirmed transactions exceed maxInFlightTransactions", func(t *testing.T) {
@@ -135,7 +135,7 @@ func TestBroadcastTransaction(t *testing.T) {
 		mTxStore.On("UpdateUnstartedTransactionWithNonce", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
 		bo, err = txm.broadcastTransaction(ctx, address)
 		assert.False(t, bo)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		tests.AssertLogCountEventually(t, observedLogs, "Reached transaction limit.", 1)
 	})
 
@@ -146,17 +146,17 @@ func TestBroadcastTransaction(t *testing.T) {
 		mTxStore.On("UpdateUnstartedTransactionWithNonce", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("call failed")).Once()
 		bo, err := txm.broadcastTransaction(ctx, address)
 		assert.False(t, bo)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "call failed")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "call failed")
 	})
 
 	t.Run("returns if there are no unstarted transactions", func(t *testing.T) {
 		lggr := logger.Test(t)
 		txStore := storage.NewInMemoryStoreManager(lggr, testutils.FixtureChainID)
-		assert.NoError(t, txStore.Add(address))
+		require.NoError(t, txStore.Add(address))
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, txStore, nil, config, keystore)
 		bo, err := txm.broadcastTransaction(ctx, address)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, bo)
 		assert.Equal(t, uint64(0), txm.getNonce(address))
 	})
@@ -186,11 +186,11 @@ func TestBroadcastTransaction(t *testing.T) {
 		client.On("SendTransaction", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		bo, err := txm.broadcastTransaction(ctx, address)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, bo)
 		assert.Equal(t, uint64(9), txm.getNonce(address))
 		tx, err = txStore.FindTxWithIdempotencyKey(tests.Context(t), &IDK)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, tx.Attempts, 1)
 		var zeroTime time.Time
 		assert.Greater(t, tx.LastBroadcastAt, zeroTime)
@@ -213,9 +213,9 @@ func TestBackfillTransactions(t *testing.T) {
 		txm := NewTxm(logger.Test(t), testutils.FixtureChainID, client, ab, storage, nil, config, keystore)
 		client.On("NonceAt", mock.Anything, address, mock.Anything).Return(uint64(0), errors.New("latest nonce fail")).Once()
 		bo, err := txm.backfillTransactions(ctx, address)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.False(t, bo)
-		assert.Contains(t, err.Error(), "latest nonce fail")
+		require.ErrorContains(t, err, "latest nonce fail")
 	})
 
 	t.Run("fails if MarkTransactionsConfirmed fails", func(t *testing.T) {
@@ -223,8 +223,8 @@ func TestBackfillTransactions(t *testing.T) {
 		client.On("NonceAt", mock.Anything, address, mock.Anything).Return(uint64(0), nil).Once()
 		storage.On("MarkTransactionsConfirmed", mock.Anything, mock.Anything, address).Return([]uint64{}, []uint64{}, errors.New("marking transactions confirmed failed")).Once()
 		bo, err := txm.backfillTransactions(ctx, address)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.False(t, bo)
-		assert.Contains(t, err.Error(), "marking transactions confirmed failed")
+		require.ErrorContains(t, err, "marking transactions confirmed failed")
 	})
 }

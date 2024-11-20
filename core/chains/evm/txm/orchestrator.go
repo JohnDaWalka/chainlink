@@ -303,7 +303,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) FindTxesWithMetaFieldByReceiptBlockNum(
 	return
 }
 
-//nolint:nolintlint // keep API backwards compatible
+//nolint:revive // keep API backwards compatible
 func (o *Orchestrator[BLOCK_HASH, HEAD]) FindTxesWithAttemptsAndReceiptsByIdsAndState(ctx context.Context, ids []int64, states []txmgrtypes.TxState, chainID *big.Int) (txs []*txmgrtypes.Tx[*big.Int, common.Address, common.Hash, common.Hash, evmtypes.Nonce, gas.EvmFee], err error) {
 	return
 }
