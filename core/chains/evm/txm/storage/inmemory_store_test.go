@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -26,9 +27,9 @@ func TestAbandonPendingTransactions(t *testing.T) {
 
 		// Unconfirmed
 		tx3, err := insertUnconfirmedTransaction(m, 3)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		tx4, err := insertUnconfirmedTransaction(m, 4)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		m.AbandonPendingTransactions()
 
@@ -45,9 +46,9 @@ func TestAbandonPendingTransactions(t *testing.T) {
 
 		// Confirmed
 		tx3, err := insertConfirmedTransaction(m, 3)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		tx4, err := insertConfirmedTransaction(m, 4)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		m.AbandonPendingTransactions()
 
@@ -65,16 +66,16 @@ func TestAppendAttemptToTransaction(t *testing.T) {
 	m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 
 	_, err := insertUnconfirmedTransaction(m, 0) // txID = 1
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = insertConfirmedTransaction(m, 2) // txID = 1
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	t.Run("fails if corresponding unconfirmed transaction for attempt was not found", func(t *testing.T) {
 		var nonce uint64 = 1
 		newAttempt := &types.Attempt{
 			TxID: 1,
 		}
-		assert.Error(t, m.AppendAttemptToTransaction(nonce, newAttempt))
+		require.Error(t, m.AppendAttemptToTransaction(nonce, newAttempt))
 	})
 
 	t.Run("fails if unconfirmed transaction was found but has doesn't match the txID", func(t *testing.T) {
@@ -82,7 +83,7 @@ func TestAppendAttemptToTransaction(t *testing.T) {
 		newAttempt := &types.Attempt{
 			TxID: 2,
 		}
-		assert.Error(t, m.AppendAttemptToTransaction(nonce, newAttempt))
+		require.Error(t, m.AppendAttemptToTransaction(nonce, newAttempt))
 	})
 
 	t.Run("appends attempt to transaction", func(t *testing.T) {
@@ -90,7 +91,7 @@ func TestAppendAttemptToTransaction(t *testing.T) {
 		newAttempt := &types.Attempt{
 			TxID: 1,
 		}
-		assert.NoError(t, m.AppendAttemptToTransaction(nonce, newAttempt))
+		require.NoError(t, m.AppendAttemptToTransaction(nonce, newAttempt))
 	})
 }
 
@@ -112,16 +113,16 @@ func TestCreateEmptyUnconfirmedTransaction(t *testing.T) {
 	fromAddress := testutils.NewAddress()
 	m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 	_, err := insertUnconfirmedTransaction(m, 0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	t.Run("fails if unconfirmed transaction with the same nonce exists", func(t *testing.T) {
 		_, err := m.CreateEmptyUnconfirmedTransaction(0, 0)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("creates a new empty unconfirmed transaction", func(t *testing.T) {
 		tx, err := m.CreateEmptyUnconfirmedTransaction(1, 0)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, types.TxUnconfirmed, tx.State)
 	})
 }
@@ -160,7 +161,7 @@ func TestCreateTransaction(t *testing.T) {
 		assert.Equal(t, maxQueuedTransactions, m.CountUnstartedTransactions())
 		// earliest tx ID should be the same amount of the number of transactions that we dropped
 		tx, err := m.UpdateUnstartedTransactionWithNonce(0)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		//nolint:gosec // this won't overflow
 		assert.Equal(t, uint64(overshot), tx.ID)
 	})
@@ -178,7 +179,7 @@ func TestFetchUnconfirmedTransactionAtNonceWithCount(t *testing.T) {
 
 	var nonce uint64
 	_, err := insertUnconfirmedTransaction(m, nonce)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	tx, count = m.FetchUnconfirmedTransactionAtNonceWithCount(0)
 	assert.Equal(t, tx.Nonce, nonce)
 	assert.Equal(t, 1, count)
@@ -199,13 +200,13 @@ func TestMarkTransactionsConfirmed(t *testing.T) {
 	t.Run("confirms transaction with nonce lower than the latest", func(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		ctx1, err := insertUnconfirmedTransaction(m, 0)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		ctx2, err := insertUnconfirmedTransaction(m, 1)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		ctxs, utxs := m.MarkTransactionsConfirmed(1)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, types.TxConfirmed, ctx1.State)
 		assert.Equal(t, types.TxUnconfirmed, ctx2.State)
 		assert.Equal(t, ctxs[0], ctx1.ID)
@@ -215,13 +216,13 @@ func TestMarkTransactionsConfirmed(t *testing.T) {
 	t.Run("unconfirms transaction with nonce equal to or higher than the latest", func(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		ctx1, err := insertConfirmedTransaction(m, 0)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		ctx2, err := insertConfirmedTransaction(m, 1)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		ctxs, utxs := m.MarkTransactionsConfirmed(1)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, types.TxConfirmed, ctx1.State)
 		assert.Equal(t, types.TxUnconfirmed, ctx2.State)
 		assert.Equal(t, utxs[0], ctx2.ID)
@@ -232,7 +233,7 @@ func TestMarkTransactionsConfirmed(t *testing.T) {
 		for i := 0; i < maxQueuedTransactions; i++ {
 			//nolint:gosec // this won't overflow
 			_, err := insertConfirmedTransaction(m, uint64(i))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 		assert.Len(t, m.ConfirmedTransactions, maxQueuedTransactions)
 		m.MarkTransactionsConfirmed(maxQueuedTransactions)
@@ -248,12 +249,12 @@ func TestMarkUnconfirmedTransactionPurgeable(t *testing.T) {
 
 	// fails if tx was not found
 	err := m.MarkUnconfirmedTransactionPurgeable(0)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	tx, err := insertUnconfirmedTransaction(m, 0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = m.MarkUnconfirmedTransactionPurgeable(0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, tx.IsPurgeable)
 }
 
@@ -265,30 +266,30 @@ func TestUpdateTransactionBroadcast(t *testing.T) {
 	t.Run("fails if unconfirmed transaction was not found", func(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		var nonce uint64
-		assert.Error(t, m.UpdateTransactionBroadcast(0, nonce, hash))
+		require.Error(t, m.UpdateTransactionBroadcast(0, nonce, hash))
 	})
 
 	t.Run("fails if attempt was not found for a given transaction", func(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		var nonce uint64
 		tx, err := insertUnconfirmedTransaction(m, nonce)
-		assert.NoError(t, err)
-		assert.Error(t, m.UpdateTransactionBroadcast(0, nonce, hash))
+		require.NoError(t, err)
+		require.Error(t, m.UpdateTransactionBroadcast(0, nonce, hash))
 
 		// Attempt with different hash
 		attempt := &types.Attempt{TxID: tx.ID, Hash: testutils.NewHash()}
 		tx.Attempts = append(tx.Attempts, attempt)
-		assert.Error(t, m.UpdateTransactionBroadcast(0, nonce, hash))
+		require.Error(t, m.UpdateTransactionBroadcast(0, nonce, hash))
 	})
 
 	t.Run("updates transaction's and attempt's broadcast times", func(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		var nonce uint64
 		tx, err := insertUnconfirmedTransaction(m, nonce)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		attempt := &types.Attempt{TxID: tx.ID, Hash: hash}
 		tx.Attempts = append(tx.Attempts, attempt)
-		assert.NoError(t, m.UpdateTransactionBroadcast(0, nonce, hash))
+		require.NoError(t, m.UpdateTransactionBroadcast(0, nonce, hash))
 		assert.False(t, tx.LastBroadcastAt.IsZero())
 		assert.False(t, attempt.BroadcastAt.IsZero())
 	})
@@ -301,7 +302,7 @@ func TestUpdateUnstartedTransactionWithNonce(t *testing.T) {
 	t.Run("returns nil if there are no unstarted transactions", func(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		tx, err := m.UpdateUnstartedTransactionWithNonce(0)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, tx)
 	})
 
@@ -310,10 +311,10 @@ func TestUpdateUnstartedTransactionWithNonce(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		insertUnstartedTransaction(m)
 		_, err := insertUnconfirmedTransaction(m, nonce)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		_, err = m.UpdateUnstartedTransactionWithNonce(nonce)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("updates unstarted transaction to unconfirmed and assigns a nonce", func(t *testing.T) {
@@ -322,7 +323,7 @@ func TestUpdateUnstartedTransactionWithNonce(t *testing.T) {
 		insertUnstartedTransaction(m)
 
 		tx, err := m.UpdateUnstartedTransactionWithNonce(nonce)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, nonce, tx.Nonce)
 		assert.Equal(t, types.TxUnconfirmed, tx.State)
 	})
@@ -337,18 +338,18 @@ func TestDeleteAttemptForUnconfirmedTx(t *testing.T) {
 		tx := &types.Transaction{Nonce: 0}
 		attempt := &types.Attempt{TxID: 0}
 		err := m.DeleteAttemptForUnconfirmedTx(tx.Nonce, attempt)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("fails if corresponding unconfirmed attempt for txID was not found", func(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		_, err := insertUnconfirmedTransaction(m, 0)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		attempt := &types.Attempt{TxID: 2, Hash: testutils.NewHash()}
 		err = m.DeleteAttemptForUnconfirmedTx(0, attempt)
 
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("deletes attempt of unconfirmed transaction", func(t *testing.T) {
@@ -356,12 +357,12 @@ func TestDeleteAttemptForUnconfirmedTx(t *testing.T) {
 		var nonce uint64
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		tx, err := insertUnconfirmedTransaction(m, nonce)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		attempt := &types.Attempt{TxID: 0, Hash: hash}
 		tx.Attempts = append(tx.Attempts, attempt)
 		err = m.DeleteAttemptForUnconfirmedTx(nonce, attempt)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		assert.Empty(t, tx.Attempts)
 	})
@@ -375,7 +376,7 @@ func TestPruneConfirmedTransactions(t *testing.T) {
 	for i := 0; i < total; i++ {
 		//nolint:gosec // this won't overflow
 		_, err := insertConfirmedTransaction(m, uint64(i))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 	prunedTxIDs := m.pruneConfirmedTransactions()
 	left := total - total/pruneSubset
