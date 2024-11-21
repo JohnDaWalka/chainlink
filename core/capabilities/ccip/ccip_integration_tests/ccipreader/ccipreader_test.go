@@ -34,7 +34,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_reader_tester"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -508,51 +507,88 @@ func TestCCIPReader_Nonces(t *testing.T) {
 
 func Test_GetChainFeePriceUpdates(t *testing.T) {
 	ctx := testutils.Context(t)
-	sb, auth := setupSimulatedBackendAndAuth(t)
-	feeQuoter := deployFeeQuoterWithPrices(t, auth, sb, chainS1)
+	env := ccdeploy.NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
+	state, err := ccdeploy.LoadOnchainState(env.Env)
+	require.NoError(t, err)
 
-	s := testSetup(ctx, t, chainD, chainD, nil, evmconfig.DestReaderConfig,
-		map[cciptypes.ChainSelector][]types.BoundContract{
-			chainD: {
+	selectors := env.Env.AllChainSelectors()
+	chain1, chain2 := selectors[0], selectors[1]
+
+	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
+	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
+
+	// Change the gas price for chain2
+	feeQuoter := state.Chains[chain1].FeeQuoter
+	_, err = feeQuoter.UpdatePrices(
+		env.Env.Chains[chain1].DeployerKey, fee_quoter.InternalPriceUpdates{
+			GasPriceUpdates: []fee_quoter.InternalGasPriceUpdate{
 				{
-					Address: feeQuoter.Address().String(),
+					DestChainSelector: chain2,
+					UsdPerUnitGas:     defaultGasPrice.ToInt(),
+				},
+			},
+		},
+	)
+	be := env.Env.Chains[chain1].Client.(*memory.Backend)
+	be.Commit()
+
+	gas, err := feeQuoter.GetDestinationChainGasPrice(&bind.CallOpts{}, chain2)
+	require.NoError(t, err)
+	require.Equal(t, defaultGasPrice.ToInt(), gas.Value)
+
+	reader := testSetupRealContracts(
+		ctx,
+		t,
+		chain1,
+		evmconfig.DestReaderConfig,
+		map[cciptypes.ChainSelector][]types.BoundContract{
+			cciptypes.ChainSelector(chain1): {
+				{
+					Address: state.Chains[chain1].FeeQuoter.Address().String(),
 					Name:    consts.ContractNameFeeQuoter,
 				},
 			},
 		},
 		nil,
-		false,
-		sb,
-		auth,
+		env,
 	)
 
-	updates := s.reader.GetChainFeePriceUpdate(ctx, []cciptypes.ChainSelector{chainS1, chainS2})
-	// only chainS1 has a bound contract
+	updates := reader.GetChainFeePriceUpdate(ctx, []cciptypes.ChainSelector{cs(chain1), cs(chain2)})
+	// only chain1 has a bound contract
 	require.Len(t, updates, 1)
-	require.Equal(t, defaultGasPrice.ToInt(), updates[chainS1].Value.Int)
+	require.Equal(t, defaultGasPrice.ToInt(), updates[cs(chain2)].Value.Int)
 }
 
 func Test_LinkPriceUSD(t *testing.T) {
 	ctx := testutils.Context(t)
-	sb, auth := setupSimulatedBackendAndAuth(t)
-	feeQuoter := deployFeeQuoterWithPrices(t, auth, sb, chainS1)
+	env := ccdeploy.NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
+	state, err := ccdeploy.LoadOnchainState(env.Env)
+	require.NoError(t, err)
 
-	s := testSetup(ctx, t, chainD, chainD, nil, evmconfig.DestReaderConfig,
+	selectors := env.Env.AllChainSelectors()
+	chain1, chain2 := selectors[0], selectors[1]
+
+	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
+	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
+
+	reader := testSetupRealContracts(
+		ctx,
+		t,
+		chain1,
+		evmconfig.DestReaderConfig,
 		map[cciptypes.ChainSelector][]types.BoundContract{
-			chainD: {
+			cciptypes.ChainSelector(chain1): {
 				{
-					Address: feeQuoter.Address().String(),
+					Address: state.Chains[chain1].FeeQuoter.Address().String(),
 					Name:    consts.ContractNameFeeQuoter,
 				},
 			},
 		},
 		nil,
-		false,
-		sb,
-		auth,
+		env,
 	)
 
-	linkPriceUSD, err := s.reader.LinkPriceUSD(ctx)
+	linkPriceUSD, err := reader.LinkPriceUSD(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, linkPriceUSD.Int)
 	require.Equal(t, InitialLinkPrice, linkPriceUSD.Int)
@@ -624,7 +660,6 @@ func Test_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 
 func Test_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 	ctx := testutils.Context(t)
-	//env := ccdeploy.NewMemoryEnvironment(t, logger.TestLogger(t), 2, 4, ccdeploy.MockLinkPrice, ccdeploy.MockWethPrice)
 	env := ccdeploy.NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
 	state, err := ccdeploy.LoadOnchainState(env.Env)
 	require.NoError(t, err)
@@ -634,24 +669,6 @@ func Test_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 
 	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
 	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
-
-	//feeQuoter := state.Chains[chain1].FeeQuoter
-	//_, err = feeQuoter.UpdatePrices(
-	//	env.Env.Chains[chain1].DeployerKey, fee_quoter.InternalPriceUpdates{
-	//		GasPriceUpdates: []fee_quoter.InternalGasPriceUpdate{
-	//			{
-	//				DestChainSelector: chain2,
-	//				UsdPerUnitGas:     defaultGasPrice.ToInt(),
-	//			},
-	//		},
-	//	},
-	//)
-	//be := env.Env.Chains[chain1].Client.(*memory.Backend)
-	//be.Commit()
-	//
-	//gas, err := feeQuoter.GetDestinationChainGasPrice(&bind.CallOpts{}, chain2)
-	//require.NoError(t, err)
-	//require.Equal(t, defaultGasPrice.ToInt(), gas.Value)
 
 	reader := testSetupRealContracts(
 		ctx,
@@ -679,22 +696,6 @@ func Test_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 	// Only chainD has reader contracts bound
 	require.Len(t, prices, 1)
 	require.Equal(t, ccdeploy.DefaultInitialPrices.WethPrice, prices[cciptypes.ChainSelector(chain1)].Int)
-}
-
-func deployRouterWithNativeToken(t *testing.T, auth *bind.TransactOpts, sb *simulated.Backend) *router.Router {
-	address, _, _, err := router.DeployRouter(
-		auth,
-		sb.Client(),
-		wethAddress,
-		utils.RandomAddress(), // armProxy address
-	)
-	require.NoError(t, err)
-	sb.Commit()
-
-	routerContract, err := router.NewRouter(address, sb.Client())
-	require.NoError(t, err)
-
-	return routerContract
 }
 
 func deployFeeQuoterWithPrices(t *testing.T, auth *bind.TransactOpts, sb *simulated.Backend, destChain cciptypes.ChainSelector) *fee_quoter.FeeQuoter {
@@ -840,7 +841,7 @@ func testSetupRealContracts(
 		extendedCr2 := contractreader.NewExtendedContractReader(cr)
 		err = extendedCr2.Bind(ctx, bindings)
 		require.NoError(t, err)
-		crs[chain] = extendedCr2
+		crs[cciptypes.ChainSelector(chain)] = extendedCr2
 
 		err = cr.Start(ctx)
 		require.NoError(t, err)
@@ -1023,4 +1024,8 @@ func uBigInt(i uint64) *big.Int {
 
 func e18Mult(amount uint64) *big.Int {
 	return new(big.Int).Mul(uBigInt(amount), uBigInt(1e18))
+}
+
+func cs(i uint64) cciptypes.ChainSelector {
+	return cciptypes.ChainSelector(i)
 }
