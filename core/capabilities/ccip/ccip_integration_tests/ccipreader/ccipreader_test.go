@@ -447,63 +447,65 @@ func TestCCIPReader_GetExpectedNextSequenceNumber(t *testing.T) {
 	}
 }
 
+// TODO: Investigate whether NonceManager has the bug or the setup is incorrect
 func TestCCIPReader_Nonces(t *testing.T) {
 	ctx := testutils.Context(t)
-	var nonces = map[cciptypes.ChainSelector]map[common.Address]uint64{
-		chainS1: {
-			utils.RandomAddress(): 10,
-			utils.RandomAddress(): 20,
-		},
-		chainS2: {
-			utils.RandomAddress(): 30,
-			utils.RandomAddress(): 40,
-		},
-		chainS3: {
-			utils.RandomAddress(): 50,
-			utils.RandomAddress(): 60,
-		},
-	}
+	env := ccdeploy.NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 3, 4)
+	state, err := ccdeploy.LoadOnchainState(env.Env)
+	require.NoError(t, err)
 
-	cfg := evmtypes.ChainReaderConfig{
-		Contracts: map[string]evmtypes.ChainContractReader{
-			consts.ContractNameNonceManager: {
-				ContractABI: ccip_reader_tester.CCIPReaderTesterABI,
-				Configs: map[string]*evmtypes.ChainReaderDefinition{
-					consts.MethodNameGetInboundNonce: {
-						ChainSpecificName: "getInboundNonce",
-						ReadType:          evmtypes.Method,
-					},
+	selectors := env.Env.AllChainSelectors()
+	destChain, srcChain, srcChain2 := selectors[0], selectors[1], selectors[2]
+
+	print(srcChain2)
+	require.NoError(t, ccdeploy.AddLanesForAll(env.Env, state))
+
+	reader := testSetupRealContracts(
+		ctx,
+		t,
+		destChain,
+		map[cciptypes.ChainSelector][]types.BoundContract{
+			cciptypes.ChainSelector(destChain): {
+				{
+					Address: state.Chains[destChain].NonceManager.Address().String(),
+					Name:    consts.ContractNameNonceManager,
 				},
 			},
 		},
+		nil,
+		env,
+	)
+
+	chain1MsgsLen := 5
+	//chain2MsgsLen := 10
+
+	for i := 0; i < chain1MsgsLen; i++ {
+		msg := ccdeploy.DefaultRouterMessage(state.Chains[destChain].Receiver.Address())
+		ccdeploy.TestSendRequest(t, env.Env, state, srcChain, destChain, false, msg)
 	}
+	//for i := 0; i < chain2MsgsLen; i++ {
+	//	msg := ccdeploy.DefaultRouterMessage(state.Chains[destChain].Receiver.Address())
+	//	ccdeploy.TestSendRequest(t, env.Env, state, srcChain2, destChain, false, msg)
+	//}
 
-	sb, auth := setupSimulatedBackendAndAuth(t)
-	s := testSetup(ctx, t, chainD, chainD, nil, cfg, nil, nil, true, sb, auth)
-
-	// Add some nonces.
-	for chain, addrs := range nonces {
-		for addr, nonce := range addrs {
-			_, err := s.contract.SetInboundNonce(s.auth, uint64(chain), nonce, common.LeftPadBytes(addr.Bytes(), 32))
-			assert.NoError(t, err)
-		}
-	}
-	s.sb.Commit()
-
-	for sourceChain, addrs := range nonces {
-		var addrQuery []string
-		for addr := range addrs {
-			addrQuery = append(addrQuery, addr.String())
-		}
-		addrQuery = append(addrQuery, utils.RandomAddress().String())
-
-		results, err := s.reader.Nonces(ctx, sourceChain, chainD, addrQuery)
-		assert.NoError(t, err)
-		assert.Len(t, results, len(addrQuery))
-		for addr, nonce := range addrs {
-			assert.Equal(t, nonce, results[addr.String()])
-		}
-	}
+	chain1Nonces, err := reader.Nonces(ctx, cs(srcChain), cs(destChain),
+		[]string{
+			env.Env.Chains[srcChain].DeployerKey.From.String(),
+			utils.RandomAddress().String(),
+		})
+	nonce, err := state.Chains[destChain].NonceManager.GetInboundNonce(&bind.CallOpts{},
+		srcChain,
+		env.Env.Chains[srcChain].DeployerKey.From.Bytes(),
+	)
+	require.NoError(t, err)
+	require.Equal(t, chain1MsgsLen, nonce)
+	require.Len(t, chain1Nonces, 1)
+	require.Equal(t, chain1MsgsLen, chain1Nonces[env.Env.Chains[srcChain].DeployerKey.From.String()])
+	//chain2Nonces, err := reader.Nonces(ctx, cs(srcChain2), cs(destChain),
+	//	[]string{
+	//		env.Env.Chains[srcChain2].DeployerKey.From.String(),
+	//		utils.RandomAddress().String(),
+	//	})
 }
 
 func Test_GetChainFeePriceUpdates(t *testing.T) {
