@@ -243,8 +243,13 @@ func mockAttestationResponse() *httptest.Server {
 }
 
 func NewMemoryEnvironmentWithJobsAndContracts(t *testing.T, lggr logger.Logger, numChains int, numNodes int) DeployedEnv {
-	e := NewMemoryEnvironment(t, lggr, numChains, numNodes, MockLinkPrice, MockWethPrice)
+	e := NewMemoryEnvironmentContractsOnly(t, lggr, numChains, numNodes)
 	e.SetupJobs(t)
+	return e
+}
+
+func NewMemoryEnvironmentContractsOnly(t *testing.T, lggr logger.Logger, numChains int, numNodes int) DeployedEnv {
+	e := NewMemoryEnvironment(t, lggr, numChains, numNodes, MockLinkPrice, MockWethPrice)
 	// Take first non-home chain as the new chain.
 	newAddresses := deployment.NewMemoryAddressBook()
 	err := DeployPrerequisiteChainContracts(e.Env, newAddresses, e.Env.AllChainSelectors())

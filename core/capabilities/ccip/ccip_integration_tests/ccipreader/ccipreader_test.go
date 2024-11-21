@@ -624,21 +624,20 @@ func Test_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 
 func Test_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 	ctx := testutils.Context(t)
-	//e2 := ccdeploy.NewMemoryEnvironment(t, logger.TestLogger(t), 2, 4, ccdeploy.MockLinkPrice, ccdeploy.MockWethPrice)
-	//TODO: create NewMemoryEnvironmentWithContractsOnly
-	e2 := ccdeploy.NewMemoryEnvironmentWithJobsAndContracts(t, logger.TestLogger(t), 2, 4)
-	state, err := ccdeploy.LoadOnchainState(e2.Env)
+	//env := ccdeploy.NewMemoryEnvironment(t, logger.TestLogger(t), 2, 4, ccdeploy.MockLinkPrice, ccdeploy.MockWethPrice)
+	env := ccdeploy.NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
+	state, err := ccdeploy.LoadOnchainState(env.Env)
 	require.NoError(t, err)
 
-	selectors := e2.Env.AllChainSelectors()
+	selectors := env.Env.AllChainSelectors()
 	chain1, chain2 := selectors[0], selectors[1]
 
-	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(e2.Env, state, chain1, chain2))
-	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(e2.Env, state, chain2, chain1))
+	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
+	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
 
 	//feeQuoter := state.Chains[chain1].FeeQuoter
 	//_, err = feeQuoter.UpdatePrices(
-	//	e2.Env.Chains[chain1].DeployerKey, fee_quoter.InternalPriceUpdates{
+	//	env.Env.Chains[chain1].DeployerKey, fee_quoter.InternalPriceUpdates{
 	//		GasPriceUpdates: []fee_quoter.InternalGasPriceUpdate{
 	//			{
 	//				DestChainSelector: chain2,
@@ -647,7 +646,9 @@ func Test_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 	//		},
 	//	},
 	//)
-
+	//be := env.Env.Chains[chain1].Client.(*memory.Backend)
+	//be.Commit()
+	//
 	//gas, err := feeQuoter.GetDestinationChainGasPrice(&bind.CallOpts{}, chain2)
 	//require.NoError(t, err)
 	//require.Equal(t, defaultGasPrice.ToInt(), gas.Value)
@@ -670,7 +671,7 @@ func Test_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 			},
 		},
 		nil,
-		e2,
+		env,
 	)
 
 	prices := reader.GetWrappedNativeTokenPriceUSD(ctx, []cciptypes.ChainSelector{cciptypes.ChainSelector(chain1), cciptypes.ChainSelector(chain2)})
@@ -824,7 +825,6 @@ func testSetupRealContracts(
 	for chain, bindings := range toBindContracts {
 		be := env.Env.Chains[uint64(chain)].Client.(*memory.Backend)
 		cl := client.NewSimulatedBackendClient(t, be.Sim, big.NewInt(0).SetUint64(uint64(chain)))
-		//cl := deployment.Backend(env.Env.Chains[uint64(chain)].Client)
 		headTracker := headtracker.NewSimulatedHeadTracker(cl, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
 		lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(0).SetUint64(uint64(chain)), db, lggr),
 			cl,

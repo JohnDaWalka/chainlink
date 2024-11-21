@@ -84,7 +84,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.3.0
 	github.com/smartcontractkit/chainlink-solana v1.1.1-0.20241115191142-8b8369c1f44e
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.1.1-0.20241017135645-176a23722fd8
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20241120141814-47da13e86197
+	//github.com/smartcontractkit/chainlink/deployment v0.0.0-20241120141814-47da13e86197
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20241009055228-33d0c0bf38de
 	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20241009055228-33d0c0bf38de
@@ -123,6 +123,8 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 )
+
+require github.com/smartcontractkit/chainlink/deployment v0.0.0-00010101000000-000000000000
 
 require (
 	cel.dev/expr v0.17.0 // indirect
@@ -554,6 +556,8 @@ replace (
 	github.com/btcsuite/btcd/btcec/v2 => github.com/btcsuite/btcd/btcec/v2 v2.3.2
 	// replicating the replace directive on cosmos SDK
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
+
+	github.com/smartcontractkit/chainlink/deployment => ./deployment
 
 	github.com/sourcegraph/sourcegraph/lib => github.com/sourcegraph/sourcegraph-public-snapshot/lib v0.0.0-20240822153003-c864f15af264
 )
