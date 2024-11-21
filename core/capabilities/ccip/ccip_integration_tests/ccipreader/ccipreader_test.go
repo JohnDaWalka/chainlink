@@ -55,11 +55,7 @@ const (
 )
 
 var (
-	defaultGasPrice  = assets.GWei(10)
-	InitialLinkPrice = e18Mult(20)
-	InitialWethPrice = e18Mult(4000)
-	linkAddress      = utils.RandomAddress()
-	wethAddress      = utils.RandomAddress()
+	defaultGasPrice = assets.GWei(10)
 )
 
 func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
@@ -84,18 +80,23 @@ func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 
 	sb, auth := setupSimulatedBackendAndAuth(t)
 	onRampAddress := utils.RandomAddress()
-	s := testSetup(ctx, t, chainD, chainD, nil, cfg, nil, map[cciptypes.ChainSelector][]types.BoundContract{
-		chainS1: {
-			{
-				Address: onRampAddress.Hex(),
-				Name:    consts.ContractNameOnRamp,
+	s := testSetup(ctx, t, testSetupParams{
+		ReaderChain:    chainD,
+		DestChain:      chainD,
+		OnChainSeqNums: nil,
+		Cfg:            cfg,
+		ToMockBindings: map[cciptypes.ChainSelector][]types.BoundContract{
+			chainS1: {
+				{
+					Address: onRampAddress.Hex(),
+					Name:    consts.ContractNameOnRamp,
+				},
 			},
 		},
-	},
-		true,
-		sb,
-		auth,
-	)
+		BindTester:       true,
+		SimulatedBackend: sb,
+		Auth:             auth,
+	})
 
 	tokenA := common.HexToAddress("123")
 	const numReports = 5
@@ -210,8 +211,17 @@ func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
 	}
 
 	sb, auth := setupSimulatedBackendAndAuth(t)
-	s := testSetup(ctx, t, chainD, chainD, nil, cfg, nil, nil, true, sb, auth)
-
+	s := testSetup(ctx, t, testSetupParams{
+		ReaderChain:      chainD,
+		DestChain:        chainD,
+		OnChainSeqNums:   nil,
+		Cfg:              cfg,
+		ToBindContracts:  nil,
+		ToMockBindings:   nil,
+		BindTester:       true,
+		SimulatedBackend: sb,
+		Auth:             auth,
+	})
 	_, err := s.contract.EmitExecutionStateChanged(
 		s.auth,
 		uint64(chainS1),
@@ -296,7 +306,17 @@ func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 	}
 
 	sb, auth := setupSimulatedBackendAndAuth(t)
-	s := testSetup(ctx, t, chainS1, chainD, nil, cfg, nil, nil, true, sb, auth)
+	s := testSetup(ctx, t, testSetupParams{
+		ReaderChain:      chainS1,
+		DestChain:        chainD,
+		OnChainSeqNums:   nil,
+		Cfg:              cfg,
+		ToBindContracts:  nil,
+		ToMockBindings:   nil,
+		BindTester:       true,
+		SimulatedBackend: sb,
+		Auth:             auth,
+	})
 
 	_, err := s.contract.EmitCCIPMessageSent(s.auth, uint64(chainD), ccip_reader_tester.InternalEVM2AnyRampMessage{
 		Header: ccip_reader_tester.InternalRampMessageHeader{
@@ -398,7 +418,17 @@ func TestCCIPReader_NextSeqNum(t *testing.T) {
 	}
 
 	sb, auth := setupSimulatedBackendAndAuth(t)
-	s := testSetup(ctx, t, chainD, chainD, onChainSeqNums, cfg, nil, nil, true, sb, auth)
+	s := testSetup(ctx, t, testSetupParams{
+		ReaderChain:      chainD,
+		DestChain:        chainD,
+		OnChainSeqNums:   onChainSeqNums,
+		Cfg:              cfg,
+		ToBindContracts:  nil,
+		ToMockBindings:   nil,
+		BindTester:       true,
+		SimulatedBackend: sb,
+		Auth:             auth,
+	})
 
 	seqNums, err := s.reader.NextSeqNum(ctx, []cciptypes.ChainSelector{chainS1, chainS2, chainS3})
 	assert.NoError(t, err)
@@ -593,7 +623,7 @@ func Test_LinkPriceUSD(t *testing.T) {
 	linkPriceUSD, err := reader.LinkPriceUSD(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, linkPriceUSD.Int)
-	require.Equal(t, InitialLinkPrice, linkPriceUSD.Int)
+	require.Equal(t, ccdeploy.DefaultInitialPrices.LinkPrice, linkPriceUSD.Int)
 }
 
 func Test_GetMedianDataAvailabilityGasConfig(t *testing.T) {
@@ -791,22 +821,14 @@ func testSetupRealContracts(
 func testSetup(
 	ctx context.Context,
 	t *testing.T,
-	readerChain,
-	destChain cciptypes.ChainSelector,
-	onChainSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum,
-	cfg evmtypes.ChainReaderConfig,
-	toBindContracts map[cciptypes.ChainSelector][]types.BoundContract,
-	toMockBindings map[cciptypes.ChainSelector][]types.BoundContract,
-	bindTester bool,
-	simulatedBackend *simulated.Backend,
-	auth *bind.TransactOpts,
+	params testSetupParams,
 ) *testSetupData {
-	address, _, _, err := ccip_reader_tester.DeployCCIPReaderTester(auth, simulatedBackend.Client())
+	address, _, _, err := ccip_reader_tester.DeployCCIPReaderTester(params.Auth, params.SimulatedBackend.Client())
 	assert.NoError(t, err)
-	simulatedBackend.Commit()
+	params.SimulatedBackend.Commit()
 
 	// Setup contract client
-	contract, err := ccip_reader_tester.NewCCIPReaderTester(address, simulatedBackend.Client())
+	contract, err := ccip_reader_tester.NewCCIPReaderTester(address, params.SimulatedBackend.Client())
 	assert.NoError(t, err)
 
 	lggr := logger.TestLogger(t)
@@ -819,9 +841,9 @@ func testSetup(
 		RpcBatchSize:             10,
 		KeepFinalizedBlocksDepth: 100000,
 	}
-	cl := client.NewSimulatedBackendClient(t, simulatedBackend, big.NewInt(0).SetUint64(uint64(readerChain)))
+	cl := client.NewSimulatedBackendClient(t, params.SimulatedBackend, big.NewInt(0).SetUint64(uint64(params.ReaderChain)))
 	headTracker := headtracker.NewSimulatedHeadTracker(cl, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
-	lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(0).SetUint64(uint64(readerChain)), db, lggr),
+	lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(0).SetUint64(uint64(params.ReaderChain)), db, lggr),
 		cl,
 		lggr,
 		headTracker,
@@ -829,27 +851,27 @@ func testSetup(
 	)
 	assert.NoError(t, lp.Start(ctx))
 
-	for sourceChain, seqNum := range onChainSeqNums {
-		_, err1 := contract.SetSourceChainConfig(auth, uint64(sourceChain), ccip_reader_tester.OffRampSourceChainConfig{
+	for sourceChain, seqNum := range params.OnChainSeqNums {
+		_, err1 := contract.SetSourceChainConfig(params.Auth, uint64(sourceChain), ccip_reader_tester.OffRampSourceChainConfig{
 			IsEnabled: true,
 			MinSeqNr:  uint64(seqNum),
 			OnRamp:    utils.RandomAddress().Bytes(),
 		})
 		assert.NoError(t, err1)
-		simulatedBackend.Commit()
+		params.SimulatedBackend.Commit()
 		scc, err1 := contract.GetSourceChainConfig(&bind.CallOpts{Context: ctx}, uint64(sourceChain))
 		assert.NoError(t, err1)
 		assert.Equal(t, seqNum, cciptypes.SeqNum(scc.MinSeqNr))
 	}
 
-	contractNames := maps.Keys(cfg.Contracts)
+	contractNames := maps.Keys(params.Cfg.Contracts)
 
-	cr, err := evm.NewChainReaderService(ctx, lggr, lp, headTracker, cl, cfg)
+	cr, err := evm.NewChainReaderService(ctx, lggr, lp, headTracker, cl, params.Cfg)
 	require.NoError(t, err)
 
 	extendedCr := contractreader.NewExtendedContractReader(cr)
 
-	if bindTester {
+	if params.BindTester {
 		err = extendedCr.Bind(ctx, []types.BoundContract{
 			{
 				Address: address.String(),
@@ -860,8 +882,8 @@ func testSetup(
 	}
 
 	var otherCrs = make(map[cciptypes.ChainSelector]contractreader.Extended)
-	for chain, bindings := range toBindContracts {
-		cl2 := client.NewSimulatedBackendClient(t, simulatedBackend, big.NewInt(0).SetUint64(uint64(chain)))
+	for chain, bindings := range params.ToBindContracts {
+		cl2 := client.NewSimulatedBackendClient(t, params.SimulatedBackend, big.NewInt(0).SetUint64(uint64(chain)))
 		headTracker2 := headtracker.NewSimulatedHeadTracker(cl2, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
 		lp2 := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(0).SetUint64(uint64(chain)), db, lggr),
 			cl2,
@@ -871,7 +893,7 @@ func testSetup(
 		)
 		require.NoError(t, lp2.Start(ctx))
 
-		cr2, err2 := evm.NewChainReaderService(ctx, lggr, lp2, headTracker2, cl2, cfg)
+		cr2, err2 := evm.NewChainReaderService(ctx, lggr, lp2, headTracker2, cl2, params.Cfg)
 		require.NoError(t, err2)
 
 		extendedCr2 := contractreader.NewExtendedContractReader(cr2)
@@ -880,7 +902,7 @@ func testSetup(
 		otherCrs[chain] = extendedCr2
 	}
 
-	for chain, bindings := range toMockBindings {
+	for chain, bindings := range params.ToMockBindings {
 		if _, ok := otherCrs[chain]; ok {
 			require.False(t, ok, "chain %d already exists", chain)
 		}
@@ -895,12 +917,12 @@ func testSetup(
 	err = cr.Start(ctx)
 	require.NoError(t, err)
 
-	contractReaders := map[cciptypes.ChainSelector]contractreader.Extended{readerChain: extendedCr}
+	contractReaders := map[cciptypes.ChainSelector]contractreader.Extended{params.ReaderChain: extendedCr}
 	for chain, cr := range otherCrs {
 		contractReaders[chain] = cr
 	}
 	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
-	reader := ccipreaderpkg.NewCCIPReaderWithExtendedContractReaders(ctx, lggr, contractReaders, contractWriters, destChain, nil)
+	reader := ccipreaderpkg.NewCCIPReaderWithExtendedContractReaders(ctx, lggr, contractReaders, contractWriters, params.DestChain, nil)
 
 	t.Cleanup(func() {
 		require.NoError(t, cr.Close())
@@ -911,13 +933,25 @@ func testSetup(
 	return &testSetupData{
 		contractAddr: address,
 		contract:     contract,
-		sb:           simulatedBackend,
-		auth:         auth,
+		sb:           params.SimulatedBackend,
+		auth:         params.Auth,
 		lp:           lp,
 		cl:           cl,
 		reader:       reader,
 		extendedCR:   extendedCr,
 	}
+}
+
+type testSetupParams struct {
+	ReaderChain      cciptypes.ChainSelector
+	DestChain        cciptypes.ChainSelector
+	OnChainSeqNums   map[cciptypes.ChainSelector]cciptypes.SeqNum
+	Cfg              evmtypes.ChainReaderConfig
+	ToBindContracts  map[cciptypes.ChainSelector][]types.BoundContract
+	ToMockBindings   map[cciptypes.ChainSelector][]types.BoundContract
+	BindTester       bool
+	SimulatedBackend *simulated.Backend
+	Auth             *bind.TransactOpts
 }
 
 type testSetupData struct {
@@ -929,14 +963,6 @@ type testSetupData struct {
 	cl           client.Client
 	reader       ccipreaderpkg.CCIPReader
 	extendedCR   contractreader.Extended
-}
-
-func uBigInt(i uint64) *big.Int {
-	return new(big.Int).SetUint64(i)
-}
-
-func e18Mult(amount uint64) *big.Int {
-	return new(big.Int).Mul(uBigInt(amount), uBigInt(1e18))
 }
 
 func cs(i uint64) cciptypes.ChainSelector {
