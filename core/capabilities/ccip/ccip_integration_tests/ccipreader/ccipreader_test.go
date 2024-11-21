@@ -3,6 +3,7 @@ package ccipreader
 import (
 	"context"
 	"encoding/hex"
+	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"math/big"
 	"sort"
 	"testing"
@@ -44,6 +45,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+
+	ccdeploy "github.com/smartcontractkit/chainlink/deployment/ccip"
 )
 
 const (
@@ -621,36 +624,60 @@ func Test_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 
 func Test_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 	ctx := testutils.Context(t)
-	sb, auth := setupSimulatedBackendAndAuth(t)
-	feeQuoter := deployFeeQuoterWithPrices(t, auth, sb, chainS1)
+	//e2 := ccdeploy.NewMemoryEnvironment(t, logger.TestLogger(t), 2, 4, ccdeploy.MockLinkPrice, ccdeploy.MockWethPrice)
+	//TODO: create NewMemoryEnvironmentWithContractsOnly
+	e2 := ccdeploy.NewMemoryEnvironmentWithJobsAndContracts(t, logger.TestLogger(t), 2, 4)
+	state, err := ccdeploy.LoadOnchainState(e2.Env)
+	require.NoError(t, err)
 
-	// Mock the routerContract to return a native token address
-	routerContract := deployRouterWithNativeToken(t, auth, sb)
+	selectors := e2.Env.AllChainSelectors()
+	chain1, chain2 := selectors[0], selectors[1]
 
-	s := testSetup(ctx, t, chainD, chainD, nil, evmconfig.DestReaderConfig,
+	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(e2.Env, state, chain1, chain2))
+	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(e2.Env, state, chain2, chain1))
+
+	//feeQuoter := state.Chains[chain1].FeeQuoter
+	//_, err = feeQuoter.UpdatePrices(
+	//	e2.Env.Chains[chain1].DeployerKey, fee_quoter.InternalPriceUpdates{
+	//		GasPriceUpdates: []fee_quoter.InternalGasPriceUpdate{
+	//			{
+	//				DestChainSelector: chain2,
+	//				UsdPerUnitGas:     defaultGasPrice.ToInt(),
+	//			},
+	//		},
+	//	},
+	//)
+
+	//gas, err := feeQuoter.GetDestinationChainGasPrice(&bind.CallOpts{}, chain2)
+	//require.NoError(t, err)
+	//require.Equal(t, defaultGasPrice.ToInt(), gas.Value)
+
+	reader := testSetupRealContracts(
+		ctx,
+		t,
+		chain1,
+		evmconfig.DestReaderConfig,
 		map[cciptypes.ChainSelector][]types.BoundContract{
-			chainD: {
+			cciptypes.ChainSelector(chain1): {
 				{
-					Address: feeQuoter.Address().String(),
+					Address: state.Chains[chain1].FeeQuoter.Address().String(),
 					Name:    consts.ContractNameFeeQuoter,
 				},
 				{
-					Address: routerContract.Address().String(),
+					Address: state.Chains[chain1].Router.Address().String(),
 					Name:    consts.ContractNameRouter,
 				},
 			},
 		},
 		nil,
-		false,
-		sb,
-		auth,
+		e2,
 	)
 
-	prices := s.reader.GetWrappedNativeTokenPriceUSD(ctx, []cciptypes.ChainSelector{chainD, chainS1})
+	prices := reader.GetWrappedNativeTokenPriceUSD(ctx, []cciptypes.ChainSelector{cciptypes.ChainSelector(chain1), cciptypes.ChainSelector(chain2)})
 
 	// Only chainD has reader contracts bound
 	require.Len(t, prices, 1)
-	require.Equal(t, InitialWethPrice, prices[chainD].Int)
+	require.Equal(t, ccdeploy.DefaultInitialPrices.WethPrice, prices[cciptypes.ChainSelector(chain1)].Int)
 }
 
 func deployRouterWithNativeToken(t *testing.T, auth *bind.TransactOpts, sb *simulated.Backend) *router.Router {
@@ -771,6 +798,80 @@ func setupSimulatedBackendAndAuth(t *testing.T) (*simulated.Backend, *bind.Trans
 	auth.GasLimit = uint64(6000000)
 
 	return simulatedBackend, auth
+}
+
+func testSetupRealContracts(
+	ctx context.Context,
+	t *testing.T,
+	destChain uint64,
+	cfg evmtypes.ChainReaderConfig,
+	toBindContracts map[cciptypes.ChainSelector][]types.BoundContract,
+	toMockBindings map[cciptypes.ChainSelector][]types.BoundContract,
+	env ccdeploy.DeployedEnv,
+) ccipreaderpkg.CCIPReader {
+	db := pgtest.NewSqlxDB(t)
+	lpOpts := logpoller.Opts{
+		PollPeriod:               time.Millisecond,
+		FinalityDepth:            0,
+		BackfillBatchSize:        10,
+		RpcBatchSize:             10,
+		KeepFinalizedBlocksDepth: 100000,
+	}
+	lggr := logger.TestLogger(t)
+	lggr.SetLogLevel(zapcore.ErrorLevel)
+
+	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
+	for chain, bindings := range toBindContracts {
+		be := env.Env.Chains[uint64(chain)].Client.(*memory.Backend)
+		cl := client.NewSimulatedBackendClient(t, be.Sim, big.NewInt(0).SetUint64(uint64(chain)))
+		//cl := deployment.Backend(env.Env.Chains[uint64(chain)].Client)
+		headTracker := headtracker.NewSimulatedHeadTracker(cl, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+		lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(0).SetUint64(uint64(chain)), db, lggr),
+			cl,
+			lggr,
+			headTracker,
+			lpOpts,
+		)
+		require.NoError(t, lp.Start(ctx))
+
+		cr, err := evm.NewChainReaderService(ctx, lggr, lp, headTracker, cl, cfg)
+		require.NoError(t, err)
+
+		extendedCr2 := contractreader.NewExtendedContractReader(cr)
+		err = extendedCr2.Bind(ctx, bindings)
+		require.NoError(t, err)
+		crs[chain] = extendedCr2
+
+		err = cr.Start(ctx)
+		require.NoError(t, err)
+
+		t.Cleanup(func() {
+			require.NoError(t, cr.Close())
+			require.NoError(t, lp.Close())
+			require.NoError(t, db.Close())
+		})
+	}
+
+	for chain, bindings := range toMockBindings {
+		if _, ok := crs[chain]; ok {
+			require.False(t, ok, "chain %d already exists", chain)
+		}
+		m := readermocks.NewMockContractReaderFacade(t)
+		m.EXPECT().Bind(ctx, bindings).Return(nil)
+		ecr := contractreader.NewExtendedContractReader(m)
+		err := ecr.Bind(ctx, bindings)
+		require.NoError(t, err)
+		crs[chain] = ecr
+	}
+
+	contractReaders := map[cciptypes.ChainSelector]contractreader.Extended{}
+	for chain, cr := range crs {
+		contractReaders[chain] = cr
+	}
+	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
+	reader := ccipreaderpkg.NewCCIPReaderWithExtendedContractReaders(ctx, lggr, contractReaders, contractWriters, cciptypes.ChainSelector(destChain), nil)
+
+	return reader
 }
 
 func testSetup(

@@ -22,7 +22,6 @@ func TestAddLane(t *testing.T) {
 	t.Parallel()
 	// We add more chains to the chainlink nodes than the number of chains where CCIP is deployed.
 	e := NewMemoryEnvironmentWithJobsAndContracts(t, logger.TestLogger(t), 2, 4)
-	// Here we have CR + nodes set up, but no CCIP contracts deployed.
 	state, err := LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
