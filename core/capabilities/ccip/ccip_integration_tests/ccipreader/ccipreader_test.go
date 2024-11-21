@@ -410,39 +410,41 @@ func TestCCIPReader_NextSeqNum(t *testing.T) {
 
 func TestCCIPReader_GetExpectedNextSequenceNumber(t *testing.T) {
 	ctx := testutils.Context(t)
+	env := ccdeploy.NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
+	state, err := ccdeploy.LoadOnchainState(env.Env)
+	require.NoError(t, err)
 
-	cfg := evmtypes.ChainReaderConfig{
-		Contracts: map[string]evmtypes.ChainContractReader{
-			consts.ContractNameOnRamp: {
-				ContractABI: ccip_reader_tester.CCIPReaderTesterABI,
-				Configs: map[string]*evmtypes.ChainReaderDefinition{
-					consts.MethodNameGetExpectedNextSequenceNumber: {
-						ChainSpecificName: "getExpectedNextSequenceNumber",
-						ReadType:          evmtypes.Method,
-					},
+	selectors := env.Env.AllChainSelectors()
+	destChain, srcChain := selectors[0], selectors[1]
+
+	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, destChain, srcChain))
+	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, srcChain, destChain))
+
+	reader := testSetupRealContracts(
+		ctx,
+		t,
+		destChain,
+		map[cciptypes.ChainSelector][]types.BoundContract{
+			cciptypes.ChainSelector(srcChain): {
+				{
+					Address: state.Chains[srcChain].OnRamp.Address().String(),
+					Name:    consts.ContractNameOnRamp,
 				},
 			},
 		},
+		nil,
+		env,
+	)
+
+	maxExpectedSeqNum := 10
+	for i := 1; i < maxExpectedSeqNum; i++ {
+		msg := ccdeploy.DefaultRouterMessage(state.Chains[destChain].Receiver.Address())
+		msgSentEvent := ccdeploy.TestSendRequest(t, env.Env, state, srcChain, destChain, false, msg)
+		require.Equal(t, uint64(i), msgSentEvent.SequenceNumber)
+		seqNum, err2 := reader.GetExpectedNextSequenceNumber(ctx, cs(srcChain), cs(destChain))
+		require.NoError(t, err2)
+		require.Equal(t, cciptypes.SeqNum(i+1), seqNum)
 	}
-
-	sb, auth := setupSimulatedBackendAndAuth(t)
-	s := testSetup(ctx, t, chainS1, chainD, nil, cfg, nil, nil, true, sb, auth)
-
-	_, err := s.contract.SetDestChainSeqNr(s.auth, uint64(chainD), 10)
-	require.NoError(t, err)
-	s.sb.Commit()
-
-	seqNum, err := s.reader.GetExpectedNextSequenceNumber(ctx, chainS1, chainD)
-	require.NoError(t, err)
-	require.Equal(t, cciptypes.SeqNum(10)+1, seqNum)
-
-	_, err = s.contract.SetDestChainSeqNr(s.auth, uint64(chainD), 25)
-	require.NoError(t, err)
-	s.sb.Commit()
-
-	seqNum, err = s.reader.GetExpectedNextSequenceNumber(ctx, chainS1, chainD)
-	require.NoError(t, err)
-	require.Equal(t, cciptypes.SeqNum(25)+1, seqNum)
 }
 
 func TestCCIPReader_Nonces(t *testing.T) {
@@ -539,7 +541,7 @@ func Test_GetChainFeePriceUpdates(t *testing.T) {
 		ctx,
 		t,
 		chain1,
-		evmconfig.DestReaderConfig,
+		//evmconfig.DestReaderConfig,
 		map[cciptypes.ChainSelector][]types.BoundContract{
 			cciptypes.ChainSelector(chain1): {
 				{
@@ -574,7 +576,6 @@ func Test_LinkPriceUSD(t *testing.T) {
 		ctx,
 		t,
 		chain1,
-		evmconfig.DestReaderConfig,
 		map[cciptypes.ChainSelector][]types.BoundContract{
 			cciptypes.ChainSelector(chain1): {
 				{
@@ -637,7 +638,6 @@ func Test_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 		ctx,
 		t,
 		destChain,
-		evmconfig.DestReaderConfig,
 		boundContracts,
 		nil,
 		env,
@@ -668,7 +668,6 @@ func Test_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 		ctx,
 		t,
 		chain1,
-		evmconfig.DestReaderConfig,
 		map[cciptypes.ChainSelector][]types.BoundContract{
 			cciptypes.ChainSelector(chain1): {
 				{
@@ -713,7 +712,6 @@ func testSetupRealContracts(
 	ctx context.Context,
 	t *testing.T,
 	destChain uint64,
-	cfg evmtypes.ChainReaderConfig,
 	toBindContracts map[cciptypes.ChainSelector][]types.BoundContract,
 	toMockBindings map[cciptypes.ChainSelector][]types.BoundContract,
 	env ccdeploy.DeployedEnv,
@@ -742,6 +740,12 @@ func testSetupRealContracts(
 		)
 		require.NoError(t, lp.Start(ctx))
 
+		var cfg evmtypes.ChainReaderConfig
+		if chain == cs(destChain) {
+			cfg = evmconfig.DestReaderConfig
+		} else {
+			cfg = evmconfig.SourceReaderConfig
+		}
 		cr, err := evm.NewChainReaderService(ctx, lggr, lp, headTracker, cl, cfg)
 		require.NoError(t, err)
 
