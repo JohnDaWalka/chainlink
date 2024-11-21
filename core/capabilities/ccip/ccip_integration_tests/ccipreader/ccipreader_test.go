@@ -2,7 +2,6 @@ package ccipreader
 
 import (
 	"context"
-	"encoding/hex"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"math/big"
 	"sort"
@@ -596,60 +595,55 @@ func Test_LinkPriceUSD(t *testing.T) {
 
 func Test_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 	ctx := testutils.Context(t)
+	env := ccdeploy.NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 4, 4)
+	state, err := ccdeploy.LoadOnchainState(env.Env)
+	require.NoError(t, err)
 
-	sb, auth := setupSimulatedBackendAndAuth(t)
+	selectors := env.Env.AllChainSelectors()
+	destChain, chain1, chain2, chain3 := selectors[0], selectors[1], selectors[2], selectors[3]
 
-	// All fee quoters using same auth and simulated backend for simplicity
-	feeQuoter1 := deployFeeQuoterWithPrices(t, auth, sb, chainD)
-	feeQuoter2 := deployFeeQuoterWithPrices(t, auth, sb, chainD)
-	feeQuoter3 := deployFeeQuoterWithPrices(t, auth, sb, chainD)
-	feeQuoters := []*fee_quoter.FeeQuoter{feeQuoter1, feeQuoter2, feeQuoter3}
+	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain1, destChain))
+	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain2, destChain))
+	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain3, destChain))
 
-	// Update the dest chain config for each fee quoter
-	for i, fq := range feeQuoters {
-		destChainCfg := defaultFeeQuoterDestChainConfig()
+	boundContracts := map[cciptypes.ChainSelector][]types.BoundContract{}
+	for i, selector := range env.Env.AllChainSelectorsExcluding([]uint64{destChain}) {
+		feeQuoter := state.Chains[selector].FeeQuoter
+		destChainCfg := ccdeploy.DefaultFeeQuoterDestChainConfig()
 		//nolint:gosec // disable G115
 		destChainCfg.DestDataAvailabilityOverheadGas = uint32(100 + i)
 		//nolint:gosec // disable G115
 		destChainCfg.DestGasPerDataAvailabilityByte = uint16(200 + i)
 		//nolint:gosec // disable G115
 		destChainCfg.DestDataAvailabilityMultiplierBps = uint16(1 + i)
-		_, err := fq.ApplyDestChainConfigUpdates(auth, []fee_quoter.FeeQuoterDestChainConfigArgs{
+		_, err2 := feeQuoter.ApplyDestChainConfigUpdates(env.Env.Chains[selector].DeployerKey, []fee_quoter.FeeQuoterDestChainConfigArgs{
 			{
-				DestChainSelector: uint64(chainD),
+				DestChainSelector: destChain,
 				DestChainConfig:   destChainCfg,
 			},
 		})
-		sb.Commit()
-		require.NoError(t, err)
+		require.NoError(t, err2)
+		be := env.Env.Chains[selector].Client.(*memory.Backend)
+		be.Commit()
+		boundContracts[cs(selector)] = []types.BoundContract{
+			{
+				Address: feeQuoter.Address().String(),
+				Name:    consts.ContractNameFeeQuoter,
+			},
+		}
 	}
 
-	s := testSetup(ctx, t, chainD, chainD, nil, evmconfig.DestReaderConfig, map[cciptypes.ChainSelector][]types.BoundContract{
-		chainS1: {
-			{
-				Address: feeQuoter1.Address().String(),
-				Name:    consts.ContractNameFeeQuoter,
-			},
-		},
-		chainS2: {
-			{
-				Address: feeQuoter2.Address().String(),
-				Name:    consts.ContractNameFeeQuoter,
-			},
-		},
-		chainS3: {
-			{
-				Address: feeQuoter3.Address().String(),
-				Name:    consts.ContractNameFeeQuoter,
-			},
-		},
-	}, nil,
-		false,
-		sb,
-		auth,
+	reader := testSetupRealContracts(
+		ctx,
+		t,
+		destChain,
+		evmconfig.DestReaderConfig,
+		boundContracts,
+		nil,
+		env,
 	)
 
-	daConfig, err := s.reader.GetMedianDataAvailabilityGasConfig(ctx)
+	daConfig, err := reader.GetMedianDataAvailabilityGasConfig(ctx)
 	require.NoError(t, err)
 
 	// Verify the results
@@ -696,93 +690,6 @@ func Test_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 	// Only chainD has reader contracts bound
 	require.Len(t, prices, 1)
 	require.Equal(t, ccdeploy.DefaultInitialPrices.WethPrice, prices[cciptypes.ChainSelector(chain1)].Int)
-}
-
-func deployFeeQuoterWithPrices(t *testing.T, auth *bind.TransactOpts, sb *simulated.Backend, destChain cciptypes.ChainSelector) *fee_quoter.FeeQuoter {
-	address, _, _, err := fee_quoter.DeployFeeQuoter(
-		auth,
-		sb.Client(),
-		fee_quoter.FeeQuoterStaticConfig{
-			MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
-			LinkToken:                    linkAddress,
-			TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
-		},
-		[]common.Address{auth.From},
-		[]common.Address{wethAddress, linkAddress},
-		[]fee_quoter.FeeQuoterTokenPriceFeedUpdate{},
-		[]fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{},
-		[]fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{},
-		[]fee_quoter.FeeQuoterDestChainConfigArgs{
-			{
-
-				DestChainSelector: uint64(destChain),
-				DestChainConfig:   defaultFeeQuoterDestChainConfig(),
-			},
-		},
-	)
-
-	require.NoError(t, err)
-	sb.Commit()
-
-	feeQuoter, err := fee_quoter.NewFeeQuoter(address, sb.Client())
-	require.NoError(t, err)
-
-	_, err = feeQuoter.UpdatePrices(
-		auth, fee_quoter.InternalPriceUpdates{
-			GasPriceUpdates: []fee_quoter.InternalGasPriceUpdate{
-				{
-					DestChainSelector: uint64(chainS1),
-					UsdPerUnitGas:     defaultGasPrice.ToInt(),
-				},
-			},
-			TokenPriceUpdates: []fee_quoter.InternalTokenPriceUpdate{
-				{
-					SourceToken: linkAddress,
-					UsdPerToken: InitialLinkPrice,
-				},
-				{
-					SourceToken: wethAddress,
-					UsdPerToken: InitialWethPrice,
-				},
-			},
-		},
-	)
-	require.NoError(t, err)
-	sb.Commit()
-
-	gas, err := feeQuoter.GetDestinationChainGasPrice(&bind.CallOpts{}, uint64(chainS1))
-	require.NoError(t, err)
-	require.Equal(t, defaultGasPrice.ToInt(), gas.Value)
-
-	return feeQuoter
-}
-
-func defaultFeeQuoterDestChainConfig() fee_quoter.FeeQuoterDestChainConfig {
-	// https://github.com/smartcontractkit/ccip/blob/c4856b64bd766f1ddbaf5d13b42d3c4b12efde3a/contracts/src/v0.8/ccip/libraries/Internal.sol#L337-L337
-	/*
-		```Solidity
-			// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
-			bytes4 public constant CHAIN_FAMILY_SELECTOR_EVM = 0x2812d52c;
-		```
-	*/
-	evmFamilySelector, _ := hex.DecodeString("2812d52c")
-	return fee_quoter.FeeQuoterDestChainConfig{
-		IsEnabled:                         true,
-		MaxNumberOfTokensPerMsg:           10,
-		MaxDataBytes:                      256,
-		MaxPerMsgGasLimit:                 3_000_000,
-		DestGasOverhead:                   50_000,
-		DefaultTokenFeeUSDCents:           1,
-		DestGasPerPayloadByte:             10,
-		DestDataAvailabilityOverheadGas:   100,
-		DestGasPerDataAvailabilityByte:    100,
-		DestDataAvailabilityMultiplierBps: 1,
-		DefaultTokenDestGasOverhead:       125_000,
-		DefaultTxGasLimit:                 200_000,
-		GasMultiplierWeiPerEth:            1,
-		NetworkFeeUSDCents:                1,
-		ChainFamilySelector:               [4]byte(evmFamilySelector),
-	}
 }
 
 func setupSimulatedBackendAndAuth(t *testing.T) (*simulated.Backend, *bind.TransactOpts) {
