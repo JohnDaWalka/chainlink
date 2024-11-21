@@ -2,6 +2,7 @@ package ccipreader
 
 import (
 	"context"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"math/big"
 	"sort"
@@ -42,8 +43,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-
 	ccdeploy "github.com/smartcontractkit/chainlink/deployment/ccip"
 )
 
@@ -58,133 +57,7 @@ var (
 	defaultGasPrice = assets.GWei(10)
 )
 
-func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
-	ctx := testutils.Context(t)
-
-	cfg := evmtypes.ChainReaderConfig{
-		Contracts: map[string]evmtypes.ChainContractReader{
-			consts.ContractNameOffRamp: {
-				ContractPollingFilter: evmtypes.ContractPollingFilter{
-					GenericEventNames: []string{consts.EventNameCommitReportAccepted},
-				},
-				ContractABI: ccip_reader_tester.CCIPReaderTesterABI,
-				Configs: map[string]*evmtypes.ChainReaderDefinition{
-					consts.EventNameCommitReportAccepted: {
-						ChainSpecificName: consts.EventNameCommitReportAccepted,
-						ReadType:          evmtypes.Event,
-					},
-				},
-			},
-		},
-	}
-
-	sb, auth := setupSimulatedBackendAndAuth(t)
-	onRampAddress := utils.RandomAddress()
-	s := testSetup(ctx, t, testSetupParams{
-		ReaderChain:    chainD,
-		DestChain:      chainD,
-		OnChainSeqNums: nil,
-		Cfg:            cfg,
-		ToMockBindings: map[cciptypes.ChainSelector][]types.BoundContract{
-			chainS1: {
-				{
-					Address: onRampAddress.Hex(),
-					Name:    consts.ContractNameOnRamp,
-				},
-			},
-		},
-		BindTester:       true,
-		SimulatedBackend: sb,
-		Auth:             auth,
-	})
-
-	tokenA := common.HexToAddress("123")
-	const numReports = 5
-
-	var firstReportTs uint64
-	for i := 0; i < numReports; i++ {
-		_, err := s.contract.EmitCommitReportAccepted(s.auth, ccip_reader_tester.OffRampCommitReport{
-			PriceUpdates: ccip_reader_tester.InternalPriceUpdates{
-				TokenPriceUpdates: []ccip_reader_tester.InternalTokenPriceUpdate{
-					{
-						SourceToken: tokenA,
-						UsdPerToken: big.NewInt(1000),
-					},
-				},
-				GasPriceUpdates: []ccip_reader_tester.InternalGasPriceUpdate{
-					{
-						DestChainSelector: uint64(chainD),
-						UsdPerUnitGas:     big.NewInt(90),
-					},
-				},
-			},
-			MerkleRoots: []ccip_reader_tester.InternalMerkleRoot{
-				{
-					SourceChainSelector: uint64(chainS1),
-					MinSeqNr:            10,
-					MaxSeqNr:            20,
-					MerkleRoot:          [32]byte{uint8(i) + 1}, //nolint:gosec // this won't overflow
-					OnRampAddress:       common.LeftPadBytes(onRampAddress.Bytes(), 32),
-				},
-			},
-			RmnSignatures: []ccip_reader_tester.IRMNRemoteSignature{
-				{
-					R: [32]byte{1},
-					S: [32]byte{2},
-				},
-				{
-					R: [32]byte{3},
-					S: [32]byte{4},
-				},
-			},
-		})
-		assert.NoError(t, err)
-		bh := s.sb.Commit()
-		b, err := s.sb.Client().BlockByHash(ctx, bh)
-		require.NoError(t, err)
-		if firstReportTs == 0 {
-			firstReportTs = b.Time()
-		}
-	}
-
-	// Need to replay as sometimes the logs are not picked up by the log poller (?)
-	// Maybe another situation where chain reader doesn't register filters as expected.
-	require.NoError(t, s.lp.Replay(ctx, 1))
-
-	var reports []plugintypes.CommitPluginReportWithMeta
-	var err error
-	require.Eventually(t, func() bool {
-		reports, err = s.reader.CommitReportsGTETimestamp(
-			ctx,
-			chainD,
-			// Skips first report
-			//nolint:gosec // this won't overflow
-			time.Unix(int64(firstReportTs)+1, 0),
-			10,
-		)
-		require.NoError(t, err)
-		return len(reports) == numReports-1
-	}, tests.WaitTimeout(t), 50*time.Millisecond)
-
-	assert.Len(t, reports, numReports-1)
-	assert.Len(t, reports[0].Report.MerkleRoots, 1)
-	assert.Equal(t, chainS1, reports[0].Report.MerkleRoots[0].ChainSel)
-	assert.Equal(t, onRampAddress.Bytes(), []byte(reports[0].Report.MerkleRoots[0].OnRampAddress))
-	assert.Equal(t, cciptypes.SeqNum(10), reports[0].Report.MerkleRoots[0].SeqNumsRange.Start())
-	assert.Equal(t, cciptypes.SeqNum(20), reports[0].Report.MerkleRoots[0].SeqNumsRange.End())
-	assert.Equal(t, "0x0200000000000000000000000000000000000000000000000000000000000000",
-		reports[0].Report.MerkleRoots[0].MerkleRoot.String())
-	assert.Equal(t, tokenA.String(), string(reports[0].Report.PriceUpdates.TokenPriceUpdates[0].TokenID))
-	assert.Equal(t, uint64(1000), reports[0].Report.PriceUpdates.TokenPriceUpdates[0].Price.Uint64())
-	assert.Equal(t, chainD, reports[0].Report.PriceUpdates.GasPriceUpdates[0].ChainSel)
-	assert.Equal(t, uint64(90), reports[0].Report.PriceUpdates.GasPriceUpdates[0].GasPrice.Uint64())
-}
-
-func TestCCIPReader_CommitReportsGTETimestamp_RespectsFinality(t *testing.T) {
-	ctx := testutils.Context(t)
-
-	var finalityDepth int64 = 10
-
+func setupGetCommitGTETimestampTest(t *testing.T, ctx context.Context, finalityDepth int64) (*testSetupData, int64, common.Address) {
 	cfg := evmtypes.ChainReaderConfig{
 		Contracts: map[string]evmtypes.ChainContractReader{
 			consts.ContractNameOffRamp: {
@@ -223,9 +96,10 @@ func TestCCIPReader_CommitReportsGTETimestamp_RespectsFinality(t *testing.T) {
 		FinalityDepth:    finalityDepth,
 	})
 
-	tokenA := common.HexToAddress("123")
-	const numReports = 5
+	return s, finalityDepth, onRampAddress
+}
 
+func emitCommitReports(t *testing.T, ctx context.Context, s *testSetupData, numReports int, tokenA common.Address, onRampAddress common.Address) uint64 {
 	var firstReportTs uint64
 	for i := 0; i < numReports; i++ {
 		_, err := s.contract.EmitCommitReportAccepted(s.auth, ccip_reader_tester.OffRampCommitReport{
@@ -271,6 +145,17 @@ func TestCCIPReader_CommitReportsGTETimestamp_RespectsFinality(t *testing.T) {
 			firstReportTs = b.Time()
 		}
 	}
+	return firstReportTs
+}
+
+func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
+	ctx := testutils.Context(t)
+	s, _, onRampAddress := setupGetCommitGTETimestampTest(t, ctx, 0)
+
+	tokenA := common.HexToAddress("123")
+	const numReports = 5
+
+	firstReportTs := emitCommitReports(t, ctx, s, numReports, tokenA, onRampAddress)
 
 	// Need to replay as sometimes the logs are not picked up by the log poller (?)
 	// Maybe another situation where chain reader doesn't register filters as expected.
@@ -278,7 +163,50 @@ func TestCCIPReader_CommitReportsGTETimestamp_RespectsFinality(t *testing.T) {
 
 	var reports []plugintypes.CommitPluginReportWithMeta
 	var err error
-	// First it will not work because the finality depth is not reached
+	require.Eventually(t, func() bool {
+		reports, err = s.reader.CommitReportsGTETimestamp(
+			ctx,
+			chainD,
+			// Skips first report
+			//nolint:gosec // this won't overflow
+			time.Unix(int64(firstReportTs)+1, 0),
+			10,
+		)
+		require.NoError(t, err)
+		return len(reports) == numReports-1
+	}, tests.WaitTimeout(t), 50*time.Millisecond)
+
+	assert.Len(t, reports, numReports-1)
+	assert.Len(t, reports[0].Report.MerkleRoots, 1)
+	assert.Equal(t, chainS1, reports[0].Report.MerkleRoots[0].ChainSel)
+	assert.Equal(t, onRampAddress.Bytes(), []byte(reports[0].Report.MerkleRoots[0].OnRampAddress))
+	assert.Equal(t, cciptypes.SeqNum(10), reports[0].Report.MerkleRoots[0].SeqNumsRange.Start())
+	assert.Equal(t, cciptypes.SeqNum(20), reports[0].Report.MerkleRoots[0].SeqNumsRange.End())
+	assert.Equal(t, "0x0200000000000000000000000000000000000000000000000000000000000000",
+		reports[0].Report.MerkleRoots[0].MerkleRoot.String())
+	assert.Equal(t, tokenA.String(), string(reports[0].Report.PriceUpdates.TokenPriceUpdates[0].TokenID))
+	assert.Equal(t, uint64(1000), reports[0].Report.PriceUpdates.TokenPriceUpdates[0].Price.Uint64())
+	assert.Equal(t, chainD, reports[0].Report.PriceUpdates.GasPriceUpdates[0].ChainSel)
+	assert.Equal(t, uint64(90), reports[0].Report.PriceUpdates.GasPriceUpdates[0].GasPrice.Uint64())
+}
+
+func TestCCIPReader_CommitReportsGTETimestamp_RespectsFinality(t *testing.T) {
+	ctx := testutils.Context(t)
+	var finalityDepth int64 = 10
+	s, _, onRampAddress := setupGetCommitGTETimestampTest(t, ctx, finalityDepth)
+
+	tokenA := common.HexToAddress("123")
+	const numReports = 5
+
+	firstReportTs := emitCommitReports(t, ctx, s, numReports, tokenA, onRampAddress)
+
+	// Need to replay as sometimes the logs are not picked up by the log poller (?)
+	// Maybe another situation where chain reader doesn't register filters as expected.
+	require.NoError(t, s.lp.Replay(ctx, 1))
+
+	var reports []plugintypes.CommitPluginReportWithMeta
+	var err error
+	// Will not return any reports as the finality depth is not reached.
 	require.Never(t, func() bool {
 		reports, err = s.reader.CommitReportsGTETimestamp(
 			ctx,
@@ -292,7 +220,7 @@ func TestCCIPReader_CommitReportsGTETimestamp_RespectsFinality(t *testing.T) {
 		return len(reports) == numReports-1
 	}, tests.WaitTimeout(t)/2, 50*time.Millisecond)
 
-	// Commit enough blocks to reach finality
+	// Commit finality depth number of blocks.
 	for i := 0; i < int(finalityDepth); i++ {
 		s.sb.Commit()
 	}
