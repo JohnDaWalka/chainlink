@@ -240,17 +240,10 @@ jobs:
         id: run-tests
         env:
           OUTPUT_FILE: ./output.txt
-          USE_TEE: false
+          USE_TEE: ${{ matrix.type.printResults }}
           CL_DATABASE_URL: ${{ env.DB_URL }}
         run: ./tools/bin/${{ matrix.type.cmd }} ./...
 
-      - name: Print Filtered Test Results
-        if: ${{ failure() && needs.filter.outputs.should-run-ci-core == 'true' && steps.run-tests.conclusion == 'failure' }}
-        run: |
-          if [[ "${{ matrix.type.printResults }}"  == "true" ]]; then
-            cat output.txt | gotestloghelper -ci
-          fi
-      
       - name: Print Races
         id: print-races
         if: ${{ failure() && matrix.type.cmd == 'go_core_race_tests' && needs.filter.outputs.should-run-ci-core == 'true' }}
