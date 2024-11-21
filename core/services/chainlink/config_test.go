@@ -568,7 +568,7 @@ func TestConfig_Marshal(t *testing.T) {
 		ResourceAttributes:    map[string]string{"Baz": "test", "Foo": "bar"},
 		TraceSampleRatio:      ptr(0.01),
 		EmitterBatchProcessor: ptr(true),
-		EmitterExportTimeout:  commoncfg.MustNewDuration(1 * time.Second),
+		EmitterExportTimeout:  commoncfg.MustNewDuration(30 * time.Second),
 	}
 	full.EVM = []*evmcfg.EVMConfig{
 		{
