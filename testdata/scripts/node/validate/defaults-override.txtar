@@ -366,7 +366,7 @@ Endpoint = ''
 InsecureConnection = false
 TraceSampleRatio = 0.01
 EmitterBatchProcessor = true
-EmitterExportTimeout = '1s'
+EmitterExportTimeout = '30s'
 
 [[EVM]]
 ChainID = '1'
