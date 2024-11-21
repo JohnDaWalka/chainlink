@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	gethParams "github.com/ethereum/go-ethereum/params"
-
 	gethwrappers2 "github.com/smartcontractkit/chainlink/v2/core/gethwrappers"
 )
 
@@ -50,7 +48,7 @@ func GenWrapper(abiPath, binPath, className, pkgName, outDirSuffixInput string) 
 	if err != nil {
 		gethwrappers2.Exit("could not read current versions database", err)
 	}
-	versions.GethVersion = gethParams.Version
+	versions.GethVersion = gethwrappers2.GethVersion
 	versions.ContractVersions[pkgName] = gethwrappers2.ContractVersion{
 		Hash:       gethwrappers2.VersionHash(abiPath, binPath),
 		AbiPath:    abiPath,
