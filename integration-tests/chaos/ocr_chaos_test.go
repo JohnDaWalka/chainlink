@@ -144,14 +144,15 @@ func TestOCRChaos(t *testing.T) {
 			nsLabels, err := environment.GetRequiredChainLinkNamespaceLabels("data-feedsv1.0", "chaos")
 			require.NoError(t, err, "Error creating required chain.link labels for namespace")
 
-			workloadLabels, err := environment.GetRequiredChainLinkWorkloadLabels("data-feedsv1.0", "chaos")
-			require.NoError(t, err, "Error creating required chain.link labels for workloads")
+			workloadPodLabels, err := environment.GetRequiredChainLinkWorkloadAndPodLabels("data-feedsv1.0", "chaos")
+			require.NoError(t, err, "Error creating required chain.link labels for workloads and pods")
 
 			testEnvironment := environment.New(&environment.Config{
 				NamespacePrefix: fmt.Sprintf("chaos-ocr-%s", name),
 				Test:            t,
 				Labels:          nsLabels,
-				WorkloadLabels:  workloadLabels,
+				WorkloadLabels:  workloadPodLabels,
+				PodLabels:       workloadPodLabels,
 			}).
 				AddHelm(mockservercfg.New(nil)).
 				AddHelm(mockserver.New(nil)).

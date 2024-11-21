@@ -164,8 +164,8 @@ func (o *OCRSoakTest) DeployEnvironment(ocrTestConfig tt.OcrTestConfig) {
 	nsLabels, err := environment.GetRequiredChainLinkNamespaceLabels(productName, "soak")
 	require.NoError(o.t, err, "Error creating required chain.link labels for namespace")
 
-	workloadLabels, err := environment.GetRequiredChainLinkWorkloadLabels(productName, "soak")
-	require.NoError(o.t, err, "Error creating required chain.link labels for workloads")
+	workloadPodLabels, err := environment.GetRequiredChainLinkWorkloadAndPodLabels(productName, "soak")
+	require.NoError(o.t, err, "Error creating required chain.link labels for workloads and pods")
 
 	baseEnvironmentConfig := &environment.Config{
 		TTL:                time.Hour * 720, // 30 days,
@@ -173,7 +173,8 @@ func (o *OCRSoakTest) DeployEnvironment(ocrTestConfig tt.OcrTestConfig) {
 		Test:               o.t,
 		PreventPodEviction: true,
 		Labels:             nsLabels,
-		WorkloadLabels:     workloadLabels,
+		WorkloadLabels:     workloadPodLabels,
+		PodLabels:          workloadPodLabels,
 	}
 
 	testEnv := environment.New(baseEnvironmentConfig).

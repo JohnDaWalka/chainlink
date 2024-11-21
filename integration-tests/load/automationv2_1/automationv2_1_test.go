@@ -199,8 +199,8 @@ Load Config:
 	nsLabels, err := environment.GetRequiredChainLinkNamespaceLabels(string(tc.Automation), testType)
 	require.NoError(t, err, "Error creating required chain.link labels for namespace")
 
-	workloadLabels, err := environment.GetRequiredChainLinkWorkloadLabels(string(tc.Automation), testType)
-	require.NoError(t, err, "Error creating required chain.link labels for workloads")
+	workloadPodLabels, err := environment.GetRequiredChainLinkWorkloadAndPodLabels(string(tc.Automation), testType)
+	require.NoError(t, err, "Error creating required chain.link labels for workloads and pods")
 
 	testEnvironment := environment.New(&environment.Config{
 		TTL: loadDuration.Round(time.Hour) + time.Hour,
@@ -212,7 +212,8 @@ Load Config:
 		Test:               t,
 		PreventPodEviction: true,
 		Labels:             nsLabels,
-		WorkloadLabels:     workloadLabels,
+		WorkloadLabels:     workloadPodLabels,
+		PodLabels:          workloadPodLabels,
 	})
 
 	testEnvironment.

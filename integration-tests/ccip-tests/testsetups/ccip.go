@@ -1412,14 +1412,15 @@ func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestC
 	nsLabels, err := environment.GetRequiredChainLinkNamespaceLabels(string(tc.CCIP), testType)
 	require.NoError(t, err, "Error creating required chain.link labels for namespace")
 
-	workloadLabels, err := environment.GetRequiredChainLinkWorkloadLabels(string(tc.CCIP), testType)
-	require.NoError(t, err, "Error creating required chain.link labels for workloads")
+	workloadPodLabels, err := environment.GetRequiredChainLinkWorkloadAndPodLabels(string(tc.CCIP), testType)
+	require.NoError(t, err, "Error creating required chain.link labels for workloads and pods")
 
 	envConfig := &environment.Config{
 		NamespacePrefix: envName,
 		Test:            t,
 		Labels:          nsLabels,
-		WorkloadLabels:  workloadLabels,
+		WorkloadLabels:  workloadPodLabels,
+		PodLabels:       workloadPodLabels,
 		//	PreventPodEviction: true, //TODO: enable this once we have a way to handle pod eviction
 	}
 	if pointer.GetBool(testConfig.TestGroupInput.StoreLaneConfig) {

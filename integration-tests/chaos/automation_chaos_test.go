@@ -200,8 +200,8 @@ func TestAutomationChaos(t *testing.T) {
 					nsLabels, err := environment.GetRequiredChainLinkNamespaceLabels(string(tc.Automation), "chaos")
 					require.NoError(t, err, "Error creating required chain.link labels for namespace")
 
-					workloadLabels, err := environment.GetRequiredChainLinkWorkloadLabels(string(tc.Automation), "chaos")
-					require.NoError(t, err, "Error creating required chain.link labels for workloads")
+					workloadPodLabels, err := environment.GetRequiredChainLinkWorkloadAndPodLabels(string(tc.Automation), "chaos")
+					require.NoError(t, err, "Error creating required chain.link labels for workloads and pods")
 
 					testEnvironment := environment.
 						New(&environment.Config{
@@ -209,7 +209,8 @@ func TestAutomationChaos(t *testing.T) {
 							TTL:             time.Hour * 1,
 							Test:            t,
 							Labels:          nsLabels,
-							WorkloadLabels:  workloadLabels,
+							WorkloadLabels:  workloadPodLabels,
+							PodLabels:       workloadPodLabels,
 						}).
 						AddHelm(testCase.networkChart).
 						AddHelm(testCase.clChart)

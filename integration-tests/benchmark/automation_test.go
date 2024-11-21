@@ -262,8 +262,8 @@ func SetupAutomationBenchmarkEnv(t *testing.T, testType string, keeperTestConfig
 	nsLabels, err := environment.GetRequiredChainLinkNamespaceLabels(string(tc.Keeper), testType)
 	require.NoError(t, err, "Error creating required chain.link labels for namespace")
 
-	workloadLabels, err := environment.GetRequiredChainLinkWorkloadLabels(string(tc.Keeper), testType)
-	require.NoError(t, err, "Error creating required chain.link labels for workloads")
+	workloadPodLabels, err := environment.GetRequiredChainLinkWorkloadAndPodLabels(string(tc.Keeper), testType)
+	require.NoError(t, err, "Error creating required chain.link labels for workloads and pods")
 
 	testEnvironment := environment.New(&environment.Config{
 		TTL: time.Hour * 720, // 30 days,
@@ -276,7 +276,8 @@ func SetupAutomationBenchmarkEnv(t *testing.T, testType string, keeperTestConfig
 		Test:               t,
 		PreventPodEviction: true,
 		Labels:             nsLabels,
-		WorkloadLabels:     workloadLabels,
+		WorkloadLabels:     workloadPodLabels,
+		PodLabels:          workloadPodLabels,
 	})
 
 	dbResources := dbResources
