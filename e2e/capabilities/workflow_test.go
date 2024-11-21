@@ -34,6 +34,7 @@ import (
 	feeds_consumer "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/feeds_consumer_1_0_0"
 	forwarder "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/forwarder_1_0_0"
 	ocr3_capability "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/ocr3_capability_1_0_0"
+	"github.com/smartcontractkit/chainlink/e2e/capabilities/components/onchain"
 )
 
 // Copying this to avoid dependency on the core repo
@@ -256,7 +257,7 @@ func TestWorkflow(t *testing.T) {
 			Build()
 		require.NoError(t, err)
 
-		capabilitiesRegistryAddress, tx, _, err := capabilities_registry.DeployCapabilitiesRegistry(
+		capabilitiesRegistryAddress, tx, capabilitiesRegistryContract, err := capabilities_registry.DeployCapabilitiesRegistry(
 			sc.NewTXOpts(),
 			sc.Client,
 		)
@@ -287,6 +288,10 @@ func TestWorkflow(t *testing.T) {
 
 		nodeClients, err := clclient.New(nodeset.CLNodes)
 		require.NoError(t, err)
+
+		err = onchain.FundNodes(sc, nodeClients, pkey, 5)
+		require.NoError(t, err)
+
 		nodesInfo := getNodesInfo(t, nodeClients)
 
 		for i, node := range nodeClients {
@@ -393,6 +398,52 @@ func TestWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		fmt.Println("P2P keys fetched")
 
+		// Add capabilities to registry
+		tx, err = capabilitiesRegistryContract.AddCapabilities(
+			sc.NewTXOpts(),
+			[]capabilities_registry.CapabilitiesRegistryCapability{
+				{
+					LabelledName:   "mock-streams-trigger",
+					Version:        "1.0.0",
+					CapabilityType: 0, // TRIGGER
+					ResponseType:   0, // REPORT
+				},
+				{
+					LabelledName:   "offchain_reporting",
+					Version:        "1.0.0",
+					CapabilityType: 2, // CONSENSUS
+					ResponseType:   0, // REPORT
+				},
+				{
+					LabelledName:   "write_31337",
+					Version:        "1.0.0",
+					CapabilityType: 3, // TARGET
+					ResponseType:   1, // OBSERVATION_IDENTICAL
+				},
+			},
+		)
+		require.NoError(t, err)
+		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		require.NoError(t, err)
+
+		// hashedTriggerID, err := capabilitiesRegistryContract.GetHashedCapabilityId(
+		// 	sc.NewCallOpts(),
+		// 	"mock-streams-trigger",
+		// 	"1.0.0",
+		// )
+		// require.NoError(t, err)
+		// hashedConsensusID, err := capabilitiesRegistryContract.GetHashedCapabilityId(
+		// 	sc.NewCallOpts(),
+		// 	"offchain_reporting",
+		// 	"1.0.0",
+		// )
+		// require.NoError(t, err)
+		// hashedTargetID, err := capabilitiesRegistryContract.GetHashedCapabilityId(
+		// 	sc.NewCallOpts(),
+		// 	"write_31337",
+		// 	"1.0.0",
+		// )
+
 		for i, nodeClient := range nodeClients {
 			// First node is a bootstrap node, so we skip it
 			if i == 0 {
@@ -402,6 +453,32 @@ func TestWorkflow(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+
+				// nodeP2pKeys, err := nodeClient.MustReadP2PKeys()
+				// require.NoError(t, err)
+
+				// var peerID ragetypes.PeerID
+				// err = peerID.UnmarshalText([]byte(nodeP2pKeys.Data[0].Attributes.PeerID))
+				// require.NoError(t, err)
+
+				// // Add node to registry
+				// tx, err = capabilitiesRegistryContract.AddNodes(
+				// 	sc.NewTXOpts(),
+				// 	[]capabilities_registry.CapabilitiesRegistryNodeParams{
+				// 		{
+				// 			NodeOperatorId:      uint32(i),
+				// 			Signer:              [32]byte{},
+				// 			P2pId:               peerID,
+				// 			EncryptionPublicKey: [32]byte{},
+				// 			HashedCapabilityIds: [][32]byte{
+				// 				hashedTriggerID,
+				// 				hashedConsensusID,
+				// 				hashedTargetID,
+				// 			},
+				// 		},
+				// 	},
+				// )
+
 				scJobSpec := `
 					type = "standardcapabilities"
 					schemaVersion = 1
@@ -518,6 +595,25 @@ targets:
 		}
 		wg.Wait()
 
+		// Add NOPs to registry
+		var nopsToAdd []capabilities_registry.CapabilitiesRegistryNodeOperator
+		for i, node := range nodesInfo {
+			if i == 0 {
+				continue
+			}
+			nopsToAdd = append(nopsToAdd, capabilities_registry.CapabilitiesRegistryNodeOperator{
+				Admin: common.HexToAddress(node.TransmitterAddress),
+				Name:  fmt.Sprintf("NOP %d", i),
+			})
+		}
+		tx, err = capabilitiesRegistryContract.AddNodeOperators(
+			sc.NewTXOpts(),
+			nopsToAdd,
+		)
+		require.NoError(t, err)
+		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		require.NoError(t, err)
+
 		ocr3Config := generateOCR3Config(t, nodeClients)
 		// Configure KV store OCR contract
 		tx, err = ocr3CapabilityContract.SetConfig(
@@ -542,6 +638,7 @@ targets:
 		// ✅ 3. Deploy and configure OCR3 contract
 		// ✅ 4. Add chain write capabilities
 		// ✅	- Check if they are added (search for "capability added")
+		// ✅	- Check if they are added (search for "Observation complete")
 		// 5. Deploy capabilities registry
 		// 		- Add nodes to registry
 		// 		- Add capabilities to registry
