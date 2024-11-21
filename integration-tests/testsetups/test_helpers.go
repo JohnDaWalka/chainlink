@@ -2,6 +2,7 @@ package testsetups
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"math/big"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
@@ -22,6 +22,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+	"google.golang.org/grpc/credentials"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -50,7 +52,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/subosito/gotenv"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // DeployedLocalDevEnvironment is a helper struct for setting up a local dev environment with docker
@@ -407,7 +408,9 @@ func CreateDockerEnv(t *testing.T) (
 			GRPC: jd.Grpc,
 			// we will use internal wsrpc for nodes on same docker network to connect to JD
 			WSRPC: jd.InternalWSRPC,
-			Creds: insecure.NewCredentials(),
+			Creds: credentials.NewTLS(&tls.Config{
+				MinVersion: tls.VersionTLS12,
+			}),
 		}
 	}
 	require.NotEmpty(t, jdConfig, "JD config is empty")
