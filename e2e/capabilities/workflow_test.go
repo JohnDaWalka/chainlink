@@ -309,9 +309,7 @@ func TestWorkflow(t *testing.T) {
 
 		nodesInfo := getNodesInfo(t, nodeClients)
 
-		for i, node := range nodeClients {
-			fmt.Println("Node i ", i)
-			fmt.Println("Node ", node)
+		for i := range nodeClients {
 			// First node is a bootstrap node, so we skip it
 			if i == 0 {
 				continue
@@ -424,7 +422,6 @@ func TestWorkflow(t *testing.T) {
 
 		p2pKeys, err := bootstrapNode.MustReadP2PKeys()
 		require.NoError(t, err)
-		fmt.Println("P2P keys fetched")
 
 		// Add capabilities to registry
 		tx, err = capabilitiesRegistryContract.AddCapabilities(
@@ -703,7 +700,7 @@ targets:
 		require.NoError(t, err)
 
 		// OCR rounds can take a while to start. I've observed 2+ minutes during local tests.
-		timeout := 3 * time.Minute
+		timeout := 5 * time.Minute
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 
