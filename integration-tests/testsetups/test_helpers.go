@@ -56,6 +56,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+const (
+	PARALLEL_FUNDING_ENV_VAR = "PARALLEL_FUNDING"
+)
+
 // DeployedLocalDevEnvironment is a helper struct for setting up a local dev environment with docker
 type DeployedLocalDevEnvironment struct {
 	changeset.DeployedEnv
@@ -130,7 +134,20 @@ func NewLocalDevEnvironment(
 
 	// fund the nodes
 	zeroLogLggr := logging.GetTestLogger(t)
-	FundNodes(t, zeroLogLggr, testEnv, cfg, don.PluginNodes())
+	// check if we can fund in parallel
+	var parallelFunding bool
+	if val := os.Getenv(PARALLEL_FUNDING_ENV_VAR); val != "" {
+		parallelFunding, err = strconv.ParseBool(val)
+		require.NoError(t, err)
+	}
+	fundGrp := errgroup.Group{}
+	if parallelFunding {
+		fundGrp.Go(func() error {
+			return FundNodes(t, zeroLogLggr, testEnv, cfg, don.PluginNodes())
+		})
+	} else {
+		require.NoError(t, FundNodes(t, zeroLogLggr, testEnv, cfg, don.PluginNodes()))
+	}
 
 	env := *e
 	envNodes, err := deployment.NodeInfo(env.NodeIDs, env.Offchain)
@@ -151,6 +168,19 @@ func NewLocalDevEnvironment(
 	for _, c := range env.AllChainSelectors() {
 		mcmsCfg[c] = mcmsCfgPerChain
 	}
+	// for the sake of faster execution, we deploy timelock contracts in parallel
+	deployTLGrp := errgroup.Group{}
+	deployTLGrp.Go(func() error {
+		env, err = commonchangeset.ApplyChangesets(t, env, nil, []commonchangeset.ChangesetApplication{
+			{
+				Changeset: commonchangeset.WrapChangeSet(commonchangeset.DeployMCMSWithTimelock),
+				Config:    mcmsCfg,
+			},
+		})
+		if err != nil {
+			return err
+		}
+	})
 	// Need to deploy prerequisites first so that we can form the USDC config
 	// no proposals to be made, timelock can be passed as nil here
 	env, err = commonchangeset.ApplyChangesets(t, env, nil, []commonchangeset.ChangesetApplication{
@@ -175,10 +205,6 @@ func NewLocalDevEnvironment(
 					changeset.WithMulticall3(tCfg.IsMultiCall3),
 				},
 			},
-		},
-		{
-			Changeset: commonchangeset.WrapChangeSet(commonchangeset.DeployMCMSWithTimelock),
-			Config:    mcmsCfg,
 		},
 		{
 			Changeset: commonchangeset.WrapChangeSet(changeset.DeployChainContracts),
@@ -243,7 +269,7 @@ func NewLocalDevEnvironment(
 
 	// Ensure capreg logs are up to date.
 	changeset.ReplayLogs(t, e.Offchain, replayBlocks)
-
+	require.NoError(t, fundGrp.Wait())
 	return changeset.DeployedEnv{
 		Env:          env,
 		HomeChainSel: homeChainSel,
@@ -433,6 +459,12 @@ func CreateDockerEnv(t *testing.T) (
 			evmNetworks[i].URLs = rpcProvider.PrivateWsUrsl()
 		}
 		env.EVMNetworks = append(env.EVMNetworks, &evmNetworks[i])
+		// if number of private keys is more than 1, we can fund the nodes in parallel
+		if len(evmNetworks[i].PrivateKeys) > 1 {
+			require.NoError(t, os.Setenv(PARALLEL_FUNDING_ENV_VAR, "true"))
+		} else {
+			require.NoError(t, os.Setenv(PARALLEL_FUNDING_ENV_VAR, "false"))
+		}
 	}
 
 	chains := CreateChainConfigFromNetworks(t, env, privateEthereumNetworks, cfg.GetNetworkConfig())
@@ -555,13 +587,15 @@ func StartChainlinkNodes(
 // FundNodes sends funds to the chainlink nodes based on the provided test config
 // It also sets up a clean-up function to return the funds back to the deployer account once the test is done
 // It assumes that the chainlink nodes are already started and the account addresses for all chains are available
-func FundNodes(t *testing.T, lggr zerolog.Logger, env *test_env.CLClusterTestEnv, cfg tc.TestConfig, nodes []devenv.Node) {
+func FundNodes(t *testing.T, lggr zerolog.Logger, env *test_env.CLClusterTestEnv, cfg tc.TestConfig, nodes []devenv.Node) error {
 	evmNetworks := networks.MustGetSelectedNetworkConfig(cfg.GetNetworkConfig())
 	for i, net := range evmNetworks {
 		// if network is simulated, update the URLs with deployed chain RPCs in the docker test environment
 		if net.Simulated {
 			rpcProvider, err := env.GetRpcProvider(net.ChainID)
-			require.NoError(t, err, "Error getting rpc provider")
+			if err != nil {
+				return fmt.Errorf("error getting rpc provider: %w", err)
+			}
 			evmNetworks[i].HTTPURLs = rpcProvider.PublicHttpUrls()
 			evmNetworks[i].URLs = rpcProvider.PublicWsUrls()
 		}
@@ -573,6 +607,7 @@ func FundNodes(t *testing.T, lggr zerolog.Logger, env *test_env.CLClusterTestEnv
 				continue
 			}
 			evmNetwork := evmNetworks[i]
+			evmNetwork.PrivateKeys = []string{evmNetwork.PrivateKeys[len(evmNetwork.PrivateKeys)-1]}
 			sethClient, err := utils.TestAwareSethClient(t, cfg, &evmNetwork)
 			require.NoError(t, err, "Error getting seth client for network %s", evmNetwork.Name)
 			require.Greater(t, len(sethClient.PrivateKeys), 0, seth.ErrNoKeyLoaded)
@@ -590,8 +625,14 @@ func FundNodes(t *testing.T, lggr zerolog.Logger, env *test_env.CLClusterTestEnv
 	})
 	fundGrp := errgroup.Group{}
 	for i := range evmNetworks {
+		i := i
 		fundGrp.Go(func() error {
 			evmNetwork := evmNetworks[i]
+			// use the last private key to fund the nodes
+			// generally the first key is used as deployer key
+			// this way we can fund the nodes and deploy contracts in parallel without running into
+			// nonce issues
+			evmNetwork.PrivateKeys = []string{evmNetwork.PrivateKeys[len(evmNetwork.PrivateKeys)-1]}
 			sethClient, err := utils.TestAwareSethClient(t, cfg, &evmNetwork)
 			if err != nil {
 				return fmt.Errorf("error getting seth client for network %s: %w", evmNetwork.Name, err)
@@ -639,7 +680,10 @@ func FundNodes(t *testing.T, lggr zerolog.Logger, env *test_env.CLClusterTestEnv
 			return nil
 		})
 	}
-	require.NoError(t, fundGrp.Wait(), "Error funding chainlink nodes")
+	if err := fundGrp.Wait(); err != nil {
+		fmt.Errorf("error funding chainlink nodes: %w", err)
+	}
+	return nil
 }
 
 // CreateChainConfigFromNetworks creates a list of ChainConfig from the network config provided in test config.

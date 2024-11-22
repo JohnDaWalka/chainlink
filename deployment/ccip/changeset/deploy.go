@@ -316,7 +316,9 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 		}
 		e.Logger.Infow("deployed ccip multicall", "addr", multicall3Contract.Address)
 	} else {
-		e.Logger.Info("ccip multicall already deployed", "addr", mc3.Address)
+		if mc3 != nil {
+			e.Logger.Info("ccip multicall already deployed", "addr", mc3.Address)
+		}
 	}
 	if isUSDC {
 		token, pool, messenger, transmitter, err1 := DeployUSDC(e.Logger, chain, ab, rmnProxy.Address(), r.Address())
