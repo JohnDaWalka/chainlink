@@ -1,9 +1,13 @@
-package ccipreader
+package ccipdeployment
 
 import (
 	"context"
+	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
+	"github.com/scylladb/go-reflectx"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
+	"github.com/smartcontractkit/chainlink/v2/core/store/dialects"
 	"math/big"
 	"sort"
 	"testing"
@@ -34,8 +38,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_reader_tester"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
@@ -43,7 +45,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	ccdeploy "github.com/smartcontractkit/chainlink/deployment/ccip"
 )
 
 const (
@@ -149,7 +150,7 @@ func emitCommitReports(t *testing.T, ctx context.Context, s *testSetupData, numR
 }
 
 func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
-	ctx := testutils.Context(t)
+	ctx := tests.Context(t)
 	s, _, onRampAddress := setupGetCommitGTETimestampTest(t, ctx, 0)
 
 	tokenA := common.HexToAddress("123")
@@ -191,7 +192,7 @@ func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 }
 
 func TestCCIPReader_CommitReportsGTETimestamp_RespectsFinality(t *testing.T) {
-	ctx := testutils.Context(t)
+	ctx := tests.Context(t)
 	var finalityDepth int64 = 10
 	s, _, onRampAddress := setupGetCommitGTETimestampTest(t, ctx, finalityDepth)
 
@@ -253,7 +254,7 @@ func TestCCIPReader_CommitReportsGTETimestamp_RespectsFinality(t *testing.T) {
 }
 
 func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
-	ctx := testutils.Context(t)
+	ctx := tests.Context(t)
 	cfg := evmtypes.ChainReaderConfig{
 		Contracts: map[string]evmtypes.ChainContractReader{
 			consts.ContractNameOffRamp: {
@@ -334,7 +335,7 @@ func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
 		)
 		require.NoError(t, err)
 		return len(executedRanges) == 2
-	}, testutils.WaitTimeout(t), 50*time.Millisecond)
+	}, tests.WaitTimeout(t), 50*time.Millisecond)
 
 	assert.Equal(t, cciptypes.SeqNum(14), executedRanges[0].Start())
 	assert.Equal(t, cciptypes.SeqNum(14), executedRanges[0].End())
@@ -344,7 +345,7 @@ func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
 }
 
 func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
-	ctx := testutils.Context(t)
+	ctx := tests.Context(t)
 
 	cfg := evmtypes.ChainReaderConfig{
 		Contracts: map[string]evmtypes.ChainContractReader{
@@ -467,7 +468,7 @@ func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 }
 
 func TestCCIPReader_NextSeqNum(t *testing.T) {
-	ctx := testutils.Context(t)
+	ctx := tests.Context(t)
 
 	onChainSeqNums := map[cciptypes.ChainSelector]cciptypes.SeqNum{
 		chainS1: 10,
@@ -511,16 +512,16 @@ func TestCCIPReader_NextSeqNum(t *testing.T) {
 }
 
 func TestCCIPReader_GetExpectedNextSequenceNumber(t *testing.T) {
-	ctx := testutils.Context(t)
-	env := ccdeploy.NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
-	state, err := ccdeploy.LoadOnchainState(env.Env)
+	ctx := tests.Context(t)
+	env := NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
+	state, err := LoadOnchainState(env.Env)
 	require.NoError(t, err)
 
 	selectors := env.Env.AllChainSelectors()
 	destChain, srcChain := selectors[0], selectors[1]
 
-	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, destChain, srcChain))
-	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, srcChain, destChain))
+	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, destChain, srcChain))
+	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, srcChain, destChain))
 
 	reader := testSetupRealContracts(
 		ctx,
@@ -540,8 +541,8 @@ func TestCCIPReader_GetExpectedNextSequenceNumber(t *testing.T) {
 
 	maxExpectedSeqNum := 10
 	for i := 1; i < maxExpectedSeqNum; i++ {
-		msg := ccdeploy.DefaultRouterMessage(state.Chains[destChain].Receiver.Address())
-		msgSentEvent := ccdeploy.TestSendRequest(t, env.Env, state, srcChain, destChain, false, msg)
+		msg := DefaultRouterMessage(state.Chains[destChain].Receiver.Address())
+		msgSentEvent := TestSendRequest(t, env.Env, state, srcChain, destChain, false, msg)
 		require.Equal(t, uint64(i), msgSentEvent.SequenceNumber)
 		seqNum, err2 := reader.GetExpectedNextSequenceNumber(ctx, cs(srcChain), cs(destChain))
 		require.NoError(t, err2)
@@ -549,78 +550,83 @@ func TestCCIPReader_GetExpectedNextSequenceNumber(t *testing.T) {
 	}
 }
 
-// TODO: Investigate whether NonceManager has the bug or the setup is incorrect
 func TestCCIPReader_Nonces(t *testing.T) {
-	ctx := testutils.Context(t)
-	env := ccdeploy.NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 3, 4)
-	state, err := ccdeploy.LoadOnchainState(env.Env)
-	require.NoError(t, err)
+	ctx := tests.Context(t)
+	var nonces = map[cciptypes.ChainSelector]map[common.Address]uint64{
+		chainS1: {
+			utils.RandomAddress(): 10,
+			utils.RandomAddress(): 20,
+		},
+		chainS2: {
+			utils.RandomAddress(): 30,
+			utils.RandomAddress(): 40,
+		},
+		chainS3: {
+			utils.RandomAddress(): 50,
+			utils.RandomAddress(): 60,
+		},
+	}
 
-	selectors := env.Env.AllChainSelectors()
-	destChain, srcChain, srcChain2 := selectors[0], selectors[1], selectors[2]
-
-	print(srcChain2)
-	require.NoError(t, ccdeploy.AddLanesForAll(env.Env, state))
-
-	reader := testSetupRealContracts(
-		ctx,
-		t,
-		destChain,
-		map[cciptypes.ChainSelector][]types.BoundContract{
-			cciptypes.ChainSelector(destChain): {
-				{
-					Address: state.Chains[destChain].NonceManager.Address().String(),
-					Name:    consts.ContractNameNonceManager,
+	cfg := evmtypes.ChainReaderConfig{
+		Contracts: map[string]evmtypes.ChainContractReader{
+			consts.ContractNameNonceManager: {
+				ContractABI: ccip_reader_tester.CCIPReaderTesterABI,
+				Configs: map[string]*evmtypes.ChainReaderDefinition{
+					consts.MethodNameGetInboundNonce: {
+						ChainSpecificName: "getInboundNonce",
+						ReadType:          evmtypes.Method,
+					},
 				},
 			},
 		},
-		nil,
-		env,
-	)
-
-	chain1MsgsLen := 5
-	//chain2MsgsLen := 10
-
-	for i := 0; i < chain1MsgsLen; i++ {
-		msg := ccdeploy.DefaultRouterMessage(state.Chains[destChain].Receiver.Address())
-		ccdeploy.TestSendRequest(t, env.Env, state, srcChain, destChain, false, msg)
 	}
-	//for i := 0; i < chain2MsgsLen; i++ {
-	//	msg := ccdeploy.DefaultRouterMessage(state.Chains[destChain].Receiver.Address())
-	//	ccdeploy.TestSendRequest(t, env.Env, state, srcChain2, destChain, false, msg)
-	//}
 
-	chain1Nonces, err := reader.Nonces(ctx, cs(srcChain), cs(destChain),
-		[]string{
-			env.Env.Chains[srcChain].DeployerKey.From.String(),
-			utils.RandomAddress().String(),
-		})
-	nonce, err := state.Chains[destChain].NonceManager.GetInboundNonce(&bind.CallOpts{},
-		srcChain,
-		env.Env.Chains[srcChain].DeployerKey.From.Bytes(),
-	)
-	require.NoError(t, err)
-	require.Equal(t, chain1MsgsLen, nonce)
-	require.Len(t, chain1Nonces, 1)
-	require.Equal(t, chain1MsgsLen, chain1Nonces[env.Env.Chains[srcChain].DeployerKey.From.String()])
-	//chain2Nonces, err := reader.Nonces(ctx, cs(srcChain2), cs(destChain),
-	//	[]string{
-	//		env.Env.Chains[srcChain2].DeployerKey.From.String(),
-	//		utils.RandomAddress().String(),
-	//	})
+	sb, auth := setupSimulatedBackendAndAuth(t)
+	s := testSetup(ctx, t, testSetupParams{
+		ReaderChain:      chainD,
+		DestChain:        chainD,
+		Cfg:              cfg,
+		BindTester:       true,
+		SimulatedBackend: sb,
+		Auth:             auth,
+	})
+
+	// Add some nonces.
+	for chain, addrs := range nonces {
+		for addr, nonce := range addrs {
+			_, err := s.contract.SetInboundNonce(s.auth, uint64(chain), nonce, common.LeftPadBytes(addr.Bytes(), 32))
+			assert.NoError(t, err)
+		}
+	}
+	s.sb.Commit()
+
+	for sourceChain, addrs := range nonces {
+		var addrQuery []string
+		for addr := range addrs {
+			addrQuery = append(addrQuery, addr.String())
+		}
+		addrQuery = append(addrQuery, utils.RandomAddress().String())
+
+		results, err := s.reader.Nonces(ctx, sourceChain, chainD, addrQuery)
+		assert.NoError(t, err)
+		assert.Len(t, results, len(addrQuery))
+		for addr, nonce := range addrs {
+			assert.Equal(t, nonce, results[addr.String()])
+		}
+	}
 }
 
 func Test_GetChainFeePriceUpdates(t *testing.T) {
-	ctx := testutils.Context(t)
-	env := ccdeploy.NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
-	state, err := ccdeploy.LoadOnchainState(env.Env)
+	ctx := tests.Context(t)
+	env := NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
+	state, err := LoadOnchainState(env.Env)
 	require.NoError(t, err)
 
 	selectors := env.Env.AllChainSelectors()
 	chain1, chain2 := selectors[0], selectors[1]
 
-	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
-	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
+	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
+	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
 
 	// Change the gas price for chain2
 	feeQuoter := state.Chains[chain1].FeeQuoter
@@ -665,16 +671,16 @@ func Test_GetChainFeePriceUpdates(t *testing.T) {
 }
 
 func Test_LinkPriceUSD(t *testing.T) {
-	ctx := testutils.Context(t)
-	env := ccdeploy.NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
-	state, err := ccdeploy.LoadOnchainState(env.Env)
+	ctx := tests.Context(t)
+	env := NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
+	state, err := LoadOnchainState(env.Env)
 	require.NoError(t, err)
 
 	selectors := env.Env.AllChainSelectors()
 	chain1, chain2 := selectors[0], selectors[1]
 
-	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
-	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
+	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
+	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
 
 	reader := testSetupRealContracts(
 		ctx,
@@ -695,26 +701,26 @@ func Test_LinkPriceUSD(t *testing.T) {
 	linkPriceUSD, err := reader.LinkPriceUSD(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, linkPriceUSD.Int)
-	require.Equal(t, ccdeploy.DefaultInitialPrices.LinkPrice, linkPriceUSD.Int)
+	require.Equal(t, DefaultInitialPrices.LinkPrice, linkPriceUSD.Int)
 }
 
 func Test_GetMedianDataAvailabilityGasConfig(t *testing.T) {
-	ctx := testutils.Context(t)
-	env := ccdeploy.NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 4, 4)
-	state, err := ccdeploy.LoadOnchainState(env.Env)
+	ctx := tests.Context(t)
+	env := NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 4, 4)
+	state, err := LoadOnchainState(env.Env)
 	require.NoError(t, err)
 
 	selectors := env.Env.AllChainSelectors()
 	destChain, chain1, chain2, chain3 := selectors[0], selectors[1], selectors[2], selectors[3]
 
-	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain1, destChain))
-	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain2, destChain))
-	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain3, destChain))
+	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain1, destChain))
+	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain2, destChain))
+	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain3, destChain))
 
 	boundContracts := map[cciptypes.ChainSelector][]types.BoundContract{}
 	for i, selector := range env.Env.AllChainSelectorsExcluding([]uint64{destChain}) {
 		feeQuoter := state.Chains[selector].FeeQuoter
-		destChainCfg := ccdeploy.DefaultFeeQuoterDestChainConfig()
+		destChainCfg := DefaultFeeQuoterDestChainConfig()
 		//nolint:gosec // disable G115
 		destChainCfg.DestDataAvailabilityOverheadGas = uint32(100 + i)
 		//nolint:gosec // disable G115
@@ -757,16 +763,16 @@ func Test_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 }
 
 func Test_GetWrappedNativeTokenPriceUSD(t *testing.T) {
-	ctx := testutils.Context(t)
-	env := ccdeploy.NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
-	state, err := ccdeploy.LoadOnchainState(env.Env)
+	ctx := tests.Context(t)
+	env := NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
+	state, err := LoadOnchainState(env.Env)
 	require.NoError(t, err)
 
 	selectors := env.Env.AllChainSelectors()
 	chain1, chain2 := selectors[0], selectors[1]
 
-	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
-	require.NoError(t, ccdeploy.AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
+	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
+	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
 
 	reader := testSetupRealContracts(
 		ctx,
@@ -792,7 +798,7 @@ func Test_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 
 	// Only chainD has reader contracts bound
 	require.Len(t, prices, 1)
-	require.Equal(t, ccdeploy.DefaultInitialPrices.WethPrice, prices[cciptypes.ChainSelector(chain1)].Int)
+	require.Equal(t, DefaultInitialPrices.WethPrice, prices[cciptypes.ChainSelector(chain1)].Int)
 }
 
 func setupSimulatedBackendAndAuth(t *testing.T) (*simulated.Backend, *bind.TransactOpts) {
@@ -818,9 +824,9 @@ func testSetupRealContracts(
 	destChain uint64,
 	toBindContracts map[cciptypes.ChainSelector][]types.BoundContract,
 	toMockBindings map[cciptypes.ChainSelector][]types.BoundContract,
-	env ccdeploy.DeployedEnv,
+	env DeployedEnv,
 ) ccipreaderpkg.CCIPReader {
-	db := pgtest.NewSqlxDB(t)
+	db := NewSqlxDB(t)
 	lpOpts := logpoller.Opts{
 		PollPeriod:               time.Millisecond,
 		FinalityDepth:            0,
@@ -905,7 +911,7 @@ func testSetup(
 
 	lggr := logger.TestLogger(t)
 	lggr.SetLogLevel(zapcore.ErrorLevel)
-	db := pgtest.NewSqlxDB(t)
+	db := NewSqlxDB(t)
 	lpOpts := logpoller.Opts{
 		PollPeriod:               time.Millisecond,
 		FinalityDepth:            params.FinalityDepth,
@@ -1040,4 +1046,12 @@ type testSetupData struct {
 
 func cs(i uint64) cciptypes.ChainSelector {
 	return cciptypes.ChainSelector(i)
+}
+
+func NewSqlxDB(t testing.TB) *sqlx.DB {
+	db, err := sqlx.Open(string(dialects.TransactionWrappedPostgres), uuid.New().String())
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, db.Close()) })
+	db.MapperFunc(reflectx.CamelToSnakeASCII)
+	return db
 }
