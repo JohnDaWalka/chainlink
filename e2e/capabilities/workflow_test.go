@@ -254,6 +254,7 @@ func generateOCR3Config(
 func TestWorkflow(t *testing.T) {
 	workflowOwner := "0x00000000000000000000000000000000000000aa"
 	workflowName := "ccipethsep"
+	feedID := "0x0003fbba4fce42f65d6032b18aee53efdf526cc734ad296cb57565979d883bdd"
 
 	t.Run("smoke test", func(t *testing.T) {
 		in, err := framework.Load[WorkflowTestConfig](t)
@@ -531,8 +532,7 @@ triggers:
     config:
       maxFrequencyMs: 15000
       feedIds:
-        - '0x0003fbba4fce42f65d6032b18aee53efdf526cc734ad296cb57565979d883bdd'
-        - '0x0003c317fec7fad514c67aacc6366bf2f007ce37100e3cddcacd0ccaa1f3746d'
+        - '%s'
 consensus:
   - id: offchain_reporting@1.0.0
     ref: ccip_feeds
@@ -546,14 +546,10 @@ consensus:
       aggregation_config:
         allowedPartialStaleness: '0.5'
         feeds:
-          '0x0003fbba4fce42f65d6032b18aee53efdf526cc734ad296cb57565979d883bdd':
+          '%s':
             deviation: '0.05'
             heartbeat: 3600
             remappedID: '0x666666666666'
-          '0x0003c317fec7fad514c67aacc6366bf2f007ce37100e3cddcacd0ccaa1f3746d':
-            deviation: '0.05'
-            heartbeat: 3600
-            remappedID: '0x777777777777'
       encoder: EVM
       encoder_config:
         abi: '(bytes32 FeedID, uint224 Price, uint32 Timestamp)[] Reports'
@@ -568,6 +564,8 @@ targets:
 """`,
 					workflowName,
 					workflowOwner,
+					feedID,
+					feedID,
 					bc.ChainID,
 					feedsConsumerAddress,
 				)
@@ -704,25 +702,29 @@ targets:
 		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
 		require.NoError(t, err)
 
-		// First rounds start after a delay of approx. 2 minutes!
+		// OCR rounds can take a while to start. I've observed 2+ minutes during local tests.
+		timeout := 3 * time.Minute
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
 
-		// ✅ Add bootstrap spec
-		// ✅ 1. Deploy mock streams capability
-		// ✅ 2. Add boostrap job spec
-		// ✅	- Starts successfully (search for "BootstrapperV2: Started listening")
-		// ✅ 3. Add OCR3 capability
-		// ✅	- This starts successfully (search for "OCREndpointV2: Initialized")
-		// ✅ 3. Deploy and configure OCR3 contract
-		// ✅ 4. Add chain write capabilities
-		// ✅	- Check if they are added (search for "capability added")
-		// ✅	- Check if they are added
-		// ✅ 5. Deploy capabilities registry
-		// ✅ 	- Add nodes to registry
-		// ✅	- Add capabilities to registry
-		// ✅ 6. Deploy Forwarder
-		// ✅	- Configure forwarder (search for "Transaction finalized")
-		// ✅ 7. Deploy Feeds Consumer
-		// ✅	- Add Keystone workflow (search for "Keystone CCIP Feeds Workflow")
-		//		- Configure Feeds Consumer to allow workflow reports
+		for {
+			select {
+			case <-ctx.Done():
+				t.Fatalf("feed did not update, timeout after %s", timeout)
+
+			case <-time.After(5 * time.Second):
+				price, timestamp, err := feedsConsumerContract.GetPrice(
+					sc.NewCallOpts(),
+					common.HexToHash(feedID),
+				)
+				require.NoError(t, err)
+				if price.String() != "0" && timestamp != 0 {
+					fmt.Printf("Feed updated - price and timestamp set to %s and %d", price, timestamp)
+					return
+				} else {
+					fmt.Println("Feed not updated yet - price and timestamp not set yet")
+				}
+			}
+		}
 	})
 }

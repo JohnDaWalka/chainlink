@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	ocr "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ocr2plustypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -105,18 +103,9 @@ func (of *oracleFactory) NewOracle(ctx context.Context, args core.OracleArgs) (c
 	oracle, err := ocr.NewOracle(ocr.OCR3OracleArgs[[]byte]{
 		// We are relying on the relayer plugin provider for the offchain config digester
 		// and the contract config tracker to save time.
-		ContractConfigTracker:  pluginProvider.ContractConfigTracker(),
-		OffchainConfigDigester: pluginProvider.OffchainConfigDigester(),
-		// TODO: Allow oracles to overwrite the local config
-		LocalConfig: ocr2plustypes.LocalConfig{
-			BlockchainTimeout:                  time.Second * 20,
-			ContractConfigTrackerPollInterval:  time.Second * 10,
-			ContractConfigLoadTimeout:          time.Second * 10,
-			ContractConfigConfirmations:        1,
-			ContractTransmitterTransmitTimeout: time.Second * 10,
-			DatabaseTimeout:                    time.Second * 10,
-			DefaultMaxDurationInitialization:   time.Second * 30,
-		},
+		ContractConfigTracker:        pluginProvider.ContractConfigTracker(),
+		OffchainConfigDigester:       pluginProvider.OffchainConfigDigester(),
+		LocalConfig:                  args.LocalConfig,
 		ContractTransmitter:          NewContractTransmitter(of.transmitterID, args.ContractTransmitter),
 		ReportingPluginFactory:       args.ReportingPluginFactoryService,
 		BinaryNetworkEndpointFactory: of.peerWrapper.Peer2,
