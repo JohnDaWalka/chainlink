@@ -1,0 +1,6 @@
+{
+  "github.com/smartcontractkit/chainlink/v2/core/cmd": "7aa13a0e85e31935ab9108671524e08ca5023a73feb9151c6ea6743c7447583c",
+  "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/mercury": "a42252cf3e594b6555cd08ba76665f2007d9188bdc3ffb705bd2d718ef705571",
+  "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/mercury/config": "23a6c96ad0f01b7596d17d3aa15d7961ee92261353a0044d7376eddb3837fb89",
+  "github.com/smartcontractkit/chainlink/v2/core/internal/features/ocr2": "0a41cb678b67f209bed912e26f91b9335c82ed430c26006ef4a8823b22c2f93e"
+}
