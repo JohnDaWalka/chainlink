@@ -154,7 +154,6 @@ func (r *Registry) Add(ctx context.Context, c capabilities.BaseCapability) error
 
 	info, err := c.Info(ctx)
 	if err != nil {
-
 		return err
 	}
 
