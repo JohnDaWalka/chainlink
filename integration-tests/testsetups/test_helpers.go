@@ -168,7 +168,6 @@ func NewLocalDevEnvironment(
 	for _, c := range env.AllChainSelectors() {
 		mcmsCfg[c] = mcmsCfgPerChain
 	}
-
 	// Need to deploy prerequisites first so that we can form the USDC config
 	// no proposals to be made, timelock can be passed as nil here
 	env, err = commonchangeset.ApplyChangesets(t, env, nil, []commonchangeset.ChangesetApplication{
@@ -185,10 +184,6 @@ func NewLocalDevEnvironment(
 			},
 		},
 		{
-			Changeset: commonchangeset.WrapChangeSet(commonchangeset.DeployMCMSWithTimelock),
-			Config:    mcmsCfg,
-		},
-		{
 			Changeset: commonchangeset.WrapChangeSet(changeset.DeployPrerequisites),
 			Config: changeset.DeployPrerequisiteConfig{
 				ChainSelectors: allChains,
@@ -197,6 +192,10 @@ func NewLocalDevEnvironment(
 					changeset.WithMulticall3(tCfg.IsMultiCall3),
 				},
 			},
+		},
+		{
+			Changeset: commonchangeset.WrapChangeSet(commonchangeset.DeployMCMSWithTimelock),
+			Config:    mcmsCfg,
 		},
 		{
 			Changeset: commonchangeset.WrapChangeSet(changeset.DeployChainContracts),
