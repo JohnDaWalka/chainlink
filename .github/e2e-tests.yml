@@ -947,7 +947,6 @@ runner-test-matrix:
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.6.0
-      PG_INSTANCE: true
 
   - id: smoke/ccip/ccip_messaging_test.go:*
     path: integration-tests/smoke/ccip/ccip_messaging_test.go

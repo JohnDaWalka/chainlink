@@ -1,0 +1,23 @@
+# This file specifies the GitHub runner for each integration test and is utilized by all integration CI workflows.
+#
+# Each entry in this file includes the following:
+# - The GitHub runner (runs_on field) that will execute tests.
+# - The tests that will be run by the runner.
+# - The triggers (e.g., Run PR Integration Tests) that should trigger these tests.
+#
+runner-test-matrix:
+  # START: CCIPv1.6 tests
+
+  - id: smoke/ccip/ccip_messaging_test.go:*
+    path: integration-tests/smoke/ccip/ccip_messaging_test.go
+    test_env_type: docker
+    runs_on: ubuntu-latest
+    triggers:
+      - PR Integration Core Tests
+    test_cmd: cd integration-tests/smoke/ccip && go test ccip_messaging_test.go -timeout 12m -test.parallel=2 -count=1 -json
+    test_env_vars:
+      E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
+      E2E_JD_VERSION: 0.6.0
+      PG_INSTANCE: true
+            
+  # END: CCIP tests
