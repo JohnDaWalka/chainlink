@@ -210,7 +210,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'pull_request' && ( needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@27467f0073162e0ca77d33ce26f649b3d0f4c188 #ctf-run-tests@0.2.0
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@29eb28c2dea7a14bf232a198fc1632c01adc3b8a # ctf-run-tests@0.3.0
     with:
       workflow_name: Run Core E2E Tests For PR
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
@@ -220,6 +220,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
+      collect_test_telemetry: false # Set to true to collect detailed performance metrics about the test run
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -251,7 +252,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'merge_group' && ( needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@27467f0073162e0ca77d33ce26f649b3d0f4c188 #ctf-run-tests@1.0.0
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@29eb28c2dea7a14bf232a198fc1632c01adc3b8a # ctf-run-tests@0.3.0
     with:
       workflow_name: Run Core E2E Tests For Merge Queue
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
@@ -265,6 +266,7 @@ jobs:
       slack_notification_after_tests: on_failure
       slack_notification_after_tests_channel_id: "#team-test-tooling-internal"
       slack_notification_after_tests_name: Core E2E Tests In Merge Queue
+      collect_test_telemetry: false # Set to true to collect detailed performance metrics about the test run
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -296,7 +298,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'pull_request' && (needs.changes.outputs.ccip_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@5412507526722a7b1c5d719fa686eed5a1bc4035 # ctf-run-tests@0.2.0
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@29eb28c2dea7a14bf232a198fc1632c01adc3b8a # ctf-run-tests@0.3.0
     with:
       workflow_name: Run CCIP E2E Tests For PR
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
@@ -306,6 +308,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
+      collect_test_telemetry: false # Set to true to collect detailed performance metrics about the test run
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -337,7 +340,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'merge_group' && (needs.changes.outputs.ccip_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@5412507526722a7b1c5d719fa686eed5a1bc4035 # ctf-run-tests@0.2.0
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@29eb28c2dea7a14bf232a198fc1632c01adc3b8a # ctf-run-tests@0.3.0
     with:
       workflow_name: Run CCIP E2E Tests For Merge Queue
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
@@ -347,6 +350,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
+      collect_test_telemetry: false # Set to true to collect detailed performance metrics about the test run
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
