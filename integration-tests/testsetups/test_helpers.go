@@ -677,7 +677,7 @@ func FundNodes(t *testing.T, lggr zerolog.Logger, env *test_env.CLClusterTestEnv
 		})
 	}
 	if err := fundGrp.Wait(); err != nil {
-		fmt.Errorf("error funding chainlink nodes: %w", err)
+		return fmt.Errorf("error funding chainlink nodes: %w", err)
 	}
 	return nil
 }
