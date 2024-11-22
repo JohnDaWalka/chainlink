@@ -700,7 +700,7 @@ targets:
 		require.NoError(t, err)
 
 		// OCR rounds can take a while to start. I've observed 2+ minutes during local tests.
-		timeout := 5 * time.Minute
+		timeout := 3 * time.Minute
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 
