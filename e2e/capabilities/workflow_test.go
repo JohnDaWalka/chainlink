@@ -17,11 +17,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
+	ragetypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
@@ -101,6 +103,8 @@ type OCR3Config struct {
 type NodeInfo struct {
 	OcrKeyBundleID     string
 	TransmitterAddress string
+	PeerID             string
+	Signer             common.Address
 }
 
 func extractKey(value string) string {
@@ -122,10 +126,17 @@ func getNodesInfo(
 		require.NoError(t, err)
 		nodesInfo[i].OcrKeyBundleID = ocr2Keys.Data[0].ID
 
+		firstOCR2Key := ocr2Keys.Data[0].Attributes
+		nodesInfo[i].Signer = common.HexToAddress(extractKey(firstOCR2Key.OnChainPublicKey))
+
 		// eth
 		ethKeys, err := node.MustReadETHKeys()
 		require.NoError(t, err)
 		nodesInfo[i].TransmitterAddress = ethKeys.Data[0].Attributes.Address
+
+		p2pKeys, err := node.MustReadP2PKeys()
+		require.NoError(t, err)
+		nodesInfo[i].PeerID = p2pKeys.Data[0].Attributes.PeerID
 	}
 
 	return nodesInfo
@@ -199,22 +210,22 @@ func generateOCR3Config(
 
 	// Generate OCR3 configuration arguments for testing
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
-		5*time.Second,              // DeltaProgress: Time between rounds
-		5*time.Second,              // DeltaResend: Time between resending unconfirmed transmissions
-		5*time.Second,              // DeltaInitial: Initial delay before starting the first round
-		2*time.Second,              // DeltaRound: Time between rounds within an epoch
+		10*time.Second,             // DeltaProgress: Time between rounds
+		10*time.Second,             // DeltaResend: Time between resending unconfirmed transmissions
+		10*time.Second,             // DeltaInitial: Initial delay before starting the first round
+		3*time.Second,              // DeltaRound: Time between rounds within an epoch
 		500*time.Millisecond,       // DeltaGrace: Grace period for delayed transmissions
-		1*time.Second,              // DeltaCertifiedCommitRequest: Time between certified commit requests
+		2*time.Second,              // DeltaCertifiedCommitRequest: Time between certified commit requests
 		30*time.Second,             // DeltaStage: Time between stages of the protocol
 		uint64(10),                 // MaxRoundsPerEpoch: Maximum number of rounds per epoch
 		transmissionSchedule,       // TransmissionSchedule: Transmission schedule
 		oracleIdentities,           // Oracle identities with their public keys
 		nil,                        // Plugin config (empty for now)
 		&maxDurationInitialization, // MaxDurationInitialization: ???
-		1*time.Second,              // MaxDurationQuery: Maximum duration for querying
-		1*time.Second,              // MaxDurationObservation: Maximum duration for observation
-		1*time.Second,              // MaxDurationAccept: Maximum duration for acceptance
-		1*time.Second,              // MaxDurationTransmit: Maximum duration for transmission
+		2*time.Second,              // MaxDurationQuery: Maximum duration for querying
+		2*time.Second,              // MaxDurationObservation: Maximum duration for observation
+		2*time.Second,              // MaxDurationAccept: Maximum duration for acceptance
+		2*time.Second,              // MaxDurationTransmit: Maximum duration for transmission
 		1,                          // F: Maximum number of faulty oracles
 		nil,                        // OnChain config (empty for now)
 	)
@@ -241,6 +252,9 @@ func generateOCR3Config(
 }
 
 func TestWorkflow(t *testing.T) {
+	workflowOwner := "0x00000000000000000000000000000000000000aa"
+	workflowName := "ccipethsep"
+
 	t.Run("smoke test", func(t *testing.T) {
 		in, err := framework.Load[WorkflowTestConfig](t)
 		require.NoError(t, err)
@@ -266,7 +280,7 @@ func TestWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		fmt.Println("Deployed capabilities_registry contract at", capabilitiesRegistryAddress)
 
-		forwarderAddress, tx, _, err := forwarder.DeployKeystoneForwarder(
+		forwarderAddress, tx, forwarderContract, err := forwarder.DeployKeystoneForwarder(
 			sc.NewTXOpts(),
 			sc.Client,
 		)
@@ -358,7 +372,7 @@ func TestWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		fmt.Println("Deployed ocr3_capability contract at", ocr3CapabilityAddress.Hex())
 
-		feedsConsumerAddress, tx, _, err := feeds_consumer.DeployKeystoneFeedsConsumer(
+		feedsConsumerAddress, tx, feedsConsumerContract, err := feeds_consumer.DeployKeystoneFeedsConsumer(
 			sc.NewTXOpts(),
 			sc.Client,
 		)
@@ -366,6 +380,19 @@ func TestWorkflow(t *testing.T) {
 		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
 		require.NoError(t, err)
 		fmt.Println("Deployed feeds_consumer contract at", feedsConsumerAddress.Hex())
+
+		var workflowNameBytes [10]byte
+		copy(workflowNameBytes[:], []byte(workflowName))
+
+		tx, err = feedsConsumerContract.SetConfig(
+			sc.NewTXOpts(),
+			[]common.Address{forwarderAddress},
+			[]common.Address{common.HexToAddress(workflowOwner)},
+			[][10]byte{workflowNameBytes},
+		)
+		require.NoError(t, err)
+		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		require.NoError(t, err)
 
 		// Add bootstrap spec to the first node
 		bootstrapNode := nodeClients[0]
@@ -389,8 +416,8 @@ func TestWorkflow(t *testing.T) {
 			`, ocr3CapabilityAddress, bc.ChainID)
 			fmt.Println("Creating bootstrap job spec", bootstrapJobSpec)
 			r, _, err2 := bootstrapNode.CreateJobRaw(bootstrapJobSpec)
-			require.NoError(t, err2)
-			require.Empty(t, r.Errors)
+			assert.NoError(t, err2)
+			assert.Empty(t, r.Errors)
 			fmt.Printf("Response from bootstrap node: %x\n", r)
 		}()
 
@@ -426,24 +453,6 @@ func TestWorkflow(t *testing.T) {
 		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
 		require.NoError(t, err)
 
-		// hashedTriggerID, err := capabilitiesRegistryContract.GetHashedCapabilityId(
-		// 	sc.NewCallOpts(),
-		// 	"mock-streams-trigger",
-		// 	"1.0.0",
-		// )
-		// require.NoError(t, err)
-		// hashedConsensusID, err := capabilitiesRegistryContract.GetHashedCapabilityId(
-		// 	sc.NewCallOpts(),
-		// 	"offchain_reporting",
-		// 	"1.0.0",
-		// )
-		// require.NoError(t, err)
-		// hashedTargetID, err := capabilitiesRegistryContract.GetHashedCapabilityId(
-		// 	sc.NewCallOpts(),
-		// 	"write_31337",
-		// 	"1.0.0",
-		// )
-
 		for i, nodeClient := range nodeClients {
 			// First node is a bootstrap node, so we skip it
 			if i == 0 {
@@ -454,31 +463,6 @@ func TestWorkflow(t *testing.T) {
 			go func() {
 				defer wg.Done()
 
-				// nodeP2pKeys, err := nodeClient.MustReadP2PKeys()
-				// require.NoError(t, err)
-
-				// var peerID ragetypes.PeerID
-				// err = peerID.UnmarshalText([]byte(nodeP2pKeys.Data[0].Attributes.PeerID))
-				// require.NoError(t, err)
-
-				// // Add node to registry
-				// tx, err = capabilitiesRegistryContract.AddNodes(
-				// 	sc.NewTXOpts(),
-				// 	[]capabilities_registry.CapabilitiesRegistryNodeParams{
-				// 		{
-				// 			NodeOperatorId:      uint32(i),
-				// 			Signer:              [32]byte{},
-				// 			P2pId:               peerID,
-				// 			EncryptionPublicKey: [32]byte{},
-				// 			HashedCapabilityIds: [][32]byte{
-				// 				hashedTriggerID,
-				// 				hashedConsensusID,
-				// 				hashedTargetID,
-				// 			},
-				// 		},
-				// 	},
-				// )
-
 				scJobSpec := `
 					type = "standardcapabilities"
 					schemaVersion = 1
@@ -487,8 +471,8 @@ func TestWorkflow(t *testing.T) {
 				`
 				fmt.Println("Creating standard capabilities job spec", scJobSpec)
 				response, _, err2 := nodeClient.CreateJobRaw(scJobSpec)
-				require.NoError(t, err2)
-				require.Equal(t, len(response.Errors), 0)
+				assert.NoError(t, err2)
+				assert.Equal(t, len(response.Errors), 0)
 				fmt.Printf("Response from node %d after streams SC: %x\n", i+1, response)
 
 				consensusJobSpec := fmt.Sprintf(`
@@ -530,8 +514,8 @@ func TestWorkflow(t *testing.T) {
 				fmt.Println("Creating consensus job spec", consensusJobSpec)
 				response, _, err2 = nodeClient.CreateJobRaw(consensusJobSpec)
 				fmt.Println("err2", err2)
-				require.NoError(t, err2)
-				require.Empty(t, response.Errors)
+				assert.NoError(t, err2)
+				assert.Empty(t, response.Errors)
 				fmt.Printf("Response from node %d after consensus job: %x\n", i+1, response)
 
 				workflowSpec := fmt.Sprintf(`
@@ -540,8 +524,8 @@ schemaVersion = 1
 name = "Keystone CCIP Feeds Workflow"
 forwardingAllowed = false
 workflow = """
-name: ccipethsep
-owner: '0x00000000000000000000000000000000000000aa'
+name: %s
+owner: '%s'
 triggers:
   - id: mock-streams-trigger@1.0.0
     config:
@@ -582,21 +566,45 @@ targets:
       deltaStage: 45s
       schedule: oneAtATime
 """`,
+					workflowName,
+					workflowOwner,
 					bc.ChainID,
 					feedsConsumerAddress,
 				)
 				fmt.Println("Adding a workflow spec", workflowSpec)
 				response, _, err2 = nodeClient.CreateJobRaw(workflowSpec)
 				fmt.Println("err2", err2)
-				require.NoError(t, err2)
-				require.Equal(t, len(response.Errors), 0)
+				assert.NoError(t, err2)
+				assert.Empty(t, response.Errors)
 				fmt.Printf("Response from node %d after workflow job spec: %x\n", i+1, response)
 			}()
 		}
 		wg.Wait()
 
-		// Add NOPs to registry
+		hashedTriggerID, err := capabilitiesRegistryContract.GetHashedCapabilityId(
+			sc.NewCallOpts(),
+			"mock-streams-trigger",
+			"1.0.0",
+		)
+		require.NoError(t, err)
+		hashedConsensusID, err := capabilitiesRegistryContract.GetHashedCapabilityId(
+			sc.NewCallOpts(),
+			"offchain_reporting",
+			"1.0.0",
+		)
+		require.NoError(t, err)
+		hashedTargetID, err := capabilitiesRegistryContract.GetHashedCapabilityId(
+			sc.NewCallOpts(),
+			"write_31337",
+			"1.0.0",
+		)
+		require.NoError(t, err)
+
 		var nopsToAdd []capabilities_registry.CapabilitiesRegistryNodeOperator
+		var nodesToAdd []capabilities_registry.CapabilitiesRegistryNodeParams
+		var donNodes [][32]byte
+		var signers []common.Address
+
 		for i, node := range nodesInfo {
 			if i == 0 {
 				continue
@@ -605,7 +613,28 @@ targets:
 				Admin: common.HexToAddress(node.TransmitterAddress),
 				Name:  fmt.Sprintf("NOP %d", i),
 			})
+
+			var peerID ragetypes.PeerID
+			err = peerID.UnmarshalText([]byte(node.PeerID))
+			require.NoError(t, err)
+
+			nodesToAdd = append(nodesToAdd, capabilities_registry.CapabilitiesRegistryNodeParams{
+				NodeOperatorId:      uint32(i),
+				Signer:              common.BytesToHash(node.Signer.Bytes()),
+				P2pId:               peerID,
+				EncryptionPublicKey: [32]byte{1, 2, 3, 4, 5},
+				HashedCapabilityIds: [][32]byte{
+					hashedTriggerID,
+					hashedConsensusID,
+					hashedTargetID,
+				},
+			})
+
+			donNodes = append(donNodes, peerID)
+			signers = append(signers, node.Signer)
 		}
+
+		// Add NOPs to registry
 		tx, err = capabilitiesRegistryContract.AddNodeOperators(
 			sc.NewTXOpts(),
 			nopsToAdd,
@@ -614,8 +643,54 @@ targets:
 		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
 		require.NoError(t, err)
 
+		// Add nodes to registry
+		tx, err = capabilitiesRegistryContract.AddNodes(
+			sc.NewTXOpts(),
+			nodesToAdd,
+		)
+		require.NoError(t, err)
+		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		require.NoError(t, err)
+
+		// Add nodeset to registry
+		tx, err = capabilitiesRegistryContract.AddDON(
+			sc.NewTXOpts(),
+			donNodes,
+			[]capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
+				{
+					CapabilityId: hashedTriggerID,
+					Config:       []byte(""),
+				},
+				{
+					CapabilityId: hashedConsensusID,
+					Config:       []byte(""),
+				},
+				{
+					CapabilityId: hashedTargetID,
+					Config:       []byte(""),
+				},
+			},
+			true,
+			true,
+			uint8(1),
+		)
+		require.NoError(t, err)
+		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		require.NoError(t, err)
+
+		tx, err = forwarderContract.SetConfig(
+			sc.NewTXOpts(),
+			1,
+			1,
+			1,
+			signers,
+		)
+		require.NoError(t, err)
+		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		require.NoError(t, err)
+
+		// Configure OCR capability contract
 		ocr3Config := generateOCR3Config(t, nodeClients)
-		// Configure KV store OCR contract
 		tx, err = ocr3CapabilityContract.SetConfig(
 			sc.NewTXOpts(),
 			ocr3Config.Signers,
@@ -629,6 +704,8 @@ targets:
 		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
 		require.NoError(t, err)
 
+		// First rounds start after a delay of approx. 2 minutes!
+
 		// ✅ Add bootstrap spec
 		// ✅ 1. Deploy mock streams capability
 		// ✅ 2. Add boostrap job spec
@@ -638,13 +715,14 @@ targets:
 		// ✅ 3. Deploy and configure OCR3 contract
 		// ✅ 4. Add chain write capabilities
 		// ✅	- Check if they are added (search for "capability added")
-		// ✅	- Check if they are added (search for "Observation complete")
-		// 5. Deploy capabilities registry
-		// 		- Add nodes to registry
-		// 		- Add capabilities to registry
+		// ✅	- Check if they are added
+		// ✅ 5. Deploy capabilities registry
+		// ✅ 	- Add nodes to registry
+		// ✅	- Add capabilities to registry
 		// ✅ 6. Deploy Forwarder
-		//      - Configure forwarder
+		// ✅	- Configure forwarder (search for "Transaction finalized")
 		// ✅ 7. Deploy Feeds Consumer
-		// ✅ 	- Add Keystone workflow (search for "Keystone CCIP Feeds Workflow")
+		// ✅	- Add Keystone workflow (search for "Keystone CCIP Feeds Workflow")
+		//		- Configure Feeds Consumer to allow workflow reports
 	})
 }
