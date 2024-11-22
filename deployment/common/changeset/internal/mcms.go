@@ -4,8 +4,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/config"
 	owner_helpers "github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/common/view/v1_0"
@@ -62,13 +64,19 @@ func DeployMCMSWithTimelockContractsBatch(
 	ab deployment.AddressBook,
 	cfgByChain map[uint64]types.MCMSWithTimelockConfig,
 ) error {
+	deployGrp := errgroup.Group{}
 	for chainSel, cfg := range cfgByChain {
-		_, err := DeployMCMSWithTimelockContracts(lggr, chains[chainSel], ab, cfg)
-		if err != nil {
-			return err
-		}
+		cfg := cfg
+		chainSel := chainSel
+		deployGrp.Go(func() error {
+			_, err := DeployMCMSWithTimelockContracts(lggr, chains[chainSel], ab, cfg)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 	}
-	return nil
+	return deployGrp.Wait()
 }
 
 // DeployMCMSWithTimelockContracts deploys an MCMS for
@@ -126,6 +134,7 @@ func DeployMCMSWithTimelockContracts(
 		lggr.Errorw("Failed to grant timelock admin role", "err", err)
 		return nil, err
 	}
+	lggr.Infow("granted timelock admin role", "addr", timelock.Address)
 	// After the proposer cycle is validated,
 	// we can remove the deployer as an admin.
 	return &MCMSWithTimelockDeploy{

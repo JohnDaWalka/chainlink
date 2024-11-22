@@ -168,19 +168,7 @@ func NewLocalDevEnvironment(
 	for _, c := range env.AllChainSelectors() {
 		mcmsCfg[c] = mcmsCfgPerChain
 	}
-	// for the sake of faster execution, we deploy timelock contracts in parallel
-	deployTLGrp := errgroup.Group{}
-	deployTLGrp.Go(func() error {
-		env, err = commonchangeset.ApplyChangesets(t, env, nil, []commonchangeset.ChangesetApplication{
-			{
-				Changeset: commonchangeset.WrapChangeSet(commonchangeset.DeployMCMSWithTimelock),
-				Config:    mcmsCfg,
-			},
-		})
-		if err != nil {
-			return err
-		}
-	})
+
 	// Need to deploy prerequisites first so that we can form the USDC config
 	// no proposals to be made, timelock can be passed as nil here
 	env, err = commonchangeset.ApplyChangesets(t, env, nil, []commonchangeset.ChangesetApplication{
@@ -195,6 +183,10 @@ func NewLocalDevEnvironment(
 					"NodeOperator": envNodes.NonBootstraps().PeerIDs(),
 				},
 			},
+		},
+		{
+			Changeset: commonchangeset.WrapChangeSet(commonchangeset.DeployMCMSWithTimelock),
+			Config:    mcmsCfg,
 		},
 		{
 			Changeset: commonchangeset.WrapChangeSet(changeset.DeployPrerequisites),
@@ -270,6 +262,7 @@ func NewLocalDevEnvironment(
 	// Ensure capreg logs are up to date.
 	changeset.ReplayLogs(t, e.Offchain, replayBlocks)
 	require.NoError(t, fundGrp.Wait())
+
 	return changeset.DeployedEnv{
 		Env:          env,
 		HomeChainSel: homeChainSel,

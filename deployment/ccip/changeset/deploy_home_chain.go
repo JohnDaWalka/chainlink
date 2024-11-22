@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -482,7 +483,7 @@ func AddDON(
 	if _, err := deployment.ConfirmIfNoError(dest, tx, err); err != nil {
 		return err
 	}
-
+	lggr.Infow("Set OCR3 Configs", "chainSelector", dest.Selector)
 	mapOfframpOCR3Configs := make(map[cctypes.PluginType]offramp.MultiOCR3BaseOCRConfigArgs)
 	for _, config := range offrampOCR3Configs {
 		mapOfframpOCR3Configs[cctypes.PluginType(config.OcrPluginType)] = config
