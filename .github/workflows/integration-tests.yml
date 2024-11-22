@@ -207,7 +207,6 @@ jobs:
     with:
       workflow_name: Run Core Integration Tests For PR
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
-      chainlink_upgrade_version: ${{ github.sha }}
       test_path: .github/integration-tests.yml
       test_trigger: PR Integration Core Tests
       upload_cl_node_coverage_artifact: true
@@ -237,7 +236,6 @@ jobs:
     with:
       workflow_name: Run Core Integration Tests For Merge Queue
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
-      chainlink_upgrade_version: ${{ github.sha }}
       test_path: .github/integration-tests.yml
       test_trigger: Merge Queue integration Core Tests
       upload_cl_node_coverage_artifact: true
