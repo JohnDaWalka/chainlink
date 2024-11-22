@@ -7,7 +7,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      CTF_CONFIGS: smoke.toml
+      CTF_CONFIGS: environment.toml
       CTF_LOG_LEVEL: info
       CTF_LOKI_STREAM: "false"
       PRIVATE_KEY: ${{ secrets.CTF_SIMULATED_KEY_1 }}
@@ -31,4 +31,4 @@ jobs:
         run: go mod download
       - name: Run tests
         working-directory: e2e/capabilities
-        run: go test -v -run TestDON
+        run: go test -v -run TestWorkflow

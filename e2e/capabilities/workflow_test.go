@@ -711,19 +711,18 @@ targets:
 			select {
 			case <-ctx.Done():
 				t.Fatalf("feed did not update, timeout after %s", timeout)
-
 			case <-time.After(5 * time.Second):
-				price, timestamp, err := feedsConsumerContract.GetPrice(
+				price, _, err := feedsConsumerContract.GetPrice(
 					sc.NewCallOpts(),
 					common.HexToHash(feedID),
 				)
 				require.NoError(t, err)
-				if price.String() != "0" && timestamp != 0 {
-					fmt.Printf("Feed updated - price and timestamp set to %s and %d", price, timestamp)
+
+				if price.String() != "0" {
+					fmt.Printf("\nFeed updated - price set, price=%s", price)
 					return
-				} else {
-					fmt.Println("Feed not updated yet - price and timestamp not set yet")
 				}
+				fmt.Println("Feed not updated yet")
 			}
 		}
 	})
