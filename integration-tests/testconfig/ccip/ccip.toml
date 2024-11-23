@@ -3,7 +3,7 @@
 chainlink_node_funding = 1
 
 [Network]
-selected_networks = ['SIMULATED_1', 'SIMULATED_2']
+selected_networks = ['SIMULATED_1', 'SIMULATED_2', 'SIMULATED_3']
 
 [Network.EVMNetworks.SIMULATED_1]
 evm_name = 'chain-1337'

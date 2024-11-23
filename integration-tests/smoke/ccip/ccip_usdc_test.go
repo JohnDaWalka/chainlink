@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"golang.org/x/exp/maps"
 
@@ -45,6 +46,7 @@ func TestUSDCTokenTransfer(t *testing.T) {
 	require.NoError(t, err)
 
 	allChainSelectors := maps.Keys(e.Chains)
+	require.Len(t, allChainSelectors, 3, "expected 3 chains for this test")
 	chainA := allChainSelectors[0]
 	chainC := allChainSelectors[1]
 	chainB := allChainSelectors[2]
@@ -74,20 +76,23 @@ func TestUSDCTokenTransfer(t *testing.T) {
 		chainB: {bChainUSDC},
 		chainC: {cChainUSDC, cChainToken},
 	})
+	updateFeeQtrGrp := errgroup.Group{}
+	updateFeeQtrGrp.Go(func() error {
+		return changeset.UpdateFeeQuoterForUSDC(lggr, e.Chains[chainA], state.Chains[chainA], chainC, aChainUSDC)
+	})
 
-	err = changeset.UpdateFeeQuoterForUSDC(lggr, e.Chains[chainA], state.Chains[chainA], chainC, aChainUSDC)
-	require.NoError(t, err)
-
-	err = changeset.UpdateFeeQuoterForUSDC(lggr, e.Chains[chainB], state.Chains[chainB], chainC, bChainUSDC)
-	require.NoError(t, err)
-
-	err = changeset.UpdateFeeQuoterForUSDC(lggr, e.Chains[chainC], state.Chains[chainC], chainA, cChainUSDC)
-	require.NoError(t, err)
+	updateFeeQtrGrp.Go(func() error {
+		return changeset.UpdateFeeQuoterForUSDC(lggr, e.Chains[chainB], state.Chains[chainB], chainC, bChainUSDC)
+	})
+	updateFeeQtrGrp.Go(func() error {
+		return changeset.UpdateFeeQuoterForUSDC(lggr, e.Chains[chainC], state.Chains[chainC], chainA, cChainUSDC)
+	})
+	require.NoError(t, updateFeeQtrGrp.Wait())
 
 	// MockE2EUSDCTransmitter always mint 1, see MockE2EUSDCTransmitter.sol for more details
 	tinyOneCoin := new(big.Int).SetUint64(1)
-
 	tcs := []struct {
+		id                     int
 		name                   string
 		receiver               common.Address
 		sourceChain            uint64
@@ -96,6 +101,8 @@ func TestUSDCTokenTransfer(t *testing.T) {
 		data                   []byte
 		expectedTokenBalances  map[common.Address]*big.Int
 		expectedExecutionState int
+		transferReturnData     transferReturnData
+		initialBalances        map[common.Address]*big.Int
 	}{
 		{
 			name:        "single USDC token transfer to EOA",
@@ -173,28 +180,41 @@ func TestUSDCTokenTransfer(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tcs {
-		t.Run(tt.name, func(t *testing.T) {
-			initialBalances := map[common.Address]*big.Int{}
-			for token := range tt.expectedTokenBalances {
-				initialBalance := getTokenBalance(t, token, tt.receiver, e.Chains[tt.destChain])
-				initialBalances[token] = initialBalance
-			}
+	for i, tt := range tcs {
+		tcs[i].initialBalances = make(map[common.Address]*big.Int)
+		for token := range tt.expectedTokenBalances {
+			initialBalance := getTokenBalance(t, token, tt.receiver, e.Chains[tt.destChain])
+			tcs[i].initialBalances[token] = initialBalance
+		}
 
-			transferAndWaitForSuccess(
+		// Send all requests first and update the return data
+		tcs[i].transferReturnData = transfer(t, e, state, tt.sourceChain, tt.destChain, router.ClientEVM2AnyMessage{
+			Receiver:     common.LeftPadBytes(tt.receiver.Bytes(), 32),
+			Data:         tt.data,
+			TokenAmounts: tt.tokens,
+			FeeToken:     common.HexToAddress("0x0"),
+			ExtraArgs:    nil,
+		})
+	}
+
+	for _, tt := range tcs {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			waitForSuccess(
 				t,
 				e,
 				state,
 				tt.sourceChain,
 				tt.destChain,
-				tt.tokens,
-				tt.receiver,
-				tt.data,
+				tt.transferReturnData,
 				tt.expectedExecutionState,
 			)
 
 			for token, balance := range tt.expectedTokenBalances {
-				expected := new(big.Int).Add(initialBalances[token], balance)
+				t.Log("Checking token balance for token", token, "receiver", tt.receiver, "dest chain", tt.destChain)
+				expected := new(big.Int).Add(tt.initialBalances[token], balance)
 				waitForTheTokenBalance(t, token, tt.receiver, e.Chains[tt.destChain], expected)
 			}
 		})
@@ -275,17 +295,19 @@ func mintAndAllow(
 	}
 }
 
-// transferAndWaitForSuccess sends a message from sourceChain to destChain and waits for it to be executed
-func transferAndWaitForSuccess(
+type transferReturnData struct {
+	startBlocks        map[uint64]*uint64
+	expectedSeqNum     map[changeset.SourceDestPair]uint64
+	expectedSeqNumExec map[changeset.SourceDestPair][]uint64
+}
+
+func transfer(
 	t *testing.T,
 	env deployment.Environment,
 	state changeset.CCIPOnChainState,
 	sourceChain, destChain uint64,
-	tokens []router.ClientEVMTokenAmount,
-	receiver common.Address,
-	data []byte,
-	expectedStatus int,
-) {
+	evm2AnyMessage router.ClientEVM2AnyMessage,
+) transferReturnData {
 	identifier := changeset.SourceDestPair{
 		SourceChainSelector: sourceChain,
 		DestChainSelector:   destChain,
@@ -300,22 +322,40 @@ func transferAndWaitForSuccess(
 	block := latesthdr.Number.Uint64()
 	startBlocks[destChain] = &block
 
-	msgSentEvent := changeset.TestSendRequest(t, env, state, sourceChain, destChain, false, router.ClientEVM2AnyMessage{
-		Receiver:     common.LeftPadBytes(receiver.Bytes(), 32),
-		Data:         data,
-		TokenAmounts: tokens,
-		FeeToken:     common.HexToAddress("0x0"),
-		ExtraArgs:    nil,
-	})
+	msgSentEvent := changeset.TestSendRequest(t, env, state, sourceChain, destChain, false, evm2AnyMessage)
 	expectedSeqNum[identifier] = msgSentEvent.SequenceNumber
 	expectedSeqNumExec[identifier] = []uint64{msgSentEvent.SequenceNumber}
+	return transferReturnData{
+		startBlocks:        startBlocks,
+		expectedSeqNum:     expectedSeqNum,
+		expectedSeqNumExec: expectedSeqNumExec,
+	}
+}
+
+// transferAndWaitForSuccess sends a message from sourceChain to destChain and waits for it to be executed
+func waitForSuccess(
+	t *testing.T,
+	env deployment.Environment,
+	state changeset.CCIPOnChainState,
+	sourceChain, destChain uint64,
+	transferData transferReturnData,
+	expectedStatus int,
+) {
+	identifier := changeset.SourceDestPair{
+		SourceChainSelector: sourceChain,
+		DestChainSelector:   destChain,
+	}
+
+	startBlocks := transferData.startBlocks
+	expectedSeqNum := transferData.expectedSeqNum
+	expectedSeqNumExec := transferData.expectedSeqNumExec
 
 	// Wait for all commit reports to land.
 	changeset.ConfirmCommitForAllWithExpectedSeqNums(t, env, state, expectedSeqNum, startBlocks)
 
 	// Wait for all exec reports to land
 	states := changeset.ConfirmExecWithSeqNrsForAll(t, env, state, expectedSeqNumExec, startBlocks)
-	require.Equal(t, expectedStatus, states[identifier][msgSentEvent.SequenceNumber])
+	require.Equal(t, expectedStatus, states[identifier][expectedSeqNum[identifier]])
 }
 
 func waitForTheTokenBalance(

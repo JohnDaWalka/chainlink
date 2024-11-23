@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"golang.org/x/sync/errgroup"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 
@@ -84,10 +85,11 @@ func Context(tb testing.TB) context.Context {
 }
 
 type DeployedEnv struct {
-	Env          deployment.Environment
-	HomeChainSel uint64
-	FeedChainSel uint64
-	ReplayBlocks map[uint64]uint64
+	Env            deployment.Environment
+	HomeChainSel   uint64
+	FeedChainSel   uint64
+	ReplayBlocks   map[uint64]uint64
+	SenderAccounts map[uint64]*bind.TransactOpts
 }
 
 func (e *DeployedEnv) SetupJobs(t *testing.T) {
@@ -708,40 +710,65 @@ func DeployTransferableToken(
 	addresses deployment.AddressBook,
 	token string,
 ) (*burn_mint_erc677.BurnMintERC677, *burn_mint_token_pool.BurnMintTokenPool, *burn_mint_erc677.BurnMintERC677, *burn_mint_token_pool.BurnMintTokenPool, error) {
+	deployGrp := errgroup.Group{}
 	// Deploy token and pools
-	srcToken, srcPool, err := deployTransferTokenOneEnd(lggr, chains[src], addresses, token)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	dstToken, dstPool, err := deployTransferTokenOneEnd(lggr, chains[dst], addresses, token)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
+	var srcToken *burn_mint_erc677.BurnMintERC677
+	var srcPool *burn_mint_token_pool.BurnMintTokenPool
+	var dstToken *burn_mint_erc677.BurnMintERC677
+	var dstPool *burn_mint_token_pool.BurnMintTokenPool
+	deployGrp.Go(func() error {
+		var err error
+		srcToken, srcPool, err = deployTransferTokenOneEnd(lggr, chains[src], addresses, token)
+		if err != nil {
+			return err
+		}
+		// Attach token pools to registry
+		if err := attachTokenToTheRegistry(chains[src], state.Chains[src], chains[src].DeployerKey, srcToken.Address(), srcPool.Address()); err != nil {
+			return err
+		}
+		return nil
+	})
+	deployGrp.Go(func() error {
+		var err error
+		dstToken, dstPool, err = deployTransferTokenOneEnd(lggr, chains[dst], addresses, token)
+		if err != nil {
+			return err
+		}
 
-	// Attach token pools to registry
-	if err := attachTokenToTheRegistry(chains[src], state.Chains[src], chains[src].DeployerKey, srcToken.Address(), srcPool.Address()); err != nil {
+		if err := attachTokenToTheRegistry(chains[dst], state.Chains[dst], chains[dst].DeployerKey, dstToken.Address(), dstPool.Address()); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err := deployGrp.Wait(); err != nil {
 		return nil, nil, nil, nil, err
 	}
-
-	if err := attachTokenToTheRegistry(chains[dst], state.Chains[dst], chains[dst].DeployerKey, dstToken.Address(), dstPool.Address()); err != nil {
-		return nil, nil, nil, nil, err
+	if srcToken == nil || srcPool == nil || dstToken == nil || dstPool == nil {
+		return nil, nil, nil, nil, fmt.Errorf("failed to deploy token and pool")
 	}
-
-	// Connect pool to each other
-	if err := setTokenPoolCounterPart(chains[src], srcPool, dst, dstToken.Address(), dstPool.Address()); err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	if err := setTokenPoolCounterPart(chains[dst], dstPool, src, srcToken.Address(), srcPool.Address()); err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	// Add burn/mint permissions
-	if err := grantMintBurnPermissions(lggr, chains[src], srcToken, srcPool.Address()); err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	if err := grantMintBurnPermissions(lggr, chains[dst], dstToken, dstPool.Address()); err != nil {
+	configurePoolGrp := errgroup.Group{}
+	configurePoolGrp.Go(func() error {
+		err := setTokenPoolCounterPart(chains[src], srcPool, dst, dstToken.Address(), dstPool.Address())
+		if err != nil {
+			return fmt.Errorf("failed to set token pool counter part chain %d: %w", src, err)
+		}
+		err = grantMintBurnPermissions(lggr, chains[src], srcToken, srcPool.Address())
+		if err != nil {
+			return fmt.Errorf("failed to grant mint burn permissions chain %d: %w", src, err)
+		}
+		return nil
+	})
+	configurePoolGrp.Go(func() error {
+		err := setTokenPoolCounterPart(chains[dst], dstPool, src, srcToken.Address(), srcPool.Address())
+		if err != nil {
+			return fmt.Errorf("failed to set token pool counter part chain %d: %w", dst, err)
+		}
+		if err := grantMintBurnPermissions(lggr, chains[dst], dstToken, dstPool.Address()); err != nil {
+			return fmt.Errorf("failed to grant mint burn permissions chain %d: %w", dst, err)
+		}
+		return nil
+	})
+	if err := configurePoolGrp.Wait(); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
