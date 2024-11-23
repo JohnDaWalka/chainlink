@@ -77,7 +77,7 @@ jobs:
           module-name: github.com/smartcontractkit/chainlink-testing-framework/lib
           enforce-semantic-tag: "true"
   changes:
-    environment: e2e
+    environment: integration
     name: Check Paths That Require Tests To Run
     runs-on: ubuntu-latest
     # We don't directly merge dependabot PRs, so let's not waste the resources
@@ -158,7 +158,7 @@ jobs:
           working-directory: ${{ matrix.project.path }}
 
   build-chainlink:
-    environment: e2e
+    environment: integration
     permissions:
       id-token: write
       contents: read
@@ -523,7 +523,7 @@ jobs:
         uses: smartcontractkit/chainlink-solana/.github/actions/projectserum_version@4b971869e26b79c7ce3fb7c98005cc2e3f350915 # stable action on Oct 12 2022
 
   solana-test-image-exists:
-    environment: e2e
+    environment: integration
     permissions:
       checks: write
       pull-requests: write
@@ -545,7 +545,7 @@ jobs:
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
   solana-build-contracts:
-    environment: e2e
+    environment: integration
     permissions:
       checks: write
       pull-requests: write
@@ -575,7 +575,7 @@ jobs:
           image-version: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
 
   solana-build-test-image:
-    environment: e2e
+    environment: integration
     permissions:
       checks: write
       pull-requests: write
@@ -620,7 +620,7 @@ jobs:
 
   solana-smoke-tests:
     if: ${{ !contains(join(github.event.pull_request.labels.*.name, ' '), 'skip-smoke-tests') }}
-    environment: e2e
+    environment: integration
     permissions:
       checks: write
       pull-requests: write
