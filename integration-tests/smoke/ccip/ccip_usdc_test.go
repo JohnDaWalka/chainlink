@@ -10,8 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
@@ -45,7 +43,7 @@ func TestUSDCTokenTransfer(t *testing.T) {
 	state, err := changeset.LoadOnchainState(e)
 	require.NoError(t, err)
 
-	allChainSelectors := maps.Keys(e.Chains)
+	allChainSelectors := e.AllChainSelectors()
 	require.Len(t, allChainSelectors, 3, "expected 3 chains for this test")
 	chainA := allChainSelectors[0]
 	chainC := allChainSelectors[1]
@@ -70,7 +68,7 @@ func TestUSDCTokenTransfer(t *testing.T) {
 
 	// Add all lanes
 	require.NoError(t, changeset.AddLanesForAll(e, state))
-
+	changeset.ReplayLogs(t, e.Offchain, tenv.ReplayBlocks)
 	mintAndAllow(t, e, state, map[uint64][]*burn_mint_erc677.BurnMintERC677{
 		chainA: {aChainUSDC, aChainToken},
 		chainB: {bChainUSDC},
