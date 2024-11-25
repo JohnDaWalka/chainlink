@@ -1,6 +1,7 @@
 package txm
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,8 +18,8 @@ import (
 
 type StuckTxDetectorConfig struct {
 	BlockTime             time.Duration
-	StuckTxBlockThreshold uint16
-	DetectionApiUrl       string
+	StuckTxBlockThreshold uint32
+	DetectionURL          string
 }
 
 type stuckTxDetector struct {
@@ -35,11 +36,11 @@ func NewStuckTxDetector(lggr logger.Logger, chaintype chaintype.ChainType, confi
 	}
 }
 
-func (s *stuckTxDetector) DetectStuckTransaction(tx *types.Transaction) (bool, error) {
+func (s *stuckTxDetector) DetectStuckTransaction(ctx context.Context, tx *types.Transaction) (bool, error) {
 	switch s.chainType {
 	// TODO: rename
 	case chaintype.ChainDualBroadcast:
-		result, err := s.dualBroadcastDetection(tx)
+		result, err := s.dualBroadcastDetection(ctx, tx)
 		if result || err != nil {
 			return result, err
 		}
@@ -59,43 +60,52 @@ func (s *stuckTxDetector) timeBasedDetection(tx *types.Transaction) bool {
 	return false
 }
 
-type ApiResponse struct {
+type APIResponse struct {
 	Status string      `json:"status,omitempty"`
 	Hash   common.Hash `json:"hash,omitempty"`
 }
 
 const (
-	ApiStatusPending   = "PENDING"
-	ApiStatusIncluded  = "INCLUDED"
-	ApiStatusFailed    = "FAILED"
-	ApiStatusCancelled = "CANCELLED"
-	ApiStatusUnknown   = "UNKNOWN"
+	APIStatusPending   = "PENDING"
+	APIStatusIncluded  = "INCLUDED"
+	APIStatusFailed    = "FAILED"
+	APIStatusCancelled = "CANCELLED"
+	APIStatusUnknown   = "UNKNOWN"
 )
 
-func (s *stuckTxDetector) dualBroadcastDetection(tx *types.Transaction) (bool, error) {
+func (s *stuckTxDetector) dualBroadcastDetection(ctx context.Context, tx *types.Transaction) (bool, error) {
 	for _, attempt := range tx.Attempts {
-		resp, err := http.Get(s.config.DetectionApiUrl + attempt.Hash.String())
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.config.DetectionURL+attempt.Hash.String(), nil)
+		if err != nil {
+			return false, fmt.Errorf("failed to make request for txID: %v, attemptHash: %v - %w", tx.ID, attempt.Hash, err)
+		}
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return false, fmt.Errorf("failed to get transaction status for txID: %v, attemptHash: %v - %w", tx.ID, attempt.Hash, err)
 		}
-		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return false, fmt.Errorf("request %v failed with status: %d", req, resp.StatusCode)
+		}
 		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
 		if err != nil {
 			return false, err
 		}
-		var apiResponse ApiResponse
+
+		var apiResponse APIResponse
 		err = json.Unmarshal(body, &apiResponse)
 		if err != nil {
 			return false, fmt.Errorf("failed to unmarshal response for txID: %v, attemptHash: %v - %w: %s", tx.ID, attempt.Hash, err, string(body))
 		}
 		switch apiResponse.Status {
-		case ApiStatusPending, ApiStatusIncluded:
+		case APIStatusPending, APIStatusIncluded:
 			return false, nil
-		case ApiStatusFailed, ApiStatusCancelled:
+		case APIStatusFailed, APIStatusCancelled:
 			s.lggr.Debugf("TxID: %v with attempHash: %v was marked as failed/cancelled by the RPC. Transaction is now considered stuck and will be purged.",
 				tx.ID, attempt.Hash)
 			return true, nil
-		case ApiStatusUnknown:
+		case APIStatusUnknown:
 			continue
 		default:
 			continue

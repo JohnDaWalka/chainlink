@@ -58,6 +58,13 @@ type Transaction struct {
 	CallbackCompleted bool
 }
 
+//	func (t *Transaction) String() string {
+//		return fmt.Sprintf(`{"ID":%d, "IdempotencyKey":%v, "ChainID":%v, "Nonce":%d, "FromAddress":%v, "ToAddress":%v, "Value":%v, `+
+//			`"Data":%v, "SpecifiedGasLimit":%d, "CreatedAt":%v, "LastBroadcastAt":%v, "State":%v, "IsPurgeable":%v, "AttemptCount":%d, `+
+//			`"Meta":%v, "Subject":%v, "PipelineTaskRunID":%v, "MinConfirmations":%v, "SignalCallback":%v, "CallbackCompleted":%v`,
+//			t.ID, *t.IdempotencyKey, t.ChainID, t.Nonce, t.FromAddress, t.ToAddress, t.Value, t.Data, t.SpecifiedGasLimit, t.CreatedAt, t.LastBroadcastAt,
+//			t.State, t.IsPurgeable, t.AttemptCount, t.Meta, t.Subject, t.PipelineTaskRunID, t.MinConfirmations, t.SignalCallback, t.CallbackCompleted)
+//	}
 func (t *Transaction) FindAttemptByHash(attemptHash common.Hash) (*Attempt, error) {
 	for _, a := range t.Attempts {
 		if a.Hash == attemptHash {
@@ -68,13 +75,13 @@ func (t *Transaction) FindAttemptByHash(attemptHash common.Hash) (*Attempt, erro
 }
 
 func (t *Transaction) DeepCopy() *Transaction {
-	copy := *t
-	var attemptsCopy []*Attempt
+	txCopy := *t
+	attemptsCopy := make([]*Attempt, 0, len(t.Attempts))
 	for _, attempt := range t.Attempts {
 		attemptsCopy = append(attemptsCopy, attempt.DeepCopy())
 	}
-	copy.Attempts = attemptsCopy
-	return &copy
+	txCopy.Attempts = attemptsCopy
+	return &txCopy
 }
 
 func (t *Transaction) GetMeta() (*TxMeta, error) {
@@ -102,12 +109,16 @@ type Attempt struct {
 }
 
 func (a *Attempt) DeepCopy() *Attempt {
-	copy := *a
+	txCopy := *a
 	if a.SignedTransaction != nil {
-		signedTransactionCopy := *a.SignedTransaction
-		copy.SignedTransaction = &signedTransactionCopy
+		txCopy.SignedTransaction = a.SignedTransaction.WithoutBlobTxSidecar()
 	}
-	return &copy
+	return &txCopy
+}
+
+func (a *Attempt) String() string {
+	return fmt.Sprintf(`{"ID":%d, "TxID":%d, "Hash":%v, "Fee":%v, "GasLimit":%d, "Type":%v, "CreatedAt":%v, "BroadcastAt":%v}`,
+		a.ID, a.TxID, a.Hash, a.Fee, a.GasLimit, a.Type, a.CreatedAt, a.BroadcastAt)
 }
 
 type TxRequest struct {
@@ -121,7 +132,7 @@ type TxRequest struct {
 
 	Meta             *sqlutil.JSON // TODO: *TxMeta after migration
 	ForwarderAddress common.Address
-	//QueueingTxStrategy QueueingTxStrategy
+	// QueueingTxStrategy QueueingTxStrategy
 
 	// Pipeline variables - if you aren't calling this from chain tx task within
 	// the pipeline, you don't need these variables

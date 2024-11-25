@@ -120,8 +120,8 @@ func NewTxmV2(
 	if txConfig.AutoPurge().Enabled() {
 		stuckTxDetectorConfig := txm.StuckTxDetectorConfig{
 			BlockTime:             *txmV2Config.BlockTime(),
-			StuckTxBlockThreshold: uint16(*txConfig.AutoPurge().Threshold()),
-			DetectionApiUrl:       txConfig.AutoPurge().DetectionApiUrl().String(),
+			StuckTxBlockThreshold: *txConfig.AutoPurge().Threshold(),
+			DetectionURL:          txConfig.AutoPurge().DetectionApiUrl().String(),
 		}
 		stuckTxDetector = txm.NewStuckTxDetector(lggr, chainConfig.ChainType(), stuckTxDetectorConfig)
 	}
@@ -129,19 +129,20 @@ func NewTxmV2(
 	attemptBuilder := txm.NewAttemptBuilder(chainID, fCfg.PriceMax(), estimator, keyStore)
 	inMemoryStoreManager := storage.NewInMemoryStoreManager(lggr, chainID)
 	config := txm.Config{
-		EIP1559:             fCfg.EIP1559DynamicFees(),
-		BlockTime:           *txmV2Config.BlockTime(),
+		EIP1559:   fCfg.EIP1559DynamicFees(),
+		BlockTime: *txmV2Config.BlockTime(),
+		//nolint:gosec // reuse existing config until migration
 		RetryBlockThreshold: uint16(fCfg.BumpThreshold()),
 		EmptyTxLimitDefault: fCfg.LimitDefault(),
 	}
 	var c txm.Client
 	if chainConfig.ChainType() == chaintype.ChainDualBroadcast {
-		c = clientwrappers.NewDualBroadcastClient(client, keyStore, txmV2Config.CustomUrl())
+		c = clientwrappers.NewDualBroadcastClient(client, keyStore, txmV2Config.CustomURL())
 	} else {
 		c = clientwrappers.NewChainClient(client)
 	}
 	t := txm.NewTxm(lggr, chainID, c, attemptBuilder, inMemoryStoreManager, stuckTxDetector, config, keyStore)
-	return txm.NewTxmOrchestrator[common.Hash, *evmtypes.Head](lggr, chainID, t, inMemoryStoreManager, fwdMgr, keyStore, attemptBuilder), nil
+	return txm.NewTxmOrchestrator(lggr, chainID, t, inMemoryStoreManager, fwdMgr, keyStore, attemptBuilder), nil
 }
 
 // NewEvmResender creates a new concrete EvmResender

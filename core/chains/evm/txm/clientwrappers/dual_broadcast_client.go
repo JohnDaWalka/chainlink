@@ -26,14 +26,14 @@ type DualBroadcastClientKeystore interface {
 type DualBroadcastClient struct {
 	c         client.Client
 	keystore  DualBroadcastClientKeystore
-	customUrl *url.URL
+	customURL *url.URL
 }
 
-func NewDualBroadcastClient(c client.Client, keystore DualBroadcastClientKeystore, customUrl *url.URL) *DualBroadcastClient {
+func NewDualBroadcastClient(c client.Client, keystore DualBroadcastClientKeystore, customURL *url.URL) *DualBroadcastClient {
 	return &DualBroadcastClient{
 		c:         c,
 		keystore:  keystore,
-		customUrl: customUrl,
+		customURL: customURL,
 	}
 }
 
@@ -60,6 +60,7 @@ func (d *DualBroadcastClient) SendTransaction(ctx context.Context, tx *types.Tra
 	if err != nil {
 		return err
 	}
+	//nolint:revive //linter nonsense
 	if meta != nil && meta.DualBroadcast != nil && *meta.DualBroadcast && !tx.IsPurgeable {
 		data, err := attempt.SignedTransaction.MarshalBinary()
 		if err != nil {
@@ -81,7 +82,7 @@ func (d *DualBroadcastClient) SendTransaction(ctx context.Context, tx *types.Tra
 
 func (d *DualBroadcastClient) signAndPostMessage(ctx context.Context, address common.Address, body []byte, urlParams string) (result string, err error) {
 	bodyReader := bytes.NewReader(body)
-	postReq, err := http.NewRequestWithContext(ctx, http.MethodPost, d.customUrl.String()+"?"+urlParams, bodyReader)
+	postReq, err := http.NewRequestWithContext(ctx, http.MethodPost, d.customURL.String()+"?"+urlParams, bodyReader)
 	if err != nil {
 		return
 	}
@@ -104,14 +105,14 @@ func (d *DualBroadcastClient) signAndPostMessage(ctx context.Context, address co
 		return result, fmt.Errorf("request %v failed with status: %d", postReq, resp.StatusCode)
 	}
 
-	keyJson, err := io.ReadAll(resp.Body)
+	keyJSON, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return
 	}
 	var response postResponse
-	err = json.Unmarshal(keyJson, &response)
+	err = json.Unmarshal(keyJSON, &response)
 	if err != nil {
-		return result, fmt.Errorf("failed to unmarshal response into struct: %w: %s", err, string(keyJson))
+		return result, fmt.Errorf("failed to unmarshal response into struct: %w: %s", err, string(keyJSON))
 	}
 	if response.Error.Message != "" {
 		return result, errors.New(response.Error.Message)

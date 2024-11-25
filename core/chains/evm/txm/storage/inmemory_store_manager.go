@@ -47,8 +47,7 @@ func (m *InMemoryStoreManager) Add(addresses ...common.Address) error {
 
 func (m *InMemoryStoreManager) AppendAttemptToTransaction(_ context.Context, txNonce uint64, fromAddress common.Address, attempt *types.Attempt) error {
 	if store, exists := m.InMemoryStoreMap[fromAddress]; exists {
-		store.AppendAttemptToTransaction(txNonce, attempt)
-		return nil
+		return store.AppendAttemptToTransaction(txNonce, attempt)
 	}
 	return fmt.Errorf(StoreNotFoundForAddress, fromAddress)
 }
@@ -92,7 +91,7 @@ func (m *InMemoryStoreManager) MarkTransactionsConfirmed(_ context.Context, nonc
 
 func (m *InMemoryStoreManager) MarkUnconfirmedTransactionPurgeable(_ context.Context, nonce uint64, fromAddress common.Address) error {
 	if store, exists := m.InMemoryStoreMap[fromAddress]; exists {
-		store.MarkUnconfirmedTransactionPurgeable(nonce)
+		return store.MarkUnconfirmedTransactionPurgeable(nonce)
 	}
 	return fmt.Errorf(StoreNotFoundForAddress, fromAddress)
 }

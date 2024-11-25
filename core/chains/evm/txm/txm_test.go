@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -38,15 +39,15 @@ func TestLifecycle(t *testing.T) {
 	t.Run("fails to start if initial pending nonce call fails", func(t *testing.T) {
 		txm := NewTxm(logger.Test(t), testutils.FixtureChainID, client, ab, nil, nil, config, keystore)
 		client.On("PendingNonceAt", mock.Anything, address1).Return(uint64(0), errors.New("error")).Once()
-		assert.Error(t, txm.Start(tests.Context(t)))
+		require.Error(t, txm.Start(tests.Context(t)))
 	})
 
 	t.Run("tests lifecycle successfully without any transactions", func(t *testing.T) {
 		lggr, observedLogs := logger.TestObserved(t, zap.DebugLevel)
 		txStore := storage.NewInMemoryStoreManager(lggr, testutils.FixtureChainID)
-		assert.NoError(t, txStore.Add(addresses...))
+		require.NoError(t, txStore.Add(addresses...))
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, txStore, nil, config, keystore)
-		var nonce uint64 = 0
+		var nonce uint64
 		// Start
 		client.On("PendingNonceAt", mock.Anything, address1).Return(nonce, nil).Once()
 		client.On("PendingNonceAt", mock.Anything, address2).Return(nonce, nil).Once()
@@ -57,7 +58,6 @@ func TestLifecycle(t *testing.T) {
 		servicetest.Run(t, txm)
 		tests.AssertLogEventually(t, observedLogs, "Backfill time elapsed")
 	})
-
 }
 
 func TestTrigger(t *testing.T) {
@@ -65,26 +65,26 @@ func TestTrigger(t *testing.T) {
 
 	address := testutils.NewAddress()
 	keystore := mocks.NewKeystore(t)
-	keystore.On("EnabledAddressesForChain", mock.Anything, mock.Anything).Return([]common.Address{address}, nil)
 	t.Run("Trigger fails if Txm is unstarted", func(t *testing.T) {
-		txm := NewTxm(logger.Test(t), nil, nil, nil, nil, nil, Config{}, keystore)
+		lggr, observedLogs := logger.TestObserved(t, zap.ErrorLevel)
+		txm := NewTxm(lggr, nil, nil, nil, nil, nil, Config{}, keystore)
 		txm.Trigger(address)
-		assert.Error(t, txm.Trigger(address), "Txm unstarted")
+		tests.AssertLogEventually(t, observedLogs, "Txm unstarted")
 	})
 
 	t.Run("executes Trigger", func(t *testing.T) {
 		lggr := logger.Test(t)
 		txStore := storage.NewInMemoryStoreManager(lggr, testutils.FixtureChainID)
-		assert.NoError(t, txStore.Add(address))
+		require.NoError(t, txStore.Add(address))
 		client := mocks.NewClient(t)
 		ab := mocks.NewAttemptBuilder(t)
 		config := Config{BlockTime: 1 * time.Minute, RetryBlockThreshold: 10}
+		keystore.On("EnabledAddressesForChain", mock.Anything, mock.Anything).Return([]common.Address{address}, nil)
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, txStore, nil, config, keystore)
-		var nonce uint64 = 0
+		var nonce uint64
 		// Start
 		client.On("PendingNonceAt", mock.Anything, address).Return(nonce, nil).Once()
 		servicetest.Run(t, txm)
-		assert.NoError(t, txm.Trigger(address))
 	})
 }
 
@@ -103,9 +103,9 @@ func TestBroadcastTransaction(t *testing.T) {
 		mTxStore.On("FetchUnconfirmedTransactionAtNonceWithCount", mock.Anything, mock.Anything, mock.Anything).Return(nil, 0, errors.New("call failed")).Once()
 		txm := NewTxm(logger.Test(t), testutils.FixtureChainID, client, ab, mTxStore, nil, config, keystore)
 		bo, err := txm.broadcastTransaction(ctx, address)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.False(t, bo)
-		assert.Contains(t, err.Error(), "call failed")
+		require.ErrorContains(t, err, "call failed")
 	})
 
 	t.Run("throws a warning and returns if unconfirmed transactions exceed maxInFlightTransactions", func(t *testing.T) {
@@ -115,7 +115,7 @@ func TestBroadcastTransaction(t *testing.T) {
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, mTxStore, nil, config, keystore)
 		bo, err := txm.broadcastTransaction(ctx, address)
 		assert.True(t, bo)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		tests.AssertLogEventually(t, observedLogs, "Reached transaction limit")
 	})
 
@@ -129,13 +129,14 @@ func TestBroadcastTransaction(t *testing.T) {
 		client.On("PendingNonceAt", mock.Anything, address).Return(uint64(0), nil).Once() // LocalNonce: 1, PendingNonce: 0
 		bo, err := txm.broadcastTransaction(ctx, address)
 		assert.True(t, bo)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		client.On("PendingNonceAt", mock.Anything, address).Return(uint64(1), nil).Once() // LocalNonce: 1, PendingNonce: 1
 		mTxStore.On("UpdateUnstartedTransactionWithNonce", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
-		txm.broadcastTransaction(ctx, address)
+		bo, err = txm.broadcastTransaction(ctx, address)
+		assert.False(t, bo)
+		require.NoError(t, err)
 		tests.AssertLogCountEventually(t, observedLogs, "Reached transaction limit.", 1)
-
 	})
 
 	t.Run("fails if UpdateUnstartedTransactionWithNonce fails", func(t *testing.T) {
@@ -145,17 +146,17 @@ func TestBroadcastTransaction(t *testing.T) {
 		mTxStore.On("UpdateUnstartedTransactionWithNonce", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("call failed")).Once()
 		bo, err := txm.broadcastTransaction(ctx, address)
 		assert.False(t, bo)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "call failed")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "call failed")
 	})
 
 	t.Run("returns if there are no unstarted transactions", func(t *testing.T) {
 		lggr := logger.Test(t)
 		txStore := storage.NewInMemoryStoreManager(lggr, testutils.FixtureChainID)
-		assert.NoError(t, txStore.Add(address))
+		require.NoError(t, txStore.Add(address))
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, txStore, nil, config, keystore)
 		bo, err := txm.broadcastTransaction(ctx, address)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, bo)
 		assert.Equal(t, uint64(0), txm.getNonce(address))
 	})
@@ -163,7 +164,7 @@ func TestBroadcastTransaction(t *testing.T) {
 	t.Run("picks a new tx and creates a new attempt then sends it and updates the broadcast time", func(t *testing.T) {
 		lggr := logger.Test(t)
 		txStore := storage.NewInMemoryStoreManager(lggr, testutils.FixtureChainID)
-		assert.NoError(t, txStore.Add(address))
+		require.NoError(t, txStore.Add(address))
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, txStore, nil, config, keystore)
 		txm.setNonce(address, 8)
 		IDK := "IDK"
@@ -175,7 +176,7 @@ func TestBroadcastTransaction(t *testing.T) {
 			SpecifiedGasLimit: 22000,
 		}
 		tx, err := txm.CreateTransaction(tests.Context(t), txRequest)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		attempt := &types.Attempt{
 			TxID:     tx.ID,
 			Fee:      gas.EvmFee{GasPrice: assets.NewWeiI(1)},
@@ -185,12 +186,12 @@ func TestBroadcastTransaction(t *testing.T) {
 		client.On("SendTransaction", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		bo, err := txm.broadcastTransaction(ctx, address)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, bo)
 		assert.Equal(t, uint64(9), txm.getNonce(address))
 		tx, err = txStore.FindTxWithIdempotencyKey(tests.Context(t), &IDK)
-		assert.NoError(t, err)
-		assert.Equal(t, 1, len(tx.Attempts))
+		require.NoError(t, err)
+		assert.Len(t, tx.Attempts, 1)
 		var zeroTime time.Time
 		assert.Greater(t, tx.LastBroadcastAt, zeroTime)
 		assert.Greater(t, tx.Attempts[0].BroadcastAt, zeroTime)
@@ -212,9 +213,9 @@ func TestBackfillTransactions(t *testing.T) {
 		txm := NewTxm(logger.Test(t), testutils.FixtureChainID, client, ab, storage, nil, config, keystore)
 		client.On("NonceAt", mock.Anything, address, mock.Anything).Return(uint64(0), errors.New("latest nonce fail")).Once()
 		bo, err := txm.backfillTransactions(ctx, address)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.False(t, bo)
-		assert.Contains(t, err.Error(), "latest nonce fail")
+		require.ErrorContains(t, err, "latest nonce fail")
 	})
 
 	t.Run("fails if MarkTransactionsConfirmed fails", func(t *testing.T) {
@@ -222,8 +223,8 @@ func TestBackfillTransactions(t *testing.T) {
 		client.On("NonceAt", mock.Anything, address, mock.Anything).Return(uint64(0), nil).Once()
 		storage.On("MarkTransactionsConfirmed", mock.Anything, mock.Anything, address).Return([]uint64{}, []uint64{}, errors.New("marking transactions confirmed failed")).Once()
 		bo, err := txm.backfillTransactions(ctx, address)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.False(t, bo)
-		assert.Contains(t, err.Error(), "marking transactions confirmed failed")
+		require.ErrorContains(t, err, "marking transactions confirmed failed")
 	})
 }

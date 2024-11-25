@@ -134,8 +134,8 @@ ResendAfterThreshold = '1m' # Default
 Enabled = false # Default
 # BlockTime controls the frequency of the backfill loop of TxmV2. 
 BlockTime = '10s' # Example
-# CustomUrl configures the base url of a custom endpoint used by the ChainDualBroadcast chain type.
-CustomUrl = 'https://example.api.io' # Example
+# CustomURL configures the base url of a custom endpoint used by the ChainDualBroadcast chain type.
+CustomURL = 'https://example.api.io' # Example
 
 [EVM.Transactions.AutoPurge]
 # Enabled enables or disables automatically purging transactions that have been idenitified as terminally stuck (will never be included on-chain). This feature is only expected to be used by ZK chains.

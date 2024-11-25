@@ -56,7 +56,7 @@ type ErrorHandler interface {
 }
 
 type StuckTxDetector interface {
-	DetectStuckTransaction(tx *types.Transaction) (bool, error)
+	DetectStuckTransaction(ctx context.Context, tx *types.Transaction) (bool, error)
 }
 
 type Keystore interface {
@@ -124,7 +124,8 @@ func (t *Txm) Start(ctx context.Context) error {
 }
 
 func (t *Txm) startAddress(address common.Address) error {
-	t.triggerCh[address] = make(chan struct{}, 1)
+	triggerCh := make(chan struct{}, 1)
+	t.triggerCh[address] = triggerCh
 	pendingNonce, err := t.client.PendingNonceAt(context.TODO(), address)
 	if err != nil {
 		return err
@@ -132,7 +133,7 @@ func (t *Txm) startAddress(address common.Address) error {
 	t.setNonce(address, pendingNonce)
 
 	t.wg.Add(2)
-	go t.broadcastLoop(address)
+	go t.broadcastLoop(address, triggerCh)
 	go t.backfillLoop(address)
 	return nil
 }
@@ -153,13 +154,16 @@ func (t *Txm) CreateTransaction(ctx context.Context, txRequest *types.TxRequest)
 	return
 }
 
-func (t *Txm) Trigger(address common.Address) error {
+func (t *Txm) Trigger(address common.Address) {
 	if !t.IfStarted(func() {
-		t.triggerCh[address] <- struct{}{}
+		triggerCh, exists := t.triggerCh[address]
+		if !exists {
+			return
+		}
+		triggerCh <- struct{}{}
 	}) {
-		return fmt.Errorf("Txm unstarted")
+		t.lggr.Error("Txm unstarted")
 	}
-	return nil
 }
 
 func (t *Txm) Abandon(address common.Address) error {
@@ -178,15 +182,15 @@ func (t *Txm) setNonce(address common.Address, nonce uint64) {
 	defer t.nonceMapMu.Unlock()
 }
 
-func newBackoff(min time.Duration) backoff.Backoff {
+func newBackoff(minDuration time.Duration) backoff.Backoff {
 	return backoff.Backoff{
-		Min:    min,
+		Min:    minDuration,
 		Max:    1 * time.Minute,
 		Jitter: true,
 	}
 }
 
-func (t *Txm) broadcastLoop(address common.Address) {
+func (t *Txm) broadcastLoop(address common.Address, triggerCh chan struct{}) {
 	defer t.wg.Done()
 	ctx, cancel := t.stopCh.NewCtx()
 	defer cancel()
@@ -197,7 +201,7 @@ func (t *Txm) broadcastLoop(address common.Address) {
 		start := time.Now()
 		bo, err := t.broadcastTransaction(ctx, address)
 		if err != nil {
-			t.lggr.Errorf("Error during transaction broadcasting: %v", err)
+			t.lggr.Errorw("Error during transaction broadcasting", "err", err)
 		} else {
 			t.lggr.Debug("Transaction broadcasting time elapsed: ", time.Since(start))
 		}
@@ -210,7 +214,7 @@ func (t *Txm) broadcastLoop(address common.Address) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.triggerCh[address]:
+		case <-triggerCh:
 			continue
 		case <-broadcastCh:
 			continue
@@ -233,7 +237,7 @@ func (t *Txm) backfillLoop(address common.Address) {
 			start := time.Now()
 			bo, err := t.backfillTransactions(ctx, address)
 			if err != nil {
-				t.lggr.Errorf("Error during backfill: %v", err)
+				t.lggr.Errorw("Error during backfill", "err", err)
 			} else {
 				t.lggr.Debug("Backfill time elapsed: ", time.Since(start))
 			}
@@ -263,9 +267,9 @@ func (t *Txm) broadcastTransaction(ctx context.Context, address common.Address) 
 				t.lggr.Warnf("Reached transaction limit: %d for unconfirmed transactions", maxInFlightTransactions)
 				return true, nil
 			}
-			pendingNonce, err := t.client.PendingNonceAt(ctx, address)
-			if err != nil {
-				return false, err
+			pendingNonce, e := t.client.PendingNonceAt(ctx, address)
+			if e != nil {
+				return false, e
 			}
 			nonce := t.getNonce(address)
 			if nonce > pendingNonce {
@@ -348,21 +352,24 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 	}
 	if unconfirmedCount == 0 {
 		t.lggr.Debugf("All transactions confirmed for address: %v", address)
-		return false, err  // TODO: add backoff to optimize requests
+		return false, err // TODO: add backoff to optimize requests
 	}
 
 	if tx == nil || tx.Nonce != latestNonce {
 		t.lggr.Warnf("Nonce gap at nonce: %d - address: %v. Creating a new transaction\n", latestNonce, address)
 		return false, t.createAndSendEmptyTx(ctx, latestNonce, address)
-	} else {
+	} else { //nolint:revive //linter nonsense
 		if !tx.IsPurgeable && t.stuckTxDetector != nil {
-			isStuck, err := t.stuckTxDetector.DetectStuckTransaction(tx)
+			isStuck, err := t.stuckTxDetector.DetectStuckTransaction(ctx, tx)
 			if err != nil {
 				return false, err
 			}
 			if isStuck {
 				tx.IsPurgeable = true
-				t.txStore.MarkUnconfirmedTransactionPurgeable(ctx, tx.Nonce, address)
+				err = t.txStore.MarkUnconfirmedTransactionPurgeable(ctx, tx.Nonce, address)
+				if err != nil {
+					return false, err
+				}
 				t.lggr.Infof("Marked tx as purgeable. Sending purge attempt for txID: %d", tx.ID)
 				return false, t.createAndSendAttempt(ctx, tx, address)
 			}

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"sort"
@@ -146,9 +147,9 @@ func (m *InMemoryStore) CreateTransaction(txRequest *types.TxRequest) *types.Tra
 		m.UnstartedTransactions = m.UnstartedTransactions[1:maxQueuedTransactions]
 	}
 
-	copy := tx.DeepCopy()
-	m.Transactions[copy.ID] = copy
-	m.UnstartedTransactions = append(m.UnstartedTransactions, copy)
+	txCopy := tx.DeepCopy()
+	m.Transactions[txCopy.ID] = txCopy
+	m.UnstartedTransactions = append(m.UnstartedTransactions, txCopy)
 	return tx
 }
 
@@ -259,11 +260,11 @@ func (m *InMemoryStore) UpdateUnstartedTransactionWithNonce(nonce uint64) (*type
 
 // Shouldn't call lock because it's being called by a method that already has the lock
 func (m *InMemoryStore) pruneConfirmedTransactions() []uint64 {
-	var noncesToPrune []uint64
+	noncesToPrune := make([]uint64, 0, len(m.ConfirmedTransactions))
 	for nonce := range m.ConfirmedTransactions {
 		noncesToPrune = append(noncesToPrune, nonce)
 	}
-	if len(noncesToPrune) <= 0 {
+	if len(noncesToPrune) == 0 {
 		return nil
 	}
 	sort.Slice(noncesToPrune, func(i, j int) bool { return noncesToPrune[i] < noncesToPrune[j] })
@@ -303,7 +304,7 @@ func (m *InMemoryStore) DeleteAttemptForUnconfirmedTx(transactionNonce uint64, a
 }
 
 func (m *InMemoryStore) MarkTxFatal(*types.Transaction) error {
-	return fmt.Errorf("not implemented")
+	return errors.New("not implemented")
 }
 
 // Orchestrator
