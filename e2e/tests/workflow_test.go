@@ -145,6 +145,7 @@ func getNodesInfo(
 func generateOCR3Config(
 	t *testing.T,
 	nodes []*clclient.ChainlinkClient,
+	nodesInfo []NodeInfo,
 ) (config *OCR3Config) {
 	oracleIdentities := []confighelper.OracleIdentityExtra{}
 	transmissionSchedule := []int{}
@@ -414,11 +415,9 @@ func TestWorkflow(t *testing.T) {
 				chainID = %s
 				providerType = "ocr3-capability"
 			`, ocr3CapabilityAddress, bc.ChainID)
-			fmt.Println("Creating bootstrap job spec", bootstrapJobSpec)
 			r, _, err2 := bootstrapNode.CreateJobRaw(bootstrapJobSpec)
 			assert.NoError(t, err2)
 			assert.Empty(t, r.Errors)
-			fmt.Printf("Response from bootstrap node: %x\n", r)
 		}()
 
 		p2pKeys, err := bootstrapNode.MustReadP2PKeys()
@@ -440,11 +439,9 @@ func TestWorkflow(t *testing.T) {
 					name = "streams-capabilities"
 					command="/home/capabilities/streams"
 				`
-				fmt.Println("Creating standard capabilities job spec", scJobSpec)
 				response, _, err2 := nodeClient.CreateJobRaw(scJobSpec)
 				assert.NoError(t, err2)
 				assert.Empty(t, response.Errors)
-				fmt.Printf("Response from node %d after streams SC: %x\n", i+1, response)
 
 				consensusJobSpec := fmt.Sprintf(`
 					type = "offchainreporting2"
@@ -482,12 +479,9 @@ func TestWorkflow(t *testing.T) {
 					bc.ChainID,
 					nodesInfo[i].OcrKeyBundleID,
 				)
-				fmt.Println("Creating consensus job spec", consensusJobSpec)
 				response, _, err2 = nodeClient.CreateJobRaw(consensusJobSpec)
-				fmt.Println("err2", err2)
 				assert.NoError(t, err2)
 				assert.Empty(t, response.Errors)
-				fmt.Printf("Response from node %d after consensus job: %x\n", i+1, response)
 
 				workflowSpec := fmt.Sprintf(`
 type = "workflow"
@@ -539,12 +533,9 @@ targets:
 					bc.ChainID,
 					feedsConsumerAddress,
 				)
-				fmt.Println("Adding a workflow spec", workflowSpec)
 				response, _, err2 = nodeClient.CreateJobRaw(workflowSpec)
-				fmt.Println("err2", err2)
 				assert.NoError(t, err2)
 				assert.Empty(t, response.Errors)
-				fmt.Printf("Response from node %d after workflow job spec: %x\n", i+1, response)
 			}()
 		}
 		wg.Wait()
@@ -635,7 +626,7 @@ targets:
 		require.NoError(t, err)
 
 		// Configure OCR capability contract
-		ocr3Config := generateOCR3Config(t, nodeClients)
+		ocr3Config := generateOCR3Config(t, nodeClients, nodesInfo)
 		tx, err = ocr3CapabilityContract.SetConfig(
 			sc.NewTXOpts(),
 			ocr3Config.Signers,
@@ -650,15 +641,17 @@ targets:
 		require.NoError(t, err)
 
 		// OCR rounds can take a while to start. I've observed 2+ minutes during local tests.
-		timeout := 3 * time.Minute
+		timeout := 4 * time.Minute
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 
+		startTime := time.Now()
 		for {
 			select {
 			case <-ctx.Done():
 				t.Fatalf("feed did not update, timeout after %s", timeout)
 			case <-time.After(5 * time.Second):
+				elapsed := time.Since(startTime).Round(time.Second)
 				price, _, err := feedsConsumerContract.GetPrice(
 					sc.NewCallOpts(),
 					common.HexToHash(feedID),
@@ -666,10 +659,10 @@ targets:
 				require.NoError(t, err)
 
 				if price.String() != "0" {
-					fmt.Printf("Feed updated - price set, price=%s", price)
+					fmt.Printf("Feed updated after %s - price set, price=%s\n", elapsed, price)
 					return
 				}
-				fmt.Println("Feed not updated yet")
+				fmt.Printf("Feed not updated yet, waiting for %s\n", elapsed)
 			}
 		}
 	})
