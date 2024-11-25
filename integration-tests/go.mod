@@ -7,6 +7,8 @@ replace github.com/smartcontractkit/chainlink/v2 => ../
 
 replace github.com/smartcontractkit/chainlink/deployment => ../deployment
 
+replace github.com/smartcontractkit/chainlink-testing-framework/lib => ../../chainlink-testing-framework/lib
+
 require (
 	dario.cat/mergo v1.0.1
 	github.com/AlekSi/pointer v1.1.0

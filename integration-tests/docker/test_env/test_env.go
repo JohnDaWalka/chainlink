@@ -3,6 +3,7 @@ package test_env
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -69,7 +70,13 @@ func (te *CLClusterTestEnv) WithTestEnvConfig(cfg *TestEnvConfig) *CLClusterTest
 	te.Cfg = cfg
 	if cfg.MockAdapter.ContainerName != "" {
 		n := []string{te.DockerNetwork.Name}
-		te.MockAdapter = test_env.NewKillgrave(n, te.Cfg.MockAdapter.ImpostersPath, test_env.WithContainerName(te.Cfg.MockAdapter.ContainerName), test_env.WithLogStream(te.LogStream))
+		var err error
+		te.MockAdapter, err = test_env.NewKillgrave(n, te.Cfg.MockAdapter.ImpostersPath, test_env.WithContainerName(te.Cfg.MockAdapter.ContainerName), test_env.WithLogStream(te.LogStream))
+		if te.t != nil {
+			require.NoError(te.t, err, "failed to create mock adapter")
+		} else {
+			te.l.Error().Err(err).Msg("failed to create mock adapter")
+		}
 	}
 	return te
 }
@@ -127,11 +134,14 @@ func (te *CLClusterTestEnv) StartJobDistributor(cfg *ccip.JDConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to start postgres db for job-distributor: %w", err)
 	}
-	jd := job_distributor.New([]string{te.DockerNetwork.Name},
+	jd, err := job_distributor.New([]string{te.DockerNetwork.Name},
 		job_distributor.WithImage(cfg.GetJDImage()),
 		job_distributor.WithVersion(cfg.GetJDVersion()),
 		job_distributor.WithDBURL(jdDB.InternalURL.String()),
 	)
+	if err != nil {
+		return fmt.Errorf("failed to create job-distributor: %w", err)
+	}
 	jd.LogStream = te.LogStream
 	err = jd.StartContainer()
 	if err != nil {

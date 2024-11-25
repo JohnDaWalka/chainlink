@@ -378,7 +378,10 @@ func (b *CLTestEnvBuilder) Build() (*CLClusterTestEnv, error) {
 			return nil, fmt.Errorf("test environment builder failed: %w", fmt.Errorf("cannot start mock adapter without a network"))
 		}
 
-		b.te.MockAdapter = test_env.NewKillgrave([]string{b.te.DockerNetwork.Name}, "", test_env.WithLogStream(b.te.LogStream))
+		b.te.MockAdapter, err = test_env.NewKillgrave([]string{b.te.DockerNetwork.Name}, "", test_env.WithLogStream(b.te.LogStream))
+		if err != nil {
+			return nil, err
+		}
 
 		err = b.te.StartMockAdapter()
 		if err != nil {
