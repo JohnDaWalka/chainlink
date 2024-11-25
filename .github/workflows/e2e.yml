@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu22.04-8cores-32GB
     env:
       CTF_CONFIGS: environment.toml
       CTF_LOG_LEVEL: info
