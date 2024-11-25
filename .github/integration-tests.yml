@@ -10,14 +10,14 @@ runner-test-matrix:
 
   - id: smoke/ccip/ccip_messaging_test.go:*
     path: integration-tests/smoke/ccip/ccip_messaging_test.go
-    test_env_type: docker
+    test_env_type: in-memory
     runs_on: ubuntu-latest
     triggers:
-      - PR Integration Core Tests
+      - PR Integration CCIP Tests
     test_cmd: cd integration-tests/smoke/ccip && go test ccip_messaging_test.go -timeout 12m -test.parallel=2 -count=1 -json
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.6.0
       PG_INSTANCE: true
-            
+
   # END: CCIP tests

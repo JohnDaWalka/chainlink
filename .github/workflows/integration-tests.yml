@@ -193,8 +193,8 @@ jobs:
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           dep_evm_sha: ${{ inputs.evm-ref }}
 
-  run-core-integration-tests-for-pr:
-    name: Run Core integration Tests For PR
+  run-ccip-integration-tests-for-pr:
+    name: Run CCIP integration Tests For PR
     permissions:
       actions: read
       checks: write
@@ -203,13 +203,12 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'pull_request' && ( needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-integration-tests.yml@6c81cac2e88ab503602121fe866d67830a27fc7d #ctf-run-tests@0.2.0
+    uses: smartcontractkit/.github/.github/workflows/run-integration-tests.yml@9dcd7f8e7e4ee66de19d7077d955751f33899d0f #ctf-run-tests@0.2.0
     with:
-      workflow_name: Run Core Integration Tests For PR
+      workflow_name: Run CCIP Integration Tests For PR
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
-      chainlink_upgrade_version: ${{ github.sha }}
       test_path: .github/integration-tests.yml
-      test_trigger: PR Integration Core Tests
+      test_trigger: PR Integration CCIP Tests
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
     secrets:
@@ -220,11 +219,10 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN: ${{ secrets.AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN }}
-      AWS_API_GW_HOST_GRAFANA: ${{ secrets.AWS_API_GW_HOST_GRAFANA }}
       SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
 
-  run-core-integration-tests-for-merge-queue:
-    name: Run Core Integration Tests For Merge Queue
+  run-ccip-integration-tests-for-merge-queue:
+    name: Run CCIP Integration Tests For Merge Queue
     permissions:
       actions: read
       checks: write
@@ -233,13 +231,12 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'merge_group' && ( needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-integration-tests.yml@6c81cac2e88ab503602121fe866d67830a27fc7d #ctf-run-tests@1.0.0
+    uses: smartcontractkit/.github/.github/workflows/run-integration-tests.yml@9dcd7f8e7e4ee66de19d7077d955751f33899d0f #ctf-run-tests@1.0.0
     with:
-      workflow_name: Run Core Integration Tests For Merge Queue
+      workflow_name: Run CCIP Integration Tests For Merge Queue
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
-      chainlink_upgrade_version: ${{ github.sha }}
       test_path: .github/integration-tests.yml
-      test_trigger: Merge Queue integration Core Tests
+      test_trigger: Merge Queue integration CCIP Tests
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       # Notify Test Tooling team in slack when merge queue tests fail
@@ -254,14 +251,13 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN: ${{ secrets.AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN }}
-      AWS_API_GW_HOST_GRAFANA: ${{ secrets.AWS_API_GW_HOST_GRAFANA }}
       SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
 
   check-integration-test-results:
     if: always()
     name: Integration Tests
     runs-on: ubuntu-latest
-    needs: [lint-integration-tests,run-core-integration-tests-for-pr,run-core-integration-tests-for-merge-queue]
+    needs: [lint-integration-tests,run-ccip-integration-tests-for-pr,run-ccip-integration-tests-for-merge-queue]
     steps:
       - name: Fail the job if core tests in PR not successful
         if: always() && needs.run-core-integration-tests-for-pr.result == 'failure'
@@ -278,7 +274,7 @@ jobs:
   cleanup:
     name: Clean up integration environment deployments
     if: always()
-    needs: [run-core-integration-tests-for-pr, run-core-integration-tests-for-merge-queue]
+    needs: [run-ccip-integration-tests-for-pr, run-ccip-integration-tests-for-merge-queue]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -298,7 +294,7 @@ jobs:
   show-chainlink-node-coverage:
     name: Show Chainlink Node Go Coverage
     if: always()
-    needs: [run-core-integration-tests-for-pr, run-core-integration-tests-for-merge-queue]
+    needs: [run-ccip-integration-tests-for-pr, run-ccip-integration-tests-for-merge-queue]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repo
