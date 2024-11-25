@@ -125,11 +125,8 @@ jobs:
     uses: smartcontractkit/.github/.github/workflows/run-integration-tests.yml@e214c63ad3022f3edd667da19f796fb9489850b2 #ctf-run-tests@0.2.0
     with:
       workflow_name: Run CCIP Integration Tests For PR
-      chainlink_version: ${{ inputs.evm-ref || github.sha }}
       test_path: .github/integration-tests.yml
       test_trigger: PR Integration CCIP Tests
-      upload_cl_node_coverage_artifact: true
-      upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
