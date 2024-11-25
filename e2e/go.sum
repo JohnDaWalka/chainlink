@@ -309,6 +309,8 @@ github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ
 github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/smartcontractkit/chainlink-testing-framework/framework v0.2.8 h1:A2jx1xbQ6oCJtNEeJ5Qi54JJNvmj9jH9HIGkFZpo3/I=
 github.com/smartcontractkit/chainlink-testing-framework/framework v0.2.8/go.mod h1:Z+eWpSStQqYIPhbC9i5pQvfijsZDvkaHB4M2iFBsz3o=
+github.com/smartcontractkit/chainlink-testing-framework/framework v0.2.9 h1:vRkWh0FvuLOZKd3WzQVzo2QWTNp/oFklh0y0UMVjIKQ=
+github.com/smartcontractkit/chainlink-testing-framework/framework v0.2.9/go.mod h1:mMUqvS3BZfvN1OfK4OFTYf1+T0X6nwmSXJM2keaPsSM=
 github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.4 h1:hPI9GhHE1RmIG1oyPeFjED0AhWnNb9JzD74Oq2bO+IQ=
 github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.4/go.mod h1:afY3QmNgeR/VI1pRbGH8g3YXGy7C2RrFOwUzEFvL3L8=
 github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12 h1:NzZGjaqez21I3DU7objl3xExTH4fxYvzTqar8DC6360=

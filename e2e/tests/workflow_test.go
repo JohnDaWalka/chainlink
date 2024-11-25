@@ -29,7 +29,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
@@ -87,9 +86,8 @@ func MarshalMultichainPublicKey(ost map[string]types.OnchainPublicKey) (types.On
 }
 
 type WorkflowTestConfig struct {
-	BlockchainA        *blockchain.Input `toml:"blockchain_a" validate:"required"`
-	MockerDataProvider *fake.Input       `toml:"data_provider" validate:"required"`
-	NodeSet            *ns.Input         `toml:"nodeset" validate:"required"`
+	BlockchainA *blockchain.Input `toml:"blockchain_a" validate:"required"`
+	NodeSet     *ns.Input         `toml:"nodeset" validate:"required"`
 }
 
 type OCR3Config struct {
@@ -614,8 +612,8 @@ targets:
 		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
 		require.NoError(t, err)
 
-		// OCR rounds can take a while to start. I've observed 2+ minutes during local tests.
-		timeout := 4 * time.Minute
+		// It can take a while before the first report is produced, particularly on CI.
+		timeout := 8 * time.Minute
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 
