@@ -32,11 +32,11 @@ import (
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
-	capabilities_registry "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/capabilities_registry_1_1_0"
-	feeds_consumer "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/feeds_consumer_1_0_0"
-	forwarder "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/forwarder_1_0_0"
-	ocr3_capability "github.com/smartcontractkit/chainlink/e2e/capabilities/components/evmcontracts/ocr3_capability_1_0_0"
-	"github.com/smartcontractkit/chainlink/e2e/capabilities/components/onchain"
+	capabilities_registry "github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/capabilities_registry_1_1_0"
+	feeds_consumer "github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/feeds_consumer_1_0_0"
+	forwarder "github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/forwarder_1_0_0"
+	ocr3_capability "github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/ocr3_capability_1_0_0"
+	"github.com/smartcontractkit/chainlink/e2e/components/onchain"
 )
 
 // Copying this to avoid dependency on the core repo
@@ -293,7 +293,7 @@ func TestWorkflow(t *testing.T) {
 		// TODO: When the capabilities registry address is provided:
 		// - NOPs and nodes are added to the registry.
 		// - Nodes are configured to listen to the registry for updates.
-		nodeset, err := ns.NewSharedDBNodeSet(in.NodeSet, bc) // TODO: Should not be a thing
+		nodeset, err := ns.NewSharedDBNodeSet(in.NodeSet, bc)
 		require.NoError(t, err)
 
 		for i, n := range nodeset.CLNodes {
@@ -716,7 +716,7 @@ targets:
 				require.NoError(t, err)
 
 				if price.String() != "0" {
-					fmt.Printf("\nFeed updated - price set, price=%s", price)
+					fmt.Printf("Feed updated - price set, price=%s", price)
 					return
 				}
 				fmt.Println("Feed not updated yet")
