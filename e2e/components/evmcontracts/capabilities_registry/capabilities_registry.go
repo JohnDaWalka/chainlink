@@ -31,7 +31,7 @@ func Deploy(sc *seth.Client) (*capabilitiesRegistry, error) {
 		return nil, err
 	}
 
-	fmt.Println("Deployed capabilities_registry contract at", capabilitiesRegistryAddress)
+	fmt.Printf("🚀 Deployed \033[1mcapabilities_registry\033[0m contract at \033[1m%s\033[0m", capabilitiesRegistryAddress)
 	return &capabilitiesRegistry{
 		sc:       sc,
 		Address:  capabilitiesRegistryAddress,

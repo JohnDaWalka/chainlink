@@ -35,7 +35,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/capabilities_registry"
 	feeds_consumer "github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/feeds_consumer_1_0_0"
-	forwarder "github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/forwarder_1_0_0"
+	"github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/forwarder"
 	ocr3_capability "github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/ocr3_capability_1_0_0"
 	"github.com/smartcontractkit/chainlink/e2e/components/onchain"
 )
@@ -102,10 +102,13 @@ type OCR3Config struct {
 }
 
 type NodeInfo struct {
-	OcrKeyBundleID     string
-	TransmitterAddress string
-	PeerID             string
-	Signer             common.Address
+	OcrKeyBundleID            string
+	TransmitterAddress        string
+	PeerID                    string
+	Signer                    common.Address
+	OffchainPublicKey         [32]byte
+	OnchainPublicKey          types.OnchainPublicKey
+	ConfigEncryptionPublicKey [32]byte
 }
 
 func extractKey(value string) string {
@@ -123,6 +126,7 @@ func getNodesInfo(
 	nodesInfo = make([]NodeInfo, len(nodes))
 
 	for i, node := range nodes {
+		// OCR Keys
 		ocr2Keys, err := node.MustReadOCR2Keys()
 		require.NoError(t, err)
 		nodesInfo[i].OcrKeyBundleID = ocr2Keys.Data[0].ID
@@ -130,10 +134,33 @@ func getNodesInfo(
 		firstOCR2Key := ocr2Keys.Data[0].Attributes
 		nodesInfo[i].Signer = common.HexToAddress(extractKey(firstOCR2Key.OnChainPublicKey))
 
+		pubKeys := make(map[string]types.OnchainPublicKey)
+		ethOnchainPubKey, err := hex.DecodeString(extractKey(firstOCR2Key.OnChainPublicKey))
+		require.NoError(t, err)
+		pubKeys["evm"] = ethOnchainPubKey
+
+		multichainPubKey, err := MarshalMultichainPublicKey(pubKeys)
+		require.NoError(t, err)
+		nodesInfo[i].OnchainPublicKey = multichainPubKey
+
+		offchainPublicKeyBytes, err := hex.DecodeString(extractKey(firstOCR2Key.OffChainPublicKey))
+		require.NoError(t, err)
+		var offchainPublicKey [32]byte
+		copy(offchainPublicKey[:], offchainPublicKeyBytes)
+		nodesInfo[i].OffchainPublicKey = offchainPublicKey
+
+		sharedSecretEncryptionPublicKeyBytes, err := hex.DecodeString(extractKey(firstOCR2Key.ConfigPublicKey))
+		require.NoError(t, err)
+		var sharedSecretEncryptionPublicKey [32]byte
+		copy(sharedSecretEncryptionPublicKey[:], sharedSecretEncryptionPublicKeyBytes)
+		nodesInfo[i].ConfigEncryptionPublicKey = sharedSecretEncryptionPublicKey
+
+		// ETH Keys
 		ethKeys, err := node.MustReadETHKeys()
 		require.NoError(t, err)
 		nodesInfo[i].TransmitterAddress = ethKeys.Data[0].Attributes.Address
 
+		// P2P Keys
 		p2pKeys, err := node.MustReadP2PKeys()
 		require.NoError(t, err)
 		nodesInfo[i].PeerID = p2pKeys.Data[0].Attributes.PeerID
@@ -144,57 +171,19 @@ func getNodesInfo(
 
 func generateOCR3Config(
 	t *testing.T,
-	nodes []*clclient.ChainlinkClient,
 	nodesInfo []NodeInfo,
 ) (config *OCR3Config) {
 	oracleIdentities := []confighelper.OracleIdentityExtra{}
 	transmissionSchedule := []int{}
 
-	for i, node := range nodes {
-		// TODO: Do not provide a bootstrap node to this func
-		// We want to skip bootstrap node.
-		if i == 0 {
-			continue
-		}
+	for _, nodeInfo := range nodesInfo {
 		transmissionSchedule = append(transmissionSchedule, 1)
 		oracleIdentity := confighelper.OracleIdentityExtra{}
-		// ocr2
-		ocr2Keys, err := node.MustReadOCR2Keys()
-		require.NoError(t, err)
-
-		firstOCR2Key := ocr2Keys.Data[0].Attributes
-
-		offchainPublicKeyBytes, err := hex.DecodeString(extractKey(firstOCR2Key.OffChainPublicKey))
-		require.NoError(t, err)
-		var offchainPublicKey [32]byte
-		copy(offchainPublicKey[:], offchainPublicKeyBytes)
-		oracleIdentity.OffchainPublicKey = offchainPublicKey
-
-		pubKeys := make(map[string]types.OnchainPublicKey)
-		ethOnchainPubKey, err := hex.DecodeString(extractKey(firstOCR2Key.OnChainPublicKey))
-		require.NoError(t, err)
-		pubKeys["evm"] = ethOnchainPubKey
-
-		multichainPubKey, err := MarshalMultichainPublicKey(pubKeys)
-		require.NoError(t, err)
-		oracleIdentity.OnchainPublicKey = multichainPubKey
-
-		sharedSecretEncryptionPublicKeyBytes, err := hex.DecodeString(extractKey(firstOCR2Key.ConfigPublicKey))
-		require.NoError(t, err)
-		var sharedSecretEncryptionPublicKey [32]byte
-		copy(sharedSecretEncryptionPublicKey[:], sharedSecretEncryptionPublicKeyBytes)
-		oracleIdentity.ConfigEncryptionPublicKey = sharedSecretEncryptionPublicKey
-
-		// p2p
-		p2pKeys, err := node.MustReadP2PKeys()
-		require.NoError(t, err)
-		oracleIdentity.PeerID = p2pKeys.Data[0].Attributes.PeerID
-
-		// eth
-		ethKeys, err := node.MustReadETHKeys()
-		require.NoError(t, err)
-		oracleIdentity.TransmitAccount = types.Account(ethKeys.Data[0].Attributes.Address)
-
+		oracleIdentity.OffchainPublicKey = nodeInfo.OffchainPublicKey
+		oracleIdentity.OnchainPublicKey = nodeInfo.OnchainPublicKey
+		oracleIdentity.ConfigEncryptionPublicKey = nodeInfo.ConfigEncryptionPublicKey
+		oracleIdentity.PeerID = nodeInfo.PeerID
+		oracleIdentity.TransmitAccount = types.Account(nodeInfo.TransmitterAddress)
 		oracleIdentities = append(oracleIdentities, oracleIdentity)
 	}
 
@@ -248,7 +237,7 @@ func TestWorkflow(t *testing.T) {
 	workflowName := "ccipethsep"
 	feedID := "0x0003fbba4fce42f65d6032b18aee53efdf526cc734ad296cb57565979d883bdd"
 
-	t.Run("smoke test", func(t *testing.T) {
+	t.Run("Keystoen workflow test", func(t *testing.T) {
 		in, err := framework.Load[WorkflowTestConfig](t)
 		require.NoError(t, err)
 		pkey := os.Getenv("PRIVATE_KEY")
@@ -262,10 +251,10 @@ func TestWorkflow(t *testing.T) {
 			Build()
 		require.NoError(t, err)
 
-		capabilitiesRegistry, err := capabilities_registry.Deploy(sc)
+		capabilitiesRegistryInstance, err := capabilities_registry.Deploy(sc)
 		require.NoError(t, err)
 
-		require.NoError(t, capabilitiesRegistry.AddCapabilities(
+		require.NoError(t, capabilitiesRegistryInstance.AddCapabilities(
 			[]capabilities_registry.CapabilitiesRegistryCapability{
 				{
 					LabelledName:   "mock-streams-trigger",
@@ -288,14 +277,8 @@ func TestWorkflow(t *testing.T) {
 			},
 		))
 
-		forwarderAddress, tx, forwarderContract, err := forwarder.DeployKeystoneForwarder(
-			sc.NewTXOpts(),
-			sc.Client,
-		)
+		forwarderInstance, err := forwarder.Deploy(sc)
 		require.NoError(t, err)
-		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
-		require.NoError(t, err)
-		fmt.Println("Deployed forwarder contract at", forwarderAddress)
 
 		// TODO: When the capabilities registry address is provided:
 		// - NOPs and nodes are added to the registry.
@@ -311,12 +294,10 @@ func TestWorkflow(t *testing.T) {
 
 		nodesInfo := getNodesInfo(t, nodeClients)
 
-		for i := range nodeClients {
-			// First node is a bootstrap node, so we skip it
-			if i == 0 {
-				continue
-			}
+		bootstrapNodeInfo := nodesInfo[0]
+		workflowNodesetInfo := nodesInfo[1:]
 
+		for i := range workflowNodesetInfo {
 			in.NodeSet.NodeSpecs[i].Node.TestConfigOverrides = fmt.Sprintf(`
 				[Feature]
 				LogPoller = true
@@ -353,8 +334,8 @@ func TestWorkflow(t *testing.T) {
 				strings.ReplaceAll(bc.Nodes[0].DockerInternalWSUrl, "127.0.0.1", "0.0.0.0"),
 				strings.ReplaceAll(bc.Nodes[0].DockerInternalHTTPUrl, "127.0.0.1", "0.0.0.0"),
 				nodesInfo[i].TransmitterAddress,
-				forwarderAddress,
-				capabilitiesRegistry.Address,
+				forwarderInstance.Address,
+				capabilitiesRegistryInstance.Address,
 				bc.ChainID,
 			)
 		}
@@ -387,7 +368,7 @@ func TestWorkflow(t *testing.T) {
 
 		tx, err = feedsConsumerContract.SetConfig(
 			sc.NewTXOpts(),
-			[]common.Address{forwarderAddress},
+			[]common.Address{forwarderInstance.Address},
 			[]common.Address{common.HexToAddress(workflowOwner)},
 			[][10]byte{workflowNameBytes},
 		)
@@ -419,9 +400,6 @@ func TestWorkflow(t *testing.T) {
 			assert.NoError(t, err2)
 			assert.Empty(t, r.Errors)
 		}()
-
-		p2pKeys, err := bootstrapNode.MustReadP2PKeys()
-		require.NoError(t, err)
 
 		for i, nodeClient := range nodeClients {
 			// First node is a bootstrap node, so we skip it
@@ -473,7 +451,7 @@ func TestWorkflow(t *testing.T) {
 					`,
 					ocr3CapabilityAddress,
 					nodesInfo[i].OcrKeyBundleID,
-					p2pKeys.Data[0].Attributes.PeerID,
+					bootstrapNodeInfo.PeerID,
 					strings.TrimPrefix(nodeset.CLNodes[0].Node.DockerP2PUrl, "http://"),
 					nodesInfo[i].TransmitterAddress,
 					bc.ChainID,
@@ -563,7 +541,7 @@ targets:
 				Signer:              common.BytesToHash(node.Signer.Bytes()),
 				P2pId:               peerID,
 				EncryptionPublicKey: [32]byte{1, 2, 3, 4, 5},
-				HashedCapabilityIds: capabilitiesRegistry.ExistingHashedCapabilitiesIDs,
+				HashedCapabilityIds: capabilitiesRegistryInstance.ExistingHashedCapabilitiesIDs,
 			})
 
 			donNodes = append(donNodes, peerID)
@@ -571,7 +549,7 @@ targets:
 		}
 
 		// Add NOPs to registry
-		tx, err = capabilitiesRegistry.Contract.AddNodeOperators(
+		tx, err = capabilitiesRegistryInstance.Contract.AddNodeOperators(
 			sc.NewTXOpts(),
 			nopsToAdd,
 		)
@@ -580,7 +558,7 @@ targets:
 		require.NoError(t, err)
 
 		// Add nodes to registry
-		tx, err = capabilitiesRegistry.Contract.AddNodes(
+		tx, err = capabilitiesRegistryInstance.Contract.AddNodes(
 			sc.NewTXOpts(),
 			nodesToAdd,
 		)
@@ -589,20 +567,20 @@ targets:
 		require.NoError(t, err)
 
 		// Add nodeset to registry
-		tx, err = capabilitiesRegistry.Contract.AddDON(
+		tx, err = capabilitiesRegistryInstance.Contract.AddDON(
 			sc.NewTXOpts(),
 			donNodes,
 			[]capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
 				{
-					CapabilityId: capabilitiesRegistry.ExistingHashedCapabilitiesIDs[0],
+					CapabilityId: capabilitiesRegistryInstance.ExistingHashedCapabilitiesIDs[0],
 					Config:       []byte(""),
 				},
 				{
-					CapabilityId: capabilitiesRegistry.ExistingHashedCapabilitiesIDs[1],
+					CapabilityId: capabilitiesRegistryInstance.ExistingHashedCapabilitiesIDs[1],
 					Config:       []byte(""),
 				},
 				{
-					CapabilityId: capabilitiesRegistry.ExistingHashedCapabilitiesIDs[2],
+					CapabilityId: capabilitiesRegistryInstance.ExistingHashedCapabilitiesIDs[2],
 					Config:       []byte(""),
 				},
 			},
@@ -614,19 +592,15 @@ targets:
 		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
 		require.NoError(t, err)
 
-		tx, err = forwarderContract.SetConfig(
-			sc.NewTXOpts(),
+		require.NoError(t, forwarderInstance.SetConfig(
 			1,
 			1,
 			1,
 			signers,
-		)
-		require.NoError(t, err)
-		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
-		require.NoError(t, err)
+		))
 
 		// Configure OCR capability contract
-		ocr3Config := generateOCR3Config(t, nodeClients, nodesInfo)
+		ocr3Config := generateOCR3Config(t, workflowNodesetInfo)
 		tx, err = ocr3CapabilityContract.SetConfig(
 			sc.NewTXOpts(),
 			ocr3Config.Signers,
