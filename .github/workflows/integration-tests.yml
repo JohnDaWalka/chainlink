@@ -203,7 +203,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'pull_request' && ( needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-integration-tests.yml@6c81cac2e88ab503602121fe866d67830a27fc7d #ctf-run-tests@0.2.0
+    uses: smartcontractkit/.github/.github/workflows/run-integration-tests.yml@fe655a3e20897f92cf76dee5ebbf919a44a7245e #ctf-run-tests@0.2.0
     with:
       workflow_name: Run Core Integration Tests For PR
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
@@ -231,7 +231,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'merge_group' && ( needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-integration-tests.yml@6c81cac2e88ab503602121fe866d67830a27fc7d #ctf-run-tests@1.0.0
+    uses: smartcontractkit/.github/.github/workflows/run-integration-tests.yml@fe655a3e20897f92cf76dee5ebbf919a44a7245e #ctf-run-tests@1.0.0
     with:
       workflow_name: Run Core Integration Tests For Merge Queue
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
