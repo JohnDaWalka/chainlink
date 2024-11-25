@@ -201,7 +201,7 @@ func (t *Txm) broadcastLoop(address common.Address, triggerCh chan struct{}) {
 		start := time.Now()
 		bo, err := t.broadcastTransaction(ctx, address)
 		if err != nil {
-			t.lggr.Errorf("Error during transaction broadcasting: %w", err)
+			t.lggr.Errorw("Error during transaction broadcasting", "err", err)
 		} else {
 			t.lggr.Debug("Transaction broadcasting time elapsed: ", time.Since(start))
 		}
@@ -237,7 +237,7 @@ func (t *Txm) backfillLoop(address common.Address) {
 			start := time.Now()
 			bo, err := t.backfillTransactions(ctx, address)
 			if err != nil {
-				t.lggr.Errorf("Error during backfill: %w", err)
+				t.lggr.Errorw("Error during backfill", "err", err)
 			} else {
 				t.lggr.Debug("Backfill time elapsed: ", time.Since(start))
 			}
