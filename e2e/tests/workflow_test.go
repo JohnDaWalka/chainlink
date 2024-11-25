@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -32,7 +33,7 @@ import (
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
-	capabilities_registry "github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/capabilities_registry_1_1_0"
+	"github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/capabilities_registry"
 	feeds_consumer "github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/feeds_consumer_1_0_0"
 	forwarder "github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/forwarder_1_0_0"
 	ocr3_capability "github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/ocr3_capability_1_0_0"
@@ -59,7 +60,7 @@ func GetChainType(chainType string) (uint8, error) {
 
 // Copying this to avoid dependency on the core repo
 func MarshalMultichainPublicKey(ost map[string]types.OnchainPublicKey) (types.OnchainPublicKey, error) {
-	var pubKeys [][]byte
+	pubKeys := make([][]byte, 0, len(ost))
 	for k, pubKey := range ost {
 		typ, err := GetChainType(k)
 		if err != nil {
@@ -72,9 +73,9 @@ func MarshalMultichainPublicKey(ost map[string]types.OnchainPublicKey) (types.On
 		}
 		length := len(pubKey)
 		if length < 0 || length > math.MaxUint16 {
-			return nil, fmt.Errorf("pubKey doesn't fit into uint16")
+			return nil, errors.New("pubKey doesn't fit into uint16")
 		}
-		if err = binary.Write(buf, binary.LittleEndian, uint16(length)); err != nil { //nolint:gosec
+		if err = binary.Write(buf, binary.LittleEndian, uint16(length)); err != nil {
 			return nil, err
 		}
 		_, _ = buf.Write(pubKey)
@@ -129,7 +130,6 @@ func getNodesInfo(
 		firstOCR2Key := ocr2Keys.Data[0].Attributes
 		nodesInfo[i].Signer = common.HexToAddress(extractKey(firstOCR2Key.OnChainPublicKey))
 
-		// eth
 		ethKeys, err := node.MustReadETHKeys()
 		require.NoError(t, err)
 		nodesInfo[i].TransmitterAddress = ethKeys.Data[0].Attributes.Address
@@ -173,15 +173,6 @@ func generateOCR3Config(
 		ethOnchainPubKey, err := hex.DecodeString(extractKey(firstOCR2Key.OnChainPublicKey))
 		require.NoError(t, err)
 		pubKeys["evm"] = ethOnchainPubKey
-
-		// // add aptos key if present
-		// if n.AptosOnchainPublicKey != "" {
-		// 	aptosPubKey, err := hex.DecodeString(n.AptosOnchainPublicKey)
-		// 	if err != nil {
-		// 		return Orc2drOracleConfig{}, fmt.Errorf("failed to decode AptosOnchainPublicKey: %w", err)
-		// 	}
-		// 	pubKeys[string(chaintype.Aptos)] = aptosPubKey
-		// }
 
 		multichainPubKey, err := MarshalMultichainPublicKey(pubKeys)
 		require.NoError(t, err)
@@ -261,25 +252,40 @@ func TestWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		pkey := os.Getenv("PRIVATE_KEY")
 
-		// deploy docker test environment
 		bc, err := blockchain.NewBlockchainNetwork(in.BlockchainA)
 		require.NoError(t, err)
 
-		// connect clients
 		sc, err := seth.NewClientBuilder().
 			WithRpcUrl(bc.Nodes[0].HostWSUrl).
 			WithPrivateKeys([]string{pkey}).
 			Build()
 		require.NoError(t, err)
 
-		capabilitiesRegistryAddress, tx, capabilitiesRegistryContract, err := capabilities_registry.DeployCapabilitiesRegistry(
-			sc.NewTXOpts(),
-			sc.Client,
-		)
+		capabilitiesRegistry, err := capabilities_registry.Deploy(sc)
 		require.NoError(t, err)
-		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
-		require.NoError(t, err)
-		fmt.Println("Deployed capabilities_registry contract at", capabilitiesRegistryAddress)
+
+		require.NoError(t, capabilitiesRegistry.AddCapabilities(
+			[]capabilities_registry.CapabilitiesRegistryCapability{
+				{
+					LabelledName:   "mock-streams-trigger",
+					Version:        "1.0.0",
+					CapabilityType: 0, // TRIGGER
+					ResponseType:   0, // REPORT
+				},
+				{
+					LabelledName:   "offchain_reporting",
+					Version:        "1.0.0",
+					CapabilityType: 2, // CONSENSUS
+					ResponseType:   0, // REPORT
+				},
+				{
+					LabelledName:   "write_31337",
+					Version:        "1.0.0",
+					CapabilityType: 3, // TARGET
+					ResponseType:   1, // OBSERVATION_IDENTICAL
+				},
+			},
+		))
 
 		forwarderAddress, tx, forwarderContract, err := forwarder.DeployKeystoneForwarder(
 			sc.NewTXOpts(),
@@ -295,11 +301,6 @@ func TestWorkflow(t *testing.T) {
 		// - Nodes are configured to listen to the registry for updates.
 		nodeset, err := ns.NewSharedDBNodeSet(in.NodeSet, bc)
 		require.NoError(t, err)
-
-		for i, n := range nodeset.CLNodes {
-			fmt.Printf("Node %d --> %s\n", i, n.Node.HostURL)
-			fmt.Printf("Node P2P %d --> %s\n", i, n.Node.HostP2PURL)
-		}
 
 		nodeClients, err := clclient.New(nodeset.CLNodes)
 		require.NoError(t, err)
@@ -352,7 +353,7 @@ func TestWorkflow(t *testing.T) {
 				strings.ReplaceAll(bc.Nodes[0].DockerInternalHTTPUrl, "127.0.0.1", "0.0.0.0"),
 				nodesInfo[i].TransmitterAddress,
 				forwarderAddress,
-				capabilitiesRegistryAddress,
+				capabilitiesRegistry.Address,
 				bc.ChainID,
 			)
 		}
@@ -423,34 +424,6 @@ func TestWorkflow(t *testing.T) {
 		p2pKeys, err := bootstrapNode.MustReadP2PKeys()
 		require.NoError(t, err)
 
-		// Add capabilities to registry
-		tx, err = capabilitiesRegistryContract.AddCapabilities(
-			sc.NewTXOpts(),
-			[]capabilities_registry.CapabilitiesRegistryCapability{
-				{
-					LabelledName:   "mock-streams-trigger",
-					Version:        "1.0.0",
-					CapabilityType: 0, // TRIGGER
-					ResponseType:   0, // REPORT
-				},
-				{
-					LabelledName:   "offchain_reporting",
-					Version:        "1.0.0",
-					CapabilityType: 2, // CONSENSUS
-					ResponseType:   0, // REPORT
-				},
-				{
-					LabelledName:   "write_31337",
-					Version:        "1.0.0",
-					CapabilityType: 3, // TARGET
-					ResponseType:   1, // OBSERVATION_IDENTICAL
-				},
-			},
-		)
-		require.NoError(t, err)
-		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
-		require.NoError(t, err)
-
 		for i, nodeClient := range nodeClients {
 			// First node is a bootstrap node, so we skip it
 			if i == 0 {
@@ -470,7 +443,7 @@ func TestWorkflow(t *testing.T) {
 				fmt.Println("Creating standard capabilities job spec", scJobSpec)
 				response, _, err2 := nodeClient.CreateJobRaw(scJobSpec)
 				assert.NoError(t, err2)
-				assert.Equal(t, len(response.Errors), 0)
+				assert.Empty(t, response.Errors)
 				fmt.Printf("Response from node %d after streams SC: %x\n", i+1, response)
 
 				consensusJobSpec := fmt.Sprintf(`
@@ -576,25 +549,6 @@ targets:
 		}
 		wg.Wait()
 
-		hashedTriggerID, err := capabilitiesRegistryContract.GetHashedCapabilityId(
-			sc.NewCallOpts(),
-			"mock-streams-trigger",
-			"1.0.0",
-		)
-		require.NoError(t, err)
-		hashedConsensusID, err := capabilitiesRegistryContract.GetHashedCapabilityId(
-			sc.NewCallOpts(),
-			"offchain_reporting",
-			"1.0.0",
-		)
-		require.NoError(t, err)
-		hashedTargetID, err := capabilitiesRegistryContract.GetHashedCapabilityId(
-			sc.NewCallOpts(),
-			"write_31337",
-			"1.0.0",
-		)
-		require.NoError(t, err)
-
 		var nopsToAdd []capabilities_registry.CapabilitiesRegistryNodeOperator
 		var nodesToAdd []capabilities_registry.CapabilitiesRegistryNodeParams
 		var donNodes [][32]byte
@@ -618,11 +572,7 @@ targets:
 				Signer:              common.BytesToHash(node.Signer.Bytes()),
 				P2pId:               peerID,
 				EncryptionPublicKey: [32]byte{1, 2, 3, 4, 5},
-				HashedCapabilityIds: [][32]byte{
-					hashedTriggerID,
-					hashedConsensusID,
-					hashedTargetID,
-				},
+				HashedCapabilityIds: capabilitiesRegistry.ExistingHashedCapabilitiesIDs,
 			})
 
 			donNodes = append(donNodes, peerID)
@@ -630,7 +580,7 @@ targets:
 		}
 
 		// Add NOPs to registry
-		tx, err = capabilitiesRegistryContract.AddNodeOperators(
+		tx, err = capabilitiesRegistry.Contract.AddNodeOperators(
 			sc.NewTXOpts(),
 			nopsToAdd,
 		)
@@ -639,7 +589,7 @@ targets:
 		require.NoError(t, err)
 
 		// Add nodes to registry
-		tx, err = capabilitiesRegistryContract.AddNodes(
+		tx, err = capabilitiesRegistry.Contract.AddNodes(
 			sc.NewTXOpts(),
 			nodesToAdd,
 		)
@@ -648,20 +598,20 @@ targets:
 		require.NoError(t, err)
 
 		// Add nodeset to registry
-		tx, err = capabilitiesRegistryContract.AddDON(
+		tx, err = capabilitiesRegistry.Contract.AddDON(
 			sc.NewTXOpts(),
 			donNodes,
 			[]capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
 				{
-					CapabilityId: hashedTriggerID,
+					CapabilityId: capabilitiesRegistry.ExistingHashedCapabilitiesIDs[0],
 					Config:       []byte(""),
 				},
 				{
-					CapabilityId: hashedConsensusID,
+					CapabilityId: capabilitiesRegistry.ExistingHashedCapabilitiesIDs[1],
 					Config:       []byte(""),
 				},
 				{
-					CapabilityId: hashedTargetID,
+					CapabilityId: capabilitiesRegistry.ExistingHashedCapabilitiesIDs[2],
 					Config:       []byte(""),
 				},
 			},
