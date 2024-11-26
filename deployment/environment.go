@@ -76,6 +76,7 @@ type Environment struct {
 	Chains            map[uint64]Chain
 	NodeIDs           []string
 	Offchain          OffchainClient
+	Flags             map[string]string
 }
 
 func NewEnvironment(
@@ -133,6 +134,10 @@ func (e Environment) AllDeployerKeys() []common.Address {
 		deployerKeys = append(deployerKeys, e.Chains[sel].DeployerKey.From)
 	}
 	return deployerKeys
+}
+
+func (e Environment) SetFlag(key, value string) {
+	e.Flags[key] = value
 }
 
 func ConfirmIfNoError(chain Chain, tx *types.Transaction, err error) (uint64, error) {
