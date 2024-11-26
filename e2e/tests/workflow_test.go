@@ -329,14 +329,16 @@ func TestWorkflow(t *testing.T) {
 				ChainID = '%s'
 			`,
 				bc.ChainID,
-				strings.ReplaceAll(bc.Nodes[0].DockerInternalWSUrl, "127.0.0.1", "0.0.0.0"),
-				strings.ReplaceAll(bc.Nodes[0].DockerInternalHTTPUrl, "127.0.0.1", "0.0.0.0"),
+				bc.Nodes[0].DockerInternalWSUrl,
+				bc.Nodes[0].DockerInternalHTTPUrl,
 				nodesInfo[i].TransmitterAddress,
 				forwarderInstance.Address,
 				capabilitiesRegistryInstance.Address,
 				bc.ChainID,
 			)
 		}
+		fmt.Println("bc.Nodes[0].DockerInternalWSUrl", bc.Nodes[0].DockerInternalWSUrl)
+		fmt.Println("bc.Nodes[0].DockerInternalHTTPUrl", bc.Nodes[0].DockerInternalHTTPUrl)
 
 		nodeset, err = ns.UpgradeNodeSet(in.NodeSet, bc, 5*time.Second)
 		require.NoError(t, err)
