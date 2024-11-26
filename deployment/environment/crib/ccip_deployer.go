@@ -53,11 +53,11 @@ func DeployCCIPAndAddLanes(lggr logger.Logger, envCfg devenv.EnvironmentConfig, 
 
 	_, err = ccipdeployment.DeployFeeds(lggr, ab, e.Chains[feedChainSel])
 	if err != nil {
-		return DeployCCIPOutput{Ab: e.ExistingAddresses}, err
+		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
 	}
 	err = ccipdeployment.DeployFeeTokensToChains(lggr, ab, e.Chains)
 	if err != nil {
-		return DeployCCIPOutput{Ab: e.ExistingAddresses}, err
+		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
 	}
 	e.ExistingAddresses = ab
 	tenv := ccipdeployment.DeployedEnv{
@@ -68,17 +68,17 @@ func DeployCCIPAndAddLanes(lggr logger.Logger, envCfg devenv.EnvironmentConfig, 
 
 	state, err := ccipdeployment.LoadOnchainState(tenv.Env)
 	if err != nil {
-		return DeployCCIPOutput{Ab: e.ExistingAddresses}, err
+		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
 	}
 	if state.Chains[tenv.HomeChainSel].LinkToken == nil {
-		return DeployCCIPOutput{Ab: e.ExistingAddresses}, errors.New("link token not deployed")
+		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, errors.New("link token not deployed")
 	}
 
 	feeds := state.Chains[tenv.FeedChainSel].USDFeeds
 	tokenConfig := ccipdeployment.NewTestTokenConfig(feeds)
 	mcmsCfg, err := ccipdeployment.NewTestMCMSConfig(tenv.Env)
 	if err != nil {
-		return DeployCCIPOutput{Ab: e.ExistingAddresses}, err
+		return DeployCCIPOutput{e.ExistingAddresses}, err
 	}
 	output, err := changeset.InitialDeploy(tenv.Env, ccipdeployment.DeployCCIPContractConfig{
 		HomeChainSel:   tenv.HomeChainSel,
@@ -89,16 +89,16 @@ func DeployCCIPAndAddLanes(lggr logger.Logger, envCfg devenv.EnvironmentConfig, 
 		OCRSecrets:     deployment.XXXGenerateTestOCRSecrets(),
 	})
 	if err != nil {
-		return DeployCCIPOutput{Ab: e.ExistingAddresses}, err
+		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
 	}
 	err = tenv.Env.ExistingAddresses.Merge(output.AddressBook)
 	if err != nil {
-		return DeployCCIPOutput{Ab: e.ExistingAddresses}, err
+		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
 	}
 	// Get new state after migration.
 	state, err = ccipdeployment.LoadOnchainState(tenv.Env)
 	if err != nil {
-		return DeployCCIPOutput{Ab: e.ExistingAddresses}, err
+		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
 	}
 
 	// Apply the jobs.
@@ -111,7 +111,7 @@ func DeployCCIPAndAddLanes(lggr logger.Logger, envCfg devenv.EnvironmentConfig, 
 					Spec:   job,
 				})
 			if err != nil {
-				return DeployCCIPOutput{Ab: e.ExistingAddresses}, err
+				return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
 			}
 		}
 	}
@@ -119,11 +119,8 @@ func DeployCCIPAndAddLanes(lggr logger.Logger, envCfg devenv.EnvironmentConfig, 
 	// Add all lanes
 	err = ccipdeployment.AddLanesForAll(tenv.Env, state)
 	if err != nil {
-		return DeployCCIPOutput{Ab: e.ExistingAddresses}, err
+		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
 	}
 	err = tenv.Env.ExistingAddresses.Merge(output.AddressBook)
-	if err != nil {
-		return DeployCCIPOutput{Ab: e.ExistingAddresses}, err
-	}
-	return DeployCCIPOutput{Ab: e.ExistingAddresses}, nil
+	return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
 }

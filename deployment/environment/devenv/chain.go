@@ -109,7 +109,7 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]deployme
 				if receipt.Status == 0 {
 					errReason, err := deployment.GetErrorReasonFromTx(ec, chainCfg.DeployerKey.From, tx, receipt)
 					if err == nil && errReason != "" {
-						return blockNumber, fmt.Errorf("tx %s reverted,error reason: %s", tx.Hash().Hex(), errReason)
+						return blockNumber, fmt.Errorf("tx %s reverted, error reason: %s", tx.Hash().Hex(), errReason)
 					}
 					return blockNumber, fmt.Errorf("tx %s reverted, could not decode error reason", tx.Hash().Hex())
 				}

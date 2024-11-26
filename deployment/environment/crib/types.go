@@ -12,31 +12,23 @@ const (
 
 type DeployOutput struct {
 	DON         devenv.DON
-	Chains      map[uint64]devenv.ChainConfig // chain selector -> Chain Config
-	AddressBook deployment.AddressBook        // Addresses of all contracts
+	Chains      []devenv.ChainConfig   // chain selector -> Chain Config
+	AddressBook deployment.AddressBook // Addresses of all contracts
 }
 
 type DeployCCIPOutput struct {
-	Ab deployment.AddressBook `json:"addressbook"`
+	deployment.AddressBook `json:"addressbook"`
 }
 
-func NewDeployEnvironmentFromCrib(lggr logger.Logger, output DeployOutput) (*deployment.Environment, error) {
+func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput) (*deployment.Environment, error) {
 	var nodeIds = make([]string, 0)
 	for _, n := range output.DON.Nodes {
 		nodeIds = append(nodeIds, n.NodeId)
 	}
 
-	var chains = make(map[uint64]deployment.Chain)
-	for sel, chain := range output.Chains {
-		multiClient, err := deployment.NewMultiClient(lggr, []deployment.RPC{{WSURL: chain.WSRPCs[0]}})
-		if err != nil {
-			return nil, err
-		}
-		chains[sel] = deployment.Chain{
-			Selector:    sel,
-			Client:      multiClient,
-			DeployerKey: chain.DeployerKey,
-		}
+	chains, err := devenv.NewChains(lggr, output.Chains)
+	if err != nil {
+		return nil, err
 	}
 	return deployment.NewEnvironment(
 		CRIB_ENV_NAME,
