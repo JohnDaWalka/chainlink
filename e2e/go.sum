@@ -285,6 +285,8 @@ github.com/smartcontractkit/chainlink-testing-framework/framework v0.2.11-0.2024
 github.com/smartcontractkit/chainlink-testing-framework/framework v0.2.11-0.20241126153933-46dc418c8243/go.mod h1:mMUqvS3BZfvN1OfK4OFTYf1+T0X6nwmSXJM2keaPsSM=
 github.com/smartcontractkit/chainlink-testing-framework/framework v0.2.11-0.20241126161118-643659c6efe5 h1:fl/xlA2/VRKijFAI+Kbmez6oa80K5DtVMxQ+niAM5Wo=
 github.com/smartcontractkit/chainlink-testing-framework/framework v0.2.11-0.20241126161118-643659c6efe5/go.mod h1:mMUqvS3BZfvN1OfK4OFTYf1+T0X6nwmSXJM2keaPsSM=
+github.com/smartcontractkit/chainlink-testing-framework/framework v0.2.11-0.20241126163231-bff659256e53 h1:uCFotJhhhAhsZfqdgPzjF1+iQOJvpsOCkWk+QGuqHVY=
+github.com/smartcontractkit/chainlink-testing-framework/framework v0.2.11-0.20241126163231-bff659256e53/go.mod h1:mMUqvS3BZfvN1OfK4OFTYf1+T0X6nwmSXJM2keaPsSM=
 github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.4 h1:hPI9GhHE1RmIG1oyPeFjED0AhWnNb9JzD74Oq2bO+IQ=
 github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.4/go.mod h1:afY3QmNgeR/VI1pRbGH8g3YXGy7C2RrFOwUzEFvL3L8=
 github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12 h1:NzZGjaqez21I3DU7objl3xExTH4fxYvzTqar8DC6360=
