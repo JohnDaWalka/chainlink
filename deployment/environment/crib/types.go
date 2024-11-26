@@ -17,7 +17,7 @@ type DeployOutput struct {
 }
 
 type DeployCCIPOutput struct {
-	ab deployment.AddressBook
+	Ab deployment.AddressBook `json:"addressbook"`
 }
 
 func NewDeployEnvironmentFromCrib(lggr logger.Logger, output DeployOutput) (*deployment.Environment, error) {
