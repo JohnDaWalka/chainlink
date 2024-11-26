@@ -455,7 +455,7 @@ func TestWorkflow(t *testing.T) {
 					bc.ChainID,
 					nodesInfo[i].OcrKeyBundleID,
 				)
-				fmt.Println(`strings.TrimPrefix(nodeset.CLNodes[0].Node.DockerP2PUrl, "http://")`, strings.TrimPrefix(nodeset.CLNodes[0].Node.DockerP2PUrl, "http://"))
+				fmt.Println("consensusJobSpec", consensusJobSpec)
 				response, _, err2 = nodeClient.CreateJobRaw(consensusJobSpec)
 				assert.NoError(t, err2)
 				assert.Empty(t, response.Errors)
