@@ -117,8 +117,9 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 			healthyNodesNum++
 			primaryNodeWg.Add(1)
 			go func(ctx context.Context) {
-				// Broadcasting transaction and results reporing are background jobs that should be detached from
-				// callers cancellation
+				// Broadcasting transaction and results reporting for invariant detection are background jobs that must be detached from
+				// callers cancellation.
+				// Results reporting to SendTransaction caller must respect caller's context to avoid goroutine leak.
 				defer primaryNodeWg.Done()
 				r := txSender.broadcastTxAsync(ctx, rpc, tx)
 				select {
