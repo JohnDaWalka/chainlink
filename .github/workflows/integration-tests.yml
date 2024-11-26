@@ -1,5 +1,5 @@
 name: Integration Tests
-run-name: Integration Tests ${{ inputs.distinct_run_name && inputs.distinct_run_name || '' }}
+run-name: Integration Tests
 on:
   merge_group:
   pull_request:
@@ -12,25 +12,11 @@ on:
         description: 'The ref to checkout, defaults to the calling branch'
         required: false
         type: string
-      evm-ref:
-        description: 'The sha of the chainlink-evm commit to use if wanted'
-        required: false
-        type: string
-      distinct_run_name:
-        description: 'A unique identifier for this run, only use from other repos'
-        required: false
-        type: string
 
 # Only run 1 of this workflow at a time per PR
 concurrency:
-  group: ${{ github.ref }}-${{ github.repository }}-${{ github.event_name }}--integration-tests-${{ inputs.distinct_run_name }}
+  group: ${{ github.ref }}-${{ github.repository }}-${{ github.event_name }}--integration-tests
   cancel-in-progress: true
-
-env:
-  # for run-test variables and environment
-  TEST_SUITE: smoke
-  TEST_ARGS: -test.timeout 12m
-  COLLECTION_ID: chainlink-integration-tests
 
 jobs:
   changes:
@@ -117,8 +103,8 @@ jobs:
       id-token: write
       contents: read
     needs: changes
-    if: github.event_name == 'pull_request' && ( needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-integration-tests.yml@4cb261035305f9b0904ae43223faaa3a84e5f4b5 #ctf-run-tests@0.2.0
+    if: github.event_name == 'pull_request' && ( needs.changes.outputs.ccip_changes == 'true' || needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
+    uses: smartcontractkit/.github/.github/workflows/run-integration-tests.yml@c41d97a7fab91ed6264f222d529cfb76c7f1b140 #ctf-run-tests@0.2.0
     with:
       workflow_name: Run CCIP Integration Tests For PR
       test_path: .github/integration-tests.yml
@@ -127,10 +113,7 @@ jobs:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
-      PROD_AWS_ACCOUNT_NUMBER: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-      AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN: ${{ secrets.AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN }}
       SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
 
   run-ccip-integration-tests-for-merge-queue:
@@ -142,8 +125,8 @@ jobs:
       id-token: write
       contents: read
     needs: changes
-    if: github.event_name == 'merge_group' && ( needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-integration-tests.yml@4cb261035305f9b0904ae43223faaa3a84e5f4b5 #ctf-run-tests@1.0.0
+    if: github.event_name == 'merge_group' && ( needs.changes.outputs.ccip_changes == 'true' || needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
+    uses: smartcontractkit/.github/.github/workflows/run-integration-tests.yml@c41d97a7fab91ed6264f222d529cfb76c7f1b140 #ctf-run-tests@1.0.0
     with:
       workflow_name: Run CCIP Integration Tests For Merge Queue
       test_path: .github/integration-tests.yml
@@ -155,10 +138,7 @@ jobs:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
-      PROD_AWS_ACCOUNT_NUMBER: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-      AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN: ${{ secrets.AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN }}
       SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
 
   check-integration-test-results:
@@ -167,12 +147,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint-integration-tests,run-ccip-integration-tests-for-pr,run-ccip-integration-tests-for-merge-queue]
     steps:
-      - name: Fail the job if core tests in PR not successful
-        if: always() && needs.run-core-integration-tests-for-pr.result == 'failure'
+      - name: Fail the job if ccip tests in PR not successful
+        if: always() && needs.run-ccip-integration-tests-for-pr.result == 'failure'
         run: exit 1
 
-      - name: Fail the job if core tests in merge queue not successful
-        if: always() && needs.run-core-integration-tests-for-merge-queue.result == 'failure'
+      - name: Fail the job if ccip tests in merge queue not successful
+        if: always() && needs.run-ccip-integration-tests-for-merge-queue.result == 'failure'
         run: exit 1
 
       - name: Fail the job if lint not successful
@@ -198,4 +178,3 @@ jobs:
         with:
           environment: integration
           ref: ${{ github.head_ref }} # See https://github.com/github/docs/issues/15319#issuecomment-1476705663
-
