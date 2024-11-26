@@ -2,4 +2,4 @@
 "chainlink": patch
 ---
 
-Fix TransactionSender go routine leak.
+Fix TransactionSender go routine leak. #bugfix
