@@ -475,7 +475,7 @@ func genMessages(
 			Target:       sourceRouter.Address(),
 			AllowFailure: false,
 			CallData:     calldata,
-			Value: bufferedFee,
+			Value:        bufferedFee,
 		})
 	}
 

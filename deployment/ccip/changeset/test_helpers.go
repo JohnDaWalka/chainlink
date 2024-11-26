@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
+
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -400,8 +401,10 @@ func CCIPSendRequest(
 	if err != nil {
 		return nil, 0, errors.Wrap(deployment.MaybeDataErr(err), "failed to get fee")
 	}
+	bufferedFee := new(big.Int).Mul(fee, big.NewInt(110)) // adding a 10% buffer
+	bufferedFee.Div(bufferedFee, big.NewInt(100))
 	if msg.FeeToken == common.HexToAddress("0x0") {
-		e.Chains[src].DeployerKey.Value = fee
+		e.Chains[src].DeployerKey.Value = bufferedFee
 		defer func() { e.Chains[src].DeployerKey.Value = nil }()
 	}
 	tx, err := r.CcipSend(
