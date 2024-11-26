@@ -600,7 +600,7 @@ targets:
 		))
 
 		// Wait for nodes to boot
-		time.Sleep(20 * time.Second)
+		time.Sleep(2 * time.Minute)
 
 		// Configure OCR capability contract
 		ocr3Config := generateOCR3Config(t, workflowNodesetInfo)
