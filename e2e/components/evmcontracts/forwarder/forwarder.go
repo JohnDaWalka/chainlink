@@ -31,7 +31,7 @@ func Deploy(sc *seth.Client) (*instance, error) {
 		return nil, err
 	}
 
-	fmt.Printf("🚀 Deployed \033[1mforwarder\033[0m contract at \033[1m%s\033[0m", forwarderAddress)
+	fmt.Printf("🚀 Deployed \033[1mforwarder\033[0m contract at \033[1m%s\033[0m\n", forwarderAddress)
 	return &instance{
 		sc:       sc,
 		Address:  forwarderAddress,

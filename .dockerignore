@@ -36,3 +36,4 @@ go.work
 go.work.sum
 
 e2e/
+e2e/**/*

@@ -337,8 +337,6 @@ func TestWorkflow(t *testing.T) {
 				bc.ChainID,
 			)
 		}
-		fmt.Println("bc.Nodes[0].DockerInternalWSUrl", bc.Nodes[0].DockerInternalWSUrl)
-		fmt.Println("bc.Nodes[0].DockerInternalHTTPUrl", bc.Nodes[0].DockerInternalHTTPUrl)
 
 		nodeset, err = ns.UpgradeNodeSet(in.NodeSet, bc, 5*time.Second)
 		require.NoError(t, err)
@@ -457,6 +455,7 @@ func TestWorkflow(t *testing.T) {
 					bc.ChainID,
 					nodesInfo[i].OcrKeyBundleID,
 				)
+				fmt.Println(`strings.TrimPrefix(nodeset.CLNodes[0].Node.DockerP2PUrl, "http://")`, strings.TrimPrefix(nodeset.CLNodes[0].Node.DockerP2PUrl, "http://"))
 				response, _, err2 = nodeClient.CreateJobRaw(consensusJobSpec)
 				assert.NoError(t, err2)
 				assert.Empty(t, response.Errors)
