@@ -254,7 +254,7 @@ func Test_CCIPBatching(t *testing.T) {
 			e.Env.Chains[sourceChain],
 			e.Env.Chains[sourceChain].DeployerKey,
 			otherSender.From,
-			assets.Ether(20).ToInt(),
+			assets.Ether(100).ToInt(),
 		)
 
 		for _, transactor := range transactors {
@@ -462,8 +462,9 @@ func genMessages(
 		if err != nil {
 			return nil, nil, fmt.Errorf("router get fee: %w", err)
 		}
-
-		totalValue.Add(totalValue, fee)
+		bufferedFee := new(big.Int).Mul(fee, big.NewInt(110)) // adding a 10% buffer
+		bufferedFee.Div(bufferedFee, big.NewInt(100))
+		totalValue.Add(totalValue, bufferedFee)
 
 		calldata, err := changeset.CCIPSendCalldata(destChainSelector, msg)
 		if err != nil {
@@ -474,7 +475,7 @@ func genMessages(
 			Target:       sourceRouter.Address(),
 			AllowFailure: false,
 			CallData:     calldata,
-			Value:        fee,
+			Value: bufferedFee,
 		})
 	}
 
