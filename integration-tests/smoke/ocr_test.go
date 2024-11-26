@@ -31,6 +31,8 @@ func TestOCRBasic(t *testing.T) {
 
 	prepareORCv1SmokeTestEnv(t, l, 5)
 
+	require.True(t, false, "let it dump logs")
+
 	//env, ocrInstances, sethClient := prepareORCv1SmokeTestEnv(t, l, 5)
 	//nodeClients := env.ClCluster.NodeAPIs()
 	//workerNodes := nodeClients[1:]
@@ -125,12 +127,12 @@ func prepareORCv1SmokeTestEnv(t *testing.T, l zerolog.Logger, firstRoundResult i
 	err = actions.CreateOCRJobsLocal(ocrInstances, bootstrapNode, workerNodes, 5, env.MockAdapter, big.NewInt(sethClient.ChainID))
 	require.NoError(t, err, "Error creating OCR jobs")
 
-	//err = actions.WatchNewOCRRound(l, sethClient, 1, contracts.V1OffChainAgrregatorToOffChainAggregatorWithRounds(ocrInstances), time.Duration(3*time.Minute))
-	//require.NoError(t, err, "Error watching for new OCR round")
-	//
-	//answer, err := ocrInstances[0].GetLatestAnswer(testcontext.Get(t))
-	//require.NoError(t, err, "Getting latest answer from OCR contract shouldn't fail")
-	//require.Equal(t, firstRoundResult, answer.Int64(), "Expected latest answer from OCR contract to be 5 but got %d", answer.Int64())
+	err = actions.WatchNewOCRRound(l, sethClient, 1, contracts.V1OffChainAgrregatorToOffChainAggregatorWithRounds(ocrInstances), time.Duration(3*time.Minute))
+	require.NoError(t, err, "Error watching for new OCR round")
+
+	answer, err := ocrInstances[0].GetLatestAnswer(testcontext.Get(t))
+	require.NoError(t, err, "Getting latest answer from OCR contract shouldn't fail")
+	require.Equal(t, firstRoundResult, answer.Int64(), "Expected latest answer from OCR contract to be 5 but got %d", answer.Int64())
 
 	return env, ocrInstances, sethClient
 }

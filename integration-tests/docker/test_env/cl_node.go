@@ -152,6 +152,11 @@ func NewClNode(networks []string, imageName, imageVersion string, nodeConfig *ch
 	for _, opt := range opts {
 		opt(n)
 	}
+	err = n.InitLogConsumerConfig(n.l)
+	if err != nil {
+		return nil, err
+	}
+
 	return n, nil
 }
 
@@ -490,28 +495,7 @@ func (n *ClNode) getContainerRequest(secrets string) (
 				FileMode:          0644,
 			},
 		},
-		LifecycleHooks: []tc.ContainerLifecycleHooks{
-			{
-				PostStarts: []tc.ContainerHook{
-					func(ctx context.Context, c tc.Container) error {
-						if n.LogStream != nil {
-							return n.LogStream.ConnectContainer(ctx, c, "")
-						}
-						return nil
-					},
-				},
-				PreStops: []tc.ContainerHook{
-					func(ctx context.Context, c tc.Container) error {
-						if n.LogStream != nil {
-							return n.LogStream.DisconnectContainer(c)
-						}
-						return nil
-					},
-				},
-				PostStops:     n.PostStopsHooks,
-				PreTerminates: n.PreTerminatesHooks,
-			},
-		},
+		LogConsumerCfg: n.LogConsumerConfig,
 	}, nil
 }
 

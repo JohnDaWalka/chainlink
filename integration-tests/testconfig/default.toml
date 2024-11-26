@@ -1,6 +1,6 @@
 [Logging]
 # set to true to flush logs to selected target regardless of test result; otherwise logs are only flushed if test failed
-test_log_collect = true
+test_log_collect = false
 
 [Logging.Grafana]
 base_url = "https://grafana.ops.prod.cldev.sh"

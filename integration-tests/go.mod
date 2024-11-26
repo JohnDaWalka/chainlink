@@ -7,8 +7,6 @@ replace github.com/smartcontractkit/chainlink/v2 => ../
 
 replace github.com/smartcontractkit/chainlink/deployment => ../deployment
 
-replace github.com/smartcontractkit/chainlink-testing-framework/lib => ../../chainlink-testing-framework/lib
-
 require (
 	dario.cat/mergo v1.0.1
 	github.com/AlekSi/pointer v1.1.0
@@ -42,7 +40,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20241118091009-43c2b4804cec
 	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241120111740-a6a70ec7692b
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.2
-	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.16
+	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.17-0.20241126115219-505ec47a9d43
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.50.0
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.9
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.50.2
