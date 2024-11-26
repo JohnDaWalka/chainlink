@@ -4,7 +4,7 @@
   image = "f4hrenh9it/foundry:latest"
   port = "8545"
   type = "anvil"
-  docker_cmd_params = ["-b", "3"]
+  docker_cmd_params = ["-b", "10"]
 
 [nodeset]
   nodes = 5
