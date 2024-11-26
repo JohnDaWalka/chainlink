@@ -11,21 +11,17 @@ const (
 )
 
 type DeployOutput struct {
-	DON         devenv.DON
+	NodeIDs     []string
 	Chains      []devenv.ChainConfig   // chain selector -> Chain Config
 	AddressBook deployment.AddressBook // Addresses of all contracts
 }
 
 type DeployCCIPOutput struct {
-	deployment.AddressBook `json:"addressbook"`
+	AddressBook deployment.AddressBookMap `json:"addressBook"`
+	NodeIDs     []string                  `json:"nodeIDs"`
 }
 
 func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput) (*deployment.Environment, error) {
-	var nodeIds = make([]string, 0)
-	for _, n := range output.DON.Nodes {
-		nodeIds = append(nodeIds, n.NodeId)
-	}
-
 	chains, err := devenv.NewChains(lggr, output.Chains)
 	if err != nil {
 		return nil, err
@@ -35,7 +31,7 @@ func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput)
 		lggr,
 		output.AddressBook,
 		chains,
-		nodeIds,
+		output.NodeIDs,
 		nil, // todo: populate the offchain client using output.DON
 	), nil
 }

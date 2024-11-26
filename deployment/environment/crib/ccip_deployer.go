@@ -3,6 +3,7 @@ package crib
 import (
 	"context"
 	"errors"
+	"golang.org/x/exp/maps"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
@@ -52,14 +53,15 @@ func DeployCCIPAndAddLanes(lggr logger.Logger, envCfg devenv.EnvironmentConfig, 
 	}
 
 	_, err = ccipdeployment.DeployFeeds(lggr, ab, e.Chains[feedChainSel])
+	addresses, err := e.ExistingAddresses.Addresses()
+
 	if err != nil {
-		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
+		return DeployCCIPOutput{}, err
 	}
 	err = ccipdeployment.DeployFeeTokensToChains(lggr, ab, e.Chains)
 	if err != nil {
-		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
+		return DeployCCIPOutput{}, err
 	}
-	e.ExistingAddresses = ab
 	tenv := ccipdeployment.DeployedEnv{
 		Env:          *e,
 		HomeChainSel: homeChainSel,
@@ -68,17 +70,17 @@ func DeployCCIPAndAddLanes(lggr logger.Logger, envCfg devenv.EnvironmentConfig, 
 
 	state, err := ccipdeployment.LoadOnchainState(tenv.Env)
 	if err != nil {
-		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
+		return DeployCCIPOutput{}, err
 	}
 	if state.Chains[tenv.HomeChainSel].LinkToken == nil {
-		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, errors.New("link token not deployed")
+		return DeployCCIPOutput{}, errors.New("link token not deployed")
 	}
 
 	feeds := state.Chains[tenv.FeedChainSel].USDFeeds
 	tokenConfig := ccipdeployment.NewTestTokenConfig(feeds)
 	mcmsCfg, err := ccipdeployment.NewTestMCMSConfig(tenv.Env)
 	if err != nil {
-		return DeployCCIPOutput{e.ExistingAddresses}, err
+		return DeployCCIPOutput{}, err
 	}
 	output, err := changeset.InitialDeploy(tenv.Env, ccipdeployment.DeployCCIPContractConfig{
 		HomeChainSel:   tenv.HomeChainSel,
@@ -89,16 +91,16 @@ func DeployCCIPAndAddLanes(lggr logger.Logger, envCfg devenv.EnvironmentConfig, 
 		OCRSecrets:     deployment.XXXGenerateTestOCRSecrets(),
 	})
 	if err != nil {
-		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
+		return DeployCCIPOutput{}, err
 	}
 	err = tenv.Env.ExistingAddresses.Merge(output.AddressBook)
 	if err != nil {
-		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
+		return DeployCCIPOutput{}, err
 	}
 	// Get new state after migration.
 	state, err = ccipdeployment.LoadOnchainState(tenv.Env)
 	if err != nil {
-		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
+		return DeployCCIPOutput{}, err
 	}
 
 	// Apply the jobs.
@@ -111,7 +113,7 @@ func DeployCCIPAndAddLanes(lggr logger.Logger, envCfg devenv.EnvironmentConfig, 
 					Spec:   job,
 				})
 			if err != nil {
-				return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
+				return DeployCCIPOutput{}, err
 			}
 		}
 	}
@@ -119,8 +121,15 @@ func DeployCCIPAndAddLanes(lggr logger.Logger, envCfg devenv.EnvironmentConfig, 
 	// Add all lanes
 	err = ccipdeployment.AddLanesForAll(tenv.Env, state)
 	if err != nil {
-		return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
+		return DeployCCIPOutput{}, err
 	}
 	err = tenv.Env.ExistingAddresses.Merge(output.AddressBook)
-	return DeployCCIPOutput{AddressBook: e.ExistingAddresses}, err
+	addresses, err = ab.Addresses()
+	if err != nil {
+		return DeployCCIPOutput{}, err
+	}
+	return DeployCCIPOutput{
+		AddressBook: deployment.AddressBookMap{AddressesByChain: addresses},
+		NodeIDs:     maps.Keys(output.JobSpecs),
+	}, err
 }
