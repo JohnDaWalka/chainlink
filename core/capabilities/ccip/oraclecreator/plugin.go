@@ -43,6 +43,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
+	evmcdoec "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/codec"
 	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/synchronization"
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
@@ -229,6 +230,13 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 ) (ocr3types.ReportingPluginFactory[[]byte], ocr3types.ContractTransmitter[[]byte], error) {
 	var factory ocr3types.ReportingPluginFactory[[]byte]
 	var transmitter ocr3types.ContractTransmitter[[]byte]
+
+	// TODO add non-evm codec base on chainID/chainFamily
+	evmCodec, err := evmcdoec.NewCodec()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create evm encoder: %w", err)
+	}
+
 	if config.Config.PluginType == uint8(cctypes.PluginTypeCCIPCommit) {
 		if !i.peerWrapper.IsStarted() {
 			return nil, nil, fmt.Errorf("peer wrapper is not started")
@@ -254,7 +262,7 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 				Named(hexutil.Encode(config.Config.OfframpAddress)),
 			donID,
 			ccipreaderpkg.OCR3ConfigWithMeta(config),
-			ccipevm.NewCommitPluginCodecV1(),
+			evmCodec,
 			ccipevm.NewMessageHasherV1(i.lggr.Named("MessageHasherV1")),
 			i.homeChainReader,
 			i.homeChainSelector,
@@ -275,7 +283,7 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 				Named(hexutil.Encode(config.Config.OfframpAddress)),
 			donID,
 			ccipreaderpkg.OCR3ConfigWithMeta(config),
-			ccipevm.NewExecutePluginCodecV1(),
+			evmCodec,
 			ccipevm.NewMessageHasherV1(i.lggr.Named("MessageHasherV1")),
 			i.homeChainReader,
 			ccipevm.NewEVMTokenDataEncoder(),
@@ -299,7 +307,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 	pluginType cctypes.PluginType,
 	config cctypes.OCR3ConfigWithMeta,
 	publicCfg ocr3confighelper.PublicConfig,
-	chainFamily string,
+	destChainFamily string,
 ) (
 	map[cciptypes.ChainSelector]types.ContractReader,
 	map[cciptypes.ChainSelector]types.ChainWriter,
@@ -328,7 +336,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 	chainWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
 	for relayID, relayer := range i.relayers {
 		chainID := relayID.ChainID
-
+		chainFamily := relayID.Network
 		chainSelector, err1 := i.getChainSelector(chainID, chainFamily)
 		if err1 != nil {
 			return nil, nil, fmt.Errorf("failed to get chain selector from chain ID %s: %w", chainID, err1)
@@ -344,7 +352,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			return nil, nil, err1
 		}
 
-		if chainID == destChainID {
+		if chainID == destChainID && destChainFamily == chainFamily {
 			offrampAddressHex := common.BytesToAddress(config.Config.OfframpAddress).Hex()
 			err2 := cr.Bind(ctx, []types.BoundContract{
 				{

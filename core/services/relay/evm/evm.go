@@ -864,6 +864,15 @@ func (r *Relayer) NewContractReader(ctx context.Context, chainReaderConfig []byt
 	return NewChainReaderService(ctx, r.lggr, r.chain.LogPoller(), r.chain.HeadTracker(), r.chain.Client(), *cfg)
 }
 
+func (r *Relayer) NewPluginCodec(ctx context.Context, chainReaderConfig []byte) (commontypes.RemoteCodec, error) {
+	cfg := &types.ChainReaderConfig{}
+	if err := json.Unmarshal(chainReaderConfig, cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshall chain reader config err: %s", err)
+	}
+
+	return NewChainReaderService(ctx, r.lggr, r.chain.LogPoller(), r.chain.HeadTracker(), r.chain.Client(), *cfg)
+}
+
 func (r *Relayer) NewMedianProvider(ctx context.Context, rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.MedianProvider, error) {
 	lggr := logger.Sugared(r.lggr).Named("MedianProvider").Named(rargs.ExternalJobID.String())
 	relayOpts := types.NewRelayOpts(rargs)
