@@ -614,7 +614,7 @@ targets:
 		require.NoError(t, err)
 
 		// It can take a while before the first report is produced, particularly on CI.
-		timeout := 8 * time.Minute
+		timeout := 5 * time.Minute
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 
