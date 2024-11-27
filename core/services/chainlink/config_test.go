@@ -494,6 +494,11 @@ func TestConfig_Marshal(t *testing.T) {
 			ChainID:   ptr("1"),
 			NetworkID: ptr("evm"),
 		},
+		WorkflowRegistry: toml.WorkflowRegistry{
+			Address:   ptr(""),
+			ChainID:   ptr("1"),
+			NetworkID: ptr("evm"),
+		},
 		Dispatcher: toml.Dispatcher{
 			SupportedVersion:   ptr(1),
 			ReceiverBufferSize: ptr(10000),
@@ -745,6 +750,7 @@ func TestConfig_Marshal(t *testing.T) {
 				TxTimeout:                commoncfg.MustNewDuration(time.Hour),
 				TxRetryTimeout:           commoncfg.MustNewDuration(time.Minute),
 				TxConfirmTimeout:         commoncfg.MustNewDuration(time.Second),
+				TxRetentionTimeout:       commoncfg.MustNewDuration(0 * time.Second),
 				SkipPreflight:            ptr(true),
 				Commitment:               ptr("banana"),
 				MaxRetries:               ptr[int64](7),
@@ -837,6 +843,7 @@ func TestConfig_Marshal(t *testing.T) {
 		Transmitter: toml.MercuryTransmitter{
 			TransmitQueueMaxSize: ptr(uint32(123)),
 			TransmitTimeout:      commoncfg.MustNewDuration(234 * time.Second),
+			TransmitConcurrency:  ptr(uint32(456)),
 		},
 		VerboseLogging: ptr(true),
 	}
@@ -1272,6 +1279,7 @@ OCR2CacheTTL = '1h0m0s'
 TxTimeout = '1h0m0s'
 TxRetryTimeout = '1m0s'
 TxConfirmTimeout = '1s'
+TxRetentionTimeout = '0s'
 SkipPreflight = true
 Commitment = 'banana'
 MaxRetries = 7
@@ -1346,6 +1354,7 @@ CertFile = '/path/to/cert.pem'
 [Mercury.Transmitter]
 TransmitQueueMaxSize = 123
 TransmitTimeout = '3m54s'
+TransmitConcurrency = 456
 `},
 		{"full", full, fullTOML},
 		{"multi-chain", multiChain, multiChainTOML},

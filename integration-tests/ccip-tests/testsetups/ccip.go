@@ -3,7 +3,7 @@ package testsetups
 import (
 	"context"
 	"fmt"
-	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
+	"math"
 	"math/big"
 	"math/rand"
 	"os"
@@ -25,6 +25,7 @@ import (
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
+	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
@@ -235,12 +236,18 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		var chainIDs []int64
 		existingChainIDs := make(map[uint64]struct{})
 		for _, net := range c.SelectedNetworks {
+			if net.ChainID < 0 {
+				return fmt.Errorf("negative chain ID: %d", net.ChainID)
+			}
 			existingChainIDs[uint64(net.ChainID)] = struct{}{}
 		}
 		for _, id := range chainselectors.TestChainIds() {
 			// if the chain id already exists in the already provided selected networks, skip it
 			if _, exists := existingChainIDs[id]; exists {
 				continue
+			}
+			if id > math.MaxInt64 {
+				return fmt.Errorf("chain ID overflows int64: %d", id)
 			}
 			chainIDs = append(chainIDs, int64(id))
 		}
@@ -301,7 +308,7 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		var newNetworkPairs []NetworkPair
 		denselyConnectedNetworks := make(map[string]struct{})
 		// if densely connected networks are provided, choose all the network pairs containing the networks mentioned in the list for DenselyConnectedNetworkChainIds
-		if c.TestGroupInput.DenselyConnectedNetworkChainIds != nil && len(c.TestGroupInput.DenselyConnectedNetworkChainIds) > 0 {
+		if len(c.TestGroupInput.DenselyConnectedNetworkChainIds) > 0 {
 			for _, n := range c.TestGroupInput.DenselyConnectedNetworkChainIds {
 				denselyConnectedNetworks[n] = struct{}{}
 			}
