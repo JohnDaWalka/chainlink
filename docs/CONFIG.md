@@ -3859,6 +3859,9 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '1h10m0s'
 
+[TxmV2]
+Enabled = false
+
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -4841,6 +4844,9 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '1h30m0s'
 
+[TxmV2]
+Enabled = false
+
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -5591,6 +5597,9 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '1h10m0s'
 
+[TxmV2]
+Enabled = false
+
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -5698,6 +5707,9 @@ RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '45m0s'
+
+[TxmV2]
+Enabled = false
 
 [Transactions]
 ForwardersEnabled = false
@@ -6350,6 +6362,9 @@ RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '1h30m0s'
+
+[TxmV2]
+Enabled = false
 
 [Transactions]
 ForwardersEnabled = false
@@ -8201,6 +8216,9 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '1h50m0s'
 
+[TxmV2]
+Enabled = false
+
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -8520,6 +8538,9 @@ RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '5m0s'
+
+[TxmV2]
+Enabled = false
 
 [Transactions]
 ForwardersEnabled = false
@@ -9403,6 +9424,9 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '1h50m0s'
 
+[TxmV2]
+Enabled = false
+
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -10122,6 +10146,33 @@ out-of-sync. Only applicable if `FinalityTagEnabled=true`
 
 Set to zero to disable.
 
+## EVM.TxmV2
+```toml
+[EVM.TxmV2]
+Enabled = false # Default
+BlockTime = '10s' # Example
+CustomURL = 'https://example.api.io' # Example
+```
+
+
+### Enabled
+```toml
+Enabled = false # Default
+```
+Enabled enables TxmV2.
+
+### BlockTime
+```toml
+BlockTime = '10s' # Example
+```
+BlockTime controls the frequency of the backfill loop of TxmV2.
+
+### CustomURL
+```toml
+CustomURL = 'https://example.api.io' # Example
+```
+CustomURL configures the base url of a custom endpoint used by the ChainDualBroadcast chain type.
+
 ## EVM.Transactions
 ```toml
 [EVM.Transactions]
@@ -10179,33 +10230,6 @@ ReaperThreshold indicates how old an EthTx ought to be before it can be reaped.
 ResendAfterThreshold = '1m' # Default
 ```
 ResendAfterThreshold controls how long to wait before re-broadcasting a transaction that has not yet been confirmed.
-
-## EVM.TxmV2
-```toml
-[EVM.TxmV2]
-Enabled = false # Default
-BlockTime = '10s' # Example
-CustomURL = 'https://example.api.io' # Example
-```
-
-
-### Enabled
-```toml
-Enabled = false # Default
-```
-Enabled enables TxmV2.
-
-### BlockTime
-```toml
-BlockTime = '10s' # Example
-```
-BlockTime controls the frequency of the backfill loop of TxmV2.
-
-### CustomURL
-```toml
-CustomURL = 'https://example.api.io' # Example
-```
-CustomURL configures the base url of a custom endpoint used by the ChainDualBroadcast chain type.
 
 ## EVM.Transactions.AutoPurge
 ```toml
