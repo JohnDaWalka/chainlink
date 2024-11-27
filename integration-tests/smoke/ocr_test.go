@@ -33,6 +33,8 @@ func TestOCRBasic(t *testing.T) {
 	nodeClients := env.ClCluster.NodeAPIs()
 	workerNodes := nodeClients[1:]
 
+	require.True(t, false, "let it dump logs")
+
 	err := actions.SetAllAdapterResponsesToTheSameValueLocal(10, ocrInstances, workerNodes, env.MockAdapter)
 	require.NoError(t, err, "Error setting all adapter responses to the same value")
 
