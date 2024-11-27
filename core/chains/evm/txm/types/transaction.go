@@ -170,6 +170,10 @@ type TxMeta struct {
 	// CCIP
 	MessageIDs []string `json:"MessageIDs,omitempty"`
 	SeqNumbers []uint64 `json:"SeqNumbers,omitempty"`
+
+	// Dual Broadcast
+	DualBroadcast       *bool   `json:"DualBroadcast,omitempty"`
+	DualBroadcastParams *string `json:"DualBroadcastParams,omitempty"`
 }
 
 type QueueingTxStrategy struct {

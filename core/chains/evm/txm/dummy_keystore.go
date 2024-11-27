@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -41,6 +42,18 @@ func (k *DummyKeystore) SignTx(_ context.Context, fromAddress common.Address, tx
 		return types.SignTx(tx, types.LatestSignerForChainID(chainID), key)
 	}
 	return nil, fmt.Errorf("private key for address: %v not found", fromAddress)
+}
+
+func (k *DummyKeystore) SignMessage(ctx context.Context, address common.Address, data []byte) ([]byte, error) {
+	key, exists := k.privateKeyMap[address]
+	if !exists {
+		return nil, fmt.Errorf("private key for address: %v not found", address)
+	}
+	signature, err := crypto.Sign(accounts.TextHash(data), key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign message for address: %v", address)
+	}
+	return signature, nil
 }
 
 func (k *DummyKeystore) EnabledAddressesForChain(_ context.Context, _ *big.Int) (addresses []common.Address, err error) {

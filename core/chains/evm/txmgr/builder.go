@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/clientwrappers"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/storage"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 )
@@ -93,12 +94,12 @@ func NewEvmTxm(
 	return txmgr.NewTxm(chainId, cfg, txCfg, keyStore, lggr, checkerFactory, fwdMgr, txAttemptBuilder, txStore, broadcaster, confirmer, resender, tracker, finalizer, client.NewTxError)
 }
 
-func NewTxmv2(
+func NewTxmV2(
 	ds sqlutil.DataSource,
 	chainConfig ChainConfig,
 	fCfg FeeConfig,
-	blockTime time.Duration,
-	fwdEnabled bool,
+	txConfig config.Transactions,
+	txmV2Config config.TxmV2,
 	client client.Client,
 	lggr logger.Logger,
 	logPoller logpoller.LogPoller,
@@ -106,23 +107,40 @@ func NewTxmv2(
 	estimator gas.EvmFeeEstimator,
 ) (TxManager, error) {
 	var fwdMgr *forwarders.FwdMgr
-	if fwdEnabled {
+	if txConfig.ForwardersEnabled() {
 		fwdMgr = forwarders.NewFwdMgr(ds, client, logPoller, lggr, chainConfig)
 	} else {
 		lggr.Info("ForwarderManager: Disabled")
 	}
 
 	chainID := client.ConfiguredChainID()
+
+	var stuckTxDetector txm.StuckTxDetector
+	if txConfig.AutoPurge().Enabled() {
+		stuckTxDetectorConfig := txm.StuckTxDetectorConfig{
+			BlockTime:             *txmV2Config.BlockTime(),
+			StuckTxBlockThreshold: *txConfig.AutoPurge().Threshold(),
+			DetectionURL:          txConfig.AutoPurge().DetectionApiUrl().String(),
+		}
+		stuckTxDetector = txm.NewStuckTxDetector(lggr, chainConfig.ChainType(), stuckTxDetectorConfig)
+	}
+
 	attemptBuilder := txm.NewAttemptBuilder(chainID, fCfg.PriceMax(), estimator, keyStore)
 	inMemoryStoreManager := storage.NewInMemoryStoreManager(lggr, chainID)
 	config := txm.Config{
 		EIP1559:   fCfg.EIP1559DynamicFees(),
-		BlockTime: blockTime, //TODO: create new config
-		//nolint:gosec // we want to reuse the existing config until migrations
+		BlockTime: *txmV2Config.BlockTime(),
+		//nolint:gosec // reuse existing config until migration
 		RetryBlockThreshold: uint16(fCfg.BumpThreshold()),
 		EmptyTxLimitDefault: fCfg.LimitDefault(),
 	}
-	t := txm.NewTxm(lggr, chainID, client, attemptBuilder, inMemoryStoreManager, config, keyStore)
+	var c txm.Client
+	if chainConfig.ChainType() == chaintype.ChainDualBroadcast {
+		c = clientwrappers.NewDualBroadcastClient(client, keyStore, txmV2Config.CustomURL())
+	} else {
+		c = clientwrappers.NewChainClient(client)
+	}
+	t := txm.NewTxm(lggr, chainID, c, attemptBuilder, inMemoryStoreManager, stuckTxDetector, config, keyStore)
 	return txm.NewTxmOrchestrator(lggr, chainID, t, inMemoryStoreManager, fwdMgr, keyStore, attemptBuilder), nil
 }
 
