@@ -1,4 +1,4 @@
-package ccipdeployment
+package ccip_integration_tests
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/scylladb/go-reflectx"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/v2/core/store/dialects"
 	"math/big"
@@ -513,15 +514,16 @@ func TestCCIPReader_NextSeqNum(t *testing.T) {
 
 func TestCCIPReader_GetExpectedNextSequenceNumber(t *testing.T) {
 	ctx := tests.Context(t)
-	env := NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
-	state, err := LoadOnchainState(env.Env)
+	//env := NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4, nil)
+	env := changeset.NewMemoryEnvironmentWithJobsAndContracts(t, logger.TestLogger(t), 2, 4, nil)
+	state, err := changeset.LoadOnchainState(env.Env)
 	require.NoError(t, err)
 
 	selectors := env.Env.AllChainSelectors()
 	destChain, srcChain := selectors[0], selectors[1]
 
-	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, destChain, srcChain))
-	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, srcChain, destChain))
+	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, destChain, srcChain))
+	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, srcChain, destChain))
 
 	reader := testSetupRealContracts(
 		ctx,
@@ -541,8 +543,8 @@ func TestCCIPReader_GetExpectedNextSequenceNumber(t *testing.T) {
 
 	maxExpectedSeqNum := 10
 	for i := 1; i < maxExpectedSeqNum; i++ {
-		msg := DefaultRouterMessage(state.Chains[destChain].Receiver.Address())
-		msgSentEvent := TestSendRequest(t, env.Env, state, srcChain, destChain, false, msg)
+		msg := changeset.DefaultRouterMessage(state.Chains[destChain].Receiver.Address())
+		msgSentEvent := changeset.TestSendRequest(t, env.Env, state, srcChain, destChain, false, msg)
 		require.Equal(t, uint64(i), msgSentEvent.SequenceNumber)
 		require.Equal(t, uint64(i), msgSentEvent.Message.Header.Nonce) // check outbound nonce incremented
 		seqNum, err2 := reader.GetExpectedNextSequenceNumber(ctx, cs(srcChain), cs(destChain))
@@ -619,15 +621,15 @@ func TestCCIPReader_Nonces(t *testing.T) {
 
 func Test_GetChainFeePriceUpdates(t *testing.T) {
 	ctx := tests.Context(t)
-	env := NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
-	state, err := LoadOnchainState(env.Env)
+	env := changeset.NewMemoryEnvironmentWithJobsAndContracts(t, logger.TestLogger(t), 2, 4, nil)
+	state, err := changeset.LoadOnchainState(env.Env)
 	require.NoError(t, err)
 
 	selectors := env.Env.AllChainSelectors()
 	chain1, chain2 := selectors[0], selectors[1]
 
-	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
-	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
+	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
+	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
 
 	// Change the gas price for chain2
 	feeQuoter := state.Chains[chain1].FeeQuoter
@@ -673,15 +675,15 @@ func Test_GetChainFeePriceUpdates(t *testing.T) {
 
 func Test_LinkPriceUSD(t *testing.T) {
 	ctx := tests.Context(t)
-	env := NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
-	state, err := LoadOnchainState(env.Env)
+	env := changeset.NewMemoryEnvironmentWithJobsAndContracts(t, logger.TestLogger(t), 2, 4, nil)
+	state, err := changeset.LoadOnchainState(env.Env)
 	require.NoError(t, err)
 
 	selectors := env.Env.AllChainSelectors()
 	chain1, chain2 := selectors[0], selectors[1]
 
-	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
-	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
+	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
+	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
 
 	reader := testSetupRealContracts(
 		ctx,
@@ -702,26 +704,26 @@ func Test_LinkPriceUSD(t *testing.T) {
 	linkPriceUSD, err := reader.LinkPriceUSD(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, linkPriceUSD.Int)
-	require.Equal(t, DefaultInitialPrices.LinkPrice, linkPriceUSD.Int)
+	require.Equal(t, changeset.DefaultInitialPrices.LinkPrice, linkPriceUSD.Int)
 }
 
 func Test_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 	ctx := tests.Context(t)
-	env := NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 4, 4)
-	state, err := LoadOnchainState(env.Env)
+	env := changeset.NewMemoryEnvironmentWithJobsAndContracts(t, logger.TestLogger(t), 4, 4, nil)
+	state, err := changeset.LoadOnchainState(env.Env)
 	require.NoError(t, err)
 
 	selectors := env.Env.AllChainSelectors()
 	destChain, chain1, chain2, chain3 := selectors[0], selectors[1], selectors[2], selectors[3]
 
-	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain1, destChain))
-	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain2, destChain))
-	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain3, destChain))
+	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain1, destChain))
+	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain2, destChain))
+	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain3, destChain))
 
 	boundContracts := map[cciptypes.ChainSelector][]types.BoundContract{}
 	for i, selector := range env.Env.AllChainSelectorsExcluding([]uint64{destChain}) {
 		feeQuoter := state.Chains[selector].FeeQuoter
-		destChainCfg := DefaultFeeQuoterDestChainConfig()
+		destChainCfg := changeset.DefaultFeeQuoterDestChainConfig()
 		//nolint:gosec // disable G115
 		destChainCfg.DestDataAvailabilityOverheadGas = uint32(100 + i)
 		//nolint:gosec // disable G115
@@ -765,15 +767,15 @@ func Test_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 
 func Test_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 	ctx := tests.Context(t)
-	env := NewMemoryEnvironmentContractsOnly(t, logger.TestLogger(t), 2, 4)
-	state, err := LoadOnchainState(env.Env)
+	env := changeset.NewMemoryEnvironmentWithJobsAndContracts(t, logger.TestLogger(t), 2, 4, nil)
+	state, err := changeset.LoadOnchainState(env.Env)
 	require.NoError(t, err)
 
 	selectors := env.Env.AllChainSelectors()
 	chain1, chain2 := selectors[0], selectors[1]
 
-	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
-	require.NoError(t, AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
+	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
+	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
 
 	reader := testSetupRealContracts(
 		ctx,
@@ -799,7 +801,7 @@ func Test_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 
 	// Only chainD has reader contracts bound
 	require.Len(t, prices, 1)
-	require.Equal(t, DefaultInitialPrices.WethPrice, prices[cciptypes.ChainSelector(chain1)].Int)
+	require.Equal(t, changeset.DefaultInitialPrices.WethPrice, prices[cciptypes.ChainSelector(chain1)].Int)
 }
 
 func setupSimulatedBackendAndAuth(t *testing.T) (*simulated.Backend, *bind.TransactOpts) {
@@ -825,7 +827,7 @@ func testSetupRealContracts(
 	destChain uint64,
 	toBindContracts map[cciptypes.ChainSelector][]types.BoundContract,
 	toMockBindings map[cciptypes.ChainSelector][]types.BoundContract,
-	env DeployedEnv,
+	env changeset.DeployedEnv,
 ) ccipreaderpkg.CCIPReader {
 	db := NewSqlxDB(t)
 	lpOpts := logpoller.Opts{

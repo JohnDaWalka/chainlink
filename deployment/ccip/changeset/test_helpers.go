@@ -958,3 +958,13 @@ func deployTransferTokenOneEnd(
 
 	return tokenContract.Contract, tokenPool.Contract, nil
 }
+
+func DefaultRouterMessage(receiverAddress common.Address) router.ClientEVM2AnyMessage {
+	return router.ClientEVM2AnyMessage{
+		Receiver:     common.LeftPadBytes(receiverAddress.Bytes(), 32),
+		Data:         []byte("hello world"),
+		TokenAmounts: nil,
+		FeeToken:     common.HexToAddress("0x0"),
+		ExtraArgs:    nil,
+	}
+}
