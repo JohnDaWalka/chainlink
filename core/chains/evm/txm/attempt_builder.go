@@ -92,8 +92,11 @@ func (a *attemptBuilder) newLegacyAttempt(ctx context.Context, tx *types.Transac
 		toAddress = tx.ToAddress
 		value = tx.Value
 	}
+	if tx.Nonce == nil {
+		return nil, fmt.Errorf("failed to create attempt for txID: %v: nonce empty", tx.ID)
+	}
 	legacyTx := evmtypes.LegacyTx{
-		Nonce:    tx.Nonce,
+		Nonce:    *tx.Nonce,
 		To:       &toAddress,
 		Value:    value,
 		Gas:      estimatedGasLimit,
@@ -126,8 +129,11 @@ func (a *attemptBuilder) newDynamicFeeAttempt(ctx context.Context, tx *types.Tra
 		toAddress = tx.ToAddress
 		value = tx.Value
 	}
+	if tx.Nonce == nil {
+		return nil, fmt.Errorf("failed to create attempt for txID: %v: nonce empty", tx.ID)
+	}
 	dynamicTx := evmtypes.DynamicFeeTx{
-		Nonce:     tx.Nonce,
+		Nonce:     *tx.Nonce,
 		To:        &toAddress,
 		Value:     value,
 		Gas:       estimatedGasLimit,
