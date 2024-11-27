@@ -286,8 +286,9 @@ func (t *Txm) broadcastTransaction(ctx context.Context, address common.Address) 
 		if tx == nil {
 			return false, nil
 		}
-		tx.Nonce = t.getNonce(address)
-		t.setNonce(address, tx.Nonce+1)
+		nonce := t.getNonce(address)
+		tx.Nonce = &nonce
+		t.setNonce(address, *tx.Nonce+1)
 		tx.State = types.TxUnconfirmed
 
 		if err := t.createAndSendAttempt(ctx, tx, address); err != nil {
@@ -302,7 +303,10 @@ func (t *Txm) createAndSendAttempt(ctx context.Context, tx *types.Transaction, a
 		return err
 	}
 
-	if err = t.txStore.AppendAttemptToTransaction(ctx, tx.Nonce, address, attempt); err != nil {
+	if tx.Nonce == nil {
+		return fmt.Errorf("nonce for txID: %v is empty", tx.ID)
+	}
+	if err = t.txStore.AppendAttemptToTransaction(ctx, *tx.Nonce, address, attempt); err != nil {
 		return err
 	}
 
@@ -310,6 +314,9 @@ func (t *Txm) createAndSendAttempt(ctx context.Context, tx *types.Transaction, a
 }
 
 func (t *Txm) sendTransactionWithError(ctx context.Context, tx *types.Transaction, attempt *types.Attempt, address common.Address) (err error) {
+	if tx.Nonce == nil {
+		return fmt.Errorf("nonce for txID: %v is empty", tx.ID)
+	}
 	start := time.Now()
 	txErr := t.client.SendTransaction(ctx, tx, attempt)
 	tx.AttemptCount++
@@ -323,13 +330,13 @@ func (t *Txm) sendTransactionWithError(ctx context.Context, tx *types.Transactio
 		if err != nil {
 			return err
 		}
-		if pendingNonce <= tx.Nonce {
+		if pendingNonce <= *tx.Nonce {
 			t.lggr.Debugf("Pending nonce for txID: %v didn't increase. PendingNonce: %d, TxNonce: %d", tx.ID, pendingNonce, tx.Nonce)
 			return nil
 		}
 	}
 
-	return t.txStore.UpdateTransactionBroadcast(ctx, attempt.TxID, tx.Nonce, attempt.Hash, address)
+	return t.txStore.UpdateTransactionBroadcast(ctx, attempt.TxID, *tx.Nonce, attempt.Hash, address)
 }
 
 func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) (bool, error) {
@@ -355,7 +362,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 		return false, err // TODO: add backoff to optimize requests
 	}
 
-	if tx == nil || tx.Nonce != latestNonce {
+	if tx == nil || *tx.Nonce != latestNonce {
 		t.lggr.Warnf("Nonce gap at nonce: %d - address: %v. Creating a new transaction\n", latestNonce, address)
 		return false, t.createAndSendEmptyTx(ctx, latestNonce, address)
 	} else { //nolint:revive //linter nonsense
@@ -366,7 +373,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 			}
 			if isStuck {
 				tx.IsPurgeable = true
-				err = t.txStore.MarkUnconfirmedTransactionPurgeable(ctx, tx.Nonce, address)
+				err = t.txStore.MarkUnconfirmedTransactionPurgeable(ctx, *tx.Nonce, address)
 				if err != nil {
 					return false, err
 				}

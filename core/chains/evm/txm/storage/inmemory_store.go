@@ -98,7 +98,7 @@ func (m *InMemoryStore) CreateEmptyUnconfirmedTransaction(nonce uint64, gasLimit
 	emptyTx := &types.Transaction{
 		ID:                m.txIDCount,
 		ChainID:           m.chainID,
-		Nonce:             nonce,
+		Nonce:             &nonce,
 		FromAddress:       m.address,
 		ToAddress:         common.Address{},
 		Value:             big.NewInt(0),
@@ -165,28 +165,34 @@ func (m *InMemoryStore) FetchUnconfirmedTransactionAtNonceWithCount(latestNonce 
 	return
 }
 
-func (m *InMemoryStore) MarkTransactionsConfirmed(latestNonce uint64) ([]uint64, []uint64) {
+func (m *InMemoryStore) MarkTransactionsConfirmed(latestNonce uint64) ([]uint64, []uint64, error) {
 	m.Lock()
 	defer m.Unlock()
 
 	var confirmedTransactionIDs []uint64
 	for _, tx := range m.UnconfirmedTransactions {
-		if tx.Nonce < latestNonce {
+		if tx.Nonce == nil {
+			return nil, nil, fmt.Errorf("nonce for txID: %v is empty", tx.ID)
+		}
+		if *tx.Nonce < latestNonce {
 			tx.State = types.TxConfirmed
 			confirmedTransactionIDs = append(confirmedTransactionIDs, tx.ID)
-			m.ConfirmedTransactions[tx.Nonce] = tx
-			delete(m.UnconfirmedTransactions, tx.Nonce)
+			m.ConfirmedTransactions[*tx.Nonce] = tx
+			delete(m.UnconfirmedTransactions, *tx.Nonce)
 		}
 	}
 
 	var unconfirmedTransactionIDs []uint64
 	for _, tx := range m.ConfirmedTransactions {
-		if tx.Nonce >= latestNonce {
+		if tx.Nonce == nil {
+			return nil, nil, fmt.Errorf("nonce for txID: %v is empty", tx.ID)
+		}
+		if *tx.Nonce >= latestNonce {
 			tx.State = types.TxUnconfirmed
 			tx.LastBroadcastAt = time.Time{} // Mark reorged transaction as if it wasn't broadcasted before
 			unconfirmedTransactionIDs = append(unconfirmedTransactionIDs, tx.ID)
-			m.UnconfirmedTransactions[tx.Nonce] = tx
-			delete(m.ConfirmedTransactions, tx.Nonce)
+			m.UnconfirmedTransactions[*tx.Nonce] = tx
+			delete(m.ConfirmedTransactions, *tx.Nonce)
 		}
 	}
 
@@ -197,7 +203,7 @@ func (m *InMemoryStore) MarkTransactionsConfirmed(latestNonce uint64) ([]uint64,
 	}
 	sort.Slice(confirmedTransactionIDs, func(i, j int) bool { return confirmedTransactionIDs[i] < confirmedTransactionIDs[j] })
 	sort.Slice(unconfirmedTransactionIDs, func(i, j int) bool { return unconfirmedTransactionIDs[i] < unconfirmedTransactionIDs[j] })
-	return confirmedTransactionIDs, unconfirmedTransactionIDs
+	return confirmedTransactionIDs, unconfirmedTransactionIDs, nil
 }
 
 func (m *InMemoryStore) MarkUnconfirmedTransactionPurgeable(nonce uint64) error {
@@ -249,7 +255,7 @@ func (m *InMemoryStore) UpdateUnstartedTransactionWithNonce(nonce uint64) (*type
 	}
 
 	tx := m.UnstartedTransactions[0]
-	tx.Nonce = nonce
+	tx.Nonce = &nonce
 	tx.State = types.TxUnconfirmed
 
 	m.UnstartedTransactions = m.UnstartedTransactions[1:]

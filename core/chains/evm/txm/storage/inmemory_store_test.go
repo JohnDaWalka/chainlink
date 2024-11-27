@@ -181,7 +181,7 @@ func TestFetchUnconfirmedTransactionAtNonceWithCount(t *testing.T) {
 	_, err := insertUnconfirmedTransaction(m, nonce)
 	require.NoError(t, err)
 	tx, count = m.FetchUnconfirmedTransactionAtNonceWithCount(0)
-	assert.Equal(t, tx.Nonce, nonce)
+	assert.Equal(t, *tx.Nonce, nonce)
 	assert.Equal(t, 1, count)
 }
 
@@ -192,7 +192,8 @@ func TestMarkTransactionsConfirmed(t *testing.T) {
 
 	t.Run("returns 0 if there are no transactions", func(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
-		un, cn := m.MarkTransactionsConfirmed(100)
+		un, cn, err := m.MarkTransactionsConfirmed(100)
+		require.NoError(t, err)
 		assert.Empty(t, un)
 		assert.Empty(t, cn)
 	})
@@ -205,7 +206,7 @@ func TestMarkTransactionsConfirmed(t *testing.T) {
 		ctx2, err := insertUnconfirmedTransaction(m, 1)
 		require.NoError(t, err)
 
-		ctxs, utxs := m.MarkTransactionsConfirmed(1)
+		ctxs, utxs, err := m.MarkTransactionsConfirmed(1)
 		require.NoError(t, err)
 		assert.Equal(t, types.TxConfirmed, ctx1.State)
 		assert.Equal(t, types.TxUnconfirmed, ctx2.State)
@@ -221,7 +222,7 @@ func TestMarkTransactionsConfirmed(t *testing.T) {
 		ctx2, err := insertConfirmedTransaction(m, 1)
 		require.NoError(t, err)
 
-		ctxs, utxs := m.MarkTransactionsConfirmed(1)
+		ctxs, utxs, err := m.MarkTransactionsConfirmed(1)
 		require.NoError(t, err)
 		assert.Equal(t, types.TxConfirmed, ctx1.State)
 		assert.Equal(t, types.TxUnconfirmed, ctx2.State)
@@ -236,7 +237,8 @@ func TestMarkTransactionsConfirmed(t *testing.T) {
 			require.NoError(t, err)
 		}
 		assert.Len(t, m.ConfirmedTransactions, maxQueuedTransactions)
-		m.MarkTransactionsConfirmed(maxQueuedTransactions)
+		_, _, err := m.MarkTransactionsConfirmed(maxQueuedTransactions)
+		require.NoError(t, err)
 		assert.Len(t, m.ConfirmedTransactions, (maxQueuedTransactions - maxQueuedTransactions/pruneSubset))
 	})
 }
@@ -324,7 +326,7 @@ func TestUpdateUnstartedTransactionWithNonce(t *testing.T) {
 
 		tx, err := m.UpdateUnstartedTransactionWithNonce(nonce)
 		require.NoError(t, err)
-		assert.Equal(t, nonce, tx.Nonce)
+		assert.Equal(t, nonce, *tx.Nonce)
 		assert.Equal(t, types.TxUnconfirmed, tx.State)
 	})
 }
@@ -335,9 +337,10 @@ func TestDeleteAttemptForUnconfirmedTx(t *testing.T) {
 	fromAddress := testutils.NewAddress()
 	t.Run("fails if corresponding unconfirmed transaction for attempt was not found", func(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
-		tx := &types.Transaction{Nonce: 0}
+		var nonce uint64
+		tx := &types.Transaction{Nonce: &nonce}
 		attempt := &types.Attempt{TxID: 0}
-		err := m.DeleteAttemptForUnconfirmedTx(tx.Nonce, attempt)
+		err := m.DeleteAttemptForUnconfirmedTx(*tx.Nonce, attempt)
 		require.Error(t, err)
 	})
 
@@ -388,11 +391,12 @@ func insertUnstartedTransaction(m *InMemoryStore) *types.Transaction {
 	m.Lock()
 	defer m.Unlock()
 
+	var nonce uint64
 	m.txIDCount++
 	tx := &types.Transaction{
 		ID:                m.txIDCount,
 		ChainID:           testutils.FixtureChainID,
-		Nonce:             0,
+		Nonce:             &nonce,
 		FromAddress:       m.address,
 		ToAddress:         testutils.NewAddress(),
 		Value:             big.NewInt(0),
@@ -413,7 +417,7 @@ func insertUnconfirmedTransaction(m *InMemoryStore, nonce uint64) (*types.Transa
 	tx := &types.Transaction{
 		ID:                m.txIDCount,
 		ChainID:           testutils.FixtureChainID,
-		Nonce:             nonce,
+		Nonce:             &nonce,
 		FromAddress:       m.address,
 		ToAddress:         testutils.NewAddress(),
 		Value:             big.NewInt(0),
@@ -438,7 +442,7 @@ func insertConfirmedTransaction(m *InMemoryStore, nonce uint64) (*types.Transact
 	tx := &types.Transaction{
 		ID:                m.txIDCount,
 		ChainID:           testutils.FixtureChainID,
-		Nonce:             nonce,
+		Nonce:             &nonce,
 		FromAddress:       m.address,
 		ToAddress:         testutils.NewAddress(),
 		Value:             big.NewInt(0),
@@ -459,11 +463,12 @@ func insertFataTransaction(m *InMemoryStore) *types.Transaction {
 	m.Lock()
 	defer m.Unlock()
 
+	var nonce uint64
 	m.txIDCount++
 	tx := &types.Transaction{
 		ID:                m.txIDCount,
 		ChainID:           testutils.FixtureChainID,
-		Nonce:             0,
+		Nonce:             &nonce,
 		FromAddress:       m.address,
 		ToAddress:         testutils.NewAddress(),
 		Value:             big.NewInt(0),

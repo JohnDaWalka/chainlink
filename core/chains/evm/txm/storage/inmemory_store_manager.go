@@ -83,7 +83,7 @@ func (m *InMemoryStoreManager) FetchUnconfirmedTransactionAtNonceWithCount(_ con
 
 func (m *InMemoryStoreManager) MarkTransactionsConfirmed(_ context.Context, nonce uint64, fromAddress common.Address) (confirmedTxIDs []uint64, unconfirmedTxIDs []uint64, err error) {
 	if store, exists := m.InMemoryStoreMap[fromAddress]; exists {
-		confirmedTxIDs, unconfirmedTxIDs = store.MarkTransactionsConfirmed(nonce)
+		confirmedTxIDs, unconfirmedTxIDs, err = store.MarkTransactionsConfirmed(nonce)
 		return
 	}
 	return nil, nil, fmt.Errorf(StoreNotFoundForAddress, fromAddress)
