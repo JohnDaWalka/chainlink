@@ -1,4 +1,4 @@
-package ccip_integration_tests
+package contracts
 
 import (
 	"context"
@@ -565,8 +565,8 @@ func TestCCIPReader_GetExpectedNextSequenceNumber(t *testing.T) {
 	selectors := env.Env.AllChainSelectors()
 	destChain, srcChain := selectors[0], selectors[1]
 
-	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, destChain, srcChain))
-	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, srcChain, destChain))
+	require.NoError(t, changeset.AddLaneWithDefaultPricesAndFeeQuoterConfig(env.Env, state, destChain, srcChain, false))
+	require.NoError(t, changeset.AddLaneWithDefaultPricesAndFeeQuoterConfig(env.Env, state, srcChain, destChain, false))
 
 	reader := testSetupRealContracts(
 		ctx,
@@ -671,8 +671,8 @@ func Test_GetChainFeePriceUpdates(t *testing.T) {
 	selectors := env.Env.AllChainSelectors()
 	chain1, chain2 := selectors[0], selectors[1]
 
-	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
-	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
+	require.NoError(t, changeset.AddLaneWithDefaultPricesAndFeeQuoterConfig(env.Env, state, chain1, chain2, false))
+	require.NoError(t, changeset.AddLaneWithDefaultPricesAndFeeQuoterConfig(env.Env, state, chain2, chain1, false))
 
 	// Change the gas price for chain2
 	feeQuoter := state.Chains[chain1].FeeQuoter
@@ -725,8 +725,8 @@ func Test_LinkPriceUSD(t *testing.T) {
 	selectors := env.Env.AllChainSelectors()
 	chain1, chain2 := selectors[0], selectors[1]
 
-	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
-	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
+	require.NoError(t, changeset.AddLaneWithDefaultPricesAndFeeQuoterConfig(env.Env, state, chain1, chain2, false))
+	require.NoError(t, changeset.AddLaneWithDefaultPricesAndFeeQuoterConfig(env.Env, state, chain2, chain1, false))
 
 	reader := testSetupRealContracts(
 		ctx,
@@ -759,9 +759,9 @@ func Test_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 	selectors := env.Env.AllChainSelectors()
 	destChain, chain1, chain2, chain3 := selectors[0], selectors[1], selectors[2], selectors[3]
 
-	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain1, destChain))
-	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain2, destChain))
-	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain3, destChain))
+	require.NoError(t, changeset.AddLaneWithDefaultPricesAndFeeQuoterConfig(env.Env, state, chain1, destChain, false))
+	require.NoError(t, changeset.AddLaneWithDefaultPricesAndFeeQuoterConfig(env.Env, state, chain2, destChain, false))
+	require.NoError(t, changeset.AddLaneWithDefaultPricesAndFeeQuoterConfig(env.Env, state, chain3, destChain, false))
 
 	boundContracts := map[cciptypes.ChainSelector][]types.BoundContract{}
 	for i, selector := range env.Env.AllChainSelectorsExcluding([]uint64{destChain}) {
@@ -817,8 +817,8 @@ func Test_GetWrappedNativeTokenPriceUSD(t *testing.T) {
 	selectors := env.Env.AllChainSelectors()
 	chain1, chain2 := selectors[0], selectors[1]
 
-	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain1, chain2))
-	require.NoError(t, changeset.AddLaneWithDefaultPrices(env.Env, state, chain2, chain1))
+	require.NoError(t, changeset.AddLaneWithDefaultPricesAndFeeQuoterConfig(env.Env, state, chain1, chain2, false))
+	require.NoError(t, changeset.AddLaneWithDefaultPricesAndFeeQuoterConfig(env.Env, state, chain2, chain1, false))
 
 	reader := testSetupRealContracts(
 		ctx,
