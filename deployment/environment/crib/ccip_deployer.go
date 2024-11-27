@@ -53,8 +53,6 @@ func DeployCCIPAndAddLanes(lggr logger.Logger, envCfg devenv.EnvironmentConfig, 
 	}
 
 	_, err = ccipdeployment.DeployFeeds(lggr, ab, e.Chains[feedChainSel])
-	addresses, err := e.ExistingAddresses.Addresses()
-
 	if err != nil {
 		return DeployCCIPOutput{}, err
 	}
@@ -62,6 +60,7 @@ func DeployCCIPAndAddLanes(lggr logger.Logger, envCfg devenv.EnvironmentConfig, 
 	if err != nil {
 		return DeployCCIPOutput{}, err
 	}
+	e.ExistingAddresses = ab
 	tenv := ccipdeployment.DeployedEnv{
 		Env:          *e,
 		HomeChainSel: homeChainSel,
@@ -124,7 +123,7 @@ func DeployCCIPAndAddLanes(lggr logger.Logger, envCfg devenv.EnvironmentConfig, 
 		return DeployCCIPOutput{}, err
 	}
 	err = tenv.Env.ExistingAddresses.Merge(output.AddressBook)
-	addresses, err = ab.Addresses()
+	addresses, err := ab.Addresses()
 	if err != nil {
 		return DeployCCIPOutput{}, err
 	}
