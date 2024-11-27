@@ -59,6 +59,7 @@ func TestAddChainInbound(t *testing.T) {
 	require.NoError(t, e.Env.ExistingAddresses.Merge(out.AddressBook))
 	newAddresses = deployment.NewMemoryAddressBook()
 	tokenConfig := NewTestTokenConfig(state.Chains[e.FeedChainSel].USDFeeds)
+
 	err = deployCCIPContracts(e.Env, newAddresses, NewChainsConfig{
 		HomeChainSel:   e.HomeChainSel,
 		FeedChainSel:   e.FeedChainSel,
@@ -75,7 +76,7 @@ func TestAddChainInbound(t *testing.T) {
 	for _, source := range initialDeploy {
 		for _, dest := range initialDeploy {
 			if source != dest {
-				require.NoError(t, AddLaneWithDefaultPrices(e.Env, state, source, dest))
+				require.NoError(t, AddLaneWithDefaultPricesAndFeeQuoterConfig(e.Env, state, source, dest, false))
 			}
 		}
 	}

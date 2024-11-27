@@ -123,15 +123,19 @@ func TestActiveCandidate(t *testing.T) {
 	// commit and exec plugin we will be using
 	rmnHomeAddress := state.Chains[tenv.HomeChainSel].RMNHome.Address()
 	tokenConfig := NewTestTokenConfig(state.Chains[tenv.FeedChainSel].USDFeeds)
+	ccipOCRParams := DefaultOCRParams(
+		tenv.FeedChainSel,
+		tokenConfig.GetTokenInfo(e.Logger, state.Chains[tenv.FeedChainSel].LinkToken, state.Chains[tenv.FeedChainSel].Weth9),
+	)
 	ocr3ConfigMap, err := internal.BuildOCR3ConfigForCCIPHome(
 		deployment.XXXGenerateTestOCRSecrets(),
 		state.Chains[tenv.FeedChainSel].OffRamp,
 		e.Chains[tenv.FeedChainSel],
-		tenv.FeedChainSel,
-		tokenConfig.GetTokenInfo(e.Logger, state.Chains[tenv.FeedChainSel].LinkToken, state.Chains[tenv.FeedChainSel].Weth9),
 		nodes.NonBootstraps(),
 		rmnHomeAddress,
-		nil,
+		ccipOCRParams.OCRParameters,
+		ccipOCRParams.CommitOffChainConfig,
+		ccipOCRParams.ExecuteOffChainConfig,
 	)
 	require.NoError(t, err)
 
