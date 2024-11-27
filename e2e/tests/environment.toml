@@ -35,7 +35,7 @@
   [[nodeset.node_specs]]
 
     [nodeset.node_specs.node]
-      capabilities = ["./streams"]
+      capabilities = ["./streams-linux-amd64"]
       docker_ctx = "../.."
       docker_file = "../../plugins/chainlink.Dockerfile"
       docker_image_name = "chainlink"
@@ -55,7 +55,7 @@
   [[nodeset.node_specs]]
 
     [nodeset.node_specs.node]
-      capabilities = ["./streams"]
+      capabilities = ["./streams-linux-amd64"]
       docker_ctx = "../.."
       docker_file = "../../plugins/chainlink.Dockerfile"
       docker_image_name = "chainlink"
@@ -75,7 +75,7 @@
   [[nodeset.node_specs]]
 
     [nodeset.node_specs.node]
-      capabilities = ["./streams"]
+      capabilities = ["./streams-linux-amd64"]
       docker_ctx = "../.."
       docker_file = "../../plugins/chainlink.Dockerfile"
       docker_image_name = "chainlink"
@@ -95,7 +95,7 @@
   [[nodeset.node_specs]]
 
     [nodeset.node_specs.node]
-      capabilities = ["./streams"]
+      capabilities = ["./streams-linux-amd64"]
       docker_ctx = "../.."
       docker_file = "../../plugins/chainlink.Dockerfile"
       docker_image_name = "chainlink"

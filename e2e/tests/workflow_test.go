@@ -413,7 +413,7 @@ func TestWorkflow(t *testing.T) {
 					type = "standardcapabilities"
 					schemaVersion = 1
 					name = "streams-capabilities"
-					command="/home/capabilities/streams"
+					command="/home/capabilities/streams-linux-amd64"
 				`
 				response, _, err2 := nodeClient.CreateJobRaw(scJobSpec)
 				assert.NoError(t, err2)
