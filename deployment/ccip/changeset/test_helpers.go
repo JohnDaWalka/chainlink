@@ -535,8 +535,14 @@ const (
 )
 
 var (
-	MockLinkPrice = deployment.E18Mult(500)
-	MockWethPrice = big.NewInt(9e8)
+	MockLinkPrice = new(big.Int).Add(
+		DefaultInitialPrices.LinkPrice,
+		new(big.Int).Add(TestDeviationPPB.Int, big.NewInt(1)),
+	) // enough to deviate
+	MockWethPrice = new(big.Int).Add(
+		DefaultInitialPrices.WethPrice,
+		new(big.Int).Add(TestDeviationPPB.Int, big.NewInt(1)),
+	) // enough to deviate
 	// MockDescriptionToTokenSymbol maps a mock feed description to token descriptor
 	MockDescriptionToTokenSymbol = map[string]TokenSymbol{
 		MockLinkAggregatorDescription: LinkSymbol,
