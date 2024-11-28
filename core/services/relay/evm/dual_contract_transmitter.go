@@ -7,6 +7,7 @@ import (
 	errors2 "errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -24,7 +25,7 @@ import (
 // TODO: Remove when new dual transmitter contracts are merged
 var dtABI = `[{"inputs":[{"internalType":"bytes32[3]","name":"reportContext","type":"bytes32[3]"},{"internalType":"bytes","name":"report","type":"bytes"},{"internalType":"bytes32[]","name":"rs","type":"bytes32[]"},{"internalType":"bytes32[]","name":"ss","type":"bytes32[]"},{"internalType":"bytes32","name":"rawVs","type":"bytes32"}],"name":"transmitSecondary","outputs":[],"stateMutability":"nonpayable","type":"function"}]`
 
-var _ ContractTransmitter = &dualContractTransmitter{}
+var _ ContractTransmitter = (*dualContractTransmitter)(nil)
 
 type dualContractTransmitter struct {
 	contractAddress     gethcommon.Address
@@ -39,13 +40,13 @@ type dualContractTransmitter struct {
 	transmitterOptions *transmitterOps
 }
 
-func dualTransmissionABI() abi.ABI {
+var dualTransmissionABI = sync.OnceValue(func() abi.ABI {
 	dualTransmissionABI, err := abi.JSON(strings.NewReader(dtABI))
 	if err != nil {
 		panic(fmt.Errorf("failed to parse dualTransmission ABI: %w", err))
 	}
 	return dualTransmissionABI
-}
+})
 
 func NewOCRDualContractTransmitter(
 	ctx context.Context,
@@ -70,7 +71,7 @@ func NewOCRDualContractTransmitter(
 		transmittedEventSig: transmitted.ID,
 		lp:                  lp,
 		contractReader:      caller,
-		lggr:                logger.Named(lggr, "OCRContractTransmitter"),
+		lggr:                logger.Named(lggr, "OCRDualContractTransmitter"),
 		transmitterOptions: &transmitterOps{
 			reportToEvmTxMeta: reportToEvmTxMetaNoop,
 			excludeSigs:       false,
@@ -124,7 +125,9 @@ func (oc *dualContractTransmitter) Transmit(ctx context.Context, reportCtx ocrty
 		return errors.Wrap(err, "abi.Pack failed")
 	}
 
-	transactionErr := errors.Wrap(oc.transmitter.CreateEthTransaction(ctx, oc.contractAddress, payload, txMeta), "failed to send Eth transaction")
+	transactionErr := errors.Wrap(oc.transmitter.CreateEthTransaction(ctx, oc.contractAddress, payload, txMeta), "failed to send primary Eth transaction")
+
+	oc.lggr.Debugw("Created primary transaction", "error", transactionErr)
 
 	// Secondary transmission
 	secondaryPayload, err := oc.dualTransmissionABI.Pack("transmitSecondary", rawReportCtx, []byte(report), rs, ss, vs)
@@ -133,7 +136,7 @@ func (oc *dualContractTransmitter) Transmit(ctx context.Context, reportCtx ocrty
 	}
 
 	err = errors.Wrap(oc.transmitter.CreateSecondaryEthTransaction(ctx, secondaryPayload, txMeta), "failed to send secondary Eth transaction")
-
+	oc.lggr.Debugw("Created secondary transaction", "error", err)
 	return errors2.Join(transactionErr, err)
 }
 
