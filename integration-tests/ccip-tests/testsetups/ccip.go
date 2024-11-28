@@ -25,6 +25,7 @@ import (
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
+
 	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
