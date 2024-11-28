@@ -142,10 +142,7 @@ flowchart LR
 	chainlink/deployment --> chainlink-testing-framework/lib
 	chainlink/deployment --> chainlink/v2
 	click chainlink/deployment href "https://github.com/smartcontractkit/chainlink"
-	chainlink/e2e --> chainlink-testing-framework/framework
-	chainlink/e2e --> chainlink-testing-framework/seth
-	chainlink/e2e --> libocr
-	click chainlink/e2e href "https://github.com/smartcontractkit/chainlink"
+	chainlink/integration-tests --> chainlink-testing-framework/framework
 	chainlink/integration-tests --> chainlink-testing-framework/havoc
 	chainlink/integration-tests --> chainlink/deployment
 	click chainlink/integration-tests href "https://github.com/smartcontractkit/chainlink"
@@ -178,7 +175,6 @@ flowchart LR
 	subgraph chainlink-repo[chainlink]
 		 chainlink/core/scripts
 		 chainlink/deployment
-		 chainlink/e2e
 		 chainlink/integration-tests
 		 chainlink/load-tests
 		 chainlink/v2
