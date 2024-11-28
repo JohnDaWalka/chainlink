@@ -200,6 +200,42 @@ jobs:
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           dep_evm_sha: ${{ inputs.evm-ref }}
 
+  # TODO: Use the docker image built in the previous step
+  ctf-v2-test:
+    runs-on: ubuntu-latest
+    env:
+      CTF_CONFIGS: environment.toml
+      CTF_LOG_LEVEL: info
+      CTF_LOKI_STREAM: "false"
+      PRIVATE_KEY: ${{ secrets.CTF_SIMULATED_KEY_1 }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.22.8
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-modules-${{ hashFiles('**/go.sum') }}-${{ runner.os }}
+          restore-keys: |
+            go-modules-${{ hashFiles('**/go.sum') }}-${{ runner.os }}
+      - name: Install dependencies
+        run: go mod download
+      - name: Run tests
+        working-directory: integration-tests/capabilities
+        run: go test -v -timeout 15m -run TestWorkflow
+      - name: Upload logs directory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-logs
+          path: integration-tests/capabilities/logs
+
   run-core-e2e-tests-for-pr:
     name: Run Core E2E Tests For PR
     permissions:
