@@ -41,6 +41,8 @@ type SrcExecProvider struct {
 	usdcAttestationAPIIntervalMilliseconds int
 	usdcSrcMsgTransmitterAddr              common.Address
 
+	// TODO: Add lbtc reader & api fields
+
 	// these values are nil and are updated for Close()
 	seenOnRampAddress       *cciptypes.Address
 	seenSourceChainSelector *uint64
@@ -70,6 +72,8 @@ func NewSrcExecProvider(
 			return nil, fmt.Errorf("new usdc reader: %w", err)
 		}
 	}
+
+	// TODO: Initialize lbtc reader
 
 	return &SrcExecProvider{
 		lggr:                                   logger.Named(lggr, "SrcExecProvider"),
@@ -188,6 +192,7 @@ func (s *SrcExecProvider) NewPriceRegistryReader(ctx context.Context, addr ccipt
 	return
 }
 
+// TODO: refactor to handle lbtc tokens. Separate methods.
 func (s *SrcExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cciptypes.Address) (tokenDataReader cciptypes.TokenDataReader, err error) {
 	attestationURI, err2 := url.ParseRequestURI(s.usdcAttestationAPI)
 	if err2 != nil {
