@@ -33,7 +33,7 @@ type Transaction struct {
 	ID                uint64
 	IdempotencyKey    *string
 	ChainID           *big.Int
-	Nonce             uint64
+	Nonce             *uint64
 	FromAddress       common.Address
 	ToAddress         common.Address
 	Value             *big.Int
