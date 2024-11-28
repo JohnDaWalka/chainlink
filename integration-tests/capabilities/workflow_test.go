@@ -32,11 +32,13 @@ import (
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
-	"github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/capabilities_registry"
-	feeds_consumer "github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/feeds_consumer_1_0_0"
-	"github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/forwarder"
-	ocr3_capability "github.com/smartcontractkit/chainlink/e2e/components/evmcontracts/ocr3_capability_1_0_0"
-	"github.com/smartcontractkit/chainlink/e2e/components/onchain"
+	"github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/evmcontracts/capabilities_registry"
+	"github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/evmcontracts/forwarder"
+	"github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/onchain"
+
+	cr_wrapper "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
+	feeds_consumer "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
+	ocr3_capability "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/ocr3_capability"
 )
 
 // Copying this to avoid dependency on the core repo
@@ -253,7 +255,7 @@ func TestWorkflow(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NoError(t, capabilitiesRegistryInstance.AddCapabilities(
-			[]capabilities_registry.CapabilitiesRegistryCapability{
+			[]cr_wrapper.CapabilitiesRegistryCapability{
 				{
 					LabelledName:   "mock-streams-trigger",
 					Version:        "1.0.0",
@@ -517,8 +519,8 @@ targets:
 		}
 		wg.Wait()
 
-		var nopsToAdd []capabilities_registry.CapabilitiesRegistryNodeOperator
-		var nodesToAdd []capabilities_registry.CapabilitiesRegistryNodeParams
+		var nopsToAdd []cr_wrapper.CapabilitiesRegistryNodeOperator
+		var nodesToAdd []cr_wrapper.CapabilitiesRegistryNodeParams
 		var donNodes [][32]byte
 		var signers []common.Address
 
@@ -526,7 +528,7 @@ targets:
 			if i == 0 {
 				continue
 			}
-			nopsToAdd = append(nopsToAdd, capabilities_registry.CapabilitiesRegistryNodeOperator{
+			nopsToAdd = append(nopsToAdd, cr_wrapper.CapabilitiesRegistryNodeOperator{
 				Admin: common.HexToAddress(node.TransmitterAddress),
 				Name:  fmt.Sprintf("NOP %d", i),
 			})
@@ -535,7 +537,7 @@ targets:
 			err = peerID.UnmarshalText([]byte(node.PeerID))
 			require.NoError(t, err)
 
-			nodesToAdd = append(nodesToAdd, capabilities_registry.CapabilitiesRegistryNodeParams{
+			nodesToAdd = append(nodesToAdd, cr_wrapper.CapabilitiesRegistryNodeParams{
 				NodeOperatorId:      uint32(i),
 				Signer:              common.BytesToHash(node.Signer.Bytes()),
 				P2pId:               peerID,
@@ -569,7 +571,7 @@ targets:
 		tx, err = capabilitiesRegistryInstance.Contract.AddDON(
 			sc.NewTXOpts(),
 			donNodes,
-			[]capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
+			[]cr_wrapper.CapabilitiesRegistryCapabilityConfiguration{
 				{
 					CapabilityId: capabilitiesRegistryInstance.ExistingHashedCapabilitiesIDs[0],
 					Config:       []byte(""),

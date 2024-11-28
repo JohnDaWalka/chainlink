@@ -8,17 +8,18 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+	cr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 )
 
-type capabilitiesRegistry struct {
+type CapabilitiesRegistryInstance struct {
 	Address                       common.Address
-	Contract                      *CapabilitiesRegistry
+	Contract                      *cr.CapabilitiesRegistry
 	sc                            *seth.Client
 	ExistingHashedCapabilitiesIDs [][32]byte
 }
 
-func Deploy(sc *seth.Client) (*capabilitiesRegistry, error) {
-	capabilitiesRegistryAddress, tx, capabilitiesRegistryContract, err := DeployCapabilitiesRegistry(
+func Deploy(sc *seth.Client) (*CapabilitiesRegistryInstance, error) {
+	capabilitiesRegistryAddress, tx, capabilitiesRegistryContract, err := cr.DeployCapabilitiesRegistry(
 		sc.NewTXOpts(),
 		sc.Client,
 	)
@@ -32,14 +33,14 @@ func Deploy(sc *seth.Client) (*capabilitiesRegistry, error) {
 	}
 
 	fmt.Printf("🚀 Deployed \033[1mcapabilities_registry\033[0m contract at \033[1m%s\033[0m\n", capabilitiesRegistryAddress)
-	return &capabilitiesRegistry{
+	return &CapabilitiesRegistryInstance{
 		sc:       sc,
 		Address:  capabilitiesRegistryAddress,
 		Contract: capabilitiesRegistryContract,
 	}, nil
 }
 
-func (cr *capabilitiesRegistry) AddCapabilities(capabilities []CapabilitiesRegistryCapability) error {
+func (cr *CapabilitiesRegistryInstance) AddCapabilities(capabilities []cr.CapabilitiesRegistryCapability) error {
 	tx, err := cr.Contract.AddCapabilities(
 		cr.sc.NewTXOpts(),
 		capabilities,

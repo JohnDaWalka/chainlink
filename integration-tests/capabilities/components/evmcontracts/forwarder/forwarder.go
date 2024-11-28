@@ -8,17 +8,19 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+
+	forwarder_wrapper "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/forwarder"
 )
 
-type instance struct {
+type ForwarderInstance struct {
 	Address                       common.Address
-	Contract                      *KeystoneForwarder
+	Contract                      *forwarder_wrapper.KeystoneForwarder
 	sc                            *seth.Client
 	ExistingHashedCapabilitiesIDs [][32]byte
 }
 
-func Deploy(sc *seth.Client) (*instance, error) {
-	forwarderAddress, tx, forwarderContract, err := DeployKeystoneForwarder(
+func Deploy(sc *seth.Client) (*ForwarderInstance, error) {
+	forwarderAddress, tx, forwarderContract, err := forwarder_wrapper.DeployKeystoneForwarder(
 		sc.NewTXOpts(),
 		sc.Client,
 	)
@@ -32,14 +34,14 @@ func Deploy(sc *seth.Client) (*instance, error) {
 	}
 
 	fmt.Printf("🚀 Deployed \033[1mforwarder\033[0m contract at \033[1m%s\033[0m\n", forwarderAddress)
-	return &instance{
+	return &ForwarderInstance{
 		sc:       sc,
 		Address:  forwarderAddress,
 		Contract: forwarderContract,
 	}, nil
 }
 
-func (i *instance) SetConfig(
+func (i *ForwarderInstance) SetConfig(
 	donID uint32,
 	configVersion uint32,
 	f uint8,

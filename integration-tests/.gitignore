@@ -1,0 +1,7 @@
+# CTFv2 - Observability stack
+**/compose
+**/compose/*
+**/*cache.toml
+
+# CTFv2 - Blockscout
+**/blockscout
