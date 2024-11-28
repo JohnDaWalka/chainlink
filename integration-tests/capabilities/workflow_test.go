@@ -538,7 +538,7 @@ targets:
 			require.NoError(t, err)
 
 			nodesToAdd = append(nodesToAdd, cr_wrapper.CapabilitiesRegistryNodeParams{
-				NodeOperatorId:      uint32(i),
+				NodeOperatorId:      uint32(i), //nolint:gosec // disable G115
 				Signer:              common.BytesToHash(node.Signer.Bytes()),
 				P2pId:               peerID,
 				EncryptionPublicKey: [32]byte{1, 2, 3, 4, 5},
