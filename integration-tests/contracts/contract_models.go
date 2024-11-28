@@ -109,6 +109,23 @@ type OffchainOptions struct {
 	Description               string         // A short description of what is being reported
 }
 
+type OffchainOptionsDualAggregator struct {
+	MaximumGasPrice           uint32         // The highest gas price for which transmitter will be compensated
+	ReasonableGasPrice        uint32         // The transmitter will receive reward for gas prices under this value
+	MicroLinkPerEth           uint32         // The reimbursement per ETH of gas cost, in 1e-6LINK units
+	LinkGweiPerObservation    uint32         // The reward to the oracle for contributing an observation to a successfully transmitted report, in 1e-9LINK units
+	LinkGweiPerTransmission   uint32         // The reward to the transmitter of a successful report, in 1e-9LINK units
+	MinimumAnswer             *big.Int       // The lowest answer the median of a report is allowed to be
+	MaximumAnswer             *big.Int       // The highest answer the median of a report is allowed to be
+	BillingAccessController   common.Address // The access controller for billing admin functions
+	RequesterAccessController common.Address // The access controller for requesting new rounds
+	Decimals                  uint8          // Answers are stored in fixed-point format, with this many digits of precision
+	Description               string         // A short description of what is being reported
+	SecondaryProxy            common.Address // The address of the secondary proxy
+	CutoffTime                uint32         // The cutoff time
+	MaxSyncIterations         uint32         // The maximum number of sync iterations
+}
+
 // https://uploads-ssl.webflow.com/5f6b7190899f41fb70882d08/603651a1101106649eef6a53_chainlink-ocr-protocol-paper-02-24-20.pdf
 type OffChainAggregatorConfig struct {
 	DeltaProgress    time.Duration // The duration in which a leader must achieve progress or be replaced

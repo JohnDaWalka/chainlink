@@ -100,6 +100,23 @@ func DefaultOffChainAggregatorOptions() OffchainOptions {
 	}
 }
 
+func DefaultOffChainDualAggregatorOptions() OffchainOptionsDualAggregator {
+	return OffchainOptionsDualAggregator{
+		MaximumGasPrice:         uint32(3000),
+		ReasonableGasPrice:      uint32(10),
+		MicroLinkPerEth:         uint32(500),
+		LinkGweiPerObservation:  uint32(500),
+		LinkGweiPerTransmission: uint32(500),
+		MinimumAnswer:           big.NewInt(1),
+		MaximumAnswer:           big.NewInt(50000000000000000),
+		Decimals:                8,
+		Description:             "Test OCR",
+		SecondaryProxy:          common.Address{},
+		CutoffTime:              uint32(100),
+		MaxSyncIterations:       uint32(100),
+	}
+}
+
 // DefaultOffChainAggregatorConfig returns some base defaults for configuring an OCR contract
 func DefaultOffChainAggregatorConfig(numberNodes int) OffChainAggregatorConfig {
 	s := []int{1}
@@ -612,6 +629,44 @@ func DeployOffchainAggregatorV2(l zerolog.Logger, seth *seth.Client, linkTokenAd
 		offchainOptions.RequesterAccessController,
 		offchainOptions.Decimals,
 		offchainOptions.Description,
+	)
+
+	if err != nil {
+		return EthereumOffchainAggregatorV2{}, fmt.Errorf("OCRv2 instance deployment have failed: %w", err)
+	}
+
+	ocr2, err := ocr2aggregator.NewOCR2Aggregator(ocrDeploymentData2.Address, wrappers.MustNewWrappedContractBackend(nil, seth))
+	if err != nil {
+		return EthereumOffchainAggregatorV2{}, fmt.Errorf("failed to instantiate OCRv2 instance: %w", err)
+	}
+
+	return EthereumOffchainAggregatorV2{
+		client:   seth,
+		contract: ocr2,
+		address:  &ocrDeploymentData2.Address,
+		l:        l,
+	}, nil
+}
+
+func DeployDualAggregator(l zerolog.Logger, seth *seth.Client, linkTokenAddress common.Address, offchainOptions OffchainOptionsDualAggregator) (EthereumOffchainAggregatorV2, error) {
+	contractAbi, err := contractsethereum.DualAggregatorMetaData.GetAbi()
+	if err != nil {
+		return EthereumOffchainAggregatorV2{}, fmt.Errorf("failed to get OffChain Aggregator v2 ABI: %w", err)
+	}
+	seth.ContractStore.AddABI("DualAggregator", *contractAbi)
+	seth.ContractStore.AddBIN("DualAggregator", common.FromHex(contractsethereum.DualAggregatorMetaData.Bin))
+
+	ocrDeploymentData2, err := seth.DeployContract(seth.NewTXOpts(), "DualAggregator", *contractAbi, common.FromHex(contractsethereum.DualAggregatorMetaData.Bin),
+		linkTokenAddress,
+		offchainOptions.MinimumAnswer,
+		offchainOptions.MaximumAnswer,
+		offchainOptions.BillingAccessController,
+		offchainOptions.RequesterAccessController,
+		offchainOptions.Decimals,
+		offchainOptions.Description,
+		offchainOptions.SecondaryProxy,
+		offchainOptions.CutoffTime,
+		offchainOptions.MaxSyncIterations,
 	)
 
 	if err != nil {

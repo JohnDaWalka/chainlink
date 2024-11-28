@@ -679,6 +679,70 @@ func SetupOCRv2Contracts(
 	return ocrInstances, nil
 }
 
+// SetupDualAggregatorContracts deploys a number of DualAggregator contracts and configures them with defaults
+func SetupDualAggregatorContracts(
+	l zerolog.Logger,
+	seth *seth.Client,
+	ocrContractsConfig ocr.OffChainAggregatorsConfig,
+	linkTokenAddress common.Address,
+	transmitters []string,
+	ocrOptions contracts.OffchainOptionsDualAggregator,
+) ([]contracts.OffchainAggregatorV2, error) {
+	var ocrInstances []contracts.OffchainAggregatorV2
+
+	if ocrContractsConfig == nil {
+		return nil, fmt.Errorf("you need to pass non-nil OffChainAggregatorsConfig to setup OCR contracts")
+	}
+
+	if !ocrContractsConfig.UseExistingOffChainAggregatorsContracts() {
+		for contractCount := 0; contractCount < ocrContractsConfig.NumberOfContractsToDeploy(); contractCount++ {
+			ocrInstance, err := contracts.DeployDualAggregator(
+				l,
+				seth,
+				linkTokenAddress,
+				ocrOptions,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("OCRv2 instance deployment have failed: %w", err)
+			}
+			ocrInstances = append(ocrInstances, &ocrInstance)
+			if (contractCount+1)%ContractDeploymentInterval == 0 { // For large amounts of contract deployments, space things out some
+				time.Sleep(2 * time.Second)
+			}
+		}
+	} else {
+		for _, address := range ocrContractsConfig.OffChainAggregatorsContractsAddresses() {
+			ocrInstance, err := contracts.LoadOffchainAggregatorV2(l, seth, address)
+			if err != nil {
+				return nil, fmt.Errorf("OCRv2 instance loading have failed: %w", err)
+			}
+			ocrInstances = append(ocrInstances, &ocrInstance)
+		}
+
+		if !ocrContractsConfig.ConfigureExistingOffChainAggregatorsContracts() {
+			return ocrInstances, nil
+		}
+	}
+
+	// Gather address payees
+	var payees []string
+	for range transmitters {
+		payees = append(payees, seth.Addresses[0].Hex())
+	}
+
+	// Set Payees
+	for contractCount, ocrInstance := range ocrInstances {
+		err := ocrInstance.SetPayees(transmitters, payees)
+		if err != nil {
+			return nil, fmt.Errorf("error settings OCR payees: %w", err)
+		}
+		if (contractCount+1)%ContractDeploymentInterval == 0 { // For large amounts of contract deployments, space things out some
+			time.Sleep(2 * time.Second)
+		}
+	}
+	return ocrInstances, nil
+}
+
 // ConfigureOCRv2AggregatorContracts sets configuration for a number of OCRv2 contracts
 func ConfigureOCRv2AggregatorContracts(
 	contractConfig *contracts.OCRv2Config,
