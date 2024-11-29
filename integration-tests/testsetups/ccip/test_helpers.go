@@ -278,7 +278,6 @@ func NewLocalDevEnvironmentWithRMN(
 		testCfg.CCIP.RMNConfig.GetProxyVersion(),
 		testCfg.CCIP.RMNConfig.GetAFN2ProxyImage(),
 		testCfg.CCIP.RMNConfig.GetAFN2ProxyVersion(),
-		dockerenv.LogStream,
 	)
 	require.NoError(t, err)
 	return tenv, *rmnCluster
@@ -531,7 +530,6 @@ func StartChainlinkNodes(
 			pointer.GetString(cfg.GetChainlinkImageConfig().Image),
 			pointer.GetString(cfg.GetChainlinkImageConfig().Version),
 			toml,
-			env.LogStream,
 			test_env.WithPgDBOptions(
 				ctftestenv.WithPostgresImageVersion(pointer.GetString(cfg.GetChainlinkImageConfig().PostgresVersion)),
 			),
