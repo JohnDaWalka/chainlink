@@ -216,9 +216,19 @@ func TestCodec_CommitReport(t *testing.T) {
 		},
 	}
 	config := `[{"components":[{"name":"chainSel","type":"uint64","internalType":"uint64"},{"name":"onRampAddress","type":"bytes","internalType":"bytes"},{"name":"seqNumsRange","type":"uint64[2]","internalType":"uint64[2]"},{"name":"merkleRoot","type":"bytes32","internalType":"bytes32"}],"name":"merkleRoots","type":"tuple[]","internalType":"struct MerkleRootChain[]"},{"components":[{"components":[{"name":"tokenID","type":"string","internalType":"string"},{"name":"price","type":"uint256","internalType":"uint256"}],"name":"tokenPriceUpdates","type":"tuple[]","internalType":"struct TokenPrice[]"},{"components":[{"name":"chainSel","type":"uint64","internalType":"uint64"},{"name":"gasPrice","type":"uint256","internalType":"uint256"}],"name":"gasPriceUpdates","type":"tuple[]","internalType":"struct GasPriceChain[]"}],"name":"priceUpdates","type":"tuple","internalType":"struct PriceUpdates"},{"components":[{"name":"r","type":"bytes32","internalType":"bytes32"},{"name":"s","type":"bytes32","internalType":"bytes32"}],"name":"rmnSignatures","type":"tuple[]"}]`
-	codecConfig := types.CodecConfig{Configs: map[string]types.ChainCodecConfig{
-		"CommitPluginReport": {TypeABI: config},
-	}}
+	codecConfig := types.CodecConfig{
+		Configs: map[string]types.ChainCodecConfig{
+			"CommitPluginReport": {
+				TypeABI: config,
+				ModifierConfigs: commoncodec.ModifiersConfig{
+					&commoncodec.WrapperModifierConfig{Fields: map[string]string{
+						"PriceUpdates.TokenPriceUpdates.Price":  "Int",
+						"PriceUpdates.GasPriceUpdates.GasPrice": "Int",
+					}},
+				},
+			},
+		},
+	}
 	c, err := codec.NewCodec(codecConfig)
 	require.NoError(t, err)
 
@@ -228,7 +238,7 @@ func TestCodec_CommitReport(t *testing.T) {
 	output := cciptypes.CommitPluginReport{}
 	err = c.Decode(testutils.Context(t), result, &output, "CommitPluginReport")
 	require.NoError(t, err)
-	//require.Equal(t, input, output)
+	require.Equal(t, input, output)
 }
 
 type codecInterfaceTester struct {
