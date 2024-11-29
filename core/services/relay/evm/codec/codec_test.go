@@ -3,12 +3,15 @@ package codec_test
 import (
 	"encoding/json"
 	"math/big"
+	"math/rand"
 	"testing"
 
 	"github.com/cometbft/cometbft/libs/strings"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -170,6 +173,62 @@ func TestCodec_EncodeTupleWithLists(t *testing.T) {
 			"00000000000000000000000000000000000000000000000000000000000000de" // Timestamps[1] = 222
 
 	require.Equal(t, expected, hexutil.Encode(result)[2:])
+}
+
+func TestCodec_CommitReport(t *testing.T) {
+	input := cciptypes.CommitPluginReport{
+		MerkleRoots: []cciptypes.MerkleRootChain{
+			{
+				ChainSel:      cciptypes.ChainSelector(rand.Uint64()),
+				OnRampAddress: common.LeftPadBytes(utils.RandomAddress().Bytes(), 32),
+				SeqNumsRange: cciptypes.NewSeqNumRange(
+					cciptypes.SeqNum(rand.Uint64()),
+					cciptypes.SeqNum(rand.Uint64()),
+				),
+				MerkleRoot: utils.RandomBytes32(),
+			},
+			{
+				OnRampAddress: common.LeftPadBytes(utils.RandomAddress().Bytes(), 32),
+				ChainSel:      cciptypes.ChainSelector(rand.Uint64()),
+				SeqNumsRange: cciptypes.NewSeqNumRange(
+					cciptypes.SeqNum(rand.Uint64()),
+					cciptypes.SeqNum(rand.Uint64()),
+				),
+				MerkleRoot: utils.RandomBytes32(),
+			},
+		},
+		PriceUpdates: cciptypes.PriceUpdates{
+			TokenPriceUpdates: []cciptypes.TokenPrice{
+				{
+					TokenID: cciptypes.UnknownEncodedAddress(utils.RandomAddress().String()),
+					Price:   cciptypes.NewBigInt(utils.RandUint256()),
+				},
+			},
+			GasPriceUpdates: []cciptypes.GasPriceChain{
+				{GasPrice: cciptypes.NewBigInt(utils.RandUint256()), ChainSel: cciptypes.ChainSelector(rand.Uint64())},
+				{GasPrice: cciptypes.NewBigInt(utils.RandUint256()), ChainSel: cciptypes.ChainSelector(rand.Uint64())},
+				{GasPrice: cciptypes.NewBigInt(utils.RandUint256()), ChainSel: cciptypes.ChainSelector(rand.Uint64())},
+			},
+		},
+		RMNSignatures: []cciptypes.RMNECDSASignature{
+			{R: utils.RandomBytes32(), S: utils.RandomBytes32()},
+			{R: utils.RandomBytes32(), S: utils.RandomBytes32()},
+		},
+	}
+	config := `[{"components":[{"name":"chainSel","type":"uint64","internalType":"uint64"},{"name":"onRampAddress","type":"bytes","internalType":"bytes"},{"name":"seqNumsRange","type":"uint64[2]","internalType":"uint64[2]"},{"name":"merkleRoot","type":"bytes32","internalType":"bytes32"}],"name":"merkleRoots","type":"tuple[]","internalType":"struct MerkleRootChain[]"},{"components":[{"components":[{"name":"tokenID","type":"string","internalType":"string"},{"name":"price","type":"uint256","internalType":"uint256"}],"name":"tokenPriceUpdates","type":"tuple[]","internalType":"struct TokenPrice[]"},{"components":[{"name":"chainSel","type":"uint64","internalType":"uint64"},{"name":"gasPrice","type":"uint256","internalType":"uint256"}],"name":"gasPriceUpdates","type":"tuple[]","internalType":"struct GasPriceChain[]"}],"name":"priceUpdates","type":"tuple","internalType":"struct PriceUpdates"},{"components":[{"name":"r","type":"bytes32","internalType":"bytes32"},{"name":"s","type":"bytes32","internalType":"bytes32"}],"name":"rmnSignatures","type":"tuple[]"}]`
+	codecConfig := types.CodecConfig{Configs: map[string]types.ChainCodecConfig{
+		"CommitPluginReport": {TypeABI: config},
+	}}
+	c, err := codec.NewCodec(codecConfig)
+	require.NoError(t, err)
+
+	result, err := c.Encode(testutils.Context(t), input, "CommitPluginReport")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	output := cciptypes.CommitPluginReport{}
+	err = c.Decode(testutils.Context(t), result, &output, "CommitPluginReport")
+	require.NoError(t, err)
+	//require.Equal(t, input, output)
 }
 
 type codecInterfaceTester struct {
