@@ -430,16 +430,6 @@ Example usage:
 TTL = "11h"
 ```
 
-### CCIP.Env.Logging
-
-Specifies the logging configuration for the test. Imported from [LoggingConfig](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/logging.go#L11) in chainlink-testing-framework.
-Example usage:
-
-```toml
-[CCIP.Env.Logging]
-test_log_collect = false # if set to true will save logs even if test did not fail
-```
-
 ### CCIP.Env.Lane.LeaderLaneEnabled
 
 Specifies whether to enable the leader lane feature. This setting is only applicable for new deployments.

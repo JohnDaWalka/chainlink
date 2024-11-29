@@ -73,9 +73,6 @@ addresses_to_fund = [
 [CCIP.Env.PrivateEthereumNetworks.SIMULATED_2.EthereumChainConfig.HardForkEpochs]
 Deneb = 500
 
-[CCIP.Env.Logging]
-test_log_collect = false # if set to true will save logs even if test did not fail
-
 # these values will be used to set up chainlink DON
 # along with these values, the secrets needs to be specified as part of .env variables
 #
