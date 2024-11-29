@@ -2,7 +2,6 @@ package test_env
 
 import (
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,6 +13,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
 	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/lib/config"

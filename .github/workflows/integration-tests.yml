@@ -210,7 +210,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'pull_request' && ( needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@2d357dcace5d6a74e4b3994a6b53533e8d1d6d25
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@f9cd205a971b8018c65264a35b7dae06c874e8e6
     with:
       workflow_name: Run Core E2E Tests For PR
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
@@ -251,7 +251,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'merge_group' && ( needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@2d357dcace5d6a74e4b3994a6b53533e8d1d6d25
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@f9cd205a971b8018c65264a35b7dae06c874e8e6
     with:
       workflow_name: Run Core E2E Tests For Merge Queue
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
@@ -296,7 +296,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'pull_request' && (needs.changes.outputs.ccip_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@2d357dcace5d6a74e4b3994a6b53533e8d1d6d25
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@f9cd205a971b8018c65264a35b7dae06c874e8e6
     with:
       workflow_name: Run CCIP E2E Tests For PR
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
@@ -337,7 +337,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'merge_group' && (needs.changes.outputs.ccip_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@2d357dcace5d6a74e4b3994a6b53533e8d1d6d25
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@f9cd205a971b8018c65264a35b7dae06c874e8e6
     with:
       workflow_name: Run CCIP E2E Tests For Merge Queue
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
