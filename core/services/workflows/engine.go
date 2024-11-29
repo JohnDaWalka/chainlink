@@ -352,7 +352,16 @@ func (e *Engine) init(ctx context.Context) {
 		}
 	}
 
-	e.logger.Infof("engine initialized for %s", e.workflow.name)
+	var name string
+	if e.workflow != nil {
+		nameBytes, err := hex.DecodeString(e.workflow.name)
+		if err != nil {
+			e.logger.Errorf("failed to decode workflow name: %s", e.workflow.name)
+		}
+		name = string(nameBytes[:])
+	}
+
+	e.logger.Infof("engine initialized for %s", name)
 	logCustMsg(ctx, e.cma, "workflow registered", e.logger)
 	e.afterInit(true)
 }

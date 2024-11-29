@@ -41,6 +41,8 @@ import (
 
 const testWorkflowId = "<workflow-id>"
 const hardcodedWorkflow = `
+name: "hcwf"
+
 triggers:
   - id: "mercury-trigger@1.0.0"
     config:
@@ -165,12 +167,14 @@ func newTestEngine(t *testing.T, reg *coreCap.Registry, sdkSpec sdk.WorkflowSpec
 
 	reg.SetLocalRegistry(&testConfigProvider{})
 	cfg := Config{
-		WorkflowID: testWorkflowId,
-		Lggr:       logger.TestLogger(t),
-		Registry:   reg,
-		Workflow:   sdkSpec,
-		maxRetries: 1,
-		retryMs:    100,
+		WorkflowID:    testWorkflowId,
+		WorkflowName:  sdkSpec.Name,
+		WorkflowOwner: sdkSpec.Owner,
+		Lggr:          logger.TestLogger(t),
+		Registry:      reg,
+		Workflow:      sdkSpec,
+		maxRetries:    1,
+		retryMs:       100,
 		afterInit: func(success bool) {
 			if success {
 				close(initSuccessful)
