@@ -8,6 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/codec"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
@@ -87,6 +90,39 @@ var randomExecuteReport = func(t *testing.T, d *testSetupData) cciptypes.Execute
 	}
 
 	return cciptypes.ExecutePluginReport{ChainReports: chainReports}
+}
+
+func TestCodec_ExecReport(t *testing.T) {
+	d := testSetup(t)
+	input := randomExecuteReport(t, d)
+	config := `[{"name":"chainReports","type":"tuple[]","components":[{"name":"sourceChainSelector","type":"uint64","internalType":"uint64"},{"name":"messages","type":"tuple[]","components":[{"name":"header","type":"tuple","components":[{"name":"messageID","type":"bytes32","internalType":"bytes32"},{"name":"sourceChainSelector","type":"uint64","internalType":"uint64"},{"name":"destChainSelector","type":"uint64","internalType":"uint64"},{"name":"sequenceNumber","type":"uint64","internalType":"uint64"},{"name":"nonce","type":"uint64","internalType":"uint64"},{"name":"msgHash","type":"bytes32","internalType":"bytes32"},{"name":"onRamp","type":"bytes","internalType":"bytes"}]},{"name":"data","type":"bytes","internalType":"bytes"},{"name":"sender","type":"bytes","internalType":"bytes"},{"name":"receiver","type":"bytes","internalType":"bytes"},{"name":"extraArgs","type":"bytes","internalType":"bytes"},{"name":"feeToken","type":"bytes","internalType":"bytes"},{"name":"feeTokenAmount","type":"uint256","internalType":"uint256"},{"name":"feeValueJuels","type":"uint256","internalType":"uint256"},{"name":"tokenAmounts","type":"tuple[]","components":[{"name":"sourcePoolAddress","type":"bytes","internalType":"bytes"},{"name":"destTokenAddress","type":"bytes","internalType":"bytes"},{"name":"extraData","type":"bytes","internalType":"bytes"},{"name":"amount","type":"uint256","internalType":"uint256"},{"name":"destExecData","type":"bytes","internalType":"bytes"}]}]},{"name":"offchainTokenData","type":"bytes[][]","internalType":"bytes[][]"},{"name":"proofs","type":"bytes32[]","internalType":"bytes32[]"},{"name":"proofFlagBits","type":"uint256","internalType":"uint256"}]}]`
+	codecConfig := types.CodecConfig{
+		Configs: map[string]types.ChainCodecConfig{
+			"ExecPluginReport": {
+				TypeABI: config,
+				ModifierConfigs: commoncodec.ModifiersConfig{
+					&commoncodec.WrapperModifierConfig{
+						Fields: map[string]string{
+							"ChainReports.Messages.FeeTokenAmount": "Int",
+							//"ChainReports.Messages.FeeValueJuels":       "Int",
+							"ChainReports.Messages.TokenAmounts.Amount": "Int",
+							"ChainReports.ProofFlagBits":                "Int",
+						},
+					},
+				},
+			},
+		},
+	}
+	c, err := codec.NewCodec(codecConfig)
+	require.NoError(t, err)
+
+	result, err := c.Encode(testutils.Context(t), input, "ExecPluginReport")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	output := cciptypes.ExecutePluginReport{}
+	err = c.Decode(testutils.Context(t), result, &output, "ExecPluginReport")
+	require.NoError(t, err)
+	require.Equal(t, input, output)
 }
 
 func TestExecutePluginCodecV1(t *testing.T) {
