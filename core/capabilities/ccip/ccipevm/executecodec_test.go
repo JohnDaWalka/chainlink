@@ -193,6 +193,7 @@ func TestExecutePluginCodecV1(t *testing.T) {
 					report.ChainReports[i].Messages[j].FeeToken = cciptypes.UnknownAddress{}
 					report.ChainReports[i].Messages[j].ExtraArgs = cciptypes.Bytes{}
 					report.ChainReports[i].Messages[j].FeeTokenAmount = cciptypes.BigInt{}
+					report.ChainReports[i].Messages[j].FeeValueJuels = cciptypes.BigInt{}
 				}
 			}
 
