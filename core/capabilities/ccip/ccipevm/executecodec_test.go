@@ -71,6 +71,7 @@ var randomExecuteReport = func(t *testing.T, d *testSetupData) cciptypes.Execute
 				ExtraArgs:      extraArgs,
 				FeeToken:       utils.RandomAddress().Bytes(),
 				FeeTokenAmount: cciptypes.NewBigInt(utils.RandUint256()),
+				FeeValueJuels:  cciptypes.NewBigInt(utils.RandUint256()),
 				TokenAmounts:   tokenAmounts,
 			}
 		}
@@ -103,8 +104,8 @@ func TestCodec_ExecReport(t *testing.T) {
 				ModifierConfigs: commoncodec.ModifiersConfig{
 					&commoncodec.WrapperModifierConfig{
 						Fields: map[string]string{
-							"ChainReports.Messages.FeeTokenAmount": "Int",
-							//"ChainReports.Messages.FeeValueJuels":       "Int",
+							"ChainReports.Messages.FeeTokenAmount":      "Int",
+							"ChainReports.Messages.FeeValueJuels":       "Int",
 							"ChainReports.Messages.TokenAmounts.Amount": "Int",
 							"ChainReports.ProofFlagBits":                "Int",
 						},
