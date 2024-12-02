@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -52,7 +53,7 @@ var MaybeRevertMessageReceiverABI = MaybeRevertMessageReceiverMetaData.ABI
 
 var MaybeRevertMessageReceiverBin = MaybeRevertMessageReceiverMetaData.Bin
 
-func DeployMaybeRevertMessageReceiver(auth *bind.TransactOpts, backend bind.ContractBackend, toRevert bool) (common.Address, *types.Transaction, *MaybeRevertMessageReceiver, error) {
+func DeployMaybeRevertMessageReceiver(auth *bind.TransactOpts, backend bind.ContractBackend, toRevert bool) (common.Address, *generated_zks.CustomTransaction, *MaybeRevertMessageReceiver, error) {
 	parsed, err := MaybeRevertMessageReceiverMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -60,7 +61,11 @@ func DeployMaybeRevertMessageReceiver(auth *bind.TransactOpts, backend bind.Cont
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(MaybeRevertMessageReceiverZKBin), backend, toRevert)
+		contractReturn := &MaybeRevertMessageReceiver{address: address, abi: *parsed, MaybeRevertMessageReceiverCaller: MaybeRevertMessageReceiverCaller{contract: contractBind}, MaybeRevertMessageReceiverTransactor: MaybeRevertMessageReceiverTransactor{contract: contractBind}, MaybeRevertMessageReceiverFilterer: MaybeRevertMessageReceiverFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(MaybeRevertMessageReceiverBin), backend, toRevert)
 	if err != nil {
 		return common.Address{}, nil, nil, err

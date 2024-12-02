@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -39,7 +40,7 @@ var LinkTokenABI = LinkTokenMetaData.ABI
 
 var LinkTokenBin = LinkTokenMetaData.Bin
 
-func DeployLinkToken(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *LinkToken, error) {
+func DeployLinkToken(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *LinkToken, error) {
 	parsed, err := LinkTokenMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -47,7 +48,11 @@ func DeployLinkToken(auth *bind.TransactOpts, backend bind.ContractBackend) (com
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(LinkTokenZKBin), backend)
+		contractReturn := &LinkToken{address: address, abi: *parsed, LinkTokenCaller: LinkTokenCaller{contract: contractBind}, LinkTokenTransactor: LinkTokenTransactor{contract: contractBind}, LinkTokenFilterer: LinkTokenFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(LinkTokenBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -89,7 +90,7 @@ var BurnWithFromMintTokenPoolABI = BurnWithFromMintTokenPoolMetaData.ABI
 
 var BurnWithFromMintTokenPoolBin = BurnWithFromMintTokenPoolMetaData.Bin
 
-func DeployBurnWithFromMintTokenPool(auth *bind.TransactOpts, backend bind.ContractBackend, token common.Address, localTokenDecimals uint8, allowlist []common.Address, rmnProxy common.Address, router common.Address) (common.Address, *types.Transaction, *BurnWithFromMintTokenPool, error) {
+func DeployBurnWithFromMintTokenPool(auth *bind.TransactOpts, backend bind.ContractBackend, token common.Address, localTokenDecimals uint8, allowlist []common.Address, rmnProxy common.Address, router common.Address) (common.Address, *generated_zks.CustomTransaction, *BurnWithFromMintTokenPool, error) {
 	parsed, err := BurnWithFromMintTokenPoolMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -97,7 +98,11 @@ func DeployBurnWithFromMintTokenPool(auth *bind.TransactOpts, backend bind.Contr
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(BurnWithFromMintTokenPoolZKBin), backend, token, localTokenDecimals, allowlist, rmnProxy, router)
+		contractReturn := &BurnWithFromMintTokenPool{address: address, abi: *parsed, BurnWithFromMintTokenPoolCaller: BurnWithFromMintTokenPoolCaller{contract: contractBind}, BurnWithFromMintTokenPoolTransactor: BurnWithFromMintTokenPoolTransactor{contract: contractBind}, BurnWithFromMintTokenPoolFilterer: BurnWithFromMintTokenPoolFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(BurnWithFromMintTokenPoolBin), backend, token, localTokenDecimals, allowlist, rmnProxy, router)
 	if err != nil {
 		return common.Address{}, nil, nil, err

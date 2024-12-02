@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 )
 
 var (
@@ -37,7 +38,7 @@ var OptimismL1BridgeAdapterABI = OptimismL1BridgeAdapterMetaData.ABI
 
 var OptimismL1BridgeAdapterBin = OptimismL1BridgeAdapterMetaData.Bin
 
-func DeployOptimismL1BridgeAdapter(auth *bind.TransactOpts, backend bind.ContractBackend, l1Bridge common.Address, wrappedNative common.Address, optimismPortal common.Address) (common.Address, *types.Transaction, *OptimismL1BridgeAdapter, error) {
+func DeployOptimismL1BridgeAdapter(auth *bind.TransactOpts, backend bind.ContractBackend, l1Bridge common.Address, wrappedNative common.Address, optimismPortal common.Address) (common.Address, *generated_zks.CustomTransaction, *OptimismL1BridgeAdapter, error) {
 	parsed, err := OptimismL1BridgeAdapterMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -45,7 +46,11 @@ func DeployOptimismL1BridgeAdapter(auth *bind.TransactOpts, backend bind.Contrac
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(OptimismL1BridgeAdapterZKBin), backend, l1Bridge, wrappedNative, optimismPortal)
+		contractReturn := &OptimismL1BridgeAdapter{address: address, abi: *parsed, OptimismL1BridgeAdapterCaller: OptimismL1BridgeAdapterCaller{contract: contractBind}, OptimismL1BridgeAdapterTransactor: OptimismL1BridgeAdapterTransactor{contract: contractBind}, OptimismL1BridgeAdapterFilterer: OptimismL1BridgeAdapterFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(OptimismL1BridgeAdapterBin), backend, l1Bridge, wrappedNative, optimismPortal)
 	if err != nil {
 		return common.Address{}, nil, nil, err

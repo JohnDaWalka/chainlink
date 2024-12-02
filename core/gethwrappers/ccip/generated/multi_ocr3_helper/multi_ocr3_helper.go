@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -66,7 +67,7 @@ var MultiOCR3HelperABI = MultiOCR3HelperMetaData.ABI
 
 var MultiOCR3HelperBin = MultiOCR3HelperMetaData.Bin
 
-func DeployMultiOCR3Helper(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *MultiOCR3Helper, error) {
+func DeployMultiOCR3Helper(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *MultiOCR3Helper, error) {
 	parsed, err := MultiOCR3HelperMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -74,7 +75,11 @@ func DeployMultiOCR3Helper(auth *bind.TransactOpts, backend bind.ContractBackend
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(MultiOCR3HelperZKBin), backend)
+		contractReturn := &MultiOCR3Helper{address: address, abi: *parsed, MultiOCR3HelperCaller: MultiOCR3HelperCaller{contract: contractBind}, MultiOCR3HelperTransactor: MultiOCR3HelperTransactor{contract: contractBind}, MultiOCR3HelperFilterer: MultiOCR3HelperFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(MultiOCR3HelperBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

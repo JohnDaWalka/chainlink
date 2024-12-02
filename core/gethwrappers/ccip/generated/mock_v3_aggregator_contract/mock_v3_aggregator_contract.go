@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -39,7 +40,7 @@ var MockV3AggregatorABI = MockV3AggregatorMetaData.ABI
 
 var MockV3AggregatorBin = MockV3AggregatorMetaData.Bin
 
-func DeployMockV3Aggregator(auth *bind.TransactOpts, backend bind.ContractBackend, _decimals uint8, _initialAnswer *big.Int) (common.Address, *types.Transaction, *MockV3Aggregator, error) {
+func DeployMockV3Aggregator(auth *bind.TransactOpts, backend bind.ContractBackend, _decimals uint8, _initialAnswer *big.Int) (common.Address, *generated_zks.CustomTransaction, *MockV3Aggregator, error) {
 	parsed, err := MockV3AggregatorMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -47,7 +48,11 @@ func DeployMockV3Aggregator(auth *bind.TransactOpts, backend bind.ContractBacken
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(MockV3AggregatorZKBin), backend, _decimals, _initialAnswer)
+		contractReturn := &MockV3Aggregator{address: address, abi: *parsed, MockV3AggregatorCaller: MockV3AggregatorCaller{contract: contractBind}, MockV3AggregatorTransactor: MockV3AggregatorTransactor{contract: contractBind}, MockV3AggregatorFilterer: MockV3AggregatorFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(MockV3AggregatorBin), backend, _decimals, _initialAnswer)
 	if err != nil {
 		return common.Address{}, nil, nil, err

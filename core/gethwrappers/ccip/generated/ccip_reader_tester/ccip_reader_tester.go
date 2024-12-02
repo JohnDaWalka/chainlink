@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -108,7 +109,7 @@ var CCIPReaderTesterABI = CCIPReaderTesterMetaData.ABI
 
 var CCIPReaderTesterBin = CCIPReaderTesterMetaData.Bin
 
-func DeployCCIPReaderTester(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *CCIPReaderTester, error) {
+func DeployCCIPReaderTester(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *CCIPReaderTester, error) {
 	parsed, err := CCIPReaderTesterMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -116,7 +117,11 @@ func DeployCCIPReaderTester(auth *bind.TransactOpts, backend bind.ContractBacken
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(CCIPReaderTesterZKBin), backend)
+		contractReturn := &CCIPReaderTester{address: address, abi: *parsed, CCIPReaderTesterCaller: CCIPReaderTesterCaller{contract: contractBind}, CCIPReaderTesterTransactor: CCIPReaderTesterTransactor{contract: contractBind}, CCIPReaderTesterFilterer: CCIPReaderTesterFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(CCIPReaderTesterBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

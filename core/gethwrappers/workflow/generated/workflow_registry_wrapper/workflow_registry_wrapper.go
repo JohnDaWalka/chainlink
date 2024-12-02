@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -50,7 +51,7 @@ var WorkflowRegistryABI = WorkflowRegistryMetaData.ABI
 
 var WorkflowRegistryBin = WorkflowRegistryMetaData.Bin
 
-func DeployWorkflowRegistry(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *WorkflowRegistry, error) {
+func DeployWorkflowRegistry(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *WorkflowRegistry, error) {
 	parsed, err := WorkflowRegistryMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -58,7 +59,11 @@ func DeployWorkflowRegistry(auth *bind.TransactOpts, backend bind.ContractBacken
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(WorkflowRegistryZKBin), backend)
+		contractReturn := &WorkflowRegistry{address: address, abi: *parsed, WorkflowRegistryCaller: WorkflowRegistryCaller{contract: contractBind}, WorkflowRegistryTransactor: WorkflowRegistryTransactor{contract: contractBind}, WorkflowRegistryFilterer: WorkflowRegistryFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(WorkflowRegistryBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

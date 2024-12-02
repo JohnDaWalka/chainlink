@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -39,7 +40,7 @@ var ERC20ABI = ERC20MetaData.ABI
 
 var ERC20Bin = ERC20MetaData.Bin
 
-func DeployERC20(auth *bind.TransactOpts, backend bind.ContractBackend, name_ string, symbol_ string) (common.Address, *types.Transaction, *ERC20, error) {
+func DeployERC20(auth *bind.TransactOpts, backend bind.ContractBackend, name_ string, symbol_ string) (common.Address, *generated_zks.CustomTransaction, *ERC20, error) {
 	parsed, err := ERC20MetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -47,7 +48,11 @@ func DeployERC20(auth *bind.TransactOpts, backend bind.ContractBackend, name_ st
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(ERC20ZKBin), backend, name_, symbol_)
+		contractReturn := &ERC20{address: address, abi: *parsed, ERC20Caller: ERC20Caller{contract: contractBind}, ERC20Transactor: ERC20Transactor{contract: contractBind}, ERC20Filterer: ERC20Filterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ERC20Bin), backend, name_, symbol_)
 	if err != nil {
 		return common.Address{}, nil, nil, err

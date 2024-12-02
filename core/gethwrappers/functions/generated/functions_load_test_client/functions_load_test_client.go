@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -39,7 +40,7 @@ var FunctionsLoadTestClientABI = FunctionsLoadTestClientMetaData.ABI
 
 var FunctionsLoadTestClientBin = FunctionsLoadTestClientMetaData.Bin
 
-func DeployFunctionsLoadTestClient(auth *bind.TransactOpts, backend bind.ContractBackend, router common.Address) (common.Address, *types.Transaction, *FunctionsLoadTestClient, error) {
+func DeployFunctionsLoadTestClient(auth *bind.TransactOpts, backend bind.ContractBackend, router common.Address) (common.Address, *generated_zks.CustomTransaction, *FunctionsLoadTestClient, error) {
 	parsed, err := FunctionsLoadTestClientMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -47,7 +48,11 @@ func DeployFunctionsLoadTestClient(auth *bind.TransactOpts, backend bind.Contrac
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(FunctionsLoadTestClientZKBin), backend, router)
+		contractReturn := &FunctionsLoadTestClient{address: address, abi: *parsed, FunctionsLoadTestClientCaller: FunctionsLoadTestClientCaller{contract: contractBind}, FunctionsLoadTestClientTransactor: FunctionsLoadTestClientTransactor{contract: contractBind}, FunctionsLoadTestClientFilterer: FunctionsLoadTestClientFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(FunctionsLoadTestClientBin), backend, router)
 	if err != nil {
 		return common.Address{}, nil, nil, err
