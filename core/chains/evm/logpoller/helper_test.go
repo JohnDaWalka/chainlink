@@ -120,6 +120,7 @@ func SetupTH(t testing.TB, opts logpoller.Opts) TestHarness {
 	lp := logpoller.NewLogPoller(o, esc, lggr, headTracker, opts)
 	emitterAddress1, _, emitter1, err := log_emitter.DeployLogEmitter(owner, backend.Client())
 	require.NoError(t, err)
+	backend.Commit()
 	emitterAddress2, _, emitter2, err := log_emitter.DeployLogEmitter(owner, backend.Client())
 	require.NoError(t, err)
 	backend.Commit()
