@@ -229,7 +229,7 @@ jobs:
         run: go mod download
       - name: Combine CHAINLINK_IMAGE and CHAINLINK_VERSION
         run: |
-          echo "CHAINLINK_IMAGE=${CHAINLINK_IMAGE}:${CHAINLINK_VERSION}" >> $GITHUB_ENV
+          echo "CHAINLINK_IMAGE=${CHAINLINK_IMAGE}:${CHAINLINK_TAG}" >> $GITHUB_ENV
           echo "Updated CHAINLINK_IMAGE: ${CHAINLINK_IMAGE}"
       - name: Run tests
         working-directory: integration-tests/capabilities
