@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -70,7 +71,7 @@ var RouterABI = RouterMetaData.ABI
 
 var RouterBin = RouterMetaData.Bin
 
-func DeployRouter(auth *bind.TransactOpts, backend bind.ContractBackend, wrappedNative common.Address, armProxy common.Address) (common.Address, *types.Transaction, *Router, error) {
+func DeployRouter(auth *bind.TransactOpts, backend bind.ContractBackend, wrappedNative common.Address, armProxy common.Address) (common.Address, *generated_zks.CustomTransaction, *Router, error) {
 	parsed, err := RouterMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -78,7 +79,11 @@ func DeployRouter(auth *bind.TransactOpts, backend bind.ContractBackend, wrapped
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(RouterZKBin), backend, wrappedNative, armProxy)
+		contractReturn := &Router{address: address, abi: *parsed, RouterCaller: RouterCaller{contract: contractBind}, RouterTransactor: RouterTransactor{contract: contractBind}, RouterFilterer: RouterFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(RouterBin), backend, wrappedNative, armProxy)
 	if err != nil {
 		return common.Address{}, nil, nil, err

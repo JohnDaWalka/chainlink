@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 )
 
 var (
@@ -58,7 +59,7 @@ var EtherSenderReceiverABI = EtherSenderReceiverMetaData.ABI
 
 var EtherSenderReceiverBin = EtherSenderReceiverMetaData.Bin
 
-func DeployEtherSenderReceiver(auth *bind.TransactOpts, backend bind.ContractBackend, router common.Address) (common.Address, *types.Transaction, *EtherSenderReceiver, error) {
+func DeployEtherSenderReceiver(auth *bind.TransactOpts, backend bind.ContractBackend, router common.Address) (common.Address, *generated_zks.CustomTransaction, *EtherSenderReceiver, error) {
 	parsed, err := EtherSenderReceiverMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -66,7 +67,11 @@ func DeployEtherSenderReceiver(auth *bind.TransactOpts, backend bind.ContractBac
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(EtherSenderReceiverZKBin), backend, router)
+		contractReturn := &EtherSenderReceiver{address: address, abi: *parsed, EtherSenderReceiverCaller: EtherSenderReceiverCaller{contract: contractBind}, EtherSenderReceiverTransactor: EtherSenderReceiverTransactor{contract: contractBind}, EtherSenderReceiverFilterer: EtherSenderReceiverFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(EtherSenderReceiverBin), backend, router)
 	if err != nil {
 		return common.Address{}, nil, nil, err

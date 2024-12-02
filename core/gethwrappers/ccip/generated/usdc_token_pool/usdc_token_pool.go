@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -102,7 +103,7 @@ var USDCTokenPoolABI = USDCTokenPoolMetaData.ABI
 
 var USDCTokenPoolBin = USDCTokenPoolMetaData.Bin
 
-func DeployUSDCTokenPool(auth *bind.TransactOpts, backend bind.ContractBackend, tokenMessenger common.Address, token common.Address, allowlist []common.Address, rmnProxy common.Address, router common.Address) (common.Address, *types.Transaction, *USDCTokenPool, error) {
+func DeployUSDCTokenPool(auth *bind.TransactOpts, backend bind.ContractBackend, tokenMessenger common.Address, token common.Address, allowlist []common.Address, rmnProxy common.Address, router common.Address) (common.Address, *generated_zks.CustomTransaction, *USDCTokenPool, error) {
 	parsed, err := USDCTokenPoolMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -110,7 +111,11 @@ func DeployUSDCTokenPool(auth *bind.TransactOpts, backend bind.ContractBackend, 
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(USDCTokenPoolZKBin), backend, tokenMessenger, token, allowlist, rmnProxy, router)
+		contractReturn := &USDCTokenPool{address: address, abi: *parsed, USDCTokenPoolCaller: USDCTokenPoolCaller{contract: contractBind}, USDCTokenPoolTransactor: USDCTokenPoolTransactor{contract: contractBind}, USDCTokenPoolFilterer: USDCTokenPoolFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(USDCTokenPoolBin), backend, tokenMessenger, token, allowlist, rmnProxy, router)
 	if err != nil {
 		return common.Address{}, nil, nil, err

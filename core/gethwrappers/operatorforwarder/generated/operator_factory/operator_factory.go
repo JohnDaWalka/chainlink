@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -39,7 +40,7 @@ var OperatorFactoryABI = OperatorFactoryMetaData.ABI
 
 var OperatorFactoryBin = OperatorFactoryMetaData.Bin
 
-func DeployOperatorFactory(auth *bind.TransactOpts, backend bind.ContractBackend, linkAddress common.Address) (common.Address, *types.Transaction, *OperatorFactory, error) {
+func DeployOperatorFactory(auth *bind.TransactOpts, backend bind.ContractBackend, linkAddress common.Address) (common.Address, *generated_zks.CustomTransaction, *OperatorFactory, error) {
 	parsed, err := OperatorFactoryMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -47,7 +48,11 @@ func DeployOperatorFactory(auth *bind.TransactOpts, backend bind.ContractBackend
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(OperatorFactoryZKBin), backend, linkAddress)
+		contractReturn := &OperatorFactory{address: address, abi: *parsed, OperatorFactoryCaller: OperatorFactoryCaller{contract: contractBind}, OperatorFactoryTransactor: OperatorFactoryTransactor{contract: contractBind}, OperatorFactoryFilterer: OperatorFactoryFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(OperatorFactoryBin), backend, linkAddress)
 	if err != nil {
 		return common.Address{}, nil, nil, err

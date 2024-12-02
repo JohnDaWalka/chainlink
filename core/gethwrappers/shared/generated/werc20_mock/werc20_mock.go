@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -39,7 +40,7 @@ var WERC20MockABI = WERC20MockMetaData.ABI
 
 var WERC20MockBin = WERC20MockMetaData.Bin
 
-func DeployWERC20Mock(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *WERC20Mock, error) {
+func DeployWERC20Mock(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *WERC20Mock, error) {
 	parsed, err := WERC20MockMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -47,7 +48,11 @@ func DeployWERC20Mock(auth *bind.TransactOpts, backend bind.ContractBackend) (co
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(WERC20MockZKBin), backend)
+		contractReturn := &WERC20Mock{address: address, abi: *parsed, WERC20MockCaller: WERC20MockCaller{contract: contractBind}, WERC20MockTransactor: WERC20MockTransactor{contract: contractBind}, WERC20MockFilterer: WERC20MockFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(WERC20MockBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

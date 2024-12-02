@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -86,7 +87,7 @@ var EntryPointABI = EntryPointMetaData.ABI
 
 var EntryPointBin = EntryPointMetaData.Bin
 
-func DeployEntryPoint(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *EntryPoint, error) {
+func DeployEntryPoint(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *EntryPoint, error) {
 	parsed, err := EntryPointMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -94,7 +95,11 @@ func DeployEntryPoint(auth *bind.TransactOpts, backend bind.ContractBackend) (co
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(EntryPointZKBin), backend)
+		contractReturn := &EntryPoint{address: address, abi: *parsed, EntryPointCaller: EntryPointCaller{contract: contractBind}, EntryPointTransactor: EntryPointTransactor{contract: contractBind}, EntryPointFilterer: EntryPointFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(EntryPointBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -45,7 +46,7 @@ var TokenAdminRegistryABI = TokenAdminRegistryMetaData.ABI
 
 var TokenAdminRegistryBin = TokenAdminRegistryMetaData.Bin
 
-func DeployTokenAdminRegistry(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *TokenAdminRegistry, error) {
+func DeployTokenAdminRegistry(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *TokenAdminRegistry, error) {
 	parsed, err := TokenAdminRegistryMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -53,7 +54,11 @@ func DeployTokenAdminRegistry(auth *bind.TransactOpts, backend bind.ContractBack
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(TokenAdminRegistryZKBin), backend)
+		contractReturn := &TokenAdminRegistry{address: address, abi: *parsed, TokenAdminRegistryCaller: TokenAdminRegistryCaller{contract: contractBind}, TokenAdminRegistryTransactor: TokenAdminRegistryTransactor{contract: contractBind}, TokenAdminRegistryFilterer: TokenAdminRegistryFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(TokenAdminRegistryBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

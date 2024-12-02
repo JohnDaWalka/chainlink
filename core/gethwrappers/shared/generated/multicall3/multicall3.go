@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 )
 
 var (
@@ -60,7 +61,7 @@ var Multicall3ABI = Multicall3MetaData.ABI
 
 var Multicall3Bin = Multicall3MetaData.Bin
 
-func DeployMulticall3(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Multicall3, error) {
+func DeployMulticall3(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *Multicall3, error) {
 	parsed, err := Multicall3MetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -68,7 +69,11 @@ func DeployMulticall3(auth *bind.TransactOpts, backend bind.ContractBackend) (co
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(Multicall3ZKBin), backend)
+		contractReturn := &Multicall3{address: address, abi: *parsed, Multicall3Caller: Multicall3Caller{contract: contractBind}, Multicall3Transactor: Multicall3Transactor{contract: contractBind}, Multicall3Filterer: Multicall3Filterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(Multicall3Bin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -52,7 +53,7 @@ var PingPongDemoABI = PingPongDemoMetaData.ABI
 
 var PingPongDemoBin = PingPongDemoMetaData.Bin
 
-func DeployPingPongDemo(auth *bind.TransactOpts, backend bind.ContractBackend, router common.Address, feeToken common.Address) (common.Address, *types.Transaction, *PingPongDemo, error) {
+func DeployPingPongDemo(auth *bind.TransactOpts, backend bind.ContractBackend, router common.Address, feeToken common.Address) (common.Address, *generated_zks.CustomTransaction, *PingPongDemo, error) {
 	parsed, err := PingPongDemoMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -60,7 +61,11 @@ func DeployPingPongDemo(auth *bind.TransactOpts, backend bind.ContractBackend, r
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(PingPongDemoZKBin), backend, router, feeToken)
+		contractReturn := &PingPongDemo{address: address, abi: *parsed, PingPongDemoCaller: PingPongDemoCaller{contract: contractBind}, PingPongDemoTransactor: PingPongDemoTransactor{contract: contractBind}, PingPongDemoFilterer: PingPongDemoFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(PingPongDemoBin), backend, router, feeToken)
 	if err != nil {
 		return common.Address{}, nil, nil, err

@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -39,7 +40,7 @@ var WETH9ABI = WETH9MetaData.ABI
 
 var WETH9Bin = WETH9MetaData.Bin
 
-func DeployWETH9(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *WETH9, error) {
+func DeployWETH9(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *WETH9, error) {
 	parsed, err := WETH9MetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -47,7 +48,11 @@ func DeployWETH9(auth *bind.TransactOpts, backend bind.ContractBackend) (common.
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(WETH9ZKBin), backend)
+		contractReturn := &WETH9{address: address, abi: *parsed, WETH9Caller: WETH9Caller{contract: contractBind}, WETH9Transactor: WETH9Transactor{contract: contractBind}, WETH9Filterer: WETH9Filterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(WETH9Bin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

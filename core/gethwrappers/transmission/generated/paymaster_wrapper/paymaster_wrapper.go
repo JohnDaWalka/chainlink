@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -53,7 +54,7 @@ var PaymasterABI = PaymasterMetaData.ABI
 
 var PaymasterBin = PaymasterMetaData.Bin
 
-func DeployPaymaster(auth *bind.TransactOpts, backend bind.ContractBackend, linkToken common.Address, linkEthFeed common.Address, entryPoint common.Address) (common.Address, *types.Transaction, *Paymaster, error) {
+func DeployPaymaster(auth *bind.TransactOpts, backend bind.ContractBackend, linkToken common.Address, linkEthFeed common.Address, entryPoint common.Address) (common.Address, *generated_zks.CustomTransaction, *Paymaster, error) {
 	parsed, err := PaymasterMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -61,7 +62,11 @@ func DeployPaymaster(auth *bind.TransactOpts, backend bind.ContractBackend, link
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(PaymasterZKBin), backend, linkToken, linkEthFeed, entryPoint)
+		contractReturn := &Paymaster{address: address, abi: *parsed, PaymasterCaller: PaymasterCaller{contract: contractBind}, PaymasterTransactor: PaymasterTransactor{contract: contractBind}, PaymasterFilterer: PaymasterFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(PaymasterBin), backend, linkToken, linkEthFeed, entryPoint)
 	if err != nil {
 		return common.Address{}, nil, nil, err
