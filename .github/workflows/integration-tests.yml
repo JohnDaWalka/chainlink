@@ -196,7 +196,7 @@ jobs:
           tag_suffix: ${{ matrix.image.tag-suffix }}
           dockerfile: ${{ matrix.image.dockerfile }}
           git_commit_sha: ${{ inputs.evm-ref || github.sha }}
-          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           dep_evm_sha: ${{ inputs.evm-ref }}
 
