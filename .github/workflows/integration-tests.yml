@@ -203,8 +203,6 @@ jobs:
   # TODO: Use the docker image built in the previous step
   ctf-v2-test:
     runs-on: ubuntu-latest
-    needs:
-      - build-chainlink
     env:
       CTF_IGNORE_CRITICAL_LOGS: true
       CTF_CONFIGS: environment.toml
@@ -229,21 +227,6 @@ jobs:
             go-modules-${{ hashFiles('**/go.sum') }}-${{ runner.os }}
       - name: Install dependencies
         run: go mod download
-      - name: Combine CHAINLINK_IMAGE and CHAINLINK_VERSION
-        run: |
-          echo "CHAINLINK_IMAGE=${QA_CTFV2_IMAGE_STUB}:${GITHUB_SHA}-plugins" >> $GITHUB_ENV
-          echo "Updated CHAINLINK_IMAGE: ${CHAINLINK_IMAGE}"
-        env:
-          GITHUB_SHA: ${{ github.sha }}
-          QA_CTFV2_IMAGE_STUB: ${{ secrets.QA_CTFV2_IMAGE_STUB }}
-      - name: Setup Github Token
-        id: get-gh-token-auth
-        uses: smartcontractkit/.github/actions/setup-github-token@ef78fa97bf3c77de6563db1175422703e9e6674f # setup-github-token@0.2.1
-        with:
-          aws-role-arn: ${{ secrets.AWS_OIDC_GLOBAL_READ_ONLY_TOKEN_ISSUER_ROLE_ARN }}
-          aws-lambda-url: ${{ secrets.AWS_INFRA_RELENG_TOKEN_ISSUER_LAMBDA_URL }}
-          aws-region: ${{ secrets.AWS_REGION }}
-          set-git-config: "true"
       - name: Run tests
         working-directory: integration-tests/capabilities
         run: go test -v -timeout 15m -run TestWorkflow
