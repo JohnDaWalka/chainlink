@@ -196,7 +196,7 @@ jobs:
           tag_suffix: ${{ matrix.image.tag-suffix }}
           dockerfile: ${{ matrix.image.dockerfile }}
           git_commit_sha: ${{ inputs.evm-ref || github.sha }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           dep_evm_sha: ${{ inputs.evm-ref }}
 
@@ -231,10 +231,11 @@ jobs:
         run: go mod download
       - name: Combine CHAINLINK_IMAGE and CHAINLINK_VERSION
         run: |
-          echo "CHAINLINK_IMAGE=${CHAINLINK_IMAGE}:${GITHUB_SHA}-plugins" >> $GITHUB_ENV
+          echo "CHAINLINK_IMAGE=${QA_CTFV2_IMAGE_STUB}:${GITHUB_SHA}-plugins" >> $GITHUB_ENV
           echo "Updated CHAINLINK_IMAGE: ${CHAINLINK_IMAGE}"
         env:
           GITHUB_SHA: ${{ github.sha }}
+          QA_CTFV2_IMAGE_STUB: ${{ secrets.QA_CTFV2_IMAGE_STUB }}
       - name: Run tests
         working-directory: integration-tests/capabilities
         run: go test -v -timeout 15m -run TestWorkflow
