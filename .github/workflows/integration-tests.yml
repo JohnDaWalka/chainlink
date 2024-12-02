@@ -204,6 +204,7 @@ jobs:
   ctf-v2-test:
     runs-on: ubuntu-latest
     env:
+      CTF_IGNORE_CRITICAL_LOGS: true
       CTF_CONFIGS: environment.toml
       CTF_LOG_LEVEL: info
       CTF_LOKI_STREAM: "false"
