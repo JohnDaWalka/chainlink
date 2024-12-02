@@ -1,8 +1,5 @@
 
 [blockchain_a]
-  chain_id = "1337"
-  image = "f4hrenh9it/foundry:latest"
-  port = "8545"
   type = "anvil"
   docker_cmd_params = ["-b", "10"]
 
@@ -16,8 +13,8 @@
   [[nodeset.node_specs]]
 
     [nodeset.node_specs.node]
-      docker_ctx = "../.."
-      docker_file = "plugins/chainlink.Dockerfile"
+#      docker_ctx = "../.."
+#      docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
@@ -35,8 +32,8 @@
 
     [nodeset.node_specs.node]
       capabilities = ["./streams-linux-amd64"]
-      docker_ctx = "../.."
-      docker_file = "plugins/chainlink.Dockerfile"
+#      docker_ctx = "../.."
+#      docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
@@ -54,8 +51,8 @@
 
     [nodeset.node_specs.node]
       capabilities = ["./streams-linux-amd64"]
-      docker_ctx = "../.."
-      docker_file = "plugins/chainlink.Dockerfile"
+#      docker_ctx = "../.."
+#      docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
@@ -73,8 +70,8 @@
 
     [nodeset.node_specs.node]
       capabilities = ["./streams-linux-amd64"]
-      docker_ctx = "../.."
-      docker_file = "plugins/chainlink.Dockerfile"
+#      docker_ctx = "../.."
+#      docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
@@ -92,8 +89,8 @@
 
     [nodeset.node_specs.node]
       capabilities = ["./streams-linux-amd64"]
-      docker_ctx = "../.."
-      docker_file = "plugins/chainlink.Dockerfile"
+#      docker_ctx = "../.."
+#      docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
