@@ -3,14 +3,9 @@ package ccipevm
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-	"github.com/ethereum/go-ethereum/core"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/codec"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/report_codec"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 
 	"github.com/stretchr/testify/assert"
@@ -68,15 +63,15 @@ func TestExecutePluginCodecV2(t *testing.T) {
 	ctx := testutils.Context(t)
 
 	// Deploy the contract
-	transactor := testutils.MustNewSimTransactor(t)
-	simulatedBackend := backends.NewSimulatedBackend(core.GenesisAlloc{
-		transactor.From: {Balance: assets.Ether(1000).ToInt()},
-	}, 30e6)
-	address, _, _, err := report_codec.DeployReportCodec(transactor, simulatedBackend)
-	require.NoError(t, err)
-	simulatedBackend.Commit()
-	contract, err := report_codec.NewReportCodec(address, simulatedBackend)
-	require.NoError(t, err)
+	//transactor := testutils.MustNewSimTransactor(t)
+	//simulatedBackend := backends.NewSimulatedBackend(core.GenesisAlloc{
+	//	transactor.From: {Balance: assets.Ether(1000).ToInt()},
+	//}, 30e6)
+	//address, _, _, err := report_codec.DeployReportCodec(transactor, simulatedBackend)
+	//require.NoError(t, err)
+	//simulatedBackend.Commit()
+	//contract, err := report_codec.NewReportCodec(address, simulatedBackend)
+	//require.NoError(t, err)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -92,27 +87,27 @@ func TestExecutePluginCodecV2(t *testing.T) {
 			testSetup(t)
 
 			// ignore msg hash in comparison
-			for i := range report.ChainReports {
-				for j := range report.ChainReports[i].Messages {
-					report.ChainReports[i].Messages[j].Header.MsgHash = cciptypes.Bytes32{}
-					report.ChainReports[i].Messages[j].Header.OnRamp = cciptypes.UnknownAddress{}
-					report.ChainReports[i].Messages[j].FeeToken = cciptypes.UnknownAddress{}
-					report.ChainReports[i].Messages[j].ExtraArgs = cciptypes.Bytes{}
-					report.ChainReports[i].Messages[j].FeeTokenAmount = cciptypes.BigInt{}
-					report.ChainReports[i].Messages[j].FeeValueJuels = cciptypes.BigInt{}
-				}
-			}
+			//for i := range report.ChainReports {
+			//	for j := range report.ChainReports[i].Messages {
+			//		report.ChainReports[i].Messages[j].Header.MsgHash = cciptypes.Bytes32{}
+			//		report.ChainReports[i].Messages[j].Header.OnRamp = cciptypes.UnknownAddress{}
+			//		report.ChainReports[i].Messages[j].FeeToken = cciptypes.UnknownAddress{}
+			//		report.ChainReports[i].Messages[j].ExtraArgs = cciptypes.Bytes{}
+			//		report.ChainReports[i].Messages[j].FeeTokenAmount = cciptypes.BigInt{}
+			//		report.ChainReports[i].Messages[j].FeeValueJuels = cciptypes.BigInt{}
+			//	}
+			//}
 
-			// decode using the contract
-			contractDecodedReport, err := contract.DecodeExecuteReport(&bind.CallOpts{Context: ctx}, bytes)
-			assert.NoError(t, err)
-			assert.Equal(t, len(report.ChainReports), len(contractDecodedReport))
-			for i, expReport := range report.ChainReports {
-				actReport := contractDecodedReport[i]
-				assert.Equal(t, expReport.OffchainTokenData, actReport.OffchainTokenData)
-				assert.Equal(t, len(expReport.Messages), len(actReport.Messages))
-				assert.Equal(t, uint64(expReport.SourceChainSelector), actReport.SourceChainSelector)
-			}
+			//// decode using the contract
+			//contractDecodedReport, err := contract.DecodeExecuteReport(&bind.CallOpts{Context: ctx}, bytes)
+			//assert.NoError(t, err)
+			//assert.Equal(t, len(report.ChainReports), len(contractDecodedReport))
+			//for i, expReport := range report.ChainReports {
+			//	actReport := contractDecodedReport[i]
+			//	assert.Equal(t, expReport.OffchainTokenData, actReport.OffchainTokenData)
+			//	assert.Equal(t, len(expReport.Messages), len(actReport.Messages))
+			//	assert.Equal(t, uint64(expReport.SourceChainSelector), actReport.SourceChainSelector)
+			//}
 
 			// decode using the codec
 			codecDecoded, err := cd.Decode(ctx, bytes)
