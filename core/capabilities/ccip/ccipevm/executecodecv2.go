@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/codec"
@@ -40,17 +41,30 @@ func NewExecutePluginCodecV2() *ExecutePluginCodecV2 {
 }
 
 func validate(report cciptypes.ExecutePluginReport) error {
-	for _, chainReport := range report.ChainReports {
+	for i, chainReport := range report.ChainReports {
 		if chainReport.ProofFlagBits.IsEmpty() {
-			return fmt.Errorf("proof flag bits are empty")
+			return errors.New("proof flag bits are empty")
 		}
 
-		evmProofs := make([][32]byte, 0, len(chainReport.Proofs))
-		for _, proof := range chainReport.Proofs {
-			evmProofs = append(evmProofs, proof)
-		}
+		for j, message := range chainReport.Messages {
+			// optional fields
+			if message.FeeToken == nil {
+				report.ChainReports[i].Messages[j].FeeToken = []byte{}
+			}
 
-		for _, message := range chainReport.Messages {
+			if message.FeeValueJuels.IsEmpty() {
+				report.ChainReports[i].Messages[j].FeeValueJuels = cciptypes.NewBigInt(big.NewInt(0))
+			}
+
+			if message.FeeTokenAmount.IsEmpty() {
+				report.ChainReports[i].Messages[j].FeeTokenAmount = cciptypes.NewBigInt(big.NewInt(0))
+			}
+
+			// required fields
+			if message.Sender == nil {
+				return errors.New("message sender is nil")
+			}
+
 			for _, tokenAmount := range message.TokenAmounts {
 				if tokenAmount.Amount.IsEmpty() {
 					return fmt.Errorf("empty amount for token: %s", tokenAmount.DestTokenAddress)

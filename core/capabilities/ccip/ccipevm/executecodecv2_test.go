@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCodec_ExecReportV2(t *testing.T) {
+func TestExecuteCodec(t *testing.T) {
 	d := testSetup(t)
 	input := randomExecuteReport(t, d)
 	c, err := codec.NewCodec(execCodecConfig)
@@ -71,7 +71,7 @@ func TestExecutePluginCodecV2(t *testing.T) {
 				assert.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			testSetup(t)
 
@@ -88,7 +88,7 @@ func TestExecutePluginCodecV2(t *testing.T) {
 
 			// decode using the codec
 			codecDecoded, err := cd.Decode(ctx, bytes)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, report, codecDecoded)
 		})
 	}
