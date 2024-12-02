@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -96,7 +97,7 @@ var CapabilitiesRegistryABI = CapabilitiesRegistryMetaData.ABI
 
 var CapabilitiesRegistryBin = CapabilitiesRegistryMetaData.Bin
 
-func DeployCapabilitiesRegistry(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *CapabilitiesRegistry, error) {
+func DeployCapabilitiesRegistry(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *CapabilitiesRegistry, error) {
 	parsed, err := CapabilitiesRegistryMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -104,7 +105,11 @@ func DeployCapabilitiesRegistry(auth *bind.TransactOpts, backend bind.ContractBa
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(CapabilitiesRegistryZKBin), backend)
+		contractReturn := &CapabilitiesRegistry{address: address, abi: *parsed, CapabilitiesRegistryCaller: CapabilitiesRegistryCaller{contract: contractBind}, CapabilitiesRegistryTransactor: CapabilitiesRegistryTransactor{contract: contractBind}, CapabilitiesRegistryFilterer: CapabilitiesRegistryFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(CapabilitiesRegistryBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

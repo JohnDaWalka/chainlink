@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -48,7 +49,7 @@ var KeystoneForwarderABI = KeystoneForwarderMetaData.ABI
 
 var KeystoneForwarderBin = KeystoneForwarderMetaData.Bin
 
-func DeployKeystoneForwarder(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *KeystoneForwarder, error) {
+func DeployKeystoneForwarder(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *KeystoneForwarder, error) {
 	parsed, err := KeystoneForwarderMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -56,7 +57,11 @@ func DeployKeystoneForwarder(auth *bind.TransactOpts, backend bind.ContractBacke
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(KeystoneForwarderZKBin), backend)
+		contractReturn := &KeystoneForwarder{address: address, abi: *parsed, KeystoneForwarderCaller: KeystoneForwarderCaller{contract: contractBind}, KeystoneForwarderTransactor: KeystoneForwarderTransactor{contract: contractBind}, KeystoneForwarderFilterer: KeystoneForwarderFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(KeystoneForwarderBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

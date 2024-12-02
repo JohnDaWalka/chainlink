@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 )
 
 var (
@@ -51,7 +52,7 @@ var SCAABI = SCAMetaData.ABI
 
 var SCABin = SCAMetaData.Bin
 
-func DeploySCA(auth *bind.TransactOpts, backend bind.ContractBackend, owner common.Address, entryPoint common.Address) (common.Address, *types.Transaction, *SCA, error) {
+func DeploySCA(auth *bind.TransactOpts, backend bind.ContractBackend, owner common.Address, entryPoint common.Address) (common.Address, *generated_zks.CustomTransaction, *SCA, error) {
 	parsed, err := SCAMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -59,7 +60,11 @@ func DeploySCA(auth *bind.TransactOpts, backend bind.ContractBackend, owner comm
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(SCAZKBin), backend, owner, entryPoint)
+		contractReturn := &SCA{address: address, abi: *parsed, SCACaller: SCACaller{contract: contractBind}, SCATransactor: SCATransactor{contract: contractBind}, SCAFilterer: SCAFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(SCABin), backend, owner, entryPoint)
 	if err != nil {
 		return common.Address{}, nil, nil, err

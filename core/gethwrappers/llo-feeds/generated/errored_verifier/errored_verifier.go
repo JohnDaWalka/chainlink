@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 )
 
 var (
@@ -42,7 +43,7 @@ var ErroredVerifierABI = ErroredVerifierMetaData.ABI
 
 var ErroredVerifierBin = ErroredVerifierMetaData.Bin
 
-func DeployErroredVerifier(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *ErroredVerifier, error) {
+func DeployErroredVerifier(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *ErroredVerifier, error) {
 	parsed, err := ErroredVerifierMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -50,7 +51,11 @@ func DeployErroredVerifier(auth *bind.TransactOpts, backend bind.ContractBackend
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(ErroredVerifierZKBin), backend)
+		contractReturn := &ErroredVerifier{address: address, abi: *parsed, ErroredVerifierCaller: ErroredVerifierCaller{contract: contractBind}, ErroredVerifierTransactor: ErroredVerifierTransactor{contract: contractBind}, ErroredVerifierFilterer: ErroredVerifierFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ErroredVerifierBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

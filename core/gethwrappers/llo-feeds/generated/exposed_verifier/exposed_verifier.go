@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 )
 
 var (
@@ -37,7 +38,7 @@ var ExposedVerifierABI = ExposedVerifierMetaData.ABI
 
 var ExposedVerifierBin = ExposedVerifierMetaData.Bin
 
-func DeployExposedVerifier(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *ExposedVerifier, error) {
+func DeployExposedVerifier(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *ExposedVerifier, error) {
 	parsed, err := ExposedVerifierMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -45,7 +46,11 @@ func DeployExposedVerifier(auth *bind.TransactOpts, backend bind.ContractBackend
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(ExposedVerifierZKBin), backend)
+		contractReturn := &ExposedVerifier{address: address, abi: *parsed, ExposedVerifierCaller: ExposedVerifierCaller{contract: contractBind}, ExposedVerifierTransactor: ExposedVerifierTransactor{contract: contractBind}, ExposedVerifierFilterer: ExposedVerifierFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ExposedVerifierBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

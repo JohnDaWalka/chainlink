@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -44,7 +45,7 @@ var TermsOfServiceAllowListABI = TermsOfServiceAllowListMetaData.ABI
 
 var TermsOfServiceAllowListBin = TermsOfServiceAllowListMetaData.Bin
 
-func DeployTermsOfServiceAllowList(auth *bind.TransactOpts, backend bind.ContractBackend, config TermsOfServiceAllowListConfig, initialAllowedSenders []common.Address, initialBlockedSenders []common.Address, previousToSContract common.Address) (common.Address, *types.Transaction, *TermsOfServiceAllowList, error) {
+func DeployTermsOfServiceAllowList(auth *bind.TransactOpts, backend bind.ContractBackend, config TermsOfServiceAllowListConfig, initialAllowedSenders []common.Address, initialBlockedSenders []common.Address, previousToSContract common.Address) (common.Address, *generated_zks.CustomTransaction, *TermsOfServiceAllowList, error) {
 	parsed, err := TermsOfServiceAllowListMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -52,7 +53,11 @@ func DeployTermsOfServiceAllowList(auth *bind.TransactOpts, backend bind.Contrac
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(TermsOfServiceAllowListZKBin), backend, config, initialAllowedSenders, initialBlockedSenders, previousToSContract)
+		contractReturn := &TermsOfServiceAllowList{address: address, abi: *parsed, TermsOfServiceAllowListCaller: TermsOfServiceAllowListCaller{contract: contractBind}, TermsOfServiceAllowListTransactor: TermsOfServiceAllowListTransactor{contract: contractBind}, TermsOfServiceAllowListFilterer: TermsOfServiceAllowListFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(TermsOfServiceAllowListBin), backend, config, initialAllowedSenders, initialBlockedSenders, previousToSContract)
 	if err != nil {
 		return common.Address{}, nil, nil, err

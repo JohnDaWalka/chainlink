@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -54,7 +55,7 @@ var LiquidityManagerABI = LiquidityManagerMetaData.ABI
 
 var LiquidityManagerBin = LiquidityManagerMetaData.Bin
 
-func DeployLiquidityManager(auth *bind.TransactOpts, backend bind.ContractBackend, token common.Address, localChainSelector uint64, localLiquidityContainer common.Address, minimumLiquidity *big.Int, finance common.Address) (common.Address, *types.Transaction, *LiquidityManager, error) {
+func DeployLiquidityManager(auth *bind.TransactOpts, backend bind.ContractBackend, token common.Address, localChainSelector uint64, localLiquidityContainer common.Address, minimumLiquidity *big.Int, finance common.Address) (common.Address, *generated_zks.CustomTransaction, *LiquidityManager, error) {
 	parsed, err := LiquidityManagerMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -62,7 +63,11 @@ func DeployLiquidityManager(auth *bind.TransactOpts, backend bind.ContractBacken
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(LiquidityManagerZKBin), backend, token, localChainSelector, localLiquidityContainer, minimumLiquidity, finance)
+		contractReturn := &LiquidityManager{address: address, abi: *parsed, LiquidityManagerCaller: LiquidityManagerCaller{contract: contractBind}, LiquidityManagerTransactor: LiquidityManagerTransactor{contract: contractBind}, LiquidityManagerFilterer: LiquidityManagerFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(LiquidityManagerBin), backend, token, localChainSelector, localLiquidityContainer, minimumLiquidity, finance)
 	if err != nil {
 		return common.Address{}, nil, nil, err

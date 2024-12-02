@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -67,7 +68,7 @@ var RMNHomeABI = RMNHomeMetaData.ABI
 
 var RMNHomeBin = RMNHomeMetaData.Bin
 
-func DeployRMNHome(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *RMNHome, error) {
+func DeployRMNHome(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *RMNHome, error) {
 	parsed, err := RMNHomeMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -75,7 +76,11 @@ func DeployRMNHome(auth *bind.TransactOpts, backend bind.ContractBackend) (commo
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(RMNHomeZKBin), backend)
+		contractReturn := &RMNHome{address: address, abi: *parsed, RMNHomeCaller: RMNHomeCaller{contract: contractBind}, RMNHomeTransactor: RMNHomeTransactor{contract: contractBind}, RMNHomeFilterer: RMNHomeFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(RMNHomeBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

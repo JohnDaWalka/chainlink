@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -89,7 +90,7 @@ var LockReleaseTokenPoolABI = LockReleaseTokenPoolMetaData.ABI
 
 var LockReleaseTokenPoolBin = LockReleaseTokenPoolMetaData.Bin
 
-func DeployLockReleaseTokenPool(auth *bind.TransactOpts, backend bind.ContractBackend, token common.Address, localTokenDecimals uint8, allowlist []common.Address, rmnProxy common.Address, acceptLiquidity bool, router common.Address) (common.Address, *types.Transaction, *LockReleaseTokenPool, error) {
+func DeployLockReleaseTokenPool(auth *bind.TransactOpts, backend bind.ContractBackend, token common.Address, localTokenDecimals uint8, allowlist []common.Address, rmnProxy common.Address, acceptLiquidity bool, router common.Address) (common.Address, *generated_zks.CustomTransaction, *LockReleaseTokenPool, error) {
 	parsed, err := LockReleaseTokenPoolMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -97,7 +98,11 @@ func DeployLockReleaseTokenPool(auth *bind.TransactOpts, backend bind.ContractBa
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	if generated_zks.IsZKSync(backend) {
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(LockReleaseTokenPoolZKBin), backend, token, localTokenDecimals, allowlist, rmnProxy, acceptLiquidity, router)
+		contractReturn := &LockReleaseTokenPool{address: address, abi: *parsed, LockReleaseTokenPoolCaller: LockReleaseTokenPoolCaller{contract: contractBind}, LockReleaseTokenPoolTransactor: LockReleaseTokenPoolTransactor{contract: contractBind}, LockReleaseTokenPoolFilterer: LockReleaseTokenPoolFilterer{contract: contractBind}}
+		return address, ethTx, contractReturn, err
+	}
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(LockReleaseTokenPoolBin), backend, token, localTokenDecimals, allowlist, rmnProxy, acceptLiquidity, router)
 	if err != nil {
 		return common.Address{}, nil, nil, err
