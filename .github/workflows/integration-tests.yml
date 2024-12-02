@@ -203,6 +203,8 @@ jobs:
   # TODO: Use the docker image built in the previous step
   ctf-v2-test:
     runs-on: ubuntu-latest
+    needs:
+      - build-chainlink
     env:
       CTF_IGNORE_CRITICAL_LOGS: true
       CTF_CONFIGS: environment.toml
@@ -229,8 +231,10 @@ jobs:
         run: go mod download
       - name: Combine CHAINLINK_IMAGE and CHAINLINK_VERSION
         run: |
-          echo "CHAINLINK_IMAGE=${CHAINLINK_IMAGE}:${CHAINLINK_TAG}" >> $GITHUB_ENV
+          echo "CHAINLINK_IMAGE=${CHAINLINK_IMAGE}:${GITHUB_SHA}-plugins" >> $GITHUB_ENV
           echo "Updated CHAINLINK_IMAGE: ${CHAINLINK_IMAGE}"
+        env:
+          GITHUB_SHA: ${{ github.sha }}
       - name: Run tests
         working-directory: integration-tests/capabilities
         run: go test -v -timeout 15m -run TestWorkflow
