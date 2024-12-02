@@ -422,7 +422,7 @@ func CreateDockerEnv(t *testing.T) (
 
 	// ignore critical CL node logs until they are fixed, as otherwise tests will fail
 	var logScannerSettings = test_env.GetDefaultChainlinkNodeLogScannerSettingsWithExtraAllowedMessages(testreporters.NewAllowedLogMessage(
-		"No live RPC nodes available.",
+		"No live RPC nodes available",
 		"CL nodes are started before simulated chains, so this is expected",
 		zapcore.DPanicLevel,
 		testreporters.WarnAboutAllowedMsgs_No,
