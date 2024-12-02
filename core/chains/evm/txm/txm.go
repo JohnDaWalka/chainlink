@@ -341,7 +341,7 @@ func (t *Txm) sendTransactionWithError(ctx context.Context, tx *types.Transactio
 	start := time.Now()
 	txErr := t.client.SendTransaction(ctx, tx, attempt)
 	tx.AttemptCount++
-	t.lggr.Infow("Broadcasted attempt", "tx", tx, "attempt", attempt, "duration", time.Since(start), "txErr: ", txErr)
+	t.lggr.Infow("Broadcasted attempt", "tx", tx.PrettyPrint(), "attempt", attempt.PrettyPrint(), "duration", time.Since(start), "txErr: ", txErr)
 	if txErr != nil && t.errorHandler != nil {
 		if err = t.errorHandler.HandleError(tx, txErr, t.attemptBuilder, t.client, t.txStore, t.setNonce, false); err != nil {
 			return
@@ -410,7 +410,8 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 		if tx.AttemptCount >= maxAllowedAttempts {
 			return true, fmt.Errorf("reached max allowed attempts for txID: %d. TXM won't broadcast any more attempts."+
 				"If this error persists, it means the transaction won't be confirmed and the TXM needs to be restarted."+
-				"Look for any error messages from previous attempts that may indicate why this happened, i.e. wallet is out of funds. Tx: %v", tx.ID, tx)
+				"Look for any error messages from previous broadcasted attempts that may indicate why this happened, i.e. wallet is out of funds. Tx: %v", tx.ID,
+				tx.PrettyPrintWithAttempts())
 		}
 
 		if time.Since(tx.LastBroadcastAt) > (t.config.BlockTime*time.Duration(t.config.RetryBlockThreshold)) || tx.LastBroadcastAt.IsZero() {
