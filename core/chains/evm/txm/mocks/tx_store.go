@@ -358,24 +358,24 @@ func (_c *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call) RunAndReturn
 }
 
 // MarkTransactionsConfirmed provides a mock function with given fields: _a0, _a1, _a2
-func (_m *TxStore) MarkTransactionsConfirmed(_a0 context.Context, _a1 uint64, _a2 common.Address) ([]uint64, []uint64, error) {
+func (_m *TxStore) MarkTransactionsConfirmed(_a0 context.Context, _a1 uint64, _a2 common.Address) ([]*types.Transaction, []uint64, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	if len(ret) == 0 {
 		panic("no return value specified for MarkTransactionsConfirmed")
 	}
 
-	var r0 []uint64
+	var r0 []*types.Transaction
 	var r1 []uint64
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, common.Address) ([]uint64, []uint64, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, common.Address) ([]*types.Transaction, []uint64, error)); ok {
 		return rf(_a0, _a1, _a2)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, common.Address) []uint64); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, common.Address) []*types.Transaction); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]uint64)
+			r0 = ret.Get(0).([]*types.Transaction)
 		}
 	}
 
@@ -416,12 +416,12 @@ func (_c *TxStore_MarkTransactionsConfirmed_Call) Run(run func(_a0 context.Conte
 	return _c
 }
 
-func (_c *TxStore_MarkTransactionsConfirmed_Call) Return(_a0 []uint64, _a1 []uint64, _a2 error) *TxStore_MarkTransactionsConfirmed_Call {
+func (_c *TxStore_MarkTransactionsConfirmed_Call) Return(_a0 []*types.Transaction, _a1 []uint64, _a2 error) *TxStore_MarkTransactionsConfirmed_Call {
 	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *TxStore_MarkTransactionsConfirmed_Call) RunAndReturn(run func(context.Context, uint64, common.Address) ([]uint64, []uint64, error)) *TxStore_MarkTransactionsConfirmed_Call {
+func (_c *TxStore_MarkTransactionsConfirmed_Call) RunAndReturn(run func(context.Context, uint64, common.Address) ([]*types.Transaction, []uint64, error)) *TxStore_MarkTransactionsConfirmed_Call {
 	_c.Call.Return(run)
 	return _c
 }

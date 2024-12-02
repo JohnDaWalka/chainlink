@@ -210,7 +210,7 @@ func TestMarkTransactionsConfirmed(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, types.TxConfirmed, ctx1.State)
 		assert.Equal(t, types.TxUnconfirmed, ctx2.State)
-		assert.Equal(t, ctxs[0], ctx1.ID)
+		assert.Equal(t, ctxs[0].ID, ctx1.ID) // Ensure order
 		assert.Empty(t, utxs)
 	})
 

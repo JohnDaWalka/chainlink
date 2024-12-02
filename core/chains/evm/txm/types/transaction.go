@@ -40,8 +40,9 @@ type Transaction struct {
 	Data              []byte
 	SpecifiedGasLimit uint64
 
-	CreatedAt       time.Time
-	LastBroadcastAt time.Time
+	CreatedAt          time.Time
+	InitialBroadcastAt time.Time
+	LastBroadcastAt    time.Time
 
 	State        TxState
 	IsPurgeable  bool
