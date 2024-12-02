@@ -28,7 +28,7 @@ const headerComment = `// Code generated - DO NOT EDIT.
 // AbigenArgs is the arguments to the abigen executable. E.g., Bin is the -bin
 // arg.
 type AbigenArgs struct {
-	Bin, ABI, Out, Type, Pkg string
+	Bin, ABI, Out, Type, Pkg, ZkBinPath string
 }
 
 // Abigen calls Abigen  with the given arguments
@@ -71,6 +71,7 @@ func Abigen(a AbigenArgs) {
 		Exit("failure while building "+a.Pkg+" wrapper, stderr: "+buildResponse.String(), err)
 	}
 
+	fmt.Println("zkbin path", a.ZkBinPath)
 	ImproveAbigenOutput(a.Out, a.ABI)
 }
 
