@@ -783,4 +783,3 @@ jobs:
           name: cl_node_coverage_data_solana_tests
           path: .covdata
           retention-days: 1
-
