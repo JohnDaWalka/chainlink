@@ -425,14 +425,18 @@ func CreateDockerEnv(t *testing.T) (
 		"No live RPC nodes available",
 		"CL nodes are started before simulated chains, so this is expected",
 		zapcore.DPanicLevel,
-		testreporters.WarnAboutAllowedMsgs_No,
-	),
+		testreporters.WarnAboutAllowedMsgs_No),
 		testreporters.NewAllowedLogMessage(
 			"Error stopping job service",
 			"Possible lifecycle bug in chainlink: failed to close RMN home reader:  has already been stopped: already stopped",
 			zapcore.DPanicLevel,
-			testreporters.WarnAboutAllowedMsgs_No,
-		))
+			testreporters.WarnAboutAllowedMsgs_No),
+		testreporters.NewAllowedLogMessage(
+			"Shutdown grace period of 5s exceeded, closing DB and exiting...",
+			"Possible lifecycle bug in chainlink.",
+			zapcore.DPanicLevel,
+			testreporters.WarnAboutAllowedMsgs_No),
+	)
 
 	builder := test_env.NewCLTestEnvBuilder().
 		WithTestConfig(&cfg).
