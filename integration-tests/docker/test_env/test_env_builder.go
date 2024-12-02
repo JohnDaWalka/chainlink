@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -257,12 +256,25 @@ func (b *CLTestEnvBuilder) Build() (*CLClusterTestEnv, error) {
 			if b.chainlinkNodeLogScannerSettings != nil {
 				var logFiles []*os.File
 
-				fileRegex := regexp.MustCompile(`^cl-node.*\.log$`)
+				// when tests run in parallel, we need to make sure that we only process logs that belong to nodes created by the current test
+				// that is required, because some tests might have custom log messages that are allowed, but only for that test (e.g. because they restart the CL node)
+				var belongsToCurrentEnv = func(filePath string) bool {
+					for _, clNode := range b.te.ClCluster.Nodes {
+						if clNode == nil {
+							continue
+						}
+						if strings.Contains(filePath, clNode.ContainerName) {
+							return true
+						}
+					}
+					return false
+				}
+
 				fileWalkErr := filepath.Walk(logsDir, func(path string, info os.FileInfo, err error) error {
 					if err != nil {
 						return err
 					}
-					if !info.IsDir() && fileRegex.MatchString(info.Name()) {
+					if !info.IsDir() && belongsToCurrentEnv(info.Name()) {
 						file, fileErr := os.Open(path)
 						if fileErr != nil {
 							return fmt.Errorf("failed to open file %s: %w", path, fileErr)
