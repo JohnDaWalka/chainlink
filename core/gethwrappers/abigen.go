@@ -73,6 +73,30 @@ func Abigen(a AbigenArgs) {
 
 	fmt.Println("zkbin path", a.ZkBinPath)
 	ImproveAbigenOutput(a.Out, a.ABI)
+	if a.ZkBinPath != "" {
+		ImproveAbigenOutput_zks(a.Out, a.ABI)
+	}
+}
+
+func ImproveAbigenOutput_zks(path string, abiPath string) {
+
+	bs, err := os.ReadFile(path)
+	if err != nil {
+		Exit("Error while improving abigen output", err)
+	}
+
+	fset, fileNode := parseFile(bs)
+
+	contractName := getContractName(fileNode)
+
+	fileNode = addZKSyncLogic(contractName, fset, fileNode)
+
+	bs = generateCode(fset, fileNode)
+
+	err = os.WriteFile(path, bs, 0600)
+	if err != nil {
+		Exit("Error while writing improved abigen source", err)
+	}
 }
 
 func ImproveAbigenOutput(path string, abiPath string) {
@@ -98,7 +122,6 @@ func ImproveAbigenOutput(path string, abiPath string) {
 	}
 	contractName := getContractName(fileNode)
 	fileNode = addContractStructFields(contractName, fileNode)
-	fileNode = addZKSyncLogic(contractName, fset, fileNode)
 	fileNode = replaceAnonymousStructs(contractName, fileNode)
 	bs = generateCode(fset, fileNode)
 	bs = writeAdditionalMethods(contractName, logNames, abi, bs)
@@ -521,6 +544,61 @@ func addZKSyncBlock(x ast.FuncDecl, zkSyncBlock string) ast.FuncDecl {
 	return x
 }
 
+// convert *types.Transaction to *generated_zks.CustomTransaction
+func modifyTxReturnType(x ast.FuncDecl) {
+	x.Type.Results.List[1].Type = &ast.StarExpr{
+		X: &ast.SelectorExpr{
+			X:   &ast.Ident{Name: "generated_zks"},
+			Sel: &ast.Ident{Name: "CustomTransaction"},
+		},
+	}
+}
+
+// convert tx to &CustomTransaction{Transaction: tx, customHash: tx.Hash()}
+func updateReturnStmt(x ast.FuncDecl) {
+	for _, stmt := range x.Body.List {
+		returnStmt, is := stmt.(*ast.ReturnStmt)
+		if !is {
+			continue
+		}
+		if len(returnStmt.Results) < 3 {
+			continue
+		}
+
+		txExpr, ok := returnStmt.Results[1].(*ast.Ident)
+		if !ok {
+			return
+		}
+		if txExpr.Name != "tx" {
+			return
+		}
+
+		txField := &ast.KeyValueExpr{
+			Key:   ast.NewIdent("Transaction"),
+			Value: ast.NewIdent("tx"),
+		}
+
+		hashField := &ast.KeyValueExpr{
+			Key: ast.NewIdent("CustomHash"),
+			Value: &ast.CallExpr{
+				Fun: &ast.SelectorExpr{
+					X:   ast.NewIdent("tx"),
+					Sel: ast.NewIdent("Hash"),
+				},
+			},
+		}
+		newRet := &ast.CompositeLit{
+			Type: &ast.SelectorExpr{
+				X:   ast.NewIdent("generated_zks"),
+				Sel: ast.NewIdent("CustomTransaction"),
+			},
+			Elts: []ast.Expr{txField, hashField},
+		}
+		pointerRet := &ast.UnaryExpr{Op: token.AND, X: newRet}
+		returnStmt.Results[1] = pointerRet
+	}
+}
+
 func addZKSyncLogic(contractName string, fset *token.FileSet, fileNode *ast.File) *ast.File {
 	astutil.AddImport(fset, fileNode, "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks")
 
@@ -536,13 +614,10 @@ func addZKSyncLogic(contractName string, fset *token.FileSet, fileNode *ast.File
 		paramList := getConstructorParams(*x)
 		zkSyncBlock := getZKSyncBlock(contractName, paramList)
 		addZKSyncBlock(*x, zkSyncBlock)
-
-		x.Type.Results.List[1].Type = &ast.StarExpr{
-			X: &ast.SelectorExpr{
-				X:   &ast.Ident{Name: "generated_zks"},
-				Sel: &ast.Ident{Name: "CustomTransaction"},
-			},
-		}
+		modifyTxReturnType(*x)
+		updateReturnStmt(*x)
+		// add zk binary
+		// work on generate_zks
 
 		return false
 	}, nil).(*ast.File)
