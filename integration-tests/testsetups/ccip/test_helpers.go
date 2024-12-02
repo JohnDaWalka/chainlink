@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/testreporters"
+	"go.uber.org/zap/zapcore"
 	"math/big"
 	"os"
 	"strconv"
@@ -413,11 +415,26 @@ func CreateDockerEnv(t *testing.T) (
 		}
 	}
 
+	// ignore critical CL node logs until they are fixed, as otherwise tests will fail
+	var logScannerSettings = test_env.GetDefaultChainlinkNodeLogScannerSettingsWithExtraAllowedMessages(testreporters.NewAllowedLogMessage(
+		"No live RPC nodes available.",
+		"CL nodes are started before simulated chains, so this is expected",
+		zapcore.DPanicLevel,
+		testreporters.WarnAboutAllowedMsgs_No,
+	),
+		testreporters.NewAllowedLogMessage(
+			"Error stopping job service",
+			"Possible lifecycle bug in chainlink: failed to close RMN home reader:  has already been stopped: already stopped",
+			zapcore.DPanicLevel,
+			testreporters.WarnAboutAllowedMsgs_No,
+		))
+
 	builder := test_env.NewCLTestEnvBuilder().
 		WithTestConfig(&cfg).
 		WithTestInstance(t).
 		WithMockAdapter().
 		WithJobDistributor(cfg.CCIP.JobDistributorConfig).
+		WithChainlinkNodeLogScanner(logScannerSettings).
 		WithStandardCleanup()
 
 	// if private ethereum networks are provided, we will use them to create the test environment

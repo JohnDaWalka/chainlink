@@ -283,7 +283,7 @@ func (b *CLTestEnvBuilder) Build() (*CLClusterTestEnv, error) {
 					for _, f := range logFiles {
 						file := f
 						verifyLogsGroup.Go(func() error {
-							verifyErr := testreporters.VerifyLogFile(file, b.chainlinkNodeLogScannerSettings.FailingLogLevel, b.chainlinkNodeLogScannerSettings.Threshold)
+							verifyErr := testreporters.VerifyLogFile(file, b.chainlinkNodeLogScannerSettings.FailingLogLevel, b.chainlinkNodeLogScannerSettings.Threshold, b.chainlinkNodeLogScannerSettings.AllowedMessages...)
 							_ = file.Close()
 							// ignore processing errors
 							if verifyErr != nil && !strings.Contains(verifyErr.Error(), testreporters.MultipleLogsAtLogLevelErr) && !strings.Contains(verifyErr.Error(), testreporters.OneLogAtLogLevelErr) {
