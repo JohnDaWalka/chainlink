@@ -57,7 +57,7 @@ func DeployRMNProxyContract(auth *bind.TransactOpts, backend bind.ContractBacken
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	return address, tx, &RMNProxyContract{address: address, abi: *parsed, RMNProxyContractCaller: RMNProxyContractCaller{contract: contract}, RMNProxyContractTransactor: RMNProxyContractTransactor{contract: contract}, RMNProxyContractFilterer: RMNProxyContractFilterer{contract: contract}}, nil
+	return address, &generated_zks.CustomTransaction{Transaction: tx, CustomHash: tx.Hash()}, &RMNProxyContract{address: address, abi: *parsed, RMNProxyContractCaller: RMNProxyContractCaller{contract: contract}, RMNProxyContractTransactor: RMNProxyContractTransactor{contract: contract}, RMNProxyContractFilterer: RMNProxyContractFilterer{contract: contract}}, nil
 }
 
 type RMNProxyContract struct {
