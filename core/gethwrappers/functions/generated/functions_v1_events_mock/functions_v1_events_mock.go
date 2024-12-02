@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -48,7 +47,7 @@ var FunctionsV1EventsMockABI = FunctionsV1EventsMockMetaData.ABI
 
 var FunctionsV1EventsMockBin = FunctionsV1EventsMockMetaData.Bin
 
-func DeployFunctionsV1EventsMock(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *FunctionsV1EventsMock, error) {
+func DeployFunctionsV1EventsMock(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *FunctionsV1EventsMock, error) {
 	parsed, err := FunctionsV1EventsMockMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -56,11 +55,7 @@ func DeployFunctionsV1EventsMock(auth *bind.TransactOpts, backend bind.ContractB
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(FunctionsV1EventsMockZKBin), backend)
-		contractReturn := &FunctionsV1EventsMock{address: address, abi: *parsed, FunctionsV1EventsMockCaller: FunctionsV1EventsMockCaller{contract: contractBind}, FunctionsV1EventsMockTransactor: FunctionsV1EventsMockTransactor{contract: contractBind}, FunctionsV1EventsMockFilterer: FunctionsV1EventsMockFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(FunctionsV1EventsMockBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

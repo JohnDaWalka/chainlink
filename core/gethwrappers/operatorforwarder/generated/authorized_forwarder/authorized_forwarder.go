@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -40,7 +39,7 @@ var AuthorizedForwarderABI = AuthorizedForwarderMetaData.ABI
 
 var AuthorizedForwarderBin = AuthorizedForwarderMetaData.Bin
 
-func DeployAuthorizedForwarder(auth *bind.TransactOpts, backend bind.ContractBackend, link common.Address, owner common.Address, recipient common.Address, message []byte) (common.Address, *generated_zks.CustomTransaction, *AuthorizedForwarder, error) {
+func DeployAuthorizedForwarder(auth *bind.TransactOpts, backend bind.ContractBackend, link common.Address, owner common.Address, recipient common.Address, message []byte) (common.Address, *types.Transaction, *AuthorizedForwarder, error) {
 	parsed, err := AuthorizedForwarderMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -48,11 +47,7 @@ func DeployAuthorizedForwarder(auth *bind.TransactOpts, backend bind.ContractBac
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(AuthorizedForwarderZKBin), backend, link, owner, recipient, message)
-		contractReturn := &AuthorizedForwarder{address: address, abi: *parsed, AuthorizedForwarderCaller: AuthorizedForwarderCaller{contract: contractBind}, AuthorizedForwarderTransactor: AuthorizedForwarderTransactor{contract: contractBind}, AuthorizedForwarderFilterer: AuthorizedForwarderFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(AuthorizedForwarderBin), backend, link, owner, recipient, message)
 	if err != nil {
 		return common.Address{}, nil, nil, err

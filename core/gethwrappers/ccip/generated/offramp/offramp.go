@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -164,7 +163,7 @@ var OffRampABI = OffRampMetaData.ABI
 
 var OffRampBin = OffRampMetaData.Bin
 
-func DeployOffRamp(auth *bind.TransactOpts, backend bind.ContractBackend, staticConfig OffRampStaticConfig, dynamicConfig OffRampDynamicConfig, sourceChainConfigs []OffRampSourceChainConfigArgs) (common.Address, *generated_zks.CustomTransaction, *OffRamp, error) {
+func DeployOffRamp(auth *bind.TransactOpts, backend bind.ContractBackend, staticConfig OffRampStaticConfig, dynamicConfig OffRampDynamicConfig, sourceChainConfigs []OffRampSourceChainConfigArgs) (common.Address, *types.Transaction, *OffRamp, error) {
 	parsed, err := OffRampMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -172,11 +171,7 @@ func DeployOffRamp(auth *bind.TransactOpts, backend bind.ContractBackend, static
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(OffRampZKBin), backend, staticConfig, dynamicConfig, sourceChainConfigs)
-		contractReturn := &OffRamp{address: address, abi: *parsed, OffRampCaller: OffRampCaller{contract: contractBind}, OffRampTransactor: OffRampTransactor{contract: contractBind}, OffRampFilterer: OffRampFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(OffRampBin), backend, staticConfig, dynamicConfig, sourceChainConfigs)
 	if err != nil {
 		return common.Address{}, nil, nil, err

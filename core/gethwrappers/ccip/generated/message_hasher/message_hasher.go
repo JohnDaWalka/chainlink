@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 )
 
 var (
@@ -80,7 +79,7 @@ var MessageHasherABI = MessageHasherMetaData.ABI
 
 var MessageHasherBin = MessageHasherMetaData.Bin
 
-func DeployMessageHasher(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *MessageHasher, error) {
+func DeployMessageHasher(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *MessageHasher, error) {
 	parsed, err := MessageHasherMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -88,11 +87,7 @@ func DeployMessageHasher(auth *bind.TransactOpts, backend bind.ContractBackend) 
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(MessageHasherZKBin), backend)
-		contractReturn := &MessageHasher{address: address, abi: *parsed, MessageHasherCaller: MessageHasherCaller{contract: contractBind}, MessageHasherTransactor: MessageHasherTransactor{contract: contractBind}, MessageHasherFilterer: MessageHasherFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(MessageHasherBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

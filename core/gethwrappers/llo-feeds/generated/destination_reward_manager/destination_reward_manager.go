@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -50,7 +49,7 @@ var DestinationRewardManagerABI = DestinationRewardManagerMetaData.ABI
 
 var DestinationRewardManagerBin = DestinationRewardManagerMetaData.Bin
 
-func DeployDestinationRewardManager(auth *bind.TransactOpts, backend bind.ContractBackend, linkAddress common.Address) (common.Address, *generated_zks.CustomTransaction, *DestinationRewardManager, error) {
+func DeployDestinationRewardManager(auth *bind.TransactOpts, backend bind.ContractBackend, linkAddress common.Address) (common.Address, *types.Transaction, *DestinationRewardManager, error) {
 	parsed, err := DestinationRewardManagerMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -58,11 +57,7 @@ func DeployDestinationRewardManager(auth *bind.TransactOpts, backend bind.Contra
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(DestinationRewardManagerZKBin), backend, linkAddress)
-		contractReturn := &DestinationRewardManager{address: address, abi: *parsed, DestinationRewardManagerCaller: DestinationRewardManagerCaller{contract: contractBind}, DestinationRewardManagerTransactor: DestinationRewardManagerTransactor{contract: contractBind}, DestinationRewardManagerFilterer: DestinationRewardManagerFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(DestinationRewardManagerBin), backend, linkAddress)
 	if err != nil {
 		return common.Address{}, nil, nil, err

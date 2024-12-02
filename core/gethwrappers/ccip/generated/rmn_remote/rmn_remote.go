@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -64,7 +63,7 @@ var RMNRemoteABI = RMNRemoteMetaData.ABI
 
 var RMNRemoteBin = RMNRemoteMetaData.Bin
 
-func DeployRMNRemote(auth *bind.TransactOpts, backend bind.ContractBackend, localChainSelector uint64) (common.Address, *generated_zks.CustomTransaction, *RMNRemote, error) {
+func DeployRMNRemote(auth *bind.TransactOpts, backend bind.ContractBackend, localChainSelector uint64) (common.Address, *types.Transaction, *RMNRemote, error) {
 	parsed, err := RMNRemoteMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -72,11 +71,7 @@ func DeployRMNRemote(auth *bind.TransactOpts, backend bind.ContractBackend, loca
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(RMNRemoteZKBin), backend, localChainSelector)
-		contractReturn := &RMNRemote{address: address, abi: *parsed, RMNRemoteCaller: RMNRemoteCaller{contract: contractBind}, RMNRemoteTransactor: RMNRemoteTransactor{contract: contractBind}, RMNRemoteFilterer: RMNRemoteFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(RMNRemoteBin), backend, localChainSelector)
 	if err != nil {
 		return common.Address{}, nil, nil, err

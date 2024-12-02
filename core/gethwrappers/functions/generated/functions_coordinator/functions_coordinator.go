@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -84,7 +83,7 @@ var FunctionsCoordinatorABI = FunctionsCoordinatorMetaData.ABI
 
 var FunctionsCoordinatorBin = FunctionsCoordinatorMetaData.Bin
 
-func DeployFunctionsCoordinator(auth *bind.TransactOpts, backend bind.ContractBackend, router common.Address, config FunctionsBillingConfig, linkToNativeFeed common.Address, linkToUsdFeed common.Address) (common.Address, *generated_zks.CustomTransaction, *FunctionsCoordinator, error) {
+func DeployFunctionsCoordinator(auth *bind.TransactOpts, backend bind.ContractBackend, router common.Address, config FunctionsBillingConfig, linkToNativeFeed common.Address, linkToUsdFeed common.Address) (common.Address, *types.Transaction, *FunctionsCoordinator, error) {
 	parsed, err := FunctionsCoordinatorMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -92,11 +91,7 @@ func DeployFunctionsCoordinator(auth *bind.TransactOpts, backend bind.ContractBa
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(FunctionsCoordinatorZKBin), backend, router, config, linkToNativeFeed, linkToUsdFeed)
-		contractReturn := &FunctionsCoordinator{address: address, abi: *parsed, FunctionsCoordinatorCaller: FunctionsCoordinatorCaller{contract: contractBind}, FunctionsCoordinatorTransactor: FunctionsCoordinatorTransactor{contract: contractBind}, FunctionsCoordinatorFilterer: FunctionsCoordinatorFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(FunctionsCoordinatorBin), backend, router, config, linkToNativeFeed, linkToUsdFeed)
 	if err != nil {
 		return common.Address{}, nil, nil, err

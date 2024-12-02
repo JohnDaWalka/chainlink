@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -40,7 +39,7 @@ var BurnMintERC20ABI = BurnMintERC20MetaData.ABI
 
 var BurnMintERC20Bin = BurnMintERC20MetaData.Bin
 
-func DeployBurnMintERC20(auth *bind.TransactOpts, backend bind.ContractBackend, name string, symbol string, decimals_ uint8, maxSupply_ *big.Int, preMint *big.Int) (common.Address, *generated_zks.CustomTransaction, *BurnMintERC20, error) {
+func DeployBurnMintERC20(auth *bind.TransactOpts, backend bind.ContractBackend, name string, symbol string, decimals_ uint8, maxSupply_ *big.Int, preMint *big.Int) (common.Address, *types.Transaction, *BurnMintERC20, error) {
 	parsed, err := BurnMintERC20MetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -48,11 +47,7 @@ func DeployBurnMintERC20(auth *bind.TransactOpts, backend bind.ContractBackend, 
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(BurnMintERC20ZKBin), backend, name, symbol, decimals_, maxSupply_, preMint)
-		contractReturn := &BurnMintERC20{address: address, abi: *parsed, BurnMintERC20Caller: BurnMintERC20Caller{contract: contractBind}, BurnMintERC20Transactor: BurnMintERC20Transactor{contract: contractBind}, BurnMintERC20Filterer: BurnMintERC20Filterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(BurnMintERC20Bin), backend, name, symbol, decimals_, maxSupply_, preMint)
 	if err != nil {
 		return common.Address{}, nil, nil, err

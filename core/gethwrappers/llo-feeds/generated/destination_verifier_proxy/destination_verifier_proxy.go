@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -40,7 +39,7 @@ var DestinationVerifierProxyABI = DestinationVerifierProxyMetaData.ABI
 
 var DestinationVerifierProxyBin = DestinationVerifierProxyMetaData.Bin
 
-func DeployDestinationVerifierProxy(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *DestinationVerifierProxy, error) {
+func DeployDestinationVerifierProxy(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *DestinationVerifierProxy, error) {
 	parsed, err := DestinationVerifierProxyMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -48,11 +47,7 @@ func DeployDestinationVerifierProxy(auth *bind.TransactOpts, backend bind.Contra
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(DestinationVerifierProxyZKBin), backend)
-		contractReturn := &DestinationVerifierProxy{address: address, abi: *parsed, DestinationVerifierProxyCaller: DestinationVerifierProxyCaller{contract: contractBind}, DestinationVerifierProxyTransactor: DestinationVerifierProxyTransactor{contract: contractBind}, DestinationVerifierProxyFilterer: DestinationVerifierProxyFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(DestinationVerifierProxyBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

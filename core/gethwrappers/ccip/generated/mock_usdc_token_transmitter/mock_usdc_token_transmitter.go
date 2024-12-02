@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -40,7 +39,7 @@ var MockE2EUSDCTransmitterABI = MockE2EUSDCTransmitterMetaData.ABI
 
 var MockE2EUSDCTransmitterBin = MockE2EUSDCTransmitterMetaData.Bin
 
-func DeployMockE2EUSDCTransmitter(auth *bind.TransactOpts, backend bind.ContractBackend, _version uint32, _localDomain uint32, token common.Address) (common.Address, *generated_zks.CustomTransaction, *MockE2EUSDCTransmitter, error) {
+func DeployMockE2EUSDCTransmitter(auth *bind.TransactOpts, backend bind.ContractBackend, _version uint32, _localDomain uint32, token common.Address) (common.Address, *types.Transaction, *MockE2EUSDCTransmitter, error) {
 	parsed, err := MockE2EUSDCTransmitterMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -48,11 +47,7 @@ func DeployMockE2EUSDCTransmitter(auth *bind.TransactOpts, backend bind.Contract
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(MockE2EUSDCTransmitterZKBin), backend, _version, _localDomain, token)
-		contractReturn := &MockE2EUSDCTransmitter{address: address, abi: *parsed, MockE2EUSDCTransmitterCaller: MockE2EUSDCTransmitterCaller{contract: contractBind}, MockE2EUSDCTransmitterTransactor: MockE2EUSDCTransmitterTransactor{contract: contractBind}, MockE2EUSDCTransmitterFilterer: MockE2EUSDCTransmitterFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(MockE2EUSDCTransmitterBin), backend, _version, _localDomain, token)
 	if err != nil {
 		return common.Address{}, nil, nil, err

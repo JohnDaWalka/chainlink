@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -107,7 +106,7 @@ var ReportCodecABI = ReportCodecMetaData.ABI
 
 var ReportCodecBin = ReportCodecMetaData.Bin
 
-func DeployReportCodec(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *ReportCodec, error) {
+func DeployReportCodec(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *ReportCodec, error) {
 	parsed, err := ReportCodecMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -115,11 +114,7 @@ func DeployReportCodec(auth *bind.TransactOpts, backend bind.ContractBackend) (c
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(ReportCodecZKBin), backend)
-		contractReturn := &ReportCodec{address: address, abi: *parsed, ReportCodecCaller: ReportCodecCaller{contract: contractBind}, ReportCodecTransactor: ReportCodecTransactor{contract: contractBind}, ReportCodecFilterer: ReportCodecFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ReportCodecBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

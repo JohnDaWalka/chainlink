@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -55,7 +54,7 @@ var FeeManagerABI = FeeManagerMetaData.ABI
 
 var FeeManagerBin = FeeManagerMetaData.Bin
 
-func DeployFeeManager(auth *bind.TransactOpts, backend bind.ContractBackend, _linkAddress common.Address, _nativeAddress common.Address, _proxyAddress common.Address, _rewardManagerAddress common.Address) (common.Address, *generated_zks.CustomTransaction, *FeeManager, error) {
+func DeployFeeManager(auth *bind.TransactOpts, backend bind.ContractBackend, _linkAddress common.Address, _nativeAddress common.Address, _proxyAddress common.Address, _rewardManagerAddress common.Address) (common.Address, *types.Transaction, *FeeManager, error) {
 	parsed, err := FeeManagerMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -63,11 +62,7 @@ func DeployFeeManager(auth *bind.TransactOpts, backend bind.ContractBackend, _li
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(FeeManagerZKBin), backend, _linkAddress, _nativeAddress, _proxyAddress, _rewardManagerAddress)
-		contractReturn := &FeeManager{address: address, abi: *parsed, FeeManagerCaller: FeeManagerCaller{contract: contractBind}, FeeManagerTransactor: FeeManagerTransactor{contract: contractBind}, FeeManagerFilterer: FeeManagerFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(FeeManagerBin), backend, _linkAddress, _nativeAddress, _proxyAddress, _rewardManagerAddress)
 	if err != nil {
 		return common.Address{}, nil, nil, err

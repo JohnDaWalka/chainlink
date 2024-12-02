@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -40,7 +39,7 @@ var KeystoneFeedsConsumerABI = KeystoneFeedsConsumerMetaData.ABI
 
 var KeystoneFeedsConsumerBin = KeystoneFeedsConsumerMetaData.Bin
 
-func DeployKeystoneFeedsConsumer(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *KeystoneFeedsConsumer, error) {
+func DeployKeystoneFeedsConsumer(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *KeystoneFeedsConsumer, error) {
 	parsed, err := KeystoneFeedsConsumerMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -48,11 +47,7 @@ func DeployKeystoneFeedsConsumer(auth *bind.TransactOpts, backend bind.ContractB
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(KeystoneFeedsConsumerZKBin), backend)
-		contractReturn := &KeystoneFeedsConsumer{address: address, abi: *parsed, KeystoneFeedsConsumerCaller: KeystoneFeedsConsumerCaller{contract: contractBind}, KeystoneFeedsConsumerTransactor: KeystoneFeedsConsumerTransactor{contract: contractBind}, KeystoneFeedsConsumerFilterer: KeystoneFeedsConsumerFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(KeystoneFeedsConsumerBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

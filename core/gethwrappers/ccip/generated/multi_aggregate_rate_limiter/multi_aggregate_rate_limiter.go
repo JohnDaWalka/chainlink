@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -96,7 +95,7 @@ var MultiAggregateRateLimiterABI = MultiAggregateRateLimiterMetaData.ABI
 
 var MultiAggregateRateLimiterBin = MultiAggregateRateLimiterMetaData.Bin
 
-func DeployMultiAggregateRateLimiter(auth *bind.TransactOpts, backend bind.ContractBackend, feeQuoter common.Address, authorizedCallers []common.Address) (common.Address, *generated_zks.CustomTransaction, *MultiAggregateRateLimiter, error) {
+func DeployMultiAggregateRateLimiter(auth *bind.TransactOpts, backend bind.ContractBackend, feeQuoter common.Address, authorizedCallers []common.Address) (common.Address, *types.Transaction, *MultiAggregateRateLimiter, error) {
 	parsed, err := MultiAggregateRateLimiterMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -104,11 +103,7 @@ func DeployMultiAggregateRateLimiter(auth *bind.TransactOpts, backend bind.Contr
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(MultiAggregateRateLimiterZKBin), backend, feeQuoter, authorizedCallers)
-		contractReturn := &MultiAggregateRateLimiter{address: address, abi: *parsed, MultiAggregateRateLimiterCaller: MultiAggregateRateLimiterCaller{contract: contractBind}, MultiAggregateRateLimiterTransactor: MultiAggregateRateLimiterTransactor{contract: contractBind}, MultiAggregateRateLimiterFilterer: MultiAggregateRateLimiterFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(MultiAggregateRateLimiterBin), backend, feeQuoter, authorizedCallers)
 	if err != nil {
 		return common.Address{}, nil, nil, err

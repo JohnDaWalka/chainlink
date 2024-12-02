@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -47,7 +46,7 @@ var ExposedConfiguratorABI = ExposedConfiguratorMetaData.ABI
 
 var ExposedConfiguratorBin = ExposedConfiguratorMetaData.Bin
 
-func DeployExposedConfigurator(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *ExposedConfigurator, error) {
+func DeployExposedConfigurator(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *ExposedConfigurator, error) {
 	parsed, err := ExposedConfiguratorMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -55,11 +54,7 @@ func DeployExposedConfigurator(auth *bind.TransactOpts, backend bind.ContractBac
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(ExposedConfiguratorZKBin), backend)
-		contractReturn := &ExposedConfigurator{address: address, abi: *parsed, ExposedConfiguratorCaller: ExposedConfiguratorCaller{contract: contractBind}, ExposedConfiguratorTransactor: ExposedConfiguratorTransactor{contract: contractBind}, ExposedConfiguratorFilterer: ExposedConfiguratorFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ExposedConfiguratorBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

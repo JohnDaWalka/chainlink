@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 )
 
 var (
@@ -38,7 +37,7 @@ var GreeterABI = GreeterMetaData.ABI
 
 var GreeterBin = GreeterMetaData.Bin
 
-func DeployGreeter(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *Greeter, error) {
+func DeployGreeter(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Greeter, error) {
 	parsed, err := GreeterMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -46,11 +45,7 @@ func DeployGreeter(auth *bind.TransactOpts, backend bind.ContractBackend) (commo
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(GreeterZKBin), backend)
-		contractReturn := &Greeter{address: address, abi: *parsed, GreeterCaller: GreeterCaller{contract: contractBind}, GreeterTransactor: GreeterTransactor{contract: contractBind}, GreeterFilterer: GreeterFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(GreeterBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

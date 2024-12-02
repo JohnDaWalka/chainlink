@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -90,7 +89,7 @@ var BurnMintTokenPoolABI = BurnMintTokenPoolMetaData.ABI
 
 var BurnMintTokenPoolBin = BurnMintTokenPoolMetaData.Bin
 
-func DeployBurnMintTokenPool(auth *bind.TransactOpts, backend bind.ContractBackend, token common.Address, localTokenDecimals uint8, allowlist []common.Address, rmnProxy common.Address, router common.Address) (common.Address, *generated_zks.CustomTransaction, *BurnMintTokenPool, error) {
+func DeployBurnMintTokenPool(auth *bind.TransactOpts, backend bind.ContractBackend, token common.Address, localTokenDecimals uint8, allowlist []common.Address, rmnProxy common.Address, router common.Address) (common.Address, *types.Transaction, *BurnMintTokenPool, error) {
 	parsed, err := BurnMintTokenPoolMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -98,11 +97,7 @@ func DeployBurnMintTokenPool(auth *bind.TransactOpts, backend bind.ContractBacke
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(BurnMintTokenPoolZKBin), backend, token, localTokenDecimals, allowlist, rmnProxy, router)
-		contractReturn := &BurnMintTokenPool{address: address, abi: *parsed, BurnMintTokenPoolCaller: BurnMintTokenPoolCaller{contract: contractBind}, BurnMintTokenPoolTransactor: BurnMintTokenPoolTransactor{contract: contractBind}, BurnMintTokenPoolFilterer: BurnMintTokenPoolFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(BurnMintTokenPoolBin), backend, token, localTokenDecimals, allowlist, rmnProxy, router)
 	if err != nil {
 		return common.Address{}, nil, nil, err

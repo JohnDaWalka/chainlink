@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -40,7 +39,7 @@ var NoOpOCR3ABI = NoOpOCR3MetaData.ABI
 
 var NoOpOCR3Bin = NoOpOCR3MetaData.Bin
 
-func DeployNoOpOCR3(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *NoOpOCR3, error) {
+func DeployNoOpOCR3(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *NoOpOCR3, error) {
 	parsed, err := NoOpOCR3MetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -48,11 +47,7 @@ func DeployNoOpOCR3(auth *bind.TransactOpts, backend bind.ContractBackend) (comm
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(NoOpOCR3ZKBin), backend)
-		contractReturn := &NoOpOCR3{address: address, abi: *parsed, NoOpOCR3Caller: NoOpOCR3Caller{contract: contractBind}, NoOpOCR3Transactor: NoOpOCR3Transactor{contract: contractBind}, NoOpOCR3Filterer: NoOpOCR3Filterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(NoOpOCR3Bin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 )
 
 var (
@@ -38,7 +37,7 @@ var SmartContractAccountHelperABI = SmartContractAccountHelperMetaData.ABI
 
 var SmartContractAccountHelperBin = SmartContractAccountHelperMetaData.Bin
 
-func DeploySmartContractAccountHelper(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *SmartContractAccountHelper, error) {
+func DeploySmartContractAccountHelper(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *SmartContractAccountHelper, error) {
 	parsed, err := SmartContractAccountHelperMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -46,11 +45,7 @@ func DeploySmartContractAccountHelper(auth *bind.TransactOpts, backend bind.Cont
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(SmartContractAccountHelperZKBin), backend)
-		contractReturn := &SmartContractAccountHelper{address: address, abi: *parsed, SmartContractAccountHelperCaller: SmartContractAccountHelperCaller{contract: contractBind}, SmartContractAccountHelperTransactor: SmartContractAccountHelperTransactor{contract: contractBind}, SmartContractAccountHelperFilterer: SmartContractAccountHelperFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(SmartContractAccountHelperBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 )
 
 var (
@@ -56,7 +55,7 @@ var ArbitrumL1BridgeAdapterABI = ArbitrumL1BridgeAdapterMetaData.ABI
 
 var ArbitrumL1BridgeAdapterBin = ArbitrumL1BridgeAdapterMetaData.Bin
 
-func DeployArbitrumL1BridgeAdapter(auth *bind.TransactOpts, backend bind.ContractBackend, l1GatewayRouter common.Address, l1Outbox common.Address) (common.Address, *generated_zks.CustomTransaction, *ArbitrumL1BridgeAdapter, error) {
+func DeployArbitrumL1BridgeAdapter(auth *bind.TransactOpts, backend bind.ContractBackend, l1GatewayRouter common.Address, l1Outbox common.Address) (common.Address, *types.Transaction, *ArbitrumL1BridgeAdapter, error) {
 	parsed, err := ArbitrumL1BridgeAdapterMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -64,11 +63,7 @@ func DeployArbitrumL1BridgeAdapter(auth *bind.TransactOpts, backend bind.Contrac
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(ArbitrumL1BridgeAdapterZKBin), backend, l1GatewayRouter, l1Outbox)
-		contractReturn := &ArbitrumL1BridgeAdapter{address: address, abi: *parsed, ArbitrumL1BridgeAdapterCaller: ArbitrumL1BridgeAdapterCaller{contract: contractBind}, ArbitrumL1BridgeAdapterTransactor: ArbitrumL1BridgeAdapterTransactor{contract: contractBind}, ArbitrumL1BridgeAdapterFilterer: ArbitrumL1BridgeAdapterFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ArbitrumL1BridgeAdapterBin), backend, l1GatewayRouter, l1Outbox)
 	if err != nil {
 		return common.Address{}, nil, nil, err

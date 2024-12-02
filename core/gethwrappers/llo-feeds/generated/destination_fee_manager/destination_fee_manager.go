@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -55,7 +54,7 @@ var DestinationFeeManagerABI = DestinationFeeManagerMetaData.ABI
 
 var DestinationFeeManagerBin = DestinationFeeManagerMetaData.Bin
 
-func DeployDestinationFeeManager(auth *bind.TransactOpts, backend bind.ContractBackend, _linkAddress common.Address, _nativeAddress common.Address, _verifierAddress common.Address, _rewardManagerAddress common.Address) (common.Address, *generated_zks.CustomTransaction, *DestinationFeeManager, error) {
+func DeployDestinationFeeManager(auth *bind.TransactOpts, backend bind.ContractBackend, _linkAddress common.Address, _nativeAddress common.Address, _verifierAddress common.Address, _rewardManagerAddress common.Address) (common.Address, *types.Transaction, *DestinationFeeManager, error) {
 	parsed, err := DestinationFeeManagerMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -63,11 +62,7 @@ func DeployDestinationFeeManager(auth *bind.TransactOpts, backend bind.ContractB
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(DestinationFeeManagerZKBin), backend, _linkAddress, _nativeAddress, _verifierAddress, _rewardManagerAddress)
-		contractReturn := &DestinationFeeManager{address: address, abi: *parsed, DestinationFeeManagerCaller: DestinationFeeManagerCaller{contract: contractBind}, DestinationFeeManagerTransactor: DestinationFeeManagerTransactor{contract: contractBind}, DestinationFeeManagerFilterer: DestinationFeeManagerFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(DestinationFeeManagerBin), backend, _linkAddress, _nativeAddress, _verifierAddress, _rewardManagerAddress)
 	if err != nil {
 		return common.Address{}, nil, nil, err

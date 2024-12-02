@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 )
 
 var (
@@ -38,7 +37,7 @@ var OptimismL2BridgeAdapterABI = OptimismL2BridgeAdapterMetaData.ABI
 
 var OptimismL2BridgeAdapterBin = OptimismL2BridgeAdapterMetaData.Bin
 
-func DeployOptimismL2BridgeAdapter(auth *bind.TransactOpts, backend bind.ContractBackend, wrappedNative common.Address) (common.Address, *generated_zks.CustomTransaction, *OptimismL2BridgeAdapter, error) {
+func DeployOptimismL2BridgeAdapter(auth *bind.TransactOpts, backend bind.ContractBackend, wrappedNative common.Address) (common.Address, *types.Transaction, *OptimismL2BridgeAdapter, error) {
 	parsed, err := OptimismL2BridgeAdapterMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -46,11 +45,7 @@ func DeployOptimismL2BridgeAdapter(auth *bind.TransactOpts, backend bind.Contrac
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(OptimismL2BridgeAdapterZKBin), backend, wrappedNative)
-		contractReturn := &OptimismL2BridgeAdapter{address: address, abi: *parsed, OptimismL2BridgeAdapterCaller: OptimismL2BridgeAdapterCaller{contract: contractBind}, OptimismL2BridgeAdapterTransactor: OptimismL2BridgeAdapterTransactor{contract: contractBind}, OptimismL2BridgeAdapterFilterer: OptimismL2BridgeAdapterFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(OptimismL2BridgeAdapterBin), backend, wrappedNative)
 	if err != nil {
 		return common.Address{}, nil, nil, err

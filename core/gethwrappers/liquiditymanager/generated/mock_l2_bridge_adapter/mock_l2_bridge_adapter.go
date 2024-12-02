@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 )
 
 var (
@@ -38,7 +37,7 @@ var MockL2BridgeAdapterABI = MockL2BridgeAdapterMetaData.ABI
 
 var MockL2BridgeAdapterBin = MockL2BridgeAdapterMetaData.Bin
 
-func DeployMockL2BridgeAdapter(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *MockL2BridgeAdapter, error) {
+func DeployMockL2BridgeAdapter(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *MockL2BridgeAdapter, error) {
 	parsed, err := MockL2BridgeAdapterMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -46,11 +45,7 @@ func DeployMockL2BridgeAdapter(auth *bind.TransactOpts, backend bind.ContractBac
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(MockL2BridgeAdapterZKBin), backend)
-		contractReturn := &MockL2BridgeAdapter{address: address, abi: *parsed, MockL2BridgeAdapterCaller: MockL2BridgeAdapterCaller{contract: contractBind}, MockL2BridgeAdapterTransactor: MockL2BridgeAdapterTransactor{contract: contractBind}, MockL2BridgeAdapterFilterer: MockL2BridgeAdapterFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(MockL2BridgeAdapterBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

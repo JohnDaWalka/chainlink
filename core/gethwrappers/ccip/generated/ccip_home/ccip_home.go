@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -74,7 +73,7 @@ var CCIPHomeABI = CCIPHomeMetaData.ABI
 
 var CCIPHomeBin = CCIPHomeMetaData.Bin
 
-func DeployCCIPHome(auth *bind.TransactOpts, backend bind.ContractBackend, capabilitiesRegistry common.Address) (common.Address, *generated_zks.CustomTransaction, *CCIPHome, error) {
+func DeployCCIPHome(auth *bind.TransactOpts, backend bind.ContractBackend, capabilitiesRegistry common.Address) (common.Address, *types.Transaction, *CCIPHome, error) {
 	parsed, err := CCIPHomeMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -82,11 +81,7 @@ func DeployCCIPHome(auth *bind.TransactOpts, backend bind.ContractBackend, capab
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(CCIPHomeZKBin), backend, capabilitiesRegistry)
-		contractReturn := &CCIPHome{address: address, abi: *parsed, CCIPHomeCaller: CCIPHomeCaller{contract: contractBind}, CCIPHomeTransactor: CCIPHomeTransactor{contract: contractBind}, CCIPHomeFilterer: CCIPHomeFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(CCIPHomeBin), backend, capabilitiesRegistry)
 	if err != nil {
 		return common.Address{}, nil, nil, err

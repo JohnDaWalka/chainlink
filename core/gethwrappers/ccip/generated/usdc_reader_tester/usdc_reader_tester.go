@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -40,7 +39,7 @@ var USDCReaderTesterABI = USDCReaderTesterMetaData.ABI
 
 var USDCReaderTesterBin = USDCReaderTesterMetaData.Bin
 
-func DeployUSDCReaderTester(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *generated_zks.CustomTransaction, *USDCReaderTester, error) {
+func DeployUSDCReaderTester(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *USDCReaderTester, error) {
 	parsed, err := USDCReaderTesterMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -48,11 +47,7 @@ func DeployUSDCReaderTester(auth *bind.TransactOpts, backend bind.ContractBacken
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(USDCReaderTesterZKBin), backend)
-		contractReturn := &USDCReaderTester{address: address, abi: *parsed, USDCReaderTesterCaller: USDCReaderTesterCaller{contract: contractBind}, USDCReaderTesterTransactor: USDCReaderTesterTransactor{contract: contractBind}, USDCReaderTesterFilterer: USDCReaderTesterFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(USDCReaderTesterBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err

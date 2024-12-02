@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
@@ -109,7 +108,7 @@ var OnRampABI = OnRampMetaData.ABI
 
 var OnRampBin = OnRampMetaData.Bin
 
-func DeployOnRamp(auth *bind.TransactOpts, backend bind.ContractBackend, staticConfig OnRampStaticConfig, dynamicConfig OnRampDynamicConfig, destChainConfigArgs []OnRampDestChainConfigArgs) (common.Address, *generated_zks.CustomTransaction, *OnRamp, error) {
+func DeployOnRamp(auth *bind.TransactOpts, backend bind.ContractBackend, staticConfig OnRampStaticConfig, dynamicConfig OnRampDynamicConfig, destChainConfigArgs []OnRampDestChainConfigArgs) (common.Address, *types.Transaction, *OnRamp, error) {
 	parsed, err := OnRampMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -117,11 +116,7 @@ func DeployOnRamp(auth *bind.TransactOpts, backend bind.ContractBackend, staticC
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(OnRampZKBin), backend, staticConfig, dynamicConfig, destChainConfigArgs)
-		contractReturn := &OnRamp{address: address, abi: *parsed, OnRampCaller: OnRampCaller{contract: contractBind}, OnRampTransactor: OnRampTransactor{contract: contractBind}, OnRampFilterer: OnRampFilterer{contract: contractBind}}
-		return address, ethTx, contractReturn, err
-	}
+
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(OnRampBin), backend, staticConfig, dynamicConfig, destChainConfigArgs)
 	if err != nil {
 		return common.Address{}, nil, nil, err
