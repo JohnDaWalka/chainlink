@@ -227,9 +227,10 @@ jobs:
             go-modules-${{ hashFiles('**/go.sum') }}-${{ runner.os }}
       - name: Install dependencies
         run: go mod download
-      - name: Debug image
+      - name: Combine CHAINLINK_IMAGE and CHAINLINK_VERSION
         run: |
-          echo ${CHAINLINK_IMAGE}
+          echo "CHAINLINK_IMAGE=${CHAINLINK_IMAGE}:${CHAINLINK_VERSION}" >> $GITHUB_ENV
+          echo "Updated CHAINLINK_IMAGE: ${CHAINLINK_IMAGE}"
       - name: Run tests
         working-directory: integration-tests/capabilities
         run: go test -v -timeout 15m -run TestWorkflow
