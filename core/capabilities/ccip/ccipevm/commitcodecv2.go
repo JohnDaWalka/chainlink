@@ -3,6 +3,7 @@ package ccipevm
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -66,6 +67,25 @@ func (c *CommitPluginCodecV2) Encode(ctx context.Context, report cciptypes.Commi
 	return cd.Encode(ctx, report, "CommitPluginReport")
 }
 
+func postProcess(report *cciptypes.CommitPluginReport) error {
+	for index, update := range report.PriceUpdates.TokenPriceUpdates {
+		if !common.IsHexAddress(string(update.TokenID)) {
+			return fmt.Errorf("invalid token address: %s", update.TokenID)
+		}
+		if update.Price.IsEmpty() || update.Price.Int64() == 0 {
+			report.PriceUpdates.TokenPriceUpdates[index].Price = cciptypes.NewBigInt(big.NewInt(0))
+		}
+	}
+
+	for idx, update := range report.PriceUpdates.GasPriceUpdates {
+		if update.GasPrice.IsEmpty() || update.GasPrice.Int64() == 0 {
+			report.PriceUpdates.GasPriceUpdates[idx].GasPrice = cciptypes.NewBigInt(big.NewInt(0))
+		}
+	}
+
+	return nil
+}
+
 func (c *CommitPluginCodecV2) Decode(ctx context.Context, bytes []byte) (cciptypes.CommitPluginReport, error) {
 	report := cciptypes.CommitPluginReport{}
 	cd, err := codec.NewCodec(commitCodecConfig)
@@ -75,6 +95,10 @@ func (c *CommitPluginCodecV2) Decode(ctx context.Context, bytes []byte) (cciptyp
 
 	err = cd.Decode(ctx, bytes, &report, "CommitPluginReport")
 	if err != nil {
+		return report, err
+	}
+
+	if err = postProcess(&report); err != nil {
 		return report, err
 	}
 

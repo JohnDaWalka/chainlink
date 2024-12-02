@@ -1,6 +1,7 @@
 package ccipevm
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -37,20 +38,20 @@ func TestCommitPluginCodecV2(t *testing.T) {
 				return report
 			},
 		},
-		//{
-		//	name: "zero token price",
-		//	report: func(report cciptypes.CommitPluginReport) cciptypes.CommitPluginReport {
-		//		report.PriceUpdates.TokenPriceUpdates[0].Price = cciptypes.NewBigInt(big.NewInt(0))
-		//		return report
-		//	},
-		//},
-		//{
-		//	name: "zero gas price",
-		//	report: func(report cciptypes.CommitPluginReport) cciptypes.CommitPluginReport {
-		//		report.PriceUpdates.GasPriceUpdates[0].GasPrice = cciptypes.NewBigInt(big.NewInt(0))
-		//		return report
-		//	},
-		//},
+		{
+			name: "zero token price",
+			report: func(report cciptypes.CommitPluginReport) cciptypes.CommitPluginReport {
+				report.PriceUpdates.TokenPriceUpdates[0].Price = cciptypes.NewBigInt(big.NewInt(0))
+				return report
+			},
+		},
+		{
+			name: "zero gas price",
+			report: func(report cciptypes.CommitPluginReport) cciptypes.CommitPluginReport {
+				report.PriceUpdates.GasPriceUpdates[0].GasPrice = cciptypes.NewBigInt(big.NewInt(0))
+				return report
+			},
+		},
 	}
 
 	for _, tc := range testCases {
