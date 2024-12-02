@@ -40,8 +40,9 @@ type Transaction struct {
 	Data              []byte
 	SpecifiedGasLimit uint64
 
-	CreatedAt       time.Time
-	LastBroadcastAt time.Time
+	CreatedAt          time.Time
+	InitialBroadcastAt time.Time
+	LastBroadcastAt    time.Time
 
 	State        TxState
 	IsPurgeable  bool
@@ -58,13 +59,24 @@ type Transaction struct {
 	CallbackCompleted bool
 }
 
-//	func (t *Transaction) String() string {
-//		return fmt.Sprintf(`{"ID":%d, "IdempotencyKey":%v, "ChainID":%v, "Nonce":%d, "FromAddress":%v, "ToAddress":%v, "Value":%v, `+
-//			`"Data":%v, "SpecifiedGasLimit":%d, "CreatedAt":%v, "LastBroadcastAt":%v, "State":%v, "IsPurgeable":%v, "AttemptCount":%d, `+
-//			`"Meta":%v, "Subject":%v, "PipelineTaskRunID":%v, "MinConfirmations":%v, "SignalCallback":%v, "CallbackCompleted":%v`,
-//			t.ID, *t.IdempotencyKey, t.ChainID, t.Nonce, t.FromAddress, t.ToAddress, t.Value, t.Data, t.SpecifiedGasLimit, t.CreatedAt, t.LastBroadcastAt,
-//			t.State, t.IsPurgeable, t.AttemptCount, t.Meta, t.Subject, t.PipelineTaskRunID, t.MinConfirmations, t.SignalCallback, t.CallbackCompleted)
-//	}
+func (t *Transaction) PrettyPrint() string {
+	return fmt.Sprintf(`{txID:%d, IdempotencyKey:%v, ChainID:%v, Nonce:%d, FromAddress:%v, ToAddress:%v, Value:%v, `+
+		`Data:%v, SpecifiedGasLimit:%d, CreatedAt:%v, InitialBroadcastAt:%v, LastBroadcastAt:%v, State:%v, IsPurgeable:%v, AttemptCount:%d, `+
+		`Meta:%v, Subject:%v}`,
+		t.ID, *t.IdempotencyKey, t.ChainID, t.Nonce, t.FromAddress, t.ToAddress, t.Value, t.Data, t.SpecifiedGasLimit, t.CreatedAt, t.InitialBroadcastAt,
+		t.LastBroadcastAt, t.State, t.IsPurgeable, t.AttemptCount, t.Meta, t.Subject)
+}
+
+func (t *Transaction) PrettyPrintWithAttempts() string {
+	attempts := " Attempts: ["
+	for _, a := range t.Attempts {
+		attempts += a.PrettyPrint() + ", "
+	}
+	attempts += "]"
+
+	return t.PrettyPrint() + attempts
+}
+
 func (t *Transaction) FindAttemptByHash(attemptHash common.Hash) (*Attempt, error) {
 	for _, a := range t.Attempts {
 		if a.Hash == attemptHash {
@@ -116,8 +128,8 @@ func (a *Attempt) DeepCopy() *Attempt {
 	return &txCopy
 }
 
-func (a *Attempt) String() string {
-	return fmt.Sprintf(`{"ID":%d, "TxID":%d, "Hash":%v, "Fee":%v, "GasLimit":%d, "Type":%v, "CreatedAt":%v, "BroadcastAt":%v}`,
+func (a *Attempt) PrettyPrint() string {
+	return fmt.Sprintf(`{ID:%d, TxID:%d, Hash:%v, Fee:%v, GasLimit:%d, Type:%v, CreatedAt:%v, BroadcastAt:%v}`,
 		a.ID, a.TxID, a.Hash, a.Fee, a.GasLimit, a.Type, a.CreatedAt, a.BroadcastAt)
 }
 
