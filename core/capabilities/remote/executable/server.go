@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable/request"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/registration"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/validation"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
@@ -45,6 +46,8 @@ type server struct {
 	// Used to detect messages with the same message id but different payloads
 	messageIDToRequestIDsCount map[string]map[string]int
 
+	registrationServer *registration.Server
+
 	receiveLock sync.Mutex
 	stopCh      services.StopChan
 	wg          sync.WaitGroup
@@ -58,6 +61,33 @@ type requestAndMsgID struct {
 	messageID string
 }
 
+type TargetAdapter struct {
+	Capability commoncap.ExecutableCapability
+}
+
+func (u *TargetAdapter) Register(ctx context.Context, key registration.Key, registerRequest []byte) error {
+	unmarshalled, err := pb.UnmarshalRegisterToWorkflowRequest(registerRequest)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal register request: %w", err)
+	}
+	if err = u.Capability.RegisterToWorkflow(ctx, unmarshalled); err != nil {
+		return fmt.Errorf("failed to register to workflow: %w", err)
+	}
+	return nil
+}
+
+func (u *TargetAdapter) Unregister(ctx context.Context, registerRequest []byte) error {
+	unmarshalled, err := pb.UnmarshalUnregisterFromWorkflowRequest(registerRequest)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal register request: %w", err)
+	}
+	if err = u.Capability.UnregisterFromWorkflow(ctx, unmarshalled); err != nil {
+		return fmt.Errorf("failed to unregister from workflow: %w", err)
+	}
+
+	return nil
+}
+
 func NewServer(remoteExecutableConfig *commoncap.RemoteExecutableConfig, peerID p2ptypes.PeerID, underlying commoncap.ExecutableCapability,
 	capInfo commoncap.CapabilityInfo, localDonInfo commoncap.DON,
 	workflowDONs map[uint32]commoncap.DON, dispatcher types.Dispatcher, requestTimeout time.Duration, lggr logger.Logger) *server {
@@ -65,6 +95,10 @@ func NewServer(remoteExecutableConfig *commoncap.RemoteExecutableConfig, peerID 
 		lggr.Info("no remote config provided, using default values")
 		remoteExecutableConfig = &commoncap.RemoteExecutableConfig{}
 	}
+	remoteExecutableConfig.ApplyDefaults()
+
+	target := &TargetAdapter{Capability: underlying}
+
 	return &server{
 		config:       remoteExecutableConfig,
 		underlying:   underlying,
@@ -78,6 +112,8 @@ func NewServer(remoteExecutableConfig *commoncap.RemoteExecutableConfig, peerID 
 		messageIDToRequestIDsCount: map[string]map[string]int{},
 		requestTimeout:             requestTimeout,
 
+		registrationServer: registration.NewServer(lggr, target, capInfo, remoteExecutableConfig.RegistrationExpiry, workflowDONs, "ExecutableCapabilityServer"),
+
 		lggr:   lggr.Named("ExecutableCapabilityServer"),
 		stopCh: make(services.StopChan),
 	}
@@ -85,6 +121,10 @@ func NewServer(remoteExecutableConfig *commoncap.RemoteExecutableConfig, peerID 
 
 func (r *server) Start(ctx context.Context) error {
 	return r.StartOnce(r.Name(), func() error {
+		if err := r.registrationServer.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start registration server: %w", err)
+		}
+
 		r.wg.Add(1)
 		go func() {
 			defer r.wg.Done()
@@ -113,6 +153,11 @@ func (r *server) Close() error {
 		close(r.stopCh)
 		r.wg.Wait()
 		r.lggr.Info("executable capability server closed")
+
+		if err := r.registrationServer.Close(); err != nil {
+			return fmt.Errorf("failed to close registration server: %w", err)
+		}
+
 		return nil
 	})
 }
@@ -138,61 +183,83 @@ func (r *server) Receive(ctx context.Context, msg *types.MessageBody) {
 	defer r.receiveLock.Unlock()
 
 	switch msg.Method {
-	case types.MethodExecute, types.MethodRegisterToWorkflow, types.MethodUnregisterFromWorkflow:
-	default:
-		r.lggr.Errorw("received request for unsupported method type", "method", remote.SanitizeLogString(msg.Method))
-	}
-
-	messageID, err := GetMessageID(msg)
-	if err != nil {
-		r.lggr.Errorw("invalid message id", "err", err, "id", remote.SanitizeLogString(string(msg.MessageId)))
-		return
-	}
-
-	msgHash, err := r.getMessageHash(msg)
-	if err != nil {
-		r.lggr.Errorw("failed to get message hash", "err", err)
-		return
-	}
-
-	// A request is uniquely identified by the message id and the hash of the payload to prevent a malicious
-	// actor from sending a different payload with the same message id
-	requestID := messageID + hex.EncodeToString(msgHash[:])
-
-	r.lggr.Debugw("received request", "msgId", msg.MessageId, "requestID", requestID)
-
-	if requestIDs, ok := r.messageIDToRequestIDsCount[messageID]; ok {
-		requestIDs[requestID]++
-	} else {
-		r.messageIDToRequestIDsCount[messageID] = map[string]int{requestID: 1}
-	}
-
-	requestIDs := r.messageIDToRequestIDsCount[messageID]
-	if len(requestIDs) > 1 {
-		// This is a potential attack vector as well as a situation that will occur if the client is sending non-deterministic payloads
-		// so a warning is logged
-		r.lggr.Warnw("received messages with the same id and different payloads", "messageID", messageID, "lenRequestIDs", len(requestIDs))
-	}
-
-	if _, ok := r.requestIDToRequest[requestID]; !ok {
-		callingDon, ok := r.workflowDONs[msg.CallerDonId]
-		if !ok {
-			r.lggr.Errorw("received request from unregistered don", "donId", msg.CallerDonId)
+	case types.MethodRegisterToWorkflow:
+		sender, err := remote.ToPeerID(msg.Sender)
+		if err != nil {
+			r.lggr.Errorw("failed to convert message sender to PeerID", "err", err)
 			return
 		}
 
-		r.requestIDToRequest[requestID] = requestAndMsgID{
-			request: request.NewServerRequest(r.underlying, msg.Method, r.capInfo.ID, r.localDonInfo.ID, r.peerID,
-				callingDon, messageID, r.dispatcher, r.requestTimeout, r.lggr),
-			messageID: messageID,
+		req, err := pb.UnmarshalRegisterToWorkflowRequest(msg.Payload)
+		if err != nil {
+			r.lggr.Errorw("failed to unmarshal register to workflow request", "capabilityId", r.capInfo.ID, "err", err)
+			return
 		}
-	}
 
-	reqAndMsgID := r.requestIDToRequest[requestID]
+		workflowID := req.Metadata.WorkflowID
+		err = r.registrationServer.Register(ctx, msg, sender, workflowID, "")
+		if err != nil {
+			r.lggr.Errorw("failed to register executable capability", "capabilityId", r.capInfo.ID, "workflowId",
+				remote.SanitizeLogString(workflowID), "callerDonId", msg.CallerDonId, "sender", sender, "err", err)
+		}
+	case types.MethodUnregisterFromWorkflow:
+		// Explicitly unregistering from a workflow is not currently supported (or needed) for executable capabilities,
+		// Unregistering from a workflow is done by the registration server and occurs when the registration expires.
+		r.lggr.Errorw("received unregister from workflow request, this request is not supported")
+	case types.MethodExecute:
+		messageID, err := GetMessageID(msg)
+		if err != nil {
+			r.lggr.Errorw("invalid message id", "err", err, "id", remote.SanitizeLogString(string(msg.MessageId)))
+			return
+		}
 
-	err = reqAndMsgID.request.OnMessage(ctx, msg)
-	if err != nil {
-		r.lggr.Errorw("request failed to OnMessage new message", "messageID", reqAndMsgID.messageID, "err", err)
+		msgHash, err := r.getMessageHash(msg)
+		if err != nil {
+			r.lggr.Errorw("failed to get message hash", "err", err)
+			return
+		}
+
+		// A request is uniquely identified by the message id and the hash of the payload to prevent a malicious
+		// actor from sending a different payload with the same message id
+		requestID := messageID + hex.EncodeToString(msgHash[:])
+
+		r.lggr.Debugw("received request", "msgId", msg.MessageId, "requestID", requestID)
+
+		if requestIDs, ok := r.messageIDToRequestIDsCount[messageID]; ok {
+			requestIDs[requestID]++
+		} else {
+			r.messageIDToRequestIDsCount[messageID] = map[string]int{requestID: 1}
+		}
+
+		requestIDs := r.messageIDToRequestIDsCount[messageID]
+		if len(requestIDs) > 1 {
+			// This is a potential attack vector as well as a situation that will occur if the client is sending non-deterministic payloads
+			// so a warning is logged
+			r.lggr.Warnw("received messages with the same id and different payloads", "messageID", messageID, "lenRequestIDs", len(requestIDs))
+		}
+
+		if _, ok := r.requestIDToRequest[requestID]; !ok {
+			callingDon, ok := r.workflowDONs[msg.CallerDonId]
+			if !ok {
+				r.lggr.Errorw("received request from unregistered don", "donId", msg.CallerDonId)
+				return
+			}
+
+			r.requestIDToRequest[requestID] = requestAndMsgID{
+				request: request.NewServerRequest(r.underlying, msg.Method, r.capInfo.ID, r.localDonInfo.ID, r.peerID,
+					callingDon, messageID, r.dispatcher, r.requestTimeout, r.lggr),
+				messageID: messageID,
+			}
+		}
+
+		reqAndMsgID := r.requestIDToRequest[requestID]
+
+		err = reqAndMsgID.request.OnMessage(ctx, msg)
+		if err != nil {
+			r.lggr.Errorw("request failed to OnMessage new message", "messageID", reqAndMsgID.messageID, "err", err)
+		}
+	default:
+		r.lggr.Errorw("received request for unsupported method type", "method", remote.SanitizeLogString(msg.Method))
 	}
 }
 

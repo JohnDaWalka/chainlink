@@ -61,6 +61,7 @@ func unmarshalCapabilityConfig(data []byte) (capabilities.CapabilityConfiguratio
 
 	var remoteTriggerConfig *capabilities.RemoteTriggerConfig
 	var remoteTargetConfig *capabilities.RemoteTargetConfig
+	var remoteExecutableConfig *capabilities.RemoteExecutableConfig
 
 	switch cconf.GetRemoteConfig().(type) {
 	case *capabilitiespb.CapabilityConfig_RemoteTriggerConfig:
@@ -74,6 +75,12 @@ func unmarshalCapabilityConfig(data []byte) (capabilities.CapabilityConfiguratio
 		prtc := cconf.GetRemoteTargetConfig()
 		remoteTargetConfig = &capabilities.RemoteTargetConfig{}
 		remoteTargetConfig.RequestHashExcludedAttributes = prtc.RequestHashExcludedAttributes
+	case *capabilitiespb.CapabilityConfig_RemoteExecutableConfig:
+		prtc := cconf.GetRemoteExecutableConfig()
+		remoteExecutableConfig = &capabilities.RemoteExecutableConfig{}
+		remoteExecutableConfig.RequestHashExcludedAttributes = prtc.RequestHashExcludedAttributes
+		remoteExecutableConfig.RegistrationRefresh = prtc.RegistrationRefresh.AsDuration()
+		remoteExecutableConfig.RegistrationExpiry = prtc.RegistrationExpiry.AsDuration()
 	}
 
 	dc, err := values.FromMapValueProto(cconf.DefaultConfig)
@@ -82,9 +89,10 @@ func unmarshalCapabilityConfig(data []byte) (capabilities.CapabilityConfiguratio
 	}
 
 	return capabilities.CapabilityConfiguration{
-		DefaultConfig:       dc,
-		RemoteTriggerConfig: remoteTriggerConfig,
-		RemoteTargetConfig:  remoteTargetConfig,
+		DefaultConfig:          dc,
+		RemoteTriggerConfig:    remoteTriggerConfig,
+		RemoteTargetConfig:     remoteTargetConfig,
+		RemoteExecutableConfig: remoteExecutableConfig,
 	}, nil
 }
 
@@ -308,7 +316,9 @@ func (w *launcher) addRemoteCapabilities(ctx context.Context, myDON registrysync
 		case capabilities.CapabilityTypeAction:
 			newActionFn := func(info capabilities.CapabilityInfo) (capabilityService, error) {
 				client := executable.NewClient(
+					capabilityConfig.RemoteExecutableConfig,
 					info,
+					remoteDON.DON,
 					myDON.DON,
 					w.dispatcher,
 					defaultTargetRequestTimeout,
@@ -326,7 +336,9 @@ func (w *launcher) addRemoteCapabilities(ctx context.Context, myDON registrysync
 		case capabilities.CapabilityTypeTarget:
 			newTargetFn := func(info capabilities.CapabilityInfo) (capabilityService, error) {
 				client := executable.NewClient(
+					capabilityConfig.RemoteExecutableConfig,
 					info,
+					remoteDON.DON,
 					myDON.DON,
 					w.dispatcher,
 					defaultTargetRequestTimeout,

@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable/request"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/registration"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
@@ -30,6 +31,7 @@ type client struct {
 	localDONInfo         commoncap.DON
 	dispatcher           types.Dispatcher
 	requestTimeout       time.Duration
+	registrationClient   *registration.Client
 
 	requestIDToCallerRequest map[string]*request.ClientRequest
 	mutex                    sync.Mutex
@@ -48,8 +50,14 @@ var (
 	ErrContextDoneBeforeResponseQuorum = errors.New("context done before remote client received a quorum of responses")
 )
 
-func NewClient(remoteCapabilityInfo commoncap.CapabilityInfo, localDonInfo commoncap.DON, dispatcher types.Dispatcher,
+func NewClient(remoteExecutableConfig *commoncap.RemoteExecutableConfig, remoteCapabilityInfo commoncap.CapabilityInfo, remoteDonInfo commoncap.DON, localDonInfo commoncap.DON, dispatcher types.Dispatcher,
 	requestTimeout time.Duration, lggr logger.Logger) *client {
+	if remoteExecutableConfig == nil {
+		lggr.Info("no remote config provided, using default values")
+		remoteExecutableConfig = &commoncap.RemoteExecutableConfig{}
+	}
+	remoteExecutableConfig.ApplyDefaults()
+
 	return &client{
 		lggr:                     lggr.Named("ExecutableCapabilityClient"),
 		remoteCapabilityInfo:     remoteCapabilityInfo,
@@ -57,12 +65,17 @@ func NewClient(remoteCapabilityInfo commoncap.CapabilityInfo, localDonInfo commo
 		dispatcher:               dispatcher,
 		requestTimeout:           requestTimeout,
 		requestIDToCallerRequest: make(map[string]*request.ClientRequest),
+		registrationClient:       registration.NewClient(lggr, types.MethodRegisterToWorkflow, remoteExecutableConfig.RegistrationRefresh, remoteCapabilityInfo, remoteDonInfo, localDonInfo, dispatcher, "ExecutableClient"),
 		stopCh:                   make(services.StopChan),
 	}
 }
 
 func (c *client) Start(ctx context.Context) error {
 	return c.StartOnce(c.Name(), func() error {
+		if err := c.registrationClient.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start registration client: %w", err)
+		}
+
 		c.wg.Add(1)
 		go func() {
 			defer c.wg.Done()
@@ -84,6 +97,12 @@ func (c *client) Close() error {
 		close(c.stopCh)
 		c.cancelAllRequests(errors.New("client closed"))
 		c.wg.Wait()
+
+		err := c.registrationClient.Close()
+		if err != nil {
+			c.lggr.Errorw("failed to close registration client", "err", err)
+		}
+
 		c.lggr.Info("ExecutableCapability closed")
 		return nil
 	})
@@ -151,10 +170,24 @@ func (c *client) Info(ctx context.Context) (commoncap.CapabilityInfo, error) {
 }
 
 func (c *client) RegisterToWorkflow(ctx context.Context, registerRequest commoncap.RegisterToWorkflowRequest) error {
+	rawRequest, err := pb.MarshalRegisterToWorkflowRequest(registerRequest)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+	workflowID := registerRequest.Metadata.WorkflowID
+	if workflowID == "" {
+		return errors.New("empty workflowID")
+	}
+
+	if err = c.registrationClient.RegisterWorkflow(workflowID, rawRequest); err != nil {
+		return fmt.Errorf("failed to register workflow: %w", err)
+	}
+
 	return nil
 }
 
 func (c *client) UnregisterFromWorkflow(ctx context.Context, unregisterRequest commoncap.UnregisterFromWorkflowRequest) error {
+	c.registrationClient.UnregisterWorkflow(unregisterRequest.Metadata.WorkflowID)
 	return nil
 }
 
