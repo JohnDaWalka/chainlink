@@ -64,7 +64,8 @@ func TestExecutePluginCodecV2(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cd := NewExecutePluginCodecV2()
+			cd, err := NewExecutePluginCodecV2()
+			require.NoError(t, err)
 			report := tc.report(randomExecuteReport(t, d))
 			bytes, err := cd.Encode(ctx, report)
 			if tc.expErr {

@@ -57,7 +57,8 @@ func TestCommitPluginCodecV2(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			report := tc.report(randomCommitReport())
-			commitCodec := NewCommitPluginCodecV2()
+			commitCodec, err := NewCommitPluginCodecV2()
+			require.NoError(t, err)
 			ctx := testutils.Context(t)
 			encodedReport, err := commitCodec.Encode(ctx, report)
 			if tc.expErr {
@@ -73,7 +74,8 @@ func TestCommitPluginCodecV2(t *testing.T) {
 }
 
 func BenchmarkCommitPluginCodecV2_Encode(b *testing.B) {
-	commitCodec := NewCommitPluginCodecV2()
+	commitCodec, err := NewCommitPluginCodecV2()
+	require.NoError(b, err)
 	ctx := testutils.Context(b)
 
 	rep := randomCommitReport()
@@ -84,7 +86,8 @@ func BenchmarkCommitPluginCodecV2_Encode(b *testing.B) {
 }
 
 func BenchmarkCommitPluginCodecV2_Decode(b *testing.B) {
-	commitCodec := NewCommitPluginCodecV2()
+	commitCodec, err := NewCommitPluginCodecV2()
+	require.NoError(b, err)
 	ctx := testutils.Context(b)
 	encodedReport, err := commitCodec.Encode(ctx, randomCommitReport())
 	require.NoError(b, err)

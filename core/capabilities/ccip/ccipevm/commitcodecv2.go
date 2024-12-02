@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/codec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
@@ -29,10 +30,16 @@ var commitCodecConfig = types.CodecConfig{
 }
 
 // CommitPluginCodecV2 is a codec for encoding and decoding commit plugin reports using generic evm codec
-type CommitPluginCodecV2 struct{}
+type CommitPluginCodecV2 struct {
+	codec commontypes.RemoteCodec
+}
 
-func NewCommitPluginCodecV2() *CommitPluginCodecV2 {
-	return &CommitPluginCodecV2{}
+func NewCommitPluginCodecV2() (*CommitPluginCodecV2, error) {
+	cd, err := codec.NewCodec(commitCodecConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &CommitPluginCodecV2{codec: cd}, nil
 }
 
 func validateReport(report cciptypes.CommitPluginReport) error {
@@ -59,12 +66,7 @@ func (c *CommitPluginCodecV2) Encode(ctx context.Context, report cciptypes.Commi
 		return nil, err
 	}
 
-	cd, err := codec.NewCodec(commitCodecConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return cd.Encode(ctx, report, "CommitPluginReport")
+	return c.codec.Encode(ctx, report, "CommitPluginReport")
 }
 
 func commitPostProcess(report *cciptypes.CommitPluginReport) error {
@@ -88,12 +90,8 @@ func commitPostProcess(report *cciptypes.CommitPluginReport) error {
 
 func (c *CommitPluginCodecV2) Decode(ctx context.Context, bytes []byte) (cciptypes.CommitPluginReport, error) {
 	report := cciptypes.CommitPluginReport{}
-	cd, err := codec.NewCodec(commitCodecConfig)
-	if err != nil {
-		return report, err
-	}
 
-	err = cd.Decode(ctx, bytes, &report, "CommitPluginReport")
+	err := c.codec.Decode(ctx, bytes, &report, "CommitPluginReport")
 	if err != nil {
 		return report, err
 	}

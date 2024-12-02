@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/codec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 
@@ -34,10 +35,16 @@ var execCodecConfig = types.CodecConfig{
 }
 
 // ExecutePluginCodecV2 is a codec for encoding and decoding execute plugin reports with generic codec
-type ExecutePluginCodecV2 struct{}
+type ExecutePluginCodecV2 struct {
+	codec commontypes.RemoteCodec
+}
 
-func NewExecutePluginCodecV2() *ExecutePluginCodecV2 {
-	return &ExecutePluginCodecV2{}
+func NewExecutePluginCodecV2() (*ExecutePluginCodecV2, error) {
+	cd, err := codec.NewCodec(execCodecConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &ExecutePluginCodecV2{codec: cd}, nil
 }
 
 func validate(report cciptypes.ExecutePluginReport) error {
@@ -91,12 +98,7 @@ func (e *ExecutePluginCodecV2) Encode(ctx context.Context, report cciptypes.Exec
 		return nil, err
 	}
 
-	cd, err := codec.NewCodec(execCodecConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return cd.Encode(ctx, report, "ExecPluginReport")
+	return e.codec.Encode(ctx, report, "ExecPluginReport")
 }
 
 func execPostProcess(report *cciptypes.ExecutePluginReport) error {
@@ -119,12 +121,7 @@ func execPostProcess(report *cciptypes.ExecutePluginReport) error {
 
 func (e *ExecutePluginCodecV2) Decode(ctx context.Context, encodedReport []byte) (cciptypes.ExecutePluginReport, error) {
 	report := cciptypes.ExecutePluginReport{}
-	cd, err := codec.NewCodec(execCodecConfig)
-	if err != nil {
-		return report, err
-	}
-
-	err = cd.Decode(ctx, encodedReport, &report, "ExecPluginReport")
+	err := e.codec.Decode(ctx, encodedReport, &report, "ExecPluginReport")
 	if err != nil {
 		return report, err
 	}
