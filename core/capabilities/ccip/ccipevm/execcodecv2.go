@@ -2,6 +2,7 @@ package ccipevm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
@@ -84,6 +85,24 @@ func (e *ExecutePluginCodecV2) Encode(ctx context.Context, report cciptypes.Exec
 	return cd.Encode(ctx, report, "ExecPluginReport")
 }
 
+func execPostProcess(report *cciptypes.ExecutePluginReport) error {
+	if len(report.ChainReports) == 0 {
+		return errors.New("chain reports is empty")
+	}
+
+	for i, evmChainReport := range report.ChainReports {
+		for j := range evmChainReport.Messages {
+			report.ChainReports[i].Messages[j].Header.MsgHash = cciptypes.Bytes32{}
+			report.ChainReports[i].Messages[j].Header.OnRamp = cciptypes.UnknownAddress{}
+			report.ChainReports[i].Messages[j].ExtraArgs = cciptypes.Bytes{}
+			report.ChainReports[i].Messages[j].FeeToken = cciptypes.UnknownAddress{}
+			report.ChainReports[i].Messages[j].FeeTokenAmount = cciptypes.BigInt{}
+		}
+	}
+
+	return nil
+}
+
 func (e *ExecutePluginCodecV2) Decode(ctx context.Context, encodedReport []byte) (cciptypes.ExecutePluginReport, error) {
 	report := cciptypes.ExecutePluginReport{}
 	cd, err := codec.NewCodec(execCodecConfig)
@@ -92,6 +111,14 @@ func (e *ExecutePluginCodecV2) Decode(ctx context.Context, encodedReport []byte)
 	}
 
 	err = cd.Decode(ctx, encodedReport, &report, "ExecPluginReport")
+	if err != nil {
+		return report, err
+	}
+
+	if err = execPostProcess(&report); err != nil {
+		return report, err
+	}
+
 	return report, err
 }
 

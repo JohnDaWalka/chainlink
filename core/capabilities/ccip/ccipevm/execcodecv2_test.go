@@ -62,17 +62,6 @@ func TestExecutePluginCodecV2(t *testing.T) {
 
 	ctx := testutils.Context(t)
 
-	// Deploy the contract
-	//transactor := testutils.MustNewSimTransactor(t)
-	//simulatedBackend := backends.NewSimulatedBackend(core.GenesisAlloc{
-	//	transactor.From: {Balance: assets.Ether(1000).ToInt()},
-	//}, 30e6)
-	//address, _, _, err := report_codec.DeployReportCodec(transactor, simulatedBackend)
-	//require.NoError(t, err)
-	//simulatedBackend.Commit()
-	//contract, err := report_codec.NewReportCodec(address, simulatedBackend)
-	//require.NoError(t, err)
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			cd := NewExecutePluginCodecV2()
@@ -87,27 +76,15 @@ func TestExecutePluginCodecV2(t *testing.T) {
 			testSetup(t)
 
 			// ignore msg hash in comparison
-			//for i := range report.ChainReports {
-			//	for j := range report.ChainReports[i].Messages {
-			//		report.ChainReports[i].Messages[j].Header.MsgHash = cciptypes.Bytes32{}
-			//		report.ChainReports[i].Messages[j].Header.OnRamp = cciptypes.UnknownAddress{}
-			//		report.ChainReports[i].Messages[j].FeeToken = cciptypes.UnknownAddress{}
-			//		report.ChainReports[i].Messages[j].ExtraArgs = cciptypes.Bytes{}
-			//		report.ChainReports[i].Messages[j].FeeTokenAmount = cciptypes.BigInt{}
-			//		report.ChainReports[i].Messages[j].FeeValueJuels = cciptypes.BigInt{}
-			//	}
-			//}
-
-			//// decode using the contract
-			//contractDecodedReport, err := contract.DecodeExecuteReport(&bind.CallOpts{Context: ctx}, bytes)
-			//assert.NoError(t, err)
-			//assert.Equal(t, len(report.ChainReports), len(contractDecodedReport))
-			//for i, expReport := range report.ChainReports {
-			//	actReport := contractDecodedReport[i]
-			//	assert.Equal(t, expReport.OffchainTokenData, actReport.OffchainTokenData)
-			//	assert.Equal(t, len(expReport.Messages), len(actReport.Messages))
-			//	assert.Equal(t, uint64(expReport.SourceChainSelector), actReport.SourceChainSelector)
-			//}
+			for i := range report.ChainReports {
+				for j := range report.ChainReports[i].Messages {
+					report.ChainReports[i].Messages[j].Header.MsgHash = cciptypes.Bytes32{}
+					report.ChainReports[i].Messages[j].Header.OnRamp = cciptypes.UnknownAddress{}
+					report.ChainReports[i].Messages[j].FeeToken = cciptypes.UnknownAddress{}
+					report.ChainReports[i].Messages[j].ExtraArgs = cciptypes.Bytes{}
+					report.ChainReports[i].Messages[j].FeeTokenAmount = cciptypes.BigInt{}
+				}
+			}
 
 			// decode using the codec
 			codecDecoded, err := cd.Decode(ctx, bytes)

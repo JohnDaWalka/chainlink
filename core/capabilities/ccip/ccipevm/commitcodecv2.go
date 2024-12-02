@@ -67,7 +67,7 @@ func (c *CommitPluginCodecV2) Encode(ctx context.Context, report cciptypes.Commi
 	return cd.Encode(ctx, report, "CommitPluginReport")
 }
 
-func postProcess(report *cciptypes.CommitPluginReport) error {
+func commitPostProcess(report *cciptypes.CommitPluginReport) error {
 	for index, update := range report.PriceUpdates.TokenPriceUpdates {
 		if !common.IsHexAddress(string(update.TokenID)) {
 			return fmt.Errorf("invalid token address: %s", update.TokenID)
@@ -98,7 +98,7 @@ func (c *CommitPluginCodecV2) Decode(ctx context.Context, bytes []byte) (cciptyp
 		return report, err
 	}
 
-	if err = postProcess(&report); err != nil {
+	if err = commitPostProcess(&report); err != nil {
 		return report, err
 	}
 
