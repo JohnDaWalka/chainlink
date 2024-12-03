@@ -1,12 +1,15 @@
+[ChainlinkImage]
+version = "ac3474aaeea6c57d2886abdd3c3984c9d55a43d0"
+
 [Network]
 selected_networks = ["LENS_SEPOLIA"]
 
 [Soak.Common]
-chainlink_node_funding = 10
+chainlink_node_funding = 100
 
 [Soak.OCR]
 [Soak.OCR.Common]
-test_duration = "24h"
+test_duration = "48h"
 
 [Soak.OCR.Soak]
 time_between_rounds = "5m"
@@ -16,8 +19,11 @@ number_of_contracts = 2
 
 [OCR.Contracts]
 use = true
-link_token = "0x9f55307967D09C73879548431bC1f3DdaE77d029"
-offchain_aggregators = ["0x10F938FED31C006637Fc26887eFD43928Aa0d3a1"]
+link_token = "0x197b880fF2fF7f04A14011c9fc62C8cc67a7d02F"
+offchain_aggregators = [
+    "0x257Fb729A3a2EeA829fac9DA08b3eb1175C52E07",
+    "0x8c2D47A942aA13d579f9FDcc2c5D944a7c776A5E",
+]
 
 [Network.EVMNetworks.LENS_SEPOLIA]
 evm_name = "LENS_SEPOLIA"
