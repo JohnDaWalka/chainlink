@@ -15,13 +15,8 @@ contract TokenPoolFactory_constructor is TokenPoolFactorySetup {
   function test_constructor_Revert() public {
     // Revert cause the tokenAdminRegistry is address(0)
     vm.expectRevert(TokenPoolFactory.InvalidZeroAddress.selector);
-    new TokenPoolFactory(ITokenAdminRegistry(address(0)), RegistryModuleOwnerCustom(address(0)), address(0), address(0));
+    new TokenPoolFactory(ITokenAdminRegistry(address(0)), RegistryModuleOwnerCustom(address(0)));
 
-    new TokenPoolFactory(
-      ITokenAdminRegistry(address(0xdeadbeef)),
-      RegistryModuleOwnerCustom(address(0xdeadbeef)),
-      address(0xdeadbeef),
-      address(0xdeadbeef)
-    );
+    new TokenPoolFactory(ITokenAdminRegistry(address(0xdeadbeef)), RegistryModuleOwnerCustom(address(0xdeadbeef)));
   }
 }
