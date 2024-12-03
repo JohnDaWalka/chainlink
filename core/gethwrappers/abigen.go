@@ -537,7 +537,7 @@ func updateDeployMethod(contractName string, fset *token.FileSet, fileNode *ast.
 		}
 
 		// only add this import if Deploy method found
-		astutil.AddImport(fset, fileNode, "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks")
+		astutil.AddImport(fset, fileNode, "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated")
 
 		// Extract the parameters from the existing function x
 		paramList := getConstructorParams(x.Type.Params.List)
@@ -556,8 +556,8 @@ func updateDeployMethod(contractName string, fset *token.FileSet, fileNode *ast.
 
 // get the `if zksync()` block
 func getZKSyncBlock(contractName, paramList string) string {
-	zkSyncBlock := `if generated_zks.IsZKSync(backend) {
-				address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, parsed, common.FromHex(%sZKBin), backend, %params)
+	zkSyncBlock := `if generated.IsZKSync(backend) {
+				address, ethTx, contractBind, _ := generated.DeployContract(auth, parsed, common.FromHex(%sZKBin), backend, %params)
 				contractReturn := &%s{address: address, abi: *parsed, %sCaller: %sCaller{contract: contractBind}, %sTransactor: %sTransactor{contract: contractBind},%sFilterer: %sFilterer{contract: contractBind}}
 				return address, ethTx, contractReturn, err
 		}`

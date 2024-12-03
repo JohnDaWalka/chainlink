@@ -97,13 +97,6 @@ artifact-generate:
 	chmod +x ./scripts/generate_compiled_json_ccip.sh
 	./scripts/generate_compiled_json_ccip.sh $(contract) $(solcversion) $(artifactpath)
 
-
-.PHONY: wrappers-ccip-zksupport
-wrappers-ccip-zksupport: pnpmdep mockery abigen ## Recompiles solidity contracts for ccip and their go wrappers with zksync support
-	./scripts/native_solc_compile_all_ccip_zks
-	go generate ../core/gethwrappers/ccip/go_generate_zks.go
-
-
 help:
 	@echo ""
 	@echo "         .__           .__       .__  .__        __"
