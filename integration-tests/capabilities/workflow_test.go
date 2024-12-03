@@ -191,22 +191,22 @@ func generateOCR3Config(
 
 	// Generate OCR3 configuration arguments for testing
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
-		20*time.Second,             // DeltaProgress: Time between rounds
-		20*time.Second,             // DeltaResend: Time between resending unconfirmed transmissions
-		20*time.Second,             // DeltaInitial: Initial delay before starting the first round
-		6*time.Second,              // DeltaRound: Time between rounds within an epoch
+		5*time.Second,              // DeltaProgress: Time between rounds
+		10*time.Second,             // DeltaResend: Time between resending unconfirmed transmissions
+		1*time.Second,              // DeltaInitial: Initial delay before starting the first round
+		5*time.Second,              // DeltaRound: Time between rounds within an epoch
 		1*time.Second,              // DeltaGrace: Grace period for delayed transmissions
-		4*time.Second,              // DeltaCertifiedCommitRequest: Time between certified commit requests
-		60*time.Second,             // DeltaStage: Time between stages of the protocol
+		5*time.Second,              // DeltaCertifiedCommitRequest: Time between certified commit requests
+		10*time.Second,             // DeltaStage: Time between stages of the protocol
 		uint64(10),                 // MaxRoundsPerEpoch: Maximum number of rounds per epoch
 		transmissionSchedule,       // TransmissionSchedule: Transmission schedule
 		oracleIdentities,           // Oracle identities with their public keys
 		nil,                        // Plugin config (empty for now)
 		&maxDurationInitialization, // MaxDurationInitialization: ???
-		4*time.Second,              // MaxDurationQuery: Maximum duration for querying
-		4*time.Second,              // MaxDurationObservation: Maximum duration for observation
-		4*time.Second,              // MaxDurationAccept: Maximum duration for acceptance
-		4*time.Second,              // MaxDurationTransmit: Maximum duration for transmission
+		5*time.Second,              // MaxDurationQuery: Maximum duration for querying
+		5*time.Second,              // MaxDurationObservation: Maximum duration for observation
+		5*time.Second,              // MaxDurationAccept: Maximum duration for acceptance
+		5*time.Second,              // MaxDurationTransmit: Maximum duration for transmission
 		1,                          // F: Maximum number of faulty oracles
 		nil,                        // OnChain config (empty for now)
 	)
