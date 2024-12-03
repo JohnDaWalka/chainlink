@@ -26,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/chaintype"
 
 	htMocks "github.com/smartcontractkit/chainlink/v2/common/headtracker/mocks"
@@ -295,7 +296,7 @@ func Test_BackupLogPoller(t *testing.T) {
 				assert.NoError(t, th.LogPoller.UnregisterFilter(ctx, "filter2"))
 			}()
 
-			for n := 1; n < 31; n++ {
+			for n := 2; n < 31; n++ {
 				h := th.Backend.Commit()
 				require.Len(t, h, 32)
 			}
@@ -611,13 +612,13 @@ func TestLogPoller_BlockTimestamps(t *testing.T) {
 
 	blk, err := th.Client.BlockByNumber(ctx, nil)
 	require.NoError(t, err)
-	require.Equal(t, big.NewInt(1), blk.Number())
+	require.Equal(t, big.NewInt(2), blk.Number())
 	start := blk.Time()
 
 	// There is automatically a 1ns delay between each block.  To make sure it's including the correct block timestamps,
 	// we introduce irregularities by inserting two additional block delays. We can't control the block times for
 	// blocks produced by the log emitter, but we can adjust the time on empty blocks in between.  Simulated time
-	// sequence:  [ #1 ] ..(1ns + delay1).. [ #2 ] ..1ns.. [ #3 (LOG1) ] ..(1ns + delay2).. [ #4 ] ..1ns.. [ #5 (LOG2) ]
+	// sequence:  [ #2 ] ..(1ns + delay1).. [ #3 ] ..1ns.. [ #4 (LOG1) ] ..(1ns + delay2).. [ #5 ] ..1ns.. [ #6 (LOG2) ]
 	const delay1 = 589 * time.Second
 	const delay2 = 643 * time.Second
 	time1 := start + 1 + uint64(589)
@@ -627,7 +628,7 @@ func TestLogPoller_BlockTimestamps(t *testing.T) {
 
 	blk, err = th.Client.BlockByNumber(ctx, nil)
 	require.NoError(t, err)
-	require.Equal(t, big.NewInt(2), blk.Number())
+	require.Equal(t, big.NewInt(3), blk.Number())
 	assert.Equal(t, time1-1, blk.Time())
 
 	_, err = th.Emitter1.EmitLog1(th.Owner, []*big.Int{big.NewInt(1)})
@@ -636,7 +637,7 @@ func TestLogPoller_BlockTimestamps(t *testing.T) {
 
 	blk, err = th.Client.BlockByHash(ctx, hash)
 	require.NoError(t, err)
-	require.Equal(t, big.NewInt(3), blk.Number())
+	require.Equal(t, big.NewInt(4), blk.Number())
 	assert.Equal(t, time1, blk.Time())
 
 	require.NoError(t, th.Backend.AdjustTime(delay2))
@@ -646,12 +647,12 @@ func TestLogPoller_BlockTimestamps(t *testing.T) {
 
 	blk, err = th.Client.BlockByNumber(ctx, nil)
 	require.NoError(t, err)
-	require.Equal(t, big.NewInt(5), blk.Number())
+	require.Equal(t, big.NewInt(6), blk.Number())
 	assert.Equal(t, time2, blk.Time())
 
 	query := ethereum.FilterQuery{
-		FromBlock: big.NewInt(2),
-		ToBlock:   big.NewInt(5),
+		FromBlock: big.NewInt(3),
+		ToBlock:   big.NewInt(6),
 		Topics:    [][]common.Hash{events},
 		Addresses: []common.Address{th.EmitterAddress1, th.EmitterAddress2}}
 
@@ -1789,7 +1790,7 @@ func Test_PollAndSavePersistsFinalityInBlocks(t *testing.T) {
 			require.Error(t, err)
 
 			// Create a couple of blocks
-			for i := 0; i < numberOfBlocks-1; i++ {
+			for i := 0; i < numberOfBlocks-2; i++ {
 				th.Backend.Commit()
 			}
 
