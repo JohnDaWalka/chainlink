@@ -602,7 +602,9 @@ targets:
 
 		// Wait for OCR listeners to be ready before setting the configuration.
 		// If the ConfigSet event is missed, OCR protocol will not start.
+		fmt.Println("Waiting 30s for OCR listeners to be ready...")
 		time.Sleep(30 * time.Second)
+		fmt.Println("Proceeding to set OCR3 configuration.")
 
 		// Configure OCR capability contract
 		ocr3Config := generateOCR3Config(t, workflowNodesetInfo)
