@@ -1,4 +1,4 @@
-# utility to convert go_generate.go to zksync version
+# utility to convert go_generate.go to go_generate_zks.go
 
 def update_go_generate(file_path):
     updated_lines = []

@@ -71,7 +71,6 @@ func Abigen(a AbigenArgs) {
 		Exit("failure while building "+a.Pkg+" wrapper, stderr: "+buildResponse.String(), err)
 	}
 
-	fmt.Println("zkbin path", a.ZkBinPath)
 	ImproveAbigenOutput(a.Out, a.ABI)
 	if a.ZkBinPath != "" {
 		ImproveAbigenOutput_zks(a.Out, a.ZkBinPath)
@@ -472,7 +471,6 @@ func addHeader(code []byte) []byte {
 }
 
 // ZK stack logic
-
 func ImproveAbigenOutput_zks(path string, zkBinPath string) {
 
 	bs, err := os.ReadFile(path)
@@ -486,12 +484,11 @@ func ImproveAbigenOutput_zks(path string, zkBinPath string) {
 
 	astutil.AddImport(fset, fileNode, "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks")
 
-	zkbytes, err := os.ReadFile(zkBinPath)
+	zkByteCode, err := os.ReadFile(zkBinPath)
 	if err != nil {
-		fmt.Println("Error reading file:", err)
-		return
+		Exit("Error while improving abigen output", err)
 	}
-	zkHexString := string(zkbytes)
+	zkHexString := string(zkByteCode)
 
 	// add zksync binary to the wrapper
 	fileNode = addZKSyncBin(fileNode, contractName, zkHexString)
@@ -559,7 +556,7 @@ func updateDeployMethod(contractName string, fset *token.FileSet, fileNode *ast.
 // get the `if zksync()` block
 func getZKSyncBlock(contractName, paramList string) string {
 	zkSyncBlock := `if generated_zks.IsZKSync(backend) {
-				address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(%sZKBin), backend, %params)
+				address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, parsed, common.FromHex(%sZKBin), backend, %params)
 				contractReturn := &%s{address: address, abi: *parsed, %sCaller: %sCaller{contract: contractBind}, %sTransactor: %sTransactor{contract: contractBind},%sFilterer: %sFilterer{contract: contractBind}}
 				return address, ethTx, contractReturn, err
 		}`
@@ -611,17 +608,17 @@ func addZKSyncBlock(x ast.FuncDecl, zkSyncBlock string) ast.FuncDecl {
 	return x
 }
 
-// convert *types.Transaction to *generated_zks.CustomTransaction
+// convert *types.Transaction to *generated_zks.Transaction
 func updateTxReturnType(x ast.FuncDecl) {
 	x.Type.Results.List[1].Type = &ast.StarExpr{
 		X: &ast.SelectorExpr{
 			X:   &ast.Ident{Name: "generated_zks"},
-			Sel: &ast.Ident{Name: "CustomTransaction"},
+			Sel: &ast.Ident{Name: "Transaction"},
 		},
 	}
 }
 
-// convert tx to &CustomTransaction{Transaction: tx, customHash: tx.Hash()}
+// convert tx to &Transaction{Transaction: tx, Hash_zks: tx.Hash()}
 func updateReturnStmt(x ast.FuncDecl) {
 	for _, stmt := range x.Body.List {
 		returnStmt, is := stmt.(*ast.ReturnStmt)
@@ -646,7 +643,7 @@ func updateReturnStmt(x ast.FuncDecl) {
 		}
 
 		hashField := &ast.KeyValueExpr{
-			Key: ast.NewIdent("CustomHash"),
+			Key: ast.NewIdent("Hash_zks"),
 			Value: &ast.CallExpr{
 				Fun: &ast.SelectorExpr{
 					X:   ast.NewIdent("tx"),
@@ -657,7 +654,7 @@ func updateReturnStmt(x ast.FuncDecl) {
 		newRet := &ast.CompositeLit{
 			Type: &ast.SelectorExpr{
 				X:   ast.NewIdent("generated_zks"),
-				Sel: ast.NewIdent("CustomTransaction"),
+				Sel: ast.NewIdent("Transaction"),
 			},
 			Elts: []ast.Expr{txField, hashField},
 		}

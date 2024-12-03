@@ -1,87 +1,106 @@
 package generated_zks
 
 import (
+	"context"
+	"fmt"
+
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	// zkSyncAccounts "github.com/zksync-sdk/zksync2-go/accounts"
-	// zkSyncClient "github.com/zksync-sdk/zksync2-go/clients"
-	// zktypes "github.com/zksync-sdk/zksync2-go/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	zkSyncAccounts "github.com/zksync-sdk/zksync2-go/accounts"
+	zkSyncClient "github.com/zksync-sdk/zksync2-go/clients"
+	zktypes "github.com/zksync-sdk/zksync2-go/types"
 )
 
-type CustomTransaction struct {
+func IsZKSync(backend bind.ContractBackend) bool {
+	client, ok := backend.(*ethclient.Client)
+	if !ok {
+		return false
+	}
+	zkclient := zkSyncClient.NewClient(client.Client())
+	// we dont care about the address
+	// we only care if the method is available
+	_, err := zkclient.MainContractAddress(context.Background())
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+type Transaction struct {
 	*types.Transaction
-	CustomHash common.Hash
+	Hash_zks common.Hash
 }
 
-func (tx *CustomTransaction) Hash() common.Hash {
-	return tx.CustomHash
+func (tx *Transaction) Hash() common.Hash {
+	return tx.Hash_zks
 }
 
-// func ConvertToTransaction(resp zktypes.TransactionResponse) *CustomTransaction {
-// 	dtx := &types.DynamicFeeTx{
-// 		ChainID:   resp.ChainID.ToInt(),
-// 		Nonce:     uint64(resp.Nonce),
-// 		GasTipCap: resp.MaxPriorityFeePerGas.ToInt(),
-// 		GasFeeCap: resp.MaxFeePerGas.ToInt(),
-// 		To:        &resp.To,
-// 		Value:     resp.Value.ToInt(),
-// 		Data:      resp.Data,
-// 		Gas:       uint64(resp.Gas),
-// 	}
+func ConvertZkTxToEthTx(resp zktypes.TransactionResponse) *Transaction {
+	// make this legacy fee ?
+	dtx := &types.DynamicFeeTx{
+		ChainID:   resp.ChainID.ToInt(),
+		Nonce:     uint64(resp.Nonce),
+		GasTipCap: resp.MaxPriorityFeePerGas.ToInt(),
+		GasFeeCap: resp.MaxFeePerGas.ToInt(),
+		To:        &resp.To,
+		Value:     resp.Value.ToInt(),
+		Data:      resp.Data,
+		Gas:       uint64(resp.Gas),
+	}
 
-// 	tx := types.NewTx(dtx)
-// 	customTransaction := CustomTransaction{Transaction: tx, CustomHash: resp.Hash}
-// 	return &customTransaction
-// }
+	tx := types.NewTx(dtx)
+	customTransaction := Transaction{Transaction: tx, Hash_zks: resp.Hash}
+	return &customTransaction
+}
 
-// func IsZkSync(backend bind.ContractBackend) bool {
-// 	client, ok := backend.(*ethclient.Client)
-// 	if !ok {
-// 		return false
-// 	}
-// 	chainId, err := client.ChainID(context.Background())
-// 	if err != nil {
-// 		return false
-// 	}
-// 	switch chainId.Uint64() {
+func getZKAuthFromEthAuth(auth *bind.TransactOpts) *zkSyncAccounts.TransactOpts {
+	return &zkSyncAccounts.TransactOpts{
+		Nonce:     auth.Nonce,
+		Value:     auth.Value,
+		GasPrice:  auth.GasPrice,
+		GasFeeCap: auth.GasFeeCap,
+		GasTipCap: auth.GasTipCap,
+		GasLimit:  auth.GasLimit,
+	}
+}
 
-// 	case 324, 280, 300:
-// 		return true
-// 	}
-// 	return false
-// }
+func DeployContract(auth *bind.TransactOpts, contractAbi *abi.ABI, contractBytes []byte, backend bind.ContractBackend, params ...interface{}) (common.Address, *Transaction, *bind.BoundContract, error) {
+	client, ok := backend.(*ethclient.Client)
+	if !ok {
+		return common.Address{}, nil, nil, fmt.Errorf("backend is not an *ethclient.Client")
+	}
+	zkclient := zkSyncClient.NewClient(client.Client())
 
-// type ZkSyncContract struct {
-// 	zkclient *zkSyncClient.Client
-// 	wallet   *zkSyncAccounts.Wallet
-// }
+	walletValue := auth.Context.Value("wallet")
+	wallet, ok := walletValue.(*zkSyncAccounts.Wallet)
+	if !ok || wallet == nil {
+		return common.Address{}, nil, nil, fmt.Errorf("wallet not found in context or invalid type")
+	}
 
-// // NewZkSyncContract creates and returns a new ZkSyncContract instance.
-// func NewZkSyncContract(auth *bind.TransactOpts, backend bind.ContractBackend, contractBytes []byte, contractAbi *abi.ABI, params ...interface{}) (common.Address, *CustomTransaction, *bind.BoundContract, error) {
-// 	client, ok := backend.(*ethclient.Client)
-// 	if !ok {
-// 		return common.Address{}, nil, nil, fmt.Errorf("backend is not an *ethclient.Client")
-// 	}
+	constructor, _ := contractAbi.Pack("", params...)
 
-// 	// Retrieve wallet from context safely
-// 	walletValue := auth.Context.Value("wallet")
-// 	wallet, ok := walletValue.(*zkSyncAccounts.Wallet)
-// 	if !ok || wallet == nil {
-// 		return common.Address{}, nil, nil, fmt.Errorf("wallet not found in context or invalid type")
-// 	}
+	hash, err := wallet.DeployWithCreate(getZKAuthFromEthAuth(auth), zkSyncAccounts.CreateTransaction{
+		Bytecode: contractBytes,
+		Calldata: constructor,
+	})
+	if err != nil {
+		return common.Address{}, nil, nil, fmt.Errorf("Error deploying contract: %v", err)
+	}
 
-// 	zkclient := zkSyncClient.NewClient(client.Client())
+	receipt, err := zkclient.WaitMined(context.Background(), hash)
+	if err != nil {
+		return common.Address{}, nil, nil, fmt.Errorf("Error waiting for contract deployment: %v", err)
+	}
 
-// 	constructor, _ := contractAbi.Pack("", params...)
+	tx, _, err := zkclient.TransactionByHash(context.Background(), hash)
+	if err != nil {
+		return common.Address{}, nil, nil, fmt.Errorf("Error getting transaction by hash: %v", err)
+	}
 
-// 	hash, _ := wallet.DeployWithCreate(nil, zkSyncAccounts.CreateTransaction{
-// 		Bytecode: contractBytes,
-// 		Calldata: constructor,
-// 	})
-// 	receipt, _ := zkclient.WaitMined(context.Background(), hash)
-// 	tx, _, _ := zkclient.TransactionByHash(context.Background(), hash)
-// 	ethTx := ConvertToTransaction(*tx)
-// 	address := receipt.ContractAddress
-// 	contractBind := bind.NewBoundContract(address, *contractAbi, backend, backend, backend)
-// 	return address, ethTx, contractBind, nil
-// }
+	address := receipt.ContractAddress
+	contractBind := bind.NewBoundContract(address, *contractAbi, backend, backend, backend)
+	return address, ConvertZkTxToEthTx(*tx), contractBind, nil
+}
