@@ -1,0 +1,16 @@
+ChainID = '2021'
+FinalityDepth = 2
+FinalityTagEnabled = true
+NoNewHeadsThreshold = "10m"
+LogPollInterval = "6s"
+
+[GasEstimator]
+EIP1559DynamicFees = false
+PriceMax = "100000 gwei"
+PriceDefault = "21 gwei"
+FeeCapDefault = "20 gwei"
+LimitDefault = 10000000
+PriceMin = "20 gwei"
+
+[HeadTracker]
+HistoryDepth = 2000
