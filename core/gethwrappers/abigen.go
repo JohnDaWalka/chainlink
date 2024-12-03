@@ -74,28 +74,7 @@ func Abigen(a AbigenArgs) {
 	fmt.Println("zkbin path", a.ZkBinPath)
 	ImproveAbigenOutput(a.Out, a.ABI)
 	if a.ZkBinPath != "" {
-		ImproveAbigenOutput_zks(a.Out, a.ABI)
-	}
-}
-
-func ImproveAbigenOutput_zks(path string, abiPath string) {
-
-	bs, err := os.ReadFile(path)
-	if err != nil {
-		Exit("Error while improving abigen output", err)
-	}
-
-	fset, fileNode := parseFile(bs)
-
-	contractName := getContractName(fileNode)
-
-	fileNode = addZKSyncLogic(contractName, fset, fileNode)
-
-	bs = generateCode(fset, fileNode)
-
-	err = os.WriteFile(path, bs, 0600)
-	if err != nil {
-		Exit("Error while writing improved abigen source", err)
+		ImproveAbigenOutput_zks(a.Out, a.ZkBinPath)
 	}
 }
 
@@ -492,6 +471,92 @@ func addHeader(code []byte) []byte {
 	return utils.ConcatBytes([]byte(headerComment), code)
 }
 
+// ZK stack logic
+
+func ImproveAbigenOutput_zks(path string, zkBinPath string) {
+
+	bs, err := os.ReadFile(path)
+	if err != nil {
+		Exit("Error while improving abigen output", err)
+	}
+
+	fset, fileNode := parseFile(bs)
+
+	contractName := getContractName(fileNode)
+
+	astutil.AddImport(fset, fileNode, "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks")
+
+	zkbytes, err := os.ReadFile(zkBinPath)
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+	zkHexString := string(zkbytes)
+
+	// add zksync binary to the wrapper
+	fileNode = addZKSyncBin(fileNode, contractName, zkHexString)
+
+	// add zksync logic to the deploy function
+	fileNode = updateDeployMethod(contractName, fset, fileNode)
+
+	bs = generateCode(fset, fileNode)
+
+	err = os.WriteFile(path, bs, 0600)
+	if err != nil {
+		Exit("Error while writing improved abigen source", err)
+	}
+}
+
+// add zksync binary to the wrapper
+func addZKSyncBin(fileNode *ast.File, contractName string, zkHexString string) *ast.File {
+	// zksync
+	newVarSpec := &ast.ValueSpec{
+		Names: []*ast.Ident{ast.NewIdent(fmt.Sprintf("%sZKBin", contractName))},
+		Type:  ast.NewIdent("string"),
+		Values: []ast.Expr{
+			&ast.BasicLit{
+				Kind:  token.STRING,
+				Value: fmt.Sprintf("(\"0x%s\")", zkHexString),
+			},
+		},
+	}
+	newVarDecl := &ast.GenDecl{
+		Tok:   token.VAR,
+		Specs: []ast.Spec{newVarSpec},
+	}
+
+	// Insert the new variable declaration at the top of the file (before existing functions)
+	fileNode.Decls = append(fileNode.Decls, newVarDecl)
+	return fileNode
+}
+
+// add zksync logic to the deploy function
+func updateDeployMethod(contractName string, fset *token.FileSet, fileNode *ast.File) *ast.File {
+
+	return astutil.Apply(fileNode, func(cursor *astutil.Cursor) bool {
+		x, is := cursor.Node().(*ast.FuncDecl)
+		if !is {
+			return true
+		} else if x.Name.Name != "Deploy"+contractName {
+			return false
+		}
+
+		// Extract the parameters from the existing function x
+		paramList := getConstructorParams(x.Type.Params.List)
+		// get the `if zksync()` block
+		zkSyncBlock := getZKSyncBlock(contractName, paramList)
+		// insert the `if zksync()` block
+		addZKSyncBlock(*x, zkSyncBlock)
+		// update the return type in the function signature
+		updateTxReturnType(*x)
+		// update the actual return value
+		updateReturnStmt(*x)
+
+		return false
+	}, nil).(*ast.File)
+}
+
+// get the `if zksync()` block
 func getZKSyncBlock(contractName, paramList string) string {
 	zkSyncBlock := `if generated_zks.IsZKSync(backend) {
 				address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(%sZKBin), backend, %params)
@@ -503,9 +568,10 @@ func getZKSyncBlock(contractName, paramList string) string {
 	return strings.ReplaceAll(zkSyncBlock, "%s", contractName)
 }
 
-func getConstructorParams(x ast.FuncDecl) string {
+// Extract the parameters for constructor function
+func getConstructorParams(contstructorParams []*ast.Field) string {
 	params := []string{}
-	for i, param := range x.Type.Params.List {
+	for i, param := range contstructorParams {
 		if i > 1 { // Skip auth and backend
 			for _, name := range param.Names {
 				params = append(params, name.Name)
@@ -516,6 +582,7 @@ func getConstructorParams(x ast.FuncDecl) string {
 	return paramList
 }
 
+// insert the `if zksync()` block
 func addZKSyncBlock(x ast.FuncDecl, zkSyncBlock string) ast.FuncDecl {
 	for i, stmt := range x.Body.List {
 
@@ -545,7 +612,7 @@ func addZKSyncBlock(x ast.FuncDecl, zkSyncBlock string) ast.FuncDecl {
 }
 
 // convert *types.Transaction to *generated_zks.CustomTransaction
-func modifyTxReturnType(x ast.FuncDecl) {
+func updateTxReturnType(x ast.FuncDecl) {
 	x.Type.Results.List[1].Type = &ast.StarExpr{
 		X: &ast.SelectorExpr{
 			X:   &ast.Ident{Name: "generated_zks"},
@@ -597,28 +664,4 @@ func updateReturnStmt(x ast.FuncDecl) {
 		pointerRet := &ast.UnaryExpr{Op: token.AND, X: newRet}
 		returnStmt.Results[1] = pointerRet
 	}
-}
-
-func addZKSyncLogic(contractName string, fset *token.FileSet, fileNode *ast.File) *ast.File {
-	astutil.AddImport(fset, fileNode, "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks")
-
-	return astutil.Apply(fileNode, func(cursor *astutil.Cursor) bool {
-		x, is := cursor.Node().(*ast.FuncDecl)
-		if !is {
-			return true
-		} else if x.Name.Name != "Deploy"+contractName {
-			return false
-		}
-
-		// Extract the parameters from the existing function x
-		paramList := getConstructorParams(*x)
-		zkSyncBlock := getZKSyncBlock(contractName, paramList)
-		addZKSyncBlock(*x, zkSyncBlock)
-		modifyTxReturnType(*x)
-		updateReturnStmt(*x)
-		// add zk binary
-		// work on generate_zks
-
-		return false
-	}, nil).(*ast.File)
 }
