@@ -97,6 +97,7 @@ artifact-generate:
 	chmod +x ./scripts/generate_compiled_json_ccip.sh
 	./scripts/generate_compiled_json_ccip.sh $(contract) $(solcversion) $(artifactpath)
 
+
 help:
 	@echo ""
 	@echo "         .__           .__       .__  .__        __"

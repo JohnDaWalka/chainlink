@@ -613,7 +613,7 @@ func addZKSyncBlock(x ast.FuncDecl, zkSyncBlock string) ast.FuncDecl {
 func updateTxReturnType(x ast.FuncDecl) {
 	x.Type.Results.List[1].Type = &ast.StarExpr{
 		X: &ast.SelectorExpr{
-			X:   &ast.Ident{Name: "generated_zks"},
+			X:   &ast.Ident{Name: "generated"},
 			Sel: &ast.Ident{Name: "Transaction"},
 		},
 	}
@@ -654,7 +654,7 @@ func updateReturnStmt(x ast.FuncDecl) {
 		}
 		newRet := &ast.CompositeLit{
 			Type: &ast.SelectorExpr{
-				X:   ast.NewIdent("generated_zks"),
+				X:   ast.NewIdent("generated"),
 				Sel: ast.NewIdent("Transaction"),
 			},
 			Elts: []ast.Expr{txField, hashField},
