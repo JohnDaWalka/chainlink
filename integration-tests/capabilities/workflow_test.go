@@ -269,7 +269,7 @@ func TestWorkflow(t *testing.T) {
 					ResponseType:   0, // REPORT
 				},
 				{
-					LabelledName:   "write_31337",
+					LabelledName:   "write_geth-testnet",
 					Version:        "1.0.0",
 					CapabilityType: 3, // TARGET
 					ResponseType:   1, // OBSERVATION_IDENTICAL
@@ -509,7 +509,7 @@ targets:
 					workflowOwner,
 					feedID,
 					feedID,
-					bc.ChainID,
+					"geth-testnet",
 					feedsConsumerAddress,
 				)
 				response, _, err2 = nodeClient.CreateJobRaw(workflowSpec)
@@ -599,6 +599,10 @@ targets:
 			1,
 			signers,
 		))
+
+		// Wait for OCR listeners to be ready before setting the configuration.
+		// If the ConfigSet event is missed, OCR protocol will not start.
+		time.Sleep(30 * time.Second)
 
 		// Configure OCR capability contract
 		ocr3Config := generateOCR3Config(t, workflowNodesetInfo)
