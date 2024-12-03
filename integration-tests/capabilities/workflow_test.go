@@ -191,7 +191,7 @@ func generateOCR3Config(
 
 	// Generate OCR3 configuration arguments for testing
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
-		5*time.Second,              // DeltaProgress: Time between rounds
+		20*time.Second,             // DeltaProgress: Time between rounds
 		10*time.Second,             // DeltaResend: Time between resending unconfirmed transmissions
 		1*time.Second,              // DeltaInitial: Initial delay before starting the first round
 		5*time.Second,              // DeltaRound: Time between rounds within an epoch
