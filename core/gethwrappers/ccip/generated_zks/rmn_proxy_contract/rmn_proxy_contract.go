@@ -37,7 +37,7 @@ var RMNProxyContractABI = RMNProxyContractMetaData.ABI
 
 var RMNProxyContractBin = RMNProxyContractMetaData.Bin
 
-func DeployRMNProxyContract(auth *bind.TransactOpts, backend bind.ContractBackend, arm common.Address) (common.Address, *generated_zks.CustomTransaction, *RMNProxyContract, error) {
+func DeployRMNProxyContract(auth *bind.TransactOpts, backend bind.ContractBackend, arm common.Address) (common.Address, *generated_zks.Transaction, *RMNProxyContract, error) {
 	parsed, err := RMNProxyContractMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -46,7 +46,7 @@ func DeployRMNProxyContract(auth *bind.TransactOpts, backend bind.ContractBacken
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 	if generated_zks.IsZKSync(backend) {
-		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, *parsed, common.FromHex(RMNProxyContractZKBin), backend, arm)
+		address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, parsed, common.FromHex(RMNProxyContractZKBin), backend, arm)
 		contractReturn := &RMNProxyContract{address: address, abi: *parsed, RMNProxyContractCaller: RMNProxyContractCaller{contract: contractBind}, RMNProxyContractTransactor: RMNProxyContractTransactor{contract: contractBind}, RMNProxyContractFilterer: RMNProxyContractFilterer{contract: contractBind}}
 		return address, ethTx, contractReturn, err
 	}
@@ -54,7 +54,7 @@ func DeployRMNProxyContract(auth *bind.TransactOpts, backend bind.ContractBacken
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	return address, &generated_zks.CustomTransaction{Transaction: tx, CustomHash: tx.Hash()}, &RMNProxyContract{address: address, abi: *parsed, RMNProxyContractCaller: RMNProxyContractCaller{contract: contract}, RMNProxyContractTransactor: RMNProxyContractTransactor{contract: contract}, RMNProxyContractFilterer: RMNProxyContractFilterer{contract: contract}}, nil
+	return address, &generated_zks.Transaction{Transaction: tx, Hash_zks: tx.Hash()}, &RMNProxyContract{address: address, abi: *parsed, RMNProxyContractCaller: RMNProxyContractCaller{contract: contract}, RMNProxyContractTransactor: RMNProxyContractTransactor{contract: contract}, RMNProxyContractFilterer: RMNProxyContractFilterer{contract: contract}}, nil
 }
 
 type RMNProxyContract struct {

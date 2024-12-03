@@ -101,7 +101,7 @@ artifact-generate:
 .PHONY: wrappers-ccip-zksupport
 wrappers-ccip-zksupport: pnpmdep mockery abigen ## Recompiles solidity contracts for ccip and their go wrappers with zksync support
 	./scripts/native_solc_compile_all_ccip_zks
-	go generate ../core/gethwrappers/ccip
+	go generate ../core/gethwrappers/ccip/go_generate_zks.go
 
 
 help:

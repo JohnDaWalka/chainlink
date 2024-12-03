@@ -482,8 +482,6 @@ func ImproveAbigenOutput_zks(path string, zkBinPath string) {
 
 	contractName := getContractName(fileNode)
 
-	astutil.AddImport(fset, fileNode, "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks")
-
 	zkByteCode, err := os.ReadFile(zkBinPath)
 	if err != nil {
 		Exit("Error while improving abigen output", err)
@@ -537,6 +535,9 @@ func updateDeployMethod(contractName string, fset *token.FileSet, fileNode *ast.
 		} else if x.Name.Name != "Deploy"+contractName {
 			return false
 		}
+
+		// only add this import if Deploy method found
+		astutil.AddImport(fset, fileNode, "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks")
 
 		// Extract the parameters from the existing function x
 		paramList := getConstructorParams(x.Type.Params.List)
