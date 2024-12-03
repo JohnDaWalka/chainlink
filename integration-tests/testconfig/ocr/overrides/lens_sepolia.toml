@@ -19,8 +19,8 @@ number_of_contracts = 2
 
 [OCR.Contracts]
 use = true
-link_token = "0x72584971748Debe8708cDDB9077Db6FD94A02895"
-offchain_aggregators = ["0x4c52528A7e6Cc449f8C77b49ad95E1113407fb5C", "0xdc140A7CFA6B4b92B88F917Be726b16815F907c9"]
+link_token = "0xEa07234ca51Fc2Ec87fc152D4dE6b2eBb25d65dE"
+offchain_aggregators = ["0x5240f07f82C8Cb4df472c9c1fe8022Be23Ee6994", "0x89625FC0Dd6cD23a6DB93C832DBcaC12A3c84516"]
 
 [Network.EVMNetworks.LENS_SEPOLIA]
 evm_name = "LENS_SEPOLIA"
