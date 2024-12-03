@@ -273,7 +273,6 @@ func (h *helper) Backend() bind.ContractBackend {
 	if h.sim == nil {
 		h.sim = simulated.NewBackend(
 			evmtypes.GenesisAlloc{h.accounts[0].From: {Balance: big.NewInt(math.MaxInt64)}, h.accounts[1].From: {Balance: big.NewInt(math.MaxInt64)}}, simulated.WithBlockGasLimit(commonGasLimitOnEvms*5000))
-		cltest.Mine(h.sim, 1*time.Second)
 	}
 
 	return h.sim.Client()
