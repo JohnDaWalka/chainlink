@@ -180,3 +180,7 @@ func TestRegistry_ChecksExecutionAPIByType(t *testing.T) {
 		})
 	}
 }
+
+func TestDebug(t *testing.T) {
+	t.Log("DEBUG: This test intentionally passes")
+}
