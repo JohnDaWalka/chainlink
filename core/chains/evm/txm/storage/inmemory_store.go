@@ -15,8 +15,11 @@ import (
 )
 
 const (
+	// maxQueuedTransactions is the max limit of UnstartedTransactions and ConfirmedTransactions structures.
 	maxQueuedTransactions = 250
-	pruneSubset           = 3
+	// pruneSubset controls the subset of confirmed transactions to prune when the structure reaches its max limit.
+	// i.e. if the value is 3 and the limit is 90, 30 transactions will be pruned.
+	pruneSubset = 3
 )
 
 type InMemoryStore struct {
@@ -111,6 +114,10 @@ func (m *InMemoryStore) CreateEmptyUnconfirmedTransaction(nonce uint64, gasLimit
 		return nil, fmt.Errorf("an unconfirmed tx with the same nonce already exists: %v", m.UnconfirmedTransactions[nonce])
 	}
 
+	if _, exists := m.Transactions[nonce]; exists {
+		return nil, fmt.Errorf("a tx with the same nonce already exists: %v", m.Transactions[nonce])
+	}
+
 	m.UnconfirmedTransactions[nonce] = emptyTx
 	m.Transactions[emptyTx.ID] = emptyTx
 
@@ -165,7 +172,7 @@ func (m *InMemoryStore) FetchUnconfirmedTransactionAtNonceWithCount(latestNonce 
 	return
 }
 
-func (m *InMemoryStore) MarkTransactionsConfirmed(latestNonce uint64) ([]*types.Transaction, []uint64, error) {
+func (m *InMemoryStore) MarkConfirmedAndReorgedTransactions(latestNonce uint64) ([]*types.Transaction, []uint64, error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -257,6 +264,10 @@ func (m *InMemoryStore) UpdateUnstartedTransactionWithNonce(nonce uint64) (*type
 		return nil, fmt.Errorf("an unconfirmed tx with the same nonce already exists: %v", m.UnconfirmedTransactions[nonce])
 	}
 
+	if _, exists := m.Transactions[nonce]; exists {
+		return nil, fmt.Errorf("a tx with the same nonce already exists: %v", m.Transactions[nonce])
+	}
+
 	tx := m.UnstartedTransactions[0]
 	tx.Nonce = &nonce
 	tx.State = types.TxUnconfirmed
@@ -318,8 +329,8 @@ func (m *InMemoryStore) MarkTxFatal(*types.Transaction) error {
 
 // Orchestrator
 func (m *InMemoryStore) FindTxWithIdempotencyKey(idempotencyKey *string) *types.Transaction {
-	m.Lock()
-	defer m.Unlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	if idempotencyKey != nil {
 		for _, tx := range m.Transactions {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -60,10 +61,17 @@ type Transaction struct {
 }
 
 func (t *Transaction) PrettyPrint() string {
-	return fmt.Sprintf(`{txID:%d, IdempotencyKey:%v, ChainID:%v, Nonce:%d, FromAddress:%v, ToAddress:%v, Value:%v, `+
+	idk, nonce := "<nil>", "<nil>"
+	if t.IdempotencyKey != nil {
+		idk = *t.IdempotencyKey
+	}
+	if t.Nonce != nil {
+		nonce = strconv.FormatUint(*t.Nonce, 10)
+	}
+	return fmt.Sprintf(`{txID:%d, IdempotencyKey:%v, ChainID:%v, Nonce:%s, FromAddress:%v, ToAddress:%v, Value:%v, `+
 		`Data:%v, SpecifiedGasLimit:%d, CreatedAt:%v, InitialBroadcastAt:%v, LastBroadcastAt:%v, State:%v, IsPurgeable:%v, AttemptCount:%d, `+
 		`Meta:%v, Subject:%v}`,
-		t.ID, *t.IdempotencyKey, t.ChainID, t.Nonce, t.FromAddress, t.ToAddress, t.Value, t.Data, t.SpecifiedGasLimit, t.CreatedAt, t.InitialBroadcastAt,
+		t.ID, idk, t.ChainID, nonce, t.FromAddress, t.ToAddress, t.Value, t.Data, t.SpecifiedGasLimit, t.CreatedAt, t.InitialBroadcastAt,
 		t.LastBroadcastAt, t.State, t.IsPurgeable, t.AttemptCount, t.Meta, t.Subject)
 }
 
