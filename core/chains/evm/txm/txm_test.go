@@ -28,21 +28,28 @@ func TestLifecycle(t *testing.T) {
 
 	client := mocks.NewClient(t)
 	ab := mocks.NewAttemptBuilder(t)
-	config := Config{BlockTime: 10 * time.Millisecond}
 	address1 := testutils.NewAddress()
 	address2 := testutils.NewAddress()
 	assert.NotEqual(t, address1, address2)
 	addresses := []common.Address{address1, address2}
 	keystore := mocks.NewKeystore(t)
-	keystore.On("EnabledAddressesForChain", mock.Anything, mock.Anything).Return(addresses, nil)
 
-	t.Run("fails to start if initial pending nonce call fails", func(t *testing.T) {
-		txm := NewTxm(logger.Test(t), testutils.FixtureChainID, client, ab, nil, nil, config, keystore)
+	t.Run("retries if initial pending nonce call fails", func(t *testing.T) {
+		config := Config{BlockTime: 1 * time.Minute}
+		txStore := mocks.NewTxStore(t)
+		txStore.On("FetchUnconfirmedTransactionAtNonceWithCount", mock.Anything, mock.Anything, mock.Anything).Return(nil, 20, nil)
+		keystore.On("EnabledAddressesForChain", mock.Anything, mock.Anything).Return([]common.Address{address1}, nil).Once()
+		lggr, observedLogs := logger.TestObserved(t, zap.DebugLevel)
+		txm := NewTxm(lggr, testutils.FixtureChainID, client, nil, txStore, nil, config, keystore)
 		client.On("PendingNonceAt", mock.Anything, address1).Return(uint64(0), errors.New("error")).Once()
-		require.Error(t, txm.Start(tests.Context(t)))
+		client.On("PendingNonceAt", mock.Anything, address1).Return(uint64(0), nil).Once()
+		require.NoError(t, txm.Start(tests.Context(t)))
+		tests.AssertLogEventually(t, observedLogs, "Error when fetching initial pending nonce")
 	})
 
 	t.Run("tests lifecycle successfully without any transactions", func(t *testing.T) {
+		config := Config{BlockTime: 200 * time.Millisecond}
+		keystore.On("EnabledAddressesForChain", mock.Anything, mock.Anything).Return(addresses, nil).Once()
 		lggr, observedLogs := logger.TestObserved(t, zap.DebugLevel)
 		txStore := storage.NewInMemoryStoreManager(lggr, testutils.FixtureChainID)
 		require.NoError(t, txStore.Add(addresses...))
@@ -52,8 +59,8 @@ func TestLifecycle(t *testing.T) {
 		client.On("PendingNonceAt", mock.Anything, address1).Return(nonce, nil).Once()
 		client.On("PendingNonceAt", mock.Anything, address2).Return(nonce, nil).Once()
 		// backfill loop (may or may not be executed multiple times)
-		client.On("NonceAt", mock.Anything, address1, mock.Anything).Return(nonce, nil)
-		client.On("NonceAt", mock.Anything, address2, mock.Anything).Return(nonce, nil)
+		client.On("NonceAt", mock.Anything, address1, mock.Anything).Return(nonce, nil).Maybe()
+		client.On("NonceAt", mock.Anything, address2, mock.Anything).Return(nonce, nil).Maybe()
 
 		servicetest.Run(t, txm)
 		tests.AssertLogEventually(t, observedLogs, "Backfill time elapsed")
@@ -170,6 +177,7 @@ func TestBroadcastTransaction(t *testing.T) {
 		txm.setNonce(address, 8)
 		IDK := "IDK"
 		txRequest := &types.TxRequest{
+			Data:              []byte{100},
 			IdempotencyKey:    &IDK,
 			ChainID:           testutils.FixtureChainID,
 			FromAddress:       address,
