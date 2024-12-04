@@ -510,6 +510,33 @@ func (s *service) DeleteJob(ctx context.Context, args *DeleteJobArgs) (int64, er
 		logger.Errorw("Failed to push metrics for job proposal deletion", "err", err)
 	}
 
+	// auto-cancellation for Workflow specs
+	if !proposal.ExternalJobID.Valid {
+		logger.Infow("ExternalJobID is null", "id", proposal.ID, "name", proposal.Name)
+		return proposal.ID, nil
+	}
+	job, err := s.jobORM.FindJobByExternalJobID(ctx, proposal.ExternalJobID.UUID)
+	if err != nil {
+		// NOTE: at this stage, we don't know if this job is of Workflow type
+		// so we don't want to return an error
+		logger.Infow("FindJobByExternalJobID failed", "id", proposal.ID, "externalJobID", proposal.ExternalJobID.UUID, "name", proposal.Name)
+		return proposal.ID, nil
+	}
+	if job.WorkflowSpecID != nil { // this is a Workflow job
+		jobSpecID := int64(*job.WorkflowSpecID)
+		jpSpec, err2 := s.orm.GetApprovedSpec(ctx, proposal.ID)
+		if err2 != nil {
+			logger.Errorw("GetApprovedSpec failed - no approved specs to cancel?", "id", proposal.ID, "err", err2, "name", job.Name)
+			// return success if there are no approved specs to cancel
+			return proposal.ID, nil
+		}
+		if err := s.CancelSpec(ctx, jpSpec.ID); err != nil {
+			logger.Errorw("Failed to auto-cancel workflow spec", "jobProposalID", proposal.ID, "jobProposalSpecID", jpSpec.ID, "jobSpecID", jobSpecID, "err", err, "name", job.Name)
+			return 0, fmt.Errorf("failed to auto-cancel workflow spec (job proposal spec ID: %d): %w", jpSpec.ID, err)
+		}
+		logger.Infow("Successfully auto-cancelled a workflow spec", "jobProposalID", proposal.ID, "jobProposalSpecID", jpSpec.ID, "jobSpecID", jobSpecID, "name", job.Name)
+	}
+
 	return proposal.ID, nil
 }
 
