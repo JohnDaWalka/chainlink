@@ -37,9 +37,15 @@ pnpmdep: ## Install solidity contract dependencies through pnpm
 abigen: ## Build & install abigen.
 	../tools/bin/build_abigen
 
+
+# env var example
+#		export ZKSOLC_VERSION=1.5.6
+#		make setup_zksolc
+# make call example
+# 		make ZKSOLC_VERSION=1.5.6 setup_zksolc
 .PHONY: setup_zksolc
 setup_zksolc: ## Download and install zksolc
-	../tools/bin/setup_zksolc.sh
+	../tools/bin/setup_zksolc.sh $(ZKSOLC_VERSION)
 
 .PHONY: mockery
 mockery: $(mockery) ## Install mockery.
