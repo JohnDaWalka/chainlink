@@ -49,7 +49,7 @@ jobs:
         uses: ./.github/actions/setup-nodejs
         with:
           prod: "true"
-      
+
       - name: Run native compile and generate wrappers
         run: make wrappers-all
         working-directory: ./contracts
