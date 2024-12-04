@@ -178,7 +178,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, 
 	}
 
 	if wrappedTx != nil {
-		o.lggr.Infof("Found Tx with IdempotencyKey: %v. Returning existing Tx without creating a new one.", wrappedTx.IdempotencyKey)
+		o.lggr.Infof("Found Tx with IdempotencyKey: %v. Returning existing Tx without creating a new one.", *wrappedTx.IdempotencyKey)
 	} else {
 		var pipelineTaskRunID uuid.NullUUID
 		if request.PipelineTaskRunID != nil {

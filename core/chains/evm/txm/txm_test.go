@@ -85,6 +85,7 @@ func TestTrigger(t *testing.T) {
 		// Start
 		client.On("PendingNonceAt", mock.Anything, address).Return(nonce, nil).Once()
 		servicetest.Run(t, txm)
+		txm.Trigger(address)
 	})
 }
 
@@ -195,6 +196,7 @@ func TestBroadcastTransaction(t *testing.T) {
 		var zeroTime time.Time
 		assert.Greater(t, tx.LastBroadcastAt, zeroTime)
 		assert.Greater(t, tx.Attempts[0].BroadcastAt, zeroTime)
+		assert.Greater(t, tx.InitialBroadcastAt, zeroTime)
 	})
 }
 
