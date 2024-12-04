@@ -1,5 +1,5 @@
 [ChainlinkImage]
-version = "f85400a5318d4c16dbba0b79220d2f063797c0cd"
+version = "061320eb3f0440536eddd0fe664d854b4b0f8bd8"
 
 [Network]
 selected_networks = ["LENS_SEPOLIA"]
