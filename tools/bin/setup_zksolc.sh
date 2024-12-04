@@ -13,8 +13,8 @@ GITHUB_URL="https://api.github.com/repos/$REPO/releases/tags/$VERSION"
 
 # ASSET_NAME2="zksolc-linux-amd64-gnu-v${VERSION}"
 # ASSET_NAME2="zksolc-macosx-arm64-v1.5.6"
-# ASSET_NAME="zksolc-macosx-arm64-v1.5.6"
-ASSET_NAME="zksolc-linux-amd64-gnu-v${VERSION}"
+ASSET_NAME="zksolc-macosx-arm64-v${VERSION}"
+# ASSET_NAME="zksolc-linux-amd64-gnu-v${VERSION}"
 # Fetch the release info using GitHub API and get the download URL for the asset
 ASSET_URL=$(curl --silent "$GITHUB_URL" | jq -r ".assets[] | select(.name == \"$ASSET_NAME\") | .browser_download_url")
 
@@ -24,8 +24,8 @@ if [ -z "$ASSET_URL" ]; then
 fi
 
 
-# echo "Removing existing link if any"
-# sudo rm /usr/local/bin/zksolc
+echo "Removing existing link if any"
+sudo rm -f /usr/local/bin/zksolc
 
 echo "Downloading $ASSET_NAME... from $ASSET_URL"
 sudo curl -L "$ASSET_URL" -o /usr/local/bin/zksolc

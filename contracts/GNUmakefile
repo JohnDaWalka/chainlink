@@ -80,7 +80,7 @@ ccip-lcov:
 # make call example
 # 		make FOUNDRY_PROFILE=llo-feeds wrappers
 .PHONY: wrappers
-wrappers: pnpmdep mockery abigen ## Recompiles solidity contracts and their go wrappers.
+wrappers: pnpmdep mockery abigen setup_zksolc ## Recompiles solidity contracts and their go wrappers.
 	./scripts/native_solc_compile_all_$(FOUNDRY_PROFILE)
 	go generate ../core/gethwrappers/$(FOUNDRY_PROFILE)
 
