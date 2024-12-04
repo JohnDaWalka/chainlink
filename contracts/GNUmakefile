@@ -37,6 +37,10 @@ pnpmdep: ## Install solidity contract dependencies through pnpm
 abigen: ## Build & install abigen.
 	../tools/bin/build_abigen
 
+.PHONY: setup_zksolc
+setup_zksolc: ## Download and install zksolc
+	../tools/bin/setup_zksolc.sh
+
 .PHONY: mockery
 mockery: $(mockery) ## Install mockery.
 	go install github.com/vektra/mockery/v2@v2.43.2
@@ -84,7 +88,7 @@ wrappers: pnpmdep mockery abigen ## Recompiles solidity contracts and their go w
 # assumption that native_solc_compile_all contains sub-calls to each product, and
 # go_generate does the same.
 .PHONY: wrappers-all
-wrappers-all: pnpmdep mockery abigen ## Recompiles solidity contracts and their go wrappers.
+wrappers-all: pnpmdep mockery abigen setup_zksolc ## Recompiles solidity contracts and their go wrappers.
 	# go_generate contains a call to  compile all contracts before generating wrappers
 	go generate ../core/gethwrappers/go_generate.go
 
