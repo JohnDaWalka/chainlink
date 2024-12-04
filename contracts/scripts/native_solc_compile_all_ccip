@@ -23,7 +23,6 @@ ROOT="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; cd ../../ && pwd -P )"
 compileContract () {
   local contract
   contract=$(basename "$1" ".sol")
-  echo "compiling $contract"
 
   local optimize_runs=$OPTIMIZE_RUNS
 
@@ -41,8 +40,6 @@ compileContract () {
       --evm-version paris \
       "$ROOT"/contracts/src/v0.8/"$1"
   
-  echo "compiling $contract zksolc"
-  zksolc --version
   zksolc --overwrite -O3 --metadata-hash none \
       -o "$ROOT"/contracts/zksolc/v$ZKSOLC_VERSION/"$contract" \
       --bin --allow-paths "$ROOT"/contracts/src/v0.8 \

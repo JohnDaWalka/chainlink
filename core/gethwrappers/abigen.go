@@ -73,7 +73,7 @@ func Abigen(a AbigenArgs) {
 
 	ImproveAbigenOutput(a.Out, a.ABI)
 	if a.ZkBinPath != "" {
-		ImproveAbigenOutput_zks(a.Out, a.ZkBinPath)
+		ImproveAbigenOutputZks(a.Out, a.ZkBinPath)
 	}
 }
 
@@ -471,7 +471,7 @@ func addHeader(code []byte) []byte {
 }
 
 // ZK stack logic
-func ImproveAbigenOutput_zks(path string, zkBinPath string) {
+func ImproveAbigenOutputZks(path string, zkBinPath string) {
 
 	bs, err := os.ReadFile(path)
 	if err != nil {
