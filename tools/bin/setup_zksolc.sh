@@ -10,8 +10,8 @@ ZKSOLC_VERSION=${1:-1.5.3}
 REPO="matter-labs/era-compiler-solidity"
 GITHUB_URL="https://api.github.com/repos/$REPO/releases/tags/$ZKSOLC_VERSION"
 
-ASSET_NAME="zksolc-macosx-arm64-v${ZKSOLC_VERSION}"
-# ASSET_NAME="zksolc-linux-amd64-gnu-v${ZKSOLC_VERSION}"
+# ASSET_NAME="zksolc-macosx-arm64-v${ZKSOLC_VERSION}"
+ASSET_NAME="zksolc-linux-amd64-gnu-v${ZKSOLC_VERSION}"
 # Fetch the release info using GitHub API and get the download URL for the asset
 ASSET_URL=$(curl --silent "$GITHUB_URL" | jq -r ".assets[] | select(.name == \"$ASSET_NAME\") | .browser_download_url")
 
