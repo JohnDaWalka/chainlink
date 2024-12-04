@@ -38,7 +38,7 @@ type TxStore interface {
 	CreateEmptyUnconfirmedTransaction(context.Context, common.Address, uint64, uint64) (*types.Transaction, error)
 	CreateTransaction(context.Context, *types.TxRequest) (*types.Transaction, error)
 	FetchUnconfirmedTransactionAtNonceWithCount(context.Context, uint64, common.Address) (*types.Transaction, int, error)
-	MarkTransactionsConfirmed(context.Context, uint64, common.Address) ([]*types.Transaction, []uint64, error)
+	MarkConfirmedAndReorgedTransactions(context.Context, uint64, common.Address) ([]*types.Transaction, []uint64, error)
 	MarkUnconfirmedTransactionPurgeable(context.Context, uint64, common.Address) error
 	UpdateTransactionBroadcast(context.Context, uint64, uint64, common.Hash, common.Address) error
 	UpdateUnstartedTransactionWithNonce(context.Context, common.Address, uint64) (*types.Transaction, error)
@@ -279,7 +279,7 @@ func (t *Txm) broadcastTransaction(ctx context.Context, address common.Address) 
 			return false, err
 		}
 
-		// Optimistically send up to 1/3 of the maxInFlightTransactions. After that threshold, broadcast more cautiously
+		// Optimistically send up to 1/maxInFlightSubset of the maxInFlightTransactions. After that threshold, broadcast more cautiously
 		// by checking the pending nonce so no more than maxInFlightTransactions/3 can get stuck simultaneously i.e. due
 		// to insufficient balance. We're making this trade-off to avoid storing stuck transactions and making unnecessary
 		// RPC calls. The upper limit is always maxInFlightTransactions regardless of the pending nonce.
@@ -300,17 +300,15 @@ func (t *Txm) broadcastTransaction(ctx context.Context, address common.Address) 
 			}
 		}
 
-		tx, err := t.txStore.UpdateUnstartedTransactionWithNonce(ctx, address, t.getNonce(address))
+		nonce := t.getNonce(address)
+		tx, err := t.txStore.UpdateUnstartedTransactionWithNonce(ctx, address, nonce)
 		if err != nil {
 			return false, err
 		}
 		if tx == nil {
 			return false, nil
 		}
-		nonce := t.getNonce(address)
-		tx.Nonce = &nonce
-		t.setNonce(address, *tx.Nonce+1)
-		tx.State = types.TxUnconfirmed
+		t.setNonce(address, nonce+1)
 
 		if err := t.createAndSendAttempt(ctx, tx, address); err != nil {
 			return true, err
@@ -367,7 +365,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 		return false, err
 	}
 
-	confirmedTransactions, unconfirmedTransactionIDs, err := t.txStore.MarkTransactionsConfirmed(ctx, latestNonce, address)
+	confirmedTransactions, unconfirmedTransactionIDs, err := t.txStore.MarkConfirmedAndReorgedTransactions(ctx, latestNonce, address)
 	if err != nil {
 		return false, err
 	}
