@@ -472,7 +472,6 @@ func addHeader(code []byte) []byte {
 
 // ZK stack logic
 func ImproveAbigenOutputZks(path string, zkBinPath string) {
-
 	bs, err := os.ReadFile(path)
 	if err != nil {
 		Exit("Error while improving abigen output", err)
@@ -506,8 +505,7 @@ func ImproveAbigenOutputZks(path string, zkBinPath string) {
 func addZKSyncBin(fileNode *ast.File, contractName string, zkHexString string) *ast.File {
 	// zksync
 	newVarSpec := &ast.ValueSpec{
-		Names: []*ast.Ident{ast.NewIdent(fmt.Sprintf("%sZKBin", contractName))},
-		Type:  ast.NewIdent("string"),
+		Names: []*ast.Ident{ast.NewIdent(contractName + "ZKBin")},
 		Values: []ast.Expr{
 			&ast.BasicLit{
 				Kind:  token.STRING,
@@ -619,7 +617,7 @@ func updateTxReturnType(x ast.FuncDecl) {
 	}
 }
 
-// convert tx to &Transaction{Transaction: tx, Hash_zks: tx.Hash()}
+// convert tx to &Transaction{Transaction: tx, HashZks: tx.Hash()}
 func updateReturnStmt(x ast.FuncDecl) {
 	for _, stmt := range x.Body.List {
 		returnStmt, is := stmt.(*ast.ReturnStmt)
@@ -644,7 +642,7 @@ func updateReturnStmt(x ast.FuncDecl) {
 		}
 
 		hashField := &ast.KeyValueExpr{
-			Key: ast.NewIdent("Hash_zks"),
+			Key: ast.NewIdent("HashZks"),
 			Value: &ast.CallExpr{
 				Fun: &ast.SelectorExpr{
 					X:   ast.NewIdent("tx"),

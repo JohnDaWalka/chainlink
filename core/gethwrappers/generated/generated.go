@@ -28,19 +28,16 @@ func IsZKSync(backend bind.ContractBackend) bool {
 	// we dont care about the address
 	// we only care if the method is available
 	_, err := zkclient.MainContractAddress(context.Background())
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 type Transaction struct {
 	*types.Transaction
-	Hash_zks common.Hash
+	HashZks common.Hash
 }
 
 func (tx *Transaction) Hash() common.Hash {
-	return tx.Hash_zks
+	return tx.HashZks
 }
 
 func ConvertZkTxToEthTx(resp zktypes.TransactionResponse) *Transaction {
@@ -57,7 +54,7 @@ func ConvertZkTxToEthTx(resp zktypes.TransactionResponse) *Transaction {
 	}
 
 	tx := types.NewTx(dtx)
-	customTransaction := Transaction{Transaction: tx, Hash_zks: resp.Hash}
+	customTransaction := Transaction{Transaction: tx, HashZks: resp.Hash}
 	return &customTransaction
 }
 
@@ -92,17 +89,17 @@ func DeployContract(auth *bind.TransactOpts, contractAbi *abi.ABI, contractBytes
 		Calldata: constructor,
 	})
 	if err != nil {
-		return common.Address{}, nil, nil, fmt.Errorf("Error deploying contract: %v", err)
+		return common.Address{}, nil, nil, fmt.Errorf("Error deploying contract: %w", err)
 	}
 
 	receipt, err := zkclient.WaitMined(context.Background(), hash)
 	if err != nil {
-		return common.Address{}, nil, nil, fmt.Errorf("Error waiting for contract deployment: %v", err)
+		return common.Address{}, nil, nil, fmt.Errorf("Error waiting for contract deployment: %w", err)
 	}
 
 	tx, _, err := zkclient.TransactionByHash(context.Background(), hash)
 	if err != nil {
-		return common.Address{}, nil, nil, fmt.Errorf("Error getting transaction by hash: %v", err)
+		return common.Address{}, nil, nil, fmt.Errorf("Error getting transaction by hash: %w", err)
 	}
 
 	address := receipt.ContractAddress
