@@ -350,7 +350,7 @@ func (t *Txm) sendTransactionWithError(ctx context.Context, tx *types.Transactio
 			return err
 		}
 		if pendingNonce <= *tx.Nonce {
-			t.lggr.Debugf("Pending nonce for txID: %v didn't increase. PendingNonce: %d, TxNonce: %d", tx.ID, pendingNonce, tx.Nonce)
+			t.lggr.Debugf("Pending nonce for txID: %v didn't increase. PendingNonce: %d, TxNonce: %d", tx.ID, pendingNonce, *tx.Nonce)
 			return nil
 		}
 	}
