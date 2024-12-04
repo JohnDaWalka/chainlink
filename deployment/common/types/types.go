@@ -16,7 +16,11 @@ const (
 	CancellerManyChainMultisig deployment.ContractType = "CancellerManyChainMultiSig"
 	ProposerManyChainMultisig  deployment.ContractType = "ProposerManyChainMultiSig"
 	RBACTimelock               deployment.ContractType = "RBACTimelock"
-	LinkToken                  deployment.ContractType = "LinkToken"
+	// StaticLinkToken doesn't support burn/mint and should almost never
+	// be used, as it won't work with CCIP. Only use it if you know exactly
+	// what you are doing, generally BurnMintLinkToken should be used for new chains.
+	StaticLinkToken   deployment.ContractType = "StaticLinkToken"
+	BurnMintLinkToken deployment.ContractType = "BurnMintLinkToken"
 )
 
 type MCMSWithTimelockConfig struct {
