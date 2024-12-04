@@ -13,11 +13,9 @@ EIP1559DynamicFees = false
 LimitDefault = 100_000_000
 # value given by ds&a
 FeeCapDefault = '2000 gwei'
-# estimators typically estimated < 100gwei but in testing setting below this threshold set off a slew of stale reports and errors
-# this value is subject to change prior to QA testing
-PriceDefault = '100 gwei'
+PriceDefault = '70 gwei'
 PriceMax = '2000 gwei'
-PriceMin = '100 gwei'
+PriceMin = '70 gwei'
 # bump gas aggressively to avoid high amounts of transmit errors
 BumpThreshold = 1
 BumpPercent = 40
