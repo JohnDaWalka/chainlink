@@ -25,7 +25,7 @@ const (
 	maxInFlightSubset           int           = 3
 	maxAllowedAttempts          uint16        = 10
 	pendingNonceDefaultTimeout  time.Duration = 30 * time.Second
-	pendingNonceRecheckInterval time.Duration = 2 * time.Second
+	pendingNonceRecheckInterval time.Duration = 1 * time.Second
 )
 
 type Client interface {

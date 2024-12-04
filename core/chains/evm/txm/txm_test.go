@@ -35,11 +35,10 @@ func TestLifecycle(t *testing.T) {
 	keystore := mocks.NewKeystore(t)
 
 	t.Run("retries if initial pending nonce call fails", func(t *testing.T) {
-		config := Config{BlockTime: 1 * time.Minute}
-		txStore := mocks.NewTxStore(t)
-		txStore.On("FetchUnconfirmedTransactionAtNonceWithCount", mock.Anything, mock.Anything, mock.Anything).Return(nil, 20, nil)
-		keystore.On("EnabledAddressesForChain", mock.Anything, mock.Anything).Return([]common.Address{address1}, nil).Once()
 		lggr, observedLogs := logger.TestObserved(t, zap.DebugLevel)
+		config := Config{BlockTime: 1 * time.Minute}
+		txStore := storage.NewInMemoryStoreManager(lggr, testutils.FixtureChainID)
+		keystore.On("EnabledAddressesForChain", mock.Anything, mock.Anything).Return([]common.Address{address1}, nil).Once()
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, nil, txStore, nil, config, keystore)
 		client.On("PendingNonceAt", mock.Anything, address1).Return(uint64(0), errors.New("error")).Once()
 		client.On("PendingNonceAt", mock.Anything, address1).Return(uint64(0), nil).Once()
