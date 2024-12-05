@@ -18,14 +18,13 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/seth"
-
 	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	k8s_config "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/conversions"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/osutil"
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	a_config "github.com/smartcontractkit/chainlink/integration-tests/testconfig/automation"
 	ccip_config "github.com/smartcontractkit/chainlink/integration-tests/testconfig/ccip"

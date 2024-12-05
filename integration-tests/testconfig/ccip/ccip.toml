@@ -122,6 +122,24 @@ FeedChainSelector = '3379446385462418246' # for chain-1337
 NoOfPluginNodes = 4
 NoOfBootstraps = 1
 
+[CCIP.PrivateAnvilEthNetworks.SIMULATED_1]
+type = "anvil"
+chain_id = "1337"
+port = "8545"
+docker_cmd_params = ["-b", "1"]
+
+[CCIP.PrivateAnvilEthNetworks.SIMULATED_2]
+type = "anvil"
+chain_id = "2337"
+port = "8546"
+docker_cmd_params = ["-b", "1"]
+
+[CCIP.PrivateAnvilEthNetworks.SIMULATED_3]
+type = "anvil"
+chain_id = "3337"
+port = "8547"
+docker_cmd_params = ["-b", "1"]
+
 [CCIP.PrivateEthereumNetworks.SIMULATED_1]
 # either eth1 or eth2 (for post-Merge); for eth2 Prysm is used for consensus layer.
 ethereum_version = "eth1"

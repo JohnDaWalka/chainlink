@@ -17,6 +17,7 @@ func TestInitialDeployOnLocal(t *testing.T) {
 	t.Parallel()
 	lggr := logger.TestLogger(t)
 	config := &changeset.TestConfigs{}
+
 	tenv, _, _ := testsetups.NewLocalDevEnvironmentWithDefaultPrice(t, lggr, config)
 	e := tenv.Env
 	state, err := changeset.LoadOnchainState(e)

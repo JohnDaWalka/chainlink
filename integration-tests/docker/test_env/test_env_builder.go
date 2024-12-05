@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
+	ctfv2_blockchain "github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
 	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
@@ -63,6 +65,7 @@ type CLTestEnvBuilder struct {
 	cleanUpCustomFn                 func()
 	evmNetworkOption                []EVMNetworkOption
 	privateEthereumNetworks         []*ctf_config.EthereumNetworkConfig
+	privateAnvilEthNetworks []*ctfv2_blockchain.Input
 	testConfig                      ctf_config.GlobalTestConfig
 	chainlinkNodeLogScannerSettings *ChainlinkNodeLogScannerSettings
 }
@@ -172,6 +175,11 @@ func (b *CLTestEnvBuilder) WithPrivateEthereumNetwork(en ctf_config.EthereumNetw
 
 func (b *CLTestEnvBuilder) WithPrivateEthereumNetworks(ens []*ctf_config.EthereumNetworkConfig) *CLTestEnvBuilder {
 	b.privateEthereumNetworks = ens
+	return b
+}
+
+func (b *CLTestEnvBuilder) WithPrivateAnvilEthNetworks(ens []*ctfv2_blockchain.Input) *CLTestEnvBuilder {
+	b.privateAnvilEthNetworks = ens
 	return b
 }
 
@@ -416,12 +424,38 @@ func (b *CLTestEnvBuilder) Build() (*CLClusterTestEnv, error) {
 			return nil, err
 		}
 	}
+
 	// in this case we will use the builder only to start chains, not the cluster, because currently we support only 1 network config per cluster
+	if len(b.privateAnvilEthNetworks) > 1 {
+		b.te.rpcProviders = make(map[int64]*test_env.RpcProvider)
+		for _, network := range b.privateAnvilEthNetworks {
+			bc, err := ctfv2_blockchain.NewBlockchainNetwork(network)
+			if err != nil {
+				return nil, err
+			}
+			b.te.EVMAnvilNetworks = append(b.te.EVMAnvilNetworks, bc)
+			rpcProvider := test_env.NewRPCProvider(
+				[]string{bc.Nodes[0].DockerInternalHTTPUrl},
+				[]string{bc.Nodes[0].DockerInternalWSUrl},
+				[]string{bc.Nodes[0].HostHTTPUrl},
+				[]string{bc.Nodes[0].HostWSUrl},
+			)
+			chainID, err := strconv.ParseInt(network.ChainID, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid ChainID: %v", err)
+			}
+			b.te.rpcProviders[chainID] = &rpcProvider
+		}
+		b.te.isSimulatedNetwork = true
+
+		return b.te, nil
+	}
 	if len(b.privateEthereumNetworks) > 1 {
 		b.te.rpcProviders = make(map[int64]*test_env.RpcProvider)
 		b.te.EVMNetworks = make([]*blockchain.EVMNetwork, 0)
 		for _, en := range b.privateEthereumNetworks {
 			en.DockerNetworkNames = []string{b.te.DockerNetwork.Name}
+
 			networkConfig, rpcProvider, err := b.te.StartEthereumNetwork(en)
 			if err != nil {
 				return nil, err

@@ -15,8 +15,9 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	ctfv2_blockchain "github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
@@ -388,6 +389,14 @@ func GenerateTestRMNConfig(t *testing.T, nRMNNodes int, tenv changeset.DeployedE
 	return rmnConfig
 }
 
+type CTFV2Config struct {
+	BlockchainNetworks []*ctfv2_blockchain.Input `toml:"Networks" validate:"required"`
+	//ChainA  *ctfv2_blockchain.Input `toml:"SIMULATED_1" validate:"required"`
+	//ChainB  *ctfv2_blockchain.Input `toml:"SIMULATED_2" validate:"required"`
+	//ChainC  *ctfv2_blockchain.Input `toml:"SIMULATED_3" validate:"required"`
+	NodeSet *ns.Input `toml:"nodeset" validate:"required"`
+}
+
 // CreateDockerEnv creates a new test environment with simulated private ethereum networks and job distributor
 // It returns the EnvironmentConfig which holds the chain config and JD config
 // The test environment is then used to start chainlink nodes
@@ -402,7 +411,6 @@ func CreateDockerEnv(t *testing.T) (
 
 	cfg, err := tc.GetChainAndTestTypeSpecificConfig("Smoke", tc.CCIP)
 	require.NoError(t, err, "Error getting config")
-
 	evmNetworks := networks.MustGetSelectedNetworkConfig(cfg.GetNetworkConfig())
 
 	// find out if the selected networks are provided with PrivateEthereumNetworks configs
@@ -411,6 +419,13 @@ func CreateDockerEnv(t *testing.T) (
 	for _, name := range cfg.GetNetworkConfig().SelectedNetworks {
 		if network, exists := cfg.CCIP.PrivateEthereumNetworks[name]; exists {
 			privateEthereumNetworks = append(privateEthereumNetworks, network)
+		}
+	}
+
+	var privateAnvilNetworks []*ctfv2_blockchain.Input
+	for _, name := range cfg.GetNetworkConfig().SelectedNetworks {
+		if network, exists := cfg.CCIP.PrivateAnvilEthNetworks[name]; exists {
+			privateAnvilNetworks = append(privateAnvilNetworks, network)
 		}
 	}
 
@@ -426,12 +441,27 @@ func CreateDockerEnv(t *testing.T) (
 	if len(privateEthereumNetworks) > 0 {
 		builder = builder.WithPrivateEthereumNetworks(privateEthereumNetworks)
 	}
+	if len(privateAnvilNetworks) > 0 {
+		builder = builder.WithPrivateAnvilEthNetworks(privateAnvilNetworks)
+	}
 	env, err := builder.Build()
 	require.NoError(t, err, "Error building test environment")
 
 	// we need to update the URLs for the simulated networks to the private chain RPCs in the docker test environment
 	// so that the chainlink nodes and rmn nodes can internally connect to the chain
 	env.EVMNetworks = []*blockchain.EVMNetwork{}
+	//for i, net := range evmNetworks {
+	//	// if network is simulated, update the URLs with private chain RPCs in the docker test environment
+	//	// so that nodes can internally connect to the chain
+	//	if net.Simulated {
+	//		rpcProvider, err := env.GetRpcProvider(net.ChainID)
+	//		require.NoError(t, err, "Error getting rpc provider")
+	//		evmNetworks[i].HTTPURLs = rpcProvider.PrivateHttpUrls()
+	//		evmNetworks[i].URLs = rpcProvider.PrivateWsUrsl()
+	//	}
+	//	env.EVMNetworks = append(env.EVMNetworks, &evmNetworks[i])
+	//}
+
 	for i, net := range evmNetworks {
 		// if network is simulated, update the URLs with private chain RPCs in the docker test environment
 		// so that nodes can internally connect to the chain

@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	tc "github.com/testcontainers/testcontainers-go"
 
+	ctfv2_blockchain "github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env/job_distributor"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
@@ -44,6 +45,7 @@ type CLClusterTestEnv struct {
 	MockAdapter            *test_env.Killgrave
 	PrivateEthereumConfigs []*ctf_config.EthereumNetworkConfig
 	EVMNetworks            []*blockchain.EVMNetwork
+	EVMAnvilNetworks []*ctfv2_blockchain.Output
 	rpcProviders           map[int64]*test_env.RpcProvider
 	JobDistributor         *job_distributor.Component
 	l                      zerolog.Logger

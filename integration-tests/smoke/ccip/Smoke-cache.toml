@@ -1,0 +1,72 @@
+[[Networks]]
+type = 'anvil'
+image = 'f4hrenh9it/foundry:latest'
+pull_image = false
+port = '8545'
+port_ws = ''
+chain_id = '1337'
+docker_cmd_params = ['-b', '1']
+
+[Networks.out]
+use_cache = true
+family = 'evm'
+container_name = 'blockchain-node-dc568'
+chain_id = '1337'
+
+[[Networks.out.nodes]]
+ws_url = 'ws://127.0.0.1:8545'
+http_url = 'http://127.0.0.1:8545'
+docker_internal_ws_url = 'ws://blockchain-node-dc568:8545'
+docker_internal_http_url = 'http://blockchain-node-dc568:8545'
+
+[[Networks]]
+type = 'anvil'
+image = 'f4hrenh9it/foundry:latest'
+pull_image = false
+port = '8546'
+port_ws = ''
+chain_id = '2337'
+docker_cmd_params = ['-b', '1']
+
+[Networks.out]
+use_cache = true
+family = 'evm'
+container_name = 'blockchain-node-cb49a'
+chain_id = '2337'
+
+[[Networks.out.nodes]]
+ws_url = 'ws://127.0.0.1:8546'
+http_url = 'http://127.0.0.1:8546'
+docker_internal_ws_url = 'ws://blockchain-node-cb49a:8546'
+docker_internal_http_url = 'http://blockchain-node-cb49a:8546'
+
+[nodeset]
+nodes = 5
+http_port_range_start = 0
+p2p_port_range_start = 0
+override_mode = 'all'
+
+[nodeset.db]
+image = 'postgres:12.0'
+port = 0
+volume_name = ''
+databases = 0
+pull_image = false
+
+[[nodeset.node_specs]]
+[nodeset.node_specs.node]
+image = 'public.ecr.aws/chainlink/chainlink:v2.17.0'
+name = ''
+docker_file = ''
+docker_ctx = ''
+docker_image_name = ''
+pull_image = false
+capabilities = []
+capabilities_container_dir = ''
+test_config_overrides = ''
+user_config_overrides = "[Feature]\nFeedsManager = true\nLogPoller = true\nUICSAKeys = true\n\n[Log]\nLevel = 'debug'\nJSONConsole = true\n\n[Log.File]\nMaxSize = '0b'\n\n[WebServer]\nAllowOrigins = '*'\nHTTPPort = 6688\nSecureCookies = false\nHTTPWriteTimeout = '3m'\nSessionTimeout = '999h0m0s'\n\n[WebServer.RateLimit]\nAuthenticated = 2000\nUnauthenticated = 1000\n\n[WebServer.TLS]\nHTTPSPort = 0\n\n[Database]\nMaxIdleConns = 20\nMaxOpenConns = 40\nMigrateOnStartup = true\n\n[OCR2]\nEnabled = true\nContractPollInterval = '5s'\n\n[OCR]\nEnabled = false\nDefaultTransactionQueueDepth = 200\n\n[P2P]\n[P2P.V2]\nEnabled = true\nListenAddresses = ['0.0.0.0:6690']\nAnnounceAddresses = ['0.0.0.0:6690']\nDeltaDial = '500ms'\nDeltaReconcile = '5s'\n"
+test_secrets_overrides = ''
+user_secrets_overrides = ''
+port = 0
+p2p_port = 0
+custom_ports = []

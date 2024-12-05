@@ -8,6 +8,7 @@ import (
 	"github.com/AlekSi/pointer"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
+	ctfv2_blockchain "github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
@@ -35,6 +36,7 @@ var (
 
 type Config struct {
 	PrivateEthereumNetworks map[string]*ctfconfig.EthereumNetworkConfig `toml:",omitempty"`
+	PrivateAnvilEthNetworks map[string]*ctfv2_blockchain.Input `toml:",omitempty"`
 	CLNode                  *NodeConfig                                 `toml:",omitempty"`
 	JobDistributorConfig    JDConfig                                    `toml:",omitempty"`
 	HomeChainSelector       *string                                     `toml:",omitempty"`
