@@ -5,13 +5,13 @@ import (
 	"fmt"
 
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 )
 
 type NopView struct {
 	// NodeID is the unique identifier of the node
 	NodeID       string                `json:"nodeID"`
-	PeerID       string                `json:"peerID"`
 	IsBootstrap  bool                  `json:"isBootstrap"`
 	OCRKeys      map[string]OCRKeyView `json:"ocrKeys"`
 	PayeeAddress string                `json:"payeeAddress"`
@@ -21,6 +21,7 @@ type NopView struct {
 }
 
 type OCRKeyView struct {
+	NodeID                    string `json:"nodeID"`
 	OffchainPublicKey         string `json:"offchainPublicKey"`
 	OnchainPublicKey          string `json:"onchainPublicKey"`
 	PeerID                    string `json:"peerID"`
@@ -50,7 +51,6 @@ func GenerateNopsView(nodeIds []string, oc deployment.OffchainClient) (map[strin
 		}
 		nop := NopView{
 			NodeID:       node.NodeID,
-			PeerID:       node.PeerID.String(),
 			IsBootstrap:  node.IsBootstrap,
 			OCRKeys:      make(map[string]OCRKeyView),
 			PayeeAddress: node.AdminAddr,
@@ -60,6 +60,7 @@ func GenerateNopsView(nodeIds []string, oc deployment.OffchainClient) (map[strin
 		}
 		for details, ocrConfig := range node.SelToOCRConfig {
 			nop.OCRKeys[details.ChainName] = OCRKeyView{
+				NodeID:                    node.NodeID,
 				OffchainPublicKey:         fmt.Sprintf("%x", ocrConfig.OffchainPublicKey[:]),
 				OnchainPublicKey:          fmt.Sprintf("%x", ocrConfig.OnchainPublicKey[:]),
 				PeerID:                    ocrConfig.PeerID.String(),
