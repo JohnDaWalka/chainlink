@@ -31,7 +31,7 @@ type Registry struct {
 }
 
 func (r *Registry) Remove(ctx context.Context, ID string) error {
-	panic("unimplemented")
+	return errors.New("unimplemented")
 }
 
 func (r *Registry) LocalNode(ctx context.Context) (capabilities.Node, error) {
