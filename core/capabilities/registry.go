@@ -30,6 +30,10 @@ type Registry struct {
 	mu               sync.RWMutex
 }
 
+func (r *Registry) Remove(ctx context.Context, ID string) error {
+	panic("unimplemented")
+}
+
 func (r *Registry) LocalNode(ctx context.Context) (capabilities.Node, error) {
 	if r.metadataRegistry == nil {
 		return capabilities.Node{}, errors.New("metadataRegistry information not available")
