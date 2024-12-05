@@ -43,7 +43,7 @@ compileContract () {
   zksolc --overwrite -O3 --metadata-hash none \
       -o "$ROOT"/contracts/zksolc/v$ZKSOLC_VERSION/"$contract" \
       --bin --allow-paths "$ROOT"/contracts/src/v0.8 \
-      --metadata --metadata-literal \
+      --metadata-literal \
       --evm-version paris \
       "$ROOT"/contracts/src/v0.8/"$1"  
 }
