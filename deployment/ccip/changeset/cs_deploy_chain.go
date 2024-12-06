@@ -214,7 +214,7 @@ func deployChainContracts(
 					false,
 				)
 				return deployment.ContractDeploy[*maybe_revert_message_receiver.MaybeRevertMessageReceiver]{
-					receiverAddr, receiver, tx, deployment.NewTypeAndVersion(CCIPReceiver, deployment.Version1_0_0), err2,
+					receiverAddr, receiver, tx.Hash(), deployment.NewTypeAndVersion(CCIPReceiver, deployment.Version1_0_0), err2,
 				}
 			})
 		if err != nil {
@@ -238,7 +238,7 @@ func deployChainContracts(
 					common.HexToAddress("0x0"),
 				)
 				return deployment.ContractDeploy[*rmn_remote.RMNRemote]{
-					rmnRemoteAddr, rmnRemote, tx, deployment.NewTypeAndVersion(RMNRemote, deployment.Version1_6_0_dev), err2,
+					rmnRemoteAddr, rmnRemote, tx.Hash(), deployment.NewTypeAndVersion(RMNRemote, deployment.Version1_6_0_dev), err2,
 				}
 			})
 		if err != nil {
@@ -282,7 +282,7 @@ func deployChainContracts(
 					rmnRemoteContract.Address(),
 				)
 				return deployment.ContractDeploy[*rmn_proxy_contract.RMNProxyContract]{
-					rmnProxyAddr, rmnProxy, tx, deployment.NewTypeAndVersion(ARMProxy, deployment.Version1_6_0_dev), err2,
+					rmnProxyAddr, rmnProxy, tx.Hash(), deployment.NewTypeAndVersion(ARMProxy, deployment.Version1_6_0_dev), err2,
 				}
 			})
 		if err != nil {
@@ -304,7 +304,7 @@ func deployChainContracts(
 					rmnProxyContract.Address(),
 				)
 				return deployment.ContractDeploy[*router.Router]{
-					routerAddr, routerC, tx2, deployment.NewTypeAndVersion(TestRouter, deployment.Version1_2_0), err2,
+					routerAddr, routerC, tx2.Hash(), deployment.NewTypeAndVersion(TestRouter, deployment.Version1_2_0), err2,
 				}
 			})
 		if err != nil {
@@ -326,7 +326,7 @@ func deployChainContracts(
 					[]common.Address{}, // Need to add onRamp after
 				)
 				return deployment.ContractDeploy[*nonce_manager.NonceManager]{
-					nonceManagerAddr, nonceManager, tx2, deployment.NewTypeAndVersion(NonceManager, deployment.Version1_6_0_dev), err2,
+					nonceManagerAddr, nonceManager, tx2.Hash(), deployment.NewTypeAndVersion(NonceManager, deployment.Version1_6_0_dev), err2,
 				}
 			})
 		if err != nil {
@@ -367,7 +367,7 @@ func deployChainContracts(
 					[]fee_quoter.FeeQuoterDestChainConfigArgs{},
 				)
 				return deployment.ContractDeploy[*fee_quoter.FeeQuoter]{
-					prAddr, pr, tx2, deployment.NewTypeAndVersion(FeeQuoter, deployment.Version1_6_0_dev), err2,
+					prAddr, pr, tx2.Hash(), deployment.NewTypeAndVersion(FeeQuoter, deployment.Version1_6_0_dev), err2,
 				}
 			})
 		if err != nil {
@@ -399,7 +399,7 @@ func deployChainContracts(
 					[]onramp.OnRampDestChainConfigArgs{},
 				)
 				return deployment.ContractDeploy[*onramp.OnRamp]{
-					onRampAddr, onRamp, tx2, deployment.NewTypeAndVersion(OnRamp, deployment.Version1_6_0_dev), err2,
+					onRampAddr, onRamp, tx2.Hash(), deployment.NewTypeAndVersion(OnRamp, deployment.Version1_6_0_dev), err2,
 				}
 			})
 		if err != nil {
@@ -432,7 +432,7 @@ func deployChainContracts(
 					[]offramp.OffRampSourceChainConfigArgs{},
 				)
 				return deployment.ContractDeploy[*offramp.OffRamp]{
-					Address: offRampAddr, Contract: offRamp, Tx: tx2, Tv: deployment.NewTypeAndVersion(OffRamp, deployment.Version1_6_0_dev), Err: err2,
+					Address: offRampAddr, Contract: offRamp, TxHash: tx2.Hash(), Tv: deployment.NewTypeAndVersion(OffRamp, deployment.Version1_6_0_dev), Err: err2,
 				}
 			})
 		if err != nil {

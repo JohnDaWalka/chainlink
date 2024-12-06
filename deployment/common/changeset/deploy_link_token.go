@@ -46,7 +46,7 @@ func deployLinkTokenContract(
 			return deployment.ContractDeploy[*link_token.LinkToken]{
 				Address:  linkTokenAddr,
 				Contract: linkToken,
-				Tx:       tx,
+				TxHash:   tx.Hash(),
 				Tv:       deployment.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0),
 				Err:      err2,
 			}

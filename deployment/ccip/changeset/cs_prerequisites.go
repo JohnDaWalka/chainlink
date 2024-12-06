@@ -149,7 +149,7 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 					chain.Client,
 				)
 				return deployment.ContractDeploy[*mock_rmn_contract.MockRMNContract]{
-					rmnAddr, rmn, tx2, deployment.NewTypeAndVersion(MockRMN, deployment.Version1_0_0), err2,
+					rmnAddr, rmn, tx2.Hash(), deployment.NewTypeAndVersion(MockRMN, deployment.Version1_0_0), err2,
 				}
 			})
 		if err != nil {
@@ -165,7 +165,7 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 					rmn.Address,
 				)
 				return deployment.ContractDeploy[*rmn_proxy_contract.RMNProxyContract]{
-					rmnProxyAddr, rmnProxy, tx2, deployment.NewTypeAndVersion(ARMProxy, deployment.Version1_0_0), err2,
+					rmnProxyAddr, rmnProxy, tx2.Hash(), deployment.NewTypeAndVersion(ARMProxy, deployment.Version1_0_0), err2,
 				}
 			})
 		if err != nil {
@@ -182,7 +182,7 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 					chain.DeployerKey,
 					chain.Client)
 				return deployment.ContractDeploy[*token_admin_registry.TokenAdminRegistry]{
-					tokenAdminRegistryAddr, tokenAdminRegistry, tx2, deployment.NewTypeAndVersion(TokenAdminRegistry, deployment.Version1_5_0), err2,
+					tokenAdminRegistryAddr, tokenAdminRegistry, tx2.Hash(), deployment.NewTypeAndVersion(TokenAdminRegistry, deployment.Version1_5_0), err2,
 				}
 			})
 		if err != nil {
@@ -202,7 +202,7 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 					chain.Client,
 					tokenAdminReg.Address())
 				return deployment.ContractDeploy[*registry_module_owner_custom.RegistryModuleOwnerCustom]{
-					regModAddr, regMod, tx2, deployment.NewTypeAndVersion(RegistryModule, deployment.Version1_5_0), err2,
+					regModAddr, regMod, tx2.Hash(), deployment.NewTypeAndVersion(RegistryModule, deployment.Version1_5_0), err2,
 				}
 			})
 		if err != nil {
@@ -241,7 +241,7 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 					chain.Client,
 				)
 				return deployment.ContractDeploy[*weth9.WETH9]{
-					weth9Addr, weth9c, tx2, deployment.NewTypeAndVersion(WETH9, deployment.Version1_0_0), err2,
+					weth9Addr, weth9c, tx2.Hash(), deployment.NewTypeAndVersion(WETH9, deployment.Version1_0_0), err2,
 				}
 			})
 		if err != nil {
@@ -264,7 +264,7 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 					rmnProxy.Address(),
 				)
 				return deployment.ContractDeploy[*router.Router]{
-					routerAddr, routerC, tx2, deployment.NewTypeAndVersion(Router, deployment.Version1_2_0), err2,
+					routerAddr, routerC, tx2.Hash(), deployment.NewTypeAndVersion(Router, deployment.Version1_2_0), err2,
 				}
 			})
 		if err != nil {
@@ -284,7 +284,7 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 					chain.Client,
 				)
 				return deployment.ContractDeploy[*multicall3.Multicall3]{
-					multicall3Addr, multicall3Wrapper, tx2, deployment.NewTypeAndVersion(Multicall3, deployment.Version1_0_0), err2,
+					multicall3Addr, multicall3Wrapper, tx2.Hash(), deployment.NewTypeAndVersion(Multicall3, deployment.Version1_0_0), err2,
 				}
 			})
 		if err != nil {

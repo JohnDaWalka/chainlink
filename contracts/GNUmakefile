@@ -37,6 +37,16 @@ pnpmdep: ## Install solidity contract dependencies through pnpm
 abigen: ## Build & install abigen.
 	../tools/bin/build_abigen
 
+
+# env var example
+#		export ZKSOLC_VERSION=1.5.6
+#		make setup_zksolc
+# make call example
+# 		make ZKSOLC_VERSION=1.5.6 setup_zksolc
+.PHONY: setup_zksolc
+setup_zksolc: ## Download and install zksolc
+	../tools/bin/setup_zksolc.sh $(ZKSOLC_VERSION)
+
 .PHONY: mockery
 mockery: $(mockery) ## Install mockery.
 	go install github.com/vektra/mockery/v2@v2.43.2
@@ -76,7 +86,7 @@ ccip-lcov:
 # make call example
 # 		make FOUNDRY_PROFILE=llo-feeds wrappers
 .PHONY: wrappers
-wrappers: pnpmdep mockery abigen ## Recompiles solidity contracts and their go wrappers.
+wrappers: pnpmdep mockery abigen setup_zksolc ## Recompiles solidity contracts and their go wrappers.
 	./scripts/native_solc_compile_all_$(FOUNDRY_PROFILE)
 	go generate ../core/gethwrappers/$(FOUNDRY_PROFILE)
 
@@ -84,7 +94,7 @@ wrappers: pnpmdep mockery abigen ## Recompiles solidity contracts and their go w
 # assumption that native_solc_compile_all contains sub-calls to each product, and
 # go_generate does the same.
 .PHONY: wrappers-all
-wrappers-all: pnpmdep mockery abigen ## Recompiles solidity contracts and their go wrappers.
+wrappers-all: pnpmdep mockery abigen setup_zksolc ## Recompiles solidity contracts and their go wrappers.
 	# go_generate contains a call to  compile all contracts before generating wrappers
 	go generate ../core/gethwrappers/go_generate.go
 

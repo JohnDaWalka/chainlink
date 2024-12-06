@@ -169,7 +169,7 @@ func DeployUSDC(
 			return deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
 				Address:  tokenAddress,
 				Contract: tokenContract,
-				Tx:       tx,
+				TxHash:   tx.Hash(),
 				Tv:       deployment.NewTypeAndVersion(USDCToken, deployment.Version1_0_0),
 				Err:      err2,
 			}
@@ -201,7 +201,7 @@ func DeployUSDC(
 			return deployment.ContractDeploy[*mock_usdc_token_transmitter.MockE2EUSDCTransmitter]{
 				Address:  transmitterAddress,
 				Contract: transmitterContract,
-				Tx:       tx,
+				TxHash:   tx.Hash(),
 				Tv:       deployment.NewTypeAndVersion(USDCMockTransmitter, deployment.Version1_0_0),
 				Err:      err2,
 			}
@@ -224,7 +224,7 @@ func DeployUSDC(
 			return deployment.ContractDeploy[*mock_usdc_token_messenger.MockE2EUSDCTokenMessenger]{
 				Address:  messengerAddress,
 				Contract: messengerContract,
-				Tx:       tx,
+				TxHash:   tx.Hash(),
 				Tv:       deployment.NewTypeAndVersion(USDCTokenMessenger, deployment.Version1_0_0),
 				Err:      err2,
 			}
@@ -249,7 +249,7 @@ func DeployUSDC(
 			return deployment.ContractDeploy[*usdc_token_pool.USDCTokenPool]{
 				Address:  tokenPoolAddress,
 				Contract: tokenPoolContract,
-				Tx:       tx,
+				TxHash:   tx.Hash(),
 				Tv:       deployment.NewTypeAndVersion(USDCTokenPool, deployment.Version1_0_0),
 				Err:      err2,
 			}

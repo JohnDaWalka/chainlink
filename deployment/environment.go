@@ -148,6 +148,7 @@ func ConfirmIfNoError(chain Chain, tx *types.Transaction, err error) (uint64, er
 		}
 		return 0, err
 	}
+
 	return chain.Confirm(tx)
 }
 
