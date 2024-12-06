@@ -76,9 +76,10 @@ jobs:
           echo $GITHUB_WORKSPACE
 
       - name: Deploy and validate CRIB Environment for Core
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@d4d9ce3fad044642d8d2f7ae5aca9f8c78b0073a # crib-deploy-environment@2.1.2
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@main
         id: deploy-crib
         with:
+          crib-repo-ref: main
           github-token: ${{ steps.token.outputs.access-token }}
           api-gateway-host: ${{ secrets.AWS_API_GW_HOST_K8S_STAGE }}
           aws-region: ${{ secrets.AWS_REGION }}
