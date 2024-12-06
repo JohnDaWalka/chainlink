@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -142,12 +143,12 @@ func DeployContract[C any](
 		lggr.Errorw("Failed to deploy contract", "err", contractDeploy.Err)
 		return nil, contractDeploy.Err
 	}
-	// _, err := chain.Confirm(contractDeploy.Tx)
-	// if err != nil {
-	// 	lggr.Errorw("Failed to confirm deployment", "err", err)
-	// 	return nil, err
-	// }
-	err := addressBook.Save(chain.Selector, contractDeploy.Address.String(), contractDeploy.Tv)
+	err := waitForMined(context.Background(), chain.Client, contractDeploy.TxHash, true)
+	if err != nil {
+		lggr.Errorw("Failed to confirm deployment", "err", err)
+		return nil, err
+	}
+	err = addressBook.Save(chain.Selector, contractDeploy.Address.String(), contractDeploy.Tv)
 	if err != nil {
 		lggr.Errorw("Failed to save contract address", "err", err)
 		return nil, err
@@ -164,4 +165,31 @@ func IsValidChainSelector(cs uint64) error {
 		return fmt.Errorf("invalid chain selector: %d - %w", cs, err)
 	}
 	return nil
+}
+
+const (
+	RetryTiming       = 5 * time.Second
+	CrossChainTimout  = 5 * time.Minute
+	TxInclusionTimout = 3 * time.Minute
+)
+
+func waitForMined(ctx context.Context, client bind.DeployBackend, hash common.Hash, shouldSucceed bool) error {
+	maxIterations := TxInclusionTimout / RetryTiming
+	for i := 0; i < int(maxIterations); i++ {
+		receipt, _ := client.TransactionReceipt(context.Background(), hash)
+
+		if receipt != nil {
+			if shouldSucceed && receipt.Status == 0 {
+				// GetLogger(ctx).Debug().Msgf("[MINING] ERROR tx reverted %s", hash.Hex())
+				return errors.New("tx reverted")
+			} else if !shouldSucceed && receipt.Status != 0 {
+				// GetLogger(ctx).Debug().Msgf("[MINING] ERROR expected tx to revert %s", hash.Hex())
+				return errors.New("tx did not revert")
+			}
+			return nil
+		}
+
+		time.Sleep(RetryTiming)
+	}
+	return errors.New("no tx found within the given timeout")
 }
