@@ -22,7 +22,7 @@ import (
 const (
 	broadcastInterval           time.Duration = 30 * time.Second
 	maxInFlightTransactions     int           = 16
-	maxInFlightSubset           int           = 3
+	maxInFlightSubset           int           = 5
 	maxAllowedAttempts          uint16        = 10
 	pendingNonceDefaultTimeout  time.Duration = 30 * time.Second
 	pendingNonceRecheckInterval time.Duration = 1 * time.Second
@@ -300,11 +300,11 @@ func (t *Txm) broadcastTransaction(ctx context.Context, address common.Address) 
 			return false, err
 		}
 
-		// Optimistically send up to 1/maxInFlightSubset of the maxInFlightTransactions. After that threshold, broadcast more cautiously
-		// by checking the pending nonce so no more than maxInFlightTransactions/3 can get stuck simultaneously i.e. due
+		// Optimistically send up to maxInFlightSubset of the maxInFlightTransactions. After that threshold, broadcast more cautiously
+		// by checking the pending nonce so no more than maxInFlightSubset can get stuck simultaneously i.e. due
 		// to insufficient balance. We're making this trade-off to avoid storing stuck transactions and making unnecessary
 		// RPC calls. The upper limit is always maxInFlightTransactions regardless of the pending nonce.
-		if unconfirmedCount >= maxInFlightTransactions/maxInFlightSubset {
+		if unconfirmedCount >= maxInFlightSubset {
 			if unconfirmedCount > maxInFlightTransactions {
 				t.lggr.Warnf("Reached transaction limit: %d for unconfirmed transactions", maxInFlightTransactions)
 				return true, nil
@@ -433,7 +433,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 				tx.PrettyPrintWithAttempts())
 		}
 
-		if time.Since(tx.LastBroadcastAt) > (t.config.BlockTime*time.Duration(t.config.RetryBlockThreshold)) || tx.LastBroadcastAt.IsZero() {
+		if tx.LastBroadcastAt == nil || time.Since(*tx.LastBroadcastAt) > (t.config.BlockTime*time.Duration(t.config.RetryBlockThreshold)) {
 			// TODO: add optional graceful bumping strategy
 			t.lggr.Info("Rebroadcasting attempt for txID: ", tx.ID)
 			return false, t.createAndSendAttempt(ctx, tx, address)
@@ -454,8 +454,8 @@ func extractMetrics(txs []*types.Transaction, chainID *big.Int) []uint64 {
 	confirmedTxIDs := make([]uint64, 0, len(txs))
 	for _, tx := range txs {
 		confirmedTxIDs = append(confirmedTxIDs, tx.ID)
-		if !tx.InitialBroadcastAt.IsZero() {
-			promTimeUntilTxConfirmed.WithLabelValues(chainID.String()).Observe(float64(time.Since(tx.InitialBroadcastAt)))
+		if tx.InitialBroadcastAt != nil {
+			promTimeUntilTxConfirmed.WithLabelValues(chainID.String()).Observe(float64(time.Since(*tx.InitialBroadcastAt)))
 		}
 	}
 	return confirmedTxIDs

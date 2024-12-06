@@ -114,6 +114,7 @@ func (a *attemptBuilder) newLegacyAttempt(ctx context.Context, tx *types.Transac
 		Fee:               gas.EvmFee{GasPrice: gasPrice},
 		Hash:              signedTx.Hash(),
 		GasLimit:          estimatedGasLimit,
+		Type:              evmtypes.LegacyTxType,
 		SignedTransaction: signedTx,
 	}
 

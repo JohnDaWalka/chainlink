@@ -52,7 +52,7 @@ func (s *stuckTxDetector) DetectStuckTransaction(ctx context.Context, tx *types.
 
 func (s *stuckTxDetector) timeBasedDetection(tx *types.Transaction) bool {
 	threshold := (s.config.BlockTime * time.Duration(s.config.StuckTxBlockThreshold))
-	if time.Since(tx.LastBroadcastAt) > threshold && !tx.LastBroadcastAt.IsZero() {
+	if tx.LastBroadcastAt != nil && time.Since(*tx.LastBroadcastAt) > threshold {
 		s.lggr.Debugf("TxID: %v last broadcast was: %v which is more than the max configured duration: %v. Transaction is now considered stuck and will be purged.",
 			tx.ID, tx.LastBroadcastAt, threshold)
 		return true

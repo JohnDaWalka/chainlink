@@ -138,11 +138,11 @@ func TestCreateTransaction(t *testing.T) {
 		txR1 := &types.TxRequest{}
 		txR2 := &types.TxRequest{}
 		tx1 := m.CreateTransaction(txR1)
-		assert.Equal(t, uint64(1), tx1.ID)
+		assert.Equal(t, uint64(0), tx1.ID)
 		assert.LessOrEqual(t, now, tx1.CreatedAt)
 
 		tx2 := m.CreateTransaction(txR2)
-		assert.Equal(t, uint64(2), tx2.ID)
+		assert.Equal(t, uint64(1), tx2.ID)
 		assert.LessOrEqual(t, now, tx2.CreatedAt)
 
 		assert.Equal(t, 2, m.CountUnstartedTransactions())
@@ -151,7 +151,7 @@ func TestCreateTransaction(t *testing.T) {
 	t.Run("prunes oldest unstarted transactions if limit is reached", func(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		overshot := 5
-		for i := 1; i < maxQueuedTransactions+overshot; i++ {
+		for i := 0; i < maxQueuedTransactions+overshot; i++ {
 			r := &types.TxRequest{}
 			tx := m.CreateTransaction(r)
 			//nolint:gosec // this won't overflow

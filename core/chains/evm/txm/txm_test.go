@@ -126,12 +126,12 @@ func TestBroadcastTransaction(t *testing.T) {
 		tests.AssertLogEventually(t, observedLogs, "Reached transaction limit")
 	})
 
-	t.Run("checks pending nonce if unconfirmed transactions are more than 1/3 of maxInFlightTransactions", func(t *testing.T) {
+	t.Run("checks pending nonce if unconfirmed transactions are equal or more than maxInFlightSubset", func(t *testing.T) {
 		lggr, observedLogs := logger.TestObserved(t, zap.DebugLevel)
 		mTxStore := mocks.NewTxStore(t)
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, mTxStore, nil, config, keystore)
 		txm.setNonce(address, 1)
-		mTxStore.On("FetchUnconfirmedTransactionAtNonceWithCount", mock.Anything, mock.Anything, mock.Anything).Return(nil, maxInFlightTransactions/3, nil).Twice()
+		mTxStore.On("FetchUnconfirmedTransactionAtNonceWithCount", mock.Anything, mock.Anything, mock.Anything).Return(nil, maxInFlightSubset, nil).Twice()
 
 		client.On("PendingNonceAt", mock.Anything, address).Return(uint64(0), nil).Once() // LocalNonce: 1, PendingNonce: 0
 		bo, err := txm.broadcastTransaction(ctx, address)
@@ -176,7 +176,7 @@ func TestBroadcastTransaction(t *testing.T) {
 		txm.setNonce(address, 8)
 		IDK := "IDK"
 		txRequest := &types.TxRequest{
-			Data:              []byte{100},
+			Data:              []byte{100, 200},
 			IdempotencyKey:    &IDK,
 			ChainID:           testutils.FixtureChainID,
 			FromAddress:       address,
@@ -197,13 +197,13 @@ func TestBroadcastTransaction(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, bo)
 		assert.Equal(t, uint64(9), txm.getNonce(address))
-		tx, err = txStore.FindTxWithIdempotencyKey(tests.Context(t), &IDK)
+		tx, err = txStore.FindTxWithIdempotencyKey(tests.Context(t), IDK)
 		require.NoError(t, err)
 		assert.Len(t, tx.Attempts, 1)
 		var zeroTime time.Time
-		assert.Greater(t, tx.LastBroadcastAt, zeroTime)
-		assert.Greater(t, tx.Attempts[0].BroadcastAt, zeroTime)
-		assert.Greater(t, tx.InitialBroadcastAt, zeroTime)
+		assert.Greater(t, *tx.LastBroadcastAt, zeroTime)
+		assert.Greater(t, *tx.Attempts[0].BroadcastAt, zeroTime)
+		assert.Greater(t, *tx.InitialBroadcastAt, zeroTime)
 	})
 }
 
