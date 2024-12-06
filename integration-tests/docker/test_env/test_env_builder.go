@@ -263,7 +263,7 @@ func (b *CLTestEnvBuilder) Build() (*CLClusterTestEnv, error) {
 						if clNode == nil {
 							continue
 						}
-						if strings.Contains(filePath, clNode.ContainerName) {
+						if strings.EqualFold(filePath, clNode.ContainerName+".log") {
 							return true
 						}
 					}
@@ -299,7 +299,7 @@ func (b *CLTestEnvBuilder) Build() (*CLClusterTestEnv, error) {
 							_ = file.Close()
 							// ignore processing errors
 							if verifyErr != nil && !strings.Contains(verifyErr.Error(), testreporters.MultipleLogsAtLogLevelErr) && !strings.Contains(verifyErr.Error(), testreporters.OneLogAtLogLevelErr) {
-								b.l.Error().Err(err).Msg("Error processing CL node logs")
+								b.l.Error().Err(verifyErr).Msg("Error processing CL node logs")
 
 								return nil
 
