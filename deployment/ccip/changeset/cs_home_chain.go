@@ -107,7 +107,7 @@ func deployCapReg(
 				chain.Client,
 			)
 			return deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
-				Address: crAddr, Contract: cr, Tv: deployment.NewTypeAndVersion(CapabilitiesRegistry, deployment.Version1_0_0), Tx: tx, Err: err2,
+				Address: crAddr, Contract: cr, Tv: deployment.NewTypeAndVersion(CapabilitiesRegistry, deployment.Version1_0_0), TxHash: tx.Hash(), Err: err2,
 			}
 		})
 	if err != nil {
@@ -148,7 +148,7 @@ func deployHomeChain(
 				capReg.Address,
 			)
 			return deployment.ContractDeploy[*ccip_home.CCIPHome]{
-				Address: ccAddr, Tv: deployment.NewTypeAndVersion(CCIPHome, deployment.Version1_6_0_dev), Tx: tx, Err: err2, Contract: cc,
+				Address: ccAddr, Tv: deployment.NewTypeAndVersion(CCIPHome, deployment.Version1_6_0_dev), TxHash: tx.Hash(), Err: err2, Contract: cc,
 			}
 		})
 	if err != nil {
@@ -165,7 +165,7 @@ func deployHomeChain(
 				chain.Client,
 			)
 			return deployment.ContractDeploy[*rmn_home.RMNHome]{
-				Address: rmnAddr, Tv: deployment.NewTypeAndVersion(RMNHome, deployment.Version1_6_0_dev), Tx: tx, Err: err2, Contract: rmn,
+				Address: rmnAddr, Tv: deployment.NewTypeAndVersion(RMNHome, deployment.Version1_6_0_dev), TxHash: tx.Hash(), Err: err2, Contract: rmn,
 			}
 		},
 	)

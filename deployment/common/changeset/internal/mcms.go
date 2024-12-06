@@ -26,7 +26,7 @@ func DeployMCMSWithConfig(
 				chain.Client,
 			)
 			return deployment.ContractDeploy[*owner_helpers.ManyChainMultiSig]{
-				mcmAddr, mcm, tx, deployment.NewTypeAndVersion(contractType, deployment.Version1_0_0), err2,
+				mcmAddr, mcm, tx.Hash(), deployment.NewTypeAndVersion(contractType, deployment.Version1_0_0), err2,
 			}
 		})
 	if err != nil {
@@ -111,7 +111,7 @@ func DeployMCMSWithTimelockContracts(
 				[]common.Address{bypasser.Address},  // bypassers
 			)
 			return deployment.ContractDeploy[*owner_helpers.RBACTimelock]{
-				timelock, cc, tx2, deployment.NewTypeAndVersion(types.RBACTimelock, deployment.Version1_0_0), err2,
+				timelock, cc, tx2.Hash(), deployment.NewTypeAndVersion(types.RBACTimelock, deployment.Version1_0_0), err2,
 			}
 		})
 	if err != nil {

@@ -691,7 +691,7 @@ func DeployFeeds(
 		aggregatorCr, err2 := aggregator_v3_interface.NewAggregatorV3Interface(linkFeed, chain.Client)
 
 		return deployment.ContractDeploy[*aggregator_v3_interface.AggregatorV3Interface]{
-			Address: linkFeed, Contract: aggregatorCr, Tv: linkTV, Tx: tx, Err: multierr.Append(err1, err2),
+			Address: linkFeed, Contract: aggregatorCr, Tv: linkTV, TxHash: tx.Hash(), Err: multierr.Append(err1, err2),
 		}
 	}
 
@@ -704,7 +704,7 @@ func DeployFeeds(
 		aggregatorCr, err2 := aggregator_v3_interface.NewAggregatorV3Interface(wethFeed, chain.Client)
 
 		return deployment.ContractDeploy[*aggregator_v3_interface.AggregatorV3Interface]{
-			Address: wethFeed, Contract: aggregatorCr, Tv: linkTV, Tx: tx, Err: multierr.Append(err1, err2),
+			Address: wethFeed, Contract: aggregatorCr, Tv: linkTV, TxHash: tx.Hash(), Err: multierr.Append(err1, err2),
 		}
 	}
 
@@ -1097,7 +1097,7 @@ func deployTransferTokenOneEnd(
 				big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
 			)
 			return deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
-				tokenAddress, token, tx, deployment.NewTypeAndVersion(BurnMintToken, deployment.Version1_0_0), err2,
+				tokenAddress, token, tx.Hash(), deployment.NewTypeAndVersion(BurnMintToken, deployment.Version1_0_0), err2,
 			}
 		})
 	if err != nil {
@@ -1126,7 +1126,7 @@ func deployTransferTokenOneEnd(
 				common.HexToAddress(routerAddress),
 			)
 			return deployment.ContractDeploy[*burn_mint_token_pool.BurnMintTokenPool]{
-				tokenPoolAddress, tokenPoolContract, tx, deployment.NewTypeAndVersion(BurnMintTokenPool, deployment.Version1_5_1), err2,
+				tokenPoolAddress, tokenPoolContract, tx.Hash(), deployment.NewTypeAndVersion(BurnMintTokenPool, deployment.Version1_5_1), err2,
 			}
 		})
 	if err != nil {
