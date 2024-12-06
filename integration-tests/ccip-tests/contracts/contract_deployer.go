@@ -133,11 +133,11 @@ func (e *CCIPContractsDeployer) DeployTokenMessenger(tokenTransmitter common.Add
 		auth *bind.TransactOpts,
 		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		address, tx, contract, err := mock_usdc_token_messenger.DeployMockE2EUSDCTokenMessenger(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), 0, tokenTransmitter)
+		address, _, contract, err := mock_usdc_token_messenger.DeployMockE2EUSDCTokenMessenger(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), 0, tokenTransmitter)
 		if err != nil {
 			return common.Address{}, nil, nil, err
 		}
-		return address, tx, contract, err
+		return address, nil, contract, err
 	})
 
 	return address, err
@@ -167,11 +167,11 @@ func (e *CCIPContractsDeployer) DeployTokenTransmitter(domain uint32, usdcToken 
 		auth *bind.TransactOpts,
 		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		address, tx, contract, err := mock_usdc_token_transmitter.DeployMockE2EUSDCTransmitter(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), 0, domain, usdcToken)
+		address, _, contract, err := mock_usdc_token_transmitter.DeployMockE2EUSDCTransmitter(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), 0, domain, usdcToken)
 		if err != nil {
 			return common.Address{}, nil, nil, err
 		}
-		return address, tx, contract, err
+		return address, nil, contract, err
 	})
 
 	if err != nil {
@@ -210,7 +210,8 @@ func (e *CCIPContractsDeployer) DeployBurnMintERC677(ownerMintingAmount *big.Int
 		auth *bind.TransactOpts,
 		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return burn_mint_erc677.DeployBurnMintERC677(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), "Test Token ERC677", "TERC677", 6, new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)))
+		address, _, instance, err := burn_mint_erc677.DeployBurnMintERC677(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), "Test Token ERC677", "TERC677", 6, new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)))
+		return address, nil, instance, err
 	})
 	if err != nil {
 		return nil, err
@@ -449,7 +450,7 @@ func (e *CCIPContractsDeployer) DeployUSDCTokenPoolContract(tokenAddr string, to
 			auth *bind.TransactOpts,
 			_ bind.ContractBackend,
 		) (common.Address, *types.Transaction, interface{}, error) {
-			return usdc_token_pool.DeployUSDCTokenPool(
+			address, _, instance, err := usdc_token_pool.DeployUSDCTokenPool(
 				auth,
 				wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
 				tokenMessenger,
@@ -458,6 +459,7 @@ func (e *CCIPContractsDeployer) DeployUSDCTokenPoolContract(tokenAddr string, to
 				rmnProxy,
 				router,
 			)
+			return address, nil, instance, err
 		})
 
 		if err != nil {
@@ -502,7 +504,7 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(tokenAddr str
 			auth *bind.TransactOpts,
 			_ bind.ContractBackend,
 		) (common.Address, *types.Transaction, interface{}, error) {
-			return lock_release_token_pool.DeployLockReleaseTokenPool(
+			address, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
 				auth,
 				wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
 				token,
@@ -512,6 +514,7 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(tokenAddr str
 				true,
 				router,
 			)
+			return address, nil, nil, err
 		})
 
 		if err != nil {
@@ -690,7 +693,8 @@ func (e *CCIPContractsDeployer) DeployReceiverDapp(revert bool) (
 		auth *bind.TransactOpts,
 		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), revert)
+		address, _, _, err := maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), revert)
+		return address, nil, nil, err
 	})
 	if err != nil {
 		return nil, err
@@ -730,7 +734,8 @@ func (e *CCIPContractsDeployer) DeployRouter(wrappedNative common.Address, armAd
 		auth *bind.TransactOpts,
 		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return router.DeployRouter(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), wrappedNative, armAddress)
+		address, _, _, err := router.DeployRouter(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), wrappedNative, armAddress)
+		return address, nil, nil, err
 	})
 	if err != nil {
 		return nil, err
@@ -857,7 +862,8 @@ func (e *CCIPContractsDeployer) DeployTokenAdminRegistry() (*TokenAdminRegistry,
 		auth *bind.TransactOpts,
 		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return token_admin_registry.DeployTokenAdminRegistry(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
+		address, _, _, err := token_admin_registry.DeployTokenAdminRegistry(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
+		return address, nil, nil, err
 	})
 	if err != nil {
 		return nil, err
@@ -1227,7 +1233,8 @@ func (e *CCIPContractsDeployer) DeployMockAggregator(decimals uint8, initialAns 
 		auth *bind.TransactOpts,
 		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return mock_v3_aggregator_contract.DeployMockV3Aggregator(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), decimals, initialAns)
+		address, _, _, err := mock_v3_aggregator_contract.DeployMockV3Aggregator(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), decimals, initialAns)
+		return address, nil, nil, err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("deploying mock aggregator: %w", err)

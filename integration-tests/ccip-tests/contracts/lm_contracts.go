@@ -34,11 +34,12 @@ func (e *CCIPContractsDeployer) DeployArmProxy(arm common.Address) (*ArmProxy, e
 		auth *bind.TransactOpts,
 		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return rmn_proxy_contract.DeployRMNProxyContract(
+		address, _, instance, err := rmn_proxy_contract.DeployRMNProxyContract(
 			auth,
 			wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
 			arm,
 		)
+		return address, nil, instance, err
 	})
 	if err != nil {
 		return nil, err
