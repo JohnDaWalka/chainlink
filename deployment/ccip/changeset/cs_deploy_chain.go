@@ -210,28 +210,28 @@ func deployChainContracts(
 	if chainState.Router == nil {
 		return fmt.Errorf("router not found for chain %s, deploy the prerequisites first", chain.String())
 	}
+	var err2 error
+	var dtx deployTx
 	if chainState.Receiver == nil {
 		_, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*maybe_revert_message_receiver.MaybeRevertMessageReceiver] {
 				var receiverAddr common.Address
 				var receiver *maybe_revert_message_receiver.MaybeRevertMessageReceiver
-				var err2 error
-				var tx deployTx
 				if generated.IsZKSync(chain.Client) {
-					receiverAddr, tx, receiver, err2 = maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(
+					receiverAddr, dtx, receiver, err2 = maybe_revert_message_receiver.DeployMaybeRevertMessageReceiverZK(
 						chain.DeployerKey,
 						chain.Client,
 						false,
 					)
 				} else {
-					receiverAddr, tx, receiver, err2 = maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(
+					receiverAddr, dtx, receiver, err2 = maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(
 						chain.DeployerKey,
 						chain.Client,
 						false,
 					)
 				}
 				return deployment.ContractDeploy[*maybe_revert_message_receiver.MaybeRevertMessageReceiver]{
-					receiverAddr, receiver, tx.Hash(), deployment.NewTypeAndVersion(CCIPReceiver, deployment.Version1_0_0), err2,
+					receiverAddr, receiver, dtx.Hash(), deployment.NewTypeAndVersion(CCIPReceiver, deployment.Version1_0_0), err2,
 				}
 			})
 		if err != nil {
@@ -246,15 +246,28 @@ func deployChainContracts(
 		// TODO: Correctly configure RMN remote.
 		rmnRemote, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*rmn_remote.RMNRemote] {
-				rmnRemoteAddr, tx, rmnRemote, err2 := rmn_remote.DeployRMNRemote(
-					chain.DeployerKey,
-					chain.Client,
-					chain.Selector,
-					// Indicates no legacy RMN contract
-					common.HexToAddress("0x0"),
-				)
+				var rmnRemoteAddr common.Address
+				var rmnRemote *rmn_remote.RMNRemote
+
+				if generated.IsZKSync(chain.Client) {
+					rmnRemoteAddr, dtx, rmnRemote, err2 = rmn_remote.DeployRMNRemote(
+						chain.DeployerKey,
+						chain.Client,
+						chain.Selector,
+						// Indicates no legacy RMN contract
+						common.HexToAddress("0x0"),
+					)
+				} else {
+					rmnRemoteAddr, dtx, rmnRemote, err2 = rmn_remote.DeployRMNRemote(
+						chain.DeployerKey,
+						chain.Client,
+						chain.Selector,
+						// Indicates no legacy RMN contract
+						common.HexToAddress("0x0"),
+					)
+				}
 				return deployment.ContractDeploy[*rmn_remote.RMNRemote]{
-					rmnRemoteAddr, rmnRemote, tx, deployment.NewTypeAndVersion(RMNRemote, deployment.Version1_6_0_dev), err2,
+					rmnRemoteAddr, rmnRemote, dtx.Hash(), deployment.NewTypeAndVersion(RMNRemote, deployment.Version1_6_0_dev), err2,
 				}
 			})
 		if err != nil {
@@ -291,13 +304,24 @@ func deployChainContracts(
 		// we deploy a new rmnproxy contract to test RMNRemote
 		rmnProxy, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*rmn_proxy_contract.RMNProxyContract] {
-				rmnProxyAddr, tx, rmnProxy, err2 := rmn_proxy_contract.DeployRMNProxyContract(
-					chain.DeployerKey,
-					chain.Client,
-					rmnRemoteContract.Address(),
-				)
+				var rmnProxyAddr common.Address
+				var rmnProxy *rmn_proxy_contract.RMNProxyContract
+				if generated.IsZKSync(chain.Client) {
+					rmnProxyAddr, dtx, rmnProxy, err2 = rmn_proxy_contract.DeployRMNProxyContractZK(
+						chain.DeployerKey,
+						chain.Client,
+						rmnRemoteContract.Address(),
+					)
+				} else {
+					rmnProxyAddr, dtx, rmnProxy, err2 = rmn_proxy_contract.DeployRMNProxyContract(
+						chain.DeployerKey,
+						chain.Client,
+						rmnRemoteContract.Address(),
+					)
+				}
+
 				return deployment.ContractDeploy[*rmn_proxy_contract.RMNProxyContract]{
-					rmnProxyAddr, rmnProxy, tx, deployment.NewTypeAndVersion(ARMProxy, deployment.Version1_6_0_dev), err2,
+					rmnProxyAddr, rmnProxy, dtx.Hash(), deployment.NewTypeAndVersion(ARMProxy, deployment.Version1_6_0_dev), err2,
 				}
 			})
 		if err != nil {

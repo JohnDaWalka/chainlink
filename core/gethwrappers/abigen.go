@@ -6,7 +6,9 @@ import (
 	"go/ast"
 	"go/format"
 	"go/parser"
+	"go/printer"
 	"go/token"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -539,11 +541,14 @@ func updateDeployMethod(contractName string, fset *token.FileSet, fileNode *ast.
 		// only add this import if Deploy method found
 		astutil.AddImport(fset, fileNode, "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated")
 
+		fmt.Println("here")
+
 		// Extract the parameters from the existing function x
 		paramList := getConstructorParams(x.Type.Params.List)
-		// get the `if zksync()` block
-		zkSyncBlock := getZKSyncBlock(contractName, paramList)
-
+		paramListWithTypes := getConstructorParamsWithTypes(x.Type.Params.List)
+		fmt.Println("paramListWithTypes: ", paramListWithTypes)
+		zkSyncBlock := getZKSyncBlock(contractName, paramList, paramListWithTypes)
+		fmt.Println("zkSyncBlock: ", zkSyncBlock)
 		node, err := parser.ParseFile(token.NewFileSet(), "", zkSyncBlock, parser.SkipObjectResolution)
 		if err != nil {
 			return false
@@ -582,25 +587,25 @@ func parseFuncDecl(funcCode string) (*ast.FuncDecl, error) {
 }
 
 var zkcode = `
-package main
-func Deploy%sZK(auth *bind.TransactOpts, backend bind.ContractBackend, params string) (common.Address, *generated.Transaction, *%s, error) {
-	parsed, err := %sMetaData.GetAbi()
-	if err != nil {
-		return common.Address{}, nil, nil, err
+	package main
+	func Deploy%sZK(auth *bind.TransactOpts, backend bind.ContractBackend, %constructorParams) (common.Address, *generated.Transaction, *%s, error) {
+		parsed, err := %sMetaData.GetAbi()
+		if err != nil {
+			return common.Address{}, nil, nil, err
+		}
+		if parsed == nil {
+			return common.Address{}, nil, nil, errors.New("GetABI returned nil")
+		}
+		address, ethTx, contract, err := generated.DeployContract(auth, parsed, common.FromHex(%sZKBin), backend, %deployParams)
+		if err != nil {
+			return common.Address{}, nil, nil, err
+		}
+		return address, ethTx, &%s{address: address, abi: *parsed, %sCaller: %sCaller{contract: contract}, %sTransactor: %sTransactor{contract: contract}, %sFilterer: %sFilterer{contract: contract}}, nil
 	}
-	if parsed == nil {
-		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
-	}
-	address, ethTx, contract, err := generated.DeployContract(auth, parsed, common.FromHex(%sZKBin), backend, params)
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-	return address, ethTx, &%s{address: address, abi: *parsed, %sCaller: %sCaller{contract: contract}, %sTransactor: %sTransactor{contract: contract}, %sFilterer: %sFilterer{contract: contract}}, nil
-}
 `
 
 // get the `if zksync()` block
-func getZKSyncBlock(contractName, paramList string) string {
+func getZKSyncBlock(contractName, paramList, paramListWithTypes string) string {
 	// zkSyncBlock := `if generated_zks.IsZKSync(backend) {
 	// 			address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, parsed, common.FromHex(%sZKBin), backend, %params)
 	// 			contractReturn := &%s{address: address, abi: *parsed, %sCaller: %sCaller{contract: contractBind}, %sTransactor: %sTransactor{contract: contractBind},%sFilterer: %sFilterer{contract: contractBind}}
@@ -608,7 +613,8 @@ func getZKSyncBlock(contractName, paramList string) string {
 	// 	}`
 	zkSyncBlock := zkcode
 	zkSyncBlock = strings.ReplaceAll(zkSyncBlock, "%s", contractName)
-	zkSyncBlock = strings.ReplaceAll(zkSyncBlock, "%params", paramList)
+	zkSyncBlock = strings.ReplaceAll(zkSyncBlock, "%constructorParams", paramListWithTypes)
+	zkSyncBlock = strings.ReplaceAll(zkSyncBlock, "%deployParams", paramList)
 	return strings.ReplaceAll(zkSyncBlock, "%s", contractName)
 }
 
@@ -624,6 +630,28 @@ func getConstructorParams(contstructorParams []*ast.Field) string {
 	}
 	paramList := strings.Join(params, ", ")
 	return paramList
+}
+
+func getConstructorParamsWithTypes(constructorParams []*ast.Field) string {
+	params := []string{}
+	for i, param := range constructorParams {
+		if i > 1 { // Skip auth and backend
+			for _, name := range param.Names {
+				paramWithType := fmt.Sprintf("%s %s", name.Name, exprToString(param.Type))
+				params = append(params, paramWithType)
+			}
+		}
+	}
+	return strings.Join(params, ", ")
+}
+
+func exprToString(expr ast.Expr) string {
+	var buf bytes.Buffer
+	err := printer.Fprint(&buf, token.NewFileSet(), expr)
+	if err != nil {
+		log.Fatalf("Failed to convert AST expression to string: %v", err)
+	}
+	return buf.String()
 }
 
 // insert the `if zksync()` block
