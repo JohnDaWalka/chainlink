@@ -335,14 +335,25 @@ func deployChainContracts(
 	if chainState.TestRouter == nil {
 		_, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*router.Router] {
-				routerAddr, tx2, routerC, err2 := router.DeployRouter(
-					chain.DeployerKey,
-					chain.Client,
-					weth9Contract.Address(),
-					rmnProxyContract.Address(),
-				)
+				var routerAddr common.Address
+				var routerC *router.Router
+				if generated.IsZKSync(chain.Client) {
+					routerAddr, dtx, routerC, err2 = router.DeployRouter(
+						chain.DeployerKey,
+						chain.Client,
+						weth9Contract.Address(),
+						rmnProxyContract.Address(),
+					)
+				} else {
+					routerAddr, dtx, routerC, err2 = router.DeployRouter(
+						chain.DeployerKey,
+						chain.Client,
+						weth9Contract.Address(),
+						rmnProxyContract.Address(),
+					)
+				}
 				return deployment.ContractDeploy[*router.Router]{
-					routerAddr, routerC, tx2, deployment.NewTypeAndVersion(TestRouter, deployment.Version1_2_0), err2,
+					routerAddr, routerC, dtx.Hash(), deployment.NewTypeAndVersion(TestRouter, deployment.Version1_2_0), err2,
 				}
 			})
 		if err != nil {
@@ -357,13 +368,23 @@ func deployChainContracts(
 	if chainState.NonceManager == nil {
 		nonceManager, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*nonce_manager.NonceManager] {
-				nonceManagerAddr, tx2, nonceManager, err2 := nonce_manager.DeployNonceManager(
-					chain.DeployerKey,
-					chain.Client,
-					[]common.Address{}, // Need to add onRamp after
-				)
+				var nonceManagerAddr common.Address
+				var nonceManager *nonce_manager.NonceManager
+				if generated.IsZKSync(chain.Client) {
+					nonceManagerAddr, dtx, nonceManager, err2 = nonce_manager.DeployNonceManager(
+						chain.DeployerKey,
+						chain.Client,
+						[]common.Address{}, // Need to add onRamp after
+					)
+				} else {
+					nonceManagerAddr, dtx, nonceManager, err2 = nonce_manager.DeployNonceManager(
+						chain.DeployerKey,
+						chain.Client,
+						[]common.Address{}, // Need to add onRamp after
+					)
+				}
 				return deployment.ContractDeploy[*nonce_manager.NonceManager]{
-					nonceManagerAddr, nonceManager, tx2, deployment.NewTypeAndVersion(NonceManager, deployment.Version1_6_0_dev), err2,
+					nonceManagerAddr, nonceManager, dtx.Hash(), deployment.NewTypeAndVersion(NonceManager, deployment.Version1_6_0_dev), err2,
 				}
 			})
 		if err != nil {
