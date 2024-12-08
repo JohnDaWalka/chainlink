@@ -116,11 +116,12 @@ func ParseErrorFromABI(errorString string, contractABI string) (string, error) {
 // via an abigen Go binding. It contains all the return values
 // as they are useful in different ways.
 type ContractDeploy[C any] struct {
-	Address  common.Address     // We leave this incase a Go binding doesn't have Address()
-	Contract C                  // Expected to be a Go binding
-	Tx       *types.Transaction // Incase the caller needs for example tx hash info for
-	Tv       TypeAndVersion
-	Err      error
+	Address  common.Address // We leave this incase a Go binding doesn't have Address()
+	Contract C              // Expected to be a Go binding
+	// Tx       *types.Transaction // Incase the caller needs for example tx hash info for
+	TxHash common.Hash // logging
+	Tv     TypeAndVersion
+	Err    error
 }
 
 // DeployContract deploys an EVM contract and

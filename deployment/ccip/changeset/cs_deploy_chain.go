@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_remote"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
 var _ deployment.ChangeSet[DeployChainContractsConfig] = DeployChainContracts
@@ -168,6 +169,10 @@ func deployChainContractsForChains(
 	return nil
 }
 
+type deployTx interface {
+	Hash() common.Hash
+}
+
 func deployChainContracts(
 	e deployment.Environment,
 	chain deployment.Chain,
@@ -208,13 +213,25 @@ func deployChainContracts(
 	if chainState.Receiver == nil {
 		_, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*maybe_revert_message_receiver.MaybeRevertMessageReceiver] {
-				receiverAddr, tx, receiver, err2 := maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(
-					chain.DeployerKey,
-					chain.Client,
-					false,
-				)
+				var receiverAddr common.Address
+				var receiver *maybe_revert_message_receiver.MaybeRevertMessageReceiver
+				var err2 error
+				var tx deployTx
+				if generated.IsZKSync(chain.Client) {
+					receiverAddr, tx, receiver, err2 = maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(
+						chain.DeployerKey,
+						chain.Client,
+						false,
+					)
+				} else {
+					receiverAddr, tx, receiver, err2 = maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(
+						chain.DeployerKey,
+						chain.Client,
+						false,
+					)
+				}
 				return deployment.ContractDeploy[*maybe_revert_message_receiver.MaybeRevertMessageReceiver]{
-					receiverAddr, receiver, tx, deployment.NewTypeAndVersion(CCIPReceiver, deployment.Version1_0_0), err2,
+					receiverAddr, receiver, tx.Hash(), deployment.NewTypeAndVersion(CCIPReceiver, deployment.Version1_0_0), err2,
 				}
 			})
 		if err != nil {

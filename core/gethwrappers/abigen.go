@@ -73,7 +73,7 @@ func Abigen(a AbigenArgs) {
 
 	ImproveAbigenOutput(a.Out, a.ABI)
 	if a.ZkBinPath != "" {
-		ImproveAbigenOutput_zks(a.Out, a.ZkBinPath)
+		ImproveAbigenOutputZKs(a.Out, a.ZkBinPath)
 	}
 }
 
@@ -471,7 +471,7 @@ func addHeader(code []byte) []byte {
 }
 
 // ZK stack logic
-func ImproveAbigenOutput_zks(path string, zkBinPath string) {
+func ImproveAbigenOutputZKs(path string, zkBinPath string) {
 
 	bs, err := os.ReadFile(path)
 	if err != nil {
@@ -507,10 +507,10 @@ func addZKSyncBin(fileNode *ast.File, contractName string, zkHexString string) *
 	// zksync
 	newVarSpec := &ast.ValueSpec{
 		Names: []*ast.Ident{ast.NewIdent(fmt.Sprintf("%sZKBin", contractName))},
-		Type:  ast.NewIdent("string"),
+		// Type:  ast.NewIdent("string"),
 		Values: []ast.Expr{
 			&ast.BasicLit{
-				Kind:  token.STRING,
+				// Kind:  token.STRING,
 				Value: fmt.Sprintf("(\"0x%s\")", zkHexString),
 			},
 		},
@@ -537,30 +537,76 @@ func updateDeployMethod(contractName string, fset *token.FileSet, fileNode *ast.
 		}
 
 		// only add this import if Deploy method found
-		astutil.AddImport(fset, fileNode, "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated_zks")
+		astutil.AddImport(fset, fileNode, "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated")
 
 		// Extract the parameters from the existing function x
 		paramList := getConstructorParams(x.Type.Params.List)
 		// get the `if zksync()` block
 		zkSyncBlock := getZKSyncBlock(contractName, paramList)
-		// insert the `if zksync()` block
-		addZKSyncBlock(*x, zkSyncBlock)
-		// update the return type in the function signature
-		updateTxReturnType(*x)
-		// update the actual return value
-		updateReturnStmt(*x)
+
+		node, err := parser.ParseFile(token.NewFileSet(), "", zkSyncBlock, parser.SkipObjectResolution)
+		if err != nil {
+			return false
+		}
+
+		var newFuncDecl *ast.FuncDecl
+		for _, decl := range node.Decls {
+			if funcDecl, ok := decl.(*ast.FuncDecl); ok {
+				newFuncDecl = funcDecl
+				break
+			}
+		}
+
+		// Add the standalone function to the file
+		fileNode.Decls = append(fileNode.Decls, newFuncDecl)
 
 		return false
 	}, nil).(*ast.File)
 }
 
+func parseFuncDecl(funcCode string) (*ast.FuncDecl, error) {
+	// Parse the function string into a Go AST
+	node, err := parser.ParseFile(token.NewFileSet(), "", funcCode, parser.SkipObjectResolution)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing function: %w", err)
+	}
+
+	// Extract the first declaration from the file node
+	for _, decl := range node.Decls {
+		if funcDecl, ok := decl.(*ast.FuncDecl); ok {
+			return funcDecl, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no function declaration found")
+}
+
+var zkcode = `
+package main
+func Deploy%sZK(auth *bind.TransactOpts, backend bind.ContractBackend, params string) (common.Address, *generated.Transaction, *%s, error) {
+	parsed, err := %sMetaData.GetAbi()
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	if parsed == nil {
+		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
+	}
+	address, ethTx, contract, err := generated.DeployContract(auth, parsed, common.FromHex(%sZKBin), backend, params)
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	return address, ethTx, &%s{address: address, abi: *parsed, %sCaller: %sCaller{contract: contract}, %sTransactor: %sTransactor{contract: contract}, %sFilterer: %sFilterer{contract: contract}}, nil
+}
+`
+
 // get the `if zksync()` block
 func getZKSyncBlock(contractName, paramList string) string {
-	zkSyncBlock := `if generated_zks.IsZKSync(backend) {
-				address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, parsed, common.FromHex(%sZKBin), backend, %params)
-				contractReturn := &%s{address: address, abi: *parsed, %sCaller: %sCaller{contract: contractBind}, %sTransactor: %sTransactor{contract: contractBind},%sFilterer: %sFilterer{contract: contractBind}}
-				return address, ethTx, contractReturn, err
-		}`
+	// zkSyncBlock := `if generated_zks.IsZKSync(backend) {
+	// 			address, ethTx, contractBind, _ := generated_zks.DeployContract(auth, parsed, common.FromHex(%sZKBin), backend, %params)
+	// 			contractReturn := &%s{address: address, abi: *parsed, %sCaller: %sCaller{contract: contractBind}, %sTransactor: %sTransactor{contract: contractBind},%sFilterer: %sFilterer{contract: contractBind}}
+	// 			return address, ethTx, contractReturn, err
+	// 	}`
+	zkSyncBlock := zkcode
 	zkSyncBlock = strings.ReplaceAll(zkSyncBlock, "%s", contractName)
 	zkSyncBlock = strings.ReplaceAll(zkSyncBlock, "%params", paramList)
 	return strings.ReplaceAll(zkSyncBlock, "%s", contractName)
