@@ -2,6 +2,7 @@ package generated
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -72,14 +73,14 @@ func getZKAuthFromEthAuth(auth *bind.TransactOpts) *zkSyncAccounts.TransactOpts 
 func DeployContract(auth *bind.TransactOpts, contractAbi *abi.ABI, contractBytes []byte, backend bind.ContractBackend, params ...interface{}) (common.Address, *Transaction, *bind.BoundContract, error) {
 	client, ok := backend.(*ethclient.Client)
 	if !ok {
-		return common.Address{}, nil, nil, fmt.Errorf("backend is not an *ethclient.Client")
+		return common.Address{}, nil, nil, errors.New("backend is not an *ethclient.Client")
 	}
 	zkclient := zkSyncClient.NewClient(client.Client())
 
 	walletValue := auth.Context.Value("wallet")
 	wallet, ok := walletValue.(*zkSyncAccounts.Wallet)
 	if !ok || wallet == nil {
-		return common.Address{}, nil, nil, fmt.Errorf("wallet not found in context or invalid type")
+		return common.Address{}, nil, nil, errors.New("wallet not found in context or invalid type")
 	}
 
 	constructor, _ := contractAbi.Pack("", params...)
@@ -89,17 +90,17 @@ func DeployContract(auth *bind.TransactOpts, contractAbi *abi.ABI, contractBytes
 		Calldata: constructor,
 	})
 	if err != nil {
-		return common.Address{}, nil, nil, fmt.Errorf("Error deploying contract: %w", err)
+		return common.Address{}, nil, nil, errors.New(fmt.Sprintf("Error deploying contract: %w", err))
 	}
 
 	receipt, err := zkclient.WaitMined(context.Background(), hash)
 	if err != nil {
-		return common.Address{}, nil, nil, fmt.Errorf("Error waiting for contract deployment: %w", err)
+		return common.Address{}, nil, nil, errors.New(fmt.Sprintf("Error waiting for contract deployment: %w", err))
 	}
 
 	tx, _, err := zkclient.TransactionByHash(context.Background(), hash)
 	if err != nil {
-		return common.Address{}, nil, nil, fmt.Errorf("Error getting transaction by hash: %w", err)
+		return common.Address{}, nil, nil, errors.New(fmt.Sprintf("Error getting transaction by hash: %w", err))
 	}
 
 	address := receipt.ContractAddress
