@@ -17,27 +17,84 @@ env:
 
 jobs:
   filter:
-    name: Detect Changes
+    name: Filter Changes
     permissions:
       pull-requests: read
-    outputs:
-      should-run-all-tests: ${{ steps.match-some.outputs.test-data == 'true' }}
-      should-collect-coverage: ${{ github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
+    outputs:
+      should-run-core-tests: >-
+        ${{
+          steps.every.outputs.core-changes == 'true' ||
+          steps.some.outputs.workflow-changes == 'true' ||
+          github.event_name == 'schedule' ||
+          (github.event_name == 'push' && github.ref == 'refs/heads/develop')
+        }}
+      should-run-ccip-tests: >-
+        ${{
+          steps.every.outputs.deployment-changes == 'true' ||
+          steps.some.outputs.workflow-changes == 'true' ||
+          github.event_name == 'schedule' ||
+          (github.event_name == 'push' && github.ref == 'refs/heads/develop')
+        }}
+      should-run-all-tests: >-
+        ${{
+          steps.some.outputs.test-data-changes == 'true' || 
+          github.event_name == 'schedule'
+        }}
+      should-collect-coverage: ${{ github.event_name == 'schedule' }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4.2.1
         with:
           repository: smartcontractkit/chainlink
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
-        id: match-some
+        id: some
         with:
           # "if any changed file matches one or more of the conditions" (https://github.com/dorny/paths-filter/issues/225)
           predicate-quantifier: some
           # test-data - any changes to any testdata files/paths
           filters: |
-            test-data:
+            test-data-changes:
               - '**/testdata/**'
+            workflow-changes:
+              - '.github/workflows/ci-core-partial.yml'
+              - '.github/actions/**'
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: every
+        with:
+          # "if any changed file matches all of the conditions" (https://github.com/dorny/paths-filter/issues/225)
+          predicate-quantifier: every
+          # Allows us to negate certain paths, allowing creating a list of opt-out paths.
+          #  - This is opt-out on purpose. To be safe, new paths are assumed to have an effect unless listed here specifically.
+          filters: |
+            ignored: &ignored
+              - '!integration-tests/**'
+              - '!tools/secrets/**'
+              - '!tools/goreleaser-config/**'
+              - '!tools/docker/**'
+              - '!tools/benchmark/**'
+              - '!**/README.md'
+              - '!**/CHANGELOG.md'
+              - '!LICENSE'
+              - '!.goreleaser.develop.yaml'
+              - '!.goreleaser.devspace.yaml'
+              - '!.goreleaser.production.yaml'
+              - '!sonar-project.properties'
+              - '!*.nix'
+              - '!nix.conf'
+              - '!nix-darwin-shell-hook.sh'
+              - '!.github/**'
+              - '!.changeset/**'
+
+            core-changes:
+              - '**'
+              - '!deployment/**'
+              - *ignored
+            
+            deployment-changes:
+              - '**'
+              - *ignored
+
 
   run-unit-tests:
     name: Tests (${{ matrix.type.test-suite }})
@@ -53,39 +110,60 @@ jobs:
           - test-suite: "core"
             module-directory: "./"
             build-flags: "-tags=integration"
+            should-run: ${{ needs.filter.outputs.should-run-core-tests == 'true' }}
           - test-suite: "ccip-deployment"
             module-directory: "./deployment"
+            should-run: ${{ needs.filter.outputs.should-run-ccip-tests == 'true' }}
     steps:
+      - name: Debug Matrix
+        run: |
+          echo "should-run-core-tests: ${{ needs.filter.outputs.should-run-core-tests }}"
+          echo "should-run-ccip-tests: ${{ needs.filter.outputs.should-run-ccip-tests }}"
+          echo "should-run-all-tests: ${{ needs.filter.outputs.should-run-all-tests }}"
+          echo "should-collect-coverage: ${{ needs.filter.outputs.should-collect-coverage }}"
+          echo "test-suite: ${{ matrix.type.test-suite }}"
+          echo "module-directory: ${{ matrix.type.module-directory }}"
+          echo "should-run: ${{ matrix.type.should-run }}"
+          echo "build-flags: ${{ matrix.type.build-flags }}"
+
       - name: Checkout the repo
+        if: ${{ matrix.type.should-run }}
         uses: actions/checkout@v4.2.1
 
       - name: Setup NodeJS
+        if: ${{ matrix.type.should-run }}
         uses: ./.github/actions/setup-nodejs
         with:
           prod: "true"
 
       - name: Setup Go
+        if: ${{ matrix.type.should-run }}
         uses: ./.github/actions/setup-go
         with:
           build-cache-version: ${{ matrix.type.test-suite }}
           restore-build-cache-only: "false"
 
       - name: Setup Solana
+        if: ${{ matrix.type.should-run }}
         uses: ./.github/actions/setup-solana
 
       - name: Setup wasmd
+        if: ${{ matrix.type.should-run }}
         uses: ./.github/actions/setup-wasmd
 
       - name: Setup Postgres
+        if: ${{ matrix.type.should-run }}
         uses: ./.github/actions/setup-postgres
 
       - name: Setup CI Core Environment
+        if: ${{ matrix.type.should-run }}
         uses: ./.github/actions/setup-ci-core-tests
         with:
           db-url: ${{ env.DB_URL }}
           go-mod-download-directory: ${{ matrix.type.test-suite == 'ccip-deployment' && matrix.type.module-directory || '' }}
 
       - name: Build Tests
+        if: ${{ matrix.type.should-run }}
         uses: smartcontractkit/.github/apps/go-conditional-tests@37882e110590e636627a26371bdbd56ddfcce821 # go-conditional-tests@0.1.0
         timeout-minutes: 10
         with:
@@ -98,6 +176,7 @@ jobs:
           build-flags: ${{ matrix.type.build-flags }}
 
       - name: Run Tests
+        if: ${{ matrix.type.should-run }}
         uses: smartcontractkit/.github/apps/go-conditional-tests@37882e110590e636627a26371bdbd56ddfcce821 # go-conditional-tests@0.1.0
         timeout-minutes: 15
         env:
@@ -112,6 +191,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update Test Index
+        if: ${{ matrix.type.should-run }}
         uses: smartcontractkit/.github/apps/go-conditional-tests@37882e110590e636627a26371bdbd56ddfcce821 # go-conditional-tests@0.1.0
         with:
           pipeline-step: "update"
@@ -120,7 +200,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Print postgres logs
-        if: ${{ always() }}
+        if: ${{ always() && matrix.type.should-run }}
         run: docker compose logs postgres | tee ../../../postgres_logs.txt
         working-directory: ./.github/actions/setup-postgres
 
