@@ -511,12 +511,39 @@ func getWorkflowRegistryEventReader(
 		Contracts: map[string]evmtypes.ChainContractReader{
 			WorkflowRegistryContractName: {
 				ContractPollingFilter: evmtypes.ContractPollingFilter{
-					GenericEventNames: []string{string(ForceUpdateSecretsEvent)},
+					GenericEventNames: []string{
+						string(ForceUpdateSecretsEvent),
+						string(WorkflowRegisteredEvent),
+						string(WorkflowUpdatedEvent),
+						string(WorkflowPausedEvent),
+						string(WorkflowActivatedEvent),
+						string(WorkflowDeletedEvent),
+					},
 				},
 				ContractABI: workflow_registry_wrapper.WorkflowRegistryABI,
 				Configs: map[string]*evmtypes.ChainReaderDefinition{
 					string(ForceUpdateSecretsEvent): {
 						ChainSpecificName: string(ForceUpdateSecretsEvent),
+						ReadType:          evmtypes.Event,
+					},
+					string(WorkflowRegisteredEvent): {
+						ChainSpecificName: string(WorkflowRegisteredEvent),
+						ReadType:          evmtypes.Event,
+					},
+					string(WorkflowUpdatedEvent): {
+						ChainSpecificName: string(WorkflowUpdatedEvent),
+						ReadType:          evmtypes.Event,
+					},
+					string(WorkflowPausedEvent): {
+						ChainSpecificName: string(WorkflowPausedEvent),
+						ReadType:          evmtypes.Event,
+					},
+					string(WorkflowActivatedEvent): {
+						ChainSpecificName: string(WorkflowActivatedEvent),
+						ReadType:          evmtypes.Event,
+					},
+					string(WorkflowDeletedEvent): {
+						ChainSpecificName: string(WorkflowDeletedEvent),
 						ReadType:          evmtypes.Event,
 					},
 				},
