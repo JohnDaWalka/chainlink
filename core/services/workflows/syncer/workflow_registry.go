@@ -272,7 +272,7 @@ func (w *workflowRegistry) handlerLoop(ctx context.Context) {
 			event := resp.Event
 			w.lggr.Debugf("handling event: %+v", event)
 			if err := w.handler.Handle(ctx, *event); err != nil {
-				w.lggr.Errorf("failed to handle event: %+v", event)
+				w.lggr.Errorf("failed to handle event: %s : %+v", err, event)
 				continue
 			}
 		}

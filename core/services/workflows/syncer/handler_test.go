@@ -46,6 +46,30 @@ func newMockFetcher(m map[string]mockFetchResp) FetcherFunc {
 	return (&mockFetcher{responseMap: m}).Fetch
 }
 
+type mockEngine struct {
+	CloseErr error
+	ReadyErr error
+}
+
+func newMockEngine(errs ...error) *mockEngine {
+	e := &mockEngine{}
+	if len(errs) > 0 {
+		e.ReadyErr = errs[0]
+	}
+	if len(errs) > 1 {
+		e.CloseErr = errs[1]
+	}
+	return e
+}
+
+func (m *mockEngine) Ready() error {
+	return m.ReadyErr
+}
+
+func (m *mockEngine) Close() error {
+	return m.CloseErr
+}
+
 func Test_Handler(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	emitter := custmsg.NewLabeler()
@@ -179,7 +203,10 @@ func Test_workflowRegisteredHandler(t *testing.T) {
 	var config = []byte("")
 	var wfOwner = []byte("0xOwner")
 	var binary = wasmtest.CreateTestBinary(binaryCmd, binaryLocation, true, t)
-	defaultValidationFn := func(t *testing.T, ctx context.Context, h *eventHandler, wfOwner []byte, wfName string, wfID string) {
+	defaultValidationFn := func(t *testing.T, ctx context.Context, event WorkflowRegistryWorkflowRegisteredV1, h *eventHandler, wfOwner []byte, wfName string, wfID string) {
+		err := h.workflowRegisteredEvent(ctx, event)
+		require.NoError(t, err)
+
 		// Verify the record is updated in the database
 		dbSpec, err := h.orm.GetWorkflowSpec(ctx, hex.EncodeToString(wfOwner), "workflow-name")
 		require.NoError(t, err)
@@ -222,6 +249,38 @@ func Test_workflowRegisteredHandler(t *testing.T) {
 			validationFn: defaultValidationFn,
 		},
 		{
+			Name: "fails if running engine exists",
+			fetcher: newMockFetcher(map[string]mockFetchResp{
+				binaryURL:  {Body: binary, Err: nil},
+				configURL:  {Body: config, Err: nil},
+				secretsURL: {Body: []byte("secrets"), Err: nil},
+			}),
+			GiveConfig: config,
+			ConfigURL:  configURL,
+			SecretsURL: secretsURL,
+			BinaryURL:  binaryURL,
+			GiveBinary: binary,
+			WFOwner:    wfOwner,
+			Event: func(wfID []byte) WorkflowRegistryWorkflowRegisteredV1 {
+				return WorkflowRegistryWorkflowRegisteredV1{
+					Status:       uint8(0),
+					WorkflowID:   [32]byte(wfID),
+					Owner:        wfOwner,
+					WorkflowName: "workflow-name",
+					BinaryURL:    binaryURL,
+					ConfigURL:    configURL,
+					SecretsURL:   secretsURL,
+				}
+			},
+			validationFn: func(t *testing.T, ctx context.Context, event WorkflowRegistryWorkflowRegisteredV1, h *eventHandler, wfOwner []byte, wfName string, wfID string) {
+				me := newMockEngine()
+				h.engineRegistry.Add(wfID, me)
+				err := h.workflowRegisteredEvent(ctx, event)
+				require.Error(t, err)
+				require.ErrorContains(t, err, "workflow is already running")
+			},
+		},
+		{
 			Name: "success with paused workflow registered",
 			fetcher: newMockFetcher(map[string]mockFetchResp{
 				binaryURL:  {Body: binary, Err: nil},
@@ -245,7 +304,10 @@ func Test_workflowRegisteredHandler(t *testing.T) {
 					SecretsURL:   secretsURL,
 				}
 			},
-			validationFn: func(t *testing.T, ctx context.Context, h *eventHandler, wfOwner []byte, wfName string, wfID string) {
+			validationFn: func(t *testing.T, ctx context.Context, event WorkflowRegistryWorkflowRegisteredV1, h *eventHandler, wfOwner []byte, wfName string, wfID string) {
+				err := h.workflowRegisteredEvent(ctx, event)
+				require.NoError(t, err)
+
 				// Verify the record is updated in the database
 				dbSpec, err := h.orm.GetWorkflowSpec(ctx, hex.EncodeToString(wfOwner), "workflow-name")
 				require.NoError(t, err)
@@ -322,7 +384,7 @@ type testCase struct {
 	WFOwner      []byte
 	fetcher      FetcherFunc
 	Event        func([]byte) WorkflowRegistryWorkflowRegisteredV1
-	validationFn func(t *testing.T, ctx context.Context, h *eventHandler, wfOwner []byte, wfName string, wfID string)
+	validationFn func(t *testing.T, ctx context.Context, event WorkflowRegistryWorkflowRegisteredV1, h *eventHandler, wfOwner []byte, wfName string, wfID string)
 }
 
 func testRunningWorkflow(t *testing.T, cmd testCase) {
@@ -363,10 +425,8 @@ func testRunningWorkflow(t *testing.T, cmd testCase) {
 			capRegistry:    registry,
 			workflowStore:  store,
 		}
-		err = h.workflowRegisteredEvent(ctx, event)
-		require.NoError(t, err)
 
-		cmd.validationFn(t, ctx, h, wfOwner, "workflow-name", wfID)
+		cmd.validationFn(t, ctx, event, h, wfOwner, "workflow-name", wfID)
 	})
 }
 
