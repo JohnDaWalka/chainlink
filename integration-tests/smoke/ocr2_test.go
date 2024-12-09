@@ -334,16 +334,19 @@ func assertCorrectNodeConfiguration(t *testing.T, l zerolog.Logger, totalNodeCou
 	close(resultsCh)
 
 	var correctlyConfiguredNodes []string
+	var incorrectlyConfiguredNodes []string
 
 	// check results
 	for result := range resultsCh {
 		for nodeName, patternsFound := range result {
 			if len(patternsFound) == len(expectedPatterns) {
 				correctlyConfiguredNodes = append(correctlyConfiguredNodes, nodeName)
+			} else {
+				incorrectlyConfiguredNodes = append(incorrectlyConfiguredNodes, nodeName)
 			}
 		}
 	}
 
-	require.Equal(t, len(correctlyConfiguredNodes), expectedNodeCount, "%d nodes' logs were missing expected plugin configuration entries. Correctly configured nodes: %s. Expected log patterns: %s", expectedNodeCount-len(correctlyConfiguredNodes), strings.Join(correctlyConfiguredNodes, ","), strings.Join(expectedPatterns, ","))
+	require.Equal(t, len(correctlyConfiguredNodes), expectedNodeCount, "%d nodes' logs were missing expected plugin configuration entries. Correctly configured nodes: %s. Nodes with missing configuration: %s. Expected log patterns: %s", expectedNodeCount-len(correctlyConfiguredNodes), strings.Join(correctlyConfiguredNodes, ", "), strings.Join(incorrectlyConfiguredNodes, ", "), strings.Join(expectedPatterns, ", "))
 	l.Info().Msg("All nodes have correct plugin configuration applied")
 }
