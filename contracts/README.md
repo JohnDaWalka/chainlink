@@ -17,7 +17,6 @@ $ npm install @chainlink/contracts --save
 │   └── v0.8
 │── abi # ABI json output
 │   └── v0.8
-└── gas-snapshots # gas metered results of available non-fuzz tests
 ```
 
 ### Usage
