@@ -2,6 +2,7 @@ package txm
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -38,12 +39,14 @@ func TestLifecycle(t *testing.T) {
 		lggr, observedLogs := logger.TestObserved(t, zap.DebugLevel)
 		config := Config{BlockTime: 1 * time.Minute}
 		txStore := storage.NewInMemoryStoreManager(lggr, testutils.FixtureChainID)
+		require.NoError(t, txStore.Add(address1))
 		keystore.On("EnabledAddressesForChain", mock.Anything, mock.Anything).Return([]common.Address{address1}, nil).Once()
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, nil, txStore, nil, config, keystore)
 		client.On("PendingNonceAt", mock.Anything, address1).Return(uint64(0), errors.New("error")).Once()
-		client.On("PendingNonceAt", mock.Anything, address1).Return(uint64(0), nil).Once()
+		client.On("PendingNonceAt", mock.Anything, address1).Return(uint64(100), nil).Once()
 		require.NoError(t, txm.Start(tests.Context(t)))
-		tests.AssertLogEventually(t, observedLogs, "Error when fetching initial pending nonce")
+		tests.AssertLogEventually(t, observedLogs, "Error when fetching initial nonce")
+		tests.AssertLogEventually(t, observedLogs, fmt.Sprintf("Set initial nonce for address: %v to %d", address1, 100))
 	})
 
 	t.Run("tests lifecycle successfully without any transactions", func(t *testing.T) {
@@ -89,7 +92,7 @@ func TestTrigger(t *testing.T) {
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, txStore, nil, config, keystore)
 		var nonce uint64
 		// Start
-		client.On("PendingNonceAt", mock.Anything, address).Return(nonce, nil).Once()
+		client.On("PendingNonceAt", mock.Anything, address).Return(nonce, nil).Maybe()
 		servicetest.Run(t, txm)
 		txm.Trigger(address)
 	})

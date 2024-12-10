@@ -137,45 +137,39 @@ func (t *Txm) Start(ctx context.Context) error {
 			return err
 		}
 		for _, address := range addresses {
-			err := t.startAddress(ctx, address)
-			if err != nil {
-				return err
-			}
+			t.startAddress(address)
 		}
 		return nil
 	})
 }
 
-func (t *Txm) startAddress(ctx context.Context, address common.Address) error {
+func (t *Txm) startAddress(address common.Address) {
 	triggerCh := make(chan struct{}, 1)
 	t.triggerCh[address] = triggerCh
-	pendingNonce, err := t.pollForPendingNonce(ctx, address)
-	if err != nil {
-		return err
-	}
-	t.setNonce(address, pendingNonce)
 
 	t.wg.Add(2)
 	go t.broadcastLoop(address, triggerCh)
 	go t.backfillLoop(address)
-	return nil
 }
 
-func (t *Txm) pollForPendingNonce(ctx context.Context, address common.Address) (pendingNonce uint64, err error) {
+func (t *Txm) initializeNonce(ctx context.Context, address common.Address) {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, pendingNonceDefaultTimeout)
 	defer cancel()
 	for {
-		pendingNonce, err = t.client.PendingNonceAt(ctxWithTimeout, address)
+		pendingNonce, err := t.client.PendingNonceAt(ctxWithTimeout, address)
 		if err != nil {
-			t.lggr.Errorw("Error when fetching initial pending nonce", "address", address, "err", err)
+			t.lggr.Errorw("Error when fetching initial nonce", "address", address, "err", err)
 			select {
 			case <-time.After(pendingNonceRecheckInterval):
 			case <-ctx.Done():
-				return 0, context.Cause(ctx)
+				t.lggr.Errorw("context error", "err", context.Cause(ctx))
+				return
 			}
 			continue
 		}
-		return pendingNonce, nil
+		t.setNonce(address, pendingNonce)
+		t.lggr.Debugf("Set initial nonce for address: %v to %d", address, pendingNonce)
+		return
 	}
 }
 
@@ -238,6 +232,8 @@ func (t *Txm) broadcastLoop(address common.Address, triggerCh chan struct{}) {
 	defer cancel()
 	broadcastWithBackoff := newBackoff(1 * time.Second)
 	var broadcastCh <-chan time.Time
+
+	t.initializeNonce(ctx, address)
 
 	for {
 		start := time.Now()
