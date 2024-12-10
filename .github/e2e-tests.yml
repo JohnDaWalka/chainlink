@@ -950,6 +950,7 @@ runner-test-matrix:
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.6.0
+      CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_token_price_updates_test.go:*
     path: integration-tests/smoke/ccip/ccip_token_price_updates_test.go
@@ -963,6 +964,7 @@ runner-test-matrix:
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.6.0
+      CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_gas_price_updates_test.go:*
     path: integration-tests/smoke/ccip/ccip_gas_price_updates_test.go
@@ -976,6 +978,7 @@ runner-test-matrix:
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.6.0
+      CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_TwoMessagesOnTwoLanesIncludingBatching$
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
@@ -991,6 +994,7 @@ runner-test-matrix:
       E2E_JD_VERSION: 0.6.0
       E2E_RMN_RAGEPROXY_VERSION: master-f461a9e
       E2E_RMN_AFN2PROXY_VERSION: master-f461a9e
+      CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_MultipleMessagesOnOneLaneNoWaitForExec$
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
@@ -1006,6 +1010,7 @@ runner-test-matrix:
       E2E_JD_VERSION: 0.6.0
       E2E_RMN_RAGEPROXY_VERSION: master-f461a9e
       E2E_RMN_AFN2PROXY_VERSION: master-f461a9e
+      CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_NotEnoughObservers$
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
@@ -1021,6 +1026,7 @@ runner-test-matrix:
       E2E_JD_VERSION: 0.6.0
       E2E_RMN_RAGEPROXY_VERSION: master-f461a9e
       E2E_RMN_AFN2PROXY_VERSION: master-f461a9e
+      CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_DifferentSigners$
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
@@ -1036,6 +1042,7 @@ runner-test-matrix:
       E2E_JD_VERSION: 0.6.0
       E2E_RMN_RAGEPROXY_VERSION: master-f461a9e
       E2E_RMN_AFN2PROXY_VERSION: master-f461a9e
+      CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_NotEnoughSigners$
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
@@ -1051,6 +1058,7 @@ runner-test-matrix:
       E2E_JD_VERSION: 0.6.0
       E2E_RMN_RAGEPROXY_VERSION: master-f461a9e
       E2E_RMN_AFN2PROXY_VERSION: master-f461a9e
+      CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_DifferentRmnNodesForDifferentChains$
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
@@ -1066,6 +1074,7 @@ runner-test-matrix:
       E2E_JD_VERSION: 0.6.0
       E2E_RMN_RAGEPROXY_VERSION: master-f461a9e
       E2E_RMN_AFN2PROXY_VERSION: master-f461a9e
+      CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_TwoMessagesOneSourceChainCursed$
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
@@ -1081,6 +1090,7 @@ runner-test-matrix:
       E2E_JD_VERSION: 0.6.0
       E2E_RMN_RAGEPROXY_VERSION: master-f461a9e
       E2E_RMN_AFN2PROXY_VERSION: master-f461a9e
+      CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_GlobalCurseTwoMessagesOnTwoLanes$
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
@@ -1096,6 +1106,7 @@ runner-test-matrix:
       E2E_JD_VERSION: 0.6.0
       E2E_RMN_RAGEPROXY_VERSION: master-f461a9e
       E2E_RMN_AFN2PROXY_VERSION: master-f461a9e
+      CCIP_V16_TEST_ENV: docker
 
   # END: CCIPv1.6 tests
 
