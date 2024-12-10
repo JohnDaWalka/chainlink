@@ -39,7 +39,7 @@
   "github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/rollups": "94c724cbc97f4b2bc07c7714f2c1a8bf86ab04677e0a99bf6b57809c0ec59442",
   "github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker": "ba8449a5fcaf712621827a86e096f7cb5a2bf4acfc2eb200d4ae8412fe533adf",
   "github.com/smartcontractkit/chainlink/v2/core/chains/evm/log": "6d856b7ad0ab39a626e6c7fb13f63e00184e1c76fda65d4c40a6eec4e9da8e4f",
-  "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller": "1aa6dd0591995084f4fdb89b843723a52d925bedf4c399917361e610fabdf6ad",
+  "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller": "40c56315a43bae7a71289d9fd33a39a631ebb885b8725a15c68191ab53f4ec67",
   "github.com/smartcontractkit/chainlink/v2/core/chains/evm/monitor": "cf1ade36fe56832a00a4c275117df1b142466742acedd3cba584151ef954529c",
   "github.com/smartcontractkit/chainlink/v2/core/chains/evm/testutils": "6e6eba26fc894ae901200ac0abbe6ef540f83afb9354bae668bc7eea3c206729",
   "github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr": "9e300344d74e302cf015e91966a84a7e2178d9ff808a0b3725a77127e65ce02a",
