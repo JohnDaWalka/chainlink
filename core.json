@@ -232,5 +232,6 @@
   "github.com/smartcontractkit/chainlink/v2/core/web/resolver": "dea460233b249696ed3b6029f2a0d73d440c3390db48d570c50947fadd9f9896",
   "github.com/smartcontractkit/chainlink/v2/plugins": "4cfe479942cf8082ac772b01085de4ec353f9225cd586a6372361fb703ee236c",
   "github.com/smartcontractkit/chainlink/v2/plugins/medianpoc": "dc42437c51c314af0f3dee58d5bb9a586bebce8939c247a7f4ce1409440c7222",
-  "github.com/smartcontractkit/chainlink/v2/tools/flakeytests": "99b41940cf3fed59c54caa6b7e34199e4f3ff57dd3170de5cd19726499199ec5"
+  "github.com/smartcontractkit/chainlink/v2/tools/flakeytests": "99b41940cf3fed59c54caa6b7e34199e4f3ff57dd3170de5cd19726499199ec5",
+  "github.com/smartcontractkit/chainlink/v2/tools/gomod-local-update/internal/updater": "2895f2ce8bc579c4d42d3f88a9700ebcd0437a293239593467586f00fa2c7cdb"
 }
