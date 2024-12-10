@@ -62,7 +62,7 @@ import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts
 ///       │    Active   │    revokeCandidate │  Candidate  │◄───────────┐
 ///       │    [1,0]    │◄───────────────────┤    [1,1]    │────────────┘
 ///       │             ├───────────────────►│             │
-///       └─────────────┘    setSecondary    └─────────────┘
+///       └─────────────┘    setCandidate    └─────────────┘
 ///
 contract CCIPHome is Ownable2StepMsgSender, ITypeAndVersion, ICapabilityConfiguration, IERC165 {
   using EnumerableSet for EnumerableSet.UintSet;
@@ -531,6 +531,15 @@ contract CCIPHome is Ownable2StepMsgSender, ITypeAndVersion, ICapabilityConfigur
   /// @return The total number of chains configured.
   function getNumChainConfigurations() external view returns (uint256) {
     return s_remoteChainSelectors.length();
+  }
+
+  /// @notice Returns the chain configuration for a given chain selector.
+  /// @param chainSelector The chain selector.
+  /// @return chainConfig The chain configuration.
+  function getChainConfig(
+    uint64 chainSelector
+  ) external view returns (ChainConfig memory) {
+    return s_chainConfigurations[chainSelector];
   }
 
   /// @notice Returns all the chain configurations.

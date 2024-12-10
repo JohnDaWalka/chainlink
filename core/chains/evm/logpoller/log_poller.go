@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"math/rand"
+	"math/rand/v2"
 	"sort"
 	"strings"
 	"sync"
@@ -687,7 +687,7 @@ func (lp *logPoller) backgroundWorkerRun() {
 
 	// Start initial prune of unmatched logs after 5-15 successful expired log prunes, so that not all chains start
 	// around the same time. After that, every 20 successful expired log prunes.
-	successfulExpiredLogPrunes := 5 + rand.Intn(10) //nolint:gosec
+	successfulExpiredLogPrunes := 5 + rand.IntN(10) //nolint:gosec // G404
 
 	for {
 		select {
@@ -1059,8 +1059,13 @@ func (lp *logPoller) PollAndSaveLogs(ctx context.Context, currentBlockNumber int
 			lp.lggr.Warnw("Unable to query for logs, retrying", "err", err, "block", currentBlockNumber)
 			return
 		}
-		lp.lggr.Debugw("Unfinalized log query", "logs", len(logs), "currentBlockNumber", currentBlockNumber, "blockHash", currentBlock.Hash, "timestamp", currentBlock.Timestamp.Unix())
-		block := NewLogPollerBlock(h, currentBlockNumber, currentBlock.Timestamp, latestFinalizedBlockNumber)
+		lp.lggr.Debugw("Unfinalized log query", "logs", len(logs), "currentBlockNumber", currentBlockNumber, "blockHash", currentBlock.Hash, "timestamp", currentBlock.Timestamp)
+		block := LogPollerBlock{
+			BlockHash:            h,
+			BlockNumber:          currentBlockNumber,
+			BlockTimestamp:       currentBlock.Timestamp,
+			FinalizedBlockNumber: latestFinalizedBlockNumber,
+		}
 		err = lp.orm.InsertLogsWithBlock(
 			ctx,
 			convertLogs(logs, []LogPollerBlock{block}, lp.lggr, lp.ec.ConfiguredChainID()),
@@ -1389,7 +1394,7 @@ func (lp *logPoller) fillRemainingBlocksFromRPC(
 			BlockNumber:          head.Number,
 			BlockTimestamp:       head.Timestamp,
 			FinalizedBlockNumber: head.Number, // always finalized; only matters if this block is returned by LatestBlock()
-			CreatedAt:            head.Timestamp,
+			CreatedAt:            head.CreatedAt,
 		}
 	}
 	return logPollerBlocks, nil
