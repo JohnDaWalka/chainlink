@@ -177,6 +177,9 @@ func TestBroadcastTransaction(t *testing.T) {
 		require.NoError(t, txStore.Add(address))
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, txStore, nil, config, keystore)
 		txm.setNonce(address, 8)
+		metrics, err := NewTxmMetrics(testutils.FixtureChainID)
+		require.NoError(t, err)
+		txm.metrics = metrics
 		IDK := "IDK"
 		txRequest := &types.TxRequest{
 			Data:              []byte{100, 200},

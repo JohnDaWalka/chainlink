@@ -9,8 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jpillora/backoff"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -67,25 +65,6 @@ type Keystore interface {
 	EnabledAddressesForChain(ctx context.Context, chainID *big.Int) (addresses []common.Address, err error)
 }
 
-var (
-	promNumBroadcastedTxs = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "txm_num_broadcasted_transactions",
-		Help: "Total number of successful broadcasted transactions.",
-	}, []string{"chainID"})
-	promNumConfirmedTxs = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "txm_num_confirmed_transactions",
-		Help: "Total number of confirmed transactions. Note that this can happen multiple times per transaction in the case of re-orgs or when filling the nonce for untracked transactions.",
-	}, []string{"chainID"})
-	promNumNonceGaps = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "txm_num_nonce_gaps",
-		Help: "Total number of nonce gaps created that the transaction manager had to fill.",
-	}, []string{"chainID"})
-	promTimeUntilTxConfirmed = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name: "txm_time_until_tx_confirmed",
-		Help: "The amount of time elapsed from a transaction being broadcast to being included in a block.",
-	}, []string{"chainID"})
-)
-
 type Config struct {
 	EIP1559             bool
 	BlockTime           time.Duration
@@ -104,6 +83,7 @@ type Txm struct {
 	txStore         TxStore
 	keystore        Keystore
 	config          Config
+	metrics         *txmMetrics
 
 	nonceMapMu sync.Mutex
 	nonceMap   map[common.Address]uint64
@@ -130,6 +110,11 @@ func NewTxm(lggr logger.Logger, chainID *big.Int, client Client, attemptBuilder 
 
 func (t *Txm) Start(ctx context.Context) error {
 	return t.StartOnce("Txm", func() error {
+		tm, err := NewTxmMetrics(t.chainID)
+		if err != nil {
+			return err
+		}
+		t.metrics = tm
 		t.stopCh = make(chan struct{})
 
 		addresses, err := t.keystore.EnabledAddressesForChain(ctx, t.chainID)
@@ -372,7 +357,7 @@ func (t *Txm) sendTransactionWithError(ctx context.Context, tx *types.Transactio
 		}
 	}
 
-	promNumBroadcastedTxs.WithLabelValues(t.chainID.String()).Add(float64(1))
+	t.metrics.IncrementNumBroadcastedTxs(ctx)
 	return t.txStore.UpdateTransactionBroadcast(ctx, attempt.TxID, *tx.Nonce, attempt.Hash, address)
 }
 
@@ -387,8 +372,8 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 		return false, err
 	}
 	if len(confirmedTransactions) > 0 || len(unconfirmedTransactionIDs) > 0 {
-		promNumConfirmedTxs.WithLabelValues(t.chainID.String()).Add(float64(len(confirmedTransactions)))
-		confirmedTransactionIDs := extractMetrics(confirmedTransactions, t.chainID)
+		t.metrics.IncrementNumConfirmedTxs(ctx, len(confirmedTransactions))
+		confirmedTransactionIDs := t.extractMetrics(ctx, confirmedTransactions)
 		t.lggr.Infof("Confirmed transaction IDs: %v . Re-orged transaction IDs: %v", confirmedTransactionIDs, unconfirmedTransactionIDs)
 	}
 
@@ -403,7 +388,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 
 	if tx == nil || *tx.Nonce != latestNonce {
 		t.lggr.Warnf("Nonce gap at nonce: %d - address: %v. Creating a new transaction\n", latestNonce, address)
-		promNumNonceGaps.WithLabelValues(t.chainID.String()).Add(float64(1))
+		t.metrics.IncrementNumNonceGaps(ctx)
 		return false, t.createAndSendEmptyTx(ctx, latestNonce, address)
 	} else { //nolint:revive //linter nonsense
 		if !tx.IsPurgeable && t.stuckTxDetector != nil {
@@ -446,12 +431,12 @@ func (t *Txm) createAndSendEmptyTx(ctx context.Context, latestNonce uint64, addr
 	return t.createAndSendAttempt(ctx, tx, address)
 }
 
-func extractMetrics(txs []*types.Transaction, chainID *big.Int) []uint64 {
+func (t *Txm) extractMetrics(ctx context.Context, txs []*types.Transaction) []uint64 {
 	confirmedTxIDs := make([]uint64, 0, len(txs))
 	for _, tx := range txs {
 		confirmedTxIDs = append(confirmedTxIDs, tx.ID)
 		if tx.InitialBroadcastAt != nil {
-			promTimeUntilTxConfirmed.WithLabelValues(chainID.String()).Observe(float64(time.Since(*tx.InitialBroadcastAt)))
+			t.metrics.RecordTimeUntilTxConfirmed(ctx, float64(time.Since(*tx.InitialBroadcastAt)))
 		}
 	}
 	return confirmedTxIDs
