@@ -246,7 +246,6 @@ func NewLocalDevEnvironment(
 			Config: changeset.NewChainsConfig{
 				HomeChainSel:       homeChainSel,
 				FeedChainSel:       feedSel,
-				OCRSecrets:         deployment.XXXGenerateTestOCRSecrets(),
 				ChainConfigByChain: chainConfigs,
 			},
 		},

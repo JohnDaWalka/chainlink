@@ -80,11 +80,23 @@ func TestAddChainInbound(t *testing.T) {
 	for _, chain := range initialDeploy {
 		chainConfig[chain] = DefaultOCRParams(e.FeedChainSel, nil, nil)
 	}
-	err = deployCCIPContracts(e.Env, newAddresses, NewChainsConfig{
+	newChainCfg := NewChainsConfig{
 		HomeChainSel:       e.HomeChainSel,
 		FeedChainSel:       e.FeedChainSel,
 		ChainConfigByChain: chainConfig,
-		OCRSecrets:         deployment.XXXGenerateTestOCRSecrets(),
+	}
+	e.Env, err = commonchangeset.ApplyChangesets(t, e.Env, nil, []commonchangeset.ChangesetApplication{
+		{
+			Changeset: commonchangeset.WrapChangeSet(DeployChainContracts),
+			Config: DeployChainContractsConfig{
+				ChainSelectors:    newChainCfg.Chains(),
+				HomeChainSelector: newChainCfg.HomeChainSel,
+			},
+		},
+		{
+			Changeset: commonchangeset.WrapChangeSet(ConfigureNewChains),
+			Config:    newChainCfg,
+		},
 	})
 	require.NoError(t, err)
 
@@ -191,7 +203,6 @@ func TestAddChainInbound(t *testing.T) {
 				NewChainSelector:  newChain,
 				PluginType:        types.PluginTypeCCIPCommit,
 				NodeIDs:           nodeIDs,
-				OCRSecrets:        deployment.XXXGenerateTestOCRSecrets(),
 				CCIPOCRParams: DefaultOCRParams(
 					e.FeedChainSel,
 					tokenConfig.GetTokenInfo(logger.TestLogger(t), state.Chains[newChain].LinkToken, state.Chains[newChain].Weth9),
@@ -207,7 +218,6 @@ func TestAddChainInbound(t *testing.T) {
 				NewChainSelector:  newChain,
 				PluginType:        types.PluginTypeCCIPExec,
 				NodeIDs:           nodeIDs,
-				OCRSecrets:        deployment.XXXGenerateTestOCRSecrets(),
 				CCIPOCRParams: DefaultOCRParams(
 					e.FeedChainSel,
 					tokenConfig.GetTokenInfo(logger.TestLogger(t), state.Chains[newChain].LinkToken, state.Chains[newChain].Weth9),
