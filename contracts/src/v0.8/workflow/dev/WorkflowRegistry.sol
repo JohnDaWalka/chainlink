@@ -99,7 +99,6 @@ contract WorkflowRegistry is Ownable2StepMsgSender, ITypeAndVersion {
   error WorkflowContentNotUpdated();
   error WorkflowDoesNotExist();
   error WorkflowIDAlreadyExists();
-  error WorkflowIDNotUpdated();
   error WorkflowNameTooLong(uint256 providedLength, uint8 maxAllowedLength);
 
   modifier registryNotLocked() {
@@ -278,18 +277,12 @@ contract WorkflowRegistry is Ownable2StepMsgSender, ITypeAndVersion {
   ) external registryNotLocked {
     _validateWorkflowURLs(bytes(binaryURL).length, bytes(configURL).length, bytes(secretsURL).length);
 
-    WorkflowMetadata storage workflow = _getWorkflowFromStorage(msg.sender, workflowKey);
+    WorkflowMetadata memory workflow = _getWorkflowFromStorage(msg.sender, workflowKey);
 
-    uint32 donID = workflow.donID;
-    _validatePermissions(donID, msg.sender);
+    _validatePermissions(workflow.donID, msg.sender);
 
     // Store the old workflowID for event emission.
     bytes32 currentWorkflowID = workflow.workflowID;
-
-    // Condition to revert: WorkflowID must change, and at least one URL must change
-    if (currentWorkflowID == newWorkflowID) {
-      revert WorkflowIDNotUpdated();
-    }
 
     // Determine which URLs have changed
     bool sameBinaryURL = Strings.equal(workflow.binaryURL, binaryURL);
@@ -306,12 +299,12 @@ contract WorkflowRegistry is Ownable2StepMsgSender, ITypeAndVersion {
     s_workflowIDs[currentWorkflowID] = false;
 
     // Update all fields that have changed and the relevant sets
-    workflow.workflowID = newWorkflowID;
+    s_workflows[workflowKey].workflowID = newWorkflowID;
     if (!sameBinaryURL) {
-      workflow.binaryURL = binaryURL;
+      s_workflows[workflowKey].binaryURL = binaryURL;
     }
     if (!sameConfigURL) {
-      workflow.configURL = configURL;
+      s_workflows[workflowKey].configURL = configURL;
     }
     if (!sameSecretsURL) {
       // Remove the old secrets hash if secretsURL is not empty
@@ -321,7 +314,7 @@ contract WorkflowRegistry is Ownable2StepMsgSender, ITypeAndVersion {
         s_secretsHashToWorkflows[oldSecretsHash].remove(workflowKey);
       }
 
-      workflow.secretsURL = secretsURL;
+      s_workflows[workflowKey].secretsURL = secretsURL;
 
       // Add the new secrets hash if secretsURL is not empty
       if (bytes(secretsURL).length > 0) {
@@ -332,7 +325,14 @@ contract WorkflowRegistry is Ownable2StepMsgSender, ITypeAndVersion {
 
     // Emit an event after updating the workflow
     emit WorkflowUpdatedV1(
-      currentWorkflowID, msg.sender, donID, newWorkflowID, workflow.workflowName, binaryURL, configURL, secretsURL
+      currentWorkflowID,
+      msg.sender,
+      workflow.donID,
+      newWorkflowID,
+      workflow.workflowName,
+      binaryURL,
+      configURL,
+      secretsURL
     );
   }
 
@@ -389,7 +389,7 @@ contract WorkflowRegistry is Ownable2StepMsgSender, ITypeAndVersion {
     bytes32 workflowKey
   ) external registryNotLocked {
     // Retrieve workflow metadata from storage
-    WorkflowMetadata storage workflow = _getWorkflowFromStorage(msg.sender, workflowKey);
+    WorkflowMetadata memory workflow = _getWorkflowFromStorage(msg.sender, workflowKey);
 
     // Only checking access for the caller instead of using _validatePermissions so that even if the DON was removed from the
     // allowed list, the workflow can still be deleted.
@@ -481,8 +481,7 @@ contract WorkflowRegistry is Ownable2StepMsgSender, ITypeAndVersion {
   /// @param newStatus The new status to set for the workflow (either `Paused` or `Active`).
   function _updateWorkflowStatus(bytes32 workflowKey, WorkflowStatus newStatus) internal {
     // Retrieve workflow metadata once
-    WorkflowMetadata storage workflow = _getWorkflowFromStorage(msg.sender, workflowKey);
-    uint32 donID = workflow.donID;
+    WorkflowMetadata memory workflow = _getWorkflowFromStorage(msg.sender, workflowKey);
 
     // Avoid unnecessary storage writes if already in the desired status
     if (workflow.status == newStatus) {
@@ -491,17 +490,17 @@ contract WorkflowRegistry is Ownable2StepMsgSender, ITypeAndVersion {
 
     // Check if the DON ID is allowed when activating a workflow
     if (newStatus == WorkflowStatus.ACTIVE) {
-      _validatePermissions(donID, msg.sender);
+      _validatePermissions(workflow.donID, msg.sender);
     }
 
     // Update the workflow status
-    workflow.status = newStatus;
+    s_workflows[workflowKey].status = newStatus;
 
     // Emit the appropriate event based on newStatus
     if (newStatus == WorkflowStatus.PAUSED) {
-      emit WorkflowPausedV1(workflow.workflowID, msg.sender, donID, workflow.workflowName);
+      emit WorkflowPausedV1(workflow.workflowID, msg.sender, workflow.donID, workflow.workflowName);
     } else if (newStatus == WorkflowStatus.ACTIVE) {
-      emit WorkflowActivatedV1(workflow.workflowID, msg.sender, donID, workflow.workflowName);
+      emit WorkflowActivatedV1(workflow.workflowID, msg.sender, workflow.donID, workflow.workflowName);
     }
   }
 
@@ -512,7 +511,7 @@ contract WorkflowRegistry is Ownable2StepMsgSender, ITypeAndVersion {
   function _getWorkflowFromStorage(
     address sender,
     bytes32 workflowKey
-  ) internal view returns (WorkflowMetadata storage workflow) {
+  ) internal view returns (WorkflowMetadata memory workflow) {
     workflow = s_workflows[workflowKey];
 
     if (workflow.owner == address(0)) revert WorkflowDoesNotExist();

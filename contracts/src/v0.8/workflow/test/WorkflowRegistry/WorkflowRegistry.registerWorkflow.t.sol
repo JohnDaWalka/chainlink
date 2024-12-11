@@ -139,7 +139,7 @@ contract WorkflowRegistry_registerWorkflow is WorkflowRegistrySetup {
   }
 
   // whenTheCallerIsAnAuthorizedAddress whenTheRegistryIsNotLocked whenTheDonIDIsAllowed
-  function test_RevertWhen_TheWorkflowIDIsAlreadyInUsedByAnotherWorkflow() external {
+  function test_RevertWhen_TheWorkflowIDIsAlreadyInUseByAnotherWorkflow() external {
     vm.startPrank(s_authorizedAddress);
 
     // Register a valid workflow first
