@@ -12,9 +12,9 @@
   "github.com/smartcontractkit/chainlink/deployment/environment/memory": "d846c15228a39db9ea512c9e6ce1303322643c9bad5863d5dbeab8035c8bc542",
   "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient": "1e05d50ca22f3bb9e867571b9b914e0b84cacef7422e0a41eec83bdbc0478422",
   "github.com/smartcontractkit/chainlink/deployment/environment/web/sdk/client": "5bf31479982957f983d975480c469e8cc2cae2f0edeedd645c0ab0594e175d1b",
-  "github.com/smartcontractkit/chainlink/deployment/keystone": "b21e6251c2088ab28a3a2622762da85825c3e50ef128a058bf1bcaed4ee0076c",
-  "github.com/smartcontractkit/chainlink/deployment/keystone/changeset": "fb2f13ae3d83df952c044cf17d3cadd5ea78de28d92fad9b6266563a3dd88b53",
-  "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal": "411c425f09f2ac04896c21f0a3cfd315ac5fbb58214695899fc837351fd01ed9",
-  "github.com/smartcontractkit/chainlink/deployment/keystone/test/changeset": "381d8ae813fd2479e63978e21e57c1b1a3e58eb55f2af7ecf3f6a0b2bd775cb6",
+  "github.com/smartcontractkit/chainlink/deployment/keystone": "7ae59d7e96788d34f57d66105a842b08679b253af66eeca38e496928eedb13d1",
+  "github.com/smartcontractkit/chainlink/deployment/keystone/changeset": "144d76cb515e5aae5b97aaa3c51c742bbd6829dc93fdb7b2f99ff4a2e3b60dc2",
+  "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal": "bffc74a3ff1dcbdf4aabb52f6a67f844e1766f394b995b0a4b61679a1d36b230",
+  "github.com/smartcontractkit/chainlink/deployment/keystone/test/changeset": "e907096017cfa234628f1d853b59f36a6f977bcf3e261b3a2ef3936e30419c4c",
   "github.com/smartcontractkit/chainlink/deployment/llo/changeset": "37096c057963592e4289635015a1ba06524d945336b8b5f59a056fc976a07a60"
 }
