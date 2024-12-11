@@ -1,2 +1,2 @@
 GETH_VERSION: 1.14.11
-workflow_registry_wrapper: ../../../contracts/solc/v0.8.24/WorkflowRegistry/WorkflowRegistry.abi ../../../contracts/solc/v0.8.24/WorkflowRegistry/WorkflowRegistry.bin bad48df0196c8a170a8e5486d0334183defd60e74bd89d3885989e00d6f13d23
+workflow_registry_wrapper: ../../../contracts/solc/v0.8.24/WorkflowRegistry/WorkflowRegistry.abi ../../../contracts/solc/v0.8.24/WorkflowRegistry/WorkflowRegistry.bin 996a828a643f73b9b7a3a24862700d7101f4cbd3d8a858584894923fabbfa71e
