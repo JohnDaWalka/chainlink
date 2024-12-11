@@ -1,6 +1,6 @@
 {
   "github.com/smartcontractkit/chainlink/deployment": "dcb8ebfeb2b3b0a776cbfe6979642d230b035316e01a1c865a06988adb136188",
-  "github.com/smartcontractkit/chainlink/deployment/ccip/changeset": "806187b917865918e75407803730fe9076fe7365677fed8ebbf16da559ee7d8f",
+  "github.com/smartcontractkit/chainlink/deployment/ccip/changeset": "699bfc69c30cf5632bea0beec60c1ad0237334d4c5e2a65e174d8543d763498d",
   "github.com/smartcontractkit/chainlink/deployment/ccip/view/v1_2": "8f2f1cf8070bd51f2a61d7f2771d7500783d1363df30d749e4ab5eba14a11a62",
   "github.com/smartcontractkit/chainlink/deployment/ccip/view/v1_5": "4cb04e6a5807a2752705c64b1d830a1c30d42801da4ec5f2ae7708fbed1150c4",
   "github.com/smartcontractkit/chainlink/deployment/ccip/view/v1_6": "96df810eae24942ab7c598fd1957d310696466bcd25040d0b7de075d87c3d0a3",
