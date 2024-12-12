@@ -44,17 +44,21 @@ func NewInMemoryStore(lggr logger.Logger, address common.Address, chainID *big.I
 		chainID:                 chainID,
 		UnstartedTransactions:   make([]*types.Transaction, 0, maxQueuedTransactions),
 		UnconfirmedTransactions: make(map[uint64]*types.Transaction),
-		ConfirmedTransactions:   make(map[uint64]*types.Transaction),
+		ConfirmedTransactions:   make(map[uint64]*types.Transaction, maxQueuedTransactions),
 		Transactions:            make(map[uint64]*types.Transaction),
 	}
 }
 
 func (m *InMemoryStore) AbandonPendingTransactions() {
+	// TODO: append existing fatal transactions and cap the size
 	m.Lock()
 	defer m.Unlock()
 
 	for _, tx := range m.UnstartedTransactions {
 		tx.State = types.TxFatalError
+	}
+	for _, tx := range m.FatalTransactions {
+		delete(m.Transactions, tx.ID)
 	}
 	m.FatalTransactions = m.UnstartedTransactions
 	m.UnstartedTransactions = []*types.Transaction{}
@@ -184,6 +188,11 @@ func (m *InMemoryStore) MarkConfirmedAndReorgedTransactions(latestNonce uint64) 
 		if tx.Nonce == nil {
 			return nil, nil, fmt.Errorf("nonce for txID: %v is empty", tx.ID)
 		}
+		existingTx, exists := m.ConfirmedTransactions[*tx.Nonce]
+		if exists {
+			m.lggr.Errorw("Another confirmed transaction with the same nonce exists. Transaction will overwritten.",
+				"existingTx", existingTx, "newTx", tx)
+		}
 		if *tx.Nonce < latestNonce {
 			tx.State = types.TxConfirmed
 			confirmedTransactions = append(confirmedTransactions, tx.DeepCopy())
@@ -197,6 +206,11 @@ func (m *InMemoryStore) MarkConfirmedAndReorgedTransactions(latestNonce uint64) 
 		if tx.Nonce == nil {
 			return nil, nil, fmt.Errorf("nonce for txID: %v is empty", tx.ID)
 		}
+		existingTx, exists := m.UnconfirmedTransactions[*tx.Nonce]
+		if exists {
+			m.lggr.Errorw("Another unconfirmed transaction with the same nonce exists. Transaction will overwritten.",
+				"existingTx", existingTx, "newTx", tx)
+		}
 		if *tx.Nonce >= latestNonce {
 			tx.State = types.TxUnconfirmed
 			tx.LastBroadcastAt = nil // Mark reorged transaction as if it wasn't broadcasted before
@@ -206,7 +220,7 @@ func (m *InMemoryStore) MarkConfirmedAndReorgedTransactions(latestNonce uint64) 
 		}
 	}
 
-	if len(m.ConfirmedTransactions) >= maxQueuedTransactions {
+	if len(m.ConfirmedTransactions) > maxQueuedTransactions {
 		prunedTxIDs := m.pruneConfirmedTransactions()
 		m.lggr.Debugf("Confirmed transactions map for address: %v reached max limit of: %d. Pruned 1/%d of the oldest confirmed transactions. TxIDs: %v",
 			m.address, maxQueuedTransactions, pruneSubset, prunedTxIDs)
@@ -247,7 +261,7 @@ func (m *InMemoryStore) UpdateTransactionBroadcast(txID uint64, txNonce uint64, 
 	}
 	a, err := unconfirmedTx.FindAttemptByHash(attemptHash)
 	if err != nil {
-		return err
+		return fmt.Errorf("UpdateTransactionBroadcast failed to find attempt. %w", err)
 	}
 	a.BroadcastAt = &now
 

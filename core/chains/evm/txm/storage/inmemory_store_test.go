@@ -8,8 +8,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/types"
@@ -19,8 +21,8 @@ func TestAbandonPendingTransactions(t *testing.T) {
 	t.Parallel()
 
 	fromAddress := testutils.NewAddress()
-	m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 	t.Run("abandons unstarted and unconfirmed transactions", func(t *testing.T) {
+		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		// Unstarted
 		tx1 := insertUnstartedTransaction(m)
 		tx2 := insertUnstartedTransaction(m)
@@ -40,6 +42,7 @@ func TestAbandonPendingTransactions(t *testing.T) {
 	})
 
 	t.Run("skips all types apart from unstarted and unconfirmed transactions", func(t *testing.T) {
+		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 		// Fatal
 		tx1 := insertFataTransaction(m)
 		tx2 := insertFataTransaction(m)
@@ -56,6 +59,7 @@ func TestAbandonPendingTransactions(t *testing.T) {
 		assert.Equal(t, types.TxFatalError, tx2.State)
 		assert.Equal(t, types.TxConfirmed, tx3.State)
 		assert.Equal(t, types.TxConfirmed, tx4.State)
+		assert.Len(t, m.Transactions, 2) // tx1, tx2 were dropped
 	})
 }
 
@@ -65,33 +69,39 @@ func TestAppendAttemptToTransaction(t *testing.T) {
 	fromAddress := testutils.NewAddress()
 	m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
 
-	_, err := insertUnconfirmedTransaction(m, 0) // txID = 1
+	_, err := insertUnconfirmedTransaction(m, 10) // txID = 1, nonce = 10
 	require.NoError(t, err)
-	_, err = insertConfirmedTransaction(m, 2) // txID = 1
+	_, err = insertConfirmedTransaction(m, 2) // txID = 2, nonce = 2
 	require.NoError(t, err)
 
 	t.Run("fails if corresponding unconfirmed transaction for attempt was not found", func(t *testing.T) {
 		var nonce uint64 = 1
-		newAttempt := &types.Attempt{
-			TxID: 1,
-		}
-		require.Error(t, m.AppendAttemptToTransaction(nonce, newAttempt))
+		newAttempt := &types.Attempt{}
+		err := m.AppendAttemptToTransaction(nonce, newAttempt)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "unconfirmed tx was not found")
 	})
 
-	t.Run("fails if unconfirmed transaction was found but has doesn't match the txID", func(t *testing.T) {
-		var nonce uint64
+	t.Run("fails if unconfirmed transaction was found but doesn't match the txID", func(t *testing.T) {
+		var nonce uint64 = 10
 		newAttempt := &types.Attempt{
 			TxID: 2,
 		}
-		require.Error(t, m.AppendAttemptToTransaction(nonce, newAttempt))
+		err := m.AppendAttemptToTransaction(nonce, newAttempt)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "attempt points to a different txID")
 	})
 
 	t.Run("appends attempt to transaction", func(t *testing.T) {
-		var nonce uint64
+		var nonce uint64 = 10
 		newAttempt := &types.Attempt{
 			TxID: 1,
 		}
 		require.NoError(t, m.AppendAttemptToTransaction(nonce, newAttempt))
+		tx, _ := m.FetchUnconfirmedTransactionAtNonceWithCount(10)
+		assert.Len(t, tx.Attempts, 1)
+		assert.Equal(t, uint16(1), tx.AttemptCount)
+		assert.False(t, tx.Attempts[0].CreatedAt.IsZero())
 	})
 }
 
@@ -105,6 +115,10 @@ func TestCountUnstartedTransactions(t *testing.T) {
 
 	insertUnstartedTransaction(m)
 	assert.Equal(t, 1, m.CountUnstartedTransactions())
+
+	_, err := insertConfirmedTransaction(m, 10)
+	require.NoError(t, err)
+	assert.Equal(t, 1, m.CountUnstartedTransactions())
 }
 
 func TestCreateEmptyUnconfirmedTransaction(t *testing.T) {
@@ -112,16 +126,23 @@ func TestCreateEmptyUnconfirmedTransaction(t *testing.T) {
 
 	fromAddress := testutils.NewAddress()
 	m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
-	_, err := insertUnconfirmedTransaction(m, 0)
+	_, err := insertUnconfirmedTransaction(m, 1)
+	require.NoError(t, err)
+	_, err = insertConfirmedTransaction(m, 0)
 	require.NoError(t, err)
 
 	t.Run("fails if unconfirmed transaction with the same nonce exists", func(t *testing.T) {
+		_, err := m.CreateEmptyUnconfirmedTransaction(1, 0)
+		require.Error(t, err)
+	})
+
+	t.Run("fails if confirmed transaction with the same nonce exists", func(t *testing.T) {
 		_, err := m.CreateEmptyUnconfirmedTransaction(0, 0)
 		require.Error(t, err)
 	})
 
 	t.Run("creates a new empty unconfirmed transaction", func(t *testing.T) {
-		tx, err := m.CreateEmptyUnconfirmedTransaction(1, 0)
+		tx, err := m.CreateEmptyUnconfirmedTransaction(2, 0)
 		require.NoError(t, err)
 		assert.Equal(t, types.TxUnconfirmed, tx.State)
 	})
@@ -185,7 +206,7 @@ func TestFetchUnconfirmedTransactionAtNonceWithCount(t *testing.T) {
 	assert.Equal(t, 1, count)
 }
 
-func TestMarkTransactionsConfirmed(t *testing.T) {
+func TestMarkConfirmedAndReorgedTransactions(t *testing.T) {
 	t.Parallel()
 
 	fromAddress := testutils.NewAddress()
@@ -245,17 +266,33 @@ func TestMarkTransactionsConfirmed(t *testing.T) {
 		assert.Equal(t, utxs[0], ctx2.ID)
 		assert.Empty(t, ctxs)
 	})
+
+	t.Run("logs an error during confirmation if a transaction with the same nonce already exists", func(t *testing.T) {
+		lggr, observedLogs := logger.TestObserved(t, zap.DebugLevel)
+		m := NewInMemoryStore(lggr, fromAddress, testutils.FixtureChainID)
+		_, err := insertConfirmedTransaction(m, 0)
+		require.NoError(t, err)
+		_, err = insertUnconfirmedTransaction(m, 0)
+		require.NoError(t, err)
+
+		_, _, err = m.MarkConfirmedAndReorgedTransactions(1)
+		require.NoError(t, err)
+		tests.AssertLogEventually(t, observedLogs, "Another confirmed transaction with the same nonce exists")
+	})
+
 	t.Run("prunes confirmed transactions map if it reaches the limit", func(t *testing.T) {
 		m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
-		for i := 0; i < maxQueuedTransactions; i++ {
+		overshot := 5
+		for i := 0; i < maxQueuedTransactions+overshot; i++ {
 			//nolint:gosec // this won't overflow
 			_, err := insertConfirmedTransaction(m, uint64(i))
 			require.NoError(t, err)
 		}
-		assert.Len(t, m.ConfirmedTransactions, maxQueuedTransactions)
-		_, _, err := m.MarkConfirmedAndReorgedTransactions(maxQueuedTransactions)
+		assert.Len(t, m.ConfirmedTransactions, maxQueuedTransactions+overshot)
+		//nolint:gosec // this won't overflow
+		_, _, err := m.MarkConfirmedAndReorgedTransactions(uint64(maxQueuedTransactions + overshot))
 		require.NoError(t, err)
-		assert.Len(t, m.ConfirmedTransactions, (maxQueuedTransactions - maxQueuedTransactions/pruneSubset))
+		assert.Len(t, m.ConfirmedTransactions, 170)
 	})
 }
 
@@ -389,6 +426,23 @@ func TestDeleteAttemptForUnconfirmedTx(t *testing.T) {
 	})
 }
 
+func TestFindTxWithIdempotencyKey(t *testing.T) {
+	t.Parallel()
+	fromAddress := testutils.NewAddress()
+	m := NewInMemoryStore(logger.Test(t), fromAddress, testutils.FixtureChainID)
+	tx, err := insertConfirmedTransaction(m, 0)
+	require.NoError(t, err)
+
+	ik := "IK"
+	tx.IdempotencyKey = &ik
+	itx := m.FindTxWithIdempotencyKey(ik)
+	assert.Equal(t, ik, *itx.IdempotencyKey)
+
+	uik := "Unknown"
+	itx = m.FindTxWithIdempotencyKey(uik)
+	assert.Nil(t, itx)
+}
+
 func TestPruneConfirmedTransactions(t *testing.T) {
 	t.Parallel()
 	fromAddress := testutils.NewAddress()
@@ -424,6 +478,7 @@ func insertUnstartedTransaction(m *InMemoryStore) *types.Transaction {
 	}
 
 	m.UnstartedTransactions = append(m.UnstartedTransactions, tx)
+	m.Transactions[tx.ID] = tx
 	return tx
 }
 
@@ -449,6 +504,7 @@ func insertUnconfirmedTransaction(m *InMemoryStore, nonce uint64) (*types.Transa
 	}
 
 	m.UnconfirmedTransactions[nonce] = tx
+	m.Transactions[tx.ID] = tx
 	return tx, nil
 }
 
@@ -474,6 +530,7 @@ func insertConfirmedTransaction(m *InMemoryStore, nonce uint64) (*types.Transact
 	}
 
 	m.ConfirmedTransactions[nonce] = tx
+	m.Transactions[tx.ID] = tx
 	return tx, nil
 }
 
@@ -496,5 +553,6 @@ func insertFataTransaction(m *InMemoryStore) *types.Transaction {
 	}
 
 	m.FatalTransactions = append(m.FatalTransactions, tx)
+	m.Transactions[tx.ID] = tx
 	return tx
 }
