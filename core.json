@@ -19,7 +19,7 @@
   "github.com/smartcontractkit/chainlink/v2/core/capabilities/gateway_connector": "791517ce1f2aec149efd9c69428f1d3d72aee619778314f2ae01494d3905a801",
   "github.com/smartcontractkit/chainlink/v2/core/capabilities/integration_tests/keystone": "c7cf0f3796eb697c986e5f20f63d6b8945fece9ae6c8b4fe09f4265101917112",
   "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote": "e99d10aa6ec8f76f516f6392c0ff8c29a4724c6a74148a5bce335641b0593a64",
-  "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable": "ed5a4f76362adfd5c817b67d482b521245be9821df88c7f5b9ded7aab3b7ac61",
+  "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable": "651bc98e974dc862d370e86c851960b15b1eb414605b60360192283175fea248",
   "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable/request": "b41ea72774f8aee1b951a02ec2a2739b05f7c8e2da6a0945d53bcb78d2947127",
   "github.com/smartcontractkit/chainlink/v2/core/capabilities/streams": "29a3b706826bb6e78f24bf50edead2581ec74093604bc6aeafd6ab83cfef37ae",
   "github.com/smartcontractkit/chainlink/v2/core/capabilities/targets": "ce35dfd24e9a38471a71fd65fafc2068f137ceec60aaa25e00122c8cbbc839f1",
