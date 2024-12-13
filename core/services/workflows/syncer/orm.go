@@ -3,6 +3,7 @@ package syncer
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -24,6 +25,9 @@ type WorkflowSecretsDS interface {
 
 	// GetContentsByHash returns the contents of the secret at the given hashed URL.
 	GetContentsByHash(ctx context.Context, hash string) (string, error)
+
+	// GetContentsByWorkflowID returns the contents and secrets_url of the secret for the given workflow.
+	GetContentsByWorkflowID(ctx context.Context, workflowID string) (string, string, error)
 
 	// GetSecretsURLHash returns the keccak256 hash of the owner and secrets URL.
 	GetSecretsURLHash(owner, secretsURL []byte) ([]byte, error)
@@ -48,6 +52,9 @@ type WorkflowSpecsDS interface {
 
 	// DeleteWorkflowSpec deletes the workflow spec for the given owner and name.
 	DeleteWorkflowSpec(ctx context.Context, owner, name string) error
+
+	// GetWorkflowSpecByID returns the workflow spec for the given workflowID.
+	GetWorkflowSpecByID(ctx context.Context, id string) (*job.WorkflowSpec, error)
 }
 
 type ORM interface {
@@ -121,6 +128,47 @@ func (orm *orm) GetContents(ctx context.Context, url string) (string, error) {
 	}
 
 	return contents, nil // Return the populated Artifact struct
+}
+
+type Int struct {
+	sql.NullInt64
+}
+
+type joinRecord struct {
+	SecretsID      sql.NullString `db:"wspec_secrets_id"`
+	SecretsURLHash sql.NullString `db:"wsec_secrets_url_hash"`
+	Contents       sql.NullString `db:"wsec_contents"`
+}
+
+var ErrEmptySecrets = errors.New("secrets field is empty")
+
+// GetContentsByWorkflowID joins the workflow_secrets on the workflow_specs table and gets
+// the associated secrets contents.
+func (orm *orm) GetContentsByWorkflowID(ctx context.Context, workflowID string) (string, string, error) {
+	var jr joinRecord
+	err := orm.ds.GetContext(
+		ctx,
+		&jr,
+		`SELECT wsec.secrets_url_hash AS wsec_secrets_url_hash, wsec.contents AS wsec_contents, wspec.secrets_id AS wspec_secrets_id
+	FROM workflow_specs AS wspec
+	LEFT JOIN
+		workflow_secrets AS wsec ON wspec.secrets_id = wsec.id
+	WHERE wspec.workflow_id = $1`,
+		workflowID,
+	)
+	if err != nil {
+		return "", "", err
+	}
+
+	if !jr.SecretsID.Valid {
+		return "", "", ErrEmptySecrets
+	}
+
+	if jr.Contents.String == "" {
+		return "", "", ErrEmptySecrets
+	}
+
+	return jr.SecretsURLHash.String, jr.Contents.String, nil
 }
 
 // Update updates the secrets content at the given hash or inserts a new record if not found.
@@ -287,10 +335,13 @@ func (orm *orm) UpsertWorkflowSpecWithSecrets(
 				status = EXCLUDED.status,
 				binary_url = EXCLUDED.binary_url,
 				config_url = EXCLUDED.config_url,
-				secrets_id = EXCLUDED.secrets_id,
 				created_at = EXCLUDED.created_at,
 				updated_at = EXCLUDED.updated_at,
-				spec_type = EXCLUDED.spec_type
+				spec_type = EXCLUDED.spec_type,
+				secrets_id = CASE
+					WHEN workflow_specs.secrets_id IS NULL THEN EXCLUDED.secrets_id
+					ELSE workflow_specs.secrets_id
+				END
 			RETURNING id
 		`
 
@@ -315,6 +366,22 @@ func (orm *orm) GetWorkflowSpec(ctx context.Context, owner, name string) (*job.W
 
 	var spec job.WorkflowSpec
 	err := orm.ds.GetContext(ctx, &spec, query, owner, name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &spec, nil
+}
+
+func (orm *orm) GetWorkflowSpecByID(ctx context.Context, id string) (*job.WorkflowSpec, error) {
+	query := `
+		SELECT *
+		FROM workflow_specs
+		WHERE workflow_id = $1
+	`
+
+	var spec job.WorkflowSpec
+	err := orm.ds.GetContext(ctx, &spec, query, id)
 	if err != nil {
 		return nil, err
 	}
