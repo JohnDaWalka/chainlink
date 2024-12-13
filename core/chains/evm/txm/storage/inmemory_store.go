@@ -42,18 +42,23 @@ func NewInMemoryStore(lggr logger.Logger, address common.Address, chainID *big.I
 		lggr:                    logger.Named(lggr, "InMemoryStore"),
 		address:                 address,
 		chainID:                 chainID,
+		UnstartedTransactions:   make([]*types.Transaction, 0, maxQueuedTransactions),
 		UnconfirmedTransactions: make(map[uint64]*types.Transaction),
-		ConfirmedTransactions:   make(map[uint64]*types.Transaction),
+		ConfirmedTransactions:   make(map[uint64]*types.Transaction, maxQueuedTransactions),
 		Transactions:            make(map[uint64]*types.Transaction),
 	}
 }
 
 func (m *InMemoryStore) AbandonPendingTransactions() {
+	// TODO: append existing fatal transactions and cap the size
 	m.Lock()
 	defer m.Unlock()
 
 	for _, tx := range m.UnstartedTransactions {
 		tx.State = types.TxFatalError
+	}
+	for _, tx := range m.FatalTransactions {
+		delete(m.Transactions, tx.ID)
 	}
 	m.FatalTransactions = m.UnstartedTransactions
 	m.UnstartedTransactions = []*types.Transaction{}
@@ -97,7 +102,6 @@ func (m *InMemoryStore) CreateEmptyUnconfirmedTransaction(nonce uint64, gasLimit
 	m.Lock()
 	defer m.Unlock()
 
-	m.txIDCount++
 	emptyTx := &types.Transaction{
 		ID:                m.txIDCount,
 		ChainID:           m.chainID,
@@ -114,10 +118,11 @@ func (m *InMemoryStore) CreateEmptyUnconfirmedTransaction(nonce uint64, gasLimit
 		return nil, fmt.Errorf("an unconfirmed tx with the same nonce already exists: %v", m.UnconfirmedTransactions[nonce])
 	}
 
-	if _, exists := m.Transactions[nonce]; exists {
-		return nil, fmt.Errorf("a tx with the same nonce already exists: %v", m.Transactions[nonce])
+	if _, exists := m.ConfirmedTransactions[nonce]; exists {
+		return nil, fmt.Errorf("a confirmed tx with the same nonce already exists: %v", m.ConfirmedTransactions[nonce])
 	}
 
+	m.txIDCount++
 	m.UnconfirmedTransactions[nonce] = emptyTx
 	m.Transactions[emptyTx.ID] = emptyTx
 
@@ -127,8 +132,6 @@ func (m *InMemoryStore) CreateEmptyUnconfirmedTransaction(nonce uint64, gasLimit
 func (m *InMemoryStore) CreateTransaction(txRequest *types.TxRequest) *types.Transaction {
 	m.Lock()
 	defer m.Unlock()
-
-	m.txIDCount++
 
 	tx := &types.Transaction{
 		ID:                m.txIDCount,
@@ -147,13 +150,17 @@ func (m *InMemoryStore) CreateTransaction(txRequest *types.TxRequest) *types.Tra
 		SignalCallback:    txRequest.SignalCallback,
 	}
 
-	if len(m.UnstartedTransactions) == maxQueuedTransactions {
-		m.lggr.Warnf("Unstarted transactions queue for address: %v reached max limit of: %d. Dropping oldest transaction: %v.",
-			m.address, maxQueuedTransactions, m.UnstartedTransactions[0])
-		delete(m.Transactions, m.UnstartedTransactions[0].ID)
-		m.UnstartedTransactions = m.UnstartedTransactions[1:maxQueuedTransactions]
+	uLen := len(m.UnstartedTransactions)
+	if uLen >= maxQueuedTransactions {
+		m.lggr.Warnw(fmt.Sprintf("Unstarted transactions queue for address: %v reached max limit of: %d. Dropping oldest transactions", m.address, maxQueuedTransactions),
+			"txs", m.UnstartedTransactions[0:uLen-maxQueuedTransactions+1]) // need to make room for the new tx
+		for _, tx := range m.UnstartedTransactions[0 : uLen-maxQueuedTransactions+1] {
+			delete(m.Transactions, tx.ID)
+		}
+		m.UnstartedTransactions = m.UnstartedTransactions[uLen-maxQueuedTransactions+1:]
 	}
 
+	m.txIDCount++
 	txCopy := tx.DeepCopy()
 	m.Transactions[txCopy.ID] = txCopy
 	m.UnstartedTransactions = append(m.UnstartedTransactions, txCopy)
@@ -181,6 +188,11 @@ func (m *InMemoryStore) MarkConfirmedAndReorgedTransactions(latestNonce uint64) 
 		if tx.Nonce == nil {
 			return nil, nil, fmt.Errorf("nonce for txID: %v is empty", tx.ID)
 		}
+		existingTx, exists := m.ConfirmedTransactions[*tx.Nonce]
+		if exists {
+			m.lggr.Errorw("Another confirmed transaction with the same nonce exists. Transaction will overwritten.",
+				"existingTx", existingTx, "newTx", tx)
+		}
 		if *tx.Nonce < latestNonce {
 			tx.State = types.TxConfirmed
 			confirmedTransactions = append(confirmedTransactions, tx.DeepCopy())
@@ -194,19 +206,24 @@ func (m *InMemoryStore) MarkConfirmedAndReorgedTransactions(latestNonce uint64) 
 		if tx.Nonce == nil {
 			return nil, nil, fmt.Errorf("nonce for txID: %v is empty", tx.ID)
 		}
+		existingTx, exists := m.UnconfirmedTransactions[*tx.Nonce]
+		if exists {
+			m.lggr.Errorw("Another unconfirmed transaction with the same nonce exists. Transaction will overwritten.",
+				"existingTx", existingTx, "newTx", tx)
+		}
 		if *tx.Nonce >= latestNonce {
 			tx.State = types.TxUnconfirmed
-			tx.LastBroadcastAt = time.Time{} // Mark reorged transaction as if it wasn't broadcasted before
+			tx.LastBroadcastAt = nil // Mark reorged transaction as if it wasn't broadcasted before
 			unconfirmedTransactionIDs = append(unconfirmedTransactionIDs, tx.ID)
 			m.UnconfirmedTransactions[*tx.Nonce] = tx
 			delete(m.ConfirmedTransactions, *tx.Nonce)
 		}
 	}
 
-	if len(m.ConfirmedTransactions) >= maxQueuedTransactions {
+	if len(m.ConfirmedTransactions) > maxQueuedTransactions {
 		prunedTxIDs := m.pruneConfirmedTransactions()
-		m.lggr.Debugf("Confirmed transactions map for address: %v reached max limit of: %d. Pruned 1/3 of the oldest confirmed transactions. TxIDs: %v",
-			m.address, maxQueuedTransactions, prunedTxIDs)
+		m.lggr.Debugf("Confirmed transactions map for address: %v reached max limit of: %d. Pruned 1/%d of the oldest confirmed transactions. TxIDs: %v",
+			m.address, maxQueuedTransactions, pruneSubset, prunedTxIDs)
 	}
 	sort.Slice(confirmedTransactions, func(i, j int) bool { return confirmedTransactions[i].ID < confirmedTransactions[j].ID })
 	sort.Slice(unconfirmedTransactionIDs, func(i, j int) bool { return unconfirmedTransactionIDs[i] < unconfirmedTransactionIDs[j] })
@@ -238,15 +255,15 @@ func (m *InMemoryStore) UpdateTransactionBroadcast(txID uint64, txNonce uint64, 
 
 	// Set the same time for both the tx and its attempt
 	now := time.Now()
-	unconfirmedTx.LastBroadcastAt = now
-	if unconfirmedTx.InitialBroadcastAt.IsZero() {
-		unconfirmedTx.InitialBroadcastAt = now
+	unconfirmedTx.LastBroadcastAt = &now
+	if unconfirmedTx.InitialBroadcastAt == nil {
+		unconfirmedTx.InitialBroadcastAt = &now
 	}
 	a, err := unconfirmedTx.FindAttemptByHash(attemptHash)
 	if err != nil {
-		return err
+		return fmt.Errorf("UpdateTransactionBroadcast failed to find attempt. %w", err)
 	}
-	a.BroadcastAt = now
+	a.BroadcastAt = &now
 
 	return nil
 }
@@ -262,10 +279,6 @@ func (m *InMemoryStore) UpdateUnstartedTransactionWithNonce(nonce uint64) (*type
 
 	if _, exists := m.UnconfirmedTransactions[nonce]; exists {
 		return nil, fmt.Errorf("an unconfirmed tx with the same nonce already exists: %v", m.UnconfirmedTransactions[nonce])
-	}
-
-	if _, exists := m.Transactions[nonce]; exists {
-		return nil, fmt.Errorf("a tx with the same nonce already exists: %v", m.Transactions[nonce])
 	}
 
 	tx := m.UnstartedTransactions[0]
@@ -328,15 +341,13 @@ func (m *InMemoryStore) MarkTxFatal(*types.Transaction) error {
 }
 
 // Orchestrator
-func (m *InMemoryStore) FindTxWithIdempotencyKey(idempotencyKey *string) *types.Transaction {
+func (m *InMemoryStore) FindTxWithIdempotencyKey(idempotencyKey string) *types.Transaction {
 	m.RLock()
 	defer m.RUnlock()
 
-	if idempotencyKey != nil {
-		for _, tx := range m.Transactions {
-			if tx.IdempotencyKey != nil && tx.IdempotencyKey == idempotencyKey {
-				return tx.DeepCopy()
-			}
+	for _, tx := range m.Transactions {
+		if tx.IdempotencyKey != nil && *tx.IdempotencyKey == idempotencyKey {
+			return tx.DeepCopy()
 		}
 	}
 

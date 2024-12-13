@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"strconv"
+	"reflect"
 	"time"
 
 	"github.com/google/uuid"
@@ -42,8 +42,8 @@ type Transaction struct {
 	SpecifiedGasLimit uint64
 
 	CreatedAt          time.Time
-	InitialBroadcastAt time.Time
-	LastBroadcastAt    time.Time
+	InitialBroadcastAt *time.Time
+	LastBroadcastAt    *time.Time
 
 	State        TxState
 	IsPurgeable  bool
@@ -60,29 +60,30 @@ type Transaction struct {
 	CallbackCompleted bool
 }
 
-func (t *Transaction) PrettyPrint() string {
-	idk, nonce := "<nil>", "<nil>"
-	if t.IdempotencyKey != nil {
-		idk = *t.IdempotencyKey
-	}
-	if t.Nonce != nil {
-		nonce = strconv.FormatUint(*t.Nonce, 10)
-	}
+func (t *Transaction) String() string {
 	return fmt.Sprintf(`{txID:%d, IdempotencyKey:%v, ChainID:%v, Nonce:%s, FromAddress:%v, ToAddress:%v, Value:%v, `+
-		`Data:%s, SpecifiedGasLimit:%d, CreatedAt:%v, InitialBroadcastAt:%v, LastBroadcastAt:%v, State:%v, IsPurgeable:%v, AttemptCount:%d, `+
+		`Data:%X, SpecifiedGasLimit:%d, CreatedAt:%v, InitialBroadcastAt:%v, LastBroadcastAt:%v, State:%v, IsPurgeable:%v, AttemptCount:%d, `+
 		`Meta:%v, Subject:%v}`,
-		t.ID, idk, t.ChainID, nonce, t.FromAddress, t.ToAddress, t.Value, t.Data, t.SpecifiedGasLimit, t.CreatedAt, t.InitialBroadcastAt,
-		t.LastBroadcastAt, t.State, t.IsPurgeable, t.AttemptCount, t.Meta, t.Subject)
+		t.ID, stringOrNull(t.IdempotencyKey), t.ChainID, stringOrNull(t.Nonce), t.FromAddress, t.ToAddress, t.Value,
+		reflect.ValueOf(&t.Data).Elem(), t.SpecifiedGasLimit, t.CreatedAt, stringOrNull(t.InitialBroadcastAt), stringOrNull(t.LastBroadcastAt),
+		t.State, t.IsPurgeable, t.AttemptCount, t.Meta, t.Subject)
 }
 
-func (t *Transaction) PrettyPrintWithAttempts() string {
+func stringOrNull[T any](t *T) string {
+	if t != nil {
+		return fmt.Sprintf("%v", *t)
+	}
+	return "null"
+}
+
+func (t *Transaction) PrintWithAttempts() string {
 	attempts := " Attempts: ["
 	for _, a := range t.Attempts {
-		attempts += a.PrettyPrint() + ", "
+		attempts += a.String() + ", "
 	}
 	attempts += "]"
 
-	return t.PrettyPrint() + attempts
+	return t.String() + attempts
 }
 
 func (t *Transaction) FindAttemptByHash(attemptHash common.Hash) (*Attempt, error) {
@@ -125,7 +126,7 @@ type Attempt struct {
 	SignedTransaction *types.Transaction
 
 	CreatedAt   time.Time
-	BroadcastAt time.Time
+	BroadcastAt *time.Time
 }
 
 func (a *Attempt) DeepCopy() *Attempt {
@@ -136,9 +137,9 @@ func (a *Attempt) DeepCopy() *Attempt {
 	return &txCopy
 }
 
-func (a *Attempt) PrettyPrint() string {
+func (a *Attempt) String() string {
 	return fmt.Sprintf(`{ID:%d, TxID:%d, Hash:%v, Fee:%v, GasLimit:%d, Type:%v, CreatedAt:%v, BroadcastAt:%v}`,
-		a.ID, a.TxID, a.Hash, a.Fee, a.GasLimit, a.Type, a.CreatedAt, a.BroadcastAt)
+		a.ID, a.TxID, a.Hash, a.Fee, a.GasLimit, a.Type, a.CreatedAt, stringOrNull(a.BroadcastAt))
 }
 
 type TxRequest struct {

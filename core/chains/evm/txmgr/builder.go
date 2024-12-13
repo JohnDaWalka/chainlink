@@ -127,7 +127,7 @@ func NewTxmV2(
 		stuckTxDetector = txm.NewStuckTxDetector(lggr, chainConfig.ChainType(), stuckTxDetectorConfig)
 	}
 
-	attemptBuilder := txm.NewAttemptBuilder(chainID, fCfg.PriceMax(), estimator, keyStore)
+	attemptBuilder := txm.NewAttemptBuilder(chainID, fCfg.PriceMaxKey, estimator, keyStore)
 	inMemoryStoreManager := storage.NewInMemoryStoreManager(lggr, chainID)
 	config := txm.Config{
 		EIP1559:   fCfg.EIP1559DynamicFees(),

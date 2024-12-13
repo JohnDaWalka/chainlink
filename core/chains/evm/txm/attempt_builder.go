@@ -20,23 +20,23 @@ type AttemptBuilderKeystore interface {
 }
 
 type attemptBuilder struct {
-	chainID  *big.Int
-	priceMax *assets.Wei
 	gas.EvmFeeEstimator
-	keystore AttemptBuilderKeystore
+	chainID     *big.Int
+	priceMaxKey func(common.Address) *assets.Wei
+	keystore    AttemptBuilderKeystore
 }
 
-func NewAttemptBuilder(chainID *big.Int, priceMax *assets.Wei, estimator gas.EvmFeeEstimator, keystore AttemptBuilderKeystore) *attemptBuilder {
+func NewAttemptBuilder(chainID *big.Int, priceMaxKey func(common.Address) *assets.Wei, estimator gas.EvmFeeEstimator, keystore AttemptBuilderKeystore) *attemptBuilder {
 	return &attemptBuilder{
 		chainID:         chainID,
-		priceMax:        priceMax,
+		priceMaxKey:     priceMaxKey,
 		EvmFeeEstimator: estimator,
 		keystore:        keystore,
 	}
 }
 
 func (a *attemptBuilder) NewAttempt(ctx context.Context, lggr logger.Logger, tx *types.Transaction, dynamic bool) (*types.Attempt, error) {
-	fee, estimatedGasLimit, err := a.EvmFeeEstimator.GetFee(ctx, tx.Data, tx.SpecifiedGasLimit, a.priceMax, &tx.FromAddress, &tx.ToAddress)
+	fee, estimatedGasLimit, err := a.EvmFeeEstimator.GetFee(ctx, tx.Data, tx.SpecifiedGasLimit, a.priceMaxKey(tx.FromAddress), &tx.FromAddress, &tx.ToAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (a *attemptBuilder) NewAttempt(ctx context.Context, lggr logger.Logger, tx 
 }
 
 func (a *attemptBuilder) NewBumpAttempt(ctx context.Context, lggr logger.Logger, tx *types.Transaction, previousAttempt types.Attempt) (*types.Attempt, error) {
-	bumpedFee, bumpedFeeLimit, err := a.EvmFeeEstimator.BumpFee(ctx, previousAttempt.Fee, tx.SpecifiedGasLimit, a.priceMax, nil)
+	bumpedFee, bumpedFeeLimit, err := a.EvmFeeEstimator.BumpFee(ctx, previousAttempt.Fee, tx.SpecifiedGasLimit, a.priceMaxKey(tx.FromAddress), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +114,7 @@ func (a *attemptBuilder) newLegacyAttempt(ctx context.Context, tx *types.Transac
 		Fee:               gas.EvmFee{GasPrice: gasPrice},
 		Hash:              signedTx.Hash(),
 		GasLimit:          estimatedGasLimit,
+		Type:              evmtypes.LegacyTxType,
 		SignedTransaction: signedTx,
 	}
 
