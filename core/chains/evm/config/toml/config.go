@@ -513,6 +513,7 @@ func (t *TxmV2) ValidateConfig() (err error) {
 	if t.Enabled != nil && *t.Enabled {
 		if t.BlockTime == nil {
 			err = multierr.Append(err, commonconfig.ErrMissing{Name: "TxmV2.BlockTime", Msg: "must be set if txmv2 feature is enabled"})
+			return
 		}
 		if t.BlockTime.Duration() < 2*time.Second {
 			err = multierr.Append(err, commonconfig.ErrInvalid{Name: "TxmV2.BlockTime", Msg: "must be equal to or greater than 2 seconds"})
