@@ -34,6 +34,7 @@ type OrchestratorTxStore interface {
 }
 
 type OrchestratorKeystore interface {
+	CheckEnabled(ctx context.Context, address common.Address, chainID *big.Int) error
 	EnabledAddressesForChain(ctx context.Context, chainID *big.Int) (addresses []common.Address, err error)
 }
 
@@ -175,6 +176,10 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, 
 	if wrappedTx != nil {
 		o.lggr.Infof("Found Tx with IdempotencyKey: %v. Returning existing Tx without creating a new one.", *wrappedTx.IdempotencyKey)
 	} else {
+		if kErr := o.keystore.CheckEnabled(ctx, request.FromAddress, o.chainID); kErr != nil {
+			return tx, fmt.Errorf("cannot send transaction from %s on chain ID %s: %w", request.FromAddress, o.chainID.String(), kErr)
+		}
+
 		var pipelineTaskRunID uuid.NullUUID
 		if request.PipelineTaskRunID != nil {
 			pipelineTaskRunID.UUID = *request.PipelineTaskRunID

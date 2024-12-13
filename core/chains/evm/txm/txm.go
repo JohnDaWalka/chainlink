@@ -187,6 +187,7 @@ func (t *Txm) Trigger(address common.Address) {
 }
 
 func (t *Txm) Abandon(address common.Address) error {
+	// TODO: restart txm
 	t.lggr.Infof("Dropping unstarted and unconfirmed transactions for address: %v", address)
 	return t.txStore.AbandonPendingTransactions(context.TODO(), address)
 }
@@ -313,7 +314,7 @@ func (t *Txm) broadcastTransaction(ctx context.Context, address common.Address) 
 		t.setNonce(address, nonce+1)
 
 		if err := t.createAndSendAttempt(ctx, tx, address); err != nil {
-			return true, err
+			return false, err
 		}
 	}
 }
@@ -352,8 +353,7 @@ func (t *Txm) sendTransactionWithError(ctx context.Context, tx *types.Transactio
 			return err
 		}
 		if pendingNonce <= *tx.Nonce {
-			t.lggr.Debugf("Pending nonce for txID: %v didn't increase. PendingNonce: %d, TxNonce: %d", tx.ID, pendingNonce, *tx.Nonce)
-			return nil
+			return fmt.Errorf("Pending nonce for txID: %v didn't increase. PendingNonce: %d, TxNonce: %d. TxErr: %w", tx.ID, pendingNonce, *tx.Nonce, txErr)
 		}
 	}
 

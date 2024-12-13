@@ -23,22 +23,23 @@ type StuckTxDetectorConfig struct {
 }
 
 type stuckTxDetector struct {
-	lggr      logger.Logger
-	chainType chaintype.ChainType
-	config    StuckTxDetectorConfig
+	lggr         logger.Logger
+	chainType    chaintype.ChainType
+	config       StuckTxDetectorConfig
+	lastPurgeMap map[common.Address]time.Time
 }
 
 func NewStuckTxDetector(lggr logger.Logger, chaintype chaintype.ChainType, config StuckTxDetectorConfig) *stuckTxDetector {
 	return &stuckTxDetector{
-		lggr:      lggr,
-		chainType: chaintype,
-		config:    config,
+		lggr:         lggr,
+		chainType:    chaintype,
+		config:       config,
+		lastPurgeMap: make(map[common.Address]time.Time),
 	}
 }
 
 func (s *stuckTxDetector) DetectStuckTransaction(ctx context.Context, tx *types.Transaction) (bool, error) {
 	switch s.chainType {
-	// TODO: rename
 	case chaintype.ChainDualBroadcast:
 		result, err := s.dualBroadcastDetection(ctx, tx)
 		if result || err != nil {
@@ -50,11 +51,20 @@ func (s *stuckTxDetector) DetectStuckTransaction(ctx context.Context, tx *types.
 	}
 }
 
+// timeBasedDetection marks a transaction if all the following conditions are met:
+// - LastBroadcastAt is not nil
+// - Time since last broadcast is above the threshold
+// - Time since last purge is above threshold
+//
+// NOTE: Potentially we can use a subset of threhsold for last purge check, because the transaction would have already been broadcasted to the mempool
+// so it is more likely to be picked up compared to a transaction that hasn't been broadcasted before. This would avoid slowing down TXM for sebsequent transactions
+// in case the current one is stuck.
 func (s *stuckTxDetector) timeBasedDetection(tx *types.Transaction) bool {
 	threshold := (s.config.BlockTime * time.Duration(s.config.StuckTxBlockThreshold))
-	if tx.LastBroadcastAt != nil && time.Since(*tx.LastBroadcastAt) > threshold {
-		s.lggr.Debugf("TxID: %v last broadcast was: %v which is more than the max configured duration: %v. Transaction is now considered stuck and will be purged.",
-			tx.ID, tx.LastBroadcastAt, threshold)
+	if tx.LastBroadcastAt != nil && min(time.Since(*tx.LastBroadcastAt), time.Since(s.lastPurgeMap[tx.FromAddress])) > threshold {
+		s.lggr.Debugf("TxID: %v last broadcast was: %v and last purge: %v which is more than the max configured duration: %v. Transaction is now considered stuck and will be purged.",
+			tx.ID, tx.LastBroadcastAt, s.lastPurgeMap[tx.FromAddress], threshold)
+		s.lastPurgeMap[tx.FromAddress] = time.Now()
 		return true
 	}
 	return false
