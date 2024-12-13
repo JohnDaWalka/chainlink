@@ -1,11 +1,15 @@
 name: CRIB Integration Tests
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/crib-integration-test.yml"
   workflow_call:
-  workflow_dispatch:
     inputs:
       image-tag:
-        required: true
+        default: develop
+        required: false
         description: The chainlink docker image tag to test against
+        type: string
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

@@ -156,18 +156,8 @@ jobs:
           goreleaser-key: ${{ secrets.GORELEASER_KEY }}
 
   crib-integration-test:
-    if: ${{ github.event.inputs.git_ref || github.ref }} == 'refs/heads/develop'
-    runs-on: ubuntu-latest
     needs: [split, image-tag]
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4.2.1
-        with:
-          ref: ${{ env.CHECKOUT_REF }}
-
-      - name: Call crib-integration-test workflow
-        uses: ./.github/workflows/crib-integration-test.yml
-        with:
-          image-tag: ${{ needs.image-tag.outputs.image-tag }}
+    uses: ./.github/workflows/crib-integration-test.yml
+    with:
+      image-tag: ${{ needs.image-tag.outputs.image-tag }}
+    secrets: inherit
