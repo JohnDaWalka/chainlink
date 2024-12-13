@@ -428,7 +428,7 @@ func (h *eventHandler) workflowRegisteredEvent(
 	}
 
 	// Calculate the hash of the binary and config files
-	hash, err := pkgworkflows.GenerateWorkflowID(payload.WorkflowOwner, decodedBinary, config, payload.SecretsURL)
+	hash, err := pkgworkflows.GenerateWorkflowID(payload.WorkflowOwner, payload.WorkflowName, decodedBinary, config, payload.SecretsURL)
 	if err != nil {
 		return fmt.Errorf("failed to generate workflow id: %w", err)
 	}
@@ -456,12 +456,13 @@ func (h *eventHandler) workflowRegisteredEvent(
 	}
 
 	wfID := hex.EncodeToString(payload.WorkflowID[:])
+	owner := hex.EncodeToString(payload.WorkflowOwner)
 	entry := &job.WorkflowSpec{
 		Workflow:      hex.EncodeToString(decodedBinary),
 		Config:        string(config),
 		WorkflowID:    wfID,
 		Status:        status,
-		WorkflowOwner: hex.EncodeToString(payload.WorkflowOwner),
+		WorkflowOwner: owner,
 		WorkflowName:  payload.WorkflowName,
 		SpecType:      job.WASMFile,
 		BinaryURL:     payload.BinaryURL,
@@ -480,7 +481,7 @@ func (h *eventHandler) workflowRegisteredEvent(
 	engine, err := h.engineFactory(
 		ctx,
 		wfID,
-		string(payload.WorkflowOwner),
+		owner,
 		payload.WorkflowName,
 		config,
 		decodedBinary,
