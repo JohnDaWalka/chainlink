@@ -6037,6 +6037,9 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
+[TxmV2]
+Enabled = false
+
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -6140,6 +6143,9 @@ RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
+
+[TxmV2]
+Enabled = false
 
 [Transactions]
 ForwardersEnabled = false
