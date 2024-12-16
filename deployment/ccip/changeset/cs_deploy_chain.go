@@ -22,7 +22,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_remote"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/link_token"
 )
 
 var _ deployment.ChangeSet[DeployChainContractsConfig] = DeployChainContracts
@@ -218,7 +220,7 @@ func deployChainContracts(
 				var rmnRemote *rmn_remote.RMNRemote
 
 				if generated.IsZKSync(chain.Client) {
-					rmnRemoteAddr, dtx, rmnRemote, err2 = rmn_remote.DeployRMNRemote(
+					rmnRemoteAddr, dtx, rmnRemote, err2 = rmn_remote.DeployRMNRemoteZK(
 						chain.DeployerKey,
 						chain.Client,
 						chain.Selector,
@@ -306,7 +308,7 @@ func deployChainContracts(
 				var routerAddr common.Address
 				var routerC *router.Router
 				if generated.IsZKSync(chain.Client) {
-					routerAddr, dtx, routerC, err2 = router.DeployRouter(
+					routerAddr, dtx, routerC, err2 = router.DeployRouterZK(
 						chain.DeployerKey,
 						chain.Client,
 						weth9Contract.Address(),
@@ -339,7 +341,7 @@ func deployChainContracts(
 				var nonceManagerAddr common.Address
 				var nonceManager *nonce_manager.NonceManager
 				if generated.IsZKSync(chain.Client) {
-					nonceManagerAddr, dtx, nonceManager, err2 = nonce_manager.DeployNonceManager(
+					nonceManagerAddr, dtx, nonceManager, err2 = nonce_manager.DeployNonceManagerZK(
 						chain.DeployerKey,
 						chain.Client,
 						[]common.Address{}, // Need to add onRamp after
@@ -367,32 +369,36 @@ func deployChainContracts(
 	if chainState.FeeQuoter == nil {
 		feeQuoter, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*fee_quoter.FeeQuoter] {
-				prAddr, tx2, pr, err2 := fee_quoter.DeployFeeQuoter(
-					chain.DeployerKey,
-					chain.Client,
-					fee_quoter.FeeQuoterStaticConfig{
-						MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
-						LinkToken:                    linkTokenContract.Address(),
-						TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
-					},
-					[]common.Address{state.Chains[chain.Selector].Timelock.Address()},      // timelock should be able to update, ramps added after
-					[]common.Address{weth9Contract.Address(), linkTokenContract.Address()}, // fee tokens
-					[]fee_quoter.FeeQuoterTokenPriceFeedUpdate{},
-					[]fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{}, // TODO: tokens
-					[]fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{
-						{
-							PremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
-							Token:                      linkTokenContract.Address(),
-						},
-						{
-							PremiumMultiplierWeiPerEth: 1e18,
-							Token:                      weth9Contract.Address(),
-						},
-					},
-					[]fee_quoter.FeeQuoterDestChainConfigArgs{},
-				)
+				staticConfig, priceUpdaters, feeTokens, tokenPriceFeeds, tokenTransferFeeConfigArgs, premiumMultiplierWeiPerEthArgs, destChainConfigArgs := getDeployFeeQuoterParams(linkTokenContract, weth9Contract, chain, state)
+				var prAddr common.Address
+				var pr *fee_quoter.FeeQuoter
+				if generated.IsZKSync(chain.Client) {
+					prAddr, dtx, pr, err2 = fee_quoter.DeployFeeQuoterZK(
+						chain.DeployerKey,
+						chain.Client,
+						staticConfig,
+						priceUpdaters, // timelock should be able to update, ramps added after
+						feeTokens,     // fee tokens
+						tokenPriceFeeds,
+						tokenTransferFeeConfigArgs, // TODO: tokens
+						premiumMultiplierWeiPerEthArgs,
+						destChainConfigArgs,
+					)
+				} else {
+					prAddr, dtx, pr, err2 = fee_quoter.DeployFeeQuoter(
+						chain.DeployerKey,
+						chain.Client,
+						staticConfig,
+						priceUpdaters, // timelock should be able to update, ramps added after
+						feeTokens,     // fee tokens
+						tokenPriceFeeds,
+						tokenTransferFeeConfigArgs, // TODO: tokens
+						premiumMultiplierWeiPerEthArgs,
+						destChainConfigArgs,
+					)
+				}
 				return deployment.ContractDeploy[*fee_quoter.FeeQuoter]{
-					prAddr, pr, tx2, deployment.NewTypeAndVersion(FeeQuoter, deployment.Version1_6_0_dev), err2,
+					prAddr, pr, dtx.Hash(), deployment.NewTypeAndVersion(FeeQuoter, deployment.Version1_6_0_dev), err2,
 				}
 			})
 		if err != nil {
@@ -407,23 +413,43 @@ func deployChainContracts(
 	if onRampContract == nil {
 		onRamp, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*onramp.OnRamp] {
-				onRampAddr, tx2, onRamp, err2 := onramp.DeployOnRamp(
-					chain.DeployerKey,
-					chain.Client,
-					onramp.OnRampStaticConfig{
-						ChainSelector:      chain.Selector,
-						RmnRemote:          rmnProxyContract.Address(),
-						NonceManager:       nmContract.Address(),
-						TokenAdminRegistry: tokenAdminReg.Address(),
-					},
-					onramp.OnRampDynamicConfig{
-						FeeQuoter:     feeQuoterContract.Address(),
-						FeeAggregator: common.HexToAddress("0x1"), // TODO real fee aggregator
-					},
-					[]onramp.OnRampDestChainConfigArgs{},
-				)
+				var onRampAddr common.Address
+				var onRamp *onramp.OnRamp
+				if generated.IsZKSync(chain.Client) {
+					onRampAddr, dtx, onRamp, err2 = onramp.DeployOnRampZK(
+						chain.DeployerKey,
+						chain.Client,
+						onramp.OnRampStaticConfig{
+							ChainSelector:      chain.Selector,
+							RmnRemote:          rmnProxyContract.Address(),
+							NonceManager:       nmContract.Address(),
+							TokenAdminRegistry: tokenAdminReg.Address(),
+						},
+						onramp.OnRampDynamicConfig{
+							FeeQuoter:     feeQuoterContract.Address(),
+							FeeAggregator: common.HexToAddress("0x1"), // TODO real fee aggregator
+						},
+						[]onramp.OnRampDestChainConfigArgs{},
+					)
+				} else {
+					onRampAddr, dtx, onRamp, err2 = onramp.DeployOnRamp(
+						chain.DeployerKey,
+						chain.Client,
+						onramp.OnRampStaticConfig{
+							ChainSelector:      chain.Selector,
+							RmnRemote:          rmnProxyContract.Address(),
+							NonceManager:       nmContract.Address(),
+							TokenAdminRegistry: tokenAdminReg.Address(),
+						},
+						onramp.OnRampDynamicConfig{
+							FeeQuoter:     feeQuoterContract.Address(),
+							FeeAggregator: common.HexToAddress("0x1"), // TODO real fee aggregator
+						},
+						[]onramp.OnRampDestChainConfigArgs{},
+					)
+				}
 				return deployment.ContractDeploy[*onramp.OnRamp]{
-					onRampAddr, onRamp, tx2, deployment.NewTypeAndVersion(OnRamp, deployment.Version1_6_0_dev), err2,
+					onRampAddr, onRamp, dtx.Hash(), deployment.NewTypeAndVersion(OnRamp, deployment.Version1_6_0_dev), err2,
 				}
 			})
 		if err != nil {
@@ -438,25 +464,48 @@ func deployChainContracts(
 	if offRampContract == nil {
 		offRamp, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*offramp.OffRamp] {
-				offRampAddr, tx2, offRamp, err2 := offramp.DeployOffRamp(
-					chain.DeployerKey,
-					chain.Client,
-					offramp.OffRampStaticConfig{
-						ChainSelector:        chain.Selector,
-						GasForCallExactCheck: 5_000,
-						RmnRemote:            rmnProxyContract.Address(),
-						NonceManager:         nmContract.Address(),
-						TokenAdminRegistry:   tokenAdminReg.Address(),
-					},
-					offramp.OffRampDynamicConfig{
-						FeeQuoter:                               feeQuoterContract.Address(),
-						PermissionLessExecutionThresholdSeconds: uint32(86400),
-						IsRMNVerificationDisabled:               true,
-					},
-					[]offramp.OffRampSourceChainConfigArgs{},
-				)
+				var offRampAddr common.Address
+				var offRamp *offramp.OffRamp
+				if generated.IsZKSync(chain.Client) {
+					offRampAddr, dtx, offRamp, err2 = offramp.DeployOffRampZK(
+						chain.DeployerKey,
+						chain.Client,
+						offramp.OffRampStaticConfig{
+							ChainSelector:        chain.Selector,
+							GasForCallExactCheck: 5_000,
+							RmnRemote:            rmnProxyContract.Address(),
+							NonceManager:         nmContract.Address(),
+							TokenAdminRegistry:   tokenAdminReg.Address(),
+						},
+						offramp.OffRampDynamicConfig{
+							FeeQuoter:                               feeQuoterContract.Address(),
+							PermissionLessExecutionThresholdSeconds: uint32(86400),
+							IsRMNVerificationDisabled:               true,
+						},
+						[]offramp.OffRampSourceChainConfigArgs{},
+					)
+				} else {
+					offRampAddr, dtx, offRamp, err2 = offramp.DeployOffRamp(
+						chain.DeployerKey,
+						chain.Client,
+						offramp.OffRampStaticConfig{
+							ChainSelector:        chain.Selector,
+							GasForCallExactCheck: 5_000,
+							RmnRemote:            rmnProxyContract.Address(),
+							NonceManager:         nmContract.Address(),
+							TokenAdminRegistry:   tokenAdminReg.Address(),
+						},
+						offramp.OffRampDynamicConfig{
+							FeeQuoter:                               feeQuoterContract.Address(),
+							PermissionLessExecutionThresholdSeconds: uint32(86400),
+							IsRMNVerificationDisabled:               true,
+						},
+						[]offramp.OffRampSourceChainConfigArgs{},
+					)
+				}
+
 				return deployment.ContractDeploy[*offramp.OffRamp]{
-					Address: offRampAddr, Contract: offRamp, Tx: tx2, Tv: deployment.NewTypeAndVersion(OffRamp, deployment.Version1_6_0_dev), Err: err2,
+					Address: offRampAddr, Contract: offRamp, TxHash: dtx.Hash(), Tv: deployment.NewTypeAndVersion(OffRamp, deployment.Version1_6_0_dev), Err: err2,
 				}
 			})
 		if err != nil {
@@ -487,4 +536,35 @@ func deployChainContracts(
 	}
 	e.Logger.Infow("Added nonce manager authorized callers", "chain", chain.String(), "callers", []common.Address{offRampContract.Address(), onRampContract.Address()})
 	return nil
+}
+
+func getDeployFeeQuoterParams(linkTokenContract *link_token.LinkToken, weth9Contract *weth9.WETH9, chain deployment.Chain, state CCIPOnChainState) (
+	fee_quoter.FeeQuoterStaticConfig,
+	[]common.Address,
+	[]common.Address,
+	[]fee_quoter.FeeQuoterTokenPriceFeedUpdate,
+	[]fee_quoter.FeeQuoterTokenTransferFeeConfigArgs,
+	[]fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs,
+	[]fee_quoter.FeeQuoterDestChainConfigArgs,
+) {
+	return fee_quoter.FeeQuoterStaticConfig{
+			MaxFeeJuelsPerMsg:            big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
+			LinkToken:                    linkTokenContract.Address(),
+			TokenPriceStalenessThreshold: uint32(24 * 60 * 60),
+		},
+		[]common.Address{state.Chains[chain.Selector].Timelock.Address()},
+		[]common.Address{weth9Contract.Address(), linkTokenContract.Address()},
+		[]fee_quoter.FeeQuoterTokenPriceFeedUpdate{},
+		[]fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{},
+		[]fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{
+			{
+				PremiumMultiplierWeiPerEth: 9e17,
+				Token:                      linkTokenContract.Address(),
+			},
+			{
+				PremiumMultiplierWeiPerEth: 1e18,
+				Token:                      weth9Contract.Address(),
+			},
+		},
+		[]fee_quoter.FeeQuoterDestChainConfigArgs{}
 }

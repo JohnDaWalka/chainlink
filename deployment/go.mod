@@ -47,8 +47,6 @@ require (
 	gotest.tools/v3 v3.5.1
 )
 
-require github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
-
 require (
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.5 // indirect
 	cosmossdk.io/api v0.3.1 // indirect
