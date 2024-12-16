@@ -18,7 +18,6 @@ import (
 )
 
 var (
-	client                = beholder.GetClient()
 	promNumBroadcastedTxs = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "txm_num_broadcasted_transactions",
 		Help: "Total number of successful broadcasted transactions.",
@@ -108,6 +107,7 @@ func (m *txmMetrics) EmitTxMessage(ctx context.Context, tx *types.Transaction, a
 		return err
 	}
 
+	client := beholder.GetClient()
 	err = client.Emitter.Emit(
 		ctx,
 		messageBytes,
