@@ -8,7 +8,8 @@ on:
   workflow_dispatch:
 
 env:
-  ECR_TAG: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-tests:develop
+  ECR_TAG_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-tests
+  ECR_TAG_DEFAULT: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-tests:develop
   CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
 
 jobs:
@@ -28,7 +29,11 @@ jobs:
         id: tags
         if: github.event_name != 'workflow_dispatch'
         run: |
-          echo "other_tags=${ECR_TAG}" >> $GITHUB_OUTPUT
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "other_tags=${ECR_TAG_BASE}:manual-${{ github.sha }}" >> $GITHUB_ENV
+          else
+            echo "other_tags=${ECR_TAG_DEFAULT}" >> $GITHUB_ENV
+          fi
       - name: Build Image
         uses: smartcontractkit/.github/actions/ctf-build-test-image@6781e048ecc1aadf7d605722c32e8068a5f829ce # ctf-build-test-image@0.2.0
         with:
