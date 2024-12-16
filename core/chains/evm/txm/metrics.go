@@ -107,8 +107,7 @@ func (m *txmMetrics) EmitTxMessage(ctx context.Context, tx *types.Transaction, a
 		return err
 	}
 
-	client := beholder.GetClient()
-	err = client.Emitter.Emit(
+	err = beholder.GetEmitter().Emit(
 		ctx,
 		messageBytes,
 		"beholder_data_schema", "transaction_schema",
