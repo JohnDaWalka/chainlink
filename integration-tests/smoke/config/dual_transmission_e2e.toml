@@ -1,0 +1,55 @@
+[contracts]
+
+[blockchain_a]
+type = "anvil"
+docker_cmd_params = ["-b", "1"]
+
+[nodeset]
+nodes = 5
+override_mode = "all"
+
+[nodeset.db]
+image = "postgres:12.0"
+
+[[nodeset.node_specs]]
+
+[nodeset.node_specs.node]
+#docker_ctx = "../../.."
+#docker_file = "plugins/chainlink.Dockerfile - path to docker image you need"
+# this is replaced in CI for most commit ref you provide
+#image = "public.ecr.aws/chainlink/chainlink:v2.17.0"
+image = "localhost:5000/chainlink:develop"
+user_config_overrides = """
+    [Feature]
+    LogPoller = true
+    [OCR2]
+    Enabled = true
+    DatabaseTimeout = '1s'
+    [P2P.V2]
+    Enabled = true
+    ListenAddresses = ['0.0.0.0:6690']
+
+    [[EVM]]
+    ChainID = '1337'
+    ChainType = 'dualBroadcast'
+    AutoCreateKey = true
+    FinalityDepth = 1
+    MinContractPayment = 0
+
+    [EVM.TxmV2]
+    Enabled = true
+    BlockTime = '11s'
+    CustomURL = '%s'
+
+    [EVM.Transactions]
+    ForwardersEnabled = true
+
+    [EVM.Transactions.AutoPurge]
+    Enabled = true
+    Threshold = 5
+    MinAttempts = 10000
+    DetectionApiUrl = 'https://protect-holesky.flashbots.net/tx/'
+
+    [EVM.GasEstimator]
+    BumpThreshold = 6
+"""

@@ -3,6 +3,7 @@ package nodeclient
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -36,12 +37,13 @@ var (
 )
 
 type ChainlinkClient struct {
-	APIClient         *resty.Client
-	Config            *ChainlinkConfig
-	pageSize          int
-	primaryEthAddress string
-	ethAddresses      []string
-	l                 zerolog.Logger
+	APIClient           *resty.Client
+	Config              *ChainlinkConfig
+	pageSize            int
+	primaryEthAddress   string
+	secondaryEthAddress string
+	ethAddresses        []string
+	l                   zerolog.Logger
 }
 
 // NewChainlinkClient creates a new Chainlink model using a provided config
@@ -576,6 +578,21 @@ func (c *ChainlinkClient) PrimaryEthAddress() (string, error) {
 		c.primaryEthAddress = ethKeys.Data[0].Attributes.Address
 	}
 	return c.primaryEthAddress, nil
+}
+
+// SecondaryEthAddress returns the second ETH address for the Chainlink node
+func (c *ChainlinkClient) SecondaryEthAddress() (string, error) {
+	if c.secondaryEthAddress == "" {
+		ethKeys, err := c.MustReadETHKeys()
+		if err != nil {
+			return "", err
+		}
+		if len(ethKeys.Data) <= 1 {
+			return "", errors.New("node does not have secondary address")
+		}
+		c.secondaryEthAddress = ethKeys.Data[1].Attributes.Address
+	}
+	return c.secondaryEthAddress, nil
 }
 
 // EthAddresses returns the ETH addresses for the Chainlink node
