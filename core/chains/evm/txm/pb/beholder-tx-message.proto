@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+option go_package = "github.com/smartcontractkit/chainlink-common/pkg/beholder/pb";
+
+package pb;
+
+// Used for testing 
+message TxMessage {
+  string Tx = 1;
+  string Address = 2;
+}

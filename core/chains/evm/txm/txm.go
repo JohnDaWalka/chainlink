@@ -358,6 +358,7 @@ func (t *Txm) sendTransactionWithError(ctx context.Context, tx *types.Transactio
 	}
 
 	t.metrics.IncrementNumBroadcastedTxs(ctx)
+	t.metrics.EmitTxMessage(ctx, tx, address)
 	return t.txStore.UpdateTransactionBroadcast(ctx, attempt.TxID, *tx.Nonce, attempt.Hash, address)
 }
 

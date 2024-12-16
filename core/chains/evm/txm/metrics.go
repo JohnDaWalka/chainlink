@@ -5,15 +5,20 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.opentelemetry.io/otel/metric"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/metrics"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/pb"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/types"
 )
 
 var (
+	client                = beholder.GetClient()
 	promNumBroadcastedTxs = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "txm_num_broadcasted_transactions",
 		Help: "Total number of successful broadcasted transactions.",
@@ -90,4 +95,27 @@ func (m *txmMetrics) IncrementNumNonceGaps(ctx context.Context) {
 func (m *txmMetrics) RecordTimeUntilTxConfirmed(ctx context.Context, duration float64) {
 	promTimeUntilTxConfirmed.WithLabelValues(m.chainID.String()).Observe(duration)
 	m.timeUntilTxConfirmed.Record(ctx, duration)
+}
+
+func (m *txmMetrics) EmitTxMessage(ctx context.Context, tx *types.Transaction, address common.Address) error {
+	message := &pb.TxMessage{
+		Tx:      tx.String(),
+		Address: address.String(),
+	}
+
+	messageBytes, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	err = client.Emitter.Emit(
+		ctx,
+		messageBytes,
+		"beholder_data_schema", "transaction_schema",
+		"beholder_domain", "beholder_test",
+		"beholder_entity", "TxMessage",
+		"additional_attribute", 1234,
+	)
+
+	return err
 }
