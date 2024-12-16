@@ -157,6 +157,7 @@ jobs:
 
   crib-integration-test:
     needs: [split, image-tag]
+    if: ${{ github.ref == 'refs/heads/develop' }}
     uses: ./.github/workflows/crib-integration-test.yml
     with:
       image-tag: ${{ needs.image-tag.outputs.image-tag }}
