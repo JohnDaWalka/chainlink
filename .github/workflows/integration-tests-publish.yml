@@ -9,7 +9,6 @@ on:
 
 env:
   ECR_TAG_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-tests
-  ECR_TAG_DEFAULT: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-tests:develop
   CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
 
 jobs:
@@ -32,7 +31,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "other_tags=${ECR_TAG_BASE}:manual-${{ github.sha }}" >> $GITHUB_ENV
           else
-            echo "other_tags=${ECR_TAG_DEFAULT}" >> $GITHUB_ENV
+            echo "other_tags=${ECR_TAG_BASE}:develop" >> $GITHUB_ENV
           fi
       - name: Build Image
         uses: smartcontractkit/.github/actions/ctf-build-test-image@6781e048ecc1aadf7d605722c32e8068a5f829ce # ctf-build-test-image@0.2.0
@@ -63,10 +62,12 @@ jobs:
           - name: ""
             dockerfile: core/chainlink.Dockerfile
             tag-suffix: ""
+            tag-prefix: "manual-"
           # uncomment in the future if we end up needing to soak test the plugins image
           # - name: (plugins)
           #   dockerfile: plugins/chainlink.Dockerfile
           #   tag-suffix: -plugins
+          #   tag-prefix: "manual-"
     name: Build Chainlink Image ${{ matrix.image.name }}
     runs-on: ubuntu22.04-8cores-32GB
     steps:
@@ -77,6 +78,7 @@ jobs:
       - name: Build Chainlink Image
         uses: ./.github/actions/build-chainlink-image
         with:
+          tag_prefix: ${{ matrix.image.tag-prefix }}
           tag_suffix: ${{ matrix.image.tag-suffix }}
           dockerfile: ${{ matrix.image.dockerfile }}
           git_commit_sha: ${{ github.sha }}

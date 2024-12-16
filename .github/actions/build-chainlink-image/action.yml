@@ -5,6 +5,9 @@ inputs:
   tag_suffix:
     description: The suffix to append to the image tag (usually blank or "-plugins")
     default: ""
+  tag_prefix:
+    description: The prefix to prepend to the image tag (usually blank)
+    default: ""
   dockerfile:
     description: The path to the Dockerfile to use (usually core/chainlink.Dockerfile or plugins/chainlink.Dockerfile)
     default: core/chainlink.Dockerfile
@@ -32,7 +35,7 @@ runs:
       uses: smartcontractkit/chainlink-github-actions/docker/image-exists@75a9005952a9e905649cfb5a6971fd9429436acd # v2.3.25
       with:
         repository: chainlink
-        tag: ${{ inputs.git_commit_sha }}${{ inputs.tag_suffix }}
+        tag: ${{ inputs.tag_prefix }}${{ inputs.git_commit_sha }}${{ inputs.tag_suffix }}
         AWS_REGION: ${{ inputs.AWS_REGION }}
         AWS_ROLE_TO_ASSUME: ${{ inputs.AWS_ROLE_TO_ASSUME }}
     - name: Build Image
@@ -42,7 +45,7 @@ runs:
         cl_repo: smartcontractkit/chainlink
         cl_ref: ${{ inputs.git_commit_sha }}
         cl_dockerfile: ${{ inputs.dockerfile }}
-        push_tag: ${{ env.CHAINLINK_IMAGE }}:${{ inputs.git_commit_sha }}${{ inputs.tag_suffix }}
+        push_tag: ${{ env.CHAINLINK_IMAGE }}:${{ inputs.tag_prefix }}${{ inputs.git_commit_sha }}${{ inputs.tag_suffix }}
         QA_AWS_REGION: ${{ inputs.AWS_REGION }}
         QA_AWS_ROLE_TO_ASSUME: ${{ inputs.AWS_ROLE_TO_ASSUME }}
         GO_COVER_FLAG: true
