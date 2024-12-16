@@ -56,25 +56,25 @@ func (s *stream) Run(ctx context.Context) (run *pipeline.Run, trrs pipeline.Task
 // Upon context cancellation, its expected that we return any usable values within ObservationGracePeriod.
 func (s *stream) executeRun(ctx context.Context) (*pipeline.Run, pipeline.TaskRunResults, error) {
 	// the hot path here is to avoid parsing and use the pre-parsed, cached, pipeline
-	// s.RLock()
-	// initialize := s.spec.Pipeline == nil
-	// s.RUnlock()
-	// if initialize {
-	//     pipeline, err := s.spec.ParsePipeline()
-	//     if err != nil {
-	//         return nil, nil, fmt.Errorf("Run failed due to unparseable pipeline: %w", err)
-	//     }
+	s.RLock()
+	initialize := s.spec.Pipeline == nil
+	s.RUnlock()
+	if initialize {
+		pipeline, err := s.spec.ParsePipeline()
+		if err != nil {
+			return nil, nil, fmt.Errorf("Run failed due to unparseable pipeline: %w", err)
+		}
 
-	//     s.Lock()
-	//     if s.spec.Pipeline == nil {
-	//         s.spec.Pipeline = pipeline
-	//         // initialize it for the given runner
-	//         if _, err := s.runner.InitializePipeline(*s.spec); err != nil {
-	//             return nil, nil, fmt.Errorf("Run failed due to error while initializing pipeline: %w", err)
-	//         }
-	//     }
-	//     s.Unlock()
-	// }
+		s.Lock()
+		if s.spec.Pipeline == nil {
+			s.spec.Pipeline = pipeline
+			// initialize it for the given runner
+			if _, err := s.runner.InitializePipeline(*s.spec); err != nil {
+				return nil, nil, fmt.Errorf("Run failed due to error while initializing pipeline: %w", err)
+			}
+		}
+		s.Unlock()
+	}
 
 	vars := pipeline.NewVarsFrom(map[string]interface{}{
 		"pipelineSpec": map[string]interface{}{
