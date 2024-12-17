@@ -538,7 +538,7 @@ func RegisterNOPS(ctx context.Context, lggr logger.Logger, req RegisterNOPSReque
 		}
 	}
 	// order nops by name + admin address
-	sort.Slice(nops, func(i, j int) bool {
+	sort.SliceStable(nops, func(i, j int) bool {
 		return strings.Compare(nops[i].Name, nops[j].Name) < 0 || nops[i].Admin.Cmp(nops[j].Admin) < 0
 	})
 
@@ -749,7 +749,7 @@ func RegisterNodes(lggr logger.Logger, req *RegisterNodesRequest) (*RegisterNode
 	for _, v := range nodeIDToParams {
 		uniqueNodeParams = append(uniqueNodeParams, v)
 	}
-	sort.Slice(uniqueNodeParams, func(i, j int) bool {
+	sort.SliceStable(uniqueNodeParams, func(i, j int) bool {
 		return bytes.Compare(uniqueNodeParams[i].P2pId[:], uniqueNodeParams[j].P2pId[:]) < 0
 	})
 	lggr.Debugw("unique node params to add", "count", len(uniqueNodeParams), "params", uniqueNodeParams)
@@ -810,6 +810,12 @@ type RegisterDonsResponse struct {
 	DonInfos map[string]kcr.CapabilitiesRegistryDONInfo
 }
 
+type p2pSortedDONToRegister struct {
+	DONToRegister
+	p2pIds        [][32]byte
+	p2pSortedHash string
+}
+
 func sortedHash(p2pids [][32]byte) string {
 	sha256Hash := sha256.New()
 	sort.Slice(p2pids, func(i, j int) bool {
@@ -843,6 +849,7 @@ func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsRes
 	}
 	lggr.Infow("fetched existing DONs...", "len", len(donInfos), "lenByNodesHash", len(existingDONs))
 
+	p2pSortedDONsToRegister := make([]p2pSortedDONToRegister, 0)
 	for _, don := range req.DonsToRegister {
 		var p2pIds [][32]byte
 		for _, n := range don.Nodes {
@@ -856,11 +863,20 @@ func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsRes
 			p2pIds = append(p2pIds, p2pID)
 		}
 
-		p2pSortedHash := sortedHash(p2pIds)
-		p2pIdsToDon[p2pSortedHash] = don.Name
+		p2pSortedDONsToRegister = append(p2pSortedDONsToRegister, p2pSortedDONToRegister{
+			don, p2pIds, sortedHash(p2pIds),
+		})
+	}
+	// sort by p2p sorted hash to ensure deterministic order
+	sort.SliceStable(p2pSortedDONsToRegister, func(i, j int) bool {
+		return p2pSortedDONsToRegister[i].p2pSortedHash < p2pSortedDONsToRegister[j].p2pSortedHash
+	})
 
-		if _, ok := existingDONs[p2pSortedHash]; ok {
-			lggr.Debugw("don already exists, ignoring", "don", don, "p2p sorted hash", p2pSortedHash)
+	for _, don := range p2pSortedDONsToRegister {
+		p2pIdsToDon[don.p2pSortedHash] = don.Name
+
+		if _, ok := existingDONs[don.p2pSortedHash]; ok {
+			lggr.Debugw("don already exists, ignoring", "don", don, "p2p sorted hash", don.p2pSortedHash)
 			continue
 		}
 
@@ -875,7 +891,7 @@ func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsRes
 				wfSupported = true
 			}
 			// TODO: accept configuration from external source for each (don,capability)
-			capCfg := DefaultCapConfig(cap.CapabilityType, len(p2pIds))
+			capCfg := DefaultCapConfig(cap.CapabilityType, len(don.p2pIds))
 			cfgb, err := proto.Marshal(capCfg)
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal capability config for %v: %w", cap, err)
@@ -886,16 +902,16 @@ func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsRes
 			})
 		}
 
-		tx, err := registry.AddDON(registryChain.DeployerKey, p2pIds, cfgs, true, wfSupported, don.F)
+		tx, err := registry.AddDON(registryChain.DeployerKey, don.p2pIds, cfgs, true, wfSupported, don.F)
 		if err != nil {
 			err = DecodeErr(kcr.CapabilitiesRegistryABI, err)
-			return nil, fmt.Errorf("failed to call AddDON for don '%s' p2p2Id hash %s capability %v: %w", don.Name, p2pSortedHash, cfgs, err)
+			return nil, fmt.Errorf("failed to call AddDON for don '%s' p2p2Id hash %s capability %v: %w", don.Name, don.p2pSortedHash, cfgs, err)
 		}
 		_, err = registryChain.Confirm(tx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to confirm AddDON transaction %s for don %s: %w", tx.Hash().String(), don.Name, err)
 		}
-		lggr.Debugw("registered DON", "don", don.Name, "p2p sorted hash", p2pSortedHash, "cgs", cfgs, "wfSupported", wfSupported, "f", don.F)
+		lggr.Debugw("registered DON", "don", don.Name, "p2p sorted hash", don.p2pSortedHash, "cgs", cfgs, "wfSupported", wfSupported, "f", don.F)
 		addedDons++
 	}
 	lggr.Debugf("Registered all DONs (new=%d), waiting for registry to update", addedDons)
