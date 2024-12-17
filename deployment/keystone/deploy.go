@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/mcms"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 
 	"google.golang.org/protobuf/proto"
@@ -536,6 +537,11 @@ func RegisterNOPS(ctx context.Context, lggr logger.Logger, req RegisterNOPSReque
 			})
 		}
 	}
+	// order nops by name + admin address
+	sort.Slice(nops, func(i, j int) bool {
+		return strings.Compare(nops[i].Name, nops[j].Name) < 0 || nops[i].Admin.Cmp(nops[j].Admin) < 0
+	})
+
 	if len(nops) == 0 {
 		lggr.Debug("no new node operators to register")
 		return resp, nil
@@ -743,6 +749,9 @@ func RegisterNodes(lggr logger.Logger, req *RegisterNodesRequest) (*RegisterNode
 	for _, v := range nodeIDToParams {
 		uniqueNodeParams = append(uniqueNodeParams, v)
 	}
+	sort.Slice(uniqueNodeParams, func(i, j int) bool {
+		return bytes.Compare(uniqueNodeParams[i].P2pId[:], uniqueNodeParams[j].P2pId[:]) < 0
+	})
 	lggr.Debugw("unique node params to add", "count", len(uniqueNodeParams), "params", uniqueNodeParams)
 	tx, err := registry.AddNodes(registryChain.DeployerKey, uniqueNodeParams)
 	if err != nil {
