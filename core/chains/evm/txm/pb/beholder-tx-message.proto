@@ -4,8 +4,10 @@ option go_package = "github.com/smartcontractkit/chainlink-common/pkg/beholder/p
 
 package pb;
 
-// Used for testing 
 message TxMessage {
   string Tx = 1;
-  string Address = 2;
+  string Sender = 2;
+  string Contract = 3;
+  bool IsEmpty = 4;
+  uint64 Nonce = 5;
 }

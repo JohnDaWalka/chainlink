@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/metrics"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/pb"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/types"
 )
 
 var (
@@ -96,10 +95,13 @@ func (m *txmMetrics) RecordTimeUntilTxConfirmed(ctx context.Context, duration fl
 	m.timeUntilTxConfirmed.Record(ctx, duration)
 }
 
-func (m *txmMetrics) EmitTxMessage(ctx context.Context, tx *types.Transaction, address common.Address) error {
+func (m *txmMetrics) EmitTxMessage(ctx context.Context, tx common.Hash, address common.Address, contract common.Address, isEmpty bool, nonce uint64) error {
 	message := &pb.TxMessage{
-		Tx:      tx.String(),
-		Address: address.String(),
+		Tx:       tx.String(),
+		Sender:   address.String(),
+		Contract: contract.String(),
+		IsEmpty:  isEmpty,
+		Nonce:    nonce,
 	}
 
 	messageBytes, err := proto.Marshal(message)
@@ -110,10 +112,9 @@ func (m *txmMetrics) EmitTxMessage(ctx context.Context, tx *types.Transaction, a
 	err = beholder.GetEmitter().Emit(
 		ctx,
 		messageBytes,
-		"beholder_data_schema", "transaction_schema",
 		"beholder_domain", "beholder_test",
 		"beholder_entity", "TxMessage",
-		"additional_attribute", 1234,
+		"beholder_data_schema", "transaction_schema",
 	)
 
 	return err
