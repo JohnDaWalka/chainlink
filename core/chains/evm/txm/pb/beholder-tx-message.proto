@@ -5,9 +5,8 @@ option go_package = "github.com/smartcontractkit/chainlink-common/pkg/beholder/p
 package pb;
 
 message TxMessage {
-  string Tx = 1;
-  string Sender = 2;
-  string Contract = 3;
-  bool IsEmpty = 4;
-  uint64 Nonce = 5;
+  string Hash = 1;
+  string FromAddress = 2;
+  string ToAddress = 3;
+  uint64 Nonce = 4;
 }

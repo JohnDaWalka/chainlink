@@ -95,13 +95,12 @@ func (m *txmMetrics) RecordTimeUntilTxConfirmed(ctx context.Context, duration fl
 	m.timeUntilTxConfirmed.Record(ctx, duration)
 }
 
-func (m *txmMetrics) EmitTxMessage(ctx context.Context, tx common.Hash, address common.Address, contract common.Address, isEmpty bool, nonce uint64) error {
+func (m *txmMetrics) EmitTxMessage(ctx context.Context, tx common.Hash, fromAddress common.Address, toAddress common.Address, nonce uint64) error {
 	message := &pb.TxMessage{
-		Tx:       tx.String(),
-		Sender:   address.String(),
-		Contract: contract.String(),
-		IsEmpty:  isEmpty,
-		Nonce:    nonce,
+		Hash:        tx.String(),
+		FromAddress: fromAddress.String(),
+		ToAddress:   toAddress.String(),
+		Nonce:       nonce,
 	}
 
 	messageBytes, err := proto.Marshal(message)
