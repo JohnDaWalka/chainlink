@@ -313,13 +313,13 @@ func (t *Txm) broadcastTransaction(ctx context.Context, address common.Address) 
 		}
 		t.setNonce(address, nonce+1)
 
-		if err := t.createAndSendAttempt(ctx, tx, address, false); err != nil {
+		if err := t.createAndSendAttempt(ctx, tx, address); err != nil {
 			return false, err
 		}
 	}
 }
 
-func (t *Txm) createAndSendAttempt(ctx context.Context, tx *types.Transaction, address common.Address, isEmpty bool) error {
+func (t *Txm) createAndSendAttempt(ctx context.Context, tx *types.Transaction, address common.Address) error {
 	attempt, err := t.attemptBuilder.NewAttempt(ctx, t.lggr, tx, t.config.EIP1559)
 	if err != nil {
 		return err
@@ -332,10 +332,10 @@ func (t *Txm) createAndSendAttempt(ctx context.Context, tx *types.Transaction, a
 		return err
 	}
 
-	return t.sendTransactionWithError(ctx, tx, attempt, address, isEmpty)
+	return t.sendTransactionWithError(ctx, tx, attempt, address)
 }
 
-func (t *Txm) sendTransactionWithError(ctx context.Context, tx *types.Transaction, attempt *types.Attempt, address common.Address, isEmpty bool) (err error) {
+func (t *Txm) sendTransactionWithError(ctx context.Context, tx *types.Transaction, attempt *types.Attempt, address common.Address) (err error) {
 	if tx.Nonce == nil {
 		return fmt.Errorf("nonce for txID: %v is empty", tx.ID)
 	}
@@ -404,7 +404,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 					return false, err
 				}
 				t.lggr.Infof("Marked tx as purgeable. Sending purge attempt for txID: %d", tx.ID)
-				return false, t.createAndSendAttempt(ctx, tx, address, false)
+				return false, t.createAndSendAttempt(ctx, tx, address)
 			}
 		}
 
@@ -418,7 +418,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 		if tx.LastBroadcastAt == nil || time.Since(*tx.LastBroadcastAt) > (t.config.BlockTime*time.Duration(t.config.RetryBlockThreshold)) {
 			// TODO: add optional graceful bumping strategy
 			t.lggr.Info("Rebroadcasting attempt for txID: ", tx.ID)
-			return false, t.createAndSendAttempt(ctx, tx, address, false)
+			return false, t.createAndSendAttempt(ctx, tx, address)
 		}
 	}
 	return false, nil
@@ -429,7 +429,7 @@ func (t *Txm) createAndSendEmptyTx(ctx context.Context, latestNonce uint64, addr
 	if err != nil {
 		return err
 	}
-	return t.createAndSendAttempt(ctx, tx, address, true)
+	return t.createAndSendAttempt(ctx, tx, address)
 }
 
 func (t *Txm) extractMetrics(ctx context.Context, txs []*types.Transaction) []uint64 {
