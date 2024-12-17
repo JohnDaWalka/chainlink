@@ -25,6 +25,8 @@ import (
 
 var _ deployment.ChangeSet[DeployChainContractsConfig] = DeployChainContracts
 
+// TODO: Solana re-write
+
 // DeployChainContracts deploys all new CCIP v1.6 or later contracts for the given chains.
 // It returns the new addresses for the contracts.
 // DeployChainContracts is idempotent. If there is an error, it will return the successfully deployed addresses and the error so that the caller can call the

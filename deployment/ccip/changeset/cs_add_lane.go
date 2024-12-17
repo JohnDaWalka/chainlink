@@ -18,6 +18,8 @@ import (
 
 var _ deployment.ChangeSet[AddLanesConfig] = AddLanes
 
+// TODO: solana re-write
+
 type InitialPrices struct {
 	LinkPrice *big.Int // USD to the power of 18 (e18) per LINK
 	WethPrice *big.Int // USD to the power of 18 (e18) per WETH

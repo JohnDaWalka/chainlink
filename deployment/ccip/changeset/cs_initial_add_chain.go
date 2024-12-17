@@ -30,6 +30,8 @@ import (
 
 var _ deployment.ChangeSet[NewChainsConfig] = ConfigureNewChains
 
+// TODO: Solana re-write
+
 // ConfigureNewChains enables new chains as destination(s) for CCIP
 // It performs the following steps per chain:
 // - addChainConfig + AddDON (candidate->primary promotion i.e. init) on the home chain
