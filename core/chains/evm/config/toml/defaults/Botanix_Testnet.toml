@@ -1,0 +1,19 @@
+ChainID = '3636'
+FinalityTagEnabled = true
+LogBroadcasterEnabled = false
+
+[GasEstimator]
+EIP1559DynamicFees = true
+
+[GasEstimator.BlockHistory]
+BlockHistorySize = 4
+TransactionPercentile = 50
+
+[OCR2.Automation]
+GasLimit = 10500000
+
+[HeadTracker]
+FinalityTagBypass = false
+
+[NodePool]
+NewHeadsPollInterval = '4s'
