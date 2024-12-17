@@ -13,6 +13,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 )
 
+// TODO: Solana re-write
+
 func TestInitialAddChainAppliedTwice(t *testing.T) {
 	t.Parallel()
 	// This already applies the initial add chain changeset.

@@ -16,6 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
+// TODO: Solana re-write
+
 func TestDeployChainContractsChangeset(t *testing.T) {
 	t.Parallel()
 	lggr := logger.TestLogger(t)
@@ -97,6 +99,7 @@ func TestDeployCCIPContracts(t *testing.T) {
 	t.Parallel()
 	e := NewMemoryEnvironment(t)
 	// Deploy all the CCIP contracts.
+	// TODO: not sure how this ends up deploying contracts ?
 	state, err := LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	snap, err := state.View(e.Env.AllChainSelectors())
