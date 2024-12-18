@@ -48,6 +48,7 @@ func NewMemoryChain(t *testing.T, selector uint64) deployment.Chain {
 // Needed for environment variables on the node which point to prexisitng addresses.
 // i.e. CapReg.
 func NewMemoryChains(t *testing.T, numChains int, numUsers int) (map[uint64]deployment.Chain, map[uint64][]*bind.TransactOpts) {
+	// TODO: add solana chain support
 	mchains := GenerateChains(t, numChains, numUsers)
 	users := make(map[uint64][]*bind.TransactOpts)
 	for id, chain := range mchains {
@@ -70,6 +71,7 @@ func generateMemoryChain(t *testing.T, inputs map[uint64]EVMChain) map[uint64]de
 		chainInfo, err := chainsel.GetChainDetailsByChainIDAndFamily(strconv.FormatUint(cid, 10), chainsel.FamilyEVM)
 		require.NoError(t, err)
 		backend := NewBackend(chain.Backend)
+		// TODO: add solana chain support
 		chains[chainInfo.ChainSelector] = deployment.Chain{
 			Selector:    chainInfo.ChainSelector,
 			Client:      backend,
@@ -148,8 +150,12 @@ func NewMemoryEnvironmentFromChainsNodes(
 
 // To be used by tests and any kind of deployment logic.
 func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Level, config MemoryEnvironmentConfig) deployment.Environment {
+	// TODO: add solana chain support
 	chains, _ := NewMemoryChains(t, config.Chains, config.NumOfUsersPerChain)
+	fmt.Println("Created chains")
+	// TODO: add solana node support ?
 	nodes := NewNodes(t, logLevel, chains, config.Nodes, config.Bootstraps, config.RegistryConfig)
+	fmt.Println("Created nodes")
 	var nodeIDs []string
 	for id := range nodes {
 		nodeIDs = append(nodeIDs, id)

@@ -26,6 +26,7 @@ func TestDeployChainContractsChangeset(t *testing.T) {
 		Chains:     2,
 		Nodes:      4,
 	})
+	fmt.Println("Created Env")
 	selectors := e.AllChainSelectors()
 	homeChainSel := selectors[0]
 	nodes, err := deployment.NodeInfo(e.NodeIDs, e.Offchain)
