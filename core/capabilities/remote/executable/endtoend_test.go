@@ -514,7 +514,6 @@ func setupDons(t *testing.T,
 
 	wfDon := newWorkflowDon(broker)
 	for i := 0; i < numWorkflowPeers; i++ {
-
 		node := newClientNode(workflowPeers[i], broker, remoteExecutableConfig, capInfo, capDonInfo, workflowDonInfo, workflowNodeTimeout, lggr)
 		wfDon.AddNode(node)
 		servicetest.Run(t, node)

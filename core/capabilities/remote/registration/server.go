@@ -69,7 +69,7 @@ func NewServer(lggr logger.Logger, target target, capInfo commoncap.CapabilityIn
 		registrationExpiry: registrationExpiry,
 		stopCh:             make(services.StopChan),
 		registrations:      make(map[Key]*serverRegistration),
-		messageCache:       messagecache.New[Key, p2ptypes.PeerID](),
+		messageCache:       messagecache.NewMessageCache[Key, p2ptypes.PeerID](),
 		membersCache:       membersCache,
 		workflowDONs:       workflowDONs,
 	}

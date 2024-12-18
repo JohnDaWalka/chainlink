@@ -76,7 +76,6 @@ func Test_Client_DonTopologies(t *testing.T) {
 
 	testClient(t, remoteExecutableConfig, 10, responseTimeOut, 10, 9,
 		capability, method)
-
 }
 
 func Test_Client_TransmissionSchedules(t *testing.T) {
@@ -176,8 +175,8 @@ func Test_Client_ContextCanceledBeforeQuorumReached(t *testing.T) {
 	require.NoError(t, err)
 
 	cancel()
-	testClient(t, 2, 20*time.Second, 2, 2,
-		capability,
+	testClient(t, &commoncap.RemoteExecutableConfig{}, 2, 20*time.Second, 2, 2,
+		func() commoncap.ExecutableCapability { return capability },
 		func(caller commoncap.ExecutableCapability) {
 			executeInputs, err := values.NewMap(map[string]any{"executeValue1": "aValue1"})
 			require.NoError(t, err)
@@ -392,7 +391,6 @@ type clientTestServer struct {
 func newTestServer(lggr logger.Logger, peerID p2ptypes.PeerID, capInfo commoncap.CapabilityInfo,
 	registrationExpiry time.Duration, dispatcher remotetypes.Dispatcher, workflowDonInfo commoncap.DON,
 	executableCapability commoncap.ExecutableCapability) *clientTestServer {
-
 	target := &executable.TargetAdapter{Capability: executableCapability}
 
 	workflowDONs := map[uint32]commoncap.DON{

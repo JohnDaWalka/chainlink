@@ -81,7 +81,7 @@ func NewTriggerSubscriber(config *commoncap.RemoteTriggerConfig, capInfo commonc
 		capInfo:            capInfo,
 		capDonMembers:      capDonMembers,
 		aggregator:         aggregator,
-		messageCache:       messagecache.New[triggerEventKey, p2ptypes.PeerID](),
+		messageCache:       messagecache.NewMessageCache[triggerEventKey, p2ptypes.PeerID](),
 		stopCh:             make(services.StopChan),
 		lggr:               lggr.Named("TriggerSubscriber"),
 		registrationClient: registration.NewClient(lggr, types.MethodRegisterTrigger, config.RegistrationRefresh, capInfo, capDonInfo, localDonInfo, dispatcher, "TriggerSubscriber"),

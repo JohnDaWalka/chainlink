@@ -398,7 +398,6 @@ func newServerTestClient(lggr logger.Logger, peerID p2ptypes.PeerID, registratio
 	capabilityDonInfo commoncap.DON,
 	workflowDonInfo commoncap.DON,
 	dispatcher remotetypes.Dispatcher) *serverTestClient {
-
 	registrationClient := registration.NewClient(lggr, remotetypes.MethodRegisterToWorkflow, registrationRefresh, capInfo, capabilityDonInfo, workflowDonInfo, dispatcher, "serverTestClient")
 
 	return &serverTestClient{lggr: lggr, peerID: peerID, dispatcher: dispatcher, capabilityDonInfo: capabilityDonInfo,
