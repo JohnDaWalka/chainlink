@@ -37,6 +37,7 @@ var _ deployment.ChangeSet[ConfigureOCR3Config] = ConfigureOCR3Contract
 type ConfigureOCR3Config struct {
 	ChainSel             uint64
 	NodeIDs              []string
+	OCR3ContractAddr     *string
 	OCR3Config           *kslib.OracleConfig
 	DryRun               bool
 	WriteGeneratedConfig io.Writer // if not nil, write the generated config to this writer as JSON [OCR2OracleConfig]
@@ -55,6 +56,7 @@ func ConfigureOCR3Contract(env deployment.Environment, cfg ConfigureOCR3Config) 
 		NodeIDs:    cfg.NodeIDs,
 		OCR3Config: cfg.OCR3Config,
 		DryRun:     cfg.DryRun,
+		OCR3Addr:   cfg.OCR3ContractAddr,
 		UseMCMS:    cfg.UseMCMS(),
 	})
 	if err != nil {

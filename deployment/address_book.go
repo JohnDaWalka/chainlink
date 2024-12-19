@@ -83,7 +83,7 @@ func NewTypeAndVersion(t ContractType, v semver.Version) TypeAndVersion {
 type AddressBook interface {
 	Save(chainSelector uint64, address string, tv TypeAndVersion) error
 	Addresses() (map[uint64]map[string]TypeAndVersion, error)
-	AddressesForChain(chain uint64) (map[string]TypeAndVersion, error)
+	AddressesForChain(chain uint64, opts ...func(map[string]TypeAndVersion)) (map[string]TypeAndVersion, error)
 	// Allows for merging address books (e.g. new deployments with existing ones)
 	Merge(other AddressBook) error
 	Remove(ab AddressBook) error
@@ -149,7 +149,7 @@ func (m *AddressBookMap) Addresses() (map[uint64]map[string]TypeAndVersion, erro
 	return m.cloneAddresses(m.addressesByChain), nil
 }
 
-func (m *AddressBookMap) AddressesForChain(chainSelector uint64) (map[string]TypeAndVersion, error) {
+func (m *AddressBookMap) AddressesForChain(chainSelector uint64, opts ...func(map[string]TypeAndVersion)) (map[string]TypeAndVersion, error) {
 	_, err := chainsel.GetChainIDFromSelector(chainSelector)
 	if err != nil {
 		return nil, errors.Wrapf(ErrInvalidChainSelector, "chain selector %d", chainSelector)
@@ -165,7 +165,11 @@ func (m *AddressBookMap) AddressesForChain(chainSelector uint64) (map[string]Typ
 	// maps are mutable and pass via a pointer
 	// creating a copy of the map to prevent concurrency
 	// read and changes outside object-bound
-	return maps.Clone(m.addressesByChain[chainSelector]), nil
+	cloned := maps.Clone(m.addressesByChain[chainSelector])
+	for _, opt := range opts {
+		opt(cloned)
+	}
+	return cloned, nil
 }
 
 // Merge will merge the addresses from another address book into this one.

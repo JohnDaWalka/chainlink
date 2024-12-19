@@ -351,7 +351,11 @@ type ConfigureOCR3Config struct {
 	ChainSel   uint64
 	NodeIDs    []string
 	OCR3Config *OracleConfig
-	DryRun     bool
+
+	// OCR3Addr is the address of the OCR3 contract to configure.  If nil, and there are more than
+	// one deployed contracts on the chain, then the configured contract is non-deterministic.
+	OCR3Addr *string
+	DryRun   bool
 
 	UseMCMS bool
 }
@@ -367,9 +371,16 @@ func ConfigureOCR3ContractFromJD(env *deployment.Environment, cfg ConfigureOCR3C
 	if !ok {
 		return nil, fmt.Errorf("chain %d not found in environment", cfg.ChainSel)
 	}
+
+	filterFunc := identityFilterer
+	if cfg.OCR3Addr != nil {
+		filterFunc = makeOCR3CapabilityFilterer(*cfg.OCR3Addr)
+	}
+
 	contractSetsResp, err := GetContractSets(env.Logger, &GetContractSetsRequest{
-		Chains:      env.Chains,
-		AddressBook: env.ExistingAddresses,
+		Chains:          env.Chains,
+		AddressBook:     env.ExistingAddresses,
+		AddressFilterer: filterFunc,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contract sets: %w", err)
@@ -382,6 +393,13 @@ func ConfigureOCR3ContractFromJD(env *deployment.Environment, cfg ConfigureOCR3C
 	if contract == nil {
 		return nil, fmt.Errorf("no ocr3 contract found for chain %d", cfg.ChainSel)
 	}
+
+	if cfg.OCR3Addr != nil {
+		if *cfg.OCR3Addr != contract.Address().String() {
+			return nil, fmt.Errorf("Requested address to configure %s does not match contract address %s", *cfg.OCR3Addr, contract.Address().String())
+		}
+	}
+
 	nodes, err := deployment.NodeInfo(cfg.NodeIDs, env.Offchain)
 	if err != nil {
 		return nil, err
@@ -970,4 +988,23 @@ func configureForwarder(lggr logger.Logger, chain deployment.Chain, contractSet 
 		lggr.Debugw("configured forwarder", "forwarder", fwdr.Address().String(), "donId", dn.Info.Id, "version", ver, "f", dn.Info.F, "signers", signers)
 	}
 	return opMap, nil
+}
+
+// makeOCR3CapabilityFilterer returns a filter func that deletes any OCR3Capability contract entries
+// that do not match a given OCR3 Address.  If no address is given, no filtering is done.
+func makeOCR3CapabilityFilterer(ocr3Addr string) func(map[string]deployment.TypeAndVersion) {
+	return func(m map[string]deployment.TypeAndVersion) {
+		for k, v := range m {
+			if v.Type == OCR3Capability {
+				if k != ocr3Addr {
+					delete(m, k)
+				}
+			}
+		}
+	}
+}
+
+// identityFilterer is a filter func that does nothing
+func identityFilterer(m map[string]deployment.TypeAndVersion) {
+	// no-op
 }

@@ -19,6 +19,10 @@ import (
 type GetContractSetsRequest struct {
 	Chains      map[uint64]deployment.Chain
 	AddressBook deployment.AddressBook
+
+	// AddressFilterer is a function that filters the addresses a given address book.  Filtering
+	// mutates the input map so the input map should be a copy of the original map.
+	AddressFilterer func(map[string]deployment.TypeAndVersion)
 }
 
 type GetContractSetsResponse struct {
@@ -62,8 +66,12 @@ func GetContractSets(lggr logger.Logger, req *GetContractSetsRequest) (*GetContr
 	resp := &GetContractSetsResponse{
 		ContractSets: make(map[uint64]ContractSet),
 	}
+	var opts []func(map[string]deployment.TypeAndVersion)
+	if req.AddressFilterer != nil {
+		opts = append(opts, req.AddressFilterer)
+	}
 	for id, chain := range req.Chains {
-		addrs, err := req.AddressBook.AddressesForChain(id)
+		addrs, err := req.AddressBook.AddressesForChain(id, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get addresses for chain %d: %w", id, err)
 		}

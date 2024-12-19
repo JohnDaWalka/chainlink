@@ -84,6 +84,122 @@ func TestConfigureOCR3(t *testing.T) {
 		assert.Nil(t, csOut.Proposals)
 	})
 
+	t.Run("success multiple OCR3 contracts", func(t *testing.T) {
+
+		te := SetupTestEnv(t, TestConfig{
+			WFDonConfig:     DonConfig{N: 4},
+			AssetDonConfig:  DonConfig{N: 4},
+			WriterDonConfig: DonConfig{N: 4},
+			NumChains:       1,
+		})
+
+		registrySel := te.Env.AllChainSelectors()[0]
+
+		existingContracts, err := te.Env.ExistingAddresses.AddressesForChain(registrySel)
+		require.NoError(t, err)
+		require.Len(t, existingContracts, 3)
+
+		// Find existing OCR3 contract
+		var existingOCR3Addr string
+		for addr, tv := range existingContracts {
+			if tv.Type == kslib.OCR3Capability {
+				existingOCR3Addr = addr
+				break
+			}
+		}
+
+		// Deploy a new OCR3 contract
+		resp, err := changeset.DeployOCR3(te.Env, registrySel)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.NoError(t, te.Env.ExistingAddresses.Merge(resp.AddressBook))
+
+		// Verify after merge there are three original contracts plus one new one
+		addrs, err := te.Env.ExistingAddresses.AddressesForChain(registrySel)
+		require.NoError(t, err)
+		require.Len(t, addrs, 4)
+
+		// Find new OCR3 contract
+		var newOCR3Addr string
+		for addr, tv := range addrs {
+			if tv.Type == kslib.OCR3Capability && addr != existingOCR3Addr {
+				newOCR3Addr = addr
+				break
+			}
+		}
+
+		var wfNodes []string
+		for id, _ := range te.WFNodes {
+			wfNodes = append(wfNodes, id)
+		}
+
+		w := &bytes.Buffer{}
+		cfg := changeset.ConfigureOCR3Config{
+			ChainSel:             te.RegistrySelector,
+			NodeIDs:              wfNodes,
+			OCR3ContractAddr:     &newOCR3Addr, // Use the new OCR3 contract to configure
+			OCR3Config:           &c,
+			WriteGeneratedConfig: w,
+		}
+
+		csOut, err := changeset.ConfigureOCR3Contract(te.Env, cfg)
+		require.NoError(t, err)
+		var got kslib.OCR2OracleConfig
+		err = json.Unmarshal(w.Bytes(), &got)
+		require.NoError(t, err)
+		assert.Len(t, got.Signers, 4)
+		assert.Len(t, got.Transmitters, 4)
+		assert.Nil(t, csOut.Proposals)
+	})
+
+	t.Run("fails to configure with multiple OCR3 contracts because not found", func(t *testing.T) {
+		te := SetupTestEnv(t, TestConfig{
+			WFDonConfig:     DonConfig{N: 4},
+			AssetDonConfig:  DonConfig{N: 4},
+			WriterDonConfig: DonConfig{N: 4},
+			NumChains:       1,
+		})
+
+		registrySel := te.Env.AllChainSelectors()[0]
+
+		existingContracts, err := te.Env.ExistingAddresses.AddressesForChain(registrySel)
+		require.NoError(t, err)
+		require.Len(t, existingContracts, 3)
+
+		// Deploy a new OCR3 contract
+		resp, err := changeset.DeployOCR3(te.Env, registrySel)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.NoError(t, te.Env.ExistingAddresses.Merge(resp.AddressBook))
+
+		// Verify after merge there are three original contracts plus one new one
+		addrs, err := te.Env.ExistingAddresses.AddressesForChain(registrySel)
+		require.NoError(t, err)
+		require.Len(t, addrs, 4)
+
+		// Specify a non-existent OCR3 contract, means all deployed contracts will be filtered
+		// out and the configuration will fail
+		notFoundAddr := "0x1234567890123456789012345678901234567890"
+
+		var wfNodes []string
+		for id, _ := range te.WFNodes {
+			wfNodes = append(wfNodes, id)
+		}
+
+		w := &bytes.Buffer{}
+		cfg := changeset.ConfigureOCR3Config{
+			ChainSel:             te.RegistrySelector,
+			NodeIDs:              wfNodes,
+			OCR3ContractAddr:     &notFoundAddr,
+			OCR3Config:           &c,
+			WriteGeneratedConfig: w,
+		}
+
+		_, err = changeset.ConfigureOCR3Contract(te.Env, cfg)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "no ocr3 contract found")
+	})
+
 	t.Run("mcms", func(t *testing.T) {
 		te := SetupTestEnv(t, TestConfig{
 			WFDonConfig:     DonConfig{N: 4},
@@ -137,5 +253,4 @@ func TestConfigureOCR3(t *testing.T) {
 		})
 		require.NoError(t, err)
 	})
-
 }

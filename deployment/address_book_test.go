@@ -72,6 +72,35 @@ func TestAddressBook_Save(t *testing.T) {
 	})
 }
 
+func TestAddressBook_AddressesForChain(t *testing.T) {
+	ab := NewMemoryAddressBook()
+	ocr3Cap100 := NewTypeAndVersion("OCR3Capability", Version1_0_0)
+	copyOCR3Cap100 := NewTypeAndVersion("OCR3Capability", Version1_0_0)
+
+	addr1 := common.HexToAddress("0x1").String()
+	addr2 := common.HexToAddress("0x2").String()
+
+	err := ab.Save(chainsel.TEST_90000001.Selector, addr1, ocr3Cap100)
+	require.NoError(t, err)
+
+	err = ab.Save(chainsel.TEST_90000001.Selector, addr2, copyOCR3Cap100)
+	require.NoError(t, err)
+
+	addresses, err := ab.AddressesForChain(chainsel.TEST_90000001.Selector,
+		func(m map[string]TypeAndVersion) {
+			for k, v := range m {
+				if v.Type == "OCR3Capability" {
+					if k != addr1 {
+						delete(m, k)
+					}
+				}
+			}
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, addresses, 1)
+}
+
 func TestAddressBook_Merge(t *testing.T) {
 	onRamp100 := NewTypeAndVersion("OnRamp", Version1_0_0)
 	onRamp110 := NewTypeAndVersion("OnRamp", Version1_1_0)
