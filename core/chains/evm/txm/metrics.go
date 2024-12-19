@@ -111,9 +111,9 @@ func (m *txmMetrics) EmitTxMessage(ctx context.Context, tx common.Hash, fromAddr
 	err = beholder.GetEmitter().Emit(
 		ctx,
 		messageBytes,
-		"beholder_domain", "beholder_test",
+		"beholder_domain", "svr",
 		"beholder_entity", "TxMessage",
-		"beholder_data_schema", "transaction_schema",
+		"beholder_data_schema", "/beholder-tx-message/versions/1",
 	)
 
 	return err

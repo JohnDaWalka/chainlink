@@ -101,9 +101,7 @@ func initGlobals(cfgProm config.Prometheus, cfgTracing config.Tracing, cfgTeleme
 				attributes = append(attributes, attribute.String(k, v))
 			}
 
-			clientCfg := beholder.TestDefaultConfig()
-
-			/*clientCfg := beholder.Config{
+			clientCfg := beholder.Config{
 				InsecureConnection:       cfgTelemetry.InsecureConnection(),
 				CACertFile:               cfgTelemetry.CACertFile(),
 				OtelExporterGRPCEndpoint: cfgTelemetry.OtelExporterGRPCEndpoint(),
@@ -113,7 +111,7 @@ func initGlobals(cfgProm config.Prometheus, cfgTracing config.Tracing, cfgTeleme
 				EmitterExportTimeout:     cfgTelemetry.EmitterExportTimeout(),
 				AuthPublicKeyHex:         csaPubKeyHex,
 				AuthHeaders:              beholderAuthHeaders,
-			}*/
+			}
 
 			// note: due to the OTEL specification, all histogram buckets
 			// must be defined when the beholder client is created
