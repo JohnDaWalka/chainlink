@@ -1,0 +1,87 @@
+[CCIP]
+[CCIP.Deployments]
+Data = """
+{
+  "lane_configs": {
+    "Astar Shibuya": {
+      "fee_token": "0xe74037112db8807B3B4B3895F5790e5bc1866a29",
+      "bridge_tokens": [
+      ],
+      "bridge_tokens_pools": [
+      ],
+      "arm": "0xB38a27930E0a071F1428280c7D2b8Fb227AEF446",
+      "router": "0x22aE550d87eBf775E0c1fDc8881121c8A51F5903",
+      "price_registry": "0xd8eAf2DC06a00aCD0E2767b3845e57F22AC58fa4",
+      "wrapped_native": "0xbd5F3751856E11f3e80dBdA567Ef91Eb7e874791",
+      "src_contracts": {
+        "Sepolia Testnet": {
+          "on_ramp": "0x8EAC33c3B95770fE8D201866E06f60Ad453F3779",
+          "deployed_at": 0
+        }
+      },
+      "dest_contracts": {
+        "Sepolia Testnet": {
+          "off_ramp": "0xF389104dFaD66cED6B77b879FF76b572a8cC3590",
+          "commit_store": "0x24949259d943A91C0ddDff8a103fa567D1e9C983",
+          "receiver_dapp": "0xc83BC84C58f3474745540B38501EaCd82BF905F6"
+        }
+      }
+    },
+    "Sepolia Testnet": {
+      "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+      "bridge_tokens": [
+      ],
+      "bridge_tokens_pools": [
+      ],
+      "arm": "0x27Da8735d8d1402cEc072C234759fbbB4dABBC4A",
+      "router": "0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59",
+      "price_registry": "0x9EF7D57a4ea30b9e37794E55b0C75F2A70275dCc",
+      "wrapped_native": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
+      "src_contracts": {
+        "Astar Shibuya": {
+          "on_ramp": "0xeCCe3a71cF5200DC5d962D4ecee047c5792393B9",
+          "deployed_at": 0
+        }
+      },
+      "dest_contracts": {
+        "Astar Shibuya": {
+          "off_ramp": "0x1B90FfC969F5065f61b7534A7dbC051E9dEB551F",
+          "commit_store": "0x416CbF8bceAf70BFE4306553cb51933397620dD9",
+          "receiver_dapp": "0xc83BC84C58f3474745540B38501EaCd82BF905F6"
+        }
+      }
+    }
+  }
+}
+"""
+
+[CCIP.Groups.load]
+NetworkPairs = ['SEPOLIA,ASTAR_SHIBUYA']
+BiDirectionalLane = true                 # same as above
+ExistingDeployment = true                # same as above
+MulticallInOneTx = false                 # same as above
+
+[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+MsgType = 'Data' # type of message to be sent, either 'Token' or 'DataWithToken' Or 'Data'
+DestGasLimit = 0 # change this to 0 gas limit if you are doing ccip-send to an EOA
+DataLength = 500
+
+[CCIP.Groups.load.LoadProfile]
+RequestPerUnitTime = [1]                                                              # number of ccip requests to be sent per unit time
+TimeUnit = '60s'                                                                      # unit of time for RequestPerUnitTime
+TestDuration = '5m'                                                                   # load test duration, not used for smoke tests
+WaitBetweenChaosDuringLoad = '60h'                                                    # Duration to wait between each chaos injection during load test; only valid for chaos tests
+FailOnFirstErrorInLoad = false
+TestRunName = 'astar_shibuya-sepolia_link_fee_without_token_load_60mins_1rq_per10s-2'
+
+[CCIP.ContractVersions]
+PriceRegistry = '1.5.0'
+OffRamp = '1.5.0'
+OnRamp = '1.5.0'
+TokenPool = '1.5.0'
+CommitStore = '1.5.0'
+
+[CCIP.Env]
+TTL = '5h'
+[CCIP.Env.Network]
+selected_networks = ['ASTAR_SHIBUYA', 'SEPOLIA']

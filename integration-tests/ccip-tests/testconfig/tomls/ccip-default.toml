@@ -97,7 +97,7 @@ DBArgs = [
 [CCIP.Env.NewCLCluster.Common]
 Name = 'node1'       # name of the chainlink node, used as prefix for all the chainlink node names , used for k8s deployment
 DBImage = 'postgres' # postgresql database image to be used for k8s deployment
-DBTag = '12.0'      # postgresql database image tag to be used for k8s deployment
+DBTag = '12.0'       # postgresql database image tag to be used for k8s deployment
 # override config toml file for chainlink nodes
 BaseConfigTOML = """
 [Feature]
@@ -217,6 +217,10 @@ FeeCapDefault = '200 gwei'
 BlockHistorySize = 200
 EIP1559FeeCapBufferBlocks = 0
 """
+
+# Run by default using latest version from `ccip-develop` branch, override this value to use a specific version
+[CCIP.Env.NewCLCluster.Common.ChainlinkImage]
+version = "ccip-develop"
 
 # the following configs are specific to each test type, smoke, load , chaos, etc...
 [CCIP.Groups]

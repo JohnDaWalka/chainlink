@@ -500,14 +500,6 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string, override
 	if !exists {
 		t.Fatalf("group config for %s does not exist", tType)
 	}
-	if tType == ccipconfig.Load {
-		if testCfg.CCIP.Env.Logging == nil || testCfg.CCIP.Env.Logging.Loki == nil {
-			t.Fatal("loki config is required to be set for load test")
-		}
-		if testCfg.CCIP.Env.Logging == nil || testCfg.CCIP.Env.Logging.Grafana == nil {
-			t.Fatal("grafana config is required for load test")
-		}
-	}
 	if pointer.GetBool(groupCfg.KeepEnvAlive) {
 		err := os.Setenv(config.EnvVarKeepEnvironments, "ALWAYS")
 		if err != nil {
