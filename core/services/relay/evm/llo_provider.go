@@ -161,6 +161,7 @@ func (p *lloProvider) ContractConfigTrackers() (cps []ocrtypes.ContractConfigTra
 	for i, cp := range p.cps {
 		cps[i] = cp
 	}
+	p.eng.SugaredLogger.Debugw("TRASH ContractConfigTrackers", "cps", cps)
 	return
 }
 

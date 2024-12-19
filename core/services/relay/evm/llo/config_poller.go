@@ -106,6 +106,8 @@ func newConfigPoller(lggr logger.Logger, lp LogPoller, cc ConfigCache, addr comm
 		Name: "LLOConfigPoller",
 	}.NewServiceEngine(logger.Sugared(lggr).Named(string(instanceType)).With("instanceType", instanceType))
 
+	lggr.Debugw("TRASH New ConfigPoller", "donID", donID, "addr", addr, "instanceType", instanceType, "fromBlock", fromBlock)
+
 	return cp
 }
 
@@ -144,6 +146,7 @@ func (cp *configPoller) latestConfig(ctx context.Context, fromBlock, toBlock int
 		}
 		switch log.EventSig {
 		case ProductionConfigSet:
+			cp.eng.SugaredLogger.Debugw("TRASH ProductionConfigSet", "log", log, "instanceType", cp.instanceType)
 			event, err := DecodeProductionConfigSetLog(log.Data)
 			if err != nil {
 				return latestConfig, log, fmt.Errorf("failed to unpack ProductionConfigSet log data: %w", err)
@@ -154,6 +157,7 @@ func (cp *configPoller) latestConfig(ctx context.Context, fromBlock, toBlock int
 			}
 
 			isProduction := (cp.instanceType != InstanceTypeBlue) == event.IsGreenProduction
+			cp.eng.SugaredLogger.Debugw("TRASH ProductionConfigSet", "isProduction", isProduction, "instanceType", cp.instanceType, "event.IsGreenProduction", event.IsGreenProduction)
 			if isProduction {
 				latestLog = log
 				latestConfig, err = FullConfigFromProductionConfigSet(event)
@@ -162,6 +166,7 @@ func (cp *configPoller) latestConfig(ctx context.Context, fromBlock, toBlock int
 				}
 			}
 		case StagingConfigSet:
+			cp.eng.SugaredLogger.Debugw("TRASH StagingConfigSet", "log", log, "instanceType", cp.instanceType)
 			event, err := DecodeStagingConfigSetLog(log.Data)
 			if err != nil {
 				return latestConfig, latestLog, fmt.Errorf("failed to unpack ProductionConfigSet log data: %w", err)
@@ -172,6 +177,7 @@ func (cp *configPoller) latestConfig(ctx context.Context, fromBlock, toBlock int
 			}
 
 			isProduction := (cp.instanceType != InstanceTypeBlue) == event.IsGreenProduction
+			cp.eng.SugaredLogger.Debugw("TRASH StagingConfigSet", "isProduction", isProduction, "instanceType", cp.instanceType, "event.IsGreenProduction", event.IsGreenProduction)
 			if !isProduction {
 				latestLog = log
 				latestConfig, err = FullConfigFromStagingConfigSet(event)
@@ -193,6 +199,9 @@ func (cp *configPoller) LatestConfig(ctx context.Context, changedInBlock uint64)
 	cfg, _, err := cp.latestConfig(ctx, int64(changedInBlock), math.MaxInt64) // #nosec G115
 	if err != nil {
 		return ocrtypes.ContractConfig{}, fmt.Errorf("failed to get latest config: %w", err)
+	}
+	if cfg.donID > 0 {
+		cp.eng.SugaredLogger.Debugw("TRASH returning config", "cfg", cfg, "instanceType", cp.instanceType, "donID", cfg.donID)
 	}
 	return cfg.ContractConfig, nil
 }
