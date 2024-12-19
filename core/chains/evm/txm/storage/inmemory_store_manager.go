@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/types"
@@ -35,14 +36,14 @@ func (m *InMemoryStoreManager) AbandonPendingTransactions(_ context.Context, fro
 	return fmt.Errorf(StoreNotFoundForAddress, fromAddress)
 }
 
-func (m *InMemoryStoreManager) Add(addresses ...common.Address) error {
+func (m *InMemoryStoreManager) Add(addresses ...common.Address) (err error) {
 	for _, address := range addresses {
 		if _, exists := m.InMemoryStoreMap[address]; exists {
-			return fmt.Errorf("address %v already exists in store manager", address)
+			err = multierr.Append(err, fmt.Errorf("address %v already exists in store manager", address))
 		}
 		m.InMemoryStoreMap[address] = NewInMemoryStore(m.lggr, address, m.chainID)
 	}
-	return nil
+	return
 }
 
 func (m *InMemoryStoreManager) AppendAttemptToTransaction(_ context.Context, txNonce uint64, fromAddress common.Address, attempt *types.Attempt) error {
@@ -124,7 +125,7 @@ func (m *InMemoryStoreManager) MarkTxFatal(_ context.Context, tx *types.Transact
 	return fmt.Errorf(StoreNotFoundForAddress, fromAddress)
 }
 
-func (m *InMemoryStoreManager) FindTxWithIdempotencyKey(_ context.Context, idempotencyKey *string) (*types.Transaction, error) {
+func (m *InMemoryStoreManager) FindTxWithIdempotencyKey(_ context.Context, idempotencyKey string) (*types.Transaction, error) {
 	for _, store := range m.InMemoryStoreMap {
 		tx := store.FindTxWithIdempotencyKey(idempotencyKey)
 		if tx != nil {

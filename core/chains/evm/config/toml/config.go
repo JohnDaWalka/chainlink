@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum/core/txpool/legacypool"
 	"github.com/pelletier/go-toml/v2"
@@ -451,6 +452,20 @@ func (c *Chain) ValidateConfig() (err error) {
 					err = multierr.Append(err, commonconfig.ErrInvalid{Name: "GasEstimator.BumpThreshold", Value: 0, Msg: fmt.Sprintf("cannot be 0 if Transactions.AutoPurge.MinAttempts is set for %s", chainType)})
 				}
 			}
+		case chaintype.ChainDualBroadcast:
+			if c.Transactions.AutoPurge.DetectionApiUrl == nil {
+				err = multierr.Append(err, commonconfig.ErrMissing{Name: "Transactions.AutoPurge.DetectionApiUrl", Msg: fmt.Sprintf("must be set for %s", chainType)})
+			}
+			if c.Transactions.AutoPurge.Threshold == nil {
+				err = multierr.Append(err, commonconfig.ErrMissing{Name: "Transactions.AutoPurge.Threshold", Msg: fmt.Sprintf("needs to be set if auto-purge feature is enabled for %s", chainType)})
+			} else if *c.Transactions.AutoPurge.Threshold == 0 {
+				err = multierr.Append(err, commonconfig.ErrInvalid{Name: "Transactions.AutoPurge.Threshold", Value: 0, Msg: fmt.Sprintf("cannot be 0 if auto-purge feature is enabled for %s", chainType)})
+			}
+			if c.TxmV2.Enabled != nil && *c.TxmV2.Enabled {
+				if c.TxmV2.CustomURL == nil {
+					err = multierr.Append(err, commonconfig.ErrMissing{Name: "TxmV2.CustomURL", Msg: fmt.Sprintf("must be set for %s", chainType)})
+				}
+			}
 		default:
 			// Bump Threshold is required because the stuck tx heuristic relies on a minimum number of bump attempts to exist
 			if c.GasEstimator.BumpThreshold == nil {
@@ -492,6 +507,19 @@ func (t *TxmV2) setFrom(f *TxmV2) {
 	if v := f.CustomURL; v != nil {
 		t.CustomURL = f.CustomURL
 	}
+}
+
+func (t *TxmV2) ValidateConfig() (err error) {
+	if t.Enabled != nil && *t.Enabled {
+		if t.BlockTime == nil {
+			err = multierr.Append(err, commonconfig.ErrMissing{Name: "TxmV2.BlockTime", Msg: "must be set if txmv2 feature is enabled"})
+			return
+		}
+		if t.BlockTime.Duration() < 2*time.Second {
+			err = multierr.Append(err, commonconfig.ErrInvalid{Name: "TxmV2.BlockTime", Msg: "must be equal to or greater than 2 seconds"})
+		}
+	}
+	return
 }
 
 type Transactions struct {

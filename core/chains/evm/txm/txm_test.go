@@ -2,6 +2,7 @@ package txm
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -38,12 +39,14 @@ func TestLifecycle(t *testing.T) {
 		lggr, observedLogs := logger.TestObserved(t, zap.DebugLevel)
 		config := Config{BlockTime: 1 * time.Minute}
 		txStore := storage.NewInMemoryStoreManager(lggr, testutils.FixtureChainID)
+		require.NoError(t, txStore.Add(address1))
 		keystore.On("EnabledAddressesForChain", mock.Anything, mock.Anything).Return([]common.Address{address1}, nil).Once()
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, nil, txStore, nil, config, keystore)
 		client.On("PendingNonceAt", mock.Anything, address1).Return(uint64(0), errors.New("error")).Once()
-		client.On("PendingNonceAt", mock.Anything, address1).Return(uint64(0), nil).Once()
+		client.On("PendingNonceAt", mock.Anything, address1).Return(uint64(100), nil).Once()
 		require.NoError(t, txm.Start(tests.Context(t)))
-		tests.AssertLogEventually(t, observedLogs, "Error when fetching initial pending nonce")
+		tests.AssertLogEventually(t, observedLogs, "Error when fetching initial nonce")
+		tests.AssertLogEventually(t, observedLogs, fmt.Sprintf("Set initial nonce for address: %v to %d", address1, 100))
 	})
 
 	t.Run("tests lifecycle successfully without any transactions", func(t *testing.T) {
@@ -89,7 +92,7 @@ func TestTrigger(t *testing.T) {
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, txStore, nil, config, keystore)
 		var nonce uint64
 		// Start
-		client.On("PendingNonceAt", mock.Anything, address).Return(nonce, nil).Once()
+		client.On("PendingNonceAt", mock.Anything, address).Return(nonce, nil).Maybe()
 		servicetest.Run(t, txm)
 		txm.Trigger(address)
 	})
@@ -126,12 +129,12 @@ func TestBroadcastTransaction(t *testing.T) {
 		tests.AssertLogEventually(t, observedLogs, "Reached transaction limit")
 	})
 
-	t.Run("checks pending nonce if unconfirmed transactions are more than 1/3 of maxInFlightTransactions", func(t *testing.T) {
+	t.Run("checks pending nonce if unconfirmed transactions are equal or more than maxInFlightSubset", func(t *testing.T) {
 		lggr, observedLogs := logger.TestObserved(t, zap.DebugLevel)
 		mTxStore := mocks.NewTxStore(t)
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, mTxStore, nil, config, keystore)
 		txm.setNonce(address, 1)
-		mTxStore.On("FetchUnconfirmedTransactionAtNonceWithCount", mock.Anything, mock.Anything, mock.Anything).Return(nil, maxInFlightTransactions/3, nil).Twice()
+		mTxStore.On("FetchUnconfirmedTransactionAtNonceWithCount", mock.Anything, mock.Anything, mock.Anything).Return(nil, maxInFlightSubset, nil).Twice()
 
 		client.On("PendingNonceAt", mock.Anything, address).Return(uint64(0), nil).Once() // LocalNonce: 1, PendingNonce: 0
 		bo, err := txm.broadcastTransaction(ctx, address)
@@ -174,9 +177,12 @@ func TestBroadcastTransaction(t *testing.T) {
 		require.NoError(t, txStore.Add(address))
 		txm := NewTxm(lggr, testutils.FixtureChainID, client, ab, txStore, nil, config, keystore)
 		txm.setNonce(address, 8)
+		metrics, err := NewTxmMetrics(testutils.FixtureChainID)
+		require.NoError(t, err)
+		txm.metrics = metrics
 		IDK := "IDK"
 		txRequest := &types.TxRequest{
-			Data:              []byte{100},
+			Data:              []byte{100, 200},
 			IdempotencyKey:    &IDK,
 			ChainID:           testutils.FixtureChainID,
 			FromAddress:       address,
@@ -197,13 +203,13 @@ func TestBroadcastTransaction(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, bo)
 		assert.Equal(t, uint64(9), txm.getNonce(address))
-		tx, err = txStore.FindTxWithIdempotencyKey(tests.Context(t), &IDK)
+		tx, err = txStore.FindTxWithIdempotencyKey(tests.Context(t), IDK)
 		require.NoError(t, err)
 		assert.Len(t, tx.Attempts, 1)
 		var zeroTime time.Time
-		assert.Greater(t, tx.LastBroadcastAt, zeroTime)
-		assert.Greater(t, tx.Attempts[0].BroadcastAt, zeroTime)
-		assert.Greater(t, tx.InitialBroadcastAt, zeroTime)
+		assert.Greater(t, *tx.LastBroadcastAt, zeroTime)
+		assert.Greater(t, *tx.Attempts[0].BroadcastAt, zeroTime)
+		assert.Greater(t, *tx.InitialBroadcastAt, zeroTime)
 	})
 }
 
