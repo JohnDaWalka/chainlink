@@ -112,7 +112,6 @@ func initGlobals(cfgProm config.Prometheus, cfgTracing config.Tracing, cfgTeleme
 				AuthPublicKeyHex:         csaPubKeyHex,
 				AuthHeaders:              beholderAuthHeaders,
 			}
-
 			// note: due to the OTEL specification, all histogram buckets
 			// must be defined when the beholder client is created
 			clientCfg.MetricViews = append(clientCfg.MetricViews, workflows.MetricViews()...)
