@@ -570,13 +570,11 @@ updateInterval = "1m"
 
 				// Trail #1: 4 oracles reporting 0, 10, 20, 30. Answer should be 20 (results[4/2]).
 				// Trial #2: 4 oracles reporting 0, 20, 40, 60. Answer should be 40 (results[4/2]).
-				if !gomega.NewGomegaWithT(t).Eventually(func() string {
+				gomega.NewGomegaWithT(t).Eventually(func() string {
 					answer, err2 := ocrContract.LatestAnswer(nil)
 					require.NoError(t, err2)
 					return answer.String()
-				}, tests.WaitTimeout(t), 200*time.Millisecond).Should(gomega.Equal(strconv.Itoa(2 * retVal))) {
-					t.Fatal()
-				}
+				}, tests.WaitTimeout(t), 200*time.Millisecond).Should(gomega.Equal(strconv.Itoa(2 * retVal)))
 
 				for _, app := range apps {
 					jobs, _, err2 := app.JobORM().FindJobs(ctx, 0, 1000)
