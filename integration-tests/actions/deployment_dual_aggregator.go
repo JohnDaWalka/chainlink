@@ -37,9 +37,9 @@ func NewDualAggregatorDeployment(c *seth.Client, in *Input, linkContractAddress 
 		offchainOptions.RequesterAccessController, // requesterAccessController
 		offchainOptions.Decimals,
 		offchainOptions.Description,
-		"0x0000000000000000000000000000000000000000", // secondary proxy
-		30, // cutOffTime
-		20, // maxSyncIterations
+		common.HexToAddress("0x0000000000000000000000000000000000000000"), // secondary proxy
+		uint32(30), // cutOffTime
+		uint32(20), // maxSyncIterations
 	)
 	if err != nil {
 		return nil, err

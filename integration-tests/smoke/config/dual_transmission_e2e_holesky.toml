@@ -2,16 +2,24 @@
 overwrite_custom_url = false
 test_timeout_minutes = 10
 expected_event_count = 5
+custom_url = "https://rpc-holesky.flashbots.net/fast"
 
 [contracts]
 
 [blockchain_a]
-type = "anvil"
+type = "geth"
 docker_cmd_params = ["-b", "1"]
-chain_id = "1337"
 
 [blockchain_a.out]
+chain_id = "17000"
+use_cache = false
 family = "evm"
+
+[[blockchain_a.out.nodes]]
+docker_internal_http_url = "https://nd-033-002-348.p2pify.com/f46b081bafa80b7c0be87edfdd6c0815"
+docker_internal_ws_url = "wss://ws-nd-033-002-348.p2pify.com/f46b081bafa80b7c0be87edfdd6c0815"
+http_url = "https://nd-033-002-348.p2pify.com/f46b081bafa80b7c0be87edfdd6c0815"
+ws_url = "wss://ws-nd-033-002-348.p2pify.com/f46b081bafa80b7c0be87edfdd6c0815"
 
 [nodeset]
 nodes = 5
@@ -23,10 +31,6 @@ image = "postgres:12.0"
 [[nodeset.node_specs]]
 
 [nodeset.node_specs.node]
-#docker_ctx = "../../.."
-#docker_file = "plugins/chainlink.Dockerfile - path to docker image you need"
-# this is replaced in CI for most commit ref you provide
-#image = "public.ecr.aws/chainlink/chainlink:v2.17.0"
 image = "localhost:5000/chainlink:develop"
 user_config_overrides = """
     [Feature]
@@ -39,7 +43,7 @@ user_config_overrides = """
     ListenAddresses = ['0.0.0.0:6690']
 
     [[EVM]]
-    ChainID = '1337'
+    ChainID = '17000'
     ChainType = 'dualBroadcast'
     AutoCreateKey = true
     FinalityDepth = 1
