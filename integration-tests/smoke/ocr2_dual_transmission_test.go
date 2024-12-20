@@ -264,7 +264,7 @@ func TestSmoke(t *testing.T) {
 		ocr2Keys, err := workerNodes[i].MustReadOCR2Keys()
 		require.NoError(t, err, "cannot fetch OCR2 keys")
 		require.Equal(t, 1, len(ocr2Keys.Data), "expecting only one OCR2 key")
-		response, _, err = workerNodes[i].CreateJobRaw(fmt.Sprintf(oevJobSpec, uuid.New().String(), oevContract.Addresses[0].String(), chainFamily, ocr2Keys.Data[0].ID, primaryAddresses[i], bootstrapPeerID.Data[0].Attributes.PeerID,
+		response, _, err := workerNodes[i].CreateJobRaw(fmt.Sprintf(oevJobSpec, uuid.New().String(), oevContract.Addresses[0].String(), chainFamily, ocr2Keys.Data[0].ID, primaryAddresses[i], bootstrapPeerID.Data[0].Attributes.PeerID,
 			strings.TrimPrefix(out.CLNodes[0].Node.DockerP2PUrl, "http://"), chainID, oevContract.Addresses[0].String(), secondaryAddresses[i]))
 		require.NoError(t, err)
 		require.Empty(t, response.Errors)
@@ -430,7 +430,7 @@ func waitForDualAggregatorEvents(
 		possibleRounds = append(possibleRounds, uint32(i))
 	}
 
-	startBlock := uint64(2969733)
+	startBlock := uint64(1) //TODO: @george-dorin Fix Me!
 	lggr.Info().Msg("Waiting for Dual aggregator events")
 	var confirmedPrimary, confirmedSecondary int16
 

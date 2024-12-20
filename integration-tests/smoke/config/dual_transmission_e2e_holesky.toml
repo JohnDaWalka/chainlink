@@ -1,17 +1,17 @@
 [test_config]
 overwrite_custom_url = false
-test_timeout_minutes = 10
-expected_event_count = 5
+test_timeout_minutes = 60
+expected_event_count = 10
 custom_url = "https://rpc-holesky.flashbots.net/fast"
 
 [contracts]
 
 [blockchain_a]
-type = "geth"
+type = "anvil"
 docker_cmd_params = ["-b", "1"]
+chain_id = "17000"
 
 [blockchain_a.out]
-chain_id = "17000"
 use_cache = false
 family = "evm"
 
