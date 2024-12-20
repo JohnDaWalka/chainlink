@@ -219,9 +219,20 @@ func TestChainScopedConfig(t *testing.T) {
 
 			assert.Equal(t, false, cfg3.EVM().LogBroadcasterEnabled())
 		})
+	})
 
-		t.Run("use Noop logBroadcaster when LogBroadcaster is disabled", func(t *testing.T) {
+	t.Run("EVM.Transactions.Enabled", func(t *testing.T) {
+		t.Run("turn on EVM.Transactions.Enabled by default", func(t *testing.T) {
+			assert.True(t, cfg.EVM().Transactions().Enabled())
+		})
 
+		t.Run("verify EVM.Transactions.Enabled is set correctly", func(t *testing.T) {
+			val := false
+			cfg3 := testutils.NewTestChainScopedConfig(t, func(c *toml.EVMConfig) {
+				c.Transactions.Enabled = ptr(val)
+			})
+
+			assert.False(t, cfg3.EVM().Transactions().Enabled())
 		})
 	})
 }
@@ -353,9 +364,9 @@ func TestNodePoolConfig(t *testing.T) {
 	require.Equal(t, uint32(5), cfg.EVM().NodePool().SyncThreshold())
 	require.Equal(t, time.Duration(10000000000), cfg.EVM().NodePool().PollInterval())
 	require.Equal(t, uint32(5), cfg.EVM().NodePool().PollFailureThreshold())
-	require.Equal(t, false, cfg.EVM().NodePool().NodeIsSyncingEnabled())
-	require.Equal(t, false, cfg.EVM().NodePool().EnforceRepeatableRead())
-	require.Equal(t, time.Duration(10000000000), cfg.EVM().NodePool().DeathDeclarationDelay())
+	require.False(t, cfg.EVM().NodePool().NodeIsSyncingEnabled())
+	require.True(t, cfg.EVM().NodePool().EnforceRepeatableRead())
+	require.Equal(t, time.Minute, cfg.EVM().NodePool().DeathDeclarationDelay())
 }
 
 func TestClientErrorsConfig(t *testing.T) {

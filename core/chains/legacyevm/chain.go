@@ -10,6 +10,8 @@ import (
 	gotoml "github.com/pelletier/go-toml/v2"
 	"go.uber.org/multierr"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/rollups"
+
 	common "github.com/smartcontractkit/chainlink-common/pkg/chains"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
@@ -173,7 +175,7 @@ func (o ChainOpts) Validate() error {
 	return err
 }
 
-func NewTOMLChain(ctx context.Context, chain *toml.EVMConfig, opts ChainRelayOpts) (Chain, error) {
+func NewTOMLChain(ctx context.Context, chain *toml.EVMConfig, opts ChainRelayOpts, clientsByChainID map[string]rollups.DAClient) (Chain, error) {
 	err := opts.Validate()
 	if err != nil {
 		return nil, err
@@ -185,17 +187,17 @@ func NewTOMLChain(ctx context.Context, chain *toml.EVMConfig, opts ChainRelayOpt
 	}
 	cfg := evmconfig.NewTOMLChainScopedConfig(chain, l)
 	// note: per-chain validation is not necessary at this point since everything is checked earlier on boot.
-	return newChain(ctx, cfg, chain.Nodes, opts)
+	return newChain(ctx, cfg, chain.Nodes, opts, clientsByChainID)
 }
 
-func newChain(ctx context.Context, cfg *evmconfig.ChainScoped, nodes []*toml.Node, opts ChainRelayOpts) (*chain, error) {
+func newChain(ctx context.Context, cfg *evmconfig.ChainScoped, nodes []*toml.Node, opts ChainRelayOpts, clientsByChainID map[string]rollups.DAClient) (*chain, error) {
 	chainID := cfg.EVM().ChainID()
 	l := opts.Logger
 	var client evmclient.Client
+	var err error
 	if !opts.AppConfig.EVMRPCEnabled() {
 		client = evmclient.NewNullClient(chainID, l)
 	} else if opts.GenEthClient == nil {
-		var err error
 		client, err = evmclient.NewEvmClient(cfg.EVM().NodePool(), cfg.EVM(), cfg.EVM().NodePool().Errors(), l, chainID, nodes, cfg.EVM().ChainType())
 		if err != nil {
 			return nil, err
@@ -242,10 +244,24 @@ func newChain(ctx context.Context, cfg *evmconfig.ChainScoped, nodes []*toml.Nod
 		}
 	}
 
-	// note: gas estimator is started as a part of the txm
-	txm, gasEstimator, err := newEvmTxm(opts.DS, cfg.EVM(), opts.AppConfig.EVMRPCEnabled(), opts.AppConfig.Database(), opts.AppConfig.Database().Listener(), client, l, logPoller, opts, headTracker)
+	// initialize gas estimator
+	gasEstimator, err := newGasEstimator(cfg.EVM(), client, l, opts, clientsByChainID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate EvmTxm for chain with ID %s: %w", chainID.String(), err)
+		return nil, fmt.Errorf("failed to instantiate gas estimator for chain with ID %s: %w", chainID, err)
+	}
+
+	// note: gas estimator is started as a part of the txm
+	var txm txmgr.TxManager
+	//nolint:gocritic // ignoring suggestion to convert to switch statement
+	if !opts.AppConfig.EVMRPCEnabled() {
+		txm = &txmgr.NullTxManager{ErrMsg: fmt.Sprintf("Ethereum is disabled for chain %d", chainID)}
+	} else if !cfg.EVM().Transactions().Enabled() {
+		txm = &txmgr.NullTxManager{ErrMsg: fmt.Sprintf("TXM disabled for chain %d", chainID)}
+	} else {
+		txm, err = newEvmTxm(opts.DS, cfg.EVM(), opts.AppConfig.Database(), opts.AppConfig.Database().Listener(), client, l, logPoller, opts, headTracker, gasEstimator)
+		if err != nil {
+			return nil, fmt.Errorf("failed to instantiate EvmTxm for chain with ID %s: %w", chainID, err)
+		}
 	}
 
 	headBroadcaster.Subscribe(txm)

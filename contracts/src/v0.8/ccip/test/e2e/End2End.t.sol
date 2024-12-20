@@ -1,24 +1,34 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IRMN} from "../../interfaces/IRMN.sol";
 import {IRMNRemote} from "../../interfaces/IRMNRemote.sol";
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../NonceManager.sol";
+import {Router} from "../../Router.sol";
+import {Client} from "../../libraries/Client.sol";
+import {Internal} from "../../libraries/Internal.sol";
+import {OffRamp} from "../../offRamp/OffRamp.sol";
+import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
-import "../helpers/MerkleHelper.sol";
-import "../offRamp/OffRampSetup.t.sol";
-import "../onRamp/OnRampSetup.t.sol";
+import {MerkleHelper} from "../helpers/MerkleHelper.sol";
+import {OnRampHelper} from "../helpers/OnRampHelper.sol";
+import {OffRampSetup} from "../offRamp/OffRamp/OffRampSetup.t.sol";
+import {OnRampSetup} from "../onRamp/OnRamp/OnRampSetup.t.sol";
+
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 /// @notice This E2E test implements the following scenario:
-/// 1. Send multiple messages from multiple source chains to a single destination chain (2 messages from source chain 1 and 1 from
-/// source chain 2).
+/// 1. Send multiple messages from multiple source chains to a single destination chain (2 messages from source chain
+/// 1 and 1 from source chain 2).
 /// 2. Commit multiple merkle roots (1 for each source chain).
 /// 3. Batch execute all the committed messages.
 contract E2E is OnRampSetup, OffRampSetup {
   using Internal for Internal.Any2EVMRampMessage;
+
+  uint256 internal constant TOKEN_AMOUNT_1 = 9;
+  uint256 internal constant TOKEN_AMOUNT_2 = 7;
 
   Router internal s_sourceRouter2;
   OnRampHelper internal s_onRamp2;
@@ -34,7 +44,7 @@ contract E2E is OnRampSetup, OffRampSetup {
     OffRampSetup.setUp();
 
     // Deploy new source router for the new source chain
-    s_sourceRouter2 = new Router(s_sourceRouter.getWrappedNative(), address(s_mockRMN));
+    s_sourceRouter2 = new Router(s_sourceRouter.getWrappedNative(), address(s_mockRMNRemote));
 
     // Deploy new TokenAdminRegistry for the new source chain
     s_tokenAdminRegistry2 = new TokenAdminRegistry();
@@ -43,7 +53,14 @@ contract E2E is OnRampSetup, OffRampSetup {
     for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
       address token = s_sourceTokens[i];
       address pool = address(
-        new LockReleaseTokenPool(IERC20(token), new address[](0), address(s_mockRMN), true, address(s_sourceRouter2))
+        new LockReleaseTokenPool(
+          IERC20(token),
+          DEFAULT_TOKEN_DECIMALS,
+          new address[](0),
+          address(s_mockRMNRemote),
+          true,
+          address(s_sourceRouter2)
+        )
       );
 
       s_sourcePoolByDestPool[s_destPoolBySourceToken[token]] = pool;
@@ -65,7 +82,7 @@ contract E2E is OnRampSetup, OffRampSetup {
     s_nonceManager2 = new NonceManager(new address[](0));
 
     (
-      // Deploy the new source chain onramp
+      // Deploy the new source chain onRamp
       // Outsource to shared helper function with OnRampSetup
       s_onRamp2,
       s_metadataHash2
@@ -84,10 +101,10 @@ contract E2E is OnRampSetup, OffRampSetup {
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp2)});
     s_sourceRouter2.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
-    // Deploy offramp
+    // Deploy offRamp
     _deployOffRamp(s_mockRMNRemote, s_inboundNonceManager);
 
-    // Enable source chains on offramp
+    // Enable source chains on offRamp
     OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](2);
     sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
       router: s_destRouter,
@@ -129,9 +146,9 @@ contract E2E is OnRampSetup, OffRampSetup {
       uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, _generateTokenMessage());
       // Asserts that the tokens have been sent and the fee has been paid.
       assertEq(
-        balance0Pre - (messages1.length + messages2.length) * (i_tokenAmount0 + expectedFee), token0.balanceOf(OWNER)
+        balance0Pre - (messages1.length + messages2.length) * (TOKEN_AMOUNT_1 + expectedFee), token0.balanceOf(OWNER)
       );
-      assertEq(balance1Pre - (messages1.length + messages2.length) * i_tokenAmount1, token1.balanceOf(OWNER));
+      assertEq(balance1Pre - (messages1.length + messages2.length) * TOKEN_AMOUNT_2, token1.balanceOf(OWNER));
     }
 
     // Commit
@@ -149,7 +166,7 @@ contract E2E is OnRampSetup, OffRampSetup {
       merkleRoots[0] = MerkleHelper.getMerkleRoot(hashedMessages1);
       merkleRoots[1] = MerkleHelper.getMerkleRoot(hashedMessages2);
 
-      // TODO make these real sigs :)
+      // TODO make these real sigs
       IRMNRemote.Signature[] memory rmnSignatures = new IRMNRemote.Signature[](0);
 
       Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](2);
@@ -178,9 +195,6 @@ contract E2E is OnRampSetup, OffRampSetup {
 
     // Scoped to RMN and verify to reduce stack pressure
     {
-      s_mockRMN.setTaggedRootBlessed(IRMN.TaggedRoot({commitStore: address(s_offRamp), root: merkleRoots[0]}), true);
-      s_mockRMN.setTaggedRootBlessed(IRMN.TaggedRoot({commitStore: address(s_offRamp), root: merkleRoots[1]}), true);
-
       bytes32[] memory proofs = new bytes32[](0);
       bytes32[] memory hashedLeaves = new bytes32[](1);
       hashedLeaves[0] = merkleRoots[0];
@@ -207,7 +221,7 @@ contract E2E is OnRampSetup, OffRampSetup {
     vm.recordLogs();
     _execute(reports);
 
-    assertExecutionStateChangedEventLogs(
+    _assertExecutionStateChangedEventLogs(
       SOURCE_CHAIN_SELECTOR,
       messages1[0].header.sequenceNumber,
       messages1[0].header.messageId,
@@ -216,7 +230,7 @@ contract E2E is OnRampSetup, OffRampSetup {
       ""
     );
 
-    assertExecutionStateChangedEventLogs(
+    _assertExecutionStateChangedEventLogs(
       SOURCE_CHAIN_SELECTOR,
       messages1[1].header.sequenceNumber,
       messages1[1].header.messageId,
@@ -225,7 +239,7 @@ contract E2E is OnRampSetup, OffRampSetup {
       ""
     );
 
-    assertExecutionStateChangedEventLogs(
+    _assertExecutionStateChangedEventLogs(
       SOURCE_CHAIN_SELECTOR + 1,
       messages2[0].header.sequenceNumber,
       messages2[0].header.messageId,
@@ -244,8 +258,8 @@ contract E2E is OnRampSetup, OffRampSetup {
     TokenAdminRegistry tokenAdminRegistry
   ) public returns (Internal.Any2EVMRampMessage memory) {
     Client.EVM2AnyMessage memory message = _generateTokenMessage();
-    IERC20(s_sourceTokens[0]).approve(address(router), i_tokenAmount0 + router.getFee(DEST_CHAIN_SELECTOR, message));
-    IERC20(s_sourceTokens[1]).approve(address(router), i_tokenAmount1);
+    IERC20(s_sourceTokens[0]).approve(address(router), TOKEN_AMOUNT_1 + router.getFee(DEST_CHAIN_SELECTOR, message));
+    IERC20(s_sourceTokens[1]).approve(address(router), TOKEN_AMOUNT_2);
 
     uint256 feeAmount = router.getFee(DEST_CHAIN_SELECTOR, message);
 
@@ -296,6 +310,19 @@ contract E2E is OnRampSetup, OffRampSetup {
       receiver: abi.decode(msgEvent.receiver, (address)),
       gasLimit: s_feeQuoter.parseEVMExtraArgsFromBytes(msgEvent.extraArgs, DEST_CHAIN_SELECTOR).gasLimit,
       tokenAmounts: any2EVMTokenTransfer
+    });
+  }
+
+  function _generateTokenMessage() public view returns (Client.EVM2AnyMessage memory) {
+    Client.EVMTokenAmount[] memory tokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    tokenAmounts[0].amount = TOKEN_AMOUNT_1;
+    tokenAmounts[1].amount = TOKEN_AMOUNT_2;
+    return Client.EVM2AnyMessage({
+      receiver: abi.encode(OWNER),
+      data: "",
+      tokenAmounts: tokenAmounts,
+      feeToken: s_sourceFeeToken,
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}))
     });
   }
 }

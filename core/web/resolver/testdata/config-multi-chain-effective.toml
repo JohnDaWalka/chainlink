@@ -237,6 +237,7 @@ CertFile = ''
 [Mercury.Transmitter]
 TransmitQueueMaxSize = 10000
 TransmitTimeout = '5s'
+TransmitConcurrency = 100
 
 [Capabilities]
 [Capabilities.Peering]
@@ -268,6 +269,11 @@ Address = ''
 NetworkID = 'evm'
 ChainID = '1'
 
+[Capabilities.WorkflowRegistry]
+Address = ''
+NetworkID = 'evm'
+ChainID = '1'
+
 [Capabilities.GatewayConnector]
 ChainIDForNodeKey = ''
 NodeAddress = ''
@@ -286,6 +292,8 @@ CACertFile = ''
 Endpoint = ''
 InsecureConnection = false
 TraceSampleRatio = 0.01
+EmitterBatchProcessor = true
+EmitterExportTimeout = '1s'
 
 [[EVM]]
 ChainID = '1'
@@ -312,6 +320,7 @@ FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '9m0s'
 
 [EVM.Transactions]
+Enabled = true
 ForwardersEnabled = false
 MaxInFlight = 16
 MaxQueued = 250
@@ -369,8 +378,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [EVM.OCR]
@@ -422,6 +431,7 @@ FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
 [EVM.Transactions]
+Enabled = true
 ForwardersEnabled = false
 MaxInFlight = 16
 MaxQueued = 250
@@ -479,8 +489,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [EVM.OCR]
@@ -526,6 +536,7 @@ FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '6m0s'
 
 [EVM.Transactions]
+Enabled = true
 ForwardersEnabled = false
 MaxInFlight = 16
 MaxQueued = 5000
@@ -583,8 +594,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 
 [EVM.OCR]
@@ -651,6 +662,8 @@ OCR2CacheTTL = '1m0s'
 TxTimeout = '1m0s'
 TxRetryTimeout = '10s'
 TxConfirmTimeout = '30s'
+TxExpirationRebroadcast = false
+TxRetentionTimeout = '0s'
 SkipPreflight = true
 Commitment = 'confirmed'
 MaxRetries = 12
@@ -660,6 +673,7 @@ ComputeUnitPriceMin = 0
 ComputeUnitPriceDefault = 0
 FeeBumpPeriod = '3s'
 BlockHistoryPollPeriod = '5s'
+BlockHistorySize = 1
 ComputeUnitLimitDefault = 200000
 EstimateComputeUnitLimit = false
 
@@ -694,6 +708,8 @@ OCR2CacheTTL = '1m0s'
 TxTimeout = '1m0s'
 TxRetryTimeout = '10s'
 TxConfirmTimeout = '30s'
+TxExpirationRebroadcast = false
+TxRetentionTimeout = '0s'
 SkipPreflight = true
 Commitment = 'confirmed'
 MaxRetries = 0
@@ -703,6 +719,7 @@ ComputeUnitPriceMin = 0
 ComputeUnitPriceDefault = 0
 FeeBumpPeriod = '3s'
 BlockHistoryPollPeriod = '5s'
+BlockHistorySize = 1
 ComputeUnitLimitDefault = 200000
 EstimateComputeUnitLimit = false
 

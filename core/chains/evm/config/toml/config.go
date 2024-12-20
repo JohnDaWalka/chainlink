@@ -472,6 +472,7 @@ func (c *Chain) ValidateConfig() (err error) {
 }
 
 type Transactions struct {
+	Enabled              *bool
 	ForwardersEnabled    *bool
 	MaxInFlight          *uint32
 	MaxQueued            *uint32
@@ -483,6 +484,9 @@ type Transactions struct {
 }
 
 func (t *Transactions) setFrom(f *Transactions) {
+	if v := f.Enabled; v != nil {
+		t.Enabled = v
+	}
 	if v := f.ForwardersEnabled; v != nil {
 		t.ForwardersEnabled = v
 	}
@@ -815,6 +819,7 @@ func (d *DAOracle) setFrom(f *DAOracle) {
 	if v := f.OracleType; v != nil {
 		d.OracleType = v
 	}
+
 	if v := f.OracleAddress; v != nil {
 		d.OracleAddress = v
 	}

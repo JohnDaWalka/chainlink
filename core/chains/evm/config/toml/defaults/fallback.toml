@@ -19,6 +19,7 @@ NoNewFinalizedHeadsThreshold = '0'
 LogBroadcasterEnabled = true
 
 [Transactions]
+Enabled = true
 ForwardersEnabled = false
 MaxInFlight = 16
 MaxQueued = 250
@@ -76,8 +77,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '1m'
 NewHeadsPollInterval = '0s'
 
 [OCR]

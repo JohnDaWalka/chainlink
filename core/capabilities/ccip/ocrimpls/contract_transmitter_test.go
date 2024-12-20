@@ -7,18 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 
@@ -27,7 +20,12 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmconfig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config"
@@ -105,7 +103,7 @@ func testTransmitter(
 	report []byte,
 ) {
 	ctx := tests.Context(t)
-	uni := newTestUniverse[[]byte](t, nil)
+	uni := newTestUniverse(t, nil)
 
 	c, err := uni.wrapper.LatestConfigDetails(nil, pluginType)
 	require.NoError(t, err, "failed to get latest config details")
@@ -161,12 +159,12 @@ func testTransmitter(
 
 	// wait for receipt to be written to the db
 	require.Eventually(t, func() bool {
-		rows, err := uni.db.QueryContext(testutils.Context(t), `SELECT count(*) as cnt FROM evm.receipts LIMIT 1`)
-		require.NoError(t, err, "failed to query receipts")
-		defer rows.Close()
-		var count int
-		for rows.Next() {
-			require.NoError(t, rows.Scan(&count), "failed to scan")
+		uni.backend.Commit()
+		var count uint32
+		err := uni.db.GetContext(testutils.Context(t), &count, `SELECT count(*) as cnt FROM evm.receipts LIMIT 1`)
+		require.NoError(t, err)
+		if count == 1 {
+			t.Log("tx receipt found in db")
 		}
 		return count == 1
 	}, testutils.WaitTimeout(t), 2*time.Second)
@@ -182,7 +180,7 @@ func testTransmitter(
 
 type testUniverse[RI any] struct {
 	simClient              *client.SimulatedBackendClient
-	backend                *backends.SimulatedBackend
+	backend                *simulated.Backend
 	deployer               *bind.TransactOpts
 	transmitters           []common.Address
 	signers                []common.Address
@@ -201,7 +199,7 @@ type keyringsAndSigners[RI any] struct {
 	signers  []common.Address
 }
 
-func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniverse[RI] {
+func newTestUniverse(t *testing.T, ks *keyringsAndSigners[[]byte]) *testUniverse[[]byte] {
 	t.Helper()
 
 	db := pgtest.NewSqlxDB(t)
@@ -217,25 +215,25 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 		transmitters = append(transmitters, key.Address)
 	}
 
-	backend := backends.NewSimulatedBackend(core.GenesisAlloc{
-		owner.From: core.GenesisAccount{
+	backend := simulated.NewBackend(types.GenesisAlloc{
+		owner.From: types.Account{
 			Balance: assets.Ether(1000).ToInt(),
 		},
-		transmitters[0]: core.GenesisAccount{
+		transmitters[0]: types.Account{
 			Balance: assets.Ether(1000).ToInt(),
 		},
-	}, 30e6)
+	}, simulated.WithBlockGasLimit(30e6))
 
-	ocr3HelperAddr, _, _, err := multi_ocr3_helper.DeployMultiOCR3Helper(owner, backend)
+	ocr3HelperAddr, _, _, err := multi_ocr3_helper.DeployMultiOCR3Helper(owner, backend.Client())
 	require.NoError(t, err)
 	backend.Commit()
-	wrapper, err := multi_ocr3_helper.NewMultiOCR3Helper(ocr3HelperAddr, backend)
+	wrapper, err := multi_ocr3_helper.NewMultiOCR3Helper(ocr3HelperAddr, backend.Client())
 	require.NoError(t, err)
 
 	// create the oracle identities for setConfig
 	// need to create at least 4 identities otherwise setConfig will fail
 	var (
-		keyrings []ocr3types.OnchainKeyring[RI]
+		keyrings []ocr3types.OnchainKeyring[[]byte]
 		signers  []common.Address
 	)
 	if ks != nil {
@@ -245,7 +243,7 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 		for i := 0; i < 4; i++ {
 			kb, err2 := ocr2key.New(kschaintype.EVM)
 			require.NoError(t, err2, "failed to create key")
-			kr := ocrimpls.NewOnchainKeyring[RI](kb, logger.TestLogger(t))
+			kr := ocrimpls.NewOnchainKeyring[[]byte](kb, logger.TestLogger(t))
 			signers = append(signers, common.BytesToAddress(kr.PublicKey()))
 			keyrings = append(keyrings, kr)
 		}
@@ -311,7 +309,7 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 	require.NoError(t, chainWriter.Start(testutils.Context(t)), "failed to start chain writer")
 	t.Cleanup(func() { require.NoError(t, chainWriter.Close()) })
 
-	transmitterWithSigs := ocrimpls.XXXNewContractTransmitterTestsOnly[RI](
+	transmitterWithSigs := ocrimpls.XXXNewContractTransmitterTestsOnly(
 		chainWriter,
 		ocrtypes.Account(transmitters[0].Hex()),
 		contractName,
@@ -319,7 +317,7 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 		ocr3HelperAddr.Hex(),
 		ocrimpls.ToCommitCalldata,
 	)
-	transmitterWithoutSigs := ocrimpls.XXXNewContractTransmitterTestsOnly[RI](
+	transmitterWithoutSigs := ocrimpls.XXXNewContractTransmitterTestsOnly(
 		chainWriter,
 		ocrtypes.Account(transmitters[0].Hex()),
 		contractName,
@@ -328,7 +326,7 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 		ocrimpls.ToExecCalldata,
 	)
 
-	return &testUniverse[RI]{
+	return &testUniverse[[]byte]{
 		simClient:              simClient,
 		backend:                backend,
 		deployer:               owner,
@@ -415,7 +413,7 @@ func makeTestEvmTxm(
 	keyStore keystore.Eth) (txmgr.TxManager, gas.EvmFeeEstimator) {
 	config, dbConfig, evmConfig := MakeTestConfigs(t)
 
-	estimator, err := gas.NewEstimator(logger.TestLogger(t), ethClient, config.ChainType(), evmConfig.GasEstimator())
+	estimator, err := gas.NewEstimator(logger.TestLogger(t), ethClient, config.ChainType(), ethClient.ConfiguredChainID(), evmConfig.GasEstimator(), nil)
 	require.NoError(t, err, "failed to create gas estimator")
 
 	lggr := logger.TestLogger(t)
@@ -605,8 +603,8 @@ func (d *TestDAOracleConfig) OracleType() *toml.DAOracleType {
 	return &oracleType
 }
 
-func (d *TestDAOracleConfig) OracleAddress() *types.EIP55Address {
-	a, err := types.NewEIP55Address("0x420000000000000000000000000000000000000F")
+func (d *TestDAOracleConfig) OracleAddress() *evmtypes.EIP55Address {
+	a, err := evmtypes.NewEIP55Address("0x420000000000000000000000000000000000000F")
 	if err != nil {
 		panic(err)
 	}
