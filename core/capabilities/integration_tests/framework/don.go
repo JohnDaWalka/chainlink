@@ -45,16 +45,19 @@ type DonContext struct {
 	EthBlockchain      *EthBlockchain
 	p2pNetwork         *FakeRageP2PNetwork
 	capabilityRegistry *CapabilitiesRegistry
+	workflowRegistry   *WorkflowRegistry
 }
 
 func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
 	ethBlockchain := NewEthBlockchain(t, 1000, 1*time.Second)
 	rageP2PNetwork := NewFakeRageP2PNetwork(ctx, t, 1000)
 	capabilitiesRegistry := NewCapabilitiesRegistry(ctx, t, ethBlockchain)
+	workflowRegistry := NewWorkflowRegistry(ctx, t, ethBlockchain)
 
 	servicetest.Run(t, rageP2PNetwork)
 	servicetest.Run(t, ethBlockchain)
-	return DonContext{EthBlockchain: ethBlockchain, p2pNetwork: rageP2PNetwork, capabilityRegistry: capabilitiesRegistry}
+	return DonContext{EthBlockchain: ethBlockchain, p2pNetwork: rageP2PNetwork, capabilityRegistry: capabilitiesRegistry,
+		workflowRegistry: workflowRegistry}
 }
 
 func (c DonContext) WaitForCapabilitiesToBeExposed(t *testing.T, dons ...*DON) {
@@ -97,7 +100,11 @@ type DON struct {
 	nodes                  []*capabilityNode
 	standardCapabilityJobs []*job.Job
 	publishedCapabilities  []capability
-	capabilitiesRegistry   *CapabilitiesRegistry
+
+	workflows []Workflow
+
+	capabilitiesRegistry *CapabilitiesRegistry
+	workflowRegistry     *WorkflowRegistry
 
 	nodeConfigModifiers []func(c *chainlink.Config, node *capabilityNode)
 
@@ -109,7 +116,8 @@ type DON struct {
 
 func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig DonConfiguration,
 	dependentDONs []commoncap.DON, donContext DonContext, supportsOCR bool) *DON {
-	don := &DON{t: t, lggr: lggr.Named(donConfig.name), config: donConfig, capabilitiesRegistry: donContext.capabilityRegistry}
+	don := &DON{t: t, lggr: lggr.Named(donConfig.name), config: donConfig, capabilitiesRegistry: donContext.capabilityRegistry,
+		workflowRegistry: donContext.workflowRegistry}
 
 	protocolRoundInterval := 1 * time.Second
 
@@ -169,6 +177,10 @@ func (d *DON) Initialise() {
 
 	//nolint:gosec // disable G115
 	d.config.DON.ID = uint32(id)
+
+	for _, workflow := range d.workflows {
+		d.workflowRegistry.RegisterWorkflow(workflow, d.config.DON.ID)
+	}
 }
 
 func (d *DON) GetID() uint32 {
@@ -340,6 +352,11 @@ func (d *DON) AddJob(ctx context.Context, j *job.Job) error {
 		}
 	}
 
+	return nil
+}
+
+func (d *DON) AddWorkflow(workflow Workflow) error {
+	d.workflows = append(d.workflows, workflow)
 	return nil
 }
 
