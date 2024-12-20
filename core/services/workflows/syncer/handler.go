@@ -214,7 +214,7 @@ func (h *eventHandler) refreshSecrets(ctx context.Context, workflowOwner, workfl
 		WorkflowRegistryForceUpdateSecretsRequestedV1{
 			SecretsURLHash: decodedHash,
 			Owner:          owner,
-			WorkflowName:   name,
+			WorkflowName:   workflowName,
 		},
 	)
 	if err != nil {
@@ -531,12 +531,14 @@ func (h *eventHandler) engineFactoryFn(ctx context.Context, id string, owner str
 		return nil, fmt.Errorf("failed to get workflow sdk spec: %w", err)
 	}
 
+	trunc := pkgworkflows.HashTruncateName(name)
+
 	cfg := workflows.Config{
 		Lggr:           h.lggr,
 		Workflow:       *sdkSpec,
 		WorkflowID:     id,
 		WorkflowOwner:  owner, // this gets hex encoded in the engine.
-		WorkflowName:   name,
+		WorkflowName:   string(trunc[:]),
 		Registry:       h.capRegistry,
 		Store:          h.workflowStore,
 		Config:         config,
