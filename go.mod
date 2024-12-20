@@ -4,6 +4,8 @@ go 1.23.3
 
 toolchain go1.23.4
 
+replace github.com/smartcontractkit/chainlink-common => ../chainlink-common
+
 require (
 	github.com/Depado/ginprom v1.8.0
 	github.com/Masterminds/semver/v3 v3.3.0
@@ -14,6 +16,7 @@ require (
 	github.com/andybalholm/brotli v1.1.1
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
+	github.com/bytecodealliance/wasmtime-go/v28 v28.0.0
 	github.com/cometbft/cometbft v0.37.5
 	github.com/cosmos/cosmos-sdk v0.47.11
 	github.com/danielkov/gin-helmet v0.0.0-20171108135313-1387e224435e
@@ -158,7 +161,6 @@ require (
 	github.com/bits-and-blooms/bitset v1.13.0 // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/bytecodealliance/wasmtime-go/v23 v23.0.0 // indirect
 	github.com/bytedance/sonic v1.11.6 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/bytecodealliance/wasmtime-go/v28"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/uuid"
@@ -27,10 +28,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/jsonserializable"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
+	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/build"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
 	gatewayconnector "github.com/smartcontractkit/chainlink/v2/core/capabilities/gateway_connector"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote"
 	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
@@ -190,6 +193,9 @@ type ApplicationOpts struct {
 	CapabilitiesDispatcher     remotetypes.Dispatcher
 	CapabilitiesPeerWrapper    p2ptypes.PeerWrapper
 	NewOracleFactoryFn         standardcapabilities.NewOracleFactoryFn
+	FetcherFunc                syncer.FetcherFunc
+	FetcherFactoryFn           compute.FetcherFactory
+	WasmModuleFactoryFn        host.WasmModuleFactoryFn
 }
 
 // NewApplication initializes a new store if one is not already
@@ -283,8 +289,18 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			srvcs = append(srvcs, wfLauncher, registrySyncer)
 
 			if cfg.Capabilities().WorkflowRegistry().Address() != "" {
-				if gatewayConnectorWrapper == nil {
-					return nil, errors.New("unable to create workflow registry syncer without gateway connector")
+				lggr := globalLogger.Named("WorkflowRegistrySyncer")
+				var fetcherFunc syncer.FetcherFunc
+				if opts.FetcherFunc == nil {
+
+					if gatewayConnectorWrapper == nil {
+						return nil, errors.New("unable to create workflow registry syncer without gateway connector")
+					}
+					fetcher := syncer.NewFetcherService(lggr, gatewayConnectorWrapper)
+					fetcherFunc = fetcher.Fetch
+					srvcs = append(srvcs, fetcher)
+				} else {
+					fetcherFunc = opts.FetcherFunc
 				}
 
 				err = keyStore.Workflow().EnsureKey(context.Background())
@@ -300,12 +316,22 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 					return nil, fmt.Errorf("expected 1 key, got %d", len(keys))
 				}
 
-				lggr := globalLogger.Named("WorkflowRegistrySyncer")
-				fetcher := syncer.NewFetcherService(lggr, gatewayConnectorWrapper)
+				var wasmModuleFactory host.WasmModuleFactoryFn
+				if opts.WasmModuleFactoryFn != nil {
+					wasmModuleFactory = opts.WasmModuleFactoryFn
+				} else {
+					// TODO need a non-test implementation of this that will serialise and cache the modules and ensure that
+					// wasmtime.NewModule is only called in a single threaded way, cached in DB?  or would local file system
+					// be good enough?  whatever it does it needs to handle the case where the serialised version does not
+					// correctly deserialise and recreates the cached serialised version, note serialisation can fail for
+					// issues such as a change to the cfg passed into module creation, wasmtime.NewModule version change etc
+					// basically it should assume serialisation will fail and handle that.
+					wasmModuleFactory = wasmtime.NewModule
+				}
 
 				eventHandler := syncer.NewEventHandler(lggr, syncer.NewWorkflowRegistryDS(opts.DS, globalLogger),
-					fetcher.Fetch, workflowstore.NewDBStore(opts.DS, lggr, clockwork.NewRealClock()), opts.CapabilitiesRegistry,
-					custmsg.NewLabeler(), clockwork.NewRealClock(), keys[0])
+					fetcherFunc, workflowstore.NewDBStore(opts.DS, lggr, clockwork.NewRealClock()), opts.CapabilitiesRegistry,
+					custmsg.NewLabeler(), clockwork.NewRealClock(), keys[0], wasmModuleFactory)
 
 				globalLogger.Debugw("Creating WorkflowRegistrySyncer")
 				wfSyncer := syncer.NewWorkflowRegistry(
@@ -321,7 +347,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 					workflowDonNotifier,
 				)
 
-				srvcs = append(srvcs, fetcher, wfSyncer)
+				srvcs = append(srvcs, wfSyncer)
 			}
 		}
 	} else {
@@ -564,6 +590,8 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		keyStore,
 		peerWrapper,
 		opts.NewOracleFactoryFn,
+		opts.FetcherFactoryFn,
+		opts.WasmModuleFactoryFn,
 	)
 
 	if cfg.OCR().Enabled() {

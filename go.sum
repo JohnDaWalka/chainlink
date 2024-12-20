@@ -198,8 +198,8 @@ github.com/bufbuild/protocompile v0.4.0 h1:LbFKd2XowZvQ/kajzguUp2DC9UEIQhIq77fZZ
 github.com/bufbuild/protocompile v0.4.0/go.mod h1:3v93+mbWn/v3xzN+31nwkJfrEpAUwp+BagBSZWx+TP8=
 github.com/buger/jsonparser v1.1.1 h1:2PnMjfWD7wBILjqQbt530v576A/cAbQvEW9gGIpYMUs=
 github.com/buger/jsonparser v1.1.1/go.mod h1:6RYKKt7H4d4+iWqouImQ9R2FZql3VbhNgx27UK13J/0=
-github.com/bytecodealliance/wasmtime-go/v23 v23.0.0 h1:NJvU4S8KEk1GnF6+FvlnzMD/8wXTj/mYJSG6Q4yu3Pw=
-github.com/bytecodealliance/wasmtime-go/v23 v23.0.0/go.mod h1:5YIL+Ouiww2zpO7u+iZ1U1G5NvmwQYaXdmCZQGjQM0U=
+github.com/bytecodealliance/wasmtime-go/v28 v28.0.0 h1:aBU8cexP2rPZ0Qz488kvn2NXvWZHL2aG1/+n7Iv+xGc=
+github.com/bytecodealliance/wasmtime-go/v28 v28.0.0/go.mod h1:4OCU0xAW9ycwtX4nMF4zxwgJBJ5/0eMfJiHB0wAmkV4=
 github.com/bytedance/sonic v1.11.6 h1:oUp34TzMlL+OY1OUWxHqsdkgC/Zfc85zGqw9siXjrc0=
 github.com/bytedance/sonic v1.11.6/go.mod h1:LysEHSvpvDySVdC2f87zGWf6CIKJcAvqab1ZaiQtds4=
 github.com/bytedance/sonic/loader v0.1.1 h1:c+e5Pt1k/cy5wMveRDyk2X4B9hF4g7an8N3zCYjJFNM=
@@ -1139,8 +1139,6 @@ github.com/smartcontractkit/chainlink-automation v0.8.1 h1:sTc9LKpBvcKPc1JDYAmgB
 github.com/smartcontractkit/chainlink-automation v0.8.1/go.mod h1:Iij36PvWZ6blrdC5A/nrQUBuf3MH3JvsBB9sSyc9W08=
 github.com/smartcontractkit/chainlink-ccip v0.0.0-20241218114855-f74219171000 h1:6Zzr/R1j6P7bbvcUlt5WUIbItvrrGdGzIsiAzQezcwo=
 github.com/smartcontractkit/chainlink-ccip v0.0.0-20241218114855-f74219171000/go.mod h1:ncjd6mPZSRlelEqH/2KeLE1pU3UlqzBSn8RYkEoECzY=
-github.com/smartcontractkit/chainlink-common v0.4.1-0.20241217120918-bbe318cd0760 h1:lB5A3TP0zOVuu1n0kEm6d8/o/4Knh6HLvsU/GChk+sI=
-github.com/smartcontractkit/chainlink-common v0.4.1-0.20241217120918-bbe318cd0760/go.mod h1:yti7e1+G9hhkYhj+L5sVUULn9Bn3bBL5/AxaNqdJ5YQ=
 github.com/smartcontractkit/chainlink-cosmos v0.5.2-0.20241202195413-82468150ac1e h1:PRoeby6ZlTuTkv2f+7tVU4+zboTfRzI+beECynF4JQ0=
 github.com/smartcontractkit/chainlink-cosmos v0.5.2-0.20241202195413-82468150ac1e/go.mod h1:mUh5/woemsVaHgTorA080hrYmO3syBCmPdnWc/5dOqk=
 github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20241216163550-fa030d178ba3 h1:aeiBdBHGY8QNftps+VqrIk6OnfeeOD5z4jrAabW4ZSc=
