@@ -109,7 +109,7 @@ jobs:
         with:
           pipeline-step: "run"
           run-concurrency: "16"
-          run-all-tests: ${{ needs.filter.outputs.should-run-all-tests }}
+          run-all-tests: "true"
           collect-coverage: ${{ needs.filter.outputs.should-collect-coverage }}
           test-suite: ${{ matrix.type.test-suite }}
           module-directory: ${{ matrix.type.module-directory }}
