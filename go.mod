@@ -52,7 +52,7 @@ require (
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/jpillora/backoff v1.0.0
 	github.com/kylelemons/godebug v1.1.0
-	github.com/leanovate/gopter v0.2.10-0.20210127095200-9abe2343507a
+	github.com/leanovate/gopter v0.2.11
 	github.com/lib/pq v1.10.9
 	github.com/manyminds/api2go v0.0.0-20171030193247-e7b693844a6f
 	github.com/mitchellh/go-homedir v1.1.0
@@ -79,7 +79,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20241118091009-43c2b4804cec
 	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241210195010-36d99fa35f9f
 	github.com/smartcontractkit/chainlink-cosmos v0.5.2-0.20241017133723-5277829bd53f
-	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20241018134907-a00ba3729b5e
+	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20241216163550-fa030d178ba3
 	github.com/smartcontractkit/chainlink-feeds v0.1.1
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.3.0
 	github.com/smartcontractkit/chainlink-solana v1.1.1-0.20241115191142-8b8369c1f44e
