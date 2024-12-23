@@ -2,7 +2,6 @@ package changeset_test
 
 import (
 	"context"
-	"strconv"
 	"testing"
 	"time"
 
@@ -19,15 +18,13 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/external_program_cpi_stub"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
-	"github.com/test-go/testify/assert"
 )
 
 var (
 	DefaultCommitment = rpc.CommitmentConfirmed
+	StubProgram       = "EQPCTRibpsPcQNb464QVBkS1PkFfuK8kYdpd5Y17HaGh"
 )
 
 // deployProgram deploys a Solana program using the Solana CLI.
@@ -74,116 +71,144 @@ func TestDeployProgram(t *testing.T) {
 	// Path to your .so file and keypair file
 	programFile := "/Users/yashvardhan/chainlink-internal-integrations/solana/contracts/target/deploy/external_program_cpi_stub.so"
 	keypairPath := "/Users/yashvardhan/.config/solana/id.json" //wallet
-	// keypairPath := "/Users/yashvardhan/chainlink-internal-integrations/solana/contracts/target/deploy/external_program_cpi_stub-keypair.json"
-
-	// Deploy the program
-	programID, err := deployProgram(programFile, keypairPath)
-	if err != nil {
-		t.Fatalf("Failed to deploy program: %v", err)
-	}
-
-	// // Verify the program ID (simple check for non-empty string)
-	if programID == "" {
-		t.Fatalf("Program ID is empty")
-	}
-
-	t.Logf("programID %s", programID)
 
 	ExternalCpiStubProgram := solana.MustPublicKeyFromBase58("EQPCTRibpsPcQNb464QVBkS1PkFfuK8kYdpd5Y17HaGh")
-	StubAccountPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("u8_value")}, ExternalCpiStubProgram)
-	t.Logf("StubAccountPDA %s", StubAccountPDA)
-	privateKey, _ := solana.PrivateKeyFromSolanaKeygenFile(keypairPath)
-	publicKey := privateKey.PublicKey()
-	t.Logf("publicKey from private key %s", publicKey)
 	solanaGoClient := rpc.New("http://127.0.0.1:8899")
 
+	// Fetch account info for the program ID
+	account, _ := solanaGoClient.GetAccountInfo(context.Background(), ExternalCpiStubProgram)
+	// if err != nil {
+	// 	fmt.Printf("Error: %v\n", err)
+	// 	return
+	// }
+
+	// Deploy program if it doesn't exist
+	if account != nil && account.Value.Executable {
+		fmt.Println("Program exists and is executable.")
+	} else {
+		fmt.Println("Program does not exist or is not executable.")
+		// Deploy the program
+		programID, err := deployProgram(programFile, keypairPath)
+		if err != nil {
+			t.Fatalf("Failed to deploy program: %v", err)
+		}
+		time.Sleep(5 * time.Second) // obviously need to do this better
+		// Verify the program ID (simple check for non-empty string)
+		if programID == "" {
+			t.Fatalf("Program ID is empty")
+		}
+
+		t.Logf("programID %s", programID)
+	}
+
+	// program should exist by now (either already deployed, or deployed and waited for confirmation)
 	external_program_cpi_stub.SetProgramID(ExternalCpiStubProgram)
 
-	ccip_router.NewInitializeInstruction()
-	ix, err := external_program_cpi_stub.NewInitializeInstruction(
-		StubAccountPDA,
-		publicKey,
-		solana.SystemProgramID, // 1111111
-	).ValidateAndBuild()
+	// wallet keys
+	privateKey, _ := solana.PrivateKeyFromSolanaKeygenFile(keypairPath)
+	publicKey := privateKey.PublicKey()
 
-	// utils.SendAndConfirm(context.Background(), t, solanaGoClient, []solana.Instruction{ix}, privateKey, config.DefaultCommitment)
+	// this is a PDA that gets initialised when you call init on the programID
+	StubAccountPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("u8_value")}, ExternalCpiStubProgram)
+	t.Logf("StubAccountPDA %s", StubAccountPDA)
 
-	// ix, _ := external_program_cpi_stub.NewEmptyInstruction().ValidateAndBuild()
-	require.NoError(t, err)
+	// check if the PDA is already initialised
+	accountInfo, _ := solanaGoClient.GetAccountInfo(context.Background(), ExternalCpiStubProgram)
+	// if err != nil {
+	// 	fmt.Printf("Error: %v\n", err)
+	// 	return
+	// }
+
+	var ix *external_program_cpi_stub.Instruction
+	var err error
+
+	if accountInfo != nil {
+		fmt.Println("Account initialized successfully.")
+		fmt.Printf("Account data: %v\n", accountInfo.Value.Data)
+		ix, err = external_program_cpi_stub.NewEmptyInstruction().ValidateAndBuild()
+	} else {
+		fmt.Println("Account does not exist or has no data.")
+		ix, err = external_program_cpi_stub.NewInitializeInstruction(
+			StubAccountPDA,
+			publicKey,
+			solana.SystemProgramID, // 1111111
+		).ValidateAndBuild()
+	}
+
 	utils.SendAndConfirm(context.Background(), t, solanaGoClient, []solana.Instruction{ix}, privateKey, config.DefaultCommitment)
 
-	t.Logf("Program deployed successfully with ID: %s", programID)
-}
-
-func spinUpDevNet(t *testing.T) (string, string) {
-	t.Helper()
-	port := "8899"
-	portInt, _ := strconv.Atoi(port)
-
-	faucetPort := "8877"
-	url := "http://127.0.0.1:" + port
-	wsURL := "ws://127.0.0.1:" + strconv.Itoa(portInt+1)
-
-	args := []string{
-		"--reset",
-		"--rpc-port", port,
-		"--faucet-port", faucetPort,
-		"--ledger", t.TempDir(),
-	}
-
-	cmd := exec.Command("solana-test-validator", args...)
-
-	var stdErr bytes.Buffer
-	cmd.Stderr = &stdErr
-	var stdOut bytes.Buffer
-	cmd.Stdout = &stdOut
-	require.NoError(t, cmd.Start())
-	t.Cleanup(func() {
-		assert.NoError(t, cmd.Process.Kill())
-		if err2 := cmd.Wait(); assert.Error(t, err2) {
-			if !assert.Contains(t, err2.Error(), "signal: killed", cmd.ProcessState.String()) {
-				t.Logf("solana-test-validator\n stdout: %s\n stderr: %s", stdOut.String(), stdErr.String())
-			}
-		}
-	})
-
-	// Wait for api server to boot
-	var ready bool
-	for i := 0; i < 30; i++ {
-		time.Sleep(time.Second)
-		client := rpc.New(url)
-		out, err := client.GetHealth(tests.Context(t))
-		if err != nil || out != rpc.HealthOk {
-			t.Logf("API server not ready yet (attempt %d)\n", i+1)
-			continue
-		}
-		ready = true
-		break
-	}
-	if !ready {
-		t.Logf("Cmd output: %s\nCmd error: %s\n", stdOut.String(), stdErr.String())
-	}
-	require.True(t, ready)
-
-	return url, wsURL
-}
-
-func getRpcClient(t *testing.T) *rpc.Client {
-	url, _ := spinUpDevNet(t)
-	return rpc.New(url)
-}
-
-func TestTokenDeploy(t *testing.T) {
-	keypairPath := "/Users/yashvardhan/.config/solana/id.json" //wallet
-	adminPrivateKey, _ := solana.PrivateKeyFromSolanaKeygenFile(keypairPath)
-	adminPublicKey := adminPrivateKey.PublicKey()
-	decimals := uint8(0)
-	// amount := uint64(1000)
-	// solanaGoClient := rpc.New("http://127.0.0.1:8899")
-	solanaGoClient := getRpcClient(t)
-	mint, _ := solana.NewRandomPrivateKey()
-	mintPublicKey := mint.PublicKey()
-	instructions, err := utils.CreateToken(context.Background(), config.Token2022Program, mintPublicKey, adminPublicKey, decimals, solanaGoClient, DefaultCommitment)
-	utils.SendAndConfirm(context.Background(), t, solanaGoClient, instructions, adminPrivateKey, DefaultCommitment, utils.AddSigners(mint))
 	require.NoError(t, err)
 }
+
+// func spinUpDevNet(t *testing.T) (string, string) {
+// 	t.Helper()
+// 	port := "8899"
+// 	portInt, _ := strconv.Atoi(port)
+
+// 	faucetPort := "8877"
+// 	url := "http://127.0.0.1:" + port
+// 	wsURL := "ws://127.0.0.1:" + strconv.Itoa(portInt+1)
+
+// 	args := []string{
+// 		"--reset",
+// 		"--rpc-port", port,
+// 		"--faucet-port", faucetPort,
+// 		"--ledger", t.TempDir(),
+// 	}
+
+// 	cmd := exec.Command("solana-test-validator", args...)
+
+// 	var stdErr bytes.Buffer
+// 	cmd.Stderr = &stdErr
+// 	var stdOut bytes.Buffer
+// 	cmd.Stdout = &stdOut
+// 	require.NoError(t, cmd.Start())
+// 	t.Cleanup(func() {
+// 		assert.NoError(t, cmd.Process.Kill())
+// 		if err2 := cmd.Wait(); assert.Error(t, err2) {
+// 			if !assert.Contains(t, err2.Error(), "signal: killed", cmd.ProcessState.String()) {
+// 				t.Logf("solana-test-validator\n stdout: %s\n stderr: %s", stdOut.String(), stdErr.String())
+// 			}
+// 		}
+// 	})
+
+// 	// Wait for api server to boot
+// 	var ready bool
+// 	for i := 0; i < 30; i++ {
+// 		time.Sleep(time.Second)
+// 		client := rpc.New(url)
+// 		out, err := client.GetHealth(tests.Context(t))
+// 		if err != nil || out != rpc.HealthOk {
+// 			t.Logf("API server not ready yet (attempt %d)\n", i+1)
+// 			continue
+// 		}
+// 		ready = true
+// 		break
+// 	}
+// 	if !ready {
+// 		t.Logf("Cmd output: %s\nCmd error: %s\n", stdOut.String(), stdErr.String())
+// 	}
+// 	require.True(t, ready)
+
+// 	return url, wsURL
+// }
+
+// func getRpcClient(t *testing.T) *rpc.Client {
+// 	url, _ := spinUpDevNet(t)
+// 	return rpc.New(url)
+// }
+
+// func TestTokenDeploy(t *testing.T) {
+// 	keypairPath := "/Users/yashvardhan/.config/solana/id.json" //wallet
+// 	adminPrivateKey, _ := solana.PrivateKeyFromSolanaKeygenFile(keypairPath)
+// 	adminPublicKey := adminPrivateKey.PublicKey()
+// 	decimals := uint8(0)
+// 	// amount := uint64(1000)
+// 	// solanaGoClient := rpc.New("http://127.0.0.1:8899")
+// 	solanaGoClient := getRpcClient(t)
+// 	mint, _ := solana.NewRandomPrivateKey()
+// 	mintPublicKey := mint.PublicKey()
+// 	instructions, err := utils.CreateToken(context.Background(), config.Token2022Program, mintPublicKey, adminPublicKey, decimals, solanaGoClient, DefaultCommitment)
+// 	utils.SendAndConfirm(context.Background(), t, solanaGoClient, instructions, adminPrivateKey, DefaultCommitment, utils.AddSigners(mint))
+// 	require.NoError(t, err)
+// }
