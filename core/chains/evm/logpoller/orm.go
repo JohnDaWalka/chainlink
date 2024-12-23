@@ -28,14 +28,14 @@ import (
 // What is more, LogPoller should not be aware of the underlying database implementation and delegate all the queries to the ORM.
 type ORM interface {
 	InsertLogs(ctx context.Context, logs []Log) error
-	InsertLogsWithBlock(ctx context.Context, logs []Log, block LogPollerBlock) error
+	InsertLogsWithBlocks(ctx context.Context, logs []Log, block []LogPollerBlock) error
 	InsertFilter(ctx context.Context, filter Filter) error
 
 	LoadFilters(ctx context.Context) (map[string]Filter, error)
 	DeleteFilter(ctx context.Context, name string) error
 
 	DeleteLogsByRowID(ctx context.Context, rowIDs []uint64) (int64, error)
-	InsertBlock(ctx context.Context, blockHash common.Hash, blockNumber int64, blockTimestamp time.Time, finalizedBlock int64) error
+	InsertBlocks(ctx context.Context, blocks []LogPollerBlock) error
 	DeleteBlocksBefore(ctx context.Context, end int64, limit int64) (int64, error)
 	DeleteLogsAndBlocksAfter(ctx context.Context, start int64) error
 	SelectUnmatchedLogIDs(ctx context.Context, limit int64) (ids []uint64, err error)
@@ -95,23 +95,41 @@ func (o *DSORM) Transact(ctx context.Context, fn func(*DSORM) error) (err error)
 // new returns a NewORM like o, but backed by ds.
 func (o *DSORM) new(ds sqlutil.DataSource) *DSORM { return NewORM(o.chainID, ds, o.lggr) }
 
-// InsertBlock is idempotent to support replays.
-func (o *DSORM) InsertBlock(ctx context.Context, blockHash common.Hash, blockNumber int64, blockTimestamp time.Time, finalizedBlock int64) error {
-	args, err := newQueryArgs(o.chainID).
-		withField("block_hash", blockHash).
-		withField("block_number", blockNumber).
-		withField("block_timestamp", blockTimestamp).
-		withField("finalized_block_number", finalizedBlock).
-		toArgs()
-	if err != nil {
-		return err
+func batchInsert[T any](ctx context.Context, ds sqlutil.DataSource, query string, batchSize, minBatchSize int, rows []T) error {
+	for i := 0; i < len(rows); i += batchSize {
+		start, end := i, i+batchSize
+		if end > len(rows) {
+			end = len(rows)
+		}
+
+		_, err := ds.NamedExecContext(ctx, query, rows[start:end])
+		if err != nil {
+			if pkgerrors.Is(err, context.DeadlineExceeded) && batchSize > minBatchSize {
+				// In case of DB timeouts, try to insert again with a smaller batch upto a limit
+				batchSize /= 2
+				i -= batchSize // counteract +=batchInsertSize on next loop iteration
+				continue
+			}
+			return err
+		}
 	}
-	query := `INSERT INTO evm.log_poller_blocks
-				(evm_chain_id, block_hash, block_number, block_timestamp, finalized_block_number, created_at)
-      		VALUES (:evm_chain_id, :block_hash, :block_number, :block_timestamp, :finalized_block_number, NOW())
+	return nil
+}
+
+// InsertBlock is idempotent to support replays.
+func (o *DSORM) InsertBlocks(ctx context.Context, blocks []LogPollerBlock) error {
+	for i, block := range blocks {
+		if block.EvmChainId == nil {
+			blocks[i].EvmChainId = ubig.New(o.chainID)
+		} else if o.chainID.Cmp(block.EvmChainId.ToInt()) != 0 {
+			return pkgerrors.Errorf("invalid chainID in block got %v want %v", block.EvmChainId.ToInt(), o.chainID)
+		}
+	}
+	q := `INSERT INTO evm.log_poller_blocks
+				(evm_chain_id, block_hash, block_number, block_timestamp, finalized_block_number, created_at, parent_block_hash)
+      		VALUES (:evm_chain_id, :block_hash, :block_number, :block_timestamp, :finalized_block_number, NOW(), :parent_block_hash)
 			ON CONFLICT DO NOTHING`
-	_, err = o.ds.NamedExecContext(ctx, query, args)
-	return err
+	return batchInsert(ctx, o.ds, q, 1000, 500, blocks)
 }
 
 // InsertFilter is idempotent.
@@ -532,10 +550,10 @@ func (o *DSORM) InsertLogs(ctx context.Context, logs []Log) error {
 	})
 }
 
-func (o *DSORM) InsertLogsWithBlock(ctx context.Context, logs []Log, block LogPollerBlock) error {
+func (o *DSORM) InsertLogsWithBlocks(ctx context.Context, logs []Log, blocks []LogPollerBlock) error {
 	// Optimization, don't open TX when there is only a block to be persisted
 	if len(logs) == 0 {
-		return o.InsertBlock(ctx, block.BlockHash, block.BlockNumber, block.BlockTimestamp, block.FinalizedBlockNumber)
+		return o.InsertBlocks(ctx, blocks)
 	}
 
 	if err := o.validateLogs(logs); err != nil {
@@ -544,7 +562,7 @@ func (o *DSORM) InsertLogsWithBlock(ctx context.Context, logs []Log, block LogPo
 
 	// Block and logs goes with the same TX to ensure atomicity
 	return o.Transact(ctx, func(orm *DSORM) error {
-		err := orm.InsertBlock(ctx, block.BlockHash, block.BlockNumber, block.BlockTimestamp, block.FinalizedBlockNumber)
+		err := orm.InsertBlocks(ctx, blocks)
 		if err != nil {
 			return err
 		}
@@ -553,31 +571,12 @@ func (o *DSORM) InsertLogsWithBlock(ctx context.Context, logs []Log, block LogPo
 }
 
 func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []Log, tx sqlutil.DataSource) error {
-	batchInsertSize := 4000
-	for i := 0; i < len(logs); i += batchInsertSize {
-		start, end := i, i+batchInsertSize
-		if end > len(logs) {
-			end = len(logs)
-		}
-
-		query := `INSERT INTO evm.logs
+	q := `INSERT INTO evm.logs
 					(evm_chain_id, log_index, block_hash, block_number, block_timestamp, address, event_sig, topics, tx_hash, data, created_at)
 				VALUES
 					(:evm_chain_id, :log_index, :block_hash, :block_number, :block_timestamp, :address, :event_sig, :topics, :tx_hash, :data, NOW())
 				ON CONFLICT DO NOTHING`
-
-		_, err := tx.NamedExecContext(ctx, query, logs[start:end])
-		if err != nil {
-			if pkgerrors.Is(err, context.DeadlineExceeded) && batchInsertSize > 500 {
-				// In case of DB timeouts, try to insert again with a smaller batch upto a limit
-				batchInsertSize /= 2
-				i -= batchInsertSize // counteract +=batchInsertSize on next loop iteration
-				continue
-			}
-			return err
-		}
-	}
-	return nil
+	return batchInsert(ctx, tx, q, 4000, 500, logs)
 }
 
 func (o *DSORM) validateLogs(logs []Log) error {

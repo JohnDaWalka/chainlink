@@ -98,11 +98,11 @@ func (o *ObservedORM) InsertLogs(ctx context.Context, logs []Log) error {
 	return err
 }
 
-func (o *ObservedORM) InsertLogsWithBlock(ctx context.Context, logs []Log, block LogPollerBlock) error {
-	err := withObservedExec(o, "InsertLogsWithBlock", create, func() error {
-		return o.ORM.InsertLogsWithBlock(ctx, logs, block)
+func (o *ObservedORM) InsertLogsWithBlocks(ctx context.Context, logs []Log, blocks []LogPollerBlock) error {
+	err := withObservedExec(o, "InsertLogsWithBlocks", create, func() error {
+		return o.ORM.InsertLogsWithBlocks(ctx, logs, blocks)
 	})
-	trackInsertedLogsAndBlock(o, logs, &block, err)
+	trackInsertedLogsAndBlock(o, logs, blocks, err)
 	return err
 }
 
@@ -332,7 +332,7 @@ func withObservedExec(o *ObservedORM, query string, queryType queryType, exec fu
 	return exec()
 }
 
-func trackInsertedLogsAndBlock(o *ObservedORM, logs []Log, block *LogPollerBlock, err error) {
+func trackInsertedLogsAndBlock(o *ObservedORM, logs []Log, blocks []LogPollerBlock, err error) {
 	if err != nil {
 		return
 	}
@@ -340,9 +340,8 @@ func trackInsertedLogsAndBlock(o *ObservedORM, logs []Log, block *LogPollerBlock
 		WithLabelValues(o.chainId).
 		Add(float64(len(logs)))
 
-	if block != nil {
+	if len(blocks) > 0 {
 		o.blocksInserted.
-			WithLabelValues(o.chainId).
-			Inc()
+			WithLabelValues(o.chainId).Add(float64(len(blocks)))
 	}
 }

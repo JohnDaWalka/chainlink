@@ -460,16 +460,53 @@ func TestDatabaseBackFillWithMigration202(t *testing.T) {
 	assert.Len(t, results, 201)
 
 	simulatedOrm := logpoller.NewORM(testutils.SimulatedChainID, db, logger.TestLogger(t))
-	require.NoError(t, simulatedOrm.InsertBlock(ctx, testutils.Random32Byte(), 10, time.Now(), 0), err)
-	require.NoError(t, simulatedOrm.InsertBlock(ctx, testutils.Random32Byte(), 51, time.Now(), 0), err)
-	require.NoError(t, simulatedOrm.InsertBlock(ctx, testutils.Random32Byte(), 90, time.Now(), 0), err)
-	require.NoError(t, simulatedOrm.InsertBlock(ctx, testutils.Random32Byte(), 120, time.Now(), 23), err)
+	require.NoError(t, simulatedOrm.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:      testutils.Random32Byte(),
+			BlockNumber:    10,
+			BlockTimestamp: time.Now(),
+		},
+	}))
+	require.NoError(t, simulatedOrm.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:      testutils.Random32Byte(),
+			BlockNumber:    51,
+			BlockTimestamp: time.Now(),
+		},
+	}))
+	require.NoError(t, simulatedOrm.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:      testutils.Random32Byte(),
+			BlockNumber:    90,
+			BlockTimestamp: time.Now(),
+		},
+	}))
+	require.NoError(t, simulatedOrm.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:            testutils.Random32Byte(),
+			BlockNumber:          120,
+			BlockTimestamp:       time.Now(),
+			FinalizedBlockNumber: 23,
+		},
+	}))
 
 	baseOrm := logpoller.NewORM(big.NewInt(int64(84531)), db, logger.TestLogger(t))
-	require.NoError(t, baseOrm.InsertBlock(ctx, testutils.Random32Byte(), 400, time.Now(), 0), err)
+	require.NoError(t, baseOrm.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:      testutils.Random32Byte(),
+			BlockNumber:    400,
+			BlockTimestamp: time.Now(),
+		},
+	}))
 
 	klaytnOrm := logpoller.NewORM(big.NewInt(int64(1001)), db, logger.TestLogger(t))
-	require.NoError(t, klaytnOrm.InsertBlock(ctx, testutils.Random32Byte(), 100, time.Now(), 0), err)
+	require.NoError(t, klaytnOrm.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:      testutils.Random32Byte(),
+			BlockNumber:    100,
+			BlockTimestamp: time.Now(),
+		},
+	}))
 
 	_, err = p.UpTo(ctx, 202)
 	require.NoError(t, err)
@@ -573,10 +610,9 @@ func BenchmarkBackfillingRecordsWithMigration202(b *testing.B) {
 		var blocks []logpoller.LogPollerBlock
 		for i := 0; i < maxLogsSize; i++ {
 			blocks = append(blocks, logpoller.LogPollerBlock{
-				EvmChainId:           ubig.NewI(int64(j + 1)),
-				BlockHash:            testutils.Random32Byte(),
-				BlockNumber:          int64(i + 1000),
-				FinalizedBlockNumber: 0,
+				EvmChainId:  ubig.NewI(int64(j + 1)),
+				BlockHash:   testutils.Random32Byte(),
+				BlockNumber: int64(i + 1000),
 			})
 		}
 		batchInsertSize := 10_000

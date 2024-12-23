@@ -127,7 +127,14 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 		log,
 		headTracker,
 		lpOpts)
-	assert.NoError(t, orm.InsertBlock(ctx, common.Hash{}, 1, time.Now(), 1))
+	assert.NoError(t, orm.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:            common.Hash{},
+			BlockNumber:          1,
+			BlockTimestamp:       time.Now(),
+			FinalizedBlockNumber: 1,
+		},
+	}))
 	// Setup offRamp.
 	var offRampAddress common.Address
 	switch version {

@@ -20,6 +20,7 @@ type LogPollerBlock struct {
 	BlockTimestamp       time.Time
 	FinalizedBlockNumber int64
 	CreatedAt            time.Time
+	ParentBlockHash      *common.Hash
 }
 
 // Log represents an EVM log.

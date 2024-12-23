@@ -532,7 +532,14 @@ func TestLogPoller_Replay(t *testing.T) {
 		require.NoError(t, err)
 
 		h := head.Load()
-		err = lp.orm.InsertBlock(ctx, h.Hash, h.Number, h.Timestamp, h.Number)
+		err = lp.orm.InsertBlocks(ctx, []LogPollerBlock{
+			{
+				BlockHash:            h.Hash,
+				BlockNumber:          h.Number,
+				BlockTimestamp:       h.Timestamp,
+				FinalizedBlockNumber: h.Number,
+			},
+		})
 		require.NoError(t, err)
 
 		ec.On("FilterLogs", mock.Anything, mock.Anything).Return([]types.Log{log1}, nil)

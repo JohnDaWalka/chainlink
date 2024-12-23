@@ -30,7 +30,7 @@ var (
 	logsFields                = [...]string{"evm_chain_id", "log_index", "block_hash", "block_number",
 		"address", "event_sig", "topics", "tx_hash", "data", "created_at", "block_timestamp"}
 	blocksFields = [...]string{"evm_chain_id", "block_hash", "block_number", "block_timestamp",
-		"finalized_block_number", "created_at"}
+		"finalized_block_number", "created_at", "parent_block_hash"}
 )
 
 // The parser builds SQL expressions piece by piece for each Accept function call and resets the error and expression

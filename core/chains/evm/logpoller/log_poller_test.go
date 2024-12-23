@@ -82,7 +82,12 @@ func populateDatabase(t testing.TB, o logpoller.ORM, chainID *big.Int) (common.H
 			})
 		}
 		require.NoError(t, o.InsertLogs(ctx, logs))
-		require.NoError(t, o.InsertBlock(ctx, utils.RandomHash(), int64((j+1)*1000-1), startDate.Add(time.Duration(j*1000)*time.Hour), 0))
+		require.NoError(t, o.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+			{
+				BlockHash:      utils.RandomHash(),
+				BlockNumber:    int64((j+1)*1000 - 1),
+				BlockTimestamp: startDate.Add(time.Duration(j*1000) * time.Hour),
+			}}))
 	}
 
 	return event1, address1, address2
@@ -128,7 +133,13 @@ func TestPopulateLoadedDB(t *testing.T) {
 	}()
 
 	// Confirm all the logs.
-	require.NoError(t, o.InsertBlock(ctx, common.HexToHash("0x10"), 1000000, time.Now(), 0))
+	require.NoError(t, o.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:      common.HexToHash("0x10"),
+			BlockNumber:    1000000,
+			BlockTimestamp: time.Now(),
+		},
+	}))
 	func() {
 		defer logRuntime(t, time.Now())
 		lgs, err1 := o.SelectLogsDataWordRange(ctx, address1, event1, 0, logpoller.EvmWord(50000), logpoller.EvmWord(50020), 0)
@@ -1565,14 +1576,14 @@ func TestTooManyLogResults(t *testing.T) {
 	}
 
 	var filterLogsCall *mock.Call
-	head := &evmtypes.Head{}
-	finalized := &evmtypes.Head{}
+	head := &evmtypes.Head{EVMChainID: ubig.New(chainID)}
+	finalized := &evmtypes.Head{EVMChainID: ubig.New(chainID)}
 
 	ec.On("HeadByNumber", mock.Anything, mock.Anything).Return(func(ctx context.Context, blockNumber *big.Int) (*evmtypes.Head, error) {
 		if blockNumber == nil {
 			require.FailNow(t, "unexpected call to get current head")
 		}
-		return &evmtypes.Head{Number: blockNumber.Int64()}, nil
+		return &evmtypes.Head{EVMChainID: ubig.New(chainID), Number: blockNumber.Int64()}, nil
 	})
 
 	t.Run("halves size until small enough, then succeeds", func(t *testing.T) {
@@ -1946,7 +1957,14 @@ func Test_PruneOldBlocks(t *testing.T) {
 			th := SetupTH(t, lpOpts)
 
 			for i := 1; i <= tt.blockToCreate; i++ {
-				err := th.ORM.InsertBlock(ctx, utils.RandomBytes32(), int64(i+10), time.Now(), int64(i))
+				err := th.ORM.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+					{
+						BlockHash:            utils.RandomBytes32(),
+						BlockNumber:          int64(i + 10),
+						BlockTimestamp:       time.Now(),
+						FinalizedBlockNumber: int64(i),
+					},
+				})
 				require.NoError(t, err)
 			}
 
@@ -1989,10 +2007,22 @@ func TestFindLCA(t *testing.T) {
 		require.ErrorContains(t, err, "failed to select the latest block")
 	})
 	// oldest
-	require.NoError(t, orm.InsertBlock(ctx, common.HexToHash("0x123"), 10, time.Now(), 0))
+	require.NoError(t, orm.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:      common.HexToHash("0x123"),
+			BlockNumber:    10,
+			BlockTimestamp: time.Now(),
+		},
+	}))
 	// latest
 	latestBlockHash := common.HexToHash("0x124")
-	require.NoError(t, orm.InsertBlock(ctx, latestBlockHash, 16, time.Now(), 0))
+	require.NoError(t, orm.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:      latestBlockHash,
+			BlockNumber:    16,
+			BlockTimestamp: time.Now(),
+		},
+	}))
 	t.Run("Fails, if caller's context canceled", func(t *testing.T) {
 		lCtx, cancel := context.WithCancel(ctx)
 		ec.On("HeadByHash", mock.Anything, latestBlockHash).Return(nil, nil).Run(func(_ mock.Arguments) {
@@ -2061,7 +2091,13 @@ func TestFindLCA(t *testing.T) {
 			for _, b := range tc.Blocks {
 				blockHashI++
 				hash := common.BigToHash(big.NewInt(blockHashI))
-				require.NoError(t, orm.InsertBlock(ctx, hash, int64(b.BN), time.Now(), 0))
+				require.NoError(t, orm.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+					{
+						BlockHash:      hash,
+						BlockNumber:    int64(b.BN),
+						BlockTimestamp: time.Now(),
+					},
+				}))
 				// Hashes are unique for all test cases
 				var onChainBlock *evmtypes.Head
 				if b.Exists {

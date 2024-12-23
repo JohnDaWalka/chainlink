@@ -319,7 +319,14 @@ func populateDatabase(b *testing.B,
 	}
 
 	require.NoError(b, testEnv.orm.InsertLogs(ctx, logs))
-	require.NoError(b, testEnv.orm.InsertBlock(ctx, utils.RandomHash(), int64(numOfMessages+finalityDepth), time.Now(), int64(numOfMessages+finalityDepth)))
+	require.NoError(b, testEnv.orm.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:            utils.RandomHash(),
+			BlockNumber:          int64(numOfMessages + finalityDepth),
+			BlockTimestamp:       time.Now(),
+			FinalizedBlockNumber: int64(numOfMessages + finalityDepth),
+		},
+	}))
 }
 
 func createMessageSentLogPollerData(startNonce int64, i int, sourceDomainCCTP uint32, destDomainCCTP uint32) []byte {

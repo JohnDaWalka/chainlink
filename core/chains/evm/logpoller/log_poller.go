@@ -903,7 +903,7 @@ func (lp *logPoller) backfill(ctx context.Context, start, end int64) error {
 		}
 
 		lp.lggr.Debugw("Backfill found logs", "from", from, "to", to, "logs", len(gethLogs), "blocks", blocks)
-		err = lp.orm.InsertLogsWithBlock(ctx, convertLogs(gethLogs, blocks, lp.lggr, lp.ec.ConfiguredChainID()), endblock)
+		err = lp.orm.InsertLogsWithBlocks(ctx, convertLogs(gethLogs, blocks, lp.lggr, lp.ec.ConfiguredChainID()), []LogPollerBlock{endblock})
 		if err != nil {
 			lp.lggr.Warnw("Unable to insert logs, retrying", "err", err, "from", from, "to", to)
 			return err
@@ -1063,15 +1063,16 @@ func (lp *logPoller) PollAndSaveLogs(ctx context.Context, currentBlockNumber int
 		}
 		lp.lggr.Debugw("Unfinalized log query", "logs", len(logs), "currentBlockNumber", currentBlockNumber, "blockHash", currentBlock.Hash, "timestamp", currentBlock.Timestamp)
 		block := LogPollerBlock{
+			EvmChainId:           currentBlock.EVMChainID,
 			BlockHash:            h,
 			BlockNumber:          currentBlockNumber,
 			BlockTimestamp:       currentBlock.Timestamp,
 			FinalizedBlockNumber: latestFinalizedBlockNumber,
 		}
-		err = lp.orm.InsertLogsWithBlock(
+		err = lp.orm.InsertLogsWithBlocks(
 			ctx,
 			convertLogs(logs, []LogPollerBlock{block}, lp.lggr, lp.ec.ConfiguredChainID()),
-			block,
+			[]LogPollerBlock{block},
 		)
 		if err != nil {
 			lp.lggr.Warnw("Unable to save logs resuming from last saved block + 1", "err", err, "block", currentBlockNumber)

@@ -1018,7 +1018,14 @@ func populateDatabaseForCommitReportAccepted(
 
 	// Insert logs into the database
 	require.NoError(b, testEnv.orm.InsertLogs(ctx, logs))
-	require.NoError(b, testEnv.orm.InsertBlock(ctx, utils.RandomHash(), int64(offset+numOfReports), timestamp, int64(offset+numOfReports)))
+	require.NoError(b, testEnv.orm.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:            utils.RandomHash(),
+			BlockNumber:          int64(offset + numOfReports),
+			BlockTimestamp:       timestamp,
+			FinalizedBlockNumber: int64(offset + numOfReports)),
+		},
+	})
 }
 
 // Benchmark Results:
@@ -1139,7 +1146,14 @@ func populateDatabaseForExecutionStateChanged(
 
 	// Insert logs into the database
 	require.NoError(b, testEnv.orm.InsertLogs(ctx, logs))
-	require.NoError(b, testEnv.orm.InsertBlock(ctx, utils.RandomHash(), int64(offset+numOfEvents), time.Now(), int64(offset+numOfEvents)))
+	require.NoError(b, testEnv.orm.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:            utils.RandomHash(),
+			BlockNumber:          int64(offset + numOfEvents),
+			BlockTimestamp:       time.Now(),
+			FinalizedBlockNumber: int64(offset + numOfEvents)),
+		},
+	})
 }
 
 // Benchmark Results:
@@ -1294,7 +1308,14 @@ func populateDatabaseForMessageSent(
 
 	// Insert logs into the database
 	require.NoError(b, testEnv.orm.InsertLogs(ctx, logs))
-	require.NoError(b, testEnv.orm.InsertBlock(ctx, utils.RandomHash(), int64(offset+numOfEvents), time.Now(), int64(offset+numOfEvents)))
+	require.NoError(b, testEnv.orm.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:            utils.RandomHash(),
+			BlockNumber:          int64(offset + numOfEvents),
+			BlockTimestamp:       time.Now(),
+			FinalizedBlockNumber: int64(offset + numOfEvents)),
+		},
+	})
 }
 
 func calculateExpectedRangeLen(logsInserted int, startSeq, endSeq cciptypes.SeqNum) int {
