@@ -3,6 +3,8 @@ package changeset
 import (
 	"fmt"
 
+	"github.com/gagliardetto/solana-go"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -22,7 +24,16 @@ func DeployLinkToken(e deployment.Environment, chains []uint64) (deployment.Chan
 	}
 	newAddresses := deployment.NewMemoryAddressBook()
 	for _, chain := range chains {
-		_, err := deployLinkTokenContract(
+		family, err := chainsel.GetSelectorFamily(chain)
+		if err != nil {
+			return deployment.ChangesetOutput{AddressBook: newAddresses}, err
+		}
+		if family == chainsel.FamilySolana {
+			_, err = deployLinkTokenContractSolana(
+				e.Logger, e.SolChains[chain], newAddresses,
+			)
+		}
+		_, err = deployLinkTokenContract(
 			e.Logger, e.Chains[chain], newAddresses,
 		)
 		if err != nil {
@@ -49,6 +60,29 @@ func deployLinkTokenContract(
 				Tx:       tx,
 				Tv:       deployment.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0),
 				Err:      err2,
+			}
+		})
+	if err != nil {
+		lggr.Errorw("Failed to deploy link token", "chain", chain.String(), "err", err)
+		return linkToken, err
+	}
+	return linkToken, nil
+}
+
+func deployLinkTokenContractSolana(
+	lggr logger.Logger,
+	chain deployment.SolChain,
+	ab deployment.AddressBook,
+) (*deployment.ContractDeploySolana, error) {
+	linkToken, err := deployment.DeploySolContract(lggr, chain, ab,
+		func(chain deployment.SolChain) deployment.ContractDeploySolana {
+			// linkTokenAddr, tx, linkToken, err2 := link_token.DeployLinkToken(
+			// 	chain.DeployerKey,
+			// 	chain.Client,
+			// )
+			// copy deployment code from solana internal integrations repo
+			return deployment.ContractDeploySolana{
+				Tv:       deployment.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0),
 			}
 		})
 	if err != nil {
