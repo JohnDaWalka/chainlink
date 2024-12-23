@@ -3,7 +3,7 @@ package changeset
 import (
 	"fmt"
 
-	"github.com/gagliardetto/solana-go"
+	// "github.com/gagliardetto/solana-go"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -23,6 +23,8 @@ func DeployLinkToken(e deployment.Environment, chains []uint64) (deployment.Chan
 		}
 	}
 	newAddresses := deployment.NewMemoryAddressBook()
+	// can we use solchains here ?
+	// the chains being passed in belong to env already
 	for _, chain := range chains {
 		family, err := chainsel.GetSelectorFamily(chain)
 		if err != nil {
@@ -82,7 +84,7 @@ func deployLinkTokenContractSolana(
 			// )
 			// copy deployment code from solana internal integrations repo
 			return deployment.ContractDeploySolana{
-				Tv:       deployment.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0),
+				Tv: deployment.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0),
 			}
 		})
 	if err != nil {
