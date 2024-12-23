@@ -167,17 +167,17 @@ func TestDeployProgram(t *testing.T) {
 // 	return rpc.New(url)
 // }
 
-// func TestTokenDeploy(t *testing.T) {
-// 	keypairPath := "/Users/yashvardhan/.config/solana/id.json" //wallet
-// 	adminPrivateKey, _ := solana.PrivateKeyFromSolanaKeygenFile(keypairPath)
-// 	adminPublicKey := adminPrivateKey.PublicKey()
-// 	decimals := uint8(0)
-// 	// amount := uint64(1000)
-// 	solanaGoClient := rpc.New("http://127.0.0.1:8899")
-// 	// solanaGoClient := getRpcClient(t)
-// 	mint, _ := solana.NewRandomPrivateKey()
-// 	mintPublicKey := mint.PublicKey()
-// 	instructions, err := utils.CreateToken(context.Background(), config.Token2022Program, mintPublicKey, adminPublicKey, decimals, solanaGoClient, DefaultCommitment)
-// 	utils.SendAndConfirm(context.Background(), t, solanaGoClient, instructions, adminPrivateKey, DefaultCommitment, utils.AddSigners(mint))
-// 	require.NoError(t, err)
-// }
+func TestTokenDeploy(t *testing.T) {
+	keypairPath := "/Users/yashvardhan/.config/solana/id.json" //wallet
+	adminPrivateKey, _ := solana.PrivateKeyFromSolanaKeygenFile(keypairPath)
+	adminPublicKey := adminPrivateKey.PublicKey()
+	decimals := uint8(0)
+	// amount := uint64(1000)
+	solanaGoClient := rpc.New("http://127.0.0.1:8899")
+	// solanaGoClient := getRpcClient(t)
+	mint, _ := solana.NewRandomPrivateKey()
+	mintPublicKey := mint.PublicKey()
+	instructions, err := utils.CreateToken(context.Background(), config.Token2022Program, mintPublicKey, adminPublicKey, decimals, solanaGoClient, DefaultCommitment)
+	utils.SendAndConfirm(context.Background(), t, solanaGoClient, instructions, adminPrivateKey, DefaultCommitment, utils.AddSigners(mint))
+	require.NoError(t, err)
+}
