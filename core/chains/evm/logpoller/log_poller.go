@@ -115,7 +115,7 @@ type logPoller struct {
 	finalityDepth            int64         // finality depth is taken to mean that block (head - finality) is finalized. If `useFinalityTag` is set to true, this value is ignored, because finalityDepth is fetched from chain
 	keepFinalizedBlocksDepth int64         // the number of blocks behind the last finalized block we keep in database
 	backfillBatchSize        int64         // batch size to use when backfilling finalized logs
-	rpcBatchSize             int64         // batch size to use for fallback RPC calls made in GetBlocks
+	rpcBatchSize             int           // batch size to use for fallback RPC calls made in GetBlocks
 	logPrunePageSize         int64
 	clientErrors             config.ClientErrors
 	backupPollerNextBlock    int64 // next block to be processed by Backup LogPoller
@@ -176,7 +176,7 @@ func NewLogPoller(orm ORM, ec Client, lggr logger.Logger, headTracker HeadTracke
 		finalityDepth:            opts.FinalityDepth,
 		useFinalityTag:           opts.UseFinalityTag,
 		backfillBatchSize:        opts.BackfillBatchSize,
-		rpcBatchSize:             opts.RpcBatchSize,
+		rpcBatchSize:             int(opts.RpcBatchSize),
 		keepFinalizedBlocksDepth: opts.KeepFinalizedBlocksDepth,
 		logPrunePageSize:         opts.LogPrunePageSize,
 		clientErrors:             opts.ClientErrors,
@@ -850,15 +850,15 @@ func convertTopics(topics []common.Hash) [][]byte {
 	return topicsForDB
 }
 
-// blocksFromLogs fetches all of the blocks associated with a given list of logs. It will also unconditionally fetch endBlockNumber,
-// whether or not there are any logs in the list from that block
-func (lp *logPoller) blocksFromLogs(ctx context.Context, logs []types.Log, endBlockNumber uint64) (blocks []LogPollerBlock, err error) {
-	var numbers []uint64
-	for _, log := range logs {
-		numbers = append(numbers, log.BlockNumber)
-	}
-	if numbers[len(numbers)-1] != endBlockNumber {
-		numbers = append(numbers, endBlockNumber)
+// blocksForLogs fetches all the blocks starting from block of the first log to the endBlockNumber.
+// endBlockNumber is always fetched even if logs slice is empty.
+func (lp *logPoller) blocksForLogs(ctx context.Context, logs []types.Log, endBlockNumber uint64) (blocks []LogPollerBlock, err error) {
+	numbers := []uint64{endBlockNumber}
+	if len(logs) > 0 {
+		numbers = make([]uint64, 0, endBlockNumber-logs[0].BlockNumber+1)
+		for i := logs[0].BlockNumber; i <= endBlockNumber; i++ {
+			numbers = append(numbers, i)
+		}
 	}
 	return lp.GetBlocksRange(ctx, numbers)
 }
@@ -891,7 +891,7 @@ func (lp *logPoller) backfill(ctx context.Context, start, end int64) error {
 		if len(gethLogs) == 0 {
 			continue
 		}
-		blocks, err := lp.blocksFromLogs(ctx, gethLogs, uint64(to))
+		blocks, err := lp.blocksForLogs(ctx, gethLogs, uint64(to))
 		if err != nil {
 			return err
 		}
@@ -1366,6 +1366,7 @@ func (lp *logPoller) GetBlocksRange(ctx context.Context, numbers []uint64) ([]Lo
 // fillRemainingBlocksFromRPC sends a batch request for each block in blocksRequested, and converts them from
 // geth blocks into LogPollerBlock structs. This is only intended to be used for requesting finalized blocks,
 // if any of the blocks coming back are not finalized, an error will be returned
+// NOTE: Does not guarantee to keep return blocks in the same order as requested
 func (lp *logPoller) fillRemainingBlocksFromRPC(
 	ctx context.Context,
 	blocksRequested map[uint64]struct{},
@@ -1379,7 +1380,7 @@ func (lp *logPoller) fillRemainingBlocksFromRPC(
 		}
 	}
 
-	if len(remainingBlocks) > 0 {
+	if len(remainingBlocks) == 0 {
 		lp.lggr.Debugw("Falling back to RPC for blocks not found in log poller blocks table",
 			"remainingBlocks", remainingBlocks)
 	}
@@ -1394,6 +1395,7 @@ func (lp *logPoller) fillRemainingBlocksFromRPC(
 		logPollerBlocks[uint64(head.Number)] = LogPollerBlock{
 			EvmChainId:           head.EVMChainID,
 			BlockHash:            head.Hash,
+			ParentBlockHash:      &head.ParentHash,
 			BlockNumber:          head.Number,
 			BlockTimestamp:       head.Timestamp,
 			FinalizedBlockNumber: head.Number, // always finalized; only matters if this block is returned by LatestBlock()
@@ -1482,24 +1484,97 @@ func (lp *logPoller) fetchBlocks(ctx context.Context, blocksRequested []string, 
 	return blocks, nil
 }
 
-func (lp *logPoller) batchFetchBlocks(ctx context.Context, blocksRequested []string, batchSize int64) ([]*evmtypes.Head, error) {
-	var blocks = make([]*evmtypes.Head, 0, len(blocksRequested)+1)
-
+func (lp *logPoller) startBlocksFetching(ctx context.Context, wg *sync.WaitGroup, requests <-chan []string, results chan []*evmtypes.Head, errs chan<- error) {
+	defer wg.Done()
 	validationReq := finalizedBlock
 	if !lp.useFinalityTag {
 		validationReq = latestBlock
 	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case request, ok := <-requests:
+			if !ok {
+				return
+			}
+			result, err := lp.fetchBlocks(ctx, request, validationReq)
+			if err != nil {
+				select {
+				case errs <- fmt.Errorf("failed to fetch blocks %v: %w", request, err):
+					return
+				case <-ctx.Done():
+					return
+				}
+			}
 
-	for i := 0; i < len(blocksRequested); i += int(batchSize) {
-		j := i + int(batchSize)
+			select {
+			case results <- result:
+				continue
+			case <-ctx.Done():
+				return
+			}
+		}
+	}
+}
+
+// batchFetchBlocks - fetches blocks concurrently each request if of batchSize.
+// NOTE: Does not guarantee to keep return blocks in the same order as requested
+func (lp *logPoller) batchFetchBlocks(ctx context.Context, blocksRequested []string, batchSize int) ([]*evmtypes.Head, error) {
+	if len(blocksRequested) == 0 {
+		return []*evmtypes.Head{}, nil
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	const fetchers = 10
+	requests := make(chan []string, len(blocksRequested)/batchSize+1)
+	// As we do not expect large number of batches, we can schedule all work at once to improve readability
+	for i := 0; i < len(blocksRequested); i += batchSize {
+		j := i + batchSize
 		if j > len(blocksRequested) {
 			j = len(blocksRequested)
 		}
-		moreBlocks, err := lp.fetchBlocks(ctx, blocksRequested[i:j], validationReq)
-		if err != nil {
+		requests <- blocksRequested[i:j]
+	}
+	close(requests)
+
+	// do work
+	var fetchingWg sync.WaitGroup
+	fetchingWg.Add(fetchers)
+	results := make(chan []*evmtypes.Head, fetchers)
+	errs := make(chan error)
+	for range fetchers {
+		go lp.startBlocksFetching(ctx, &fetchingWg, requests, results, errs)
+	}
+
+	// signal when done
+	lp.wg.Add(1)
+	go func() {
+		defer lp.wg.Done()
+		fetchingWg.Wait()
+		close(results)
+	}()
+
+	blocks := make([]*evmtypes.Head, 0, len(blocksRequested))
+readLoop:
+	for {
+		select {
+		case err := <-errs:
+			// all child goroutine are stopped on exit
 			return nil, err
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case result, ok := <-results:
+			if !ok {
+				break readLoop
+			}
+			blocks = append(blocks, result...)
 		}
-		blocks = append(blocks, moreBlocks...)
+	}
+
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
 
 	return blocks, nil

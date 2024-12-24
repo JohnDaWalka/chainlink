@@ -35,9 +35,10 @@ import (
 )
 
 type block struct {
-	number    int64
-	hash      common.Hash
-	timestamp int64
+	number     int64
+	hash       common.Hash
+	parentHash *common.Hash
+	timestamp  int64
 }
 
 var lpOpts = logpoller.Opts{
@@ -99,6 +100,8 @@ func TestLogPoller_Batching(t *testing.T) {
 	require.Equal(t, len(logs), len(lgs))
 }
 
+func ptr[T any](v T) *T { return &v }
+
 func TestORM_GetBlocks_From_Range(t *testing.T) {
 	th := SetupTH(t, lpOpts)
 	o1 := th.ORM
@@ -106,37 +109,43 @@ func TestORM_GetBlocks_From_Range(t *testing.T) {
 	// Insert many blocks and read them back together
 	blocks := []block{
 		{
-			number:    10,
-			hash:      common.HexToHash("0x111"),
-			timestamp: 0,
+			number:     10,
+			hash:       common.HexToHash("0x111"),
+			parentHash: ptr(common.HexToHash("0x110")),
+			timestamp:  0,
 		},
 		{
-			number:    11,
-			hash:      common.HexToHash("0x112"),
-			timestamp: 10,
+			number:     11,
+			hash:       common.HexToHash("0x112"),
+			parentHash: ptr(common.HexToHash("0x111")),
+			timestamp:  10,
 		},
 		{
-			number:    12,
-			hash:      common.HexToHash("0x113"),
-			timestamp: 20,
+			number:     12,
+			hash:       common.HexToHash("0x113"),
+			parentHash: ptr(common.HexToHash("0x112")),
+			timestamp:  20,
 		},
 		{
-			number:    13,
-			hash:      common.HexToHash("0x114"),
-			timestamp: 30,
+			number:     13,
+			hash:       common.HexToHash("0x114"),
+			parentHash: ptr(common.HexToHash("0x113")),
+			timestamp:  30,
 		},
 		{
-			number:    14,
-			hash:      common.HexToHash("0x115"),
-			timestamp: 40,
+			number:     14,
+			hash:       common.HexToHash("0x115"),
+			parentHash: ptr(common.HexToHash("0x114")),
+			timestamp:  40,
 		},
 	}
 	for _, b := range blocks {
 		require.NoError(t, o1.InsertBlocks(ctx, []logpoller.LogPollerBlock{
 			{
-				BlockHash:      b.hash,
-				BlockNumber:    b.number,
-				BlockTimestamp: time.Unix(b.timestamp, 0).UTC(),
+				BlockHash:       b.hash,
+				BlockNumber:     b.number,
+				BlockTimestamp:  time.Unix(b.timestamp, 0).UTC(),
+				ParentBlockHash: b.parentHash,
 			},
 		}))
 	}
@@ -159,6 +168,19 @@ func TestORM_GetBlocks_From_Range(t *testing.T) {
 	lpBlocks3, err := o1.GetBlocksRange(ctx, 15, 15)
 	require.NoError(t, err)
 	assert.Len(t, lpBlocks3, 0)
+
+	// Ignore blocks without parent hash
+	require.NoError(t, o1.InsertBlocks(ctx, []logpoller.LogPollerBlock{
+		{
+			BlockHash:      common.HexToHash("0x116"),
+			BlockNumber:    15,
+			BlockTimestamp: time.Unix(50, 0).UTC(),
+		},
+	}))
+
+	lpBlocks4, err := o1.GetBlocksRange(ctx, 16, 16)
+	require.NoError(t, err)
+	assert.Len(t, lpBlocks4, 0)
 }
 
 func TestORM_GetBlocks_From_Range_Recent_Blocks(t *testing.T) {
@@ -167,8 +189,11 @@ func TestORM_GetBlocks_From_Range_Recent_Blocks(t *testing.T) {
 	ctx := testutils.Context(t)
 	// Insert many blocks and read them back together
 	var recentBlocks []block
+	var parentHash common.Hash
 	for i := 1; i <= 256; i++ {
-		recentBlocks = append(recentBlocks, block{number: int64(i), hash: common.HexToHash(fmt.Sprintf("0x%d", i))})
+		hash := common.HexToHash(fmt.Sprintf("0x%d", i))
+		recentBlocks = append(recentBlocks, block{number: int64(i), hash: hash, parentHash: &parentHash})
+		parentHash = hash
 	}
 	for _, b := range recentBlocks {
 		require.NoError(t, o1.InsertBlocks(ctx, []logpoller.LogPollerBlock{
@@ -177,6 +202,7 @@ func TestORM_GetBlocks_From_Range_Recent_Blocks(t *testing.T) {
 				BlockNumber:          b.number,
 				BlockTimestamp:       time.Now(),
 				FinalizedBlockNumber: 0,
+				ParentBlockHash:      b.parentHash,
 			},
 		}))
 	}
@@ -214,6 +240,7 @@ func TestORM(t *testing.T) {
 			BlockNumber:          10,
 			BlockTimestamp:       time.Now(),
 			FinalizedBlockNumber: 0,
+			ParentBlockHash:      ptr(common.HexToHash("0x1235")),
 		},
 	}))
 	b, err := o1.SelectBlockByHash(ctx, common.HexToHash("0x1234"))
@@ -221,7 +248,7 @@ func TestORM(t *testing.T) {
 	assert.Equal(t, b.BlockNumber, int64(10))
 	assert.Equal(t, b.BlockHash.Bytes(), common.HexToHash("0x1234").Bytes())
 	assert.Equal(t, b.EvmChainId.String(), th.ChainID.String())
-	assert.Nil(t, b.ParentBlockHash)
+	assert.Equal(t, common.HexToHash("0x1235"), *b.ParentBlockHash)
 
 	// Insert blocks from a different chain
 	parentHash := common.HexToHash("0x1233")

@@ -1316,7 +1316,7 @@ func TestLogPoller_GetBlocks_Range(t *testing.T) {
 		UseFinalityTag:           false,
 		FinalityDepth:            2,
 		BackfillBatchSize:        3,
-		RpcBatchSize:             2,
+		RpcBatchSize:             1,
 		KeepFinalizedBlocksDepth: 1000,
 	}
 	th := SetupTH(t, lpOpts)
@@ -1340,13 +1340,13 @@ func TestLogPoller_GetBlocks_Range(t *testing.T) {
 	blockNums := []uint64{}
 	blocks, err := th.LogPoller.GetBlocksRange(testutils.Context(t), blockNums)
 	require.NoError(t, err)
-	assert.Equal(t, 0, len(blocks))
+	assert.Empty(t, blocks)
 
 	// LP retrieves block 1
 	blockNums = []uint64{1}
 	blocks, err = th.LogPoller.GetBlocksRange(testutils.Context(t), blockNums)
 	require.NoError(t, err)
-	assert.Equal(t, 1, len(blocks))
+	require.Len(t, blocks, 1)
 	assert.Equal(t, 1, int(blocks[0].BlockNumber))
 	assert.Equal(t, 1, int(blocks[0].FinalizedBlockNumber))
 
@@ -1354,7 +1354,7 @@ func TestLogPoller_GetBlocks_Range(t *testing.T) {
 	blockNums = []uint64{2}
 	_, err = th.LogPoller.GetBlocksRange(testutils.Context(t), blockNums)
 	require.Error(t, err)
-	assert.Equal(t, "Received unfinalized block 2 while expecting finalized block (latestFinalizedBlockNumber = 1)", err.Error())
+	assert.Equal(t, "failed to fetch blocks [0x2]: Received unfinalized block 2 while expecting finalized block (latestFinalizedBlockNumber = 1)", err.Error())
 
 	th.Backend.Commit() // Commit block #4, so that block #2 is finalized
 
@@ -1365,7 +1365,7 @@ func TestLogPoller_GetBlocks_Range(t *testing.T) {
 	// getBlocksRange is able to retrieve block 2 by calling RPC
 	rpcBlocks, err := th.LogPoller.GetBlocksRange(testutils.Context(t), blockNums)
 	require.NoError(t, err)
-	assert.Equal(t, 1, len(rpcBlocks))
+	require.Len(t, rpcBlocks, 1)
 	assert.Equal(t, 2, int(rpcBlocks[0].BlockNumber))
 	assert.Equal(t, 2, int(rpcBlocks[0].FinalizedBlockNumber))
 
@@ -1379,7 +1379,7 @@ func TestLogPoller_GetBlocks_Range(t *testing.T) {
 	blockNums2 := []uint64{1, 3}
 	rpcBlocks2, err := th.LogPoller.GetBlocksRange(testutils.Context(t), blockNums2)
 	require.NoError(t, err)
-	assert.Equal(t, 2, len(rpcBlocks2))
+	require.Len(t, rpcBlocks2, 2)
 	assert.Equal(t, 1, int(rpcBlocks2[0].BlockNumber))
 	assert.Equal(t, 3, int(rpcBlocks2[1].BlockNumber))
 	assert.Equal(t, 3, int(rpcBlocks2[1].FinalizedBlockNumber))
@@ -1393,7 +1393,7 @@ func TestLogPoller_GetBlocks_Range(t *testing.T) {
 	// getBlocksRange should still be able to return block 2 by fetching from DB
 	lpBlocks, err := th.LogPoller.GetBlocksRange(testutils.Context(t), blockNums)
 	require.NoError(t, err)
-	assert.Equal(t, 1, len(lpBlocks))
+	require.Len(t, lpBlocks, 1)
 	assert.Equal(t, rpcBlocks[0].BlockNumber, lpBlocks[0].BlockNumber)
 	assert.Equal(t, rpcBlocks[0].BlockHash, lpBlocks[0].BlockHash)
 	assert.Equal(t, rpcBlocks[0].FinalizedBlockNumber, lpBlocks[0].FinalizedBlockNumber)
@@ -1423,12 +1423,6 @@ func TestLogPoller_GetBlocks_Range(t *testing.T) {
 	_, err = th.LogPoller.GetBlocksRange(ctx, blockNums)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "context canceled")
-
-	// test canceled ctx
-	ctx, cancel = context.WithCancel(testutils.Context(t))
-	cancel()
-	_, err = th.LogPoller.GetBlocksRange(ctx, blockNums)
-	require.Equal(t, err, context.Canceled)
 }
 
 func TestGetReplayFromBlock(t *testing.T) {
@@ -1957,12 +1951,14 @@ func Test_PruneOldBlocks(t *testing.T) {
 			th := SetupTH(t, lpOpts)
 
 			for i := 1; i <= tt.blockToCreate; i++ {
+				parentHash := common.Hash(utils.RandomBytes32())
 				err := th.ORM.InsertBlocks(ctx, []logpoller.LogPollerBlock{
 					{
 						BlockHash:            utils.RandomBytes32(),
 						BlockNumber:          int64(i + 10),
 						BlockTimestamp:       time.Now(),
 						FinalizedBlockNumber: int64(i),
+						ParentBlockHash:      &parentHash,
 					},
 				})
 				require.NoError(t, err)

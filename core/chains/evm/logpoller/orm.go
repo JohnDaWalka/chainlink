@@ -721,6 +721,7 @@ func (o *DSORM) GetBlocksRange(ctx context.Context, start int64, end int64) ([]L
 			WHERE block_number >= :start_block
 			AND block_number <= :end_block
 			AND evm_chain_id = :evm_chain_id
+			AND parent_block_hash IS NOT NULL
 			ORDER BY block_number ASC`)
 
 	var blocks []LogPollerBlock
