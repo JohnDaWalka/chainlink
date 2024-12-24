@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.1
+        with:
+          persist-credentials: false
       - name: Check git tag type
         id: check-git-tag-type
         shell: bash
@@ -72,6 +74,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.1
+        with:
+          persist-credentials: false
 
       - name: Build, sign and publish chainlink image
         id: build-sign-publish
@@ -104,6 +108,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.1
+        with:
+          persist-credentials: false
       - name: Notify Slack
         uses: smartcontractkit/.github/actions/slack-notify-git-ref@31e00facdd8f57a2bc7868b5e4c8591bf2aa3727 # slack-notify-git-ref@0.1.2
         with:
