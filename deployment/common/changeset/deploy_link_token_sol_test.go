@@ -20,12 +20,13 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/external_program_cpi_stub"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/stretchr/testify/require"
 	"github.com/test-go/testify/assert"
 )
@@ -70,28 +71,6 @@ var (
 	MaxSignersAndTransmitters       = 16
 )
 
-// deployProgram deploys a Solana program using the Solana CLI.
-func deployProgram(programFile, keypairPath, programKeyPair string) (string, error) {
-	// Construct the CLI command: solana program deploy
-	cmd := exec.Command("solana", "program", "deploy", programFile, "--keypair", keypairPath, "--program-id", programKeyPair)
-
-	// Capture the command output
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	// Run the command
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("error deploying program: %s: %s", err.Error(), stderr.String())
-	}
-
-	// Parse and return the program ID
-	output := stdout.String()
-
-	time.Sleep(5 * time.Second) // obviously need to do this better
-	return parseProgramID(output)
-}
-
 func setDevNet(keypairPath string) error {
 	// Construct the CLI command: solana program deploy
 	cmd := exec.Command("solana", "config", "set", "--url", "localhost", "--keypair", keypairPath)
@@ -106,23 +85,6 @@ func setDevNet(keypairPath string) error {
 		return fmt.Errorf("error setting config: %s: %s", err.Error(), stderr.String())
 	}
 	return nil
-}
-
-// parseProgramID parses the program ID from the deploy output.
-func parseProgramID(output string) (string, error) {
-	// Look for the program ID in the CLI output
-	// Example output: "Program Id: <PROGRAM_ID>"
-	const prefix = "Program Id: "
-	startIdx := bytes.Index([]byte(output), []byte(prefix))
-	if startIdx == -1 {
-		return "", fmt.Errorf("failed to find program ID in output")
-	}
-	startIdx += len(prefix)
-	endIdx := bytes.Index([]byte(output[startIdx:]), []byte("\n"))
-	if endIdx == -1 {
-		endIdx = len(output)
-	}
-	return output[startIdx : startIdx+endIdx], nil
 }
 
 // TestDeployProgram is a test for deploying the Solana program.
@@ -149,7 +111,7 @@ func TestDeployProgram(t *testing.T) {
 	} else {
 		fmt.Println("Program does not exist or is not executable.")
 		// Deploy the program
-		programID, err := deployProgram(programFile, keypairPath, programKeyPair)
+		programID, err := deployment.DeploySolProgramCLI(programFile, keypairPath, programKeyPair)
 		if err != nil {
 			t.Fatalf("Failed to deploy program: %v", err)
 		}
@@ -289,7 +251,7 @@ func TestCcipRouterDeploy(t *testing.T) {
 	})
 	require.ErrorAs(t, err, &rpc.ErrNotFound)
 	// Deploy the program
-	programID, err := deployProgram(programFile, keypairPath, programKeyPair)
+	programID, err := deployment.DeploySolProgramCLI(programFile, keypairPath, programKeyPair)
 	if err != nil {
 		t.Fatalf("Failed to deploy program: %v", err)
 	}

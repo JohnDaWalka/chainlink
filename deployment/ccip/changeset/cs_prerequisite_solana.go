@@ -1,13 +1,18 @@
 package changeset
 
 import (
+	"context"
 	"fmt"
 
+	bin "github.com/gagliardetto/binary"
 	ag_solanago "github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink/deployment"
 )
 
@@ -66,29 +71,97 @@ func deployPrerequisiteChainContractsSolana(e deployment.Environment, ab deploym
 // This is only required for staging and test environments where the contracts are not already deployed.
 func deployPrerequisiteContractsSolana(e deployment.Environment, ab deployment.AddressBook, state CCIPOnChainState, chain deployment.SolChain) error {
 	lggr := e.Logger
-	chainState, chainExists := state.SolChains[chain.Selector]
-	var ccipRouter *ag_solanago.PublicKey
-	var ccipReceiver *ag_solanago.PublicKey
-	var tokenPool *ag_solanago.PublicKey
-	if chainExists {
-		ccipRouter = chainState.CcipRouter
-		ccipReceiver = chainState.CcipReceiver
-		tokenPool = chainState.TokenPool
+	chainState, _ := state.SolChains[chain.Selector]
+	ccipRouterProgram := chainState.CcipRouter
+	ccipReceiverProgram := chainState.CcipReceiver
+	tokenPoolProgram := chainState.TokenPool
+	if ccipRouterProgram.IsZero() {
+		panic("ccipRouter is not set")
+	} else {
+		// Fetch account info for the program ID
+		account, _ := chain.Client.GetAccountInfoWithOpts(context.Background(), ccipRouterProgram, &rpc.GetAccountInfoOpts{
+			Commitment: rpc.CommitmentConfirmed,
+		})
+		programFile := "ccipRouter.so"           //TODO
+		keypairPath := "ccipRouter-keypair.json" // TODO
+		programKeyPair := "ccipRouter-keypair"   // TODO
+		// Deploy program if it doesn't exist
+		if account != nil && account.Value.Executable {
+			lggr.Info("ccipRouter exists and is executable.")
+		} else {
+			lggr.Info("Program does not exist or is not executable.")
+			// Deploy the program
+			programID, err := deployment.DeploySolProgramCLI(programFile, keypairPath, programKeyPair)
+			if err != nil {
+				lggr.Fatalf("Failed to deploy program: %v", err)
+			}
+			// Verify the program ID (simple check for non-empty string)
+			if programID == "" {
+				lggr.Fatalf("Program ID is empty")
+			}
+
+			lggr.Infof("programID %s", programID)
+		}
+
+		// program should exist by now (either already deployed, or deployed and waited for confirmation)
+		ccip_router.SetProgramID(ccipRouterProgram)
+
+		// wallet keys
+		privateKey, _ := ag_solanago.PrivateKeyFromSolanaKeygenFile(keypairPath)
+		publicKey := privateKey.PublicKey()
+
+		// this is a PDA that gets initialised when you call init on the programID
+		RouterConfigPDA, _, _ := ag_solanago.FindProgramAddress([][]byte{[]byte("config")}, ccipRouterProgram)
+		RouterStatePDA, _, _ := ag_solanago.FindProgramAddress([][]byte{[]byte("state")}, ccipRouterProgram)
+		ExternalExecutionConfigPDA, _, _ := ag_solanago.FindProgramAddress([][]byte{[]byte("external_execution_config")}, ccipRouterProgram)
+		ExternalTokenPoolsSignerPDA, _, _ := ag_solanago.FindProgramAddress([][]byte{[]byte("external_token_pools_signer")}, ccipRouterProgram)
+
+		// check if the PDA is already initialised
+		data, err := chain.Client.GetAccountInfoWithOpts(context.Background(), ccipRouterProgram, &rpc.GetAccountInfoOpts{
+			Commitment: rpc.CommitmentConfirmed,
+		})
+		if err != nil {
+			lggr.Fatalf("Failed to get account info: %v", err)
+		}
+
+		var programData struct {
+			DataType uint32
+			Address  ag_solanago.PublicKey
+		}
+		err = bin.UnmarshalBorsh(&programData, data.Bytes())
+		if err != nil {
+			lggr.Fatalf("Failed to unmarshal data: %v", err)
+		}
+		instruction, err := ccip_router.NewInitializeInstruction(
+			chain.Selector, // chain selector
+			bin.Uint128{},  // default gas limit
+			true,           // allow out of order execution
+			int64(1800),    // period to wait before allowing manual execution. 30 mins
+			RouterConfigPDA,
+			RouterStatePDA,
+			publicKey,
+			ag_solanago.SystemProgramID,
+			ccipRouterProgram,
+			programData.Address,
+			ExternalExecutionConfigPDA,
+			ExternalTokenPoolsSignerPDA,
+		).ValidateAndBuild()
+		_, err = common.SendAndConfirm(context.Background(), chain.Client, []ag_solanago.Instruction{instruction}, privateKey, rpc.CommitmentConfirmed)
+		if err != nil {
+			lggr.Fatalf("Failed to send and confirm: %v", err)
+		}
 	}
-	if ccipRouter == nil {
+	if ccipReceiverProgram.IsZero() {
+		panic("ccipReceiver is not set")
+	} else {
+		// ReceiverTargetAccountPDA, _, _ = ag_solanago.FindProgramAddress([][]byte{[]byte("counter")}, ccipReceiver)
+		// ReceiverExternalExecutionConfigPDA, _, _ = ag_solanago.FindProgramAddress([][]byte{[]byte("external_execution_config")}, CcipReceiverProgram)
+		// TODO
+	}
+	if tokenPoolProgram.IsZero() {
 
 	} else {
-		lggr.Infow("ccipRouter already deployed", "chain", chain.String(), "addr", ccipRouter)
-	}
-	if ccipReceiver == nil {
-
-	} else {
-		lggr.Infow("ccipReceiver already deployed", "chain", chain.String(), "addr", ccipReceiver)
-	}
-	if tokenPool == nil {
-
-	} else {
-		lggr.Infow("tokenPool already deployed", "chain", chain.String(), "addr", tokenPool)
+		// TODO
 	}
 	return nil
 }
