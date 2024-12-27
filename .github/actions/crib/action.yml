@@ -79,7 +79,7 @@ runs:
         aws-role-duration-seconds: "1800"
 
     - name: Deploy and validate CRIB Environment for Core
-      uses: smartcontractkit/.github/actions/crib-deploy-environment@re-3360/crib-deploy-environment-tweaks # TODO: use released version
+      uses: smartcontractkit/.github/actions/crib-deploy-environment@2a98268bdf57ea840f00326f3f5b234a865f93bb # crib-deploy-environment@7.5.0
       id: deploy-crib
       with:
         github-token: ${{ steps.token.outputs.access-token }}
@@ -103,7 +103,7 @@ runs:
         go-version-file: "go.mod"
 
     - name: Run CRIB integration test
-      if: integration-tests-run == 'true'
+      if: inputs.integration-tests-run == 'true'
       shell: bash
       working-directory: integration-tests/crib
       env:
