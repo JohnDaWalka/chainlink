@@ -114,6 +114,8 @@ runs:
         GAP_URL: ${{ format('https://localhost:{0}/', steps.deploy-crib.outputs.gap-local-proxy-port) }}
         SETH_LOG_LEVEL: info
         TEST_PERSISTENCE: true
+        E2E_TEST_CHAINLINK_IMAGE: ${{ inputs.crib-chainlink-docker-image-name }}
+        E2E_TEST_CHAINLINK_VERSION: ${{ inputs.crib-chainlink-docker-image-tag }}
       run: go test -v -run TestCRIBChaos
 
     - name: Destroy CRIB Environment
