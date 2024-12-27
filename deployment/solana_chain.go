@@ -8,15 +8,23 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	solCommomUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+)
+
+// TODO: hard coding these for test, need to figure out the dynamic way like evm
+var (
+	SolanaChainSelector uint64 = 16423721717087811551 //devnet
 )
 
 // SolChain represents a Solana chain.
 type SolChain struct {
 	// Selectors used as canonical chain identifier.
 	Selector uint64
-	Client   *rpc.Client
-	Confirm  func() (uint64, error)
+	// RPC cient
+	Client *rpc.Client
+	// TODO: raw private key for now, need to replace with a more secure way
+	DeployerKey *solana.PrivateKey
+	Confirm     func(instructions []solana.Instruction, opts ...solCommomUtil.TxModifier) error
 }
 
 func (c SolChain) String() string {
@@ -47,31 +55,6 @@ type ContractDeploySolana struct {
 	ProgramID *solana.PublicKey // We leave this incase a Go binding doesn't have Address()
 	Tv        TypeAndVersion
 	Err       error
-}
-
-func DeploySolContract(
-	lggr logger.Logger,
-	chain SolChain,
-	addressBook AddressBook,
-	deploy func(chain SolChain) ContractDeploySolana,
-) (*ContractDeploySolana, error) {
-	contractDeploy := deploy(chain)
-	if contractDeploy.Err != nil {
-		lggr.Errorw("Failed to deploy contract", "chain", chain.String(), "err", contractDeploy.Err)
-		return nil, contractDeploy.Err
-	}
-	_, err := chain.Confirm()
-	if err != nil {
-		lggr.Errorw("Failed to confirm deployment", "chain", chain.String(), "Contract", contractDeploy.Tv.String(), "err", err)
-		return nil, err
-	}
-	lggr.Infow("Deployed contract", "Contract", contractDeploy.Tv.String(), "addr", contractDeploy.ProgramID, "chain", chain.String())
-	err = addressBook.Save(chain.Selector, "fill in address", contractDeploy.Tv)
-	if err != nil {
-		lggr.Errorw("Failed to save contract address", "Contract", contractDeploy.Tv.String(), "addr", contractDeploy.ProgramID, "chain", chain.String(), "err", err)
-		return nil, err
-	}
-	return &contractDeploy, nil
 }
 
 func DeploySolProgramCLI(programFile, keypairPath, programKeyPair string) (string, error) {
@@ -110,4 +93,10 @@ func parseProgramID(output string) (string, error) {
 		endIdx = len(output)
 	}
 	return output[startIdx : startIdx+endIdx], nil
+}
+
+func GetSolanaDeployerKey() solana.PrivateKey {
+	keypairPath := "/Users/yashvardhan/.config/solana/id.json" //wallet
+	adminPrivateKey, _ := solana.PrivateKeyFromSolanaKeygenFile(keypairPath)
+	return adminPrivateKey
 }

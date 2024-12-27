@@ -24,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/external_program_cpi_stub"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/stretchr/testify/require"
@@ -207,30 +206,29 @@ func spinUpDevNet(t *testing.T) (string, string) {
 		t.Logf("Cmd output: %s\nCmd error: %s\n", stdOut.String(), stdErr.String())
 	}
 	require.True(t, ready)
+	t.Logf("Solana Devnet spun up successfully")
 
 	return url, wsURL
 }
 
 func getRpcClient(t *testing.T) *rpc.Client {
 	url, _ := spinUpDevNet(t)
+	// url, _ := memory.solChain(t)
 	return rpc.New(url)
 }
 
-func TestTokenDeploy(t *testing.T) {
-	keypairPath := "/Users/yashvardhan/.config/solana/id.json" //wallet
-	adminPrivateKey, _ := solana.PrivateKeyFromSolanaKeygenFile(keypairPath)
-	adminPublicKey := adminPrivateKey.PublicKey()
-	decimals := uint8(0)
-	// amount := uint64(1000)
-	// solanaGoClient := rpc.New("http://127.0.0.1:8899")
-	solanaGoClient := getRpcClient(t)
-	mint, _ := solana.NewRandomPrivateKey()
-	mintPublicKey := mint.PublicKey()
-	instructions, err := tokens.CreateToken(context.Background(), config.Token2022Program, mintPublicKey, adminPublicKey, decimals, solanaGoClient, DefaultCommitment)
-	require.NoError(t, err)
-	_, err = common.SendAndConfirm(context.Background(), solanaGoClient, instructions, adminPrivateKey, DefaultCommitment, common.AddSigners(mint))
-	require.NoError(t, err)
-}
+// Added TestDeployLinkTokenSol -> so this is not required anymore
+// func TestTokenDeploy(t *testing.T) {
+// 	solanaGoClient := getRpcClient(t)
+// 	adminPrivateKey := deployment.GetSolanaDeployerKey()
+// 	adminPublicKey := adminPrivateKey.PublicKey()
+// 	mint, _ := solana.NewRandomPrivateKey()
+// 	mintPublicKey := mint.PublicKey()
+// 	instructions, err := tokens.CreateToken(context.Background(), config.Token2022Program, mintPublicKey, adminPublicKey, uint8(0), solanaGoClient, DefaultCommitment)
+// 	require.NoError(t, err)
+// 	_, err = common.SendAndConfirm(context.Background(), solanaGoClient, instructions, adminPrivateKey, DefaultCommitment, common.AddSigners(mint))
+// 	require.NoError(t, err)
+// }
 
 func TestCcipRouterDeploy(t *testing.T) {
 	// Path to your .so file and keypair file

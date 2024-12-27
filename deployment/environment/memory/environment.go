@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/gagliardetto/solana-go"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -19,6 +20,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 
+	solRpc "github.com/gagliardetto/solana-go/rpc"
+	solCommomUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
@@ -151,6 +154,7 @@ func NewMemoryEnvironmentFromChainsNodes(
 		lggr,
 		deployment.NewMemoryAddressBook(),
 		chains,
+		nil,
 		nodeIDs, // Note these have the p2p_ prefix.
 		NewMemoryJobClient(nodes),
 		ctx,
@@ -160,10 +164,11 @@ func NewMemoryEnvironmentFromChainsNodes(
 
 // To be used by tests and any kind of deployment logic.
 func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Level, config MemoryEnvironmentConfig) deployment.Environment {
-	// TODO: add solana chain support
 	chains, _ := NewMemoryChains(t, config.Chains, config.NumOfUsersPerChain)
-	fmt.Println("Created chains")
-	// TODO: add solana node support ?
+	t.Log("Created chains")
+	solChains := NewMemoryChainsSol(t)
+	t.Log(solChains)
+	// TODO: add solana node support
 	nodes := NewNodes(t, logLevel, chains, config.Nodes, config.Bootstraps, config.RegistryConfig)
 	fmt.Println("Created nodes")
 	var nodeIDs []string
@@ -175,9 +180,38 @@ func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Lev
 		lggr,
 		deployment.NewMemoryAddressBook(),
 		chains,
+		solChains,
 		nodeIDs,
 		NewMemoryJobClient(nodes),
 		func() context.Context { return tests.Context(t) },
 		deployment.XXXGenerateTestOCRSecrets(),
 	)
+}
+
+func NewMemoryChainsSol(t *testing.T) map[uint64]deployment.SolChain {
+	// one solana chain only for now
+	// TODO: add support for n solana chains like evm
+	t.Logf("Creating solana chain")
+	solChainSelector := deployment.SolanaChainSelector
+	solChains := make(map[uint64]deployment.SolChain)
+	t.Logf("Spinning up devnet")
+	url, _ := solChain(t)
+	client := solRpc.New(url)
+	adminPrivateKey := deployment.GetSolanaDeployerKey()
+	newSolChain := deployment.SolChain{
+		Selector:    solChainSelector,
+		Client:      client,
+		DeployerKey: &adminPrivateKey,
+		Confirm: func(instructions []solana.Instruction, opts ...solCommomUtil.TxModifier) error {
+			_, err := solCommomUtil.SendAndConfirm(
+				context.Background(), client, instructions, adminPrivateKey, solRpc.CommitmentConfirmed, opts...,
+			)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+	solChains[solChainSelector] = newSolChain
+	return solChains
 }

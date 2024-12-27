@@ -1,12 +1,16 @@
 package changeset
 
 import (
+	"context"
 	"fmt"
 
-	// "github.com/gagliardetto/solana-go"
-	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/gagliardetto/solana-go"
+	solRpc "github.com/gagliardetto/solana-go/rpc"
+	solConfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	solCommomUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/link_token"
@@ -23,20 +27,28 @@ func DeployLinkToken(e deployment.Environment, chains []uint64) (deployment.Chan
 		}
 	}
 	newAddresses := deployment.NewMemoryAddressBook()
-	// can we use solchains here ?
-	// the chains being passed in belong to env already
 	for _, chain := range chains {
-		family, err := chainsel.GetSelectorFamily(chain)
+		_, err := deployLinkTokenContract(
+			e.Logger, e.Chains[chain], newAddresses,
+		)
 		if err != nil {
 			return deployment.ChangesetOutput{AddressBook: newAddresses}, err
 		}
-		if family == chainsel.FamilySolana {
-			_, err = deployLinkTokenContractSolana(
-				e.Logger, e.SolChains[chain], newAddresses,
-			)
+	}
+	return deployment.ChangesetOutput{AddressBook: newAddresses}, nil
+}
+
+func DeployLinkTokenSolana(e deployment.Environment, chains []uint64) (deployment.ChangesetOutput, error) {
+	for _, chain := range chains {
+		_, ok := e.SolChains[chain]
+		if !ok {
+			return deployment.ChangesetOutput{}, fmt.Errorf("sol chain not found in environment")
 		}
-		_, err = deployLinkTokenContract(
-			e.Logger, e.Chains[chain], newAddresses,
+	}
+	newAddresses := deployment.NewMemoryAddressBook()
+	for _, chain := range chains {
+		err := deployLinkTokenContractSolana(
+			e.Logger, e.SolChains[chain], newAddresses,
 		)
 		if err != nil {
 			return deployment.ChangesetOutput{AddressBook: newAddresses}, err
@@ -71,25 +83,38 @@ func deployLinkTokenContract(
 	return linkToken, nil
 }
 
+// for ethereum -> DeployContract -> calls
+// 1. gethwrapper DeployContract
+// 2. chain.Confirm
+// 3. addressBook.Save
 func deployLinkTokenContractSolana(
 	lggr logger.Logger,
 	chain deployment.SolChain,
 	ab deployment.AddressBook,
-) (*deployment.ContractDeploySolana, error) {
-	linkToken, err := deployment.DeploySolContract(lggr, chain, ab,
-		func(chain deployment.SolChain) deployment.ContractDeploySolana {
-			// linkTokenAddr, tx, linkToken, err2 := link_token.DeployLinkToken(
-			// 	chain.DeployerKey,
-			// 	chain.Client,
-			// )
-			// copy deployment code from solana internal integrations repo
-			return deployment.ContractDeploySolana{
-				Tv: deployment.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0),
-			}
-		})
+) error {
+	decimals := uint8(0)
+	adminPublicKey := chain.DeployerKey.PublicKey()
+	mint, _ := solana.NewRandomPrivateKey()
+	mintPublicKey := mint.PublicKey()
+	instructions, err := solTokenUtil.CreateToken(
+		context.Background(), solConfig.Token2022Program, mintPublicKey, adminPublicKey, decimals, chain.Client, solRpc.CommitmentConfirmed,
+	)
 	if err != nil {
 		lggr.Errorw("Failed to deploy link token", "chain", chain.String(), "err", err)
-		return linkToken, err
+		return err
 	}
-	return linkToken, nil
+	err = chain.Confirm(instructions, solCommomUtil.AddSigners(mint))
+	if err != nil {
+		lggr.Errorw("Failed to deploy link token", "chain", chain.String(), "err", err)
+		return err
+	}
+	tv := deployment.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0)
+	lggr.Infow("Deployed contract", "Contract", tv.String(), "addr", mintPublicKey.String(), "chain", chain.String())
+	err = ab.Save(chain.Selector, mintPublicKey.String(), tv)
+	if err != nil {
+		lggr.Errorw("Failed to deploy link token", "chain", chain.String(), "err", err)
+		return err
+	}
+
+	return nil
 }
