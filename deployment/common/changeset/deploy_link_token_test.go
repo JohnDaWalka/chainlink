@@ -35,6 +35,8 @@ func TestDeployLinkToken(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TODO: fails sometimes with
+// (string) (len=96) "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb failed: invalid account data for instruction"
 func TestDeployLinkTokenSol(t *testing.T) {
 	t.Parallel()
 	lggr := logger.TestLogger(t)

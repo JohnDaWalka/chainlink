@@ -38,7 +38,9 @@ func DeployLinkToken(e deployment.Environment, chains []uint64) (deployment.Chan
 	return deployment.ChangesetOutput{AddressBook: newAddresses}, nil
 }
 
+// Solana variant of DeployLinkToken -> do we want separate variants ? or we want to combine them ?
 func DeployLinkTokenSolana(e deployment.Environment, chains []uint64) (deployment.ChangesetOutput, error) {
+	fmt.Println("DeployLinkTokenSolana", e.SolChains)
 	for _, chain := range chains {
 		_, ok := e.SolChains[chain]
 		if !ok {

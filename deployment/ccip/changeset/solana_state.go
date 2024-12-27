@@ -19,6 +19,7 @@ var (
 	SolRouter    deployment.ContractType = "SolCcipRouter"
 	SolReceiver  deployment.ContractType = "SolCcipReceiver"
 	SolTokenPool deployment.ContractType = "SolTokenPool"
+	LinkToken    deployment.ContractType = "LinkToken"
 )
 
 type SolCCIPRouter struct {
@@ -41,6 +42,8 @@ type SolCCIPChainState struct {
 	CcipRouter   ag_solanago.PublicKey
 	CcipReceiver ag_solanago.PublicKey
 	TokenPool    ag_solanago.PublicKey
+	LinkToken    ag_solanago.PublicKey
+	Weth9        ag_solanago.PublicKey
 }
 
 // TODO: Solana re-write
@@ -88,6 +91,10 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 			pub := ag_solanago.MustPublicKeyFromBase58(address)
 			token_pool.SetProgramID(pub)
 			state.TokenPool = pub
+		case deployment.NewTypeAndVersion(LinkToken, deployment.Version1_0_0).String():
+			pub := ag_solanago.MustPublicKeyFromBase58(address)
+			// token_pool.SetProgramID(pub)
+			state.LinkToken = pub
 		default:
 			return state, fmt.Errorf("unknown contract %s", tvStr)
 		}

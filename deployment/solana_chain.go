@@ -59,6 +59,7 @@ type ContractDeploySolana struct {
 
 func DeploySolProgramCLI(programFile, keypairPath, programKeyPair string) (string, error) {
 	// Construct the CLI command: solana program deploy
+	// TODO: @terry doing this on the fly
 	cmd := exec.Command("solana", "program", "deploy", programFile, "--keypair", keypairPath, "--program-id", programKeyPair)
 
 	// Capture the command output
