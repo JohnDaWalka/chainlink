@@ -33,6 +33,7 @@ const (
     `
 )
 
+// nolint
 func Up195(ctx context.Context, tx *sql.Tx) error {
 	chainID, set := os.LookupEnv(env.EVMChainIDNotNullMigration0195)
 	if set {
@@ -57,6 +58,7 @@ func Up195(ctx context.Context, tx *sql.Tx) error {
 	return errors.Wrap(err, "failed to add null constraints")
 }
 
+// nolint
 func Down195(ctx context.Context, tx *sql.Tx) error {
 	if _, err := tx.ExecContext(ctx, dropNullConstraintsFromSpecs); err != nil {
 		return err

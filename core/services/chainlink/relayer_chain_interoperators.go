@@ -11,10 +11,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-cosmos/pkg/cosmos"
 	"github.com/smartcontractkit/chainlink-cosmos/pkg/cosmos/adapters"
-
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 
-	commonTypes "github.com/smartcontractkit/chainlink/v2/common/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/services"
@@ -54,7 +52,7 @@ type LegacyChainer interface {
 
 type ChainStatuser interface {
 	ChainStatus(ctx context.Context, id types.RelayID) (types.ChainStatus, error)
-	ChainStatuses(ctx context.Context, offset, limit int) ([]commonTypes.ChainStatusWithID, int, error)
+	ChainStatuses(ctx context.Context, offset, limit int) ([]types.ChainStatus, int, error)
 }
 
 // NodesStatuser is an interface for node configuration and state.
@@ -156,7 +154,7 @@ func InitCosmos(ctx context.Context, factory RelayerFactory, config CosmosFactor
 // InitSolana is a option for instantiating Solana relayers
 func InitSolana(ctx context.Context, factory RelayerFactory, config SolanaFactoryConfig) CoreRelayerChainInitFunc {
 	return func(op *CoreRelayerChainInteroperators) error {
-		solRelayers, err := factory.NewSolana(config)
+		solRelayers, err := factory.NewSolana(config.Keystore, config.TOMLConfigs)
 		if err != nil {
 			return fmt.Errorf("failed to setup Solana relayer: %w", err)
 		}
@@ -262,9 +260,9 @@ func (rs *CoreRelayerChainInteroperators) ChainStatus(ctx context.Context, id ty
 	return lr.GetChainStatus(ctx)
 }
 
-func (rs *CoreRelayerChainInteroperators) ChainStatuses(ctx context.Context, offset, limit int) ([]commonTypes.ChainStatusWithID, int, error) {
+func (rs *CoreRelayerChainInteroperators) ChainStatuses(ctx context.Context, offset, limit int) ([]types.ChainStatus, int, error) {
 	var (
-		stats    []commonTypes.ChainStatusWithID
+		stats    []types.ChainStatus
 		totalErr error
 	)
 	rs.mu.Lock()
@@ -284,7 +282,7 @@ func (rs *CoreRelayerChainInteroperators) ChainStatuses(ctx context.Context, off
 			totalErr = errors.Join(totalErr, err)
 			continue
 		}
-		stats = append(stats, commonTypes.ChainStatusWithID{ChainStatus: stat, RelayID: rid})
+		stats = append(stats, stat)
 	}
 
 	if totalErr != nil {

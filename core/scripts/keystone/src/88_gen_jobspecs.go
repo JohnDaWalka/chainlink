@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	ksdeploy "github.com/smartcontractkit/chainlink/deployment/keystone"
 )
 
 type spec []string
@@ -74,7 +74,7 @@ func replacePlaceholders(
 
 	chainID, p2pPort int64,
 	contractAddress, bootHost string,
-	boot, node changeset.NodeKeys,
+	boot, node ksdeploy.NodeKeys,
 ) (output []string) {
 	chainIDStr := strconv.FormatInt(chainID, 10)
 	bootstrapper := fmt.Sprintf("%s@%s:%d", boot.P2PPeerID, bootHost, p2pPort)

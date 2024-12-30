@@ -1,7 +1,6 @@
 package testconfig
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -19,12 +18,12 @@ Chainlink version must be set in toml config.
 `
 
 	if os.Getenv("E2E_TEST_CHAINLINK_IMAGE") == "" || os.Getenv("E2E_TEST_CHAINLINK_UPGRADE_IMAGE") == "" {
-		return fmt.Errorf("%s\n%s", errStr, missingImage)
+		return fmt.Errorf(fmt.Sprintf("%s\n%s", errStr, missingImage))
 	}
 	if os.Getenv("CHAINLINK_VERSION") == "" || os.Getenv("CHAINLINK_UPGRADE_VERSION") == "" {
-		return fmt.Errorf("%s\n%s", errStr, missingVersion)
+		return fmt.Errorf(fmt.Sprintf("%s\n%s", errStr, missingVersion))
 	}
-	return errors.New(errStr)
+	return fmt.Errorf(errStr)
 }
 
 // NoSelectedNetworkInfoAsError return a helfpul error message when the no selected network info is found in TOML config.
@@ -34,6 +33,8 @@ func NoSelectedNetworkInfoAsError(errStr string) error {
 You might have used old configuration approach. If so, use TOML instead of env vars.
 Please refer to integration-tests/testconfig/README.md for more information.
 `
+
+	finalErrStr := fmt.Sprintf("%s\n%s", errStr, intro)
 
 	if net := os.Getenv("SELECTED_NETWORKS"); net != "" {
 		parts := strings.Split(net, ",")
@@ -51,10 +52,10 @@ Please refer to integration-tests/testconfig/README.md for more information.
 Or if you want to run your tests right now add following content to integration-tests/testconfig/overrides.toml:
 [Network]
 selected_networks=`
-		return fmt.Errorf("%s\n%s%s%s", errStr, intro, extraInfo, selectedNetworkStr)
+		finalErrStr = fmt.Sprintf("%s\n%s%s%s", errStr, intro, extraInfo, selectedNetworkStr)
 	}
 
-	return fmt.Errorf("%s\n%s", errStr, intro)
+	return fmt.Errorf(finalErrStr)
 }
 
 func GetChainAndTestTypeSpecificConfig(testType string, product Product) (TestConfig, error) {

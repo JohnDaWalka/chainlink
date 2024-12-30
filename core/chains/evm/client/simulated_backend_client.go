@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 	"testing"
@@ -358,12 +357,9 @@ func (c *SimulatedBackendClient) SubscribeToHeads(
 			case h := <-ch:
 				var head *evmtypes.Head
 				if h != nil {
-					if h.Time > math.MaxInt64 {
-						c.t.Fatalf("time overflows int64: %d", h.Time)
-					}
 					head = &evmtypes.Head{
 						Difficulty: h.Difficulty,
-						Timestamp:  time.Unix(int64(h.Time), 0),
+						Timestamp:  time.Unix(int64(h.Time), 0), //nolint:gosec
 						Number:     h.Number.Int64(),
 						Hash:       h.Hash(),
 						ParentHash: h.ParentHash,

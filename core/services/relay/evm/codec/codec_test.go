@@ -16,15 +16,14 @@ import (
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/evmtesting"
 
-	looptestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
+	looptestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils" //nolint common practice to import test mods with .
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/chain_reader_tester"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/codec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
-
-	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint:revive // dot-imports
 )
 
 const anyExtraValue = 3
@@ -289,8 +288,8 @@ func packArgs(t *testing.T, allArgs []any, oargs abi.Arguments, request *EncodeR
 	}
 
 	if request.MissingField {
-		args = args[1:]
-		allArgs = allArgs[1:]
+		args = args[1:]       //nolint we know it's non-zero len
+		allArgs = allArgs[1:] //nolint we know it's non-zero len
 	}
 
 	bytes, err := args.Pack(allArgs...)

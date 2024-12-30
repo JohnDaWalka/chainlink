@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {IMessageInterceptor} from "../../../interfaces/IMessageInterceptor.sol";
 import {IRouter} from "../../../interfaces/IRouter.sol";
@@ -20,7 +20,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     vm.startPrank(address(s_offRamp));
   }
 
-  function test_executeSingleMessage_NoTokens() public {
+  function test_executeSingleMessage_NoTokens_Success() public {
     Internal.Any2EVMRampMessage memory message =
       _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1);
 
@@ -36,7 +36,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
       abi.encodeWithSelector(
         IRouter.routeMessage.selector,
         expectedAny2EvmMessage,
-        GAS_FOR_CALL_EXACT_CHECK,
+        Internal.GAS_FOR_CALL_EXACT_CHECK,
         message.gasLimit,
         message.receiver
       )
@@ -44,7 +44,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
   }
 
-  function test_executeSingleMessage_WithTokens() public {
+  function test_executeSingleMessage_WithTokens_Success() public {
     Internal.Any2EVMRampMessage memory message =
       _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)[0];
     bytes[] memory offchainTokenData = new bytes[](message.tokenAmounts.length);
@@ -69,7 +69,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     s_offRamp.executeSingleMessage(message, offchainTokenData, new uint32[](0));
   }
 
-  function test_executeSingleMessage_WithMessageInterceptor() public {
+  function test_executeSingleMessage_WithVInterception_Success() public {
     vm.stopPrank();
     vm.startPrank(OWNER);
     _enableInboundMessageInterceptor();
@@ -79,47 +79,46 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
   }
 
-  function test_executeSingleMessage_NonContract() public {
+  function test_NonContract_Success() public {
     Internal.Any2EVMRampMessage memory message =
       _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1);
     message.receiver = STRANGER;
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
   }
 
-  function test_executeSingleMessage_NonContractWithTokens() public {
+  function test_NonContractWithTokens_Success() public {
     uint256[] memory amounts = new uint256[](2);
     amounts[0] = 1000;
     amounts[1] = 50;
-
-    Internal.Any2EVMRampMessage memory message =
-      _generateAny2EVMMessageWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1, amounts);
-
-    message.receiver = STRANGER;
-
     vm.expectEmit();
     emit TokenPool.Released(address(s_offRamp), STRANGER, amounts[0]);
     vm.expectEmit();
     emit TokenPool.Minted(address(s_offRamp), STRANGER, amounts[1]);
-
+    Internal.Any2EVMRampMessage memory message =
+      _generateAny2EVMMessageWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1, amounts);
+    message.receiver = STRANGER;
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
   }
 
   // Reverts
 
-  function test_RevertWhen_executeSingleMessageWhen_TokenHandlingError() public {
-    Internal.Any2EVMRampMessage memory message = _generateAny2EVMMessageWithMaybeRevertingSingleToken(1, 50);
-    address destPool = s_destPoolByToken[message.tokenAmounts[0].destTokenAddress];
+  function test_TokenHandlingError_Revert() public {
+    uint256[] memory amounts = new uint256[](2);
+    amounts[0] = 1000;
+    amounts[1] = 50;
 
     bytes memory errorMessage = "Random token pool issue";
 
+    Internal.Any2EVMRampMessage memory message =
+      _generateAny2EVMMessageWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1, amounts);
     s_maybeRevertingPool.setShouldRevert(errorMessage);
 
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.TokenHandlingError.selector, destPool, errorMessage));
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.TokenHandlingError.selector, errorMessage));
 
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
   }
 
-  function test_RevertWhen_executeSingleMessageWhen_ZeroGasDONExecution() public {
+  function test_ZeroGasDONExecution_Revert() public {
     Internal.Any2EVMRampMessage memory message =
       _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1);
     message.gasLimit = 0;
@@ -129,7 +128,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
   }
 
-  function test_RevertWhen_executeSingleMessageWhen_MessageSender() public {
+  function test_MessageSender_Revert() public {
     vm.stopPrank();
     Internal.Any2EVMRampMessage memory message =
       _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1);
@@ -137,7 +136,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
   }
 
-  function test_RevertWhen_executeSingleMessageWhen_MessageValidationError() public {
+  function test_executeSingleMessage_WithFailingValidation_Revert() public {
     vm.stopPrank();
     vm.startPrank(OWNER);
     _enableInboundMessageInterceptor();
@@ -154,7 +153,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
   }
 
-  function test_RevertWhen_executeSingleMessageWhen_WithFailingValidationNoRouterCall() public {
+  function test_executeSingleMessage_WithFailingValidationNoRouterCall_Revert() public {
     vm.stopPrank();
     vm.startPrank(OWNER);
     _enableInboundMessageInterceptor();

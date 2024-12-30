@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.24;
-
-import {IAny2EVMMessageReceiver} from "../../../interfaces/IAny2EVMMessageReceiver.sol";
-import {IRouter} from "../../../interfaces/IRouter.sol";
+pragma solidity 0.8.24;
 
 import {Router} from "../../../Router.sol";
+import {IAny2EVMMessageReceiver} from "../../../interfaces/IAny2EVMMessageReceiver.sol";
+import {IRouter} from "../../../interfaces/IRouter.sol";
 import {Client} from "../../../libraries/Client.sol";
-import {BaseTest} from "../../BaseTest.t.sol";
-import {MaybeRevertMessageReceiver} from "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
 
-contract Router_applyRampUpdates is BaseTest {
+import {MaybeRevertMessageReceiver} from "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
+import {RouterSetup} from "./RouterSetup.t.sol";
+
+contract Router_applyRampUpdates is RouterSetup {
   MaybeRevertMessageReceiver internal s_receiver;
 
-  function setUp() public virtual override {
+  function setUp() public virtual override(RouterSetup) {
     super.setUp();
     s_receiver = new MaybeRevertMessageReceiver(false);
   }
@@ -22,14 +22,7 @@ contract Router_applyRampUpdates is BaseTest {
   ) internal {
     vm.startPrank(offRamp.offRamp);
 
-    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
-      messageId: bytes32("a"),
-      sourceChainSelector: offRamp.sourceChainSelector,
-      sender: bytes("a"),
-      data: bytes("a"),
-      destTokenAmounts: new Client.EVMTokenAmount[](0)
-    });
-
+    Client.Any2EVMMessage memory message = _generateReceiverMessage(offRamp.sourceChainSelector);
     vm.expectCall(address(s_receiver), abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message));
     s_sourceRouter.routeMessage(message, GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver));
   }
@@ -41,20 +34,11 @@ contract Router_applyRampUpdates is BaseTest {
 
     vm.expectRevert(IRouter.OnlyOffRamp.selector);
     s_sourceRouter.routeMessage(
-      Client.Any2EVMMessage({
-        messageId: bytes32("a"),
-        sourceChainSelector: offRamp.sourceChainSelector,
-        sender: bytes("a"),
-        data: bytes("a"),
-        destTokenAmounts: new Client.EVMTokenAmount[](0)
-      }),
-      GAS_FOR_CALL_EXACT_CHECK,
-      100_000,
-      address(s_receiver)
+      _generateReceiverMessage(offRamp.sourceChainSelector), GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver)
     );
   }
 
-  function testFuzz_applyRampUpdates_OffRampUpdates(
+  function testFuzz_OffRampUpdates(
     address[20] memory offRampsInput
   ) public {
     Router.OffRamp[] memory offRamps = new Router.OffRamp[](20);
@@ -88,7 +72,7 @@ contract Router_applyRampUpdates is BaseTest {
     }
   }
 
-  function test_applyRampUpdates_OffRampUpdatesWithRouting() public {
+  function test_OffRampUpdatesWithRouting() public {
     // Explicitly construct chain selectors and ramp addresses so we have ramp uniqueness for the various test scenarios.
     uint256 numberOfSelectors = 10;
     uint64[] memory sourceChainSelectors = new uint64[](numberOfSelectors);
@@ -235,7 +219,7 @@ contract Router_applyRampUpdates is BaseTest {
     }
   }
 
-  function testFuzz_applyRampUpdates_OnRampUpdates(
+  function testFuzz_OnRampUpdates(
     Router.OnRamp[] memory onRamps
   ) public {
     // Test adding onRamps
@@ -260,7 +244,7 @@ contract Router_applyRampUpdates is BaseTest {
     }
   }
 
-  function test_applyRampUpdates_OnRampDisable() public {
+  function test_OnRampDisable() public {
     // Add onRamp
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](0);
@@ -283,7 +267,7 @@ contract Router_applyRampUpdates is BaseTest {
     assertTrue(s_sourceRouter.isChainSupported(DEST_CHAIN_SELECTOR));
   }
 
-  function test_RevertWhen_applyRampUpdatesWhen_OnlyOwner() public {
+  function test_OnlyOwner_Revert() public {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
@@ -291,7 +275,7 @@ contract Router_applyRampUpdates is BaseTest {
     s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates, offRampUpdates);
   }
 
-  function test_RevertWhen_applyRampUpdatesWhen_OffRampMismatch() public {
+  function test_OffRampMismatch_Revert() public {
     address offRamp = address(uint160(2));
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);

@@ -6,11 +6,12 @@ import (
 	"errors"
 	"fmt"
 
-	agbinary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipsolana/ccip_router"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+
+	agbinary "github.com/gagliardetto/binary"
 )
 
 // CommitPluginCodecV1 is a codec for encoding and decoding commit plugin reports.
@@ -38,7 +39,7 @@ func (c *CommitPluginCodecV1) Encode(ctx context.Context, report cciptypes.Commi
 	for _, update := range report.PriceUpdates.TokenPriceUpdates {
 		b, err := update.Price.MarshalJSON()
 		if err != nil {
-			return nil, fmt.Errorf("error marshaling token price: %w", err)
+			return nil, fmt.Errorf("error marshaling token price: %v", err)
 		}
 
 		if len(b) > 28 {

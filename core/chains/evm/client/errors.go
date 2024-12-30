@@ -64,7 +64,6 @@ const (
 	ServiceUnavailable
 	TerminallyStuck
 	TooManyResults
-	ServiceTimeout
 )
 
 type ClientErrors map[int]*regexp.Regexp
@@ -161,8 +160,7 @@ var arbitrum = ClientErrors{
 	Fatal:                 arbitrumFatal,
 	L2FeeTooLow:           regexp.MustCompile(`(: |^)max fee per gas less than block base fee(:|$)`),
 	L2Full:                regexp.MustCompile(`(: |^)(queue full|sequencer pending tx pool full, please try again)(:|$)`),
-	ServiceUnavailable:    regexp.MustCompile(`(: |^)502 Bad Gateway: [\s\S]*$|network is unreachable|i/o timeout|(: |^)503 Service Temporarily Unavailable(:|$)`),
-	ServiceTimeout:        regexp.MustCompile(`(: |^)408 Request Timeout(:|$)`),
+	ServiceUnavailable:    regexp.MustCompile(`(: |^)502 Bad Gateway: [\s\S]*$|network is unreachable|i/o timeout`),
 }
 
 // Treasure
@@ -242,7 +240,7 @@ var harmony = ClientErrors{
 var zkSync = ClientErrors{
 	NonceTooLow:           regexp.MustCompile(`(?:: |^)nonce too low\..+actual: \d*$`),
 	NonceTooHigh:          regexp.MustCompile(`(?:: |^)nonce too high\..+actual: \d*$`),
-	TerminallyUnderpriced: regexp.MustCompile(`(?:: |^)(max fee per gas less than block base fee|virtual machine entered unexpected state. (?:P|p)lease contact developers and provide transaction details that caused this error. Error description: (?:The operator included transaction with an unacceptable gas price|Assertion error: Fair pubdata price too high))$`),
+	TerminallyUnderpriced: regexp.MustCompile(`(?:: |^)(max fee per gas less than block base fee|virtual machine entered unexpected state. please contact developers and provide transaction details that caused this error. Error description: The operator included transaction with an unacceptable gas price)$`),
 	InsufficientEth:       regexp.MustCompile(`(?:: |^)(?:insufficient balance for transfer$|insufficient funds for gas + value)`),
 	TxFeeExceedsCap:       regexp.MustCompile(`(?:: |^)max priority fee per gas higher than max fee per gas$`),
 	// intrinsic gas too low 						- gas limit less than 14700
@@ -398,11 +396,6 @@ func (s *SendError) IsServiceUnavailable(configErrors *ClientErrors) bool {
 	}
 
 	return s.is(ServiceUnavailable, configErrors) || pkgerrors.Is(s.err, commonclient.ErroringNodeError)
-}
-
-// IsServiceTimeout indicates if the error was caused by a service timeout
-func (s *SendError) IsServiceTimeout(configErrors *ClientErrors) bool {
-	return s.is(ServiceTimeout, configErrors)
 }
 
 // IsTerminallyStuck indicates if a transaction was stuck without any chance of inclusion
@@ -626,10 +619,6 @@ func ClassifySendError(err error, clientErrors config.ClientErrors, lggr logger.
 		lggr.Errorw(fmt.Sprintf("service unavailable while sending transaction %x", tx.Hash()), "err", sendError, "etx", tx)
 		return commonclient.Retryable
 	}
-	if sendError.IsServiceTimeout(configErrors) {
-		lggr.Errorw(fmt.Sprintf("service timed out while sending transaction %x", tx.Hash()), "err", sendError, "etx", tx)
-		return commonclient.Retryable
-	}
 	if sendError.IsTimeout() {
 		lggr.Errorw(fmt.Sprintf("timeout while sending transaction %x", tx.Hash()), "err", sendError, "etx", tx)
 		return commonclient.Retryable
@@ -677,7 +666,7 @@ var drpc = ClientErrors{
 
 // Linkpool, Blockdaemon, and Chainstack all return "request timed out" if the log results are too large for them to process
 var defaultClient = ClientErrors{
-	TooManyResults: regexp.MustCompile(`request timed out|408 Request Timed Out`),
+	TooManyResults: regexp.MustCompile(`request timed out`),
 }
 
 // JSON-RPC error codes which can indicate a refusal of the server to process an eth_getLogs request because the result set is too large

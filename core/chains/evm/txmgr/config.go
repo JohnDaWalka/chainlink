@@ -46,6 +46,7 @@ type (
 	EvmTxmConfig         txmgrtypes.TransactionManagerChainConfig
 	EvmTxmFeeConfig      txmgrtypes.TransactionManagerFeeConfig
 	EvmBroadcasterConfig txmgrtypes.BroadcasterChainConfig
+	EvmConfirmerConfig   txmgrtypes.ConfirmerChainConfig
 	EvmResenderConfig    txmgrtypes.ResenderChainConfig
 )
 

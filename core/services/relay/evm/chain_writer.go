@@ -26,7 +26,7 @@ import (
 
 type ChainWriterService interface {
 	services.ServiceCtx
-	commontypes.ContractWriter
+	commontypes.ChainWriter
 }
 
 // Compile-time assertion that chainWriter implements the ChainWriterService interface.

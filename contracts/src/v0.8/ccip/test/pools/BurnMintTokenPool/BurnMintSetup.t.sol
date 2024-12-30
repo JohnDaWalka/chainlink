@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
-import {BurnMintERC20} from "../../../../shared/token/ERC20/BurnMintERC20.sol";
+import {BurnMintERC677} from "../../../../shared/token/ERC677/BurnMintERC677.sol";
 import {Router} from "../../../Router.sol";
 import {BurnMintTokenPool} from "../../../pools/BurnMintTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {BaseTest} from "../../BaseTest.t.sol";
+import {RouterSetup} from "../../router/Router/RouterSetup.t.sol";
 
-contract BurnMintSetup is BaseTest {
-  BurnMintERC20 internal s_burnMintERC20;
+contract BurnMintSetup is RouterSetup {
+  BurnMintERC677 internal s_burnMintERC677;
   address internal s_burnMintOffRamp = makeAddr("burn_mint_offRamp");
   address internal s_burnMintOnRamp = makeAddr("burn_mint_onRamp");
 
@@ -16,27 +16,25 @@ contract BurnMintSetup is BaseTest {
   address internal s_remoteToken = makeAddr("remote_token");
 
   function setUp() public virtual override {
-    super.setUp();
+    RouterSetup.setUp();
 
-    s_burnMintERC20 = new BurnMintERC20("Chainlink Token", "LINK", 18, 0, 0);
+    s_burnMintERC677 = new BurnMintERC677("Chainlink Token", "LINK", 18, 0);
   }
 
   function _applyChainUpdates(
     address pool
   ) internal {
-    bytes[] memory remotePoolAddresses = new bytes[](1);
-    remotePoolAddresses[0] = abi.encode(s_remoteBurnMintPool);
-
-    TokenPool.ChainUpdate[] memory chainsToAdd = new TokenPool.ChainUpdate[](1);
-    chainsToAdd[0] = TokenPool.ChainUpdate({
+    TokenPool.ChainUpdate[] memory chains = new TokenPool.ChainUpdate[](1);
+    chains[0] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      remotePoolAddresses: remotePoolAddresses,
+      remotePoolAddress: abi.encode(s_remoteBurnMintPool),
       remoteTokenAddress: abi.encode(s_remoteToken),
+      allowed: true,
       outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
 
-    BurnMintTokenPool(pool).applyChainUpdates(new uint64[](0), chainsToAdd);
+    BurnMintTokenPool(pool).applyChainUpdates(chains);
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: s_burnMintOnRamp});

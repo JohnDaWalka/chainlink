@@ -5,7 +5,7 @@ import {TokenAdminRegistry} from "../../../tokenAdminRegistry/TokenAdminRegistry
 import {TokenAdminRegistrySetup} from "./TokenAdminRegistrySetup.t.sol";
 
 contract TokenAdminRegistry_proposeAdministrator is TokenAdminRegistrySetup {
-  function test_proposeAdministrator_module() public {
+  function test_proposeAdministrator_module_Success() public {
     vm.startPrank(s_registryModule);
     address newAdmin = makeAddr("newAdmin");
     address newToken = makeAddr("newToken");
@@ -25,7 +25,7 @@ contract TokenAdminRegistry_proposeAdministrator is TokenAdminRegistrySetup {
     assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newAdmin));
   }
 
-  function test_proposeAdministrator_owner() public {
+  function test_proposeAdministrator_owner_Success() public {
     address newAdmin = makeAddr("newAdmin");
     address newToken = makeAddr("newToken");
 
@@ -42,7 +42,7 @@ contract TokenAdminRegistry_proposeAdministrator is TokenAdminRegistrySetup {
     assertTrue(s_tokenAdminRegistry.isAdministrator(newToken, newAdmin));
   }
 
-  function test_proposeAdministrator_reRegisterWhileUnclaimed() public {
+  function test_proposeAdministrator_reRegisterWhileUnclaimed_Success() public {
     address newAdmin = makeAddr("wrongAddress");
     address newToken = makeAddr("newToken");
 
@@ -87,7 +87,7 @@ contract TokenAdminRegistry_proposeAdministrator is TokenAdminRegistrySetup {
     }
   }
 
-  function test_RevertWhen_proposeAdministrator_OnlyRegistryModule() public {
+  function test_proposeAdministrator_OnlyRegistryModule_Revert() public {
     address newToken = makeAddr("newToken");
     vm.stopPrank();
 
@@ -95,14 +95,14 @@ contract TokenAdminRegistry_proposeAdministrator is TokenAdminRegistrySetup {
     s_tokenAdminRegistry.proposeAdministrator(newToken, OWNER);
   }
 
-  function test_RevertWhen_proposeAdministrator_ZeroAddress() public {
+  function test_proposeAdministrator_ZeroAddress_Revert() public {
     address newToken = makeAddr("newToken");
 
     vm.expectRevert(abi.encodeWithSelector(TokenAdminRegistry.ZeroAddress.selector));
     s_tokenAdminRegistry.proposeAdministrator(newToken, address(0));
   }
 
-  function test_RevertWhen_proposeAdministrator_AlreadyRegistered() public {
+  function test_proposeAdministrator_AlreadyRegistered_Revert() public {
     address newAdmin = makeAddr("newAdmin");
     address newToken = makeAddr("newToken");
 

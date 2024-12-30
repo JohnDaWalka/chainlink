@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"sync"
 	"testing"
 	"time"
 
@@ -169,32 +168,11 @@ type MaybeRevertReceiver struct {
 	Strict   bool
 }
 
-// Backend wraps a simulated backend with a mutex to make it safe for concurrent use
-// Commit() in particular has caused races.
-type Backend struct {
-	mu sync.Mutex
-	*simulated.Backend
-}
-
-func NewBackend(sim *simulated.Backend) *Backend {
-	return &Backend{
-		mu:      sync.Mutex{},
-		Backend: sim,
-	}
-}
-
-func (b *Backend) Commit() common.Hash {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	return b.Backend.Commit()
-}
-
 type Common struct {
 	ChainID            uint64
 	ChainSelector      uint64
 	User               *bind.TransactOpts
-	Chain              *Backend
+	Chain              *simulated.Backend
 	LinkToken          *link_token_interface.LinkToken
 	LinkTokenPool      *lock_release_token_pool.LockReleaseTokenPool
 	CustomToken        *link_token_interface.LinkToken
@@ -811,14 +789,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	// │                        Deploy Pools                          │
 	// ================================================================
 
-	// All the tokens deployed above have 18 decimals
-	tokenDecimals := uint8(18)
-
 	sourcePoolLinkAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
 		sourceUser,
 		sourceChain.Client(),
 		sourceLinkTokenAddress,
-		tokenDecimals,
 		[]common.Address{},
 		armProxySourceAddress,
 		true,
@@ -835,7 +809,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		sourceUser,
 		sourceChain.Client(),
 		sourceWeth9addr,
-		tokenDecimals,
 		[]common.Address{},
 		armProxySourceAddress,
 		true,
@@ -854,7 +827,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		destUser,
 		destChain.Client(),
 		destLinkTokenAddress,
-		tokenDecimals,
 		[]common.Address{},
 		armProxyDestAddress,
 		true,
@@ -886,7 +858,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		destUser,
 		destChain.Client(),
 		destWeth9addr,
-		tokenDecimals,
 		[]common.Address{},
 		armProxyDestAddress,
 		true,
@@ -921,11 +892,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	_, err = sourceLinkPool.ApplyChainUpdates(
 		sourceUser,
-		[]uint64{},
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
 			RemoteChainSelector: DestChainSelector,
-			RemotePoolAddresses: [][]byte{abiEncodedDestLinkPool},
+			RemotePoolAddress:   abiEncodedDestLinkPool,
 			RemoteTokenAddress:  abiEncodedDestLinkTokenAddress,
+			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
@@ -946,11 +917,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	_, err = sourceWeth9Pool.ApplyChainUpdates(
 		sourceUser,
-		[]uint64{},
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
 			RemoteChainSelector: DestChainSelector,
-			RemotePoolAddresses: [][]byte{abiEncodedDestWrappedPool},
+			RemotePoolAddress:   abiEncodedDestWrappedPool,
 			RemoteTokenAddress:  abiEncodedDestWrappedTokenAddr,
+			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
@@ -972,11 +943,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	_, err = destLinkPool.ApplyChainUpdates(
 		destUser,
-		[]uint64{},
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
 			RemoteChainSelector: SourceChainSelector,
-			RemotePoolAddresses: [][]byte{abiEncodedSourceLinkPool},
+			RemotePoolAddress:   abiEncodedSourceLinkPool,
 			RemoteTokenAddress:  abiEncodedSourceLinkTokenAddr,
+			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
@@ -997,11 +968,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	_, err = destWrappedPool.ApplyChainUpdates(
 		destUser,
-		[]uint64{},
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
 			RemoteChainSelector: SourceChainSelector,
-			RemotePoolAddresses: [][]byte{abiEncodedSourceWrappedPool},
+			RemotePoolAddress:   abiEncodedSourceWrappedPool,
 			RemoteTokenAddress:  abiEncodedSourceWrappedTokenAddr,
+			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
@@ -1216,7 +1187,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			ChainID:            sourceChainID,
 			ChainSelector:      sourceChainSelector,
 			User:               sourceUser,
-			Chain:              NewBackend(sourceChain),
+			Chain:              sourceChain,
 			LinkToken:          sourceLinkToken,
 			LinkTokenPool:      sourceLinkPool,
 			CustomToken:        sourceCustomToken,
@@ -1236,7 +1207,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			ChainID:            destChainID,
 			ChainSelector:      destChainSelector,
 			User:               destUser,
-			Chain:              NewBackend(destChain),
+			Chain:              destChain,
 			LinkToken:          destLinkToken,
 			LinkTokenPool:      destLinkPool,
 			CustomToken:        destCustomToken,

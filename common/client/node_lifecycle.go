@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/smartcontractkit/chainlink/v2/common/types"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
@@ -15,7 +17,6 @@ import (
 	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
 
 	iutils "github.com/smartcontractkit/chainlink/v2/common/internal/utils"
-	"github.com/smartcontractkit/chainlink/v2/common/types"
 )
 
 var (
@@ -131,7 +132,6 @@ func (n *node[CHAIN_ID, HEAD, RPC]) aliveLoop() {
 		}
 	}
 
-	// Get the latest chain info to use as local highest
 	localHighestChainInfo, _ := n.rpc.GetInterceptedChainInfo()
 	var pollFailures uint32
 
@@ -168,8 +168,10 @@ func (n *node[CHAIN_ID, HEAD, RPC]) aliveLoop() {
 				n.declareUnreachable()
 				return
 			}
-			if outOfSync, liveNodes := n.isOutOfSyncWithPool(); outOfSync {
+			_, latestChainInfo := n.StateAndLatest()
+			if outOfSync, liveNodes := n.isOutOfSyncWithPool(latestChainInfo); outOfSync {
 				// note: there must be another live node for us to be out of sync
+				lggr.Errorw("RPC endpoint has fallen behind", "blockNumber", latestChainInfo.BlockNumber, "totalDifficulty", latestChainInfo.TotalDifficulty, "nodeState", n.getCachedState())
 				if liveNodes < 2 {
 					lggr.Criticalf("RPC endpoint has fallen behind; %s %s", msgCannotDisable, msgDegradedState)
 					continue
@@ -308,9 +310,9 @@ func (n *node[CHAIN_ID, HEAD, RPC]) onNewFinalizedHead(lggr logger.SugaredLogger
 	}
 
 	latestFinalizedBN := latestFinalized.BlockNumber()
-	lggr.Debugw("Got latest finalized head", "latestFinalized", latestFinalized)
+	lggr.Tracew("Got latest finalized head", "latestFinalized", latestFinalized)
 	if latestFinalizedBN <= chainInfo.FinalizedBlockNumber {
-		lggr.Debugw("Ignoring previously seen finalized block number")
+		lggr.Tracew("Ignoring previously seen finalized block number")
 		return false
 	}
 
@@ -326,10 +328,10 @@ func (n *node[CHAIN_ID, HEAD, RPC]) onNewHead(lggr logger.SugaredLogger, chainIn
 	}
 
 	promPoolRPCNodeNumSeenBlocks.WithLabelValues(n.chainID.String(), n.name).Inc()
-	lggr.Debugw("Got head", "head", head)
+	lggr.Tracew("Got head", "head", head)
 	lggr = lggr.With("latestReceivedBlockNumber", chainInfo.BlockNumber, "blockNumber", head.BlockNumber(), "nodeState", n.getCachedState())
 	if head.BlockNumber() <= chainInfo.BlockNumber {
-		lggr.Debugw("Ignoring previously seen block number")
+		lggr.Tracew("Ignoring previously seen block number")
 		return false
 	}
 
@@ -356,7 +358,7 @@ const (
 // isOutOfSyncWithPool returns outOfSync true if num or td is more than SyncThresold behind the best node.
 // Always returns outOfSync false for SyncThreshold 0.
 // liveNodes is only included when outOfSync is true.
-func (n *node[CHAIN_ID, HEAD, RPC]) isOutOfSyncWithPool() (outOfSync bool, liveNodes int) {
+func (n *node[CHAIN_ID, HEAD, RPC]) isOutOfSyncWithPool(localState ChainInfo) (outOfSync bool, liveNodes int) {
 	if n.poolInfoProvider == nil {
 		n.lfcLog.Warn("skipping sync state against the pool - should only occur in tests")
 		return // skip for tests
@@ -367,22 +369,16 @@ func (n *node[CHAIN_ID, HEAD, RPC]) isOutOfSyncWithPool() (outOfSync bool, liveN
 	}
 	// Check against best node
 	ln, ci := n.poolInfoProvider.LatestChainInfo()
-	localChainInfo, _ := n.rpc.GetInterceptedChainInfo()
 	mode := n.nodePoolCfg.SelectionMode()
 	switch mode {
 	case NodeSelectionModeHighestHead, NodeSelectionModeRoundRobin, NodeSelectionModePriorityLevel:
-		outOfSync = localChainInfo.BlockNumber < ci.BlockNumber-int64(threshold)
+		return localState.BlockNumber < ci.BlockNumber-int64(threshold), ln
 	case NodeSelectionModeTotalDifficulty:
 		bigThreshold := big.NewInt(int64(threshold))
-		outOfSync = localChainInfo.TotalDifficulty.Cmp(bigmath.Sub(ci.TotalDifficulty, bigThreshold)) < 0
+		return localState.TotalDifficulty.Cmp(bigmath.Sub(ci.TotalDifficulty, bigThreshold)) < 0, ln
 	default:
 		panic("unrecognized NodeSelectionMode: " + mode)
 	}
-
-	if outOfSync && n.getCachedState() == nodeStateAlive {
-		n.lfcLog.Errorw("RPC endpoint has fallen behind", "blockNumber", localChainInfo.BlockNumber, "bestLatestBlockNumber", ci.BlockNumber, "totalDifficulty", localChainInfo.TotalDifficulty)
-	}
-	return outOfSync, ln
 }
 
 // outOfSyncLoop takes an OutOfSync node and waits until isOutOfSync returns false to go back to live status
@@ -468,7 +464,7 @@ func (n *node[CHAIN_ID, HEAD, RPC]) outOfSyncLoop(syncIssues syncStatus) {
 
 			// received a new head - clear NoNewHead flag
 			syncIssues &= ^syncStatusNoNewHead
-			if outOfSync, _ := n.isOutOfSyncWithPool(); !outOfSync {
+			if outOfSync, _ := n.isOutOfSyncWithPool(localHighestChainInfo); !outOfSync {
 				// we caught up with the pool - clear NotInSyncWithPool flag
 				syncIssues &= ^syncStatusNotInSyncWithPool
 			} else {
@@ -519,12 +515,7 @@ func (n *node[CHAIN_ID, HEAD, RPC]) outOfSyncLoop(syncIssues syncStatus) {
 				finalizedHeadsSub.ResetTimer(noNewFinalizedBlocksTimeoutThreshold)
 			}
 
-			var highestSeen ChainInfo
-			if n.poolInfoProvider != nil {
-				highestSeen = n.poolInfoProvider.HighestUserObservations()
-			}
-
-			lggr.Debugw(msgReceivedFinalizedBlock, "blockNumber", latestFinalized.BlockNumber(), "poolHighestBlockNumber", highestSeen.FinalizedBlockNumber, "syncIssues", syncIssues)
+			lggr.Debugw(msgReceivedFinalizedBlock, "blockNumber", latestFinalized.BlockNumber(), "syncIssues", syncIssues)
 		case err := <-finalizedHeadsSub.Errors:
 			lggr.Errorw("Finalized head subscription was terminated", "err", err)
 			n.declareUnreachable()
@@ -657,7 +648,7 @@ func (n *node[CHAIN_ID, HEAD, RPC]) syncingLoop() {
 		case nodeStateClosed:
 			return
 		default:
-			panic(fmt.Sprintf("syncingLoop can only run for node in NodeStateSyncing state, got: %s", state))
+			panic(fmt.Sprintf("syncingLoop can only run for node in nodeStateSyncing state, got: %s", state))
 		}
 	}
 

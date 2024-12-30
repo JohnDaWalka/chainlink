@@ -2,15 +2,15 @@
 pragma solidity ^0.8.24;
 
 import {MockBridgehub} from "../../mocks/zksync/MockZKSyncL1Bridge.sol";
-import {ISequencerUptimeFeed} from "../../../interfaces/ISequencerUptimeFeed.sol";
-import {ZKSyncValidator} from "../../../zksync/ZKSyncValidator.sol";
-import {BaseValidator} from "../../../base/BaseValidator.sol";
+import {ISequencerUptimeFeed} from "../../../dev/interfaces/ISequencerUptimeFeed.sol";
+import {ZKSyncValidator} from "../../../dev/zksync/ZKSyncValidator.sol";
+import {BaseValidator} from "../../../dev/shared/BaseValidator.sol";
 import {L2EPTest} from "../L2EPTest.t.sol";
 
-contract ZKSyncValidator_Setup is L2EPTest {
-  address internal immutable L2_SEQ_STATUS_RECORDER_ADDRESS = makeAddr("L2_SEQ_STATUS_RECORDER_ADDRESS");
-  address internal immutable DUMMY_L1_XDOMAIN_MSNGR_ADDR = makeAddr("DUMMY_L1_XDOMAIN_MSNGR_ADDR");
-  address internal immutable DUMMY_L2_UPTIME_FEED_ADDR = makeAddr("DUMMY_L2_UPTIME_FEED_ADDR");
+contract ZKSyncValidatorTest is L2EPTest {
+  address internal constant L2_SEQ_STATUS_RECORDER_ADDRESS = address(0x491B1dDA0A8fa069bbC1125133A975BF4e85a91b);
+  address internal constant DUMMY_L1_XDOMAIN_MSNGR_ADDR = address(0xa04Fc18f012B1a5A8231c7Ee4b916Dd6dbd271b6);
+  address internal constant DUMMY_L2_UPTIME_FEED_ADDR = address(0xFe31891940A2e5f04B76eD8bD1038E44127d1512);
   uint32 internal constant INIT_GAS_PER_PUBDATA_BYTE_LIMIT = 800;
   uint32 internal constant INIT_GAS_LIMIT = 1900000;
   uint32 internal constant MAIN_NET_CHAIN_ID = 300;
@@ -38,9 +38,9 @@ contract ZKSyncValidator_Setup is L2EPTest {
   }
 }
 
-contract ZKSyncValidator_Constructor is ZKSyncValidator_Setup {
-  /// @notice Reverts when chain ID is invalid
-  function test_Constructor_RevertWhen_ChainIdIsInvalid() public {
+contract ZKSyncValidator_Constructor is ZKSyncValidatorTest {
+  /// @notice it correctly validates that the chain id is valid
+  function test_ConstructingRevertedWithInvalidChainId() public {
     vm.expectRevert(ZKSyncValidator.InvalidChainID.selector);
     new ZKSyncValidator(
       DUMMY_L1_XDOMAIN_MSNGR_ADDR,
@@ -51,8 +51,8 @@ contract ZKSyncValidator_Constructor is ZKSyncValidator_Setup {
     );
   }
 
-  /// @notice Reverts when L1 bridge address is zero
-  function test_Constructor_RevertWhen_L1BridgeAddressIsZero() public {
+  /// @notice it correctly validates that the L1 bridge address is not zero
+  function test_ConstructingRevertedWithZeroL1BridgeAddress() public {
     vm.expectRevert(BaseValidator.L1CrossDomainMessengerAddressZero.selector);
     new ZKSyncValidator(
       address(0),
@@ -63,8 +63,8 @@ contract ZKSyncValidator_Constructor is ZKSyncValidator_Setup {
     );
   }
 
-  /// @notice Reverts when L2 update feed address is zero
-  function test_Constructor_RevertWhen_L2UpdateFeedAddressIsZero() public {
+  /// @notice it correctly validates that the L2 Uptime feed address is not zero
+  function test_ConstructingRevertedWithZeroL2UpdateFeedAddress() public {
     vm.expectRevert(BaseValidator.L2UptimeFeedAddrZero.selector);
     new ZKSyncValidator(
       DUMMY_L1_XDOMAIN_MSNGR_ADDR,
@@ -76,9 +76,9 @@ contract ZKSyncValidator_Constructor is ZKSyncValidator_Setup {
   }
 }
 
-contract ZKSyncValidator_GetSetL2GasPerPubdataByteLimit is ZKSyncValidator_Setup {
-  /// @notice Correctly gets and updates the gas per pubdata byte limit
-  function test_GetSetL2GasPerPubdataByteLimit_CorrectlyHandlesGasPerPubdataByteLimit() public {
+contract ZKSyncValidator_GetSetL2GasPerPubdataByteLimit is ZKSyncValidatorTest {
+  /// @notice it correctly updates the gas limit per pubdata byte
+  function test_CorrectlyGetsAndUpdatesTheGasPerPubdataByteLimit() public {
     assertEq(s_zksyncValidator.getL2GasPerPubdataByteLimit(), INIT_GAS_PER_PUBDATA_BYTE_LIMIT);
 
     uint32 newGasPerPubDataByteLimit = 2000000;
@@ -87,23 +87,23 @@ contract ZKSyncValidator_GetSetL2GasPerPubdataByteLimit is ZKSyncValidator_Setup
   }
 }
 
-contract ZKSyncValidator_GetChainId is ZKSyncValidator_Setup {
-  /// @notice Correctly gets the chain ID
-  function test_GetChainId_CorrectlyGetsTheChainId() public view {
+contract ZKSyncValidator_GetChainId is ZKSyncValidatorTest {
+  /// @notice it correctly gets the chain id
+  function test_CorrectlyGetsTheChainId() public {
     assertEq(s_zksyncValidator.getChainId(), MAIN_NET_CHAIN_ID);
   }
 }
 
-contract ZKSyncValidator_Validate is ZKSyncValidator_Setup {
-  /// @notice Reverts if called by an account with no access
-  function test_Validate_RevertWhen_CalledByAccountWithNoAccess() public {
+contract ZKSyncValidator_Validate is ZKSyncValidatorTest {
+  /// @notice it reverts if called by account with no access
+  function test_RevertsIfCalledByAnAccountWithNoAccess() public {
     vm.startPrank(s_strangerAddr);
     vm.expectRevert("No access");
     s_zksyncValidator.validate(0, 0, 1, 1);
   }
 
-  /// @notice Posts sequencer status when there is no status change
-  function test_Validate_PostSequencerStatus_NoStatusChange() public {
+  /// @notice it posts sequencer status when there is not status change
+  function test_PostSequencerStatusWhenThereIsNotStatusChange() public {
     // Gives access to the s_eoaValidator
     s_zksyncValidator.addAccess(s_eoaValidator);
 
@@ -126,8 +126,8 @@ contract ZKSyncValidator_Validate is ZKSyncValidator_Setup {
     s_zksyncValidator.validate(0, 0, 0, 0);
   }
 
-  /// @notice Posts sequencer offline status
-  function test_Validate_PostSequencerOffline() public {
+  /// @notice it post sequencer offline
+  function test_PostSequencerOffline() public {
     // Gives access to the s_eoaValidator
     s_zksyncValidator.addAccess(s_eoaValidator);
 

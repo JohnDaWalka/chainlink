@@ -23,11 +23,9 @@ import (
 // A dummy transmitter useful for benchmarking and testing
 
 var (
-	promTransmitSuccessCount = promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: "llo",
-		Subsystem: "dummytransmitter",
-		Name:      "transmit_success_count",
-		Help:      "Running count of successful transmits",
+	transmitSuccessCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "llo_transmit_success_count",
+		Help: "Running count of successful transmits",
 	})
 )
 
@@ -103,7 +101,7 @@ func (t *transmitter) Transmit(
 			lggr.Debugw(fmt.Sprintf("Failed to decode report with type %s", report.Info.ReportFormat), "err", err)
 		}
 	}
-	promTransmitSuccessCount.Inc()
+	transmitSuccessCount.Inc()
 	lggr.Infow("Transmit (dummy)", "digest", digest, "seqNr", seqNr, "report.Report", report.Report, "report.Info", report.Info, "sigs", sigs)
 	return nil
 }

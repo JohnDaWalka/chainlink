@@ -90,26 +90,13 @@ func WithPrivateEVMs(networks []blockchain.EVMNetwork, commonChainConfig *evmcfg
 	var evmConfigs []*evmcfg.EVMConfig
 	for _, network := range networks {
 		var evmNodes []*evmcfg.Node
-
-		// The CL node cannot have missing HTTP urls. If there are more WS URLs it will fail validation.
-		// If len(network.HTTPURLs) == 2 then len(network.URLs) must be 2 or less.
-		urlCount := len(network.HTTPURLs)
-
-		for i := 0; i < urlCount; i++ {
-			node := &evmcfg.Node{
-				Name: ptr.Ptr(fmt.Sprintf("%s-%d", network.Name, i)),
-			}
-			// Assign HTTP URL if available
-			if i < len(network.HTTPURLs) {
-				node.HTTPURL = itutils.MustURL(network.HTTPURLs[i])
-			}
-			// Assign WS URL if available
-			if i < len(network.URLs) {
-				node.WSURL = itutils.MustURL(network.URLs[i])
-			}
-			evmNodes = append(evmNodes, node)
+		for i := range network.URLs {
+			evmNodes = append(evmNodes, &evmcfg.Node{
+				Name:    ptr.Ptr(fmt.Sprintf("%s-%d", network.Name, i)),
+				WSURL:   itutils.MustURL(network.URLs[i]),
+				HTTPURL: itutils.MustURL(network.HTTPURLs[i]),
+			})
 		}
-
 		evmConfig := &evmcfg.EVMConfig{
 			ChainID: ubig.New(big.NewInt(network.ChainID)),
 			Nodes:   evmNodes,

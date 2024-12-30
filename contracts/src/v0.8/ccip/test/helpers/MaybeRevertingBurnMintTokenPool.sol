@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 
@@ -13,11 +13,10 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
 
   constructor(
     IBurnMintERC20 token,
-    uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
     address router
-  ) BurnMintTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+  ) BurnMintTokenPool(token, allowlist, rmnProxy, router) {}
 
   function setShouldRevert(
     bytes calldata revertReason
@@ -53,7 +52,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     emit Burned(msg.sender, lockOrBurnIn.amount);
     return Pool.LockOrBurnOutV1({
       destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: s_sourceTokenData.length == 0 ? _encodeLocalDecimals() : s_sourceTokenData
+      destPoolData: s_sourceTokenData
     });
   }
 
@@ -69,11 +68,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
         revert(add(32, revertReason), mload(revertReason))
       }
     }
-    // Calculate the local amount
-    uint256 localAmount =
-      _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
-
-    uint256 amount = localAmount * s_releaseOrMintMultiplier;
+    uint256 amount = releaseOrMintIn.amount * s_releaseOrMintMultiplier;
     IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, amount);
 
     emit Minted(msg.sender, releaseOrMintIn.receiver, amount);

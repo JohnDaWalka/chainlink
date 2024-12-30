@@ -185,7 +185,6 @@ func setupNode(
 
 		// [Mercury]
 		c.Mercury.VerboseLogging = ptr(true)
-		c.Mercury.Transmitter.TransmitConcurrency = ptr(uint32(5)) // Avoid a ridiculous number of goroutines
 	})
 
 	lggr, observedLogs := logger.TestLoggerObserved(t, zapcore.DebugLevel)

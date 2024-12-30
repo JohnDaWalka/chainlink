@@ -12,13 +12,11 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	pkgerrors "github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/libocr/gethwrappers2/ocr2aggregator"
@@ -41,7 +39,6 @@ import (
 	txm "github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
-	coreconfig "github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo/bm"
@@ -88,7 +85,7 @@ func init() {
 	}
 }
 
-var _ commontypes.Relayer = &Relayer{}
+var _ commontypes.Relayer = &Relayer{} //nolint:staticcheck
 
 // The current PluginProvider interface does not support an error return. This was fine up until CCIP.
 // CCIP is the first product to introduce the idea of incomplete implementations of a provider based on
@@ -145,7 +142,6 @@ type Relayer struct {
 	ds                   sqlutil.DataSource
 	chain                legacyevm.Chain
 	lggr                 logger.SugaredLogger
-	registerer           prometheus.Registerer
 	ks                   CSAETHKeystore
 	mercuryPool          wsrpc.Pool
 	codec                commontypes.Codec
@@ -153,7 +149,7 @@ type Relayer struct {
 
 	// Mercury
 	mercuryORM        mercury.ORM
-	mercuryCfg        MercuryConfig
+	transmitterCfg    mercury.TransmitterConfig
 	triggerCapability *triggers.MercuryTriggerService
 
 	// LLO/data streams
@@ -166,20 +162,14 @@ type CSAETHKeystore interface {
 	Eth() keystore.Eth
 }
 
-type MercuryConfig interface {
-	Transmitter() coreconfig.MercuryTransmitter
-	VerboseLogging() bool
-}
-
 type RelayerOpts struct {
-	DS         sqlutil.DataSource
-	Registerer prometheus.Registerer
+	DS sqlutil.DataSource
 	CSAETHKeystore
 	MercuryPool           wsrpc.Pool
 	RetirementReportCache llo.RetirementReportCache
-	MercuryConfig
-	CapabilitiesRegistry coretypes.CapabilitiesRegistry
-	HTTPClient           *http.Client
+	TransmitterConfig     mercury.TransmitterConfig
+	CapabilitiesRegistry  coretypes.CapabilitiesRegistry
+	HTTPClient            *http.Client
 }
 
 func (c RelayerOpts) Validate() error {
@@ -218,13 +208,12 @@ func NewRelayer(ctx context.Context, lggr logger.Logger, chain legacyevm.Chain, 
 		ds:                    opts.DS,
 		chain:                 chain,
 		lggr:                  sugared,
-		registerer:            opts.Registerer,
 		ks:                    opts.CSAETHKeystore,
 		mercuryPool:           opts.MercuryPool,
 		cdcFactory:            cdcFactory,
 		retirementReportCache: opts.RetirementReportCache,
 		mercuryORM:            mercuryORM,
-		mercuryCfg:            opts.MercuryConfig,
+		transmitterCfg:        opts.TransmitterConfig,
 		capabilitiesRegistry:  opts.CapabilitiesRegistry,
 	}
 
@@ -260,14 +249,6 @@ func (r *Relayer) Close() error {
 	cs := make([]io.Closer, 0, 2)
 	if r.triggerCapability != nil {
 		cs = append(cs, r.triggerCapability)
-
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-
-		err := r.capabilitiesRegistry.Remove(ctx, r.triggerCapability.ID)
-		if err != nil {
-			return err
-		}
 	}
 	cs = append(cs, r.chain)
 	return services.MultiCloser(cs).Close()
@@ -465,6 +446,9 @@ func (r *Relayer) NewMercuryProvider(ctx context.Context, rargs commontypes.Rela
 		}
 	}
 
+	// FIXME: We actually know the version here since it's in the feed ID, can
+	// we use generics to avoid passing three of this?
+	// https://smartcontract-it.atlassian.net/browse/MERC-1414
 	reportCodecV1 := reportcodecv1.NewReportCodec(*relayConfig.FeedID, lggr.Named("ReportCodecV1"))
 	reportCodecV2 := reportcodecv2.NewReportCodec(*relayConfig.FeedID, lggr.Named("ReportCodecV2"))
 	reportCodecV3 := reportcodecv3.NewReportCodec(*relayConfig.FeedID, lggr.Named("ReportCodecV3"))
@@ -500,7 +484,7 @@ func (r *Relayer) NewMercuryProvider(ctx context.Context, rargs commontypes.Rela
 		return nil, err
 	}
 
-	transmitter := mercury.NewTransmitter(lggr, r.mercuryCfg.Transmitter(), clients, privKey.PublicKey, rargs.JobID, *relayConfig.FeedID, r.mercuryORM, transmitterCodec, benchmarkPriceDecoder, r.triggerCapability)
+	transmitter := mercury.NewTransmitter(lggr, r.transmitterCfg, clients, privKey.PublicKey, rargs.JobID, *relayConfig.FeedID, r.mercuryORM, transmitterCodec, benchmarkPriceDecoder, r.triggerCapability)
 
 	return NewMercuryProvider(cp, r.codec, NewMercuryChainReader(r.chain.HeadTracker()), transmitter, reportCodecV1, reportCodecV2, reportCodecV3, reportCodecV4, lggr), nil
 }
@@ -552,6 +536,8 @@ func (r *Relayer) NewLLOProvider(ctx context.Context, rargs commontypes.RelayArg
 		return nil, pkgerrors.Wrap(err, "failed to get CSA key for mercury connection")
 	}
 
+	// FIXME: Remove after benchmarking is done
+	// https://smartcontract-it.atlassian.net/browse/MERC-3487
 	var transmitter LLOTransmitter
 	if lloCfg.BenchmarkMode {
 		r.lggr.Info("Benchmark mode enabled, using dummy transmitter. NOTE: THIS WILL NOT TRANSMIT ANYTHING")
@@ -566,18 +552,15 @@ func (r *Relayer) NewLLOProvider(ctx context.Context, rargs commontypes.RelayArg
 			clients[server.URL] = client
 		}
 		transmitter = llo.NewTransmitter(llo.TransmitterOpts{
-			Lggr:           r.lggr,
-			FromAccount:    fmt.Sprintf("%x", privKey.PublicKey), // NOTE: This may need to change if we support e.g. multiple tranmsmitters, to be a composite of all keys
-			VerboseLogging: r.mercuryCfg.VerboseLogging(),
+			Lggr:        r.lggr,
+			FromAccount: fmt.Sprintf("%x", privKey.PublicKey), // NOTE: This may need to change if we support e.g. multiple tranmsmitters, to be a composite of all keys
 			MercuryTransmitterOpts: mercurytransmitter.Opts{
-				Lggr:           r.lggr,
-				Registerer:     r.registerer,
-				VerboseLogging: r.mercuryCfg.VerboseLogging(),
-				Cfg:            r.mercuryCfg.Transmitter(),
-				Clients:        clients,
-				FromAccount:    privKey.PublicKey,
-				DonID:          relayConfig.LLODONID,
-				ORM:            mercurytransmitter.NewORM(r.ds, relayConfig.LLODONID),
+				Lggr:        r.lggr,
+				Cfg:         r.transmitterCfg,
+				Clients:     clients,
+				FromAccount: privKey.PublicKey,
+				DonID:       relayConfig.LLODONID,
+				ORM:         mercurytransmitter.NewORM(r.ds, relayConfig.LLODONID),
 			},
 			RetirementReportCache: r.retirementReportCache,
 		})
@@ -854,7 +837,7 @@ func generateTransmitterFrom(ctx context.Context, rargs commontypes.RelayArgs, e
 	return transmitter, nil
 }
 
-func (r *Relayer) NewContractWriter(_ context.Context, config []byte) (commontypes.ContractWriter, error) {
+func (r *Relayer) NewChainWriter(_ context.Context, config []byte) (commontypes.ChainWriter, error) {
 	var cfg types.ChainWriterConfig
 	if err := json.Unmarshal(config, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshall chain writer config err: %s", err)

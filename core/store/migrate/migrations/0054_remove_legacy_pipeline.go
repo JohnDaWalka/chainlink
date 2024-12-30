@@ -32,6 +32,7 @@ type queryer interface {
 	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }
 
+// nolint
 func Up54(ctx context.Context, tx *sql.Tx) error {
 	if err := CheckNoLegacyJobs(ctx, tx); err != nil {
 		return err
@@ -42,6 +43,7 @@ func Up54(ctx context.Context, tx *sql.Tx) error {
 	return nil
 }
 
+// nolint
 func Down54(ctx context.Context, tx *sql.Tx) error {
 	return errors.New("irreversible migration")
 }

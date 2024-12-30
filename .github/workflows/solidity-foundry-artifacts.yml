@@ -16,6 +16,7 @@ on:
           - "llo-feeds"
           - "operatorforwarder"
           - "shared"
+          - "transmission"
           - "vrf"
           - "workflow"
       commit_to_use:

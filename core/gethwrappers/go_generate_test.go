@@ -16,8 +16,7 @@ import (
 	"github.com/fatih/color"
 
 	cutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	"github.com/stretchr/testify/assert"
@@ -30,7 +29,7 @@ const compileCommand = "../../contracts/scripts/native_solc_compile_all"
 // contract artifacts in contracts/solc with the abi and bytecode stored in the
 // contract wrapper
 func TestCheckContractHashesFromLastGoGenerate(t *testing.T) {
-	tests.SkipShort(t, "requires compiled artifacts")
+	testutils.SkipShort(t, "requires compiled artifacts")
 	versions, err := ReadVersionsDB()
 	require.NoError(t, err)
 	require.NotEmpty(t, versions.GethVersion, `version DB should have a "GETH_VERSION:" line`)

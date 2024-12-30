@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"math/rand/v2"
+	"math/rand"
 	"sort"
 	"strings"
 	"sync"
@@ -22,8 +22,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	pkgerrors "github.com/pkg/errors"
 	"golang.org/x/exp/maps"
-
-	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -93,7 +91,6 @@ type Client interface {
 }
 
 type HeadTracker interface {
-	services.Service
 	LatestAndFinalizedBlock(ctx context.Context) (latest, finalized *evmtypes.Head, err error)
 }
 
@@ -102,6 +99,7 @@ var (
 	ErrReplayRequestAborted               = pkgerrors.New("aborted, replay request cancelled")
 	ErrReplayInProgress                   = pkgerrors.New("replay request cancelled, but replay is already in progress")
 	ErrLogPollerShutdown                  = pkgerrors.New("replay aborted due to log poller shutdown")
+	ErrFinalityViolated                   = pkgerrors.New("finality violated")
 )
 
 type logPoller struct {
@@ -527,7 +525,7 @@ func (lp *logPoller) Close() error {
 
 func (lp *logPoller) Healthy() error {
 	if lp.finalityViolated.Load() {
-		return commontypes.ErrFinalityViolated
+		return ErrFinalityViolated
 	}
 	return nil
 }
@@ -689,7 +687,7 @@ func (lp *logPoller) backgroundWorkerRun() {
 
 	// Start initial prune of unmatched logs after 5-15 successful expired log prunes, so that not all chains start
 	// around the same time. After that, every 20 successful expired log prunes.
-	successfulExpiredLogPrunes := 5 + rand.IntN(10) //nolint:gosec // G404
+	successfulExpiredLogPrunes := 5 + rand.Intn(10) //nolint:gosec
 
 	for {
 		select {

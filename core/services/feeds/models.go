@@ -12,7 +12,6 @@ import (
 	"gopkg.in/guregu/null.v4"
 
 	proto "github.com/smartcontractkit/chainlink-protos/orchestrator/feedsmanager"
-
 	"github.com/smartcontractkit/chainlink/v2/core/utils/crypto"
 )
 
@@ -83,7 +82,6 @@ const (
 	ChainTypeEVM      ChainType = "EVM"
 	ChainTypeSolana   ChainType = "SOLANA"
 	ChainTypeStarknet ChainType = "STARKNET"
-	ChainTypeTron     ChainType = "TRON"
 )
 
 func NewChainType(s string) (ChainType, error) {
@@ -96,8 +94,6 @@ func NewChainType(s string) (ChainType, error) {
 		return ChainTypeSolana, nil
 	case "APTOS":
 		return ChainTypeAptos, nil
-	case "TRON":
-		return ChainTypeTron, nil
 	default:
 		return ChainTypeUnknown, errors.New("invalid chain type")
 	}

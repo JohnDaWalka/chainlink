@@ -19,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/aggregation"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable"
 	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/streams"
@@ -44,12 +43,11 @@ var defaultStreamConfig = p2ptypes.StreamConfig{
 
 type launcher struct {
 	services.StateMachine
-	lggr                logger.Logger
-	peerWrapper         p2ptypes.PeerWrapper
-	dispatcher          remotetypes.Dispatcher
-	registry            *Registry
-	subServices         []services.Service
-	workflowDonNotifier donNotifier
+	lggr        logger.Logger
+	peerWrapper p2ptypes.PeerWrapper
+	dispatcher  remotetypes.Dispatcher
+	registry    *Registry
+	subServices []services.Service
 }
 
 func unmarshalCapabilityConfig(data []byte) (capabilities.CapabilityConfiguration, error) {
@@ -88,24 +86,18 @@ func unmarshalCapabilityConfig(data []byte) (capabilities.CapabilityConfiguratio
 	}, nil
 }
 
-type donNotifier interface {
-	NotifyDonSet(don capabilities.DON)
-}
-
 func NewLauncher(
 	lggr logger.Logger,
 	peerWrapper p2ptypes.PeerWrapper,
 	dispatcher remotetypes.Dispatcher,
 	registry *Registry,
-	workflowDonNotifier donNotifier,
 ) *launcher {
 	return &launcher{
-		lggr:                lggr.Named("CapabilitiesLauncher"),
-		peerWrapper:         peerWrapper,
-		dispatcher:          dispatcher,
-		registry:            registry,
-		subServices:         []services.Service{},
-		workflowDonNotifier: workflowDonNotifier,
+		lggr:        lggr.Named("CapabilitiesLauncher"),
+		peerWrapper: peerWrapper,
+		dispatcher:  dispatcher,
+		registry:    registry,
+		subServices: []services.Service{},
 	}
 }
 
@@ -136,7 +128,6 @@ func (w *launcher) Name() string {
 }
 
 func (w *launcher) Launch(ctx context.Context, state *registrysyncer.LocalRegistry) error {
-	w.lggr.Debug("CapabilitiesLauncher triggered...")
 	w.registry.SetLocalRegistry(state)
 
 	allDONIDs := []registrysyncer.DonID{}
@@ -224,9 +215,6 @@ func (w *launcher) Launch(ctx context.Context, state *registrysyncer.LocalRegist
 			return errors.New("invariant violation: node is part of more than one workflowDON")
 		}
 
-		w.lggr.Debug("Notifying DON set...")
-		w.workflowDonNotifier.NotifyDonSet(myDON.DON)
-
 		for _, rcd := range remoteCapabilityDONs {
 			err := w.addRemoteCapabilities(ctx, myDON, rcd, state)
 			if err != nil {
@@ -281,7 +269,7 @@ func (w *launcher) addRemoteCapabilities(ctx context.Context, myDON registrysync
 						w.lggr,
 					)
 				} else {
-					aggregator = aggregation.NewDefaultModeAggregator(uint32(remoteDON.F) + 1)
+					aggregator = remote.NewDefaultModeAggregator(uint32(remoteDON.F) + 1)
 				}
 
 				// TODO: We need to implement a custom, Mercury-specific
@@ -399,8 +387,7 @@ func (w *launcher) addToRegistryAndSetDispatcher(ctx context.Context, capability
 }
 
 var (
-	// TODO: make this configurable
-	defaultTargetRequestTimeout = 8 * time.Minute
+	defaultTargetRequestTimeout = time.Minute
 )
 
 func (w *launcher) exposeCapabilities(ctx context.Context, myPeerID p2ptypes.PeerID, don registrysyncer.DON, state *registrysyncer.LocalRegistry, remoteWorkflowDONs []registrysyncer.DON) error {
@@ -472,8 +459,7 @@ func (w *launcher) exposeCapabilities(ctx context.Context, myPeerID p2ptypes.Pee
 
 			err = w.addReceiver(ctx, capability, don, newActionServer)
 			if err != nil {
-				w.lggr.Errorw("failed to add action server-side receiver - it won't be exposed remotely", "id", cid, "error", err)
-				// continue attempting other capabilities
+				return fmt.Errorf("failed to add action server-side receiver: %w", err)
 			}
 		case capabilities.CapabilityTypeConsensus:
 			w.lggr.Warn("no remote client configured for capability type consensus, skipping configuration")

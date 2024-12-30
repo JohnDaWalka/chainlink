@@ -10,13 +10,12 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 )
 
 func Test_CheckMessageStatus(t *testing.T) {
-	tests.SkipShort(t, "")
+	testutils.SkipShort(t, "")
 	ctx := context.Background()
 	mockTxManager := mocks.NewMockEvmTxManager(t)
 	checker := NewTxmStatusChecker(mockTxManager.GetTransactionStatus)

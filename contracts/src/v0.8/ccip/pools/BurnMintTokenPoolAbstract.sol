@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {IBurnMintERC20} from "../../shared/token/ERC20/IBurnMintERC20.sol";
 
@@ -25,10 +25,7 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
 
     emit Burned(msg.sender, lockOrBurnIn.amount);
 
-    return Pool.LockOrBurnOutV1({
-      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
-      destPoolData: _encodeLocalDecimals()
-    });
+    return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   /// @notice Mint tokens from the pool to the recipient
@@ -38,15 +35,11 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
   ) external virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn);
 
-    // Calculate the local amount
-    uint256 localAmount =
-      _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
-
     // Mint to the receiver
-    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, localAmount);
+    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
-    emit Minted(msg.sender, releaseOrMintIn.receiver, localAmount);
+    emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
-    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 }

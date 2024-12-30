@@ -36,8 +36,6 @@ func WrapContractReaderTesterWithBindings(t *testing.T, wrapped *EVMChainCompone
 		interfacetests.ContractReaderBatchGetLatestValueSetsErrorsProperly, interfacetests.ContractReaderBatchGetLatestValueNoArgumentsWithSliceReturn, interfacetests.ContractReaderBatchGetLatestValueWithModifiersOwnMapstructureOverride,
 		interfacetests.ContractReaderQueryKeyNotFound, interfacetests.ContractReaderQueryKeyReturnsData, interfacetests.ContractReaderQueryKeyReturnsDataAsValuesDotValue, interfacetests.ContractReaderQueryKeyReturnsDataAsValuesDotValue,
 		interfacetests.ContractReaderQueryKeyCanFilterWithValueComparator, interfacetests.ContractReaderQueryKeyCanLimitResultsWithCursor,
-		interfacetests.ContractReaderQueryKeysNotFound, interfacetests.ContractReaderQueryKeysReturnsData, interfacetests.ContractReaderQueryKeysReturnsDataTwoEventTypes, interfacetests.ContractReaderQueryKeysReturnsDataAsValuesDotValue,
-		interfacetests.ContractReaderQueryKeysCanFilterWithValueComparator, interfacetests.ContractReaderQueryKeysCanLimitResultsWithCursor,
 		ContractReaderQueryKeyFilterOnDataWordsWithValueComparator, ContractReaderQueryKeyOnDataWordsWithValueComparatorOnNestedField,
 		ContractReaderQueryKeyFilterOnDataWordsWithValueComparatorOnDynamicField, ContractReaderQueryKeyFilteringOnDataWordsUsingValueComparatorsOnFieldsWithManualIndex,
 		// TODO BCFR-1073 - Fix flaky tests
@@ -73,7 +71,6 @@ func newBindingsMapping() bindingsMapping {
 		interfacetests.MethodSettingStruct:                         "AddTestStruct",
 		interfacetests.MethodSettingUint64:                         "SetAlterablePrimitiveValue",
 		interfacetests.MethodTriggeringEvent:                       "TriggerEvent",
-		interfacetests.MethodTriggeringEventWithDynamicTopic:       "TriggerEventWithDynamicTopic",
 	}
 	methodNameMappingByContract[interfacetests.AnySecondContractName] = map[string]string{
 		interfacetests.MethodReturningUint64: "GetDifferentPrimitiveValue",
@@ -149,23 +146,23 @@ func (b bindingClientTester) addDefaultBindings(t *testing.T) {
 		if chainReaderTester == nil {
 			chainReaderTester = &bindings.ChainReaderTester{
 				BoundContract: binding,
-				ChainWriter:   b.bindingsMapping.chainWriterProxy.ContractWriter,
+				ChainWriter:   b.bindingsMapping.chainWriterProxy.ChainWriter,
 			}
 			b.bindingsMapping.chainReaderTesters[binding.Address] = chainReaderTester
 		} else {
-			chainReaderTester.ChainWriter = b.bindingsMapping.chainWriterProxy.ContractWriter
+			chainReaderTester.ChainWriter = b.bindingsMapping.chainWriterProxy.ChainWriter
 		}
 	}
 }
 
-func (b bindingClientTester) GetChainWriter(t *testing.T) commontypes.ContractWriter {
-	chainWriter := b.ChainComponentsInterfaceTester.GetContractWriter(t)
-	if b.bindingsMapping.chainWriterProxy.ContractWriter == nil {
+func (b bindingClientTester) GetChainWriter(t *testing.T) commontypes.ChainWriter {
+	chainWriter := b.ChainComponentsInterfaceTester.GetChainWriter(t)
+	if b.bindingsMapping.chainWriterProxy.ChainWriter == nil {
 		b.addDefaultBindings(t)
 		for _, tester := range b.bindingsMapping.chainReaderTesters {
 			tester.ChainWriter = chainWriter
 		}
-		b.bindingsMapping.chainWriterProxy.ContractWriter = chainWriter
+		b.bindingsMapping.chainWriterProxy.ChainWriter = chainWriter
 	}
 	return b.bindingsMapping.chainWriterProxy
 }
@@ -185,7 +182,7 @@ type bindingContractReaderProxy struct {
 }
 
 type bindingChainWriterProxy struct {
-	commontypes.ContractWriter
+	commontypes.ChainWriter
 	bm *bindingsMapping
 }
 
@@ -195,7 +192,7 @@ func (b bindingContractReaderProxy) Bind(ctx context.Context, boundContracts []c
 		b.bm.chainReaderTesters[updatedBinding.Address] = &bindings.ChainReaderTester{
 			BoundContract:  updatedBinding,
 			ContractReader: b.ContractReader,
-			ChainWriter:    b.bm.chainWriterProxy.ContractWriter,
+			ChainWriter:    b.bm.chainWriterProxy.ChainWriter,
 		}
 	}
 	return b.ContractReader.Bind(ctx, updatedBindings)
@@ -252,10 +249,6 @@ func (b bindingChainWriterProxy) SubmitTransaction(ctx context.Context, contract
 			bindingsInput := bindings.TriggerEventInput{}
 			_ = convertStruct(args, &bindingsInput)
 			return chainReaderTesters.TriggerEvent(ctx, bindingsInput, transactionID, toAddress, meta)
-		case interfacetests.MethodTriggeringEventWithDynamicTopic:
-			bindingsInput := bindings.TriggerEventWithDynamicTopicInput{}
-			_ = convertStruct(args, &bindingsInput)
-			return chainReaderTesters.TriggerEventWithDynamicTopic(ctx, bindingsInput, transactionID, toAddress, meta)
 		default:
 			return errors.New("No logic implemented for method: " + method)
 		}
@@ -265,7 +258,7 @@ func (b bindingChainWriterProxy) SubmitTransaction(ctx context.Context, contract
 }
 
 func (b *bindingChainWriterProxy) GetTransactionStatus(ctx context.Context, transactionID string) (commontypes.TransactionStatus, error) {
-	return b.ContractWriter.GetTransactionStatus(ctx, transactionID)
+	return b.ChainWriter.GetTransactionStatus(ctx, transactionID)
 }
 
 func removeAddressFromReadIdentifier(s string) string {

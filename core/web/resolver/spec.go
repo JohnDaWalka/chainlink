@@ -1,7 +1,7 @@
 package resolver
 
 import (
-	"strconv"
+	"fmt"
 
 	"github.com/graph-gophers/graphql-go"
 
@@ -139,13 +139,8 @@ func (r *SpecResolver) ToStreamSpec() (*StreamSpecResolver, bool) {
 	if r.j.Type != job.Stream {
 		return nil, false
 	}
-	res := &StreamSpecResolver{}
-	if r.j.StreamID != nil {
-		sid := strconv.FormatUint(uint64(*r.j.StreamID), 10)
-		res.streamID = &sid
-	}
 
-	return res, true
+	return &StreamSpecResolver{streamID: fmt.Sprintf("%d", r.j.StreamID)}, true
 }
 
 type CronSpecResolver struct {
@@ -992,11 +987,6 @@ func (r *BootstrapSpecResolver) ContractConfigConfirmations() *int32 {
 	return &confirmations
 }
 
-// RelayConfig resolves the spec's onchain signing strategy config
-func (r *OCR2SpecResolver) OnchainSigningStrategy() gqlscalar.Map {
-	return gqlscalar.Map(r.spec.OnchainSigningStrategy)
-}
-
 // CreatedAt resolves the spec's created at timestamp.
 func (r *BootstrapSpecResolver) CreatedAt() graphql.Time {
 	return graphql.Time{Time: r.spec.CreatedAt}
@@ -1067,9 +1057,9 @@ func (r *StandardCapabilitiesSpecResolver) Config() *string {
 }
 
 type StreamSpecResolver struct {
-	streamID *string
+	streamID string
 }
 
-func (r *StreamSpecResolver) StreamID() *string {
+func (r *StreamSpecResolver) StreamID() string {
 	return r.streamID
 }

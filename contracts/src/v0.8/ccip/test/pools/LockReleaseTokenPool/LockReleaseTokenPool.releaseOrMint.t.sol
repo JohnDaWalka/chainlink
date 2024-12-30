@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {Pool} from "../../../libraries/Pool.sol";
 import {RateLimiter} from "../../../libraries/RateLimiter.sol";
@@ -10,24 +10,21 @@ import {LockReleaseTokenPoolSetup} from "./LockReleaseTokenPoolSetup.t.sol";
 contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
   function setUp() public virtual override {
     LockReleaseTokenPoolSetup.setUp();
-
-    bytes[] memory remotePoolAddresses = new bytes[](1);
-    remotePoolAddresses[0] = abi.encode(s_sourcePoolAddress);
-
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      remotePoolAddresses: remotePoolAddresses,
+      remotePoolAddress: abi.encode(s_sourcePoolAddress),
       remoteTokenAddress: abi.encode(address(2)),
+      allowed: true,
       outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
 
-    s_lockReleaseTokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
-    s_lockReleaseTokenPoolWithAllowList.applyChainUpdates(new uint64[](0), chainUpdate);
+    s_lockReleaseTokenPool.applyChainUpdates(chainUpdate);
+    s_lockReleaseTokenPoolWithAllowList.applyChainUpdates(chainUpdate);
   }
 
-  function test_ReleaseOrMint() public {
+  function test_ReleaseOrMint_Success() public {
     vm.startPrank(s_allowedOffRamp);
 
     uint256 amount = 100;
@@ -93,11 +90,20 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     );
   }
 
-  function test_RevertWhen_ChainNotAllowed() public {
-    uint64[] memory chainsToRemove = new uint64[](1);
-    chainsToRemove[0] = SOURCE_CHAIN_SELECTOR;
+  function test_ChainNotAllowed_Revert() public {
+    address notAllowedRemotePoolAddress = address(1);
 
-    s_lockReleaseTokenPool.applyChainUpdates(chainsToRemove, new TokenPool.ChainUpdate[](0));
+    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
+    chainUpdate[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+      remotePoolAddress: abi.encode(notAllowedRemotePoolAddress),
+      remoteTokenAddress: abi.encode(address(2)),
+      allowed: false,
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
+    });
+
+    s_lockReleaseTokenPool.applyChainUpdates(chainUpdate);
 
     vm.startPrank(s_allowedOffRamp);
 
@@ -116,9 +122,9 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     );
   }
 
-  function test_RevertWhen_PoolMintNotHealthy() public {
+  function test_PoolMintNotHealthy_Revert() public {
     // Should not mint tokens if cursed.
-    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(true));
+    s_mockRMN.setGlobalCursed(true);
     uint256 before = s_token.balanceOf(OWNER);
     vm.startPrank(s_allowedOffRamp);
     vm.expectRevert(TokenPool.CursedByRMN.selector);

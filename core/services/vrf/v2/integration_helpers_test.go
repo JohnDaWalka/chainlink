@@ -445,13 +445,13 @@ func testMultipleConsumersNeedTrustedBHS(
 		topUpSubscription(t, consumer, consumerContract, uni.backend, big.NewInt(5e18 /* 5 LINK */), nativePayment)
 
 		// Wait for fulfillment to be queued.
-		require.Eventually(t, func() bool {
+		gomega.NewGomegaWithT(t).Eventually(func() bool {
 			uni.backend.Commit()
 			runs, err := app.PipelineORM().GetAllRuns(ctx)
 			require.NoError(t, err)
 			t.Log("runs", len(runs))
-			return len(runs) >= 1
-		}, testutils.WaitTimeout(t), time.Second)
+			return len(runs) == 1
+		}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue())
 
 		mine(t, requestID, subID, uni.backend, db, vrfVersion, testutils.SimulatedChainID)
 
@@ -1020,7 +1020,7 @@ func testSingleConsumerForcedFulfillment(
 	uni.backend.Commit()
 
 	// Wait for force-fulfillment to be queued.
-	require.Eventually(t, func() bool {
+	gomega.NewGomegaWithT(t).Eventually(func() bool {
 		uni.backend.Commit()
 		commitment, err2 := uni.oldRootContract.GetCommitment(nil, requestID)
 		require.NoError(t, err2)
@@ -1036,7 +1036,7 @@ func testSingleConsumerForcedFulfillment(
 		}
 		t.Log("num RandomWordsForced logs:", i)
 		return utils.IsEmpty(commitment[:])
-	}, testutils.WaitTimeout(t), time.Second)
+	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue())
 
 	// Mine the fulfillment that was queued.
 	mine(t, requestID, subID, uni.backend, db, vrfVersion, testutils.SimulatedChainID)

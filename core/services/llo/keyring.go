@@ -33,14 +33,13 @@ type Key interface {
 }
 
 type onchainKeyring struct {
-	lggr  logger.Logger
-	keys  map[llotypes.ReportFormat]Key
-	donID uint32
+	lggr logger.Logger
+	keys map[llotypes.ReportFormat]Key
 }
 
-func NewOnchainKeyring(lggr logger.Logger, keys map[llotypes.ReportFormat]Key, donID uint32) LLOOnchainKeyring {
+func NewOnchainKeyring(lggr logger.Logger, keys map[llotypes.ReportFormat]Key) LLOOnchainKeyring {
 	return &onchainKeyring{
-		lggr.Named("OnchainKeyring"), keys, donID,
+		lggr.Named("OnchainKeyring"), keys,
 	}
 }
 
@@ -84,10 +83,7 @@ func (okr *onchainKeyring) Sign(digest types.ConfigDigest, seqNr uint64, r ocr3t
 		rf := r.Info.ReportFormat
 		if key, exists := okr.keys[rf]; exists {
 			// NOTE: Must use legacy Sign method for compatibility with v0.3 report verification
-			rc, err := evm.LegacyReportContext(digest, seqNr, okr.donID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get legacy report context: %w", err)
-			}
+			rc := evm.LegacyReportContext(digest, seqNr)
 			return key.Sign(rc, r.Report)
 		}
 	default:
@@ -105,11 +101,7 @@ func (okr *onchainKeyring) Verify(key types.OnchainPublicKey, digest types.Confi
 		rf := r.Info.ReportFormat
 		if verifier, exists := okr.keys[rf]; exists {
 			// NOTE: Must use legacy Verify method for compatibility with v0.3 report verification
-			rc, err := evm.LegacyReportContext(digest, seqNr, okr.donID)
-			if err != nil {
-				okr.lggr.Errorw("Verify failed; unable to get legacy report context", "err", err)
-				return false
-			}
+			rc := evm.LegacyReportContext(digest, seqNr)
 			return verifier.Verify(key, rc, r.Report, signature)
 		}
 	default:

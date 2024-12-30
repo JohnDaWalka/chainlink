@@ -4,11 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Khan/genqlient/graphql"
-	"github.com/sethvargo/go-retry"
 	"net/http"
 	"strings"
-	"time"
+
+	"github.com/Khan/genqlient/graphql"
 
 	"github.com/smartcontractkit/chainlink/deployment/environment/web/sdk/client/doer"
 	"github.com/smartcontractkit/chainlink/deployment/environment/web/sdk/internal/generated"
@@ -61,15 +60,8 @@ func New(baseURI string, creds Credentials) (Client, error) {
 		endpoints:   ep,
 		credentials: creds,
 	}
-	
-	err := retry.Do(context.Background(), retry.WithMaxDuration(10*time.Second, retry.NewFibonacci(2*time.Second)), func(ctx context.Context) error {
-		err := c.login()
-		if err != nil {
-			return retry.RetryableError(fmt.Errorf("retrying login to node: %w", err))
-		}
-		return nil
-	})
-	if err != nil {
+
+	if err := c.login(); err != nil {
 		return nil, fmt.Errorf("failed to login to node: %w", err)
 	}
 
@@ -210,11 +202,7 @@ func (c *client) CreateJobDistributor(ctx context.Context, in JobDistributorInpu
 		feedsManager := success.GetFeedsManager()
 		return feedsManager.GetId(), nil
 	}
-	if err, ok := response.GetCreateFeedsManager().(*generated.CreateFeedsManagerCreateFeedsManagerSingleFeedsManagerError); ok {
-		msg := err.GetMessage()
-		return "", fmt.Errorf("failed to create feeds manager: %v", msg)
-	}
-	return "", fmt.Errorf("failed to create feeds manager: %v", response.GetCreateFeedsManager().GetTypename())
+	return "", fmt.Errorf("failed to create feeds manager")
 }
 
 func (c *client) UpdateJobDistributor(ctx context.Context, id string, in JobDistributorInput) error {

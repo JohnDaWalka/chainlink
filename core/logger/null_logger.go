@@ -4,6 +4,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// nolint
 var NullLogger Logger = &nullLogger{}
 
 type nullLogger struct{}

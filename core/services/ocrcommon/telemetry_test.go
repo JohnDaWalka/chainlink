@@ -1,7 +1,6 @@
 package ocrcommon
 
 import (
-	"fmt"
 	"math/big"
 	"sync"
 	"testing"
@@ -659,15 +658,18 @@ func TestGetPricesFromBridgeTaskByOrder(t *testing.T) {
 	require.Equal(t, float64(0), benchmarkPrice)
 	require.Equal(t, float64(0), bid)
 	require.Equal(t, float64(0), ask)
-	require.Equal(t, 0, logs.Len())
+	require.Equal(t, 1, logs.Len())
+	require.Contains(t, logs.All()[0].Message, "cannot parse enhanced EA telemetry")
 
 	tt := trrsMercuryV1[:2]
 	getPricesFromBridgeTask(lggr, trrsMercuryV1[0], tt, 1)
-	require.Equal(t, 0, logs.Len())
+	require.Equal(t, 2, logs.Len())
+	require.Contains(t, logs.All()[1].Message, "cannot parse enhanced EA telemetry bid price, task is nil")
 
 	tt = trrsMercuryV1[:3]
 	getPricesFromBridgeTask(lggr, trrsMercuryV1[0], tt, 1)
-	require.Equal(t, 0, logs.Len())
+	require.Equal(t, 3, logs.Len())
+	require.Contains(t, logs.All()[2].Message, "cannot parse enhanced EA telemetry ask price, task is nil")
 
 	trrs2 := pipeline.TaskRunResults{
 		pipeline.TaskRunResult{
@@ -707,10 +709,10 @@ func TestGetPricesFromBridgeTaskByOrder(t *testing.T) {
 	require.Equal(t, benchmarkPrice, float64(0))
 	require.Equal(t, bid, float64(0))
 	require.Equal(t, ask, float64(0))
-	require.Equal(t, 3, logs.Len())
-	require.Contains(t, logs.All()[0].Message, "cannot parse EA telemetry price to float64, DOT id ds1_benchmark")
-	require.Contains(t, logs.All()[1].Message, "cannot parse EA telemetry price to float64, DOT id ds2_bid")
-	require.Contains(t, logs.All()[2].Message, "cannot parse EA telemetry price to float64, DOT id ds3_ask")
+	require.Equal(t, logs.Len(), 6)
+	require.Contains(t, logs.All()[3].Message, "cannot parse EA telemetry price to float64, DOT id ds1_benchmark")
+	require.Contains(t, logs.All()[4].Message, "cannot parse EA telemetry price to float64, DOT id ds2_bid")
+	require.Contains(t, logs.All()[5].Message, "cannot parse EA telemetry price to float64, DOT id ds3_ask")
 
 	benchmarkPrice, bid, ask = getPricesFromBridgeTask(lggr, trrsMercuryV1[0], trrsMercuryV2, 2)
 	require.Equal(t, 123456.123456, benchmarkPrice)
@@ -1022,8 +1024,9 @@ func TestCollectMercuryEnhancedTelemetryV1(t *testing.T) {
 	}
 
 	wg.Wait()
-	require.Equal(t, 1, logs.Len())
-	require.Contains(t, logs.All()[0].Message, "cannot parse EA telemetry")
+	require.Equal(t, 2, logs.Len())
+	require.Contains(t, logs.All()[0].Message, `cannot get bridge response from bridge task, id=ds1, name="test-mercury-bridge-1"`)
+	require.Contains(t, logs.All()[1].Message, "cannot parse EA telemetry")
 	chDone <- struct{}{}
 }
 
@@ -1137,9 +1140,11 @@ func TestCollectMercuryEnhancedTelemetryV2(t *testing.T) {
 	}
 
 	wg.Wait()
-	require.Equal(t, 1, logs.Len())
-	fmt.Println(logs.All())
-	require.Contains(t, logs.All()[0].Message, "cannot parse EA telemetry")
+	require.Equal(t, 4, logs.Len())
+	require.Contains(t, logs.All()[0].Message, "cannot parse enhanced EA telemetry bid price")
+	require.Contains(t, logs.All()[1].Message, "cannot get bridge response from bridge task")
+	require.Contains(t, logs.All()[2].Message, "cannot parse EA telemetry")
+	require.Contains(t, logs.All()[3].Message, "cannot parse enhanced EA telemetry bid price")
 	chDone <- struct{}{}
 }
 

@@ -13,16 +13,18 @@ import (
 )
 
 const (
-	MethodRegisterTrigger   = "RegisterTrigger"
-	MethodUnRegisterTrigger = "UnregisterTrigger"
-	MethodTriggerEvent      = "TriggerEvent"
-	MethodExecute           = "Execute"
+	MethodRegisterTrigger        = "RegisterTrigger"
+	MethodUnRegisterTrigger      = "UnregisterTrigger"
+	MethodTriggerEvent           = "TriggerEvent"
+	MethodExecute                = "Execute"
+	MethodRegisterToWorkflow     = "RegisterToWorkflow"
+	MethodUnregisterFromWorkflow = "UnregisterFromWorkflow"
 )
 
 type Dispatcher interface {
 	services.Service
-	SetReceiver(capabilityID string, donID uint32, receiver Receiver) error
-	RemoveReceiver(capabilityID string, donID uint32)
+	SetReceiver(capabilityId string, donId uint32, receiver Receiver) error
+	RemoveReceiver(capabilityId string, donId uint32)
 	Send(peerID p2ptypes.PeerID, msgBody *MessageBody) error
 }
 

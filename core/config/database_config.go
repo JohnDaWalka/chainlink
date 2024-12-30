@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"time"
 
-	pgcommon "github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
+	"github.com/smartcontractkit/chainlink/v2/core/store/dialects"
 )
 
 type Backup interface {
@@ -35,7 +35,7 @@ type Database interface {
 	DefaultIdleInTxSessionTimeout() time.Duration
 	DefaultLockTimeout() time.Duration
 	DefaultQueryTimeout() time.Duration
-	Dialect() pgcommon.DialectName
+	Dialect() dialects.DialectName
 	LogSQL() bool
 	MaxIdleConns() int
 	MaxOpenConns() int

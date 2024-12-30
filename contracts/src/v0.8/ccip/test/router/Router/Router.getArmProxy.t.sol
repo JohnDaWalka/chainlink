@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
-import {BaseTest} from "../../BaseTest.t.sol";
+import {RouterSetup} from "./RouterSetup.t.sol";
 
-contract Router_getArmProxy is BaseTest {
+contract Router_getArmProxy is RouterSetup {
   function test_getArmProxy() public view {
-    assertEq(s_sourceRouter.getArmProxy(), address(s_mockRMNRemote));
+    assertEq(s_sourceRouter.getArmProxy(), address(s_mockRMN));
   }
 }

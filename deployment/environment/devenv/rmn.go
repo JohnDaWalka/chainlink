@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/docker"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logstream"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 )
 
@@ -50,6 +51,7 @@ func NewRage2ProxyComponent(
 	imageVersion string,
 	local ProxyLocalConfig,
 	shared ProxySharedConfig,
+	logStream *logstream.LogStream,
 ) (*RageProxy, error) {
 	rageName := fmt.Sprintf("%s-proxy-%s", name, uuid.NewString()[0:8])
 
@@ -69,6 +71,7 @@ func NewRage2ProxyComponent(
 			ContainerImage:   imageName,
 			ContainerVersion: imageVersion,
 			Networks:         networks,
+			LogStream:        logStream,
 		},
 		Passphrase:        DefaultAFNPassphrase,
 		proxyListenerPort: listenPort,
@@ -190,7 +193,8 @@ func NewAFN2ProxyComponent(
 	imageName,
 	imageVersion string,
 	shared SharedConfig,
-	local LocalConfig) (*AFN2Proxy, error) {
+	local LocalConfig,
+	logStream *logstream.LogStream) (*AFN2Proxy, error) {
 	afnName := fmt.Sprintf("%s-%s", name, uuid.NewString()[0:8])
 	rmn := &AFN2Proxy{
 		EnvComponent: test_env.EnvComponent{
@@ -198,6 +202,7 @@ func NewAFN2ProxyComponent(
 			ContainerImage:   imageName,
 			ContainerVersion: imageVersion,
 			Networks:         networks,
+			LogStream:        logStream,
 		},
 		AFNPassphrase: DefaultAFNPassphrase,
 		Shared:        shared,
@@ -338,6 +343,7 @@ func NewRMNCluster(
 	proxyVersion string,
 	rmnImage string,
 	rmnVersion string,
+	logStream *logstream.LogStream,
 ) (*RMNCluster, error) {
 	rmn := &RMNCluster{
 		t:     t,
@@ -345,7 +351,7 @@ func NewRMNCluster(
 		Nodes: make(map[string]RMNNode),
 	}
 	for name, rmnConfig := range config {
-		proxy, err := NewRage2ProxyComponent(networks, name, proxyImage, proxyVersion, rmnConfig.ProxyLocal, rmnConfig.ProxyShared)
+		proxy, err := NewRage2ProxyComponent(networks, name, proxyImage, proxyVersion, rmnConfig.ProxyLocal, rmnConfig.ProxyShared, logStream)
 		if err != nil {
 			return nil, err
 		}
@@ -365,7 +371,7 @@ func NewRMNCluster(
 			return nil, err
 		}
 		rmnConfig.Local.Networking.RageProxy = strings.TrimPrefix(fmt.Sprintf("%s:%s", proxyName, port), "/")
-		afn, err := NewAFN2ProxyComponent(networks, name, rmnImage, rmnVersion, rmnConfig.Shared, rmnConfig.Local)
+		afn, err := NewAFN2ProxyComponent(networks, name, rmnImage, rmnVersion, rmnConfig.Shared, rmnConfig.Local, logStream)
 		if err != nil {
 			return nil, err
 		}

@@ -26,6 +26,7 @@ const (
 
 var (
 	triggerEvent1 = map[string]any{"event": "triggerEvent1"}
+	triggerEvent2 = map[string]any{"event": "triggerEvent2"}
 )
 
 func TestTriggerSubscriber_RegisterAndReceive(t *testing.T) {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {IFeeQuoter} from "../../../interfaces/IFeeQuoter.sol";
 import {IRMNRemote} from "../../../interfaces/IRMNRemote.sol";
@@ -20,7 +20,7 @@ contract OffRamp_commit is OffRampSetup {
     s_latestSequenceNumber = uint64(uint256(s_configDigestCommit));
   }
 
-  function test_ReportAndPriceUpdate() public {
+  function test_ReportAndPriceUpdate_Success() public {
     OffRamp.CommitReport memory commitReport = _constructCommitReport();
 
     vm.expectEmit();
@@ -64,7 +64,7 @@ contract OffRamp_commit is OffRampSetup {
     assertEq(block.timestamp, s_offRamp.getMerkleRoot(SOURCE_CHAIN_SELECTOR_1, root));
   }
 
-  function test_RootWithRMNDisabled() public {
+  function test_RootWithRMNDisabled_success() public {
     // force RMN verification to fail
     vm.mockCallRevert(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNRemote.verify.selector), bytes(""));
 
@@ -101,7 +101,7 @@ contract OffRamp_commit is OffRampSetup {
     assertEq(block.timestamp, s_offRamp.getMerkleRoot(SOURCE_CHAIN_SELECTOR_1, root));
   }
 
-  function test_StaleReportWithRoot() public {
+  function test_StaleReportWithRoot_Success() public {
     uint64 maxSeq = 12;
     uint224 tokenStartPrice = IFeeQuoter(s_offRamp.getDynamicConfig().feeQuoter).getTokenPrice(s_sourceFeeToken).value;
 
@@ -144,7 +144,7 @@ contract OffRamp_commit is OffRampSetup {
     assertEq(tokenStartPrice, IFeeQuoter(s_offRamp.getDynamicConfig().feeQuoter).getTokenPrice(s_sourceFeeToken).value);
   }
 
-  function test_OnlyTokenPriceUpdates() public {
+  function test_OnlyTokenPriceUpdates_Success() public {
     // force RMN verification to fail
     vm.mockCallRevert(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNRemote.verify.selector), bytes(""));
 
@@ -166,7 +166,7 @@ contract OffRamp_commit is OffRampSetup {
     assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
   }
 
-  function test_OnlyGasPriceUpdates() public {
+  function test_OnlyGasPriceUpdates_Success() public {
     // force RMN verification to fail
     vm.mockCallRevert(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNRemote.verify.selector), bytes(""));
 
@@ -187,7 +187,7 @@ contract OffRamp_commit is OffRampSetup {
     assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
   }
 
-  function test_PriceSequenceNumberCleared() public {
+  function test_PriceSequenceNumberCleared_Success() public {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](0);
     OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
@@ -236,7 +236,7 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
   }
 
-  function test_ValidPriceUpdateThenStaleReportWithRoot() public {
+  function test_ValidPriceUpdateThenStaleReportWithRoot_Success() public {
     uint64 maxSeq = 12;
     uint224 tokenPrice1 = 4e18;
     uint224 tokenPrice2 = 5e18;
@@ -282,10 +282,11 @@ contract OffRamp_commit is OffRampSetup {
 
   // Reverts
 
-  function test_RevertWhen_UnauthorizedTransmitter() public {
+  function test_UnauthorizedTransmitter_Revert() public {
     OffRamp.CommitReport memory commitReport = _constructCommitReport();
 
-    bytes32[2] memory reportContext = [s_configDigestCommit, bytes32(uint256(s_latestSequenceNumber))];
+    bytes32[3] memory reportContext =
+      [s_configDigestCommit, bytes32(uint256(s_latestSequenceNumber)), s_configDigestCommit];
 
     (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
       _getSignaturesForDigest(s_validSignerKeys, abi.encode(commitReport), reportContext, F + 1);
@@ -294,12 +295,12 @@ contract OffRamp_commit is OffRampSetup {
     s_offRamp.commit(reportContext, abi.encode(commitReport), rs, ss, rawVs);
   }
 
-  function test_RevertWhen_NoConfig() public {
+  function test_NoConfig_Revert() public {
     _redeployOffRampWithNoOCRConfigs();
 
     OffRamp.CommitReport memory commitReport = _constructCommitReport();
 
-    bytes32[2] memory reportContext = [bytes32(""), s_configDigestCommit];
+    bytes32[3] memory reportContext = [bytes32(""), s_configDigestCommit, s_configDigestCommit];
     (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
       _getSignaturesForDigest(s_validSignerKeys, abi.encode(commitReport), reportContext, F + 1);
 
@@ -308,7 +309,7 @@ contract OffRamp_commit is OffRampSetup {
     s_offRamp.commit(reportContext, abi.encode(commitReport), rs, ss, rawVs);
   }
 
-  function test_RevertWhen_NoConfigWithOtherConfigPresent() public {
+  function test_NoConfigWithOtherConfigPresent_Revert() public {
     _redeployOffRampWithNoOCRConfigs();
 
     MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
@@ -324,7 +325,7 @@ contract OffRamp_commit is OffRampSetup {
 
     OffRamp.CommitReport memory commitReport = _constructCommitReport();
 
-    bytes32[2] memory reportContext = [bytes32(""), s_configDigestCommit];
+    bytes32[3] memory reportContext = [bytes32(""), s_configDigestCommit, s_configDigestCommit];
     (bytes32[] memory rs, bytes32[] memory ss,, bytes32 rawVs) =
       _getSignaturesForDigest(s_validSignerKeys, abi.encode(commitReport), reportContext, F + 1);
 
@@ -333,7 +334,7 @@ contract OffRamp_commit is OffRampSetup {
     s_offRamp.commit(reportContext, abi.encode(commitReport), rs, ss, rawVs);
   }
 
-  function test_RevertWhen_FailedRMNVerifications() public {
+  function test_FailedRMNVerification_Reverts() public {
     // force RMN verification to fail
     vm.mockCallRevert(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNRemote.verify.selector), bytes(""));
 
@@ -342,7 +343,7 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
   }
 
-  function test_RevertWhen_Unhealthy() public {
+  function test_Unhealthy_Revert() public {
     _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, true);
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
@@ -360,7 +361,7 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
   }
 
-  function test_RevertWhen_InvalidRoot() public {
+  function test_InvalidRootRevert() public {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
@@ -376,7 +377,7 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
   }
 
-  function test_RevertWhen_InvalidInterval() public {
+  function test_InvalidInterval_Revert() public {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
@@ -396,7 +397,7 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
   }
 
-  function test_RevertWhen_InvalidIntervalMinLargerThanMax() public {
+  function test_InvalidIntervalMinLargerThanMax_Revert() public {
     s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
@@ -417,7 +418,7 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
   }
 
-  function test_RevertWhen_ZeroEpochAndRound() public {
+  function test_ZeroEpochAndRound_Revert() public {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](0);
     OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
@@ -429,7 +430,7 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, 0);
   }
 
-  function test_RevertWhen_OnlyPriceUpdateStaleReport() public {
+  function test_OnlyPriceUpdateStaleReport_Revert() public {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](0);
     OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
@@ -445,7 +446,7 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
   }
 
-  function test_RevertWhen_SourceChainNotEnabled() public {
+  function test_SourceChainNotEnabled_Revert() public {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
       sourceChainSelector: 0,
@@ -462,7 +463,7 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
   }
 
-  function test_RevertWhen_RootAlreadyCommitted() public {
+  function test_RootAlreadyCommitted_Revert() public {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
@@ -484,7 +485,7 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, ++s_latestSequenceNumber);
   }
 
-  function test_RevertWhen_CommitOnRampMismatch() public {
+  function test_CommitOnRampMismatch_Revert() public {
     OffRamp.CommitReport memory commitReport = _constructCommitReport();
 
     commitReport.merkleRoots[0].onRampAddress = ON_RAMP_ADDRESS_2;

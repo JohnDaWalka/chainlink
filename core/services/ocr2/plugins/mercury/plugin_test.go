@@ -2,7 +2,6 @@ package mercury_test
 
 import (
 	"context"
-	"errors"
 	"os/exec"
 	"reflect"
 	"testing"
@@ -10,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/config/env"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -24,7 +22,6 @@ import (
 	v2 "github.com/smartcontractkit/chainlink-common/pkg/types/mercury/v2"
 	v3 "github.com/smartcontractkit/chainlink-common/pkg/types/mercury/v3"
 	v4 "github.com/smartcontractkit/chainlink-common/pkg/types/mercury/v4"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	mercuryocr2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/mercury"
 
@@ -95,23 +92,21 @@ var (
 
 	// this is kind of gross, but it's the best way to test return values of the services
 	expectedEmbeddedServiceCnt = 3
-	expectedLoopServiceCnt     = expectedEmbeddedServiceCnt + 2 // factory server and loop unregisterer
+	expectedLoopServiceCnt     = expectedEmbeddedServiceCnt + 1
 )
 
 func TestNewServices(t *testing.T) {
 	type args struct {
 		pluginConfig job.JSONConfig
 		feedID       utils.FeedID
-		cfg          mercuryocr2.Config
 	}
-	testCases := []struct {
+	tests := []struct {
 		name            string
 		args            args
 		loopMode        bool
 		wantLoopFactory any
 		wantServiceCnt  int
 		wantErr         bool
-		wantErrStr      string
 	}{
 		{
 			name: "no plugin config error ",
@@ -192,19 +187,6 @@ func TestNewServices(t *testing.T) {
 			wantLoopFactory: &loop.MercuryV3Service{},
 		},
 		{
-			name:     "v3 loop err",
-			loopMode: true,
-			args: args{
-				pluginConfig: v3jsonCfg,
-				feedID:       v3FeedId,
-				cfg:          mercuryocr2.NewMercuryConfig(1, 1, &testRegistrarConfig{failRegister: true}),
-			},
-			wantServiceCnt:  expectedLoopServiceCnt,
-			wantErr:         true,
-			wantLoopFactory: &loop.MercuryV3Service{},
-			wantErrStr:      "failed to init loop for feed",
-		},
-		{
 			name:     "v4 loop",
 			loopMode: true,
 			args: args{
@@ -216,25 +198,15 @@ func TestNewServices(t *testing.T) {
 			wantLoopFactory: &loop.MercuryV4Service{},
 		},
 	}
-	for _, tt := range testCases {
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.loopMode {
 				t.Setenv(string(env.MercuryPlugin.Cmd), "fake_cmd")
 				assert.NotEmpty(t, env.MercuryPlugin.Cmd.Get())
 			}
-			// use default config if not provided
-			if tt.args.cfg == nil {
-				tt.args.cfg = testCfg
-			}
-			got, err := newServicesTestWrapper(t, tt.args.pluginConfig, tt.args.feedID, tt.args.cfg)
+			got, err := newServicesTestWrapper(t, tt.args.pluginConfig, tt.args.feedID)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewServices() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if err != nil {
-				if tt.wantErrStr != "" {
-					assert.Contains(t, err.Error(), tt.wantErrStr)
-				}
 				return
 			}
 			assert.Len(t, got, tt.wantServiceCnt)
@@ -250,97 +222,15 @@ func TestNewServices(t *testing.T) {
 			}
 		})
 	}
-
-	t.Run("restartable loop", func(t *testing.T) {
-		// setup a real loop registry to test restartability
-		registry := plugins.NewLoopRegistry(logger.TestLogger(t), nil, nil, nil, "")
-		loopRegistrarConfig := plugins.NewRegistrarConfig(loop.GRPCOpts{}, registry.Register, registry.Unregister)
-		prodCfg := mercuryocr2.NewMercuryConfig(1, 1, loopRegistrarConfig)
-		type args struct {
-			pluginConfig job.JSONConfig
-			feedID       utils.FeedID
-			cfg          mercuryocr2.Config
-		}
-		testCases := []struct {
-			name    string
-			args    args
-			wantErr bool
-		}{
-			{
-				name: "v1 loop",
-				args: args{
-					pluginConfig: v1jsonCfg,
-					feedID:       v1FeedId,
-					cfg:          prodCfg,
-				},
-				wantErr: false,
-			},
-			{
-				name: "v2 loop",
-				args: args{
-					pluginConfig: v2jsonCfg,
-					feedID:       v2FeedId,
-					cfg:          prodCfg,
-				},
-				wantErr: false,
-			},
-			{
-				name: "v3 loop",
-				args: args{
-					pluginConfig: v3jsonCfg,
-					feedID:       v3FeedId,
-					cfg:          prodCfg,
-				},
-				wantErr: false,
-			},
-			{
-				name: "v4 loop",
-				args: args{
-					pluginConfig: v4jsonCfg,
-					feedID:       v4FeedId,
-					cfg:          prodCfg,
-				},
-				wantErr: false,
-			},
-		}
-
-		for _, tt := range testCases {
-			t.Run(tt.name, func(t *testing.T) {
-				t.Setenv(string(env.MercuryPlugin.Cmd), "fake_cmd")
-				assert.NotEmpty(t, env.MercuryPlugin.Cmd.Get())
-
-				got, err := newServicesTestWrapper(t, tt.args.pluginConfig, tt.args.feedID, tt.args.cfg)
-				if (err != nil) != tt.wantErr {
-					t.Errorf("NewServices() error = %v, wantErr %v", err, tt.wantErr)
-					return
-				}
-				// hack to simulate a restart. we don't have enough boilerplate to start the oracle service
-				// only care about the subservices so we start all except the oracle, which happens to be the last one
-				for i := 0; i < len(got)-1; i++ {
-					require.NoError(t, got[i].Start(tests.Context(t)))
-				}
-				// if we don't close the services, we get conflicts with the loop registry
-				_, err = newServicesTestWrapper(t, tt.args.pluginConfig, tt.args.feedID, tt.args.cfg)
-				require.ErrorContains(t, err, "plugin already registered")
-
-				// close all services and try again
-				for i := len(got) - 2; i >= 0; i-- {
-					require.NoError(t, got[i].Close())
-				}
-				_, err = newServicesTestWrapper(t, tt.args.pluginConfig, tt.args.feedID, tt.args.cfg)
-				require.NoError(t, err)
-			})
-		}
-	})
 }
 
 // we are only varying the version via feedID (and the plugin config)
 // this wrapper supplies dummy values for the rest of the arguments
-func newServicesTestWrapper(t *testing.T, pluginConfig job.JSONConfig, feedID utils.FeedID, cfg mercuryocr2.Config) ([]job.ServiceCtx, error) {
+func newServicesTestWrapper(t *testing.T, pluginConfig job.JSONConfig, feedID utils.FeedID) ([]job.ServiceCtx, error) {
 	t.Helper()
 	jb := testJob
 	jb.OCR2OracleSpec.PluginConfig = pluginConfig
-	return mercuryocr2.NewServices(jb, &testProvider{}, nil, logger.TestLogger(t), testArgsNoPlugin, cfg, nil, &testDataSourceORM{}, feedID, false)
+	return mercuryocr2.NewServices(jb, &testProvider{}, nil, logger.TestLogger(t), testArgsNoPlugin, testCfg, nil, &testDataSourceORM{}, feedID, false)
 }
 
 type testProvider struct{}
@@ -402,21 +292,16 @@ func (*testProvider) ReportCodecV3() v3.ReportCodec { return nil }
 func (*testProvider) ReportCodecV4() v4.ReportCodec { return nil }
 
 // Start implements types.MercuryProvider.
-func (*testProvider) Start(context.Context) error { return nil }
+func (*testProvider) Start(context.Context) error { panic("unimplemented") }
 
 var _ commontypes.MercuryProvider = (*testProvider)(nil)
 
-type testRegistrarConfig struct {
-	failRegister bool
-}
+type testRegistrarConfig struct{}
 
 func (c *testRegistrarConfig) UnregisterLOOP(ID string) {}
 
 // RegisterLOOP implements plugins.RegistrarConfig.
-func (c *testRegistrarConfig) RegisterLOOP(config plugins.CmdConfig) (func() *exec.Cmd, loop.GRPCOpts, error) {
-	if c.failRegister {
-		return nil, loop.GRPCOpts{}, errors.New("failed to register")
-	}
+func (*testRegistrarConfig) RegisterLOOP(config plugins.CmdConfig) (func() *exec.Cmd, loop.GRPCOpts, error) {
 	return nil, loop.GRPCOpts{}, nil
 }
 

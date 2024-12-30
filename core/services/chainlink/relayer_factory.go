@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/pelletier/go-toml/v2"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
@@ -38,7 +37,6 @@ type RelayerFactory struct {
 	logger.Logger
 	*plugins.LoopRegistry
 	loop.GRPCOpts
-	Registerer            prometheus.Registerer
 	MercuryPool           wsrpc.Pool
 	CapabilitiesRegistry  coretypes.CapabilitiesRegistry
 	HTTPClient            *http.Client
@@ -56,7 +54,7 @@ func (r *RelayerFactory) NewDummy(config DummyFactoryConfig) (loop.Relayer, erro
 type EVMFactoryConfig struct {
 	legacyevm.ChainOpts
 	evmrelay.CSAETHKeystore
-	MercuryConfig coreconfig.Mercury
+	coreconfig.MercuryTransmitter
 }
 
 func (r *RelayerFactory) NewEVM(ctx context.Context, config EVMFactoryConfig) (map[types.RelayID]evmrelay.LOOPRelayAdapter, error) {
@@ -83,10 +81,9 @@ func (r *RelayerFactory) NewEVM(ctx context.Context, config EVMFactoryConfig) (m
 
 		relayerOpts := evmrelay.RelayerOpts{
 			DS:                    ccOpts.DS,
-			Registerer:            r.Registerer,
 			CSAETHKeystore:        config.CSAETHKeystore,
 			MercuryPool:           r.MercuryPool,
-			MercuryConfig:         config.MercuryConfig,
+			TransmitterConfig:     config.MercuryTransmitter,
 			CapabilitiesRegistry:  r.CapabilitiesRegistry,
 			HTTPClient:            r.HTTPClient,
 			RetirementReportCache: r.RetirementReportCache,
@@ -107,11 +104,9 @@ func (r *RelayerFactory) NewEVM(ctx context.Context, config EVMFactoryConfig) (m
 type SolanaFactoryConfig struct {
 	Keystore keystore.Solana
 	solcfg.TOMLConfigs
-	DS sqlutil.DataSource
 }
 
-func (r *RelayerFactory) NewSolana(config SolanaFactoryConfig) (map[types.RelayID]loop.Relayer, error) {
-	chainCfgs, ds, ks := config.TOMLConfigs, config.DS, config.Keystore
+func (r *RelayerFactory) NewSolana(ks keystore.Solana, chainCfgs solcfg.TOMLConfigs) (map[types.RelayID]loop.Relayer, error) {
 	solanaRelayers := make(map[types.RelayID]loop.Relayer)
 	var (
 		solLggr = r.Logger.Named("Solana")
@@ -164,7 +159,6 @@ func (r *RelayerFactory) NewSolana(config SolanaFactoryConfig) (map[types.RelayI
 			opts := solana.ChainOpts{
 				Logger:   lggr,
 				KeyStore: signer,
-				DS:       ds,
 			}
 
 			chain, err := solana.NewChain(chainCfg, opts)

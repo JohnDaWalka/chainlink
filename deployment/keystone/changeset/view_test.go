@@ -7,7 +7,6 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 )
 
@@ -26,7 +25,7 @@ func TestKeystoneView(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.NoError(t, env.ExistingAddresses.Merge(resp.AddressBook))
-	resp, err = DeployForwarder(env, DeployForwarderRequest{})
+	resp, err = DeployForwarder(env, registryChain)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.NoError(t, env.ExistingAddresses.Merge(resp.AddressBook))

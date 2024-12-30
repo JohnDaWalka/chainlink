@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/docker"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logstream"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
@@ -125,11 +126,11 @@ func WithPgDBOptions(opts ...test_env.PostgresDbOption) ClNodeOption {
 	}
 }
 
-func NewClNode(networks []string, imageName, imageVersion string, nodeConfig *chainlink.Config, opts ...ClNodeOption) (*ClNode, error) {
+func NewClNode(networks []string, imageName, imageVersion string, nodeConfig *chainlink.Config, logStream *logstream.LogStream, opts ...ClNodeOption) (*ClNode, error) {
 	nodeDefaultCName := fmt.Sprintf("%s-%s", "cl-node", uuid.NewString()[0:8])
 	pgDefaultCName := fmt.Sprintf("pg-%s", nodeDefaultCName)
 
-	pgDb, err := test_env.NewPostgresDb(networks, test_env.WithPostgresDbContainerName(pgDefaultCName))
+	pgDb, err := test_env.NewPostgresDb(networks, test_env.WithPostgresDbContainerName(pgDefaultCName), test_env.WithPostgresDbLogStream(logStream))
 	if err != nil {
 		return nil, err
 	}
@@ -139,6 +140,7 @@ func NewClNode(networks []string, imageName, imageVersion string, nodeConfig *ch
 			ContainerImage:   imageName,
 			ContainerVersion: imageVersion,
 			Networks:         networks,
+			LogStream:        logStream,
 			StartupTimeout:   3 * time.Minute,
 		},
 		UserEmail:    "local@local.com",
@@ -147,6 +149,7 @@ func NewClNode(networks []string, imageName, imageVersion string, nodeConfig *ch
 		PostgresDb:   pgDb,
 		l:            log.Logger,
 	}
+	n.SetDefaultHooks()
 	for _, opt := range opts {
 		opt(n)
 	}
@@ -486,6 +489,13 @@ func (n *ClNode) getContainerRequest(secrets string) (
 				HostFilePath:      apiCredsFile.Name(),
 				ContainerFilePath: apiCredsPath,
 				FileMode:          0644,
+			},
+		},
+		LifecycleHooks: []tc.ContainerLifecycleHooks{
+			{
+				PostStarts:    n.PostStartsHooks,
+				PostStops:     n.PostStopsHooks,
+				PreTerminates: n.PreTerminatesHooks,
 			},
 		},
 	}, nil

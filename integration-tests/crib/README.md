@@ -6,7 +6,7 @@ It runs OCRv1 and reboots the environment confirming integration with environmen
 Go to the [CRIB](https://github.com/smartcontractkit/crib) repository and spin up a cluster.
 
 ```shell
-DEVSPACE_NAMESPACE=crib-oh-my-crib crib init
+./scripts/cribbit.sh crib-oh-my-crib
 devspace deploy --debug --profile local-dev-simulated-core-ocr1
 ```
 

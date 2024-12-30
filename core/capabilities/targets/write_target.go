@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -31,7 +30,7 @@ const transactionStatusCheckInterval = 2 * time.Second
 
 type WriteTarget struct {
 	cr               ContractValueGetter
-	cw               commontypes.ContractWriter
+	cw               commontypes.ChainWriter
 	binding          commontypes.BoundContract
 	forwarderAddress string
 	// The minimum amount of gas that the receiver contract must get to process the forwarder report
@@ -67,7 +66,7 @@ func NewWriteTarget(
 	lggr logger.Logger,
 	id string,
 	cr ContractValueGetter,
-	cw commontypes.ContractWriter,
+	cw commontypes.ChainWriter,
 	forwarderAddress string,
 	txGasLimit uint64,
 ) *WriteTarget {
@@ -187,23 +186,15 @@ func evaluate(rawRequest capabilities.CapabilityRequest) (r Request, err error) 
 	}
 
 	if hex.EncodeToString(reportMetadata.WorkflowExecutionID[:]) != rawRequest.Metadata.WorkflowExecutionID {
-		return r, fmt.Errorf("WorkflowExecutionID in the report does not match WorkflowExecutionID in the request metadata. Report WorkflowExecutionID: %+v, request WorkflowExecutionID: %+v", hex.EncodeToString(reportMetadata.WorkflowExecutionID[:]), rawRequest.Metadata.WorkflowExecutionID)
+		return r, fmt.Errorf("WorkflowExecutionID in the report does not match WorkflowExecutionID in the request metadata. Report WorkflowExecutionID: %+v, request WorkflowExecutionID: %+v", reportMetadata.WorkflowExecutionID, rawRequest.Metadata.WorkflowExecutionID)
 	}
 
-	// case-insensitive verification of the owner address (so that a check-summed address matches its non-checksummed version).
-	if !strings.EqualFold(hex.EncodeToString(reportMetadata.WorkflowOwner[:]), rawRequest.Metadata.WorkflowOwner) {
-		return r, fmt.Errorf("WorkflowOwner in the report does not match WorkflowOwner in the request metadata. Report WorkflowOwner: %+v, request WorkflowOwner: %+v", hex.EncodeToString(reportMetadata.WorkflowOwner[:]), rawRequest.Metadata.WorkflowOwner)
+	if hex.EncodeToString(reportMetadata.WorkflowOwner[:]) != rawRequest.Metadata.WorkflowOwner {
+		return r, fmt.Errorf("WorkflowOwner in the report does not match WorkflowOwner in the request metadata. Report WorkflowOwner: %+v, request WorkflowOwner: %+v", reportMetadata.WorkflowOwner, rawRequest.Metadata.WorkflowOwner)
 	}
 
-	// workflowNames are padded to 10bytes
-	decodedName, err := hex.DecodeString(rawRequest.Metadata.WorkflowName)
-	if err != nil {
-		return r, err
-	}
-	var workflowName [10]byte
-	copy(workflowName[:], decodedName)
-	if !bytes.Equal(reportMetadata.WorkflowName[:], workflowName[:]) {
-		return r, fmt.Errorf("WorkflowName in the report does not match WorkflowName in the request metadata. Report WorkflowName: %+v, request WorkflowName: %+v", hex.EncodeToString(reportMetadata.WorkflowName[:]), hex.EncodeToString(workflowName[:]))
+	if hex.EncodeToString(reportMetadata.WorkflowName[:]) != rawRequest.Metadata.WorkflowName {
+		return r, fmt.Errorf("WorkflowName in the report does not match WorkflowName in the request metadata. Report WorkflowName: %+v, request WorkflowName: %+v", reportMetadata.WorkflowName, rawRequest.Metadata.WorkflowName)
 	}
 
 	if hex.EncodeToString(reportMetadata.WorkflowCID[:]) != rawRequest.Metadata.WorkflowID {

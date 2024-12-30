@@ -118,5 +118,5 @@ func (th *EVMBackendTH) NewContractReader(ctx context.Context, t *testing.T, cfg
 		return nil, err
 	}
 
-	return svc, err
+	return svc, svc.Start(ctx)
 }

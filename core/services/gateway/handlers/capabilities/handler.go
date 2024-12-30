@@ -20,10 +20,9 @@ import (
 
 const (
 	// NOTE: more methods will go here. HTTP trigger/action/target; etc.
-	MethodWebAPITarget   = "web_api_target"
-	MethodWebAPITrigger  = "web_api_trigger"
-	MethodComputeAction  = "compute_action"
-	MethodWorkflowSyncer = "workflow_syncer"
+	MethodWebAPITarget  = "web_api_target"
+	MethodWebAPITrigger = "web_api_trigger"
+	MethodComputeAction = "compute_action"
 )
 
 type handler struct {
@@ -146,8 +145,7 @@ func (h *handler) handleWebAPIOutgoingMessage(ctx context.Context, msg *api.Mess
 		newCtx := context.WithoutCancel(ctx)
 		newCtx, cancel := context.WithTimeout(newCtx, timeout)
 		defer cancel()
-		l := h.lggr.With("url", payload.URL, "messageId", msg.Body.MessageId, "method", payload.Method, "timeout", payload.TimeoutMs)
-		l.Debug("Sending request to client")
+		l := h.lggr.With("url", payload.URL, "messageId", msg.Body.MessageId, "method", payload.Method)
 		respMsg, err := h.sendHTTPMessageToClient(newCtx, req, msg)
 		if err != nil {
 			l.Errorw("error while sending HTTP request to external endpoint", "err", err)
@@ -188,7 +186,7 @@ func (h *handler) HandleNodeMessage(ctx context.Context, msg *api.Message, nodeA
 	switch msg.Body.Method {
 	case MethodWebAPITrigger:
 		return h.handleWebAPITriggerMessage(ctx, msg, nodeAddr)
-	case MethodWebAPITarget, MethodComputeAction, MethodWorkflowSyncer:
+	case MethodWebAPITarget, MethodComputeAction:
 		return h.handleWebAPIOutgoingMessage(ctx, msg, nodeAddr)
 	default:
 		return fmt.Errorf("unsupported method: %s", msg.Body.Method)

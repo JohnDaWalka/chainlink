@@ -14,7 +14,6 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -25,9 +24,6 @@ var _ LogPoller = (*mockLogPoller)(nil)
 type mockLogPoller struct {
 	logs        []logpoller.Log
 	latestBlock int64
-
-	exprs        []query.Expression
-	limitAndSort query.LimitAndSort
 }
 
 func (m *mockLogPoller) LatestBlock(ctx context.Context) (logpoller.LogPollerBlock, error) {
@@ -39,10 +35,22 @@ func (m *mockLogPoller) RegisterFilter(ctx context.Context, filter logpoller.Fil
 func (m *mockLogPoller) Replay(ctx context.Context, fromBlock int64) error {
 	return nil
 }
-func (m *mockLogPoller) FilteredLogs(ctx context.Context, filter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]logpoller.Log, error) {
-	m.exprs = filter
-	m.limitAndSort = limitAndSort
-	return m.logs, nil
+func (m *mockLogPoller) LogsWithSigs(ctx context.Context, start, end int64, eventSigs []common.Hash, address common.Address) ([]logpoller.Log, error) {
+	logs := make([]logpoller.Log, 0)
+	for _, log := range m.logs {
+		if log.BlockNumber >= start && log.BlockNumber <= end && log.Address == address {
+			for _, sig := range eventSigs {
+				if log.EventSig == sig {
+					logs = append(logs, log)
+				}
+			}
+		}
+	}
+
+	return logs, nil
+}
+func (m *mockLogPoller) IndexedLogsByBlockRange(ctx context.Context, start, end int64, eventSig common.Hash, address common.Address, topicIndex int, topicValues []common.Hash) ([]logpoller.Log, error) {
+	return m.LogsWithSigs(ctx, start, end, []common.Hash{eventSig}, address)
 }
 
 type cfg struct {
@@ -63,7 +71,7 @@ func (m *mockConfigCache) StoreConfig(ctx context.Context, cd ocrtypes.ConfigDig
 func Test_ConfigPoller(t *testing.T) {
 	ctx := testutils.Context(t)
 	lggr := logger.Test(t)
-	lp := &mockLogPoller{make([]logpoller.Log, 0), 0, nil, query.LimitAndSort{}}
+	lp := &mockLogPoller{make([]logpoller.Log, 0), 0}
 	addr := common.Address{1}
 	donID := uint32(1)
 	donIDHash := DonIDToBytes32(donID)
@@ -320,6 +328,15 @@ func Test_ConfigPoller(t *testing.T) {
 			})
 		})
 		t.Run("LatestConfig", func(t *testing.T) {
+			t.Run("changedInBlock in future, returns nothing", func(t *testing.T) {
+				cfg, err := cpBlue.LatestConfig(ctx, 200)
+				require.NoError(t, err)
+				assert.Zero(t, cfg)
+
+				cfg, err = cpGreen.LatestConfig(ctx, 200)
+				require.NoError(t, err)
+				assert.Zero(t, cfg)
+			})
 			t.Run("changedInBlock corresponds to a block in which a log was emitted, returns the config", func(t *testing.T) {
 				expectedSigners := []ocr2types.OnchainPublicKey{ocr2types.OnchainPublicKey{0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, ocr2types.OnchainPublicKey{0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}}
 				expectedTransmitters := []ocr2types.Account{"0100000000000000000000000000000000000000000000000000000000000000", "0200000000000000000000000000000000000000000000000000000000000000"}

@@ -2,7 +2,6 @@ package request
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -26,7 +25,7 @@ type response struct {
 type ServerRequest struct {
 	capability capabilities.ExecutableCapability
 
-	capabilityPeerID p2ptypes.PeerID
+	capabilityPeerId p2ptypes.PeerID
 	capabilityID     string
 	capabilityDonID  uint32
 
@@ -49,8 +48,6 @@ type ServerRequest struct {
 	lggr logger.Logger
 }
 
-var errExternalErrorMsg = errors.New("failed to execute capability")
-
 func NewServerRequest(capability capabilities.ExecutableCapability, method string, capabilityID string, capabilityDonID uint32,
 	capabilityPeerID p2ptypes.PeerID,
 	callingDon commoncap.DON, requestID string,
@@ -60,7 +57,7 @@ func NewServerRequest(capability capabilities.ExecutableCapability, method strin
 		createdTime:             time.Now(),
 		capabilityID:            capabilityID,
 		capabilityDonID:         capabilityDonID,
-		capabilityPeerID:        capabilityPeerID,
+		capabilityPeerId:        capabilityPeerID,
 		dispatcher:              dispatcher,
 		requesters:              map[p2ptypes.PeerID]bool{},
 		responseSentToRequester: map[p2ptypes.PeerID]bool{},
@@ -77,7 +74,7 @@ func (e *ServerRequest) OnMessage(ctx context.Context, msg *types.MessageBody) e
 	defer e.mux.Unlock()
 
 	if msg.Sender == nil {
-		return errors.New("sender missing from message")
+		return fmt.Errorf("sender missing from message")
 	}
 
 	requester, err := remote.ToPeerID(msg.Sender)
@@ -94,6 +91,10 @@ func (e *ServerRequest) OnMessage(ctx context.Context, msg *types.MessageBody) e
 		switch e.method {
 		case types.MethodExecute:
 			e.executeRequest(ctx, msg.Payload, executeCapabilityRequest)
+		case types.MethodRegisterToWorkflow:
+			e.executeRequest(ctx, msg.Payload, registerToWorkflow)
+		case types.MethodUnregisterFromWorkflow:
+			e.executeRequest(ctx, msg.Payload, unregisterFromWorkflow)
 		default:
 			e.setError(types.Error_INTERNAL_ERROR, "unknown method %s"+e.method)
 		}
@@ -202,7 +203,7 @@ func (e *ServerRequest) sendResponse(requester p2ptypes.PeerID) error {
 		CallerDonId:     e.callingDon.ID,
 		Method:          types.MethodExecute,
 		MessageId:       []byte(e.requestMessageID),
-		Sender:          e.capabilityPeerID[:],
+		Sender:          e.capabilityPeerId[:],
 		Receiver:        requester[:],
 	}
 
@@ -227,24 +228,52 @@ func executeCapabilityRequest(ctx context.Context, lggr logger.Logger, capabilit
 	payload []byte) ([]byte, error) {
 	capabilityRequest, err := pb.UnmarshalCapabilityRequest(payload)
 	if err != nil {
-		lggr.Errorw("failed to unmarshal capability request", "err", err)
-		return nil, errExternalErrorMsg
+		return nil, fmt.Errorf("failed to unmarshal capability request: %w", err)
 	}
 
 	lggr.Debugw("executing capability", "metadata", capabilityRequest.Metadata)
 	capResponse, err := capability.Execute(ctx, capabilityRequest)
 
 	if err != nil {
-		lggr.Errorw("received execution error", "workflowExecutionID", capabilityRequest.Metadata.WorkflowExecutionID, "error", err)
-		return nil, errExternalErrorMsg
+		lggr.Debugw("received execution error", "workflowExecutionID", capabilityRequest.Metadata.WorkflowExecutionID, "error", err)
+		return nil, fmt.Errorf("failed to execute capability: %w", err)
 	}
 
 	responsePayload, err := pb.MarshalCapabilityResponse(capResponse)
 	if err != nil {
-		lggr.Errorw("failed to marshal capability request", "err", err)
-		return nil, errExternalErrorMsg
+		return nil, fmt.Errorf("failed to marshal capability response: %w", err)
 	}
 
 	lggr.Debugw("received execution results", "workflowExecutionID", capabilityRequest.Metadata.WorkflowExecutionID)
 	return responsePayload, nil
+}
+
+func registerToWorkflow(ctx context.Context, _ logger.Logger, capability capabilities.ExecutableCapability,
+	payload []byte) ([]byte, error) {
+	registerRequest, err := pb.UnmarshalRegisterToWorkflowRequest(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal register to workflow request: %w", err)
+	}
+
+	err = capability.RegisterToWorkflow(ctx, registerRequest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register to workflow: %w", err)
+	}
+
+	return nil, nil
+}
+
+func unregisterFromWorkflow(ctx context.Context, _ logger.Logger, capability capabilities.ExecutableCapability,
+	payload []byte) ([]byte, error) {
+	unregisterRequest, err := pb.UnmarshalUnregisterFromWorkflowRequest(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal unregister from workflow request: %w", err)
+	}
+
+	err = capability.UnregisterFromWorkflow(ctx, unregisterRequest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unregister from workflow: %w", err)
+	}
+
+	return nil, nil
 }

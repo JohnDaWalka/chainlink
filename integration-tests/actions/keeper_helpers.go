@@ -670,14 +670,15 @@ Distribute your funds across multiple private keys and update your configuration
 func GetAndAssertCorrectConcurrency(client *seth.Client, minConcurrency int) (int, error) {
 	concurrency := client.Cfg.GetMaxConcurrency()
 
+	var msg string
+	if client.Cfg.IsSimulatedNetwork() {
+		msg = fmt.Sprintf(INSUFFICIENT_EPHEMERAL_KEYS, concurrency)
+	} else {
+		msg = fmt.Sprintf(INSUFFICIENT_STATIC_KEYS, concurrency)
+	}
+
 	if concurrency < minConcurrency {
-		var err error
-		if client.Cfg.IsSimulatedNetwork() {
-			err = fmt.Errorf(INSUFFICIENT_EPHEMERAL_KEYS, concurrency)
-		} else {
-			err = fmt.Errorf(INSUFFICIENT_STATIC_KEYS, concurrency)
-		}
-		return 0, err
+		return 0, fmt.Errorf(msg)
 	}
 
 	return concurrency, nil

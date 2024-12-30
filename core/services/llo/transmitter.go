@@ -23,9 +23,17 @@ import (
 // If you need to "fan-out" transmits and send reports to a new destination,
 // add a new subTransmitter
 
+// TODO: prom metrics (common with mercury/transmitter.go?)
+// https://smartcontract-it.atlassian.net/browse/MERC-3659
+
 const (
 	// Mercury server error codes
 	DuplicateReport = 2
+	// TODO: revisit these values in light of parallel composition
+	// https://smartcontract-it.atlassian.net/browse/MERC-3659
+	// maxTransmitQueueSize = 10_000
+	// maxDeleteQueueSize   = 10_000
+	// transmitTimeout      = 5 * time.Second
 )
 
 type Transmitter interface {
@@ -39,9 +47,8 @@ type TransmitterRetirementReportCacheWriter interface {
 
 type transmitter struct {
 	services.StateMachine
-	lggr           logger.Logger
-	verboseLogging bool
-	fromAccount    string
+	lggr        logger.Logger
+	fromAccount string
 
 	subTransmitters       []Transmitter
 	retirementReportCache TransmitterRetirementReportCacheWriter
@@ -49,7 +56,6 @@ type transmitter struct {
 
 type TransmitterOpts struct {
 	Lggr                   logger.Logger
-	VerboseLogging         bool
 	FromAccount            string
 	MercuryTransmitterOpts mercurytransmitter.Opts
 	RetirementReportCache  TransmitterRetirementReportCacheWriter
@@ -63,7 +69,6 @@ func NewTransmitter(opts TransmitterOpts) Transmitter {
 	return &transmitter{
 		services.StateMachine{},
 		opts.Lggr,
-		opts.VerboseLogging,
 		opts.FromAccount,
 		subTransmitters,
 		opts.RetirementReportCache,
@@ -109,10 +114,6 @@ func (t *transmitter) Transmit(
 	report ocr3types.ReportWithInfo[llotypes.ReportInfo],
 	sigs []types.AttributedOnchainSignature,
 ) (err error) {
-	if t.verboseLogging {
-		t.lggr.Debugw("Transmit report", "digest", digest, "seqNr", seqNr, "report", report, "sigs", sigs)
-	}
-
 	if report.Info.ReportFormat == llotypes.ReportFormatRetirement {
 		// Retirement reports don't get transmitted; rather, they are stored in
 		// the RetirementReportCache

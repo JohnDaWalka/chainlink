@@ -10,7 +10,6 @@ import (
 	"slices"
 
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli"
 
 	"github.com/smartcontractkit/chainlink/v2/core/build"
@@ -86,7 +85,6 @@ func NewApp(s *Shell) *cli.App {
 		}
 
 		s.Logger = lggr
-		s.Registerer = prometheus.DefaultRegisterer // use the global DefaultRegisterer, should be safe since we only ever run one instance of the app per shell
 		s.CloseLogger = closeFn
 		s.Config = cfg
 
@@ -290,14 +288,25 @@ func NewApp(s *Shell) *cli.App {
 			},
 		},
 		{
-			Name:        "chains",
-			Usage:       "Commands for handling chain configuration",
-			Subcommands: initChainSubCmds(s),
+			Name:  "chains",
+			Usage: "Commands for handling chain configuration",
+			Subcommands: cli.Commands{
+				chainCommand("EVM", EVMChainClient(s), cli.Int64Flag{Name: "id", Usage: "chain ID"}),
+				chainCommand("Cosmos", CosmosChainClient(s), cli.StringFlag{Name: "id", Usage: "chain ID"}),
+				chainCommand("Solana", SolanaChainClient(s),
+					cli.StringFlag{Name: "id", Usage: "chain ID, options: [mainnet, testnet, devnet, localnet]"}),
+				chainCommand("StarkNet", StarkNetChainClient(s), cli.StringFlag{Name: "id", Usage: "chain ID"}),
+			},
 		},
 		{
-			Name:        "nodes",
-			Usage:       "Commands for handling node configuration",
-			Subcommands: initNodeSubCmds(s),
+			Name:  "nodes",
+			Usage: "Commands for handling node configuration",
+			Subcommands: cli.Commands{
+				initEVMNodeSubCmd(s),
+				initCosmosNodeSubCmd(s),
+				initSolanaNodeSubCmd(s),
+				initStarkNetNodeSubCmd(s),
+			},
 		},
 		{
 			Name:        "forwarders",

@@ -4,7 +4,6 @@ import (
 	"math/rand"
 
 	"github.com/rs/zerolog"
-	"golang.org/x/exp/constraints"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 
@@ -124,9 +123,9 @@ func (m *SingleHashGun) Call(_ *wasp.Generator) *wasp.Response {
 
 func deviateValue(requestCountPerTX uint16, deviation uint16) uint16 {
 	if randBool() && requestCountPerTX > deviation {
-		requestCountPerTX -= randInRange(0, deviation)
+		requestCountPerTX -= uint16(randInRange(0, int(deviation)))
 	} else {
-		requestCountPerTX += randInRange(0, deviation)
+		requestCountPerTX += uint16(randInRange(0, int(deviation)))
 	}
 	return requestCountPerTX
 }
@@ -134,7 +133,6 @@ func deviateValue(requestCountPerTX uint16, deviation uint16) uint16 {
 func randBool() bool {
 	return rand.Intn(2) == 1
 }
-
-func randInRange[I constraints.Integer](lower, upper I) I {
-	return I(rand.Intn(int(upper-lower)+1)) + lower
+func randInRange(min int, max int) int {
+	return rand.Intn(max-min+1) + min
 }

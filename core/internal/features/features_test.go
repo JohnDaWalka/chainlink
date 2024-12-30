@@ -40,7 +40,6 @@ import (
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink/v2/core/auth"
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
@@ -65,8 +64,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/keystest"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocrkey"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 	"github.com/smartcontractkit/chainlink/v2/core/services/webhook"
@@ -527,15 +526,10 @@ observationSource   = """
 		assert.Equal(t, []*string(nil), run.Errors)
 
 		testutils.WaitForLogMessage(t, o, "Sending transaction")
-		gomega.NewWithT(t).Eventually(func() bool {
-			b.Commit() // Process new head until tx confirmed, receipt is fetched, and task resumed
-			for _, l := range o.All() {
-				if strings.Contains(l.Message, "Resume run success") {
-					return true
-				}
-			}
-			return false
-		}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
+		b.Commit() // Needs at least two confirmations
+		b.Commit() // Needs at least two confirmations
+		b.Commit() // Needs at least two confirmations
+		testutils.WaitForLogMessage(t, o, "Resume run success")
 
 		pipelineRuns := cltest.WaitForPipelineComplete(t, 0, j.ID, 1, 1, app.JobORM(), testutils.WaitTimeout(t), time.Second)
 
@@ -578,15 +572,10 @@ observationSource   = """
 		assert.Equal(t, []*string(nil), run.Errors)
 
 		testutils.WaitForLogMessage(t, o, "Sending transaction")
-		gomega.NewWithT(t).Eventually(func() bool {
-			b.Commit() // Process new head until tx confirmed, receipt is fetched, and task resumed
-			for _, l := range o.All() {
-				if strings.Contains(l.Message, "Resume run success") {
-					return true
-				}
-			}
-			return false
-		}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
+		b.Commit() // Needs at least two confirmations
+		b.Commit() // Needs at least two confirmations
+		b.Commit() // Needs at least two confirmations
+		testutils.WaitForLogMessage(t, o, "Resume run success")
 
 		pipelineRuns := cltest.WaitForPipelineError(t, 0, j.ID, 1, 1, app.JobORM(), testutils.WaitTimeout(t), time.Second)
 
@@ -621,15 +610,10 @@ observationSource   = """
 		assert.Equal(t, []*string(nil), run.Errors)
 
 		testutils.WaitForLogMessage(t, o, "Sending transaction")
-		gomega.NewWithT(t).Eventually(func() bool {
-			b.Commit() // Process new head until tx confirmed, receipt is fetched, and task resumed
-			for _, l := range o.All() {
-				if strings.Contains(l.Message, "Resume run success") {
-					return true
-				}
-			}
-			return false
-		}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
+		b.Commit() // Needs at least two confirmations
+		b.Commit() // Needs at least two confirmations
+		b.Commit() // Needs at least two confirmations
+		testutils.WaitForLogMessage(t, o, "Resume run success")
 
 		pipelineRuns := cltest.WaitForPipelineComplete(t, 0, j.ID, 1, 1, app.JobORM(), testutils.WaitTimeout(t), time.Second)
 
@@ -641,7 +625,7 @@ observationSource   = """
 		require.Len(t, outputs, 1)
 		output := outputs[0]
 		receipt := output.(map[string]interface{})
-		assert.Equal(t, "0x13", receipt["blockNumber"])
+		assert.Equal(t, "0x11", receipt["blockNumber"])
 		assert.Equal(t, "0x7a120", receipt["gasUsed"])
 		assert.Equal(t, "0x0", receipt["status"])
 	})
@@ -694,7 +678,7 @@ func setupNode(t *testing.T, owner *bind.TransactOpts, portV2 int,
 	b evmtypes.Backend, overrides func(c *chainlink.Config, s *chainlink.Secrets),
 ) (*cltest.TestApplication, string, common.Address, ocrkey.KeyV2) {
 	ctx := testutils.Context(t)
-	p2pKey := p2pkey.MustNewV2XXXTestingOnly(big.NewInt(int64(portV2)))
+	p2pKey := keystest.NewP2PKeyV2(t)
 	config, _ := heavyweight.FullTestDBV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
 		c.Insecure.OCRDevelopmentMode = ptr(true) // Disables ocr spec validation so we can have fast polling for the test.
 
@@ -739,7 +723,7 @@ func setupNode(t *testing.T, owner *bind.TransactOpts, portV2 int,
 
 func setupForwarderEnabledNode(t *testing.T, owner *bind.TransactOpts, portV2 int, b evmtypes.Backend, overrides func(c *chainlink.Config, s *chainlink.Secrets)) (*cltest.TestApplication, string, common.Address, common.Address, ocrkey.KeyV2) {
 	ctx := testutils.Context(t)
-	p2pKey := p2pkey.MustNewV2XXXTestingOnly(big.NewInt(int64(portV2)))
+	p2pKey := keystest.NewP2PKeyV2(t)
 	config, _ := heavyweight.FullTestDBV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
 		c.Insecure.OCRDevelopmentMode = ptr(true) // Disables ocr spec validation so we can have fast polling for the test.
 
@@ -799,7 +783,7 @@ func setupForwarderEnabledNode(t *testing.T, owner *bind.TransactOpts, portV2 in
 
 func TestIntegration_OCR(t *testing.T) {
 	t.Skip("fails after geth upgrade https://github.com/smartcontractkit/chainlink/pull/11809; passes local but fails CI")
-	tests.SkipShort(t, "long test")
+	testutils.SkipShort(t, "long test")
 	t.Parallel()
 	tests := []struct {
 		id      int
@@ -1032,7 +1016,7 @@ observationSource = """
 
 func TestIntegration_OCR_ForwarderFlow(t *testing.T) {
 	t.Skip("fails after geth upgrade https://github.com/smartcontractkit/chainlink/pull/11809")
-	tests.SkipShort(t, "long test")
+	testutils.SkipShort(t, "long test")
 	t.Parallel()
 	numOracles := 4
 	t.Run("ocr_forwarder_flow", func(t *testing.T) {

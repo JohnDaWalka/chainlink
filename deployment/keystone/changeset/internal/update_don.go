@@ -6,18 +6,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/mcms"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"google.golang.org/protobuf/proto"
 
-	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
+
+	kslib "github.com/smartcontractkit/chainlink/deployment/keystone"
 )
 
 // CapabilityConfig is a struct that holds a capability and its configuration
@@ -27,21 +26,18 @@ type CapabilityConfig struct {
 }
 
 type UpdateDonRequest struct {
-	Chain       deployment.Chain
-	ContractSet *ContractSet // contract set for the given chain
+	Registry *kcr.CapabilitiesRegistry
+	Chain    deployment.Chain
 
 	P2PIDs            []p2pkey.PeerID    // this is the unique identifier for the don
 	CapabilityConfigs []CapabilityConfig // if Config subfield is nil, a default config is used
-
-	UseMCMS bool
 }
 
-func (r *UpdateDonRequest) AppendNodeCapabilitiesRequest() *AppendNodeCapabilitiesRequest {
+func (r *UpdateDonRequest) appendNodeCapabilitiesRequest() *AppendNodeCapabilitiesRequest {
 	out := &AppendNodeCapabilitiesRequest{
 		Chain:             r.Chain,
-		ContractSet:       r.ContractSet,
+		Registry:          r.Registry,
 		P2pToCapabilities: make(map[p2pkey.PeerID][]kcr.CapabilitiesRegistryCapability),
-		UseMCMS:           r.UseMCMS,
 	}
 	for _, p2pid := range r.P2PIDs {
 		if _, exists := out.P2pToCapabilities[p2pid]; !exists {
@@ -55,7 +51,7 @@ func (r *UpdateDonRequest) AppendNodeCapabilitiesRequest() *AppendNodeCapabiliti
 }
 
 func (r *UpdateDonRequest) Validate() error {
-	if r.ContractSet.CapabilitiesRegistry == nil {
+	if r.Registry == nil {
 		return fmt.Errorf("registry is required")
 	}
 	if len(r.P2PIDs) == 0 {
@@ -66,7 +62,6 @@ func (r *UpdateDonRequest) Validate() error {
 
 type UpdateDonResponse struct {
 	DonInfo kcr.CapabilitiesRegistryDONInfo
-	Ops     *timelock.BatchChainOperation
 }
 
 func UpdateDon(lggr logger.Logger, req *UpdateDonRequest) (*UpdateDonResponse, error) {
@@ -74,8 +69,7 @@ func UpdateDon(lggr logger.Logger, req *UpdateDonRequest) (*UpdateDonResponse, e
 		return nil, fmt.Errorf("failed to validate request: %w", err)
 	}
 
-	registry := req.ContractSet.CapabilitiesRegistry
-	getDonsResp, err := registry.GetDONs(&bind.CallOpts{})
+	getDonsResp, err := req.Registry.GetDONs(&bind.CallOpts{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Dons: %w", err)
 	}
@@ -84,42 +78,29 @@ func UpdateDon(lggr logger.Logger, req *UpdateDonRequest) (*UpdateDonResponse, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to lookup don by p2pIDs: %w", err)
 	}
-	cfgs, err := computeConfigs(registry, req.CapabilityConfigs, don)
+	cfgs, err := computeConfigs(req.Registry, req.CapabilityConfigs, don)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute configs: %w", err)
 	}
 
-	txOpts := req.Chain.DeployerKey
-	if req.UseMCMS {
-		txOpts = deployment.SimTransactOpts()
-	}
-	tx, err := registry.UpdateDON(txOpts, don.Id, don.NodeP2PIds, cfgs, don.IsPublic, don.F)
+	_, err = AppendNodeCapabilitiesImpl(lggr, req.appendNodeCapabilitiesRequest())
 	if err != nil {
-		err = deployment.DecodeErr(kcr.CapabilitiesRegistryABI, err)
-		return nil, fmt.Errorf("failed to call UpdateDON: %w", err)
-	}
-	var ops *timelock.BatchChainOperation
-	if !req.UseMCMS {
-		_, err = req.Chain.Confirm(tx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to confirm UpdateDON transaction %s: %w", tx.Hash().String(), err)
-		}
-	} else {
-		ops = &timelock.BatchChainOperation{
-			ChainIdentifier: mcms.ChainIdentifier(req.Chain.Selector),
-			Batch: []mcms.Operation{
-				{
-					To:    registry.Address(),
-					Data:  tx.Data(),
-					Value: big.NewInt(0),
-				},
-			},
-		}
+		return nil, fmt.Errorf("failed to append node capabilities: %w", err)
 	}
 
+	tx, err := req.Registry.UpdateDON(req.Chain.DeployerKey, don.Id, don.NodeP2PIds, cfgs, don.IsPublic, don.F)
+	if err != nil {
+		err = kslib.DecodeErr(kcr.CapabilitiesRegistryABI, err)
+		return nil, fmt.Errorf("failed to call UpdateDON: %w", err)
+	}
+
+	_, err = req.Chain.Confirm(tx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to confirm UpdateDON transaction %s: %w", tx.Hash().String(), err)
+	}
 	out := don
 	out.CapabilityConfigurations = cfgs
-	return &UpdateDonResponse{DonInfo: out, Ops: ops}, nil
+	return &UpdateDonResponse{DonInfo: out}, nil
 }
 
 func PeerIDsToBytes(p2pIDs []p2pkey.PeerID) [][32]byte {
@@ -148,7 +129,7 @@ func computeConfigs(registry *kcr.CapabilitiesRegistry, caps []CapabilityConfig,
 		}
 		out[i].CapabilityId = id
 		if out[i].Config == nil {
-			c := DefaultCapConfig(cap.Capability.CapabilityType, int(donInfo.F))
+			c := kslib.DefaultCapConfig(cap.Capability.CapabilityType, int(donInfo.F))
 			cb, err := proto.Marshal(c)
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal capability config for %v: %w", c, err)

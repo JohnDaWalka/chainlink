@@ -3,7 +3,6 @@ package node
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"math/big"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
@@ -55,9 +54,6 @@ func WithPrivateEVMs(networks []blockchain.EVMNetwork, commonChainConfig *evmcfg
 			}
 		}
 		if evmConfig.Chain.FinalityDepth == nil && network.FinalityDepth > 0 {
-			if network.FinalityDepth > math.MaxUint32 {
-				panic(fmt.Errorf("finality depth overflows uint32: %d", network.FinalityDepth))
-			}
 			evmConfig.Chain.FinalityDepth = ptr.Ptr(uint32(network.FinalityDepth))
 		}
 		if evmConfig.Chain.FinalityTagEnabled == nil && network.FinalityTag {

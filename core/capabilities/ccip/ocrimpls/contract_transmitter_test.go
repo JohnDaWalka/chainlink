@@ -103,7 +103,7 @@ func testTransmitter(
 	report []byte,
 ) {
 	ctx := tests.Context(t)
-	uni := newTestUniverse(t, nil)
+	uni := newTestUniverse[[]byte](t, nil)
 
 	c, err := uni.wrapper.LatestConfigDetails(nil, pluginType)
 	require.NoError(t, err, "failed to get latest config details")
@@ -159,12 +159,12 @@ func testTransmitter(
 
 	// wait for receipt to be written to the db
 	require.Eventually(t, func() bool {
-		uni.backend.Commit()
-		var count uint32
-		err := uni.db.GetContext(testutils.Context(t), &count, `SELECT count(*) as cnt FROM evm.receipts LIMIT 1`)
-		require.NoError(t, err)
-		if count == 1 {
-			t.Log("tx receipt found in db")
+		rows, err := uni.db.QueryContext(testutils.Context(t), `SELECT count(*) as cnt FROM evm.receipts LIMIT 1`)
+		require.NoError(t, err, "failed to query receipts")
+		defer rows.Close()
+		var count int
+		for rows.Next() {
+			require.NoError(t, rows.Scan(&count), "failed to scan")
 		}
 		return count == 1
 	}, testutils.WaitTimeout(t), 2*time.Second)
@@ -199,7 +199,7 @@ type keyringsAndSigners[RI any] struct {
 	signers  []common.Address
 }
 
-func newTestUniverse(t *testing.T, ks *keyringsAndSigners[[]byte]) *testUniverse[[]byte] {
+func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniverse[RI] {
 	t.Helper()
 
 	db := pgtest.NewSqlxDB(t)
@@ -233,7 +233,7 @@ func newTestUniverse(t *testing.T, ks *keyringsAndSigners[[]byte]) *testUniverse
 	// create the oracle identities for setConfig
 	// need to create at least 4 identities otherwise setConfig will fail
 	var (
-		keyrings []ocr3types.OnchainKeyring[[]byte]
+		keyrings []ocr3types.OnchainKeyring[RI]
 		signers  []common.Address
 	)
 	if ks != nil {
@@ -243,7 +243,7 @@ func newTestUniverse(t *testing.T, ks *keyringsAndSigners[[]byte]) *testUniverse
 		for i := 0; i < 4; i++ {
 			kb, err2 := ocr2key.New(kschaintype.EVM)
 			require.NoError(t, err2, "failed to create key")
-			kr := ocrimpls.NewOnchainKeyring[[]byte](kb, logger.TestLogger(t))
+			kr := ocrimpls.NewOnchainKeyring[RI](kb, logger.TestLogger(t))
 			signers = append(signers, common.BytesToAddress(kr.PublicKey()))
 			keyrings = append(keyrings, kr)
 		}
@@ -309,7 +309,7 @@ func newTestUniverse(t *testing.T, ks *keyringsAndSigners[[]byte]) *testUniverse
 	require.NoError(t, chainWriter.Start(testutils.Context(t)), "failed to start chain writer")
 	t.Cleanup(func() { require.NoError(t, chainWriter.Close()) })
 
-	transmitterWithSigs := ocrimpls.XXXNewContractTransmitterTestsOnly(
+	transmitterWithSigs := ocrimpls.XXXNewContractTransmitterTestsOnly[RI](
 		chainWriter,
 		ocrtypes.Account(transmitters[0].Hex()),
 		contractName,
@@ -317,7 +317,7 @@ func newTestUniverse(t *testing.T, ks *keyringsAndSigners[[]byte]) *testUniverse
 		ocr3HelperAddr.Hex(),
 		ocrimpls.ToCommitCalldata,
 	)
-	transmitterWithoutSigs := ocrimpls.XXXNewContractTransmitterTestsOnly(
+	transmitterWithoutSigs := ocrimpls.XXXNewContractTransmitterTestsOnly[RI](
 		chainWriter,
 		ocrtypes.Account(transmitters[0].Hex()),
 		contractName,
@@ -326,7 +326,7 @@ func newTestUniverse(t *testing.T, ks *keyringsAndSigners[[]byte]) *testUniverse
 		ocrimpls.ToExecCalldata,
 	)
 
-	return &testUniverse[[]byte]{
+	return &testUniverse[RI]{
 		simClient:              simClient,
 		backend:                backend,
 		deployer:               owner,

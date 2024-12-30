@@ -22,7 +22,6 @@ import (
 )
 
 func Test_CLOSpecApprovalFlow_pipeline(t *testing.T) {
-	t.Parallel()
 	ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(
 		t,
 		testhelpers.SourceChainID,
@@ -41,7 +40,6 @@ func Test_CLOSpecApprovalFlow_pipeline(t *testing.T) {
 }
 
 func Test_CLOSpecApprovalFlow_dynamicPriceGetter(t *testing.T) {
-	t.Parallel()
 	ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(
 		t,
 		testhelpers.SourceChainID,

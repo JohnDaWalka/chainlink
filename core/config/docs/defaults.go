@@ -5,10 +5,9 @@ import (
 	"strings"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	pgcommon "github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
-
 	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink/cfgtest"
+	"github.com/smartcontractkit/chainlink/v2/core/store/dialects"
 )
 
 var (
@@ -23,7 +22,7 @@ func init() {
 
 func CoreDefaults() (c toml.Core) {
 	c.SetFrom(&defaults)
-	c.Database.Dialect = pgcommon.Postgres // not user visible - overridden for tests only
+	c.Database.Dialect = dialects.Postgres // not user visible - overridden for tests only
 	c.Tracing.Attributes = make(map[string]string)
 	return
 }

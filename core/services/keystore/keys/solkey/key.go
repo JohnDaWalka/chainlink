@@ -17,9 +17,11 @@ type Raw []byte
 // Key gets the Key
 func (raw Raw) Key() Key {
 	privKey := ed25519.NewKeyFromSeed(raw)
+	pubKey := make([]byte, ed25519.PublicKeySize)
+	copy(pubKey, privKey[ed25519.PublicKeySize:])
 	return Key{
 		privkey: privKey,
-		pubKey:  privKey.Public().(ed25519.PublicKey),
+		pubKey:  pubKey,
 	}
 }
 

@@ -3,7 +3,6 @@ package llo
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	llotypes "github.com/smartcontractkit/chainlink-common/pkg/types/llo"
@@ -26,7 +25,7 @@ type staticCDC struct {
 func NewStaticChannelDefinitionCache(lggr logger.Logger, dfnstr string) (llotypes.ChannelDefinitionCache, error) {
 	var definitions llotypes.ChannelDefinitions
 	if err := json.Unmarshal([]byte(dfnstr), &definitions); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal static channel definitions: %w", err)
+		return nil, err
 	}
 	return &staticCDC{services.StateMachine{}, logger.Named(lggr, "StaticChannelDefinitionCache"), definitions}, nil
 }

@@ -7,8 +7,6 @@ import {WorkflowRegistrySetup} from "./WorkflowRegistrySetup.t.sol";
 contract WorkflowRegistry_updateWorkflow is WorkflowRegistrySetup {
   bytes32 private s_newValidWorkflowID = keccak256("newValidWorkflowID");
   string private s_newValidSecretsURL = "https://example.com/new-secrets";
-  string private s_newValidConfigURL = "https://example.com/new-config";
-  string private s_newValidBinaryURL = "https://example.com/new-binary";
 
   function test_RevertWhen_TheCallerIsNotAnAuthorizedAddress() external {
     // Register the workflow first as an authorized address.
@@ -159,53 +157,27 @@ contract WorkflowRegistry_updateWorkflow is WorkflowRegistrySetup {
   }
 
   // whenTheCallerIsAnAuthorizedAddress whenTheRegistryIsNotLocked whenTheDonIDIsAllowed whenTheCallerIsTheWorkflowOwner
-  function test_RevertWhen_TheWorkflowIDIsAlreadyInUsedByAnotherWorkflow() external {
-    // Register a workflow first
-    _registerValidWorkflow();
-
-    // Register another workflow with another workflow ID
-    vm.startPrank(s_authorizedAddress);
-    s_registry.registerWorkflow(
-      "ValidWorkflow2",
-      s_newValidWorkflowID,
-      s_allowedDonID,
-      WorkflowRegistry.WorkflowStatus.ACTIVE,
-      s_validBinaryURL,
-      s_validConfigURL,
-      s_validSecretsURL
-    );
-
-    // Update the workflow with a workflow ID that is already in use by another workflow.
-    vm.expectRevert(WorkflowRegistry.WorkflowIDAlreadyExists.selector);
-    s_registry.updateWorkflow(
-      s_validWorkflowKey, s_newValidWorkflowID, s_validBinaryURL, s_validConfigURL, s_newValidSecretsURL
-    );
-
-    vm.stopPrank();
-  }
-
-  // whenTheCallerIsAnAuthorizedAddress whenTheRegistryIsNotLocked whenTheDonIDIsAllowed whenTheCallerIsTheWorkflowOwner
   function test_WhenTheWorkflowInputsAreAllValid() external {
     // Register a workflow first.
     _registerValidWorkflow();
 
     // Update the workflow.
     // It should emit {WorkflowUpdatedV1}.
-    vm.expectEmit();
+    vm.expectEmit(true, true, true, true);
     emit WorkflowRegistry.WorkflowUpdatedV1(
       s_validWorkflowID,
       s_authorizedAddress,
       s_allowedDonID,
       s_newValidWorkflowID,
       s_validWorkflowName,
-      s_newValidBinaryURL,
-      s_newValidConfigURL,
+      s_validBinaryURL,
+      s_validConfigURL,
       s_newValidSecretsURL
     );
 
     vm.startPrank(s_authorizedAddress);
     s_registry.updateWorkflow(
-      s_validWorkflowKey, s_newValidWorkflowID, s_newValidBinaryURL, s_newValidConfigURL, s_newValidSecretsURL
+      s_validWorkflowKey, s_newValidWorkflowID, s_validBinaryURL, s_validConfigURL, s_newValidSecretsURL
     );
 
     // It should update the workflow in s_workflows with the new values
@@ -215,8 +187,8 @@ contract WorkflowRegistry_updateWorkflow is WorkflowRegistrySetup {
     assertEq(workflow.donID, s_allowedDonID);
     assertEq(workflow.workflowName, s_validWorkflowName);
     assertEq(workflow.workflowID, s_newValidWorkflowID);
-    assertEq(workflow.binaryURL, s_newValidBinaryURL);
-    assertEq(workflow.configURL, s_newValidConfigURL);
+    assertEq(workflow.binaryURL, s_validBinaryURL);
+    assertEq(workflow.configURL, s_validConfigURL);
     assertEq(workflow.secretsURL, s_newValidSecretsURL);
     assertTrue(workflow.status == WorkflowRegistry.WorkflowStatus.ACTIVE);
 

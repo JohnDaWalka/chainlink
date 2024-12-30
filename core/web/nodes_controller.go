@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/manyminds/api2go/jsonapi"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger/audit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
-	"github.com/smartcontractkit/chainlink/v2/core/web/presenters"
 )
 
 type NodesController interface {
@@ -36,38 +36,42 @@ func (n *NetworkScopedNodeStatuser) NodeStatuses(ctx context.Context, offset, li
 }
 
 type nodesController[R jsonapi.EntityNamer] struct {
-	relayers    chainlink.RelayerChainInteroperators
-	newResource func(status types.NodeStatus) R
-	auditLogger audit.AuditLogger
+	nodeSet       *NetworkScopedNodeStatuser
+	errNotEnabled error
+	newResource   func(status types.NodeStatus) R
+	auditLogger   audit.AuditLogger
 }
 
-func NewNodesController(
-	relayers chainlink.RelayerChainInteroperators, auditLogger audit.AuditLogger,
+func newNodesController[R jsonapi.EntityNamer](
+	nodeSet *NetworkScopedNodeStatuser,
+	errNotEnabled error,
+	newResource func(status types.NodeStatus) R,
+	auditLogger audit.AuditLogger,
 ) NodesController {
-	return &nodesController[presenters.NodeResource]{
-		relayers:    relayers,
-		newResource: presenters.NewNodeResource,
-		auditLogger: auditLogger,
+	return &nodesController[R]{
+		nodeSet:       nodeSet,
+		errNotEnabled: errNotEnabled,
+		newResource:   newResource,
+		auditLogger:   auditLogger,
 	}
 }
 
 func (n *nodesController[R]) Index(c *gin.Context, size, page, offset int) {
+	if n.nodeSet == nil {
+		jsonAPIError(c, http.StatusBadRequest, n.errNotEnabled)
+		return
+	}
+
 	id := c.Param("ID")
-	network := c.Param("network")
 
 	var nodes []types.NodeStatus
 	var count int
 	var err error
 
-	relayers := n.relayers
-	if network != "" {
-		relayers = relayers.List(chainlink.FilterRelayersByType(network))
-	}
-
 	ctx := c.Request.Context()
 	if id == "" {
 		// fetch all nodes
-		nodes, count, err = relayers.NodeStatuses(ctx, offset, size)
+		nodes, count, err = n.nodeSet.NodeStatuses(ctx, offset, size)
 	} else {
 		// fetch nodes for chain ID
 		// backward compatibility
@@ -75,9 +79,9 @@ func (n *nodesController[R]) Index(c *gin.Context, size, page, offset int) {
 		err = rid.UnmarshalString(id)
 		if err != nil {
 			rid.ChainID = id
-			rid.Network = network
+			rid.Network = n.nodeSet.network
 		}
-		nodes, count, err = relayers.NodeStatuses(ctx, offset, size, rid)
+		nodes, count, err = n.nodeSet.NodeStatuses(ctx, offset, size, rid)
 	}
 
 	var resources []R

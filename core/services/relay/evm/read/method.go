@@ -2,7 +2,6 @@ package read
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -22,8 +21,6 @@ import (
 
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 )
-
-var ErrEmptyContractReturnValue = errors.New("the contract return value was empty")
 
 type MethodBinding struct {
 	// read-only properties
@@ -71,9 +68,8 @@ func (b *MethodBinding) Bind(ctx context.Context, bindings ...common.Address) er
 		// check for contract byte code at the latest block and provided address
 		byteCode, err := b.client.CodeAt(ctx, binding, nil)
 		if err != nil {
-			return Error{
-				Err:  fmt.Errorf("%w: code at call failure: %s", commontypes.ErrInternal, err.Error()),
-				Type: singleReadType,
+			return ErrRead{
+				Err: fmt.Errorf("%w: code at call failure: %s", commontypes.ErrInternal, err.Error()),
 				Detail: &readDetail{
 					Address:  binding.Hex(),
 					Contract: b.contractName,
@@ -150,7 +146,7 @@ func (b *MethodBinding) GetLatestValueWithHeadData(ctx context.Context, addr com
 				ReadName:        b.method,
 				Params:          params,
 				ReturnVal:       returnVal,
-			}, blockNum.String(), singleReadType)
+			}, blockNum.String(), false)
 
 		return nil, callErr
 	}
@@ -171,15 +167,9 @@ func (b *MethodBinding) GetLatestValueWithHeadData(ctx context.Context, addr com
 				ReadName:        b.method,
 				Params:          params,
 				ReturnVal:       returnVal,
-			}, blockNum.String(), singleReadType)
+			}, blockNum.String(), false)
 
 		return nil, callErr
-	}
-
-	// there may be cases where the contract value has not been set and the RPC returns with a value of 0x
-	// which is a set of empty bytes. there is no need for the codec to run in this case.
-	if len(bytes) == 0 {
-		return block.ToChainAgnosticHead(), nil
 	}
 
 	if err = b.codec.Decode(ctx, bytes, returnVal, codec.WrapItemType(b.contractName, b.method, false)); err != nil {
@@ -191,7 +181,7 @@ func (b *MethodBinding) GetLatestValueWithHeadData(ctx context.Context, addr com
 				ReadName:        b.method,
 				Params:          params,
 				ReturnVal:       returnVal,
-			}, blockNum.String(), singleReadType)
+			}, blockNum.String(), false)
 
 		strResult := hexutil.Encode(bytes)
 		callErr.Result = &strResult

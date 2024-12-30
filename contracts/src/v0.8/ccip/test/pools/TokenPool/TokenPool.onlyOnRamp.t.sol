@@ -1,14 +1,26 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {Router} from "../../../Router.sol";
+import {RateLimiter} from "../../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {TokenPoolSetup} from "./TokenPoolSetup.t.sol";
 
 contract TokenPool_onlyOnRamp is TokenPoolSetup {
-  function test_onlyOnRamp() public {
-    uint64 chainSelector = DEST_CHAIN_SELECTOR;
+  function test_onlyOnRamp_Success() public {
+    uint64 chainSelector = 13377;
     address onRamp = makeAddr("onRamp");
+
+    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
+    chainUpdate[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
+      allowed: true,
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+    });
+    s_tokenPool.applyChainUpdates(chainUpdate);
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: chainSelector, onRamp: onRamp});
@@ -19,8 +31,8 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     s_tokenPool.onlyOnRampModifier(chainSelector);
   }
 
-  function test_RevertWhen_ChainNotAllowed() public {
-    uint64 chainSelector = DEST_CHAIN_SELECTOR + 1;
+  function test_ChainNotAllowed_Revert() public {
+    uint64 chainSelector = 13377;
     address onRamp = makeAddr("onRamp");
 
     vm.startPrank(onRamp);
@@ -33,12 +45,13 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
-      remotePoolAddresses: new bytes[](0),
+      remotePoolAddress: abi.encode(address(1)),
       remoteTokenAddress: abi.encode(address(2)),
+      allowed: true,
       outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
-    s_tokenPool.applyChainUpdates(new uint64[](0), chainUpdate);
+    s_tokenPool.applyChainUpdates(chainUpdate);
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     onRampUpdates[0] = Router.OnRamp({destChainSelector: chainSelector, onRamp: onRamp});
@@ -48,11 +61,17 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     // Should succeed now that we've added the chain
     s_tokenPool.onlyOnRampModifier(chainSelector);
 
-    uint64[] memory chainsToRemove = new uint64[](1);
-    chainsToRemove[0] = chainSelector;
+    chainUpdate[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
+      allowed: false,
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
+    });
 
     vm.startPrank(OWNER);
-    s_tokenPool.applyChainUpdates(chainsToRemove, new TokenPool.ChainUpdate[](0));
+    s_tokenPool.applyChainUpdates(chainUpdate);
 
     vm.startPrank(onRamp);
 
@@ -60,9 +79,20 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     s_tokenPool.onlyOffRampModifier(chainSelector);
   }
 
-  function test_RevertWhen_CallerIsNotARampOnRouter() public {
-    uint64 chainSelector = DEST_CHAIN_SELECTOR;
+  function test_CallerIsNotARampOnRouter_Revert() public {
+    uint64 chainSelector = 13377;
     address onRamp = makeAddr("onRamp");
+
+    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
+    chainUpdate[0] = TokenPool.ChainUpdate({
+      remoteChainSelector: chainSelector,
+      remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
+      allowed: true,
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+    });
+    s_tokenPool.applyChainUpdates(chainUpdate);
 
     vm.startPrank(onRamp);
 

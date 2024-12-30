@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {ITokenAdminRegistry} from "../../../interfaces/ITokenAdminRegistry.sol";
 
@@ -17,7 +17,7 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     _setupMultipleOffRamps();
   }
 
-  function test__releaseOrMintSingleToken() public {
+  function test__releaseOrMintSingleToken_Success() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
     bytes memory originalSender = abi.encode(OWNER);
@@ -56,7 +56,7 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     assertEq(startingBalance + amount, dstToken1.balanceOf(OWNER));
   }
 
-  function test_RevertWhen_releaseOrMintToken_InvalidDataLength() public {
+  function test_releaseOrMintToken_InvalidDataLength_Revert() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
 
@@ -78,14 +78,13 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     s_offRamp.releaseOrMintSingleToken(tokenAmount, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR, "");
   }
 
-  function test_RevertWhen_releaseOrMintTokenWhen_TokenHandlingError_BalanceOf() public {
+  function test_releaseOrMintToken_TokenHandlingError_BalanceOf_Revert() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
-    address destTokenAddress = s_destTokenBySourceToken[token];
 
     Internal.Any2EVMTokenTransfer memory tokenAmount = Internal.Any2EVMTokenTransfer({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
-      destTokenAddress: destTokenAddress,
+      destTokenAddress: s_destTokenBySourceToken[token],
       extraData: "",
       amount: amount,
       destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
@@ -94,14 +93,16 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     bytes memory revertData = "failed to balanceOf";
 
     // Mock the call so returns 2 slots of data
-    vm.mockCallRevert(destTokenAddress, abi.encodeWithSelector(IERC20.balanceOf.selector, OWNER), revertData);
+    vm.mockCallRevert(
+      s_destTokenBySourceToken[token], abi.encodeWithSelector(IERC20.balanceOf.selector, OWNER), revertData
+    );
 
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.TokenHandlingError.selector, destTokenAddress, revertData));
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.TokenHandlingError.selector, revertData));
 
     s_offRamp.releaseOrMintSingleToken(tokenAmount, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR, "");
   }
 
-  function test_RevertWhen_releaseOrMintToken_ReleaseOrMintBalanceMismatch() public {
+  function test_releaseOrMintToken_ReleaseOrMintBalanceMismatch_Revert() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
     uint256 mockedStaticBalance = 50000;
@@ -129,7 +130,7 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     s_offRamp.releaseOrMintSingleToken(tokenAmount, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR, "");
   }
 
-  function test_RevertWhen_releaseOrMintToken_skip_ReleaseOrMintBalanceMismatch_if_pool() public {
+  function test_releaseOrMintToken_skip_ReleaseOrMintBalanceMismatch_if_pool_Revert() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
     uint256 mockedStaticBalance = 50000;
@@ -154,7 +155,7 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     );
   }
 
-  function test_RevertWhen__releaseOrMintSingleToken_NotACompatiblePool() public {
+  function test__releaseOrMintSingleToken_NotACompatiblePool_Revert() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
     address destToken = s_destTokenBySourceToken[token];
@@ -197,14 +198,13 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     s_offRamp.releaseOrMintSingleToken(tokenAmount, originalSender, OWNER, SOURCE_CHAIN_SELECTOR_1, offchainTokenData);
   }
 
-  function test_RevertWhen_releaseOrMintSingleTokenWhen_TokenHandlingError_transfer() public {
+  function test__releaseOrMintSingleToken_TokenHandlingError_transfer_Revert() public {
     address receiver = makeAddr("receiver");
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
     address destToken = s_destTokenBySourceToken[token];
     bytes memory originalSender = abi.encode(OWNER);
     bytes memory offchainTokenData = abi.encode(keccak256("offchainTokenData"));
-    address destPool = s_destPoolByToken[destToken];
 
     Internal.Any2EVMTokenTransfer memory tokenAmount = Internal.Any2EVMTokenTransfer({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
@@ -218,7 +218,7 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
 
     vm.mockCallRevert(destToken, abi.encodeWithSelector(IERC20.transfer.selector, receiver, amount), revertData);
 
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.TokenHandlingError.selector, destPool, revertData));
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.TokenHandlingError.selector, revertData));
     s_offRamp.releaseOrMintSingleToken(
       tokenAmount, originalSender, receiver, SOURCE_CHAIN_SELECTOR_1, offchainTokenData
     );

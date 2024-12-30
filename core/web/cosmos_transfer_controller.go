@@ -27,13 +27,11 @@ type CosmosTransfersController struct {
 	App chainlink.Application
 }
 
-var ErrCosmosNotEnabled = errChainDisabled{name: "Cosmos", tomlKey: "Cosmos.Enabled"}
-
 // Create sends native coins from the Chainlink's account to a specified address.
 func (tc *CosmosTransfersController) Create(c *gin.Context) {
 	relayers := tc.App.GetRelayers().List(chainlink.FilterRelayersByType(relay.NetworkCosmos))
 	if relayers == nil {
-		jsonAPIError(c, http.StatusBadRequest, ErrCosmosNotEnabled)
+		jsonAPIError(c, http.StatusBadRequest, ErrSolanaNotEnabled)
 		return
 	}
 

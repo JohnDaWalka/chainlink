@@ -303,15 +303,11 @@ func (k *KeeperBenchmarkTest) Run() {
 				startedObservations.Add(1)
 				k.log.Info().Int("Channel index", chIndex).Str("UpkeepID", upkeepIDCopy.String()).Msg("Starting upkeep observation")
 
-				upKeepSLA := inputs.Upkeeps.BlockRange + inputs.UpkeepSLA
-				if upKeepSLA < 0 {
-					k.t.Fatalf("negative upkeep SLA: %d", upKeepSLA)
-				}
 				confirmer := contracts.NewAutomationConsumerBenchmarkUpkeepObserver(
 					k.keeperConsumerContracts[registryIndex],
 					k.keeperRegistries[registryIndex],
 					upkeepIDCopy,
-					uint64(upKeepSLA),
+					inputs.Upkeeps.BlockRange+inputs.UpkeepSLA,
 					inputs.UpkeepSLA,
 					&k.TestReporter,
 					upkeepIndex,
@@ -727,9 +723,6 @@ func (k *KeeperBenchmarkTest) SetupBenchmarkKeeperContracts(index int, a *automa
 	err = actions.SetupMultiCallAndFundDeploymentAddresses(k.chainClient, k.linkToken, upkeep.NumberOfUpkeeps, linkFunds, a.TestConfig)
 	require.NoError(k.t, err, "Sending link funds to deployment addresses shouldn't fail")
 
-	if upkeep.UpkeepGasLimit < 0 || upkeep.UpkeepGasLimit > math.MaxUint32 {
-		k.t.Fatalf("upkeep gas limit overflows uint32: %d", upkeep.UpkeepGasLimit)
-	}
 	upkeepIds := actions.RegisterUpkeepContractsWithCheckData(k.t, k.chainClient, k.linkToken, linkFunds, uint32(upkeep.UpkeepGasLimit), a.Registry, a.Registrar, upkeep.NumberOfUpkeeps, upkeepAddresses, checkData, false, false, false, nil)
 
 	k.automationTests[index] = *a

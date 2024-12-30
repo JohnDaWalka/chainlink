@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {ISequencerUptimeFeed} from "../../../interfaces/ISequencerUptimeFeed.sol";
+import {ISequencerUptimeFeed} from "../../../dev/interfaces/ISequencerUptimeFeed.sol";
 
 import {MockScrollL1CrossDomainMessenger} from "../../mocks/scroll/MockScrollL1CrossDomainMessenger.sol";
 import {MockScrollL2CrossDomainMessenger} from "../../mocks/scroll/MockScrollL2CrossDomainMessenger.sol";
 import {MockScrollL1MessageQueue} from "../../mocks/scroll/MockScrollL1MessageQueue.sol";
-import {ScrollSequencerUptimeFeed} from "../../../scroll/ScrollSequencerUptimeFeed.sol";
-import {ScrollValidator} from "../../../scroll/ScrollValidator.sol";
+import {ScrollSequencerUptimeFeed} from "../../../dev/scroll/ScrollSequencerUptimeFeed.sol";
+import {ScrollValidator} from "../../../dev/scroll/ScrollValidator.sol";
 import {L2EPTest} from "../L2EPTest.t.sol";
 
-contract ScrollValidator_Setup is L2EPTest {
+contract ScrollValidatorTest is L2EPTest {
   /// Helper constants
-  address internal immutable L2_SEQ_STATUS_RECORDER_ADDRESS = makeAddr("L2_SEQ_STATUS_RECORDER_ADDRESS");
+  address internal constant L2_SEQ_STATUS_RECORDER_ADDRESS = 0x491B1dDA0A8fa069bbC1125133A975BF4e85a91b;
   uint32 internal constant INIT_GAS_LIMIT = 1900000;
 
   /// L2EP contracts
@@ -53,31 +53,26 @@ contract ScrollValidator_Setup is L2EPTest {
   }
 }
 
-contract ScrollValidator_Constructor is ScrollValidator_Setup {
-  /// @notice Reverts when L1 message queue address is invalid
-  function test_Constructor_RevertWhen_InvalidL1MessageQueueAddress() public {
-    vm.startPrank(s_l1OwnerAddr);
-
-    vm.expectRevert("Invalid L1 message queue address");
-    new ScrollValidator(
-      address(s_mockScrollL1CrossDomainMessenger),
-      address(s_scrollSequencerUptimeFeed),
-      address(0),
-      INIT_GAS_LIMIT
-    );
+contract ScrollValidator_SetGasLimit is ScrollValidatorTest {
+  /// @notice it correctly updates the gas limit
+  function test_CorrectlyUpdatesTheGasLimit() public {
+    uint32 newGasLimit = 2000000;
+    assertEq(s_scrollValidator.getGasLimit(), INIT_GAS_LIMIT);
+    s_scrollValidator.setGasLimit(newGasLimit);
+    assertEq(s_scrollValidator.getGasLimit(), newGasLimit);
   }
 }
 
-contract ScrollValidator_Validate is ScrollValidator_Setup {
-  /// @notice Reverts if called by an account with no access
-  function test_Validate_RevertWhen_CalledByAccountWithNoAccess() public {
+contract ScrollValidator_Validate is ScrollValidatorTest {
+  /// @notice it reverts if called by account with no access
+  function test_RevertsIfCalledByAnAccountWithNoAccess() public {
     vm.startPrank(s_strangerAddr);
     vm.expectRevert("No access");
     s_scrollValidator.validate(0, 0, 1, 1);
   }
 
-  /// @notice Posts sequencer status when there is no status change
-  function test_Validate_PostSequencerStatus_NoStatusChange() public {
+  /// @notice it posts sequencer status when there is not status change
+  function test_PostSequencerStatusWhenThereIsNotStatusChange() public {
     // Gives access to the s_eoaValidator
     s_scrollValidator.addAccess(s_eoaValidator);
 
@@ -101,8 +96,8 @@ contract ScrollValidator_Validate is ScrollValidator_Setup {
     s_scrollValidator.validate(0, 0, 0, 0);
   }
 
-  /// @notice Posts sequencer offline status
-  function test_Validate_PostSequencerOffline() public {
+  /// @notice it post sequencer offline
+  function test_PostSequencerOffline() public {
     // Gives access to the s_eoaValidator
     s_scrollValidator.addAccess(s_eoaValidator);
 

@@ -2,14 +2,13 @@ package llo
 
 import (
 	"fmt"
-	"math"
-	"math/rand/v2"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ocr3types "github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -69,7 +68,7 @@ func Test_Keyring(t *testing.T) {
 		llotypes.ReportFormatJSON:             &mockKey{format: llotypes.ReportFormatJSON, maxSignatureLen: 2, sig: []byte("sig-2")},
 	}
 
-	kr := NewOnchainKeyring(lggr, ks, 2)
+	kr := NewOnchainKeyring(lggr, ks)
 
 	cases := []struct {
 		format llotypes.ReportFormat
@@ -84,7 +83,7 @@ func Test_Keyring(t *testing.T) {
 
 	cd, err := ocrtypes.BytesToConfigDigest(testutils.MustRandBytes(32))
 	require.NoError(t, err)
-	seqNr := rand.Uint64N(math.MaxUint32 << 8)
+	seqNr := rand.Uint64()
 	t.Run("Sign+Verify", func(t *testing.T) {
 		for _, tc := range cases {
 			t.Run(tc.format.String(), func(t *testing.T) {

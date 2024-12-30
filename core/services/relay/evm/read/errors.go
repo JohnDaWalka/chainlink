@@ -10,17 +10,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 )
 
-type readType string
-
-const (
-	batchReadType  readType = "BatchGetLatestValue"
-	singleReadType readType = "GetLatestValue"
-	eventReadType  readType = "QueryKey"
-)
-
-type Error struct {
+type ErrRead struct {
 	Err    error
-	Type   readType
+	Batch  bool
 	Detail *readDetail
 	Result *string
 }
@@ -33,10 +25,10 @@ type readDetail struct {
 	Block          string
 }
 
-func newErrorFromCall(err error, call Call, block string, tp readType) Error {
-	return Error{
-		Err:  err,
-		Type: tp,
+func newErrorFromCall(err error, call Call, block string, batch bool) ErrRead {
+	return ErrRead{
+		Err:   err,
+		Batch: batch,
 		Detail: &readDetail{
 			Address:  call.ContractAddress.Hex(),
 			Contract: call.ContractName,
@@ -48,12 +40,12 @@ func newErrorFromCall(err error, call Call, block string, tp readType) Error {
 	}
 }
 
-func (e Error) Error() string {
+func (e ErrRead) Error() string {
 	var builder strings.Builder
 
-	builder.WriteString("[read error]")
+	builder.WriteString("[rpc error]")
+	builder.WriteString(fmt.Sprintf(" batch: %T;", e.Batch))
 	builder.WriteString(fmt.Sprintf(" err: %s;", e.Err.Error()))
-	builder.WriteString(fmt.Sprintf(" type: %s;", e.Type))
 
 	if e.Detail != nil {
 		builder.WriteString(fmt.Sprintf(" block: %s;", e.Detail.Block))
@@ -71,59 +63,7 @@ func (e Error) Error() string {
 	return builder.String()
 }
 
-func (e Error) Unwrap() error {
-	return e.Err
-}
-
-type MultiCallError struct {
-	Err    error
-	Type   readType
-	Detail *callsReadDetail
-	Result *string
-}
-
-type callsReadDetail struct {
-	Calls []Call
-	Block string
-}
-
-func newErrorFromCalls(err error, calls []Call, block string, tp readType) MultiCallError {
-	return MultiCallError{
-		Err:  err,
-		Type: tp,
-		Detail: &callsReadDetail{
-			Calls: calls,
-			Block: block,
-		},
-	}
-}
-
-func (e MultiCallError) Error() string {
-	var builder strings.Builder
-
-	builder.WriteString("[read error]")
-	builder.WriteString(fmt.Sprintf(" err: %s;", e.Err.Error()))
-	builder.WriteString(fmt.Sprintf(" type: %s;", e.Type))
-
-	if e.Detail != nil {
-		builder.WriteString(fmt.Sprintf(" block: %s;", e.Detail.Block))
-		for _, call := range e.Detail.Calls {
-			builder.WriteString(fmt.Sprintf(" address: %s;", call.ContractAddress.Hex()))
-			builder.WriteString(fmt.Sprintf(" contract-name: %s;", call.ContractName))
-			builder.WriteString(fmt.Sprintf(" read-name: %s;", call.ReadName))
-			builder.WriteString(fmt.Sprintf(" params: %+v;", call.Params))
-			builder.WriteString(fmt.Sprintf(" expected return type: %s;", reflect.TypeOf(call.ReturnVal)))
-		}
-
-		if e.Result != nil {
-			builder.WriteString(fmt.Sprintf("encoded result: %s;", *e.Result))
-		}
-	}
-
-	return builder.String()
-}
-
-func (e MultiCallError) Unwrap() error {
+func (e ErrRead) Unwrap() error {
 	return e.Err
 }
 

@@ -98,7 +98,6 @@ type RPCClient struct {
 	newHeadsPollInterval       time.Duration
 	rpcTimeout                 time.Duration
 	chainType                  chaintype.ChainType
-	clientErrors               config.ClientErrors
 
 	ws   *rawclient
 	http *rawclient
@@ -123,7 +122,7 @@ type RPCClient struct {
 }
 
 var _ commonclient.RPCClient[*big.Int, *evmtypes.Head] = (*RPCClient)(nil)
-var _ commonclient.SendTxRPCClient[*types.Transaction, *SendTxResult] = (*RPCClient)(nil)
+var _ commonclient.SendTxRPCClient[*types.Transaction] = (*RPCClient)(nil)
 
 func NewRPCClient(
 	cfg config.NodePool,
@@ -142,7 +141,6 @@ func NewRPCClient(
 		largePayloadRPCTimeout: largePayloadRPCTimeout,
 		rpcTimeout:             rpcTimeout,
 		chainType:              chainType,
-		clientErrors:           cfg.Errors(),
 	}
 	r.cfg = cfg
 	r.name = name
@@ -804,29 +802,7 @@ func (r *RPCClient) BlockByNumberGeth(ctx context.Context, number *big.Int) (blo
 	return
 }
 
-type SendTxResult struct {
-	err  error
-	code commonclient.SendTxReturnCode
-}
-
-var _ commonclient.SendTxResult = (*SendTxResult)(nil)
-
-func NewSendTxResult(err error) *SendTxResult {
-	result := &SendTxResult{
-		err: err,
-	}
-	return result
-}
-
-func (r *SendTxResult) Error() error {
-	return r.err
-}
-
-func (r *SendTxResult) Code() commonclient.SendTxReturnCode {
-	return r.code
-}
-
-func (r *RPCClient) SendTransaction(ctx context.Context, tx *types.Transaction) *SendTxResult {
+func (r *RPCClient) SendTransaction(ctx context.Context, tx *types.Transaction) error {
 	ctx, cancel, ws, http := r.makeLiveQueryCtxAndSafeGetClients(ctx, r.largePayloadRPCTimeout)
 	defer cancel()
 	lggr := r.newRqLggr().With("tx", tx)
@@ -843,10 +819,7 @@ func (r *RPCClient) SendTransaction(ctx context.Context, tx *types.Transaction) 
 
 	r.logResult(lggr, err, duration, r.getRPCDomain(), "SendTransaction")
 
-	return &SendTxResult{
-		err:  err,
-		code: ClassifySendError(err, r.clientErrors, logger.Sugared(logger.Nop()), tx, common.Address{}, r.chainType.IsL2()),
-	}
+	return err
 }
 
 func (r *RPCClient) SimulateTransaction(ctx context.Context, tx *types.Transaction) error {

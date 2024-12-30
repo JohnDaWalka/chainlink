@@ -13,17 +13,17 @@ import (
 	"github.com/urfave/cli"
 
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	ksdeploy "github.com/smartcontractkit/chainlink/deployment/keystone"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/cmd"
 	"github.com/smartcontractkit/chainlink/v2/core/web/presenters"
 )
 
-func downloadNodePubKeys(nodeList string, chainID int64, pubKeysPath string) []changeset.NodeKeys {
+func downloadNodePubKeys(nodeList string, chainID int64, pubKeysPath string) []ksdeploy.NodeKeys {
 	// Check if file exists already, and if so, return the keys
 	if _, err := os.Stat(pubKeysPath); err == nil {
 		fmt.Println("Loading existing public keys at:", pubKeysPath)
-		return mustParseJSON[[]changeset.NodeKeys](pubKeysPath)
+		return mustParseJSON[[]ksdeploy.NodeKeys](pubKeysPath)
 	}
 
 	nodes := downloadNodeAPICredentials(nodeList)
@@ -97,7 +97,7 @@ type ocr2Bundle struct {
 	ConfigPublicKey   string `json:"configPublicKey"`
 }
 
-func mustFetchNodesKeys(chainID int64, nodes []*node) (nca []changeset.NodeKeys) {
+func mustFetchNodesKeys(chainID int64, nodes []*node) (nca []ksdeploy.NodeKeys) {
 	for _, n := range nodes {
 		output := &bytes.Buffer{}
 		client, app := newApp(n, output)
@@ -209,7 +209,7 @@ func mustFetchNodesKeys(chainID int64, nodes []*node) (nca []changeset.NodeKeys)
 		helpers.PanicErr(err)
 		output.Reset()
 
-		nc := changeset.NodeKeys{
+		nc := ksdeploy.NodeKeys{
 			EthAddress:            ethAddress,
 			AptosAccount:          aptosAccount,
 			P2PPeerID:             peerID,
