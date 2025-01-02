@@ -54,16 +54,16 @@ func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
 	ethBlockchain := NewEthBlockchain(t, 1000, 1*time.Second)
 	rageP2PNetwork := NewFakeRageP2PNetwork(ctx, t, 1000)
 	capabilitiesRegistry := NewCapabilitiesRegistry(ctx, t, ethBlockchain)
-	workflowRegistry := NewWorkflowRegistry(ctx, t, ethBlockchain)
 
 	servicetest.Run(t, rageP2PNetwork)
 	servicetest.Run(t, ethBlockchain)
-	return DonContext{EthBlockchain: ethBlockchain, p2pNetwork: rageP2PNetwork, capabilityRegistry: capabilitiesRegistry,
-		workflowRegistry: workflowRegistry}
+	return DonContext{EthBlockchain: ethBlockchain, p2pNetwork: rageP2PNetwork, capabilityRegistry: capabilitiesRegistry}
 }
 
-func CreateDonContextWithFetchFunc(ctx context.Context, t *testing.T, fetcherFunc syncer.FetcherFunc) DonContext {
+func CreateDonContextWithWorkflowRegistry(ctx context.Context, t *testing.T, fetcherFunc syncer.FetcherFunc) DonContext {
 	donContext := CreateDonContext(ctx, t)
+	workflowRegistry := NewWorkflowRegistry(ctx, t, donContext.EthBlockchain)
+	donContext.workflowRegistry = workflowRegistry
 	donContext.fetcherFunc = fetcherFunc
 	return donContext
 }
@@ -103,6 +103,7 @@ type capabilityNode struct {
 type DON struct {
 	services.StateMachine
 	t                      *testing.T
+	id                     *uint32
 	config                 DonConfiguration
 	lggr                   logger.Logger
 	nodes                  []*capabilityNode
@@ -185,8 +186,9 @@ func (d *DON) Initialise() {
 
 	//nolint:gosec // disable G115
 	d.config.DON.ID = uint32(id)
+	d.id = &d.config.DON.ID
 
-	if d.IsWorkflowDon() {
+	if d.config.AcceptsWorkflows && d.workflowRegistry != nil {
 		d.workflowRegistry.UpdateAllowedDons([]uint32{d.config.DON.ID})
 		d.nodeConfigModifiers = append(d.nodeConfigModifiers, func(c *chainlink.Config, node *capabilityNode) {
 			workflowRegistryAddressStr := d.workflowRegistry.addr.String()
@@ -194,14 +196,10 @@ func (d *DON) Initialise() {
 		})
 
 		for _, workflow := range d.workflows {
-			d.workflowRegistry.RegisterWorkflow(workflow, d.config.DON.ID)
+			d.workflowRegistry.RegisterWorkflow(workflow, *d.id)
 		}
 	}
 
-}
-
-func (d *DON) IsWorkflowDon() bool {
-	return len(d.workflows) > 0
 }
 
 func (d *DON) GetID() uint32 {
@@ -377,7 +375,12 @@ func (d *DON) AddJob(ctx context.Context, j *job.Job) error {
 }
 
 func (d *DON) AddWorkflow(workflow Workflow) error {
+	if !d.config.AcceptsWorkflows {
+		return fmt.Errorf("cannot add workflow to non-workflow DON")
+	}
+
 	d.workflows = append(d.workflows, workflow)
+
 	return nil
 }
 
