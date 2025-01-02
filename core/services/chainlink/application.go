@@ -190,6 +190,7 @@ type ApplicationOpts struct {
 	CapabilitiesDispatcher     remotetypes.Dispatcher
 	CapabilitiesPeerWrapper    p2ptypes.PeerWrapper
 	NewOracleFactoryFn         standardcapabilities.NewOracleFactoryFn
+	FetcherFunc                syncer.FetcherFunc
 }
 
 // NewApplication initializes a new store if one is not already
@@ -283,8 +284,18 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			srvcs = append(srvcs, wfLauncher, registrySyncer)
 
 			if cfg.Capabilities().WorkflowRegistry().Address() != "" {
-				if gatewayConnectorWrapper == nil {
-					return nil, errors.New("unable to create workflow registry syncer without gateway connector")
+				lggr := globalLogger.Named("WorkflowRegistrySyncer")
+				var fetcherFunc syncer.FetcherFunc
+				if opts.FetcherFunc == nil {
+
+					if gatewayConnectorWrapper == nil {
+						return nil, errors.New("unable to create workflow registry syncer without gateway connector")
+					}
+					fetcher := syncer.NewFetcherService(lggr, gatewayConnectorWrapper)
+					fetcherFunc = fetcher.Fetch
+					srvcs = append(srvcs, fetcher)
+				} else {
+					fetcherFunc = opts.FetcherFunc
 				}
 
 				err = keyStore.Workflow().EnsureKey(context.Background())
@@ -300,11 +311,8 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 					return nil, fmt.Errorf("expected 1 key, got %d", len(keys))
 				}
 
-				lggr := globalLogger.Named("WorkflowRegistrySyncer")
-				fetcher := syncer.NewFetcherService(lggr, gatewayConnectorWrapper)
-
 				eventHandler := syncer.NewEventHandler(lggr, syncer.NewWorkflowRegistryDS(opts.DS, globalLogger),
-					fetcher.Fetch, workflowstore.NewDBStore(opts.DS, lggr, clockwork.NewRealClock()), opts.CapabilitiesRegistry,
+					fetcherFunc, workflowstore.NewDBStore(opts.DS, lggr, clockwork.NewRealClock()), opts.CapabilitiesRegistry,
 					custmsg.NewLabeler(), clockwork.NewRealClock(), keys[0])
 
 				globalLogger.Debugw("Creating WorkflowRegistrySyncer")
@@ -321,7 +329,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 					workflowDonNotifier,
 				)
 
-				srvcs = append(srvcs, fetcher, wfSyncer)
+				srvcs = append(srvcs, wfSyncer)
 			}
 		}
 	} else {

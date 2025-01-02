@@ -526,6 +526,7 @@ func (h *eventHandler) getWorkflowArtifacts(
 
 func (h *eventHandler) engineFactoryFn(ctx context.Context, id string, owner string, name string, config []byte, binary []byte) (services.Service, error) {
 	moduleConfig := &host.ModuleConfig{Logger: h.lggr, Labeler: h.emitter}
+
 	sdkSpec, err := host.GetWorkflowSpec(ctx, moduleConfig, binary, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workflow sdk spec: %w", err)

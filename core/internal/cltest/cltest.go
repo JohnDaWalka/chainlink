@@ -35,6 +35,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncer"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/standardcapabilities"
@@ -276,7 +277,6 @@ func NewApplicationWithConfigAndKey(t testing.TB, c chainlink.GeneralConfig, fla
 
 func setKeys(t testing.TB, app *TestApplication, flagsAndDeps ...interface{}) (chainID ubig.Big) {
 	ctx := testutils.Context(t)
-	require.NoError(t, app.KeyStore.Unlock(ctx, Password))
 
 	for _, dep := range flagsAndDeps {
 		switch v := dep.(type) {
@@ -357,6 +357,14 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		}
 	}
 
+	var fetcherFunc syncer.FetcherFunc
+	for _, dep := range flagsAndDeps {
+		fetcherFunc, _ = dep.(syncer.FetcherFunc)
+		if fetcherFunc != nil {
+			break
+		}
+	}
+
 	var peerWrapper p2ptypes.PeerWrapper
 	for _, dep := range flagsAndDeps {
 		peerWrapper, _ = dep.(p2ptypes.PeerWrapper)
@@ -392,6 +400,7 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 	}
 
 	keyStore := keystore.NewInMemory(ds, utils.FastScryptParams, lggr)
+	require.NoError(t, keyStore.Unlock(ctx, Password))
 
 	mailMon := mailbox.NewMonitor(cfg.AppID().String(), lggr.Named("Mailbox"))
 	loopRegistry := plugins.NewLoopRegistry(lggr, nil, nil, nil, "")
@@ -495,6 +504,7 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		CapabilitiesDispatcher:     dispatcher,
 		CapabilitiesPeerWrapper:    peerWrapper,
 		NewOracleFactoryFn:         newOracleFactoryFn,
+		FetcherFunc:                fetcherFunc,
 		RetirementReportCache:      retirementReportCache,
 	})
 

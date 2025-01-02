@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncer"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -46,6 +47,7 @@ type DonContext struct {
 	p2pNetwork         *FakeRageP2PNetwork
 	capabilityRegistry *CapabilitiesRegistry
 	workflowRegistry   *WorkflowRegistry
+	fetcherFunc        syncer.FetcherFunc
 }
 
 func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
@@ -58,6 +60,12 @@ func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
 	servicetest.Run(t, ethBlockchain)
 	return DonContext{EthBlockchain: ethBlockchain, p2pNetwork: rageP2PNetwork, capabilityRegistry: capabilitiesRegistry,
 		workflowRegistry: workflowRegistry}
+}
+
+func CreateDonContextWithFetchFunc(ctx context.Context, t *testing.T, fetcherFunc syncer.FetcherFunc) DonContext {
+	donContext := CreateDonContext(ctx, t)
+	donContext.fetcherFunc = fetcherFunc
+	return donContext
 }
 
 func (c DonContext) WaitForCapabilitiesToBeExposed(t *testing.T, dons ...*DON) {
@@ -161,7 +169,7 @@ func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig Don
 					for _, modifier := range don.nodeConfigModifiers {
 						modifier(c, cn)
 					}
-				})
+				}, donContext.fetcherFunc)
 
 			require.NoError(t, node.Start(testutils.Context(t)))
 			cn.TestApplication = node
@@ -178,9 +186,22 @@ func (d *DON) Initialise() {
 	//nolint:gosec // disable G115
 	d.config.DON.ID = uint32(id)
 
-	for _, workflow := range d.workflows {
-		d.workflowRegistry.RegisterWorkflow(workflow, d.config.DON.ID)
+	if d.IsWorkflowDon() {
+		d.workflowRegistry.UpdateAllowedDons([]uint32{d.config.DON.ID})
+		d.nodeConfigModifiers = append(d.nodeConfigModifiers, func(c *chainlink.Config, node *capabilityNode) {
+			workflowRegistryAddressStr := d.workflowRegistry.addr.String()
+			c.Capabilities.WorkflowRegistry.Address = &workflowRegistryAddressStr
+		})
+
+		for _, workflow := range d.workflows {
+			d.workflowRegistry.RegisterWorkflow(workflow, d.config.DON.ID)
+		}
 	}
+
+}
+
+func (d *DON) IsWorkflowDon() bool {
+	return len(d.workflows) > 0
 }
 
 func (d *DON) GetID() uint32 {
@@ -383,12 +404,14 @@ func startNewNode(ctx context.Context,
 	newOracleFactoryFn standardcapabilities.NewOracleFactoryFn,
 	keyV2 ethkey.KeyV2,
 	setupCfg func(c *chainlink.Config),
+	fetcherFunc syncer.FetcherFunc,
 ) *cltest.TestApplication {
 	config, _ := heavyweight.FullTestDBV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
 		c.Capabilities.ExternalRegistry.ChainID = ptr(fmt.Sprintf("%d", testutils.SimulatedChainID))
 		c.Capabilities.ExternalRegistry.Address = ptr(capRegistryAddr.String())
 		c.Capabilities.Peering.V2.Enabled = ptr(true)
 		c.Feature.FeedsManager = ptr(false)
+		c.Feature.LogPoller = ptr(true)
 
 		if setupCfg != nil {
 			setupCfg(c)
@@ -411,7 +434,7 @@ func startNewNode(ctx context.Context,
 	ethBlockchain.Commit()
 
 	return cltest.NewApplicationWithConfigV2AndKeyOnSimulatedBlockchain(t, config, ethBlockchain.Backend, nodeInfo,
-		dispatcher, peerWrapper, newOracleFactoryFn, localCapabilities, keyV2, lggr)
+		dispatcher, peerWrapper, newOracleFactoryFn, localCapabilities, keyV2, lggr, fetcherFunc)
 }
 
 // Functions below this point are for adding non-standard capabilities to a DON, deliberately verbose. Eventually these
