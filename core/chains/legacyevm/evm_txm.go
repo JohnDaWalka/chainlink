@@ -55,13 +55,13 @@ func newEvmTxm(
 	}
 
 	if opts.GenTxManager == nil {
-		if cfg.TxmV2().Enabled() {
+		if cfg.Transactions().TransactionManagerV2().Enabled() {
 			txm, err = txmgr.NewTxmV2(
 				ds,
 				cfg,
 				txmgr.NewEvmTxmFeeConfig(cfg.GasEstimator()),
 				cfg.Transactions(),
-				cfg.TxmV2(),
+				cfg.Transactions().TransactionManagerV2(),
 				client,
 				lggr,
 				logPoller,

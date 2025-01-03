@@ -336,9 +336,6 @@ RPCBlockQueryDelay = 10
 FinalizedBlockOffset = 16
 NoNewFinalizedHeadsThreshold = '1h0m0s'
 
-[EVM.TxmV2]
-Enabled = false
-
 [EVM.Transactions]
 ForwardersEnabled = true
 MaxInFlight = 19
@@ -348,6 +345,9 @@ ReaperThreshold = '1m0s'
 ResendAfterThreshold = '1h0m0s'
 
 [EVM.Transactions.AutoPurge]
+Enabled = false
+
+[EVM.Transactions.TransactionManagerV2]
 Enabled = false
 
 [EVM.BalanceMonitor]

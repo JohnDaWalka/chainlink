@@ -2033,9 +2033,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '9m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -2045,6 +2042,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -2140,9 +2140,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -2152,6 +2149,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -2247,9 +2247,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -2259,6 +2256,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -2354,9 +2354,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -2366,6 +2363,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -2462,9 +2462,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '13m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -2474,6 +2471,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -2573,9 +2573,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -2585,6 +2582,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -2680,9 +2680,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -2692,6 +2689,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -2788,9 +2788,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -2800,6 +2797,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -2895,9 +2895,6 @@ RPCBlockQueryDelay = 2
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '45s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -2907,6 +2904,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -3001,9 +3001,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -3013,6 +3010,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -3107,9 +3107,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -3119,6 +3116,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -3214,9 +3214,6 @@ RPCBlockQueryDelay = 2
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '40s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -3226,6 +3223,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -3322,9 +3322,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '2m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -3334,6 +3331,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -3429,9 +3429,6 @@ RPCBlockQueryDelay = 2
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -3441,6 +3438,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -3536,9 +3536,6 @@ RPCBlockQueryDelay = 10
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '6m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -3548,6 +3545,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -3643,9 +3643,6 @@ RPCBlockQueryDelay = 15
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -3657,6 +3654,9 @@ ResendAfterThreshold = '3m0s'
 [Transactions.AutoPurge]
 Enabled = true
 MinAttempts = 3
+
+[Transactions.TransactionManagerV2]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -3751,9 +3751,6 @@ RPCBlockQueryDelay = 15
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -3765,6 +3762,9 @@ ResendAfterThreshold = '3m0s'
 [Transactions.AutoPurge]
 Enabled = true
 MinAttempts = 3
+
+[Transactions.TransactionManagerV2]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -3859,9 +3859,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '1h10m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -3871,6 +3868,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -3970,9 +3970,6 @@ RPCBlockQueryDelay = 2
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -3982,6 +3979,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -4077,9 +4077,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -4089,6 +4086,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -4188,9 +4188,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -4200,6 +4197,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -4298,9 +4298,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -4310,6 +4307,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '2m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -4405,9 +4405,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -4417,6 +4414,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '2m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -4512,9 +4512,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -4524,6 +4521,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -4622,9 +4622,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -4634,6 +4631,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -4733,9 +4733,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -4745,6 +4742,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -4844,9 +4844,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '1h30m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -4856,6 +4853,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -4955,9 +4955,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -4967,6 +4964,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -5061,9 +5061,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -5073,6 +5070,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -5168,9 +5168,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -5180,6 +5177,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -5275,9 +5275,6 @@ RPCBlockQueryDelay = 15
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -5289,6 +5286,9 @@ ResendAfterThreshold = '3m0s'
 [Transactions.AutoPurge]
 Enabled = true
 MinAttempts = 3
+
+[Transactions.TransactionManagerV2]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -5383,9 +5383,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '40s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -5395,6 +5392,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -5490,9 +5490,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '40s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -5502,6 +5499,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -5597,9 +5597,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '1h10m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -5609,6 +5606,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -5708,9 +5708,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '45m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -5720,6 +5717,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -5818,9 +5818,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -5830,6 +5827,9 @@ ReaperThreshold = '0s'
 ResendAfterThreshold = '0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -5926,9 +5926,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '2h0m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -5938,6 +5935,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -6037,9 +6037,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -6049,6 +6046,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -6144,9 +6144,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -6156,6 +6153,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -6251,9 +6251,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -6263,6 +6260,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -6362,9 +6362,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -6376,6 +6373,9 @@ ResendAfterThreshold = '3m0s'
 [Transactions.AutoPurge]
 Enabled = true
 MinAttempts = 3
+
+[Transactions.TransactionManagerV2]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -6470,9 +6470,6 @@ RPCBlockQueryDelay = 2
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -6482,6 +6479,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -6577,9 +6577,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '1h30m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -6589,6 +6586,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -6687,9 +6687,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -6699,6 +6696,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -6794,9 +6794,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '15m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -6806,6 +6803,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -6905,9 +6905,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '2m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -6917,6 +6914,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -7013,9 +7013,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -7025,6 +7022,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -7124,9 +7124,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -7136,6 +7133,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -7235,9 +7235,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -7247,6 +7244,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -7345,9 +7345,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '1m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -7357,6 +7354,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -7452,9 +7452,6 @@ RPCBlockQueryDelay = 2
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '1m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -7464,6 +7461,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -7559,9 +7559,6 @@ RPCBlockQueryDelay = 2
 FinalizedBlockOffset = 2
 NoNewFinalizedHeadsThreshold = '1m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -7571,6 +7568,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -7666,9 +7666,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '45m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -7678,6 +7675,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -7774,9 +7774,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '15m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -7789,6 +7786,9 @@ ResendAfterThreshold = '30s'
 Enabled = true
 Threshold = 90
 MinAttempts = 3
+
+[Transactions.TransactionManagerV2]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -7888,9 +7888,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '15m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -7903,6 +7900,9 @@ ResendAfterThreshold = '30s'
 Enabled = true
 Threshold = 90
 MinAttempts = 3
+
+[Transactions.TransactionManagerV2]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -8000,9 +8000,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -8012,6 +8009,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '3m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -8106,9 +8106,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -8121,6 +8118,9 @@ ResendAfterThreshold = '3m0s'
 Enabled = true
 Threshold = 50
 MinAttempts = 3
+
+[Transactions.TransactionManagerV2]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -8214,9 +8214,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -8229,6 +8226,9 @@ ResendAfterThreshold = '3m0s'
 Enabled = true
 Threshold = 50
 MinAttempts = 3
+
+[Transactions.TransactionManagerV2]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -8323,9 +8323,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -8335,6 +8332,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -8430,9 +8430,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '1h50m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -8442,6 +8439,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -8541,9 +8541,6 @@ RPCBlockQueryDelay = 10
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -8553,6 +8550,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -8647,9 +8647,6 @@ RPCBlockQueryDelay = 10
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '12m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -8659,6 +8656,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -8753,9 +8753,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '5m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -8765,6 +8762,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -8860,9 +8860,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -8872,6 +8869,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -8971,9 +8971,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '12m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -8983,6 +8980,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -9083,9 +9083,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -9095,6 +9092,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -9194,9 +9194,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -9206,6 +9203,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -9304,9 +9304,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -9316,6 +9313,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -9414,9 +9414,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -9428,6 +9425,9 @@ ResendAfterThreshold = '1m0s'
 [Transactions.AutoPurge]
 Enabled = true
 DetectionApiUrl = 'https://sepolia-venus.scroll.io'
+
+[Transactions.TransactionManagerV2]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -9526,9 +9526,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -9540,6 +9537,9 @@ ResendAfterThreshold = '1m0s'
 [Transactions.AutoPurge]
 Enabled = true
 DetectionApiUrl = 'https://venus.scroll.io'
+
+[Transactions.TransactionManagerV2]
+Enabled = false
 
 [BalanceMonitor]
 Enabled = true
@@ -9638,9 +9638,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '1h50m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -9650,6 +9647,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -9749,9 +9749,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -9761,6 +9758,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -9856,9 +9856,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '15m0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -9868,6 +9865,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '30s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -9967,9 +9967,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -9979,6 +9976,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -10074,9 +10074,6 @@ RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
-[TxmV2]
-Enabled = false
-
 [Transactions]
 ForwardersEnabled = false
 MaxInFlight = 16
@@ -10086,6 +10083,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
+Enabled = false
+
+[Transactions.TransactionManagerV2]
 Enabled = false
 
 [BalanceMonitor]
@@ -10360,33 +10360,6 @@ out-of-sync. Only applicable if `FinalityTagEnabled=true`
 
 Set to zero to disable.
 
-## EVM.TxmV2
-```toml
-[EVM.TxmV2]
-Enabled = false # Default
-BlockTime = '10s' # Example
-CustomURL = 'https://example.api.io' # Example
-```
-
-
-### Enabled
-```toml
-Enabled = false # Default
-```
-Enabled enables TxmV2.
-
-### BlockTime
-```toml
-BlockTime = '10s' # Example
-```
-BlockTime controls the frequency of the backfill loop of TxmV2.
-
-### CustomURL
-```toml
-CustomURL = 'https://example.api.io' # Example
-```
-CustomURL configures the base url of a custom endpoint used by the ChainDualBroadcast chain type.
-
 ## EVM.Transactions
 ```toml
 [EVM.Transactions]
@@ -10478,6 +10451,40 @@ Threshold configures the number of blocks a transaction has to remain unconfirme
 MinAttempts = 3 # Example
 ```
 MinAttempts configures the minimum number of broadcasted attempts a transaction has to have before it is evaluated further for being terminally stuck. This threshold is only applied if there is no custom API to identify stuck transactions provided by the chain. Ensure the gas estimator configs take more bump attempts before reaching the configured max gas price.
+
+## EVM.Transactions.TransactionManagerV2
+```toml
+[EVM.Transactions.TransactionManagerV2]
+Enabled = false # Default
+BlockTime = '10s' # Example
+CustomURL = 'https://example.api.io' # Example
+DualBroadcast = false # Example
+```
+
+
+### Enabled
+```toml
+Enabled = false # Default
+```
+Enabled enables TransactionManagerV2.
+
+### BlockTime
+```toml
+BlockTime = '10s' # Example
+```
+BlockTime controls the frequency of the backfill loop of TransactionManagerV2.
+
+### CustomURL
+```toml
+CustomURL = 'https://example.api.io' # Example
+```
+CustomURL configures the base url of a custom endpoint used by the ChainDualBroadcast chain type.
+
+### DualBroadcast
+```toml
+DualBroadcast = false # Example
+```
+DualBroadcast enables DualBroadcast functionality.
 
 ## EVM.BalanceMonitor
 ```toml

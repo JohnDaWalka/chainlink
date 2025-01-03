@@ -20,6 +20,7 @@ type StuckTxDetectorConfig struct {
 	BlockTime             time.Duration
 	StuckTxBlockThreshold uint32
 	DetectionURL          string
+	DualBroadcast         bool
 }
 
 type stuckTxDetector struct {
@@ -39,14 +40,15 @@ func NewStuckTxDetector(lggr logger.Logger, chaintype chaintype.ChainType, confi
 }
 
 func (s *stuckTxDetector) DetectStuckTransaction(ctx context.Context, tx *types.Transaction) (bool, error) {
+	//nolint:gocritic //placeholder for upcoming chaintypes
 	switch s.chainType {
-	case chaintype.ChainDualBroadcast:
-		result, err := s.dualBroadcastDetection(ctx, tx)
-		if result || err != nil {
-			return result, err
-		}
-		return s.timeBasedDetection(tx), nil
 	default:
+		if s.config.DualBroadcast {
+			result, err := s.dualBroadcastDetection(ctx, tx)
+			if result || err != nil {
+				return result, err
+			}
+		}
 		return s.timeBasedDetection(tx), nil
 	}
 }
