@@ -43,7 +43,6 @@ jobs:
   run-unit-tests:
     name: Tests (${{ matrix.type.test-suite }})
     needs: filter
-    runs-on: ubuntu22.04-32cores-128GB
     permissions:
       id-token: write
       contents: write
@@ -55,8 +54,15 @@ jobs:
           - test-suite: "core"
             module-directory: "./"
             build-flags: "-tags=integration"
+            os: ubuntu-latest-64cores-256GB
+            build-concurrency: "64"
+            run-concurrency: "32"
           - test-suite: "ccip-deployment"
             module-directory: "./deployment"
+            os: ubuntu22.04-32cores-128GB
+            build-concurrency: "32"
+            run-concurrency: "16"
+    runs-on: ${{ matrix.type.os }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4.2.1
@@ -94,7 +100,7 @@ jobs:
         timeout-minutes: 10
         with:
           pipeline-step: "build"
-          build-concurrency: "32"
+          build-concurrency: ${{ matrix.type.build-concurrency }}
           collect-coverage: ${{ needs.filter.outputs.should-collect-coverage }}
           test-suite: ${{ matrix.type.test-suite }}
           module-directory: ${{ matrix.type.module-directory }}
@@ -108,8 +114,8 @@ jobs:
           CL_DATABASE_URL: ${{ env.DB_URL }}
         with:
           pipeline-step: "run"
-          run-concurrency: "16"
-          run-all-tests: ${{ needs.filter.outputs.should-run-all-tests }}
+          run-concurrency: ${{ matrix.type.run-concurrency }}
+          run-all-tests: "true" # ${{ needs.filter.outputs.should-run-all-tests }}
           collect-coverage: ${{ needs.filter.outputs.should-collect-coverage }}
           test-suite: ${{ matrix.type.test-suite }}
           module-directory: ${{ matrix.type.module-directory }}
