@@ -48,7 +48,14 @@ type UpdateNonceManagerConfig struct {
 type NonceManagerUpdate struct {
 	AddedAuthCallers   []common.Address
 	RemovedAuthCallers []common.Address
-	PreviousRampsArgs  []nonce_manager.NonceManagerPreviousRampsArgs
+	PreviousRampsArgs  []PreviousRampCfg
+}
+
+type PreviousRampCfg struct {
+	RemoteChainSelector uint64
+	OverrideExisting    bool
+	EnableOnRamp        bool
+	EnableOffRamp       bool
 }
 
 func (cfg UpdateNonceManagerConfig) Validate(e deployment.Environment) error {
@@ -56,7 +63,7 @@ func (cfg UpdateNonceManagerConfig) Validate(e deployment.Environment) error {
 	if err != nil {
 		return err
 	}
-	for sourceSel := range cfg.UpdatesByChain {
+	for sourceSel, update := range cfg.UpdatesByChain {
 		sourceChainState, ok := state.Chains[sourceSel]
 		if !ok {
 			return fmt.Errorf("chain %d not found in onchain state", sourceSel)
@@ -70,6 +77,31 @@ func (cfg UpdateNonceManagerConfig) Validate(e deployment.Environment) error {
 		}
 		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, sourceChain.DeployerKey.From, sourceChainState.Timelock.Address(), sourceChainState.OnRamp); err != nil {
 			return fmt.Errorf("chain %s: %w", sourceChain.String(), err)
+		}
+		for _, prevRamp := range update.PreviousRampsArgs {
+			if prevRamp.RemoteChainSelector == sourceSel {
+				return errors.New("source and dest chain cannot be the same")
+			}
+			if _, ok := state.Chains[prevRamp.RemoteChainSelector]; !ok {
+				return fmt.Errorf("dest chain %d not found in onchain state for chain %d", prevRamp.RemoteChainSelector, sourceSel)
+			}
+			if !prevRamp.EnableOnRamp && !prevRamp.EnableOffRamp {
+				return errors.New("must specify either onramp or offramp")
+			}
+			if prevRamp.EnableOnRamp {
+				if prevOnRamp := state.Chains[sourceSel].EVM2EVMOnRamp; prevOnRamp == nil {
+					return fmt.Errorf("no previous onramp for source chain %d", sourceSel)
+				} else if prevOnRamp[prevRamp.RemoteChainSelector] == nil {
+					return fmt.Errorf("no previous onramp for source chain %d and dest chain %d", sourceSel, prevRamp.RemoteChainSelector)
+				}
+			}
+			if prevRamp.EnableOffRamp {
+				if prevOffRamp := state.Chains[sourceSel].EVM2EVMOffRamp; prevOffRamp == nil {
+					return fmt.Errorf("missing previous offramps for chain %d", sourceSel)
+				} else if prevOffRamp[prevRamp.RemoteChainSelector] == nil {
+					return fmt.Errorf("no previous offramp for source chain %d and dest chain %d", prevRamp.RemoteChainSelector, sourceSel)
+				}
+			}
 		}
 	}
 	return nil
@@ -103,7 +135,25 @@ func UpdateNonceManagersCS(e deployment.Environment, cfg UpdateNonceManagerConfi
 			}
 		}
 		if len(updates.PreviousRampsArgs) > 0 {
-			prevRampsTx, err = nm.ApplyPreviousRampsUpdates(txOpts, updates.PreviousRampsArgs)
+			previousRampsArgs := make([]nonce_manager.NonceManagerPreviousRampsArgs, 0)
+			for _, prevRamp := range updates.PreviousRampsArgs {
+				var onRamp, offRamp common.Address
+				if prevRamp.EnableOnRamp {
+					onRamp = s.Chains[chainSel].EVM2EVMOnRamp[prevRamp.RemoteChainSelector].Address()
+				}
+				if prevRamp.EnableOffRamp {
+					offRamp = s.Chains[chainSel].EVM2EVMOffRamp[prevRamp.RemoteChainSelector].Address()
+				}
+				previousRampsArgs = append(previousRampsArgs, nonce_manager.NonceManagerPreviousRampsArgs{
+					RemoteChainSelector:   prevRamp.RemoteChainSelector,
+					OverrideExistingRamps: prevRamp.OverrideExisting,
+					PrevRamps: nonce_manager.NonceManagerPreviousRamps{
+						PrevOnRamp:  onRamp,
+						PrevOffRamp: offRamp,
+					},
+				})
+			}
+			prevRampsTx, err = nm.ApplyPreviousRampsUpdates(txOpts, previousRampsArgs)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("error updating previous ramps for chain %s: %w", e.Chains[chainSel].String(), err)
 			}
@@ -137,6 +187,9 @@ func UpdateNonceManagersCS(e deployment.Environment, cfg UpdateNonceManagerConfi
 					Data:  prevRampsTx.Data(),
 					Value: big.NewInt(0),
 				})
+			}
+			if len(ops) == 0 {
+				return deployment.ChangesetOutput{}, errors.New("no operations to batch")
 			}
 			batches = append(batches, timelock.BatchChainOperation{
 				ChainIdentifier: mcms.ChainIdentifier(chainSel),
@@ -300,7 +353,7 @@ func UpdateOnRampsDests(e deployment.Environment, cfg UpdateOnRampDestsConfig) (
 }
 
 type UpdateFeeQuoterPricesConfig struct {
-	InitialPrices map[uint64]FeeQuoterPriceUpdatePerSource
+	PricesByChain map[uint64]FeeQuoterPriceUpdatePerSource // source -> PriceDetails
 	MCMS          *MCMSConfig
 }
 
@@ -314,7 +367,7 @@ func (cfg UpdateFeeQuoterPricesConfig) Validate(e deployment.Environment) error 
 	if err != nil {
 		return err
 	}
-	for chainSel, initialPrice := range cfg.InitialPrices {
+	for chainSel, initialPrice := range cfg.PricesByChain {
 		if err := deployment.IsValidChainSelector(chainSel); err != nil {
 			return fmt.Errorf("invalid chain selector: %w", err)
 		}
@@ -322,11 +375,33 @@ func (cfg UpdateFeeQuoterPricesConfig) Validate(e deployment.Environment) error 
 		if !ok {
 			return fmt.Errorf("chain %d not found in onchain state", chainSel)
 		}
-		if chainState.FeeQuoter == nil {
+		fq := chainState.FeeQuoter
+		if fq == nil {
 			return fmt.Errorf("missing fee quoter for chain %d", chainSel)
 		}
 		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.FeeQuoter); err != nil {
 			return err
+		}
+		// check that whether price updaters are set
+		authCallers, err := fq.GetAllAuthorizedCallers(&bind.CallOpts{Context: e.GetContext()})
+		if err != nil {
+			return fmt.Errorf("failed to get authorized callers for chain %d: %w", chainSel, err)
+		}
+		if len(authCallers) == 0 {
+			return fmt.Errorf("no authorized callers for chain %d", chainSel)
+		}
+		expectedAuthCaller := e.Chains[chainSel].DeployerKey.From
+		if cfg.MCMS != nil {
+			expectedAuthCaller = chainState.Timelock.Address()
+		}
+		foundCaller := false
+		for _, authCaller := range authCallers {
+			if authCaller.Cmp(expectedAuthCaller) == 0 {
+				foundCaller = true
+			}
+		}
+		if !foundCaller {
+			return fmt.Errorf("expected authorized caller %s not found for chain %d", expectedAuthCaller.String(), chainSel)
 		}
 		for token, price := range initialPrice.TokenPrices {
 			if price == nil {
@@ -373,7 +448,7 @@ func UpdateFeeQuoterPricesCS(e deployment.Environment, cfg UpdateFeeQuoterPrices
 	var batches []timelock.BatchChainOperation
 	timelocks := make(map[uint64]common.Address)
 	proposers := make(map[uint64]*gethwrappers.ManyChainMultiSig)
-	for chainSel, initialPrice := range cfg.InitialPrices {
+	for chainSel, initialPrice := range cfg.PricesByChain {
 		txOpts := e.Chains[chainSel].DeployerKey
 		if cfg.MCMS != nil {
 			txOpts = deployment.SimTransactOpts()

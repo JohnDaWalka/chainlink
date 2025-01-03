@@ -9,16 +9,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
-	"github.com/smartcontractkit/chainlink/deployment"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
-)
-
-var (
-	LINKPrice = deployment.E18Mult(20)
-	WETHPrice = deployment.E18Mult(4000)
-	GasPrice  = ToPackedFee(big.NewInt(8e14), big.NewInt(0))
 )
 
 func TestAddLanesWithTestRouter(t *testing.T) {
@@ -50,14 +43,14 @@ func TestAddLanesWithTestRouter(t *testing.T) {
 		{
 			Changeset: commoncs.WrapChangeSet(UpdateFeeQuoterPricesCS),
 			Config: UpdateFeeQuoterPricesConfig{
-				InitialPrices: map[uint64]FeeQuoterPriceUpdatePerSource{
+				PricesByChain: map[uint64]FeeQuoterPriceUpdatePerSource{
 					chain1: {
 						TokenPrices: map[common.Address]*big.Int{
-							stateChain1.LinkToken.Address(): LINKPrice,
-							stateChain1.Weth9.Address():     WETHPrice,
+							stateChain1.LinkToken.Address(): DefaultLinkPrice,
+							stateChain1.Weth9.Address():     DefaultWethPrice,
 						},
 						GasPrices: map[uint64]*big.Int{
-							chain2: GasPrice,
+							chain2: DefaultGasPrice,
 						},
 					},
 				},
@@ -97,7 +90,7 @@ func TestAddLanesWithTestRouter(t *testing.T) {
 							chain2: true,
 						},
 					},
-					// off
+					// offramp update on dest chain
 					chain2: {
 						OffRampUpdates: map[uint64]bool{
 							chain1: true,
