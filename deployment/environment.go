@@ -110,6 +110,7 @@ func NewEnvironment(
 	logger logger.Logger,
 	existingAddrs AddressBook,
 	chains map[uint64]Chain,
+	solChains map[uint64]SolChain,
 	nodeIDs []string,
 	offchain OffchainClient,
 	ctx func() context.Context,
@@ -120,6 +121,7 @@ func NewEnvironment(
 		Logger:            logger,
 		ExistingAddresses: existingAddrs,
 		Chains:            chains,
+		SolChains:         solChains,
 		NodeIDs:           nodeIDs,
 		Offchain:          offchain,
 		GetContext:        ctx,
@@ -150,6 +152,17 @@ func (e Environment) AllChainSelectorsExcluding(excluding []uint64) []uint64 {
 		if excluded {
 			continue
 		}
+		selectors = append(selectors, sel)
+	}
+	sort.Slice(selectors, func(i, j int) bool {
+		return selectors[i] < selectors[j]
+	})
+	return selectors
+}
+
+func (e Environment) AllChainSelectorsSolana() []uint64 {
+	var selectors []uint64
+	for sel := range e.SolChains {
 		selectors = append(selectors, sel)
 	}
 	sort.Slice(selectors, func(i, j int) bool {
