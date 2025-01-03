@@ -216,6 +216,8 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 				return
 			}
 
+			time.Sleep(30 * time.Second)
+
 			w.lggr.Debugw("Loading initial workflows for DON", "DON", don.ID)
 			loadWorkflowsHead, err := w.loadWorkflows(ctx, don, reader)
 			if err != nil {
