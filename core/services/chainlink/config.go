@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/imdario/mergo"
+	"dario.cat/mergo"
 	"go.uber.org/multierr"
 
 	gotoml "github.com/pelletier/go-toml/v2"
