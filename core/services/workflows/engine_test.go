@@ -1449,7 +1449,7 @@ func TestEngine_WithCustomComputeStep(t *testing.T) {
 	require.NoError(t, err)
 
 	idGeneratorFn := func() string { return "validRequestID" }
-	compute, err := compute.NewAction(cfg, log, reg, handler, idGeneratorFn)
+	compute, err := compute.NewAction(cfg, log, reg, compute.NewOutgoingConnectorFetcherFactory(handler, idGeneratorFn))
 	require.NoError(t, err)
 	require.NoError(t, compute.Start(ctx))
 	defer compute.Close()
@@ -1515,7 +1515,7 @@ func TestEngine_CustomComputePropagatesBreaks(t *testing.T) {
 	require.NoError(t, err)
 
 	idGeneratorFn := func() string { return "validRequestID" }
-	compute, err := compute.NewAction(cfg, log, reg, handler, idGeneratorFn)
+	compute, err := compute.NewAction(cfg, log, reg, compute.NewOutgoingConnectorFetcherFactory(handler, idGeneratorFn))
 	require.NoError(t, err)
 	require.NoError(t, compute.Start(ctx))
 	defer compute.Close()

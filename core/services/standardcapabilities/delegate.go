@@ -254,7 +254,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) ([]job.Ser
 			return uuid.New().String()
 		}
 
-		computeSrvc, err := compute.NewAction(cfg, log, d.registry, handler, idGeneratorFn)
+		computeSrvc, err := compute.NewAction(cfg, log, d.registry, compute.NewOutgoingConnectorFetcherFactory(handler, idGeneratorFn))
 		if err != nil {
 			return nil, err
 		}
