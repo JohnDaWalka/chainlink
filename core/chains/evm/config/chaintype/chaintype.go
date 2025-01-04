@@ -8,7 +8,6 @@ import (
 type ChainType string
 
 const (
-	ChainSei             ChainType = "sei"
 	ChainArbitrum        ChainType = "arbitrum"
 	ChainAstar           ChainType = "astar"
 	ChainCelo            ChainType = "celo"
@@ -40,7 +39,7 @@ func (c ChainType) IsL2() bool {
 
 func (c ChainType) IsValid() bool {
 	switch c {
-	case "", ChainArbitrum, ChainAstar, ChainCelo, ChainGnosis, ChainHedera, ChainKroma, ChainMantle, ChainMetis, ChainOptimismBedrock, ChainScroll, ChainWeMix, ChainXLayer, ChainZkEvm, ChainZkSync, ChainZircuit, ChainSei:
+	case "", ChainArbitrum, ChainAstar, ChainCelo, ChainGnosis, ChainHedera, ChainKroma, ChainMantle, ChainMetis, ChainOptimismBedrock, ChainScroll, ChainWeMix, ChainXLayer, ChainZkEvm, ChainZkSync, ChainZircuit:
 		return true
 	}
 	return false
@@ -78,8 +77,6 @@ func FromSlug(slug string) ChainType {
 		return ChainZkSync
 	case "zircuit":
 		return ChainZircuit
-	case "sei":
-		return ChainSei
 	default:
 		return ChainType(slug)
 	}
@@ -147,5 +144,4 @@ var ErrInvalid = fmt.Errorf("must be one of %s or omitted", strings.Join([]strin
 	string(ChainZkEvm),
 	string(ChainZkSync),
 	string(ChainZircuit),
-	string(ChainSei),
 }, ", "))
