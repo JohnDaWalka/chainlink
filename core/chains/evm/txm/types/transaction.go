@@ -16,18 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	clnull "github.com/smartcontractkit/chainlink-common/pkg/utils/null"
 
+	commontypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
-)
-
-type TxState string
-
-const (
-	TxUnstarted   = TxState("unstarted")
-	TxUnconfirmed = TxState("unconfirmed")
-	TxConfirmed   = TxState("confirmed")
-
-	TxFatalError = TxState("fatal")
-	TxFinalized  = TxState("finalized")
 )
 
 type Transaction struct {
@@ -45,7 +35,7 @@ type Transaction struct {
 	InitialBroadcastAt *time.Time
 	LastBroadcastAt    *time.Time
 
-	State        TxState
+	State        commontypes.TxState
 	IsPurgeable  bool
 	Attempts     []*Attempt
 	AttemptCount uint16 // AttempCount is strictly kept in memory and prevents indefinite retrying

@@ -329,14 +329,14 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) GetTransactionStatus(ctx context.Contex
 	}
 
 	switch tx.State {
-	case txmtypes.TxUnconfirmed:
+	case txmgr.TxUnconfirmed:
 		return commontypes.Pending, nil
-	case txmtypes.TxConfirmed:
+	case txmgr.TxConfirmed:
 		// Return unconfirmed for confirmed transactions because they are not yet finalized
 		return commontypes.Unconfirmed, nil
-	case txmtypes.TxFinalized:
+	case txmgr.TxFinalized:
 		return commontypes.Finalized, nil
-	case txmtypes.TxFatalError:
+	case txmgr.TxFatalError:
 		return commontypes.Fatal, nil
 	default:
 		return commontypes.Unknown, nil
