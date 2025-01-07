@@ -135,32 +135,41 @@ func deployChainContractsForChains(
 
 	rmnHome := existingEVMState.Chains[homeChainSel].RMNHome
 
-	// existingSolState, err := LoadOnchainStateSolana(e)
+	existingSolState, err := LoadOnchainStateSolana(e)
+	if err != nil {
+		e.Logger.Errorw("Failed to load existing onchain solanastate", "err")
+		return err
+	}
 
 	deployGrp := errgroup.Group{}
 
 	for _, chainSel := range chainsToDeploy {
 		// already validated family
 		family, _ := chainsel.GetSelectorFamily(chainSel)
+		var deployFn func() error
 		switch family {
 		case chainsel.FamilyEVM:
 			chain := e.Chains[chainSel]
 			if existingEVMState.Chains[chainSel].LinkToken == nil || existingEVMState.Chains[chainSel].Weth9 == nil {
 				return fmt.Errorf("fee tokens not found for chain %d", chainSel)
 			}
-			deployGrp.Go(
-				func() error {
-					err := deployChainContracts(e, chain, ab, rmnHome)
-					if err != nil {
-						e.Logger.Errorw("Failed to deploy chain contracts", "chain", chainSel, "err", err)
-						return fmt.Errorf("failed to deploy chain contracts for chain %d: %w", chainSel, err)
-					}
-					return nil
-				})
+			deployFn = func() error { return deployChainContractsEVM(e, chain, ab, rmnHome) }
+
 		case chainsel.FamilySolana:
-			// chain := e.SolChains[chainSel]
-			fmt.Println("deploying solana chain contracts", chainSel)
+			chain := e.SolChains[chainSel]
+			if existingSolState.SolChains[chainSel].LinkToken.IsZero() {
+				return fmt.Errorf("fee tokens not found for chain %d", chainSel)
+			}
+			deployFn = func() error { return deployChainContractsSolana(e, chain, ab) }
 		}
+		deployGrp.Go(func() error {
+			err := deployFn()
+			if err != nil {
+				e.Logger.Errorw("Failed to deploy chain contracts", "chain", chainSel, "err", err)
+				return fmt.Errorf("failed to deploy chain contracts for chain %d: %w", chainSel, err)
+			}
+			return nil
+		})
 	}
 	if err := deployGrp.Wait(); err != nil {
 		e.Logger.Errorw("Failed to deploy chain contracts", "err", err)
@@ -169,7 +178,7 @@ func deployChainContractsForChains(
 	return nil
 }
 
-func deployChainContracts(
+func deployChainContractsEVM(
 	e deployment.Environment,
 	chain deployment.Chain,
 	ab deployment.AddressBook,
@@ -429,5 +438,13 @@ func deployChainContracts(
 		return err
 	}
 	e.Logger.Infow("Added nonce manager authorized callers", "chain", chain.String(), "callers", []common.Address{offRampContract.Address(), onRampContract.Address()})
+	return nil
+}
+
+func deployChainContractsSolana(
+	e deployment.Environment,
+	chain deployment.SolChain,
+	ab deployment.AddressBook,
+) error {
 	return nil
 }
