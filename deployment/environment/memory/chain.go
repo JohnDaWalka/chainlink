@@ -72,7 +72,6 @@ func getTestSolanaChainSelectors() []uint64 {
 }
 
 func GenerateChainsSol(t *testing.T, numChains int) map[uint64]SolanaChain {
-
 	chains := make(map[uint64]SolanaChain)
 	testSolanaChainSelectors := getTestSolanaChainSelectors()
 	if len(testSolanaChainSelectors) < numChains {

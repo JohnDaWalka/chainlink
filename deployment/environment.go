@@ -161,7 +161,7 @@ func (e Environment) AllChainSelectorsExcluding(excluding []uint64) []uint64 {
 }
 
 func (e Environment) AllChainSelectorsSolana() []uint64 {
-	var selectors []uint64
+	selectors := make([]uint64, 0, len(e.SolChains))
 	for sel := range e.SolChains {
 		selectors = append(selectors, sel)
 	}
