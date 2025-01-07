@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/gagliardetto/solana-go"
 	solRpc "github.com/gagliardetto/solana-go/rpc"
@@ -35,7 +36,7 @@ func (c SolChain) Name() string {
 		panic(err)
 	}
 	if chainInfo.ChainName == "" {
-		return fmt.Sprintf("%d", c.Selector)
+		return strconv.FormatUint(c.Selector, 10)
 	}
 	return chainInfo.ChainName
 }
