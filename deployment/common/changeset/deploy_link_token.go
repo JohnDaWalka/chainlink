@@ -18,6 +18,10 @@ import (
 
 var _ deployment.ChangeSet[[]uint64] = DeployLinkToken
 
+const (
+	TokenDecimalsSolana = 9
+)
+
 // DeployLinkToken deploys a link token contract to the chain identified by the ChainSelector.
 func DeployLinkToken(e deployment.Environment, chains []uint64) (deployment.ChangesetOutput, error) {
 	for _, chain := range chains {
@@ -86,13 +90,13 @@ func deployLinkTokenContractSolana(
 	chain deployment.SolChain,
 	ab deployment.AddressBook,
 ) error {
-	decimals := uint8(0)
+
 	adminPublicKey := chain.DeployerKey.PublicKey()
 	mint, _ := solana.NewRandomPrivateKey()
 	// this is the token address
 	mintPublicKey := mint.PublicKey()
 	instructions, err := solTokenUtil.CreateToken(
-		context.Background(), solana.Token2022ProgramID, mintPublicKey, adminPublicKey, decimals, chain.Client, solRpc.CommitmentConfirmed,
+		context.Background(), solana.Token2022ProgramID, mintPublicKey, adminPublicKey, TokenDecimalsSolana, chain.Client, solRpc.CommitmentConfirmed,
 	)
 	if err != nil {
 		lggr.Errorw("Failed to generate instructions for link token deployment", "chain", chain.String(), "err", err)
