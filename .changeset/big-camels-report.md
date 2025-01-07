@@ -2,4 +2,4 @@
 "chainlink": patch
 ---
 
-#bugfix fix missing unregister in mercury job loop
+#bugfix fix non-idempotent loopp registry.Register
