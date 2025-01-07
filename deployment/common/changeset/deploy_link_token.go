@@ -8,6 +8,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	solRpc "github.com/gagliardetto/solana-go/rpc"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	solCommomUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -28,15 +29,20 @@ func DeployLinkToken(e deployment.Environment, chains []uint64) (deployment.Chan
 	}
 	newAddresses := deployment.NewMemoryAddressBook()
 	for _, chain := range chains {
-		if _, ok := e.Chains[chain]; ok {
+		family, err := chainsel.GetSelectorFamily(chain)
+		if err != nil {
+			return deployment.ChangesetOutput{AddressBook: newAddresses}, err
+		}
+		switch family {
+		case chainsel.FamilyEVM:
 			// Deploy EVM LINK token
-			_, err := deployLinkTokenContract(
+			_, err := deployLinkTokenContractEVM(
 				e.Logger, e.Chains[chain], newAddresses,
 			)
 			if err != nil {
 				return deployment.ChangesetOutput{AddressBook: newAddresses}, err
 			}
-		} else if _, ok := e.SolChains[chain]; ok {
+		case chainsel.FamilySolana:
 			// Deploy Solana LINK token
 			err := deployLinkTokenContractSolana(
 				e.Logger, e.SolChains[chain], newAddresses,
@@ -49,7 +55,7 @@ func DeployLinkToken(e deployment.Environment, chains []uint64) (deployment.Chan
 	return deployment.ChangesetOutput{AddressBook: newAddresses}, nil
 }
 
-func deployLinkTokenContract(
+func deployLinkTokenContractEVM(
 	lggr logger.Logger,
 	chain deployment.Chain,
 	ab deployment.AddressBook,
