@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 	"golang.org/x/sync/errgroup"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_home"
@@ -67,17 +68,12 @@ func (c DeployChainContractsConfig) Validate() error {
 	return nil
 }
 
-func deployChainContractsForChains(
-	e deployment.Environment,
-	ab deployment.AddressBook,
-	homeChainSel uint64,
-	chainsToDeploy []uint64) error {
+func validateHomeChainState(e deployment.Environment, homeChainSel uint64, existingState CCIPOnChainState) error {
 	existingState, err := LoadOnchainState(e)
 	if err != nil {
 		e.Logger.Errorw("Failed to load existing onchain state", "err")
 		return err
 	}
-
 	capReg := existingState.Chains[homeChainSel].CapabilityRegistry
 	if capReg == nil {
 		e.Logger.Errorw("Failed to get capability registry")
@@ -112,24 +108,59 @@ func deployChainContractsForChains(
 		e.Logger.Errorw("Failed to get rmn home", "err", err)
 		return fmt.Errorf("rmn home not found")
 	}
+	return nil
+}
+
+func deployChainContractsForChains(
+	e deployment.Environment,
+	ab deployment.AddressBook,
+	homeChainSel uint64,
+	chainsToDeploy []uint64) error {
+
+	existingEVMState, err := LoadOnchainState(e)
+	if err != nil {
+		e.Logger.Errorw("Failed to load existing onchain state", "err")
+		return err
+	}
+
+	err = validateHomeChainState(e, homeChainSel, existingEVMState)
+	if err != nil {
+		return err
+	}
+
+	err = deployment.ValidateSelectorsInEnvironment(e, chainsToDeploy)
+	if err != nil {
+		return err
+	}
+
+	rmnHome := existingEVMState.Chains[homeChainSel].RMNHome
+
+	// existingSolState, err := LoadOnchainStateSolana(e)
+
 	deployGrp := errgroup.Group{}
+
 	for _, chainSel := range chainsToDeploy {
-		chain, ok := e.Chains[chainSel]
-		if !ok {
-			return fmt.Errorf("chain %d not found", chainSel)
+		// already validated family
+		family, _ := chainsel.GetSelectorFamily(chainSel)
+		switch family {
+		case chainsel.FamilyEVM:
+			chain := e.Chains[chainSel]
+			if existingEVMState.Chains[chainSel].LinkToken == nil || existingEVMState.Chains[chainSel].Weth9 == nil {
+				return fmt.Errorf("fee tokens not found for chain %d", chainSel)
+			}
+			deployGrp.Go(
+				func() error {
+					err := deployChainContracts(e, chain, ab, rmnHome)
+					if err != nil {
+						e.Logger.Errorw("Failed to deploy chain contracts", "chain", chainSel, "err", err)
+						return fmt.Errorf("failed to deploy chain contracts for chain %d: %w", chainSel, err)
+					}
+					return nil
+				})
+		case chainsel.FamilySolana:
+			// chain := e.SolChains[chainSel]
+			fmt.Println("deploying solana chain contracts", chainSel)
 		}
-		if existingState.Chains[chainSel].LinkToken == nil || existingState.Chains[chainSel].Weth9 == nil {
-			return fmt.Errorf("fee tokens not found for chain %d", chainSel)
-		}
-		deployGrp.Go(
-			func() error {
-				err := deployChainContracts(e, chain, ab, rmnHome)
-				if err != nil {
-					e.Logger.Errorw("Failed to deploy chain contracts", "chain", chainSel, "err", err)
-					return fmt.Errorf("failed to deploy chain contracts for chain %d: %w", chainSel, err)
-				}
-				return nil
-			})
 	}
 	if err := deployGrp.Wait(); err != nil {
 		e.Logger.Errorw("Failed to deploy chain contracts", "err", err)
