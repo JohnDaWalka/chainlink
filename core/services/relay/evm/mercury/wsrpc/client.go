@@ -224,9 +224,15 @@ func (w *client) resetTransport() {
 	ctx, cancel := w.chStop.NewCtx()
 	defer cancel()
 	b := utils.NewRedialBackoff()
+	var cnt int
 	for {
-		// Will block until successful dial, or context is canceled (i.e. on close)
-		err := w.dial(ctx, wsrpc.WithBlock())
+		cnt++
+		w.logger.Warnw("ResetTransport resetting transport", "attempt", cnt)
+		// Will block until successful dial, or context is canceled
+		// If it takes longer than 5 seconds to try to dial, abort and retry to avoid getting stuck
+		loopCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		err := w.dial(loopCtx, wsrpc.WithBlock())
+		cancel()
 		if err == nil {
 			break
 		}
