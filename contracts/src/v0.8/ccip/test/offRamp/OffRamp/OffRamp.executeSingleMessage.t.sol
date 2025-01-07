@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IMessageInterceptor} from "../../../interfaces/IMessageInterceptor.sol";
+import {IMessageTransformer} from "../../../interfaces/IMessageTransformer.sol";
 import {IRouter} from "../../../interfaces/IRouter.sol";
 
 import {Client} from "../../../libraries/Client.sol";
@@ -10,6 +11,7 @@ import {Pool} from "../../../libraries/Pool.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
+import {MessageTransformerHelper} from "../../helpers/MessageTransformerHelper.sol";
 import {MaybeRevertMessageReceiverNo165} from "../../helpers/receivers/MaybeRevertMessageReceiverNo165.sol";
 import {OffRampSetup} from "./OffRampSetup.t.sol";
 
@@ -76,6 +78,36 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     vm.startPrank(address(s_offRamp));
     Internal.Any2EVMRampMessage memory message =
       _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
+  }
+
+  function test_executeSingleMessage_WithMessageTransformer() public {
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+    _enableInboundMessageTransformer();
+    vm.startPrank(address(s_offRamp));
+    Internal.Any2EVMRampMessage memory message =
+      _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
+  }
+
+  function test_executeSingleMessage_WithMessageTransformer_RevertWhen_UnknownChain() public {
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+    _enableInboundMessageTransformer();
+    vm.startPrank(address(s_offRamp));
+    Internal.Any2EVMRampMessage memory message =
+      _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1);
+
+    // Fail with any error (UnknownChain in this case) to check if OffRamp wraps the error with MessageTransformError during the revert
+    s_inboundMessageTransformer.setShouldRevert(true);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        IMessageTransformer.MessageTransformError.selector,
+        abi.encodeWithSelector(MessageTransformerHelper.UnknownChain.selector)
+      )
+    );
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
   }
 

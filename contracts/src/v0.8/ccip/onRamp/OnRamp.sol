@@ -5,6 +5,7 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
+import {IMessageTransformer} from "../interfaces/IMessageTransformer.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
@@ -71,6 +72,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     address feeQuoter; // FeeQuoter address.
     bool reentrancyGuardEntered; // Reentrancy protection.
     address messageInterceptor; // Optional message interceptor to validate messages. Zero address = no interceptor.
+    address messageTransformer; // Optional message transformer to transform outbound messages (zero address = no transformer)
     address feeAggregator; // Fee aggregator address.
     address allowlistAdmin; // authorized admin to add or remove allowed senders.
   }
@@ -237,6 +239,16 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
 
     for (uint256 i = 0; i < newMessage.tokenAmounts.length; ++i) {
       newMessage.tokenAmounts[i].destExecData = destExecDataPerToken[i];
+    }
+
+    if (s_dynamicConfig.messageTransformer != address(0)) {
+      try IMessageTransformer(s_dynamicConfig.messageTransformer).transformOutboundMessage(
+        destChainSelector, newMessage
+      ) returns (Internal.EVM2AnyRampMessage memory transformedMessage) {
+        newMessage = transformedMessage;
+      } catch (bytes memory err) {
+        revert IMessageTransformer.MessageTransformError(err);
+      }
     }
 
     // Hash only after all fields have been set.

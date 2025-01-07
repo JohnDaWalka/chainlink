@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity 0.8.26;
+
+import {IMessageTransformer} from "../../interfaces/IMessageTransformer.sol";
+import {Internal} from "../../libraries/Internal.sol";
+
+// This helper is used to test the On/OffRamps
+contract MessageTransformerHelper is IMessageTransformer {
+  error UnknownChain();
+
+  bool public s_shouldRevert;
+
+  function setShouldRevert(
+    bool _shouldRevert
+  ) external {
+    s_shouldRevert = _shouldRevert;
+  }
+
+  /// @inheritdoc IMessageTransformer
+  function transformInboundMessage(
+    Internal.Any2EVMRampMessage memory message
+  ) public view returns (Internal.Any2EVMRampMessage memory) {
+    if (s_shouldRevert) {
+      revert UnknownChain();
+    }
+    return message;
+  }
+
+  /// @inheritdoc IMessageTransformer
+  function transformOutboundMessage(
+    // solhint-disable-next-line no-unused-vars
+    uint64 _destChainSelector,
+    Internal.EVM2AnyRampMessage memory message
+  ) public view returns (Internal.EVM2AnyRampMessage memory) {
+    if (s_shouldRevert) {
+      revert UnknownChain();
+    }
+    return message;
+  }
+}

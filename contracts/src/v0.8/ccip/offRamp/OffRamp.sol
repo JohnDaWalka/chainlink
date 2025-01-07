@@ -5,6 +5,7 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
+import {IMessageTransformer} from "../interfaces/IMessageTransformer.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
@@ -123,6 +124,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     uint32 permissionLessExecutionThresholdSeconds; // │ Waiting time before manual execution is enabled.
     bool isRMNVerificationDisabled; // ────────────────╯ Flag whether the RMN verification is disabled or not.
     address messageInterceptor; // Optional, validates incoming messages (zero address = no interceptor).
+    address messageTransformer; // Optional message transformer to transform incoming messages (zero address = no transformer)
   }
 
   /// @dev Report that is committed by the observing DON at the committing phase.
@@ -565,6 +567,17 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     uint32[] calldata tokenGasOverrides
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
+
+    if (s_dynamicConfig.messageTransformer != address(0)) {
+      try IMessageTransformer(s_dynamicConfig.messageTransformer).transformInboundMessage(message) returns (
+        Internal.Any2EVMRampMessage memory transformedMessage
+      ) {
+        message = transformedMessage;
+      } catch (bytes memory err) {
+        revert IMessageTransformer.MessageTransformError(err);
+      }
+    }
+
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
       destTokenAmounts = _releaseOrMintTokens(

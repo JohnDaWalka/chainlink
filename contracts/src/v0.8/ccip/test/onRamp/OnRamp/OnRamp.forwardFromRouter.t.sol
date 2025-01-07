@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IMessageInterceptor} from "../../../interfaces/IMessageInterceptor.sol";
+import {IMessageTransformer} from "../../../interfaces/IMessageTransformer.sol";
 import {IRouter} from "../../../interfaces/IRouter.sol";
 
 import {BurnMintERC20} from "../../../../shared/token/ERC20/BurnMintERC20.sol";
@@ -13,6 +14,7 @@ import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {MessageInterceptorHelper} from "../../helpers/MessageInterceptorHelper.sol";
+import {MessageTransformerHelper} from "../../helpers/MessageTransformerHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
 import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -24,6 +26,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
   }
 
   MessageInterceptorHelper internal s_outboundMessageInterceptor;
+  MessageTransformerHelper internal s_outboundMessageTranformer;
 
   address internal s_destTokenPool = makeAddr("destTokenPool");
   address internal s_destToken = makeAddr("destToken");
@@ -31,6 +34,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
   function setUp() public virtual override {
     super.setUp();
     s_outboundMessageInterceptor = new MessageInterceptorHelper();
+    s_outboundMessageTranformer = new MessageTransformerHelper();
 
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
@@ -270,6 +274,23 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 
+  function test_forwardFromRouter_WithMessageTransformer_Success() public {
+    _enableOutboundMessageTransformer();
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
+    uint256 feeAmount = 1234567890;
+    message.tokenAmounts = new Client.EVMTokenAmount[](1);
+    message.tokenAmounts[0].amount = 1e18;
+    message.tokenAmounts[0].token = s_sourceTokens[0];
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+
+    vm.expectEmit();
+    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
+
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+  }
+
   // Reverts
 
   function test_RevertWhen_Paused() public {
@@ -358,6 +379,30 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     vm.expectRevert(abi.encodeWithSelector(OnRamp.UnsupportedToken.selector, wrongToken));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
+  }
+
+  function test_MessageTransformerError_Revert() public {
+    _enableOutboundMessageTransformer();
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
+    uint256 feeAmount = 1234567890;
+    message.tokenAmounts = new Client.EVMTokenAmount[](1);
+    message.tokenAmounts[0].amount = 1e18;
+    message.tokenAmounts[0].token = s_sourceTokens[0];
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+
+    // Fail with any error (UnknownChain in this case) to check if OnRamp wraps the error with MessageTransformError during the revert
+    s_outboundMessageTranformer.setShouldRevert(true);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        IMessageTransformer.MessageTransformError.selector,
+        abi.encodeWithSelector(MessageTransformerHelper.UnknownChain.selector)
+      )
+    );
+
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 
   function test_RevertWhen_forwardFromRouter_UnsupportedToken() public {
@@ -476,6 +521,27 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
 
     OnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
     dynamicConfig.messageInterceptor = address(s_outboundMessageInterceptor);
+    s_onRamp.setDynamicConfig(dynamicConfig);
+
+    if (resetPrank) {
+      vm.stopPrank();
+      vm.startPrank(msgSender);
+    }
+  }
+
+  function _enableOutboundMessageTransformer() internal {
+    (, address msgSender,) = vm.readCallers();
+
+    bool resetPrank = false;
+
+    if (msgSender != OWNER) {
+      vm.stopPrank();
+      vm.startPrank(OWNER);
+      resetPrank = true;
+    }
+
+    OnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
+    dynamicConfig.messageTransformer = address(s_outboundMessageTranformer);
     s_onRamp.setDynamicConfig(dynamicConfig);
 
     if (resetPrank) {

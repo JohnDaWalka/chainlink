@@ -12,6 +12,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
       feeQuoter: address(23423),
       reentrancyGuardEntered: false,
       messageInterceptor: makeAddr("messageInterceptor"),
+      messageTransformer: address(0),
       feeAggregator: FEE_AGGREGATOR,
       allowlistAdmin: address(0)
     });
@@ -33,6 +34,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
       reentrancyGuardEntered: false,
       feeAggregator: FEE_AGGREGATOR,
       messageInterceptor: makeAddr("messageInterceptor"),
+      messageTransformer: address(0),
       allowlistAdmin: address(0)
     });
 
@@ -45,6 +47,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
       feeQuoter: address(23423),
       reentrancyGuardEntered: false,
       messageInterceptor: address(0),
+      messageTransformer: address(0),
       feeAggregator: FEE_AGGREGATOR,
       allowlistAdmin: address(0)
     });
@@ -60,6 +63,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
       feeQuoter: address(23423),
       reentrancyGuardEntered: false,
       messageInterceptor: address(0),
+      messageTransformer: address(0),
       feeAggregator: address(0),
       allowlistAdmin: address(0)
     });
@@ -79,6 +83,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
       feeQuoter: address(23423),
       reentrancyGuardEntered: true,
       messageInterceptor: makeAddr("messageInterceptor"),
+      messageTransformer: address(0),
       feeAggregator: FEE_AGGREGATOR,
       allowlistAdmin: address(0)
     });
