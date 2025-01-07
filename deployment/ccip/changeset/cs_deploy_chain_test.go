@@ -22,10 +22,13 @@ func TestDeployChainContractsChangeset(t *testing.T) {
 	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
 		Bootstraps: 1,
 		Chains:     2,
+		SolChains:  1,
 		Nodes:      4,
 	})
-	selectors := e.AllChainSelectors()
-	homeChainSel := selectors[0]
+	evmSelectors := e.AllChainSelectors()
+	homeChainSel := evmSelectors[0]
+	solChainSelectors := e.AllChainSelectorsSolana()
+	selectors := append(evmSelectors, solChainSelectors...)
 	nodes, err := deployment.NodeInfo(e.NodeIDs, e.Offchain)
 	require.NoError(t, err)
 	p2pIds := nodes.NonBootstraps().PeerIDs()
