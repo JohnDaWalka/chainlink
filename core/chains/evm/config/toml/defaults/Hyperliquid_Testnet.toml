@@ -1,7 +1,7 @@
-ChainID = '10143'
+ChainID = '998'
 # finality_depth was: 0
 FinalityDepth = 10
-# block_time was:  1s, adding 1 second buffer  
+# block_time was:  0.4s, adding 1 second buffer  
 LogPollInterval = '2s'
 LogBroadcasterEnabled = false
 
@@ -13,7 +13,7 @@ EIP1559DynamicFees = true
 Mode = 'FeeHistory'
 
 [GasEstimator.FeeHistory]
-# block_time was: 1s, per recommendation skip 1-2 blocks
+# block_time was: 0.4s, per recommendation skip 1-2 blocks
 CacheTimeout = '2s'
 
 [GasEstimator.BlockHistory]
