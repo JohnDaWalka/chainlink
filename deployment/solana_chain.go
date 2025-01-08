@@ -29,6 +29,7 @@ type SolChain struct {
 	DeployerKey *solana.PrivateKey
 	Confirm     func(instructions []solana.Instruction, opts ...solCommomUtil.TxModifier) error
 	URL         string
+	WSURL       string
 	KeypairPath string
 }
 
@@ -65,6 +66,7 @@ func (c SolChain) DeployProgram(logger logger.Logger, programName string) (strin
 	}
 	logger.Infow("program key pair", "key", key)
 	cmd := exec.Command("solana", "program", "deploy", programFile, "--keypair", c.KeypairPath, "--program-id", programKeyPair, "--url", c.URL)
+	// cmd := exec.Command("solana", "program", "deploy", programFile, "--upgrade-authority", c.DeployerKey.PublicKey().String(), "--program-id", programKeyPair, "--url", c.URL)
 
 	// Capture the command output
 	var stdout, stderr bytes.Buffer

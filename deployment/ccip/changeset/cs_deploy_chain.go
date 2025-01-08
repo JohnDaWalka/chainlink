@@ -537,6 +537,7 @@ func deployChainContractsSolana(
 		if err != nil {
 			return fmt.Errorf("failed to save address: %v", err)
 		}
+		//TODO: deploy token pool contract
 	}
 	return nil
 }

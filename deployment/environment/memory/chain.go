@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/gagliardetto/solana-go"
 	solRpc "github.com/gagliardetto/solana-go/rpc"
+	"github.com/mr-tron/base58"
 
 	"github.com/stretchr/testify/require"
 
@@ -35,6 +36,7 @@ type SolanaChain struct {
 	Client      *solRpc.Client
 	DeployerKey *solana.PrivateKey
 	URL         string
+	WSURL       string
 	KeypairPath string
 }
 
@@ -84,15 +86,20 @@ func generateAndStoreKeypair() (solana.PrivateKey, string, error) {
 		return solana.PrivateKey{}, "", fmt.Errorf("failed to generate private key: %w", err)
 	}
 
-	// Convert the private key to a byte slice
-	keypairBytes := privateKey
-
-	// solana.NewWallet().
-
-	// Serialize the keypair as JSON
-	jsonData, err := json.Marshal(keypairBytes)
+	privateKeyBytes, err := base58.Decode(privateKey.String())
 	if err != nil {
-		return solana.PrivateKey{}, "", fmt.Errorf("failed to serialize keypair: %w", err)
+		return solana.PrivateKey{}, "", fmt.Errorf("failed to decode Base58 private key: %w", err)
+	}
+
+	intArray := make([]int, len(privateKeyBytes))
+	for i, b := range privateKeyBytes {
+		intArray[i] = int(b)
+	}
+
+	// Marshal the integer array to JSON
+	keypairJSON, err := json.Marshal(intArray)
+	if err != nil {
+		return solana.PrivateKey{}, "", fmt.Errorf("failed to marshal keypair to JSON: %w", err)
 	}
 
 	// Create a temporary file
@@ -103,8 +110,8 @@ func generateAndStoreKeypair() (solana.PrivateKey, string, error) {
 	defer tempFile.Close()
 
 	// Write the keypair data to the file
-	if _, err := tempFile.Write(jsonData); err != nil {
-		return solana.PrivateKey{}, "", fmt.Errorf("failed to write keypair to temporary file: %w", err)
+	if err := os.WriteFile(tempFile.Name(), keypairJSON, 0600); err != nil {
+		return solana.PrivateKey{}, "", fmt.Errorf("failed to write keypair to file: %w", err)
 	}
 
 	// Return the path to the temporary file
@@ -119,10 +126,10 @@ func GenerateChainsSol(t *testing.T, numChains int) map[uint64]SolanaChain {
 	chains := make(map[uint64]SolanaChain)
 	for i := 0; i < numChains; i++ {
 		chainID := testSolanaChainSelectors[i]
-		url, _ := solTestUtil.SetupLocalSolNodeWithFlags(t)
+		url, wsurl := solTestUtil.SetupLocalSolNodeWithFlags(t)
 		admin, keypairPath, gerr := generateAndStoreKeypair()
+		// byteSlice, err := base58.Decode(admin)
 		t.Log("keypairPath", keypairPath)
-		t.Log("admin", admin.PublicKey())
 		t.Log("admin private key", admin)
 		key, err := solana.PrivateKeyFromSolanaKeygenFile(keypairPath)
 		require.NoError(t, err)
@@ -134,6 +141,7 @@ func GenerateChainsSol(t *testing.T, numChains int) map[uint64]SolanaChain {
 			Client:      solRpc.New(url),
 			DeployerKey: &admin,
 			URL:         url,
+			WSURL:       wsurl,
 			KeypairPath: keypairPath,
 		}
 	}

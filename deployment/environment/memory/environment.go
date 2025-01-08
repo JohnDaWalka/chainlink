@@ -130,6 +130,7 @@ func generateMemoryChainSol(t *testing.T, inputs map[uint64]SolanaChain) map[uin
 			Client:      chain.Client,
 			DeployerKey: chain.DeployerKey,
 			URL:         chain.URL,
+			WSURL:       chain.WSURL,
 			KeypairPath: chain.KeypairPath,
 			Confirm: func(instructions []solana.Instruction, opts ...solCommomUtil.TxModifier) error {
 				_, err := solCommomUtil.SendAndConfirm(
