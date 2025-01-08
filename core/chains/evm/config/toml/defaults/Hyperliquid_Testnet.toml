@@ -4,7 +4,7 @@ FinalityDepth = 10
 # block_time was:  0.4s, adding 1 second buffer  
 LogPollInterval = '2s'
 LogBroadcasterEnabled = false
-
+FinalityTagEnabled = false
 # finality_depth * block_time / 60 secs = < 1 min (finality time)
 NoNewFinalizedHeadsThreshold = '1m'
 
