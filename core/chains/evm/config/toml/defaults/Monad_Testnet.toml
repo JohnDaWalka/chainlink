@@ -4,7 +4,6 @@ FinalityDepth = 10
 # block_time was:  1s, adding 1 second buffer  
 LogPollInterval = '2s'
 LogBroadcasterEnabled = false
-NewHeadsPollInterval = '6s'
 
 # finality_depth * block_time / 60 secs = < 1 min (finality time)
 NoNewFinalizedHeadsThreshold = '1m'
@@ -20,3 +19,6 @@ CacheTimeout = '2s'
 [GasEstimator.BlockHistory]
 BlockHistorySize = 100
 
+
+[NodePool]
+NewHeadsPollInterval = '2s' 
