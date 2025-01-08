@@ -9,15 +9,13 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
-	"github.com/stretchr/testify/require"
-
-	chainsel "github.com/smartcontractkit/chain-selectors"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/gagliardetto/solana-go"
 	solRpc "github.com/gagliardetto/solana-go/rpc"
 	solTestUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
+	"github.com/stretchr/testify/require"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 )
 
