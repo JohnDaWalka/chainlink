@@ -215,7 +215,7 @@ func deployChainContractsEVM(
 	if chainState.Router == nil {
 		return fmt.Errorf("router not found for chain %s, deploy the prerequisites first", chain.String())
 	}
-	rmnProxyContract := chainState.RMNProxy
+	RMNProxy := chainState.RMNProxy
 	if chainState.RMNProxy == nil {
 		e.Logger.Errorw("RMNProxy not found", "chain", chain.String())
 		return fmt.Errorf("rmn proxy not found for chain %s, deploy the prerequisites first", chain.String())
@@ -280,7 +280,7 @@ func deployChainContractsEVM(
 					chain.DeployerKey,
 					chain.Client,
 					weth9Contract.Address(),
-					rmnProxyContract.Address(),
+					RMNProxy.Address(),
 				)
 				return deployment.ContractDeploy[*router.Router]{
 					routerAddr, routerC, tx2, deployment.NewTypeAndVersion(TestRouter, deployment.Version1_2_0), err2,
@@ -364,7 +364,7 @@ func deployChainContractsEVM(
 					chain.Client,
 					onramp.OnRampStaticConfig{
 						ChainSelector:      chain.Selector,
-						RmnRemote:          rmnProxyContract.Address(),
+						RmnRemote:          RMNProxy.Address(),
 						NonceManager:       nmContract.Address(),
 						TokenAdminRegistry: tokenAdminReg.Address(),
 					},
@@ -396,7 +396,7 @@ func deployChainContractsEVM(
 					offramp.OffRampStaticConfig{
 						ChainSelector:        chain.Selector,
 						GasForCallExactCheck: 5_000,
-						RmnRemote:            rmnProxyContract.Address(),
+						RmnRemote:            RMNProxy.Address(),
 						NonceManager:         nmContract.Address(),
 						TokenAdminRegistry:   tokenAdminReg.Address(),
 					},
