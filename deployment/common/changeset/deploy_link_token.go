@@ -90,7 +90,6 @@ func deployLinkTokenContractSolana(
 	chain deployment.SolChain,
 	ab deployment.AddressBook,
 ) error {
-
 	adminPublicKey := chain.DeployerKey.PublicKey()
 	mint, _ := solana.NewRandomPrivateKey()
 	// this is the token address
