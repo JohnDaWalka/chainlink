@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	deployBinPath = "/Users/yashvardhan/chainlink-ccip/chains/solana/contracts/target/deploy"
+	deployBinPath = "./internal/solana_contracts"
 	// keypairPath   = "/Users/yashvardhan/.config/solana/id.json" //wallet
 )
 
