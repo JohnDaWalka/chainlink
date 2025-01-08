@@ -4,6 +4,8 @@ go 1.23.3
 
 toolchain go1.23.4
 
+replace github.com/smartcontractkit/chainlink-common => ../chainlink-common
+
 require (
 	github.com/Depado/ginprom v1.8.0
 	github.com/Masterminds/semver/v3 v3.3.0

@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strconv"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
 
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncer"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
@@ -43,11 +45,12 @@ import (
 )
 
 type DonContext struct {
-	EthBlockchain      *EthBlockchain
-	p2pNetwork         *FakeRageP2PNetwork
-	capabilityRegistry *CapabilitiesRegistry
-	workflowRegistry   *WorkflowRegistry
-	fetcherFunc        syncer.FetcherFunc
+	EthBlockchain         *EthBlockchain
+	p2pNetwork            *FakeRageP2PNetwork
+	capabilityRegistry    *CapabilitiesRegistry
+	workflowRegistry      *WorkflowRegistry
+	syncerFetcherFunc     syncer.FetcherFunc
+	computeFetcherFactory compute.FetcherFactory
 }
 
 func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
@@ -60,11 +63,13 @@ func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
 	return DonContext{EthBlockchain: ethBlockchain, p2pNetwork: rageP2PNetwork, capabilityRegistry: capabilitiesRegistry}
 }
 
-func CreateDonContextWithWorkflowRegistry(ctx context.Context, t *testing.T, fetcherFunc syncer.FetcherFunc) DonContext {
+func CreateDonContextWithWorkflowRegistry(ctx context.Context, t *testing.T, syncerFetcherFunc syncer.FetcherFunc,
+	computeFetcherFactory compute.FetcherFactory) DonContext {
 	donContext := CreateDonContext(ctx, t)
 	workflowRegistry := NewWorkflowRegistry(ctx, t, donContext.EthBlockchain)
 	donContext.workflowRegistry = workflowRegistry
-	donContext.fetcherFunc = fetcherFunc
+	donContext.syncerFetcherFunc = syncerFetcherFunc
+	donContext.computeFetcherFactory = computeFetcherFactory
 	return donContext
 }
 
@@ -110,7 +115,7 @@ type DON struct {
 	standardCapabilityJobs []*job.Job
 	publishedCapabilities  []capability
 
-	workflows []Workflow
+	initialised bool
 
 	capabilitiesRegistry *CapabilitiesRegistry
 	workflowRegistry     *WorkflowRegistry
@@ -170,7 +175,7 @@ func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig Don
 					for _, modifier := range don.nodeConfigModifiers {
 						modifier(c, cn)
 					}
-				}, donContext.fetcherFunc)
+				}, donContext.syncerFetcherFunc, donContext.computeFetcherFactory)
 
 			require.NoError(t, node.Start(testutils.Context(t)))
 			cn.TestApplication = node
@@ -194,11 +199,8 @@ func (d *DON) Initialise() {
 			workflowRegistryAddressStr := d.workflowRegistry.addr.String()
 			c.Capabilities.WorkflowRegistry.Address = &workflowRegistryAddressStr
 		})
-
-		for _, workflow := range d.workflows {
-			d.workflowRegistry.RegisterWorkflow(workflow, *d.id)
-		}
 	}
+	d.initialised = true
 
 }
 
@@ -376,10 +378,14 @@ func (d *DON) AddJob(ctx context.Context, j *job.Job) error {
 
 func (d *DON) AddWorkflow(workflow Workflow) error {
 	if !d.config.AcceptsWorkflows {
-		return fmt.Errorf("cannot add workflow to non-workflow DON")
+		return errors.New("cannot add workflow to non-workflow DON")
 	}
 
-	d.workflows = append(d.workflows, workflow)
+	if !d.initialised {
+		return errors.New("cannot add workflow to non-initialised DON")
+	}
+
+	d.workflowRegistry.RegisterWorkflow(workflow, *d.id)
 
 	return nil
 }
@@ -408,6 +414,7 @@ func startNewNode(ctx context.Context,
 	keyV2 ethkey.KeyV2,
 	setupCfg func(c *chainlink.Config),
 	fetcherFunc syncer.FetcherFunc,
+	fetcherFactoryFunc compute.FetcherFactory,
 ) *cltest.TestApplication {
 	config, _ := heavyweight.FullTestDBV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
 		c.Capabilities.ExternalRegistry.ChainID = ptr(fmt.Sprintf("%d", testutils.SimulatedChainID))
@@ -437,7 +444,7 @@ func startNewNode(ctx context.Context,
 	ethBlockchain.Commit()
 
 	return cltest.NewApplicationWithConfigV2AndKeyOnSimulatedBlockchain(t, config, ethBlockchain.Backend, nodeInfo,
-		dispatcher, peerWrapper, newOracleFactoryFn, localCapabilities, keyV2, lggr, fetcherFunc)
+		dispatcher, peerWrapper, newOracleFactoryFn, localCapabilities, keyV2, lggr, fetcherFunc, fetcherFactoryFunc)
 }
 
 // Functions below this point are for adding non-standard capabilities to a DON, deliberately verbose. Eventually these
@@ -459,24 +466,29 @@ func (d *DON) AddOCR3NonStandardCapability() {
 	})
 }
 
-func (d *DON) AddEthereumWriteTargetNonStandardCapability(forwarderAddr common.Address) error {
+func (d *DON) AddEthereumWriteTargetNonStandardCapability(forwarderAddr common.Address) (string, error) {
 	d.nodeConfigModifiers = append(d.nodeConfigModifiers, func(c *chainlink.Config, node *capabilityNode) {
 		eip55Address := types.EIP55AddressFromAddress(forwarderAddr)
 		c.EVM[0].Chain.Workflow.ForwarderAddress = &eip55Address
 		c.EVM[0].Chain.Workflow.FromAddress = &node.key.EIP55Address
 	})
 
+	labelledName := "write_geth-testnet"
+	version := "1.0.0"
+
 	writeChain := kcr.CapabilitiesRegistryCapability{
-		LabelledName:   "write_geth-testnet",
-		Version:        "1.0.0",
+		LabelledName:   labelledName,
+		Version:        version,
 		CapabilityType: uint8(registrysyncer.ContractCapabilityTypeTarget),
 	}
+
+	capabilityID := fmt.Sprintf("%s@%s", labelledName, version)
 
 	targetCapabilityConfig := newCapabilityConfig()
 
 	configWithLimit, err := values.WrapMap(map[string]any{"gasLimit": 500000})
 	if err != nil {
-		return fmt.Errorf("failed to wrap map: %w", err)
+		return "", fmt.Errorf("failed to wrap map: %w", err)
 	}
 
 	targetCapabilityConfig.DefaultConfig = values.Proto(configWithLimit).GetMapValue()
@@ -492,7 +504,7 @@ func (d *DON) AddEthereumWriteTargetNonStandardCapability(forwarderAddr common.A
 		registryConfig:      writeChain,
 	})
 
-	return nil
+	return capabilityID, nil
 }
 
 func addOCR3Capability(ctx context.Context, t *testing.T, lggr logger.Logger, capabilityRegistry *capabilities.Registry,

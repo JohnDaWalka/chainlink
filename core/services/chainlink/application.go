@@ -31,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/build"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
 	gatewayconnector "github.com/smartcontractkit/chainlink/v2/core/capabilities/gateway_connector"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote"
 	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
@@ -191,6 +192,7 @@ type ApplicationOpts struct {
 	CapabilitiesPeerWrapper    p2ptypes.PeerWrapper
 	NewOracleFactoryFn         standardcapabilities.NewOracleFactoryFn
 	FetcherFunc                syncer.FetcherFunc
+	FetcherFactoryFn           compute.FetcherFactory
 }
 
 // NewApplication initializes a new store if one is not already
@@ -572,6 +574,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		keyStore,
 		peerWrapper,
 		opts.NewOracleFactoryFn,
+		opts.FetcherFactoryFn,
 	)
 
 	if cfg.OCR().Enabled() {

@@ -35,6 +35,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncer"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting/types"
 
@@ -357,10 +358,18 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		}
 	}
 
-	var fetcherFunc syncer.FetcherFunc
+	var syncerFetcherFunc syncer.FetcherFunc
 	for _, dep := range flagsAndDeps {
-		fetcherFunc, _ = dep.(syncer.FetcherFunc)
-		if fetcherFunc != nil {
+		syncerFetcherFunc, _ = dep.(syncer.FetcherFunc)
+		if syncerFetcherFunc != nil {
+			break
+		}
+	}
+
+	var computeFetcherFactory compute.FetcherFactory
+	for _, dep := range flagsAndDeps {
+		computeFetcherFactory, _ = dep.(compute.FetcherFactory)
+		if computeFetcherFactory != nil {
 			break
 		}
 	}
@@ -504,7 +513,8 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		CapabilitiesDispatcher:     dispatcher,
 		CapabilitiesPeerWrapper:    peerWrapper,
 		NewOracleFactoryFn:         newOracleFactoryFn,
-		FetcherFunc:                fetcherFunc,
+		FetcherFunc:                syncerFetcherFunc,
+		FetcherFactoryFn:           computeFetcherFactory,
 		RetirementReportCache:      retirementReportCache,
 	})
 

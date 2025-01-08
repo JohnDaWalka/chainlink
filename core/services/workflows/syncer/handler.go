@@ -485,6 +485,8 @@ func (h *eventHandler) workflowRegisteredEvent(
 
 	h.engineRegistry.Add(wfID, engine)
 
+	h.lggr.Debugw("STARTED WORKFLOW ENGINE", "workflow", wfID)
+
 	return nil
 }
 
