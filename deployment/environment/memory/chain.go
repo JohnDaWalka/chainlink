@@ -1,7 +1,10 @@
 package memory
 
 import (
+	"encoding/json"
+	"fmt"
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -31,6 +34,8 @@ type EVMChain struct {
 type SolanaChain struct {
 	Client      *solRpc.Client
 	DeployerKey *solana.PrivateKey
+	URL         string
+	KeypairPath string
 }
 
 func fundAddress(t *testing.T, from *bind.TransactOpts, to common.Address, amount *big.Int, backend *simulated.Backend) {
@@ -72,6 +77,40 @@ func getTestSolanaChainSelectors() []uint64 {
 	return result
 }
 
+func generateAndStoreKeypair() (solana.PrivateKey, string, error) {
+	// Generate a random private key
+	privateKey, err := solana.NewRandomPrivateKey()
+	if err != nil {
+		return solana.PrivateKey{}, "", fmt.Errorf("failed to generate private key: %w", err)
+	}
+
+	// Convert the private key to a byte slice
+	keypairBytes := privateKey
+
+	// solana.NewWallet().
+
+	// Serialize the keypair as JSON
+	jsonData, err := json.Marshal(keypairBytes)
+	if err != nil {
+		return solana.PrivateKey{}, "", fmt.Errorf("failed to serialize keypair: %w", err)
+	}
+
+	// Create a temporary file
+	tempFile, err := os.CreateTemp("", "solana-keypair-*.json")
+	if err != nil {
+		return solana.PrivateKey{}, "", fmt.Errorf("failed to create temporary file: %w", err)
+	}
+	defer tempFile.Close()
+
+	// Write the keypair data to the file
+	if _, err := tempFile.Write(jsonData); err != nil {
+		return solana.PrivateKey{}, "", fmt.Errorf("failed to write keypair to temporary file: %w", err)
+	}
+
+	// Return the path to the temporary file
+	return privateKey, tempFile.Name(), nil
+}
+
 func GenerateChainsSol(t *testing.T, numChains int) map[uint64]SolanaChain {
 	testSolanaChainSelectors := getTestSolanaChainSelectors()
 	if len(testSolanaChainSelectors) < numChains {
@@ -81,12 +120,21 @@ func GenerateChainsSol(t *testing.T, numChains int) map[uint64]SolanaChain {
 	for i := 0; i < numChains; i++ {
 		chainID := testSolanaChainSelectors[i]
 		url, _ := solTestUtil.SetupLocalSolNodeWithFlags(t)
-		admin, gerr := solana.NewRandomPrivateKey()
+		admin, keypairPath, gerr := generateAndStoreKeypair()
+		t.Log("keypairPath", keypairPath)
+		t.Log("admin", admin.PublicKey())
+		t.Log("admin private key", admin)
+		key, err := solana.PrivateKeyFromSolanaKeygenFile(keypairPath)
+		require.NoError(t, err)
+		t.Log("keypair key", key)
+		require.NoError(t, gerr)
 		solTestUtil.FundTestAccounts(t, []solana.PublicKey{admin.PublicKey()}, url)
 		require.NoError(t, gerr)
 		chains[chainID] = SolanaChain{
 			Client:      solRpc.New(url),
 			DeployerKey: &admin,
+			URL:         url,
+			KeypairPath: keypairPath,
 		}
 	}
 	return chains

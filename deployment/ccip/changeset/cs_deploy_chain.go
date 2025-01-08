@@ -7,9 +7,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"golang.org/x/sync/errgroup"
 
+	solBinary "github.com/gagliardetto/binary"
+	solRpc "github.com/gagliardetto/solana-go/rpc"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
@@ -24,6 +28,10 @@ import (
 )
 
 var _ deployment.ChangeSet[DeployChainContractsConfig] = DeployChainContracts
+
+var (
+	EnableExecutionAfter = int64(1800) // 30min
+)
 
 // DeployChainContracts deploys all new CCIP v1.6 or later contracts for the given chains.
 // It returns the new addresses for the contracts.
@@ -441,10 +449,94 @@ func deployChainContractsEVM(
 	return nil
 }
 
+func solRouterProgramData(e deployment.Environment, chain deployment.SolChain, CcipRouterProgram solana.PublicKey) (struct {
+	DataType uint32
+	Address  solana.PublicKey
+}, error) {
+	var programData struct {
+		DataType uint32
+		Address  solana.PublicKey
+	}
+	data, err := chain.Client.GetAccountInfoWithOpts(e.GetContext(), CcipRouterProgram, &solRpc.GetAccountInfoOpts{
+		Commitment: solRpc.CommitmentConfirmed,
+	})
+	if err != nil {
+		return programData, fmt.Errorf("failed to deploy program: %v", err)
+	}
+
+	err = solBinary.UnmarshalBorsh(&programData, data.Bytes())
+	if err != nil {
+		return programData, fmt.Errorf("failed to unmarshal program data: %v", err)
+	}
+	return programData, nil
+}
+
 func deployChainContractsSolana(
 	e deployment.Environment,
 	chain deployment.SolChain,
 	ab deployment.AddressBook,
 ) error {
+	state, err := LoadOnchainStateSolana(e)
+	if err != nil {
+		e.Logger.Errorw("Failed to load existing onchain state", "err")
+		return err
+	}
+	chainState, chainExists := state.SolChains[chain.Selector]
+	if !chainExists {
+		return fmt.Errorf("chain %s not found in existing state, deploy the prerequisites first", chain.String())
+	}
+	linkTokenContract := chainState.LinkToken
+	e.Logger.Infow("link token", "addr", linkTokenContract.String())
+
+	if chainState.SolCcipRouter.IsZero() {
+		// deploy and initialize router
+		programID, err := chain.DeployProgram(e.Logger, "ccip_router")
+		if err != nil {
+			return fmt.Errorf("failed to deploy program: %v", err)
+		}
+
+		tv := deployment.NewTypeAndVersion("SolCcipRouter", deployment.Version1_0_0)
+		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
+
+		CcipRouterProgram := solana.MustPublicKeyFromBase58(programID)
+		programData, err := solRouterProgramData(e, chain, CcipRouterProgram)
+		if err != nil {
+			return fmt.Errorf("failed to get solana router program data: %v", err)
+		}
+
+		ccip_router.SetProgramID(CcipRouterProgram)
+
+		defaultGasLimit := solBinary.Uint128{Lo: 3000, Hi: 0, Endianness: nil}
+
+		instruction, err := ccip_router.NewInitializeInstruction(
+			chain.Selector,       // chain selector
+			defaultGasLimit,      // default gas limit
+			true,                 // allow out of order execution
+			EnableExecutionAfter, // period to wait before allowing manual execution
+			solana.PublicKey{},
+			GetRouterConfigPDA(CcipRouterProgram),
+			GetRouterStatePDA(CcipRouterProgram),
+			chain.DeployerKey.PublicKey(),
+			solana.SystemProgramID,
+			CcipRouterProgram,
+			programData.Address,
+			GetExternalExecutionConfigPDA(CcipRouterProgram),
+			GetExternalTokenPoolsSignerPDA(CcipRouterProgram),
+		).ValidateAndBuild()
+
+		if err != nil {
+			return fmt.Errorf("failed to build instruction: %v", err)
+		}
+		err = chain.Confirm([]solana.Instruction{instruction})
+
+		if err != nil {
+			return fmt.Errorf("failed to confirm instructions: %v", err)
+		}
+
+		err = ab.Save(chain.Selector, programID, tv)
+		if err != nil {
+			return fmt.Errorf("failed to save address: %v", err)
+		}
+	}
 	return nil
 }
