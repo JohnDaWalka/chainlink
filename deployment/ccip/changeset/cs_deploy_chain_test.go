@@ -3,11 +3,14 @@ package changeset
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 
+	"github.com/mr-tron/base58"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -87,7 +90,7 @@ func TestDeployChainContractsChangeset(t *testing.T) {
 	require.NotNil(t, state.Chains[homeChainSel].CapabilityRegistry)
 	require.NotNil(t, state.Chains[homeChainSel].CCIPHome)
 	require.NotNil(t, state.Chains[homeChainSel].RMNHome)
-	for _, sel := range selectors {
+	for _, sel := range evmSelectors {
 		require.NotNil(t, state.Chains[sel].LinkToken)
 		require.NotNil(t, state.Chains[sel].Weth9)
 		require.NotNil(t, state.Chains[sel].TokenAdminRegistry)
@@ -100,6 +103,14 @@ func TestDeployChainContractsChangeset(t *testing.T) {
 		require.NotNil(t, state.Chains[sel].OffRamp)
 		require.NotNil(t, state.Chains[sel].OnRamp)
 	}
+
+	solState, err := LoadOnchainStateSolana(e)
+	require.NoError(t, err)
+	for _, sel := range solChainSelectors {
+		require.NotNil(t, solState.SolChains[sel].LinkToken)
+		require.NotNil(t, solState.SolChains[sel].SolCcipRouter)
+	}
+
 }
 
 func TestDeployCCIPContracts(t *testing.T) {
@@ -116,4 +127,46 @@ func TestDeployCCIPContracts(t *testing.T) {
 	b, err := json.MarshalIndent(snap, "", "	")
 	require.NoError(t, err)
 	fmt.Println(string(b))
+}
+
+func TestYash(t *testing.T) {
+	privateKey, _ := solana.NewRandomPrivateKey()
+	fmt.Println(privateKey.String())
+
+	// Decode the Base58 private key
+	privateKeyBytes, err := base58.Decode(privateKey.String())
+	if err != nil {
+		fmt.Printf("Error decoding Base58 private key: %v\n", err)
+		return
+	}
+	fmt.Printf("Bytes after decode: %v\n", privateKeyBytes)
+
+	// Convert bytes to array of integers
+	intArray := make([]int, len(privateKeyBytes))
+	for i, b := range privateKeyBytes {
+		intArray[i] = int(b)
+	}
+
+	// Marshal the integer array to JSON
+	keypairJSON, err := json.Marshal(intArray)
+	if err != nil {
+		fmt.Printf("Error marshaling to JSON: %v\n", err)
+		return
+	}
+	outputFilePath := "/Users/yashvardhan/.config/solana/myid.json"
+	if err := os.WriteFile(outputFilePath, keypairJSON, 0600); err != nil {
+		fmt.Printf("Error writing keypair to file: %v\n", err)
+		return
+	}
+
+	// if err := os.WriteFile(outputFilePath, privateKeyBytes, 0600); err != nil {
+	// 	fmt.Printf("Error writing keypair to file: %v\n", err)
+	// 	return
+	// }
+
+	pk, err := solana.PrivateKeyFromSolanaKeygenFile(outputFilePath)
+	require.NoError(t, err)
+	fmt.Println(pk.String())
+
+	// fmt.Printf("Keypair JSON successfully written to: %s\n", outputFilePath)
 }
