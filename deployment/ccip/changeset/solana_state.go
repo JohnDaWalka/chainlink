@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 )
 
@@ -29,18 +30,16 @@ func LoadOnchainStateSolana(e deployment.Environment) (CCIPOnChainState, error) 
 		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)
 		if err != nil {
 			// Chain not found in address book, initialize empty
-			if errors.Is(err, deployment.ErrChainNotFound) {
-				addresses = make(map[string]deployment.TypeAndVersion)
-			} else {
+			if !errors.Is(err, deployment.ErrChainNotFound) {
 				return state, err
 			}
+			addresses = make(map[string]deployment.TypeAndVersion)
 		}
 		chainState, err := LoadChainStateSolana(chain, addresses)
 		if err != nil {
 			return state, err
 		}
 		state.SolChains[chainSelector] = chainState
-
 	}
 	return state, nil
 }
