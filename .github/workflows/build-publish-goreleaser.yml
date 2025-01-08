@@ -128,3 +128,8 @@ jobs:
           goreleaser-release-type: release
           goreleaser-config: .goreleaser.production.yaml
           goreleaser-key: ${{ secrets.GORELEASER_KEY }}
+
+      - name: ls directories
+        run: |
+          ls -la dist
+          ls -la dist/${{ matrix.dist_name }}
