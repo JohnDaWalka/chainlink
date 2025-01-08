@@ -16,7 +16,7 @@ number_of_contracts = 2
 
 [Network.EVMNetworks.MONAD_TESTNET]
 evm_name = "monad-testnet"
-evm_chain_id = 1328
+evm_chain_id = 10143
 client_implementation = "Ethereum"
 evm_simulated = false
 evm_chainlink_transaction_limit = 5000
