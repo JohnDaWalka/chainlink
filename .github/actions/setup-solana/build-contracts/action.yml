@@ -9,7 +9,7 @@ runs:
       with:
         repository: chainlink/chainlink-ccip
         path: chainlink-ccip
-        token: ${{ github.token }}
+        token: ${{ secrets.GITHUB_TOKEN }}
     - name: Get Anchor Version
       id: get_anchor_version
       shell: bash
