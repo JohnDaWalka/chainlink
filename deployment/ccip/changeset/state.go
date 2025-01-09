@@ -6,10 +6,13 @@ import (
 
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_from_mint_token_pool"
 	burn_mint_token_pool "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool_1_4_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_with_from_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
@@ -40,7 +43,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_home"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	capabilities_registry "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
@@ -84,11 +87,14 @@ var (
 	USDCMockTransmitter deployment.ContractType = "USDCMockTransmitter"
 
 	// Pools
-	BurnMintToken      deployment.ContractType = "BurnMintToken"
-	BurnMintTokenPool  deployment.ContractType = "BurnMintTokenPool"
-	USDCToken          deployment.ContractType = "USDCToken"
-	USDCTokenMessenger deployment.ContractType = "USDCTokenMessenger"
-	USDCTokenPool      deployment.ContractType = "USDCTokenPool"
+	BurnMintToken             deployment.ContractType = "BurnMintToken"
+	BurnMintTokenPool         deployment.ContractType = "BurnMintTokenPool"
+	BurnWithFromMintTokenPool deployment.ContractType = "BurnWithFromMintTokenPool"
+	BurnFromMintTokenPool     deployment.ContractType = "BurnFromMintTokenPool"
+	LockReleaseTokenPool      deployment.ContractType = "LockReleaseTokenPool"
+	USDCToken                 deployment.ContractType = "USDCToken"
+	USDCTokenMessenger        deployment.ContractType = "USDCTokenMessenger"
+	USDCTokenPool             deployment.ContractType = "USDCTokenPool"
 )
 
 // CCIPChainState holds a Go binding for all the currently deployed CCIP contracts
@@ -111,8 +117,11 @@ type CCIPChainState struct {
 	// and the respective token contract
 	// This is more of an illustration of how we'll have tokens, and it might need some work later to work properly.
 	// Not all tokens will be burn and mint tokens.
-	BurnMintTokens677  map[TokenSymbol]*burn_mint_erc677.BurnMintERC677
-	BurnMintTokenPools map[TokenSymbol]*burn_mint_token_pool.BurnMintTokenPool
+	BurnMintTokens677          map[TokenSymbol]*burn_mint_erc677.BurnMintERC677
+	BurnMintTokenPools         map[TokenSymbol]*burn_mint_token_pool.BurnMintTokenPool
+	BurnWithFromMintTokenPools map[TokenSymbol]*burn_with_from_mint_token_pool.BurnWithFromMintTokenPool
+	BurnFromMintTokenPools     map[TokenSymbol]*burn_from_mint_token_pool.BurnFromMintTokenPool
+	LockReleaseTokenPools      map[TokenSymbol]*lock_release_token_pool.LockReleaseTokenPool
 	// Map between token Symbol (e.g. LinkSymbol, WethSymbol)
 	// and the respective aggregator USD feed contract
 	USDFeeds map[TokenSymbol]*aggregator_v3_interface.AggregatorV3Interface
