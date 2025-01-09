@@ -7,7 +7,6 @@ import {OffRampSetup} from "./OffRampSetup.t.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {IMessageTransformer} from "../../../interfaces/IMessageTransformer.sol";
 import {MessageTransformerHelper} from "../../helpers/MessageTransformerHelper.sol";
-import {MultiOCR3Base} from "../../../ocr/MultiOCR3Base.sol";
 import {Router} from "../../../Router.sol";
 
 contract MessageTransformerOffRamp_executeSingleMessage is OffRampSetup {
