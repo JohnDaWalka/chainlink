@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {OnRamp} from "./OnRamp.sol";
 import {IMessageTransformer} from "../interfaces/IMessageTransformer.sol";
 import {Internal} from "../libraries/Internal.sol";
+import {OnRamp} from "./OnRamp.sol";
 
 contract MessageTransformerOnRamp is OnRamp {
-
   address internal s_messageTransformer;
 
   error ZeroAddressNotAllowed();
@@ -25,14 +24,14 @@ contract MessageTransformerOnRamp is OnRamp {
 
   function getMessageTransformerAddress() external view returns (address) {
     return s_messageTransformer;
-  } 
+  }
 
   function _postProcessMessage(
     Internal.EVM2AnyRampMessage memory message
   ) internal override returns (Internal.EVM2AnyRampMessage memory transformedMessage) {
-    try IMessageTransformer(s_messageTransformer).transformOutboundMessage(
-      message
-    ) returns (Internal.EVM2AnyRampMessage memory m) {
+    try IMessageTransformer(s_messageTransformer).transformOutboundMessage(message) returns (
+      Internal.EVM2AnyRampMessage memory m
+    ) {
       transformedMessage = m;
     } catch (bytes memory err) {
       revert IMessageTransformer.MessageTransformError(err);

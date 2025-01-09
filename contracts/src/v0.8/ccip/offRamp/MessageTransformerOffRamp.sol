@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {OffRamp} from "./OffRamp.sol";
 import {IMessageTransformer} from "../interfaces/IMessageTransformer.sol";
 import {Internal} from "../libraries/Internal.sol";
+import {OffRamp} from "./OffRamp.sol";
 
 contract MessageTransformerOffRamp is OffRamp {
-  
   address internal s_messageTransformer;
-  
+
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,

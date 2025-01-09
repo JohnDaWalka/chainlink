@@ -557,7 +557,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @return transformedMessage modified message
   function _beforeExecuteSingleMessage(
     Internal.Any2EVMRampMessage memory message
-    ) internal virtual returns (Internal.Any2EVMRampMessage memory transformedMessage) {
+  ) internal virtual returns (Internal.Any2EVMRampMessage memory transformedMessage) {
     return message;
   }
 
