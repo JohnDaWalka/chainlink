@@ -9,7 +9,7 @@ FinalityTagEnabled = false
 NoNewFinalizedHeadsThreshold = '1m'
 
 [GasEstimator]
-EIP1559DynamicFees = true
+EIP1559DynamicFees = false
 Mode = 'FeeHistory'
 
 [GasEstimator.FeeHistory]
