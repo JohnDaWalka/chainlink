@@ -198,7 +198,7 @@ func DeployTokenPoolContracts(env deployment.Environment, c DeployTokenPoolContr
 			return deployment.ChangesetOutput{}, fmt.Errorf("no chain with selector %d found in environment", chainSelector)
 		}
 		chainState := state.Chains[chainSelector] // state is derived from env, no need to re-check
-		tokenChainConfig, err := fetchAndValidateTimelockOwnedTokenPool(env.Logger, chainEnv, chainState, chainConfig)
+		tokenChainConfig, err := fetchAndValidateTimelockOwnedTokenPool(chainEnv, chainState, chainConfig)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch token pool on %s for token with address %s: %w", chainEnv.Name(), chainConfig.TokenAddress, err)
 		}
@@ -245,7 +245,6 @@ func DeployTokenPoolContracts(env deployment.Environment, c DeployTokenPoolContr
 // fetchAndValidateTimelockOwnedTokenPool constructs a token's chain configuration based on the current pool set on the registry,
 // asserting that the pool is current owned by the Timelock.
 func fetchAndValidateTimelockOwnedTokenPool(
-	logger logger.Logger,
 	chainEnv deployment.Chain,
 	chainState CCIPChainState,
 	chainConfig BaseTokenPoolInput,
@@ -315,7 +314,14 @@ func deployAndTransferTokenPoolToTimelock(
 	if err != nil {
 		return TokenChainConfig{}, fmt.Errorf("failed to deploy token pool on %s: %w", chainEnv.Name(), err)
 	}
-	tokenPoolDeployment.Contract.TransferOwnership(chainEnv.DeployerKey, timelock.Address())
+	tx, err := tokenPoolDeployment.Contract.TransferOwnership(chainEnv.DeployerKey, timelock.Address())
+	if err != nil {
+		return TokenChainConfig{}, fmt.Errorf("failed to transfer ownership of token pool to timelock on %s: %w", chainEnv.Name(), err)
+	}
+	_, err = chainEnv.Confirm(tx)
+	if err != nil {
+		return TokenChainConfig{}, fmt.Errorf("failed to confirm ownership transfer of token pool to timelock on %s: %w", chainEnv.Name(), err)
+	}
 
 	return TokenChainConfig{
 		TokenAdminRegistry: tokenAdminRegistry,
@@ -490,7 +496,8 @@ func makeTokenPoolOperationsForChain(
 		})
 	}
 
-	// If an external admin is specified & timelock is currently the admin, transfer ownership of the pool and admin rights on the registry
+	// If an external admin is specified & timelock is currently the admin, transfer ownership of the pool and admin rights on the registry.
+	// The timelock would be the owner of the pool at this point, so we don't need to check ownership there.
 	if isTimelockAdmin && tokenChainConfig.ExternalAdmin.Cmp(ZeroAddress()) != 0 {
 		transferAdminRoleTx, err := tokenChainConfig.TokenAdminRegistry.TransferAdminRole(deployment.SimTransactOpts(), tokenChainConfig.TokenAddress, tokenChainConfig.ExternalAdmin)
 		if err != nil {
