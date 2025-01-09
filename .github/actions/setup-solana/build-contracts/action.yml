@@ -13,7 +13,7 @@ runs:
       id: get_anchor_version
       shell: bash
       run: |
-        cd chainlink-ccip
+        cd chainlink-ccip/chains/solana
         anchor=$(make anchor_version)
         echo "ANCHOR_VERSION=${anchor}" >> $GITHUB_ENV
     - name: cache docker build image
