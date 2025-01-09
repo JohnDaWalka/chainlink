@@ -265,6 +265,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
   function _postProcessMessage(
     Internal.EVM2AnyRampMessage memory message
   ) internal virtual returns (Internal.EVM2AnyRampMessage memory transformedMessage) {
+    return message;
   }
 
   /// @notice Uses a pool to lock or burn a token.

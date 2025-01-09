@@ -35,5 +35,6 @@ contract MessageTransformerOffRamp is OffRamp {
     } catch (bytes memory err) {
       revert IMessageTransformer.MessageTransformError(err);
     }
+    return transformedMessage;
   }
 }
