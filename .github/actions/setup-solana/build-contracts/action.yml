@@ -16,14 +16,14 @@ runs:
       run: |
         cd chainlink-ccip
         anchor=$(make anchor_version)
-        echo "anchor=${anchor}" >>$GITHUB_OUTPUT
+        echo "ANCHOR_VERSION=${anchor}" >> $GITHUB_ENV
     - name: cache docker build image
       id: cache-image
       uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         lookup-only: true
         path: chains/solana/contracts/docker-build.tar
-        key: ${{ runner.os }}-solana-build-${{ get_anchor_version.outputs.anchor_version }}-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-solana-build-${{ env.ANCHOR_VERSION }}-${{ hashFiles('**/Cargo.lock') }}
     - name: Cache cargo target dir
       id: cache-target
       uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
@@ -36,7 +36,7 @@ runs:
       shell: bash
       run: |
         cd contracts
-        docker buildx build . -t ccip-solana:build --build-arg ANCHOR_CLI=${{ get_anchor_version.outputs.anchor_version }}
+        docker buildx build . -t ccip-solana:build --build-arg ANCHOR_CLI=${{ env.ANCHOR_VERSION }}
         docker save -o docker-build.tar ccip-solana
     - name: build & save contract compilation artifacts
       if: steps.cache-target.outputs.cache-hit != 'true'
