@@ -1,24 +1,16 @@
 # Changelog Chainlink Core
 
-## 2.19.1 - UNRELEASED, unofficial custom testing image for Data Streams
+## 2.19.0 - 2024-12-12
 
 ### Minor Changes
-
-- [#15699](https://github.com/smartcontractkit/chainlink/pull/15699) [`329e8f02fd`](https://github.com/smartcontractkit/chainlink/commit/329e8f02fdd4becd333878991a4463423082aaba) - #updated feat(job-distributor): support tron chain type on sync
 
 - [#15126](https://github.com/smartcontractkit/chainlink/pull/15126) [`bf9b08c331`](https://github.com/smartcontractkit/chainlink/commit/bf9b08c33119d14a34c4914a3a7cc94ea6cb5481) - update plugin and evm chainwriter to remove evmConfig dependency #updated
 
 - [#15148](https://github.com/smartcontractkit/chainlink/pull/15148) [`07a2cec532`](https://github.com/smartcontractkit/chainlink/commit/07a2cec532704aebe413a9fa29edc04bd9063677) - #added address book remove feature
 
-- [#15330](https://github.com/smartcontractkit/chainlink/pull/15330) [`35ef812d7f`](https://github.com/smartcontractkit/chainlink/commit/35ef812d7fc8ccaa31f362980b06b782ce2dcb29) - #removed Remove duplicated testing util for p2p_key only.
-
 - [#14898](https://github.com/smartcontractkit/chainlink/pull/14898) [`a417740359`](https://github.com/smartcontractkit/chainlink/commit/a41774035961ce88be2fed7c6759758a7f00881d) - Bump to start the next version
 
-- [#15416](https://github.com/smartcontractkit/chainlink/pull/15416) [`dcc6a36763`](https://github.com/smartcontractkit/chainlink/commit/dcc6a367633eedf0ad2f7b054f0892c53d6b4506) - #updated Remove custom ed25519 private to public key conversion.
-
 - [#15010](https://github.com/smartcontractkit/chainlink/pull/15010) [`c162226424`](https://github.com/smartcontractkit/chainlink/commit/c1622264243c2ee83ff7ba54989cfe789a8da53c) - #added support enable and disable feed manager
-
-- [#15307](https://github.com/smartcontractkit/chainlink/pull/15307) [`a3c8092824`](https://github.com/smartcontractkit/chainlink/commit/a3c809282446174c8a13b78e83c3a76a3efca171) - #removed Remove unused ocr1 key files.
 
 - [#15104](https://github.com/smartcontractkit/chainlink/pull/15104) [`cf7db16483`](https://github.com/smartcontractkit/chainlink/commit/cf7db164832ea95354a3c953126c2fd32a59afd7) - Updated Solana TXM's in-memory storage to track statuses across the Solana transaction lifecycle. Added a method to translate Solana transaction statuses into states expected by the ChainWriter interface. Made the duration transactions are retained in storage after finality or error configurable using `TxRetentionTimeout`. #added
 
@@ -36,8 +28,6 @@
   update ethkeys, ethtransactions to handle duplicate chain id in different network
   introduce network arg input to Chain graphql query to allow better lookup based on network and chain id
 
-- [#15269](https://github.com/smartcontractkit/chainlink/pull/15269) [`00777b83e1`](https://github.com/smartcontractkit/chainlink/commit/00777b83e1086c2541303926b5063794ec41dc7f) - Update deployment address book to support non-evm chains
-
 - [#14405](https://github.com/smartcontractkit/chainlink/pull/14405) [`03115e8038`](https://github.com/smartcontractkit/chainlink/commit/03115e80382dc02a7bce66dc16d8bae5bd7de132) - #internal Updated the TXM confirmation logic to use the mined transaction count to identify re-org'd or confirmed transactions.
 
   - Confirmer uses the mined transaction count to determine if transactions have been re-org'd or confirmed.
@@ -46,11 +36,7 @@
   - Finalizer now responsible for resuming pending task runs.
   - Finalizer now responsible for marking old transactions without receipts broadcasted before the finalized head as fatal.
 
-- [#15213](https://github.com/smartcontractkit/chainlink/pull/15213) [`1f44f3c40b`](https://github.com/smartcontractkit/chainlink/commit/1f44f3c40b4e49ebd58aea2e2ae60ec7e972776a) - Refactor chain ID logic in plugin to be chain agnostic #added
-
 - [#14912](https://github.com/smartcontractkit/chainlink/pull/14912) [`bb6a20a882`](https://github.com/smartcontractkit/chainlink/commit/bb6a20a8825d9f374b99238097b4c9f701336a0c) - Use correct OCR2OracleSpecID when setting up RequestedRoundTracker #bugfix
-
-- [#15323](https://github.com/smartcontractkit/chainlink/pull/15323) [`9eceab5b88`](https://github.com/smartcontractkit/chainlink/commit/9eceab5b88fce2ee23f440f25c0b20df3e1d4b1d) - #updated chainconfig: show chain type next to key bundle id in UI
 
 - [#15029](https://github.com/smartcontractkit/chainlink/pull/15029) [`99241ec680`](https://github.com/smartcontractkit/chainlink/commit/99241ec68098d818b97b046a1f9b4f5c8f0c5366) - Added multiple blocks history estimator feature and config for Solana TXM. #added
 
@@ -69,51 +55,19 @@
 
 - [#15237](https://github.com/smartcontractkit/chainlink/pull/15237) [`1f9c07de61`](https://github.com/smartcontractkit/chainlink/commit/1f9c07de618ecfa3f23b8259ce0558941b5c357f) - #added feat: support creating solana chain config in job distributor page
 
-- [#15412](https://github.com/smartcontractkit/chainlink/pull/15412) [`fcc8d3c10c`](https://github.com/smartcontractkit/chainlink/commit/fcc8d3c10c8c8a757f113d9a9acb34997cb935b7) - Add support for Mercury LLO streams to feeds service. #added
-
 - [#15299](https://github.com/smartcontractkit/chainlink/pull/15299) [`a2c3da471c`](https://github.com/smartcontractkit/chainlink/commit/a2c3da471cc344a14003f53c2c2f09c937c204c1) - #updated Update few incorrect occurences of the password for notreal@fakeemail.ch.
-
-- [#15429](https://github.com/smartcontractkit/chainlink/pull/15429) [`030fd7c530`](https://github.com/smartcontractkit/chainlink/commit/030fd7c5309b43148a637fd762bf346467275bc6) - Change ChainWriter naming to ContractWriter to consolidate Relayer chain interfaces #internal
 
 ### Patch Changes
 
-- [#15357](https://github.com/smartcontractkit/chainlink/pull/15357) [`18cb44e891`](https://github.com/smartcontractkit/chainlink/commit/18cb44e891a00edff7486640ffc8e0c9275a04f8) - #updated use real contracts in ccipreader_tests where possible
-
-- [#15573](https://github.com/smartcontractkit/chainlink/pull/15573) [`eaeb2ebe7b`](https://github.com/smartcontractkit/chainlink/commit/eaeb2ebe7bfc53572655be322b793f0bf9556e1e) - #bugfix fix non-idempotent loopp registry.Register
-
-- [#15482](https://github.com/smartcontractkit/chainlink/pull/15482) [`35c2f05853`](https://github.com/smartcontractkit/chainlink/commit/35c2f05853ea1ba28be2c74941674289943b2fe6) - Potential bug introduced from chain selector refactor, not causing issue now since only EVM is used, but need to fix #bugfix
-
-- [#15293](https://github.com/smartcontractkit/chainlink/pull/15293) [`466586309a`](https://github.com/smartcontractkit/chainlink/commit/466586309a8cbbfc1c793ff1021b7fcd3522dd3e) - allow different decimals on different chains for token pools
-
-- [#15271](https://github.com/smartcontractkit/chainlink/pull/15271) [`1231f1417e`](https://github.com/smartcontractkit/chainlink/commit/1231f1417e7fddeca190c2ab037e84c4858181df) - Updated the Solana TXM compute unit limit estimation feature to use the max 1.4M compute unit limit for simulation and enable SigVerify #updated
-
-- [#15321](https://github.com/smartcontractkit/chainlink/pull/15321) [`29eb7554a6`](https://github.com/smartcontractkit/chainlink/commit/29eb7554a62d46f17b7d64674ad01910a03023d1) - Removing ccip-tests/\* dependencies and moving ccip tests under a directory in smoke
-
-- [#15539](https://github.com/smartcontractkit/chainlink/pull/15539) [`49b77048d1`](https://github.com/smartcontractkit/chainlink/commit/49b77048d1b5480a07b9f77b32b005379c679c44) - Adding OCR3 promwrapper to LLO #internal
-
 - [#14896](https://github.com/smartcontractkit/chainlink/pull/14896) [`38ef1799dc`](https://github.com/smartcontractkit/chainlink/commit/38ef1799dc8dade6882acbafda3f49e942483f6f) - Ensure RPCClient with enabled polling respects health check flag #internal
-
-- [#15544](https://github.com/smartcontractkit/chainlink/pull/15544) [`036cb20d43`](https://github.com/smartcontractkit/chainlink/commit/036cb20d43b8f2d3cdb4de79d11f97ff63831025) - Reporting number of OCR3 instances running using promwrapper #internal
-
-- [#15121](https://github.com/smartcontractkit/chainlink/pull/15121) [`5d22ba8dd2`](https://github.com/smartcontractkit/chainlink/commit/5d22ba8dd2269b11e024e3bc93fc90225034abf7) - #added Adding 5 chains (B^2, BoB, Berachain, Unichain, Worldchain configs)
 
 - [#14978](https://github.com/smartcontractkit/chainlink/pull/14978) [`65351c3a6f`](https://github.com/smartcontractkit/chainlink/commit/65351c3a6fffcff03d249e64cae223daabd86e3c) - Set `NodePool.EnforceRepeatableRead = true` by default for all chains. This forces Core to stop using RPCs behind on the latest finalized block. #changed #nops
 
 - [#14875](https://github.com/smartcontractkit/chainlink/pull/14875) [`101fbbc75a`](https://github.com/smartcontractkit/chainlink/commit/101fbbc75a76893d2ebe0c24fa61773876007d76) - #updated ignoring tx type 126 on celo
 
-- [#15690](https://github.com/smartcontractkit/chainlink/pull/15690) [`ed6f486d59`](https://github.com/smartcontractkit/chainlink/commit/ed6f486d59c2cbdfa02c6fbfc3a42fb6d5f805a2) - #added stream job delete capability
-
 - [#14929](https://github.com/smartcontractkit/chainlink/pull/14929) [`da5910eda9`](https://github.com/smartcontractkit/chainlink/commit/da5910eda98882f8a1b9ccc52b99afa223fb3997) - Add config validation so it requires ws url when http polling disabled #bugfix
 
-- [#15521](https://github.com/smartcontractkit/chainlink/pull/15521) [`f6f2457d93`](https://github.com/smartcontractkit/chainlink/commit/f6f2457d9367c543bef20491a26785266849c154) - Prometheus observability layer added to OCR3 Reporting Plugins #internal
-
-- [#15624](https://github.com/smartcontractkit/chainlink/pull/15624) [`8f6c3b461b`](https://github.com/smartcontractkit/chainlink/commit/8f6c3b461b05b4686b98d31a3c85df078328d526) - #added Lens Sepolia config
-
 - [#14964](https://github.com/smartcontractkit/chainlink/pull/14964) [`7a80f364f9`](https://github.com/smartcontractkit/chainlink/commit/7a80f364f902c46a958021777336d6f6de9203c3) - #internal Add tokenDestGasOverhead to CalculateMessageMaxGas
-
-- [#15488](https://github.com/smartcontractkit/chainlink/pull/15488) [`52f364a6cd`](https://github.com/smartcontractkit/chainlink/commit/52f364a6cd842fe63c4cab6182f4c9fbbf7d134e) - Add error handling for Arbitrum RPC server timeouts. #added
-
-- [#15339](https://github.com/smartcontractkit/chainlink/pull/15339) [`0cabe54f85`](https://github.com/smartcontractkit/chainlink/commit/0cabe54f8535a466a5404bac67396071ec058d94) - fix reported evm node states
 
 - [#15115](https://github.com/smartcontractkit/chainlink/pull/15115) [`f8a6218727`](https://github.com/smartcontractkit/chainlink/commit/f8a62187273bac1f12eeee0fe33355fe1b4faebb) - Fixed outdated headtracker config doc. #internal
 
@@ -121,58 +75,29 @@
 
 - [#14950](https://github.com/smartcontractkit/chainlink/pull/14950) [`0cd0867140`](https://github.com/smartcontractkit/chainlink/commit/0cd086714086b2a788c54de9aea13d58316518dd) - #internal OracleFactory error handling change
 
-- [#15470](https://github.com/smartcontractkit/chainlink/pull/15470) [`54938d4ad2`](https://github.com/smartcontractkit/chainlink/commit/54938d4ad2b430d4941eaae711abe5e1e6a7686a) - #internal refactor: inject ocr secrets via env instead of config
-
 - [#14893](https://github.com/smartcontractkit/chainlink/pull/14893) [`e116f744b2`](https://github.com/smartcontractkit/chainlink/commit/e116f744b222b7d664a8501566093ca1c1c63aa9) - Relocation of the deployment directory into a direct subdir of the root. #internal
 
 - [#15024](https://github.com/smartcontractkit/chainlink/pull/15024) [`6b29cdb7f3`](https://github.com/smartcontractkit/chainlink/commit/6b29cdb7f349b370581822ec6f54713faa7ca49e) - Minor fixes to the CCIPChainReader enabling proper serialization #internal
-
-- [#15362](https://github.com/smartcontractkit/chainlink/pull/15362) [`6ea458859f`](https://github.com/smartcontractkit/chainlink/commit/6ea458859f19835d671455c5ce48a5d91cc9d6aa) - Add two new metrics for monitoring LLO transmitter health #added
-
-  `llo_mercurytransmitter_concurrent_transmit_gauge`
-  Gauge that measures the number of transmit threads currently waiting on a remote transmit call. You may wish to alert if this exceeds some number for a given period of time, or if it ever reaches its max.
-
-  `llo_mercurytransmitter_concurrent_delete_gauge`
-  Gauge that measures the number of delete threads currently waiting on a delete call to the DB. You may wish to alert if this exceeds some number for a given period of time, or if it ever reaches its max.
-
-- [#15425](https://github.com/smartcontractkit/chainlink/pull/15425) [`f094f6c550`](https://github.com/smartcontractkit/chainlink/commit/f094f6c550df43b761d71fdf10cc70bf71a7a318) - Fix TransactionSender go routine leak. #bugfix
 
 - [#14827](https://github.com/smartcontractkit/chainlink/pull/14827) [`a9f86b51bf`](https://github.com/smartcontractkit/chainlink/commit/a9f86b51bf8d3a8548d4870c91f3e82669f5f21a) - #added Handle Hex String in EA Telemetry
 
 - [#15137](https://github.com/smartcontractkit/chainlink/pull/15137) [`7bd35dcea0`](https://github.com/smartcontractkit/chainlink/commit/7bd35dcea04b02ceb2e46a0431eca61ab3b78889) - #internal Update ccip contract reader cfg for ccip message sent to use output codec wrapper modifier
 
-- [#15543](https://github.com/smartcontractkit/chainlink/pull/15543) [`7b6e20f1b4`](https://github.com/smartcontractkit/chainlink/commit/7b6e20f1b40506467349eb0203178aa2c51f5d41) - #internal refactor update nodes changeset to support mcms
-
-- [#15169](https://github.com/smartcontractkit/chainlink/pull/15169) [`1341a3a39b`](https://github.com/smartcontractkit/chainlink/commit/1341a3a39be8987bae7318f7f3dba0e9b0f31c49) - Add config var Mercury.Transmitter.TransmitConcurrency #added
-
 - [#14710](https://github.com/smartcontractkit/chainlink/pull/14710) [`12174c79c4`](https://github.com/smartcontractkit/chainlink/commit/12174c79c4d1746149d7c89e41e67f9dc6525c18) - Adds new custom calldata DA oracle #added
 
 - [#14891](https://github.com/smartcontractkit/chainlink/pull/14891) [`12e2eb251c`](https://github.com/smartcontractkit/chainlink/commit/12e2eb251c406b601b2f954ed25ccad369421403) - Fix flaky WS test server #internal
-
-- [#15457](https://github.com/smartcontractkit/chainlink/pull/15457) [`f6dfb4e87b`](https://github.com/smartcontractkit/chainlink/commit/f6dfb4e87b8cf58ccb2646737f354f2453d07940) - Fixes a race condition with the Finalizer when clearing txs #bugfix
 
 - [#11809](https://github.com/smartcontractkit/chainlink/pull/11809) [`2e8e16820b`](https://github.com/smartcontractkit/chainlink/commit/2e8e16820b02a9ca83aa46e7ae2deac31eaf08aa) - Upgrade go-ethereum to v1.14.11 #internal
 
 - [#15279](https://github.com/smartcontractkit/chainlink/pull/15279) [`276d1f3255`](https://github.com/smartcontractkit/chainlink/commit/276d1f3255aeafb1767ee84f697fc4746890a9a6) - Integration tests for USDC token transfer #internal
 
-- [#15169](https://github.com/smartcontractkit/chainlink/pull/15169) [`1341a3a39b`](https://github.com/smartcontractkit/chainlink/commit/1341a3a39be8987bae7318f7f3dba0e9b0f31c49) - Logging improvements for LLO
-  #internal
-
 - [#14984](https://github.com/smartcontractkit/chainlink/pull/14984) [`1738332823`](https://github.com/smartcontractkit/chainlink/commit/173833282344857b5e7d95863d8dab211db71ad7) - use last mined nonce instead of pending nonce to recover from occasional nonce gap issues within nonce tracker. #internal
 
 - [#11809](https://github.com/smartcontractkit/chainlink/pull/11809) [`2e8e16820b`](https://github.com/smartcontractkit/chainlink/commit/2e8e16820b02a9ca83aa46e7ae2deac31eaf08aa) - Fix HeadTracker tests caused by simulated client update #internal
 
-- [#15058](https://github.com/smartcontractkit/chainlink/pull/15058) [`d4d1456cc7`](https://github.com/smartcontractkit/chainlink/commit/d4d1456cc7d4b0828c1b5e270857636762680e04) - Update MultiNode with latest changes and bug fixes. Fixes an issue that caused nodes to go OutOfSync incorrectly, and also fixed context handling for sending transactions. #internal #bugfix
-
-- [#15585](https://github.com/smartcontractkit/chainlink/pull/15585) [`99b666fbcb`](https://github.com/smartcontractkit/chainlink/commit/99b666fbcbccb926e6dbac11896bf7e7ee5c25ea) - #bugfix fix: duplicate chain id in chain config dialog
-
 - [#15130](https://github.com/smartcontractkit/chainlink/pull/15130) [`4f0491483c`](https://github.com/smartcontractkit/chainlink/commit/4f0491483c089ee2fd5e7875b0d58b65b304b111) - CCIP token transfer integration tests #internal
 
 - [#15150](https://github.com/smartcontractkit/chainlink/pull/15150) [`68bff71f20`](https://github.com/smartcontractkit/chainlink/commit/68bff71f201c8d40219aeadea08a49a19f1ba6f1) - #updated Operator UI to support StreamSpec job definition
-
-- [#15474](https://github.com/smartcontractkit/chainlink/pull/15474) [`b0ea0ca066`](https://github.com/smartcontractkit/chainlink/commit/b0ea0ca0665ef5ebd2136fe4392c8b3ee7f49d12) - Increase GasLimit for Automation on ZKsync to 6M #nops
-
-- [#15628](https://github.com/smartcontractkit/chainlink/pull/15628) [`6101be751e`](https://github.com/smartcontractkit/chainlink/commit/6101be751e8c1088e53bcf7e1c2481f4215d420f) - Switching CCIP to observed ChainReader for HomeChainReader #internal
 
 - [#14433](https://github.com/smartcontractkit/chainlink/pull/14433) [`340a6bfdf5`](https://github.com/smartcontractkit/chainlink/commit/340a6bfdf54745dd1c6d9f322d9c9515c97060bb) - Merge raw configs correctly #bugfix
 
@@ -182,15 +107,15 @@
 
 - [#15157](https://github.com/smartcontractkit/chainlink/pull/15157) [`12986aa461`](https://github.com/smartcontractkit/chainlink/commit/12986aa461a86a593dbce422725abf7e05f05332) - Enable AutoPurge feature on all affected chains #nops
 
-- [#15604](https://github.com/smartcontractkit/chainlink/pull/15604) [`5f3aa78bce`](https://github.com/smartcontractkit/chainlink/commit/5f3aa78bce9f13f5bee26b8a53cb5a1f14ea9102) - Added new fatal error cases for transactions to the Solana TXM. #added
-
 - [#14800](https://github.com/smartcontractkit/chainlink/pull/14800) [`7bac85fdb3`](https://github.com/smartcontractkit/chainlink/commit/7bac85fdb37ed15eb42357b0a0ce06e4febd7494) - #bugfix Memory leak fix on promwrapper
-
-- [#15369](https://github.com/smartcontractkit/chainlink/pull/15369) [`cb194d72a4`](https://github.com/smartcontractkit/chainlink/commit/cb194d72a4ea88831eaf7e6505c582f6dc312d27) - Updated Solana TXM to store prebroadcast transaction errors caught upfront by simulation. Refactored error parsing to more easily introduce new error cases. Optimized storing finalized and errored transaction to minimize memory usage. #updated
 
 - [#14867](https://github.com/smartcontractkit/chainlink/pull/14867) [`2d28b4eb9d`](https://github.com/smartcontractkit/chainlink/commit/2d28b4eb9d8635215d953b4f5d256791a9941035) - #updated Use labelers from `chainlink-common`
 
 - [#15284](https://github.com/smartcontractkit/chainlink/pull/15284) [`7cd17d687a`](https://github.com/smartcontractkit/chainlink/commit/7cd17d687a11fcfe36ad78d6279dc642b6186eaa) - Bump Solana to include MultiNode integration. #added
+
+- [#15372](https://github.com/smartcontractkit/chainlink/pull/15372) [`d3fa330b1b`](https://github.com/smartcontractkit/chainlink/commit/d3fa330b1b3c275c48ea7ec962b4b8457f940fcd) - fix reported evm node states
+
+- [#15577](https://github.com/smartcontractkit/chainlink/pull/15577) [`6da84b21c1`](https://github.com/smartcontractkit/chainlink/commit/6da84b21c16f680f86f640df7ac4cfefab5b942e) - Fixes a race condition with the Finalizer when clearing txs #bugfix
 
 ## 2.18.0 - 2024-11-01
 
