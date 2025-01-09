@@ -138,7 +138,7 @@ func GenerateChainsSol(t *testing.T, numChains int) map[uint64]SolanaChain {
 		client := solRpc.New(url)
 		balance, err := client.GetBalance(context.Background(), admin.PublicKey(), solRpc.CommitmentConfirmed)
 		require.NoError(t, err)
-		require.NotEqual(t, balance.Value, 0) // auto funded 500000000.000000000 SOL
+		require.NotEqual(t, 0, balance.Value) // auto funded 500000000.000000000 SOL
 		chains[chainID] = SolanaChain{
 			Client:      client,
 			DeployerKey: &admin,
