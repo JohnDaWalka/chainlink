@@ -552,6 +552,14 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     return (Internal.MessageExecutionState.SUCCESS, "");
   }
 
+  /// @notice hook for applying custom logic to the input message before executeSingleMessage()
+  /// @param message initial message
+  /// @return transformedMessage modified message
+  function _beforeExecuteSingleMessage(
+    Internal.Any2EVMRampMessage memory message
+    ) internal virtual returns (Internal.Any2EVMRampMessage memory transformedMessage) {
+  }
+
   /// @notice Executes a single message.
   /// @param message The message that will be executed.
   /// @param offchainTokenData Token transfer data to be passed to TokenPool.
@@ -565,6 +573,9 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     uint32[] calldata tokenGasOverrides
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
+
+    message = _beforeExecuteSingleMessage(message);
+
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
       destTokenAmounts = _releaseOrMintTokens(
