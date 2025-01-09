@@ -43,12 +43,6 @@ func (s *stuckTxDetector) DetectStuckTransaction(ctx context.Context, tx *types.
 	//nolint:gocritic //placeholder for upcoming chaintypes
 	switch s.chainType {
 	default:
-		if s.config.DualBroadcast {
-			result, err := s.dualBroadcastDetection(ctx, tx)
-			if result || err != nil {
-				return result, err
-			}
-		}
 		return s.timeBasedDetection(tx), nil
 	}
 }
@@ -85,7 +79,9 @@ const (
 	APIStatusUnknown   = "UNKNOWN"
 )
 
-func (s *stuckTxDetector) dualBroadcastDetection(ctx context.Context, tx *types.Transaction) (bool, error) {
+// Deprecated: DualBroadcastDetection doesn't provide any significant benefits in terms of speed and time
+// based detection can replace it.
+func (s *stuckTxDetector) DualBroadcastDetection(ctx context.Context, tx *types.Transaction) (bool, error) {
 	for _, attempt := range tx.Attempts {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.config.DetectionURL+attempt.Hash.String(), nil)
 		if err != nil {
