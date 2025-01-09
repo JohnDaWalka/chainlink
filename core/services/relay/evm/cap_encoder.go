@@ -195,8 +195,14 @@ func decodeAndAppend(id string, expectedLen int, prevResult []byte, logName stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to hex-decode %s (%s): %w", logName, id, err)
 	}
-	if len(b) != expectedLen {
+	if len(b) > expectedLen || (len(b) < expectedLen && logName != "WorkflowName") {
 		return nil, fmt.Errorf("incorrect length for id %s (%s), expected %d bytes, got %d", logName, id, expectedLen, len(b))
+	}
+
+	// Right-pad short workflow names.
+	if len(b) < expectedLen && logName == "WorkflowName" {
+		padding := make([]byte, expectedLen-len(b))
+		b = append(b, padding...)
 	}
 	return append(prevResult, b...), nil
 }
