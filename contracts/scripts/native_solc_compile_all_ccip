@@ -15,16 +15,24 @@ FOUNDRY_PROJECT_SUFFIX="-compile"
 CONTRACTS_DIR="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; cd ../ && pwd -P )"
 export FOUNDRY_PROFILE="$PROJECT"$FOUNDRY_PROJECT_SUFFIX
 
+# first argument is the contract path, second argument is whether to use the --via-ir flag
 compileContract() {
   local contract
   contract=$(basename "$1")
   echo "Compiling" "$contract"
+
+  local viaIR=""
+  if [[ "$2" =~ "true" ]]; then
+    echo "via-ir flag enabled"
+    viaIR="--via-ir"
+  fi
 
   local command
   command="forge build $CONTRACTS_DIR/src/v0.8/$PROJECT/"$1.sol" \
    --root $CONTRACTS_DIR \
    $(getOptimizations "$contract") \
    --extra-output-files bin abi \
+   $viaIR \
    -o $CONTRACTS_DIR/solc/$PROJECT/$contract"
 
   $command
@@ -80,5 +88,9 @@ compileContract test/WETH9
 compileContract test/helpers/CCIPReaderTester
 # Offchain test encoding utils
 compileContract test/helpers/EncodingUtils
+
+# Message Transformer On/OffRamps
+compileContract offRamp/MessageTransformerOffRamp true
+compileContract onRamp/MessageTransformerOnRamp
 
 
