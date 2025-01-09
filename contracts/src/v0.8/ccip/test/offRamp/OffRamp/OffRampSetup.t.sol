@@ -173,8 +173,7 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
       feeQuoter: feeQuoter,
       permissionLessExecutionThresholdSeconds: 60 * 60,
       isRMNVerificationDisabled: false,
-      messageInterceptor: address(0),
-      messageTransformer: address(0)
+      messageInterceptor: address(0)
     });
   }
 
@@ -346,12 +345,6 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
   function _enableInboundMessageInterceptor() internal {
     OffRamp.DynamicConfig memory dynamicConfig = s_offRamp.getDynamicConfig();
     dynamicConfig.messageInterceptor = address(s_inboundMessageInterceptor);
-    s_offRamp.setDynamicConfig(dynamicConfig);
-  }
-
-  function _enableInboundMessageTransformer() internal {
-    OffRamp.DynamicConfig memory dynamicConfig = s_offRamp.getDynamicConfig();
-    dynamicConfig.messageTransformer = address(s_inboundMessageTransformer);
     s_offRamp.setDynamicConfig(dynamicConfig);
   }
 

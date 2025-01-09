@@ -5,7 +5,6 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
-import {IMessageTransformer} from "../interfaces/IMessageTransformer.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
@@ -124,7 +123,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     uint32 permissionLessExecutionThresholdSeconds; // │ Waiting time before manual execution is enabled.
     bool isRMNVerificationDisabled; // ────────────────╯ Flag whether the RMN verification is disabled or not.
     address messageInterceptor; // Optional, validates incoming messages (zero address = no interceptor).
-    address messageTransformer; // Optional message transformer to transform incoming messages (zero address = no transformer)
   }
 
   /// @dev Report that is committed by the observing DON at the committing phase.
@@ -554,6 +552,14 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     return (Internal.MessageExecutionState.SUCCESS, "");
   }
 
+  /// @notice hook for applying custom logic to the input message before executeSingleMessage()
+  /// @param message initial message
+  /// @return transformedMessage modified message
+  function _beforeExecuteSingleMessage(
+    Internal.Any2EVMRampMessage memory message
+    ) internal virtual returns (Internal.Any2EVMRampMessage memory transformedMessage) {
+  }
+
   /// @notice Executes a single message.
   /// @param message The message that will be executed.
   /// @param offchainTokenData Token transfer data to be passed to TokenPool.
@@ -568,15 +574,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
 
-    if (s_dynamicConfig.messageTransformer != address(0)) {
-      try IMessageTransformer(s_dynamicConfig.messageTransformer).transformInboundMessage(message) returns (
-        Internal.Any2EVMRampMessage memory transformedMessage
-      ) {
-        message = transformedMessage;
-      } catch (bytes memory err) {
-        revert IMessageTransformer.MessageTransformError(err);
-      }
-    }
+    message = _beforeExecuteSingleMessage(message);
 
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {

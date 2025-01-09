@@ -133,7 +133,6 @@ contract OnRampSetup is FeeQuoterFeeSetup {
       feeQuoter: feeQuoter,
       reentrancyGuardEntered: false,
       messageInterceptor: address(0),
-      messageTransformer: address(0),
       feeAggregator: FEE_AGGREGATOR,
       allowlistAdmin: address(0)
     });

@@ -28,8 +28,6 @@ contract MessageTransformerHelper is IMessageTransformer {
 
   /// @inheritdoc IMessageTransformer
   function transformOutboundMessage(
-    // solhint-disable-next-line no-unused-vars
-    uint64 _destChainSelector,
     Internal.EVM2AnyRampMessage memory message
   ) public view returns (Internal.EVM2AnyRampMessage memory) {
     if (s_shouldRevert) {
