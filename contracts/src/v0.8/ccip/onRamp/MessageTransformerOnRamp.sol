@@ -5,6 +5,7 @@ import {IMessageTransformer} from "../interfaces/IMessageTransformer.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {OnRamp} from "./OnRamp.sol";
 
+/// @notice OnRamp that uses a message transformer to transform messages from router
 contract MessageTransformerOnRamp is OnRamp {
   address internal s_messageTransformer;
 

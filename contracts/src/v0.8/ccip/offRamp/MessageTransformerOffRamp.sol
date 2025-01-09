@@ -5,6 +5,7 @@ import {IMessageTransformer} from "../interfaces/IMessageTransformer.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {OffRamp} from "./OffRamp.sol";
 
+/// @notice OffRamp that uses a message transformer to transform messages before execution
 contract MessageTransformerOffRamp is OffRamp {
   address internal s_messageTransformer;
 
