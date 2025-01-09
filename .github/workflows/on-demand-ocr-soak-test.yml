@@ -43,7 +43,7 @@ on:
 jobs:
   run-e2e-tests-workflow:
     name: Run E2E Tests
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@0d4a2b2b009c87b5c366d0b97f7a8d7de2f60760
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@16f4fd9ec6f1ac84d1d11e55eff173fee0825d11
     with:
       test_path: .github/e2e-tests.yml
       test_ids: ${{ inputs.testToRun}}
