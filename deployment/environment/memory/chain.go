@@ -29,7 +29,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	solTestConfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
@@ -88,7 +87,7 @@ func getTestSolanaChainSelectors() []uint64 {
 	return result
 }
 
-func GenerateSolanaKeypair(t testing.TB) (solana.PrivateKey, string, error) {
+func generateSolanaKeypair(t testing.TB) (solana.PrivateKey, string, error) {
 	// Create a temporary directory that will be cleaned up after the test
 	tmpDir := t.TempDir()
 
@@ -131,7 +130,7 @@ func GenerateChainsSol(t *testing.T, numChains int) map[uint64]SolanaChain {
 	chains := make(map[uint64]SolanaChain)
 	for i := 0; i < numChains; i++ {
 		chainID := testSolanaChainSelectors[i]
-		admin, keypairPath, err := GenerateSolanaKeypair(t)
+		admin, keypairPath, err := generateSolanaKeypair(t)
 		require.NoError(t, err)
 		url, wsURL, err := solChain(t, chainID, &admin)
 		require.NoError(t, err)
@@ -195,8 +194,6 @@ func solChain(t *testing.T, chainID uint64, adminKey *solana.PrivateKey) (string
 	require.NoError(t, err)
 
 	port := freeport.GetOne(t)
-
-	fmt.Println(solTestConfig.CcipRouterProgram.String())
 
 	bcInput := &blockchain.Input{
 		Type:         "solana",
