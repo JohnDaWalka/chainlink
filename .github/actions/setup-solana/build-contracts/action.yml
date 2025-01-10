@@ -49,3 +49,8 @@ runs:
           cd /solana/contracts &&\
           anchor build &&\
           chmod -R 755 ./target"
+    - name: move built contracts to test folder
+      shell: bash
+      run: |
+        mkdir -p chainlink-ccip/chains/solana/tests/contracts
+        cp -r chainlink-ccip/chains/solana/contracts/target/*.so deployment/ccip/changeset/internal/solana_contracts
