@@ -53,4 +53,4 @@ runs:
       shell: bash
       run: |
         mkdir -p chainlink-ccip/chains/solana/tests/contracts
-        cp -r chainlink-ccip/chains/solana/contracts/target/deploy/*.so deployment/ccip/changeset/internal/solana_contracts
+        cp -r chainlink-ccip/chains/solana/contracts/target/deploy/*.so /home/runner/work/chainlink/chainlink/deployment/ccip/changeset/internal/solana_contracts
