@@ -28,9 +28,9 @@ func NewInMemoryStoreManager(lggr logger.Logger, chainID *big.Int) *InMemoryStor
 		InMemoryStoreMap: inMemoryStoreMap}
 }
 
-func (m *InMemoryStoreManager) AbandonPendingTransactions(_ context.Context, fromAddress common.Address) error {
+func (m *InMemoryStoreManager) Abandon(_ context.Context, _ *big.Int, fromAddress common.Address) error {
 	if store, exists := m.InMemoryStoreMap[fromAddress]; exists {
-		store.AbandonPendingTransactions()
+		store.Abandon()
 		return nil
 	}
 	return fmt.Errorf(StoreNotFoundForAddress, fromAddress)
@@ -42,6 +42,16 @@ func (m *InMemoryStoreManager) Add(addresses ...common.Address) (err error) {
 			err = multierr.Append(err, fmt.Errorf("address %v already exists in store manager", address))
 		}
 		m.InMemoryStoreMap[address] = NewInMemoryStore(m.lggr, address, m.chainID)
+	}
+	return
+}
+
+func (m *InMemoryStoreManager) Remove(addresses ...common.Address) (err error) {
+	for _, address := range addresses {
+		if _, exists := m.InMemoryStoreMap[address]; !exists {
+			err = multierr.Append(err, fmt.Errorf("address %v doesn't exist in store manager", address))
+		}
+		delete(m.InMemoryStoreMap, address)
 	}
 	return
 }
@@ -80,6 +90,14 @@ func (m *InMemoryStoreManager) FetchUnconfirmedTransactionAtNonceWithCount(_ con
 		return
 	}
 	return nil, 0, fmt.Errorf(StoreNotFoundForAddress, fromAddress)
+}
+
+func (m *InMemoryStoreManager) FindLatestNonce(ctx context.Context, fromAddress common.Address, chainID *big.Int) (maxNonce uint64, err error) {
+	if store, exists := m.InMemoryStoreMap[fromAddress]; exists {
+		maxNonce = store.FindLatestNonce()
+		return
+	}
+	return 0, fmt.Errorf(StoreNotFoundForAddress, fromAddress)
 }
 
 func (m *InMemoryStoreManager) MarkConfirmedAndReorgedTransactions(_ context.Context, nonce uint64, fromAddress common.Address) (confirmedTxs []*types.Transaction, unconfirmedTxIDs []uint64, err error) {

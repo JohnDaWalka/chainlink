@@ -52,7 +52,7 @@ func NewInMemoryStore(lggr logger.Logger, address common.Address, chainID *big.I
 	}
 }
 
-func (m *InMemoryStore) AbandonPendingTransactions() {
+func (m *InMemoryStore) Abandon() {
 	// TODO: append existing fatal transactions and cap the size
 	m.Lock()
 	defer m.Unlock()
@@ -179,6 +179,24 @@ func (m *InMemoryStore) FetchUnconfirmedTransactionAtNonceWithCount(latestNonce 
 		txCopy = tx.DeepCopy()
 	}
 	unconfirmedCount = len(m.UnconfirmedTransactions)
+	return
+}
+
+func (m *InMemoryStore) FindLatestNonce() (maxNonce uint64) {
+	m.RLock()
+	defer m.RUnlock()
+
+	for _, tx := range m.UnconfirmedTransactions {
+		if tx.Nonce != nil {
+			maxNonce = max(*tx.Nonce, maxNonce)
+		}
+	}
+
+	for _, tx := range m.ConfirmedTransactions {
+		if tx.Nonce != nil {
+			maxNonce = max(*tx.Nonce, maxNonce)
+		}
+	}
 	return
 }
 

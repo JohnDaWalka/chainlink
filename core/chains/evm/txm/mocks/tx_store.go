@@ -4,6 +4,7 @@ package mocks
 
 import (
 	context "context"
+	big "math/big"
 
 	common "github.com/ethereum/go-ethereum/common"
 
@@ -25,17 +26,17 @@ func (_m *TxStore) EXPECT() *TxStore_Expecter {
 	return &TxStore_Expecter{mock: &_m.Mock}
 }
 
-// AbandonPendingTransactions provides a mock function with given fields: _a0, _a1
-func (_m *TxStore) AbandonPendingTransactions(_a0 context.Context, _a1 common.Address) error {
-	ret := _m.Called(_a0, _a1)
+// Abandon provides a mock function with given fields: _a0, _a1, _a2
+func (_m *TxStore) Abandon(_a0 context.Context, _a1 *big.Int, _a2 common.Address) error {
+	ret := _m.Called(_a0, _a1, _a2)
 
 	if len(ret) == 0 {
-		panic("no return value specified for AbandonPendingTransactions")
+		panic("no return value specified for Abandon")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, common.Address) error); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(context.Context, *big.Int, common.Address) error); ok {
+		r0 = rf(_a0, _a1, _a2)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -43,31 +44,32 @@ func (_m *TxStore) AbandonPendingTransactions(_a0 context.Context, _a1 common.Ad
 	return r0
 }
 
-// TxStore_AbandonPendingTransactions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AbandonPendingTransactions'
-type TxStore_AbandonPendingTransactions_Call struct {
+// TxStore_Abandon_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Abandon'
+type TxStore_Abandon_Call struct {
 	*mock.Call
 }
 
-// AbandonPendingTransactions is a helper method to define mock.On call
+// Abandon is a helper method to define mock.On call
 //   - _a0 context.Context
-//   - _a1 common.Address
-func (_e *TxStore_Expecter) AbandonPendingTransactions(_a0 interface{}, _a1 interface{}) *TxStore_AbandonPendingTransactions_Call {
-	return &TxStore_AbandonPendingTransactions_Call{Call: _e.mock.On("AbandonPendingTransactions", _a0, _a1)}
+//   - _a1 *big.Int
+//   - _a2 common.Address
+func (_e *TxStore_Expecter) Abandon(_a0 interface{}, _a1 interface{}, _a2 interface{}) *TxStore_Abandon_Call {
+	return &TxStore_Abandon_Call{Call: _e.mock.On("Abandon", _a0, _a1, _a2)}
 }
 
-func (_c *TxStore_AbandonPendingTransactions_Call) Run(run func(_a0 context.Context, _a1 common.Address)) *TxStore_AbandonPendingTransactions_Call {
+func (_c *TxStore_Abandon_Call) Run(run func(_a0 context.Context, _a1 *big.Int, _a2 common.Address)) *TxStore_Abandon_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(common.Address))
+		run(args[0].(context.Context), args[1].(*big.Int), args[2].(common.Address))
 	})
 	return _c
 }
 
-func (_c *TxStore_AbandonPendingTransactions_Call) Return(_a0 error) *TxStore_AbandonPendingTransactions_Call {
+func (_c *TxStore_Abandon_Call) Return(_a0 error) *TxStore_Abandon_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *TxStore_AbandonPendingTransactions_Call) RunAndReturn(run func(context.Context, common.Address) error) *TxStore_AbandonPendingTransactions_Call {
+func (_c *TxStore_Abandon_Call) RunAndReturn(run func(context.Context, *big.Int, common.Address) error) *TxStore_Abandon_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -353,6 +355,64 @@ func (_c *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call) Return(_a0 *
 }
 
 func (_c *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call) RunAndReturn(run func(context.Context, uint64, common.Address) (*types.Transaction, int, error)) *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindLatestNonce provides a mock function with given fields: _a0, _a1, _a2
+func (_m *TxStore) FindLatestNonce(_a0 context.Context, _a1 common.Address, _a2 *big.Int) (uint64, error) {
+	ret := _m.Called(_a0, _a1, _a2)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindLatestNonce")
+	}
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, common.Address, *big.Int) (uint64, error)); ok {
+		return rf(_a0, _a1, _a2)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, common.Address, *big.Int) uint64); ok {
+		r0 = rf(_a0, _a1, _a2)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, common.Address, *big.Int) error); ok {
+		r1 = rf(_a0, _a1, _a2)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// TxStore_FindLatestNonce_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindLatestNonce'
+type TxStore_FindLatestNonce_Call struct {
+	*mock.Call
+}
+
+// FindLatestNonce is a helper method to define mock.On call
+//   - _a0 context.Context
+//   - _a1 common.Address
+//   - _a2 *big.Int
+func (_e *TxStore_Expecter) FindLatestNonce(_a0 interface{}, _a1 interface{}, _a2 interface{}) *TxStore_FindLatestNonce_Call {
+	return &TxStore_FindLatestNonce_Call{Call: _e.mock.On("FindLatestNonce", _a0, _a1, _a2)}
+}
+
+func (_c *TxStore_FindLatestNonce_Call) Run(run func(_a0 context.Context, _a1 common.Address, _a2 *big.Int)) *TxStore_FindLatestNonce_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(common.Address), args[2].(*big.Int))
+	})
+	return _c
+}
+
+func (_c *TxStore_FindLatestNonce_Call) Return(_a0 uint64, _a1 error) *TxStore_FindLatestNonce_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *TxStore_FindLatestNonce_Call) RunAndReturn(run func(context.Context, common.Address, *big.Int) (uint64, error)) *TxStore_FindLatestNonce_Call {
 	_c.Call.Return(run)
 	return _c
 }

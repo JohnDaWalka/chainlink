@@ -34,7 +34,7 @@ func TestAbandonPendingTransactions(t *testing.T) {
 		tx4, err := insertUnconfirmedTransaction(m, 4)
 		require.NoError(t, err)
 
-		m.AbandonPendingTransactions()
+		m.Abandon()
 
 		assert.Equal(t, txmgr.TxFatalError, tx1.State)
 		assert.Equal(t, txmgr.TxFatalError, tx2.State)
@@ -54,7 +54,7 @@ func TestAbandonPendingTransactions(t *testing.T) {
 		tx4, err := insertConfirmedTransaction(m, 4)
 		require.NoError(t, err)
 
-		m.AbandonPendingTransactions()
+		m.Abandon()
 
 		assert.Equal(t, txmgr.TxFatalError, tx1.State)
 		assert.Equal(t, txmgr.TxFatalError, tx2.State)

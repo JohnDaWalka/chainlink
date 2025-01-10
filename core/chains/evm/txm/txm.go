@@ -2,6 +2,7 @@ package txm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -33,11 +34,12 @@ type Client interface {
 }
 
 type TxStore interface {
-	AbandonPendingTransactions(context.Context, common.Address) error
+	Abandon(context.Context, *big.Int, common.Address) error
 	AppendAttemptToTransaction(context.Context, uint64, common.Address, *types.Attempt) error
 	CreateEmptyUnconfirmedTransaction(context.Context, common.Address, uint64, uint64) (*types.Transaction, error)
 	CreateTransaction(context.Context, *types.TxRequest) (*types.Transaction, error)
 	FetchUnconfirmedTransactionAtNonceWithCount(context.Context, uint64, common.Address) (*types.Transaction, int, error)
+	FindLatestNonce(context.Context, common.Address, *big.Int) (uint64, error)
 	MarkConfirmedAndReorgedTransactions(context.Context, uint64, common.Address) ([]*types.Transaction, []uint64, error)
 	MarkUnconfirmedTransactionPurgeable(context.Context, uint64, common.Address) error
 	UpdateTransactionBroadcast(context.Context, uint64, uint64, common.Hash, common.Address) error
@@ -137,13 +139,39 @@ func (t *Txm) startAddress(address common.Address) {
 	go t.backfillLoop(address)
 }
 
+func (t *Txm) Reset(ctx context.Context, address *common.Address) (err error) {
+	if t.IfStarted(func() {
+		close(t.stopCh)
+		t.wg.Wait()
+
+		if address != nil {
+			if err = t.txStore.Abandon(ctx, t.chainID, *address); err != nil {
+				return
+			}
+		}
+
+		var addresses []common.Address
+		addresses, err = t.keystore.EnabledAddressesForChain(ctx, t.chainID)
+		if err != nil {
+			return
+		}
+		for _, address := range addresses {
+			t.startAddress(address)
+		}
+	}) {
+		return errors.New("Txm unstarted")
+	}
+	return
+}
+
 func (t *Txm) initializeNonce(ctx context.Context, address common.Address) {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, pendingNonceDefaultTimeout)
 	defer cancel()
 	for {
-		pendingNonce, err := t.client.PendingNonceAt(ctxWithTimeout, address)
-		if err != nil {
-			t.lggr.Errorw("Error when fetching initial nonce", "address", address, "err", err)
+		pendingNonce, rErr := t.client.PendingNonceAt(ctxWithTimeout, address)
+		storedNonce, sErr := t.txStore.FindLatestNonce(ctxWithTimeout, address, t.chainID)
+		if rErr != nil || sErr != nil {
+			t.lggr.Errorw("Error when fetching initial nonce", "address", address, "requestError", rErr, "storageError", sErr)
 			select {
 			case <-time.After(pendingNonceRecheckInterval):
 			case <-ctx.Done():
@@ -152,7 +180,7 @@ func (t *Txm) initializeNonce(ctx context.Context, address common.Address) {
 			}
 			continue
 		}
-		t.setNonce(address, pendingNonce)
+		t.setNonce(address, max(pendingNonce, storedNonce))
 		t.lggr.Debugf("Set initial nonce for address: %v to %d", address, pendingNonce)
 		return
 	}
@@ -188,12 +216,6 @@ func (t *Txm) Trigger(address common.Address) {
 	}) {
 		t.lggr.Error("Txm unstarted")
 	}
-}
-
-func (t *Txm) Abandon(address common.Address) error {
-	// TODO: restart txm
-	t.lggr.Infof("Dropping unstarted and unconfirmed transactions for address: %v", address)
-	return t.txStore.AbandonPendingTransactions(context.TODO(), address)
 }
 
 func (t *Txm) getNonce(address common.Address) uint64 {
