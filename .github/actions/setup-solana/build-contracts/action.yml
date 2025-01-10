@@ -52,5 +52,6 @@ runs:
     - name: move built contracts to test folder
       shell: bash
       run: |
-        mkdir -p chainlink-ccip/chains/solana/tests/contracts
-        cp -r chainlink-ccip/chains/solana/contracts/target/deploy/*.so /home/runner/work/chainlink/chainlink/deployment/ccip/changeset/internal/solana_contracts
+        mkdir -p /home/runner/work/chainlink/chainlink/deployment/ccip/changeset/internal/solana_contracts
+        cp chainlink-ccip/chains/solana/contracts/target/deploy/*.so /home/runner/work/chainlink/chainlink/deployment/ccip/changeset/internal/solana_contracts
+        
