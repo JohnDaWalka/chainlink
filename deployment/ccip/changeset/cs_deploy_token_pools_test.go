@@ -20,6 +20,7 @@ import (
 )
 
 const localTokenDecimals = 18
+const testTokenSymbol = "TEST"
 
 // createSymmetricRateLimits is a utility to quickly create a rate limiter config with equal inbound and outbound values
 func createSymmetricRateLimits(rate int64, capacity int64) RateLimiterConfig {
@@ -52,11 +53,6 @@ func setup2ChainEnvironment(t *testing.T) (deployment.Environment, uint64, uint6
 			ChainSelector: selector,
 		})
 	}
-	// Deploys all pre-1.6 contracts, which are all we need for these particular tests
-	deployPrerequisiteChainContracts(e, addressBook, DeployPrerequisiteConfig{
-		Configs: prereqCfg,
-	})
-	e.ExistingAddresses = addressBook
 
 	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfig)
 	for _, selector := range selectors {
@@ -71,8 +67,8 @@ func setup2ChainEnvironment(t *testing.T) (deployment.Environment, uint64, uint6
 				tokenAddress, tx, token, err := burn_mint_erc677.DeployBurnMintERC677(
 					e.Chains[selector].DeployerKey,
 					e.Chains[selector].Client,
-					"TEST",
-					"TEST",
+					testTokenSymbol,
+					testTokenSymbol,
 					localTokenDecimals,
 					big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
 				)
@@ -89,8 +85,14 @@ func setup2ChainEnvironment(t *testing.T) (deployment.Environment, uint64, uint6
 		tokens[selector] = token
 	}
 
-	// Deploy MCMS & Timelock setup
+	// Deploy MCMS setup & prerequisite contracts
 	e, err := commonchangeset.ApplyChangesets(t, e, nil, []commonchangeset.ChangesetApplication{
+		{
+			Changeset: commonchangeset.WrapChangeSet(DeployPrerequisites),
+			Config: DeployPrerequisiteConfig{
+				Configs: prereqCfg,
+			},
+		},
 		{
 			Changeset: commonchangeset.WrapChangeSet(commonchangeset.DeployMCMSWithTimelock),
 			Config:    mcmsCfg,
@@ -139,7 +141,7 @@ func TestDeployTokenPoolContracts_DeployNew(t *testing.T) {
 		{
 			Changeset: commonchangeset.WrapChangeSet(DeployTokenPoolContracts),
 			Config: DeployTokenPoolContractsConfig{
-				Symbol:        "TEST",
+				Symbol:        testTokenSymbol,
 				TimelockDelay: 0 * time.Second,
 				NewPools: map[uint64]NewTokenPoolInput{
 					selectorA: {
@@ -173,7 +175,7 @@ func TestDeployTokenPoolContracts_DeployNew(t *testing.T) {
 
 	for _, selector := range []uint64{selectorA, selectorB} {
 		timelockAddress := state.Chains[selector].Timelock.Address()
-		burnMintTokenPool := state.Chains[selector].BurnMintTokenPools["TEST"]
+		burnMintTokenPool := state.Chains[selector].BurnMintTokenPools[testTokenSymbol]
 
 		// Verify that the timelock is the owner
 		owner, err := burnMintTokenPool.Owner(nil)
@@ -208,7 +210,7 @@ func TestDeployTokenPoolContracts_DeployNew(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tokens[supportedChain].Address.Bytes(), remoteTokenAddress)
 
-			remoteBurnMintPool := state.Chains[supportedChain].BurnMintTokenPools["TEST"]
+			remoteBurnMintPool := state.Chains[supportedChain].BurnMintTokenPools[testTokenSymbol]
 			remotePoolAddresses, err := burnMintTokenPool.GetRemotePools(nil, supportedChain)
 			require.NoError(t, err)
 			require.Equal(t, [][]byte{remoteBurnMintPool.Address().Bytes()}, remotePoolAddresses)

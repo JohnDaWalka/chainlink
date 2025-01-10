@@ -36,14 +36,14 @@ Others, not as urgent
 
 var _ deployment.ChangeSet[DeployTokenPoolContractsConfig] = DeployTokenPoolContracts
 
-// Zero returns a zero-value big.Int.
-func Zero() *big.Int {
+// zero returns a zero-value big.Int.
+func zero() *big.Int {
 	return big.NewInt(0)
 }
 
-// ZeroAddress returns a zero-value Ethereum address.
-func ZeroAddress() common.Address {
-	return common.BigToAddress(Zero())
+// zeroAddress returns a zero-value Ethereum address.
+func zeroAddress() common.Address {
+	return common.BigToAddress(zero())
 }
 
 // TokenChainConfig defines all information required to construct operations that fully configure the pool.
@@ -68,11 +68,11 @@ type RateLimiterConfig struct {
 // see https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/libraries/RateLimiter.sol.
 func validateRateLimiterConfig(rateLimiterConfig token_pool.RateLimiterConfig) error {
 	if rateLimiterConfig.IsEnabled {
-		if rateLimiterConfig.Rate.Cmp(rateLimiterConfig.Capacity) >= 0 || rateLimiterConfig.Rate.Cmp(Zero()) == 0 {
+		if rateLimiterConfig.Rate.Cmp(rateLimiterConfig.Capacity) >= 0 || rateLimiterConfig.Rate.Cmp(zero()) == 0 {
 			return errors.New("rate must be greater than 0 and less than capacity")
 		}
 	} else {
-		if rateLimiterConfig.Rate.Cmp(Zero()) != 0 || rateLimiterConfig.Capacity.Cmp(Zero()) != 0 {
+		if rateLimiterConfig.Rate.Cmp(zero()) != 0 || rateLimiterConfig.Capacity.Cmp(zero()) != 0 {
 			return errors.New("rate and capacity must be 0")
 		}
 	}
@@ -258,7 +258,7 @@ func fetchAndValidateTimelockOwnedTokenPool(
 	if err != nil {
 		return TokenChainConfig{}, fmt.Errorf("failed to get config on %s registry for token with address %s: %w", chainEnv.Name(), chainConfig.TokenAddress, err)
 	}
-	if tokenConfigOnRegistry.TokenPool.Cmp(ZeroAddress()) == 0 {
+	if tokenConfigOnRegistry.TokenPool.Cmp(zeroAddress()) == 0 {
 		return TokenChainConfig{}, fmt.Errorf("token with address %s is not set on %s registry: %w", chainConfig.TokenAddress, chainEnv.Name(), err)
 	}
 	tokenPool, err := token_pool.NewTokenPool(tokenConfigOnRegistry.TokenPool, chainEnv.Client)
@@ -423,7 +423,7 @@ func makeTokenPoolOperationsForChain(
 		batch = append(batch, mcms.Operation{
 			To:    tokenChainConfig.TokenPool.Address(),
 			Data:  acceptOwnershipTx.Data(),
-			Value: Zero(),
+			Value: zero(),
 		})
 	}
 
@@ -436,7 +436,7 @@ func makeTokenPoolOperationsForChain(
 		}
 		remotePoolAddresses := [][]byte{remoteTokenConfig.TokenPool.Address().Bytes()}
 		// If the token pool on the remote chain's registry is not the current pool nor the zero address, we should add it as a supported remote pool to avoid downtime
-		if remoteTokenConfig.RegistryState.TokenPool.Cmp(remoteTokenConfig.TokenPool.Address()) != 0 && remoteTokenConfig.RegistryState.TokenPool.Cmp(ZeroAddress()) != 0 {
+		if remoteTokenConfig.RegistryState.TokenPool.Cmp(remoteTokenConfig.TokenPool.Address()) != 0 && remoteTokenConfig.RegistryState.TokenPool.Cmp(zeroAddress()) != 0 {
 			remotePoolAddresses = append(remotePoolAddresses, remoteTokenConfig.RegistryState.TokenPool.Bytes())
 		}
 		chainUpdates = append(chainUpdates, token_pool.TokenPoolChainUpdate{
@@ -455,12 +455,12 @@ func makeTokenPoolOperationsForChain(
 		batch = append(batch, mcms.Operation{
 			To:    tokenChainConfig.TokenPool.Address(),
 			Data:  applyChainUpdatesTx.Data(),
-			Value: Zero(),
+			Value: zero(),
 		})
 	}
 
 	// Set the administrator of the token to the timelock (if it hasn't been set before)
-	noExistingAdmin := tokenChainConfig.RegistryState.Administrator.Cmp(ZeroAddress()) == 0
+	noExistingAdmin := tokenChainConfig.RegistryState.Administrator.Cmp(zeroAddress()) == 0
 	if noExistingAdmin {
 		proposeAdministratorTx, err := tokenChainConfig.TokenAdminRegistry.ProposeAdministrator(deployment.SimTransactOpts(), tokenChainConfig.TokenAddress, tokenChainConfig.TimelockAddress)
 		if err != nil {
@@ -469,7 +469,7 @@ func makeTokenPoolOperationsForChain(
 		batch = append(batch, mcms.Operation{
 			To:    tokenChainConfig.TokenAdminRegistry.Address(),
 			Data:  proposeAdministratorTx.Data(),
-			Value: Zero(),
+			Value: zero(),
 		})
 		acceptAdminRoleTx, err := tokenChainConfig.TokenAdminRegistry.AcceptAdminRole(deployment.SimTransactOpts(), tokenChainConfig.TokenAddress)
 		if err != nil {
@@ -478,7 +478,7 @@ func makeTokenPoolOperationsForChain(
 		batch = append(batch, mcms.Operation{
 			To:    tokenChainConfig.TokenAdminRegistry.Address(),
 			Data:  acceptAdminRoleTx.Data(),
-			Value: Zero(),
+			Value: zero(),
 		})
 	}
 	isTimelockAdmin := noExistingAdmin || tokenChainConfig.RegistryState.Administrator.Cmp(tokenChainConfig.TimelockAddress) == 0
@@ -492,13 +492,13 @@ func makeTokenPoolOperationsForChain(
 		batch = append(batch, mcms.Operation{
 			To:    tokenChainConfig.TokenAdminRegistry.Address(),
 			Data:  setPoolTx.Data(),
-			Value: Zero(),
+			Value: zero(),
 		})
 	}
 
 	// If an external admin is specified & timelock is currently the admin, transfer ownership of the pool and admin rights on the registry.
 	// The timelock would be the owner of the pool at this point, so we don't need to check ownership there.
-	if isTimelockAdmin && tokenChainConfig.ExternalAdmin.Cmp(ZeroAddress()) != 0 {
+	if isTimelockAdmin && tokenChainConfig.ExternalAdmin.Cmp(zeroAddress()) != 0 {
 		transferAdminRoleTx, err := tokenChainConfig.TokenAdminRegistry.TransferAdminRole(deployment.SimTransactOpts(), tokenChainConfig.TokenAddress, tokenChainConfig.ExternalAdmin)
 		if err != nil {
 			return []mcms.Operation{}, fmt.Errorf("failed to create transferAdminRole transaction: %w", err)
@@ -506,7 +506,7 @@ func makeTokenPoolOperationsForChain(
 		batch = append(batch, mcms.Operation{
 			To:    tokenChainConfig.TokenAdminRegistry.Address(),
 			Data:  transferAdminRoleTx.Data(),
-			Value: Zero(),
+			Value: zero(),
 		})
 		transferOwnershipTx, err := tokenChainConfig.TokenPool.TransferOwnership(deployment.SimTransactOpts(), tokenChainConfig.ExternalAdmin)
 		if err != nil {
@@ -515,7 +515,7 @@ func makeTokenPoolOperationsForChain(
 		batch = append(batch, mcms.Operation{
 			To:    tokenChainConfig.TokenPool.Address(),
 			Data:  transferOwnershipTx.Data(),
-			Value: Zero(),
+			Value: zero(),
 		})
 	}
 
