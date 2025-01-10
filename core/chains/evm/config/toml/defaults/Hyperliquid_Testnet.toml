@@ -21,3 +21,8 @@ BlockHistorySize = 100
 
 [NodePool]
 NewHeadsPollInterval = '2s' 
+
+[Nodes]
+HTTPURL = "https://api.hyperliquid-testnet.xyz/evm"
+Name = "HL_PUB_TESTNET"
+SendOnly = true
