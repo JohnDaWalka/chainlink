@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
+<<<<<<< HEAD
+=======
+	"strings"
+>>>>>>> b11f530614feb47581ebb5dfc713ad27047be88f
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -17,21 +21,23 @@ import (
 
 var (
 	deployBinPath = "./internal/solana_contracts"
-	// keypairPath   = "/Users/yashvardhan/.config/solana/id.json" //wallet
 )
 
 // SolChain represents a Solana chain.
 type SolChain struct {
 	// Selectors used as canonical chain identifier.
 	Selector uint64
-	// RPC cient
+	// RPC client
 	Client *solRpc.Client
+	URL    string
+	WSURL  string
 	// TODO: raw private key for now, need to replace with a more secure way
 	DeployerKey *solana.PrivateKey
 	Confirm     func(instructions []solana.Instruction, opts ...solCommomUtil.TxModifier) error
-	URL         string
-	WSURL       string
-	KeypairPath string
+	
+	// deploy uses the solana CLI which needs a keyfile
+	KeypairPath  string
+	ProgramsPath string
 }
 
 func (c SolChain) String() string {
@@ -55,6 +61,7 @@ func (c SolChain) Name() string {
 	return chainInfo.ChainName
 }
 
+<<<<<<< HEAD
 func (c SolChain) DeployProgram(logger logger.Logger, programName string) (string, error) {
 	programFile := fmt.Sprintf("%s/%s.so", deployBinPath, programName)
 	programKeyPair := fmt.Sprintf("%s/%s-keypair.json", deployBinPath, programName)
@@ -68,6 +75,15 @@ func (c SolChain) DeployProgram(logger logger.Logger, programName string) (strin
 	logger.Infow("program key pair", "key", key)
 	cmd := exec.Command("solana", "program", "deploy", programFile, "--keypair", c.KeypairPath, "--program-id", programKeyPair, "--url", c.URL)
 	// cmd := exec.Command("solana", "program", "deploy", programFile, "--upgrade-authority", c.DeployerKey.PublicKey().String(), "--program-id", programKeyPair, "--url", c.URL)
+=======
+func (c SolChain) DeployProgram(programName string) (string, error) {
+	programFile := fmt.Sprintf("%s/%s.so", c.ProgramsPath, programName)
+	programKeyPair := fmt.Sprintf("%s/%s-keypair.json", c.ProgramsPath, programName)
+
+	// Construct the CLI command: solana program deploy
+	// TODO: @terry doing this on the fly
+	cmd := exec.Command("solana", "program", "deploy", programFile, "--keypair", c.KeypairPath, "--program-id", programKeyPair)
+>>>>>>> b11f530614feb47581ebb5dfc713ad27047be88f
 
 	// Capture the command output
 	var stdout, stderr bytes.Buffer
@@ -91,12 +107,20 @@ func parseProgramID(output string) (string, error) {
 	// Look for the program ID in the CLI output
 	// Example output: "Program Id: <PROGRAM_ID>"
 	const prefix = "Program Id: "
+<<<<<<< HEAD
 	startIdx := bytes.Index([]byte(output), []byte(prefix))
+=======
+	startIdx := strings.Index(output, prefix)
+>>>>>>> b11f530614feb47581ebb5dfc713ad27047be88f
 	if startIdx == -1 {
 		return "", errors.New("failed to find program ID in output")
 	}
 	startIdx += len(prefix)
+<<<<<<< HEAD
 	endIdx := bytes.Index([]byte(output[startIdx:]), []byte("\n"))
+=======
+	endIdx := strings.Index(output[startIdx:], "\n")
+>>>>>>> b11f530614feb47581ebb5dfc713ad27047be88f
 	if endIdx == -1 {
 		endIdx = len(output)
 	}

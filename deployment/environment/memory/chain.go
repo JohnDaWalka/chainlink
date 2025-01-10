@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -21,10 +22,14 @@ import (
 	"github.com/mr-tron/base58"
 
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
@@ -224,12 +229,14 @@ func evmChain(t *testing.T, numUsers int) EVMChain {
 	}
 }
 
+var once = &sync.Once{}
+
 func solChain(t *testing.T, chainID uint64, adminKey *solana.PrivateKey) (string, string, error) {
 	t.Helper()
 
 	// initialize the docker network used by CTF
-	// TODO: framework.DefaultNetwork(once) is broken for me, use a static name for now
-	framework.DefaultNetworkName = "chainlink"
+	err := framework.DefaultNetwork(once)
+	require.NoError(t, err)
 
 	port := freeport.GetOne(t)
 
@@ -242,7 +249,7 @@ func solChain(t *testing.T, chainID uint64, adminKey *solana.PrivateKey) (string
 	}
 	output, err := blockchain.NewBlockchainNetwork(bcInput)
 	require.NoError(t, err)
-	// TODO:cleanup the container
+	testcontainers.CleanupContainer(t, output.Container)
 
 	url := output.Nodes[0].HostHTTPUrl
 	wsURL := output.Nodes[0].HostWSUrl
