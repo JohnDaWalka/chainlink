@@ -17,23 +17,23 @@ func TestWithFewerLanesThanAllPossibleLanesBetweenChains(t *testing.T) {
 	state, err := changeset.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	require.Len(t, e.Env.AllChainSelectors(), 3)
-	src1, chain2 := e.Env.AllChainSelectors()[0], e.Env.AllChainSelectors()[1]
+	src, dest := e.Env.AllChainSelectors()[0], e.Env.AllChainSelectors()[1]
 	// Add only one lane between the first two chains
-	changeset.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, src1, chain2, true)
+	changeset.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, src, dest, true)
 	startBlocks := make(map[uint64]*uint64)
-	latesthdr, err := e.Env.Chains[chain2].Client.HeaderByNumber(testcontext.Get(t), nil)
+	latesthdr, err := e.Env.Chains[dest].Client.HeaderByNumber(testcontext.Get(t), nil)
 	require.NoError(t, err)
 	block := latesthdr.Number.Uint64()
-	startBlocks[chain2] = &block
+	startBlocks[dest] = &block
 	expectedSeqNumExec := make(map[changeset.SourceDestPair][]uint64)
 	// Send a message from the first chain to the second chain
 	msgSentEvent, err := changeset.DoSendRequest(
 		t, e.Env, state,
-		changeset.WithSourceChain(src1),
-		changeset.WithDestChain(chain2),
+		changeset.WithSourceChain(src),
+		changeset.WithDestChain(dest),
 		changeset.WithTestRouter(true),
 		changeset.WithEvm2AnyMessage(router.ClientEVM2AnyMessage{
-			Receiver:     common.LeftPadBytes(state.Chains[chain2].Receiver.Address().Bytes(), 32),
+			Receiver:     common.LeftPadBytes(state.Chains[dest].Receiver.Address().Bytes(), 32),
 			Data:         []byte("hello"),
 			TokenAmounts: nil,
 			FeeToken:     common.HexToAddress("0x0"),
@@ -42,8 +42,8 @@ func TestWithFewerLanesThanAllPossibleLanesBetweenChains(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedSeqNumExec[changeset.SourceDestPair{
-		SourceChainSelector: src1,
-		DestChainSelector:   chain2,
+		SourceChainSelector: src,
+		DestChainSelector:   dest,
 	}] = []uint64{msgSentEvent.SequenceNumber}
 
 	// Wait for all exec reports to land
