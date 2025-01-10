@@ -166,6 +166,10 @@ func (t *Txm) Close() error {
 	})
 }
 
+func (t *Txm) HealthReport() map[string]error {
+	return map[string]error{t.lggr.Name(): t.Healthy()}
+}
+
 func (t *Txm) CreateTransaction(ctx context.Context, txRequest *types.TxRequest) (tx *types.Transaction, err error) {
 	tx, err = t.txStore.CreateTransaction(ctx, txRequest)
 	if err == nil {
