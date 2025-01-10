@@ -3,7 +3,9 @@ package deployment
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -55,12 +57,30 @@ func (c SolChain) Name() string {
 }
 
 func (c SolChain) DeployProgram(logger logger.Logger, programName string) (string, error) {
-	programFile := fmt.Sprintf("%s/%s.so", c.ProgramsPath, programName)
-	programKeyPair := fmt.Sprintf("%s/%s-keypair.json", c.ProgramsPath, programName)
+	programFile := filepath.Join(c.ProgramsPath, programName+".so")
+	programKeyPair := filepath.Join(c.ProgramsPath, programName+"-keypair.json")
 
-	logger.Infow("Deploying program", "programFile", programFile, "programKeyPair", programKeyPair, "keypairPath", c.KeypairPath, "url", c.URL)
-	// Construct the CLI command: solana program deploy
-	cmd := exec.Command("solana", "program", "deploy", programFile, "--program-id", programKeyPair, "--keypair", c.KeypairPath, "--url", c.URL)
+	// Base command with required args
+	baseArgs := []string{
+		"program", "deploy",
+		programFile,                //.so file
+		"--keypair", c.KeypairPath, //admin, upgradeAuthority
+		"--url", c.URL, //rpc url
+	}
+
+	var cmd *exec.Cmd
+	if _, err := os.Stat(programKeyPair); err == nil {
+		// Keypair exists, include program-id
+		logger.Infow("Deploying program with existing keypair",
+			"programFile", programFile,
+			"programKeyPair", programKeyPair)
+		cmd = exec.Command("solana", append(baseArgs, "--program-id", programKeyPair)...)
+	} else {
+		// Keypairs wont be created for devenvs
+		logger.Infow("Deploying new program",
+			"programFile", programFile)
+		cmd = exec.Command("solana", baseArgs...)
+	}
 
 	// Capture the command output
 	var stdout, stderr bytes.Buffer

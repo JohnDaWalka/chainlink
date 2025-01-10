@@ -29,6 +29,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	solTestConfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
@@ -195,12 +196,19 @@ func solChain(t *testing.T, chainID uint64, adminKey *solana.PrivateKey) (string
 
 	port := freeport.GetOne(t)
 
+	fmt.Println(solTestConfig.CcipRouterProgram.String())
+
 	bcInput := &blockchain.Input{
-		Type:      "solana",
-		ChainID:   strconv.FormatUint(chainID, 10),
-		PublicKey: adminKey.PublicKey().String(),
-		Port:      strconv.Itoa(port),
-		// TODO: ContractsDir & SolanaPrograms via env vars
+		Type:         "solana",
+		ChainID:      strconv.FormatUint(chainID, 10),
+		PublicKey:    adminKey.PublicKey().String(),
+		Port:         strconv.Itoa(port),
+		ContractsDir: ProgramsPath,
+		// TODO: this should be solTestConfig.CCIPRouterProgram
+		// TODO: make this a function
+		SolanaPrograms: map[string]string{
+			"ccip_router": "AmTB9SpwRjjKd3dHjFJiQoVt2bSzbzFnzBHCSpX4k9MW",
+		},
 	}
 	output, err := blockchain.NewBlockchainNetwork(bcInput)
 	require.NoError(t, err)

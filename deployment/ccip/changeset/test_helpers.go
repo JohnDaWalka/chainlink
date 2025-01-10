@@ -1257,3 +1257,9 @@ func DefaultRouterMessage(receiverAddress common.Address) router.ClientEVM2AnyMe
 		ExtraArgs:    nil,
 	}
 }
+
+func SavePreloadedSolAddresses(e deployment.Environment, solChainSelector uint64) {
+	tv := deployment.NewTypeAndVersion("SolCcipRouter", deployment.Version1_0_0)
+	// TODO: this should be solTestConfig.CCIPRouterProgram
+	e.ExistingAddresses.Save(solChainSelector, "AmTB9SpwRjjKd3dHjFJiQoVt2bSzbzFnzBHCSpX4k9MW", tv)
+}

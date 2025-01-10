@@ -473,6 +473,17 @@ func solRouterProgramData(e deployment.Environment, chain deployment.SolChain, c
 	return programData, nil
 }
 
+func checkRouterInitialized(e deployment.Environment, chain deployment.SolChain, ccipRouterProgram solana.PublicKey) (bool, error) {
+	routerConfigPDA := GetRouterConfigPDA(ccipRouterProgram)
+	routerConfigInfo, err := chain.Client.GetAccountInfoWithOpts(e.GetContext(), routerConfigPDA, &solRpc.GetAccountInfoOpts{
+		Commitment: solRpc.CommitmentConfirmed,
+	})
+	if err != nil {
+		return false, nil
+	}
+	return routerConfigInfo != nil && len(routerConfigInfo.Value.Data.GetBinary()) > 0, nil
+}
+
 func deployChainContractsSolana(
 	e deployment.Environment,
 	chain deployment.SolChain,
@@ -490,8 +501,9 @@ func deployChainContractsSolana(
 	linkTokenContract := chainState.LinkToken
 	e.Logger.Infow("link token", "addr", linkTokenContract.String())
 
+	var ccipRouterProgram solana.PublicKey
 	if chainState.SolCcipRouter.IsZero() {
-		// deploy and initialize router
+		//deploy router
 		programID, err := chain.DeployProgram(e.Logger, "ccip_router")
 		if err != nil {
 			return fmt.Errorf("failed to deploy program: %w", err)
@@ -500,47 +512,61 @@ func deployChainContractsSolana(
 		tv := deployment.NewTypeAndVersion("SolCcipRouter", deployment.Version1_0_0)
 		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
 
-		ccipRouterProgram := solana.MustPublicKeyFromBase58(programID)
-		programData, err := solRouterProgramData(e, chain, ccipRouterProgram)
-		if err != nil {
-			return fmt.Errorf("failed to get solana router program data: %w", err)
-		}
-
-		ccip_router.SetProgramID(ccipRouterProgram)
-
-		defaultGasLimit := solBinary.Uint128{Lo: 3000, Hi: 0, Endianness: nil}
-
-		instruction, err := ccip_router.NewInitializeInstruction(
-			chain.Selector,       // chain selector
-			defaultGasLimit,      // default gas limit
-			true,                 // allow out of order execution
-			EnableExecutionAfter, // period to wait before allowing manual execution
-			solana.PublicKey{},
-			GetRouterConfigPDA(ccipRouterProgram),
-			GetRouterStatePDA(ccipRouterProgram),
-			chain.DeployerKey.PublicKey(),
-			solana.SystemProgramID,
-			ccipRouterProgram,
-			programData.Address,
-			GetExternalExecutionConfigPDA(ccipRouterProgram),
-			GetExternalTokenPoolsSignerPDA(ccipRouterProgram),
-		).ValidateAndBuild()
-
-		if err != nil {
-			return fmt.Errorf("failed to build instruction: %w", err)
-		}
-		err = chain.Confirm([]solana.Instruction{instruction})
-
-		if err != nil {
-			return fmt.Errorf("failed to confirm instructions: %w", err)
-		}
-
+		ccipRouterProgram = solana.MustPublicKeyFromBase58(programID)
 		err = ab.Save(chain.Selector, programID, tv)
 		if err != nil {
 			return fmt.Errorf("failed to save address: %w", err)
 		}
-		//TODO: deploy token pool contract
-		//TODO: log errors
+	} else {
+		e.Logger.Infow("Using existing router", "addr", chainState.SolCcipRouter.String())
+		ccipRouterProgram = chainState.SolCcipRouter
 	}
+	ccip_router.SetProgramID(ccipRouterProgram)
+
+	// check if solana router is initalised
+	initialized, err := checkRouterInitialized(e, chain, ccipRouterProgram)
+	if err != nil {
+		return err
+	}
+	if initialized {
+		e.Logger.Infow("Router already initialized, skipping initialization", "chain", chain.String())
+		return nil
+	}
+
+	programData, err := solRouterProgramData(e, chain, ccipRouterProgram)
+	if err != nil {
+		return fmt.Errorf("failed to get solana router program data: %w", err)
+	}
+
+	defaultGasLimit := solBinary.Uint128{Lo: 3000, Hi: 0, Endianness: nil}
+
+	instruction, err := ccip_router.NewInitializeInstruction(
+		chain.Selector,       // chain selector
+		defaultGasLimit,      // default gas limit
+		true,                 // allow out of order execution
+		EnableExecutionAfter, // period to wait before allowing manual execution
+		solana.PublicKey{},
+		GetRouterConfigPDA(ccipRouterProgram),
+		GetRouterStatePDA(ccipRouterProgram),
+		chain.DeployerKey.PublicKey(),
+		solana.SystemProgramID,
+		ccipRouterProgram,
+		programData.Address,
+		GetExternalExecutionConfigPDA(ccipRouterProgram),
+		GetExternalTokenPoolsSignerPDA(ccipRouterProgram),
+	).ValidateAndBuild()
+
+	if err != nil {
+		return fmt.Errorf("failed to build instruction: %w", err)
+	}
+	err = chain.Confirm([]solana.Instruction{instruction})
+
+	if err != nil {
+		return fmt.Errorf("failed to confirm instructions: %w", err)
+	}
+
+	//TODO: deploy token pool contract
+	//TODO: log errors
+
 	return nil
 }
