@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -139,12 +140,14 @@ func evmChain(t *testing.T, numUsers int) EVMChain {
 	}
 }
 
+var once = &sync.Once{}
+
 func solChain(t *testing.T) SolanaChain {
 	t.Helper()
 
 	// initialize the docker network used by CTF
-	// TODO: framework.DefaultNetwork(once) is broken for me, use a static name for now
-	framework.DefaultNetworkName = "chainlink"
+	err := framework.DefaultNetwork(once)
+	require.NoError(t, err)
 
 	deployerKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -160,8 +163,7 @@ func solChain(t *testing.T) SolanaChain {
 	port := freeport.GetOne(t)
 
 	bcInput := &blockchain.Input{
-		Type: "solana",
-		// TODO: randomize port
+		Type:      "solana",
 		ChainID:   chainselectors.SOLANA_DEVNET.ChainID,
 		PublicKey: deployerKey.PublicKey().String(),
 		Port:      strconv.Itoa(port),
