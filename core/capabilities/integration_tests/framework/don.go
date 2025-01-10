@@ -122,6 +122,7 @@ type DON struct {
 
 	nodeConfigModifiers []func(c *chainlink.Config, node *capabilityNode)
 
+	fakeLibOcr                   *FakeLibOCR
 	addOCR3NonStandardCapability bool
 
 	triggerFactories []TriggerFactory
@@ -129,18 +130,15 @@ type DON struct {
 }
 
 func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig DonConfiguration,
-	dependentDONs []commoncap.DON, donContext DonContext, supportsOCR bool) *DON {
+	dependentDONs []commoncap.DON, donContext DonContext, supportsOCR bool, protocolRoundInterval time.Duration) *DON {
 	don := &DON{t: t, lggr: lggr.Named(donConfig.name), config: donConfig, capabilitiesRegistry: donContext.capabilityRegistry,
 		workflowRegistry: donContext.workflowRegistry}
 
-	protocolRoundInterval := 1 * time.Second
-
 	var newOracleFactoryFn standardcapabilities.NewOracleFactoryFn
-	var libOcr *FakeLibOCR
 	if supportsOCR {
 		// This is required to support the non standard OCR3 capability - will be removed when required OCR3 behaviour is implemented as standard capabilities
-		libOcr = NewFakeLibOCR(t, lggr, donConfig.F, protocolRoundInterval)
-		servicetest.Run(t, libOcr)
+		don.fakeLibOcr = NewFakeLibOCR(t, lggr, donConfig.F, protocolRoundInterval)
+		servicetest.Run(t, don.fakeLibOcr)
 	}
 
 	for i, member := range donConfig.Members {
@@ -271,11 +269,12 @@ func (d *DON) Start(ctx context.Context) error {
 	}
 
 	if d.addOCR3NonStandardCapability {
-		libocr := NewFakeLibOCR(d.t, d.lggr, d.config.F, 1*time.Second)
-		servicetest.Run(d.t, libocr)
+		if d.fakeLibOcr == nil {
+			return errors.New("don does not support OCR")
+		}
 
 		for _, node := range d.nodes {
-			addOCR3Capability(ctx, d.t, d.lggr, node.registry, libocr, d.config.F, node.KeyBundle)
+			addOCR3Capability(ctx, d.t, d.lggr, node.registry, d.fakeLibOcr, d.config.F, node.KeyBundle)
 		}
 	}
 
@@ -466,7 +465,29 @@ func (d *DON) AddOCR3NonStandardCapability() {
 	})
 }
 
+func (d *DON) AddPublishedEthereumWriteTargetNonStandardCapability(forwarderAddr common.Address) (string, error) {
+	published := true
+
+	capabilityID, s, err := d.addEtherueumWriteTarget(forwarderAddr, published)
+	if err != nil {
+		return s, err
+	}
+
+	return capabilityID, nil
+}
+
 func (d *DON) AddEthereumWriteTargetNonStandardCapability(forwarderAddr common.Address) (string, error) {
+	published := false
+
+	capabilityID, s, err := d.addEtherueumWriteTarget(forwarderAddr, published)
+	if err != nil {
+		return s, err
+	}
+
+	return capabilityID, nil
+}
+
+func (d *DON) addEtherueumWriteTarget(forwarderAddr common.Address, published bool) (string, string, error) {
 	d.nodeConfigModifiers = append(d.nodeConfigModifiers, func(c *chainlink.Config, node *capabilityNode) {
 		eip55Address := types.EIP55AddressFromAddress(forwarderAddr)
 		c.EVM[0].Chain.Workflow.ForwarderAddress = &eip55Address
@@ -488,7 +509,7 @@ func (d *DON) AddEthereumWriteTargetNonStandardCapability(forwarderAddr common.A
 
 	configWithLimit, err := values.WrapMap(map[string]any{"gasLimit": 500000})
 	if err != nil {
-		return "", fmt.Errorf("failed to wrap map: %w", err)
+		return "", "", fmt.Errorf("failed to wrap map: %w", err)
 	}
 
 	targetCapabilityConfig.DefaultConfig = values.Proto(configWithLimit).GetMapValue()
@@ -499,12 +520,13 @@ func (d *DON) AddEthereumWriteTargetNonStandardCapability(forwarderAddr common.A
 		},
 	}
 
-	d.publishedCapabilities = append(d.publishedCapabilities, capability{
-		donCapabilityConfig: targetCapabilityConfig,
-		registryConfig:      writeChain,
-	})
-
-	return capabilityID, nil
+	if published {
+		d.publishedCapabilities = append(d.publishedCapabilities, capability{
+			donCapabilityConfig: targetCapabilityConfig,
+			registryConfig:      writeChain,
+		})
+	}
+	return capabilityID, "", nil
 }
 
 func addOCR3Capability(ctx context.Context, t *testing.T, lggr logger.Logger, capabilityRegistry *capabilities.Registry,
