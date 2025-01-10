@@ -34,14 +34,15 @@ runs:
       if: steps.cache-image.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        cd contracts
+        cd chainlink-ccip/chains/solana/contracts
         docker buildx build . -t ccip-solana:build --build-arg ANCHOR_CLI=${{ env.ANCHOR_VERSION }}
         docker save -o docker-build.tar ccip-solana
     - name: build & save contract compilation artifacts
       if: steps.cache-target.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        docker run -v "$(pwd)/":/solana ccip-solana:build bash -c "\
+        cd chainlink-ccip/chains/solana
+        docker run -v "$(pwd)/contracts":/solana/contracts ccip-solana:build bash -c "\
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
