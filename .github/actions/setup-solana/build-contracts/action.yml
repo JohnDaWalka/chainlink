@@ -47,6 +47,7 @@ runs:
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
           cd /solana/contracts &&\
+          anchor keys sync &&\
           anchor build &&\
           chmod -R 755 ./target"
     - name: move built contracts to test folder

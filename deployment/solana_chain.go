@@ -64,7 +64,7 @@ func (c SolChain) DeployProgram(logger logger.Logger, programName string) (strin
 	baseArgs := []string{
 		"program", "deploy",
 		programFile,                //.so file
-		"--keypair", c.KeypairPath, //admin, upgradeAuthority
+		"--keypair", c.KeypairPath, //program keypair
 		"--url", c.URL, //rpc url
 	}
 
