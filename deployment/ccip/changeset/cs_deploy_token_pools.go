@@ -23,20 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 )
 
-/*
-TODO: Other actions required to support token pools ->
-
-- Removing support for chains (not as common, likely a separate changeset)
-- Set rate limit admin (usually left as zero address, not urgent)
-- Set rebalancer on lock-release pools (usually left as zero address, not urgent)
-- Deploying a price feed for a token with BPS & reconfiguring a DON to support the feed
-
-Deploying price feeds for tokens with BPS [REQUIRED]
-
-Others, not as urgent
-
-*/
-
 var _ deployment.ChangeSet[DeployTokenPoolContractsConfig] = DeployTokenPoolContracts
 
 // zero returns a zero-value big.Int.
@@ -208,7 +194,7 @@ func DeployTokenPoolContracts(env deployment.Environment, c DeployTokenPoolContr
 		tokenChainConfigs[chainSelector] = tokenChainConfig
 	}
 
-	operations := make([]timelock.BatchChainOperation, len(tokenChainConfigs), len(tokenChainConfigs))
+	operations := make([]timelock.BatchChainOperation, len(tokenChainConfigs))
 	timelocks := make(map[uint64]common.Address)
 	proposers := make(map[uint64]*gethwrappers.ManyChainMultiSig)
 
@@ -252,10 +238,11 @@ func fetchAndValidateTimelockOwnedTokenPool(
 	chainState CCIPChainState,
 	chainConfig BaseTokenPoolInput,
 ) (TokenChainConfig, error) {
-	// Assumes that timelock & tokenAdminRegistry are not nil
-	// TODO: Should we assert this?
 	tokenAdminRegistry := chainState.TokenAdminRegistry
 	timelock := chainState.Timelock
+	if tokenAdminRegistry == nil || timelock == nil {
+		return TokenChainConfig{}, fmt.Errorf("timelock and tokenAdminRegistry must both exist on %s", chainEnv.Name())
+	}
 
 	tokenConfigOnRegistry, err := tokenAdminRegistry.GetTokenConfig(nil, chainConfig.TokenAddress)
 	if err != nil {
@@ -295,12 +282,13 @@ func deployAndTransferTokenPoolToTimelock(
 	addressBook deployment.AddressBook,
 	chainConfig NewTokenPoolInput,
 ) (TokenChainConfig, error) {
-	// Assumes that router, rmnProxy, tokenAdminRegistry, & timelock will not be nil
-	// TODO: Should we assert this?
 	router := chainState.Router
 	rmnProxy := chainState.RMNProxy
 	timelock := chainState.Timelock
 	tokenAdminRegistry := chainState.TokenAdminRegistry
+	if tokenAdminRegistry == nil || timelock == nil || rmnProxy == nil || router == nil {
+		return TokenChainConfig{}, fmt.Errorf("timelock, tokenAdminRegistry, rmnProxy, and router must all exist on %s", chainEnv.Name())
+	}
 
 	tokenConfigOnRegistry, err := tokenAdminRegistry.GetTokenConfig(nil, chainConfig.TokenAddress)
 	if err != nil {
@@ -355,44 +343,23 @@ func deployTokenPool(
 			switch chainConfig.Type {
 			case BurnMintTokenPool:
 				tpAddr, tx, _, err = burn_mint_token_pool.DeployBurnMintTokenPool(
-					chain.DeployerKey,
-					chain.Client,
-					chainConfig.TokenAddress,
-					chainConfig.LocalTokenDecimals,
-					chainConfig.AllowList,
-					rmnProxyAddress,
-					routerAddress,
+					chain.DeployerKey, chain.Client, chainConfig.TokenAddress, chainConfig.LocalTokenDecimals,
+					chainConfig.AllowList, rmnProxyAddress, routerAddress,
 				)
 			case BurnWithFromMintTokenPool:
 				tpAddr, tx, _, err = burn_with_from_mint_token_pool.DeployBurnWithFromMintTokenPool(
-					chain.DeployerKey,
-					chain.Client,
-					chainConfig.TokenAddress,
-					chainConfig.LocalTokenDecimals,
-					chainConfig.AllowList,
-					rmnProxyAddress,
-					routerAddress,
+					chain.DeployerKey, chain.Client, chainConfig.TokenAddress, chainConfig.LocalTokenDecimals,
+					chainConfig.AllowList, rmnProxyAddress, routerAddress,
 				)
 			case BurnFromMintTokenPool:
 				tpAddr, tx, _, err = burn_from_mint_token_pool.DeployBurnFromMintTokenPool(
-					chain.DeployerKey,
-					chain.Client,
-					chainConfig.TokenAddress,
-					chainConfig.LocalTokenDecimals,
-					chainConfig.AllowList,
-					rmnProxyAddress,
-					routerAddress,
+					chain.DeployerKey, chain.Client, chainConfig.TokenAddress, chainConfig.LocalTokenDecimals,
+					chainConfig.AllowList, rmnProxyAddress, routerAddress,
 				)
 			case LockReleaseTokenPool:
 				tpAddr, tx, _, err = lock_release_token_pool.DeployLockReleaseTokenPool(
-					chain.DeployerKey,
-					chain.Client,
-					chainConfig.TokenAddress,
-					chainConfig.LocalTokenDecimals,
-					chainConfig.AllowList,
-					rmnProxyAddress,
-					*chainConfig.AcceptLiquidity,
-					routerAddress,
+					chain.DeployerKey, chain.Client, chainConfig.TokenAddress, chainConfig.LocalTokenDecimals,
+					chainConfig.AllowList, rmnProxyAddress, *chainConfig.AcceptLiquidity, routerAddress,
 				)
 			}
 			var tp *token_pool.TokenPool
@@ -431,7 +398,7 @@ func makeTokenPoolOperationsForChain(
 	}
 
 	// Apply chain updates on the token pool
-	chainUpdates := make([]token_pool.TokenPoolChainUpdate, len(tokenChainConfig.RemoteChainsToAdd), len(tokenChainConfig.RemoteChainsToAdd))
+	chainUpdates := make([]token_pool.TokenPoolChainUpdate, len(tokenChainConfig.RemoteChainsToAdd))
 	for remoteChainSelector, remoteChainConfig := range tokenChainConfig.RemoteChainsToAdd {
 		remoteTokenConfig, ok := tokenChainConfigs[remoteChainSelector]
 		if !ok {

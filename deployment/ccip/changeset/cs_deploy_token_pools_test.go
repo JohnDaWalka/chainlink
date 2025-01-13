@@ -48,7 +48,7 @@ func setup2ChainEnvironment(t *testing.T) (deployment.Environment, uint64, uint6
 	selectors := e.AllChainSelectors()
 
 	addressBook := deployment.NewMemoryAddressBook()
-	prereqCfg := make([]DeployPrerequisiteConfigPerChain, len(selectors), len(selectors))
+	prereqCfg := make([]DeployPrerequisiteConfigPerChain, len(selectors))
 	for _, selector := range selectors {
 		prereqCfg = append(prereqCfg, DeployPrerequisiteConfigPerChain{
 			ChainSelector: selector,
