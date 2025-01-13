@@ -49,7 +49,8 @@ runs:
           cd /solana/contracts &&\
           anchor keys sync &&\
           anchor build &&\
-          anchor keys list | sed 's/ //g' | sed 's/\([^:]*\):\s*\(.*\)/\1 = "\2"/' > program_ids.toml &&\
+          anchor keys list &&\
+          anchor keys list | awk -F: '{gsub(/^[ \t]+|[ \t]+$/, "", $1); gsub(/^[ \t]+|[ \t]+$/, "", $2); print $1 " = \"" $2 "\""}' > program_ids.toml &&\
           chmod -R 755 ./target"
     - name: move built contracts to test folder
       shell: bash
