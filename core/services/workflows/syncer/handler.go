@@ -3,6 +3,7 @@ package syncer
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -223,7 +224,7 @@ func (h *eventHandler) refreshSecrets(ctx context.Context, workflowOwner, workfl
 	return updatedSecrets, nil
 }
 
-func (h *eventHandler) SecretsFor(ctx context.Context, workflowOwner, workflowName, workflowID string) (map[string]string, error) {
+func (h *eventHandler) SecretsFor(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName, workflowID string) (map[string]string, error) {
 	secretsURLHash, secretsPayload, err := h.orm.GetContentsByWorkflowID(ctx, workflowID)
 	if err != nil {
 		// The workflow record was found, but secrets_id was empty.
@@ -237,15 +238,16 @@ func (h *eventHandler) SecretsFor(ctx context.Context, workflowOwner, workflowNa
 
 	lastFetchedAt, ok := h.lastFetchedAtMap.Get(secretsURLHash)
 	if !ok || h.clock.Now().Sub(lastFetchedAt) > h.secretsFreshnessDuration {
-		updatedSecrets, innerErr := h.refreshSecrets(ctx, workflowOwner, workflowName, workflowID, secretsURLHash)
+		updatedSecrets, innerErr := h.refreshSecrets(ctx, workflowOwner, hexWorkflowName, workflowID, secretsURLHash)
 		if innerErr != nil {
 			msg := fmt.Sprintf("could not refresh secrets: proceeding with stale secrets for workflowID %s: %s", workflowID, innerErr)
 			h.lggr.Error(msg)
+
 			logCustMsg(
 				ctx,
 				h.emitter.With(
 					platform.KeyWorkflowID, workflowID,
-					platform.KeyWorkflowName, workflowName,
+					platform.KeyWorkflowName, decodedWorkflowName,
 					platform.KeyWorkflowOwner, workflowOwner,
 				),
 				msg,
@@ -497,19 +499,19 @@ func (h *eventHandler) getWorkflowArtifacts(
 	if err != nil {
 		binary, err2 := h.fetcher(ctx, payload.BinaryURL)
 		if err2 != nil {
-			return nil, nil, fmt.Errorf("failed to fetch binary from %s : %w", payload.BinaryURL, err)
+			return nil, nil, fmt.Errorf("failed to fetch binary from %s : %w", payload.BinaryURL, err2)
 		}
 
 		decodedBinary, err2 := base64.StdEncoding.DecodeString(string(binary))
 		if err2 != nil {
-			return nil, nil, fmt.Errorf("failed to decode binary: %w", err)
+			return nil, nil, fmt.Errorf("failed to decode binary: %w", err2)
 		}
 
 		var config []byte
 		if payload.ConfigURL != "" {
 			config, err2 = h.fetcher(ctx, payload.ConfigURL)
 			if err2 != nil {
-				return nil, nil, fmt.Errorf("failed to fetch config from %s : %w", payload.ConfigURL, err)
+				return nil, nil, fmt.Errorf("failed to fetch config from %s : %w", payload.ConfigURL, err2)
 			}
 		}
 		return decodedBinary, config, nil
@@ -642,9 +644,15 @@ func (h *eventHandler) workflowDeletedEvent(
 		return err
 	}
 
-	if err := h.orm.DeleteWorkflowSpec(ctx, hex.EncodeToString(payload.WorkflowOwner), payload.WorkflowName); err != nil {
+	err := h.orm.DeleteWorkflowSpec(ctx, hex.EncodeToString(payload.WorkflowOwner), payload.WorkflowName)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			h.lggr.Warnw("workflow spec not found", "workflowID", hex.EncodeToString(payload.WorkflowID[:]))
+			return nil
+		}
 		return fmt.Errorf("failed to delete workflow spec: %w", err)
 	}
+
 	return nil
 }
 

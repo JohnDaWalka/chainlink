@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -326,9 +328,19 @@ func (o *orm) CreateJob(ctx context.Context, jb *Job) error {
 					return errors.New("invalid transmitter address in dual transmission config")
 				}
 
+				rawMeta, ok := dualTransmissionConfig["meta"].(map[string]interface{})
+				if !ok {
+					return errors.New("invalid dual transmission meta")
+				}
+
+				if err = validateDualTransmissionMeta(rawMeta); err != nil {
+					return err
+				}
+
 				if err = validateKeyStoreMatchForRelay(ctx, jb.OCR2OracleSpec.Relay, tx.keyStore, dtTransmitterAddress); err != nil {
 					return errors.Wrap(err, "unknown dual transmission transmitterAddress")
 				}
+
 			}
 
 			specID, err := tx.insertOCR2OracleSpec(ctx, jb.OCR2OracleSpec)
@@ -658,6 +670,11 @@ func validateKeyStoreMatchForRelay(ctx context.Context, network string, keyStore
 		if err != nil {
 			return errors.Errorf("no Aptos key matching: %q", key)
 		}
+	case relay.NetworkTron:
+		_, err := keyStore.Tron().Get(key)
+		if err != nil {
+			return errors.Errorf("no Tron key matching: %q", key)
+		}
 	}
 	return nil
 }
@@ -747,6 +764,7 @@ func (o *orm) DeleteJob(ctx context.Context, id int32, jobType Type) error {
 		Workflow:             `DELETE FROM workflow_specs WHERE id in (SELECT workflow_spec_id FROM deleted_jobs)`,
 		StandardCapabilities: `DELETE FROM standardcapabilities_specs WHERE id in (SELECT standard_capabilities_spec_id FROM deleted_jobs)`,
 		CCIP:                 `DELETE FROM ccip_specs WHERE id in (SELECT ccip_spec_id FROM deleted_jobs)`,
+		Stream:               ``,
 	}
 	q, ok := queries[jobType]
 	if !ok {
@@ -757,7 +775,7 @@ func (o *orm) DeleteJob(ctx context.Context, id int32, jobType Type) error {
 	// and this query was taking ~40secs.
 	ctx, cancel := context.WithTimeout(sqlutil.WithoutDefaultTimeout(ctx), time.Minute)
 	defer cancel()
-	query := fmt.Sprintf(`
+	query := `
 		WITH deleted_jobs AS (
 			DELETE FROM jobs WHERE id = $1 RETURNING
 				id,
@@ -775,15 +793,19 @@ func (o *orm) DeleteJob(ctx context.Context, id int32, jobType Type) error {
 				gateway_spec_id,
 				workflow_spec_id,
 				standard_capabilities_spec_id,
-				ccip_spec_id
-		),
-		deleted_specific_specs AS (
-			%s
-		),
+				ccip_spec_id,
+				stream_id
+		),`
+	if len(q) > 0 {
+		query += fmt.Sprintf(`deleted_specific_specs AS (
+								%s
+							),`, q)
+	}
+	query += `	
 		deleted_job_pipeline_specs AS (
 			DELETE FROM job_pipeline_specs WHERE job_id IN (SELECT id FROM deleted_jobs) RETURNING pipeline_spec_id
 		)
-		DELETE FROM pipeline_specs WHERE id IN (SELECT pipeline_spec_id FROM deleted_job_pipeline_specs)`, q)
+		DELETE FROM pipeline_specs WHERE id IN (SELECT pipeline_spec_id FROM deleted_job_pipeline_specs)`
 	res, err := o.ds.ExecContext(ctx, query, id)
 	if err != nil {
 		return errors.Wrap(err, "DeleteJob failed to delete job")
@@ -1658,4 +1680,68 @@ func (r legacyGasStationServerSpecRow) toLegacyGasStationServerSpec() *LegacyGas
 
 func (o *orm) loadJobSpecErrors(ctx context.Context, jb *Job) error {
 	return errors.Wrapf(o.ds.SelectContext(ctx, &jb.JobSpecErrors, `SELECT * FROM job_spec_errors WHERE job_id = $1`, jb.ID), "failed to load job spec errors for job %d", jb.ID)
+}
+
+func validateDualTransmissionHint(vals []interface{}) error {
+	accepted := []string{"contract_address", "function_selector", "logs", "calldata", "default_logs"}
+	for _, v := range vals {
+		valString, ok := v.(string)
+		if !ok {
+			return errors.Errorf("dual transmission meta value %v is not a string", v)
+		}
+		if !slices.Contains(accepted, valString) {
+			return errors.Errorf("dual transmission meta.hint value %s should be one of the following %s", valString, accepted)
+		}
+	}
+	return nil
+}
+
+func validateDualTransmissionRefund(vals []interface{}) error {
+	totalRefund := 0
+	for _, v := range vals {
+		valString, ok := v.(string)
+		if !ok {
+			return errors.Errorf("dual transmission meta value %v is not a string", v)
+		}
+
+		s := strings.Split(valString, ":")
+		if len(s) != 2 {
+			return errors.New("invalid dual transmission refund, format should be <ADDRESS>:<PERCENT>")
+		}
+		if !common.IsHexAddress(s[0]) {
+			return errors.Errorf("invalid dual transmission refund address, %s is not a valid address", s[0])
+		}
+		percent, err := strconv.Atoi(s[1])
+		if err != nil {
+			return errors.Errorf("invalid dual transmission refund percent, %s is not a number", s[1])
+		}
+		totalRefund += percent
+	}
+
+	if totalRefund >= 100 {
+		return errors.New("invalid dual transmission refund percentages, total sum of percentages must be less than 100")
+	}
+	return nil
+}
+
+func validateDualTransmissionMeta(meta map[string]interface{}) error {
+	for k, v := range meta {
+		metaFieldValues, ok := v.([]interface{})
+		if !ok {
+			return errors.Errorf("dual transmission meta value %s is not a slice", k)
+		}
+		if k == "hint" {
+			if err := validateDualTransmissionHint(metaFieldValues); err != nil {
+				return err
+			}
+		}
+
+		if k == "refund" {
+			if err := validateDualTransmissionRefund(metaFieldValues); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
