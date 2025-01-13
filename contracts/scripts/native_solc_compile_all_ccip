@@ -44,7 +44,7 @@ function getOptimizations() {
     local optimize_runs_override=""
 
     case $1 in
-      "OffRamp")
+      "OffRamp" | "MessageTransformerOffRamp")
         optimize_runs_override="--optimizer-runs "$OPTIMIZE_RUNS_OFFRAMP
         ;;
     esac
