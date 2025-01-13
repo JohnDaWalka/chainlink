@@ -467,15 +467,222 @@ func TestDeployTokenPoolContracts_RedeployNew(t *testing.T) {
 	*/
 }
 
-// RemoteChains.Validate: rate and capacity are non-zero when isEnabled is set to false
-// RemoteChains.Validate: rate is greater than capacity
-// RemoteChains.Validate: rate is 0
+func TestValidateRemoteChains(t *testing.T) {
+	t.Parallel()
 
-// NewTokenPoolInput.Validate: invalid pool type
-// NewTokenPoolInput.Validate: accept liquidity must be defined for lock release type
-// NewTokenPoolInput.Validate: accept liquidity must be nil for burn mint types
+	tests := []struct {
+		IsEnabled bool
+		Rate      *big.Int
+		Capacity  *big.Int
+		ErrStr    string
+	}{
+		{
+			IsEnabled: false,
+			Rate:      big.NewInt(1),
+			Capacity:  big.NewInt(10),
+			ErrStr:    "rate and capacity must be 0",
+		},
+		{
+			IsEnabled: true,
+			Rate:      big.NewInt(0),
+			Capacity:  big.NewInt(10),
+			ErrStr:    "rate must be greater than 0 and less than capacity",
+		},
+		{
+			IsEnabled: true,
+			Rate:      big.NewInt(11),
+			Capacity:  big.NewInt(10),
+			ErrStr:    "rate must be greater than 0 and less than capacity",
+		},
+	}
 
-// DeployTokenPoolContractsConfig.Validate: chain selector is invalid
-// DeployTokenPoolContractsConfig.Validate: chain selector maps have overlap
+	for _, test := range tests {
+		remoteChains := RemoteChains{
+			1: {
+				Inbound: token_pool.RateLimiterConfig{
+					IsEnabled: test.IsEnabled,
+					Rate:      test.Rate,
+					Capacity:  test.Capacity,
+				},
+				Outbound: token_pool.RateLimiterConfig{
+					IsEnabled: test.IsEnabled,
+					Rate:      test.Rate,
+					Capacity:  test.Capacity,
+				},
+			},
+		}
 
-// deployTokenPool: deploy the 4 pool types successfully
+		err := remoteChains.Validate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), test.ErrStr)
+	}
+}
+
+func TestValidateNewTokenPoolInput(t *testing.T) {
+	t.Parallel()
+
+	acceptLiquidity := true
+
+	tests := []struct {
+		Input  NewTokenPoolInput
+		ErrStr string
+	}{
+		{
+			Input: NewTokenPoolInput{
+				Type: deployment.ContractType("InvalidTokenPool"),
+			},
+			ErrStr: "InvalidTokenPool is not a valid token pool type",
+		},
+		{
+			Input: NewTokenPoolInput{
+				Type: LockReleaseTokenPool,
+			},
+			ErrStr: "accept liquidity must be defined for lock release pools",
+		},
+		{
+			Input: NewTokenPoolInput{
+				Type:            BurnMintTokenPool,
+				AcceptLiquidity: &acceptLiquidity,
+			},
+			ErrStr: "accept liquidity must be nil for burn mint pools",
+		},
+	}
+
+	for _, test := range tests {
+		err := test.Input.Validate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), test.ErrStr)
+	}
+}
+
+func TestValidateDeployTokenPoolContractsConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		Config DeployTokenPoolContractsConfig
+		ErrStr string
+	}{
+		{
+			Config: DeployTokenPoolContractsConfig{
+				NewPools: map[uint64]NewTokenPoolInput{
+					1: NewTokenPoolInput{},
+				},
+				ExistingPoolUpdates: map[uint64]BaseTokenPoolInput{
+					1: BaseTokenPoolInput{},
+				},
+			},
+			ErrStr: "chain overlap exists between new pools and updates to existing pools",
+		},
+	}
+
+	for _, test := range tests {
+		err := test.Config.Validate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), test.ErrStr)
+	}
+}
+
+func TestZero(t *testing.T) {
+	t.Parallel()
+
+	zero := zero()
+	require.Equal(t, int64(0), zero.Int64())
+}
+
+func TestZeroAddress(t *testing.T) {
+	t.Parallel()
+
+	zeroAddress := zeroAddress()
+	require.Equal(t, "0x0000000000000000000000000000000000000000", zeroAddress.String())
+}
+
+func TestDeployTokenPool(t *testing.T) {
+	t.Parallel()
+
+	e, selectorA, _, tokens, _ := setup2ChainEnvironment(t)
+
+	acceptLiquidity := false
+
+	tests := []struct {
+		Input NewTokenPoolInput
+	}{
+		{
+			Input: NewTokenPoolInput{
+				BaseTokenPoolInput: BaseTokenPoolInput{
+					TokenAddress: tokens[selectorA].Address,
+				},
+				Type:               BurnMintTokenPool,
+				LocalTokenDecimals: localTokenDecimals,
+				AllowList:          []common.Address{},
+			},
+		},
+		{
+			Input: NewTokenPoolInput{
+				BaseTokenPoolInput: BaseTokenPoolInput{
+					TokenAddress: tokens[selectorA].Address,
+				},
+				Type:               BurnWithFromMintTokenPool,
+				LocalTokenDecimals: localTokenDecimals,
+				AllowList:          []common.Address{},
+			},
+		},
+		{
+			Input: NewTokenPoolInput{
+				BaseTokenPoolInput: BaseTokenPoolInput{
+					TokenAddress: tokens[selectorA].Address,
+				},
+				Type:               BurnFromMintTokenPool,
+				LocalTokenDecimals: localTokenDecimals,
+				AllowList:          []common.Address{},
+			},
+		},
+		{
+			Input: NewTokenPoolInput{
+				BaseTokenPoolInput: BaseTokenPoolInput{
+					TokenAddress: tokens[selectorA].Address,
+				},
+				Type:               LockReleaseTokenPool,
+				LocalTokenDecimals: localTokenDecimals,
+				AllowList:          []common.Address{},
+				AcceptLiquidity:    &acceptLiquidity,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		addressBook := deployment.NewMemoryAddressBook()
+		state, err := LoadOnchainState(e)
+		require.NoError(t, err)
+
+		_, err = deployTokenPool(
+			e.Logger,
+			e.Chains[selectorA],
+			addressBook,
+			test.Input,
+			state.Chains[selectorA].Router.Address(),
+			state.Chains[selectorA].RMNProxy.Address(),
+		)
+		require.NoError(t, err)
+
+		err = e.ExistingAddresses.Merge(addressBook)
+		require.NoError(t, err)
+
+		state, err = LoadOnchainState(e)
+		require.NoError(t, err)
+
+		switch test.Input.Type {
+		case BurnMintTokenPool:
+			_, ok := state.Chains[selectorA].BurnMintTokenPools[testTokenSymbol]
+			require.True(t, ok)
+		case LockReleaseTokenPool:
+			_, ok := state.Chains[selectorA].LockReleaseTokenPools[testTokenSymbol]
+			require.True(t, ok)
+		case BurnWithFromMintTokenPool:
+			_, ok := state.Chains[selectorA].BurnWithFromMintTokenPools[testTokenSymbol]
+			require.True(t, ok)
+		case BurnFromMintTokenPool:
+			_, ok := state.Chains[selectorA].BurnFromMintTokenPools[testTokenSymbol]
+			require.True(t, ok)
+		}
+	}
+}

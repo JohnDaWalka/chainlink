@@ -596,6 +596,69 @@ func LoadChainState(chain deployment.Chain, addresses map[string]deployment.Type
 				return state, err
 			}
 			state.BurnMintTokenPools[TokenSymbol(symbol)] = pool
+		case deployment.NewTypeAndVersion(BurnWithFromMintTokenPool, deployment.Version1_5_1).String():
+			pool, err := burn_with_from_mint_token_pool.NewBurnWithFromMintTokenPool(common.HexToAddress(address), chain.Client)
+			if err != nil {
+				return state, err
+			}
+			if state.BurnWithFromMintTokenPools == nil {
+				state.BurnWithFromMintTokenPools = make(map[TokenSymbol]*burn_with_from_mint_token_pool.BurnWithFromMintTokenPool)
+			}
+			tokAddress, err := pool.GetToken(nil)
+			if err != nil {
+				return state, err
+			}
+			tok, err := erc20.NewERC20(tokAddress, chain.Client)
+			if err != nil {
+				return state, err
+			}
+			symbol, err := tok.Symbol(nil)
+			if err != nil {
+				return state, err
+			}
+			state.BurnWithFromMintTokenPools[TokenSymbol(symbol)] = pool
+		case deployment.NewTypeAndVersion(BurnFromMintTokenPool, deployment.Version1_5_1).String():
+			pool, err := burn_from_mint_token_pool.NewBurnFromMintTokenPool(common.HexToAddress(address), chain.Client)
+			if err != nil {
+				return state, err
+			}
+			if state.BurnFromMintTokenPools == nil {
+				state.BurnFromMintTokenPools = make(map[TokenSymbol]*burn_from_mint_token_pool.BurnFromMintTokenPool)
+			}
+			tokAddress, err := pool.GetToken(nil)
+			if err != nil {
+				return state, err
+			}
+			tok, err := erc20.NewERC20(tokAddress, chain.Client)
+			if err != nil {
+				return state, err
+			}
+			symbol, err := tok.Symbol(nil)
+			if err != nil {
+				return state, err
+			}
+			state.BurnFromMintTokenPools[TokenSymbol(symbol)] = pool
+		case deployment.NewTypeAndVersion(LockReleaseTokenPool, deployment.Version1_5_1).String():
+			pool, err := lock_release_token_pool.NewLockReleaseTokenPool(common.HexToAddress(address), chain.Client)
+			if err != nil {
+				return state, err
+			}
+			if state.LockReleaseTokenPools == nil {
+				state.LockReleaseTokenPools = make(map[TokenSymbol]*lock_release_token_pool.LockReleaseTokenPool)
+			}
+			tokAddress, err := pool.GetToken(nil)
+			if err != nil {
+				return state, err
+			}
+			tok, err := erc20.NewERC20(tokAddress, chain.Client)
+			if err != nil {
+				return state, err
+			}
+			symbol, err := tok.Symbol(nil)
+			if err != nil {
+				return state, err
+			}
+			state.LockReleaseTokenPools[TokenSymbol(symbol)] = pool
 		case deployment.NewTypeAndVersion(BurnMintToken, deployment.Version1_0_0).String():
 			tok, err := burn_mint_erc677.NewBurnMintERC677(common.HexToAddress(address), chain.Client)
 			if err != nil {

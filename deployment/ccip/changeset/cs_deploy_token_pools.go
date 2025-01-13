@@ -24,14 +24,17 @@ import (
 )
 
 /*
-TODOs
+TODO: Other actions required to support token pools ->
+
+- Removing support for chains (not as common, likely a separate changeset)
+- Set rate limit admin (usually left as zero address, not urgent)
+- Set rebalancer on lock-release pools (usually left as zero address, not urgent)
+- Deploying a price feed for a token with BPS & reconfiguring a DON to support the feed
 
 Deploying price feeds for tokens with BPS [REQUIRED]
 
 Others, not as urgent
-- Removing support for chains (not as common, likely a separate changeset)
-- Set rate limit admin (usually left as zero address)
-- Set rebalancer on lock-release pools (usually left as zero address)
+
 */
 
 var _ deployment.ChangeSet[DeployTokenPoolContractsConfig] = DeployTokenPoolContracts
