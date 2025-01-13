@@ -198,6 +198,7 @@ func DeployTokenPoolContracts(env deployment.Environment, c DeployTokenPoolContr
 	timelocks := make(map[uint64]common.Address)
 	proposers := make(map[uint64]*gethwrappers.ManyChainMultiSig)
 
+	var i int
 	for chainSelector := range tokenChainConfigs {
 		chainEnv := env.Chains[chainSelector] // chain selector has already been confirmed as a valid key
 		batch, err := makeTokenPoolOperationsForChain(chainSelector, tokenChainConfigs)
@@ -207,10 +208,11 @@ func DeployTokenPoolContracts(env deployment.Environment, c DeployTokenPoolContr
 		proposers[chainSelector] = state.Chains[chainSelector].ProposerMcm
 		timelocks[chainSelector] = state.Chains[chainSelector].Timelock.Address()
 
-		operations = append(operations, timelock.BatchChainOperation{
+		operations[i] = timelock.BatchChainOperation{
 			Batch:           batch,
 			ChainIdentifier: mcms.ChainIdentifier(chainSelector),
-		})
+		}
+		i++
 	}
 
 	proposal, err := proposalutils.BuildProposalFromBatches(
@@ -399,6 +401,7 @@ func makeTokenPoolOperationsForChain(
 
 	// Apply chain updates on the token pool
 	chainUpdates := make([]token_pool.TokenPoolChainUpdate, len(tokenChainConfig.RemoteChainsToAdd))
+	var i int
 	for remoteChainSelector, remoteChainConfig := range tokenChainConfig.RemoteChainsToAdd {
 		remoteTokenConfig, ok := tokenChainConfigs[remoteChainSelector]
 		if !ok {
@@ -409,13 +412,14 @@ func makeTokenPoolOperationsForChain(
 		if remoteTokenConfig.RegistryState.TokenPool.Cmp(remoteTokenConfig.TokenPool.Address()) != 0 && remoteTokenConfig.RegistryState.TokenPool.Cmp(zeroAddress()) != 0 {
 			remotePoolAddresses = append(remotePoolAddresses, remoteTokenConfig.RegistryState.TokenPool.Bytes())
 		}
-		chainUpdates = append(chainUpdates, token_pool.TokenPoolChainUpdate{
+		chainUpdates[i] = token_pool.TokenPoolChainUpdate{
 			RemoteChainSelector:       remoteChainSelector,
 			InboundRateLimiterConfig:  remoteChainConfig.Inbound,
 			OutboundRateLimiterConfig: remoteChainConfig.Outbound,
 			RemoteTokenAddress:        remoteTokenConfig.TokenAddress.Bytes(),
 			RemotePoolAddresses:       remotePoolAddresses,
-		})
+		}
+		i++
 	}
 	if len(chainUpdates) > 0 {
 		applyChainUpdatesTx, err := tokenChainConfig.TokenPool.ApplyChainUpdates(deployment.SimTransactOpts(), []uint64{}, chainUpdates)

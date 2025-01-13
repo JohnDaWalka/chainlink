@@ -50,10 +50,10 @@ func setup2ChainEnvironment(t *testing.T) (deployment.Environment, uint64, uint6
 
 	addressBook := deployment.NewMemoryAddressBook()
 	prereqCfg := make([]DeployPrerequisiteConfigPerChain, len(selectors))
-	for _, selector := range selectors {
-		prereqCfg = append(prereqCfg, DeployPrerequisiteConfigPerChain{
+	for i, selector := range selectors {
+		prereqCfg[i] = DeployPrerequisiteConfigPerChain{
 			ChainSelector: selector,
-		})
+		}
 	}
 
 	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfig)
