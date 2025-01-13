@@ -21,7 +21,6 @@ import (
 	solRpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/mr-tron/base58"
-	"github.com/pelletier/go-toml/v2"
 
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -197,7 +196,6 @@ func solChain(t *testing.T, chainID uint64, adminKey *solana.PrivateKey) (string
 
 	port := freeport.GetOne(t)
 
-	// programIds := getProgramIds(t)
 	programIds := map[string]string{
 		"ccip_router": solTestConfig.CcipRouterProgram.String(),
 	}
@@ -239,20 +237,4 @@ func solChain(t *testing.T, chainID uint64, adminKey *solana.PrivateKey) (string
 	t.Logf("solana-test-validator is ready at %s", url)
 
 	return url, wsURL, nil
-}
-
-func getProgramIds(t *testing.T) map[string]string {
-	programIds := map[string]string{}
-
-	// This file is generated during the CI build process
-	programPath := GetProgramsPath()
-	programData, err := os.ReadFile(filepath.Join(programPath, "program_ids.toml"))
-	require.NoError(t, err)
-
-	fmt.Printf(string(programData))
-
-	err = toml.Unmarshal(programData, &programIds)
-	require.NoError(t, err)
-
-	return programIds
 }
