@@ -199,7 +199,6 @@ func solChain(t *testing.T, chainID uint64, adminKey *solana.PrivateKey) (string
 
 	// programIds := getProgramIds(t)
 	programIds := map[string]string{
-		// "ccip_router": "AmTB9SpwRjjKd3dHjFJiQoVt2bSzbzFnzBHCSpX4k9MW",
 		"ccip_router": solTestConfig.CcipRouterProgram.String(),
 	}
 
