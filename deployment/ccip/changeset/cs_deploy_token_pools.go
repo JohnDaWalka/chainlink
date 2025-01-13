@@ -154,7 +154,7 @@ func (c DeployTokenPoolContractsConfig) Validate() error {
 	}
 	for chainSelector, chainConfig := range c.NewPools {
 		if _, ok := seenChains[chainSelector]; ok {
-			return fmt.Errorf("chain overlap exists between new pools and updates to existing pools")
+			return errors.New("chain overlap exists between new pools and updates to existing pools")
 		}
 		if err := chainConfig.Validate(); err != nil {
 			return fmt.Errorf("chain with selector %d is invalid: %w", chainSelector, err)
@@ -208,7 +208,7 @@ func DeployTokenPoolContracts(env deployment.Environment, c DeployTokenPoolContr
 		tokenChainConfigs[chainSelector] = tokenChainConfig
 	}
 
-	var operations []timelock.BatchChainOperation
+	operations := make([]timelock.BatchChainOperation, len(tokenChainConfigs), len(tokenChainConfigs))
 	timelocks := make(map[uint64]common.Address)
 	proposers := make(map[uint64]*gethwrappers.ManyChainMultiSig)
 
@@ -431,7 +431,7 @@ func makeTokenPoolOperationsForChain(
 	}
 
 	// Apply chain updates on the token pool
-	var chainUpdates []token_pool.TokenPoolChainUpdate
+	chainUpdates := make([]token_pool.TokenPoolChainUpdate, len(tokenChainConfig.RemoteChainsToAdd), len(tokenChainConfig.RemoteChainsToAdd))
 	for remoteChainSelector, remoteChainConfig := range tokenChainConfig.RemoteChainsToAdd {
 		remoteTokenConfig, ok := tokenChainConfigs[remoteChainSelector]
 		if !ok {

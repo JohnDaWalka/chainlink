@@ -48,7 +48,7 @@ func setup2ChainEnvironment(t *testing.T) (deployment.Environment, uint64, uint6
 	selectors := e.AllChainSelectors()
 
 	addressBook := deployment.NewMemoryAddressBook()
-	var prereqCfg []DeployPrerequisiteConfigPerChain
+	prereqCfg := make([]DeployPrerequisiteConfigPerChain, len(selectors), len(selectors))
 	for _, selector := range selectors {
 		prereqCfg = append(prereqCfg, DeployPrerequisiteConfigPerChain{
 			ChainSelector: selector,
@@ -163,13 +163,13 @@ func validateMemberOfBurnMintPair(
 	for _, supportedChain := range supportedChains {
 		inboundConfig, err := tokenPool.GetCurrentInboundRateLimiterState(nil, supportedChain)
 		require.NoError(t, err)
-		require.Equal(t, true, inboundConfig.IsEnabled)
+		require.True(t, inboundConfig.IsEnabled)
 		require.Equal(t, big.NewInt(capacity), inboundConfig.Capacity)
 		require.Equal(t, big.NewInt(rate), inboundConfig.Rate)
 
 		outboundConfig, err := tokenPool.GetCurrentOutboundRateLimiterState(nil, supportedChain)
 		require.NoError(t, err)
-		require.Equal(t, true, outboundConfig.IsEnabled)
+		require.True(t, outboundConfig.IsEnabled)
 		require.Equal(t, big.NewInt(capacity), outboundConfig.Capacity)
 		require.Equal(t, big.NewInt(rate), outboundConfig.Rate)
 
