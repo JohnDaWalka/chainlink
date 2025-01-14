@@ -129,7 +129,7 @@ func deployChainContractsForChains(
 	chainsToDeploy []uint64) error {
 	existingEVMState, err := LoadOnchainState(e)
 	if err != nil {
-		e.Logger.Errorw("Failed to load existing onchain state", "err")
+		e.Logger.Errorw("Failed to load existing onchain state", err)
 		return err
 	}
 
@@ -147,7 +147,7 @@ func deployChainContractsForChains(
 
 	existingSolState, err := LoadOnchainStateSolana(e)
 	if err != nil {
-		e.Logger.Errorw("Failed to load existing onchain solanastate", "err")
+		e.Logger.Errorw("Failed to load existing onchain solanastate", err)
 		return err
 	}
 
@@ -491,7 +491,7 @@ func deployChainContractsSolana(
 ) error {
 	state, err := LoadOnchainStateSolana(e)
 	if err != nil {
-		e.Logger.Errorw("Failed to load existing onchain state", "err")
+		e.Logger.Errorw("Failed to load existing onchain state", err)
 		return err
 	}
 	chainState, chainExists := state.SolChains[chain.Selector]
