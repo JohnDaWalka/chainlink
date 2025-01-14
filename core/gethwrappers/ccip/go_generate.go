@@ -6,6 +6,7 @@ package ccip
 //go:generate go run ../generation/wrap.go ccip OffRamp offramp
 //go:generate go run ../generation/wrap.go ccip OnRampWithMessageTransformer onramp_with_message_transformer
 //go:generate go run ../generation/wrap.go ccip OffRampWithMessageTransformer offramp_with_message_transformer
+//go:generate go run ../generation/wrap.go ccip DummyMessageTransformer dummy_message_transformer
 //go:generate go run ../generation/wrap.go ccip FeeQuoter fee_quoter
 //go:generate go run ../generation/wrap.go ccip NonceManager nonce_manager
 //go:generate go run ../generation/wrap.go ccip MultiAggregateRateLimiter multi_aggregate_rate_limiter

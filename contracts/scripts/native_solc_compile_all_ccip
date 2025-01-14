@@ -84,5 +84,6 @@ compileContract test/helpers/EncodingUtils
 # Message Transformer On/OffRamps
 compileContract offRamp/OffRampWithMessageTransformer
 compileContract onRamp/OnRampWithMessageTransformer
+compileContract encryption/DummyMessageTransformer
 
 
