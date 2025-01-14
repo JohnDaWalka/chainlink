@@ -740,6 +740,9 @@ func deployChainContractsSolana(
 		routerStatePDA, _, _ := solState.FindStatePDA(ccipRouterProgram)
 		externalExecutionConfigPDA, _, _ := solState.FindExternalExecutionConfigPDA(ccipRouterProgram)
 		externalTokenPoolsSignerPDA, _, _ := solState.FindExternalTokenPoolsSignerPDA(ccipRouterProgram)
+		feeBillingSignerPDA, _, _ := solState.FindFeeBillingSignerPDA(ccipRouterProgram)
+		feeQuoterConfigPDA, _, _ := solState.FindFqConfigPDA(feeQuoterAddress)
+		linkFqBillingConfigPDA, _, _ := solState.FindFqBillingTokenConfigPDA(chainState.LinkToken, feeQuoterAddress)
 		table, err := solCommonUtil.SetupLookupTable(
 			e.GetContext(),
 			chain.Client,
@@ -761,7 +764,13 @@ func deployChainContractsSolana(
 				solana.Token2022ProgramID,
 				solana.TokenProgramID,
 				solana.SPLAssociatedTokenAccountProgramID,
+				// fee quoter
+				feeBillingSignerPDA,
+				feeQuoterConfigPDA,
+				feeQuoterAddress,
+				linkFqBillingConfigPDA,
 			})
+
 		if err != nil {
 			return fmt.Errorf("failed to create lookup table: %w", err)
 		}
