@@ -4,8 +4,8 @@ package ccip
 //go:generate go run ../generation/wrap.go ccip CCIPHome ccip_home
 //go:generate go run ../generation/wrap.go ccip OnRamp onramp
 //go:generate go run ../generation/wrap.go ccip OffRamp offramp
-//go:generate go run ../generation/wrap.go ccip MessageTransformerOnRamp message_transformer_onramp
-//go:generate go run ../generation/wrap.go ccip MessageTransformerOffRamp message_transformer_offramp
+//go:generate go run ../generation/wrap.go ccip OnRampWithMessageTransformer onramp_with_message_transformer
+//go:generate go run ../generation/wrap.go ccip OffRampWithMessageTransformer offramp_with_message_transformer
 //go:generate go run ../generation/wrap.go ccip FeeQuoter fee_quoter
 //go:generate go run ../generation/wrap.go ccip NonceManager nonce_manager
 //go:generate go run ../generation/wrap.go ccip MultiAggregateRateLimiter multi_aggregate_rate_limiter

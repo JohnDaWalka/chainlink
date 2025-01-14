@@ -11,8 +11,6 @@ import {OnRampWithMessageTransformer} from "../../../onRamp/OnRampWithMessageTra
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {MessageTransformerHelper} from "../../helpers/MessageTransformerHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
-import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC20.sol";
-import {LogMessageDataReceiver} from "../../helpers/receivers/LogMessageDataReceiver.sol";
 
 contract OnRampWithMessageTransformer_executeSingleMessage is OnRampSetup {
   OnRampWithMessageTransformer internal s_onRampWithMessageTransformer;

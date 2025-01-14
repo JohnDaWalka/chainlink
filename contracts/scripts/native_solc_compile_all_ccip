@@ -36,7 +36,7 @@ function getOptimizations() {
     local optimize_runs_override=""
 
     case $1 in
-      "OffRamp" | "MessageTransformerOffRamp")
+      "OffRamp" | "OffRampWithMessageTransformer")
         optimize_runs_override="--optimizer-runs "$OPTIMIZE_RUNS_OFFRAMP
         ;;
     esac
@@ -82,7 +82,7 @@ compileContract test/helpers/CCIPReaderTester
 compileContract test/helpers/EncodingUtils
 
 # Message Transformer On/OffRamps
-compileContract offRamp/MessageTransformerOffRamp
-compileContract onRamp/MessageTransformerOnRamp
+compileContract offRamp/OffRampWithMessageTransformer
+compileContract onRamp/OnRampWithMessageTransformer
 
 
