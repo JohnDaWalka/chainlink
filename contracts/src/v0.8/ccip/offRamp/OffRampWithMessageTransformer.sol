@@ -6,7 +6,7 @@ import {Internal} from "../libraries/Internal.sol";
 import {OffRamp} from "./OffRamp.sol";
 
 /// @notice OffRamp that uses a message transformer to transform messages before execution
-contract MessageTransformerOffRamp is OffRamp {
+contract OffRampWithMessageTransformer is OffRamp {
   address internal s_messageTransformer;
 
   constructor(
@@ -21,20 +21,19 @@ contract MessageTransformerOffRamp is OffRamp {
     s_messageTransformer = messageTransformerAddr;
   }
 
-  function getMessageTransformerAddress() external view returns (address) {
+  function getMessageTransformer() external view returns (address) {
     return s_messageTransformer;
   }
 
   function _beforeExecuteSingleMessage(
     Internal.Any2EVMRampMessage memory message
-  ) internal override returns (Internal.Any2EVMRampMessage memory transformedMessage) {
+  ) internal override returns (Internal.Any2EVMRampMessage memory) {
     try IMessageTransformer(s_messageTransformer).transformInboundMessage(message) returns (
-      Internal.Any2EVMRampMessage memory m
+      Internal.Any2EVMRampMessage memory transformedMessage
     ) {
-      transformedMessage = m;
+      return transformedMessage;
     } catch (bytes memory err) {
       revert IMessageTransformer.MessageTransformError(err);
     }
-    return transformedMessage;
   }
 }

@@ -17,22 +17,24 @@ contract MessageTransformerHelper is IMessageTransformer {
   }
 
   /// @inheritdoc IMessageTransformer
-  function transformInboundMessage(
-    Internal.Any2EVMRampMessage memory message
-  ) public view returns (Internal.Any2EVMRampMessage memory) {
-    if (s_shouldRevert) {
-      revert UnknownChain();
-    }
-    return message;
-  }
-
-  /// @inheritdoc IMessageTransformer
   function transformOutboundMessage(
     Internal.EVM2AnyRampMessage memory message
   ) public view returns (Internal.EVM2AnyRampMessage memory) {
     if (s_shouldRevert) {
       revert UnknownChain();
     }
+    message.data = abi.encodePacked("transformedData", message.data);
+    return message;
+  }
+
+  /// @inheritdoc IMessageTransformer
+  function transformInboundMessage(
+    Internal.Any2EVMRampMessage memory message
+  ) public view returns (Internal.Any2EVMRampMessage memory) {
+    if (s_shouldRevert) {
+      revert UnknownChain();
+    }
+    message.data = abi.encodePacked("transformedData", message.data);
     return message;
   }
 }

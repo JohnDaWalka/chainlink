@@ -14,7 +14,6 @@ import {OffRamp} from "../../../offRamp/OffRamp.sol";
 import {FeeQuoterSetup} from "../../feeQuoter/FeeQuoterSetup.t.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {MessageInterceptorHelper} from "../../helpers/MessageInterceptorHelper.sol";
-import {MessageTransformerHelper} from "../../helpers/MessageTransformerHelper.sol";
 import {OffRampHelper} from "../../helpers/OffRampHelper.sol";
 import {MaybeRevertMessageReceiver} from "../../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MultiOCR3BaseSetup} from "../../ocr/MultiOCR3Base/MultiOCR3BaseSetup.t.sol";
@@ -39,7 +38,6 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
 
   OffRampHelper internal s_offRamp;
   MessageInterceptorHelper internal s_inboundMessageInterceptor;
-  MessageTransformerHelper internal s_inboundMessageTransformer;
   NonceManager internal s_inboundNonceManager;
 
   bytes32 internal s_configDigestExec;
@@ -55,7 +53,6 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     MultiOCR3BaseSetup.setUp();
 
     s_inboundMessageInterceptor = new MessageInterceptorHelper();
-    s_inboundMessageTransformer = new MessageTransformerHelper();
     s_receiver = new MaybeRevertMessageReceiver(false);
     s_secondary_receiver = new MaybeRevertMessageReceiver(false);
     s_reverting_receiver = new MaybeRevertMessageReceiver(true);

@@ -259,7 +259,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, Ownable2StepMsgSender 
     return newMessage.header.messageId;
   }
 
-  /// @notice hook for applying custom logic to the message from router
+  /// @notice hook for applying custom logic to the message from the router
   /// @param message router message
   /// @return transformedMessage modified message
   function _postProcessMessage(
