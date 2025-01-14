@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	pkgworkflows "github.com/smartcontractkit/chainlink-common/pkg/workflows"
+	"github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/secrets"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -26,6 +27,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/workflowkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/store"
+
+	"crypto/sha256"
 )
 
 var ErrNotImplemented = errors.New("not implemented")
@@ -145,6 +148,8 @@ type eventHandler struct {
 	secretsFreshnessDuration time.Duration
 	encryptionKey            workflowkey.Key
 	engineFactory            engineFactoryFn
+
+	sdkCache map[[32]byte]*sdk.WorkflowSpec
 }
 
 type Event interface {
@@ -190,6 +195,8 @@ func NewEventHandler(
 		clock:                    clock,
 		secretsFreshnessDuration: defaultSecretsFreshnessDuration,
 		encryptionKey:            encryptionKey,
+
+		sdkCache: map[[32]byte]*sdk.WorkflowSpec{},
 	}
 	eh.engineFactory = eh.engineFactoryFn
 	for _, o := range opts {
@@ -526,12 +533,42 @@ func (h *eventHandler) getWorkflowArtifacts(
 	return decodedBinary, []byte(spec.Config), nil
 }
 
+var (
+	versionByte = byte(0)
+)
+
+func generateSdkID(workflow []byte, config []byte) ([32]byte, error) {
+	s := sha256.New()
+	_, err := s.Write(workflow)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	_, err = s.Write([]byte(config))
+	if err != nil {
+		return [32]byte{}, err
+	}
+	sha := [32]byte(s.Sum(nil))
+	sha[0] = versionByte
+
+	return sha, nil
+}
+
 func (h *eventHandler) engineFactoryFn(ctx context.Context, id string, owner string, name string, config []byte, binary []byte) (services.Service, error) {
 	moduleConfig := &host.ModuleConfig{Logger: h.lggr, Labeler: h.emitter}
 
-	sdkSpec, err := host.GetWorkflowSpec(ctx, moduleConfig, binary, config)
+	sdkID, err := generateSdkID(binary, config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get workflow sdk spec: %w", err)
+		return nil, fmt.Errorf("failed to generate sdk id: %w", err)
+	}
+
+	sdkSpec := h.sdkCache[sdkID]
+	if sdkSpec == nil {
+		sdkSpec, err = host.GetWorkflowSpec(ctx, moduleConfig, binary, config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get workflow sdk spec: %w", err)
+		}
+
+		h.sdkCache[sdkID] = sdkSpec
 	}
 
 	cfg := workflows.Config{
