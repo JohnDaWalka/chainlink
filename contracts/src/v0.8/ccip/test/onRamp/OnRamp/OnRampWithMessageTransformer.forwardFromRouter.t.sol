@@ -7,8 +7,9 @@ import {Router} from "../../../Router.sol";
 import {IMessageTransformer} from "../../../interfaces/IMessageTransformer.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
-import {OnRampWithMessageTransformer} from "../../../onRamp/OnRampWithMessageTransformer.sol";
+
 import {OnRamp} from "../../../onRamp/OnRamp.sol";
+import {OnRampWithMessageTransformer} from "../../../onRamp/OnRampWithMessageTransformer.sol";
 import {MessageTransformerHelper} from "../../helpers/MessageTransformerHelper.sol";
 import {OnRampSetup} from "./OnRampSetup.t.sol";
 
@@ -27,7 +28,10 @@ contract OnRampWithMessageTransformer_executeSingleMessage is OnRampSetup {
     );
     s_metadataHash = keccak256(
       abi.encode(
-        Internal.EVM_2_ANY_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, address(s_onRampWithMessageTransformer)
+        Internal.EVM_2_ANY_MESSAGE_HASH,
+        SOURCE_CHAIN_SELECTOR,
+        DEST_CHAIN_SELECTOR,
+        address(s_onRampWithMessageTransformer)
       )
     );
     address[] memory authorizedCallers = new address[](1);
