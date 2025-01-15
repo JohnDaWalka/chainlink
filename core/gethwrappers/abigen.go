@@ -509,7 +509,7 @@ func addZKSyncBin(fileNode *ast.File, contractName string, zkHexString string) *
 		Values: []ast.Expr{
 			&ast.BasicLit{
 				Kind:  token.STRING,
-				Value: fmt.Sprintf("(\"0x%s\")", zkHexString),
+				Value: fmt.Sprintf("(\"%s\")", zkHexString),
 			},
 		},
 	}
