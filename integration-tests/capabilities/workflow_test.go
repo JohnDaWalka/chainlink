@@ -400,7 +400,7 @@ func TestWorkflow(t *testing.T) {
 		_, decodeErr = sc.Decode(allowAddrTx, allowAddrErr)
 		require.NoError(t, decodeErr)
 
-		wrTx, wrErr := workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), "https://gist.githubusercontent.com/Tofel/066e3632ef56338cf0c617b50bc8208b/raw/76f5033eeb951ae7d322926aa8a2d810e0fd4d78/binary.wasm.br", "", "")
+		wrTx, wrErr := workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), "https://gist.githubusercontent.com/Tofel/8105d6b8289c253d67d7d0abc60a01d1/raw/a376a30b32b60b8188914ebd092a73f7faec1519/binary.wasm.br", "", "")
 		_, decodeErr = sc.Decode(wrTx, wrErr)
 		require.NoError(t, decodeErr)
 
