@@ -141,8 +141,7 @@ func TestStarknetSigner(t *testing.T) {
 	t.Run("keystore adapter integration", func(t *testing.T) {
 		adapter := starktxm.NewKeystoreAdapter(lk)
 		baseKs.On("Get", starknetSenderAddr).Return(starkKey, nil)
-		hash, err := curve.Curve.PedersenHash([]*big.Int{big.NewInt(42)})
-		require.NoError(t, err)
+		hash := curve.HashPedersenElements([]*big.Int{big.NewInt(42)})
 		r, s, err := adapter.Sign(testutils.Context(t), starknetSenderAddr, hash)
 		require.NoError(t, err)
 		require.NotNil(t, r)
