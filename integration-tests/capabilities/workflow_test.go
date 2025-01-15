@@ -37,8 +37,10 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/evmcontracts/forwarder"
 	"github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/onchain"
 
+	feeds_consumer_debug "github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/evmcontracts/feed_consumer_debug"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
+
 	cr_wrapper "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
-	feeds_consumer "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
 	ocr3_capability "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/ocr3_capability"
 	workflow_registry "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/workflow/generated/workflow_registry_wrapper"
 )
@@ -192,23 +194,46 @@ func generateOCR3Config(
 	maxDurationInitialization := 10 * time.Second
 
 	// Generate OCR3 configuration arguments for testing
+	// signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
+	// 	20*time.Second,             // DeltaProgress: Time between rounds
+	// 	10*time.Second,             // DeltaResend: Time between resending unconfirmed transmissions
+	// 	1*time.Second,              // DeltaInitial: Initial delay before starting the first round
+	// 	5*time.Second,              // DeltaRound: Time between rounds within an epoch
+	// 	1*time.Second,              // DeltaGrace: Grace period for delayed transmissions
+	// 	5*time.Second,              // DeltaCertifiedCommitRequest: Time between certified commit requests
+	// 	10*time.Second,             // DeltaStage: Time between stages of the protocol
+	// 	uint64(10),                 // MaxRoundsPerEpoch: Maximum number of rounds per epoch
+	// 	transmissionSchedule,       // TransmissionSchedule: Transmission schedule
+	// 	oracleIdentities,           // Oracle identities with their public keys
+	// 	nil,                        // Plugin config (empty for now)
+	// 	&maxDurationInitialization, // MaxDurationInitialization: ???
+	// 	5*time.Second,              // MaxDurationQuery: Maximum duration for querying
+	// 	5*time.Second,              // MaxDurationObservation: Maximum duration for observation
+	// 	5*time.Second,              // MaxDurationAccept: Maximum duration for acceptance
+	// 	5*time.Second,              // MaxDurationTransmit: Maximum duration for transmission
+	// 	1,                          // F: Maximum number of faulty oracles
+	// 	nil,                        // OnChain config (empty for now)
+	// )
+	// require.NoError(t, err)
+
+	// values supplied by Alexandr Y
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
-		20*time.Second,             // DeltaProgress: Time between rounds
-		10*time.Second,             // DeltaResend: Time between resending unconfirmed transmissions
-		1*time.Second,              // DeltaInitial: Initial delay before starting the first round
-		5*time.Second,              // DeltaRound: Time between rounds within an epoch
-		1*time.Second,              // DeltaGrace: Grace period for delayed transmissions
-		5*time.Second,              // DeltaCertifiedCommitRequest: Time between certified commit requests
-		10*time.Second,             // DeltaStage: Time between stages of the protocol
+		5*time.Second,              // DeltaProgress: Time between rounds
+		5*time.Second,              // DeltaResend: Time between resending unconfirmed transmissions
+		5*time.Second,              // DeltaInitial: Initial delay before starting the first round
+		2*time.Second,              // DeltaRound: Time between rounds within an epoch
+		500*time.Millisecond,       // DeltaGrace: Grace period for delayed transmissions
+		1*time.Second,              // DeltaCertifiedCommitRequest: Time between certified commit requests
+		30*time.Second,             // DeltaStage: Time between stages of the protocol
 		uint64(10),                 // MaxRoundsPerEpoch: Maximum number of rounds per epoch
 		transmissionSchedule,       // TransmissionSchedule: Transmission schedule
 		oracleIdentities,           // Oracle identities with their public keys
 		nil,                        // Plugin config (empty for now)
 		&maxDurationInitialization, // MaxDurationInitialization: ???
-		5*time.Second,              // MaxDurationQuery: Maximum duration for querying
-		5*time.Second,              // MaxDurationObservation: Maximum duration for observation
-		5*time.Second,              // MaxDurationAccept: Maximum duration for acceptance
-		5*time.Second,              // MaxDurationTransmit: Maximum duration for transmission
+		1*time.Second,              // MaxDurationQuery: Maximum duration for querying
+		1*time.Second,              // MaxDurationObservation: Maximum duration for observation
+		1*time.Second,              // MaxDurationAccept: Maximum duration for acceptance
+		1*time.Second,              // MaxDurationTransmit: Maximum duration for transmission
 		1,                          // F: Maximum number of faulty oracles
 		nil,                        // OnChain config (empty for now)
 	)
@@ -288,7 +313,9 @@ func GenerateWorkflowID(owner []byte, name string, workflow []byte, config []byt
 
 func TestWorkflow(t *testing.T) {
 	// workflowOwner := "0x00000000000000000000000000000000000000aa"
-	feedID := "0x018BFE88407000400000000000000000"
+	// without 0x prefix!
+	feedID := "018bfe8840700040000000000000000000000000000000000000000000000000"
+	feedBytes := common.HexToHash(feedID)
 
 	t.Run("Keystoen workflow test", func(t *testing.T) {
 		in, err := framework.Load[WorkflowTestConfig](t)
@@ -373,7 +400,7 @@ func TestWorkflow(t *testing.T) {
 		_, decodeErr = sc.Decode(allowAddrTx, allowAddrErr)
 		require.NoError(t, decodeErr)
 
-		wrTx, wrErr := workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), "https://gist.githubusercontent.com/Tofel/99b7581d068ec4fa5f67cacd07711c0e/raw/c3e59c777ca33b781c87c96bb6727a324416ab2b/binary.wasm.br", "", "")
+		wrTx, wrErr := workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), "https://gist.githubusercontent.com/Tofel/066e3632ef56338cf0c617b50bc8208b/raw/76f5033eeb951ae7d322926aa8a2d810e0fd4d78/binary.wasm.br", "", "")
 		_, decodeErr = sc.Decode(wrTx, wrErr)
 		require.NoError(t, decodeErr)
 
@@ -512,6 +539,19 @@ func TestWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		fmt.Println("Deployed ocr3_capability contract at", ocr3CapabilityAddress.Hex())
 
+		_ = feeds_consumer_debug.DeployFeedsConsumerDebug
+
+		// feedsConsumerDebugAddress, tx, feedsConsumerDebugContract, err := feeds_consumer_debug.DeployFeedsConsumerDebug(
+		// 	sc.NewTXOpts(),
+		// 	sc.Client,
+		// )
+		// require.NoError(t, err)
+		// _, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		// require.NoError(t, err)
+
+		// _ = feedsConsumerDebugAddress
+		// _ = feedsConsumerDebugContract
+
 		feedsConsumerAddress, tx, feedsConsumerContract, err := feeds_consumer.DeployKeystoneFeedsConsumer(
 			sc.NewTXOpts(),
 			sc.Client,
@@ -519,6 +559,7 @@ func TestWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
 		require.NoError(t, err)
+
 		fmt.Println("Deployed feeds_consumer contract at", feedsConsumerAddress.Hex())
 
 		var workflowNameBytes [10]byte
@@ -527,7 +568,7 @@ func TestWorkflow(t *testing.T) {
 		tx, err = feedsConsumerContract.SetConfig(
 			sc.NewTXOpts(),
 			[]common.Address{forwarderInstance.Address},
-			[]common.Address{common.HexToAddress("0x00000000000000000000000000000000000000aa")},
+			[]common.Address{sc.MustGetRootKeyAddress()},
 			[][10]byte{workflowNameBytes},
 		)
 		require.NoError(t, err)
@@ -913,16 +954,18 @@ func TestWorkflow(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 
+		// Node sent transaction
+
 		startTime := time.Now()
 		for {
 			select {
 			case <-ctx.Done():
 				t.Fatalf("feed did not update, timeout after %s", timeout)
-			case <-time.After(5 * time.Second):
+			case <-time.After(10 * time.Second):
 				elapsed := time.Since(startTime).Round(time.Second)
 				price, _, err := feedsConsumerContract.GetPrice(
 					sc.NewCallOpts(),
-					common.HexToHash(feedID),
+					feedBytes,
 				)
 				require.NoError(t, err)
 
@@ -930,6 +973,22 @@ func TestWorkflow(t *testing.T) {
 					fmt.Printf("Feed updated after %s - price set, price=%s\n", elapsed, price)
 					return
 				}
+				// ids, prices, timestamps, err := feedsConsumerContract.GetAllFeeds(sc.NewCallOpts())
+				// require.NoError(t, err)
+
+				// for i, feedId := range ids {
+				// 	fmt.Printf("Feed %s - price=%d, timestamp=%d\n", common.Bytes2Hex(feedId[:]), prices[i], timestamps[i])
+				// 	price, _, err := feedsConsumerContract.GetPrice(
+				// 		sc.NewCallOpts(),
+				// 		feedId,
+				// 	)
+				// 	require.NoError(t, err)
+
+				// 	if price.String() != "0" {
+				// 		fmt.Printf("Feed updated after %s - price set, price=%s\n", elapsed, price)
+				// 		return
+				// 	}
+				// }
 				fmt.Printf("Feed not updated yet, waiting for %s\n", elapsed)
 			}
 		}
