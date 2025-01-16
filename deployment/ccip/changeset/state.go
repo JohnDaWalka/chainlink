@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc677"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_transmitter"
@@ -88,6 +89,8 @@ var (
 
 	// Pools
 	BurnMintToken             deployment.ContractType = "BurnMintToken"
+	ERC20Token                deployment.ContractType = "ERC20Token"
+	ERC677Token               deployment.ContractType = "ERC677Token"
 	BurnMintTokenPool         deployment.ContractType = "BurnMintTokenPool"
 	BurnWithFromMintTokenPool deployment.ContractType = "BurnWithFromMintTokenPool"
 	BurnFromMintTokenPool     deployment.ContractType = "BurnFromMintTokenPool"
@@ -116,6 +119,8 @@ type CCIPChainState struct {
 	// Map between token Descriptor (e.g. LinkSymbol, WethSymbol)
 	// and the respective token / token pool contract(s) (only one of which would be active on the registry).
 	// This is more of an illustration of how we'll have tokens, and it might need some work later to work properly.
+	ERC20Tokens                map[TokenSymbol]*erc20.ERC20
+	ERC677Tokens               map[TokenSymbol]*erc677.ERC677
 	BurnMintTokens677          map[TokenSymbol]*burn_mint_erc677.BurnMintERC677
 	BurnMintTokenPools         map[TokenSymbol][]*burn_mint_token_pool.BurnMintTokenPool
 	BurnWithFromMintTokenPools map[TokenSymbol][]*burn_with_from_mint_token_pool.BurnWithFromMintTokenPool
@@ -145,6 +150,16 @@ type CCIPChainState struct {
 	MockRMN        *mock_rmn_contract.MockRMNContract
 	PriceRegistry  *price_registry_1_2_0.PriceRegistry
 	RMN            *rmn_contract.RMNContract
+}
+
+func (c CCIPChainState) LinkTokenAddress() (common.Address, error) {
+	if c.LinkToken != nil {
+		return c.LinkToken.Address(), nil
+	}
+	if c.StaticLinkToken != nil {
+		return c.StaticLinkToken.Address(), nil
+	}
+	return common.Address{}, errors.New("no link token found in the state")
 }
 
 func (c CCIPChainState) GenerateView() (view.ChainView, error) {
@@ -320,6 +335,16 @@ type CCIPOnChainState struct {
 	SolChains map[uint64]SolCCIPChainState
 }
 
+func (s CCIPOnChainState) Validate() error {
+	for sel, chain := range s.Chains {
+		// cannot have static link and link together
+		if chain.LinkToken != nil && chain.StaticLinkToken != nil {
+			return fmt.Errorf("cannot have both link and static link token on the same chain %d", sel)
+		}
+	}
+	return nil
+}
+
 func (s CCIPOnChainState) GetAllProposerMCMSForChains(chains []uint64) (map[uint64]*gethwrappers.ManyChainMultiSig, error) {
 	multiSigs := make(map[uint64]*gethwrappers.ManyChainMultiSig)
 	for _, chain := range chains {
@@ -402,7 +427,7 @@ func LoadOnchainState(e deployment.Environment) (CCIPOnChainState, error) {
 		}
 		state.Chains[chainSelector] = chainState
 	}
-	return state, nil
+	return state, state.Validate()
 }
 
 // LoadChainState Loads all state for a chain into state
@@ -615,6 +640,32 @@ func LoadChainState(chain deployment.Chain, addresses map[string]deployment.Type
 				return state, fmt.Errorf("failed to get token symbol of token at %s: %w", address, err)
 			}
 			state.BurnMintTokens677[TokenSymbol(symbol)] = tok
+		case deployment.NewTypeAndVersion(ERC20Token, deployment.Version1_0_0).String():
+			tok, err := erc20.NewERC20(common.HexToAddress(address), chain.Client)
+			if err != nil {
+				return state, err
+			}
+			if state.ERC20Tokens == nil {
+				state.ERC20Tokens = make(map[TokenSymbol]*erc20.ERC20)
+			}
+			symbol, err := tok.Symbol(nil)
+			if err != nil {
+				return state, fmt.Errorf("failed to get token symbol of token at %s: %w", address, err)
+			}
+			state.ERC20Tokens[TokenSymbol(symbol)] = tok
+		case deployment.NewTypeAndVersion(ERC677Token, deployment.Version1_0_0).String():
+			tok, err := erc677.NewERC677(common.HexToAddress(address), chain.Client)
+			if err != nil {
+				return state, err
+			}
+			if state.ERC677Tokens == nil {
+				state.ERC677Tokens = make(map[TokenSymbol]*erc677.ERC677)
+			}
+			symbol, err := tok.Symbol(nil)
+			if err != nil {
+				return state, fmt.Errorf("failed to get token symbol of token at %s: %w", address, err)
+			}
+			state.ERC677Tokens[TokenSymbol(symbol)] = tok
 		// legacy addresses below
 		case deployment.NewTypeAndVersion(OnRamp, deployment.Version1_5_0).String():
 			onRampC, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress(address), chain.Client)
