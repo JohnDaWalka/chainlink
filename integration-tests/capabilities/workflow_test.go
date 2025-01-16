@@ -412,12 +412,12 @@ func TestWorkflow(t *testing.T) {
 				[P2P.V2]
 				Enabled = true
 				ListenAddresses = ['0.0.0.0:5001']
-				DefaultBootstrappers = ['%s@node0:5001']
+				DefaultBootstrappers = ['%s@localhost:5001']
 
 				[Capabilities.Peering.V2]
 				Enabled = true
 				ListenAddresses = ['0.0.0.0:6690']
-				DefaultBootstrappers = ['%s@node0:6690']
+				DefaultBootstrappers = ['%s@localhost:6690']
 
 				# This is needed for the target capability to be initialized
 				[[EVM]]
@@ -435,22 +435,7 @@ func TestWorkflow(t *testing.T) {
 			bc.Nodes[0].DockerInternalHTTPUrl,
 		)
 
-		//remove gateway config for now
-		// [[Capabilities.GatewayConnector.Gateways]]
-		// Id = "por_gateway"
-		// URL = "%s"
-
-		// [Capabilities.GatewayConnector]
-		// DonID = "1"
-		// ChainIDForNodeKey = "%s"
-		// NodeAddress = '%s'
-
-		// remove WorkflowRegistry, because it needs gateway connector
-		// [Capabilities.WorkflowRegistry]
-		// Address = "%s"
-		// NetworkID = "evm"
-		// ChainID = "%s"
-
+		// i + 1, because wo
 		for i := range workflowNodesetInfo {
 			in.NodeSet.NodeSpecs[i+1].Node.TestConfigOverrides = fmt.Sprintf(`
 				[Feature]
@@ -490,6 +475,20 @@ func TestWorkflow(t *testing.T) {
 				Address = '%s'
 				NetworkID = 'evm'
 				ChainID = '%s'
+
+				[Capabilities.WorkflowRegistry]
+				Address = "%s"
+				NetworkID = "evm"
+				ChainID = "%s"
+
+				[Capabilities.GatewayConnector]
+				DonID = "1"
+				ChainIDForNodeKey = "%s"
+				NodeAddress = '%s'
+
+				[[Capabilities.GatewayConnector.Gateways]]
+				Id = "por_gateway"
+				URL = "%s"
 			`,
 				bootstrapNodeInfo.PeerID,
 				bootstrapNodeInfo.PeerID,
@@ -500,12 +499,12 @@ func TestWorkflow(t *testing.T) {
 				forwarderInstance.Address,
 				capabilitiesRegistryInstance.Address,
 				bc.ChainID,
-				// workflowRegistryAddr.Hex(),
-				// bc.ChainID,
-				// bc.ChainID,
-				// workflowNodesetInfo[i].TransmitterAddress,
+				workflowRegistryAddr.Hex(),
+				bc.ChainID,
+				bc.ChainID,
+				workflowNodesetInfo[i].TransmitterAddress,
 				// assuming that node0 is the bootstrap node
-				// "ws://node0:5003/node",
+				"ws://node0:5003/node",
 			)
 		}
 
@@ -559,109 +558,7 @@ func TestWorkflow(t *testing.T) {
 		// Add bootstrap spec to the last node
 		bootstrapNode := nodeClients[0]
 
-		// Wait for OCR listeners to be ready before setting the configuration.
-		// If the ConfigSet event is missed, OCR protocol will not start.
-		// TODO make it fluent!
-		fmt.Println("Waiting 30s for OCR listeners to be ready...")
-		time.Sleep(30 * time.Second)
-		fmt.Println("Proceeding to set OCR3 configuration.")
-
-		// Configure OCR capability contract
-		// should I use only worker nodes or all nodes?
-		ocr3Config := generateOCR3Config(t, workflowNodesetInfo)
-		tx, err = ocr3CapabilityContract.SetConfig(
-			sc.NewTXOpts(),
-			ocr3Config.Signers,
-			ocr3Config.Transmitters,
-			ocr3Config.F,
-			ocr3Config.OnchainConfig,
-			ocr3Config.OffchainConfigVersion,
-			ocr3Config.OffchainConfig,
-		)
-		_, decodeErr = sc.Decode(tx, err)
-		require.NoError(t, decodeErr)
-
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			bootstrapJobSpec := fmt.Sprintf(`
-				type = "bootstrap"
-				schemaVersion = 1
-				name = "Botostrap"
-				contractID = "%s"
-				contractConfigTrackerPollInterval = "1s"
-				contractConfigConfirmations = 1
-				relay = "evm"
-
-				[relayConfig]
-				chainID = %s
-				providerType = "ocr3-capability"
-			`, ocr3CapabilityAddress, bc.ChainID)
-			r, _, err3 := bootstrapNode.CreateJobRaw(bootstrapJobSpec)
-			assert.NoError(t, err3)
-			assert.Empty(t, r.Errors)
-		}()
-
-		for i, nodeClient := range nodeClients {
-			// Last node is a bootstrap node, so we skip it
-			if i == 0 {
-				continue
-			}
-
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				consensusJobSpec := fmt.Sprintf(`
-					type = "offchainreporting2"
-					schemaVersion = 1
-					name = "Keystone OCR3 Consensus Capability"
-					contractID = "%s"
-					ocrKeyBundleID = "%s"
-					p2pv2Bootstrappers = [
-						"%s@%s",
-					]
-					relay = "evm"
-					pluginType = "plugin"
-					transmitterID = "%s"
-
-					[relayConfig]
-					chainID = "%s"
-
-					[pluginConfig]
-					command = "/usr/local/bin/chainlink-ocr3-capability"
-					ocrVersion = 3
-					pluginName = "ocr-capability"
-					providerType = "ocr3-capability"
-					telemetryType = "plugin"
-
-					[onchainSigningStrategy]
-					strategyName = 'multi-chain'
-					[onchainSigningStrategy.config]
-					evm = "%s"
-					`,
-					ocr3CapabilityAddress,
-					nodesInfo[i].OcrKeyBundleID,
-					bootstrapNodeInfo.PeerID,
-					"node0:6690",
-					nodesInfo[i].TransmitterAddress,
-					bc.ChainID,
-					nodesInfo[i].OcrKeyBundleID,
-				)
-				fmt.Println("consensusJobSpec", consensusJobSpec)
-				response, _, err2 := nodeClient.CreateJobRaw(consensusJobSpec)
-				assert.NoError(t, err2)
-				assert.Empty(t, response.Errors)
-			}()
-		}
-		wg.Wait()
-
-		nodeset, err = ns.UpgradeNodeSet(in.NodeSet, bc, 5*time.Second)
-		require.NoError(t, err)
-		nodeClients, err = clclient.New(nodeset.CLNodes)
-		require.NoError(t, err)
-
-		wg = sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -735,22 +632,22 @@ func TestWorkflow(t *testing.T) {
 			assert.NoError(t, err2)
 			assert.Empty(t, r.Errors)
 
-			// bootstrapJobSpec := fmt.Sprintf(`
-			// 	type = "bootstrap"
-			// 	schemaVersion = 1
-			// 	name = "Botostrap"
-			// 	contractID = "%s"
-			// 	contractConfigTrackerPollInterval = "1s"
-			// 	contractConfigConfirmations = 1
-			// 	relay = "evm"
+			bootstrapJobSpec := fmt.Sprintf(`
+				type = "bootstrap"
+				schemaVersion = 1
+				name = "Botostrap"
+				contractID = "%s"
+				contractConfigTrackerPollInterval = "1s"
+				contractConfigConfirmations = 1
+				relay = "evm"
 
-			// 	[relayConfig]
-			// 	chainID = %s
-			// 	providerType = "ocr3-capability"
-			// `, ocr3CapabilityAddress, bc.ChainID)
-			// r, _, err3 := bootstrapNode.CreateJobRaw(bootstrapJobSpec)
-			// assert.NoError(t, err3)
-			// assert.Empty(t, r.Errors)
+				[relayConfig]
+				chainID = %s
+				providerType = "ocr3-capability"
+			`, ocr3CapabilityAddress, bc.ChainID)
+			r, _, err3 := bootstrapNode.CreateJobRaw(bootstrapJobSpec)
+			assert.NoError(t, err3)
+			assert.Empty(t, r.Errors)
 		}()
 
 		for i, nodeClient := range nodeClients {
@@ -806,46 +703,46 @@ func TestWorkflow(t *testing.T) {
 				assert.NoError(t, err4)
 				assert.Empty(t, response.Errors)
 
-				// consensusJobSpec := fmt.Sprintf(`
-				// 	type = "offchainreporting2"
-				// 	schemaVersion = 1
-				// 	name = "Keystone OCR3 Consensus Capability"
-				// 	contractID = "%s"
-				// 	ocrKeyBundleID = "%s"
-				// 	p2pv2Bootstrappers = [
-				// 		"%s@%s",
-				// 	]
-				// 	relay = "evm"
-				// 	pluginType = "plugin"
-				// 	transmitterID = "%s"
+				consensusJobSpec := fmt.Sprintf(`
+					type = "offchainreporting2"
+					schemaVersion = 1
+					name = "Keystone OCR3 Consensus Capability"
+					contractID = "%s"
+					ocrKeyBundleID = "%s"
+					p2pv2Bootstrappers = [
+						"%s@%s",
+					]
+					relay = "evm"
+					pluginType = "plugin"
+					transmitterID = "%s"
 
-				// 	[relayConfig]
-				// 	chainID = "%s"
+					[relayConfig]
+					chainID = "%s"
 
-				// 	[pluginConfig]
-				// 	command = "/usr/local/bin/chainlink-ocr3-capability"
-				// 	ocrVersion = 3
-				// 	pluginName = "ocr-capability"
-				// 	providerType = "ocr3-capability"
-				// 	telemetryType = "plugin"
+					[pluginConfig]
+					command = "/usr/local/bin/chainlink-ocr3-capability"
+					ocrVersion = 3
+					pluginName = "ocr-capability"
+					providerType = "ocr3-capability"
+					telemetryType = "plugin"
 
-				// 	[onchainSigningStrategy]
-				// 	strategyName = 'multi-chain'
-				// 	[onchainSigningStrategy.config]
-				// 	evm = "%s"
-				// 	`,
-				// 	ocr3CapabilityAddress,
-				// 	nodesInfo[i].OcrKeyBundleID,
-				// 	nodesInfo[1].PeerID, // was bootstrapNodeInfo.PeerID
-				// 	"node1:6690",        // was node0:6690
-				// 	nodesInfo[i].TransmitterAddress,
-				// 	bc.ChainID,
-				// 	nodesInfo[i].OcrKeyBundleID,
-				// )
-				// fmt.Println("consensusJobSpec", consensusJobSpec)
-				// response, _, err2 = nodeClient.CreateJobRaw(consensusJobSpec)
-				// assert.NoError(t, err2)
-				// assert.Empty(t, response.Errors)
+					[onchainSigningStrategy]
+					strategyName = 'multi-chain'
+					[onchainSigningStrategy.config]
+					evm = "%s"
+					`,
+					ocr3CapabilityAddress,
+					nodesInfo[i].OcrKeyBundleID,
+					bootstrapNodeInfo.PeerID,
+					"node0:6690",
+					nodesInfo[i].TransmitterAddress,
+					bc.ChainID,
+					nodesInfo[i].OcrKeyBundleID,
+				)
+				fmt.Println("consensusJobSpec", consensusJobSpec)
+				response, _, err2 = nodeClient.CreateJobRaw(consensusJobSpec)
+				assert.NoError(t, err2)
+				assert.Empty(t, response.Errors)
 			}()
 		}
 		wg.Wait()
@@ -936,26 +833,26 @@ func TestWorkflow(t *testing.T) {
 			signers,
 		))
 
-		// // Wait for OCR listeners to be ready before setting the configuration.
-		// // If the ConfigSet event is missed, OCR protocol will not start.
-		// // TODO make it fluent!
-		// fmt.Println("Waiting 30s for OCR listeners to be ready...")
-		// time.Sleep(30 * time.Second)
-		// fmt.Println("Proceeding to set OCR3 configuration.")
+		// Wait for OCR listeners to be ready before setting the configuration.
+		// If the ConfigSet event is missed, OCR protocol will not start.
+		// TODO make it fluent!
+		fmt.Println("Waiting 30s for OCR listeners to be ready...")
+		time.Sleep(30 * time.Second)
+		fmt.Println("Proceeding to set OCR3 configuration.")
 
-		// // Configure OCR capability contract
-		// ocr3Config := generateOCR3Config(t, nodesInfo)
-		// tx, err = ocr3CapabilityContract.SetConfig(
-		// 	sc.NewTXOpts(),
-		// 	ocr3Config.Signers,
-		// 	ocr3Config.Transmitters,
-		// 	ocr3Config.F,
-		// 	ocr3Config.OnchainConfig,
-		// 	ocr3Config.OffchainConfigVersion,
-		// 	ocr3Config.OffchainConfig,
-		// )
-		// _, decodeErr = sc.Decode(tx, err)
-		// require.NoError(t, decodeErr)
+		// Configure OCR capability contract
+		ocr3Config := generateOCR3Config(t, workflowNodesetInfo)
+		tx, err = ocr3CapabilityContract.SetConfig(
+			sc.NewTXOpts(),
+			ocr3Config.Signers,
+			ocr3Config.Transmitters,
+			ocr3Config.F,
+			ocr3Config.OnchainConfig,
+			ocr3Config.OffchainConfigVersion,
+			ocr3Config.OffchainConfig,
+		)
+		_, decodeErr = sc.Decode(tx, err)
+		require.NoError(t, decodeErr)
 
 		// It can take a while before the first report is produced, particularly on CI.
 		timeout := 10 * time.Minute
