@@ -62,20 +62,26 @@ contract KeystoneFeedsConsumer is IReceiver, OwnerIsCreator {
     s_allowedWorkflowNamesList = _allowedWorkflowNamesList;
   }
 
+  event DebugEvent(string reason);
+
   function onReport(bytes calldata metadata, bytes calldata rawReport) external {
     if (!s_allowedSenders[msg.sender]) {
+      emit DebugEvent("UnauthorizedSender");
       revert UnauthorizedSender(msg.sender);
     }
 
     (bytes10 workflowName, address workflowOwner) = _getInfo(metadata);
     if (!s_allowedWorkflowNames[workflowName]) {
+      emit DebugEvent("UnauthorizedWorkflowName");
       revert UnauthorizedWorkflowName(workflowName);
     }
     if (!s_allowedWorkflowOwners[workflowOwner]) {
+      emit DebugEvent("UnauthorizedWorkflowOwner");
       revert UnauthorizedWorkflowOwner(workflowOwner);
     }
 
     ReceivedFeedReport[] memory feeds = abi.decode(rawReport, (ReceivedFeedReport[]));
+    emit DebugEvent("decoding worked");
     for (uint256 i = 0; i < feeds.length; ++i) {
       s_feedReports[feeds[i].FeedId] = StoredFeedReport(feeds[i].Price, feeds[i].Timestamp);
       s_feedReportsList.push(feeds[i].FeedId);

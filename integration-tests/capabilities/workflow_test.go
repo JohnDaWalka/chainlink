@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,7 +38,6 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/onchain"
 
 	feeds_consumer_debug "github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/evmcontracts/feed_consumer_debug"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
 
 	cr_wrapper "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	ocr3_capability "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/ocr3_capability"
@@ -380,7 +380,7 @@ func TestWorkflow(t *testing.T) {
 
 		var configData []byte
 
-		workflowName := "PoR"
+		workflowName := "abcdefgasd"
 		donID := uint32(1)
 		workflowID, idErr := GenerateWorkflowIDFromStrings(sc.MustGetRootKeyAddress().Hex(), workflowName, workFlowData, configData, "")
 		require.NoError(t, idErr)
@@ -543,32 +543,38 @@ func TestWorkflow(t *testing.T) {
 		require.NoError(t, decodeErr)
 		fmt.Println("Deployed ocr3_capability contract at", ocr3CapabilityAddress.Hex())
 
-		_ = feeds_consumer_debug.DeployFeedsConsumerDebug
+		// _ = feeds_consumer_debug.DeployFeedsConsumerDebug
 
-		// feedsConsumerDebugAddress, tx, feedsConsumerDebugContract, err := feeds_consumer_debug.DeployFeedsConsumerDebug(
-		// 	sc.NewTXOpts(),
-		// 	sc.Client,
-		// )
-		// require.NoError(t, err)
-		// _, err = bind.WaitMined(context.Background(), sc.Client, tx)
-		// require.NoError(t, err)
-
-		// _ = feedsConsumerDebugAddress
-		// _ = feedsConsumerDebugContract
-
-		feedsConsumerAddress, tx, feedsConsumerContract, err := feeds_consumer.DeployKeystoneFeedsConsumer(
+		feedsConsumerDebugAddress, tx, feedsConsumerDebugContract, err := feeds_consumer_debug.DeployFeedsConsumerDebug(
 			sc.NewTXOpts(),
 			sc.Client,
 		)
-		_, decodeErr = sc.Decode(tx, err)
-		require.NoError(t, decodeErr)
+		require.NoError(t, err)
+		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		require.NoError(t, err)
 
-		fmt.Println("Deployed feeds_consumer contract at", feedsConsumerAddress.Hex())
+		_ = feedsConsumerDebugAddress
+		_ = feedsConsumerDebugContract
+
+		fmt.Println("Deployed feeds_consumer contract at", feedsConsumerDebugAddress.Hex())
+
+		// feedsConsumerAddress, tx, feedsConsumerContract, err := feeds_consumer.DeployKeystoneFeedsConsumer(
+		// 	sc.NewTXOpts(),
+		// 	sc.Client,
+		// )
+		// _, decodeErr = sc.Decode(tx, err)
+		// require.NoError(t, decodeErr)
+
+		// fmt.Println("Deployed feeds_consumer contract at", feedsConsumerAddress.Hex())
 
 		var workflowNameBytes [10]byte
 		copy(workflowNameBytes[:], []byte(workflowName))
 
-		tx, err = feedsConsumerContract.SetConfig(
+		fmt.Println("Workflow owner: ", sc.MustGetRootKeyAddress().Hex())
+		fmt.Println("Workflow name: ", workflowName)
+		fmt.Println("workflowNameBytes: ", string([]byte(workflowName)))
+
+		tx, err = feedsConsumerDebugContract.SetConfig(
 			sc.NewTXOpts(),
 			[]common.Address{forwarderInstance.Address},
 			[]common.Address{sc.MustGetRootKeyAddress()},
@@ -890,7 +896,7 @@ func TestWorkflow(t *testing.T) {
 				t.Fatalf("feed did not update, timeout after %s", timeout)
 			case <-time.After(10 * time.Second):
 				elapsed := time.Since(startTime).Round(time.Second)
-				price, _, err := feedsConsumerContract.GetPrice(
+				price, _, err := feedsConsumerDebugContract.GetPrice(
 					sc.NewCallOpts(),
 					feedBytes,
 				)
