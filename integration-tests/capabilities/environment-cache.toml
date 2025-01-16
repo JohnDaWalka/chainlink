@@ -1,0 +1,128 @@
+[blockchain_a]
+type = 'anvil'
+image = 'f4hrenh9it/foundry:latest'
+pull_image = false
+port = '8545'
+port_ws = ''
+chain_id = '1337'
+docker_cmd_params = ['-b', '5']
+public_key = ''
+contracts_dir = ''
+
+[blockchain_a.out]
+use_cache = true
+family = 'evm'
+container_name = 'blockchain-node-35764'
+chain_id = '1337'
+
+[[blockchain_a.out.nodes]]
+ws_url = 'ws://127.0.0.1:8545'
+http_url = 'http://127.0.0.1:8545'
+docker_internal_ws_url = 'ws://blockchain-node-35764:8545'
+docker_internal_http_url = 'http://blockchain-node-35764:8545'
+
+[nodeset]
+nodes = 5
+http_port_range_start = 0
+p2p_port_range_start = 0
+dlv_port_range_start = 0
+override_mode = 'each'
+
+[nodeset.db]
+image = 'postgres:15.6'
+port = 0
+name = ''
+volume_name = ''
+databases = 5
+jd_database = false
+pull_image = false
+
+[[nodeset.node_specs]]
+[nodeset.node_specs.node]
+image = ''
+name = ''
+docker_file = 'plugins/chainlink.Dockerfile'
+docker_ctx = '../..'
+pull_image = false
+capabilities = []
+capabilities_container_dir = ''
+test_config_overrides = "\n\t\t\t\t[Feature]\n\t\t\t\tLogPoller = true\n\n\t\t\t\t[OCR2]\n\t\t\t\tEnabled = true\n\t\t\t\tDatabaseTimeout = '1s'\n\n\t\t\t\t[P2P.V2]\n\t\t\t\tEnabled = true\n\t\t\t\tListenAddresses = ['0.0.0.0:5001']\n\t\t\t\tDefaultBootstrappers = ['12D3KooWP6kD9RrEcFWFLKNrZtufX6pEPSsrGJqWVZn7Czygr9Ch@localhost:5001']\n\n\t\t\t\t[Capabilities.Peering.V2]\n\t\t\t\tEnabled = true\n\t\t\t\tListenAddresses = ['0.0.0.0:6690']\n\t\t\t\tDefaultBootstrappers = ['12D3KooWP6kD9RrEcFWFLKNrZtufX6pEPSsrGJqWVZn7Czygr9Ch@localhost:6690']\n\n\t\t\t\t# This is needed for the target capability to be initialized\n\t\t\t\t[[EVM]]\n\t\t\t\tChainID = '1337'\n\n\t\t\t\t[[EVM.Nodes]]\n\t\t\t\tName = 'anvil'\n\t\t\t\tWSURL = 'ws://blockchain-node-35764:8545'\n\t\t\t\tHTTPURL = 'http://blockchain-node-35764:8545'\n\t\t\t"
+user_config_overrides = "      [Feature]\n\t\t\tLogPoller = true\n\n\t\t\t[OCR2]\n\t\t\tEnabled = true\n\t\t\tDatabaseTimeout = '1s'\n\n\t\t\t[P2P.V2]\n\t\t\tEnabled = true\n\t\t\tListenAddresses = ['0.0.0.0:5001']\n      "
+test_secrets_overrides = ''
+user_secrets_overrides = ''
+port = 0
+p2p_port = 0
+custom_ports = []
+debugger_port = 0
+
+[[nodeset.node_specs]]
+[nodeset.node_specs.node]
+image = ''
+name = ''
+docker_file = 'plugins/chainlink.Dockerfile'
+docker_ctx = '../..'
+pull_image = false
+capabilities = ['./streams-linux-amd64', './cron-linux-amd64']
+capabilities_container_dir = ''
+test_config_overrides = "\n\t\t\t\t[Feature]\n\t\t\t\tLogPoller = true\n\n\t\t\t\t[OCR2]\n\t\t\t\tEnabled = true\n\t\t\t\tDatabaseTimeout = '1s'\n\n\t\t\t\t[P2P.V2]\n\t\t\t\tEnabled = true\n\t\t\t\tListenAddresses = ['0.0.0.0:5001']\n\t\t\t\t# assuming that node0 is the bootstrap node\n\t\t\t\tDefaultBootstrappers = ['12D3KooWP6kD9RrEcFWFLKNrZtufX6pEPSsrGJqWVZn7Czygr9Ch@node0:5001']\n\n\t\t\t\t[Capabilities.Peering.V2]\n\t\t\t\tEnabled = true\n\t\t\t\tListenAddresses = ['0.0.0.0:6690']\n\t\t\t\t# assuming that node0 is the bootstrap node\n\t\t\t\tDefaultBootstrappers = ['12D3KooWP6kD9RrEcFWFLKNrZtufX6pEPSsrGJqWVZn7Czygr9Ch@node0:6690']\n\n\t\t\t\t# This is needed for the target capability to be initialized\n\t\t\t\t[[EVM]]\n\t\t\t\tChainID = '1337'\n\n\t\t\t\t[[EVM.Nodes]]\n\t\t\t\tName = 'anvil'\n\t\t\t\tWSURL = 'ws://blockchain-node-35764:8545'\n\t\t\t\tHTTPURL = 'http://blockchain-node-35764:8545'\n\n\t\t\t\t[EVM.Workflow]\n\t\t\t\tFromAddress = '0x61bf8A16f5A774Bd1244B0e42a89713ed356c21d'\n\t\t\t\tForwarderAddress = '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9'\n\t\t\t\tGasLimitDefault = 400_000\n\n\t\t\t\t[Capabilities.ExternalRegistry]\n\t\t\t\tAddress = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'\n\t\t\t\tNetworkID = 'evm'\n\t\t\t\tChainID = '1337'\n\n\t\t\t\t[Capabilities.WorkflowRegistry]\n\t\t\t\tAddress = \"0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9\"\n\t\t\t\tNetworkID = \"evm\"\n\t\t\t\tChainID = \"1337\"\n\t\t\t"
+user_config_overrides = "      [Feature]\n\t\t\tLogPoller = true\n\n\t\t\t[OCR2]\n\t\t\tEnabled = true\n\t\t\tDatabaseTimeout = '1s'\n\n\t\t\t[P2P.V2]\n\t\t\tEnabled = true\n\t\t\tListenAddresses = ['0.0.0.0:5001']\n      "
+test_secrets_overrides = ''
+user_secrets_overrides = ''
+port = 0
+p2p_port = 0
+custom_ports = []
+debugger_port = 0
+
+[[nodeset.node_specs]]
+[nodeset.node_specs.node]
+image = ''
+name = ''
+docker_file = 'plugins/chainlink.Dockerfile'
+docker_ctx = '../..'
+pull_image = false
+capabilities = ['./streams-linux-amd64', './cron-linux-amd64']
+capabilities_container_dir = ''
+test_config_overrides = "\n\t\t\t\t[Feature]\n\t\t\t\tLogPoller = true\n\n\t\t\t\t[OCR2]\n\t\t\t\tEnabled = true\n\t\t\t\tDatabaseTimeout = '1s'\n\n\t\t\t\t[P2P.V2]\n\t\t\t\tEnabled = true\n\t\t\t\tListenAddresses = ['0.0.0.0:5001']\n\t\t\t\t# assuming that node0 is the bootstrap node\n\t\t\t\tDefaultBootstrappers = ['12D3KooWP6kD9RrEcFWFLKNrZtufX6pEPSsrGJqWVZn7Czygr9Ch@node0:5001']\n\n\t\t\t\t[Capabilities.Peering.V2]\n\t\t\t\tEnabled = true\n\t\t\t\tListenAddresses = ['0.0.0.0:6690']\n\t\t\t\t# assuming that node0 is the bootstrap node\n\t\t\t\tDefaultBootstrappers = ['12D3KooWP6kD9RrEcFWFLKNrZtufX6pEPSsrGJqWVZn7Czygr9Ch@node0:6690']\n\n\t\t\t\t# This is needed for the target capability to be initialized\n\t\t\t\t[[EVM]]\n\t\t\t\tChainID = '1337'\n\n\t\t\t\t[[EVM.Nodes]]\n\t\t\t\tName = 'anvil'\n\t\t\t\tWSURL = 'ws://blockchain-node-35764:8545'\n\t\t\t\tHTTPURL = 'http://blockchain-node-35764:8545'\n\n\t\t\t\t[EVM.Workflow]\n\t\t\t\tFromAddress = '0x80d8bF53d12927Bd76813b809eD29d2949Cab16b'\n\t\t\t\tForwarderAddress = '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9'\n\t\t\t\tGasLimitDefault = 400_000\n\n\t\t\t\t[Capabilities.ExternalRegistry]\n\t\t\t\tAddress = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'\n\t\t\t\tNetworkID = 'evm'\n\t\t\t\tChainID = '1337'\n\n\t\t\t\t[Capabilities.WorkflowRegistry]\n\t\t\t\tAddress = \"0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9\"\n\t\t\t\tNetworkID = \"evm\"\n\t\t\t\tChainID = \"1337\"\n\t\t\t"
+user_config_overrides = "      [Feature]\n\t\t\tLogPoller = true\n\n\t\t\t[OCR2]\n\t\t\tEnabled = true\n\t\t\tDatabaseTimeout = '1s'\n\n\t\t\t[P2P.V2]\n\t\t\tEnabled = true\n\t\t\tListenAddresses = ['0.0.0.0:5001']\n      "
+test_secrets_overrides = ''
+user_secrets_overrides = ''
+port = 0
+p2p_port = 0
+custom_ports = []
+debugger_port = 0
+
+[[nodeset.node_specs]]
+[nodeset.node_specs.node]
+image = ''
+name = ''
+docker_file = 'plugins/chainlink.Dockerfile'
+docker_ctx = '../..'
+pull_image = false
+capabilities = ['./streams-linux-amd64', './cron-linux-amd64']
+capabilities_container_dir = ''
+test_config_overrides = "\n\t\t\t\t[Feature]\n\t\t\t\tLogPoller = true\n\n\t\t\t\t[OCR2]\n\t\t\t\tEnabled = true\n\t\t\t\tDatabaseTimeout = '1s'\n\n\t\t\t\t[P2P.V2]\n\t\t\t\tEnabled = true\n\t\t\t\tListenAddresses = ['0.0.0.0:5001']\n\t\t\t\t# assuming that node0 is the bootstrap node\n\t\t\t\tDefaultBootstrappers = ['12D3KooWP6kD9RrEcFWFLKNrZtufX6pEPSsrGJqWVZn7Czygr9Ch@node0:5001']\n\n\t\t\t\t[Capabilities.Peering.V2]\n\t\t\t\tEnabled = true\n\t\t\t\tListenAddresses = ['0.0.0.0:6690']\n\t\t\t\t# assuming that node0 is the bootstrap node\n\t\t\t\tDefaultBootstrappers = ['12D3KooWP6kD9RrEcFWFLKNrZtufX6pEPSsrGJqWVZn7Czygr9Ch@node0:6690']\n\n\t\t\t\t# This is needed for the target capability to be initialized\n\t\t\t\t[[EVM]]\n\t\t\t\tChainID = '1337'\n\n\t\t\t\t[[EVM.Nodes]]\n\t\t\t\tName = 'anvil'\n\t\t\t\tWSURL = 'ws://blockchain-node-35764:8545'\n\t\t\t\tHTTPURL = 'http://blockchain-node-35764:8545'\n\n\t\t\t\t[EVM.Workflow]\n\t\t\t\tFromAddress = '0xAaC1812F3e4912EDeB50CD30805fB35B87d87eE0'\n\t\t\t\tForwarderAddress = '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9'\n\t\t\t\tGasLimitDefault = 400_000\n\n\t\t\t\t[Capabilities.ExternalRegistry]\n\t\t\t\tAddress = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'\n\t\t\t\tNetworkID = 'evm'\n\t\t\t\tChainID = '1337'\n\n\t\t\t\t[Capabilities.WorkflowRegistry]\n\t\t\t\tAddress = \"0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9\"\n\t\t\t\tNetworkID = \"evm\"\n\t\t\t\tChainID = \"1337\"\n\t\t\t"
+user_config_overrides = "      [Feature]\n\t\t\tLogPoller = true\n\n\t\t\t[OCR2]\n\t\t\tEnabled = true\n\t\t\tDatabaseTimeout = '1s'\n\n\t\t\t[P2P.V2]\n\t\t\tEnabled = true\n\t\t\tListenAddresses = ['0.0.0.0:5001']\n      "
+test_secrets_overrides = ''
+user_secrets_overrides = ''
+port = 0
+p2p_port = 0
+custom_ports = []
+debugger_port = 0
+
+[[nodeset.node_specs]]
+[nodeset.node_specs.node]
+image = ''
+name = ''
+docker_file = 'plugins/chainlink.Dockerfile'
+docker_ctx = '../..'
+pull_image = false
+capabilities = ['./streams-linux-amd64', './cron-linux-amd64']
+capabilities_container_dir = ''
+test_config_overrides = "\n\t\t\t\t[Feature]\n\t\t\t\tLogPoller = true\n\n\t\t\t\t[OCR2]\n\t\t\t\tEnabled = true\n\t\t\t\tDatabaseTimeout = '1s'\n\n\t\t\t\t[P2P.V2]\n\t\t\t\tEnabled = true\n\t\t\t\tListenAddresses = ['0.0.0.0:5001']\n\t\t\t\t# assuming that node0 is the bootstrap node\n\t\t\t\tDefaultBootstrappers = ['12D3KooWP6kD9RrEcFWFLKNrZtufX6pEPSsrGJqWVZn7Czygr9Ch@node0:5001']\n\n\t\t\t\t[Capabilities.Peering.V2]\n\t\t\t\tEnabled = true\n\t\t\t\tListenAddresses = ['0.0.0.0:6690']\n\t\t\t\t# assuming that node0 is the bootstrap node\n\t\t\t\tDefaultBootstrappers = ['12D3KooWP6kD9RrEcFWFLKNrZtufX6pEPSsrGJqWVZn7Czygr9Ch@node0:6690']\n\n\t\t\t\t# This is needed for the target capability to be initialized\n\t\t\t\t[[EVM]]\n\t\t\t\tChainID = '1337'\n\n\t\t\t\t[[EVM.Nodes]]\n\t\t\t\tName = 'anvil'\n\t\t\t\tWSURL = 'ws://blockchain-node-35764:8545'\n\t\t\t\tHTTPURL = 'http://blockchain-node-35764:8545'\n\n\t\t\t\t[EVM.Workflow]\n\t\t\t\tFromAddress = '0xcBcDCF01BA7f35D9EeFA88360c099B1dd301F506'\n\t\t\t\tForwarderAddress = '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9'\n\t\t\t\tGasLimitDefault = 400_000\n\n\t\t\t\t[Capabilities.ExternalRegistry]\n\t\t\t\tAddress = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'\n\t\t\t\tNetworkID = 'evm'\n\t\t\t\tChainID = '1337'\n\n\t\t\t\t[Capabilities.WorkflowRegistry]\n\t\t\t\tAddress = \"0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9\"\n\t\t\t\tNetworkID = \"evm\"\n\t\t\t\tChainID = \"1337\"\n\t\t\t"
+user_config_overrides = "      [Feature]\n\t\t\tLogPoller = true\n\n\t\t\t[OCR2]\n\t\t\tEnabled = true\n\t\t\tDatabaseTimeout = '1s'\n\n\t\t\t[P2P.V2]\n\t\t\tEnabled = true\n\t\t\tListenAddresses = ['0.0.0.0:5001']\n      "
+test_secrets_overrides = ''
+user_secrets_overrides = ''
+port = 0
+p2p_port = 0
+custom_ports = []
+debugger_port = 0

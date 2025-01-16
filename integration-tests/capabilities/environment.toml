@@ -1,0 +1,105 @@
+
+[blockchain_a]
+  type = "anvil"
+  docker_cmd_params = ["-b", "5"]
+
+[nodeset]
+  nodes = 5
+  override_mode = "each"
+
+[nodeset.db]
+  image = "postgres:15.6"
+
+  [[nodeset.node_specs]]
+
+    [nodeset.node_specs.node]
+      docker_ctx = "../.."
+      docker_file = "plugins/chainlink.Dockerfile"
+      user_config_overrides = """
+      [Feature]
+			LogPoller = true
+
+			[OCR2]
+			Enabled = true
+			DatabaseTimeout = '1s'
+
+			[P2P.V2]
+			Enabled = true
+			ListenAddresses = ['0.0.0.0:5001']
+      """
+
+  [[nodeset.node_specs]]
+
+    [nodeset.node_specs.node]
+      capabilities = ["./streams-linux-amd64", "./cron-linux-amd64"]
+      docker_ctx = "../.."
+      docker_file = "plugins/chainlink.Dockerfile"
+      user_config_overrides = """
+      [Feature]
+			LogPoller = true
+
+			[OCR2]
+			Enabled = true
+			DatabaseTimeout = '1s'
+
+			[P2P.V2]
+			Enabled = true
+			ListenAddresses = ['0.0.0.0:5001']
+      """
+
+  [[nodeset.node_specs]]
+
+    [nodeset.node_specs.node]
+      capabilities = ["./streams-linux-amd64", "./cron-linux-amd64"]
+      docker_ctx = "../.."
+      docker_file = "plugins/chainlink.Dockerfile"
+      user_config_overrides = """
+      [Feature]
+			LogPoller = true
+
+			[OCR2]
+			Enabled = true
+			DatabaseTimeout = '1s'
+
+			[P2P.V2]
+			Enabled = true
+			ListenAddresses = ['0.0.0.0:5001']
+      """
+
+  [[nodeset.node_specs]]
+
+    [nodeset.node_specs.node]
+      capabilities = ["./streams-linux-amd64", "./cron-linux-amd64"]
+      docker_ctx = "../.."
+      docker_file = "plugins/chainlink.Dockerfile"
+      user_config_overrides = """
+      [Feature]
+			LogPoller = true
+
+			[OCR2]
+			Enabled = true
+			DatabaseTimeout = '1s'
+
+			[P2P.V2]
+			Enabled = true
+			ListenAddresses = ['0.0.0.0:5001']
+      """
+
+  [[nodeset.node_specs]]
+
+    [nodeset.node_specs.node]
+      capabilities = ["./streams-linux-amd64", "./cron-linux-amd64"]
+      docker_ctx = "../.."
+      docker_file = "plugins/chainlink.Dockerfile"
+      user_config_overrides = """
+      [Feature]
+			LogPoller = true
+
+			[OCR2]
+			Enabled = true
+			DatabaseTimeout = '1s'
+
+			[P2P.V2]
+			Enabled = true
+			ListenAddresses = ['0.0.0.0:5001']
+      """
