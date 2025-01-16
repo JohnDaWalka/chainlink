@@ -3,158 +3,151 @@ package changeset
 import (
 	"errors"
 	"fmt"
-	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/mcms"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_from_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_with_from_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 )
 
 var _ deployment.ChangeSet[DeployTokenPoolContractsConfig] = DeployTokenPoolContracts
 
-// zero returns a zero-value big.Int.
-func zero() *big.Int {
-	return big.NewInt(0)
+var tokenTypes map[deployment.ContractType]struct{} = map[deployment.ContractType]struct{}{
+	BurnMintTokenPool:     struct{}{},
+	BurnFromMintTokenPool: struct{}{},
+	BurnFromMintTokenPool: struct{}{},
+	LockReleaseTokenPool:  struct{}{},
 }
 
-// zeroAddress returns a zero-value Ethereum address.
-func zeroAddress() common.Address {
-	return common.BigToAddress(zero())
-}
-
-// TokenChainConfig defines all information required to construct operations that fully configure the pool.
-type TokenChainConfig struct {
-	TokenAdminRegistry *token_admin_registry.TokenAdminRegistry
-	TokenPool          *token_pool.TokenPool
-	TokenAddress       common.Address
-	TimelockAddress    common.Address
-	ExternalAdmin      common.Address
-	RegistryState      token_admin_registry.TokenAdminRegistryTokenConfig
-	RemoteChainsToAdd  RemoteChains
-	OwnedByTimelock    bool
-}
-
-// RateLimiterConfig defines the inbound and outbound rate limits for a remote chain.
-type RateLimiterConfig struct {
-	Inbound  token_pool.RateLimiterConfig
-	Outbound token_pool.RateLimiterConfig
-}
-
-// validateRateLimterConfig validates rate and capacity in accordance with on-chain code.
-// see https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/libraries/RateLimiter.sol.
-func validateRateLimiterConfig(rateLimiterConfig token_pool.RateLimiterConfig) error {
-	if rateLimiterConfig.IsEnabled {
-		if rateLimiterConfig.Rate.Cmp(rateLimiterConfig.Capacity) >= 0 || rateLimiterConfig.Rate.Cmp(zero()) == 0 {
-			return errors.New("rate must be greater than 0 and less than capacity")
-		}
-	} else {
-		if rateLimiterConfig.Rate.Cmp(zero()) != 0 || rateLimiterConfig.Capacity.Cmp(zero()) != 0 {
-			return errors.New("rate and capacity must be 0")
-		}
-	}
-	return nil
-}
-
-// RemoteChainsConfig defines rate limits for remote chains.
-type RemoteChains map[uint64]RateLimiterConfig
-
-func (rc RemoteChains) Validate() error {
-	for chainSelector, chainConfig := range rc {
-		if err := validateRateLimiterConfig(chainConfig.Inbound); err != nil {
-			return fmt.Errorf("validation of inbound rate limiter config for remote chain with selector %d failed: %w", chainSelector, err)
-		}
-		if err := validateRateLimiterConfig(chainConfig.Outbound); err != nil {
-			return fmt.Errorf("validation of outbound rate limiter config for remote chain with selector %d failed: %w", chainSelector, err)
-		}
-	}
-	return nil
-}
-
-// BaseTokenPoolInput defines all the information required of the user to configure new and existing pools.
-type BaseTokenPoolInput struct {
-	RemoteChainsToAdd RemoteChains
-	TokenAddress      common.Address
-	ExternalAdmin     common.Address
-}
-
-func (t BaseTokenPoolInput) Validate() error {
-	if err := t.RemoteChainsToAdd.Validate(); err != nil {
-		return fmt.Errorf("failed to validate remote chains config: %w", err)
-	}
-	return nil
-}
-
-// NewTokenPoolInput defines all information required of the user to deploy and configure a new token pool.
-type NewTokenPoolInput struct {
-	BaseTokenPoolInput
-	Type               deployment.ContractType
+// DeployTokenPoolInput defines all information required of the user to deploy a new token pool contract.
+type DeployTokenPoolInput struct {
+	// Type is the type of token pool that must be deployed.
+	Type deployment.ContractType
+	// TokenAddress is the address of the token for which we are deploying a pool.
+	TokenAddress common.Address
+	// AllowList is the optional list of addresses permitted to initiate a token transfer.
+	// If omitted, all addresses will be permitted to transfer the token.
+	AllowList []common.Address
+	// LocalTokenDecimals is the number of decimals used by the token at tokenAddress.
 	LocalTokenDecimals uint8
-	AllowList          []common.Address
-	AcceptLiquidity    *bool
+	// AcceptLiquidity indicates whether or not the new pool can accept liquidity from a rebalancer address (lock-release only).
+	AcceptLiquidity *bool
+	// ForceDeployment forces deployment of a new token pool, even if one already exists for the corresponding token in state.
+	ForceDeployment bool
 }
 
-func (t NewTokenPoolInput) Validate() error {
-	if err := t.RemoteChainsToAdd.Validate(); err != nil {
-		return fmt.Errorf("failed to validate remote chains config: %w", err)
+func (i DeployTokenPoolInput) Validate(chain deployment.Chain, state CCIPChainState, tokenSymbol TokenSymbol) error {
+	// Ensure that required fields are populated
+	if i.TokenAddress == utils.ZeroAddress {
+		return errors.New("token address must be defined")
 	}
-	if t.Type != BurnMintTokenPool && t.Type != BurnFromMintTokenPool && t.Type != BurnWithFromMintTokenPool && t.Type != LockReleaseTokenPool {
-		return fmt.Errorf("%s is not a valid token pool type", t.Type)
+	if i.Type == deployment.ContractType("") {
+		return errors.New("type must be defined")
 	}
-	if t.Type == LockReleaseTokenPool && t.AcceptLiquidity == nil {
+
+	// Validate that the type is known
+	if _, ok := tokenTypes[i.Type]; !ok {
+		return fmt.Errorf("requested token pool type %s is unknown", i.Type)
+	}
+
+	// Validate the token exists and matches the expected symbol
+	token, err := erc20.NewERC20(i.TokenAddress, chain.Client)
+	if err != nil {
+		return fmt.Errorf("failed to connect address %s with erc20 bindings: %w", i.TokenAddress, err)
+	}
+	symbol, err := token.Symbol(nil)
+	if err != nil {
+		return fmt.Errorf("failed to fetch symbol from token with address %s: %w", i.TokenAddress, err)
+	}
+	if symbol != string(tokenSymbol) {
+		return fmt.Errorf("symbol of token with address %s (%s) does not match expected symbol (%s)", i.TokenAddress, symbol, tokenSymbol)
+	}
+
+	// Validate localTokenDecimals against the decimals value on the token contract
+	decimals, err := token.Decimals(nil)
+	if err != nil {
+		return fmt.Errorf("failed to fetch decimals from token with address %s: %w", i.TokenAddress, err)
+	}
+	if decimals != i.LocalTokenDecimals {
+		return fmt.Errorf("decimals of token with address %s (%d) does not match localTokenDecimals (%d)", i.TokenAddress, decimals, i.LocalTokenDecimals)
+	}
+
+	// Validate acceptLiquidity based on requested pool type
+	if i.Type == LockReleaseTokenPool && i.AcceptLiquidity == nil {
 		return errors.New("accept liquidity must be defined for lock release pools")
 	}
-	if t.Type != LockReleaseTokenPool && t.AcceptLiquidity != nil {
+	if i.Type != LockReleaseTokenPool && i.AcceptLiquidity != nil {
 		return errors.New("accept liquidity must be nil for burn mint pools")
 	}
+
+	// Regardless of requested type, we should check if a token pool of any type already exists
+	tokenPools, err := getAllTokenPoolsWithSymbol(state, chain.Client, tokenSymbol)
+	if err != nil {
+		return fmt.Errorf("failed to get all token pools with symbol %s on chain %s: %w", tokenSymbol, chain.Name(), err)
+	}
+	if len(tokenPools) > 0 && !i.ForceDeployment {
+		return fmt.Errorf("token pool already exists for %s on %s (use forceDeployment to bypass)", tokenSymbol, chain.Name())
+	}
+
 	return nil
 }
 
-// DeployTokenPoolContractsConfig is the configuration for the DeployTokenPoolContracts changeset.
+// DeployTokenPoolContractsConfig defines the token pool contracts that need to be deployed on each chain.
 type DeployTokenPoolContractsConfig struct {
-	Symbol              TokenSymbol
-	TimelockDelay       time.Duration
-	ExistingPoolUpdates map[uint64]BaseTokenPoolInput
-	NewPools            map[uint64]NewTokenPoolInput
+	// Symbol is the symbol of the token for which we are deploying a pool.
+	TokenSymbol TokenSymbol
+	// NewPools defines the per-chain configuration of each new pool
+	NewPools map[uint64]DeployTokenPoolInput
 }
 
-func (c DeployTokenPoolContractsConfig) Validate() error {
-	seenChains := make(map[uint64]struct{})
-	for chainSelector, chainConfig := range c.ExistingPoolUpdates {
-		seenChains[chainSelector] = struct{}{}
-		if err := chainConfig.Validate(); err != nil {
-			return fmt.Errorf("chain with selector %d is invalid: %w", chainSelector, err)
-		}
-	}
-	for chainSelector, chainConfig := range c.NewPools {
-		if _, ok := seenChains[chainSelector]; ok {
-			return errors.New("chain overlap exists between new pools and updates to existing pools")
-		}
-		if err := chainConfig.Validate(); err != nil {
-			return fmt.Errorf("chain with selector %d is invalid: %w", chainSelector, err)
-		}
+func (c DeployTokenPoolContractsConfig) Validate(env deployment.Environment) error {
+	// Ensure that required fields are populated
+	if c.TokenSymbol == TokenSymbol("") {
+		return errors.New("token symbol must be defined")
 	}
 
+	state, err := LoadOnchainState(env)
+	if err != nil {
+		return fmt.Errorf("failed to load onchain state: %w", err)
+	}
+	for chainSelector, poolConfig := range c.NewPools {
+		err := deployment.IsValidChainSelector(chainSelector)
+		if err != nil {
+			return fmt.Errorf("failed to validate chain selector %d: %w", chainSelector, err)
+		}
+		chain, ok := env.Chains[chainSelector]
+		if !ok {
+			return fmt.Errorf("chain with selector %d does not exist in environment", chainSelector)
+		}
+		chainState, ok := state.Chains[chainSelector]
+		if !ok {
+			return fmt.Errorf("chain with selector %d does not exist in state", chainSelector)
+		}
+		if router := chainState.Router; router == nil {
+			return fmt.Errorf("missing router on %s", chain.Name())
+		}
+		if rmnProxy := chainState.RMNProxy; rmnProxy == nil {
+			return fmt.Errorf("missing rmnProxy on %s", chain.Name())
+		}
+		err = poolConfig.Validate(chain, chainState, c.TokenSymbol)
+		if err != nil {
+			return fmt.Errorf("failed to validate token pool config for chain selector %d: %w", chainSelector, err)
+		}
+	}
 	return nil
 }
 
-// DeployTokenPoolContract deploys & configures new pools for a given token across multiple chains.
-// The changeset will first deploy new token pools and transfer ownership of the pools to the Timelock.
-// The outputted MCMS proposal will apply chain updates on each token pool and set new pools on the TokenAdminRegistry.
+// DeployTokenPoolContract deploys new pools for a given token across multiple chains.
 func DeployTokenPoolContracts(env deployment.Environment, c DeployTokenPoolContractsConfig) (deployment.ChangesetOutput, error) {
-	if err := c.Validate(); err != nil {
+	if err := c.Validate(env); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("invalid DeployTokenPoolContractsConfig: %w", err)
 	}
 	newAddresses := deployment.NewMemoryAddressBook()
@@ -164,204 +157,57 @@ func DeployTokenPoolContracts(env deployment.Environment, c DeployTokenPoolContr
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
 
-	tokenChainConfigs := make(map[uint64]TokenChainConfig)
+	for chainSelector, poolConfig := range c.NewPools {
+		chain := env.Chains[chainSelector]
+		chainState := state.Chains[chainSelector]
 
-	// Deploy new token pools & transfer ownership of each new pool to the timelock
-	for chainSelector, chainConfig := range c.NewPools {
-		chainEnv, ok := env.Chains[chainSelector]
-		if !ok {
-			return deployment.ChangesetOutput{}, fmt.Errorf("no chain with selector %d found in environment", chainSelector)
-		}
-		chainState := state.Chains[chainSelector] // state is derived from env, no need to re-check
-		tokenChainConfig, err := deployAndTransferTokenPoolToTimelock(env.Logger, chainEnv, chainState, newAddresses, chainConfig)
+		_, err := deployTokenPool(env.Logger, chain, chainState, newAddresses, poolConfig)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy and transfer token pool to timelock on %s: %w", chainEnv.Name(), err)
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy %s token pool on %s: %w", c.TokenSymbol, chain.Name(), err)
 		}
-		tokenChainConfigs[chainSelector] = tokenChainConfig
-	}
-
-	// Fetch addresses of the existing token pools via the token admin registry
-	for chainSelector, chainConfig := range c.ExistingPoolUpdates {
-		chainEnv, ok := env.Chains[chainSelector]
-		if !ok {
-			return deployment.ChangesetOutput{}, fmt.Errorf("no chain with selector %d found in environment", chainSelector)
-		}
-		chainState := state.Chains[chainSelector] // state is derived from env, no need to re-check
-		tokenChainConfig, err := fetchAndValidateTimelockOwnedTokenPool(chainEnv, chainState, chainConfig)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch token pool on %s for token with address %s: %w", chainEnv.Name(), chainConfig.TokenAddress, err)
-		}
-		tokenChainConfigs[chainSelector] = tokenChainConfig
-	}
-
-	operations := make([]timelock.BatchChainOperation, len(tokenChainConfigs))
-	timelocks := make(map[uint64]common.Address)
-	proposers := make(map[uint64]*gethwrappers.ManyChainMultiSig)
-
-	var i int
-	for chainSelector := range tokenChainConfigs {
-		chainEnv := env.Chains[chainSelector] // chain selector has already been confirmed as a valid key
-		batch, err := makeTokenPoolOperationsForChain(chainSelector, tokenChainConfigs)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to create operations for token pool on %s: %w", chainEnv.Name(), err)
-		}
-		proposers[chainSelector] = state.Chains[chainSelector].ProposerMcm
-		timelocks[chainSelector] = state.Chains[chainSelector].Timelock.Address()
-
-		operations[i] = timelock.BatchChainOperation{
-			Batch:           batch,
-			ChainIdentifier: mcms.ChainIdentifier(chainSelector),
-		}
-		i++
-	}
-
-	proposal, err := proposalutils.BuildProposalFromBatches(
-		timelocks,
-		proposers,
-		operations,
-		fmt.Sprintf("update token pool deployments for %s", c.Symbol),
-		c.TimelockDelay,
-	)
-	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to build proposal: %w", err)
 	}
 
 	return deployment.ChangesetOutput{
-		Proposals:   []timelock.MCMSWithTimelockProposal{*proposal},
 		AddressBook: newAddresses,
-		JobSpecs:    nil,
-	}, nil
-}
-
-// fetchAndValidateTimelockOwnedTokenPool constructs a token's chain configuration based on the current pool set on the registry,
-// asserting that the pool is current owned by the Timelock.
-func fetchAndValidateTimelockOwnedTokenPool(
-	chainEnv deployment.Chain,
-	chainState CCIPChainState,
-	chainConfig BaseTokenPoolInput,
-) (TokenChainConfig, error) {
-	tokenAdminRegistry := chainState.TokenAdminRegistry
-	timelock := chainState.Timelock
-	if tokenAdminRegistry == nil || timelock == nil {
-		return TokenChainConfig{}, fmt.Errorf("timelock and tokenAdminRegistry must both exist on %s", chainEnv.Name())
-	}
-
-	tokenConfigOnRegistry, err := tokenAdminRegistry.GetTokenConfig(nil, chainConfig.TokenAddress)
-	if err != nil {
-		return TokenChainConfig{}, fmt.Errorf("failed to get config on %s registry for token with address %s: %w", chainEnv.Name(), chainConfig.TokenAddress, err)
-	}
-	if tokenConfigOnRegistry.TokenPool.Cmp(zeroAddress()) == 0 {
-		return TokenChainConfig{}, fmt.Errorf("token with address %s is not set on %s registry: %w", chainConfig.TokenAddress, chainEnv.Name(), err)
-	}
-	tokenPool, err := token_pool.NewTokenPool(tokenConfigOnRegistry.TokenPool, chainEnv.Client)
-	if err != nil {
-		return TokenChainConfig{}, fmt.Errorf("failed to connect address %s on %s with token pool bindings: %w", tokenConfigOnRegistry.TokenPool, chainEnv.Name(), err)
-	}
-	owner, err := tokenPool.Owner(nil)
-	if err != nil {
-		return TokenChainConfig{}, fmt.Errorf("failed to fetch owner from token pool with address %s on %s: %w", tokenConfigOnRegistry.TokenPool, chainEnv.Name(), err)
-	}
-	if owner.Cmp(timelock.Address()) != 0 {
-		return TokenChainConfig{}, fmt.Errorf("token pool with address %s on %s is not owned by the timelock", tokenConfigOnRegistry.TokenPool, chainEnv.Name())
-	}
-	return TokenChainConfig{
-		TokenAdminRegistry: tokenAdminRegistry,
-		TokenAddress:       chainConfig.TokenAddress,
-		TokenPool:          tokenPool,
-		RegistryState:      tokenConfigOnRegistry,
-		OwnedByTimelock:    true,
-		RemoteChainsToAdd:  chainConfig.RemoteChainsToAdd,
-		TimelockAddress:    timelock.Address(),
-		ExternalAdmin:      chainConfig.ExternalAdmin,
-	}, nil
-}
-
-// deployAndTransferTokenPoolToTimelock deploys a token pool and transfers ownership to the timelock using CCIP chain state.
-func deployAndTransferTokenPoolToTimelock(
-	logger logger.Logger,
-	chainEnv deployment.Chain,
-	chainState CCIPChainState,
-	addressBook deployment.AddressBook,
-	chainConfig NewTokenPoolInput,
-) (TokenChainConfig, error) {
-	router := chainState.Router
-	rmnProxy := chainState.RMNProxy
-	timelock := chainState.Timelock
-	tokenAdminRegistry := chainState.TokenAdminRegistry
-	if tokenAdminRegistry == nil || timelock == nil || rmnProxy == nil || router == nil {
-		return TokenChainConfig{}, fmt.Errorf("timelock, tokenAdminRegistry, rmnProxy, and router must all exist on %s", chainEnv.Name())
-	}
-
-	tokenConfigOnRegistry, err := tokenAdminRegistry.GetTokenConfig(nil, chainConfig.TokenAddress)
-	if err != nil {
-		return TokenChainConfig{}, fmt.Errorf("failed to get config on %s registry for token with address %s: %w", chainEnv.Name(), chainConfig.TokenAddress, err)
-	}
-	tokenPoolDeployment, err := deployTokenPool(
-		logger,
-		chainEnv,
-		addressBook,
-		chainConfig,
-		router.Address(),
-		rmnProxy.Address(),
-	)
-	if err != nil {
-		return TokenChainConfig{}, fmt.Errorf("failed to deploy token pool on %s: %w", chainEnv.Name(), err)
-	}
-	tx, err := tokenPoolDeployment.Contract.TransferOwnership(chainEnv.DeployerKey, timelock.Address())
-	if err != nil {
-		return TokenChainConfig{}, fmt.Errorf("failed to transfer ownership of token pool to timelock on %s: %w", chainEnv.Name(), err)
-	}
-	_, err = chainEnv.Confirm(tx)
-	if err != nil {
-		return TokenChainConfig{}, fmt.Errorf("failed to confirm ownership transfer of token pool to timelock on %s: %w", chainEnv.Name(), err)
-	}
-
-	return TokenChainConfig{
-		TokenAdminRegistry: tokenAdminRegistry,
-		TokenAddress:       chainConfig.TokenAddress,
-		TokenPool:          tokenPoolDeployment.Contract,
-		RegistryState:      tokenConfigOnRegistry,
-		OwnedByTimelock:    false,
-		RemoteChainsToAdd:  chainConfig.RemoteChainsToAdd,
-		TimelockAddress:    timelock.Address(),
-		ExternalAdmin:      chainConfig.ExternalAdmin,
 	}, nil
 }
 
 // deployTokenPool deploys a token pool contract based on a given type & configuration.
 func deployTokenPool(
 	logger logger.Logger,
-	chainEnv deployment.Chain,
+	chain deployment.Chain,
+	chainState CCIPChainState,
 	addressBook deployment.AddressBook,
-	chainConfig NewTokenPoolInput,
-	routerAddress common.Address,
-	rmnProxyAddress common.Address,
+	poolConfig DeployTokenPoolInput,
 ) (*deployment.ContractDeploy[*token_pool.TokenPool], error) {
-	return deployment.DeployContract(logger, chainEnv, addressBook,
+	router := chainState.Router
+	rmnProxy := chainState.RMNProxy
+
+	return deployment.DeployContract(logger, chain, addressBook,
 		func(chain deployment.Chain) deployment.ContractDeploy[*token_pool.TokenPool] {
 			var tpAddr common.Address
 			var tx *types.Transaction
 			var err error
-			switch chainConfig.Type {
+			switch poolConfig.Type {
 			case BurnMintTokenPool:
 				tpAddr, tx, _, err = burn_mint_token_pool.DeployBurnMintTokenPool(
-					chain.DeployerKey, chain.Client, chainConfig.TokenAddress, chainConfig.LocalTokenDecimals,
-					chainConfig.AllowList, rmnProxyAddress, routerAddress,
+					chain.DeployerKey, chain.Client, poolConfig.TokenAddress, poolConfig.LocalTokenDecimals,
+					poolConfig.AllowList, rmnProxy.Address(), router.Address(),
 				)
 			case BurnWithFromMintTokenPool:
 				tpAddr, tx, _, err = burn_with_from_mint_token_pool.DeployBurnWithFromMintTokenPool(
-					chain.DeployerKey, chain.Client, chainConfig.TokenAddress, chainConfig.LocalTokenDecimals,
-					chainConfig.AllowList, rmnProxyAddress, routerAddress,
+					chain.DeployerKey, chain.Client, poolConfig.TokenAddress, poolConfig.LocalTokenDecimals,
+					poolConfig.AllowList, rmnProxy.Address(), router.Address(),
 				)
 			case BurnFromMintTokenPool:
 				tpAddr, tx, _, err = burn_from_mint_token_pool.DeployBurnFromMintTokenPool(
-					chain.DeployerKey, chain.Client, chainConfig.TokenAddress, chainConfig.LocalTokenDecimals,
-					chainConfig.AllowList, rmnProxyAddress, routerAddress,
+					chain.DeployerKey, chain.Client, poolConfig.TokenAddress, poolConfig.LocalTokenDecimals,
+					poolConfig.AllowList, rmnProxy.Address(), router.Address(),
 				)
 			case LockReleaseTokenPool:
 				tpAddr, tx, _, err = lock_release_token_pool.DeployLockReleaseTokenPool(
-					chain.DeployerKey, chain.Client, chainConfig.TokenAddress, chainConfig.LocalTokenDecimals,
-					chainConfig.AllowList, rmnProxyAddress, *chainConfig.AcceptLiquidity, routerAddress,
+					chain.DeployerKey, chain.Client, poolConfig.TokenAddress, poolConfig.LocalTokenDecimals,
+					poolConfig.AllowList, rmnProxy.Address(), *poolConfig.AcceptLiquidity, router.Address(),
 				)
 			}
 			var tp *token_pool.TokenPool
@@ -369,129 +215,8 @@ func deployTokenPool(
 				tp, err = token_pool.NewTokenPool(tpAddr, chain.Client)
 			}
 			return deployment.ContractDeploy[*token_pool.TokenPool]{
-				Address: tpAddr, Contract: tp, Tv: deployment.NewTypeAndVersion(chainConfig.Type, deployment.Version1_5_1), Tx: tx, Err: err,
+				Address: tpAddr, Contract: tp, Tv: deployment.NewTypeAndVersion(poolConfig.Type, deployment.Version1_5_1), Tx: tx, Err: err,
 			}
 		},
 	)
-}
-
-// makeTokenPoolOperationsForChain constructs a batch of MCMS operations to configure a token pool on a chain.
-func makeTokenPoolOperationsForChain(
-	chainSelector uint64,
-	tokenChainConfigs map[uint64]TokenChainConfig,
-) ([]mcms.Operation, error) {
-	var batch []mcms.Operation
-	tokenChainConfig, ok := tokenChainConfigs[chainSelector]
-	if !ok {
-		return []mcms.Operation{}, fmt.Errorf("no token found on chain with selector %d", chainSelector)
-	}
-
-	// Accept ownership if the timelock does not currently own the pool
-	if !tokenChainConfig.OwnedByTimelock {
-		acceptOwnershipTx, err := tokenChainConfig.TokenPool.AcceptOwnership(deployment.SimTransactOpts())
-		if err != nil {
-			return []mcms.Operation{}, fmt.Errorf("failed to create acceptOwnership transaction: %w", err)
-		}
-		batch = append(batch, mcms.Operation{
-			To:    tokenChainConfig.TokenPool.Address(),
-			Data:  acceptOwnershipTx.Data(),
-			Value: zero(),
-		})
-	}
-
-	// Apply chain updates on the token pool
-	chainUpdates := make([]token_pool.TokenPoolChainUpdate, len(tokenChainConfig.RemoteChainsToAdd))
-	var i int
-	for remoteChainSelector, remoteChainConfig := range tokenChainConfig.RemoteChainsToAdd {
-		remoteTokenConfig, ok := tokenChainConfigs[remoteChainSelector]
-		if !ok {
-			return []mcms.Operation{}, fmt.Errorf("no token found on remote chain with selector %d", remoteChainSelector)
-		}
-		remotePoolAddresses := [][]byte{remoteTokenConfig.TokenPool.Address().Bytes()}
-		// If the token pool on the remote chain's registry is not the current pool nor the zero address, we should add it as a supported remote pool to avoid downtime
-		if remoteTokenConfig.RegistryState.TokenPool.Cmp(remoteTokenConfig.TokenPool.Address()) != 0 && remoteTokenConfig.RegistryState.TokenPool.Cmp(zeroAddress()) != 0 {
-			remotePoolAddresses = append(remotePoolAddresses, remoteTokenConfig.RegistryState.TokenPool.Bytes())
-		}
-		chainUpdates[i] = token_pool.TokenPoolChainUpdate{
-			RemoteChainSelector:       remoteChainSelector,
-			InboundRateLimiterConfig:  remoteChainConfig.Inbound,
-			OutboundRateLimiterConfig: remoteChainConfig.Outbound,
-			RemoteTokenAddress:        remoteTokenConfig.TokenAddress.Bytes(),
-			RemotePoolAddresses:       remotePoolAddresses,
-		}
-		i++
-	}
-	if len(chainUpdates) > 0 {
-		applyChainUpdatesTx, err := tokenChainConfig.TokenPool.ApplyChainUpdates(deployment.SimTransactOpts(), []uint64{}, chainUpdates)
-		if err != nil {
-			return []mcms.Operation{}, fmt.Errorf("failed to create applyChainUpdates transaction: %w", err)
-		}
-		batch = append(batch, mcms.Operation{
-			To:    tokenChainConfig.TokenPool.Address(),
-			Data:  applyChainUpdatesTx.Data(),
-			Value: zero(),
-		})
-	}
-
-	// Set the administrator of the token to the timelock (if it hasn't been set before)
-	noExistingAdmin := tokenChainConfig.RegistryState.Administrator.Cmp(zeroAddress()) == 0
-	if noExistingAdmin {
-		proposeAdministratorTx, err := tokenChainConfig.TokenAdminRegistry.ProposeAdministrator(deployment.SimTransactOpts(), tokenChainConfig.TokenAddress, tokenChainConfig.TimelockAddress)
-		if err != nil {
-			return []mcms.Operation{}, fmt.Errorf("failed to create proposeAdministrator transaction: %w", err)
-		}
-		batch = append(batch, mcms.Operation{
-			To:    tokenChainConfig.TokenAdminRegistry.Address(),
-			Data:  proposeAdministratorTx.Data(),
-			Value: zero(),
-		})
-		acceptAdminRoleTx, err := tokenChainConfig.TokenAdminRegistry.AcceptAdminRole(deployment.SimTransactOpts(), tokenChainConfig.TokenAddress)
-		if err != nil {
-			return []mcms.Operation{}, fmt.Errorf("failed to create acceptAdminRole transaction: %w", err)
-		}
-		batch = append(batch, mcms.Operation{
-			To:    tokenChainConfig.TokenAdminRegistry.Address(),
-			Data:  acceptAdminRoleTx.Data(),
-			Value: zero(),
-		})
-	}
-	isTimelockAdmin := noExistingAdmin || tokenChainConfig.RegistryState.Administrator.Cmp(tokenChainConfig.TimelockAddress) == 0
-
-	// Set the pool if the timelock is admin at this point & pool isn't already set
-	if isTimelockAdmin && tokenChainConfig.RegistryState.TokenPool.Cmp(tokenChainConfig.TokenPool.Address()) != 0 {
-		setPoolTx, err := tokenChainConfig.TokenAdminRegistry.SetPool(deployment.SimTransactOpts(), tokenChainConfig.TokenAddress, tokenChainConfig.TokenPool.Address())
-		if err != nil {
-			return []mcms.Operation{}, fmt.Errorf("failed to create setPool transaction: %w", err)
-		}
-		batch = append(batch, mcms.Operation{
-			To:    tokenChainConfig.TokenAdminRegistry.Address(),
-			Data:  setPoolTx.Data(),
-			Value: zero(),
-		})
-	}
-
-	// If an external admin is specified & timelock is currently the admin, transfer ownership of the pool and admin rights on the registry.
-	// The timelock would be the owner of the pool at this point, so we don't need to check ownership there.
-	if isTimelockAdmin && tokenChainConfig.ExternalAdmin.Cmp(zeroAddress()) != 0 {
-		transferAdminRoleTx, err := tokenChainConfig.TokenAdminRegistry.TransferAdminRole(deployment.SimTransactOpts(), tokenChainConfig.TokenAddress, tokenChainConfig.ExternalAdmin)
-		if err != nil {
-			return []mcms.Operation{}, fmt.Errorf("failed to create transferAdminRole transaction: %w", err)
-		}
-		batch = append(batch, mcms.Operation{
-			To:    tokenChainConfig.TokenAdminRegistry.Address(),
-			Data:  transferAdminRoleTx.Data(),
-			Value: zero(),
-		})
-		transferOwnershipTx, err := tokenChainConfig.TokenPool.TransferOwnership(deployment.SimTransactOpts(), tokenChainConfig.ExternalAdmin)
-		if err != nil {
-			return []mcms.Operation{}, fmt.Errorf("failed to create transferOwnership transaction: %w", err)
-		}
-		batch = append(batch, mcms.Operation{
-			To:    tokenChainConfig.TokenPool.Address(),
-			Data:  transferOwnershipTx.Data(),
-			Value: zero(),
-		})
-	}
-
-	return batch, nil
 }

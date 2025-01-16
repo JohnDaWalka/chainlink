@@ -114,14 +114,13 @@ type CCIPChainState struct {
 	Weth9              *weth9.WETH9
 	RMNRemote          *rmn_remote.RMNRemote
 	// Map between token Descriptor (e.g. LinkSymbol, WethSymbol)
-	// and the respective token contract
+	// and the respective token / token pool contract(s) (only one of which would be active on the registry).
 	// This is more of an illustration of how we'll have tokens, and it might need some work later to work properly.
-	// Not all tokens will be burn and mint tokens.
 	BurnMintTokens677          map[TokenSymbol]*burn_mint_erc677.BurnMintERC677
-	BurnMintTokenPools         map[TokenSymbol]*burn_mint_token_pool.BurnMintTokenPool
-	BurnWithFromMintTokenPools map[TokenSymbol]*burn_with_from_mint_token_pool.BurnWithFromMintTokenPool
-	BurnFromMintTokenPools     map[TokenSymbol]*burn_from_mint_token_pool.BurnFromMintTokenPool
-	LockReleaseTokenPools      map[TokenSymbol]*lock_release_token_pool.LockReleaseTokenPool
+	BurnMintTokenPools         map[TokenSymbol][]*burn_mint_token_pool.BurnMintTokenPool
+	BurnWithFromMintTokenPools map[TokenSymbol][]*burn_with_from_mint_token_pool.BurnWithFromMintTokenPool
+	BurnFromMintTokenPools     map[TokenSymbol][]*burn_from_mint_token_pool.BurnFromMintTokenPool
+	LockReleaseTokenPools      map[TokenSymbol][]*lock_release_token_pool.LockReleaseTokenPool
 	// Map between token Symbol (e.g. LinkSymbol, WethSymbol)
 	// and the respective aggregator USD feed contract
 	USDFeeds map[TokenSymbol]*aggregator_v3_interface.AggregatorV3Interface
@@ -576,89 +575,33 @@ func LoadChainState(chain deployment.Chain, addresses map[string]deployment.Type
 			}
 			state.USDFeeds[key] = feed
 		case deployment.NewTypeAndVersion(BurnMintTokenPool, deployment.Version1_5_1).String():
-			pool, err := burn_mint_token_pool.NewBurnMintTokenPool(common.HexToAddress(address), chain.Client)
+			ethAddress := common.HexToAddress(address)
+			pool, symbol, err := newTokenPoolWithSymbol(burn_mint_token_pool.NewBurnMintTokenPool, ethAddress, chain.Client)
 			if err != nil {
-				return state, err
+				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
-			if state.BurnMintTokenPools == nil {
-				state.BurnMintTokenPools = make(map[TokenSymbol]*burn_mint_token_pool.BurnMintTokenPool)
-			}
-			tokAddress, err := pool.GetToken(nil)
-			if err != nil {
-				return state, err
-			}
-			tok, err := erc20.NewERC20(tokAddress, chain.Client)
-			if err != nil {
-				return state, err
-			}
-			symbol, err := tok.Symbol(nil)
-			if err != nil {
-				return state, err
-			}
-			state.BurnMintTokenPools[TokenSymbol(symbol)] = pool
+			state.BurnMintTokenPools = safeAppendToKey(state.BurnMintTokenPools, symbol, pool)
 		case deployment.NewTypeAndVersion(BurnWithFromMintTokenPool, deployment.Version1_5_1).String():
-			pool, err := burn_with_from_mint_token_pool.NewBurnWithFromMintTokenPool(common.HexToAddress(address), chain.Client)
+			ethAddress := common.HexToAddress(address)
+			pool, symbol, err := newTokenPoolWithSymbol(burn_with_from_mint_token_pool.NewBurnWithFromMintTokenPool, ethAddress, chain.Client)
 			if err != nil {
-				return state, err
+				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
-			if state.BurnWithFromMintTokenPools == nil {
-				state.BurnWithFromMintTokenPools = make(map[TokenSymbol]*burn_with_from_mint_token_pool.BurnWithFromMintTokenPool)
-			}
-			tokAddress, err := pool.GetToken(nil)
-			if err != nil {
-				return state, err
-			}
-			tok, err := erc20.NewERC20(tokAddress, chain.Client)
-			if err != nil {
-				return state, err
-			}
-			symbol, err := tok.Symbol(nil)
-			if err != nil {
-				return state, err
-			}
-			state.BurnWithFromMintTokenPools[TokenSymbol(symbol)] = pool
+			state.BurnWithFromMintTokenPools = safeAppendToKey(state.BurnWithFromMintTokenPools, symbol, pool)
 		case deployment.NewTypeAndVersion(BurnFromMintTokenPool, deployment.Version1_5_1).String():
-			pool, err := burn_from_mint_token_pool.NewBurnFromMintTokenPool(common.HexToAddress(address), chain.Client)
+			ethAddress := common.HexToAddress(address)
+			pool, symbol, err := newTokenPoolWithSymbol(burn_from_mint_token_pool.NewBurnFromMintTokenPool, ethAddress, chain.Client)
 			if err != nil {
-				return state, err
+				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
-			if state.BurnFromMintTokenPools == nil {
-				state.BurnFromMintTokenPools = make(map[TokenSymbol]*burn_from_mint_token_pool.BurnFromMintTokenPool)
-			}
-			tokAddress, err := pool.GetToken(nil)
-			if err != nil {
-				return state, err
-			}
-			tok, err := erc20.NewERC20(tokAddress, chain.Client)
-			if err != nil {
-				return state, err
-			}
-			symbol, err := tok.Symbol(nil)
-			if err != nil {
-				return state, err
-			}
-			state.BurnFromMintTokenPools[TokenSymbol(symbol)] = pool
+			state.BurnFromMintTokenPools = safeAppendToKey(state.BurnFromMintTokenPools, symbol, pool)
 		case deployment.NewTypeAndVersion(LockReleaseTokenPool, deployment.Version1_5_1).String():
-			pool, err := lock_release_token_pool.NewLockReleaseTokenPool(common.HexToAddress(address), chain.Client)
+			ethAddress := common.HexToAddress(address)
+			pool, symbol, err := newTokenPoolWithSymbol(lock_release_token_pool.NewLockReleaseTokenPool, ethAddress, chain.Client)
 			if err != nil {
-				return state, err
+				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
-			if state.LockReleaseTokenPools == nil {
-				state.LockReleaseTokenPools = make(map[TokenSymbol]*lock_release_token_pool.LockReleaseTokenPool)
-			}
-			tokAddress, err := pool.GetToken(nil)
-			if err != nil {
-				return state, err
-			}
-			tok, err := erc20.NewERC20(tokAddress, chain.Client)
-			if err != nil {
-				return state, err
-			}
-			symbol, err := tok.Symbol(nil)
-			if err != nil {
-				return state, err
-			}
-			state.LockReleaseTokenPools[TokenSymbol(symbol)] = pool
+			state.LockReleaseTokenPools = safeAppendToKey(state.LockReleaseTokenPools, symbol, pool)
 		case deployment.NewTypeAndVersion(BurnMintToken, deployment.Version1_0_0).String():
 			tok, err := burn_mint_erc677.NewBurnMintERC677(common.HexToAddress(address), chain.Client)
 			if err != nil {
@@ -735,4 +678,48 @@ func LoadChainState(chain deployment.Chain, addresses map[string]deployment.Type
 		}
 	}
 	return state, nil
+}
+
+// pool defines behavior common to all token pools
+type pool interface {
+	GetToken(opts *bind.CallOpts) (common.Address, error)
+}
+
+// newTokenPoolWithSymbol returns a token pool along with the symbol of its corresponding token.
+func newTokenPoolWithSymbol[P pool](
+	newTokenPool func(address common.Address, backend bind.ContractBackend) (P, error),
+	poolAddress common.Address,
+	chainClient deployment.OnchainClient,
+) (P, TokenSymbol, error) {
+	pool, err := newTokenPool(poolAddress, chainClient)
+	if err != nil {
+		return pool, "", fmt.Errorf("failed to connect address %s with token pool bindings: %w", poolAddress, err)
+	}
+	tokenAddress, err := pool.GetToken(nil)
+	if err != nil {
+		return pool, "", fmt.Errorf("failed to get token address from pool with address %s: %w", poolAddress, err)
+	}
+	token, err := erc20.NewERC20(tokenAddress, chainClient)
+	if err != nil {
+		return pool, "", fmt.Errorf("failed to connect address %s with ERC20 bindings: %w", tokenAddress, err)
+	}
+	symbol, err := token.Symbol(nil)
+	if err != nil {
+		return pool, "", fmt.Errorf("failed to fetch symbol from token with address %s: %w", tokenAddress, err)
+	}
+	return pool, TokenSymbol(symbol), nil
+}
+
+// safeAppendToKey safely appends a new value to an array of values assigned to a map key
+func safeAppendToKey[K comparable, V any](mapping map[K][]V, key K, value V) map[K][]V {
+	if mapping == nil {
+		mapping = make(map[K][]V)
+	}
+	if mapping[key] == nil {
+		mapping[key] = make([]V, 1)
+		mapping[key][0] = value
+		return mapping
+	}
+	mapping[key] = append(mapping[key], value)
+	return mapping
 }

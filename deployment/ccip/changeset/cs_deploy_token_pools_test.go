@@ -1,647 +1,231 @@
 package changeset
 
 import (
-	"math/big"
+	"fmt"
 	"testing"
-	"time"
 
-	"go.uber.org/zap/zapcore"
-
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
-
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
-	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
-	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 )
-
-const localTokenDecimals = 18
-const testTokenSymbol TokenSymbol = "TEST"
-
-// createSymmetricRateLimits is a utility to quickly create a rate limiter config with equal inbound and outbound values
-func createSymmetricRateLimits(rate int64, capacity int64) RateLimiterConfig {
-	return RateLimiterConfig{
-		Inbound: token_pool.RateLimiterConfig{
-			IsEnabled: rate != 0 || capacity != 0,
-			Rate:      big.NewInt(rate),
-			Capacity:  big.NewInt(capacity),
-		},
-		Outbound: token_pool.RateLimiterConfig{
-			IsEnabled: rate != 0 || capacity != 0,
-			Rate:      big.NewInt(rate),
-			Capacity:  big.NewInt(capacity),
-		},
-	}
-}
-
-// setup2ChainEnvironment preps the environment for token pool deployment testing
-func setup2ChainEnvironment(t *testing.T) (deployment.Environment, uint64, uint64, map[uint64]*deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677], map[uint64]*proposalutils.TimelockExecutionContracts) {
-	lggr := logger.TestLogger(t)
-	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
-		Chains: 2,
-	})
-	selectors := e.AllChainSelectors()
-
-	addressBook := deployment.NewMemoryAddressBook()
-	prereqCfg := make([]DeployPrerequisiteConfigPerChain, len(selectors))
-	for i, selector := range selectors {
-		prereqCfg[i] = DeployPrerequisiteConfigPerChain{
-			ChainSelector: selector,
-		}
-	}
-
-	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfig)
-	for _, selector := range selectors {
-		mcmsCfg[selector] = proposalutils.SingleGroupTimelockConfig(t)
-	}
-
-	// Deploy one burn-mint token per chain to use in the tests
-	tokens := make(map[uint64]*deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677])
-	for _, selector := range selectors {
-		token, err := deployment.DeployContract(e.Logger, e.Chains[selector], addressBook,
-			func(chain deployment.Chain) deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
-				tokenAddress, tx, token, err := burn_mint_erc677.DeployBurnMintERC677(
-					e.Chains[selector].DeployerKey,
-					e.Chains[selector].Client,
-					string(testTokenSymbol),
-					string(testTokenSymbol),
-					localTokenDecimals,
-					big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
-				)
-				return deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
-					Address:  tokenAddress,
-					Contract: token,
-					Tv:       deployment.NewTypeAndVersion(BurnMintToken, deployment.Version1_0_0),
-					Tx:       tx,
-					Err:      err,
-				}
-			},
-		)
-		require.NoError(t, err)
-		tokens[selector] = token
-	}
-
-	// Deploy MCMS setup & prerequisite contracts
-	e, err := commonchangeset.ApplyChangesets(t, e, nil, []commonchangeset.ChangesetApplication{
-		{
-			Changeset: commonchangeset.WrapChangeSet(DeployPrerequisites),
-			Config: DeployPrerequisiteConfig{
-				Configs: prereqCfg,
-			},
-		},
-		{
-			Changeset: commonchangeset.WrapChangeSet(commonchangeset.DeployMCMSWithTimelock),
-			Config:    mcmsCfg,
-		},
-	})
-	require.NoError(t, err)
-
-	state, err := LoadOnchainState(e)
-	require.NoError(t, err)
-
-	// We only need the token admin registry to be owned by the timelock in these tests
-	timelockOwnedContractsByChain := make(map[uint64][]common.Address)
-	for _, selector := range selectors {
-		timelockOwnedContractsByChain[selector] = []common.Address{state.Chains[selector].TokenAdminRegistry.Address()}
-	}
-
-	// Assemble map of addresses required for Timelock scheduling & execution
-	timelockContracts := make(map[uint64]*proposalutils.TimelockExecutionContracts)
-	for _, selector := range selectors {
-		timelockContracts[selector] = &proposalutils.TimelockExecutionContracts{
-			Timelock:  state.Chains[selector].Timelock,
-			CallProxy: state.Chains[selector].CallProxy,
-		}
-	}
-
-	// Transfer ownership of token admin registry to the Timelock
-	e, err = commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
-		{
-			Changeset: commonchangeset.WrapChangeSet(commonchangeset.TransferToMCMSWithTimelock),
-			Config: commonchangeset.TransferToMCMSWithTimelockConfig{
-				ContractsByChain: timelockOwnedContractsByChain,
-				MinDelay:         0,
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	return e, selectors[0], selectors[1], tokens, timelockContracts
-}
-
-// validateMemberOfBurnMintPair performs checks required to validate that a token pool is fully configured for cross-chain transfer.
-// Assumes that the deployed token pools are burn-mint.
-func validateMemberOfBurnMintPair(
-	t *testing.T,
-	state CCIPOnChainState,
-	tokens map[uint64]*deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677],
-	tokenSymbol TokenSymbol,
-	chainSelector uint64,
-	rate int64,
-	capacity int64,
-	externalAdmin *bind.TransactOpts,
-) {
-	timelockAddress := state.Chains[chainSelector].Timelock.Address()
-	tokenPool, ok := state.Chains[chainSelector].BurnMintTokenPools[testTokenSymbol]
-	require.True(t, ok)
-
-	// Verify that the timelock is the owner
-	owner, err := tokenPool.Owner(nil)
-	require.NoError(t, err)
-	require.Equal(t, timelockAddress, owner)
-
-	// Fetch the supported remote chains
-	supportedChains, err := tokenPool.GetSupportedChains(nil)
-	require.NoError(t, err)
-
-	// Verify that the rate limits and remote addresses are correct
-	for _, supportedChain := range supportedChains {
-		inboundConfig, err := tokenPool.GetCurrentInboundRateLimiterState(nil, supportedChain)
-		require.NoError(t, err)
-		require.True(t, inboundConfig.IsEnabled)
-		require.Equal(t, big.NewInt(capacity), inboundConfig.Capacity)
-		require.Equal(t, big.NewInt(rate), inboundConfig.Rate)
-
-		outboundConfig, err := tokenPool.GetCurrentOutboundRateLimiterState(nil, supportedChain)
-		require.NoError(t, err)
-		require.True(t, outboundConfig.IsEnabled)
-		require.Equal(t, big.NewInt(capacity), outboundConfig.Capacity)
-		require.Equal(t, big.NewInt(rate), outboundConfig.Rate)
-
-		remoteTokenAddress, err := tokenPool.GetRemoteToken(nil, supportedChain)
-		require.NoError(t, err)
-		require.Equal(t, tokens[supportedChain].Address.Bytes(), remoteTokenAddress)
-
-		remoteBurnMintPool, ok := state.Chains[supportedChain].BurnMintTokenPools[testTokenSymbol]
-		require.True(t, ok)
-		remotePoolAddresses, err := tokenPool.GetRemotePools(nil, supportedChain)
-		require.NoError(t, err)
-		require.Equal(t, [][]byte{remoteBurnMintPool.Address().Bytes()}, remotePoolAddresses)
-	}
-
-	// Verify that the pool is set on the registry
-	tokenConfigOnRegistry, err := state.Chains[chainSelector].TokenAdminRegistry.GetTokenConfig(nil, tokens[chainSelector].Address)
-	require.NoError(t, err)
-	require.Equal(t, timelockAddress, tokenConfigOnRegistry.Administrator)
-	require.Equal(t, tokenPool.Address(), tokenConfigOnRegistry.TokenPool)
-
-	if externalAdmin != nil {
-		// Verify that the pending administrator is the external admin
-		require.Equal(t, externalAdmin.From, tokenConfigOnRegistry.PendingAdministrator)
-
-		// Accept ownership using deployer key
-		_, err := tokenPool.AcceptOwnership(externalAdmin)
-		require.NoError(t, err)
-	}
-}
-
-func TestDeployTokenPoolContracts_DeployNew(t *testing.T) {
-	t.Parallel()
-	e, selectorA, selectorB, tokens, timelockContracts := setup2ChainEnvironment(t)
-
-	e, err := commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
-		{
-			Changeset: commonchangeset.WrapChangeSet(DeployTokenPoolContracts),
-			Config: DeployTokenPoolContractsConfig{
-				Symbol:        testTokenSymbol,
-				TimelockDelay: 0 * time.Second,
-				NewPools: map[uint64]NewTokenPoolInput{
-					selectorA: {
-						BaseTokenPoolInput: BaseTokenPoolInput{
-							TokenAddress: tokens[selectorA].Address,
-							RemoteChainsToAdd: RemoteChains{
-								selectorB: createSymmetricRateLimits(100, 1000),
-							},
-						},
-						Type:               BurnMintTokenPool,
-						LocalTokenDecimals: localTokenDecimals,
-					},
-					selectorB: {
-						BaseTokenPoolInput: BaseTokenPoolInput{
-							TokenAddress: tokens[selectorB].Address,
-							RemoteChainsToAdd: RemoteChains{
-								selectorA: createSymmetricRateLimits(100, 1000),
-							},
-						},
-						Type:               BurnMintTokenPool,
-						LocalTokenDecimals: localTokenDecimals,
-					},
-				},
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	state, err := LoadOnchainState(e)
-	require.NoError(t, err)
-
-	for _, selector := range []uint64{selectorA, selectorB} {
-		validateMemberOfBurnMintPair(t, state, tokens, testTokenSymbol, selector, 100, 1000, nil)
-	}
-}
-
-func TestDeployTokenPoolContracts_DeployNewAndUpdateExisting(t *testing.T) {
-	t.Parallel()
-	e, selectorA, selectorB, tokens, timelockContracts := setup2ChainEnvironment(t)
-
-	// Deploy the first token pool on chain A
-	e, err := commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
-		{
-			Changeset: commonchangeset.WrapChangeSet(DeployTokenPoolContracts),
-			Config: DeployTokenPoolContractsConfig{
-				Symbol:        testTokenSymbol,
-				TimelockDelay: 0 * time.Second,
-				NewPools: map[uint64]NewTokenPoolInput{
-					selectorA: {
-						BaseTokenPoolInput: BaseTokenPoolInput{
-							TokenAddress: tokens[selectorA].Address,
-						},
-						Type:               BurnMintTokenPool,
-						LocalTokenDecimals: localTokenDecimals,
-					},
-				},
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	state, err := LoadOnchainState(e)
-	require.NoError(t, err)
-
-	timelockAddress := state.Chains[selectorA].Timelock.Address()
-	burnMintTokenPool := state.Chains[selectorA].BurnMintTokenPools[testTokenSymbol]
-
-	// Verify that the timelock is the owner of the token pool on chain A
-	owner, err := burnMintTokenPool.Owner(nil)
-	require.NoError(t, err)
-	require.Equal(t, timelockAddress, owner)
-
-	// Verify that remote chains are not yet configured on the token pool on chain A
-	supportedChains, err := burnMintTokenPool.GetSupportedChains(nil)
-	require.NoError(t, err)
-	require.Equal(t, []uint64{}, supportedChains)
-
-	// Verify that the pool is set on the chain A registry
-	tokenConfigOnRegistry, err := state.Chains[selectorA].TokenAdminRegistry.GetTokenConfig(nil, tokens[selectorA].Address)
-	require.NoError(t, err)
-	require.Equal(t, timelockAddress, tokenConfigOnRegistry.Administrator)
-	require.Equal(t, burnMintTokenPool.Address(), tokenConfigOnRegistry.TokenPool)
-
-	// Deploy the second token pool on chain B, configuring the token pool on chain A to point at it
-	e, err = commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
-		{
-			Changeset: commonchangeset.WrapChangeSet(DeployTokenPoolContracts),
-			Config: DeployTokenPoolContractsConfig{
-				Symbol:        testTokenSymbol,
-				TimelockDelay: 0 * time.Second,
-				ExistingPoolUpdates: map[uint64]BaseTokenPoolInput{
-					selectorA: {
-						TokenAddress: tokens[selectorA].Address,
-						RemoteChainsToAdd: RemoteChains{
-							selectorB: createSymmetricRateLimits(100, 1000),
-						},
-					},
-				},
-				NewPools: map[uint64]NewTokenPoolInput{
-					selectorB: {
-						BaseTokenPoolInput: BaseTokenPoolInput{
-							TokenAddress: tokens[selectorB].Address,
-							RemoteChainsToAdd: RemoteChains{
-								selectorA: createSymmetricRateLimits(100, 1000),
-							},
-						},
-						Type:               BurnMintTokenPool,
-						LocalTokenDecimals: localTokenDecimals,
-					},
-				},
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	state, err = LoadOnchainState(e)
-	require.NoError(t, err)
-
-	for _, selector := range []uint64{selectorA, selectorB} {
-		validateMemberOfBurnMintPair(t, state, tokens, testTokenSymbol, selector, 100, 1000, nil)
-	}
-}
-
-func TestDeployTokenPoolContracts_DeployNewWithTransferToExternalAdmin(t *testing.T) {
-	t.Parallel()
-	e, selectorA, selectorB, tokens, timelockContracts := setup2ChainEnvironment(t)
-
-	e, err := commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
-		{
-			Changeset: commonchangeset.WrapChangeSet(DeployTokenPoolContracts),
-			Config: DeployTokenPoolContractsConfig{
-				Symbol:        testTokenSymbol,
-				TimelockDelay: 0 * time.Second,
-				NewPools: map[uint64]NewTokenPoolInput{
-					selectorA: {
-						BaseTokenPoolInput: BaseTokenPoolInput{
-							TokenAddress: tokens[selectorA].Address,
-							RemoteChainsToAdd: RemoteChains{
-								selectorB: createSymmetricRateLimits(100, 1000),
-							},
-							ExternalAdmin: e.Chains[selectorA].DeployerKey.From,
-						},
-						Type:               BurnMintTokenPool,
-						LocalTokenDecimals: localTokenDecimals,
-					},
-					selectorB: {
-						BaseTokenPoolInput: BaseTokenPoolInput{
-							TokenAddress: tokens[selectorB].Address,
-							RemoteChainsToAdd: RemoteChains{
-								selectorA: createSymmetricRateLimits(100, 1000),
-							},
-							ExternalAdmin: e.Chains[selectorB].DeployerKey.From,
-						},
-						Type:               BurnMintTokenPool,
-						LocalTokenDecimals: localTokenDecimals,
-					},
-				},
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	state, err := LoadOnchainState(e)
-	require.NoError(t, err)
-
-	for _, selector := range []uint64{selectorA, selectorB} {
-		validateMemberOfBurnMintPair(t, state, tokens, testTokenSymbol, selector, 100, 1000, e.Chains[selector].DeployerKey)
-	}
-}
-
-func TestDeployTokenPoolContracts_KeepExistingWithTransferToExternalAdmin(t *testing.T) {
-	t.Parallel()
-	e, selectorA, selectorB, tokens, timelockContracts := setup2ChainEnvironment(t)
-
-	// Initial deployment
-	e, err := commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
-		{
-			Changeset: commonchangeset.WrapChangeSet(DeployTokenPoolContracts),
-			Config: DeployTokenPoolContractsConfig{
-				Symbol:        testTokenSymbol,
-				TimelockDelay: 0 * time.Second,
-				NewPools: map[uint64]NewTokenPoolInput{
-					selectorA: {
-						BaseTokenPoolInput: BaseTokenPoolInput{
-							TokenAddress: tokens[selectorA].Address,
-							RemoteChainsToAdd: RemoteChains{
-								selectorB: createSymmetricRateLimits(100, 1000),
-							},
-						},
-						Type:               BurnMintTokenPool,
-						LocalTokenDecimals: localTokenDecimals,
-					},
-					selectorB: {
-						BaseTokenPoolInput: BaseTokenPoolInput{
-							TokenAddress: tokens[selectorB].Address,
-							RemoteChainsToAdd: RemoteChains{
-								selectorA: createSymmetricRateLimits(100, 1000),
-							},
-						},
-						Type:               BurnMintTokenPool,
-						LocalTokenDecimals: localTokenDecimals,
-					},
-				},
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	state, err := LoadOnchainState(e)
-	require.NoError(t, err)
-
-	for _, selector := range []uint64{selectorA, selectorB} {
-		validateMemberOfBurnMintPair(t, state, tokens, testTokenSymbol, selector, 100, 1000, nil)
-	}
-
-	// Transfer existing pools to an external administrator
-	e, err = commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
-		{
-			Changeset: commonchangeset.WrapChangeSet(DeployTokenPoolContracts),
-			Config: DeployTokenPoolContractsConfig{
-				Symbol:        testTokenSymbol,
-				TimelockDelay: 0 * time.Second,
-				ExistingPoolUpdates: map[uint64]BaseTokenPoolInput{
-					selectorA: {
-						TokenAddress:  tokens[selectorA].Address,
-						ExternalAdmin: e.Chains[selectorA].DeployerKey.From,
-					},
-					selectorB: {
-						TokenAddress:  tokens[selectorB].Address,
-						ExternalAdmin: e.Chains[selectorB].DeployerKey.From,
-					},
-				},
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	state, err = LoadOnchainState(e)
-	require.NoError(t, err)
-
-	for _, selector := range []uint64{selectorA, selectorB} {
-		validateMemberOfBurnMintPair(t, state, tokens, testTokenSymbol, selector, 100, 1000, e.Chains[selector].DeployerKey)
-	}
-}
-
-func TestDeployTokenPoolContracts_RedeployNew(t *testing.T) {
-	/*
-		TODO: This use case is not yet supported.
-
-		The LoadOnchainState function will potentially load the old token pool into the state mapping,
-		as token pools are currently keyed by TokenSymbol. Pools of different versions will be tied to the same symbol.
-
-		Two options to resolve...
-		- Ability to remove a current address from the address book through a changeset.
-		- Key pools by address instead of token symbol, same as other contracts
-	*/
-}
-
-func TestValidateRemoteChains(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		IsEnabled bool
-		Rate      *big.Int
-		Capacity  *big.Int
-		ErrStr    string
-	}{
-		{
-			IsEnabled: false,
-			Rate:      big.NewInt(1),
-			Capacity:  big.NewInt(10),
-			ErrStr:    "rate and capacity must be 0",
-		},
-		{
-			IsEnabled: true,
-			Rate:      big.NewInt(0),
-			Capacity:  big.NewInt(10),
-			ErrStr:    "rate must be greater than 0 and less than capacity",
-		},
-		{
-			IsEnabled: true,
-			Rate:      big.NewInt(11),
-			Capacity:  big.NewInt(10),
-			ErrStr:    "rate must be greater than 0 and less than capacity",
-		},
-	}
-
-	for _, test := range tests {
-		remoteChains := RemoteChains{
-			1: {
-				Inbound: token_pool.RateLimiterConfig{
-					IsEnabled: test.IsEnabled,
-					Rate:      test.Rate,
-					Capacity:  test.Capacity,
-				},
-				Outbound: token_pool.RateLimiterConfig{
-					IsEnabled: test.IsEnabled,
-					Rate:      test.Rate,
-					Capacity:  test.Capacity,
-				},
-			},
-		}
-
-		err := remoteChains.Validate()
-		require.Error(t, err)
-		require.Contains(t, err.Error(), test.ErrStr)
-	}
-}
-
-func TestValidateNewTokenPoolInput(t *testing.T) {
-	t.Parallel()
-
-	acceptLiquidity := true
-
-	tests := []struct {
-		Input  NewTokenPoolInput
-		ErrStr string
-	}{
-		{
-			Input: NewTokenPoolInput{
-				Type: deployment.ContractType("InvalidTokenPool"),
-			},
-			ErrStr: "InvalidTokenPool is not a valid token pool type",
-		},
-		{
-			Input: NewTokenPoolInput{
-				Type: LockReleaseTokenPool,
-			},
-			ErrStr: "accept liquidity must be defined for lock release pools",
-		},
-		{
-			Input: NewTokenPoolInput{
-				Type:            BurnMintTokenPool,
-				AcceptLiquidity: &acceptLiquidity,
-			},
-			ErrStr: "accept liquidity must be nil for burn mint pools",
-		},
-	}
-
-	for _, test := range tests {
-		err := test.Input.Validate()
-		require.Error(t, err)
-		require.Contains(t, err.Error(), test.ErrStr)
-	}
-}
 
 func TestValidateDeployTokenPoolContractsConfig(t *testing.T) {
 	t.Parallel()
 
+	lggr := logger.TestLogger(t)
+	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
+		Chains: 2,
+	})
+
 	tests := []struct {
-		Config DeployTokenPoolContractsConfig
-		ErrStr string
+		Msg         string
+		TokenSymbol TokenSymbol
+		Input       DeployTokenPoolContractsConfig
+		ErrStr      string
 	}{
 		{
-			Config: DeployTokenPoolContractsConfig{
-				NewPools: map[uint64]NewTokenPoolInput{
-					1: NewTokenPoolInput{},
-				},
-				ExistingPoolUpdates: map[uint64]BaseTokenPoolInput{
-					1: BaseTokenPoolInput{},
+			Msg:    "Token symbol is missing",
+			Input:  DeployTokenPoolContractsConfig{},
+			ErrStr: "token symbol must be defined",
+		},
+		{
+			Msg: "Chain selector is not valid",
+			Input: DeployTokenPoolContractsConfig{
+				TokenSymbol: "TEST",
+				NewPools: map[uint64]DeployTokenPoolInput{
+					0: DeployTokenPoolInput{},
 				},
 			},
-			ErrStr: "chain overlap exists between new pools and updates to existing pools",
+			ErrStr: "failed to validate chain selector 0",
+		},
+		{
+			Msg: "Chain selector doesn't exist in environment",
+			Input: DeployTokenPoolContractsConfig{
+				TokenSymbol: "TEST",
+				NewPools: map[uint64]DeployTokenPoolInput{
+					5009297550715157269: DeployTokenPoolInput{},
+				},
+			},
+			ErrStr: "chain with selector 5009297550715157269 does not exist in environment",
+		},
+		{
+			Msg: "Router contract is missing from chain",
+			Input: DeployTokenPoolContractsConfig{
+				TokenSymbol: "TEST",
+				NewPools: map[uint64]DeployTokenPoolInput{
+					e.AllChainSelectors()[0]: DeployTokenPoolInput{},
+				},
+			},
+			ErrStr: fmt.Sprintf("missing router on %d", e.AllChainSelectors()[0]),
 		},
 	}
 
 	for _, test := range tests {
-		err := test.Config.Validate()
-		require.Error(t, err)
-		require.Contains(t, err.Error(), test.ErrStr)
+		t.Run(test.Msg, func(t *testing.T) {
+			err := test.Input.Validate(e)
+			require.Contains(t, err.Error(), test.ErrStr)
+		})
 	}
 }
 
-func TestZero(t *testing.T) {
+func TestValidateDeployTokenPoolInput(t *testing.T) {
 	t.Parallel()
 
-	zero := zero()
-	require.Equal(t, int64(0), zero.Int64())
-}
+	e, selectorA, _, tokens, _ := setupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
+	acceptLiquidity := false
+	invalidAddress := utils.RandomAddress()
 
-func TestZeroAddress(t *testing.T) {
-	t.Parallel()
+	e = deployTestTokenPools(t, e, map[uint64]DeployTokenPoolInput{
+		selectorA: {
+			Type:               BurnMintTokenPool,
+			TokenAddress:       tokens[selectorA].Address,
+			LocalTokenDecimals: 18,
+		},
+	}, true)
 
-	zeroAddress := zeroAddress()
-	require.Equal(t, "0x0000000000000000000000000000000000000000", zeroAddress.String())
+	tests := []struct {
+		Msg    string
+		Symbol TokenSymbol
+		Input  DeployTokenPoolInput
+		ErrStr string
+	}{
+		{
+			Msg:    "Token address is missing",
+			Input:  DeployTokenPoolInput{},
+			ErrStr: "token address must be defined",
+		},
+		{
+			Msg: "Token pool type is missing",
+			Input: DeployTokenPoolInput{
+				TokenAddress: invalidAddress,
+			},
+			ErrStr: "type must be defined",
+		},
+		{
+			Msg: "Token pool type is invalid",
+			Input: DeployTokenPoolInput{
+				TokenAddress: invalidAddress,
+				Type:         deployment.ContractType("InvalidTokenPool"),
+			},
+			ErrStr: "requested token pool type InvalidTokenPool is unknown",
+		},
+		{
+			Msg: "Token address is invalid",
+			Input: DeployTokenPoolInput{
+				Type:         BurnMintTokenPool,
+				TokenAddress: invalidAddress,
+			},
+			ErrStr: fmt.Sprintf("failed to fetch symbol from token with address %s", invalidAddress),
+		},
+		{
+			Msg:    "Token symbol mismatch",
+			Symbol: "WRONG",
+			Input: DeployTokenPoolInput{
+				Type:         BurnMintTokenPool,
+				TokenAddress: tokens[selectorA].Address,
+			},
+			ErrStr: fmt.Sprintf("symbol of token with address %s (%s) does not match expected symbol (WRONG)", tokens[selectorA].Address, testTokenSymbol),
+		},
+		{
+			Msg:    "Token decimal mismatch",
+			Symbol: testTokenSymbol,
+			Input: DeployTokenPoolInput{
+				Type:               BurnMintTokenPool,
+				TokenAddress:       tokens[selectorA].Address,
+				LocalTokenDecimals: 17,
+			},
+			ErrStr: fmt.Sprintf("decimals of token with address %s (%d) does not match localTokenDecimals (17)", tokens[selectorA].Address, localTokenDecimals),
+		},
+		{
+			Msg:    "Accept liquidity should be defined",
+			Symbol: testTokenSymbol,
+			Input: DeployTokenPoolInput{
+				Type:               LockReleaseTokenPool,
+				TokenAddress:       tokens[selectorA].Address,
+				LocalTokenDecimals: 18,
+			},
+			ErrStr: "accept liquidity must be defined for lock release pools",
+		},
+		{
+			Msg:    "Accept liquidity should be omitted",
+			Symbol: testTokenSymbol,
+			Input: DeployTokenPoolInput{
+				Type:               BurnMintTokenPool,
+				TokenAddress:       tokens[selectorA].Address,
+				LocalTokenDecimals: 18,
+				AcceptLiquidity:    &acceptLiquidity,
+			},
+			ErrStr: "accept liquidity must be nil for burn mint pools",
+		},
+		{
+			Msg:    "Token pool already exists",
+			Symbol: testTokenSymbol,
+			Input: DeployTokenPoolInput{
+				Type:               BurnMintTokenPool,
+				TokenAddress:       tokens[selectorA].Address,
+				LocalTokenDecimals: 18,
+			},
+			ErrStr: fmt.Sprintf("token pool already exists for %s on %d (use forceDeployment to bypass)", testTokenSymbol, selectorA),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Msg, func(t *testing.T) {
+			state, err := LoadOnchainState(e)
+			require.NoError(t, err)
+
+			err = test.Input.Validate(e.Chains[selectorA], state.Chains[selectorA], test.Symbol)
+			require.Contains(t, err.Error(), test.ErrStr)
+		})
+	}
 }
 
 func TestDeployTokenPool(t *testing.T) {
 	t.Parallel()
 
-	e, selectorA, _, tokens, _ := setup2ChainEnvironment(t)
-
+	e, selectorA, _, tokens, _ := setupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
 	acceptLiquidity := false
 
 	tests := []struct {
-		Input NewTokenPoolInput
+		Msg   string
+		Input DeployTokenPoolInput
 	}{
 		{
-			Input: NewTokenPoolInput{
-				BaseTokenPoolInput: BaseTokenPoolInput{
-					TokenAddress: tokens[selectorA].Address,
-				},
+			Msg: "BurnMint",
+			Input: DeployTokenPoolInput{
+				TokenAddress:       tokens[selectorA].Address,
 				Type:               BurnMintTokenPool,
 				LocalTokenDecimals: localTokenDecimals,
 				AllowList:          []common.Address{},
 			},
 		},
 		{
-			Input: NewTokenPoolInput{
-				BaseTokenPoolInput: BaseTokenPoolInput{
-					TokenAddress: tokens[selectorA].Address,
-				},
+			Msg: "BurnWithFromMint",
+			Input: DeployTokenPoolInput{
+				TokenAddress:       tokens[selectorA].Address,
 				Type:               BurnWithFromMintTokenPool,
 				LocalTokenDecimals: localTokenDecimals,
 				AllowList:          []common.Address{},
 			},
 		},
 		{
-			Input: NewTokenPoolInput{
-				BaseTokenPoolInput: BaseTokenPoolInput{
-					TokenAddress: tokens[selectorA].Address,
-				},
+			Msg: "BurnFromMint",
+			Input: DeployTokenPoolInput{
+				TokenAddress:       tokens[selectorA].Address,
 				Type:               BurnFromMintTokenPool,
 				LocalTokenDecimals: localTokenDecimals,
 				AllowList:          []common.Address{},
 			},
 		},
 		{
-			Input: NewTokenPoolInput{
-				BaseTokenPoolInput: BaseTokenPoolInput{
-					TokenAddress: tokens[selectorA].Address,
-				},
+			Msg: "LockRelease",
+			Input: DeployTokenPoolInput{
+				TokenAddress:       tokens[selectorA].Address,
 				Type:               LockReleaseTokenPool,
 				LocalTokenDecimals: localTokenDecimals,
 				AllowList:          []common.Address{},
@@ -651,39 +235,119 @@ func TestDeployTokenPool(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		addressBook := deployment.NewMemoryAddressBook()
+		t.Run(test.Msg, func(t *testing.T) {
+			addressBook := deployment.NewMemoryAddressBook()
+			state, err := LoadOnchainState(e)
+			require.NoError(t, err)
+
+			_, err = deployTokenPool(
+				e.Logger,
+				e.Chains[selectorA],
+				state.Chains[selectorA],
+				addressBook,
+				test.Input,
+			)
+			require.NoError(t, err)
+
+			err = e.ExistingAddresses.Merge(addressBook)
+			require.NoError(t, err)
+
+			state, err = LoadOnchainState(e)
+			require.NoError(t, err)
+
+			switch test.Input.Type {
+			case BurnMintTokenPool:
+				_, ok := state.Chains[selectorA].BurnMintTokenPools[testTokenSymbol]
+				require.True(t, ok)
+			case LockReleaseTokenPool:
+				_, ok := state.Chains[selectorA].LockReleaseTokenPools[testTokenSymbol]
+				require.True(t, ok)
+			case BurnWithFromMintTokenPool:
+				_, ok := state.Chains[selectorA].BurnWithFromMintTokenPools[testTokenSymbol]
+				require.True(t, ok)
+			case BurnFromMintTokenPool:
+				_, ok := state.Chains[selectorA].BurnFromMintTokenPools[testTokenSymbol]
+				require.True(t, ok)
+			}
+		})
+	}
+}
+
+func TestDeployTokenPoolContracts(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		Msg             string
+		Redeploy        bool
+		ForceDeployment bool
+		ErrStr          string
+	}{
+		{
+			Msg: "Deploy once",
+		},
+		{
+			Msg:             "Redeploy but don't force redeployment",
+			Redeploy:        true,
+			ForceDeployment: false,
+			ErrStr:          "token pool already exists for TEST",
+		},
+		{
+			Msg:             "Redeploy with force",
+			Redeploy:        true,
+			ForceDeployment: true,
+		},
+	}
+
+	for _, test := range tests {
+
+		e, selectorA, _, tokens, timelockContracts := setupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
+		changesetApplication := commonchangeset.ChangesetApplication{
+			Changeset: commonchangeset.WrapChangeSet(DeployTokenPoolContracts),
+			Config: DeployTokenPoolContractsConfig{
+				TokenSymbol: testTokenSymbol,
+				NewPools: map[uint64]DeployTokenPoolInput{
+					selectorA: {
+						TokenAddress:       tokens[selectorA].Address,
+						Type:               BurnMintTokenPool,
+						LocalTokenDecimals: localTokenDecimals,
+						AllowList:          []common.Address{},
+						ForceDeployment:    test.ForceDeployment,
+					},
+				},
+			},
+		}
+
+		// Initial deployment
+		e, err := commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
+			changesetApplication,
+		})
+		require.NoError(t, err)
+
 		state, err := LoadOnchainState(e)
 		require.NoError(t, err)
 
-		_, err = deployTokenPool(
-			e.Logger,
-			e.Chains[selectorA],
-			addressBook,
-			test.Input,
-			state.Chains[selectorA].Router.Address(),
-			state.Chains[selectorA].RMNProxy.Address(),
-		)
+		burnMintTokenPools, ok := state.Chains[selectorA].BurnMintTokenPools[testTokenSymbol]
+		require.True(t, ok)
+		require.Len(t, burnMintTokenPools, 1)
+		owner, err := burnMintTokenPools[0].Owner(nil)
 		require.NoError(t, err)
+		require.Equal(t, e.Chains[selectorA].DeployerKey.From, owner)
 
-		err = e.ExistingAddresses.Merge(addressBook)
-		require.NoError(t, err)
+		// Redeployment
+		if test.Redeploy {
+			e, err = commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
+				changesetApplication,
+			})
+			if test.ErrStr != "" {
+				require.ErrorContains(t, err, fmt.Sprintf("token pool already exists for TEST on %d (use forceDeployment to bypass)", selectorA))
+			} else {
+				state, err = LoadOnchainState(e)
+				require.NoError(t, err)
 
-		state, err = LoadOnchainState(e)
-		require.NoError(t, err)
-
-		switch test.Input.Type {
-		case BurnMintTokenPool:
-			_, ok := state.Chains[selectorA].BurnMintTokenPools[testTokenSymbol]
-			require.True(t, ok)
-		case LockReleaseTokenPool:
-			_, ok := state.Chains[selectorA].LockReleaseTokenPools[testTokenSymbol]
-			require.True(t, ok)
-		case BurnWithFromMintTokenPool:
-			_, ok := state.Chains[selectorA].BurnWithFromMintTokenPools[testTokenSymbol]
-			require.True(t, ok)
-		case BurnFromMintTokenPool:
-			_, ok := state.Chains[selectorA].BurnFromMintTokenPools[testTokenSymbol]
-			require.True(t, ok)
+				burnMintTokenPools, ok = state.Chains[selectorA].BurnMintTokenPools[testTokenSymbol]
+				require.True(t, ok)
+				require.Len(t, burnMintTokenPools, 2)
+			}
 		}
 	}
 }
