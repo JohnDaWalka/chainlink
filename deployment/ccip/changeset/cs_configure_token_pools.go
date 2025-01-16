@@ -1,6 +1,7 @@
 package changeset
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 )
 
@@ -175,7 +177,7 @@ func ConfigureTokenPoolContracts(env deployment.Environment, c ConfigureTokenPoo
 
 		operations, err := configureTokenPool(env.Chains, state, c, chainSelector)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to make operations to configure token admin registry on %s: %w", chain.Name(), err)
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to make operations to configure token pool with address %s on %s: %w", c.PoolUpdates[chainSelector].PoolAddress, chain.Name(), err)
 		}
 		if len(operations) > 0 {
 			proposers[chainSelector] = chainState.ProposerMcm
@@ -223,18 +225,9 @@ func configureTokenPool(
 	poolUpdate := config.PoolUpdates[chainSelector]
 	poolAddress := poolUpdate.PoolAddress
 	chain := chains[chainSelector]
-	tokenPool, err := token_pool.NewTokenPool(poolAddress, chain.Client)
+	tokenPool, _, tokenConfig, err := getTokenStateFromPool(poolAddress, chain, state.Chains[chainSelector])
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect pool with address %s on %s with token pool bindings: %w", poolAddress, chain.Name(), err)
-	}
-	remoteTokenAddress, err := tokenPool.GetToken(nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get token from pool with address %s on %s: %w", poolAddress, chain.Name(), err)
-	}
-	tokenAdminRegistry := state.Chains[chainSelector].TokenAdminRegistry
-	tokenConfig, err := tokenAdminRegistry.GetTokenConfig(nil, remoteTokenAddress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get %s config from registry on %s: %w", config.TokenSymbol, chain.Name(), err)
+		return nil, fmt.Errorf("failed to get token state from pool with address %s on %s: %w", poolAddress, chain.Name(), err)
 	}
 
 	// Create opts and handler
@@ -264,18 +257,9 @@ func configureTokenPool(
 		}
 		remoteChain := chains[remoteChainSelector]
 		remotePoolAddress := config.PoolUpdates[remoteChainSelector].PoolAddress
-		remoteTokenPool, err := token_pool.NewTokenPool(remotePoolAddress, remoteChain.Client)
+		_, remoteTokenAddress, remoteTokenConfig, err := getTokenStateFromPool(remotePoolAddress, remoteChain, state.Chains[remoteChainSelector])
 		if err != nil {
-			return nil, fmt.Errorf("failed to connect pool with address %s on %s with token pool bindings: %w", poolAddress, remoteChain.Name(), err)
-		}
-		remoteTokenAddress, err := remoteTokenPool.GetToken(nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get token from pool with address %s on %s: %w", remotePoolAddress, remoteChain.Name(), err)
-		}
-		remoteTokenAdminRegistry := state.Chains[remoteChainSelector].TokenAdminRegistry
-		remoteTokenConfig, err := remoteTokenAdminRegistry.GetTokenConfig(nil, remoteTokenAddress)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get %s config from registry on %s: %w", config.TokenSymbol, remoteChain.Name(), err)
+			return nil, fmt.Errorf("failed to get token state from pool with address %s on %s: %w", remotePoolAddress, remoteChain.Name(), err)
 		}
 		if isSupportedChain {
 			// Just update the rate limits if the chain is already supported
@@ -302,7 +286,11 @@ func configureTokenPool(
 				if err != nil {
 					return nil, fmt.Errorf("failed to fetch remote pools from token pool with address %s on chain %s: %w", tokenConfig.TokenPool, chain.Name(), err)
 				}
-				remotePoolAddresses = append(remotePoolAddresses, remotePoolAddressesOnChain...)
+				for _, address := range remotePoolAddressesOnChain {
+					if bytes.Compare(address, remotePoolAddress.Bytes()) != 0 {
+						remotePoolAddresses = append(remotePoolAddresses, remotePoolAddressesOnChain...)
+					}
+				}
 			}
 			chainAdditions = append(chainAdditions, token_pool.TokenPoolChainUpdate{
 				RemoteChainSelector:       remoteChainSelector,
@@ -362,4 +350,22 @@ func configureTokenPool(
 	}
 
 	return operations, nil
+}
+
+// getTokenStateFromPool fetches the token config from the registry given the pool address
+func getTokenStateFromPool(poolAddress common.Address, chain deployment.Chain, state CCIPChainState) (*token_pool.TokenPool, common.Address, token_admin_registry.TokenAdminRegistryTokenConfig, error) {
+	tokenPool, err := token_pool.NewTokenPool(poolAddress, chain.Client)
+	if err != nil {
+		return nil, utils.ZeroAddress, token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("failed to connect pool with address %s on %s with token pool bindings: %w", poolAddress, chain.Name(), err)
+	}
+	tokenAddress, err := tokenPool.GetToken(nil)
+	if err != nil {
+		return nil, utils.ZeroAddress, token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("failed to get token from pool with address %s on %s: %w", poolAddress, chain.Name(), err)
+	}
+	tokenAdminRegistry := state.TokenAdminRegistry
+	tokenConfig, err := tokenAdminRegistry.GetTokenConfig(nil, tokenAddress)
+	if err != nil {
+		return nil, utils.ZeroAddress, token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("failed to get config of token with address %s from registry on %s: %w", tokenAddress, chain.Name(), err)
+	}
+	return tokenPool, tokenAddress, tokenConfig, nil
 }

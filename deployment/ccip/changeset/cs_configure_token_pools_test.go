@@ -6,10 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -34,26 +36,22 @@ func createSymmetricRateLimits(rate int64, capacity int64) RateLimiterConfig {
 }
 
 // validateMemberOfBurnMintPair performs checks required to validate that a token pool is fully configured for cross-chain transfer.
-// Assumes that the deployed token pools are burn-mint.
 func validateMemberOfBurnMintPair(
 	t *testing.T,
 	state CCIPOnChainState,
+	tokenPool *burn_mint_token_pool.BurnMintTokenPool,
+	expectedRemotePools []string,
 	tokens map[uint64]*deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677],
 	tokenSymbol TokenSymbol,
 	chainSelector uint64,
-	rate int64,
-	capacity int64,
+	rate *big.Int,
+	capacity *big.Int,
+	expectedOwner common.Address,
 ) {
-	timelockAddress := state.Chains[chainSelector].Timelock.Address()
-	tokenPools, ok := state.Chains[chainSelector].BurnMintTokenPools[testTokenSymbol]
-	require.True(t, ok)
-
-	tokenPool := tokenPools[0]
-
-	// Verify that the timelock is the owner
+	// Verify that the owner is expected
 	owner, err := tokenPool.Owner(nil)
 	require.NoError(t, err)
-	require.Equal(t, timelockAddress, owner)
+	require.Equal(t, expectedOwner, owner)
 
 	// Fetch the supported remote chains
 	supportedChains, err := tokenPool.GetSupportedChains(nil)
@@ -64,25 +62,27 @@ func validateMemberOfBurnMintPair(
 		inboundConfig, err := tokenPool.GetCurrentInboundRateLimiterState(nil, supportedChain)
 		require.NoError(t, err)
 		require.True(t, inboundConfig.IsEnabled)
-		require.Equal(t, big.NewInt(capacity), inboundConfig.Capacity)
-		require.Equal(t, big.NewInt(rate), inboundConfig.Rate)
+		require.Equal(t, capacity, inboundConfig.Capacity)
+		require.Equal(t, rate, inboundConfig.Rate)
 
 		outboundConfig, err := tokenPool.GetCurrentOutboundRateLimiterState(nil, supportedChain)
 		require.NoError(t, err)
 		require.True(t, outboundConfig.IsEnabled)
-		require.Equal(t, big.NewInt(capacity), outboundConfig.Capacity)
-		require.Equal(t, big.NewInt(rate), outboundConfig.Rate)
+		require.Equal(t, capacity, outboundConfig.Capacity)
+		require.Equal(t, rate, outboundConfig.Rate)
 
 		remoteTokenAddress, err := tokenPool.GetRemoteToken(nil, supportedChain)
 		require.NoError(t, err)
 		require.Equal(t, tokens[supportedChain].Address.Bytes(), remoteTokenAddress)
 
-		remoteBurnMintPools, ok := state.Chains[supportedChain].BurnMintTokenPools[testTokenSymbol]
-		require.True(t, ok)
-		remoteBurnMintPool := remoteBurnMintPools[0]
 		remotePoolAddresses, err := tokenPool.GetRemotePools(nil, supportedChain)
 		require.NoError(t, err)
-		require.Equal(t, [][]byte{remoteBurnMintPool.Address().Bytes()}, remotePoolAddresses)
+
+		remotePoolsStr := make([]string, len(remotePoolAddresses))
+		for i, remotePool := range remotePoolAddresses {
+			remotePoolsStr[i] = common.HexToAddress(common.Bytes2Hex(remotePool)).String()
+		}
+		require.ElementsMatch(t, expectedRemotePools, remotePoolsStr)
 	}
 }
 
@@ -284,7 +284,7 @@ func TestValidateConfigureTokenPoolContractsConfig(t *testing.T) {
 					},
 				},
 			},
-			ErrStr: fmt.Sprintf("missing tokenAdminRegistry on %d", e.AllChainSelectors()[0]),
+			ErrStr: "missing tokenAdminRegistry",
 		},
 	}
 
@@ -298,96 +298,263 @@ func TestValidateConfigureTokenPoolContractsConfig(t *testing.T) {
 
 func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 	t.Parallel()
-
 	lggr := logger.TestLogger(t)
-	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
-		Chains: 2,
-	})
 
-	e, selectorA, selectorB, tokens, timelockContracts := setupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
+	type regPass struct {
+		SelectorA2B RateLimiterConfig
+		SelectorB2A RateLimiterConfig
+	}
 
-	e = deployTestTokenPools(t, e, map[uint64]DeployTokenPoolInput{
-		selectorA: {
-			Type:               BurnMintTokenPool,
-			TokenAddress:       tokens[selectorA].Address,
-			LocalTokenDecimals: 18,
-		},
-		selectorB: {
-			Type:               BurnMintTokenPool,
-			TokenAddress:       tokens[selectorB].Address,
-			LocalTokenDecimals: 18,
-		},
-	}, true)
+	type updatePass struct {
+		PoolIndexA  int
+		PoolIndexB  int
+		SelectorA2B RateLimiterConfig
+		SelectorB2A RateLimiterConfig
+	}
 
-	/*
-		e = deployTestTokenPools(t, e, map[uint64]DeployTokenPoolInput{
-			selectorA: {
-				Type:               BurnMintTokenPool,
-				TokenAddress:       tokens[selectorA].Address,
-				LocalTokenDecimals: 18,
-				ForceDeployment:    true,
-			},
-		}, true)
-	*/
-
-	state, err := LoadOnchainState(e)
-	require.NoError(t, err)
-
-	activePoolAddressA := state.Chains[selectorA].BurnMintTokenPools[testTokenSymbol][0].Address()
-	activePoolAddressB := state.Chains[selectorB].BurnMintTokenPools[testTokenSymbol][0].Address()
-	// upcomingPoolAddressA := state.Chains[selectorA].BurnMintTokenPools[testTokenSymbol][1].Address()
-	// upcomingPoolAddressB := state.Chains[selectorB].BurnMintTokenPools[testTokenSymbol][1].Address()
-
-	/*
-		// Configure the active pools on the registry
-		e, err = commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
-			{
-				Changeset: commonchangeset.WrapChangeSet(ConfigureTokenAdminRegistry),
-				Config: ConfigureTokenAdminRegistryConfig{
-					TokenSymbol: testTokenSymbol,
-					MCMS: &MCMSConfig{
-						MinDelay: 0 * time.Second,
-					},
-					RegistryUpdates: map[uint64]RegistryConfig{
-						selectorA: {
-							PoolAddress: activePoolAddressA,
-						},
-						selectorA: {
-							PoolAddress: activePoolAddressB,
-						},
-					},
-				},
-			},
-		})
-	*/
-
-	e, err = commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
+	tests := []struct {
+		Msg              string
+		RegistrationPass *regPass
+		UpdatePass       *updatePass
+	}{
 		{
-			Changeset: commonchangeset.WrapChangeSet(ConfigureTokenPoolContracts),
-			Config: ConfigureTokenPoolContractsConfig{
-				TokenSymbol: testTokenSymbol,
-				MCMS: &MCMSConfig{
-					MinDelay: 0 * time.Second,
-				},
-				PoolUpdates: map[uint64]TokenPoolConfig{
-					selectorA: {
-						PoolAddress: activePoolAddressA,
-						ChainUpdates: RemoteChainsConfig{
-							selectorB: createSymmetricRateLimits(100, 1000),
-						},
-					},
-					selectorA: {
-						PoolAddress: activePoolAddressB,
-						ChainUpdates: RemoteChainsConfig{
-							selectorA: createSymmetricRateLimits(100, 1000),
-						},
-					},
-				},
+			Msg: "Configure new pools on registry",
+			RegistrationPass: &regPass{
+				SelectorA2B: createSymmetricRateLimits(100, 1000),
+				SelectorB2A: createSymmetricRateLimits(100, 1000),
 			},
 		},
-	})
+		{
+			Msg: "Configure new pools on registry, update their rate limits",
+			RegistrationPass: &regPass{
+				SelectorA2B: createSymmetricRateLimits(100, 1000),
+				SelectorB2A: createSymmetricRateLimits(100, 1000),
+			},
+			UpdatePass: &updatePass{
+				PoolIndexA:  0,
+				PoolIndexB:  0,
+				SelectorA2B: createSymmetricRateLimits(200, 2000),
+				SelectorB2A: createSymmetricRateLimits(200, 2000),
+			},
+		},
+		{
+			Msg: "Configure new pools on registry, update both pools",
+			RegistrationPass: &regPass{
+				SelectorA2B: createSymmetricRateLimits(100, 1000),
+				SelectorB2A: createSymmetricRateLimits(100, 1000),
+			},
+			UpdatePass: &updatePass{
+				PoolIndexA:  1,
+				PoolIndexB:  1,
+				SelectorA2B: createSymmetricRateLimits(100, 1000),
+				SelectorB2A: createSymmetricRateLimits(100, 1000),
+			},
+		},
+		{
+			Msg: "Configure new pools on registry, update only one pool",
+			RegistrationPass: &regPass{
+				SelectorA2B: createSymmetricRateLimits(100, 1000),
+				SelectorB2A: createSymmetricRateLimits(100, 1000),
+			},
+			UpdatePass: &updatePass{
+				PoolIndexA:  0,
+				PoolIndexB:  1,
+				SelectorA2B: createSymmetricRateLimits(200, 2000),
+				SelectorB2A: createSymmetricRateLimits(200, 2000),
+			},
+		},
+	}
 
-	for _, selector := range e.AllChainSelectors() {
-		validateMemberOfBurnMintPair(t, state, tokens, testTokenSymbol, selector, 100, 1000)
+	for _, test := range tests {
+		for _, mcmsConfig := range []*MCMSConfig{nil, &MCMSConfig{MinDelay: 0 * time.Second}} { // Run all tests with and without MCMS
+			t.Run(test.Msg, func(t *testing.T) {
+				e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
+					Chains: 2,
+				})
+
+				e, selectorA, selectorB, tokens, timelockContracts := setupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), mcmsConfig != nil)
+
+				e = deployTestTokenPools(t, e, map[uint64]DeployTokenPoolInput{
+					selectorA: {
+						Type:               BurnMintTokenPool,
+						TokenAddress:       tokens[selectorA].Address,
+						LocalTokenDecimals: 18,
+					},
+					selectorB: {
+						Type:               BurnMintTokenPool,
+						TokenAddress:       tokens[selectorB].Address,
+						LocalTokenDecimals: 18,
+					},
+				}, mcmsConfig != nil)
+
+				e = deployTestTokenPools(t, e, map[uint64]DeployTokenPoolInput{
+					selectorA: {
+						Type:               BurnMintTokenPool,
+						TokenAddress:       tokens[selectorA].Address,
+						LocalTokenDecimals: 18,
+						ForceDeployment:    true,
+					},
+					selectorB: {
+						Type:               BurnMintTokenPool,
+						TokenAddress:       tokens[selectorB].Address,
+						LocalTokenDecimals: 18,
+						ForceDeployment:    true,
+					},
+				}, mcmsConfig != nil)
+
+				state, err := LoadOnchainState(e)
+				require.NoError(t, err)
+
+				pools := map[uint64][]*burn_mint_token_pool.BurnMintTokenPool{
+					selectorA: []*burn_mint_token_pool.BurnMintTokenPool{
+						state.Chains[selectorA].BurnMintTokenPools[testTokenSymbol][0],
+						state.Chains[selectorA].BurnMintTokenPools[testTokenSymbol][1],
+					},
+					selectorB: []*burn_mint_token_pool.BurnMintTokenPool{
+						state.Chains[selectorB].BurnMintTokenPools[testTokenSymbol][0],
+						state.Chains[selectorB].BurnMintTokenPools[testTokenSymbol][1],
+					},
+				}
+				expectedOwners := make(map[uint64]common.Address, 2)
+				if mcmsConfig != nil {
+					expectedOwners[selectorA] = state.Chains[selectorA].Timelock.Address()
+					expectedOwners[selectorB] = state.Chains[selectorB].Timelock.Address()
+				} else {
+					expectedOwners[selectorA] = e.Chains[selectorA].DeployerKey.From
+					expectedOwners[selectorB] = e.Chains[selectorB].DeployerKey.From
+				}
+
+				if test.RegistrationPass != nil {
+					// Configure & set the active pools on the registry
+					e, err = commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
+						{
+							Changeset: commonchangeset.WrapChangeSet(ConfigureTokenPoolContracts),
+							Config: ConfigureTokenPoolContractsConfig{
+								TokenSymbol: testTokenSymbol,
+								MCMS:        mcmsConfig,
+								PoolUpdates: map[uint64]TokenPoolConfig{
+									selectorA: {
+										PoolAddress: pools[selectorA][0].Address(),
+										ChainUpdates: RemoteChainsConfig{
+											selectorB: test.RegistrationPass.SelectorA2B,
+										},
+									},
+									selectorB: {
+										PoolAddress: pools[selectorB][0].Address(),
+										ChainUpdates: RemoteChainsConfig{
+											selectorA: test.RegistrationPass.SelectorB2A,
+										},
+									},
+								},
+							},
+						},
+						{
+							Changeset: commonchangeset.WrapChangeSet(ConfigureTokenAdminRegistry),
+							Config: ConfigureTokenAdminRegistryConfig{
+								TokenSymbol: testTokenSymbol,
+								MCMS:        mcmsConfig,
+								RegistryUpdates: map[uint64]RegistryConfig{
+									selectorA: {
+										PoolAddress: pools[selectorA][0].Address(),
+									},
+									selectorB: {
+										PoolAddress: pools[selectorB][0].Address(),
+									},
+								},
+							},
+						},
+					})
+					require.NoError(t, err)
+
+					for _, selector := range e.AllChainSelectors() {
+						var remoteChainSelector uint64
+						var rateLimiterConfig RateLimiterConfig
+						switch selector {
+						case selectorA:
+							remoteChainSelector = selectorB
+							rateLimiterConfig = test.RegistrationPass.SelectorA2B
+						case selectorB:
+							remoteChainSelector = selectorA
+							rateLimiterConfig = test.RegistrationPass.SelectorB2A
+						}
+						validateMemberOfBurnMintPair(
+							t,
+							state,
+							pools[selector][0],
+							[]string{pools[remoteChainSelector][0].Address().Hex()},
+							tokens,
+							testTokenSymbol,
+							selector,
+							rateLimiterConfig.Inbound.Rate, // inbound & outbound are the same in this test
+							rateLimiterConfig.Inbound.Capacity,
+							expectedOwners[selector],
+						)
+					}
+				}
+
+				if test.UpdatePass != nil {
+					// Only configure, do not update registry
+					e, err = commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
+						{
+							Changeset: commonchangeset.WrapChangeSet(ConfigureTokenPoolContracts),
+							Config: ConfigureTokenPoolContractsConfig{
+								TokenSymbol: testTokenSymbol,
+								MCMS:        mcmsConfig,
+								PoolUpdates: map[uint64]TokenPoolConfig{
+									selectorA: {
+										PoolAddress: pools[selectorA][test.UpdatePass.PoolIndexA].Address(),
+										ChainUpdates: RemoteChainsConfig{
+											selectorB: test.UpdatePass.SelectorA2B,
+										},
+									},
+									selectorB: {
+										PoolAddress: pools[selectorB][test.UpdatePass.PoolIndexB].Address(),
+										ChainUpdates: RemoteChainsConfig{
+											selectorA: test.UpdatePass.SelectorB2A,
+										},
+									},
+								},
+							},
+						},
+					})
+					require.NoError(t, err)
+
+					for _, selector := range e.AllChainSelectors() {
+						var poolIndex int
+						var remotePoolIndex int
+						var remoteChainSelector uint64
+						var rateLimiterConfig RateLimiterConfig
+						switch selector {
+						case selectorA:
+							remoteChainSelector = selectorB
+							rateLimiterConfig = test.UpdatePass.SelectorA2B
+							poolIndex = test.UpdatePass.PoolIndexA
+							remotePoolIndex = test.UpdatePass.PoolIndexB
+						case selectorB:
+							remoteChainSelector = selectorA
+							rateLimiterConfig = test.UpdatePass.SelectorB2A
+							poolIndex = test.UpdatePass.PoolIndexB
+							remotePoolIndex = test.UpdatePass.PoolIndexA
+						}
+						remotePoolAddresses := []string{pools[remoteChainSelector][0].Address().String()} // add registered pool by default
+						if remotePoolIndex == 1 {                                                         // if remote pool address is being updated, we push the new address
+							remotePoolAddresses = append(remotePoolAddresses, pools[remoteChainSelector][1].Address().String())
+						}
+						validateMemberOfBurnMintPair(
+							t,
+							state,
+							pools[selector][poolIndex],
+							remotePoolAddresses,
+							tokens,
+							testTokenSymbol,
+							selector,
+							rateLimiterConfig.Inbound.Rate, // inbound & outbound are the same in this test
+							rateLimiterConfig.Inbound.Capacity,
+							expectedOwners[selector],
+						)
+					}
+				}
+			})
+		}
 	}
 }
