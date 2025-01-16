@@ -458,7 +458,6 @@ func TestWorkflow(t *testing.T) {
 			bc.Nodes[0].DockerInternalHTTPUrl,
 		)
 
-		// i + 1, because wo
 		for i := range workflowNodesetInfo {
 			in.NodeSet.NodeSpecs[i+1].Node.TestConfigOverrides = fmt.Sprintf(`
 				[Feature]
@@ -757,7 +756,7 @@ func TestWorkflow(t *testing.T) {
 					ocr3CapabilityAddress,
 					nodesInfo[i].OcrKeyBundleID,
 					bootstrapNodeInfo.PeerID,
-					"node0:6690",
+					"node0:5001",
 					nodesInfo[i].TransmitterAddress,
 					bc.ChainID,
 					nodesInfo[i].OcrKeyBundleID,
