@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/test-go/testify/require"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
@@ -62,5 +62,6 @@ func TestMakeTxOptsAndHandlerForContract_UseDeployer(t *testing.T) {
 	require.Nil(t, op)
 
 	config, err := chainState.TokenAdminRegistry.GetTokenConfig(nil, tokenAddress)
+	require.NoError(t, err)
 	require.Equal(t, chain.DeployerKey.From, config.PendingAdministrator)
 }
