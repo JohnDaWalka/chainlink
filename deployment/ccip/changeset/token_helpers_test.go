@@ -1,8 +1,9 @@
 package changeset_test
 
 import (
-	"fmt"
 	"testing"
+
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -10,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -75,7 +75,7 @@ func TestGetAllTokenPoolsWithSymbol(t *testing.T) {
 		if i == 0 {
 			tokenPools, err := changeset.GetAllTokenPoolsWithSymbol(state.Chains[selectorA], chain.Client, testhelpers.TestTokenSymbol)
 			require.NoError(t, err)
-			assert.Len(t, tokenPools, 0)
+			require.Len(t, tokenPools, 0)
 		}
 
 		_, err = changeset.DeployTokenPool(l, chain, chainState, addressBook, test.Input)
@@ -90,7 +90,7 @@ func TestGetAllTokenPoolsWithSymbol(t *testing.T) {
 
 		tokenPools, err := changeset.GetAllTokenPoolsWithSymbol(chainState, chain.Client, testhelpers.TestTokenSymbol)
 		require.NoError(t, err)
-		assert.Len(t, tokenPools, i+1)
+		require.Len(t, tokenPools, i+1)
 	}
 }
 
