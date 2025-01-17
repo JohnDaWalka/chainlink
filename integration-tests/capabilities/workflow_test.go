@@ -327,6 +327,7 @@ func TestWorkflow(t *testing.T) {
 		sc, err := seth.NewClientBuilder().
 			WithRpcUrl(bc.Nodes[0].HostWSUrl).
 			WithPrivateKeys([]string{pkey}).
+			WithGethWrappersFolders([]string{"./components"}).
 			Build()
 		require.NoError(t, err)
 
@@ -381,9 +382,70 @@ func TestWorkflow(t *testing.T) {
 		var configData []byte
 
 		workflowName := "abcdefgasd"
+
+		var HashTruncateName = func(name string) string {
+			// Compute SHA-256 hash of the input string
+			hash := sha256.Sum256([]byte(name))
+
+			// Encode as hex to ensure UTF8
+			var hashBytes []byte = hash[:]
+			resultHex := hex.EncodeToString(hashBytes)
+
+			// Truncate to 10 bytes
+			truncated := []byte(resultHex)[:10]
+			return string(truncated)
+		}
+
+		truncated := HashTruncateName(workflowName)
+		fmt.Println("Truncated name: ", truncated)
+
+		var workflowNameBytes [10]byte
+		copy(workflowNameBytes[:], []byte(truncated))
+
+		fmt.Println("Workflow name bytes ", string(workflowNameBytes[:]))
+
 		donID := uint32(1)
 		workflowID, idErr := GenerateWorkflowIDFromStrings(sc.MustGetRootKeyAddress().Hex(), workflowName, workFlowData, configData, "")
 		require.NoError(t, idErr)
+
+		// feedsConsumerDebugAddress, tx, feedsConsumerDebugContract, err := feeds_consumer_debug.DeployFeedsConsumerDebug(
+		// 	sc.NewTXOpts(),
+		// 	sc.Client,
+		// )
+		// require.NoError(t, err)
+		// _, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		// require.NoError(t, err)
+
+		// tx, err = feedsConsumerDebugContract.SetConfig(
+		// 	sc.NewTXOpts(),
+		// 	[]common.Address{forwarderInstance.Address, sc.MustGetRootKeyAddress()},
+		// 	[]common.Address{sc.MustGetRootKeyAddress()},
+		// 	[][10]byte{workflowNameBytes},
+		// )
+		// _, decodeErr = sc.Decode(tx, err)
+		// require.NoError(t, decodeErr)
+
+		// metadataB64 := "AJ4fSINfRzT/YmFvFoJu/Z5CQcYKTI+8p5XQZTbbOp3Q3yKVAQAAAAAA85/W5RqtiPb0zmq4gnJ5z/+5ImYAAQ"
+		// mBytes, err := base64.RawStdEncoding.DecodeString(metadataB64)
+		// require.NoError(t, err)
+
+		// fmt.Printf("Metadata bytes: %q\n", mBytes)
+
+		// rawReportB64 := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQGL/ohAcABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC7XBYsgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZ4pYNQ"
+		// rawReportBytes, err := base64.RawStdEncoding.DecodeString(rawReportB64)
+		// require.NoError(t, err)
+
+		// mb64 := "AN/C5o6b4ckIM57v1/K5FIaQ0Meg7TZkd5dphOyKhixkMGRmMjI5NTAx85/W5RqtiPb0zmq4gnJ5z/+5ImYAAQ"
+		// mb, err := base64.RawStdEncoding.DecodeString(mb64)
+		// require.NoError(t, err)
+
+		// r64 := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQGL/ohAcABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC7XBYsgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZ4qWFQ"
+		// r, err := base64.RawStdEncoding.DecodeString(r64)
+		// require.NoError(t, err)
+
+		// onTx, onErr := feedsConsumerDebugContract.OnReport(sc.NewTXOpts(), mb, r)
+		// _, decodeErr = sc.Decode(onTx, onErr)
+		// require.NoError(t, decodeErr)
 
 		// 00327e3b13a0f5e4da1a9b980e33fde2602043a06289aa6d4eb65af733cb3be6 is workflowID generated from the above function
 		// 2025-01-14 15:11:04 2025-01-14T14:11:04.429Z [ERROR] failed to handle workflow registration: workflowID mismatch: 00b8a8f28d3a29f73c1a052273d4b5ed0951e70eb4fae56f7531539af4aca96f != 00327e3b13a0f5e4da1a9b980e33fde2602043a06289aa6d4eb65af733cb3be6 syncer/workflow_registry.go:485  logger=WorkflowRegistrySyncer stacktrace=github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncer.(*workflowRegistry).loadWorkflows
@@ -567,12 +629,12 @@ func TestWorkflow(t *testing.T) {
 
 		// fmt.Println("Deployed feeds_consumer contract at", feedsConsumerAddress.Hex())
 
-		var workflowNameBytes [10]byte
-		copy(workflowNameBytes[:], []byte(workflowName))
+		// var workflowNameBytes [10]byte
+		// copy(workflowNameBytes[:], []byte(workflowName))
 
 		fmt.Println("Workflow owner: ", sc.MustGetRootKeyAddress().Hex())
 		fmt.Println("Workflow name: ", workflowName)
-		fmt.Println("workflowNameBytes: ", string([]byte(workflowName)))
+		fmt.Println("workflowNameBytes: ", string([]byte(truncated)))
 
 		tx, err = feedsConsumerDebugContract.SetConfig(
 			sc.NewTXOpts(),

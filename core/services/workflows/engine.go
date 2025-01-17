@@ -1298,12 +1298,18 @@ func NewEngine(ctx context.Context, cfg Config) (engine *Engine, err error) {
 
 	workflow.id = cfg.WorkflowID
 	workflow.owner = cfg.WorkflowOwner
-	workflow.hexName = hex.EncodeToString([]byte(cfg.WorkflowName))
+	// workflow.hexName = hex.EncodeToString([]byte(cfg.WorkflowName))
 	workflow.name = cfg.WorkflowName
 
+	// if len(cfg.WorkflowNameTransform) > 0 {
+	// 	workflow.hexName = cfg.WorkflowNameTransform
+	// }
+
+	hexName := cfg.WorkflowName
 	if len(cfg.WorkflowNameTransform) > 0 {
-		workflow.hexName = cfg.WorkflowNameTransform
+		hexName = cfg.WorkflowNameTransform
 	}
+	workflow.hexName = hex.EncodeToString([]byte(hexName))
 
 	engine = &Engine{
 		cma:            cma,
