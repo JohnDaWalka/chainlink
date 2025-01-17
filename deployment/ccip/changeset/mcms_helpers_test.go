@@ -32,8 +32,7 @@ func TestMakeTxOptsAndHandlerForContract_UseMCMS(t *testing.T) {
 	require.Equal(t, utils.ZeroAddress, opts.From)
 
 	tx, err := chainState.TokenAdminRegistry.ProposeAdministrator(opts, tokenAddress, chain.DeployerKey.From)
-	require.NoError(t, err)
-	op, err := handle(tx)
+	op, err := handle(tx, err)
 	require.NoError(t, err)
 	require.NotNil(t, op)
 }
@@ -56,8 +55,7 @@ func TestMakeTxOptsAndHandlerForContract_UseDeployer(t *testing.T) {
 	require.Equal(t, chain.DeployerKey.From, opts.From)
 
 	tx, err := chainState.TokenAdminRegistry.ProposeAdministrator(opts, tokenAddress, chain.DeployerKey.From)
-	require.NoError(t, err)
-	op, err := handle(tx)
+	op, err := handle(tx, err)
 	require.NoError(t, err)
 	require.Nil(t, op)
 

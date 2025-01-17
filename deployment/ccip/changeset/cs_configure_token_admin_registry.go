@@ -229,10 +229,7 @@ func createTokenAdminRegistryOps(
 			if tokenConfig.PendingAdministrator != fromAddress {
 				// Propose administrator
 				tx, err := tokenAdminRegistry.ProposeAdministrator(opts, token, fromAddress)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create proposeAdministrator transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
-				}
-				mcmsOp, err := handle(tx)
+				mcmsOp, err := handle(tx, err)
 				if err != nil {
 					return nil, fmt.Errorf("failed to handle proposeAdministrator transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 				}
@@ -242,10 +239,7 @@ func createTokenAdminRegistryOps(
 			}
 			// Accept admin role
 			tx, err := tokenAdminRegistry.AcceptAdminRole(opts, token)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create acceptAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
-			}
-			mcmsOp, err := handle(tx)
+			mcmsOp, err := handle(tx, err)
 			if err != nil {
 				return nil, fmt.Errorf("failed to handle acceptAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 			}
@@ -255,10 +249,7 @@ func createTokenAdminRegistryOps(
 		}
 		// Set pool
 		tx, err := tokenAdminRegistry.SetPool(opts, token, registryUpdate.PoolAddress)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create setPool transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
-		}
-		mcmsOp, err := handle(tx)
+		mcmsOp, err := handle(tx, err)
 		if err != nil {
 			return nil, fmt.Errorf("failed to handle setPool transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 		}
@@ -270,10 +261,7 @@ func createTokenAdminRegistryOps(
 	if registryUpdate.Administrator != fromAddress {
 		// Transfer admin role
 		tx, err := tokenAdminRegistry.TransferAdminRole(opts, token, registryUpdate.Administrator)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create transferAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
-		}
-		mcmsOp, err := handle(tx)
+		mcmsOp, err := handle(tx, err)
 		if err != nil {
 			return nil, fmt.Errorf("failed to handle transferAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 		}

@@ -306,10 +306,7 @@ func configureTokenPool(
 	// Handle new chain support
 	if len(chainAdditions) > 0 {
 		tx, err := tokenPool.ApplyChainUpdates(opts, []uint64{}, chainAdditions)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create applyChainUpdates transaction for token pool with address %s: %w", poolAddress, err)
-		}
-		mcmsOp, err := handle(tx)
+		mcmsOp, err := handle(tx, err)
 		if err != nil {
 			return nil, fmt.Errorf("failed to handle applyChainUpdates transaction for token pool with address %s: %w", poolAddress, err)
 		}
@@ -321,10 +318,7 @@ func configureTokenPool(
 	// Handle updates to existing chain support
 	if len(remoteChainSelectorsToUpdate) > 0 {
 		tx, err := tokenPool.SetChainRateLimiterConfigs(opts, remoteChainSelectorsToUpdate, updatedOutboundConfigs, updatedInboundConfigs)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create setChainRateLimiterConfigs transaction for token pool with address %s: %w", poolAddress, err)
-		}
-		mcmsOp, err := handle(tx)
+		mcmsOp, err := handle(tx, err)
 		if err != nil {
 			return nil, fmt.Errorf("failed to handle setChainRateLimiterConfigs transaction for token pool with address %s: %w", poolAddress, err)
 		}
@@ -336,10 +330,7 @@ func configureTokenPool(
 	// Handle remote pool additions
 	for remoteChainSelector, remotePoolAddress := range remotePoolAddressAdditions {
 		tx, err := tokenPool.AddRemotePool(opts, remoteChainSelector, remotePoolAddress.Bytes())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create addRemotePool transaction for token pool with address %s: %w", poolAddress, err)
-		}
-		mcmsOp, err := handle(tx)
+		mcmsOp, err := handle(tx, err)
 		if err != nil {
 			return nil, fmt.Errorf("failed to handle addRemotePool transaction for token pool with address %s: %w", poolAddress, err)
 		}

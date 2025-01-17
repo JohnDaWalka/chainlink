@@ -19,12 +19,12 @@ type MCMSConfig struct {
 }
 
 // MakeTxOptsAndHandlerForContract creates transaction opts and a handler that either confirms a transaction or adds it to an MCMS proposal,
-// all depending on the current owner of the target contract.
+// all depending on whether or not an MCMS config is supplied.
 func MakeTxOptsAndHandlerForContract(
 	contractAddress common.Address,
 	chain deployment.Chain,
 	mcmsConfig *MCMSConfig,
-) (*bind.TransactOpts, func(tx *types.Transaction) (*mcms.Operation, error), error) {
+) (*bind.TransactOpts, func(tx *types.Transaction, err error) (*mcms.Operation, error), error) {
 	// Set the transaction opts based whether or not the MCMS config was applied
 	var opts *bind.TransactOpts
 	if mcmsConfig != nil {
@@ -34,10 +34,9 @@ func MakeTxOptsAndHandlerForContract(
 	}
 
 	// Create handler
-	handler := func(tx *types.Transaction) (*mcms.Operation, error) {
+	handler := func(tx *types.Transaction, err error) (*mcms.Operation, error) {
 		if opts.From == chain.DeployerKey.From {
-			_, err := chain.Confirm(tx)
-			if err != nil {
+			if _, err = deployment.ConfirmIfNoError(chain, tx, err); err != nil {
 				return nil, fmt.Errorf("failed to confirm transaction with hash %s on %s: %w", tx.Hash(), chain.String(), err)
 			}
 			return nil, nil
