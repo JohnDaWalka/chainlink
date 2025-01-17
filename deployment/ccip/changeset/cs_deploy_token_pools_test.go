@@ -1,4 +1,4 @@
-package changeset
+package changeset_test
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -24,41 +26,41 @@ func TestValidateDeployTokenPoolContractsConfig(t *testing.T) {
 
 	tests := []struct {
 		Msg         string
-		TokenSymbol TokenSymbol
-		Input       DeployTokenPoolContractsConfig
+		TokenSymbol changeset.TokenSymbol
+		Input       changeset.DeployTokenPoolContractsConfig
 		ErrStr      string
 	}{
 		{
 			Msg:    "Token symbol is missing",
-			Input:  DeployTokenPoolContractsConfig{},
+			Input:  changeset.DeployTokenPoolContractsConfig{},
 			ErrStr: "token symbol must be defined",
 		},
 		{
 			Msg: "Chain selector is not valid",
-			Input: DeployTokenPoolContractsConfig{
+			Input: changeset.DeployTokenPoolContractsConfig{
 				TokenSymbol: "TEST",
-				NewPools: map[uint64]DeployTokenPoolInput{
-					0: DeployTokenPoolInput{},
+				NewPools: map[uint64]changeset.DeployTokenPoolInput{
+					0: changeset.DeployTokenPoolInput{},
 				},
 			},
 			ErrStr: "failed to validate chain selector 0",
 		},
 		{
 			Msg: "Chain selector doesn't exist in environment",
-			Input: DeployTokenPoolContractsConfig{
+			Input: changeset.DeployTokenPoolContractsConfig{
 				TokenSymbol: "TEST",
-				NewPools: map[uint64]DeployTokenPoolInput{
-					5009297550715157269: DeployTokenPoolInput{},
+				NewPools: map[uint64]changeset.DeployTokenPoolInput{
+					5009297550715157269: changeset.DeployTokenPoolInput{},
 				},
 			},
 			ErrStr: "chain with selector 5009297550715157269 does not exist in environment",
 		},
 		{
 			Msg: "Router contract is missing from chain",
-			Input: DeployTokenPoolContractsConfig{
+			Input: changeset.DeployTokenPoolContractsConfig{
 				TokenSymbol: "TEST",
-				NewPools: map[uint64]DeployTokenPoolInput{
-					e.AllChainSelectors()[0]: DeployTokenPoolInput{},
+				NewPools: map[uint64]changeset.DeployTokenPoolInput{
+					e.AllChainSelectors()[0]: changeset.DeployTokenPoolInput{},
 				},
 			},
 			ErrStr: fmt.Sprintf("missing router on %d", e.AllChainSelectors()[0]),
@@ -76,39 +78,39 @@ func TestValidateDeployTokenPoolContractsConfig(t *testing.T) {
 func TestValidateDeployTokenPoolInput(t *testing.T) {
 	t.Parallel()
 
-	e, selectorA, _, tokens, _ := setupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
+	e, selectorA, _, tokens, _ := testhelpers.SetupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
 	acceptLiquidity := false
 	invalidAddress := utils.RandomAddress()
 
-	e = deployTestTokenPools(t, e, map[uint64]DeployTokenPoolInput{
+	e = testhelpers.DeployTestTokenPools(t, e, map[uint64]changeset.DeployTokenPoolInput{
 		selectorA: {
-			Type:               BurnMintTokenPool,
+			Type:               changeset.BurnMintTokenPool,
 			TokenAddress:       tokens[selectorA].Address,
-			LocalTokenDecimals: 18,
+			LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 		},
 	}, true)
 
 	tests := []struct {
 		Msg    string
-		Symbol TokenSymbol
-		Input  DeployTokenPoolInput
+		Symbol changeset.TokenSymbol
+		Input  changeset.DeployTokenPoolInput
 		ErrStr string
 	}{
 		{
 			Msg:    "Token address is missing",
-			Input:  DeployTokenPoolInput{},
+			Input:  changeset.DeployTokenPoolInput{},
 			ErrStr: "token address must be defined",
 		},
 		{
 			Msg: "Token pool type is missing",
-			Input: DeployTokenPoolInput{
+			Input: changeset.DeployTokenPoolInput{
 				TokenAddress: invalidAddress,
 			},
 			ErrStr: "type must be defined",
 		},
 		{
 			Msg: "Token pool type is invalid",
-			Input: DeployTokenPoolInput{
+			Input: changeset.DeployTokenPoolInput{
 				TokenAddress: invalidAddress,
 				Type:         deployment.ContractType("InvalidTokenPool"),
 			},
@@ -116,8 +118,8 @@ func TestValidateDeployTokenPoolInput(t *testing.T) {
 		},
 		{
 			Msg: "Token address is invalid",
-			Input: DeployTokenPoolInput{
-				Type:         BurnMintTokenPool,
+			Input: changeset.DeployTokenPoolInput{
+				Type:         changeset.BurnMintTokenPool,
 				TokenAddress: invalidAddress,
 			},
 			ErrStr: fmt.Sprintf("failed to fetch symbol from token with address %s", invalidAddress),
@@ -125,58 +127,58 @@ func TestValidateDeployTokenPoolInput(t *testing.T) {
 		{
 			Msg:    "Token symbol mismatch",
 			Symbol: "WRONG",
-			Input: DeployTokenPoolInput{
-				Type:         BurnMintTokenPool,
+			Input: changeset.DeployTokenPoolInput{
+				Type:         changeset.BurnMintTokenPool,
 				TokenAddress: tokens[selectorA].Address,
 			},
-			ErrStr: fmt.Sprintf("symbol of token with address %s (%s) does not match expected symbol (WRONG)", tokens[selectorA].Address, testTokenSymbol),
+			ErrStr: fmt.Sprintf("symbol of token with address %s (%s) does not match expected symbol (WRONG)", tokens[selectorA].Address, testhelpers.TestTokenSymbol),
 		},
 		{
 			Msg:    "Token decimal mismatch",
-			Symbol: testTokenSymbol,
-			Input: DeployTokenPoolInput{
-				Type:               BurnMintTokenPool,
+			Symbol: testhelpers.TestTokenSymbol,
+			Input: changeset.DeployTokenPoolInput{
+				Type:               changeset.BurnMintTokenPool,
 				TokenAddress:       tokens[selectorA].Address,
 				LocalTokenDecimals: 17,
 			},
-			ErrStr: fmt.Sprintf("decimals of token with address %s (%d) does not match localTokenDecimals (17)", tokens[selectorA].Address, localTokenDecimals),
+			ErrStr: fmt.Sprintf("decimals of token with address %s (%d) does not match localTokenDecimals (17)", tokens[selectorA].Address, testhelpers.LocalTokenDecimals),
 		},
 		{
 			Msg:    "Accept liquidity should be defined",
-			Symbol: testTokenSymbol,
-			Input: DeployTokenPoolInput{
-				Type:               LockReleaseTokenPool,
+			Symbol: testhelpers.TestTokenSymbol,
+			Input: changeset.DeployTokenPoolInput{
+				Type:               changeset.LockReleaseTokenPool,
 				TokenAddress:       tokens[selectorA].Address,
-				LocalTokenDecimals: 18,
+				LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 			},
 			ErrStr: "accept liquidity must be defined for lock release pools",
 		},
 		{
 			Msg:    "Accept liquidity should be omitted",
-			Symbol: testTokenSymbol,
-			Input: DeployTokenPoolInput{
-				Type:               BurnMintTokenPool,
+			Symbol: testhelpers.TestTokenSymbol,
+			Input: changeset.DeployTokenPoolInput{
+				Type:               changeset.BurnMintTokenPool,
 				TokenAddress:       tokens[selectorA].Address,
-				LocalTokenDecimals: 18,
+				LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 				AcceptLiquidity:    &acceptLiquidity,
 			},
 			ErrStr: "accept liquidity must be nil for burn mint pools",
 		},
 		{
 			Msg:    "Token pool already exists",
-			Symbol: testTokenSymbol,
-			Input: DeployTokenPoolInput{
-				Type:               BurnMintTokenPool,
+			Symbol: testhelpers.TestTokenSymbol,
+			Input: changeset.DeployTokenPoolInput{
+				Type:               changeset.BurnMintTokenPool,
 				TokenAddress:       tokens[selectorA].Address,
-				LocalTokenDecimals: 18,
+				LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 			},
-			ErrStr: fmt.Sprintf("token pool already exists for %s on %d (use forceDeployment to bypass)", testTokenSymbol, selectorA),
+			ErrStr: fmt.Sprintf("token pool already exists for %s on %d (use forceDeployment to bypass)", testhelpers.TestTokenSymbol, selectorA),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.Msg, func(t *testing.T) {
-			state, err := LoadOnchainState(e)
+			state, err := changeset.LoadOnchainState(e)
 			require.NoError(t, err)
 
 			err = test.Input.Validate(e.Chains[selectorA], state.Chains[selectorA], test.Symbol)
@@ -188,46 +190,46 @@ func TestValidateDeployTokenPoolInput(t *testing.T) {
 func TestDeployTokenPool(t *testing.T) {
 	t.Parallel()
 
-	e, selectorA, _, tokens, _ := setupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
+	e, selectorA, _, tokens, _ := testhelpers.SetupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
 	acceptLiquidity := false
 
 	tests := []struct {
 		Msg   string
-		Input DeployTokenPoolInput
+		Input changeset.DeployTokenPoolInput
 	}{
 		{
 			Msg: "BurnMint",
-			Input: DeployTokenPoolInput{
+			Input: changeset.DeployTokenPoolInput{
 				TokenAddress:       tokens[selectorA].Address,
-				Type:               BurnMintTokenPool,
-				LocalTokenDecimals: localTokenDecimals,
+				Type:               changeset.BurnMintTokenPool,
+				LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 				AllowList:          []common.Address{},
 			},
 		},
 		{
 			Msg: "BurnWithFromMint",
-			Input: DeployTokenPoolInput{
+			Input: changeset.DeployTokenPoolInput{
 				TokenAddress:       tokens[selectorA].Address,
-				Type:               BurnWithFromMintTokenPool,
-				LocalTokenDecimals: localTokenDecimals,
+				Type:               changeset.BurnWithFromMintTokenPool,
+				LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 				AllowList:          []common.Address{},
 			},
 		},
 		{
 			Msg: "BurnFromMint",
-			Input: DeployTokenPoolInput{
+			Input: changeset.DeployTokenPoolInput{
 				TokenAddress:       tokens[selectorA].Address,
-				Type:               BurnFromMintTokenPool,
-				LocalTokenDecimals: localTokenDecimals,
+				Type:               changeset.BurnFromMintTokenPool,
+				LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 				AllowList:          []common.Address{},
 			},
 		},
 		{
 			Msg: "LockRelease",
-			Input: DeployTokenPoolInput{
+			Input: changeset.DeployTokenPoolInput{
 				TokenAddress:       tokens[selectorA].Address,
-				Type:               LockReleaseTokenPool,
-				LocalTokenDecimals: localTokenDecimals,
+				Type:               changeset.LockReleaseTokenPool,
+				LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 				AllowList:          []common.Address{},
 				AcceptLiquidity:    &acceptLiquidity,
 			},
@@ -237,10 +239,10 @@ func TestDeployTokenPool(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.Msg, func(t *testing.T) {
 			addressBook := deployment.NewMemoryAddressBook()
-			state, err := LoadOnchainState(e)
+			state, err := changeset.LoadOnchainState(e)
 			require.NoError(t, err)
 
-			_, err = deployTokenPool(
+			_, err = changeset.DeployTokenPool(
 				e.Logger,
 				e.Chains[selectorA],
 				state.Chains[selectorA],
@@ -252,21 +254,21 @@ func TestDeployTokenPool(t *testing.T) {
 			err = e.ExistingAddresses.Merge(addressBook)
 			require.NoError(t, err)
 
-			state, err = LoadOnchainState(e)
+			state, err = changeset.LoadOnchainState(e)
 			require.NoError(t, err)
 
 			switch test.Input.Type {
-			case BurnMintTokenPool:
-				_, ok := state.Chains[selectorA].BurnMintTokenPools[testTokenSymbol]
+			case changeset.BurnMintTokenPool:
+				_, ok := state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol]
 				require.True(t, ok)
-			case LockReleaseTokenPool:
-				_, ok := state.Chains[selectorA].LockReleaseTokenPools[testTokenSymbol]
+			case changeset.LockReleaseTokenPool:
+				_, ok := state.Chains[selectorA].LockReleaseTokenPools[testhelpers.TestTokenSymbol]
 				require.True(t, ok)
-			case BurnWithFromMintTokenPool:
-				_, ok := state.Chains[selectorA].BurnWithFromMintTokenPools[testTokenSymbol]
+			case changeset.BurnWithFromMintTokenPool:
+				_, ok := state.Chains[selectorA].BurnWithFromMintTokenPools[testhelpers.TestTokenSymbol]
 				require.True(t, ok)
-			case BurnFromMintTokenPool:
-				_, ok := state.Chains[selectorA].BurnFromMintTokenPools[testTokenSymbol]
+			case changeset.BurnFromMintTokenPool:
+				_, ok := state.Chains[selectorA].BurnFromMintTokenPools[testhelpers.TestTokenSymbol]
 				require.True(t, ok)
 			}
 		})
@@ -300,16 +302,16 @@ func TestDeployTokenPoolContracts(t *testing.T) {
 
 	for _, test := range tests {
 
-		e, selectorA, _, tokens, timelockContracts := setupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
+		e, selectorA, _, tokens, timelockContracts := testhelpers.SetupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
 		changesetApplication := commonchangeset.ChangesetApplication{
-			Changeset: commonchangeset.WrapChangeSet(DeployTokenPoolContracts),
-			Config: DeployTokenPoolContractsConfig{
-				TokenSymbol: testTokenSymbol,
-				NewPools: map[uint64]DeployTokenPoolInput{
+			Changeset: commonchangeset.WrapChangeSet(changeset.DeployTokenPoolContracts),
+			Config: changeset.DeployTokenPoolContractsConfig{
+				TokenSymbol: testhelpers.TestTokenSymbol,
+				NewPools: map[uint64]changeset.DeployTokenPoolInput{
 					selectorA: {
 						TokenAddress:       tokens[selectorA].Address,
-						Type:               BurnMintTokenPool,
-						LocalTokenDecimals: localTokenDecimals,
+						Type:               changeset.BurnMintTokenPool,
+						LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 						AllowList:          []common.Address{},
 						ForceDeployment:    test.ForceDeployment,
 					},
@@ -323,10 +325,10 @@ func TestDeployTokenPoolContracts(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		state, err := LoadOnchainState(e)
+		state, err := changeset.LoadOnchainState(e)
 		require.NoError(t, err)
 
-		burnMintTokenPools, ok := state.Chains[selectorA].BurnMintTokenPools[testTokenSymbol]
+		burnMintTokenPools, ok := state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol]
 		require.True(t, ok)
 		require.Len(t, burnMintTokenPools, 1)
 		owner, err := burnMintTokenPools[0].Owner(nil)
@@ -341,10 +343,10 @@ func TestDeployTokenPoolContracts(t *testing.T) {
 			if test.ErrStr != "" {
 				require.ErrorContains(t, err, fmt.Sprintf("token pool already exists for TEST on %d (use forceDeployment to bypass)", selectorA))
 			} else {
-				state, err = LoadOnchainState(e)
+				state, err = changeset.LoadOnchainState(e)
 				require.NoError(t, err)
 
-				burnMintTokenPools, ok = state.Chains[selectorA].BurnMintTokenPools[testTokenSymbol]
+				burnMintTokenPools, ok = state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol]
 				require.True(t, ok)
 				require.Len(t, burnMintTokenPools, 2)
 			}

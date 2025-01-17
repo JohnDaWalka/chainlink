@@ -161,7 +161,7 @@ func DeployTokenPoolContracts(env deployment.Environment, c DeployTokenPoolContr
 		chain := env.Chains[chainSelector]
 		chainState := state.Chains[chainSelector]
 
-		_, err := deployTokenPool(env.Logger, chain, chainState, newAddresses, poolConfig)
+		_, err := DeployTokenPool(env.Logger, chain, chainState, newAddresses, poolConfig)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy %s token pool on %s: %w", c.TokenSymbol, chain.Name(), err)
 		}
@@ -173,7 +173,7 @@ func DeployTokenPoolContracts(env deployment.Environment, c DeployTokenPoolContr
 }
 
 // deployTokenPool deploys a token pool contract based on a given type & configuration.
-func deployTokenPool(
+func DeployTokenPool(
 	logger logger.Logger,
 	chain deployment.Chain,
 	chainState CCIPChainState,

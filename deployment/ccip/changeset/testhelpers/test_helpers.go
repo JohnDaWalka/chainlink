@@ -19,10 +19,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
-	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
-	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
-	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
@@ -32,7 +29,6 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"go.uber.org/multierr"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
@@ -61,9 +57,6 @@ import (
 const (
 	HomeChainIndex = 0
 	FeedChainIndex = 1
-
-	localTokenDecimals                       = 18
-	testTokenSymbol    changeset.TokenSymbol = "TEST"
 )
 
 var (
@@ -1241,182 +1234,6 @@ func DefaultRouterMessage(receiverAddress common.Address) router.ClientEVM2AnyMe
 		FeeToken:     common.HexToAddress("0x0"),
 		ExtraArgs:    nil,
 	}
-}
-
-// setupTwoChainEnvironmentWithTokens preps the environment for token pool deployment testing
-func setupTwoChainEnvironmentWithTokens(t *testing.T, lggr logger.Logger, transferToTimelock bool) (deployment.Environment, uint64, uint64, map[uint64]*deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677], map[uint64]*proposalutils.TimelockExecutionContracts) {
-	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
-		Chains: 2,
-	})
-	selectors := e.AllChainSelectors()
-
-	addressBook := deployment.NewMemoryAddressBook()
-	prereqCfg := make([]changeset.DeployPrerequisiteConfigPerChain, len(selectors))
-	for i, selector := range selectors {
-		prereqCfg[i] = changeset.DeployPrerequisiteConfigPerChain{
-			ChainSelector: selector,
-		}
-	}
-
-	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfig)
-	for _, selector := range selectors {
-		mcmsCfg[selector] = proposalutils.SingleGroupTimelockConfig(t)
-	}
-
-	// Deploy one burn-mint token per chain to use in the tests
-	tokens := make(map[uint64]*deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677])
-	for _, selector := range selectors {
-		token, err := deployment.DeployContract(e.Logger, e.Chains[selector], addressBook,
-			func(chain deployment.Chain) deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
-				tokenAddress, tx, token, err := burn_mint_erc677.DeployBurnMintERC677(
-					e.Chains[selector].DeployerKey,
-					e.Chains[selector].Client,
-					string(testTokenSymbol),
-					string(testTokenSymbol),
-					localTokenDecimals,
-					big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
-				)
-				return deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
-					Address:  tokenAddress,
-					Contract: token,
-					Tv:       deployment.NewTypeAndVersion(changeset.BurnMintToken, deployment.Version1_0_0),
-					Tx:       tx,
-					Err:      err,
-				}
-			},
-		)
-		require.NoError(t, err)
-		tokens[selector] = token
-	}
-
-	// Deploy MCMS setup & prerequisite contracts
-	e, err := commoncs.ApplyChangesets(t, e, nil, []commoncs.ChangesetApplication{
-		{
-			Changeset: commoncs.WrapChangeSet(changeset.DeployPrerequisitesChangeset),
-			Config: changeset.DeployPrerequisiteConfig{
-				Configs: prereqCfg,
-			},
-		},
-		{
-			Changeset: commoncs.WrapChangeSet(commoncs.DeployMCMSWithTimelock),
-			Config:    mcmsCfg,
-		},
-	})
-	require.NoError(t, err)
-
-	state, err := changeset.LoadOnchainState(e)
-	require.NoError(t, err)
-
-	// We only need the token admin registry to be owned by the timelock in these tests
-	timelockOwnedContractsByChain := make(map[uint64][]common.Address)
-	for _, selector := range selectors {
-		timelockOwnedContractsByChain[selector] = []common.Address{state.Chains[selector].TokenAdminRegistry.Address()}
-	}
-
-	// Assemble map of addresses required for Timelock scheduling & execution
-	timelockContracts := make(map[uint64]*proposalutils.TimelockExecutionContracts)
-	for _, selector := range selectors {
-		timelockContracts[selector] = &proposalutils.TimelockExecutionContracts{
-			Timelock:  state.Chains[selector].Timelock,
-			CallProxy: state.Chains[selector].CallProxy,
-		}
-	}
-
-	if transferToTimelock {
-		// Transfer ownership of token admin registry to the Timelock
-		e, err = commoncs.ApplyChangesets(t, e, timelockContracts, []commoncs.ChangesetApplication{
-			{
-				Changeset: commoncs.WrapChangeSet(commoncs.TransferToMCMSWithTimelock),
-				Config: commoncs.TransferToMCMSWithTimelockConfig{
-					ContractsByChain: timelockOwnedContractsByChain,
-					MinDelay:         0,
-				},
-			},
-		})
-		require.NoError(t, err)
-	}
-
-	return e, selectors[0], selectors[1], tokens, timelockContracts
-}
-
-type addressable interface {
-	Address() common.Address
-}
-
-func getPoolsOwnedByDeployer[T commonchangeset.Ownable](t *testing.T, contracts []T, chain deployment.Chain) []common.Address {
-	var addresses []common.Address
-	for _, contract := range contracts {
-		owner, err := contract.Owner(nil)
-		require.NoError(t, err)
-		if owner == chain.DeployerKey.From {
-			addresses = append(addresses, contract.Address())
-		}
-	}
-	return addresses
-}
-
-func deployTestTokenPools(
-	t *testing.T,
-	e deployment.Environment,
-	newPools map[uint64]changeset.DeployTokenPoolInput,
-	transferToTimelock bool,
-) deployment.Environment {
-	selectors := e.AllChainSelectors()
-
-	e, err := commonchangeset.ApplyChangesets(t, e, nil, []commonchangeset.ChangesetApplication{
-		{
-			Changeset: commonchangeset.WrapChangeSet(changeset.DeployTokenPoolContracts),
-			Config: changeset.DeployTokenPoolContractsConfig{
-				TokenSymbol: testTokenSymbol,
-				NewPools:    newPools,
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	state, err := changeset.LoadOnchainState(e)
-	require.NoError(t, err)
-
-	timelockOwnedContractsByChain := make(map[uint64][]common.Address)
-	for _, selector := range selectors {
-		if newPool, ok := newPools[selector]; ok {
-			switch newPool.Type {
-			case changeset.BurnFromMintTokenPool:
-				timelockOwnedContractsByChain[selector] = getPoolsOwnedByDeployer(t, state.Chains[selector].BurnFromMintTokenPools[testTokenSymbol], e.Chains[selector])
-			case changeset.BurnWithFromMintTokenPool:
-				timelockOwnedContractsByChain[selector] = getPoolsOwnedByDeployer(t, state.Chains[selector].BurnWithFromMintTokenPools[testTokenSymbol], e.Chains[selector])
-			case changeset.BurnMintTokenPool:
-				timelockOwnedContractsByChain[selector] = getPoolsOwnedByDeployer(t, state.Chains[selector].BurnMintTokenPools[testTokenSymbol], e.Chains[selector])
-			case changeset.LockReleaseTokenPool:
-				timelockOwnedContractsByChain[selector] = getPoolsOwnedByDeployer(t, state.Chains[selector].LockReleaseTokenPools[testTokenSymbol], e.Chains[selector])
-			}
-		}
-	}
-
-	// Assemble map of addresses required for Timelock scheduling & execution
-	timelockContracts := make(map[uint64]*proposalutils.TimelockExecutionContracts)
-	for _, selector := range selectors {
-		timelockContracts[selector] = &proposalutils.TimelockExecutionContracts{
-			Timelock:  state.Chains[selector].Timelock,
-			CallProxy: state.Chains[selector].CallProxy,
-		}
-	}
-
-	if transferToTimelock {
-		// Transfer ownership of token admin registry to the Timelock
-		e, err = commoncs.ApplyChangesets(t, e, timelockContracts, []commoncs.ChangesetApplication{
-			{
-				Changeset: commoncs.WrapChangeSet(commoncs.TransferToMCMSWithTimelock),
-				Config: commoncs.TransferToMCMSWithTimelockConfig{
-					ContractsByChain: timelockOwnedContractsByChain,
-					MinDelay:         0,
-				},
-			},
-		})
-		require.NoError(t, err)
-	}
-
-	return e
 }
 
 func GenTestTransferOwnershipConfig(
