@@ -38,22 +38,22 @@ func (c RegistryConfig) Validate(ctx context.Context, chain deployment.Chain, st
 	// Ensure that the given pool address and symbol are aligned and known to the environment
 	tokenPool, err := GetTokenPoolWithSymbolAndAddress(state, chain, tokenSymbol, c.PoolAddress)
 	if err != nil {
-		return fmt.Errorf("failed to find token pool on %s with symbol %s and address %s: %w", chain.Name(), tokenSymbol, c.PoolAddress, err)
+		return fmt.Errorf("failed to find token pool on %s with symbol %s and address %s: %w", chain.String(), tokenSymbol, c.PoolAddress, err)
 	}
 
 	// Validate that the token admin registry is owned by the address that will be actioning the transactions (i.e. Timelock or deployer key)
 	if err := commoncs.ValidateOwnership(ctx, useMcms, chain.DeployerKey.From, state.Timelock.Address(), state.TokenAdminRegistry); err != nil {
-		return fmt.Errorf("token admin registry failed ownership validation on %s: %w", chain.Name(), err)
+		return fmt.Errorf("token admin registry failed ownership validation on %s: %w", chain.String(), err)
 	}
 
 	// Fetch information about the corresponding token and its state on the registry
 	token, err := tokenPool.GetToken(nil)
 	if err != nil {
-		return fmt.Errorf("failed to get token from pool with address %s on chain %s: %w", c.PoolAddress, chain.Name(), err)
+		return fmt.Errorf("failed to get token from pool with address %s on chain %s: %w", c.PoolAddress, chain.String(), err)
 	}
 	tokenConfig, err := state.TokenAdminRegistry.GetTokenConfig(nil, token)
 	if err != nil {
-		return fmt.Errorf("failed to get %s config from registry on chain %s: %w", tokenSymbol, chain.Name(), err)
+		return fmt.Errorf("failed to get %s config from registry on chain %s: %w", tokenSymbol, chain.String(), err)
 	}
 
 	// To update the pool, one of the following must be true
@@ -61,7 +61,7 @@ func (c RegistryConfig) Validate(ctx context.Context, chain deployment.Chain, st
 	//   - The admin of the token doesn't exist yet and we are the owner of the registry
 	registryOwner, err := state.TokenAdminRegistry.Owner(nil)
 	if err != nil {
-		return fmt.Errorf("failed to get owner of registry on chain %s: %w", chain.Name(), err)
+		return fmt.Errorf("failed to get owner of registry on chain %s: %w", chain.String(), err)
 	}
 	fromAddress := state.Timelock.Address() // again, "we" are either the Timelock or the deployer key
 	if !useMcms {
@@ -70,7 +70,7 @@ func (c RegistryConfig) Validate(ctx context.Context, chain deployment.Chain, st
 	weCanBeAdmin := tokenConfig.Administrator == utils.ZeroAddress && fromAddress == registryOwner
 	weAreAdmin := tokenConfig.Administrator == fromAddress
 	if tokenConfig.TokenPool != c.PoolAddress && !(weCanBeAdmin || weAreAdmin) {
-		return fmt.Errorf("address %s is unable to be the admin of %s on %s", fromAddress, tokenSymbol, chain.Name())
+		return fmt.Errorf("address %s is unable to be the admin of %s on %s", fromAddress, tokenSymbol, chain.String())
 	}
 	return nil
 }
@@ -104,19 +104,19 @@ func (c ConfigureTokenAdminRegistryConfig) Validate(env deployment.Environment) 
 		}
 		chainState, ok := state.Chains[chainSelector]
 		if !ok {
-			return fmt.Errorf("%s does not exist in state", chain.Name())
+			return fmt.Errorf("%s does not exist in state", chain.String())
 		}
 		if tokenAdminRegistry := chainState.TokenAdminRegistry; tokenAdminRegistry == nil {
-			return fmt.Errorf("missing tokenAdminRegistry on %s", chain.Name())
+			return fmt.Errorf("missing tokenAdminRegistry on %s", chain.String())
 		}
 		if timelock := chainState.Timelock; timelock == nil {
-			return fmt.Errorf("missing timelock on %s", chain.Name())
+			return fmt.Errorf("missing timelock on %s", chain.String())
 		}
 		if proposerMcm := chainState.ProposerMcm; proposerMcm == nil {
-			return fmt.Errorf("missing proposerMcm on %s", chain.Name())
+			return fmt.Errorf("missing proposerMcm on %s", chain.String())
 		}
 		if err := registryUpdate.Validate(env.GetContext(), chain, chainState, c.MCMS != nil, c.TokenSymbol); err != nil {
-			return fmt.Errorf("invalid pool update on %s: %w", chain.Name(), err)
+			return fmt.Errorf("invalid pool update on %s: %w", chain.String(), err)
 		}
 	}
 
@@ -146,7 +146,7 @@ func ConfigureTokenAdminRegistry(env deployment.Environment, c ConfigureTokenAdm
 
 		operations, err := createTokenAdminRegistryOps(chain, tokenAdminRegistry, registryUpdate, timelock, c.MCMS, c.TokenSymbol)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to make operations to configure token admin registry on %s: %w", chain.Name(), err)
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to make operations to configure token admin registry on %s: %w", chain.String(), err)
 		}
 		if len(operations) > 0 {
 			proposers[chainSelector] = proposerMcm
@@ -200,21 +200,21 @@ func createTokenAdminRegistryOps(
 		mcmsConfig,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make tx opts and handler for registry on %s: %w", chain.Name(), err)
+		return nil, fmt.Errorf("failed to make tx opts and handler for registry on %s: %w", chain.String(), err)
 	}
 
 	tokenPool, err := token_pool.NewTokenPool(registryUpdate.PoolAddress, chain.Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect address %s on chain %s with token pool bindings: %w", registryUpdate.PoolAddress, chain.Name(), err)
+		return nil, fmt.Errorf("failed to connect address %s on chain %s with token pool bindings: %w", registryUpdate.PoolAddress, chain.String(), err)
 	}
 	token, err := tokenPool.GetToken(nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token from address %s on chain %s: %w", registryUpdate.PoolAddress, chain.Name(), err)
+		return nil, fmt.Errorf("failed to get token from address %s on chain %s: %w", registryUpdate.PoolAddress, chain.String(), err)
 	}
 
 	tokenConfig, err := tokenAdminRegistry.GetTokenConfig(nil, token)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get %s config from registry on chain %s: %w", tokenSymbol, chain.Name(), err)
+		return nil, fmt.Errorf("failed to get %s config from registry on chain %s: %w", tokenSymbol, chain.String(), err)
 	}
 
 	fromAddress := timelock.Address()
@@ -230,11 +230,11 @@ func createTokenAdminRegistryOps(
 				// Propose administrator
 				tx, err := tokenAdminRegistry.ProposeAdministrator(opts, token, fromAddress)
 				if err != nil {
-					return nil, fmt.Errorf("failed to create proposeAdministrator transaction for %s on %s registry: %w", tokenSymbol, chain.Name(), err)
+					return nil, fmt.Errorf("failed to create proposeAdministrator transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 				}
 				mcmsOp, err := handle(tx)
 				if err != nil {
-					return nil, fmt.Errorf("failed to handle proposeAdministrator transaction for %s on %s registry: %w", tokenSymbol, chain.Name(), err)
+					return nil, fmt.Errorf("failed to handle proposeAdministrator transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 				}
 				if mcmsOp != nil {
 					operations = append(operations, *mcmsOp)
@@ -243,11 +243,11 @@ func createTokenAdminRegistryOps(
 			// Accept admin role
 			tx, err := tokenAdminRegistry.AcceptAdminRole(opts, token)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create acceptAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.Name(), err)
+				return nil, fmt.Errorf("failed to create acceptAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 			}
 			mcmsOp, err := handle(tx)
 			if err != nil {
-				return nil, fmt.Errorf("failed to handle acceptAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.Name(), err)
+				return nil, fmt.Errorf("failed to handle acceptAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 			}
 			if mcmsOp != nil {
 				operations = append(operations, *mcmsOp)
@@ -256,11 +256,11 @@ func createTokenAdminRegistryOps(
 		// Set pool
 		tx, err := tokenAdminRegistry.SetPool(opts, token, registryUpdate.PoolAddress)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create setPool transaction for %s on %s registry: %w", tokenSymbol, chain.Name(), err)
+			return nil, fmt.Errorf("failed to create setPool transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 		}
 		mcmsOp, err := handle(tx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to handle setPool transaction for %s on %s registry: %w", tokenSymbol, chain.Name(), err)
+			return nil, fmt.Errorf("failed to handle setPool transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 		}
 		if mcmsOp != nil {
 			operations = append(operations, *mcmsOp)
@@ -271,11 +271,11 @@ func createTokenAdminRegistryOps(
 		// Transfer admin role
 		tx, err := tokenAdminRegistry.TransferAdminRole(opts, token, registryUpdate.Administrator)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create transferAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.Name(), err)
+			return nil, fmt.Errorf("failed to create transferAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 		}
 		mcmsOp, err := handle(tx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to handle transferAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.Name(), err)
+			return nil, fmt.Errorf("failed to handle transferAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 		}
 		if mcmsOp != nil {
 			operations = append(operations, *mcmsOp)

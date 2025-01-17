@@ -161,7 +161,7 @@ func TestValidateConfigureTokenAdminRegistryConfig(t *testing.T) {
 					5009297550715157269: changeset.RegistryConfig{},
 				},
 			},
-			ErrStr: "chain with selector 5009297550715157269 does not exist in environment",
+			ErrStr: "chain with selector 5009297550715157269 (5009297550715157269) does not exist in environment",
 		},
 		{
 			Msg: "Token admin registry is missing",

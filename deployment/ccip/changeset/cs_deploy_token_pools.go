@@ -91,10 +91,10 @@ func (i DeployTokenPoolInput) Validate(chain deployment.Chain, state CCIPChainSt
 	// Regardless of requested type, we should check if a token pool of any type already exists
 	tokenPools, err := GetAllTokenPoolsWithSymbol(state, chain.Client, tokenSymbol)
 	if err != nil {
-		return fmt.Errorf("failed to get all token pools with symbol %s on chain %s: %w", tokenSymbol, chain.Name(), err)
+		return fmt.Errorf("failed to get all token pools with symbol %s on chain %s: %w", tokenSymbol, chain.String(), err)
 	}
 	if len(tokenPools) > 0 && !i.ForceDeployment {
-		return fmt.Errorf("token pool already exists for %s on %s (use forceDeployment to bypass)", tokenSymbol, chain.Name())
+		return fmt.Errorf("token pool already exists for %s on %s (use forceDeployment to bypass)", tokenSymbol, chain.String())
 	}
 
 	return nil
@@ -132,10 +132,10 @@ func (c DeployTokenPoolContractsConfig) Validate(env deployment.Environment) err
 			return fmt.Errorf("chain with selector %d does not exist in state", chainSelector)
 		}
 		if router := chainState.Router; router == nil {
-			return fmt.Errorf("missing router on %s", chain.Name())
+			return fmt.Errorf("missing router on %s", chain.String())
 		}
 		if rmnProxy := chainState.RMNProxy; rmnProxy == nil {
-			return fmt.Errorf("missing rmnProxy on %s", chain.Name())
+			return fmt.Errorf("missing rmnProxy on %s", chain.String())
 		}
 		err = poolConfig.Validate(chain, chainState, c.TokenSymbol)
 		if err != nil {
@@ -163,7 +163,7 @@ func DeployTokenPoolContracts(env deployment.Environment, c DeployTokenPoolContr
 
 		_, err := DeployTokenPool(env.Logger, chain, chainState, newAddresses, poolConfig)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy %s token pool on %s: %w", c.TokenSymbol, chain.Name(), err)
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy %s token pool on %s: %w", c.TokenSymbol, chain.String(), err)
 		}
 	}
 

@@ -38,7 +38,7 @@ func MakeTxOptsAndHandlerForContract(
 		if opts.From == chain.DeployerKey.From {
 			_, err := chain.Confirm(tx)
 			if err != nil {
-				return nil, fmt.Errorf("failed to confirm transaction with hash %s on %s: %w", tx.Hash(), chain.Name(), err)
+				return nil, fmt.Errorf("failed to confirm transaction with hash %s on %s: %w", tx.Hash(), chain.String(), err)
 			}
 			return nil, nil
 		}

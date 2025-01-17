@@ -120,7 +120,7 @@ func TestValidateRemoteChains(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.ErrStr, func(t *testing.T) {
-			remoteChains := changeset.RemoteChainsConfig{
+			remoteChains := changeset.RateLimiterPerChain{
 				1: {
 					Inbound: token_pool.RateLimiterConfig{
 						IsEnabled: test.IsEnabled,
@@ -177,14 +177,14 @@ func TestValidateTokenPoolConfig(t *testing.T) {
 			TokenPoolConfig: changeset.TokenPoolConfig{
 				PoolAddress: invalidPoolAddress,
 			},
-			ErrStr: fmt.Sprintf("failed to find token pool on %d with symbol %s and address %s", selectorA, testhelpers.TestTokenSymbol, invalidPoolAddress),
+			ErrStr: fmt.Sprintf("failed to find token pool on %d (%d) with symbol %s and address %s", selectorA, selectorA, testhelpers.TestTokenSymbol, invalidPoolAddress),
 		},
 		{
 			Msg: "Pool is not owned by required address",
 			TokenPoolConfig: changeset.TokenPoolConfig{
 				PoolAddress: poolAddress,
 			},
-			ErrStr: fmt.Sprintf("token pool with address %s on %d failed ownership validation", poolAddress, selectorA),
+			ErrStr: fmt.Sprintf("token pool with address %s on %d (%d) failed ownership validation", poolAddress, selectorA, selectorA),
 		},
 	}
 
@@ -234,7 +234,7 @@ func TestValidateConfigureTokenPoolContractsConfig(t *testing.T) {
 					5009297550715157269: changeset.TokenPoolConfig{},
 				},
 			},
-			ErrStr: "chain with selector 5009297550715157269 does not exist in environment",
+			ErrStr: "chain with selector 5009297550715157269 (5009297550715157269) does not exist in environment",
 		},
 		{
 			Msg: "Corresponding pool update missing",
@@ -242,13 +242,13 @@ func TestValidateConfigureTokenPoolContractsConfig(t *testing.T) {
 				TokenSymbol: testhelpers.TestTokenSymbol,
 				PoolUpdates: map[uint64]changeset.TokenPoolConfig{
 					e.AllChainSelectors()[0]: changeset.TokenPoolConfig{
-						ChainUpdates: changeset.RemoteChainsConfig{
+						ChainUpdates: changeset.RateLimiterPerChain{
 							e.AllChainSelectors()[1]: changeset.RateLimiterConfig{},
 						},
 					},
 				},
 			},
-			ErrStr: fmt.Sprintf("%d is expecting a pool update to be defined for chain with selector %d", e.AllChainSelectors()[0], e.AllChainSelectors()[1]),
+			ErrStr: fmt.Sprintf("%d (%d) is expecting a pool update to be defined for chain with selector %d", e.AllChainSelectors()[0], e.AllChainSelectors()[0], e.AllChainSelectors()[1]),
 		},
 		{
 			Msg: "Corresponding pool update missing a chain update",
@@ -256,14 +256,14 @@ func TestValidateConfigureTokenPoolContractsConfig(t *testing.T) {
 				TokenSymbol: testhelpers.TestTokenSymbol,
 				PoolUpdates: map[uint64]changeset.TokenPoolConfig{
 					e.AllChainSelectors()[0]: changeset.TokenPoolConfig{
-						ChainUpdates: changeset.RemoteChainsConfig{
+						ChainUpdates: changeset.RateLimiterPerChain{
 							e.AllChainSelectors()[1]: changeset.RateLimiterConfig{},
 						},
 					},
 					e.AllChainSelectors()[1]: changeset.TokenPoolConfig{},
 				},
 			},
-			ErrStr: fmt.Sprintf("%d is expecting pool update on chain with selector %d to define a chain config pointing back to it", e.AllChainSelectors()[0], e.AllChainSelectors()[1]),
+			ErrStr: fmt.Sprintf("%d (%d) is expecting pool update on chain with selector %d to define a chain config pointing back to it", e.AllChainSelectors()[0], e.AllChainSelectors()[0], e.AllChainSelectors()[1]),
 		},
 		{
 			Msg: "Token admin registry is missing",
@@ -271,12 +271,12 @@ func TestValidateConfigureTokenPoolContractsConfig(t *testing.T) {
 				TokenSymbol: testhelpers.TestTokenSymbol,
 				PoolUpdates: map[uint64]changeset.TokenPoolConfig{
 					e.AllChainSelectors()[0]: changeset.TokenPoolConfig{
-						ChainUpdates: changeset.RemoteChainsConfig{
+						ChainUpdates: changeset.RateLimiterPerChain{
 							e.AllChainSelectors()[1]: changeset.RateLimiterConfig{},
 						},
 					},
 					e.AllChainSelectors()[1]: changeset.TokenPoolConfig{
-						ChainUpdates: changeset.RemoteChainsConfig{
+						ChainUpdates: changeset.RateLimiterPerChain{
 							e.AllChainSelectors()[0]: changeset.RateLimiterConfig{},
 						},
 					},
@@ -428,13 +428,13 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 								PoolUpdates: map[uint64]changeset.TokenPoolConfig{
 									selectorA: {
 										PoolAddress: pools[selectorA][0].Address(),
-										ChainUpdates: changeset.RemoteChainsConfig{
+										ChainUpdates: changeset.RateLimiterPerChain{
 											selectorB: test.RegistrationPass.SelectorA2B,
 										},
 									},
 									selectorB: {
 										PoolAddress: pools[selectorB][0].Address(),
-										ChainUpdates: changeset.RemoteChainsConfig{
+										ChainUpdates: changeset.RateLimiterPerChain{
 											selectorA: test.RegistrationPass.SelectorB2A,
 										},
 									},
@@ -496,13 +496,13 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 								PoolUpdates: map[uint64]changeset.TokenPoolConfig{
 									selectorA: {
 										PoolAddress: pools[selectorA][test.UpdatePass.PoolIndexA].Address(),
-										ChainUpdates: changeset.RemoteChainsConfig{
+										ChainUpdates: changeset.RateLimiterPerChain{
 											selectorB: test.UpdatePass.SelectorA2B,
 										},
 									},
 									selectorB: {
 										PoolAddress: pools[selectorB][test.UpdatePass.PoolIndexB].Address(),
-										ChainUpdates: changeset.RemoteChainsConfig{
+										ChainUpdates: changeset.RateLimiterPerChain{
 											selectorA: test.UpdatePass.SelectorB2A,
 										},
 									},

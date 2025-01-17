@@ -53,7 +53,7 @@ func TestValidateDeployTokenPoolContractsConfig(t *testing.T) {
 					5009297550715157269: changeset.DeployTokenPoolInput{},
 				},
 			},
-			ErrStr: "chain with selector 5009297550715157269 does not exist in environment",
+			ErrStr: "chain with selector 5009297550715157269 (5009297550715157269) does not exist in environment",
 		},
 		{
 			Msg: "Router contract is missing from chain",
@@ -172,7 +172,7 @@ func TestValidateDeployTokenPoolInput(t *testing.T) {
 				TokenAddress:       tokens[selectorA].Address,
 				LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 			},
-			ErrStr: fmt.Sprintf("token pool already exists for %s on %d (use forceDeployment to bypass)", testhelpers.TestTokenSymbol, selectorA),
+			ErrStr: fmt.Sprintf("token pool already exists for %s on %d (%d) (use forceDeployment to bypass)", testhelpers.TestTokenSymbol, selectorA, selectorA),
 		},
 	}
 

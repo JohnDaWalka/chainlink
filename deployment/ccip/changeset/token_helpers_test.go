@@ -133,6 +133,6 @@ func TestGetTokenPoolWithSymbolAndAddress(t *testing.T) {
 
 	// Get wrong pool
 	tokenPool, err = changeset.GetTokenPoolWithSymbolAndAddress(chainState, chain, testhelpers.TestTokenSymbol, wrongPoolAddress)
-	require.ErrorContains(t, err, fmt.Sprintf("no token pool found with symbol %s and address %s on chain %s", testhelpers.TestTokenSymbol, wrongPoolAddress, chain.Name()))
+	require.ErrorContains(t, err, fmt.Sprintf("no token pool found with symbol %s and address %s on chain %s", testhelpers.TestTokenSymbol, wrongPoolAddress, chain.String()))
 	require.Nil(t, tokenPool)
 }

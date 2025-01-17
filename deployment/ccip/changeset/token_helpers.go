@@ -57,7 +57,7 @@ func GetAllTokenPoolsWithSymbol(
 func GetTokenPoolWithSymbolAndAddress(chainState CCIPChainState, chain deployment.Chain, symbol TokenSymbol, address common.Address) (*token_pool.TokenPool, error) {
 	tokenPools, err := GetAllTokenPoolsWithSymbol(chainState, chain.Client, symbol)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get %s token pools on %s: %w", symbol, chain.Name(), err)
+		return nil, fmt.Errorf("failed to get %s token pools on %s: %w", symbol, chain.String(), err)
 	}
 	var desiredTokenPool *token_pool.TokenPool
 	for _, tokenPool := range tokenPools {
@@ -67,7 +67,7 @@ func GetTokenPoolWithSymbolAndAddress(chainState CCIPChainState, chain deploymen
 		}
 	}
 	if desiredTokenPool == nil {
-		return nil, fmt.Errorf("no token pool found with symbol %s and address %s on chain %s", symbol, address, chain.Name())
+		return nil, fmt.Errorf("no token pool found with symbol %s and address %s on chain %s", symbol, address, chain.String())
 	}
 	return desiredTokenPool, nil
 }
