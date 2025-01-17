@@ -231,10 +231,9 @@ func configureTokenPool(
 	}
 
 	// Create opts and handler
-	opts, handle, err := makeTxOptsAndHandlerForContract(
+	opts, handle, err := MakeTxOptsAndHandlerForContract(
 		poolAddress,
 		chain,
-		chain.DeployerKey,
 		config.MCMS,
 	)
 	if err != nil {

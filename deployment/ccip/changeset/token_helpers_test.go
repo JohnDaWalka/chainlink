@@ -6,12 +6,13 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/stretchr/testify/require"
 )
 
 func TestGetAllTokenPoolsWithSymbol(t *testing.T) {
@@ -75,7 +76,7 @@ func TestGetAllTokenPoolsWithSymbol(t *testing.T) {
 		if i == 0 {
 			tokenPools, err := changeset.GetAllTokenPoolsWithSymbol(state.Chains[selectorA], chain.Client, testhelpers.TestTokenSymbol)
 			require.NoError(t, err)
-			require.Len(t, tokenPools, 0)
+			require.Empty(t, tokenPools)
 		}
 
 		_, err = changeset.DeployTokenPool(l, chain, chainState, addressBook, test.Input)

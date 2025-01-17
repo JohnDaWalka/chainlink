@@ -194,10 +194,9 @@ func createTokenAdminRegistryOps(
 	tokenSymbol TokenSymbol,
 ) ([]mcms.Operation, error) {
 	// Create opts and handler
-	opts, handle, err := makeTxOptsAndHandlerForContract(
+	opts, handle, err := MakeTxOptsAndHandlerForContract(
 		tokenAdminRegistry.Address(),
 		chain,
-		chain.DeployerKey,
 		mcmsConfig,
 	)
 	if err != nil {

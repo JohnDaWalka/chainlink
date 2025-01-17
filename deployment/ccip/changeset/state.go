@@ -731,7 +731,7 @@ func LoadChainState(chain deployment.Chain, addresses map[string]deployment.Type
 	return state, nil
 }
 
-// pool defines behavior common to all token pools
+// pool defines behavior common to all token pools.
 type pool interface {
 	GetToken(opts *bind.CallOpts) (common.Address, error)
 }
@@ -761,7 +761,7 @@ func newTokenPoolWithSymbol[P pool](
 	return pool, TokenSymbol(symbol), nil
 }
 
-// safeAppendToKey safely appends a new value to an array of values assigned to a map key
+// safeAppendToKey safely appends a new value to an array of values assigned to a map key.
 func safeAppendToKey[K comparable, V any](mapping map[K][]V, key K, value V) map[K][]V {
 	if mapping == nil {
 		mapping = make(map[K][]V)
