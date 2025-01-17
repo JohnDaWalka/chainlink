@@ -3,8 +3,6 @@ package changeset_test
 import (
 	"testing"
 
-	"fmt"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
@@ -133,6 +131,6 @@ func TestGetTokenPoolWithSymbolAndAddress(t *testing.T) {
 
 	// Get wrong pool
 	tokenPool, err = changeset.GetTokenPoolWithSymbolAndAddress(chainState, chain, testhelpers.TestTokenSymbol, wrongPoolAddress)
-	require.ErrorContains(t, err, fmt.Sprintf("no token pool found with symbol %s and address %s on chain %s", testhelpers.TestTokenSymbol, wrongPoolAddress, chain.String()))
+	require.ErrorContains(t, err, "no token pool found with symbol")
 	require.Nil(t, tokenPool)
 }

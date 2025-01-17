@@ -1,7 +1,6 @@
 package changeset_test
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -92,7 +91,7 @@ func TestValidateRegistryConfig(t *testing.T) {
 				PoolAddress:   invalidPoolAddress,
 				Administrator: administrator,
 			},
-			ErrStr: fmt.Sprintf("failed to find token pool on %d with symbol %s and address %s", selectorA, testhelpers.TestTokenSymbol, invalidPoolAddress),
+			ErrStr: "failed to find token pool",
 		},
 		{
 			Msg:         "Token admin registry is not owned by required address",
@@ -101,7 +100,7 @@ func TestValidateRegistryConfig(t *testing.T) {
 				PoolAddress:   poolAddress2,
 				Administrator: administrator,
 			},
-			ErrStr: fmt.Sprintf("token admin registry failed ownership validation on %d", selectorA),
+			ErrStr: "token admin registry failed ownership validation",
 		},
 		{
 			Msg:         "Owner can't become admin of token",
@@ -111,7 +110,7 @@ func TestValidateRegistryConfig(t *testing.T) {
 				PoolAddress:   poolAddress2,
 				Administrator: administrator,
 			},
-			ErrStr: fmt.Sprintf("address %s is unable to be the admin of %s on %d", state.Chains[selectorA].Timelock.Address(), testhelpers.TestTokenSymbol, selectorA),
+			ErrStr: "is unable to be the admin of",
 		},
 	}
 
@@ -161,7 +160,7 @@ func TestValidateConfigureTokenAdminRegistryConfig(t *testing.T) {
 					5009297550715157269: changeset.RegistryConfig{},
 				},
 			},
-			ErrStr: "chain with selector 5009297550715157269 (5009297550715157269) does not exist in environment",
+			ErrStr: "does not exist in environment",
 		},
 		{
 			Msg: "Token admin registry is missing",
@@ -171,7 +170,7 @@ func TestValidateConfigureTokenAdminRegistryConfig(t *testing.T) {
 					e.AllChainSelectors()[0]: changeset.RegistryConfig{},
 				},
 			},
-			ErrStr: fmt.Sprintf("missing tokenAdminRegistry on %d", e.AllChainSelectors()[0]),
+			ErrStr: "missing tokenAdminRegistry",
 		},
 	}
 

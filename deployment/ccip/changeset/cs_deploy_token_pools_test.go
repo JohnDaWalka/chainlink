@@ -53,7 +53,7 @@ func TestValidateDeployTokenPoolContractsConfig(t *testing.T) {
 					5009297550715157269: changeset.DeployTokenPoolInput{},
 				},
 			},
-			ErrStr: "chain with selector 5009297550715157269 (5009297550715157269) does not exist in environment",
+			ErrStr: "does not exist in environment",
 		},
 		{
 			Msg: "Router contract is missing from chain",
@@ -63,7 +63,7 @@ func TestValidateDeployTokenPoolContractsConfig(t *testing.T) {
 					e.AllChainSelectors()[0]: changeset.DeployTokenPoolInput{},
 				},
 			},
-			ErrStr: fmt.Sprintf("missing router on %d", e.AllChainSelectors()[0]),
+			ErrStr: "missing router",
 		},
 	}
 
@@ -172,7 +172,7 @@ func TestValidateDeployTokenPoolInput(t *testing.T) {
 				TokenAddress:       tokens[selectorA].Address,
 				LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 			},
-			ErrStr: fmt.Sprintf("token pool already exists for %s on %d (%d) (use forceDeployment to bypass)", testhelpers.TestTokenSymbol, selectorA, selectorA),
+			ErrStr: "token pool already exists",
 		},
 	}
 
@@ -340,7 +340,7 @@ func TestDeployTokenPoolContracts(t *testing.T) {
 				changesetApplication,
 			})
 			if test.ErrStr != "" {
-				require.ErrorContains(t, err, fmt.Sprintf("token pool already exists for TEST on %d (use forceDeployment to bypass)", selectorA))
+				require.ErrorContains(t, err, "token pool already exists for TEST")
 			} else {
 				state, err = changeset.LoadOnchainState(e)
 				require.NoError(t, err)

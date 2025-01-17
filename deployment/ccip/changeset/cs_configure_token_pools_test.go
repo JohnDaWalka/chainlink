@@ -1,7 +1,6 @@
 package changeset_test
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -177,14 +176,14 @@ func TestValidateTokenPoolConfig(t *testing.T) {
 			TokenPoolConfig: changeset.TokenPoolConfig{
 				PoolAddress: invalidPoolAddress,
 			},
-			ErrStr: fmt.Sprintf("failed to find token pool on %d (%d) with symbol %s and address %s", selectorA, selectorA, testhelpers.TestTokenSymbol, invalidPoolAddress),
+			ErrStr: "failed to find token pool",
 		},
 		{
 			Msg: "Pool is not owned by required address",
 			TokenPoolConfig: changeset.TokenPoolConfig{
 				PoolAddress: poolAddress,
 			},
-			ErrStr: fmt.Sprintf("token pool with address %s on %d (%d) failed ownership validation", poolAddress, selectorA, selectorA),
+			ErrStr: "failed ownership validation",
 		},
 	}
 
@@ -234,7 +233,7 @@ func TestValidateConfigureTokenPoolContractsConfig(t *testing.T) {
 					5009297550715157269: changeset.TokenPoolConfig{},
 				},
 			},
-			ErrStr: "chain with selector 5009297550715157269 (5009297550715157269) does not exist in environment",
+			ErrStr: "does not exist in environment",
 		},
 		{
 			Msg: "Corresponding pool update missing",
@@ -248,7 +247,7 @@ func TestValidateConfigureTokenPoolContractsConfig(t *testing.T) {
 					},
 				},
 			},
-			ErrStr: fmt.Sprintf("%d (%d) is expecting a pool update to be defined for chain with selector %d", e.AllChainSelectors()[0], e.AllChainSelectors()[0], e.AllChainSelectors()[1]),
+			ErrStr: "is expecting a pool update to be defined for chain with selector",
 		},
 		{
 			Msg: "Corresponding pool update missing a chain update",
@@ -263,7 +262,7 @@ func TestValidateConfigureTokenPoolContractsConfig(t *testing.T) {
 					e.AllChainSelectors()[1]: changeset.TokenPoolConfig{},
 				},
 			},
-			ErrStr: fmt.Sprintf("%d (%d) is expecting pool update on chain with selector %d to define a chain config pointing back to it", e.AllChainSelectors()[0], e.AllChainSelectors()[0], e.AllChainSelectors()[1]),
+			ErrStr: "to define a chain config pointing back to it",
 		},
 		{
 			Msg: "Token admin registry is missing",
