@@ -66,7 +66,7 @@ func Test_CCIPMessaging(t *testing.T) {
 				TestSetup:              setup,
 				Replayed:               replayed,
 				Nonce:                  nonce,
-				Receiver:               common.HexToAddress("0xdead"),
+				Receiver:               common.HexToAddress("0xdead").Bytes(),
 				MsgData:                []byte("hello eoa"),
 				ExtraArgs:              nil,                                 // default extraArgs
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS, // success because offRamp won't call an EOA
@@ -80,7 +80,7 @@ func Test_CCIPMessaging(t *testing.T) {
 				TestSetup:              setup,
 				Replayed:               out.Replayed,
 				Nonce:                  out.Nonce,
-				Receiver:               state.Chains[destChain].FeeQuoter.Address(),
+				Receiver:               state.Chains[destChain].FeeQuoter.Address().Bytes(),
 				MsgData:                []byte("hello FeeQuoter"),
 				ExtraArgs:              nil,                                 // default extraArgs
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS, // success because offRamp won't call a contract not implementing CCIPReceiver
@@ -96,7 +96,7 @@ func Test_CCIPMessaging(t *testing.T) {
 				TestSetup:              setup,
 				Replayed:               out.Replayed,
 				Nonce:                  out.Nonce,
-				Receiver:               state.Chains[destChain].Receiver.Address(),
+				Receiver:               state.Chains[destChain].Receiver.Address().Bytes(),
 				MsgData:                []byte("hello CCIPReceiver"),
 				ExtraArgs:              nil, // default extraArgs
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
@@ -123,7 +123,7 @@ func Test_CCIPMessaging(t *testing.T) {
 				TestSetup:              setup,
 				Replayed:               out.Replayed,
 				Nonce:                  out.Nonce,
-				Receiver:               state.Chains[destChain].Receiver.Address(),
+				Receiver:               state.Chains[destChain].Receiver.Address().Bytes(),
 				MsgData:                []byte("hello CCIPReceiver with low exec gas"),
 				ExtraArgs:              testhelpers.MakeEVMExtraArgsV2(1, false), // 1 gas is too low.
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_FAILURE,      // state would be failed onchain due to low gas
