@@ -14,18 +14,19 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 )
 
+// MCMSConfig defines timelock duration.
 type MCMSConfig struct {
 	MinDelay time.Duration
 }
 
-// MakeTxOptsAndHandlerForContract creates transaction opts and a handler that either confirms a transaction or adds it to an MCMS proposal,
-// all depending on whether or not an MCMS config is supplied.
+// MakeTxOptsAndHandlerForContract creates transaction opts and a handler that either submits and confirms a transaction or outputs it as an MCMS operation,
+// depending on whether or not an MCMS config is supplied.
 func MakeTxOptsAndHandlerForContract(
 	contractAddress common.Address,
 	chain deployment.Chain,
 	mcmsConfig *MCMSConfig,
 ) (*bind.TransactOpts, func(tx *types.Transaction, err error) (*mcms.Operation, error), error) {
-	// Set the transaction opts based whether or not the MCMS config was applied
+	// Set the transaction opts based whether or not the MCMS config exists
 	var opts *bind.TransactOpts
 	if mcmsConfig != nil {
 		opts = deployment.SimTransactOpts()
