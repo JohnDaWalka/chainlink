@@ -144,11 +144,6 @@ func TestValidateRemoteChains(t *testing.T) {
 func TestValidateTokenPoolConfig(t *testing.T) {
 	t.Parallel()
 
-	lggr := logger.TestLogger(t)
-	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
-		Chains: 2,
-	})
-
 	e, selectorA, _, tokens, _ := testhelpers.SetupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
 
 	e = testhelpers.DeployTestTokenPools(t, e, map[uint64]changeset.DeployTokenPoolInput{
@@ -300,7 +295,6 @@ func TestValidateConfigureTokenPoolContractsConfig(t *testing.T) {
 
 func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 	t.Parallel()
-	lggr := logger.TestLogger(t)
 
 	type regPass struct {
 		SelectorA2B changeset.RateLimiterConfig
@@ -370,10 +364,6 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 	for _, test := range tests {
 		for _, mcmsConfig := range []*changeset.MCMSConfig{nil, &changeset.MCMSConfig{MinDelay: 0 * time.Second}} { // Run all tests with and without MCMS
 			t.Run(test.Msg, func(t *testing.T) {
-				e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
-					Chains: 2,
-				})
-
 				e, selectorA, selectorB, tokens, timelockContracts := testhelpers.SetupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), mcmsConfig != nil)
 
 				e = testhelpers.DeployTestTokenPools(t, e, map[uint64]changeset.DeployTokenPoolInput{

@@ -9,8 +9,7 @@ import (
 )
 
 // getAllTokenPoolsWithSymbol returns a list of all token pools tied to the given token symbol.
-// TODO: Write tests
-func getAllTokenPoolsWithSymbol(
+func GetAllTokenPoolsWithSymbol(
 	chainState CCIPChainState,
 	chainClient deployment.OnchainClient,
 	symbol TokenSymbol,
@@ -54,9 +53,8 @@ func getAllTokenPoolsWithSymbol(
 }
 
 // getTokenPoolWithSymbolAndAddress returns the token pool in the environment linked to both the given symbol and pool address.
-// TODO: Write tests
-func getTokenPoolWithSymbolAndAddress(chainState CCIPChainState, chain deployment.Chain, symbol TokenSymbol, address common.Address) (*token_pool.TokenPool, error) {
-	tokenPools, err := getAllTokenPoolsWithSymbol(chainState, chain.Client, symbol)
+func GetTokenPoolWithSymbolAndAddress(chainState CCIPChainState, chain deployment.Chain, symbol TokenSymbol, address common.Address) (*token_pool.TokenPool, error) {
+	tokenPools, err := GetAllTokenPoolsWithSymbol(chainState, chain.Client, symbol)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get %s token pools on %s: %w", symbol, chain.Name(), err)
 	}

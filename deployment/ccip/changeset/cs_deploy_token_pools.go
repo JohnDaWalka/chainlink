@@ -21,10 +21,10 @@ import (
 var _ deployment.ChangeSet[DeployTokenPoolContractsConfig] = DeployTokenPoolContracts
 
 var tokenTypes map[deployment.ContractType]struct{} = map[deployment.ContractType]struct{}{
-	BurnMintTokenPool:     struct{}{},
-	BurnFromMintTokenPool: struct{}{},
-	BurnFromMintTokenPool: struct{}{},
-	LockReleaseTokenPool:  struct{}{},
+	BurnMintTokenPool:         struct{}{},
+	BurnWithFromMintTokenPool: struct{}{},
+	BurnFromMintTokenPool:     struct{}{},
+	LockReleaseTokenPool:      struct{}{},
 }
 
 // DeployTokenPoolInput defines all information required of the user to deploy a new token pool contract.
@@ -89,7 +89,7 @@ func (i DeployTokenPoolInput) Validate(chain deployment.Chain, state CCIPChainSt
 	}
 
 	// Regardless of requested type, we should check if a token pool of any type already exists
-	tokenPools, err := getAllTokenPoolsWithSymbol(state, chain.Client, tokenSymbol)
+	tokenPools, err := GetAllTokenPoolsWithSymbol(state, chain.Client, tokenSymbol)
 	if err != nil {
 		return fmt.Errorf("failed to get all token pools with symbol %s on chain %s: %w", tokenSymbol, chain.Name(), err)
 	}

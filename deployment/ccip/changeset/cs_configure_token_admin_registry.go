@@ -36,7 +36,7 @@ func (c RegistryConfig) Validate(ctx context.Context, chain deployment.Chain, st
 	}
 
 	// Ensure that the given pool address and symbol are aligned and known to the environment
-	tokenPool, err := getTokenPoolWithSymbolAndAddress(state, chain, tokenSymbol, c.PoolAddress)
+	tokenPool, err := GetTokenPoolWithSymbolAndAddress(state, chain, tokenSymbol, c.PoolAddress)
 	if err != nil {
 		return fmt.Errorf("failed to find token pool on %s with symbol %s and address %s: %w", chain.Name(), tokenSymbol, c.PoolAddress, err)
 	}

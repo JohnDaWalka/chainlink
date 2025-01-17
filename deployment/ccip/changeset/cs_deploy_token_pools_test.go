@@ -301,7 +301,6 @@ func TestDeployTokenPoolContracts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-
 		e, selectorA, _, tokens, timelockContracts := testhelpers.SetupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
 		changesetApplication := commonchangeset.ChangesetApplication{
 			Changeset: commonchangeset.WrapChangeSet(changeset.DeployTokenPoolContracts),

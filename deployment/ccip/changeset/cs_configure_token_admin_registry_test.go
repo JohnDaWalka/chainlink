@@ -19,11 +19,6 @@ import (
 func TestValidateRegistryConfig(t *testing.T) {
 	t.Parallel()
 
-	lggr := logger.TestLogger(t)
-	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
-		Chains: 2,
-	})
-
 	e, selectorA, _, tokens, timelockContracts := testhelpers.SetupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
 	invalidPoolAddress := utils.RandomAddress()
 	administrator := utils.RandomAddress()
@@ -189,7 +184,6 @@ func TestValidateConfigureTokenAdminRegistryConfig(t *testing.T) {
 
 func TestConfigureTokenAdminRegistry(t *testing.T) {
 	t.Parallel()
-	lggr := logger.TestLogger(t)
 
 	tests := []struct {
 		Administrator common.Address
@@ -220,10 +214,6 @@ func TestConfigureTokenAdminRegistry(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Msg, func(t *testing.T) {
-			e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
-				Chains: 2,
-			})
-
 			e, selectorA, _, tokens, timelockContracts := testhelpers.SetupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), test.MCMS != nil)
 
 			e = testhelpers.DeployTestTokenPools(t, e, map[uint64]changeset.DeployTokenPoolInput{
