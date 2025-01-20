@@ -21,6 +21,11 @@ const (
 	LinkSymbol   TokenSymbol = "LINK"
 	WethSymbol   TokenSymbol = "WETH"
 	WAVAXSymbol  TokenSymbol = "WAVAX"
+	WWEMIXSymbol TokenSymbol = "WEEMIX"
+	WXDAISymbol  TokenSymbol = "WXDAI"
+	WBNBSymbol   TokenSymbol = "WBNB"
+	WMATICSymbol TokenSymbol = "WMATIC"
+	WCELOSymbol  TokenSymbol = "WCELO"
 	USDCSymbol   TokenSymbol = "USDC"
 	USDCName     string      = "USD Coin"
 	LinkDecimals             = 18
@@ -31,6 +36,11 @@ const (
 	AvaxUSD = "AVAX / USD"
 	LinkUSD = "LINK / USD"
 	EthUSD  = "ETH / USD"
+	WemixUSD = "WEMIX / USD"
+	XDaiUSD  = "WXDAI / USD"
+	BNBUSD   = "BNB / USD"
+	MaticUSD = "MATIC / USD"
+	CeloUSD  = "CELO / USD"
 
 	// MockLinkAggregatorDescription is the description of the MockV3Aggregator.sol contract
 	// https://github.com/smartcontractkit/chainlink/blob/a348b98e90527520049c580000a86fb8ceff7fa7/contracts/src/v0.8/tests/MockV3Aggregator.sol#L76-L76
@@ -50,6 +60,11 @@ var (
 		LinkUSD:                       LinkSymbol,
 		AvaxUSD:                       WAVAXSymbol,
 		EthUSD:                        WethSymbol,
+		WemixUSD: WWEMIXSymbol,
+		XDaiUSD:  WXDAISymbol,
+		BNBUSD:   WBNBSymbol,
+		MaticUSD: WMATICSymbol,
+		CeloUSD:  WCELOSymbol,
 	}
 	MockSymbolToDescription = map[TokenSymbol]string{
 		LinkSymbol: MockLinkAggregatorDescription,
