@@ -27,12 +27,16 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	ragetypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	geth_types "github.com/ethereum/go-ethereum/core/types"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
+	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/evmcontracts/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/evmcontracts/forwarder"
 	"github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/onchain"
@@ -41,7 +45,10 @@ import (
 
 	cr_wrapper "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	ocr3_capability "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/ocr3_capability"
-	workflow_registry "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/workflow/generated/workflow_registry_wrapper"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/workflow/generated/workflow_registry_wrapper"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
+
+	workflow_registry_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/workflowregistry"
 )
 
 // Copying this to avoid dependency on the core repo
@@ -364,11 +371,11 @@ func TestWorkflow(t *testing.T) {
 		forwarderInstance, err := forwarder.Deploy(sc)
 		require.NoError(t, err)
 
-		workflowRegistryAddr, tx, workflow_registryInstance, err := workflow_registry.DeployWorkflowRegistry(sc.NewTXOpts(), sc.Client)
-		_, decodeErr := sc.Decode(tx, err)
-		require.NoError(t, decodeErr)
+		// workflowRegistryAddr, tx, workflow_registryInstance, err := workflow_registry.DeployWorkflowRegistry(sc.NewTXOpts(), sc.Client)
+		// _, decodeErr := sc.Decode(tx, err)
+		// require.NoError(t, decodeErr)
 
-		_ = workflowRegistryAddr
+		// _ = workflowRegistryAddr
 
 		workFlowData, err := os.ReadFile("./binary.wasm.br")
 		require.NoError(t, err)
@@ -401,6 +408,84 @@ func TestWorkflow(t *testing.T) {
 		donID := uint32(1)
 		workflowID, idErr := GenerateWorkflowIDFromStrings(sc.MustGetRootKeyAddress().Hex(), workflowName, workFlowData, configData, "")
 		require.NoError(t, idErr)
+
+		lgr := logger.TestLogger(t)
+		require.NoError(t, err)
+		addressBook := deployment.NewMemoryAddressBook()
+		chainMap := make(map[uint64]deployment.Chain)
+		ctx := context.Background()
+
+		chainSelector, err := chainselectors.SelectorFromChainId(sc.Cfg.Network.ChainID)
+		require.NoError(t, err)
+		chainMap[chainSelector] = deployment.Chain{
+			Selector:    chainSelector,
+			Client:      sc.Client,
+			DeployerKey: sc.NewTXOpts(seth.WithNonce(nil)), //set nonce to nil, so it will be fetched from the chain
+			Confirm: func(tx *geth_types.Transaction) (uint64, error) {
+				decoded, revertErr := sc.DecodeTx(tx)
+				if revertErr != nil {
+					return 0, revertErr
+				}
+				if decoded.Receipt == nil {
+					return 0, fmt.Errorf("no receipt found for transaction %s even though it wasn't reverted. This should not happen", tx.Hash().String())
+				}
+				return decoded.Receipt.BlockNumber.Uint64(), nil
+			},
+		}
+
+		ctfEnv := deployment.NewEnvironment("ctfV2", lgr, addressBook, chainMap, nil, nil, nil, func() context.Context { return ctx }, deployment.OCRSecrets{})
+
+		output, err := workflow_registry_changeset.Deploy(*ctfEnv, chainSelector)
+		require.NoError(t, err)
+
+		addresses, err := output.AddressBook.AddressesForChain(chainSelector)
+		require.NoError(t, err)
+
+		var workflowRegistryAddr common.Address
+		for addrStr, tv := range addresses {
+			fmt.Println("Address: ", addrStr)
+			fmt.Println("Type and version: ", tv.String())
+			if strings.Contains(tv.String(), "WorkflowRegistry") {
+				workflowRegistryAddr = common.HexToAddress(addrStr)
+			}
+		}
+
+		// TODO really? why do I have to update that manually?
+		ctfEnv.ExistingAddresses = output.AddressBook
+
+		_, err = workflow_registry_changeset.UpdateAllowedDons(*ctfEnv, &workflow_registry_changeset.UpdateAllowedDonsRequest{
+			RegistryChainSel: chainSelector,
+			DonIDs:           []uint32{donID},
+			Allowed:          true,
+		})
+		require.NoError(t, err)
+
+		_, err = workflow_registry_changeset.UpdateAuthorizedAddresses(*ctfEnv, &workflow_registry_changeset.UpdateAuthorizedAddressesRequest{
+			RegistryChainSel: chainSelector,
+			Addresses:        []string{sc.MustGetRootKeyAddress().Hex()},
+			Allowed:          true,
+		})
+		require.NoError(t, err)
+
+		workflow_registryInstance, err := workflow_registry_wrapper.NewWorkflowRegistry(workflowRegistryAddr, sc.Client)
+		require.NoError(t, err)
+
+		wrTx, wrErr := workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), "https://gist.githubusercontent.com/Tofel/3949a5537557c3e2d07524b1a0c857a0/raw/3f7dcbc91fbdb67d598ee0949c03965a771888a3/binary.wasm.br", "", "")
+		_, decodeErr := sc.Decode(wrTx, wrErr)
+		require.NoError(t, decodeErr)
+
+		feedsConsumerDebugAddress, tx, feedsConsumerDebugContract, err := feeds_consumer_debug.DeployFeedsConsumerDebug(
+			sc.NewTXOpts(),
+			sc.Client,
+		)
+		require.NoError(t, err)
+		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		require.NoError(t, err)
+
+		_ = feedsConsumerDebugAddress
+		_ = feedsConsumerDebugContract
+
+		fmt.Println("Deployed feeds_consumer contract at", feedsConsumerDebugAddress.Hex())
 
 		// feedsConsumerDebugAddress, tx, feedsConsumerDebugContract, err := feeds_consumer_debug.DeployFeedsConsumerDebug(
 		// 	sc.NewTXOpts(),
@@ -445,21 +530,21 @@ func TestWorkflow(t *testing.T) {
 		// 2025-01-14 15:11:04 2025-01-14T14:11:04.429Z [ERROR] failed to handle workflow registration: workflowID mismatch: 00b8a8f28d3a29f73c1a052273d4b5ed0951e70eb4fae56f7531539af4aca96f != 00327e3b13a0f5e4da1a9b980e33fde2602043a06289aa6d4eb65af733cb3be6 syncer/workflow_registry.go:485  logger=WorkflowRegistrySyncer stacktrace=github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncer.(*workflowRegistry).loadWorkflows
 
 		// workflowID = "00b8a8f28d3a29f73c1a052273d4b5ed0951e70eb4fae56f7531539af4aca96f"
-		abi, err := workflow_registry.WorkflowRegistryMetaData.GetAbi()
-		require.NoError(t, err)
-		sc.ContractStore.AddABI("WorkflowRegistry", *abi)
+		// abi, err := workflow_registry.WorkflowRegistryMetaData.GetAbi()
+		// require.NoError(t, err)
+		// sc.ContractStore.AddABI("WorkflowRegistry", *abi)
 
-		allowTx, allowErr := workflow_registryInstance.UpdateAllowedDONs(sc.NewTXOpts(), []uint32{donID}, true)
-		_, decodeErr = sc.Decode(allowTx, allowErr)
-		require.NoError(t, decodeErr)
+		// allowTx, allowErr := workflow_registryInstance.UpdateAllowedDONs(sc.NewTXOpts(), []uint32{donID}, true)
+		// _, decodeErr = sc.Decode(allowTx, allowErr)
+		// require.NoError(t, decodeErr)
 
-		allowAddrTx, allowAddrErr := workflow_registryInstance.UpdateAuthorizedAddresses(sc.NewTXOpts(), []common.Address{sc.MustGetRootKeyAddress()}, true)
-		_, decodeErr = sc.Decode(allowAddrTx, allowAddrErr)
-		require.NoError(t, decodeErr)
+		// allowAddrTx, allowAddrErr := workflow_registryInstance.UpdateAuthorizedAddresses(sc.NewTXOpts(), []common.Address{sc.MustGetRootKeyAddress()}, true)
+		// _, decodeErr = sc.Decode(allowAddrTx, allowAddrErr)
+		// require.NoError(t, decodeErr)
 
-		wrTx, wrErr := workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), "https://gist.githubusercontent.com/Tofel/8105d6b8289c253d67d7d0abc60a01d1/raw/a376a30b32b60b8188914ebd092a73f7faec1519/binary.wasm.br", "", "")
-		_, decodeErr = sc.Decode(wrTx, wrErr)
-		require.NoError(t, decodeErr)
+		// wrTx, wrErr := workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), "https://gist.githubusercontent.com/Tofel/8105d6b8289c253d67d7d0abc60a01d1/raw/a376a30b32b60b8188914ebd092a73f7faec1519/binary.wasm.br", "", "")
+		// _, decodeErr = sc.Decode(wrTx, wrErr)
+		// require.NoError(t, decodeErr)
 
 		// TODO: When the capabilities registry address is provided:
 		// - NOPs and nodes are added to the registry.
@@ -601,18 +686,18 @@ func TestWorkflow(t *testing.T) {
 
 		// _ = feeds_consumer_debug.DeployFeedsConsumerDebug
 
-		feedsConsumerDebugAddress, tx, feedsConsumerDebugContract, err := feeds_consumer_debug.DeployFeedsConsumerDebug(
-			sc.NewTXOpts(),
-			sc.Client,
-		)
-		require.NoError(t, err)
-		_, err = bind.WaitMined(context.Background(), sc.Client, tx)
-		require.NoError(t, err)
+		// feedsConsumerDebugAddress, tx, feedsConsumerDebugContract, err := feeds_consumer_debug.DeployFeedsConsumerDebug(
+		// 	sc.NewTXOpts(),
+		// 	sc.Client,
+		// )
+		// require.NoError(t, err)
+		// _, err = bind.WaitMined(context.Background(), sc.Client, tx)
+		// require.NoError(t, err)
 
-		_ = feedsConsumerDebugAddress
-		_ = feedsConsumerDebugContract
+		// _ = feedsConsumerDebugAddress
+		// _ = feedsConsumerDebugContract
 
-		fmt.Println("Deployed feeds_consumer contract at", feedsConsumerDebugAddress.Hex())
+		// fmt.Println("Deployed feeds_consumer contract at", feedsConsumerDebugAddress.Hex())
 
 		// feedsConsumerAddress, tx, feedsConsumerContract, err := feeds_consumer.DeployKeystoneFeedsConsumer(
 		// 	sc.NewTXOpts(),
