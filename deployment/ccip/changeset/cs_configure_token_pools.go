@@ -8,15 +8,11 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/mcms"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
-	rbac_timelock "github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
-	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
@@ -150,11 +146,13 @@ func (c ConfigureTokenPoolContractsConfig) Validate(env deployment.Environment) 
 		if tokenAdminRegistry := chainState.TokenAdminRegistry; tokenAdminRegistry == nil {
 			return fmt.Errorf("missing tokenAdminRegistry on %s", chain.String())
 		}
-		if timelock := chainState.Timelock; timelock == nil {
-			return fmt.Errorf("missing timelock on %s", chain.String())
-		}
-		if proposerMcm := chainState.ProposerMcm; proposerMcm == nil {
-			return fmt.Errorf("missing proposerMcm on %s", chain.String())
+		if c.MCMS != nil {
+			if timelock := chainState.Timelock; timelock == nil {
+				return fmt.Errorf("missing timelock on %s", chain.String())
+			}
+			if proposerMcm := chainState.ProposerMcm; proposerMcm == nil {
+				return fmt.Errorf("missing proposerMcm on %s", chain.String())
+			}
 		}
 		if err := poolUpdate.Validate(env.GetContext(), chain, chainState, c.MCMS != nil, c.TokenSymbol); err != nil {
 			return fmt.Errorf("invalid pool update on %s: %w", chain.String(), err)
@@ -175,76 +173,38 @@ func ConfigureTokenPoolContractsChangeset(env deployment.Environment, c Configur
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
+	deployerGroup := NewDeployerGroup(env, state, c.MCMS)
 
-	var batches []timelock.BatchChainOperation
-	timelocks := make(map[uint64]common.Address)
-	proposers := make(map[uint64]*gethwrappers.ManyChainMultiSig)
 	for chainSelector := range c.PoolUpdates {
 		chain := env.Chains[chainSelector]
-		chainState := state.Chains[chainSelector]
 
-		operations, err := configureTokenPool(env.Chains, state, c, chainSelector)
+		opts, err := deployerGroup.GetDeployer(chainSelector)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get deployer for %s", chain)
+		}
+		err = configureTokenPool(opts, env.Chains, state, c, chainSelector)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to make operations to configure %s token pool on %s: %w", c.TokenSymbol, chain.String(), err)
 		}
-		if len(operations) > 0 {
-			proposers[chainSelector] = chainState.ProposerMcm
-			timelocks[chainSelector] = chainState.Timelock.Address()
-			batches = append(batches, rbac_timelock.BatchChainOperation{
-				Batch:           operations,
-				ChainIdentifier: mcms.ChainIdentifier(chainSelector),
-			})
-		}
 	}
 
-	if len(batches) > 0 {
-		proposal, err := proposalutils.BuildProposalFromBatches(
-			timelocks,
-			proposers,
-			batches,
-			fmt.Sprintf("configure %s token pools", c.TokenSymbol),
-			c.MCMS.MinDelay,
-		)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to build proposal: %w", err)
-		}
-		return deployment.ChangesetOutput{
-			Proposals:   []rbac_timelock.MCMSWithTimelockProposal{*proposal},
-			AddressBook: nil,
-			JobSpecs:    nil,
-		}, nil
-	}
-
-	return deployment.ChangesetOutput{
-		Proposals:   []timelock.MCMSWithTimelockProposal{},
-		AddressBook: nil,
-		JobSpecs:    nil,
-	}, nil
+	return deployerGroup.Enact(fmt.Sprintf("configure %s token pools", c.TokenSymbol))
 }
 
 // configureTokenPool creates all transactions required to configure the desired token pool on a chain,
 // either applying the transactions with the deployer key or returning an MCMS proposal.
 func configureTokenPool(
+	opts *bind.TransactOpts,
 	chains map[uint64]deployment.Chain,
 	state CCIPOnChainState,
 	config ConfigureTokenPoolContractsConfig,
 	chainSelector uint64,
-) ([]mcms.Operation, error) {
+) error {
 	poolUpdate := config.PoolUpdates[chainSelector]
 	chain := chains[chainSelector]
 	tokenPool, _, tokenConfig, err := getTokenStateFromPool(config.TokenSymbol, poolUpdate.Type, poolUpdate.Version, chain, state.Chains[chainSelector])
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token state from pool with address %s on %s: %w", tokenPool.Address(), chain.String(), err)
-	}
-
-	// Create opts and handler
-	opts, handle, err := MakeTxOptsAndHandlerForContract(
-		tokenPool.Address(),
-		chain,
-		config.MCMS,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make transaction opts and handler for pool with address %s on %s: %w", tokenPool.Address(), chain.String(), err)
+		return fmt.Errorf("failed to get token state from pool with address %s on %s: %w", tokenPool.Address(), chain.String(), err)
 	}
 
 	// For adding chain support
@@ -259,13 +219,13 @@ func configureTokenPool(
 	for remoteChainSelector, chainUpdate := range poolUpdate.ChainUpdates {
 		isSupportedChain, err := tokenPool.IsSupportedChain(nil, remoteChainSelector)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if %d is supported on pool with address %s on %s: %w", remoteChainSelector, tokenPool.Address(), chain.String(), err)
+			return fmt.Errorf("failed to check if %d is supported on pool with address %s on %s: %w", remoteChainSelector, tokenPool.Address(), chain.String(), err)
 		}
 		remoteChain := chains[remoteChainSelector]
 		remotePoolUpdate := config.PoolUpdates[remoteChainSelector]
 		remoteTokenPool, remoteTokenAddress, remoteTokenConfig, err := getTokenStateFromPool(config.TokenSymbol, remotePoolUpdate.Type, remotePoolUpdate.Version, remoteChain, state.Chains[remoteChainSelector])
 		if err != nil {
-			return nil, fmt.Errorf("failed to get token state from pool with address %s on %s: %w", tokenPool.Address(), chain.String(), err)
+			return fmt.Errorf("failed to get token state from pool with address %s on %s: %w", tokenPool.Address(), chain.String(), err)
 		}
 		if isSupportedChain {
 			// Just update the rate limits if the chain is already supported
@@ -286,11 +246,11 @@ func configureTokenPool(
 			if tokenConfig.TokenPool != utils.ZeroAddress && tokenConfig.TokenPool != tokenPool.Address() {
 				activeTokenPool, err := token_pool.NewTokenPool(tokenConfig.TokenPool, chain.Client)
 				if err != nil {
-					return nil, fmt.Errorf("failed to connect pool with address %s on %s with token pool bindings: %w", tokenConfig.TokenPool, chain.String(), err)
+					return fmt.Errorf("failed to connect pool with address %s on %s with token pool bindings: %w", tokenConfig.TokenPool, chain.String(), err)
 				}
 				remotePoolAddressesOnChain, err := activeTokenPool.GetRemotePools(nil, remoteChainSelector)
 				if err != nil {
-					return nil, fmt.Errorf("failed to fetch remote pools from token pool with address %s on chain %s: %w", tokenConfig.TokenPool, chain.String(), err)
+					return fmt.Errorf("failed to fetch remote pools from token pool with address %s on chain %s: %w", tokenConfig.TokenPool, chain.String(), err)
 				}
 				for _, address := range remotePoolAddressesOnChain {
 					if !bytes.Equal(address, remoteTokenPool.Address().Bytes()) {
@@ -308,45 +268,31 @@ func configureTokenPool(
 		}
 	}
 
-	var operations []mcms.Operation
-
 	// Handle new chain support
 	if len(chainAdditions) > 0 {
-		tx, err := tokenPool.ApplyChainUpdates(opts, []uint64{}, chainAdditions)
-		mcmsOp, err := handle(tx, err)
+		_, err := tokenPool.ApplyChainUpdates(opts, []uint64{}, chainAdditions)
 		if err != nil {
-			return nil, fmt.Errorf("failed to handle applyChainUpdates transaction for token pool with address %s: %w", tokenPool.Address(), err)
-		}
-		if mcmsOp != nil {
-			operations = append(operations, *mcmsOp)
+			return fmt.Errorf("failed to create applyChainUpdates transaction for token pool with address %s: %w", tokenPool.Address(), err)
 		}
 	}
 
 	// Handle updates to existing chain support
 	if len(remoteChainSelectorsToUpdate) > 0 {
-		tx, err := tokenPool.SetChainRateLimiterConfigs(opts, remoteChainSelectorsToUpdate, updatedOutboundConfigs, updatedInboundConfigs)
-		mcmsOp, err := handle(tx, err)
+		_, err := tokenPool.SetChainRateLimiterConfigs(opts, remoteChainSelectorsToUpdate, updatedOutboundConfigs, updatedInboundConfigs)
 		if err != nil {
-			return nil, fmt.Errorf("failed to handle setChainRateLimiterConfigs transaction for token pool with address %s: %w", tokenPool.Address(), err)
-		}
-		if mcmsOp != nil {
-			operations = append(operations, *mcmsOp)
+			return fmt.Errorf("failed to create setChainRateLimiterConfigs transaction for token pool with address %s: %w", tokenPool.Address(), err)
 		}
 	}
 
 	// Handle remote pool additions
 	for remoteChainSelector, remotePoolAddress := range remotePoolAddressAdditions {
-		tx, err := tokenPool.AddRemotePool(opts, remoteChainSelector, remotePoolAddress.Bytes())
-		mcmsOp, err := handle(tx, err)
+		_, err := tokenPool.AddRemotePool(opts, remoteChainSelector, remotePoolAddress.Bytes())
 		if err != nil {
-			return nil, fmt.Errorf("failed to handle addRemotePool transaction for token pool with address %s: %w", tokenPool.Address(), err)
-		}
-		if mcmsOp != nil {
-			operations = append(operations, *mcmsOp)
+			return fmt.Errorf("failed to create addRemotePool transaction for token pool with address %s: %w", tokenPool.Address(), err)
 		}
 	}
 
-	return operations, nil
+	return nil
 }
 
 // getTokenStateFromPool fetches the token config from the registry given the pool address
