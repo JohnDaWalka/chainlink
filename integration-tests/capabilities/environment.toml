@@ -31,7 +31,7 @@
   [[nodeset.node_specs]]
 
     [nodeset.node_specs.node]
-      capabilities = ["./streams-linux-amd64", "./cron-linux-amd64"]
+      capabilities = ["./cron-linux-amd64"]
       docker_ctx = "../.."
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
@@ -50,7 +50,7 @@
   [[nodeset.node_specs]]
 
     [nodeset.node_specs.node]
-      capabilities = ["./streams-linux-amd64", "./cron-linux-amd64"]
+      capabilities = ["./cron-linux-amd64"]
       docker_ctx = "../.."
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
@@ -69,7 +69,7 @@
   [[nodeset.node_specs]]
 
     [nodeset.node_specs.node]
-      capabilities = ["./streams-linux-amd64", "./cron-linux-amd64"]
+      capabilities = ["./cron-linux-amd64"]
       docker_ctx = "../.."
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
@@ -88,7 +88,7 @@
   [[nodeset.node_specs]]
 
     [nodeset.node_specs.node]
-      capabilities = ["./streams-linux-amd64", "./cron-linux-amd64"]
+      capabilities = ["./cron-linux-amd64"]
       docker_ctx = "../.."
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """

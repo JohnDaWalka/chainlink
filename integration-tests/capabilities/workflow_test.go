@@ -337,12 +337,6 @@ func TestWorkflow(t *testing.T) {
 		require.NoError(t, capabilitiesRegistryInstance.AddCapabilities(
 			[]cr_wrapper.CapabilitiesRegistryCapability{
 				{
-					LabelledName:   "mock-streams-trigger",
-					Version:        "1.0.0",
-					CapabilityType: 0, // TRIGGER
-					ResponseType:   0, // REPORT
-				},
-				{
 					LabelledName:   "offchain_reporting",
 					Version:        "1.0.0",
 					CapabilityType: 2, // CONSENSUS
@@ -749,17 +743,6 @@ func TestWorkflow(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-
-				scJobSpec := `
-					type = "standardcapabilities"
-					schemaVersion = 1
-					name = "streams-capabilities"
-					command="/home/capabilities/streams-linux-amd64"
-				`
-				response, _, err2 := nodeClient.CreateJobRaw(scJobSpec)
-				assert.NoError(t, err2)
-				assert.Empty(t, response.Errors)
-
 				cronJobSpec := `
 					type = "standardcapabilities"
 					schemaVersion = 1
@@ -769,8 +752,8 @@ func TestWorkflow(t *testing.T) {
 					config = ""
 				`
 
-				response, _, err3 := nodeClient.CreateJobRaw(cronJobSpec)
-				assert.NoError(t, err3)
+				response, _, errCron := nodeClient.CreateJobRaw(cronJobSpec)
+				assert.NoError(t, errCron)
 				assert.Empty(t, response.Errors)
 
 				computeJobSpec := `
@@ -789,8 +772,8 @@ func TestWorkflow(t *testing.T) {
 					"""
 				`
 
-				response, _, err4 := nodeClient.CreateJobRaw(computeJobSpec)
-				assert.NoError(t, err4)
+				response, _, errCompute := nodeClient.CreateJobRaw(computeJobSpec)
+				assert.NoError(t, errCompute)
 				assert.Empty(t, response.Errors)
 
 				consensusJobSpec := fmt.Sprintf(`
@@ -830,8 +813,8 @@ func TestWorkflow(t *testing.T) {
 					nodesInfo[i].OcrKeyBundleID,
 				)
 				fmt.Println("consensusJobSpec", consensusJobSpec)
-				response, _, err2 = nodeClient.CreateJobRaw(consensusJobSpec)
-				assert.NoError(t, err2)
+				response, _, errCons := nodeClient.CreateJobRaw(consensusJobSpec)
+				assert.NoError(t, errCons)
 				assert.Empty(t, response.Errors)
 			}()
 		}
@@ -902,10 +885,6 @@ func TestWorkflow(t *testing.T) {
 				},
 				{
 					CapabilityId: capabilitiesRegistryInstance.ExistingHashedCapabilitiesIDs[3],
-					Config:       []byte(""),
-				},
-				{
-					CapabilityId: capabilitiesRegistryInstance.ExistingHashedCapabilitiesIDs[4],
 					Config:       []byte(""),
 				},
 			},
