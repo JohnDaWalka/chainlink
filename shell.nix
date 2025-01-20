@@ -97,12 +97,10 @@ in
         pkg-config
         libudev-zero
         libusb1
-        solanaBinaries.x86_64-linux
       ] ++ lib.optionals isCrib [
         nur.repos.goreleaser.goreleaser-pro
         patchelf
       ] ++ pkgs.lib.optionals (pkgs.stdenv.isDarwin && pkgs.stdenv.hostPlatform.isAarch64) [
-        solanaBinaries.aarch64-apple-darwin
       ];
 
     shellHook = ''

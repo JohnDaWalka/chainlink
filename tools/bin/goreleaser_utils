@@ -73,12 +73,15 @@ get_remote_plugin_paths() {
 }
 
 build_standard_capabilities() {
+  echo "Building standard capabilities"
+  echo "$PWD"
   cd ./capabilities
+  
   npx nx@19.8.2 init
   ./nx run-many -t build
   # binaries get put into /bin under /bin/amd64/ and /bin/arm64/
   cp "./bin/$(go env GOARCH)"/* "../$lib_path/plugins" 
-  cd ../
+  cd ..
 }
 
 install_remote_plugins() {
