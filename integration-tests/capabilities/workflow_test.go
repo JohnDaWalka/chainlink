@@ -37,11 +37,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/evmcontracts/capabilities_registry"
-	"github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/evmcontracts/forwarder"
 	"github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/onchain"
 
 	cr_wrapper "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/forwarder"
 	ocr3_capability "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/ocr3_capability"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/workflow/generated/workflow_registry_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -367,8 +367,49 @@ func TestWorkflow(t *testing.T) {
 			},
 		))
 
-		forwarderInstance, err := forwarder.Deploy(sc)
+		lgr := logger.TestLogger(t)
 		require.NoError(t, err)
+		addressBook := deployment.NewMemoryAddressBook()
+		chainMap := make(map[uint64]deployment.Chain)
+		ctx := context.Background()
+
+		chainSelector, err := chainselectors.SelectorFromChainId(sc.Cfg.Network.ChainID)
+		require.NoError(t, err)
+		chainMap[chainSelector] = deployment.Chain{
+			Selector:    chainSelector,
+			Client:      sc.Client,
+			DeployerKey: sc.NewTXOpts(seth.WithNonce(nil)), //set nonce to nil, so it will be fetched from the chain
+			Confirm: func(tx *geth_types.Transaction) (uint64, error) {
+				decoded, revertErr := sc.DecodeTx(tx)
+				if revertErr != nil {
+					return 0, revertErr
+				}
+				if decoded.Receipt == nil {
+					return 0, fmt.Errorf("no receipt found for transaction %s even though it wasn't reverted. This should not happen", tx.Hash().String())
+				}
+				return decoded.Receipt.BlockNumber.Uint64(), nil
+			},
+		}
+
+		ctfEnv := deployment.NewEnvironment("ctfV2", lgr, addressBook, chainMap, nil, nil, nil, func() context.Context { return ctx }, deployment.OCRSecrets{})
+
+		output, err := keystone_changeset.DeployForwarder(*ctfEnv, keystone_changeset.DeployForwarderRequest{
+			ChainSelectors: []uint64{chainSelector},
+		})
+		require.NoError(t, err)
+
+		addresses, err := output.AddressBook.AddressesForChain(chainSelector)
+		require.NoError(t, err)
+
+		var forwarderAddress common.Address
+		for addrStr, tv := range addresses {
+			fmt.Println("Address: ", addrStr)
+			fmt.Println("Type and version: ", tv.String())
+			if strings.Contains(tv.String(), "KeystoneForwarder") {
+				forwarderAddress = common.HexToAddress(addrStr)
+				break
+			}
+		}
 
 		// workflowRegistryAddr, tx, workflow_registryInstance, err := workflow_registry.DeployWorkflowRegistry(sc.NewTXOpts(), sc.Client)
 		// _, decodeErr := sc.Decode(tx, err)
@@ -408,36 +449,10 @@ func TestWorkflow(t *testing.T) {
 		workflowID, idErr := GenerateWorkflowIDFromStrings(sc.MustGetRootKeyAddress().Hex(), workflowName, workFlowData, configData, "")
 		require.NoError(t, idErr)
 
-		lgr := logger.TestLogger(t)
-		require.NoError(t, err)
-		addressBook := deployment.NewMemoryAddressBook()
-		chainMap := make(map[uint64]deployment.Chain)
-		ctx := context.Background()
-
-		chainSelector, err := chainselectors.SelectorFromChainId(sc.Cfg.Network.ChainID)
-		require.NoError(t, err)
-		chainMap[chainSelector] = deployment.Chain{
-			Selector:    chainSelector,
-			Client:      sc.Client,
-			DeployerKey: sc.NewTXOpts(seth.WithNonce(nil)), //set nonce to nil, so it will be fetched from the chain
-			Confirm: func(tx *geth_types.Transaction) (uint64, error) {
-				decoded, revertErr := sc.DecodeTx(tx)
-				if revertErr != nil {
-					return 0, revertErr
-				}
-				if decoded.Receipt == nil {
-					return 0, fmt.Errorf("no receipt found for transaction %s even though it wasn't reverted. This should not happen", tx.Hash().String())
-				}
-				return decoded.Receipt.BlockNumber.Uint64(), nil
-			},
-		}
-
-		ctfEnv := deployment.NewEnvironment("ctfV2", lgr, addressBook, chainMap, nil, nil, nil, func() context.Context { return ctx }, deployment.OCRSecrets{})
-
-		output, err := workflow_registry_changeset.Deploy(*ctfEnv, chainSelector)
+		output, err = workflow_registry_changeset.Deploy(*ctfEnv, chainSelector)
 		require.NoError(t, err)
 
-		addresses, err := output.AddressBook.AddressesForChain(chainSelector)
+		addresses, err = output.AddressBook.AddressesForChain(chainSelector)
 		require.NoError(t, err)
 
 		var workflowRegistryAddr common.Address
@@ -501,7 +516,7 @@ func TestWorkflow(t *testing.T) {
 
 		tx, err := feedsConsumerInstance.SetConfig(
 			sc.NewTXOpts(),
-			[]common.Address{forwarderInstance.Address},
+			[]common.Address{forwarderAddress},
 			[]common.Address{sc.MustGetRootKeyAddress()},
 			[][10]byte{workflowNameBytes},
 		)
@@ -691,7 +706,7 @@ func TestWorkflow(t *testing.T) {
 				bc.Nodes[0].DockerInternalWSUrl,
 				bc.Nodes[0].DockerInternalHTTPUrl,
 				workflowNodesetInfo[i].TransmitterAddress,
-				forwarderInstance.Address,
+				forwarderAddress.Hex(),
 				capabilitiesRegistryInstance.Address,
 				bc.ChainID,
 				workflowRegistryAddr.Hex(),
@@ -999,12 +1014,16 @@ func TestWorkflow(t *testing.T) {
 		_, decodeErr = sc.Decode(tx, err)
 		require.NoError(t, decodeErr)
 
-		require.NoError(t, forwarderInstance.SetConfig(
+		forwarderInstance, err := forwarder.NewKeystoneForwarder(forwarderAddress, sc.Client)
+		require.NoError(t, err)
+
+		_, err = sc.Decode(forwarderInstance.SetConfig(
+			sc.NewTXOpts(),
 			1,
 			1,
 			1,
-			signers,
-		))
+			signers))
+		require.NoError(t, err)
 
 		// Wait for OCR listeners to be ready before setting the configuration.
 		// If the ConfigSet event is missed, OCR protocol will not start.
