@@ -716,7 +716,8 @@ func createTopicFilters(hashedTopics []common.Hash) (query.Expression, error) {
 	var expressions []query.Expression
 	for topicID, hash := range hashedTopics {
 		expressions = append(expressions, logpoller.NewEventByTopicFilter(
-			uint64(topicID), []logpoller.HashedValueComparator{{Values: []common.Hash{hash}, Operator: primitives.Eq}},
+			// adding 1 to skip even signature
+			uint64(topicID+1), []logpoller.HashedValueComparator{{Values: []common.Hash{hash}, Operator: primitives.Eq}},
 		))
 	}
 

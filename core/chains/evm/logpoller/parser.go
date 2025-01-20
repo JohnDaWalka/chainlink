@@ -210,6 +210,12 @@ func (v *pgDSLParser) hashedValueCmpToCondition(comp HashedValueComparator, colu
 	if err != nil {
 		return "", err
 	}
+
+	// simplify query for Postgres as in some cases, it's not that smart
+	if len(comp.Values) == 1 {
+		return fmt.Sprintf("%s %s :%s", column, cmp, v.args.withIndexedField(fieldName, comp.Values[0])), nil
+	}
+
 	return fmt.Sprintf("%s %s ANY(:%s)", column, cmp, v.args.withIndexedField(fieldName, comp.Values)), nil
 }
 
