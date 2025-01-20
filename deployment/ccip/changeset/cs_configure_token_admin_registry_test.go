@@ -20,7 +20,6 @@ func TestValidateRegistryConfig(t *testing.T) {
 	t.Parallel()
 
 	e, selectorA, _, tokens, timelockContracts := testhelpers.SetupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
-	invalidPoolAddress := utils.RandomAddress()
 	administrator := utils.RandomAddress()
 
 	e = testhelpers.DeployTestTokenPools(t, e, map[uint64]changeset.DeployTokenPoolInput{
@@ -34,7 +33,7 @@ func TestValidateRegistryConfig(t *testing.T) {
 	// Deploy another token pool with force enabled
 	e = testhelpers.DeployTestTokenPools(t, e, map[uint64]changeset.DeployTokenPoolInput{
 		selectorA: {
-			Type:               changeset.BurnMintTokenPool,
+			Type:               changeset.BurnWithFromMintTokenPool,
 			TokenAddress:       tokens[selectorA].Address,
 			LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 			ForceDeployment:    true,
@@ -44,14 +43,12 @@ func TestValidateRegistryConfig(t *testing.T) {
 	state, err := changeset.LoadOnchainState(e)
 	require.NoError(t, err)
 
-	poolAddress1 := state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][0].Address()
-	poolAddress2 := state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][1].Address()
 	tokenAdminRegistry := state.Chains[selectorA].TokenAdminRegistry
 
 	// We want to transfer the admin role of the pool to the deployer to get a validation failure in the last test
 	e, err = commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
 		{
-			Changeset: commonchangeset.WrapChangeSet(changeset.ConfigureTokenAdminRegistry),
+			Changeset: commonchangeset.WrapChangeSet(changeset.ConfigureTokenAdminRegistryChangeset),
 			Config: changeset.ConfigureTokenAdminRegistryConfig{
 				TokenSymbol: testhelpers.TestTokenSymbol,
 				MCMS: &changeset.MCMSConfig{
@@ -59,7 +56,8 @@ func TestValidateRegistryConfig(t *testing.T) {
 				},
 				RegistryUpdates: map[uint64]changeset.RegistryConfig{
 					selectorA: {
-						PoolAddress:   poolAddress1,
+						Type:          changeset.BurnMintTokenPool,
+						Version:       changeset.CurrentTokenPoolVersion,
 						Administrator: e.Chains[selectorA].DeployerKey.From,
 					},
 				},
@@ -80,16 +78,23 @@ func TestValidateRegistryConfig(t *testing.T) {
 		ErrStr         string
 	}{
 		{
-			Msg:            "Pool address is missing",
+			Msg:            "Pool type is invalid",
 			RegistryConfig: changeset.RegistryConfig{},
-			ErrStr:         "pool address must be defined",
+			ErrStr:         "is not a known token pool type",
 		},
 		{
-			Msg:         "Pool doesn't exist",
-			TokenSymbol: testhelpers.TestTokenSymbol,
+			Msg: "Pool version is invalid",
 			RegistryConfig: changeset.RegistryConfig{
-				PoolAddress:   invalidPoolAddress,
-				Administrator: administrator,
+				Type: changeset.BurnWithFromMintTokenPool,
+			},
+			ErrStr: "is not a known token pool version",
+		},
+		{
+			Msg:         "Pool not found",
+			TokenSymbol: "WRONG",
+			RegistryConfig: changeset.RegistryConfig{
+				Type:    changeset.BurnWithFromMintTokenPool,
+				Version: changeset.CurrentTokenPoolVersion,
 			},
 			ErrStr: "failed to find token pool",
 		},
@@ -97,8 +102,8 @@ func TestValidateRegistryConfig(t *testing.T) {
 			Msg:         "Token admin registry is not owned by required address",
 			TokenSymbol: testhelpers.TestTokenSymbol,
 			RegistryConfig: changeset.RegistryConfig{
-				PoolAddress:   poolAddress2,
-				Administrator: administrator,
+				Type:    changeset.BurnWithFromMintTokenPool,
+				Version: changeset.CurrentTokenPoolVersion,
 			},
 			ErrStr: "token admin registry failed ownership validation",
 		},
@@ -107,7 +112,8 @@ func TestValidateRegistryConfig(t *testing.T) {
 			TokenSymbol: testhelpers.TestTokenSymbol,
 			UseMcms:     true,
 			RegistryConfig: changeset.RegistryConfig{
-				PoolAddress:   poolAddress2,
+				Type:          changeset.BurnWithFromMintTokenPool,
+				Version:       changeset.CurrentTokenPoolVersion,
 				Administrator: administrator,
 			},
 			ErrStr: "is unable to be the admin of",
@@ -229,19 +235,20 @@ func TestConfigureTokenAdminRegistry(t *testing.T) {
 
 			tokenAddress := tokens[selectorA].Address
 			timelockAddress := state.Chains[selectorA].Timelock.Address()
-			poolAddress := state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][0].Address()
+			poolAddress := state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][changeset.CurrentTokenPoolVersion].Address()
 			tokenAdminRegistry := state.Chains[selectorA].TokenAdminRegistry
 			deployerKey := e.Chains[selectorA].DeployerKey.From
 
 			e, err = commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
 				{
-					Changeset: commonchangeset.WrapChangeSet(changeset.ConfigureTokenAdminRegistry),
+					Changeset: commonchangeset.WrapChangeSet(changeset.ConfigureTokenAdminRegistryChangeset),
 					Config: changeset.ConfigureTokenAdminRegistryConfig{
 						TokenSymbol: testhelpers.TestTokenSymbol,
 						MCMS:        test.MCMS,
 						RegistryUpdates: map[uint64]changeset.RegistryConfig{
 							selectorA: {
-								PoolAddress:   poolAddress,
+								Type:          changeset.BurnMintTokenPool,
+								Version:       changeset.CurrentTokenPoolVersion,
 								Administrator: test.Administrator,
 							},
 						},

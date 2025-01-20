@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/mcms"
@@ -16,29 +17,35 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 )
 
-var _ deployment.ChangeSet[ConfigureTokenAdminRegistryConfig] = ConfigureTokenAdminRegistry
+var _ deployment.ChangeSet[ConfigureTokenAdminRegistryConfig] = ConfigureTokenAdminRegistryChangeset
 
 // RegistryConfig defines a token and its state on the token admin registry
 type RegistryConfig struct {
-	// PoolAddress is the address of the token pool that should be set on the registry.
-	PoolAddress common.Address
+	// Type is the type of the token pool.
+	Type deployment.ContractType
+	// Version is the version of the token pool.
+	Version semver.Version
 	// Administrator is the address of the token administrator that should be set on the registry.
 	Administrator common.Address
 }
 
 func (c RegistryConfig) Validate(ctx context.Context, chain deployment.Chain, state CCIPChainState, useMcms bool, tokenSymbol TokenSymbol) error {
-	// Ensure that required fields are populated
-	if c.PoolAddress == utils.ZeroAddress {
-		return errors.New("pool address must be defined")
+	// Ensure that the inputted type is known
+	if _, ok := TokenPoolTypes[c.Type]; !ok {
+		return fmt.Errorf("%s is not a known token pool type", c.Type)
 	}
 
-	// Ensure that the given pool address and symbol are aligned and known to the environment
-	tokenPool, err := GetTokenPoolWithSymbolAndAddress(state, chain, tokenSymbol, c.PoolAddress)
+	// Ensure that the inputted version is known
+	if _, ok := TokenPoolVersions[c.Version]; !ok {
+		return fmt.Errorf("%s is not a known token pool version", c.Version)
+	}
+
+	// Ensure that a pool with given symbol, type and version is known to the environment
+	tokenPool, err := GetTokenPoolFromSymbolTypeAndVersion(state, chain, tokenSymbol, c.Type, c.Version)
 	if err != nil {
-		return fmt.Errorf("failed to find token pool on %s with symbol %s and address %s: %w", chain.String(), tokenSymbol, c.PoolAddress, err)
+		return fmt.Errorf("failed to find token pool on %s with symbol %s, type %s, and version %s: %w", chain.String(), tokenSymbol, c.Type, c.Version, err)
 	}
 
 	// Validate that the token admin registry is owned by the address that will be actioning the transactions (i.e. Timelock or deployer key)
@@ -49,7 +56,7 @@ func (c RegistryConfig) Validate(ctx context.Context, chain deployment.Chain, st
 	// Fetch information about the corresponding token and its state on the registry
 	token, err := tokenPool.GetToken(nil)
 	if err != nil {
-		return fmt.Errorf("failed to get token from pool with address %s on chain %s: %w", c.PoolAddress, chain.String(), err)
+		return fmt.Errorf("failed to get token from pool with address %s on chain %s: %w", tokenPool.Address(), chain.String(), err)
 	}
 	tokenConfig, err := state.TokenAdminRegistry.GetTokenConfig(nil, token)
 	if err != nil {
@@ -69,7 +76,7 @@ func (c RegistryConfig) Validate(ctx context.Context, chain deployment.Chain, st
 	}
 	weCanBeAdmin := tokenConfig.Administrator == utils.ZeroAddress && fromAddress == registryOwner
 	weAreAdmin := tokenConfig.Administrator == fromAddress
-	if tokenConfig.TokenPool != c.PoolAddress && !(weCanBeAdmin || weAreAdmin) {
+	if tokenConfig.TokenPool != tokenPool.Address() && !(weCanBeAdmin || weAreAdmin) {
 		return fmt.Errorf("address %s is unable to be the admin of %s on %s", fromAddress, tokenSymbol, chain.String())
 	}
 	return nil
@@ -123,8 +130,8 @@ func (c ConfigureTokenAdminRegistryConfig) Validate(env deployment.Environment) 
 	return nil
 }
 
-// ConfigureTokenAdminRegistry configures updates administrators and token pools on the TokenAdminRegistry.
-func ConfigureTokenAdminRegistry(env deployment.Environment, c ConfigureTokenAdminRegistryConfig) (deployment.ChangesetOutput, error) {
+// ConfigureTokenAdminRegistryChangeset configures updates administrators and token pools on the TokenAdminRegistry.
+func ConfigureTokenAdminRegistryChangeset(env deployment.Environment, c ConfigureTokenAdminRegistryConfig) (deployment.ChangesetOutput, error) {
 	if err := c.Validate(env); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("invalid ConfigureTokenAdminRegistryConfig: %w", err)
 	}
@@ -144,7 +151,7 @@ func ConfigureTokenAdminRegistry(env deployment.Environment, c ConfigureTokenAdm
 		timelock := chainState.Timelock
 		proposerMcm := chainState.ProposerMcm
 
-		operations, err := createTokenAdminRegistryOps(chain, tokenAdminRegistry, registryUpdate, timelock, c.MCMS, c.TokenSymbol)
+		operations, err := createTokenAdminRegistryOps(chainState, chain, tokenAdminRegistry, registryUpdate, timelock, c.MCMS, c.TokenSymbol)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to make operations to configure token admin registry on %s: %w", chain.String(), err)
 		}
@@ -186,6 +193,7 @@ func ConfigureTokenAdminRegistry(env deployment.Environment, c ConfigureTokenAdm
 // createTokenAdminRegistryOps creates all transactions required to configure the tokenAdminRegistry on a chain,
 // either applying the transactions with the deployer key or returning an MCMS proposal.
 func createTokenAdminRegistryOps(
+	state CCIPChainState,
 	chain deployment.Chain,
 	tokenAdminRegistry *token_admin_registry.TokenAdminRegistry,
 	registryUpdate RegistryConfig,
@@ -203,13 +211,14 @@ func createTokenAdminRegistryOps(
 		return nil, fmt.Errorf("failed to make tx opts and handler for registry on %s: %w", chain.String(), err)
 	}
 
-	tokenPool, err := token_pool.NewTokenPool(registryUpdate.PoolAddress, chain.Client)
+	tokenPool, err := GetTokenPoolFromSymbolTypeAndVersion(state, chain, tokenSymbol, registryUpdate.Type, registryUpdate.Version)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect address %s on chain %s with token pool bindings: %w", registryUpdate.PoolAddress, chain.String(), err)
+		return nil, fmt.Errorf("failed to find token pool on %s with symbol %s, type %s, and version %s: %w", chain.String(), tokenSymbol, registryUpdate.Type, registryUpdate.Version, err)
 	}
+
 	token, err := tokenPool.GetToken(nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token from address %s on chain %s: %w", registryUpdate.PoolAddress, chain.String(), err)
+		return nil, fmt.Errorf("failed to get token from address %s on chain %s: %w", tokenPool.Address(), chain.String(), err)
 	}
 
 	tokenConfig, err := tokenAdminRegistry.GetTokenConfig(nil, token)
@@ -224,7 +233,7 @@ func createTokenAdminRegistryOps(
 
 	var operations []mcms.Operation
 
-	if tokenConfig.TokenPool != registryUpdate.PoolAddress {
+	if tokenConfig.TokenPool != tokenPool.Address() {
 		if tokenConfig.Administrator != fromAddress {
 			if tokenConfig.PendingAdministrator != fromAddress {
 				// Propose administrator
@@ -248,7 +257,7 @@ func createTokenAdminRegistryOps(
 			}
 		}
 		// Set pool
-		tx, err := tokenAdminRegistry.SetPool(opts, token, registryUpdate.PoolAddress)
+		tx, err := tokenAdminRegistry.SetPool(opts, token, tokenPool.Address())
 		mcmsOp, err := handle(tx, err)
 		if err != nil {
 			return nil, fmt.Errorf("failed to handle setPool transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)

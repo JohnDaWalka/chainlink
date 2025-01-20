@@ -18,14 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 )
 
-var _ deployment.ChangeSet[DeployTokenPoolContractsConfig] = DeployTokenPoolContracts
-
-var tokenTypes map[deployment.ContractType]struct{} = map[deployment.ContractType]struct{}{
-	BurnMintTokenPool:         struct{}{},
-	BurnWithFromMintTokenPool: struct{}{},
-	BurnFromMintTokenPool:     struct{}{},
-	LockReleaseTokenPool:      struct{}{},
-}
+var _ deployment.ChangeSet[DeployTokenPoolContractsConfig] = DeployTokenPoolContractsChangeset
 
 // DeployTokenPoolInput defines all information required of the user to deploy a new token pool contract.
 type DeployTokenPoolInput struct {
@@ -54,7 +47,7 @@ func (i DeployTokenPoolInput) Validate(chain deployment.Chain, state CCIPChainSt
 	}
 
 	// Validate that the type is known
-	if _, ok := tokenTypes[i.Type]; !ok {
+	if _, ok := TokenPoolTypes[i.Type]; !ok {
 		return fmt.Errorf("requested token pool type %s is unknown", i.Type)
 	}
 
@@ -89,12 +82,12 @@ func (i DeployTokenPoolInput) Validate(chain deployment.Chain, state CCIPChainSt
 	}
 
 	// Regardless of requested type, we should check if a token pool of any type already exists
-	tokenPools, err := GetAllTokenPoolsWithSymbol(state, chain.Client, tokenSymbol)
+	tokenPools, err := GetAllTokenPoolsWithSymbolAndVersion(state, chain.Client, tokenSymbol, CurrentTokenPoolVersion)
 	if err != nil {
 		return fmt.Errorf("failed to get all token pools with symbol %s on chain %s: %w", tokenSymbol, chain.String(), err)
 	}
 	if len(tokenPools) > 0 && !i.ForceDeployment {
-		return fmt.Errorf("token pool already exists for %s on %s (use forceDeployment to bypass)", tokenSymbol, chain.String())
+		return fmt.Errorf("token pool with version %s already exists for %s on %s (use forceDeployment to bypass)", CurrentTokenPoolVersion, tokenSymbol, chain.String())
 	}
 
 	return nil
@@ -145,8 +138,8 @@ func (c DeployTokenPoolContractsConfig) Validate(env deployment.Environment) err
 	return nil
 }
 
-// DeployTokenPoolContract deploys new pools for a given token across multiple chains.
-func DeployTokenPoolContracts(env deployment.Environment, c DeployTokenPoolContractsConfig) (deployment.ChangesetOutput, error) {
+// DeployTokenPoolContractsChangeset deploys new pools for a given token across multiple chains.
+func DeployTokenPoolContractsChangeset(env deployment.Environment, c DeployTokenPoolContractsConfig) (deployment.ChangesetOutput, error) {
 	if err := c.Validate(env); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("invalid DeployTokenPoolContractsConfig: %w", err)
 	}
@@ -215,7 +208,7 @@ func DeployTokenPool(
 				tp, err = token_pool.NewTokenPool(tpAddr, chain.Client)
 			}
 			return deployment.ContractDeploy[*token_pool.TokenPool]{
-				Address: tpAddr, Contract: tp, Tv: deployment.NewTypeAndVersion(poolConfig.Type, deployment.Version1_5_1), Tx: tx, Err: err,
+				Address: tpAddr, Contract: tp, Tv: deployment.NewTypeAndVersion(poolConfig.Type, CurrentTokenPoolVersion), Tx: tx, Err: err,
 			}
 		},
 	)

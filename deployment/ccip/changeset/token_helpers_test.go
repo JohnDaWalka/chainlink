@@ -9,11 +9,10 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
-func TestGetAllTokenPoolsWithSymbol(t *testing.T) {
+func TestGetAllTokenPoolsWithSymbolAndVersion(t *testing.T) {
 	t.Parallel()
 
 	l := logger.TestLogger(t)
@@ -72,7 +71,7 @@ func TestGetAllTokenPoolsWithSymbol(t *testing.T) {
 		addressBook := deployment.NewMemoryAddressBook()
 
 		if i == 0 {
-			tokenPools, err := changeset.GetAllTokenPoolsWithSymbol(state.Chains[selectorA], chain.Client, testhelpers.TestTokenSymbol)
+			tokenPools, err := changeset.GetAllTokenPoolsWithSymbolAndVersion(state.Chains[selectorA], chain.Client, testhelpers.TestTokenSymbol, changeset.CurrentTokenPoolVersion)
 			require.NoError(t, err)
 			require.Empty(t, tokenPools)
 		}
@@ -87,13 +86,13 @@ func TestGetAllTokenPoolsWithSymbol(t *testing.T) {
 		require.NoError(t, err)
 		chainState = state.Chains[selectorA]
 
-		tokenPools, err := changeset.GetAllTokenPoolsWithSymbol(chainState, chain.Client, testhelpers.TestTokenSymbol)
+		tokenPools, err := changeset.GetAllTokenPoolsWithSymbolAndVersion(chainState, chain.Client, testhelpers.TestTokenSymbol, changeset.CurrentTokenPoolVersion)
 		require.NoError(t, err)
 		require.Len(t, tokenPools, i+1)
 	}
 }
 
-func TestGetTokenPoolWithSymbolAndAddress(t *testing.T) {
+func TestGetTokenPoolFromSymbolTypeAndVersion(t *testing.T) {
 	t.Parallel()
 
 	l := logger.TestLogger(t)
@@ -121,16 +120,23 @@ func TestGetTokenPoolWithSymbolAndAddress(t *testing.T) {
 	require.NoError(t, err)
 	chainState = state.Chains[selectorA]
 
-	poolAddress := chainState.BurnMintTokenPools[testhelpers.TestTokenSymbol][0].Address()
-	wrongPoolAddress := utils.RandomAddress()
+	// Wrong symbol
+	tokenPool, err := changeset.GetTokenPoolFromSymbolTypeAndVersion(chainState, chain, changeset.TokenSymbol("WRONG"), changeset.BurnMintTokenPool, changeset.CurrentTokenPoolVersion)
+	require.Error(t, err)
+	require.Nil(t, tokenPool)
+
+	// Wrong type
+	tokenPool, err = changeset.GetTokenPoolFromSymbolTypeAndVersion(chainState, chain, testhelpers.TestTokenSymbol, changeset.BurnWithFromMintTokenPool, changeset.CurrentTokenPoolVersion)
+	require.Error(t, err)
+	require.Nil(t, tokenPool)
+
+	// Wrong version
+	tokenPool, err = changeset.GetTokenPoolFromSymbolTypeAndVersion(chainState, chain, testhelpers.TestTokenSymbol, changeset.BurnMintTokenPool, deployment.Version1_0_0)
+	require.Error(t, err)
+	require.Nil(t, tokenPool)
 
 	// Get correct pool
-	tokenPool, err := changeset.GetTokenPoolWithSymbolAndAddress(chainState, chain, testhelpers.TestTokenSymbol, poolAddress)
+	tokenPool, err = changeset.GetTokenPoolFromSymbolTypeAndVersion(chainState, chain, testhelpers.TestTokenSymbol, changeset.BurnMintTokenPool, changeset.CurrentTokenPoolVersion)
 	require.NoError(t, err)
 	require.NotNil(t, tokenPool)
-
-	// Get wrong pool
-	tokenPool, err = changeset.GetTokenPoolWithSymbolAndAddress(chainState, chain, testhelpers.TestTokenSymbol, wrongPoolAddress)
-	require.ErrorContains(t, err, "no token pool found with symbol")
-	require.Nil(t, tokenPool)
 }

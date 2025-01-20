@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_from_mint_token_pool"
@@ -35,6 +36,7 @@ import (
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	common_v1_0 "github.com/smartcontractkit/chainlink/deployment/common/view/v1_0"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/registry_module_owner_custom"
@@ -122,10 +124,10 @@ type CCIPChainState struct {
 	ERC20Tokens                map[TokenSymbol]*erc20.ERC20
 	ERC677Tokens               map[TokenSymbol]*erc677.ERC677
 	BurnMintTokens677          map[TokenSymbol]*burn_mint_erc677.BurnMintERC677
-	BurnMintTokenPools         map[TokenSymbol][]*burn_mint_token_pool.BurnMintTokenPool
-	BurnWithFromMintTokenPools map[TokenSymbol][]*burn_with_from_mint_token_pool.BurnWithFromMintTokenPool
-	BurnFromMintTokenPools     map[TokenSymbol][]*burn_from_mint_token_pool.BurnFromMintTokenPool
-	LockReleaseTokenPools      map[TokenSymbol][]*lock_release_token_pool.LockReleaseTokenPool
+	BurnMintTokenPools         map[TokenSymbol]map[semver.Version]*burn_mint_token_pool.BurnMintTokenPool
+	BurnWithFromMintTokenPools map[TokenSymbol]map[semver.Version]*burn_with_from_mint_token_pool.BurnWithFromMintTokenPool
+	BurnFromMintTokenPools     map[TokenSymbol]map[semver.Version]*burn_from_mint_token_pool.BurnFromMintTokenPool
+	LockReleaseTokenPools      map[TokenSymbol]map[semver.Version]*lock_release_token_pool.LockReleaseTokenPool
 	// Map between token Symbol (e.g. LinkSymbol, WethSymbol)
 	// and the respective aggregator USD feed contract
 	USDFeeds map[TokenSymbol]*aggregator_v3_interface.AggregatorV3Interface
@@ -601,32 +603,32 @@ func LoadChainState(chain deployment.Chain, addresses map[string]deployment.Type
 			state.USDFeeds[key] = feed
 		case deployment.NewTypeAndVersion(BurnMintTokenPool, deployment.Version1_5_1).String():
 			ethAddress := common.HexToAddress(address)
-			pool, symbol, err := newTokenPoolWithSymbol(burn_mint_token_pool.NewBurnMintTokenPool, ethAddress, chain.Client)
+			pool, metadata, err := newTokenPoolWithMetadata(burn_mint_token_pool.NewBurnMintTokenPool, ethAddress, chain.Client)
 			if err != nil {
 				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
-			state.BurnMintTokenPools = safeAppendToKey(state.BurnMintTokenPools, symbol, pool)
+			state.BurnMintTokenPools = addTokenPoolToMap(state.BurnMintTokenPools, metadata, pool)
 		case deployment.NewTypeAndVersion(BurnWithFromMintTokenPool, deployment.Version1_5_1).String():
 			ethAddress := common.HexToAddress(address)
-			pool, symbol, err := newTokenPoolWithSymbol(burn_with_from_mint_token_pool.NewBurnWithFromMintTokenPool, ethAddress, chain.Client)
+			pool, metadata, err := newTokenPoolWithMetadata(burn_with_from_mint_token_pool.NewBurnWithFromMintTokenPool, ethAddress, chain.Client)
 			if err != nil {
 				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
-			state.BurnWithFromMintTokenPools = safeAppendToKey(state.BurnWithFromMintTokenPools, symbol, pool)
+			state.BurnWithFromMintTokenPools = addTokenPoolToMap(state.BurnWithFromMintTokenPools, metadata, pool)
 		case deployment.NewTypeAndVersion(BurnFromMintTokenPool, deployment.Version1_5_1).String():
 			ethAddress := common.HexToAddress(address)
-			pool, symbol, err := newTokenPoolWithSymbol(burn_from_mint_token_pool.NewBurnFromMintTokenPool, ethAddress, chain.Client)
+			pool, metadata, err := newTokenPoolWithMetadata(burn_from_mint_token_pool.NewBurnFromMintTokenPool, ethAddress, chain.Client)
 			if err != nil {
 				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
-			state.BurnFromMintTokenPools = safeAppendToKey(state.BurnFromMintTokenPools, symbol, pool)
+			state.BurnFromMintTokenPools = addTokenPoolToMap(state.BurnFromMintTokenPools, metadata, pool)
 		case deployment.NewTypeAndVersion(LockReleaseTokenPool, deployment.Version1_5_1).String():
 			ethAddress := common.HexToAddress(address)
-			pool, symbol, err := newTokenPoolWithSymbol(lock_release_token_pool.NewLockReleaseTokenPool, ethAddress, chain.Client)
+			pool, metadata, err := newTokenPoolWithMetadata(lock_release_token_pool.NewLockReleaseTokenPool, ethAddress, chain.Client)
 			if err != nil {
 				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
-			state.LockReleaseTokenPools = safeAppendToKey(state.LockReleaseTokenPools, symbol, pool)
+			state.LockReleaseTokenPools = addTokenPoolToMap(state.LockReleaseTokenPools, metadata, pool)
 		case deployment.NewTypeAndVersion(BurnMintToken, deployment.Version1_0_0).String():
 			tok, err := burn_mint_erc677.NewBurnMintERC677(common.HexToAddress(address), chain.Client)
 			if err != nil {
@@ -734,43 +736,65 @@ func LoadChainState(chain deployment.Chain, addresses map[string]deployment.Type
 // pool defines behavior common to all token pools.
 type pool interface {
 	GetToken(opts *bind.CallOpts) (common.Address, error)
+	TypeAndVersion(*bind.CallOpts) (string, error)
 }
 
-// newTokenPoolWithSymbol returns a token pool along with the symbol of its corresponding token.
-func newTokenPoolWithSymbol[P pool](
+// tokenPoolMetadata defines the type, version, and symbol of the corresponding token.
+type tokenPoolMetadata struct {
+	Version semver.Version
+	Symbol  TokenSymbol
+}
+
+// newTokenPoolWithMetadata returns a token pool along with its type and version and corresponding token symbol.
+func newTokenPoolWithMetadata[P pool](
 	newTokenPool func(address common.Address, backend bind.ContractBackend) (P, error),
 	poolAddress common.Address,
 	chainClient deployment.OnchainClient,
-) (P, TokenSymbol, error) {
+) (P, tokenPoolMetadata, error) {
 	pool, err := newTokenPool(poolAddress, chainClient)
 	if err != nil {
-		return pool, "", fmt.Errorf("failed to connect address %s with token pool bindings: %w", poolAddress, err)
+		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to connect address %s with token pool bindings: %w", poolAddress, err)
 	}
 	tokenAddress, err := pool.GetToken(nil)
 	if err != nil {
-		return pool, "", fmt.Errorf("failed to get token address from pool with address %s: %w", poolAddress, err)
+		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to get token address from pool with address %s: %w", poolAddress, err)
+	}
+	typeAndVersionStr, err := pool.TypeAndVersion(nil)
+	if err != nil {
+		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to get type and version from pool with address %s: %w", poolAddress, err)
+	}
+	_, versionStr, err := ccipconfig.ParseTypeAndVersion(typeAndVersionStr)
+	if err != nil {
+		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to parse type and version of pool with address %s: %w", poolAddress, err)
+	}
+	version, err := semver.NewVersion(versionStr)
+	if err != nil {
+		return pool, tokenPoolMetadata{}, fmt.Errorf("failed parsing version %s of pool with address %s: %w", versionStr, poolAddress, err)
 	}
 	token, err := erc20.NewERC20(tokenAddress, chainClient)
 	if err != nil {
-		return pool, "", fmt.Errorf("failed to connect address %s with ERC20 bindings: %w", tokenAddress, err)
+		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to connect address %s with ERC20 bindings: %w", tokenAddress, err)
 	}
 	symbol, err := token.Symbol(nil)
 	if err != nil {
-		return pool, "", fmt.Errorf("failed to fetch symbol from token with address %s: %w", tokenAddress, err)
+		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to fetch symbol from token with address %s: %w", tokenAddress, err)
 	}
-	return pool, TokenSymbol(symbol), nil
+	return pool, tokenPoolMetadata{
+		Symbol:  TokenSymbol(symbol),
+		Version: *version,
+	}, nil
 }
 
-// safeAppendToKey safely appends a new value to an array of values assigned to a map key.
-func safeAppendToKey[K comparable, V any](mapping map[K][]V, key K, value V) map[K][]V {
+// addTokenPoolToMap adds a new token pool to a map based on metadata to a nested map key.
+func addTokenPoolToMap[P pool](mapping map[TokenSymbol]map[semver.Version]P, metadata tokenPoolMetadata, value P) map[TokenSymbol]map[semver.Version]P {
 	if mapping == nil {
-		mapping = make(map[K][]V)
+		mapping = make(map[TokenSymbol]map[semver.Version]P)
 	}
-	if mapping[key] == nil {
-		mapping[key] = make([]V, 1)
-		mapping[key][0] = value
+	if mapping[metadata.Symbol] == nil {
+		mapping[metadata.Symbol] = make(map[semver.Version]P)
+		mapping[metadata.Symbol][metadata.Version] = value
 		return mapping
 	}
-	mapping[key] = append(mapping[key], value)
+	mapping[metadata.Symbol][metadata.Version] = value
 	return mapping
 }

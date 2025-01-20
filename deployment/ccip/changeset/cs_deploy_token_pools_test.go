@@ -173,7 +173,7 @@ func TestValidateDeployTokenPoolInput(t *testing.T) {
 				TokenAddress:       tokens[selectorA].Address,
 				LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 			},
-			ErrStr: "token pool already exists",
+			ErrStr: fmt.Sprintf("token pool with version %s already exists", changeset.CurrentTokenPoolVersion),
 		},
 	}
 
@@ -292,7 +292,7 @@ func TestDeployTokenPoolContracts(t *testing.T) {
 			Msg:             "Redeploy but don't force redeployment",
 			Redeploy:        true,
 			ForceDeployment: false,
-			ErrStr:          "token pool already exists for TEST",
+			ErrStr:          fmt.Sprintf("token pool with version %s already exists for TEST", changeset.CurrentTokenPoolVersion),
 		},
 		{
 			Msg:             "Redeploy with force",
@@ -303,25 +303,24 @@ func TestDeployTokenPoolContracts(t *testing.T) {
 
 	for _, test := range tests {
 		e, selectorA, _, tokens, timelockContracts := testhelpers.SetupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), true)
-		changesetApplication := commonchangeset.ChangesetApplication{
-			Changeset: commonchangeset.WrapChangeSet(changeset.DeployTokenPoolContracts),
-			Config: changeset.DeployTokenPoolContractsConfig{
-				TokenSymbol: testhelpers.TestTokenSymbol,
-				NewPools: map[uint64]changeset.DeployTokenPoolInput{
-					selectorA: {
-						TokenAddress:       tokens[selectorA].Address,
-						Type:               changeset.BurnMintTokenPool,
-						LocalTokenDecimals: testhelpers.LocalTokenDecimals,
-						AllowList:          []common.Address{},
-						ForceDeployment:    test.ForceDeployment,
-					},
-				},
-			},
-		}
 
 		// Initial deployment
 		e, err := commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
-			changesetApplication,
+			commonchangeset.ChangesetApplication{
+				Changeset: commonchangeset.WrapChangeSet(changeset.DeployTokenPoolContractsChangeset),
+				Config: changeset.DeployTokenPoolContractsConfig{
+					TokenSymbol: testhelpers.TestTokenSymbol,
+					NewPools: map[uint64]changeset.DeployTokenPoolInput{
+						selectorA: {
+							TokenAddress:       tokens[selectorA].Address,
+							Type:               changeset.BurnMintTokenPool,
+							LocalTokenDecimals: testhelpers.LocalTokenDecimals,
+							AllowList:          []common.Address{},
+							ForceDeployment:    test.ForceDeployment,
+						},
+					},
+				},
+			},
 		})
 		require.NoError(t, err)
 
@@ -331,24 +330,38 @@ func TestDeployTokenPoolContracts(t *testing.T) {
 		burnMintTokenPools, ok := state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol]
 		require.True(t, ok)
 		require.Len(t, burnMintTokenPools, 1)
-		owner, err := burnMintTokenPools[0].Owner(nil)
+		owner, err := burnMintTokenPools[changeset.CurrentTokenPoolVersion].Owner(nil)
 		require.NoError(t, err)
 		require.Equal(t, e.Chains[selectorA].DeployerKey.From, owner)
 
 		// Redeployment
 		if test.Redeploy {
 			e, err = commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
-				changesetApplication,
+				commonchangeset.ChangesetApplication{
+					Changeset: commonchangeset.WrapChangeSet(changeset.DeployTokenPoolContractsChangeset),
+					Config: changeset.DeployTokenPoolContractsConfig{
+						TokenSymbol: testhelpers.TestTokenSymbol,
+						NewPools: map[uint64]changeset.DeployTokenPoolInput{
+							selectorA: {
+								TokenAddress:       tokens[selectorA].Address,
+								Type:               changeset.BurnWithFromMintTokenPool,
+								LocalTokenDecimals: testhelpers.LocalTokenDecimals,
+								AllowList:          []common.Address{},
+								ForceDeployment:    test.ForceDeployment,
+							},
+						},
+					},
+				},
 			})
 			if test.ErrStr != "" {
-				require.ErrorContains(t, err, "token pool already exists for TEST")
+				require.ErrorContains(t, err, test.ErrStr)
 			} else {
 				state, err = changeset.LoadOnchainState(e)
 				require.NoError(t, err)
 
-				burnMintTokenPools, ok = state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol]
-				require.True(t, ok)
-				require.Len(t, burnMintTokenPools, 2)
+				tokenPools, err := changeset.GetAllTokenPoolsWithSymbolAndVersion(state.Chains[selectorA], e.Chains[selectorA].Client, testhelpers.TestTokenSymbol, changeset.CurrentTokenPoolVersion)
+				require.NoError(t, err)
+				require.Len(t, tokenPools, 2)
 			}
 		}
 	}

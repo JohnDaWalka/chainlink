@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -125,7 +126,7 @@ func SetupTwoChainEnvironmentWithTokens(
 }
 
 // getPoolsOwnedByDeployer returns any pools that need to be transferred to timelock.
-func getPoolsOwnedByDeployer[T commonchangeset.Ownable](t *testing.T, contracts []T, chain deployment.Chain) []common.Address {
+func getPoolsOwnedByDeployer[T commonchangeset.Ownable](t *testing.T, contracts map[semver.Version]T, chain deployment.Chain) []common.Address {
 	var addresses []common.Address
 	for _, contract := range contracts {
 		owner, err := contract.Owner(nil)
@@ -148,7 +149,7 @@ func DeployTestTokenPools(
 
 	e, err := commonchangeset.ApplyChangesets(t, e, nil, []commonchangeset.ChangesetApplication{
 		{
-			Changeset: commonchangeset.WrapChangeSet(changeset.DeployTokenPoolContracts),
+			Changeset: commonchangeset.WrapChangeSet(changeset.DeployTokenPoolContractsChangeset),
 			Config: changeset.DeployTokenPoolContractsConfig{
 				TokenSymbol: TestTokenSymbol,
 				NewPools:    newPools,
