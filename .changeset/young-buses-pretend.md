@@ -2,4 +2,4 @@
 "chainlink": minor
 ---
 
-Beholder metric to monitor TXMv2 transactions. #added
+#added beholder metric to monitor TXMv2 transactions
