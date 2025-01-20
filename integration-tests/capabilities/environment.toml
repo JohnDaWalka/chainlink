@@ -3,6 +3,17 @@
   type = "anvil"
   docker_cmd_params = ["-b", "5"]
 
+[workflow_config]
+  use_chainlink_cli = false
+  use_existing = true
+
+  [workflow_config.chainlink_cli]
+    folder_location = "/Users/bartektofel/Downloads/workflow_test"
+    compile = true
+
+  [workflow_config.existing]
+    binary_url = "https://gist.githubusercontent.com/Tofel/3949a5537557c3e2d07524b1a0c857a0/raw/3f7dcbc91fbdb67d598ee0949c03965a771888a3/binary.wasm.br"
+
 [nodeset]
   nodes = 5
   override_mode = "each"

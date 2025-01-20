@@ -5,12 +5,17 @@ import (
 	"cmp"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"math"
+	"math/big"
+	"net/http"
 	"os"
+	"os/exec"
 	"slices"
 	"strings"
 	"sync"
@@ -18,6 +23,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -36,8 +42,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/evmcontracts/capabilities_registry"
-	"github.com/smartcontractkit/chainlink/integration-tests/capabilities/components/onchain"
+	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 
 	cr_wrapper "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
@@ -96,9 +101,26 @@ func MarshalMultichainPublicKey(ost map[string]types.OnchainPublicKey) (types.On
 	return bytes.Join(pubKeys, nil), nil
 }
 
+type WorkflowConfig struct {
+	UseChainlinkCLI bool                    `toml:"use_chainlink_cli"`
+	ChainlinkCLI    *ChainlinkCLIConfig     `toml:"chainlink_cli"`
+	UseExising      bool                    `toml:"use_existing"`
+	Existing        *ExistingWorkflowConfig `toml:"existing"`
+}
+
+type ExistingWorkflowConfig struct {
+	BinaryURL string `toml:"binary_url"`
+}
+
+type ChainlinkCLIConfig struct {
+	FolderLocation *string `toml:"folder_location"`
+	Compile        bool    `toml:"compile"`
+}
+
 type WorkflowTestConfig struct {
-	BlockchainA *blockchain.Input `toml:"blockchain_a" validate:"required"`
-	NodeSet     *ns.Input         `toml:"nodeset" validate:"required"`
+	BlockchainA    *blockchain.Input `toml:"blockchain_a" validate:"required"`
+	NodeSet        *ns.Input         `toml:"nodeset" validate:"required"`
+	WorkflowConfig *WorkflowConfig   `toml:"workflow_config" validate:"required"`
 }
 
 type OCR3Config struct {
@@ -316,6 +338,39 @@ func GenerateWorkflowID(owner []byte, name string, workflow []byte, config []byt
 	return sha, nil
 }
 
+func isInstalled(name string) bool {
+	_, err := exec.LookPath(name)
+	return err == nil
+}
+
+func downloadAndDecode(url string) ([]byte, error) {
+	// Step 1: Make an HTTP GET request
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Step 2: Check the HTTP response status
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("received non-200 response: %d", resp.StatusCode)
+	}
+
+	// Step 3: Read the response body
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Step 4: Decode the base64 content
+	decoded, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode base64 content: %w", err)
+	}
+
+	return decoded, nil
+}
+
 func TestWorkflow(t *testing.T) {
 	// workflowOwner := "0x00000000000000000000000000000000000000aa"
 	// without 0x prefix!
@@ -327,45 +382,18 @@ func TestWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		pkey := os.Getenv("PRIVATE_KEY")
 
+		if in.WorkflowConfig.UseChainlinkCLI {
+			require.True(t, isInstalled("chainlink-cli"), "chainlink-cli is required for this test. Please install it, add to path and run again")
+		}
+
 		bc, err := blockchain.NewBlockchainNetwork(in.BlockchainA)
 		require.NoError(t, err)
 
 		sc, err := seth.NewClientBuilder().
 			WithRpcUrl(bc.Nodes[0].HostWSUrl).
 			WithPrivateKeys([]string{pkey}).
-			WithGethWrappersFolders([]string{"./components"}).
 			Build()
 		require.NoError(t, err)
-
-		capabilitiesRegistryInstance, err := capabilities_registry.Deploy(sc)
-		require.NoError(t, err)
-
-		require.NoError(t, capabilitiesRegistryInstance.AddCapabilities(
-			[]cr_wrapper.CapabilitiesRegistryCapability{
-				{
-					LabelledName:   "offchain_reporting",
-					Version:        "1.0.0",
-					CapabilityType: 2, // CONSENSUS
-					ResponseType:   0, // REPORT
-				},
-				{
-					LabelledName:   "write_geth-testnet",
-					Version:        "1.0.0",
-					CapabilityType: 3, // TARGET
-					ResponseType:   1, // OBSERVATION_IDENTICAL
-				},
-				{
-					LabelledName:   "cron-trigger",
-					Version:        "1.0.0",
-					CapabilityType: uint8(0), // trigger
-				},
-				{
-					LabelledName:   "custom-compute",
-					Version:        "1.0.0",
-					CapabilityType: uint8(1), // action
-				},
-			},
-		))
 
 		lgr := logger.TestLogger(t)
 		require.NoError(t, err)
@@ -393,6 +421,57 @@ func TestWorkflow(t *testing.T) {
 
 		ctfEnv := deployment.NewEnvironment("ctfV2", lgr, addressBook, chainMap, nil, nil, nil, func() context.Context { return ctx }, deployment.OCRSecrets{})
 
+		// output, err := keystone_changeset.DeployCapabilityRegistry(*ctfEnv, chainSelector)
+		// require.NoError(t, err)
+
+		capRegAddr, tx, capabilitiesRegistryInstance, err := cr_wrapper.DeployCapabilitiesRegistry(sc.NewTXOpts(), sc.Client)
+		_, decodeErr := sc.Decode(tx, err)
+		require.NoError(t, decodeErr)
+
+		allCaps := []cr_wrapper.CapabilitiesRegistryCapability{
+			{
+				LabelledName:   "offchain_reporting",
+				Version:        "1.0.0",
+				CapabilityType: 2, // CONSENSUS
+				ResponseType:   0, // REPORT
+			},
+			{
+				LabelledName:   "write_geth-testnet",
+				Version:        "1.0.0",
+				CapabilityType: 3, // TARGET
+				ResponseType:   1, // OBSERVATION_IDENTICAL
+			},
+			{
+				LabelledName:   "cron-trigger",
+				Version:        "1.0.0",
+				CapabilityType: uint8(0), // trigger
+			},
+			{
+				LabelledName:   "custom-compute",
+				Version:        "1.0.0",
+				CapabilityType: uint8(1), // action
+			},
+		}
+
+		tx, err = capabilitiesRegistryInstance.AddCapabilities(
+			sc.NewTXOpts(),
+			allCaps,
+		)
+		_, decodeErr = sc.Decode(tx, err)
+		require.NoError(t, decodeErr)
+
+		var hashedCapabilities [][32]byte
+
+		for _, capability := range allCaps {
+			hashed, err := capabilitiesRegistryInstance.GetHashedCapabilityId(
+				sc.NewCallOpts(),
+				capability.LabelledName,
+				capability.Version,
+			)
+			require.NoError(t, err)
+			hashedCapabilities = append(hashedCapabilities, hashed)
+		}
+
 		output, err := keystone_changeset.DeployForwarder(*ctfEnv, keystone_changeset.DeployForwarderRequest{
 			ChainSelectors: []uint64{chainSelector},
 		})
@@ -417,37 +496,8 @@ func TestWorkflow(t *testing.T) {
 
 		// _ = workflowRegistryAddr
 
-		workFlowData, err := os.ReadFile("./binary.wasm.br")
-		require.NoError(t, err)
-
-		var configData []byte
-
-		workflowName := "abcdefgasd"
-
-		var HashTruncateName = func(name string) string {
-			// Compute SHA-256 hash of the input string
-			hash := sha256.Sum256([]byte(name))
-
-			// Encode as hex to ensure UTF8
-			var hashBytes []byte = hash[:]
-			resultHex := hex.EncodeToString(hashBytes)
-
-			// Truncate to 10 bytes
-			truncated := []byte(resultHex)[:10]
-			return string(truncated)
-		}
-
-		truncated := HashTruncateName(workflowName)
-		fmt.Println("Truncated name: ", truncated)
-
-		var workflowNameBytes [10]byte
-		copy(workflowNameBytes[:], []byte(truncated))
-
-		fmt.Println("Workflow name bytes ", string(workflowNameBytes[:]))
-
 		donID := uint32(1)
-		workflowID, idErr := GenerateWorkflowIDFromStrings(sc.MustGetRootKeyAddress().Hex(), workflowName, workFlowData, configData, "")
-		require.NoError(t, idErr)
+		workflowName := "abcdefgasd"
 
 		output, err = workflow_registry_changeset.Deploy(*ctfEnv, chainSelector)
 		require.NoError(t, err)
@@ -481,12 +531,45 @@ func TestWorkflow(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		workflow_registryInstance, err := workflow_registry_wrapper.NewWorkflowRegistry(workflowRegistryAddr, sc.Client)
-		require.NoError(t, err)
+		var workflowNameBytes [10]byte
+		if in.WorkflowConfig.UseExising {
+			workFlowData, err := downloadAndDecode(in.WorkflowConfig.Existing.BinaryURL)
+			require.NoError(t, err)
 
-		wrTx, wrErr := workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), "https://gist.githubusercontent.com/Tofel/3949a5537557c3e2d07524b1a0c857a0/raw/3f7dcbc91fbdb67d598ee0949c03965a771888a3/binary.wasm.br", "", "")
-		_, decodeErr := sc.Decode(wrTx, wrErr)
-		require.NoError(t, decodeErr)
+			var configData []byte
+
+			var HashTruncateName = func(name string) string {
+				// Compute SHA-256 hash of the input string
+				hash := sha256.Sum256([]byte(name))
+
+				// Encode as hex to ensure UTF8
+				var hashBytes []byte = hash[:]
+				resultHex := hex.EncodeToString(hashBytes)
+
+				// Truncate to 10 bytes
+				truncated := []byte(resultHex)[:10]
+				return string(truncated)
+			}
+
+			truncated := HashTruncateName(workflowName)
+			fmt.Println("Truncated name: ", truncated)
+
+			copy(workflowNameBytes[:], []byte(truncated))
+
+			fmt.Println("Workflow owner: ", sc.MustGetRootKeyAddress().Hex())
+			fmt.Println("Workflow name: ", workflowName)
+			fmt.Println("workflowNameBytes: ", string([]byte(truncated)))
+
+			workflowID, idErr := GenerateWorkflowIDFromStrings(sc.MustGetRootKeyAddress().Hex(), workflowName, workFlowData, configData, "")
+			require.NoError(t, idErr)
+
+			workflow_registryInstance, err := workflow_registry_wrapper.NewWorkflowRegistry(workflowRegistryAddr, sc.Client)
+			require.NoError(t, err)
+
+			wrTx, wrErr := workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), "https://gist.githubusercontent.com/Tofel/3949a5537557c3e2d07524b1a0c857a0/raw/3f7dcbc91fbdb67d598ee0949c03965a771888a3/binary.wasm.br", "", "")
+			_, decodeErr := sc.Decode(wrTx, wrErr)
+			require.NoError(t, decodeErr)
+		}
 
 		output, err = keystone_changeset.DeployFeedsConsumer(*ctfEnv, &keystone_changeset.DeployFeedsConsumerRequest{
 			ChainSelector: chainSelector,
@@ -507,14 +590,11 @@ func TestWorkflow(t *testing.T) {
 
 		fmt.Println("Deployed feeds_consumer contract at", feedsConsumerAddress.Hex())
 
-		fmt.Println("Workflow owner: ", sc.MustGetRootKeyAddress().Hex())
-		fmt.Println("Workflow name: ", workflowName)
-		fmt.Println("workflowNameBytes: ", string([]byte(truncated)))
-
+		//move this inside the if block
 		feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(feedsConsumerAddress, sc.Client)
 		require.NoError(t, err)
 
-		tx, err := feedsConsumerInstance.SetConfig(
+		tx, err = feedsConsumerInstance.SetConfig(
 			sc.NewTXOpts(),
 			[]common.Address{forwarderAddress},
 			[]common.Address{sc.MustGetRootKeyAddress()},
@@ -602,10 +682,19 @@ func TestWorkflow(t *testing.T) {
 		nodeClients, err := clclient.New(nodeset.CLNodes)
 		require.NoError(t, err)
 
-		err = onchain.FundNodes(sc, nodeClients, pkey, 5)
-		require.NoError(t, err)
+		// err = onchain.FundNodes(sc, nodeClients, pkey, 5)
+		// require.NoError(t, err)
 
 		nodesInfo := getNodesInfo(t, nodeClients)
+
+		for _, nodeInfo := range nodesInfo {
+			_, err := actions.SendFunds(zerolog.Logger{}, sc, actions.FundsToSendPayload{
+				ToAddress:  common.HexToAddress(nodeInfo.TransmitterAddress),
+				Amount:     big.NewInt(5000000000000000000),
+				PrivateKey: sc.MustGetRootPrivateKey(),
+			})
+			require.NoError(t, err)
+		}
 
 		bootstrapNodeInfo := nodesInfo[0]
 		workflowNodesetInfo := nodesInfo[1:]
@@ -707,7 +796,7 @@ func TestWorkflow(t *testing.T) {
 				bc.Nodes[0].DockerInternalHTTPUrl,
 				workflowNodesetInfo[i].TransmitterAddress,
 				forwarderAddress.Hex(),
-				capabilitiesRegistryInstance.Address,
+				capRegAddr,
 				bc.ChainID,
 				workflowRegistryAddr.Hex(),
 				bc.ChainID,
@@ -939,6 +1028,121 @@ func TestWorkflow(t *testing.T) {
 		}
 		wg.Wait()
 
+		// req := keystone_changeset.InitialContractsCfg{
+		// 	RegistryChainSel: chainSelector,
+		// }
+
+		// _, err = keystone_changeset.ConfigureInitialContractsChangeset(*ctfEnv, req)
+		// require.NoError(t, err)
+
+		// allCapabilities := []kcr.CapabilitiesRegistryCapability{
+		// 	{
+		// 		LabelledName:   "offchain_reporting",
+		// 		Version:        "1.0.0",
+		// 		CapabilityType: 2, // CONSENSUS
+		// 		ResponseType:   0, // REPORT
+		// 	},
+		// 	{
+		// 		LabelledName:   "write_geth-testnet",
+		// 		Version:        "1.0.0",
+		// 		CapabilityType: 3, // TARGET
+		// 		ResponseType:   1, // OBSERVATION_IDENTICAL
+		// 	},
+		// 	{
+		// 		LabelledName:   "cron-trigger",
+		// 		Version:        "1.0.0",
+		// 		CapabilityType: uint8(0), // trigger
+		// 	},
+		// 	{
+		// 		LabelledName:   "custom-compute",
+		// 		Version:        "1.0.0",
+		// 		CapabilityType: uint8(1), // action
+		// 	},
+		// }
+
+		// p2pCapabilities := map[p2pkey.PeerID][]kcr.CapabilitiesRegistryCapability{}
+
+		// for i, node := range nodesInfo {
+		// 	if i == 0 {
+		// 		continue
+		// 	}
+
+		// 	peerId, err := p2pkey.MakePeerID(node.PeerID)
+		// 	require.NoError(t, err)
+
+		// 	p2pCapabilities[peerId] = allCapabilities
+		// }
+
+		// _, err = keystone_changeset.AppendNodeCapabilities(*ctfEnv, &keystone_changeset.AppendNodeCapabilitiesRequest{
+		// 	RegistryChainSel:  chainSelector,
+		// 	P2pToCapabilities: p2pCapabilities,
+		// })
+		// require.NoError(t, err)
+
+		// keystone_changeset.AddCapabilities(*ctfEnv, capabilitiesRegistryInstance, []cr_wrapper.CapabilitiesRegistryCapability{
+		// 	{
+		// 		LabelledName:   "offchain_reporting",
+		// 		Version:        "1.0.0",
+		// 		CapabilityType: 2, // CONSENSUS
+		// 		ResponseType:   0, // REPORT
+		// 	},
+		// 	{
+		// 		LabelledName:   "write_geth-testnet",
+		// 		Version:        "1.0.0",
+		// 		CapabilityType: 3, // TARGET
+		// 		ResponseType:   1, // OBSERVATION_IDENTICAL
+		// 	},
+		// 	{
+		// 		LabelledName:   "cron-trigger",
+		// 		Version:        "1.0.0",
+		// 		CapabilityType: uint8(0), // trigger
+		// 	},
+		// 	{
+		// 		LabelledName:   "custom-compute",
+		// 		Version:        "1.0.0",
+		// 		CapabilityType: uint8(1), // action
+		// 	},
+		// })
+
+		// nops := []*kcr.CapabilitiesRegistryNodeOperator{
+		// 	{
+		// 		Admin: common.HexToAddress(sc.MustGetRootKeyAddress().Hex()),
+		// 		Name:  "Admin",
+		// 	},
+		// }
+		// nopToNodeId := map[kcr.CapabilitiesRegistryNodeOperator][]string{
+		// 	{
+		// 		Admin: common.HexToAddress(sc.MustGetRootKeyAddress().Hex()),
+		// 		Name:  "Admin",
+		// 	}: {nodesInfo[0].PeerID, nodesInfo[1].PeerID, nodesInfo[2].PeerID, nodesInfo[3].PeerID},
+		// }
+
+		// donToNodes := make(map[string][]deployment.Node)
+		// donToNodes["1"] = []deployment.Node{}
+
+		// donCaps := []keystone_changeset.RegisteredCapability{}
+
+		// for _, cap := range allCapabilities {
+		// 	c, err := keystone_changeset.FromCapabilitiesRegistryCapability(&cap, *ctfEnv, chainSelector)
+		// 	require.NoError(t, err)
+
+		// 	donCaps = append(donCaps, keystone_changeset.RegisteredCapability(*c))
+		// }
+
+		// donToCapability := map[string][]keystone_changeset.RegisteredCapability{
+		// 	"1": donCaps,
+		// }
+
+		// _, err = keystone_changeset.RegisterNodes(lgr, &keystone_changeset.RegisterNodesRequest{
+		// 	Env:                   ctfEnv,
+		// 	RegistryChainSelector: chainSelector,
+		// 	NopToNodeIDs:          nopToNodeId,
+		// 	DonToNodes:            donToNodes,
+		// 	DonToCapabilities:     donToCapability,
+		// 	Nops:                  nops,
+		// })
+		// require.NoError(t, err)
+
 		var nopsToAdd []cr_wrapper.CapabilitiesRegistryNodeOperator
 		var nodesToAdd []cr_wrapper.CapabilitiesRegistryNodeParams
 		var donNodes [][32]byte
@@ -962,7 +1166,7 @@ func TestWorkflow(t *testing.T) {
 				Signer:              common.BytesToHash(node.Signer.Bytes()),
 				P2pId:               peerID,
 				EncryptionPublicKey: [32]byte{1, 2, 3, 4, 5},
-				HashedCapabilityIds: capabilitiesRegistryInstance.ExistingHashedCapabilitiesIDs,
+				HashedCapabilityIds: hashedCapabilities,
 			})
 
 			donNodes = append(donNodes, peerID)
@@ -970,7 +1174,7 @@ func TestWorkflow(t *testing.T) {
 		}
 
 		// Add NOPs to registry
-		tx, err = capabilitiesRegistryInstance.Contract.AddNodeOperators(
+		tx, err = capabilitiesRegistryInstance.AddNodeOperators(
 			sc.NewTXOpts(),
 			nopsToAdd,
 		)
@@ -978,35 +1182,26 @@ func TestWorkflow(t *testing.T) {
 		require.NoError(t, decodeErr)
 
 		// Add nodes to registry
-		tx, err = capabilitiesRegistryInstance.Contract.AddNodes(
+		tx, err = capabilitiesRegistryInstance.AddNodes(
 			sc.NewTXOpts(),
 			nodesToAdd,
 		)
 		_, decodeErr = sc.Decode(tx, err)
 		require.NoError(t, decodeErr)
 
+		var capRegConfig []cr_wrapper.CapabilitiesRegistryCapabilityConfiguration
+		for _, hashed := range hashedCapabilities {
+			capRegConfig = append(capRegConfig, cr_wrapper.CapabilitiesRegistryCapabilityConfiguration{
+				CapabilityId: hashed,
+				Config:       []byte(""),
+			})
+		}
+
 		// Add nodeset to registry
-		tx, err = capabilitiesRegistryInstance.Contract.AddDON(
+		tx, err = capabilitiesRegistryInstance.AddDON(
 			sc.NewTXOpts(),
 			donNodes,
-			[]cr_wrapper.CapabilitiesRegistryCapabilityConfiguration{
-				{
-					CapabilityId: capabilitiesRegistryInstance.ExistingHashedCapabilitiesIDs[0],
-					Config:       []byte(""),
-				},
-				{
-					CapabilityId: capabilitiesRegistryInstance.ExistingHashedCapabilitiesIDs[1],
-					Config:       []byte(""),
-				},
-				{
-					CapabilityId: capabilitiesRegistryInstance.ExistingHashedCapabilitiesIDs[2],
-					Config:       []byte(""),
-				},
-				{
-					CapabilityId: capabilitiesRegistryInstance.ExistingHashedCapabilitiesIDs[3],
-					Config:       []byte(""),
-				},
-			},
+			capRegConfig,
 			true,     // is public
 			true,     // accepts workflows
 			uint8(1), // max number of malicious nodes
