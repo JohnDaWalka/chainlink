@@ -28,7 +28,7 @@ experiments_enabled = ["slow_funds_return"]
 [Network.EVMNetworks.TREASURE_TOPAZ]
 evm_name = "TREASURE_TOPAZ"
 evm_chain_id = 978658
-client_implementation = "zksync"
+client_implementation = "Ethereum"
 evm_simulated = false
 evm_chainlink_transaction_limit = 5000
 evm_minimum_confirmations = 1
