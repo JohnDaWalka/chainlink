@@ -68,8 +68,8 @@ func (d *DeployerGroup) GetDeployer(chain uint64) (*bind.TransactOpts, error) {
 
 	opts.Signer = func(a common.Address, t *types.Transaction) (*types.Transaction, error) {
 		// Defer signing until later step, when transactions can be simulated, executed, and confirmed sequentially (for case where deployer is used)
-		d.transactions[chain] = append(d.transactions[chain], t)
 		// Increment opts.Nonce so that the next transaction signed will use the new nonce
+		d.transactions[chain] = append(d.transactions[chain], t)
 		opts.Nonce = big.NewInt(0).Add(opts.Nonce, big.NewInt(1))
 		return t, nil
 	}
@@ -183,28 +183,57 @@ func (d *DeployerGroup) enactDeployer() (deployment.ChangesetOutput, error) {
 }
 
 func (d *DeployerGroup) signTransaction(chain uint64, index int64) (*types.Transaction, error) {
+	var err error
 	unsignedTx := d.transactions[chain][index]
 	opts := d.getTransactionOpts(chain)
 
 	if d.mcmConfig == nil {
-		// This function assumes that we have signed and sent transactions @ prior indicies,
-		// so we hold off until estimating gas here so that calls with a dependency do not fail.
-		gasLimit, err := d.e.Chains[chain].Client.EstimateGas(d.e.GetContext(), ethereum.CallMsg{
-			From:  d.e.Chains[chain].DeployerKey.From,
-			To:    unsignedTx.To(),
-			Value: unsignedTx.Value(),
-			Data:  unsignedTx.Data(),
-		})
+		unsignedTx, err = d.updateGasLimitForTx(chain, unsignedTx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to estimate gas of transaction with index %d on chain with selector %d: %w", index, chain, err)
+			return nil, fmt.Errorf("failed to update gas limit for transaction at index %d on chain with selector %d: %w", index, chain, err)
 		}
-		opts.GasLimit = gasLimit
 	}
 
-	fmt.Println("Unsigned tx nonce is set to ", unsignedTx.Nonce())
 	signedTx, err := opts.Signer(opts.From, unsignedTx)
-	fmt.Println("Signed tx nonce is set to ", signedTx.Nonce())
 	return signedTx, err
+}
+
+func (d *DeployerGroup) updateGasLimitForTx(chain uint64, tx *types.Transaction) (*types.Transaction, error) {
+	gasLimit, err := d.e.Chains[chain].Client.EstimateGas(d.e.GetContext(), ethereum.CallMsg{
+		From:  d.e.Chains[chain].DeployerKey.From,
+		To:    tx.To(),
+		Value: tx.Value(),
+		Data:  tx.Data(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to estimate gas of transaction on chain with selector %d: %w", chain, err)
+	}
+	switch tx.Type() {
+	case types.LegacyTxType:
+		tx = types.NewTx(&types.LegacyTx{
+			To:       tx.To(),
+			Nonce:    tx.Nonce(),
+			GasPrice: tx.GasPrice(),
+			Gas:      gasLimit,
+			Value:    tx.Value(),
+			Data:     tx.Data(),
+		})
+	case types.DynamicFeeTxType:
+		tx = types.NewTx(&types.DynamicFeeTx{
+			To:         tx.To(),
+			Nonce:      tx.Nonce(),
+			GasFeeCap:  tx.GasFeeCap(),
+			GasTipCap:  tx.GasTipCap(),
+			Gas:        gasLimit,
+			Value:      tx.Value(),
+			Data:       tx.Data(),
+			AccessList: tx.AccessList(),
+		})
+	default:
+		// Other types are not referenced by "Transact" function in go-ethereum
+		return nil, fmt.Errorf("transaction with type %d is not supported by DeployerGroup", tx.Type())
+	}
+	return tx, nil
 }
 
 func BuildTimelockPerChain(e deployment.Environment, state CCIPOnChainState) map[uint64]*proposalutils.TimelockExecutionContracts {
