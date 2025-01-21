@@ -159,7 +159,7 @@ func (d *DeployerGroup) enactMcms(deploymentDescription string) (deployment.Chan
 
 func (d *DeployerGroup) enactDeployer() (deployment.ChangesetOutput, error) {
 	for selector, txs := range d.transactions {
-		for _, tx := range txs {
+		for i, tx := range txs {
 			signedTx, err := d.signTransaction(selector, tx)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to sign transaction at index %d on chain with selector %d: %w", i, selector, err)
