@@ -35,3 +35,12 @@ evm_minimum_confirmations = 1
 evm_gas_estimation_buffer = 10000
 evm_supports_eip1559 = true
 evm_default_gas_limit = 2500000000
+
+[[Seth.networks]]
+name = "TREASURE_TOPAZ"
+transaction_timeout = "2m"
+gas_price = 264_184_358_789
+gas_tip_cap = 0
+gas_fee_cap = 264_184_358_789
+# EIP-1559 transactions
+eip_1559_dynamic_fees = true
