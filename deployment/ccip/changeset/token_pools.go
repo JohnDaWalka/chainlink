@@ -4,10 +4,12 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
 var currentTokenPoolVersion semver.Version = deployment.Version1_5_1
@@ -21,6 +23,58 @@ var tokenPoolTypes map[deployment.ContractType]struct{} = map[deployment.Contrac
 
 var tokenPoolVersions map[semver.Version]struct{} = map[semver.Version]struct{}{
 	deployment.Version1_5_1: struct{}{},
+}
+
+// tokenPool defines behavior common to all token pools.
+type tokenPool interface {
+	GetToken(opts *bind.CallOpts) (common.Address, error)
+	TypeAndVersion(*bind.CallOpts) (string, error)
+}
+
+// tokenPoolMetadata defines the token pool version version and symbol of the corresponding token.
+type tokenPoolMetadata struct {
+	Version semver.Version
+	Symbol  TokenSymbol
+}
+
+// newTokenPoolWithMetadata returns a token pool along with its metadata.
+func newTokenPoolWithMetadata[P tokenPool](
+	newTokenPool func(address common.Address, backend bind.ContractBackend) (P, error),
+	poolAddress common.Address,
+	chainClient deployment.OnchainClient,
+) (P, tokenPoolMetadata, error) {
+	pool, err := newTokenPool(poolAddress, chainClient)
+	if err != nil {
+		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to connect address %s with token pool bindings: %w", poolAddress, err)
+	}
+	tokenAddress, err := pool.GetToken(nil)
+	if err != nil {
+		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to get token address from pool with address %s: %w", poolAddress, err)
+	}
+	typeAndVersionStr, err := pool.TypeAndVersion(nil)
+	if err != nil {
+		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to get type and version from pool with address %s: %w", poolAddress, err)
+	}
+	_, versionStr, err := ccipconfig.ParseTypeAndVersion(typeAndVersionStr)
+	if err != nil {
+		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to parse type and version of pool with address %s: %w", poolAddress, err)
+	}
+	version, err := semver.NewVersion(versionStr)
+	if err != nil {
+		return pool, tokenPoolMetadata{}, fmt.Errorf("failed parsing version %s of pool with address %s: %w", versionStr, poolAddress, err)
+	}
+	token, err := erc20.NewERC20(tokenAddress, chainClient)
+	if err != nil {
+		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to connect address %s with ERC20 bindings: %w", tokenAddress, err)
+	}
+	symbol, err := token.Symbol(nil)
+	if err != nil {
+		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to fetch symbol from token with address %s: %w", tokenAddress, err)
+	}
+	return pool, tokenPoolMetadata{
+		Symbol:  TokenSymbol(symbol),
+		Version: *version,
+	}, nil
 }
 
 // getAllTokenPoolsWithSymbolAndVersion returns a list of all token pools tied to the given token symbol and semver version.

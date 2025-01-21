@@ -36,7 +36,7 @@ import (
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	common_v1_0 "github.com/smartcontractkit/chainlink/deployment/common/view/v1_0"
-	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/deployment/helpers"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/registry_module_owner_custom"
@@ -607,28 +607,28 @@ func LoadChainState(chain deployment.Chain, addresses map[string]deployment.Type
 			if err != nil {
 				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
-			state.BurnMintTokenPools = addTokenPoolToMap(state.BurnMintTokenPools, metadata, pool)
+			state.BurnMintTokenPools = helpers.AddValueToNestedMap(state.BurnMintTokenPools, metadata.Symbol, metadata.Version, pool)
 		case deployment.NewTypeAndVersion(BurnWithFromMintTokenPool, deployment.Version1_5_1).String():
 			ethAddress := common.HexToAddress(address)
 			pool, metadata, err := newTokenPoolWithMetadata(burn_with_from_mint_token_pool.NewBurnWithFromMintTokenPool, ethAddress, chain.Client)
 			if err != nil {
 				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
-			state.BurnWithFromMintTokenPools = addTokenPoolToMap(state.BurnWithFromMintTokenPools, metadata, pool)
+			state.BurnWithFromMintTokenPools = helpers.AddValueToNestedMap(state.BurnWithFromMintTokenPools, metadata.Symbol, metadata.Version, pool)
 		case deployment.NewTypeAndVersion(BurnFromMintTokenPool, deployment.Version1_5_1).String():
 			ethAddress := common.HexToAddress(address)
 			pool, metadata, err := newTokenPoolWithMetadata(burn_from_mint_token_pool.NewBurnFromMintTokenPool, ethAddress, chain.Client)
 			if err != nil {
 				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
-			state.BurnFromMintTokenPools = addTokenPoolToMap(state.BurnFromMintTokenPools, metadata, pool)
+			state.BurnFromMintTokenPools = helpers.AddValueToNestedMap(state.BurnFromMintTokenPools, metadata.Symbol, metadata.Version, pool)
 		case deployment.NewTypeAndVersion(LockReleaseTokenPool, deployment.Version1_5_1).String():
 			ethAddress := common.HexToAddress(address)
 			pool, metadata, err := newTokenPoolWithMetadata(lock_release_token_pool.NewLockReleaseTokenPool, ethAddress, chain.Client)
 			if err != nil {
 				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
-			state.LockReleaseTokenPools = addTokenPoolToMap(state.LockReleaseTokenPools, metadata, pool)
+			state.LockReleaseTokenPools = helpers.AddValueToNestedMap(state.LockReleaseTokenPools, metadata.Symbol, metadata.Version, pool)
 		case deployment.NewTypeAndVersion(BurnMintToken, deployment.Version1_0_0).String():
 			tok, err := burn_mint_erc677.NewBurnMintERC677(common.HexToAddress(address), chain.Client)
 			if err != nil {
@@ -731,70 +731,4 @@ func LoadChainState(chain deployment.Chain, addresses map[string]deployment.Type
 		}
 	}
 	return state, nil
-}
-
-// pool defines behavior common to all token pools.
-type pool interface {
-	GetToken(opts *bind.CallOpts) (common.Address, error)
-	TypeAndVersion(*bind.CallOpts) (string, error)
-}
-
-// tokenPoolMetadata defines the type, version, and symbol of the corresponding token.
-type tokenPoolMetadata struct {
-	Version semver.Version
-	Symbol  TokenSymbol
-}
-
-// newTokenPoolWithMetadata returns a token pool along with its type and version and corresponding token symbol.
-func newTokenPoolWithMetadata[P pool](
-	newTokenPool func(address common.Address, backend bind.ContractBackend) (P, error),
-	poolAddress common.Address,
-	chainClient deployment.OnchainClient,
-) (P, tokenPoolMetadata, error) {
-	pool, err := newTokenPool(poolAddress, chainClient)
-	if err != nil {
-		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to connect address %s with token pool bindings: %w", poolAddress, err)
-	}
-	tokenAddress, err := pool.GetToken(nil)
-	if err != nil {
-		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to get token address from pool with address %s: %w", poolAddress, err)
-	}
-	typeAndVersionStr, err := pool.TypeAndVersion(nil)
-	if err != nil {
-		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to get type and version from pool with address %s: %w", poolAddress, err)
-	}
-	_, versionStr, err := ccipconfig.ParseTypeAndVersion(typeAndVersionStr)
-	if err != nil {
-		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to parse type and version of pool with address %s: %w", poolAddress, err)
-	}
-	version, err := semver.NewVersion(versionStr)
-	if err != nil {
-		return pool, tokenPoolMetadata{}, fmt.Errorf("failed parsing version %s of pool with address %s: %w", versionStr, poolAddress, err)
-	}
-	token, err := erc20.NewERC20(tokenAddress, chainClient)
-	if err != nil {
-		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to connect address %s with ERC20 bindings: %w", tokenAddress, err)
-	}
-	symbol, err := token.Symbol(nil)
-	if err != nil {
-		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to fetch symbol from token with address %s: %w", tokenAddress, err)
-	}
-	return pool, tokenPoolMetadata{
-		Symbol:  TokenSymbol(symbol),
-		Version: *version,
-	}, nil
-}
-
-// addTokenPoolToMap adds a new token pool to a map based on metadata to a nested map key.
-func addTokenPoolToMap[P pool](mapping map[TokenSymbol]map[semver.Version]P, metadata tokenPoolMetadata, value P) map[TokenSymbol]map[semver.Version]P {
-	if mapping == nil {
-		mapping = make(map[TokenSymbol]map[semver.Version]P)
-	}
-	if mapping[metadata.Symbol] == nil {
-		mapping[metadata.Symbol] = make(map[semver.Version]P)
-		mapping[metadata.Symbol][metadata.Version] = value
-		return mapping
-	}
-	mapping[metadata.Symbol][metadata.Version] = value
-	return mapping
 }
