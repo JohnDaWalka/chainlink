@@ -35,3 +35,19 @@ evm_minimum_confirmations = 1
 evm_gas_estimation_buffer = 10000
 evm_supports_eip1559 = true
 evm_default_gas_limit = 2500000000
+
+[[Seth.networks]]
+name = "TREASURE_TOPAZ"
+transaction_timeout = "3m"
+transfer_gas_fee = 5_000_000
+gas_limit = 2_500_000_000
+# legacy transactions
+gas_price = 264_184_358_789
+# EIP-1559 transactions
+eip_1559_dynamic_fees = true
+gas_fee_cap = 264_184_358_789
+gas_tip_cap = 50_000_000
+# if set to true we will estimate gas for every transaction
+gas_price_estimation_enabled = true
+# how many last blocks to use, when estimating gas for a transaction
+gas_price_estimation_blocks = 200
