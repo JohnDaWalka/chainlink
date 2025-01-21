@@ -19,6 +19,8 @@ import (
 	"go.opentelemetry.io/otel"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
+
 	pgcommon "github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
 )
 
@@ -79,7 +81,7 @@ func NewConnection(ctx context.Context, uri string, dialect pgcommon.DialectName
 		// txdb it should have already been set at the point where we called
 		// txdb.Register
 
-		err := pgcommon.RegisterTxDb(uri)
+		err := sqltest.RegisterTxDB(uri)
 		if err != nil {
 			return nil, fmt.Errorf("failed to register txdb: %w", err)
 		}
