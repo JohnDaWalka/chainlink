@@ -170,15 +170,6 @@ protoc: ## Install protoc
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@`go list -m -json google.golang.org/protobuf | jq -r .Version`
 	go install github.com/smartcontractkit/wsrpc/cmd/protoc-gen-go-wsrpc@`go list -m -json github.com/smartcontractkit/wsrpc | jq -r .Version`
 
-.PHONY: telemetry-protobuf
-telemetry-protobuf: $(telemetry-protobuf) ## Generate telemetry protocol buffers.
-	protoc \
-	--go_out=. \
-	--go_opt=paths=source_relative \
-	--go-wsrpc_out=. \
-	--go-wsrpc_opt=paths=source_relative \
-	./core/services/synchronization/telem/*.proto
-
 .PHONY: config-docs
 config-docs: ## Generate core node configuration documentation
 	go run ./core/config/docs/cmd/generate -o ./docs/
