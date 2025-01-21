@@ -123,15 +123,11 @@ func (d *DeployerGroup) enactMcms(deploymentDescription string) (deployment.Chan
 	batches := make([]timelock.BatchChainOperation, 0)
 	for selector, txs := range d.transactions {
 		mcmOps := make([]mcms.Operation, len(txs))
-		for i := range txs {
-			signedTx, err := d.signTransaction(selector, int64(i))
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to sign transaction at index %d on chain with selector %d: %w", i, selector, err)
-			}
+		for i, tx := range txs {
 			mcmOps[i] = mcms.Operation{
-				To:    *signedTx.To(),
-				Data:  signedTx.Data(),
-				Value: signedTx.Value(),
+				To:    *tx.To(),
+				Data:  tx.Data(),
+				Value: tx.Value(),
 			}
 		}
 		batches = append(batches, timelock.BatchChainOperation{
@@ -163,8 +159,8 @@ func (d *DeployerGroup) enactMcms(deploymentDescription string) (deployment.Chan
 
 func (d *DeployerGroup) enactDeployer() (deployment.ChangesetOutput, error) {
 	for selector, txs := range d.transactions {
-		for i := range txs {
-			signedTx, err := d.signTransaction(selector, int64(i))
+		for _, tx := range txs {
+			signedTx, err := d.signTransaction(selector, tx)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to sign transaction at index %d on chain with selector %d: %w", i, selector, err)
 			}
@@ -182,19 +178,15 @@ func (d *DeployerGroup) enactDeployer() (deployment.ChangesetOutput, error) {
 	return deployment.ChangesetOutput{}, nil
 }
 
-func (d *DeployerGroup) signTransaction(chain uint64, index int64) (*types.Transaction, error) {
-	var err error
-	unsignedTx := d.transactions[chain][index]
+func (d *DeployerGroup) signTransaction(chain uint64, transaction *types.Transaction) (*types.Transaction, error) {
 	opts := d.getTransactionOpts(chain)
 
-	if d.mcmConfig == nil {
-		unsignedTx, err = d.updateGasLimitForTx(chain, unsignedTx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to update gas limit for transaction at index %d on chain with selector %d: %w", index, chain, err)
-		}
+	transaction, err := d.updateGasLimitForTx(chain, transaction)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update gas limit for transaction on chain with selector %d: %w", chain, err)
 	}
 
-	signedTx, err := opts.Signer(opts.From, unsignedTx)
+	signedTx, err := opts.Signer(opts.From, transaction)
 	return signedTx, err
 }
 
