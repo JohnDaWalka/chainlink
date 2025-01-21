@@ -18,8 +18,6 @@ import (
 )
 
 const (
-	// maxQueuedTransactions is the max limit of UnstartedTransactions and ConfirmedTransactions structures.
-	maxQueuedTransactions = 250
 	// pruneSubset controls the subset of confirmed transactions to prune when the structure reaches its max limit.
 	// i.e. if the value is 3 and the limit is 90, 30 transactions will be pruned.
 	pruneSubset = 3
@@ -27,10 +25,11 @@ const (
 
 type InMemoryStore struct {
 	sync.RWMutex
-	lggr      logger.Logger
-	txIDCount uint64
-	address   common.Address
-	chainID   *big.Int
+	lggr                  logger.Logger
+	txIDCount             uint64
+	address               common.Address
+	chainID               *big.Int
+	maxQueuedTransactions int
 
 	UnstartedTransactions   []*types.Transaction
 	UnconfirmedTransactions map[uint64]*types.Transaction
@@ -40,11 +39,12 @@ type InMemoryStore struct {
 	Transactions map[uint64]*types.Transaction
 }
 
-func NewInMemoryStore(lggr logger.Logger, address common.Address, chainID *big.Int) *InMemoryStore {
+func NewInMemoryStore(lggr logger.Logger, address common.Address, chainID *big.Int, maxQueuedTransactions int) *InMemoryStore {
 	return &InMemoryStore{
 		lggr:                    logger.Named(lggr, "InMemoryStore"),
 		address:                 address,
 		chainID:                 chainID,
+		maxQueuedTransactions:   maxQueuedTransactions,
 		UnstartedTransactions:   make([]*types.Transaction, 0, maxQueuedTransactions),
 		UnconfirmedTransactions: make(map[uint64]*types.Transaction),
 		ConfirmedTransactions:   make(map[uint64]*types.Transaction, maxQueuedTransactions),
@@ -154,13 +154,13 @@ func (m *InMemoryStore) CreateTransaction(txRequest *types.TxRequest) *types.Tra
 	}
 
 	uLen := len(m.UnstartedTransactions)
-	if uLen >= maxQueuedTransactions {
-		m.lggr.Warnw(fmt.Sprintf("Unstarted transactions queue for address: %v reached max limit of: %d. Dropping oldest transactions", m.address, maxQueuedTransactions),
-			"txs", m.UnstartedTransactions[0:uLen-maxQueuedTransactions+1]) // need to make room for the new tx
-		for _, tx := range m.UnstartedTransactions[0 : uLen-maxQueuedTransactions+1] {
+	if uLen >= m.maxQueuedTransactions {
+		m.lggr.Warnw(fmt.Sprintf("Unstarted transactions queue for address: %v reached max limit of: %d. Dropping oldest transactions", m.address, m.maxQueuedTransactions),
+			"txs", m.UnstartedTransactions[0:uLen-m.maxQueuedTransactions+1]) // need to make room for the new tx
+		for _, tx := range m.UnstartedTransactions[0 : uLen-m.maxQueuedTransactions+1] {
 			delete(m.Transactions, tx.ID)
 		}
-		m.UnstartedTransactions = m.UnstartedTransactions[uLen-maxQueuedTransactions+1:]
+		m.UnstartedTransactions = m.UnstartedTransactions[uLen-m.maxQueuedTransactions+1:]
 	}
 
 	m.txIDCount++
@@ -223,10 +223,10 @@ func (m *InMemoryStore) MarkConfirmedAndReorgedTransactions(latestNonce uint64) 
 		}
 	}
 
-	if len(m.ConfirmedTransactions) > maxQueuedTransactions {
+	if len(m.ConfirmedTransactions) > m.maxQueuedTransactions {
 		prunedTxIDs := m.pruneConfirmedTransactions()
 		m.lggr.Debugf("Confirmed transactions map for address: %v reached max limit of: %d. Pruned 1/%d of the oldest confirmed transactions. TxIDs: %v",
-			m.address, maxQueuedTransactions, pruneSubset, prunedTxIDs)
+			m.address, m.maxQueuedTransactions, pruneSubset, prunedTxIDs)
 	}
 	sort.Slice(confirmedTransactions, func(i, j int) bool { return confirmedTransactions[i].ID < confirmedTransactions[j].ID })
 	sort.Slice(unconfirmedTransactionIDs, func(i, j int) bool { return unconfirmedTransactionIDs[i] < unconfirmedTransactionIDs[j] })

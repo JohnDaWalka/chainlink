@@ -2,6 +2,8 @@ package txmgr
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"math/big"
 	"time"
 
@@ -128,7 +130,10 @@ func NewTxmV2(
 	}
 
 	attemptBuilder := txm.NewAttemptBuilder(chainID, fCfg.PriceMaxKey, estimator, keyStore)
-	inMemoryStoreManager := storage.NewInMemoryStoreManager(lggr, chainID)
+	if txConfig.MaxQueued() > math.MaxInt {
+		return nil, fmt.Errorf("Overflow error for MaxQueued: %v", txConfig.MaxQueued())
+	}
+	inMemoryStoreManager := storage.NewInMemoryStoreManager(lggr, chainID, int(txConfig.MaxQueued()))
 	config := txm.Config{
 		EIP1559:   fCfg.EIP1559DynamicFees(),
 		BlockTime: *txmV2Config.BlockTime(),
@@ -143,7 +148,7 @@ func NewTxmV2(
 		c = clientwrappers.NewChainClient(client)
 	}
 	t := txm.NewTxm(lggr, chainID, c, attemptBuilder, inMemoryStoreManager, stuckTxDetector, config, keyStore)
-	return txm.NewTxmOrchestrator(lggr, chainID, t, inMemoryStoreManager, fwdMgr, keyStore, attemptBuilder), nil
+	return txm.NewTxmOrchestrator(lggr, chainID, txConfig.MaxQueued(), t, inMemoryStoreManager, fwdMgr, keyStore, attemptBuilder), nil
 }
 
 // NewEvmResender creates a new concrete EvmResender

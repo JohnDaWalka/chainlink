@@ -33,15 +33,15 @@ type Client interface {
 }
 
 type TxStore interface {
-	AbandonPendingTransactions(context.Context, common.Address) error
-	AppendAttemptToTransaction(context.Context, uint64, common.Address, *types.Attempt) error
-	CreateEmptyUnconfirmedTransaction(context.Context, common.Address, uint64, uint64) (*types.Transaction, error)
-	CreateTransaction(context.Context, *types.TxRequest) (*types.Transaction, error)
-	FetchUnconfirmedTransactionAtNonceWithCount(context.Context, uint64, common.Address) (*types.Transaction, int, error)
-	MarkConfirmedAndReorgedTransactions(context.Context, uint64, common.Address) ([]*types.Transaction, []uint64, error)
+	Abandon(context.Context, *big.Int, common.Address) error
+	AppendAttemptToTransaction(context.Context, *types.Transaction, *types.Attempt) error
+	CreateEmptyUnconfirmedTransaction(context.Context, common.Address, uint64, uint64, *big.Int) (*types.Transaction, error)
+	CreateTx(context.Context, *types.TxRequest, uint64) (*types.Transaction, error)
+	FetchUnconfirmedTransactionAtNonceWithCount(context.Context, uint64, common.Address, *big.Int) (*types.Transaction, int, error)
+	MarkConfirmedAndReorgedTransactions(context.Context, uint64, common.Address, *big.Int) ([]*types.Transaction, []uint64, error)
 	MarkUnconfirmedTransactionPurgeable(context.Context, uint64, common.Address) error
 	UpdateTransactionBroadcast(context.Context, uint64, uint64, common.Hash, common.Address) error
-	UpdateUnstartedTransactionWithNonce(context.Context, common.Address, uint64) (*types.Transaction, error)
+	UpdateUnstartedTransactionWithNonce(context.Context, common.Address, uint64, *big.Int) (*types.Transaction, error)
 
 	// ErrorHandler
 	DeleteAttemptForUnconfirmedTx(context.Context, uint64, *types.Attempt, common.Address) error
@@ -170,8 +170,8 @@ func (t *Txm) HealthReport() map[string]error {
 	return map[string]error{t.lggr.Name(): t.Healthy()}
 }
 
-func (t *Txm) CreateTransaction(ctx context.Context, txRequest *types.TxRequest) (tx *types.Transaction, err error) {
-	tx, err = t.txStore.CreateTransaction(ctx, txRequest)
+func (t *Txm) CreateTransaction(ctx context.Context, txRequest *types.TxRequest, maxQueuedTransactions uint64) (tx *types.Transaction, err error) {
+	tx, err = t.txStore.CreateTx(ctx, txRequest, maxQueuedTransactions)
 	if err == nil {
 		t.lggr.Infow("Created transaction", "tx", tx)
 	}
@@ -193,7 +193,7 @@ func (t *Txm) Trigger(address common.Address) {
 func (t *Txm) Abandon(address common.Address) error {
 	// TODO: restart txm
 	t.lggr.Infof("Dropping unstarted and unconfirmed transactions for address: %v", address)
-	return t.txStore.AbandonPendingTransactions(context.TODO(), address)
+	return t.txStore.Abandon(context.TODO(), t.chainID, address)
 }
 
 func (t *Txm) getNonce(address common.Address) uint64 {
@@ -281,7 +281,7 @@ func (t *Txm) backfillLoop(address common.Address) {
 
 func (t *Txm) broadcastTransaction(ctx context.Context, address common.Address) (bool, error) {
 	for {
-		_, unconfirmedCount, err := t.txStore.FetchUnconfirmedTransactionAtNonceWithCount(ctx, 0, address)
+		_, unconfirmedCount, err := t.txStore.FetchUnconfirmedTransactionAtNonceWithCount(ctx, 0, address, t.chainID)
 		if err != nil {
 			return false, err
 		}
@@ -308,7 +308,7 @@ func (t *Txm) broadcastTransaction(ctx context.Context, address common.Address) 
 		}
 
 		nonce := t.getNonce(address)
-		tx, err := t.txStore.UpdateUnstartedTransactionWithNonce(ctx, address, nonce)
+		tx, err := t.txStore.UpdateUnstartedTransactionWithNonce(ctx, address, nonce, t.chainID)
 		if err != nil {
 			return false, err
 		}
@@ -329,10 +329,7 @@ func (t *Txm) createAndSendAttempt(ctx context.Context, tx *types.Transaction, a
 		return err
 	}
 
-	if tx.Nonce == nil {
-		return fmt.Errorf("nonce for txID: %v is empty", tx.ID)
-	}
-	if err = t.txStore.AppendAttemptToTransaction(ctx, *tx.Nonce, address, attempt); err != nil {
+	if err = t.txStore.AppendAttemptToTransaction(ctx, tx, attempt); err != nil {
 		return err
 	}
 
@@ -371,7 +368,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 		return false, err
 	}
 
-	confirmedTransactions, unconfirmedTransactionIDs, err := t.txStore.MarkConfirmedAndReorgedTransactions(ctx, latestNonce, address)
+	confirmedTransactions, unconfirmedTransactionIDs, err := t.txStore.MarkConfirmedAndReorgedTransactions(ctx, latestNonce, address, t.chainID)
 	if err != nil {
 		return false, err
 	}
@@ -381,7 +378,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 		t.lggr.Infof("Confirmed transaction IDs: %v . Re-orged transaction IDs: %v", confirmedTransactionIDs, unconfirmedTransactionIDs)
 	}
 
-	tx, unconfirmedCount, err := t.txStore.FetchUnconfirmedTransactionAtNonceWithCount(ctx, latestNonce, address)
+	tx, unconfirmedCount, err := t.txStore.FetchUnconfirmedTransactionAtNonceWithCount(ctx, latestNonce, address, t.chainID)
 	if err != nil {
 		return false, err
 	}
@@ -428,7 +425,7 @@ func (t *Txm) backfillTransactions(ctx context.Context, address common.Address) 
 }
 
 func (t *Txm) createAndSendEmptyTx(ctx context.Context, latestNonce uint64, address common.Address) error {
-	tx, err := t.txStore.CreateEmptyUnconfirmedTransaction(ctx, address, latestNonce, t.config.EmptyTxLimitDefault)
+	tx, err := t.txStore.CreateEmptyUnconfirmedTransaction(ctx, address, latestNonce, t.config.EmptyTxLimitDefault, t.chainID)
 	if err != nil {
 		return err
 	}

@@ -16,7 +16,7 @@ func TestAdd(t *testing.T) {
 	t.Parallel()
 
 	fromAddress := testutils.NewAddress()
-	m := NewInMemoryStoreManager(logger.Test(t), testutils.FixtureChainID)
+	m := NewInMemoryStoreManager(logger.Test(t), testutils.FixtureChainID, maxQueuedTransactionsTest)
 	// Adds a new address
 	err := m.Add(fromAddress)
 	require.NoError(t, err)

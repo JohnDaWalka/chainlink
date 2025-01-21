@@ -4,6 +4,7 @@ package mocks
 
 import (
 	context "context"
+	big "math/big"
 
 	common "github.com/ethereum/go-ethereum/common"
 
@@ -25,17 +26,17 @@ func (_m *TxStore) EXPECT() *TxStore_Expecter {
 	return &TxStore_Expecter{mock: &_m.Mock}
 }
 
-// AbandonPendingTransactions provides a mock function with given fields: _a0, _a1
-func (_m *TxStore) AbandonPendingTransactions(_a0 context.Context, _a1 common.Address) error {
-	ret := _m.Called(_a0, _a1)
+// Abandon provides a mock function with given fields: _a0, _a1, _a2
+func (_m *TxStore) Abandon(_a0 context.Context, _a1 *big.Int, _a2 common.Address) error {
+	ret := _m.Called(_a0, _a1, _a2)
 
 	if len(ret) == 0 {
-		panic("no return value specified for AbandonPendingTransactions")
+		panic("no return value specified for Abandon")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, common.Address) error); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(context.Context, *big.Int, common.Address) error); ok {
+		r0 = rf(_a0, _a1, _a2)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -43,46 +44,47 @@ func (_m *TxStore) AbandonPendingTransactions(_a0 context.Context, _a1 common.Ad
 	return r0
 }
 
-// TxStore_AbandonPendingTransactions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AbandonPendingTransactions'
-type TxStore_AbandonPendingTransactions_Call struct {
+// TxStore_Abandon_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Abandon'
+type TxStore_Abandon_Call struct {
 	*mock.Call
 }
 
-// AbandonPendingTransactions is a helper method to define mock.On call
+// Abandon is a helper method to define mock.On call
 //   - _a0 context.Context
-//   - _a1 common.Address
-func (_e *TxStore_Expecter) AbandonPendingTransactions(_a0 interface{}, _a1 interface{}) *TxStore_AbandonPendingTransactions_Call {
-	return &TxStore_AbandonPendingTransactions_Call{Call: _e.mock.On("AbandonPendingTransactions", _a0, _a1)}
+//   - _a1 *big.Int
+//   - _a2 common.Address
+func (_e *TxStore_Expecter) Abandon(_a0 interface{}, _a1 interface{}, _a2 interface{}) *TxStore_Abandon_Call {
+	return &TxStore_Abandon_Call{Call: _e.mock.On("Abandon", _a0, _a1, _a2)}
 }
 
-func (_c *TxStore_AbandonPendingTransactions_Call) Run(run func(_a0 context.Context, _a1 common.Address)) *TxStore_AbandonPendingTransactions_Call {
+func (_c *TxStore_Abandon_Call) Run(run func(_a0 context.Context, _a1 *big.Int, _a2 common.Address)) *TxStore_Abandon_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(common.Address))
+		run(args[0].(context.Context), args[1].(*big.Int), args[2].(common.Address))
 	})
 	return _c
 }
 
-func (_c *TxStore_AbandonPendingTransactions_Call) Return(_a0 error) *TxStore_AbandonPendingTransactions_Call {
+func (_c *TxStore_Abandon_Call) Return(_a0 error) *TxStore_Abandon_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *TxStore_AbandonPendingTransactions_Call) RunAndReturn(run func(context.Context, common.Address) error) *TxStore_AbandonPendingTransactions_Call {
+func (_c *TxStore_Abandon_Call) RunAndReturn(run func(context.Context, *big.Int, common.Address) error) *TxStore_Abandon_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// AppendAttemptToTransaction provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *TxStore) AppendAttemptToTransaction(_a0 context.Context, _a1 uint64, _a2 common.Address, _a3 *types.Attempt) error {
-	ret := _m.Called(_a0, _a1, _a2, _a3)
+// AppendAttemptToTransaction provides a mock function with given fields: _a0, _a1, _a2
+func (_m *TxStore) AppendAttemptToTransaction(_a0 context.Context, _a1 *types.Transaction, _a2 *types.Attempt) error {
+	ret := _m.Called(_a0, _a1, _a2)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AppendAttemptToTransaction")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, common.Address, *types.Attempt) error); ok {
-		r0 = rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.Transaction, *types.Attempt) error); ok {
+		r0 = rf(_a0, _a1, _a2)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -97,16 +99,15 @@ type TxStore_AppendAttemptToTransaction_Call struct {
 
 // AppendAttemptToTransaction is a helper method to define mock.On call
 //   - _a0 context.Context
-//   - _a1 uint64
-//   - _a2 common.Address
-//   - _a3 *types.Attempt
-func (_e *TxStore_Expecter) AppendAttemptToTransaction(_a0 interface{}, _a1 interface{}, _a2 interface{}, _a3 interface{}) *TxStore_AppendAttemptToTransaction_Call {
-	return &TxStore_AppendAttemptToTransaction_Call{Call: _e.mock.On("AppendAttemptToTransaction", _a0, _a1, _a2, _a3)}
+//   - _a1 *types.Transaction
+//   - _a2 *types.Attempt
+func (_e *TxStore_Expecter) AppendAttemptToTransaction(_a0 interface{}, _a1 interface{}, _a2 interface{}) *TxStore_AppendAttemptToTransaction_Call {
+	return &TxStore_AppendAttemptToTransaction_Call{Call: _e.mock.On("AppendAttemptToTransaction", _a0, _a1, _a2)}
 }
 
-func (_c *TxStore_AppendAttemptToTransaction_Call) Run(run func(_a0 context.Context, _a1 uint64, _a2 common.Address, _a3 *types.Attempt)) *TxStore_AppendAttemptToTransaction_Call {
+func (_c *TxStore_AppendAttemptToTransaction_Call) Run(run func(_a0 context.Context, _a1 *types.Transaction, _a2 *types.Attempt)) *TxStore_AppendAttemptToTransaction_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(uint64), args[2].(common.Address), args[3].(*types.Attempt))
+		run(args[0].(context.Context), args[1].(*types.Transaction), args[2].(*types.Attempt))
 	})
 	return _c
 }
@@ -116,14 +117,14 @@ func (_c *TxStore_AppendAttemptToTransaction_Call) Return(_a0 error) *TxStore_Ap
 	return _c
 }
 
-func (_c *TxStore_AppendAttemptToTransaction_Call) RunAndReturn(run func(context.Context, uint64, common.Address, *types.Attempt) error) *TxStore_AppendAttemptToTransaction_Call {
+func (_c *TxStore_AppendAttemptToTransaction_Call) RunAndReturn(run func(context.Context, *types.Transaction, *types.Attempt) error) *TxStore_AppendAttemptToTransaction_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// CreateEmptyUnconfirmedTransaction provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *TxStore) CreateEmptyUnconfirmedTransaction(_a0 context.Context, _a1 common.Address, _a2 uint64, _a3 uint64) (*types.Transaction, error) {
-	ret := _m.Called(_a0, _a1, _a2, _a3)
+// CreateEmptyUnconfirmedTransaction provides a mock function with given fields: _a0, _a1, _a2, _a3, _a4
+func (_m *TxStore) CreateEmptyUnconfirmedTransaction(_a0 context.Context, _a1 common.Address, _a2 uint64, _a3 uint64, _a4 *big.Int) (*types.Transaction, error) {
+	ret := _m.Called(_a0, _a1, _a2, _a3, _a4)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateEmptyUnconfirmedTransaction")
@@ -131,19 +132,19 @@ func (_m *TxStore) CreateEmptyUnconfirmedTransaction(_a0 context.Context, _a1 co
 
 	var r0 *types.Transaction
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, common.Address, uint64, uint64) (*types.Transaction, error)); ok {
-		return rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(0).(func(context.Context, common.Address, uint64, uint64, *big.Int) (*types.Transaction, error)); ok {
+		return rf(_a0, _a1, _a2, _a3, _a4)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, common.Address, uint64, uint64) *types.Transaction); ok {
-		r0 = rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(0).(func(context.Context, common.Address, uint64, uint64, *big.Int) *types.Transaction); ok {
+		r0 = rf(_a0, _a1, _a2, _a3, _a4)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Transaction)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, common.Address, uint64, uint64) error); ok {
-		r1 = rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(1).(func(context.Context, common.Address, uint64, uint64, *big.Int) error); ok {
+		r1 = rf(_a0, _a1, _a2, _a3, _a4)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -161,13 +162,14 @@ type TxStore_CreateEmptyUnconfirmedTransaction_Call struct {
 //   - _a1 common.Address
 //   - _a2 uint64
 //   - _a3 uint64
-func (_e *TxStore_Expecter) CreateEmptyUnconfirmedTransaction(_a0 interface{}, _a1 interface{}, _a2 interface{}, _a3 interface{}) *TxStore_CreateEmptyUnconfirmedTransaction_Call {
-	return &TxStore_CreateEmptyUnconfirmedTransaction_Call{Call: _e.mock.On("CreateEmptyUnconfirmedTransaction", _a0, _a1, _a2, _a3)}
+//   - _a4 *big.Int
+func (_e *TxStore_Expecter) CreateEmptyUnconfirmedTransaction(_a0 interface{}, _a1 interface{}, _a2 interface{}, _a3 interface{}, _a4 interface{}) *TxStore_CreateEmptyUnconfirmedTransaction_Call {
+	return &TxStore_CreateEmptyUnconfirmedTransaction_Call{Call: _e.mock.On("CreateEmptyUnconfirmedTransaction", _a0, _a1, _a2, _a3, _a4)}
 }
 
-func (_c *TxStore_CreateEmptyUnconfirmedTransaction_Call) Run(run func(_a0 context.Context, _a1 common.Address, _a2 uint64, _a3 uint64)) *TxStore_CreateEmptyUnconfirmedTransaction_Call {
+func (_c *TxStore_CreateEmptyUnconfirmedTransaction_Call) Run(run func(_a0 context.Context, _a1 common.Address, _a2 uint64, _a3 uint64, _a4 *big.Int)) *TxStore_CreateEmptyUnconfirmedTransaction_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(common.Address), args[2].(uint64), args[3].(uint64))
+		run(args[0].(context.Context), args[1].(common.Address), args[2].(uint64), args[3].(uint64), args[4].(*big.Int))
 	})
 	return _c
 }
@@ -177,34 +179,34 @@ func (_c *TxStore_CreateEmptyUnconfirmedTransaction_Call) Return(_a0 *types.Tran
 	return _c
 }
 
-func (_c *TxStore_CreateEmptyUnconfirmedTransaction_Call) RunAndReturn(run func(context.Context, common.Address, uint64, uint64) (*types.Transaction, error)) *TxStore_CreateEmptyUnconfirmedTransaction_Call {
+func (_c *TxStore_CreateEmptyUnconfirmedTransaction_Call) RunAndReturn(run func(context.Context, common.Address, uint64, uint64, *big.Int) (*types.Transaction, error)) *TxStore_CreateEmptyUnconfirmedTransaction_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// CreateTransaction provides a mock function with given fields: _a0, _a1
-func (_m *TxStore) CreateTransaction(_a0 context.Context, _a1 *types.TxRequest) (*types.Transaction, error) {
-	ret := _m.Called(_a0, _a1)
+// CreateTx provides a mock function with given fields: _a0, _a1, _a2
+func (_m *TxStore) CreateTx(_a0 context.Context, _a1 *types.TxRequest, _a2 uint64) (*types.Transaction, error) {
+	ret := _m.Called(_a0, _a1, _a2)
 
 	if len(ret) == 0 {
-		panic("no return value specified for CreateTransaction")
+		panic("no return value specified for CreateTx")
 	}
 
 	var r0 *types.Transaction
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.TxRequest) (*types.Transaction, error)); ok {
-		return rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.TxRequest, uint64) (*types.Transaction, error)); ok {
+		return rf(_a0, _a1, _a2)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *types.TxRequest) *types.Transaction); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.TxRequest, uint64) *types.Transaction); ok {
+		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Transaction)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *types.TxRequest) error); ok {
-		r1 = rf(_a0, _a1)
+	if rf, ok := ret.Get(1).(func(context.Context, *types.TxRequest, uint64) error); ok {
+		r1 = rf(_a0, _a1, _a2)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -212,31 +214,32 @@ func (_m *TxStore) CreateTransaction(_a0 context.Context, _a1 *types.TxRequest) 
 	return r0, r1
 }
 
-// TxStore_CreateTransaction_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateTransaction'
-type TxStore_CreateTransaction_Call struct {
+// TxStore_CreateTx_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateTx'
+type TxStore_CreateTx_Call struct {
 	*mock.Call
 }
 
-// CreateTransaction is a helper method to define mock.On call
+// CreateTx is a helper method to define mock.On call
 //   - _a0 context.Context
 //   - _a1 *types.TxRequest
-func (_e *TxStore_Expecter) CreateTransaction(_a0 interface{}, _a1 interface{}) *TxStore_CreateTransaction_Call {
-	return &TxStore_CreateTransaction_Call{Call: _e.mock.On("CreateTransaction", _a0, _a1)}
+//   - _a2 uint64
+func (_e *TxStore_Expecter) CreateTx(_a0 interface{}, _a1 interface{}, _a2 interface{}) *TxStore_CreateTx_Call {
+	return &TxStore_CreateTx_Call{Call: _e.mock.On("CreateTx", _a0, _a1, _a2)}
 }
 
-func (_c *TxStore_CreateTransaction_Call) Run(run func(_a0 context.Context, _a1 *types.TxRequest)) *TxStore_CreateTransaction_Call {
+func (_c *TxStore_CreateTx_Call) Run(run func(_a0 context.Context, _a1 *types.TxRequest, _a2 uint64)) *TxStore_CreateTx_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*types.TxRequest))
+		run(args[0].(context.Context), args[1].(*types.TxRequest), args[2].(uint64))
 	})
 	return _c
 }
 
-func (_c *TxStore_CreateTransaction_Call) Return(_a0 *types.Transaction, _a1 error) *TxStore_CreateTransaction_Call {
+func (_c *TxStore_CreateTx_Call) Return(_a0 *types.Transaction, _a1 error) *TxStore_CreateTx_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *TxStore_CreateTransaction_Call) RunAndReturn(run func(context.Context, *types.TxRequest) (*types.Transaction, error)) *TxStore_CreateTransaction_Call {
+func (_c *TxStore_CreateTx_Call) RunAndReturn(run func(context.Context, *types.TxRequest, uint64) (*types.Transaction, error)) *TxStore_CreateTx_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -290,9 +293,9 @@ func (_c *TxStore_DeleteAttemptForUnconfirmedTx_Call) RunAndReturn(run func(cont
 	return _c
 }
 
-// FetchUnconfirmedTransactionAtNonceWithCount provides a mock function with given fields: _a0, _a1, _a2
-func (_m *TxStore) FetchUnconfirmedTransactionAtNonceWithCount(_a0 context.Context, _a1 uint64, _a2 common.Address) (*types.Transaction, int, error) {
-	ret := _m.Called(_a0, _a1, _a2)
+// FetchUnconfirmedTransactionAtNonceWithCount provides a mock function with given fields: _a0, _a1, _a2, _a3
+func (_m *TxStore) FetchUnconfirmedTransactionAtNonceWithCount(_a0 context.Context, _a1 uint64, _a2 common.Address, _a3 *big.Int) (*types.Transaction, int, error) {
+	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FetchUnconfirmedTransactionAtNonceWithCount")
@@ -301,25 +304,25 @@ func (_m *TxStore) FetchUnconfirmedTransactionAtNonceWithCount(_a0 context.Conte
 	var r0 *types.Transaction
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, common.Address) (*types.Transaction, int, error)); ok {
-		return rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, common.Address, *big.Int) (*types.Transaction, int, error)); ok {
+		return rf(_a0, _a1, _a2, _a3)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, common.Address) *types.Transaction); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, common.Address, *big.Int) *types.Transaction); ok {
+		r0 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Transaction)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, uint64, common.Address) int); ok {
-		r1 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, common.Address, *big.Int) int); ok {
+		r1 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, uint64, common.Address) error); ok {
-		r2 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(2).(func(context.Context, uint64, common.Address, *big.Int) error); ok {
+		r2 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -336,13 +339,14 @@ type TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call struct {
 //   - _a0 context.Context
 //   - _a1 uint64
 //   - _a2 common.Address
-func (_e *TxStore_Expecter) FetchUnconfirmedTransactionAtNonceWithCount(_a0 interface{}, _a1 interface{}, _a2 interface{}) *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call {
-	return &TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call{Call: _e.mock.On("FetchUnconfirmedTransactionAtNonceWithCount", _a0, _a1, _a2)}
+//   - _a3 *big.Int
+func (_e *TxStore_Expecter) FetchUnconfirmedTransactionAtNonceWithCount(_a0 interface{}, _a1 interface{}, _a2 interface{}, _a3 interface{}) *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call {
+	return &TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call{Call: _e.mock.On("FetchUnconfirmedTransactionAtNonceWithCount", _a0, _a1, _a2, _a3)}
 }
 
-func (_c *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call) Run(run func(_a0 context.Context, _a1 uint64, _a2 common.Address)) *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call {
+func (_c *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call) Run(run func(_a0 context.Context, _a1 uint64, _a2 common.Address, _a3 *big.Int)) *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(uint64), args[2].(common.Address))
+		run(args[0].(context.Context), args[1].(uint64), args[2].(common.Address), args[3].(*big.Int))
 	})
 	return _c
 }
@@ -352,14 +356,14 @@ func (_c *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call) Return(_a0 *
 	return _c
 }
 
-func (_c *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call) RunAndReturn(run func(context.Context, uint64, common.Address) (*types.Transaction, int, error)) *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call {
+func (_c *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call) RunAndReturn(run func(context.Context, uint64, common.Address, *big.Int) (*types.Transaction, int, error)) *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// MarkConfirmedAndReorgedTransactions provides a mock function with given fields: _a0, _a1, _a2
-func (_m *TxStore) MarkConfirmedAndReorgedTransactions(_a0 context.Context, _a1 uint64, _a2 common.Address) ([]*types.Transaction, []uint64, error) {
-	ret := _m.Called(_a0, _a1, _a2)
+// MarkConfirmedAndReorgedTransactions provides a mock function with given fields: _a0, _a1, _a2, _a3
+func (_m *TxStore) MarkConfirmedAndReorgedTransactions(_a0 context.Context, _a1 uint64, _a2 common.Address, _a3 *big.Int) ([]*types.Transaction, []uint64, error) {
+	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	if len(ret) == 0 {
 		panic("no return value specified for MarkConfirmedAndReorgedTransactions")
@@ -368,27 +372,27 @@ func (_m *TxStore) MarkConfirmedAndReorgedTransactions(_a0 context.Context, _a1 
 	var r0 []*types.Transaction
 	var r1 []uint64
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, common.Address) ([]*types.Transaction, []uint64, error)); ok {
-		return rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, common.Address, *big.Int) ([]*types.Transaction, []uint64, error)); ok {
+		return rf(_a0, _a1, _a2, _a3)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, common.Address) []*types.Transaction); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, common.Address, *big.Int) []*types.Transaction); ok {
+		r0 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*types.Transaction)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, uint64, common.Address) []uint64); ok {
-		r1 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, common.Address, *big.Int) []uint64); ok {
+		r1 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).([]uint64)
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, uint64, common.Address) error); ok {
-		r2 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(2).(func(context.Context, uint64, common.Address, *big.Int) error); ok {
+		r2 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -405,13 +409,14 @@ type TxStore_MarkConfirmedAndReorgedTransactions_Call struct {
 //   - _a0 context.Context
 //   - _a1 uint64
 //   - _a2 common.Address
-func (_e *TxStore_Expecter) MarkConfirmedAndReorgedTransactions(_a0 interface{}, _a1 interface{}, _a2 interface{}) *TxStore_MarkConfirmedAndReorgedTransactions_Call {
-	return &TxStore_MarkConfirmedAndReorgedTransactions_Call{Call: _e.mock.On("MarkConfirmedAndReorgedTransactions", _a0, _a1, _a2)}
+//   - _a3 *big.Int
+func (_e *TxStore_Expecter) MarkConfirmedAndReorgedTransactions(_a0 interface{}, _a1 interface{}, _a2 interface{}, _a3 interface{}) *TxStore_MarkConfirmedAndReorgedTransactions_Call {
+	return &TxStore_MarkConfirmedAndReorgedTransactions_Call{Call: _e.mock.On("MarkConfirmedAndReorgedTransactions", _a0, _a1, _a2, _a3)}
 }
 
-func (_c *TxStore_MarkConfirmedAndReorgedTransactions_Call) Run(run func(_a0 context.Context, _a1 uint64, _a2 common.Address)) *TxStore_MarkConfirmedAndReorgedTransactions_Call {
+func (_c *TxStore_MarkConfirmedAndReorgedTransactions_Call) Run(run func(_a0 context.Context, _a1 uint64, _a2 common.Address, _a3 *big.Int)) *TxStore_MarkConfirmedAndReorgedTransactions_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(uint64), args[2].(common.Address))
+		run(args[0].(context.Context), args[1].(uint64), args[2].(common.Address), args[3].(*big.Int))
 	})
 	return _c
 }
@@ -421,7 +426,7 @@ func (_c *TxStore_MarkConfirmedAndReorgedTransactions_Call) Return(_a0 []*types.
 	return _c
 }
 
-func (_c *TxStore_MarkConfirmedAndReorgedTransactions_Call) RunAndReturn(run func(context.Context, uint64, common.Address) ([]*types.Transaction, []uint64, error)) *TxStore_MarkConfirmedAndReorgedTransactions_Call {
+func (_c *TxStore_MarkConfirmedAndReorgedTransactions_Call) RunAndReturn(run func(context.Context, uint64, common.Address, *big.Int) ([]*types.Transaction, []uint64, error)) *TxStore_MarkConfirmedAndReorgedTransactions_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -572,9 +577,9 @@ func (_c *TxStore_UpdateTransactionBroadcast_Call) RunAndReturn(run func(context
 	return _c
 }
 
-// UpdateUnstartedTransactionWithNonce provides a mock function with given fields: _a0, _a1, _a2
-func (_m *TxStore) UpdateUnstartedTransactionWithNonce(_a0 context.Context, _a1 common.Address, _a2 uint64) (*types.Transaction, error) {
-	ret := _m.Called(_a0, _a1, _a2)
+// UpdateUnstartedTransactionWithNonce provides a mock function with given fields: _a0, _a1, _a2, _a3
+func (_m *TxStore) UpdateUnstartedTransactionWithNonce(_a0 context.Context, _a1 common.Address, _a2 uint64, _a3 *big.Int) (*types.Transaction, error) {
+	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateUnstartedTransactionWithNonce")
@@ -582,19 +587,19 @@ func (_m *TxStore) UpdateUnstartedTransactionWithNonce(_a0 context.Context, _a1 
 
 	var r0 *types.Transaction
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, common.Address, uint64) (*types.Transaction, error)); ok {
-		return rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, common.Address, uint64, *big.Int) (*types.Transaction, error)); ok {
+		return rf(_a0, _a1, _a2, _a3)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, common.Address, uint64) *types.Transaction); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, common.Address, uint64, *big.Int) *types.Transaction); ok {
+		r0 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Transaction)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, common.Address, uint64) error); ok {
-		r1 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(1).(func(context.Context, common.Address, uint64, *big.Int) error); ok {
+		r1 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -611,13 +616,14 @@ type TxStore_UpdateUnstartedTransactionWithNonce_Call struct {
 //   - _a0 context.Context
 //   - _a1 common.Address
 //   - _a2 uint64
-func (_e *TxStore_Expecter) UpdateUnstartedTransactionWithNonce(_a0 interface{}, _a1 interface{}, _a2 interface{}) *TxStore_UpdateUnstartedTransactionWithNonce_Call {
-	return &TxStore_UpdateUnstartedTransactionWithNonce_Call{Call: _e.mock.On("UpdateUnstartedTransactionWithNonce", _a0, _a1, _a2)}
+//   - _a3 *big.Int
+func (_e *TxStore_Expecter) UpdateUnstartedTransactionWithNonce(_a0 interface{}, _a1 interface{}, _a2 interface{}, _a3 interface{}) *TxStore_UpdateUnstartedTransactionWithNonce_Call {
+	return &TxStore_UpdateUnstartedTransactionWithNonce_Call{Call: _e.mock.On("UpdateUnstartedTransactionWithNonce", _a0, _a1, _a2, _a3)}
 }
 
-func (_c *TxStore_UpdateUnstartedTransactionWithNonce_Call) Run(run func(_a0 context.Context, _a1 common.Address, _a2 uint64)) *TxStore_UpdateUnstartedTransactionWithNonce_Call {
+func (_c *TxStore_UpdateUnstartedTransactionWithNonce_Call) Run(run func(_a0 context.Context, _a1 common.Address, _a2 uint64, _a3 *big.Int)) *TxStore_UpdateUnstartedTransactionWithNonce_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(common.Address), args[2].(uint64))
+		run(args[0].(context.Context), args[1].(common.Address), args[2].(uint64), args[3].(*big.Int))
 	})
 	return _c
 }
@@ -627,7 +633,7 @@ func (_c *TxStore_UpdateUnstartedTransactionWithNonce_Call) Return(_a0 *types.Tr
 	return _c
 }
 
-func (_c *TxStore_UpdateUnstartedTransactionWithNonce_Call) RunAndReturn(run func(context.Context, common.Address, uint64) (*types.Transaction, error)) *TxStore_UpdateUnstartedTransactionWithNonce_Call {
+func (_c *TxStore_UpdateUnstartedTransactionWithNonce_Call) RunAndReturn(run func(context.Context, common.Address, uint64, *big.Int) (*types.Transaction, error)) *TxStore_UpdateUnstartedTransactionWithNonce_Call {
 	_c.Call.Return(run)
 	return _c
 }

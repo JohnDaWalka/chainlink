@@ -29,8 +29,8 @@ import (
 
 type OrchestratorTxStore interface {
 	Add(addresses ...common.Address) error
-	FetchUnconfirmedTransactionAtNonceWithCount(context.Context, uint64, common.Address) (*txmtypes.Transaction, int, error)
-	FindTxWithIdempotencyKey(context.Context, string) (*txmtypes.Transaction, error)
+	FetchUnconfirmedTransactionAtNonceWithCount(context.Context, uint64, common.Address, *big.Int) (*txmtypes.Transaction, int, error)
+	FindTxWithIdempotencyKey(context.Context, string, *big.Int) (*txmtypes.Transaction, error)
 }
 
 type OrchestratorKeystore interface {
@@ -52,19 +52,21 @@ type Orchestrator[
 	HEAD types.Head[BLOCK_HASH],
 ] struct {
 	services.StateMachine
-	lggr           logger.SugaredLogger
-	chainID        *big.Int
-	txm            *Txm
-	txStore        OrchestratorTxStore
-	fwdMgr         *forwarders.FwdMgr
-	keystore       OrchestratorKeystore
-	attemptBuilder OrchestratorAttemptBuilder[BLOCK_HASH, HEAD]
-	resumeCallback txmgr.ResumeCallback
+	lggr                  logger.SugaredLogger
+	chainID               *big.Int
+	maxQueuedTransactions uint64
+	txm                   *Txm
+	txStore               OrchestratorTxStore
+	fwdMgr                *forwarders.FwdMgr
+	keystore              OrchestratorKeystore
+	attemptBuilder        OrchestratorAttemptBuilder[BLOCK_HASH, HEAD]
+	resumeCallback        txmgr.ResumeCallback
 }
 
 func NewTxmOrchestrator[BLOCK_HASH types.Hashable, HEAD types.Head[BLOCK_HASH]](
 	lggr logger.Logger,
 	chainID *big.Int,
+	maxQueuedTransactions uint64,
 	txm *Txm,
 	txStore OrchestratorTxStore,
 	fwdMgr *forwarders.FwdMgr,
@@ -72,13 +74,14 @@ func NewTxmOrchestrator[BLOCK_HASH types.Hashable, HEAD types.Head[BLOCK_HASH]](
 	attemptBuilder OrchestratorAttemptBuilder[BLOCK_HASH, HEAD],
 ) *Orchestrator[BLOCK_HASH, HEAD] {
 	return &Orchestrator[BLOCK_HASH, HEAD]{
-		lggr:           logger.Sugared(logger.Named(lggr, "Orchestrator")),
-		chainID:        chainID,
-		txm:            txm,
-		txStore:        txStore,
-		keystore:       keystore,
-		attemptBuilder: attemptBuilder,
-		fwdMgr:         fwdMgr,
+		lggr:                  logger.Sugared(logger.Named(lggr, "Orchestrator")),
+		chainID:               chainID,
+		maxQueuedTransactions: maxQueuedTransactions,
+		txm:                   txm,
+		txStore:               txStore,
+		keystore:              keystore,
+		attemptBuilder:        attemptBuilder,
+		fwdMgr:                fwdMgr,
 	}
 }
 
@@ -167,7 +170,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) OnNewLongestChain(ctx context.Context, 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, request txmgrtypes.TxRequest[common.Address, common.Hash]) (tx txmgrtypes.Tx[*big.Int, common.Address, common.Hash, common.Hash, evmtypes.Nonce, gas.EvmFee], err error) {
 	var wrappedTx *txmtypes.Transaction
 	if request.IdempotencyKey != nil {
-		wrappedTx, err = o.txStore.FindTxWithIdempotencyKey(ctx, *request.IdempotencyKey)
+		wrappedTx, err = o.txStore.FindTxWithIdempotencyKey(ctx, *request.IdempotencyKey, o.chainID)
 		if err != nil {
 			return
 		}
@@ -230,7 +233,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, 
 			SignalCallback:    request.SignalCallback,
 		}
 
-		wrappedTx, err = o.txm.CreateTransaction(ctx, wrappedTxRequest)
+		wrappedTx, err = o.txm.CreateTransaction(ctx, wrappedTxRequest, o.maxQueuedTransactions)
 		if err != nil {
 			return
 		}
@@ -270,7 +273,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) CountTransactionsByState(ctx context.Co
 	}
 	total := 0
 	for _, address := range addresses {
-		_, count, err := o.txStore.FetchUnconfirmedTransactionAtNonceWithCount(ctx, 0, address)
+		_, count, err := o.txStore.FetchUnconfirmedTransactionAtNonceWithCount(ctx, 0, address, o.chainID)
 		if err != nil {
 			return 0, err
 		}
@@ -322,7 +325,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) GetForwarderForEOAOCR2Feeds(ctx context
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) GetTransactionStatus(ctx context.Context, transactionID string) (status commontypes.TransactionStatus, err error) {
 	// Loads attempts and receipts in the transaction
-	tx, err := o.txStore.FindTxWithIdempotencyKey(ctx, transactionID)
+	tx, err := o.txStore.FindTxWithIdempotencyKey(ctx, transactionID, o.chainID)
 	if err != nil || tx == nil {
 		return status, fmt.Errorf("failed to find transaction with IdempotencyKey %s: %w", transactionID, err)
 	}
