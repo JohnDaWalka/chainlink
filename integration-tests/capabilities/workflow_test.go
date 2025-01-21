@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -23,6 +25,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/go-yaml/yaml"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -110,6 +113,7 @@ type WorkflowConfig struct {
 
 type ExistingWorkflowConfig struct {
 	BinaryURL string `toml:"binary_url"`
+	ConfigURL string `toml:"config_url"`
 }
 
 type ChainlinkCLIConfig struct {
@@ -371,8 +375,55 @@ func downloadAndDecode(url string) ([]byte, error) {
 	return decoded, nil
 }
 
+type ChainlinkCliSettings struct {
+	DevPlatform  DevPlatform  `yaml:"dev-platform"`
+	UserWorkflow UserWorkflow `yaml:"user-workflow"`
+	Logging      Logging      `yaml:"logging"`
+	McmsConfig   McmsConfig   `yaml:"mcms-config"`
+	Contracts    Contracts    `yaml:"contracts"`
+	Rpcs         []Rpc        `yaml:"rpcs"`
+}
+
+type DevPlatform struct {
+	CapabilitiesRegistryAddress string `yaml:"capabilities-registry-contract-address"`
+	DonId                       uint32 `yaml:"don-id"`
+	WorkflowRegistryAddress     string `yaml:"workflow-registry-contract-address"`
+}
+
+type UserWorkflow struct {
+	WorkflowOwnerAddress string `yaml:"workflow-owner-address"`
+}
+
+type Logging struct {
+	SethConfigPath string `yaml:"seth-config-path"`
+}
+
+type McmsConfig struct {
+	ProposalsDirectory string `yaml:"proposals-directory"`
+}
+
+type Contracts struct {
+	ContractRegistry []ContractRegistry `yaml:"registries"`
+}
+
+type ContractRegistry struct {
+	Name          string `yaml:"name"`
+	Address       string `yaml:"address"`
+	ChainSelector uint64 `yaml:"chain-selector"`
+}
+
+type Rpc struct {
+	ChainSelector uint64 `yaml:"chain-selector"`
+	URL           string `yaml:"url"`
+}
+
+type PoRWorkflowConfig struct {
+	FeedID          string `json:"feed_id"`
+	URL             string `json:"url"`
+	ConsumerAddress string `json:"consumer_address"`
+}
+
 func TestWorkflow(t *testing.T) {
-	// workflowOwner := "0x00000000000000000000000000000000000000aa"
 	// without 0x prefix!
 	feedID := "018bfe8840700040000000000000000000000000000000000000000000000000"
 	feedBytes := common.HexToHash(feedID)
@@ -382,10 +433,6 @@ func TestWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		pkey := os.Getenv("PRIVATE_KEY")
 
-		if in.WorkflowConfig.UseChainlinkCLI {
-			require.True(t, isInstalled("chainlink-cli"), "chainlink-cli is required for this test. Please install it, add to path and run again")
-		}
-
 		bc, err := blockchain.NewBlockchainNetwork(in.BlockchainA)
 		require.NoError(t, err)
 
@@ -394,6 +441,16 @@ func TestWorkflow(t *testing.T) {
 			WithPrivateKeys([]string{pkey}).
 			Build()
 		require.NoError(t, err)
+
+		if in.WorkflowConfig.UseChainlinkCLI {
+			require.True(t, isInstalled("chainlink-cli"), "chainlink-cli is required for this test. Please install it, add to path and run again")
+			require.NotEmpty(t, os.Getenv("GITHUB_API_TOKEN"), "GITHUB_API_TOKEN must be set to use chainlink-cli. It requires read/write Gist permissions")
+			err := os.Setenv("WORKFLOW_OWNER_ADDRESS", sc.MustGetRootKeyAddress().Hex())
+			require.NoError(t, err)
+
+			err = os.Setenv("ETH_PRIVATE_KEY", pkey)
+			require.NoError(t, err)
+		}
 
 		lgr := logger.TestLogger(t)
 		require.NoError(t, err)
@@ -490,12 +547,6 @@ func TestWorkflow(t *testing.T) {
 			}
 		}
 
-		// workflowRegistryAddr, tx, workflow_registryInstance, err := workflow_registry.DeployWorkflowRegistry(sc.NewTXOpts(), sc.Client)
-		// _, decodeErr := sc.Decode(tx, err)
-		// require.NoError(t, decodeErr)
-
-		// _ = workflowRegistryAddr
-
 		donID := uint32(1)
 		workflowName := "abcdefgasd"
 
@@ -531,46 +582,6 @@ func TestWorkflow(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		var workflowNameBytes [10]byte
-		if in.WorkflowConfig.UseExising {
-			workFlowData, err := downloadAndDecode(in.WorkflowConfig.Existing.BinaryURL)
-			require.NoError(t, err)
-
-			var configData []byte
-
-			var HashTruncateName = func(name string) string {
-				// Compute SHA-256 hash of the input string
-				hash := sha256.Sum256([]byte(name))
-
-				// Encode as hex to ensure UTF8
-				var hashBytes []byte = hash[:]
-				resultHex := hex.EncodeToString(hashBytes)
-
-				// Truncate to 10 bytes
-				truncated := []byte(resultHex)[:10]
-				return string(truncated)
-			}
-
-			truncated := HashTruncateName(workflowName)
-			fmt.Println("Truncated name: ", truncated)
-
-			copy(workflowNameBytes[:], []byte(truncated))
-
-			fmt.Println("Workflow owner: ", sc.MustGetRootKeyAddress().Hex())
-			fmt.Println("Workflow name: ", workflowName)
-			fmt.Println("workflowNameBytes: ", string([]byte(truncated)))
-
-			workflowID, idErr := GenerateWorkflowIDFromStrings(sc.MustGetRootKeyAddress().Hex(), workflowName, workFlowData, configData, "")
-			require.NoError(t, idErr)
-
-			workflow_registryInstance, err := workflow_registry_wrapper.NewWorkflowRegistry(workflowRegistryAddr, sc.Client)
-			require.NoError(t, err)
-
-			wrTx, wrErr := workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), "https://gist.githubusercontent.com/Tofel/3949a5537557c3e2d07524b1a0c857a0/raw/3f7dcbc91fbdb67d598ee0949c03965a771888a3/binary.wasm.br", "", "")
-			_, decodeErr := sc.Decode(wrTx, wrErr)
-			require.NoError(t, decodeErr)
-		}
-
 		output, err = keystone_changeset.DeployFeedsConsumer(*ctfEnv, &keystone_changeset.DeployFeedsConsumerRequest{
 			ChainSelector: chainSelector,
 		})
@@ -590,88 +601,170 @@ func TestWorkflow(t *testing.T) {
 
 		fmt.Println("Deployed feeds_consumer contract at", feedsConsumerAddress.Hex())
 
-		//move this inside the if block
+		var workflowNameBytes [10]byte
+		var HashTruncateName = func(name string) string {
+			// Compute SHA-256 hash of the input string
+			hash := sha256.Sum256([]byte(name))
+
+			// Encode as hex to ensure UTF8
+			var hashBytes []byte = hash[:]
+			resultHex := hex.EncodeToString(hashBytes)
+
+			// Truncate to 10 bytes
+			truncated := []byte(resultHex)[:10]
+			return string(truncated)
+		}
+
+		truncated := HashTruncateName(workflowName)
+		fmt.Println("Truncated name: ", truncated)
+		fmt.Println("Workflow owner: ", sc.MustGetRootKeyAddress().Hex())
+		fmt.Println("Workflow name: ", workflowName)
+		fmt.Println("workflowNameBytes: ", string([]byte(truncated)))
+
+		copy(workflowNameBytes[:], []byte(truncated))
+
+		if in.WorkflowConfig.UseExising {
+			require.NotEmpty(t, in.WorkflowConfig.Existing.BinaryURL)
+			workFlowData, err := downloadAndDecode(in.WorkflowConfig.Existing.BinaryURL)
+			require.NoError(t, err)
+
+			var configData []byte
+			if in.WorkflowConfig.Existing.ConfigURL != "" {
+				configData, err = downloadAndDecode(in.WorkflowConfig.Existing.ConfigURL)
+				require.NoError(t, err)
+			}
+
+			// use non-encoded workflow name
+			workflowID, idErr := GenerateWorkflowIDFromStrings(sc.MustGetRootKeyAddress().Hex(), workflowName, workFlowData, configData, "")
+			require.NoError(t, idErr)
+
+			workflow_registryInstance, err := workflow_registry_wrapper.NewWorkflowRegistry(workflowRegistryAddr, sc.Client)
+			require.NoError(t, err)
+
+			// use non-encoded workflow name
+			wrTx, wrErr := workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), in.WorkflowConfig.Existing.BinaryURL, in.WorkflowConfig.Existing.ConfigURL, "")
+			_, decodeErr := sc.Decode(wrTx, wrErr)
+			require.NoError(t, decodeErr)
+		}
+
+		if in.WorkflowConfig.UseChainlinkCLI {
+			// create settings file
+			settingsFile, err := os.CreateTemp("", ".chainlink-cli-settings.yaml")
+			require.NoError(t, err)
+
+			settings := ChainlinkCliSettings{
+				DevPlatform: DevPlatform{
+					CapabilitiesRegistryAddress: capRegAddr.Hex(),
+					DonId:                       donID,
+					WorkflowRegistryAddress:     workflowRegistryAddr.Hex(),
+				},
+				UserWorkflow: UserWorkflow{
+					WorkflowOwnerAddress: sc.MustGetRootKeyAddress().Hex(),
+				},
+				Logging: Logging{},
+				McmsConfig: McmsConfig{
+					ProposalsDirectory: "./",
+				},
+				Contracts: Contracts{
+					ContractRegistry: []ContractRegistry{
+						{
+							Name:          "CapabilitiesRegistry",
+							Address:       capRegAddr.Hex(),
+							ChainSelector: chainSelector,
+						},
+						{
+							Name:          "WorkflowRegistry",
+							Address:       workflowRegistryAddr.Hex(),
+							ChainSelector: chainSelector,
+						},
+					},
+				},
+				Rpcs: []Rpc{
+					{
+						ChainSelector: chainSelector,
+						URL:           bc.Nodes[0].HostHTTPUrl, // chainlink-cli doesn't work with WS
+					},
+				},
+			}
+
+			settingsMarshalled, err := yaml.Marshal(settings)
+			require.NoError(t, err)
+
+			_, err = settingsFile.Write(settingsMarshalled)
+			require.NoError(t, err)
+
+			var workflowGistUrl string
+			var workflowConfigUrl string
+
+			if in.WorkflowConfig.ChainlinkCLI.Compile {
+				feedId := "0x018BFE88407000400000000000000000"
+
+				configFile, err := os.CreateTemp("", "config.json")
+				require.NoError(t, err)
+
+				workflowConfig := PoRWorkflowConfig{
+					FeedID:          feedId,
+					URL:             "https://api.real-time-reserves.verinumus.io/v1/chainlink/proof-of-reserves/TrueUSD",
+					ConsumerAddress: feedsConsumerAddress.Hex(),
+				}
+
+				configMarshalled, err := json.Marshal(workflowConfig)
+				require.NoError(t, err)
+
+				_, err = configFile.Write(configMarshalled)
+				require.NoError(t, err)
+
+				var outputBuffer bytes.Buffer
+
+				compileCmd := exec.Command("chainlink-cli", "workflow", "compile", "-S", settingsFile.Name(), "-c", configFile.Name(), "main.go")
+				compileCmd.Stdout = &outputBuffer
+				compileCmd.Stderr = &outputBuffer
+				compileCmd.Dir = *in.WorkflowConfig.ChainlinkCLI.FolderLocation
+				err = compileCmd.Start()
+				require.NoError(t, err)
+
+				err = compileCmd.Wait()
+				require.NoError(t, err)
+
+				fmt.Println("Compile output:\n", outputBuffer.String())
+
+				re := regexp.MustCompile(`Gist URL=([^\s]+)`)
+				matches := re.FindAllStringSubmatch(outputBuffer.String(), -1)
+				require.Len(t, matches, 2)
+
+				ansiEscapePattern := `\x1b\[[0-9;]*m`
+				re = regexp.MustCompile(ansiEscapePattern)
+
+				workflowGistUrl = re.ReplaceAllString(matches[0][1], "")
+				workflowConfigUrl = re.ReplaceAllString(matches[1][1], "")
+
+				require.NotEmpty(t, workflowGistUrl)
+				require.NotEmpty(t, workflowConfigUrl)
+			} else {
+				// TODO get gist urls from config
+			}
+
+			// deploy the workflow
+			registerCmd := exec.Command("chainlink-cli", "workflow", "register", workflowName, "-b", workflowGistUrl, "-c", workflowConfigUrl, "-S", settingsFile.Name(), "-v")
+			registerCmd.Stdout = os.Stdout
+			registerCmd.Stderr = os.Stderr
+			registerCmd.Dir = *in.WorkflowConfig.ChainlinkCLI.FolderLocation
+			err = registerCmd.Run()
+			require.NoError(t, err)
+		}
+
 		feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(feedsConsumerAddress, sc.Client)
 		require.NoError(t, err)
 
+		// here we need to use hex-encoded workflow name converted to []byte
 		tx, err = feedsConsumerInstance.SetConfig(
 			sc.NewTXOpts(),
-			[]common.Address{forwarderAddress},
-			[]common.Address{sc.MustGetRootKeyAddress()},
-			[][10]byte{workflowNameBytes},
+			[]common.Address{forwarderAddress},           // allowed senders
+			[]common.Address{sc.MustGetRootKeyAddress()}, // allowed workflow owners
+			[][10]byte{workflowNameBytes},                // allowed workflow names
 		)
 		_, decodeErr = sc.Decode(tx, err)
 		require.NoError(t, decodeErr)
-
-		// feedsConsumerDebugAddress, tx, feedsConsumerDebugContract, err := feeds_consumer_debug.DeployFeedsConsumerDebug(
-		// 	sc.NewTXOpts(),
-		// 	sc.Client,
-		// )
-		// require.NoError(t, err)
-		// _, err = bind.WaitMined(context.Background(), sc.Client, tx)
-		// require.NoError(t, err)
-
-		// _ = feedsConsumerDebugAddress
-		// _ = feedsConsumerDebugContract
-
-		// feedsConsumerDebugAddress, tx, feedsConsumerDebugContract, err := feeds_consumer_debug.DeployFeedsConsumerDebug(
-		// 	sc.NewTXOpts(),
-		// 	sc.Client,
-		// )
-		// require.NoError(t, err)
-		// _, err = bind.WaitMined(context.Background(), sc.Client, tx)
-		// require.NoError(t, err)
-
-		// tx, err = feedsConsumerDebugContract.SetConfig(
-		// 	sc.NewTXOpts(),
-		// 	[]common.Address{forwarderInstance.Address, sc.MustGetRootKeyAddress()},
-		// 	[]common.Address{sc.MustGetRootKeyAddress()},
-		// 	[][10]byte{workflowNameBytes},
-		// )
-		// _, decodeErr = sc.Decode(tx, err)
-		// require.NoError(t, decodeErr)
-
-		// metadataB64 := "AJ4fSINfRzT/YmFvFoJu/Z5CQcYKTI+8p5XQZTbbOp3Q3yKVAQAAAAAA85/W5RqtiPb0zmq4gnJ5z/+5ImYAAQ"
-		// mBytes, err := base64.RawStdEncoding.DecodeString(metadataB64)
-		// require.NoError(t, err)
-
-		// fmt.Printf("Metadata bytes: %q\n", mBytes)
-
-		// rawReportB64 := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQGL/ohAcABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC7XBYsgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZ4pYNQ"
-		// rawReportBytes, err := base64.RawStdEncoding.DecodeString(rawReportB64)
-		// require.NoError(t, err)
-
-		// mb64 := "AN/C5o6b4ckIM57v1/K5FIaQ0Meg7TZkd5dphOyKhixkMGRmMjI5NTAx85/W5RqtiPb0zmq4gnJ5z/+5ImYAAQ"
-		// mb, err := base64.RawStdEncoding.DecodeString(mb64)
-		// require.NoError(t, err)
-
-		// r64 := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQGL/ohAcABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC7XBYsgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZ4qWFQ"
-		// r, err := base64.RawStdEncoding.DecodeString(r64)
-		// require.NoError(t, err)
-
-		// onTx, onErr := feedsConsumerDebugContract.OnReport(sc.NewTXOpts(), mb, r)
-		// _, decodeErr = sc.Decode(onTx, onErr)
-		// require.NoError(t, decodeErr)
-
-		// 00327e3b13a0f5e4da1a9b980e33fde2602043a06289aa6d4eb65af733cb3be6 is workflowID generated from the above function
-		// 2025-01-14 15:11:04 2025-01-14T14:11:04.429Z [ERROR] failed to handle workflow registration: workflowID mismatch: 00b8a8f28d3a29f73c1a052273d4b5ed0951e70eb4fae56f7531539af4aca96f != 00327e3b13a0f5e4da1a9b980e33fde2602043a06289aa6d4eb65af733cb3be6 syncer/workflow_registry.go:485  logger=WorkflowRegistrySyncer stacktrace=github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncer.(*workflowRegistry).loadWorkflows
-
-		// workflowID = "00b8a8f28d3a29f73c1a052273d4b5ed0951e70eb4fae56f7531539af4aca96f"
-		// abi, err := workflow_registry.WorkflowRegistryMetaData.GetAbi()
-		// require.NoError(t, err)
-		// sc.ContractStore.AddABI("WorkflowRegistry", *abi)
-
-		// allowTx, allowErr := workflow_registryInstance.UpdateAllowedDONs(sc.NewTXOpts(), []uint32{donID}, true)
-		// _, decodeErr = sc.Decode(allowTx, allowErr)
-		// require.NoError(t, decodeErr)
-
-		// allowAddrTx, allowAddrErr := workflow_registryInstance.UpdateAuthorizedAddresses(sc.NewTXOpts(), []common.Address{sc.MustGetRootKeyAddress()}, true)
-		// _, decodeErr = sc.Decode(allowAddrTx, allowAddrErr)
-		// require.NoError(t, decodeErr)
-
-		// wrTx, wrErr := workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), "https://gist.githubusercontent.com/Tofel/8105d6b8289c253d67d7d0abc60a01d1/raw/a376a30b32b60b8188914ebd092a73f7faec1519/binary.wasm.br", "", "")
-		// _, decodeErr = sc.Decode(wrTx, wrErr)
-		// require.NoError(t, decodeErr)
 
 		// TODO: When the capabilities registry address is provided:
 		// - NOPs and nodes are added to the registry.
@@ -681,9 +774,6 @@ func TestWorkflow(t *testing.T) {
 
 		nodeClients, err := clclient.New(nodeset.CLNodes)
 		require.NoError(t, err)
-
-		// err = onchain.FundNodes(sc, nodeClients, pkey, 5)
-		// require.NoError(t, err)
 
 		nodesInfo := getNodesInfo(t, nodeClients)
 
@@ -700,7 +790,6 @@ func TestWorkflow(t *testing.T) {
 		workflowNodesetInfo := nodesInfo[1:]
 
 		// bootstrap node
-		// changed: use docker container name instead of 'localhost' for default bootstrappers url
 		in.NodeSet.NodeSpecs[0].Node.TestConfigOverrides = fmt.Sprintf(`
 				[Feature]
 				LogPoller = true
@@ -818,34 +907,8 @@ func TestWorkflow(t *testing.T) {
 		)
 		_, decodeErr = sc.Decode(tx, err)
 		require.NoError(t, decodeErr)
+
 		fmt.Println("Deployed ocr3_capability contract at", ocr3CapabilityAddress.Hex())
-
-		// _ = feeds_consumer_debug.DeployFeedsConsumerDebug
-
-		// feedsConsumerDebugAddress, tx, feedsConsumerDebugContract, err := feeds_consumer_debug.DeployFeedsConsumerDebug(
-		// 	sc.NewTXOpts(),
-		// 	sc.Client,
-		// )
-		// require.NoError(t, err)
-		// _, err = bind.WaitMined(context.Background(), sc.Client, tx)
-		// require.NoError(t, err)
-
-		// _ = feedsConsumerDebugAddress
-		// _ = feedsConsumerDebugContract
-
-		// fmt.Println("Deployed feeds_consumer contract at", feedsConsumerDebugAddress.Hex())
-
-		// feedsConsumerAddress, tx, feedsConsumerContract, err := feeds_consumer.DeployKeystoneFeedsConsumer(
-		// 	sc.NewTXOpts(),
-		// 	sc.Client,
-		// )
-		// _, decodeErr = sc.Decode(tx, err)
-		// require.NoError(t, decodeErr)
-
-		// fmt.Println("Deployed feeds_consumer contract at", feedsConsumerAddress.Hex())
-
-		// var workflowNameBytes [10]byte
-		// copy(workflowNameBytes[:], []byte(workflowName))
 
 		// Add bootstrap spec to the last node
 		bootstrapNode := nodeClients[0]
@@ -1265,22 +1328,6 @@ func TestWorkflow(t *testing.T) {
 					fmt.Printf("Feed updated after %s - price set, price=%s\n", elapsed, price)
 					return
 				}
-				// ids, prices, timestamps, err := feedsConsumerContract.GetAllFeeds(sc.NewCallOpts())
-				// require.NoError(t, err)
-
-				// for i, feedId := range ids {
-				// 	fmt.Printf("Feed %s - price=%d, timestamp=%d\n", common.Bytes2Hex(feedId[:]), prices[i], timestamps[i])
-				// 	price, _, err := feedsConsumerContract.GetPrice(
-				// 		sc.NewCallOpts(),
-				// 		feedId,
-				// 	)
-				// 	require.NoError(t, err)
-
-				// 	if price.String() != "0" {
-				// 		fmt.Printf("Feed updated after %s - price set, price=%s\n", elapsed, price)
-				// 		return
-				// 	}
-				// }
 				fmt.Printf("Feed not updated yet, waiting for %s\n", elapsed)
 			}
 		}

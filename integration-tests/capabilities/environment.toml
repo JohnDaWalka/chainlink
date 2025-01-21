@@ -4,8 +4,8 @@
   docker_cmd_params = ["-b", "5"]
 
 [workflow_config]
-  use_chainlink_cli = false
-  use_existing = true
+  use_chainlink_cli = true
+  use_existing = false
 
   [workflow_config.chainlink_cli]
     folder_location = "/Users/bartektofel/Downloads/workflow_test"
