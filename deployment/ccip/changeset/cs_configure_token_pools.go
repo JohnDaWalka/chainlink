@@ -71,17 +71,17 @@ type TokenPoolConfig struct {
 
 func (c TokenPoolConfig) Validate(ctx context.Context, chain deployment.Chain, state CCIPChainState, useMcms bool, tokenSymbol TokenSymbol) error {
 	// Ensure that the inputted type is known
-	if _, ok := TokenPoolTypes[c.Type]; !ok {
+	if _, ok := tokenPoolTypes[c.Type]; !ok {
 		return fmt.Errorf("%s is not a known token pool type", c.Type)
 	}
 
 	// Ensure that the inputted version is known
-	if _, ok := TokenPoolVersions[c.Version]; !ok {
+	if _, ok := tokenPoolVersions[c.Version]; !ok {
 		return fmt.Errorf("%s is not a known token pool version", c.Version)
 	}
 
 	// Ensure that a pool with given symbol, type and version is known to the environment
-	tokenPool, err := GetTokenPoolFromSymbolTypeAndVersion(state, chain, tokenSymbol, c.Type, c.Version)
+	tokenPool, err := getTokenPoolFromSymbolTypeAndVersion(state, chain, tokenSymbol, c.Type, c.Version)
 	if err != nil {
 		return fmt.Errorf("failed to find token pool on %s with symbol %s, type %s, and version %s: %w", chain.String(), tokenSymbol, c.Type, c.Version, err)
 	}
@@ -303,7 +303,7 @@ func getTokenStateFromPool(
 	chain deployment.Chain,
 	state CCIPChainState,
 ) (*token_pool.TokenPool, common.Address, token_admin_registry.TokenAdminRegistryTokenConfig, error) {
-	tokenPool, err := GetTokenPoolFromSymbolTypeAndVersion(state, chain, symbol, poolType, version)
+	tokenPool, err := getTokenPoolFromSymbolTypeAndVersion(state, chain, symbol, poolType, version)
 	if err != nil {
 		return nil, utils.ZeroAddress, token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("failed to find token pool on %s with symbol %s, type %s, and version %s: %w", chain.String(), symbol, poolType, version, err)
 	}

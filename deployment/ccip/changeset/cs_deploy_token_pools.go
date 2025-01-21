@@ -47,7 +47,7 @@ func (i DeployTokenPoolInput) Validate(chain deployment.Chain, state CCIPChainSt
 	}
 
 	// Validate that the type is known
-	if _, ok := TokenPoolTypes[i.Type]; !ok {
+	if _, ok := tokenPoolTypes[i.Type]; !ok {
 		return fmt.Errorf("requested token pool type %s is unknown", i.Type)
 	}
 
@@ -82,12 +82,12 @@ func (i DeployTokenPoolInput) Validate(chain deployment.Chain, state CCIPChainSt
 	}
 
 	// Regardless of requested type, we should check if a token pool of any type already exists
-	tokenPools, err := GetAllTokenPoolsWithSymbolAndVersion(state, chain.Client, tokenSymbol, CurrentTokenPoolVersion)
+	tokenPools, err := getAllTokenPoolsWithSymbolAndVersion(state, chain.Client, tokenSymbol, currentTokenPoolVersion)
 	if err != nil {
 		return fmt.Errorf("failed to get all token pools with symbol %s on chain %s: %w", tokenSymbol, chain.String(), err)
 	}
 	if len(tokenPools) > 0 && !i.ForceDeployment {
-		return fmt.Errorf("token pool with version %s already exists for %s on %s (use forceDeployment to bypass)", CurrentTokenPoolVersion, tokenSymbol, chain.String())
+		return fmt.Errorf("token pool with version %s already exists for %s on %s (use forceDeployment to bypass)", currentTokenPoolVersion, tokenSymbol, chain.String())
 	}
 
 	return nil
@@ -208,7 +208,7 @@ func DeployTokenPool(
 				tp, err = token_pool.NewTokenPool(tpAddr, chain.Client)
 			}
 			return deployment.ContractDeploy[*token_pool.TokenPool]{
-				Address: tpAddr, Contract: tp, Tv: deployment.NewTypeAndVersion(poolConfig.Type, CurrentTokenPoolVersion), Tx: tx, Err: err,
+				Address: tpAddr, Contract: tp, Tv: deployment.NewTypeAndVersion(poolConfig.Type, currentTokenPoolVersion), Tx: tx, Err: err,
 			}
 		},
 	)

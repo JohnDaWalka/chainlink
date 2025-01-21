@@ -173,7 +173,7 @@ func TestValidateDeployTokenPoolInput(t *testing.T) {
 				TokenAddress:       tokens[selectorA].Address,
 				LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 			},
-			ErrStr: fmt.Sprintf("token pool with version %s already exists", changeset.CurrentTokenPoolVersion),
+			ErrStr: fmt.Sprintf("token pool with version %s already exists", deployment.Version1_5_1),
 		},
 	}
 
@@ -292,7 +292,7 @@ func TestDeployTokenPoolContracts(t *testing.T) {
 			Msg:             "Redeploy but don't force redeployment",
 			Redeploy:        true,
 			ForceDeployment: false,
-			ErrStr:          fmt.Sprintf("token pool with version %s already exists for TEST", changeset.CurrentTokenPoolVersion),
+			ErrStr:          fmt.Sprintf("token pool with version %s already exists for TEST", deployment.Version1_5_1),
 		},
 		{
 			Msg:             "Redeploy with force",
@@ -330,7 +330,7 @@ func TestDeployTokenPoolContracts(t *testing.T) {
 		burnMintTokenPools, ok := state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol]
 		require.True(t, ok)
 		require.Len(t, burnMintTokenPools, 1)
-		owner, err := burnMintTokenPools[changeset.CurrentTokenPoolVersion].Owner(nil)
+		owner, err := burnMintTokenPools[deployment.Version1_5_1].Owner(nil)
 		require.NoError(t, err)
 		require.Equal(t, e.Chains[selectorA].DeployerKey.From, owner)
 
@@ -359,9 +359,10 @@ func TestDeployTokenPoolContracts(t *testing.T) {
 				state, err = changeset.LoadOnchainState(e)
 				require.NoError(t, err)
 
-				tokenPools, err := changeset.GetAllTokenPoolsWithSymbolAndVersion(state.Chains[selectorA], e.Chains[selectorA].Client, testhelpers.TestTokenSymbol, changeset.CurrentTokenPoolVersion)
-				require.NoError(t, err)
-				require.Len(t, tokenPools, 2)
+				burnMints := state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol]
+				require.Len(t, burnMints, 1)
+				burnWithFromMints := state.Chains[selectorA].BurnWithFromMintTokenPools[testhelpers.TestTokenSymbol]
+				require.Len(t, burnWithFromMints, 1)
 			}
 		}
 	}

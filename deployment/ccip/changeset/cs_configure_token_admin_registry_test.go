@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -57,7 +58,7 @@ func TestValidateRegistryConfig(t *testing.T) {
 				RegistryUpdates: map[uint64]changeset.RegistryConfig{
 					selectorA: {
 						Type:          changeset.BurnMintTokenPool,
-						Version:       changeset.CurrentTokenPoolVersion,
+						Version:       deployment.Version1_5_1,
 						Administrator: e.Chains[selectorA].DeployerKey.From,
 					},
 				},
@@ -94,7 +95,7 @@ func TestValidateRegistryConfig(t *testing.T) {
 			TokenSymbol: "WRONG",
 			RegistryConfig: changeset.RegistryConfig{
 				Type:    changeset.BurnWithFromMintTokenPool,
-				Version: changeset.CurrentTokenPoolVersion,
+				Version: deployment.Version1_5_1,
 			},
 			ErrStr: "failed to find token pool",
 		},
@@ -103,7 +104,7 @@ func TestValidateRegistryConfig(t *testing.T) {
 			TokenSymbol: testhelpers.TestTokenSymbol,
 			RegistryConfig: changeset.RegistryConfig{
 				Type:    changeset.BurnWithFromMintTokenPool,
-				Version: changeset.CurrentTokenPoolVersion,
+				Version: deployment.Version1_5_1,
 			},
 			ErrStr: "token admin registry failed ownership validation",
 		},
@@ -113,10 +114,10 @@ func TestValidateRegistryConfig(t *testing.T) {
 			UseMcms:     true,
 			RegistryConfig: changeset.RegistryConfig{
 				Type:          changeset.BurnWithFromMintTokenPool,
-				Version:       changeset.CurrentTokenPoolVersion,
+				Version:       deployment.Version1_5_1,
 				Administrator: administrator,
 			},
-			ErrStr: "is unable to be the admin of",
+			ErrStr: "we can't set it because we do not control the admin address",
 		},
 	}
 
@@ -235,7 +236,7 @@ func TestConfigureTokenAdminRegistry(t *testing.T) {
 
 			tokenAddress := tokens[selectorA].Address
 			timelockAddress := state.Chains[selectorA].Timelock.Address()
-			poolAddress := state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][changeset.CurrentTokenPoolVersion].Address()
+			poolAddress := state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address()
 			tokenAdminRegistry := state.Chains[selectorA].TokenAdminRegistry
 			deployerKey := e.Chains[selectorA].DeployerKey.From
 
@@ -248,7 +249,7 @@ func TestConfigureTokenAdminRegistry(t *testing.T) {
 						RegistryUpdates: map[uint64]changeset.RegistryConfig{
 							selectorA: {
 								Type:          changeset.BurnMintTokenPool,
-								Version:       changeset.CurrentTokenPoolVersion,
+								Version:       deployment.Version1_5_1,
 								Administrator: test.Administrator,
 							},
 						},

@@ -30,17 +30,17 @@ type RegistryConfig struct {
 
 func (c RegistryConfig) Validate(ctx context.Context, chain deployment.Chain, state CCIPChainState, useMcms bool, tokenSymbol TokenSymbol) error {
 	// Ensure that the inputted type is known
-	if _, ok := TokenPoolTypes[c.Type]; !ok {
+	if _, ok := tokenPoolTypes[c.Type]; !ok {
 		return fmt.Errorf("%s is not a known token pool type", c.Type)
 	}
 
 	// Ensure that the inputted version is known
-	if _, ok := TokenPoolVersions[c.Version]; !ok {
+	if _, ok := tokenPoolVersions[c.Version]; !ok {
 		return fmt.Errorf("%s is not a known token pool version", c.Version)
 	}
 
 	// Ensure that a pool with given symbol, type and version is known to the environment
-	tokenPool, err := GetTokenPoolFromSymbolTypeAndVersion(state, chain, tokenSymbol, c.Type, c.Version)
+	tokenPool, err := getTokenPoolFromSymbolTypeAndVersion(state, chain, tokenSymbol, c.Type, c.Version)
 	if err != nil {
 		return fmt.Errorf("failed to find token pool on %s with symbol %s, type %s, and version %s: %w", chain.String(), tokenSymbol, c.Type, c.Version, err)
 	}
@@ -74,7 +74,7 @@ func (c RegistryConfig) Validate(ctx context.Context, chain deployment.Chain, st
 	weCanBeAdmin := tokenConfig.Administrator == utils.ZeroAddress && fromAddress == registryOwner
 	weAreAdmin := tokenConfig.Administrator == fromAddress
 	if tokenConfig.TokenPool != tokenPool.Address() && !(weCanBeAdmin || weAreAdmin) {
-		return fmt.Errorf("address %s is unable to be the admin of %s on %s", fromAddress, tokenSymbol, chain.String())
+		return fmt.Errorf("%s token pool with address %s is not set on the %s registry, but we can't set it because we do not control the admin address %s", tokenSymbol, tokenPool.Address(), chain, tokenConfig.Administrator)
 	}
 	return nil
 }
@@ -173,7 +173,7 @@ func createTokenAdminRegistryOps(
 	mcmsConfig *MCMSConfig,
 	tokenSymbol TokenSymbol,
 ) error {
-	tokenPool, err := GetTokenPoolFromSymbolTypeAndVersion(state, chain, tokenSymbol, registryUpdate.Type, registryUpdate.Version)
+	tokenPool, err := getTokenPoolFromSymbolTypeAndVersion(state, chain, tokenSymbol, registryUpdate.Type, registryUpdate.Version)
 	if err != nil {
 		return fmt.Errorf("failed to find token pool on %s with symbol %s, type %s, and version %s: %w", chain.String(), tokenSymbol, registryUpdate.Type, registryUpdate.Version, err)
 	}

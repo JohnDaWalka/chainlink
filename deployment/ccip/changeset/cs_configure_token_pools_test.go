@@ -177,7 +177,7 @@ func TestValidateTokenPoolConfig(t *testing.T) {
 			Msg: "Pool is not owned by required address",
 			TokenPoolConfig: changeset.TokenPoolConfig{
 				Type:    changeset.BurnMintTokenPool,
-				Version: changeset.CurrentTokenPoolVersion,
+				Version: deployment.Version1_5_1,
 			},
 			ErrStr: "failed ownership validation",
 		},
@@ -402,11 +402,11 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 				state, err := changeset.LoadOnchainState(e)
 				require.NoError(t, err)
 
-				lockReleaseA, _ := token_pool.NewTokenPool(state.Chains[selectorA].LockReleaseTokenPools[testhelpers.TestTokenSymbol][changeset.CurrentTokenPoolVersion].Address(), e.Chains[selectorA].Client)
-				burnMintA, _ := token_pool.NewTokenPool(state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][changeset.CurrentTokenPoolVersion].Address(), e.Chains[selectorA].Client)
+				lockReleaseA, _ := token_pool.NewTokenPool(state.Chains[selectorA].LockReleaseTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.Chains[selectorA].Client)
+				burnMintA, _ := token_pool.NewTokenPool(state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.Chains[selectorA].Client)
 
-				lockReleaseB, _ := token_pool.NewTokenPool(state.Chains[selectorB].LockReleaseTokenPools[testhelpers.TestTokenSymbol][changeset.CurrentTokenPoolVersion].Address(), e.Chains[selectorB].Client)
-				burnMintB, _ := token_pool.NewTokenPool(state.Chains[selectorB].BurnMintTokenPools[testhelpers.TestTokenSymbol][changeset.CurrentTokenPoolVersion].Address(), e.Chains[selectorB].Client)
+				lockReleaseB, _ := token_pool.NewTokenPool(state.Chains[selectorB].LockReleaseTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.Chains[selectorB].Client)
+				burnMintB, _ := token_pool.NewTokenPool(state.Chains[selectorB].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.Chains[selectorB].Client)
 
 				pools := map[uint64]tokenPools{
 					selectorA: tokenPools{
@@ -438,14 +438,14 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 								PoolUpdates: map[uint64]changeset.TokenPoolConfig{
 									selectorA: {
 										Type:    changeset.LockReleaseTokenPool,
-										Version: changeset.CurrentTokenPoolVersion,
+										Version: deployment.Version1_5_1,
 										ChainUpdates: changeset.RateLimiterPerChain{
 											selectorB: test.RegistrationPass.SelectorA2B,
 										},
 									},
 									selectorB: {
 										Type:    changeset.LockReleaseTokenPool,
-										Version: changeset.CurrentTokenPoolVersion,
+										Version: deployment.Version1_5_1,
 										ChainUpdates: changeset.RateLimiterPerChain{
 											selectorA: test.RegistrationPass.SelectorB2A,
 										},
@@ -461,11 +461,11 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 								RegistryUpdates: map[uint64]changeset.RegistryConfig{
 									selectorA: {
 										Type:    changeset.LockReleaseTokenPool,
-										Version: changeset.CurrentTokenPoolVersion,
+										Version: deployment.Version1_5_1,
 									},
 									selectorB: {
 										Type:    changeset.LockReleaseTokenPool,
-										Version: changeset.CurrentTokenPoolVersion,
+										Version: deployment.Version1_5_1,
 									},
 								},
 							},
@@ -518,14 +518,14 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 								PoolUpdates: map[uint64]changeset.TokenPoolConfig{
 									selectorA: {
 										Type:    aType,
-										Version: changeset.CurrentTokenPoolVersion,
+										Version: deployment.Version1_5_1,
 										ChainUpdates: changeset.RateLimiterPerChain{
 											selectorB: test.UpdatePass.SelectorA2B,
 										},
 									},
 									selectorB: {
 										Type:    bType,
-										Version: changeset.CurrentTokenPoolVersion,
+										Version: deployment.Version1_5_1,
 										ChainUpdates: changeset.RateLimiterPerChain{
 											selectorA: test.UpdatePass.SelectorB2A,
 										},

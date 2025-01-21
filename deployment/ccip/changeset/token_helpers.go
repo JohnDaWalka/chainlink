@@ -10,21 +10,21 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 )
 
-var CurrentTokenPoolVersion semver.Version = deployment.Version1_5_1
+var currentTokenPoolVersion semver.Version = deployment.Version1_5_1
 
-var TokenPoolTypes map[deployment.ContractType]struct{} = map[deployment.ContractType]struct{}{
+var tokenPoolTypes map[deployment.ContractType]struct{} = map[deployment.ContractType]struct{}{
 	BurnMintTokenPool:         struct{}{},
 	BurnWithFromMintTokenPool: struct{}{},
 	BurnFromMintTokenPool:     struct{}{},
 	LockReleaseTokenPool:      struct{}{},
 }
 
-var TokenPoolVersions map[semver.Version]struct{} = map[semver.Version]struct{}{
+var tokenPoolVersions map[semver.Version]struct{} = map[semver.Version]struct{}{
 	deployment.Version1_5_1: struct{}{},
 }
 
-// GetAllTokenPoolsWithSymbolAndVersion returns a list of all token pools tied to the given token symbol and semver version.
-func GetAllTokenPoolsWithSymbolAndVersion(
+// getAllTokenPoolsWithSymbolAndVersion returns a list of all token pools tied to the given token symbol and semver version.
+func getAllTokenPoolsWithSymbolAndVersion(
 	chainState CCIPChainState,
 	chainClient deployment.OnchainClient,
 	symbol TokenSymbol,
@@ -71,8 +71,8 @@ func GetAllTokenPoolsWithSymbolAndVersion(
 	return tokenPools, nil
 }
 
-// GetTokenPoolFromSymbolTypeAndVersion returns the token pool in the environment linked to a particular symbol, type, and version
-func GetTokenPoolFromSymbolTypeAndVersion(
+// getTokenPoolFromSymbolTypeAndVersion returns the token pool in the environment linked to a particular symbol, type, and version
+func getTokenPoolFromSymbolTypeAndVersion(
 	chainState CCIPChainState,
 	chain deployment.Chain,
 	symbol TokenSymbol,
