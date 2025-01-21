@@ -39,7 +39,7 @@ func TestRMN_TwoMessagesOnTwoLanesIncludingBatching(t *testing.T) {
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
-		RateLimiterPerChain: []remoteChainConfig{
+		remoteChainsConfig: []remoteChainConfig{
 			{chainIdx: chain0, f: 1},
 			{chainIdx: chain1, f: 1},
 		},
@@ -62,7 +62,7 @@ func TestRMN_MultipleMessagesOnOneLaneNoWaitForExec(t *testing.T) {
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
-		RateLimiterPerChain: []remoteChainConfig{
+		remoteChainsConfig: []remoteChainConfig{
 			{chainIdx: chain0, f: 1},
 			{chainIdx: chain1, f: 1},
 		},
@@ -84,7 +84,7 @@ func TestRMN_NotEnoughObservers(t *testing.T) {
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
-		RateLimiterPerChain: []remoteChainConfig{
+		remoteChainsConfig: []remoteChainConfig{
 			{chainIdx: chain0, f: 1},
 			{chainIdx: chain1, f: 1},
 		},
@@ -105,7 +105,7 @@ func TestRMN_DifferentSigners(t *testing.T) {
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
-		RateLimiterPerChain: []remoteChainConfig{
+		remoteChainsConfig: []remoteChainConfig{
 			{chainIdx: chain0, f: 1},
 			{chainIdx: chain1, f: 1},
 		},
@@ -130,7 +130,7 @@ func TestRMN_NotEnoughSigners(t *testing.T) {
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
-		RateLimiterPerChain: []remoteChainConfig{
+		remoteChainsConfig: []remoteChainConfig{
 			{chainIdx: chain0, f: 1},
 			{chainIdx: chain1, f: 1},
 		},
@@ -155,7 +155,7 @@ func TestRMN_DifferentRmnNodesForDifferentChains(t *testing.T) {
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
-		RateLimiterPerChain: []remoteChainConfig{
+		remoteChainsConfig: []remoteChainConfig{
 			{chainIdx: chain0, f: 1},
 			{chainIdx: chain1, f: 1},
 		},
@@ -187,7 +187,7 @@ func TestRMN_TwoMessagesOneSourceChainCursed(t *testing.T) {
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
-		RateLimiterPerChain: []remoteChainConfig{
+		remoteChainsConfig: []remoteChainConfig{
 			{chainIdx: chain0, f: 1},
 			{chainIdx: chain1, f: 1},
 		},
@@ -210,7 +210,7 @@ func TestRMN_GlobalCurseTwoMessagesOnTwoLanes(t *testing.T) {
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
-		RateLimiterPerChain: []remoteChainConfig{
+		remoteChainsConfig: []remoteChainConfig{
 			{chainIdx: chain0, f: 1},
 			{chainIdx: chain1, f: 1},
 		},
@@ -299,7 +299,7 @@ func runRmnTestCase(t *testing.T, tc rmnTestCase) {
 		candidateDigest[:], activeDigest[:])
 
 	rmnRemoteConfig := make(map[uint64]changeset.RMNRemoteConfig)
-	for _, remoteCfg := range tc.RateLimiterPerChain {
+	for _, remoteCfg := range tc.remoteChainsConfig {
 		selector := tc.pf.chainSelectors[remoteCfg.chainIdx]
 		if remoteCfg.f < 0 {
 			t.Fatalf("remoteCfg.f is negative: %d", remoteCfg.f)
@@ -446,7 +446,7 @@ type rmnTestCase struct {
 	revokedCursedSubjectsPerChain map[int]map[int]time.Duration // chainIdx -> subjectIdx -> timer to revoke
 	waitForExec                   bool
 	homeChainConfig               homeChainConfig
-	RateLimiterPerChain           []remoteChainConfig
+	remoteChainsConfig            []remoteChainConfig
 	rmnNodes                      []rmnNode
 	messagesToSend                []messageToSend
 
@@ -609,7 +609,7 @@ func (tc rmnTestCase) sendMessages(t *testing.T, onChainState changeset.CCIPOnCh
 }
 
 func (tc rmnTestCase) callContractsToCurseChains(ctx context.Context, t *testing.T, onChainState changeset.CCIPOnChainState, envWithRMN testhelpers.DeployedEnv) {
-	for _, remoteCfg := range tc.RateLimiterPerChain {
+	for _, remoteCfg := range tc.remoteChainsConfig {
 		remoteSel := tc.pf.chainSelectors[remoteCfg.chainIdx]
 		chState, ok := onChainState.Chains[remoteSel]
 		require.True(t, ok)
@@ -644,7 +644,7 @@ func (tc rmnTestCase) callContractsToCurseChains(ctx context.Context, t *testing
 }
 
 func (tc rmnTestCase) callContractsToCurseAndRevokeCurse(ctx context.Context, eg *errgroup.Group, t *testing.T, onChainState changeset.CCIPOnChainState, envWithRMN testhelpers.DeployedEnv) {
-	for _, remoteCfg := range tc.RateLimiterPerChain {
+	for _, remoteCfg := range tc.remoteChainsConfig {
 		remoteSel := tc.pf.chainSelectors[remoteCfg.chainIdx]
 		chState, ok := onChainState.Chains[remoteSel]
 		require.True(t, ok)
