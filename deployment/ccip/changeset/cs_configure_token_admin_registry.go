@@ -62,13 +62,22 @@ func (c RegistryConfig) Validate(ctx context.Context, chain deployment.Chain, st
 	if !useMcms {
 		fromAddress = chain.DeployerKey.From
 	}
+
+	// Running this changeset has possible motivations: we want to update the pool for a token or transfer the admin rights of a token.
+	// It doesn't really matter if we are doing one or both, so long as we are able to perform the action(s).
+
+	// To perform these actions, we have to be the admin of the token. There are three ways this can happen:
+	//   1. We are already the admin of the token (no action)
+	//   2. We are the proposed admin of the token (just have to accept)
+	//   3. We can become the admin of the token (have to propose and accept), which requires us to be the owner of the registry and for the token to be admin-less.
+	// The following code checks these conditions.
+
 	if tokenConfig.Administrator == fromAddress || tokenConfig.PendingAdministrator == fromAddress {
 		// We are already the administrator / pending administrator & will be able to perform any actions required
 		return nil
 	}
 
-	// To be able to perform required actions (i.e. update the pool, transfer admin rights), we must be the admin / pending admin of the token
-	// If we are not, we must set ourselves as admin of the token, which requires two things to be true.
+	// If we are not admin / pending admin, we must set ourselves as admin of the token, which requires two things to be true.
 	//   1. We own the token admin registry
 	//   2. An admin musn't exist yet
 	// We've already validated that we own the registry during ValidateOwnership, so we only need to check the 2nd condition
@@ -192,7 +201,7 @@ func createTokenAdminRegistryOps(
 	// The following calls depend on each other and must be executed in sequence.
 	// i.e. proposeAdmin must go before acceptAdminRole, which if required must go before "setPool".
 	// MCMS enforces nonces, so execution via MCMS will guarantee the proper ordering.
-	// If using a deployer key, execution failure will cause the changeset to exit, but you can always re-run without issues.
+	// If using a deployer key, execution failure will cause the changeset to exit (see enactDeployer function) and you can re-run without issues.
 	// For example, if acceptAdminRole fails, the second pass will see that our deployer key is already the pending administrator
 	// and will only attempt (at most) acceptAdminRole, setPool, and transferAdminRole.
 
