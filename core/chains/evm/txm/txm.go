@@ -170,9 +170,14 @@ func (t *Txm) initializeNonce(ctx context.Context, address common.Address) {
 	defer cancel()
 	for {
 		pendingNonce, rErr := t.client.PendingNonceAt(ctxWithTimeout, address)
+		if rErr != nil {
+			t.lggr.Criticalw("Error while fetching initial nonce", "address", address, "err", rErr)
+		}
 		storedNonce, sErr := t.txStore.FindLatestNonce(ctxWithTimeout, address, t.chainID)
+		if sErr != nil {
+			t.lggr.Errorw("Error while fetching nonce from storage", "address", address, "err", sErr)
+		}
 		if rErr != nil || sErr != nil {
-			t.lggr.Errorw("Error when fetching initial nonce", "address", address, "requestError", rErr, "storageError", sErr)
 			select {
 			case <-time.After(pendingNonceRecheckInterval):
 			case <-ctx.Done():
@@ -375,9 +380,9 @@ func (t *Txm) sendTransactionWithError(ctx context.Context, tx *types.Transactio
 			return
 		}
 	} else if txErr != nil {
-		pendingNonce, err := t.client.PendingNonceAt(ctx, address)
-		if err != nil {
-			return err
+		pendingNonce, rErr := t.client.PendingNonceAt(ctx, address)
+		if rErr != nil {
+			return rErr
 		}
 		if pendingNonce <= *tx.Nonce {
 			return fmt.Errorf("Pending nonce for txID: %v didn't increase. PendingNonce: %d, TxNonce: %d. TxErr: %w", tx.ID, pendingNonce, *tx.Nonce, txErr)
