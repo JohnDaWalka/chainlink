@@ -119,6 +119,7 @@ type ExistingWorkflowConfig struct {
 type ChainlinkCLIConfig struct {
 	FolderLocation *string `toml:"folder_location"`
 	Compile        bool    `toml:"compile"`
+	ExistingWorkflowConfig
 }
 
 type WorkflowTestConfig struct {
@@ -741,7 +742,8 @@ func TestWorkflow(t *testing.T) {
 				require.NotEmpty(t, workflowGistUrl)
 				require.NotEmpty(t, workflowConfigUrl)
 			} else {
-				// TODO get gist urls from config
+				workflowGistUrl = in.WorkflowConfig.ChainlinkCLI.ExistingWorkflowConfig.BinaryURL
+				workflowConfigUrl = in.WorkflowConfig.ChainlinkCLI.ExistingWorkflowConfig.ConfigURL
 			}
 
 			// deploy the workflow

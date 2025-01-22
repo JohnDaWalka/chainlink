@@ -25,7 +25,6 @@ contract KeystoneFeedsConsumer is IReceiver, OwnerIsCreator {
     uint32 Timestamp;
   }
 
-  bytes32[] private s_feedReportsList;
   mapping(bytes32 feedId => StoredFeedReport feedReport) internal s_feedReports;
   address[] internal s_allowedSendersList;
   mapping(address sender => bool) internal s_allowedSenders;
@@ -62,29 +61,22 @@ contract KeystoneFeedsConsumer is IReceiver, OwnerIsCreator {
     s_allowedWorkflowNamesList = _allowedWorkflowNamesList;
   }
 
-  event DebugEvent(string reason);
-
   function onReport(bytes calldata metadata, bytes calldata rawReport) external {
     if (!s_allowedSenders[msg.sender]) {
-      emit DebugEvent("UnauthorizedSender");
       revert UnauthorizedSender(msg.sender);
     }
 
     (bytes10 workflowName, address workflowOwner) = _getInfo(metadata);
     if (!s_allowedWorkflowNames[workflowName]) {
-      emit DebugEvent("UnauthorizedWorkflowName");
       revert UnauthorizedWorkflowName(workflowName);
     }
     if (!s_allowedWorkflowOwners[workflowOwner]) {
-      emit DebugEvent("UnauthorizedWorkflowOwner");
       revert UnauthorizedWorkflowOwner(workflowOwner);
     }
 
     ReceivedFeedReport[] memory feeds = abi.decode(rawReport, (ReceivedFeedReport[]));
-    emit DebugEvent("decoding worked");
     for (uint256 i = 0; i < feeds.length; ++i) {
       s_feedReports[feeds[i].FeedId] = StoredFeedReport(feeds[i].Price, feeds[i].Timestamp);
-      s_feedReportsList.push(feeds[i].FeedId);
       emit FeedReceived(feeds[i].FeedId, feeds[i].Price, feeds[i].Timestamp);
     }
   }
@@ -108,27 +100,6 @@ contract KeystoneFeedsConsumer is IReceiver, OwnerIsCreator {
     StoredFeedReport memory report = s_feedReports[feedId];
     return (report.Price, report.Timestamp);
   }
-
-  function getAllFeeds() external view returns (bytes32[] memory, uint224[] memory, uint32[] memory) {
-    uint256 count = s_feedReportsList.length;
-
-    // Create arrays for the results
-    bytes32[] memory ids = new bytes32[](count);
-    uint224[] memory prices = new uint224[](count);
-    uint32[] memory timestamps = new uint32[](count);
-
-    // Populate arrays from feed reports
-    for (uint256 i = 0; i < count; ++i) {
-        bytes32 feedId = s_feedReportsList[i];
-        StoredFeedReport memory report = s_feedReports[feedId];
-        ids[i] = feedId;
-        prices[i] = report.Price;
-        timestamps[i] = report.Timestamp;
-    }
-
-    return (ids, prices, timestamps);
-  }
-
 
   function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
     return interfaceId == type(IReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
