@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/workflowkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/store"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 var ErrNotImplemented = errors.New("not implemented")
@@ -130,12 +132,39 @@ func newLastFetchedAtMap() *lastFetchedAtMap {
 
 type engineFactoryFn func(ctx context.Context, wfid string, owner string, name string, config []byte, binary []byte) (services.Service, error)
 
+type ArtifactConfig struct {
+	MaxConfigSize  uint64
+	MaxSecretsSize uint64
+	MaxBinarySize  uint64
+}
+
+// By default, if type is unknown, the largest artifact size is 26.4KB.  Configure the artifact size
+// via the ArtifactConfig to override this default.
+const defaultMaxArtifactSizeBytes = 26.4 * utils.KB
+
+func (cfg *ArtifactConfig) ApplyDefaults() {
+	if cfg.MaxConfigSize == 0 {
+		cfg.MaxConfigSize = defaultMaxArtifactSizeBytes
+	}
+	if cfg.MaxSecretsSize == 0 {
+		cfg.MaxSecretsSize = defaultMaxArtifactSizeBytes
+	}
+	if cfg.MaxBinarySize == 0 {
+		cfg.MaxBinarySize = defaultMaxArtifactSizeBytes
+	}
+}
+
 // eventHandler is a handler for WorkflowRegistryEvent events.  Each event type has a corresponding
 // method that handles the event.
 type eventHandler struct {
-	lggr                     logger.Logger
-	orm                      WorkflowRegistryDS
-	fetcher                  FetcherFunc
+	lggr logger.Logger
+	orm  WorkflowRegistryDS
+
+	// fetchFn is a function that fetches the contents of a URL with a limit on the size of the response.
+	fetchFn FetcherFunc
+
+	// limits sets max artifact sizes to fetch when handling events
+	limits                   *ArtifactConfig
 	workflowStore            store.Store
 	capRegistry              core.CapabilitiesRegistry
 	engineRegistry           *EngineRegistry
@@ -166,11 +195,17 @@ func WithEngineFactoryFn(efn engineFactoryFn) func(*eventHandler) {
 	}
 }
 
+func WithMaxArtifactSize(cfg ArtifactConfig) func(*eventHandler) {
+	return func(eh *eventHandler) {
+		eh.limits = &cfg
+	}
+}
+
 // NewEventHandler returns a new eventHandler instance.
 func NewEventHandler(
 	lggr logger.Logger,
 	orm ORM,
-	gateway FetcherFunc,
+	fetchFn FetcherFunc,
 	workflowStore store.Store,
 	capRegistry core.CapabilitiesRegistry,
 	emitter custmsg.MessageEmitter,
@@ -181,20 +216,23 @@ func NewEventHandler(
 	eh := &eventHandler{
 		lggr:                     lggr,
 		orm:                      orm,
-		fetcher:                  gateway,
 		workflowStore:            workflowStore,
 		capRegistry:              capRegistry,
+		fetchFn:                  fetchFn,
 		engineRegistry:           NewEngineRegistry(),
 		emitter:                  emitter,
 		lastFetchedAtMap:         newLastFetchedAtMap(),
 		clock:                    clock,
+		limits:                   &ArtifactConfig{},
 		secretsFreshnessDuration: defaultSecretsFreshnessDuration,
 		encryptionKey:            encryptionKey,
 	}
 	eh.engineFactory = eh.engineFactoryFn
+	eh.limits.ApplyDefaults()
 	for _, o := range opts {
 		o(eh)
 	}
+
 	return eh
 }
 
@@ -224,7 +262,7 @@ func (h *eventHandler) refreshSecrets(ctx context.Context, workflowOwner, workfl
 	return updatedSecrets, nil
 }
 
-func (h *eventHandler) SecretsFor(ctx context.Context, workflowOwner, workflowName, workflowID string) (map[string]string, error) {
+func (h *eventHandler) SecretsFor(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName, workflowID string) (map[string]string, error) {
 	secretsURLHash, secretsPayload, err := h.orm.GetContentsByWorkflowID(ctx, workflowID)
 	if err != nil {
 		// The workflow record was found, but secrets_id was empty.
@@ -238,15 +276,16 @@ func (h *eventHandler) SecretsFor(ctx context.Context, workflowOwner, workflowNa
 
 	lastFetchedAt, ok := h.lastFetchedAtMap.Get(secretsURLHash)
 	if !ok || h.clock.Now().Sub(lastFetchedAt) > h.secretsFreshnessDuration {
-		updatedSecrets, innerErr := h.refreshSecrets(ctx, workflowOwner, workflowName, workflowID, secretsURLHash)
+		updatedSecrets, innerErr := h.refreshSecrets(ctx, workflowOwner, hexWorkflowName, workflowID, secretsURLHash)
 		if innerErr != nil {
 			msg := fmt.Sprintf("could not refresh secrets: proceeding with stale secrets for workflowID %s: %s", workflowID, innerErr)
 			h.lggr.Error(msg)
+
 			logCustMsg(
 				ctx,
 				h.emitter.With(
 					platform.KeyWorkflowID, workflowID,
-					platform.KeyWorkflowName, workflowName,
+					platform.KeyWorkflowName, decodedWorkflowName,
 					platform.KeyWorkflowOwner, workflowOwner,
 				),
 				msg,
@@ -410,7 +449,7 @@ func (h *eventHandler) workflowRegisteredEvent(
 	// Always fetch secrets from the SecretsURL
 	var secrets []byte
 	if payload.SecretsURL != "" {
-		secrets, err = h.fetcher(ctx, payload.SecretsURL)
+		secrets, err = h.fetchFn(ctx, payload.SecretsURL, safeUint32(h.limits.MaxSecretsSize))
 		if err != nil {
 			return fmt.Errorf("failed to fetch secrets from %s : %w", payload.SecretsURL, err)
 		}
@@ -483,7 +522,11 @@ func (h *eventHandler) workflowRegisteredEvent(
 		return fmt.Errorf("failed to start workflow engine: %w", err)
 	}
 
-	h.engineRegistry.Add(wfID, engine)
+	// This shouldn't happen because we call the handler serially and
+	// check for running engines above, see the call to engineRegistry.IsRunning.
+	if err := h.engineRegistry.Add(wfID, engine); err != nil {
+		return fmt.Errorf("invariant violation: %w", err)
+	}
 
 	return nil
 }
@@ -494,34 +537,35 @@ func (h *eventHandler) getWorkflowArtifacts(
 	ctx context.Context,
 	payload WorkflowRegistryWorkflowRegisteredV1,
 ) ([]byte, []byte, error) {
-	spec, err := h.orm.GetWorkflowSpecByID(ctx, hex.EncodeToString(payload.WorkflowID[:]))
-	if err != nil {
-		binary, err2 := h.fetcher(ctx, payload.BinaryURL)
-		if err2 != nil {
-			return nil, nil, fmt.Errorf("failed to fetch binary from %s : %w", payload.BinaryURL, err2)
+	// Check if the workflow spec is already stored in the database
+	if spec, err := h.orm.GetWorkflowSpecByID(ctx, hex.EncodeToString(payload.WorkflowID[:])); err == nil {
+		// there is no update in the BinaryURL or ConfigURL, lets decode the stored artifacts
+		decodedBinary, err := hex.DecodeString(spec.Workflow)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to decode stored workflow spec: %w", err)
 		}
-
-		decodedBinary, err2 := base64.StdEncoding.DecodeString(string(binary))
-		if err2 != nil {
-			return nil, nil, fmt.Errorf("failed to decode binary: %w", err2)
-		}
-
-		var config []byte
-		if payload.ConfigURL != "" {
-			config, err2 = h.fetcher(ctx, payload.ConfigURL)
-			if err2 != nil {
-				return nil, nil, fmt.Errorf("failed to fetch config from %s : %w", payload.ConfigURL, err2)
-			}
-		}
-		return decodedBinary, config, nil
+		return decodedBinary, []byte(spec.Config), nil
 	}
 
-	// there is no update in the BinaryURL or ConfigURL, lets decode the stored artifacts
-	decodedBinary, err := hex.DecodeString(spec.Workflow)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to decode stored workflow spec: %w", err)
+	// Fetch the binary and config files from the specified URLs.
+	var (
+		binary, decodedBinary, config []byte
+		err                           error
+	)
+	if binary, err = h.fetchFn(ctx, payload.BinaryURL, safeUint32(h.limits.MaxBinarySize)); err != nil {
+		return nil, nil, fmt.Errorf("failed to fetch binary from %s : %w", payload.BinaryURL, err)
 	}
-	return decodedBinary, []byte(spec.Config), nil
+
+	if decodedBinary, err = base64.StdEncoding.DecodeString(string(binary)); err != nil {
+		return nil, nil, fmt.Errorf("failed to decode binary: %w", err)
+	}
+
+	if payload.ConfigURL != "" {
+		if config, err = h.fetchFn(ctx, payload.ConfigURL, safeUint32(h.limits.MaxConfigSize)); err != nil {
+			return nil, nil, fmt.Errorf("failed to fetch config from %s : %w", payload.ConfigURL, err)
+		}
+	}
+	return decodedBinary, config, nil
 }
 
 func (h *eventHandler) engineFactoryFn(ctx context.Context, id string, owner string, name string, config []byte, binary []byte) (services.Service, error) {
@@ -532,16 +576,20 @@ func (h *eventHandler) engineFactoryFn(ctx context.Context, id string, owner str
 	}
 
 	cfg := workflows.Config{
-		Lggr:           h.lggr,
-		Workflow:       *sdkSpec,
-		WorkflowID:     id,
-		WorkflowOwner:  owner, // this gets hex encoded in the engine.
-		WorkflowName:   name,
-		Registry:       h.capRegistry,
-		Store:          h.workflowStore,
-		Config:         config,
-		Binary:         binary,
-		SecretsFetcher: h,
+		Lggr:          h.lggr,
+		Workflow:      *sdkSpec,
+		WorkflowID:    id,
+		WorkflowOwner: owner, // this gets hex encoded in the engine.
+		WorkflowName:  name,
+		// Internal workflow names must not exceed 10 bytes for workflow engine and on-chain use.
+		// A name is used internally that is first hashed to avoid collisions,
+		// hex encoded to ensure UTF8 encoding, then truncated to 10 bytes.
+		WorkflowNameTransform: pkgworkflows.HashTruncateName(name),
+		Registry:              h.capRegistry,
+		Store:                 h.workflowStore,
+		Config:                config,
+		Binary:                binary,
+		SecretsFetcher:        h,
 	}
 	return workflows.NewEngine(ctx, cfg)
 }
@@ -669,7 +717,7 @@ func (h *eventHandler) forceUpdateSecretsEvent(
 	}
 
 	// Fetch the contents of the secrets file from the url via the fetcher
-	secrets, err := h.fetcher(ctx, url)
+	secrets, err := h.fetchFn(ctx, url, safeUint32(h.limits.MaxSecretsSize))
 	if err != nil {
 		return "", err
 	}
@@ -712,4 +760,11 @@ func logCustMsg(ctx context.Context, cma custmsg.MessageEmitter, msg string, log
 
 func newHandlerTypeError(data any) error {
 	return fmt.Errorf("invalid data type %T for event", data)
+}
+
+func safeUint32(n uint64) uint32 {
+	if n > math.MaxUint32 {
+		return math.MaxUint32
+	}
+	return uint32(n)
 }

@@ -176,7 +176,7 @@ func TestCoreRelayerChainInteroperators(t *testing.T) {
 
 	factory := chainlink.RelayerFactory{
 		Logger:               lggr,
-		LoopRegistry:         plugins.NewLoopRegistry(lggr, nil, nil, nil, ""),
+		LoopRegistry:         plugins.NewTestLoopRegistry(lggr),
 		GRPCOpts:             loop.GRPCOpts{},
 		CapabilitiesRegistry: capabilities.NewRegistry(lggr),
 	}
@@ -378,6 +378,8 @@ func TestCoreRelayerChainInteroperators(t *testing.T) {
 					expectedChainCnt, expectedNodeCnt = tt.expectedDummyChainCnt, tt.expectedDummyNodeCnt
 				case relay.NetworkAptos:
 					t.Skip("aptos doesn't need a CoreRelayerChainInteroperator")
+				case relay.NetworkTron:
+					t.Skip("tron doesn't need a CoreRelayerChainInteroperator")
 
 				default:
 					require.Fail(t, "untested relay network", relayNetwork)

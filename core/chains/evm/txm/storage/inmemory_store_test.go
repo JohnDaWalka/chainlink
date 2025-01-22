@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink/v2/common/txmgr"
+	"github.com/smartcontractkit/chainlink-framework/chains/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/types"
 )
@@ -34,7 +34,7 @@ func TestAbandonPendingTransactions(t *testing.T) {
 		tx4, err := insertUnconfirmedTransaction(m, 4)
 		require.NoError(t, err)
 
-		m.Abandon()
+		m.AbandonPendingTransactions()
 
 		assert.Equal(t, txmgr.TxFatalError, tx1.State)
 		assert.Equal(t, txmgr.TxFatalError, tx2.State)
@@ -54,7 +54,7 @@ func TestAbandonPendingTransactions(t *testing.T) {
 		tx4, err := insertConfirmedTransaction(m, 4)
 		require.NoError(t, err)
 
-		m.Abandon()
+		m.AbandonPendingTransactions()
 
 		assert.Equal(t, txmgr.TxFatalError, tx1.State)
 		assert.Equal(t, txmgr.TxFatalError, tx2.State)

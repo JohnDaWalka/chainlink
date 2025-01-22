@@ -18,21 +18,21 @@ import (
 	ocrcommontypes "github.com/smartcontractkit/libocr/commontypes"
 
 	commonassets "github.com/smartcontractkit/chainlink-common/pkg/assets"
-	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	commoncfg "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/hex"
 	coscfg "github.com/smartcontractkit/chainlink-cosmos/pkg/cosmos/config"
+	"github.com/smartcontractkit/chainlink-framework/multinode"
+	mnCfg "github.com/smartcontractkit/chainlink-framework/multinode/config"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	stkcfg "github.com/smartcontractkit/chainlink-starknet/relayer/pkg/chainlink/config"
 
-	"github.com/smartcontractkit/chainlink/v2/common/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/chaintype"
 	evmcfg "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
-	legacy "github.com/smartcontractkit/chainlink/v2/core/config"
+	"github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink/cfgtest"
@@ -49,7 +49,7 @@ var (
 
 	second        = *commoncfg.MustNewDuration(time.Second)
 	minute        = *commoncfg.MustNewDuration(time.Minute)
-	selectionMode = client.NodeSelectionModeHighestHead
+	selectionMode = multinode.NodeSelectionModeHighestHead
 
 	multiChain = Config{
 		Core: toml.Core{
@@ -171,8 +171,8 @@ var (
 				Chain: solcfg.Chain{
 					MaxRetries: ptr[int64](12),
 				},
-				MultiNode: solcfg.MultiNodeConfig{
-					MultiNode: solcfg.MultiNode{
+				MultiNode: mnCfg.MultiNodeConfig{
+					MultiNode: mnCfg.MultiNode{
 						Enabled:                      ptr(false),
 						PollFailureThreshold:         ptr[uint32](5),
 						PollInterval:                 &second,
@@ -180,6 +180,7 @@ var (
 						SyncThreshold:                ptr[uint32](5),
 						NodeIsSyncingEnabled:         ptr(false),
 						LeaseDuration:                &minute,
+						NewHeadsPollInterval:         &second,
 						FinalizedBlockPollInterval:   &second,
 						EnforceRepeatableRead:        ptr(true),
 						DeathDeclarationDelay:        &minute,
@@ -199,8 +200,8 @@ var (
 				Chain: solcfg.Chain{
 					OCR2CachePollPeriod: commoncfg.MustNewDuration(time.Minute),
 				},
-				MultiNode: solcfg.MultiNodeConfig{
-					MultiNode: solcfg.MultiNode{
+				MultiNode: mnCfg.MultiNodeConfig{
+					MultiNode: mnCfg.MultiNode{
 						Enabled:                      ptr(false),
 						PollFailureThreshold:         ptr[uint32](5),
 						PollInterval:                 &second,
@@ -208,6 +209,7 @@ var (
 						SyncThreshold:                ptr[uint32](5),
 						NodeIsSyncingEnabled:         ptr(false),
 						LeaseDuration:                &minute,
+						NewHeadsPollInterval:         &second,
 						FinalizedBlockPollInterval:   &second,
 						EnforceRepeatableRead:        ptr(true),
 						DeathDeclarationDelay:        &minute,
@@ -258,7 +260,7 @@ func TestConfig_Marshal(t *testing.T) {
 		require.NoError(t, err)
 		return &a
 	}
-	selectionMode := client.NodeSelectionModeHighestHead
+	selectionMode := multinode.NodeSelectionModeHighestHead
 
 	global := Config{
 		Core: toml.Core{
@@ -327,7 +329,7 @@ func TestConfig_Marshal(t *testing.T) {
 		Backup: toml.DatabaseBackup{
 			Dir:              ptr("test/backup/dir"),
 			Frequency:        &hour,
-			Mode:             &legacy.DatabaseBackupModeFull,
+			Mode:             &config.DatabaseBackupModeFull,
 			OnVersionUpgrade: ptr(true),
 		},
 	}
@@ -495,9 +497,12 @@ func TestConfig_Marshal(t *testing.T) {
 			NetworkID: ptr("evm"),
 		},
 		WorkflowRegistry: toml.WorkflowRegistry{
-			Address:   ptr(""),
-			ChainID:   ptr("1"),
-			NetworkID: ptr("evm"),
+			Address:                 ptr(""),
+			ChainID:                 ptr("1"),
+			NetworkID:               ptr("evm"),
+			MaxBinarySize:           ptr(utils.FileSize(20 * utils.MB)),
+			MaxEncryptedSecretsSize: ptr(utils.FileSize(26.4 * utils.KB)),
+			MaxConfigSize:           ptr(utils.FileSize(50 * utils.KB)),
 		},
 		Dispatcher: toml.Dispatcher{
 			SupportedVersion:   ptr(1),
@@ -769,8 +774,8 @@ func TestConfig_Marshal(t *testing.T) {
 				ComputeUnitLimitDefault:  ptr[uint32](100_000),
 				EstimateComputeUnitLimit: ptr(false),
 			},
-			MultiNode: solcfg.MultiNodeConfig{
-				MultiNode: solcfg.MultiNode{
+			MultiNode: mnCfg.MultiNodeConfig{
+				MultiNode: mnCfg.MultiNode{
 					Enabled:                      ptr(false),
 					PollFailureThreshold:         ptr[uint32](5),
 					PollInterval:                 &second,
@@ -778,6 +783,7 @@ func TestConfig_Marshal(t *testing.T) {
 					SyncThreshold:                ptr[uint32](5),
 					NodeIsSyncingEnabled:         ptr(false),
 					LeaseDuration:                &minute,
+					NewHeadsPollInterval:         &second,
 					FinalizedBlockPollInterval:   &second,
 					EnforceRepeatableRead:        ptr(true),
 					DeathDeclarationDelay:        &minute,
@@ -846,6 +852,7 @@ func TestConfig_Marshal(t *testing.T) {
 			CertFile: ptr("/path/to/cert.pem"),
 		},
 		Transmitter: toml.MercuryTransmitter{
+			Protocol:             ptr(config.MercuryTransmitterProtocolGRPC),
 			TransmitQueueMaxSize: ptr(uint32(123)),
 			TransmitTimeout:      commoncfg.MustNewDuration(234 * time.Second),
 			TransmitConcurrency:  ptr(uint32(456)),
@@ -1311,6 +1318,7 @@ SelectionMode = 'HighestHead'
 SyncThreshold = 5
 NodeIsSyncingEnabled = false
 LeaseDuration = '1m0s'
+NewHeadsPollInterval = '1s'
 FinalizedBlockPollInterval = '1s'
 EnforceRepeatableRead = true
 DeathDeclarationDelay = '1m0s'
@@ -1362,6 +1370,7 @@ LatestReportDeadline = '1m42s'
 CertFile = '/path/to/cert.pem'
 
 [Mercury.Transmitter]
+Protocol = 'grpc'
 TransmitQueueMaxSize = 123
 TransmitTimeout = '3m54s'
 TransmitConcurrency = 456
@@ -1376,7 +1385,7 @@ TransmitConcurrency = 456
 
 			var got Config
 
-			require.NoError(t, config.DecodeTOML(strings.NewReader(s), &got))
+			require.NoError(t, commoncfg.DecodeTOML(strings.NewReader(s), &got))
 			ts, err := got.TOMLString()
 
 			require.NoError(t, err)
@@ -1387,7 +1396,7 @@ TransmitConcurrency = 456
 
 func TestConfig_full(t *testing.T) {
 	var got Config
-	require.NoError(t, config.DecodeTOML(strings.NewReader(fullTOML), &got))
+	require.NoError(t, commoncfg.DecodeTOML(strings.NewReader(fullTOML), &got))
 	// Except for some EVM node fields.
 	for c := range got.EVM {
 		addr, err := types.NewEIP55Address("0x2a3e23c6f242F5345320814aC8a1b4E58707D292")
@@ -1455,7 +1464,7 @@ func TestConfig_Validate(t *testing.T) {
 		toml string
 		exp  string
 	}{
-		{name: "invalid", toml: invalidTOML, exp: `invalid configuration: 8 errors:
+		{name: "invalid", toml: invalidTOML, exp: `invalid configuration: 9 errors:
 	- P2P.V2.Enabled: invalid value (false): P2P required for OCR or OCR2. Please enable P2P or disable OCR/OCR2.
 	- Database.Lock.LeaseRefreshInterval: invalid value (6s): must be less than or equal to half of LeaseDuration (10s)
 	- WebServer: 8 errors:
@@ -1487,7 +1496,7 @@ func TestConfig_Validate(t *testing.T) {
 		- 1: 10 errors:
 			- ChainType: invalid value (Foo): must not be set with this chain id
 			- Nodes: missing: must have at least one node
-			- ChainType: invalid value (Foo): must be one of arbitrum, astar, celo, gnosis, hedera, kroma, mantle, metis, optimismBedrock, scroll, wemix, xlayer, zkevm, zksync, zircuit or omitted
+			- ChainType: invalid value (Foo): must be one of arbitrum, astar, celo, gnosis, hedera, kroma, mantle, metis, optimismBedrock, sei, scroll, wemix, xlayer, zkevm, zksync, zircuit or omitted
 			- HeadTracker.HistoryDepth: invalid value (30): must be greater than or equal to FinalizedBlockOffset
 			- GasEstimator.BumpThreshold: invalid value (0): cannot be 0 if auto-purge feature is enabled for Foo
 			- Transactions.AutoPurge.Threshold: missing: needs to be set if auto-purge feature is enabled for Foo
@@ -1500,7 +1509,7 @@ func TestConfig_Validate(t *testing.T) {
 		- 2: 5 errors:
 			- ChainType: invalid value (Arbitrum): only "optimismBedrock" can be used with this chain id
 			- Nodes: missing: must have at least one node
-			- ChainType: invalid value (Arbitrum): must be one of arbitrum, astar, celo, gnosis, hedera, kroma, mantle, metis, optimismBedrock, scroll, wemix, xlayer, zkevm, zksync, zircuit or omitted
+			- ChainType: invalid value (Arbitrum): must be one of arbitrum, astar, celo, gnosis, hedera, kroma, mantle, metis, optimismBedrock, sei, scroll, wemix, xlayer, zkevm, zksync, zircuit or omitted
 			- FinalityDepth: invalid value (0): must be greater than or equal to 1
 			- MinIncomingConfirmations: invalid value (0): must be greater than or equal to 1
 		- 3: 3 errors:
@@ -1554,11 +1563,16 @@ func TestConfig_Validate(t *testing.T) {
 		- 0.Nodes.1.Name: invalid value (primary): duplicate - must be unique
 		- 0: 2 errors:
 			- Enabled: invalid value (1): expected bool
+			- ChainID: missing: required for all chains
+	- Tron: 2 errors:
+		- 0.Nodes.1.Name: invalid value (tron-test): duplicate - must be unique
+		- 0: 2 errors:
+			- Enabled: invalid value (1): expected bool
 			- ChainID: missing: required for all chains`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var c Config
-			require.NoError(t, config.DecodeTOML(strings.NewReader(tt.toml), &c))
+			require.NoError(t, commoncfg.DecodeTOML(strings.NewReader(tt.toml), &c))
 			c.setDefaults()
 			assertValidationError(t, &c, tt.exp)
 		})
@@ -1763,7 +1777,7 @@ AllowSimplePasswords = true`,
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var s Secrets
-			require.NoError(t, config.DecodeTOML(strings.NewReader(tt.toml), &s))
+			require.NoError(t, commoncfg.DecodeTOML(strings.NewReader(tt.toml), &s))
 			assertValidationError(t, &s, tt.exp)
 		})
 	}
@@ -1823,7 +1837,7 @@ func TestConfig_SetFrom(t *testing.T) {
 			var c Config
 			for _, fs := range tt.from {
 				var f Config
-				require.NoError(t, config.DecodeTOML(strings.NewReader(fs), &f))
+				require.NoError(t, commoncfg.DecodeTOML(strings.NewReader(fs), &f))
 				require.NoError(t, c.SetFrom(&f))
 			}
 			ts, err := c.TOMLString()

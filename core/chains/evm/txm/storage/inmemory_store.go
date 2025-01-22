@@ -11,9 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
-	txmgr "github.com/smartcontractkit/chainlink/v2/common/txmgr"
-
+	"github.com/smartcontractkit/chainlink-framework/chains/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/types"
 )
 
@@ -52,7 +50,7 @@ func NewInMemoryStore(lggr logger.Logger, address common.Address, chainID *big.I
 	}
 }
 
-func (m *InMemoryStore) Abandon() {
+func (m *InMemoryStore) AbandonPendingTransactions() {
 	// TODO: append existing fatal transactions and cap the size
 	m.Lock()
 	defer m.Unlock()
@@ -211,7 +209,7 @@ func (m *InMemoryStore) MarkConfirmedAndReorgedTransactions(latestNonce uint64) 
 		}
 		existingTx, exists := m.ConfirmedTransactions[*tx.Nonce]
 		if exists {
-			m.lggr.Errorw("Another confirmed transaction with the same nonce exists. Transaction will overwritten.",
+			m.lggr.Errorw("Another confirmed transaction with the same nonce exists. Transaction will be overwritten.",
 				"existingTx", existingTx, "newTx", tx)
 		}
 		if *tx.Nonce < latestNonce {
@@ -298,8 +296,8 @@ func (m *InMemoryStore) UpdateUnstartedTransactionWithNonce(nonce uint64) (*type
 		return nil, nil
 	}
 
-	if _, exists := m.UnconfirmedTransactions[nonce]; exists {
-		return nil, fmt.Errorf("an unconfirmed tx with the same nonce already exists: %v", m.UnconfirmedTransactions[nonce])
+	if tx, exists := m.UnconfirmedTransactions[nonce]; exists {
+		return nil, fmt.Errorf("an unconfirmed tx with the same nonce already exists: %v", tx)
 	}
 
 	tx := m.UnstartedTransactions[0]

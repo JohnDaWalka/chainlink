@@ -83,21 +83,33 @@ func hash(url string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func (s *FetcherService) Fetch(ctx context.Context, url string) ([]byte, error) {
+// Fetch fetches the given URL and returns the response body.  n is the maximum number of bytes to
+// read from the response body.  Set n to zero to use the default size limit specified by the
+// configured gateway's http client, if any.
+func (s *FetcherService) Fetch(ctx context.Context, url string, n uint32) ([]byte, error) {
 	messageID := strings.Join([]string{ghcapabilities.MethodWorkflowSyncer, hash(url)}, "/")
 	resp, err := s.och.HandleSingleNodeRequest(ctx, messageID, ghcapabilities.Request{
-		URL:    url,
-		Method: http.MethodGet,
+		URL:              url,
+		Method:           http.MethodGet,
+		MaxResponseBytes: n,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	s.lggr.Debugw("received gateway response")
+	if err = resp.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid response from gateway: %w", err)
+	}
+
+	s.lggr.Debugw("received gateway response", "donID", resp.Body.DonId, "msgID", resp.Body.MessageId)
+
 	var payload ghcapabilities.Response
-	err = json.Unmarshal(resp.Body.Payload, &payload)
-	if err != nil {
+	if err = json.Unmarshal(resp.Body.Payload, &payload); err != nil {
 		return nil, err
+	}
+
+	if err = payload.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid payload received from gateway message: %w", err)
 	}
 
 	if payload.ExecutionError {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	gethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
@@ -20,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/solkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/starkkey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/tronkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/vrfkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/workflowkey"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -158,6 +160,7 @@ type keyRing struct {
 	Solana     map[string]solkey.Key
 	StarkNet   map[string]starkkey.Key
 	Aptos      map[string]aptoskey.Key
+	Tron       map[string]tronkey.Key
 	VRF        map[string]vrfkey.KeyV2
 	Workflow   map[string]workflowkey.Key
 	LegacyKeys LegacyKeyStorage
@@ -174,6 +177,7 @@ func newKeyRing() *keyRing {
 		Solana:   make(map[string]solkey.Key),
 		StarkNet: make(map[string]starkkey.Key),
 		Aptos:    make(map[string]aptoskey.Key),
+		Tron:     make(map[string]tronkey.Key),
 		VRF:      make(map[string]vrfkey.KeyV2),
 		Workflow: make(map[string]workflowkey.Key),
 	}
@@ -236,6 +240,9 @@ func (kr *keyRing) raw() (rawKeys rawKeyRing) {
 	for _, aptoskey := range kr.Aptos {
 		rawKeys.Aptos = append(rawKeys.Aptos, aptoskey.Raw())
 	}
+	for _, tronkey := range kr.Tron {
+		rawKeys.Tron = append(rawKeys.Tron, tronkey.Raw())
+	}
 	for _, vrfKey := range kr.VRF {
 		rawKeys.VRF = append(rawKeys.VRF, vrfKey.Raw())
 	}
@@ -283,6 +290,10 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 	for _, aptosKey := range kr.Aptos {
 		aptosIDs = append(aptosIDs, aptosKey.ID())
 	}
+	tronIDs := []string{}
+	for _, tronKey := range kr.Tron {
+		tronIDs = append(tronIDs, tronKey.ID())
+	}
 	var vrfIDs []string
 	for _, VRFKey := range kr.VRF {
 		vrfIDs = append(vrfIDs, VRFKey.ID())
@@ -320,6 +331,9 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 	if len(aptosIDs) > 0 {
 		lggr.Infow(fmt.Sprintf("Unlocked %d Aptos keys", len(aptosIDs)), "keys", aptosIDs)
 	}
+	if len(tronIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d Tron keys", len(tronIDs)), "keys", tronIDs)
+	}
 	if len(vrfIDs) > 0 {
 		lggr.Infow(fmt.Sprintf("Unlocked %d VRF keys", len(vrfIDs)), "keys", vrfIDs)
 	}
@@ -344,6 +358,7 @@ type rawKeyRing struct {
 	Solana     []solkey.Raw
 	StarkNet   []starkkey.Raw
 	Aptos      []aptoskey.Raw
+	Tron       []tronkey.Raw
 	VRF        []vrfkey.Raw
 	Workflow   []workflowkey.Raw
 	LegacyKeys LegacyKeyStorage `json:"-"`
@@ -388,6 +403,10 @@ func (rawKeys rawKeyRing) keys() (*keyRing, error) {
 		aptosKey := rawAptosKey.Key()
 		keyRing.Aptos[aptosKey.ID()] = aptosKey
 	}
+	for _, rawTronKey := range rawKeys.Tron {
+		tronKey := rawTronKey.Key()
+		keyRing.Tron[tronKey.ID()] = tronKey
+	}
 	for _, rawVRFKey := range rawKeys.VRF {
 		vrfKey := rawVRFKey.Key()
 		keyRing.VRF[vrfKey.ID()] = vrfKey
@@ -404,4 +423,71 @@ func (rawKeys rawKeyRing) keys() (*keyRing, error) {
 // adulteration prevents the password from getting used in the wrong place
 func adulteratedPassword(password string) string {
 	return "master-password-" + password
+}
+
+type ResourceMutex struct {
+	mu          sync.Mutex
+	serviceType ServiceType
+	count       int // Tracks active users per service type
+}
+type ServiceType int
+
+const (
+	TXMv1 ServiceType = iota
+	TXMv2
+)
+
+// TryLock attempts to lock the resource for the specified service type.
+// It returns an error if the resource is locked by a different service type.
+func (rm *ResourceMutex) TryLock(serviceType ServiceType) error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	if rm.count == 0 {
+		rm.serviceType = serviceType
+	}
+
+	// Check if other service types are using the resource
+	if rm.serviceType != serviceType && rm.count > 0 {
+		return errors.New("resource is locked by another service type")
+	}
+
+	// Increment active count for the current service type
+	rm.count++
+	return nil
+}
+
+// Unlock releases the lock for the service type
+func (rm *ResourceMutex) Unlock(serviceType ServiceType) error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	// Check if the service type has an active lock
+	if rm.count == 0 {
+		return errors.New("no active lock")
+	}
+
+	if rm.serviceType != serviceType {
+		return errors.New("no active lock for this service type")
+	}
+
+	// Decrement active count for the service type
+	rm.count--
+	return nil
+}
+
+// IsLocked checks if the resource is locked by a specific service type.
+func (rm *ResourceMutex) IsLocked(serviceType ServiceType) (bool, error) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	if rm.count == 0 || rm.serviceType != serviceType {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func NewResourceMutex() *ResourceMutex {
+	return &ResourceMutex{}
 }

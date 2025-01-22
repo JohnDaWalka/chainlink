@@ -1,5 +1,5 @@
 ChainID = '1337'
-FinalityDepth = 1
+FinalityDepth = 10
 MinIncomingConfirmations = 1
 MinContractPayment = '100'
 NoNewHeadsThreshold = '0s'
@@ -19,7 +19,6 @@ PriceMax = '100 micro'
 HistoryDepth = 10
 MaxBufferSize = 100
 SamplingInterval = '0s'
-PersistenceEnabled = false
 
 [OCR]
 ContractConfirmations = 1

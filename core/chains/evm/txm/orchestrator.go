@@ -19,9 +19,9 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
-	"github.com/smartcontractkit/chainlink/v2/common/txmgr"
-	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
-	"github.com/smartcontractkit/chainlink/v2/common/types"
+	"github.com/smartcontractkit/chainlink-framework/chains"
+	"github.com/smartcontractkit/chainlink-framework/chains/txmgr"
+	txmgrtypes "github.com/smartcontractkit/chainlink-framework/chains/txmgr/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/forwarders"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	txmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/types"
@@ -43,8 +43,8 @@ type OrchestratorKeystore interface {
 }
 
 type OrchestratorAttemptBuilder[
-	BLOCK_HASH types.Hashable,
-	HEAD types.Head[BLOCK_HASH],
+	BLOCK_HASH chains.Hashable,
+	HEAD chains.Head[BLOCK_HASH],
 ] interface {
 	services.Service
 	OnNewLongestChain(ctx context.Context, head HEAD)
@@ -52,8 +52,8 @@ type OrchestratorAttemptBuilder[
 
 // Generics are necessary to keep TXMv2 backwards compatible
 type Orchestrator[
-	BLOCK_HASH types.Hashable,
-	HEAD types.Head[BLOCK_HASH],
+	BLOCK_HASH chains.Hashable,
+	HEAD chains.Head[BLOCK_HASH],
 ] struct {
 	services.StateMachine
 	lggr             logger.SugaredLogger
@@ -70,7 +70,7 @@ type Orchestrator[
 	wg               *sync.WaitGroup
 }
 
-func NewTxmOrchestrator[BLOCK_HASH types.Hashable, HEAD types.Head[BLOCK_HASH]](
+func NewTxmOrchestrator[BLOCK_HASH chains.Hashable, HEAD chains.Head[BLOCK_HASH]](
 	lggr logger.Logger,
 	chainID *big.Int,
 	txm *Txm,
@@ -227,7 +227,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) Reset(addr common.Address, abandon bool
 	if !ok {
 		return errors.New("Orchestrator not started yet")
 	}
-	return err
+	return nil
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) OnNewLongestChain(ctx context.Context, head HEAD) {
@@ -326,10 +326,8 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, 
 		FeeLimit:       wrappedTx.SpecifiedGasLimit,
 		CreatedAt:      wrappedTx.CreatedAt,
 		Meta:           wrappedTx.Meta,
-		// Subject: wrappedTx.Subject,
-
-		// TransmitChecker: wrappedTx.TransmitChecker,
-		ChainID: wrappedTx.ChainID,
+		Subject:        wrappedTx.Subject,
+		ChainID:        wrappedTx.ChainID,
 
 		PipelineTaskRunID: wrappedTx.PipelineTaskRunID,
 		MinConfirmations:  wrappedTx.MinConfirmations,
@@ -339,6 +337,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) CreateTransaction(ctx context.Context, 
 	return
 }
 
+// CountTransactionsByState was required for backwards compatibility and it's used only for unconfirmed transactions.
 func (o *Orchestrator[BLOCK_HASH, HEAD]) CountTransactionsByState(ctx context.Context, state txmgrtypes.TxState) (uint32, error) {
 	addresses, err := o.keystore.EnabledAddressesForChain(ctx, o.chainID)
 	if err != nil {

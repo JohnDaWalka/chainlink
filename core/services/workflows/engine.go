@@ -96,7 +96,7 @@ func (sucm *stepUpdateManager) len() int64 {
 }
 
 type secretsFetcher interface {
-	SecretsFor(ctx context.Context, workflowOwner, workflowName, workflowID string) (map[string]string, error)
+	SecretsFor(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName, workflowID string) (map[string]string, error)
 }
 
 // Engine handles the lifecycle of a single workflow and its executions.
@@ -440,6 +440,7 @@ func (e *Engine) registerTrigger(ctx context.Context, t *triggerCapability, trig
 			WorkflowDonID:            e.localNode.WorkflowDON.ID,
 			WorkflowDonConfigVersion: e.localNode.WorkflowDON.ConfigVersion,
 			ReferenceID:              t.Ref,
+			DecodedWorkflowName:      e.workflow.name,
 		},
 		Config:    t.config.Load(),
 		TriggerID: triggerID,
@@ -832,14 +833,34 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 	l.Debugf("sent step state update for execution %s with status %s", stepState.ExecutionID, stepStatus)
 }
 
-func merge(baseConfig *values.Map, overrideConfig *values.Map) *values.Map {
-	m := values.EmptyMap()
-
-	for k, v := range baseConfig.Underlying {
-		m.Underlying[k] = v
+func merge(baseConfig *values.Map, capConfig capabilities.CapabilityConfiguration) *values.Map {
+	restrictedKeys := map[string]bool{}
+	for _, k := range capConfig.RestrictedKeys {
+		restrictedKeys[k] = true
 	}
 
-	for k, v := range overrideConfig.Underlying {
+	// Shallow copy the defaults set in the onchain capability config.
+	m := values.EmptyMap()
+
+	if capConfig.DefaultConfig != nil {
+		for k, v := range capConfig.DefaultConfig.Underlying {
+			m.Underlying[k] = v
+		}
+	}
+
+	// Add in user-provided config, but skipping any restricted keys
+	for k, v := range baseConfig.Underlying {
+		if !restrictedKeys[k] {
+			m.Underlying[k] = v
+		}
+	}
+
+	if capConfig.RestrictedConfig == nil {
+		return m
+	}
+
+	// Then overwrite the config with any restricted settings.
+	for k, v := range capConfig.RestrictedConfig.Underlying {
 		m.Underlying[k] = v
 	}
 
@@ -868,7 +889,7 @@ func (e *Engine) interpolateEnvVars(config map[string]any, env exec.Env) (*value
 // registry (for capability-level configuration). It doesn't perform any caching of the config values, since
 // the two registries perform their own caching.
 func (e *Engine) configForStep(ctx context.Context, lggr logger.Logger, step *step) (*values.Map, error) {
-	secrets, err := e.secretsFetcher.SecretsFor(ctx, e.workflow.owner, e.workflow.hexName, e.workflow.id)
+	secrets, err := e.secretsFetcher.SecretsFor(ctx, e.workflow.owner, e.workflow.hexName, e.workflow.name, e.workflow.id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch secrets: %w", err)
 	}
@@ -900,14 +921,12 @@ func (e *Engine) configForStep(ctx context.Context, lggr logger.Logger, step *st
 		return config, nil
 	}
 
-	if capConfig.DefaultConfig == nil {
-		return config, nil
-	}
-
-	// Merge the configs with registry config overriding the step config.  This is because
-	// some config fields are sensitive and could affect the safe running of the capability,
-	// so we avoid user provided values by overriding them with config from the capabilities registry.
-	return merge(config, capConfig.DefaultConfig), nil
+	// Merge the capability registry config with the config provided by the user.
+	// We need to obey the following rules:
+	// - Remove any restricted keys
+	// - Overlay any restricted config
+	// - Merge the other keys, with user keys taking precedence
+	return merge(config, capConfig), nil
 }
 
 // executeStep executes the referenced capability within a step and returns the result.
@@ -964,6 +983,7 @@ func (e *Engine) executeStep(ctx context.Context, lggr logger.Logger, msg stepRe
 			WorkflowDonID:            e.localNode.WorkflowDON.ID,
 			WorkflowDonConfigVersion: e.localNode.WorkflowDON.ConfigVersion,
 			ReferenceID:              msg.stepRef,
+			DecodedWorkflowName:      e.workflow.name,
 		},
 	}
 
@@ -989,6 +1009,7 @@ func (e *Engine) deregisterTrigger(ctx context.Context, t *triggerCapability, tr
 			WorkflowName:             e.workflow.hexName,
 			WorkflowOwner:            e.workflow.owner,
 			ReferenceID:              t.Ref,
+			DecodedWorkflowName:      e.workflow.name,
 		},
 		TriggerID: generateTriggerId(e.workflow.id, triggerIdx),
 		Config:    t.config.Load(),
@@ -1188,22 +1209,23 @@ func (e *Engine) Name() string {
 }
 
 type Config struct {
-	Workflow             sdk.WorkflowSpec
-	WorkflowID           string
-	WorkflowOwner        string
-	WorkflowName         string
-	Lggr                 logger.Logger
-	Registry             core.CapabilitiesRegistry
-	MaxWorkerLimit       int
-	QueueSize            int
-	NewWorkerTimeout     time.Duration
-	MaxExecutionDuration time.Duration
-	Store                store.Store
-	Config               []byte
-	Binary               []byte
-	SecretsFetcher       secretsFetcher
-	HeartbeatCadence     time.Duration
-	StepTimeout          time.Duration
+	Workflow              sdk.WorkflowSpec
+	WorkflowID            string
+	WorkflowOwner         string
+	WorkflowName          string // Full human-readable workflow name. Intended for metrics and logging.
+	WorkflowNameTransform string // The Workflow Name in an on-chain format, which has requirements of being hex encoded and max 10 bytes
+	Lggr                  logger.Logger
+	Registry              core.CapabilitiesRegistry
+	MaxWorkerLimit        int
+	QueueSize             int
+	NewWorkerTimeout      time.Duration
+	MaxExecutionDuration  time.Duration
+	Store                 store.Store
+	Config                []byte
+	Binary                []byte
+	SecretsFetcher        secretsFetcher
+	HeartbeatCadence      time.Duration
+	StepTimeout           time.Duration
 
 	// For testing purposes only
 	maxRetries          int
@@ -1295,6 +1317,11 @@ func NewEngine(ctx context.Context, cfg Config) (engine *Engine, err error) {
 	workflow.id = cfg.WorkflowID
 	workflow.owner = cfg.WorkflowOwner
 	workflow.hexName = hex.EncodeToString([]byte(cfg.WorkflowName))
+	workflow.name = cfg.WorkflowName
+
+	if len(cfg.WorkflowNameTransform) > 0 {
+		workflow.hexName = cfg.WorkflowNameTransform
+	}
 
 	engine = &Engine{
 		cma:            cma,

@@ -2,11 +2,11 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm/types"
@@ -30,7 +30,7 @@ func NewInMemoryStoreManager(lggr logger.Logger, chainID *big.Int) *InMemoryStor
 
 func (m *InMemoryStoreManager) Abandon(_ context.Context, _ *big.Int, fromAddress common.Address) error {
 	if store, exists := m.InMemoryStoreMap[fromAddress]; exists {
-		store.Abandon()
+		store.AbandonPendingTransactions()
 		return nil
 	}
 	return fmt.Errorf(StoreNotFoundForAddress, fromAddress)
@@ -39,7 +39,7 @@ func (m *InMemoryStoreManager) Abandon(_ context.Context, _ *big.Int, fromAddres
 func (m *InMemoryStoreManager) Add(addresses ...common.Address) (err error) {
 	for _, address := range addresses {
 		if _, exists := m.InMemoryStoreMap[address]; exists {
-			err = multierr.Append(err, fmt.Errorf("address %v already exists in store manager", address))
+			err = errors.Join(err, fmt.Errorf("address %v already exists in store manager", address))
 		}
 		m.InMemoryStoreMap[address] = NewInMemoryStore(m.lggr, address, m.chainID)
 	}
@@ -49,7 +49,7 @@ func (m *InMemoryStoreManager) Add(addresses ...common.Address) (err error) {
 func (m *InMemoryStoreManager) Remove(addresses ...common.Address) (err error) {
 	for _, address := range addresses {
 		if _, exists := m.InMemoryStoreMap[address]; !exists {
-			err = multierr.Append(err, fmt.Errorf("address %v doesn't exist in store manager", address))
+			err = errors.Join(err, fmt.Errorf("address %v doesn't exist in store manager", address))
 		}
 		delete(m.InMemoryStoreMap, address)
 	}

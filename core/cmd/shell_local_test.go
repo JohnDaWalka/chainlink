@@ -12,8 +12,8 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	pgcommon "github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
+	"github.com/smartcontractkit/chainlink-framework/multinode"
 
-	"github.com/smartcontractkit/chainlink/v2/common/client"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/cmd"
@@ -46,7 +46,7 @@ import (
 func genTestEVMRelayers(t *testing.T, opts legacyevm.ChainRelayOpts, ks evmrelayer.CSAETHKeystore) *chainlink.CoreRelayerChainInteroperators {
 	f := chainlink.RelayerFactory{
 		Logger:               opts.Logger,
-		LoopRegistry:         plugins.NewLoopRegistry(opts.Logger, opts.AppConfig.Tracing(), opts.AppConfig.Telemetry(), nil, ""),
+		LoopRegistry:         plugins.NewLoopRegistry(opts.Logger, opts.AppConfig.Database(), opts.AppConfig.Tracing(), opts.AppConfig.Telemetry(), nil, ""),
 		CapabilitiesRegistry: capabilities.NewRegistry(opts.Logger),
 	}
 
@@ -283,7 +283,7 @@ func TestShell_RebroadcastTransactions_Txm(t *testing.T) {
 	// test multiple connections to the database, and changes made within
 	// the transaction cannot be seen from another connection.
 	config, sqlxDB := heavyweight.FullTestDBV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
-		c.Database.Dialect = pgcommon.Postgres
+		c.Database.DriverName = pgcommon.DriverPostgres
 		// evm config is used in this test. but if set, it must be pass config validation.
 		// simplest to make it nil
 		c.EVM = nil
@@ -337,7 +337,7 @@ func TestShell_RebroadcastTransactions_Txm(t *testing.T) {
 		n := i
 		ethClient.On("SendTransactionReturnCode", mock.Anything, mock.MatchedBy(func(tx *gethTypes.Transaction) bool {
 			return tx.Nonce() == n
-		}), mock.Anything).Once().Return(client.Successful, nil)
+		}), mock.Anything).Once().Return(multinode.Successful, nil)
 	}
 
 	assert.NoError(t, c.RebroadcastTransactions(ctx))
@@ -363,7 +363,7 @@ func TestShell_RebroadcastTransactions_OutsideRange_Txm(t *testing.T) {
 			// test multiple connections to the database, and changes made within
 			// the transaction cannot be seen from another connection.
 			config, sqlxDB := heavyweight.FullTestDBV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
-				c.Database.Dialect = pgcommon.Postgres
+				c.Database.DriverName = pgcommon.DriverPostgres
 				// evm config is used in this test. but if set, it must be pass config validation.
 				// simplest to make it nil
 				c.EVM = nil
@@ -417,7 +417,7 @@ func TestShell_RebroadcastTransactions_OutsideRange_Txm(t *testing.T) {
 				n := i
 				ethClient.On("SendTransactionReturnCode", mock.Anything, mock.MatchedBy(func(tx *gethTypes.Transaction) bool {
 					return uint(tx.Nonce()) == n
-				}), mock.Anything).Once().Return(client.Successful, nil)
+				}), mock.Anything).Once().Return(multinode.Successful, nil)
 			}
 
 			assert.NoError(t, c.RebroadcastTransactions(ctx))
@@ -441,7 +441,7 @@ func TestShell_RebroadcastTransactions_AddressCheck(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			config, sqlxDB := heavyweight.FullTestDBV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
-				c.Database.Dialect = pgcommon.Postgres
+				c.Database.DriverName = pgcommon.DriverPostgres
 
 				c.EVM = nil
 				// seems to be needed for config validate
@@ -469,7 +469,7 @@ func TestShell_RebroadcastTransactions_AddressCheck(t *testing.T) {
 
 			mockRelayerChainInteroperators := &chainlinkmocks.FakeRelayerChainInteroperators{EVMChains: legacy}
 			app.On("GetRelayers").Return(mockRelayerChainInteroperators).Maybe()
-			ethClient.On("SendTransactionReturnCode", mock.Anything, mock.Anything, mock.Anything).Maybe().Return(client.Successful, nil)
+			ethClient.On("SendTransactionReturnCode", mock.Anything, mock.Anything, mock.Anything).Maybe().Return(multinode.Successful, nil)
 
 			client := cmd.Shell{
 				Config:                 config,
@@ -499,7 +499,7 @@ func TestShell_RebroadcastTransactions_AddressCheck(t *testing.T) {
 func TestShell_CleanupChainTables(t *testing.T) {
 	// Just check if it doesn't error, command itself shouldn't be changed unless major schema changes were made.
 	// It would be really hard to write a test that accounts for schema changes, so this should be enough to alarm us that something broke.
-	config, _ := heavyweight.FullTestDBV2(t, func(c *chainlink.Config, s *chainlink.Secrets) { c.Database.Dialect = pgcommon.Postgres })
+	config, _ := heavyweight.FullTestDBV2(t, func(c *chainlink.Config, s *chainlink.Secrets) { c.Database.DriverName = pgcommon.DriverPostgres })
 	client := cmd.Shell{
 		Config: config,
 		Logger: logger.TestLogger(t),

@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	clnull "github.com/smartcontractkit/chainlink-common/pkg/utils/null"
 
-	commontypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
+	commontypes "github.com/smartcontractkit/chainlink-framework/chains/txmgr/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 )
 
@@ -143,7 +143,6 @@ type TxRequest struct {
 
 	Meta             *sqlutil.JSON // TODO: *TxMeta after migration
 	ForwarderAddress common.Address
-	// QueueingTxStrategy QueueingTxStrategy
 
 	// Pipeline variables - if you aren't calling this from chain tx task within
 	// the pipeline, you don't need these variables
