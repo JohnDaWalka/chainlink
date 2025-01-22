@@ -1,0 +1,17 @@
+name: test workflow
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  test-permissions:
+    name: "Test Permissions"
+    runs-on: ubuntu-latest-4cores-16GB
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v4
+        with:
+          repository: smartcontractkit/chainlink-ccip
+          path: chainlink-ccip
+          persist-credentials: false
