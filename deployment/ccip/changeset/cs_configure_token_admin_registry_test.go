@@ -57,9 +57,9 @@ func TestValidateRegistryConfig(t *testing.T) {
 				},
 				RegistryUpdates: map[uint64]changeset.RegistryConfig{
 					selectorA: {
-						Type:          changeset.BurnMintTokenPool,
-						Version:       deployment.Version1_5_1,
-						Administrator: e.Chains[selectorA].DeployerKey.From,
+						Type:                  changeset.BurnMintTokenPool,
+						Version:               deployment.Version1_5_1,
+						ExternalAdministrator: e.Chains[selectorA].DeployerKey.From,
 					},
 				},
 			},
@@ -113,11 +113,11 @@ func TestValidateRegistryConfig(t *testing.T) {
 			TokenSymbol: testhelpers.TestTokenSymbol,
 			UseMcms:     true,
 			RegistryConfig: changeset.RegistryConfig{
-				Type:          changeset.BurnWithFromMintTokenPool,
-				Version:       deployment.Version1_5_1,
-				Administrator: administrator,
+				Type:                  changeset.BurnWithFromMintTokenPool,
+				Version:               deployment.Version1_5_1,
+				ExternalAdministrator: administrator,
 			},
-			ErrStr: "we can't set it because we do not control the admin address",
+			ErrStr: "token already has an administrator",
 		},
 	}
 
@@ -248,9 +248,9 @@ func TestConfigureTokenAdminRegistry(t *testing.T) {
 						MCMS:        test.MCMS,
 						RegistryUpdates: map[uint64]changeset.RegistryConfig{
 							selectorA: {
-								Type:          changeset.BurnMintTokenPool,
-								Version:       deployment.Version1_5_1,
-								Administrator: test.Administrator,
+								Type:                  changeset.BurnMintTokenPool,
+								Version:               deployment.Version1_5_1,
+								ExternalAdministrator: test.Administrator,
 							},
 						},
 					},

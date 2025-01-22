@@ -8,12 +8,10 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 )
 
 var _ deployment.ChangeSet[ConfigureTokenAdminRegistryConfig] = ConfigureTokenAdminRegistryChangeset
@@ -24,8 +22,8 @@ type RegistryConfig struct {
 	Type deployment.ContractType
 	// Version is the version of the token pool.
 	Version semver.Version
-	// Administrator is the address of the token administrator that should be set on the registry.
-	Administrator common.Address
+	// ExternalAdministrator is the address of a 3rd party token administrator that should be set on the registry.
+	ExternalAdministrator common.Address
 }
 
 func (c RegistryConfig) Validate(ctx context.Context, chain deployment.Chain, state CCIPChainState, useMcms bool, tokenSymbol TokenSymbol) error {
@@ -60,21 +58,22 @@ func (c RegistryConfig) Validate(ctx context.Context, chain deployment.Chain, st
 		return fmt.Errorf("failed to get %s config from registry on chain %s: %w", tokenSymbol, chain.String(), err)
 	}
 
-	// To update the pool, one of the following must be true
-	//   - We are the current admin of the token
-	//   - The admin of the token doesn't exist yet and we are the owner of the registry
-	registryOwner, err := state.TokenAdminRegistry.Owner(nil)
-	if err != nil {
-		return fmt.Errorf("failed to get owner of registry on chain %s: %w", chain.String(), err)
-	}
-	fromAddress := state.Timelock.Address() // again, "we" are either the Timelock or the deployer key
+	fromAddress := state.Timelock.Address() // "We" are either the Timelock or the deployer key
 	if !useMcms {
 		fromAddress = chain.DeployerKey.From
 	}
-	weCanBeAdmin := tokenConfig.Administrator == utils.ZeroAddress && fromAddress == registryOwner
-	weAreAdmin := tokenConfig.Administrator == fromAddress
-	if tokenConfig.TokenPool != tokenPool.Address() && !(weCanBeAdmin || weAreAdmin) {
-		return fmt.Errorf("%s token pool with address %s is not set on the %s registry, but we can't set it because we do not control the admin address %s", tokenSymbol, tokenPool.Address(), chain, tokenConfig.Administrator)
+	if tokenConfig.Administrator == fromAddress || tokenConfig.PendingAdministrator == fromAddress {
+		// We are already the administrator / pending administrator & will be able to perform any actions required
+		return nil
+	}
+
+	// To be able to perform required actions (i.e. update the pool, transfer admin rights), we must be the admin / pending admin of the token
+	// If we are not, we must set ourselves as admin of the token, which requires two things to be true.
+	//   1. We own the token admin registry
+	//   2. An admin musn't exist yet
+	// We've already validated that we own the registry during ValidateOwnership, so we only need to check the 2nd condition
+	if tokenConfig.Administrator != utils.ZeroAddress {
+		return fmt.Errorf("unable to set %s as admin of %s token on %s: token already has an administrator (%s)", fromAddress, tokenSymbol, chain, tokenConfig.Administrator)
 	}
 	return nil
 }
@@ -144,15 +143,12 @@ func ConfigureTokenAdminRegistryChangeset(env deployment.Environment, c Configur
 		chain := env.Chains[chainSelector]
 		chainState := state.Chains[chainSelector]
 
-		tokenAdminRegistry := chainState.TokenAdminRegistry
-		timelock := chainState.Timelock
-
 		opts, err := deployerGroup.GetDeployer(chainSelector)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get deployer for %s", chain)
 		}
 
-		err = createTokenAdminRegistryOps(opts, chainState, chain, tokenAdminRegistry, registryUpdate, timelock, c.MCMS, c.TokenSymbol)
+		err = createTokenAdminRegistryOps(opts, chainState, chain, registryUpdate, c.MCMS, c.TokenSymbol)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to make operations to configure token admin registry on %s: %w", chain.String(), err)
 		}
@@ -167,9 +163,7 @@ func createTokenAdminRegistryOps(
 	opts *bind.TransactOpts,
 	state CCIPChainState,
 	chain deployment.Chain,
-	tokenAdminRegistry *token_admin_registry.TokenAdminRegistry,
 	registryUpdate RegistryConfig,
-	timelock *gethwrappers.RBACTimelock,
 	mcmsConfig *MCMSConfig,
 	tokenSymbol TokenSymbol,
 ) error {
@@ -183,41 +177,53 @@ func createTokenAdminRegistryOps(
 		return fmt.Errorf("failed to get token from address %s on chain %s: %w", tokenPool.Address(), chain.String(), err)
 	}
 
-	tokenConfig, err := tokenAdminRegistry.GetTokenConfig(nil, token)
+	tokenConfig, err := state.TokenAdminRegistry.GetTokenConfig(nil, token)
 	if err != nil {
 		return fmt.Errorf("failed to get %s config from registry on chain %s: %w", tokenSymbol, chain.String(), err)
 	}
 
-	fromAddress := timelock.Address()
+	fromAddress := state.Timelock.Address()
 	if mcmsConfig == nil {
 		fromAddress = chain.DeployerKey.From
 	}
 
-	if tokenConfig.TokenPool != tokenPool.Address() {
-		if tokenConfig.Administrator != fromAddress {
-			if tokenConfig.PendingAdministrator != fromAddress {
-				// Propose administrator
-				_, err := tokenAdminRegistry.ProposeAdministrator(opts, token, fromAddress)
-				if err != nil {
-					return fmt.Errorf("failed to create proposeAdministrator transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
-				}
-			}
-			// Accept admin role
-			_, err := tokenAdminRegistry.AcceptAdminRole(opts, token)
+	// NOTE ABOUT DEPENDENT CALLS:
+	//
+	// The following calls depend on each other and must be executed in sequence.
+	// i.e. proposeAdmin must go before acceptAdminRole, which if required must go before "setPool".
+	// MCMS enforces nonces, so execution via MCMS will guarantee the proper ordering.
+	// If using a deployer key, execution failure will cause the changeset to exit, but you can always re-run without issues.
+	// For example, if acceptAdminRole fails, the second pass will see that our deployer key is already the pending administrator
+	// and will only attempt (at most) acceptAdminRole, setPool, and transferAdminRole.
+
+	// Thanks to the validations performed earlier in the changeset, we know that both of the following conditions are true
+	//   1. We own the token admin registry
+	//   2. An admin musn't exist yet
+	// We can proceed with proposing & accepting the admin role if we are not yet the admin
+	if tokenConfig.Administrator != fromAddress {
+		if tokenConfig.PendingAdministrator != fromAddress {
+			_, err := state.TokenAdminRegistry.ProposeAdministrator(opts, token, fromAddress)
 			if err != nil {
-				return fmt.Errorf("failed to create acceptAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
+				return fmt.Errorf("failed to create proposeAdministrator transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 			}
 		}
-		// Set pool
-		_, err := tokenAdminRegistry.SetPool(opts, token, tokenPool.Address())
+		_, err := state.TokenAdminRegistry.AcceptAdminRole(opts, token)
+		if err != nil {
+			return fmt.Errorf("failed to create acceptAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
+		}
+	}
+
+	// Only set the pool if we need to
+	if tokenConfig.TokenPool != tokenPool.Address() {
+		_, err := state.TokenAdminRegistry.SetPool(opts, token, tokenPool.Address())
 		if err != nil {
 			return fmt.Errorf("failed to create setPool transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 		}
 	}
 
-	if registryUpdate.Administrator != fromAddress {
-		// Transfer admin role
-		_, err := tokenAdminRegistry.TransferAdminRole(opts, token, registryUpdate.Administrator)
+	// Only set the administrator to an external address if we need to
+	if registryUpdate.ExternalAdministrator != fromAddress {
+		_, err := state.TokenAdminRegistry.TransferAdminRole(opts, token, registryUpdate.ExternalAdministrator)
 		if err != nil {
 			return fmt.Errorf("failed to create transferAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
 		}
