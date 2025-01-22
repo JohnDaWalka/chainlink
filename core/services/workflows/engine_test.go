@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bytecodealliance/wasmtime-go/v23"
 	"github.com/jonboulle/clockwork"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -1463,6 +1464,7 @@ func TestEngine_WithCustomComputeStep(t *testing.T) {
 		ctx,
 		&host.ModuleConfig{Logger: log},
 		binaryB,
+		wasmtime.NewModule,
 		nil, // config
 	)
 	require.NoError(t, err)
@@ -1529,6 +1531,7 @@ func TestEngine_CustomComputePropagatesBreaks(t *testing.T) {
 		ctx,
 		&host.ModuleConfig{Logger: log},
 		binaryB,
+		wasmtime.NewModule,
 		nil, // config
 	)
 	require.NoError(t, err)

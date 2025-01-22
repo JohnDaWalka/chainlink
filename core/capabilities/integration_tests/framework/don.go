@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncer"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -51,6 +52,7 @@ type DonContext struct {
 	workflowRegistry      *WorkflowRegistry
 	syncerFetcherFunc     syncer.FetcherFunc
 	computeFetcherFactory compute.FetcherFactory
+	wasmModuleFactory     WasmModuleFactory
 }
 
 func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
@@ -64,12 +66,13 @@ func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
 }
 
 func CreateDonContextWithWorkflowRegistry(ctx context.Context, t *testing.T, syncerFetcherFunc syncer.FetcherFunc,
-	computeFetcherFactory compute.FetcherFactory) DonContext {
+	computeFetcherFactory compute.FetcherFactory, wasmModuleFactory WasmModuleFactory) DonContext {
 	donContext := CreateDonContext(ctx, t)
 	workflowRegistry := NewWorkflowRegistry(ctx, t, donContext.EthBlockchain)
 	donContext.workflowRegistry = workflowRegistry
 	donContext.syncerFetcherFunc = syncerFetcherFunc
 	donContext.computeFetcherFactory = computeFetcherFactory
+	donContext.wasmModuleFactory = wasmModuleFactory
 	return donContext
 }
 
@@ -165,6 +168,8 @@ func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig Don
 			newOracleFactoryFn = factory.NewOracleFactory
 		}
 
+		wasmModuleFactory := donContext.wasmModuleFactory.NewWasmModuleFactoryFnForPeer(nodeInfo.PeerID.String())
+
 		cn.start = func() {
 			node := startNewNode(ctx, t, lggr.Named(donConfig.name+"-"+strconv.Itoa(i)), nodeInfo, donContext.EthBlockchain,
 				donContext.capabilityRegistry.getAddress(), dispatcher,
@@ -173,7 +178,7 @@ func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig Don
 					for _, modifier := range don.nodeConfigModifiers {
 						modifier(c, cn)
 					}
-				}, donContext.syncerFetcherFunc, donContext.computeFetcherFactory)
+				}, donContext.syncerFetcherFunc, donContext.computeFetcherFactory, wasmModuleFactory)
 
 			require.NoError(t, node.Start(testutils.Context(t)))
 			cn.TestApplication = node
@@ -414,6 +419,7 @@ func startNewNode(ctx context.Context,
 	setupCfg func(c *chainlink.Config),
 	fetcherFunc syncer.FetcherFunc,
 	fetcherFactoryFunc compute.FetcherFactory,
+	wasmModuleFactoryFunc host.WasmModuleFactoryFn,
 ) *cltest.TestApplication {
 	config, _ := heavyweight.FullTestDBV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
 		c.Capabilities.ExternalRegistry.ChainID = ptr(fmt.Sprintf("%d", testutils.SimulatedChainID))
@@ -443,7 +449,8 @@ func startNewNode(ctx context.Context,
 	ethBlockchain.Commit()
 
 	return cltest.NewApplicationWithConfigV2AndKeyOnSimulatedBlockchain(t, config, ethBlockchain.Backend, nodeInfo,
-		dispatcher, peerWrapper, newOracleFactoryFn, localCapabilities, keyV2, lggr, fetcherFunc, fetcherFactoryFunc)
+		dispatcher, peerWrapper, newOracleFactoryFn, localCapabilities, keyV2, lggr, fetcherFunc, fetcherFactoryFunc,
+		wasmModuleFactoryFunc)
 }
 
 // Functions below this point are for adding non-standard capabilities to a DON, deliberately verbose. Eventually these

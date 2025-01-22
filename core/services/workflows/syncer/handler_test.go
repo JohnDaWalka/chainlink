@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bytecodealliance/wasmtime-go/v23"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/custmsg"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	pkgworkflows "github.com/smartcontractkit/chainlink-common/pkg/workflows"
@@ -94,7 +96,7 @@ func Test_Handler(t *testing.T) {
 		}
 		mockORM.EXPECT().GetSecretsURLByHash(matches.AnyContext, giveHash).Return(giveURL, nil)
 		mockORM.EXPECT().Update(matches.AnyContext, giveHash, "contents").Return(int64(1), nil)
-		h := NewEventHandler(lggr, mockORM, fetcher, nil, nil, emitter, clockwork.NewFakeClock(), workflowkey.Key{})
+		h := NewEventHandler(lggr, mockORM, fetcher, nil, nil, emitter, clockwork.NewFakeClock(), workflowkey.Key{}, wasmtime.NewModule)
 		err = h.Handle(ctx, giveEvent)
 		require.NoError(t, err)
 	})
@@ -108,7 +110,7 @@ func Test_Handler(t *testing.T) {
 			return []byte("contents"), nil
 		}
 
-		h := NewEventHandler(lggr, mockORM, fetcher, nil, nil, emitter, clockwork.NewFakeClock(), workflowkey.Key{})
+		h := NewEventHandler(lggr, mockORM, fetcher, nil, nil, emitter, clockwork.NewFakeClock(), workflowkey.Key{}, wasmtime.NewModule)
 		err := h.Handle(ctx, giveEvent)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "event type unsupported")
@@ -117,7 +119,7 @@ func Test_Handler(t *testing.T) {
 	t.Run("fails to get secrets url", func(t *testing.T) {
 		mockORM := mocks.NewORM(t)
 		ctx := testutils.Context(t)
-		h := NewEventHandler(lggr, mockORM, nil, nil, nil, emitter, clockwork.NewFakeClock(), workflowkey.Key{})
+		h := NewEventHandler(lggr, mockORM, nil, nil, nil, emitter, clockwork.NewFakeClock(), workflowkey.Key{}, wasmtime.NewModule)
 		giveURL := "https://original-url.com"
 		giveBytes, err := crypto.Keccak256([]byte(giveURL))
 		require.NoError(t, err)
@@ -157,7 +159,7 @@ func Test_Handler(t *testing.T) {
 			return nil, assert.AnError
 		}
 		mockORM.EXPECT().GetSecretsURLByHash(matches.AnyContext, giveHash).Return(giveURL, nil)
-		h := NewEventHandler(lggr, mockORM, fetcher, nil, nil, emitter, clockwork.NewFakeClock(), workflowkey.Key{})
+		h := NewEventHandler(lggr, mockORM, fetcher, nil, nil, emitter, clockwork.NewFakeClock(), workflowkey.Key{}, wasmtime.NewModule)
 		err = h.Handle(ctx, giveEvent)
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
@@ -184,7 +186,7 @@ func Test_Handler(t *testing.T) {
 		}
 		mockORM.EXPECT().GetSecretsURLByHash(matches.AnyContext, giveHash).Return(giveURL, nil)
 		mockORM.EXPECT().Update(matches.AnyContext, giveHash, "contents").Return(0, assert.AnError)
-		h := NewEventHandler(lggr, mockORM, fetcher, nil, nil, emitter, clockwork.NewFakeClock(), workflowkey.Key{})
+		h := NewEventHandler(lggr, mockORM, fetcher, nil, nil, emitter, clockwork.NewFakeClock(), workflowkey.Key{}, wasmtime.NewModule)
 		err = h.Handle(ctx, giveEvent)
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
@@ -462,7 +464,7 @@ func testRunningWorkflow(t *testing.T, tc testCase) {
 		registry := capabilities.NewRegistry(lggr)
 		registry.SetLocalRegistry(&capabilities.TestMetadataRegistry{})
 		h := NewEventHandler(lggr, orm, fetcher, store, registry, emitter, clockwork.NewFakeClock(),
-			workflowkey.Key{}, opts...)
+			workflowkey.Key{}, wasmtime.NewModule, opts...)
 
 		tc.validationFn(t, ctx, event, h, wfOwner, "workflow-name", wfID)
 	})
@@ -520,6 +522,7 @@ func Test_workflowDeletedHandler(t *testing.T) {
 			emitter,
 			clockwork.NewFakeClock(),
 			workflowkey.Key{},
+			wasmtime.NewModule,
 			WithEngineRegistry(er),
 		)
 		err = h.workflowRegisteredEvent(ctx, active)
@@ -594,6 +597,7 @@ func Test_workflowDeletedHandler(t *testing.T) {
 			emitter,
 			clockwork.NewFakeClock(),
 			workflowkey.Key{},
+			wasmtime.NewModule,
 			WithEngineRegistry(er),
 		)
 
@@ -673,6 +677,7 @@ func Test_workflowPausedActivatedUpdatedHandler(t *testing.T) {
 			emitter,
 			clockwork.NewFakeClock(),
 			workflowkey.Key{},
+			wasmtime.NewModule,
 			WithEngineRegistry(er),
 		)
 		err = h.workflowRegisteredEvent(ctx, active)
@@ -818,6 +823,7 @@ func Test_Handler_SecretsFor(t *testing.T) {
 		custmsg.NewLabeler(),
 		clockwork.NewFakeClock(),
 		encryptionKey,
+		wasmtime.NewModule,
 	)
 
 	gotSecrets, err := h.SecretsFor(testutils.Context(t), workflowOwner, workflowName, workflowID)
@@ -879,6 +885,7 @@ func Test_Handler_SecretsFor_RefreshesSecrets(t *testing.T) {
 		custmsg.NewLabeler(),
 		clockwork.NewFakeClock(),
 		encryptionKey,
+		wasmtime.NewModule,
 	)
 
 	gotSecrets, err := h.SecretsFor(testutils.Context(t), workflowOwner, workflowName, workflowID)
@@ -941,6 +948,7 @@ func Test_Handler_SecretsFor_RefreshLogic(t *testing.T) {
 		custmsg.NewLabeler(),
 		clock,
 		encryptionKey,
+		wasmtime.NewModule,
 	)
 
 	gotSecrets, err := h.SecretsFor(testutils.Context(t), workflowOwner, workflowName, workflowID)

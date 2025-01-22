@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bytecodealliance/wasmtime-go/v23"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jonboulle/clockwork"
@@ -340,7 +341,7 @@ func Test_SecretsWorker(t *testing.T) {
 
 	handler := &testSecretsWorkEventHandler{
 		wrappedHandler: syncer.NewEventHandler(lggr, orm, fetcherFn, nil, nil,
-			emitter, clockwork.NewFakeClock(), workflowkey.Key{}),
+			emitter, clockwork.NewFakeClock(), workflowkey.Key{}, wasmtime.NewModule),
 		registeredCh: make(chan syncer.Event, 1),
 	}
 
@@ -421,7 +422,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyPaused(t *testing.T) {
 
 	er := syncer.NewEngineRegistry()
 	handler := syncer.NewEventHandler(lggr, orm, fetcherFn, nil, nil,
-		emitter, clockwork.NewFakeClock(), workflowkey.Key{}, syncer.WithEngineRegistry(er))
+		emitter, clockwork.NewFakeClock(), workflowkey.Key{}, wasmtime.NewModule, syncer.WithEngineRegistry(er))
 
 	worker := syncer.NewWorkflowRegistry(
 		lggr,
@@ -527,6 +528,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyActivated(t *testing.T) {
 		emitter,
 		clockwork.NewFakeClock(),
 		workflowkey.Key{},
+		wasmtime.NewModule,
 		syncer.WithEngineRegistry(er),
 		syncer.WithEngineFactoryFn(mf.new),
 	)

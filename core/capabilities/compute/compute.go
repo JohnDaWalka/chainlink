@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bytecodealliance/wasmtime-go/v23"
 	"github.com/google/uuid"
 	"github.com/jonboulle/clockwork"
 	"github.com/prometheus/client_golang/prometheus"
@@ -190,7 +191,9 @@ func (c *Compute) initModule(id string, cfg *host.ModuleConfig, binary []byte, r
 	initStart := time.Now()
 
 	cfg.Fetch = c.fetcherFactory.NewFetcher(c.log, c.emitter)
-	mod, err := host.NewModule(cfg, binary)
+
+	// TODO - here also use the module factory
+	mod, err := host.NewModule(cfg, binary, wasmtime.NewModule)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate WASM module: %w", err)
 	}
