@@ -581,6 +581,7 @@ func TestWorkflow(t *testing.T) {
 	pkey := os.Getenv("PRIVATE_KEY")
 	require.NotEmpty(t, pkey, "PRIVATE_KEY env var must be set")
 
+	// Create a new blockchain network
 	bc, err := blockchain.NewBlockchainNetwork(in.BlockchainA)
 	require.NoError(t, err)
 
@@ -588,33 +589,38 @@ func TestWorkflow(t *testing.T) {
 		WithRpcUrl(bc.Nodes[0].HostWSUrl).
 		WithPrivateKeys([]string{pkey}).
 		Build()
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to create seth client")
 
+	// Make sure the chainlink-cli is installed, if we want to use it and whether we have the required env vars
 	if in.WorkflowConfig.UseChainlinkCLI {
 		require.True(t, isInstalled("chainlink-cli"), "chainlink-cli is required for this test. Please install it, add to path and run again")
 
 		if !in.WorkflowConfig.UseExising {
 			require.NotEmpty(t, os.Getenv("GITHUB_API_TOKEN"), "GITHUB_API_TOKEN must be set to use chainlink-cli. It requires read/write Gist permissions")
 		}
+
+		// These two env vars are required by the chainlink-cli
 		err := os.Setenv("WORKFLOW_OWNER_ADDRESS", sc.MustGetRootKeyAddress().Hex())
-		require.NoError(t, err)
+		require.NoError(t, err, "failed to set WORKFLOW_OWNER_ADDRESS env var")
 
 		err = os.Setenv("ETH_PRIVATE_KEY", pkey)
-		require.NoError(t, err)
+		require.NoError(t, err, "failed to set ETH_PRIVATE_KEY env var")
 	}
 
+	// prepare the chainlink/deployment environment
 	lgr := logger.TestLogger(t)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to create test logger")
+
 	addressBook := deployment.NewMemoryAddressBook()
 	chainMap := make(map[uint64]deployment.Chain)
 	ctx := context.Background()
 
 	chainSelector, err := chainselectors.SelectorFromChainId(sc.Cfg.Network.ChainID)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to get chain selector for chain id %d from the address book", sc.Cfg.Network.ChainID)
 	chainMap[chainSelector] = deployment.Chain{
 		Selector:    chainSelector,
 		Client:      sc.Client,
-		DeployerKey: sc.NewTXOpts(seth.WithNonce(nil)), //set nonce to nil, so it will be fetched from the chain
+		DeployerKey: sc.NewTXOpts(seth.WithNonce(nil)), //set nonce to nil, so that it will be fetched from the chain
 		Confirm: func(tx *geth_types.Transaction) (uint64, error) {
 			decoded, revertErr := sc.DecodeTx(tx)
 			if revertErr != nil {
@@ -629,9 +635,10 @@ func TestWorkflow(t *testing.T) {
 
 	ctfEnv := deployment.NewEnvironment("ctfV2", lgr, addressBook, chainMap, nil, nil, nil, func() context.Context { return ctx }, deployment.OCRSecrets{})
 
+	// Deploy the capabilities registry
 	capRegAddr, tx, capabilitiesRegistryInstance, err := cr_wrapper.DeployCapabilitiesRegistry(sc.NewTXOpts(), sc.Client)
 	_, decodeErr := sc.Decode(tx, err)
-	require.NoError(t, decodeErr)
+	require.NoError(t, decodeErr, "failed to deploy capabilities registry contract")
 
 	allCaps := []cr_wrapper.CapabilitiesRegistryCapability{
 		{
@@ -658,32 +665,19 @@ func TestWorkflow(t *testing.T) {
 		},
 	}
 
-	tx, err = capabilitiesRegistryInstance.AddCapabilities(
+	_, decodeErr = sc.Decode(capabilitiesRegistryInstance.AddCapabilities(
 		sc.NewTXOpts(),
 		allCaps,
-	)
-	_, decodeErr = sc.Decode(tx, err)
-	require.NoError(t, decodeErr)
-
-	var hashedCapabilities [][32]byte
-
-	for _, capability := range allCaps {
-		hashed, err := capabilitiesRegistryInstance.GetHashedCapabilityId(
-			sc.NewCallOpts(),
-			capability.LabelledName,
-			capability.Version,
-		)
-		require.NoError(t, err)
-		hashedCapabilities = append(hashedCapabilities, hashed)
-	}
+	))
+	require.NoError(t, decodeErr, "failed to add capabilities to capabilities registry")
 
 	output, err := keystone_changeset.DeployForwarder(*ctfEnv, keystone_changeset.DeployForwarderRequest{
 		ChainSelectors: []uint64{chainSelector},
 	})
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to deploy forwarder contract")
 
 	addresses, err := output.AddressBook.AddressesForChain(chainSelector)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to get addresses for chain %d from the address book", chainSelector)
 
 	var forwarderAddress common.Address
 	for addrStr, tv := range addresses {
@@ -1250,6 +1244,17 @@ func TestWorkflow(t *testing.T) {
 	var nodesToAdd []cr_wrapper.CapabilitiesRegistryNodeParams
 	var donNodes [][32]byte
 	var signers []common.Address
+
+	var hashedCapabilities [][32]byte
+	for _, capability := range allCaps {
+		hashed, err := capabilitiesRegistryInstance.GetHashedCapabilityId(
+			sc.NewCallOpts(),
+			capability.LabelledName,
+			capability.Version,
+		)
+		require.NoError(t, err)
+		hashedCapabilities = append(hashedCapabilities, hashed)
+	}
 
 	for i, node := range nodesInfo {
 		if i == 0 {
