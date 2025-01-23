@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/bytecodealliance/wasmtime-go/v23"
+	"github.com/bytecodealliance/wasmtime-go/v28"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/uuid"
@@ -591,6 +591,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		peerWrapper,
 		opts.NewOracleFactoryFn,
 		opts.FetcherFactoryFn,
+		opts.WasmModuleFactoryFn,
 	)
 
 	if cfg.OCR().Enabled() {

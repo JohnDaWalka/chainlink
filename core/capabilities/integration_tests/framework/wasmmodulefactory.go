@@ -1,15 +1,18 @@
 package framework
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
-	"github.com/bytecodealliance/wasmtime-go/v23"
+	"github.com/andybalholm/brotli"
+	"github.com/bytecodealliance/wasmtime-go/v28"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
 )
@@ -60,12 +63,28 @@ func (f *cachedWasmModuleFactory) NewWasmModuleFactoryFnForPeer(peerID string) h
 				return nil, fmt.Errorf("failed to create cache directory: %w", err)
 			}
 
-			f.mux.Lock()
+			// real solution will need to check the flag
+			//if !modCfg.IsUncompressed {
+			start := time.Now()
+			rdr := brotli.NewReader(bytes.NewBuffer(wasm))
+			decompedBinary, err := io.ReadAll(rdr)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decompress binary: %w", err)
+			}
+			fmt.Printf("SDKSPEC DECOMPRESS time: %s\n", time.Since(start))
+
+			wasm = decompedBinary
+			//}
+
+			//f.mux.Lock()
+			start = time.Now()
+			fmt.Printf("NEWMODULE START\n")
 			module, err := wasmtime.NewModule(engine, wasm)
-			f.mux.Unlock()
+			//f.mux.Unlock()
 			if err != nil {
 				return nil, fmt.Errorf("failed to create module: %w", err)
 			}
+			fmt.Printf("NEWMODULE DONE: %s\n", time.Since(start))
 
 			serialisedBytes, err := module.Serialize()
 			if err != nil {
@@ -81,12 +100,15 @@ func (f *cachedWasmModuleFactory) NewWasmModuleFactoryFnForPeer(peerID string) h
 		} else if err != nil {
 			return nil, fmt.Errorf("failed to check if cache file exists: %w", err)
 		} else {
-			f.mux.Lock()
+			//	f.mux.Lock()
 			start := time.Now()
-			fmt.Printf("NEWMODULE START\n")
+			fmt.Printf("NEWMODULE DES START\n")
 			mod, err := wasmtime.NewModuleDeserializeFile(engine, cacheFile)
-			fmt.Printf("NEWMODULE DONE: %s\n", time.Since(start))
-			f.mux.Unlock()
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("NEWMODULE DES DONE: %s\n", time.Since(start))
+			//	f.mux.Unlock()
 			if err != nil {
 				return nil, fmt.Errorf("failed to deserialize module: %w", err)
 			}

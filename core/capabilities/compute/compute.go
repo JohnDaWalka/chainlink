@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bytecodealliance/wasmtime-go/v23"
 	"github.com/google/uuid"
 	"github.com/jonboulle/clockwork"
 	"github.com/prometheus/client_golang/prometheus"
@@ -95,7 +94,8 @@ type Compute struct {
 	// of a request.
 	transformer *transformer
 
-	fetcherFactory FetcherFactory
+	fetcherFactory    FetcherFactory
+	wasmModuleFactory host.WasmModuleFactoryFn
 
 	numWorkers int
 	queue      chan request
@@ -193,7 +193,7 @@ func (c *Compute) initModule(id string, cfg *host.ModuleConfig, binary []byte, r
 	cfg.Fetch = c.fetcherFactory.NewFetcher(c.log, c.emitter)
 
 	// TODO - here also use the module factory
-	mod, err := host.NewModule(cfg, binary, wasmtime.NewModule)
+	mod, err := host.NewModule(cfg, binary, c.wasmModuleFactory)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate WASM module: %w", err)
 	}
@@ -402,6 +402,7 @@ func NewAction(
 	log logger.Logger,
 	registry coretypes.CapabilitiesRegistry,
 	fetcherFactory FetcherFactory,
+	wasmModuleFactory host.WasmModuleFactoryFn,
 	opts ...func(*Compute),
 ) (*Compute, error) {
 	if config.NumWorkers == 0 {
@@ -412,15 +413,16 @@ func NewAction(
 		lggr    = logger.Named(log, "CustomCompute")
 		labeler = custmsg.NewLabeler()
 		compute = &Compute{
-			stopCh:         make(services.StopChan),
-			log:            lggr,
-			emitter:        labeler,
-			registry:       registry,
-			modules:        newModuleCache(clockwork.NewRealClock(), 1*time.Minute, 10*time.Minute, 3),
-			transformer:    NewTransformer(lggr, labeler),
-			fetcherFactory: fetcherFactory,
-			queue:          make(chan request),
-			numWorkers:     defaultNumWorkers,
+			stopCh:            make(services.StopChan),
+			log:               lggr,
+			emitter:           labeler,
+			registry:          registry,
+			modules:           newModuleCache(clockwork.NewRealClock(), 1*time.Minute, 10*time.Minute, 3),
+			transformer:       NewTransformer(lggr, labeler),
+			fetcherFactory:    fetcherFactory,
+			queue:             make(chan request),
+			numWorkers:        defaultNumWorkers,
+			wasmModuleFactory: wasmModuleFactory,
 		}
 	)
 
