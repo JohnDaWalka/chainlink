@@ -3,7 +3,7 @@
 selected_networks = ["TREASURE_TOPAZ"]
 # soak test specific configuration
 [Soak.Common]
-chainlink_node_funding = 0.3 # Funding per node
+chainlink_node_funding = 500 # Funding per node
 # Note this is for when you are running OCR2 tests
 # To run OCR1 tests use [Soak.OCR] instead
 [Soak.OCR]
@@ -40,7 +40,7 @@ evm_default_gas_limit = 2500000000
 name = "TREASURE_TOPAZ"
 transaction_timeout = "3m"
 transfer_gas_fee = 5_000_000
-gas_limit = 2_500_000_000
+gas_limit = 500_000_000
 # legacy transactions
 gas_price = 264_184_358_789
 # EIP-1559 transactions
