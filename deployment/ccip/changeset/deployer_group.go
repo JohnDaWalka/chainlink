@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -24,10 +23,11 @@ type MCMSConfig struct {
 }
 
 type DeployerGroup struct {
-	e            deployment.Environment
-	state        CCIPOnChainState
-	mcmConfig    *MCMSConfig
-	transactions map[uint64][]*types.Transaction
+	e                    deployment.Environment
+	state                CCIPOnChainState
+	mcmConfig            *MCMSConfig
+	transactions         map[uint64][]*types.Transaction
+	mcmsOperationOffsets map[uint64]uint64
 }
 
 // DeployerGroup is an abstraction that lets developers write their changeset
@@ -44,39 +44,15 @@ type DeployerGroup struct {
 //	deployerGroup.Enact("Curse RMNRemote")
 func NewDeployerGroup(e deployment.Environment, state CCIPOnChainState, mcmConfig *MCMSConfig) *DeployerGroup {
 	return &DeployerGroup{
-		e:            e,
-		mcmConfig:    mcmConfig,
-		state:        state,
-		transactions: make(map[uint64][]*types.Transaction),
+		e:                    e,
+		mcmConfig:            mcmConfig,
+		state:                state,
+		transactions:         make(map[uint64][]*types.Transaction),
+		mcmsOperationOffsets: make(map[uint64]uint64),
 	}
 }
 
 func (d *DeployerGroup) GetDeployer(chain uint64) (*bind.TransactOpts, error) {
-	opts := d.getTransactionOpts(chain)
-
-	var startingNonce *big.Int
-	if opts.Nonce != nil {
-		startingNonce = new(big.Int).Set(opts.Nonce)
-	} else {
-		nonce, err := d.e.Chains[chain].Client.PendingNonceAt(context.Background(), opts.From)
-		if err != nil {
-			return nil, fmt.Errorf("could not get nonce for deployer: %w", err)
-		}
-		startingNonce = new(big.Int).SetUint64(nonce)
-	}
-	opts.Nonce = startingNonce
-
-	opts.Signer = func(a common.Address, t *types.Transaction) (*types.Transaction, error) {
-		// Defer signing until later step, when transactions can be simulated, executed, and confirmed sequentially (for case where deployer is used)
-		// Increment opts.Nonce so that the next transaction signed will use the new nonce
-		d.transactions[chain] = append(d.transactions[chain], t)
-		opts.Nonce = big.NewInt(0).Add(opts.Nonce, big.NewInt(1))
-		return t, nil
-	}
-	return opts, nil
-}
-
-func (d *DeployerGroup) getTransactionOpts(chain uint64) *bind.TransactOpts {
 	txOpts := d.e.Chains[chain].DeployerKey
 	if d.mcmConfig != nil {
 		txOpts = deployment.SimTransactOpts()
@@ -94,9 +70,10 @@ func (d *DeployerGroup) getTransactionOpts(chain uint64) *bind.TransactOpts {
 			NoSend:     txOpts.NoSend,
 		}
 	}
-	return &bind.TransactOpts{
+	sim := &bind.TransactOpts{
 		From:       txOpts.From,
 		Signer:     txOpts.Signer,
+		GasLimit:   txOpts.GasLimit,
 		GasPrice:   txOpts.GasPrice,
 		Nonce:      txOpts.Nonce,
 		Value:      txOpts.Value,
@@ -105,18 +82,53 @@ func (d *DeployerGroup) getTransactionOpts(chain uint64) *bind.TransactOpts {
 		Context:    txOpts.Context,
 		AccessList: txOpts.AccessList,
 		NoSend:     true,
-		// Set the gas limit to avoid simulating the call before appending to transactions.
-		// Some calls depend on each other, so we don't want to simulate until we actually start executing.
-		GasLimit: 1_000_000,
 	}
+	oldSigner := sim.Signer
+
+	sim.Signer = func(a common.Address, t *types.Transaction) (*types.Transaction, error) {
+		// Fetch the starting nonce
+		var startingNonce *big.Int
+		if txOpts.Nonce != nil {
+			startingNonce = new(big.Int).Set(txOpts.Nonce)
+		} else {
+			nonce, err := d.e.Chains[chain].Client.PendingNonceAt(context.Background(), txOpts.From)
+			if err != nil {
+				return nil, fmt.Errorf("could not get nonce for deployer: %w", err)
+			}
+			startingNonce = new(big.Int).SetUint64(nonce)
+		}
+
+		// Update the nonce to consider the transactions that have been sent
+		sim.Nonce = big.NewInt(0).Add(startingNonce, big.NewInt(int64(len(d.transactions[chain]))+1))
+
+		tx, err := oldSigner(a, t)
+		if err != nil {
+			return nil, err
+		}
+		d.transactions[chain] = append(d.transactions[chain], tx)
+		return tx, nil
+	}
+	return sim, nil
 }
 
 func (d *DeployerGroup) Enact(deploymentDescription string) (deployment.ChangesetOutput, error) {
+	defer d.reset()
+
 	if d.mcmConfig != nil {
 		return d.enactMcms(deploymentDescription)
 	}
 
 	return d.enactDeployer()
+}
+
+func (d *DeployerGroup) reset() {
+	for selector := range d.transactions {
+		if _, ok := d.mcmsOperationOffsets[selector]; !ok {
+			d.mcmsOperationOffsets[selector] = 0
+		}
+		d.mcmsOperationOffsets[selector] += 1
+	}
+	d.transactions = make(map[uint64][]*types.Transaction)
 }
 
 func (d *DeployerGroup) enactMcms(deploymentDescription string) (deployment.ChangesetOutput, error) {
@@ -140,9 +152,10 @@ func (d *DeployerGroup) enactMcms(deploymentDescription string) (deployment.Chan
 
 	proposerMCMSes := BuildProposerPerChain(d.e, d.state)
 
-	prop, err := proposalutils.BuildProposalFromBatches(
+	prop, err := proposalutils.BuildProposalFromBatchesWithOffsets(
 		timelocksPerChain,
 		proposerMCMSes,
+		d.mcmsOperationOffsets,
 		batches,
 		deploymentDescription,
 		d.mcmConfig.MinDelay,
@@ -159,73 +172,19 @@ func (d *DeployerGroup) enactMcms(deploymentDescription string) (deployment.Chan
 
 func (d *DeployerGroup) enactDeployer() (deployment.ChangesetOutput, error) {
 	for selector, txs := range d.transactions {
-		for i, tx := range txs {
-			signedTx, err := d.signTransaction(selector, tx)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to sign transaction at index %d on chain with selector %d: %w", i, selector, err)
-			}
-			err = d.e.Chains[selector].Client.SendTransaction(context.Background(), signedTx)
+		for _, tx := range txs {
+			err := d.e.Chains[selector].Client.SendTransaction(context.Background(), tx)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to send transaction: %w", err)
 			}
 
-			_, err = d.e.Chains[selector].Confirm(signedTx)
+			_, err = d.e.Chains[selector].Confirm(tx)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("waiting for tx to be mined failed: %w", err)
 			}
 		}
 	}
 	return deployment.ChangesetOutput{}, nil
-}
-
-func (d *DeployerGroup) signTransaction(chain uint64, transaction *types.Transaction) (*types.Transaction, error) {
-	opts := d.getTransactionOpts(chain)
-
-	transaction, err := d.updateGasLimitForTx(chain, transaction)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update gas limit for transaction on chain with selector %d: %w", chain, err)
-	}
-
-	signedTx, err := opts.Signer(opts.From, transaction)
-	return signedTx, err
-}
-
-func (d *DeployerGroup) updateGasLimitForTx(chain uint64, tx *types.Transaction) (*types.Transaction, error) {
-	gasLimit, err := d.e.Chains[chain].Client.EstimateGas(d.e.GetContext(), ethereum.CallMsg{
-		From:  d.e.Chains[chain].DeployerKey.From,
-		To:    tx.To(),
-		Value: tx.Value(),
-		Data:  tx.Data(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to estimate gas of transaction on chain with selector %d: %w", chain, err)
-	}
-	switch tx.Type() {
-	case types.LegacyTxType:
-		tx = types.NewTx(&types.LegacyTx{
-			To:       tx.To(),
-			Nonce:    tx.Nonce(),
-			GasPrice: tx.GasPrice(),
-			Gas:      gasLimit,
-			Value:    tx.Value(),
-			Data:     tx.Data(),
-		})
-	case types.DynamicFeeTxType:
-		tx = types.NewTx(&types.DynamicFeeTx{
-			To:         tx.To(),
-			Nonce:      tx.Nonce(),
-			GasFeeCap:  tx.GasFeeCap(),
-			GasTipCap:  tx.GasTipCap(),
-			Gas:        gasLimit,
-			Value:      tx.Value(),
-			Data:       tx.Data(),
-			AccessList: tx.AccessList(),
-		})
-	default:
-		// Other types are not referenced by "Transact" function in go-ethereum
-		return nil, fmt.Errorf("transaction with type %d is not supported by DeployerGroup", tx.Type())
-	}
-	return tx, nil
 }
 
 func BuildTimelockPerChain(e deployment.Environment, state CCIPOnChainState) map[uint64]*proposalutils.TimelockExecutionContracts {

@@ -9,9 +9,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 	"github.com/smartcontractkit/chainlink/deployment"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 )
 
 var _ deployment.ChangeSet[ConfigureTokenAdminRegistryConfig] = ConfigureTokenAdminRegistryChangeset
@@ -148,95 +151,148 @@ func ConfigureTokenAdminRegistryChangeset(env deployment.Environment, c Configur
 	}
 	deployerGroup := NewDeployerGroup(env, state, c.MCMS)
 
+	chainConfigs, err := getConfigurationsByChain(env, state, c, deployerGroup)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch configurations for each chain: %w", err)
+	}
+
+	// Propose admin pass
+	for chainSelector := range c.RegistryUpdates {
+		cc := chainConfigs[chainSelector]
+
+		if cc.TokenConfigOnRegistry.Administrator != cc.Sender && cc.TokenConfigOnRegistry.PendingAdministrator != cc.Sender {
+			_, err := cc.State.TokenAdminRegistry.ProposeAdministrator(cc.Opts, cc.TokenAddress, cc.Sender)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to create proposeAdministrator transaction for %s on %s registry: %w", c.TokenSymbol, cc.Chain, err)
+			}
+		}
+	}
+
+	proposeAdminOutput, err := deployerGroup.Enact(fmt.Sprintf("propose admin for %s on token admin registries", c.TokenSymbol))
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("propose admin for %s on token admin registries: %w", c.TokenSymbol, err)
+	}
+
+	// Accept admin pass
+	for chainSelector := range c.RegistryUpdates {
+		cc := chainConfigs[chainSelector]
+
+		if cc.TokenConfigOnRegistry.Administrator != cc.Sender {
+			_, err := cc.State.TokenAdminRegistry.AcceptAdminRole(cc.Opts, cc.TokenAddress)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to create acceptAdminRole transaction for %s on %s registry: %w", c.TokenSymbol, cc.Chain, err)
+			}
+		}
+	}
+
+	acceptAdminOutput, err := deployerGroup.Enact(fmt.Sprintf("accept admin rights for %s on token admin registries", c.TokenSymbol))
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to accept admin rights for %s on token admin registries: %w", c.TokenSymbol, err)
+	}
+
+	// Configuration pass (set pool, transfer admin role to 3rd party)
+	for chainSelector, registryUpdate := range c.RegistryUpdates {
+		cc := chainConfigs[chainSelector]
+
+		// Only set the pool if we need to
+		if cc.TokenConfigOnRegistry.TokenPool != cc.TokenPool.Address() {
+			_, err := cc.State.TokenAdminRegistry.SetPool(cc.Opts, cc.TokenAddress, cc.TokenPool.Address())
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to create setPool transaction for %s on %s registry: %w", c.TokenSymbol, cc.Chain, err)
+			}
+		}
+
+		// Only set the administrator to an external address if we need to
+		if registryUpdate.ExternalAdministrator != cc.Sender {
+			_, err := cc.State.TokenAdminRegistry.TransferAdminRole(cc.Opts, cc.TokenAddress, registryUpdate.ExternalAdministrator)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to create transferAdminRole transaction for %s on %s registry: %w", c.TokenSymbol, cc.Chain, err)
+			}
+		}
+	}
+
+	configurationOutput, err := deployerGroup.Enact(fmt.Sprintf("configure %s on token admin registries", c.TokenSymbol))
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to configure %s on token admin registries: %w", c.TokenSymbol, err)
+	}
+
+	if c.MCMS != nil {
+		// Pre-allocate the proposal slice with the correct capacity
+		totalProposals := len(proposeAdminOutput.Proposals) +
+			len(acceptAdminOutput.Proposals) +
+			len(configurationOutput.Proposals)
+		proposals := make([]timelock.MCMSWithTimelockProposal, 0, totalProposals)
+		proposals = append(proposals, proposeAdminOutput.Proposals...)
+		proposals = append(proposals, acceptAdminOutput.Proposals...)
+		proposals = append(proposals, configurationOutput.Proposals...)
+
+		return deployment.ChangesetOutput{
+			Proposals: proposals,
+		}, nil
+	}
+
+	return deployment.ChangesetOutput{}, nil
+}
+
+// chainConfig defines the configuration needed to create operations on a chain
+type chainConfig struct {
+	TokenPool             *token_pool.TokenPool
+	TokenAddress          common.Address
+	TokenConfigOnRegistry token_admin_registry.TokenAdminRegistryTokenConfig
+	Sender                common.Address
+	State                 CCIPChainState
+	Chain                 deployment.Chain
+	Opts                  *bind.TransactOpts
+}
+
+// getConfigurationsByChain fetches the configuration required to create operations for each chain
+func getConfigurationsByChain(
+	env deployment.Environment,
+	state CCIPOnChainState,
+	c ConfigureTokenAdminRegistryConfig,
+	deployerGroup *DeployerGroup,
+) (map[uint64]chainConfig, error) {
+	chainConfigs := make(map[uint64]chainConfig, len(c.RegistryUpdates))
+
 	for chainSelector, registryUpdate := range c.RegistryUpdates {
 		chain := env.Chains[chainSelector]
 		chainState := state.Chains[chainSelector]
 
 		opts, err := deployerGroup.GetDeployer(chainSelector)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get deployer for %s", chain)
+			return map[uint64]chainConfig{}, fmt.Errorf("failed to get deployer for %s", chain)
 		}
 
-		err = createTokenAdminRegistryOps(opts, chainState, chain, registryUpdate, c.MCMS, c.TokenSymbol)
+		tokenPool, err := getTokenPoolFromSymbolTypeAndVersion(chainState, chain, c.TokenSymbol, registryUpdate.Type, registryUpdate.Version)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to make operations to configure token admin registry on %s: %w", chain.String(), err)
+			return map[uint64]chainConfig{}, fmt.Errorf("failed to find token pool on %s with symbol %s, type %s, and version %s: %w", chain.String(), c.TokenSymbol, registryUpdate.Type, registryUpdate.Version, err)
 		}
-	}
 
-	return deployerGroup.Enact(fmt.Sprintf("configure %s on token admin registries", c.TokenSymbol))
-}
-
-// createTokenAdminRegistryOps creates all transactions required to configure the tokenAdminRegistry on a chain,
-// either applying the transactions with the deployer key or returning an MCMS proposal.
-func createTokenAdminRegistryOps(
-	opts *bind.TransactOpts,
-	state CCIPChainState,
-	chain deployment.Chain,
-	registryUpdate RegistryConfig,
-	mcmsConfig *MCMSConfig,
-	tokenSymbol TokenSymbol,
-) error {
-	tokenPool, err := getTokenPoolFromSymbolTypeAndVersion(state, chain, tokenSymbol, registryUpdate.Type, registryUpdate.Version)
-	if err != nil {
-		return fmt.Errorf("failed to find token pool on %s with symbol %s, type %s, and version %s: %w", chain.String(), tokenSymbol, registryUpdate.Type, registryUpdate.Version, err)
-	}
-
-	token, err := tokenPool.GetToken(nil)
-	if err != nil {
-		return fmt.Errorf("failed to get token from address %s on chain %s: %w", tokenPool.Address(), chain.String(), err)
-	}
-
-	tokenConfig, err := state.TokenAdminRegistry.GetTokenConfig(nil, token)
-	if err != nil {
-		return fmt.Errorf("failed to get %s config from registry on chain %s: %w", tokenSymbol, chain.String(), err)
-	}
-
-	fromAddress := state.Timelock.Address()
-	if mcmsConfig == nil {
-		fromAddress = chain.DeployerKey.From
-	}
-
-	// NOTE ABOUT DEPENDENT CALLS:
-	//
-	// The following calls depend on each other and must be executed in sequence.
-	// i.e. proposeAdmin must go before acceptAdminRole, which if required must go before "setPool".
-	// MCMS enforces nonces, so execution via MCMS will guarantee the proper ordering.
-	// If using a deployer key, execution failure will cause the changeset to exit (see enactDeployer function) and you can re-run without issues.
-	// For example, if acceptAdminRole fails, the second pass will see that our deployer key is already the pending administrator
-	// and will only attempt (at most) acceptAdminRole, setPool, and transferAdminRole.
-
-	// Thanks to the validations performed earlier in the changeset, we know that both of the following conditions are true
-	//   1. We own the token admin registry
-	//   2. An admin musn't exist yet
-	// We can proceed with proposing & accepting the admin role if we are not yet the admin
-	if tokenConfig.Administrator != fromAddress {
-		if tokenConfig.PendingAdministrator != fromAddress {
-			_, err := state.TokenAdminRegistry.ProposeAdministrator(opts, token, fromAddress)
-			if err != nil {
-				return fmt.Errorf("failed to create proposeAdministrator transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
-			}
-		}
-		_, err := state.TokenAdminRegistry.AcceptAdminRole(opts, token)
+		token, err := tokenPool.GetToken(nil)
 		if err != nil {
-			return fmt.Errorf("failed to create acceptAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
+			return map[uint64]chainConfig{}, fmt.Errorf("failed to get token from address %s on chain %s: %w", tokenPool.Address(), chain.String(), err)
 		}
-	}
 
-	// Only set the pool if we need to
-	if tokenConfig.TokenPool != tokenPool.Address() {
-		_, err := state.TokenAdminRegistry.SetPool(opts, token, tokenPool.Address())
+		tokenConfig, err := chainState.TokenAdminRegistry.GetTokenConfig(nil, token)
 		if err != nil {
-			return fmt.Errorf("failed to create setPool transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
+			return map[uint64]chainConfig{}, fmt.Errorf("failed to get %s config from registry on chain %s: %w", c.TokenSymbol, chain.String(), err)
+		}
+
+		sender := chainState.Timelock.Address()
+		if c.MCMS == nil {
+			sender = chain.DeployerKey.From
+		}
+
+		chainConfigs[chainSelector] = chainConfig{
+			TokenPool:             tokenPool,
+			TokenAddress:          token,
+			TokenConfigOnRegistry: tokenConfig,
+			Sender:                sender,
+			State:                 chainState,
+			Chain:                 chain,
+			Opts:                  opts,
 		}
 	}
 
-	// Only set the administrator to an external address if we need to
-	if registryUpdate.ExternalAdministrator != fromAddress {
-		_, err := state.TokenAdminRegistry.TransferAdminRole(opts, token, registryUpdate.ExternalAdministrator)
-		if err != nil {
-			return fmt.Errorf("failed to create transferAdminRole transaction for %s on %s registry: %w", tokenSymbol, chain.String(), err)
-		}
-	}
-
-	return nil
+	return chainConfigs, nil
 }
