@@ -5,14 +5,11 @@
 
 [workflow_config]
   use_chainlink_cli = true
-  use_existing = false
-
-  [workflow_config.chainlink_cli]
-    folder_location = "/Users/bartektofel/Downloads/workflow_test"
-    compile = true
+  use_existing = true
 
   [workflow_config.existing]
-    binary_url = "https://gist.githubusercontent.com/Tofel/3949a5537557c3e2d07524b1a0c857a0/raw/3f7dcbc91fbdb67d598ee0949c03965a771888a3/binary.wasm.br"
+    binary_url = "https://gist.githubusercontent.com/Tofel/8a39af5b68c213d2200446c175b5c99e/raw/cb7b2a56b37e333fe0bdce07b79538c4ce332f5f/binary.wasm.br"
+    config_url = "https://gist.githubusercontent.com/Tofel/5b9ccb1cc1a5aa68aa08a5b2066d60a7/raw/7dcdda86b9d50d17029614f370fd2acab1e7fb27/config.json3175390991"
 
 [nodeset]
   nodes = 5
