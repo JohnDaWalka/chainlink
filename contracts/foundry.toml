@@ -27,7 +27,7 @@ single_line_statement_blocks = "preserve"
 solc_version = '0.8.26'
 src = 'src/v0.8/ccip'
 test = 'src/v0.8/ccip/test'
-evm_version = 'paris'
+evm_version = 'cancun'
 optimizer_runs = 500
 
 # This profile should be used prior to any release to ensure the tests are passing with via-ir enabled. Enabling via-ir
