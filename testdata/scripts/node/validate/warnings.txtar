@@ -270,7 +270,8 @@ LatestReportDeadline = '5s'
 CertFile = ''
 
 [Mercury.Transmitter]
-TransmitQueueMaxSize = 10000
+Protocol = 'wsrpc'
+TransmitQueueMaxSize = 100000
 TransmitTimeout = '5s'
 TransmitConcurrency = 100
 
@@ -308,6 +309,9 @@ ChainID = '1'
 Address = ''
 NetworkID = 'evm'
 ChainID = '1'
+MaxBinarySize = '20.00mb'
+MaxEncryptedSecretsSize = '26.40kb'
+MaxConfigSize = '50.00kb'
 
 [Capabilities.GatewayConnector]
 ChainIDForNodeKey = ''
