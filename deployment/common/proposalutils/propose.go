@@ -39,37 +39,6 @@ func BuildProposalMetadata(
 	return metaDataPerChain, nil
 }
 
-// BuildProposalMetadataWithOffsets builds the metadata for a proposa;, offsetting the startingOpCount.
-func BuildProposalMetadataWithOffsets(
-	chainSelectors []uint64,
-	proposerMcmsesPerChain map[uint64]*gethwrappers.ManyChainMultiSig,
-	offsets map[uint64]uint64,
-) (map[mcms.ChainIdentifier]mcms.ChainMetadata, error) {
-	metaDataPerChain := make(map[mcms.ChainIdentifier]mcms.ChainMetadata)
-	for _, selector := range chainSelectors {
-		proposerMcms, ok := proposerMcmsesPerChain[selector]
-		if !ok {
-			return nil, fmt.Errorf("missing proposer mcm for chain %d", selector)
-		}
-		var offset uint64 // offset will default to 0 if not defined
-		if offsets != nil {
-			if _, ok := offsets[selector]; ok {
-				offset = offsets[selector]
-			}
-		}
-		chainId := mcms.ChainIdentifier(selector)
-		opCount, err := proposerMcms.GetOpCount(nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get op count for chain %d: %w", selector, err)
-		}
-		metaDataPerChain[chainId] = mcms.ChainMetadata{
-			StartingOpCount: opCount.Uint64() + offset,
-			MCMAddress:      proposerMcms.Address(),
-		}
-	}
-	return metaDataPerChain, nil
-}
-
 // BuildProposalFromBatches Given batches of operations, we build the metadata and timelock addresses of those opartions
 // We then return a proposal that can be executed and signed.
 // You can specify multiple batches for the same chain, but the only
@@ -99,59 +68,6 @@ func BuildProposalFromBatches(
 		return nil, err
 	}
 
-	return newMcmsWithTimelockProposal(
-		timelocksPerChain,
-		proposerMcmsesPerChain,
-		batches,
-		description,
-		minDelay,
-		mcmsMd,
-	)
-}
-
-// BuildProposalFromBatchesWithOffsets builds the metadata and timelock addresses based on batches of operations.
-// It also adjusts the startingOpCounts of each chain based on user inputted offsets.
-// We then return a proposal that can be executed and signed.
-func BuildProposalFromBatchesWithOffsets(
-	timelocksPerChain map[uint64]common.Address,
-	proposerMcmsesPerChain map[uint64]*gethwrappers.ManyChainMultiSig,
-	offsetsPerChain map[uint64]uint64,
-	batches []timelock.BatchChainOperation,
-	description string,
-	minDelay time.Duration,
-) (*timelock.MCMSWithTimelockProposal, error) {
-	if len(batches) == 0 {
-		return nil, errors.New("no operations in batch")
-	}
-
-	chains := mapset.NewSet[uint64]()
-	for _, op := range batches {
-		chains.Add(uint64(op.ChainIdentifier))
-	}
-
-	mcmsMd, err := BuildProposalMetadataWithOffsets(chains.ToSlice(), proposerMcmsesPerChain, offsetsPerChain)
-	if err != nil {
-		return nil, err
-	}
-
-	return newMcmsWithTimelockProposal(
-		timelocksPerChain,
-		proposerMcmsesPerChain,
-		batches,
-		description,
-		minDelay,
-		mcmsMd,
-	)
-}
-
-func newMcmsWithTimelockProposal(
-	timelocksPerChain map[uint64]common.Address,
-	proposerMcmsesPerChain map[uint64]*gethwrappers.ManyChainMultiSig,
-	batches []timelock.BatchChainOperation,
-	description string,
-	minDelay time.Duration,
-	mcmsMetadata map[mcms.ChainIdentifier]mcms.ChainMetadata,
-) (*timelock.MCMSWithTimelockProposal, error) {
 	tlsPerChainId := make(map[mcms.ChainIdentifier]common.Address)
 	for chainId, tl := range timelocksPerChain {
 		tlsPerChainId[mcms.ChainIdentifier(chainId)] = tl
@@ -162,7 +78,7 @@ func newMcmsWithTimelockProposal(
 		uint32(validUntil),
 		[]mcms.Signature{},
 		false,
-		mcmsMetadata,
+		mcmsMd,
 		tlsPerChainId,
 		description,
 		batches,
