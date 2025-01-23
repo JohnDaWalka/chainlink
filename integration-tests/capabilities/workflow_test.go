@@ -577,6 +577,7 @@ func TestWorkflow(t *testing.T) {
 
 	in, err := framework.Load[WorkflowTestConfig](t)
 	require.NoError(t, err, "couldn't load test config")
+	require.True(t, (in.WorkflowConfig.UseChainlinkCLI && in.WorkflowConfig.UseExising) || (!in.WorkflowConfig.UseChainlinkCLI && in.WorkflowConfig.UseExising), "if you are not using chainlink-cli you must use an existing workflow")
 
 	pkey := os.Getenv("PRIVATE_KEY")
 	require.NotEmpty(t, pkey, "PRIVATE_KEY env var must be set")
@@ -635,7 +636,7 @@ func TestWorkflow(t *testing.T) {
 
 	ctfEnv := deployment.NewEnvironment("ctfV2", lgr, addressBook, chainMap, nil, nil, nil, func() context.Context { return ctx }, deployment.OCRSecrets{})
 
-	// Deploy the capabilities registry
+	// Deploy the capabilities registry and add capabilities
 	capRegAddr, tx, capabilitiesRegistryInstance, err := cr_wrapper.DeployCapabilitiesRegistry(sc.NewTXOpts(), sc.Client)
 	_, decodeErr := sc.Decode(tx, err)
 	require.NoError(t, decodeErr, "failed to deploy capabilities registry contract")
@@ -671,6 +672,7 @@ func TestWorkflow(t *testing.T) {
 	))
 	require.NoError(t, decodeErr, "failed to add capabilities to capabilities registry")
 
+	// Deploy keystone forwarder contract
 	output, err := keystone_changeset.DeployForwarder(*ctfEnv, keystone_changeset.DeployForwarderRequest{
 		ChainSelectors: []uint64{chainSelector},
 	})
@@ -681,10 +683,9 @@ func TestWorkflow(t *testing.T) {
 
 	var forwarderAddress common.Address
 	for addrStr, tv := range addresses {
-		fmt.Println("Address: ", addrStr)
-		fmt.Println("Type and version: ", tv.String())
 		if strings.Contains(tv.String(), "KeystoneForwarder") {
 			forwarderAddress = common.HexToAddress(addrStr)
+			lgr.Infof("Deployed KeystoneForwarder contract at %s", forwarderAddress.Hex())
 			break
 		}
 	}
@@ -692,57 +693,57 @@ func TestWorkflow(t *testing.T) {
 	donID := uint32(1)
 	workflowName := "abcdefgasd"
 
+	// Deploy workflow registry contract
 	output, err = workflow_registry_changeset.Deploy(*ctfEnv, chainSelector)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to deploy workflow registry contract")
 
 	addresses, err = output.AddressBook.AddressesForChain(chainSelector)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to get addresses for chain %d from the address book", chainSelector)
 
 	var workflowRegistryAddr common.Address
 	for addrStr, tv := range addresses {
-		fmt.Println("Address: ", addrStr)
-		fmt.Println("Type and version: ", tv.String())
 		if strings.Contains(tv.String(), "WorkflowRegistry") {
 			workflowRegistryAddr = common.HexToAddress(addrStr)
+			lgr.Infof("Deployed WorkflowRegistry contract at %s", workflowRegistryAddr.Hex())
 		}
 	}
 
-	// TODO really? why do I have to update that manually?
+	// TODO Do we have to update existing addresses manually with output.AddressBook?
 	ctfEnv.ExistingAddresses = output.AddressBook
 
+	// Configure Workflow Registry contract
 	_, err = workflow_registry_changeset.UpdateAllowedDons(*ctfEnv, &workflow_registry_changeset.UpdateAllowedDonsRequest{
 		RegistryChainSel: chainSelector,
 		DonIDs:           []uint32{donID},
 		Allowed:          true,
 	})
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to update allowed Dons")
 
 	_, err = workflow_registry_changeset.UpdateAuthorizedAddresses(*ctfEnv, &workflow_registry_changeset.UpdateAuthorizedAddressesRequest{
 		RegistryChainSel: chainSelector,
 		Addresses:        []string{sc.MustGetRootKeyAddress().Hex()},
 		Allowed:          true,
 	})
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to update authorized addresses")
 
+	// Deploy Keystone Feeds Consumer contract
 	output, err = keystone_changeset.DeployFeedsConsumer(*ctfEnv, &keystone_changeset.DeployFeedsConsumerRequest{
 		ChainSelector: chainSelector,
 	})
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to deploy feeds_consumer contract")
 
 	addresses, err = output.AddressBook.AddressesForChain(chainSelector)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to get addresses for chain %d from the address book", chainSelector)
 
 	var feedsConsumerAddress common.Address
 	for addrStr, tv := range addresses {
-		fmt.Println("Address: ", addrStr)
-		fmt.Println("Type and version: ", tv.String())
 		if strings.Contains(tv.String(), "FeedConsumer") {
+			lgr.Infof("Deployed FeedConsumer contract at %s", feedsConsumerAddress.Hex())
 			feedsConsumerAddress = common.HexToAddress(addrStr)
 		}
 	}
 
-	fmt.Println("Deployed feeds_consumer contract at", feedsConsumerAddress.Hex())
-
+	// Prepare hex-encoded and truncated workflow name
 	var workflowNameBytes [10]byte
 	var HashTruncateName = func(name string) string {
 		// Compute SHA-256 hash of the input string
@@ -758,41 +759,37 @@ func TestWorkflow(t *testing.T) {
 	}
 
 	truncated := HashTruncateName(workflowName)
-	fmt.Println("Truncated name: ", truncated)
-	fmt.Println("Workflow owner: ", sc.MustGetRootKeyAddress().Hex())
-	fmt.Println("Workflow name: ", workflowName)
-	fmt.Println("workflowNameBytes: ", string([]byte(truncated)))
-
 	copy(workflowNameBytes[:], []byte(truncated))
 
+	// Register workflow directly using the provided binary and config URLs
+	// This is a legacy solution, probably we can remove it soon
 	if in.WorkflowConfig.UseExising && !in.WorkflowConfig.UseChainlinkCLI {
 		require.NotEmpty(t, in.WorkflowConfig.Existing.BinaryURL)
 		workFlowData, err := downloadAndDecode(in.WorkflowConfig.Existing.BinaryURL)
-		require.NoError(t, err)
+		require.NoError(t, err, "failed to download and decode workflow binary")
 
 		var configData []byte
 		if in.WorkflowConfig.Existing.ConfigURL != "" {
 			configData, err = download(in.WorkflowConfig.Existing.ConfigURL)
-			require.NoError(t, err)
+			require.NoError(t, err, "failed to download workflow config")
 		}
 
 		// use non-encoded workflow name
 		workflowID, idErr := GenerateWorkflowIDFromStrings(sc.MustGetRootKeyAddress().Hex(), workflowName, workFlowData, configData, "")
-		require.NoError(t, idErr)
+		require.NoError(t, idErr, "failed to generate workflow ID")
 
 		workflow_registryInstance, err := workflow_registry_wrapper.NewWorkflowRegistry(workflowRegistryAddr, sc.Client)
-		require.NoError(t, err)
+		require.NoError(t, err, "failed to create workflow registry instance")
 
 		// use non-encoded workflow name
-		wrTx, wrErr := workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), in.WorkflowConfig.Existing.BinaryURL, in.WorkflowConfig.Existing.ConfigURL, "")
-		_, decodeErr := sc.Decode(wrTx, wrErr)
-		require.NoError(t, decodeErr)
+		_, decodeErr = sc.Decode(workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), in.WorkflowConfig.Existing.BinaryURL, in.WorkflowConfig.Existing.ConfigURL, ""))
+		require.NoError(t, decodeErr, "failed to register workflow")
 	}
 
 	if in.WorkflowConfig.UseChainlinkCLI {
-		// create settings file
+		// create chainlink-cli settings file
 		settingsFile, err := os.CreateTemp("", ".chainlink-cli-settings.yaml")
-		require.NoError(t, err)
+		require.NoError(t, err, "failed to create chainlink-cli settings file")
 
 		settings := ChainlinkCliSettings{
 			DevPlatform: DevPlatform{
@@ -830,19 +827,20 @@ func TestWorkflow(t *testing.T) {
 		}
 
 		settingsMarshalled, err := yaml.Marshal(settings)
-		require.NoError(t, err)
+		require.NoError(t, err, "failed to marshal chainlink-cli settings")
 
 		_, err = settingsFile.Write(settingsMarshalled)
-		require.NoError(t, err)
+		require.NoError(t, err, "failed to write chainlink-cli settings file")
 
 		var workflowGistUrl string
 		var workflowConfigUrl string
 
+		// compile and upload the workflow, if we are not using an existing one
 		if !in.WorkflowConfig.UseExising {
 			feedId := "0x018BFE88407000400000000000000000"
 
 			configFile, err := os.CreateTemp("", "config.json")
-			require.NoError(t, err)
+			require.NoError(t, err, "failed to create workflow config file")
 
 			workflowConfig := PoRWorkflowConfig{
 				FeedID:          feedId,
@@ -851,10 +849,10 @@ func TestWorkflow(t *testing.T) {
 			}
 
 			configMarshalled, err := json.Marshal(workflowConfig)
-			require.NoError(t, err)
+			require.NoError(t, err, "failed to marshal workflow config")
 
 			_, err = configFile.Write(configMarshalled)
-			require.NoError(t, err)
+			require.NoError(t, err, "failed to write workflow config file")
 
 			var outputBuffer bytes.Buffer
 
@@ -863,16 +861,16 @@ func TestWorkflow(t *testing.T) {
 			compileCmd.Stderr = &outputBuffer
 			compileCmd.Dir = *in.WorkflowConfig.ChainlinkCLI.FolderLocation
 			err = compileCmd.Start()
-			require.NoError(t, err)
+			require.NoError(t, err, "failed to start compile command")
 
 			err = compileCmd.Wait()
-			require.NoError(t, err)
+			require.NoError(t, err, "failed to wait for compile command")
 
 			fmt.Println("Compile output:\n", outputBuffer.String())
 
 			re := regexp.MustCompile(`Gist URL=([^\s]+)`)
 			matches := re.FindAllStringSubmatch(outputBuffer.String(), -1)
-			require.Len(t, matches, 2)
+			require.Len(t, matches, 2, "failed to find 2 gist URLs in compile output")
 
 			ansiEscapePattern := `\x1b\[[0-9;]*m`
 			re = regexp.MustCompile(ansiEscapePattern)
@@ -880,34 +878,37 @@ func TestWorkflow(t *testing.T) {
 			workflowGistUrl = re.ReplaceAllString(matches[0][1], "")
 			workflowConfigUrl = re.ReplaceAllString(matches[1][1], "")
 
-			require.NotEmpty(t, workflowGistUrl)
-			require.NotEmpty(t, workflowConfigUrl)
+			require.NotEmpty(t, workflowGistUrl, "failed to find workflow gist URL")
+			require.NotEmpty(t, workflowConfigUrl, "failed to find workflow config gist URL")
 		} else {
 			workflowGistUrl = in.WorkflowConfig.Existing.BinaryURL
 			workflowConfigUrl = in.WorkflowConfig.Existing.ConfigURL
 		}
 
-		// deploy the workflow
+		// register the workflow
 		registerCmd := exec.Command("chainlink-cli", "workflow", "register", workflowName, "-b", workflowGistUrl, "-c", workflowConfigUrl, "-S", settingsFile.Name(), "-v")
 		registerCmd.Stdout = os.Stdout
 		registerCmd.Stderr = os.Stderr
 		err = registerCmd.Run()
-		require.NoError(t, err)
+		require.NoError(t, err, "failed to register workflow using chainlink-cli")
 	}
 
+	// configure Keystone Feeds Consumer contract, so it can accept reports from the forwarder contract,
+	// that come from our workflow that is owned by the root private key
 	feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(feedsConsumerAddress, sc.Client)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to create feeds consumer instance")
 
-	// here we need to use hex-encoded workflow name converted to []byte
-	tx, err = feedsConsumerInstance.SetConfig(
+	_, decodeErr = sc.Decode(feedsConsumerInstance.SetConfig(
 		sc.NewTXOpts(),
 		[]common.Address{forwarderAddress},           // allowed senders
 		[]common.Address{sc.MustGetRootKeyAddress()}, // allowed workflow owners
-		[][10]byte{workflowNameBytes},                // allowed workflow names
-	)
-	_, decodeErr = sc.Decode(tx, err)
-	require.NoError(t, decodeErr)
+		// here we need to use hex-encoded workflow name converted to []byte
+		[][10]byte{workflowNameBytes}, // allowed workflow names
+	))
+	require.NoError(t, decodeErr, "failed to set config for feeds consumer")
 
+	// Hack for CI that allows us to dynamically set the chainlink image and version
+	// CTFv2 currently doesn't support dynamic image and version setting
 	if os.Getenv("IS_CI") == "true" {
 		image := fmt.Sprintf("%s:%s", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV))
 		for _, nodeSpec := range in.NodeSet.NodeSpecs {
@@ -915,17 +916,16 @@ func TestWorkflow(t *testing.T) {
 		}
 	}
 
-	// TODO: When the capabilities registry address is provided:
-	// - NOPs and nodes are added to the registry.
-	// - Nodes are configured to listen to the registry for updates.
+	// Deploy a DON node set
 	nodeset, err := ns.NewSharedDBNodeSet(in.NodeSet, bc)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to deploy node set")
 
 	nodeClients, err := clclient.New(nodeset.CLNodes)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to create chainlink clients")
 
 	nodesInfo := getNodesInfo(t, nodeClients)
 
+	// Fund all nodes
 	for _, nodeInfo := range nodesInfo {
 		_, err := actions.SendFunds(zerolog.Logger{}, sc, actions.FundsToSendPayload{
 			ToAddress:  common.HexToAddress(nodeInfo.TransmitterAddress),
@@ -938,7 +938,7 @@ func TestWorkflow(t *testing.T) {
 	bootstrapNodeInfo := nodesInfo[0]
 	workflowNodesetInfo := nodesInfo[1:]
 
-	// bootstrap node
+	// configure the bootstrap node
 	in.NodeSet.NodeSpecs[0].Node.TestConfigOverrides = fmt.Sprintf(`
 				[Feature]
 				LogPoller = true
@@ -973,6 +973,8 @@ func TestWorkflow(t *testing.T) {
 		bc.Nodes[0].DockerInternalHTTPUrl,
 	)
 
+	// configure worker nodes with p2p, peering capabilitity (for DON-2-DON communication),
+	// capability (external) registry, workflow registry and gateway connector (required for reading from workflow registry and for external communication)
 	for i := range workflowNodesetInfo {
 		in.NodeSet.NodeSpecs[i+1].Node.TestConfigOverrides = fmt.Sprintf(`
 				[Feature]
@@ -1040,32 +1042,52 @@ func TestWorkflow(t *testing.T) {
 			bc.ChainID,
 			bc.ChainID,
 			workflowNodesetInfo[i].TransmitterAddress,
-			// assuming that node0 is the bootstrap node
-			"ws://node0:5003/node",
+			"ws://node0:5003/node", // bootstrap node exposes gateway port on 5003
 		)
 	}
 
+	// we need to restart all nodes for configuration changes to take effect
 	nodeset, err = ns.UpgradeNodeSet(in.NodeSet, bc, 5*time.Second)
-	require.NoError(t, err)
-	nodeClients, err = clclient.New(nodeset.CLNodes)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to upgrade node set")
 
+	// we need to recreate chainlink clients after the nodes are restarted
+	nodeClients, err = clclient.New(nodeset.CLNodes)
+	require.NoError(t, err, "failed to create chainlink clients")
+
+	// Deploy OCR3 Capability contract
 	ocr3CapabilityAddress, tx, ocr3CapabilityContract, err := ocr3_capability.DeployOCR3Capability(
 		sc.NewTXOpts(),
 		sc.Client,
 	)
 	_, decodeErr = sc.Decode(tx, err)
-	require.NoError(t, decodeErr)
+	require.NoError(t, decodeErr, "failed to deploy OCR Capability contract")
 
-	fmt.Println("Deployed ocr3_capability contract at", ocr3CapabilityAddress.Hex())
+	lgr.Infof("Deployed OCR3 Capability contract at %s", ocr3CapabilityAddress.Hex())
 
-	// Add bootstrap spec to the last node
+	// Create gateway and bootstrap (ocr3) jobs for the bootstrap node
 	bootstrapNode := nodeClients[0]
-
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		bootstrapJobSpec := fmt.Sprintf(`
+				type = "bootstrap"
+				schemaVersion = 1
+				name = "Botostrap"
+				contractID = "%s"
+				contractConfigTrackerPollInterval = "1s"
+				contractConfigConfirmations = 1
+				relay = "evm"
+
+				[relayConfig]
+				chainID = %s
+				providerType = "ocr3-capability"
+			`, ocr3CapabilityAddress, bc.ChainID)
+		r, _, bootErr := bootstrapNode.CreateJobRaw(bootstrapJobSpec)
+		assert.NoError(t, bootErr, "failed to create bootstrap job for the bootstrap node")
+		assert.Empty(t, r.Errors, "failed to create bootstrap job for the bootstrap node")
+
 		gatewayJobSpec := fmt.Sprintf(`
 				type = "gateway"
 				schemaVersion = 1
@@ -1132,30 +1154,14 @@ func TestWorkflow(t *testing.T) {
 			workflowNodesetInfo[3].TransmitterAddress,
 		)
 
-		r, _, err2 := bootstrapNode.CreateJobRaw(gatewayJobSpec)
-		assert.NoError(t, err2)
-		assert.Empty(t, r.Errors)
-
-		bootstrapJobSpec := fmt.Sprintf(`
-				type = "bootstrap"
-				schemaVersion = 1
-				name = "Botostrap"
-				contractID = "%s"
-				contractConfigTrackerPollInterval = "1s"
-				contractConfigConfirmations = 1
-				relay = "evm"
-
-				[relayConfig]
-				chainID = %s
-				providerType = "ocr3-capability"
-			`, ocr3CapabilityAddress, bc.ChainID)
-		r, _, err3 := bootstrapNode.CreateJobRaw(bootstrapJobSpec)
-		assert.NoError(t, err3)
-		assert.Empty(t, r.Errors)
+		r, _, gatewayErr := bootstrapNode.CreateJobRaw(gatewayJobSpec)
+		assert.NoError(t, gatewayErr, "failed to create gateway job for the bootstrap node")
+		assert.Empty(t, r.Errors, "failed to create gateway job for the bootstrap node")
 	}()
 
+	// for each capability that's required by the workflow, create a job for workflow each node
 	for i, nodeClient := range nodeClients {
-		// Last node is a bootstrap node, so we skip it
+		// First node is a bootstrap node, so we skip it
 		if i == 0 {
 			continue
 		}
@@ -1173,8 +1179,8 @@ func TestWorkflow(t *testing.T) {
 				`
 
 			response, _, errCron := nodeClient.CreateJobRaw(cronJobSpec)
-			assert.NoError(t, errCron)
-			assert.Empty(t, response.Errors)
+			assert.NoError(t, errCron, "failed to create cron job")
+			assert.Empty(t, response.Errors, "failed to create cron job")
 
 			computeJobSpec := `
 					type = "standardcapabilities"
@@ -1193,8 +1199,8 @@ func TestWorkflow(t *testing.T) {
 				`
 
 			response, _, errCompute := nodeClient.CreateJobRaw(computeJobSpec)
-			assert.NoError(t, errCompute)
-			assert.Empty(t, response.Errors)
+			assert.NoError(t, errCompute, "failed to create compute job")
+			assert.Empty(t, response.Errors, "failed to create compute job")
 
 			consensusJobSpec := fmt.Sprintf(`
 					type = "offchainreporting2"
@@ -1234,12 +1240,13 @@ func TestWorkflow(t *testing.T) {
 			)
 			fmt.Println("consensusJobSpec", consensusJobSpec)
 			response, _, errCons := nodeClient.CreateJobRaw(consensusJobSpec)
-			assert.NoError(t, errCons)
-			assert.Empty(t, response.Errors)
+			assert.NoError(t, errCons, "failed to create consensus job")
+			assert.Empty(t, response.Errors, "failed to create consensus job")
 		}()
 	}
 	wg.Wait()
 
+	// Register node operators, nodes and DON in the Capabilities registry
 	var nopsToAdd []cr_wrapper.CapabilitiesRegistryNodeOperator
 	var nodesToAdd []cr_wrapper.CapabilitiesRegistryNodeParams
 	var donNodes [][32]byte
@@ -1252,11 +1259,13 @@ func TestWorkflow(t *testing.T) {
 			capability.LabelledName,
 			capability.Version,
 		)
-		require.NoError(t, err)
+		require.NoError(t, err, "failed to get hashed capability ID for %s", capability.LabelledName)
 		hashedCapabilities = append(hashedCapabilities, hashed)
 	}
 
 	for i, node := range nodesInfo {
+		// skip the first node, as it's the bootstrap node
+		// it doesn't have any capabilities that are required by the workflow
 		if i == 0 {
 			continue
 		}
@@ -1267,7 +1276,7 @@ func TestWorkflow(t *testing.T) {
 
 		var peerID ragetypes.PeerID
 		err = peerID.UnmarshalText([]byte(node.PeerID))
-		require.NoError(t, err)
+		require.NoError(t, err, "failed to unmarshal peer ID")
 
 		nodesToAdd = append(nodesToAdd, cr_wrapper.CapabilitiesRegistryNodeParams{
 			NodeOperatorId:      uint32(i), //nolint:gosec // disable G115
@@ -1281,21 +1290,19 @@ func TestWorkflow(t *testing.T) {
 		signers = append(signers, node.Signer)
 	}
 
-	// Add NOPs to registry
-	tx, err = capabilitiesRegistryInstance.AddNodeOperators(
+	// Add NOPs to capabilities registry
+	_, decodeErr = sc.Decode(capabilitiesRegistryInstance.AddNodeOperators(
 		sc.NewTXOpts(),
 		nopsToAdd,
-	)
-	_, decodeErr = sc.Decode(tx, err)
-	require.NoError(t, decodeErr)
+	))
+	require.NoError(t, decodeErr, "failed to add NOPs to capabilities registry")
 
-	// Add nodes to registry
-	tx, err = capabilitiesRegistryInstance.AddNodes(
+	// Add nodes to capabilities registry
+	_, decodeErr = sc.Decode(capabilitiesRegistryInstance.AddNodes(
 		sc.NewTXOpts(),
 		nodesToAdd,
-	)
-	_, decodeErr = sc.Decode(tx, err)
-	require.NoError(t, decodeErr)
+	))
+	require.NoError(t, decodeErr, "failed to add nodes to capabilities registry")
 
 	var capRegConfig []cr_wrapper.CapabilitiesRegistryCapabilityConfiguration
 	for _, hashed := range hashedCapabilities {
@@ -1305,28 +1312,28 @@ func TestWorkflow(t *testing.T) {
 		})
 	}
 
-	// Add nodeset to registry
-	tx, err = capabilitiesRegistryInstance.AddDON(
+	// Add nodeset to capabilities registry
+	_, decodeErr = sc.Decode(capabilitiesRegistryInstance.AddDON(
 		sc.NewTXOpts(),
 		donNodes,
 		capRegConfig,
 		true,     // is public
 		true,     // accepts workflows
 		uint8(1), // max number of malicious nodes
-	)
-	_, decodeErr = sc.Decode(tx, err)
-	require.NoError(t, decodeErr)
+	))
+	require.NoError(t, decodeErr, "failed to add DON to capabilities registry")
 
+	// configure Keystone Forwarder contract
 	forwarderInstance, err := forwarder.NewKeystoneForwarder(forwarderAddress, sc.Client)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to create forwarder instance")
 
 	_, err = sc.Decode(forwarderInstance.SetConfig(
 		sc.NewTXOpts(),
-		1,
-		1,
-		1,
+		1, // donID
+		1, // configVersion -- wonder what it does
+		1, // maximum number of faulty nodes
 		signers))
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to set config for forwarder")
 
 	// Wait for OCR listeners to be ready before setting the configuration.
 	// If the ConfigSet event is missed, OCR protocol will not start.
@@ -1335,9 +1342,9 @@ func TestWorkflow(t *testing.T) {
 	time.Sleep(30 * time.Second)
 	fmt.Println("Proceeding to set OCR3 configuration.")
 
-	// Configure OCR capability contract
+	// Configure OCR3 capability contract
 	ocr3Config := generateOCR3Config(t, workflowNodesetInfo)
-	tx, err = ocr3CapabilityContract.SetConfig(
+	_, decodeErr = sc.Decode(ocr3CapabilityContract.SetConfig(
 		sc.NewTXOpts(),
 		ocr3Config.Signers,
 		ocr3Config.Transmitters,
@@ -1345,16 +1352,13 @@ func TestWorkflow(t *testing.T) {
 		ocr3Config.OnchainConfig,
 		ocr3Config.OffchainConfigVersion,
 		ocr3Config.OffchainConfig,
-	)
-	_, decodeErr = sc.Decode(tx, err)
-	require.NoError(t, decodeErr)
+	))
+	require.NoError(t, decodeErr, "failed to set OCR3 configuration")
 
 	// It can take a while before the first report is produced, particularly on CI.
 	timeout := 10 * time.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-
-	// Node sent transaction
 
 	startTime := time.Now()
 	for {
@@ -1367,13 +1371,13 @@ func TestWorkflow(t *testing.T) {
 				sc.NewCallOpts(),
 				feedBytes,
 			)
-			require.NoError(t, err)
+			require.NoError(t, err, "failed to get price from Keystone Consumer contract")
 
 			if price.String() != "0" {
-				fmt.Printf("Feed updated after %s - price set, price=%s\n", elapsed, price)
+				lgr.Infof("Feed updated after %s - price set, price=%s", elapsed, price)
 				return
 			}
-			fmt.Printf("Feed not updated yet, waiting for %s\n", elapsed)
+			lgr.Infof("Feed not updated yet, waiting for %s", elapsed)
 		}
 	}
 }
