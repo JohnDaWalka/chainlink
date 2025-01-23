@@ -1,6 +1,7 @@
 package changeset
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -8,6 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/deployment"
+	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -24,6 +28,67 @@ var tokenPoolTypes map[deployment.ContractType]struct{} = map[deployment.Contrac
 
 var tokenPoolVersions map[semver.Version]struct{} = map[semver.Version]struct{}{
 	deployment.Version1_5_1: struct{}{},
+}
+
+// TokenPoolInfo defines the type & version of a token pool, along with an optional external administrator.
+type TokenPoolInfo struct {
+	// Type is the type of the token pool.
+	Type deployment.ContractType
+	// Version is the version of the token pool.
+	Version semver.Version
+	// ExternalAdmin is the external administrator of the token pool on the registry.
+	ExternalAdmin common.Address
+}
+
+func (t TokenPoolInfo) Validate() error {
+	// Ensure that the inputted type is known
+	if _, ok := tokenPoolTypes[t.Type]; !ok {
+		return fmt.Errorf("%s is not a known token pool type", t.Type)
+	}
+
+	// Ensure that the inputted version is known
+	if _, ok := tokenPoolVersions[t.Version]; !ok {
+		return fmt.Errorf("%s is not a known token pool version", t.Version)
+	}
+
+	return nil
+}
+
+// GetConfigOnRegistry fetches the token's config on the token admin registry.
+func (t TokenPoolInfo) GetConfigOnRegistry(
+	ctx context.Context,
+	symbol TokenSymbol,
+	chain deployment.Chain,
+	state CCIPChainState,
+) (token_admin_registry.TokenAdminRegistryTokenConfig, error) {
+	_, tokenAddress, err := t.GetPoolAndTokenAddress(ctx, symbol, chain, state)
+	if err != nil {
+		return token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("failed to get token pool and token address for %s token on %s: %w", symbol, chain, err)
+	}
+	tokenAdminRegistry := state.TokenAdminRegistry
+	tokenConfig, err := tokenAdminRegistry.GetTokenConfig(&bind.CallOpts{Context: ctx}, tokenAddress)
+	if err != nil {
+		return token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("failed to get config of %s token with address %s from registry on %s: %w", symbol, tokenAddress, chain, err)
+	}
+	return tokenConfig, nil
+}
+
+// GetPoolAndTokenAddress returns pool bindings and the token address.
+func (t TokenPoolInfo) GetPoolAndTokenAddress(
+	ctx context.Context,
+	symbol TokenSymbol,
+	chain deployment.Chain,
+	state CCIPChainState,
+) (*token_pool.TokenPool, common.Address, error) {
+	tokenPool, err := getTokenPoolFromSymbolTypeAndVersion(state, chain, symbol, t.Type, t.Version)
+	if err != nil {
+		return nil, utils.ZeroAddress, fmt.Errorf("failed to find token pool on %s with symbol %s, type %s, and version %s: %w", chain, symbol, t.Type, t.Version, err)
+	}
+	tokenAddress, err := tokenPool.GetToken(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, utils.ZeroAddress, fmt.Errorf("failed to get token from pool with address %s on %s: %w", tokenPool.Address(), chain, err)
+	}
+	return tokenPool, tokenAddress, nil
 }
 
 // tokenPool defines behavior common to all token pools.
@@ -162,4 +227,80 @@ func getTokenPoolFromSymbolTypeAndVersion(
 	}
 
 	return nil, fmt.Errorf("failed to find token pool with symbol %s, type %s, and version %s", symbol, poolType, version)
+}
+
+// TokenAdminRegistryChangesetConfig defines a config for all token admin registry actions.
+type TokenAdminRegistryChangesetConfig struct {
+	// MCMS defines the delay to use for Timelock (if absent, the changeset will attempt to use the deployer key).
+	MCMS *MCMSConfig
+	// Pools defines the pools corresponding to the tokens we want to accept admin role for.
+	Pools map[uint64]map[TokenSymbol]TokenPoolInfo
+}
+
+// validateTokenAdminRegistryChangeset validates all token admin registry changesets.
+func (c TokenAdminRegistryChangesetConfig) Validate(
+	env deployment.Environment,
+	registryConfigCheck func(
+		config token_admin_registry.TokenAdminRegistryTokenConfig,
+		sender common.Address,
+		externalAdmin common.Address,
+		symbol TokenSymbol,
+		chain deployment.Chain,
+	) error,
+) error {
+	state, err := LoadOnchainState(env)
+	if err != nil {
+		return fmt.Errorf("failed to load onchain state: %w", err)
+	}
+	for chainSelector, symbolToPoolInfo := range c.Pools {
+		err := deployment.IsValidChainSelector(chainSelector)
+		if err != nil {
+			return fmt.Errorf("failed to validate chain selector %d: %w", chainSelector, err)
+		}
+		chain, ok := env.Chains[chainSelector]
+		if !ok {
+			return fmt.Errorf("chain with selector %d does not exist in environment", chainSelector)
+		}
+		chainState, ok := state.Chains[chainSelector]
+		if !ok {
+			return fmt.Errorf("%s does not exist in state", chain)
+		}
+		if tokenAdminRegistry := chainState.TokenAdminRegistry; tokenAdminRegistry == nil {
+			return fmt.Errorf("missing tokenAdminRegistry on %s", chain)
+		}
+		if c.MCMS != nil {
+			if timelock := chainState.Timelock; timelock == nil {
+				return fmt.Errorf("missing timelock on %s", chain)
+			}
+			if proposerMcm := chainState.ProposerMcm; proposerMcm == nil {
+				return fmt.Errorf("missing proposerMcm on %s", chain)
+			}
+		}
+		// Validate that the token admin registry is owned by the address that will be actioning the transactions (i.e. Timelock or deployer key)
+		if err := commoncs.ValidateOwnership(env.GetContext(), c.MCMS != nil, chain.DeployerKey.From, chainState.Timelock.Address(), chainState.TokenAdminRegistry); err != nil {
+			return fmt.Errorf("token admin registry failed ownership validation on %s: %w", chain, err)
+		}
+		for symbol, poolInfo := range symbolToPoolInfo {
+			if err := poolInfo.Validate(); err != nil {
+				return fmt.Errorf("failed to validate token pool info for %s token on chain %s: %w", symbol, chain, err)
+			}
+
+			tokenConfigOnRegistry, err := poolInfo.GetConfigOnRegistry(env.GetContext(), symbol, chain, chainState)
+			if err != nil {
+				return fmt.Errorf("failed to get state of %s token on chain %s: %w", symbol, chain, err)
+			}
+
+			fromAddress := chain.DeployerKey.From // "We" are either the deployer key or the timelock
+			if c.MCMS != nil {
+				fromAddress = chainState.Timelock.Address()
+			}
+
+			err = registryConfigCheck(tokenConfigOnRegistry, fromAddress, poolInfo.ExternalAdmin, symbol, chain)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

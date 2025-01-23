@@ -23,11 +23,10 @@ type MCMSConfig struct {
 }
 
 type DeployerGroup struct {
-	e                    deployment.Environment
-	state                CCIPOnChainState
-	mcmConfig            *MCMSConfig
-	transactions         map[uint64][]*types.Transaction
-	mcmsOperationOffsets map[uint64]uint64
+	e            deployment.Environment
+	state        CCIPOnChainState
+	mcmConfig    *MCMSConfig
+	transactions map[uint64][]*types.Transaction
 }
 
 // DeployerGroup is an abstraction that lets developers write their changeset
@@ -44,11 +43,10 @@ type DeployerGroup struct {
 //	deployerGroup.Enact("Curse RMNRemote")
 func NewDeployerGroup(e deployment.Environment, state CCIPOnChainState, mcmConfig *MCMSConfig) *DeployerGroup {
 	return &DeployerGroup{
-		e:                    e,
-		mcmConfig:            mcmConfig,
-		state:                state,
-		transactions:         make(map[uint64][]*types.Transaction),
-		mcmsOperationOffsets: make(map[uint64]uint64),
+		e:            e,
+		mcmConfig:    mcmConfig,
+		state:        state,
+		transactions: make(map[uint64][]*types.Transaction),
 	}
 }
 
@@ -85,19 +83,18 @@ func (d *DeployerGroup) GetDeployer(chain uint64) (*bind.TransactOpts, error) {
 	}
 	oldSigner := sim.Signer
 
-	sim.Signer = func(a common.Address, t *types.Transaction) (*types.Transaction, error) {
-		// Fetch the starting nonce
-		var startingNonce *big.Int
-		if txOpts.Nonce != nil {
-			startingNonce = new(big.Int).Set(txOpts.Nonce)
-		} else {
-			nonce, err := d.e.Chains[chain].Client.PendingNonceAt(context.Background(), txOpts.From)
-			if err != nil {
-				return nil, fmt.Errorf("could not get nonce for deployer: %w", err)
-			}
-			startingNonce = new(big.Int).SetUint64(nonce)
+	var startingNonce *big.Int
+	if txOpts.Nonce != nil {
+		startingNonce = new(big.Int).Set(txOpts.Nonce)
+	} else {
+		nonce, err := d.e.Chains[chain].Client.PendingNonceAt(context.Background(), txOpts.From)
+		if err != nil {
+			return nil, fmt.Errorf("could not get nonce for deployer: %w", err)
 		}
+		startingNonce = new(big.Int).SetUint64(nonce)
+	}
 
+	sim.Signer = func(a common.Address, t *types.Transaction) (*types.Transaction, error) {
 		// Update the nonce to consider the transactions that have been sent
 		sim.Nonce = big.NewInt(0).Add(startingNonce, big.NewInt(int64(len(d.transactions[chain]))+1))
 
@@ -112,23 +109,11 @@ func (d *DeployerGroup) GetDeployer(chain uint64) (*bind.TransactOpts, error) {
 }
 
 func (d *DeployerGroup) Enact(deploymentDescription string) (deployment.ChangesetOutput, error) {
-	defer d.reset()
-
 	if d.mcmConfig != nil {
 		return d.enactMcms(deploymentDescription)
 	}
 
 	return d.enactDeployer()
-}
-
-func (d *DeployerGroup) reset() {
-	for selector := range d.transactions {
-		if _, ok := d.mcmsOperationOffsets[selector]; !ok {
-			d.mcmsOperationOffsets[selector] = 0
-		}
-		d.mcmsOperationOffsets[selector] += 1
-	}
-	d.transactions = make(map[uint64][]*types.Transaction)
 }
 
 func (d *DeployerGroup) enactMcms(deploymentDescription string) (deployment.ChangesetOutput, error) {
@@ -152,10 +137,9 @@ func (d *DeployerGroup) enactMcms(deploymentDescription string) (deployment.Chan
 
 	proposerMCMSes := BuildProposerPerChain(d.e, d.state)
 
-	prop, err := proposalutils.BuildProposalFromBatchesWithOffsets(
+	prop, err := proposalutils.BuildProposalFromBatches(
 		timelocksPerChain,
 		proposerMCMSes,
-		d.mcmsOperationOffsets,
 		batches,
 		deploymentDescription,
 		d.mcmConfig.MinDelay,

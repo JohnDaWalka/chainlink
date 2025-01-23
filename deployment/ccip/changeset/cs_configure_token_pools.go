@@ -182,7 +182,7 @@ func ConfigureTokenPoolContractsChangeset(env deployment.Environment, c Configur
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get deployer for %s", chain)
 		}
-		err = configureTokenPool(opts, env.Chains, state, c, chainSelector)
+		err = configureTokenPool(env.GetContext(), opts, env.Chains, state, c, chainSelector)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to make operations to configure %s token pool on %s: %w", c.TokenSymbol, chain.String(), err)
 		}
@@ -194,6 +194,7 @@ func ConfigureTokenPoolContractsChangeset(env deployment.Environment, c Configur
 // configureTokenPool creates all transactions required to configure the desired token pool on a chain,
 // either applying the transactions with the deployer key or returning an MCMS proposal.
 func configureTokenPool(
+	ctx context.Context,
 	opts *bind.TransactOpts,
 	chains map[uint64]deployment.Chain,
 	state CCIPOnChainState,
@@ -202,7 +203,7 @@ func configureTokenPool(
 ) error {
 	poolUpdate := config.PoolUpdates[chainSelector]
 	chain := chains[chainSelector]
-	tokenPool, _, tokenConfig, err := getTokenStateFromPool(config.TokenSymbol, poolUpdate.Type, poolUpdate.Version, chain, state.Chains[chainSelector])
+	tokenPool, _, tokenConfig, err := getTokenStateFromPool(ctx, config.TokenSymbol, poolUpdate.Type, poolUpdate.Version, chain, state.Chains[chainSelector])
 	if err != nil {
 		return fmt.Errorf("failed to get token state from pool with address %s on %s: %w", tokenPool.Address(), chain.String(), err)
 	}
@@ -223,7 +224,7 @@ func configureTokenPool(
 		}
 		remoteChain := chains[remoteChainSelector]
 		remotePoolUpdate := config.PoolUpdates[remoteChainSelector]
-		remoteTokenPool, remoteTokenAddress, remoteTokenConfig, err := getTokenStateFromPool(config.TokenSymbol, remotePoolUpdate.Type, remotePoolUpdate.Version, remoteChain, state.Chains[remoteChainSelector])
+		remoteTokenPool, remoteTokenAddress, remoteTokenConfig, err := getTokenStateFromPool(ctx, config.TokenSymbol, remotePoolUpdate.Type, remotePoolUpdate.Version, remoteChain, state.Chains[remoteChainSelector])
 		if err != nil {
 			return fmt.Errorf("failed to get token state from pool with address %s on %s: %w", tokenPool.Address(), chain.String(), err)
 		}
@@ -297,6 +298,7 @@ func configureTokenPool(
 
 // getTokenStateFromPool fetches the token config from the registry given the pool address
 func getTokenStateFromPool(
+	ctx context.Context,
 	symbol TokenSymbol,
 	poolType deployment.ContractType,
 	version semver.Version,
@@ -307,7 +309,7 @@ func getTokenStateFromPool(
 	if err != nil {
 		return nil, utils.ZeroAddress, token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("failed to find token pool on %s with symbol %s, type %s, and version %s: %w", chain.String(), symbol, poolType, version, err)
 	}
-	tokenAddress, err := tokenPool.GetToken(nil)
+	tokenAddress, err := tokenPool.GetToken(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, utils.ZeroAddress, token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("failed to get token from pool with address %s on %s: %w", tokenPool.Address(), chain.String(), err)
 	}

@@ -456,18 +456,61 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 							},
 						},
 						{
-							Changeset: commonchangeset.WrapChangeSet(changeset.ConfigureTokenAdminRegistryChangeset),
-							Config: changeset.ConfigureTokenAdminRegistryConfig{
-								TokenSymbol: testhelpers.TestTokenSymbol,
-								MCMS:        mcmsConfig,
-								RegistryUpdates: map[uint64]changeset.RegistryConfig{
-									selectorA: {
-										Type:    changeset.LockReleaseTokenPool,
-										Version: deployment.Version1_5_1,
+							Changeset: commonchangeset.WrapChangeSet(changeset.ProposeAdminRoleChangeset),
+							Config: changeset.TokenAdminRegistryChangesetConfig{
+								MCMS: mcmsConfig,
+								Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+									selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+										testhelpers.TestTokenSymbol: {
+											Type:    changeset.LockReleaseTokenPool,
+											Version: deployment.Version1_5_1,
+										},
 									},
-									selectorB: {
-										Type:    changeset.LockReleaseTokenPool,
-										Version: deployment.Version1_5_1,
+									selectorB: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+										testhelpers.TestTokenSymbol: {
+											Type:    changeset.LockReleaseTokenPool,
+											Version: deployment.Version1_5_1,
+										},
+									},
+								},
+							},
+						},
+						{
+							Changeset: commonchangeset.WrapChangeSet(changeset.AcceptAdminRoleChangeset),
+							Config: changeset.TokenAdminRegistryChangesetConfig{
+								MCMS: mcmsConfig,
+								Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+									selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+										testhelpers.TestTokenSymbol: {
+											Type:    changeset.LockReleaseTokenPool,
+											Version: deployment.Version1_5_1,
+										},
+									},
+									selectorB: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+										testhelpers.TestTokenSymbol: {
+											Type:    changeset.LockReleaseTokenPool,
+											Version: deployment.Version1_5_1,
+										},
+									},
+								},
+							},
+						},
+						{
+							Changeset: commonchangeset.WrapChangeSet(changeset.SetPoolChangeset),
+							Config: changeset.TokenAdminRegistryChangesetConfig{
+								MCMS: mcmsConfig,
+								Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+									selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+										testhelpers.TestTokenSymbol: {
+											Type:    changeset.LockReleaseTokenPool,
+											Version: deployment.Version1_5_1,
+										},
+									},
+									selectorB: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+										testhelpers.TestTokenSymbol: {
+											Type:    changeset.LockReleaseTokenPool,
+											Version: deployment.Version1_5_1,
+										},
 									},
 								},
 							},
