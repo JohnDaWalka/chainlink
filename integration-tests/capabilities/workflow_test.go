@@ -57,6 +57,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/workflow/generated/workflow_registry_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	workflow_registry_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/workflowregistry"
 )
@@ -558,9 +559,8 @@ func downloadCronCapability(ghToken string) (string, error) {
 
 func TestWorkflow(t *testing.T) {
 	if os.Getenv("IS_CI") == "true" {
-		require.NotEmpty(t, os.Getenv("QA_AWS_REGION"), "missing QA_AWS_REGION env var")
-		require.NotEmpty(t, os.Getenv("QA_AWS_ACCOUNT_NUMBER"), "missing QA_AWS_ACCOUNT_NUMBER env var")
-		require.NotEmpty(t, os.Getenv("E2E_TEST_CHAINLINK_VERSION"), "missing E2E_TEST_CHAINLINK_VERSION env var")
+		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV)
+		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV)
 
 		ghToken := os.Getenv("GH_TOKEN")
 		_, err := downloadCronCapability(ghToken)
@@ -911,7 +911,7 @@ func TestWorkflow(t *testing.T) {
 	require.NoError(t, decodeErr)
 
 	if os.Getenv("IS_CI") == "true" {
-		image := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/chainlink:%s", os.Getenv("QA_AWS_ACCOUNT_NUMBER"), os.Getenv("QA_AWS_REGION"), os.Getenv("E2E_TEST_CHAINLINK_VERSION"))
+		image := fmt.Sprintf("%s:%s", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV))
 		for _, nodeSpec := range in.NodeSet.NodeSpecs {
 			nodeSpec.Node.Image = image
 		}

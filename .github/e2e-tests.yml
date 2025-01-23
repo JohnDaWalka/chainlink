@@ -197,6 +197,7 @@ runner-test-matrix:
       ENABLE_OTEL_TRACES: true
       IS_CI: "true"
       CTF_CONFIG: "environment-ci.toml"
+      GH_TOKEN: "{{ env.GH_TOKEN }}"
 
   - id: chaos/ocr_chaos_test.go
     path: integration-tests/chaos/ocr_chaos_test.go
