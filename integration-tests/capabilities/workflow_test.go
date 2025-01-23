@@ -558,6 +558,8 @@ func downloadCronCapability(ghToken string) (string, error) {
 }
 
 func TestWorkflow(t *testing.T) {
+	// TODO this part should ideally happen outside of the test, but due to how our reusable e2e test workflow is structured now
+	// we cannot execute this part in workflow steps (it doesn't support any pre-execution hooks)
 	if os.Getenv("IS_CI") == "true" {
 		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV)
 		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV)
@@ -569,13 +571,15 @@ func TestWorkflow(t *testing.T) {
 		err = downloadAndInstallChainlinkCLI(ghToken)
 		require.NoError(t, err, "failed to download and install chainlink-cli")
 	}
-	// without 0x prefix!
-	feedID := "018bfe8840700040000000000000000000000000000000000000000000000000"
+
+	feedID := "018bfe8840700040000000000000000000000000000000000000000000000000" // without 0x prefix!
 	feedBytes := common.HexToHash(feedID)
 
 	in, err := framework.Load[WorkflowTestConfig](t)
-	require.NoError(t, err)
+	require.NoError(t, err, "couldn't load test config")
+
 	pkey := os.Getenv("PRIVATE_KEY")
+	require.NotEmpty(t, pkey, "PRIVATE_KEY env var must be set")
 
 	bc, err := blockchain.NewBlockchainNetwork(in.BlockchainA)
 	require.NoError(t, err)
