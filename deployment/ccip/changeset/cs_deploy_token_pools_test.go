@@ -1,6 +1,7 @@
 package changeset_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -13,8 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/evm/utils"
 )
 
 func TestValidateDeployTokenPoolContractsConfig(t *testing.T) {
@@ -182,7 +183,7 @@ func TestValidateDeployTokenPoolInput(t *testing.T) {
 			state, err := changeset.LoadOnchainState(e)
 			require.NoError(t, err)
 
-			err = test.Input.Validate(e.Chains[selectorA], state.Chains[selectorA], test.Symbol)
+			err = test.Input.Validate(context.Background(), e.Chains[selectorA], state.Chains[selectorA], test.Symbol)
 			require.Contains(t, err.Error(), test.ErrStr)
 		})
 	}
