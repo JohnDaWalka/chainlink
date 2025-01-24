@@ -11,6 +11,9 @@
     binary_url = "https://gist.githubusercontent.com/Tofel/8a39af5b68c213d2200446c175b5c99e/raw/cb7b2a56b37e333fe0bdce07b79538c4ce332f5f/binary.wasm.br"
     config_url = "https://gist.githubusercontent.com/Tofel/5b9ccb1cc1a5aa68aa08a5b2066d60a7/raw/7dcdda86b9d50d17029614f370fd2acab1e7fb27/config.json3175390991"
 
+  [workflow_config.chainlink_cli]
+    folder_location = "path-to-folder-with-main.go-of-your-workflow"
+
 [nodeset]
   nodes = 5
   override_mode = "each"
