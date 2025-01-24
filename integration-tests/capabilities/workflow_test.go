@@ -558,6 +558,13 @@ func downloadCronCapability(ghToken string) (string, error) {
 }
 
 func TestWorkflow(t *testing.T) {
+	feedID := "018bfe8840700040000000000000000000000000000000000000000000000000" // without 0x prefix!
+	feedBytes := common.HexToHash(feedID)
+
+	in, err := framework.Load[WorkflowTestConfig](t)
+	require.NoError(t, err, "couldn't load test config")
+	require.True(t, (in.WorkflowConfig.UseChainlinkCLI && in.WorkflowConfig.UseExising) || (!in.WorkflowConfig.UseChainlinkCLI && in.WorkflowConfig.UseExising), "if you are not using chainlink-cli you must use an existing workflow")
+
 	// TODO this part should ideally happen outside of the test, but due to how our reusable e2e test workflow is structured now
 	// we cannot execute this part in workflow steps (it doesn't support any pre-execution hooks)
 	if os.Getenv("IS_CI") == "true" {
@@ -568,16 +575,11 @@ func TestWorkflow(t *testing.T) {
 		_, err := downloadCronCapability(ghToken)
 		require.NoError(t, err, "failed to download cron capability")
 
-		err = downloadAndInstallChainlinkCLI(ghToken)
-		require.NoError(t, err, "failed to download and install chainlink-cli")
+		if in.WorkflowConfig.UseChainlinkCLI {
+			err = downloadAndInstallChainlinkCLI(ghToken)
+			require.NoError(t, err, "failed to download and install chainlink-cli")
+		}
 	}
-
-	feedID := "018bfe8840700040000000000000000000000000000000000000000000000000" // without 0x prefix!
-	feedBytes := common.HexToHash(feedID)
-
-	in, err := framework.Load[WorkflowTestConfig](t)
-	require.NoError(t, err, "couldn't load test config")
-	require.True(t, (in.WorkflowConfig.UseChainlinkCLI && in.WorkflowConfig.UseExising) || (!in.WorkflowConfig.UseChainlinkCLI && in.WorkflowConfig.UseExising), "if you are not using chainlink-cli you must use an existing workflow")
 
 	pkey := os.Getenv("PRIVATE_KEY")
 	require.NotEmpty(t, pkey, "PRIVATE_KEY env var must be set")
@@ -597,7 +599,7 @@ func TestWorkflow(t *testing.T) {
 		require.True(t, isInstalled("chainlink-cli"), "chainlink-cli is required for this test. Please install it, add to path and run again")
 
 		if !in.WorkflowConfig.UseExising {
-			require.NotEmpty(t, os.Getenv("GITHUB_API_TOKEN"), "GITHUB_API_TOKEN must be set to use chainlink-cli. It requires read/write Gist permissions")
+			require.NotEmpty(t, os.Getenv("GITHUB_TOKEN"), "GITHUB_TOKEN must be set to use chainlink-cli. It requires read/write Gist permissions")
 		}
 
 		// These two env vars are required by the chainlink-cli

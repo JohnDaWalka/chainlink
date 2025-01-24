@@ -4,7 +4,7 @@
   docker_cmd_params = ["-b", "5"]
 
 [workflow_config]
-  use_chainlink_cli = true
+  use_chainlink_cli = false
   use_existing = true
 
   [workflow_config.existing]
