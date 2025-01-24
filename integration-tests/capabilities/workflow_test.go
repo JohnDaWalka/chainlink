@@ -564,7 +564,7 @@ func TestWorkflow(t *testing.T) {
 		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV)
 		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV)
 
-		ghToken := os.Getenv("GH_TOKEN")
+		ghToken := os.Getenv("GITHUB_TOKEN")
 		_, err := downloadCronCapability(ghToken)
 		require.NoError(t, err, "failed to download cron capability")
 
