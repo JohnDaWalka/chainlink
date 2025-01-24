@@ -571,13 +571,13 @@ func validateInputsAndEnvVars(t *testing.T, testConfig *WorkflowTestConfig) {
 		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV)
 		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV)
 
-		ghToken := os.Getenv("GITHUB_TOKEN")
+		ghToken := os.Getenv("GITHUB_API_TOKEN")
 		_, err := downloadCronCapability(ghToken)
-		require.NoError(t, err, "failed to download cron capability")
+		require.NoError(t, err, "failed to download cron capability. Make sure token has content:read permissions to the capabilities repo")
 
 		if testConfig.WorkflowConfig.UseChainlinkCLI {
 			err = downloadAndInstallChainlinkCLI(ghToken)
-			require.NoError(t, err, "failed to download and install chainlink-cli")
+			require.NoError(t, err, "failed to download and install chainlink-cli. Make sure token has content:read permissions to the dev-platform repo")
 		}
 	}
 
@@ -585,7 +585,7 @@ func validateInputsAndEnvVars(t *testing.T, testConfig *WorkflowTestConfig) {
 		require.True(t, isInstalled("chainlink-cli"), "chainlink-cli is required for this test. Please install it, add to path and run again")
 
 		if !testConfig.WorkflowConfig.UseExising {
-			require.NotEmpty(t, os.Getenv("GITHUB_TOKEN"), "GITHUB_TOKEN must be set to use chainlink-cli. It requires read/write Gist permissions")
+			require.NotEmpty(t, os.Getenv("GITHUB_API_TOKEN"), "GITHUB_API_TOKEN must be set to use chainlink-cli. It requires gist:read and gist:write permissions")
 		} else {
 			require.NotEmpty(t, testConfig.WorkflowConfig.ChainlinkCLI.FolderLocation, "folder_location must be set in the chainlink_cli config")
 		}
@@ -976,7 +976,7 @@ func starAndFundNodes(t *testing.T, testLogger zerolog.Logger, in *WorkflowTestC
 	if os.Getenv("IS_CI") == "true" {
 		// Due to how we pass custom env vars to reusable workflow we need to use placeholders, so first we need to resolve what's the name of the target environment variable
 		// that stores chainlink version and then we can use it to resolve the image name
-		image := fmt.Sprintf("%s:%s", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), os.Getenv(ctfutils.MustResolveEnvPlaceholder(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV)))
+		image := fmt.Sprintf("%s:%s", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), os.Getenv(ctfutils.MustResolveEnvPlaceholder(os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV))))
 		testLogger.Info().Msgf("Setting chainlink image to %s", image)
 		for _, nodeSpec := range in.NodeSet.NodeSpecs {
 			nodeSpec.Node.Image = image
