@@ -390,14 +390,12 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 						TokenAddress:       tokens[selectorA].Address,
 						LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 						AcceptLiquidity:    &acceptLiquidity,
-						ForceDeployment:    true,
 					},
 					selectorB: {
 						Type:               changeset.LockReleaseTokenPool,
 						TokenAddress:       tokens[selectorB].Address,
 						LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 						AcceptLiquidity:    &acceptLiquidity,
-						ForceDeployment:    true,
 					},
 				}, mcmsConfig != nil)
 
