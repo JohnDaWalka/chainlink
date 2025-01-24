@@ -42,6 +42,7 @@ contract RoninForkTests is Test {
   uint256 public constant FORK_BLOCK = 21680971;
 
   address public constant MCMS_MULTISIG = 0x44835bBBA9D40DEDa9b64858095EcFB2693c9449;
+  address public constant RONIN_USDC_LIQUIDITY_PROVIDER = address(0x1234);
 
   SiloedLockReleaseTokenPool public s_siloedTokenPool;
 
@@ -60,12 +61,12 @@ contract RoninForkTests is Test {
   }
 
   function test_SiloedLockReleaseTokenPool() public {
-
     address currentWethPool = TOKEN_ADMIN_REGISTRY.getPool(WETH);
 
     // Get the address of the rebalancer that can withdraw from the pool
     address rebalancer = LockReleaseTokenPool(currentWethPool).getRebalancer();
 
+    // Set the rebalancer on the new pool to be equal to the current finance multisig
     s_siloedTokenPool.setRebalancer(rebalancer);
 
     // Add ronin to the list of allowed chains
@@ -90,11 +91,11 @@ contract RoninForkTests is Test {
     // Set the new siloed lock release token pool as the official pool for WETH on mainnet.
     vm.expectEmit();
     emit TokenAdminRegistry.PoolSet(WETH, currentWethPool, address(s_siloedTokenPool));
-
     TOKEN_ADMIN_REGISTRY.setPool(WETH, address(s_siloedTokenPool));
 
     assertEq(address(s_siloedTokenPool), TOKEN_ADMIN_REGISTRY.getPool(WETH));
 
+    // Get the balance of the pool now which will be migrated
     uint256 liquidityBalance = IERC20(WETH).balanceOf(address(s_siloedTokenPool));
 
     vm.startPrank(rebalancer);
@@ -105,10 +106,9 @@ contract RoninForkTests is Test {
 
     s_siloedTokenPool.provideLiquidity(liquidityBalance);
 
+    // Check that the liquidity was migrated correctly.
     assertEq(IERC20(WETH).balanceOf(address(s_siloedTokenPool)), liquidityBalance);
     assertEq(s_siloedTokenPool.getUnsiloedLiquidity(), liquidityBalance);
-
-
 
     // Set the Remote chain to be siloed
     SiloedLockReleaseTokenPool.SiloConfigUpdate[] memory updates = new SiloedLockReleaseTokenPool.SiloConfigUpdate[](1);
@@ -121,6 +121,7 @@ contract RoninForkTests is Test {
     s_siloedTokenPool.updateSiloDesignations(new uint64[](0), updates);
     assertTrue(s_siloedTokenPool.isSiloed(RONIN_CHAIN_SELECTOR));
 
+    // As the Ronin rebalance role, approve the siloed token pool to spend the WETH
     vm.startPrank(SILOED_REBALANCER);
     IERC20(WETH).safeApprove(address(s_siloedTokenPool), type(uint256).max);
 
@@ -165,6 +166,7 @@ contract RoninForkTests is Test {
     vm.startPrank(MCMS_MULTISIG);
     uint256 sendAmount = 1e6;
 
+    // Check that Ronin is disabled by default for the pool
     assertFalse(USDCTokenPool.shouldUseLockRelease(RONIN_CHAIN_SELECTOR));
     assertFalse(USDCTokenPool.isSupportedChain(RONIN_CHAIN_SELECTOR));
     RateLimiter.Config memory rateLimiterConfig = RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0});
@@ -181,6 +183,7 @@ contract RoninForkTests is Test {
       inboundRateLimiterConfig: rateLimiterConfig
     });
 
+    // Enable the pool first and then enable the selector mechanism to use L/R
     USDCTokenPool.applyChainUpdates(new uint64[](0), updates);
 
     // Check that Ronin has been enabled.
@@ -280,7 +283,7 @@ contract RoninForkTests is Test {
     vm.expectEmit();
     emit TokenPool.Released(RONIN_OFF_RAMP, address(0xdeadbeef), sendAmount);
 
-    // Use the LOCK_RELEASE_FLAG to trigger the L/R mechanism on the pool
+    // Use the LOCK_RELEASE_FLAG to trigger the L/R mechanism on the pool from Ronin
     USDCTokenPool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode("FAKE_SENDER"),
@@ -296,5 +299,44 @@ contract RoninForkTests is Test {
 
     // Check that the tokens were actually released
     assertEq(IERC20(USDC).balanceOf(address(USDCTokenPool)), 0);
+
+    // Test the providing of USDC Liquidity
+    vm.startPrank(MCMS_MULTISIG);
+    
+    // Set the Ronin chain as a liquidity provider
+    uint256 liquidityAmount = 1e12;
+    USDCTokenPool.setLiquidityProvider(RONIN_CHAIN_SELECTOR, RONIN_USDC_LIQUIDITY_PROVIDER);
+    deal(USDC, RONIN_USDC_LIQUIDITY_PROVIDER, liquidityAmount);
+    
+    // Provide the liquidity
+    vm.startPrank(RONIN_USDC_LIQUIDITY_PROVIDER);
+    IERC20(USDC).safeApprove(address(USDCTokenPool), type(uint256).max);
+    USDCTokenPool.provideLiquidity(RONIN_CHAIN_SELECTOR, liquidityAmount);
+
+    assertEq(USDCTokenPool.getLockedTokensForChain(RONIN_CHAIN_SELECTOR), liquidityAmount);
+
+    vm.startPrank(RONIN_OFF_RAMP);
+
+    vm.expectEmit();
+    emit TokenPool.Released(RONIN_OFF_RAMP, address(0xdeadbeef), liquidityAmount);
+
+    // Attempt an incoming message from Ronin to release the liquidity
+    USDCTokenPool.releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: abi.encode("FAKE_SENDER"),
+        remoteChainSelector: RONIN_CHAIN_SELECTOR,
+        receiver: address(0xdeadbeef),
+        amount: liquidityAmount,
+        localToken: USDC,
+        sourcePoolAddress: abi.encode("FAKE_POOL"),
+        sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
+        offchainTokenData: ""
+      })
+    );
+
+    // Assert that the liquidity was released
+    assertEq(IERC20(USDC).balanceOf(address(USDCTokenPool)), 0);
+    assertEq(USDCTokenPool.getLockedTokensForChain(RONIN_CHAIN_SELECTOR), 0);
+
   }
 }
