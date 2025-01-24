@@ -59,7 +59,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
-	ctfutils "github.com/smartcontractkit/chainlink-testing-framework/lib/utils"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	workflow_registry_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/workflowregistry"
 )
@@ -976,7 +975,7 @@ func starAndFundNodes(t *testing.T, testLogger zerolog.Logger, in *WorkflowTestC
 	if os.Getenv("IS_CI") == "true" {
 		// Due to how we pass custom env vars to reusable workflow we need to use placeholders, so first we need to resolve what's the name of the target environment variable
 		// that stores chainlink version and then we can use it to resolve the image name
-		image := fmt.Sprintf("%s:%s", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), os.Getenv(ctfutils.MustResolveEnvPlaceholder(os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV))))
+		image := fmt.Sprintf("%s:%s", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV))
 		testLogger.Info().Msgf("Setting chainlink image to %s", image)
 		for _, nodeSpec := range in.NodeSet.NodeSpecs {
 			nodeSpec.Node.Image = image
