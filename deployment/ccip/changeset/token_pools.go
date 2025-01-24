@@ -80,9 +80,13 @@ func (t TokenPoolInfo) GetPoolAndTokenAddress(
 	chain deployment.Chain,
 	state CCIPChainState,
 ) (*token_pool.TokenPool, common.Address, error) {
-	tokenPool, err := getTokenPoolFromSymbolTypeAndVersion(state, chain, symbol, t.Type, t.Version)
+	tokenPoolAddress, ok := getTokenPoolAddressFromSymbolTypeAndVersion(state, chain, symbol, t.Type, t.Version)
+	if !ok {
+		return nil, utils.ZeroAddress, fmt.Errorf("token pool does not exist on %s with symbol %s, type %s, and version %s", chain, symbol, t.Type, t.Version)
+	}
+	tokenPool, err := token_pool.NewTokenPool(tokenPoolAddress, chain.Client)
 	if err != nil {
-		return nil, utils.ZeroAddress, fmt.Errorf("failed to find token pool on %s with symbol %s, type %s, and version %s: %w", chain, symbol, t.Type, t.Version, err)
+		return nil, utils.ZeroAddress, fmt.Errorf("failed to connect token pool with address %s on chain %s to token pool bindings: %w", tokenPoolAddress, chain, err)
 	}
 	tokenAddress, err := tokenPool.GetToken(&bind.CallOpts{Context: ctx})
 	if err != nil {
@@ -144,90 +148,42 @@ func newTokenPoolWithMetadata[P tokenPool](
 	}, nil
 }
 
-// getAllTokenPoolsWithSymbolAndVersion returns a list of all token pools tied to the given token symbol and semver version.
-func getAllTokenPoolsWithSymbolAndVersion(
-	chainState CCIPChainState,
-	chainClient deployment.OnchainClient,
-	symbol TokenSymbol,
-	requestedVersion semver.Version,
-) ([]*token_pool.TokenPool, error) {
-	var tokenPools []*token_pool.TokenPool
-	appendPoolIfVersionIsCorrect := func(address common.Address, version semver.Version) error {
-		if version.Equal(&requestedVersion) {
-			tp, err := token_pool.NewTokenPool(address, chainClient)
-			if err != nil {
-				return fmt.Errorf("failed to connect address %s with token pool bindings: %w", address, err)
-			}
-			tokenPools = append(tokenPools, tp)
-			return nil
-		}
-		return nil
-	}
-
-	for version, pool := range chainState.BurnMintTokenPools[symbol] {
-		err := appendPoolIfVersionIsCorrect(pool.Address(), version)
-		if err != nil {
-			return nil, err
-		}
-	}
-	for version, pool := range chainState.BurnWithFromMintTokenPools[symbol] {
-		err := appendPoolIfVersionIsCorrect(pool.Address(), version)
-		if err != nil {
-			return nil, err
-		}
-	}
-	for version, pool := range chainState.BurnFromMintTokenPools[symbol] {
-		err := appendPoolIfVersionIsCorrect(pool.Address(), version)
-		if err != nil {
-			return nil, err
-		}
-	}
-	for version, pool := range chainState.LockReleaseTokenPools[symbol] {
-		err := appendPoolIfVersionIsCorrect(pool.Address(), version)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return tokenPools, nil
-}
-
-// getTokenPoolFromSymbolTypeAndVersion returns the token pool in the environment linked to a particular symbol, type, and version
-func getTokenPoolFromSymbolTypeAndVersion(
+// getTokenPoolAddressFromSymbolTypeAndVersion returns the token pool address in the environment linked to a particular symbol, type, and version
+func getTokenPoolAddressFromSymbolTypeAndVersion(
 	chainState CCIPChainState,
 	chain deployment.Chain,
 	symbol TokenSymbol,
 	poolType deployment.ContractType,
 	version semver.Version,
-) (*token_pool.TokenPool, error) {
+) (common.Address, bool) {
 	switch poolType {
 	case BurnMintTokenPool:
 		if tokenPools, ok := chainState.BurnMintTokenPools[symbol]; ok {
 			if tokenPool, ok := tokenPools[version]; ok {
-				return token_pool.NewTokenPool(tokenPool.Address(), chain.Client)
+				return tokenPool.Address(), true
 			}
 		}
 	case BurnFromMintTokenPool:
 		if tokenPools, ok := chainState.BurnFromMintTokenPools[symbol]; ok {
 			if tokenPool, ok := tokenPools[version]; ok {
-				return token_pool.NewTokenPool(tokenPool.Address(), chain.Client)
+				return tokenPool.Address(), true
 			}
 		}
 	case BurnWithFromMintTokenPool:
 		if tokenPools, ok := chainState.BurnWithFromMintTokenPools[symbol]; ok {
 			if tokenPool, ok := tokenPools[version]; ok {
-				return token_pool.NewTokenPool(tokenPool.Address(), chain.Client)
+				return tokenPool.Address(), true
 			}
 		}
 	case LockReleaseTokenPool:
 		if tokenPools, ok := chainState.LockReleaseTokenPools[symbol]; ok {
 			if tokenPool, ok := tokenPools[version]; ok {
-				return token_pool.NewTokenPool(tokenPool.Address(), chain.Client)
+				return tokenPool.Address(), true
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("failed to find token pool with symbol %s, type %s, and version %s", symbol, poolType, version)
+	return utils.ZeroAddress, false
 }
 
 // TokenAdminRegistryChangesetConfig defines a config for all token admin registry actions.

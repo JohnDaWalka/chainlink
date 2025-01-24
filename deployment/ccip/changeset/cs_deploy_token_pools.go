@@ -35,8 +35,6 @@ type DeployTokenPoolInput struct {
 	LocalTokenDecimals uint8
 	// AcceptLiquidity indicates whether or not the new pool can accept liquidity from a rebalancer address (lock-release only).
 	AcceptLiquidity *bool
-	// ForceDeployment forces deployment of a new token pool, even if one already exists for the corresponding token in state.
-	ForceDeployment bool
 }
 
 func (i DeployTokenPoolInput) Validate(ctx context.Context, chain deployment.Chain, state CCIPChainState, tokenSymbol TokenSymbol) error {
@@ -83,13 +81,10 @@ func (i DeployTokenPoolInput) Validate(ctx context.Context, chain deployment.Cha
 		return errors.New("accept liquidity must be nil for burn mint pools")
 	}
 
-	// Regardless of requested type, we should check if a token pool of any type already exists
-	tokenPools, err := getAllTokenPoolsWithSymbolAndVersion(state, chain.Client, tokenSymbol, currentTokenPoolVersion)
-	if err != nil {
-		return fmt.Errorf("failed to get all token pools with symbol %s on chain %s: %w", tokenSymbol, chain.String(), err)
-	}
-	if len(tokenPools) > 0 && !i.ForceDeployment {
-		return fmt.Errorf("token pool with version %s already exists for %s on %s (use forceDeployment to bypass)", currentTokenPoolVersion, tokenSymbol, chain.String())
+	// We should check if a token pool with this type, version, and symbol already exists
+	_, ok := getTokenPoolAddressFromSymbolTypeAndVersion(state, chain, tokenSymbol, i.Type, currentTokenPoolVersion)
+	if ok {
+		return fmt.Errorf("token pool with type %s and version %s already exists for %s on %s", i.Type, currentTokenPoolVersion, tokenSymbol, chain)
 	}
 
 	return nil

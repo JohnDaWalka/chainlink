@@ -81,14 +81,14 @@ func (c TokenPoolConfig) Validate(ctx context.Context, chain deployment.Chain, s
 	}
 
 	// Ensure that a pool with given symbol, type and version is known to the environment
-	tokenPool, err := getTokenPoolFromSymbolTypeAndVersion(state, chain, tokenSymbol, c.Type, c.Version)
-	if err != nil {
-		return fmt.Errorf("failed to find token pool on %s with symbol %s, type %s, and version %s: %w", chain.String(), tokenSymbol, c.Type, c.Version, err)
+	tokenPoolAddress, ok := getTokenPoolAddressFromSymbolTypeAndVersion(state, chain, tokenSymbol, c.Type, c.Version)
+	if !ok {
+		return fmt.Errorf("token pool does not exist on %s with symbol %s, type %s, and version %s", chain.String(), tokenSymbol, c.Type, c.Version)
 	}
 
 	// Validate that the token pool is owned by the address that will be actioning the transactions (i.e. Timelock or deployer key)
 	if err := commoncs.ValidateOwnership(ctx, useMcms, chain.DeployerKey.From, state.Timelock.Address(), state.TokenAdminRegistry); err != nil {
-		return fmt.Errorf("token pool with address %s on %s failed ownership validation: %w", tokenPool.Address(), chain.String(), err)
+		return fmt.Errorf("token pool with address %s on %s failed ownership validation: %w", tokenPoolAddress, chain.String(), err)
 	}
 
 	// Validate chain configurations, namely rate limits
@@ -305,9 +305,13 @@ func getTokenStateFromPool(
 	chain deployment.Chain,
 	state CCIPChainState,
 ) (*token_pool.TokenPool, common.Address, token_admin_registry.TokenAdminRegistryTokenConfig, error) {
-	tokenPool, err := getTokenPoolFromSymbolTypeAndVersion(state, chain, symbol, poolType, version)
+	tokenPoolAddress, ok := getTokenPoolAddressFromSymbolTypeAndVersion(state, chain, symbol, poolType, version)
+	if !ok {
+		return nil, utils.ZeroAddress, token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("token pool does not exist on %s with symbol %s, type %s, and version %s", chain.String(), symbol, poolType, version)
+	}
+	tokenPool, err := token_pool.NewTokenPool(tokenPoolAddress, chain.Client)
 	if err != nil {
-		return nil, utils.ZeroAddress, token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("failed to find token pool on %s with symbol %s, type %s, and version %s: %w", chain.String(), symbol, poolType, version, err)
+		return nil, utils.ZeroAddress, token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("failed to connect token pool with address %s on chain %s to token pool bindings: %w", tokenPoolAddress, chain, err)
 	}
 	tokenAddress, err := tokenPool.GetToken(&bind.CallOpts{Context: ctx})
 	if err != nil {

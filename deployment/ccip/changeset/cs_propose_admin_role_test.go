@@ -260,7 +260,7 @@ func TestProposeAdminRoleChangeset_ExecutionWithExternalAdmin(t *testing.T) {
 			registryOnA := state.Chains[selectorA].TokenAdminRegistry
 			registryOnB := state.Chains[selectorB].TokenAdminRegistry
 
-			e, err = commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
+			_, err = commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
 				{
 					Changeset: commonchangeset.WrapChangeSet(changeset.ProposeAdminRoleChangeset),
 					Config: changeset.TokenAdminRegistryChangesetConfig{
