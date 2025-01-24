@@ -100,7 +100,7 @@ jobs:
               - '.github/workflows/integration-tests.yml'
               - '.github/workflows/run-e2e-tests-reusable-workflow.yml'
               - '.github/e2e-tests.yml'
-            core_changes:
+            core_changes: &core_changes
               - '**/*.go'
               - '**/*go.sum'
               - '**/*go.mod'
@@ -108,13 +108,13 @@ jobs:
               - 'core/**/migrations/*.sql'
               - 'core/**/config/**/*.toml'
               - 'integration-tests/**/*.toml'
-            workflow_engine_changes:
-              - 'core/services/gateway/**'
-              - 'core/services/ocr3/**'
-              - 'core/services/ocrcommon/**'
-              - 'core/services/registrysyncer/**'
-              - 'core/services/workflows/**'
-              - 'core/services/standardcapabilities/**'
+            keystone_changes:
+              - *core_changes
+              - 'contracts/src/**/keystone/**'
+              - 'contracts/src/**/shared/**'
+              - 'contracts/GNUmakefile'
+              - 'contracts/foundry.toml'
+              - 'contracts/package.json'
             ccip_changes:
               - '**/*ccip*'
               - '**/*ccip*/**'
@@ -126,8 +126,9 @@ jobs:
       github_ci_changes: ${{ steps.ignore-filter.outputs.changes || steps.changes.outputs.github_ci_changes }}
       core_changes: ${{ steps.ignore-filter.outputs.changes || steps.changes.outputs.core_changes }}
       ccip_changes: ${{ steps.ignore-filter.outputs.changes || steps.changes.outputs.ccip_changes }}
+      # keystone_changes: ${{ steps.ignore-filter.outputs.changes || steps.changes.outputs.keystone_changes }}
       # set to 'true' for testing purposes
-      workflow_engine_changes: 'true'
+      keystone_changes: 'true'
 
   build-chainlink:
     environment: integration
@@ -174,8 +175,8 @@ jobs:
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           dep_evm_sha: ${{ inputs.evm-ref }}
 
-  run-core-e2e-workflow-engine-tests-for-pr:
-    name: Run Core Workflow Engine E2E Tests For PR
+  run-core-e2e-keystone-tests-for-pr:
+    name: Run Core Keystone Engine E2E Tests For PR
     permissions:
       actions: read
       checks: write
@@ -183,8 +184,8 @@ jobs:
       id-token: write
       contents: read
     needs: [build-chainlink, changes]
-    if: github.event_name == 'pull_request' && ( needs.changes.outputs.workflow_engine_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@6123809ec05787bfe0424fad755366ea915614c6
+    if: github.event_name == 'pull_request' && ( needs.changes.outputs.keystone_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@2f8d779d95916135b35e6e0d653a799c4e42cfb7
     with:
       workflow_name: Run Core Workflow Engine Tests For PR
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
@@ -401,7 +402,7 @@ jobs:
     name: ETH Smoke Tests
     runs-on: ubuntu-latest
     # needs: [run-core-e2e-tests-for-pr, run-ccip-e2e-tests-for-pr, run-core-e2e-tests-for-merge-queue, run-ccip-e2e-tests-for-merge-queue]
-    needs: [run-core-e2e-workflow-engine-tests-for-pr, run-core-e2e-tests-for-merge-queue, run-ccip-e2e-tests-for-merge-queue]
+    needs: [run-core-e2e-keystone-tests-for-pr, run-core-e2e-tests-for-merge-queue, run-ccip-e2e-tests-for-merge-queue]
     steps:
       # - name: Check Core test results
       #   id: check_core_results
@@ -413,10 +414,10 @@ jobs:
       #     node_migration_tests_failed=$(echo $results | jq '[.[] | select(.id == "integration-tests/migration/upgrade_version_test.go:*" ) | select(.result != "success")] | length > 0')
       #     echo "node_migration_tests_failed=$node_migration_tests_failed" >> $GITHUB_OUTPUT
 
-      - name: Check Core Workflow Engine test results
-        id: check_core_workflow_engine_results
+      - name: Check Core Keystone test results
+        id: check_core_keystone_results
         run: |
-          results='${{ needs.run-core-e2e-workflow-engine-tests-for-p.outputs.test_results }}'
+          results='${{ needs.run-core-e2e-keystone-tests-for-pr.outputs.test_results }}'
           echo "Core test results:"
           echo "$results" | jq .
 
