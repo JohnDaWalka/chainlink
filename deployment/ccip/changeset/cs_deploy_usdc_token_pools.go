@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	"github.com/smartcontractkit/chainlink/v2/evm/utils"
@@ -16,17 +17,15 @@ import (
 
 var _ deployment.ChangeSet[DeployUSDCTokenPoolContractsConfig] = DeployUSDCTokenPoolContractsChangeset
 
-// DeployUSDCTokenPoolInput defines all information required of the user to deploy a new token pool contract.
+// DeployUSDCTokenPoolInput defines all information required of the user to deploy a new USDC token pool contract.
 type DeployUSDCTokenPoolInput struct {
 	// TokenMessenger is the address of the USDC token messenger contract.
 	TokenMessenger common.Address
-	// USDCTokenAddress is the address of the token for which we are deploying a USDC token pool.
+	// USDCTokenAddress is the address of the USDC token for which we are deploying a token pool.
 	TokenAddress common.Address
 	// AllowList is the optional list of addresses permitted to initiate a token transfer.
 	// If omitted, all addresses will be permitted to transfer the token.
 	AllowList []common.Address
-	// ForceDeployment forces deployment of a new token pool, even if one already exists for the corresponding token in state.
-	ForceDeployment bool
 }
 
 func (i DeployUSDCTokenPoolInput) Validate(ctx context.Context, chain deployment.Chain, state CCIPChainState) error {
@@ -51,9 +50,25 @@ func (i DeployUSDCTokenPoolInput) Validate(ctx context.Context, chain deployment
 		return fmt.Errorf("symbol of token with address %s (%s) is not USDC", i.TokenAddress, symbol)
 	}
 
-	// Check if a USDC token pool with the given type already exists
+	// Check if a USDC token pool with the given version already exists
 	if _, ok := state.USDCTokenPools[currentTokenPoolVersion]; ok {
-		return fmt.Errorf("USDC token pool with version %s already exists on %s", currentTokenPoolVersion, chain.String())
+		return fmt.Errorf("USDC token pool with version %s already exists on %s", currentTokenPoolVersion, chain)
+	}
+
+	// Perform USDC checks (i.e. make sure we can call the required functions)
+	// LocalMessageTransmitter and MessageBodyVersion are called in the contract constructor:
+	// https://github.com/smartcontractkit/chainlink/blob/f52a57762643b9cdc8e9241737e13501a4278716/contracts/src/v0.8/ccip/pools/USDC/USDCTokenPool.sol#L83
+	messenger, err := mock_usdc_token_messenger.NewMockE2EUSDCTokenMessenger(i.TokenMessenger, chain.Client)
+	if err != nil {
+		return fmt.Errorf("failed to connect address %s on %s with token messenger bindings: %w", i.TokenMessenger, chain, err)
+	}
+	_, err = messenger.LocalMessageTransmitter(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return fmt.Errorf("failed to fetch local message transmitter from address %s on %s: %w", i.TokenMessenger, chain, err)
+	}
+	_, err = messenger.MessageBodyVersion(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return fmt.Errorf("failed to fetch message body version from address %s on %s: %w", i.TokenMessenger, chain, err)
 	}
 
 	return nil
@@ -84,10 +99,10 @@ func (c DeployUSDCTokenPoolContractsConfig) Validate(env deployment.Environment)
 			return fmt.Errorf("chain with selector %d does not exist in state", chainSelector)
 		}
 		if router := chainState.Router; router == nil {
-			return fmt.Errorf("missing router on %s", chain.String())
+			return fmt.Errorf("missing router on %s", chain)
 		}
 		if rmnProxy := chainState.RMNProxy; rmnProxy == nil {
-			return fmt.Errorf("missing rmnProxy on %s", chain.String())
+			return fmt.Errorf("missing rmnProxy on %s", chain)
 		}
 		err = poolConfig.Validate(env.GetContext(), chain, chainState)
 		if err != nil {

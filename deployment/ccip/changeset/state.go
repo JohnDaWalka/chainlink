@@ -146,7 +146,7 @@ type CCIPChainState struct {
 	Receiver               maybe_revert_message_receiver.MaybeRevertMessageReceiverInterface
 	LogMessageDataReceiver *log_message_data_receiver.LogMessageDataReceiver
 	TestRouter             *router.Router
-	USDCTokenPool          *usdc_token_pool.USDCTokenPool
+	TestUSDCTokenPool      *usdc_token_pool.USDCTokenPool
 	MockUSDCTransmitter    *mock_usdc_token_transmitter.MockE2EUSDCTransmitter
 	MockUSDCTokenMessenger *mock_usdc_token_messenger.MockE2EUSDCTokenMessenger
 	Multicall3             *multicall3.Multicall3

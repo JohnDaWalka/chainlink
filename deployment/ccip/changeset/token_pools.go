@@ -226,13 +226,11 @@ func (c TokenAdminRegistryChangesetConfig) Validate(
 		if tokenAdminRegistry := chainState.TokenAdminRegistry; tokenAdminRegistry == nil {
 			return fmt.Errorf("missing tokenAdminRegistry on %s", chain)
 		}
-		if c.MCMS != nil {
-			if timelock := chainState.Timelock; timelock == nil {
-				return fmt.Errorf("missing timelock on %s", chain)
-			}
-			if proposerMcm := chainState.ProposerMcm; proposerMcm == nil {
-				return fmt.Errorf("missing proposerMcm on %s", chain)
-			}
+		if timelock := chainState.Timelock; timelock == nil {
+			return fmt.Errorf("missing timelock on %s", chain)
+		}
+		if proposerMcm := chainState.ProposerMcm; proposerMcm == nil {
+			return fmt.Errorf("missing proposerMcm on %s", chain)
 		}
 		// Validate that the token admin registry is owned by the address that will be actioning the transactions (i.e. Timelock or deployer key)
 		// However, most token admin registry actions aren't owner-protected. They just require you to be the admin.
