@@ -45,6 +45,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -558,6 +559,7 @@ func downloadCronCapability(ghToken string) (string, error) {
 }
 
 func TestWorkflow(t *testing.T) {
+	testLogger := logging.GetTestLogger(t)
 	feedID := "018bfe8840700040000000000000000000000000000000000000000000000000" // without 0x prefix!
 	feedBytes := common.HexToHash(feedID)
 
@@ -687,7 +689,7 @@ func TestWorkflow(t *testing.T) {
 	for addrStr, tv := range addresses {
 		if strings.Contains(tv.String(), "KeystoneForwarder") {
 			forwarderAddress = common.HexToAddress(addrStr)
-			lgr.Infof("Deployed KeystoneForwarder contract at %s", forwarderAddress.Hex())
+			testLogger.Info().Msgf("Deployed KeystoneForwarder contract at %s", forwarderAddress.Hex())
 			break
 		}
 	}
@@ -706,7 +708,7 @@ func TestWorkflow(t *testing.T) {
 	for addrStr, tv := range addresses {
 		if strings.Contains(tv.String(), "WorkflowRegistry") {
 			workflowRegistryAddr = common.HexToAddress(addrStr)
-			lgr.Infof("Deployed WorkflowRegistry contract at %s", workflowRegistryAddr.Hex())
+			testLogger.Info().Msgf("Deployed WorkflowRegistry contract at %s", workflowRegistryAddr.Hex())
 		}
 	}
 
@@ -740,7 +742,7 @@ func TestWorkflow(t *testing.T) {
 	var feedsConsumerAddress common.Address
 	for addrStr, tv := range addresses {
 		if strings.Contains(tv.String(), "FeedConsumer") {
-			lgr.Infof("Deployed FeedConsumer contract at %s", feedsConsumerAddress.Hex())
+			testLogger.Info().Msgf("Deployed FeedConsumer contract at %s", feedsConsumerAddress.Hex())
 			feedsConsumerAddress = common.HexToAddress(addrStr)
 		}
 	}
@@ -913,6 +915,7 @@ func TestWorkflow(t *testing.T) {
 	// CTFv2 currently doesn't support dynamic image and version setting
 	if os.Getenv("IS_CI") == "true" {
 		image := fmt.Sprintf("%s:%s", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV))
+		testLogger.Info().Msgf("Setting chainlink image to %s", image)
 		for _, nodeSpec := range in.NodeSet.NodeSpecs {
 			nodeSpec.Node.Image = image
 		}
@@ -1064,7 +1067,7 @@ func TestWorkflow(t *testing.T) {
 	_, decodeErr = sc.Decode(tx, err)
 	require.NoError(t, decodeErr, "failed to deploy OCR Capability contract")
 
-	lgr.Infof("Deployed OCR3 Capability contract at %s", ocr3CapabilityAddress.Hex())
+	testLogger.Info().Msgf("Deployed OCR3 Capability contract at %s", ocr3CapabilityAddress.Hex())
 
 	// Create gateway and bootstrap (ocr3) jobs for the bootstrap node
 	bootstrapNode := nodeClients[0]
@@ -1176,7 +1179,7 @@ func TestWorkflow(t *testing.T) {
 					schemaVersion = 1
 					name = "cron-capabilities"
 					forwardingAllowed = false
-					command = "/home/capabilities/cron-linux-amd64"
+					command = "/home/capabilities/amd64_cron"
 					config = ""
 				`
 
@@ -1376,10 +1379,10 @@ func TestWorkflow(t *testing.T) {
 			require.NoError(t, err, "failed to get price from Keystone Consumer contract")
 
 			if price.String() != "0" {
-				lgr.Infof("Feed updated after %s - price set, price=%s", elapsed, price)
+				testLogger.Info().Msgf("Feed updated after %s - price set, price=%s", elapsed, price)
 				return
 			}
-			lgr.Infof("Feed not updated yet, waiting for %s", elapsed)
+			testLogger.Info().Msgf("Feed not updated yet, waiting for %s", elapsed)
 		}
 	}
 }
