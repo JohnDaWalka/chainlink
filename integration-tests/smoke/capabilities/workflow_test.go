@@ -564,15 +564,15 @@ func validateInputsAndEnvVars(t *testing.T, testConfig *WorkflowTestConfig) {
 		require.True(t, testConfig.WorkflowConfig.UseExising, "if you are not using chainlink-cli you must use an existing workflow")
 	}
 
+	ghToken := os.Getenv("GITHUB_API_TOKEN")
+	_, err := downloadCronCapability(ghToken)
+	require.NoError(t, err, "failed to download cron capability. Make sure token has content:read permissions to the capabilities repo")
+
 	// TODO this part should ideally happen outside of the test, but due to how our reusable e2e test workflow is structured now
 	// we cannot execute this part in workflow steps (it doesn't support any pre-execution hooks)
 	if os.Getenv("IS_CI") == "true" {
 		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV)
 		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV)
-
-		ghToken := os.Getenv("GITHUB_API_TOKEN")
-		_, err := downloadCronCapability(ghToken)
-		require.NoError(t, err, "failed to download cron capability. Make sure token has content:read permissions to the capabilities repo")
 
 		if testConfig.WorkflowConfig.UseChainlinkCLI {
 			err = downloadAndInstallChainlinkCLI(ghToken)
@@ -650,7 +650,9 @@ func deployKeystoneForwarder(t *testing.T, testLogger zerolog.Logger, ctfEnv *de
 	})
 	require.NoError(t, err, "failed to deploy forwarder contract")
 
-	addresses, err := output.AddressBook.AddressesForChain(chainSelector)
+	ctfEnv.ExistingAddresses.Merge(output.AddressBook)
+
+	addresses, err := ctfEnv.ExistingAddresses.AddressesForChain(chainSelector)
 	require.NoError(t, err, "failed to get addresses for chain %d from the address book", chainSelector)
 
 	var forwarderAddress common.Address
@@ -712,7 +714,9 @@ func prepareWorkflowRegistry(t *testing.T, testLogger zerolog.Logger, ctfEnv *de
 	output, err := workflow_registry_changeset.Deploy(*ctfEnv, chainSelector)
 	require.NoError(t, err, "failed to deploy workflow registry contract")
 
-	addresses, err := output.AddressBook.AddressesForChain(chainSelector)
+	ctfEnv.ExistingAddresses.Merge(output.AddressBook)
+
+	addresses, err := ctfEnv.ExistingAddresses.AddressesForChain(chainSelector)
 	require.NoError(t, err, "failed to get addresses for chain %d from the address book", chainSelector)
 
 	var workflowRegistryAddr common.Address
@@ -722,9 +726,6 @@ func prepareWorkflowRegistry(t *testing.T, testLogger zerolog.Logger, ctfEnv *de
 			testLogger.Info().Msgf("Deployed WorkflowRegistry contract at %s", workflowRegistryAddr.Hex())
 		}
 	}
-
-	// TODO Do we have to update existing addresses manually with output.AddressBook?
-	ctfEnv.ExistingAddresses = output.AddressBook
 
 	// Configure Workflow Registry contract
 	_, err = workflow_registry_changeset.UpdateAllowedDons(*ctfEnv, &workflow_registry_changeset.UpdateAllowedDonsRequest{
@@ -750,7 +751,9 @@ func prepareFeedsConsumer(t *testing.T, testLogger zerolog.Logger, ctfEnv *deplo
 	})
 	require.NoError(t, err, "failed to deploy feeds_consumer contract")
 
-	addresses, err := output.AddressBook.AddressesForChain(chainSelector)
+	ctfEnv.ExistingAddresses.Merge(output.AddressBook)
+
+	addresses, err := ctfEnv.ExistingAddresses.AddressesForChain(chainSelector)
 	require.NoError(t, err, "failed to get addresses for chain %d from the address book", chainSelector)
 
 	var feedsConsumerAddress common.Address
@@ -969,14 +972,13 @@ func registerWorkflow(t *testing.T, in *WorkflowTestConfig, sc *seth.Client, cap
 	require.NoError(t, err, "failed to register workflow using chainlink-cli")
 }
 
-func starAndFundNodes(t *testing.T, testLogger zerolog.Logger, in *WorkflowTestConfig, bc *blockchain.Output, sc *seth.Client) (*ns.Output, []NodeInfo) {
+func starAndFundNodes(t *testing.T, in *WorkflowTestConfig, bc *blockchain.Output, sc *seth.Client) (*ns.Output, []NodeInfo) {
 	// Hack for CI that allows us to dynamically set the chainlink image and version
 	// CTFv2 currently doesn't support dynamic image and version setting
 	if os.Getenv("IS_CI") == "true" {
 		// Due to how we pass custom env vars to reusable workflow we need to use placeholders, so first we need to resolve what's the name of the target environment variable
 		// that stores chainlink version and then we can use it to resolve the image name
 		image := fmt.Sprintf("%s:%s", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV))
-		testLogger.Info().Msgf("Setting chainlink image to %s", image)
 		for _, nodeSpec := range in.NodeSet.NodeSpecs {
 			nodeSpec.Node.Image = image
 		}
@@ -1454,7 +1456,7 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 	registerWorkflow(t, in, sc, capRegAddr, workflowRegistryAddr, feedsConsumerAddress, donID, chainSelector, workflowName, pkey, bc.Nodes[0].HostHTTPUrl)
 
 	// Deploy and fund the DON
-	_, nodesInfo := starAndFundNodes(t, testLogger, in, bc, sc)
+	_, nodesInfo := starAndFundNodes(t, in, bc, sc)
 	_, nodeClients := configureNodes(t, nodesInfo, in, bc, capRegAddr, workflowRegistryAddr, forwarderAddress)
 
 	// Deploy OCR3 Capability contract

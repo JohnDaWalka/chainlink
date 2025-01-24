@@ -4,7 +4,7 @@
   docker_cmd_params = ["-b", "5"]
 
 [workflow_config]
-  use_chainlink_cli = false
+  use_chainlink_cli = true
   use_existing = true
 
   [workflow_config.existing]
@@ -24,7 +24,7 @@
   [[nodeset.node_specs]]
 
     [nodeset.node_specs.node]
-      docker_ctx = "../.."
+      docker_ctx = "../../.."
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
@@ -43,7 +43,7 @@
 
     [nodeset.node_specs.node]
       capabilities = ["./amd64_cron"]
-      docker_ctx = "../.."
+      docker_ctx = "../../.."
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
@@ -62,7 +62,7 @@
 
     [nodeset.node_specs.node]
       capabilities = ["./amd64_cron"]
-      docker_ctx = "../.."
+      docker_ctx = "../../.."
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
@@ -81,7 +81,7 @@
 
     [nodeset.node_specs.node]
       capabilities = ["./amd64_cron"]
-      docker_ctx = "../.."
+      docker_ctx = "../../.."
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
@@ -100,7 +100,7 @@
 
     [nodeset.node_specs.node]
       capabilities = ["./amd64_cron"]
-      docker_ctx = "../.."
+      docker_ctx = "../../.."
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
