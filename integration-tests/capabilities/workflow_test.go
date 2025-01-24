@@ -914,7 +914,7 @@ func TestWorkflow(t *testing.T) {
 	// Hack for CI that allows us to dynamically set the chainlink image and version
 	// CTFv2 currently doesn't support dynamic image and version setting
 	if os.Getenv("IS_CI") == "true" {
-		image := fmt.Sprintf("%s:%s", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV))
+		image := fmt.Sprintf("%s:%s", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), fmt.Sprintf("%s-plugins", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV)))
 		testLogger.Info().Msgf("Setting chainlink image to %s", image)
 		for _, nodeSpec := range in.NodeSet.NodeSpecs {
 			nodeSpec.Node.Image = image

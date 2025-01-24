@@ -193,7 +193,6 @@ runner-test-matrix:
     test_cmd: cd integration-tests/ && go test capabilities/workflow_test.go -timeout 30m -count=1 -test.parallel=1 -json
     pyroscope_env: ci-smoke-capabilities-evm-simulated
     test_env_vars:
-      E2E_TEST_CHAINLINK_VERSION: '{{ env.DEFAULT_CHAINLINK_PLUGINS_VERSION }}' # This is the chainlink version that has the plugins
       ENABLE_OTEL_TRACES: true
       IS_CI: "true"
       CTF_CONFIGS: "environment-ci.toml"
