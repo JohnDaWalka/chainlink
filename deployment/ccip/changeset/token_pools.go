@@ -105,6 +105,7 @@ type tokenPoolMetadata struct {
 
 // newTokenPoolWithMetadata returns a token pool along with its metadata.
 func newTokenPoolWithMetadata[P tokenPool](
+	ctx context.Context,
 	newTokenPool func(address common.Address, backend bind.ContractBackend) (P, error),
 	poolAddress common.Address,
 	chainClient deployment.OnchainClient,
@@ -113,11 +114,11 @@ func newTokenPoolWithMetadata[P tokenPool](
 	if err != nil {
 		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to connect address %s with token pool bindings: %w", poolAddress, err)
 	}
-	tokenAddress, err := pool.GetToken(nil)
+	tokenAddress, err := pool.GetToken(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to get token address from pool with address %s: %w", poolAddress, err)
 	}
-	typeAndVersionStr, err := pool.TypeAndVersion(nil)
+	typeAndVersionStr, err := pool.TypeAndVersion(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to get type and version from pool with address %s: %w", poolAddress, err)
 	}
@@ -133,7 +134,7 @@ func newTokenPoolWithMetadata[P tokenPool](
 	if err != nil {
 		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to connect address %s with ERC20 bindings: %w", tokenAddress, err)
 	}
-	symbol, err := token.Symbol(nil)
+	symbol, err := token.Symbol(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return pool, tokenPoolMetadata{}, fmt.Errorf("failed to fetch symbol from token with address %s: %w", tokenAddress, err)
 	}
@@ -240,6 +241,7 @@ type TokenAdminRegistryChangesetConfig struct {
 // validateTokenAdminRegistryChangeset validates all token admin registry changesets.
 func (c TokenAdminRegistryChangesetConfig) Validate(
 	env deployment.Environment,
+	mustBeOwner bool,
 	registryConfigCheck func(
 		config token_admin_registry.TokenAdminRegistryTokenConfig,
 		sender common.Address,
@@ -277,8 +279,11 @@ func (c TokenAdminRegistryChangesetConfig) Validate(
 			}
 		}
 		// Validate that the token admin registry is owned by the address that will be actioning the transactions (i.e. Timelock or deployer key)
-		if err := commoncs.ValidateOwnership(env.GetContext(), c.MCMS != nil, chain.DeployerKey.From, chainState.Timelock.Address(), chainState.TokenAdminRegistry); err != nil {
-			return fmt.Errorf("token admin registry failed ownership validation on %s: %w", chain, err)
+		// However, most token admin registry actions aren't owner-protected. They just require you to be the admin.
+		if mustBeOwner {
+			if err := commoncs.ValidateOwnership(env.GetContext(), c.MCMS != nil, chain.DeployerKey.From, chainState.Timelock.Address(), chainState.TokenAdminRegistry); err != nil {
+				return fmt.Errorf("token admin registry failed ownership validation on %s: %w", chain, err)
+			}
 		}
 		for symbol, poolInfo := range symbolToPoolInfo {
 			if err := poolInfo.Validate(); err != nil {

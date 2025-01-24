@@ -30,7 +30,7 @@ func validateProposeAdminRole(
 
 // ProposeAdminRoleChangeset proposes admin rights for tokens on the token admin registry.
 func ProposeAdminRoleChangeset(env deployment.Environment, c TokenAdminRegistryChangesetConfig) (deployment.ChangesetOutput, error) {
-	if err := c.Validate(env, validateProposeAdminRole); err != nil {
+	if err := c.Validate(env, true, validateProposeAdminRole); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("invalid TokenAdminRegistryChangesetConfig: %w", err)
 	}
 	state, err := LoadOnchainState(env)
@@ -46,16 +46,19 @@ func ProposeAdminRoleChangeset(env deployment.Environment, c TokenAdminRegistryC
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get deployer for %s", chain)
 		}
-		sender := chainState.Timelock.Address()
+		desiredAdmin := chainState.Timelock.Address()
 		if c.MCMS == nil {
-			sender = chain.DeployerKey.From
+			desiredAdmin = chain.DeployerKey.From
 		}
 		for symbol, poolInfo := range tokenSymbolToPoolInfo {
+			if poolInfo.ExternalAdmin != utils.ZeroAddress {
+				desiredAdmin = poolInfo.ExternalAdmin
+			}
 			_, tokenAddress, err := poolInfo.GetPoolAndTokenAddress(env.GetContext(), symbol, chain, chainState)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get state of %s token on chain %s: %w", symbol, chain, err)
 			}
-			_, err = chainState.TokenAdminRegistry.ProposeAdministrator(opts, tokenAddress, sender)
+			_, err = chainState.TokenAdminRegistry.ProposeAdministrator(opts, tokenAddress, desiredAdmin)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to create proposeAdministrator transaction for %s on %s registry: %w", symbol, chain, err)
 			}

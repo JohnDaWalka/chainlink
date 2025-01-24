@@ -29,7 +29,7 @@ type RateLimiterConfig struct {
 }
 
 // validateRateLimterConfig validates rate and capacity in accordance with on-chain code.
-// see https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/libraries/RateLimiter.sol.
+// see https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/ccip/libraries/RateLimiter.sol.
 func validateRateLimiterConfig(rateLimiterConfig token_pool.RateLimiterConfig) error {
 	zero := big.NewInt(0)
 	if rateLimiterConfig.IsEnabled {
@@ -218,7 +218,7 @@ func configureTokenPool(
 	remotePoolAddressAdditions := make(map[uint64]common.Address)
 
 	for remoteChainSelector, chainUpdate := range poolUpdate.ChainUpdates {
-		isSupportedChain, err := tokenPool.IsSupportedChain(nil, remoteChainSelector)
+		isSupportedChain, err := tokenPool.IsSupportedChain(&bind.CallOpts{Context: ctx}, remoteChainSelector)
 		if err != nil {
 			return fmt.Errorf("failed to check if %d is supported on pool with address %s on %s: %w", remoteChainSelector, tokenPool.Address(), chain.String(), err)
 		}
@@ -249,7 +249,7 @@ func configureTokenPool(
 				if err != nil {
 					return fmt.Errorf("failed to connect pool with address %s on %s with token pool bindings: %w", tokenConfig.TokenPool, chain.String(), err)
 				}
-				remotePoolAddressesOnChain, err := activeTokenPool.GetRemotePools(nil, remoteChainSelector)
+				remotePoolAddressesOnChain, err := activeTokenPool.GetRemotePools(&bind.CallOpts{Context: ctx}, remoteChainSelector)
 				if err != nil {
 					return fmt.Errorf("failed to fetch remote pools from token pool with address %s on chain %s: %w", tokenConfig.TokenPool, chain.String(), err)
 				}
@@ -314,7 +314,7 @@ func getTokenStateFromPool(
 		return nil, utils.ZeroAddress, token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("failed to get token from pool with address %s on %s: %w", tokenPool.Address(), chain.String(), err)
 	}
 	tokenAdminRegistry := state.TokenAdminRegistry
-	tokenConfig, err := tokenAdminRegistry.GetTokenConfig(nil, tokenAddress)
+	tokenConfig, err := tokenAdminRegistry.GetTokenConfig(&bind.CallOpts{Context: ctx}, tokenAddress)
 	if err != nil {
 		return nil, utils.ZeroAddress, token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("failed to get config of token with address %s from registry on %s: %w", tokenAddress, chain.String(), err)
 	}

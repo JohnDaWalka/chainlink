@@ -26,7 +26,7 @@ func validateAcceptAdminRole(
 
 // AcceptAdminRoleChangeset accepts admin rights for tokens on the token admin registry.
 func AcceptAdminRoleChangeset(env deployment.Environment, c TokenAdminRegistryChangesetConfig) (deployment.ChangesetOutput, error) {
-	if err := c.Validate(env, validateAcceptAdminRole); err != nil {
+	if err := c.Validate(env, false, validateAcceptAdminRole); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("invalid TokenAdminRegistryChangesetConfig: %w", err)
 	}
 	state, err := LoadOnchainState(env)

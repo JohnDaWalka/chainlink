@@ -26,7 +26,7 @@ func validateSetPool(
 
 // SetPoolChangeset sets pools for tokens on the token admin registry.
 func SetPoolChangeset(env deployment.Environment, c TokenAdminRegistryChangesetConfig) (deployment.ChangesetOutput, error) {
-	if err := c.Validate(env, validateSetPool); err != nil {
+	if err := c.Validate(env, false, validateSetPool); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("invalid TokenAdminRegistryChangesetConfig: %w", err)
 	}
 	state, err := LoadOnchainState(env)

@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/evm/utils"
 )
 
 func TestProposeAdminRoleChangeset_Validations(t *testing.T) {
@@ -156,11 +157,11 @@ func TestProposeAdminRoleChangeset_Validations(t *testing.T) {
 	}
 }
 
-func TestProposeAdminRoleChangeset_Execution(t *testing.T) {
+func TestProposeAdminRoleChangeset_ExecutionWithoutExternalAdmin(t *testing.T) {
 	for _, mcmsConfig := range []*changeset.MCMSConfig{nil, &changeset.MCMSConfig{MinDelay: 0 * time.Second}} {
-		msg := "Propose admin role with MCMS"
+		msg := "Propose admin role without external admin with MCMS"
 		if mcmsConfig == nil {
-			msg = "Propose admin role without MCMS"
+			msg = "Propose admin role without external admin without MCMS"
 		}
 
 		t.Run(msg, func(t *testing.T) {
@@ -224,6 +225,74 @@ func TestProposeAdminRoleChangeset_Execution(t *testing.T) {
 			} else {
 				require.Equal(t, e.Chains[selectorB].DeployerKey.From, configOnB.PendingAdministrator)
 			}
+		})
+	}
+}
+
+func TestProposeAdminRoleChangeset_ExecutionWithExternalAdmin(t *testing.T) {
+	for _, mcmsConfig := range []*changeset.MCMSConfig{nil, &changeset.MCMSConfig{MinDelay: 0 * time.Second}} {
+		msg := "Propose admin role with external admin with MCMS"
+		if mcmsConfig == nil {
+			msg = "Propose admin role with external admin without MCMS"
+		}
+
+		t.Run(msg, func(t *testing.T) {
+			e, selectorA, selectorB, tokens, timelockContracts := testhelpers.SetupTwoChainEnvironmentWithTokens(t, logger.TestLogger(t), mcmsConfig != nil)
+			externalAdminA := utils.RandomAddress()
+			externalAdminB := utils.RandomAddress()
+
+			e = testhelpers.DeployTestTokenPools(t, e, map[uint64]changeset.DeployTokenPoolInput{
+				selectorA: {
+					Type:               changeset.BurnMintTokenPool,
+					TokenAddress:       tokens[selectorA].Address,
+					LocalTokenDecimals: testhelpers.LocalTokenDecimals,
+				},
+				selectorB: {
+					Type:               changeset.BurnMintTokenPool,
+					TokenAddress:       tokens[selectorB].Address,
+					LocalTokenDecimals: testhelpers.LocalTokenDecimals,
+				},
+			}, mcmsConfig != nil)
+
+			state, err := changeset.LoadOnchainState(e)
+			require.NoError(t, err)
+
+			registryOnA := state.Chains[selectorA].TokenAdminRegistry
+			registryOnB := state.Chains[selectorB].TokenAdminRegistry
+
+			e, err = commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
+				{
+					Changeset: commonchangeset.WrapChangeSet(changeset.ProposeAdminRoleChangeset),
+					Config: changeset.TokenAdminRegistryChangesetConfig{
+						MCMS: mcmsConfig,
+						Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+							selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+								testhelpers.TestTokenSymbol: {
+									Type:          changeset.BurnMintTokenPool,
+									Version:       deployment.Version1_5_1,
+									ExternalAdmin: externalAdminA,
+								},
+							},
+							selectorB: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+								testhelpers.TestTokenSymbol: {
+									Type:          changeset.BurnMintTokenPool,
+									Version:       deployment.Version1_5_1,
+									ExternalAdmin: externalAdminB,
+								},
+							},
+						},
+					},
+				},
+			})
+			require.NoError(t, err)
+
+			configOnA, err := registryOnA.GetTokenConfig(nil, tokens[selectorA].Address)
+			require.NoError(t, err)
+			require.Equal(t, externalAdminA, configOnA.PendingAdministrator)
+
+			configOnB, err := registryOnB.GetTokenConfig(nil, tokens[selectorB].Address)
+			require.NoError(t, err)
+			require.Equal(t, externalAdminB, configOnB.PendingAdministrator)
 		})
 	}
 }

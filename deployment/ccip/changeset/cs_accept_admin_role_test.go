@@ -54,15 +54,6 @@ func TestAcceptAdminRoleChangeset_Validations(t *testing.T) {
 			ErrStr: "does not exist in environment",
 		},
 		{
-			Msg: "Ownership validation failure",
-			Config: changeset.TokenAdminRegistryChangesetConfig{
-				Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
-					selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{},
-				},
-			},
-			ErrStr: "token admin registry failed ownership validation",
-		},
-		{
 			Msg: "Invalid pool type",
 			Config: changeset.TokenAdminRegistryChangesetConfig{
 				MCMS: mcmsConfig,

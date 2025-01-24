@@ -1,6 +1,7 @@
 package changeset
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -434,7 +435,7 @@ func LoadOnchainState(e deployment.Environment) (CCIPOnChainState, error) {
 				return state, err
 			}
 		}
-		chainState, err := LoadChainState(chain, addresses)
+		chainState, err := LoadChainState(e.GetContext(), chain, addresses)
 		if err != nil {
 			return state, err
 		}
@@ -444,7 +445,7 @@ func LoadOnchainState(e deployment.Environment) (CCIPOnChainState, error) {
 }
 
 // LoadChainState Loads all state for a chain into state
-func LoadChainState(chain deployment.Chain, addresses map[string]deployment.TypeAndVersion) (CCIPChainState, error) {
+func LoadChainState(ctx context.Context, chain deployment.Chain, addresses map[string]deployment.TypeAndVersion) (CCIPChainState, error) {
 	var state CCIPChainState
 	mcmsWithTimelock, err := commoncs.MaybeLoadMCMSWithTimelockChainState(chain, addresses)
 	if err != nil {
@@ -620,28 +621,28 @@ func LoadChainState(chain deployment.Chain, addresses map[string]deployment.Type
 			state.USDFeeds[key] = feed
 		case deployment.NewTypeAndVersion(BurnMintTokenPool, deployment.Version1_5_1).String():
 			ethAddress := common.HexToAddress(address)
-			pool, metadata, err := newTokenPoolWithMetadata(burn_mint_token_pool.NewBurnMintTokenPool, ethAddress, chain.Client)
+			pool, metadata, err := newTokenPoolWithMetadata(ctx, burn_mint_token_pool.NewBurnMintTokenPool, ethAddress, chain.Client)
 			if err != nil {
 				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
 			state.BurnMintTokenPools = helpers.AddValueToNestedMap(state.BurnMintTokenPools, metadata.Symbol, metadata.Version, pool)
 		case deployment.NewTypeAndVersion(BurnWithFromMintTokenPool, deployment.Version1_5_1).String():
 			ethAddress := common.HexToAddress(address)
-			pool, metadata, err := newTokenPoolWithMetadata(burn_with_from_mint_token_pool.NewBurnWithFromMintTokenPool, ethAddress, chain.Client)
+			pool, metadata, err := newTokenPoolWithMetadata(ctx, burn_with_from_mint_token_pool.NewBurnWithFromMintTokenPool, ethAddress, chain.Client)
 			if err != nil {
 				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
 			state.BurnWithFromMintTokenPools = helpers.AddValueToNestedMap(state.BurnWithFromMintTokenPools, metadata.Symbol, metadata.Version, pool)
 		case deployment.NewTypeAndVersion(BurnFromMintTokenPool, deployment.Version1_5_1).String():
 			ethAddress := common.HexToAddress(address)
-			pool, metadata, err := newTokenPoolWithMetadata(burn_from_mint_token_pool.NewBurnFromMintTokenPool, ethAddress, chain.Client)
+			pool, metadata, err := newTokenPoolWithMetadata(ctx, burn_from_mint_token_pool.NewBurnFromMintTokenPool, ethAddress, chain.Client)
 			if err != nil {
 				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}
 			state.BurnFromMintTokenPools = helpers.AddValueToNestedMap(state.BurnFromMintTokenPools, metadata.Symbol, metadata.Version, pool)
 		case deployment.NewTypeAndVersion(LockReleaseTokenPool, deployment.Version1_5_1).String():
 			ethAddress := common.HexToAddress(address)
-			pool, metadata, err := newTokenPoolWithMetadata(lock_release_token_pool.NewLockReleaseTokenPool, ethAddress, chain.Client)
+			pool, metadata, err := newTokenPoolWithMetadata(ctx, lock_release_token_pool.NewLockReleaseTokenPool, ethAddress, chain.Client)
 			if err != nil {
 				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", ethAddress, err)
 			}

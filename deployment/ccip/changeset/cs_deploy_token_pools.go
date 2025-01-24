@@ -1,9 +1,11 @@
 package changeset
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
@@ -37,7 +39,7 @@ type DeployTokenPoolInput struct {
 	ForceDeployment bool
 }
 
-func (i DeployTokenPoolInput) Validate(chain deployment.Chain, state CCIPChainState, tokenSymbol TokenSymbol) error {
+func (i DeployTokenPoolInput) Validate(ctx context.Context, chain deployment.Chain, state CCIPChainState, tokenSymbol TokenSymbol) error {
 	// Ensure that required fields are populated
 	if i.TokenAddress == utils.ZeroAddress {
 		return errors.New("token address must be defined")
@@ -56,7 +58,7 @@ func (i DeployTokenPoolInput) Validate(chain deployment.Chain, state CCIPChainSt
 	if err != nil {
 		return fmt.Errorf("failed to connect address %s with erc20 bindings: %w", i.TokenAddress, err)
 	}
-	symbol, err := token.Symbol(nil)
+	symbol, err := token.Symbol(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return fmt.Errorf("failed to fetch symbol from token with address %s: %w", i.TokenAddress, err)
 	}
@@ -65,7 +67,7 @@ func (i DeployTokenPoolInput) Validate(chain deployment.Chain, state CCIPChainSt
 	}
 
 	// Validate localTokenDecimals against the decimals value on the token contract
-	decimals, err := token.Decimals(nil)
+	decimals, err := token.Decimals(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return fmt.Errorf("failed to fetch decimals from token with address %s: %w", i.TokenAddress, err)
 	}
@@ -130,7 +132,7 @@ func (c DeployTokenPoolContractsConfig) Validate(env deployment.Environment) err
 		if rmnProxy := chainState.RMNProxy; rmnProxy == nil {
 			return fmt.Errorf("missing rmnProxy on %s", chain.String())
 		}
-		err = poolConfig.Validate(chain, chainState, c.TokenSymbol)
+		err = poolConfig.Validate(env.GetContext(), chain, chainState, c.TokenSymbol)
 		if err != nil {
 			return fmt.Errorf("failed to validate token pool config for chain selector %d: %w", chainSelector, err)
 		}
@@ -208,7 +210,11 @@ func DeployTokenPool(
 				tp, err = token_pool.NewTokenPool(tpAddr, chain.Client)
 			}
 			return deployment.ContractDeploy[*token_pool.TokenPool]{
-				Address: tpAddr, Contract: tp, Tv: deployment.NewTypeAndVersion(poolConfig.Type, currentTokenPoolVersion), Tx: tx, Err: err,
+				Address:  tpAddr,
+				Contract: tp,
+				Tv:       deployment.NewTypeAndVersion(poolConfig.Type, currentTokenPoolVersion),
+				Tx:       tx,
+				Err:      err,
 			}
 		},
 	)
