@@ -93,16 +93,17 @@ var (
 	USDCMockTransmitter    deployment.ContractType = "USDCMockTransmitter"
 
 	// Pools
-	BurnMintToken             deployment.ContractType = "BurnMintToken"
-	ERC20Token                deployment.ContractType = "ERC20Token"
-	ERC677Token               deployment.ContractType = "ERC677Token"
-	BurnMintTokenPool         deployment.ContractType = "BurnMintTokenPool"
-	BurnWithFromMintTokenPool deployment.ContractType = "BurnWithFromMintTokenPool"
-	BurnFromMintTokenPool     deployment.ContractType = "BurnFromMintTokenPool"
-	LockReleaseTokenPool      deployment.ContractType = "LockReleaseTokenPool"
-	USDCToken                 deployment.ContractType = "USDCToken"
-	USDCTokenMessenger        deployment.ContractType = "USDCTokenMessenger"
-	USDCTokenPool             deployment.ContractType = "USDCTokenPool"
+	BurnMintToken                  deployment.ContractType = "BurnMintToken"
+	ERC20Token                     deployment.ContractType = "ERC20Token"
+	ERC677Token                    deployment.ContractType = "ERC677Token"
+	BurnMintTokenPool              deployment.ContractType = "BurnMintTokenPool"
+	BurnWithFromMintTokenPool      deployment.ContractType = "BurnWithFromMintTokenPool"
+	BurnFromMintTokenPool          deployment.ContractType = "BurnFromMintTokenPool"
+	LockReleaseTokenPool           deployment.ContractType = "LockReleaseTokenPool"
+	USDCToken                      deployment.ContractType = "USDCToken"
+	USDCTokenMessenger             deployment.ContractType = "USDCTokenMessenger"
+	USDCTokenPool                  deployment.ContractType = "USDCTokenPool"
+	HybridLockReleaseUSDCTokenPool deployment.ContractType = "HybridLockReleaseUSDCTokenPool"
 )
 
 // CCIPChainState holds a Go binding for all the currently deployed CCIP contracts
@@ -130,6 +131,7 @@ type CCIPChainState struct {
 	BurnMintTokenPools         map[TokenSymbol]map[semver.Version]*burn_mint_token_pool.BurnMintTokenPool
 	BurnWithFromMintTokenPools map[TokenSymbol]map[semver.Version]*burn_with_from_mint_token_pool.BurnWithFromMintTokenPool
 	BurnFromMintTokenPools     map[TokenSymbol]map[semver.Version]*burn_from_mint_token_pool.BurnFromMintTokenPool
+	USDCTokenPools             map[semver.Version]*usdc_token_pool.USDCTokenPool
 	LockReleaseTokenPools      map[TokenSymbol]map[semver.Version]*lock_release_token_pool.LockReleaseTokenPool
 	// Map between token Symbol (e.g. LinkSymbol, WethSymbol)
 	// and the respective aggregator USD feed contract
@@ -566,6 +568,24 @@ func LoadChainState(ctx context.Context, chain deployment.Chain, addresses map[s
 				return state, err
 			}
 			state.USDCTokenPool = utp
+		case deployment.NewTypeAndVersion(USDCTokenPool, deployment.Version1_5_1).String():
+			utp, err := usdc_token_pool.NewUSDCTokenPool(common.HexToAddress(address), chain.Client)
+			if err != nil {
+				return state, err
+			}
+			if state.USDCTokenPools == nil {
+				state.USDCTokenPools = make(map[semver.Version]*usdc_token_pool.USDCTokenPool)
+			}
+			state.USDCTokenPools[deployment.Version1_5_1] = utp
+		case deployment.NewTypeAndVersion(HybridLockReleaseUSDCTokenPool, deployment.Version1_5_1).String():
+			utp, err := usdc_token_pool.NewUSDCTokenPool(common.HexToAddress(address), chain.Client)
+			if err != nil {
+				return state, err
+			}
+			if state.USDCTokenPools == nil {
+				state.USDCTokenPools = make(map[semver.Version]*usdc_token_pool.USDCTokenPool)
+			}
+			state.USDCTokenPools[deployment.Version1_5_1] = utp
 		case deployment.NewTypeAndVersion(USDCMockTransmitter, deployment.Version1_0_0).String():
 			umt, err := mock_usdc_token_transmitter.NewMockE2EUSDCTransmitter(common.HexToAddress(address), chain.Client)
 			if err != nil {
