@@ -51,6 +51,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 
+	pkgworkflows "github.com/smartcontractkit/chainlink-common/pkg/workflows"
 	cr_wrapper "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/forwarder"
@@ -296,30 +297,6 @@ func generateOCR3Config(
 
 	maxDurationInitialization := 10 * time.Second
 
-	// Generate OCR3 configuration arguments for testing
-	// signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
-	// 	20*time.Second,             // DeltaProgress: Time between rounds
-	// 	10*time.Second,             // DeltaResend: Time between resending unconfirmed transmissions
-	// 	1*time.Second,              // DeltaInitial: Initial delay before starting the first round
-	// 	5*time.Second,              // DeltaRound: Time between rounds within an epoch
-	// 	1*time.Second,              // DeltaGrace: Grace period for delayed transmissions
-	// 	5*time.Second,              // DeltaCertifiedCommitRequest: Time between certified commit requests
-	// 	10*time.Second,             // DeltaStage: Time between stages of the protocol
-	// 	uint64(10),                 // MaxRoundsPerEpoch: Maximum number of rounds per epoch
-	// 	transmissionSchedule,       // TransmissionSchedule: Transmission schedule
-	// 	oracleIdentities,           // Oracle identities with their public keys
-	// 	nil,                        // Plugin config (empty for now)
-	// 	&maxDurationInitialization, // MaxDurationInitialization: ???
-	// 	5*time.Second,              // MaxDurationQuery: Maximum duration for querying
-	// 	5*time.Second,              // MaxDurationObservation: Maximum duration for observation
-	// 	5*time.Second,              // MaxDurationAccept: Maximum duration for acceptance
-	// 	5*time.Second,              // MaxDurationTransmit: Maximum duration for transmission
-	// 	1,                          // F: Maximum number of faulty oracles
-	// 	nil,                        // OnChain config (empty for now)
-	// )
-	// require.NoError(t, err)
-
-	// // values supplied by Alexandr Y
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
 		5*time.Second,              // DeltaProgress: Time between rounds
 		5*time.Second,              // DeltaResend: Time between resending unconfirmed transmissions
@@ -373,45 +350,12 @@ func GenerateWorkflowIDFromStrings(owner string, name string, workflow []byte, c
 		return "", err
 	}
 
-	wid, err := GenerateWorkflowID(ownerb, name, workflow, config, secretsURL)
+	wid, err := pkgworkflows.GenerateWorkflowID(ownerb, name, workflow, config, secretsURL)
 	if err != nil {
 		return "", err
 	}
 
 	return hex.EncodeToString(wid[:]), nil
-}
-
-var (
-	versionByte = byte(0)
-)
-
-func GenerateWorkflowID(owner []byte, name string, workflow []byte, config []byte, secretsURL string) ([32]byte, error) {
-	s := sha256.New()
-	_, err := s.Write(owner)
-	if err != nil {
-		return [32]byte{}, err
-	}
-	_, err = s.Write([]byte(name))
-	if err != nil {
-		return [32]byte{}, err
-	}
-	_, err = s.Write(workflow)
-	if err != nil {
-		return [32]byte{}, err
-	}
-	_, err = s.Write(config)
-	if err != nil {
-		return [32]byte{}, err
-	}
-	_, err = s.Write([]byte(secretsURL))
-	if err != nil {
-		return [32]byte{}, err
-	}
-
-	sha := [32]byte(s.Sum(nil))
-	sha[0] = versionByte
-
-	return sha, nil
 }
 
 func isInstalled(name string) bool {
@@ -508,13 +452,18 @@ type PoRWorkflowConfig struct {
 	ConsumerAddress string `json:"consumer_address"`
 }
 
+const (
+	chainlinkCliAssetFile   = "cre_v1.0.2_linux_amd64.tar.gz"
+	cronCapabilityAssetFile = "amd64_cron"
+)
+
 func downloadAndInstallChainlinkCLI(ghToken string) error {
-	content, err := downloadGHAssetFromLatestRelease("smartcontractkit", "dev-platform", test_env.AUTOMATIC_LATEST_TAG, "cre_v1.0.2_linux_amd64.tar.gz", ghToken)
+	content, err := downloadGHAssetFromLatestRelease("smartcontractkit", "dev-platform", test_env.AUTOMATIC_LATEST_TAG, chainlinkCliAssetFile, ghToken)
 	if err != nil {
 		return err
 	}
 
-	tmpfile, err := os.CreateTemp("", "cre_v1.0.2_linux_amd64.tar.gz")
+	tmpfile, err := os.CreateTemp("", chainlinkCliAssetFile)
 	if err != nil {
 		return err
 	}
@@ -546,13 +495,13 @@ func downloadAndInstallChainlinkCLI(ghToken string) error {
 }
 
 func downloadCronCapability(ghToken string) (string, error) {
-	content, err := downloadGHAssetFromLatestRelease("smartcontractkit", "capabilities", test_env.AUTOMATIC_LATEST_TAG, "amd64_cron", ghToken)
+	content, err := downloadGHAssetFromLatestRelease("smartcontractkit", "capabilities", test_env.AUTOMATIC_LATEST_TAG, cronCapabilityAssetFile, ghToken)
 	if err != nil {
 		return "", err
 	}
 
-	fileName := "amd64_cron"
-	file, err := os.Create("amd64_cron")
+	fileName := cronCapabilityAssetFile
+	file, err := os.Create(cronCapabilityAssetFile)
 	if err != nil {
 		return "", err
 	}
@@ -1250,14 +1199,14 @@ func createNodeJobs(t *testing.T, nodeClients []*clclient.ChainlinkClient, nodes
 			defer wg.Done()
 			// since we are using a capability that is not bundled-in, we need to copy it to the Docker container
 			// and point the job to the copied binary
-			cronJobSpec := `
+			cronJobSpec := fmt.Sprintf(`
 					type = "standardcapabilities"
 					schemaVersion = 1
 					name = "cron-capabilities"
 					forwardingAllowed = false
-					command = "/home/capabilities/amd64_cron"
+					command = "/home/capabilities/%s"
 					config = ""
-				`
+				`, cronCapabilityAssetFile)
 
 			response, _, errCron := nodeClient.CreateJobRaw(cronJobSpec)
 			assert.NoError(t, errCron, "failed to create cron job")
