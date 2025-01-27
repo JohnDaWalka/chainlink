@@ -2,6 +2,7 @@ package changeset
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -36,7 +37,7 @@ func (c USDCChainConfig) Validate(ctx context.Context, chain deployment.Chain, s
 	}
 
 	if c.Enabled == nil {
-		return fmt.Errorf("isEnabled is not defined")
+		return errors.New("isEnabled is not defined")
 	}
 
 	// Validate that the USDC token pool is owned by the address that will be actioning the transactions (i.e. Timelock or deployer key)
