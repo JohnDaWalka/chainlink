@@ -29,7 +29,7 @@ contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersio
   /// This can be either an EOA without a corresponding private key, or a contract which does not have the ability to transfer the tokens.
   address public immutable i_burnAddress;
 
-  /// @notice Minted Tokens is a safety mechanism to ensure that more tokens cannot be sent out of the bridge
+  /// @notice Outstanding Tokens is a safety mechanism to ensure that more tokens cannot be sent out of the bridge
   /// than were originally sent in via CCIP. On incoming messages the value is increased, and on outgoing messages,
   /// the value is decreased. For pools with existing tokens in circulation, the value may not be known at deployment
   /// time, and thus should be set later using the setoutstandingTokens() function.
@@ -53,11 +53,14 @@ contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersio
   function releaseOrMint(
     Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
   ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-    // When minting tokens, the local outstanding supply increases. These tokens will be burned
-    // when they are sent back to the pool on an outgoing message.
-    s_outstandingTokens += releaseOrMintIn.amount;
+    Pool.ReleaseOrMintOutV1 memory releaseOrMintOut = super.releaseOrMint(releaseOrMintIn);
 
-    return super.releaseOrMint(releaseOrMintIn);
+    // When minting tokens, the local outstanding supply increases. These tokens will be burned
+    // when they are sent back to the pool on an outgoing message. To save gas, use the local amount
+    // instead of the remote amount returned from the call to super.releaseOrMint.
+    s_outstandingTokens += releaseOrMintOut.destinationAmount;
+
+    return releaseOrMintOut;
   }
 
   /// @inheritdoc BurnMintTokenPoolAbstract
@@ -94,6 +97,8 @@ contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersio
   function setOutstandingTokens(
     uint256 amount
   ) external onlyOwner {
+    if (s_outstandingTokens == 0) {}
+
     uint256 currentOutstandingTokens = s_outstandingTokens;
 
     s_outstandingTokens = amount;

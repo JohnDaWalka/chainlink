@@ -88,4 +88,10 @@ contract SiloedLockReleaseTokenPool_provideLiqudity is SiloedLockReleaseTokenPoo
 
     s_siloedLockReleaseTokenPool.provideLiquidity(1);
   }
+
+  function test_ProvideLiquidity_RevertWhen_LiquidityAmountCannotBeZero() public {
+    vm.expectRevert(abi.encodeWithSelector(SiloedLockReleaseTokenPool.LiquidityAmountCannotBeZero.selector));
+
+    s_siloedLockReleaseTokenPool.provideSiloedLiquidity(SILOED_CHAIN_SELECTOR, 0);
+  }
 }
