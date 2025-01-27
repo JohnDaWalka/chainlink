@@ -198,19 +198,19 @@ func downloadGHAssetFromLatestRelease(owner, repository, releaseType, assetName,
 			return content, errors.New("failed to find latest release with automatic tag: " + releaseType)
 		}
 
-		var assetId int64
+		var assetID int64
 		for _, asset := range latestRelease.Assets {
 			if strings.Contains(asset.GetName(), assetName) {
-				assetId = asset.GetID()
+				assetID = asset.GetID()
 				break
 			}
 		}
 
-		if assetId == 0 {
+		if assetID == 0 {
 			return content, fmt.Errorf("failed to find asset %s for %s", assetName, *latestRelease.TagName)
 		}
 
-		asset, _, err := ghClient.Repositories.DownloadReleaseAsset(context.Background(), owner, repository, assetId, tc)
+		asset, _, err := ghClient.Repositories.DownloadReleaseAsset(context.Background(), owner, repository, assetID, tc)
 		if err != nil {
 			return content, errors.Wrapf(err, "failed to download asset %s for %s", assetName, *latestRelease.TagName)
 		}
@@ -221,7 +221,6 @@ func downloadGHAssetFromLatestRelease(owner, repository, releaseType, assetName,
 		}
 
 		return content, nil
-
 	}
 
 	return content, errors.New("no automatic tag provided")
@@ -400,7 +399,7 @@ func GenerateWorkflowID(owner []byte, name string, workflow []byte, config []byt
 	if err != nil {
 		return [32]byte{}, err
 	}
-	_, err = s.Write([]byte(config))
+	_, err = s.Write(config)
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -421,10 +420,18 @@ func isInstalled(name string) bool {
 }
 
 func download(url string) ([]byte, error) {
-	resp, err := http.Get(url)
+	ctx, cancelFn := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancelFn()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to download file: %w", err)
+		return nil, err
 	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -459,12 +466,12 @@ type ChainlinkCliSettings struct {
 	Logging      Logging      `yaml:"logging"`
 	McmsConfig   McmsConfig   `yaml:"mcms-config"`
 	Contracts    Contracts    `yaml:"contracts"`
-	Rpcs         []Rpc        `yaml:"rpcs"`
+	Rpcs         []RPC        `yaml:"rpcs"`
 }
 
 type DevPlatform struct {
 	CapabilitiesRegistryAddress string `yaml:"capabilities-registry-contract-address"`
-	DonId                       uint32 `yaml:"don-id"`
+	DonID                       uint32 `yaml:"don-id"`
 	WorkflowRegistryAddress     string `yaml:"workflow-registry-contract-address"`
 }
 
@@ -490,7 +497,7 @@ type ContractRegistry struct {
 	ChainSelector uint64 `yaml:"chain-selector"`
 }
 
-type Rpc struct {
+type RPC struct {
 	ChainSelector uint64 `yaml:"chain-selector"`
 	URL           string `yaml:"url"`
 }
@@ -517,7 +524,7 @@ func downloadAndInstallChainlinkCLI(ghToken string) error {
 		return err
 	}
 
-	cmd := exec.Command("tar", "-xvf", tmpfile.Name())
+	cmd := exec.Command("tar", "-xvf", tmpfile.Name()) // #nosec G204
 	err = cmd.Run()
 
 	if err != nil {
@@ -603,7 +610,7 @@ func buildChainlinkDeploymentEnv(t *testing.T, sc *seth.Client) (*deployment.Env
 	chainMap[chainSelector] = deployment.Chain{
 		Selector:    chainSelector,
 		Client:      sc.Client,
-		DeployerKey: sc.NewTXOpts(seth.WithNonce(nil)), //set nonce to nil, so that it will be fetched from the chain
+		DeployerKey: sc.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
 		Confirm: func(tx *geth_types.Transaction) (uint64, error) {
 			decoded, revertErr := sc.DecodeTx(tx)
 			if revertErr != nil {
@@ -630,15 +637,15 @@ func prepareCapabilitiesRegistry(t *testing.T, sc *seth.Client, allCaps []cr_wra
 	))
 	require.NoError(t, decodeErr, "failed to add capabilities to capabilities registry")
 
-	var hashedCapabilities [][32]byte
-	for _, capability := range allCaps {
+	hashedCapabilities := make([][32]byte, len(allCaps))
+	for i, capability := range allCaps {
 		hashed, err := capabilitiesRegistryInstance.GetHashedCapabilityId(
 			sc.NewCallOpts(),
 			capability.LabelledName,
 			capability.Version,
 		)
 		require.NoError(t, err, "failed to get hashed capability ID for %s", capability.LabelledName)
-		hashedCapabilities = append(hashedCapabilities, hashed)
+		hashedCapabilities[i] = hashed
 	}
 
 	return capRegAddr, hashedCapabilities
@@ -672,7 +679,7 @@ func configureKeystoneForwarder(t *testing.T, forwarderAddress common.Address, s
 	forwarderInstance, err := forwarder.NewKeystoneForwarder(forwarderAddress, sc.Client)
 	require.NoError(t, err, "failed to create forwarder instance")
 
-	var signers []common.Address
+	signers := make([]common.Address, len(nodesInfo)-1)
 
 	for i, node := range nodesInfo {
 		// skip the first node, as it's the bootstrap node
@@ -680,7 +687,7 @@ func configureKeystoneForwarder(t *testing.T, forwarderAddress common.Address, s
 		if i == 0 {
 			continue
 		}
-		signers = append(signers, node.Signer)
+		signers[i-1] = node.Signer
 	}
 
 	_, err = sc.Decode(forwarderInstance.SetConfig(
@@ -832,22 +839,23 @@ func registerWorkflowDirectly(t *testing.T, in *WorkflowTestConfig, sc *seth.Cli
 	workflowID, idErr := GenerateWorkflowIDFromStrings(sc.MustGetRootKeyAddress().Hex(), workflowName, workFlowData, configData, "")
 	require.NoError(t, idErr, "failed to generate workflow ID")
 
-	workflow_registryInstance, err := workflow_registry_wrapper.NewWorkflowRegistry(workflowRegistryAddr, sc.Client)
+	workflowRegistryInstance, err := workflow_registry_wrapper.NewWorkflowRegistry(workflowRegistryAddr, sc.Client)
 	require.NoError(t, err, "failed to create workflow registry instance")
 
 	// use non-encoded workflow name
-	_, decodeErr := sc.Decode(workflow_registryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), in.WorkflowConfig.Existing.BinaryURL, in.WorkflowConfig.Existing.ConfigURL, ""))
+	_, decodeErr := sc.Decode(workflowRegistryInstance.RegisterWorkflow(sc.NewTXOpts(), workflowName, [32]byte(common.Hex2Bytes(workflowID)), donID, uint8(0), in.WorkflowConfig.Existing.BinaryURL, in.WorkflowConfig.Existing.ConfigURL, ""))
 	require.NoError(t, decodeErr, "failed to register workflow")
 }
 
+//revive:disable // ignore confusing-results
 func compileWorkflowWithChainlinkCli(t *testing.T, in *WorkflowTestConfig, feedsConsumerAddress common.Address, settingsFile *os.File) (string, string) {
-	feedId := "0x018BFE88407000400000000000000000"
+	feedID := "0x018BFE88407000400000000000000000"
 
 	configFile, err := os.CreateTemp("", "config.json")
 	require.NoError(t, err, "failed to create workflow config file")
 
 	workflowConfig := PoRWorkflowConfig{
-		FeedID:          feedId,
+		FeedID:          feedID,
 		URL:             "https://api.real-time-reserves.verinumus.io/v1/chainlink/proof-of-reserves/TrueUSD",
 		ConsumerAddress: feedsConsumerAddress.Hex(),
 	}
@@ -860,7 +868,7 @@ func compileWorkflowWithChainlinkCli(t *testing.T, in *WorkflowTestConfig, feeds
 
 	var outputBuffer bytes.Buffer
 
-	compileCmd := exec.Command("chainlink-cli", "workflow", "compile", "-S", settingsFile.Name(), "-c", configFile.Name(), "main.go")
+	compileCmd := exec.Command("chainlink-cli", "workflow", "compile", "-S", settingsFile.Name(), "-c", configFile.Name(), "main.go") // #nosec G204
 	compileCmd.Stdout = &outputBuffer
 	compileCmd.Stderr = &outputBuffer
 	compileCmd.Dir = *in.WorkflowConfig.ChainlinkCLI.FolderLocation
@@ -879,16 +887,16 @@ func compileWorkflowWithChainlinkCli(t *testing.T, in *WorkflowTestConfig, feeds
 	ansiEscapePattern := `\x1b\[[0-9;]*m`
 	re = regexp.MustCompile(ansiEscapePattern)
 
-	workflowGistUrl := re.ReplaceAllString(matches[0][1], "")
-	workflowConfigUrl := re.ReplaceAllString(matches[1][1], "")
+	workflowGistURL := re.ReplaceAllString(matches[0][1], "")
+	workflowConfigURL := re.ReplaceAllString(matches[1][1], "")
 
-	require.NotEmpty(t, workflowGistUrl, "failed to find workflow gist URL")
-	require.NotEmpty(t, workflowConfigUrl, "failed to find workflow config gist URL")
+	require.NotEmpty(t, workflowGistURL, "failed to find workflow gist URL")
+	require.NotEmpty(t, workflowConfigURL, "failed to find workflow config gist URL")
 
-	return workflowGistUrl, workflowConfigUrl
+	return workflowGistURL, workflowConfigURL
 }
 
-func preapreChainlinkCliSettingsFile(t *testing.T, sc *seth.Client, capRegAddr, workflowRegistryAddr common.Address, donID uint32, chainSelector uint64, rpcHttpUrl string) *os.File {
+func preapreChainlinkCliSettingsFile(t *testing.T, sc *seth.Client, capRegAddr, workflowRegistryAddr common.Address, donID uint32, chainSelector uint64, rpcHTTPURL string) *os.File {
 	// create chainlink-cli settings file
 	settingsFile, err := os.CreateTemp("", ".chainlink-cli-settings.yaml")
 	require.NoError(t, err, "failed to create chainlink-cli settings file")
@@ -896,7 +904,7 @@ func preapreChainlinkCliSettingsFile(t *testing.T, sc *seth.Client, capRegAddr, 
 	settings := ChainlinkCliSettings{
 		DevPlatform: DevPlatform{
 			CapabilitiesRegistryAddress: capRegAddr.Hex(),
-			DonId:                       donID,
+			DonID:                       donID,
 			WorkflowRegistryAddress:     workflowRegistryAddr.Hex(),
 		},
 		UserWorkflow: UserWorkflow{
@@ -920,10 +928,10 @@ func preapreChainlinkCliSettingsFile(t *testing.T, sc *seth.Client, capRegAddr, 
 				},
 			},
 		},
-		Rpcs: []Rpc{
+		Rpcs: []RPC{
 			{
 				ChainSelector: chainSelector,
-				URL:           rpcHttpUrl,
+				URL:           rpcHTTPURL,
 			},
 		},
 	}
@@ -937,7 +945,7 @@ func preapreChainlinkCliSettingsFile(t *testing.T, sc *seth.Client, capRegAddr, 
 	return settingsFile
 }
 
-func registerWorkflow(t *testing.T, in *WorkflowTestConfig, sc *seth.Client, capRegAddr, workflowRegistryAddr, feedsConsumerAddress common.Address, donID uint32, chainSelector uint64, workflowName, pkey, rpcHttpUrl string) {
+func registerWorkflow(t *testing.T, in *WorkflowTestConfig, sc *seth.Client, capRegAddr, workflowRegistryAddr, feedsConsumerAddress common.Address, donID uint32, chainSelector uint64, workflowName, pkey, rpcHTTPURL string) {
 	// Register workflow directly using the provided binary and config URLs
 	// This is a legacy solution, probably we can remove it soon
 	if in.WorkflowConfig.UseExising && !in.WorkflowConfig.UseChainlinkCLI {
@@ -954,21 +962,21 @@ func registerWorkflow(t *testing.T, in *WorkflowTestConfig, sc *seth.Client, cap
 	require.NoError(t, err, "failed to set ETH_PRIVATE_KEY env var")
 
 	// create chainlink-cli settings file
-	settingsFile := preapreChainlinkCliSettingsFile(t, sc, capRegAddr, workflowRegistryAddr, donID, chainSelector, rpcHttpUrl)
+	settingsFile := preapreChainlinkCliSettingsFile(t, sc, capRegAddr, workflowRegistryAddr, donID, chainSelector, rpcHTTPURL)
 
-	var workflowGistUrl string
-	var workflowConfigUrl string
+	var workflowGistURL string
+	var workflowConfigURL string
 
 	// compile and upload the workflow, if we are not using an existing one
 	if !in.WorkflowConfig.UseExising {
-		workflowGistUrl, workflowConfigUrl = compileWorkflowWithChainlinkCli(t, in, feedsConsumerAddress, settingsFile)
+		workflowGistURL, workflowConfigURL = compileWorkflowWithChainlinkCli(t, in, feedsConsumerAddress, settingsFile)
 	} else {
-		workflowGistUrl = in.WorkflowConfig.Existing.BinaryURL
-		workflowConfigUrl = in.WorkflowConfig.Existing.ConfigURL
+		workflowGistURL = in.WorkflowConfig.Existing.BinaryURL
+		workflowConfigURL = in.WorkflowConfig.Existing.ConfigURL
 	}
 
 	// register the workflow
-	registerCmd := exec.Command("chainlink-cli", "workflow", "register", workflowName, "-b", workflowGistUrl, "-c", workflowConfigUrl, "-S", settingsFile.Name(), "-v")
+	registerCmd := exec.Command("chainlink-cli", "workflow", "register", workflowName, "-b", workflowGistURL, "-c", workflowConfigURL, "-S", settingsFile.Name(), "-v")
 	registerCmd.Stdout = os.Stdout
 	registerCmd.Stderr = os.Stderr
 	err = registerCmd.Run()
@@ -1322,9 +1330,9 @@ func createNodeJobs(t *testing.T, nodeClients []*clclient.ChainlinkClient, nodes
 
 func registerDONAndCapabilities(t *testing.T, capRegAddr common.Address, hashedCapabilities [][32]byte, nodesInfo []NodeInfo, sc *seth.Client) {
 	// Register node operators, nodes and DON in the Capabilities registry
-	var nopsToAdd []cr_wrapper.CapabilitiesRegistryNodeOperator
-	var nodesToAdd []cr_wrapper.CapabilitiesRegistryNodeParams
-	var donNodes [][32]byte
+	nopsToAdd := make([]cr_wrapper.CapabilitiesRegistryNodeOperator, len(nodesInfo)-1)
+	nodesToAdd := make([]cr_wrapper.CapabilitiesRegistryNodeParams, len(nodesInfo)-1)
+	donNodes := make([][32]byte, len(nodesInfo)-1)
 
 	for i, node := range nodesInfo {
 		// skip the first node, as it's the bootstrap node
@@ -1332,24 +1340,24 @@ func registerDONAndCapabilities(t *testing.T, capRegAddr common.Address, hashedC
 		if i == 0 {
 			continue
 		}
-		nopsToAdd = append(nopsToAdd, cr_wrapper.CapabilitiesRegistryNodeOperator{
+		nopsToAdd[i-1] = cr_wrapper.CapabilitiesRegistryNodeOperator{
 			Admin: common.HexToAddress(node.TransmitterAddress),
 			Name:  fmt.Sprintf("NOP %d", i),
-		})
+		}
 
 		var peerID ragetypes.PeerID
 		err := peerID.UnmarshalText([]byte(node.PeerID))
 		require.NoError(t, err, "failed to unmarshal peer ID")
 
-		nodesToAdd = append(nodesToAdd, cr_wrapper.CapabilitiesRegistryNodeParams{
+		nodesToAdd[i-1] = cr_wrapper.CapabilitiesRegistryNodeParams{
 			NodeOperatorId:      uint32(i), //nolint:gosec // disable G115
 			Signer:              common.BytesToHash(node.Signer.Bytes()),
 			P2pId:               peerID,
 			EncryptionPublicKey: [32]byte{1, 2, 3, 4, 5},
 			HashedCapabilityIds: hashedCapabilities,
-		})
+		}
 
-		donNodes = append(donNodes, peerID)
+		donNodes[i-1] = peerID
 	}
 
 	capabilitiesRegistryInstance, err := cr_wrapper.NewCapabilitiesRegistry(capRegAddr, sc.Client)
@@ -1369,12 +1377,12 @@ func registerDONAndCapabilities(t *testing.T, capRegAddr common.Address, hashedC
 	))
 	require.NoError(t, decodeErr, "failed to add nodes to capabilities registry")
 
-	var capRegConfig []cr_wrapper.CapabilitiesRegistryCapabilityConfiguration
-	for _, hashed := range hashedCapabilities {
-		capRegConfig = append(capRegConfig, cr_wrapper.CapabilitiesRegistryCapabilityConfiguration{
+	capRegConfig := make([]cr_wrapper.CapabilitiesRegistryCapabilityConfiguration, len(hashedCapabilities))
+	for i, hashed := range hashedCapabilities {
+		capRegConfig[i] = cr_wrapper.CapabilitiesRegistryCapabilityConfiguration{
 			CapabilityId: hashed,
 			Config:       []byte(""),
-		})
+		}
 	}
 
 	// Add nodeset to capabilities registry
@@ -1389,6 +1397,16 @@ func registerDONAndCapabilities(t *testing.T, capRegAddr common.Address, hashedC
 	require.NoError(t, decodeErr, "failed to add DON to capabilities registry")
 }
 
+/*
+!!! ATTENTION !!!
+
+Do not use this test as a template for your tests. It's hacky, since we were working under time pressure. We will soon refactor it follow best practices
+and a golden example. Apart from its structure what is currently missing is:
+- using `chainlink/deployment` to deploy and configure all the contracts
+- using Job Distribution to create jobs for the nodes
+- using only `chainlink-cli` to register the workflow
+- using a mock service to provide the feed data
+*/
 func TestKeystoneWithOCR3Workflow(t *testing.T) {
 	testLogger := logging.GetTestLogger(t)
 
