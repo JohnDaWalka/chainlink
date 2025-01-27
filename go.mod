@@ -12,7 +12,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/NethermindEth/juno v0.3.1
 	github.com/NethermindEth/starknet.go v0.7.1-0.20240401080518-34a506f3cfdb
-	github.com/XSAM/otelsql v0.27.0
+	github.com/XSAM/otelsql v0.29.0
 	github.com/andybalholm/brotli v1.1.1
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
