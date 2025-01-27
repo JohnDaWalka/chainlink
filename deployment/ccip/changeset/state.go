@@ -567,7 +567,7 @@ func LoadChainState(ctx context.Context, chain deployment.Chain, addresses map[s
 			if err != nil {
 				return state, err
 			}
-			state.USDCTokenPool = utp
+			state.TestUSDCTokenPool = utp
 		case deployment.NewTypeAndVersion(USDCTokenPool, deployment.Version1_5_1).String():
 			utp, err := usdc_token_pool.NewUSDCTokenPool(common.HexToAddress(address), chain.Client)
 			if err != nil {
