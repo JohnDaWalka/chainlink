@@ -146,7 +146,6 @@ type CCIPChainState struct {
 	Receiver               maybe_revert_message_receiver.MaybeRevertMessageReceiverInterface
 	LogMessageDataReceiver *log_message_data_receiver.LogMessageDataReceiver
 	TestRouter             *router.Router
-	TestUSDCTokenPool      *usdc_token_pool.USDCTokenPool
 	MockUSDCTransmitter    *mock_usdc_token_transmitter.MockE2EUSDCTransmitter
 	MockUSDCTokenMessenger *mock_usdc_token_messenger.MockE2EUSDCTokenMessenger
 	Multicall3             *multicall3.Multicall3
@@ -562,12 +561,6 @@ func LoadChainState(ctx context.Context, chain deployment.Chain, addresses map[s
 			state.BurnMintTokens677 = map[TokenSymbol]*burn_mint_erc677.BurnMintERC677{
 				USDCSymbol: ut,
 			}
-		case deployment.NewTypeAndVersion(USDCTokenPool, deployment.Version1_0_0).String():
-			utp, err := usdc_token_pool.NewUSDCTokenPool(common.HexToAddress(address), chain.Client)
-			if err != nil {
-				return state, err
-			}
-			state.TestUSDCTokenPool = utp
 		case deployment.NewTypeAndVersion(USDCTokenPool, deployment.Version1_5_1).String():
 			utp, err := usdc_token_pool.NewUSDCTokenPool(common.HexToAddress(address), chain.Client)
 			if err != nil {
