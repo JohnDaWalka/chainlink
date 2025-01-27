@@ -650,7 +650,8 @@ func deployKeystoneForwarder(t *testing.T, testLogger zerolog.Logger, ctfEnv *de
 	})
 	require.NoError(t, err, "failed to deploy forwarder contract")
 
-	ctfEnv.ExistingAddresses.Merge(output.AddressBook)
+	err = ctfEnv.ExistingAddresses.Merge(output.AddressBook)
+	require.NoError(t, err, "failed to merge address book")
 
 	addresses, err := ctfEnv.ExistingAddresses.AddressesForChain(chainSelector)
 	require.NoError(t, err, "failed to get addresses for chain %d from the address book", chainSelector)
@@ -714,7 +715,8 @@ func prepareWorkflowRegistry(t *testing.T, testLogger zerolog.Logger, ctfEnv *de
 	output, err := workflow_registry_changeset.Deploy(*ctfEnv, chainSelector)
 	require.NoError(t, err, "failed to deploy workflow registry contract")
 
-	ctfEnv.ExistingAddresses.Merge(output.AddressBook)
+	err = ctfEnv.ExistingAddresses.Merge(output.AddressBook)
+	require.NoError(t, err, "failed to merge address book")
 
 	addresses, err := ctfEnv.ExistingAddresses.AddressesForChain(chainSelector)
 	require.NoError(t, err, "failed to get addresses for chain %d from the address book", chainSelector)
@@ -751,7 +753,8 @@ func prepareFeedsConsumer(t *testing.T, testLogger zerolog.Logger, ctfEnv *deplo
 	})
 	require.NoError(t, err, "failed to deploy feeds_consumer contract")
 
-	ctfEnv.ExistingAddresses.Merge(output.AddressBook)
+	err = ctfEnv.ExistingAddresses.Merge(output.AddressBook)
+	require.NoError(t, err, "failed to merge address book")
 
 	addresses, err := ctfEnv.ExistingAddresses.AddressesForChain(chainSelector)
 	require.NoError(t, err, "failed to get addresses for chain %d from the address book", chainSelector)

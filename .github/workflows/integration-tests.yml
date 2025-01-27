@@ -111,7 +111,7 @@ jobs:
             keystone_changes:
               - *core_changes
               - 'contracts/src/**/keystone/**'
-              - 'contracts/src/**/shared/**'
+              - 'core/gethwrappers/keystone/**'
               - 'contracts/GNUmakefile'
               - 'contracts/foundry.toml'
               - 'contracts/package.json'
@@ -126,9 +126,7 @@ jobs:
       github_ci_changes: ${{ steps.ignore-filter.outputs.changes || steps.changes.outputs.github_ci_changes }}
       core_changes: ${{ steps.ignore-filter.outputs.changes || steps.changes.outputs.core_changes }}
       ccip_changes: ${{ steps.ignore-filter.outputs.changes || steps.changes.outputs.ccip_changes }}
-      # keystone_changes: ${{ steps.ignore-filter.outputs.changes || steps.changes.outputs.keystone_changes }}
-      # set to 'true' for testing purposes
-      keystone_changes: 'true'
+      keystone_changes: ${{ steps.ignore-filter.outputs.changes || steps.changes.outputs.keystone_changes }}
 
   build-chainlink:
     environment: integration
@@ -228,9 +226,7 @@ jobs:
       id-token: write
       contents: read
     needs: [build-chainlink, changes]
-    # disable for keystone smoke test testing
-    if: false
-    # if: github.event_name == 'pull_request' && ( needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
+    if: github.event_name == 'pull_request' && ( needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
     uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@61acf908014e2fe42c04f2a507c79f97eb5f8c4d
     with:
       workflow_name: Run Core E2E Tests For PR
@@ -318,9 +314,7 @@ jobs:
       id-token: write
       contents: read
     needs: [build-chainlink, changes]
-    # disable for keystone smoke test testing
-    if: false
-    # if: github.event_name == 'pull_request' && (needs.changes.outputs.ccip_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
+    if: github.event_name == 'pull_request' && (needs.changes.outputs.ccip_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
     uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@61acf908014e2fe42c04f2a507c79f97eb5f8c4d
     with:
       workflow_name: Run CCIP E2E Tests For PR
@@ -401,18 +395,17 @@ jobs:
     if: always()
     name: ETH Smoke Tests
     runs-on: ubuntu-latest
-    # needs: [run-core-e2e-tests-for-pr, run-ccip-e2e-tests-for-pr, run-core-e2e-tests-for-merge-queue, run-ccip-e2e-tests-for-merge-queue]
-    needs: [run-core-e2e-keystone-tests-for-pr, run-core-e2e-tests-for-merge-queue, run-ccip-e2e-tests-for-merge-queue]
+    needs: [run-core-e2e-tests-for-pr, run-core-e2e-keystone-tests-for-pr, run-ccip-e2e-tests-for-pr, run-core-e2e-tests-for-merge-queue, run-ccip-e2e-tests-for-merge-queue]
     steps:
-      # - name: Check Core test results
-      #   id: check_core_results
-      #   run: |
-      #     results='${{ needs.run-core-e2e-tests-for-pr.outputs.test_results }}'
-      #     echo "Core test results:"
-      #     echo "$results" | jq .
+      - name: Check Core test results
+        id: check_core_results
+        run: |
+          results='${{ needs.run-core-e2e-tests-for-pr.outputs.test_results }}'
+          echo "Core test results:"
+          echo "$results" | jq .
 
-      #     node_migration_tests_failed=$(echo $results | jq '[.[] | select(.id == "integration-tests/migration/upgrade_version_test.go:*" ) | select(.result != "success")] | length > 0')
-      #     echo "node_migration_tests_failed=$node_migration_tests_failed" >> $GITHUB_OUTPUT
+          node_migration_tests_failed=$(echo $results | jq '[.[] | select(.id == "integration-tests/migration/upgrade_version_test.go:*" ) | select(.result != "success")] | length > 0')
+          echo "node_migration_tests_failed=$node_migration_tests_failed" >> $GITHUB_OUTPUT
 
       - name: Check Core Keystone test results
         id: check_core_keystone_results
@@ -424,16 +417,16 @@ jobs:
           node_migration_tests_failed=$(echo $results | jq '[.[] | select(.id == "integration-tests/migration/upgrade_version_test.go:*" ) | select(.result != "success")] | length > 0')
           echo "node_migration_tests_failed=$node_migration_tests_failed" >> $GITHUB_OUTPUT
 
-      # - name: Check CCIP test results
-      #   id: check_ccip_results
-      #   run: |
-      #     if [[ '${{ needs.run-ccip-e2e-tests-for-pr.result }}' != 'skipped' ]]; then
-      #       results='${{ needs.run-ccip-e2e-tests-for-pr.outputs.test_results }}'
-      #       echo "CCIP test results:"
-      #       echo "$results" | jq .
-      #     else
-      #       echo "CCIP tests were skipped."
-      #     fi
+      - name: Check CCIP test results
+        id: check_ccip_results
+        run: |
+          if [[ '${{ needs.run-ccip-e2e-tests-for-pr.result }}' != 'skipped' ]]; then
+            results='${{ needs.run-ccip-e2e-tests-for-pr.outputs.test_results }}'
+            echo "CCIP test results:"
+            echo "$results" | jq .
+          else
+            echo "CCIP tests were skipped."
+          fi
 
       - name: Send slack notification for failed migration tests
         if: steps.check_core_results.outputs.node_migration_tests_failed == 'true' && github.event_name != 'workflow_dispatch'
@@ -497,10 +490,8 @@ jobs:
 
   ## Solana Section
   get_solana_sha:
-    # disable for now
-    if: false
     # We don't directly merge dependabot PRs, so let's not waste the resources\
-    # if: ${{ github.actor != 'dependabot[bot]' && inputs.run_solana != 'false' }}
+    if: ${{ github.actor != 'dependabot[bot]' && inputs.run_solana != 'false' }}
     name: Get Solana Sha From Go Mod
     environment: Integration
     runs-on: ubuntu-latest
