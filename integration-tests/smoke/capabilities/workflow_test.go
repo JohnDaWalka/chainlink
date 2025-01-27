@@ -14,6 +14,7 @@ import (
 	"math"
 	"math/big"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"regexp"
@@ -31,18 +32,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	ragetypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	geth_types "github.com/ethereum/go-ethereum/core/types"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
@@ -60,6 +62,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
+	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
+	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	workflow_registry_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/workflowregistry"
 )
@@ -130,6 +134,7 @@ type WorkflowTestConfig struct {
 	BlockchainA    *blockchain.Input `toml:"blockchain_a" validate:"required"`
 	NodeSet        *ns.Input         `toml:"nodeset" validate:"required"`
 	WorkflowConfig *WorkflowConfig   `toml:"workflow_config" validate:"required"`
+	JD             *jd.Input         `toml:"jd" validate:"required"`
 }
 
 type OCR3Config struct {
@@ -547,32 +552,124 @@ func validateInputsAndEnvVars(t *testing.T, testConfig *WorkflowTestConfig) {
 	}
 }
 
-func buildChainlinkDeploymentEnv(t *testing.T, sc *seth.Client) (*deployment.Environment, uint64) {
-	lgr := logger.TestLogger(t)
+// copied from Bala's unmerged PR: https://github.com/smartcontractkit/chainlink/pull/15751
+func getNodeInfo(nodeOut *ns.Output, bootstrapNodeCount int) ([]devenv.NodeInfo, error) {
+	var nodeInfo []devenv.NodeInfo
+	for i := 1; i <= len(nodeOut.CLNodes); i++ {
+		p2pURL, err := url.Parse(nodeOut.CLNodes[i-1].Node.DockerP2PUrl)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse p2p url: %w", err)
+		}
+		if i <= bootstrapNodeCount {
+			nodeInfo = append(nodeInfo, devenv.NodeInfo{
+				IsBootstrap: true,
+				Name:        fmt.Sprintf("bootstrap-%d", i),
+				P2PPort:     p2pURL.Port(),
+				CLConfig: nodeclient.ChainlinkConfig{
+					URL:        nodeOut.CLNodes[i-1].Node.HostURL,
+					Email:      nodeOut.CLNodes[i-1].Node.APIAuthUser,
+					Password:   nodeOut.CLNodes[i-1].Node.APIAuthPassword,
+					InternalIP: nodeOut.CLNodes[i-1].Node.InternalIP,
+				},
+			})
+		} else {
+			nodeInfo = append(nodeInfo, devenv.NodeInfo{
+				IsBootstrap: false,
+				Name:        fmt.Sprintf("node-%d", i),
+				P2PPort:     p2pURL.Port(),
+				CLConfig: nodeclient.ChainlinkConfig{
+					URL:        nodeOut.CLNodes[i-1].Node.HostURL,
+					Email:      nodeOut.CLNodes[i-1].Node.APIAuthUser,
+					Password:   nodeOut.CLNodes[i-1].Node.APIAuthPassword,
+					InternalIP: nodeOut.CLNodes[i-1].Node.InternalIP,
+				},
+			})
+		}
+	}
+	return nodeInfo, nil
+}
 
-	addressBook := deployment.NewMemoryAddressBook()
-	chainMap := make(map[uint64]deployment.Chain)
-	ctx := context.Background()
+func buildChainlinkDeploymentEnv(t *testing.T, jdOutput *jd.Output, nodeOutput *ns.Output, bs *blockchain.Output, sc *seth.Client) (*deployment.Environment, uint64) {
+	lgr := logger.TestLogger(t)
 
 	chainSelector, err := chainselectors.SelectorFromChainId(sc.Cfg.Network.ChainID)
 	require.NoError(t, err, "failed to get chain selector for chain id %d", sc.Cfg.Network.ChainID)
-	chainMap[chainSelector] = deployment.Chain{
-		Selector:    chainSelector,
-		Client:      sc.Client,
-		DeployerKey: sc.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
-		Confirm: func(tx *geth_types.Transaction) (uint64, error) {
-			decoded, revertErr := sc.DecodeTx(tx)
-			if revertErr != nil {
-				return 0, revertErr
-			}
-			if decoded.Receipt == nil {
-				return 0, fmt.Errorf("no receipt found for transaction %s even though it wasn't reverted. This should not happen", tx.Hash().String())
-			}
-			return decoded.Receipt.BlockNumber.Uint64(), nil
+
+	// addressBook := deployment.NewMemoryAddressBook()
+	// chainMap := make(map[uint64]deployment.Chain)
+	// ctx := context.Background()
+
+	// chainMap[chainSelector] = deployment.Chain{
+	// 	Selector:    chainSelector,
+	// 	Client:      sc.Client,
+	// 	DeployerKey: sc.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
+	// 	Confirm: func(tx *geth_types.Transaction) (uint64, error) {
+	// 		decoded, revertErr := sc.DecodeTx(tx)
+	// 		if revertErr != nil {
+	// 			return 0, revertErr
+	// 		}
+	// 		if decoded.Receipt == nil {
+	// 			return 0, fmt.Errorf("no receipt found for transaction %s even though it wasn't reverted. This should not happen", tx.Hash().String())
+	// 		}
+	// 		return decoded.Receipt.BlockNumber.Uint64(), nil
+	// 	},
+	// }
+
+	nodeInfo, err := getNodeInfo(nodeOutput, 5)
+	require.NoError(t, err, "failed to get node info")
+
+	jdConfig := devenv.JDConfig{
+		GRPC:     jdOutput.HostGRPCUrl,
+		WSRPC:    jdOutput.DockerWSRPCUrl,
+		Creds:    insecure.NewCredentials(),
+		NodeInfo: nodeInfo,
+	}
+
+	// var nodeIDs []string
+	// if jd.don != nil {
+	// 	err = jd.don.CreateSupportedChains(ctx(), config.Chains, *jd)
+	// 	if err != nil {
+	// 		return nil, nil, err
+	// 	}
+	// 	nodeIDs = jd.don.NodeIds()
+	// }
+
+	// type ChainConfig struct {
+	// 	ChainID     uint64               // chain id as per EIP-155, mainly applicable for EVM chains
+	// 	ChainName   string               // name of the chain populated from chainselector repo
+	// 	ChainType   string               // should denote the chain family. Acceptable values are EVM, COSMOS, SOLANA, STARKNET, APTOS etc
+	// 	WSRPCs      []CribRPCs           // websocket rpcs to connect to the chain
+	// 	HTTPRPCs    []CribRPCs           // http rpcs to connect to the chain
+	// 	DeployerKey *bind.TransactOpts   // key to deploy and configure contracts on the chain
+	// 	Users       []*bind.TransactOpts // map of addresses to their transact opts to interact with the chain as users
+	// }
+
+	require.Len(t, bs.Nodes, 1, "expected only one node in the blockchain output")
+
+	devenvConfig := devenv.EnvironmentConfig{
+		JDConfig: jdConfig,
+		Chains: []devenv.ChainConfig{
+			{
+				ChainID:   sc.Cfg.Network.ChainID,
+				ChainName: sc.Cfg.Network.Name,
+				ChainType: strings.ToUpper(bs.Family),
+				WSRPCs: []devenv.CribRPCs{{
+					External: bs.Nodes[0].HostWSUrl,
+					Internal: bs.Nodes[0].DockerInternalWSUrl,
+				}},
+				HTTPRPCs: []devenv.CribRPCs{{
+					External: bs.Nodes[0].HostHTTPUrl,
+					Internal: bs.Nodes[0].DockerInternalHTTPUrl,
+				}},
+			},
 		},
 	}
 
-	return deployment.NewEnvironment("ctfV2", lgr, addressBook, chainMap, nil, nil, nil, func() context.Context { return ctx }, deployment.OCRSecrets{}), chainSelector
+	env, _, err := devenv.NewEnvironment(context.Background, lgr, devenvConfig)
+	require.NoError(t, err, "failed to create environment")
+
+	return env, chainSelector
+	// return deployment.NewEnvironment("ctfV2", lgr, addressBook, chainMap, nil, nil, nil, func() context.Context { return ctx }, deployment.OCRSecrets{}), chainSelector
 }
 
 func prepareCapabilitiesRegistry(t *testing.T, sc *seth.Client, allCaps []cr_wrapper.CapabilitiesRegistryCapability) (common.Address, [][32]byte) {
@@ -1381,8 +1478,15 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 		Build()
 	require.NoError(t, err, "failed to create seth client")
 
+	// Start job distributor
+	jdOutput, err := jd.NewJD(in.JD)
+	require.NoError(t, err, "failed to create new job distributor")
+
+	// Deploy and fund the DON
+	nodeOutput, nodesInfo := starAndFundNodes(t, in, bc, sc)
+
 	// Prepare the chainlink/deployment environment
-	ctfEnv, chainSelector := buildChainlinkDeploymentEnv(t, sc)
+	ctfEnv, chainSelector := buildChainlinkDeploymentEnv(t, jdOutput, nodeOutput, bc, sc)
 
 	// Define required capabilities
 	// These need to match the capabilities that are required by the workflow,
@@ -1425,8 +1529,6 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 	// Register the workflow (either via chainlink-cli or by calling the workflow registry directly)
 	registerWorkflow(t, in, sc, capRegAddr, workflowRegistryAddr, feedsConsumerAddress, donID, chainSelector, workflowName, pkey, bc.Nodes[0].HostHTTPUrl)
 
-	// Deploy and fund the DON
-	_, nodesInfo := starAndFundNodes(t, in, bc, sc)
 	_, nodeClients := configureNodes(t, nodesInfo, in, bc, capRegAddr, workflowRegistryAddr, forwarderAddress)
 
 	// Deploy OCR3 Capability contract
