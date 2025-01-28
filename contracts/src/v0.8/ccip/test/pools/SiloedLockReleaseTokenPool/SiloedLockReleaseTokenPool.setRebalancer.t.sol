@@ -9,7 +9,7 @@ contract SiloedLockReleaseTokenPool_setRebalancer is SiloedLockReleaseTokenPoolS
 
   function test_setSiloRebalancer() public {
     vm.expectEmit();
-    emit SiloedLockReleaseTokenPool.SiloRebalancerSet(SILOED_CHAIN_SELECTOR, REBALANCER_ADDRESS, OWNER);
+    emit SiloedLockReleaseTokenPool.SiloRebalancerSet(SILOED_CHAIN_SELECTOR, OWNER, REBALANCER_ADDRESS);
 
     s_siloedLockReleaseTokenPool.setSiloRebalancer(SILOED_CHAIN_SELECTOR, REBALANCER_ADDRESS);
 
@@ -19,7 +19,7 @@ contract SiloedLockReleaseTokenPool_setRebalancer is SiloedLockReleaseTokenPoolS
 
   function test_setRebalancer_UnsiloedChains() public {
     vm.expectEmit();
-    emit SiloedLockReleaseTokenPool.UnsiloedRebalancerSet(REBALANCER_ADDRESS, OWNER);
+    emit SiloedLockReleaseTokenPool.UnsiloedRebalancerSet(OWNER, REBALANCER_ADDRESS);
 
     s_siloedLockReleaseTokenPool.setRebalancer(REBALANCER_ADDRESS);
 
