@@ -1643,12 +1643,15 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 	// Register the workflow (either via chainlink-cli or by calling the workflow registry directly)
 	registerWorkflow(t, in, sc, keystoneContracts.capabilityRegistryAddrress, workflowRegistryAddr, feedsConsumerAddress, donID, chainSelector, workflowName, pkey, bc.Nodes[0].HostHTTPUrl)
 
-	_, nodeClients := configureNodes(t, nodesInfo, in, bc, keystoneContracts.capabilityRegistryAddrress, workflowRegistryAddr, keystoneContracts.forwarderAddress)
-	// use when using JD
-	// configureNodes(t, nodesInfo, in, bc, capRegAddr, workflowRegistryAddr, forwarderAddress)
-
 	// Create OCR3 and capability jobs for each node
-	createNodeJobs(t, nodeClients, nodesInfo, bc, keystoneContracts.ocr3CapabilityAddress)
+
+	// without JD
+	// _, nodeClients := configureNodes(t, nodesInfo, in, bc, keystoneContracts.capabilityRegistryAddrress, workflowRegistryAddr, keystoneContracts.forwarderAddress)
+	// createNodeJobs(t, nodeClients, nodesInfo, bc, keystoneContracts.ocr3CapabilityAddress)
+
+	// with JD
+	configureNodes(t, nodesInfo, in, bc, keystoneContracts.ocr3CapabilityAddress, workflowRegistryAddr, keystoneContracts.forwarderAddress)
+	createNodeJobsWithJd(t, ctfEnv, don, bc, chainSelector, keystoneContracts.ocr3CapabilityAddress)
 
 	// Wait for OCR listeners to be ready before setting the configuration.
 	// If the ConfigSet event is missed, OCR protocol will not start.
