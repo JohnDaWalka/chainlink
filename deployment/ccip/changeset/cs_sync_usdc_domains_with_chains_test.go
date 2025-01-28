@@ -180,14 +180,14 @@ func TestValidateUSDCChainConfig(t *testing.T) {
 		{
 			Msg: "No USDC token pool found with version",
 			Input: changeset.USDCChainConfig{
-				Version: deployment.Version1_5_1,
+				Version: changeset.CurrentTokenPoolVersion,
 			},
 			ErrStr: "no USDC token pool found",
 		},
 		{
 			Msg: "Not owned by expected owner",
 			Input: changeset.USDCChainConfig{
-				Version: deployment.Version1_5_1,
+				Version: changeset.CurrentTokenPoolVersion,
 			},
 			ErrStr:     "failed ownership validation",
 			DeployUSDC: true,
@@ -196,7 +196,7 @@ func TestValidateUSDCChainConfig(t *testing.T) {
 		{
 			Msg: "No domain ID found for selector",
 			Input: changeset.USDCChainConfig{
-				Version: deployment.Version1_5_1,
+				Version: changeset.CurrentTokenPoolVersion,
 			},
 			ErrStr: "no USDC domain ID defined for chain with selector",
 		},
@@ -249,7 +249,6 @@ func TestSyncUSDCDomainsWithChainsChangeset(t *testing.T) {
 	t.Parallel()
 
 	for _, mcmsConfig := range []*changeset.MCMSConfig{nil, &changeset.MCMSConfig{MinDelay: 0 * time.Second}} {
-
 		msg := "Sync domains without MCMS"
 		if mcmsConfig != nil {
 			msg = "Sync domains with MCMS"
@@ -338,11 +337,10 @@ func TestSyncUSDCDomainsWithChainsChangeset(t *testing.T) {
 				remoteUsdcTokenPool := state.Chains[remoteSelector].USDCTokenPools[changeset.CurrentTokenPoolVersion]
 				domain, err := usdcTokenPool.GetDomain(nil, remoteSelector)
 				allowedCaller := make([]byte, 32)
-				for i, b := range domain.AllowedCaller {
-					allowedCaller[i] = b
-				}
+				bytesCopied := copy(allowedCaller, domain.AllowedCaller[:])
+				require.Equal(t, 32, bytesCopied)
 				require.NoError(t, err)
-				require.Equal(t, true, domain.Enabled)
+				require.True(t, domain.Enabled)
 				require.Equal(t, remoteDomain, domain.DomainIdentifier)
 				require.Equal(t, remoteUsdcTokenPool.Address(), common.BytesToAddress(allowedCaller))
 			}
@@ -364,7 +362,7 @@ func TestSyncUSDCDomainsWithChainsChangeset(t *testing.T) {
 				},
 			})
 			require.NoError(t, err)
-			require.Len(t, output.Proposals, 0)
+			require.Empty(t, output.Proposals)
 		})
 	}
 }
