@@ -35,10 +35,7 @@ import (
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
-	ragetypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
@@ -48,7 +45,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -56,10 +52,7 @@ import (
 
 	pkgworkflows "github.com/smartcontractkit/chainlink-common/pkg/workflows"
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
-	cr_wrapper "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/forwarder"
-	ocr3_capability "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/ocr3_capability"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/workflow/generated/workflow_registry_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
@@ -285,68 +278,6 @@ func getNodesInfo(
 	return nodesInfo
 }
 
-func generateOCR3Config(
-	t *testing.T,
-	nodesInfo []NodeInfo,
-) (config *OCR3Config) {
-	oracleIdentities := []confighelper.OracleIdentityExtra{}
-	transmissionSchedule := []int{}
-
-	for _, nodeInfo := range nodesInfo {
-		transmissionSchedule = append(transmissionSchedule, 1)
-		oracleIdentity := confighelper.OracleIdentityExtra{}
-		oracleIdentity.OffchainPublicKey = nodeInfo.OffchainPublicKey
-		oracleIdentity.OnchainPublicKey = nodeInfo.OnchainPublicKey
-		oracleIdentity.ConfigEncryptionPublicKey = nodeInfo.ConfigEncryptionPublicKey
-		oracleIdentity.PeerID = nodeInfo.PeerID
-		oracleIdentity.TransmitAccount = types.Account(nodeInfo.TransmitterAddress)
-		oracleIdentities = append(oracleIdentities, oracleIdentity)
-	}
-
-	maxDurationInitialization := 10 * time.Second
-
-	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
-		5*time.Second,              // DeltaProgress: Time between rounds
-		5*time.Second,              // DeltaResend: Time between resending unconfirmed transmissions
-		5*time.Second,              // DeltaInitial: Initial delay before starting the first round
-		2*time.Second,              // DeltaRound: Time between rounds within an epoch
-		500*time.Millisecond,       // DeltaGrace: Grace period for delayed transmissions
-		1*time.Second,              // DeltaCertifiedCommitRequest: Time between certified commit requests
-		30*time.Second,             // DeltaStage: Time between stages of the protocol
-		uint64(10),                 // MaxRoundsPerEpoch: Maximum number of rounds per epoch
-		transmissionSchedule,       // TransmissionSchedule: Transmission schedule
-		oracleIdentities,           // Oracle identities with their public keys
-		nil,                        // Plugin config (empty for now)
-		&maxDurationInitialization, // MaxDurationInitialization: ???
-		1*time.Second,              // MaxDurationQuery: Maximum duration for querying
-		1*time.Second,              // MaxDurationObservation: Maximum duration for observation
-		1*time.Second,              // MaxDurationAccept: Maximum duration for acceptance
-		1*time.Second,              // MaxDurationTransmit: Maximum duration for transmission
-		1,                          // F: Maximum number of faulty oracles
-		nil,                        // OnChain config (empty for now)
-	)
-	require.NoError(t, err)
-
-	signerAddresses := [][]byte{}
-	for _, signer := range signers {
-		signerAddresses = append(signerAddresses, signer)
-	}
-
-	transmitterAddresses := []common.Address{}
-	for _, transmitter := range transmitters {
-		transmitterAddresses = append(transmitterAddresses, common.HexToAddress(string(transmitter)))
-	}
-
-	return &OCR3Config{
-		Signers:               signerAddresses,
-		Transmitters:          transmitterAddresses,
-		F:                     f,
-		OnchainConfig:         onchainConfig,
-		OffchainConfigVersion: offchainConfigVersion,
-		OffchainConfig:        offchainConfig,
-	}
-}
-
 func GenerateWorkflowIDFromStrings(owner string, name string, workflow []byte, config []byte, secretsURL string) (string, error) {
 	ownerWithoutPrefix := owner
 	if strings.HasPrefix(owner, "0x") {
@@ -528,7 +459,7 @@ func validateInputsAndEnvVars(t *testing.T, testConfig *WorkflowTestConfig) {
 		require.True(t, testConfig.WorkflowConfig.UseExising, "if you are not using chainlink-cli you must use an existing workflow")
 	}
 
-	ghToken := os.Getenv("GITHUB_API_TOKEN")
+	ghToken := os.Getenv("GITHUB_CAP_API_TOKEN")
 	_, err := downloadCronCapability(ghToken)
 	require.NoError(t, err, "failed to download cron capability. Make sure token has content:read permissions to the capabilities repo")
 
@@ -548,7 +479,7 @@ func validateInputsAndEnvVars(t *testing.T, testConfig *WorkflowTestConfig) {
 		require.True(t, isInstalled("chainlink-cli"), "chainlink-cli is required for this test. Please install it, add to path and run again")
 
 		if !testConfig.WorkflowConfig.UseExising {
-			require.NotEmpty(t, os.Getenv("GITHUB_API_TOKEN"), "GITHUB_API_TOKEN must be set to use chainlink-cli. It requires gist:read and gist:write permissions")
+			require.NotEmpty(t, os.Getenv("GITHUB_GIST_API_TOKEN"), "GITHUB_GIST_API_TOKEN must be set to use chainlink-cli. It requires gist:read and gist:write permissions")
 		} else {
 			require.NotEmpty(t, testConfig.WorkflowConfig.ChainlinkCLI.FolderLocation, "folder_location must be set in the chainlink_cli config")
 		}
@@ -598,26 +529,6 @@ func buildChainlinkDeploymentEnv(t *testing.T, jdOutput *jd.Output, nodeOutput *
 	chainSelector, err := chainselectors.SelectorFromChainId(sc.Cfg.Network.ChainID)
 	require.NoError(t, err, "failed to get chain selector for chain id %d", sc.Cfg.Network.ChainID)
 
-	// addressBook := deployment.NewMemoryAddressBook()
-	// chainMap := make(map[uint64]deployment.Chain)
-	// ctx := context.Background()
-
-	// chainMap[chainSelector] = deployment.Chain{
-	// 	Selector:    chainSelector,
-	// 	Client:      sc.Client,
-	// 	DeployerKey: sc.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
-	// 	Confirm: func(tx *geth_types.Transaction) (uint64, error) {
-	// 		decoded, revertErr := sc.DecodeTx(tx)
-	// 		if revertErr != nil {
-	// 			return 0, revertErr
-	// 		}
-	// 		if decoded.Receipt == nil {
-	// 			return 0, fmt.Errorf("no receipt found for transaction %s even though it wasn't reverted. This should not happen", tx.Hash().String())
-	// 		}
-	// 		return decoded.Receipt.BlockNumber.Uint64(), nil
-	// 	},
-	// }
-
 	nodeInfo, err := getNodeInfo(nodeOutput, 1)
 	require.NoError(t, err, "failed to get node info")
 
@@ -627,25 +538,6 @@ func buildChainlinkDeploymentEnv(t *testing.T, jdOutput *jd.Output, nodeOutput *
 		Creds:    insecure.NewCredentials(),
 		NodeInfo: nodeInfo,
 	}
-
-	// var nodeIDs []string
-	// if jd.don != nil {
-	// 	err = jd.don.CreateSupportedChains(ctx(), config.Chains, *jd)
-	// 	if err != nil {
-	// 		return nil, nil, err
-	// 	}
-	// 	nodeIDs = jd.don.NodeIds()
-	// }
-
-	// type ChainConfig struct {
-	// 	ChainID     uint64               // chain id as per EIP-155, mainly applicable for EVM chains
-	// 	ChainName   string               // name of the chain populated from chainselector repo
-	// 	ChainType   string               // should denote the chain family. Acceptable values are EVM, COSMOS, SOLANA, STARKNET, APTOS etc
-	// 	WSRPCs      []CribRPCs           // websocket rpcs to connect to the chain
-	// 	HTTPRPCs    []CribRPCs           // http rpcs to connect to the chain
-	// 	DeployerKey *bind.TransactOpts   // key to deploy and configure contracts on the chain
-	// 	Users       []*bind.TransactOpts // map of addresses to their transact opts to interact with the chain as users
-	// }
 
 	require.Len(t, bs.Nodes, 1, "expected only one node in the blockchain output")
 
@@ -673,32 +565,29 @@ func buildChainlinkDeploymentEnv(t *testing.T, jdOutput *jd.Output, nodeOutput *
 	require.NoError(t, err, "failed to create environment")
 
 	return env, don, chainSelector
-	// return deployment.NewEnvironment("ctfV2", lgr, addressBook, chainMap, nil, nil, nil, func() context.Context { return ctx }, deployment.OCRSecrets{}), chainSelector
 }
 
-func prepareCapabilitiesRegistry(t *testing.T, sc *seth.Client, allCaps []cr_wrapper.CapabilitiesRegistryCapability) (common.Address, [][32]byte) {
-	capRegAddr, tx, capabilitiesRegistryInstance, err := cr_wrapper.DeployCapabilitiesRegistry(sc.NewTXOpts(), sc.Client)
-	_, decodeErr := sc.Decode(tx, err)
-	require.NoError(t, decodeErr, "failed to deploy capabilities registry contract")
+type keystoneContracts struct {
+	forwarderAddress           common.Address
+	ocr3CapabilityAddress      common.Address
+	capabilityRegistryAddrress common.Address
+}
 
-	_, decodeErr = sc.Decode(capabilitiesRegistryInstance.AddCapabilities(
-		sc.NewTXOpts(),
-		allCaps,
-	))
-	require.NoError(t, decodeErr, "failed to add capabilities to capabilities registry")
+func deployKeystoneContracts(t *testing.T, testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) keystoneContracts {
+	// Deploy keystone forwarder contract
+	forwarderAddress := deployKeystoneForwarder(t, testLogger, ctfEnv, chainSelector)
 
-	hashedCapabilities := make([][32]byte, len(allCaps))
-	for i, capability := range allCaps {
-		hashed, err := capabilitiesRegistryInstance.GetHashedCapabilityId(
-			sc.NewCallOpts(),
-			capability.LabelledName,
-			capability.Version,
-		)
-		require.NoError(t, err, "failed to get hashed capability ID for %s", capability.LabelledName)
-		hashedCapabilities[i] = hashed
+	// Deploy OCR3 contract
+	ocr3CapabilityAddress := deployOCR3(t, testLogger, ctfEnv, chainSelector)
+
+	// Deploy capabilities registry contract
+	capRegAddr := deployCapabilitiesRegistry(t, testLogger, ctfEnv, chainSelector)
+
+	return keystoneContracts{
+		forwarderAddress:           forwarderAddress,
+		ocr3CapabilityAddress:      ocr3CapabilityAddress,
+		capabilityRegistryAddrress: capRegAddr,
 	}
-
-	return capRegAddr, hashedCapabilities
 }
 
 func deployOCR3(t *testing.T, testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) common.Address {
@@ -767,49 +656,6 @@ func deployKeystoneForwarder(t *testing.T, testLogger zerolog.Logger, ctfEnv *de
 	}
 
 	return forwarderAddress
-}
-
-func configureKeystoneForwarder(t *testing.T, forwarderAddress common.Address, sc *seth.Client, nodesInfo []NodeInfo) {
-	forwarderInstance, err := forwarder.NewKeystoneForwarder(forwarderAddress, sc.Client)
-	require.NoError(t, err, "failed to create forwarder instance")
-
-	signers := make([]common.Address, len(nodesInfo)-1)
-
-	for i, node := range nodesInfo {
-		// skip the first node, as it's the bootstrap node
-		// it doesn't have any capabilities that are required by the workflow
-		if i == 0 {
-			continue
-		}
-		signers[i-1] = node.Signer
-	}
-
-	_, err = sc.Decode(forwarderInstance.SetConfig(
-		sc.NewTXOpts(),
-		1, // donID
-		1, // configVersion -- wonder what it does
-		1, // maximum number of faulty nodes
-		signers))
-	require.NoError(t, err, "failed to set config for forwarder")
-}
-
-func configureOCR3Capability(t *testing.T, ocr3CapabilityAddress common.Address, sc *seth.Client, nodeInfo []NodeInfo) {
-	workflowNodesetInfo := nodeInfo[1:]
-
-	ocr3CapabilityContract, err := ocr3_capability.NewOCR3Capability(ocr3CapabilityAddress, sc.Client)
-	require.NoError(t, err, "failed to create OCR3 capability contract instance")
-
-	ocr3Config := generateOCR3Config(t, workflowNodesetInfo)
-	_, decodeErr := sc.Decode(ocr3CapabilityContract.SetConfig(
-		sc.NewTXOpts(),
-		ocr3Config.Signers,
-		ocr3Config.Transmitters,
-		ocr3Config.F,
-		ocr3Config.OnchainConfig,
-		ocr3Config.OffchainConfigVersion,
-		ocr3Config.OffchainConfig,
-	))
-	require.NoError(t, decodeErr, "failed to set OCR3 configuration")
 }
 
 func prepareWorkflowRegistry(t *testing.T, testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64, sc *seth.Client, donID uint32) common.Address {
@@ -906,18 +752,6 @@ func prepareFeedsConsumer(t *testing.T, testLogger zerolog.Logger, ctfEnv *deplo
 	return feedsConsumerAddress
 }
 
-func deployOCR3Capability(t *testing.T, testLogger zerolog.Logger, sc *seth.Client) common.Address {
-	ocr3CapabilityAddress, tx, _, err := ocr3_capability.DeployOCR3Capability(
-		sc.NewTXOpts(),
-		sc.Client,
-	)
-	_, decodeErr := sc.Decode(tx, err)
-	require.NoError(t, decodeErr, "failed to deploy OCR Capability contract")
-
-	testLogger.Info().Msgf("Deployed OCR3 Capability contract at %s", ocr3CapabilityAddress.Hex())
-
-	return ocr3CapabilityAddress
-}
 func registerWorkflowDirectly(t *testing.T, in *WorkflowTestConfig, sc *seth.Client, workflowRegistryAddr common.Address, donID uint32, workflowName string) {
 	require.NotEmpty(t, in.WorkflowConfig.Existing.BinaryURL)
 	workFlowData, err := downloadAndDecode(in.WorkflowConfig.Existing.BinaryURL)
@@ -970,9 +804,9 @@ func compileWorkflowWithChainlinkCli(t *testing.T, in *WorkflowTestConfig, feeds
 	require.NoError(t, err, "failed to start compile command")
 
 	err = compileCmd.Wait()
-	require.NoError(t, err, "failed to wait for compile command")
-
 	fmt.Println("Compile output:\n", outputBuffer.String())
+
+	require.NoError(t, err, "failed to wait for compile command")
 
 	re := regexp.MustCompile(`Gist URL=([^\s]+)`)
 	matches := re.FindAllStringSubmatch(outputBuffer.String(), -1)
@@ -1063,6 +897,8 @@ func registerWorkflow(t *testing.T, in *WorkflowTestConfig, sc *seth.Client, cap
 
 	// compile and upload the workflow, if we are not using an existing one
 	if !in.WorkflowConfig.UseExising {
+		err := os.Setenv("GITHUB_API_TOKEN", os.Getenv("GITHUB_GIST_API_TOKEN"))
+		require.NoError(t, err, "failed to set GITHUB_API_TOKEN env var")
 		workflowGistURL, workflowConfigURL = compileWorkflowWithChainlinkCli(t, in, feedsConsumerAddress, settingsFile)
 	} else {
 		workflowGistURL = in.WorkflowConfig.Existing.BinaryURL
@@ -1677,144 +1513,7 @@ func createNodeJobsWithJd(t *testing.T, ctfEnv *deployment.Environment, don *dev
 	require.False(t, errFound, "failed to create jobs")
 }
 
-func registerDONAndCapabilities(t *testing.T, capRegAddr common.Address, hashedCapabilities [][32]byte, nodesInfo []NodeInfo, sc *seth.Client) {
-	// Register node operators, nodes and DON in the Capabilities registry
-	nopsToAdd := make([]cr_wrapper.CapabilitiesRegistryNodeOperator, len(nodesInfo)-1)
-	nodesToAdd := make([]cr_wrapper.CapabilitiesRegistryNodeParams, len(nodesInfo)-1)
-	donNodes := make([][32]byte, len(nodesInfo)-1)
-
-	for i, node := range nodesInfo {
-		// skip the first node, as it's the bootstrap node
-		// it doesn't have any capabilities that are required by the workflow
-		if i == 0 {
-			continue
-		}
-		nopsToAdd[i-1] = cr_wrapper.CapabilitiesRegistryNodeOperator{
-			Admin: common.HexToAddress(node.TransmitterAddress),
-			Name:  fmt.Sprintf("NOP %d", i),
-		}
-
-		var peerID ragetypes.PeerID
-		err := peerID.UnmarshalText([]byte(node.PeerID))
-		require.NoError(t, err, "failed to unmarshal peer ID")
-
-		nodesToAdd[i-1] = cr_wrapper.CapabilitiesRegistryNodeParams{
-			NodeOperatorId:      uint32(i), //nolint:gosec // disable G115
-			Signer:              common.BytesToHash(node.Signer.Bytes()),
-			P2pId:               peerID,
-			EncryptionPublicKey: [32]byte{1, 2, 3, 4, 5},
-			HashedCapabilityIds: hashedCapabilities,
-		}
-
-		donNodes[i-1] = peerID
-	}
-
-	capabilitiesRegistryInstance, err := cr_wrapper.NewCapabilitiesRegistry(capRegAddr, sc.Client)
-	require.NoError(t, err, "failed to create capabilities registry instance")
-
-	// Add NOPs to capabilities registry
-	_, decodeErr := sc.Decode(capabilitiesRegistryInstance.AddNodeOperators(
-		sc.NewTXOpts(),
-		nopsToAdd,
-	))
-	require.NoError(t, decodeErr, "failed to add NOPs to capabilities registry")
-
-	// Add nodes to capabilities registry
-	_, decodeErr = sc.Decode(capabilitiesRegistryInstance.AddNodes(
-		sc.NewTXOpts(),
-		nodesToAdd,
-	))
-	require.NoError(t, decodeErr, "failed to add nodes to capabilities registry")
-
-	capRegConfig := make([]cr_wrapper.CapabilitiesRegistryCapabilityConfiguration, len(hashedCapabilities))
-	for i, hashed := range hashedCapabilities {
-		capRegConfig[i] = cr_wrapper.CapabilitiesRegistryCapabilityConfiguration{
-			CapabilityId: hashed,
-			Config:       []byte(""),
-		}
-	}
-
-	// Add nodeset to capabilities registry
-	_, decodeErr = sc.Decode(capabilitiesRegistryInstance.AddDON(
-		sc.NewTXOpts(),
-		donNodes,
-		capRegConfig,
-		true,     // is public
-		true,     // accepts workflows
-		uint8(1), // max number of malicious nodes
-	))
-	require.NoError(t, decodeErr, "failed to add DON to capabilities registry")
-}
-
-/*
-!!! ATTENTION !!!
-
-Do not use this test as a template for your tests. It's hacky, since we were working under time pressure. We will soon refactor it follow best practices
-and a golden example. Apart from its structure what is currently missing is:
-- using `chainlink/deployment` to deploy and configure all the contracts
-- using Job Distribution to create jobs for the nodes
-- using only `chainlink-cli` to register the workflow
-- using a mock service to provide the feed data
-*/
-func TestKeystoneWithOCR3Workflow(t *testing.T) {
-	testLogger := logging.GetTestLogger(t)
-
-	// Define and load the test configuration
-	donID := uint32(1)
-	workflowName := "abcdefgasd"
-	feedID := "018bfe8840700040000000000000000000000000000000000000000000000000" // without 0x prefix!
-	feedBytes := common.HexToHash(feedID)
-
-	in, err := framework.Load[WorkflowTestConfig](t)
-	require.NoError(t, err, "couldn't load test config")
-	validateInputsAndEnvVars(t, in)
-
-	pkey := os.Getenv("PRIVATE_KEY")
-
-	// Create a new blockchain network
-	bc, err := blockchain.NewBlockchainNetwork(in.BlockchainA)
-	require.NoError(t, err)
-
-	sc, err := seth.NewClientBuilder().
-		WithRpcUrl(bc.Nodes[0].HostWSUrl).
-		WithPrivateKeys([]string{pkey}).
-		Build()
-	require.NoError(t, err, "failed to create seth client")
-
-	// Start job distributor
-	jdOutput, err := jd.NewJD(in.JD)
-	require.NoError(t, err, "failed to create new job distributor")
-
-	// Deploy and fund the DON
-	nodeOutput, nodesInfo := startAndFundNodes(t, in, bc, sc)
-
-	// Prepare the chainlink/deployment environment
-	ctfEnv, don, chainSelector := buildChainlinkDeploymentEnv(t, jdOutput, nodeOutput, bc, sc)
-
-	_ = don
-
-	nodeIds := make([]string, len(don.Nodes))
-	for i, node := range don.Nodes {
-		nodeIds[i] = node.NodeId
-	}
-
-	// these 3 are reguried to call ConfigureInitialContractsChangeset
-	// case kslib.CapabilitiesRegistry:
-	// 	foundRegistry = true
-	// case kslib.OCR3Capability:
-	// 	foundOCR3 = true
-	// case kslib.KeystoneForwarder:
-	// 	foundForwarder = true
-
-	// Deploy keystone forwarder contract
-	forwarderAddress := deployKeystoneForwarder(t, testLogger, ctfEnv, chainSelector)
-
-	// Deploy OCR3 contract
-	ocr3CapabilityAddress := deployOCR3(t, testLogger, ctfEnv, chainSelector)
-
-	// Deploy capabilities registry contract
-	capRegAddr := deployCapabilitiesRegistry(t, testLogger, ctfEnv, chainSelector)
-
+func configureWorkflowDON(t *testing.T, ctfEnv *deployment.Environment, don *devenv.DON, chainSelector uint64) {
 	kcrAllCaps := []kcr.CapabilitiesRegistryCapability{
 		{
 			LabelledName:   "offchain_reporting",
@@ -1884,70 +1583,72 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 		OCR3Config:       &oracleConfig,
 	}
 
-	_, err = keystone_changeset.ConfigureInitialContractsChangeset(*ctfEnv, cfg)
+	_, err := keystone_changeset.ConfigureInitialContractsChangeset(*ctfEnv, cfg)
 	require.NoError(t, err, "failed to configure initial contracts")
+}
 
-	// Define required capabilities
-	// These need to match the capabilities that are required by the workflow,
-	// which in our case is a Proof-of-Reserves workflow
-	// allCaps := []cr_wrapper.CapabilitiesRegistryCapability{
-	// 	{
-	// 		LabelledName:   "offchain_reporting",
-	// 		Version:        "1.0.0",
-	// 		CapabilityType: 2, // CONSENSUS
-	// 		ResponseType:   0, // REPORT
-	// 	},
-	// 	{
-	// 		LabelledName:   "write_geth-testnet",
-	// 		Version:        "1.0.0",
-	// 		CapabilityType: 3, // TARGET
-	// 		ResponseType:   1, // OBSERVATION_IDENTICAL
-	// 	},
-	// 	{
-	// 		LabelledName:   "cron-trigger",
-	// 		Version:        "1.0.0",
-	// 		CapabilityType: uint8(0), // trigger
-	// 	},
-	// 	{
-	// 		LabelledName:   "custom-compute",
-	// 		Version:        "1.0.0",
-	// 		CapabilityType: uint8(1), // action
-	// 	},
-	// }
-	// capRegAddr, hashedCapabilities := prepareCapabilitiesRegistry(t, sc, allCaps)
+/*
+!!! ATTENTION !!!
+
+Do not use this test as a template for your tests. It's hacky, since we were working under time pressure. We will soon refactor it follow best practices
+and a golden example. Apart from its structure what is currently missing is:
+- using Job Distribution to create jobs for the nodes
+- using only `chainlink-cli` to register the workflow (it's there, but doesn't work in CI due to insufficient Github token permissions)
+- using a mock service to provide the feed data
+*/
+func TestKeystoneWithOCR3Workflow(t *testing.T) {
+	testLogger := framework.L
+
+	// Define and load the test configuration
+	donID := uint32(1)
+	workflowName := "abcdefgasd"
+	feedID := "018bfe8840700040000000000000000000000000000000000000000000000000" // without 0x prefix!
+	feedBytes := common.HexToHash(feedID)
+
+	in, err := framework.Load[WorkflowTestConfig](t)
+	require.NoError(t, err, "couldn't load test config")
+	validateInputsAndEnvVars(t, in)
+
+	pkey := os.Getenv("PRIVATE_KEY")
+
+	// Create a new blockchain network
+	bc, err := blockchain.NewBlockchainNetwork(in.BlockchainA)
+	require.NoError(t, err)
+
+	sc, err := seth.NewClientBuilder().
+		WithRpcUrl(bc.Nodes[0].HostWSUrl).
+		WithPrivateKeys([]string{pkey}).
+		Build()
+	require.NoError(t, err, "failed to create seth client")
+
+	// Start job distributor
+	jdOutput, err := jd.NewJD(in.JD)
+	require.NoError(t, err, "failed to create new job distributor")
+
+	// Deploy and fund the DON
+	nodeOutput, nodesInfo := startAndFundNodes(t, in, bc, sc)
+
+	// Prepare the chainlink/deployment environment
+	ctfEnv, don, chainSelector := buildChainlinkDeploymentEnv(t, jdOutput, nodeOutput, bc, sc)
+
+	// Deploy keystone contracts
+	keystoneContracts := deployKeystoneContracts(t, testLogger, ctfEnv, chainSelector)
 
 	// Deploy and pre-configure workflow registry contract
 	workflowRegistryAddr := prepareWorkflowRegistry(t, testLogger, ctfEnv, chainSelector, sc, donID)
 
 	// Deploy and configure Keystone Feeds Consumer contract
-	feedsConsumerAddress := prepareFeedsConsumer(t, testLogger, ctfEnv, chainSelector, sc, forwarderAddress, workflowName)
+	feedsConsumerAddress := prepareFeedsConsumer(t, testLogger, ctfEnv, chainSelector, sc, keystoneContracts.forwarderAddress, workflowName)
 
 	// Register the workflow (either via chainlink-cli or by calling the workflow registry directly)
-	registerWorkflow(t, in, sc, capRegAddr, workflowRegistryAddr, feedsConsumerAddress, donID, chainSelector, workflowName, pkey, bc.Nodes[0].HostHTTPUrl)
+	registerWorkflow(t, in, sc, keystoneContracts.capabilityRegistryAddrress, workflowRegistryAddr, feedsConsumerAddress, donID, chainSelector, workflowName, pkey, bc.Nodes[0].HostHTTPUrl)
 
-	_, nodeClients := configureNodes(t, nodesInfo, in, bc, capRegAddr, workflowRegistryAddr, forwarderAddress)
+	_, nodeClients := configureNodes(t, nodesInfo, in, bc, keystoneContracts.capabilityRegistryAddrress, workflowRegistryAddr, keystoneContracts.forwarderAddress)
 	// use when using JD
 	// configureNodes(t, nodesInfo, in, bc, capRegAddr, workflowRegistryAddr, forwarderAddress)
 
-	// Deploy OCR3 Capability contract
-	// ocr3CapabilityAddress := deployOCR3Capability(t, testLogger, sc)
-
 	// Create OCR3 and capability jobs for each node
-	createNodeJobs(t, nodeClients, nodesInfo, bc, ocr3CapabilityAddress)
-
-	// use when using JD
-	// createNodeJobsWithJd(t, ctfEnv, don, bc, chainSelector, ocr3CapabilityAddress)
-
-	// Register DON and capabilities
-	// registerDONAndCapabilities(t, capRegAddr, hashedCapabilities, nodesInfo, sc)
-
-	// configure Keystone Forwarder contract
-	// configureKeystoneForwarder(t, forwarderAddress, sc, nodesInfo)
-
-	// nodeIds := make([]string, len(don.Nodes))
-	// for i, node := range don.Nodes {
-	// 	nodeIds[i] = node.NodeId
-	// }
+	createNodeJobs(t, nodeClients, nodesInfo, bc, keystoneContracts.ocr3CapabilityAddress)
 
 	// Wait for OCR listeners to be ready before setting the configuration.
 	// If the ConfigSet event is missed, OCR protocol will not start.
@@ -1956,8 +1657,8 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 	time.Sleep(30 * time.Second)
 	testLogger.Info().Msg("Proceeding to set OCR3 configuration.")
 
-	// Configure OCR3 capability contract
-	// configureOCR3Capability(t, ocr3CapabilityAddress, sc, nodesInfo)
+	// Configure the workflow DON
+	configureWorkflowDON(t, ctfEnv, don, chainSelector)
 
 	// It can take a while before the first report is produced, particularly on CI.
 	timeout := 10 * time.Minute
@@ -1984,6 +1685,7 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 
 			if price.String() != "0" {
 				testLogger.Info().Msgf("Feed updated after %s - price set, price=%s", elapsed, price)
+
 				return
 			}
 			testLogger.Info().Msgf("Feed not updated yet, waiting for %s", elapsed)
