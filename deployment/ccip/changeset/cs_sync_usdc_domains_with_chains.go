@@ -2,7 +2,6 @@ package changeset
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -18,14 +17,9 @@ var _ deployment.ChangeSet[SyncUSDCDomainsWithChainsConfig] = SyncUSDCDomainsWit
 type USDCChainConfig struct {
 	// Version is the version of the USDC token pool.
 	Version semver.Version
-	// Domain is the USDC domain ID for this chain.
-	Domain uint32
-	// Enabled specifies whether or not we want the domain to be enabled
-	// Defined as a pointer to ensure that the user doesn't forget to provide it.
-	Enabled *bool
 }
 
-func (c USDCChainConfig) Validate(ctx context.Context, chain deployment.Chain, state CCIPChainState, useMcms bool) error {
+func (c USDCChainConfig) Validate(ctx context.Context, chain deployment.Chain, state CCIPChainState, useMcms bool, chainSelectorToDomainId map[uint64]uint32) error {
 	usdcTokenPool, ok := state.USDCTokenPools[c.Version]
 	if !ok {
 		return fmt.Errorf("no USDC token pool found on %s with version %s", chain, c.Version)
@@ -36,13 +30,20 @@ func (c USDCChainConfig) Validate(ctx context.Context, chain deployment.Chain, s
 		return fmt.Errorf("expected USDC token pool address on %s (%s) to be less than 32 bytes", chain, usdcTokenPool.Address())
 	}
 
-	if c.Enabled == nil {
-		return errors.New("isEnabled is not defined")
-	}
-
 	// Validate that the USDC token pool is owned by the address that will be actioning the transactions (i.e. Timelock or deployer key)
 	if err := commoncs.ValidateOwnership(ctx, useMcms, chain.DeployerKey.From, state.Timelock.Address(), usdcTokenPool); err != nil {
 		return fmt.Errorf("token pool with address %s on %s failed ownership validation: %w", usdcTokenPool.Address(), chain, err)
+	}
+
+	// Validate that each supported chain has a domain ID defined
+	supportedChains, err := usdcTokenPool.GetSupportedChains(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return fmt.Errorf("failed to get supported chains from USDC token pool on %s with address %s: %w", chain, usdcTokenPool.Address(), err)
+	}
+	for _, supportedChain := range supportedChains {
+		if _, ok := chainSelectorToDomainId[supportedChain]; !ok {
+			return fmt.Errorf("no USDC domain ID defined for chain with selector %d", supportedChain)
+		}
 	}
 
 	return nil
@@ -52,6 +53,8 @@ func (c USDCChainConfig) Validate(ctx context.Context, chain deployment.Chain, s
 type SyncUSDCDomainsWithChainsConfig struct {
 	// USDCConfigsByChain defines the USDC domain and pool version for each chain selector.
 	USDCConfigsByChain map[uint64]USDCChainConfig
+	// ChainSelectorToUSDCDomain maps chains selectors to their USDC domain identifiers.
+	ChainSelectorToUSDCDomain map[uint64]uint32
 	// MCMS defines the delay to use for Timelock (if absent, the changeset will attempt to use the deployer key).
 	MCMS *MCMSConfig
 }
@@ -75,16 +78,16 @@ func (c SyncUSDCDomainsWithChainsConfig) Validate(env deployment.Environment) er
 		if !ok {
 			return fmt.Errorf("chain with selector %d does not exist in state", chainSelector)
 		}
+		if chainState.USDCTokenPools == nil {
+			return fmt.Errorf("%s does not define any USDC token pools, config should be removed", chain)
+		}
 		if timelock := chainState.Timelock; timelock == nil {
 			return fmt.Errorf("missing timelock on %s", chain.String())
 		}
 		if proposerMcm := chainState.ProposerMcm; proposerMcm == nil {
 			return fmt.Errorf("missing proposerMcm on %s", chain.String())
 		}
-		if chainState.USDCTokenPools == nil {
-			return fmt.Errorf("%s does not define any USDC token pools, config should be removed", chain)
-		}
-		if err = config.Validate(env.GetContext(), chain, chainState, c.MCMS != nil); err != nil {
+		if err = config.Validate(env.GetContext(), chain, chainState, c.MCMS != nil, c.ChainSelectorToUSDCDomain); err != nil {
 			return fmt.Errorf("USDC config for %s is not valid: %w", chain, err)
 		}
 	}
@@ -127,16 +130,16 @@ func SyncUSDCDomainsWithChainsChangeset(env deployment.Environment, c SyncUSDCDo
 
 		domainUpdates := make([]usdc_token_pool.USDCTokenPoolDomainUpdate, 0)
 		for _, remoteChainSelector := range supportedChains {
-			remoteChainState := state.Chains[chainSelector]
+			remoteChainState := state.Chains[remoteChainSelector]
 			remoteUSDCChainConfig := c.USDCConfigsByChain[remoteChainSelector]
 			remoteUSDCTokenPool := remoteChainState.USDCTokenPools[remoteUSDCChainConfig.Version]
 
 			var desiredAllowedCaller [32]byte
-			for i, b := range remoteUSDCTokenPool.Address().Bytes() {
-				desiredAllowedCaller[i] = b
+			remoteUSDCTokenPoolAddressBytes := remoteUSDCTokenPool.Address().Bytes()
+			for i, j := len(desiredAllowedCaller)-len(remoteUSDCTokenPoolAddressBytes), 0; i < len(desiredAllowedCaller); i, j = i+1, j+1 {
+				desiredAllowedCaller[i] = remoteUSDCTokenPoolAddressBytes[j]
 			}
-			desiredDomainIdentifier := usdcChainConfig.Domain
-			desiredEnabled := *usdcChainConfig.Enabled
+			desiredDomainIdentifier := c.ChainSelectorToUSDCDomain[remoteChainSelector]
 
 			currentDomain, err := usdcTokenPool.GetDomain(readOpts, remoteChainSelector)
 			if err != nil {
@@ -144,12 +147,12 @@ func SyncUSDCDomainsWithChainsChangeset(env deployment.Environment, c SyncUSDCDo
 			}
 			// If any parameters are different, we need to add a setDomains call
 			if currentDomain.AllowedCaller != desiredAllowedCaller ||
-				currentDomain.Enabled != desiredEnabled ||
 				currentDomain.DomainIdentifier != desiredDomainIdentifier {
 				domainUpdates = append(domainUpdates, usdc_token_pool.USDCTokenPoolDomainUpdate{
-					AllowedCaller:    desiredAllowedCaller,
-					Enabled:          desiredEnabled,
-					DomainIdentifier: desiredDomainIdentifier,
+					AllowedCaller:     desiredAllowedCaller,
+					Enabled:           true,
+					DomainIdentifier:  desiredDomainIdentifier,
+					DestChainSelector: remoteChainSelector,
 				})
 			}
 		}

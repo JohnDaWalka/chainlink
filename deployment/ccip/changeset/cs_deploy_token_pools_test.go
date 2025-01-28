@@ -174,7 +174,7 @@ func TestValidateDeployTokenPoolInput(t *testing.T) {
 				TokenAddress:       tokens[selectorA].Address,
 				LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 			},
-			ErrStr: fmt.Sprintf("token pool with type BurnMintTokenPool and version %s already exists", deployment.Version1_5_1),
+			ErrStr: fmt.Sprintf("token pool with type BurnMintTokenPool and version %s already exists", changeset.CurrentTokenPoolVersion),
 		},
 	}
 
@@ -306,7 +306,7 @@ func TestDeployTokenPoolContracts(t *testing.T) {
 	burnMintTokenPools, ok := state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol]
 	require.True(t, ok)
 	require.Len(t, burnMintTokenPools, 1)
-	owner, err := burnMintTokenPools[deployment.Version1_5_1].Owner(nil)
+	owner, err := burnMintTokenPools[changeset.CurrentTokenPoolVersion].Owner(nil)
 	require.NoError(t, err)
 	require.Equal(t, e.Chains[selectorA].DeployerKey.From, owner)
 }

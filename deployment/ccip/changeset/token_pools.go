@@ -17,13 +17,14 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/evm/utils"
 )
 
-var currentTokenPoolVersion semver.Version = deployment.Version1_5_1
+var CurrentTokenPoolVersion semver.Version = deployment.Version1_5_1
 
 var tokenPoolTypes map[deployment.ContractType]struct{} = map[deployment.ContractType]struct{}{
 	BurnMintTokenPool:         struct{}{},
 	BurnWithFromMintTokenPool: struct{}{},
 	BurnFromMintTokenPool:     struct{}{},
 	LockReleaseTokenPool:      struct{}{},
+	USDCTokenPool:             struct{}{},
 }
 
 var tokenPoolVersions map[semver.Version]struct{} = map[semver.Version]struct{}{
@@ -180,6 +181,10 @@ func getTokenPoolAddressFromSymbolTypeAndVersion(
 			if tokenPool, ok := tokenPools[version]; ok {
 				return tokenPool.Address(), true
 			}
+		}
+	case USDCTokenPool:
+		if tokenPool, ok := chainState.USDCTokenPools[version]; ok {
+			return tokenPool.Address(), true
 		}
 	}
 

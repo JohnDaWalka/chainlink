@@ -51,8 +51,8 @@ func (i DeployUSDCTokenPoolInput) Validate(ctx context.Context, chain deployment
 	}
 
 	// Check if a USDC token pool with the given version already exists
-	if _, ok := state.USDCTokenPools[currentTokenPoolVersion]; ok {
-		return fmt.Errorf("USDC token pool with version %s already exists on %s", currentTokenPoolVersion, chain)
+	if _, ok := state.USDCTokenPools[CurrentTokenPoolVersion]; ok {
+		return fmt.Errorf("USDC token pool with version %s already exists on %s", CurrentTokenPoolVersion, chain)
 	}
 
 	// Perform USDC checks (i.e. make sure we can call the required functions)
@@ -137,7 +137,7 @@ func DeployUSDCTokenPoolContractsChangeset(env deployment.Environment, c DeployU
 				return deployment.ContractDeploy[*usdc_token_pool.USDCTokenPool]{
 					Address:  poolAddress,
 					Contract: usdcTokenPool,
-					Tv:       deployment.NewTypeAndVersion(USDCTokenPool, currentTokenPoolVersion),
+					Tv:       deployment.NewTypeAndVersion(USDCTokenPool, CurrentTokenPoolVersion),
 					Tx:       tx,
 					Err:      err,
 				}

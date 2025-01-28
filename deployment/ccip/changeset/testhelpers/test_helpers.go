@@ -938,7 +938,7 @@ func deployTransferTokenOneEnd(
 				common.HexToAddress(routerAddress),
 			)
 			return deployment.ContractDeploy[*burn_mint_token_pool.BurnMintTokenPool]{
-				Address: tokenPoolAddress, Contract: tokenPoolContract, Tx: tx, Tv: deployment.NewTypeAndVersion(changeset.BurnMintTokenPool, deployment.Version1_5_1), Err: err2,
+				Address: tokenPoolAddress, Contract: tokenPoolContract, Tx: tx, Tv: deployment.NewTypeAndVersion(changeset.BurnMintTokenPool, changeset.CurrentTokenPoolVersion), Err: err2,
 			}
 		})
 	if err != nil {

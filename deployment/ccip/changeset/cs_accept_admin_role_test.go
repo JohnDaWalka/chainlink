@@ -61,7 +61,7 @@ func TestAcceptAdminRoleChangeset_Validations(t *testing.T) {
 					selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 						testhelpers.TestTokenSymbol: {
 							Type:    "InvalidType",
-							Version: deployment.Version1_5_1,
+							Version: changeset.CurrentTokenPoolVersion,
 						},
 					},
 				},
@@ -91,7 +91,7 @@ func TestAcceptAdminRoleChangeset_Validations(t *testing.T) {
 					selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 						testhelpers.TestTokenSymbol: {
 							Type:    changeset.BurnMintTokenPool,
-							Version: deployment.Version1_5_1,
+							Version: changeset.CurrentTokenPoolVersion,
 						},
 					},
 				},
@@ -152,13 +152,13 @@ func TestAcceptAdminRoleChangeset_Execution(t *testing.T) {
 							selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 								testhelpers.TestTokenSymbol: {
 									Type:    changeset.BurnMintTokenPool,
-									Version: deployment.Version1_5_1,
+									Version: changeset.CurrentTokenPoolVersion,
 								},
 							},
 							selectorB: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 								testhelpers.TestTokenSymbol: {
 									Type:    changeset.BurnMintTokenPool,
-									Version: deployment.Version1_5_1,
+									Version: changeset.CurrentTokenPoolVersion,
 								},
 							},
 						},
@@ -172,13 +172,13 @@ func TestAcceptAdminRoleChangeset_Execution(t *testing.T) {
 							selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 								testhelpers.TestTokenSymbol: {
 									Type:    changeset.BurnMintTokenPool,
-									Version: deployment.Version1_5_1,
+									Version: changeset.CurrentTokenPoolVersion,
 								},
 							},
 							selectorB: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 								testhelpers.TestTokenSymbol: {
 									Type:    changeset.BurnMintTokenPool,
-									Version: deployment.Version1_5_1,
+									Version: changeset.CurrentTokenPoolVersion,
 								},
 							},
 						},

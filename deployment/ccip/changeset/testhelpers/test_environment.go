@@ -567,9 +567,9 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		for _, usdcChain := range allChains {
 			require.NotNil(t, state.Chains[usdcChain].MockUSDCTokenMessenger)
 			require.NotNil(t, state.Chains[usdcChain].MockUSDCTransmitter)
-			require.NotNil(t, state.Chains[usdcChain].USDCTokenPools[deployment.Version1_5_1])
+			require.NotNil(t, state.Chains[usdcChain].USDCTokenPools[changeset.CurrentTokenPoolVersion])
 			cctpContracts[cciptypes.ChainSelector(usdcChain)] = pluginconfig.USDCCCTPTokenConfig{
-				SourcePoolAddress:            state.Chains[usdcChain].USDCTokenPools[deployment.Version1_5_1].Address().String(),
+				SourcePoolAddress:            state.Chains[usdcChain].USDCTokenPools[changeset.CurrentTokenPoolVersion].Address().String(),
 				SourceMessageTransmitterAddr: state.Chains[usdcChain].MockUSDCTransmitter.Address().String(),
 			}
 		}

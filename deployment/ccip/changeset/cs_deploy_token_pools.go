@@ -82,9 +82,9 @@ func (i DeployTokenPoolInput) Validate(ctx context.Context, chain deployment.Cha
 	}
 
 	// We should check if a token pool with this type, version, and symbol already exists
-	_, ok := getTokenPoolAddressFromSymbolTypeAndVersion(state, chain, tokenSymbol, i.Type, currentTokenPoolVersion)
+	_, ok := getTokenPoolAddressFromSymbolTypeAndVersion(state, chain, tokenSymbol, i.Type, CurrentTokenPoolVersion)
 	if ok {
-		return fmt.Errorf("token pool with type %s and version %s already exists for %s on %s", i.Type, currentTokenPoolVersion, tokenSymbol, chain)
+		return fmt.Errorf("token pool with type %s and version %s already exists for %s on %s", i.Type, CurrentTokenPoolVersion, tokenSymbol, chain)
 	}
 
 	return nil
@@ -207,7 +207,7 @@ func DeployTokenPool(
 			return deployment.ContractDeploy[*token_pool.TokenPool]{
 				Address:  tpAddr,
 				Contract: tp,
-				Tv:       deployment.NewTypeAndVersion(poolConfig.Type, currentTokenPoolVersion),
+				Tv:       deployment.NewTypeAndVersion(poolConfig.Type, CurrentTokenPoolVersion),
 				Tx:       tx,
 				Err:      err,
 			}

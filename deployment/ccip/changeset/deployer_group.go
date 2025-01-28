@@ -117,6 +117,10 @@ func (d *DeployerGroup) Enact(deploymentDescription string) (deployment.Changese
 }
 
 func (d *DeployerGroup) enactMcms(deploymentDescription string) (deployment.ChangesetOutput, error) {
+	if len(d.transactions) == 0 {
+		return deployment.ChangesetOutput{}, nil
+	}
+
 	batches := make([]timelock.BatchChainOperation, 0)
 	for selector, txs := range d.transactions {
 		mcmOps := make([]mcms.Operation, len(txs))

@@ -61,7 +61,7 @@ func TestSetPoolChangeset_Validations(t *testing.T) {
 					selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 						testhelpers.TestTokenSymbol: {
 							Type:    "InvalidType",
-							Version: deployment.Version1_5_1,
+							Version: changeset.CurrentTokenPoolVersion,
 						},
 					},
 				},
@@ -91,7 +91,7 @@ func TestSetPoolChangeset_Validations(t *testing.T) {
 					selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 						testhelpers.TestTokenSymbol: {
 							Type:    changeset.BurnMintTokenPool,
-							Version: deployment.Version1_5_1,
+							Version: changeset.CurrentTokenPoolVersion,
 						},
 					},
 				},
@@ -152,13 +152,13 @@ func TestSetPoolChangeset_Execution(t *testing.T) {
 							selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 								testhelpers.TestTokenSymbol: {
 									Type:    changeset.BurnMintTokenPool,
-									Version: deployment.Version1_5_1,
+									Version: changeset.CurrentTokenPoolVersion,
 								},
 							},
 							selectorB: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 								testhelpers.TestTokenSymbol: {
 									Type:    changeset.BurnMintTokenPool,
-									Version: deployment.Version1_5_1,
+									Version: changeset.CurrentTokenPoolVersion,
 								},
 							},
 						},
@@ -172,13 +172,13 @@ func TestSetPoolChangeset_Execution(t *testing.T) {
 							selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 								testhelpers.TestTokenSymbol: {
 									Type:    changeset.BurnMintTokenPool,
-									Version: deployment.Version1_5_1,
+									Version: changeset.CurrentTokenPoolVersion,
 								},
 							},
 							selectorB: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 								testhelpers.TestTokenSymbol: {
 									Type:    changeset.BurnMintTokenPool,
-									Version: deployment.Version1_5_1,
+									Version: changeset.CurrentTokenPoolVersion,
 								},
 							},
 						},
@@ -192,13 +192,13 @@ func TestSetPoolChangeset_Execution(t *testing.T) {
 							selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 								testhelpers.TestTokenSymbol: {
 									Type:    changeset.BurnMintTokenPool,
-									Version: deployment.Version1_5_1,
+									Version: changeset.CurrentTokenPoolVersion,
 								},
 							},
 							selectorB: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 								testhelpers.TestTokenSymbol: {
 									Type:    changeset.BurnMintTokenPool,
-									Version: deployment.Version1_5_1,
+									Version: changeset.CurrentTokenPoolVersion,
 								},
 							},
 						},
@@ -209,11 +209,11 @@ func TestSetPoolChangeset_Execution(t *testing.T) {
 
 			configOnA, err := registryOnA.GetTokenConfig(nil, tokens[selectorA].Address)
 			require.NoError(t, err)
-			require.Equal(t, state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), configOnA.TokenPool)
+			require.Equal(t, state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][changeset.CurrentTokenPoolVersion].Address(), configOnA.TokenPool)
 
 			configOnB, err := registryOnB.GetTokenConfig(nil, tokens[selectorB].Address)
 			require.NoError(t, err)
-			require.Equal(t, state.Chains[selectorB].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), configOnB.TokenPool)
+			require.Equal(t, state.Chains[selectorB].BurnMintTokenPools[testhelpers.TestTokenSymbol][changeset.CurrentTokenPoolVersion].Address(), configOnB.TokenPool)
 		})
 	}
 }

@@ -547,7 +547,7 @@ func deployUSDC(
 				Address:  tokenPoolAddress,
 				Contract: tokenPoolContract,
 				Tx:       tx,
-				Tv:       deployment.NewTypeAndVersion(USDCTokenPool, currentTokenPoolVersion),
+				Tv:       deployment.NewTypeAndVersion(USDCTokenPool, CurrentTokenPoolVersion),
 				Err:      err2,
 			}
 		})

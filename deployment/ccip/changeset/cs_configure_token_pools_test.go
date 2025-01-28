@@ -19,22 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
-// createSymmetricRateLimits is a utility to quickly create a rate limiter config with equal inbound and outbound values.
-func createSymmetricRateLimits(rate int64, capacity int64) changeset.RateLimiterConfig {
-	return changeset.RateLimiterConfig{
-		Inbound: token_pool.RateLimiterConfig{
-			IsEnabled: rate != 0 || capacity != 0,
-			Rate:      big.NewInt(rate),
-			Capacity:  big.NewInt(capacity),
-		},
-		Outbound: token_pool.RateLimiterConfig{
-			IsEnabled: rate != 0 || capacity != 0,
-			Rate:      big.NewInt(rate),
-			Capacity:  big.NewInt(capacity),
-		},
-	}
-}
-
 // validateMemberOfTokenPoolPair performs checks required to validate that a token pool is fully configured for cross-chain transfer.
 func validateMemberOfTokenPoolPair(
 	t *testing.T,
@@ -177,7 +161,7 @@ func TestValidateTokenPoolConfig(t *testing.T) {
 			Msg: "Pool is not owned by required address",
 			TokenPoolConfig: changeset.TokenPoolConfig{
 				Type:    changeset.BurnMintTokenPool,
-				Version: deployment.Version1_5_1,
+				Version: changeset.CurrentTokenPoolVersion,
 			},
 			ErrStr: "failed ownership validation",
 		},
@@ -321,47 +305,47 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 		{
 			Msg: "Configure new pools on registry",
 			RegistrationPass: &regPass{
-				SelectorA2B: createSymmetricRateLimits(100, 1000),
-				SelectorB2A: createSymmetricRateLimits(100, 1000),
+				SelectorA2B: testhelpers.CreateSymmetricRateLimits(100, 1000),
+				SelectorB2A: testhelpers.CreateSymmetricRateLimits(100, 1000),
 			},
 		},
 		{
 			Msg: "Configure new pools on registry, update their rate limits",
 			RegistrationPass: &regPass{
-				SelectorA2B: createSymmetricRateLimits(100, 1000),
-				SelectorB2A: createSymmetricRateLimits(100, 1000),
+				SelectorA2B: testhelpers.CreateSymmetricRateLimits(100, 1000),
+				SelectorB2A: testhelpers.CreateSymmetricRateLimits(100, 1000),
 			},
 			UpdatePass: &updatePass{
 				UpdatePoolOnA: false,
 				UpdatePoolOnB: false,
-				SelectorA2B:   createSymmetricRateLimits(200, 2000),
-				SelectorB2A:   createSymmetricRateLimits(200, 2000),
+				SelectorA2B:   testhelpers.CreateSymmetricRateLimits(200, 2000),
+				SelectorB2A:   testhelpers.CreateSymmetricRateLimits(200, 2000),
 			},
 		},
 		{
 			Msg: "Configure new pools on registry, update both pools",
 			RegistrationPass: &regPass{
-				SelectorA2B: createSymmetricRateLimits(100, 1000),
-				SelectorB2A: createSymmetricRateLimits(100, 1000),
+				SelectorA2B: testhelpers.CreateSymmetricRateLimits(100, 1000),
+				SelectorB2A: testhelpers.CreateSymmetricRateLimits(100, 1000),
 			},
 			UpdatePass: &updatePass{
 				UpdatePoolOnA: true,
 				UpdatePoolOnB: true,
-				SelectorA2B:   createSymmetricRateLimits(100, 1000),
-				SelectorB2A:   createSymmetricRateLimits(100, 1000),
+				SelectorA2B:   testhelpers.CreateSymmetricRateLimits(100, 1000),
+				SelectorB2A:   testhelpers.CreateSymmetricRateLimits(100, 1000),
 			},
 		},
 		{
 			Msg: "Configure new pools on registry, update only one pool",
 			RegistrationPass: &regPass{
-				SelectorA2B: createSymmetricRateLimits(100, 1000),
-				SelectorB2A: createSymmetricRateLimits(100, 1000),
+				SelectorA2B: testhelpers.CreateSymmetricRateLimits(100, 1000),
+				SelectorB2A: testhelpers.CreateSymmetricRateLimits(100, 1000),
 			},
 			UpdatePass: &updatePass{
 				UpdatePoolOnA: false,
 				UpdatePoolOnB: true,
-				SelectorA2B:   createSymmetricRateLimits(200, 2000),
-				SelectorB2A:   createSymmetricRateLimits(200, 2000),
+				SelectorA2B:   testhelpers.CreateSymmetricRateLimits(200, 2000),
+				SelectorB2A:   testhelpers.CreateSymmetricRateLimits(200, 2000),
 			},
 		},
 	}
@@ -402,11 +386,11 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 				state, err := changeset.LoadOnchainState(e)
 				require.NoError(t, err)
 
-				lockReleaseA, _ := token_pool.NewTokenPool(state.Chains[selectorA].LockReleaseTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.Chains[selectorA].Client)
-				burnMintA, _ := token_pool.NewTokenPool(state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.Chains[selectorA].Client)
+				lockReleaseA, _ := token_pool.NewTokenPool(state.Chains[selectorA].LockReleaseTokenPools[testhelpers.TestTokenSymbol][changeset.CurrentTokenPoolVersion].Address(), e.Chains[selectorA].Client)
+				burnMintA, _ := token_pool.NewTokenPool(state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][changeset.CurrentTokenPoolVersion].Address(), e.Chains[selectorA].Client)
 
-				lockReleaseB, _ := token_pool.NewTokenPool(state.Chains[selectorB].LockReleaseTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.Chains[selectorB].Client)
-				burnMintB, _ := token_pool.NewTokenPool(state.Chains[selectorB].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.Chains[selectorB].Client)
+				lockReleaseB, _ := token_pool.NewTokenPool(state.Chains[selectorB].LockReleaseTokenPools[testhelpers.TestTokenSymbol][changeset.CurrentTokenPoolVersion].Address(), e.Chains[selectorB].Client)
+				burnMintB, _ := token_pool.NewTokenPool(state.Chains[selectorB].BurnMintTokenPools[testhelpers.TestTokenSymbol][changeset.CurrentTokenPoolVersion].Address(), e.Chains[selectorB].Client)
 
 				pools := map[uint64]tokenPools{
 					selectorA: tokenPools{
@@ -438,14 +422,14 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 								PoolUpdates: map[uint64]changeset.TokenPoolConfig{
 									selectorA: {
 										Type:    changeset.LockReleaseTokenPool,
-										Version: deployment.Version1_5_1,
+										Version: changeset.CurrentTokenPoolVersion,
 										ChainUpdates: changeset.RateLimiterPerChain{
 											selectorB: test.RegistrationPass.SelectorA2B,
 										},
 									},
 									selectorB: {
 										Type:    changeset.LockReleaseTokenPool,
-										Version: deployment.Version1_5_1,
+										Version: changeset.CurrentTokenPoolVersion,
 										ChainUpdates: changeset.RateLimiterPerChain{
 											selectorA: test.RegistrationPass.SelectorB2A,
 										},
@@ -461,13 +445,13 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 									selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 										testhelpers.TestTokenSymbol: {
 											Type:    changeset.LockReleaseTokenPool,
-											Version: deployment.Version1_5_1,
+											Version: changeset.CurrentTokenPoolVersion,
 										},
 									},
 									selectorB: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 										testhelpers.TestTokenSymbol: {
 											Type:    changeset.LockReleaseTokenPool,
-											Version: deployment.Version1_5_1,
+											Version: changeset.CurrentTokenPoolVersion,
 										},
 									},
 								},
@@ -481,13 +465,13 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 									selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 										testhelpers.TestTokenSymbol: {
 											Type:    changeset.LockReleaseTokenPool,
-											Version: deployment.Version1_5_1,
+											Version: changeset.CurrentTokenPoolVersion,
 										},
 									},
 									selectorB: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 										testhelpers.TestTokenSymbol: {
 											Type:    changeset.LockReleaseTokenPool,
-											Version: deployment.Version1_5_1,
+											Version: changeset.CurrentTokenPoolVersion,
 										},
 									},
 								},
@@ -501,13 +485,13 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 									selectorA: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 										testhelpers.TestTokenSymbol: {
 											Type:    changeset.LockReleaseTokenPool,
-											Version: deployment.Version1_5_1,
+											Version: changeset.CurrentTokenPoolVersion,
 										},
 									},
 									selectorB: map[changeset.TokenSymbol]changeset.TokenPoolInfo{
 										testhelpers.TestTokenSymbol: {
 											Type:    changeset.LockReleaseTokenPool,
-											Version: deployment.Version1_5_1,
+											Version: changeset.CurrentTokenPoolVersion,
 										},
 									},
 								},
@@ -561,14 +545,14 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 								PoolUpdates: map[uint64]changeset.TokenPoolConfig{
 									selectorA: {
 										Type:    aType,
-										Version: deployment.Version1_5_1,
+										Version: changeset.CurrentTokenPoolVersion,
 										ChainUpdates: changeset.RateLimiterPerChain{
 											selectorB: test.UpdatePass.SelectorA2B,
 										},
 									},
 									selectorB: {
 										Type:    bType,
-										Version: deployment.Version1_5_1,
+										Version: changeset.CurrentTokenPoolVersion,
 										ChainUpdates: changeset.RateLimiterPerChain{
 											selectorA: test.UpdatePass.SelectorB2A,
 										},
