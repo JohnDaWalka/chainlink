@@ -166,13 +166,16 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     }
 
     for (uint256 i = 0; i < adds.length; ++i) {
+      // Using a storage pointer saves gas instead of direct assignment of a struct.
+      SiloConfig storage remoteConfig = s_chainConfigs[adds[i].remoteChainSelector];
+
       // Since the zero chain selector is used to designate unsiloed chains, it should never be used for siloed chains.
-      if (adds[i].remoteChainSelector == 0 || s_chainConfigs[adds[i].remoteChainSelector].isSiloed) {
+      if (adds[i].remoteChainSelector == 0 || remoteConfig.isSiloed) {
         revert InvalidChainSelector(adds[i].remoteChainSelector);
       }
 
-      s_chainConfigs[adds[i].remoteChainSelector] =
-        SiloConfig({tokenBalance: 0, rebalancer: adds[i].rebalancer, isSiloed: true});
+      remoteConfig.isSiloed = true;
+      remoteConfig.rebalancer = adds[i].rebalancer;
 
       emit ChainSiloed(adds[i].remoteChainSelector, adds[i].rebalancer);
     }
