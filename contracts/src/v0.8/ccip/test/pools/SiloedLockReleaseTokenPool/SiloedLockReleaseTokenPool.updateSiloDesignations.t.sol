@@ -35,7 +35,7 @@ contract SiloedLockReleaseTokenPool_updateSiloDesignations is SiloedLockReleaseT
 
     // Now we re-silo the chain
     SiloedLockReleaseTokenPool.SiloConfigUpdate[] memory chainSelectors =
-    new SiloedLockReleaseTokenPool.SiloConfigUpdate[](1);
+      new SiloedLockReleaseTokenPool.SiloConfigUpdate[](1);
 
     chainSelectors[0] =
       SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: SILOED_CHAIN_SELECTOR, rebalancer: OWNER});
@@ -80,10 +80,13 @@ contract SiloedLockReleaseTokenPool_updateSiloDesignations is SiloedLockReleaseT
 
   function test_updateSiloDesignations_RevertWhen_InvalidChainSelector_ChainAlreadySiloed() public {
     SiloedLockReleaseTokenPool.SiloConfigUpdate[] memory adds = new SiloedLockReleaseTokenPool.SiloConfigUpdate[](1);
-    adds[0] = SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: SILOED_CHAIN_SELECTOR, rebalancer: OWNER});
+    adds[0] =
+      SiloedLockReleaseTokenPool.SiloConfigUpdate({remoteChainSelector: SILOED_CHAIN_SELECTOR, rebalancer: OWNER});
 
     // Since the chain is already siloed you cannot re-silo it.
-    vm.expectRevert(abi.encodeWithSelector(SiloedLockReleaseTokenPool.InvalidChainSelector.selector, SILOED_CHAIN_SELECTOR));
+    vm.expectRevert(
+      abi.encodeWithSelector(SiloedLockReleaseTokenPool.InvalidChainSelector.selector, SILOED_CHAIN_SELECTOR)
+    );
 
     s_siloedLockReleaseTokenPool.updateSiloDesignations(new uint64[](0), adds);
   }

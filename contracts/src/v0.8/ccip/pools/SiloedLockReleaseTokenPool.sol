@@ -20,7 +20,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   error LiquidityAmountCannotBeZero();
 
   event LiquidityAdded(uint64 remoteChainSelector, address indexed provider, uint256 amount);
-  event LiquidityRemoved(uint64 remoteChainSelector, address indexed provider, uint256 amount);
+  event LiquidityRemoved(uint64 remoteChainSelector, address indexed remover, uint256 amount);
   event ChainUnsiloed(uint64 remoteChainSelector, uint256 amountUnsiloed);
   event ChainSiloed(uint64 remoteChainSelector, address rebalancer);
   event SiloRebalancerSet(uint64 indexed remoteChainSelector, address oldRebalancer, address newRebalancer);
@@ -227,6 +227,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @param amount The amount of liquidity to provide.
   /// @dev Only the rebalancer for the chain can add liquidity
   function provideSiloedLiquidity(uint64 remoteChainSelector, uint256 amount) external {
+    if (remoteChainSelector == 0) revert InvalidChainSelector(0);
     _provideLiquidity(remoteChainSelector, amount);
   }
 
