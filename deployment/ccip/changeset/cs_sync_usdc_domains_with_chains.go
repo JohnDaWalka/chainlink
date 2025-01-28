@@ -19,7 +19,7 @@ type USDCChainConfig struct {
 	Version semver.Version
 }
 
-func (c USDCChainConfig) Validate(ctx context.Context, chain deployment.Chain, state CCIPChainState, useMcms bool, chainSelectorToDomainId map[uint64]uint32) error {
+func (c USDCChainConfig) Validate(ctx context.Context, chain deployment.Chain, state CCIPChainState, useMcms bool, chainSelectorToDomainID map[uint64]uint32) error {
 	usdcTokenPool, ok := state.USDCTokenPools[c.Version]
 	if !ok {
 		return fmt.Errorf("no USDC token pool found on %s with version %s", chain, c.Version)
@@ -41,7 +41,7 @@ func (c USDCChainConfig) Validate(ctx context.Context, chain deployment.Chain, s
 		return fmt.Errorf("failed to get supported chains from USDC token pool on %s with address %s: %w", chain, usdcTokenPool.Address(), err)
 	}
 	for _, supportedChain := range supportedChains {
-		if _, ok := chainSelectorToDomainId[supportedChain]; !ok {
+		if _, ok := chainSelectorToDomainID[supportedChain]; !ok {
 			return fmt.Errorf("no USDC domain ID defined for chain with selector %d", supportedChain)
 		}
 	}
