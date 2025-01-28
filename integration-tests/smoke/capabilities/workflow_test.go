@@ -1,6 +1,7 @@
 package capabilities_test
 
 import (
+	"bufio"
 	"bytes"
 	"cmp"
 	"context"
@@ -16,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -718,8 +720,8 @@ func prepareFeedsConsumer(t *testing.T, testLogger zerolog.Logger, ctfEnv *deplo
 	var feedsConsumerAddress common.Address
 	for addrStr, tv := range addresses {
 		if strings.Contains(tv.String(), "FeedConsumer") {
-			testLogger.Info().Msgf("Deployed FeedConsumer contract at %s", feedsConsumerAddress.Hex())
 			feedsConsumerAddress = common.HexToAddress(addrStr)
+			testLogger.Info().Msgf("Deployed FeedConsumer contract at %s", feedsConsumerAddress.Hex())
 			break
 		}
 	}
@@ -1078,7 +1080,7 @@ func configureNodes(t *testing.T, nodesInfo []NodeInfo, in *WorkflowTestConfig, 
 	}
 
 	// we need to restart all nodes for configuration changes to take effect
-	nodeset, err := ns.UpgradeNodeSet(in.NodeSet, bc, 5*time.Second)
+	nodeset, err := ns.UpgradeNodeSet(t, in.NodeSet, bc, 5*time.Second)
 	require.NoError(t, err, "failed to upgrade node set")
 
 	// we need to recreate chainlink clients after the nodes are restarted
@@ -1346,6 +1348,129 @@ func registerDONAndCapabilities(t *testing.T, capRegAddr common.Address, hashedC
 	require.NoError(t, decodeErr, "failed to add DON to capabilities registry")
 }
 
+func debugReportTransmission(t *testing.T, l zerolog.Logger, ns *ns.Output, wsRPCURL string) {
+	var logFiles []*os.File
+
+	// when tests run in parallel, we need to make sure that we only process logs that belong to nodes created by the current test
+	// that is required, because some tests might have custom log messages that are allowed, but only for that test (e.g. because they restart the CL node)
+	var belongsToCurrentEnv = func(filePath string) bool {
+		for _, clNode := range ns.CLNodes {
+			if clNode == nil {
+				continue
+			}
+			if strings.EqualFold(filePath, clNode.Node.ContainerName+".log") {
+				return true
+			}
+		}
+		return false
+	}
+
+	logsDir := "logs/docker-" + t.Name()
+
+	fileWalkErr := filepath.Walk(logsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && belongsToCurrentEnv(info.Name()) {
+			file, fileErr := os.Open(path)
+			if fileErr != nil {
+				return fmt.Errorf("failed to open file %s: %w", path, fileErr)
+			}
+			logFiles = append(logFiles, file)
+		}
+		return nil
+	})
+
+	if len(logFiles) != len(ns.CLNodes) {
+		l.Warn().Int("Expected", len(ns.CLNodes)).Int("Got", len(logFiles)).Msg("Number of log files does not match number of nodes. Some logs might be missing.")
+	}
+
+	if fileWalkErr != nil {
+		l.Error().Err(fileWalkErr).Msg("Error walking through log files. Will not look for report transmission transaction hashes")
+		return
+	}
+
+	re, err := regexp.Compile(`"hash":"(0x[0-9a-fA-F]+)"`)
+	require.NoError(t, err, "failed to compile regex")
+
+	wg := &sync.WaitGroup{}
+	resultsCh := make(chan string, len(logFiles))
+
+	for _, f := range logFiles {
+		wg.Add(1)
+		file := f
+
+		go func() {
+			defer file.Close()
+			defer wg.Done()
+
+			scanner := bufio.NewScanner(file)
+			scanner.Split(bufio.ScanLines)
+
+			for scanner.Scan() {
+				jsonLogLine := scanner.Text()
+
+				if !strings.Contains(jsonLogLine, "Node sent transaction") {
+					continue
+				}
+
+				match := re.MatchString(jsonLogLine)
+				if match {
+					resultsCh <- re.FindStringSubmatch(jsonLogLine)[1]
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(resultsCh)
+
+	// required as Seth prints transaction traces to stdout with debug level
+	_ = os.Setenv(seth.LogLevelEnvVar, "debug")
+
+	sc, err := seth.NewClientBuilder().
+		WithRpcUrl(wsRPCURL).
+		WithReadOnlyMode().
+		WithGethWrappersFolders([]string{"../../../core/gethwrappers/keystone/generated"}).
+		Build()
+
+	if err != nil {
+		l.Error().Err(err).Msg("Failed to create seth client")
+		return
+	}
+
+	transmissionsFound := false
+	for txHash := range resultsCh {
+		transmissionsFound = true
+
+		// set tracing level to all to trace also successful transactions
+		sc.Cfg.TracingLevel = seth.TracingLevel_All
+		tx, _, err := sc.Client.TransactionByHash(context.Background(), common.HexToHash(txHash))
+		if err != nil {
+			l.Warn().Err(err).Msgf("Failed to get transaction by hash %s", txHash)
+			continue
+		}
+		_, decodedErr := sc.DecodeTx(tx)
+
+		if decodedErr != nil {
+			l.Error().Err(decodedErr).Msgf("Transmission transaction %s failed due to %s", txHash, decodedErr.Error())
+			continue
+		}
+	}
+
+	if !transmissionsFound {
+		l.Warn().Msg("No report transmissions found")
+	}
+}
+
+func logTestInfo(l zerolog.Logger, feedId, workflowName, feedConsumerAddr, forwarderAddr string) {
+	l.Info().Msg("Test configuration:")
+	l.Info().Msgf("Feed ID: %s", feedId)
+	l.Info().Msgf("Workflow name: %s", workflowName)
+	l.Info().Msgf("FeedConsumer address: %s", feedConsumerAddr)
+	l.Info().Msgf("KeystoneForwarder address: %s", forwarderAddr)
+}
+
 /*
 !!! ATTENTION !!!
 
@@ -1364,6 +1489,24 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 	workflowName := "abcdefgasd"
 	feedID := "018bfe8840700040000000000000000000000000000000000000000000000000" // without 0x prefix!
 	feedBytes := common.HexToHash(feedID)
+
+	// we need to use double-pointers, so that what's captured in the cleanup function is a pointer, not the actual object,
+	// which is only set later in the test, after the cleanup function is defined
+	var sethClient **seth.Client
+	var nodes **ns.Output
+	var wsRPCURL *string
+
+	// clean up is LIFO, so we need to make sure we execute the debug report transmission after logs are written down
+	// if the test fails, let's debug transaction hashes of the report transmissions
+	t.Cleanup(func() {
+		if t.Failed() {
+			if sethClient == nil || nodes == nil {
+				testLogger.Warn().Msg("sethClient or nodes are nil, skipping debug report transmission")
+				return
+			}
+			debugReportTransmission(t, testLogger, *nodes, *wsRPCURL)
+		}
+	})
 
 	in, err := framework.Load[WorkflowTestConfig](t)
 	require.NoError(t, err, "couldn't load test config")
@@ -1425,9 +1568,19 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 	// Register the workflow (either via chainlink-cli or by calling the workflow registry directly)
 	registerWorkflow(t, in, sc, capRegAddr, workflowRegistryAddr, feedsConsumerAddress, donID, chainSelector, workflowName, pkey, bc.Nodes[0].HostHTTPUrl)
 
+	// log extra information that might help debugging
+	t.Cleanup(func() {
+		logTestInfo(testLogger, feedID, workflowName, feedsConsumerAddress.Hex(), forwarderAddress.Hex())
+	})
+
 	// Deploy and fund the DON
-	_, nodesInfo := starAndFundNodes(t, in, bc, sc)
+	ns, nodesInfo := starAndFundNodes(t, in, bc, sc)
 	_, nodeClients := configureNodes(t, nodesInfo, in, bc, capRegAddr, workflowRegistryAddr, forwarderAddress)
+
+	// set variables that are needed for the cleanup function
+	sethClient = &sc
+	nodes = &ns
+	wsRPCURL = &bc.Nodes[0].HostWSUrl
 
 	// Deploy OCR3 Capability contract
 	ocr3CapabilityAddress := deployOCR3Capability(t, testLogger, sc)
