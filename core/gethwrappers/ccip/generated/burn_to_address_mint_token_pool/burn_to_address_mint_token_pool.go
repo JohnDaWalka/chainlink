@@ -1,0 +1,3377 @@
+// Code generated - DO NOT EDIT.
+// This file is a generated binding and any manual changes will be lost.
+
+package burn_to_address_mint_token_pool
+
+import (
+	"errors"
+	"fmt"
+	"math/big"
+	"strings"
+
+	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
+)
+
+var (
+	_ = errors.New
+	_ = big.NewInt
+	_ = strings.NewReader
+	_ = ethereum.NotFound
+	_ = bind.Bind
+	_ = common.Big1
+	_ = types.BloomLookup
+	_ = event.NewSubscription
+	_ = abi.ConvertType
+)
+
+type PoolLockOrBurnInV1 struct {
+	Receiver            []byte
+	RemoteChainSelector uint64
+	OriginalSender      common.Address
+	Amount              *big.Int
+	LocalToken          common.Address
+}
+
+type PoolLockOrBurnOutV1 struct {
+	DestTokenAddress []byte
+	DestPoolData     []byte
+}
+
+type PoolReleaseOrMintInV1 struct {
+	OriginalSender      []byte
+	RemoteChainSelector uint64
+	Receiver            common.Address
+	Amount              *big.Int
+	LocalToken          common.Address
+	SourcePoolAddress   []byte
+	SourcePoolData      []byte
+	OffchainTokenData   []byte
+}
+
+type PoolReleaseOrMintOutV1 struct {
+	DestinationAmount *big.Int
+}
+
+type RateLimiterConfig struct {
+	IsEnabled bool
+	Capacity  *big.Int
+	Rate      *big.Int
+}
+
+type RateLimiterTokenBucket struct {
+	Tokens      *big.Int
+	LastUpdated uint32
+	IsEnabled   bool
+	Capacity    *big.Int
+	Rate        *big.Int
+}
+
+type TokenPoolChainUpdate struct {
+	RemoteChainSelector       uint64
+	RemotePoolAddresses       [][]byte
+	RemoteTokenAddress        []byte
+	OutboundRateLimiterConfig RateLimiterConfig
+	InboundRateLimiterConfig  RateLimiterConfig
+}
+
+var BurnToAddressMintTokenPoolMetaData = &bind.MetaData{
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"contractIBurnMintERC20\"},{\"name\":\"localTokenDecimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"allowlist\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"rmnProxy\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"burnAddress\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyAllowListUpdates\",\"inputs\":[{\"name\":\"removes\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"adds\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"applyChainUpdates\",\"inputs\":[{\"name\":\"remoteChainSelectorsToRemove\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"},{\"name\":\"chainsToAdd\",\"type\":\"tuple[]\",\"internalType\":\"structTokenPool.ChainUpdate[]\",\"components\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddresses\",\"type\":\"bytes[]\",\"internalType\":\"bytes[]\"},{\"name\":\"remoteTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAllowList\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllowListEnabled\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getBurnAddress\",\"inputs\":[],\"outputs\":[{\"name\":\"burnAddress\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCurrentInboundRateLimiterState\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.TokenBucket\",\"components\":[{\"name\":\"tokens\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"lastUpdated\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCurrentOutboundRateLimiterState\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.TokenBucket\",\"components\":[{\"name\":\"tokens\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"lastUpdated\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getOutstandingTokens\",\"inputs\":[],\"outputs\":[{\"name\":\"outstandingTokens\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRateLimitAdmin\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRemotePools\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes[]\",\"internalType\":\"bytes[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRemoteToken\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRmnProxy\",\"inputs\":[],\"outputs\":[{\"name\":\"rmnProxy\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRouter\",\"inputs\":[],\"outputs\":[{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getSupportedChains\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getToken\",\"inputs\":[],\"outputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"contractIERC20\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getTokenDecimals\",\"inputs\":[],\"outputs\":[{\"name\":\"decimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"i_burnAddress\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isSupportedChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isSupportedToken\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"lockOrBurn\",\"inputs\":[{\"name\":\"lockOrBurnIn\",\"type\":\"tuple\",\"internalType\":\"structPool.LockOrBurnInV1\",\"components\":[{\"name\":\"receiver\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"originalSender\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"}]}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structPool.LockOrBurnOutV1\",\"components\":[{\"name\":\"destTokenAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destPoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"releaseOrMint\",\"inputs\":[{\"name\":\"releaseOrMintIn\",\"type\":\"tuple\",\"internalType\":\"structPool.ReleaseOrMintInV1\",\"components\":[{\"name\":\"originalSender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"receiver\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"localToken\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"sourcePoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"offchainTokenData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structPool.ReleaseOrMintOutV1\",\"components\":[{\"name\":\"destinationAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"removeRemotePool\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setChainRateLimiterConfig\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"outboundConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setChainRateLimiterConfigs\",\"inputs\":[{\"name\":\"remoteChainSelectors\",\"type\":\"uint64[]\",\"internalType\":\"uint64[]\"},{\"name\":\"outboundConfigs\",\"type\":\"tuple[]\",\"internalType\":\"structRateLimiter.Config[]\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundConfigs\",\"type\":\"tuple[]\",\"internalType\":\"structRateLimiter.Config[]\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setOutstandingTokens\",\"inputs\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setRateLimitAdmin\",\"inputs\":[{\"name\":\"rateLimitAdmin\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setRouter\",\"inputs\":[{\"name\":\"newRouter\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"supportsInterface\",\"inputs\":[{\"name\":\"interfaceId\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"AllowListAdd\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AllowListRemove\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Burned\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ChainAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"remoteToken\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ChainConfigured\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"outboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]},{\"name\":\"inboundRateLimiterConfig\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ChainRemoved\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ConfigChanged\",\"inputs\":[{\"name\":\"config\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Locked\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Minted\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OutstandingTokensSet\",\"inputs\":[{\"name\":\"newMintedTokenAmount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"oldMintedTokenAmount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RateLimitAdminSet\",\"inputs\":[{\"name\":\"rateLimitAdmin\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Released\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RemotePoolAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RemotePoolRemoved\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RouterUpdated\",\"inputs\":[{\"name\":\"oldRouter\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"newRouter\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"TokensConsumed\",\"inputs\":[{\"name\":\"tokens\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AggregateValueMaxCapacityExceeded\",\"inputs\":[{\"name\":\"capacity\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"requested\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"AggregateValueRateLimitReached\",\"inputs\":[{\"name\":\"minWaitInSeconds\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"available\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"AllowListNotEnabled\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"BucketOverfilled\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"CallerIsNotARampOnRouter\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ChainAlreadyExists\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"ChainNotAllowed\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"CursedByRMN\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"DisabledNonZeroRateLimit\",\"inputs\":[{\"name\":\"config\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]},{\"type\":\"error\",\"name\":\"InsufficientOutstandingTokens\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidDecimalArgs\",\"inputs\":[{\"name\":\"expected\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"actual\",\"type\":\"uint8\",\"internalType\":\"uint8\"}]},{\"type\":\"error\",\"name\":\"InvalidRateLimitRate\",\"inputs\":[{\"name\":\"rateLimiterConfig\",\"type\":\"tuple\",\"internalType\":\"structRateLimiter.Config\",\"components\":[{\"name\":\"isEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"capacity\",\"type\":\"uint128\",\"internalType\":\"uint128\"},{\"name\":\"rate\",\"type\":\"uint128\",\"internalType\":\"uint128\"}]}]},{\"type\":\"error\",\"name\":\"InvalidRemoteChainDecimals\",\"inputs\":[{\"name\":\"sourcePoolData\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidRemotePoolForChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidSourcePoolAddress\",\"inputs\":[{\"name\":\"sourcePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"InvalidToken\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"MismatchedArrayLengths\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NonExistentChain\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OverflowDetected\",\"inputs\":[{\"name\":\"remoteDecimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"localDecimals\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"remoteAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"PoolAlreadyAdded\",\"inputs\":[{\"name\":\"remoteChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"remotePoolAddress\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"type\":\"error\",\"name\":\"RateLimitMustBeDisabled\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"SenderNotAllowed\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"TokenMaxCapacityExceeded\",\"inputs\":[{\"name\":\"capacity\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"requested\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"tokenAddress\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"TokenRateLimitReached\",\"inputs\":[{\"name\":\"minWaitInSeconds\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"available\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"tokenAddress\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"Unauthorized\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]}]",
+	Bin: "0x610120806040523461038257614cff803803809161001d8285610401565b8339810160c0828203126103825781516001600160a01b03811692908390036103825761004c60208201610424565b60408201516001600160401b0381116103825782019280601f85011215610382578351936001600160401b0385116103eb578460051b9060208201956100956040519788610401565b865260208087019282010192831161038257602001905b8282106103d3575050506100c260608301610432565b936100db60a06100d460808601610432565b9401610432565b9433156103c257600180546001600160a01b03191633179055811580156103b1575b80156103a0575b61038f578160209160049360805260c0526040519283809263313ce56760e01b82525afa6000918161034e575b50610323575b5060a052600480546001600160a01b0319166001600160a01b03929092169190911790558051151560e0819052610206575b506101005260405161471890816105e782396080518181816116a00152818161188f0152818161243a015281816126160152818161297501526129ed015260a051818181611a10015281816128fc01528181613a300152613ab3015260c051818181610c740152818161173c01526124d5015260e051818181610c040152818161177f01526122230152610100518181816118ff0152612d660152f35b60206040516102158282610401565b60008152600036813760e051156103125760005b8151811015610290576001906001600160a01b036102478285610446565b51168461025382610488565b610260575b505001610229565b7f800671136ab6cfee9fbe5ed1fb7ca417811aca3cf864800d127b927adedf756691604051908152a13884610258565b505060005b8251811015610309576001906001600160a01b036102b38286610446565b5116801561030357836102c582610586565b6102d3575b50505b01610295565b7f2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d891604051908152a138836102ca565b506102cd565b50505038610169565b6335f4a7b360e01b60005260046000fd5b60ff1660ff82168181036103375750610137565b6332ad3e0760e11b60005260045260245260446000fd5b9091506020813d602011610387575b8161036a60209383610401565b810103126103825761037b90610424565b9038610131565b600080fd5b3d915061035d565b6342bcdf7f60e11b60005260046000fd5b506001600160a01b03811615610104565b506001600160a01b038416156100fd565b639b15e16f60e01b60005260046000fd5b602080916103e084610432565b8152019101906100ac565b634e487b7160e01b600052604160045260246000fd5b601f909101601f19168101906001600160401b038211908210176103eb57604052565b519060ff8216820361038257565b51906001600160a01b038216820361038257565b805182101561045a5760209160051b010190565b634e487b7160e01b600052603260045260246000fd5b805482101561045a5760005260206000200190600090565b600081815260036020526040902054801561057f5760001981018181116105695760025460001981019190821161056957818103610518575b505050600254801561050257600019016104dc816002610470565b8154906000199060031b1b19169055600255600052600360205260006040812055600190565b634e487b7160e01b600052603160045260246000fd5b61055161052961053a936002610470565b90549060031b1c9283926002610470565b819391549060031b91821b91600019901b19161790565b905560005260036020526040600020553880806104c1565b634e487b7160e01b600052601160045260246000fd5b5050600090565b806000526003602052604060002054156000146105e057600254680100000000000000008110156103eb576105c761053a8260018594016002556002610470565b9055600254906000526003602052604060002055600190565b5060009056fe608080604052600436101561001357600080fd5b600090813560e01c90816301ffc9a714612a9057508063181f5a7714612a1157806321df0da7146129a2578063240028e81461292057806324f65ee7146128c4578063296c64491461288857806338b39d2914610e6757806339077537146123865780634c5ef0ed1461236c57806354c8a4f3146121ef57806362ddd3c41461216b5780636d3d1a581461211957806379ba5097146120345780637d54534e14611f875780638926f54f14611f235780638da5cb5b14611ed1578063962d402014611d2d5780639a4575b9146115f8578063a42a7b8b14611473578063a7cd63b7146113a7578063acfecf9114611283578063af58d59f1461121c578063b0f479a1146111ca578063b794658014611173578063c0d786551461107b578063c4bffe2b14610f32578063c75eea9c14610e6c578063c8de9fe014610e67578063cf7401f314610c98578063dc0bd97114610c29578063e0351e1314610bce578063e8a1da17146102f9578063f2fde38b1461020c5763fbaf651a1461019757600080fd5b346102095760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc360112610209577fb99cf177d1af358d78f1de66579c44b1ebb76db812d856800d1bb83ea1fb2ddc60406004356101f46133d3565b600a5481600a5582519182526020820152a180f35b80fd5b50346102095760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126102095773ffffffffffffffffffffffffffffffffffffffff610259612cf8565b6102616133d3565b163381146102d157807fffffffffffffffffffffffff000000000000000000000000000000000000000083541617825573ffffffffffffffffffffffffffffffffffffffff600154167fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12788380a380f35b6004827fdad89dca000000000000000000000000000000000000000000000000000000008152fd5b50346102095761030836612e55565b939190926103146133d3565b82915b808310610a39575050508063ffffffff4216917ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffee1843603015b85821015610a35578160051b85013581811215610a315785019061012082360312610a31576040519561038287612be6565b823567ffffffffffffffff81168103610a2c578752602083013567ffffffffffffffff8111610a285783019536601f88011215610a28578635966103c58861301d565b976103d3604051998a612c1e565b8089526020808a019160051b83010190368211610a245760208301905b8282106109f1575050505060208801968752604084013567ffffffffffffffff81116109ed576104239036908601613346565b9860408901998a5261044d61043b3660608801612f13565b9560608b0196875260c0369101612f13565b9660808a0197885261045f8651613862565b6104698851613862565b8a5151156109c55761048567ffffffffffffffff8b51166142a8565b1561098e5767ffffffffffffffff8a511681526007602052604081206105c587516fffffffffffffffffffffffffffffffff604082015116906105806fffffffffffffffffffffffffffffffff602083015116915115158360806040516104eb81612be6565b858152602081018c905260408101849052606081018690520152855474ff000000000000000000000000000000000000000091151560a01b919091167fffffffffffffffffffffff0000000000000000000000000000000000000000009091166fffffffffffffffffffffffffffffffff84161773ffffffff0000000000000000000000000000000060808b901b1617178555565b60809190911b7fffffffffffffffffffffffffffffffff00000000000000000000000000000000166fffffffffffffffffffffffffffffffff91909116176001830155565b6106eb89516fffffffffffffffffffffffffffffffff604082015116906106a66fffffffffffffffffffffffffffffffff6020830151169151151583608060405161060f81612be6565b858152602081018c9052604081018490526060810186905201526002860180547fffffffffffffffffffffff000000000000000000000000000000000000000000166fffffffffffffffffffffffffffffffff85161773ffffffff0000000000000000000000000000000060808c901b161791151560a01b74ff000000000000000000000000000000000000000016919091179055565b60809190911b7fffffffffffffffffffffffffffffffff00000000000000000000000000000000166fffffffffffffffffffffffffffffffff91909116176003830155565b60048c5191019080519067ffffffffffffffff82116109615761070e8354613115565b601f8111610926575b50602090601f831160011461088757610765929185918361087c575b50507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8260011b9260031b1c19161790565b90555b805b895180518210156107a0579061079a600192610793838f67ffffffffffffffff90511692613101565b519061341e565b0161076a565b5050975097987f8d340f17e19058004c20453540862a9c62778504476f6756755cb33bcd6c38c29295939661086e67ffffffffffffffff600197949c511692519351915161083a61080560405196879687526101006020880152610100870190612c99565b9360408601906fffffffffffffffffffffffffffffffff60408092805115158552826020820151166020860152015116910152565b60a08401906fffffffffffffffffffffffffffffffff60408092805115158552826020820151166020860152015116910152565b0390a1019093949291610350565b015190503880610733565b83855281852091907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08416865b81811061090e57509084600195949392106108d7575b505050811b019055610768565b01517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff60f88460031b161c191690553880806108ca565b929360206001819287860151815501950193016108b4565b6109519084865260208620601f850160051c81019160208610610957575b601f0160051c019061331c565b38610717565b9091508190610944565b6024847f4e487b710000000000000000000000000000000000000000000000000000000081526041600452fd5b60249067ffffffffffffffff8b51167f1d5ad3c5000000000000000000000000000000000000000000000000000000008252600452fd5b807f8579befe0000000000000000000000000000000000000000000000000000000060049252fd5b8680fd5b813567ffffffffffffffff8111610a2057602091610a158392833691890101613346565b8152019101906103f0565b8a80fd5b8880fd5b8580fd5b600080fd5b8380fd5b8280f35b9092919367ffffffffffffffff610a59610a5487858861309d565b6130dc565b1695610a6487613fe9565b15610ba2578684526007602052610a8060056040862001613df0565b94845b8651811015610ab9576001908987526007602052610ab260056040892001610aab838b613101565b5190614114565b5001610a83565b5093945094909580855260076020526005604086208681558660018201558660028201558660038201558660048201610af28154613115565b80610b61575b5050500180549086815581610b43575b5050907f5204aec90a3c794d8e90fded8b46ae9c7c552803e7e832e0c1d358396d8599166020600193604051908152a1019190949394610317565b865260208620908101905b81811015610b0857868155600101610b4e565b601f8111600114610b775750555b863880610af8565b81835260208320610b9291601f01861c81019060010161331c565b8082528160208120915555610b6f565b602484887f1e670e4b000000000000000000000000000000000000000000000000000000008252600452fd5b503461020957807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126102095760206040517f000000000000000000000000000000000000000000000000000000000000000015158152f35b503461020957807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261020957602060405173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b50346102095760e07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261020957610cd0612d8a565b9060607fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdc36011261020957604051610d0781612c02565b6024358015158103610e635781526044356fffffffffffffffffffffffffffffffff81168103610e635760208201526064356fffffffffffffffffffffffffffffffff81168103610e6357604082015260607fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7c360112610e5f5760405190610d8e82612c02565b6084358015158103610a3157825260a4356fffffffffffffffffffffffffffffffff81168103610a3157602083015260c4356fffffffffffffffffffffffffffffffff81168103610a3157604083015273ffffffffffffffffffffffffffffffffffffffff6009541633141580610e3d575b610e1157610e0e9293613688565b80f35b6024837f8e4a23d600000000000000000000000000000000000000000000000000000000815233600452fd5b5073ffffffffffffffffffffffffffffffffffffffff60015416331415610e00565b5080fd5b8280fd5b612d1b565b50346102095760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261020957610ed5610ed06040610f2e9367ffffffffffffffff610eb9612d8a565b610ec1613269565b50168152600760205220613294565b6137dd565b6040519182918291909160806fffffffffffffffffffffffffffffffff8160a084019582815116855263ffffffff6020820151166020860152604081015115156040860152826060820151166060860152015116910152565b0390f35b503461020957807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261020957604051906005548083528260208101600584526020842092845b818110611062575050610f9092500383612c1e565b8151610fb4610f9e8261301d565b91610fac6040519384612c1e565b80835261301d565b917fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0602083019301368437805b8451811015611013578067ffffffffffffffff61100060019388613101565b511661100c8286613101565b5201610fe1565b50925090604051928392602084019060208552518091526040840192915b81811061103f575050500390f35b825167ffffffffffffffff16845285945060209384019390920191600101611031565b8454835260019485019487945060209093019201610f7b565b50346102095760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126102095773ffffffffffffffffffffffffffffffffffffffff6110c8612cf8565b6110d06133d3565b16801561114b5760407f02dc5c233404867c793b749c6d644beb2277536d18a7e7974d3f238e4c6f16849160045490807fffffffffffffffffffffffff000000000000000000000000000000000000000083161760045573ffffffffffffffffffffffffffffffffffffffff8351921682526020820152a180f35b6004827f8579befe000000000000000000000000000000000000000000000000000000008152fd5b50346102095760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261020957610f2e6111b66111b1612d8a565b6132fa565b604051918291602083526020830190612c99565b503461020957807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261020957602073ffffffffffffffffffffffffffffffffffffffff60045416604051908152f35b50346102095760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261020957610ed5610ed060026040610f2e9467ffffffffffffffff61126b612d8a565b611273613269565b5016815260076020522001613294565b50346102095767ffffffffffffffff61129b36612da1565b9290916112a66133d3565b16916112bf836000526006602052604060002054151590565b1561137b5782845260076020526112ee600560408620016112e1368486612f9b565b6020815191012090614114565b1561133357907f52d00ee4d9bd51b40168f2afc5848837288ce258784ad914278791464b3f4d769161132d60405192839260208452602084019161322a565b0390a280f35b82611377836040519384937f74f23c7c000000000000000000000000000000000000000000000000000000008552600485015260406024850152604484019161322a565b0390fd5b602484847f1e670e4b000000000000000000000000000000000000000000000000000000008252600452fd5b503461020957807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261020957604051600254808252602082018091600285526020852090855b81811061145d5750505082611406910383612c1e565b604051928392602084019060208552518091526040840192915b81811061142e575050500390f35b825173ffffffffffffffffffffffffffffffffffffffff16845285945060209384019390920191600101611420565b82548452602090930192600192830192016113f0565b50346102095760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126102095767ffffffffffffffff6114b4612d8a565b16815260076020526114cb60056040832001613df0565b80517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe06115106114fa8361301d565b926115086040519485612c1e565b80845261301d565b01835b8181106115e7575050825b8251811015611564578061153460019285613101565b518552600860205261154860408620613168565b6115528285613101565b5261155d8184613101565b500161151e565b81846040519182916020830160208452825180915260408401602060408360051b870101940192905b82821061159c57505050500390f35b919360206115d7827fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc060019597998495030186528851612c99565b960192019201859493919261158d565b806060602080938601015201611513565b50346102095760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126102095760043567ffffffffffffffff8111610e5f5760a07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc8236030112610e5f576060602060405161167681612bca565b828152015260848101611688816133b2565b73ffffffffffffffffffffffffffffffffffffffff807f000000000000000000000000000000000000000000000000000000000000000016911603611ce35750602481019077ffffffffffffffff000000000000000000000000000000006116ef836130dc565b60801b16604051907f2cbc26bb000000000000000000000000000000000000000000000000000000008252600482015260208160248173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000165afa908115611c04578491611cb4575b50611c8c5761177d604482016133b2565b7f0000000000000000000000000000000000000000000000000000000000000000611c3a575b5067ffffffffffffffff6117b6836130dc565b166117ce816000526006602052604060002054151590565b15611c0f57602073ffffffffffffffffffffffffffffffffffffffff60045416916024604051809481937fa8d87a3b00000000000000000000000000000000000000000000000000000000835260048301525afa8015611c04578490611ba1575b73ffffffffffffffffffffffffffffffffffffffff9150163303611b75578192606461186367ffffffffffffffff946130dc565b92013592839216815260076020526118b76040822073ffffffffffffffffffffffffffffffffffffffff7f000000000000000000000000000000000000000000000000000000000000000016948591614357565b600a54808311611b4d57906118cf836119c1936137d0565b600a556040517fa9059cbb00000000000000000000000000000000000000000000000000000000602082019081527f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff1660248301526044808301869052825294909190611952606484612c1e565b81806040978851956119648a88612c1e565b602087527f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c65646020880152519082855af1903d15611b44573d6119a581612c5f565b906119b289519283612c1e565b8152809360203d92013e61463f565b805180611aa3575b611a7284610f2e611a086111b1898885519081527f696de425f79f4a40bc6d2122ca50507f0efbeabbff86a84871b7196ab8ea8df760203392a26130dc565b9180519060ff7f000000000000000000000000000000000000000000000000000000000000000016602083015260208252611a438183612c1e565b805193611a4f85612bca565b845260208401918252805194859460208652518260208701526060860190612c99565b9151907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08584030190850152612c99565b90602080611ab59383010191016137b8565b15611ac15738806119c9565b608482517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e60448201527f6f742073756363656564000000000000000000000000000000000000000000006064820152fd5b6060925061463f565b6004827f48d3485d000000000000000000000000000000000000000000000000000000008152fd5b6024837f728fe07b00000000000000000000000000000000000000000000000000000000815233600452fd5b506020813d602011611bfc575b81611bbb60209383612c1e565b81010312610a31575173ffffffffffffffffffffffffffffffffffffffff81168103610a315773ffffffffffffffffffffffffffffffffffffffff9061182f565b3d9150611bae565b6040513d86823e3d90fd5b7fa9902c7e000000000000000000000000000000000000000000000000000000008452600452602483fd5b73ffffffffffffffffffffffffffffffffffffffff16808452600360205260408420546117a3577fd0d25976000000000000000000000000000000000000000000000000000000008452600452602483fd5b6004837f53ad11d8000000000000000000000000000000000000000000000000000000008152fd5b611cd6915060203d602011611cdc575b611cce8183612c1e565b8101906137b8565b3861176c565b503d611cc4565b8273ffffffffffffffffffffffffffffffffffffffff611d046024936133b2565b7f961c9a4f00000000000000000000000000000000000000000000000000000000835216600452fd5b50346102095760607ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126102095760043567ffffffffffffffff8111610e5f57611d7d903690600401612e24565b60243567ffffffffffffffff8111610a3157611d9d903690600401612ec5565b60449291923567ffffffffffffffff8111610a2857611dc0903690600401612ec5565b91909273ffffffffffffffffffffffffffffffffffffffff6009541633141580611eaf575b611e8357818114801590611e79575b611e5157865b818110611e05578780f35b80611e4b611e19610a54600194868c61309d565b611e2483878b6130f1565b611e45611e3d611e35868b8d6130f1565b923690612f13565b913690612f13565b91613688565b01611dfa565b6004877f568efce2000000000000000000000000000000000000000000000000000000008152fd5b5082811415611df4565b6024877f8e4a23d600000000000000000000000000000000000000000000000000000000815233600452fd5b5073ffffffffffffffffffffffffffffffffffffffff60015416331415611de5565b503461020957807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261020957602073ffffffffffffffffffffffffffffffffffffffff60015416604051908152f35b50346102095760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc360112610209576020611f7d67ffffffffffffffff611f69612d8a565b166000526006602052604060002054151590565b6040519015158152f35b50346102095760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc360112610209577f44676b5284b809a22248eba0da87391d79098be38bb03154be88a58bf4d09174602073ffffffffffffffffffffffffffffffffffffffff611ff7612cf8565b611fff6133d3565b16807fffffffffffffffffffffffff00000000000000000000000000000000000000006009541617600955604051908152a180f35b503461020957807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261020957805473ffffffffffffffffffffffffffffffffffffffff811633036120f1577fffffffffffffffffffffffff000000000000000000000000000000000000000060015491338284161760015516825573ffffffffffffffffffffffffffffffffffffffff3391167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e08380a380f35b6004827f02b543c6000000000000000000000000000000000000000000000000000000008152fd5b503461020957807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261020957602073ffffffffffffffffffffffffffffffffffffffff60095416604051908152f35b50346102095761217a36612da1565b612186939291936133d3565b67ffffffffffffffff82166121a8816000526006602052604060002054151590565b156121c45750610e0e92936121be913691612f9b565b9061341e565b7f1e670e4b000000000000000000000000000000000000000000000000000000008452600452602483fd5b5034610209576122199061222161220536612e55565b95916122129391936133d3565b3691613035565b933691613035565b7f00000000000000000000000000000000000000000000000000000000000000001561234457815b83518110156122bc578073ffffffffffffffffffffffffffffffffffffffff61227460019387613101565b511661227f81613e53565b61228b575b5001612249565b60207f800671136ab6cfee9fbe5ed1fb7ca417811aca3cf864800d127b927adedf756691604051908152a138612284565b5090805b8251811015612340578073ffffffffffffffffffffffffffffffffffffffff6122eb60019386613101565b5116801561233a576122fc81614248565b612309575b505b016122c0565b60207f2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d891604051908152a184612301565b50612303565b5080f35b6004827f35f4a7b3000000000000000000000000000000000000000000000000000000008152fd5b5034610209576020611f7d61238036612da1565b91612fd2565b50346102095760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126102095760043567ffffffffffffffff8111610e5f57806004016101007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc8336030112610e63578260405161240681612b7f565b528260405161241481612b7f565b5260848201612422816133b2565b73ffffffffffffffffffffffffffffffffffffffff807f00000000000000000000000000000000000000000000000000000000000000001691160361286757506024820177ffffffffffffffff00000000000000000000000000000000612488826130dc565b60801b16604051907f2cbc26bb000000000000000000000000000000000000000000000000000000008252600482015260208160248173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000165afa9081156127ea578591612848575b506128205767ffffffffffffffff61251c826130dc565b16612534816000526006602052604060002054151590565b156127f557602073ffffffffffffffffffffffffffffffffffffffff60045416916044604051809481937f83826b2b00000000000000000000000000000000000000000000000000000000835260048301523360248301525afa9081156127ea5785916127cb575b501561279f576125ab816130dc565b6125bd60a48501916123808386613361565b15612758575061265a67ffffffffffffffff9261265461264f6126486125e46044966130dc565b936064890135978895168a52600760205261263e600260408c200173ffffffffffffffffffffffffffffffffffffffff7f000000000000000000000000000000000000000000000000000000000000000016998a91614357565b60c4890190613361565b3691612f9b565b6139bd565b90613ab0565b92019083612667836133b2565b823b15610e5f576040517f40c10f1900000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff91909116600482015260248101859052918290604490829084905af18015611c0457916020946126f59273ffffffffffffffffffffffffffffffffffffffff94612748575b50506133b2565b166040518281527f9d228d69b5fdb8d273a2336f8fb8612d039631024ea9bf09c424a9503aa078f0843392a361273c6040519161273183612b7f565b808352600a54612f5f565b600a5560405190518152f35b8161275291612c1e565b386126ee565b6127629083613361565b6113776040519283927f24eb47e500000000000000000000000000000000000000000000000000000000845260206004850152602484019161322a565b6024847f728fe07b00000000000000000000000000000000000000000000000000000000815233600452fd5b6127e4915060203d602011611cdc57611cce8183612c1e565b3861259c565b6040513d87823e3d90fd5b7fa9902c7e000000000000000000000000000000000000000000000000000000008552600452602484fd5b6004847f53ad11d8000000000000000000000000000000000000000000000000000000008152fd5b612861915060203d602011611cdc57611cce8183612c1e565b38612505565b8373ffffffffffffffffffffffffffffffffffffffff611d046024936133b2565b503461020957807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc360112610209576020600a54604051908152f35b503461020957807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261020957602060405160ff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b50346102095760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126102095760209061295b612cf8565b905073ffffffffffffffffffffffffffffffffffffffff807f0000000000000000000000000000000000000000000000000000000000000000169116146040519015158152f35b503461020957807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc36011261020957602060405173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b503461020957807ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126102095750610f2e604051612a52604082612c1e565b601c81527f4275726e546f41646472657373546f6b656e506f6f6c20312e352e31000000006020820152604051918291602083526020830190612c99565b905034610e5f5760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc360112610e5f576004357fffffffff000000000000000000000000000000000000000000000000000000008116809103610e6357602092507faff2afbf000000000000000000000000000000000000000000000000000000008114908115612b55575b8115612b2b575b5015158152f35b7f01ffc9a70000000000000000000000000000000000000000000000000000000091501438612b24565b7f0e64dd290000000000000000000000000000000000000000000000000000000081149150612b1d565b6020810190811067ffffffffffffffff821117612b9b57604052565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040810190811067ffffffffffffffff821117612b9b57604052565b60a0810190811067ffffffffffffffff821117612b9b57604052565b6060810190811067ffffffffffffffff821117612b9b57604052565b90601f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0910116810190811067ffffffffffffffff821117612b9b57604052565b67ffffffffffffffff8111612b9b57601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe01660200190565b919082519283825260005b848110612ce35750507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f8460006020809697860101520116010190565b80602080928401015182828601015201612ca4565b6004359073ffffffffffffffffffffffffffffffffffffffff82168203610a2c57565b34610a2c5760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc360112610a2c57602060405173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b6004359067ffffffffffffffff82168203610a2c57565b60407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc820112610a2c5760043567ffffffffffffffff81168103610a2c579160243567ffffffffffffffff8111610a2c5782602382011215610a2c5780600401359267ffffffffffffffff8411610a2c5760248483010111610a2c576024019190565b9181601f84011215610a2c5782359167ffffffffffffffff8311610a2c576020808501948460051b010111610a2c57565b60407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc820112610a2c5760043567ffffffffffffffff8111610a2c5781612e9e91600401612e24565b929092916024359067ffffffffffffffff8211610a2c57612ec191600401612e24565b9091565b9181601f84011215610a2c5782359167ffffffffffffffff8311610a2c5760208085019460608502010111610a2c57565b35906fffffffffffffffffffffffffffffffff82168203610a2c57565b9190826060910312610a2c57604051612f2b81612c02565b80928035908115158203610a2c576040612f5a9181938552612f4f60208201612ef6565b602086015201612ef6565b910152565b91908201809211612f6c57565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b929192612fa782612c5f565b91612fb56040519384612c1e565b829481845281830111610a2c578281602093846000960137010152565b61301a929167ffffffffffffffff612ffd921660005260076020526005604060002001923691612f9b565b602081519101209060019160005201602052604060002054151590565b90565b67ffffffffffffffff8111612b9b5760051b60200190565b92916130408261301d565b9361304e6040519586612c1e565b602085848152019260051b8101918211610a2c57915b81831061307057505050565b823573ffffffffffffffffffffffffffffffffffffffff81168103610a2c57815260209283019201613064565b91908110156130ad5760051b0190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b3567ffffffffffffffff81168103610a2c5790565b91908110156130ad576060020190565b80518210156130ad5760209160051b010190565b90600182811c9216801561315e575b602083101461312f57565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b91607f1691613124565b906040519182600082549261317c84613115565b80845293600181169081156131ea57506001146131a3575b506131a192500383612c1e565b565b90506000929192526020600020906000915b8183106131ce5750509060206131a19282010138613194565b60209193508060019154838589010152019101909184926131b5565b602093506131a19592507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0091501682840152151560051b82010138613194565b601f82602094937fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0938186528686013760008582860101520116010190565b6040519061327682612be6565b60006080838281528260208201528260408201528260608201520152565b906040516132a181612be6565b60806001829460ff81546fffffffffffffffffffffffffffffffff8116865263ffffffff81861c16602087015260a01c161515604085015201546fffffffffffffffffffffffffffffffff81166060840152811c910152565b67ffffffffffffffff16600052600760205261301a6004604060002001613168565b818110613327575050565b6000815560010161331c565b81810292918115918404141715612f6c57565b9080601f83011215610a2c5781602061301a93359101612f9b565b9035907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe181360301821215610a2c570180359067ffffffffffffffff8211610a2c57602001918136038313610a2c57565b3573ffffffffffffffffffffffffffffffffffffffff81168103610a2c5790565b73ffffffffffffffffffffffffffffffffffffffff6001541633036133f457565b7f2b5c74de0000000000000000000000000000000000000000000000000000000060005260046000fd5b9080511561365e5767ffffffffffffffff81516020830120921691826000526007602052613453816005604060002001614302565b1561361a5760005260086020526040600020815167ffffffffffffffff8111612b9b576134808254613115565b601f81116135e8575b506020601f821160011461352257916134fc827f7d628c9a1796743d365ab521a8b2a4686e419b3269919dc9145ea2ce853b54ea959361351295600091613517575b507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8260011b9260031b1c19161790565b9055604051918291602083526020830190612c99565b0390a2565b9050840151386134cb565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe082169083600052806000209160005b8181106135d05750926135129492600192827f7d628c9a1796743d365ab521a8b2a4686e419b3269919dc9145ea2ce853b54ea989610613599575b5050811b0190556111b6565b8501517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff60f88460031b161c19169055388061358d565b9192602060018192868a015181550194019201613552565b61361490836000526020600020601f840160051c8101916020851061095757601f0160051c019061331c565b38613489565b50906113776040519283927f393b8ad20000000000000000000000000000000000000000000000000000000084526004840152604060248401526044830190612c99565b7f8579befe0000000000000000000000000000000000000000000000000000000060005260046000fd5b67ffffffffffffffff16600081815260066020526040902054909291901561378a579161378760e092613753856136df7f0350d63aa5f270e01729d00d627eeb8f3429772b1818c016c66a588a864f912b97613862565b8460005260076020526136f6816040600020613bbd565b6136ff83613862565b846000526007602052613719836002604060002001613bbd565b60405194855260208501906fffffffffffffffffffffffffffffffff60408092805115158552826020820151166020860152015116910152565b60808301906fffffffffffffffffffffffffffffffff60408092805115158552826020820151166020860152015116910152565ba1565b827f1e670e4b0000000000000000000000000000000000000000000000000000000060005260045260246000fd5b90816020910312610a2c57518015158103610a2c5790565b91908203918211612f6c57565b6137e5613269565b506fffffffffffffffffffffffffffffffff6060820151166fffffffffffffffffffffffffffffffff8083511691613842602085019361383c61382f63ffffffff875116426137d0565b8560808901511690613333565b90612f5f565b8082101561385b57505b16825263ffffffff4216905290565b905061384c565b805115613916576fffffffffffffffffffffffffffffffff6040820151166fffffffffffffffffffffffffffffffff60208301511681109081159161390d575b506138aa5750565b60649061390b604051917f8020d12400000000000000000000000000000000000000000000000000000000835260048301906fffffffffffffffffffffffffffffffff60408092805115158552826020820151166020860152015116910152565bfd5b905015386138a2565b6fffffffffffffffffffffffffffffffff6040820151161580159061399e575b61393d5750565b60649061390b604051917fd68af9cc00000000000000000000000000000000000000000000000000000000835260048301906fffffffffffffffffffffffffffffffff60408092805115158552826020820151166020860152015116910152565b506fffffffffffffffffffffffffffffffff6020820151161515613936565b80518015613a2c576020036139ee57602081805181010312610a2c5760208101519060ff82116139ee575060ff1690565b611377906040519182917f953576f7000000000000000000000000000000000000000000000000000000008352602060048401526024830190612c99565b50507f000000000000000000000000000000000000000000000000000000000000000090565b9060ff8091169116039060ff8211612f6c57565b60ff16604d8111612f6c57600a0a90565b8115613a81570490565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601260045260246000fd5b907f00000000000000000000000000000000000000000000000000000000000000009060ff82169060ff811692828414613bb657828411613b8c5790613af591613a52565b91604d60ff8416118015613b53575b613b1d57505090613b1761301a92613a66565b90613333565b9091507fa9cb113d0000000000000000000000000000000000000000000000000000000060005260045260245260445260646000fd5b50613b5d83613a66565b8015613a81577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff048411613b04565b613b9591613a52565b91604d60ff841611613b1d57505090613bb061301a92613a66565b90613a77565b5050505090565b7f9ea3374b67bf275e6bb9c8ae68f9cae023e1c528b4b27e092f0bb209d3531c1991613cf66060928054613bfa63ffffffff8260801c16426137d0565b9081613d35575b50506fffffffffffffffffffffffffffffffff6001816020860151169282815416808510600014613d2d57508280855b16167fffffffffffffffffffffffffffffffff00000000000000000000000000000000825416178155613caa8651151582907fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff74ff0000000000000000000000000000000000000000835492151560a01b169116179055565b60408601517fffffffffffffffffffffffffffffffff0000000000000000000000000000000060809190911b16939092166fffffffffffffffffffffffffffffffff1692909217910155565b61378760405180926fffffffffffffffffffffffffffffffff60408092805115158552826020820151166020860152015116910152565b838091613c31565b6fffffffffffffffffffffffffffffffff91613d6a839283613d636001880154948286169560801c90613333565b9116612f5f565b80821015613de957505b83547fffffffffffffffffffffffff00000000ffffffffffffffffffffffffffffffff9290911692909216167fffffffffffffffffffffffff0000000000000000000000000000000000000000909116174260801b73ffffffff00000000000000000000000000000000161781553880613c01565b9050613d74565b906040519182815491828252602082019060005260206000209260005b818110613e225750506131a192500383612c1e565b8454835260019485019487945060209093019201613e0d565b80548210156130ad5760005260206000200190600090565b6000818152600360205260409020548015613fe2577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8101818111612f6c57600254907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8201918211612f6c57818103613f73575b5050506002548015613f44577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01613f01816002613e3b565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82549160031b1b19169055600255600052600360205260006040812055600190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fd5b613fca613f84613f95936002613e3b565b90549060031b1c9283926002613e3b565b81939154907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9060031b92831b921b19161790565b90556000526003602052604060002055388080613ec8565b5050600090565b6000818152600660205260409020548015613fe2577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8101818111612f6c57600554907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8201918211612f6c578181036140da575b5050506005548015613f44577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01614097816005613e3b565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82549160031b1b19169055600555600052600660205260006040812055600190565b6140fc6140eb613f95936005613e3b565b90549060031b1c9283926005613e3b565b9055600052600660205260406000205538808061405e565b906001820191816000528260205260406000205480151560001461423f577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8101818111612f6c578254907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8201918211612f6c57818103614208575b50505080548015613f44577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01906141c98282613e3b565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82549160031b1b191690555560005260205260006040812055600190565b614228614218613f959386613e3b565b90549060031b1c92839286613e3b565b905560005283602052604060002055388080614191565b50505050600090565b806000526003602052604060002054156000146142a25760025468010000000000000000811015612b9b57614289613f958260018594016002556002613e3b565b9055600254906000526003602052604060002055600190565b50600090565b806000526006602052604060002054156000146142a25760055468010000000000000000811015612b9b576142e9613f958260018594016005556005613e3b565b9055600554906000526006602052604060002055600190565b6000828152600182016020526040902054613fe25780549068010000000000000000821015612b9b5782614340613f95846001809601855584613e3b565b905580549260005201602052604060002055600190565b929192805460ff8160a01c16158015614637575b614630576fffffffffffffffffffffffffffffffff811690600183019081546143b063ffffffff6fffffffffffffffffffffffffffffffff83169360801c16426137d0565b9081614592575b5050848110614510575083821061443f57507f1871cdf8010e63f2eb8384381a68dfa7416dc571a5517e66e88b2d2d0c0a690a939450906fffffffffffffffffffffffffffffffff8061440d85602096956137d0565b16167fffffffffffffffffffffffffffffffff00000000000000000000000000000000825416179055604051908152a1565b81945061445192505460801c926137d0565b907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff810190808211612f6c5761449f6144a49273ffffffffffffffffffffffffffffffffffffffff94612f5f565b613a77565b92169182156144e0577fd0c8d23a0000000000000000000000000000000000000000000000000000000060005260045260245260445260646000fd5b7f15279c080000000000000000000000000000000000000000000000000000000060005260045260245260446000fd5b8473ffffffffffffffffffffffffffffffffffffffff8816918215614562577f1a76572a0000000000000000000000000000000000000000000000000000000060005260045260245260445260646000fd5b7ff94ebcd10000000000000000000000000000000000000000000000000000000060005260045260245260446000fd5b828592939511614606576145ad9261383c9160801c90613333565b808310156146015750815b83547fffffffffffffffffffffffff00000000ffffffffffffffffffffffffffffffff164260801b73ffffffff00000000000000000000000000000000161784559138806143b7565b6145b8565b7f9725942a0000000000000000000000000000000000000000000000000000000060005260046000fd5b5050509050565b50821561436b565b919290156146ba5750815115614653575090565b3b1561465c5790565b60646040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e74726163740000006044820152fd5b8251909150156146cd5750805190602001fd5b611377906040519182917f08c379a0000000000000000000000000000000000000000000000000000000008352602060048401526024830190612c9956fea164736f6c634300081a000a",
+}
+
+var BurnToAddressMintTokenPoolABI = BurnToAddressMintTokenPoolMetaData.ABI
+
+var BurnToAddressMintTokenPoolBin = BurnToAddressMintTokenPoolMetaData.Bin
+
+func DeployBurnToAddressMintTokenPool(auth *bind.TransactOpts, backend bind.ContractBackend, token common.Address, localTokenDecimals uint8, allowlist []common.Address, rmnProxy common.Address, router common.Address, burnAddress common.Address) (common.Address, *types.Transaction, *BurnToAddressMintTokenPool, error) {
+	parsed, err := BurnToAddressMintTokenPoolMetaData.GetAbi()
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	if parsed == nil {
+		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
+	}
+
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(BurnToAddressMintTokenPoolBin), backend, token, localTokenDecimals, allowlist, rmnProxy, router, burnAddress)
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	return address, tx, &BurnToAddressMintTokenPool{address: address, abi: *parsed, BurnToAddressMintTokenPoolCaller: BurnToAddressMintTokenPoolCaller{contract: contract}, BurnToAddressMintTokenPoolTransactor: BurnToAddressMintTokenPoolTransactor{contract: contract}, BurnToAddressMintTokenPoolFilterer: BurnToAddressMintTokenPoolFilterer{contract: contract}}, nil
+}
+
+type BurnToAddressMintTokenPool struct {
+	address common.Address
+	abi     abi.ABI
+	BurnToAddressMintTokenPoolCaller
+	BurnToAddressMintTokenPoolTransactor
+	BurnToAddressMintTokenPoolFilterer
+}
+
+type BurnToAddressMintTokenPoolCaller struct {
+	contract *bind.BoundContract
+}
+
+type BurnToAddressMintTokenPoolTransactor struct {
+	contract *bind.BoundContract
+}
+
+type BurnToAddressMintTokenPoolFilterer struct {
+	contract *bind.BoundContract
+}
+
+type BurnToAddressMintTokenPoolSession struct {
+	Contract     *BurnToAddressMintTokenPool
+	CallOpts     bind.CallOpts
+	TransactOpts bind.TransactOpts
+}
+
+type BurnToAddressMintTokenPoolCallerSession struct {
+	Contract *BurnToAddressMintTokenPoolCaller
+	CallOpts bind.CallOpts
+}
+
+type BurnToAddressMintTokenPoolTransactorSession struct {
+	Contract     *BurnToAddressMintTokenPoolTransactor
+	TransactOpts bind.TransactOpts
+}
+
+type BurnToAddressMintTokenPoolRaw struct {
+	Contract *BurnToAddressMintTokenPool
+}
+
+type BurnToAddressMintTokenPoolCallerRaw struct {
+	Contract *BurnToAddressMintTokenPoolCaller
+}
+
+type BurnToAddressMintTokenPoolTransactorRaw struct {
+	Contract *BurnToAddressMintTokenPoolTransactor
+}
+
+func NewBurnToAddressMintTokenPool(address common.Address, backend bind.ContractBackend) (*BurnToAddressMintTokenPool, error) {
+	abi, err := abi.JSON(strings.NewReader(BurnToAddressMintTokenPoolABI))
+	if err != nil {
+		return nil, err
+	}
+	contract, err := bindBurnToAddressMintTokenPool(address, backend, backend, backend)
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPool{address: address, abi: abi, BurnToAddressMintTokenPoolCaller: BurnToAddressMintTokenPoolCaller{contract: contract}, BurnToAddressMintTokenPoolTransactor: BurnToAddressMintTokenPoolTransactor{contract: contract}, BurnToAddressMintTokenPoolFilterer: BurnToAddressMintTokenPoolFilterer{contract: contract}}, nil
+}
+
+func NewBurnToAddressMintTokenPoolCaller(address common.Address, caller bind.ContractCaller) (*BurnToAddressMintTokenPoolCaller, error) {
+	contract, err := bindBurnToAddressMintTokenPool(address, caller, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolCaller{contract: contract}, nil
+}
+
+func NewBurnToAddressMintTokenPoolTransactor(address common.Address, transactor bind.ContractTransactor) (*BurnToAddressMintTokenPoolTransactor, error) {
+	contract, err := bindBurnToAddressMintTokenPool(address, nil, transactor, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolTransactor{contract: contract}, nil
+}
+
+func NewBurnToAddressMintTokenPoolFilterer(address common.Address, filterer bind.ContractFilterer) (*BurnToAddressMintTokenPoolFilterer, error) {
+	contract, err := bindBurnToAddressMintTokenPool(address, nil, nil, filterer)
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolFilterer{contract: contract}, nil
+}
+
+func bindBurnToAddressMintTokenPool(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
+	parsed, err := BurnToAddressMintTokenPoolMetaData.GetAbi()
+	if err != nil {
+		return nil, err
+	}
+	return bind.NewBoundContract(address, *parsed, caller, transactor, filterer), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _BurnToAddressMintTokenPool.Contract.BurnToAddressMintTokenPoolCaller.contract.Call(opts, result, method, params...)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.BurnToAddressMintTokenPoolTransactor.contract.Transfer(opts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.BurnToAddressMintTokenPoolTransactor.contract.Transact(opts, method, params...)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _BurnToAddressMintTokenPool.Contract.contract.Call(opts, result, method, params...)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.contract.Transfer(opts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.contract.Transact(opts, method, params...)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) GetAllowList(opts *bind.CallOpts) ([]common.Address, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "getAllowList")
+
+	if err != nil {
+		return *new([]common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) GetAllowList() ([]common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetAllowList(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) GetAllowList() ([]common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetAllowList(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) GetAllowListEnabled(opts *bind.CallOpts) (bool, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "getAllowListEnabled")
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) GetAllowListEnabled() (bool, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetAllowListEnabled(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) GetAllowListEnabled() (bool, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetAllowListEnabled(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) GetBurnAddress(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "getBurnAddress")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) GetBurnAddress() (common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetBurnAddress(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) GetBurnAddress() (common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetBurnAddress(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) GetCurrentInboundRateLimiterState(opts *bind.CallOpts, remoteChainSelector uint64) (RateLimiterTokenBucket, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "getCurrentInboundRateLimiterState", remoteChainSelector)
+
+	if err != nil {
+		return *new(RateLimiterTokenBucket), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(RateLimiterTokenBucket)).(*RateLimiterTokenBucket)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) GetCurrentInboundRateLimiterState(remoteChainSelector uint64) (RateLimiterTokenBucket, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetCurrentInboundRateLimiterState(&_BurnToAddressMintTokenPool.CallOpts, remoteChainSelector)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) GetCurrentInboundRateLimiterState(remoteChainSelector uint64) (RateLimiterTokenBucket, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetCurrentInboundRateLimiterState(&_BurnToAddressMintTokenPool.CallOpts, remoteChainSelector)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) GetCurrentOutboundRateLimiterState(opts *bind.CallOpts, remoteChainSelector uint64) (RateLimiterTokenBucket, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "getCurrentOutboundRateLimiterState", remoteChainSelector)
+
+	if err != nil {
+		return *new(RateLimiterTokenBucket), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(RateLimiterTokenBucket)).(*RateLimiterTokenBucket)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) GetCurrentOutboundRateLimiterState(remoteChainSelector uint64) (RateLimiterTokenBucket, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetCurrentOutboundRateLimiterState(&_BurnToAddressMintTokenPool.CallOpts, remoteChainSelector)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) GetCurrentOutboundRateLimiterState(remoteChainSelector uint64) (RateLimiterTokenBucket, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetCurrentOutboundRateLimiterState(&_BurnToAddressMintTokenPool.CallOpts, remoteChainSelector)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) GetOutstandingTokens(opts *bind.CallOpts) (*big.Int, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "getOutstandingTokens")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) GetOutstandingTokens() (*big.Int, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetOutstandingTokens(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) GetOutstandingTokens() (*big.Int, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetOutstandingTokens(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) GetRateLimitAdmin(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "getRateLimitAdmin")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) GetRateLimitAdmin() (common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetRateLimitAdmin(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) GetRateLimitAdmin() (common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetRateLimitAdmin(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) GetRemotePools(opts *bind.CallOpts, remoteChainSelector uint64) ([][]byte, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "getRemotePools", remoteChainSelector)
+
+	if err != nil {
+		return *new([][]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([][]byte)).(*[][]byte)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) GetRemotePools(remoteChainSelector uint64) ([][]byte, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetRemotePools(&_BurnToAddressMintTokenPool.CallOpts, remoteChainSelector)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) GetRemotePools(remoteChainSelector uint64) ([][]byte, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetRemotePools(&_BurnToAddressMintTokenPool.CallOpts, remoteChainSelector)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) GetRemoteToken(opts *bind.CallOpts, remoteChainSelector uint64) ([]byte, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "getRemoteToken", remoteChainSelector)
+
+	if err != nil {
+		return *new([]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) GetRemoteToken(remoteChainSelector uint64) ([]byte, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetRemoteToken(&_BurnToAddressMintTokenPool.CallOpts, remoteChainSelector)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) GetRemoteToken(remoteChainSelector uint64) ([]byte, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetRemoteToken(&_BurnToAddressMintTokenPool.CallOpts, remoteChainSelector)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) GetRmnProxy(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "getRmnProxy")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) GetRmnProxy() (common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetRmnProxy(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) GetRmnProxy() (common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetRmnProxy(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) GetRouter(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "getRouter")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) GetRouter() (common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetRouter(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) GetRouter() (common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetRouter(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) GetSupportedChains(opts *bind.CallOpts) ([]uint64, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "getSupportedChains")
+
+	if err != nil {
+		return *new([]uint64), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]uint64)).(*[]uint64)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) GetSupportedChains() ([]uint64, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetSupportedChains(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) GetSupportedChains() ([]uint64, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetSupportedChains(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) GetToken(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "getToken")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) GetToken() (common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetToken(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) GetToken() (common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetToken(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) GetTokenDecimals(opts *bind.CallOpts) (uint8, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "getTokenDecimals")
+
+	if err != nil {
+		return *new(uint8), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(uint8)).(*uint8)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) GetTokenDecimals() (uint8, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetTokenDecimals(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) GetTokenDecimals() (uint8, error) {
+	return _BurnToAddressMintTokenPool.Contract.GetTokenDecimals(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) IBurnAddress(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "i_burnAddress")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) IBurnAddress() (common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.IBurnAddress(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) IBurnAddress() (common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.IBurnAddress(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) IsRemotePool(opts *bind.CallOpts, remoteChainSelector uint64, remotePoolAddress []byte) (bool, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "isRemotePool", remoteChainSelector, remotePoolAddress)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) IsRemotePool(remoteChainSelector uint64, remotePoolAddress []byte) (bool, error) {
+	return _BurnToAddressMintTokenPool.Contract.IsRemotePool(&_BurnToAddressMintTokenPool.CallOpts, remoteChainSelector, remotePoolAddress)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) IsRemotePool(remoteChainSelector uint64, remotePoolAddress []byte) (bool, error) {
+	return _BurnToAddressMintTokenPool.Contract.IsRemotePool(&_BurnToAddressMintTokenPool.CallOpts, remoteChainSelector, remotePoolAddress)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) IsSupportedChain(opts *bind.CallOpts, remoteChainSelector uint64) (bool, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "isSupportedChain", remoteChainSelector)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) IsSupportedChain(remoteChainSelector uint64) (bool, error) {
+	return _BurnToAddressMintTokenPool.Contract.IsSupportedChain(&_BurnToAddressMintTokenPool.CallOpts, remoteChainSelector)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) IsSupportedChain(remoteChainSelector uint64) (bool, error) {
+	return _BurnToAddressMintTokenPool.Contract.IsSupportedChain(&_BurnToAddressMintTokenPool.CallOpts, remoteChainSelector)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) IsSupportedToken(opts *bind.CallOpts, token common.Address) (bool, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "isSupportedToken", token)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) IsSupportedToken(token common.Address) (bool, error) {
+	return _BurnToAddressMintTokenPool.Contract.IsSupportedToken(&_BurnToAddressMintTokenPool.CallOpts, token)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) IsSupportedToken(token common.Address) (bool, error) {
+	return _BurnToAddressMintTokenPool.Contract.IsSupportedToken(&_BurnToAddressMintTokenPool.CallOpts, token)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "owner")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) Owner() (common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.Owner(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) Owner() (common.Address, error) {
+	return _BurnToAddressMintTokenPool.Contract.Owner(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) SupportsInterface(opts *bind.CallOpts, interfaceId [4]byte) (bool, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "supportsInterface", interfaceId)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) SupportsInterface(interfaceId [4]byte) (bool, error) {
+	return _BurnToAddressMintTokenPool.Contract.SupportsInterface(&_BurnToAddressMintTokenPool.CallOpts, interfaceId)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) SupportsInterface(interfaceId [4]byte) (bool, error) {
+	return _BurnToAddressMintTokenPool.Contract.SupportsInterface(&_BurnToAddressMintTokenPool.CallOpts, interfaceId)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCaller) TypeAndVersion(opts *bind.CallOpts) (string, error) {
+	var out []interface{}
+	err := _BurnToAddressMintTokenPool.contract.Call(opts, &out, "typeAndVersion")
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) TypeAndVersion() (string, error) {
+	return _BurnToAddressMintTokenPool.Contract.TypeAndVersion(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolCallerSession) TypeAndVersion() (string, error) {
+	return _BurnToAddressMintTokenPool.Contract.TypeAndVersion(&_BurnToAddressMintTokenPool.CallOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactor) AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.contract.Transact(opts, "acceptOwnership")
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) AcceptOwnership() (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.AcceptOwnership(&_BurnToAddressMintTokenPool.TransactOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorSession) AcceptOwnership() (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.AcceptOwnership(&_BurnToAddressMintTokenPool.TransactOpts)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactor) AddRemotePool(opts *bind.TransactOpts, remoteChainSelector uint64, remotePoolAddress []byte) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.contract.Transact(opts, "addRemotePool", remoteChainSelector, remotePoolAddress)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) AddRemotePool(remoteChainSelector uint64, remotePoolAddress []byte) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.AddRemotePool(&_BurnToAddressMintTokenPool.TransactOpts, remoteChainSelector, remotePoolAddress)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorSession) AddRemotePool(remoteChainSelector uint64, remotePoolAddress []byte) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.AddRemotePool(&_BurnToAddressMintTokenPool.TransactOpts, remoteChainSelector, remotePoolAddress)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactor) ApplyAllowListUpdates(opts *bind.TransactOpts, removes []common.Address, adds []common.Address) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.contract.Transact(opts, "applyAllowListUpdates", removes, adds)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) ApplyAllowListUpdates(removes []common.Address, adds []common.Address) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.ApplyAllowListUpdates(&_BurnToAddressMintTokenPool.TransactOpts, removes, adds)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorSession) ApplyAllowListUpdates(removes []common.Address, adds []common.Address) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.ApplyAllowListUpdates(&_BurnToAddressMintTokenPool.TransactOpts, removes, adds)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactor) ApplyChainUpdates(opts *bind.TransactOpts, remoteChainSelectorsToRemove []uint64, chainsToAdd []TokenPoolChainUpdate) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.contract.Transact(opts, "applyChainUpdates", remoteChainSelectorsToRemove, chainsToAdd)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) ApplyChainUpdates(remoteChainSelectorsToRemove []uint64, chainsToAdd []TokenPoolChainUpdate) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.ApplyChainUpdates(&_BurnToAddressMintTokenPool.TransactOpts, remoteChainSelectorsToRemove, chainsToAdd)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorSession) ApplyChainUpdates(remoteChainSelectorsToRemove []uint64, chainsToAdd []TokenPoolChainUpdate) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.ApplyChainUpdates(&_BurnToAddressMintTokenPool.TransactOpts, remoteChainSelectorsToRemove, chainsToAdd)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactor) LockOrBurn(opts *bind.TransactOpts, lockOrBurnIn PoolLockOrBurnInV1) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.contract.Transact(opts, "lockOrBurn", lockOrBurnIn)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) LockOrBurn(lockOrBurnIn PoolLockOrBurnInV1) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.LockOrBurn(&_BurnToAddressMintTokenPool.TransactOpts, lockOrBurnIn)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorSession) LockOrBurn(lockOrBurnIn PoolLockOrBurnInV1) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.LockOrBurn(&_BurnToAddressMintTokenPool.TransactOpts, lockOrBurnIn)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactor) ReleaseOrMint(opts *bind.TransactOpts, releaseOrMintIn PoolReleaseOrMintInV1) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.contract.Transact(opts, "releaseOrMint", releaseOrMintIn)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) ReleaseOrMint(releaseOrMintIn PoolReleaseOrMintInV1) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.ReleaseOrMint(&_BurnToAddressMintTokenPool.TransactOpts, releaseOrMintIn)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorSession) ReleaseOrMint(releaseOrMintIn PoolReleaseOrMintInV1) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.ReleaseOrMint(&_BurnToAddressMintTokenPool.TransactOpts, releaseOrMintIn)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactor) RemoveRemotePool(opts *bind.TransactOpts, remoteChainSelector uint64, remotePoolAddress []byte) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.contract.Transact(opts, "removeRemotePool", remoteChainSelector, remotePoolAddress)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) RemoveRemotePool(remoteChainSelector uint64, remotePoolAddress []byte) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.RemoveRemotePool(&_BurnToAddressMintTokenPool.TransactOpts, remoteChainSelector, remotePoolAddress)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorSession) RemoveRemotePool(remoteChainSelector uint64, remotePoolAddress []byte) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.RemoveRemotePool(&_BurnToAddressMintTokenPool.TransactOpts, remoteChainSelector, remotePoolAddress)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactor) SetChainRateLimiterConfig(opts *bind.TransactOpts, remoteChainSelector uint64, outboundConfig RateLimiterConfig, inboundConfig RateLimiterConfig) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.contract.Transact(opts, "setChainRateLimiterConfig", remoteChainSelector, outboundConfig, inboundConfig)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) SetChainRateLimiterConfig(remoteChainSelector uint64, outboundConfig RateLimiterConfig, inboundConfig RateLimiterConfig) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.SetChainRateLimiterConfig(&_BurnToAddressMintTokenPool.TransactOpts, remoteChainSelector, outboundConfig, inboundConfig)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorSession) SetChainRateLimiterConfig(remoteChainSelector uint64, outboundConfig RateLimiterConfig, inboundConfig RateLimiterConfig) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.SetChainRateLimiterConfig(&_BurnToAddressMintTokenPool.TransactOpts, remoteChainSelector, outboundConfig, inboundConfig)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactor) SetChainRateLimiterConfigs(opts *bind.TransactOpts, remoteChainSelectors []uint64, outboundConfigs []RateLimiterConfig, inboundConfigs []RateLimiterConfig) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.contract.Transact(opts, "setChainRateLimiterConfigs", remoteChainSelectors, outboundConfigs, inboundConfigs)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) SetChainRateLimiterConfigs(remoteChainSelectors []uint64, outboundConfigs []RateLimiterConfig, inboundConfigs []RateLimiterConfig) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.SetChainRateLimiterConfigs(&_BurnToAddressMintTokenPool.TransactOpts, remoteChainSelectors, outboundConfigs, inboundConfigs)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorSession) SetChainRateLimiterConfigs(remoteChainSelectors []uint64, outboundConfigs []RateLimiterConfig, inboundConfigs []RateLimiterConfig) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.SetChainRateLimiterConfigs(&_BurnToAddressMintTokenPool.TransactOpts, remoteChainSelectors, outboundConfigs, inboundConfigs)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactor) SetOutstandingTokens(opts *bind.TransactOpts, amount *big.Int) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.contract.Transact(opts, "setOutstandingTokens", amount)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) SetOutstandingTokens(amount *big.Int) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.SetOutstandingTokens(&_BurnToAddressMintTokenPool.TransactOpts, amount)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorSession) SetOutstandingTokens(amount *big.Int) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.SetOutstandingTokens(&_BurnToAddressMintTokenPool.TransactOpts, amount)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactor) SetRateLimitAdmin(opts *bind.TransactOpts, rateLimitAdmin common.Address) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.contract.Transact(opts, "setRateLimitAdmin", rateLimitAdmin)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) SetRateLimitAdmin(rateLimitAdmin common.Address) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.SetRateLimitAdmin(&_BurnToAddressMintTokenPool.TransactOpts, rateLimitAdmin)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorSession) SetRateLimitAdmin(rateLimitAdmin common.Address) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.SetRateLimitAdmin(&_BurnToAddressMintTokenPool.TransactOpts, rateLimitAdmin)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactor) SetRouter(opts *bind.TransactOpts, newRouter common.Address) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.contract.Transact(opts, "setRouter", newRouter)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) SetRouter(newRouter common.Address) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.SetRouter(&_BurnToAddressMintTokenPool.TransactOpts, newRouter)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorSession) SetRouter(newRouter common.Address) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.SetRouter(&_BurnToAddressMintTokenPool.TransactOpts, newRouter)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactor) TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.contract.Transact(opts, "transferOwnership", to)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.TransferOwnership(&_BurnToAddressMintTokenPool.TransactOpts, to)
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolTransactorSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
+	return _BurnToAddressMintTokenPool.Contract.TransferOwnership(&_BurnToAddressMintTokenPool.TransactOpts, to)
+}
+
+type BurnToAddressMintTokenPoolAllowListAddIterator struct {
+	Event *BurnToAddressMintTokenPoolAllowListAdd
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolAllowListAddIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolAllowListAdd)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolAllowListAdd)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolAllowListAddIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolAllowListAddIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolAllowListAdd struct {
+	Sender common.Address
+	Raw    types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterAllowListAdd(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolAllowListAddIterator, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "AllowListAdd")
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolAllowListAddIterator{contract: _BurnToAddressMintTokenPool.contract, event: "AllowListAdd", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchAllowListAdd(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolAllowListAdd) (event.Subscription, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "AllowListAdd")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolAllowListAdd)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "AllowListAdd", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseAllowListAdd(log types.Log) (*BurnToAddressMintTokenPoolAllowListAdd, error) {
+	event := new(BurnToAddressMintTokenPoolAllowListAdd)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "AllowListAdd", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolAllowListRemoveIterator struct {
+	Event *BurnToAddressMintTokenPoolAllowListRemove
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolAllowListRemoveIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolAllowListRemove)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolAllowListRemove)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolAllowListRemoveIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolAllowListRemoveIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolAllowListRemove struct {
+	Sender common.Address
+	Raw    types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterAllowListRemove(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolAllowListRemoveIterator, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "AllowListRemove")
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolAllowListRemoveIterator{contract: _BurnToAddressMintTokenPool.contract, event: "AllowListRemove", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchAllowListRemove(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolAllowListRemove) (event.Subscription, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "AllowListRemove")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolAllowListRemove)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "AllowListRemove", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseAllowListRemove(log types.Log) (*BurnToAddressMintTokenPoolAllowListRemove, error) {
+	event := new(BurnToAddressMintTokenPoolAllowListRemove)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "AllowListRemove", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolBurnedIterator struct {
+	Event *BurnToAddressMintTokenPoolBurned
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolBurnedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolBurned)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolBurned)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolBurnedIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolBurnedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolBurned struct {
+	Sender common.Address
+	Amount *big.Int
+	Raw    types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterBurned(opts *bind.FilterOpts, sender []common.Address) (*BurnToAddressMintTokenPoolBurnedIterator, error) {
+
+	var senderRule []interface{}
+	for _, senderItem := range sender {
+		senderRule = append(senderRule, senderItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "Burned", senderRule)
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolBurnedIterator{contract: _BurnToAddressMintTokenPool.contract, event: "Burned", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchBurned(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolBurned, sender []common.Address) (event.Subscription, error) {
+
+	var senderRule []interface{}
+	for _, senderItem := range sender {
+		senderRule = append(senderRule, senderItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "Burned", senderRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolBurned)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "Burned", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseBurned(log types.Log) (*BurnToAddressMintTokenPoolBurned, error) {
+	event := new(BurnToAddressMintTokenPoolBurned)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "Burned", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolChainAddedIterator struct {
+	Event *BurnToAddressMintTokenPoolChainAdded
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolChainAddedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolChainAdded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolChainAdded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolChainAddedIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolChainAddedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolChainAdded struct {
+	RemoteChainSelector       uint64
+	RemoteToken               []byte
+	OutboundRateLimiterConfig RateLimiterConfig
+	InboundRateLimiterConfig  RateLimiterConfig
+	Raw                       types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterChainAdded(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolChainAddedIterator, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "ChainAdded")
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolChainAddedIterator{contract: _BurnToAddressMintTokenPool.contract, event: "ChainAdded", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchChainAdded(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolChainAdded) (event.Subscription, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "ChainAdded")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolChainAdded)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "ChainAdded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseChainAdded(log types.Log) (*BurnToAddressMintTokenPoolChainAdded, error) {
+	event := new(BurnToAddressMintTokenPoolChainAdded)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "ChainAdded", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolChainConfiguredIterator struct {
+	Event *BurnToAddressMintTokenPoolChainConfigured
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolChainConfiguredIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolChainConfigured)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolChainConfigured)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolChainConfiguredIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolChainConfiguredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolChainConfigured struct {
+	RemoteChainSelector       uint64
+	OutboundRateLimiterConfig RateLimiterConfig
+	InboundRateLimiterConfig  RateLimiterConfig
+	Raw                       types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterChainConfigured(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolChainConfiguredIterator, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "ChainConfigured")
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolChainConfiguredIterator{contract: _BurnToAddressMintTokenPool.contract, event: "ChainConfigured", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchChainConfigured(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolChainConfigured) (event.Subscription, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "ChainConfigured")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolChainConfigured)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "ChainConfigured", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseChainConfigured(log types.Log) (*BurnToAddressMintTokenPoolChainConfigured, error) {
+	event := new(BurnToAddressMintTokenPoolChainConfigured)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "ChainConfigured", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolChainRemovedIterator struct {
+	Event *BurnToAddressMintTokenPoolChainRemoved
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolChainRemovedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolChainRemoved)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolChainRemoved)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolChainRemovedIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolChainRemovedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolChainRemoved struct {
+	RemoteChainSelector uint64
+	Raw                 types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterChainRemoved(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolChainRemovedIterator, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "ChainRemoved")
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolChainRemovedIterator{contract: _BurnToAddressMintTokenPool.contract, event: "ChainRemoved", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchChainRemoved(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolChainRemoved) (event.Subscription, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "ChainRemoved")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolChainRemoved)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "ChainRemoved", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseChainRemoved(log types.Log) (*BurnToAddressMintTokenPoolChainRemoved, error) {
+	event := new(BurnToAddressMintTokenPoolChainRemoved)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "ChainRemoved", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolConfigChangedIterator struct {
+	Event *BurnToAddressMintTokenPoolConfigChanged
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolConfigChangedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolConfigChanged)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolConfigChanged)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolConfigChangedIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolConfigChangedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolConfigChanged struct {
+	Config RateLimiterConfig
+	Raw    types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterConfigChanged(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolConfigChangedIterator, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "ConfigChanged")
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolConfigChangedIterator{contract: _BurnToAddressMintTokenPool.contract, event: "ConfigChanged", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchConfigChanged(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolConfigChanged) (event.Subscription, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "ConfigChanged")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolConfigChanged)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "ConfigChanged", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseConfigChanged(log types.Log) (*BurnToAddressMintTokenPoolConfigChanged, error) {
+	event := new(BurnToAddressMintTokenPoolConfigChanged)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "ConfigChanged", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolLockedIterator struct {
+	Event *BurnToAddressMintTokenPoolLocked
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolLockedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolLocked)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolLocked)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolLockedIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolLockedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolLocked struct {
+	Sender common.Address
+	Amount *big.Int
+	Raw    types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterLocked(opts *bind.FilterOpts, sender []common.Address) (*BurnToAddressMintTokenPoolLockedIterator, error) {
+
+	var senderRule []interface{}
+	for _, senderItem := range sender {
+		senderRule = append(senderRule, senderItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "Locked", senderRule)
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolLockedIterator{contract: _BurnToAddressMintTokenPool.contract, event: "Locked", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchLocked(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolLocked, sender []common.Address) (event.Subscription, error) {
+
+	var senderRule []interface{}
+	for _, senderItem := range sender {
+		senderRule = append(senderRule, senderItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "Locked", senderRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolLocked)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "Locked", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseLocked(log types.Log) (*BurnToAddressMintTokenPoolLocked, error) {
+	event := new(BurnToAddressMintTokenPoolLocked)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "Locked", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolMintedIterator struct {
+	Event *BurnToAddressMintTokenPoolMinted
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolMintedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolMinted)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolMinted)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolMintedIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolMintedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolMinted struct {
+	Sender    common.Address
+	Recipient common.Address
+	Amount    *big.Int
+	Raw       types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterMinted(opts *bind.FilterOpts, sender []common.Address, recipient []common.Address) (*BurnToAddressMintTokenPoolMintedIterator, error) {
+
+	var senderRule []interface{}
+	for _, senderItem := range sender {
+		senderRule = append(senderRule, senderItem)
+	}
+	var recipientRule []interface{}
+	for _, recipientItem := range recipient {
+		recipientRule = append(recipientRule, recipientItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "Minted", senderRule, recipientRule)
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolMintedIterator{contract: _BurnToAddressMintTokenPool.contract, event: "Minted", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchMinted(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolMinted, sender []common.Address, recipient []common.Address) (event.Subscription, error) {
+
+	var senderRule []interface{}
+	for _, senderItem := range sender {
+		senderRule = append(senderRule, senderItem)
+	}
+	var recipientRule []interface{}
+	for _, recipientItem := range recipient {
+		recipientRule = append(recipientRule, recipientItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "Minted", senderRule, recipientRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolMinted)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "Minted", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseMinted(log types.Log) (*BurnToAddressMintTokenPoolMinted, error) {
+	event := new(BurnToAddressMintTokenPoolMinted)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "Minted", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolOutstandingTokensSetIterator struct {
+	Event *BurnToAddressMintTokenPoolOutstandingTokensSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolOutstandingTokensSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolOutstandingTokensSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolOutstandingTokensSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolOutstandingTokensSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolOutstandingTokensSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolOutstandingTokensSet struct {
+	NewMintedTokenAmount *big.Int
+	OldMintedTokenAmount *big.Int
+	Raw                  types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterOutstandingTokensSet(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolOutstandingTokensSetIterator, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "OutstandingTokensSet")
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolOutstandingTokensSetIterator{contract: _BurnToAddressMintTokenPool.contract, event: "OutstandingTokensSet", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchOutstandingTokensSet(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolOutstandingTokensSet) (event.Subscription, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "OutstandingTokensSet")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolOutstandingTokensSet)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "OutstandingTokensSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseOutstandingTokensSet(log types.Log) (*BurnToAddressMintTokenPoolOutstandingTokensSet, error) {
+	event := new(BurnToAddressMintTokenPoolOutstandingTokensSet)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "OutstandingTokensSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolOwnershipTransferRequestedIterator struct {
+	Event *BurnToAddressMintTokenPoolOwnershipTransferRequested
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolOwnershipTransferRequestedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolOwnershipTransferRequested)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolOwnershipTransferRequested)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolOwnershipTransferRequestedIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolOwnershipTransferRequestedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolOwnershipTransferRequested struct {
+	From common.Address
+	To   common.Address
+	Raw  types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*BurnToAddressMintTokenPoolOwnershipTransferRequestedIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "OwnershipTransferRequested", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolOwnershipTransferRequestedIterator{contract: _BurnToAddressMintTokenPool.contract, event: "OwnershipTransferRequested", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchOwnershipTransferRequested(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolOwnershipTransferRequested, from []common.Address, to []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "OwnershipTransferRequested", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolOwnershipTransferRequested)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "OwnershipTransferRequested", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseOwnershipTransferRequested(log types.Log) (*BurnToAddressMintTokenPoolOwnershipTransferRequested, error) {
+	event := new(BurnToAddressMintTokenPoolOwnershipTransferRequested)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "OwnershipTransferRequested", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolOwnershipTransferredIterator struct {
+	Event *BurnToAddressMintTokenPoolOwnershipTransferred
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolOwnershipTransferredIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolOwnershipTransferred)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolOwnershipTransferred)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolOwnershipTransferredIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolOwnershipTransferredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolOwnershipTransferred struct {
+	From common.Address
+	To   common.Address
+	Raw  types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*BurnToAddressMintTokenPoolOwnershipTransferredIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "OwnershipTransferred", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolOwnershipTransferredIterator{contract: _BurnToAddressMintTokenPool.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "OwnershipTransferred", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolOwnershipTransferred)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseOwnershipTransferred(log types.Log) (*BurnToAddressMintTokenPoolOwnershipTransferred, error) {
+	event := new(BurnToAddressMintTokenPoolOwnershipTransferred)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolRateLimitAdminSetIterator struct {
+	Event *BurnToAddressMintTokenPoolRateLimitAdminSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolRateLimitAdminSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolRateLimitAdminSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolRateLimitAdminSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolRateLimitAdminSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolRateLimitAdminSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolRateLimitAdminSet struct {
+	RateLimitAdmin common.Address
+	Raw            types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterRateLimitAdminSet(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolRateLimitAdminSetIterator, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "RateLimitAdminSet")
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolRateLimitAdminSetIterator{contract: _BurnToAddressMintTokenPool.contract, event: "RateLimitAdminSet", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchRateLimitAdminSet(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolRateLimitAdminSet) (event.Subscription, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "RateLimitAdminSet")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolRateLimitAdminSet)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "RateLimitAdminSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseRateLimitAdminSet(log types.Log) (*BurnToAddressMintTokenPoolRateLimitAdminSet, error) {
+	event := new(BurnToAddressMintTokenPoolRateLimitAdminSet)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "RateLimitAdminSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolReleasedIterator struct {
+	Event *BurnToAddressMintTokenPoolReleased
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolReleasedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolReleased)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolReleased)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolReleasedIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolReleasedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolReleased struct {
+	Sender    common.Address
+	Recipient common.Address
+	Amount    *big.Int
+	Raw       types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterReleased(opts *bind.FilterOpts, sender []common.Address, recipient []common.Address) (*BurnToAddressMintTokenPoolReleasedIterator, error) {
+
+	var senderRule []interface{}
+	for _, senderItem := range sender {
+		senderRule = append(senderRule, senderItem)
+	}
+	var recipientRule []interface{}
+	for _, recipientItem := range recipient {
+		recipientRule = append(recipientRule, recipientItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "Released", senderRule, recipientRule)
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolReleasedIterator{contract: _BurnToAddressMintTokenPool.contract, event: "Released", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchReleased(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolReleased, sender []common.Address, recipient []common.Address) (event.Subscription, error) {
+
+	var senderRule []interface{}
+	for _, senderItem := range sender {
+		senderRule = append(senderRule, senderItem)
+	}
+	var recipientRule []interface{}
+	for _, recipientItem := range recipient {
+		recipientRule = append(recipientRule, recipientItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "Released", senderRule, recipientRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolReleased)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "Released", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseReleased(log types.Log) (*BurnToAddressMintTokenPoolReleased, error) {
+	event := new(BurnToAddressMintTokenPoolReleased)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "Released", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolRemotePoolAddedIterator struct {
+	Event *BurnToAddressMintTokenPoolRemotePoolAdded
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolRemotePoolAddedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolRemotePoolAdded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolRemotePoolAdded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolRemotePoolAddedIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolRemotePoolAddedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolRemotePoolAdded struct {
+	RemoteChainSelector uint64
+	RemotePoolAddress   []byte
+	Raw                 types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterRemotePoolAdded(opts *bind.FilterOpts, remoteChainSelector []uint64) (*BurnToAddressMintTokenPoolRemotePoolAddedIterator, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "RemotePoolAdded", remoteChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolRemotePoolAddedIterator{contract: _BurnToAddressMintTokenPool.contract, event: "RemotePoolAdded", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchRemotePoolAdded(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolRemotePoolAdded, remoteChainSelector []uint64) (event.Subscription, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "RemotePoolAdded", remoteChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolRemotePoolAdded)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "RemotePoolAdded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseRemotePoolAdded(log types.Log) (*BurnToAddressMintTokenPoolRemotePoolAdded, error) {
+	event := new(BurnToAddressMintTokenPoolRemotePoolAdded)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "RemotePoolAdded", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolRemotePoolRemovedIterator struct {
+	Event *BurnToAddressMintTokenPoolRemotePoolRemoved
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolRemotePoolRemovedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolRemotePoolRemoved)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolRemotePoolRemoved)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolRemotePoolRemovedIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolRemotePoolRemovedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolRemotePoolRemoved struct {
+	RemoteChainSelector uint64
+	RemotePoolAddress   []byte
+	Raw                 types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterRemotePoolRemoved(opts *bind.FilterOpts, remoteChainSelector []uint64) (*BurnToAddressMintTokenPoolRemotePoolRemovedIterator, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "RemotePoolRemoved", remoteChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolRemotePoolRemovedIterator{contract: _BurnToAddressMintTokenPool.contract, event: "RemotePoolRemoved", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchRemotePoolRemoved(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolRemotePoolRemoved, remoteChainSelector []uint64) (event.Subscription, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "RemotePoolRemoved", remoteChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolRemotePoolRemoved)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "RemotePoolRemoved", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseRemotePoolRemoved(log types.Log) (*BurnToAddressMintTokenPoolRemotePoolRemoved, error) {
+	event := new(BurnToAddressMintTokenPoolRemotePoolRemoved)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "RemotePoolRemoved", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolRouterUpdatedIterator struct {
+	Event *BurnToAddressMintTokenPoolRouterUpdated
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolRouterUpdatedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolRouterUpdated)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolRouterUpdated)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolRouterUpdatedIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolRouterUpdatedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolRouterUpdated struct {
+	OldRouter common.Address
+	NewRouter common.Address
+	Raw       types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterRouterUpdated(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolRouterUpdatedIterator, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "RouterUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolRouterUpdatedIterator{contract: _BurnToAddressMintTokenPool.contract, event: "RouterUpdated", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchRouterUpdated(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolRouterUpdated) (event.Subscription, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "RouterUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolRouterUpdated)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "RouterUpdated", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseRouterUpdated(log types.Log) (*BurnToAddressMintTokenPoolRouterUpdated, error) {
+	event := new(BurnToAddressMintTokenPoolRouterUpdated)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "RouterUpdated", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type BurnToAddressMintTokenPoolTokensConsumedIterator struct {
+	Event *BurnToAddressMintTokenPoolTokensConsumed
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *BurnToAddressMintTokenPoolTokensConsumedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(BurnToAddressMintTokenPoolTokensConsumed)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(BurnToAddressMintTokenPoolTokensConsumed)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *BurnToAddressMintTokenPoolTokensConsumedIterator) Error() error {
+	return it.fail
+}
+
+func (it *BurnToAddressMintTokenPoolTokensConsumedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type BurnToAddressMintTokenPoolTokensConsumed struct {
+	Tokens *big.Int
+	Raw    types.Log
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) FilterTokensConsumed(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolTokensConsumedIterator, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.FilterLogs(opts, "TokensConsumed")
+	if err != nil {
+		return nil, err
+	}
+	return &BurnToAddressMintTokenPoolTokensConsumedIterator{contract: _BurnToAddressMintTokenPool.contract, event: "TokensConsumed", logs: logs, sub: sub}, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) WatchTokensConsumed(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolTokensConsumed) (event.Subscription, error) {
+
+	logs, sub, err := _BurnToAddressMintTokenPool.contract.WatchLogs(opts, "TokensConsumed")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(BurnToAddressMintTokenPoolTokensConsumed)
+				if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "TokensConsumed", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPoolFilterer) ParseTokensConsumed(log types.Log) (*BurnToAddressMintTokenPoolTokensConsumed, error) {
+	event := new(BurnToAddressMintTokenPoolTokensConsumed)
+	if err := _BurnToAddressMintTokenPool.contract.UnpackLog(event, "TokensConsumed", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPool) ParseLog(log types.Log) (generated.AbigenLog, error) {
+	switch log.Topics[0] {
+	case _BurnToAddressMintTokenPool.abi.Events["AllowListAdd"].ID:
+		return _BurnToAddressMintTokenPool.ParseAllowListAdd(log)
+	case _BurnToAddressMintTokenPool.abi.Events["AllowListRemove"].ID:
+		return _BurnToAddressMintTokenPool.ParseAllowListRemove(log)
+	case _BurnToAddressMintTokenPool.abi.Events["Burned"].ID:
+		return _BurnToAddressMintTokenPool.ParseBurned(log)
+	case _BurnToAddressMintTokenPool.abi.Events["ChainAdded"].ID:
+		return _BurnToAddressMintTokenPool.ParseChainAdded(log)
+	case _BurnToAddressMintTokenPool.abi.Events["ChainConfigured"].ID:
+		return _BurnToAddressMintTokenPool.ParseChainConfigured(log)
+	case _BurnToAddressMintTokenPool.abi.Events["ChainRemoved"].ID:
+		return _BurnToAddressMintTokenPool.ParseChainRemoved(log)
+	case _BurnToAddressMintTokenPool.abi.Events["ConfigChanged"].ID:
+		return _BurnToAddressMintTokenPool.ParseConfigChanged(log)
+	case _BurnToAddressMintTokenPool.abi.Events["Locked"].ID:
+		return _BurnToAddressMintTokenPool.ParseLocked(log)
+	case _BurnToAddressMintTokenPool.abi.Events["Minted"].ID:
+		return _BurnToAddressMintTokenPool.ParseMinted(log)
+	case _BurnToAddressMintTokenPool.abi.Events["OutstandingTokensSet"].ID:
+		return _BurnToAddressMintTokenPool.ParseOutstandingTokensSet(log)
+	case _BurnToAddressMintTokenPool.abi.Events["OwnershipTransferRequested"].ID:
+		return _BurnToAddressMintTokenPool.ParseOwnershipTransferRequested(log)
+	case _BurnToAddressMintTokenPool.abi.Events["OwnershipTransferred"].ID:
+		return _BurnToAddressMintTokenPool.ParseOwnershipTransferred(log)
+	case _BurnToAddressMintTokenPool.abi.Events["RateLimitAdminSet"].ID:
+		return _BurnToAddressMintTokenPool.ParseRateLimitAdminSet(log)
+	case _BurnToAddressMintTokenPool.abi.Events["Released"].ID:
+		return _BurnToAddressMintTokenPool.ParseReleased(log)
+	case _BurnToAddressMintTokenPool.abi.Events["RemotePoolAdded"].ID:
+		return _BurnToAddressMintTokenPool.ParseRemotePoolAdded(log)
+	case _BurnToAddressMintTokenPool.abi.Events["RemotePoolRemoved"].ID:
+		return _BurnToAddressMintTokenPool.ParseRemotePoolRemoved(log)
+	case _BurnToAddressMintTokenPool.abi.Events["RouterUpdated"].ID:
+		return _BurnToAddressMintTokenPool.ParseRouterUpdated(log)
+	case _BurnToAddressMintTokenPool.abi.Events["TokensConsumed"].ID:
+		return _BurnToAddressMintTokenPool.ParseTokensConsumed(log)
+
+	default:
+		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
+	}
+}
+
+func (BurnToAddressMintTokenPoolAllowListAdd) Topic() common.Hash {
+	return common.HexToHash("0x2640d4d76caf8bf478aabfa982fa4e1c4eb71a37f93cd15e80dbc657911546d8")
+}
+
+func (BurnToAddressMintTokenPoolAllowListRemove) Topic() common.Hash {
+	return common.HexToHash("0x800671136ab6cfee9fbe5ed1fb7ca417811aca3cf864800d127b927adedf7566")
+}
+
+func (BurnToAddressMintTokenPoolBurned) Topic() common.Hash {
+	return common.HexToHash("0x696de425f79f4a40bc6d2122ca50507f0efbeabbff86a84871b7196ab8ea8df7")
+}
+
+func (BurnToAddressMintTokenPoolChainAdded) Topic() common.Hash {
+	return common.HexToHash("0x8d340f17e19058004c20453540862a9c62778504476f6756755cb33bcd6c38c2")
+}
+
+func (BurnToAddressMintTokenPoolChainConfigured) Topic() common.Hash {
+	return common.HexToHash("0x0350d63aa5f270e01729d00d627eeb8f3429772b1818c016c66a588a864f912b")
+}
+
+func (BurnToAddressMintTokenPoolChainRemoved) Topic() common.Hash {
+	return common.HexToHash("0x5204aec90a3c794d8e90fded8b46ae9c7c552803e7e832e0c1d358396d859916")
+}
+
+func (BurnToAddressMintTokenPoolConfigChanged) Topic() common.Hash {
+	return common.HexToHash("0x9ea3374b67bf275e6bb9c8ae68f9cae023e1c528b4b27e092f0bb209d3531c19")
+}
+
+func (BurnToAddressMintTokenPoolLocked) Topic() common.Hash {
+	return common.HexToHash("0x9f1ec8c880f76798e7b793325d625e9b60e4082a553c98f42b6cda368dd60008")
+}
+
+func (BurnToAddressMintTokenPoolMinted) Topic() common.Hash {
+	return common.HexToHash("0x9d228d69b5fdb8d273a2336f8fb8612d039631024ea9bf09c424a9503aa078f0")
+}
+
+func (BurnToAddressMintTokenPoolOutstandingTokensSet) Topic() common.Hash {
+	return common.HexToHash("0xb99cf177d1af358d78f1de66579c44b1ebb76db812d856800d1bb83ea1fb2ddc")
+}
+
+func (BurnToAddressMintTokenPoolOwnershipTransferRequested) Topic() common.Hash {
+	return common.HexToHash("0xed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278")
+}
+
+func (BurnToAddressMintTokenPoolOwnershipTransferred) Topic() common.Hash {
+	return common.HexToHash("0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0")
+}
+
+func (BurnToAddressMintTokenPoolRateLimitAdminSet) Topic() common.Hash {
+	return common.HexToHash("0x44676b5284b809a22248eba0da87391d79098be38bb03154be88a58bf4d09174")
+}
+
+func (BurnToAddressMintTokenPoolReleased) Topic() common.Hash {
+	return common.HexToHash("0x2d87480f50083e2b2759522a8fdda59802650a8055e609a7772cf70c07748f52")
+}
+
+func (BurnToAddressMintTokenPoolRemotePoolAdded) Topic() common.Hash {
+	return common.HexToHash("0x7d628c9a1796743d365ab521a8b2a4686e419b3269919dc9145ea2ce853b54ea")
+}
+
+func (BurnToAddressMintTokenPoolRemotePoolRemoved) Topic() common.Hash {
+	return common.HexToHash("0x52d00ee4d9bd51b40168f2afc5848837288ce258784ad914278791464b3f4d76")
+}
+
+func (BurnToAddressMintTokenPoolRouterUpdated) Topic() common.Hash {
+	return common.HexToHash("0x02dc5c233404867c793b749c6d644beb2277536d18a7e7974d3f238e4c6f1684")
+}
+
+func (BurnToAddressMintTokenPoolTokensConsumed) Topic() common.Hash {
+	return common.HexToHash("0x1871cdf8010e63f2eb8384381a68dfa7416dc571a5517e66e88b2d2d0c0a690a")
+}
+
+func (_BurnToAddressMintTokenPool *BurnToAddressMintTokenPool) Address() common.Address {
+	return _BurnToAddressMintTokenPool.address
+}
+
+type BurnToAddressMintTokenPoolInterface interface {
+	GetAllowList(opts *bind.CallOpts) ([]common.Address, error)
+
+	GetAllowListEnabled(opts *bind.CallOpts) (bool, error)
+
+	GetBurnAddress(opts *bind.CallOpts) (common.Address, error)
+
+	GetCurrentInboundRateLimiterState(opts *bind.CallOpts, remoteChainSelector uint64) (RateLimiterTokenBucket, error)
+
+	GetCurrentOutboundRateLimiterState(opts *bind.CallOpts, remoteChainSelector uint64) (RateLimiterTokenBucket, error)
+
+	GetOutstandingTokens(opts *bind.CallOpts) (*big.Int, error)
+
+	GetRateLimitAdmin(opts *bind.CallOpts) (common.Address, error)
+
+	GetRemotePools(opts *bind.CallOpts, remoteChainSelector uint64) ([][]byte, error)
+
+	GetRemoteToken(opts *bind.CallOpts, remoteChainSelector uint64) ([]byte, error)
+
+	GetRmnProxy(opts *bind.CallOpts) (common.Address, error)
+
+	GetRouter(opts *bind.CallOpts) (common.Address, error)
+
+	GetSupportedChains(opts *bind.CallOpts) ([]uint64, error)
+
+	GetToken(opts *bind.CallOpts) (common.Address, error)
+
+	GetTokenDecimals(opts *bind.CallOpts) (uint8, error)
+
+	IBurnAddress(opts *bind.CallOpts) (common.Address, error)
+
+	IsRemotePool(opts *bind.CallOpts, remoteChainSelector uint64, remotePoolAddress []byte) (bool, error)
+
+	IsSupportedChain(opts *bind.CallOpts, remoteChainSelector uint64) (bool, error)
+
+	IsSupportedToken(opts *bind.CallOpts, token common.Address) (bool, error)
+
+	Owner(opts *bind.CallOpts) (common.Address, error)
+
+	SupportsInterface(opts *bind.CallOpts, interfaceId [4]byte) (bool, error)
+
+	TypeAndVersion(opts *bind.CallOpts) (string, error)
+
+	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
+
+	AddRemotePool(opts *bind.TransactOpts, remoteChainSelector uint64, remotePoolAddress []byte) (*types.Transaction, error)
+
+	ApplyAllowListUpdates(opts *bind.TransactOpts, removes []common.Address, adds []common.Address) (*types.Transaction, error)
+
+	ApplyChainUpdates(opts *bind.TransactOpts, remoteChainSelectorsToRemove []uint64, chainsToAdd []TokenPoolChainUpdate) (*types.Transaction, error)
+
+	LockOrBurn(opts *bind.TransactOpts, lockOrBurnIn PoolLockOrBurnInV1) (*types.Transaction, error)
+
+	ReleaseOrMint(opts *bind.TransactOpts, releaseOrMintIn PoolReleaseOrMintInV1) (*types.Transaction, error)
+
+	RemoveRemotePool(opts *bind.TransactOpts, remoteChainSelector uint64, remotePoolAddress []byte) (*types.Transaction, error)
+
+	SetChainRateLimiterConfig(opts *bind.TransactOpts, remoteChainSelector uint64, outboundConfig RateLimiterConfig, inboundConfig RateLimiterConfig) (*types.Transaction, error)
+
+	SetChainRateLimiterConfigs(opts *bind.TransactOpts, remoteChainSelectors []uint64, outboundConfigs []RateLimiterConfig, inboundConfigs []RateLimiterConfig) (*types.Transaction, error)
+
+	SetOutstandingTokens(opts *bind.TransactOpts, amount *big.Int) (*types.Transaction, error)
+
+	SetRateLimitAdmin(opts *bind.TransactOpts, rateLimitAdmin common.Address) (*types.Transaction, error)
+
+	SetRouter(opts *bind.TransactOpts, newRouter common.Address) (*types.Transaction, error)
+
+	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
+
+	FilterAllowListAdd(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolAllowListAddIterator, error)
+
+	WatchAllowListAdd(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolAllowListAdd) (event.Subscription, error)
+
+	ParseAllowListAdd(log types.Log) (*BurnToAddressMintTokenPoolAllowListAdd, error)
+
+	FilterAllowListRemove(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolAllowListRemoveIterator, error)
+
+	WatchAllowListRemove(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolAllowListRemove) (event.Subscription, error)
+
+	ParseAllowListRemove(log types.Log) (*BurnToAddressMintTokenPoolAllowListRemove, error)
+
+	FilterBurned(opts *bind.FilterOpts, sender []common.Address) (*BurnToAddressMintTokenPoolBurnedIterator, error)
+
+	WatchBurned(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolBurned, sender []common.Address) (event.Subscription, error)
+
+	ParseBurned(log types.Log) (*BurnToAddressMintTokenPoolBurned, error)
+
+	FilterChainAdded(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolChainAddedIterator, error)
+
+	WatchChainAdded(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolChainAdded) (event.Subscription, error)
+
+	ParseChainAdded(log types.Log) (*BurnToAddressMintTokenPoolChainAdded, error)
+
+	FilterChainConfigured(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolChainConfiguredIterator, error)
+
+	WatchChainConfigured(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolChainConfigured) (event.Subscription, error)
+
+	ParseChainConfigured(log types.Log) (*BurnToAddressMintTokenPoolChainConfigured, error)
+
+	FilterChainRemoved(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolChainRemovedIterator, error)
+
+	WatchChainRemoved(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolChainRemoved) (event.Subscription, error)
+
+	ParseChainRemoved(log types.Log) (*BurnToAddressMintTokenPoolChainRemoved, error)
+
+	FilterConfigChanged(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolConfigChangedIterator, error)
+
+	WatchConfigChanged(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolConfigChanged) (event.Subscription, error)
+
+	ParseConfigChanged(log types.Log) (*BurnToAddressMintTokenPoolConfigChanged, error)
+
+	FilterLocked(opts *bind.FilterOpts, sender []common.Address) (*BurnToAddressMintTokenPoolLockedIterator, error)
+
+	WatchLocked(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolLocked, sender []common.Address) (event.Subscription, error)
+
+	ParseLocked(log types.Log) (*BurnToAddressMintTokenPoolLocked, error)
+
+	FilterMinted(opts *bind.FilterOpts, sender []common.Address, recipient []common.Address) (*BurnToAddressMintTokenPoolMintedIterator, error)
+
+	WatchMinted(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolMinted, sender []common.Address, recipient []common.Address) (event.Subscription, error)
+
+	ParseMinted(log types.Log) (*BurnToAddressMintTokenPoolMinted, error)
+
+	FilterOutstandingTokensSet(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolOutstandingTokensSetIterator, error)
+
+	WatchOutstandingTokensSet(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolOutstandingTokensSet) (event.Subscription, error)
+
+	ParseOutstandingTokensSet(log types.Log) (*BurnToAddressMintTokenPoolOutstandingTokensSet, error)
+
+	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*BurnToAddressMintTokenPoolOwnershipTransferRequestedIterator, error)
+
+	WatchOwnershipTransferRequested(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolOwnershipTransferRequested, from []common.Address, to []common.Address) (event.Subscription, error)
+
+	ParseOwnershipTransferRequested(log types.Log) (*BurnToAddressMintTokenPoolOwnershipTransferRequested, error)
+
+	FilterOwnershipTransferred(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*BurnToAddressMintTokenPoolOwnershipTransferredIterator, error)
+
+	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
+
+	ParseOwnershipTransferred(log types.Log) (*BurnToAddressMintTokenPoolOwnershipTransferred, error)
+
+	FilterRateLimitAdminSet(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolRateLimitAdminSetIterator, error)
+
+	WatchRateLimitAdminSet(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolRateLimitAdminSet) (event.Subscription, error)
+
+	ParseRateLimitAdminSet(log types.Log) (*BurnToAddressMintTokenPoolRateLimitAdminSet, error)
+
+	FilterReleased(opts *bind.FilterOpts, sender []common.Address, recipient []common.Address) (*BurnToAddressMintTokenPoolReleasedIterator, error)
+
+	WatchReleased(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolReleased, sender []common.Address, recipient []common.Address) (event.Subscription, error)
+
+	ParseReleased(log types.Log) (*BurnToAddressMintTokenPoolReleased, error)
+
+	FilterRemotePoolAdded(opts *bind.FilterOpts, remoteChainSelector []uint64) (*BurnToAddressMintTokenPoolRemotePoolAddedIterator, error)
+
+	WatchRemotePoolAdded(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolRemotePoolAdded, remoteChainSelector []uint64) (event.Subscription, error)
+
+	ParseRemotePoolAdded(log types.Log) (*BurnToAddressMintTokenPoolRemotePoolAdded, error)
+
+	FilterRemotePoolRemoved(opts *bind.FilterOpts, remoteChainSelector []uint64) (*BurnToAddressMintTokenPoolRemotePoolRemovedIterator, error)
+
+	WatchRemotePoolRemoved(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolRemotePoolRemoved, remoteChainSelector []uint64) (event.Subscription, error)
+
+	ParseRemotePoolRemoved(log types.Log) (*BurnToAddressMintTokenPoolRemotePoolRemoved, error)
+
+	FilterRouterUpdated(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolRouterUpdatedIterator, error)
+
+	WatchRouterUpdated(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolRouterUpdated) (event.Subscription, error)
+
+	ParseRouterUpdated(log types.Log) (*BurnToAddressMintTokenPoolRouterUpdated, error)
+
+	FilterTokensConsumed(opts *bind.FilterOpts) (*BurnToAddressMintTokenPoolTokensConsumedIterator, error)
+
+	WatchTokensConsumed(opts *bind.WatchOpts, sink chan<- *BurnToAddressMintTokenPoolTokensConsumed) (event.Subscription, error)
+
+	ParseTokensConsumed(log types.Log) (*BurnToAddressMintTokenPoolTokensConsumed, error)
+
+	ParseLog(log types.Log) (generated.AbigenLog, error)
+
+	Address() common.Address
+}
