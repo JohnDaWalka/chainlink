@@ -3,13 +3,16 @@
   type = "anvil"
   docker_cmd_params = ["-b", "5"]
 
+[jd]
+  image = "replace-me"
+
 [workflow_config]
   use_chainlink_cli = false
   use_existing = true
 
   [workflow_config.existing]
-    binary_url = "https://gist.githubusercontent.com/Tofel/8a39af5b68c213d2200446c175b5c99e/raw/cb7b2a56b37e333fe0bdce07b79538c4ce332f5f/binary.wasm.br"
-    config_url = "https://gist.githubusercontent.com/Tofel/5b9ccb1cc1a5aa68aa08a5b2066d60a7/raw/7dcdda86b9d50d17029614f370fd2acab1e7fb27/config.json3175390991"
+    binary_url = "https://gist.githubusercontent.com/Tofel/da9b5ecdc4f53ddddfafeba4f57fe5f0/raw/cb7b2a56b37e333fe0bdce07b79538c4ce332f5f/binary.wasm.br"
+    config_url = "https://gist.githubusercontent.com/Tofel/3b6581a7aafcadb697b848b1e8c106a4/raw/1344c259ef7e970dbabaa1e9e885845b8eba5da9/config.json2801644267"
 
 [nodeset]
   nodes = 5
