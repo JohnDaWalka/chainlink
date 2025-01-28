@@ -171,11 +171,8 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
         revert InvalidChainSelector(adds[i].remoteChainSelector);
       }
 
-      s_chainConfigs[adds[i].remoteChainSelector] = SiloConfig({
-        tokenBalance: 0,
-        rebalancer: adds[i].rebalancer,
-        isSiloed: true
-      });
+      s_chainConfigs[adds[i].remoteChainSelector] =
+        SiloConfig({tokenBalance: 0, rebalancer: adds[i].rebalancer, isSiloed: true});
 
       emit ChainSiloed(adds[i].remoteChainSelector, adds[i].rebalancer);
     }
