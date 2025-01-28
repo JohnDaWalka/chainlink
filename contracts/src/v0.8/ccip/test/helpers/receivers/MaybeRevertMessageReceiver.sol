@@ -40,13 +40,13 @@ contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
 
   function setRevert(
     bool toRevert
-  ) external onlyManager {
+  ) external {
     s_toRevert = toRevert;
   }
 
   function setErr(
     bytes memory err
-  ) external onlyManager {
+  ) external {
     s_err = err;
   }
 
