@@ -39,7 +39,6 @@ contract SiloedLockReleaseTokenPool_provideSiloedLiquidity is SiloedLockReleaseT
     s_siloedLockReleaseTokenPool.provideSiloedLiquidity(SILOED_CHAIN_SELECTOR, amount);
 
     assertEq(s_token.balanceOf(address(s_siloedLockReleaseTokenPool)), amount);
-
     assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(SILOED_CHAIN_SELECTOR), amount);
 
     // Since the funds for the destination chain are not siloed, the locked token amount should not be increased

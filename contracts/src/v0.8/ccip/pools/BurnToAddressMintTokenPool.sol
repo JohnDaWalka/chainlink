@@ -17,10 +17,6 @@ import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 contract BurnToAddressMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
-  event OutstandingTokensSet(uint256 newMintedTokenAmount, uint256 oldMintedTokenAmount);
-
-  error InsufficientOutstandingTokens();
-
   string public constant override typeAndVersion = "BurnToAddressTokenPool 1.5.1";
 
   /// @notice The address where tokens are sent during a call to lockOrBurn, functionally burning but without decreasing

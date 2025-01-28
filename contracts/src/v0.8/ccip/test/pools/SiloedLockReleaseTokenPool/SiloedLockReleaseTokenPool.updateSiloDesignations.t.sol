@@ -8,8 +8,6 @@ contract SiloedLockReleaseTokenPool_updateSiloDesignations is SiloedLockReleaseT
   function test_updateSiloDesignations() public {
     uint256 amount = 1e18;
 
-    // The chain is already siloed so we attempt to remove it first and then re-add it
-
     // Provide some Liquidity so that we can then check that it gets removed.
     s_siloedLockReleaseTokenPool.provideSiloedLiquidity(SILOED_CHAIN_SELECTOR, amount);
     assertEq(s_siloedLockReleaseTokenPool.getAvailableTokens(SILOED_CHAIN_SELECTOR), amount);
