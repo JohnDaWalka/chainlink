@@ -20,19 +20,19 @@ contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
     bytes32 messageId, uint64 sourceChainSelector, bytes sender, bytes data, Client.EVMTokenAmount[] destTokenAmounts
   );
 
-  address private immutable s_manager;
+  address private immutable i_manager;
   bool public s_toRevert;
   bytes private s_err;
 
   constructor(
     bool toRevert
   ) {
-    s_manager = msg.sender;
+    i_manager = msg.sender;
     s_toRevert = toRevert;
   }
 
   modifier onlyManager() {
-    if (msg.sender != s_manager) {
+    if (msg.sender != i_manager) {
       revert Unauthorized();
     }
     _;
@@ -70,7 +70,8 @@ contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
       message.messageId, message.sourceChainSelector, message.sender, message.data, message.destTokenAmounts
     );
   }
-
+  
+  // solhint-disable-next-line no-complex-fallback
   receive() external payable {
     if (s_toRevert) {
       revert ReceiveRevert();
@@ -86,12 +87,12 @@ contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
       revert InsufficientBalance(0, 1);
     }
 
-    (bool success,) = s_manager.call{value: balance}("");
+    (bool success,) = i_manager.call{value: balance}("");
     if (!success) {
       revert TransferFailed();
     }
 
-    emit FundsWithdrawn(s_manager, balance);
+    emit FundsWithdrawn(i_manager, balance);
   }
 
   /// @notice Allows the manager to withdraw ERC-20 tokens from the contract
@@ -104,12 +105,12 @@ contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
       revert InsufficientBalance(balance, amount);
     }
 
-    bool success = erc20.transfer(s_manager, amount);
+    bool success = erc20.transfer(i_manager, amount);
     if (!success) {
       revert TransferFailed();
     }
 
-    emit TokensWithdrawn(token, s_manager, amount);
+    emit TokensWithdrawn(token, i_manager, amount);
   }
 
   /// @notice Fetches the balance of an ERC-20 token held by the contract
