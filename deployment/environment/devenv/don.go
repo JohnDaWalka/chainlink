@@ -130,6 +130,15 @@ func NewRegisteredDON(ctx context.Context, nodeInfo []NodeInfo, jd JobDistributo
 			// multi address is not applicable for non-bootstrap nodes
 			// explicitly set it to empty string to denote that
 			node.multiAddr = ""
+
+			// set admin address for non-bootstrap nodes
+			node.adminAddr = info.AdminAddr
+
+			// TODO remove me, hack so that code can progress
+			if info.AdminAddr == "" {
+				node.adminAddr = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+			}
+
 			node.labels = append(node.labels, &ptypes.Label{
 				Key:   NodeLabelKeyType,
 				Value: ptr(NodeLabelValuePlugin),
@@ -167,15 +176,17 @@ func NewNode(nodeInfo NodeInfo) (*Node, error) {
 }
 
 type Node struct {
-	NodeId      string                    // node id returned by job distributor after node is registered with it
-	JDId        string                    // job distributor id returned by node after Job distributor is created in node
-	Name        string                    // name of the node
-	AccountAddr map[uint64]string         // chain id to node's account address mapping for supported chains
-	gqlClient   client.Client             // graphql client to interact with the node
-	restClient  *clclient.ChainlinkClient // rest client to interact with the node
-	labels      []*ptypes.Label           // labels with which the node is registered with the job distributor
-	adminAddr   string                    // admin address to send payments to, applicable only for non-bootstrap nodes
-	multiAddr   string                    // multi address denoting node's FQN (needed for deriving P2PBootstrappers in OCR), applicable only for bootstrap nodes
+	NodeId          string            // node id returned by job distributor after node is registered with it
+	JDId            string            // job distributor id returned by node after Job distributor is created in node
+	Name            string            // name of the node
+	AccountAddr     map[uint64]string // chain id to node's account address mapping for supported chains
+	PeerId          string
+	Ocr2KeyBundleID string
+	gqlClient       client.Client             // graphql client to interact with the node
+	restClient      *clclient.ChainlinkClient // rest client to interact with the node
+	labels          []*ptypes.Label           // labels with which the node is registered with the job distributor
+	adminAddr       string                    // admin address to send payments to, applicable only for non-bootstrap nodes
+	multiAddr       string                    // multi address denoting node's FQN (needed for deriving P2PBootstrappers in OCR), applicable only for bootstrap nodes
 }
 
 type JDChainConfigInput struct {
@@ -226,6 +237,7 @@ func (n *Node) CreateCCIPOCRSupportedChains(ctx context.Context, chains []JDChai
 		if peerID == nil {
 			return fmt.Errorf("no peer id found for node %s", n.Name)
 		}
+		n.PeerId = *peerID
 
 		ocr2BundleId, err := n.gqlClient.FetchOCR2KeyBundleID(ctx, chain.ChainType)
 		if err != nil {
@@ -234,6 +246,7 @@ func (n *Node) CreateCCIPOCRSupportedChains(ctx context.Context, chains []JDChai
 		if ocr2BundleId == "" {
 			return fmt.Errorf("no OCR2 key bundle id found for node %s", n.Name)
 		}
+		n.Ocr2KeyBundleID = ocr2BundleId
 		// fetch node labels to know if the node is bootstrap or plugin
 		isBootstrap := false
 		for _, label := range n.labels {
