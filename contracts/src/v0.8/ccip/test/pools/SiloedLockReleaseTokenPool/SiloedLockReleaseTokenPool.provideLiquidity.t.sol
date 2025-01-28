@@ -5,7 +5,7 @@ import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenP
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {SiloedLockReleaseTokenPoolSetup} from "./SiloedLockReleaseTokenPoolSetup.t.sol";
 
-contract SiloedLockReleaseTokenPool_provideLiqudity is SiloedLockReleaseTokenPoolSetup {
+contract SiloedLockReleaseTokenPool_provideLiquidity is SiloedLockReleaseTokenPoolSetup {
   address public UNAUTHORIZED_ADDRESS = address(0xdeadbeef);
 
   function setUp() public override {
@@ -31,7 +31,7 @@ contract SiloedLockReleaseTokenPool_provideLiqudity is SiloedLockReleaseTokenPoo
 
   // Reverts
 
-  function test_ProvideLiquidity_RevertWhen_Unauthorized() public {
+  function test_RevertWhen_Unauthorized() public {
     vm.startPrank(UNAUTHORIZED_ADDRESS);
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.Unauthorized.selector, UNAUTHORIZED_ADDRESS));

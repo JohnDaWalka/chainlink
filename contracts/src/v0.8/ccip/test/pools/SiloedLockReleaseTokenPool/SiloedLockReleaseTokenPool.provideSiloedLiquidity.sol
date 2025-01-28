@@ -5,7 +5,7 @@ import {SiloedLockReleaseTokenPool} from "../../../pools/SiloedLockReleaseTokenP
 import {TokenPool} from "../../../pools/TokenPool.sol";
 import {SiloedLockReleaseTokenPoolSetup} from "./SiloedLockReleaseTokenPoolSetup.t.sol";
 
-contract SiloedLockReleaseTokenPool_ProvideSiloedLiqudity is SiloedLockReleaseTokenPoolSetup {
+contract SiloedLockReleaseTokenPool_provideSiloedLiquidity is SiloedLockReleaseTokenPoolSetup {
   address public UNAUTHORIZED_ADDRESS = address(0xdeadbeef);
 
   function setUp() public override {
@@ -14,7 +14,7 @@ contract SiloedLockReleaseTokenPool_ProvideSiloedLiqudity is SiloedLockReleaseTo
     s_siloedLockReleaseTokenPool.setSiloRebalancer(SILOED_CHAIN_SELECTOR, OWNER);
   }
 
-  function test_ProvideSiloedLiquidity_UnsiloedChain() public {
+  function test_UnsiloedChain() public {
     uint256 amount = 1e24;
 
     vm.expectEmit();
@@ -30,7 +30,7 @@ contract SiloedLockReleaseTokenPool_ProvideSiloedLiqudity is SiloedLockReleaseTo
     assertEq(s_siloedLockReleaseTokenPool.getUnsiloedLiquidity(), amount);
   }
 
-  function test_ProvideSiloedLiquidity_SiloedChain() public {
+  function test_siloedChain() public {
     uint256 amount = 1e24;
 
     vm.expectEmit();
@@ -48,7 +48,7 @@ contract SiloedLockReleaseTokenPool_ProvideSiloedLiqudity is SiloedLockReleaseTo
 
   // Reverts
 
-  function test_ProvideSiloedLiquidity_RevertWhen_UnauthorizedForSiloedChain() public {
+  function test_RevertWhen_unauthorizedForSiloedChain() public {
     vm.startPrank(UNAUTHORIZED_ADDRESS);
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.Unauthorized.selector, UNAUTHORIZED_ADDRESS));
@@ -56,7 +56,7 @@ contract SiloedLockReleaseTokenPool_ProvideSiloedLiqudity is SiloedLockReleaseTo
     s_siloedLockReleaseTokenPool.provideSiloedLiquidity(SILOED_CHAIN_SELECTOR, 1);
   }
 
-  function test_ProvideSiloedLiquidity_RevertWhen_UnauthorizedForUnsiloedChain() public {
+  function test_RevertWhen_unauthorizedForUnsiloedChain() public {
     vm.startPrank(UNAUTHORIZED_ADDRESS);
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.Unauthorized.selector, UNAUTHORIZED_ADDRESS));
@@ -64,13 +64,13 @@ contract SiloedLockReleaseTokenPool_ProvideSiloedLiqudity is SiloedLockReleaseTo
     s_siloedLockReleaseTokenPool.provideSiloedLiquidity(DEST_CHAIN_SELECTOR, 1);
   }
 
-  function test_ProvideSiloedLiquidity_RevertWhen_LiquidityAmountCannotBeZero() public {
+  function test_RevertWhen_liquidityAmountCannotBeZero() public {
     vm.expectRevert(abi.encodeWithSelector(SiloedLockReleaseTokenPool.LiquidityAmountCannotBeZero.selector));
 
     s_siloedLockReleaseTokenPool.provideSiloedLiquidity(SILOED_CHAIN_SELECTOR, 0);
   }
 
-  function test_ProvideSiloedLiquidity_RevertWhen_InvalidChainSelector_Zero() public {
+  function test_RevertWhen_invalidChainSelector_Zero() public {
     vm.expectRevert(abi.encodeWithSelector(SiloedLockReleaseTokenPool.InvalidChainSelector.selector, 0));
 
     s_siloedLockReleaseTokenPool.provideSiloedLiquidity(0, 1);
