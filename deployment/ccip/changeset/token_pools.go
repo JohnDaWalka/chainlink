@@ -186,6 +186,10 @@ func getTokenPoolAddressFromSymbolTypeAndVersion(
 		if tokenPool, ok := chainState.USDCTokenPools[version]; ok {
 			return tokenPool.Address(), true
 		}
+	case HybridLockReleaseUSDCTokenPool:
+		if tokenPool, ok := chainState.USDCTokenPools[version]; ok {
+			return tokenPool.Address(), true
+		}
 	}
 
 	return utils.ZeroAddress, false

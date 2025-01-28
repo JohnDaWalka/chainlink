@@ -59,11 +59,7 @@ type SyncUSDCDomainsWithChainsConfig struct {
 	MCMS *MCMSConfig
 }
 
-func (c SyncUSDCDomainsWithChainsConfig) Validate(env deployment.Environment) error {
-	state, err := LoadOnchainState(env)
-	if err != nil {
-		return fmt.Errorf("failed to load onchain state: %w", err)
-	}
+func (c SyncUSDCDomainsWithChainsConfig) Validate(env deployment.Environment, state CCIPOnChainState) error {
 	// Validate that all USDC configs inputted are for valid chains that define USDC pools.
 	for chainSelector, config := range c.USDCConfigsByChain {
 		err := deployment.IsValidChainSelector(chainSelector)
@@ -81,10 +77,10 @@ func (c SyncUSDCDomainsWithChainsConfig) Validate(env deployment.Environment) er
 		if chainState.USDCTokenPools == nil {
 			return fmt.Errorf("%s does not define any USDC token pools, config should be removed", chain)
 		}
-		if timelock := chainState.Timelock; timelock == nil {
+		if chainState.Timelock == nil {
 			return fmt.Errorf("missing timelock on %s", chain.String())
 		}
-		if proposerMcm := chainState.ProposerMcm; proposerMcm == nil {
+		if chainState.ProposerMcm == nil {
 			return fmt.Errorf("missing proposerMcm on %s", chain.String())
 		}
 		if err = config.Validate(env.GetContext(), chain, chainState, c.MCMS != nil, c.ChainSelectorToUSDCDomain); err != nil {
@@ -103,15 +99,15 @@ func (c SyncUSDCDomainsWithChainsConfig) Validate(env deployment.Environment) er
 // SyncUSDCDomainsWithChainsChangeset syncs domain support on specified USDC token pools with its chain support.
 // As such, it is expected that ConfigureTokenPoolContractsChangeset is executed before running this changeset.
 func SyncUSDCDomainsWithChainsChangeset(env deployment.Environment, c SyncUSDCDomainsWithChainsConfig) (deployment.ChangesetOutput, error) {
-	if err := c.Validate(env); err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("invalid SyncUSDCDomainsWithChainsConfig: %w", err)
-	}
-	readOpts := &bind.CallOpts{Context: env.GetContext()}
-
 	state, err := LoadOnchainState(env)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
+	if err := c.Validate(env, state); err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("invalid SyncUSDCDomainsWithChainsConfig: %w", err)
+	}
+	readOpts := &bind.CallOpts{Context: env.GetContext()}
+
 	deployerGroup := NewDeployerGroup(env, state, c.MCMS)
 
 	for chainSelector, usdcChainConfig := range c.USDCConfigsByChain {
