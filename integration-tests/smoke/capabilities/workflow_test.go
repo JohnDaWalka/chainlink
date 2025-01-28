@@ -1390,8 +1390,7 @@ func debugReportTransmission(t *testing.T, l zerolog.Logger, ns *ns.Output, wsRP
 		return
 	}
 
-	re, err := regexp.Compile(`"hash":"(0x[0-9a-fA-F]+)"`)
-	require.NoError(t, err, "failed to compile regex")
+	re := regexp.MustCompile(`"hash":"(0x[0-9a-fA-F]+)"`)
 
 	wg := &sync.WaitGroup{}
 	resultsCh := make(chan string, len(logFiles))
