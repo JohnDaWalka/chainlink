@@ -371,7 +371,7 @@ SiloedLockReleaseTokenPool_releaseOrMint:test_ReleaseOrMint_SiloedChain() (gas: 
 SiloedLockReleaseTokenPool_releaseOrMint:test_ReleaseOrMint_UnsiloedChain() (gas: 263392)
 SiloedLockReleaseTokenPool_setRebalancer:test_setRebalancer_UnsiloedChains() (gas: 22212)
 SiloedLockReleaseTokenPool_setRebalancer:test_setSiloRebalancer() (gas: 27518)
-SiloedLockReleaseTokenPool_updateSiloDesignations:test_updateSiloDesignations() (gas: 134735)
+SiloedLockReleaseTokenPool_updateSiloDesignations:test_updateSiloDesignations() (gas: 135077)
 SiloedLockReleaseTokenPool_withdrawLiqudity:test_withdrawLiquidity_RevertsWhen_LegacyFunctionSelectorUnauthorized() (gas: 16067)
 SiloedLockReleaseTokenPool_withdrawLiqudity:test_withdrawLiquidity_SiloedFunds() (gas: 70845)
 SiloedLockReleaseTokenPool_withdrawLiqudity:test_withdrawLiquidity_UnsiloedFunds_LegacyFunctionSelector() (gas: 72904)
