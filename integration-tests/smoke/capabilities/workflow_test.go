@@ -979,7 +979,7 @@ func configureNodes(t *testing.T, nodesInfo []NodeInfo, in *WorkflowTestConfig, 
 				[OCR2]
 				Enabled = true
 				DatabaseTimeout = '1s'
-				ContractPollInterval = '500ms'
+				ContractPollInterval = '1s'
 
 				[P2P.V2]
 				Enabled = true
@@ -1017,7 +1017,7 @@ func configureNodes(t *testing.T, nodesInfo []NodeInfo, in *WorkflowTestConfig, 
 				[OCR2]
 				Enabled = true
 				DatabaseTimeout = '1s'
-				ContractPollInterval = '500ms'
+				ContractPollInterval = '1s'
 
 				[P2P.V2]
 				Enabled = true
