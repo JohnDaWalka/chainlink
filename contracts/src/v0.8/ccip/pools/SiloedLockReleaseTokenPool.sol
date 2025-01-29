@@ -96,13 +96,16 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     // Save gas by using storage instead of memory as a value may need to be updated.
     SiloConfig storage remoteConfig = s_chainConfigs[releaseOrMintIn.remoteChainSelector];
 
+    // Since remoteConfig.isSiloed is used more than once, caching in memory saves gas instead of multiple SLOADs.
+    bool isSiloed = remoteConfig.isSiloed;
+
     // Prevent A silent underflow by explicitly ensuring that enough funds are available to release
-    uint256 availableLiquidity = remoteConfig.isSiloed ? remoteConfig.tokenBalance : s_unsiloedTokenBalance;
+    uint256 availableLiquidity = isSiloed ? remoteConfig.tokenBalance : s_unsiloedTokenBalance;
     if (localAmount > availableLiquidity) revert InsufficientLiquidity(availableLiquidity, localAmount);
 
     // Tracking balances independently by chain is a security measure to prevent liquidity for one chain from being
     // released by another chain.
-    if (remoteConfig.isSiloed) {
+    if (isSiloed) {
       remoteConfig.tokenBalance -= localAmount;
     } else {
       s_unsiloedTokenBalance -= localAmount;
@@ -114,16 +117,6 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     emit Released(msg.sender, releaseOrMintIn.receiver, localAmount);
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
-  }
-
-  /// @notice Returns whether the tokens locked for a given remote chain should be siloed independently
-  /// from all other remote chains.
-  /// @param remoteChainSelector the CCIP specific selector for the remote chain being interacted with.
-  /// @return isSiloed Whether the funds should be isolated from all the others.
-  function isSiloed(
-    uint64 remoteChainSelector
-  ) external view returns (bool) {
-    return s_chainConfigs[remoteChainSelector].isSiloed;
   }
 
   /// @notice Returns the amount of tokens in the token pool that were siloed for a specific remote chain selector.
@@ -144,6 +137,20 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
   /// @return unsiloedTokens amount of tokens available to all unsiloed chains.
   function getUnsiloedLiquidity() external view returns (uint256) {
     return s_unsiloedTokenBalance;
+  }
+
+  // ================================================================
+  // │                      Chain Management                        │
+  // ================================================================
+
+  /// @notice Returns whether the tokens locked for a given remote chain should be siloed independently
+  /// from all other remote chains.
+  /// @param remoteChainSelector the CCIP specific selector for the remote chain being interacted with.
+  /// @return isSiloed Whether the funds should be isolated from all the others.
+  function isSiloed(
+    uint64 remoteChainSelector
+  ) external view returns (bool) {
+    return s_chainConfigs[remoteChainSelector].isSiloed;
   }
 
   /// @notice Updates designations for chains on whether to mark funds as Siloed or not
@@ -180,7 +187,7 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
   /// @notice Gets the rebalancer able to provide liquidity for a remote chain selector
   /// @param remoteChainSelector The CCIP specific selector for the remote chain being interacted with.
-  /// @return The current liquidity manager, contract owner if the chain's funds are not siloed.
+  /// @return The current liquidity manager for the given siloed chain, or the unsiloed rebalancer if the chain is not siloed.
   function getSiloRebalancer(
     uint64 remoteChainSelector
   ) public view returns (address) {
@@ -189,6 +196,12 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
       return remoteConfig.rebalancer;
     }
 
+    return s_rebalancer;
+  }
+
+  /// @notice Gets the rebalancer for the unsiloed chains.
+  /// @return The current liquidity manager for the unsiloed chains.
+  function getRebalancer() external view returns (address) {
     return s_rebalancer;
   }
 
@@ -220,6 +233,10 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
 
     emit UnsiloedRebalancerSet(oldRebalancer, newRebalancer);
   }
+
+  // ================================================================
+  // │                    Provide Liquidity                         │
+  // ================================================================
 
   /// @notice Adds liquidity to the pool. The tokens should be approved first.
   /// @param remoteChainSelector the remote chain to set. If the chain is not siloed, the liquidity will be shared among all
@@ -257,6 +274,10 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     i_token.safeTransferFrom(msg.sender, address(this), amount);
     emit LiquidityAdded(remoteChainSelector, msg.sender, amount);
   }
+
+  // ================================================================
+  // │                    Withdraw Liquidity                        │
+  // ================================================================
 
   /// @notice Removes liquidity from the pool for unsiloed chains. Function is used to support legacy liquidity operations
   /// by using a function selector available to previous L/R pools.

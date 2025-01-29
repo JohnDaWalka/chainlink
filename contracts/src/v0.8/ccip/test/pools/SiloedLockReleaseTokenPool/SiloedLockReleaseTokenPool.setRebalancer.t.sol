@@ -24,6 +24,7 @@ contract SiloedLockReleaseTokenPool_setRebalancer is SiloedLockReleaseTokenPoolS
     s_siloedLockReleaseTokenPool.setRebalancer(REBALANCER_ADDRESS);
 
     assertEq(s_siloedLockReleaseTokenPool.getSiloRebalancer(DEST_CHAIN_SELECTOR), REBALANCER_ADDRESS);
+    assertEq(s_siloedLockReleaseTokenPool.getRebalancer(), REBALANCER_ADDRESS);
   }
 
   // Reverts
