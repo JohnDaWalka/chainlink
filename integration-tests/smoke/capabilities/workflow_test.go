@@ -459,9 +459,9 @@ func validateInputsAndEnvVars(t *testing.T, testConfig *WorkflowTestConfig) {
 		require.True(t, testConfig.WorkflowConfig.UseExising, "if you are not using chainlink-cli you must use an existing workflow")
 	}
 
-	ghToken := os.Getenv("GITHUB_CAP_API_TOKEN")
-	_, err := downloadCronCapability(ghToken)
-	require.NoError(t, err, "failed to download cron capability. Make sure token has content:read permissions to the capabilities repo")
+	// do not download the binary, it's committed in the repo
+	// _, err := downloadCronCapability(ghToken)
+	// require.NoError(t, err, "failed to download cron capability. Make sure token has content:read permissions to the capabilities repo")
 
 	// TODO this part should ideally happen outside of the test, but due to how our reusable e2e test workflow is structured now
 	// we cannot execute this part in workflow steps (it doesn't support any pre-execution hooks)
@@ -470,7 +470,8 @@ func validateInputsAndEnvVars(t *testing.T, testConfig *WorkflowTestConfig) {
 		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV)
 
 		if testConfig.WorkflowConfig.UseChainlinkCLI {
-			err = downloadAndInstallChainlinkCLI(ghToken)
+			ghToken := os.Getenv("GITHUB_CAP_API_TOKEN")
+			err := downloadAndInstallChainlinkCLI(ghToken)
 			require.NoError(t, err, "failed to download and install chainlink-cli. Make sure token has content:read permissions to the dev-platform repo")
 		}
 	}
