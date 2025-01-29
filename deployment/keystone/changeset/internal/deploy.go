@@ -18,12 +18,23 @@ import (
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/mcms"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
 
+	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/deployment"
+
+	"google.golang.org/protobuf/proto"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
+
+	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
+
+	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
+
+	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	capabilities_registry "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	kf "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/forwarder_1_0_0"
 )
@@ -210,7 +221,7 @@ func ConfigureRegistry(ctx context.Context, lggr logger.Logger, req ConfigureCon
 	}
 
 	// register capabilities
-	capabilitiesResp, err := RegisterCapabilities(lggr, RegisterCapabilitiesRequest{
+	capabilitiesResp, err := registerCapabilities(lggr, RegisterCapabilitiesRequest{
 		Env:                   req.Env,
 		RegistryChainSelector: req.RegistryChainSel,
 		DonToCapabilities:     donToCapabilities,
@@ -409,8 +420,7 @@ type RegisterCapabilitiesRequest struct {
 	RegistryChainSelector uint64
 	DonToCapabilities     map[string][]DONCapabilityWithConfig
 
-	// if UseMCMS is true, a batch proposal is returned and no transaction is confirmed on chain.
-	UseMCMS bool
+	MCMSConfig *MCMSConfig
 }
 
 type RegisterCapabilitiesResponse struct {
@@ -444,7 +454,51 @@ func FromCapabilitiesRegistryCapability(capReg *capabilities_registry.Capabiliti
 }
 
 // RegisterCapabilities add computes the capability id, adds it to the registry and associates the registered capabilities with appropriate don(s)
-func RegisterCapabilities(lggr logger.Logger, req RegisterCapabilitiesRequest) (*RegisterCapabilitiesResponse, error) {
+func RegisterCapabilities(lggr logger.Logger, req RegisterCapabilitiesRequest) (deployment.ChangesetOutput, error) {
+	resp, err := registerCapabilities(lggr, req)
+	if err != nil {
+		return deployment.ChangesetOutput{}, err
+	}
+
+	out := deployment.ChangesetOutput{}
+
+	if req.MCMSConfig != nil {
+		cresp, err := GetContractSets(req.Env.Logger, &GetContractSetsRequest{
+			Chains:      req.Env.Chains,
+			AddressBook: req.Env.ExistingAddresses,
+		})
+		if err != nil {
+			return deployment.ChangesetOutput{}, err
+		}
+
+		contracts := cresp.ContractSets[req.RegistryChainSelector]
+
+		timelocksPerChain := map[uint64]common.Address{
+			req.RegistryChainSelector: contracts.Timelock.Address(),
+		}
+		proposerMCMSes := map[uint64]*gethwrappers.ManyChainMultiSig{
+			req.RegistryChainSelector: contracts.ProposerMcm,
+		}
+
+		proposal, err := proposalutils.BuildProposalFromBatches(
+			timelocksPerChain,
+			proposerMCMSes,
+			[]timelock.BatchChainOperation{*resp.Ops},
+			"proposal to register new capabilities",
+			req.MCMSConfig.MinDuration,
+		)
+		if err != nil {
+			return out, err
+		}
+
+		out.Proposals = []timelock.MCMSWithTimelockProposal{*proposal}
+	}
+
+	return out, err
+}
+
+// RegisterCapabilities add computes the capability id, adds it to the registry and associates the registered capabilities with appropriate don(s)
+func registerCapabilities(lggr logger.Logger, req RegisterCapabilitiesRequest) (*RegisterCapabilitiesResponse, error) {
 	if len(req.DonToCapabilities) == 0 {
 		return nil, errors.New("no capabilities to register")
 	}
@@ -496,7 +550,7 @@ func RegisterCapabilities(lggr logger.Logger, req RegisterCapabilitiesRequest) (
 		return &RegisterCapabilitiesResponse{}, nil
 	}
 
-	ops, err := AddCapabilities(lggr, contracts.CapabilitiesRegistry, registryChain, capabilities, req.UseMCMS)
+	ops, err := AddCapabilities(lggr, contracts.CapabilitiesRegistry, registryChain, capabilities, req.MCMSConfig != nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add capabilities: %w", err)
 	}
