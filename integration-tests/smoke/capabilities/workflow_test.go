@@ -1288,7 +1288,7 @@ func createNodeJobsWithJd(t *testing.T, ctfEnv *deployment.Environment, don *dev
 		bootstrapJobSpec := fmt.Sprintf(`
 				type = "bootstrap"
 				schemaVersion = 1
-				externalJobId = "%s"
+				externalJobID = "%s"
 				name = "Botostrap"
 				contractID = "%s"
 				contractConfigTrackerPollInterval = "1s"
@@ -1317,7 +1317,7 @@ func createNodeJobsWithJd(t *testing.T, ctfEnv *deployment.Environment, don *dev
 		gatewayJobSpec := fmt.Sprintf(`
 				type = "gateway"
 				schemaVersion = 1
-				externalJobId = "%s"
+				externalJobID = "%s"
 				name = "PoR Gateway"
 				forwardingAllowed = false
 
@@ -1410,7 +1410,7 @@ func createNodeJobsWithJd(t *testing.T, ctfEnv *deployment.Environment, don *dev
 			cronJobSpec := fmt.Sprintf(`
 					type = "standardcapabilities"
 					schemaVersion = 1
-					externalJobId = "%s"
+					externalJobID = "%s"
 					name = "cron-capabilities"
 					forwardingAllowed = false
 					command = "/home/capabilities/%s"
@@ -1433,7 +1433,7 @@ func createNodeJobsWithJd(t *testing.T, ctfEnv *deployment.Environment, don *dev
 			computeJobSpec := fmt.Sprintf(`
 					type = "standardcapabilities"
 					schemaVersion = 1
-					externalJobId = "%s"
+					externalJobID = "%s"
 					name = "compute-capabilities"
 					forwardingAllowed = false
 					command = "__builtin_custom-compute-action"
@@ -1462,7 +1462,7 @@ func createNodeJobsWithJd(t *testing.T, ctfEnv *deployment.Environment, don *dev
 			consensusJobSpec := fmt.Sprintf(`
 					type = "offchainreporting2"
 					schemaVersion = 1
-					externalJobId = "%s"
+					externalJobID = "%s"
 					name = "Keystone OCR3 Consensus Capability"
 					contractID = "%s"
 					ocrKeyBundleID = "%s"
