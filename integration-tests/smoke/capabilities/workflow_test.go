@@ -396,10 +396,11 @@ type PoRWorkflowConfig struct {
 }
 
 const (
-	chainlinkCliAssetFile       = "cre_v1.0.2_linux_amd64.tar.gz"
-	cronCapabilityAssetFile     = "amd64_cron"
-	e2eJobDistributorEnvVarName = "E2E_JD_IMAGE"
-	ghReadTokenEnvVarName       = "GITHUB_READ_TOKEN"
+	chainlinkCliAssetFile              = "cre_v1.0.2_linux_amd64.tar.gz"
+	cronCapabilityAssetFile            = "amd64_cron"
+	e2eJobDistributorImageEnvVarName   = "E2E_JD_IMAGE"
+	e2eJobDistributorVersionEnvVarName = "E2E_JD_VERSION"
+	ghReadTokenEnvVarName              = "GITHUB_READ_TOKEN"
 )
 
 func downloadAndInstallChainlinkCLI(ghToken string) error {
@@ -472,7 +473,8 @@ func validateInputsAndEnvVars(t *testing.T, testConfig *WorkflowTestConfig) {
 		// we cannot execute this part in workflow steps (it doesn't support any pre-execution hooks)
 		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV)
 		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV)
-		require.NotEmpty(t, os.Getenv(e2eJobDistributorEnvVarName), "missing env var: "+e2eJobDistributorEnvVarName)
+		require.NotEmpty(t, os.Getenv(e2eJobDistributorImageEnvVarName), "missing env var: "+e2eJobDistributorImageEnvVarName)
+		require.NotEmpty(t, os.Getenv(e2eJobDistributorVersionEnvVarName), "missing env var: "+e2eJobDistributorVersionEnvVarName)
 
 		// disabled until we can figure out how to generate a gist read:write token in CI
 		require.True(t, testConfig.WorkflowConfig.UseExising, "only existing workflow can be used in CI as of now due to issues with generating a gist read:write token")
@@ -1368,8 +1370,9 @@ func configureWorkflowDON(t *testing.T, ctfEnv *deployment.Environment, don *dev
 
 func startJobDistributor(t *testing.T, in *WorkflowTestConfig) *jd.Output {
 	if os.Getenv("IS_CI") == "true" {
-		jdImage := ctfconfig.MustReadEnvVar_String(e2eJobDistributorEnvVarName)
-		in.JD.Image = jdImage
+		jdImage := ctfconfig.MustReadEnvVar_String(e2eJobDistributorImageEnvVarName)
+		jdVersion := os.Getenv(e2eJobDistributorVersionEnvVarName)
+		in.JD.Image = fmt.Sprintf("%s:%s", jdImage, jdVersion)
 	}
 	jdOutput, err := jd.NewJD(in.JD)
 	require.NoError(t, err, "failed to create new job distributor")
