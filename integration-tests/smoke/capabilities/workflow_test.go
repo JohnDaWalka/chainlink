@@ -399,6 +399,7 @@ const (
 	chainlinkCliAssetFile       = "cre_v1.0.2_linux_amd64.tar.gz"
 	cronCapabilityAssetFile     = "amd64_cron"
 	e2eJobDistributorEnvVarName = "E2E_JD_IMAGE"
+	ghReadTokenEnvVarName       = "GITHUB_READ_TOKEN"
 )
 
 func downloadAndInstallChainlinkCLI(ghToken string) error {
@@ -464,30 +465,40 @@ func validateInputsAndEnvVars(t *testing.T, testConfig *WorkflowTestConfig) {
 		require.True(t, testConfig.WorkflowConfig.UseExising, "if you are not using chainlink-cli you must use an existing workflow")
 	}
 
-	ghToken := os.Getenv("GITHUB_API_TOKEN")
-	_, err := downloadCronCapability(ghToken)
-	require.NoError(t, err, "failed to download cron capability. Make sure token has content:read permissions to the capabilities repo")
-
-	// TODO this part should ideally happen outside of the test, but due to how our reusable e2e test workflow is structured now
-	// we cannot execute this part in workflow steps (it doesn't support any pre-execution hooks)
+	var ghReadToken string
+	// this is a small hack to avoid changing the reusable workflow
 	if os.Getenv("IS_CI") == "true" {
+		// This part should ideally happen outside of the test, but due to how our reusable e2e test workflow is structured now
+		// we cannot execute this part in workflow steps (it doesn't support any pre-execution hooks)
 		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV)
 		require.NotEmpty(t, os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV), "missing env var: "+ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV)
 		require.NotEmpty(t, os.Getenv(e2eJobDistributorEnvVarName), "missing env var: "+e2eJobDistributorEnvVarName)
 
-		if testConfig.WorkflowConfig.UseChainlinkCLI {
-			err = downloadAndInstallChainlinkCLI(ghToken)
+		// disabled until we can figure out how to generate a gist read:write token in CI
+		require.True(t, testConfig.WorkflowConfig.UseExising, "only existing workflow can be used in CI as of now due to issues with generating a gist read:write token")
+
+		// we use this special function to subsitute a placeholder env variable with the actual environment variable name
+		// it is defined in .github/e2e-tests.yml as '{{ env.GITHUB_API_TOKEN }}'
+		ghReadToken = ctfconfig.MustReadEnvVar_String(ghReadTokenEnvVarName)
+	} else {
+		ghReadToken = os.Getenv(ghReadTokenEnvVarName)
+	}
+
+	require.NotEmpty(t, ghReadToken, ghReadTokenEnvVarName+" env var must be set")
+	_, err := downloadCronCapability(ghReadToken)
+	require.NoError(t, err, "failed to download cron capability. Make sure token has content:read permissions to the capabilities repo")
+
+	if testConfig.WorkflowConfig.UseChainlinkCLI {
+		if !isInstalled("chainlink-cli") {
+			err = downloadAndInstallChainlinkCLI(ghReadToken)
 			require.NoError(t, err, "failed to download and install chainlink-cli. Make sure token has content:read permissions to the dev-platform repo")
 		}
 
-		require.True(t, testConfig.WorkflowConfig.UseExising, "only existing workflow can be used in CI as of now due to issues with generating a gist read:write token")
-	}
-
-	if testConfig.WorkflowConfig.UseChainlinkCLI {
-		require.True(t, isInstalled("chainlink-cli"), "chainlink-cli is required for this test. Please install it, add to path and run again")
-
 		if !testConfig.WorkflowConfig.UseExising {
-			require.NotEmpty(t, os.Getenv("GITHUB_API_TOKEN"), "GITHUB_API_TOKEN must be set to use chainlink-cli. It requires gist:read and gist:write permissions")
+			gistWriteToken := os.Getenv("GIST_WRITE_TOKEN")
+			require.NotEmpty(t, gistWriteToken, "GIST_WRITE_TOKEN must be set to use chainlink-cli to compile workflows. It requires gist:read and gist:write permissions")
+			err := os.Setenv("GITHUB_API_TOKEN", gistWriteToken)
+			require.NoError(t, err, "failed to set GITHUB_API_TOKEN env var")
 		} else {
 			require.NotEmpty(t, testConfig.WorkflowConfig.ChainlinkCLI.FolderLocation, "folder_location must be set in the chainlink_cli config")
 		}
@@ -1368,18 +1379,20 @@ func startJobDistributor(t *testing.T, in *WorkflowTestConfig) *jd.Output {
 	return jdOutput
 }
 
-// This function is used to go through Chainlink Node logs and look for entries related to report transmissions.
-// Once such a log entry is found, it looks for transaction hash and then it tries to decode the transaction and print the result.
-func debugReportTransmission(t *testing.T, l zerolog.Logger, ns *ns.Output, wsRPCURL string) {
+func getLogFileHandles(t *testing.T, l zerolog.Logger, ns *ns.Output) ([]*os.File, error) {
 	var logFiles []*os.File
 
-	// when tests run in parallel, we need to make sure that we only process logs that belong to nodes created by the current test
-	// that is required, because some tests might have custom log messages that are allowed, but only for that test (e.g. because they restart the CL node)
 	var belongsToCurrentEnv = func(filePath string) bool {
-		for _, clNode := range ns.CLNodes {
+		for i, clNode := range ns.CLNodes {
 			if clNode == nil {
 				continue
 			}
+
+			// skip the first node, as it's the bootstrap node
+			if i == 0 {
+				continue
+			}
+
 			if strings.EqualFold(filePath, clNode.Node.ContainerName+".log") {
 				return true
 			}
@@ -1403,36 +1416,42 @@ func debugReportTransmission(t *testing.T, l zerolog.Logger, ns *ns.Output, wsRP
 		return nil
 	})
 
-	if len(logFiles) != len(ns.CLNodes) {
-		l.Warn().Int("Expected", len(ns.CLNodes)).Int("Got", len(logFiles)).Msg("Number of log files does not match number of nodes. Some logs might be missing.")
+	expectedLogCount := len(ns.CLNodes) - 1
+	if len(logFiles) != expectedLogCount {
+		l.Warn().Int("Expected", expectedLogCount).Int("Got", len(logFiles)).Msg("Number of log files does not match number of worker nodes. Some logs might be missing.")
 	}
 
 	if fileWalkErr != nil {
 		l.Error().Err(fileWalkErr).Msg("Error walking through log files. Will not look for report transmission transaction hashes")
-		return
+		return nil, fileWalkErr
 	}
 
+	return logFiles, nil
+}
+
+// This function is used to go through Chainlink Node logs and look for entries related to report transmissions.
+// Once such a log entry is found, it looks for transaction hash and then it tries to decode the transaction and print the result.
+func debugReportTransmissions(logFiles []*os.File, l zerolog.Logger, wsRPCURL string) {
 	/*
 	 Example log entry:
 	 2025-01-28T14:44:48.080Z [DEBUG] Node sent transaction                              multinode@v0.0.0-20250121205514-f73e2f86c23b/transaction_sender.go:180 chainID=1337 logger=EVM.1337.TransactionSender tx={"type":"0x0","chainId":"0x539","nonce":"0x0","to":"0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9","gas":"0x61a80","gasPrice":"0x3b9aca00","maxPriorityFeePerGas":null,"maxFeePerGas":null,"value":"0x0","input":"0x11289565000000000000000000000000a513e6e4b8f2a923d98304ec87f64353c4d5c853000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001c00000000000000000000000000000000000000000000000000000000000000240000000000000000000000000000000000000000000000000000000000000010d010f715db03509d388f706e16137722000e26aa650a64ac826ae8e5679cdf57fd96798ed50000000010000000100000a9c593aaed2f5371a5bc0779d1b8ea6f9c7d37bfcbb876a0a9444dbd36f64306466323239353031f39fd6e51aad88f6f4ce6ab8827279cfffb92266000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000001018bfe88407000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000bb5c162c8000000000000000000000000000000000000000000000000000000006798ed37000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000e700d4c57250eac9dc925c951154c90c1b6017944322fb2075055d8bdbe19000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000041561c171b7465e8efef35572ef82adedb49ea71b8344a34a54ce5e853f80ca1ad7d644ebe710728f21ebfc3e2407bd90173244f744faa011c3a57213c8c585de90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004165e6f3623acc43f163a58761655841bfebf3f6b4ea5f8d34c64188036b0ac23037ebbd3854b204ca26d828675395c4b9079ca068d9798326eb8c93f26570a1080100000000000000000000000000000000000000000000000000000000000000","v":"0xa96","r":"0x168547e96e7088c212f85a4e8dddce044bbb2abfd5ccc8a5451fdfcb812c94e5","s":"0x2a735a3df046632c2aaa7e583fe161113f3345002e6c9137bbfa6800a63f28a4","hash":"0x3fc5508310f8deef09a46ad594dcc5dc9ba415319ef1dfa3136335eb9e87ff4d"} version=2.19.0@05c05a9
+
+	 What we are looking for:
+	 "hash":"0x3fc5508310f8deef09a46ad594dcc5dc9ba415319ef1dfa3136335eb9e87ff4d"
 	*/
 	reportTransmissionTxHashPattern := regexp.MustCompile(`"hash":"(0x[0-9a-fA-F]+)"`)
-
-	wg := &sync.WaitGroup{}
 
 	// let's be prudent and assume that in extreme scenario when feed price isn't updated, but
 	// transmission is still sent, we might have multiple transmissions per node, and if we want
 	// to avoid blocking on the channel, we need to have a higher buffer
 	resultsCh := make(chan string, len(logFiles)*4)
 
-	// iterate overall log files looking for log entries containing "Node sent transaction" text
-	// extract transaction hash from the log entry
+	wg := &sync.WaitGroup{}
 	for _, f := range logFiles {
 		wg.Add(1)
 		file := f
 
 		go func() {
-			defer file.Close()
 			defer wg.Done()
 
 			scanner := bufio.NewScanner(file)
@@ -1456,6 +1475,11 @@ func debugReportTransmission(t *testing.T, l zerolog.Logger, ns *ns.Output, wsRP
 	wg.Wait()
 	close(resultsCh)
 
+	if len(resultsCh) == 0 {
+		l.Error().Msg("❌ No report transmissions found in Chainlink Node logs.")
+		return
+	}
+
 	// required as Seth prints transaction traces to stdout with debug level
 	_ = os.Setenv(seth.LogLevelEnvVar, "debug")
 
@@ -1470,10 +1494,8 @@ func debugReportTransmission(t *testing.T, l zerolog.Logger, ns *ns.Output, wsRP
 		return
 	}
 
-	transmissionsFound := false
 	for txHash := range resultsCh {
-		transmissionsFound = true
-
+		l.Info().Msgf("🔍 Tracing report transmission transaction %s", txHash)
 		// set tracing level to all to trace also successful transactions
 		sc.Cfg.TracingLevel = seth.TracingLevel_All
 		tx, _, err := sc.Client.TransactionByHash(context.Background(), common.HexToHash(txHash))
@@ -1488,10 +1510,116 @@ func debugReportTransmission(t *testing.T, l zerolog.Logger, ns *ns.Output, wsRP
 			continue
 		}
 	}
+}
 
-	if !transmissionsFound {
-		l.Error().Msg("No report transmissions found in Chainlink Node logs. This might be due to a bug in the node or contracts or node/job misconfiguration. Or issues with the test itself.")
+// this function is used to print debug information from Chainlink Node logs
+// it checks whether workflow was executing, OCR was executing and whether reports were sent
+// and if they were, it traces each report transmission transaction
+func printTestDebug(t *testing.T, l zerolog.Logger, ns *ns.Output, wsRPCURL string) {
+	logFiles, err := getLogFileHandles(t, l, ns)
+	if err != nil {
+		l.Error().Err(err).Msg("Failed to get log file handles. No debug information will be printed")
+		return
 	}
+
+	defer func() {
+		for _, f := range logFiles {
+			_ = f.Close()
+		}
+	}()
+
+	l.Info().Msg("🔍 Debug information from Chainlink Node logs:")
+
+	// assuming one bootstrap node
+	workflowNodeCount := len(ns.CLNodes) - 1
+	if !checkIfWorkflowWasExecuting(logFiles, workflowNodeCount) {
+		l.Error().Msg("❌ Workflow was not executing")
+		return
+	} else {
+		l.Info().Msg("✅ Workflow was executing")
+	}
+
+	if !checkIfOCRWasExecuting(logFiles, workflowNodeCount) {
+		l.Error().Msg("❌ OCR was not executing")
+		return
+	} else {
+		l.Info().Msg("✅ OCR was executing")
+	}
+
+	if !checkIfAtLeastOneReportWasSent(logFiles, workflowNodeCount) {
+		l.Error().Msg("❌ Reports were not sent")
+		return
+	} else {
+		l.Info().Msg("✅ Reports were sent")
+
+		// debug report transmissions
+		debugReportTransmissions(logFiles, l, wsRPCURL)
+	}
+}
+
+func checkIfLogsHaveText(logFiles []*os.File, bufferSize int, expectedText string, validationFn func(int) bool) bool {
+	wg := &sync.WaitGroup{}
+
+	resultsCh := make(chan struct{}, bufferSize)
+
+	for _, f := range logFiles {
+		wg.Add(1)
+		file := f
+
+		go func() {
+			defer func() {
+				wg.Done()
+				// reset file pointer to the beginning of the file
+				// so that subsequent reads start from the beginning
+				_, _ = file.Seek(0, io.SeekStart)
+			}()
+
+			scanner := bufio.NewScanner(file)
+			scanner.Split(bufio.ScanLines)
+
+			for scanner.Scan() {
+				jsonLogLine := scanner.Text()
+
+				if strings.Contains(jsonLogLine, expectedText) {
+					resultsCh <- struct{}{}
+					return
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(resultsCh)
+
+	var found int
+	for range resultsCh {
+		found++
+	}
+
+	return validationFn(found)
+}
+
+func exactCountValidationFn(expected int) func(int) bool {
+	return func(found int) bool {
+		return found == expected
+	}
+}
+
+func checkIfWorkflowWasExecuting(logFiles []*os.File, workflowNodeCount int) bool {
+	return checkIfLogsHaveText(logFiles, workflowNodeCount, "step request enqueued", exactCountValidationFn(workflowNodeCount))
+}
+
+func checkIfOCRWasExecuting(logFiles []*os.File, workflowNodeCount int) bool {
+	return checkIfLogsHaveText(logFiles, workflowNodeCount, "✅ committed outcome", exactCountValidationFn(workflowNodeCount))
+}
+
+func checkIfAtLeastOneReportWasSent(logFiles []*os.File, workflowNodeCount int) bool {
+	// we are looking for "Node sent transaction" log entry, which might appear various times in the logs
+	// but most probably not in the logs of all nodes, since they take turns in sending reports
+	// our buffer must be large enough to capture all the possible log entries in order to avoid channel blocking
+	bufferSize := workflowNodeCount * 4
+
+	return checkIfLogsHaveText(logFiles, bufferSize, "Node sent transaction", func(found int) bool { return found > 0 })
 }
 
 func logTestInfo(l zerolog.Logger, feedId, workflowName, feedConsumerAddr, forwarderAddr string) {
@@ -1527,18 +1655,18 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 				testLogger.Warn().Msg("nodeset output is nil, skipping debug report transmission")
 				return
 			}
-			// if the test fails, let's debug transactions of the report transmissions
-			debugReportTransmission(t, testLogger, *nodes, *wsRPCURL)
+			printTestDebug(t, testLogger, *nodes, *wsRPCURL)
 		}
 	})
 
+	// Load test configuration
 	in, err := framework.Load[WorkflowTestConfig](t)
 	require.NoError(t, err, "couldn't load test config")
 	validateInputsAndEnvVars(t, in)
 
 	pkey := os.Getenv("PRIVATE_KEY")
 
-	// Create a new blockchain network and blockchain client
+	// Create a new blockchain network and Seth client to interact with it
 	bc, err := blockchain.NewBlockchainNetwork(in.BlockchainA)
 	require.NoError(t, err)
 

@@ -1,10 +1,10 @@
 name: abcdefgasd
-workflowID: 00000a9c593aaed2f5371a5bc0779d1b8ea6f9c7d37bfcbb876a0a9444dbd36f
+workflowID: 007af76735053df3bbb9d1666cecbae4aee47300bcd2229389ab4d6dcca8e9bd
 workflowOwner: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 binaryURL: https://gist.githubusercontent.com/Tofel/8a39af5b68c213d2200446c175b5c99e/raw/cb7b2a56b37e333fe0bdce07b79538c4ce332f5f/binary.wasm.br
-configURL: https://gist.githubusercontent.com/Tofel/5b9ccb1cc1a5aa68aa08a5b2066d60a7/raw/7dcdda86b9d50d17029614f370fd2acab1e7fb27/config.json3175390991
+configURL: https://gist.githubusercontent.com/Tofel/19c80e6297914a79449f916e5e65dfdd/raw/1344c259ef7e970dbabaa1e9e885845b8eba5da9/config.json3674692696
 secretsURL: ""
 donID: "1"
-workflowRegistry: 0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9
+workflowRegistry: 0x8A791620dd6260079BF849Dc5567aDC3F2FdC318
 automaticallyStarted: true
-timestamp: "2025-01-29T18:11:13+01:00"
+timestamp: "2025-01-29T19:23:46+01:00"
