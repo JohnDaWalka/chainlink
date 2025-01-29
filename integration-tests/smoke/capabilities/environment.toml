@@ -4,7 +4,7 @@
   docker_cmd_params = ["-b", "5"]
 
 [jd]
-  image = "jd-test-1:latest"
+  image = "replace-me"
 
 [workflow_config]
   use_chainlink_cli = true
@@ -27,9 +27,9 @@
   [[nodeset.node_specs]]
 
     [nodeset.node_specs.node]
-      # docker_ctx = "../../.."
-      # docker_file = "plugins/chainlink.Dockerfile"
-      image = "chainlink-test:latest"
+      docker_ctx = "../../.."
+      docker_file = "plugins/chainlink.Dockerfile"
+      # image = "chainlink-test:latest"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
@@ -47,9 +47,9 @@
 
     [nodeset.node_specs.node]
       capabilities = ["./amd64_cron"]
-      # docker_ctx = "../../.."
-      # docker_file = "plugins/chainlink.Dockerfile"
-      image = "chainlink-test:latest"
+      docker_ctx = "../../.."
+      docker_file = "plugins/chainlink.Dockerfile"
+      # image = "chainlink-test:latest"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
@@ -67,9 +67,9 @@
 
     [nodeset.node_specs.node]
       capabilities = ["./amd64_cron"]
-      # docker_ctx = "../../.."
-      # docker_file = "plugins/chainlink.Dockerfile"
-      image = "chainlink-test:latest"
+      docker_ctx = "../../.."
+      docker_file = "plugins/chainlink.Dockerfile"
+      # image = "chainlink-test:latest"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
@@ -87,9 +87,9 @@
 
     [nodeset.node_specs.node]
       capabilities = ["./amd64_cron"]
-      # docker_ctx = "../../.."
-      # docker_file = "plugins/chainlink.Dockerfile"
-      image = "chainlink-test:latest"
+      docker_ctx = "../../.."
+      docker_file = "plugins/chainlink.Dockerfile"
+      # image = "chainlink-test:latest"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
@@ -107,9 +107,9 @@
 
     [nodeset.node_specs.node]
       capabilities = ["./amd64_cron"]
-      # docker_ctx = "../../.."
-      # docker_file = "plugins/chainlink.Dockerfile"
-      image = "chainlink-test:latest"
+      docker_ctx = "../../.."
+      docker_file = "plugins/chainlink.Dockerfile"
+      # image = "chainlink-test:latest"
       user_config_overrides = """
       [Feature]
 			LogPoller = true

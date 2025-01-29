@@ -970,6 +970,10 @@ func configureNodes(t *testing.T, nodesInfo []NodeInfo, in *WorkflowTestConfig, 
 				ListenAddresses = ['0.0.0.0:6690']
 				DefaultBootstrappers = ['%s@localhost:6690']
 
+				[WebServer]
+				SecureCookies = true
+				AllowOrigins = "*"
+
 				# This is needed for the target capability to be initialized
 				[[EVM]]
 				ChainID = '%s'
@@ -1009,6 +1013,10 @@ func configureNodes(t *testing.T, nodesInfo []NodeInfo, in *WorkflowTestConfig, 
 				ListenAddresses = ['0.0.0.0:6690']
 				# assuming that node0 is the bootstrap node
 				DefaultBootstrappers = ['%s@node0:6690']
+
+				[WebServer]
+				SecureCookies = true
+				AllowOrigins = "*"
 
 				# This is needed for the target capability to be initialized
 				[[EVM]]
