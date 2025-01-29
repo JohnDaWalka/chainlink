@@ -7,12 +7,17 @@
   image = "replace-me"
 
 [workflow_config]
+	don_id = 1
+	workflow_name = "abcdefgasd"
+  # without 0x prefix!
+	feed_id = "018bfe8840700040000000000000000000000000000000000000000000000000"
+
   use_chainlink_cli = false
   use_existing = true
 
   [workflow_config.existing]
-    binary_url = "https://gist.githubusercontent.com/Tofel/da9b5ecdc4f53ddddfafeba4f57fe5f0/raw/cb7b2a56b37e333fe0bdce07b79538c4ce332f5f/binary.wasm.br"
-    config_url = "https://gist.githubusercontent.com/Tofel/3b6581a7aafcadb697b848b1e8c106a4/raw/1344c259ef7e970dbabaa1e9e885845b8eba5da9/config.json2801644267"
+    binary_url = "https://gist.githubusercontent.com/Tofel/8a39af5b68c213d2200446c175b5c99e/raw/cb7b2a56b37e333fe0bdce07b79538c4ce332f5f/binary.wasm.br"
+    config_url = "https://gist.githubusercontent.com/Tofel/19c80e6297914a79449f916e5e65dfdd/raw/1344c259ef7e970dbabaa1e9e885845b8eba5da9/config.json3674692696"
 
 [nodeset]
   nodes = 5

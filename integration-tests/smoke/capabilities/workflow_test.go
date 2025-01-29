@@ -56,6 +56,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/workflow/generated/workflow_registry_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
+	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
@@ -111,10 +112,13 @@ func MarshalMultichainPublicKey(ost map[string]types.OnchainPublicKey) (types.On
 }
 
 type WorkflowConfig struct {
-	UseChainlinkCLI bool                    `toml:"use_chainlink_cli"`
+	UseChainlinkCLI bool                    `toml:"use_chainlink_cli" validate:"required"`
 	ChainlinkCLI    *ChainlinkCLIConfig     `toml:"chainlink_cli"`
-	UseExising      bool                    `toml:"use_existing"`
+	UseExising      bool                    `toml:"use_existing" validate:"required"`
 	Existing        *ExistingWorkflowConfig `toml:"existing"`
+	DonId           uint32                  `toml:"don_id" validate:"required"`
+	WorkflowName    string                  `toml:"workflow_name" validate:"required" `
+	FeedID          string                  `toml:"feed_id" validate:"required"`
 }
 
 type ExistingWorkflowConfig struct {
@@ -488,6 +492,9 @@ func validateInputsAndEnvVars(t *testing.T, testConfig *WorkflowTestConfig) {
 			require.NotEmpty(t, testConfig.WorkflowConfig.ChainlinkCLI.FolderLocation, "folder_location must be set in the chainlink_cli config")
 		}
 	}
+
+	// make sure the feed id is in the correct format
+	testConfig.WorkflowConfig.FeedID = strings.TrimPrefix(testConfig.WorkflowConfig.FeedID, "0x")
 }
 
 // copied from Bala's unmerged PR: https://github.com/smartcontractkit/chainlink/pull/15751
@@ -713,8 +720,8 @@ func prepareFeedsConsumer(t *testing.T, testLogger zerolog.Logger, ctfEnv *deplo
 	var feedsConsumerAddress common.Address
 	for addrStr, tv := range addresses {
 		if strings.Contains(tv.String(), "FeedConsumer") {
-			testLogger.Info().Msgf("Deployed FeedConsumer contract at %s", feedsConsumerAddress.Hex())
 			feedsConsumerAddress = common.HexToAddress(addrStr)
+			testLogger.Info().Msgf("Deployed FeedConsumer contract at %s", feedsConsumerAddress.Hex())
 			break
 		}
 	}
@@ -1265,28 +1272,40 @@ func createNodeJobs(t *testing.T, nodeClients []*clclient.ChainlinkClient, nodes
 }
 
 func configureWorkflowDON(t *testing.T, ctfEnv *deployment.Environment, don *devenv.DON, chainSelector uint64) {
-	kcrAllCaps := []kcr.CapabilitiesRegistryCapability{
+	kcrAllCaps := []keystone_changeset.DONCapabilityWithConfig{
 		{
-			LabelledName:   "offchain_reporting",
-			Version:        "1.0.0",
-			CapabilityType: 2, // CONSENSUS
-			ResponseType:   0, // REPORT
+			Capability: kcr.CapabilitiesRegistryCapability{
+				LabelledName:   "offchain_reporting",
+				Version:        "1.0.0",
+				CapabilityType: 2, // CONSENSUS
+				ResponseType:   0, // REPORT
+			},
+			Config: &capabilitiespb.CapabilityConfig{},
 		},
 		{
-			LabelledName:   "write_geth-testnet",
-			Version:        "1.0.0",
-			CapabilityType: 3, // TARGET
-			ResponseType:   1, // OBSERVATION_IDENTICAL
+			Capability: kcr.CapabilitiesRegistryCapability{
+				LabelledName:   "write_geth-testnet",
+				Version:        "1.0.0",
+				CapabilityType: 3, // TARGET
+				ResponseType:   1, // OBSERVATION_IDENTICAL
+			},
+			Config: &capabilitiespb.CapabilityConfig{},
 		},
 		{
-			LabelledName:   "cron-trigger",
-			Version:        "1.0.0",
-			CapabilityType: uint8(0), // trigger
+			Capability: kcr.CapabilitiesRegistryCapability{
+				LabelledName:   "cron-trigger",
+				Version:        "1.0.0",
+				CapabilityType: uint8(0), // trigger
+			},
+			Config: &capabilitiespb.CapabilityConfig{},
 		},
 		{
-			LabelledName:   "custom-compute",
-			Version:        "1.0.0",
-			CapabilityType: uint8(1), // action
+			Capability: kcr.CapabilitiesRegistryCapability{
+				LabelledName:   "custom-compute",
+				Version:        "1.0.0",
+				CapabilityType: uint8(1), // action
+			},
+			Config: &capabilitiespb.CapabilityConfig{},
 		},
 	}
 
@@ -1305,12 +1324,10 @@ func configureWorkflowDON(t *testing.T, ctfEnv *deployment.Environment, don *dev
 
 	donName := "keystone-don"
 	donCap := keystone_changeset.DonCapabilities{
-		Name: donName,
-		F:    1,
-		Nops: []keystone_changeset.NOP{nop},
-		Capabilities: keystone_changeset.DONCapabilityWithConfig{
-			Capability: kcrAllCaps,
-		},
+		Name:         donName,
+		F:            1,
+		Nops:         []keystone_changeset.NOP{nop},
+		Capabilities: kcrAllCaps,
 	}
 
 	oracleConfig := keystone_changeset.OracleConfig{
@@ -1478,7 +1495,7 @@ func debugReportTransmission(t *testing.T, l zerolog.Logger, ns *ns.Output, wsRP
 }
 
 func logTestInfo(l zerolog.Logger, feedId, workflowName, feedConsumerAddr, forwarderAddr string) {
-	l.Info().Msg("Test configuration:")
+	l.Info().Msg("------ Test configuration:")
 	l.Info().Msgf("Feed ID: %s", feedId)
 	l.Info().Msgf("Workflow name: %s", workflowName)
 	l.Info().Msgf("FeedConsumer address: %s", feedConsumerAddr)
@@ -1497,19 +1514,13 @@ and a golden example. Apart from its structure what is currently missing is:
 func TestKeystoneWithOCR3Workflow(t *testing.T) {
 	testLogger := framework.L
 
-	// Define test configuration
-	donID := uint32(1)
-	workflowName := "abcdefgasd"
-	feedID := "018bfe8840700040000000000000000000000000000000000000000000000000" // without 0x prefix!
-	feedBytes := common.HexToHash(feedID)
-
 	// we need to use double-pointers, so that what's captured in the cleanup function is a pointer, not the actual object,
 	// which is only set later in the test, after the cleanup function is defined
 	var nodes **ns.Output
 	var wsRPCURL *string
 
 	// clean up is LIFO, so we need to make sure we execute the debug report transmission after logs are written down
-	// by function added to clean up by framework.Load() method.
+	// by function added to clean up by framework.Load() method
 	t.Cleanup(func() {
 		if t.Failed() {
 			if nodes == nil {
@@ -1527,7 +1538,7 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 
 	pkey := os.Getenv("PRIVATE_KEY")
 
-	// Create a new blockchain network
+	// Create a new blockchain network and blockchain client
 	bc, err := blockchain.NewBlockchainNetwork(in.BlockchainA)
 	require.NoError(t, err)
 
@@ -1546,17 +1557,17 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 	// Prepare the chainlink/deployment environment
 	ctfEnv, don, chainSelector := buildChainlinkDeploymentEnv(t, jdOutput, nodeOutput, bc, sc)
 
-	// Deploy keystone contracts
+	// Deploy keystone contracts (forwarder, capability registry, ocr3 capability)
 	keystoneContracts := deployKeystoneContracts(t, testLogger, ctfEnv, chainSelector)
 
 	// Deploy and pre-configure workflow registry contract
-	workflowRegistryAddr := prepareWorkflowRegistry(t, testLogger, ctfEnv, chainSelector, sc, donID)
+	workflowRegistryAddr := prepareWorkflowRegistry(t, testLogger, ctfEnv, chainSelector, sc, in.WorkflowConfig.DonId)
 
 	// Deploy and configure Keystone Feeds Consumer contract
-	feedsConsumerAddress := prepareFeedsConsumer(t, testLogger, ctfEnv, chainSelector, sc, keystoneContracts.forwarderAddress, workflowName)
+	feedsConsumerAddress := prepareFeedsConsumer(t, testLogger, ctfEnv, chainSelector, sc, keystoneContracts.forwarderAddress, in.WorkflowConfig.WorkflowName)
 
 	// Register the workflow (either via chainlink-cli or by calling the workflow registry directly)
-	registerWorkflow(t, in, sc, keystoneContracts.capabilityRegistryAddrress, workflowRegistryAddr, feedsConsumerAddress, donID, chainSelector, workflowName, pkey, bc.Nodes[0].HostHTTPUrl)
+	registerWorkflow(t, in, sc, keystoneContracts.capabilityRegistryAddrress, workflowRegistryAddr, feedsConsumerAddress, in.WorkflowConfig.DonId, chainSelector, in.WorkflowConfig.WorkflowName, pkey, bc.Nodes[0].HostHTTPUrl)
 
 	// Create OCR3 and capability jobs for each node without JD
 	ns, nodeClients := configureNodes(t, nodesInfo, in, bc, keystoneContracts.capabilityRegistryAddrress, workflowRegistryAddr, keystoneContracts.forwarderAddress)
@@ -1564,13 +1575,14 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 
 	// Log extra information that might help debugging
 	t.Cleanup(func() {
-		logTestInfo(testLogger, feedID, workflowName, feedsConsumerAddress.Hex(), keystoneContracts.forwarderAddress.Hex())
+		logTestInfo(testLogger, in.WorkflowConfig.FeedID, in.WorkflowConfig.WorkflowName, feedsConsumerAddress.Hex(), keystoneContracts.forwarderAddress.Hex())
 	})
 
 	// set variables that are needed for the cleanup function, which debugs report transmissions
 	nodes = &ns
 	wsRPCURL = &bc.Nodes[0].HostWSUrl
 
+	// CAUTION: It is crucial to configure OCR3 jobs on nodes before configuring the workflow contracts.
 	// Wait for OCR listeners to be ready before setting the configuration.
 	// If the ConfigSet event is missed, OCR protocol will not start.
 	// TODO make it fluent!
@@ -1578,7 +1590,7 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 	time.Sleep(30 * time.Second)
 	testLogger.Info().Msg("Proceeding to set OCR3 configuration.")
 
-	// Configure the workflow DON
+	// Configure the workflow DON and contracts
 	configureWorkflowDON(t, ctfEnv, don, chainSelector)
 
 	// It can take a while before the first report is produced, particularly on CI.
@@ -1591,6 +1603,7 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 
 	testLogger.Info().Msg("Waiting for feed to update...")
 	startTime := time.Now()
+	feedBytes := common.HexToHash(in.WorkflowConfig.FeedID)
 
 	for {
 		select {
