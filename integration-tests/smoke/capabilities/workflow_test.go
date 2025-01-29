@@ -116,7 +116,7 @@ type WorkflowConfig struct {
 	ChainlinkCLI    *ChainlinkCLIConfig     `toml:"chainlink_cli"`
 	UseExising      bool                    `toml:"use_existing"`
 	Existing        *ExistingWorkflowConfig `toml:"existing"`
-	DonId           uint32                  `toml:"don_id" validate:"required"`
+	DonID           uint32                  `toml:"don_id" validate:"required"`
 	WorkflowName    string                  `toml:"workflow_name" validate:"required" `
 	FeedID          string                  `toml:"feed_id" validate:"required"`
 }
@@ -919,8 +919,6 @@ func registerWorkflow(t *testing.T, in *WorkflowTestConfig, sc *seth.Client, cap
 
 	// compile and upload the workflow, if we are not using an existing one
 	if !in.WorkflowConfig.UseExising {
-		err := os.Setenv("GITHUB_API_TOKEN", os.Getenv("GITHUB_GIST_API_TOKEN"))
-		require.NoError(t, err, "failed to set GITHUB_API_TOKEN env var")
 		workflowGistURL, workflowConfigURL = compileWorkflowWithChainlinkCli(t, in, feedsConsumerAddress, settingsFile)
 	} else {
 		workflowGistURL = in.WorkflowConfig.Existing.BinaryURL
@@ -1325,7 +1323,7 @@ func configureWorkflowDON(t *testing.T, ctfEnv *deployment.Environment, don *dev
 		if i == 0 {
 			continue
 		}
-		peerIds[i-1] = node.PeerId
+		peerIds[i-1] = node.PeerID
 	}
 
 	nop := keystone_changeset.NOP{
@@ -1689,13 +1687,13 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 	keystoneContracts := deployKeystoneContracts(t, testLogger, ctfEnv, chainSelector)
 
 	// Deploy and pre-configure workflow registry contract
-	workflowRegistryAddr := prepareWorkflowRegistry(t, testLogger, ctfEnv, chainSelector, sc, in.WorkflowConfig.DonId)
+	workflowRegistryAddr := prepareWorkflowRegistry(t, testLogger, ctfEnv, chainSelector, sc, in.WorkflowConfig.DonID)
 
 	// Deploy and configure Keystone Feeds Consumer contract
 	feedsConsumerAddress := prepareFeedsConsumer(t, testLogger, ctfEnv, chainSelector, sc, keystoneContracts.forwarderAddress, in.WorkflowConfig.WorkflowName)
 
 	// Register the workflow (either via chainlink-cli or by calling the workflow registry directly)
-	registerWorkflow(t, in, sc, keystoneContracts.capabilityRegistryAddrress, workflowRegistryAddr, feedsConsumerAddress, in.WorkflowConfig.DonId, chainSelector, in.WorkflowConfig.WorkflowName, pkey, bc.Nodes[0].HostHTTPUrl)
+	registerWorkflow(t, in, sc, keystoneContracts.capabilityRegistryAddrress, workflowRegistryAddr, feedsConsumerAddress, in.WorkflowConfig.DonID, chainSelector, in.WorkflowConfig.WorkflowName, pkey, bc.Nodes[0].HostHTTPUrl)
 
 	// Create OCR3 and capability jobs for each node without JD
 	ns, nodeClients := configureNodes(t, nodesInfo, in, bc, keystoneContracts.capabilityRegistryAddrress, workflowRegistryAddr, keystoneContracts.forwarderAddress)
