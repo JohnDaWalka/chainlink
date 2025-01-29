@@ -48,6 +48,8 @@
 
 - [#15899](https://github.com/smartcontractkit/chainlink/pull/15899) [`796357b17c`](https://github.com/smartcontractkit/chainlink/commit/796357b17ca875ba80e157fc08b0da5db4ed1644) - #updated feat:create tron chain config on operator ui
 
+- [#16019](https://github.com/smartcontractkit/chainlink/pull/16019) [`c75092086f`](https://github.com/smartcontractkit/chainlink/commit/c75092086f790d273abb08f18f1b03f7934e30dc) - Bump to start the next version
+
 ### Patch Changes
 
 - [#15357](https://github.com/smartcontractkit/chainlink/pull/15357) [`18cb44e891`](https://github.com/smartcontractkit/chainlink/commit/18cb44e891a00edff7486640ffc8e0c9275a04f8) - #updated use real contracts in ccipreader_tests where possible
