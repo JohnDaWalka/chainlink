@@ -92,6 +92,8 @@ type ConfigureContractsResponse = internal.ConfigureContractsResponse
 // in is in a convenient form to handle the CLO representation of the nop data
 type DonCapabilities = internal.DonCapabilities
 
+type DONCapabilityWithConfig = internal.DONCapabilityWithConfig
+
 type DeployRequest = internal.DeployRequest
 type DeployResponse = internal.DeployResponse
 
