@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -24,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -31,7 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_home"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	capabilities_registry "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 )
 
 var (
@@ -39,7 +39,7 @@ var (
 	_ deployment.ChangeSet[PromoteCandidateChangesetConfig]      = PromoteCandidateChangeset
 	_ deployment.ChangeSet[SetCandidateChangesetConfig]          = SetCandidateChangeset
 	_ deployment.ChangeSet[RevokeCandidateChangesetConfig]       = RevokeCandidateChangeset
-	_ deployment.ChangeSet[UpdateChainConfigConfig]              = UpdateChainConfig
+	_ deployment.ChangeSet[UpdateChainConfigConfig]              = UpdateChainConfigChangeset
 )
 
 type tokenInfo interface {
@@ -88,7 +88,12 @@ func validateCommitOffchainConfig(c *pluginconfig.CommitOffchainConfig, selector
 		for _, tk := range onchainState.ERC677Tokens {
 			tokenInfos = append(tokenInfos, tk)
 		}
-		tokenInfos = append(tokenInfos, onchainState.LinkToken)
+		var linkTokenInfo tokenInfo
+		linkTokenInfo = onchainState.LinkToken
+		if onchainState.LinkToken == nil {
+			linkTokenInfo = onchainState.StaticLinkToken
+		}
+		tokenInfos = append(tokenInfos, linkTokenInfo)
 		tokenInfos = append(tokenInfos, onchainState.Weth9)
 		symbol, decimal, err := findTokenInfo(tokenInfos, token)
 		if err != nil {
@@ -171,55 +176,85 @@ func (c CCIPOCRParams) Validate(selector uint64, feedChainSel uint64, state CCIP
 	return nil
 }
 
-// DefaultOCRParams returns the default OCR parameters for a chain,
-// except for a few values which must be parameterized (passed as arguments).
-func DefaultOCRParams(
-	feedChainSel uint64,
-	tokenInfo map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo,
-	tokenDataObservers []pluginconfig.TokenDataObserverConfig,
-	commit bool,
-	exec bool,
+type CCIPOCROpts func(params *CCIPOCRParams)
+
+// WithOCRParamOverride can be used if you want to override the default OCR parameters with your custom function.
+func WithOCRParamOverride(override func(params *CCIPOCRParams)) CCIPOCROpts {
+	return func(params *CCIPOCRParams) {
+		if override != nil {
+			override(params)
+		}
+	}
+}
+
+// WithDefaultCommitOffChainConfig can be used to add token info to the existing commit off-chain config. If no commit off-chain config is set, it will be created with default values.
+func WithDefaultCommitOffChainConfig(feedChainSel uint64, tokenInfo map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo) CCIPOCROpts {
+	return func(params *CCIPOCRParams) {
+		if params.CommitOffChainConfig == nil {
+			params.CommitOffChainConfig = &pluginconfig.CommitOffchainConfig{
+				RemoteGasPriceBatchWriteFrequency:  *config.MustNewDuration(globals.RemoteGasPriceBatchWriteFrequency),
+				TokenPriceBatchWriteFrequency:      *config.MustNewDuration(globals.TokenPriceBatchWriteFrequency),
+				TokenInfo:                          tokenInfo,
+				PriceFeedChainSelector:             ccipocr3.ChainSelector(feedChainSel),
+				NewMsgScanBatchSize:                merklemulti.MaxNumberTreeLeaves,
+				MaxReportTransmissionCheckAttempts: 5,
+				RMNEnabled:                         false,
+				RMNSignaturesTimeout:               30 * time.Minute,
+				MaxMerkleTreeSize:                  merklemulti.MaxNumberTreeLeaves,
+				SignObservationPrefix:              "chainlink ccip 1.6 rmn observation",
+			}
+		} else {
+			if params.CommitOffChainConfig.TokenInfo == nil {
+				params.CommitOffChainConfig.TokenInfo = make(map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo)
+			}
+			for k, v := range tokenInfo {
+				params.CommitOffChainConfig.TokenInfo[k] = v
+			}
+		}
+	}
+}
+
+// WithDefaultExecuteOffChainConfig can be used to add token data observers to the execute off-chain config. If no execute off-chain config is set, it will be created with default values.
+func WithDefaultExecuteOffChainConfig(tokenDataObservers []pluginconfig.TokenDataObserverConfig) CCIPOCROpts {
+	return func(params *CCIPOCRParams) {
+		if params.ExecuteOffChainConfig == nil {
+			params.ExecuteOffChainConfig = &pluginconfig.ExecuteOffchainConfig{
+				BatchGasLimit:             globals.BatchGasLimit,
+				RelativeBoostPerWaitHour:  globals.RelativeBoostPerWaitHour,
+				InflightCacheExpiry:       *config.MustNewDuration(globals.InflightCacheExpiry),
+				RootSnoozeTime:            *config.MustNewDuration(globals.RootSnoozeTime),
+				MessageVisibilityInterval: *config.MustNewDuration(globals.FirstBlockAge),
+				BatchingStrategyID:        globals.BatchingStrategyID,
+				TokenDataObservers:        tokenDataObservers,
+			}
+		} else if tokenDataObservers != nil {
+			params.ExecuteOffChainConfig.TokenDataObservers = append(params.ExecuteOffChainConfig.TokenDataObservers, tokenDataObservers...)
+		}
+	}
+}
+
+// DeriveCCIPOCRParams derives the default OCR parameters for a chain, with the option to override them.
+func DeriveCCIPOCRParams(
+	opts ...CCIPOCROpts,
 ) CCIPOCRParams {
 	params := CCIPOCRParams{
 		OCRParameters: commontypes.OCRParameters{
-			DeltaProgress:                           internal.DeltaProgress,
-			DeltaResend:                             internal.DeltaResend,
-			DeltaInitial:                            internal.DeltaInitial,
-			DeltaRound:                              internal.DeltaRound,
-			DeltaGrace:                              internal.DeltaGrace,
-			DeltaCertifiedCommitRequest:             internal.DeltaCertifiedCommitRequest,
-			DeltaStage:                              internal.DeltaStage,
-			Rmax:                                    internal.Rmax,
-			MaxDurationQuery:                        internal.MaxDurationQuery,
-			MaxDurationObservation:                  internal.MaxDurationObservation,
-			MaxDurationShouldAcceptAttestedReport:   internal.MaxDurationShouldAcceptAttestedReport,
-			MaxDurationShouldTransmitAcceptedReport: internal.MaxDurationShouldTransmitAcceptedReport,
+			DeltaProgress:                           globals.DeltaProgress,
+			DeltaResend:                             globals.DeltaResend,
+			DeltaInitial:                            globals.DeltaInitial,
+			DeltaRound:                              globals.DeltaRound,
+			DeltaGrace:                              globals.DeltaGrace,
+			DeltaCertifiedCommitRequest:             globals.DeltaCertifiedCommitRequest,
+			DeltaStage:                              globals.DeltaStage,
+			Rmax:                                    globals.Rmax,
+			MaxDurationQuery:                        globals.MaxDurationQuery,
+			MaxDurationObservation:                  globals.MaxDurationObservation,
+			MaxDurationShouldAcceptAttestedReport:   globals.MaxDurationShouldAcceptAttestedReport,
+			MaxDurationShouldTransmitAcceptedReport: globals.MaxDurationShouldTransmitAcceptedReport,
 		},
 	}
-	if exec {
-		params.ExecuteOffChainConfig = &pluginconfig.ExecuteOffchainConfig{
-			BatchGasLimit:             internal.BatchGasLimit,
-			RelativeBoostPerWaitHour:  internal.RelativeBoostPerWaitHour,
-			InflightCacheExpiry:       *config.MustNewDuration(internal.InflightCacheExpiry),
-			RootSnoozeTime:            *config.MustNewDuration(internal.RootSnoozeTime),
-			MessageVisibilityInterval: *config.MustNewDuration(internal.FirstBlockAge),
-			BatchingStrategyID:        internal.BatchingStrategyID,
-			TokenDataObservers:        tokenDataObservers,
-		}
-	}
-	if commit {
-		params.CommitOffChainConfig = &pluginconfig.CommitOffchainConfig{
-			RemoteGasPriceBatchWriteFrequency:  *config.MustNewDuration(internal.RemoteGasPriceBatchWriteFrequency),
-			TokenPriceBatchWriteFrequency:      *config.MustNewDuration(internal.TokenPriceBatchWriteFrequency),
-			TokenInfo:                          tokenInfo,
-			PriceFeedChainSelector:             ccipocr3.ChainSelector(feedChainSel),
-			NewMsgScanBatchSize:                merklemulti.MaxNumberTreeLeaves,
-			MaxReportTransmissionCheckAttempts: 5,
-			RMNEnabled:                         os.Getenv("ENABLE_RMN") == "true", // only enabled in manual test
-			RMNSignaturesTimeout:               30 * time.Minute,
-			MaxMerkleTreeSize:                  merklemulti.MaxNumberTreeLeaves,
-			SignObservationPrefix:              "chainlink ccip 1.6 rmn observation",
-		}
+	for _, opt := range opts {
+		opt(&params)
 	}
 	return params
 }
@@ -227,8 +262,9 @@ func DefaultOCRParams(
 type PromoteCandidatePluginInfo struct {
 	// RemoteChainSelectors is the chain selector of the DONs that we want to promote the candidate config of.
 	// Note that each (chain, ccip capability version) pair has a unique DON ID.
-	RemoteChainSelectors []uint64
-	PluginType           types.PluginType
+	RemoteChainSelectors    []uint64
+	PluginType              types.PluginType
+	AllowEmptyConfigPromote bool // safe guard to prevent promoting empty config to active
 }
 
 type PromoteCandidateChangesetConfig struct {
@@ -267,13 +303,8 @@ func (p PromoteCandidateChangesetConfig) Validate(e deployment.Environment) (map
 			if err := deployment.IsValidChainSelector(chainSelector); err != nil {
 				return nil, fmt.Errorf("don chain selector invalid: %w", err)
 			}
-			chainState, exists := state.Chains[chainSelector]
-			if !exists {
-				return nil, fmt.Errorf("chain %d does not exist", chainSelector)
-			}
-			if chainState.OffRamp == nil {
-				// should not be possible, but a defensive check.
-				return nil, errors.New("OffRamp contract does not exist")
+			if err := state.ValidateOffRamp(chainSelector); err != nil {
+				return nil, err
 			}
 
 			donID, err := internal.DonIDForChain(
@@ -294,7 +325,13 @@ func (p PromoteCandidateChangesetConfig) Validate(e deployment.Environment) (map
 			if err != nil {
 				return nil, fmt.Errorf("fetching %s configs from cciphome: %w", plugin.PluginType.String(), err)
 			}
+			// If promoteCandidate is called with AllowEmptyConfigPromote set to false and
+			// the CandidateConfig config digest is zero, do not promote the candidate config to active.
+			if !plugin.AllowEmptyConfigPromote && pluginConfigs.CandidateConfig.ConfigDigest == [32]byte{} {
+				return nil, fmt.Errorf("%s candidate config digest is empty", plugin.PluginType.String())
+			}
 
+			// If the active and candidate config digests are both zero, we should not promote the candidate config to active.
 			if pluginConfigs.ActiveConfig.ConfigDigest == [32]byte{} &&
 				pluginConfigs.CandidateConfig.ConfigDigest == [32]byte{} {
 				return nil, fmt.Errorf("%s active and candidate config digests are both zero", plugin.PluginType.String())
@@ -358,6 +395,7 @@ func PromoteCandidateChangeset(
 				nodes.NonBootstraps(),
 				donID,
 				plugin.PluginType,
+				plugin.AllowEmptyConfigPromote,
 				cfg.MCMS != nil,
 			)
 			if err != nil {
@@ -413,16 +451,14 @@ func (p SetCandidatePluginInfo) Validate(state CCIPOnChainState, homeChain uint6
 		return errors.New("PluginType must be set to either CCIPCommit or CCIPExec")
 	}
 	for chainSelector, params := range p.OCRConfigPerRemoteChainSelector {
-		_, ok := state.Chains[chainSelector]
-		if !ok {
+		if _, exists := state.SupportedChains()[chainSelector]; !exists {
 			return fmt.Errorf("chain %d does not exist in state", chainSelector)
 		}
 		if err := deployment.IsValidChainSelector(chainSelector); err != nil {
 			return fmt.Errorf("don chain selector invalid: %w", err)
 		}
-		if state.Chains[chainSelector].OffRamp == nil {
-			// should not be possible, but a defensive check.
-			return fmt.Errorf("OffRamp contract does not exist on don chain selector %d", chainSelector)
+		if err := state.ValidateOffRamp(chainSelector); err != nil {
+			return err
 		}
 		if p.PluginType == types.PluginTypeCCIPCommit && params.CommitOffChainConfig == nil {
 			return errors.New("commit off-chain config must be set")
@@ -433,7 +469,7 @@ func (p SetCandidatePluginInfo) Validate(state CCIPOnChainState, homeChain uint6
 
 		chainConfig, err := state.Chains[homeChain].CCIPHome.GetChainConfig(nil, chainSelector)
 		if err != nil {
-			return fmt.Errorf("get all chain configs: %w", err)
+			return fmt.Errorf("can't get chain config for %d: %w", chainSelector, err)
 		}
 		// FChain should never be zero if a chain config is set in CCIPHome
 		if chainConfig.FChain == 0 {
@@ -441,6 +477,13 @@ func (p SetCandidatePluginInfo) Validate(state CCIPOnChainState, homeChain uint6
 		}
 		if len(chainConfig.Readers) == 0 {
 			return errors.New("readers must be set")
+		}
+		decodedChainConfig, err := chainconfig.DecodeChainConfig(chainConfig.Config)
+		if err != nil {
+			return fmt.Errorf("can't decode chain config: %w", err)
+		}
+		if err := decodedChainConfig.Validate(); err != nil {
+			return fmt.Errorf("invalid chain config: %w", err)
 		}
 		err = params.Validate(chainSelector, feedChain, state)
 		if err != nil {
@@ -569,12 +612,15 @@ func AddDonAndSetCandidateChangeset(
 		txOpts = deployment.SimTransactOpts()
 	}
 	var donOps []mcms.Operation
-
 	for chainSelector, params := range cfg.PluginInfo.OCRConfigPerRemoteChainSelector {
+		offRampAddress, err := state.GetOffRampAddress(chainSelector)
+		if err != nil {
+			return deployment.ChangesetOutput{}, err
+		}
 		newDONArgs, err := internal.BuildOCR3ConfigForCCIPHome(
 			e.OCRSecrets,
-			state.Chains[chainSelector].OffRamp,
-			e.Chains[chainSelector],
+			offRampAddress,
+			chainSelector,
 			nodes.NonBootstraps(),
 			state.Chains[cfg.HomeChainSelector].RMNHome.Address(),
 			params.OCRParameters,
@@ -758,10 +804,14 @@ func SetCandidateChangeset(
 	for _, plugin := range cfg.PluginInfo {
 		pluginInfos = append(pluginInfos, plugin.String())
 		for chainSelector, params := range plugin.OCRConfigPerRemoteChainSelector {
+			offRampAddress, err := state.GetOffRampAddress(chainSelector)
+			if err != nil {
+				return deployment.ChangesetOutput{}, err
+			}
 			newDONArgs, err := internal.BuildOCR3ConfigForCCIPHome(
 				e.OCRSecrets,
-				state.Chains[chainSelector].OffRamp,
-				e.Chains[chainSelector],
+				offRampAddress,
+				chainSelector,
 				nodes.NonBootstraps(),
 				state.Chains[cfg.HomeChainSelector].RMNHome.Address(),
 				params.OCRParameters,
@@ -950,6 +1000,7 @@ func promoteCandidateForChainOps(
 	nodes deployment.Nodes,
 	donID uint32,
 	pluginType cctypes.PluginType,
+	allowEmpty bool,
 	mcmsEnabled bool,
 ) (mcms.Operation, error) {
 	if donID == 0 {
@@ -958,6 +1009,9 @@ func promoteCandidateForChainOps(
 	digest, err := ccipHome.GetCandidateDigest(nil, donID, uint8(pluginType))
 	if err != nil {
 		return mcms.Operation{}, err
+	}
+	if digest == [32]byte{} && !allowEmpty {
+		return mcms.Operation{}, errors.New("candidate config digest is zero, promoting empty config is not allowed")
 	}
 	fmt.Println("Promoting candidate for plugin", pluginType.String(), "with digest", digest)
 	updatePluginOp, err := promoteCandidateOp(
@@ -1213,11 +1267,14 @@ func (c UpdateChainConfigConfig) Validate(e deployment.Environment) error {
 		if len(ccfg.Readers) == 0 {
 			return errors.New("Readers must be set")
 		}
+		if err := ccfg.EncodableChainConfig.Validate(); err != nil {
+			return fmt.Errorf("invalid chain config for selector %d: %w", add, err)
+		}
 	}
 	return nil
 }
 
-func UpdateChainConfig(e deployment.Environment, cfg UpdateChainConfigConfig) (deployment.ChangesetOutput, error) {
+func UpdateChainConfigChangeset(e deployment.Environment, cfg UpdateChainConfigConfig) (deployment.ChangesetOutput, error) {
 	if err := cfg.Validate(e); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("%w: %w", deployment.ErrInvalidConfig, err)
 	}

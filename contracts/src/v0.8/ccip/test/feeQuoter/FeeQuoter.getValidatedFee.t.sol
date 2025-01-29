@@ -205,6 +205,22 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 
+  function test_SolChainFamilySelector() public {
+    // Update config to enforce allowOutOfOrderExecution = true.
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SVM;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+    vm.stopPrank();
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage2SVM();
+
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
+  }
+
   // Reverts
 
   function test_RevertWhen_DestinationChainNotEnabled() public {
@@ -270,6 +286,32 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
 
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, message.receiver));
 
+    s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
+  }
+
+  function test_RevertWhen_SVMMessageWithTokenTransferAndInvalidTokenReceiver() public {
+    vm.stopPrank();
+    //setup to set chainFamilySelector for SVM so that token receiver's check flow is enabled
+    vm.startPrank(OWNER);
+
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_SVM;
+
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+    vm.stopPrank();
+
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1);
+    // replace with SVM Extra Args
+    message.extraArgs = Client._svmArgsToBytes(
+      Client.SVMExtraArgsV1({
+        computeUnits: GAS_LIMIT,
+        accountIsWritableBitmap: 0,
+        allowOutOfOrderExecution: true,
+        tokenReceiver: bytes32(0),
+        accounts: new bytes32[](0)
+      })
+    );
+    vm.expectRevert(FeeQuoter.InvalidTokenReceiver.selector);
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
 }
