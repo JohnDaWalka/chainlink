@@ -112,9 +112,9 @@ func MarshalMultichainPublicKey(ost map[string]types.OnchainPublicKey) (types.On
 }
 
 type WorkflowConfig struct {
-	UseChainlinkCLI bool                    `toml:"use_chainlink_cli" validate:"required"`
+	UseChainlinkCLI bool                    `toml:"use_chainlink_cli"`
 	ChainlinkCLI    *ChainlinkCLIConfig     `toml:"chainlink_cli"`
-	UseExising      bool                    `toml:"use_existing" validate:"required"`
+	UseExising      bool                    `toml:"use_existing"`
 	Existing        *ExistingWorkflowConfig `toml:"existing"`
 	DonId           uint32                  `toml:"don_id" validate:"required"`
 	WorkflowName    string                  `toml:"workflow_name" validate:"required" `
