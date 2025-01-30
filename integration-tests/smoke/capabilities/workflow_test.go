@@ -1289,6 +1289,11 @@ func configureWorkflowDON(t *testing.T, ctfEnv *deployment.Environment, don *dev
 		Capabilities: kcrAllCaps,
 	}
 
+	transmissionSchedule := make([]int, len(don.Nodes)-1)
+	for i := range transmissionSchedule {
+		transmissionSchedule[i] = i + 1
+	}
+
 	oracleConfig := keystone_changeset.OracleConfig{
 		DeltaProgressMillis:               5000,
 		DeltaResendMillis:                 5000,
@@ -1298,7 +1303,7 @@ func configureWorkflowDON(t *testing.T, ctfEnv *deployment.Environment, don *dev
 		DeltaCertifiedCommitRequestMillis: 1000,
 		DeltaStageMillis:                  30000,
 		MaxRoundsPerEpoch:                 10,
-		TransmissionSchedule:              []int{1, 2, 3, 4},
+		TransmissionSchedule:              transmissionSchedule,
 		MaxDurationQueryMillis:            1000,
 		MaxDurationObservationMillis:      1000,
 		MaxDurationAcceptMillis:           1000,
