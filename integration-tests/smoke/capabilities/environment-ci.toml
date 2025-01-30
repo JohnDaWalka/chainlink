@@ -12,7 +12,7 @@
   # without 0x prefix!
 	feed_id = "018bfe8840700040000000000000000000000000000000000000000000000000"
 
-  use_chainlink_cli = false
+  use_chainlink_cli = true
   use_existing = true
 
   [workflow_config.existing]
