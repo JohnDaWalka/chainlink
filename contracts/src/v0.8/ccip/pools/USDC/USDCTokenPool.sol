@@ -2,11 +2,13 @@
 pragma solidity ^0.8.24;
 
 import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
+
 import {IMessageTransmitter} from "./IMessageTransmitter.sol";
 import {ITokenMessenger} from "./ITokenMessenger.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
+import {CCTPMessageTransmitterProxy} from "./CCTPMessageTransmitterProxy.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -50,14 +52,14 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     uint32 sourceDomain;
   }
 
-  string public constant override typeAndVersion = "USDCTokenPool 1.5.1";
+  string public constant override typeAndVersion = "USDCTokenPool 1.6.1";
 
   // We restrict to the first version. New pool may be required for subsequent versions.
   uint32 public constant SUPPORTED_USDC_VERSION = 0;
 
   // The local USDC config
   ITokenMessenger public immutable i_tokenMessenger;
-  IMessageTransmitter public immutable i_messageTransmitter;
+  CCTPMessageTransmitterProxy public immutable i_messageTransmitterProxy;
   uint32 public immutable i_localDomainIdentifier;
 
   /// A domain is a USDC representation of a destination chain.
@@ -74,6 +76,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
   constructor(
     ITokenMessenger tokenMessenger,
+    CCTPMessageTransmitterProxy cctpMessageTransmitterProxy,
     IERC20 token,
     address[] memory allowlist,
     address rmnProxy,
@@ -85,9 +88,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     if (transmitterVersion != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(transmitterVersion);
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
     if (tokenMessengerVersion != SUPPORTED_USDC_VERSION) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
+    if (cctpMessageTransmitterProxy.getTransmitter() != transmitter) revert InvalidConfig();
 
     i_tokenMessenger = tokenMessenger;
-    i_messageTransmitter = transmitter;
+    i_messageTransmitterProxy = cctpMessageTransmitterProxy;
     i_localDomainIdentifier = transmitter.localDomain();
     i_token.safeIncreaseAllowance(address(i_tokenMessenger), type(uint256).max);
     emit ConfigSet(address(tokenMessenger));
@@ -146,7 +150,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
     _validateMessage(msgAndAttestation.message, sourceTokenDataPayload);
 
-    if (!i_messageTransmitter.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
+    if (!i_messageTransmitterProxy.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();
     }
 
