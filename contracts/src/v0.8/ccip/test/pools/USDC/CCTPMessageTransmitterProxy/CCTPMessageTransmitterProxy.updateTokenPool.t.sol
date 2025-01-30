@@ -7,7 +7,7 @@ import {CCTPMessageTransmitterProxySetup} from "./CCTPMessageTransmitterProxySet
 contract CCTPMessageTransmitterProxy_updateTokenPool is CCTPMessageTransmitterProxySetup {
   function test_updateTokenPool() public {
     s_cctpMessageTransmitterProxy.updateTokenPool(s_usdcTokenPool);
-    assertEq(s_cctpMessageTransmitterProxy.s_tokenPool(), s_usdcTokenPool);
+    assertEq(s_cctpMessageTransmitterProxy.getTokenPool(), s_usdcTokenPool);
   }
 
   // Revert cases

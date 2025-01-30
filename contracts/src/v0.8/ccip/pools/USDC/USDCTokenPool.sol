@@ -31,6 +31,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   error InvalidSourceDomain(uint32 expected, uint32 got);
   error InvalidDestinationDomain(uint32 expected, uint32 got);
   error InvalidReceiver(bytes receiver);
+  error InvalidTransmitterInProxy();
 
   // This data is supplied from offchain and contains everything needed
   // to receive the USDC tokens.
@@ -88,7 +89,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     if (transmitterVersion != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(transmitterVersion);
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
     if (tokenMessengerVersion != SUPPORTED_USDC_VERSION) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
-    if (cctpMessageTransmitterProxy.getTransmitter() != transmitter) revert InvalidConfig();
+    if (cctpMessageTransmitterProxy.i_transmitter() != transmitter) revert InvalidTransmitterInProxy();
 
     i_tokenMessenger = tokenMessenger;
     i_messageTransmitterProxy = cctpMessageTransmitterProxy;

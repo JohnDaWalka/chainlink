@@ -9,8 +9,8 @@ import {Ownable2StepMsgSender} from "../../../shared/access/Ownable2StepMsgSende
 contract CCTPMessageTransmitterProxy is Ownable2StepMsgSender {
   error OnlyCallableByTokenPool();
 
-  IMessageTransmitter private immutable i_transmitter;
-  address public s_tokenPool;
+  IMessageTransmitter public immutable i_transmitter;
+  address private s_tokenPool;
 
   // There's a one time cyclic dependency between the TokenPool and the MessageTransmitter.
   // We will deploy MessageTransmitter first and then deploy upgraded TokenPool.
@@ -28,8 +28,8 @@ contract CCTPMessageTransmitterProxy is Ownable2StepMsgSender {
     return i_transmitter.receiveMessage(message, attestation);
   }
 
-  function getTransmitter() external view returns (IMessageTransmitter transmitter) {
-    return i_transmitter;
+  function getTokenPool() external view returns (address) {
+    return s_tokenPool;
   }
 
   function updateTokenPool(
