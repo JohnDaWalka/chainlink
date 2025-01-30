@@ -304,13 +304,8 @@ func (p PromoteCandidateChangesetConfig) Validate(e deployment.Environment) (map
 			if err := deployment.IsValidChainSelector(chainSelector); err != nil {
 				return nil, fmt.Errorf("don chain selector invalid: %w", err)
 			}
-			chainState, exists := state.Chains[chainSelector]
-			if !exists {
-				return nil, fmt.Errorf("chain %d does not exist", chainSelector)
-			}
-			if chainState.OffRamp == nil {
-				// should not be possible, but a defensive check.
-				return nil, errors.New("OffRamp contract does not exist")
+			if err := state.ValidateOffRamp(chainSelector); err != nil {
+				return nil, err
 			}
 
 			donID, err := internal.DonIDForChain(
@@ -457,16 +452,14 @@ func (p SetCandidatePluginInfo) Validate(state CCIPOnChainState, homeChain uint6
 		return errors.New("PluginType must be set to either CCIPCommit or CCIPExec")
 	}
 	for chainSelector, params := range p.OCRConfigPerRemoteChainSelector {
-		_, ok := state.Chains[chainSelector]
-		if !ok {
+		if _, exists := state.SupportedChains()[chainSelector]; !exists {
 			return fmt.Errorf("chain %d does not exist in state", chainSelector)
 		}
 		if err := deployment.IsValidChainSelector(chainSelector); err != nil {
 			return fmt.Errorf("don chain selector invalid: %w", err)
 		}
-		if state.Chains[chainSelector].OffRamp == nil {
-			// should not be possible, but a defensive check.
-			return fmt.Errorf("OffRamp contract does not exist on don chain selector %d", chainSelector)
+		if err := state.ValidateOffRamp(chainSelector); err != nil {
+			return err
 		}
 		if p.PluginType == types.PluginTypeCCIPCommit && params.CommitOffChainConfig == nil {
 			return errors.New("commit off-chain config must be set")
@@ -620,12 +613,15 @@ func AddDonAndSetCandidateChangeset(
 		txOpts = deployment.SimTransactOpts()
 	}
 	var donOps []mcms.Operation
-
 	for chainSelector, params := range cfg.PluginInfo.OCRConfigPerRemoteChainSelector {
+		offRampAddress, err := state.GetOffRampAddress(chainSelector)
+		if err != nil {
+			return deployment.ChangesetOutput{}, err
+		}
 		newDONArgs, err := internal.BuildOCR3ConfigForCCIPHome(
 			e.OCRSecrets,
-			state.Chains[chainSelector].OffRamp,
-			e.Chains[chainSelector],
+			offRampAddress,
+			chainSelector,
 			nodes.NonBootstraps(),
 			state.Chains[cfg.HomeChainSelector].RMNHome.Address(),
 			params.OCRParameters,
@@ -809,10 +805,14 @@ func SetCandidateChangeset(
 	for _, plugin := range cfg.PluginInfo {
 		pluginInfos = append(pluginInfos, plugin.String())
 		for chainSelector, params := range plugin.OCRConfigPerRemoteChainSelector {
+			offRampAddress, err := state.GetOffRampAddress(chainSelector)
+			if err != nil {
+				return deployment.ChangesetOutput{}, err
+			}
 			newDONArgs, err := internal.BuildOCR3ConfigForCCIPHome(
 				e.OCRSecrets,
-				state.Chains[chainSelector].OffRamp,
-				e.Chains[chainSelector],
+				offRampAddress,
+				chainSelector,
 				nodes.NonBootstraps(),
 				state.Chains[cfg.HomeChainSelector].RMNHome.Address(),
 				params.OCRParameters,
