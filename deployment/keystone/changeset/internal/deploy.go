@@ -994,12 +994,11 @@ func containsAllDONs(donInfos []capabilities_registry.CapabilitiesRegistryDONInf
 
 // configureForwarder sets the config for the forwarder contract on the chain for all Dons that accept workflows
 // dons that don't accept workflows are not registered with the forwarder
-func configureForwarder(lggr logger.Logger, chain deployment.Chain, contractSet ContractSet, dons []RegisteredDon, useMCMS bool) (map[uint64]timelock.BatchChainOperation, error) {
-	if contractSet.Forwarder == nil {
+func configureForwarder(lggr logger.Logger, chain deployment.Chain, fwdr *kf.KeystoneForwarder, dons []RegisteredDon, useMCMS bool) (map[uint64]timelock.BatchChainOperation, error) {
+	if fwdr == nil {
 		return nil, errors.New("nil forwarder contract")
 	}
 	var (
-		fwdr  = contractSet.Forwarder
 		opMap = make(map[uint64]timelock.BatchChainOperation)
 	)
 	for _, dn := range dons {
