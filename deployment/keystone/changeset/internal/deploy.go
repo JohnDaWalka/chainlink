@@ -323,12 +323,11 @@ func ConfigureOCR3Contract(env *deployment.Environment, chainSel uint64, dons []
 		}
 
 		_, err = configureOCR3contract(configureOCR3Request{
-			cfg:         cfg,
-			chain:       registryChain,
-			contract:    contract,
-			nodes:       don.Nodes,
-			contractSet: &contracts,
-			ocrSecrets:  env.OCRSecrets,
+			cfg:        cfg,
+			chain:      registryChain,
+			contract:   contract,
+			nodes:      don.Nodes,
+			ocrSecrets: env.OCRSecrets,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to configure OCR3 contract for don %s: %w", don.Name, err)
@@ -386,14 +385,13 @@ func ConfigureOCR3ContractFromJD(env *deployment.Environment, cfg ConfigureOCR3C
 		return nil, err
 	}
 	r, err := configureOCR3contract(configureOCR3Request{
-		cfg:         cfg.OCR3Config,
-		chain:       registryChain,
-		contract:    contract,
-		nodes:       nodes,
-		dryRun:      cfg.DryRun,
-		contractSet: &contracts,
-		useMCMS:     cfg.UseMCMS,
-		ocrSecrets:  env.OCRSecrets,
+		cfg:        cfg.OCR3Config,
+		chain:      registryChain,
+		contract:   contract,
+		nodes:      nodes,
+		dryRun:     cfg.DryRun,
+		useMCMS:    cfg.UseMCMS,
+		ocrSecrets: env.OCRSecrets,
 	})
 	if err != nil {
 		return nil, err

@@ -29,10 +29,10 @@ import (
 
 func Test_UpdateNodesRequest_validate(t *testing.T) {
 	type fields struct {
-		p2pToUpdates map[p2pkey.PeerID]internal.NodeUpdate
-		nopToNodes   map[kcr.CapabilitiesRegistryNodeOperator][]*internal.P2PSignerEnc
-		chain        deployment.Chain
-		contractSet  *internal.ContractSet
+		p2pToUpdates         map[p2pkey.PeerID]internal.NodeUpdate
+		nopToNodes           map[kcr.CapabilitiesRegistryNodeOperator][]*internal.P2PSignerEnc
+		chain                deployment.Chain
+		capabilitiesRegistry *kcr.CapabilitiesRegistry
 	}
 	tests := []struct {
 		name    string
@@ -42,10 +42,10 @@ func Test_UpdateNodesRequest_validate(t *testing.T) {
 		{
 			name: "err",
 			fields: fields{
-				p2pToUpdates: map[p2pkey.PeerID]internal.NodeUpdate{},
-				nopToNodes:   nil,
-				chain:        deployment.Chain{},
-				contractSet:  nil,
+				p2pToUpdates:         map[p2pkey.PeerID]internal.NodeUpdate{},
+				nopToNodes:           nil,
+				chain:                deployment.Chain{},
+				capabilitiesRegistry: nil,
 			},
 			wantErr: true,
 		},
@@ -57,9 +57,9 @@ func Test_UpdateNodesRequest_validate(t *testing.T) {
 						EncryptionPublicKey: "jk",
 					},
 				},
-				nopToNodes:  nil,
-				chain:       deployment.Chain{},
-				contractSet: nil,
+				nopToNodes:           nil,
+				chain:                deployment.Chain{},
+				capabilitiesRegistry: nil,
 			},
 			wantErr: true,
 		},
@@ -71,9 +71,9 @@ func Test_UpdateNodesRequest_validate(t *testing.T) {
 						EncryptionPublicKey: "aabb",
 					},
 				},
-				nopToNodes:  nil,
-				chain:       deployment.Chain{},
-				contractSet: nil,
+				nopToNodes:           nil,
+				chain:                deployment.Chain{},
+				capabilitiesRegistry: nil,
 			},
 			wantErr: true,
 		},
@@ -83,7 +83,7 @@ func Test_UpdateNodesRequest_validate(t *testing.T) {
 			req := &internal.UpdateNodesRequest{
 				P2pToUpdates:         tt.fields.p2pToUpdates,
 				Chain:                tt.fields.chain,
-				CapabilitiesRegistry: tt.fields.contractSet.CapabilitiesRegistry,
+				CapabilitiesRegistry: tt.fields.capabilitiesRegistry,
 			}
 			if err := req.Validate(); (err != nil) != tt.wantErr {
 				t.Errorf("internal.UpdateNodesRequest.validate() error = %v, wantErr %v", err, tt.wantErr)
