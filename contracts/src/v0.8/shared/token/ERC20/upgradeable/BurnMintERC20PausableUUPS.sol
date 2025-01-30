@@ -13,7 +13,6 @@ import {AccessControlUpgradeable} from
   "../../../../vendor/openzeppelin-solidity-upgradeable/v4.8.3/contracts/access/AccessControlUpgradeable.sol";
 import {IAccessControlUpgradeable} from
   "../../../../vendor/openzeppelin-solidity-upgradeable/v4.8.3/contracts/access/IAccessControlUpgradeable.sol";
-
 import {PausableUpgradeable} from
   "../../../../vendor/openzeppelin-solidity-upgradeable/v4.8.3/contracts/security/PausableUpgradeable.sol";
 import {ERC20Upgradeable} from
@@ -206,10 +205,14 @@ contract BurnMintERC20PausableUUPS is
   // │                          Pausing                             │
   // ================================================================
 
+  /// @notice Pauses the implementation.
+  /// @dev Requires the caller to have the PAUSER_ROLE.
   function pause() public onlyRole(PAUSER_ROLE) {
     _pause();
   }
 
+  /// @notice Unpauses the implementation.
+  /// @dev Requires the caller to have the PAUSER_ROLE.
   function unpause() public onlyRole(PAUSER_ROLE) {
     _unpause();
   }
