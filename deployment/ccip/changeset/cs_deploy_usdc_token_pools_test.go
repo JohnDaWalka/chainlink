@@ -35,7 +35,7 @@ func TestValidateDeployUSDCTokenPoolContractsConfig(t *testing.T) {
 		{
 			Msg: "Chain selector is not valid",
 			Input: changeset.DeployUSDCTokenPoolContractsConfig{
-				NewUSDCPools: map[uint64]changeset.DeployUSDCTokenPoolInput{
+				USDCPools: map[uint64]changeset.DeployUSDCTokenPoolInput{
 					0: changeset.DeployUSDCTokenPoolInput{},
 				},
 			},
@@ -44,7 +44,7 @@ func TestValidateDeployUSDCTokenPoolContractsConfig(t *testing.T) {
 		{
 			Msg: "Chain selector doesn't exist in environment",
 			Input: changeset.DeployUSDCTokenPoolContractsConfig{
-				NewUSDCPools: map[uint64]changeset.DeployUSDCTokenPoolInput{
+				USDCPools: map[uint64]changeset.DeployUSDCTokenPoolInput{
 					5009297550715157269: changeset.DeployUSDCTokenPoolInput{},
 				},
 			},
@@ -53,7 +53,7 @@ func TestValidateDeployUSDCTokenPoolContractsConfig(t *testing.T) {
 		{
 			Msg: "Missing router",
 			Input: changeset.DeployUSDCTokenPoolContractsConfig{
-				NewUSDCPools: map[uint64]changeset.DeployUSDCTokenPoolInput{
+				USDCPools: map[uint64]changeset.DeployUSDCTokenPoolInput{
 					e.AllChainSelectors()[0]: changeset.DeployUSDCTokenPoolInput{},
 				},
 			},
@@ -213,7 +213,7 @@ func TestDeployUSDCTokenPoolContracts(t *testing.T) {
 					commonchangeset.ChangesetApplication{
 						Changeset: commonchangeset.WrapChangeSet(changeset.DeployUSDCTokenPoolContractsChangeset),
 						Config: changeset.DeployUSDCTokenPoolContractsConfig{
-							NewUSDCPools: newUSDCTokenPools,
+							USDCPools: newUSDCTokenPools,
 						},
 					},
 				})

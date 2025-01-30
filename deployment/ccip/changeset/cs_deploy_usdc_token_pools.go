@@ -76,8 +76,8 @@ func (i DeployUSDCTokenPoolInput) Validate(ctx context.Context, chain deployment
 
 // DeployUSDCTokenPoolContractsConfig defines the USDC token pool contracts that need to be deployed on each chain.
 type DeployUSDCTokenPoolContractsConfig struct {
-	// NewUSDCPools defines the per-chain configuration of each new USDC pool.
-	NewUSDCPools map[uint64]DeployUSDCTokenPoolInput
+	// USDCPools defines the per-chain configuration of each new USDC pool.
+	USDCPools map[uint64]DeployUSDCTokenPoolInput
 }
 
 func (c DeployUSDCTokenPoolContractsConfig) Validate(env deployment.Environment) error {
@@ -85,7 +85,7 @@ func (c DeployUSDCTokenPoolContractsConfig) Validate(env deployment.Environment)
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
 	}
-	for chainSelector, poolConfig := range c.NewUSDCPools {
+	for chainSelector, poolConfig := range c.USDCPools {
 		err := deployment.IsValidChainSelector(chainSelector)
 		if err != nil {
 			return fmt.Errorf("failed to validate chain selector %d: %w", chainSelector, err)
@@ -98,10 +98,10 @@ func (c DeployUSDCTokenPoolContractsConfig) Validate(env deployment.Environment)
 		if !ok {
 			return fmt.Errorf("chain with selector %d does not exist in state", chainSelector)
 		}
-		if router := chainState.Router; router == nil {
+		if chainState.Router == nil {
 			return fmt.Errorf("missing router on %s", chain)
 		}
-		if rmnProxy := chainState.RMNProxy; rmnProxy == nil {
+		if chainState.RMNProxy == nil {
 			return fmt.Errorf("missing rmnProxy on %s", chain)
 		}
 		err = poolConfig.Validate(env.GetContext(), chain, chainState)
@@ -124,7 +124,7 @@ func DeployUSDCTokenPoolContractsChangeset(env deployment.Environment, c DeployU
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
 
-	for chainSelector, poolConfig := range c.NewUSDCPools {
+	for chainSelector, poolConfig := range c.USDCPools {
 		chain := env.Chains[chainSelector]
 		chainState := state.Chains[chainSelector]
 

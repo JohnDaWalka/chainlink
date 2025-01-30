@@ -20,11 +20,12 @@ import (
 var CurrentTokenPoolVersion semver.Version = deployment.Version1_5_1
 
 var tokenPoolTypes map[deployment.ContractType]struct{} = map[deployment.ContractType]struct{}{
-	BurnMintTokenPool:         struct{}{},
-	BurnWithFromMintTokenPool: struct{}{},
-	BurnFromMintTokenPool:     struct{}{},
-	LockReleaseTokenPool:      struct{}{},
-	USDCTokenPool:             struct{}{},
+	BurnMintTokenPool:              struct{}{},
+	BurnWithFromMintTokenPool:      struct{}{},
+	BurnFromMintTokenPool:          struct{}{},
+	LockReleaseTokenPool:           struct{}{},
+	USDCTokenPool:                  struct{}{},
+	HybridLockReleaseUSDCTokenPool: struct{}{},
 }
 
 var tokenPoolVersions map[semver.Version]struct{} = map[semver.Version]struct{}{

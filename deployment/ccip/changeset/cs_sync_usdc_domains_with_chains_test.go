@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -55,7 +56,7 @@ func deployChainWithUSDCTokenPool(
 		commonchangeset.ChangesetApplication{
 			Changeset: commonchangeset.WrapChangeSet(changeset.DeployUSDCTokenPoolContractsChangeset),
 			Config: changeset.DeployUSDCTokenPoolContractsConfig{
-				NewUSDCPools: map[uint64]changeset.DeployUSDCTokenPoolInput{
+				USDCPools: map[uint64]changeset.DeployUSDCTokenPoolInput{
 					selector: changeset.DeployUSDCTokenPoolInput{
 						TokenMessenger: tokenMessenger.Address,
 						TokenAddress:   usdcToken.Address,
@@ -104,7 +105,7 @@ func TestValidateSyncUSDCDomainsWithChainsConfig(t *testing.T) {
 	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
 		Chains: 2,
 	})
-	selector := e.AllChainSelectors()[0]
+	selectors := e.AllChainSelectors()
 
 	tests := []struct {
 		Msg        string
@@ -113,92 +114,78 @@ func TestValidateSyncUSDCDomainsWithChainsConfig(t *testing.T) {
 		DeployUSDC bool
 	}{
 		{
+			Msg:    "Domain mapping not defined",
+			Input:  changeset.SyncUSDCDomainsWithChainsConfig{},
+			ErrStr: "chain selector to usdc domain must be defined",
+		},
+		{
 			Msg: "Chain selector is not valid",
 			Input: changeset.SyncUSDCDomainsWithChainsConfig{
-				USDCConfigsByChain: map[uint64]changeset.USDCChainConfig{
-					0: changeset.USDCChainConfig{},
+				USDCVersionByChain: map[uint64]semver.Version{
+					0: changeset.CurrentTokenPoolVersion,
 				},
+				ChainSelectorToUSDCDomain: map[uint64]uint32{},
 			},
 			ErrStr: "failed to validate chain selector 0",
 		},
 		{
 			Msg: "Chain selector doesn't exist in environment",
 			Input: changeset.SyncUSDCDomainsWithChainsConfig{
-				USDCConfigsByChain: map[uint64]changeset.USDCChainConfig{
-					5009297550715157269: changeset.USDCChainConfig{},
+				USDCVersionByChain: map[uint64]semver.Version{
+					5009297550715157269: changeset.CurrentTokenPoolVersion,
 				},
+				ChainSelectorToUSDCDomain: map[uint64]uint32{},
 			},
 			ErrStr: "does not exist in environment",
 		},
 		{
-			Msg: "Missing USDC in state",
 			Input: changeset.SyncUSDCDomainsWithChainsConfig{
-				USDCConfigsByChain: map[uint64]changeset.USDCChainConfig{
-					selector: changeset.USDCChainConfig{},
+				USDCVersionByChain: map[uint64]semver.Version{
+					selectors[0]: changeset.CurrentTokenPoolVersion,
 				},
+				ChainSelectorToUSDCDomain: map[uint64]uint32{},
 			},
 			ErrStr: "does not define any USDC token pools, config should be removed",
 		},
 		{
-			Msg: "Missing USDC in input",
+			Msg: "No USDC token pool found with version",
 			Input: changeset.SyncUSDCDomainsWithChainsConfig{
-				USDCConfigsByChain: map[uint64]changeset.USDCChainConfig{},
+				USDCVersionByChain: map[uint64]semver.Version{
+					selectors[0]: deployment.Version1_0_0,
+				},
+				ChainSelectorToUSDCDomain: map[uint64]uint32{},
 			},
 			DeployUSDC: true,
-			ErrStr:     "which does support USDC",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.Msg, func(t *testing.T) {
-			if test.DeployUSDC {
-				e = deployChainWithUSDCTokenPool(t, lggr, e, selector, false)
-			}
-
-			err := test.Input.Validate(e)
-			require.Contains(t, err.Error(), test.ErrStr)
-		})
-	}
-}
-
-func TestValidateUSDCChainConfig(t *testing.T) {
-	t.Parallel()
-
-	lggr := logger.TestLogger(t)
-	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
-		Chains: 2,
-	})
-	selectors := e.AllChainSelectors()
-
-	tests := []struct {
-		Msg        string
-		Input      changeset.USDCChainConfig
-		ErrStr     string
-		DeployUSDC bool
-		UseMCMS    bool
-	}{
-		{
-			Msg: "No USDC token pool found with version",
-			Input: changeset.USDCChainConfig{
-				Version: changeset.CurrentTokenPoolVersion,
-			},
-			ErrStr: "no USDC token pool found",
+			ErrStr:     "no USDC token pool found",
 		},
 		{
 			Msg: "Not owned by expected owner",
-			Input: changeset.USDCChainConfig{
-				Version: changeset.CurrentTokenPoolVersion,
+			Input: changeset.SyncUSDCDomainsWithChainsConfig{
+				USDCVersionByChain: map[uint64]semver.Version{
+					selectors[0]: changeset.CurrentTokenPoolVersion,
+				},
+				ChainSelectorToUSDCDomain: map[uint64]uint32{},
+				MCMS:                      &changeset.MCMSConfig{MinDelay: 0 * time.Second},
 			},
-			ErrStr:     "failed ownership validation",
-			DeployUSDC: true,
-			UseMCMS:    true,
+			ErrStr: "failed ownership validation",
 		},
 		{
 			Msg: "No domain ID found for selector",
-			Input: changeset.USDCChainConfig{
-				Version: changeset.CurrentTokenPoolVersion,
+			Input: changeset.SyncUSDCDomainsWithChainsConfig{
+				USDCVersionByChain: map[uint64]semver.Version{
+					selectors[0]: changeset.CurrentTokenPoolVersion,
+				},
+				ChainSelectorToUSDCDomain: map[uint64]uint32{},
 			},
 			ErrStr: "no USDC domain ID defined for chain with selector",
+		},
+		{
+			Msg: "Missing USDC in input",
+			Input: changeset.SyncUSDCDomainsWithChainsConfig{
+				USDCVersionByChain:        map[uint64]semver.Version{},
+				ChainSelectorToUSDCDomain: map[uint64]uint32{},
+			},
+			ErrStr: "which does support USDC",
 		},
 	}
 
@@ -239,7 +226,7 @@ func TestValidateUSDCChainConfig(t *testing.T) {
 			state, err := changeset.LoadOnchainState(e)
 			require.NoError(t, err)
 
-			err = test.Input.Validate(e.GetContext(), e.Chains[selectors[0]], state.Chains[selectors[0]], test.UseMCMS, map[uint64]uint32{})
+			err = test.Input.Validate(e, state)
 			require.Contains(t, err.Error(), test.ErrStr)
 		})
 	}
@@ -304,13 +291,9 @@ func TestSyncUSDCDomainsWithChainsChangeset(t *testing.T) {
 					Changeset: commoncs.WrapChangeSet(changeset.SyncUSDCDomainsWithChainsChangeset),
 					Config: changeset.SyncUSDCDomainsWithChainsConfig{
 						MCMS: mcmsConfig,
-						USDCConfigsByChain: map[uint64]changeset.USDCChainConfig{
-							selectors[0]: {
-								Version: changeset.CurrentTokenPoolVersion,
-							},
-							selectors[1]: {
-								Version: changeset.CurrentTokenPoolVersion,
-							},
+						USDCVersionByChain: map[uint64]semver.Version{
+							selectors[0]: changeset.CurrentTokenPoolVersion,
+							selectors[1]: changeset.CurrentTokenPoolVersion,
 						},
 						ChainSelectorToUSDCDomain: map[uint64]uint32{
 							selectors[0]: 1,
@@ -348,13 +331,9 @@ func TestSyncUSDCDomainsWithChainsChangeset(t *testing.T) {
 			// Idempotency check
 			output, err := changeset.SyncUSDCDomainsWithChainsChangeset(e, changeset.SyncUSDCDomainsWithChainsConfig{
 				MCMS: mcmsConfig,
-				USDCConfigsByChain: map[uint64]changeset.USDCChainConfig{
-					selectors[0]: {
-						Version: changeset.CurrentTokenPoolVersion,
-					},
-					selectors[1]: {
-						Version: changeset.CurrentTokenPoolVersion,
-					},
+				USDCVersionByChain: map[uint64]semver.Version{
+					selectors[0]: changeset.CurrentTokenPoolVersion,
+					selectors[1]: changeset.CurrentTokenPoolVersion,
 				},
 				ChainSelectorToUSDCDomain: map[uint64]uint32{
 					selectors[0]: 1,
