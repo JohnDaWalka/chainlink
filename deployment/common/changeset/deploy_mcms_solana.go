@@ -28,7 +28,7 @@ func DeployMCMSWithTimelockContractsSolana(
 	state MCMSSolanaState,
 	chain deployment.SolChain,
 	addressBook deployment.AddressBook,
-	config types.MCMSWithTimelockConfig,
+	config types.MCMSWithTimelockConfigV2,
 ) (any, error) { // FIXME: define return type
 	err := deployMCMSSolana(e, state, chain, addressBook, config)
 	if err != nil {
@@ -55,7 +55,7 @@ func DeployMCMSWithTimelockContractsSolana(
 
 func deployMCMSSolana(
 	e deployment.Environment, state MCMSSolanaState, chain deployment.SolChain, addressBook deployment.AddressBook,
-	_ types.MCMSWithTimelockConfig,
+	_ types.MCMSWithTimelockConfigV2,
 ) error {
 	var mcmProgram solana.PublicKey
 	if state.MCM.IsZero() {
@@ -92,7 +92,7 @@ func deployMCMSSolana(
 
 func deployTimelockSolana(
 	e deployment.Environment, state MCMSSolanaState, chain deployment.SolChain, addressBook deployment.AddressBook,
-	config types.MCMSWithTimelockConfig,
+	config types.MCMSWithTimelockConfigV2,
 ) error {
 	var timelockProgram solana.PublicKey
 	if state.Timelock.IsZero() {
@@ -129,7 +129,7 @@ func deployTimelockSolana(
 
 func deployAccessControllerSolana(
 	e deployment.Environment, state MCMSSolanaState, chain deployment.SolChain, addressBook deployment.AddressBook,
-	_ types.MCMSWithTimelockConfig,
+	_ types.MCMSWithTimelockConfigV2,
 ) error {
 	var accessControllerProgram solana.PublicKey
 	if state.AccessController.IsZero() {
@@ -258,6 +258,7 @@ func initializeTimelock(
 	var bypasserRoleAccessController solana.PublicKey
 
 	instruction, err := timelockBindings.NewInitializeInstruction(
+		timelockID,
 		minDelay.Uint64(), // minDelay,
 		GetTimelockConfigPDA(timelockProgram, timelockID),
 		chain.DeployerKey.PublicKey(),

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/config"
+	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 )
@@ -32,6 +33,14 @@ type MCMSWithTimelockConfig struct {
 	Canceller        config.Config
 	Bypasser         config.Config
 	Proposer         config.Config
+	TimelockMinDelay *big.Int
+}
+
+type MCMSWithTimelockConfigV2 struct {
+	Seed             [16]byte // application specific identifier; must be unique per chain
+	Canceller        mcmstypes.Config
+	Bypasser         mcmstypes.Config
+	Proposer         mcmstypes.Config
 	TimelockMinDelay *big.Int
 }
 
