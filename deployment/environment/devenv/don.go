@@ -24,6 +24,7 @@ import (
 
 const (
 	NodeLabelKeyType        = "type"
+	NodeLabelP2PIDType      = "p2p_id"
 	NodeLabelValueBootstrap = "bootstrap"
 	NodeLabelValuePlugin    = "plugin"
 )
@@ -180,7 +181,6 @@ type Node struct {
 	JDId            string                    // job distributor id returned by node after Job distributor is created in node
 	Name            string                    // name of the node
 	AccountAddr     map[uint64]string         // chain id to node's account address mapping for supported chains
-	PeerID          string                    // peer id of the node
 	Ocr2KeyBundleID string                    // OCR2 key bundle id of the node
 	gqlClient       client.Client             // graphql client to interact with the node
 	restClient      *clclient.ChainlinkClient // rest client to interact with the node
@@ -192,6 +192,10 @@ type Node struct {
 type JDChainConfigInput struct {
 	ChainID   uint64
 	ChainType string
+}
+
+func (n *Node) Labels() []*ptypes.Label {
+	return n.labels
 }
 
 // CreateCCIPOCRSupportedChains creates a JobDistributorChainConfig for the node.
@@ -237,7 +241,6 @@ func (n *Node) CreateCCIPOCRSupportedChains(ctx context.Context, chains []JDChai
 		if peerID == nil {
 			return fmt.Errorf("no peer id found for node %s", n.Name)
 		}
-		n.PeerID = *peerID
 
 		ocr2BundleId, err := n.gqlClient.FetchOCR2KeyBundleID(ctx, chain.ChainType)
 		if err != nil {
@@ -357,7 +360,7 @@ func (n *Node) RegisterNodeToJobDistributor(ctx context.Context, jd JobDistribut
 		return fmt.Errorf("no peer id found for node %s", n.Name)
 	}
 	n.labels = append(n.labels, &ptypes.Label{
-		Key:   "p2p_id",
+		Key:   NodeLabelP2PIDType,
 		Value: peerID,
 	})
 
@@ -374,7 +377,7 @@ func (n *Node) RegisterNodeToJobDistributor(ctx context.Context, jd JobDistribut
 			Filter: &nodev1.ListNodesRequest_Filter{
 				Selectors: []*ptypes.Selector{
 					{
-						Key:   "p2p_id",
+						Key:   NodeLabelP2PIDType,
 						Op:    ptypes.SelectorOp_EQ,
 						Value: peerID,
 					},
