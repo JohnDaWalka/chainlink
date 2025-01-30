@@ -19,7 +19,7 @@ func Test_RegisterNOPS(t *testing.T) {
 		useMCMS   bool
 		lggr      = logger.Test(t)
 		setupResp = kstest.SetupTestRegistry(t, lggr, &kstest.SetupTestRegistryRequest{})
-		registry  = setupResp.Registry
+		registry  = setupResp.CapabilitiesRegistry
 		chain     = setupResp.Chain
 		nops      = make([]kcr.CapabilitiesRegistryNodeOperator, 0)
 	)
@@ -59,7 +59,7 @@ func Test_AddCapabilities(t *testing.T) {
 		useMCMS      bool
 		lggr         = logger.Test(t)
 		setupResp    = kstest.SetupTestRegistry(t, lggr, &kstest.SetupTestRegistryRequest{})
-		registry     = setupResp.Registry
+		registry     = setupResp.CapabilitiesRegistry
 		chain        = setupResp.Chain
 		capabilities = make([]kcr.CapabilitiesRegistryCapability, 0)
 	)
@@ -89,7 +89,7 @@ func Test_RegisterNodes(t *testing.T) {
 		useMCMS   bool
 		lggr      = logger.Test(t)
 		setupResp = kstest.SetupTestRegistry(t, lggr, &kstest.SetupTestRegistryRequest{})
-		registry  = setupResp.Registry
+		registry  = setupResp.CapabilitiesRegistry
 		chain     = setupResp.Chain
 	)
 	t.Run("success create add nodes mcms proposal", func(t *testing.T) {
@@ -124,7 +124,7 @@ func Test_RegisterDons(t *testing.T) {
 		useMCMS   bool
 		lggr      = logger.Test(t)
 		setupResp = kstest.SetupTestRegistry(t, lggr, &kstest.SetupTestRegistryRequest{})
-		registry  = setupResp.Registry
+		registry  = setupResp.CapabilitiesRegistry
 		chain     = setupResp.Chain
 	)
 	t.Run("success create add DONs mcms proposal", func(t *testing.T) {

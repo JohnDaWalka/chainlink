@@ -514,8 +514,8 @@ type RegisterNOPSRequest struct {
 }
 
 type RegisterNOPSResponse struct {
-	Nops []*capabilities_registry.CapabilitiesRegistryNodeOperatorAdded
-	Ops  *timelock.BatchChainOperation
+	Nops []*capabilities_registry.CapabilitiesRegistryNodeOperatorAdded // if UseMCMS is false, a list of added node operators is returned
+	Ops  *timelock.BatchChainOperation                                  // if UseMCMS is true, a batch proposal is returned and no transaction is confirmed on chain.
 }
 
 func RegisterNOPS(ctx context.Context, lggr logger.Logger, req RegisterNOPSRequest) (*RegisterNOPSResponse, error) {

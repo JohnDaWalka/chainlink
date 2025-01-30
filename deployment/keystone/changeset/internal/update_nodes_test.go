@@ -81,9 +81,9 @@ func Test_UpdateNodesRequest_validate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := &internal.UpdateNodesRequest{
-				P2pToUpdates: tt.fields.p2pToUpdates,
-				Chain:        tt.fields.chain,
-				ContractSet:  tt.fields.contractSet,
+				P2pToUpdates:         tt.fields.p2pToUpdates,
+				Chain:                tt.fields.chain,
+				CapabilitiesRegistry: tt.fields.contractSet.CapabilitiesRegistry,
 			}
 			if err := req.Validate(); (err != nil) != tt.wantErr {
 				t.Errorf("internal.UpdateNodesRequest.validate() error = %v, wantErr %v", err, tt.wantErr)
@@ -349,8 +349,8 @@ func TestUpdateNodes(t *testing.T) {
 							EncryptionPublicKey: newKeyStr,
 						},
 					},
-					Chain:       chain,
-					ContractSet: nil, // set in test to ensure no conflicts
+					Chain:                chain,
+					CapabilitiesRegistry: nil, // set in test to ensure no conflicts
 				},
 				nopsToNodes: map[kcr.CapabilitiesRegistryNodeOperator][]*internal.P2PSignerEnc{
 					testNop(t, "nop1"): []*internal.P2PSignerEnc{
@@ -384,8 +384,8 @@ func TestUpdateNodes(t *testing.T) {
 							Signer: [32]byte{0: 2, 1: 3},
 						},
 					},
-					Chain:       chain,
-					ContractSet: nil, // set in test to ensure no conflicts
+					Chain:                chain,
+					CapabilitiesRegistry: nil, // set in test to ensure no conflicts
 				},
 				nopsToNodes: map[kcr.CapabilitiesRegistryNodeOperator][]*internal.P2PSignerEnc{
 					testNop(t, "nop1"): []*internal.P2PSignerEnc{
@@ -471,8 +471,8 @@ func TestUpdateNodes(t *testing.T) {
 				P2pToCapabilities: initMap,
 				NopToNodes:        tt.args.nopsToNodes,
 			})
-			registry := setupResp.Registry
-			tt.args.req.ContractSet = setupResp.ContractSet
+			registry := setupResp.CapabilitiesRegistry
+			tt.args.req.CapabilitiesRegistry = setupResp.CapabilitiesRegistry
 			tt.args.req.Chain = setupResp.Chain
 
 			id, err := registry.GetHashedCapabilityId(&bind.CallOpts{}, phonyCap.LabelledName, phonyCap.Version)
@@ -565,7 +565,7 @@ func TestUpdateNodes(t *testing.T) {
 			P2pToCapabilities: p2pToCapabilitiesInitial,
 			NopToNodes:        nopToNodes,
 		})
-		registry := setupResp.Registry
+		registry := setupResp.CapabilitiesRegistry
 		chain := setupResp.Chain
 
 		// there should be two capabilities
@@ -590,8 +590,8 @@ func TestUpdateNodes(t *testing.T) {
 					Capabilities: toRegister,
 				},
 			},
-			Chain:       chain,
-			ContractSet: setupResp.ContractSet,
+			Chain:                chain,
+			CapabilitiesRegistry: setupResp.CapabilitiesRegistry,
 		}
 		_, err = internal.UpdateNodes(lggr, req)
 		require.NoError(t, err)
@@ -639,7 +639,7 @@ func TestAppendCapabilities(t *testing.T) {
 		P2pToCapabilities: capMap,
 		NopToNodes:        nopToNodes,
 	})
-	registry := setupResp.Registry
+	registry := setupResp.CapabilitiesRegistry
 	chain := setupResp.Chain
 
 	info, err := registry.GetNode(&bind.CallOpts{}, testPeerID(t, "peerID_1"))

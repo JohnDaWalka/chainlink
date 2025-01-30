@@ -37,12 +37,14 @@ type SetupTestRegistryRequest struct {
 }
 
 type SetupTestRegistryResponse struct {
-	Registry         *capabilities_registry.CapabilitiesRegistry
-	Chain            deployment.Chain
-	RegistrySelector uint64
-	ContractSet      *internal.ContractSet
+	CapabilitiesRegistry *capabilities_registry.CapabilitiesRegistry
+	Chain                deployment.Chain
+	RegistrySelector     uint64
 }
 
+// SetupTestRegistry is a helper function to setup a the capabilities registry
+// and add the given capabilities and node operators
+// It can be used in tests that mutate the registry without any other setup such as actual nodes, dons, jobs, etc.
 func SetupTestRegistry(t *testing.T, lggr logger.Logger, req *SetupTestRegistryRequest) *SetupTestRegistryResponse {
 	chain := testChain(t)
 	// deploy the registry
@@ -98,12 +100,9 @@ func SetupTestRegistry(t *testing.T, lggr logger.Logger, req *SetupTestRegistryR
 	addDons(t, lggr, chain, registry, capCache, req.Dons)
 
 	return &SetupTestRegistryResponse{
-		Registry:         registry,
-		Chain:            chain,
-		RegistrySelector: chain.Selector,
-		ContractSet: &internal.ContractSet{
-			CapabilitiesRegistry: registry,
-		},
+		CapabilitiesRegistry: registry,
+		Chain:                chain,
+		RegistrySelector:     chain.Selector,
 	}
 }
 

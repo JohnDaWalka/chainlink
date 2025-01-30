@@ -131,16 +131,16 @@ func TestUpdateDon(t *testing.T) {
 		}
 
 		_, err := internal.AppendNodeCapabilitiesImpl(lggr, &internal.AppendNodeCapabilitiesRequest{
-			Chain:             testCfg.Chain,
-			ContractSet:       testCfg.ContractSet,
-			P2pToCapabilities: m,
+			Chain:                testCfg.Chain,
+			CapabilitiesRegistry: testCfg.CapabilitiesRegistry,
+			P2pToCapabilities:    m,
 		})
 		require.NoError(t, err)
 
 		req := &internal.UpdateDonRequest{
-			ContractSet: testCfg.ContractSet,
-			Chain:       testCfg.Chain,
-			P2PIDs:      []p2pkey.PeerID{p2p_1.PeerID(), p2p_2.PeerID(), p2p_3.PeerID(), p2p_4.PeerID()},
+			CapabilitiesRegistry: testCfg.CapabilitiesRegistry,
+			Chain:                testCfg.Chain,
+			P2PIDs:               []p2pkey.PeerID{p2p_1.PeerID(), p2p_2.PeerID(), p2p_3.PeerID(), p2p_4.PeerID()},
 			CapabilityConfigs: []internal.CapabilityConfig{
 				{Capability: initialCap, Config: initialCapCfgB}, {Capability: capToAdd, Config: capToAddCfgB},
 			},
@@ -151,8 +151,8 @@ func TestUpdateDon(t *testing.T) {
 				ConfigCount: 1,
 				NodeP2PIds:  internal.PeerIDsToBytes([]p2pkey.PeerID{p2p_1.PeerID(), p2p_2.PeerID(), p2p_3.PeerID(), p2p_4.PeerID()}),
 				CapabilityConfigurations: []kcr.CapabilitiesRegistryCapabilityConfiguration{
-					{CapabilityId: kstest.MustCapabilityId(t, testCfg.Registry, initialCap), Config: initialCapCfgB},
-					{CapabilityId: kstest.MustCapabilityId(t, testCfg.Registry, capToAdd), Config: capToAddCfgB},
+					{CapabilityId: kstest.MustCapabilityId(t, testCfg.CapabilitiesRegistry, initialCap), Config: initialCapCfgB},
+					{CapabilityId: kstest.MustCapabilityId(t, testCfg.CapabilitiesRegistry, capToAdd), Config: capToAddCfgB},
 				},
 			},
 		}
