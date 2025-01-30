@@ -1704,7 +1704,9 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 
 	// Log extra information that might help debugging
 	t.Cleanup(func() {
-		logTestInfo(testLogger, in.WorkflowConfig.FeedID, in.WorkflowConfig.WorkflowName, feedsConsumerAddress.Hex(), keystoneContracts.forwarderAddress.Hex())
+		if t.Failed() {
+			logTestInfo(testLogger, in.WorkflowConfig.FeedID, in.WorkflowConfig.WorkflowName, feedsConsumerAddress.Hex(), keystoneContracts.forwarderAddress.Hex())
+		}
 	})
 
 	// set variables that are needed for the cleanup function, which debugs report transmissions

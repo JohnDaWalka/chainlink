@@ -134,7 +134,7 @@ func NewRegisteredDON(ctx context.Context, nodeInfo []NodeInfo, jd JobDistributo
 			// set admin address for non-bootstrap nodes
 			node.adminAddr = info.AdminAddr
 
-			// TODO remove me, hack so that code can progress
+			// capability registry requires non-null admin address; use arbitrary default value if node is not configured
 			if info.AdminAddr == "" {
 				node.adminAddr = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 			}
