@@ -182,11 +182,14 @@ func newTestEngine(t *testing.T, reg *coreCap.Registry, sdkSpec sdk.WorkflowSpec
 	cfg := Config{
 		WorkflowID:    testWorkflowID,
 		WorkflowOwner: testWorkflowOwner,
-		Lggr:          logger.TestLogger(t),
-		Registry:      reg,
-		Workflow:      sdkSpec,
-		maxRetries:    1,
-		retryMs:       100,
+		WorkflowName: defaultName{
+			name: testWorkflowName,
+		},
+		Lggr:       logger.TestLogger(t),
+		Registry:   reg,
+		Workflow:   sdkSpec,
+		maxRetries: 1,
+		retryMs:    100,
 		afterInit: func(success bool) {
 			if success {
 				close(initSuccessful)
@@ -1583,7 +1586,9 @@ func TestEngine_WithCustomComputeStep(t *testing.T) {
 	require.NoError(t, err)
 
 	idGeneratorFn := func() string { return "validRequestID" }
-	compute, err := compute.NewAction(cfg, log, reg, handler, idGeneratorFn)
+	fetcher, err := compute.NewOutgoingConnectorFetcherFactory(handler, idGeneratorFn)
+	require.NoError(t, err)
+	compute, err := compute.NewAction(cfg, log, reg, fetcher)
 	require.NoError(t, err)
 	require.NoError(t, compute.Start(ctx))
 	defer compute.Close()
@@ -1649,7 +1654,9 @@ func TestEngine_CustomComputePropagatesBreaks(t *testing.T) {
 	require.NoError(t, err)
 
 	idGeneratorFn := func() string { return "validRequestID" }
-	compute, err := compute.NewAction(cfg, log, reg, handler, idGeneratorFn)
+	fetcher, err := compute.NewOutgoingConnectorFetcherFactory(handler, idGeneratorFn)
+	require.NoError(t, err)
+	compute, err := compute.NewAction(cfg, log, reg, fetcher)
 	require.NoError(t, err)
 	require.NoError(t, compute.Start(ctx))
 	defer compute.Close()

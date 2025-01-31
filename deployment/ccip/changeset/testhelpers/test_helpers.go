@@ -43,6 +43,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 
+	solTestConfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
@@ -481,6 +482,52 @@ func AddLane(
 	require.NoError(t, err)
 }
 
+// RemoveLane removes a lane between the source and destination chains in the deployed environment.
+func RemoveLane(t *testing.T, e *DeployedEnv, src, dest uint64, isTestRouter bool) {
+	var err error
+	apps := []commoncs.ChangesetApplication{
+		{
+			Changeset: commoncs.WrapChangeSet(changeset.UpdateRouterRampsChangeset),
+			Config: changeset.UpdateRouterRampsConfig{
+				UpdatesByChain: map[uint64]changeset.RouterUpdates{
+					// onRamp update on source chain
+					src: {
+						OnRampUpdates: map[uint64]bool{
+							dest: false,
+						},
+					},
+				},
+			},
+		},
+		{
+			Changeset: commoncs.WrapChangeSet(changeset.UpdateFeeQuoterDestsChangeset),
+			Config: changeset.UpdateFeeQuoterDestsConfig{
+				UpdatesByChain: map[uint64]map[uint64]fee_quoter.FeeQuoterDestChainConfig{
+					src: {
+						dest: changeset.DefaultFeeQuoterDestChainConfig(false),
+					},
+				},
+			},
+		},
+		{
+			Changeset: commoncs.WrapChangeSet(changeset.UpdateOnRampsDestsChangeset),
+			Config: changeset.UpdateOnRampDestsConfig{
+				UpdatesByChain: map[uint64]map[uint64]changeset.OnRampDestinationUpdate{
+					src: {
+						dest: {
+							IsEnabled:        false,
+							TestRouter:       isTestRouter,
+							AllowListEnabled: false,
+						},
+					},
+				},
+			},
+		},
+	}
+	e.Env, err = commoncs.ApplyChangesets(t, e.Env, e.TimelockContracts(t), apps)
+	require.NoError(t, err)
+}
+
 func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, state changeset.CCIPOnChainState, from, to uint64, isTestRouter bool) {
 	stateChainFrom := state.Chains[from]
 	AddLane(
@@ -493,7 +540,7 @@ func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, st
 		}, map[common.Address]*big.Int{
 			stateChainFrom.LinkToken.Address(): DefaultLinkPrice,
 			stateChainFrom.Weth9.Address():     DefaultWethPrice,
-		}, changeset.DefaultFeeQuoterDestChainConfig())
+		}, changeset.DefaultFeeQuoterDestChainConfig(true))
 }
 
 // AddLanesForAll adds densely connected lanes for all chains in the environment so that each chain
@@ -612,7 +659,7 @@ func ConfirmRequestOnSourceAndDest(t *testing.T, env deployment.Environment, sta
 
 	fmt.Printf("Request sent for seqnr %d", msgSentEvent.SequenceNumber)
 	require.NoError(t,
-		commonutils.JustError(ConfirmCommitWithExpectedSeqNumRange(t, env.Chains[sourceCS], env.Chains[destCS], state.Chains[destCS].OffRamp, &startBlock, cciptypes.SeqNumRange{
+		commonutils.JustError(ConfirmCommitWithExpectedSeqNumRange(t, sourceCS, env.Chains[destCS], state.Chains[destCS].OffRamp, &startBlock, cciptypes.SeqNumRange{
 			cciptypes.SeqNum(msgSentEvent.SequenceNumber),
 			cciptypes.SeqNum(msgSentEvent.SequenceNumber),
 		}, true)))
@@ -623,7 +670,7 @@ func ConfirmRequestOnSourceAndDest(t *testing.T, env deployment.Environment, sta
 		commonutils.JustError(
 			ConfirmExecWithSeqNrs(
 				t,
-				env.Chains[sourceCS],
+				sourceCS,
 				env.Chains[destCS],
 				state.Chains[destCS].OffRamp,
 				&startBlock,
@@ -1247,6 +1294,12 @@ func DefaultRouterMessage(receiverAddress common.Address) router.ClientEVM2AnyMe
 		FeeToken:     common.HexToAddress("0x0"),
 		ExtraArgs:    nil,
 	}
+}
+
+func SavePreloadedSolAddresses(t *testing.T, e deployment.Environment, solChainSelector uint64) {
+	tv := deployment.NewTypeAndVersion("SolCcipRouter", deployment.Version1_0_0)
+	err := e.ExistingAddresses.Save(solChainSelector, solTestConfig.CcipRouterProgram.String(), tv)
+	require.NoError(t, err)
 }
 
 func GenTestTransferOwnershipConfig(
