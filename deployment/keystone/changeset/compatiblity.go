@@ -82,12 +82,6 @@ type DONToRegister = internal.DONToRegister
 // NOP is a node operator profile, required to register a node with the capabilities registry
 type NOP = internal.NOP
 
-// ConfigureContractsRequest is a request to configure ALL the contracts
-type ConfigureContractsRequest = internal.ConfigureContractsRequest
-
-// ConfigureContractsResponse is a response to configure ALL the contracts
-type ConfigureContractsResponse = internal.ConfigureContractsResponse
-
 // DonCapabilities is a set of capabilities hosted by a set of node operators
 // in is in a convenient form to handle the CLO representation of the nop data
 type DonCapabilities = internal.DonCapabilities

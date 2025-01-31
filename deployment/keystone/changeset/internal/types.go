@@ -318,31 +318,6 @@ func (d RegisteredDon) Signers(chainFamily string) []common.Address {
 	return out
 }
 
-func joinInfoAndNodes(donInfos map[string]kcr.CapabilitiesRegistryDONInfo, dons []DonInfo, registryChainSel uint64) ([]RegisteredDon, error) {
-	// all maps should have the same keys
-	nodes, err := mapDonsToNodes(dons, true, registryChainSel)
-	if err != nil {
-		return nil, fmt.Errorf("failed to map dons to capabilities: %w", err)
-	}
-	if len(donInfos) != len(nodes) {
-		return nil, fmt.Errorf("mismatched lengths don infos %d,  nodes %d", len(donInfos), len(nodes))
-	}
-	var out []RegisteredDon
-	for donName, info := range donInfos {
-		ocr2nodes, ok := nodes[donName]
-		if !ok {
-			return nil, fmt.Errorf("nodes not found for don %s", donName)
-		}
-		out = append(out, RegisteredDon{
-			Name:  donName,
-			Info:  info,
-			Nodes: ocr2nodes,
-		})
-	}
-
-	return out, nil
-}
-
 var emptyAddr = "0x0000000000000000000000000000000000000000"
 
 // compute the admin address from the string. If the address is empty, replaces the 0s with fs
