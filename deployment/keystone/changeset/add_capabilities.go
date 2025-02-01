@@ -1,6 +1,7 @@
 package changeset
 
 import (
+	"errors"
 	"fmt"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -53,7 +54,7 @@ func AddCapabilities(env deployment.Environment, req *AddCapabilitiesRequest) (d
 	out := deployment.ChangesetOutput{}
 	if useMCMS {
 		if ops == nil {
-			return out, fmt.Errorf("expected MCMS operation to be non-nil")
+			return out, errors.New("expected MCMS operation to be non-nil")
 		}
 		timelocksPerChain := map[uint64]gethcommon.Address{
 			registryChain.Selector: contractSet.Timelock.Address(),

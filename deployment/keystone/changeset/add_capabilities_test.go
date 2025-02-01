@@ -95,6 +95,5 @@ func assertCapabilitiesExist(t *testing.T, registry *kcr.CapabilitiesRegistry, c
 		assert.Equal(t, capability.CapabilityType, got.CapabilityType)
 		assert.Equal(t, capability.LabelledName, got.LabelledName)
 		assert.Equal(t, capability.Version, got.Version)
-
 	}
 }
