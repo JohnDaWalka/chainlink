@@ -1,25 +1,33 @@
 package changeset_test
 
 import (
-	"encoding/hex"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/maps"
 
-	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/test"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 )
 
 func TestAddCapabilities(t *testing.T) {
 	t.Parallel()
 
+	capabilitiesToAdd := []kcr.CapabilitiesRegistryCapability{
+		{
+			LabelledName:   "test-cap",
+			Version:        "0.0.1",
+			CapabilityType: 1,
+		},
+		{
+			LabelledName:   "test-cap-2",
+			Version:        "0.0.1",
+			CapabilityType: 1,
+		},
+	}
 	t.Run("no mcms", func(t *testing.T) {
 		te := test.SetupTestEnv(t, test.TestConfig{
 			WFDonConfig:     test.DonConfig{N: 4},
@@ -28,28 +36,14 @@ func TestAddCapabilities(t *testing.T) {
 			NumChains:       1,
 		})
 
-		cfg := changeset.DONCapabilityWithConfig{
-			Capability: kcr.CapabilitiesRegistryCapability{
-				LabelledName:   "test-cap",
-				Version:        "0.0.1",
-				CapabilityType: 1,
-			},
-			Config: &capabilitiespb.CapabilityConfig{},
-		}
-
 		csOut, err := changeset.AddCapabilities(te.Env, &changeset.AddCapabilitiesRequest{
 			RegistryChainSel: te.RegistrySelector,
-			DonCapabilities:  map[string][]changeset.DONCapabilityWithConfig{"anything": {cfg}},
+			Capabilities:     capabilitiesToAdd,
 		})
 		require.NoError(t, err)
 		require.Empty(t, csOut.Proposals)
 		require.Nil(t, csOut.AddressBook)
-		reg := te.CapabilitiesRegistry()
-		wantID, err := reg.GetHashedCapabilityId(nil, "test-cap", "0.0.1")
-		require.NoError(t, err)
-		info, err := reg.GetCapability(nil, wantID)
-		require.NoError(t, err)
-		assert.Equal(t, uint8(1), info.CapabilityType)
+		assertCapabilitiesExist(t, te.CapabilitiesRegistry(), capabilitiesToAdd...)
 	})
 
 	t.Run("with mcms", func(t *testing.T) {
@@ -61,18 +55,9 @@ func TestAddCapabilities(t *testing.T) {
 			UseMCMS:         true,
 		})
 
-		cfg := changeset.DONCapabilityWithConfig{
-			Capability: kcr.CapabilitiesRegistryCapability{
-				LabelledName:   "test-cap",
-				Version:        "0.0.1",
-				CapabilityType: 1,
-			},
-			Config: &capabilitiespb.CapabilityConfig{},
-		}
-
 		req := &changeset.AddCapabilitiesRequest{
 			RegistryChainSel: te.RegistrySelector,
-			DonCapabilities:  map[string][]changeset.DONCapabilityWithConfig{"anything": {cfg}},
+			Capabilities:     capabilitiesToAdd,
 			MCMSConfig:       &changeset.MCMSConfig{MinDuration: 0},
 		}
 		csOut, err := changeset.AddCapabilities(te.Env, req)
@@ -96,26 +81,20 @@ func TestAddCapabilities(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		reg := te.CapabilitiesRegistry()
-		wantID, err := reg.GetHashedCapabilityId(nil, "test-cap", "0.0.1")
-		require.NoError(t, err)
-		info, err := reg.GetCapability(nil, wantID)
-		require.NoError(t, err)
-		assert.Equal(t, uint8(1), info.CapabilityType)
-
+		assertCapabilitiesExist(t, te.CapabilitiesRegistry(), capabilitiesToAdd...)
 	})
 }
 
-// validateUpdate checks reads nodes from the registry and checks they have the expected updates
-func validateAddCapability(t *testing.T, te test.TestEnv, expected map[p2pkey.PeerID]changeset.NodeUpdate) {
-	registry := te.ContractSets()[te.RegistrySelector].CapabilitiesRegistry
-	wfP2PIDs := p2pIDs(t, maps.Keys(te.WFNodes))
-	nodes, err := registry.GetNodesByP2PIds(nil, wfP2PIDs)
-	require.NoError(t, err)
-	require.Len(t, nodes, len(wfP2PIDs))
-	for _, node := range nodes {
-		// only check the fields that were updated
-		assert.Equal(t, expected[node.P2pId].EncryptionPublicKey, hex.EncodeToString(node.EncryptionPublicKey[:]))
-		assert.Equal(t, expected[node.P2pId].Signer, node.Signer)
+func assertCapabilitiesExist(t *testing.T, registry *kcr.CapabilitiesRegistry, capabilities ...kcr.CapabilitiesRegistryCapability) {
+	for _, capability := range capabilities {
+		wantID, err := registry.GetHashedCapabilityId(nil, capability.LabelledName, capability.Version)
+		require.NoError(t, err)
+		got, err := registry.GetCapability(nil, wantID)
+		require.NoError(t, err)
+		require.NotEmpty(t, got)
+		assert.Equal(t, capability.CapabilityType, got.CapabilityType)
+		assert.Equal(t, capability.LabelledName, got.LabelledName)
+		assert.Equal(t, capability.Version, got.Version)
+
 	}
 }

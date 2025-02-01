@@ -1,7 +1,6 @@
 package changeset
 
 import (
-	"errors"
 	"fmt"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -10,14 +9,14 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 )
 
 // AddCapabilitiesRequest is a request to add capabilities
 type AddCapabilitiesRequest struct {
 	RegistryChainSel uint64
-	// map from a don name to it's list of capabilities
-	DonCapabilities map[string][]DONCapabilityWithConfig
 
+	Capabilities []kcr.CapabilitiesRegistryCapability
 	// MCMSConfig is optional. If non-nil, the changes will be proposed using MCMS.
 	MCMSConfig *MCMSConfig
 }
@@ -25,8 +24,10 @@ type AddCapabilitiesRequest struct {
 var _ deployment.ChangeSet[*AddCapabilitiesRequest] = AddCapabilities
 
 // AddCapabilities is a deployment.ChangeSet that adds capabilities to the capabilities registry
-// It is idempotent.
-// When using MCMS, the output will contain a single proposal with a single batch containing all cababilities to be added.
+//
+// It is idempotent. It deduplicates the input capabilities.
+//
+// When using MCMS, the output will contain a single proposal with a single batch containing all capabilities to be added.
 // When not using MCMS, each capability will be added in a separate transaction.
 func AddCapabilities(env deployment.Environment, req *AddCapabilitiesRequest) (deployment.ChangesetOutput, error) {
 	registryChain, ok := env.Chains[req.RegistryChainSel]
@@ -44,23 +45,15 @@ func AddCapabilities(env deployment.Environment, req *AddCapabilitiesRequest) (d
 	if !exists {
 		return deployment.ChangesetOutput{}, fmt.Errorf("contract set not found for chain %d", req.RegistryChainSel)
 	}
-
-	req2 := internal.RegisterCapabilitiesRequest{
-		Env:                   &env,
-		RegistryChainSelector: req.RegistryChainSel,
-		DonToCapabilities:     req.DonCapabilities,
-		UseMCMS:               req.MCMSConfig != nil,
-	}
-	resp, err := internal.RegisterCapabilities(env.Logger, req2)
+	useMCMS := req.MCMSConfig != nil
+	ops, err := internal.AddCapabilities(env.Logger, contractSet.CapabilitiesRegistry, env.Chains[req.RegistryChainSel], req.Capabilities, useMCMS)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to add capabilities: %w", err)
 	}
-	env.Logger.Infow("registered capabilities", "capabilities", resp.DonToCapabilities)
-
 	out := deployment.ChangesetOutput{}
-	if req2.UseMCMS {
-		if resp.Ops == nil {
-			return out, errors.New("expected MCMS operation to be non-nil")
+	if useMCMS {
+		if ops == nil {
+			return out, fmt.Errorf("expected MCMS operation to be non-nil")
 		}
 		timelocksPerChain := map[uint64]gethcommon.Address{
 			registryChain.Selector: contractSet.Timelock.Address(),
@@ -72,7 +65,7 @@ func AddCapabilities(env deployment.Environment, req *AddCapabilitiesRequest) (d
 		proposal, err := proposalutils.BuildProposalFromBatches(
 			timelocksPerChain,
 			proposerMCMSes,
-			[]timelock.BatchChainOperation{*resp.Ops},
+			[]timelock.BatchChainOperation{*ops},
 			"proposal to add capabilities",
 			req.MCMSConfig.MinDuration,
 		)
@@ -81,6 +74,5 @@ func AddCapabilities(env deployment.Environment, req *AddCapabilitiesRequest) (d
 		}
 		out.Proposals = []timelock.MCMSWithTimelockProposal{*proposal}
 	}
-
 	return out, nil
 }
