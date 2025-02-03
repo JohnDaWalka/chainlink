@@ -1615,7 +1615,7 @@ func isOCR3ConfigSetOnOffRamp(
 
 // DefaultFeeQuoterDestChainConfig returns the default FeeQuoterDestChainConfig
 // with the config enabled/disabled based on the configEnabled flag.
-func DefaultFeeQuoterDestChainConfig(configEnabled bool) fee_quoter.FeeQuoterDestChainConfig {
+func DefaultFeeQuoterDestChainConfig(configEnabled bool, destChainSelector ...uint64) fee_quoter.FeeQuoterDestChainConfig {
 	// https://github.com/smartcontractkit/ccip/blob/c4856b64bd766f1ddbaf5d13b42d3c4b12efde3a/contracts/src/v0.8/ccip/libraries/Internal.sol#L337-L337
 	/*
 		```Solidity
@@ -1623,7 +1623,13 @@ func DefaultFeeQuoterDestChainConfig(configEnabled bool) fee_quoter.FeeQuoterDes
 			bytes4 public constant CHAIN_FAMILY_SELECTOR_EVM = 0x2812d52c;
 		```
 	*/
-	evmFamilySelector, _ := hex.DecodeString("2812d52c")
+	familySelector, _ := hex.DecodeString("2812d52c") // evm
+	if len(destChainSelector) > 0 {
+		destFamily, _ := chain_selectors.GetSelectorFamily(destChainSelector[0])
+		if destFamily == chain_selectors.FamilySolana {
+			familySelector, _ = hex.DecodeString("1e10bdc4") // solana
+		}
+	}
 	return fee_quoter.FeeQuoterDestChainConfig{
 		IsEnabled:                         configEnabled,
 		MaxNumberOfTokensPerMsg:           10,
@@ -1641,6 +1647,6 @@ func DefaultFeeQuoterDestChainConfig(configEnabled bool) fee_quoter.FeeQuoterDes
 		DefaultTxGasLimit:                 200_000,
 		GasMultiplierWeiPerEth:            11e17, // Gas multiplier in wei per eth is scaled by 1e18, so 11e17 is 1.1 = 110%
 		NetworkFeeUSDCents:                1,
-		ChainFamilySelector:               [4]byte(evmFamilySelector),
+		ChainFamilySelector:               [4]byte(familySelector),
 	}
 }

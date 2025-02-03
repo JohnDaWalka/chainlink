@@ -46,10 +46,12 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 
-	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
-	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
-
 	solTestConfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	solTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/token_pool"
+	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
@@ -464,6 +466,20 @@ func AddLane(
 				},
 			},
 		},
+		{
+			Changeset: commoncs.WrapChangeSet(changeset.UpdateRouterRampsChangeset),
+			Config: changeset.UpdateRouterRampsConfig{
+				TestRouter: isTestRouter,
+				UpdatesByChain: map[uint64]changeset.RouterUpdates{
+					// onRamp update on source chain
+					from: {
+						OnRampUpdates: map[uint64]bool{
+							to: true,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	require.NoError(t, err)
@@ -489,12 +505,6 @@ func AddLane(
 				Config: changeset.UpdateRouterRampsConfig{
 					TestRouter: isTestRouter,
 					UpdatesByChain: map[uint64]changeset.RouterUpdates{
-						// onRamp update on source chain
-						from: {
-							OnRampUpdates: map[uint64]bool{
-								to: true,
-							},
-						},
 						// offramp update on dest chain
 						to: {
 							OffRampUpdates: map[uint64]bool{
@@ -542,6 +552,15 @@ func AddLane(
 	e.Env, err = commoncs.ApplyChangesets(t, e.Env, e.TimelockContracts(t), changesets)
 	require.NoError(t, err)
 
+	// verification (debugging)
+	state, err := changeset.LoadOnchainState(e.Env)
+	require.NoError(t, err)
+	config, err := state.Chains[from].Router.GetOnRamp(&bind.CallOpts{}, to)
+	require.NoError(t, err)
+	t.Logf("CONFIG: %+v", config)
+	destConfig, err := state.Chains[from].FeeQuoter.GetDestChainConfig(&bind.CallOpts{}, to)
+	require.NoError(t, err)
+	t.Logf("DEST CONFIG: %+v", destConfig)
 }
 
 // RemoveLane removes a lane between the source and destination chains in the deployed environment.
@@ -602,7 +621,7 @@ func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, st
 		}, map[common.Address]*big.Int{
 			stateChainFrom.LinkToken.Address(): DefaultLinkPrice,
 			stateChainFrom.Weth9.Address():     DefaultWethPrice,
-		}, changeset.DefaultFeeQuoterDestChainConfig(true))
+		}, changeset.DefaultFeeQuoterDestChainConfig(true, to))
 }
 
 // AddLanesForAll adds densely connected lanes for all chains in the environment so that each chain
@@ -762,7 +781,7 @@ func DeployTransferableToken(
 	// Configure pools in parallel
 	configurePoolGrp := errgroup.Group{}
 	configurePoolGrp.Go(func() error {
-		err := setTokenPoolCounterPart(chains[src], srcPool, srcActor, dst, dstToken.Address(), dstPool.Address())
+		err := setTokenPoolCounterPart(chains[src], srcPool, srcActor, dst, dstToken.Address().Bytes(), dstPool.Address().Bytes())
 		if err != nil {
 			return fmt.Errorf("failed to set token pool counter part chain %d: %w", src, err)
 		}
@@ -773,7 +792,7 @@ func DeployTransferableToken(
 		return nil
 	})
 	configurePoolGrp.Go(func() error {
-		err := setTokenPoolCounterPart(chains[dst], dstPool, dstActor, src, srcToken.Address(), srcPool.Address())
+		err := setTokenPoolCounterPart(chains[dst], dstPool, dstActor, src, srcToken.Address().Bytes(), srcPool.Address().Bytes())
 		if err != nil {
 			return fmt.Errorf("failed to set token pool counter part chain %d: %w", dst, err)
 		}
@@ -786,6 +805,127 @@ func DeployTransferableToken(
 		return nil, nil, nil, nil, err
 	}
 	return srcToken, srcPool, dstToken, dstPool, nil
+}
+
+// assuming one out of the src and dst is solana and the other is evm
+func DeployTransferableTokenSolana(
+	t *testing.T,
+	e deployment.Environment,
+	evmChainSel, solChainSel uint64,
+	evmTokenName string,
+	evmDeployer *bind.TransactOpts,
+	addresses deployment.AddressBook,
+) (*burn_mint_erc677.BurnMintERC677,
+	*burn_mint_token_pool.BurnMintTokenPool, solana.PublicKey, error) {
+	state, err := changeset.LoadOnchainStateSolana(e)
+	require.NoError(t, err)
+
+	// deploy evm token
+	evmToken, evmPool, err := deployTransferTokenOneEnd(nil, e.Chains[evmChainSel], evmDeployer, addresses, evmTokenName)
+	if err != nil {
+		return nil, nil, solana.PublicKey{}, err
+	}
+	if err := attachTokenToTheRegistry(e.Chains[evmChainSel], state.Chains[evmChainSel], evmDeployer, evmToken.Address(), evmPool.Address()); err != nil {
+		return nil, nil, solana.PublicKey{}, err
+	}
+	require.NoError(t, err)
+
+	// deploy solana token
+	e, err = commoncs.ApplyChangesets(t, e, nil, []commoncs.ChangesetApplication{
+		{ // this makes the deployer the mint authority by default
+			Changeset: commoncs.WrapChangeSet(changeset_solana.DeploySolanaToken),
+			Config: changeset_solana.DeploySolanaTokenConfig{
+				ChainSelector:    solChainSel,
+				TokenProgramName: deployment.SPL2022Tokens,
+				TokenDecimals:    9,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	state, err = changeset.LoadOnchainStateSolana(e)
+	require.NoError(t, err)
+	solTokenAddress := state.SolChains[solChainSel].SPL2022Tokens[0]
+	solDeployerKey := e.SolChains[solChainSel].DeployerKey.PublicKey()
+	e, err = commoncs.ApplyChangesets(t, e, nil, []commoncs.ChangesetApplication{
+		{ // create the ata for the deployerKey
+			Changeset: commoncs.WrapChangeSet(changeset_solana.CreateSolanaTokenATA),
+			Config: changeset_solana.CreateSolanaTokenATAConfig{
+				ChainSelector: solChainSel,
+				TokenPubkey:   solTokenAddress,
+				TokenProgram:  deployment.SPL2022Tokens,
+				ATAList:       []string{solDeployerKey.String()},
+			},
+		},
+		{ // mint the token to the deployerKey
+			Changeset: commoncs.WrapChangeSet(changeset_solana.MintSolanaToken),
+			Config: changeset_solana.MintSolanaTokenConfig{
+				ChainSelector: solChainSel,
+				TokenPubkey:   solTokenAddress,
+				TokenProgram:  deployment.SPL2022Tokens,
+				AmountToAddress: map[string]uint64{
+					solDeployerKey.String(): uint64(1000),
+				},
+			},
+		},
+		{ // deploy token pool and set the burn/mint authority to the tokenPool
+			Changeset: commoncs.WrapChangeSet(changeset_solana.AddTokenPool),
+			Config: changeset_solana.TokenPoolConfig{
+				ChainSelector:    solChainSel,
+				TokenPubKey:      solTokenAddress.String(),
+				TokenProgramName: deployment.SPL2022Tokens,
+				PoolType:         "BurnAndMint",
+				Authority:        solDeployerKey.String(),
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	// configure evm
+	poolConfigPDA, err := solTokenUtil.TokenPoolConfigAddress(solTokenAddress, state.SolChains[solChainSel].TokenPool)
+	require.NoError(t, err)
+	err = setTokenPoolCounterPart(e.Chains[evmChainSel], evmPool, evmDeployer, solChainSel, solTokenAddress.Bytes(), poolConfigPDA.Bytes())
+	require.NoError(t, err)
+
+	err = grantMintBurnPermissions(nil, e.Chains[evmChainSel], evmToken, evmDeployer, evmPool.Address())
+	require.NoError(t, err)
+
+	// configure solana
+	e, err = commoncs.ApplyChangesets(t, e, nil, []commoncs.ChangesetApplication{
+		{
+			Changeset: commoncs.WrapChangeSet(changeset_solana.SetupTokenPoolForRemoteChain),
+			Config: changeset_solana.RemoteChainTokenPoolConfig{
+				ChainSelector:       solChainSel,
+				RemoteChainSelector: evmChainSel,
+				TokenPubKey:         solTokenAddress.String(),
+				RemoteConfig: solTokenPool.RemoteConfig{
+					// this can be potentially read from the state if we are given the token symbol
+					PoolAddresses: []solTokenPool.RemoteAddress{
+						{
+							Address: evmPool.Address().Bytes(),
+						},
+					},
+					TokenAddress: solTokenPool.RemoteAddress{
+						Address: evmToken.Address().Bytes(),
+					},
+					Decimals: 9,
+				},
+				InboundRateLimit: solTokenPool.RateLimitConfig{
+					Enabled:  true,
+					Capacity: uint64(1000),
+					Rate:     1,
+				},
+				OutboundRateLimit: solTokenPool.RateLimitConfig{
+					Enabled:  true,
+					Capacity: uint64(1000),
+					Rate:     1,
+				},
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	return evmToken, evmPool, solTokenAddress, nil
 }
 
 func deployTokenPoolsInParallel(
@@ -888,18 +1028,25 @@ func setUSDCTokenPoolCounterPart(
 		return err
 	}
 
-	return setTokenPoolCounterPart(chain, pool, actor, destChainSelector, destTokenAddress, destTokenPoolAddress)
+	return setTokenPoolCounterPart(chain, pool, actor, destChainSelector, destTokenAddress.Bytes(), destTokenPoolAddress.Bytes())
 }
 
-func setTokenPoolCounterPart(chain deployment.Chain, tokenPool *burn_mint_token_pool.BurnMintTokenPool, actor *bind.TransactOpts, destChainSelector uint64, destTokenAddress common.Address, destTokenPoolAddress common.Address) error {
+func setTokenPoolCounterPart(
+	chain deployment.Chain,
+	tokenPool *burn_mint_token_pool.BurnMintTokenPool,
+	actor *bind.TransactOpts,
+	destChainSelector uint64,
+	destTokenAddress []byte,
+	destTokenPoolAddress []byte,
+) error {
 	tx, err := tokenPool.ApplyChainUpdates(
 		actor,
 		[]uint64{},
 		[]burn_mint_token_pool.TokenPoolChainUpdate{
 			{
 				RemoteChainSelector: destChainSelector,
-				RemotePoolAddresses: [][]byte{common.LeftPadBytes(destTokenPoolAddress.Bytes(), 32)},
-				RemoteTokenAddress:  common.LeftPadBytes(destTokenAddress.Bytes(), 32),
+				RemotePoolAddresses: [][]byte{common.LeftPadBytes(destTokenPoolAddress, 32)},
+				RemoteTokenAddress:  common.LeftPadBytes(destTokenAddress, 32),
 				OutboundRateLimiterConfig: burn_mint_token_pool.RateLimiterConfig{
 					IsEnabled: false,
 					Capacity:  big.NewInt(0),
@@ -925,7 +1072,7 @@ func setTokenPoolCounterPart(chain deployment.Chain, tokenPool *burn_mint_token_
 	tx, err = tokenPool.AddRemotePool(
 		actor,
 		destChainSelector,
-		destTokenPoolAddress.Bytes(),
+		destTokenPoolAddress,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to set remote pool on token pool %s: %w", tokenPool.Address(), err)

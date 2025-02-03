@@ -89,7 +89,7 @@ func Test_CCIPMessaging(t *testing.T) {
 			replayed:      replayed,
 			nonce:         nonce,
 		},
-			common.HexToAddress("0xdead"),
+			common.HexToAddress("0xdead").Bytes(),
 			[]byte("hello eoa"),
 			nil,                                 // default extraArgs
 			testhelpers.EXECUTION_STATE_SUCCESS, // success because offRamp won't call an EOA
@@ -103,7 +103,7 @@ func Test_CCIPMessaging(t *testing.T) {
 				replayed:      out.replayed,
 				nonce:         out.nonce,
 			},
-			state.Chains[destChain].FeeQuoter.Address(),
+			state.Chains[destChain].FeeQuoter.Address().Bytes(),
 			[]byte("hello FeeQuoter"),
 			nil,                                 // default extraArgs
 			testhelpers.EXECUTION_STATE_SUCCESS, // success because offRamp won't call a contract not implementing CCIPReceiver
@@ -119,7 +119,7 @@ func Test_CCIPMessaging(t *testing.T) {
 				replayed:      out.replayed,
 				nonce:         out.nonce,
 			},
-			state.Chains[destChain].Receiver.Address(),
+			state.Chains[destChain].Receiver.Address().Bytes(),
 			[]byte("hello CCIPReceiver"),
 			nil, // default extraArgs
 			testhelpers.EXECUTION_STATE_SUCCESS,
@@ -144,7 +144,7 @@ func Test_CCIPMessaging(t *testing.T) {
 				replayed:      out.replayed,
 				nonce:         out.nonce,
 			},
-			state.Chains[destChain].Receiver.Address(),
+			state.Chains[destChain].Receiver.Address().Bytes(),
 			[]byte("hello CCIPReceiver with low exec gas"),
 			testhelpers.MakeEVMExtraArgsV2(1, false), // 1 gas is too low.
 			testhelpers.EXECUTION_STATE_FAILURE,      // state would be failed onchain due to low gas
@@ -318,7 +318,7 @@ func getLatestNonce(tc messagingTestCase) uint64 {
 
 func runMessagingTestCase(
 	tc messagingTestCase,
-	receiver common.Address,
+	receiver []byte,
 	msgData []byte,
 	extraArgs []byte,
 	expectedExecutionState int,
@@ -330,7 +330,7 @@ func runMessagingTestCase(
 
 	startBlocks := make(map[uint64]*uint64)
 	msgSentEvent := testhelpers.TestSendRequest(tc.t, tc.deployedEnv.Env, tc.onchainState, tc.sourceChain, tc.destChain, false, router.ClientEVM2AnyMessage{
-		Receiver:     common.LeftPadBytes(receiver.Bytes(), 32),
+		Receiver:     common.LeftPadBytes(receiver, 32),
 		Data:         msgData,
 		TokenAmounts: nil,
 		FeeToken:     common.HexToAddress("0x0"),
@@ -397,4 +397,66 @@ func boolsToBitFlags(bools []bool) *big.Int {
 		}
 	}
 	return encodedFlags
+}
+
+func Test_CCIPMessaging_Solana(t *testing.T) {
+	// Setup 2 chains (EVM and Solana) and a single lane.
+	// ctx := testhelpers.Context(t)
+	e, _, _ := testsetups.NewIntegrationEnvironment(t, testhelpers.WithSolChains(1))
+
+	state, err := changeset.LoadOnchainState(e.Env)
+	require.NoError(t, err)
+
+	allChainSelectors := maps.Keys(e.Env.Chains)
+	allSolChainSelectors := maps.Keys(e.Env.SolChains)
+	sourceChain := allChainSelectors[0]
+	destChain := allSolChainSelectors[0]
+
+	// connect a single lane, source to dest
+	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
+	testhelpers.DeploySolanaCcipReceiver(t, e.Env)
+	state, _ = changeset.LoadOnchainState(e.Env)
+
+	out, err := state.Chains[sourceChain].Router.GetFee(nil, destChain, router.ClientEVM2AnyMessage{
+		Receiver:     common.LeftPadBytes(state.SolChains[destChain].Receiver.Bytes(), 32),
+		Data:         []byte("hello CCIPReceiver"),
+		TokenAmounts: nil,
+		FeeToken:     common.HexToAddress("0x0"),
+		ExtraArgs:    nil,
+	})
+	require.NoError(t, err)
+	t.Logf("fee: %d", out)
+	// require.Equal(t, uint64(0), out.Fee)
+	// latestHead, err := e.Env.Chains[destChain].Client.HeaderByNumber(ctx, nil)
+	// require.NoError(t, err)
+	// sender := common.LeftPadBytes(e.Env.Chains[sourceChain].DeployerKey.From.Bytes(), 32)
+	// setup := testCaseSetup{
+	// 	t:            t,
+	// 	sender:       sender,
+	// 	deployedEnv:  e,
+	// 	onchainState: state,
+	// 	sourceChain:  sourceChain,
+	// 	destChain:    destChain,
+	// }
+	// out := messagingTestCaseOutput{}
+	// out = runMessagingTestCase(
+	// 	messagingTestCase{
+	// 		testCaseSetup: setup,
+	// 		replayed:      out.replayed,
+	// 		nonce:         out.nonce,
+	// 	},
+	// 	state.SolChains[destChain].Receiver.Bytes(),
+	// 	[]byte("hello CCIPReceiver"),
+	// 	nil, // default extraArgs
+	// 	testhelpers.EXECUTION_STATE_SUCCESS,
+	// 	// func(t *testing.T) {
+	// 	// 	iter, err := state.Chains[destChain].Receiver.FilterMessageReceived(&bind.FilterOpts{
+	// 	// 		Context: ctx,
+	// 	// 		Start:   latestHead.Number.Uint64(),
+	// 	// 	})
+	// 	// 	require.NoError(t, err)
+	// 	// 	require.True(t, iter.Next())
+	// 	// 	// MessageReceived doesn't emit the data unfortunately, so can't check that.
+	// 	// },
+	// )
 }

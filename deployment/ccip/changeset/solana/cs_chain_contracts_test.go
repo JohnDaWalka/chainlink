@@ -143,6 +143,7 @@ func TestAddTokenPool(t *testing.T) {
 				RemoteChainSelector: evmChain,
 				TokenPubKey:         tokenAddress.String(),
 				RemoteConfig: token_pool.RemoteConfig{
+					// this can be potentially read from the state if we are given the token symbol
 					PoolAddresses: []token_pool.RemoteAddress{{Address: []byte{1, 2, 3}}},
 					TokenAddress:  token_pool.RemoteAddress{Address: []byte{4, 5, 6}},
 					Decimals:      9,
