@@ -94,7 +94,8 @@ type Compute struct {
 	// of a request.
 	transformer *transformer
 
-	fetcherFactory FetcherFactory
+	fetcherFactory        FetcherFactory
+	wasmtimeModuleFactory host.WasmtimeModuleFactoryFn
 
 	numWorkers int
 	queue      chan request
@@ -191,7 +192,7 @@ func (c *Compute) initModule(id string, cfg *host.ModuleConfig, binary []byte, r
 
 	cfg.Fetch = c.fetcherFactory.NewFetcher(c.log, c.emitter)
 
-	mod, err := host.NewModule(cfg, binary)
+	mod, err := host.NewModule(cfg, binary, c.wasmtimeModuleFactory)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate WASM module: %w", err)
 	}
@@ -433,6 +434,7 @@ func NewAction(
 	log logger.Logger,
 	registry coretypes.CapabilitiesRegistry,
 	fetcherFactory FetcherFactory,
+	wasmtimeModuleFactory host.WasmtimeModuleFactoryFn,
 	opts ...func(*Compute),
 ) (*Compute, error) {
 	config.ApplyDefaults()
@@ -441,15 +443,16 @@ func NewAction(
 		lggr    = logger.Named(log, "CustomCompute")
 		labeler = custmsg.NewLabeler()
 		compute = &Compute{
-			stopCh:         make(services.StopChan),
-			log:            lggr,
-			emitter:        labeler,
-			registry:       registry,
-			modules:        newModuleCache(clockwork.NewRealClock(), 1*time.Minute, 10*time.Minute, 3),
-			transformer:    NewTransformer(lggr, labeler, config),
-			fetcherFactory: fetcherFactory,
-			queue:          make(chan request),
-			numWorkers:     config.NumWorkers,
+			stopCh:                make(services.StopChan),
+			log:                   lggr,
+			emitter:               labeler,
+			registry:              registry,
+			modules:               newModuleCache(clockwork.NewRealClock(), 1*time.Minute, 10*time.Minute, 3),
+			transformer:           NewTransformer(lggr, labeler, config),
+			fetcherFactory:        fetcherFactory,
+			wasmtimeModuleFactory: wasmtimeModuleFactory,
+			queue:                 make(chan request),
+			numWorkers:            config.NumWorkers,
 		}
 	)
 

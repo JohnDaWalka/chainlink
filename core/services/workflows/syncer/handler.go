@@ -176,6 +176,7 @@ type eventHandler struct {
 	encryptionKey            workflowkey.Key
 	engineFactory            engineFactoryFn
 	ratelimiter              *ratelimiter.RateLimiter
+	wasmtimeModuleFactory    host.WasmtimeModuleFactoryFn
 }
 
 type Event interface {
@@ -214,6 +215,7 @@ func NewEventHandler(
 	clock clockwork.Clock,
 	encryptionKey workflowkey.Key,
 	ratelimiter *ratelimiter.RateLimiter,
+	wasmtimeModuleFactory host.WasmtimeModuleFactoryFn,
 	opts ...func(*eventHandler),
 ) *eventHandler {
 	eh := &eventHandler{
@@ -230,6 +232,7 @@ func NewEventHandler(
 		secretsFreshnessDuration: defaultSecretsFreshnessDuration,
 		encryptionKey:            encryptionKey,
 		ratelimiter:              ratelimiter,
+		wasmtimeModuleFactory:    wasmtimeModuleFactory,
 	}
 	eh.engineFactory = eh.engineFactoryFn
 	eh.limits.ApplyDefaults()
@@ -593,7 +596,7 @@ func (h *eventHandler) getWorkflowArtifacts(
 
 func (h *eventHandler) engineFactoryFn(ctx context.Context, id string, owner string, name workflows.WorkflowNamer, config []byte, binary []byte) (services.Service, error) {
 	moduleConfig := &host.ModuleConfig{Logger: h.lggr, Labeler: h.emitter}
-	sdkSpec, err := host.GetWorkflowSpec(ctx, moduleConfig, binary, config)
+	sdkSpec, err := host.GetWorkflowSpec(ctx, moduleConfig, binary, config, h.wasmtimeModuleFactory)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workflow sdk spec: %w", err)
 	}

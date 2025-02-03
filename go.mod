@@ -4,6 +4,8 @@ go 1.23.3
 
 toolchain go1.23.4
 
+replace github.com/smartcontractkit/chainlink-common => ../chainlink-common
+
 require (
 	github.com/Depado/ginprom v1.8.0
 	github.com/Masterminds/semver/v3 v3.3.0
@@ -79,7 +81,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.37
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250203130001-13e2609047e9
-	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250130202959-6f1f48342e36
+	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250203165453-f973d5a57353
 	github.com/smartcontractkit/chainlink-cosmos v0.5.2-0.20250130125138-3df261e09ddc
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250128203428-08031923fbe5
 	github.com/smartcontractkit/chainlink-feeds v0.1.1

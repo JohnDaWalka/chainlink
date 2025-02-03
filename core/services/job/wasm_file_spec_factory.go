@@ -11,6 +11,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/bytecodealliance/wasmtime-go/v28"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
 
@@ -33,7 +35,8 @@ func (w WasmFileSpecFactory) Spec(ctx context.Context, workflow, configLocation 
 	}
 
 	moduleConfig := &host.ModuleConfig{Logger: logger.NullLogger}
-	spec, err := host.GetWorkflowSpec(ctx, moduleConfig, compressedBinary, config)
+	spec, err := host.GetWorkflowSpec(ctx, moduleConfig, compressedBinary, config,
+		newWasmTimeModule)
 	if err != nil {
 		return sdk.WorkflowSpec{}, nil, "", err
 	} else if spec == nil {
@@ -41,6 +44,19 @@ func (w WasmFileSpecFactory) Spec(ctx context.Context, workflow, configLocation 
 	}
 
 	return *spec, compressedBinary, sha, nil
+}
+
+func newWasmTimeModule(engine *wasmtime.Engine, binary []byte, isUncompressed bool, maxCompressedBinarySize uint64, maxDecompressedBinarySize uint64) (*wasmtime.Module, error) {
+	binary, err := host.ValidateAndDecompressBinary(binary, isUncompressed, maxCompressedBinarySize, maxDecompressedBinarySize)
+	if err != nil {
+		return nil, fmt.Errorf("error validating and decompressing binary: %w", err)
+	}
+
+	mod, err := wasmtime.NewModule(engine, binary)
+	if err != nil {
+		return nil, fmt.Errorf("error creating wasmtime module: %w", err)
+	}
+	return mod, nil
 }
 
 func (w WasmFileSpecFactory) RawSpec(ctx context.Context, workflow, configLocation string) ([]byte, error) {

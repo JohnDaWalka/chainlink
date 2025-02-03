@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/jsonserializable"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
+	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/build"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
@@ -199,6 +200,7 @@ type ApplicationOpts struct {
 	NewOracleFactoryFn         standardcapabilities.NewOracleFactoryFn
 	FetcherFunc                syncer.FetcherFunc
 	FetcherFactoryFn           compute.FetcherFactory
+	WasmtimeModuleFactory      host.WasmtimeModuleFactoryFn
 }
 
 type Heartbeat struct {
@@ -359,6 +361,16 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 
 			srvcs = append(srvcs, wfLauncher, registrySyncer)
 
+			if opts.WasmtimeModuleFactory == nil {
+				// for tests only, in prod Registry should always be set at this point
+				moduleFactory, err := NewCachedWasmModuleFactory(globalLogger, "")
+				if err != nil {
+					return nil, fmt.Errorf("could not create wasmtime module factory: %w", err)
+				}
+
+				opts.WasmtimeModuleFactory = moduleFactory.NewModule
+			}
+
 			if cfg.Capabilities().WorkflowRegistry().Address() != "" {
 				lggr := globalLogger.Named("WorkflowRegistrySyncer")
 				var fetcherFunc syncer.FetcherFunc
@@ -396,6 +408,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 					clockwork.NewRealClock(),
 					keys[0],
 					workflowRateLimiter,
+					opts.WasmtimeModuleFactory,
 					syncer.WithMaxArtifactSize(
 						syncer.ArtifactConfig{
 							MaxBinarySize:  uint64(cfg.Capabilities().WorkflowRegistry().MaxBinarySize()),
@@ -664,6 +677,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		peerWrapper,
 		opts.NewOracleFactoryFn,
 		opts.FetcherFactoryFn,
+		opts.WasmtimeModuleFactory,
 	)
 
 	if cfg.OCR().Enabled() {

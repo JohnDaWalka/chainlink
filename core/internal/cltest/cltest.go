@@ -35,6 +35,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
@@ -375,6 +376,14 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		}
 	}
 
+	var wasmtimeModuleFactory host.WasmtimeModuleFactoryFn
+	for _, dep := range flagsAndDeps {
+		wasmtimeModuleFactory, _ = dep.(host.WasmtimeModuleFactoryFn)
+		if wasmtimeModuleFactory != nil {
+			break
+		}
+	}
+
 	var peerWrapper p2ptypes.PeerWrapper
 	for _, dep := range flagsAndDeps {
 		peerWrapper, _ = dep.(p2ptypes.PeerWrapper)
@@ -526,6 +535,7 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		NewOracleFactoryFn:         newOracleFactoryFn,
 		FetcherFunc:                syncerFetcherFunc,
 		FetcherFactoryFn:           computeFetcherFactory,
+		WasmtimeModuleFactory:      wasmtimeModuleFactory,
 		RetirementReportCache:      retirementReportCache,
 	})
 
