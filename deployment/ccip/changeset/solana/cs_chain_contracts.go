@@ -1006,10 +1006,7 @@ type TokenPoolLookupTableConfig struct {
 
 func (cfg TokenPoolLookupTableConfig) Validate(e deployment.Environment) error {
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
-	if err := commonValidation(e, cfg.ChainSelector, tokenPubKey); err != nil {
-		return err
-	}
-	return nil
+	return commonValidation(e, cfg.ChainSelector, tokenPubKey)
 }
 
 func AddTokenPoolLookupTable(e deployment.Environment, cfg TokenPoolLookupTableConfig) (deployment.ChangesetOutput, error) {
