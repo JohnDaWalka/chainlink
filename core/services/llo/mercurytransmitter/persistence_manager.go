@@ -72,7 +72,7 @@ func (pm *persistenceManager) AsyncDelete(hash [32]byte) {
 }
 
 func (pm *persistenceManager) Load(ctx context.Context) ([]*Transmission, error) {
-	return pm.orm.Get(ctx, pm.serverURL)
+	return pm.orm.Get(ctx, pm.serverURL, pm.maxTransmitQueueSize)
 }
 
 func (pm *persistenceManager) runFlushDeletesLoop() {

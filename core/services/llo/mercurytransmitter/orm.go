@@ -19,7 +19,7 @@ type ORM interface {
 	DonID() uint32
 	Insert(ctx context.Context, transmissions []*Transmission) error
 	Delete(ctx context.Context, hashes [][32]byte) error
-	Get(ctx context.Context, serverURL string) ([]*Transmission, error)
+	Get(ctx context.Context, serverURL string, limit int) ([]*Transmission, error)
 	Prune(ctx context.Context, serverURL string, maxSize int) error
 	Cleanup(ctx context.Context) error
 }
@@ -116,7 +116,7 @@ func (o *orm) Delete(ctx context.Context, hashes [][32]byte) error {
 }
 
 // Get returns all transmissions in chronologically descending order
-func (o *orm) Get(ctx context.Context, serverURL string) ([]*Transmission, error) {
+func (o *orm) Get(ctx context.Context, serverURL string, limit int) ([]*Transmission, error) {
 	// The priority queue uses seqnr to sort transmissions so order by
 	// the same fields here for optimal insertion into the pq.
 	rows, err := o.ds.QueryContext(ctx, `
@@ -124,7 +124,8 @@ func (o *orm) Get(ctx context.Context, serverURL string) ([]*Transmission, error
 		FROM llo_mercury_transmit_queue
 		WHERE don_id = $1 AND server_url = $2
 		ORDER BY seq_nr DESC, transmission_hash DESC
-	`, o.donID, serverURL)
+		LIMIT $3
+	`, o.donID, serverURL, limit)
 	if err != nil {
 		return nil, fmt.Errorf("llo orm: failed to get transmissions: %w", err)
 	}
