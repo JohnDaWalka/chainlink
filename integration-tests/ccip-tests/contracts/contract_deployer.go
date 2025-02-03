@@ -46,8 +46,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool_1_4_0"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_4_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_5_1"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
@@ -409,7 +409,7 @@ func (e *CCIPContractsDeployer) NewUSDCTokenPoolContract(addr common.Address) (
 	e.logger.Info().Str("Version", version.String()).Msg("New USDC Token Pool")
 	switch version {
 	case Latest:
-		pool, err := usdc_token_pool.NewUSDCTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
+		pool, err := usdc_token_pool_1_5_1.NewUSDCTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 
 		if err != nil {
 			return nil, err
@@ -485,7 +485,7 @@ func (e *CCIPContractsDeployer) DeployUSDCTokenPoolContract(tokenAddr string, to
 			auth *bind.TransactOpts,
 			_ bind.ContractBackend,
 		) (common.Address, *types.Transaction, interface{}, error) {
-			return usdc_token_pool.DeployUSDCTokenPool(
+			return usdc_token_pool_1_5_1.DeployUSDCTokenPool(
 				auth,
 				wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
 				tokenMessenger,

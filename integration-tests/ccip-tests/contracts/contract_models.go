@@ -40,8 +40,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool_1_4_0"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_4_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_5_1"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
@@ -404,7 +404,7 @@ func (l *LinkToken) Transfer(to string, amount *big.Int) error {
 type LatestPool struct {
 	PoolInterface   *token_pool.TokenPool
 	LockReleasePool *lock_release_token_pool.LockReleaseTokenPool
-	USDCPool        *usdc_token_pool.USDCTokenPool
+	USDCPool        *usdc_token_pool_1_5_1.USDCTokenPool
 	MockLBTCPool    *mock_lbtc_token_pool.MockLBTCTokenPool
 }
 
@@ -429,7 +429,7 @@ func (w TokenPoolWrapper) SetRebalancer(opts *bind.TransactOpts, from common.Add
 	return nil, fmt.Errorf("no pool found to set rebalancer")
 }
 
-func (w TokenPoolWrapper) SetUSDCDomains(opts *bind.TransactOpts, updates []usdc_token_pool.USDCTokenPoolDomainUpdate) (*types.Transaction, error) {
+func (w TokenPoolWrapper) SetUSDCDomains(opts *bind.TransactOpts, updates []usdc_token_pool_1_5_1.USDCTokenPoolDomainUpdate) (*types.Transaction, error) {
 	if w.Latest != nil && w.Latest.USDCPool != nil {
 		return w.Latest.USDCPool.SetDomains(opts, updates)
 	}
@@ -694,7 +694,7 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 		Str("Allowed Caller", destPoolAddr.Hex()).
 		Str("Dest Chain Selector", fmt.Sprintf("%d", destChainSelector)).
 		Msg("Syncing USDC Domain")
-	tx, err := pool.Instance.SetUSDCDomains(opts, []usdc_token_pool.USDCTokenPoolDomainUpdate{
+	tx, err := pool.Instance.SetUSDCDomains(opts, []usdc_token_pool_1_5_1.USDCTokenPoolDomainUpdate{
 		{
 			AllowedCaller:     allowedCallerBytes,
 			DomainIdentifier:  domain,
