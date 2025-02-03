@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_with_from_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_5_1"
 )
 
 type TokenPoolContract interface {
@@ -42,7 +42,7 @@ func GetCurrentInboundRateLimiterState(t TokenPoolContract, remoteChainSelector 
 	case *lock_release_token_pool.LockReleaseTokenPool:
 		state, err := v.GetCurrentInboundRateLimiterState(nil, remoteChainSelector)
 		return token_pool.RateLimiterTokenBucket(state), err
-	case *usdc_token_pool.USDCTokenPool:
+	case *usdc_token_pool_1_5_1.USDCTokenPool:
 		state, err := v.GetCurrentInboundRateLimiterState(nil, remoteChainSelector)
 		return token_pool.RateLimiterTokenBucket(state), err
 	default:
@@ -64,7 +64,7 @@ func GetCurrentOutboundRateLimiterState(t TokenPoolContract, remoteChainSelector
 	case *lock_release_token_pool.LockReleaseTokenPool:
 		state, err := v.GetCurrentOutboundRateLimiterState(nil, remoteChainSelector)
 		return token_pool.RateLimiterTokenBucket(state), err
-	case *usdc_token_pool.USDCTokenPool:
+	case *usdc_token_pool_1_5_1.USDCTokenPool:
 		state, err := v.GetCurrentOutboundRateLimiterState(nil, remoteChainSelector)
 		return token_pool.RateLimiterTokenBucket(state), err
 	default:
@@ -96,7 +96,7 @@ type USDCTokenPoolView struct {
 	TokenMessenger     common.Address
 	MessageTransmitter common.Address
 	LocalDomain        uint32
-	ChainToDomain      map[uint64]usdc_token_pool.USDCTokenPoolDomain
+	ChainToDomain      map[uint64]usdc_token_pool_1_5_1.USDCTokenPoolDomain
 }
 
 type LockReleaseTokenPoolView struct {
@@ -197,7 +197,7 @@ func GenerateLockReleaseTokenPoolView(pool *lock_release_token_pool.LockReleaseT
 	}, nil
 }
 
-func GenerateUSDCTokenPoolView(pool *usdc_token_pool.USDCTokenPool) (USDCTokenPoolView, error) {
+func GenerateUSDCTokenPoolView(pool *usdc_token_pool_1_5_1.USDCTokenPool) (USDCTokenPoolView, error) {
 	basePoolView, err := GenerateTokenPoolView(pool)
 	if err != nil {
 		return USDCTokenPoolView{}, err
@@ -214,7 +214,7 @@ func GenerateUSDCTokenPoolView(pool *usdc_token_pool.USDCTokenPool) (USDCTokenPo
 	if err != nil {
 		return USDCTokenPoolView{}, err
 	}
-	chainToDomain := make(map[uint64]usdc_token_pool.USDCTokenPoolDomain)
+	chainToDomain := make(map[uint64]usdc_token_pool_1_5_1.USDCTokenPoolDomain)
 	remoteChains := maps.Keys(basePoolView.RemoteChainConfigs)
 	for _, chainSel := range remoteChains {
 		domain, err := pool.GetDomain(nil, chainSel)

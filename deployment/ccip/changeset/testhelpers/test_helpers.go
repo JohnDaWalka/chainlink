@@ -53,7 +53,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_5_1"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_ethusd_aggregator_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/aggregator_v3_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
@@ -853,7 +853,7 @@ func grantMintBurnPermissions(lggr logger.Logger, chain deployment.Chain, token 
 
 func setUSDCTokenPoolCounterPart(
 	chain deployment.Chain,
-	tokenPool *usdc_token_pool.USDCTokenPool,
+	tokenPool *usdc_token_pool_1_5_1.USDCTokenPool,
 	destChainSelector uint64,
 	actor *bind.TransactOpts,
 	destTokenAddress common.Address,
@@ -865,7 +865,7 @@ func setUSDCTokenPoolCounterPart(
 
 	domain := reader.AllAvailableDomains()[destChainSelector]
 
-	domains := []usdc_token_pool.USDCTokenPoolDomainUpdate{
+	domains := []usdc_token_pool_1_5_1.USDCTokenPoolDomainUpdate{
 		{
 			AllowedCaller:     fixedAddr,
 			DomainIdentifier:  domain,
