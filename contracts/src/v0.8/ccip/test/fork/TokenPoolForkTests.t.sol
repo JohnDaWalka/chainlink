@@ -33,6 +33,7 @@ contract RoninForkTests is Test {
   address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
   address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
   address public constant RONIN_OFF_RAMP = 0x9a3Ed7007809CfD666999e439076B4Ce4120528D;
+  address public constant LEGACY_WETH_POOL = 0x69c24c970B65e22Ac26864aF10b2295B7d78f93A;
 
   address public constant ARB_OFF_RAMP = 0xdf615eF8D4C64d0ED8Fd7824BBEd2f6a10245aC9;
   bytes public constant ARB_USDC_POOL = hex"000000000000000000000000f46beff26e1c4552fb4ffb00314bdf175fbe97e4";
@@ -58,13 +59,53 @@ contract RoninForkTests is Test {
     );
 
     s_siloedTokenPool = new SiloedLockReleaseTokenPool(IERC20(WETH), 18, new address[](0), RMNPRoxy, address(ROUTER));
+    vm.makePersistent(address(s_siloedTokenPool));
+  }
+
+  function test_LockReleaseTokenPool_Migrations() public {
+    vm.createSelectFork(vm.envString("ARBITRUM_RPC_URL"), 301236399);
+
+    address ArbRouter = 0x141fa059441E0ca23ce184B6A78bafD2A517DdE8;
+    address ArbTokenAdminRegistry = 0x39AE1032cF4B334a1Ed41cdD0833bdD7c7E7751E;
+    address ARBWeth = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+    address ArbRMN = 0xC311a21e6fEf769344EB1515588B9d535662a145;
+
+    address currentWethPool = TokenAdminRegistry(ArbTokenAdminRegistry).getPool(ARBWeth);
+
+    LockReleaseTokenPool arbWethPool = LockReleaseTokenPool(currentWethPool);
+    LockReleaseTokenPool newArbWethPool = new LockReleaseTokenPool(IERC20(ARBWeth), 18, new address[](0), ArbRMN, true, ArbRouter);
+
+    vm.makePersistent(address(arbWethPool));
+    vm.makePersistent(address(newArbWethPool));
+
+    address currentOwner = arbWethPool.owner();
+
+    vm.startPrank(currentOwner);
+    
+    arbWethPool.setRebalancer(address(newArbWethPool));
+
+    uint256 liquidityBalance = IERC20(ARBWeth).balanceOf(address(arbWethPool));
+
+    vm.stopPrank();
+    newArbWethPool.transferLiquidity(address(arbWethPool), liquidityBalance);
+
+    assertEq(IERC20(ARBWeth).balanceOf(address(newArbWethPool)), liquidityBalance);
+    assertEq(IERC20(ARBWeth).balanceOf(address(arbWethPool)), 0);
+
+    TokenAdminRegistry.TokenConfig memory config = TokenAdminRegistry(ArbTokenAdminRegistry).getTokenConfig(ARBWeth);
+
+    vm.startPrank(config.administrator);
+    TokenAdminRegistry(ArbTokenAdminRegistry).setPool(ARBWeth, address(newArbWethPool));
+
+    assertEq(TokenAdminRegistry(ArbTokenAdminRegistry).getPool(ARBWeth), address(newArbWethPool));
+
   }
 
   function test_SiloedLockReleaseTokenPool() public {
     address currentWethPool = TOKEN_ADMIN_REGISTRY.getPool(WETH);
 
     // Get the address of the rebalancer that can withdraw from the pool
-    address rebalancer = LockReleaseTokenPool(currentWethPool).getRebalancer();
+    address rebalancer = LockReleaseTokenPool(LEGACY_WETH_POOL).getRebalancer();
 
     // Set the rebalancer on the new pool to be equal to the current finance multisig
     s_siloedTokenPool.setRebalancer(rebalancer);
@@ -95,13 +136,13 @@ contract RoninForkTests is Test {
 
     assertEq(address(s_siloedTokenPool), TOKEN_ADMIN_REGISTRY.getPool(WETH));
 
-    // Get the balance of the pool now which will be migrated
-    uint256 liquidityBalance = IERC20(WETH).balanceOf(address(s_siloedTokenPool));
-
-    vm.startPrank(rebalancer);
+    // Get the balance of the legacy pool now which will be migrated
+    uint256 liquidityBalance = IERC20(WETH).balanceOf(address(LEGACY_WETH_POOL));
 
     // Do the liquidity transfer from the existing pool to the new one with unsiloed liquidity
-    LockReleaseTokenPool(currentWethPool).withdrawLiquidity(IERC20(WETH).balanceOf(currentWethPool));
+    vm.startPrank(rebalancer);
+
+    LockReleaseTokenPool(LEGACY_WETH_POOL).withdrawLiquidity(liquidityBalance);
     IERC20(WETH).safeApprove(address(s_siloedTokenPool), type(uint256).max);
 
     s_siloedTokenPool.provideLiquidity(liquidityBalance);
