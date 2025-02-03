@@ -18,13 +18,17 @@ func NewLabelSet(labels ...string) LabelSet {
 }
 
 // Add inserts a labels into the set.
-func (ls LabelSet) Add(labels string) {
-	ls[labels] = struct{}{}
+func (ls LabelSet) Add(labels ...string) {
+	for _, label := range labels {
+		ls[label] = struct{}{}
+	}
 }
 
 // Remove deletes a labels from the set, if it exists.
-func (ls LabelSet) Remove(labels string) {
-	delete(ls, labels)
+func (ls LabelSet) Remove(labels ...string) {
+	for _, label := range labels {
+		delete(ls, label)
+	}
 }
 
 // Contains checks if the set contains the given labels.
@@ -64,4 +68,16 @@ func (ls LabelSet) Equal(other LabelSet) bool {
 		}
 	}
 	return true
+}
+
+// DeepClone returns a copy of the LabelSet.
+func (ls LabelSet) DeepClone() LabelSet {
+	if ls == nil {
+		return nil
+	}
+	out := make(LabelSet, len(ls))
+	for label := range ls {
+		out[label] = struct{}{}
+	}
+	return out
 }

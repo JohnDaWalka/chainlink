@@ -7,10 +7,248 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
 )
+
+func TestTypeAndVersion_NewTypeAndVersion(t *testing.T) {
+	contractType := ContractType("TestContract")
+	version := semver.MustParse("1.0.0")
+
+	tv1 := NewTypeAndVersion(contractType, *version)
+	tv2 := NewTypeAndVersion(contractType, *version)
+	tv3 := TypeAndVersion{
+		Type:    "TestContract",
+		Version: *version,
+	}
+
+	assert.True(t, tv1.Equal(tv2), "expected tv1 to be equal to tv2")
+	assert.Equal(t, tv1, tv3, "expected tv1 to be equal to tv3")
+}
+
+func TestTypeAndVersion_String(t *testing.T) {
+	contractType := ContractType("TestContract")
+	version := semver.MustParse("1.0.0")
+
+	tests := []struct {
+		name     string
+		tv       TypeAndVersion
+		expected string
+	}{
+		{
+			name: "Nil labels",
+			tv: TypeAndVersion{
+				Type:    contractType,
+				Version: *version,
+				Labels:  nil,
+			},
+			expected: "TestContract 1.0.0",
+		},
+		{
+			name: "Empty labels",
+			tv: TypeAndVersion{
+				Type:    contractType,
+				Version: *version,
+				Labels:  make(LabelSet),
+			},
+			expected: "TestContract 1.0.0",
+		},
+		{
+			name: "With labels",
+			tv: TypeAndVersion{
+				Type:    contractType,
+				Version: *version,
+				Labels:  NewLabelSet("alpha", "beta"),
+			},
+			expected: "TestContract 1.0.0",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.tv.String(), "unexpected string representation")
+		})
+	}
+}
+
+func TestTypeAndVersion_FullString(t *testing.T) {
+	contractType := ContractType("TestContract")
+	version := semver.MustParse("1.0.0")
+
+	tests := []struct {
+		name     string
+		tv       TypeAndVersion
+		expected string
+	}{
+		{
+			name: "Nil labels",
+			tv: TypeAndVersion{
+				Type:    contractType,
+				Version: *version,
+				Labels:  nil,
+			},
+			expected: "TestContract 1.0.0",
+		},
+		{
+			name: "Empty labels",
+			tv: TypeAndVersion{
+				Type:    contractType,
+				Version: *version,
+				Labels:  make(LabelSet),
+			},
+			expected: "TestContract 1.0.0",
+		},
+		{
+			name: "With labels",
+			tv: TypeAndVersion{
+				Type:    contractType,
+				Version: *version,
+				Labels:  NewLabelSet("alpha", "beta"),
+			},
+			expected: "TestContract 1.0.0 alpha beta",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.tv.FullString(), "unexpected string representation")
+		})
+	}
+}
+
+func TestTypeAndVersion_DeepClone(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     TypeAndVersion
+		mutate    func(tv *TypeAndVersion)
+		wantEqual bool
+	}{
+		{
+			name: "No labels",
+			input: TypeAndVersion{
+				Type:    "MyContract",
+				Version: *semver.MustParse("1.2.3"),
+				Labels:  nil,
+			},
+			mutate: func(tv *TypeAndVersion) {
+				tv.Type = "Mutated"
+				tv.Version = *semver.MustParse("9.9.9")
+			},
+			wantEqual: false,
+		},
+		{
+			name: "With labels",
+			input: TypeAndVersion{
+				Type:    "AnotherContract",
+				Version: *semver.MustParse("2.0.1"),
+				Labels:  NewLabelSet("fast", "secure"),
+			},
+			mutate: func(tv *TypeAndVersion) {
+				tv.Labels.Add("new-label")
+			},
+			wantEqual: false,
+		},
+		{
+			name: "Empty label set",
+			input: TypeAndVersion{
+				Type:    "EmptyLabelContract",
+				Version: *semver.MustParse("0.1.0"),
+				Labels:  NewLabelSet(), // empty, but allocated
+			},
+			mutate: func(tv *TypeAndVersion) {
+				tv.Labels.Add("test-label")
+			},
+			wantEqual: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Clone
+			clone := tt.input.DeepClone()
+
+			// Before mutation, the clone should be Equal to the original
+			assert.True(t, tt.input.Equal(clone),
+				"DeepClone result should initially match the input")
+
+			// Mutate the clone
+			tt.mutate(&clone)
+
+			// If wantEqual is false, the original should differ from the mutated clone
+			if !tt.wantEqual {
+				assert.False(t, tt.input.Equal(clone),
+					"Mutating the clone should not affect the original if deep-cloned")
+			} else {
+				assert.True(t, tt.input.Equal(clone),
+					"Mutating the clone incorrectly affected the original")
+			}
+		})
+	}
+}
+
+func TestAddressBookMap_DeepCloneAddresses(t *testing.T) {
+	// Prepare some TypeAndVersion items
+	tvA := TypeAndVersion{
+		Type:    "ContractA",
+		Version: *semver.MustParse("1.0.0"),
+		Labels:  NewLabelSet("labelA"),
+	}
+	tvB := TypeAndVersion{
+		Type:    "ContractB",
+		Version: *semver.MustParse("1.1.0"),
+		Labels:  NewLabelSet("labelB1", "labelB2"),
+	}
+
+	// Build our sample input
+	inputMap := map[uint64]map[string]TypeAndVersion{
+		111: {
+			"0x1234": tvA,
+		},
+		222: {
+			"0xABCD": tvB,
+		},
+	}
+
+	ab := NewMemoryAddressBookFromMap(inputMap)
+
+	// Addresses() is supposed to return a deep clone
+	clonedAddrs, err := ab.Addresses()
+	require.NoError(t, err)
+
+	// Now mutate something in the clone to see if the original is affected
+	clonedAddrs[111]["0x1234"] = TypeAndVersion{
+		Type:    "MutatedType",
+		Version: *semver.MustParse("9.9.9"),
+		Labels:  NewLabelSet("mutated"),
+	}
+
+	// Check original is not mutated
+	originalAddrs, err := ab.Addresses()
+	require.NoError(t, err)
+
+	// The original 111 -> 0x1234 should remain tvA
+	assert.Equal(t, tvA, originalAddrs[111]["0x1234"],
+		"Mutating cloned addresses must not affect the original")
+
+	// Also check that the `Labels` inside each TypeAndVersion are deeply cloned
+	// For example, add a label to the clone's tvB
+	cloneTvB := clonedAddrs[222]["0xABCD"]
+	cloneTvB.Labels.Add("extra-label")
+	clonedAddrs[222]["0xABCD"] = cloneTvB
+
+	// Now see if the original's version is unchanged
+	originalTvB := originalAddrs[222]["0xABCD"]
+	assert.False(t, originalTvB.Labels.Contains("extra-label"),
+		"Original TypeAndVersion's Labels should not reflect changes to the clone")
+
+	// Optionally, ensure the rest of the original is still correct
+	assert.Equal(t, tvB, originalTvB,
+		"Original TypeAndVersion for 222 -> 0xABCD should remain unchanged")
+}
 
 func TestAddressBook_Save(t *testing.T) {
 	ab := NewMemoryAddressBook()
@@ -254,8 +492,8 @@ func TestAddressesContainBundle(t *testing.T) {
 
 	// Create one with labels
 	onRamp100WithLabels := NewTypeAndVersion("OnRamp", Version1_0_0)
-	onRamp100WithLabels.Labels.Add("sa")
-	onRamp100WithLabels.Labels.Add("staging")
+	onRamp100WithLabels.AddLabel("sa")
+	onRamp100WithLabels.AddLabel("staging")
 
 	addr1 := common.HexToAddress("0x1").String()
 	addr2 := common.HexToAddress("0x2").String()
@@ -264,7 +502,7 @@ func TestAddressesContainBundle(t *testing.T) {
 	tests := []struct {
 		name       string
 		addrs      map[string]TypeAndVersion // input address map
-		wantTypes  []TypeAndVersion          // the “bundle” we want
+		wantTypes  []TypeAndVersion          // the "bundle" we want
 		wantErr    bool
 		wantErrMsg string
 		wantResult bool // expected boolean return when no error
@@ -332,7 +570,7 @@ func TestAddressesContainBundle(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // capture range variable
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -361,6 +599,80 @@ func TestTypeAndVersionFromString(t *testing.T) {
 		wantErr            bool
 		wantType           ContractType
 		wantVersion        semver.Version
+		wantTypeAndVersion string
+	}{
+		{
+			name:               "valid - no labels",
+			input:              "CallProxy 1.0.0",
+			wantErr:            false,
+			wantType:           "CallProxy",
+			wantVersion:        Version1_0_0,
+			wantTypeAndVersion: "CallProxy 1.0.0",
+		},
+		{
+			name:               "valid - multiple labels, normal spacing",
+			input:              "CallProxy 1.0.0 SA staging",
+			wantErr:            false,
+			wantType:           "CallProxy",
+			wantVersion:        Version1_0_0,
+			wantTypeAndVersion: "CallProxy 1.0.0",
+		},
+		{
+			name:               "valid - multiple labels, extra spacing",
+			input:              "   CallProxy     1.0.0    SA    staging   ",
+			wantErr:            false,
+			wantType:           "CallProxy",
+			wantVersion:        Version1_0_0,
+			wantTypeAndVersion: "CallProxy 1.0.0",
+		},
+		{
+			name:    "invalid - not enough parts",
+			input:   "CallProxy",
+			wantErr: true,
+		},
+		{
+			name:    "invalid - version not parseable",
+			input:   "CallProxy notASemver",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			gotTV, gotErr := TypeAndVersionFromString(tt.input)
+			if tt.wantErr {
+				require.Error(t, gotErr, "expected error but got none")
+				return
+			}
+			require.NoError(t, gotErr, "did not expect an error but got one")
+
+			// Check ContractType
+			require.Equal(t, tt.wantType, gotTV.Type, "incorrect contract type")
+
+			// Check Version
+			require.Equal(t, tt.wantVersion.String(), gotTV.Version.String(), "incorrect version")
+
+			// Check labels
+			require.Equal(t, LabelSet(nil), gotTV.Labels, "labels mismatch")
+
+			// Check type and version
+			require.Equal(t, tt.wantTypeAndVersion, gotTV.String(), "type and version mismatch")
+		})
+	}
+}
+
+func TestTypeAndVersionFromFullString(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name               string
+		input              string
+		wantErr            bool
+		wantType           ContractType
+		wantVersion        semver.Version
 		wantLabels         LabelSet
 		wantTypeAndVersion string
 	}{
@@ -370,7 +682,7 @@ func TestTypeAndVersionFromString(t *testing.T) {
 			wantErr:            false,
 			wantType:           "CallProxy",
 			wantVersion:        Version1_0_0,
-			wantLabels:         NewLabelSet(),
+			wantLabels:         nil,
 			wantTypeAndVersion: "CallProxy 1.0.0",
 		},
 		{
@@ -404,11 +716,11 @@ func TestTypeAndVersionFromString(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // capture range variable
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			gotTV, gotErr := TypeAndVersionFromString(tt.input)
+			gotTV, gotErr := TypeAndVersionFromFullString(tt.input)
 			if tt.wantErr {
 				require.Error(t, gotErr, "expected error but got none")
 				return
@@ -424,8 +736,8 @@ func TestTypeAndVersionFromString(t *testing.T) {
 			// Check labels
 			require.Equal(t, tt.wantLabels, gotTV.Labels, "labels mismatch")
 
-			// Check type and version
-			require.Equal(t, tt.wantTypeAndVersion, gotTV.String(), "type and version mismatch")
+			// Check full type + version + labels
+			require.Equal(t, tt.wantTypeAndVersion, gotTV.FullString(), "type and version mismatch")
 		})
 	}
 }
@@ -464,7 +776,7 @@ func TestTypeAndVersion_AddLabels(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // capture range variable
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -488,6 +800,112 @@ func TestTypeAndVersion_AddLabels(t *testing.T) {
 				require.True(t, tv.Labels.Contains(md),
 					"expected labels %q was not found in tv.Labels", md)
 			}
+		})
+	}
+}
+
+func TestTypeAndVersion_RemoveLabel(t *testing.T) {
+	contractType := ContractType("TestContract")
+	version := semver.MustParse("1.0.0")
+
+	tests := []struct {
+		name          string
+		initialLabels []string
+		toRemove      []string
+		wantLabels    LabelSet
+	}{
+		{
+			name:          "Remove from nil labels",
+			initialLabels: nil,
+			toRemove:      []string{"alpha"},
+			wantLabels:    NewLabelSet(),
+		},
+		{
+			name:          "Remove from empty labels",
+			initialLabels: []string{},
+			toRemove:      []string{"alpha"},
+			wantLabels:    NewLabelSet(),
+		},
+		{
+			name:          "Remove existing label",
+			initialLabels: []string{"alpha", "beta"},
+			toRemove:      []string{"alpha"},
+			wantLabels:    NewLabelSet("beta"),
+		},
+		{
+			name:          "Remove non-existing label",
+			initialLabels: []string{"alpha"},
+			toRemove:      []string{"beta"},
+			wantLabels:    NewLabelSet("alpha"),
+		},
+		{
+			name:          "Remove multiple labels",
+			initialLabels: []string{"alpha", "beta", "gamma"},
+			toRemove:      []string{"alpha", "gamma"},
+			wantLabels:    NewLabelSet("beta"),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tv := TypeAndVersion{
+				Type:    contractType,
+				Version: *version,
+			}
+
+			if tt.initialLabels != nil {
+				tv.Labels = NewLabelSet(tt.initialLabels...)
+			}
+
+			tv.RemoveLabel(tt.toRemove...)
+
+			assert.True(t, tt.wantLabels.Equal(tv.Labels), "unexpected labels after removal")
+		})
+	}
+}
+
+func TestTypeAndVersion_LabelsString(t *testing.T) {
+	contractType := ContractType("TestContract")
+	version := semver.MustParse("1.0.0")
+
+	tests := []struct {
+		name     string
+		labels   []string
+		expected string
+	}{
+		{
+			name:     "Nil labels",
+			labels:   nil,
+			expected: "",
+		},
+		{
+			name:     "Empty labels",
+			labels:   []string{},
+			expected: "",
+		},
+		{
+			name:     "Single label",
+			labels:   []string{"alpha"},
+			expected: "alpha",
+		},
+		{
+			name:     "Multiple labels",
+			labels:   []string{"alpha", "beta"},
+			expected: "alpha beta",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tv := TypeAndVersion{
+				Type:    contractType,
+				Version: *version,
+				Labels:  NewLabelSet(tt.labels...),
+			}
+
+			assert.Equal(t, tt.expected, tv.LabelsString(), "unexpected labels string")
 		})
 	}
 }

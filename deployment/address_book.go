@@ -32,23 +32,23 @@ var (
 )
 
 type TypeAndVersion struct {
-	Type    ContractType   `json:"type"`
-	Version semver.Version `json:"version"`
-	Labels  LabelSet       `json:"labels,omitempty"`
+	Type    ContractType   `json:"Type"`
+	Version semver.Version `json:"Version"`
+	Labels  LabelSet       `json:"Labels,omitempty"`
 }
 
+// String returns ONLY the type and version of the struct. It does not include labels. To get the string including labels, use FullString().
 func (tv TypeAndVersion) String() string {
+	return fmt.Sprintf("%s %s", tv.Type, tv.Version)
+}
+
+// FullString returns the type, version, and labels of the struct.
+func (tv TypeAndVersion) FullString() string {
 	if len(tv.Labels) == 0 {
-		return fmt.Sprintf("%s %s", tv.Type, tv.Version.String())
+		return fmt.Sprintf("%s %s", tv.Type, tv.Version)
 	}
 
-	// Use the LabelSet's String method for sorted labels
-	sortedLabels := tv.Labels.String()
-	return fmt.Sprintf("%s %s %s",
-		tv.Type,
-		tv.Version.String(),
-		sortedLabels,
-	)
+	return fmt.Sprintf("%s %s %s", tv.Type, tv.Version, tv.Labels)
 }
 
 func (tv TypeAndVersion) Equal(other TypeAndVersion) bool {
@@ -83,7 +83,24 @@ func TypeAndVersionFromString(s string) (TypeAndVersion, error) {
 	if err != nil {
 		return TypeAndVersion{}, err
 	}
-	labels := make(LabelSet)
+
+	return TypeAndVersion{
+		Type:    ContractType(parts[0]),
+		Version: *v,
+	}, nil
+}
+
+// TypeAndVersionFromFullString parses a string containing a type, version, and optional labels.
+func TypeAndVersionFromFullString(s string) (TypeAndVersion, error) {
+	parts := strings.Fields(s) // Ignores consecutive spaces
+	if len(parts) < 2 {
+		return TypeAndVersion{}, fmt.Errorf("invalid type and version string: %s", s)
+	}
+	v, err := semver.NewVersion(parts[1])
+	if err != nil {
+		return TypeAndVersion{}, err
+	}
+	var labels LabelSet
 	if len(parts) > 2 {
 		labels = NewLabelSet(parts[2:]...)
 	}
@@ -98,8 +115,21 @@ func NewTypeAndVersion(t ContractType, v semver.Version) TypeAndVersion {
 	return TypeAndVersion{
 		Type:    t,
 		Version: v,
-		Labels:  make(LabelSet), // empty set,
+		Labels:  nil,
 	}
+}
+
+// DeepClone returns a copy of the TypeAndVersion struct with its Labels cloned.
+func (tv TypeAndVersion) DeepClone() TypeAndVersion {
+	// Make a shallow copy first
+	out := tv
+
+	// Now deep-copy the Labels map
+	if tv.Labels != nil {
+		out.Labels = tv.Labels.DeepClone()
+	}
+
+	return out
 }
 
 // AddressBook is a simple interface for storing and retrieving contract addresses across
@@ -172,7 +202,7 @@ func (m *AddressBookMap) Addresses() (map[uint64]map[string]TypeAndVersion, erro
 	// maps are mutable and pass via a pointer
 	// creating a copy of the map to prevent concurrency
 	// read and changes outside object-bound
-	return m.cloneAddresses(m.addressesByChain), nil
+	return m.deepCloneAddresses(m.addressesByChain), nil
 }
 
 func (m *AddressBookMap) AddressesForChain(chainSelector uint64) (map[string]TypeAndVersion, error) {
@@ -245,11 +275,28 @@ func (m *AddressBookMap) Remove(ab AddressBook) error {
 	return nil
 }
 
-// cloneAddresses creates a deep copy of map[uint64]map[string]TypeAndVersion object
+// cloneAddresses creates a shallow copy of map[uint64]map[string]TypeAndVersion object
 func (m *AddressBookMap) cloneAddresses(input map[uint64]map[string]TypeAndVersion) map[uint64]map[string]TypeAndVersion {
 	result := make(map[uint64]map[string]TypeAndVersion)
 	for chainSelector, chainAddresses := range input {
 		result[chainSelector] = maps.Clone(chainAddresses)
+	}
+	return result
+}
+
+// deepCloneAddresses creates a deep copy of map[uint64]map[string]TypeAndVersion object
+func (m *AddressBookMap) deepCloneAddresses(
+	input map[uint64]map[string]TypeAndVersion,
+) map[uint64]map[string]TypeAndVersion {
+	result := make(map[uint64]map[string]TypeAndVersion, len(input))
+	for chainSelector, chainAddresses := range input {
+		// Make a new map for the nested addresses
+		newChainMap := make(map[string]TypeAndVersion, len(chainAddresses))
+		for addr, tv := range chainAddresses {
+			// Use the DeepClone method on the TypeAndVersion
+			newChainMap[addr] = tv.DeepClone()
+		}
+		result[chainSelector] = newChainMap
 	}
 	return result
 }
@@ -307,11 +354,15 @@ type typeVersionKey struct {
 }
 
 func tvKey(tv TypeAndVersion) typeVersionKey {
-	sortedLabels := tv.Labels.String()
+	var labels string
+	if tv.Labels != nil {
+		labels = tv.Labels.String()
+	}
+
 	return typeVersionKey{
 		Type:    tv.Type,
 		Version: tv.Version.String(),
-		Labels:  sortedLabels,
+		Labels:  labels,
 	}
 }
 
@@ -328,8 +379,12 @@ func AddressesContainBundle(addrs map[string]TypeAndVersion, wantTypes []TypeAnd
 				// They match exactly (Type, Version, Labels)
 				counts[wantKey]++
 				if counts[wantKey] > 1 {
+					var labels string
+					if wantTV.Labels != nil {
+						labels = wantTV.Labels.String()
+					}
 					return false, fmt.Errorf("found more than one instance of contract %s %s (labels=%s)",
-						wantTV.Type, wantTV.Version.String(), wantTV.Labels.String())
+						wantTV.Type, wantTV.Version, labels)
 				}
 			}
 		}
@@ -340,9 +395,24 @@ func AddressesContainBundle(addrs map[string]TypeAndVersion, wantTypes []TypeAnd
 }
 
 // AddLabel adds a string to the LabelSet in the TypeAndVersion.
-func (tv *TypeAndVersion) AddLabel(label string) {
+func (tv *TypeAndVersion) AddLabel(label ...string) {
 	if tv.Labels == nil {
 		tv.Labels = make(LabelSet)
 	}
-	tv.Labels.Add(label)
+	tv.Labels.Add(label...)
+}
+
+func (tv *TypeAndVersion) RemoveLabel(label ...string) *TypeAndVersion {
+	if tv.Labels == nil {
+		return tv
+	}
+	tv.Labels.Remove(label...)
+	return tv
+}
+
+func (tv *TypeAndVersion) LabelsString() string {
+	if tv.Labels == nil {
+		return ""
+	}
+	return tv.Labels.String()
 }
