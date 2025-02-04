@@ -882,8 +882,8 @@ type WorkflowSpec struct {
 	// fields derived from the yaml spec, used for indexing the database
 	// note: i tried to make these private, but translating them to the database seems to require them to be public
 	WorkflowID    string             `toml:"-" db:"workflow_id"` // Derived. Do not modify. the CID of the workflow.
-	WorkflowOwner string             `toml:"workflowOwner" db:"workflow_owner"`
-	WorkflowName  string             `toml:"workflowName" db:"workflow_name"`
+	WorkflowOwner string             `toml:"workflow_owner" db:"workflow_owner"`
+	WorkflowName  string             `toml:"workflow_name" db:"workflow_name"`
 	Status        WorkflowSpecStatus `db:"status"`
 	BinaryURL     string             `db:"binary_url"`
 	ConfigURL     string             `db:"config_url"`
