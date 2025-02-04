@@ -77,9 +77,18 @@ contract OffRamp_commit is OffRampSetup {
     vm.mockCallRevert(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNRemote.verify.selector), bytes(""));
 
     // but ☝️ doesn't matter because RMN verification is disabled
-    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(address(s_feeQuoter));
-    dynamicConfig.isRMNVerificationDisabled = true;
-    s_offRamp.setDynamicConfig(dynamicConfig);
+    OffRamp.SourceChainConfig memory sourceChainConfig = s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR_1);
+
+    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigUpdates = new OffRamp.SourceChainConfigArgs[](1);
+    sourceChainConfigUpdates[0] = OffRamp.SourceChainConfigArgs({
+      router: sourceChainConfig.router,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      isEnabled: sourceChainConfig.isEnabled,
+      isRMNVerificationDisabled: true,
+      onRamp: sourceChainConfig.onRamp
+    });
+
+    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigUpdates);
 
     uint64 max1 = 931;
     bytes32 root = "Only a single root";
