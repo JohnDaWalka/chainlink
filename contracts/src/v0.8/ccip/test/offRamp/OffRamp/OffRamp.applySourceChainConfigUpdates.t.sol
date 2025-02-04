@@ -215,7 +215,8 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     _commit(
       OffRamp.CommitReport({
         priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
-        merkleRoots: roots,
+        blessedMerkleRoots: roots,
+        unblessedMerkleRoots: new Internal.MerkleRoot[](0),
         rmnSignatures: s_rmnSignatures
       }),
       s_latestSequenceNumber
@@ -299,7 +300,8 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     _commit(
       OffRamp.CommitReport({
         priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
-        merkleRoots: roots,
+        blessedMerkleRoots: roots,
+        unblessedMerkleRoots: new Internal.MerkleRoot[](0),
         rmnSignatures: s_rmnSignatures
       }),
       s_latestSequenceNumber
