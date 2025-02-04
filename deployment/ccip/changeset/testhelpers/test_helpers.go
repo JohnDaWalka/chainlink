@@ -551,16 +551,6 @@ func AddLane(
 
 	e.Env, err = commoncs.ApplyChangesets(t, e.Env, e.TimelockContracts(t), changesets)
 	require.NoError(t, err)
-
-	// verification (debugging)
-	state, err := changeset.LoadOnchainState(e.Env)
-	require.NoError(t, err)
-	config, err := state.Chains[from].Router.GetOnRamp(&bind.CallOpts{}, to)
-	require.NoError(t, err)
-	t.Logf("CONFIG: %+v", config)
-	destConfig, err := state.Chains[from].FeeQuoter.GetDestChainConfig(&bind.CallOpts{}, to)
-	require.NoError(t, err)
-	t.Logf("DEST CONFIG: %+v", destConfig)
 }
 
 // RemoveLane removes a lane between the source and destination chains in the deployed environment.

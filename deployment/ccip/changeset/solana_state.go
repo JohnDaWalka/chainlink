@@ -22,6 +22,9 @@ var (
 	// for PDAs from AddRemoteChainToSolana
 	RemoteSource deployment.ContractType = "RemoteSource"
 	RemoteDest   deployment.ContractType = "RemoteDest"
+
+	// Tokenpool lookup table
+	TokenPoolLookupTable deployment.ContractType = "TokenPoolLookupTable"
 )
 
 // SolChainState holds a Go binding for all the currently deployed CCIP programs
@@ -40,6 +43,7 @@ type SolCCIPChainState struct {
 	RouterConfigPDA      solana.PublicKey
 	SourceChainStatePDAs map[uint64]solana.PublicKey
 	DestChainStatePDAs   map[uint64]solana.PublicKey
+	TokenPoolLookupTable map[solana.PublicKey]solana.PublicKey
 }
 
 func LoadOnchainStateSolana(e deployment.Environment) (CCIPOnChainState, error) {
@@ -69,8 +73,9 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 	state := SolCCIPChainState{
 		SourceChainStatePDAs: make(map[uint64]solana.PublicKey),
 		DestChainStatePDAs:   make(map[uint64]solana.PublicKey),
+		SPL2022Tokens:        make([]solana.PublicKey, 0),
+		TokenPoolLookupTable: make(map[solana.PublicKey]solana.PublicKey),
 	}
-	var spl2022Tokens []solana.PublicKey
 	for address, tvStr := range addresses {
 		switch tvStr.Type {
 		case commontypes.LinkToken:
@@ -97,7 +102,7 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 			state.Receiver = pub
 		case SPL2022Tokens:
 			pub := solana.MustPublicKeyFromBase58(address)
-			spl2022Tokens = append(spl2022Tokens, pub)
+			state.SPL2022Tokens = append(state.SPL2022Tokens, pub)
 		case TokenPool:
 			pub := solana.MustPublicKeyFromBase58(address)
 			state.TokenPool = pub
@@ -121,11 +126,17 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 				}
 				state.DestChainStatePDAs[selector] = pub
 			}
+		case TokenPoolLookupTable:
+			lookupTablePubKey := solana.MustPublicKeyFromBase58(address)
+			// Labels should only have one entry
+			for tokenPubKeyStr := range tvStr.Labels {
+				tokenPubKey := solana.MustPublicKeyFromBase58(tokenPubKeyStr)
+				state.TokenPoolLookupTable[tokenPubKey] = lookupTablePubKey
+			}
 		default:
 			return state, fmt.Errorf("unknown contract %s", tvStr)
 		}
 	}
 	state.WSOL = solana.SolMint
-	state.SPL2022Tokens = spl2022Tokens
 	return state, nil
 }

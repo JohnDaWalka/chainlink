@@ -424,7 +424,7 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 		authorityPubKey,
 	)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
 	}
 	instructions := []solana.Instruction{createI, poolInitI, authI}
 
@@ -922,10 +922,80 @@ func AcceptAdminRoleTokenAdminRegistry(e deployment.Environment, cfg AcceptAdmin
 	return deployment.ChangesetOutput{}, nil
 }
 
-// TODO (all look up table related changesets):
-// Update look up tables with tokens and pools
-// Set Pool (https://smartcontract-it.atlassian.net/browse/INTAUTO-437)
-// NewAppendRemotePoolAddressesInstruction (https://smartcontract-it.atlassian.net/browse/INTAUTO-436)
+type TokenPoolLookupTableConfig struct {
+	ChainSelector uint64
+	TokenPubKey   string
+	TokenProgram  string // this can go as a address book tag
+}
+
+func (cfg TokenPoolLookupTableConfig) Validate(e deployment.Environment) error {
+	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
+	if err := commonValidation(e, cfg.ChainSelector, tokenPubKey); err != nil {
+		return err
+	}
+	state, _ := cs.LoadOnchainState(e)
+	chainState := state.SolChains[cfg.ChainSelector]
+	if chainState.TokenPool.IsZero() {
+		return fmt.Errorf("token pool not found in existing state, deploy the token pool first for chain %d", cfg.ChainSelector)
+	}
+
+	// TODO: do we need to validate if everything that goes into the lookup table is already created ?
+	return nil
+}
+
+func AddTokenPoolLookupTable(e deployment.Environment, cfg TokenPoolLookupTableConfig) (deployment.ChangesetOutput, error) {
+	if err := cfg.Validate(e); err != nil {
+		return deployment.ChangesetOutput{}, err
+	}
+	chain := e.SolChains[cfg.ChainSelector]
+	ctx := e.GetContext()
+	client := chain.Client
+	state, _ := cs.LoadOnchainState(e)
+	chainState := state.SolChains[cfg.ChainSelector]
+	authorityPrivKey := chain.DeployerKey // assuming the authority is the deployer key
+	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
+
+	tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, chainState.Router)
+	tokenPoolChainConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, chainState.TokenPool)
+	tokenPoolSigner, _ := solTokenUtil.TokenPoolSignerAddress(tokenPubKey, chainState.TokenPool)
+	tokenProgram, _ := GetTokenProgramID(cfg.TokenProgram)
+	poolTokenAccount, _, _ := solTokenUtil.FindAssociatedTokenAddress(tokenProgram, tokenPubKey, tokenPoolSigner)
+	feeTokenConfigPDA, _, _ := solState.FindFeeBillingTokenConfigPDA(tokenPubKey, chainState.Router)
+
+	// the 'table' address is not derivable
+	// but this will be stored in tokenAdminRegistryPDA as a part of the SetPool changeset
+	// and tokenAdminRegistryPDA is derivable using token and router address
+	table, err := solCommonUtil.CreateLookupTable(ctx, client, *authorityPrivKey)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to create lookup table for token pool (mint: %s): %w", tokenPubKey.String(), err)
+	}
+	list := solana.PublicKeySlice{
+		table,                   // 0
+		tokenAdminRegistryPDA,   // 1
+		chainState.TokenPool,    // 2
+		tokenPoolChainConfigPDA, // 3 - writable
+		poolTokenAccount,        // 4 - writable
+		tokenPoolSigner,         // 5
+		tokenProgram,            // 6
+		tokenPubKey,             // 7 - writable
+		feeTokenConfigPDA,       // 8
+	}
+	if err = solCommonUtil.ExtendLookupTable(ctx, client, table, *authorityPrivKey, list); err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to extend lookup table for token pool (mint: %s): %w", tokenPubKey.String(), err)
+	}
+	if err := solCommonUtil.AwaitSlotChange(ctx, client); err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to await slot change while extending lookup table: %w", err)
+	}
+	newAddressBook := deployment.NewMemoryAddressBook()
+	tv := deployment.NewTypeAndVersion(cs.TokenPoolLookupTable, deployment.Version1_0_0)
+	tv.Labels.Add(tokenPubKey.String())
+	if err := newAddressBook.Save(cfg.ChainSelector, table.String(), tv); err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to save tokenpool address lookup table: %w", err)
+	}
+	return deployment.ChangesetOutput{
+		AddressBook: newAddressBook,
+	}, nil
+}
 
 type SetPoolConfig struct {
 	ChainSelector                     uint64
@@ -998,59 +1068,5 @@ func SetPool(e deployment.Environment, cfg SetPoolConfig) (deployment.ChangesetO
 	return deployment.ChangesetOutput{}, nil
 }
 
-type TokenPoolLookupTableConfig struct {
-	ChainSelector uint64
-	TokenPubKey   string
-	TokenProgram  string // this can go as a address book tag
-}
-
-func (cfg TokenPoolLookupTableConfig) Validate(e deployment.Environment) error {
-	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
-	return commonValidation(e, cfg.ChainSelector, tokenPubKey)
-}
-
-func AddTokenPoolLookupTable(e deployment.Environment, cfg TokenPoolLookupTableConfig) (deployment.ChangesetOutput, error) {
-	if err := cfg.Validate(e); err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-	chain := e.SolChains[cfg.ChainSelector]
-	// pool lookup table
-	// the last arg is the private key of the authority
-	ctx := e.GetContext()
-	client := chain.Client
-	state, _ := cs.LoadOnchainState(e)
-	chainState := state.SolChains[cfg.ChainSelector]
-	authorityPrivKey := chain.DeployerKey
-	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
-
-	tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, chainState.Router)
-	tokenPoolChainConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, chainState.Router)
-	tokenPoolSigner, _ := solTokenUtil.TokenPoolSignerAddress(tokenPubKey, chainState.Router)
-	tokenProgram, _ := GetTokenProgramID(cfg.TokenProgram)
-	poolTokenAccount, _, _ := solana.FindAssociatedTokenAddress(tokenPoolSigner, tokenPubKey)
-	feeTokenConfigPDA, _, _ := solState.FindFeeBillingTokenConfigPDA(tokenPubKey, chainState.Router)
-
-	// TODO: this needs to be saved in the addressbook, its not derivable
-	table, err := solCommonUtil.CreateLookupTable(ctx, client, *authorityPrivKey)
-	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to create lookup table for token pool (mint: %s): %w", tokenPubKey.String(), err)
-	}
-	list := solana.PublicKeySlice{
-		table,                   // 0
-		tokenAdminRegistryPDA,   // 1
-		chainState.TokenPool,    // 2
-		tokenPoolChainConfigPDA, // 3 - writable
-		poolTokenAccount,        // 4 - writable
-		tokenPoolSigner,         // 5
-		tokenProgram,            // 6
-		tokenPubKey,             // 7 - writable
-		feeTokenConfigPDA,       // 8
-	}
-	if err = solCommonUtil.ExtendLookupTable(ctx, client, table, *authorityPrivKey, list); err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to extend lookup table for token pool (mint: %s): %w", tokenPubKey.String(), err)
-	}
-	if err := solCommonUtil.AwaitSlotChange(ctx, client); err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to await slot change while extending lookup table: %w", err)
-	}
-	return deployment.ChangesetOutput{}, nil
-}
+// TODO:
+// NewAppendRemotePoolAddressesInstruction (https://smartcontract-it.atlassian.net/browse/INTAUTO-436)

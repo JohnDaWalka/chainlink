@@ -700,7 +700,6 @@ func deployChainContractsSolana(
 				solana.TokenProgramID,
 				solana.SPLAssociatedTokenAccountProgramID,
 			})
-		// TODO: can we use solCommonUtil.AwaitSlotChange here?
 		if err != nil {
 			return fmt.Errorf("failed to create lookup table: %w", err)
 		}

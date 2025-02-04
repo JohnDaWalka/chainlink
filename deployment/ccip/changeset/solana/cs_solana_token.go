@@ -17,7 +17,7 @@ var _ deployment.ChangeSet[MintSolanaTokenConfig] = MintSolanaToken
 var _ deployment.ChangeSet[CreateSolanaTokenATAConfig] = CreateSolanaTokenATA
 
 // TODO: add option to set token mint authority by taking in its public key
-// might need to take is private key if it needs to sign that
+// might need to take authority private key if it needs to sign that
 type DeploySolanaTokenConfig struct {
 	ChainSelector    uint64
 	TokenProgramName string
@@ -56,7 +56,7 @@ func DeploySolanaToken(e deployment.Environment, cfg DeploySolanaTokenConfig) (d
 	if err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
-	// do i need to add the mint as a signer here ?
+	// TODO:does the mint need to be added as a signer here ?
 	err = chain.Confirm(instructions, solCommomUtil.AddSigners(mint))
 	if err != nil {
 		e.Logger.Errorw("Failed to confirm instructions for link token deployment", "chain", chain.String(), "err", err)
