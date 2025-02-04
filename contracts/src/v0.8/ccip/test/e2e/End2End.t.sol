@@ -185,8 +185,12 @@ contract E2E is OnRampSetup, OffRampSetup {
         merkleRoot: merkleRoots[1]
       });
 
-      OffRamp.CommitReport memory report =
-        OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: rmnSignatures});
+      OffRamp.CommitReport memory report = OffRamp.CommitReport({
+        priceUpdates: _getEmptyPriceUpdates(),
+        blessedMerkleRoots: roots,
+        unblessedMerkleRoots: new Internal.MerkleRoot[](0),
+        rmnSignatures: rmnSignatures
+      });
 
       vm.resumeGasMetering();
       _commit(report, ++s_latestSequenceNumber);

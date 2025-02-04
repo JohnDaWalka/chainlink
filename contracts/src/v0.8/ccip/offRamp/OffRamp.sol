@@ -84,7 +84,11 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   event SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
   event AlreadyAttempted(uint64 sourceChainSelector, uint64 sequenceNumber);
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
-  event CommitReportAccepted(Internal.MerkleRoot[] merkleRoots, Internal.PriceUpdates priceUpdates);
+  event CommitReportAccepted(
+    Internal.MerkleRoot[] blessedMerkleRoots,
+    Internal.MerkleRoot[] unblessedMerkleRoots,
+    Internal.PriceUpdates priceUpdates
+  );
   event RootRemoved(bytes32 root);
   event SkippedReportExecution(uint64 sourceChainSelector);
 
@@ -104,6 +108,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     IRouter router; // ───╮ Local router to use for messages coming from this source chain.
     bool isEnabled; //    │ Flag whether the source chain is enabled or not.
     uint64 minSeqNr; // ──╯ The min sequence number expected for future messages.
+    bool isRMNVerificationDisabled; // ────────────────╯ Flag whether the RMN verification is disabled or not.
     bytes onRamp; // OnRamp address on the source chain.
   }
 
@@ -113,23 +118,24 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     IRouter router; // ────────────╮  Local router to use for messages coming from this source chain.
     uint64 sourceChainSelector; // │  Source chain selector of the config to update.
     bool isEnabled; // ────────────╯  Flag whether the source chain is enabled or not.
+    bool isRMNVerificationDisabled; // ────────────────╯ Flag whether the RMN verification is disabled or not.
     bytes onRamp; // OnRamp address on the source chain.
   }
 
   /// @dev Dynamic offRamp config.
   /// @dev Since DynamicConfig is part of DynamicConfigSet event, if changing it, we should update the ABI on Atlas.
   struct DynamicConfig {
-    address feeQuoter; // ─────────────────────────────╮ FeeQuoter address on the local chain.
-    uint32 permissionLessExecutionThresholdSeconds; // │ Waiting time before manual execution is enabled.
-    bool isRMNVerificationDisabled; // ────────────────╯ Flag whether the RMN verification is disabled or not.
+    address feeQuoter; // ──────────────────────────────╮ FeeQuoter address on the local chain.
+    uint32 permissionLessExecutionThresholdSeconds; // ─╯ Waiting time before manual execution is enabled.
     address messageInterceptor; // Optional, validates incoming messages (zero address = no interceptor).
   }
 
   /// @dev Report that is committed by the observing DON at the committing phase.
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct CommitReport {
-    Internal.PriceUpdates priceUpdates; // Collection of gas and price updates to commit.
-    Internal.MerkleRoot[] merkleRoots; // Collection of merkle roots per source chain to commit.
+    Internal.PriceUpdates priceUpdates; // List of gas and price updates to commit.
+    Internal.MerkleRoot[] blessedMerkleRoots; // List of merkle roots from source chains for which RMN is enabled.
+    Internal.MerkleRoot[] unblessedMerkleRoots; // List of merkle roots from source chains for which RMN is disabled.
     IRMNRemote.Signature[] rmnSignatures; // RMN signatures on the merkle roots.
   }
 
@@ -812,10 +818,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     DynamicConfig storage dynamicConfig = s_dynamicConfig;
 
     // Verify RMN signatures
-    if (!dynamicConfig.isRMNVerificationDisabled) {
-      if (commitReport.merkleRoots.length > 0) {
-        i_rmnRemote.verify(address(this), commitReport.merkleRoots, commitReport.rmnSignatures);
-      }
+    if (commitReport.blessedMerkleRoots.length > 0) {
+      i_rmnRemote.verify(address(this), commitReport.blessedMerkleRoots, commitReport.rmnSignatures);
     }
 
     // Check if the report contains price updates.
@@ -832,12 +836,15 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       } else {
         // If prices are stale and the report doesn't contain a root, this report does not have any valid information
         // and we revert. If it does contain a merkle root, continue to the root checking section.
-        if (commitReport.merkleRoots.length == 0) revert StaleCommitReport();
+        if (commitReport.blessedMerkleRoots.length + commitReport.unblessedMerkleRoots.length == 0) {
+          revert StaleCommitReport();
+        }
       }
     }
 
-    for (uint256 i = 0; i < commitReport.merkleRoots.length; ++i) {
-      Internal.MerkleRoot memory root = commitReport.merkleRoots[i];
+    // TODO Unblessed
+    for (uint256 i = 0; i < commitReport.blessedMerkleRoots.length; ++i) {
+      Internal.MerkleRoot memory root = commitReport.blessedMerkleRoots[i];
       uint64 sourceChainSelector = root.sourceChainSelector;
 
       if (i_rmnRemote.isCursed(bytes16(uint128(sourceChainSelector)))) {
@@ -866,7 +873,9 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       s_roots[root.sourceChainSelector][merkleRoot] = block.timestamp;
     }
 
-    emit CommitReportAccepted(commitReport.merkleRoots, commitReport.priceUpdates);
+    emit CommitReportAccepted(
+      commitReport.blessedMerkleRoots, commitReport.unblessedMerkleRoots, commitReport.priceUpdates
+    );
 
     _transmit(uint8(Internal.OCRPluginType.Commit), reportContext, report, rs, ss, rawVs);
   }
