@@ -106,20 +106,20 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @dev Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp).
   struct SourceChainConfig {
-    IRouter router; // ───╮ Local router to use for messages coming from this source chain.
-    bool isEnabled; //    │ Flag whether the source chain is enabled or not.
-    uint64 minSeqNr; // ──╯ The min sequence number expected for future messages.
-    bool isRMNVerificationDisabled; // ────────────────╯ Flag whether the RMN verification is disabled or not.
+    IRouter router; // ─────────────────╮ Local router to use for messages coming from this source chain.
+    bool isEnabled; //                  │ Flag whether the source chain is enabled or not.
+    uint64 minSeqNr; //                 │ The min sequence number expected for future messages.
+    bool isRMNVerificationDisabled; // ─╯ Flag whether the RMN verification is disabled or not.
     bytes onRamp; // OnRamp address on the source chain.
   }
 
   /// @dev Same as SourceChainConfig but with source chain selector so that an array of these
   /// can be passed in the constructor and the applySourceChainConfigUpdates function.
   struct SourceChainConfigArgs {
-    IRouter router; // ────────────╮  Local router to use for messages coming from this source chain.
-    uint64 sourceChainSelector; // │  Source chain selector of the config to update.
-    bool isEnabled; // ────────────╯  Flag whether the source chain is enabled or not.
-    bool isRMNVerificationDisabled; // ────────────────╯ Flag whether the RMN verification is disabled or not.
+    IRouter router; // ─────────────────╮  Local router to use for messages coming from this source chain.
+    uint64 sourceChainSelector; //      │  Source chain selector of the config to update.
+    bool isEnabled; //                  │  Flag whether the source chain is enabled or not.
+    bool isRMNVerificationDisabled; // ─╯ Flag whether the RMN verification is disabled or not.
     bytes onRamp; // OnRamp address on the source chain.
   }
 
@@ -160,7 +160,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev The address of the nonce manager.
   address internal immutable i_nonceManager;
   /// @dev The minimum amount of gas to perform the call with exact gas.
-  /// We include this in the offramp so that we can redeploy to adjust it should a hardfork change the gas costs of
+  /// We include this in the offRamp so that we can redeploy to adjust it should a hardfork change the gas costs of
   /// relevant opcodes in callWithExactGas.
   uint16 internal immutable i_gasForCallExactCheck;
 
