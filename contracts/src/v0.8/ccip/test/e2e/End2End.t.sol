@@ -111,13 +111,15 @@ contract E2E is OnRampSetup, OffRampSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       isEnabled: true,
       // Must match OnRamp address
-      onRamp: abi.encode(address(s_onRamp))
+      onRamp: abi.encode(address(s_onRamp)),
+      isRMNVerificationDisabled: false
     });
     sourceChainConfigs[1] = OffRamp.SourceChainConfigArgs({
       router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
       isEnabled: true,
-      onRamp: abi.encode(address(s_onRamp2))
+      onRamp: abi.encode(address(s_onRamp2)),
+      isRMNVerificationDisabled: false
     });
 
     _setupMultipleOffRampsFromConfigs(sourceChainConfigs);
