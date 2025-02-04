@@ -363,7 +363,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 
 			if opts.WasmtimeModuleFactory == nil {
 				// for tests only, in prod Registry should always be set at this point
-				moduleFactory, err := NewCachedWasmModuleFactory(globalLogger, "")
+				moduleFactory, err := NewCachedWasmModuleFactory(globalLogger, "", &NoopWasmModuleCacheStats{})
 				if err != nil {
 					return nil, fmt.Errorf("could not create wasmtime module factory: %w", err)
 				}

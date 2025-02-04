@@ -170,7 +170,8 @@ func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig Don
 			newOracleFactoryFn = factory.NewOracleFactory
 		}
 
-		wasmModuleFactory := donContext.wasmModuleFactory.NewWasmModuleFactoryFnForPeer(nodeInfo.PeerID.String())
+		wasmModuleFactory, err := donContext.wasmModuleFactory.NewWasmModuleFactoryFnForPeer(nodeInfo.PeerID.String())
+		require.NoError(t, err)
 
 		cn.start = func() {
 			node := startNewNode(ctx, t, lggr.Named(donConfig.name+"-"+strconv.Itoa(i)), nodeInfo, donContext.EthBlockchain,
