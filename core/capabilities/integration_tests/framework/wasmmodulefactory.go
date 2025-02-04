@@ -3,7 +3,6 @@ package framework
 import (
 	"fmt"
 	"path/filepath"
-	"sync"
 
 	"github.com/bytecodealliance/wasmtime-go/v28"
 
@@ -37,7 +36,6 @@ func NoCacheWasmModuleFactory(engine *wasmtime.Engine, wasm []byte, isUncompress
 
 type cachedWasmModuleFactory struct {
 	lggr     logger.Logger
-	mux      sync.Mutex
 	cacheDir string
 }
 
@@ -51,7 +49,7 @@ func NewCachedWasmModuleFactory(lggr logger.Logger, cacheDir string) (WasmModule
 
 func (f *cachedWasmModuleFactory) NewWasmModuleFactoryFnForPeer(peerID string) (host.WasmtimeModuleFactoryFn, error) {
 
-	factory, err := chainlink.NewCachedWasmModuleFactory(f.lggr, filepath.Join(f.cacheDir, peerID))
+	factory, err := chainlink.NewCachedWasmModuleFactory(f.lggr, filepath.Join(f.cacheDir, peerID), &chainlink.NoopWasmModuleCacheStats{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cached wasm module factory: %w", err)
 	}
