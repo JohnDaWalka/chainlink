@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_transmitter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_5_1"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 )
 
@@ -36,9 +36,9 @@ func ConfigureUSDCTokenPools(
 		dstChainSel uint64
 		state       changeset.CCIPChainState
 		srcToken    *burn_mint_erc677.BurnMintERC677
-		srcPool     *usdc_token_pool.USDCTokenPool
+		srcPool     *usdc_token_pool_1_5_1.USDCTokenPool
 		dstToken    *burn_mint_erc677.BurnMintERC677
-		dstPool     *usdc_token_pool.USDCTokenPool
+		dstPool     *usdc_token_pool_1_5_1.USDCTokenPool
 	}{
 		{
 			chains[src],
@@ -76,9 +76,9 @@ func configureSingleChain(
 	dstChainSel uint64,
 	state changeset.CCIPChainState,
 	srcToken *burn_mint_erc677.BurnMintERC677,
-	srcPool *usdc_token_pool.USDCTokenPool,
+	srcPool *usdc_token_pool_1_5_1.USDCTokenPool,
 	dstToken *burn_mint_erc677.BurnMintERC677,
-	dstPool *usdc_token_pool.USDCTokenPool,
+	dstPool *usdc_token_pool_1_5_1.USDCTokenPool,
 ) func() error {
 	return func() error {
 		if err := attachTokenToTheRegistry(sourceChain, state, sourceChain.DeployerKey, srcToken.Address(), srcPool.Address()); err != nil {

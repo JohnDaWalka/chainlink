@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {BurnMintERC677} from "../../../../../shared/token/ERC677/BurnMintERC677.sol";
 
+import {CCTPMessageTransmitterProxy} from "../../../../pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {HybridLockReleaseUSDCTokenPool} from "../../../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
 import {USDCTokenPool} from "../../../../pools/USDC/USDCTokenPool.sol";
 import {USDCSetup} from "../USDCSetup.t.sol";
@@ -10,18 +11,22 @@ import {USDCSetup} from "../USDCSetup.t.sol";
 contract HybridLockReleaseUSDCTokenPoolSetup is USDCSetup {
   HybridLockReleaseUSDCTokenPool internal s_usdcTokenPool;
   HybridLockReleaseUSDCTokenPool internal s_usdcTokenPoolTransferLiquidity;
+  CCTPMessageTransmitterProxy internal s_cctpMessageTransmitterProxyForTransferLiquidity;
   address[] internal s_allowedList;
 
   function setUp() public virtual override {
     super.setUp();
 
     s_usdcTokenPool = new HybridLockReleaseUSDCTokenPool(
-      s_mockUSDC, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
     );
+    s_cctpMessageTransmitterProxy.updateTokenPool(address(s_usdcTokenPool));
 
+    s_cctpMessageTransmitterProxyForTransferLiquidity = new CCTPMessageTransmitterProxy(s_mockUSDC);
     s_usdcTokenPoolTransferLiquidity = new HybridLockReleaseUSDCTokenPool(
-      s_mockUSDC, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
+      s_mockUSDC, s_cctpMessageTransmitterProxy, s_token, new address[](0), address(s_mockRMNRemote), address(s_router)
     );
+    s_cctpMessageTransmitterProxyForTransferLiquidity.updateTokenPool(address(s_usdcTokenPoolTransferLiquidity));
 
     BurnMintERC677(address(s_token)).grantMintAndBurnRoles(address(s_usdcTokenPool));
 
