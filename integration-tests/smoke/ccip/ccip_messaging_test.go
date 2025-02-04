@@ -100,7 +100,7 @@ func Test_CCIPMessaging(t *testing.T) {
 	})
 
 	t.Run("message to contract implementing CCIPReceiver", func(t *testing.T) {
-		latestHead, err := e.Env.Chains[destChain].Client.HeaderByNumber(ctx, nil)
+		latestHead, err := testhelpers.LatestBlock(ctx, e.Env, destChain)
 		require.NoError(t, err)
 		out = mt.Run(
 			mt.TestCase{
@@ -115,7 +115,7 @@ func Test_CCIPMessaging(t *testing.T) {
 					func(t *testing.T) {
 						iter, err := state.Chains[destChain].Receiver.FilterMessageReceived(&bind.FilterOpts{
 							Context: ctx,
-							Start:   latestHead.Number.Uint64(),
+							Start:   latestHead,
 						})
 						require.NoError(t, err)
 						require.True(t, iter.Next())
@@ -127,7 +127,7 @@ func Test_CCIPMessaging(t *testing.T) {
 	})
 
 	t.Run("message to contract implementing CCIPReceiver with low exec gas", func(t *testing.T) {
-		latestHead, err := e.Env.Chains[destChain].Client.HeaderByNumber(ctx, nil)
+		latestHead, err := testhelpers.LatestBlock(ctx, e.Env, destChain)
 		require.NoError(t, err)
 		out = mt.Run(
 			mt.TestCase{
@@ -141,7 +141,7 @@ func Test_CCIPMessaging(t *testing.T) {
 			},
 		)
 
-		manuallyExecute(ctx, t, latestHead.Number.Uint64(), state, destChain, out, sourceChain, e, sender)
+		manuallyExecute(ctx, t, latestHead, state, destChain, out, sourceChain, e, sender)
 
 		t.Logf("successfully manually executed message %x",
 			out.MsgSentEvent.Message.Header.MessageId)
@@ -207,7 +207,7 @@ func Test_CCIPMessaging_Solana(t *testing.T) {
 
 	t.Run("message to contract implementing CCIPReceiver", func(t *testing.T) {
 		// TODO: abstract out into a helper
-		latestHead, err := e.Env.SolChains[destChain].Client.GetSlot(ctx, solconfig.DefaultCommitment)
+		latestSlot, err := testhelpers.LatestBlock(ctx, e.Env, destChain)
 		require.NoError(t, err)
 		receiver := state.SolChains[destChain].Receiver.Bytes()
 		extraArgs, err := SerializeSVMExtraArgs(message_hasher.ClientSVMExtraArgsV1{}) // SVM doesn't allow an empty extraArgs
@@ -226,7 +226,7 @@ func Test_CCIPMessaging_Solana(t *testing.T) {
 				// TODO: fix up, use the same code event filter does
 				iter, err := state.Chains[destChain].Receiver.FilterMessageReceived(&bind.FilterOpts{
 					Context: ctx,
-					Start:   latestHead,
+					Start:   latestSlot,
 				})
 				require.NoError(t, err)
 				require.True(t, iter.Next())
