@@ -10,7 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_messenger"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_5_1"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	"github.com/smartcontractkit/chainlink/v2/evm/utils"
 )
@@ -129,12 +129,12 @@ func DeployUSDCTokenPoolContractsChangeset(env deployment.Environment, c DeployU
 		chainState := state.Chains[chainSelector]
 
 		_, err := deployment.DeployContract(env.Logger, chain, newAddresses,
-			func(chain deployment.Chain) deployment.ContractDeploy[*usdc_token_pool.USDCTokenPool] {
-				poolAddress, tx, usdcTokenPool, err := usdc_token_pool.DeployUSDCTokenPool(
+			func(chain deployment.Chain) deployment.ContractDeploy[*usdc_token_pool_1_5_1.USDCTokenPool] {
+				poolAddress, tx, usdcTokenPool, err := usdc_token_pool_1_5_1.DeployUSDCTokenPool(
 					chain.DeployerKey, chain.Client, poolConfig.TokenMessenger, poolConfig.TokenAddress,
 					poolConfig.AllowList, chainState.RMNProxy.Address(), chainState.Router.Address(),
 				)
-				return deployment.ContractDeploy[*usdc_token_pool.USDCTokenPool]{
+				return deployment.ContractDeploy[*usdc_token_pool_1_5_1.USDCTokenPool]{
 					Address:  poolAddress,
 					Contract: usdcTokenPool,
 					Tv:       deployment.NewTypeAndVersion(USDCTokenPool, CurrentTokenPoolVersion),

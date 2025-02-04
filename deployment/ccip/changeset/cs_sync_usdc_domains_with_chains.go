@@ -10,7 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool_1_5_1"
 )
 
 var _ deployment.ChangeSet[SyncUSDCDomainsWithChainsConfig] = SyncUSDCDomainsWithChainsChangeset
@@ -99,7 +99,7 @@ func SyncUSDCDomainsWithChainsChangeset(env deployment.Environment, c SyncUSDCDo
 	}
 	readOpts := &bind.CallOpts{Context: env.GetContext()}
 
-	deployerGroup := NewDeployerGroup(env, state, c.MCMS)
+	deployerGroup := NewDeployerGroup(env, state, c.MCMS).WithDeploymentContext("sync domain support with chain support on USDC token pools")
 
 	for chainSelector, version := range c.USDCVersionByChain {
 		chain := env.Chains[chainSelector]
@@ -115,7 +115,7 @@ func SyncUSDCDomainsWithChainsChangeset(env deployment.Environment, c SyncUSDCDo
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch supported chains from USDC token pool with address %s on %s: %w", usdcTokenPool.Address(), chain, err)
 		}
 
-		domainUpdates := make([]usdc_token_pool.USDCTokenPoolDomainUpdate, 0)
+		domainUpdates := make([]usdc_token_pool_1_5_1.USDCTokenPoolDomainUpdate, 0)
 		for _, remoteChainSelector := range supportedChains {
 			remoteChainState := state.Chains[remoteChainSelector]
 			remoteUSDCVersion := c.USDCVersionByChain[remoteChainSelector]
@@ -133,7 +133,7 @@ func SyncUSDCDomainsWithChainsChangeset(env deployment.Environment, c SyncUSDCDo
 			// If any parameters are different, we need to add a setDomains call
 			if currentDomain.AllowedCaller != desiredAllowedCaller ||
 				currentDomain.DomainIdentifier != desiredDomainIdentifier {
-				domainUpdates = append(domainUpdates, usdc_token_pool.USDCTokenPoolDomainUpdate{
+				domainUpdates = append(domainUpdates, usdc_token_pool_1_5_1.USDCTokenPoolDomainUpdate{
 					AllowedCaller:     desiredAllowedCaller,
 					Enabled:           true,
 					DomainIdentifier:  desiredDomainIdentifier,
@@ -150,5 +150,5 @@ func SyncUSDCDomainsWithChainsChangeset(env deployment.Environment, c SyncUSDCDo
 		}
 	}
 
-	return deployerGroup.Enact("sync domain support with chain support on USDC token pools")
+	return deployerGroup.Enact()
 }
