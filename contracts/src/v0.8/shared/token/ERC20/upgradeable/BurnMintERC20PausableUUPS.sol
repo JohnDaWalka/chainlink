@@ -39,6 +39,8 @@ contract BurnMintERC20PausableUUPS is
   error BurnMintERC20PausableUUPS__Paused();
 
   event CCIPAdminTransferred(address indexed previousAdmin, address indexed newAdmin);
+  event Paused();
+  event Unpaused();
 
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
   bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
@@ -209,12 +211,16 @@ contract BurnMintERC20PausableUUPS is
   /// @dev Requires the caller to have the PAUSER_ROLE.
   function pause() public onlyRole(PAUSER_ROLE) {
     _pause();
+
+    emit Paused();
   }
 
   /// @notice Unpauses the implementation.
   /// @dev Requires the caller to have the PAUSER_ROLE.
   function unpause() public onlyRole(PAUSER_ROLE) {
     _unpause();
+
+    emit Unpaused();
   }
 
   // ================================================================
