@@ -261,6 +261,7 @@ func (h *Heartbeat) getBeat() time.Duration {
 // be used by the node.
 // TODO: Inject more dependencies here to save booting up useless stuff in tests
 func NewApplication(opts ApplicationOpts) (Application, error) {
+	// Touch
 	var srvcs []services.ServiceCtx
 
 	heartbeat := NewHeartbeat(opts.Logger)
