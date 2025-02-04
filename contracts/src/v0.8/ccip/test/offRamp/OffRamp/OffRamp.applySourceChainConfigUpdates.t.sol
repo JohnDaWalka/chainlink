@@ -171,7 +171,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       isEnabled: sourceChainConfigArgs.isEnabled,
       minSeqNr: 1,
       onRamp: sourceChainConfigArgs.onRamp,
-      isRMNVerificationDisabled: false
+      isRMNVerificationDisabled: sourceChainConfigArgs.isRMNVerificationDisabled
     });
 
     if (isNewChain) {

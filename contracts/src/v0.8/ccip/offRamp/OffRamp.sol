@@ -65,6 +65,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error SignatureVerificationNotAllowedInExecutionPlugin();
   error CommitOnRampMismatch(bytes reportOnRamp, bytes configOnRamp);
   error InvalidOnRampUpdate(uint64 sourceChainSelector);
+  error RootBlessingMismatch(uint64 sourceChainSelector, bytes32 merkleRoot, bool isBlessed);
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -842,35 +843,12 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       }
     }
 
-    // TODO Unblessed
     for (uint256 i = 0; i < commitReport.blessedMerkleRoots.length; ++i) {
-      Internal.MerkleRoot memory root = commitReport.blessedMerkleRoots[i];
-      uint64 sourceChainSelector = root.sourceChainSelector;
+      _commitRoot(commitReport.blessedMerkleRoots[i], true);
+    }
 
-      if (i_rmnRemote.isCursed(bytes16(uint128(sourceChainSelector)))) {
-        revert CursedByRMN(sourceChainSelector);
-      }
-
-      SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
-
-      if (keccak256(root.onRampAddress) != keccak256(sourceChainConfig.onRamp)) {
-        revert CommitOnRampMismatch(root.onRampAddress, sourceChainConfig.onRamp);
-      }
-
-      if (sourceChainConfig.minSeqNr != root.minSeqNr || root.minSeqNr > root.maxSeqNr) {
-        revert InvalidInterval(root.sourceChainSelector, root.minSeqNr, root.maxSeqNr);
-      }
-
-      bytes32 merkleRoot = root.merkleRoot;
-      if (merkleRoot == bytes32(0)) revert InvalidRoot();
-      // If we reached this section, the report should contain a valid root.
-      // We disallow duplicate roots as that would reset the timestamp and delay potential manual execution.
-      if (s_roots[root.sourceChainSelector][merkleRoot] != 0) {
-        revert RootAlreadyCommitted(root.sourceChainSelector, merkleRoot);
-      }
-
-      sourceChainConfig.minSeqNr = root.maxSeqNr + 1;
-      s_roots[root.sourceChainSelector][merkleRoot] = block.timestamp;
+    for (uint256 i = 0; i < commitReport.unblessedMerkleRoots.length; ++i) {
+      _commitRoot(commitReport.unblessedMerkleRoots[i], false);
     }
 
     emit CommitReportAccepted(
@@ -878,6 +856,41 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     );
 
     _transmit(uint8(Internal.OCRPluginType.Commit), reportContext, report, rs, ss, rawVs);
+  }
+
+  function _commitRoot(Internal.MerkleRoot memory root, bool isBlessed) internal {
+    uint64 sourceChainSelector = root.sourceChainSelector;
+
+    if (i_rmnRemote.isCursed(bytes16(uint128(sourceChainSelector)))) {
+      revert CursedByRMN(sourceChainSelector);
+    }
+
+    SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
+
+    // If the root is blessed but RMN blessing is disabled for the source chain, or if the root is not blessed but RMN
+    // blessing is enabled, we revert.
+    if (isBlessed == sourceChainConfig.isRMNVerificationDisabled) {
+      revert RootBlessingMismatch(sourceChainSelector, root.merkleRoot, isBlessed);
+    }
+
+    if (keccak256(root.onRampAddress) != keccak256(sourceChainConfig.onRamp)) {
+      revert CommitOnRampMismatch(root.onRampAddress, sourceChainConfig.onRamp);
+    }
+
+    if (sourceChainConfig.minSeqNr != root.minSeqNr || root.minSeqNr > root.maxSeqNr) {
+      revert InvalidInterval(root.sourceChainSelector, root.minSeqNr, root.maxSeqNr);
+    }
+
+    bytes32 merkleRoot = root.merkleRoot;
+    if (merkleRoot == bytes32(0)) revert InvalidRoot();
+    // If we reached this section, the report should contain a valid root.
+    // We disallow duplicate roots as that would reset the timestamp and delay potential manual execution.
+    if (s_roots[root.sourceChainSelector][merkleRoot] != 0) {
+      revert RootAlreadyCommitted(root.sourceChainSelector, merkleRoot);
+    }
+
+    sourceChainConfig.minSeqNr = root.maxSeqNr + 1;
+    s_roots[root.sourceChainSelector][merkleRoot] = block.timestamp;
   }
 
   /// @notice Returns the sequence number of the last price update.
@@ -1026,6 +1039,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       currentConfig.onRamp = newOnRamp;
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
       currentConfig.router = sourceConfigUpdate.router;
+      currentConfig.isRMNVerificationDisabled = sourceConfigUpdate.isRMNVerificationDisabled;
 
       // We don't need to check the return value, as inserting the item twice has no effect.
       s_sourceChainSelectors.add(sourceChainSelector);
