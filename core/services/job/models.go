@@ -931,6 +931,8 @@ func (w *WorkflowSpec) Validate(ctx context.Context) error {
 		return err
 	}
 
+	// For yaml-based workflow specs, use the owner & name fields defined there.
+	// For wasm workflows, use the `workflow_name` & `workflow_owner` fields directly from the job spec.
 	if s.Owner+s.Name != "" {
 		w.WorkflowOwner = strings.TrimPrefix(s.Owner, "0x") // the json schema validation ensures it is a hex string with 0x prefix, but the database does not store the prefix
 		w.WorkflowName = s.Name
