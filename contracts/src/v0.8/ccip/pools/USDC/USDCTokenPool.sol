@@ -66,6 +66,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// A domain is a USDC representation of a destination chain.
   /// @dev Zero is a valid domain identifier.
   /// @dev The address to mint on the destination chain is the corresponding USDC pool.
+  /// @dev The allowedCaller represents the contract authorized to call receiveMessage on the destination CCTP message transmitter.
+  ///      - For dest pool version 1.6.1, this is the MessageTransmitterProxy of the destination chain.
+  ///      - For dest pool version 1.5.1, this is the destination chain's token pool.
   struct Domain {
     bytes32 allowedCaller; //      Address allowed to mint on the domain
     uint32 domainIdentifier; // ─╮ Unique domain ID
@@ -99,6 +102,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   }
 
   /// @notice Burn the token in the pool
+  /// @notice Outgoing messages (burns) do not require any changes since they are routed
+  /// through `i_tokenMessenger.depositForBurnWithCaller` and we will configure the correct allowedCaller
+  ///for each domain and dest token pool version
   /// @dev emits ITokenMessenger.DepositForBurn
   /// @dev Assumes caller has validated destinationReceiver
   function lockOrBurn(
