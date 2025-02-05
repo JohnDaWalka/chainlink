@@ -147,7 +147,6 @@ func DefaultFeeQuoterParams() FeeQuoterParams {
 type OffRampParams struct {
 	GasForCallExactCheck                    uint16
 	PermissionLessExecutionThresholdSeconds uint32
-	IsRMNVerificationDisabled               bool
 	MessageInterceptor                      common.Address
 }
 
@@ -165,7 +164,6 @@ func DefaultOffRampParams() OffRampParams {
 	return OffRampParams{
 		GasForCallExactCheck:                    uint16(5000),
 		PermissionLessExecutionThresholdSeconds: uint32(24 * 60 * 60),
-		IsRMNVerificationDisabled:               true,
 	}
 }
 
@@ -496,7 +494,6 @@ func deployChainContractsEVM(e deployment.Environment, chain deployment.Chain, a
 					offramp.OffRampDynamicConfig{
 						FeeQuoter:                               feeQuoterContract.Address(),
 						PermissionLessExecutionThresholdSeconds: contractParams.OffRampParams.PermissionLessExecutionThresholdSeconds,
-						IsRMNVerificationDisabled:               contractParams.OffRampParams.IsRMNVerificationDisabled,
 						MessageInterceptor:                      contractParams.OffRampParams.MessageInterceptor,
 					},
 					[]offramp.OffRampSourceChainConfigArgs{},
