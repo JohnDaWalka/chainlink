@@ -43,7 +43,7 @@ func (c *CommitPluginCodecV1) Encode(ctx context.Context, report cciptypes.Commi
 	// TODO: de-dup
 	// -------------------------------
 	unblessedMerkleRoots := make([]ccip_encoding_utils.InternalMerkleRoot, 0, len(report.UnblessedMerkleRoots))
-	for _, root := range report.BlessedMerkleRoots {
+	for _, root := range report.UnblessedMerkleRoots {
 		unblessedMerkleRoots = append(unblessedMerkleRoots, ccip_encoding_utils.InternalMerkleRoot{
 			SourceChainSelector: uint64(root.ChainSel),
 			// TODO: abi-encoded address for EVM source, figure out what to do for non-EVM.
