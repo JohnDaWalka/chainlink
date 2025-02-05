@@ -858,6 +858,11 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     _transmit(uint8(Internal.OCRPluginType.Commit), reportContext, report, rs, ss, rawVs);
   }
 
+  /// @notice Commits a single merkle root. The blessing status has to match the source chain config.
+  /// @dev An unblessed root means that RMN verification is disabled for the source chain. It does not mean there is
+  /// some future point where the root will be blessed.
+  /// @param root The merkle root to commit.
+  /// @param isBlessed The blessing status of the root.
   function _commitRoot(Internal.MerkleRoot memory root, bool isBlessed) internal {
     uint64 sourceChainSelector = root.sourceChainSelector;
 
@@ -878,19 +883,19 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     }
 
     if (sourceChainConfig.minSeqNr != root.minSeqNr || root.minSeqNr > root.maxSeqNr) {
-      revert InvalidInterval(root.sourceChainSelector, root.minSeqNr, root.maxSeqNr);
+      revert InvalidInterval(sourceChainSelector, root.minSeqNr, root.maxSeqNr);
     }
 
     bytes32 merkleRoot = root.merkleRoot;
     if (merkleRoot == bytes32(0)) revert InvalidRoot();
     // If we reached this section, the report should contain a valid root.
     // We disallow duplicate roots as that would reset the timestamp and delay potential manual execution.
-    if (s_roots[root.sourceChainSelector][merkleRoot] != 0) {
-      revert RootAlreadyCommitted(root.sourceChainSelector, merkleRoot);
+    if (s_roots[sourceChainSelector][merkleRoot] != 0) {
+      revert RootAlreadyCommitted(sourceChainSelector, merkleRoot);
     }
 
     sourceChainConfig.minSeqNr = root.maxSeqNr + 1;
-    s_roots[root.sourceChainSelector][merkleRoot] = block.timestamp;
+    s_roots[sourceChainSelector][merkleRoot] = block.timestamp;
   }
 
   /// @notice Returns the sequence number of the last price update.
