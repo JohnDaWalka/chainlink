@@ -269,7 +269,7 @@ func (w *workflowRegistry) readRegistryEvents(ctx context.Context, reader Contra
 			KeyFilter: query.KeyFilter{
 				Key: string(et),
 				Expressions: []query.Expression{
-					query.Confidence(primitives.Finalized),
+					query.Confidence(primitives.Unconfirmed),
 					query.Block(lastReadBlockNumber, primitives.Gt),
 				},
 			},
@@ -461,7 +461,7 @@ func (w *workflowRegistry) loadWorkflows(ctx context.Context, don capabilities.D
 	for {
 		var err error
 		var workflows GetWorkflowMetadataListByDONReturnVal
-		headAtLastRead, err = contractReader.GetLatestValueWithHeadData(ctx, readIdentifier, primitives.Finalized, params, &workflows)
+		headAtLastRead, err = contractReader.GetLatestValueWithHeadData(ctx, readIdentifier, primitives.Unconfirmed, params, &workflows)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get lastest value with head data %w", err)
 		}
