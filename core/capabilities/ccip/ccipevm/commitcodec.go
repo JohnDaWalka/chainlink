@@ -28,9 +28,9 @@ func NewCommitPluginCodecV1() *CommitPluginCodecV1 {
 }
 
 func (c *CommitPluginCodecV1) Encode(ctx context.Context, report cciptypes.CommitPluginReport) ([]byte, error) {
-	merkleRoots := make([]ccip_encoding_utils.InternalMerkleRoot, 0, len(report.MerkleRoots))
-	for _, root := range report.MerkleRoots {
-		merkleRoots = append(merkleRoots, ccip_encoding_utils.InternalMerkleRoot{
+	blessedMerkleRoots := make([]ccip_encoding_utils.InternalMerkleRoot, 0, len(report.BlessedMerkleRoots))
+	for _, root := range report.BlessedMerkleRoots {
+		blessedMerkleRoots = append(blessedMerkleRoots, ccip_encoding_utils.InternalMerkleRoot{
 			SourceChainSelector: uint64(root.ChainSel),
 			// TODO: abi-encoded address for EVM source, figure out what to do for non-EVM.
 			OnRampAddress: common.LeftPadBytes(root.OnRampAddress, 32),
@@ -39,6 +39,21 @@ func (c *CommitPluginCodecV1) Encode(ctx context.Context, report cciptypes.Commi
 			MerkleRoot:    root.MerkleRoot,
 		})
 	}
+
+	// TODO: de-dup
+	// -------------------------------
+	unblessedMerkleRoots := make([]ccip_encoding_utils.InternalMerkleRoot, 0, len(report.UnblessedMerkleRoots))
+	for _, root := range report.BlessedMerkleRoots {
+		unblessedMerkleRoots = append(unblessedMerkleRoots, ccip_encoding_utils.InternalMerkleRoot{
+			SourceChainSelector: uint64(root.ChainSel),
+			// TODO: abi-encoded address for EVM source, figure out what to do for non-EVM.
+			OnRampAddress: common.LeftPadBytes(root.OnRampAddress, 32),
+			MinSeqNr:      uint64(root.SeqNumsRange.Start()),
+			MaxSeqNr:      uint64(root.SeqNumsRange.End()),
+			MerkleRoot:    root.MerkleRoot,
+		})
+	}
+	// -------------------------------
 
 	rmnSignatures := make([]ccip_encoding_utils.IRMNRemoteSignature, 0, len(report.RMNSignatures))
 	for _, sig := range report.RMNSignatures {
@@ -80,9 +95,10 @@ func (c *CommitPluginCodecV1) Encode(ctx context.Context, report cciptypes.Commi
 	}
 
 	commitReport := &ccip_encoding_utils.OffRampCommitReport{
-		PriceUpdates:  priceUpdates,
-		MerkleRoots:   merkleRoots,
-		RmnSignatures: rmnSignatures,
+		PriceUpdates:         priceUpdates,
+		BlessedMerkleRoots:   blessedMerkleRoots,
+		UnblessedMerkleRoots: unblessedMerkleRoots,
+		RmnSignatures:        rmnSignatures,
 	}
 
 	packed, err := ccipEncodingUtilsABI.Pack("exposeCommitReport", commitReport)
@@ -109,9 +125,9 @@ func (c *CommitPluginCodecV1) Decode(ctx context.Context, bytes []byte) (cciptyp
 
 	commitReport := *abi.ConvertType(unpacked[0], new(ccip_encoding_utils.OffRampCommitReport)).(*ccip_encoding_utils.OffRampCommitReport)
 
-	merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(commitReport.MerkleRoots))
-	for _, root := range commitReport.MerkleRoots {
-		merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
+	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(commitReport.BlessedMerkleRoots))
+	for _, root := range commitReport.BlessedMerkleRoots {
+		blessedMerkleRoots = append(blessedMerkleRoots, cciptypes.MerkleRootChain{
 			ChainSel:      cciptypes.ChainSelector(root.SourceChainSelector),
 			OnRampAddress: root.OnRampAddress,
 			SeqNumsRange: cciptypes.NewSeqNumRange(
@@ -121,6 +137,22 @@ func (c *CommitPluginCodecV1) Decode(ctx context.Context, bytes []byte) (cciptyp
 			MerkleRoot: root.MerkleRoot,
 		})
 	}
+
+	// todo: dedup
+	// ---------------------------------
+	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(commitReport.UnblessedMerkleRoots))
+	for _, root := range commitReport.UnblessedMerkleRoots {
+		unblessedMerkleRoots = append(unblessedMerkleRoots, cciptypes.MerkleRootChain{
+			ChainSel:      cciptypes.ChainSelector(root.SourceChainSelector),
+			OnRampAddress: root.OnRampAddress,
+			SeqNumsRange: cciptypes.NewSeqNumRange(
+				cciptypes.SeqNum(root.MinSeqNr),
+				cciptypes.SeqNum(root.MaxSeqNr),
+			),
+			MerkleRoot: root.MerkleRoot,
+		})
+	}
+	// ---------------------------------
 
 	tokenPriceUpdates := make([]cciptypes.TokenPrice, 0, len(commitReport.PriceUpdates.TokenPriceUpdates))
 	for _, update := range commitReport.PriceUpdates.TokenPriceUpdates {
@@ -147,7 +179,8 @@ func (c *CommitPluginCodecV1) Decode(ctx context.Context, bytes []byte) (cciptyp
 	}
 
 	return cciptypes.CommitPluginReport{
-		MerkleRoots: merkleRoots,
+		BlessedMerkleRoots:   blessedMerkleRoots,
+		UnblessedMerkleRoots: unblessedMerkleRoots,
 		PriceUpdates: cciptypes.PriceUpdates{
 			TokenPriceUpdates: tokenPriceUpdates,
 			GasPriceUpdates:   gasPriceUpdates,
