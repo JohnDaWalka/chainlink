@@ -397,14 +397,16 @@ func TestUpdateOffRampsSources(t *testing.T) {
 						UpdatesByChain: map[uint64]map[uint64]changeset.OffRampSourceUpdate{
 							source: {
 								dest: {
-									IsEnabled:  true,
-									TestRouter: true,
+									IsEnabled:                 true,
+									TestRouter:                true,
+									IsRMNVerificationDisabled: true,
 								},
 							},
 							dest: {
 								source: {
-									IsEnabled:  true,
-									TestRouter: false,
+									IsEnabled:                 true,
+									TestRouter:                false,
+									IsRMNVerificationDisabled: true,
 								},
 							},
 						},

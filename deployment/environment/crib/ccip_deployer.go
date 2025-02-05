@@ -290,7 +290,8 @@ func DeployCCIPAndAddLanes(ctx context.Context, lggr logger.Logger, envConfig de
 							UpdatesByChain: map[uint64]map[uint64]changeset.OffRampSourceUpdate{
 								dst: {
 									src: {
-										IsEnabled: true,
+										IsEnabled:                 true,
+										IsRMNVerificationDisabled: true,
 									},
 								},
 							},
