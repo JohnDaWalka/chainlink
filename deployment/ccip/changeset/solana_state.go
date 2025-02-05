@@ -44,6 +44,8 @@ type SolCCIPChainState struct {
 	SourceChainStatePDAs map[uint64]solana.PublicKey
 	DestChainStatePDAs   map[uint64]solana.PublicKey
 	TokenPoolLookupTable map[solana.PublicKey]solana.PublicKey
+	FeeQuoter            solana.PublicKey
+	FeeQuoterConfigPDA   solana.PublicKey
 }
 
 func LoadOnchainStateSolana(e deployment.Environment) (CCIPOnChainState, error) {
@@ -133,6 +135,14 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 				tokenPubKey := solana.MustPublicKeyFromBase58(tokenPubKeyStr)
 				state.TokenPoolLookupTable[tokenPubKey] = lookupTablePubKey
 			}
+		case FeeQuoter:
+			pub := solana.MustPublicKeyFromBase58(address)
+			state.FeeQuoter = pub
+			feeQuoterConfigPDA, _, err := solState.FindFqConfigPDA(state.FeeQuoter)
+			if err != nil {
+				return state, err
+			}
+			state.FeeQuoterConfigPDA = feeQuoterConfigPDA
 		default:
 			return state, fmt.Errorf("unknown contract %s", tvStr)
 		}
