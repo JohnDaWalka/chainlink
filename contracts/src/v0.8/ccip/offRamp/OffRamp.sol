@@ -70,7 +70,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
   event DynamicConfigSet(DynamicConfig dynamicConfig);
-  /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event ExecutionStateChanged(
     uint64 indexed sourceChainSelector,
     uint64 indexed sequenceNumber,
@@ -84,7 +83,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
   event SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
   event AlreadyAttempted(uint64 sourceChainSelector, uint64 sequenceNumber);
-  /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event CommitReportAccepted(
     Internal.MerkleRoot[] blessedMerkleRoots,
     Internal.MerkleRoot[] unblessedMerkleRoots,
@@ -94,7 +92,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   event SkippedReportExecution(uint64 sourceChainSelector);
 
   /// @dev Struct that contains the static configuration. The individual components are stored as immutable variables.
-  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
     uint64 chainSelector; // ───────╮ Destination chainSelector
@@ -132,7 +129,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   }
 
   /// @dev Report that is committed by the observing DON at the committing phase.
-  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct CommitReport {
     Internal.PriceUpdates priceUpdates; // List of gas and price updates to commit.
     Internal.MerkleRoot[] blessedMerkleRoots; // List of merkle roots from source chains for which RMN is enabled.
@@ -957,7 +953,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice Returns the static config.
   /// @dev This function will always return the same struct as the contents is static and can never change.
-  /// RMN depends on this function, if changing, please notify the RMN maintainers.
   /// @return staticConfig The static config.
   function getStaticConfig() external view returns (StaticConfig memory) {
     return StaticConfig({
