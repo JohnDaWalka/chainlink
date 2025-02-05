@@ -176,7 +176,7 @@ type eventHandler struct {
 	encryptionKey            workflowkey.Key
 	engineFactory            engineFactoryFn
 	ratelimiter              *ratelimiter.RateLimiter
-	wasmtimeModuleFactory    host.WasmtimeModuleFactoryFn
+	getModuleFromBinary      getModuleFromBinary
 }
 
 type Event interface {
@@ -204,6 +204,9 @@ func WithMaxArtifactSize(cfg ArtifactConfig) func(*eventHandler) {
 	}
 }
 
+type getModuleFromBinary func(binary []byte, initialFuel uint64, isUncompressed bool,
+	maxCompressedBinarySize uint64, maxDecompressedBinarySize uint64) (*host.WasmTimeModule, error)
+
 // NewEventHandler returns a new eventHandler instance.
 func NewEventHandler(
 	lggr logger.Logger,
@@ -215,7 +218,7 @@ func NewEventHandler(
 	clock clockwork.Clock,
 	encryptionKey workflowkey.Key,
 	ratelimiter *ratelimiter.RateLimiter,
-	wasmtimeModuleFactory host.WasmtimeModuleFactoryFn,
+	getModuleFromBinary getModuleFromBinary,
 	opts ...func(*eventHandler),
 ) *eventHandler {
 	eh := &eventHandler{
@@ -232,7 +235,7 @@ func NewEventHandler(
 		secretsFreshnessDuration: defaultSecretsFreshnessDuration,
 		encryptionKey:            encryptionKey,
 		ratelimiter:              ratelimiter,
-		wasmtimeModuleFactory:    wasmtimeModuleFactory,
+		getModuleFromBinary:      getModuleFromBinary,
 	}
 	eh.engineFactory = eh.engineFactoryFn
 	eh.limits.ApplyDefaults()
@@ -594,9 +597,12 @@ func (h *eventHandler) getWorkflowArtifacts(
 	return decodedBinary, config, nil
 }
 
-func (h *eventHandler) engineFactoryFn(ctx context.Context, id string, owner string, name workflows.WorkflowNamer, config []byte, binary []byte) (services.Service, error) {
-	moduleConfig := &host.ModuleConfig{Logger: h.lggr, Labeler: h.emitter}
-	sdkSpec, err := host.GetWorkflowSpec(ctx, moduleConfig, binary, config, h.wasmtimeModuleFactory)
+func (h *eventHandler) engineFactoryFn(ctx context.Context, id string, owner string, name workflows.WorkflowNamer,
+	config []byte, binary []byte) (services.Service, error) {
+	moduleConfig := &host.ModuleConfig{Logger: h.lggr, Labeler: h.emitter, IsUncompressed: false, InitialFuel: 0}
+	sdkSpec, err := host.GetWorkflowSpec(ctx, moduleConfig, config, func(initialFuel uint64) (*host.WasmTimeModule, error) {
+		return h.getModuleFromBinary(binary, initialFuel, moduleConfig.IsUncompressed, moduleConfig.MaxCompressedBinarySize, moduleConfig.MaxDecompressedBinarySize)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workflow sdk spec: %w", err)
 	}

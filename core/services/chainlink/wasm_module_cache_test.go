@@ -9,11 +9,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/bytecodealliance/wasmtime-go/v28"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
 )
 
 type bytePair struct {
@@ -27,73 +27,76 @@ func TestNewModule(t *testing.T) {
 	wasmDir := t.TempDir()
 	cacheDir := t.TempDir()
 	stats := &testCacheStats{}
-	factory, err := NewCachedWasmModuleFactory(lggr, cacheDir, stats)
+	factory, err := NewFileBasedModuleCache(lggr, cacheDir, stats)
 	require.NoError(t, err)
 
-	// generate 10 unique wasmBytes and get and store the moduleBytes as a pair
-	var bytePairs []bytePair
+	// generate 10 unique wasmBytes and get and store the module as a pair
+	var modules []*host.WasmTimeModule
 	for i := 0; i < 10; i++ {
 		wasmBytes := getWasmBytes(t, fmt.Sprintf("Hello, WebAssembly! %d", i), wasmDir)
-		moduleBytes, err := getSerializedModule(factory, wasmBytes)
+		module, err := getModule(factory, wasmBytes)
 		require.NoError(t, err)
-		bytePairs = append(bytePairs, bytePair{wasmBytes: wasmBytes, moduleBytes: moduleBytes})
+		modules = append(modules, module)
 	}
 
 	assert.Equal(t, 10, stats.GetMisses())
 	assert.Equal(t, 10, stats.GetAdditions())
 
-	// Now retrieve the moduleBytes from the cache  and confirm that the cache stats are updated correctly
-	// and that the retrieved module bytes are correct
+	// Now retrieve the module from the cache and confirm that the cache stats are updated correctly
+	// and that the retrieved module is correct
 	for i := 0; i < 10; i++ {
-		wasmBytes := bytePairs[i].wasmBytes
-		moduleBytes := bytePairs[i].moduleBytes
+		wasmBytes := getWasmBytes(t, fmt.Sprintf("Hello, WebAssembly! %d", i), wasmDir)
+		module := modules[i]
 
-		moduleBytes2, err := getSerializedModule(factory, wasmBytes)
+		retrievedModule, err := getModule(factory, wasmBytes)
 		require.NoError(t, err)
 
-		assert.Equal(t, moduleBytes, moduleBytes2)
+		equal, err := host.ModuleEquals(module, retrievedModule)
+		require.NoError(t, err)
+		assert.True(t, equal)
 	}
 
 	assert.Equal(t, 10, stats.GetHits())
 	assert.Equal(t, 10, stats.GetMisses())
 }
 
-// Now test the cache retrieving in a multithreaded environment
-func TestNewModuleMultithreaded_Retrieval(t *testing.T) {
+func TestNewModuleMultithreaded_RetrievalUsingBinary(t *testing.T) {
 	lggr := logger.Test(t)
 
 	wasmDir := t.TempDir()
 	cacheDir := t.TempDir()
 	stats := &testCacheStats{}
-	factory, err := NewCachedWasmModuleFactory(lggr, cacheDir, stats)
+	factory, err := NewFileBasedModuleCache(lggr, cacheDir, stats)
 	require.NoError(t, err)
 
-	// generate 10 unique wasmBytes and get and store the moduleBytes as a pair
-	var bytePairs []bytePair
+	// generate 10 unique wasmBytes and get and store the module as a pair
+	var modules []*host.WasmTimeModule
 	for i := 0; i < 10; i++ {
 		wasmBytes := getWasmBytes(t, fmt.Sprintf("Hello, WebAssembly! %d", i), wasmDir)
-		moduleBytes, err := getSerializedModule(factory, wasmBytes)
+		module, err := getModule(factory, wasmBytes)
 		require.NoError(t, err)
-		bytePairs = append(bytePairs, bytePair{wasmBytes: wasmBytes, moduleBytes: moduleBytes})
+		modules = append(modules, module)
 	}
 
 	assert.Equal(t, 10, stats.GetMisses())
 	assert.Equal(t, 10, stats.GetAdditions())
 
-	// Now retrieve the moduleBytes from the cache  and confirm that the cache stats are updated correctly
-	// and that the retrieved module bytes are correct
+	// Now retrieve the module from the cache and confirm that the cache stats are updated correctly
+	// and that the retrieved module is correct
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			wasmBytes := bytePairs[i].wasmBytes
-			moduleBytes := bytePairs[i].moduleBytes
+			wasmBytes := getWasmBytes(t, fmt.Sprintf("Hello, WebAssembly! %d", i), wasmDir)
+			module := modules[i]
 
-			retrievedModuleBytes, err := getSerializedModule(factory, wasmBytes)
+			retrievedModule, err := getModule(factory, wasmBytes)
 			require.NoError(t, err)
 
-			assert.Equal(t, moduleBytes, retrievedModuleBytes)
+			equal, err := host.ModuleEquals(module, retrievedModule)
+			require.NoError(t, err)
+			assert.True(t, equal)
 		}(i)
 	}
 	wg.Wait()
@@ -102,30 +105,75 @@ func TestNewModuleMultithreaded_Retrieval(t *testing.T) {
 	assert.Equal(t, 10, stats.GetMisses())
 }
 
-// Now test the cache adding and retrieving in a multithreaded environment
+func TestNewModuleMultithreaded_RetrievalUsingBinaryID(t *testing.T) {
+	lggr := logger.Test(t)
+
+	wasmDir := t.TempDir()
+	cacheDir := t.TempDir()
+	stats := &testCacheStats{}
+	factory, err := NewFileBasedModuleCache(lggr, cacheDir, stats)
+	require.NoError(t, err)
+
+	// generate 10 unique wasmBytes and get and store the module as a pair
+	var modules []*host.WasmTimeModule
+	for i := 0; i < 10; i++ {
+		wasmBytes := getWasmBytes(t, fmt.Sprintf("Hello, WebAssembly! %d", i), wasmDir)
+		module, err := getModule(factory, wasmBytes)
+		require.NoError(t, err)
+		modules = append(modules, module)
+	}
+
+	assert.Equal(t, 10, stats.GetMisses())
+	assert.Equal(t, 10, stats.GetAdditions())
+
+	// Now retrieve the module from the cache and confirm that the cache stats are updated correctly
+	// and that the retrieved module is correct
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			wasmBytes := getWasmBytes(t, fmt.Sprintf("Hello, WebAssembly! %d", i), wasmDir)
+			module := modules[i]
+
+			binaryID := host.FromBinary(wasmBytes)
+			retrievedModule, err := factory.GetModuleFromBinaryID(binaryID, 0)
+			require.NoError(t, err)
+
+			equal, err := host.ModuleEquals(module, retrievedModule)
+			require.NoError(t, err)
+			assert.True(t, equal)
+		}(i)
+	}
+	wg.Wait()
+
+	assert.Equal(t, 10, stats.GetHits())
+	assert.Equal(t, 10, stats.GetMisses())
+}
+
 func TestNewModuleMultithreaded_Adding(t *testing.T) {
 	lggr := logger.Test(t)
 
 	wasmDir := t.TempDir()
 	cacheDir := t.TempDir()
 	stats := &testCacheStats{}
-	factory, err := NewCachedWasmModuleFactory(lggr, cacheDir, stats)
+	factory, err := NewFileBasedModuleCache(lggr, cacheDir, stats)
 	require.NoError(t, err)
 
-	// generate 10 unique wasmBytes and get and store the moduleBytes as a pair
-	var bytePairs []bytePair
+	// generate 10 unique wasmBytes and get and store the module as a pair
+	var modules []*host.WasmTimeModule
 	for i := 0; i < 10; i++ {
 		wasmBytes := getWasmBytes(t, fmt.Sprintf("Hello, WebAssembly! %d", i), wasmDir)
-		moduleBytes, err := getSerializedModule(factory, wasmBytes)
+		module, err := getModule(factory, wasmBytes)
 		require.NoError(t, err)
-		bytePairs = append(bytePairs, bytePair{wasmBytes: wasmBytes, moduleBytes: moduleBytes})
+		modules = append(modules, module)
 	}
 
-	// Now using a new cache, add/retrieve the moduleBytes from the cache in a multithreaded environment
-	// and confirm that the cache stats are updated correctly and the retrieved module bytes are correct
+	// Now using a new cache, add/retrieve the module from the cache in a multithreaded environment
+	// and confirm that the cache stats are updated correctly and the retrieved module is correct
 	cacheDir = t.TempDir()
 	stats = &testCacheStats{}
-	factory, err = NewCachedWasmModuleFactory(lggr, cacheDir, stats)
+	factory, err = NewFileBasedModuleCache(lggr, cacheDir, stats)
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -133,18 +181,26 @@ func TestNewModuleMultithreaded_Adding(t *testing.T) {
 		wg.Add(2)
 		go func(i int) {
 			defer wg.Done()
-			bytes := bytePairs[i].wasmBytes
-			moduleBytes, err := getSerializedModule(factory, bytes)
+			wasmBytes := getWasmBytes(t, fmt.Sprintf("Hello, WebAssembly! %d", i), wasmDir)
+			module := modules[i]
+
+			retrievedModule, err := getModule(factory, wasmBytes)
 			require.NoError(t, err)
-			assert.Equal(t, bytePairs[i].moduleBytes, moduleBytes)
+			equal, err := host.ModuleEquals(module, retrievedModule)
+			require.NoError(t, err)
+			assert.True(t, equal)
 		}(i)
 
 		go func(i int) {
 			defer wg.Done()
-			bytes := bytePairs[i].wasmBytes
-			moduleBytes, err := getSerializedModule(factory, bytes)
+			wasmBytes := getWasmBytes(t, fmt.Sprintf("Hello, WebAssembly! %d", i), wasmDir)
+			module := modules[i]
+
+			retrievedModule, err := getModule(factory, wasmBytes)
 			require.NoError(t, err)
-			assert.Equal(t, bytePairs[i].moduleBytes, moduleBytes)
+			equal, err := host.ModuleEquals(module, retrievedModule)
+			require.NoError(t, err)
+			assert.True(t, equal)
 		}(i)
 	}
 
@@ -153,26 +209,13 @@ func TestNewModuleMultithreaded_Adding(t *testing.T) {
 	assert.Equal(t, 10, stats.GetHits())
 	assert.Equal(t, 10, stats.GetMisses())
 	assert.Equal(t, 10, stats.GetAdditions())
-
 }
 
-func getSerializedModule(factory *cachedWasmModuleFactory, wasmBytes []byte) ([]byte, error) {
-	engine := wasmtime.NewEngine()
-	isUncompressed := true
+func getModule(factory *fileBasedModuleCache, wasmBytes []byte) (*host.WasmTimeModule, error) {
 	maxCompressedBinarySize := uint64(math.MaxUint64)
 	maxDecompressedBinarySize := uint64(math.MaxUint64)
 
-	module, err := factory.NewModule(engine, wasmBytes, isUncompressed, maxCompressedBinarySize, maxDecompressedBinarySize)
-	if err != nil {
-		return nil, err
-	}
-
-	moduleBytes, err := module.Serialize()
-	if err != nil {
-		return nil, err
-	}
-
-	return moduleBytes, nil
+	return factory.GetModuleFromBinary(wasmBytes, 0, true, maxCompressedBinarySize, maxDecompressedBinarySize)
 }
 
 func getWasmBytes(t *testing.T, message string, wasmDir string) []byte {

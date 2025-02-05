@@ -60,7 +60,7 @@ func (mc *moduleCache) start() {
 	mc.wg.Add(1)
 	go func() {
 		defer mc.wg.Done()
-		mc.reapLoop()
+		//mc.reapLoop()
 	}()
 }
 

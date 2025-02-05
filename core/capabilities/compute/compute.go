@@ -81,6 +81,8 @@ type FetcherFactory interface {
 	NewFetcher(log logger.Logger, emitter custmsg.MessageEmitter) FetcherFn
 }
 
+type GetModuleFromBinaryID func(binaryID host.BinaryID, initialFuel uint64) (*host.WasmTimeModule, error)
+
 type Compute struct {
 	stopCh services.StopChan
 	log    logger.Logger
@@ -94,8 +96,8 @@ type Compute struct {
 	// of a request.
 	transformer *transformer
 
-	fetcherFactory        FetcherFactory
-	wasmtimeModuleFactory host.WasmtimeModuleFactoryFn
+	fetcherFactory FetcherFactory
+	getModule      GetModuleFromBinaryID
 
 	numWorkers int
 	queue      chan request
@@ -166,11 +168,10 @@ func (c *Compute) execute(ctx context.Context, respCh chan response, req capabil
 		return
 	}
 
-	id := generateID(cfg.Binary)
-
+	id := cfg.Binary
 	m, ok := c.modules.get(id)
 	if !ok {
-		mod, innerErr := c.initModule(id, cfg.ModuleConfig, cfg.Binary, copiedReq.Metadata)
+		mod, innerErr := c.initModule(id, cfg.ModuleConfig, host.BinaryID(cfg.Binary), copiedReq.Metadata)
 		if innerErr != nil {
 			respCh <- response{err: innerErr}
 			return
@@ -187,12 +188,14 @@ func (c *Compute) execute(ctx context.Context, respCh chan response, req capabil
 	}
 }
 
-func (c *Compute) initModule(id string, cfg *host.ModuleConfig, binary []byte, requestMetadata capabilities.RequestMetadata) (*module, error) {
+func (c *Compute) initModule(id string, cfg *host.ModuleConfig, binaryID host.BinaryID, requestMetadata capabilities.RequestMetadata) (*module, error) {
 	initStart := time.Now()
 
 	cfg.Fetch = c.fetcherFactory.NewFetcher(c.log, c.emitter)
 
-	mod, err := host.NewModule(cfg, binary, c.wasmtimeModuleFactory)
+	mod, err := host.NewModule(cfg, func(initialFuel uint64) (*host.WasmTimeModule, error) {
+		return c.getModule(binaryID, initialFuel)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate WASM module: %w", err)
 	}
@@ -203,6 +206,7 @@ func (c *Compute) initModule(id string, cfg *host.ModuleConfig, binary []byte, r
 	computeWASMInit.WithLabelValues(requestMetadata.WorkflowID, requestMetadata.ReferenceID).Observe(float64(initDuration))
 
 	m := &module{module: mod}
+
 	err = c.modules.add(id, m)
 	if err != nil {
 		c.log.Warnf("failed to add module to cache: %s", err.Error())
@@ -434,7 +438,7 @@ func NewAction(
 	log logger.Logger,
 	registry coretypes.CapabilitiesRegistry,
 	fetcherFactory FetcherFactory,
-	wasmtimeModuleFactory host.WasmtimeModuleFactoryFn,
+	getModule GetModuleFromBinaryID,
 	opts ...func(*Compute),
 ) (*Compute, error) {
 	config.ApplyDefaults()
@@ -443,16 +447,16 @@ func NewAction(
 		lggr    = logger.Named(log, "CustomCompute")
 		labeler = custmsg.NewLabeler()
 		compute = &Compute{
-			stopCh:                make(services.StopChan),
-			log:                   lggr,
-			emitter:               labeler,
-			registry:              registry,
-			modules:               newModuleCache(clockwork.NewRealClock(), 1*time.Minute, 10*time.Minute, 3),
-			transformer:           NewTransformer(lggr, labeler, config),
-			fetcherFactory:        fetcherFactory,
-			wasmtimeModuleFactory: wasmtimeModuleFactory,
-			queue:                 make(chan request),
-			numWorkers:            config.NumWorkers,
+			stopCh:         make(services.StopChan),
+			log:            lggr,
+			emitter:        labeler,
+			registry:       registry,
+			modules:        newModuleCache(clockwork.NewRealClock(), 1*time.Minute, 10*time.Minute, 3),
+			transformer:    NewTransformer(lggr, labeler, config),
+			fetcherFactory: fetcherFactory,
+			getModule:      getModule,
+			queue:          make(chan request),
+			numWorkers:     config.NumWorkers,
 		}
 	)
 

@@ -1,8 +1,6 @@
 package chainlink
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"sync"
@@ -20,7 +18,7 @@ type wasmModuleCacheStats interface {
 	OnCacheAddition()
 }
 
-type cachedWasmModuleFactory struct {
+type fileBasedModuleCache struct {
 	lggr     logger.Logger
 	cacheDir string
 	stats    wasmModuleCacheStats
@@ -28,61 +26,122 @@ type cachedWasmModuleFactory struct {
 	wasmLocks sync.Map
 }
 
-func NewCachedWasmModuleFactory(lggr logger.Logger, cacheDir string, stats wasmModuleCacheStats) (*cachedWasmModuleFactory, error) {
+type WasmModuleCache interface {
+	GetModuleFromBinaryID(binaryID host.BinaryID, initialFuel uint64) (*host.WasmTimeModule, error)
+	GetModuleFromBinary(binary []byte, initialFuel uint64, isUncompressed bool,
+		maxCompressedBinarySize uint64, maxDecompressedBinarySize uint64) (*host.WasmTimeModule, error)
+}
+
+func NewFileBasedModuleCache(lggr logger.Logger, cacheDir string, stats wasmModuleCacheStats) (*fileBasedModuleCache, error) {
 	err := os.MkdirAll(cacheDir, 0755)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find or create cache directory: %w", err)
 	}
 
-	return &cachedWasmModuleFactory{lggr: lggr, cacheDir: cacheDir, stats: stats}, nil
+	return &fileBasedModuleCache{lggr: lggr, cacheDir: cacheDir, stats: stats}, nil
 }
 
 type wasmLock struct {
 	mux *sync.Mutex
 }
 
-func (f *cachedWasmModuleFactory) NewModule(engine *wasmtime.Engine, wasm []byte, isUncompressed bool, maxCompressedBinarySize uint64, maxDecompressedBinarySize uint64) (*wasmtime.Module, error) {
-	sha := sha256.Sum256(wasm)
-	wasmBytesID := hex.EncodeToString(sha[:])
+var ErrSerialisedModuleNotFound = fmt.Errorf("serialised module not found")
 
-	lock := wasmLock{mux: &sync.Mutex{}}
-	actual, _ := f.wasmLocks.LoadOrStore(wasmBytesID, &lock)
-	lock = *actual.(*wasmLock)
+// GetModuleFromBinaryID creates a new module if a serialised module is found in the cache, else it returns an
+// ErrSerialisedModuleNotFound error.
+func (f *fileBasedModuleCache) GetModuleFromBinaryID(binaryID host.BinaryID, initialFuel uint64) (*host.WasmTimeModule, error) {
+	return f.getModule(binaryID, nil, initialFuel, false, 0, 0)
+}
+
+// GetModuleFromBinary creates a new module from the given binary, caching a serialised version of the module.  The returned
+// module must be Closed.
+func (f *fileBasedModuleCache) GetModuleFromBinary(binary []byte, initialFuel uint64, isUncompressed bool,
+	maxCompressedBinarySize uint64, maxDecompressedBinarySize uint64) (*host.WasmTimeModule, error) {
+	binaryID := host.FromBinary(binary)
+
+	return f.getModule(binaryID, binary, initialFuel, isUncompressed, maxCompressedBinarySize, maxDecompressedBinarySize)
+}
+
+// getModule will return a module from the cache if it exists, otherwise if the binary for the module is provided it
+// will create a new module and cache it.  If the binary is not provided, it will return an ErrSerialisedModuleNotFound error.
+func (f *fileBasedModuleCache) getModule(binaryID host.BinaryID, binary []byte, initialFuel uint64,
+	isUncompressed bool, maxCompressedBinarySize uint64, maxDecompressedBinarySize uint64) (*host.WasmTimeModule, error) {
+
+	lock := f.getLockForBinaryID(binaryID)
 	lock.mux.Lock()
 	defer lock.mux.Unlock()
 
-	cacheFile := f.cacheDir + "/" + wasmBytesID[:] + ".serialized"
+	cacheFile := f.getCacheFilePath(binaryID)
 
-	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
-		wasm, err = host.ValidateAndDecompressBinary(wasm, isUncompressed, maxCompressedBinarySize, maxDecompressedBinarySize)
-		if err != nil {
-			return nil, fmt.Errorf("failed to validate and decompress binary: %w", err)
+	engineCfg, err := host.GetEngineConfiguration(initialFuel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get engine configuration: %w", err)
+	}
+	engine := wasmtime.NewEngineWithConfig(engineCfg)
+
+	var module *wasmtime.Module
+	if f.isCacheFileMissing(cacheFile) {
+		if binary == nil {
+			return nil, ErrSerialisedModuleNotFound
 		}
-
-		module, err := f.createAndCacheModule(engine, wasm, cacheFile)
+		module, err = f.createAndCacheNewModule(engine, binary, cacheFile, isUncompressed, maxCompressedBinarySize, maxDecompressedBinarySize)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create and cache module: %w", err)
 		}
-		return module, nil
-	} else if err != nil {
-		return nil, fmt.Errorf("failed to check if cache file exists: %w", err)
 	} else {
-		f.stats.OnCacheHit()
-		mod, err := wasmtime.NewModuleDeserializeFile(engine, cacheFile)
+		module, err = f.loadModuleFromCache(engine, cacheFile, binary)
 		if err != nil {
-			f.lggr.Warn("Failed to deserialize module from cache, recreating and caching module", "cacheFile", cacheFile, "error", err)
-			// If the module fails to deserialize from the cache create it from new and cache it again
-			// This is to handle the case where the engined configuration has changed or the cache is corrupted
-			mod, err = f.createAndCacheModule(engine, wasm, cacheFile)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create and cache module: %w", err)
-			}
+			return nil, fmt.Errorf("failed to load module from cache: %w", err)
 		}
-		return mod, nil
 	}
+
+	return host.NewWasmTimeModule(engine, module, engineCfg), nil
 }
 
-func (f *cachedWasmModuleFactory) createAndCacheModule(engine *wasmtime.Engine, wasm []byte, cacheFile string) (*wasmtime.Module, error) {
+func (f *fileBasedModuleCache) getLockForBinaryID(binaryID host.BinaryID) *wasmLock {
+	lock := wasmLock{mux: &sync.Mutex{}}
+	actual, _ := f.wasmLocks.LoadOrStore(binaryID, &lock)
+	return actual.(*wasmLock)
+}
+
+func (f *fileBasedModuleCache) getCacheFilePath(binaryID host.BinaryID) string {
+	return f.cacheDir + "/" + string(binaryID) + ".serialized"
+}
+
+func (f *fileBasedModuleCache) isCacheFileMissing(cacheFile string) bool {
+	_, err := os.Stat(cacheFile)
+	return os.IsNotExist(err)
+}
+
+func (f *fileBasedModuleCache) createAndCacheNewModule(engine *wasmtime.Engine, binary []byte, cacheFile string,
+	isUncompressed bool, maxCompressedBinarySize uint64, maxDecompressedBinarySize uint64) (*wasmtime.Module, error) {
+
+	binary, err := host.ValidateAndDecompressBinary(binary, isUncompressed, maxCompressedBinarySize, maxDecompressedBinarySize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate and decompress binary: %w", err)
+	}
+
+	module, err := f.createAndCacheModule(engine, binary, cacheFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create and cache module: %w", err)
+	}
+	return module, nil
+}
+
+func (f *fileBasedModuleCache) loadModuleFromCache(engine *wasmtime.Engine, cacheFile string, binary []byte) (*wasmtime.Module, error) {
+	f.stats.OnCacheHit()
+	mod, err := wasmtime.NewModuleDeserializeFile(engine, cacheFile)
+	if err != nil {
+		f.lggr.Warn("Failed to deserialize module from cache, recreating and caching module", "cacheFile", cacheFile, "error", err)
+		mod, err = f.createAndCacheModule(engine, binary, cacheFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create and cache module: %w", err)
+		}
+	}
+	return mod, nil
+}
+
+func (f *fileBasedModuleCache) createAndCacheModule(engine *wasmtime.Engine, wasm []byte, cacheFile string) (*wasmtime.Module, error) {
 	f.stats.OnCacheMiss()
 	module, err := wasmtime.NewModule(engine, wasm)
 	if err != nil {

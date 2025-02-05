@@ -14,7 +14,7 @@ import (
 
 // ParsedConfig is a struct that contains the binary and config for a wasm module, as well as the module config.
 type ParsedConfig struct {
-	Binary []byte
+	Binary string
 	Config []byte
 
 	// ModuleConfig is the configuration and dependencies to inject into the wasm module.
@@ -51,7 +51,7 @@ func (t *transformer) Transform(req capabilities.CapabilityRequest, opts ...func
 		Config:   shallowCopy(req.Config),
 	}
 
-	binary, err := popValue[[]byte](copiedReq.Config, binaryKey)
+	binary, err := popValue[string](copiedReq.Config, binaryKey)
 	if err != nil {
 		return capabilities.CapabilityRequest{}, nil, NewInvalidRequestError(err)
 	}

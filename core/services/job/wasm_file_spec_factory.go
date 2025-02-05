@@ -34,9 +34,9 @@ func (w WasmFileSpecFactory) Spec(ctx context.Context, workflow, configLocation 
 		return sdk.WorkflowSpec{}, nil, "", err
 	}
 
-	moduleConfig := &host.ModuleConfig{Logger: logger.NullLogger}
-	spec, err := host.GetWorkflowSpec(ctx, moduleConfig, compressedBinary, config,
-		newWasmTimeModule)
+	moduleConfig := &host.ModuleConfig{Logger: logger.NullLogger, IsUncompressed: false}
+	spec, err := host.GetWorkflowSpec(ctx, moduleConfig, config,
+		getModuleFactory(compressedBinary, moduleConfig))
 	if err != nil {
 		return sdk.WorkflowSpec{}, nil, "", err
 	} else if spec == nil {
@@ -46,17 +46,28 @@ func (w WasmFileSpecFactory) Spec(ctx context.Context, workflow, configLocation 
 	return *spec, compressedBinary, sha, nil
 }
 
-func newWasmTimeModule(engine *wasmtime.Engine, binary []byte, isUncompressed bool, maxCompressedBinarySize uint64, maxDecompressedBinarySize uint64) (*wasmtime.Module, error) {
-	binary, err := host.ValidateAndDecompressBinary(binary, isUncompressed, maxCompressedBinarySize, maxDecompressedBinarySize)
-	if err != nil {
-		return nil, fmt.Errorf("error validating and decompressing binary: %w", err)
-	}
+func getModuleFactory(binary []byte, moduleCfg *host.ModuleConfig) func(initialFuel uint64) (*host.WasmTimeModule, error) {
 
-	mod, err := wasmtime.NewModule(engine, binary)
-	if err != nil {
-		return nil, fmt.Errorf("error creating wasmtime module: %w", err)
+	return func(initialFuel uint64) (*host.WasmTimeModule, error) {
+
+		decompressedBinary, err := host.ValidateAndDecompressBinary(binary, moduleCfg.IsUncompressed, moduleCfg.MaxCompressedBinarySize, moduleCfg.MaxDecompressedBinarySize)
+		if err != nil {
+			return nil, fmt.Errorf("error validating and decompressing binary: %w", err)
+		}
+
+		engineCfg, err := host.GetEngineConfiguration(moduleCfg.InitialFuel)
+		if err != nil {
+			return nil, fmt.Errorf("error getting engine configuration: %w", err)
+		}
+
+		engine := wasmtime.NewEngineWithConfig(engineCfg)
+
+		mod, err := wasmtime.NewModule(engine, decompressedBinary)
+		if err != nil {
+			return nil, fmt.Errorf("error creating wasmtime module: %w", err)
+		}
+		return host.NewWasmTimeModule(engine, mod, engineCfg), nil
 	}
-	return mod, nil
 }
 
 func (w WasmFileSpecFactory) RawSpec(ctx context.Context, workflow, configLocation string) ([]byte, error) {

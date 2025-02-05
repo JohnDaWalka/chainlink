@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
@@ -52,14 +51,14 @@ type DonContext struct {
 	workflowRegistry      *WorkflowRegistry
 	syncerFetcherFunc     syncer.FetcherFunc
 	computeFetcherFactory compute.FetcherFactory
-	wasmModuleFactory     WasmModuleFactory
+	wasmModuleFactory     WasmModuleCacheFactory
 }
 
 func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
 	ethBlockchain := NewEthBlockchain(t, 1000, 1*time.Second)
 	rageP2PNetwork := NewFakeRageP2PNetwork(ctx, t, 1000)
 	capabilitiesRegistry := NewCapabilitiesRegistry(ctx, t, ethBlockchain)
-	wasmModuleFactory := NewNoCacheWasmModuleFactory()
+	wasmModuleFactory := NewInMemoryWasmModuleCacheFactory()
 
 	servicetest.Run(t, rageP2PNetwork)
 	servicetest.Run(t, ethBlockchain)
@@ -68,7 +67,7 @@ func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
 }
 
 func CreateDonContextWithWorkflowRegistry(ctx context.Context, t *testing.T, syncerFetcherFunc syncer.FetcherFunc,
-	computeFetcherFactory compute.FetcherFactory, wasmModuleFactory WasmModuleFactory) DonContext {
+	computeFetcherFactory compute.FetcherFactory, wasmModuleFactory WasmModuleCacheFactory) DonContext {
 	donContext := CreateDonContext(ctx, t)
 	workflowRegistry := NewWorkflowRegistry(ctx, t, donContext.EthBlockchain)
 	donContext.workflowRegistry = workflowRegistry
@@ -170,7 +169,7 @@ func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig Don
 			newOracleFactoryFn = factory.NewOracleFactory
 		}
 
-		wasmModuleFactory, err := donContext.wasmModuleFactory.NewWasmModuleFactoryFnForPeer(nodeInfo.PeerID.String())
+		wasmModuleFactory, err := donContext.wasmModuleFactory.NewWasmModuleCacheForPeer(nodeInfo.PeerID.String())
 		require.NoError(t, err)
 
 		cn.start = func() {
@@ -421,7 +420,7 @@ func startNewNode(ctx context.Context,
 	setupCfg func(c *chainlink.Config),
 	fetcherFunc syncer.FetcherFunc,
 	fetcherFactoryFunc compute.FetcherFactory,
-	wasmtimeModuleFactory host.WasmtimeModuleFactoryFn,
+	wasmModuleCache chainlink.WasmModuleCache,
 ) *cltest.TestApplication {
 	config, _ := heavyweight.FullTestDBV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
 		c.Capabilities.ExternalRegistry.ChainID = ptr(fmt.Sprintf("%d", testutils.SimulatedChainID))
@@ -452,7 +451,7 @@ func startNewNode(ctx context.Context,
 
 	return cltest.NewApplicationWithConfigV2AndKeyOnSimulatedBlockchain(t, config, ethBlockchain.Backend, nodeInfo,
 		dispatcher, peerWrapper, newOracleFactoryFn, localCapabilities, keyV2, lggr, fetcherFunc, fetcherFactoryFunc,
-		wasmtimeModuleFactory)
+		wasmModuleCache)
 }
 
 // Functions below this point are for adding non-standard capabilities to a DON, deliberately verbose. Eventually these
