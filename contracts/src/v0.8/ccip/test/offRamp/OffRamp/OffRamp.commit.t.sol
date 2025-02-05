@@ -556,6 +556,51 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
   }
 
+  function test_RevertWhen_RootBlessingMismatch_blessedButShouldNot() public {
+    OffRamp.CommitReport memory commitReport = _constructCommitReport();
+    uint64 sourceChainSelector = commitReport.blessedMerkleRoots[0].sourceChainSelector;
+
+    OffRamp.SourceChainConfig memory sourceChainConfig = s_offRamp.getSourceChainConfig(sourceChainSelector);
+
+    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigUpdates = new OffRamp.SourceChainConfigArgs[](1);
+    sourceChainConfigUpdates[0] = OffRamp.SourceChainConfigArgs({
+      router: sourceChainConfig.router,
+      sourceChainSelector: sourceChainSelector,
+      isEnabled: sourceChainConfig.isEnabled,
+      isRMNVerificationDisabled: true,
+      onRamp: sourceChainConfig.onRamp
+    });
+
+    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigUpdates);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        OffRamp.RootBlessingMismatch.selector,
+        commitReport.blessedMerkleRoots[0].sourceChainSelector,
+        commitReport.blessedMerkleRoots[0].merkleRoot,
+        true
+      )
+    );
+    _commit(commitReport, s_latestSequenceNumber);
+  }
+
+  function test_RevertWhen_RootBlessingMismatch_unblessedButShouldBeBlessed() public {
+    OffRamp.CommitReport memory commitReport = _constructCommitReport();
+
+    commitReport.unblessedMerkleRoots = commitReport.blessedMerkleRoots;
+    commitReport.blessedMerkleRoots = new Internal.MerkleRoot[](0);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        OffRamp.RootBlessingMismatch.selector,
+        commitReport.unblessedMerkleRoots[0].sourceChainSelector,
+        commitReport.unblessedMerkleRoots[0].merkleRoot,
+        false
+      )
+    );
+    _commit(commitReport, s_latestSequenceNumber);
+  }
+
   function _constructCommitReport() internal view returns (OffRamp.CommitReport memory) {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
