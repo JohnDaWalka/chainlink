@@ -1,35 +1,32 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.24;
 
 import {IGetCCIPAdmin} from "../../../../ccip/interfaces/IGetCCIPAdmin.sol";
 import {IBurnMintERC20Upgradeable} from "../../../../shared/token/ERC20/upgradeable/IBurnMintERC20Upgradeable.sol";
 
 import {Initializable} from
-  "../../../../vendor/openzeppelin-solidity-upgradeable/v4.8.3/contracts/proxy/utils/Initializable.sol";
+  "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from
-  "../../../../vendor/openzeppelin-solidity-upgradeable/v4.8.3/contracts/proxy/utils/UUPSUpgradeable.sol";
+  "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 import {AccessControlUpgradeable} from
-  "../../../../vendor/openzeppelin-solidity-upgradeable/v4.8.3/contracts/access/AccessControlUpgradeable.sol";
-import {IAccessControlUpgradeable} from
-  "../../../../vendor/openzeppelin-solidity-upgradeable/v4.8.3/contracts/access/IAccessControlUpgradeable.sol";
-import {PausableUpgradeable} from
-  "../../../../vendor/openzeppelin-solidity-upgradeable/v4.8.3/contracts/security/PausableUpgradeable.sol";
+  "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/access/AccessControlUpgradeable.sol";
 import {ERC20Upgradeable} from
-  "../../../../vendor/openzeppelin-solidity-upgradeable/v4.8.3/contracts/token/ERC20/ERC20Upgradeable.sol";
-import {IERC20Upgradeable} from
-  "../../../../vendor/openzeppelin-solidity-upgradeable/v4.8.3/contracts/token/ERC20/IERC20Upgradeable.sol";
+  "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/token/ERC20/ERC20Upgradeable.sol";
 import {ERC20BurnableUpgradeable} from
-  "../../../../vendor/openzeppelin-solidity-upgradeable/v4.8.3/contracts/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
-import {IERC165Upgradeable} from
-  "../../../../vendor/openzeppelin-solidity-upgradeable/v4.8.3/contracts/utils/introspection/IERC165Upgradeable.sol";
+  "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
+import {PausableUpgradeable} from
+  "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/utils/PausableUpgradeable.sol";
+import {IAccessControl} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/access/IAccessControl.sol";
+import {IERC20} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC20.sol";
+import {IERC165} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 contract BurnMintERC20PausableUUPS is
   Initializable,
   UUPSUpgradeable,
   IBurnMintERC20Upgradeable,
   IGetCCIPAdmin,
-  IERC165Upgradeable,
+  IERC165,
   ERC20BurnableUpgradeable,
   AccessControlUpgradeable,
   PausableUpgradeable
@@ -51,22 +48,25 @@ contract BurnMintERC20PausableUUPS is
   // │                         Storage                              │
   // ================================================================
 
-  /// @dev the CCIPAdmin can be used to register with the CCIP token admin registry, but has no other special powers,
-  /// and can only be transferred by the owner.
-  address internal s_ccipAdmin;
+  /// @custom:storage-location erc7201:chainlink.storage.BurnMintERC20PausableUUPS
+  struct BurnMintERC20PausableUUPSStorage {
+    /// @dev the CCIPAdmin can be used to register with the CCIP token admin registry, but has no other special powers, and can only be transferred by the owner.
+    address s_ccipAdmin;
+    /// @dev The number of decimals for the token
+    uint8 s_decimals;
+    /// @dev The maximum supply of the token, 0 if unlimited
+    uint256 s_maxSupply;
+  }
 
-  /// @dev The number of decimals for the token
-  uint8 internal s_decimals;
+  // keccak256(abi.encode(uint256(keccak256("chainlink.storage.BurnMintERC20PausableUUPS")) - 1)) & ~bytes32(uint256(0xff));
+  bytes32 private constant BURN_MINT_ERC20_PAUSABLE_UUPS_STORAGE_LOCATION =
+    0x505653ac1e4443b183033fdbc64f9f34c7ad0cd52c0e262b849fc6d68ba2d100;
 
-  /// @dev The maximum supply of the token, 0 if unlimited
-  uint256 internal s_maxSupply;
-
-  /**
-   * @dev This empty reserved space is put in place to allow future versions to add new
-   * variables without shifting down storage in the inheritance chain.
-   * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
-   */
-  uint256[47] private __gap;
+  function _getBurnMintERC20PausableUUPSStorage() private pure returns (BurnMintERC20PausableUUPSStorage storage $) {
+    assembly {
+      $.slot := BURN_MINT_ERC20_PAUSABLE_UUPS_STORAGE_LOCATION
+    }
+  }
 
   // ================================================================
   // │                            UUPS                              │
@@ -94,10 +94,12 @@ contract BurnMintERC20PausableUUPS is
     __Pausable_init();
     __UUPSUpgradeable_init();
 
-    s_decimals = decimals_;
-    s_maxSupply = maxSupply_;
+    BurnMintERC20PausableUUPSStorage storage $ = _getBurnMintERC20PausableUUPSStorage();
 
-    s_ccipAdmin = defaultAdmin;
+    $.s_decimals = decimals_;
+    $.s_maxSupply = maxSupply_;
+
+    $.s_ccipAdmin = defaultAdmin;
 
     if (preMint != 0) {
       _mint(defaultAdmin, preMint);
@@ -116,13 +118,13 @@ contract BurnMintERC20PausableUUPS is
   // │                           ERC165                             │
   // ================================================================
 
-  /// @inheritdoc IERC165Upgradeable
+  /// @inheritdoc IERC165
   function supportsInterface(
     bytes4 interfaceId
-  ) public pure virtual override(AccessControlUpgradeable, IERC165Upgradeable) returns (bool) {
-    return interfaceId == type(IERC20Upgradeable).interfaceId
-      || interfaceId == type(IBurnMintERC20Upgradeable).interfaceId || interfaceId == type(IERC165Upgradeable).interfaceId
-      || interfaceId == type(IAccessControlUpgradeable).interfaceId || interfaceId == type(IGetCCIPAdmin).interfaceId;
+  ) public pure virtual override(AccessControlUpgradeable, IERC165) returns (bool) {
+    return interfaceId == type(IERC20).interfaceId || interfaceId == type(IBurnMintERC20Upgradeable).interfaceId
+      || interfaceId == type(IERC165).interfaceId || interfaceId == type(IAccessControl).interfaceId
+      || interfaceId == type(IGetCCIPAdmin).interfaceId;
   }
 
   // ================================================================
@@ -131,31 +133,33 @@ contract BurnMintERC20PausableUUPS is
 
   /// @dev Returns the number of decimals used in its user representation.
   function decimals() public view virtual override returns (uint8) {
-    return s_decimals;
+    BurnMintERC20PausableUUPSStorage storage $ = _getBurnMintERC20PausableUUPSStorage();
+    return $.s_decimals;
   }
 
   /// @dev Returns the max supply of the token, 0 if unlimited.
   function maxSupply() public view virtual returns (uint256) {
-    return s_maxSupply;
+    BurnMintERC20PausableUUPSStorage storage $ = _getBurnMintERC20PausableUUPSStorage();
+    return $.s_maxSupply;
   }
 
-  /// @dev Uses OZ ERC20Upgradeable _beforeTokenTransfer hook to disallow transfers, minting and burning if implementation is paused.
+  /// @dev Uses OZ ERC20Upgradeable _update hook to disallow transfers, minting and burning if implementation is paused.
   /// @dev Disallows sending to address(this)
-  function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual override {
-    super._beforeTokenTransfer(from, to, amount);
-
+  function _update(address from, address to, uint256 value) internal virtual override {
     if (paused()) revert BurnMintERC20PausableUUPS__Paused();
     if (to == address(this)) revert BurnMintERC20PausableUUPS__InvalidRecipient(to);
+
+    super._update(from, to, value);
   }
 
   /// @dev Uses OZ ERC20Upgradeable _approve to disallow approving for address(0).
   /// @dev Disallows approving if implementation is paused.
   /// @dev Disallows approving for address(this)
-  function _approve(address owner, address spender, uint256 amount) internal virtual override {
+  function _approve(address owner, address spender, uint256 value, bool emitEvent) internal virtual override {
     if (paused()) revert BurnMintERC20PausableUUPS__Paused();
     if (spender == address(this)) revert BurnMintERC20PausableUUPS__InvalidRecipient(spender);
 
-    super._approve(owner, spender, amount);
+    super._approve(owner, spender, value, emitEvent);
   }
 
   // ================================================================
@@ -193,11 +197,12 @@ contract BurnMintERC20PausableUUPS is
   /// @dev Disallows minting to address(this) via _beforeTokenTransfer hook.
   /// @dev Increases the total supply.
   function mint(address account, uint256 amount) external override onlyRole(MINTER_ROLE) {
-    uint256 maxSupply_ = s_maxSupply;
-    uint256 totalSupply_ = totalSupply();
+    BurnMintERC20PausableUUPSStorage storage $ = _getBurnMintERC20PausableUUPSStorage();
+    uint256 _maxSupply = $.s_maxSupply;
+    uint256 _totalSupply = totalSupply();
 
-    if (maxSupply_ != 0 && totalSupply_ + amount > maxSupply_) {
-      revert BurnMintERC20PausableUUPS__MaxSupplyExceeded(totalSupply_ + amount);
+    if (_maxSupply != 0 && _totalSupply + amount > _maxSupply) {
+      revert BurnMintERC20PausableUUPS__MaxSupplyExceeded(_totalSupply + amount);
     }
 
     _mint(account, amount);
@@ -239,7 +244,8 @@ contract BurnMintERC20PausableUUPS is
 
   /// @notice Returns the current CCIPAdmin
   function getCCIPAdmin() external view returns (address) {
-    return s_ccipAdmin;
+    BurnMintERC20PausableUUPSStorage storage $ = _getBurnMintERC20PausableUUPSStorage();
+    return $.s_ccipAdmin;
   }
 
   /// @notice Transfers the CCIPAdmin role to a new address
@@ -249,9 +255,10 @@ contract BurnMintERC20PausableUUPS is
   function setCCIPAdmin(
     address newAdmin
   ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    address currentAdmin = s_ccipAdmin;
+    BurnMintERC20PausableUUPSStorage storage $ = _getBurnMintERC20PausableUUPSStorage();
+    address currentAdmin = $.s_ccipAdmin;
 
-    s_ccipAdmin = newAdmin;
+    $.s_ccipAdmin = newAdmin;
 
     emit CCIPAdminTransferred(currentAdmin, newAdmin);
   }
