@@ -9,17 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	bin "github.com/gagliardetto/binary"
-	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
-
-	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
-	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
-	solstate "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
-
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
@@ -187,15 +178,17 @@ func Test_CCIPMessaging_Solana(t *testing.T) {
 		replayed bool
 		nonce    uint64
 		sender   = common.LeftPadBytes(e.Env.Chains[sourceChain].DeployerKey.From.Bytes(), 32)
-		out      messagingTestCaseOutput
-		setup    = testCaseSetup{
-			t:            t,
-			sender:       sender,
-			deployedEnv:  e,
-			onchainState: state,
-			sourceChain:  sourceChain,
-			destChain:    destChain,
-		}
+		out      mt.TestCaseOutput
+		setup    = mt.NewTestSetupWithDeployedEnv(
+			t,
+			e,
+			state,
+			sourceChain,
+			destChain,
+			sender,
+			false, // testRouter
+			true,  // validateResp
+		)
 	)
 
 	// message := ccip_router.SVM2AnyMessage{
@@ -206,31 +199,34 @@ func Test_CCIPMessaging_Solana(t *testing.T) {
 	// }
 
 	t.Run("message to contract implementing CCIPReceiver", func(t *testing.T) {
-		// TODO: abstract out into a helper
 		latestSlot, err := testhelpers.LatestBlock(ctx, e.Env, destChain)
 		require.NoError(t, err)
 		receiver := state.SolChains[destChain].Receiver.Bytes()
 		extraArgs, err := SerializeSVMExtraArgs(message_hasher.ClientSVMExtraArgsV1{}) // SVM doesn't allow an empty extraArgs
 		require.NoError(t, err)
-		out = runMessagingTestCase(
-			messagingTestCase{
-				testCaseSetup: setup,
-				replayed:      replayed,
-				nonce:         nonce,
-			},
-			receiver,
-			[]byte("hello CCIPReceiver"),
-			extraArgs,
-			testhelpers.EXECUTION_STATE_SUCCESS,
-			func(t *testing.T) {
-				// TODO: fix up, use the same code event filter does
-				iter, err := state.Chains[destChain].Receiver.FilterMessageReceived(&bind.FilterOpts{
-					Context: ctx,
-					Start:   latestSlot,
-				})
-				require.NoError(t, err)
-				require.True(t, iter.Next())
-				// MessageReceived doesn't emit the data unfortunately, so can't check that.
+		out = mt.Run(
+			mt.TestCase{
+				TestSetup:              setup,
+				Replayed:               replayed,
+				Nonce:                  nonce,
+				Receiver:               receiver,
+				MsgData:                []byte("hello CCIPReceiver"),
+				ExtraArgs:              extraArgs,
+				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
+				ExtraAssertions: []func(t *testing.T){
+					func(t *testing.T) {
+						// TODO: lookup event state, assert counter incremented
+						// state.SolChains[destChain].Receiver
+						// TODO: fix up, use the same code event filter does
+						iter, err := state.Chains[destChain].Receiver.FilterMessageReceived(&bind.FilterOpts{
+							Context: ctx,
+							Start:   latestSlot,
+						})
+						require.NoError(t, err)
+						require.True(t, iter.Next())
+						// MessageReceived doesn't emit the data unfortunately, so can't check that.
+					},
+				},
 			},
 		)
 	})
