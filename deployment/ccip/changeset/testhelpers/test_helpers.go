@@ -48,7 +48,10 @@ import (
 
 	solTestConfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	solFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
+	solTestReceiver "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
 	solTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/token_pool"
+	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool"
@@ -518,32 +521,32 @@ func AddLane(
 		bigNum, ok := new(big.Int).SetString("19816680000000000000", 10)
 		require.True(t, ok)
 		bigNum.FillBytes(value[:])
-		// solanaChangesets := []commoncs.ChangesetApplication{
-		// 	{
-		// 		Changeset: commoncs.WrapChangeSet(changeset_solana.AddRemoteChainToSolana),
-		// 		Config: changeset_solana.AddRemoteChainToSolanaConfig{
-		// 			UpdatesByChain: map[uint64]map[uint64]changeset_solana.RemoteChainConfigSolana{
-		// 				to: {
-		// 					from: {
-		// 						EnabledAsSource: true,
-		// 						DestinationConfig: solRouter.DestChainConfig{
-		// 							IsEnabled:                   true,
-		// 							DefaultTxGasLimit:           200000,
-		// 							MaxPerMsgGasLimit:           3000000,
-		// 							MaxDataBytes:                30000,
-		// 							MaxNumberOfTokensPerMsg:     5,
-		// 							DefaultTokenDestGasOverhead: 5000,
-		// 							// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
-		// 							// TODO: do a similar test for other chain families
-		// 							ChainFamilySelector: [4]uint8{40, 18, 213, 44},
-		// 						},
-		// 					},
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// }
-		// changesets = append(changesets, solanaChangesets...)
+		solanaChangesets := []commoncs.ChangesetApplication{
+			{
+				Changeset: commoncs.WrapChangeSet(changeset_solana.AddRemoteChainToSolana),
+				Config: changeset_solana.AddRemoteChainToSolanaConfig{
+					ChainSelector: to,
+					UpdatesByChain: map[uint64]changeset_solana.RemoteChainConfigSolana{
+						from: {
+							EnabledAsSource:         true,
+							RouterDestinationConfig: solRouter.DestChainConfig{},
+							FeeQuoterDestinationConfig: solFeeQuoter.DestChainConfig{
+								IsEnabled:                   true,
+								DefaultTxGasLimit:           200000,
+								MaxPerMsgGasLimit:           3000000,
+								MaxDataBytes:                30000,
+								MaxNumberOfTokensPerMsg:     5,
+								DefaultTokenDestGasOverhead: 5000,
+								// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
+								// TODO: do a similar test for other chain families
+								ChainFamilySelector: [4]uint8{40, 18, 213, 44},
+							},
+						},
+					},
+				},
+			},
+		}
+		changesets = append(changesets, solanaChangesets...)
 	}
 
 	e.Env, err = commoncs.ApplyChangesets(t, e.Env, e.TimelockContracts(t), changesets)
@@ -1497,9 +1500,9 @@ func SavePreloadedSolAddresses(t *testing.T, e deployment.Environment, solChainS
 	tv := deployment.NewTypeAndVersion(changeset.Router, deployment.Version1_0_0)
 	err := e.ExistingAddresses.Save(solChainSelector, solTestConfig.CcipRouterProgram.String(), tv)
 	require.NoError(t, err)
-	// tv = deployment.NewTypeAndVersion(changeset.Receiver, deployment.Version1_0_0)
-	// err = e.ExistingAddresses.Save(solChainSelector, solTestConfig.CcipLogicReceiver.String(), tv)
-	// require.NoError(t, err)
+	tv = deployment.NewTypeAndVersion(changeset.Receiver, deployment.Version1_0_0)
+	err = e.ExistingAddresses.Save(solChainSelector, solTestConfig.CcipLogicReceiver.String(), tv)
+	require.NoError(t, err)
 	tv = deployment.NewTypeAndVersion(changeset.TokenPool, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, solTestConfig.CcipTokenPoolProgram.String(), tv)
 	require.NoError(t, err)
@@ -1534,21 +1537,21 @@ func ValidateSolanaState(t *testing.T, e deployment.Environment, solChainSelecto
 }
 
 func DeploySolanaCcipReceiver(t *testing.T, e deployment.Environment) {
-	// state, err := changeset.LoadOnchainStateSolana(e)
-	// require.NoError(t, err)
-	// for solSelector, chainState := range state.SolChains {
-	// 	ccip_receiver.SetProgramID(chainState.Receiver)
-	// 	externalExecutionConfigPDA, _, _ := solState.FindExternalExecutionConfigPDA(chainState.Receiver)
-	// 	instruction, ixErr := ccip_receiver.NewInitializeInstruction(
-	// 		FindReceiverTargetAccount(chainState.Receiver),
-	// 		externalExecutionConfigPDA,
-	// 		e.SolChains[solSelector].DeployerKey.PublicKey(),
-	// 		solana.SystemProgramID,
-	// 	).ValidateAndBuild()
-	// 	require.NoError(t, ixErr)
-	// 	err = e.SolChains[solSelector].Confirm([]solana.Instruction{instruction})
-	// 	require.NoError(t, err)
-	// }
+	state, err := changeset.LoadOnchainStateSolana(e)
+	require.NoError(t, err)
+	for solSelector, chainState := range state.SolChains {
+		solTestReceiver.SetProgramID(chainState.Receiver)
+		externalExecutionConfigPDA, _, _ := solState.FindExternalExecutionConfigPDA(chainState.Receiver)
+		instruction, ixErr := solTestReceiver.NewInitializeInstruction(
+			FindReceiverTargetAccount(chainState.Receiver),
+			externalExecutionConfigPDA,
+			e.SolChains[solSelector].DeployerKey.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		require.NoError(t, ixErr)
+		err = e.SolChains[solSelector].Confirm([]solana.Instruction{instruction})
+		require.NoError(t, err)
+	}
 	return
 }
 
