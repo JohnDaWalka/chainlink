@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 
 	"github.com/ethereum/go-ethereum/common"
 

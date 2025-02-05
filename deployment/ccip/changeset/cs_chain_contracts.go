@@ -1509,7 +1509,6 @@ func UpdateDynamicConfigOffRampChangeset(e deployment.Environment, cfg UpdateDyn
 		dCfg := offramp.OffRampDynamicConfig{
 			FeeQuoter:                               state.Chains[chainSel].FeeQuoter.Address(),
 			PermissionLessExecutionThresholdSeconds: params.PermissionLessExecutionThresholdSeconds,
-			IsRMNVerificationDisabled:               params.IsRMNVerificationDisabled,
 			MessageInterceptor:                      params.MessageInterceptor,
 		}
 		tx, err := offRamp.SetDynamicConfig(txOpts, dCfg)
