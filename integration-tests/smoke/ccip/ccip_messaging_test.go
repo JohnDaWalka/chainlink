@@ -228,7 +228,7 @@ func getMerkleRoot(
 	})
 	require.NoError(t, err)
 	for iter.Next() {
-		for _, mr := range iter.Event.MerkleRoots {
+		for _, mr := range iter.Event.BlessedMerkleRoots {
 			if mr.MinSeqNr >= seqNr || mr.MaxSeqNr <= seqNr {
 				return mr.MerkleRoot
 			}
