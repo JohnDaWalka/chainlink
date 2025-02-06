@@ -114,8 +114,8 @@ func subscribeDeferredCommitEvents(
 			errChan <- subErr
 			return
 		case report := <-sink:
-			if len(report.BlessedMerkleRoots) > 0 {
-				for _, mr := range report.BlessedMerkleRoots {
+			if len(report.BlessedMerkleRoots)+len(report.UnblessedMerkleRoots) > 0 {
+				for _, mr := range append(report.BlessedMerkleRoots, report.UnblessedMerkleRoots...) {
 					lggr.Infow("Received commit report ",
 						"sourceChain", mr.SourceChainSelector,
 						"offRamp", offRamp.Address().String(),

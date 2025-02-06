@@ -116,7 +116,6 @@ func Test_CCIPMessaging(t *testing.T) {
 	})
 
 	t.Run("message to contract implementing CCIPReceiver with low exec gas", func(t *testing.T) {
-		t.Skipf("skip temporarily") // todo: debug and re-enable
 		latestHead, err := e.Env.Chains[destChain].Client.HeaderByNumber(ctx, nil)
 		require.NoError(t, err)
 		out = mt.Run(
@@ -234,6 +233,14 @@ func getMerkleRoot(
 				return mr.MerkleRoot
 			}
 		}
+		// todo: dedup
+		// ------------------------------
+		for _, mr := range iter.Event.UnblessedMerkleRoots {
+			if mr.MinSeqNr >= seqNr || mr.MaxSeqNr <= seqNr {
+				return mr.MerkleRoot
+			}
+		}
+		// ------------------------------
 	}
 	require.Fail(
 		t,
