@@ -380,49 +380,49 @@ func (w *workflowRegistry) newWorkflowRegistryContractReader(
 					GetWorkflowMetadataListByDONMethodName: {
 						ChainSpecificName: GetWorkflowMetadataListByDONMethodName,
 						ConfidenceConfirmations: map[string]int{
-							string(primitives.Finalized): 3,
+							"1.0": 3,
 						},
 					},
 					string(ForceUpdateSecretsEvent): {
 						ChainSpecificName: string(ForceUpdateSecretsEvent),
 						ReadType:          evmtypes.Event,
 						ConfidenceConfirmations: map[string]int{
-							string(primitives.Finalized): 3,
+							"1.0": 3,
 						},
 					},
 					string(WorkflowActivatedEvent): {
 						ChainSpecificName: string(WorkflowActivatedEvent),
 						ReadType:          evmtypes.Event,
 						ConfidenceConfirmations: map[string]int{
-							string(primitives.Finalized): 3,
+							"1.0": 3,
 						},
 					},
 					string(WorkflowDeletedEvent): {
 						ChainSpecificName: string(WorkflowDeletedEvent),
 						ReadType:          evmtypes.Event,
 						ConfidenceConfirmations: map[string]int{
-							string(primitives.Finalized): 3,
+							"1.0": 3,
 						},
 					},
 					string(WorkflowPausedEvent): {
 						ChainSpecificName: string(WorkflowPausedEvent),
 						ReadType:          evmtypes.Event,
 						ConfidenceConfirmations: map[string]int{
-							string(primitives.Finalized): 3,
+							"1.0": 3,
 						},
 					},
 					string(WorkflowRegisteredEvent): {
 						ChainSpecificName: string(WorkflowRegisteredEvent),
 						ReadType:          evmtypes.Event,
 						ConfidenceConfirmations: map[string]int{
-							string(primitives.Finalized): 3,
+							"1.0": 3,
 						},
 					},
 					string(WorkflowUpdatedEvent): {
 						ChainSpecificName: string(WorkflowUpdatedEvent),
 						ReadType:          evmtypes.Event,
 						ConfidenceConfirmations: map[string]int{
-							string(primitives.Finalized): 3,
+							"1.0": 3,
 						},
 					},
 				},
