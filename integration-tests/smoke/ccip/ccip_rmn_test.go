@@ -318,6 +318,10 @@ func runRmnTestCase(t *testing.T, tc rmnTestCase) {
 
 	tc.killMarkedRmnNodes(t, rmnCluster)
 
+	for _, chain := range envWithRMN.Env.Chains {
+		envWithRMN.RmnEnabledSourceChains[chain.Selector] = true
+	}
+
 	testhelpers.ReplayLogs(t, envWithRMN.Env.Offchain, envWithRMN.ReplayBlocks)
 	testhelpers.AddLanesForAll(t, &envWithRMN, onChainState)
 	disabledNodes := tc.disableOraclesIfThisIsACursingTestCase(ctx, t, envWithRMN)

@@ -480,7 +480,7 @@ func AddLane(
 							from: {
 								IsEnabled:                 true,
 								TestRouter:                isTestRouter,
-								IsRMNVerificationDisabled: true,
+								IsRMNVerificationDisabled: e.RmnEnabledSourceChains[from],
 							},
 						},
 					},
