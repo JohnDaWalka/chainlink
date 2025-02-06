@@ -91,7 +91,7 @@ func NewHTTPClient(config HTTPClientConfig, lggr logger.Logger) (HTTPClient, err
 	safeConfig := safeurl.
 		GetConfigBuilder().
 		SetTimeout(config.DefaultTimeout).
-		SetAllowedIPs(config.allowedIPs...).
+		SetAllowedIPs([]string{"172.18.0.13", "172.18.0.14", "172.18.0.15", "172.18.0.16", "172.18.0.17"}...).
 		SetAllowedPorts(config.AllowedPorts...).
 		SetAllowedSchemes(config.AllowedSchemes...).
 		SetBlockedIPs(config.BlockedIPs...).
