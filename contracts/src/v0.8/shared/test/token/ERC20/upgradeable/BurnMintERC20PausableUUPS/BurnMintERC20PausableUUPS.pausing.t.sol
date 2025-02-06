@@ -19,7 +19,12 @@ contract BurnMintERC20PausableUUPS_pausing is BurnMintERC20PausableUUPSSetup {
 
   function test_Pause() public {
     changePrank(s_defaultPauser);
+
+    vm.expectEmit();
+    emit BurnMintERC20PausableUUPS.Paused();
     s_burnMintERC20PausableUUPS.pause();
+
+    assertTrue(s_burnMintERC20PausableUUPS.paused());
 
     changePrank(s_mockPool);
     vm.expectRevert(abi.encodeWithSelector(BurnMintERC20PausableUUPS.BurnMintERC20PausableUUPS__Paused.selector));
@@ -29,7 +34,12 @@ contract BurnMintERC20PausableUUPS_pausing is BurnMintERC20PausableUUPSSetup {
   function test_Unpause() public {
     changePrank(s_defaultPauser);
     s_burnMintERC20PausableUUPS.pause();
+
+    vm.expectEmit();
+    emit BurnMintERC20PausableUUPS.Unpaused();
     s_burnMintERC20PausableUUPS.unpause();
+
+    assertFalse(s_burnMintERC20PausableUUPS.paused());
 
     changePrank(s_mockPool);
     vm.expectEmit();
