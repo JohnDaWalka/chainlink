@@ -318,6 +318,7 @@ func runRmnTestCase(t *testing.T, tc rmnTestCase) {
 
 	tc.killMarkedRmnNodes(t, rmnCluster)
 
+	envWithRMN.RmnEnabledSourceChains = make(map[uint64]bool)
 	for _, chain := range envWithRMN.Env.Chains {
 		envWithRMN.RmnEnabledSourceChains[chain.Selector] = true
 	}
