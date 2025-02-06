@@ -125,7 +125,7 @@ func Test_OutOfOrderExecution(t *testing.T) {
 		sourceChain,
 		destChain,
 		tokenTransfer,
-		firstReceiver,
+		firstReceiver.Bytes(),
 		nil,
 		testhelpers.MakeEVMExtraArgsV2(0, true),
 	)
@@ -144,7 +144,7 @@ func Test_OutOfOrderExecution(t *testing.T) {
 		sourceChain,
 		destChain,
 		usdcTransfer,
-		secondReceiver,
+		secondReceiver.Bytes(),
 		nil,
 		nil,
 	)
@@ -162,7 +162,7 @@ func Test_OutOfOrderExecution(t *testing.T) {
 		sourceChain,
 		destChain,
 		tokenTransfer,
-		thirdReceiver,
+		thirdReceiver.Bytes(),
 		nil,
 		testhelpers.MakeEVMExtraArgsV2(0, false),
 	)
@@ -180,7 +180,7 @@ func Test_OutOfOrderExecution(t *testing.T) {
 		sourceChain,
 		destChain,
 		tokenTransfer,
-		fourthReceiver,
+		fourthReceiver.Bytes(),
 		[]byte("this message has enough gas to execute"),
 		testhelpers.MakeEVMExtraArgsV2(300_000, true),
 	)
