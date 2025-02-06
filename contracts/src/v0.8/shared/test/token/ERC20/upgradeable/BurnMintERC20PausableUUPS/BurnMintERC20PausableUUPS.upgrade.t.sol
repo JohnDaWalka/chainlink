@@ -1,0 +1,96 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.24;
+
+import {UnsafeUpgrades} from "../../../../../../vendor/openzeppelin-foundry-upgrades/v0.3.8/Upgrades.sol";
+import {BurnMintERC20PausableUUPS} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
+import {BurnMintERC20PausableUUPSSetup} from "./BurnMintERC20PausableUUPSSetup.t.sol";
+
+/// @dev Mock contract with limited functionality used for testing only.
+/// @dev It adds a new freeze functionality to the BurnMintERC20PausableUUPS contract.
+/// @dev We want to test that the new implementation works as expected and keeps track of the balances from previous version.
+contract MockBurnMintERC20PausableUUPSV2 is BurnMintERC20PausableUUPS {
+  error MockBurnMintERC20PausableUUPSV2__AccountFrozen(address account);
+
+  bytes32 public constant FREEZER_ROLE = keccak256("FREEZER_ROLE");
+
+  /// @custom:storage-location erc7201:chainlink.storage.MockBurnMintERC20PausableUUPSV2
+  struct MockBurnMintERC20PausableUUPSV2Storage {
+    mapping(address => bool) s_isFrozen;
+  }
+
+  // keccak256(abi.encode(uint256(keccak256("chainlink.storage.MockBurnMintERC20PausableUUPSV2")) - 1)) & ~bytes32(uint256(0xff));
+  bytes32 private constant V2_STORAGE_LOCATION = 0x98bca5456fc57bb77324f8627b5055944605eb027b3a0652fea6ac1ede88a400;
+
+  function _getV2Storage() private pure returns (MockBurnMintERC20PausableUUPSV2Storage storage $) {
+    assembly {
+      $.slot := V2_STORAGE_LOCATION
+    }
+  }
+
+  function initializeFreezerRole(
+    address defaultFreezer
+  ) public onlyRole(UPGRADER_ROLE) {
+    _grantRole(FREEZER_ROLE, defaultFreezer);
+  }
+
+  function freeze(
+    address account
+  ) public onlyRole(FREEZER_ROLE) {
+    MockBurnMintERC20PausableUUPSV2Storage storage $ = _getV2Storage();
+    $.s_isFrozen[account] = true;
+  }
+
+  function _update(address from, address to, uint256 value) internal virtual override {
+    MockBurnMintERC20PausableUUPSV2Storage storage $ = _getV2Storage();
+    if ($.s_isFrozen[from]) revert MockBurnMintERC20PausableUUPSV2__AccountFrozen(from);
+    if ($.s_isFrozen[to]) revert MockBurnMintERC20PausableUUPSV2__AccountFrozen(to);
+
+    super._update(from, to, value);
+  }
+}
+
+contract BurnMintERC20PausableUUPS_upgrade is BurnMintERC20PausableUUPSSetup {
+  function test_Upgrade() public {
+    uint256 amount = 1e18;
+    address s_defaultFreezer = makeAddr("s_defaultFreezer");
+
+    changePrank(s_defaultAdmin);
+    s_burnMintERC20PausableUUPS.grantMintAndBurnRoles(s_defaultAdmin);
+    s_burnMintERC20PausableUUPS.mint(STRANGER, amount);
+
+    assertEq(s_burnMintERC20PausableUUPS.balanceOf(STRANGER), amount);
+    assertEq(s_burnMintERC20PausableUUPS.totalSupply(), amount);
+
+    // Upgrade to the new version
+    changePrank(s_defaultUpgrader);
+    address currentImplementationAddress = UnsafeUpgrades.getImplementationAddress(s_uupsProxy);
+    MockBurnMintERC20PausableUUPSV2 newImplementation = new MockBurnMintERC20PausableUUPSV2();
+
+    UnsafeUpgrades.upgradeProxy(
+      s_uupsProxy,
+      address(newImplementation),
+      abi.encodeCall(MockBurnMintERC20PausableUUPSV2.initializeFreezerRole, (s_defaultFreezer))
+    );
+
+    address newImplementationAddress = UnsafeUpgrades.getImplementationAddress(s_uupsProxy);
+    assertFalse(currentImplementationAddress == newImplementationAddress);
+
+    newImplementation = MockBurnMintERC20PausableUUPSV2(s_uupsProxy);
+
+    // Validate that the new implementation keeps track of the balances from the previous version
+    assertEq(newImplementation.balanceOf(STRANGER), amount);
+    assertEq(newImplementation.totalSupply(), amount);
+
+    // Validate that the new functionality works as expected
+    changePrank(s_defaultFreezer);
+    newImplementation.freeze(STRANGER);
+
+    changePrank(STRANGER);
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        MockBurnMintERC20PausableUUPSV2.MockBurnMintERC20PausableUUPSV2__AccountFrozen.selector, STRANGER
+      )
+    );
+    newImplementation.transfer(OWNER, amount);
+  }
+}
