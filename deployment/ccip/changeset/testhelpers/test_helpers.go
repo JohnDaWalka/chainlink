@@ -800,6 +800,7 @@ func DeployTransferableToken(
 // assuming one out of the src and dst is solana and the other is evm
 func DeployTransferableTokenSolana(
 	t *testing.T,
+	lggr logger.Logger,
 	e deployment.Environment,
 	evmChainSel, solChainSel uint64,
 	evmTokenName string,
@@ -811,7 +812,7 @@ func DeployTransferableTokenSolana(
 	require.NoError(t, err)
 
 	// deploy evm token
-	evmToken, evmPool, err := deployTransferTokenOneEnd(nil, e.Chains[evmChainSel], evmDeployer, addresses, evmTokenName)
+	evmToken, evmPool, err := deployTransferTokenOneEnd(lggr, e.Chains[evmChainSel], evmDeployer, addresses, evmTokenName)
 	if err != nil {
 		return nil, nil, solana.PublicKey{}, err
 	}
@@ -833,7 +834,7 @@ func DeployTransferableTokenSolana(
 	})
 	require.NoError(t, err)
 
-	state, err = changeset.LoadOnchainStateSolana(e)
+	state, err = changeset.LoadOnchainState(e)
 	require.NoError(t, err)
 	solTokenAddress := state.SolChains[solChainSel].SPL2022Tokens[0]
 	solDeployerKey := e.SolChains[solChainSel].DeployerKey.PublicKey()
@@ -877,7 +878,7 @@ func DeployTransferableTokenSolana(
 	err = setTokenPoolCounterPart(e.Chains[evmChainSel], evmPool, evmDeployer, solChainSel, solTokenAddress.Bytes(), poolConfigPDA.Bytes())
 	require.NoError(t, err)
 
-	err = grantMintBurnPermissions(nil, e.Chains[evmChainSel], evmToken, evmDeployer, evmPool.Address())
+	err = grantMintBurnPermissions(lggr, e.Chains[evmChainSel], evmToken, evmDeployer, evmPool.Address())
 	require.NoError(t, err)
 
 	// configure solana

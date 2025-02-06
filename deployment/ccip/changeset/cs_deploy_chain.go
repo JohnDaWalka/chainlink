@@ -692,7 +692,7 @@ func deployChainContractsSolana(
 	feeQuoterConfigPDA, _, _ := solState.FindFqConfigPDA(feeQuoterAddress)
 	err = chain.GetAccountDataBorshInto(e.GetContext(), feeQuoterConfigPDA, &fqConfig)
 	if err != nil {
-		if err2 := initializeFeeQuoter(e, chain, feeQuoterAddress, chainState.LinkToken, feeQuoterAddress); err2 != nil {
+		if err2 := initializeFeeQuoter(e, chain, ccipRouterProgram, chainState.LinkToken, feeQuoterAddress); err2 != nil {
 			return err2
 		}
 	} else {
