@@ -269,7 +269,7 @@ func (w *workflowRegistry) readRegistryEvents(ctx context.Context, reader Contra
 			KeyFilter: query.KeyFilter{
 				Key: string(et),
 				Expressions: []query.Expression{
-					query.Confidence(primitives.Unconfirmed),
+					query.Confidence(primitives.Finalized),
 					query.Block(lastReadBlockNumber, primitives.Gt),
 				},
 			},
@@ -379,30 +379,51 @@ func (w *workflowRegistry) newWorkflowRegistryContractReader(
 				Configs: map[string]*evmtypes.ChainReaderDefinition{
 					GetWorkflowMetadataListByDONMethodName: {
 						ChainSpecificName: GetWorkflowMetadataListByDONMethodName,
+						ConfidenceConfirmations: map[string]int{
+							string(primitives.Finalized): 3,
+						},
 					},
 					string(ForceUpdateSecretsEvent): {
 						ChainSpecificName: string(ForceUpdateSecretsEvent),
 						ReadType:          evmtypes.Event,
+						ConfidenceConfirmations: map[string]int{
+							string(primitives.Finalized): 3,
+						},
 					},
 					string(WorkflowActivatedEvent): {
 						ChainSpecificName: string(WorkflowActivatedEvent),
 						ReadType:          evmtypes.Event,
+						ConfidenceConfirmations: map[string]int{
+							string(primitives.Finalized): 3,
+						},
 					},
 					string(WorkflowDeletedEvent): {
 						ChainSpecificName: string(WorkflowDeletedEvent),
 						ReadType:          evmtypes.Event,
+						ConfidenceConfirmations: map[string]int{
+							string(primitives.Finalized): 3,
+						},
 					},
 					string(WorkflowPausedEvent): {
 						ChainSpecificName: string(WorkflowPausedEvent),
 						ReadType:          evmtypes.Event,
+						ConfidenceConfirmations: map[string]int{
+							string(primitives.Finalized): 3,
+						},
 					},
 					string(WorkflowRegisteredEvent): {
 						ChainSpecificName: string(WorkflowRegisteredEvent),
 						ReadType:          evmtypes.Event,
+						ConfidenceConfirmations: map[string]int{
+							string(primitives.Finalized): 3,
+						},
 					},
 					string(WorkflowUpdatedEvent): {
 						ChainSpecificName: string(WorkflowUpdatedEvent),
 						ReadType:          evmtypes.Event,
+						ConfidenceConfirmations: map[string]int{
+							string(primitives.Finalized): 3,
+						},
 					},
 				},
 			},
@@ -461,7 +482,7 @@ func (w *workflowRegistry) loadWorkflows(ctx context.Context, don capabilities.D
 	for {
 		var err error
 		var workflows GetWorkflowMetadataListByDONReturnVal
-		headAtLastRead, err = contractReader.GetLatestValueWithHeadData(ctx, readIdentifier, primitives.Unconfirmed, params, &workflows)
+		headAtLastRead, err = contractReader.GetLatestValueWithHeadData(ctx, readIdentifier, primitives.Finalized, params, &workflows)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get lastest value with head data %w", err)
 		}
