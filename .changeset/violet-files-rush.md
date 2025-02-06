@@ -2,4 +2,4 @@
 "chainlink": minor
 ---
 
-Fix wasm workflow toml fields
+Fix wasm workflow toml fields #changed
