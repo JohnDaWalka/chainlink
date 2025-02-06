@@ -108,6 +108,7 @@ func MintSolanaToken(e deployment.Environment, cfg MintSolanaTokenConfig) (deplo
 			return deployment.ChangesetOutput{}, err
 		}
 		instructions = append(instructions, mintToI)
+		e.Logger.Infow("Minting", "amount", amount, "to", toAddress, "for token", tokenAddress.String())
 	}
 	// confirm instructions
 	err = chain.Confirm(instructions)
@@ -115,6 +116,7 @@ func MintSolanaToken(e deployment.Environment, cfg MintSolanaTokenConfig) (deplo
 		e.Logger.Errorw("Failed to confirm instructions for token minting", "chain", chain.String(), "err", err)
 		return deployment.ChangesetOutput{}, err
 	}
+	e.Logger.Infow("Minted tokens on", "chain", cfg.ChainSelector, "for token", cfg.TokenPubkey.String())
 	return deployment.ChangesetOutput{}, nil
 }
 
@@ -154,6 +156,7 @@ func CreateSolanaTokenATA(e deployment.Environment, cfg CreateSolanaTokenATAConf
 		e.Logger.Errorw("Failed to confirm instructions for ATA creation", "chain", chain.String(), "err", err)
 		return deployment.ChangesetOutput{}, err
 	}
+	e.Logger.Infow("Created ATAs on", "chain", cfg.ChainSelector, "for token", cfg.TokenPubkey.String(), "numATAs", len(cfg.ATAList))
 
 	return deployment.ChangesetOutput{}, nil
 }
