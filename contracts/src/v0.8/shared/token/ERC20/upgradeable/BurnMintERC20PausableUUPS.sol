@@ -144,6 +144,7 @@ contract BurnMintERC20PausableUUPS is
   }
 
   /// @dev Uses OZ ERC20Upgradeable _update hook to disallow transfers, minting and burning if implementation is paused.
+  /// @dev Disallows sending, minting and burning if implementation is paused.
   /// @dev Disallows sending to address(this)
   function _update(address from, address to, uint256 value) internal virtual override {
     if (paused()) revert BurnMintERC20PausableUUPS__Paused();
