@@ -803,12 +803,12 @@ func DeployTransferableTokenSolana(
 	lggr logger.Logger,
 	e deployment.Environment,
 	evmChainSel, solChainSel uint64,
-	evmTokenName string,
 	evmDeployer *bind.TransactOpts,
 	addresses deployment.AddressBook,
+	evmTokenName string,
 ) (*burn_mint_erc677.BurnMintERC677,
 	*burn_mint_token_pool.BurnMintTokenPool, solana.PublicKey, error) {
-	state, err := changeset.LoadOnchainStateSolana(e)
+	state, err := changeset.LoadOnchainState(e)
 	require.NoError(t, err)
 
 	// deploy evm token
@@ -1060,16 +1060,35 @@ func setTokenPoolCounterPart(
 		return err
 	}
 
-	tx, err = tokenPool.AddRemotePool(
-		actor,
-		destChainSelector,
-		destTokenPoolAddress,
-	)
+	supported, err := tokenPool.IsSupportedChain(&bind.CallOpts{}, destChainSelector)
 	if err != nil {
-		return fmt.Errorf("failed to set remote pool on token pool %s: %w", tokenPool.Address(), err)
+		return err
+	}
+	if !supported {
+		return fmt.Errorf("token pool %s is not supported on chain %d", tokenPool.Address(), destChainSelector)
 	}
 
-	_, err = chain.Confirm(tx)
+	fmt.Println("tokenPool", tokenPool.Address(), "supported", supported)
+	fmt.Println("destTokenPoolAddress", destTokenPoolAddress)
+	fmt.Println("destChainSelector", destChainSelector)
+
+	remotePools, err := tokenPool.GetRemotePools(&bind.CallOpts{}, destChainSelector)
+	if err != nil {
+		return err
+	}
+	fmt.Println("remotePools", remotePools)
+
+	// tx, err = tokenPool.AddRemotePool(
+	// 	actor,
+	// 	destChainSelector,
+	// 	destTokenPoolAddress,
+	// )
+	// if err != nil {
+	// 	return fmt.Errorf("failed to set remote pool on token pool %s: %w", tokenPool.Address(), err)
+	// }
+
+	// _, err = chain.Confirm(tx)
+	// return err
 	return err
 }
 
