@@ -80,19 +80,18 @@ func TestAddRemoteChain(t *testing.T) {
 
 	state, err = ccipChangeset.LoadOnchainStateSolana(tenv.Env)
 	require.NoError(t, err)
-	var sourceChainStateAccount solRouter.SourceChain
-	evmSourceChainStatePDA := state.SolChains[solChain].SourceChainStatePDAs[evmChain]
-	err = tenv.Env.SolChains[solChain].GetAccountDataBorshInto(ctx, evmSourceChainStatePDA, &sourceChainStateAccount)
-	require.NoError(t, err)
-	require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
-	require.True(t, sourceChainStateAccount.Config.IsEnabled)
 
 	var destChainStateAccount solRouter.DestChain
 	evmDestChainStatePDA := state.SolChains[solChain].DestChainStatePDAs[evmChain]
 	err = tenv.Env.SolChains[solChain].GetAccountDataBorshInto(ctx, evmDestChainStatePDA, &destChainStateAccount)
 	require.NoError(t, err)
 
-	// TODO: test fee quoter
+	var destChainFqAccount solFeeQuoter.DestChain
+	fqEvmDestChainPDA, _, _ := solState.FindFqDestChainPDA(evmChain, state.SolChains[solChain].FeeQuoter)
+	err = tenv.Env.SolChains[solChain].GetAccountDataBorshInto(ctx, fqEvmDestChainPDA, &destChainFqAccount)
+	require.NoError(t, err, "failed to get account info")
+	require.Equal(t, solFeeQuoter.TimestampedPackedU224{}, destChainFqAccount.State.UsdPerUnitGas)
+	require.Equal(t, true, destChainFqAccount.Config.IsEnabled)
 }
 
 func TestDeployCCIPContracts(t *testing.T) {

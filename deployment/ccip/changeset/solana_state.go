@@ -38,14 +38,16 @@ type SolCCIPChainState struct {
 	SPL2022Tokens      []solana.PublicKey
 	TokenPool          solana.PublicKey
 	WSOL               solana.PublicKey
+	FeeQuoter          solana.PublicKey
+	OffRamp            solana.PublicKey
 	// PDAs to avoid redundant lookups
-	RouterStatePDA       solana.PublicKey
 	RouterConfigPDA      solana.PublicKey
 	SourceChainStatePDAs map[uint64]solana.PublicKey
 	DestChainStatePDAs   map[uint64]solana.PublicKey
 	TokenPoolLookupTable map[solana.PublicKey]solana.PublicKey
-	FeeQuoter            solana.PublicKey
 	FeeQuoterConfigPDA   solana.PublicKey
+	OffRampConfigPDA     solana.PublicKey
+	OffRampStatePDA      solana.PublicKey
 }
 
 func LoadOnchainStateSolana(e deployment.Environment) (CCIPOnChainState, error) {
@@ -86,11 +88,6 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 		case Router:
 			pub := solana.MustPublicKeyFromBase58(address)
 			state.Router = pub
-			routerStatePDA, _, err := solState.FindStatePDA(state.Router)
-			if err != nil {
-				return state, err
-			}
-			state.RouterStatePDA = routerStatePDA
 			routerConfigPDA, _, err := solState.FindConfigPDA(state.Router)
 			if err != nil {
 				return state, err
@@ -143,6 +140,19 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 				return state, err
 			}
 			state.FeeQuoterConfigPDA = feeQuoterConfigPDA
+		case OffRamp:
+			pub := solana.MustPublicKeyFromBase58(address)
+			state.OffRamp = pub
+			offRampConfigPDA, _, err := solState.FindOfframpConfigPDA(state.OffRamp)
+			if err != nil {
+				return state, err
+			}
+			state.OffRampConfigPDA = offRampConfigPDA
+			offRampStatePDA, _, err := solState.FindOfframpStatePDA(state.OffRamp)
+			if err != nil {
+				return state, err
+			}
+			state.OffRampStatePDA = offRampStatePDA
 		default:
 			return state, fmt.Errorf("unknown contract %s", tvStr)
 		}

@@ -47,6 +47,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 
 	solTestConfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	solFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	solTestReceiver "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
@@ -1529,6 +1530,9 @@ func SavePreloadedSolAddresses(t *testing.T, e deployment.Environment, solChainS
 	tv = deployment.NewTypeAndVersion(changeset.FeeQuoter, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, solTestConfig.FeeQuoterProgram.String(), tv)
 	require.NoError(t, err)
+	tv = deployment.NewTypeAndVersion(changeset.OffRamp, deployment.Version1_0_0)
+	err = e.ExistingAddresses.Save(solChainSelector, solTestConfig.CcipOfframpProgram.String(), tv)
+	require.NoError(t, err)
 }
 
 func ValidateSolanaState(t *testing.T, e deployment.Environment, solChainSelectors []uint64) {
@@ -1541,18 +1545,27 @@ func ValidateSolanaState(t *testing.T, e deployment.Environment, solChainSelecto
 		require.True(t, exists, "Chain selector %d not found in Solana state", sel)
 
 		// Validate addresses
-		require.False(t, chainState.LinkToken.IsZero(), "Link token address is zero for chain %d", sel)
 		require.False(t, chainState.Router.IsZero(), "Router address is zero for chain %d", sel)
-		require.False(t, chainState.RouterConfigPDA.IsZero(), "RouterConfigPDA is zero for chain %d", sel)
-		require.False(t, chainState.RouterStatePDA.IsZero(), "RouterStatePDA is zero for chain %d", sel)
+		require.False(t, chainState.OffRamp.IsZero(), "OffRamp address is zero for chain %d", sel)
+		require.False(t, chainState.FeeQuoter.IsZero(), "FeeQuoter address is zero for chain %d", sel)
+		require.False(t, chainState.LinkToken.IsZero(), "Link token address is zero for chain %d", sel)
 		require.False(t, chainState.AddressLookupTable.IsZero(), "Address lookup table is zero for chain %d", sel)
 
 		// Get router config
 		var routerConfigAccount solRouter.Config
-
-		// Check if account exists first
 		err = e.SolChains[sel].GetAccountDataBorshInto(testcontext.Get(t), chainState.RouterConfigPDA, &routerConfigAccount)
 		require.NoError(t, err, "Failed to deserialize router config for chain %d", sel)
+
+		// Get fee quoter config
+		var feeQuoterConfigAccount solFeeQuoter.Config
+		err = e.SolChains[sel].GetAccountDataBorshInto(testcontext.Get(t), chainState.FeeQuoterConfigPDA, &feeQuoterConfigAccount)
+		require.NoError(t, err, "Failed to deserialize fee quoter config for chain %d", sel)
+
+		// Get offramp config
+		var offRampConfigAccount solOffRamp.Config
+		err = e.SolChains[sel].GetAccountDataBorshInto(testcontext.Get(t), chainState.OffRampConfigPDA, &offRampConfigAccount)
+		require.NoError(t, err, "Failed to deserialize offramp config for chain %d", sel)
+
 	}
 }
 

@@ -13,8 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
-	solFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
-	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 )
@@ -97,14 +95,4 @@ func TestDeployChainContractsChangeset(t *testing.T) {
 	require.NoError(t, err)
 	// solana verification
 	testhelpers.ValidateSolanaState(t, e, solChainSelectors)
-	state, err := changeset.LoadOnchainStateSolana(e)
-	var fqConfig solFeeQuoter.Config
-	feeQuoterAddress := state.SolChains[solChainSelectors[0]].FeeQuoter
-	feeQuoterConfigPDA, _, _ := solState.FindFqConfigPDA(feeQuoterAddress)
-	err = e.SolChains[solChainSelectors[0]].GetAccountDataBorshInto(e.GetContext(), feeQuoterConfigPDA, &fqConfig)
-	require.NoError(t, err)
-	require.Equal(t, fqConfig.LinkTokenMint, state.SolChains[solChainSelectors[0]].LinkToken)
-	// require.Equal(t, fqConfig.MaxFeeJuelsPerMsg, state.Chains[homeChainSel].FeeQuoter.MaxFeeJuelsPerMsg)
-	// require.Equal(t, fqConfig.Onramp, state.Chains[homeChainSel].Router)
-	// require.Equal(t, fqConfig.OfframpSigner, state.Chains[homeChainSel].OffRamp)
 }

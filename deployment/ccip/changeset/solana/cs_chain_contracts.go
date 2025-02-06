@@ -7,6 +7,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 
+	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	solFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	solTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/token_pool"
@@ -27,9 +28,7 @@ var _ deployment.ChangeSet[AddRemoteChainToSolanaConfig] = AddRemoteChainToSolan
 var _ deployment.ChangeSet[TokenPoolConfig] = AddTokenPool
 var _ deployment.ChangeSet[RemoteChainTokenPoolConfig] = SetupTokenPoolForRemoteChain
 var _ deployment.ChangeSet[cs.SetOCR3OffRampConfig] = SetOCR3ConfigSolana
-
 var _ deployment.ChangeSet[BillingTokenConfig] = AddBillingToken
-
 var _ deployment.ChangeSet[BillingTokenForRemoteChainConfig] = AddBillingTokenForRemoteChain
 var _ deployment.ChangeSet[RegisterTokenAdminRegistryConfig] = RegisterTokenAdminRegistry
 var _ deployment.ChangeSet[TransferAdminRoleTokenAdminRegistryConfig] = TransferAdminRoleTokenAdminRegistry
@@ -221,21 +220,15 @@ func doAddRemoteChainToSolana(
 			copy(onRampBytes[:], addressBytes)
 		}
 
-		validSourceChainConfig := solRouter.SourceChainConfig{
-			OnRamp:    [2][64]byte{onRampBytes, [64]byte{}},
-			IsEnabled: update.EnabledAsSource,
-		}
-		// addressing errcheck in the next PR
+		// verified while loading state
 		fqEvmDestChainPDA, _, _ := solState.FindFqDestChainPDA(remoteChainSel, feeQuoterId)
 		destChainStatePDA, _ := solState.FindDestChainStatePDA(remoteChainSel, ccipRouterID)
-		sourceChainStatePDA, _ := solState.FindSourceChainStatePDA(remoteChainSel, ccipRouterID)
+		offRampSourceChainPDA, _, _ := solState.FindOfframpSourceChainPDA(remoteChainSel, s.SolChains[chainSel].OffRamp)
 
 		solRouter.SetProgramID(ccipRouterID)
 		routerIx, err := solRouter.NewAddChainSelectorInstruction(
 			remoteChainSel,
-			validSourceChainConfig,
 			update.RouterDestinationConfig,
-			sourceChainStatePDA,
 			destChainStatePDA,
 			s.SolChains[chainSel].RouterConfigPDA,
 			chain.DeployerKey.PublicKey(),
@@ -254,12 +247,25 @@ func doAddRemoteChainToSolana(
 			chain.DeployerKey.PublicKey(),
 			solana.SystemProgramID,
 		).ValidateAndBuild()
-
 		if err != nil {
 			return fmt.Errorf("failed to generate instructions: %w", err)
 		}
 
-		err = chain.Confirm([]solana.Instruction{routerIx, feeQuoterIx})
+		solOffRamp.SetProgramID(s.SolChains[chainSel].OffRamp)
+		validSourceChainConfig := solOffRamp.SourceChainConfig{
+			OnRamp:    [2][64]byte{onRampBytes, [64]byte{}},
+			IsEnabled: update.EnabledAsSource,
+		}
+		offRampIx, err := solOffRamp.NewAddSourceChainInstruction(
+			remoteChainSel,
+			validSourceChainConfig,
+			offRampSourceChainPDA,
+			s.SolChains[chainSel].OffRampConfigPDA,
+			chain.DeployerKey.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+
+		err = chain.Confirm([]solana.Instruction{routerIx, feeQuoterIx, offRampIx})
 		if err != nil {
 			return fmt.Errorf("failed to confirm instructions: %w", err)
 		}
@@ -272,12 +278,13 @@ func doAddRemoteChainToSolana(
 			return fmt.Errorf("failed to save dest chain state to address book: %w", err)
 		}
 
-		tv = deployment.NewTypeAndVersion(cs.RemoteSource, deployment.Version1_0_0)
-		tv.AddLabel(remoteChainSelStr)
-		err = ab.Save(chainSel, sourceChainStatePDA.String(), tv)
-		if err != nil {
-			return fmt.Errorf("failed to save source chain state to address book: %w", err)
-		}
+		// TODO
+		// tv = deployment.NewTypeAndVersion(cs.RemoteSource, deployment.Version1_0_0)
+		// tv.AddLabel(remoteChainSelStr)
+		// err = ab.Save(chainSel, sourceChainStatePDA.String(), tv)
+		// if err != nil {
+		// 	return fmt.Errorf("failed to save source chain state to address book: %w", err)
+		// }
 	}
 
 	return nil
@@ -325,21 +332,21 @@ func SetOCR3ConfigSolana(e deployment.Environment, cfg cs.SetOCR3OffRampConfig) 
 		// TODO: check if ocr3 has already been set
 		// set, err := isOCR3ConfigSetSolana(e.Logger, e.Chains[remote], state.Chains[remote].OffRamp, args)
 		var instructions []solana.Instruction
-		routerConfigPDA := solChains[remote].RouterConfigPDA
-		routerStatePDA := solChains[remote].RouterStatePDA
-		solRouter.SetProgramID(solChains[remote].Router)
+		offRampConfigPDA := solChains[remote].OffRampConfigPDA
+		offRampStatePDA := solChains[remote].OffRampStatePDA
+		solOffRamp.SetProgramID(solChains[remote].OffRamp)
 		for _, arg := range args {
-			instruction, err := solRouter.NewSetOcrConfigInstruction(
+			instruction, err := solOffRamp.NewSetOcrConfigInstruction(
 				arg.OCRPluginType,
-				solRouter.Ocr3ConfigInfo{
+				solOffRamp.Ocr3ConfigInfo{
 					ConfigDigest:                   arg.ConfigDigest,
 					F:                              arg.F,
 					IsSignatureVerificationEnabled: btoi(arg.IsSignatureVerificationEnabled),
 				},
 				arg.Signers,
 				arg.Transmitters,
-				routerConfigPDA,
-				routerStatePDA,
+				offRampConfigPDA,
+				offRampStatePDA,
 				e.SolChains[remote].DeployerKey.PublicKey(),
 			).ValidateAndBuild()
 			if err != nil {

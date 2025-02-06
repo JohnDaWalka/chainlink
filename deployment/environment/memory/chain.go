@@ -200,6 +200,7 @@ func solChain(t *testing.T, chainID uint64, adminKey *solana.PrivateKey) (string
 			"token_pool":         solTestConfig.CcipTokenPoolProgram.String(),
 			"fee_quoter":         solTestConfig.FeeQuoterProgram.String(),
 			"test_ccip_receiver": solTestConfig.CcipLogicReceiver.String(),
+			"ccip_offramp":       solTestConfig.CcipOfframpProgram.String(),
 		}
 
 		bcInput := &blockchain.Input{

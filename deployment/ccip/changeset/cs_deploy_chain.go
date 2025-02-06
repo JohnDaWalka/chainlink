@@ -12,10 +12,11 @@ import (
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 	"golang.org/x/sync/errgroup"
 
-	solBinary "github.com/gagliardetto/binary"
-	solRpc "github.com/gagliardetto/solana-go/rpc"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
+	solBinary "github.com/gagliardetto/binary"
+	solRpc "github.com/gagliardetto/solana-go/rpc"
+	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	solFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -562,24 +563,18 @@ func initializeRouter(e deployment.Environment, chain deployment.SolChain, ccipR
 	}
 	// addressing errcheck in the next PR
 	routerConfigPDA, _, _ := solState.FindConfigPDA(ccipRouterProgram)
-	routerStatePDA, _, _ := solState.FindStatePDA(ccipRouterProgram)
-	externalExecutionConfigPDA, _, _ := solState.FindExternalExecutionConfigPDA(ccipRouterProgram)
 	externalTokenPoolsSignerPDA, _, _ := solState.FindExternalTokenPoolsSignerPDA(ccipRouterProgram)
 
 	instruction, err := solRouter.NewInitializeInstruction(
-		chain.Selector,                  // chain selector
-		deployment.EnableExecutionAfter, // period to wait before allowing manual execution
-		solana.PublicKey{},              // fee aggregator (TODO: changeset to set the fee aggregator)
+		chain.Selector,     // chain selector
+		solana.PublicKey{}, // fee aggregator (TODO: changeset to set the fee aggregator)
 		feeQuoterAddress,
-		linkTokenAddress,                       // link token mint
-		deployment.SolDefaultMaxFeeJuelsPerMsg, // max fee juels per msg
+		linkTokenAddress, // link token mint
 		routerConfigPDA,
-		routerStatePDA,
 		chain.DeployerKey.PublicKey(),
 		solana.SystemProgramID,
 		ccipRouterProgram,
 		programData.Address,
-		externalExecutionConfigPDA,
 		externalTokenPoolsSignerPDA,
 	).ValidateAndBuild()
 
@@ -593,23 +588,76 @@ func initializeRouter(e deployment.Environment, chain deployment.SolChain, ccipR
 	return nil
 }
 
-func initializeFeeQuoter(e deployment.Environment, chain deployment.SolChain, ccipRouterProgram solana.PublicKey, linkTokenAddress solana.PublicKey, feeQuoterAddress solana.PublicKey) error {
+func initializeFeeQuoter(
+	e deployment.Environment,
+	chain deployment.SolChain,
+	ccipRouterProgram solana.PublicKey,
+	linkTokenAddress solana.PublicKey,
+	feeQuoterAddress solana.PublicKey,
+	offRampAddress solana.PublicKey,
+) error {
 	programData, err := solRouterProgramData(e, chain, feeQuoterAddress)
 	if err != nil {
 		return fmt.Errorf("failed to get solana router program data: %w", err)
 	}
-	feeBillingSignerPDA, _, _ := solState.FindFeeBillingSignerPDA(ccipRouterProgram)
+	offRampBillingSignerPDA, _, _ := solState.FindOfframpBillingSignerPDA(offRampAddress)
 	feeQuoterConfigPDA, _, _ := solState.FindFqConfigPDA(feeQuoterAddress)
 
 	instruction, err := solFeeQuoter.NewInitializeInstruction(
 		linkTokenAddress,
 		deployment.SolDefaultMaxFeeJuelsPerMsg,
 		ccipRouterProgram,
-		feeBillingSignerPDA,
+		offRampBillingSignerPDA,
 		feeQuoterConfigPDA,
 		chain.DeployerKey.PublicKey(),
 		solana.SystemProgramID,
 		feeQuoterAddress,
+		programData.Address,
+	).ValidateAndBuild()
+
+	if err != nil {
+		return fmt.Errorf("failed to build instruction: %w", err)
+	}
+	if err := chain.Confirm([]solana.Instruction{instruction}); err != nil {
+		return fmt.Errorf("failed to confirm instructions: %w", err)
+	}
+	e.Logger.Infow("Initialized fee quoter", "chain", chain.String())
+	return nil
+}
+
+func intializeOffRamp(
+	e deployment.Environment,
+	chain deployment.SolChain,
+	ccipRouterProgram solana.PublicKey,
+	linkTokenAddress solana.PublicKey,
+	feeQuoterAddress solana.PublicKey,
+	offRampAddress solana.PublicKey,
+) error {
+	programData, err := solRouterProgramData(e, chain, feeQuoterAddress)
+	if err != nil {
+		return fmt.Errorf("failed to get solana router program data: %w", err)
+	}
+	offRampConfigPDA, _, _ := solState.FindOfframpConfigPDA(offRampAddress)
+	offRampReferenceAddressesPDA, _, _ := solState.FindOfframpReferenceAddressesPDA(offRampAddress)
+	// offrampLookupTable := map[solana.PublicKey]solana.PublicKeySlice{}
+	offRampStatePDA, _, _ := solState.FindOfframpStatePDA(offRampAddress)
+	offRampExternalExecutionConfigPDA, _, _ := solState.FindExternalExecutionConfigPDA(offRampAddress)
+	offRampTokenPoolsSignerPDA, _, _ := solState.FindExternalTokenPoolsSignerPDA(offRampAddress)
+
+	instruction, err := solOffRamp.NewInitializeInstruction(
+		chain.Selector,
+		deployment.EnableExecutionAfter,
+		offRampConfigPDA,
+		offRampReferenceAddressesPDA,
+		ccipRouterProgram,
+		feeQuoterAddress,
+		solana.PublicKey{}, // offrampLookupTable (TODO)
+		offRampStatePDA,
+		offRampExternalExecutionConfigPDA,
+		offRampTokenPoolsSignerPDA,
+		chain.DeployerKey.PublicKey(),
+		solana.SystemProgramID,
+		offRampAddress,
 		programData.Address,
 	).ValidateAndBuild()
 
@@ -687,12 +735,30 @@ func deployChainContractsSolana(
 	}
 	solRouter.SetProgramID(ccipRouterProgram)
 
+	// OFFRAMP DEPLOY
+	var offRampAddress solana.PublicKey
+	if chainState.OffRamp.IsZero() {
+		// deploy offramp
+		programID, err := chain.DeployProgram(e.Logger, "ccip_offramp")
+		if err != nil {
+			return fmt.Errorf("failed to deploy program: %w", err)
+		}
+		tv := deployment.NewTypeAndVersion(OffRamp, deployment.Version1_0_0)
+		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
+		offRampAddress = solana.MustPublicKeyFromBase58(programID)
+		err = ab.Save(chain.Selector, programID, tv)
+		if err != nil {
+			return fmt.Errorf("failed to save address: %w", err)
+		}
+	}
+	solOffRamp.SetProgramID(offRampAddress)
+
 	// FEE QUOTER INITIALIZE
 	var fqConfig solFeeQuoter.Config
 	feeQuoterConfigPDA, _, _ := solState.FindFqConfigPDA(feeQuoterAddress)
 	err = chain.GetAccountDataBorshInto(e.GetContext(), feeQuoterConfigPDA, &fqConfig)
 	if err != nil {
-		if err2 := initializeFeeQuoter(e, chain, ccipRouterProgram, chainState.LinkToken, feeQuoterAddress); err2 != nil {
+		if err2 := initializeFeeQuoter(e, chain, ccipRouterProgram, chainState.LinkToken, feeQuoterAddress, offRampAddress); err2 != nil {
 			return err2
 		}
 	} else {
@@ -710,6 +776,18 @@ func deployChainContractsSolana(
 		}
 	} else {
 		e.Logger.Infow("Router already initialized, skipping initialization", "chain", chain.String())
+	}
+
+	// OFFRAMP INITIALIZE
+	var offRampConfigAccount solOffRamp.Config
+	offRampConfigPDA, _, _ := solState.FindOfframpConfigPDA(offRampAddress)
+	err = chain.GetAccountDataBorshInto(e.GetContext(), offRampConfigPDA, &offRampConfigAccount)
+	if err != nil {
+		if err2 := intializeOffRamp(e, chain, ccipRouterProgram, chainState.LinkToken, feeQuoterAddress, offRampAddress); err2 != nil {
+			return err2
+		}
+	} else {
+		e.Logger.Infow("Offramp already initialized, skipping initialization", "chain", chain.String())
 	}
 
 	// TOKEN POOL DEPLOY
@@ -737,12 +815,13 @@ func deployChainContractsSolana(
 	if chainState.AddressLookupTable.IsZero() {
 		// addressing errcheck in the next PR
 		routerConfigPDA, _, _ := solState.FindConfigPDA(ccipRouterProgram)
-		routerStatePDA, _, _ := solState.FindStatePDA(ccipRouterProgram)
 		externalExecutionConfigPDA, _, _ := solState.FindExternalExecutionConfigPDA(ccipRouterProgram)
 		externalTokenPoolsSignerPDA, _, _ := solState.FindExternalTokenPoolsSignerPDA(ccipRouterProgram)
 		feeBillingSignerPDA, _, _ := solState.FindFeeBillingSignerPDA(ccipRouterProgram)
 		feeQuoterConfigPDA, _, _ := solState.FindFqConfigPDA(feeQuoterAddress)
 		linkFqBillingConfigPDA, _, _ := solState.FindFqBillingTokenConfigPDA(chainState.LinkToken, feeQuoterAddress)
+
+		// TODO: update this with offramp
 		table, err := solCommonUtil.SetupLookupTable(
 			e.GetContext(),
 			chain.Client,
@@ -755,7 +834,6 @@ func deployChainContractsSolana(
 				// router
 				ccipRouterProgram,
 				routerConfigPDA,
-				routerStatePDA,
 				externalExecutionConfigPDA,
 				externalTokenPoolsSignerPDA,
 				// token pools
