@@ -91,7 +91,7 @@ func TestAddRemoteChain(t *testing.T) {
 	err = tenv.Env.SolChains[solChain].GetAccountDataBorshInto(ctx, fqEvmDestChainPDA, &destChainFqAccount)
 	require.NoError(t, err, "failed to get account info")
 	require.Equal(t, solFeeQuoter.TimestampedPackedU224{}, destChainFqAccount.State.UsdPerUnitGas)
-	require.Equal(t, true, destChainFqAccount.Config.IsEnabled)
+	require.True(t, destChainFqAccount.Config.IsEnabled)
 }
 
 func TestDeployCCIPContracts(t *testing.T) {

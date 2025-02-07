@@ -2,6 +2,7 @@ package solana
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -18,6 +19,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	ata "github.com/gagliardetto/solana-go/programs/associated-token-account"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
@@ -163,7 +165,7 @@ func (cfg AddRemoteChainToSolanaConfig) Validate(e deployment.Environment) error
 	_ = chain.GetAccountDataBorshInto(context.Background(), chainState.RouterConfigPDA, &routerConfigAccount)
 
 	supportedChains := state.SupportedChains()
-	for remote, _ := range cfg.UpdatesByChain {
+	for remote := range cfg.UpdatesByChain {
 		if _, ok := supportedChains[remote]; !ok {
 			return fmt.Errorf("remote chain %d is not supported", remote)
 		}
@@ -202,7 +204,7 @@ func doAddRemoteChainToSolana(
 	ab deployment.AddressBook) error {
 	chain := e.SolChains[chainSel]
 	ccipRouterID := s.SolChains[chainSel].Router
-	feeQuoterId := s.SolChains[chainSel].FeeQuoter
+	feeQuoterID := s.SolChains[chainSel].FeeQuoter
 
 	for remoteChainSel, update := range updates {
 		var onRampBytes [64]byte
@@ -221,7 +223,7 @@ func doAddRemoteChainToSolana(
 		}
 
 		// verified while loading state
-		fqEvmDestChainPDA, _, _ := solState.FindFqDestChainPDA(remoteChainSel, feeQuoterId)
+		fqEvmDestChainPDA, _, _ := solState.FindFqDestChainPDA(remoteChainSel, feeQuoterID)
 		destChainStatePDA, _ := solState.FindDestChainStatePDA(remoteChainSel, ccipRouterID)
 		offRampSourceChainPDA, _, _ := solState.FindOfframpSourceChainPDA(remoteChainSel, s.SolChains[chainSel].OffRamp)
 
@@ -264,6 +266,9 @@ func doAddRemoteChainToSolana(
 			chain.DeployerKey.PublicKey(),
 			solana.SystemProgramID,
 		).ValidateAndBuild()
+		if err != nil {
+			return fmt.Errorf("failed to generate instructions: %w", err)
+		}
 
 		err = chain.Confirm([]solana.Instruction{routerIx, feeQuoterIx, offRampIx})
 		if err != nil {
@@ -361,10 +366,7 @@ func SetOCR3ConfigSolana(e deployment.Environment, cfg cs.SetOCR3OffRampConfig) 
 			}
 		}
 	}
-
 	return deployment.ChangesetOutput{}, nil
-
-	// TODO: timelock mcms support
 }
 
 // ADD TOKEN POOL
@@ -730,7 +732,7 @@ func (cfg RegisterTokenAdminRegistryConfig) Validate(e deployment.Environment) e
 	}
 
 	if cfg.TokenAdminRegistryAdmin == "" {
-		return fmt.Errorf("token admin registry admin is required")
+		return errors.New("token admin registry admin is required")
 	}
 
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)

@@ -1585,7 +1585,6 @@ func DeploySolanaCcipReceiver(t *testing.T, e deployment.Environment) {
 		err = e.SolChains[solSelector].Confirm([]solana.Instruction{instruction})
 		require.NoError(t, err)
 	}
-	return
 }
 
 func FindReceiverTargetAccount(receiverID solana.PublicKey) solana.PublicKey {
