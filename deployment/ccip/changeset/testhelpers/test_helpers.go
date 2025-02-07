@@ -62,7 +62,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_receiver"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
 )
 
 const (
@@ -1399,9 +1399,9 @@ func DeploySolanaCcipReceiver(t *testing.T, e deployment.Environment) {
 	state, err := changeset.LoadOnchainStateSolana(e)
 	require.NoError(t, err)
 	for solSelector, chainState := range state.SolChains {
-		ccip_receiver.SetProgramID(chainState.Receiver)
+		test_ccip_receiver.SetProgramID(chainState.Receiver)
 		externalExecutionConfigPDA, _, _ := solState.FindExternalExecutionConfigPDA(chainState.Receiver)
-		instruction, ixErr := ccip_receiver.NewInitializeInstruction(
+		instruction, ixErr := test_ccip_receiver.NewInitializeInstruction(
 			FindReceiverTargetAccount(chainState.Receiver),
 			externalExecutionConfigPDA,
 			e.SolChains[solSelector].DeployerKey.PublicKey(),
