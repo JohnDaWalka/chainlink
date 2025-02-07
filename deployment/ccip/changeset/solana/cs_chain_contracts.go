@@ -360,8 +360,7 @@ func SetOCR3ConfigSolana(e deployment.Environment, cfg cs.SetOCR3OffRampConfig) 
 			instructions = append(instructions, instruction)
 		}
 		if cfg.MCMS == nil {
-			err := e.SolChains[remote].Confirm(instructions)
-			if err != nil {
+			if err := e.SolChains[remote].Confirm(instructions); err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
 			}
 		}
