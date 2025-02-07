@@ -11,8 +11,6 @@ import {UUPSUpgradeable} from
 
 import {AccessControlUpgradeable} from
   "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/access/AccessControlUpgradeable.sol";
-import {ERC20Upgradeable} from
-  "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/token/ERC20/ERC20Upgradeable.sol";
 import {ERC20BurnableUpgradeable} from
   "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
 import {PausableUpgradeable} from
@@ -62,6 +60,7 @@ contract BurnMintERC20PausableUUPS is
   bytes32 private constant BURN_MINT_ERC20_PAUSABLE_UUPS_STORAGE_LOCATION =
     0x505653ac1e4443b183033fdbc64f9f34c7ad0cd52c0e262b849fc6d68ba2d100;
 
+  // solhint-disable-next-line chainlink-solidity/explicit-returns
   function _getBurnMintERC20PausableUUPSStorage() private pure returns (BurnMintERC20PausableUUPSStorage storage $) {
     assembly {
       $.slot := BURN_MINT_ERC20_PAUSABLE_UUPS_STORAGE_LOCATION

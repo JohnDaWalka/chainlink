@@ -26,6 +26,7 @@ contract BurnMintERC20PausableFreezableTransparent is BurnMintERC20PausableTrans
   bytes32 private constant BURN_MINT_ERC20_PAUSABLE_FREEZABLE_TRANSPARENT_STORAGE_LOCATION =
     0xe4a0d511ce93f7d3bf378a3a2c82dfeda12e9faf72c0533ddcd2be06e2d60f00;
 
+  // solhint-disable-next-line chainlink-solidity/explicit-returns
   function _getBurnMintERC20PausableFreezableTransparentStorage()
     private
     pure

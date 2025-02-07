@@ -9,8 +9,6 @@ import {Initializable} from
 
 import {AccessControlUpgradeable} from
   "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/access/AccessControlUpgradeable.sol";
-import {ERC20Upgradeable} from
-  "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/token/ERC20/ERC20Upgradeable.sol";
 import {ERC20BurnableUpgradeable} from
   "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
 import {PausableUpgradeable} from
@@ -58,6 +56,7 @@ contract BurnMintERC20PausableTransparent is
   bytes32 private constant BURN_MINT_ERC20_PAUSABLE_TRANSPARENT_STORAGE_LOCATION =
     0x59b4c9c2cce0d798b79dd0fc5ebe1928d8919a5c6a224a033d19ec4c09b58b00;
 
+  // solhint-disable-next-line chainlink-solidity/explicit-returns
   function _getBurnMintERC20PausableTransparentStorage()
     private
     pure

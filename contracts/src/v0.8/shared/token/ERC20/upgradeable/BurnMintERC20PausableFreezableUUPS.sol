@@ -26,6 +26,7 @@ contract BurnMintERC20PausableFreezableUUPS is BurnMintERC20PausableUUPS {
   bytes32 private constant BURN_MINT_ERC20_PAUSABLE_FREEZABLE_UUPS_STORAGE_LOCATION =
     0x36a30f686feb055c8d90421e230dafb8f47433e358189345608518a408badc00;
 
+  // solhint-disable-next-line chainlink-solidity/explicit-returns
   function _getBurnMintERC20PausableFreezableUUPSStorage()
     private
     pure
