@@ -627,11 +627,10 @@ func intializeOffRamp(
 	e deployment.Environment,
 	chain deployment.SolChain,
 	ccipRouterProgram solana.PublicKey,
-	linkTokenAddress solana.PublicKey,
 	feeQuoterAddress solana.PublicKey,
 	offRampAddress solana.PublicKey,
 ) error {
-	programData, err := solRouterProgramData(e, chain, feeQuoterAddress)
+	programData, err := solRouterProgramData(e, chain, offRampAddress)
 	if err != nil {
 		return fmt.Errorf("failed to get solana router program data: %w", err)
 	}
@@ -665,7 +664,7 @@ func intializeOffRamp(
 	if err := chain.Confirm([]solana.Instruction{instruction}); err != nil {
 		return fmt.Errorf("failed to confirm instructions: %w", err)
 	}
-	e.Logger.Infow("Initialized fee quoter", "chain", chain.String())
+	e.Logger.Infow("Initialized offRamp", "chain", chain.String())
 	return nil
 }
 
@@ -748,6 +747,9 @@ func deployChainContractsSolana(
 		if err != nil {
 			return fmt.Errorf("failed to save address: %w", err)
 		}
+	} else {
+		e.Logger.Infow("Using existing offramp", "addr", chainState.OffRamp.String())
+		offRampAddress = chainState.OffRamp
 	}
 	solOffRamp.SetProgramID(offRampAddress)
 
@@ -781,7 +783,7 @@ func deployChainContractsSolana(
 	offRampConfigPDA, _, _ := solState.FindOfframpConfigPDA(offRampAddress)
 	err = chain.GetAccountDataBorshInto(e.GetContext(), offRampConfigPDA, &offRampConfigAccount)
 	if err != nil {
-		if err2 := intializeOffRamp(e, chain, ccipRouterProgram, chainState.LinkToken, feeQuoterAddress, offRampAddress); err2 != nil {
+		if err2 := intializeOffRamp(e, chain, ccipRouterProgram, feeQuoterAddress, offRampAddress); err2 != nil {
 			return err2
 		}
 	} else {
