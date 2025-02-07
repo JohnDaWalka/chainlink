@@ -1,13 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {
-  IAccessControl,
-  IBurnMintERC20Upgradeable,
-  IERC165,
-  IERC20,
-  IGetCCIPAdmin
-} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
+import {IAccessControl, IBurnMintERC20Upgradeable, IERC165, IERC20, IGetCCIPAdmin} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
 import {BurnMintERC20PausableUUPSSetup} from "./BurnMintERC20PausableUUPSSetup.t.sol";
 
 contract BurnMintERC20PausableUUPS_supportsInterface is BurnMintERC20PausableUUPSSetup {

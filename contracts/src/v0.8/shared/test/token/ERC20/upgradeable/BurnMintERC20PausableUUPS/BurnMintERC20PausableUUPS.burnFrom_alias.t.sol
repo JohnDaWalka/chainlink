@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {
-  BurnMintERC20PausableUUPS,
-  IAccessControl,
-  IERC20
-} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
+import {BurnMintERC20PausableUUPS, IAccessControl, IERC20} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
 import {BurnMintERC20PausableUUPSSetup} from "./BurnMintERC20PausableUUPSSetup.t.sol";
 
 contract BurnMintERC20PausableUUPS_burnFrom_alias is BurnMintERC20PausableUUPSSetup {
@@ -52,7 +48,9 @@ contract BurnMintERC20PausableUUPS_burnFrom_alias is BurnMintERC20PausableUUPSSe
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        IAccessControl.AccessControlUnauthorizedAccount.selector, STRANGER, s_burnMintERC20PausableUUPS.BURNER_ROLE()
+        IAccessControl.AccessControlUnauthorizedAccount.selector,
+        STRANGER,
+        s_burnMintERC20PausableUUPS.BURNER_ROLE()
       )
     );
 

@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {TransparentUpgradeableProxy} from
-  "../../../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {BurnMintERC20PausableTransparent} from
-  "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableTransparent.sol";
+import {TransparentUpgradeableProxy} from "../../../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {BurnMintERC20PausableTransparent} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableTransparent.sol";
 import {BaseTest} from "../../../../BaseTest.t.sol";
 
 contract BurnMintERC20PausableTransparentSetup is BaseTest {

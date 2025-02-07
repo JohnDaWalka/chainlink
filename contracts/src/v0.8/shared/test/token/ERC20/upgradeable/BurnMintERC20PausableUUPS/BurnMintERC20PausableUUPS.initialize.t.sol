@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {
-  BurnMintERC20PausableUUPS,
-  Initializable
-} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
+import {BurnMintERC20PausableUUPS, Initializable} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
 import {BurnMintERC20PausableUUPSSetup} from "./BurnMintERC20PausableUUPSSetup.t.sol";
 
 contract BurnMintERC20PausableUUPS_initialize is BurnMintERC20PausableUUPSSetup {
@@ -24,7 +21,14 @@ contract BurnMintERC20PausableUUPS_initialize is BurnMintERC20PausableUUPSSetup 
     vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
 
     s_burnMintERC20PausableUUPS.initialize(
-      s_name, s_symbol, s_decimals, s_maxSupply, s_preMint, s_defaultAdmin, s_defaultUpgrader, s_defaultPauser
+      s_name,
+      s_symbol,
+      s_decimals,
+      s_maxSupply,
+      s_preMint,
+      s_defaultAdmin,
+      s_defaultUpgrader,
+      s_defaultPauser
     );
   }
 
@@ -37,7 +41,14 @@ contract BurnMintERC20PausableUUPS_initialize is BurnMintERC20PausableUUPSSetup 
     vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
 
     newBurnMintERC20PausableUUPS.initialize(
-      s_name, s_symbol, s_decimals, s_maxSupply, s_preMint, s_defaultAdmin, s_defaultUpgrader, s_defaultPauser
+      s_name,
+      s_symbol,
+      s_decimals,
+      s_maxSupply,
+      s_preMint,
+      s_defaultAdmin,
+      s_defaultUpgrader,
+      s_defaultPauser
     );
   }
 }
