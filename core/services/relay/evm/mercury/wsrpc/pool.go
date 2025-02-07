@@ -7,9 +7,9 @@ import (
 
 	"github.com/smartcontractkit/wsrpc/credentials"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/csakey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/wsrpc/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -60,7 +60,7 @@ func (conn *connection) checkout(ctx context.Context) (cco *clientCheckout, err 
 // not thread-safe, access must be serialized
 func (conn *connection) ensureStartedClient(ctx context.Context) error {
 	if len(conn.checkouts) == 0 {
-		conn.Client = conn.pool.newClient(conn.lggr, conn.clientPrivKey, conn.serverPubKey, conn.serverURL, conn.pool.cacheSet)
+		conn.Client = conn.pool.newClient(ClientOpts{logger.Sugared(conn.lggr), conn.clientPrivKey, conn.serverPubKey, conn.serverURL, conn.pool.cacheSet, nil})
 		return conn.Client.Start(ctx)
 	}
 	return nil
@@ -121,7 +121,7 @@ type pool struct {
 	connections map[string]map[credentials.StaticSizedPublicKey]*connection
 
 	// embedding newClient makes testing/mocking easier
-	newClient func(lggr logger.Logger, privKey csakey.KeyV2, serverPubKey []byte, serverURL string, cacheSet cache.CacheSet) Client
+	newClient func(opts ClientOpts) Client
 
 	mu sync.RWMutex
 
@@ -131,7 +131,7 @@ type pool struct {
 }
 
 func NewPool(lggr logger.Logger, cacheCfg cache.Config) Pool {
-	lggr = lggr.Named("Mercury.WSRPCPool")
+	lggr = logger.Sugared(lggr).Named("Mercury.WSRPCPool")
 	p := newPool(lggr)
 	p.newClient = NewClient
 	p.cacheSet = cache.NewCacheSet(lggr, cacheCfg)

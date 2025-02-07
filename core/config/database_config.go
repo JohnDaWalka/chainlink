@@ -3,8 +3,6 @@ package config
 import (
 	"net/url"
 	"time"
-
-	"github.com/smartcontractkit/chainlink/v2/core/store/dialects"
 )
 
 type Backup interface {
@@ -35,7 +33,7 @@ type Database interface {
 	DefaultIdleInTxSessionTimeout() time.Duration
 	DefaultLockTimeout() time.Duration
 	DefaultQueryTimeout() time.Duration
-	Dialect() dialects.DialectName
+	DriverName() string
 	LogSQL() bool
 	MaxIdleConns() int
 	MaxOpenConns() int

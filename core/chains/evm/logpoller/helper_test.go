@@ -20,14 +20,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/chaintype"
+	"github.com/smartcontractkit/chainlink-integrations/evm/client"
+	"github.com/smartcontractkit/chainlink-integrations/evm/config/chaintype"
+	"github.com/smartcontractkit/chainlink-integrations/evm/testutils"
+	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/log_emitter"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/log_emitter"
 )
 
 var (
@@ -94,7 +93,7 @@ func SetupTH(t testing.TB, opts logpoller.Opts) TestHarness {
 	lggr := logger.Test(t)
 	chainID := testutils.NewRandomEVMChainID()
 	chainID2 := testutils.NewRandomEVMChainID()
-	db := pgtest.NewSqlxDB(t)
+	db := testutils.NewSqlxDB(t)
 
 	o := logpoller.NewORM(chainID, db, lggr)
 	o2 := logpoller.NewORM(chainID2, db, lggr)
@@ -118,11 +117,19 @@ func SetupTH(t testing.TB, opts logpoller.Opts) TestHarness {
 		opts.PollPeriod = 1 * time.Hour
 	}
 	lp := logpoller.NewLogPoller(o, esc, lggr, headTracker, opts)
+
+	pendingNonce, err := backend.Client().PendingNonceAt(testutils.Context(t), owner.From)
+	require.NoError(t, err)
+
+	owner.Nonce = big.NewInt(0).SetUint64(pendingNonce)
 	emitterAddress1, _, emitter1, err := log_emitter.DeployLogEmitter(owner, backend.Client())
 	require.NoError(t, err)
+
+	owner.Nonce.Add(owner.Nonce, big.NewInt(1)) // Avoid race where DeployLogEmitter returns before PendingNonce has been incremented
 	emitterAddress2, _, emitter2, err := log_emitter.DeployLogEmitter(owner, backend.Client())
 	require.NoError(t, err)
 	backend.Commit()
+	owner.Nonce = nil // Just use pending nonce after this
 
 	return TestHarness{
 		Lggr:            lggr,

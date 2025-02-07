@@ -15,7 +15,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	v1 "github.com/smartcontractkit/chainlink-common/pkg/types/mercury/v1"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 )
 
@@ -157,7 +157,7 @@ func (r *ReportCodec) ValidFromBlockNumFromReport(report ocrtypes.Report) (int64
 	if n > math.MaxInt64 {
 		return 0, fmt.Errorf("ValidFromBlockNum=%d overflows max int64", n)
 	}
-	return int64(n), nil //nolint:gosec // G115
+	return int64(n), nil
 }
 
 func Test_ReportCodec_ValidFromBlockNumFromReport(t *testing.T) {

@@ -20,9 +20,9 @@ import (
 	mercuryv1 "github.com/smartcontractkit/chainlink-common/pkg/types/mercury/v1"
 	mercuryv2 "github.com/smartcontractkit/chainlink-common/pkg/types/mercury/v2"
 	mercuryv4 "github.com/smartcontractkit/chainlink-common/pkg/types/mercury/v4"
-	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
-	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
+	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
+	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
+	ubig "github.com/smartcontractkit/chainlink-integrations/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
@@ -385,8 +385,7 @@ func TestGetObservation(t *testing.T) {
 
 	obs := e.getObservation(&pipeline.FinalResult{})
 	assert.Equal(t, obs, int64(0))
-	assert.Equal(t, logs.Len(), 1)
-	assert.Contains(t, logs.All()[0].Message, "cannot get singular result")
+	assert.Equal(t, 0, logs.Len())
 
 	finalResult := &pipeline.FinalResult{
 		Values:      []interface{}{"123456"},
@@ -457,8 +456,7 @@ func TestCollectAndSend(t *testing.T) {
 	}
 
 	wg.Wait()
-	assert.Equal(t, logs.Len(), 2)
-	assert.Contains(t, logs.All()[0].Message, "cannot parse bridge response from bridge task")
+	assert.Equal(t, 0, logs.Len())
 
 	badTrrs = &pipeline.TaskRunResults{
 		pipeline.TaskRunResult{
@@ -475,9 +473,7 @@ func TestCollectAndSend(t *testing.T) {
 		RepTimestamp:   observationTimestamp,
 	}
 	wg.Wait()
-	assert.Equal(t, 2, logs.Len())
-	assert.Contains(t, logs.All()[0].Message, "cannot parse bridge response from bridge task")
-	assert.Contains(t, logs.All()[1].Message, "cannot get json parse value")
+	assert.Equal(t, 0, logs.Len())
 	doneCh <- struct{}{}
 }
 
@@ -707,10 +703,7 @@ func TestGetPricesFromBridgeTaskByOrder(t *testing.T) {
 	require.Equal(t, benchmarkPrice, float64(0))
 	require.Equal(t, bid, float64(0))
 	require.Equal(t, ask, float64(0))
-	require.Equal(t, 3, logs.Len())
-	require.Contains(t, logs.All()[0].Message, "cannot parse EA telemetry price to float64, DOT id ds1_benchmark")
-	require.Contains(t, logs.All()[1].Message, "cannot parse EA telemetry price to float64, DOT id ds2_bid")
-	require.Contains(t, logs.All()[2].Message, "cannot parse EA telemetry price to float64, DOT id ds3_ask")
+	require.Equal(t, 0, logs.Len())
 
 	benchmarkPrice, bid, ask = getPricesFromBridgeTask(lggr, trrsMercuryV1[0], trrsMercuryV2, 2)
 	require.Equal(t, 123456.123456, benchmarkPrice)

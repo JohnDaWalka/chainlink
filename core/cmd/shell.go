@@ -37,6 +37,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
+
 	"github.com/smartcontractkit/chainlink/v2/core/build"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
@@ -52,6 +53,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/wsrpc/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/versioning"
 	"github.com/smartcontractkit/chainlink/v2/core/services/webhook"
+	"github.com/smartcontractkit/chainlink/v2/core/services/workflows"
 	"github.com/smartcontractkit/chainlink/v2/core/sessions"
 	"github.com/smartcontractkit/chainlink/v2/core/static"
 	"github.com/smartcontractkit/chainlink/v2/core/store/migrate"
@@ -110,6 +112,10 @@ func initGlobals(cfgProm config.Prometheus, cfgTracing config.Tracing, cfgTeleme
 				AuthPublicKeyHex:         csaPubKeyHex,
 				AuthHeaders:              beholderAuthHeaders,
 			}
+			// note: due to the OTEL specification, all histogram buckets
+			// must be defined when the beholder client is created
+			clientCfg.MetricViews = append(clientCfg.MetricViews, workflows.MetricViews()...)
+
 			if tracingCfg.Enabled {
 				clientCfg.TraceSpanExporter, err = tracingCfg.NewSpanExporter()
 				if err != nil {
@@ -223,7 +229,7 @@ func (n ChainlinkAppFactory) NewApplication(ctx context.Context, cfg chainlink.G
 
 	mailMon := mailbox.NewMonitor(cfg.AppID().String(), appLggr.Named("Mailbox"))
 
-	loopRegistry := plugins.NewLoopRegistry(appLggr, cfg.Tracing(), cfg.Telemetry(), beholderAuthHeaders, csaPubKeyHex)
+	loopRegistry := plugins.NewLoopRegistry(appLggr, cfg.Database(), cfg.Tracing(), cfg.Telemetry(), beholderAuthHeaders, csaPubKeyHex)
 
 	mercuryPool := wsrpc.NewPool(appLggr, cache.Config{
 		LatestReportTTL:      cfg.Mercury().Cache().LatestReportTTL(),
@@ -234,6 +240,7 @@ func (n ChainlinkAppFactory) NewApplication(ctx context.Context, cfg chainlink.G
 	capabilitiesRegistry := capabilities.NewRegistry(appLggr)
 
 	retirementReportCache := llo.NewRetirementReportCache(appLggr, ds)
+	lloReaper := llo.NewTransmissionReaper(ds, appLggr, cfg.Mercury().Transmitter().ReaperFrequency().Duration(), cfg.Mercury().Transmitter().ReaperMaxAge().Duration())
 
 	unrestrictedClient := clhttp.NewUnrestrictedHTTPClient()
 	// create the relayer-chain interoperators from application configuration
@@ -250,8 +257,15 @@ func (n ChainlinkAppFactory) NewApplication(ctx context.Context, cfg chainlink.G
 
 	evmFactoryCfg := chainlink.EVMFactoryConfig{
 		CSAETHKeystore: keyStore,
-		ChainOpts:      legacyevm.ChainOpts{AppConfig: cfg, MailMon: mailMon, DS: ds},
-		MercuryConfig:  cfg.Mercury(),
+		ChainOpts: legacyevm.ChainOpts{
+			ChainConfigs:   cfg.EVMConfigs(),
+			DatabaseConfig: cfg.Database(),
+			ListenerConfig: cfg.Database().Listener(),
+			FeatureConfig:  cfg.Feature(),
+			MailMon:        mailMon,
+			DS:             ds,
+		},
+		MercuryConfig: cfg.Mercury(),
 	}
 	// evm always enabled for backward compatibility
 	// TODO BCF-2510 this needs to change in order to clear the path for EVM extraction
@@ -269,6 +283,7 @@ func (n ChainlinkAppFactory) NewApplication(ctx context.Context, cfg chainlink.G
 		solanaCfg := chainlink.SolanaFactoryConfig{
 			Keystore:    keyStore.Solana(),
 			TOMLConfigs: cfg.SolanaConfigs(),
+			DS:          ds,
 		}
 		initOps = append(initOps, chainlink.InitSolana(ctx, relayerFactory, solanaCfg))
 	}
@@ -285,6 +300,13 @@ func (n ChainlinkAppFactory) NewApplication(ctx context.Context, cfg chainlink.G
 			TOMLConfigs: cfg.AptosConfigs(),
 		}
 		initOps = append(initOps, chainlink.InitAptos(ctx, relayerFactory, aptosCfg))
+	}
+	if cfg.TronEnabled() {
+		tronCfg := chainlink.TronFactoryConfig{
+			Keystore:    keyStore.Tron(),
+			TOMLConfigs: cfg.TronConfigs(),
+		}
+		initOps = append(initOps, chainlink.InitTron(ctx, relayerFactory, tronCfg))
 	}
 
 	relayChainInterops, err := chainlink.NewCoreRelayerChainInteroperators(initOps...)
@@ -317,6 +339,7 @@ func (n ChainlinkAppFactory) NewApplication(ctx context.Context, cfg chainlink.G
 		GRPCOpts:                   grpcOpts,
 		MercuryPool:                mercuryPool,
 		RetirementReportCache:      retirementReportCache,
+		LLOTransmissionReaper:      lloReaper,
 		CapabilitiesRegistry:       capabilitiesRegistry,
 	})
 }
@@ -392,7 +415,7 @@ func takeBackupIfVersionUpgrade(dbUrl url.URL, rootDir string, cfg periodicbacku
 	}
 
 	// Because backups can take a long time we must start a "fake" health report to prevent
-	//node shutdown because of healthcheck fail/timeout
+	// node shutdown because of healthcheck fail/timeout
 	err = databaseBackup.RunBackup(appv.String())
 	return err
 }

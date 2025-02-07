@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
+	"strconv"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -14,6 +17,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/llo-feeds/generated/configurator"
@@ -26,15 +31,18 @@ const (
 	InstanceTypeGreen InstanceType = InstanceType("Green")
 )
 
+var (
+	NoLimitSortAsc = query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Asc))
+)
+
 type ConfigPollerService interface {
 	services.Service
 	ocrtypes.ContractConfigTracker
 }
 
 type LogPoller interface {
-	IndexedLogsByBlockRange(ctx context.Context, start, end int64, eventSig common.Hash, address common.Address, topicIndex int, topicValues []common.Hash) ([]logpoller.Log, error)
 	LatestBlock(ctx context.Context) (logpoller.LogPollerBlock, error)
-	LogsWithSigs(ctx context.Context, start, end int64, eventSigs []common.Hash, address common.Address) ([]logpoller.Log, error)
+	FilteredLogs(ctx context.Context, filter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]logpoller.Log, error)
 }
 
 // ConfigCache is most likely the global RetirementReportCache. Every config
@@ -47,13 +55,15 @@ type configPoller struct {
 	services.Service
 	eng *services.Engine
 
-	lp        LogPoller
-	cc        ConfigCache
-	addr      common.Address
-	donID     uint32
-	donIDHash [32]byte
+	lp          LogPoller
+	cc          ConfigCache
+	addr        common.Address
+	donID       uint32
+	donIDTopic  [32]byte
+	filterExprs []query.Expression
 
-	fromBlock uint64
+	fromBlock int64
+	mu        sync.RWMutex
 
 	instanceType InstanceType
 }
@@ -70,14 +80,30 @@ func NewConfigPoller(lggr logger.Logger, lp LogPoller, cc ConfigCache, addr comm
 }
 
 func newConfigPoller(lggr logger.Logger, lp LogPoller, cc ConfigCache, addr common.Address, donID uint32, instanceType InstanceType, fromBlock uint64) *configPoller {
+	donIDTopic := DonIDToBytes32(donID)
+	exprs := []query.Expression{
+		logpoller.NewAddressFilter(addr),
+		query.Or(
+			logpoller.NewEventSigFilter(ProductionConfigSet),
+			logpoller.NewEventSigFilter(StagingConfigSet),
+		),
+		logpoller.NewEventByTopicFilter(1, []logpoller.HashedValueComparator{
+			{Values: []common.Hash{donIDTopic}, Operator: primitives.Eq},
+		}),
+		// NOTE: Optimize for fast config switches. On Arbitrum, finalization
+		// can take tens of minutes
+		// (https://grafana.ops.prod.cldev.sh/d/e0453cc9-4b4a-41e1-9f01-7c21de805b39/blockchain-finality-and-gas?orgId=1&var-env=All&var-network_name=ethereum-testnet-sepolia-arbitrum-1&var-network_name=ethereum-mainnet-arbitrum-1&from=1732460992641&to=1732547392641)
+		query.Confidence(primitives.Unconfirmed),
+	}
 	cp := &configPoller{
 		lp:           lp,
 		cc:           cc,
 		addr:         addr,
 		donID:        donID,
-		donIDHash:    DonIDToBytes32(donID),
+		donIDTopic:   DonIDToBytes32(donID),
+		filterExprs:  exprs,
 		instanceType: instanceType,
-		fromBlock:    fromBlock,
+		fromBlock:    int64(fromBlock),
 	}
 	cp.Service, cp.eng = services.Config{
 		Name: "LLOConfigPoller",
@@ -92,26 +118,52 @@ func (cp *configPoller) Notify() <-chan struct{} {
 
 // LatestConfigDetails returns the latest config details from the logs
 func (cp *configPoller) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest ocrtypes.ConfigDigest, err error) {
-	latestConfig, log, err := cp.latestConfig(ctx, int64(cp.fromBlock), math.MaxInt64) // #nosec G115
+	latestConfig, log, err := cp.latestConfig(ctx, cp.readFromBlock(), math.MaxInt64)
 	if err != nil {
 		return 0, ocrtypes.ConfigDigest{}, fmt.Errorf("failed to get latest config: %w", err)
 	}
-	return uint64(log.BlockNumber), latestConfig.ConfigDigest, nil
+	// Slight optimization, since we only care about the latest log, we can
+	// avoid re-scanning from the original fromBlock every time by setting
+	// fromBlock to the latest seen log here.
+	//
+	// This should always be safe even if LatestConfigDetails is called
+	// concurrently.
+	cp.setFromBlock(log.BlockNumber)
+	return uint64(log.BlockNumber), latestConfig.ConfigDigest, nil // #nosec G115 // log.BlockNumber will never be negative
+}
+
+func (cp *configPoller) readFromBlock() int64 {
+	cp.mu.RLock()
+	defer cp.mu.RUnlock()
+	return cp.fromBlock
+}
+
+func (cp *configPoller) setFromBlock(fromBlock int64) {
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+	if fromBlock > cp.fromBlock {
+		cp.fromBlock = fromBlock
+	}
 }
 
 func (cp *configPoller) latestConfig(ctx context.Context, fromBlock, toBlock int64) (latestConfig FullConfigFromLog, latestLog logpoller.Log, err error) {
-	// Get all config set logs run through them forwards
-	// TODO: This could probably be optimized with a 'latestBlockNumber' cache or something to avoid reading from `fromBlock` on every call
-	// TODO: Actually we only care about the latest of each type here
-	// MERC-3524
-	logs, err := cp.lp.LogsWithSigs(ctx, fromBlock, toBlock, []common.Hash{ProductionConfigSet, StagingConfigSet}, cp.addr)
+	// Get all configset logs and run through them forwards
+	// NOTE: It's useful to get _all_ logs rather than just the latest since
+	// they are stored in the ConfigCache
+	exprs := make([]query.Expression, 0, len(cp.filterExprs)+2)
+	exprs = append(exprs, cp.filterExprs...)
+	exprs = append(exprs,
+		query.Block(strconv.FormatInt(fromBlock, 10), primitives.Gte),
+		query.Block(strconv.FormatInt(toBlock, 10), primitives.Lte),
+	)
+	logs, err := cp.lp.FilteredLogs(ctx, exprs, NoLimitSortAsc, "LLOConfigPoller - latestConfig")
 	if err != nil {
 		return latestConfig, latestLog, fmt.Errorf("failed to get logs: %w", err)
 	}
 	for _, log := range logs {
-		// TODO: This can be optimized probably by adding donIDHash to the logpoller lookup
-		// MERC-3524
-		if !bytes.Equal(log.Topics[1], cp.donIDHash[:]) {
+		if !bytes.Equal(log.Topics[1], cp.donIDTopic[:]) {
+			// skip logs for other donIDs, shouldn't happen given the
+			// FilterLogs call, but belts and braces
 			continue
 		}
 		switch log.EventSig {
@@ -122,7 +174,7 @@ func (cp *configPoller) latestConfig(ctx context.Context, fromBlock, toBlock int
 			}
 
 			if err = cp.cc.StoreConfig(ctx, event.ConfigDigest, event.Signers, event.F); err != nil {
-				cp.eng.SugaredLogger.Errorf("failed to store production config: %v", err)
+				cp.eng.Errorf("failed to store production config: %v", err)
 			}
 
 			isProduction := (cp.instanceType != InstanceTypeBlue) == event.IsGreenProduction
@@ -140,7 +192,7 @@ func (cp *configPoller) latestConfig(ctx context.Context, fromBlock, toBlock int
 			}
 
 			if err = cp.cc.StoreConfig(ctx, event.ConfigDigest, event.Signers, event.F); err != nil {
-				cp.eng.SugaredLogger.Errorf("failed to store staging config: %v", err)
+				cp.eng.Errorf("failed to store staging config: %v", err)
 			}
 
 			isProduction := (cp.instanceType != InstanceTypeBlue) == event.IsGreenProduction
@@ -162,10 +214,11 @@ func (cp *configPoller) latestConfig(ctx context.Context, fromBlock, toBlock int
 
 // LatestConfig returns the latest config from the logs starting from a certain block
 func (cp *configPoller) LatestConfig(ctx context.Context, changedInBlock uint64) (ocrtypes.ContractConfig, error) {
-	cfg, _, err := cp.latestConfig(ctx, int64(changedInBlock), math.MaxInt64) // #nosec G115
+	cfg, latestLog, err := cp.latestConfig(ctx, int64(changedInBlock), math.MaxInt64) // #nosec G115
 	if err != nil {
 		return ocrtypes.ContractConfig{}, fmt.Errorf("failed to get latest config: %w", err)
 	}
+	cp.eng.Infow("LatestConfig fetched", "config", cfg.ContractConfig, "txHash", latestLog.TxHash, "blockNumber", latestLog.BlockNumber, "blockHash", latestLog.BlockHash, "logIndex", latestLog.LogIndex, "instanceType", cp.instanceType, "donID", cp.donID, "changedInBlock", changedInBlock)
 	return cfg.ContractConfig, nil
 }
 
@@ -178,7 +231,7 @@ func (cp *configPoller) LatestBlockHeight(ctx context.Context) (blockHeight uint
 		}
 		return 0, err
 	}
-	return uint64(latest.BlockNumber), nil
+	return uint64(latest.BlockNumber), nil // #nosec G115 // latest.BlockNumber will never be negative
 }
 
 func (cp *configPoller) InstanceType() InstanceType {
@@ -192,14 +245,13 @@ type FullConfigFromLog struct {
 }
 
 func FullConfigFromProductionConfigSet(unpacked configurator.ConfiguratorProductionConfigSet) (FullConfigFromLog, error) {
-	var transmitAccounts []ocrtypes.Account
-	for _, addr := range unpacked.OffchainTransmitters {
-		transmitAccounts = append(transmitAccounts, ocrtypes.Account(fmt.Sprintf("%x", addr)))
+	transmitAccounts := make([]ocrtypes.Account, len(unpacked.OffchainTransmitters))
+	for i, addr := range unpacked.OffchainTransmitters {
+		transmitAccounts[i] = ocrtypes.Account(hex.EncodeToString(addr[:]))
 	}
-	var signers []ocrtypes.OnchainPublicKey
-	for _, addr := range unpacked.Signers {
-		addr := addr
-		signers = append(signers, addr)
+	signers := make([]ocrtypes.OnchainPublicKey, len(unpacked.Signers))
+	for i, addr := range unpacked.Signers {
+		signers[i] = addr
 	}
 
 	donIDBig := common.Hash(unpacked.ConfigId).Big()
@@ -224,14 +276,13 @@ func FullConfigFromProductionConfigSet(unpacked configurator.ConfiguratorProduct
 }
 
 func FullConfigFromStagingConfigSet(unpacked configurator.ConfiguratorStagingConfigSet) (FullConfigFromLog, error) {
-	var transmitAccounts []ocrtypes.Account
-	for _, addr := range unpacked.OffchainTransmitters {
-		transmitAccounts = append(transmitAccounts, ocrtypes.Account(fmt.Sprintf("%x", addr)))
+	transmitAccounts := make([]ocrtypes.Account, len(unpacked.OffchainTransmitters))
+	for i, addr := range unpacked.OffchainTransmitters {
+		transmitAccounts[i] = ocrtypes.Account(hex.EncodeToString(addr[:]))
 	}
-	var signers []ocrtypes.OnchainPublicKey
-	for _, addr := range unpacked.Signers {
-		addr := addr
-		signers = append(signers, addr)
+	signers := make([]ocrtypes.OnchainPublicKey, len(unpacked.Signers))
+	for i, addr := range unpacked.Signers {
+		signers[i] = addr
 	}
 
 	donIDBig := common.Hash(unpacked.ConfigId).Big()

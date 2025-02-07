@@ -23,11 +23,12 @@ func TestTOMLGeneralConfig_Defaults(t *testing.T) {
 	config, err := GeneralConfigOpts{}.New()
 	require.NoError(t, err)
 	assert.Equal(t, (*url.URL)(nil), config.WebServer().BridgeResponseURL())
-	assert.False(t, config.EVMRPCEnabled())
+	assert.False(t, config.EVMConfigs().RPCEnabled())
 	assert.False(t, config.EVMEnabled())
 	assert.False(t, config.CosmosEnabled())
 	assert.False(t, config.SolanaEnabled())
 	assert.False(t, config.StarkNetEnabled())
+	assert.False(t, config.TronEnabled())
 	assert.Equal(t, false, config.JobPipeline().ExternalInitiatorsEnabled())
 	assert.Equal(t, 15*time.Minute, config.WebServer().SessionTimeout().Duration())
 }

@@ -5,11 +5,9 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
-	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 )
 
 type ChangesetApplication struct {
@@ -33,7 +31,7 @@ func WrapChangeSet[C any](fn deployment.ChangeSet[C]) func(e deployment.Environm
 }
 
 // ApplyChangesets applies the changeset applications to the environment and returns the updated environment.
-func ApplyChangesets(t *testing.T, e deployment.Environment, timelocksPerChain map[uint64]*gethwrappers.RBACTimelock, changesetApplications []ChangesetApplication) (deployment.Environment, error) {
+func ApplyChangesets(t *testing.T, e deployment.Environment, timelockContractsPerChain map[uint64]*proposalutils.TimelockExecutionContracts, changesetApplications []ChangesetApplication) (deployment.Environment, error) {
 	currentEnv := e
 	for i, csa := range changesetApplications {
 		out, err := csa.Changeset(currentEnv, csa.Config)
@@ -50,21 +48,8 @@ func ApplyChangesets(t *testing.T, e deployment.Environment, timelocksPerChain m
 		} else {
 			addresses = currentEnv.ExistingAddresses
 		}
-		if out.JobSpecs != nil {
-			ctx := testcontext.Get(t)
-			for nodeID, jobs := range out.JobSpecs {
-				for _, job := range jobs {
-					// Note these auto-accept
-					_, err := currentEnv.Offchain.ProposeJob(ctx,
-						&jobv1.ProposeJobRequest{
-							NodeId: nodeID,
-							Spec:   job,
-						})
-					if err != nil {
-						return e, fmt.Errorf("failed to propose job: %w", err)
-					}
-				}
-			}
+		if out.Jobs != nil {
+			// do nothing, as these jobs auto-accept.
 		}
 		if out.Proposals != nil {
 			for _, prop := range out.Proposals {
@@ -73,13 +58,46 @@ func ApplyChangesets(t *testing.T, e deployment.Environment, timelocksPerChain m
 					chains.Add(uint64(op.ChainIdentifier))
 				}
 
-				signed := SignProposal(t, e, &prop)
+				signed := proposalutils.SignProposal(t, e, &prop)
 				for _, sel := range chains.ToSlice() {
-					timelock, ok := timelocksPerChain[sel]
-					if !ok || timelock == nil {
-						return deployment.Environment{}, fmt.Errorf("timelock not found for chain %d", sel)
+					timelockContracts, ok := timelockContractsPerChain[sel]
+					if !ok || timelockContracts == nil {
+						return deployment.Environment{}, fmt.Errorf("timelock contracts not found for chain %d", sel)
 					}
-					ExecuteProposal(t, e, signed, timelock, sel)
+
+					proposalutils.ExecuteProposal(t, e, signed, timelockContracts, sel)
+				}
+			}
+		}
+		if out.MCMSTimelockProposals != nil {
+			for _, prop := range out.MCMSTimelockProposals {
+				chains := mapset.NewSet[uint64]()
+				for _, op := range prop.Operations {
+					chains.Add(uint64(op.ChainSelector))
+				}
+
+				p := proposalutils.SignMCMSTimelockProposal(t, e, &prop)
+				for _, sel := range chains.ToSlice() {
+					timelockContracts, ok := timelockContractsPerChain[sel]
+					if !ok || timelockContracts == nil {
+						return deployment.Environment{}, fmt.Errorf("timelock contracts not found for chain %d", sel)
+					}
+
+					proposalutils.ExecuteMCMSProposalV2(t, e, p, sel)
+					proposalutils.ExecuteMCMSTimelockProposalV2(t, e, &prop, sel)
+				}
+			}
+		}
+		if out.MCMSProposals != nil {
+			for _, prop := range out.MCMSProposals {
+				chains := mapset.NewSet[uint64]()
+				for _, op := range prop.Operations {
+					chains.Add(uint64(op.ChainSelector))
+				}
+
+				p := proposalutils.SignMCMSProposal(t, e, &prop)
+				for _, sel := range chains.ToSlice() {
+					proposalutils.ExecuteMCMSProposalV2(t, e, p, sel)
 				}
 			}
 		}
@@ -88,8 +106,11 @@ func ApplyChangesets(t *testing.T, e deployment.Environment, timelocksPerChain m
 			Logger:            e.Logger,
 			ExistingAddresses: addresses,
 			Chains:            e.Chains,
+			SolChains:         e.SolChains,
 			NodeIDs:           e.NodeIDs,
 			Offchain:          e.Offchain,
+			OCRSecrets:        e.OCRSecrets,
+			GetContext:        e.GetContext,
 		}
 	}
 	return currentEnv, nil

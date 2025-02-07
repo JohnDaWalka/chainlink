@@ -16,7 +16,7 @@ import (
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 
-	evmcfg "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
+	configtoml "github.com/smartcontractkit/chainlink-integrations/evm/config/toml"
 	"github.com/smartcontractkit/chainlink/v2/core/config/docs"
 	"github.com/smartcontractkit/chainlink/v2/core/config/env"
 	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
@@ -37,7 +37,7 @@ import (
 type Config struct {
 	toml.Core
 
-	EVM evmcfg.EVMConfigs `toml:",omitempty"`
+	EVM configtoml.EVMConfigs `toml:",omitempty"`
 
 	Cosmos coscfg.TOMLConfigs `toml:",omitempty"`
 
@@ -46,6 +46,8 @@ type Config struct {
 	Starknet stkcfg.TOMLConfigs `toml:",omitempty"`
 
 	Aptos RawConfigs `toml:",omitempty"`
+
+	Tron RawConfigs `toml:",omitempty"`
 }
 
 // RawConfigs is a list of RawConfig.
@@ -260,6 +262,7 @@ func (c *Config) TOMLString() (string, error) {
 // warnings aggregates warnings from valueWarnings and deprecationWarnings
 func (c *Config) warnings() (err error) {
 	deprecationErr := c.deprecationWarnings()
+
 	warningErr := c.valueWarnings()
 	err = multierr.Append(deprecationErr, warningErr)
 	_, list := commonconfig.MultiErrorList(err)
@@ -301,9 +304,9 @@ func (c *Config) setDefaults() {
 
 	for i := range c.EVM {
 		if input := c.EVM[i]; input == nil {
-			c.EVM[i] = &evmcfg.EVMConfig{Chain: evmcfg.Defaults(nil)}
+			c.EVM[i] = &configtoml.EVMConfig{Chain: configtoml.Defaults(nil)}
 		} else {
-			input.Chain = evmcfg.Defaults(input.ChainID, &input.Chain)
+			input.Chain = configtoml.Defaults(input.ChainID, &input.Chain)
 		}
 	}
 
@@ -350,6 +353,10 @@ func (c *Config) SetFrom(f *Config) (err error) {
 
 	if err5 := c.Aptos.SetFrom(f.Aptos); err5 != nil {
 		err = multierr.Append(err, commonconfig.NamedMultiErrorList(err5, "Aptos"))
+	}
+
+	if err6 := c.Tron.SetFrom(f.Tron); err6 != nil {
+		err = multierr.Append(err, commonconfig.NamedMultiErrorList(err6, "Tron"))
 	}
 
 	_, err = commonconfig.MultiErrorList(err)

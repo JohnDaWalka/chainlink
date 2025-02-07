@@ -2,15 +2,16 @@ package llo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/shopspring/decimal"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -19,7 +20,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 	"github.com/smartcontractkit/chainlink/v2/core/services/streams"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 var (
@@ -42,7 +42,7 @@ var (
 )
 
 type Registry interface {
-	Get(streamID streams.StreamID) (strm streams.Stream, exists bool)
+	Get(streamID streams.StreamID) (p streams.Pipeline, exists bool)
 }
 
 type ErrObservationFailed struct {
@@ -92,6 +92,7 @@ func newDataSource(lggr logger.Logger, registry Registry, t Telemeter) *dataSour
 // Observe looks up all streams in the registry and populates a map of stream ID => value
 func (d *dataSource) Observe(ctx context.Context, streamValues llo.StreamValues, opts llo.DSOpts) error {
 	now := time.Now()
+	lggr := logger.With(d.lggr, "observationTimestamp", opts.ObservationTimestamp(), "configDigest", opts.ConfigDigest(), "seqNr", opts.OutCtx().SeqNr)
 
 	if opts.VerboseLogging() {
 		streamIDs := make([]streams.StreamID, 0, len(streamValues))
@@ -99,7 +100,8 @@ func (d *dataSource) Observe(ctx context.Context, streamValues llo.StreamValues,
 			streamIDs = append(streamIDs, streamID)
 		}
 		sort.Slice(streamIDs, func(i, j int) bool { return streamIDs[i] < streamIDs[j] })
-		d.lggr.Debugw("Observing streams", "streamIDs", streamIDs, "configDigest", opts.ConfigDigest(), "seqNr", opts.OutCtx().SeqNr)
+		lggr = logger.With(lggr, "streamIDs", streamIDs)
+		lggr.Debugw("Observing streams")
 	}
 
 	var wg sync.WaitGroup
@@ -109,42 +111,39 @@ func (d *dataSource) Observe(ctx context.Context, streamValues llo.StreamValues,
 	successfulStreamIDs := make([]streams.StreamID, 0, len(streamValues))
 	var errs []ErrObservationFailed
 
+	// oc only lives for the duration of this Observe call
+	oc := NewObservationContext(lggr, d.registry, d.t)
+
+	// Telemetry
+	{
+		// Size needs to accommodate the max number of telemetry events that could be generated
+		// Standard case might be about 3 bridge requests per spec and one stream<=>spec
+		// Overallocate for safety (to avoid dropping packets)
+		telemCh := d.t.MakeTelemChannel(opts, 10*len(streamValues))
+		if telemCh != nil {
+			ctx = pipeline.WithTelemetryCh(ctx, telemCh)
+			// After all Observations have returned, nothing else will be sent to the
+			// telemetry channel, so it can safely be closed
+			defer close(telemCh)
+		}
+	}
+
+	// Observe all streams concurrently
 	for _, streamID := range maps.Keys(streamValues) {
 		go func(streamID llotypes.StreamID) {
 			defer wg.Done()
-
-			var val llo.StreamValue
-
-			stream, exists := d.registry.Get(streamID)
-			if !exists {
-				mu.Lock()
-				errs = append(errs, ErrObservationFailed{streamID: streamID, reason: fmt.Sprintf("missing stream: %d", streamID)})
-				mu.Unlock()
-				promMissingStreamCount.WithLabelValues(fmt.Sprintf("%d", streamID)).Inc()
-				return
-			}
-			run, trrs, err := stream.Run(ctx)
+			val, err := oc.Observe(ctx, streamID, opts)
 			if err != nil {
+				strmIDStr := strconv.FormatUint(uint64(streamID), 10)
+				if errors.As(err, &MissingStreamError{}) {
+					promMissingStreamCount.WithLabelValues(strmIDStr).Inc()
+				}
+				promObservationErrorCount.WithLabelValues(strmIDStr).Inc()
 				mu.Lock()
-				errs = append(errs, ErrObservationFailed{inner: err, run: run, streamID: streamID, reason: "pipeline run failed"})
-				mu.Unlock()
-				promObservationErrorCount.WithLabelValues(fmt.Sprintf("%d", streamID)).Inc()
-				// TODO: Consolidate/reduce telemetry. We should send all observation results in a single packet
-				// https://smartcontract-it.atlassian.net/browse/MERC-6290
-				d.t.EnqueueV3PremiumLegacy(run, trrs, streamID, opts, nil, err)
-				return
-			}
-			// TODO: Consolidate/reduce telemetry. We should send all observation results in a single packet
-			// https://smartcontract-it.atlassian.net/browse/MERC-6290
-			val, err = ExtractStreamValue(trrs)
-			if err != nil {
-				mu.Lock()
-				errs = append(errs, ErrObservationFailed{inner: err, run: run, streamID: streamID, reason: "failed to extract big.Int"})
+				errs = append(errs, ErrObservationFailed{inner: err, streamID: streamID, reason: "failed to observe stream"})
 				mu.Unlock()
 				return
 			}
-
-			d.t.EnqueueV3PremiumLegacy(run, trrs, streamID, opts, val, nil)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -156,11 +155,13 @@ func (d *dataSource) Observe(ctx context.Context, streamValues llo.StreamValues,
 		}(streamID)
 	}
 
+	// Wait for all Observations to complete
 	wg.Wait()
-	elapsed := time.Since(now)
 
 	// Only log on errors or if VerboseLogging is turned on
 	if len(errs) > 0 || opts.VerboseLogging() {
+		elapsed := time.Since(now)
+
 		slices.Sort(successfulStreamIDs)
 		sort.Slice(errs, func(i, j int) bool { return errs[i].streamID < errs[j].streamID })
 
@@ -171,7 +172,7 @@ func (d *dataSource) Observe(ctx context.Context, streamValues llo.StreamValues,
 			failedStreamIDs[i] = e.streamID
 		}
 
-		lggr := logger.With(d.lggr, "elapsed", elapsed, "nSuccessfulStreams", len(successfulStreamIDs), "nFailedStreams", len(failedStreamIDs), "successfulStreamIDs", successfulStreamIDs, "failedStreamIDs", failedStreamIDs, "errs", errStrs, "configDigest", opts.ConfigDigest(), "seqNr", opts.OutCtx().SeqNr)
+		lggr = logger.With(lggr, "elapsed", elapsed, "nSuccessfulStreams", len(successfulStreamIDs), "nFailedStreams", len(failedStreamIDs), "successfulStreamIDs", successfulStreamIDs, "failedStreamIDs", failedStreamIDs, "errs", errStrs)
 
 		if opts.VerboseLogging() {
 			lggr = logger.With(lggr, "streamValues", streamValues)
@@ -185,58 +186,4 @@ func (d *dataSource) Observe(ctx context.Context, streamValues llo.StreamValues,
 	}
 
 	return nil
-}
-
-// ExtractStreamValue extracts a StreamValue from a TaskRunResults
-func ExtractStreamValue(trrs pipeline.TaskRunResults) (llo.StreamValue, error) {
-	// pipeline.TaskRunResults comes ordered asc by index, this is guaranteed
-	// by the pipeline executor
-	finaltrrs := trrs.Terminals()
-
-	// TODO: Special handling for missing native/link streams?
-	// https://smartcontract-it.atlassian.net/browse/MERC-5949
-
-	// HACK: Right now we rely on the number of outputs to determine whether
-	// its a Decimal or a Quote.
-	// This isn't very robust or future-proof but is sufficient to support v0.3
-	// compat.
-	// There are a number of different possible ways to solve this in future.
-	// See: https://smartcontract-it.atlassian.net/browse/MERC-5934
-	switch len(finaltrrs) {
-	case 1:
-		res := finaltrrs[0].Result
-		if res.Error != nil {
-			return nil, res.Error
-		}
-		val, err := toDecimal(res.Value)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse BenchmarkPrice: %w", err)
-		}
-		return llo.ToDecimal(val), nil
-	case 3:
-		// Expect ordering of Benchmark, Bid, Ask
-		results := make([]decimal.Decimal, 3)
-		for i, trr := range finaltrrs {
-			res := trr.Result
-			if res.Error != nil {
-				return nil, fmt.Errorf("failed to parse stream output into Quote (task index: %d): %w", i, res.Error)
-			}
-			val, err := toDecimal(res.Value)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse decimal: %w", err)
-			}
-			results[i] = val
-		}
-		return &llo.Quote{
-			Benchmark: results[0],
-			Bid:       results[1],
-			Ask:       results[2],
-		}, nil
-	default:
-		return nil, fmt.Errorf("invalid number of results, expected: 1 or 3, got: %d", len(finaltrrs))
-	}
-}
-
-func toDecimal(val interface{}) (decimal.Decimal, error) {
-	return utils.ToDecimal(val)
 }

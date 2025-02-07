@@ -1,16 +1,66 @@
 package changeset
 
 import (
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink/deployment"
+
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/aggregator_v3_interface"
+)
+
+type TokenSymbol string
+
+const (
+	LinkSymbol   TokenSymbol = "LINK"
+	WethSymbol   TokenSymbol = "WETH"
+	WAVAXSymbol  TokenSymbol = "WAVAX"
+	WBNBSymbol   TokenSymbol = "WBNB"
+	WPOLSymbol   TokenSymbol = "WPOL"
+	USDCSymbol   TokenSymbol = "USDC"
+	USDCName     string      = "USD Coin"
+	LinkDecimals             = 18
+	WethDecimals             = 18
+	UsdcDecimals             = 6
+
+	// Price Feed Descriptions
+	AvaxUSD  = "AVAX / USD"
+	LinkUSD  = "LINK / USD"
+	EthUSD   = "ETH / USD"
+	MaticUSD = "MATIC / USD"
+	BNBUSD   = "BNB / USD"
+
+	// MockLinkAggregatorDescription is the description of the MockV3Aggregator.sol contract
+	// https://github.com/smartcontractkit/chainlink/blob/a348b98e90527520049c580000a86fb8ceff7fa7/contracts/src/v0.8/tests/MockV3Aggregator.sol#L76-L76
+	MockLinkAggregatorDescription = "v0.8/tests/MockV3Aggregator.sol"
+	// MockWETHAggregatorDescription is the description from MockETHUSDAggregator.sol
+	// https://github.com/smartcontractkit/chainlink/blob/a348b98e90527520049c580000a86fb8ceff7fa7/contracts/src/v0.8/automation/testhelpers/MockETHUSDAggregator.sol#L19-L19
+	MockWETHAggregatorDescription = "MockETHUSDAggregator"
 )
 
 var (
+	MockLinkPrice = deployment.E18Mult(500)
+	MockWethPrice = big.NewInt(9e8)
+	// DescriptionToTokenSymbol maps price feed description to token descriptor
+	DescriptionToTokenSymbol = map[string]TokenSymbol{
+		MockLinkAggregatorDescription: LinkSymbol,
+		MockWETHAggregatorDescription: WethSymbol,
+		LinkUSD:                       LinkSymbol,
+		AvaxUSD:                       WAVAXSymbol,
+		EthUSD:                        WethSymbol,
+		MaticUSD:                      WPOLSymbol,
+		BNBUSD:                        WBNBSymbol,
+	}
+	MockSymbolToDescription = map[TokenSymbol]string{
+		LinkSymbol: MockLinkAggregatorDescription,
+		WethSymbol: MockWETHAggregatorDescription,
+	}
 	TestDeviationPPB = ccipocr3.NewBigIntFromInt64(1e9)
 )
 
@@ -55,15 +105,15 @@ func (tc *TokenConfig) UpsertTokenInfo(
 // GetTokenInfo Adds mapping between dest chain tokens and their respective aggregators on feed chain.
 func (tc *TokenConfig) GetTokenInfo(
 	lggr logger.Logger,
-	linkToken *burn_mint_erc677.BurnMintERC677,
-	wethToken *weth9.WETH9,
+	linkTokenAddr,
+	wethTokenAddr common.Address,
 ) map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo {
 	tokenToAggregate := make(map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo)
 	if _, ok := tc.TokenSymbolToInfo[LinkSymbol]; !ok {
 		lggr.Debugw("Link aggregator not found, deploy without mapping link token")
 	} else {
 		lggr.Debugw("Mapping LinkToken to Link aggregator")
-		acc := ccipocr3.UnknownEncodedAddress(linkToken.Address().String())
+		acc := ccipocr3.UnknownEncodedAddress(linkTokenAddr.String())
 		tokenToAggregate[acc] = tc.TokenSymbolToInfo[LinkSymbol]
 	}
 
@@ -71,7 +121,7 @@ func (tc *TokenConfig) GetTokenInfo(
 		lggr.Debugw("Weth aggregator not found, deploy without mapping link token")
 	} else {
 		lggr.Debugw("Mapping WethToken to Weth aggregator")
-		acc := ccipocr3.UnknownEncodedAddress(wethToken.Address().String())
+		acc := ccipocr3.UnknownEncodedAddress(wethTokenAddr.String())
 		tokenToAggregate[acc] = tc.TokenSymbolToInfo[WethSymbol]
 	}
 

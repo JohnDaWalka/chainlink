@@ -2,6 +2,7 @@ package devenv
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -14,32 +15,30 @@ const (
 )
 
 type EnvironmentConfig struct {
-	Chains            []ChainConfig
-	HomeChainSelector uint64
-	FeedChainSelector uint64
-	JDConfig          JDConfig
+	Chains   []ChainConfig
+	JDConfig JDConfig
 }
 
-func NewEnvironment(ctx context.Context, lggr logger.Logger, config EnvironmentConfig) (*deployment.Environment, *DON, error) {
+func NewEnvironment(ctx func() context.Context, lggr logger.Logger, config EnvironmentConfig) (*deployment.Environment, *DON, error) {
 	chains, err := NewChains(lggr, config.Chains)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create chains: %w", err)
 	}
-	offChain, err := NewJDClient(ctx, config.JDConfig)
+	offChain, err := NewJDClient(ctx(), config.JDConfig)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create JD client: %w", err)
 	}
 
 	jd, ok := offChain.(*JobDistributor)
 	if !ok {
-		return nil, nil, fmt.Errorf("offchain client does not implement JobDistributor")
+		return nil, nil, errors.New("offchain client does not implement JobDistributor")
 	}
 	if jd == nil {
-		return nil, nil, fmt.Errorf("offchain client is not set up")
+		return nil, nil, errors.New("offchain client is not set up")
 	}
 	var nodeIDs []string
 	if jd.don != nil {
-		err = jd.don.CreateSupportedChains(ctx, config.Chains, *jd)
+		err = jd.don.CreateSupportedChains(ctx(), config.Chains, *jd)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -51,7 +50,10 @@ func NewEnvironment(ctx context.Context, lggr logger.Logger, config EnvironmentC
 		lggr,
 		deployment.NewMemoryAddressBook(),
 		chains,
+		nil, // sending nil for solana chains right now, we can build this when we need it
 		nodeIDs,
 		offChain,
+		ctx,
+		deployment.XXXGenerateTestOCRSecrets(),
 	), jd.don, nil
 }

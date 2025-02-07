@@ -45,6 +45,10 @@ inputs:
   aws-region:
     description: The AWS region the ECR repository is located in, should only be needed for public ECR repositories, used in configuring docker/login-action
     required: false
+  git-tag-type:
+    description: The type of git tag (core or ccip)
+    default: core
+    required: false
 
   # Inputs for signing
   sign-images:
@@ -70,6 +74,9 @@ runs:
     - name: Set shared variables
       shell: bash
       # See https://docs.github.com/en/actions/learn-github-actions/workflow-commands-for-github-actions#multiline-strings
+      env:
+        GIT_COMMIT_SHA: ${{ inputs.git-commit-sha }}
+        GIT_TAG_TYPE: ${{ inputs.git-tag-type }}
       run: |
         SHARED_IMAGES=${{ inputs.ecr-hostname }}/${{ inputs.ecr-image-name }}
         OIDC_ISSUER=https://token.actions.githubusercontent.com
@@ -82,10 +89,18 @@ runs:
         EOF
         )
 
-        SHARED_BUILD_ARGS=$(cat << EOF
-        COMMIT_SHA=${{ inputs.git-commit-sha }}
+        if [[ "${GIT_TAG_TYPE}" = "ccip" ]]; then
+          SHARED_BUILD_ARGS=$(cat << EOF
+        COMMIT_SHA=${GIT_COMMIT_SHA}
+        CL_CHAIN_DEFAULTS=/ccip-config
         EOF
         )
+        else
+          SHARED_BUILD_ARGS=$(cat << EOF
+        COMMIT_SHA=${GIT_COMMIT_SHA}
+        EOF
+        )
+        fi
 
         echo "shared-images<<EOF" >> $GITHUB_ENV
         echo "$SHARED_IMAGES" >> $GITHUB_ENV
@@ -210,12 +225,12 @@ runs:
         IMAGES_NAME_RAW=${{ fromJSON(steps.buildpush-nonroot.outputs.metadata)['image.name'] }}
         IMAGE_DIGEST=${{ fromJSON(steps.buildpush-nonroot.outputs.metadata)['containerimage.digest'] }}
         IMAGE_NAME=$(echo "$IMAGES_NAME_RAW" | cut -d"," -f1)
-        IMAGE_TAG=$(echo "$IMAGES_NAME_RAW" | cut -d":" -f2)
+        IMAGE_TAG=$(echo "$IMAGE_NAME" | cut -d":" -f2)
         echo "nonroot_image_name=${IMAGE_NAME}" >> $GITHUB_ENV
         echo "nonroot_image_digest=${IMAGE_DIGEST}" >> $GITHUB_ENV
         echo '### Docker Image' >> $GITHUB_STEP_SUMMARY
-        echo "Image Name: ${IMAGE_NAME}"  >> $GITHUB_STEP_SUMMARY
-        echo "Image Digest: ${IMAGE_DIGEST}"  >> $GITHUB_STEP_SUMMARY
+        echo "Image Name: ${IMAGE_NAME}" >> $GITHUB_STEP_SUMMARY
+        echo "Image Digest: ${IMAGE_DIGEST}" >> $GITHUB_STEP_SUMMARY
         echo "image-tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
         echo "image-digest=${IMAGE_DIGEST}" >> $GITHUB_OUTPUT
 

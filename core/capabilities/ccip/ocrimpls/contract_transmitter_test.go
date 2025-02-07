@@ -21,21 +21,21 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
-	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 
+	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
+	"github.com/smartcontractkit/chainlink-integrations/evm/client"
+	evmconfig "github.com/smartcontractkit/chainlink-integrations/evm/config"
+	"github.com/smartcontractkit/chainlink-integrations/evm/config/chaintype"
+	"github.com/smartcontractkit/chainlink-integrations/evm/config/toml"
+	"github.com/smartcontractkit/chainlink-integrations/evm/gas"
+	"github.com/smartcontractkit/chainlink-integrations/evm/keystore"
+	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
+	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	evmconfig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/chaintype"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/multi_ocr3_helper"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
@@ -103,7 +103,7 @@ func testTransmitter(
 	report []byte,
 ) {
 	ctx := tests.Context(t)
-	uni := newTestUniverse[[]byte](t, nil)
+	uni := newTestUniverse(t, nil)
 
 	c, err := uni.wrapper.LatestConfigDetails(nil, pluginType)
 	require.NoError(t, err, "failed to get latest config details")
@@ -199,7 +199,7 @@ type keyringsAndSigners[RI any] struct {
 	signers  []common.Address
 }
 
-func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniverse[RI] {
+func newTestUniverse(t *testing.T, ks *keyringsAndSigners[[]byte]) *testUniverse[[]byte] {
 	t.Helper()
 
 	db := pgtest.NewSqlxDB(t)
@@ -233,7 +233,7 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 	// create the oracle identities for setConfig
 	// need to create at least 4 identities otherwise setConfig will fail
 	var (
-		keyrings []ocr3types.OnchainKeyring[RI]
+		keyrings []ocr3types.OnchainKeyring[[]byte]
 		signers  []common.Address
 	)
 	if ks != nil {
@@ -243,7 +243,7 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 		for i := 0; i < 4; i++ {
 			kb, err2 := ocr2key.New(kschaintype.EVM)
 			require.NoError(t, err2, "failed to create key")
-			kr := ocrimpls.NewOnchainKeyring[RI](kb, logger.TestLogger(t))
+			kr := ocrimpls.NewOnchainKeyring[[]byte](kb, logger.TestLogger(t))
 			signers = append(signers, common.BytesToAddress(kr.PublicKey()))
 			keyrings = append(keyrings, kr)
 		}
@@ -309,7 +309,7 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 	require.NoError(t, chainWriter.Start(testutils.Context(t)), "failed to start chain writer")
 	t.Cleanup(func() { require.NoError(t, chainWriter.Close()) })
 
-	transmitterWithSigs := ocrimpls.XXXNewContractTransmitterTestsOnly[RI](
+	transmitterWithSigs := ocrimpls.XXXNewContractTransmitterTestsOnly(
 		chainWriter,
 		ocrtypes.Account(transmitters[0].Hex()),
 		contractName,
@@ -317,7 +317,7 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 		ocr3HelperAddr.Hex(),
 		ocrimpls.ToCommitCalldata,
 	)
-	transmitterWithoutSigs := ocrimpls.XXXNewContractTransmitterTestsOnly[RI](
+	transmitterWithoutSigs := ocrimpls.XXXNewContractTransmitterTestsOnly(
 		chainWriter,
 		ocrtypes.Account(transmitters[0].Hex()),
 		contractName,
@@ -326,7 +326,7 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 		ocrimpls.ToExecCalldata,
 	)
 
-	return &testUniverse[RI]{
+	return &testUniverse[[]byte]{
 		simClient:              simClient,
 		backend:                backend,
 		deployer:               owner,
@@ -476,7 +476,8 @@ func makeTestEvmTxm(
 		lp,
 		keyStore,
 		estimator,
-		ht)
+		ht,
+		nil)
 	require.NoError(t, err, "can't create tx manager")
 
 	_, unsub := broadcaster.Subscribe(txm)

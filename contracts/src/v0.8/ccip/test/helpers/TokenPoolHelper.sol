@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
@@ -17,10 +17,6 @@ contract TokenPoolHelper is TokenPool {
     address rmnProxy,
     address router
   ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
-
-  function getRemotePoolHashes() external view returns (bytes32[] memory) {
-    return new bytes32[](0); // s_remotePoolHashes.values();
-  }
 
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn

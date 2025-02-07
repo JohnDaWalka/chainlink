@@ -20,9 +20,10 @@ import (
 
 const (
 	// NOTE: more methods will go here. HTTP trigger/action/target; etc.
-	MethodWebAPITarget  = "web_api_target"
-	MethodWebAPITrigger = "web_api_trigger"
-	MethodComputeAction = "compute_action"
+	MethodWebAPITarget   = "web_api_target"
+	MethodWebAPITrigger  = "web_api_trigger"
+	MethodComputeAction  = "compute_action"
+	MethodWorkflowSyncer = "workflow_syncer"
 )
 
 type handler struct {
@@ -130,11 +131,12 @@ func (h *handler) handleWebAPIOutgoingMessage(ctx context.Context, msg *api.Mess
 
 	timeout := time.Duration(payload.TimeoutMs) * time.Millisecond
 	req := network.HTTPRequest{
-		Method:  payload.Method,
-		URL:     payload.URL,
-		Headers: payload.Headers,
-		Body:    payload.Body,
-		Timeout: timeout,
+		Method:           payload.Method,
+		URL:              payload.URL,
+		Headers:          payload.Headers,
+		Body:             payload.Body,
+		MaxResponseBytes: payload.MaxResponseBytes,
+		Timeout:          timeout,
 	}
 
 	// send response to node async
@@ -145,7 +147,8 @@ func (h *handler) handleWebAPIOutgoingMessage(ctx context.Context, msg *api.Mess
 		newCtx := context.WithoutCancel(ctx)
 		newCtx, cancel := context.WithTimeout(newCtx, timeout)
 		defer cancel()
-		l := h.lggr.With("url", payload.URL, "messageId", msg.Body.MessageId, "method", payload.Method)
+		l := h.lggr.With("url", payload.URL, "messageId", msg.Body.MessageId, "method", payload.Method, "timeout", payload.TimeoutMs)
+		l.Debug("Sending request to client")
 		respMsg, err := h.sendHTTPMessageToClient(newCtx, req, msg)
 		if err != nil {
 			l.Errorw("error while sending HTTP request to external endpoint", "err", err)
@@ -168,8 +171,14 @@ func (h *handler) handleWebAPIOutgoingMessage(ctx context.Context, msg *api.Mess
 				},
 			}
 		}
-		// this signature is not verified by the node because
-		// WS connection between gateway and node are already verified
+
+		// Work around the fact that the connection manager expects all messages
+		// to have a valid signature by reusing the signature that came with the message.
+		// This is OK to do because:
+		// - our trust model for Gateways assumes that we can trust the Gateway node. This is a central assumption since
+		// the Gateway node has access to plaintext secrets sent by DON nodes.
+		// - the connection between the Gateway and DON Node is already authorized via a DON-side and Gateway-side
+		// allowlist, and secured via TLS.
 		respMsg.Signature = msg.Signature
 
 		err = h.don.SendToNode(newCtx, nodeAddr, respMsg)
@@ -186,7 +195,7 @@ func (h *handler) HandleNodeMessage(ctx context.Context, msg *api.Message, nodeA
 	switch msg.Body.Method {
 	case MethodWebAPITrigger:
 		return h.handleWebAPITriggerMessage(ctx, msg, nodeAddr)
-	case MethodWebAPITarget, MethodComputeAction:
+	case MethodWebAPITarget, MethodComputeAction, MethodWorkflowSyncer:
 		return h.handleWebAPIOutgoingMessage(ctx, msg, nodeAddr)
 	default:
 		return fmt.Errorf("unsupported method: %s", msg.Body.Method)

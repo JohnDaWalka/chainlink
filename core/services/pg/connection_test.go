@@ -4,15 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v4/stdlib"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/store/dialects"
 )
 
 var _ Getter = &mockGetter{}
@@ -63,24 +58,4 @@ func Test_checkVersion(t *testing.T) {
 		err := checkVersion(m, 110001)
 		require.NoError(t, err)
 	})
-}
-
-func Test_disallowReplica(t *testing.T) {
-	testutils.SkipShortDB(t)
-	db, err := sqlx.Open(string(dialects.TransactionWrappedPostgres), uuid.New().String())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-
-	_, err = db.Exec("SET session_replication_role= 'origin'")
-	require.NoError(t, err)
-	err = disallowReplica(db)
-	require.NoError(t, err)
-
-	_, err = db.Exec("SET session_replication_role= 'replica'")
-	require.NoError(t, err)
-	err = disallowReplica(db)
-	require.Error(t, err, "replica role should be disallowed")
-
-	_, err = db.Exec("SET session_replication_role= 'not_valid_role'")
-	require.Error(t, err)
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"strconv"
 	"testing"
 	"time"
 
@@ -21,18 +22,18 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_home"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_home"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
+	"github.com/smartcontractkit/chainlink-integrations/evm/client"
 	configsevm "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_home"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_home"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -137,7 +138,7 @@ func NewTestUniverse(ctx context.Context, t *testing.T, lggr logger.Logger) Test
 	t.Cleanup(func() { require.NoError(t, lp.Close()) })
 
 	cr := NewReader(t, lp, headTracker, cl, ccAddress, configsevm.HomeChainReaderConfigRaw)
-	hcr := NewHomeChainReader(t, cr, ccAddress)
+	hcr := NewHomeChainReader(t, cr, ccAddress, strconv.Itoa(chainID))
 	return TestUniverse{
 		Transactor:         transactor,
 		Backend:            backend,
@@ -237,11 +238,22 @@ func (t *TestUniverse) AddCapability(p2pIDs [][32]byte) {
 	}
 }
 
-func NewHomeChainReader(t *testing.T, cr types.ContractReader, ccAddress common.Address) ccipreader.HomeChain {
-	hcr := ccipreader.NewHomeChainReader(cr, logger.TestLogger(t), 50*time.Millisecond, types.BoundContract{
-		Address: ccAddress.String(),
-		Name:    consts.ContractNameCCIPConfig,
-	})
+func NewHomeChainReader(
+	t *testing.T,
+	cr types.ContractReader,
+	ccAddress common.Address,
+	chainID string,
+) ccipreader.HomeChain {
+	hcr := ccipreader.NewObservedHomeChainReader(
+		cr,
+		logger.TestLogger(t),
+		50*time.Millisecond,
+		types.BoundContract{
+			Address: ccAddress.String(),
+			Name:    consts.ContractNameCCIPConfig,
+		},
+		chainID,
+	)
 	require.NoError(t, hcr.Start(testutils.Context(t)))
 	t.Cleanup(func() { require.NoError(t, hcr.Close()) })
 
@@ -408,7 +420,7 @@ func GenerateRMNHomeConfigs(
 		SourceChains: []rmn_home.RMNHomeSourceChain{
 			{
 				ChainSelector:       chainSelector,
-				F:                   f,
+				FObserve:            f,
 				ObserverNodesBitmap: observerBitmap,
 			},
 		},

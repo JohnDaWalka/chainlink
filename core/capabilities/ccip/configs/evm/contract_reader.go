@@ -6,22 +6,21 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/codec"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_home"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_proxy_contract"
-
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 
-	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
+	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_home"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_home"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_remote"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
-	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/aggregator_v3_interface"
 	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
@@ -33,7 +32,7 @@ var (
 	nonceManagerABI         = evmtypes.MustGetABI(nonce_manager.NonceManagerABI)
 	priceFeedABI            = evmtypes.MustGetABI(aggregator_v3_interface.AggregatorV3InterfaceABI)
 	rmnRemoteABI            = evmtypes.MustGetABI(rmn_remote.RMNRemoteABI)
-	rmnProxyABI             = evmtypes.MustGetABI(rmn_proxy_contract.RMNProxyContractABI)
+	rmnProxyABI             = evmtypes.MustGetABI(rmn_proxy_contract.RMNProxyABI)
 	rmnHomeABI              = evmtypes.MustGetABI(rmn_home.RMNHomeABI)
 	routerABI               = evmtypes.MustGetABI(router.RouterABI)
 )
@@ -87,6 +86,10 @@ var DestReaderConfig = evmrelaytypes.ChainReaderConfig{
 				},
 				consts.MethodNameOffRampGetAllSourceChainConfigs: {
 					ChainSpecificName: mustGetMethodName("getAllSourceChainConfigs", offrampABI),
+					ReadType:          evmrelaytypes.Method,
+				},
+				consts.MethodNameOffRampLatestConfigDetails: {
+					ChainSpecificName: mustGetMethodName("latestConfigDetails", offrampABI),
 					ReadType:          evmrelaytypes.Method,
 				},
 				consts.EventNameCommitReportAccepted: {
@@ -179,10 +182,14 @@ var DestReaderConfig = evmrelaytypes.ChainReaderConfig{
 					ChainSpecificName: mustGetMethodName("getReportDigestHeader", rmnRemoteABI),
 					ReadType:          evmrelaytypes.Method,
 				},
+				consts.MethodNameGetCursedSubjects: {
+					ChainSpecificName: mustGetMethodName("getCursedSubjects", rmnRemoteABI),
+					ReadType:          evmrelaytypes.Method,
+				},
 			},
 		},
 		consts.ContractNameRMNProxy: {
-			ContractABI: rmn_proxy_contract.RMNProxyContractABI,
+			ContractABI: rmn_proxy_contract.RMNProxyABI,
 			Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
 				consts.MethodNameGetARM: {
 					ChainSpecificName: mustGetMethodName("getARM", rmnProxyABI),
@@ -282,6 +289,23 @@ var SourceReaderConfig = evmrelaytypes.ChainReaderConfig{
 				},
 				consts.MethodNameGetFeeTokens: {
 					ChainSpecificName: mustGetMethodName("getFeeTokens", feeQuoterABI),
+					ReadType:          evmrelaytypes.Method,
+				},
+			},
+		},
+		consts.ContractNameRMNRemote: {
+			ContractABI: rmn_remote.RMNRemoteABI,
+			Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
+				consts.MethodNameGetVersionedConfig: {
+					ChainSpecificName: mustGetMethodName("getVersionedConfig", rmnRemoteABI),
+					ReadType:          evmrelaytypes.Method,
+				},
+				consts.MethodNameGetReportDigestHeader: {
+					ChainSpecificName: mustGetMethodName("getReportDigestHeader", rmnRemoteABI),
+					ReadType:          evmrelaytypes.Method,
+				},
+				consts.MethodNameGetCursedSubjects: {
+					ChainSpecificName: mustGetMethodName("getCursedSubjects", rmnRemoteABI),
 					ReadType:          evmrelaytypes.Method,
 				},
 			},

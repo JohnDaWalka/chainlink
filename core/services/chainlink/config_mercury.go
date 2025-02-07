@@ -42,6 +42,10 @@ type mercuryTransmitterConfig struct {
 	c toml.MercuryTransmitter
 }
 
+func (m *mercuryTransmitterConfig) Protocol() config.MercuryTransmitterProtocol {
+	return *m.c.Protocol
+}
+
 func (m *mercuryTransmitterConfig) TransmitQueueMaxSize() uint32 {
 	return *m.c.TransmitQueueMaxSize
 }
@@ -52,6 +56,14 @@ func (m *mercuryTransmitterConfig) TransmitTimeout() commonconfig.Duration {
 
 func (m *mercuryTransmitterConfig) TransmitConcurrency() uint32 {
 	return *m.c.TransmitConcurrency
+}
+
+func (m *mercuryTransmitterConfig) ReaperFrequency() commonconfig.Duration {
+	return *m.c.ReaperFrequency
+}
+
+func (m *mercuryTransmitterConfig) ReaperMaxAge() commonconfig.Duration {
+	return *m.c.ReaperMaxAge
 }
 
 type mercuryConfig struct {

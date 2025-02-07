@@ -9,9 +9,9 @@ import (
 
 	commonassets "github.com/smartcontractkit/chainlink-common/pkg/assets"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
+	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
+	"github.com/smartcontractkit/chainlink-integrations/evm/types"
+	"github.com/smartcontractkit/chainlink-integrations/evm/utils/big"
 	clnull "github.com/smartcontractkit/chainlink/v2/core/null"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
@@ -176,6 +176,7 @@ type OffChainReporting2Spec struct {
 	BlockchainTimeout                 models.Interval        `json:"blockchainTimeout"`
 	ContractConfigTrackerPollInterval models.Interval        `json:"contractConfigTrackerPollInterval"`
 	ContractConfigConfirmations       uint16                 `json:"contractConfigConfirmations"`
+	OnchainSigningStrategy            map[string]interface{} `json:"onchainSigningStrategy"`
 	CreatedAt                         time.Time              `json:"createdAt"`
 	UpdatedAt                         time.Time              `json:"updatedAt"`
 	CollectTelemetry                  bool                   `json:"collectTelemetry"`
@@ -194,6 +195,7 @@ func NewOffChainReporting2Spec(spec *job.OCR2OracleSpec) *OffChainReporting2Spec
 		BlockchainTimeout:                 spec.BlockchainTimeout,
 		ContractConfigTrackerPollInterval: spec.ContractConfigTrackerPollInterval,
 		ContractConfigConfirmations:       spec.ContractConfigConfirmations,
+		OnchainSigningStrategy:            spec.OnchainSigningStrategy,
 		CreatedAt:                         spec.CreatedAt,
 		UpdatedAt:                         spec.UpdatedAt,
 		CollectTelemetry:                  spec.CaptureEATelemetry,

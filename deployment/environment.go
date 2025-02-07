@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -54,6 +55,30 @@ type Chain struct {
 	// Note the Sign function can be abstract supporting a variety of key storage mechanisms (e.g. KMS etc).
 	DeployerKey *bind.TransactOpts
 	Confirm     func(tx *types.Transaction) (uint64, error)
+	// Users are a set of keys that can be used to interact with the chain.
+	// These are distinct from the deployer key.
+	Users []*bind.TransactOpts
+}
+
+func (c Chain) String() string {
+	chainInfo, err := ChainInfo(c.Selector)
+	if err != nil {
+		// we should never get here, if the selector is invalid it should not be in the environment
+		panic(err)
+	}
+	return fmt.Sprintf("%s (%d)", chainInfo.ChainName, chainInfo.ChainSelector)
+}
+
+func (c Chain) Name() string {
+	chainInfo, err := ChainInfo(c.Selector)
+	if err != nil {
+		// we should never get here, if the selector is invalid it should not be in the environment
+		panic(err)
+	}
+	if chainInfo.ChainName == "" {
+		return strconv.FormatUint(c.Selector, 10)
+	}
+	return chainInfo.ChainName
 }
 
 // Environment represents an instance of a deployed product
@@ -74,8 +99,11 @@ type Environment struct {
 	Logger            logger.Logger
 	ExistingAddresses AddressBook
 	Chains            map[uint64]Chain
+	SolChains         map[uint64]SolChain
 	NodeIDs           []string
 	Offchain          OffchainClient
+	GetContext        func() context.Context
+	OCRSecrets        OCRSecrets
 }
 
 func NewEnvironment(
@@ -83,16 +111,22 @@ func NewEnvironment(
 	logger logger.Logger,
 	existingAddrs AddressBook,
 	chains map[uint64]Chain,
+	solChains map[uint64]SolChain,
 	nodeIDs []string,
 	offchain OffchainClient,
+	ctx func() context.Context,
+	secrets OCRSecrets,
 ) *Environment {
 	return &Environment{
 		Name:              name,
 		Logger:            logger,
 		ExistingAddresses: existingAddrs,
 		Chains:            chains,
+		SolChains:         solChains,
 		NodeIDs:           nodeIDs,
 		Offchain:          offchain,
+		GetContext:        ctx,
+		OCRSecrets:        secrets,
 	}
 }
 
@@ -127,6 +161,17 @@ func (e Environment) AllChainSelectorsExcluding(excluding []uint64) []uint64 {
 	return selectors
 }
 
+func (e Environment) AllChainSelectorsSolana() []uint64 {
+	selectors := make([]uint64, 0, len(e.SolChains))
+	for sel := range e.SolChains {
+		selectors = append(selectors, sel)
+	}
+	sort.Slice(selectors, func(i, j int) bool {
+		return selectors[i] < selectors[j]
+	})
+	return selectors
+}
+
 func (e Environment) AllDeployerKeys() []common.Address {
 	var deployerKeys []common.Address
 	for sel := range e.Chains {
@@ -141,7 +186,7 @@ func ConfirmIfNoError(chain Chain, tx *types.Transaction, err error) (uint64, er
 		var d rpc.DataError
 		ok := errors.As(err, &d)
 		if ok {
-			return 0, fmt.Errorf("transaction reverted: Error %s ErrorData %v", d.Error(), d.ErrorData())
+			return 0, fmt.Errorf("transaction reverted on chain %s: Error %s ErrorData %v", chain.String(), d.Error(), d.ErrorData())
 		}
 		return 0, err
 	}
@@ -153,7 +198,30 @@ func MaybeDataErr(err error) error {
 	var d rpc.DataError
 	ok := errors.As(err, &d)
 	if ok {
-		return d
+		return fmt.Errorf("%s: %v", d.Error(), d.ErrorData())
+	}
+	return err
+}
+
+// ConfirmIfNoErrorWithABI confirms the transaction if no error occurred.
+// if the error is a DataError, it will return the decoded error message and data.
+func ConfirmIfNoErrorWithABI(chain Chain, tx *types.Transaction, abi string, err error) (uint64, error) {
+	if err != nil {
+		return 0, fmt.Errorf("transaction reverted on chain %s: Error %w",
+			chain.String(), DecodedErrFromABIIfDataErr(err, abi))
+	}
+	return chain.Confirm(tx)
+}
+
+func DecodedErrFromABIIfDataErr(err error, abi string) error {
+	var d rpc.DataError
+	ok := errors.As(err, &d)
+	if ok {
+		errReason, err := parseErrorFromABI(fmt.Sprintf("%s", d.ErrorData()), abi)
+		if err != nil {
+			return fmt.Errorf("%s: %v", d.Error(), d.ErrorData())
+		}
+		return fmt.Errorf("%s due to %s: %v", d.Error(), errReason, d.ErrorData())
 	}
 	return err
 }
@@ -258,13 +326,6 @@ func (n Node) OCRConfigForChainSelector(chainSel uint64) (OCRConfig, bool) {
 	return c, ok
 }
 
-func (n Node) FirstOCRKeybundle() OCRConfig {
-	for _, ocrConfig := range n.SelToOCRConfig {
-		return ocrConfig
-	}
-	return OCRConfig{}
-}
-
 func MustPeerIDFromString(s string) p2pkey.PeerID {
 	p := p2pkey.PeerID{}
 	if err := p.UnmarshalString(s); err != nil {
@@ -304,7 +365,6 @@ func NodeInfo(nodeIDs []string, oc NodeChainConfigsLister) (Nodes, error) {
 			Enabled: 1,
 			Ids:     nodeIDs,
 		}
-
 	}
 	nodesFromJD, err := oc.ListNodes(context.Background(), &nodev1.ListNodesRequest{
 		Filter: filter,
@@ -406,6 +466,7 @@ func NodeInfo(nodeIDs []string, oc NodeChainConfigsLister) (Nodes, error) {
 }
 
 type CapabilityRegistryConfig struct {
-	EVMChainID uint64         // chain id of the chain the CR is deployed on
-	Contract   common.Address // address of the CR contract
+	EVMChainID  uint64         // chain id of the chain the CR is deployed on
+	Contract    common.Address // address of the CR contract
+	NetworkType string         // network type of the chain
 }

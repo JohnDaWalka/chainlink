@@ -23,7 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	txmgrcommon "github.com/smartcontractkit/chainlink/v2/common/txmgr"
+	txmgrcommon "github.com/smartcontractkit/chainlink-framework/chains/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/log"
 	logmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/log/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
@@ -150,7 +150,7 @@ type setupOptions struct {
 // functional options to configure the setup
 func setup(t *testing.T, ds sqlutil.DataSource, optionFns ...func(*setupOptions)) (*fluxmonitorv2.FluxMonitor, *testMocks) {
 	t.Helper()
-	testutils.SkipShort(t, "long test")
+	tests.SkipShort(t, "long test")
 
 	tm := setupMocks(t)
 	options := setupOptions{

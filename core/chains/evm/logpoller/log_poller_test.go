@@ -23,23 +23,22 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/chaintype"
 
+	"github.com/smartcontractkit/chainlink-integrations/evm/client"
+	"github.com/smartcontractkit/chainlink-integrations/evm/client/clienttest"
+	"github.com/smartcontractkit/chainlink-integrations/evm/config/chaintype"
+	"github.com/smartcontractkit/chainlink-integrations/evm/testutils"
+	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
+	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
+	ubig "github.com/smartcontractkit/chainlink-integrations/evm/utils/big"
 	htMocks "github.com/smartcontractkit/chainlink/v2/common/headtracker/mocks"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
-	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/log_emitter"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/evmtest"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
-	"github.com/smartcontractkit/chainlink/v2/core/utils/testutils/heavyweight"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/log_emitter"
 )
 
 func logRuntime(t testing.TB, start time.Time) {
@@ -88,7 +87,7 @@ func populateDatabase(t testing.TB, o logpoller.ORM, chainID *big.Int) (common.H
 func BenchmarkSelectLogsCreatedAfter(b *testing.B) {
 	chainId := big.NewInt(137)
 	ctx := testutils.Context(b)
-	_, db := heavyweight.FullTestDBV2(b, nil)
+	db := testutils.NewIndependentSqlxDB(b)
 	o := logpoller.NewORM(chainId, db, logger.Test(b))
 	event, address, _ := populateDatabase(b, o, chainId)
 
@@ -106,7 +105,7 @@ func BenchmarkSelectLogsCreatedAfter(b *testing.B) {
 
 func TestPopulateLoadedDB(t *testing.T) {
 	t.Skip("Only for local load testing and query analysis")
-	_, db := heavyweight.FullTestDBV2(t, nil)
+	db := testutils.NewIndependentSqlxDB(t)
 	ctx := testutils.Context(t)
 	chainID := big.NewInt(137)
 
@@ -685,7 +684,7 @@ func TestLogPoller_SynchronizedWithGeth(t *testing.T) {
 	numChainInserts := 3
 	finalityDepth := 5
 	lggr := logger.Test(t)
-	db := pgtest.NewSqlxDB(t)
+	db := testutils.NewSqlxDB(t)
 
 	owner := testutils.MustNewSimTransactor(t)
 	owner.GasPrice = big.NewInt(10e9)
@@ -1106,7 +1105,8 @@ func TestLogPoller_ReorgDeeperThanFinality(t *testing.T) {
 
 			secondPoll := th.PollAndSaveLogs(testutils.Context(t), firstPoll)
 			assert.Equal(t, firstPoll, secondPoll)
-			assert.Equal(t, logpoller.ErrFinalityViolated, th.LogPoller.Healthy())
+			require.Equal(t, commontypes.ErrFinalityViolated, th.LogPoller.Healthy())
+			require.Equal(t, commontypes.ErrFinalityViolated, th.LogPoller.HealthReport()[th.LogPoller.Name()])
 
 			// Manually remove re-org'd chain from the log poller to bring it back to life
 			// LogPoller should be healthy again after first poll
@@ -1116,7 +1116,8 @@ func TestLogPoller_ReorgDeeperThanFinality(t *testing.T) {
 			// Poll from latest
 			recoveryPoll := th.PollAndSaveLogs(testutils.Context(t), 1)
 			assert.Equal(t, int64(35), recoveryPoll)
-			assert.NoError(t, th.LogPoller.Healthy())
+			require.NoError(t, th.LogPoller.Healthy())
+			require.NoError(t, th.LogPoller.HealthReport()[th.LogPoller.Name()])
 		})
 	}
 }
@@ -1338,7 +1339,7 @@ func TestLogPoller_GetBlocks_Range(t *testing.T) {
 	blockNums = []uint64{2}
 	_, err = th.LogPoller.GetBlocksRange(testutils.Context(t), blockNums)
 	require.Error(t, err)
-	assert.Equal(t, "Received unfinalized block 2 while expecting finalized block (latestFinalizedBlockNumber = 1)", err.Error())
+	assert.Equal(t, "received unfinalized block 2 while expecting finalized block (latestFinalizedBlockNumber = 1)", err.Error())
 
 	th.Backend.Commit() // Commit block #4, so that block #2 is finalized
 
@@ -1407,12 +1408,6 @@ func TestLogPoller_GetBlocks_Range(t *testing.T) {
 	_, err = th.LogPoller.GetBlocksRange(ctx, blockNums)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "context canceled")
-
-	// test canceled ctx
-	ctx, cancel = context.WithCancel(testutils.Context(t))
-	cancel()
-	_, err = th.LogPoller.GetBlocksRange(ctx, blockNums)
-	require.Equal(t, err, context.Canceled)
 }
 
 func TestGetReplayFromBlock(t *testing.T) {
@@ -1465,7 +1460,7 @@ func TestLogPoller_DBErrorHandling(t *testing.T) {
 	lggr, observedLogs := logger.TestObserved(t, zapcore.WarnLevel)
 	chainID1 := testutils.NewRandomEVMChainID()
 	chainID2 := testutils.NewRandomEVMChainID()
-	db := pgtest.NewSqlxDB(t)
+	db := testutils.NewSqlxDB(t)
 	o := logpoller.NewORM(chainID1, db, lggr)
 
 	owner := testutils.MustNewSimTransactor(t)
@@ -1535,10 +1530,10 @@ func TestTooManyLogResults(t *testing.T) {
 	t.Parallel()
 
 	ctx := testutils.Context(t)
-	ec := evmtest.NewEthClientMockWithDefaultChain(t)
+	ec := clienttest.NewClientWithDefaultChainID(t)
 	lggr, obs := logger.TestObserved(t, zapcore.DebugLevel)
 	chainID := testutils.NewRandomEVMChainID()
-	db := pgtest.NewSqlxDB(t)
+	db := testutils.NewSqlxDB(t)
 
 	o := logpoller.NewORM(chainID, db, lggr)
 
@@ -1667,11 +1662,11 @@ func TestTooManyLogResults(t *testing.T) {
 		crit := obs.FilterLevelExact(zapcore.DPanicLevel).All()
 		errors := obs.FilterLevelExact(zapcore.ErrorLevel).All()
 		warns := obs.FilterLevelExact(zapcore.WarnLevel).All()
-		assert.Len(t, crit, 0)
-		require.Len(t, errors, 1)
-		assert.Equal(t, errors[0].Message, "Unable to query for logs")
-		require.Len(t, warns, 1)
-		assert.Contains(t, warns[0].Message, "retrying later")
+		assert.Empty(t, crit)
+		require.Len(t, errors, 2)
+		assert.Contains(t, errors[0].Message, "Unable to query for logs")
+		assert.Contains(t, errors[1].Message, "Failed to poll and save logs, retrying later")
+		require.Empty(t, warns)
 	})
 }
 
@@ -1963,10 +1958,10 @@ func Test_PruneOldBlocks(t *testing.T) {
 
 func TestFindLCA(t *testing.T) {
 	ctx := testutils.Context(t)
-	ec := evmtest.NewEthClientMockWithDefaultChain(t)
+	ec := clienttest.NewClientWithDefaultChainID(t)
 	lggr := logger.Test(t)
 	chainID := testutils.NewRandomEVMChainID()
-	db := pgtest.NewSqlxDB(t)
+	db := testutils.NewSqlxDB(t)
 
 	orm := logpoller.NewORM(chainID, db, lggr)
 

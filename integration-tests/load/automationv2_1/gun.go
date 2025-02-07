@@ -1,4 +1,4 @@
-package automationv2_1
+package automation
 
 import (
 	"math/big"
@@ -10,7 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/log_emitter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/log_emitter"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 )
@@ -44,14 +44,14 @@ func generateCallData(int1 int64, int2 int64, count int64) []byte {
 
 func NewLogTriggerUser(
 	logger zerolog.Logger,
-	TriggerConfigs []LogTriggerConfig,
+	triggerConfigs []LogTriggerConfig,
 	client *seth.Client,
 	multicallAddress string,
 ) *LogTriggerGun {
 	var data [][]byte
 	var addresses []string
 
-	for _, c := range TriggerConfigs {
+	for _, c := range triggerConfigs {
 		if c.NumberOfEvents > 0 {
 			d := generateCallData(1, 1, c.NumberOfEvents)
 			data = append(data, d)

@@ -82,10 +82,12 @@ type OCR2Spec {
     p2pv2Bootstrappers: [String!]
     relay: String!
     relayConfig: Map!
+    onchainSigningStrategy: Map!
     transmitterID: String
     pluginType: String!
     pluginConfig: Map!
     feedID: String
+    allowNoBootstrappers: Boolean!
 }
 
 type VRFSpec {
@@ -182,5 +184,5 @@ type StandardCapabilitiesSpec {
 }
 
 type StreamSpec {
-    streamID: String!
+    streamID: String
 }

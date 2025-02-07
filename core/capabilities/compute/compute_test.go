@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/wasmtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/utils/matches"
 
 	cappkg "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -58,10 +59,13 @@ func setup(t *testing.T, config Config) testHarness {
 	registry := capabilities.NewRegistry(log)
 	connector := gcmocks.NewGatewayConnector(t)
 	idGeneratorFn := func() string { return validRequestUUID }
+	connector.EXPECT().GatewayIDs().Return([]string{"gateway1"})
 	connectorHandler, err := webapi.NewOutgoingConnectorHandler(connector, config.ServiceConfig, ghcapabilities.MethodComputeAction, log)
 	require.NoError(t, err)
 
-	compute, err := NewAction(config, log, registry, connectorHandler, idGeneratorFn)
+	fetchFactory, err := NewOutgoingConnectorFetcherFactory(connectorHandler, idGeneratorFn)
+	require.NoError(t, err)
+	compute, err := NewAction(config, log, registry, fetchFactory)
 	require.NoError(t, err)
 	compute.modules.clock = clockwork.NewFakeClock()
 
@@ -90,7 +94,7 @@ func TestComputeExecuteMissingConfig(t *testing.T) {
 	th := setup(t, defaultConfig)
 	require.NoError(t, th.compute.Start(tests.Context(t)))
 
-	binary := wasmtest.CreateTestBinary(binaryCmd, binaryLocation, true, t)
+	binary := wasmtest.CreateTestBinary(simpleBinaryCmd, simpleBinaryLocation, true, t)
 
 	config, err := values.WrapMap(map[string]any{
 		"binary": binary,
@@ -133,7 +137,7 @@ func TestComputeExecute(t *testing.T) {
 
 	require.NoError(t, th.compute.Start(tests.Context(t)))
 
-	binary := wasmtest.CreateTestBinary(binaryCmd, binaryLocation, true, t)
+	binary := wasmtest.CreateTestBinary(simpleBinaryCmd, simpleBinaryLocation, true, t)
 
 	config, err := values.WrapMap(map[string]any{
 		"config": []byte(""),
@@ -188,6 +192,7 @@ func TestComputeFetch(t *testing.T) {
 	th := setup(t, defaultConfig)
 
 	th.connector.EXPECT().DonID().Return("don-id")
+	th.connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
 	th.connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
 
 	msgID := strings.Join([]string{

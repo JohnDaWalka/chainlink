@@ -4,9 +4,8 @@ pragma solidity 0.8.19;
 import "forge-std/Test.sol";
 
 import {LinkToken} from "../../../shared/token/ERC677/LinkToken.sol";
-import {ERC20Mock} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/mocks/ERC20Mock.sol";
 import {ERC20Mock6Decimals} from "../../mocks/ERC20Mock6Decimals.sol";
-import {MockV3Aggregator} from "../../../tests/MockV3Aggregator.sol";
+import {MockV3Aggregator} from "../../../shared/mocks/MockV3Aggregator.sol";
 import {AutomationForwarderLogic} from "../../AutomationForwarderLogic.sol";
 import {UpkeepTranscoder5_0 as Transcoder} from "../../v2_3/UpkeepTranscoder5_0.sol";
 import {ZKSyncAutomationRegistry2_3} from "../../v2_3_zksync/ZKSyncAutomationRegistry2_3.sol";
@@ -17,12 +16,14 @@ import {ZKSyncAutomationRegistryBase2_3 as ZKSyncAutoBase} from "../../v2_3_zksy
 import {IAutomationRegistryMaster2_3 as Registry, AutomationRegistryBase2_3} from "../../interfaces/v2_3/IAutomationRegistryMaster2_3.sol";
 import {AutomationRegistrar2_3} from "../../v2_3/AutomationRegistrar2_3.sol";
 import {ChainModuleBase} from "../../chains/ChainModuleBase.sol";
-import {IERC20Metadata as IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {MockUpkeep} from "../../mocks/MockUpkeep.sol";
 import {IWrappedNative} from "../../interfaces/v2_3/IWrappedNative.sol";
-import {WETH9} from "../WETH9.sol";
-import {MockGasBoundCaller} from "../../../tests/MockGasBoundCaller.sol";
-import {MockZKSyncSystemContext} from "../../../tests/MockZKSyncSystemContext.sol";
+import {MockGasBoundCaller} from "../../mocks/MockGasBoundCaller.sol";
+import {MockZKSyncSystemContext} from "../../mocks/MockZKSyncSystemContext.sol";
+
+import {ERC20Mock} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/mocks/ERC20Mock.sol";
+import {IERC20Metadata as IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {WETH9} from "../../../vendor/canonical-weth/WETH9.sol";
 
 /**
  * @title BaseTest provides basic test setup procedures and dependencies for use by other
@@ -149,10 +150,10 @@ contract BaseTest is Test {
     usdToken6.mint(FINANCE_ADMIN, 1000e6);
     usdToken6.mint(STRANGER, 1000e6);
 
-    weth.mint(OWNER, 1000e18);
-    weth.mint(UPKEEP_ADMIN, 1000e18);
-    weth.mint(FINANCE_ADMIN, 1000e18);
-    weth.mint(STRANGER, 1000e18);
+    deal(address(weth), OWNER, 100 ether);
+    deal(address(weth), UPKEEP_ADMIN, 100 ether);
+    deal(address(weth), FINANCE_ADMIN, 100 ether);
+    deal(address(weth), STRANGER, 100 ether);
 
     vm.stopPrank();
   }
@@ -415,6 +416,54 @@ contract BaseTest is Test {
     if (selector != bytes4(0)) {
       vm.expectRevert(selector);
     }
+    registry.transmit(reportContext, reportBytes, rs, ss, vs);
+    vm.stopPrank();
+  }
+
+  function _batchTransmitWithBadTriggers(uint256[] memory ids, bool[] memory goodTriggers, Registry registry) internal {
+    bytes memory reportBytes;
+    {
+      uint256[] memory upkeepIds = new uint256[](ids.length);
+      uint256[] memory gasLimits = new uint256[](ids.length);
+      bytes[] memory performDatas = new bytes[](ids.length);
+      bytes[] memory triggers = new bytes[](ids.length);
+      for (uint256 i = 0; i < ids.length; i++) {
+        upkeepIds[i] = ids[i];
+        gasLimits[i] = registry.getUpkeep(ids[i]).performGas;
+        performDatas[i] = new bytes(0);
+        uint8 triggerType = registry.getTriggerType(ids[i]);
+        if (triggerType == 0) {
+          uint256 j = 0;
+          if (goodTriggers[i]) {
+            j = 1;
+          }
+          triggers[i] = _encodeConditionalTrigger(
+            ZKSyncAutoBase.ConditionalTrigger(uint32(block.number - j), blockhash(block.number - j))
+          );
+        } else {
+          revert("not implemented");
+        }
+      }
+
+      ZKSyncAutoBase.Report memory report = ZKSyncAutoBase.Report(
+        uint256(1000000000),
+        uint256(2000000000),
+        upkeepIds,
+        gasLimits,
+        triggers,
+        performDatas
+      );
+
+      reportBytes = _encodeReport(report);
+    }
+    (, , bytes32 configDigest) = registry.latestConfigDetails();
+    bytes32[3] memory reportContext = [configDigest, configDigest, configDigest];
+    uint256[] memory signerPKs = new uint256[](2);
+    signerPKs[0] = SIGNING_KEY0;
+    signerPKs[1] = SIGNING_KEY1;
+    (bytes32[] memory rs, bytes32[] memory ss, bytes32 vs) = _signReport(reportBytes, reportContext, signerPKs);
+
+    vm.startPrank(TRANSMITTERS[0]);
     registry.transmit(reportContext, reportBytes, rs, ss, vs);
     vm.stopPrank();
   }

@@ -18,6 +18,7 @@ import (
 	"golang.org/x/exp/rand"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_lbtc_token_pool"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/wrappers"
 
@@ -33,7 +34,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_transmitter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
@@ -45,6 +45,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
@@ -404,6 +405,7 @@ type LatestPool struct {
 	PoolInterface   *token_pool.TokenPool
 	LockReleasePool *lock_release_token_pool.LockReleaseTokenPool
 	USDCPool        *usdc_token_pool.USDCTokenPool
+	MockLBTCPool    *mock_lbtc_token_pool.MockLBTCTokenPool
 }
 
 type V1_4_0Pool struct {
@@ -485,6 +487,7 @@ func (w TokenPoolWrapper) ApplyChainUpdates(opts *bind.TransactOpts, update []to
 		for i, u := range update {
 			V1_4_0Updates[i] = token_pool_1_4_0.TokenPoolChainUpdate{
 				RemoteChainSelector: u.RemoteChainSelector,
+				Allowed:             true,
 				InboundRateLimiterConfig: token_pool_1_4_0.RateLimiterConfig{
 					IsEnabled: u.InboundRateLimiterConfig.IsEnabled,
 					Capacity:  u.InboundRateLimiterConfig.Capacity,
@@ -503,8 +506,13 @@ func (w TokenPoolWrapper) ApplyChainUpdates(opts *bind.TransactOpts, update []to
 }
 
 func (w TokenPoolWrapper) SetChainRateLimiterConfig(opts *bind.TransactOpts, selector uint64, out token_pool.RateLimiterConfig, in token_pool.RateLimiterConfig) (*types.Transaction, error) {
+
 	if w.Latest != nil && w.Latest.PoolInterface != nil {
-		return w.Latest.PoolInterface.SetChainRateLimiterConfig(opts, selector, out, in)
+		selectors := []uint64{selector}
+		out := []token_pool.RateLimiterConfig{out}
+		in := []token_pool.RateLimiterConfig{in}
+
+		return w.Latest.PoolInterface.SetChainRateLimiterConfigs(opts, selectors, out, in)
 	}
 	if w.V1_4_0 != nil && w.V1_4_0.PoolInterface != nil {
 		return w.V1_4_0.PoolInterface.SetChainRateLimiterConfig(opts, selector,
@@ -1070,7 +1078,7 @@ func (b *CommitStore) WatchReportAccepted(opts *bind.WatchOpts, acceptedEvent ch
 type ReceiverDapp struct {
 	client     blockchain.EVMClient
 	logger     *zerolog.Logger
-	instance   *maybe_revert_message_receiver.MaybeRevertMessageReceiver
+	Instance   *maybe_revert_message_receiver.MaybeRevertMessageReceiver
 	EthAddress common.Address
 }
 
@@ -1083,7 +1091,7 @@ func (rDapp *ReceiverDapp) ToggleRevert(revert bool) error {
 	if err != nil {
 		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
-	tx, err := rDapp.instance.SetRevert(opts, revert)
+	tx, err := rDapp.Instance.SetRevert(opts, revert)
 	if err != nil {
 		return fmt.Errorf("error setting revert: %w", err)
 	}
@@ -1094,6 +1102,19 @@ func (rDapp *ReceiverDapp) ToggleRevert(revert bool) error {
 		Str(Network, rDapp.client.GetNetworkConfig().Name).
 		Msg("ReceiverDapp revert set")
 	return rDapp.client.ProcessTransaction(tx)
+}
+
+// WatchMessageReceived watches for `MessageReceived` events from the ReceiverDapp contract.
+func (rDapp *ReceiverDapp) WatchMessageReceived(opts *bind.WatchOpts, messageReceivedEvent chan *maybe_revert_message_receiver.MaybeRevertMessageReceiverMessageReceived) (event.Subscription, error) {
+	if rDapp.Instance != nil {
+		return rDapp.Instance.WatchMessageReceived(opts, messageReceivedEvent)
+	}
+
+	newInstance, err := maybe_revert_message_receiver.NewMaybeRevertMessageReceiver(rDapp.EthAddress, wrappers.MustNewWrappedContractBackend(rDapp.client, nil))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a new ReceiverDapp contract instance: %w", err)
+	}
+	return newInstance.WatchMessageReceived(opts, messageReceivedEvent)
 }
 
 type InternalTimestampedPackedUint224 struct {
@@ -1434,6 +1455,20 @@ func (r *Router) SetOnRamp(chainSelector uint64, onRamp common.Address) error {
 
 func (r *Router) CCIPSend(destChainSelector uint64, msg router.ClientEVM2AnyMessage, valueForNative *big.Int) (*types.Transaction, error) {
 	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
+	// print out opts
+	r.logger.Info().
+		Str("from", opts.From.Hex()).
+		Str("nonce", fmt.Sprintf("%v", opts.Nonce)).
+		Str("value", fmt.Sprintf("%v", opts.Value)).
+		Str("gasPrice", fmt.Sprintf("%v", opts.GasPrice)).
+		Str("gasFeeCap", fmt.Sprintf("%v", opts.GasFeeCap)).
+		Str("gasTipCap", fmt.Sprintf("%v", opts.GasTipCap)).
+		Uint64("gasLimit", opts.GasLimit).
+		Str("accessList", fmt.Sprintf("%v", opts.AccessList)).
+		Str("context", fmt.Sprintf("%v", opts.Context)).
+		Bool("noSend", opts.NoSend).
+		Msg("TransactOpts")
+
 	if err != nil {
 		return nil, fmt.Errorf("error getting transaction opts: %w", err)
 	}

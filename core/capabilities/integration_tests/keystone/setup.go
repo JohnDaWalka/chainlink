@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -18,7 +19,7 @@ import (
 	v3 "github.com/smartcontractkit/chainlink-common/pkg/types/mercury/v3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/integration_tests/framework"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
+	feeds_consumer "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer_1_0_0"
 
 	ocrTypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -60,7 +61,7 @@ func setupKeystoneDons(ctx context.Context, t *testing.T, lggr logger.SugaredLog
 func createKeystoneTriggerDon(ctx context.Context, t *testing.T, lggr logger.SugaredLogger, triggerDonInfo framework.DonConfiguration,
 	donContext framework.DonContext, trigger framework.TriggerFactory) *framework.DON {
 	triggerDon := framework.NewDON(ctx, t, lggr, triggerDonInfo,
-		[]commoncap.DON{}, donContext, false)
+		[]commoncap.DON{}, donContext, false, 1*time.Second)
 
 	triggerDon.AddExternalTriggerCapability(trigger)
 	triggerDon.Initialise()
@@ -69,8 +70,8 @@ func createKeystoneTriggerDon(ctx context.Context, t *testing.T, lggr logger.Sug
 
 func createKeystoneWriteTargetDon(ctx context.Context, t *testing.T, lggr logger.SugaredLogger, targetDonInfo framework.DonConfiguration, donContext framework.DonContext, forwarderAddr common.Address) *framework.DON {
 	writeTargetDon := framework.NewDON(ctx, t, lggr, targetDonInfo,
-		[]commoncap.DON{}, donContext, false)
-	err := writeTargetDon.AddEthereumWriteTargetNonStandardCapability(forwarderAddr)
+		[]commoncap.DON{}, donContext, false, 1*time.Second)
+	_, err := writeTargetDon.AddPublishedEthereumWriteTargetNonStandardCapability(forwarderAddr)
 	require.NoError(t, err)
 	writeTargetDon.Initialise()
 	return writeTargetDon
@@ -80,7 +81,7 @@ func createKeystoneWorkflowDon(ctx context.Context, t *testing.T, lggr logger.Su
 	triggerDonInfo framework.DonConfiguration, targetDonInfo framework.DonConfiguration, donContext framework.DonContext) *framework.DON {
 	workflowDon := framework.NewDON(ctx, t, lggr, workflowDonInfo,
 		[]commoncap.DON{triggerDonInfo.DON, targetDonInfo.DON},
-		donContext, true)
+		donContext, true, 1*time.Second)
 
 	workflowDon.AddOCR3NonStandardCapability()
 	workflowDon.Initialise()
@@ -130,7 +131,7 @@ func newReport(t *testing.T, feedID [32]byte, price *big.Int, timestamp int64) [
 	v3Codec := reportcodec.NewReportCodec(feedID, logger.TestLogger(t))
 	raw, err := v3Codec.BuildReport(ctx, v3.ReportFields{
 		BenchmarkPrice: price,
-		//nolint:gosec // disable G115
+
 		Timestamp: uint32(timestamp),
 		Bid:       big.NewInt(0),
 		Ask:       big.NewInt(0),

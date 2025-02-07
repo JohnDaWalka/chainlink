@@ -18,10 +18,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox/mailboxtest"
 
+	"github.com/smartcontractkit/chainlink-integrations/evm/client/clienttest"
+	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
 	htmocks "github.com/smartcontractkit/chainlink/v2/common/headtracker/mocks"
-	evmclimocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	logmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/log/mocks"
-	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/offchain_aggregator_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -49,7 +49,7 @@ type contractTrackerUni struct {
 	db      *ocrmocks.OCRContractTrackerDB
 	lb      *logmocks.Broadcaster
 	hb      *htmocks.HeadBroadcaster[*evmtypes.Head, common.Hash]
-	ec      *evmclimocks.Client
+	ec      *clienttest.Client
 	tracker *ocr.OCRContractTracker
 }
 

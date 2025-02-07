@@ -23,6 +23,7 @@ import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/fatih/color"
+	"github.com/jmoiron/sqlx"
 	"github.com/kylelemons/godebug/diff"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
@@ -31,23 +32,21 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/guregu/null.v4"
 
-	"github.com/jmoiron/sqlx"
-
+	pgcommon "github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
 	cutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 
+	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
+	"github.com/smartcontractkit/chainlink-integrations/evm/gas"
+	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
+	ubig "github.com/smartcontractkit/chainlink-integrations/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/build"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
-	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
-	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/sessions"
 	"github.com/smartcontractkit/chainlink/v2/core/shutdown"
 	"github.com/smartcontractkit/chainlink/v2/core/static"
-	"github.com/smartcontractkit/chainlink/v2/core/store/dialects"
 	"github.com/smartcontractkit/chainlink/v2/core/store/migrate"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/web"
@@ -365,6 +364,7 @@ func (s *Shell) runNode(c *cli.Context) error {
 		if err := ldb.Close(); err != nil {
 			lggr.Criticalf("Failed to close LockedDB: %v", err)
 		}
+		lggr.Debug("Closed DB")
 		if err := s.CloseLogger(); err != nil {
 			log.Printf("Failed to close Logger: %v", err)
 		}
@@ -433,6 +433,9 @@ func (s *Shell) runNode(c *cli.Context) error {
 		if s.Config.AptosEnabled() {
 			enabledChains = append(enabledChains, chaintype.Aptos)
 		}
+		if s.Config.TronEnabled() {
+			enabledChains = append(enabledChains, chaintype.Tron)
+		}
 		err2 := app.GetKeyStore().OCR2().EnsureKeys(rootCtx, enabledChains...)
 		if err2 != nil {
 			return errors.Wrap(err2, "failed to ensure ocr key")
@@ -468,15 +471,19 @@ func (s *Shell) runNode(c *cli.Context) error {
 			return errors.Wrap(err2, "failed to ensure aptos key")
 		}
 	}
-
-	if s.Config.Capabilities().WorkflowRegistry().Address() != "" {
-		err2 := app.GetKeyStore().Workflow().EnsureKey(rootCtx)
+	if s.Config.TronEnabled() {
+		err2 := app.GetKeyStore().Tron().EnsureKey(rootCtx)
 		if err2 != nil {
-			return errors.Wrap(err2, "failed to ensure workflow key")
+			return errors.Wrap(err2, "failed to ensure tron key")
 		}
 	}
 
-	err2 := app.GetKeyStore().CSA().EnsureKey(rootCtx)
+	err2 := app.GetKeyStore().Workflow().EnsureKey(rootCtx)
+	if err2 != nil {
+		return errors.Wrap(err2, "failed to ensure workflow key")
+	}
+
+	err2 = app.GetKeyStore().CSA().EnsureKey(rootCtx)
 	if err2 != nil {
 		return errors.Wrap(err2, "failed to ensure CSA key")
 	}
@@ -686,7 +693,6 @@ func (s *Shell) RebroadcastTransactions(c *cli.Context) (err error) {
 		nonces[i] = evmtypes.Nonce(beginningNonce + i)
 	}
 	if gasPriceWei <= math.MaxInt64 {
-		//nolint:gosec // disable G115
 		return s.errorOut(ec.ForceRebroadcast(ctx, nonces, gas.EvmFee{GasPrice: assets.NewWeiI(int64(gasPriceWei))}, address, uint64(overrideGasLimit)))
 	}
 	return s.errorOut(fmt.Errorf("integer overflow conversion error. GasPrice: %v", gasPriceWei))
@@ -808,7 +814,7 @@ func (s *Shell) PrepareTestDatabase(c *cli.Context) error {
 
 	// Creating pristine DB copy to speed up FullTestDB
 	dbUrl := cfg.Database().URL()
-	db, err := sqlx.Open(string(dialects.Postgres), dbUrl.String())
+	db, err := sqlx.Open(pgcommon.DriverPostgres, dbUrl.String())
 	if err != nil {
 		return s.errorOut(err)
 	}
@@ -1091,7 +1097,7 @@ type dbConfig interface {
 	MaxOpenConns() int
 	MaxIdleConns() int
 	URL() url.URL
-	Dialect() dialects.DialectName
+	DriverName() string
 }
 
 func newConnection(ctx context.Context, cfg dbConfig) (*sqlx.DB, error) {
@@ -1099,7 +1105,7 @@ func newConnection(ctx context.Context, cfg dbConfig) (*sqlx.DB, error) {
 	if parsed.String() == "" {
 		return nil, errDBURLMissing
 	}
-	return pg.NewConnection(ctx, parsed.String(), cfg.Dialect(), cfg)
+	return pg.NewConnection(ctx, parsed.String(), cfg.DriverName(), cfg)
 }
 
 func dropAndCreateDB(parsed url.URL, force bool) (err error) {
@@ -1107,7 +1113,7 @@ func dropAndCreateDB(parsed url.URL, force bool) (err error) {
 	// to a different one. template1 should be present on all postgres installations
 	dbname := parsed.Path[1:]
 	parsed.Path = "/template1"
-	db, err := sql.Open(string(dialects.Postgres), parsed.String())
+	db, err := sql.Open(pgcommon.DriverPostgres, parsed.String())
 	if err != nil {
 		return fmt.Errorf("unable to open postgres database for creating test db: %+v", err)
 	}
@@ -1206,7 +1212,7 @@ func checkSchema(dbURL url.URL, prevSchema string) error {
 }
 
 func insertFixtures(dbURL url.URL, pathToFixtures string) (err error) {
-	db, err := sql.Open(string(dialects.Postgres), dbURL.String())
+	db, err := sql.Open(pgcommon.DriverPostgres, dbURL.String())
 	if err != nil {
 		return fmt.Errorf("unable to open postgres database for creating test db: %+v", err)
 	}

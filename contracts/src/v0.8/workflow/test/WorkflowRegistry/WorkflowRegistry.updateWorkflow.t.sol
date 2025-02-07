@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {WorkflowRegistry} from "../../dev/WorkflowRegistry.sol";
+import {WorkflowRegistry} from "../../WorkflowRegistry.sol";
 import {WorkflowRegistrySetup} from "./WorkflowRegistrySetup.t.sol";
 
 contract WorkflowRegistry_updateWorkflow is WorkflowRegistrySetup {
@@ -83,19 +83,6 @@ contract WorkflowRegistry_updateWorkflow is WorkflowRegistrySetup {
   }
 
   // whenTheCallerIsAnAuthorizedAddress whenTheRegistryIsNotLocked whenTheDonIDIsAllowed whenTheCallerIsTheWorkflowOwner
-  function test_RevertWhen_TheNewWorkflowIDIsTheSameAsTheExistingWorkflowID() external {
-    // Register a workflow first
-    _registerValidWorkflow();
-
-    // Update the workflow now with the same workflow ID
-    vm.prank(s_authorizedAddress);
-    vm.expectRevert(WorkflowRegistry.WorkflowIDNotUpdated.selector);
-    s_registry.updateWorkflow(
-      s_validWorkflowKey, s_validWorkflowID, s_validBinaryURL, s_validConfigURL, s_newValidSecretsURL
-    );
-  }
-
-  // whenTheCallerIsAnAuthorizedAddress whenTheRegistryIsNotLocked whenTheDonIDIsAllowed whenTheCallerIsTheWorkflowOwner
   function test_RevertWhen_NoneOfTheURLsAreUpdated() external {
     // Register a workflow first
     _registerValidWorkflow();
@@ -106,6 +93,17 @@ contract WorkflowRegistry_updateWorkflow is WorkflowRegistrySetup {
     s_registry.updateWorkflow(
       s_validWorkflowKey, s_newValidWorkflowID, s_validBinaryURL, s_validConfigURL, s_validSecretsURL
     );
+  }
+
+  // whenTheCallerIsAnAuthorizedAddress whenTheRegistryIsNotLocked whenTheDonIDIsAllowed whenTheCallerIsTheWorkflowOwner
+  function test_RevertWhen_TheBinaryURLIsEmpty() external {
+    // Register a workflow first
+    _registerValidWorkflow();
+
+    // Update the workflow with a binary URL that is empty
+    vm.prank(s_authorizedAddress);
+    vm.expectRevert(WorkflowRegistry.BinaryURLRequired.selector);
+    s_registry.updateWorkflow(s_validWorkflowKey, s_newValidWorkflowID, "", s_validConfigURL, s_validSecretsURL);
   }
 
   // whenTheCallerIsAnAuthorizedAddress whenTheRegistryIsNotLocked whenTheDonIDIsAllowed whenTheCallerIsTheWorkflowOwner
@@ -156,6 +154,32 @@ contract WorkflowRegistry_updateWorkflow is WorkflowRegistrySetup {
     vm.prank(s_authorizedAddress);
     vm.expectRevert(WorkflowRegistry.InvalidWorkflowID.selector);
     s_registry.updateWorkflow(s_validWorkflowKey, bytes32(0), s_validBinaryURL, s_validConfigURL, s_newValidSecretsURL);
+  }
+
+  // whenTheCallerIsAnAuthorizedAddress whenTheRegistryIsNotLocked whenTheDonIDIsAllowed whenTheCallerIsTheWorkflowOwner
+  function test_RevertWhen_TheWorkflowIDIsAlreadyInUsedByAnotherWorkflow() external {
+    // Register a workflow first
+    _registerValidWorkflow();
+
+    // Register another workflow with another workflow ID
+    vm.startPrank(s_authorizedAddress);
+    s_registry.registerWorkflow(
+      "ValidWorkflow2",
+      s_newValidWorkflowID,
+      s_allowedDonID,
+      WorkflowRegistry.WorkflowStatus.ACTIVE,
+      s_validBinaryURL,
+      s_validConfigURL,
+      s_validSecretsURL
+    );
+
+    // Update the workflow with a workflow ID that is already in use by another workflow.
+    vm.expectRevert(WorkflowRegistry.WorkflowIDAlreadyExists.selector);
+    s_registry.updateWorkflow(
+      s_validWorkflowKey, s_newValidWorkflowID, s_validBinaryURL, s_validConfigURL, s_newValidSecretsURL
+    );
+
+    vm.stopPrank();
   }
 
   // whenTheCallerIsAnAuthorizedAddress whenTheRegistryIsNotLocked whenTheDonIDIsAllowed whenTheCallerIsTheWorkflowOwner

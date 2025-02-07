@@ -139,6 +139,7 @@ DatabaseTimeout = '20s'
 KeyBundleID = '0000000000000000000000000000000000000000000000000000000000000000'
 CaptureEATelemetry = false
 CaptureAutomationCustomTelemetry = true
+AllowNoBootstrappers = false
 DefaultTransactionQueueDepth = 1
 SimulateTransactions = false
 TraceLogging = false
@@ -235,11 +236,20 @@ LatestReportDeadline = '5s'
 CertFile = ''
 
 [Mercury.Transmitter]
-TransmitQueueMaxSize = 10000
+Protocol = 'wsrpc'
+TransmitQueueMaxSize = 100000
 TransmitTimeout = '5s'
 TransmitConcurrency = 100
+ReaperFrequency = '1h0m0s'
+ReaperMaxAge = '48h0m0s'
 
 [Capabilities]
+[Capabilities.RateLimit]
+GlobalRPS = 200.0
+GlobalBurst = 200
+PerSenderRPS = 100.0
+PerSenderBurst = 100
+
 [Capabilities.Peering]
 IncomingMessageBufferSize = 10
 OutgoingMessageBufferSize = 10
@@ -273,6 +283,9 @@ ChainID = '1'
 Address = ''
 NetworkID = 'evm'
 ChainID = '1'
+MaxBinarySize = '20.00mb'
+MaxEncryptedSecretsSize = '26.40kb'
+MaxConfigSize = '50.00kb'
 
 [Capabilities.GatewayConnector]
 ChainIDForNodeKey = ''
@@ -320,6 +333,7 @@ FinalizedBlockOffset = 12
 NoNewFinalizedHeadsThreshold = '9m0s'
 
 [EVM.Transactions]
+Enabled = true
 ForwardersEnabled = false
 MaxInFlight = 16
 MaxQueued = 250
@@ -328,6 +342,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [EVM.Transactions.AutoPurge]
+Enabled = false
+
+[EVM.Transactions.TransactionManagerV2]
 Enabled = false
 
 [EVM.BalanceMonitor]
@@ -430,6 +447,7 @@ FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '0s'
 
 [EVM.Transactions]
+Enabled = true
 ForwardersEnabled = false
 MaxInFlight = 16
 MaxQueued = 250
@@ -438,6 +456,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [EVM.Transactions.AutoPurge]
+Enabled = false
+
+[EVM.Transactions.TransactionManagerV2]
 Enabled = false
 
 [EVM.BalanceMonitor]
@@ -534,6 +555,7 @@ FinalizedBlockOffset = 0
 NoNewFinalizedHeadsThreshold = '6m0s'
 
 [EVM.Transactions]
+Enabled = true
 ForwardersEnabled = false
 MaxInFlight = 16
 MaxQueued = 5000
@@ -542,6 +564,9 @@ ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
 
 [EVM.Transactions.AutoPurge]
+Enabled = false
+
+[EVM.Transactions.TransactionManagerV2]
 Enabled = false
 
 [EVM.BalanceMonitor]
@@ -659,6 +684,7 @@ OCR2CacheTTL = '1m0s'
 TxTimeout = '1m0s'
 TxRetryTimeout = '10s'
 TxConfirmTimeout = '30s'
+TxExpirationRebroadcast = false
 TxRetentionTimeout = '0s'
 SkipPreflight = true
 Commitment = 'confirmed'
@@ -681,6 +707,7 @@ SelectionMode = 'HighestHead'
 SyncThreshold = 5
 NodeIsSyncingEnabled = false
 LeaseDuration = '1m0s'
+NewHeadsPollInterval = '1s'
 FinalizedBlockPollInterval = '1s'
 EnforceRepeatableRead = true
 DeathDeclarationDelay = '1m0s'
@@ -704,6 +731,7 @@ OCR2CacheTTL = '1m0s'
 TxTimeout = '1m0s'
 TxRetryTimeout = '10s'
 TxConfirmTimeout = '30s'
+TxExpirationRebroadcast = false
 TxRetentionTimeout = '0s'
 SkipPreflight = true
 Commitment = 'confirmed'
@@ -726,6 +754,7 @@ SelectionMode = 'HighestHead'
 SyncThreshold = 5
 NodeIsSyncingEnabled = false
 LeaseDuration = '1m0s'
+NewHeadsPollInterval = '1s'
 FinalizedBlockPollInterval = '1s'
 EnforceRepeatableRead = true
 DeathDeclarationDelay = '1m0s'

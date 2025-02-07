@@ -107,9 +107,11 @@ func (r *RelayerFactory) NewEVM(ctx context.Context, config EVMFactoryConfig) (m
 type SolanaFactoryConfig struct {
 	Keystore keystore.Solana
 	solcfg.TOMLConfigs
+	DS sqlutil.DataSource
 }
 
-func (r *RelayerFactory) NewSolana(ks keystore.Solana, chainCfgs solcfg.TOMLConfigs) (map[types.RelayID]loop.Relayer, error) {
+func (r *RelayerFactory) NewSolana(config SolanaFactoryConfig) (map[types.RelayID]loop.Relayer, error) {
+	chainCfgs, ds, ks := config.TOMLConfigs, config.DS, config.Keystore
 	solanaRelayers := make(map[types.RelayID]loop.Relayer)
 	var (
 		solLggr = r.Logger.Named("Solana")
@@ -139,7 +141,6 @@ func (r *RelayerFactory) NewSolana(ks keystore.Solana, chainCfgs solcfg.TOMLConf
 			cfgTOML, err := toml.Marshal(struct {
 				Solana solcfg.TOMLConfig
 			}{Solana: *chainCfg})
-
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal Solana configs: %w", err)
 			}
@@ -162,6 +163,7 @@ func (r *RelayerFactory) NewSolana(ks keystore.Solana, chainCfgs solcfg.TOMLConf
 			opts := solana.ChainOpts{
 				Logger:   lggr,
 				KeyStore: signer,
+				DS:       ds,
 			}
 
 			chain, err := solana.NewChain(chainCfg, opts)
@@ -273,12 +275,12 @@ func (c CosmosFactoryConfig) Validate() error {
 	return err
 }
 
-func (r *RelayerFactory) NewCosmos(config CosmosFactoryConfig) (map[types.RelayID]LOOPRelayAdapter, error) {
+func (r *RelayerFactory) NewCosmos(config CosmosFactoryConfig) (map[types.RelayID]loop.Relayer, error) {
 	err := config.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("cannot create Cosmos relayer: %w", err)
 	}
-	relayers := make(map[types.RelayID]LOOPRelayAdapter)
+	relayers := make(map[types.RelayID]loop.Relayer)
 
 	var (
 		cosmosLggr = r.Logger.Named("Cosmos")
@@ -291,18 +293,43 @@ func (r *RelayerFactory) NewCosmos(config CosmosFactoryConfig) (map[types.RelayI
 
 		lggr := cosmosLggr.Named(relayID.ChainID)
 
-		opts := cosmos.ChainOpts{
-			Logger:   lggr,
-			DS:       config.DS,
-			KeyStore: loopKs,
-		}
+		if cmdName := env.CosmosPlugin.Cmd.Get(); cmdName != "" {
+			// setup LOOPP
+			cfgTOML, err := toml.Marshal(struct {
+				Cosmos coscfg.TOMLConfig
+			}{Cosmos: *chainCfg})
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal Cosmos configs: %w", err)
+			}
+			envVars, err := plugins.ParseEnvFile(env.CosmosPlugin.Env.Get())
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse Cosmos env vars: %w", err)
+			}
+			cosCmdFn, err := plugins.NewCmdFactory(r.Register, plugins.CmdConfig{
+				ID:  relayID.Name(),
+				Cmd: cmdName,
+				Env: envVars,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to create Cosmos LOOP command: %w", err)
+			}
+			relayers[relayID] = loop.NewRelayerService(lggr, r.GRPCOpts, cosCmdFn, string(cfgTOML), loopKs, r.CapabilitiesRegistry)
+		} else {
+			// fallback to embedded chain
 
-		chain, err := cosmos.NewChain(chainCfg, opts)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load Cosmos chain %q: %w", relayID, err)
-		}
+			opts := cosmos.ChainOpts{
+				Logger:   lggr,
+				DS:       config.DS,
+				KeyStore: loopKs,
+			}
 
-		relayers[relayID] = NewCosmosLOOPRelayerChain(cosmos.NewRelayer(lggr, chain))
+			chain, err := cosmos.NewChain(chainCfg, opts)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load Cosmos chain %q: %w", relayID, err)
+			}
+
+			relayers[relayID] = relay.NewServerAdapter(cosmos.NewRelayer(lggr, chain))
+		}
 	}
 	return relayers, nil
 }
@@ -367,4 +394,15 @@ func (r *RelayerFactory) NewLOOPRelayer(name string, network string, plugin env.
 		relayers[relayID] = loop.NewRelayerService(lggr2, r.GRPCOpts, cmdFn, string(cfgTOML), ks, r.CapabilitiesRegistry)
 	}
 	return relayers, nil
+}
+
+type TronFactoryConfig struct {
+	Keystore    keystore.Tron
+	TOMLConfigs RawConfigs
+}
+
+func (r *RelayerFactory) NewTron(ks keystore.Tron, chainCfgs RawConfigs) (map[types.RelayID]loop.Relayer, error) {
+	plugin := env.NewPlugin("tron")
+	loopKs := &keystore.TronLOOPKeystore{Tron: ks}
+	return r.NewLOOPRelayer("Tron", relay.NetworkTron, plugin, loopKs, chainCfgs)
 }

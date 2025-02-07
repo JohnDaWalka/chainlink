@@ -6,7 +6,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
-	"github.com/smartcontractkit/chainlink/v2/core/store/dialects"
 )
 
 type backupConfig struct {
@@ -106,11 +105,14 @@ func (d *databaseConfig) DefaultQueryTimeout() time.Duration {
 }
 
 func (d *databaseConfig) URL() url.URL {
+	if d.s.URL == nil {
+		return url.URL{}
+	}
 	return *d.s.URL.URL()
 }
 
-func (d *databaseConfig) Dialect() dialects.DialectName {
-	return d.c.Dialect
+func (d *databaseConfig) DriverName() string {
+	return d.c.DriverName
 }
 
 func (d *databaseConfig) MigrateDatabase() bool {

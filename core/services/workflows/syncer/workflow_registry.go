@@ -4,36 +4,56 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"strconv"
+	"iter"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/custmsg"
+	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	types "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-	query "github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/workflow/generated/workflow_registry_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
-	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/store"
 )
 
 const name = "WorkflowRegistrySyncer"
 
 var (
-	defaultTickInterval = 12 * time.Second
-	ContractName        = "WorkflowRegistry"
+	defaultTickInterval                    = 12 * time.Second
+	WorkflowRegistryContractName           = "WorkflowRegistry"
+	GetWorkflowMetadataListByDONMethodName = "getWorkflowMetadataListByDON"
 )
 
 type Head struct {
 	Hash      string
 	Height    string
 	Timestamp uint64
+}
+
+type GetWorkflowMetadataListByDONParams struct {
+	DonID uint32
+	Start uint64
+	Limit uint64
+}
+
+type GetWorkflowMetadata struct {
+	WorkflowID   [32]byte
+	Owner        []byte
+	DonID        uint32
+	Status       uint8
+	WorkflowName string
+	BinaryURL    string
+	ConfigURL    string
+	SecretsURL   string
+}
+
+type GetWorkflowMetadataListByDONReturnVal struct {
+	WorkflowMetadataList []GetWorkflowMetadata
 }
 
 // WorkflowRegistryEvent is an event emitted by the WorkflowRegistry.  Each event is typed
@@ -45,34 +65,44 @@ type WorkflowRegistryEvent struct {
 	Head      Head
 }
 
+func (we WorkflowRegistryEvent) GetEventType() WorkflowRegistryEventType {
+	return we.EventType
+}
+
+func (we WorkflowRegistryEvent) GetData() any {
+	return we.Data
+}
+
 // WorkflowRegistryEventResponse is a response to either parsing a queried event or handling the event.
 type WorkflowRegistryEventResponse struct {
 	Err   error
 	Event *WorkflowRegistryEvent
 }
 
-// ContractEventPollerConfig is the configuration needed to poll for events on a contract.  Currently
+// WorkflowEventPollerConfig is the configuration needed to poll for events on a contract.  Currently
 // requires the ContractEventName.
-//
-// TODO(mstreet3): Use LookbackBlocks instead of StartBlockNum
-type ContractEventPollerConfig struct {
-	ContractName    string
-	ContractAddress string
-	StartBlockNum   uint64
-	QueryCount      uint64
+type WorkflowEventPollerConfig struct {
+	QueryCount uint64
+}
+
+type WorkflowLoadConfig struct {
+	FetchBatchSize int
 }
 
 // FetcherFunc is an abstraction for fetching the contents stored at a URL.
-type FetcherFunc func(ctx context.Context, url string) ([]byte, error)
-
-type ContractReaderFactory interface {
-	NewContractReader(context.Context, []byte) (types.ContractReader, error)
-}
+type FetcherFunc func(ctx context.Context, url string, maxBytesSize uint32) ([]byte, error)
 
 // ContractReader is a subset of types.ContractReader defined locally to enable mocking.
 type ContractReader interface {
+	Start(ctx context.Context) error
+	Close() error
 	Bind(context.Context, []types.BoundContract) error
-	QueryKey(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, any) ([]types.Sequence, error)
+	QueryKeys(ctx context.Context, keyQueries []types.ContractKeyFilter, limitAndSort query.LimitAndSort) (iter.Seq2[string, types.Sequence], error)
+	GetLatestValueWithHeadData(ctx context.Context, readName string, confidenceLevel primitives.ConfidenceLevel, params any, returnVal any) (head *types.Head, err error)
+}
+
+type ContractReaderFactory interface {
+	NewContractReader(context.Context, []byte) (types.ContractReader, error)
 }
 
 // WorkflowRegistrySyncer is the public interface of the package.
@@ -95,34 +125,16 @@ type workflowRegistry struct {
 	// ticker is the interval at which the workflowRegistry will poll the contract for events.
 	ticker <-chan time.Time
 
-	lggr    logger.Logger
-	emitter custmsg.Labeler
-	orm     WorkflowRegistryDS
-	reader  ContractReader
-	gateway FetcherFunc
+	lggr                    logger.Logger
+	workflowRegistryAddress string
 
-	// initReader allows the workflowRegistry to initialize a contract reader if one is not provided
-	// and separates the contract reader initialization from the workflowRegistry start up.
-	initReader func(context.Context, logger.Logger, ContractReaderFactory, types.BoundContract) (types.ContractReader, error)
-	relayer    ContractReaderFactory
+	newContractReaderFn newContractReaderFn
 
-	cfg        ContractEventPollerConfig
-	eventTypes []WorkflowRegistryEventType
+	eventPollerCfg WorkflowEventPollerConfig
+	eventTypes     []WorkflowRegistryEventType
+	handler        evtHandler
 
-	// eventsCh is read by the handler and each event is handled once received.
-	eventsCh chan WorkflowRegistryEventResponse
-	handler  *eventHandler
-
-	// batchCh is a channel that receives batches of events from the contract query goroutines.
-	batchCh chan []WorkflowRegistryEventResponse
-
-	// heap is a min heap that merges batches of events from the contract query goroutines.  The
-	// default min heap is sorted by block height.
-	heap Heap
-
-	workflowStore  store.Store
-	capRegistry    core.CapabilitiesRegistry
-	engineRegistry *engineRegistry
+	workflowDonNotifier donNotifier
 }
 
 // WithTicker allows external callers to provide a ticker to the workflowRegistry.  This is useful
@@ -133,51 +145,47 @@ func WithTicker(ticker <-chan time.Time) func(*workflowRegistry) {
 	}
 }
 
-func WithReader(reader types.ContractReader) func(*workflowRegistry) {
-	return func(wr *workflowRegistry) {
-		wr.reader = reader
-	}
+type evtHandler interface {
+	Handle(ctx context.Context, event Event) error
 }
+
+type donNotifier interface {
+	WaitForDon(ctx context.Context) (capabilities.DON, error)
+}
+
+type newContractReaderFn func(context.Context, []byte) (ContractReader, error)
 
 // NewWorkflowRegistry returns a new workflowRegistry.
 // Only queries for WorkflowRegistryForceUpdateSecretsRequestedV1 events.
-func NewWorkflowRegistry[T ContractReader](
+func NewWorkflowRegistry(
 	lggr logger.Logger,
-	orm WorkflowRegistryDS,
-	reader T,
-	gateway FetcherFunc,
+	newContractReaderFn newContractReaderFn,
 	addr string,
-	workflowStore store.Store,
-	capRegistry core.CapabilitiesRegistry,
-	emitter custmsg.Labeler,
+	eventPollerConfig WorkflowEventPollerConfig,
+	handler evtHandler,
+	workflowDonNotifier donNotifier,
 	opts ...func(*workflowRegistry),
 ) *workflowRegistry {
-	ets := []WorkflowRegistryEventType{ForceUpdateSecretsEvent}
-	wr := &workflowRegistry{
-		lggr:           lggr.Named(name),
-		emitter:        emitter,
-		orm:            orm,
-		reader:         reader,
-		gateway:        gateway,
-		workflowStore:  workflowStore,
-		capRegistry:    capRegistry,
-		engineRegistry: newEngineRegistry(),
-		cfg: ContractEventPollerConfig{
-			ContractName:    ContractName,
-			ContractAddress: addr,
-			QueryCount:      20,
-			StartBlockNum:   0,
-		},
-		initReader: newReader,
-		heap:       newBlockHeightHeap(),
-		stopCh:     make(services.StopChan),
-		eventTypes: ets,
-		eventsCh:   make(chan WorkflowRegistryEventResponse),
-		batchCh:    make(chan []WorkflowRegistryEventResponse, len(ets)),
+	ets := []WorkflowRegistryEventType{
+		ForceUpdateSecretsEvent,
+		WorkflowActivatedEvent,
+		WorkflowDeletedEvent,
+		WorkflowPausedEvent,
+		WorkflowRegisteredEvent,
+		WorkflowUpdatedEvent,
 	}
-	wr.handler = newEventHandler(wr.lggr, wr.orm, wr.gateway, wr.workflowStore, wr.capRegistry,
-		wr.engineRegistry, wr.emitter, secretsFetcherFunc(wr.SecretsFor),
-	)
+
+	wr := &workflowRegistry{
+		lggr:                    lggr,
+		newContractReaderFn:     newContractReaderFn,
+		workflowRegistryAddress: addr,
+		eventPollerCfg:          eventPollerConfig,
+		stopCh:                  make(services.StopChan),
+		eventTypes:              ets,
+		handler:                 handler,
+		workflowDonNotifier:     workflowDonNotifier,
+	}
+
 	for _, opt := range opts {
 		opt(wr)
 	}
@@ -195,15 +203,35 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 			defer w.wg.Done()
 			defer cancel()
 
-			w.syncEventsLoop(ctx)
-		}()
+			w.lggr.Debugw("Waiting for DON...")
+			don, err := w.workflowDonNotifier.WaitForDon(ctx)
+			if err != nil {
+				w.lggr.Errorw("failed to wait for don", "err", err)
+				return
+			}
 
-		w.wg.Add(1)
-		go func() {
-			defer w.wg.Done()
-			defer cancel()
+			reader, err := w.newWorkflowRegistryContractReader(ctx)
+			if err != nil {
+				w.lggr.Criticalf("contract reader unavailable : %s", err)
+				return
+			}
 
-			w.handlerLoop(ctx)
+			w.lggr.Debugw("Loading initial workflows for DON", "DON", don.ID)
+			loadWorkflowsHead, err := w.loadWorkflows(ctx, don, reader)
+			if err != nil {
+				// TODO - this is a temporary fix to handle the case where the chainreader errors because the contract
+				// contains no workflows.  To track: https://smartcontract-it.atlassian.net/browse/CAPPL-393
+				if !strings.Contains(err.Error(), "attempting to unmarshal an empty string while arguments are expected") {
+					w.lggr.Errorw("failed to load workflows", "err", err)
+					return
+				}
+
+				loadWorkflowsHead = &types.Head{
+					Height: "0",
+				}
+			}
+
+			w.readRegistryEvents(ctx, reader, loadWorkflowsHead.Height)
 		}()
 
 		return nil
@@ -230,133 +258,82 @@ func (w *workflowRegistry) Name() string {
 	return name
 }
 
-func (w *workflowRegistry) SecretsFor(ctx context.Context, workflowOwner, workflowName string) (map[string]string, error) {
-	return nil, errors.New("not implemented")
-}
+// readRegistryEvents polls the contract for events and send them to the events channel.
+func (w *workflowRegistry) readRegistryEvents(ctx context.Context, reader ContractReader, lastReadBlockNumber string) {
+	ticker := w.getTicker()
 
-// handlerLoop handles the events that are emitted by the contract.
-func (w *workflowRegistry) handlerLoop(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case resp, open := <-w.eventsCh:
-			if !open {
-				return
-			}
-
-			if resp.Err != nil || resp.Event == nil {
-				w.lggr.Errorf("failed to handle event: %+v", resp.Err)
-				continue
-			}
-
-			event := resp.Event
-			w.lggr.Debugf("handling event: %+v", event)
-			if err := w.handler.Handle(ctx, *event); err != nil {
-				w.lggr.Errorf("failed to handle event: %+v", event)
-				continue
-			}
-		}
-	}
-}
-
-// syncEventsLoop polls the contract for events and passes them to a channel for handling.
-func (w *workflowRegistry) syncEventsLoop(ctx context.Context) {
-	var (
-		// sendLog is a helper that sends a WorkflowRegistryEventResponse to the eventsCh in a
-		// blocking way that will send the response or be canceled.
-		sendLog = func(resp WorkflowRegistryEventResponse) {
-			select {
-			case w.eventsCh <- resp:
-			case <-ctx.Done():
-			}
-		}
-
-		ticker = w.getTicker()
-
-		signals = make(map[WorkflowRegistryEventType]chan struct{}, 0)
-	)
-
-	// critical failure if there is no reader, the loop will exit and the parent context will be
-	// canceled.
-	reader, err := w.getContractReader(ctx)
-	if err != nil {
-		w.lggr.Criticalf("contract reader unavailable : %s", err)
-		return
+	var keyQueries = make([]types.ContractKeyFilter, 0, len(w.eventTypes))
+	for _, et := range w.eventTypes {
+		var logData values.Value
+		keyQueries = append(keyQueries, types.ContractKeyFilter{
+			KeyFilter: query.KeyFilter{
+				Key: string(et),
+				Expressions: []query.Expression{
+					query.Confidence(primitives.Finalized),
+					query.Block(lastReadBlockNumber, primitives.Gt),
+				},
+			},
+			Contract: types.BoundContract{
+				Name:    WorkflowRegistryContractName,
+				Address: w.workflowRegistryAddress,
+			},
+			SequenceDataType: &logData,
+		})
 	}
 
-	// fan out and query for each event type
-	for i := 0; i < len(w.eventTypes); i++ {
-		signal := make(chan struct{}, 1)
-		signals[w.eventTypes[i]] = signal
-		w.wg.Add(1)
-		go func() {
-			defer w.wg.Done()
-
-			queryEvent(
-				ctx,
-				signal,
-				w.lggr,
-				reader,
-				w.cfg,
-				w.eventTypes[i],
-				w.batchCh,
-			)
-		}()
-	}
-
-	// Periodically send a signal to all the queryEvent goroutines to query the contract
+	cursor := ""
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker:
-			// for each event type, send a signal for it to execute a query and produce a new
-			// batch of event logs
-			for i := 0; i < len(w.eventTypes); i++ {
-				signal := signals[w.eventTypes[i]]
-				select {
-				case signal <- struct{}{}:
-				case <-ctx.Done():
-					return
-				}
+			limitAndSort := query.LimitAndSort{
+				SortBy: []query.SortBy{query.NewSortByTimestamp(query.Asc)},
+				Limit:  query.Limit{Count: w.eventPollerCfg.QueryCount},
+			}
+			if cursor != "" {
+				limitAndSort.Limit = query.CursorLimit(cursor, query.CursorFollowing, w.eventPollerCfg.QueryCount)
 			}
 
-			// block on fan-in until all fetched event logs are sent to the handlers
-			w.orderAndSend(
-				ctx,
-				len(w.eventTypes),
-				w.batchCh,
-				sendLog,
-			)
-		}
-	}
-}
-
-// orderAndSend reads n batches from the batch channel, heapifies all the batches then dequeues
-// the min heap via the sendLog function.
-func (w *workflowRegistry) orderAndSend(
-	ctx context.Context,
-	batchCount int,
-	batchCh <-chan []WorkflowRegistryEventResponse,
-	sendLog func(WorkflowRegistryEventResponse),
-) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case batch := <-batchCh:
-			for _, response := range batch {
-				w.heap.Push(response)
+			logsIter, err := reader.QueryKeys(ctx, keyQueries, limitAndSort)
+			if err != nil {
+				w.lggr.Errorw("failed to query keys", "err", err)
+				continue
 			}
-			batchCount--
 
-			// If we have received responses for all the events, then we can drain the heap.
-			if batchCount == 0 {
-				for w.heap.Len() > 0 {
-					sendLog(w.heap.Pop())
+			var logs []sequenceWithEventType
+			for eventType, log := range logsIter {
+				logs = append(logs, sequenceWithEventType{
+					Sequence:  log,
+					EventType: WorkflowRegistryEventType(eventType),
+				})
+			}
+			w.lggr.Debugw("QueryKeys called", "logs", len(logs), "eventTypes", w.eventTypes, "lastReadBlockNumber", lastReadBlockNumber, "logCursor", cursor)
+
+			// ChainReader QueryKey API provides logs including the cursor value and not
+			// after the cursor value. If the response only consists of the log corresponding
+			// to the cursor and no log after it, then we understand that there are no new
+			// logs
+			if len(logs) == 1 && logs[0].Sequence.Cursor == cursor {
+				w.lggr.Infow("No new logs since", "cursor", cursor)
+				continue
+			}
+
+			var events []WorkflowRegistryEventResponse
+			for _, log := range logs {
+				if log.Sequence.Cursor == cursor {
+					continue
 				}
-				return
+
+				events = append(events, toWorkflowRegistryEventResponse(log.Sequence, log.EventType, w.lggr))
+				cursor = log.Sequence.Cursor
+			}
+
+			for _, event := range events {
+				err := w.handler.Handle(ctx, event.Event)
+				if err != nil {
+					w.lggr.Errorw("failed to handle event", "err", err, "type", event.Event.EventType)
+				}
 			}
 		}
 	}
@@ -372,120 +349,59 @@ func (w *workflowRegistry) getTicker() <-chan time.Time {
 	return w.ticker
 }
 
-// getContractReader initializes a contract reader if needed, otherwise returns the existing
-// reader.
-func (w *workflowRegistry) getContractReader(ctx context.Context) (ContractReader, error) {
-	c := types.BoundContract{
-		Name:    w.cfg.ContractName,
-		Address: w.cfg.ContractAddress,
-	}
-
-	if w.reader == nil {
-		reader, err := w.initReader(ctx, w.lggr, w.relayer, c)
-		if err != nil {
-			return nil, err
-		}
-
-		w.reader = reader
-	}
-
-	return w.reader, nil
+type sequenceWithEventType struct {
+	Sequence  types.Sequence
+	EventType WorkflowRegistryEventType
 }
 
-// queryEvent queries the contract for events of the given type on each tick from the ticker.
-// Sends a batch of event logs to the batch channel.  The batch represents all the
-// event logs read since the last query.  Loops until the context is canceled.
-func queryEvent(
+func (w *workflowRegistry) newWorkflowRegistryContractReader(
 	ctx context.Context,
-	ticker <-chan struct{},
-	lggr logger.Logger,
-	reader ContractReader,
-	cfg ContractEventPollerConfig,
-	et WorkflowRegistryEventType,
-	batchCh chan<- []WorkflowRegistryEventResponse,
-) {
-	// create query
-	var (
-		responseBatch []WorkflowRegistryEventResponse
-		logData       values.Value
-		cursor        = ""
-		limitAndSort  = query.LimitAndSort{
-			SortBy: []query.SortBy{query.NewSortByTimestamp(query.Asc)},
-			Limit:  query.Limit{Count: cfg.QueryCount},
-		}
-		bc = types.BoundContract{
-			Name:    cfg.ContractName,
-			Address: cfg.ContractAddress,
-		}
-	)
-
-	// Loop until canceled
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker:
-			if cursor != "" {
-				limitAndSort.Limit = query.CursorLimit(cursor, query.CursorFollowing, cfg.QueryCount)
-			}
-
-			logs, err := reader.QueryKey(
-				ctx,
-				bc,
-				query.KeyFilter{
-					Key: string(et),
-					Expressions: []query.Expression{
-						query.Confidence(primitives.Finalized),
-						query.Block(strconv.FormatUint(cfg.StartBlockNum, 10), primitives.Gte),
-					},
-				},
-				limitAndSort,
-				&logData,
-			)
-
-			if err != nil {
-				lggr.Errorw("QueryKey failure", "err", err)
-				continue
-			}
-
-			// ChainReader QueryKey API provides logs including the cursor value and not
-			// after the cursor value. If the response only consists of the log corresponding
-			// to the cursor and no log after it, then we understand that there are no new
-			// logs
-			if len(logs) == 1 && logs[0].Cursor == cursor {
-				lggr.Infow("No new logs since", "cursor", cursor)
-				continue
-			}
-
-			for _, log := range logs {
-				if log.Cursor == cursor {
-					continue
-				}
-
-				responseBatch = append(responseBatch, toWorkflowRegistryEventResponse(log, et, lggr))
-				cursor = log.Cursor
-			}
-			batchCh <- responseBatch
-		}
+) (ContractReader, error) {
+	bc := types.BoundContract{
+		Name:    WorkflowRegistryContractName,
+		Address: w.workflowRegistryAddress,
 	}
-}
 
-func newReader(
-	ctx context.Context,
-	lggr logger.Logger,
-	factory ContractReaderFactory,
-	bc types.BoundContract,
-) (types.ContractReader, error) {
 	contractReaderCfg := evmtypes.ChainReaderConfig{
 		Contracts: map[string]evmtypes.ChainContractReader{
-			ContractName: {
+			WorkflowRegistryContractName: {
 				ContractPollingFilter: evmtypes.ContractPollingFilter{
-					GenericEventNames: []string{string(ForceUpdateSecretsEvent)},
+					GenericEventNames: []string{
+						string(ForceUpdateSecretsEvent),
+						string(WorkflowActivatedEvent),
+						string(WorkflowDeletedEvent),
+						string(WorkflowPausedEvent),
+						string(WorkflowRegisteredEvent),
+						string(WorkflowUpdatedEvent),
+					},
 				},
 				ContractABI: workflow_registry_wrapper.WorkflowRegistryABI,
 				Configs: map[string]*evmtypes.ChainReaderDefinition{
+					GetWorkflowMetadataListByDONMethodName: {
+						ChainSpecificName: GetWorkflowMetadataListByDONMethodName,
+					},
 					string(ForceUpdateSecretsEvent): {
 						ChainSpecificName: string(ForceUpdateSecretsEvent),
+						ReadType:          evmtypes.Event,
+					},
+					string(WorkflowActivatedEvent): {
+						ChainSpecificName: string(WorkflowActivatedEvent),
+						ReadType:          evmtypes.Event,
+					},
+					string(WorkflowDeletedEvent): {
+						ChainSpecificName: string(WorkflowDeletedEvent),
+						ReadType:          evmtypes.Event,
+					},
+					string(WorkflowPausedEvent): {
+						ChainSpecificName: string(WorkflowPausedEvent),
+						ReadType:          evmtypes.Event,
+					},
+					string(WorkflowRegisteredEvent): {
+						ChainSpecificName: string(WorkflowRegisteredEvent),
+						ReadType:          evmtypes.Event,
+					},
+					string(WorkflowUpdatedEvent): {
+						ChainSpecificName: string(WorkflowUpdatedEvent),
 						ReadType:          evmtypes.Event,
 					},
 				},
@@ -498,7 +414,7 @@ func newReader(
 		return nil, err
 	}
 
-	reader, err := factory.NewContractReader(ctx, marshalledCfg)
+	reader, err := w.newContractReaderFn(ctx, marshalledCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +424,76 @@ func newReader(
 		return nil, err
 	}
 
+	if err := reader.Start(ctx); err != nil {
+		return nil, err
+	}
+
 	return reader, nil
+}
+
+type workflowAsEvent struct {
+	Data      WorkflowRegistryWorkflowRegisteredV1
+	EventType WorkflowRegistryEventType
+}
+
+func (r workflowAsEvent) GetEventType() WorkflowRegistryEventType {
+	return r.EventType
+}
+
+func (r workflowAsEvent) GetData() any {
+	return r.Data
+}
+
+func (w *workflowRegistry) loadWorkflows(ctx context.Context, don capabilities.DON, contractReader ContractReader) (*types.Head, error) {
+	contractBinding := types.BoundContract{
+		Address: w.workflowRegistryAddress,
+		Name:    WorkflowRegistryContractName,
+	}
+
+	readIdentifier := contractBinding.ReadIdentifier(GetWorkflowMetadataListByDONMethodName)
+	params := GetWorkflowMetadataListByDONParams{
+		DonID: don.ID,
+		Start: 0,
+		Limit: 0, // 0 tells the contract to return max pagination limit workflows on each call
+	}
+
+	var headAtLastRead *types.Head
+	for {
+		var err error
+		var workflows GetWorkflowMetadataListByDONReturnVal
+		headAtLastRead, err = contractReader.GetLatestValueWithHeadData(ctx, readIdentifier, primitives.Finalized, params, &workflows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get lastest value with head data %w", err)
+		}
+
+		w.lggr.Debugw("Rehydrating existing workflows", "len", len(workflows.WorkflowMetadataList))
+		for _, workflow := range workflows.WorkflowMetadataList {
+			toRegisteredEvent := WorkflowRegistryWorkflowRegisteredV1{
+				WorkflowID:    workflow.WorkflowID,
+				WorkflowOwner: workflow.Owner,
+				DonID:         workflow.DonID,
+				Status:        workflow.Status,
+				WorkflowName:  workflow.WorkflowName,
+				BinaryURL:     workflow.BinaryURL,
+				ConfigURL:     workflow.ConfigURL,
+				SecretsURL:    workflow.SecretsURL,
+			}
+			if err = w.handler.Handle(ctx, workflowAsEvent{
+				Data:      toRegisteredEvent,
+				EventType: WorkflowRegisteredEvent,
+			}); err != nil {
+				w.lggr.Errorf("failed to handle workflow registration: %s", err)
+			}
+		}
+
+		if len(workflows.WorkflowMetadataList) == 0 {
+			break
+		}
+
+		params.Start += uint64(len(workflows.WorkflowMetadataList))
+	}
+
+	return headAtLastRead, nil
 }
 
 // toWorkflowRegistryEventResponse converts a types.Sequence to a WorkflowRegistryEventResponse.
@@ -546,6 +531,51 @@ func toWorkflowRegistryEventResponse(
 			return resp
 		}
 		resp.Event.Data = data
+	case WorkflowRegisteredEvent:
+		var data WorkflowRegistryWorkflowRegisteredV1
+		if err := dataAsValuesMap.UnwrapTo(&data); err != nil {
+			lggr.Errorf("failed to unwrap data: %+v", log.Data)
+			resp.Event = nil
+			resp.Err = err
+			return resp
+		}
+		resp.Event.Data = data
+	case WorkflowUpdatedEvent:
+		var data WorkflowRegistryWorkflowUpdatedV1
+		if err := dataAsValuesMap.UnwrapTo(&data); err != nil {
+			lggr.Errorf("failed to unwrap data: %+v", log.Data)
+			resp.Event = nil
+			resp.Err = err
+			return resp
+		}
+		resp.Event.Data = data
+	case WorkflowPausedEvent:
+		var data WorkflowRegistryWorkflowPausedV1
+		if err := dataAsValuesMap.UnwrapTo(&data); err != nil {
+			lggr.Errorf("failed to unwrap data: %+v", log.Data)
+			resp.Event = nil
+			resp.Err = err
+			return resp
+		}
+		resp.Event.Data = data
+	case WorkflowActivatedEvent:
+		var data WorkflowRegistryWorkflowActivatedV1
+		if err := dataAsValuesMap.UnwrapTo(&data); err != nil {
+			lggr.Errorf("failed to unwrap data: %+v", log.Data)
+			resp.Event = nil
+			resp.Err = err
+			return resp
+		}
+		resp.Event.Data = data
+	case WorkflowDeletedEvent:
+		var data WorkflowRegistryWorkflowDeletedV1
+		if err := dataAsValuesMap.UnwrapTo(&data); err != nil {
+			lggr.Errorf("failed to unwrap data: %+v", log.Data)
+			resp.Event = nil
+			resp.Err = err
+			return resp
+		}
+		resp.Event.Data = data
 	default:
 		lggr.Errorf("unknown event type: %s", evt)
 		resp.Event = nil
@@ -553,39 +583,4 @@ func toWorkflowRegistryEventResponse(
 	}
 
 	return resp
-}
-
-type nullWorkflowRegistrySyncer struct {
-	services.Service
-}
-
-func NewNullWorkflowRegistrySyncer() *nullWorkflowRegistrySyncer {
-	return &nullWorkflowRegistrySyncer{}
-}
-
-// Start
-func (u *nullWorkflowRegistrySyncer) Start(context.Context) error {
-	return nil
-}
-
-// Close
-func (u *nullWorkflowRegistrySyncer) Close() error {
-	return nil
-}
-
-// SecretsFor
-func (u *nullWorkflowRegistrySyncer) SecretsFor(context.Context, string, string) (map[string]string, error) {
-	return nil, nil
-}
-
-func (u *nullWorkflowRegistrySyncer) Ready() error {
-	return nil
-}
-
-func (u *nullWorkflowRegistrySyncer) HealthReport() map[string]error {
-	return nil
-}
-
-func (u *nullWorkflowRegistrySyncer) Name() string {
-	return "Null" + name
 }

@@ -37,6 +37,9 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
+	"github.com/smartcontractkit/chainlink-testing-framework/sentinel"
+	"github.com/smartcontractkit/chainlink-testing-framework/sentinel/blockchain_client_wrapper"
+	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 
 	integrationactions "github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
@@ -46,6 +49,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
 	testutils "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/utils"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 )
 
@@ -307,8 +311,8 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		var newNetworkPairs []NetworkPair
 		denselyConnectedNetworks := make(map[string]struct{})
 		// if densely connected networks are provided, choose all the network pairs containing the networks mentioned in the list for DenselyConnectedNetworkChainIds
-		if len(c.TestGroupInput.DenselyConnectedNetworkChainIds) > 0 {
-			for _, n := range c.TestGroupInput.DenselyConnectedNetworkChainIds {
+		if len(c.TestGroupInput.DenselyConnectedNetworkChainIDs) > 0 {
+			for _, n := range c.TestGroupInput.DenselyConnectedNetworkChainIDs {
 				denselyConnectedNetworks[n] = struct{}{}
 			}
 			for _, pair := range c.NetworkPairs {
@@ -576,6 +580,7 @@ type CCIPTestSetUpOutputs struct {
 	Balance                *actions.BalanceSheet
 	BootstrapAdded         *atomic.Bool
 	JobAddGrp              *errgroup.Group
+	SC                     *sentinel.SentinelCoordinator
 }
 
 func (o *CCIPTestSetUpOutputs) AddToLanes(lane *BiDirectionalLaneConfig) {
@@ -887,6 +892,17 @@ func (o *CCIPTestSetUpOutputs) StartEventWatchers() {
 	}
 }
 
+func (o *CCIPTestSetUpOutputs) StartEventWatchersPolling() {
+	for _, lane := range o.ReadLanes() {
+		err := lane.ForwardLane.StartEventWatchersPolling(o.SC)
+		require.NoError(o.Cfg.Test, err)
+		if lane.ReverseLane != nil {
+			err = lane.ReverseLane.StartEventWatchersPolling(o.SC)
+			require.NoError(o.Cfg.Test, err)
+		}
+	}
+}
+
 func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates() {
 	t := o.Cfg.Test
 	priceUpdateGrp, _ := errgroup.WithContext(o.SetUpContext)
@@ -1153,8 +1169,15 @@ func CCIPDefaultTestSetUp(
 			// if it's a new USDC deployment, set up mock server for attestation,
 			// we need to set it only once for all the lanes as the attestation path uses regex to match the path for
 			// all messages across all lanes
-			err = actions.SetMockServerWithUSDCAttestation(killgrave, setUpArgs.Env.MockServer)
-			require.NoError(t, err, "failed to set up mock server for attestation")
+			err = actions.SetMockServerWithUSDCAttestation(killgrave, setUpArgs.Env.MockServer, false)
+			require.NoError(t, err, "failed to set up mock server for USDC attestation")
+		}
+		if pointer.GetBool(setUpArgs.Cfg.TestGroupInput.LBTCMockDeployment) {
+			// if it's a new LBTC deployment, set up mock server for attestation,
+			// we need to set it only once for all the lanes as the attestation path uses regex to match the path for
+			// all messages across all lanes
+			err = actions.SetMockServerWithLBTCAttestation(killgrave, setUpArgs.Env.MockServer)
+			require.NoError(t, err, "failed to set up mock server for LBTC attestation")
 		}
 	}
 	// deploy all lane specific contracts
@@ -1207,7 +1230,21 @@ func CCIPDefaultTestSetUp(
 	}
 
 	// start event watchers for all lanes
-	setUpArgs.StartEventWatchers()
+	if useWebSocket(chainClientByChainID) {
+		setUpArgs.StartEventWatchers()
+	} else {
+		setUpArgs.SC = sentinel.NewSentinelCoordinator(*lggr)
+		err := setUpArgs.addChains()
+		require.NoError(t, err, "error adding chain to Sentinel")
+		setUpArgs.StartEventWatchersPolling()
+		t.Cleanup(func() {
+			if setUpArgs.SC != nil {
+				lggr.Info().Msg("Closing Sentinel")
+				setUpArgs.SC.Sentinel.Close()
+			}
+		})
+	}
+
 	// now that lane configs are already dumped to file, we can clean up the lane config map
 	setUpArgs.LaneConfig = nil
 	setUpArgs.TearDown = func() error {
@@ -1230,6 +1267,47 @@ func CCIPDefaultTestSetUp(
 	}
 	lggr.Info().Msg("Test setup completed")
 	return setUpArgs
+}
+
+func useWebSocket(chainClientByChainID map[int64]blockchain.EVMClient) bool {
+	for _, c := range chainClientByChainID {
+		if !c.GetEthClient().Client().SupportsSubscriptions() {
+			return false
+		}
+	}
+	return true
+}
+
+func (o *CCIPTestSetUpOutputs) addChains() error {
+	for _, lane := range o.ReadLanes() {
+		// Add both forward and reverse lanes
+		err := o.addChainToSentinel(lane.ForwardLane.SourceChain)
+		if err != nil {
+			return err
+		}
+		err = o.addChainToSentinel(lane.ForwardLane.DestChain)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// addChainToSentinel is a helper function to add a chain to Sentinel
+func (o *CCIPTestSetUpOutputs) addChainToSentinel(chain blockchain.EVMClient) error {
+	blockchainClient := blockchain_client_wrapper.NewGethClientWrapper(chain.GetEthClient())
+
+	// Define the chain poller service configuration
+	addChainConfig := sentinel.AddChainConfig{
+		ChainID:          chain.GetChainID().Int64(),
+		PollInterval:     30 * time.Second,
+		BlockchainClient: blockchainClient,
+	}
+
+	// Add the chain to Sentinel
+	err := o.SC.Sentinel.AddChain(addChainConfig)
+
+	return err
 }
 
 // CreateEnvironment creates the environment for the test and registers the test clean-up function to tear down the set-up environment
@@ -1414,9 +1492,19 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 }
 
 func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestConfig, reportPath string) *environment.Config {
+	testType := testConfig.TestGroupInput.Type
+	nsLabels, err := environment.GetRequiredChainLinkNamespaceLabels(string(tc.CCIP), testType)
+	require.NoError(t, err, "Error creating required chain.link labels for namespace")
+
+	workloadPodLabels, err := environment.GetRequiredChainLinkWorkloadAndPodLabels(string(tc.CCIP), testType)
+	require.NoError(t, err, "Error creating required chain.link labels for workloads and pods")
+
 	envConfig := &environment.Config{
 		NamespacePrefix: envName,
 		Test:            t,
+		Labels:          nsLabels,
+		WorkloadLabels:  workloadPodLabels,
+		PodLabels:       workloadPodLabels,
 		//	PreventPodEviction: true, //TODO: enable this once we have a way to handle pod eviction
 	}
 	if pointer.GetBool(testConfig.TestGroupInput.StoreLaneConfig) {

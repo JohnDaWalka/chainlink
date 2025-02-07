@@ -5,7 +5,7 @@ import (
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	stkcfg "github.com/smartcontractkit/chainlink-starknet/relayer/pkg/chainlink/config"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
+	"github.com/smartcontractkit/chainlink-integrations/evm/config/toml"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 )
 
@@ -16,6 +16,7 @@ type GeneralConfig interface {
 	SolanaConfigs() solcfg.TOMLConfigs
 	StarknetConfigs() stkcfg.TOMLConfigs
 	AptosConfigs() RawConfigs
+	TronConfigs() RawConfigs
 	// ConfigTOML returns both the user provided and effective configuration as TOML.
 	ConfigTOML() (user, effective string)
 }

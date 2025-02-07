@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
+
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable"
 	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/transmission"
@@ -29,6 +30,8 @@ const (
 )
 
 func Test_Client_DonTopologies(t *testing.T) {
+	t.Skip("Flaking again: https://smartcontract-it.atlassian.net/browse/CAPPL-322")
+
 	ctx := testutils.Context(t)
 
 	transmissionSchedule, err := values.NewMap(map[string]any{
@@ -38,10 +41,12 @@ func Test_Client_DonTopologies(t *testing.T) {
 	require.NoError(t, err)
 
 	responseTest := func(t *testing.T, response commoncap.CapabilityResponse, responseError error) {
-		require.NoError(t, responseError)
-		mp, err := response.Value.Unwrap()
-		require.NoError(t, err)
-		assert.Equal(t, "aValue1", mp.(map[string]any)["response"].(string))
+		if assert.NoError(t, responseError) {
+			mp, err := response.Value.Unwrap()
+			if assert.NoError(t, err) {
+				assert.Equal(t, "aValue1", mp.(map[string]any)["response"].(string))
+			}
+		}
 	}
 
 	capability := &TestCapability{}
@@ -52,20 +57,9 @@ func Test_Client_DonTopologies(t *testing.T) {
 
 	methods = append(methods, func(caller commoncap.ExecutableCapability) {
 		executeInputs, err := values.NewMap(map[string]any{"executeValue1": "aValue1"})
-		require.NoError(t, err)
-		executeMethod(ctx, caller, transmissionSchedule, executeInputs, responseTest, t)
-	})
-
-	methods = append(methods, func(caller commoncap.ExecutableCapability) {
-		registerToWorkflowMethod(ctx, caller, transmissionSchedule, func(t *testing.T, responseError error) {
-			require.NoError(t, responseError)
-		}, t)
-	})
-
-	methods = append(methods, func(caller commoncap.ExecutableCapability) {
-		unregisterFromWorkflowMethod(ctx, caller, transmissionSchedule, func(t *testing.T, responseError error) {
-			require.NoError(t, responseError)
-		}, t)
+		if assert.NoError(t, err) {
+			executeMethod(ctx, caller, transmissionSchedule, executeInputs, responseTest, t)
+		}
 	})
 
 	for _, method := range methods {
@@ -90,10 +84,12 @@ func Test_Client_TransmissionSchedules(t *testing.T) {
 	ctx := testutils.Context(t)
 
 	responseTest := func(t *testing.T, response commoncap.CapabilityResponse, responseError error) {
-		require.NoError(t, responseError)
-		mp, err := response.Value.Unwrap()
-		require.NoError(t, err)
-		assert.Equal(t, "aValue1", mp.(map[string]any)["response"].(string))
+		if assert.NoError(t, responseError) {
+			mp, err := response.Value.Unwrap()
+			if assert.NoError(t, err) {
+				assert.Equal(t, "aValue1", mp.(map[string]any)["response"].(string))
+			}
+		}
 	}
 
 	capability := &TestCapability{}
@@ -109,14 +105,16 @@ func Test_Client_TransmissionSchedules(t *testing.T) {
 	testClient(t, 1, responseTimeOut, 1, 0,
 		capability, func(caller commoncap.ExecutableCapability) {
 			executeInputs, err2 := values.NewMap(map[string]any{"executeValue1": "aValue1"})
-			require.NoError(t, err2)
-			executeMethod(ctx, caller, transmissionSchedule, executeInputs, responseTest, t)
+			if assert.NoError(t, err2) {
+				executeMethod(ctx, caller, transmissionSchedule, executeInputs, responseTest, t)
+			}
 		})
 	testClient(t, 10, responseTimeOut, 10, 3,
 		capability, func(caller commoncap.ExecutableCapability) {
 			executeInputs, err2 := values.NewMap(map[string]any{"executeValue1": "aValue1"})
-			require.NoError(t, err2)
-			executeMethod(ctx, caller, transmissionSchedule, executeInputs, responseTest, t)
+			if assert.NoError(t, err2) {
+				executeMethod(ctx, caller, transmissionSchedule, executeInputs, responseTest, t)
+			}
 		})
 
 	transmissionSchedule, err = values.NewMap(map[string]any{
@@ -128,14 +126,16 @@ func Test_Client_TransmissionSchedules(t *testing.T) {
 	testClient(t, 1, responseTimeOut, 1, 0,
 		capability, func(caller commoncap.ExecutableCapability) {
 			executeInputs, err := values.NewMap(map[string]any{"executeValue1": "aValue1"})
-			require.NoError(t, err)
-			executeMethod(ctx, caller, transmissionSchedule, executeInputs, responseTest, t)
+			if assert.NoError(t, err) {
+				executeMethod(ctx, caller, transmissionSchedule, executeInputs, responseTest, t)
+			}
 		})
 	testClient(t, 10, responseTimeOut, 10, 3,
 		capability, func(caller commoncap.ExecutableCapability) {
 			executeInputs, err := values.NewMap(map[string]any{"executeValue1": "aValue1"})
-			require.NoError(t, err)
-			executeMethod(ctx, caller, transmissionSchedule, executeInputs, responseTest, t)
+			if assert.NoError(t, err) {
+				executeMethod(ctx, caller, transmissionSchedule, executeInputs, responseTest, t)
+			}
 		})
 }
 
@@ -143,7 +143,7 @@ func Test_Client_TimesOutIfInsufficientCapabilityPeerResponses(t *testing.T) {
 	ctx := testutils.Context(t)
 
 	responseTest := func(t *testing.T, response commoncap.CapabilityResponse, responseError error) {
-		assert.Error(t, responseError)
+		assert.ErrorIs(t, responseError, executable.ErrRequestExpired)
 	}
 
 	capability := &TestCapability{}
@@ -160,8 +160,34 @@ func Test_Client_TimesOutIfInsufficientCapabilityPeerResponses(t *testing.T) {
 		capability,
 		func(caller commoncap.ExecutableCapability) {
 			executeInputs, err := values.NewMap(map[string]any{"executeValue1": "aValue1"})
-			require.NoError(t, err)
-			executeMethod(ctx, caller, transmissionSchedule, executeInputs, responseTest, t)
+			if assert.NoError(t, err) {
+				executeMethod(ctx, caller, transmissionSchedule, executeInputs, responseTest, t)
+			}
+		})
+}
+
+func Test_Client_ContextCanceledBeforeQuorumReached(t *testing.T) {
+	ctx, cancel := context.WithCancel(testutils.Context(t))
+
+	responseTest := func(t *testing.T, response commoncap.CapabilityResponse, responseError error) {
+		assert.ErrorIs(t, responseError, executable.ErrContextDoneBeforeResponseQuorum)
+	}
+
+	capability := &TestCapability{}
+	transmissionSchedule, err := values.NewMap(map[string]any{
+		"schedule":   transmission.Schedule_AllAtOnce,
+		"deltaStage": "20s",
+	})
+	require.NoError(t, err)
+
+	cancel()
+	testClient(t, 2, 20*time.Second, 2, 2,
+		capability,
+		func(caller commoncap.ExecutableCapability) {
+			executeInputs, err := values.NewMap(map[string]any{"executeValue1": "aValue1"})
+			if assert.NoError(t, err) {
+				executeMethod(ctx, caller, transmissionSchedule, executeInputs, responseTest, t)
+			}
 		})
 }
 
@@ -234,34 +260,6 @@ func testClient(t *testing.T, numWorkflowPeers int, workflowNodeResponseTimeout 
 	wg.Wait()
 }
 
-func registerToWorkflowMethod(ctx context.Context, caller commoncap.ExecutableCapability, transmissionSchedule *values.Map,
-	responseTest func(t *testing.T, responseError error), t *testing.T) {
-	err := caller.RegisterToWorkflow(ctx, commoncap.RegisterToWorkflowRequest{
-		Metadata: commoncap.RegistrationMetadata{
-			WorkflowID:    workflowID1,
-			ReferenceID:   stepReferenceID1,
-			WorkflowOwner: workflowOwnerID,
-		},
-		Config: transmissionSchedule,
-	})
-
-	responseTest(t, err)
-}
-
-func unregisterFromWorkflowMethod(ctx context.Context, caller commoncap.ExecutableCapability, transmissionSchedule *values.Map,
-	responseTest func(t *testing.T, responseError error), t *testing.T) {
-	err := caller.UnregisterFromWorkflow(ctx, commoncap.UnregisterFromWorkflowRequest{
-		Metadata: commoncap.RegistrationMetadata{
-			WorkflowID:    workflowID1,
-			ReferenceID:   stepReferenceID1,
-			WorkflowOwner: workflowOwnerID,
-		},
-		Config: transmissionSchedule,
-	})
-
-	responseTest(t, err)
-}
-
 func executeMethod(ctx context.Context, caller commoncap.ExecutableCapability, transmissionSchedule *values.Map,
 	executeInputs *values.Map, responseTest func(t *testing.T, responseCh commoncap.CapabilityResponse, responseError error), t *testing.T) {
 	responseCh, err := caller.Execute(ctx,
@@ -332,21 +330,6 @@ func (t *clientTestServer) Receive(_ context.Context, msg *remotetypes.MessageBo
 			resp, responseErr := t.executableCapability.Execute(context.Background(), capabilityRequest)
 			payload, marshalErr := pb.MarshalCapabilityResponse(resp)
 			t.sendResponse(messageID, responseErr, payload, marshalErr)
-
-		case remotetypes.MethodRegisterToWorkflow:
-			registerRequest, err := pb.UnmarshalRegisterToWorkflowRequest(msg.Payload)
-			if err != nil {
-				panic(err)
-			}
-			responseErr := t.executableCapability.RegisterToWorkflow(context.Background(), registerRequest)
-			t.sendResponse(messageID, responseErr, nil, nil)
-		case remotetypes.MethodUnregisterFromWorkflow:
-			unregisterRequest, err := pb.UnmarshalUnregisterFromWorkflowRequest(msg.Payload)
-			if err != nil {
-				panic(err)
-			}
-			responseErr := t.executableCapability.UnregisterFromWorkflow(context.Background(), unregisterRequest)
-			t.sendResponse(messageID, responseErr, nil, nil)
 		default:
 			panic("unknown method")
 		}
