@@ -443,6 +443,6 @@ func TestPoolLookupTable(t *testing.T) {
 
 	err = e.SolChains[solChain].GetAccountDataBorshInto(ctx, tokenAdminRegistryPDA, &tokenAdminRegistry)
 	require.NoError(t, err)
-	require.Equal(t, e.SolChains[solChain].DeployerKey.PublicKey(), tokenAdminRegistry.Administrator)
+	require.Equal(t, tokenAdminRegistryAdminPrivKey.PublicKey(), tokenAdminRegistry.Administrator)
 	require.Equal(t, lookupTablePubKey, tokenAdminRegistry.LookupTable)
 }
