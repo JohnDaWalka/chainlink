@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {Upgrades} from "../../../../../../vendor/openzeppelin-foundry-upgrades/v0.3.8/Upgrades.sol";
+import {ERC1967Proxy} from
+  "../../../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {BurnMintERC20PausableUUPS} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
 import {BaseTest} from "../../../../BaseTest.t.sol";
-// import {ERC1967Proxy} from "../../openzeppelin-solidity/v5.0.2/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract BurnMintERC20PausableUUPSSetup is BaseTest {
   BurnMintERC20PausableUUPS internal s_burnMintERC20PausableUUPS;
@@ -22,13 +22,15 @@ contract BurnMintERC20PausableUUPSSetup is BaseTest {
   function setUp() public virtual override {
     BaseTest.setUp();
 
-    // s_burnMintERC20PausableUUPS = new BurnMintERC20PausableUUPS();
+    address implementation = address(new BurnMintERC20PausableUUPS());
 
-    s_uupsProxy = Upgrades.deployUUPSProxy(
-      "BurnMintERC20PausableUUPS.sol",
-      abi.encodeCall(
-        BurnMintERC20PausableUUPS.initialize,
-        (s_name, s_symbol, s_decimals, s_maxSupply, s_preMint, s_defaultAdmin, s_defaultUpgrader, s_defaultPauser)
+    s_uupsProxy = address(
+      new ERC1967Proxy(
+        implementation,
+        abi.encodeCall(
+          BurnMintERC20PausableUUPS.initialize,
+          (s_name, s_symbol, s_decimals, s_maxSupply, s_preMint, s_defaultAdmin, s_defaultUpgrader, s_defaultPauser)
+        )
       )
     );
 

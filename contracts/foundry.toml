@@ -104,18 +104,6 @@ test = 'src/v0.8/workflow/test'
 via_ir = true # reconsider using the --via-ir flag if compilation takes too long
 evm_version = 'paris'
 
-[profile.shared-token-upgradeable]
-optimizer_runs = 1_000_000
-src = 'src/v0.8/shared/token/ERC20/upgradeable'
-test = 'src/v0.8/shared/test/token/ERC20/upgradeable'
-solc_version = '0.8.24'
-evm_version = 'paris'
-ffi = true
-ast = true
-build_info = true
-extra_output = ["storageLayout"]
-fs_permissions = [{ access = "read", path = "foundry-artifacts" }]
-
 [profile.shared]
 optimizer_runs = 1_000_000
 src = 'src/v0.8/shared'

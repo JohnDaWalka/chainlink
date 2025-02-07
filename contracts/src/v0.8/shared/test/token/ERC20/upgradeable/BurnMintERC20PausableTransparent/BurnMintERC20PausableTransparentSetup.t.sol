@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {Upgrades} from "../../../../../../vendor/openzeppelin-foundry-upgrades/v0.3.8/Upgrades.sol";
+import {TransparentUpgradeableProxy} from
+  "../../../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {BurnMintERC20PausableTransparent} from
   "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableTransparent.sol";
 import {BaseTest} from "../../../../BaseTest.t.sol";
@@ -22,12 +23,16 @@ contract BurnMintERC20PausableTransparentSetup is BaseTest {
   function setUp() public virtual override {
     BaseTest.setUp();
 
-    s_TransparentProxy = Upgrades.deployTransparentProxy(
-      "BurnMintERC20PausableTransparent.sol",
-      s_initialOwnerAddressForProxyAdmin,
-      abi.encodeCall(
-        BurnMintERC20PausableTransparent.initialize,
-        (s_name, s_symbol, s_decimals, s_maxSupply, s_preMint, s_defaultAdmin, s_defaultPauser)
+    address implementation = address(new BurnMintERC20PausableTransparent());
+
+    s_TransparentProxy = address(
+      new TransparentUpgradeableProxy(
+        implementation,
+        s_initialOwnerAddressForProxyAdmin,
+        abi.encodeCall(
+          BurnMintERC20PausableTransparent.initialize,
+          (s_name, s_symbol, s_decimals, s_maxSupply, s_preMint, s_defaultAdmin, s_defaultPauser)
+        )
       )
     );
 

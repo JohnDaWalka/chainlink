@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {Upgrades} from "../../../../../../vendor/openzeppelin-foundry-upgrades/v0.3.8/Upgrades.sol";
 import {Initializable} from
   "../../../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/proxy/utils/Initializable.sol";
 import {BurnMintERC20PausableFreezableTransparent} from
@@ -10,8 +9,6 @@ import {BurnMintERC20PausableFreezableTransparentSetup} from "./BurnMintERC20Pau
 
 contract BurnMintERC20PausableFreezableTransparent_initialize is BurnMintERC20PausableFreezableTransparentSetup {
   function test_Initialize() public view {
-    assertFalse(Upgrades.getAdminAddress(s_TransparentProxy) == address(0));
-
     assertEq(s_burnMintERC20PausableFreezableTransparent.name(), s_name);
     assertEq(s_burnMintERC20PausableFreezableTransparent.symbol(), s_symbol);
     assertEq(s_burnMintERC20PausableFreezableTransparent.decimals(), s_decimals);

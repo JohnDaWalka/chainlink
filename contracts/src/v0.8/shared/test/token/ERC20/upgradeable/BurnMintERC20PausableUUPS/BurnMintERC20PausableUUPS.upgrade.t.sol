@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {UnsafeUpgrades} from "../../../../../../vendor/openzeppelin-foundry-upgrades/v0.3.8/Upgrades.sol";
+import {ERC1967Utils} from
+  "../../../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {BurnMintERC20PausableUUPS} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
 import {BurnMintERC20PausableUUPSSetup} from "./BurnMintERC20PausableUUPSSetup.t.sol";
+
+interface IUpgradeableProxy {
+  function upgradeToAndCall(address, bytes memory) external payable;
+}
 
 /// @dev Mock contract with limited functionality used for testing only.
 /// @dev It adds a new freeze functionality to the BurnMintERC20PausableUUPS contract.
@@ -63,17 +68,12 @@ contract BurnMintERC20PausableUUPS_upgrade is BurnMintERC20PausableUUPSSetup {
 
     // Upgrade to the new version
     changePrank(s_defaultUpgrader);
-    address currentImplementationAddress = UnsafeUpgrades.getImplementationAddress(s_uupsProxy);
     MockBurnMintERC20PausableUUPSV2 newImplementation = new MockBurnMintERC20PausableUUPSV2();
 
-    UnsafeUpgrades.upgradeProxy(
-      s_uupsProxy,
+    IUpgradeableProxy(s_uupsProxy).upgradeToAndCall(
       address(newImplementation),
       abi.encodeCall(MockBurnMintERC20PausableUUPSV2.initializeFreezerRole, (s_defaultFreezer))
     );
-
-    address newImplementationAddress = UnsafeUpgrades.getImplementationAddress(s_uupsProxy);
-    assertFalse(currentImplementationAddress == newImplementationAddress);
 
     newImplementation = MockBurnMintERC20PausableUUPSV2(s_uupsProxy);
 
