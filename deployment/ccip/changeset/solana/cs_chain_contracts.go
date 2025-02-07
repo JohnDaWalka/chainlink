@@ -240,7 +240,7 @@ func doAddRemoteChainToSolana(
 			return fmt.Errorf("failed to generate instructions: %w", err)
 		}
 
-		solFeeQuoter.SetProgramID(feeQuoterId)
+		solFeeQuoter.SetProgramID(feeQuoterID)
 		feeQuoterIx, err := solFeeQuoter.NewAddDestChainInstruction(
 			remoteChainSel,
 			update.FeeQuoterDestinationConfig,
