@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -31,7 +32,18 @@ import (
 )
 
 type DonConfig struct {
-	N int
+	Name             string // required, must be unique across all dons
+	N                int
+	F                *int                                          // if nil, defaults to floor(N-1/3) + 1
+	CapabilityConfig map[CapabilityNaturalKey]*pb.CapabilityConfig // optional DON specific configuration for the given capability
+	Labels           map[string]string                             // optional
+	RegistryChainSel uint64                                        // require, must be the same for all dons
+	ChainSelectors   []uint64                                      // optional chains
+}
+
+type CapabilityNaturalKey struct {
+	LabelledName string
+	Version      string
 }
 
 func (c DonConfig) Validate() error {
@@ -39,6 +51,15 @@ func (c DonConfig) Validate() error {
 		return errors.New("N must be at least 4")
 	}
 	return nil
+}
+
+type TestEnvI interface {
+	ContractSets() map[uint64]internal.ContractSet
+	CapabilitiesRegistry() *kcr.CapabilitiesRegistry
+	CapabilityInfos() []kcr.CapabilitiesRegistryCapabilityInfo
+	Nops() []kcr.CapabilitiesRegistryNodeOperatorAdded
+
+	GetDon(name string) deployment.Nodes
 }
 
 // TODO: separate the config into different types; wf should expand to types of ocr keybundles; writer to target chains; ...

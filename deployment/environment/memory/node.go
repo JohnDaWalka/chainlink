@@ -18,6 +18,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/maps"
 
+	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
@@ -66,6 +68,101 @@ func (n Node) ReplayLogs(chains map[uint64]uint64) error {
 		}
 	}
 	return nil
+}
+
+func (n Node) DeplonmentNode() deployment.Node {
+	/*
+		m := make(map[chainsel.ChainDetails]deployment.OCRConfig)
+		for _, k := range n.Keys.OCRKeyBundles {
+		}
+	*/
+	return deployment.Node{
+		PeerID:      n.Keys.PeerID,
+		CSAKey:      n.Keys.CSA.PublicKeyString(),
+		NodeID:      n.Keys.PeerID.String(),
+		IsBootstrap: n.IsBoostrap,
+	}
+}
+
+func (n Node) JDChainConfigs() ([]*nodev1.ChainConfig, error) {
+	var chainConfigs []*nodev1.ChainConfig
+	for _, selector := range n.Chains {
+		family, err := chainsel.GetSelectorFamily(selector)
+		if err != nil {
+			return nil, err
+		}
+
+		// NOTE: this supports non-EVM too
+		chainID, err := chainsel.GetChainIDFromSelector(selector)
+		if err != nil {
+			return nil, err
+		}
+
+		var ocrtype chaintype.ChainType
+		switch family {
+		case chainsel.FamilyEVM:
+			ocrtype = chaintype.EVM
+		case chainsel.FamilySolana:
+			ocrtype = chaintype.Solana
+		case chainsel.FamilyStarknet:
+			ocrtype = chaintype.StarkNet
+		case chainsel.FamilyCosmos:
+			ocrtype = chaintype.Cosmos
+		case chainsel.FamilyAptos:
+			ocrtype = chaintype.Aptos
+		default:
+			return nil, fmt.Errorf("Unsupported chain family %v", family)
+		}
+
+		bundle := n.Keys.OCRKeyBundles[ocrtype]
+		offpk := bundle.OffchainPublicKey()
+		cpk := bundle.ConfigEncryptionPublicKey()
+
+		keyBundle := &nodev1.OCR2Config_OCRKeyBundle{
+			BundleId:              bundle.ID(),
+			ConfigPublicKey:       common.Bytes2Hex(cpk[:]),
+			OffchainPublicKey:     common.Bytes2Hex(offpk[:]),
+			OnchainSigningAddress: bundle.OnChainPublicKey(),
+		}
+
+		var ctype nodev1.ChainType
+		switch family {
+		case chainsel.FamilyEVM:
+			ctype = nodev1.ChainType_CHAIN_TYPE_EVM
+		case chainsel.FamilySolana:
+			ctype = nodev1.ChainType_CHAIN_TYPE_SOLANA
+		case chainsel.FamilyStarknet:
+			ctype = nodev1.ChainType_CHAIN_TYPE_STARKNET
+		case chainsel.FamilyAptos:
+			ctype = nodev1.ChainType_CHAIN_TYPE_APTOS
+		default:
+			panic(fmt.Sprintf("Unsupported chain family %v", family))
+		}
+
+		transmitter := n.Keys.Transmitters[selector]
+
+		chainConfigs = append(chainConfigs, &nodev1.ChainConfig{
+			Chain: &nodev1.Chain{
+				Id:   chainID,
+				Type: ctype,
+			},
+			AccountAddress: transmitter,
+			AdminAddress:   transmitter,
+			Ocr1Config:     nil,
+			Ocr2Config: &nodev1.OCR2Config{
+				Enabled:     true,
+				IsBootstrap: n.IsBoostrap,
+				P2PKeyBundle: &nodev1.OCR2Config_P2PKeyBundle{
+					PeerId: n.Keys.PeerID.String(),
+				},
+				OcrKeyBundle:     keyBundle,
+				Multiaddr:        n.Addr.String(),
+				Plugins:          nil,
+				ForwarderAddress: ptr(""),
+			},
+		})
+	}
+	return chainConfigs, nil
 }
 
 // Creates a CL node which is:
