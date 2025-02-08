@@ -125,26 +125,27 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 
 // ADD TOKEN POOL FOR REMOTE CHAIN
 type RemoteChainTokenPoolConfig struct {
-	ChainSelector       uint64
+	SolChainSelector    uint64
 	RemoteChainSelector uint64
-	TokenPubKey         string
-	RemoteConfig        solTokenPool.RemoteConfig
-	InboundRateLimit    solTokenPool.RateLimitConfig
-	OutboundRateLimit   solTokenPool.RateLimitConfig
+	SolTokenPubKey      string
+	// this is actually derivable from on chain given token symbol
+	RemoteConfig      solTokenPool.RemoteConfig
+	InboundRateLimit  solTokenPool.RateLimitConfig
+	OutboundRateLimit solTokenPool.RateLimitConfig
 }
 
 func (cfg RemoteChainTokenPoolConfig) Validate(e deployment.Environment) error {
-	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
-	if err := commonValidation(e, cfg.ChainSelector, solana.MustPublicKeyFromBase58(cfg.TokenPubKey)); err != nil {
+	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.SolTokenPubKey)
+	if err := commonValidation(e, cfg.SolChainSelector, tokenPubKey); err != nil {
 		return err
 	}
 	state, _ := cs.LoadOnchainState(e)
-	chainState := state.SolChains[cfg.ChainSelector]
+	chainState := state.SolChains[cfg.SolChainSelector]
 	if chainState.TokenPool.IsZero() {
-		return fmt.Errorf("token pool not found in existing state, deploy token pool for chain %d", cfg.ChainSelector)
+		return fmt.Errorf("token pool not found in existing state, deploy token pool for chain %d", cfg.SolChainSelector)
 	}
 
-	chain := e.SolChains[cfg.ChainSelector]
+	chain := e.SolChains[cfg.SolChainSelector]
 	tokenPool := chainState.TokenPool
 
 	// check if pool config exists (cannot do remote setup without it)
@@ -157,7 +158,7 @@ func (cfg RemoteChainTokenPoolConfig) Validate(e deployment.Environment) error {
 		return fmt.Errorf("token pool config not found (mint: %s, pool: %s): %w", tokenPubKey.String(), chainState.TokenPool.String(), err)
 	}
 
-	// check if existing pool setup already has this remote chain configured
+	// check if this remote chain is already configured for this token
 	remoteChainConfigPDA, _, err := solTokenUtil.TokenPoolChainConfigPDA(cfg.RemoteChainSelector, tokenPubKey, tokenPool)
 	if err != nil {
 		return fmt.Errorf("failed to get token pool remote chain config pda (remoteSelector: %d, mint: %s, pool: %s): %w", cfg.RemoteChainSelector, tokenPubKey.String(), tokenPool.String(), err)
@@ -173,10 +174,10 @@ func SetupTokenPoolForRemoteChain(e deployment.Environment, cfg RemoteChainToken
 	if err := cfg.Validate(e); err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
-	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
-	chain := e.SolChains[cfg.ChainSelector]
+	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.SolTokenPubKey)
+	chain := e.SolChains[cfg.SolChainSelector]
 	state, _ := cs.LoadOnchainState(e)
-	chainState := state.SolChains[cfg.ChainSelector]
+	chainState := state.SolChains[cfg.SolChainSelector]
 	// verified
 	poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, chainState.TokenPool)
 	remoteChainConfigPDA, _, _ := solTokenUtil.TokenPoolChainConfigPDA(cfg.RemoteChainSelector, tokenPubKey, chainState.TokenPool)
@@ -207,11 +208,26 @@ func SetupTokenPoolForRemoteChain(e deployment.Environment, cfg RemoteChainToken
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
 	}
-	instructions := []solana.Instruction{ixConfigure, ixRates}
+
+	ixAppend, err := solTokenPool.NewAppendRemotePoolAddressesInstruction(
+		cfg.RemoteChainSelector,
+		tokenPubKey,
+		cfg.RemoteConfig.PoolAddresses, // i dont know why this is a list (is it for differnt types of pool of the same token?)
+		poolConfigPDA,
+		remoteChainConfigPDA,
+		chain.DeployerKey.PublicKey(),
+		solana.SystemProgramID,
+	).ValidateAndBuild()
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+	}
+
+	instructions := []solana.Instruction{ixConfigure, ixRates, ixAppend}
 	err = chain.Confirm(instructions)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
 	}
+	e.Logger.Infow("Configured token pool for remote chain", "remote_chain_selector", cfg.RemoteChainSelector, "token_pubkey", tokenPubKey.String())
 	return deployment.ChangesetOutput{}, nil
 }
 
@@ -286,6 +302,7 @@ func AddTokenPoolLookupTable(e deployment.Environment, cfg TokenPoolLookupTableC
 	if err := newAddressBook.Save(cfg.ChainSelector, table.String(), tv); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to save tokenpool address lookup table: %w", err)
 	}
+	e.Logger.Infow("Added token pool lookup table", "token_pubkey", tokenPubKey.String())
 	return deployment.ChangesetOutput{
 		AddressBook: newAddressBook,
 	}, nil
@@ -359,5 +376,6 @@ func SetPool(e deployment.Environment, cfg SetPoolConfig) (deployment.ChangesetO
 	if err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
+	e.Logger.Infow("Set pool config", "token_pubkey", tokenPubKey.String())
 	return deployment.ChangesetOutput{}, nil
 }

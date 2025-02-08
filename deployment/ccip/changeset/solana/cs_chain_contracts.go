@@ -120,6 +120,3 @@ func validateOffRampConfig(chain deployment.SolChain, chainState cs.SolCCIPChain
 	}
 	return nil
 }
-
-// TODO:
-// NewAppendRemotePoolAddressesInstruction (https://smartcontract-it.atlassian.net/browse/INTAUTO-436)

@@ -887,9 +887,9 @@ func DeployTransferableTokenSolana(
 		{
 			Changeset: commoncs.WrapChangeSet(changeset_solana.SetupTokenPoolForRemoteChain),
 			Config: changeset_solana.RemoteChainTokenPoolConfig{
-				ChainSelector:       solChainSel,
+				SolChainSelector:    solChainSel,
 				RemoteChainSelector: evmChainSel,
-				TokenPubKey:         solTokenAddress.String(),
+				SolTokenPubKey:      solTokenAddress.String(),
 				RemoteConfig: solTokenPool.RemoteConfig{
 					// this can be potentially read from the state if we are given the token symbol
 					PoolAddresses: []solTokenPool.RemoteAddress{
