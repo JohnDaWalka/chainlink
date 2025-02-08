@@ -245,6 +245,15 @@ type OCRConfig struct {
 	KeyBundleID               string
 }
 
+func (ocrCfg OCRConfig) JDOCR2KeyBundle() *nodev1.OCR2Config_OCRKeyBundle {
+	return &nodev1.OCR2Config_OCRKeyBundle{
+		OffchainPublicKey:     hex.EncodeToString(ocrCfg.OffchainPublicKey[:]),
+		OnchainSigningAddress: hex.EncodeToString(ocrCfg.OnchainPublicKey),
+		ConfigPublicKey:       hex.EncodeToString(ocrCfg.ConfigEncryptionPublicKey[:]),
+		BundleId:              ocrCfg.KeyBundleID,
+	}
+}
+
 // Nodes includes is a group CL nodes.
 type Nodes []Node
 
@@ -343,12 +352,7 @@ func (n Node) ChainConfigs() ([]*nodev1.ChainConfig, error) {
 			Chain: c,
 			// only have ocr2 in Node
 			Ocr2Config: &nodev1.OCR2Config{
-				OcrKeyBundle: &nodev1.OCR2Config_OCRKeyBundle{
-					OffchainPublicKey:     hex.EncodeToString(ocrCfg.OffchainPublicKey[:]),
-					OnchainSigningAddress: hex.EncodeToString(ocrCfg.OnchainPublicKey),
-					ConfigPublicKey:       hex.EncodeToString(ocrCfg.ConfigEncryptionPublicKey[:]),
-					BundleId:              ocrCfg.KeyBundleID,
-				},
+				OcrKeyBundle: ocrCfg.JDOCR2KeyBundle(),
 				P2PKeyBundle: &nodev1.OCR2Config_P2PKeyBundle{
 					PeerId: n.PeerID.String(),
 					// note: we don't have the public key in the OCRConfig struct
@@ -450,7 +454,7 @@ func NewNodeFromJD(jdNode *nodev1.Node, chainConfigs []*nodev1.ChainConfig) (*No
 	bootstrap := goldenConfig.Ocr2Config.IsBootstrap
 	if !bootstrap { // no ocr config on bootstrap
 		var err error
-		selToOCRConfig, err = chainConfigsToOCRConfig(chainConfigs)
+		selToOCRConfig, err = ChainConfigsToOCRConfig(chainConfigs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get chain to ocr config: %w", err)
 		}
@@ -468,7 +472,7 @@ func NewNodeFromJD(jdNode *nodev1.Node, chainConfigs []*nodev1.ChainConfig) (*No
 	}, nil
 }
 
-func chainConfigsToOCRConfig(chainConfigs []*nodev1.ChainConfig) (map[chain_selectors.ChainDetails]OCRConfig, error) {
+func ChainConfigsToOCRConfig(chainConfigs []*nodev1.ChainConfig) (map[chain_selectors.ChainDetails]OCRConfig, error) {
 	selToOCRConfig := make(map[chain_selectors.ChainDetails]OCRConfig)
 	for _, chainConfig := range chainConfigs {
 		b := common.Hex2Bytes(chainConfig.Ocr2Config.OcrKeyBundle.OffchainPublicKey)

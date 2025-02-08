@@ -70,18 +70,32 @@ func (n Node) ReplayLogs(chains map[uint64]uint64) error {
 	return nil
 }
 
-func (n Node) DeplonmentNode() deployment.Node {
-	/*
-		m := make(map[chainsel.ChainDetails]deployment.OCRConfig)
-		for _, k := range n.Keys.OCRKeyBundles {
-		}
-	*/
-	return deployment.Node{
-		PeerID:      n.Keys.PeerID,
-		CSAKey:      n.Keys.CSA.PublicKeyString(),
-		NodeID:      n.Keys.PeerID.String(),
-		IsBootstrap: n.IsBoostrap,
+// DeploymentNode is an adapter for deployment.Node
+func (n Node) DeploymentNode() (deployment.Node, error) {
+	jdChainConfigs, err := n.JDChainConfigs()
+	if err != nil {
+		return deployment.Node{}, err
 	}
+	selMap, err := deployment.ChainConfigsToOCRConfig(jdChainConfigs)
+	if err != nil {
+		return deployment.Node{}, err
+	}
+	// arbitrarily set the first evm chain as the transmitter
+	var admin string
+	for _, k := range n.Keys.Transmitters {
+		admin = k
+		break
+	}
+	return deployment.Node{
+		NodeID:         n.Keys.PeerID.String(),
+		Name:           n.Keys.PeerID.String(),
+		SelToOCRConfig: selMap,
+		CSAKey:         n.Keys.CSA.ID(),
+		PeerID:         n.Keys.PeerID,
+		AdminAddr:      admin,
+		MultiAddr:      n.Addr.String(),
+		IsBootstrap:    n.IsBoostrap,
+	}, nil
 }
 
 func (n Node) JDChainConfigs() ([]*nodev1.ChainConfig, error) {
