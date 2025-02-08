@@ -695,7 +695,7 @@ func deployChainContractsSolana(
 
 	// initialize this last with every address we need
 	var addressLookupTable solana.PublicKey
-	if chainState.AddressLookupTable.IsZero() {
+	if chainState.OfframpAddressLookupTable.IsZero() {
 		addressLookupTable, err = solCommonUtil.SetupLookupTable(
 			e.GetContext(),
 			chain.Client,
@@ -714,7 +714,7 @@ func deployChainContractsSolana(
 		if err != nil {
 			return fmt.Errorf("failed to create lookup table: %w", err)
 		}
-		err = ab.Save(chain.Selector, addressLookupTable.String(), deployment.NewTypeAndVersion(AddressLookupTable, deployment.Version1_0_0))
+		err = ab.Save(chain.Selector, addressLookupTable.String(), deployment.NewTypeAndVersion(OfframpAddressLookupTable, deployment.Version1_0_0))
 		if err != nil {
 			return fmt.Errorf("failed to save address: %w", err)
 		}
