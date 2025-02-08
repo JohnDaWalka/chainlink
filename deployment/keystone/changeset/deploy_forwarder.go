@@ -51,6 +51,7 @@ var _ deployment.ChangeSet[ConfigureForwardContractsRequest] = ConfigureForwardC
 
 type ConfigureForwardContractsRequest struct {
 	WFDonName string
+	WFDonID   uint32
 	// workflow don node ids in the offchain client. Used to fetch and derive the signer keys
 	WFNodeIDs        []string
 	RegistryChainSel uint64
@@ -74,6 +75,7 @@ func ConfigureForwardContracts(env deployment.Environment, req ConfigureForwardC
 	wfDon, err := internal.NewRegisteredDon(env, internal.RegisteredDonConfig{
 		NodeIDs:          req.WFNodeIDs,
 		Name:             req.WFDonName,
+		ID:               req.WFDonID,
 		RegistryChainSel: req.RegistryChainSel,
 	})
 	if err != nil {

@@ -252,6 +252,7 @@ type RegisteredDon struct {
 
 type RegisteredDonConfig struct {
 	Name             string
+	ID               uint32
 	NodeIDs          []string // ids in the offchain client
 	RegistryChainSel uint64
 }
@@ -280,10 +281,10 @@ func NewRegisteredDon(env deployment.Environment, cfg RegisteredDonConfig) (*Reg
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node info: %w", err)
 	}
-	want := sortedHash(nodes.PeerIDs())
+	want := donIdentifier(nodes.PeerIDs(), cfg.ID)
 	var don *kcr.CapabilitiesRegistryDONInfo
 	for i, d := range di {
-		got := sortedHash(d.NodeP2PIds)
+		got := donIdentifier(d.NodeP2PIds, d.Id)
 		if got == want {
 			don = &di[i]
 		}

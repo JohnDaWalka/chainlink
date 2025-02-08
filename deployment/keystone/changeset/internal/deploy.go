@@ -647,6 +647,12 @@ func RegisterNodes(lggr logger.Logger, req *RegisterNodesRequest) (*RegisterNode
 				}
 				params.HashedCapabilityIds = append(params.HashedCapabilityIds, newCapIDs...)
 			}
+
+			if len(params.HashedCapabilityIds) == 0 {
+				lggr.Errorw("invalid node config", "params", params, "node id", n.NodeID, "don", don, "p2p", n.PeerID)
+				return nil, fmt.Errorf("cannot add node %s of DON %s without capabilities to registry", n.NodeID, don)
+			}
+
 			nodeIDToParams[n.NodeID] = params
 			nodeIDToDon[n.NodeID] = don
 		}
@@ -667,8 +673,6 @@ func RegisterNodes(lggr logger.Logger, req *RegisterNodesRequest) (*RegisterNode
 			nodeIDToParams: nodeIDToParams,
 		}, nil
 	}
-
-	lggr.Debugw("unique node params to add after deduplication", "count", len(nodes2Add), "params", nodes2Add)
 
 	if req.UseMCMS {
 		ops, err := addNodesMCMSProposal(registry, nodes2Add, registryChain)
@@ -771,6 +775,7 @@ func addNodesMCMSProposal(registry *capabilities_registry.CapabilitiesRegistry, 
 
 type DONToRegister struct {
 	Name  string
+	ID    uint32
 	F     uint8
 	Nodes []deployment.Node
 }
@@ -790,7 +795,9 @@ type RegisterDonsResponse struct {
 	Ops      *timelock.BatchChainOperation
 }
 
-func sortedHash(p2pids [][32]byte) string {
+// donIdentifier creates a unique identifier for a DON by hashing together all the sorted p2p IDs of its
+// nodes and its ID.
+func donIdentifier(p2pids [][32]byte, id uint32) string {
 	sha256Hash := sha256.New()
 	sort.Slice(p2pids, func(i, j int) bool {
 		return bytes.Compare(p2pids[i][:], p2pids[j][:]) < 0
@@ -798,6 +805,7 @@ func sortedHash(p2pids [][32]byte) string {
 	for _, id := range p2pids {
 		sha256Hash.Write(id[:])
 	}
+	sha256Hash.Write([]byte{byte(id)})
 	return hex.EncodeToString(sha256Hash.Sum(nil))
 }
 
@@ -806,10 +814,12 @@ func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsRes
 	if err != nil {
 		return nil, fmt.Errorf("failed to get registry: %w", err)
 	}
+
 	lggr.Infow("registering DONs...", "len", len(req.DonsToRegister))
+
 	// track hash of sorted p2pids to don name because the registry return value does not include the don name
 	// and we need to map it back to the don name to access the other mapping data such as the don's capabilities & nodes
-	p2pIdsToDon := make(map[string]string)
+	uuidToDON := make(map[string]string)
 	var addedDons = 0
 
 	donInfos, err := registry.GetDONs(&bind.CallOpts{})
@@ -819,12 +829,19 @@ func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsRes
 	}
 	existingDONs := make(map[string]struct{})
 	for _, donInfo := range donInfos {
-		existingDONs[sortedHash(donInfo.NodeP2PIds)] = struct{}{}
+		donNodeHash := donIdentifier(donInfo.NodeP2PIds, donInfo.Id)
+		lggr.Debugw("fetched an existing DON", "sorted p2p IDs hash", donNodeHash, "id", donInfo.Id)
+		existingDONs[donNodeHash] = struct{}{}
 	}
-	lggr.Infow("fetched existing DONs...", "len", len(donInfos), "lenByNodesHash", len(existingDONs))
 
 	mcmsOps := make([]mcms.Operation, 0)
 	for _, don := range req.DonsToRegister {
+		nn := make([]string, 0)
+		for _, n := range don.Nodes {
+			nn = append(nn, n.Name)
+		}
+		lggr.Debugw("don2Register", "nodes count", len(don.Nodes), "name", don.Name, "nodes", nn)
+
 		var p2pIds [][32]byte
 		for _, n := range don.Nodes {
 			if n.IsBootstrap {
@@ -837,15 +854,16 @@ func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsRes
 			p2pIds = append(p2pIds, p2pID)
 		}
 
-		p2pSortedHash := sortedHash(p2pIds)
-		p2pIdsToDon[p2pSortedHash] = don.Name
+		donUUID := donIdentifier(p2pIds, don.ID)
+		uuidToDON[donUUID] = don.Name
 
-		if _, ok := existingDONs[p2pSortedHash]; ok {
-			lggr.Debugw("don already exists, ignoring", "don", don.Name, "p2p sorted hash", p2pSortedHash)
+		lggr.Debugw("calculated the sorted p2p ID hash", "hash", donUUID, "don", don.Name, "nodes", nn)
+
+		if _, ok := existingDONs[donUUID]; ok {
+			lggr.Debugw("don already exists, ignoring", "don", don.Name, "p2p sorted hash", donUUID)
 			continue
 		}
 
-		lggr.Debugw("registering DON", "don", don.Name, "p2p sorted hash", p2pSortedHash)
 		regCaps, ok := req.DonToCapabilities[don.Name]
 		if !ok {
 			return nil, fmt.Errorf("capabilities not found for DON %s", don.Name)
@@ -874,12 +892,11 @@ func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsRes
 			txOpts = deployment.SimTransactOpts()
 		}
 
-		lggr.Debugw("calling add don", "don", don.Name, "p2p sorted hash", p2pSortedHash, "cgs", cfgs, "wfSupported", wfSupported, "f", don.F,
-			"p2pids", p2pIds, "node count", len(p2pIds))
+		lggr.Debugw("generating addDON transaction", "don", don.Name, "identifier", donUUID, "node count", len(p2pIds))
 		tx, err := registry.AddDON(txOpts, p2pIds, cfgs, true, wfSupported, don.F)
 		if err != nil {
 			err = deployment.DecodeErr(capabilities_registry.CapabilitiesRegistryABI, err)
-			return nil, fmt.Errorf("failed to call AddDON for don '%s' p2p2Id hash %s capability %v: %w", don.Name, p2pSortedHash, cfgs, err)
+			return nil, fmt.Errorf("failed to call AddDON for don '%s' p2p2Id hash %s capability %v: %w", don.Name, donUUID, cfgs, err)
 		}
 
 		if req.UseMCMS {
@@ -897,7 +914,7 @@ func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsRes
 		if err != nil {
 			return nil, fmt.Errorf("failed to confirm AddDON transaction %s for don %s: %w", tx.Hash().String(), don.Name, err)
 		}
-		lggr.Debugw("registered DON", "don", don.Name, "p2p sorted hash", p2pSortedHash, "cgs", cfgs, "wfSupported", wfSupported, "f", don.F)
+		lggr.Debugw("registered DON", "don", don.Name, "p2p sorted hash", donUUID, "cgs", cfgs, "wfSupported", wfSupported, "f", don.F)
 		addedDons++
 	}
 
@@ -921,7 +938,7 @@ func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsRes
 	for i := 0; i < 10; i++ {
 		lggr.Debugw("attempting to get DONs from registry", "attempt#", i)
 		donInfos, err = registry.GetDONs(&bind.CallOpts{})
-		if !containsAllDONs(donInfos, p2pIdsToDon) {
+		if !containsAllDONs(donInfos, uuidToDON) {
 			lggr.Debugw("some expected dons not registered yet, re-checking after a delay ...")
 			time.Sleep(2 * time.Second)
 		} else {
@@ -941,9 +958,9 @@ func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsRes
 		DonInfos: make(map[string]capabilities_registry.CapabilitiesRegistryDONInfo),
 	}
 	for i, donInfo := range donInfos {
-		donName, ok := p2pIdsToDon[sortedHash(donInfo.NodeP2PIds)]
+		donName, ok := uuidToDON[donIdentifier(donInfo.NodeP2PIds, donInfo.Id)]
 		if !ok {
-			lggr.Debugw("irrelevant DON found in the registry, ignoring", "p2p sorted hash", sortedHash(donInfo.NodeP2PIds))
+			lggr.Debugw("irrelevant DON found in the registry, ignoring", "identifier", donIdentifier(donInfo.NodeP2PIds, donInfo.Id))
 			continue
 		}
 		lggr.Debugw("adding don info to the response (keyed by DON name)", "don", donName)
@@ -957,7 +974,7 @@ func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsRes
 func containsAllDONs(donInfos []capabilities_registry.CapabilitiesRegistryDONInfo, p2pIdsToDon map[string]string) bool {
 	found := make(map[string]struct{})
 	for _, donInfo := range donInfos {
-		hash := sortedHash(donInfo.NodeP2PIds)
+		hash := donIdentifier(donInfo.NodeP2PIds, donInfo.Id)
 		if _, ok := p2pIdsToDon[hash]; ok {
 			found[hash] = struct{}{}
 		}
