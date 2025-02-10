@@ -104,6 +104,7 @@ var (
 					PerOwner: ptr(int32(200)),
 				},
 			},
+			Wasm: toml.Wasm{SerialisedModulesDir: ptr("test/root/dir")},
 		},
 		EVM: []*evmcfg.EVMConfig{
 			{
@@ -568,6 +569,7 @@ func TestConfig_Marshal(t *testing.T) {
 		EmitterExportTimeout:  commoncfg.MustNewDuration(1 * time.Second),
 		ChipIngressEndpoint:   ptr("example.com/chip-ingress"),
 	}
+	full.Wasm = toml.Wasm{SerialisedModulesDir: ptr("test/root/dir")}
 	full.EVM = []*evmcfg.EVMConfig{
 		{
 			ChainID: ubig.NewI(1),

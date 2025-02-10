@@ -341,6 +341,8 @@ func (c *Config) setDefaults() {
 	c.Starknet.SetDefaults()
 
 	c.Tron.SetDefaults()
+
+	c.Wasm.SetDefaults(core.RootDir)
 }
 
 func (c *Config) SetFrom(f *Config) (err error) {

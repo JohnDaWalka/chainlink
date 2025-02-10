@@ -354,7 +354,13 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 		return nil, err
 	}
 
-	creServices, err := newCREServices(ctx, globalLogger, opts.DS, keyStore, cfg.Capabilities(), cfg.Workflows(), relayChainInterops, opts.CREOpts)
+	opts.Config.Wasm().SerialisedModulesDir()
+
+	wasmDir := cfg.Wasm().SerialisedModulesDir()
+	if wasmDir == "" {
+		wasmDir = cfg.RootDir()
+	}
+	creServices, err := newCREServices(ctx, globalLogger, opts.DS, keyStore, cfg.Capabilities(), cfg.Workflows(), relayChainInterops, wasmDir, opts.CREOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initilize CRE: %w", err)
 	}
@@ -595,6 +601,7 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 		peerWrapper,
 		opts.NewOracleFactoryFn,
 		opts.FetcherFactoryFn,
+		creServices.wasmBinaryStore,
 	)
 
 	if cfg.OCR().Enabled() {
@@ -763,6 +770,7 @@ type CREOpts struct {
 
 	FetcherFunc      artifacts.FetcherFunc
 	FetcherFactoryFn compute.FetcherFactory
+	ModuleStore      artifacts.SerialisedModuleStore
 }
 
 // creServiceConfig contains the configuration required to create the CRE services
@@ -789,6 +797,9 @@ type CREServices struct {
 	// gatewayConnectorWrapper is the wrapper for the gateway connector
 	// it is exposed because there are contingent services in the application
 	gatewayConnectorWrapper *gatewayconnector.ServiceWrapper
+
+	wasmBinaryStore compute.WasmBinaryStore
+
 	// srvs are all the services that are created, including those that are explicitly exposed
 	srvs []services.ServiceCtx
 }
@@ -801,6 +812,7 @@ func newCREServices(
 	capCfg config.Capabilities,
 	wCfg config.Workflows,
 	relayerChainInterops *CoreRelayerChainInteroperators,
+	wasmDir string,
 	opts CREOpts,
 ) (*CREServices, error) {
 	var srvcs []services.ServiceCtx
@@ -843,6 +855,7 @@ func newCREServices(
 	}
 
 	var externalPeerWrapper p2ptypes.PeerWrapper
+	var computeWasmBinaryStore compute.WasmBinaryStore
 	if capCfg.Peering().Enabled() {
 		var dispatcher remotetypes.Dispatcher
 		if opts.CapabilitiesDispatcher == nil {
@@ -918,7 +931,18 @@ func newCREServices(
 					return nil, fmt.Errorf("failed to get all workflow keys: %w", err)
 				}
 
+				var moduleStore artifacts.SerialisedModuleStore
+				if opts.ModuleStore != nil {
+					moduleStore = opts.ModuleStore
+				} else {
+					moduleStore, err = artifacts.NewFileBasedModuleStore(wasmDir)
+					if err != nil {
+						return nil, fmt.Errorf("could not create module store: %w", err)
+					}
+				}
+
 				artifactsStore := artifacts.NewStore(lggr, artifacts.NewWorkflowRegistryDS(ds, globalLogger),
+					moduleStore,
 					fetcherFunc,
 					clockwork.NewRealClock(), key, custmsg.NewLabeler(), artifacts.WithMaxArtifactSize(
 						artifacts.ArtifactConfig{
@@ -927,6 +951,8 @@ func newCREServices(
 							MaxConfigSize:  uint64(capCfg.WorkflowRegistry().MaxConfigSize()),
 						},
 					))
+
+				computeWasmBinaryStore = artifactsStore
 
 				engineRegistry := syncer.NewEngineRegistry()
 
@@ -979,6 +1005,7 @@ func newCREServices(
 		workflowRateLimiter:     workflowRateLimiter,
 		workflowLimits:          workflowLimits,
 		gatewayConnectorWrapper: gatewayConnectorWrapper,
+		wasmBinaryStore:         computeWasmBinaryStore,
 		srvs:                    srvcs,
 	}, nil
 }
@@ -1224,7 +1251,7 @@ func (app *ChainlinkApplication) RunJobV2(
 					common.BigToHash(big.NewInt(42)).Bytes(), // seed
 					evmutils.NewHash().Bytes(),               // sender
 					evmutils.NewHash().Bytes(),               // fee
-					evmutils.NewHash().Bytes()},              // requestID
+					evmutils.NewHash().Bytes()}, // requestID
 					[]byte{}),
 				Topics:      []common.Hash{{}, jb.ExternalIDEncodeBytesToTopic()}, // jobID BYTES
 				TxHash:      evmutils.NewHash(),

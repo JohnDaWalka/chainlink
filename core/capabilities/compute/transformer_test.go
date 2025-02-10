@@ -92,7 +92,6 @@ func Test_transformer(t *testing.T) {
 			"maxMemoryMBs": 1024,
 			"timeout":      "4s",
 			"tickInterval": "8s",
-			"binary":       []byte{0x01, 0x02, 0x03},
 			"config":       []byte{0x04, 0x05, 0x06},
 		})
 		giveReq := capabilities.CapabilityRequest{
@@ -102,7 +101,6 @@ func Test_transformer(t *testing.T) {
 
 		wantTO := 4 * time.Second
 		wantConfig := &ParsedConfig{
-			Binary: []byte{0x01, 0x02, 0x03},
 			Config: []byte{0x04, 0x05, 0x06},
 			ModuleConfig: &host.ModuleConfig{
 				MaxMemoryMBs: 1024,
@@ -127,7 +125,6 @@ func Test_transformer(t *testing.T) {
 
 	t.Run("success missing optional fields", func(t *testing.T) {
 		giveMap, err := values.NewMap(map[string]any{
-			"binary": []byte{0x01, 0x02, 0x03},
 			"config": []byte{0x04, 0x05, 0x06},
 		})
 		giveReq := capabilities.CapabilityRequest{
@@ -137,7 +134,6 @@ func Test_transformer(t *testing.T) {
 
 		timeout := defaultMaxTimeout
 		wantConfig := &ParsedConfig{
-			Binary: []byte{0x01, 0x02, 0x03},
 			Config: []byte{0x04, 0x05, 0x06},
 			ModuleConfig: &host.ModuleConfig{
 				Logger:       lgger,

@@ -52,6 +52,7 @@ type DonContext struct {
 	workflowRegistry      *WorkflowRegistry
 	syncerFetcherFunc     artifacts.FetcherFunc
 	computeFetcherFactory compute.FetcherFactory
+	moduleStoreFactory    SerialisedModuleStoreFactory
 }
 
 func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
@@ -61,16 +62,18 @@ func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
 
 	servicetest.Run(t, rageP2PNetwork)
 	servicetest.Run(t, ethBlockchain)
-	return DonContext{EthBlockchain: ethBlockchain, p2pNetwork: rageP2PNetwork, capabilityRegistry: capabilitiesRegistry}
+	return DonContext{EthBlockchain: ethBlockchain, p2pNetwork: rageP2PNetwork, capabilityRegistry: capabilitiesRegistry,
+		moduleStoreFactory: NewNoStoreModuleStoreFactory()}
 }
 
 func CreateDonContextWithWorkflowRegistry(ctx context.Context, t *testing.T, syncerFetcherFunc artifacts.FetcherFunc,
-	computeFetcherFactory compute.FetcherFactory) DonContext {
+	computeFetcherFactory compute.FetcherFactory, moduleStoreFactory SerialisedModuleStoreFactory) DonContext {
 	donContext := CreateDonContext(ctx, t)
 	workflowRegistry := NewWorkflowRegistry(ctx, t, donContext.EthBlockchain)
 	donContext.workflowRegistry = workflowRegistry
 	donContext.syncerFetcherFunc = syncerFetcherFunc
 	donContext.computeFetcherFactory = computeFetcherFactory
+	donContext.moduleStoreFactory = moduleStoreFactory
 	return donContext
 }
 
@@ -166,6 +169,9 @@ func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig Don
 			newOracleFactoryFn = factory.NewOracleFactory
 		}
 
+		moduleStore, err := donContext.moduleStoreFactory.GetModuleStoreForPeer(member.String())
+		require.NoError(t, err)
+
 		cn.start = func() {
 			node := startNewNode(ctx, t, lggr.Named(donConfig.name+"-"+strconv.Itoa(i)), nodeInfo, donContext.EthBlockchain,
 				donContext.capabilityRegistry.getAddress(), dispatcher,
@@ -174,7 +180,7 @@ func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig Don
 					for _, modifier := range don.nodeConfigModifiers {
 						modifier(c, cn)
 					}
-				}, donContext.syncerFetcherFunc, donContext.computeFetcherFactory)
+				}, donContext.syncerFetcherFunc, donContext.computeFetcherFactory, moduleStore)
 
 			require.NoError(t, node.Start(testutils.Context(t)))
 			cn.TestApplication = node
@@ -415,6 +421,7 @@ func startNewNode(ctx context.Context,
 	setupCfg func(c *chainlink.Config),
 	fetcherFunc artifacts.FetcherFunc,
 	fetcherFactoryFunc compute.FetcherFactory,
+	moduleStore artifacts.SerialisedModuleStore,
 ) *cltest.TestApplication {
 	beholderTester := tests.Beholder(t)
 	config, _ := heavyweight.FullTestDBV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
@@ -446,7 +453,7 @@ func startNewNode(ctx context.Context,
 
 	return cltest.NewApplicationWithConfigV2AndKeyOnSimulatedBlockchain(t, config, ethBlockchain.Backend,
 		nodeInfo, dispatcher, peerWrapper, newOracleFactoryFn, localCapabilities, keyV2, lggr, fetcherFunc,
-		fetcherFactoryFunc, beholderTester)
+		fetcherFactoryFunc, beholderTester, moduleStore)
 }
 
 // Functions below this point are for adding non-standard capabilities to a DON, deliberately verbose. Eventually these

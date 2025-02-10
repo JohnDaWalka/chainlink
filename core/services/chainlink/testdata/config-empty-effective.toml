@@ -315,3 +315,6 @@ ChipIngressEndpoint = ''
 [Workflows.Limits]
 Global = 200
 PerOwner = 200
+
+[Wasm]
+SerialisedModulesDir = ''

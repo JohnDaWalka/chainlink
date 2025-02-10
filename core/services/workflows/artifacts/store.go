@@ -129,11 +129,13 @@ type Store struct {
 	decryptSecrets decryptSecretsFn
 
 	emitter custmsg.MessageEmitter
+
+	serialisedModuleStore SerialisedModuleStore
 }
 
-func NewStore(lggr logger.Logger, orm WorkflowRegistryDS, fetchFn FetcherFunc, clock clockwork.Clock, encryptionKey workflowkey.Key,
+func NewStore(lggr logger.Logger, orm WorkflowRegistryDS, moduleStore SerialisedModuleStore, fetchFn FetcherFunc, clock clockwork.Clock, encryptionKey workflowkey.Key,
 	emitter custmsg.MessageEmitter, opts ...func(*Store)) *Store {
-	return NewStoreWithDecryptSecretsFn(lggr, orm, fetchFn, clock, encryptionKey, emitter,
+	return NewStoreWithDecryptSecretsFn(lggr, orm, moduleStore, fetchFn, clock, encryptionKey, emitter,
 		func(data []byte, owner string) (map[string]string, error) {
 			secretsPayload := secrets.EncryptedSecretsResult{}
 			err := json.Unmarshal(data, &secretsPayload)
@@ -146,7 +148,7 @@ func NewStore(lggr logger.Logger, orm WorkflowRegistryDS, fetchFn FetcherFunc, c
 		opts...)
 }
 
-func NewStoreWithDecryptSecretsFn(lggr logger.Logger, orm WorkflowRegistryDS, fetchFn FetcherFunc, clock clockwork.Clock, encryptionKey workflowkey.Key,
+func NewStoreWithDecryptSecretsFn(lggr logger.Logger, orm WorkflowRegistryDS, moduleStore SerialisedModuleStore, fetchFn FetcherFunc, clock clockwork.Clock, encryptionKey workflowkey.Key,
 	emitter custmsg.MessageEmitter, decryptSecrets decryptSecretsFn, opts ...func(*Store)) *Store {
 	limits := &ArtifactConfig{}
 	limits.ApplyDefaults()
@@ -162,6 +164,7 @@ func NewStoreWithDecryptSecretsFn(lggr logger.Logger, orm WorkflowRegistryDS, fe
 		encryptionKey:            encryptionKey,
 		emitter:                  emitter,
 		decryptSecrets:           decryptSecrets,
+		serialisedModuleStore:    moduleStore,
 	}
 
 	for _, o := range opts {
@@ -355,6 +358,10 @@ func (h *Store) GetSecretsURLHash(workflowOwner []byte, secretsURL []byte) ([]by
 
 // DeleteWorkflowArtifacts removes the workflow spec from the database. If not found, returns nil.
 func (h *Store) DeleteWorkflowArtifacts(ctx context.Context, workflowOwner string, workflowName string, workflowID string) error {
+	if err := h.serialisedModuleStore.DeleteModule(workflowID); err != nil {
+		return fmt.Errorf("failed to delete serialised module: %w", err)
+	}
+
 	err := h.orm.DeleteWorkflowSpec(ctx, workflowOwner, workflowName)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -365,6 +372,18 @@ func (h *Store) DeleteWorkflowArtifacts(ctx context.Context, workflowOwner strin
 	}
 
 	return nil
+}
+
+func (h *Store) StoreSerialisedModule(workflowID string, binaryID string, module []byte) error {
+	return h.serialisedModuleStore.StoreModule(workflowID, binaryID, module)
+}
+
+func (h *Store) GetSerialisedModulePath(workflowID string) (string, bool, error) {
+	return h.serialisedModuleStore.GetModulePath(workflowID)
+}
+
+func (h *Store) GetWasmBinaryID(workflowID string) (string, bool, error) {
+	return h.serialisedModuleStore.GetBinaryID(workflowID)
 }
 
 func (h *Store) GetWasmBinary(ctx context.Context, workflowID string) ([]byte, error) {

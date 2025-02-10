@@ -2,6 +2,8 @@ package workflows
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand/v2"
@@ -1801,7 +1803,12 @@ func TestEngine_WithCustomComputeStep(t *testing.T) {
 	idGeneratorFn := func() string { return "validRequestID" }
 	fetcher, err := compute.NewOutgoingConnectorFetcherFactory(handler, idGeneratorFn)
 	require.NoError(t, err)
-	compute, err := compute.NewAction(cfg, log, reg, fetcher)
+	binaryB := wasmtest.CreateTestBinary(cmd, binary, true, t)
+
+	fakeWasmBinaryStore := NewFakeComputeWasmStore()
+	fakeWasmBinaryStore.AddWasmBinary(testWorkflowID, binaryB)
+
+	compute, err := compute.NewAction(cfg, log, reg, fetcher, fakeWasmBinaryStore)
 	require.NoError(t, err)
 	require.NoError(t, compute.Start(ctx))
 	defer compute.Close()
@@ -1809,12 +1816,11 @@ func TestEngine_WithCustomComputeStep(t *testing.T) {
 	trigger := basicTestTrigger(t)
 	require.NoError(t, reg.Add(ctx, trigger))
 
-	binaryB := wasmtest.CreateTestBinary(cmd, binary, true, t)
-
 	spec, err := host.GetWorkflowSpec(
-		ctx,
+		ctx, log,
 		&host.ModuleConfig{Logger: log},
-		binaryB,
+		testWorkflowID,
+		fakeWasmBinaryStore,
 		nil, // config
 	)
 	require.NoError(t, err)
@@ -1823,7 +1829,6 @@ func TestEngine_WithCustomComputeStep(t *testing.T) {
 		reg,
 		*spec,
 		func(c *Config) {
-			c.Binary = binaryB
 			c.Config = nil
 		},
 	)
@@ -1876,7 +1881,12 @@ func TestEngine_CustomComputePropagatesBreaks(t *testing.T) {
 	idGeneratorFn := func() string { return "validRequestID" }
 	fetcher, err := compute.NewOutgoingConnectorFetcherFactory(handler, idGeneratorFn)
 	require.NoError(t, err)
-	compute, err := compute.NewAction(cfg, log, reg, fetcher)
+	binaryB := wasmtest.CreateTestBinary(cmd, binary, true, t)
+
+	fakeWasmBinaryStore := NewFakeComputeWasmStore()
+	fakeWasmBinaryStore.AddWasmBinary(testWorkflowID, binaryB)
+
+	compute, err := compute.NewAction(cfg, log, reg, fetcher, fakeWasmBinaryStore)
 	require.NoError(t, err)
 	require.NoError(t, compute.Start(ctx))
 	defer compute.Close()
@@ -1884,12 +1894,11 @@ func TestEngine_CustomComputePropagatesBreaks(t *testing.T) {
 	trigger := basicTestTrigger(t)
 	require.NoError(t, reg.Add(ctx, trigger))
 
-	binaryB := wasmtest.CreateTestBinary(cmd, binary, true, t)
-
 	spec, err := host.GetWorkflowSpec(
-		ctx,
+		ctx, log,
 		&host.ModuleConfig{Logger: log},
-		binaryB,
+		testWorkflowID,
+		fakeWasmBinaryStore,
 		nil, // config
 	)
 	require.NoError(t, err)
@@ -1898,7 +1907,6 @@ func TestEngine_CustomComputePropagatesBreaks(t *testing.T) {
 		reg,
 		*spec,
 		func(c *Config) {
-			c.Binary = binaryB
 			c.Config = nil
 		},
 	)
@@ -2375,4 +2383,51 @@ func (_m *mockBillingClient) SubmitWorkflowReceipt(ctx context.Context, req *bil
 	}
 
 	return a0, args.Error(1)
+}
+
+type FakeComputeWasmStore struct {
+	binaries map[string][]byte
+	mu       sync.Mutex
+}
+
+func NewFakeComputeWasmStore() *FakeComputeWasmStore {
+	return &FakeComputeWasmStore{
+		binaries: make(map[string][]byte),
+	}
+}
+
+func (s *FakeComputeWasmStore) GetSerialisedModulePath(workflowID string) (string, bool, error) {
+	return "", false, nil
+}
+
+func (s *FakeComputeWasmStore) StoreSerialisedModule(workflowID string, binaryID string, serialisedModule []byte) error {
+	return nil
+}
+
+func (s *FakeComputeWasmStore) AddWasmBinary(workflowID string, binary []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.binaries[workflowID] = binary
+}
+
+func (s *FakeComputeWasmStore) GetWasmBinary(ctx context.Context, workflowID string) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	binary, exists := s.binaries[workflowID]
+	if !exists {
+		return nil, fmt.Errorf("binary not found for workflow ID: %s", workflowID)
+	}
+	return binary, nil
+}
+
+func (s *FakeComputeWasmStore) GetWasmBinaryID(workflowID string) (string, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	binary, exists := s.binaries[workflowID]
+	if !exists {
+		return "", false, fmt.Errorf("binary id not found for workflow ID: %s", workflowID)
+	}
+	hash := sha256.Sum256(binary)
+	binaryID := hex.EncodeToString(hash[:])
+	return binaryID, true, nil
 }

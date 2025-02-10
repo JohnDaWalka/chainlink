@@ -334,7 +334,7 @@ func Test_workflowRegisteredHandler(t *testing.T) {
 				configURL:  {Body: config, Err: nil},
 				secretsURL: {Body: []byte("secrets"), Err: nil},
 			}),
-			engineFactoryFn: func(ctx context.Context, wfid string, owner string, name types.WorkflowName, config []byte, binary []byte) (services.Service, error) {
+			engineFactoryFn: func(ctx context.Context, wfid string, owner string, name types.WorkflowName, config []byte) (services.Service, error) {
 				return &mockEngine{}, nil
 			},
 			GiveConfig: config,
@@ -363,7 +363,7 @@ func Test_workflowRegisteredHandler(t *testing.T) {
 				configURL:  {Body: config, Err: nil},
 				secretsURL: {Body: []byte("secrets"), Err: nil},
 			}),
-			engineFactoryFn: func(ctx context.Context, wfid string, owner string, name types.WorkflowName, config []byte, binary []byte) (services.Service, error) {
+			engineFactoryFn: func(ctx context.Context, wfid string, owner string, name types.WorkflowName, config []byte) (services.Service, error) {
 				if _, err := hex.DecodeString(name.Hex()); err != nil {
 					return nil, fmt.Errorf("invalid workflow name: %w", err)
 				}
@@ -399,7 +399,7 @@ func Test_workflowRegisteredHandler(t *testing.T) {
 				configURL:  {Body: config, Err: nil},
 				secretsURL: {Body: []byte("secrets"), Err: nil},
 			}),
-			engineFactoryFn: func(ctx context.Context, wfid string, owner string, name types.WorkflowName, config []byte, binary []byte) (services.Service, error) {
+			engineFactoryFn: func(ctx context.Context, wfid string, owner string, name types.WorkflowName, config []byte) (services.Service, error) {
 				return &mockEngine{StartErr: assert.AnError}, nil
 			},
 			GiveConfig: config,
@@ -718,7 +718,7 @@ type testCase struct {
 	fetcher         *mockFetcher
 	Event           func([]byte) WorkflowRegisteredV1
 	validationFn    func(t *testing.T, ctx context.Context, event WorkflowRegisteredV1, h *eventHandler, s *artifacts.Store, wfOwner []byte, wfName string, wfID string, fetcher *mockFetcher)
-	engineFactoryFn func(ctx context.Context, wfid string, owner string, name types.WorkflowName, config []byte, binary []byte) (services.Service, error)
+	engineFactoryFn func(ctx context.Context, wfid string, owner string, name types.WorkflowName, config []byte) (services.Service, error)
 }
 
 func testRunningWorkflow(t *testing.T, tc testCase) {
@@ -763,7 +763,11 @@ func testRunningWorkflow(t *testing.T, tc testCase) {
 		require.NoError(t, err)
 
 		decrypter := newMockDecrypter()
-		artifactStore := artifacts.NewStoreWithDecryptSecretsFn(lggr, orm, fetcher.FetcherFunc(), clockwork.NewFakeClock(), workflowkey.Key{}, custmsg.NewLabeler(), decrypter.decryptSecrets)
+
+		moduleStore := NewFakeModuleStore()
+		artifactStore := artifacts.NewStoreWithDecryptSecretsFn(lggr, orm, moduleStore, fetcher.FetcherFunc(), clockwork.NewFakeClock(), workflowkey.Key{}, custmsg.NewLabeler(), decrypter.decryptSecrets)
+
+
 
 		h, err := NewEventHandler(lggr, store, registry, NewEngineRegistry(), emitter, rl, workflowLimits, artifactStore, opts...)
 		require.NoError(t, err)
@@ -846,6 +850,7 @@ func Test_workflowDeletedHandler(t *testing.T) {
 		giveWFID, err := pkgworkflows.GenerateWorkflowID(wfOwner, "workflow-name", binary, config, secretsURL)
 
 		require.NoError(t, err)
+		wfIDs := hex.EncodeToString(giveWFID[:])
 
 		active := WorkflowRegisteredV1{
 			Status:        uint8(0),
@@ -863,11 +868,17 @@ func Test_workflowDeletedHandler(t *testing.T) {
 		registry.SetLocalRegistry(&capabilities.TestMetadataRegistry{})
 		rl, err := ratelimiter.NewRateLimiter(rlConfig)
 		require.NoError(t, err)
+
+		moduleStore, err := artifacts.NewFileBasedModuleStore(t.TempDir())
+		require.NoError(t, err)
+		err = moduleStore.StoreModule(wfIDs, "binaryID", binary)
+		require.NoError(t, err)
+
 		workflowLimits, err := syncerlimiter.NewWorkflowLimits(lggr, syncerlimiter.Config{Global: 200, PerOwner: 200})
 		require.NoError(t, err)
 
 		decrypter := newMockDecrypter()
-		artifactStore := artifacts.NewStoreWithDecryptSecretsFn(lggr, orm, fetcher.FetcherFunc(), clockwork.NewFakeClock(), workflowkey.Key{}, custmsg.NewLabeler(), decrypter.decryptSecrets)
+		artifactStore := artifacts.NewStoreWithDecryptSecretsFn(lggr, orm, moduleStore, fetcher.FetcherFunc(), clockwork.NewFakeClock(), workflowkey.Key{}, custmsg.NewLabeler(), decrypter.decryptSecrets)
 
 		h, err := NewEventHandler(lggr, store, registry, NewEngineRegistry(), emitter, rl, workflowLimits, artifactStore, WithEngineRegistry(er))
 		require.NoError(t, err)
@@ -904,6 +915,11 @@ func Test_workflowDeletedHandler(t *testing.T) {
 		// Verify the engine is deleted
 		_, err = h.engineRegistry.Get(EngineRegistryKey{Owner: wfOwner, Name: dbSpec.WorkflowName})
 		require.Error(t, err)
+
+		// Verify the module is deleted
+		_, exists, err := moduleStore.GetModulePath(wfIDs)
+		require.NoError(t, err)
+		require.False(t, exists)
 	})
 	t.Run("success deleting non-existing workflow spec", func(t *testing.T) {
 		var (
@@ -940,7 +956,10 @@ func Test_workflowDeletedHandler(t *testing.T) {
 		workflowLimits, err := syncerlimiter.NewWorkflowLimits(lggr, syncerlimiter.Config{Global: 200, PerOwner: 200})
 		require.NoError(t, err)
 		decrypter := newMockDecrypter()
-		artifactStore := artifacts.NewStoreWithDecryptSecretsFn(lggr, orm, fetcher.FetcherFunc(), clockwork.NewFakeClock(), workflowkey.Key{}, custmsg.NewLabeler(), decrypter.decryptSecrets)
+
+		moduleStore, err := artifacts.NewFileBasedModuleStore(t.TempDir())
+		require.NoError(t, err)
+		artifactStore := artifacts.NewStoreWithDecryptSecretsFn(lggr, orm, moduleStore, fetcher.FetcherFunc(), clockwork.NewFakeClock(), workflowkey.Key{}, custmsg.NewLabeler(), decrypter.decryptSecrets)
 
 		h, err := NewEventHandler(lggr, store, registry, NewEngineRegistry(), emitter, rl, workflowLimits, artifactStore, WithEngineRegistry(er))
 		require.NoError(t, err)
@@ -1175,4 +1194,28 @@ func Test_workflowPausedActivatedUpdatedHandler(t *testing.T) {
 		// old engine is no longer running
 		require.Equal(t, types.WorkflowID(updatedWFID), engine.WorkflowID)
 	})
+}
+
+
+type FakeModuleStore struct {
+}
+
+func NewFakeModuleStore() *FakeModuleStore {
+	return &FakeModuleStore{}
+}
+
+func (s *FakeModuleStore) StoreModule(workflowID string, binaryID string, module []byte) error {
+	return nil
+}
+
+func (s *FakeModuleStore) GetModulePath(workflowID string) (string, bool, error) {
+	return "", false, nil
+}
+
+func (s *FakeModuleStore) GetBinaryID(workflowID string) (string, bool, error) {
+	return "", false, nil
+}
+
+func (s *FakeModuleStore) DeleteModule(workflowID string) error {
+	return nil
 }

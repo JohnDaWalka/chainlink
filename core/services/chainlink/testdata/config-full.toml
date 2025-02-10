@@ -330,6 +330,9 @@ Foo = 'bar'
 Global = 200
 PerOwner = 200
 
+[Wasm]
+SerialisedModulesDir = 'test/root/dir'
+
 [[EVM]]
 ChainID = '1'
 Enabled = false

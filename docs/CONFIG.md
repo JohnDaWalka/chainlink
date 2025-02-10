@@ -2143,6 +2143,19 @@ foo = "bar" # Example
 ```
 foo is an example resource attribute
 
+## Wasm
+```toml
+[Wasm]
+SerialisedModulesDir = '/path/to/serialised/modules' # Example
+```
+Wasm holds settings for the WebAssembly runtime.
+
+### SerialisedModulesDir
+```toml
+SerialisedModulesDir = '/path/to/serialised/modules' # Example
+```
+SerialisedModulesDir is the directory where the serialised Wasm modules are stored
+
 ## EVM
 EVM defaults depend on ChainID:
 

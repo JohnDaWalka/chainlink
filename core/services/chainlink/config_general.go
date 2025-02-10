@@ -541,4 +541,8 @@ func (g *generalConfig) Telemetry() coreconfig.Telemetry {
 	return &telemetryConfig{s: g.c.Telemetry}
 }
 
+func (g *generalConfig) Wasm() coreconfig.Wasm {
+	return &wasmConfig{w: g.c.Wasm}
+}
+
 var zeroSha256Hash = models.Sha256Hash{}

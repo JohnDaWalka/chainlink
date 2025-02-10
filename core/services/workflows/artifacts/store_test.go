@@ -69,6 +69,7 @@ func Test_Handler_SecretsFor(t *testing.T) {
 	h := NewStore(
 		lggr,
 		orm,
+		nil,
 		fetcher.Fetch,
 		clockwork.NewFakeClock(),
 		encryptionKey,
@@ -132,6 +133,7 @@ func Test_Handler_SecretsFor_RefreshesSecrets(t *testing.T) {
 	h := NewStore(
 		lggr,
 		orm,
+		nil,
 		fetcher.Fetch,
 		clockwork.NewFakeClock(),
 		encryptionKey,
@@ -198,6 +200,7 @@ func Test_Handler_SecretsFor_RefreshLogic(t *testing.T) {
 	h := NewStore(
 		lggr,
 		orm,
+		nil,
 		fetcher.Fetch,
 		clock,
 		encryptionKey,

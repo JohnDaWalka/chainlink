@@ -61,6 +61,7 @@ type Core struct {
 	Capabilities     Capabilities     `toml:",omitempty"`
 	Telemetry        Telemetry        `toml:",omitempty"`
 	Workflows        Workflows        `toml:",omitempty"`
+	Wasm             Wasm             `toml:",omitempty"`
 }
 
 // SetFrom updates c with any non-nil values from f. (currently TOML field only!)
@@ -102,6 +103,7 @@ func (c *Core) SetFrom(f *Core) {
 	c.Insecure.setFrom(&f.Insecure)
 	c.Tracing.setFrom(&f.Tracing)
 	c.Telemetry.setFrom(&f.Telemetry)
+	c.Wasm.setFrom(&f.Wasm)
 }
 
 func (c *Core) ValidateConfig() (err error) {
@@ -1902,6 +1904,22 @@ func (t *Tracing) ValidateConfig() (err error) {
 	}
 
 	return err
+}
+
+type Wasm struct {
+	SerialisedModulesDir *string
+}
+
+func (w *Wasm) setFrom(f *Wasm) {
+	if v := f.SerialisedModulesDir; v != nil {
+		w.SerialisedModulesDir = v
+	}
+}
+
+func (w *Wasm) SetDefaults(rootDir *string) {
+	if w.SerialisedModulesDir == nil {
+		w.SerialisedModulesDir = rootDir
+	}
 }
 
 type Telemetry struct {

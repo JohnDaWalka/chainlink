@@ -1322,7 +1322,6 @@ type Config struct {
 	MaxExecutionDuration time.Duration
 	Store                store.Store
 	Config               []byte
-	Binary               []byte
 	SecretsFetcher       SecretsFor
 	HeartbeatCadence     time.Duration
 	StepTimeout          time.Duration
@@ -1481,7 +1480,6 @@ func NewEngine(ctx context.Context, cfg Config) (engine *Engine, err error) {
 		secretsFetcher: cfg.SecretsFetcher,
 		env: exec.Env{
 			Config: cfg.Config,
-			Binary: cfg.Binary,
 		},
 		executionsStore:      cfg.Store,
 		pendingStepRequests:  make(chan stepRequest, cfg.QueueSize),

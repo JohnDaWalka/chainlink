@@ -2,9 +2,12 @@ package compute
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -61,6 +64,7 @@ type testHarness struct {
 	config           Config
 	connectorHandler *webapi.OutgoingConnectorHandler
 	compute          *Compute
+	computeWasmBinaryStore *FakeComputeWasmStore
 }
 
 func setup(t *testing.T, config Config) testHarness {
@@ -71,19 +75,22 @@ func setup(t *testing.T, config Config) testHarness {
 	connectorHandler, err := webapi.NewOutgoingConnectorHandler(connector, config.ServiceConfig, ghcapabilities.MethodComputeAction, log, webapi.WithFixedStart())
 	require.NoError(t, err)
 
+	fakeComputeWasmStore := NewFakeComputeWasmStore()
+
 	fetchFactory, err := NewOutgoingConnectorFetcherFactory(connectorHandler, idGeneratorFn)
 	require.NoError(t, err)
-	compute, err := NewAction(config, log, registry, fetchFactory)
+	compute, err := NewAction(config, log, registry, fetchFactory, fakeComputeWasmStore)
 	require.NoError(t, err)
 	compute.modules.clock = clockwork.NewFakeClock()
 
 	return testHarness{
-		registry:         registry,
-		connector:        connector,
-		log:              log,
-		config:           config,
-		connectorHandler: connectorHandler,
-		compute:          compute,
+		registry:               registry,
+		connector:              connector,
+		log:                    log,
+		config:                 config,
+		connectorHandler:       connectorHandler,
+		compute:                compute,
+		computeWasmBinaryStore: fakeComputeWasmStore,
 	}
 }
 
@@ -103,6 +110,8 @@ func TestComputeExecuteMissingConfig(t *testing.T) {
 	require.NoError(t, th.compute.Start(t.Context()))
 
 	binary := wasmtest.CreateTestBinary(simpleBinaryCmd, simpleBinaryLocation, true, t)
+
+	th.computeWasmBinaryStore.AddWasmBinary("workflowID", binary)
 
 	config, err := values.WrapMap(map[string]any{
 		"binary": binary,
@@ -132,26 +141,28 @@ func TestComputeExecuteMissingBinary(t *testing.T) {
 		Inputs: values.EmptyMap(),
 		Config: config,
 		Metadata: cappkg.RequestMetadata{
+			WorkflowID:  "workflowID",
 			ReferenceID: "compute",
 		},
 	}
 	_, err = th.compute.Execute(t.Context(), req)
-	assert.ErrorContains(t, err, "invalid request: could not find \"binary\" in map")
+	assert.ErrorContains(t, err, "binary not found for workflow ID:")
 }
 
 func TestComputeExecute(t *testing.T) {
 	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-560")
 
 	t.Parallel()
+
+	binary := wasmtest.CreateTestBinary(simpleBinaryCmd, simpleBinaryLocation, true, t)
 	th := setup(t, defaultConfig)
+
+	th.computeWasmBinaryStore.AddWasmBinary("workflowID", binary)
 
 	require.NoError(t, th.compute.Start(t.Context()))
 
-	binary := wasmtest.CreateTestBinary(simpleBinaryCmd, simpleBinaryLocation, true, t)
-
 	config, err := values.WrapMap(map[string]any{
 		"config": []byte(""),
-		"binary": binary,
 	})
 	require.NoError(t, err)
 	inputs, err := values.WrapMap(map[string]any{
@@ -180,13 +191,13 @@ func TestComputeExecute(t *testing.T) {
 	require.NoError(t, err)
 	config, err = values.WrapMap(map[string]any{
 		"config": []byte(""),
-		"binary": binary,
 	})
 	require.NoError(t, err)
 	req = cappkg.CapabilityRequest{
 		Inputs: inputs,
 		Config: config,
 		Metadata: cappkg.RequestMetadata{
+			WorkflowID:  "workflowID",
 			ReferenceID: "compute",
 		},
 	}
@@ -201,7 +212,10 @@ func TestComputeFetch(t *testing.T) {
 	t.Parallel()
 	workflowID := "15c631d295ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0"
 	workflowExecutionID := "95ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0abbadeed"
+	binary := wasmtest.CreateTestBinary(fetchBinaryCmd, fetchBinaryLocation, true, t)
 	th := setup(t, defaultConfig)
+
+	th.computeWasmBinaryStore.AddWasmBinary(workflowID, binary)
 
 	th.connector.EXPECT().DonID().Return("don-id")
 	th.connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
@@ -223,8 +237,6 @@ func TestComputeFetch(t *testing.T) {
 		Once()
 
 	require.NoError(t, th.compute.Start(t.Context()))
-
-	binary := wasmtest.CreateTestBinary(fetchBinaryCmd, fetchBinaryLocation, true, t)
 
 	config, err := values.WrapMap(map[string]any{
 		"config": []byte(""),
@@ -419,4 +431,51 @@ func gatewayResponse(t *testing.T, msgID string, body []byte) *api.Message {
 			Payload:   responsePayload,
 		},
 	}
+}
+
+type FakeComputeWasmStore struct {
+	binaries map[string][]byte
+	mu       sync.RWMutex
+}
+
+func NewFakeComputeWasmStore() *FakeComputeWasmStore {
+	return &FakeComputeWasmStore{
+		binaries: make(map[string][]byte),
+	}
+}
+
+func (s *FakeComputeWasmStore) GetSerialisedModulePath(workflowID string) (string, bool, error) {
+	return "", false, nil
+}
+
+func (s *FakeComputeWasmStore) StoreSerialisedModule(workflowID string, binaryID string, serialisedModule []byte) error {
+	return nil
+}
+
+func (s *FakeComputeWasmStore) AddWasmBinary(workflowID string, binary []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.binaries[workflowID] = binary
+}
+
+func (s *FakeComputeWasmStore) GetWasmBinary(ctx context.Context, workflowID string) ([]byte, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	binary, exists := s.binaries[workflowID]
+	if !exists {
+		return nil, fmt.Errorf("binary not found for workflow ID: %s", workflowID)
+	}
+	return binary, nil
+}
+
+func (s *FakeComputeWasmStore) GetWasmBinaryID(workflowID string) (string, bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	binary, exists := s.binaries[workflowID]
+	if !exists {
+		return "", false, fmt.Errorf("binary not found for workflow ID: %s", workflowID)
+	}
+	hash := sha256.Sum256(binary)
+	binaryID := hex.EncodeToString(hash[:])
+	return binaryID, true, nil
 }

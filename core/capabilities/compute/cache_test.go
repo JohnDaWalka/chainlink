@@ -26,6 +26,7 @@ func TestCache(t *testing.T) {
 	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-558")
 
 	t.Parallel()
+	ctx := tests.Context(t)
 	clock := clockwork.NewFakeClock()
 	tick := 1 * time.Second
 	timeout := 1 * time.Second
@@ -38,10 +39,11 @@ func TestCache(t *testing.T) {
 	defer cache.close()
 
 	binary := wasmtest.CreateTestBinary(simpleBinaryCmd, simpleBinaryLocation, false, t)
-	hmod, err := host.NewModule(&host.ModuleConfig{
+	hmod, err := host.NewModule(ctx, &host.ModuleConfig{
 		Logger:         logger.TestLogger(t),
 		IsUncompressed: true,
-	}, binary)
+	},
+		host.NewSingleBinaryWasmBinaryStore(binary), "")
 	require.NoError(t, err)
 
 	id := uuid.New().String()
@@ -77,10 +79,10 @@ func TestCache_EvictAfterSize(t *testing.T) {
 	defer cache.close()
 
 	binary := wasmtest.CreateTestBinary(simpleBinaryCmd, simpleBinaryLocation, false, t)
-	hmod, err := host.NewModule(&host.ModuleConfig{
+	hmod, err := host.NewModule(t.Context(), &host.ModuleConfig{
 		Logger:         logger.TestLogger(t),
 		IsUncompressed: true,
-	}, binary)
+	}, host.NewSingleBinaryWasmBinaryStore(binary), "")
 	require.NoError(t, err)
 
 	id := uuid.New().String()
@@ -110,6 +112,7 @@ func TestCache_AddDuplicatedModule(t *testing.T) {
 	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-574")
 
 	t.Parallel()
+	ctx := tests.Context(t)
 	clock := clockwork.NewFakeClock()
 	tick := 1 * time.Second
 	timeout := 1 * time.Second
@@ -122,10 +125,10 @@ func TestCache_AddDuplicatedModule(t *testing.T) {
 	defer cache.close()
 
 	simpleBinary := wasmtest.CreateTestBinary(simpleBinaryCmd, simpleBinaryLocation, false, t)
-	shmod, err := host.NewModule(&host.ModuleConfig{
+	shmod, err := host.NewModule(ctx, &host.ModuleConfig{
 		Logger:         logger.TestLogger(t),
 		IsUncompressed: true,
-	}, simpleBinary)
+	}, host.NewSingleBinaryWasmBinaryStore(simpleBinary), "")
 	require.NoError(t, err)
 
 	// we will use the same id for both modules, but should only be associated to the simple module
@@ -142,10 +145,10 @@ func TestCache_AddDuplicatedModule(t *testing.T) {
 
 	// Adding a different module but with the same id should not overwrite the existing module
 	fetchBinary := wasmtest.CreateTestBinary(fetchBinaryCmd, fetchBinaryLocation, false, t)
-	fhmod, err := host.NewModule(&host.ModuleConfig{
+	fhmod, err := host.NewModule(ctx, &host.ModuleConfig{
 		Logger:         logger.TestLogger(t),
 		IsUncompressed: true,
-	}, fetchBinary)
+	}, host.NewSingleBinaryWasmBinaryStore(fetchBinary), "")
 	require.NoError(t, err)
 
 	fmod := &module{

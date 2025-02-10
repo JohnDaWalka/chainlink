@@ -347,6 +347,14 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		}
 	}
 
+	var moduleStore artifacts.SerialisedModuleStore
+	for _, dep := range flagsAndDeps {
+		moduleStore, _ = dep.(artifacts.SerialisedModuleStore)
+		if moduleStore != nil {
+			break
+		}
+	}
+
 	var computeFetcherFactory compute.FetcherFactory
 	for _, dep := range flagsAndDeps {
 		computeFetcherFactory, _ = dep.(compute.FetcherFactory)
@@ -433,6 +441,7 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 			CapabilitiesPeerWrapper: peerWrapper,
 			FetcherFunc:             syncerFetcherFunc,
 			FetcherFactoryFn:        computeFetcherFactory,
+			ModuleStore:             moduleStore,
 		},
 		Config:   cfg,
 		DS:       ds,

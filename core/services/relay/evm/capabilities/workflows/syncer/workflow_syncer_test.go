@@ -390,7 +390,7 @@ func Test_SecretsWorker(t *testing.T) {
 			wl, err := syncerlimiter.NewWorkflowLimits(lggr, wlConfig)
 			require.NoError(t, err)
 
-			store := artifacts.NewStore(lggr, orm, fetcherFn, clockwork.NewFakeClock(), encryptionKey, emitter)
+			store := artifacts.NewStore(lggr, orm, nil, fetcherFn, clockwork.NewFakeClock(), encryptionKey, emitter)
 
 			engineRegistry := syncer.NewEngineRegistry()
 
@@ -573,7 +573,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyPaused(t *testing.T) {
 	wl, err := syncerlimiter.NewWorkflowLimits(lggr, wlConfig)
 	require.NoError(t, err)
 
-	store := artifacts.NewStore(lggr, orm, fetcherFn, clockwork.NewFakeClock(), workflowkey.Key{}, emitter)
+	store := artifacts.NewStore(lggr, orm, nil, fetcherFn, clockwork.NewFakeClock(), workflowkey.Key{}, emitter)
 
 	handler, err := syncer.NewEventHandler(lggr, nil, nil, er, emitter, rl, wl, store)
 	require.NoError(t, err)
@@ -676,7 +676,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyActivated(t *testing.T) {
 	wl, err := syncerlimiter.NewWorkflowLimits(lggr, wlConfig)
 	require.NoError(t, err)
 
-	store := artifacts.NewStore(lggr, orm, fetcherFn, clockwork.NewFakeClock(), workflowkey.Key{}, emitter)
+	store := artifacts.NewStore(lggr, orm, nil, fetcherFn, clockwork.NewFakeClock(), workflowkey.Key{}, emitter)
 
 	handler, err := syncer.NewEventHandler(lggr, nil, nil, er,
 		emitter, rl, wl, store, syncer.WithStaticEngine(&mockService{}))

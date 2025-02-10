@@ -104,7 +104,7 @@ type WorkflowDeletedV1 struct {
 	WorkflowName  string
 }
 
-type engineFactoryFn func(ctx context.Context, wfid string, owner string, name types.WorkflowName, config []byte, binary []byte) (services.Service, error)
+type engineFactoryFn func(ctx context.Context, wfid string, owner string, name types.WorkflowName, config []byte) (services.Service, error)
 
 // eventHandler is a handler for WorkflowRegistryEvent events.  Each event type has a corresponding
 // method that handles the event.
@@ -140,13 +140,14 @@ func WithEngineFactoryFn(efn engineFactoryFn) func(*eventHandler) {
 
 func WithStaticEngine(engine services.Service) func(*eventHandler) {
 	return func(e *eventHandler) {
-		e.engineFactory = func(_ context.Context, _ string, _ string, _ types.WorkflowName, _ []byte, _ []byte) (services.Service, error) {
+		e.engineFactory = func(_ context.Context, _ string, _ string, _ types.WorkflowName, _ []byte) (services.Service, error) {
 			return engine, nil
 		}
 	}
 }
 
 type WorkflowArtifactsStore interface {
+	host.WasmBinaryStore
 	FetchWorkflowArtifacts(ctx context.Context, workflowID, binaryURL, configURL string) ([]byte, []byte, error)
 	GetWorkflowSpec(ctx context.Context, workflowOwner string, workflowName string) (*job.WorkflowSpec, error)
 	UpsertWorkflowSpec(ctx context.Context, spec *job.WorkflowSpec) (int64, error)
@@ -468,15 +469,15 @@ func (h *eventHandler) createWorkflowSpec(ctx context.Context, payload WorkflowR
 	return entry, nil
 }
 
-func (h *eventHandler) engineFactoryFn(ctx context.Context, workflowID string, owner string, name types.WorkflowName, config []byte, binary []byte) (services.Service, error) {
+func (h *eventHandler) engineFactoryFn(ctx context.Context, workflowID string, owner string, name types.WorkflowName, config []byte) (services.Service, error) {
 	moduleConfig := &host.ModuleConfig{Logger: h.lggr, Labeler: h.emitter}
-	module, err := host.NewModule(moduleConfig, binary, host.WithDeterminism())
+	module, err := host.NewModule(ctx, moduleConfig, h.workflowArtifactsStore, workflowID, host.WithDeterminism())
 	if err != nil {
 		return nil, fmt.Errorf("could not instantiate module: %w", err)
 	}
 
 	if module.IsLegacyDAG() { // V1 aka "DAG"
-		sdkSpec, err := host.GetWorkflowSpec(ctx, moduleConfig, binary, config)
+		sdkSpec, err := host.GetWorkflowSpec(ctx, moduleConfig, h.workflowArtifactsStore, workflowID, config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get workflow sdk spec: %w", err)
 		}
@@ -490,7 +491,6 @@ func (h *eventHandler) engineFactoryFn(ctx context.Context, workflowID string, o
 			Registry:       h.capRegistry,
 			Store:          h.workflowStore,
 			Config:         config,
-			Binary:         binary,
 			SecretsFetcher: h.workflowArtifactsStore.SecretsFor,
 			RateLimiter:    h.ratelimiter,
 			WorkflowLimits: h.workflowLimits,
@@ -662,11 +662,6 @@ func (h *eventHandler) tryEngineCleanup(workflowOwner []byte, workflowName strin
 
 // tryEngineCreate attempts to create a new workflow engine, start it, and register it with the engine registry
 func (h *eventHandler) tryEngineCreate(ctx context.Context, spec *job.WorkflowSpec) error {
-	decodedBinary, err := hex.DecodeString(spec.Workflow)
-	if err != nil {
-		return fmt.Errorf("failed to decode workflow spec binary: %w", err)
-	}
-
 	// Start a new WorkflowEngine instance, and add it to local engine registry
 	workflowName, err := types.NewWorkflowName(spec.WorkflowName)
 	if err != nil {
@@ -678,7 +673,6 @@ func (h *eventHandler) tryEngineCreate(ctx context.Context, spec *job.WorkflowSp
 		spec.WorkflowOwner,
 		workflowName,
 		[]byte(spec.Config),
-		decodedBinary,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create workflow engine: %w", err)
