@@ -729,7 +729,7 @@ func deployChainContractsSolana(
 			return fmt.Errorf("failed to deploy program: %w", err)
 		}
 
-		tv := deployment.NewTypeAndVersion(Router, deployment.Version1_0_0)
+		tv := deployment.NewTypeAndVersion(FeeQuoter, deployment.Version1_0_0)
 		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
 
 		feeQuoterAddress = solana.MustPublicKeyFromBase58(programID)
