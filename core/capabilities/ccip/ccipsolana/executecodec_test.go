@@ -10,6 +10,7 @@ import (
 	agbinary "github.com/gagliardetto/binary"
 	solanago "github.com/gagliardetto/solana-go"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -196,7 +197,7 @@ func Test_DecodingExecuteReport(t *testing.T) {
 
 		onChainReport := ccip_router.ExecutionReportSingleChain{
 			SourceChainSelector: uint64(chainSel),
-			Message: ccip_router.Any2SVMRampMessage{
+			Message: ccip_offramp.Any2SVMRampMessage{
 				Header: ccip_router.RampMessageHeader{
 					SourceChainSelector: uint64(chainSel),
 				},

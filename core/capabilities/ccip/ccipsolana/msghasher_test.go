@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 
@@ -33,7 +34,7 @@ func TestMessageHasher_Any2Solana(t *testing.T) {
 	require.Equal(t, expectedHash, actualHash[:32])
 }
 
-func createAny2SolanaMessages(t *testing.T) (cciptypes.Message, ccip_router.Any2SVMRampMessage, []solana.PublicKey) {
+func createAny2SolanaMessages(t *testing.T) (cciptypes.Message, ccip_offramp.Any2SVMRampMessage, []solana.PublicKey) {
 	messageID := utils.RandomBytes32()
 
 	sourceChain := rand.Uint64()
@@ -82,7 +83,7 @@ func createAny2SolanaMessages(t *testing.T) (cciptypes.Message, ccip_router.Any2
 		}
 	}
 
-	any2SolanaMsg := ccip_router.Any2SVMRampMessage{
+	any2SolanaMsg := ccip_offramp.Any2SVMRampMessage{
 		Header: ccip_router.RampMessageHeader{
 			MessageId:           messageID,
 			SourceChainSelector: sourceChain,
