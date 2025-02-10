@@ -1,27 +1,51 @@
 package memory
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
+	"strconv"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
+	"github.com/gagliardetto/solana-go"
+	solRpc "github.com/gagliardetto/solana-go/rpc"
+	"github.com/hashicorp/consul/sdk/freeport"
+
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
+	solTestConfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 )
 
 type EVMChain struct {
 	Backend     *simulated.Backend
 	DeployerKey *bind.TransactOpts
 	Users       []*bind.TransactOpts
+}
+
+type SolanaChain struct {
+	Client      *solRpc.Client
+	DeployerKey solana.PrivateKey
+	URL         string
+	WSURL       string
+	KeypairPath string
 }
 
 func fundAddress(t *testing.T, from *bind.TransactOpts, to common.Address, amount *big.Int, backend *simulated.Backend) {
@@ -49,6 +73,75 @@ func GenerateChains(t *testing.T, numChains int, numUsers int) map[uint64]EVMCha
 	for i := 0; i < numChains; i++ {
 		chainID := chainsel.TEST_90000001.EvmChainID + uint64(i)
 		chains[chainID] = evmChain(t, numUsers)
+	}
+	return chains
+}
+
+func getTestSolanaChainSelectors() []uint64 {
+	result := []uint64{}
+	for _, x := range chainsel.SolanaALL {
+		if x.Name == x.ChainID {
+			result = append(result, x.Selector)
+		}
+	}
+	return result
+}
+
+func generateSolanaKeypair(t testing.TB) (solana.PrivateKey, string, error) {
+	// Create a temporary directory that will be cleaned up after the test
+	tmpDir := t.TempDir()
+
+	privateKey, err := solana.NewRandomPrivateKey()
+	if err != nil {
+		return solana.PrivateKey{}, "", fmt.Errorf("failed to generate private key: %w", err)
+	}
+
+	// Convert private key bytes to JSON array
+	privateKeyBytes := []byte(privateKey)
+
+	// Convert bytes to array of integers for JSON
+	intArray := make([]int, len(privateKeyBytes))
+	for i, b := range privateKeyBytes {
+		intArray[i] = int(b)
+	}
+
+	keypairJSON, err := json.Marshal(intArray)
+	if err != nil {
+		return solana.PrivateKey{}, "", fmt.Errorf("failed to marshal keypair: %w", err)
+	}
+
+	// Create the keypair file in the temporary directory
+	keypairPath := filepath.Join(tmpDir, "solana-keypair.json")
+	if err := os.WriteFile(keypairPath, keypairJSON, 0600); err != nil {
+		return solana.PrivateKey{}, "", fmt.Errorf("failed to write keypair to file: %w", err)
+	}
+
+	return privateKey, keypairPath, nil
+}
+
+func GenerateChainsSol(t *testing.T, numChains int) map[uint64]SolanaChain {
+	testSolanaChainSelectors := getTestSolanaChainSelectors()
+	if len(testSolanaChainSelectors) < numChains {
+		t.Fatalf("not enough test solana chain selectors available")
+	}
+	chains := make(map[uint64]SolanaChain)
+	for i := 0; i < numChains; i++ {
+		chainID := testSolanaChainSelectors[i]
+		admin, keypairPath, err := generateSolanaKeypair(t)
+		require.NoError(t, err)
+		url, wsURL, err := solChain(t, chainID, &admin)
+		require.NoError(t, err)
+		client := solRpc.New(url)
+		balance, err := client.GetBalance(context.Background(), admin.PublicKey(), solRpc.CommitmentConfirmed)
+		require.NoError(t, err)
+		require.NotEqual(t, 0, balance.Value) // auto funded 500000000.000000000 SOL
+		chains[chainID] = SolanaChain{
+			Client:      client,
+			DeployerKey: admin,
+			URL:         url,
+			WSURL:       wsURL,
+			KeypairPath: keypairPath,
+		}
 	}
 	return chains
 }
@@ -86,4 +179,72 @@ func evmChain(t *testing.T, numUsers int) EVMChain {
 		DeployerKey: owner,
 		Users:       users,
 	}
+}
+
+var once = &sync.Once{}
+
+func solChain(t *testing.T, chainID uint64, adminKey *solana.PrivateKey) (string, string, error) {
+	t.Helper()
+
+	// initialize the docker network used by CTF
+	err := framework.DefaultNetwork(once)
+	require.NoError(t, err)
+
+	maxRetries := 10
+	var url, wsURL string
+	for i := 0; i < maxRetries; i++ {
+		port := freeport.GetOne(t)
+
+		programIds := map[string]string{
+			"ccip_router":        solTestConfig.CcipRouterProgram.String(),
+			"token_pool":         solTestConfig.CcipTokenPoolProgram.String(),
+			"fee_quoter":         solTestConfig.FeeQuoterProgram.String(),
+			"test_ccip_receiver": solTestConfig.CcipLogicReceiver.String(),
+			"ccip_offramp":       solTestConfig.CcipOfframpProgram.String(),
+		}
+
+		bcInput := &blockchain.Input{
+			Type:           "solana",
+			ChainID:        strconv.FormatUint(chainID, 10),
+			PublicKey:      adminKey.PublicKey().String(),
+			Port:           strconv.Itoa(port),
+			ContractsDir:   ProgramsPath,
+			SolanaPrograms: programIds,
+		}
+		output, err := blockchain.NewBlockchainNetwork(bcInput)
+		if err != nil {
+			t.Logf("Error creating solana network: %v", err)
+			time.Sleep(time.Second)
+			maxRetries -= 1
+			continue
+		}
+		require.NoError(t, err)
+		testcontainers.CleanupContainer(t, output.Container)
+		url = output.Nodes[0].HostHTTPUrl
+		wsURL = output.Nodes[0].HostWSUrl
+		break
+	}
+	require.NoError(t, err)
+
+	// Wait for api server to boot
+	client := solRpc.New(url)
+	var ready bool
+	for i := 0; i < 30; i++ {
+		time.Sleep(time.Second)
+		out, err := client.GetHealth(tests.Context(t))
+		if err != nil || out != solRpc.HealthOk {
+			t.Logf("API server not ready yet (attempt %d)\n", i+1)
+			continue
+		}
+		ready = true
+		break
+	}
+	if !ready {
+		t.Logf("solana-test-validator is not ready after 30 attempts")
+	}
+	require.True(t, ready)
+	t.Logf("solana-test-validator is ready at %s", url)
+	time.Sleep(15 * time.Second) // we have slot errors that force retries if the chain is not given enough time to boot
+
+	return url, wsURL, nil
 }

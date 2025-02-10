@@ -4,11 +4,15 @@ import (
 	"errors"
 	"fmt"
 
+	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 )
+
+var _ deployment.ChangeSet[JobSpecsForLanesConfig] = JobSpecsForLanesChangeset
 
 type JobSpecsForLanesConfig struct {
 	Configs []JobSpecInput
@@ -55,7 +59,7 @@ func (j JobSpecInput) Validate() error {
 	return nil
 }
 
-func JobSpecsForLanes(env deployment.Environment, c JobSpecsForLanesConfig) (deployment.ChangesetOutput, error) {
+func JobSpecsForLanesChangeset(env deployment.Environment, c JobSpecsForLanesConfig) (deployment.ChangesetOutput, error) {
 	if err := c.Validate(); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("invalid JobSpecsForLanesConfig: %w", err)
 	}
@@ -67,8 +71,32 @@ func JobSpecsForLanes(env deployment.Environment, c JobSpecsForLanesConfig) (dep
 	if err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
+	// Now we propose the job specs to the offchain system.
+	var Jobs []deployment.ProposedJob
+	for nodeID, jobs := range nodesToJobSpecs {
+		for _, job := range jobs {
+			Jobs = append(Jobs, deployment.ProposedJob{
+				Node: nodeID,
+				Spec: job,
+			})
+			res, err := env.Offchain.ProposeJob(env.GetContext(),
+				&jobv1.ProposeJobRequest{
+					NodeId: nodeID,
+					Spec:   job,
+				})
+			if err != nil {
+				// If we fail to propose a job, we should return an error and the jobs we've already proposed.
+				// This is so that we can retry the proposal with manual intervention.
+				// JOBID will be empty if the proposal failed.
+				return deployment.ChangesetOutput{
+					Jobs: Jobs,
+				}, fmt.Errorf("failed to propose job: %w", err)
+			}
+			Jobs[len(Jobs)-1].JobID = res.Proposal.JobId
+		}
+	}
 	return deployment.ChangesetOutput{
-		JobSpecs: nodesToJobSpecs,
+		Jobs: Jobs,
 	}, nil
 }
 

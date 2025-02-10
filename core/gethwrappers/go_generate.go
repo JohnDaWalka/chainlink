@@ -57,7 +57,6 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/IChainModule/IChainModule.abi ../../contracts/solc/v0.8.19/IChainModule/IChainModule.bin IChainModule i_chain_module
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/IAutomationV21PlusCommon/IAutomationV21PlusCommon.abi ../../contracts/solc/v0.8.19/IAutomationV21PlusCommon/IAutomationV21PlusCommon.bin IAutomationV21PlusCommon i_automation_v21_plus_common
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/MockETHUSDAggregator/MockETHUSDAggregator.abi ../../contracts/solc/v0.8.19/MockETHUSDAggregator/MockETHUSDAggregator.bin MockETHUSDAggregator mock_ethusd_aggregator_wrapper
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/WETH9/WETH9.abi ../../contracts/solc/v0.8.19/WETH9/WETH9.bin WETH9 weth9_wrapper
 
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.16/ILogAutomation/ILogAutomation.abi ../../contracts/solc/v0.8.16/ILogAutomation/ILogAutomation.bin ILogAutomation i_log_automation
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.16/AutomationForwarderLogic/AutomationForwarderLogic.abi ../../contracts/solc/v0.8.16/AutomationForwarderLogic/AutomationForwarderLogic.bin AutomationForwarderLogic automation_forwarder_logic
@@ -145,6 +144,7 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/VRFCoordinatorTestV2_5/VRFCoordinatorTestV2_5.abi ../../contracts/solc/v0.8.19/VRFCoordinatorTestV2_5/VRFCoordinatorTestV2_5.bin VRFCoordinatorTestV2_5 vrf_coordinator_test_v2_5
 
 // Aggregators
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/AggregatorV2V3Interface/AggregatorV2V3Interface.abi ../../contracts/solc/v0.8.6/AggregatorV2V3Interface/AggregatorV2V3Interface.bin AggregatorV2V3Interface aggregator_v2v3_interface
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.6/MockAggregatorProxy/MockAggregatorProxy.abi ../../contracts/solc/v0.8.6/MockAggregatorProxy/MockAggregatorProxy.bin MockAggregatorProxy mock_aggregator_proxy
 
 //go:generate go generate ./functions

@@ -3,15 +3,24 @@ mockname: "{{ .InterfaceName }}"
 outpkg: mocks
 filename: "{{ .InterfaceName | snakecase }}.go"
 packages:
-  github.com/smartcontractkit/chainlink/v2/common/headtracker:
+  github.com/smartcontractkit/chainlink-framework/chains/heads:
+    config:
+      dir: common/headtracker/mocks
+      outpkg: mocks
     interfaces:
-      HeadTrackable:
-      HeadTracker:
-      HeadBroadcaster:
-  github.com/smartcontractkit/chainlink/v2/common/txmgr:
+      Trackable:
+      Tracker:
+      Broadcaster:
+  github.com/smartcontractkit/chainlink-framework/chains/txmgr:
+    config:
+      dir: common/txmgr/mocks
+      outpkg: mocks
     interfaces:
       TxManager:
-  github.com/smartcontractkit/chainlink/v2/common/txmgr/types:
+  github.com/smartcontractkit/chainlink-framework/chains/txmgr/types:
+    config:
+      dir: common/txmgr/types/mocks
+      outpkg: mocks
     interfaces:
       ReaperChainConfig:
         config:
@@ -21,12 +30,6 @@ packages:
       TxStrategy:
       TxAttemptBuilder:
       TxStore:
-  github.com/smartcontractkit/chainlink-framework/multinode:
-    config:
-      dir: common/types/mocks
-      outpkg: mocks
-    interfaces:
-      Subscription:
   github.com/smartcontractkit/chainlink/v2/core/bridges:
     interfaces:
       ORM:
@@ -38,36 +41,9 @@ packages:
     interfaces:
       Dispatcher:
       Receiver:
-  github.com/smartcontractkit/chainlink/v2/core/chains/evm/client:
-    interfaces:
-      Client:
-  github.com/smartcontractkit/chainlink/v2/core/chains/evm/config:
-    interfaces:
-      GasEstimator:
-      ChainScopedConfig:
   github.com/smartcontractkit/chainlink/v2/core/chains/evm/forwarders:
     interfaces:
       ORM:
-  github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas:
-    interfaces:
-      Config:
-      EvmFeeEstimator:
-      feeEstimatorClient:
-        config:
-          mockname: FeeEstimatorClient
-      feeHistoryEstimatorClient:
-        config:
-          mockname: FeeHistoryEstimatorClient
-      EvmEstimator:
-  github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/rollups:
-    interfaces:
-      L1Oracle:
-      l1OracleClient:
-        config:
-          mockname: L1OracleClient
-  github.com/smartcontractkit/chainlink/v2/core/chains/evm/keystore:
-    interfaces:
-      Eth:
   github.com/smartcontractkit/chainlink/v2/core/chains/evm/log:
     interfaces:
       Broadcaster:
@@ -76,11 +52,12 @@ packages:
   github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller:
     interfaces:
       LogPoller:
-  github.com/smartcontractkit/chainlink/v2/core/chains/evm/monitor:
+  github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm:
     interfaces:
-      BalanceMonitor:
-        config:
-          dir: "{{ .InterfaceDir }}/../mocks"
+      Client:
+      TxStore:
+      AttemptBuilder:
+      Keystore:
   github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr:
     interfaces:
       ChainConfig:
@@ -221,6 +198,7 @@ packages:
       StarkNet:
         config:
           filename: starknet.go
+      Tron:
       VRF:
       Workflow:
   github.com/smartcontractkit/chainlink/v2/core/services/ocr:
@@ -489,12 +467,20 @@ packages:
       PriceRegistryReader:
         config:
           filename: price_registry_reader_mock.go
+      FeeEstimatorConfigReader:
+        config:
+          filename: fee_estimator_config_mock.go
       TokenPoolReader:
         config:
           filename: token_pool_reader_mock.go
       USDCReader:
         config:
           filename: usdc_reader_mock.go
+  github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig:
+    interfaces:
+      GasPriceInterceptor:
+        config:
+          filename: gas_price_interceptor_mock.go
   github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/batchreader:
     config:
       filename: token_pool_batched_reader_mock.go

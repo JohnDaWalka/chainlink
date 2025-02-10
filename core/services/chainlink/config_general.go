@@ -13,12 +13,10 @@ import (
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
 
-	coscfg "github.com/smartcontractkit/chainlink-cosmos/pkg/cosmos/config"
-	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	starknet "github.com/smartcontractkit/chainlink-starknet/relayer/pkg/chainlink/config"
-
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	evmcfg "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
+	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+
+	evmcfg "github.com/smartcontractkit/chainlink-integrations/evm/config/toml"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	coreconfig "github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/config/env"
@@ -194,10 +192,13 @@ func (o *GeneralConfigOpts) parse() (err error) {
 }
 
 func (g *generalConfig) EVMConfigs() evmcfg.EVMConfigs {
+	if g.c.EVM == nil {
+		return evmcfg.EVMConfigs{} // return empty to pass nil check
+	}
 	return g.c.EVM
 }
 
-func (g *generalConfig) CosmosConfigs() coscfg.TOMLConfigs {
+func (g *generalConfig) CosmosConfigs() RawConfigs {
 	return g.c.Cosmos
 }
 
@@ -205,12 +206,16 @@ func (g *generalConfig) SolanaConfigs() solcfg.TOMLConfigs {
 	return g.c.Solana
 }
 
-func (g *generalConfig) StarknetConfigs() starknet.TOMLConfigs {
+func (g *generalConfig) StarknetConfigs() RawConfigs {
 	return g.c.Starknet
 }
 
 func (g *generalConfig) AptosConfigs() RawConfigs {
 	return g.c.Aptos
+}
+
+func (g *generalConfig) TronConfigs() RawConfigs {
+	return g.c.Tron
 }
 
 func (g *generalConfig) Validate() error {
@@ -311,17 +316,6 @@ func (g *generalConfig) EVMEnabled() bool {
 	return false
 }
 
-func (g *generalConfig) EVMRPCEnabled() bool {
-	for _, c := range g.c.EVM {
-		if c.IsEnabled() {
-			if len(c.Nodes) > 0 {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func (g *generalConfig) SolanaEnabled() bool {
 	for _, c := range g.c.Solana {
 		if c.IsEnabled() {
@@ -351,6 +345,15 @@ func (g *generalConfig) StarkNetEnabled() bool {
 
 func (g *generalConfig) AptosEnabled() bool {
 	for _, c := range g.c.Aptos {
+		if c.IsEnabled() {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *generalConfig) TronEnabled() bool {
+	for _, c := range g.c.Tron {
 		if c.IsEnabled() {
 			return true
 		}

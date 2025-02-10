@@ -10,10 +10,10 @@ import (
 	"github.com/graph-gophers/graphql-go/gqltesting"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/smartcontractkit/chainlink-integrations/evm/client/clienttest"
+	evmConfigMocks "github.com/smartcontractkit/chainlink-integrations/evm/config/mocks"
+	evmMonMocks "github.com/smartcontractkit/chainlink-integrations/evm/monitor/mocks"
 	bridgeORMMocks "github.com/smartcontractkit/chainlink/v2/core/bridges/mocks"
-	evmClientMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
-	evmConfigMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/mocks"
-	evmORMMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/mocks"
 	evmtxmgrmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr/mocks"
 	legacyEvmORMMocks "github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm/mocks"
 	coremocks "github.com/smartcontractkit/chainlink/v2/core/internal/mocks"
@@ -54,12 +54,13 @@ type mocks struct {
 	aptos                *keystoreMocks.Aptos
 	cosmos               *keystoreMocks.Cosmos
 	starknet             *keystoreMocks.StarkNet
+	tron                 *keystoreMocks.Tron
 	chain                *legacyEvmORMMocks.Chain
 	legacyEVMChains      *legacyEvmORMMocks.LegacyChainContainer
 	relayerChainInterops *chainlinkMocks.FakeRelayerChainInteroperators
-	ethClient            *evmClientMocks.Client
+	ethClient            *clienttest.Client
 	eIMgr                *webhookmocks.ExternalInitiatorManager
-	balM                 *evmORMMocks.BalanceMonitor
+	balM                 *evmMonMocks.BalanceMonitor
 	txmStore             *evmtxmgrmocks.EvmTxStore
 	auditLogger          *audit.AuditLoggerService
 }
@@ -112,12 +113,13 @@ func setupFramework(t *testing.T) *gqlTestFramework {
 		aptos:                keystoreMocks.NewAptos(t),
 		cosmos:               keystoreMocks.NewCosmos(t),
 		starknet:             keystoreMocks.NewStarkNet(t),
+		tron:                 keystoreMocks.NewTron(t),
 		chain:                legacyEvmORMMocks.NewChain(t),
 		legacyEVMChains:      legacyEvmORMMocks.NewLegacyChainContainer(t),
 		relayerChainInterops: &chainlinkMocks.FakeRelayerChainInteroperators{},
-		ethClient:            evmClientMocks.NewClient(t),
+		ethClient:            clienttest.NewClient(t),
 		eIMgr:                webhookmocks.NewExternalInitiatorManager(t),
-		balM:                 evmORMMocks.NewBalanceMonitor(t),
+		balM:                 evmMonMocks.NewBalanceMonitor(t),
 		txmStore:             evmtxmgrmocks.NewEvmTxStore(t),
 		auditLogger:          &audit.AuditLoggerService{},
 	}

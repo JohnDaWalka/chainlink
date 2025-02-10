@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/transmission"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/platform"
+	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/ratelimiter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/store"
 )
 
@@ -96,7 +97,7 @@ func (sucm *stepUpdateManager) len() int64 {
 }
 
 type secretsFetcher interface {
-	SecretsFor(ctx context.Context, workflowOwner, workflowName, workflowID string) (map[string]string, error)
+	SecretsFor(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName, workflowID string) (map[string]string, error)
 }
 
 // Engine handles the lifecycle of a single workflow and its executions.
@@ -125,6 +126,10 @@ type Engine struct {
 	onExecutionFinished func(string)
 	// testing lifecycle hook to signal initialization status
 	afterInit func(success bool)
+
+	// testing lifecycle hook to signal the execution was rate limited
+	onRateLimit func(string)
+
 	// Used for testing to control the number of retries
 	// we'll do when initializing the engine.
 	maxRetries int
@@ -134,7 +139,8 @@ type Engine struct {
 
 	maxWorkerLimit int
 
-	clock clockwork.Clock
+	clock       clockwork.Clock
+	ratelimiter *ratelimiter.RateLimiter
 }
 
 func (e *Engine) Start(_ context.Context) error {
@@ -436,10 +442,11 @@ func (e *Engine) registerTrigger(ctx context.Context, t *triggerCapability, trig
 		Metadata: capabilities.RequestMetadata{
 			WorkflowID:               e.workflow.id,
 			WorkflowOwner:            e.workflow.owner,
-			WorkflowName:             e.workflow.hexName,
+			WorkflowName:             e.workflow.name.Hex(),
 			WorkflowDonID:            e.localNode.WorkflowDON.ID,
 			WorkflowDonConfigVersion: e.localNode.WorkflowDON.ConfigVersion,
 			ReferenceID:              t.Ref,
+			DecodedWorkflowName:      e.workflow.name.String(),
 		},
 		Config:    t.config.Load(),
 		TriggerID: triggerID,
@@ -462,6 +469,9 @@ func (e *Engine) registerTrigger(ctx context.Context, t *triggerCapability, trig
 				platform.KeyTriggerID:    triggerID,
 			}}
 	}
+
+	// mark the trigger as successfully registered
+	t.registered = true
 
 	e.wg.Add(1)
 	go func() {
@@ -748,6 +758,22 @@ func (e *Engine) worker(ctx context.Context) {
 				continue
 			}
 
+			senderAllowed, globalAllowed := e.ratelimiter.Allow(e.workflow.owner)
+			if !senderAllowed {
+				e.onRateLimit(executionID)
+				e.logger.With(platform.KeyWorkflowID, e.workflow.id, platform.KeyWorkflowOwner, e.workflow.owner, platform.KeyWorkflowExecutionID, executionID).Errorf("failed to start execution: per sender rate limit exceeded")
+				logCustMsg(ctx, e.cma.With(platform.KeyCapabilityID, te.ID), "failed to start execution: per sender rate limit exceeded", e.logger)
+				e.metrics.with(platform.KeyWorkflowID, e.workflow.id, platform.KeyWorkflowExecutionID, executionID, platform.KeyTriggerID, te.ID, platform.KeyWorkflowOwner, e.workflow.owner).incrementWorkflowExecutionRateLimitPerUserCounter(ctx)
+				continue
+			}
+			if !globalAllowed {
+				e.onRateLimit(executionID)
+				e.logger.With(platform.KeyWorkflowID, e.workflow.id, platform.KeyWorkflowOwner, e.workflow.owner, platform.KeyWorkflowExecutionID, executionID).Errorf("failed to start execution: global rate limit exceeded")
+				logCustMsg(ctx, e.cma.With(platform.KeyCapabilityID, te.ID), "failed to start execution: global rate limit exceeded", e.logger)
+				e.metrics.with(platform.KeyWorkflowID, e.workflow.id, platform.KeyWorkflowExecutionID, executionID, platform.KeyTriggerID, te.ID, platform.KeyWorkflowOwner, e.workflow.owner).incrementWorkflowExecutionRateLimitGlobalCounter(ctx)
+				continue
+			}
+
 			cma := e.cma.With(platform.KeyWorkflowExecutionID, executionID)
 			err = e.startExecution(ctx, executionID, resp.Event.Outputs)
 			if err != nil {
@@ -832,14 +858,34 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 	l.Debugf("sent step state update for execution %s with status %s", stepState.ExecutionID, stepStatus)
 }
 
-func merge(baseConfig *values.Map, overrideConfig *values.Map) *values.Map {
-	m := values.EmptyMap()
-
-	for k, v := range baseConfig.Underlying {
-		m.Underlying[k] = v
+func merge(baseConfig *values.Map, capConfig capabilities.CapabilityConfiguration) *values.Map {
+	restrictedKeys := map[string]bool{}
+	for _, k := range capConfig.RestrictedKeys {
+		restrictedKeys[k] = true
 	}
 
-	for k, v := range overrideConfig.Underlying {
+	// Shallow copy the defaults set in the onchain capability config.
+	m := values.EmptyMap()
+
+	if capConfig.DefaultConfig != nil {
+		for k, v := range capConfig.DefaultConfig.Underlying {
+			m.Underlying[k] = v
+		}
+	}
+
+	// Add in user-provided config, but skipping any restricted keys
+	for k, v := range baseConfig.Underlying {
+		if !restrictedKeys[k] {
+			m.Underlying[k] = v
+		}
+	}
+
+	if capConfig.RestrictedConfig == nil {
+		return m
+	}
+
+	// Then overwrite the config with any restricted settings.
+	for k, v := range capConfig.RestrictedConfig.Underlying {
 		m.Underlying[k] = v
 	}
 
@@ -868,7 +914,7 @@ func (e *Engine) interpolateEnvVars(config map[string]any, env exec.Env) (*value
 // registry (for capability-level configuration). It doesn't perform any caching of the config values, since
 // the two registries perform their own caching.
 func (e *Engine) configForStep(ctx context.Context, lggr logger.Logger, step *step) (*values.Map, error) {
-	secrets, err := e.secretsFetcher.SecretsFor(ctx, e.workflow.owner, e.workflow.hexName, e.workflow.id)
+	secrets, err := e.secretsFetcher.SecretsFor(ctx, e.workflow.owner, e.workflow.name.Hex(), e.workflow.name.String(), e.workflow.id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch secrets: %w", err)
 	}
@@ -900,14 +946,12 @@ func (e *Engine) configForStep(ctx context.Context, lggr logger.Logger, step *st
 		return config, nil
 	}
 
-	if capConfig.DefaultConfig == nil {
-		return config, nil
-	}
-
-	// Merge the configs with registry config overriding the step config.  This is because
-	// some config fields are sensitive and could affect the safe running of the capability,
-	// so we avoid user provided values by overriding them with config from the capabilities registry.
-	return merge(config, capConfig.DefaultConfig), nil
+	// Merge the capability registry config with the config provided by the user.
+	// We need to obey the following rules:
+	// - Remove any restricted keys
+	// - Overlay any restricted config
+	// - Merge the other keys, with user keys taking precedence
+	return merge(config, capConfig), nil
 }
 
 // executeStep executes the referenced capability within a step and returns the result.
@@ -960,10 +1004,11 @@ func (e *Engine) executeStep(ctx context.Context, lggr logger.Logger, msg stepRe
 			WorkflowID:               msg.state.WorkflowID,
 			WorkflowExecutionID:      msg.state.ExecutionID,
 			WorkflowOwner:            e.workflow.owner,
-			WorkflowName:             e.workflow.hexName,
+			WorkflowName:             e.workflow.name.Hex(),
 			WorkflowDonID:            e.localNode.WorkflowDON.ID,
 			WorkflowDonConfigVersion: e.localNode.WorkflowDON.ConfigVersion,
 			ReferenceID:              msg.stepRef,
+			DecodedWorkflowName:      e.workflow.name.String(),
 		},
 	}
 
@@ -986,18 +1031,19 @@ func (e *Engine) deregisterTrigger(ctx context.Context, t *triggerCapability, tr
 			WorkflowID:               e.workflow.id,
 			WorkflowDonID:            e.localNode.WorkflowDON.ID,
 			WorkflowDonConfigVersion: e.localNode.WorkflowDON.ConfigVersion,
-			WorkflowName:             e.workflow.hexName,
+			WorkflowName:             e.workflow.name.Hex(),
 			WorkflowOwner:            e.workflow.owner,
 			ReferenceID:              t.Ref,
+			DecodedWorkflowName:      e.workflow.name.String(),
 		},
 		TriggerID: generateTriggerId(e.workflow.id, triggerIdx),
 		Config:    t.config.Load(),
 	}
 
-	// if t.trigger == nil, then we haven't initialized the workflow
+	// if t.trigger == nil or !t.registered, then we haven't initialized the workflow
 	// yet, and can safely consider the trigger deregistered with
 	// no further action.
-	if t.trigger != nil {
+	if t.trigger != nil && t.registered {
 		return t.trigger.UnregisterTrigger(ctx, deregRequest)
 	}
 
@@ -1191,7 +1237,7 @@ type Config struct {
 	Workflow             sdk.WorkflowSpec
 	WorkflowID           string
 	WorkflowOwner        string
-	WorkflowName         string
+	WorkflowName         WorkflowNamer
 	Lggr                 logger.Logger
 	Registry             core.CapabilitiesRegistry
 	MaxWorkerLimit       int
@@ -1204,12 +1250,14 @@ type Config struct {
 	SecretsFetcher       secretsFetcher
 	HeartbeatCadence     time.Duration
 	StepTimeout          time.Duration
+	RateLimiter          *ratelimiter.RateLimiter
 
 	// For testing purposes only
 	maxRetries          int
 	retryMs             int
 	afterInit           func(success bool)
 	onExecutionFinished func(weid string)
+	onRateLimit         func(weid string)
 	clock               clockwork.Clock
 }
 
@@ -1267,8 +1315,20 @@ func NewEngine(ctx context.Context, cfg Config) (engine *Engine, err error) {
 		cfg.onExecutionFinished = func(weid string) {}
 	}
 
+	if cfg.onRateLimit == nil {
+		cfg.onRateLimit = func(weid string) {}
+	}
+
 	if cfg.clock == nil {
 		cfg.clock = clockwork.NewRealClock()
+	}
+
+	if cfg.RateLimiter == nil {
+		return nil, &workflowError{reason: "ratelimiter must be provided",
+			labels: map[string]string{
+				platform.KeyWorkflowID: cfg.WorkflowID,
+			},
+		}
 	}
 
 	// TODO: validation of the workflow spec
@@ -1285,7 +1345,7 @@ func NewEngine(ctx context.Context, cfg Config) (engine *Engine, err error) {
 		return nil, fmt.Errorf("could not initialize monitoring resources: %w", err)
 	}
 
-	cma := custmsg.NewLabeler().With(platform.KeyWorkflowID, cfg.WorkflowID, platform.KeyWorkflowOwner, cfg.WorkflowOwner, platform.KeyWorkflowName, cfg.WorkflowName)
+	cma := custmsg.NewLabeler().With(platform.KeyWorkflowID, cfg.WorkflowID, platform.KeyWorkflowOwner, cfg.WorkflowOwner, platform.KeyWorkflowName, cfg.WorkflowName.String())
 	workflow, err := Parse(cfg.Workflow)
 	if err != nil {
 		logCustMsg(ctx, cma, fmt.Sprintf("failed to parse workflow: %s", err), cfg.Lggr)
@@ -1294,12 +1354,12 @@ func NewEngine(ctx context.Context, cfg Config) (engine *Engine, err error) {
 
 	workflow.id = cfg.WorkflowID
 	workflow.owner = cfg.WorkflowOwner
-	workflow.hexName = hex.EncodeToString([]byte(cfg.WorkflowName))
+	workflow.name = cfg.WorkflowName
 
 	engine = &Engine{
 		cma:            cma,
 		logger:         cfg.Lggr.Named("WorkflowEngine").With("workflowID", cfg.WorkflowID),
-		metrics:        workflowsMetricLabeler{metrics.NewLabeler().With(platform.KeyWorkflowID, cfg.WorkflowID, platform.KeyWorkflowOwner, cfg.WorkflowOwner, platform.KeyWorkflowName, cfg.WorkflowName), *em},
+		metrics:        workflowsMetricLabeler{metrics.NewLabeler().With(platform.KeyWorkflowID, cfg.WorkflowID, platform.KeyWorkflowOwner, cfg.WorkflowOwner, platform.KeyWorkflowName, cfg.WorkflowName.String()), *em},
 		registry:       cfg.Registry,
 		workflow:       workflow,
 		secretsFetcher: cfg.SecretsFetcher,
@@ -1317,11 +1377,13 @@ func NewEngine(ctx context.Context, cfg Config) (engine *Engine, err error) {
 		maxExecutionDuration: cfg.MaxExecutionDuration,
 		heartbeatCadence:     cfg.HeartbeatCadence,
 		onExecutionFinished:  cfg.onExecutionFinished,
+		onRateLimit:          cfg.onRateLimit,
 		afterInit:            cfg.afterInit,
 		maxRetries:           cfg.maxRetries,
 		retryMs:              cfg.retryMs,
 		maxWorkerLimit:       cfg.MaxWorkerLimit,
 		clock:                cfg.clock,
+		ratelimiter:          cfg.RateLimiter,
 	}
 
 	return engine, nil

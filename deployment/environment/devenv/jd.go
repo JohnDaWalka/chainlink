@@ -13,15 +13,21 @@ import (
 	csav1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/csa"
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 )
+
+type GAPConfig struct {
+	Token      string
+	Repository string
+}
 
 type JDConfig struct {
 	GRPC     string
 	WSRPC    string
 	Creds    credentials.TransportCredentials
 	Auth     oauth2.TokenSource
-	GAP      string
+	GAP      *GAPConfig
 	NodeInfo []NodeInfo
 }
 
@@ -62,6 +68,22 @@ func gapTokenInterceptor(token string) grpc.UnaryClientInterceptor {
 	}
 }
 
+func gapRepositoryInterceptor(repository string) grpc.UnaryClientInterceptor {
+	return func(
+		ctx context.Context,
+		method string,
+		req, reply any,
+		cc *grpc.ClientConn,
+		invoker grpc.UnaryInvoker,
+		opts ...grpc.CallOption,
+	) error {
+		return invoker(
+			metadata.AppendToOutgoingContext(ctx, "x-repository", repository),
+			method, req, reply, cc, opts...,
+		)
+	}
+}
+
 func NewJDConnection(cfg JDConfig) (*grpc.ClientConn, error) {
 	opts := []grpc.DialOption{}
 	interceptors := []grpc.UnaryClientInterceptor{}
@@ -72,8 +94,8 @@ func NewJDConnection(cfg JDConfig) (*grpc.ClientConn, error) {
 	if cfg.Auth != nil {
 		interceptors = append(interceptors, authTokenInterceptor(cfg.Auth))
 	}
-	if cfg.GAP != "" {
-		interceptors = append(interceptors, gapTokenInterceptor(cfg.GAP))
+	if cfg.GAP != nil && cfg.GAP.Token != "" && cfg.GAP.Repository != "" {
+		interceptors = append(interceptors, gapTokenInterceptor(cfg.GAP.Token), gapRepositoryInterceptor(cfg.GAP.Repository))
 	}
 
 	if len(interceptors) > 0 {
@@ -145,7 +167,7 @@ func (jd JobDistributor) ProposeJob(ctx context.Context, in *jobv1.ProposeJobReq
 		return res, nil
 	}
 	for _, node := range jd.don.Nodes {
-		if node.NodeId != in.NodeId {
+		if node.NodeID != in.NodeId {
 			continue
 		}
 		// TODO : is there a way to accept the job with proposal id?

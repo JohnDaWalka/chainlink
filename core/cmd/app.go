@@ -201,6 +201,7 @@ func NewApp(s *Shell) *cli.App {
 				keysCommand("Solana", NewSolanaKeysClient(s)),
 				keysCommand("StarkNet", NewStarkNetKeysClient(s)),
 				keysCommand("Aptos", NewAptosKeysClient(s)),
+				keysCommand("Tron", NewTronKeysClient(s)),
 
 				initVRFKeysSubCmd(s),
 			},
@@ -266,6 +267,7 @@ func NewApp(s *Shell) *cli.App {
 					FileMaxSizeMB:  int(logFileMaxSizeMB),
 					FileMaxAgeDays: int(s.Config.Log().File().MaxAgeDays()),
 					FileMaxBackups: int(s.Config.Log().File().MaxBackups()),
+					SentryEnabled:  s.Config.Sentry().DSN() != "",
 				}
 				l, closeFn := lggrCfg.New()
 

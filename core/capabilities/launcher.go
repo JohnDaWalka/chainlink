@@ -81,8 +81,15 @@ func unmarshalCapabilityConfig(data []byte) (capabilities.CapabilityConfiguratio
 		return capabilities.CapabilityConfiguration{}, err
 	}
 
+	rc, err := values.FromMapValueProto(cconf.RestrictedConfig)
+	if err != nil {
+		return capabilities.CapabilityConfiguration{}, err
+	}
+
 	return capabilities.CapabilityConfiguration{
 		DefaultConfig:       dc,
+		RestrictedKeys:      cconf.RestrictedKeys,
+		RestrictedConfig:    rc,
 		RemoteTriggerConfig: remoteTriggerConfig,
 		RemoteTargetConfig:  remoteTargetConfig,
 	}, nil
@@ -322,7 +329,7 @@ func (w *launcher) addRemoteCapabilities(ctx context.Context, myDON registrysync
 				return fmt.Errorf("failed to add action shim: %w", err)
 			}
 		case capabilities.CapabilityTypeConsensus:
-			w.lggr.Warn("no remote client configured for capability type consensus, skipping configuration")
+			// nothing to do; we don't support remote consensus capabilities for now
 		case capabilities.CapabilityTypeTarget:
 			newTargetFn := func(info capabilities.CapabilityInfo) (capabilityService, error) {
 				client := executable.NewClient(
