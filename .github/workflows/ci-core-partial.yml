@@ -89,7 +89,7 @@ jobs:
         uses: ./.github/actions/setup-wasmd
 
       - name: Setup Postgres
-        uses: ./.github/actions/setup-postgres
+        uses: smartcontractkit/.github/actions/setup-postgres@7aa7ce23687ba493e9ba9c6ad47a063e60ae3433 # setup-postgres@0.1.0
 
       - name: Setup CI Core Environment
         uses: ./.github/actions/setup-ci-core-tests
@@ -133,8 +133,9 @@ jobs:
 
       - name: Print postgres logs
         if: ${{ always() }}
-        run: docker compose logs postgres | tee ../../../postgres_logs.txt
-        working-directory: ./.github/actions/setup-postgres
+        uses: smartcontractkit/.github/actions/setup-postgres@7aa7ce23687ba493e9ba9c6ad47a063e60ae3433 # setup-postgres@0.1.0
+        with:
+          print-logs: 'true'
 
   scan:
     name: SonarQube Scan
@@ -222,7 +223,7 @@ jobs:
         uses: ./.github/actions/setup-wasmd
 
       - name: Setup Postgres
-        uses: ./.github/actions/setup-postgres
+        uses: smartcontractkit/.github/actions/setup-postgres@7aa7ce23687ba493e9ba9c6ad47a063e60ae3433 # setup-postgres@0.1.0
 
       - name: Setup CI Core Environment
         uses: ./.github/actions/setup-ci-core-tests
@@ -242,8 +243,9 @@ jobs:
 
       - name: Print postgres logs
         if: ${{ always() }}
-        run: docker compose logs postgres | tee ../../../postgres_logs.txt
-        working-directory: ./.github/actions/setup-postgres
+        uses: smartcontractkit/.github/actions/setup-postgres@7aa7ce23687ba493e9ba9c6ad47a063e60ae3433 # setup-postgres@0.1.0
+        with:
+          print-logs: 'true'
 
   run-race-tests:
     name: Tests (race)
@@ -271,7 +273,7 @@ jobs:
         uses: ./.github/actions/setup-wasmd
 
       - name: Setup Postgres
-        uses: ./.github/actions/setup-postgres
+        uses: smartcontractkit/.github/actions/setup-postgres@7aa7ce23687ba493e9ba9c6ad47a063e60ae3433 # setup-postgres@0.1.0
 
       - name: Setup CI Core Environment
         uses: ./.github/actions/setup-ci-core-tests
@@ -306,5 +308,6 @@ jobs:
 
       - name: Print postgres logs
         if: ${{ always() }}
-        run: docker compose logs postgres | tee ../../../postgres_logs.txt
-        working-directory: ./.github/actions/setup-postgres
+        uses: smartcontractkit/.github/actions/setup-postgres@7aa7ce23687ba493e9ba9c6ad47a063e60ae3433 # setup-postgres@0.1.0
+        with:
+          print-logs: 'true'
