@@ -20,10 +20,11 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	types2 "github.com/smartcontractkit/chainlink-common/pkg/types"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	ocr2keepers "github.com/smartcontractkit/chainlink-common/pkg/types/automation"
 	commonhex "github.com/smartcontractkit/chainlink-common/pkg/utils/hex"
 
+	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
 	"github.com/smartcontractkit/chainlink/core/scripts/chaincli/config"
 	"github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/cbor"
@@ -36,7 +37,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/mercury"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/mercury/streams"
 	bigmath "github.com/smartcontractkit/chainlink/v2/core/utils/big_math"
-	"github.com/smartcontractkit/chainlink/v2/evm/assets"
 )
 
 const (
@@ -270,7 +270,7 @@ func (k *Keeper) Debug(ctx context.Context, args []string) {
 
 	// handle data streams lookup
 	if checkResult.UpkeepFailureReason == uint8(encoding.UpkeepFailureReasonTargetCheckReverted) {
-		mc := &types2.MercuryCredentials{LegacyURL: k.cfg.DataStreamsLegacyURL, URL: k.cfg.DataStreamsURL, Username: k.cfg.DataStreamsID, Password: k.cfg.DataStreamsKey}
+		mc := &commontypes.MercuryCredentials{LegacyURL: k.cfg.DataStreamsLegacyURL, URL: k.cfg.DataStreamsURL, Username: k.cfg.DataStreamsID, Password: k.cfg.DataStreamsKey}
 		mercuryConfig := evm21.NewMercuryConfig(mc, core.StreamsCompatibleABI)
 		lggr, _ := logger.NewLogger()
 		blockSub := &blockSubscriber{k.client}
@@ -564,7 +564,7 @@ func mustUpkeepWorkID(upkeepID *big.Int, trigger ocr2keepers.Trigger) [32]byte {
 	}
 
 	var result [32]byte
-	copy(result[:], workIDBytes[:])
+	copy(result[:], workIDBytes)
 	return result
 }
 

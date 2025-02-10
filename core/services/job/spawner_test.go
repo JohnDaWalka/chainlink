@@ -18,12 +18,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox/mailboxtest"
 
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
-	"github.com/smartcontractkit/chainlink/v2/plugins"
-
+	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	mocklp "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
-	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/configtest"
@@ -37,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 	evmrelayer "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
+	"github.com/smartcontractkit/chainlink/v2/plugins"
 )
 
 type delegate struct {
@@ -102,7 +101,7 @@ func TestSpawner_CreateJobDeleteJob(t *testing.T) {
 	legacyChains := evmtest.NewLegacyChains(t, evmtest.TestChainOpts{
 		DB:             db,
 		Client:         ethClient,
-		GeneralConfig:  config,
+		ChainConfigs:   config.EVMConfigs(),
 		DatabaseConfig: config.Database(),
 		FeatureConfig:  config.Feature(),
 		ListenerConfig: config.Database().Listener(),
@@ -287,7 +286,7 @@ func TestSpawner_CreateJobDeleteJob(t *testing.T) {
 		testopts := evmtest.TestChainOpts{
 			DB:             db,
 			Client:         ethClient,
-			GeneralConfig:  config,
+			ChainConfigs:   config.EVMConfigs(),
 			DatabaseConfig: config.Database(),
 			FeatureConfig:  config.Feature(),
 			ListenerConfig: config.Database().Listener(),

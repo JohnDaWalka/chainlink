@@ -23,16 +23,17 @@ import (
 	txmgrcommon "github.com/smartcontractkit/chainlink-framework/chains/txmgr"
 	txmgrtypes "github.com/smartcontractkit/chainlink-framework/chains/txmgr/types"
 
-	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/testutils"
+	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
+	evmclient "github.com/smartcontractkit/chainlink-integrations/evm/client"
+	"github.com/smartcontractkit/chainlink-integrations/evm/client/clienttest"
+	"github.com/smartcontractkit/chainlink-integrations/evm/testutils"
+	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
-	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	v1 "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/solidity_vrf_coordinator_interface"
-	"github.com/smartcontractkit/chainlink/v2/evm/assets"
 )
 
 func TestFactory(t *testing.T) {
-	client := testutils.NewEthClientMockWithDefaultChain(t)
+	client := clienttest.NewClientWithDefaultChainID(t)
 	factory := &txmgr.CheckerFactory{Client: client}
 
 	t.Run("no checker", func(t *testing.T) {
@@ -103,7 +104,7 @@ func TestFactory(t *testing.T) {
 }
 
 func TestTransmitCheckers(t *testing.T) {
-	client := testutils.NewEthClientMockWithDefaultChain(t)
+	client := clienttest.NewClientWithDefaultChainID(t)
 	log := logger.Sugared(logger.Test(t))
 	ctx := tests.Context(t)
 

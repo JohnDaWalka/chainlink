@@ -13,8 +13,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-integrations/evm/config/toml"
+	evmutils "github.com/smartcontractkit/chainlink-integrations/evm/utils"
+	ubig "github.com/smartcontractkit/chainlink-integrations/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/chains"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	evmtxmgrmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr/mocks"
 	coremocks "github.com/smartcontractkit/chainlink/v2/core/internal/mocks"
@@ -28,8 +30,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	testutils2 "github.com/smartcontractkit/chainlink/v2/core/web/testutils"
-	evmutils "github.com/smartcontractkit/chainlink/v2/evm/utils"
-	ubig "github.com/smartcontractkit/chainlink/v2/evm/utils/big"
 )
 
 func TestLoader_Chains(t *testing.T) {

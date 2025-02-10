@@ -184,10 +184,10 @@ func dockers(environment string, architectures []string) []config.Docker {
 		for _, imageName := range imageNames {
 			for _, arch := range architectures {
 				id := fmt.Sprintf("linux-%s-%s", arch, imageName)
-				pluginId := fmt.Sprintf("%s-plugins", id)
+				pluginID := id + "-plugins"
 
 				dockers = append(dockers, docker(id, "linux", arch, environment, false))
-				dockers = append(dockers, docker(pluginId, "linux", arch, environment, false))
+				dockers = append(dockers, docker(pluginID, "linux", arch, environment, false))
 			}
 		}
 	}
@@ -215,7 +215,7 @@ func docker(id, goos, goarch, environment string, isDevspace bool) config.Docker
 
 	if strings.Contains(id, "ccip") {
 		buildFlagTemplates = append(buildFlagTemplates,
-			"--build-arg=CL_CHAIN_DEFAULTS=/chainlink/ccip-config")
+			"--build-arg=CL_CHAIN_DEFAULTS=/ccip-config")
 	}
 
 	if strings.Contains(id, "plugins") || isDevspace {

@@ -16,14 +16,16 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
-	"github.com/smartcontractkit/chainlink/v2/evm/utils"
 
-	evmclimocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
-	gasmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
+	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
+	"github.com/smartcontractkit/chainlink-integrations/evm/client/clienttest"
+	"github.com/smartcontractkit/chainlink-integrations/evm/gas"
+	gasmocks "github.com/smartcontractkit/chainlink-integrations/evm/gas/mocks"
+	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
+	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
+	ubig "github.com/smartcontractkit/chainlink-integrations/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	txmmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr/mocks"
-	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -35,8 +37,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keeper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
-	"github.com/smartcontractkit/chainlink/v2/evm/assets"
-	ubig "github.com/smartcontractkit/chainlink/v2/evm/utils/big"
 )
 
 func newHead() evmtypes.Head {
@@ -56,7 +56,7 @@ func mockEstimator(t *testing.T) gas.EvmFeeEstimator {
 func setup(t *testing.T, estimator gas.EvmFeeEstimator, overrideFn func(c *chainlink.Config, s *chainlink.Secrets)) (
 	*sqlx.DB,
 	chainlink.GeneralConfig,
-	*evmclimocks.Client,
+	*clienttest.Client,
 	*keeper.UpkeepExecuter,
 	keeper.Registry,
 	keeper.UpkeepRegistration,
@@ -85,7 +85,7 @@ func setup(t *testing.T, estimator gas.EvmFeeEstimator, overrideFn func(c *chain
 		DB:             db,
 		Client:         ethClient,
 		KeyStore:       keyStore.Eth(),
-		GeneralConfig:  cfg,
+		ChainConfigs:   cfg.EVMConfigs(),
 		DatabaseConfig: cfg.Database(),
 		FeatureConfig:  cfg.Feature(),
 		ListenerConfig: cfg.Database().Listener(),

@@ -28,9 +28,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/jsonserializable"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox/mailboxtest"
 
+	"github.com/smartcontractkit/chainlink-integrations/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/auth"
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/configtest"
@@ -86,7 +86,7 @@ func TestRunner(t *testing.T) {
 	legacyChains := evmtest.NewLegacyChains(t, evmtest.TestChainOpts{
 		DB:             db,
 		Client:         ethClient,
-		GeneralConfig:  config,
+		ChainConfigs:   config.EVMConfigs(),
 		DatabaseConfig: config.Database(),
 		FeatureConfig:  config.Feature(),
 		ListenerConfig: config.Database().Listener(),
@@ -570,7 +570,7 @@ answer1      [type=median index=0];
 			legacyChains2 := evmtest.NewLegacyChains(t, evmtest.TestChainOpts{
 				DB:             db,
 				Client:         ethClient,
-				GeneralConfig:  config,
+				ChainConfigs:   config.EVMConfigs(),
 				DatabaseConfig: config.Database(),
 				FeatureConfig:  config.Feature(),
 				ListenerConfig: config.Database().Listener(),

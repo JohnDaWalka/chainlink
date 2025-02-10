@@ -21,7 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/types"
 
-	"github.com/smartcontractkit/chainlink/v2/evm/utils"
+	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
 )
 
 type FunctionsTest struct {
@@ -87,11 +87,11 @@ func SetupLocalLoadTestEnv(globalConfig ctf_config.GlobalTestConfig, functionsCo
 		if err != nil {
 			return nil, fmt.Errorf("failed to create a new subscription: %w", err)
 		}
-		encodedSubId, err := utils.ABIEncode(`[{"type":"uint64"}]`, subID)
+		encodedSubID, err := utils.ABIEncode(`[{"type":"uint64"}]`, subID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode subscription ID for funding: %w", err)
 		}
-		_, err = lt.TransferAndCall(router.Address(), big.NewInt(0).Mul(cfg.Common.SubFunds, big.NewInt(1e18)), encodedSubId)
+		_, err = lt.TransferAndCall(router.Address(), big.NewInt(0).Mul(cfg.Common.SubFunds, big.NewInt(1e18)), encodedSubID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to transferAndCall router, LINK funding: %w", err)
 		}

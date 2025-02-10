@@ -15,19 +15,18 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/seth"
-	"github.com/smartcontractkit/chainlink/v2/evm/utils"
-
-	cltypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	registrylogicc23 "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/automation_registry_logic_c_wrapper_2_3"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ethereum"
 	eth_contracts "github.com/smartcontractkit/chainlink/integration-tests/contracts/ethereum"
 	"github.com/smartcontractkit/chainlink/integration-tests/testreporters"
 	"github.com/smartcontractkit/chainlink/integration-tests/wrappers"
 
+	cltypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
+	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arbitrum_module"
 	acutils "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/automation_compatible_utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/automation_consumer_benchmark"
