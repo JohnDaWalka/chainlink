@@ -212,7 +212,7 @@ func SetupTokenPoolForRemoteChain(e deployment.Environment, cfg RemoteChainToken
 	ixAppend, err := solTokenPool.NewAppendRemotePoolAddressesInstruction(
 		cfg.RemoteChainSelector,
 		tokenPubKey,
-		cfg.RemoteConfig.PoolAddresses, // i dont know why this is a list (is it for differnt types of pool of the same token?)
+		cfg.RemoteConfig.PoolAddresses, // i dont know why this is a list (is it for different types of pool of the same token?)
 		poolConfigPDA,
 		remoteChainConfigPDA,
 		chain.DeployerKey.PublicKey(),
