@@ -36,6 +36,14 @@ type MetadataRecord struct {
 	Metadata string // json probably
 }
 
+func (rec MetadataRecord) Equals(other any) bool {
+	o, ok := other.(MetadataRecord)
+	return ok &&
+		rec.Chain == o.Chain &&
+		rec.Address == o.Address &&
+		rec.Metadata == o.Metadata
+}
+
 func (rec MetadataRecord) Clone() MetadataRecord {
 	return MetadataRecord{Chain: rec.Chain, Address: rec.Address, Metadata: rec.Metadata}
 }

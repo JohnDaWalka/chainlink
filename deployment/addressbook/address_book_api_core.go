@@ -5,8 +5,9 @@ import (
 )
 
 var (
-	ErrRecordNotFound = errors.New("no such record can be found with the supplied key")
-	ErrRecordExists   = errors.New("a record with the supplied key already exists")
+	ErrRecordNotFound  = errors.New("no such record can be found with the supplied key")
+	ErrRecordExists    = errors.New("a record with the supplied key already exists")
+	ErrRecordsNotEqual = errors.New("compared records were not strictly equal")
 )
 
 // addressBookV2 represents an abstract generic base type which can support some variations. In particular, this is

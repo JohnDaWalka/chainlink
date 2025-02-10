@@ -66,6 +66,17 @@ func (rec AddressRecord) Clone() AddressRecord {
 	}
 }
 
+func (rec AddressRecord) Equals(other any) bool {
+	o, ok := other.(AddressRecord)
+	return ok && // short-circuit
+		rec.Chain == o.Chain &&
+		rec.Type == o.Type &&
+		rec.Version == o.Version &&
+		rec.Qualifier == o.Qualifier &&
+		rec.Address == o.Address &&
+		rec.Labels.Equal(o.Labels)
+}
+
 func (rec AddressRecord) Key() AddressKey {
 	return addressKeyImpl{
 		chain:        rec.Chain,
