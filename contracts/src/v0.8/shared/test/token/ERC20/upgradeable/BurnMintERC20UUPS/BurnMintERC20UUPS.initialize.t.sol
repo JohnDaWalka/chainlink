@@ -20,7 +20,13 @@ contract BurnMintERC20UUPS_initialize is BurnMintERC20UUPSSetup {
     vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
 
     s_burnMintERC20UUPS.initialize(
-      s_name, s_symbol, s_decimals, s_maxSupply, s_preMint, s_defaultAdmin, s_defaultUpgrader
+      s_name,
+      s_symbol,
+      s_decimals,
+      s_maxSupply,
+      s_preMint,
+      s_defaultAdmin,
+      s_defaultUpgrader
     );
   }
 
@@ -33,7 +39,13 @@ contract BurnMintERC20UUPS_initialize is BurnMintERC20UUPSSetup {
     vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
 
     newBurnMintERC20UUPS.initialize(
-      s_name, s_symbol, s_decimals, s_maxSupply, s_preMint, s_defaultAdmin, s_defaultUpgrader
+      s_name,
+      s_symbol,
+      s_decimals,
+      s_maxSupply,
+      s_preMint,
+      s_defaultAdmin,
+      s_defaultUpgrader
     );
   }
 }

@@ -36,7 +36,8 @@ contract BurnMintERC20UUPS_approve is BurnMintERC20UUPSSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        BurnMintERC20UUPS.BurnMintERC20UUPS__InvalidRecipient.selector, address(s_burnMintERC20UUPS)
+        BurnMintERC20UUPS.BurnMintERC20UUPS__InvalidRecipient.selector,
+        address(s_burnMintERC20UUPS)
       )
     );
 

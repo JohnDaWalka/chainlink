@@ -4,13 +4,10 @@ pragma solidity ^0.8.24;
 import {IGetCCIPAdmin} from "../../../../ccip/interfaces/IGetCCIPAdmin.sol";
 import {IBurnMintERC20Upgradeable} from "../../../../shared/token/ERC20/upgradeable/IBurnMintERC20Upgradeable.sol";
 
-import {Initializable} from
-  "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/proxy/utils/Initializable.sol";
+import {Initializable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/proxy/utils/Initializable.sol";
 
-import {AccessControlUpgradeable} from
-  "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/access/AccessControlUpgradeable.sol";
-import {ERC20BurnableUpgradeable} from
-  "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
+import {AccessControlUpgradeable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/access/AccessControlUpgradeable.sol";
+import {ERC20BurnableUpgradeable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
 import {IAccessControl} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/access/IAccessControl.sol";
 import {IERC20} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC20.sol";
 import {IERC165} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
@@ -100,9 +97,12 @@ contract BurnMintERC20Transparent is
   function supportsInterface(
     bytes4 interfaceId
   ) public pure virtual override(AccessControlUpgradeable, IERC165) returns (bool) {
-    return interfaceId == type(IERC20).interfaceId || interfaceId == type(IBurnMintERC20Upgradeable).interfaceId
-      || interfaceId == type(IERC165).interfaceId || interfaceId == type(IAccessControl).interfaceId
-      || interfaceId == type(IGetCCIPAdmin).interfaceId;
+    return
+      interfaceId == type(IERC20).interfaceId ||
+      interfaceId == type(IBurnMintERC20Upgradeable).interfaceId ||
+      interfaceId == type(IERC165).interfaceId ||
+      interfaceId == type(IAccessControl).interfaceId ||
+      interfaceId == type(IGetCCIPAdmin).interfaceId;
   }
 
   // ================================================================
@@ -188,9 +188,7 @@ contract BurnMintERC20Transparent is
   /// @notice grants both mint and burn roles to `burnAndMinter`.
   /// @dev calls public functions so this function does not require
   /// access controls. This is handled in the inner functions.
-  function grantMintAndBurnRoles(
-    address burnAndMinter
-  ) external {
+  function grantMintAndBurnRoles(address burnAndMinter) external {
     grantRole(MINTER_ROLE, burnAndMinter);
     grantRole(BURNER_ROLE, burnAndMinter);
   }
@@ -205,9 +203,7 @@ contract BurnMintERC20Transparent is
   /// @dev only the owner can call this function, NOT the current ccipAdmin, and 1-step ownership transfer is used.
   /// @param newAdmin The address to transfer the CCIPAdmin role to. Setting to address(0) is a valid way to revoke
   /// the role
-  function setCCIPAdmin(
-    address newAdmin
-  ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+  function setCCIPAdmin(address newAdmin) external onlyRole(DEFAULT_ADMIN_ROLE) {
     BurnMintERC20TransparentStorage storage $ = _getBurnMintERC20TransparentStorage();
     address currentAdmin = $.s_ccipAdmin;
 

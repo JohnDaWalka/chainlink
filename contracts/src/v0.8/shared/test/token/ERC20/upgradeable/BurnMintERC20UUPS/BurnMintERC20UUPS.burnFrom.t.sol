@@ -47,7 +47,9 @@ contract BurnMintERC20UUPS_burnFrom is BurnMintERC20UUPSSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        IAccessControl.AccessControlUnauthorizedAccount.selector, STRANGER, s_burnMintERC20UUPS.BURNER_ROLE()
+        IAccessControl.AccessControlUnauthorizedAccount.selector,
+        STRANGER,
+        s_burnMintERC20UUPS.BURNER_ROLE()
       )
     );
 

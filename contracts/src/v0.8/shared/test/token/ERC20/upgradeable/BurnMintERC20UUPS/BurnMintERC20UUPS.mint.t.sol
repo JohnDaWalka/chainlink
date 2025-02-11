@@ -48,7 +48,9 @@ contract BurnMintERC20UUPS_mint is BurnMintERC20UUPSSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        IAccessControl.AccessControlUnauthorizedAccount.selector, STRANGER, s_burnMintERC20UUPS.MINTER_ROLE()
+        IAccessControl.AccessControlUnauthorizedAccount.selector,
+        STRANGER,
+        s_burnMintERC20UUPS.MINTER_ROLE()
       )
     );
 
@@ -60,7 +62,8 @@ contract BurnMintERC20UUPS_mint is BurnMintERC20UUPSSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        BurnMintERC20UUPS.BurnMintERC20UUPS__InvalidRecipient.selector, address(s_burnMintERC20UUPS)
+        BurnMintERC20UUPS.BurnMintERC20UUPS__InvalidRecipient.selector,
+        address(s_burnMintERC20UUPS)
       )
     );
 

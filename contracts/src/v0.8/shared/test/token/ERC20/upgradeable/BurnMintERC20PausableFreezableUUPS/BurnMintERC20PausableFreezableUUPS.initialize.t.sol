@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {Initializable} from
-  "../../../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/proxy/utils/Initializable.sol";
-import {BurnMintERC20PausableFreezableUUPS} from
-  "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableFreezableUUPS.sol";
+import {Initializable} from "../../../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/proxy/utils/Initializable.sol";
+import {BurnMintERC20PausableFreezableUUPS} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableFreezableUUPS.sol";
 import {BurnMintERC20PausableFreezableUUPSSetup} from "./BurnMintERC20PausableFreezableUUPSSetup.t.sol";
 
 contract BurnMintERC20PausableFreezableUUPS_initialize is BurnMintERC20PausableFreezableUUPSSetup {
@@ -17,12 +15,14 @@ contract BurnMintERC20PausableFreezableUUPS_initialize is BurnMintERC20PausableF
 
     assertTrue(
       s_burnMintERC20PausableFreezableUUPS.hasRole(
-        s_burnMintERC20PausableFreezableUUPS.DEFAULT_ADMIN_ROLE(), s_defaultAdmin
+        s_burnMintERC20PausableFreezableUUPS.DEFAULT_ADMIN_ROLE(),
+        s_defaultAdmin
       )
     );
     assertTrue(
       s_burnMintERC20PausableFreezableUUPS.hasRole(
-        s_burnMintERC20PausableFreezableUUPS.UPGRADER_ROLE(), s_defaultUpgrader
+        s_burnMintERC20PausableFreezableUUPS.UPGRADER_ROLE(),
+        s_defaultUpgrader
       )
     );
     assertTrue(
@@ -30,7 +30,8 @@ contract BurnMintERC20PausableFreezableUUPS_initialize is BurnMintERC20PausableF
     );
     assertTrue(
       s_burnMintERC20PausableFreezableUUPS.hasRole(
-        s_burnMintERC20PausableFreezableUUPS.FREEZER_ROLE(), s_defaultFreezer
+        s_burnMintERC20PausableFreezableUUPS.FREEZER_ROLE(),
+        s_defaultFreezer
       )
     );
   }
