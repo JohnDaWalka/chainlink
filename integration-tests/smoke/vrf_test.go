@@ -99,6 +99,8 @@ func TestVRFJobReplacement(t *testing.T) {
 	l := logging.GetTestLogger(t)
 	env, contracts, sethClient := prepareVRFtestEnv(t, l)
 
+	require.Fail(t, "Intentionally failing this test for demonstration purposes")
+
 	for _, n := range env.ClCluster.Nodes {
 		nodeKey, err := n.API.MustCreateVRFKey()
 		require.NoError(t, err, "Creating VRF key shouldn't fail")
