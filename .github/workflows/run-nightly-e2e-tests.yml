@@ -20,7 +20,7 @@ on:
 jobs:
   call-run-e2e-tests-workflow:
     name: Run E2E Tests
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@fe1687506c30b8a141a94bccaefe0d0aa7481dcd
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@3e9e1ff3b39e8782dab12b464615985500b05646
     with:
       chainlink_version: ${{ inputs.chainlink_version || 'develop' }}
       test_path: .github/e2e-tests.yml
