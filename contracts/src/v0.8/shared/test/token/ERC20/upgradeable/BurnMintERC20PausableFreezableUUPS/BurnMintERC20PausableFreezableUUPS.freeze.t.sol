@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {BurnMintERC20PausableFreezableUUPS} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableFreezableUUPS.sol";
-import {IAccessControl} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
+import {BurnMintERC20PausableFreezableUUPS} from
+  "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableFreezableUUPS.sol";
+import {IAccessControl} from "../../../../../token/ERC20/upgradeable/BurnMintERC20UUPS.sol";
 import {BurnMintERC20PausableFreezableUUPSSetup} from "./BurnMintERC20PausableFreezableUUPSSetup.t.sol";
 
 contract BurnMintERC20PausableFreezableUUPS_freeze is BurnMintERC20PausableFreezableUUPSSetup {
@@ -60,6 +61,19 @@ contract BurnMintERC20PausableFreezableUUPS_freeze is BurnMintERC20PausableFreez
     s_burnMintERC20PausableFreezableUUPS.freeze(address(s_burnMintERC20PausableFreezableUUPS));
   }
 
+  function test_Freeze_RevertWhen_AccountIsAlreadyFrozen() public {
+    changePrank(s_defaultFreezer);
+    s_burnMintERC20PausableFreezableUUPS.freeze(OWNER);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        BurnMintERC20PausableFreezableUUPS.BurnMintERC20PausableFreezableUUPS__AccountFrozen.selector, OWNER
+      )
+    );
+
+    s_burnMintERC20PausableFreezableUUPS.freeze(OWNER);
+  }
+
   function test_Mint_RevertWhen_AccountIsFrozen() public {
     changePrank(s_defaultFreezer);
     s_burnMintERC20PausableFreezableUUPS.freeze(OWNER);
@@ -68,8 +82,7 @@ contract BurnMintERC20PausableFreezableUUPS_freeze is BurnMintERC20PausableFreez
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        BurnMintERC20PausableFreezableUUPS.BurnMintERC20PausableFreezableUUPS__AccountFrozen.selector,
-        OWNER
+        BurnMintERC20PausableFreezableUUPS.BurnMintERC20PausableFreezableUUPS__AccountFrozen.selector, OWNER
       )
     );
 
@@ -87,8 +100,7 @@ contract BurnMintERC20PausableFreezableUUPS_freeze is BurnMintERC20PausableFreez
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        BurnMintERC20PausableFreezableUUPS.BurnMintERC20PausableFreezableUUPS__AccountFrozen.selector,
-        OWNER
+        BurnMintERC20PausableFreezableUUPS.BurnMintERC20PausableFreezableUUPS__AccountFrozen.selector, OWNER
       )
     );
 

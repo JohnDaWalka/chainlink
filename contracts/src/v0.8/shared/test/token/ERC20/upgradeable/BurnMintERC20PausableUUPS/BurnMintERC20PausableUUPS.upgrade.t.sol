@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {ERC1967Utils} from "../../../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {BurnMintERC20PausableUUPS} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
 import {BurnMintERC20PausableUUPSSetup} from "./BurnMintERC20PausableUUPSSetup.t.sol";
 
@@ -31,11 +30,15 @@ contract MockBurnMintERC20PausableUUPSV2 is BurnMintERC20PausableUUPS {
     }
   }
 
-  function initializeFreezerRole(address defaultFreezer) public onlyRole(UPGRADER_ROLE) {
+  function initializeFreezerRole(
+    address defaultFreezer
+  ) public onlyRole(UPGRADER_ROLE) {
     _grantRole(FREEZER_ROLE, defaultFreezer);
   }
 
-  function freeze(address account) public onlyRole(FREEZER_ROLE) {
+  function freeze(
+    address account
+  ) public onlyRole(FREEZER_ROLE) {
     MockBurnMintERC20PausableUUPSV2Storage storage $ = _getV2Storage();
     $.s_isFrozen[account] = true;
   }
@@ -83,8 +86,7 @@ contract BurnMintERC20PausableUUPS_upgrade is BurnMintERC20PausableUUPSSetup {
     changePrank(STRANGER);
     vm.expectRevert(
       abi.encodeWithSelector(
-        MockBurnMintERC20PausableUUPSV2.MockBurnMintERC20PausableUUPSV2__AccountFrozen.selector,
-        STRANGER
+        MockBurnMintERC20PausableUUPSV2.MockBurnMintERC20PausableUUPSV2__AccountFrozen.selector, STRANGER
       )
     );
     newImplementation.transfer(OWNER, amount);

@@ -9,6 +9,7 @@ contract BurnMintERC20PausableFreezableTransparent is BurnMintERC20PausableTrans
 
   error BurnMintERC20PausableFreezableTransparent__InvalidRecipient(address recipient);
   error BurnMintERC20PausableFreezableTransparent__AccountFrozen(address account);
+  error BurnMintERC20PausableFreezableTransparent__AccountNotFrozen(address account);
 
   bytes32 public constant FREEZER_ROLE = keccak256("FREEZER_ROLE");
 
@@ -68,10 +69,14 @@ contract BurnMintERC20PausableFreezableTransparent is BurnMintERC20PausableTrans
   /// @notice Freezes an account, disallowing transfers, minting and burning from/to it.
   /// @dev Requires the caller to have the FREEZER_ROLE.
   /// @dev Can be called even if the contract is paused.
-  function freeze(address account) public onlyRole(FREEZER_ROLE) {
+  function freeze(
+    address account
+  ) public onlyRole(FREEZER_ROLE) {
     if (account == address(this)) revert BurnMintERC20PausableFreezableTransparent__InvalidRecipient(account);
 
     BurnMintERC20PausableFreezableTransparentStorage storage $ = _getBurnMintERC20PausableFreezableTransparentStorage();
+    if ($.s_isFrozen[account]) revert BurnMintERC20PausableFreezableTransparent__AccountFrozen(account);
+
     $.s_isFrozen[account] = true;
 
     emit AccountFrozen(account);
@@ -80,14 +85,20 @@ contract BurnMintERC20PausableFreezableTransparent is BurnMintERC20PausableTrans
   /// @notice Unfreezes an account
   /// @dev Requires the caller to have the FREEZER_ROLE.
   /// @dev Can be called even if the contract is paused.
-  function unfreeze(address account) public onlyRole(FREEZER_ROLE) {
+  function unfreeze(
+    address account
+  ) public onlyRole(FREEZER_ROLE) {
     BurnMintERC20PausableFreezableTransparentStorage storage $ = _getBurnMintERC20PausableFreezableTransparentStorage();
+    if (!$.s_isFrozen[account]) revert BurnMintERC20PausableFreezableTransparent__AccountNotFrozen(account);
+
     $.s_isFrozen[account] = false;
 
     emit AccountUnfrozen(account);
   }
 
-  function isFrozen(address account) public view returns (bool) {
+  function isFrozen(
+    address account
+  ) public view returns (bool) {
     BurnMintERC20PausableFreezableTransparentStorage storage $ = _getBurnMintERC20PausableFreezableTransparentStorage();
     return $.s_isFrozen[account];
   }

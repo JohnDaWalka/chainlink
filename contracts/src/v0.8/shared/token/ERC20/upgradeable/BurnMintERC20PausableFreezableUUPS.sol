@@ -9,6 +9,7 @@ contract BurnMintERC20PausableFreezableUUPS is BurnMintERC20PausableUUPS {
 
   error BurnMintERC20PausableFreezableUUPS__InvalidRecipient(address recipient);
   error BurnMintERC20PausableFreezableUUPS__AccountFrozen(address account);
+  error BurnMintERC20PausableFreezableUUPS__AccountNotFrozen(address account);
 
   bytes32 public constant FREEZER_ROLE = keccak256("FREEZER_ROLE");
 
@@ -69,10 +70,14 @@ contract BurnMintERC20PausableFreezableUUPS is BurnMintERC20PausableUUPS {
   /// @notice Freezes an account, disallowing transfers, minting and burning from/to it.
   /// @dev Requires the caller to have the FREEZER_ROLE.
   /// @dev Can be called even if the contract is paused.
-  function freeze(address account) public onlyRole(FREEZER_ROLE) {
+  function freeze(
+    address account
+  ) public onlyRole(FREEZER_ROLE) {
     if (account == address(this)) revert BurnMintERC20PausableFreezableUUPS__InvalidRecipient(account);
 
     BurnMintERC20PausableFreezableUUPSStorage storage $ = _getBurnMintERC20PausableFreezableUUPSStorage();
+    if ($.s_isFrozen[account]) revert BurnMintERC20PausableFreezableUUPS__AccountFrozen(account);
+
     $.s_isFrozen[account] = true;
 
     emit AccountFrozen(account);
@@ -81,14 +86,20 @@ contract BurnMintERC20PausableFreezableUUPS is BurnMintERC20PausableUUPS {
   /// @notice Unfreezes an account
   /// @dev Requires the caller to have the FREEZER_ROLE.
   /// @dev Can be called even if the contract is paused.
-  function unfreeze(address account) public onlyRole(FREEZER_ROLE) {
+  function unfreeze(
+    address account
+  ) public onlyRole(FREEZER_ROLE) {
     BurnMintERC20PausableFreezableUUPSStorage storage $ = _getBurnMintERC20PausableFreezableUUPSStorage();
+    if (!$.s_isFrozen[account]) revert BurnMintERC20PausableFreezableUUPS__AccountNotFrozen(account);
+
     $.s_isFrozen[account] = false;
 
     emit AccountUnfrozen(account);
   }
 
-  function isFrozen(address account) public view returns (bool) {
+  function isFrozen(
+    address account
+  ) public view returns (bool) {
     BurnMintERC20PausableFreezableUUPSStorage storage $ = _getBurnMintERC20PausableFreezableUUPSStorage();
     return $.s_isFrozen[account];
   }

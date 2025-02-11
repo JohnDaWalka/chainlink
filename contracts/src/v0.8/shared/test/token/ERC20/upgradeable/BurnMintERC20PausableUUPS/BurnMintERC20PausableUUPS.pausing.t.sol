@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {BurnMintERC20PausableUUPS, IERC20} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
+import {BurnMintERC20PausableUUPS} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
+import {IERC20} from "../../../../../token/ERC20/upgradeable/BurnMintERC20UUPS.sol";
 import {BurnMintERC20PausableUUPSSetup} from "./BurnMintERC20PausableUUPSSetup.t.sol";
 
 contract BurnMintERC20PausableUUPS_pausing is BurnMintERC20PausableUUPSSetup {
@@ -25,10 +26,6 @@ contract BurnMintERC20PausableUUPS_pausing is BurnMintERC20PausableUUPSSetup {
     s_burnMintERC20PausableUUPS.pause();
 
     assertTrue(s_burnMintERC20PausableUUPS.paused());
-
-    changePrank(s_mockPool);
-    vm.expectRevert(abi.encodeWithSelector(BurnMintERC20PausableUUPS.BurnMintERC20PausableUUPS__Paused.selector));
-    s_burnMintERC20PausableUUPS.mint(STRANGER, s_amount);
   }
 
   function test_Unpause() public {
@@ -45,5 +42,59 @@ contract BurnMintERC20PausableUUPS_pausing is BurnMintERC20PausableUUPSSetup {
     vm.expectEmit();
     emit IERC20.Transfer(address(0), STRANGER, s_amount);
     s_burnMintERC20PausableUUPS.mint(STRANGER, s_amount);
+  }
+
+  function test_Mint_RevertWhen_ImplementationIsPaused() public {
+    changePrank(s_defaultPauser);
+    s_burnMintERC20PausableUUPS.pause();
+
+    changePrank(s_mockPool);
+
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC20PausableUUPS.BurnMintERC20PausableUUPS__Paused.selector));
+    s_burnMintERC20PausableUUPS.mint(STRANGER, s_amount);
+  }
+
+  function test_Transfer_RevertWhen_ImplementationIsPaused() public {
+    changePrank(s_mockPool);
+    s_burnMintERC20PausableUUPS.mint(STRANGER, s_amount);
+
+    changePrank(s_defaultPauser);
+    s_burnMintERC20PausableUUPS.pause();
+
+    changePrank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC20PausableUUPS.BurnMintERC20PausableUUPS__Paused.selector));
+    s_burnMintERC20PausableUUPS.transfer(OWNER, s_amount);
+  }
+
+  function test_Burn_RevertWhen_ImplementationIsPaused() public {
+    changePrank(s_defaultPauser);
+    s_burnMintERC20PausableUUPS.pause();
+
+    changePrank(s_mockPool);
+
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC20PausableUUPS.BurnMintERC20PausableUUPS__Paused.selector));
+
+    s_burnMintERC20PausableUUPS.burn(0);
+  }
+
+  function test_BurnFrom_RevertWhen_ImplementationIsPaused() public {
+    changePrank(s_defaultPauser);
+    s_burnMintERC20PausableUUPS.pause();
+
+    changePrank(s_mockPool);
+
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC20PausableUUPS.BurnMintERC20PausableUUPS__Paused.selector));
+    s_burnMintERC20PausableUUPS.burnFrom(STRANGER, 0);
+  }
+
+  function test_Approve_RevertWhen_ImplementationIsPaused() public {
+    changePrank(s_defaultPauser);
+    s_burnMintERC20PausableUUPS.pause();
+
+    changePrank(STRANGER);
+
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC20PausableUUPS.BurnMintERC20PausableUUPS__Paused.selector));
+
+    s_burnMintERC20PausableUUPS.approve(s_mockPool, s_amount);
   }
 }

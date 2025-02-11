@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {BurnMintERC20PausableFreezableUUPS} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableFreezableUUPS.sol";
-import {IAccessControl} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
+import {BurnMintERC20PausableFreezableUUPS} from
+  "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableFreezableUUPS.sol";
+import {IAccessControl} from "../../../../../token/ERC20/upgradeable/BurnMintERC20UUPS.sol";
 import {BurnMintERC20PausableFreezableUUPSSetup} from "./BurnMintERC20PausableFreezableUUPSSetup.t.sol";
 
 contract BurnMintERC20PausableFreezableUUPS_unfreeze is BurnMintERC20PausableFreezableUUPSSetup {
@@ -52,5 +53,19 @@ contract BurnMintERC20PausableFreezableUUPS_unfreeze is BurnMintERC20PausableFre
     );
 
     s_burnMintERC20PausableFreezableUUPS.unfreeze(OWNER);
+  }
+
+  function test_Unfreeze_RevertWhen_AccountIsNotFrozen() public {
+    changePrank(s_defaultFreezer);
+
+    assertFalse(s_burnMintERC20PausableFreezableUUPS.isFrozen(STRANGER));
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        BurnMintERC20PausableFreezableUUPS.BurnMintERC20PausableFreezableUUPS__AccountNotFrozen.selector, STRANGER
+      )
+    );
+
+    s_burnMintERC20PausableFreezableUUPS.unfreeze(STRANGER);
   }
 }

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {BurnMintERC20PausableTransparent, Initializable} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableTransparent.sol";
+import {BurnMintERC20PausableTransparent} from
+  "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableTransparent.sol";
+import {Initializable} from "../../../../../token/ERC20/upgradeable/BurnMintERC20Transparent.sol";
 import {BurnMintERC20PausableTransparentSetup} from "./BurnMintERC20PausableTransparentSetup.t.sol";
 
 contract BurnMintERC20PausableTransparent_initialize is BurnMintERC20PausableTransparentSetup {
@@ -14,8 +16,7 @@ contract BurnMintERC20PausableTransparent_initialize is BurnMintERC20PausableTra
 
     assertTrue(
       s_burnMintERC20PausableTransparent.hasRole(
-        s_burnMintERC20PausableTransparent.DEFAULT_ADMIN_ROLE(),
-        s_defaultAdmin
+        s_burnMintERC20PausableTransparent.DEFAULT_ADMIN_ROLE(), s_defaultAdmin
       )
     );
     assertTrue(
@@ -27,13 +28,7 @@ contract BurnMintERC20PausableTransparent_initialize is BurnMintERC20PausableTra
     vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
 
     s_burnMintERC20PausableTransparent.initialize(
-      s_name,
-      s_symbol,
-      s_decimals,
-      s_maxSupply,
-      s_preMint,
-      s_defaultAdmin,
-      s_defaultPauser
+      s_name, s_symbol, s_decimals, s_maxSupply, s_preMint, s_defaultAdmin, s_defaultPauser
     );
   }
 
@@ -46,13 +41,7 @@ contract BurnMintERC20PausableTransparent_initialize is BurnMintERC20PausableTra
     vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
 
     newBurnMintERC20PausableTransparent.initialize(
-      s_name,
-      s_symbol,
-      s_decimals,
-      s_maxSupply,
-      s_preMint,
-      s_defaultAdmin,
-      s_defaultPauser
+      s_name, s_symbol, s_decimals, s_maxSupply, s_preMint, s_defaultAdmin, s_defaultPauser
     );
   }
 }
