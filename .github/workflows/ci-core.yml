@@ -239,7 +239,8 @@ jobs:
 
       - name: Setup Postgres
         if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
-        uses: ./.github/actions/setup-postgres
+        id: setup-pg
+        uses: smartcontractkit/.github/actions/setup-postgres@setup-postgres
 
       - name: Touching core/web/assets/index.html
         if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
@@ -257,7 +258,7 @@ jobs:
         if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
         run: ./chainlink.test local db preparetest
         env:
-          CL_DATABASE_URL: ${{ env.DB_URL }}
+          CL_DATABASE_URL: ${{ steps.setup-pg.outputs.database-url }}
 
       - name: Install LOOP Plugins
         if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
@@ -276,7 +277,7 @@ jobs:
         id: run-tests
         env:
           OUTPUT_FILE: ./output.txt
-          CL_DATABASE_URL: ${{ env.DB_URL }}
+          CL_DATABASE_URL: ${{ steps.setup-pg.outputs.database-url }}
         run: ./tools/bin/${{ matrix.type.cmd }} ./...
 
       - name: Print Races
@@ -302,8 +303,9 @@ jobs:
 
       - name: Print postgres logs
         if: ${{ always() &&  needs.filter.outputs.should-run-ci-core == 'true' }}
-        run: docker compose logs postgres | tee ../../../postgres_logs.txt
-        working-directory: ./.github/actions/setup-postgres
+        uses: smartcontractkit/.github/actions/setup-postgres@setup-postgres
+        with:
+          print-logs: 'true'
 
       - name: Store logs artifacts
         if: ${{ always() && needs.filter.outputs.should-run-ci-core == 'true' }}
