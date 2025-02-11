@@ -359,12 +359,12 @@ func (_c *TxStore_FetchUnconfirmedTransactionAtNonceWithCount_Call) RunAndReturn
 	return _c
 }
 
-// FindLatestNonce provides a mock function with given fields: _a0, _a1, _a2
-func (_m *TxStore) FindLatestNonce(_a0 context.Context, _a1 common.Address, _a2 *big.Int) (uint64, error) {
+// FindNextNonce provides a mock function with given fields: _a0, _a1, _a2
+func (_m *TxStore) FindNextNonce(_a0 context.Context, _a1 common.Address, _a2 *big.Int) (uint64, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	if len(ret) == 0 {
-		panic("no return value specified for FindLatestNonce")
+		panic("no return value specified for FindNextNonce")
 	}
 
 	var r0 uint64
@@ -387,32 +387,32 @@ func (_m *TxStore) FindLatestNonce(_a0 context.Context, _a1 common.Address, _a2 
 	return r0, r1
 }
 
-// TxStore_FindLatestNonce_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindLatestNonce'
-type TxStore_FindLatestNonce_Call struct {
+// TxStore_FindNextNonce_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindNextNonce'
+type TxStore_FindNextNonce_Call struct {
 	*mock.Call
 }
 
-// FindLatestNonce is a helper method to define mock.On call
+// FindNextNonce is a helper method to define mock.On call
 //   - _a0 context.Context
 //   - _a1 common.Address
 //   - _a2 *big.Int
-func (_e *TxStore_Expecter) FindLatestNonce(_a0 interface{}, _a1 interface{}, _a2 interface{}) *TxStore_FindLatestNonce_Call {
-	return &TxStore_FindLatestNonce_Call{Call: _e.mock.On("FindLatestNonce", _a0, _a1, _a2)}
+func (_e *TxStore_Expecter) FindNextNonce(_a0 interface{}, _a1 interface{}, _a2 interface{}) *TxStore_FindNextNonce_Call {
+	return &TxStore_FindNextNonce_Call{Call: _e.mock.On("FindNextNonce", _a0, _a1, _a2)}
 }
 
-func (_c *TxStore_FindLatestNonce_Call) Run(run func(_a0 context.Context, _a1 common.Address, _a2 *big.Int)) *TxStore_FindLatestNonce_Call {
+func (_c *TxStore_FindNextNonce_Call) Run(run func(_a0 context.Context, _a1 common.Address, _a2 *big.Int)) *TxStore_FindNextNonce_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(common.Address), args[2].(*big.Int))
 	})
 	return _c
 }
 
-func (_c *TxStore_FindLatestNonce_Call) Return(_a0 uint64, _a1 error) *TxStore_FindLatestNonce_Call {
+func (_c *TxStore_FindNextNonce_Call) Return(_a0 uint64, _a1 error) *TxStore_FindNextNonce_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *TxStore_FindLatestNonce_Call) RunAndReturn(run func(context.Context, common.Address, *big.Int) (uint64, error)) *TxStore_FindLatestNonce_Call {
+func (_c *TxStore_FindNextNonce_Call) RunAndReturn(run func(context.Context, common.Address, *big.Int) (uint64, error)) *TxStore_FindNextNonce_Call {
 	_c.Call.Return(run)
 	return _c
 }

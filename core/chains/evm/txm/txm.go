@@ -40,7 +40,7 @@ type TxStore interface {
 	CreateEmptyUnconfirmedTransaction(context.Context, common.Address, uint64, uint64) (*types.Transaction, error)
 	CreateTransaction(context.Context, *types.TxRequest) (*types.Transaction, error)
 	FetchUnconfirmedTransactionAtNonceWithCount(context.Context, uint64, common.Address) (*types.Transaction, int, error)
-	FindLatestNonce(context.Context, common.Address, *big.Int) (uint64, error)
+	FindNextNonce(context.Context, common.Address, *big.Int) (uint64, error)
 	MarkConfirmedAndReorgedTransactions(context.Context, uint64, common.Address) ([]*types.Transaction, []uint64, error)
 	MarkUnconfirmedTransactionPurgeable(context.Context, uint64, common.Address) error
 	UpdateTransactionBroadcast(context.Context, uint64, uint64, common.Hash, common.Address) error
@@ -127,6 +127,7 @@ func (t *Txm) Start(ctx context.Context) error {
 		for _, address := range addresses {
 			t.startAddress(address)
 		}
+		t.lggr.Info("TXM started successfully")
 		return nil
 	})
 }
@@ -141,9 +142,10 @@ func (t *Txm) startAddress(address common.Address) {
 }
 
 func (t *Txm) Reset(ctx context.Context, address *common.Address) (err error) {
-	if t.IfStarted(func() {
+	if !t.IfStarted(func() {
 		close(t.stopCh)
 		t.wg.Wait()
+		t.stopCh = make(chan struct{})
 
 		if address != nil {
 			if err = t.txStore.Abandon(ctx, t.chainID, *address); err != nil {
@@ -173,7 +175,7 @@ func (t *Txm) initializeNonce(ctx context.Context, address common.Address) {
 		if rErr != nil {
 			t.lggr.Criticalw("Error while fetching initial nonce", "address", address, "err", rErr)
 		}
-		storedNonce, sErr := t.txStore.FindLatestNonce(ctxWithTimeout, address, t.chainID)
+		storedNonce, sErr := t.txStore.FindNextNonce(ctxWithTimeout, address, t.chainID)
 		if sErr != nil {
 			t.lggr.Errorw("Error while fetching nonce from storage", "address", address, "err", sErr)
 		}
@@ -196,6 +198,7 @@ func (t *Txm) Close() error {
 	return t.StopOnce("Txm", func() error {
 		close(t.stopCh)
 		t.wg.Wait()
+		t.lggr.Info("TXM closed successfully")
 		return nil
 	})
 }

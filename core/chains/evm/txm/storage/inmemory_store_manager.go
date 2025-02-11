@@ -92,9 +92,9 @@ func (m *InMemoryStoreManager) FetchUnconfirmedTransactionAtNonceWithCount(_ con
 	return nil, 0, fmt.Errorf(StoreNotFoundForAddress, fromAddress)
 }
 
-func (m *InMemoryStoreManager) FindLatestNonce(ctx context.Context, fromAddress common.Address, chainID *big.Int) (maxNonce uint64, err error) {
+func (m *InMemoryStoreManager) FindNextNonce(ctx context.Context, fromAddress common.Address, chainID *big.Int) (maxNonce uint64, err error) {
 	if store, exists := m.InMemoryStoreMap[fromAddress]; exists {
-		maxNonce = store.FindLatestNonce()
+		maxNonce = store.FindNextNonce()
 		return
 	}
 	return 0, fmt.Errorf(StoreNotFoundForAddress, fromAddress)
