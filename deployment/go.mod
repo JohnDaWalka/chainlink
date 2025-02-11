@@ -41,7 +41,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.4.7
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.22
 	github.com/smartcontractkit/libocr v0.0.0-20241223215956-e5b78d8e3919
-	github.com/smartcontractkit/mcms v0.9.0
+	github.com/smartcontractkit/mcms v0.10.0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.35.0
 	go.uber.org/multierr v1.11.0
