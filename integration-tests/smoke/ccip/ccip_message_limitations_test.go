@@ -152,7 +152,7 @@ func Test_CCIPMessageLimitations(t *testing.T) {
 		t.Logf("Sending msg: %s", msg.name)
 		require.NotEqual(t, msg.fromChain, msg.toChain, "fromChain and toChain cannot be the same")
 		startBlocks[msg.toChain] = nil
-		msgSentEvent, err := testhelpers.DoSendRequest(
+		msgSentEvent, err := testhelpers.SendRequest(
 			t, testEnv.Env, onChainState,
 			testhelpers.WithSourceChain(msg.fromChain),
 			testhelpers.WithDestChain(msg.toChain),
