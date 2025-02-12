@@ -4,6 +4,8 @@
 
 ### Minor Changes
 
+- [#16331](https://github.com/smartcontractkit/chainlink/pull/16331) [`481d5be330`](https://github.com/smartcontractkit/chainlink/commit/481d5be330a94ffc56e0b259ad2e8ce0e6cb0578) - Bump to start the next version #internal
+
 - [#15939](https://github.com/smartcontractkit/chainlink/pull/15939) [`c54d23ddee`](https://github.com/smartcontractkit/chainlink/commit/c54d23ddeea5f6885a24358a0ce567a56981a6ae) - #added Implements rate limiter for workflow executions by workflow engine
 
 - [#16209](https://github.com/smartcontractkit/chainlink/pull/16209) [`7721d68687`](https://github.com/smartcontractkit/chainlink/commit/7721d68687db55f9134e7d5a8ce17014262b0367) - #nops bump chain selector
@@ -43,6 +45,8 @@
 - [#15974](https://github.com/smartcontractkit/chainlink/pull/15974) [`111fe84ec6`](https://github.com/smartcontractkit/chainlink/commit/111fe84ec692dff5c5be0da5c3f079540044b682) - Add solana support for contract transmitter and remove evm depdendency for address encoding #added
 
 ### Patch Changes
+
+- [#16334](https://github.com/smartcontractkit/chainlink/pull/16334) [`5f02ba508c`](https://github.com/smartcontractkit/chainlink/commit/5f02ba508cd47597f6c703b3ccbd5f33c246d015) - #internal add binding call to new config initialize method
 
 - [#16203](https://github.com/smartcontractkit/chainlink/pull/16203) [`91f7aba882`](https://github.com/smartcontractkit/chainlink/commit/91f7aba8820d477a78ecb3515a5f3f19a567167c) - #internal update go.mod
 
