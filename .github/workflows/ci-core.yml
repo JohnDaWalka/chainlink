@@ -209,16 +209,17 @@ jobs:
           find . -type f,d -exec touch -r {} -d '1970-01-01T00:00:01' {} \; || true
 
       - name: Setup NodeJS
-        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         uses: ./.github/actions/setup-nodejs
         with:
           prod: "true"
 
       - name: Install Foundry
+        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         uses: ./.github/actions/install-solidity-foundry
 
       - name: Setup Go
-        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         uses: ./.github/actions/setup-go
         with:
           # race/fuzz tests don't benefit repeated caching, so restore from develop's build cache
@@ -226,63 +227,78 @@ jobs:
           build-cache-version: ${{ matrix.type.cmd }}
 
       - name: Setup Solana
-        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         uses: ./.github/actions/setup-solana
 
       - name: Build Solana artifacts
         # do not build for core tests, core 'integration' tests, or fuzz tests
-        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.build-solana-artifacts != 'false' }}
+        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.build-solana-artifacts != 'false' && matrix.type.cmd == 'go_core_tests' }}
         uses: ./.github/actions/setup-solana/build-contracts
 
       - name: Setup wasmd
-        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         uses: ./.github/actions/setup-wasmd
 
       - name: Setup Postgres
-        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         uses: ./.github/actions/setup-postgres
 
       - name: Touching core/web/assets/index.html
-        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         run: mkdir -p core/web/assets && touch core/web/assets/index.html
 
       - name: Download Go vendor packages
-        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         run: go mod download
 
       - name: Build binary
-        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         run: go build -o chainlink.test .
 
       - name: Setup DB
-        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         run: ./chainlink.test local db preparetest
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
 
       - name: Install LOOP Plugins
-        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         run: make install-plugins
 
       - name: Increase Timeouts for Fuzz/Race
         # Increase timeouts for scheduled runs only
-        if: ${{ github.event.schedule != '' && needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ github.event.schedule != '' && needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         run: |
           echo "TIMEOUT=10m" >> $GITHUB_ENV
           echo "COUNT=50" >> $GITHUB_ENV
           echo "FUZZ_TIMEOUT_MINUTES=10">> $GITHUB_ENV
 
+      - name: Debug Tests
+        run: |
+          git rev-parse HEAD
+          git rev-parse --abbrev-ref HEAD
+          git status
+
+          cd $(go env GOMODCACHE)/github.com/smartcontractkit/
+          ls -la | grep chainlink-integrations
+          ls -la chainlink-integrations
+          ls -la chainlink-integrations/evm@v0.0.0-20250211163724-89a32c016ce4/
+          ls -la chainlink-integrations/evm@v0.0.0-20250211163724-89a32c016ce4/testutils/
+          cat chainlink-integrations/evm@v0.0.0-20250211163724-89a32c016ce4/testutils/testutils.go
+
       - name: Run tests
-        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         id: run-tests
         env:
           OUTPUT_FILE: ./output.txt
           CL_DATABASE_URL: ${{ env.DB_URL }}
-        run: ./tools/bin/${{ matrix.type.cmd }} ./...
+        run: |
+          export GODEBUG=goindex=0
+          ./tools/bin/${{ matrix.type.cmd }} ./...
 
       - name: Print Races
         id: print-races
-        if: ${{ failure() && matrix.type.cmd == 'go_core_race_tests' && needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ failure() && matrix.type.cmd == 'go_core_race_tests' && needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         env:
           GH_REPO: ${{ github.repository }}
           GH_RUN_ID: ${{ github.run_id }}
@@ -302,12 +318,12 @@ jobs:
           echo "github.ref: ${{ github.ref }}"
 
       - name: Print postgres logs
-        if: ${{ always() &&  needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ always() &&  needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         run: docker compose logs postgres | tee ../../../postgres_logs.txt
         working-directory: ./.github/actions/setup-postgres
 
       - name: Store logs artifacts
-        if: ${{ always() && needs.filter.outputs.should-run-ci-core == 'true' }}
+        if: ${{ always() && needs.filter.outputs.should-run-ci-core == 'true' && matrix.type.cmd == 'go_core_tests' }}
         uses: actions/upload-artifact@v4.4.3
         with:
           name: ${{ matrix.type.cmd }}_logs
