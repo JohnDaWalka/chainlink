@@ -2824,8 +2824,8 @@ func DefaultDestinationCCIPModule(
 
 type CCIPRequest struct {
 	ReqNo                   int64
-	txHash                  string
-	txConfirmationTimestamp time.Time
+	TxHash                  string
+	TxConfirmationTimestamp time.Time
 	RequestStat             *testreporters.RequestStat
 	MessageData             []byte
 }
@@ -2843,8 +2843,8 @@ func CCIPRequestFromTxHash(txHash common.Hash, chainClient blockchain.EVMClient)
 	txConfirmationTimestamp := hdr.Timestamp
 
 	return CCIPRequest{
-		txHash:                  txHash.Hex(),
-		txConfirmationTimestamp: txConfirmationTimestamp,
+		TxHash:                  txHash.Hex(),
+		TxConfirmationTimestamp: txConfirmationTimestamp,
 	}, rcpt, nil
 }
 
@@ -2992,8 +2992,8 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporter
 	for _, stat := range reqStats {
 		allRequests = append(allRequests, CCIPRequest{
 			ReqNo:                   stat.ReqNo,
-			txHash:                  rcpt.TxHash.Hex(),
-			txConfirmationTimestamp: request.txConfirmationTimestamp,
+			TxHash:                  rcpt.TxHash.Hex(),
+			TxConfirmationTimestamp: request.TxConfirmationTimestamp,
 			RequestStat:             stat,
 			MessageData:             msgData,
 		})
@@ -3348,7 +3348,7 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 		reqStats       []*testreporters.RequestStat
 		timeout        = lane.ValidationTimeout
 		ccipRequests   = lane.SentReqs[txHash]
-		txConfirmation = ccipRequests[0].txConfirmationTimestamp
+		txConfirmation = ccipRequests[0].TxConfirmationTimestamp
 	)
 	require.Greater(lane.Test, len(ccipRequests), 0, "no ccip requests found for tx hash")
 

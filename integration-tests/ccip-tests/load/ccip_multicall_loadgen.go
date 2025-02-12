@@ -183,6 +183,12 @@ func (m *CCIPMultiCallLoadGenerator) Call(_ *wasp.Generator) *wasp.Response {
 			res.Failed = true
 			return res
 		}
+		_, err = m.E2ELoads[m.MultiCall].Lane.AddToSentReqs(sendTx.Hash(), rValues.Stats, nil)
+		if err != nil {
+			res.Error = err.Error()
+			res.Failed = true
+			return res
+		}
 		for _, stat := range rValues.Stats {
 			stat.UpdateState(&lggr, 0, testreporters.TX, startTime.Sub(txConfirmationTime), testreporters.Success, nil)
 		}

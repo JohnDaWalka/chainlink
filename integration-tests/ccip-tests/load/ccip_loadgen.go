@@ -42,6 +42,29 @@ type CCIPLaneOptimized struct {
 	Source            *actions.SourceCCIPModule
 	Dest              *actions.DestCCIPModule
 	Reports           *testreporters.CCIPLaneStats
+	SentReqs          map[common.Hash][]actions.CCIPRequest
+}
+
+func (lane *CCIPLaneOptimized) AddToSentReqs(txHash common.Hash, reqStats []*testreporters.RequestStat, msgData []byte) (*types.Receipt, error) {
+	request, rcpt, err := actions.CCIPRequestFromTxHash(txHash, lane.Source.Common.ChainClient)
+	if err != nil {
+		for _, stat := range reqStats {
+			stat.UpdateState(lane.Logger, 0, testreporters.TX, 0, testreporters.Failure, nil)
+		}
+		return rcpt, fmt.Errorf("could not get request from tx hash %s: %w", txHash.Hex(), err)
+	}
+	var allRequests []actions.CCIPRequest
+	for _, stat := range reqStats {
+		allRequests = append(allRequests, actions.CCIPRequest{
+			ReqNo:                   stat.ReqNo,
+			TxHash:                  rcpt.TxHash.Hex(),
+			TxConfirmationTimestamp: request.TxConfirmationTimestamp,
+			RequestStat:             stat,
+			MessageData:             msgData,
+		})
+	}
+	lane.SentReqs[rcpt.TxHash] = allRequests
+	return rcpt, nil
 }
 
 type CCIPE2ELoad struct {
@@ -77,6 +100,7 @@ func NewCCIPLoad(
 		Source:            lane.Source,
 		Dest:              lane.Dest,
 		Reports:           lane.Reports,
+		SentReqs:          make(map[common.Hash][]actions.CCIPRequest),
 	}
 
 	return &CCIPE2ELoad{
@@ -283,7 +307,6 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		res.Failed = true
 		return res
 	}
-
 	// initiate the transfer
 	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
 	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
@@ -307,12 +330,18 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		return res
 	}
 
-	// the msg is no longer needed, so we can clear it to avoid holding extra data during load
-	//nolint:ineffassign,staticcheck
-	msg = router.ClientEVM2AnyMessage{}
-
 	txConfirmationTime := time.Now().UTC()
 	lggr = lggr.With().Str("Msg Tx", sendTx.Hash().String()).Logger()
+	// add the request to the sent requests
+	c.Lane.SentReqs[sendTx.Hash()] = nil
+
+	_, err = c.Lane.AddToSentReqs(sendTx.Hash(), []*testreporters.RequestStat{stats}, msg.Data)
+	if err != nil {
+		res.Error = err.Error()
+		res.Failed = true
+		res.Data = stats.StatusByPhase
+		return res
+	}
 
 	stats.UpdateState(&lggr, 0, testreporters.TX, txConfirmationTime.Sub(startTime), testreporters.Success, nil)
 	err = c.Validate(lggr, sendTx, txConfirmationTime, []*testreporters.RequestStat{stats})
