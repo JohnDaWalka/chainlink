@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
+	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-integrations/evm/client"
@@ -15,7 +16,7 @@ import (
 
 // NewSimulation returns a client and a simulated backend.
 func NewSimulation(t testing.TB) (*bind.TransactOpts, *client.SimulatedBackendClient) {
-	user := testutils.MustNewSimTransactor(t)
+	user := testutils2.MustNewSimTransactor(t)
 	simulatedBackend := simulated.NewBackend(types.GenesisAlloc{
 		user.From: {
 			Balance: big.NewInt(0).Mul(big.NewInt(3), big.NewInt(1e18)),

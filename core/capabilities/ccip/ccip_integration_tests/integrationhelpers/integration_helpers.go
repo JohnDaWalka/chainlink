@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
+	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -101,7 +102,8 @@ type TestUniverse struct {
 }
 
 func NewTestUniverse(ctx context.Context, t *testing.T, lggr logger.Logger) TestUniverse {
-	transactor := testutils.MustNewSimTransactor(t)
+	var t2 testing.TB = t
+	transactor := testutils2.MustNewSimTransactor(t2)
 	backend := simulated.NewBackend(ethtypes.GenesisAlloc{
 		transactor.From: {Balance: assets.Ether(1000).ToInt()},
 	}, simulated.WithBlockGasLimit(30e6))

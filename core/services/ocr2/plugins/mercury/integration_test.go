@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/shopspring/decimal"
+	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -91,7 +92,8 @@ func detectPanicLogs(t *testing.T, logObservers []*observer.ObservedLogs) {
 }
 
 func setupBlockchain(t *testing.T) (*bind.TransactOpts, evmtypes.Backend, *verifier.Verifier, common.Address, func() common.Hash) {
-	steve := testutils.MustNewSimTransactor(t) // config contract deployer and owner
+	var t2 testing.TB = t
+	steve := testutils2.MustNewSimTransactor(t2) // config contract deployer and owner
 	genesisData := types.GenesisAlloc{steve.From: {Balance: assets.Ether(1000).ToInt()}}
 	backend := cltest.NewSimulatedBackend(t, genesisData, ethconfig.Defaults.Miner.GasCeil)
 	backend.Commit()                                          // ensure starting block number at least 1

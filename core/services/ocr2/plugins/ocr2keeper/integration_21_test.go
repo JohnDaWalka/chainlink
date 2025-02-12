@@ -21,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/onsi/gomega"
+	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo/abi"
@@ -89,9 +90,12 @@ func TestIntegration_KeeperPluginConditionalUpkeep(t *testing.T) {
 	lggr := logger.TestLogger(t)
 
 	// setup blockchain
-	sergey := testutils.MustNewSimTransactor(t) // owns all the link
-	steve := testutils.MustNewSimTransactor(t)  // registry owner
-	carrol := testutils.MustNewSimTransactor(t) // upkeep owner
+	var t2 testing.TB = t
+	sergey := testutils2.MustNewSimTransactor(t2) // owns all the link
+	var t3 testing.TB = t
+	steve := testutils2.MustNewSimTransactor(t3) // registry owner
+	var t4 testing.TB = t
+	carrol := testutils2.MustNewSimTransactor(t4) // upkeep owner
 	genesisData := gethtypes.GenesisAlloc{
 		sergey.From: {Balance: assets.Ether(10000).ToInt()},
 		steve.From:  {Balance: assets.Ether(10000).ToInt()},
@@ -185,9 +189,12 @@ func TestIntegration_KeeperPluginLogUpkeep(t *testing.T) {
 	g := gomega.NewWithT(t)
 
 	// setup blockchain
-	sergey := testutils.MustNewSimTransactor(t) // owns all the link
-	steve := testutils.MustNewSimTransactor(t)  // registry owner
-	carrol := testutils.MustNewSimTransactor(t) // upkeep owner
+	var t2 testing.TB = t
+	sergey := testutils2.MustNewSimTransactor(t2) // owns all the link
+	var t3 testing.TB = t
+	steve := testutils2.MustNewSimTransactor(t3) // registry owner
+	var t4 testing.TB = t
+	carrol := testutils2.MustNewSimTransactor(t4) // upkeep owner
 	genesisData := gethtypes.GenesisAlloc{
 		sergey.From: {Balance: assets.Ether(10000).ToInt()},
 		steve.From:  {Balance: assets.Ether(10000).ToInt()},
@@ -278,9 +285,12 @@ func TestIntegration_KeeperPluginLogUpkeep_Retry(t *testing.T) {
 	g := gomega.NewWithT(t)
 
 	// setup blockchain
-	linkOwner := testutils.MustNewSimTransactor(t)     // owns all the link
-	registryOwner := testutils.MustNewSimTransactor(t) // registry owner
-	upkeepOwner := testutils.MustNewSimTransactor(t)   // upkeep owner
+	var t2 testing.TB = t
+	linkOwner := testutils2.MustNewSimTransactor(t2) // owns all the link
+	var t3 testing.TB = t
+	registryOwner := testutils2.MustNewSimTransactor(t3) // registry owner
+	var t4 testing.TB = t
+	upkeepOwner := testutils2.MustNewSimTransactor(t4) // upkeep owner
 	genesisData := gethtypes.GenesisAlloc{
 		linkOwner.From:     {Balance: assets.Ether(10000).ToInt()},
 		registryOwner.From: {Balance: assets.Ether(10000).ToInt()},
@@ -398,9 +408,12 @@ func TestIntegration_KeeperPluginLogUpkeep_ErrHandler(t *testing.T) {
 	g := gomega.NewWithT(t)
 
 	// setup blockchain
-	linkOwner := testutils.MustNewSimTransactor(t)     // owns all the link
-	registryOwner := testutils.MustNewSimTransactor(t) // registry owner
-	upkeepOwner := testutils.MustNewSimTransactor(t)   // upkeep owner
+	var t2 testing.TB = t
+	linkOwner := testutils2.MustNewSimTransactor(t2) // owns all the link
+	var t3 testing.TB = t
+	registryOwner := testutils2.MustNewSimTransactor(t3) // registry owner
+	var t4 testing.TB = t
+	upkeepOwner := testutils2.MustNewSimTransactor(t4) // upkeep owner
 	genesisData := gethtypes.GenesisAlloc{
 		linkOwner.From:     {Balance: assets.Ether(10000).ToInt()},
 		registryOwner.From: {Balance: assets.Ether(10000).ToInt()},

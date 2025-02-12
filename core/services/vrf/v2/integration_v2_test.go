@@ -22,6 +22,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/onsi/gomega"
 	"github.com/shopspring/decimal"
+	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -149,19 +150,25 @@ func newVRFCoordinatorV2Universe(t *testing.T, key ethkey.KeyV2, numConsumers in
 	tests.SkipShort(t, "VRFCoordinatorV2Universe")
 	oracleTransactor, err := bind.NewKeyedTransactorWithChainID(key.ToEcdsaPrivKey(), testutils.SimulatedChainID)
 	require.NoError(t, err)
+	var t2 testing.TB = t
+	var t3 testing.TB = t
+	var t4 testing.TB = t
+	var t5 testing.TB = t
+	var t6 testing.TB = t
 	var (
-		sergey       = testutils.MustNewSimTransactor(t)
-		neil         = testutils.MustNewSimTransactor(t)
-		ned          = testutils.MustNewSimTransactor(t)
-		evil         = testutils.MustNewSimTransactor(t)
-		reverter     = testutils.MustNewSimTransactor(t)
+		sergey       = testutils2.MustNewSimTransactor(t2)
+		neil         = testutils2.MustNewSimTransactor(t3)
+		ned          = testutils2.MustNewSimTransactor(t4)
+		evil         = testutils2.MustNewSimTransactor(t5)
+		reverter     = testutils2.MustNewSimTransactor(t6)
 		nallory      = oracleTransactor
 		vrfConsumers []*bind.TransactOpts
 	)
 
 	// Create consumer contract deployer identities
 	for i := 0; i < numConsumers; i++ {
-		vrfConsumers = append(vrfConsumers, testutils.MustNewSimTransactor(t))
+		var t7 testing.TB = t
+		vrfConsumers = append(vrfConsumers, testutils2.MustNewSimTransactor(t7))
 	}
 
 	genesisData := gethtypes.GenesisAlloc{
@@ -1566,8 +1573,10 @@ func registerProvingKeyHelper(t *testing.T, uni coordinatorV2UniverseCommon, coo
 }
 
 func TestExternalOwnerConsumerExample(t *testing.T) {
-	owner := testutils.MustNewSimTransactor(t)
-	random := testutils.MustNewSimTransactor(t)
+	var t2 testing.TB = t
+	owner := testutils2.MustNewSimTransactor(t2)
+	var t3 testing.TB = t
+	random := testutils2.MustNewSimTransactor(t3)
 	genesisData := gethtypes.GenesisAlloc{
 		owner.From:  {Balance: assets.Ether(10).ToInt()},
 		random.From: {Balance: assets.Ether(10).ToInt()},
@@ -1630,8 +1639,10 @@ func TestExternalOwnerConsumerExample(t *testing.T) {
 }
 
 func TestSimpleConsumerExample(t *testing.T) {
-	owner := testutils.MustNewSimTransactor(t)
-	random := testutils.MustNewSimTransactor(t)
+	var t2 testing.TB = t
+	owner := testutils2.MustNewSimTransactor(t2)
+	var t3 testing.TB = t
+	random := testutils2.MustNewSimTransactor(t3)
 	genesisData := gethtypes.GenesisAlloc{
 		owner.From: {Balance: assets.Ether(10).ToInt()},
 	}

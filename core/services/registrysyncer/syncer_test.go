@@ -15,6 +15,7 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
+	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -49,7 +50,8 @@ var writeChainCapability = kcr.CapabilitiesRegistryCapability{
 }
 
 func startNewChainWithRegistry(t *testing.T) (*kcr.CapabilitiesRegistry, common.Address, *bind.TransactOpts, *simulated.Backend) {
-	owner := testutils.MustNewSimTransactor(t)
+	var t2 testing.TB = t
+	owner := testutils2.MustNewSimTransactor(t2)
 
 	i := &big.Int{}
 	oneEth, _ := i.SetString("100000000000000000000", 10)

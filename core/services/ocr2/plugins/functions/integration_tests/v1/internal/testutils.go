@@ -21,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/onsi/gomega"
+	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -167,7 +168,8 @@ type Coordinator struct {
 }
 
 func StartNewChainWithContracts(t *testing.T, nClients int) (*bind.TransactOpts, evmtypes.Backend, func() common.Hash, func(), Coordinator, Coordinator, []deployedClientContract, common.Address, *functions_router.FunctionsRouter, *link_token_interface.LinkToken, common.Address, *functions_allow_list.TermsOfServiceAllowList) {
-	owner := testutils.MustNewSimTransactor(t)
+	var t2 testing.TB = t
+	owner := testutils2.MustNewSimTransactor(t2)
 	owner.GasPrice = big.NewInt(int64(DefaultGasPrice))
 	sb := new(big.Int)
 	sb, _ = sb.SetString("100000000000000000000", 10) // 1 eth

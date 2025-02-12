@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/jmoiron/sqlx"
 	"github.com/onsi/gomega"
+	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -75,7 +76,8 @@ func setupVRFLogPollerListenerTH(t *testing.T) *vrfLogPollerListenerTH {
 	db := pgtest.NewSqlxDB(t)
 
 	o := logpoller.NewORM(chainID, db, lggr)
-	owner := testutils.MustNewSimTransactor(t)
+	var t2 testing.TB = t
+	owner := testutils2.MustNewSimTransactor(t2)
 	backend := simulated.NewBackend(ethtypes.GenesisAlloc{
 		owner.From: {
 			Balance: big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)),
@@ -802,7 +804,8 @@ func SetupGetUnfulfilledTH(t *testing.T) (*listenerV2, *ubig.Big) {
 	chain := evmmocks.NewChain(t)
 
 	// Construct CoordinatorV2_X object for VRF listener
-	owner := testutils.MustNewSimTransactor(t)
+	var t2 testing.TB = t
+	owner := testutils2.MustNewSimTransactor(t2)
 	b := simulated.NewBackend(ethtypes.GenesisAlloc{
 		owner.From: {
 			Balance: big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)),

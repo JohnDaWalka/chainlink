@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/jmoiron/sqlx"
+	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -203,7 +204,8 @@ func newTestUniverse(t *testing.T, ks *keyringsAndSigners[[]byte]) *testUniverse
 	t.Helper()
 
 	db := pgtest.NewSqlxDB(t)
-	owner := testutils.MustNewSimTransactor(t)
+	var t2 testing.TB = t
+	owner := testutils2.MustNewSimTransactor(t2)
 
 	// create many transmitters but only need to fund one, rest are to get
 	// setOCR3Config to pass.

@@ -20,6 +20,7 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/onsi/gomega"
+	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -114,9 +115,12 @@ func setupFluxAggregatorUniverse(t *testing.T, configOptions ...func(cfg *fluxAg
 	var f fluxAggregatorUniverse
 	f.evmChainID = *testutils.SimulatedChainID
 	f.key = key
-	f.sergey = testutils.MustNewSimTransactor(t)
-	f.neil = testutils.MustNewSimTransactor(t)
-	f.ned = testutils.MustNewSimTransactor(t)
+	var t2 testing.TB = t
+	f.sergey = testutils2.MustNewSimTransactor(t2)
+	var t3 testing.TB = t
+	f.neil = testutils2.MustNewSimTransactor(t3)
+	var t4 testing.TB = t
+	f.ned = testutils2.MustNewSimTransactor(t4)
 	f.nallory = oracleTransactor
 	genesisData := gethtypes.GenesisAlloc{
 		f.sergey.From:  {Balance: assets.Ether(1000).ToInt()},

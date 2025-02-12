@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -128,7 +129,8 @@ func TestExecutePluginCodecV1(t *testing.T) {
 	ctx := testutils.Context(t)
 
 	// Deploy the contract
-	transactor := testutils.MustNewSimTransactor(t)
+	var t2 testing.TB = t
+	transactor := testutils2.MustNewSimTransactor(t2)
 	simulatedBackend := backends.NewSimulatedBackend(core.GenesisAlloc{
 		transactor.From: {Balance: assets.Ether(1000).ToInt()},
 	}, 30e6)

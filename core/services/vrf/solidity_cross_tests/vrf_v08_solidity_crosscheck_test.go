@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/solidity_vrf_v08_verifier_wrapper"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	proof2 "github.com/smartcontractkit/chainlink/v2/core/services/vrf/proof"
 
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
@@ -28,7 +28,8 @@ import (
 // (with the exception of TestVRFV08_InvalidPointCoordinates which is a new check in v0.8)
 // except we are testing against the v0.8 implementation of VRF.sol.
 func deployVRFV08TestHelper(t *testing.T) *solidity_vrf_v08_verifier_wrapper.VRFV08TestHelper {
-	auth := testutils.MustNewSimTransactor(t)
+	var t2 testing.TB = t
+	auth := testutils2.MustNewSimTransactor(t2)
 	genesisData := gethtypes.GenesisAlloc{auth.From: {Balance: assets.Ether(100).ToInt()}}
 	backend := cltest.NewSimulatedBackend(t, genesisData, ethconfig.Defaults.Miner.GasCeil)
 	_, _, verifier, err := solidity_vrf_v08_verifier_wrapper.DeployVRFV08TestHelper(auth, backend.Client())
