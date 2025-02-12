@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -21,7 +22,7 @@ import (
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
@@ -289,7 +290,8 @@ func DeployCCIPAndAddLanes(ctx context.Context, lggr logger.Logger, envConfig de
 							UpdatesByChain: map[uint64]map[uint64]changeset.OffRampSourceUpdate{
 								dst: {
 									src: {
-										IsEnabled: true,
+										IsEnabled:                 true,
+										IsRMNVerificationDisabled: true,
 									},
 								},
 							},
