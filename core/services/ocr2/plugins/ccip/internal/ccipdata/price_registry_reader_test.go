@@ -57,8 +57,7 @@ func commitAndGetBlockTs(ec *client.SimulatedBackendClient) uint64 {
 }
 
 func newSim(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendClient) {
-	var t2 testing.TB = t
-	user := evmtestutils.MustNewSimTransactor(t2)
+	user := evmtestutils.MustNewSimTransactor(t)
 	sim := simulated.NewBackend(map[common.Address]types.Account{
 		user.From: {
 			Balance: big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)),

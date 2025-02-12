@@ -76,8 +76,7 @@ func setupVRFLogPollerListenerTH(t *testing.T) *vrfLogPollerListenerTH {
 	db := pgtest.NewSqlxDB(t)
 
 	o := logpoller.NewORM(chainID, db, lggr)
-	var t2 testing.TB = t
-	owner := evmtestutils.MustNewSimTransactor(t2)
+	owner := evmtestutils.MustNewSimTransactor(t)
 	backend := simulated.NewBackend(ethtypes.GenesisAlloc{
 		owner.From: {
 			Balance: big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)),
@@ -804,8 +803,7 @@ func SetupGetUnfulfilledTH(t *testing.T) (*listenerV2, *ubig.Big) {
 	chain := evmmocks.NewChain(t)
 
 	// Construct CoordinatorV2_X object for VRF listener
-	var t2 testing.TB = t
-	owner := evmtestutils.MustNewSimTransactor(t2)
+	owner := evmtestutils.MustNewSimTransactor(t)
 	b := simulated.NewBackend(ethtypes.GenesisAlloc{
 		owner.From: {
 			Balance: big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)),

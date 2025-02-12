@@ -65,8 +65,7 @@ type Node struct {
 }
 
 func SetupOCR2Contracts(t *testing.T) (*bind.TransactOpts, *simulated.Backend, common.Address, *ocr2aggregator.OCR2Aggregator) {
-	var t2 testing.TB = t
-	owner := evmtestutils.MustNewSimTransactor(t2)
+	owner := evmtestutils.MustNewSimTransactor(t)
 	sb := new(big.Int)
 	sb, _ = sb.SetString("100000000000000000000", 10) // 1 eth
 	genesisData := types.GenesisAlloc{owner.From: {Balance: sb}}

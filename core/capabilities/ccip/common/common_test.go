@@ -15,8 +15,7 @@ import (
 )
 
 func Test_HashedCapabilityId(t *testing.T) {
-	var t2 testing.TB = t
-	transactor := testutils.MustNewSimTransactor(t2)
+	transactor := testutils.MustNewSimTransactor(t)
 	sb := backends.NewSimulatedBackend(core.GenesisAlloc{
 		transactor.From: {Balance: assets.Ether(1000).ToInt()},
 	}, 30e6)

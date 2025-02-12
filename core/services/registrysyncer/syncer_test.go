@@ -50,8 +50,7 @@ var writeChainCapability = kcr.CapabilitiesRegistryCapability{
 }
 
 func startNewChainWithRegistry(t *testing.T) (*kcr.CapabilitiesRegistry, common.Address, *bind.TransactOpts, *simulated.Backend) {
-	var t2 testing.TB = t
-	owner := evmtestutils.MustNewSimTransactor(t2)
+	owner := evmtestutils.MustNewSimTransactor(t)
 
 	i := &big.Int{}
 	oneEth, _ := i.SetString("100000000000000000000", 10)

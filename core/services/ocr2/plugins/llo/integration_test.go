@@ -86,8 +86,7 @@ func setupBlockchain(t *testing.T) (
 	*verifier_proxy.VerifierProxy,
 	common.Address,
 ) {
-	var t2 testing.TB = t
-	steve := evmtestutils.MustNewSimTransactor(t2) // config contract deployer and owner
+	steve := evmtestutils.MustNewSimTransactor(t) // config contract deployer and owner
 	genesisData := gethtypes.GenesisAlloc{steve.From: {Balance: assets.Ether(1000).ToInt()}}
 	backend := cltest.NewSimulatedBackend(t, genesisData, ethconfig.Defaults.Miner.GasCeil)
 	backend.Commit()

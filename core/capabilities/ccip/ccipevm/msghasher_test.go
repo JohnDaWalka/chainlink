@@ -182,8 +182,7 @@ type testSetupData struct {
 }
 
 func testSetup(t *testing.T) *testSetupData {
-	var t2 testing.TB = t
-	transactor := evmtestutils.MustNewSimTransactor(t2)
+	transactor := evmtestutils.MustNewSimTransactor(t)
 	simulatedBackend := backends.NewSimulatedBackend(core.GenesisAlloc{
 		transactor.From: {Balance: assets.Ether(1000).ToInt()},
 	}, 30e6)
@@ -206,8 +205,7 @@ func testSetup(t *testing.T) *testSetupData {
 }
 
 func TestMessagerHasher_againstRmnSharedVector(t *testing.T) {
-	var t2 testing.TB = t
-	transactor := evmtestutils.MustNewSimTransactor(t2)
+	transactor := evmtestutils.MustNewSimTransactor(t)
 	backend := backends.NewSimulatedBackend(types.GenesisAlloc{
 		transactor.From: {Balance: assets.Ether(1000).ToInt()},
 	}, 30e6)

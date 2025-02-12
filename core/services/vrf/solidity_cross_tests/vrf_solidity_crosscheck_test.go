@@ -41,8 +41,7 @@ import (
 // were sharing a common global verifier (which is fine, because all methods are
 // pure.) Revert to that, and see if it helps.
 func deployVRFTestHelper(t *testing.T) *solidity_vrf_verifier_wrapper.VRFTestHelper {
-	var t2 testing.TB = t
-	auth := testutils.MustNewSimTransactor(t2)
+	auth := testutils.MustNewSimTransactor(t)
 	genesisData := gethtypes.GenesisAlloc{auth.From: {Balance: assets.Ether(100).ToInt()}}
 	backend := cltest.NewSimulatedBackend(t, genesisData, ethconfig.Defaults.Miner.GasCeil)
 	_, _, verifier, err := solidity_vrf_verifier_wrapper.DeployVRFTestHelper(auth, backend.Client())

@@ -168,8 +168,7 @@ type Coordinator struct {
 }
 
 func StartNewChainWithContracts(t *testing.T, nClients int) (*bind.TransactOpts, evmtypes.Backend, func() common.Hash, func(), Coordinator, Coordinator, []deployedClientContract, common.Address, *functions_router.FunctionsRouter, *link_token_interface.LinkToken, common.Address, *functions_allow_list.TermsOfServiceAllowList) {
-	var t2 testing.TB = t
-	owner := evmtestutils.MustNewSimTransactor(t2)
+	owner := evmtestutils.MustNewSimTransactor(t)
 	owner.GasPrice = big.NewInt(int64(DefaultGasPrice))
 	sb := new(big.Int)
 	sb, _ = sb.SetString("100000000000000000000", 10) // 1 eth

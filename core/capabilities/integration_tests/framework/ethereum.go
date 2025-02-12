@@ -32,8 +32,7 @@ type EthBlockchain struct {
 }
 
 func NewEthBlockchain(t *testing.T, initialEth int, blockTimeProcessingTime time.Duration) *EthBlockchain {
-	var t2 testing.TB = t
-	transactOpts := testutils.MustNewSimTransactor(t2) // config contract deployer and owner
+	transactOpts := testutils.MustNewSimTransactor(t) // config contract deployer and owner
 	genesisData := types.GenesisAlloc{transactOpts.From: {Balance: assets.Ether(initialEth).ToInt()}}
 	backend := cltest.NewSimulatedBackend(t, genesisData, ethconfig.Defaults.Miner.GasCeil)
 	gethlog.SetDefault(gethlog.NewLogger(gethlog.NewTerminalHandlerWithLevel(os.Stderr, gethlog.LevelWarn, true)))

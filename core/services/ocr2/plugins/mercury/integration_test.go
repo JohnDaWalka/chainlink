@@ -92,8 +92,7 @@ func detectPanicLogs(t *testing.T, logObservers []*observer.ObservedLogs) {
 }
 
 func setupBlockchain(t *testing.T) (*bind.TransactOpts, evmtypes.Backend, *verifier.Verifier, common.Address, func() common.Hash) {
-	var t2 testing.TB = t
-	steve := evmtestutils.MustNewSimTransactor(t2) // config contract deployer and owner
+	steve := evmtestutils.MustNewSimTransactor(t) // config contract deployer and owner
 	genesisData := types.GenesisAlloc{steve.From: {Balance: assets.Ether(1000).ToInt()}}
 	backend := cltest.NewSimulatedBackend(t, genesisData, ethconfig.Defaults.Miner.GasCeil)
 	backend.Commit()                                          // ensure starting block number at least 1

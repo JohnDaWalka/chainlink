@@ -28,8 +28,7 @@ import (
 // (with the exception of TestVRFV08_InvalidPointCoordinates which is a new check in v0.8)
 // except we are testing against the v0.8 implementation of VRF.sol.
 func deployVRFV08TestHelper(t *testing.T) *solidity_vrf_v08_verifier_wrapper.VRFV08TestHelper {
-	var t2 testing.TB = t
-	auth := testutils.MustNewSimTransactor(t2)
+	auth := testutils.MustNewSimTransactor(t)
 	genesisData := gethtypes.GenesisAlloc{auth.From: {Balance: assets.Ether(100).ToInt()}}
 	backend := cltest.NewSimulatedBackend(t, genesisData, ethconfig.Defaults.Miner.GasCeil)
 	_, _, verifier, err := solidity_vrf_v08_verifier_wrapper.DeployVRFV08TestHelper(auth, backend.Client())

@@ -115,12 +115,9 @@ func setupFluxAggregatorUniverse(t *testing.T, configOptions ...func(cfg *fluxAg
 	var f fluxAggregatorUniverse
 	f.evmChainID = *testutils.SimulatedChainID
 	f.key = key
-	var t2 testing.TB = t
-	f.sergey = evmtestutils.MustNewSimTransactor(t2)
-	var t3 testing.TB = t
-	f.neil = evmtestutils.MustNewSimTransactor(t3)
-	var t4 testing.TB = t
-	f.ned = evmtestutils.MustNewSimTransactor(t4)
+	f.sergey = evmtestutils.MustNewSimTransactor(t)
+	f.neil = evmtestutils.MustNewSimTransactor(t)
+	f.ned = evmtestutils.MustNewSimTransactor(t)
 	f.nallory = oracleTransactor
 	genesisData := gethtypes.GenesisAlloc{
 		f.sergey.From:  {Balance: assets.Ether(1000).ToInt()},

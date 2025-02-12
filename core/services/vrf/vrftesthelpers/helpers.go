@@ -189,15 +189,11 @@ func NewVRFCoordinatorUniverse(t *testing.T, keys ...ethkey.KeyV2) CoordinatorUn
 		oracleTransactors = append(oracleTransactors, oracleTransactor)
 	}
 
-	var t2 testing.TB = t
-	var t3 testing.TB = t
-	var t4 testing.TB = t
-	var t5 testing.TB = t
 	var (
-		sergey = evmtestutils.MustNewSimTransactor(t2)
-		neil   = evmtestutils.MustNewSimTransactor(t3)
-		ned    = evmtestutils.MustNewSimTransactor(t4)
-		carol  = evmtestutils.MustNewSimTransactor(t5)
+		sergey = evmtestutils.MustNewSimTransactor(t)
+		neil   = evmtestutils.MustNewSimTransactor(t)
+		ned    = evmtestutils.MustNewSimTransactor(t)
+		carol  = evmtestutils.MustNewSimTransactor(t)
 	)
 	genesisData := gethtypes.GenesisAlloc{
 		sergey.From: {Balance: assets.Ether(1000).ToInt()},

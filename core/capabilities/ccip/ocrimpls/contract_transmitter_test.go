@@ -204,8 +204,7 @@ func newTestUniverse(t *testing.T, ks *keyringsAndSigners[[]byte]) *testUniverse
 	t.Helper()
 
 	db := pgtest.NewSqlxDB(t)
-	var t2 testing.TB = t
-	owner := evmtestutils.MustNewSimTransactor(t2)
+	owner := evmtestutils.MustNewSimTransactor(t)
 
 	// create many transmitters but only need to fund one, rest are to get
 	// setOCR3Config to pass.

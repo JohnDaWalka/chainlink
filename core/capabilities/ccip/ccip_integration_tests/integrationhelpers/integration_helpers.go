@@ -102,8 +102,7 @@ type TestUniverse struct {
 }
 
 func NewTestUniverse(ctx context.Context, t *testing.T, lggr logger.Logger) TestUniverse {
-	var t2 testing.TB = t
-	transactor := evmtestutils.MustNewSimTransactor(t2)
+	transactor := evmtestutils.MustNewSimTransactor(t)
 	backend := simulated.NewBackend(ethtypes.GenesisAlloc{
 		transactor.From: {Balance: assets.Ether(1000).ToInt()},
 	}, simulated.WithBlockGasLimit(30e6))

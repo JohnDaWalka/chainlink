@@ -480,12 +480,9 @@ func setup(lggr logger.Logger, poller logpoller.LogPoller, c evmclient.Client, s
 }
 
 func setupBackend(t *testing.T) (backend evmtypes.Backend, stop func(), opts []*bind.TransactOpts) {
-	var t2 testing.TB = t
-	sergey := evmtestutils.MustNewSimTransactor(t2) // owns all the link
-	var t3 testing.TB = t
-	steve := evmtestutils.MustNewSimTransactor(t3) // registry owner
-	var t4 testing.TB = t
-	carrol := evmtestutils.MustNewSimTransactor(t4) // upkeep owner
+	sergey := evmtestutils.MustNewSimTransactor(t) // owns all the link
+	steve := evmtestutils.MustNewSimTransactor(t)  // registry owner
+	carrol := evmtestutils.MustNewSimTransactor(t) // upkeep owner
 	genesisData := gethtypes.GenesisAlloc{
 		sergey.From: {Balance: assets.Ether(1000000000000000000).ToInt()},
 		steve.From:  {Balance: assets.Ether(1000000000000000000).ToInt()},
