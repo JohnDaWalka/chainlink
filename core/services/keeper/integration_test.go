@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/smartcontractkit/libocr/gethwrappers/link_token_interface"
 	"github.com/stretchr/testify/require"
 
@@ -20,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
 	"github.com/smartcontractkit/chainlink-integrations/evm/client"
+	evmtestutils "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
 	ubig "github.com/smartcontractkit/chainlink-integrations/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/forwarders"
@@ -179,15 +179,15 @@ func TestKeeperEthIntegration(t *testing.T) {
 
 			// setup blockchain
 			var t2 testing.TB = t
-			sergey := testutils2.MustNewSimTransactor(t2) // owns all the link
+			sergey := evmtestutils.MustNewSimTransactor(t2) // owns all the link
 			var t3 testing.TB = t
-			steve := testutils2.MustNewSimTransactor(t3) // registry owner
+			steve := evmtestutils.MustNewSimTransactor(t3) // registry owner
 			var t4 testing.TB = t
-			carrol := testutils2.MustNewSimTransactor(t4) // client
+			carrol := evmtestutils.MustNewSimTransactor(t4) // client
 			var t5 testing.TB = t
-			nelly := testutils2.MustNewSimTransactor(t5) // other keeper operator 1
+			nelly := evmtestutils.MustNewSimTransactor(t5) // other keeper operator 1
 			var t6 testing.TB = t
-			nick := testutils2.MustNewSimTransactor(t6) // other keeper operator 2
+			nick := evmtestutils.MustNewSimTransactor(t6) // other keeper operator 2
 			genesisData := types.GenesisAlloc{
 				sergey.From: {Balance: assets.Ether(1000).ToInt()},
 				steve.From:  {Balance: assets.Ether(1000).ToInt()},
@@ -339,15 +339,15 @@ func TestKeeperForwarderEthIntegration(t *testing.T) {
 
 		// setup blockchain
 		var t2 testing.TB = t
-		sergey := testutils2.MustNewSimTransactor(t2) // owns all the link
+		sergey := evmtestutils.MustNewSimTransactor(t2) // owns all the link
 		var t3 testing.TB = t
-		steve := testutils2.MustNewSimTransactor(t3) // registry owner
+		steve := evmtestutils.MustNewSimTransactor(t3) // registry owner
 		var t4 testing.TB = t
-		carrol := testutils2.MustNewSimTransactor(t4) // client
+		carrol := evmtestutils.MustNewSimTransactor(t4) // client
 		var t5 testing.TB = t
-		nelly := testutils2.MustNewSimTransactor(t5) // other keeper operator 1
+		nelly := evmtestutils.MustNewSimTransactor(t5) // other keeper operator 1
 		var t6 testing.TB = t
-		nick := testutils2.MustNewSimTransactor(t6) // other keeper operator 2
+		nick := evmtestutils.MustNewSimTransactor(t6) // other keeper operator 2
 		genesisData := types.GenesisAlloc{
 			sergey.From: {Balance: assets.Ether(1000).ToInt()},
 			steve.From:  {Balance: assets.Ether(1000).ToInt()},
@@ -505,15 +505,15 @@ func TestMaxPerformDataSize(t *testing.T) {
 
 		// setup blockchain
 		var t2 testing.TB = t
-		sergey := testutils2.MustNewSimTransactor(t2) // owns all the link
+		sergey := evmtestutils.MustNewSimTransactor(t2) // owns all the link
 		var t3 testing.TB = t
-		steve := testutils2.MustNewSimTransactor(t3) // registry owner
+		steve := evmtestutils.MustNewSimTransactor(t3) // registry owner
 		var t4 testing.TB = t
-		carrol := testutils2.MustNewSimTransactor(t4) // client
+		carrol := evmtestutils.MustNewSimTransactor(t4) // client
 		var t5 testing.TB = t
-		nelly := testutils2.MustNewSimTransactor(t5) // other keeper operator 1
+		nelly := evmtestutils.MustNewSimTransactor(t5) // other keeper operator 1
 		var t6 testing.TB = t
-		nick := testutils2.MustNewSimTransactor(t6) // other keeper operator 2
+		nick := evmtestutils.MustNewSimTransactor(t6) // other keeper operator 2
 		genesisData := types.GenesisAlloc{
 			sergey.From: {Balance: assets.Ether(1000).ToInt()},
 			steve.From:  {Balance: assets.Ether(1000).ToInt()},

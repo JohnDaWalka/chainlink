@@ -13,10 +13,10 @@ import (
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
-	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
+	evmtestutils "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/blockhash_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
@@ -194,10 +194,10 @@ func NewVRFCoordinatorUniverse(t *testing.T, keys ...ethkey.KeyV2) CoordinatorUn
 	var t4 testing.TB = t
 	var t5 testing.TB = t
 	var (
-		sergey = testutils2.MustNewSimTransactor(t2)
-		neil   = testutils2.MustNewSimTransactor(t3)
-		ned    = testutils2.MustNewSimTransactor(t4)
-		carol  = testutils2.MustNewSimTransactor(t5)
+		sergey = evmtestutils.MustNewSimTransactor(t2)
+		neil   = evmtestutils.MustNewSimTransactor(t3)
+		ned    = evmtestutils.MustNewSimTransactor(t4)
+		carol  = evmtestutils.MustNewSimTransactor(t5)
 	)
 	genesisData := gethtypes.GenesisAlloc{
 		sergey.From: {Balance: assets.Ether(1000).ToInt()},

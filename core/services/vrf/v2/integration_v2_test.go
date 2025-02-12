@@ -22,7 +22,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/onsi/gomega"
 	"github.com/shopspring/decimal"
-	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -39,6 +38,7 @@ import (
 	"github.com/smartcontractkit/chainlink-integrations/evm/client/clienttest"
 	"github.com/smartcontractkit/chainlink-integrations/evm/config/toml"
 	"github.com/smartcontractkit/chainlink-integrations/evm/gas"
+	evmtestutils "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/smartcontractkit/chainlink-integrations/evm/types"
 	evmutils "github.com/smartcontractkit/chainlink-integrations/evm/utils"
 	ubig "github.com/smartcontractkit/chainlink-integrations/evm/utils/big"
@@ -156,11 +156,11 @@ func newVRFCoordinatorV2Universe(t *testing.T, key ethkey.KeyV2, numConsumers in
 	var t5 testing.TB = t
 	var t6 testing.TB = t
 	var (
-		sergey       = testutils2.MustNewSimTransactor(t2)
-		neil         = testutils2.MustNewSimTransactor(t3)
-		ned          = testutils2.MustNewSimTransactor(t4)
-		evil         = testutils2.MustNewSimTransactor(t5)
-		reverter     = testutils2.MustNewSimTransactor(t6)
+		sergey       = evmtestutils.MustNewSimTransactor(t2)
+		neil         = evmtestutils.MustNewSimTransactor(t3)
+		ned          = evmtestutils.MustNewSimTransactor(t4)
+		evil         = evmtestutils.MustNewSimTransactor(t5)
+		reverter     = evmtestutils.MustNewSimTransactor(t6)
 		nallory      = oracleTransactor
 		vrfConsumers []*bind.TransactOpts
 	)
@@ -168,7 +168,7 @@ func newVRFCoordinatorV2Universe(t *testing.T, key ethkey.KeyV2, numConsumers in
 	// Create consumer contract deployer identities
 	for i := 0; i < numConsumers; i++ {
 		var t7 testing.TB = t
-		vrfConsumers = append(vrfConsumers, testutils2.MustNewSimTransactor(t7))
+		vrfConsumers = append(vrfConsumers, evmtestutils.MustNewSimTransactor(t7))
 	}
 
 	genesisData := gethtypes.GenesisAlloc{
@@ -1574,9 +1574,9 @@ func registerProvingKeyHelper(t *testing.T, uni coordinatorV2UniverseCommon, coo
 
 func TestExternalOwnerConsumerExample(t *testing.T) {
 	var t2 testing.TB = t
-	owner := testutils2.MustNewSimTransactor(t2)
+	owner := evmtestutils.MustNewSimTransactor(t2)
 	var t3 testing.TB = t
-	random := testutils2.MustNewSimTransactor(t3)
+	random := evmtestutils.MustNewSimTransactor(t3)
 	genesisData := gethtypes.GenesisAlloc{
 		owner.From:  {Balance: assets.Ether(10).ToInt()},
 		random.From: {Balance: assets.Ether(10).ToInt()},
@@ -1640,9 +1640,9 @@ func TestExternalOwnerConsumerExample(t *testing.T) {
 
 func TestSimpleConsumerExample(t *testing.T) {
 	var t2 testing.TB = t
-	owner := testutils2.MustNewSimTransactor(t2)
+	owner := evmtestutils.MustNewSimTransactor(t2)
 	var t3 testing.TB = t
-	random := testutils2.MustNewSimTransactor(t3)
+	random := evmtestutils.MustNewSimTransactor(t3)
 	genesisData := gethtypes.GenesisAlloc{
 		owner.From: {Balance: assets.Ether(10).ToInt()},
 	}

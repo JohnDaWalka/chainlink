@@ -11,7 +11,6 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/jmoiron/sqlx"
-	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
@@ -21,6 +20,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
 	evmclient "github.com/smartcontractkit/chainlink-integrations/evm/client"
+	evmtestutils "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -481,11 +481,11 @@ func setup(lggr logger.Logger, poller logpoller.LogPoller, c evmclient.Client, s
 
 func setupBackend(t *testing.T) (backend evmtypes.Backend, stop func(), opts []*bind.TransactOpts) {
 	var t2 testing.TB = t
-	sergey := testutils2.MustNewSimTransactor(t2) // owns all the link
+	sergey := evmtestutils.MustNewSimTransactor(t2) // owns all the link
 	var t3 testing.TB = t
-	steve := testutils2.MustNewSimTransactor(t3) // registry owner
+	steve := evmtestutils.MustNewSimTransactor(t3) // registry owner
 	var t4 testing.TB = t
-	carrol := testutils2.MustNewSimTransactor(t4) // upkeep owner
+	carrol := evmtestutils.MustNewSimTransactor(t4) // upkeep owner
 	genesisData := gethtypes.GenesisAlloc{
 		sergey.From: {Balance: assets.Ether(1000000000000000000).ToInt()},
 		steve.From:  {Balance: assets.Ether(1000000000000000000).ToInt()},

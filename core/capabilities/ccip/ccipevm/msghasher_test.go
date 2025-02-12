@@ -17,13 +17,13 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
+	evmtestutils "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/message_hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -183,7 +183,7 @@ type testSetupData struct {
 
 func testSetup(t *testing.T) *testSetupData {
 	var t2 testing.TB = t
-	transactor := testutils2.MustNewSimTransactor(t2)
+	transactor := evmtestutils.MustNewSimTransactor(t2)
 	simulatedBackend := backends.NewSimulatedBackend(core.GenesisAlloc{
 		transactor.From: {Balance: assets.Ether(1000).ToInt()},
 	}, 30e6)
@@ -207,7 +207,7 @@ func testSetup(t *testing.T) *testSetupData {
 
 func TestMessagerHasher_againstRmnSharedVector(t *testing.T) {
 	var t2 testing.TB = t
-	transactor := testutils2.MustNewSimTransactor(t2)
+	transactor := evmtestutils.MustNewSimTransactor(t2)
 	backend := backends.NewSimulatedBackend(types.GenesisAlloc{
 		transactor.From: {Balance: assets.Ether(1000).ToInt()},
 	}, 30e6)

@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
-	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,6 +21,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
 	"github.com/smartcontractkit/chainlink-integrations/evm/config/toml"
+	evmtestutils "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
 	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/batch_blockhash_store"
@@ -78,12 +78,12 @@ func newVRFCoordinatorV2PlusUniverse(t *testing.T, key ethkey.KeyV2, numConsumer
 	var t6 testing.TB = t
 	var t7 testing.TB = t
 	var (
-		sergey       = testutils2.MustNewSimTransactor(t2)
-		neil         = testutils2.MustNewSimTransactor(t3)
-		ned          = testutils2.MustNewSimTransactor(t4)
-		evil         = testutils2.MustNewSimTransactor(t5)
-		reverter     = testutils2.MustNewSimTransactor(t6)
-		submanager   = testutils2.MustNewSimTransactor(t7)
+		sergey       = evmtestutils.MustNewSimTransactor(t2)
+		neil         = evmtestutils.MustNewSimTransactor(t3)
+		ned          = evmtestutils.MustNewSimTransactor(t4)
+		evil         = evmtestutils.MustNewSimTransactor(t5)
+		reverter     = evmtestutils.MustNewSimTransactor(t6)
+		submanager   = evmtestutils.MustNewSimTransactor(t7)
 		nallory      = oracleTransactor
 		vrfConsumers []*bind.TransactOpts
 	)
@@ -91,7 +91,7 @@ func newVRFCoordinatorV2PlusUniverse(t *testing.T, key ethkey.KeyV2, numConsumer
 	// Create consumer contract deployer identities
 	for i := 0; i < numConsumers; i++ {
 		var t8 testing.TB = t
-		vrfConsumers = append(vrfConsumers, testutils2.MustNewSimTransactor(t8))
+		vrfConsumers = append(vrfConsumers, evmtestutils.MustNewSimTransactor(t8))
 	}
 
 	genesisData := gethtypes.GenesisAlloc{
@@ -726,9 +726,9 @@ func TestVRFV2PlusIntegration_ConsumerProxy_CoordinatorZeroAddress(t *testing.T)
 
 func TestVRFV2PlusIntegration_ExternalOwnerConsumerExample(t *testing.T) {
 	var t2 testing.TB = t
-	owner := testutils2.MustNewSimTransactor(t2)
+	owner := evmtestutils.MustNewSimTransactor(t2)
 	var t3 testing.TB = t
-	random := testutils2.MustNewSimTransactor(t3)
+	random := evmtestutils.MustNewSimTransactor(t3)
 	genesisData := gethtypes.GenesisAlloc{
 		owner.From:  {Balance: assets.Ether(10).ToInt()},
 		random.From: {Balance: assets.Ether(10).ToInt()},
@@ -810,9 +810,9 @@ func TestVRFV2PlusIntegration_ExternalOwnerConsumerExample(t *testing.T) {
 
 func TestVRFV2PlusIntegration_SimpleConsumerExample(t *testing.T) {
 	var t2 testing.TB = t
-	owner := testutils2.MustNewSimTransactor(t2)
+	owner := evmtestutils.MustNewSimTransactor(t2)
 	var t3 testing.TB = t
-	random := testutils2.MustNewSimTransactor(t3)
+	random := evmtestutils.MustNewSimTransactor(t3)
 	genesisData := gethtypes.GenesisAlloc{
 		owner.From: {Balance: assets.Ether(10).ToInt()},
 	}

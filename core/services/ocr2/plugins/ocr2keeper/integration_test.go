@@ -18,7 +18,6 @@ import (
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	testutils2 "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo/abi"
@@ -33,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
+	evmtestutils "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
 	ubig "github.com/smartcontractkit/chainlink-integrations/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/forwarders"
@@ -212,11 +212,11 @@ func runKeeperPluginBasic(t *testing.T) {
 
 	// setup blockchain
 	var t2 testing.TB = t
-	sergey := testutils2.MustNewSimTransactor(t2) // owns all the link
+	sergey := evmtestutils.MustNewSimTransactor(t2) // owns all the link
 	var t3 testing.TB = t
-	steve := testutils2.MustNewSimTransactor(t3) // registry owner
+	steve := evmtestutils.MustNewSimTransactor(t3) // registry owner
 	var t4 testing.TB = t
-	carrol := testutils2.MustNewSimTransactor(t4) // upkeep owner
+	carrol := evmtestutils.MustNewSimTransactor(t4) // upkeep owner
 	genesisData := gethtypes.GenesisAlloc{
 		sergey.From: {Balance: assets.Ether(1000).ToInt()},
 		steve.From:  {Balance: assets.Ether(1000).ToInt()},
@@ -469,11 +469,11 @@ func TestIntegration_KeeperPluginForwarderEnabled(t *testing.T) {
 
 	// setup blockchain
 	var t2 testing.TB = t
-	sergey := testutils2.MustNewSimTransactor(t2) // owns all the link
+	sergey := evmtestutils.MustNewSimTransactor(t2) // owns all the link
 	var t3 testing.TB = t
-	steve := testutils2.MustNewSimTransactor(t3) // registry owner
+	steve := evmtestutils.MustNewSimTransactor(t3) // registry owner
 	var t4 testing.TB = t
-	carrol := testutils2.MustNewSimTransactor(t4) // upkeep owner
+	carrol := evmtestutils.MustNewSimTransactor(t4) // upkeep owner
 	genesisData := gethtypes.GenesisAlloc{
 		sergey.From: {Balance: assets.Ether(1000).ToInt()},
 		steve.From:  {Balance: assets.Ether(1000).ToInt()},
