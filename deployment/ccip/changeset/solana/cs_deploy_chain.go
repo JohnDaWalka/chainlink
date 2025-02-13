@@ -450,7 +450,7 @@ func (cfg SetFeeAggregatorConfig) Validate(e deployment.Environment) error {
 	}
 
 	if chainState.FeeAggregator.Equals(solana.MustPublicKeyFromBase58(cfg.FeeAggregator)) {
-		return fmt.Errorf("fee aggregator is already set")
+		return fmt.Errorf("fee aggregator %s is already set on chain %d", cfg.FeeAggregator, cfg.ChainSelector)
 	}
 
 	return nil

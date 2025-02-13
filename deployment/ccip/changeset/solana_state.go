@@ -156,6 +156,9 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 				return state, err
 			}
 			state.OffRampStatePDA = offRampStatePDA
+		case FeeAggregator:
+			pub := solana.MustPublicKeyFromBase58(address)
+			state.FeeAggregator = pub
 		default:
 			return state, fmt.Errorf("unknown contract %s", tvStr)
 		}

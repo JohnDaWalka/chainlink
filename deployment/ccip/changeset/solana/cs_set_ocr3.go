@@ -3,13 +3,11 @@ package solana
 import (
 	"fmt"
 
-	// "strconv"
-
 	"github.com/gagliardetto/solana-go"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink/deployment"
 	cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
@@ -129,7 +127,7 @@ func isOCR3ConfigSetOnOffRampSolana(
 			e.Logger.Infof("OCR3 config signature verification mismatch")
 			return false, nil
 		}
-		if newState.OCRPluginType == uint8(OcrCommitPlugin) {
+		if newState.OCRPluginType == OcrCommitPlugin {
 			// only commit will set signers, exec doesn't need them.
 			if len(existingState.Signers) != len(newState.Signers) {
 				e.Logger.Infof("OCR3 config signers length mismatch")

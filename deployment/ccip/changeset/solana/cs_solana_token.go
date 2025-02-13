@@ -98,7 +98,6 @@ func (cfg MintSolanaTokenConfig) Validate(e deployment.Environment) error {
 		return err
 	}
 
-	//validation
 	accountInfo, err := chain.Client.GetAccountInfoWithOpts(e.GetContext(), tokenAddress, &rpc.GetAccountInfoOpts{
 		Commitment: deployment.SolDefaultCommitment,
 	})

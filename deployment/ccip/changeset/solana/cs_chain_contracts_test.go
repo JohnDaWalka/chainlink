@@ -145,7 +145,6 @@ func TestAddTokenPool(t *testing.T) {
 	}
 
 	for tokenProgramName, tokenAddress := range tokenMap {
-
 		e, err = commonchangeset.Apply(t, e, nil,
 			commonchangeset.Configure(
 				deployment.CreateLegacyChangeSet(changeset_solana.AddTokenPool),

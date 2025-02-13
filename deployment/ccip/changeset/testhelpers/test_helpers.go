@@ -829,14 +829,14 @@ func DeployTransferableTokenSolana(
 		return nil, nil, solana.PublicKey{}, err
 	}
 	if selectorFamily != chainsel.FamilyEVM {
-		return nil, nil, solana.PublicKey{}, fmt.Errorf("evmChainSel is not an evm chain")
+		return nil, nil, solana.PublicKey{}, fmt.Errorf("evmChainSel %d is not an evm chain", evmChainSel)
 	}
 	selectorFamily, err = chainsel.GetSelectorFamily(solChainSel)
 	if err != nil {
 		return nil, nil, solana.PublicKey{}, err
 	}
 	if selectorFamily != chainsel.FamilySolana {
-		return nil, nil, solana.PublicKey{}, fmt.Errorf("solChainSel is not a solana chain")
+		return nil, nil, solana.PublicKey{}, fmt.Errorf("solChainSel %d is not a solana chain", solChainSel)
 	}
 	state, err := changeset.LoadOnchainState(e)
 	require.NoError(t, err)
