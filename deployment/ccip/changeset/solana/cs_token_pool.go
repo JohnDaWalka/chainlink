@@ -94,6 +94,8 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
 	}
 	// make pool mint_authority for token (required for burn/mint)
+	// this cannot be done for WSOL
+	// so if we ever need a WSOL token pool, we will have to split this out to another changeset
 	authI, err := solTokenUtil.SetTokenMintAuthority(
 		tokenprogramID,
 		poolSigner,
@@ -241,7 +243,6 @@ func (cfg TokenPoolLookupTableConfig) Validate(e deployment.Environment) error {
 		return fmt.Errorf("token pool not found in existing state, deploy the token pool first for chain %d", cfg.ChainSelector)
 	}
 
-	// TODO: do we need to validate if everything that goes into the lookup table is already created ?
 	return nil
 }
 
