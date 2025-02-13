@@ -286,10 +286,23 @@ jobs:
 
           echo $GITHUB_WORKSPACE
 
+          which go
+          go version
+          go env
+          ls -l /opt/hostedtoolcache/go
+
       - name: Build debug image
         if: ${{ matrix.type.skip != 'true' }}
         run: |
-          docker build -f debug.Dockerfile -t go-debug-base .
+          cat <<EOF > Dockerfile.min
+          FROM ubuntu:22.04
+          # We'll rely on the runner's Go installation, so we do NOT install Go here.
+          # Just some basic deps (optional)
+          RUN apt-get update && apt-get install -y ca-certificates git && rm -rf /var/lib/apt/lists/*
+          CMD ["bash"]
+          EOF
+
+          docker build -f Dockerfile.min -t go-debug-base .
 
       - name: Snapshot runner's environment
         if: ${{ matrix.type.skip != 'true' }}
@@ -297,27 +310,32 @@ jobs:
           echo "step 1"
           docker run -d --name go-debug-snap go-debug-base sleep infinity
 
-          echo "step 2"
+          echo "copy repo"
           docker exec go-debug-snap mkdir -p /home/runner/work/chainlink/chainlink
-          docker exec go-debug-snap mkdir -p /home/runner/go/pkg
-          docker exec go-debug-snap mkdir -p /home/runner/.cache
-
-          echo "step 3"
-          # Copy your entire repo exactly as is
           docker cp . go-debug-snap:/home/runner/work/chainlink/chainlink
 
-          echo "step 4"
-          # Copy the Go module cache
+          echo "copy go"
+          docker exec go-debug-snap mkdir -p /opt/hostedtoolcache/go/1.23.4/
+          docker cp /opt/hostedtoolcache/go/1.23.4/x64 go-debug-snap:/opt/hostedtoolcache/go/1.23.4/x64
+
+          echo "copy go mod cache"
+          docker exec go-debug-snap mkdir -p /home/runner/go/pkg
           docker cp $(go env GOMODCACHE) go-debug-snap:/home/runner/go/pkg/
 
-          echo "step 5"
+          echo "step go cache"
+          docker exec go-debug-snap mkdir -p /home/runner/.cache
           docker cp $(go env GOCACHE) go-debug-snap:/home/runner/.cache/
 
-          echo "step 6"
-          # Commit
+          echo "setup envs"
+          docker exec go-debug-snap bash -c "echo 'export GOROOT=/opt/hostedtoolcache/go/1.23.4/x64' >> /root/.bashrc"
+          docker exec go-debug-snap bash -c "echo 'export GOCACHE=/home/runner/.cache/go-build' >> /root/.bashrc"
+          docker exec go-debug-snap bash -c "echo 'export GOMODCACHE=/home/runner/go/pkg/mod' >> /root/.bashrc"
+          docker exec go-debug-snap bash -c "echo 'export PATH=\$GOROOT/bin:\$PATH' >> /root/.bashrc"
+
+          echo "commit"
           docker commit go-debug-snap go-debug-final
 
-          echo "step 7"
+          echo "rm container"
           docker rm -f go-debug-snap
 
       # 7) Save that final snapshot image to a tar.gz file
