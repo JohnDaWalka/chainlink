@@ -401,7 +401,7 @@ jobs:
     name: test-scripts
     needs: [filter]
     runs-on: ubuntu-latest
-    if: ${{  needs.filter.outputs.should-run-ci-core == 'true' }}
+    if: ${{ github.actor == 'dependabot[bot]' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4.2.1
@@ -430,7 +430,7 @@ jobs:
   scan:
     name: SonarQube Scan
     needs: [golangci, core, core-scripts-tests]
-    if: ${{ always() && github.actor != 'dependabot[bot]' }}
+    if: ${{ github.actor == 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repo
@@ -531,7 +531,7 @@ jobs:
 
   clean:
     name: Clean Go Tidy & Generate
-    if: ${{ github.actor != 'dependabot[bot]' }}
+    if: ${{ github.actor == 'dependabot[bot]' }}
     runs-on: ubuntu22.04-8cores-32GB
     defaults:
       run:
