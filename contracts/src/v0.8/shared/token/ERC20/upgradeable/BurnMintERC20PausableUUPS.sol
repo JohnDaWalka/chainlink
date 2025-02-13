@@ -8,26 +8,6 @@ contract BurnMintERC20PausableUUPS is BurnMintERC20UUPS, PausableUpgradeable {
   bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
   // ================================================================
-  // │                            UUPS                              │
-  // ================================================================
-
-  /// @dev the underscores in parameter names are used to suppress compiler warnings about shadowing ERC20 functions
-  function initialize(
-    string memory name,
-    string memory symbol,
-    uint8 decimals_,
-    uint256 maxSupply_,
-    uint256 preMint,
-    address defaultAdmin,
-    address defaultUpgrader,
-    address defaultPauser
-  ) public initializer {
-    super.initialize(name, symbol, decimals_, maxSupply_, preMint, defaultAdmin, defaultUpgrader);
-
-    _grantRole(PAUSER_ROLE, defaultPauser);
-  }
-
-  // ================================================================
   // │                          Pausing                             │
   // ================================================================
 

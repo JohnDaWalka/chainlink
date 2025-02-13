@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {ERC1967Proxy} from "../../../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {BurnMintERC20PausableUUPS} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
+import {BurnMintERC20UUPS} from "../../../../../token/ERC20/upgradeable/BurnMintERC20UUPS.sol";
 import {BaseTest} from "../../../../BaseTest.t.sol";
 
 contract BurnMintERC20PausableUUPSSetup is BaseTest {
@@ -27,12 +28,14 @@ contract BurnMintERC20PausableUUPSSetup is BaseTest {
       new ERC1967Proxy(
         implementation,
         abi.encodeCall(
-          BurnMintERC20PausableUUPS.initialize,
-          (s_name, s_symbol, s_decimals, s_maxSupply, s_preMint, s_defaultAdmin, s_defaultUpgrader, s_defaultPauser)
+          BurnMintERC20UUPS.initialize,
+          (s_name, s_symbol, s_decimals, s_maxSupply, s_preMint, s_defaultAdmin, s_defaultUpgrader)
         )
       )
     );
 
     s_burnMintERC20PausableUUPS = BurnMintERC20PausableUUPS(s_uupsProxy);
+
+    s_burnMintERC20PausableUUPS.grantRole(s_burnMintERC20PausableUUPS.PAUSER_ROLE(), s_defaultPauser);
   }
 }

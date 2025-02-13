@@ -39,25 +39,6 @@ contract BurnMintERC20PausableFreezableTransparent is BurnMintERC20PausableTrans
   }
 
   // ================================================================
-  // │                         Transparent                          │
-  // ================================================================
-
-  function initialize(
-    string memory name,
-    string memory symbol,
-    uint8 decimals,
-    uint256 maxSupply,
-    uint256 preMint,
-    address defaultAdmin,
-    address defaultPauser,
-    address defaultFreezer
-  ) public initializer {
-    super.initialize(name, symbol, decimals, maxSupply, preMint, defaultAdmin, defaultPauser);
-
-    _grantRole(FREEZER_ROLE, defaultFreezer);
-  }
-
-  // ================================================================
   // │                         Freezing                             │
   // ================================================================
 

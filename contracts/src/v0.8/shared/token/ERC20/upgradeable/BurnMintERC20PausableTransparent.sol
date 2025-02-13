@@ -8,30 +8,6 @@ contract BurnMintERC20PausableTransparent is BurnMintERC20Transparent, PausableU
   bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
   // ================================================================
-  // │                         Transparent                          │
-  // ================================================================
-
-  /// @custom:oz-upgrades-unsafe-allow constructor
-  constructor() {
-    _disableInitializers();
-  }
-
-  /// @dev the underscores in parameter names are used to suppress compiler warnings about shadowing ERC20 functions
-  function initialize(
-    string memory name,
-    string memory symbol,
-    uint8 decimals_,
-    uint256 maxSupply_,
-    uint256 preMint,
-    address defaultAdmin,
-    address defaultPauser
-  ) public initializer {
-    super.initialize(name, symbol, decimals_, maxSupply_, preMint, defaultAdmin);
-
-    _grantRole(PAUSER_ROLE, defaultPauser);
-  }
-
-  // ================================================================
   // │                          Pausing                             │
   // ================================================================
 
