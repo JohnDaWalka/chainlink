@@ -858,7 +858,7 @@ func DeployTransferableTokenSolana(
 			deployment.CreateLegacyChangeSet(changeset_solana.MintSolanaToken),
 			changeset_solana.MintSolanaTokenConfig{
 				ChainSelector: solChainSel,
-				TokenPubkey:   solTokenAddress,
+				TokenPubkey:   solTokenAddress.String(),
 				TokenProgram:  deployment.SPL2022Tokens,
 				AmountToAddress: map[string]uint64{
 					solDeployerKey.String(): uint64(1000),
