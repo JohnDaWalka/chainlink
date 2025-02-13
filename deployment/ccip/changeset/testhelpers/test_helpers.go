@@ -811,6 +811,20 @@ func DeployTransferableTokenSolana(
 	evmTokenName string,
 ) (*burn_mint_erc677.BurnMintERC677,
 	*burn_mint_token_pool.BurnMintTokenPool, solana.PublicKey, error) {
+	selectorFamily, err := chainsel.GetSelectorFamily(evmChainSel)
+	if err != nil {
+		return nil, nil, solana.PublicKey{}, err
+	}
+	if selectorFamily != chainsel.FamilyEVM {
+		return nil, nil, solana.PublicKey{}, fmt.Errorf("evmChainSel is not an evm chain")
+	}
+	selectorFamily, err = chainsel.GetSelectorFamily(solChainSel)
+	if err != nil {
+		return nil, nil, solana.PublicKey{}, err
+	}
+	if selectorFamily != chainsel.FamilySolana {
+		return nil, nil, solana.PublicKey{}, fmt.Errorf("solChainSel is not a solana chain")
+	}
 	state, err := changeset.LoadOnchainState(e)
 	require.NoError(t, err)
 
