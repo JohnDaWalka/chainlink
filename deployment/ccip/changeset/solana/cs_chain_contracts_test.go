@@ -345,7 +345,6 @@ func TestTokenAdminRegistry(t *testing.T) {
 	require.Equal(t, tokenAdminRegistryAdminPrivKey.PublicKey(), tokenAdminRegistryAccount.Administrator)
 	require.Equal(t, solana.PublicKey{}, tokenAdminRegistryAccount.PendingAdministrator)
 
-	// TODO: transfer and accept is breaking
 	newTokenAdminRegistryAdminPrivKey, _ := solana.NewRandomPrivateKey()
 	e, err = commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(
