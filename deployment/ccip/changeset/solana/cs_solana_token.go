@@ -60,7 +60,6 @@ func DeploySolanaToken(e deployment.Environment, cfg DeploySolanaTokenConfig) (d
 	if err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
-	// TODO:does the mint need to be added as a signer here ?
 	err = chain.Confirm(instructions, solCommomUtil.AddSigners(mintPrivKey))
 	if err != nil {
 		e.Logger.Errorw("Failed to confirm instructions for link token deployment", "chain", chain.String(), "err", err)
