@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/evm/utils"
 )
 
 func TestValidateDeployTokenPoolContractsConfig(t *testing.T) {
@@ -280,17 +280,17 @@ func TestDeployTokenPoolContracts(t *testing.T) {
 
 			test.Input.TokenAddress = tokens[selectorA].Address
 
-			e, err := commonchangeset.ApplyChangesets(t, e, timelockContracts, []commonchangeset.ChangesetApplication{
-				commonchangeset.ChangesetApplication{
-					Changeset: commonchangeset.WrapChangeSet(changeset.DeployTokenPoolContractsChangeset),
-					Config: changeset.DeployTokenPoolContractsConfig{
+			e, err := commonchangeset.Apply(t, e, timelockContracts,
+				commonchangeset.Configure(
+					deployment.CreateLegacyChangeSet(changeset.DeployTokenPoolContractsChangeset),
+					changeset.DeployTokenPoolContractsConfig{
 						TokenSymbol: testhelpers.TestTokenSymbol,
 						NewPools: map[uint64]changeset.DeployTokenPoolInput{
 							selectorA: test.Input,
 						},
 					},
-				},
-			})
+				),
+			)
 			require.NoError(t, err)
 
 			state, err := changeset.LoadOnchainState(e)
