@@ -428,67 +428,65 @@ func AddLane(
 	fromFamily, _ := chainsel.GetSelectorFamily(from)
 	toFamily, _ := chainsel.GetSelectorFamily(to)
 
-	if fromFamily != chainsel.FamilyEVM {
-		t.Fatalf("from family is not evm, %s", fromFamily)
-	}
+	changesets := []commoncs.ConfiguredChangeSet{}
 
-	changesets := []commoncs.ConfiguredChangeSet{
-		commoncs.Configure(
-			deployment.CreateLegacyChangeSet(changeset.UpdateOnRampsDestsChangeset),
-			changeset.UpdateOnRampDestsConfig{
-				UpdatesByChain: map[uint64]map[uint64]changeset.OnRampDestinationUpdate{
-					from: {
-						to: {
-							IsEnabled:        true,
-							TestRouter:       isTestRouter,
-							AllowListEnabled: false,
+	if fromFamily == chainsel.FamilyEVM {
+		evmSrcChangesets := []commoncs.ConfiguredChangeSet{
+			commoncs.Configure(
+				deployment.CreateLegacyChangeSet(changeset.UpdateOnRampsDestsChangeset),
+				changeset.UpdateOnRampDestsConfig{
+					UpdatesByChain: map[uint64]map[uint64]changeset.OnRampDestinationUpdate{
+						from: {
+							to: {
+								IsEnabled:        true,
+								TestRouter:       isTestRouter,
+								AllowListEnabled: false,
+							},
 						},
 					},
 				},
-			},
-		),
-		commoncs.Configure(
-			deployment.CreateLegacyChangeSet(changeset.UpdateFeeQuoterPricesChangeset),
-			changeset.UpdateFeeQuoterPricesConfig{
-				PricesByChain: map[uint64]changeset.FeeQuoterPriceUpdatePerSource{
-					from: {
-						TokenPrices: tokenPrices,
-						GasPrices:   gasprice,
-					},
-				},
-			},
-		),
-		commoncs.Configure(
-			deployment.CreateLegacyChangeSet(changeset.UpdateFeeQuoterDestsChangeset),
-			changeset.UpdateFeeQuoterDestsConfig{
-				UpdatesByChain: map[uint64]map[uint64]fee_quoter.FeeQuoterDestChainConfig{
-					from: {
-						to: fqCfg,
-					},
-				},
-			},
-		),
-		commoncs.Configure(
-			deployment.CreateLegacyChangeSet(changeset.UpdateRouterRampsChangeset),
-			changeset.UpdateRouterRampsConfig{
-				TestRouter: isTestRouter,
-				UpdatesByChain: map[uint64]changeset.RouterUpdates{
-					// onRamp update on source chain
-					from: {
-						OnRampUpdates: map[uint64]bool{
-							to: true,
+			),
+			commoncs.Configure(
+				deployment.CreateLegacyChangeSet(changeset.UpdateFeeQuoterPricesChangeset),
+				changeset.UpdateFeeQuoterPricesConfig{
+					PricesByChain: map[uint64]changeset.FeeQuoterPriceUpdatePerSource{
+						from: {
+							TokenPrices: tokenPrices,
+							GasPrices:   gasprice,
 						},
 					},
 				},
-			},
-		),
+			),
+			commoncs.Configure(
+				deployment.CreateLegacyChangeSet(changeset.UpdateFeeQuoterDestsChangeset),
+				changeset.UpdateFeeQuoterDestsConfig{
+					UpdatesByChain: map[uint64]map[uint64]fee_quoter.FeeQuoterDestChainConfig{
+						from: {
+							to: fqCfg,
+						},
+					},
+				},
+			),
+			commoncs.Configure(
+				deployment.CreateLegacyChangeSet(changeset.UpdateRouterRampsChangeset),
+				changeset.UpdateRouterRampsConfig{
+					TestRouter: isTestRouter,
+					UpdatesByChain: map[uint64]changeset.RouterUpdates{
+						// onRamp update on source chain
+						from: {
+							OnRampUpdates: map[uint64]bool{
+								to: true,
+							},
+						},
+					},
+				},
+			),
+		}
+		changesets = append(changesets, evmSrcChangesets...)
 	}
 
-	require.NoError(t, err)
-
-	switch toFamily {
-	case chainsel.FamilyEVM:
-		evmChangesets := []commoncs.ConfiguredChangeSet{
+	if toFamily == chainsel.FamilyEVM {
+		evmDstChangesets := []commoncs.ConfiguredChangeSet{
 			commoncs.Configure(
 				deployment.CreateLegacyChangeSet(changeset.UpdateOffRampSourcesChangeset),
 				changeset.UpdateOffRampSourcesConfig{
@@ -518,42 +516,50 @@ func AddLane(
 				},
 			),
 		}
-		changesets = append(changesets, evmChangesets...)
-	case chainsel.FamilySolana:
-		value := [28]uint8{}
-		bigNum, ok := new(big.Int).SetString("19816680000000000000", 10)
-		require.True(t, ok)
-		bigNum.FillBytes(value[:])
-		solanaChangesets := []commoncs.ConfiguredChangeSet{
-			commoncs.Configure(
-				deployment.CreateLegacyChangeSet(changeset_solana.AddRemoteChainToSolana),
-				changeset_solana.AddRemoteChainToSolanaConfig{
-					ChainSelector: to,
-					UpdatesByChain: map[uint64]changeset_solana.RemoteChainConfigSolana{
-						from: {
-							EnabledAsSource:         true,
-							RouterDestinationConfig: solRouter.DestChainConfig{},
-							FeeQuoterDestinationConfig: solFeeQuoter.DestChainConfig{
-								IsEnabled:                   true,
-								DefaultTxGasLimit:           200000,
-								MaxPerMsgGasLimit:           3000000,
-								MaxDataBytes:                30000,
-								MaxNumberOfTokensPerMsg:     5,
-								DefaultTokenDestGasOverhead: 5000,
-								// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
-								// TODO: do a similar test for other chain families
-								ChainFamilySelector: [4]uint8{40, 18, 213, 44},
-							},
-						},
-					},
-				},
-			),
-		}
-		changesets = append(changesets, solanaChangesets...)
+		changesets = append(changesets, evmDstChangesets...)
+	}
+
+	if fromFamily == chainsel.FamilySolana {
+		changesets = append(changesets, addLaneSolanaChangesets(t, from, to)...)
+	} else if toFamily == chainsel.FamilySolana {
+		changesets = append(changesets, addLaneSolanaChangesets(t, to, from)...)
 	}
 
 	e.Env, err = commoncs.ApplyChangesets(t, e.Env, e.TimelockContracts(t), changesets)
 	require.NoError(t, err)
+}
+
+func addLaneSolanaChangesets(t *testing.T, solChainSelector, evmChainSelector uint64) []commoncs.ConfiguredChangeSet {
+	value := [28]uint8{}
+	bigNum, ok := new(big.Int).SetString("19816680000000000000", 10)
+	require.True(t, ok)
+	bigNum.FillBytes(value[:])
+	solanaChangesets := []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(
+			deployment.CreateLegacyChangeSet(changeset_solana.AddRemoteChainToSolana),
+			changeset_solana.AddRemoteChainToSolanaConfig{
+				ChainSelector: solChainSelector,
+				UpdatesByChain: map[uint64]changeset_solana.RemoteChainConfigSolana{
+					evmChainSelector: {
+						EnabledAsSource:         true,
+						RouterDestinationConfig: solRouter.DestChainConfig{},
+						FeeQuoterDestinationConfig: solFeeQuoter.DestChainConfig{
+							IsEnabled:                   true,
+							DefaultTxGasLimit:           200000,
+							MaxPerMsgGasLimit:           3000000,
+							MaxDataBytes:                30000,
+							MaxNumberOfTokensPerMsg:     5,
+							DefaultTokenDestGasOverhead: 5000,
+							// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
+							// TODO: do a similar test for other chain families
+							ChainFamilySelector: [4]uint8{40, 18, 213, 44},
+						},
+					},
+				},
+			},
+		),
+	}
+	return solanaChangesets
 }
 
 // RemoveLane removes a lane between the source and destination chains in the deployed environment.
