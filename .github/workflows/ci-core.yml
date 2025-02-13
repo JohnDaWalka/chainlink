@@ -343,6 +343,16 @@ jobs:
         run: |
           # See: https://github.com/golang/go/issues/69179
           GODEBUG=goindex=0
+
+          echo "Debug info: ---------------------"
+
+          go version
+          echo "------"
+          go env
+          echo "------"
+          env
+          echo "------"
+
           ./tools/bin/${{ matrix.type.cmd }} ./...
 
       - name: Print Races

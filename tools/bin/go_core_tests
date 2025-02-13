@@ -6,6 +6,14 @@ SCRIPT_PATH=`dirname "$0"`; SCRIPT_PATH=`eval "cd \"$SCRIPT_PATH\" && pwd"`
 OUTPUT_FILE=${OUTPUT_FILE:-"./output.txt"}
 EXTRA_FLAGS="-timeout 20m"
 
+echo "Debug info: ---------------------"
+
+go version
+echo "------"
+go env
+echo "------"
+env
+
 echo "Test execution results: ---------------------"
 echo ""
 if [[ $GITHUB_EVENT_NAME == "schedule" ]]; then
