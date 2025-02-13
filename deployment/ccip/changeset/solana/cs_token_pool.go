@@ -93,19 +93,22 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
 	}
-	// make pool mint_authority for token (required for burn/mint)
-	// this cannot be done for WSOL
-	// so if we ever need a WSOL token pool, we will have to split this out to another changeset
-	authI, err := solTokenUtil.SetTokenMintAuthority(
-		tokenprogramID,
-		poolSigner,
-		tokenPubKey,
-		authorityPubKey,
-	)
-	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+
+	instructions := []solana.Instruction{createI, poolInitI}
+
+	if cfg.PoolType == solTestTokenPool.BurnAndMint_PoolType && tokenPubKey != solana.SolMint {
+		// make pool mint_authority for token
+		authI, err := solTokenUtil.SetTokenMintAuthority(
+			tokenprogramID,
+			poolSigner,
+			tokenPubKey,
+			authorityPubKey,
+		)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+		}
+		instructions = append(instructions, authI)
 	}
-	instructions := []solana.Instruction{createI, poolInitI, authI}
 
 	// add signer here if authority is different from deployer key
 	if err := chain.Confirm(instructions); err != nil {
