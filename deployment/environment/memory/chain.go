@@ -204,7 +204,7 @@ func solChain(t *testing.T, chainID uint64, adminKey *solana.PrivateKey) (string
 		}
 
 		bcInput := &blockchain.Input{
-			Image:          "solanalabs/solana:v1.18.26", // TODO: workaround on linux
+			//Image:          "solanalabs/solana:v1.18.26", // TODO: workaround on linux
 			Type:           "solana",
 			ChainID:        strconv.FormatUint(chainID, 10),
 			PublicKey:      adminKey.PublicKey().String(),
