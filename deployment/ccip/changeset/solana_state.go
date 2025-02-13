@@ -19,6 +19,7 @@ var (
 	Receiver                  deployment.ContractType = "Receiver"
 	SPL2022Tokens             deployment.ContractType = "SPL2022Tokens"
 	WSOL                      deployment.ContractType = "WSOL"
+	FeeAggregator             deployment.ContractType = "FeeAggregator"
 	// for PDAs from AddRemoteChainToSolana
 	RemoteSource deployment.ContractType = "RemoteSource"
 	RemoteDest   deployment.ContractType = "RemoteDest"
@@ -40,6 +41,8 @@ type SolCCIPChainState struct {
 	WSOL                      solana.PublicKey
 	FeeQuoter                 solana.PublicKey
 	OffRamp                   solana.PublicKey
+	FeeAggregator             solana.PublicKey
+
 	// PDAs to avoid redundant lookups
 	RouterConfigPDA      solana.PublicKey
 	SourceChainStatePDAs map[uint64]solana.PublicKey // deprecated

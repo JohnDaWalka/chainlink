@@ -449,6 +449,10 @@ func (cfg SetFeeAggregatorConfig) Validate(e deployment.Environment) error {
 		return fmt.Errorf("invalid fee aggregator address: %w", err)
 	}
 
+	if chainState.FeeAggregator.Equals(solana.MustPublicKeyFromBase58(cfg.FeeAggregator)) {
+		return fmt.Errorf("fee aggregator is already set")
+	}
+
 	return nil
 }
 
@@ -478,7 +482,14 @@ func SetFeeAggregator(e deployment.Environment, cfg SetFeeAggregatorConfig) (dep
 	if err := chain.Confirm([]solana.Instruction{instruction}); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
 	}
+	newAddresses := deployment.NewMemoryAddressBook()
+	err = newAddresses.Save(cfg.ChainSelector, cfg.FeeAggregator, deployment.NewTypeAndVersion(changeset.FeeAggregator, deployment.Version1_0_0))
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to save address: %w", err)
+	}
 
 	e.Logger.Infow("Set new fee aggregator", "chain", chain.String(), "fee_aggregator", feeAggregatorPubKey.String())
-	return deployment.ChangesetOutput{}, nil
+	return deployment.ChangesetOutput{
+		AddressBook: newAddresses,
+	}, nil
 }
