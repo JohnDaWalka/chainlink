@@ -5,21 +5,11 @@ import {PausableUpgradeable} from "../../../../vendor/openzeppelin-solidity-upgr
 import {BurnMintERC20UUPS} from "./BurnMintERC20UUPS.sol";
 
 contract BurnMintERC20PausableUUPS is BurnMintERC20UUPS, PausableUpgradeable {
-  error BurnMintERC20PausableUUPS__Paused();
-
-  event Paused();
-  event Unpaused();
-
   bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
   // ================================================================
   // │                            UUPS                              │
   // ================================================================
-
-  /// @custom:oz-upgrades-unsafe-allow constructor
-  constructor() {
-    _disableInitializers();
-  }
 
   /// @dev the underscores in parameter names are used to suppress compiler warnings about shadowing ERC20 functions
   function initialize(
@@ -46,7 +36,7 @@ contract BurnMintERC20PausableUUPS is BurnMintERC20UUPS, PausableUpgradeable {
   function pause() public onlyRole(PAUSER_ROLE) {
     _pause();
 
-    emit Paused();
+    emit Paused(msg.sender);
   }
 
   /// @notice Unpauses the implementation.
@@ -54,7 +44,7 @@ contract BurnMintERC20PausableUUPS is BurnMintERC20UUPS, PausableUpgradeable {
   function unpause() public onlyRole(PAUSER_ROLE) {
     _unpause();
 
-    emit Unpaused();
+    emit Unpaused(msg.sender);
   }
 
   // ================================================================
@@ -63,14 +53,14 @@ contract BurnMintERC20PausableUUPS is BurnMintERC20UUPS, PausableUpgradeable {
 
   /// @dev Disallows sending, minting and burning if implementation is paused.
   function _update(address from, address to, uint256 value) internal virtual override {
-    if (paused()) revert BurnMintERC20PausableUUPS__Paused();
+    _requireNotPaused();
 
     super._update(from, to, value);
   }
 
   /// @dev Disallows approving if implementation is paused.
   function _approve(address owner, address spender, uint256 value, bool emitEvent) internal virtual override {
-    if (paused()) revert BurnMintERC20PausableUUPS__Paused();
+    _requireNotPaused();
 
     super._approve(owner, spender, value, emitEvent);
   }

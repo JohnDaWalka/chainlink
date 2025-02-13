@@ -42,11 +42,6 @@ contract BurnMintERC20PausableFreezableTransparent is BurnMintERC20PausableTrans
   // │                         Transparent                          │
   // ================================================================
 
-  /// @custom:oz-upgrades-unsafe-allow constructor
-  constructor() {
-    _disableInitializers();
-  }
-
   function initialize(
     string memory name,
     string memory symbol,
@@ -93,8 +88,7 @@ contract BurnMintERC20PausableFreezableTransparent is BurnMintERC20PausableTrans
   }
 
   function isFrozen(address account) public view returns (bool) {
-    BurnMintERC20PausableFreezableTransparentStorage storage $ = _getBurnMintERC20PausableFreezableTransparentStorage();
-    return $.s_isFrozen[account];
+    return _getBurnMintERC20PausableFreezableTransparentStorage().s_isFrozen[account];
   }
 
   // ================================================================

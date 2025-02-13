@@ -5,11 +5,6 @@ import {PausableUpgradeable} from "../../../../vendor/openzeppelin-solidity-upgr
 import {BurnMintERC20Transparent} from "./BurnMintERC20Transparent.sol";
 
 contract BurnMintERC20PausableTransparent is BurnMintERC20Transparent, PausableUpgradeable {
-  error BurnMintERC20PausableTransparent__Paused();
-
-  event Paused();
-  event Unpaused();
-
   bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
   // ================================================================
@@ -45,7 +40,7 @@ contract BurnMintERC20PausableTransparent is BurnMintERC20Transparent, PausableU
   function pause() public onlyRole(PAUSER_ROLE) {
     _pause();
 
-    emit Paused();
+    emit Paused(msg.sender);
   }
 
   /// @notice Unpauses the implementation.
@@ -53,7 +48,7 @@ contract BurnMintERC20PausableTransparent is BurnMintERC20Transparent, PausableU
   function unpause() public onlyRole(PAUSER_ROLE) {
     _unpause();
 
-    emit Unpaused();
+    emit Unpaused(msg.sender);
   }
 
   // ================================================================
@@ -62,14 +57,14 @@ contract BurnMintERC20PausableTransparent is BurnMintERC20Transparent, PausableU
 
   /// @dev Disallows sending, minting and burning if implementation is paused.
   function _update(address from, address to, uint256 value) internal virtual override {
-    if (paused()) revert BurnMintERC20PausableTransparent__Paused();
+    _requireNotPaused();
 
     super._update(from, to, value);
   }
 
   /// @dev Disallows approving if implementation is paused.
   function _approve(address owner, address spender, uint256 value, bool emitEvent) internal virtual override {
-    if (paused()) revert BurnMintERC20PausableTransparent__Paused();
+    _requireNotPaused();
 
     super._approve(owner, spender, value, emitEvent);
   }

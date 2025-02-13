@@ -42,11 +42,6 @@ contract BurnMintERC20PausableFreezableUUPS is BurnMintERC20PausableUUPS {
   // │                            UUPS                              │
   // ================================================================
 
-  /// @custom:oz-upgrades-unsafe-allow constructor
-  constructor() {
-    _disableInitializers();
-  }
-
   function initialize(
     string memory name,
     string memory symbol,
@@ -94,8 +89,7 @@ contract BurnMintERC20PausableFreezableUUPS is BurnMintERC20PausableUUPS {
   }
 
   function isFrozen(address account) public view returns (bool) {
-    BurnMintERC20PausableFreezableUUPSStorage storage $ = _getBurnMintERC20PausableFreezableUUPSStorage();
-    return $.s_isFrozen[account];
+    return _getBurnMintERC20PausableFreezableUUPSStorage().s_isFrozen[account];
   }
 
   // ================================================================

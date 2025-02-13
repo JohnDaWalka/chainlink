@@ -5,7 +5,6 @@ import {IGetCCIPAdmin} from "../../../../ccip/interfaces/IGetCCIPAdmin.sol";
 import {IBurnMintERC20Upgradeable} from "../../../../shared/token/ERC20/upgradeable/IBurnMintERC20Upgradeable.sol";
 
 import {Initializable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/proxy/utils/Initializable.sol";
-
 import {AccessControlUpgradeable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/access/AccessControlUpgradeable.sol";
 import {ERC20BurnableUpgradeable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
 import {IAccessControl} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/access/IAccessControl.sol";
@@ -35,11 +34,11 @@ contract BurnMintERC20Transparent is
   /// @custom:storage-location erc7201:chainlink.storage.BurnMintERC20Transparent
   struct BurnMintERC20TransparentStorage {
     /// @dev the CCIPAdmin can be used to register with the CCIP token admin registry, but has no other special powers, and can only be transferred by the owner.
-    address s_ccipAdmin;
+    address ccipAdmin;
     /// @dev The number of decimals for the token
-    uint8 s_decimals;
+    uint8 decimals;
     /// @dev The maximum supply of the token, 0 if unlimited
-    uint256 s_maxSupply;
+    uint256 maxSupply;
   }
 
   // keccak256(abi.encode(uint256(keccak256("chainlink.storage.BurnMintERC20Transparent")) - 1)) & ~bytes32(uint256(0xff));
@@ -77,10 +76,10 @@ contract BurnMintERC20Transparent is
 
     BurnMintERC20TransparentStorage storage $ = _getBurnMintERC20TransparentStorage();
 
-    $.s_decimals = decimals_;
-    $.s_maxSupply = maxSupply_;
+    $.decimals = decimals_;
+    $.maxSupply = maxSupply_;
 
-    $.s_ccipAdmin = defaultAdmin;
+    $.ccipAdmin = defaultAdmin;
 
     if (preMint != 0) {
       _mint(defaultAdmin, preMint);
@@ -112,13 +111,13 @@ contract BurnMintERC20Transparent is
   /// @dev Returns the number of decimals used in its user representation.
   function decimals() public view virtual override returns (uint8) {
     BurnMintERC20TransparentStorage storage $ = _getBurnMintERC20TransparentStorage();
-    return $.s_decimals;
+    return $.decimals;
   }
 
   /// @dev Returns the max supply of the token, 0 if unlimited.
   function maxSupply() public view virtual returns (uint256) {
     BurnMintERC20TransparentStorage storage $ = _getBurnMintERC20TransparentStorage();
-    return $.s_maxSupply;
+    return $.maxSupply;
   }
 
   /// @dev Disallows sending to address(this)
@@ -171,7 +170,7 @@ contract BurnMintERC20Transparent is
   /// @dev Increases the total supply.
   function mint(address account, uint256 amount) external override onlyRole(MINTER_ROLE) {
     BurnMintERC20TransparentStorage storage $ = _getBurnMintERC20TransparentStorage();
-    uint256 _maxSupply = $.s_maxSupply;
+    uint256 _maxSupply = $.maxSupply;
     uint256 _totalSupply = totalSupply();
 
     if (_maxSupply != 0 && _totalSupply + amount > _maxSupply) {
@@ -196,7 +195,7 @@ contract BurnMintERC20Transparent is
   /// @notice Returns the current CCIPAdmin
   function getCCIPAdmin() external view returns (address) {
     BurnMintERC20TransparentStorage storage $ = _getBurnMintERC20TransparentStorage();
-    return $.s_ccipAdmin;
+    return $.ccipAdmin;
   }
 
   /// @notice Transfers the CCIPAdmin role to a new address
@@ -205,9 +204,9 @@ contract BurnMintERC20Transparent is
   /// the role
   function setCCIPAdmin(address newAdmin) external onlyRole(DEFAULT_ADMIN_ROLE) {
     BurnMintERC20TransparentStorage storage $ = _getBurnMintERC20TransparentStorage();
-    address currentAdmin = $.s_ccipAdmin;
+    address currentAdmin = $.ccipAdmin;
 
-    $.s_ccipAdmin = newAdmin;
+    $.ccipAdmin = newAdmin;
 
     emit CCIPAdminTransferred(currentAdmin, newAdmin);
   }

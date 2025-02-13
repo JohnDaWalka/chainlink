@@ -6,7 +6,6 @@ import {IBurnMintERC20Upgradeable} from "../../../../shared/token/ERC20/upgradea
 
 import {Initializable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/proxy/utils/UUPSUpgradeable.sol";
-
 import {AccessControlUpgradeable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/access/AccessControlUpgradeable.sol";
 import {ERC20BurnableUpgradeable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
 import {IAccessControl} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/access/IAccessControl.sol";
@@ -38,11 +37,11 @@ contract BurnMintERC20UUPS is
   /// @custom:storage-location erc7201:chainlink.storage.BurnMintERC20UUPS
   struct BurnMintERC20UUPSStorage {
     /// @dev the CCIPAdmin can be used to register with the CCIP token admin registry, but has no other special powers, and can only be transferred by the owner.
-    address s_ccipAdmin;
+    address ccipAdmin;
     /// @dev The number of decimals for the token
-    uint8 s_decimals;
+    uint8 decimals;
     /// @dev The maximum supply of the token, 0 if unlimited
-    uint256 s_maxSupply;
+    uint256 maxSupply;
   }
 
   // keccak256(abi.encode(uint256(keccak256("chainlink.storage.BurnMintERC20UUPS")) - 1)) & ~bytes32(uint256(0xff));
@@ -82,10 +81,10 @@ contract BurnMintERC20UUPS is
 
     BurnMintERC20UUPSStorage storage $ = _getBurnMintERC20UUPSStorage();
 
-    $.s_decimals = decimals_;
-    $.s_maxSupply = maxSupply_;
+    $.decimals = decimals_;
+    $.maxSupply = maxSupply_;
 
-    $.s_ccipAdmin = defaultAdmin;
+    $.ccipAdmin = defaultAdmin;
 
     if (preMint != 0) {
       _mint(defaultAdmin, preMint);
@@ -119,18 +118,16 @@ contract BurnMintERC20UUPS is
 
   /// @dev Returns the number of decimals used in its user representation.
   function decimals() public view virtual override returns (uint8) {
-    BurnMintERC20UUPSStorage storage $ = _getBurnMintERC20UUPSStorage();
-    return $.s_decimals;
+    return _getBurnMintERC20UUPSStorage().decimals;
   }
 
   /// @dev Returns the max supply of the token, 0 if unlimited.
   function maxSupply() public view virtual returns (uint256) {
-    BurnMintERC20UUPSStorage storage $ = _getBurnMintERC20UUPSStorage();
-    return $.s_maxSupply;
+    return _getBurnMintERC20UUPSStorage().maxSupply;
   }
 
   /// @dev Uses OZ ERC20Upgradeable _update to disallow transfers, minting and burning to/from address(0).
-  /// @dev Disallows minting and transfering to address(this).
+  /// @dev Disallows minting and transferring to address(this).
   function _update(address from, address to, uint256 value) internal virtual override {
     if (to == address(this)) revert BurnMintERC20UUPS__InvalidRecipient(to);
 
@@ -180,8 +177,7 @@ contract BurnMintERC20UUPS is
   /// @dev Disallows minting to address(this) via _beforeTokenTransfer hook.
   /// @dev Increases the total supply.
   function mint(address account, uint256 amount) external override onlyRole(MINTER_ROLE) {
-    BurnMintERC20UUPSStorage storage $ = _getBurnMintERC20UUPSStorage();
-    uint256 _maxSupply = $.s_maxSupply;
+    uint256 _maxSupply = _getBurnMintERC20UUPSStorage().maxSupply;
     uint256 _totalSupply = totalSupply();
 
     if (_maxSupply != 0 && _totalSupply + amount > _maxSupply) {
@@ -205,8 +201,7 @@ contract BurnMintERC20UUPS is
 
   /// @notice Returns the current CCIPAdmin
   function getCCIPAdmin() external view returns (address) {
-    BurnMintERC20UUPSStorage storage $ = _getBurnMintERC20UUPSStorage();
-    return $.s_ccipAdmin;
+    return _getBurnMintERC20UUPSStorage().ccipAdmin;
   }
 
   /// @notice Transfers the CCIPAdmin role to a new address
@@ -215,9 +210,9 @@ contract BurnMintERC20UUPS is
   /// the role
   function setCCIPAdmin(address newAdmin) external onlyRole(DEFAULT_ADMIN_ROLE) {
     BurnMintERC20UUPSStorage storage $ = _getBurnMintERC20UUPSStorage();
-    address currentAdmin = $.s_ccipAdmin;
+    address currentAdmin = $.ccipAdmin;
 
-    $.s_ccipAdmin = newAdmin;
+    $.ccipAdmin = newAdmin;
 
     emit CCIPAdminTransferred(currentAdmin, newAdmin);
   }
