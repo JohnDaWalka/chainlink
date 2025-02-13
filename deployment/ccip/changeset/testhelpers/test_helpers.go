@@ -520,27 +520,36 @@ func AddLane(
 	}
 
 	if fromFamily == chainsel.FamilySolana {
-		changesets = append(changesets, addLaneSolanaChangesets(t, from, to)...)
-	} else if toFamily == chainsel.FamilySolana {
-		changesets = append(changesets, addLaneSolanaChangesets(t, to, from)...)
+		changesets = append(changesets, addLaneSolanaChangesets(t, from, to, toFamily)...)
+	}
+	if toFamily == chainsel.FamilySolana {
+		changesets = append(changesets, addLaneSolanaChangesets(t, to, from, fromFamily)...)
 	}
 
 	e.Env, err = commoncs.ApplyChangesets(t, e.Env, e.TimelockContracts(t), changesets)
 	require.NoError(t, err)
 }
 
-func addLaneSolanaChangesets(t *testing.T, solChainSelector, evmChainSelector uint64) []commoncs.ConfiguredChangeSet {
+func addLaneSolanaChangesets(t *testing.T, solChainSelector, remoteChainSelector uint64, remoteFamily string) []commoncs.ConfiguredChangeSet {
 	value := [28]uint8{}
 	bigNum, ok := new(big.Int).SetString("19816680000000000000", 10)
 	require.True(t, ok)
 	bigNum.FillBytes(value[:])
+	chainFamilySelector := [4]uint8{}
+	if remoteFamily == chainsel.FamilyEVM {
+		// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
+		chainFamilySelector = [4]uint8{40, 18, 213, 44}
+	} else if remoteFamily == chainsel.FamilySolana {
+		// bytes4(keccak256("CCIP ChainFamilySelector SVM"));
+		chainFamilySelector = [4]uint8{30, 16, 189, 196}
+	}
 	solanaChangesets := []commoncs.ConfiguredChangeSet{
 		commoncs.Configure(
 			deployment.CreateLegacyChangeSet(changeset_solana.AddRemoteChainToSolana),
 			changeset_solana.AddRemoteChainToSolanaConfig{
 				ChainSelector: solChainSelector,
 				UpdatesByChain: map[uint64]changeset_solana.RemoteChainConfigSolana{
-					evmChainSelector: {
+					remoteChainSelector: {
 						EnabledAsSource:         true,
 						RouterDestinationConfig: solRouter.DestChainConfig{},
 						FeeQuoterDestinationConfig: solFeeQuoter.DestChainConfig{
@@ -550,9 +559,7 @@ func addLaneSolanaChangesets(t *testing.T, solChainSelector, evmChainSelector ui
 							MaxDataBytes:                30000,
 							MaxNumberOfTokensPerMsg:     5,
 							DefaultTokenDestGasOverhead: 5000,
-							// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
-							// TODO: do a similar test for other chain families
-							ChainFamilySelector: [4]uint8{40, 18, 213, 44},
+							ChainFamilySelector:         chainFamilySelector,
 						},
 					},
 				},
