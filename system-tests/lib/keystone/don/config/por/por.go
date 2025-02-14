@@ -2,10 +2,9 @@ package por
 
 import (
 	"strconv"
-	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
+	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
@@ -17,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
 )
 
-func Define(t *testing.T,
+func Define(
 	don *devenv.DON,
 	nodeInput *types.CapabilitiesAwareNodeSet,
 	nodeOutput *types.WrappedNodeOutput,
@@ -29,15 +28,19 @@ func Define(t *testing.T,
 	workflowRegistryAddr,
 	forwarderAddress common.Address,
 	gatewayConnectorData *types.GatewayConnectorData,
-) types.NodeIndexToConfigOverrides {
+) (types.NodeIndexToConfigOverrides, error) {
 	// prepare required variables
 	donBootstrapNodePeerID, err := node.ToP2PID(don.Nodes[0], node.KeyExtractingTransformFn)
-	require.NoError(t, err, "failed to get bootstrap node peer ID")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get bootstrap node peer ID")
+	}
 
 	donBootstrapNodeHost := nodeOutput.CLNodes[0].Node.ContainerName
 
 	chainIDInt, err := strconv.Atoi(bc.ChainID)
-	require.NoError(t, err, "failed to convert chain ID to int")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to convert chain ID to int")
+	}
 	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
 
 	configOverrides := make(types.NodeIndexToConfigOverrides)
@@ -48,7 +51,9 @@ func Define(t *testing.T,
 	if keystoneflags.HasFlag(flags, types.WorkflowDON) {
 		configOverrides[0] += config.BoostrapDon2DonPeering(peeringData)
 
-		require.NotNil(t, gatewayConnectorData.Host, "gatewayConnectorData.Host is required for Workflow DON")
+		if gatewayConnectorData == nil {
+			return nil, errors.New("gatewayConnectorData is required for Workflow DON")
+		}
 		gatewayConnectorData.Host = donBootstrapNodeHost
 	}
 
@@ -83,5 +88,5 @@ func Define(t *testing.T,
 		}
 	}
 
-	return configOverrides
+	return configOverrides, nil
 }

@@ -2,21 +2,26 @@ package don
 
 import (
 	"math/big"
-	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 
 	libfunding "github.com/smartcontractkit/chainlink/system-tests/lib/funding"
 	keystonetypes "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
 
-func FundNodes(t *testing.T, keystoneEnv *keystonetypes.KeystoneEnvironment) {
-	require.NotNil(t, keystoneEnv, "keystone environment must be set")
-	require.NotNil(t, keystoneEnv.SethClient, "seth client must be set")
-	require.NotNil(t, keystoneEnv.Dons, "dons must be set")
+func FundNodes(keystoneEnv *keystonetypes.KeystoneEnvironment) error {
+	if keystoneEnv == nil {
+		return errors.New("keystone environment must not be nil")
+	}
+	if keystoneEnv.SethClient == nil {
+		return errors.New("seth client must be set")
+	}
+	if len(keystoneEnv.Dons) == 0 {
+		return errors.New("dons must be set")
+	}
 
 	for _, don := range keystoneEnv.Dons {
 		for _, node := range don.Nodes {
@@ -25,7 +30,11 @@ func FundNodes(t *testing.T, keystoneEnv *keystonetypes.KeystoneEnvironment) {
 				Amount:     big.NewInt(5000000000000000000),
 				PrivateKey: keystoneEnv.SethClient.MustGetRootPrivateKey(),
 			})
-			require.NoError(t, err, "failed to send funds to node %s", node.AccountAddr[keystoneEnv.SethClient.Cfg.Network.ChainID])
+			if err != nil {
+				return errors.Wrapf(err, "failed to send funds to node %s", node.AccountAddr[keystoneEnv.SethClient.Cfg.Network.ChainID])
+			}
 		}
 	}
+
+	return nil
 }

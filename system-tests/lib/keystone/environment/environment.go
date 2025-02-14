@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
@@ -22,20 +21,44 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
 )
 
-func BuildTopologyAndCLDEnvironment(t *testing.T, keystoneEnv *types.KeystoneEnvironment) {
-	buildChainlinkDeploymentEnv(t, keystoneEnv)
-	don.BuildDONTopology(t, keystoneEnv)
+func BuildTopologyAndCLDEnvironment(lgr logger.Logger, keystoneEnv *types.KeystoneEnvironment) error {
+	err := buildChainlinkDeploymentEnv(lgr, keystoneEnv)
+	if err != nil {
+		return errors.Wrap(err, "failed to build chainlink deployment environment")
+	}
+	err = don.BuildDONTopology(keystoneEnv)
+	if err != nil {
+		return errors.Wrap(err, "failed to build DON topology")
+	}
+
+	return nil
 }
 
-func buildChainlinkDeploymentEnv(t *testing.T, keystoneEnv *types.KeystoneEnvironment) {
-	lgr := logger.TestLogger(t)
-	require.NotNil(t, keystoneEnv, "keystone environment must be set")
-	require.NotNil(t, keystoneEnv.Blockchain, "blockchain must be set")
-	require.NotNil(t, keystoneEnv.WrappedNodeOutput, "wrapped node output must be set")
-	require.NotNil(t, keystoneEnv.JD, "job distributor must be set")
-	require.NotNil(t, keystoneEnv.SethClient, "seth client must be set")
-	require.GreaterOrEqual(t, len(keystoneEnv.Blockchain.Nodes), 1, "expected at least one node in the blockchain output")
-	require.GreaterOrEqual(t, len(keystoneEnv.WrappedNodeOutput), 1, "expected at least one node in the wrapped node output")
+func buildChainlinkDeploymentEnv(lgr logger.Logger, keystoneEnv *types.KeystoneEnvironment) error {
+	if keystoneEnv == nil {
+		return errors.New("keystone environment must be set")
+	}
+	if keystoneEnv.Environment == nil {
+		return errors.New("environment must be set")
+	}
+	if keystoneEnv.Blockchain == nil {
+		return errors.New("blockchain must be set")
+	}
+	if keystoneEnv.WrappedNodeOutput == nil {
+		return errors.New("wrapped node output must be set")
+	}
+	if keystoneEnv.JD == nil {
+		return errors.New("job distributor must be set")
+	}
+	if keystoneEnv.SethClient == nil {
+		return errors.New("seth client must be set")
+	}
+	if len(keystoneEnv.Blockchain.Nodes) < 1 {
+		return errors.New("expected at least one node in the blockchain output")
+	}
+	if len(keystoneEnv.WrappedNodeOutput) < 1 {
+		return errors.New("expected at least one node in the wrapped node output")
+	}
 
 	envs := make([]*deployment.Environment, len(keystoneEnv.WrappedNodeOutput))
 	keystoneEnv.Dons = make([]*devenv.DON, len(keystoneEnv.WrappedNodeOutput))
@@ -43,7 +66,9 @@ func buildChainlinkDeploymentEnv(t *testing.T, keystoneEnv *types.KeystoneEnviro
 	for i, nodeOutput := range keystoneEnv.WrappedNodeOutput {
 		// assume that each nodeset has only one bootstrap node
 		nodeInfo, err := getNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, 1)
-		require.NoError(t, err, "failed to get node info")
+		if err != nil {
+			return errors.Wrap(err, "failed to get node info")
+		}
 
 		jdConfig := devenv.JDConfig{
 			GRPC:     keystoneEnv.JD.HostGRPCUrl,
@@ -73,7 +98,9 @@ func buildChainlinkDeploymentEnv(t *testing.T, keystoneEnv *types.KeystoneEnviro
 		}
 
 		env, don, err := devenv.NewEnvironment(context.Background, lgr, devenvConfig)
-		require.NoError(t, err, "failed to create environment")
+		if err != nil {
+			return errors.Wrap(err, "failed to create environment")
+		}
 
 		envs[i] = env
 		keystoneEnv.Dons[i] = don
@@ -98,6 +125,8 @@ func buildChainlinkDeploymentEnv(t *testing.T, keystoneEnv *types.KeystoneEnviro
 		GetContext:        envs[0].GetContext,
 		NodeIDs:           nodeIDs,
 	}
+
+	return nil
 }
 
 // copied from Bala's unmerged PR: https://github.com/smartcontractkit/chainlink/pull/15751

@@ -2,10 +2,9 @@ package por
 
 import (
 	"strconv"
-	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
+	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -23,14 +22,18 @@ import (
 // If we wanted to by fancy we could also accept map[JobDescription]string that would get us the job spec
 // if there's no job spec for the given JobDescription we would use the standard one, that could be easier
 // than having to define the job spec for each JobDescription manually, in case someone wants to change one parameter
-func Define(t *testing.T, ctfEnv *deployment.Environment, don *devenv.DON, nodeOutput *types.WrappedNodeOutput, bc *blockchain.Output, ocr3CapabilityAddress common.Address, donID uint32, flags []string, extraAllowedPorts []int, extraAllowedIps []string, cronCapBinName string, gatewayConnectorData types.GatewayConnectorData) types.DonJobs {
+func Define(ctfEnv *deployment.Environment, don *devenv.DON, nodeOutput *types.WrappedNodeOutput, bc *blockchain.Output, ocr3CapabilityAddress common.Address, donID uint32, flags []string, extraAllowedPorts []int, extraAllowedIps []string, cronCapBinName string, gatewayConnectorData types.GatewayConnectorData) (types.DonJobs, error) {
 	donBootstrapNodePeerID, err := keystonenode.ToP2PID(don.Nodes[0], keystonenode.KeyExtractingTransformFn)
-	require.NoError(t, err, "failed to get bootstrap node peer ID")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get bootstrap node peer ID")
+	}
 
 	donBootstrapNodeHost := nodeOutput.CLNodes[0].Node.ContainerName
 
 	chainIDInt, err := strconv.Atoi(bc.ChainID)
-	require.NoError(t, err, "failed to convert chain ID to int")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to convert chain ID to int")
+	}
 	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
 
 	jobSpecs := make(types.DonJobs)
@@ -101,5 +104,5 @@ func Define(t *testing.T, ctfEnv *deployment.Environment, don *devenv.DON, nodeO
 		}
 	}
 
-	return jobSpecs
+	return jobSpecs, nil
 }

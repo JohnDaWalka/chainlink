@@ -3,11 +3,8 @@ package jobs
 import (
 	"context"
 	"sync"
-	"testing"
 
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
@@ -27,7 +24,7 @@ var SupportedJobs = []types.JobDescription{
 	{Flag: types.OCR3Capability, NodeType: types.WorkerNode},
 }
 
-func Create(t *testing.T, offChainClient deployment.OffchainClient, don *devenv.DON, flags []string, jobSpecs types.DonJobs) {
+func Create(offChainClient deployment.OffchainClient, don *devenv.DON, flags []string, jobSpecs types.DonJobs) error {
 	errCh := make(chan error, calculateJobCount(jobSpecs))
 
 	var wg sync.WaitGroup
@@ -52,14 +49,16 @@ func Create(t *testing.T, offChainClient deployment.OffchainClient, don *devenv.
 	wg.Wait()
 	close(errCh)
 
-	errFound := false
+	var finalErr error
 	for err := range errCh {
-		errFound = true
-		//nolint:testifylint // we want to assert here to catch all errors
-		assert.NoError(t, err, "job creation/acception failed")
+		finalErr = errors.Wrap(finalErr, err.Error())
 	}
 
-	require.False(t, errFound, "failed to create at least one job for DON")
+	if finalErr != nil {
+		return errors.Wrap(finalErr, "failed to create at least one job for DON")
+	}
+
+	return nil
 }
 
 func calculateJobCount(jobSpecs types.DonJobs) int {

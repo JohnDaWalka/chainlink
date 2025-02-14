@@ -2,9 +2,8 @@ package flags
 
 import (
 	"slices"
-	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
 )
@@ -25,11 +24,13 @@ func HasFlag(values []string, flag string) bool {
 	return slices.Contains(values, flag)
 }
 
-func MustOneDONTopologyWithFlag(t *testing.T, donTopologies []*types.DONTopology, flag string) *types.DONTopology {
+func OneDONTopologyWithFlag(donTopologies []*types.DONTopology, flag string) (*types.DONTopology, error) {
 	donTopologies = DONTopologyWithFlag(donTopologies, flag)
-	require.Len(t, donTopologies, 1, "expected exactly one DON topology with flag %d", flag)
+	if len(donTopologies) != 1 {
+		return nil, errors.Errorf("expected exactly one DON topology with flag %s, got %d", flag, len(donTopologies))
+	}
 
-	return donTopologies[0]
+	return donTopologies[0], nil
 }
 
 func NodeSetFlags(nodeSet *types.CapabilitiesAwareNodeSet) ([]string, error) {

@@ -6,12 +6,17 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
-	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/pkg/errors"
 )
 
-func CompileWorkflow(t *testing.T, workflowFolder string, configFile, settingsFile *os.File) (string, string) {
+type CompilationResult struct {
+	WorkflowURL string
+	ConfigURL   string
+	SecretsURL  string
+}
+
+func CompileWorkflow(workflowFolder string, configFile, settingsFile *os.File) (CompilationResult, error) {
 	var outputBuffer bytes.Buffer
 
 	// the CLI expects the workflow code to be located in the same directory as its `go.mod`` file. That's why we assume that the file, which
@@ -21,16 +26,21 @@ func CompileWorkflow(t *testing.T, workflowFolder string, configFile, settingsFi
 	compileCmd.Stderr = &outputBuffer
 	compileCmd.Dir = workflowFolder
 	err := compileCmd.Start()
-	require.NoError(t, err, "failed to start compile command")
+	if err != nil {
+		return CompilationResult{}, errors.Wrap(err, "failed to start compile command")
+	}
 
 	err = compileCmd.Wait()
 	fmt.Println("Compile output:\n", outputBuffer.String())
-
-	require.NoError(t, err, "failed to wait for compile command")
+	if err != nil {
+		return CompilationResult{}, errors.Wrap(err, "failed to wait for compile command")
+	}
 
 	re := regexp.MustCompile(`Gist URL=([^\s]+)`)
 	matches := re.FindAllStringSubmatch(outputBuffer.String(), -1)
-	require.Len(t, matches, 2, "failed to find 2 gist URLs in compile output")
+	if len(matches) != 3 {
+		return CompilationResult{}, errors.New("failed to find gist URLs in compile output")
+	}
 
 	ansiEscapePattern := `\x1b\[[0-9;]*m`
 	re = regexp.MustCompile(ansiEscapePattern)
@@ -38,15 +48,23 @@ func CompileWorkflow(t *testing.T, workflowFolder string, configFile, settingsFi
 	workflowGistURL := re.ReplaceAllString(matches[0][1], "")
 	workflowConfigURL := re.ReplaceAllString(matches[1][1], "")
 
-	require.NotEmpty(t, workflowGistURL, "failed to find workflow gist URL")
-	require.NotEmpty(t, workflowConfigURL, "failed to find workflow config gist URL")
+	if workflowGistURL == "" || workflowConfigURL == "" {
+		return CompilationResult{}, errors.New("failed to find gist URLs in compile output")
+	}
 
-	return workflowGistURL, workflowConfigURL
+	return CompilationResult{
+		WorkflowURL: workflowGistURL,
+		ConfigURL:   workflowConfigURL,
+	}, nil
 }
 
-func RegisterWorkflow(t *testing.T, workflowName, workflowURL, configURL string, settingsFile *os.File) {
+func RegisterWorkflow(workflowName, workflowURL, configURL string, settingsFile *os.File) error {
 	registerCmd := exec.Command(CRECLICommand, "workflow", "register", workflowName, "-b", workflowURL, "-c", configURL, "-S", settingsFile.Name(), "-v") // #nosec G204
 	registerCmd.Stdout = os.Stdout
 	registerCmd.Stderr = os.Stderr
-	require.NoError(t, registerCmd.Run(), "failed to register workflow using CRE CLI")
+	if err := registerCmd.Start(); err != nil {
+		return errors.Wrap(err, "failed to start register command")
+	}
+
+	return nil
 }

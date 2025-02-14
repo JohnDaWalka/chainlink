@@ -24,6 +24,7 @@ import (
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
+	"github.com/smartcontractkit/chainlink/deployment/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
@@ -187,7 +188,8 @@ func registerPoRWorkflow(t *testing.T, in *TestConfig, workflowName string, keys
 	// This is a legacy solution, probably we can remove it soon, but there's still quite a lot of people
 	// who have no access to dev-platform repo, so they cannot use the CRE CLI
 	if !in.WorkflowConfig.ShouldCompileNewWorkflow && !in.WorkflowConfig.UseCRECLI {
-		libcontracts.RegisterWorkflow(t, keystoneEnv.SethClient, keystoneEnv.KeystoneContractAddresses.WorkflowRegistryAddress, keystoneEnv.WorkflowDONID, workflowName, in.WorkflowConfig.CompiledWorkflowConfig.BinaryURL, in.WorkflowConfig.CompiledWorkflowConfig.ConfigURL)
+		err := libcontracts.RegisterWorkflow(keystoneEnv.SethClient, keystoneEnv.KeystoneContractAddresses.WorkflowRegistryAddress, keystoneEnv.WorkflowDONID, workflowName, in.WorkflowConfig.CompiledWorkflowConfig.BinaryURL, in.WorkflowConfig.CompiledWorkflowConfig.ConfigURL)
+		require.NoError(t, err, "failed to register workflow")
 
 		return
 	}
@@ -200,22 +202,29 @@ func registerPoRWorkflow(t *testing.T, in *TestConfig, workflowName string, keys
 	require.NoError(t, err, "failed to set ETH_PRIVATE_KEY env var")
 
 	// create CRE CLI settings file
-	settingsFile := libcrecli.PrepareCRECLISettingsFile(t, keystoneEnv.SethClient.MustGetRootKeyAddress(), keystoneEnv.KeystoneContractAddresses.CapabilitiesRegistryAddress, keystoneEnv.KeystoneContractAddresses.WorkflowRegistryAddress, keystoneEnv.WorkflowDONID, keystoneEnv.ChainSelector, keystoneEnv.Blockchain.Nodes[0].HostHTTPUrl)
+	settingsFile, settingsErr := libcrecli.PrepareCRECLISettingsFile(keystoneEnv.SethClient.MustGetRootKeyAddress(), keystoneEnv.KeystoneContractAddresses.CapabilitiesRegistryAddress, keystoneEnv.KeystoneContractAddresses.WorkflowRegistryAddress, keystoneEnv.WorkflowDONID, keystoneEnv.ChainSelector, keystoneEnv.Blockchain.Nodes[0].HostHTTPUrl)
+	require.NoError(t, settingsErr, "failed to create CRE CLI settings file")
 
 	var workflowURL string
 	var workflowConfigURL string
 
-	workflowConfigFile := keystoneporcrecli.CreateConfigFile(t, keystoneEnv.KeystoneContractAddresses.FeedsConsumerAddress, in.PriceProvider.FeedID, priceProvider.URL())
+	workflowConfigFile, configErr := keystoneporcrecli.CreateConfigFile(keystoneEnv.KeystoneContractAddresses.FeedsConsumerAddress, in.PriceProvider.FeedID, priceProvider.URL())
+	require.NoError(t, configErr, "failed to create workflow config file")
 
 	// compile and upload the workflow, if we are not using an existing one
 	if in.WorkflowConfig.ShouldCompileNewWorkflow {
-		workflowURL, workflowConfigURL = libcrecli.CompileWorkflow(t, *in.WorkflowConfig.WorkflowFolderLocation, workflowConfigFile, settingsFile)
+		compilationResult, err := libcrecli.CompileWorkflow(*in.WorkflowConfig.WorkflowFolderLocation, workflowConfigFile, settingsFile)
+		require.NoError(t, err, "failed to compile workflow")
+
+		workflowURL = compilationResult.WorkflowURL
+		workflowConfigURL = compilationResult.ConfigURL
 	} else {
 		workflowURL = in.WorkflowConfig.CompiledWorkflowConfig.BinaryURL
 		workflowConfigURL = in.WorkflowConfig.CompiledWorkflowConfig.ConfigURL
 	}
 
-	libcrecli.RegisterWorkflow(t, workflowName, workflowURL, workflowConfigURL, settingsFile)
+	registerErr := libcrecli.RegisterWorkflow(workflowName, workflowURL, workflowConfigURL, settingsFile)
+	require.NoError(t, registerErr, "failed to register workflow")
 }
 
 func startNodeSets(t *testing.T, nsInputs []*keystonetypes.CapabilitiesAwareNodeSet, keystoneEnv *keystonetypes.KeystoneEnvironment) {
@@ -503,26 +512,33 @@ func prepareTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestCon
 	priceProvider := setupPriceProvider(t, testLogger, in)
 
 	// Start job distributor
-	libjobs.StartJobDistributor(t, in.JD, keystoneEnv)
+	err := libjobs.StartJobDistributor(in.JD, keystoneEnv)
+	require.NoError(t, err, "failed to start job distributor")
 
 	// Deploy the DONs
 	startNodeSets(t, in.NodeSets, keystoneEnv)
 
 	// Prepare the CLD environment and figure out DON topology; configure chains for nodes and job distributor
-	keystoneenv.BuildTopologyAndCLDEnvironment(t, keystoneEnv)
+	err = keystoneenv.BuildTopologyAndCLDEnvironment(logger.NewSingleFileLogger(t), keystoneEnv)
+	require.NoError(t, err, "failed to build topology and CLD environment")
 
 	// Fund the nodes
-	libdon.FundNodes(t, keystoneEnv)
+	err = libdon.FundNodes(keystoneEnv)
+	require.NoError(t, err, "failed to fund nodes")
 
 	// Deploy keystone contracts (forwarder, capability registry, ocr3 capability, workflow registry)
-	libcontracts.DeployKeystone(t, testLogger, keystoneEnv)
+	err = libcontracts.DeployKeystone(testLogger, keystoneEnv)
+	require.NoError(t, err, "failed to deploy keystone contracts")
 
 	// Separated from Keystone deployment because it will soon be replaced with DF Cache
-	libcontracts.DeployFeedsConsumer(t, testLogger, keystoneEnv)
+	err = libcontracts.DeployFeedsConsumer(testLogger, keystoneEnv)
+	require.NoError(t, err, "failed to deploy feeds consumer")
 
 	// Configure Workflow Registry and Feeds Consumer
-	libcontracts.ConfigureWorkflowRegistry(t, testLogger, keystoneEnv)
-	libcontracts.ConfigureFeedsConsumer(t, testLogger, in.WorkflowConfig.WorkflowName, keystoneEnv)
+	err = libcontracts.ConfigureWorkflowRegistry(testLogger, keystoneEnv)
+	require.NoError(t, err, "failed to configure workflow registry")
+	err = libcontracts.ConfigureFeedsConsumer(testLogger, in.WorkflowConfig.WorkflowName, keystoneEnv)
+	require.NoError(t, err, "failed to configure feeds consumer")
 
 	// Register the workflow (either via CRE CLI or by calling the workflow registry directly; using only workflow DON id)
 	registerPoRWorkflow(t, in, in.WorkflowConfig.WorkflowName, keystoneEnv, priceProvider)
@@ -539,7 +555,8 @@ func prepareTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestCon
 	testLogger.Info().Msg("Proceeding to set OCR3 configuration.")
 
 	// Configure the Forwarder, OCR3 and Capabilities contracts
-	libcontracts.ConfigureKeystone(t, keystoneEnv)
+	err = libcontracts.ConfigureKeystone(keystoneEnv)
+	require.NoError(t, err, "failed to configure keystone contracts")
 
 	return keystoneEnv, priceProvider
 }
@@ -551,8 +568,9 @@ func prepareJobSpecsAndNodeConfigs(t *testing.T, testLogger zerolog.Logger, in *
 	require.NoError(t, err, "failed to get peering data")
 
 	donToConfigs := make(keystonetypes.DonsToConfigOverrides)
+	var configErr error
 	for _, donTopology := range keystoneEnv.DONTopology {
-		donToConfigs[donTopology.ID] = keystoneporconfig.Define(t,
+		donToConfigs[donTopology.ID], configErr = keystoneporconfig.Define(
 			donTopology.DON,
 			donTopology.NodeInput,
 			donTopology.NodeOutput,
@@ -565,12 +583,14 @@ func prepareJobSpecsAndNodeConfigs(t *testing.T, testLogger zerolog.Logger, in *
 			keystoneEnv.KeystoneContractAddresses.ForwarderAddress,
 			keystoneEnv.GatewayConnectorData,
 		)
+		require.NoError(t, configErr, "failed to define config for DON %d", donTopology.ID)
 	}
 
 	// define jobs
 	donToJobSpecs := make(map[uint32]keystonetypes.DonJobs)
+	var jobSpecsErr error
 	for _, donTopology := range keystoneEnv.DONTopology {
-		jobSpecs := keystonepor.Define(t,
+		donToJobSpecs[donTopology.ID], jobSpecsErr = keystonepor.Define(
 			keystoneEnv.Environment,
 			donTopology.DON,
 			donTopology.NodeOutput,
@@ -583,7 +603,7 @@ func prepareJobSpecsAndNodeConfigs(t *testing.T, testLogger zerolog.Logger, in *
 			cronCapabilityAssetFile,
 			*keystoneEnv.GatewayConnectorData,
 		)
-		donToJobSpecs[donTopology.ID] = jobSpecs
+		require.NoError(t, jobSpecsErr, "failed to define job specs for DON %d", donTopology.ID)
 	}
 
 	return donToConfigs, donToJobSpecs
@@ -617,7 +637,7 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 				return
 			}
 
-			lidebug.PrintTestDebug(t, testLogger, keystoneEnv)
+			lidebug.PrintTestDebug(t.Name(), testLogger, keystoneEnv)
 		}
 	})
 

@@ -4,22 +4,25 @@ import (
 	"encoding/json"
 	"os"
 	"strings"
-	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
+	"github.com/pkg/errors"
 
 	libcrecli "github.com/smartcontractkit/chainlink/system-tests/lib/crecli"
 )
 
-func CreateConfigFile(t *testing.T, feedsConsumerAddress common.Address, feedID, dataURL string) *os.File {
+func CreateConfigFile(feedsConsumerAddress common.Address, feedID, dataURL string) (*os.File, error) {
 	configFile, err := os.CreateTemp("", "config.json")
-	require.NoError(t, err, "failed to create workflow config file")
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create workflow config file")
+	}
 
 	cleanFeedID := strings.TrimPrefix(feedID, "0x")
 	feedLength := len(cleanFeedID)
 
-	require.GreaterOrEqual(t, feedLength, 32, "feed ID must be at least 32 characters long")
+	if feedLength < 32 {
+		return nil, errors.Errorf("feed ID must be at least 32 characters long, but was %d", feedLength)
+	}
 
 	if feedLength > 32 {
 		cleanFeedID = cleanFeedID[:32]
@@ -34,10 +37,14 @@ func CreateConfigFile(t *testing.T, feedsConsumerAddress common.Address, feedID,
 	}
 
 	configMarshalled, err := json.Marshal(workflowConfig)
-	require.NoError(t, err, "failed to marshal workflow config")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal workflow config")
+	}
 
 	_, err = configFile.Write(configMarshalled)
-	require.NoError(t, err, "failed to write workflow config file")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to write workflow config file")
+	}
 
-	return configFile
+	return configFile, nil
 }

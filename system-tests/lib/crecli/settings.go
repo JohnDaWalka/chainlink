@@ -2,11 +2,10 @@ package crecli
 
 import (
 	"os"
-	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/go-yaml/yaml"
-	"github.com/stretchr/testify/require"
+	"github.com/pkg/errors"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -66,9 +65,11 @@ type PoRWorkflowConfig struct {
 	ConsumerAddress string `json:"consumer_address"`
 }
 
-func PrepareCRECLISettingsFile(t *testing.T, workflowOwner, capRegAddr, workflowRegistryAddr common.Address, donID uint32, chainSelector uint64, rpcHTTPURL string) *os.File {
+func PrepareCRECLISettingsFile(workflowOwner, capRegAddr, workflowRegistryAddr common.Address, donID uint32, chainSelector uint64, rpcHTTPURL string) (*os.File, error) {
 	settingsFile, err := os.CreateTemp("", CRECLISettingsFileName)
-	require.NoError(t, err, "failed to create CRE CLI settings file")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create CRE CLI settings file")
+	}
 
 	settings := Settings{
 		DevPlatform: DevPlatform{
@@ -106,10 +107,14 @@ func PrepareCRECLISettingsFile(t *testing.T, workflowOwner, capRegAddr, workflow
 	}
 
 	settingsMarshalled, err := yaml.Marshal(settings)
-	require.NoError(t, err, "failed to marshal CRE CLI settings")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal CRE CLI settings")
+	}
 
 	_, err = settingsFile.Write(settingsMarshalled)
-	require.NoError(t, err, "failed to write %s settings file", CRECLISettingsFileName)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to write %s settings file", CRECLISettingsFileName)
+	}
 
-	return settingsFile
+	return settingsFile, nil
 }

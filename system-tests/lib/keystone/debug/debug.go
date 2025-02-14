@@ -10,11 +10,9 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
@@ -23,10 +21,17 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
 )
 
-func PrintTestDebug(t *testing.T, l zerolog.Logger, keystoneEnv *types.KeystoneEnvironment) {
-	require.NotNil(t, keystoneEnv, "keystone environment must not be nil")
-	require.NotNil(t, keystoneEnv.DONTopology, "keystone environment must have DON topology")
-	require.NotNil(t, keystoneEnv.Blockchain, "keystone environment must have blockchain")
+func PrintTestDebug(testName string, l zerolog.Logger, keystoneEnv *types.KeystoneEnvironment) {
+	if keystoneEnv == nil {
+		l.Error().Msg("❌ Keystone environment is nil")
+		return
+	}
+	if keystoneEnv.DONTopology == nil {
+		l.Error().Msg("❌ DON topology is nil")
+	}
+	if keystoneEnv.Blockchain == nil {
+		l.Error().Msg("❌ Blockchain is nil")
+	}
 
 	l.Info().Msg("🔍 Debug information from Chainlink Node logs:")
 
@@ -41,7 +46,7 @@ func PrintTestDebug(t *testing.T, l zerolog.Logger, keystoneEnv *types.KeystoneE
 	}()
 
 	for _, donTopology := range keystoneEnv.DONTopology {
-		logFiles, err := getLogFileHandles(t, l, donTopology.NodeOutput.Output)
+		logFiles, err := getLogFileHandles(testName, l, donTopology.NodeOutput.Output)
 		if err != nil {
 			l.Error().Err(err).Msg("Failed to get log file handles. No debug information will be printed")
 			return
@@ -167,7 +172,7 @@ func ReportTransmissions(logFiles []*os.File, l zerolog.Logger, wsRPCURL string)
 	}
 }
 
-func getLogFileHandles(t *testing.T, l zerolog.Logger, ns *ns.Output) ([]*os.File, error) {
+func getLogFileHandles(testName string, l zerolog.Logger, ns *ns.Output) ([]*os.File, error) {
 	var logFiles []*os.File
 
 	var belongsToCurrentEnv = func(filePath string) bool {
@@ -188,7 +193,7 @@ func getLogFileHandles(t *testing.T, l zerolog.Logger, ns *ns.Output) ([]*os.Fil
 		return false
 	}
 
-	logsDir := "logs/docker-" + t.Name()
+	logsDir := "logs/docker-" + testName
 
 	fileWalkErr := filepath.Walk(logsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {

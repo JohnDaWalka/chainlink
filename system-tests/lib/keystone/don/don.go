@@ -4,9 +4,9 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
@@ -22,29 +22,63 @@ const (
 	GistIP = "185.199.108.133"
 )
 
-func Configure(t *testing.T, testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment, donToJobSpecs types.DonsToJobSpecs, donToConfigOverrides types.DonsToConfigOverrides) {
-	require.NotNil(t, keystoneEnv, "keystone environment must be set")
-	require.NotNil(t, keystoneEnv.Environment, "environment must be set")
-	require.NotNil(t, keystoneEnv.Blockchain, "blockchain must be set")
-	require.NotNil(t, keystoneEnv.WrappedNodeOutput, "wrapped node output must be set")
-	require.NotNil(t, keystoneEnv.JD, "job distributor must be set")
-	require.NotNil(t, keystoneEnv.SethClient, "seth client must be set")
-	require.NotEmpty(t, keystoneEnv.DONTopology, "DON topology must not be empty")
-	require.NotNil(t, keystoneEnv.KeystoneContractAddresses, "keystone contract addresses must be set")
-	require.NotEmpty(t, keystoneEnv.KeystoneContractAddresses.CapabilitiesRegistryAddress, "capabilities registry address must be set")
-	require.NotEmpty(t, keystoneEnv.KeystoneContractAddresses.OCR3CapabilityAddress, "OCR3 capability address must be set")
-	require.NotEmpty(t, keystoneEnv.KeystoneContractAddresses.ForwarderAddress, "forwarder address must be set")
-	require.NotEmpty(t, keystoneEnv.KeystoneContractAddresses.WorkflowRegistryAddress, "workflow registry address must be set")
-	require.GreaterOrEqual(t, len(keystoneEnv.DONTopology), 1, "expected at least one DON topology")
-	require.NotNil(t, keystoneEnv.GatewayConnectorData, "gateway connector data must be set")
+func Configure(t *testing.T, testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment, donToJobSpecs types.DonsToJobSpecs, donToConfigOverrides types.DonsToConfigOverrides) error {
+	if keystoneEnv == nil {
+		return errors.New("keystone environment must not be nil")
+	}
+	if keystoneEnv.Environment == nil {
+		return errors.New("environment must be set")
+	}
+	if keystoneEnv.Blockchain == nil {
+		return errors.New("blockchain must be set")
+	}
+	if keystoneEnv.WrappedNodeOutput == nil {
+		return errors.New("wrapped node output must be set")
+	}
+	if keystoneEnv.JD == nil {
+		return errors.New("job distributor must be set")
+	}
+	if keystoneEnv.SethClient == nil {
+		return errors.New("seth client must be set")
+	}
+	if len(keystoneEnv.DONTopology) == 0 {
+		return errors.New("DON topology must not be empty")
+	}
+	if keystoneEnv.KeystoneContractAddresses == nil {
+		return errors.New("keystone contract addresses must be set")
+	}
+	if keystoneEnv.KeystoneContractAddresses.CapabilitiesRegistryAddress == (common.Address{}) {
+		return errors.New("capabilities registry address must be set")
+	}
+	if keystoneEnv.KeystoneContractAddresses.OCR3CapabilityAddress == (common.Address{}) {
+		return errors.New("OCR3 capability address must be set")
+	}
+	if keystoneEnv.KeystoneContractAddresses.ForwarderAddress == (common.Address{}) {
+		return errors.New("forwarder address must be set")
+	}
+	if keystoneEnv.KeystoneContractAddresses.WorkflowRegistryAddress == (common.Address{}) {
+		return errors.New("workflow registry address must be set")
+	}
+	if len(keystoneEnv.DONTopology) == 0 {
+		return errors.New("expected at least one DON topology")
+	}
+	if keystoneEnv.GatewayConnectorData == nil {
+		return errors.New("gateway connector data must be set")
+	}
 
 	for i, donTopology := range keystoneEnv.DONTopology {
 		if configOverrides, ok := donToConfigOverrides[donTopology.ID]; ok {
 			for j, configOverride := range configOverrides {
-				require.GreaterOrEqual(t, len(donTopology.NodeInput.NodeSpecs)-1, j, "config override index out of bounds")
+				if len(donTopology.NodeInput.NodeSpecs)-1 < j {
+					return errors.Errorf("config override index out of bounds: %d", j)
+				}
 				donTopology.NodeInput.NodeSpecs[j].Node.TestConfigOverrides = configOverride
 			}
-			keystoneEnv.DONTopology[i].NodeOutput = config.Set(t, donTopology.NodeInput, keystoneEnv.Blockchain)
+			var setErr error
+			keystoneEnv.DONTopology[i].NodeOutput, setErr = config.Set(t, donTopology.NodeInput, keystoneEnv.Blockchain)
+			if setErr != nil {
+				return errors.Wrap(setErr, "failed to set node output")
+			}
 		}
 	}
 
@@ -55,30 +89,50 @@ func Configure(t *testing.T, testLogger zerolog.Logger, keystoneEnv *types.Keyst
 
 	// after restarting the nodes, we need to reinitialize the JD clients otherwise
 	// communication between JD and nodes will fail due to invalidated session cookie
-	keystoneEnv.Environment = jobs.ReinitialiseJDClients(t, keystoneEnv.Environment, keystoneEnv.JD, nodeOutputs...)
+	var jdErr error
+	keystoneEnv.Environment, jdErr = jobs.ReinitialiseJDClients(keystoneEnv.Environment, keystoneEnv.JD, nodeOutputs...)
+	if jdErr != nil {
+		return errors.Wrap(jdErr, "failed to reinitialize JD clients")
+	}
 	for _, donTopology := range keystoneEnv.DONTopology {
 		if jobSpecs, ok := donToJobSpecs[donTopology.ID]; ok {
-			jobs.Create(t, keystoneEnv.Environment.Offchain, donTopology.DON, donTopology.Flags, jobSpecs)
+			createErr := jobs.Create(keystoneEnv.Environment.Offchain, donTopology.DON, donTopology.Flags, jobSpecs)
+			if createErr != nil {
+				return errors.Wrapf(createErr, "failed to create jobs for DON %d", donTopology.ID)
+			}
 		} else {
-			testLogger.Error().Msgf("No job specs found for DON %d", donTopology.ID)
-			t.FailNow()
+			testLogger.Warn().Msgf("No job specs found for DON %d", donTopology.ID)
 		}
 	}
+
+	return nil
 }
 
-func BuildDONTopology(t *testing.T, keystoneEnv *types.KeystoneEnvironment) {
-	require.NotNil(t, keystoneEnv, "keystone environment must not be nil")
-	require.NotNil(t, keystoneEnv.NodeInput, "keystone environment must have node input")
-	require.NotNil(t, keystoneEnv.Dons, "keystone environment must have DONs")
-	require.NotNil(t, keystoneEnv.WrappedNodeOutput, "keystone environment must have node outputs")
+func BuildDONTopology(keystoneEnv *types.KeystoneEnvironment) error {
+	if keystoneEnv == nil {
+		return errors.New("keystone environment must not be nil")
+	}
+	if keystoneEnv.NodeInput == nil {
+		return errors.New("node input must be set")
+	}
+	if len(keystoneEnv.Dons) == 0 {
+		return errors.New("Dons must be set")
+	}
+	if len(keystoneEnv.WrappedNodeOutput) == 0 {
+		return errors.New("wrapped node output must be set")
+	}
+	if len(keystoneEnv.Dons) != len(keystoneEnv.WrappedNodeOutput) {
+		return errors.New("number of DONs and node outputs must match")
+	}
 
-	require.Equal(t, len(keystoneEnv.Dons), len(keystoneEnv.WrappedNodeOutput), "number of DONs and node outputs must match")
 	keystoneEnv.DONTopology = make([]*types.DONTopology, len(keystoneEnv.Dons))
 
 	// one DON to do everything
 	if len(keystoneEnv.Dons) == 1 {
 		flags, err := keystoneflags.NodeSetFlags(keystoneEnv.NodeInput[0])
-		require.NoError(t, err, "failed to convert string flags to bitmap for nodeset %s", keystoneEnv.NodeInput[0].Name)
+		if err != nil {
+			return errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", keystoneEnv.NodeInput[0].Name)
+		}
 
 		keystoneEnv.DONTopology[0] = &types.DONTopology{
 			DON:        keystoneEnv.Dons[0],
@@ -90,7 +144,9 @@ func BuildDONTopology(t *testing.T, keystoneEnv *types.KeystoneEnvironment) {
 	} else {
 		for i, don := range keystoneEnv.Dons {
 			flags, err := keystoneflags.NodeSetFlags(keystoneEnv.NodeInput[i])
-			require.NoError(t, err, "failed to convert string flags to bitmap for nodeset %s", keystoneEnv.NodeInput[i].Name)
+			if err != nil {
+				return errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", keystoneEnv.NodeInput[i].Name)
+			}
 
 			keystoneEnv.DONTopology[i] = &types.DONTopology{
 				DON:        don,
@@ -102,7 +158,13 @@ func BuildDONTopology(t *testing.T, keystoneEnv *types.KeystoneEnvironment) {
 		}
 	}
 
-	keystoneEnv.WorkflowDONID = keystoneflags.MustOneDONTopologyWithFlag(t, keystoneEnv.DONTopology, types.WorkflowDON).ID
+	maybeID, err := keystoneflags.OneDONTopologyWithFlag(keystoneEnv.DONTopology, types.WorkflowDON)
+	if err != nil {
+		return errors.Wrap(err, "failed to get workflow DON ID")
+	}
+	keystoneEnv.WorkflowDONID = maybeID.ID
+
+	return nil
 }
 
 // In order to whitelist host IP in the gateway, we need to resolve the host.docker.internal to the host IP,

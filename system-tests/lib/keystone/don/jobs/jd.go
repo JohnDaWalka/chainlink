@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
@@ -23,12 +22,14 @@ const (
 	E2eJobDistributorVersionEnvVarName = "E2E_JD_VERSION"
 )
 
-func ReinitialiseJDClients(t *testing.T, ctfEnv *deployment.Environment, jdOutput *jd.Output, nodeOutputs ...*types.WrappedNodeOutput) *deployment.Environment {
+func ReinitialiseJDClients(ctfEnv *deployment.Environment, jdOutput *jd.Output, nodeOutputs ...*types.WrappedNodeOutput) (*deployment.Environment, error) {
 	offchainClients := make([]deployment.OffchainClient, len(nodeOutputs))
 
 	for i, nodeOutput := range nodeOutputs {
 		nodeInfo, err := node.GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, 1)
-		require.NoError(t, err, "failed to get node info")
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get node info")
+		}
 
 		jdConfig := devenv.JDConfig{
 			GRPC:     jdOutput.HostGRPCUrl,
@@ -38,7 +39,9 @@ func ReinitialiseJDClients(t *testing.T, ctfEnv *deployment.Environment, jdOutpu
 		}
 
 		offChain, err := devenv.NewJDClient(context.Background(), jdConfig)
-		require.NoError(t, err, "failed to create JD client")
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create JD client")
+		}
 
 		offchainClients[i] = offChain
 	}
@@ -48,17 +51,21 @@ func ReinitialiseJDClients(t *testing.T, ctfEnv *deployment.Environment, jdOutpu
 	// that authenticates JD with each node
 	ctfEnv.Offchain = offchainClients[0]
 
-	return ctfEnv
+	return ctfEnv, nil
 }
 
-func StartJobDistributor(t *testing.T, jdInput *jd.Input, keystoneEnv *types.KeystoneEnvironment) {
+func StartJobDistributor(jdInput *jd.Input, keystoneEnv *types.KeystoneEnvironment) error {
 	if os.Getenv("CI") == "true" {
 		jdImage := ctfconfig.MustReadEnvVar_String(E2eJobDistributorImageEnvVarName)
 		jdVersion := os.Getenv(E2eJobDistributorVersionEnvVarName)
 		jdInput.Image = fmt.Sprintf("%s:%s", jdImage, jdVersion)
 	}
 	jdOutput, err := jd.NewJD(jdInput)
-	require.NoError(t, err, "failed to create new job distributor")
+	if err != nil {
+		return errors.Wrap(err, "failed to create new job distributor")
+	}
 
 	keystoneEnv.JD = jdOutput
+
+	return nil
 }

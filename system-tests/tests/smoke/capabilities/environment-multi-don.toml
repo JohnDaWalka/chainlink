@@ -48,8 +48,9 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../../chainlink"
-      docker_file = "plugins/chainlink.Dockerfile"
+      # docker_ctx = "../../../.."
+      # docker_file = "plugins/chainlink.Dockerfile"
+      image = "chainlink-tmp"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
@@ -66,8 +67,9 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../../chainlink"
-      docker_file = "plugins/chainlink.Dockerfile"
+      # docker_ctx = "../../../.."
+      # docker_file = "plugins/chainlink.Dockerfile"
+      image = "chainlink-tmp"
       capabilities = ["./amd64_cron"]
       user_config_overrides = """
       [Feature]
@@ -85,8 +87,9 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../../chainlink"
-      docker_file = "plugins/chainlink.Dockerfile"
+      # docker_ctx = "../../../.."
+      # docker_file = "plugins/chainlink.Dockerfile"
+      image = "chainlink-tmp"
       capabilities = ["./amd64_cron"]
       user_config_overrides = """
       [Feature]
@@ -104,8 +107,9 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../../chainlink"
-      docker_file = "plugins/chainlink.Dockerfile"
+      # docker_ctx = "../../../.."
+      # docker_file = "plugins/chainlink.Dockerfile"
+      image = "chainlink-tmp"
       capabilities = ["./amd64_cron"]
       user_config_overrides = """
       [Feature]
@@ -123,8 +127,9 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../../chainlink"
-      docker_file = "plugins/chainlink.Dockerfile"
+      # docker_ctx = "../../../.."
+      # docker_file = "plugins/chainlink.Dockerfile"
+      image = "chainlink-tmp"
       capabilities = ["./amd64_cron"]
       user_config_overrides = """
       [Feature]
@@ -142,7 +147,7 @@
 [[nodesets]]
   don_type = "capabilities"
   capabilities = ["write-evm"]
-  nodes = 5
+  nodes = 3
   override_mode = "each"
   http_port_range_start = 10200
   name = "capabilities"
@@ -155,8 +160,9 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../../chainlink"
-      docker_file = "plugins/chainlink.Dockerfile"
+      # docker_ctx = "../../../.."
+      # docker_file = "plugins/chainlink.Dockerfile"
+      image = "chainlink-tmp"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
@@ -173,8 +179,9 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../../chainlink"
-      docker_file = "plugins/chainlink.Dockerfile"
+      # docker_ctx = "../../../.."
+      # docker_file = "plugins/chainlink.Dockerfile"
+      image = "chainlink-tmp"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
@@ -191,44 +198,9 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../../chainlink"
-      docker_file = "plugins/chainlink.Dockerfile"
-      user_config_overrides = """
-      [Feature]
-			LogPoller = true
-
-			[OCR2]
-			Enabled = true
-			DatabaseTimeout = '1s'
-
-			[P2P.V2]
-			Enabled = true
-			ListenAddresses = ['0.0.0.0:5001']
-      """
-
-  [[nodesets.node_specs]]
-
-    [nodesets.node_specs.node]
-      docker_ctx = "../../../chainlink"
-      docker_file = "plugins/chainlink.Dockerfile"
-      user_config_overrides = """
-      [Feature]
-			LogPoller = true
-
-			[OCR2]
-			Enabled = true
-			DatabaseTimeout = '1s'
-
-			[P2P.V2]
-			Enabled = true
-			ListenAddresses = ['0.0.0.0:5001']
-      """
-
-  [[nodesets.node_specs]]
-
-    [nodesets.node_specs.node]
-      docker_ctx = "../../../chainlink"
-      docker_file = "plugins/chainlink.Dockerfile"
+      # docker_ctx = "../../../.."
+      # docker_file = "plugins/chainlink.Dockerfile"
+      image = "chainlink-tmp"
       user_config_overrides = """
       [Feature]
 			LogPoller = true

@@ -5,11 +5,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
-	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -25,11 +24,19 @@ import (
 	keystonenode "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don/node"
 )
 
-func ConfigureKeystone(t *testing.T, keystoneEnv *types.KeystoneEnvironment) {
-	require.NotNil(t, keystoneEnv, "keystone environment must be set")
-	require.NotNil(t, keystoneEnv.DONTopology, "DON topology must be set")
-	require.NotEmpty(t, keystoneEnv.ChainSelector, "chain selector must be set")
-	require.NotNil(t, keystoneEnv.Environment, "environment must be set")
+func ConfigureKeystone(keystoneEnv *types.KeystoneEnvironment) error {
+	if keystoneEnv == nil {
+		return errors.New("keystone environment must be set")
+	}
+	if keystoneEnv.DONTopology == nil {
+		return errors.New("DON topology must be set")
+	}
+	if keystoneEnv.ChainSelector == 0 {
+		return errors.New("chain selector must be set")
+	}
+	if keystoneEnv.Environment == nil {
+		return errors.New("environment must be set")
+	}
 
 	donCapabilities := make([]keystone_changeset.DonCapabilities, 0, len(keystoneEnv.DONTopology))
 
@@ -92,7 +99,9 @@ func ConfigureKeystone(t *testing.T, keystoneEnv *types.KeystoneEnvironment) {
 			}
 
 			p2pID, err := keystonenode.ToP2PID(node, keystonenode.NoOpTransformFn)
-			require.NoError(t, err, "failed to get p2p id for node %s", node.Name)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get p2p id for node %s", node.Name)
+			}
 
 			donPeerIDs[i-1] = p2pID
 		}
@@ -123,7 +132,9 @@ func ConfigureKeystone(t *testing.T, keystoneEnv *types.KeystoneEnvironment) {
 		}
 	}
 
-	require.NotEmpty(t, transmissionSchedule, "transmission schedule must not be empty")
+	if len(transmissionSchedule) == 0 {
+		return errors.New("no OCR3-capable DON found in the topology")
+	}
 
 	// values supplied by Alexandr Yepishev as the expected values for OCR3 config
 	oracleConfig := keystone_changeset.OracleConfig{
@@ -155,31 +166,62 @@ func ConfigureKeystone(t *testing.T, keystoneEnv *types.KeystoneEnvironment) {
 	}
 
 	_, err := keystone_changeset.ConfigureInitialContractsChangeset(*keystoneEnv.Environment, cfg)
-	require.NoError(t, err, "failed to configure initial contracts")
+	if err != nil {
+		return errors.Wrap(err, "failed to configure initial contracts")
+	}
+
+	return nil
 }
 
-func DeployKeystone(t *testing.T, testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment) {
-	require.NotNil(t, keystoneEnv, "keystone environment must be set")
-	require.NotNil(t, keystoneEnv.Environment, "environment must be set")
-	require.NotEmpty(t, keystoneEnv.ChainSelector, "chain selector must be set")
+func DeployKeystone(testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment) error {
+	if keystoneEnv == nil {
+		return errors.New("keystone environment must be set")
+	}
+	if keystoneEnv.Environment == nil {
+		return errors.New("environment must be set")
+	}
+	if keystoneEnv.ChainSelector == 0 {
+		return errors.New("chain selector must be set")
+	}
 
 	keystoneEnv.KeystoneContractAddresses = &types.KeystoneContractAddresses{}
 
-	keystoneEnv.KeystoneContractAddresses.ForwarderAddress = deployKeystoneForwarder(t, testLogger, keystoneEnv.Environment, keystoneEnv.ChainSelector)
-	keystoneEnv.KeystoneContractAddresses.OCR3CapabilityAddress = deployOCR3(t, testLogger, keystoneEnv.Environment, keystoneEnv.ChainSelector)
-	keystoneEnv.KeystoneContractAddresses.CapabilitiesRegistryAddress = deployCapabilitiesRegistry(t, testLogger, keystoneEnv.Environment, keystoneEnv.ChainSelector)
-	keystoneEnv.KeystoneContractAddresses.WorkflowRegistryAddress = deployWorkflowRegistry(t, testLogger, keystoneEnv.Environment, keystoneEnv.ChainSelector)
+	var err error
+	keystoneEnv.KeystoneContractAddresses.ForwarderAddress, err = deployKeystoneForwarder(testLogger, keystoneEnv.Environment, keystoneEnv.ChainSelector)
+	if err != nil {
+		return errors.Wrap(err, "failed to deploy Keystone Forwarder contract")
+	}
+	keystoneEnv.KeystoneContractAddresses.OCR3CapabilityAddress, err = deployOCR3(testLogger, keystoneEnv.Environment, keystoneEnv.ChainSelector)
+	if err != nil {
+		return errors.Wrap(err, "failed to deploy OCR3 contract")
+	}
+	keystoneEnv.KeystoneContractAddresses.CapabilitiesRegistryAddress, err = deployCapabilitiesRegistry(testLogger, keystoneEnv.Environment, keystoneEnv.ChainSelector)
+	if err != nil {
+		return errors.Wrap(err, "failed to deploy Capabilities Registry contract")
+	}
+	keystoneEnv.KeystoneContractAddresses.WorkflowRegistryAddress, err = deployWorkflowRegistry(testLogger, keystoneEnv.Environment, keystoneEnv.ChainSelector)
+	if err != nil {
+		return errors.Wrap(err, "failed to deploy Workflow Registry contract")
+	}
+
+	return nil
 }
 
-func deployOCR3(t *testing.T, testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) common.Address {
+func deployOCR3(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
 	output, err := keystone_changeset.DeployOCR3(*ctfEnv, chainSelector)
-	require.NoError(t, err, "failed to deploy OCR3 Capability contract")
+	if err != nil {
+		return common.Address{}, errors.Wrap(err, "failed to deploy OCR3 contract")
+	}
 
 	err = ctfEnv.ExistingAddresses.Merge(output.AddressBook)
-	require.NoError(t, err, "failed to merge address book")
+	if err != nil {
+		return common.Address{}, errors.Wrap(err, "failed to merge address book")
+	}
 
 	addresses, err := ctfEnv.ExistingAddresses.AddressesForChain(chainSelector)
-	require.NoError(t, err, "failed to get addresses for chain %d from the address book", chainSelector)
+	if err != nil {
+		return common.Address{}, errors.Wrapf(err, "failed to get addresses for chain %d from the address book", chainSelector)
+	}
 
 	var ocr3capabilityAddr common.Address
 	for addrStr, tv := range addresses {
@@ -189,20 +231,28 @@ func deployOCR3(t *testing.T, testLogger zerolog.Logger, ctfEnv *deployment.Envi
 			break
 		}
 	}
-	require.NotEmpty(t, ocr3capabilityAddr, "failed to find OCR3Capability address in the address book")
+	if ocr3capabilityAddr == (common.Address{}) {
+		return common.Address{}, errors.New("failed to find OCR3Capability address in the address book")
+	}
 
-	return ocr3capabilityAddr
+	return ocr3capabilityAddr, nil
 }
 
-func deployCapabilitiesRegistry(t *testing.T, testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) common.Address {
+func deployCapabilitiesRegistry(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
 	output, err := keystone_changeset.DeployCapabilityRegistry(*ctfEnv, chainSelector)
-	require.NoError(t, err, "failed to deploy Capabilities Registry contract")
+	if err != nil {
+		return common.Address{}, errors.Wrap(err, "failed to deploy Capabilities Registry contract")
+	}
 
 	err = ctfEnv.ExistingAddresses.Merge(output.AddressBook)
-	require.NoError(t, err, "failed to merge address book")
+	if err != nil {
+		return common.Address{}, errors.Wrap(err, "failed to merge address book")
+	}
 
 	addresses, err := ctfEnv.ExistingAddresses.AddressesForChain(chainSelector)
-	require.NoError(t, err, "failed to get addresses for chain %d from the address book", chainSelector)
+	if err != nil {
+		return common.Address{}, errors.Wrapf(err, "failed to get addresses for chain %d from the address book", chainSelector)
+	}
 
 	var capabilitiesRegistryAddr common.Address
 	for addrStr, tv := range addresses {
@@ -212,22 +262,30 @@ func deployCapabilitiesRegistry(t *testing.T, testLogger zerolog.Logger, ctfEnv 
 			break
 		}
 	}
-	require.NotEmpty(t, capabilitiesRegistryAddr, "failed to find Capabilities Registry address in the address book")
+	if capabilitiesRegistryAddr == (common.Address{}) {
+		return common.Address{}, errors.New("failed to find Capabilities Registry address in the address book")
+	}
 
-	return capabilitiesRegistryAddr
+	return capabilitiesRegistryAddr, nil
 }
 
-func deployKeystoneForwarder(t *testing.T, testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) common.Address {
+func deployKeystoneForwarder(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
 	output, err := keystone_changeset.DeployForwarder(*ctfEnv, keystone_changeset.DeployForwarderRequest{
 		ChainSelectors: []uint64{chainSelector},
 	})
-	require.NoError(t, err, "failed to deploy forwarder contract")
+	if err != nil {
+		return common.Address{}, errors.Wrap(err, "failed to deploy forwarder contract")
+	}
 
 	err = ctfEnv.ExistingAddresses.Merge(output.AddressBook)
-	require.NoError(t, err, "failed to merge address book")
+	if err != nil {
+		return common.Address{}, errors.Wrap(err, "failed to merge address book")
+	}
 
 	addresses, err := ctfEnv.ExistingAddresses.AddressesForChain(chainSelector)
-	require.NoError(t, err, "failed to get addresses for chain %d from the address book", chainSelector)
+	if err != nil {
+		return common.Address{}, errors.Wrapf(err, "failed to get addresses for chain %d from the address book", chainSelector)
+	}
 
 	var forwarderAddress common.Address
 	for addrStr, tv := range addresses {
@@ -237,22 +295,28 @@ func deployKeystoneForwarder(t *testing.T, testLogger zerolog.Logger, ctfEnv *de
 			break
 		}
 	}
-	require.NotEmpty(t, forwarderAddress, "failed to find KeystoneForwarder address in the address book")
+	if forwarderAddress == (common.Address{}) {
+		return common.Address{}, errors.New("failed to find KeystoneForwarder address in the address book")
+	}
 
-	return forwarderAddress
+	return forwarderAddress, nil
 }
 
-func deployWorkflowRegistry(t *testing.T, testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) common.Address {
-	require.NotNil(t, ctfEnv, "environment must not be nil")
-
+func deployWorkflowRegistry(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
 	output, err := workflow_registry_changeset.Deploy(*ctfEnv, chainSelector)
-	require.NoError(t, err, "failed to deploy workflow registry contract")
+	if err != nil {
+		return common.Address{}, errors.Wrap(err, "failed to deploy workflow registry contract")
+	}
 
 	err = ctfEnv.ExistingAddresses.Merge(output.AddressBook)
-	require.NoError(t, err, "failed to merge address book")
+	if err != nil {
+		return common.Address{}, errors.Wrap(err, "failed to merge address book")
+	}
 
 	addresses, err := ctfEnv.ExistingAddresses.AddressesForChain(chainSelector)
-	require.NoError(t, err, "failed to get addresses for chain %d from the address book", chainSelector)
+	if err != nil {
+		return common.Address{}, errors.Wrapf(err, "failed to get addresses for chain %d from the address book", chainSelector)
+	}
 
 	var workflowRegistryAddr common.Address
 	for addrStr, tv := range addresses {
@@ -261,51 +325,90 @@ func deployWorkflowRegistry(t *testing.T, testLogger zerolog.Logger, ctfEnv *dep
 			testLogger.Info().Msgf("Deployed WorkflowRegistry contract at %s", workflowRegistryAddr.Hex())
 		}
 	}
-	require.NotEmpty(t, workflowRegistryAddr, "failed to find WorkflowRegistry address in the address book")
+	if workflowRegistryAddr == (common.Address{}) {
+		return common.Address{}, errors.New("failed to find WorkflowRegistry address in the address book")
+	}
 
-	return workflowRegistryAddr
+	return workflowRegistryAddr, nil
 }
 
-func ConfigureWorkflowRegistry(t *testing.T, testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment) {
-	require.NotNil(t, keystoneEnv, "keystone environment must be set")
-	require.NotNil(t, keystoneEnv.Environment, "environment must be set")
-	require.NotEmpty(t, keystoneEnv.ChainSelector, "chain selector must be set")
-	require.NotNil(t, keystoneEnv.SethClient, "seth client must be set")
-	require.NotEmpty(t, keystoneEnv.WorkflowDONID, "workflow DON ID must be set")
+func ConfigureWorkflowRegistry(testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment) error {
+	if keystoneEnv == nil {
+		return errors.New("keystone environment must be set")
+	}
+	if keystoneEnv.Environment == nil {
+		return errors.New("environment must be set")
+	}
+	if keystoneEnv.ChainSelector == 0 {
+		return errors.New("chain selector must be set")
+	}
+	if keystoneEnv.SethClient == nil {
+		return errors.New("seth client must be set")
+	}
+	if keystoneEnv.WorkflowDONID == 0 {
+		return errors.New("workflow DON ID must be set")
+	}
 
 	_, err := workflow_registry_changeset.UpdateAllowedDons(*keystoneEnv.Environment, &workflow_registry_changeset.UpdateAllowedDonsRequest{
 		RegistryChainSel: keystoneEnv.ChainSelector,
 		DonIDs:           []uint32{keystoneEnv.WorkflowDONID},
 		Allowed:          true,
 	})
-	require.NoError(t, err, "failed to update allowed Dons")
+	if err != nil {
+		return errors.Wrap(err, "failed to update allowed Dons")
+	}
 
 	_, err = workflow_registry_changeset.UpdateAuthorizedAddresses(*keystoneEnv.Environment, &workflow_registry_changeset.UpdateAuthorizedAddressesRequest{
 		RegistryChainSel: keystoneEnv.ChainSelector,
 		Addresses:        []string{keystoneEnv.SethClient.MustGetRootKeyAddress().Hex()},
 		Allowed:          true,
 	})
-	require.NoError(t, err, "failed to update authorized addresses")
+	if err != nil {
+		return errors.Wrap(err, "failed to update authorized addresses")
+	}
+
+	return nil
 }
 
-func DeployFeedsConsumer(t *testing.T, testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment) {
-	require.NotNil(t, keystoneEnv, "keystone environment must be set")
-	require.NotNil(t, keystoneEnv.Environment, "environment must be set")
-	require.NotEmpty(t, keystoneEnv.ChainSelector, "chain selector must be set")
-	require.NotNil(t, keystoneEnv.SethClient, "seth client must be set")
-	require.NotNil(t, keystoneEnv.KeystoneContractAddresses, "keystone contract addresses must be set")
-	require.NotEmpty(t, keystoneEnv.KeystoneContractAddresses.ForwarderAddress, "forwarder address must be set")
+func DeployFeedsConsumer(testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment) error {
+	if keystoneEnv == nil {
+		return errors.New("keystone environment must be set")
+	}
+	if keystoneEnv.Environment == nil {
+		return errors.New("environment must be set")
+	}
+	if keystoneEnv.ChainSelector == 0 {
+		return errors.New("chain selector must be set")
+	}
+	if keystoneEnv.SethClient == nil {
+		return errors.New("seth client must be set")
+	}
+	if keystoneEnv.WorkflowDONID == 0 {
+		return errors.New("workflow DON ID must be set")
+	}
+	if keystoneEnv.KeystoneContractAddresses == nil {
+		return errors.New("keystone contract addresses must be set")
+	}
+	if keystoneEnv.KeystoneContractAddresses.ForwarderAddress == (common.Address{}) {
+		return errors.New("forwarder address must be set")
+	}
 
 	output, err := keystone_changeset.DeployFeedsConsumer(*keystoneEnv.Environment, &keystone_changeset.DeployFeedsConsumerRequest{
 		ChainSelector: keystoneEnv.ChainSelector,
 	})
-	require.NoError(t, err, "failed to deploy feeds_consumer contract")
+	if err != nil {
+		return errors.Wrap(err, "failed to deploy feeds_consumer contract")
+	}
 
 	err = keystoneEnv.Environment.ExistingAddresses.Merge(output.AddressBook)
-	require.NoError(t, err, "failed to merge address book")
+	if err != nil {
+		return errors.Wrap(err, "failed to merge address book")
+	}
 
 	addresses, err := keystoneEnv.Environment.ExistingAddresses.AddressesForChain(keystoneEnv.ChainSelector)
-	require.NoError(t, err, "failed to get addresses for chain %d from the address book", keystoneEnv.ChainSelector)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get addresses for chain %d from the address book", keystoneEnv.ChainSelector)
+	}
 
 	var feedsConsumerAddress common.Address
 	for addrStr, tv := range addresses {
@@ -316,23 +419,47 @@ func DeployFeedsConsumer(t *testing.T, testLogger zerolog.Logger, keystoneEnv *t
 		}
 	}
 
-	require.NotEmpty(t, feedsConsumerAddress, "failed to find FeedConsumer address in the address book")
+	if feedsConsumerAddress == (common.Address{}) {
+		return errors.New("failed to find FeedConsumer address in the address book")
+	}
+
 	keystoneEnv.KeystoneContractAddresses.FeedsConsumerAddress = feedsConsumerAddress
+
+	return nil
 }
 
-func ConfigureFeedsConsumer(t *testing.T, testLogger zerolog.Logger, workflowName string, keystoneEnv *types.KeystoneEnvironment) {
-	require.NotNil(t, keystoneEnv, "keystone environment must be set")
-	require.NotNil(t, keystoneEnv.Environment, "environment must be set")
-	require.NotEmpty(t, keystoneEnv.ChainSelector, "chain selector must be set")
-	require.NotNil(t, keystoneEnv.SethClient, "seth client must be set")
-	require.NotNil(t, keystoneEnv.KeystoneContractAddresses, "keystone contract addresses must be set")
-	require.NotEmpty(t, keystoneEnv.KeystoneContractAddresses.ForwarderAddress, "forwarder address must be set")
-	require.NotEmpty(t, keystoneEnv.KeystoneContractAddresses.FeedsConsumerAddress, "feeds consumer address must be set")
+func ConfigureFeedsConsumer(testLogger zerolog.Logger, workflowName string, keystoneEnv *types.KeystoneEnvironment) error {
+	if keystoneEnv == nil {
+		return errors.New("keystone environment must be set")
+	}
+	if keystoneEnv.Environment == nil {
+		return errors.New("environment must be set")
+	}
+	if keystoneEnv.ChainSelector == 0 {
+		return errors.New("chain selector must be set")
+	}
+	if keystoneEnv.SethClient == nil {
+		return errors.New("seth client must be set")
+	}
+	if keystoneEnv.WorkflowDONID == 0 {
+		return errors.New("workflow DON ID must be set")
+	}
+	if keystoneEnv.KeystoneContractAddresses == nil {
+		return errors.New("keystone contract addresses must be set")
+	}
+	if keystoneEnv.KeystoneContractAddresses.ForwarderAddress == (common.Address{}) {
+		return errors.New("forwarder address must be set")
+	}
+	if keystoneEnv.KeystoneContractAddresses.FeedsConsumerAddress == (common.Address{}) {
+		return errors.New("feeds consumer address must be set")
+	}
 
 	// configure Keystone Feeds Consumer contract, so it can accept reports from the forwarder contract,
 	// that come from our workflow that is owned by the root private key
 	feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(keystoneEnv.KeystoneContractAddresses.FeedsConsumerAddress, keystoneEnv.SethClient.Client)
-	require.NoError(t, err, "failed to create feeds consumer instance")
+	if err != nil {
+		return errors.Wrap(err, "failed to create feeds consumer instance")
+	}
 
 	// Prepare hex-encoded and truncated workflow name
 	var workflowNameBytes [10]byte
@@ -359,5 +486,9 @@ func ConfigureFeedsConsumer(t *testing.T, testLogger zerolog.Logger, workflowNam
 		// here we need to use hex-encoded workflow name converted to []byte
 		[][10]byte{workflowNameBytes}, // allowed workflow names
 	))
-	require.NoError(t, decodeErr, "failed to set config for feeds consumer")
+	if decodeErr != nil {
+		return errors.Wrap(decodeErr, "failed to set config for feeds consumer")
+	}
+
+	return nil
 }
