@@ -48,7 +48,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../.."
+      docker_ctx = "../../../chainlink"
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
@@ -66,26 +66,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../.."
-      docker_file = "plugins/chainlink.Dockerfile"
-      capabilities = ["./amd64_cron"]
-      user_config_overrides = """
-      [Feature]
-			LogPoller = true
-
-			[OCR2]
-			Enabled = true
-			DatabaseTimeout = '1s'
-
-			[P2P.V2]
-			Enabled = true
-			ListenAddresses = ['0.0.0.0:5001']
-      """
-
-  [[nodesets.node_specs]]
-
-    [nodesets.node_specs.node]
-      docker_ctx = "../../.."
+      docker_ctx = "../../../chainlink"
       docker_file = "plugins/chainlink.Dockerfile"
       capabilities = ["./amd64_cron"]
       user_config_overrides = """
@@ -104,7 +85,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../.."
+      docker_ctx = "../../../chainlink"
       docker_file = "plugins/chainlink.Dockerfile"
       capabilities = ["./amd64_cron"]
       user_config_overrides = """
@@ -123,7 +104,26 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../.."
+      docker_ctx = "../../../chainlink"
+      docker_file = "plugins/chainlink.Dockerfile"
+      capabilities = ["./amd64_cron"]
+      user_config_overrides = """
+      [Feature]
+			LogPoller = true
+
+			[OCR2]
+			Enabled = true
+			DatabaseTimeout = '1s'
+
+			[P2P.V2]
+			Enabled = true
+			ListenAddresses = ['0.0.0.0:5001']
+      """
+
+  [[nodesets.node_specs]]
+
+    [nodesets.node_specs.node]
+      docker_ctx = "../../../chainlink"
       docker_file = "plugins/chainlink.Dockerfile"
       capabilities = ["./amd64_cron"]
       user_config_overrides = """
@@ -155,7 +155,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../.."
+      docker_ctx = "../../../chainlink"
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
@@ -173,7 +173,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../.."
+      docker_ctx = "../../../chainlink"
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
@@ -191,7 +191,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../.."
+      docker_ctx = "../../../chainlink"
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
@@ -209,7 +209,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../.."
+      docker_ctx = "../../../chainlink"
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
@@ -227,7 +227,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      docker_ctx = "../../.."
+      docker_ctx = "../../../chainlink"
       docker_file = "plugins/chainlink.Dockerfile"
       user_config_overrides = """
       [Feature]
