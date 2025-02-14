@@ -141,7 +141,7 @@ func ReportTransmissions(logFiles []*os.File, l zerolog.Logger, wsRPCURL string)
 	sc, err := seth.NewClientBuilder().
 		WithRpcUrl(wsRPCURL).
 		WithReadOnlyMode().
-		WithGethWrappersFolders([]string{"../../../core/gethwrappers/keystone/generated"}). // point Seth to the folder with keystone geth wrappers, so that it can load contract ABIs
+		WithGethWrappersFolders([]string{"../../../../core/gethwrappers/keystone/generated"}). // point Seth to the folder with keystone geth wrappers, so that it can load contract ABIs
 		Build()
 
 	if err != nil {

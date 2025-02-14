@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net"
 	"os"
 	"runtime"
 	"strings"
@@ -47,7 +48,6 @@ import (
 const (
 	cronCapabilityAssetFile = "amd64_cron"
 	ghReadTokenEnvVarName   = "GITHUB_READ_TOKEN"
-	GistIP                  = "185.199.108.133"
 )
 
 type TestConfig struct {
@@ -260,7 +260,8 @@ func setupFakeDataProvider(t *testing.T, testLogger zerolog.Logger, in *TestConf
 	_, err := fake.NewFakeDataProvider(in.PriceProvider.Fake.Input)
 	require.NoError(t, err, "failed to set up fake data provider")
 	fakeAPIPath := "/fake/api/price"
-	fakeFinalURL := fmt.Sprintf("%s:%d%s", framework.HostDockerInternal(), in.PriceProvider.Fake.Port, fakeAPIPath)
+	host := framework.HostDockerInternal()
+	fakeFinalURL := fmt.Sprintf("%s:%d%s", host, in.PriceProvider.Fake.Port, fakeAPIPath)
 
 	getPriceResponseFn := func() map[string]interface{} {
 		response := map[string]interface{}{
@@ -472,8 +473,17 @@ func extraAllowedPortsAndIps(t *testing.T, testLogger zerolog.Logger, in *TestCo
 
 	testLogger.Info().Msgf("Will allow IP %s and port %d for the fake data provider", hostIP, in.PriceProvider.Fake.Port)
 
+	ips, err := net.LookupIP("gist.githubusercontent.com")
+	require.NoError(t, err, "failed to resolve IP for gist.githubusercontent.com")
+
+	gistIPs := make([]string, len(ips))
+	for i, ip := range ips {
+		gistIPs[i] = ip.To4().String()
+		testLogger.Debug().Msgf("Resolved IP for gist.githubusercontent.com: %s", gistIPs[i])
+	}
+
 	// we also need to explicitly allow Gist's IP
-	return []string{hostIP, GistIP}, []int{in.PriceProvider.Fake.Port}
+	return append(gistIPs, hostIP), []int{in.PriceProvider.Fake.Port}
 }
 
 // TODO think whether we should structure it in a way that envforces some order of execution,
