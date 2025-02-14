@@ -61,6 +61,7 @@ func NewClientExecuteRequest(ctx context.Context, lggr logger.Logger, req common
 		return nil, fmt.Errorf("workflow execution ID is invalid: %w", err)
 	}
 
+	// We need this
 	// the requestID must be delineated by the workflow execution ID and the reference ID
 	// to ensure that it supports parallel step execution
 	requestID := types.MethodExecute + ":" + workflowExecutionID + ":" + req.Metadata.ReferenceID
