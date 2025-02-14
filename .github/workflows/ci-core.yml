@@ -298,7 +298,7 @@ jobs:
           FROM ubuntu:22.04
           # We'll rely on the runner's Go installation, so we do NOT install Go here.
           # Just some basic deps (optional)
-          RUN apt-get update && apt-get install -y ca-certificates git && rm -rf /var/lib/apt/lists/*
+          RUN apt-get update && apt-get install -y ca-certificates git make gcc && rm -rf /var/lib/apt/lists/*
           CMD ["bash"]
           EOF
 
@@ -331,6 +331,9 @@ jobs:
           docker exec go-debug-snap bash -c "echo 'export GOCACHE=/home/runner/.cache/go-build' >> /root/.bashrc"
           docker exec go-debug-snap bash -c "echo 'export GOMODCACHE=/home/runner/go/pkg/mod' >> /root/.bashrc"
           docker exec go-debug-snap bash -c "echo 'export PATH=\$GOROOT/bin:\$PATH' >> /root/.bashrc"
+
+          echo "wasmd"
+          docker exec go-debug-snap bash -c "source /root/.bashrc; cd /home/runner/work/chainlink/chainlink; ./tools/ci/install_wasmd"
 
           echo "commit"
           docker commit go-debug-snap go-debug-final
