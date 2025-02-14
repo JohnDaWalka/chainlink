@@ -812,36 +812,6 @@ func LoadChainState(ctx context.Context, chain deployment.Chain, addresses map[s
 	return state, nil
 }
 
-// func (s CCIPOnChainState) ValidateOffRamp(chainSelector uint64) error {
-// 	family, err := chain_selectors.GetSelectorFamily(chainSelector)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	switch family {
-// 	case chain_selectors.FamilyEVM:
-// 		chainState, exists := s.Chains[chainSelector]
-// 		if !exists {
-// 			return fmt.Errorf("chain %d does not exist", chainSelector)
-// 		}
-// 		if chainState.OffRamp == nil {
-// 			// should not be possible, but a defensive check.
-// 			return fmt.Errorf("OffRamp contract does not exist on chain %d", chainSelector)
-// 		}
-// 	case chain_selectors.FamilySolana:
-// 		chainState, exists := s.SolChains[chainSelector]
-// 		if !exists {
-// 			return fmt.Errorf("chain %d does not exist", chainSelector)
-// 		}
-// 		if chainState.OffRamp.IsZero() {
-// 			// should not be possible, but a defensive check.
-// 			return fmt.Errorf("CCIP offramp contract does not exist on chain %d", chainSelector)
-// 		}
-// 	default:
-// 		return fmt.Errorf("unknown chain family %s", family)
-// 	}
-// 	return nil
-// }
-
 func (s CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType deployment.ContractType) error {
 	family, err := chain_selectors.GetSelectorFamily(chainSelector)
 	if err != nil {
