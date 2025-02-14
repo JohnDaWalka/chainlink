@@ -823,11 +823,16 @@ func (s CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType deployment
 		if !exists {
 			return fmt.Errorf("chain %d does not exist", chainSelector)
 		}
-		if rampType == OffRamp && chainState.OffRamp == nil {
-			return fmt.Errorf("offramp contract does not exist on evm chain %d", chainSelector)
-		} else if rampType == OnRamp && chainState.OnRamp == nil {
-			return fmt.Errorf("onramp contract does not exist on evm chain %d", chainSelector)
-		} else {
+		switch rampType {
+		case OffRamp:
+			if chainState.OffRamp == nil {
+				return fmt.Errorf("offramp contract does not exist on evm chain %d", chainSelector)
+			}
+		case OnRamp:
+			if chainState.OnRamp == nil {
+				return fmt.Errorf("onramp contract does not exist on evm chain %d", chainSelector)
+			}
+		default:
 			return fmt.Errorf("unknown ramp type %s", rampType)
 		}
 
@@ -836,17 +841,23 @@ func (s CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType deployment
 		if !exists {
 			return fmt.Errorf("chain %d does not exist", chainSelector)
 		}
-		if rampType == OffRamp && chainState.OffRamp.IsZero() {
-			return fmt.Errorf("offramp contract does not exist on solana chain %d", chainSelector)
-		} else if rampType == OnRamp && chainState.Router.IsZero() {
-			return fmt.Errorf("router contract does not exist on solana chain %d", chainSelector)
-		} else {
+		switch rampType {
+		case OffRamp:
+			if chainState.OffRamp.IsZero() {
+				return fmt.Errorf("offramp contract does not exist on solana chain %d", chainSelector)
+			}
+		case OnRamp:
+			if chainState.Router.IsZero() {
+				return fmt.Errorf("router contract does not exist on solana chain %d", chainSelector)
+			}
+		default:
 			return fmt.Errorf("unknown ramp type %s", rampType)
 		}
 
 	default:
 		return fmt.Errorf("unknown chain family %s", family)
 	}
+	return nil
 }
 
 func ValidateChain(env deployment.Environment, state CCIPOnChainState, chainSel uint64, checkMcms bool) error {
