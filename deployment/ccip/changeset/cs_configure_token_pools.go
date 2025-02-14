@@ -11,11 +11,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
+
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_5_1/token_pool"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
-	"github.com/smartcontractkit/chainlink/v2/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_5_0/token_admin_registry"
 )
 
 var _ deployment.ChangeSet[ConfigureTokenPoolContractsConfig] = ConfigureTokenPoolContractsChangeset
@@ -245,7 +247,8 @@ func configureTokenPool(
 			// First, we need to assemble a list of valid remote pools
 			// The desired token pool on the remote chain is added by default
 			var remotePoolAddresses [][]byte
-			remotePoolAddresses = append(remotePoolAddresses, remoteTokenPool.Address().Bytes())
+			remoteTokenPoolAddressBytes := common.LeftPadBytes(remoteTokenPool.Address().Bytes(), 32)
+			remotePoolAddresses = append(remotePoolAddresses, remoteTokenPoolAddressBytes)
 			// If the desired token pool is updating an old one, we still need to support the remote pool addresses that the old pool supported to ensure 0 downtime
 			if tokenConfig.TokenPool != utils.ZeroAddress && tokenConfig.TokenPool != tokenPool.Address() {
 				activeTokenPool, err := token_pool.NewTokenPool(tokenConfig.TokenPool, chain.Client)
@@ -257,7 +260,7 @@ func configureTokenPool(
 					return fmt.Errorf("failed to fetch remote pools from token pool with address %s on chain %s: %w", tokenConfig.TokenPool, chain.String(), err)
 				}
 				for _, address := range remotePoolAddressesOnChain {
-					if !bytes.Equal(address, remoteTokenPool.Address().Bytes()) {
+					if !bytes.Equal(address, remoteTokenPoolAddressBytes) {
 						remotePoolAddresses = append(remotePoolAddresses, remotePoolAddressesOnChain...)
 					}
 				}
@@ -266,7 +269,7 @@ func configureTokenPool(
 				RemoteChainSelector:       remoteChainSelector,
 				InboundRateLimiterConfig:  chainUpdate.Inbound,
 				OutboundRateLimiterConfig: chainUpdate.Outbound,
-				RemoteTokenAddress:        remoteTokenAddress.Bytes(),
+				RemoteTokenAddress:        common.LeftPadBytes(remoteTokenAddress.Bytes(), 32),
 				RemotePoolAddresses:       remotePoolAddresses,
 			})
 		}
@@ -290,7 +293,7 @@ func configureTokenPool(
 
 	// Handle remote pool additions
 	for remoteChainSelector, remotePoolAddress := range remotePoolAddressAdditions {
-		_, err := tokenPool.AddRemotePool(opts, remoteChainSelector, remotePoolAddress.Bytes())
+		_, err := tokenPool.AddRemotePool(opts, remoteChainSelector, common.LeftPadBytes(remotePoolAddress.Bytes(), 32))
 		if err != nil {
 			return fmt.Errorf("failed to create addRemotePool transaction for token pool with address %s: %w", tokenPool.Address(), err)
 		}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
@@ -18,12 +19,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
-
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/integration-tests/utils/pgtest"
+	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 
 	readermocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -35,29 +35,33 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
+	"github.com/smartcontractkit/chainlink-integrations/evm/client"
+	"github.com/smartcontractkit/chainlink-integrations/evm/heads/headstest"
+	"github.com/smartcontractkit/chainlink-integrations/evm/logpoller"
+	evmchaintypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
+	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
+	ubig "github.com/smartcontractkit/chainlink-integrations/evm/utils/big"
+
 	evmconfig "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_reader_tester"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_0_0/rmn_proxy_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/ccip_reader_tester"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/fee_quoter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/rmn_remote"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/testutils/heavyweight"
-	"github.com/smartcontractkit/chainlink/v2/evm/assets"
-	"github.com/smartcontractkit/chainlink/v2/evm/client"
-	evmchaintypes "github.com/smartcontractkit/chainlink/v2/evm/types"
-	"github.com/smartcontractkit/chainlink/v2/evm/utils"
-	ubig "github.com/smartcontractkit/chainlink/v2/evm/utils/big"
 )
 
 const (
-	chainS1 = cciptypes.ChainSelector(1)
-	chainS2 = cciptypes.ChainSelector(2)
-	chainS3 = cciptypes.ChainSelector(3)
-	chainD  = cciptypes.ChainSelector(4)
+	chainS1   = cciptypes.ChainSelector(1)
+	chainS2   = cciptypes.ChainSelector(2)
+	chainS3   = cciptypes.ChainSelector(3)
+	chainD    = cciptypes.ChainSelector(4)
+	chainSEVM = cciptypes.ChainSelector(5009297550715157269)
 )
 
 var (
@@ -79,6 +83,12 @@ func setupGetCommitGTETimestampTest(ctx context.Context, t testing.TB, finalityD
 		Cfg:            evmconfig.DestReaderConfig,
 		ToMockBindings: map[cciptypes.ChainSelector][]types.BoundContract{
 			chainS1: {
+				{
+					Address: onRampAddress.Hex(),
+					Name:    consts.ContractNameOnRamp,
+				},
+			},
+			chainS2: {
 				{
 					Address: onRampAddress.Hex(),
 					Name:    consts.ContractNameOnRamp,
@@ -114,10 +124,10 @@ func setupExecutedMessagesTest(ctx context.Context, t testing.TB, useHeavyDB boo
 	})
 }
 
-func setupMsgsBetweenSeqNumsTest(ctx context.Context, t testing.TB, useHeavyDB bool) *testSetupData {
+func setupMsgsBetweenSeqNumsTest(ctx context.Context, t testing.TB, useHeavyDB bool, sourceChainSel cciptypes.ChainSelector) *testSetupData {
 	sb, auth := setupSimulatedBackendAndAuth(t)
 	return testSetup(ctx, t, testSetupParams{
-		ReaderChain:        chainS1,
+		ReaderChain:        sourceChainSel,
 		DestChain:          chainD,
 		OnChainSeqNums:     nil,
 		Cfg:                evmconfig.SourceReaderConfig,
@@ -149,12 +159,21 @@ func emitCommitReports(ctx context.Context, t *testing.T, s *testSetupData, numR
 					},
 				},
 			},
-			MerkleRoots: []ccip_reader_tester.InternalMerkleRoot{
+			BlessedMerkleRoots: []ccip_reader_tester.InternalMerkleRoot{
 				{
 					SourceChainSelector: uint64(chainS1),
 					MinSeqNr:            10,
 					MaxSeqNr:            20,
 					MerkleRoot:          [32]byte{i + 1},
+					OnRampAddress:       common.LeftPadBytes(onRampAddress.Bytes(), 32),
+				},
+			},
+			UnblessedMerkleRoots: []ccip_reader_tester.InternalMerkleRoot{
+				{
+					SourceChainSelector: uint64(chainS2),
+					MinSeqNr:            20,
+					MaxSeqNr:            30,
+					MerkleRoot:          [32]byte{i + 2},
 					OnRampAddress:       common.LeftPadBytes(onRampAddress.Bytes(), 32),
 				},
 			},
@@ -180,6 +199,120 @@ func emitCommitReports(ctx context.Context, t *testing.T, s *testSetupData, numR
 	return firstReportTs
 }
 
+func TestCCIPReader_GetRMNRemoteConfig(t *testing.T) {
+	t.Parallel()
+	ctx := tests.Context(t)
+	sb, auth := setupSimulatedBackendAndAuth(t)
+
+	rmnRemoteAddr, _, _, err := rmn_remote.DeployRMNRemote(auth, sb.Client(), uint64(chainD), utils.RandomAddress())
+	require.NoError(t, err)
+	sb.Commit()
+
+	proxyAddr, _, _, err := rmn_proxy_contract.DeployRMNProxy(auth, sb.Client(), rmnRemoteAddr)
+	require.NoError(t, err)
+	sb.Commit()
+
+	t.Logf("Proxy address: %s, rmn remote address: %s", proxyAddr.Hex(), rmnRemoteAddr.Hex())
+
+	proxy, err := rmn_proxy_contract.NewRMNProxy(proxyAddr, sb.Client())
+	require.NoError(t, err)
+
+	currARM, err := proxy.GetARM(&bind.CallOpts{
+		Context: ctx,
+	})
+	require.NoError(t, err)
+	require.Equal(t, currARM, rmnRemoteAddr)
+
+	rmnRemote, err := rmn_remote.NewRMNRemote(rmnRemoteAddr, sb.Client())
+	require.NoError(t, err)
+
+	_, err = rmnRemote.SetConfig(auth, rmn_remote.RMNRemoteConfig{
+		RmnHomeContractConfigDigest: utils.RandomBytes32(),
+		Signers: []rmn_remote.RMNRemoteSigner{
+			{
+				OnchainPublicKey: utils.RandomAddress(),
+				NodeIndex:        0,
+			},
+			{
+				OnchainPublicKey: utils.RandomAddress(),
+				NodeIndex:        1,
+			},
+			{
+				OnchainPublicKey: utils.RandomAddress(),
+				NodeIndex:        2,
+			},
+		},
+		FSign: 1, // 2*FSign + 1 == 3
+	})
+	require.NoError(t, err)
+	sb.Commit()
+
+	db := pgtest.NewSqlxDB(t)
+	lggr := logger.TestLogger(t)
+	lggr.SetLogLevel(zapcore.ErrorLevel)
+	lpOpts := logpoller.Opts{
+		PollPeriod:               time.Millisecond,
+		FinalityDepth:            1,
+		BackfillBatchSize:        10,
+		RPCBatchSize:             10,
+		KeepFinalizedBlocksDepth: 100000,
+	}
+	cl := client.NewSimulatedBackendClient(t, sb, big.NewInt(1337))
+	headTracker := headstest.NewSimulatedHeadTracker(cl, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+	orm := logpoller.NewORM(big.NewInt(1337), db, lggr)
+	lp := logpoller.NewLogPoller(
+		orm,
+		cl,
+		lggr,
+		headTracker,
+		lpOpts,
+	)
+	require.NoError(t, lp.Start(ctx))
+	t.Cleanup(func() { require.NoError(t, lp.Close()) })
+
+	cr, err := evm.NewChainReaderService(ctx, lggr, lp, headTracker, cl, evmconfig.DestReaderConfig)
+	require.NoError(t, err)
+	err = cr.Start(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, cr.Close()) })
+
+	extendedCr := contractreader.NewExtendedContractReader(cr)
+	err = extendedCr.Bind(ctx, []types.BoundContract{
+		{
+			Address: proxyAddr.String(),
+			Name:    consts.ContractNameRMNRemote,
+		},
+	})
+	require.NoError(t, err)
+
+	reader := ccipreaderpkg.NewCCIPReaderWithExtendedContractReaders(
+		ctx,
+		lggr,
+		map[cciptypes.ChainSelector]contractreader.Extended{
+			chainD: extendedCr,
+		},
+		nil,
+		chainD,
+		rmnRemoteAddr.Bytes(),
+		ccipcommon.NewExtraDataCodec(),
+	)
+
+	exp, err := rmnRemote.GetVersionedConfig(&bind.CallOpts{
+		Context: ctx,
+	})
+	require.NoError(t, err)
+
+	rmnRemoteConfig, err := reader.GetRMNRemoteConfig(ctx)
+	require.NoError(t, err)
+	require.Equal(t, exp.Config.RmnHomeContractConfigDigest[:], rmnRemoteConfig.ConfigDigest[:])
+	require.Equal(t, len(exp.Config.Signers), len(rmnRemoteConfig.Signers))
+	for i, signer := range exp.Config.Signers {
+		require.Equal(t, signer.OnchainPublicKey.Bytes(), []byte(rmnRemoteConfig.Signers[i].OnchainPublicKey))
+		require.Equal(t, signer.NodeIndex, rmnRemoteConfig.Signers[i].NodeIndex)
+	}
+	require.Equal(t, exp.Config.FSign, rmnRemoteConfig.FSign)
+}
+
 func TestCCIPReader_GetOffRampConfigDigest(t *testing.T) {
 	t.Parallel()
 	ctx := tests.Context(t)
@@ -194,7 +327,6 @@ func TestCCIPReader_GetOffRampConfigDigest(t *testing.T) {
 	}, offramp.OffRampDynamicConfig{
 		FeeQuoter:                               utils.RandomAddress(),
 		PermissionLessExecutionThresholdSeconds: 1,
-		IsRMNVerificationDisabled:               true,
 		MessageInterceptor:                      utils.RandomAddress(),
 	}, []offramp.OffRampSourceChainConfigArgs{})
 	require.NoError(t, err)
@@ -246,11 +378,11 @@ func TestCCIPReader_GetOffRampConfigDigest(t *testing.T) {
 		PollPeriod:               time.Millisecond,
 		FinalityDepth:            1,
 		BackfillBatchSize:        10,
-		RpcBatchSize:             10,
+		RPCBatchSize:             10,
 		KeepFinalizedBlocksDepth: 100000,
 	}
 	cl := client.NewSimulatedBackendClient(t, sb, big.NewInt(1337))
-	headTracker := headtracker.NewSimulatedHeadTracker(cl, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+	headTracker := headstest.NewSimulatedHeadTracker(cl, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
 	orm := logpoller.NewORM(big.NewInt(1337), db, lggr)
 	lp := logpoller.NewLogPoller(
 		orm,
@@ -308,97 +440,113 @@ func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 
 	firstReportTs := emitCommitReports(ctx, t, s, numReports, tokenA, onRampAddress)
 
+	iter, err := s.contract.FilterCommitReportAccepted(&bind.FilterOpts{
+		Start: 0,
+	})
+	require.NoError(t, err)
+	var onchainEvents []*ccip_reader_tester.CCIPReaderTesterCommitReportAccepted
+	for iter.Next() {
+		onchainEvents = append(onchainEvents, iter.Event)
+	}
+	require.Len(t, onchainEvents, numReports)
+	sort.Slice(onchainEvents, func(i, j int) bool {
+		return onchainEvents[i].Raw.BlockNumber < onchainEvents[j].Raw.BlockNumber
+	})
+
 	// Need to replay as sometimes the logs are not picked up by the log poller (?)
 	// Maybe another situation where chain reader doesn't register filters as expected.
 	require.NoError(t, s.lp.Replay(ctx, 1))
 
-	var reports []plugintypes.CommitPluginReportWithMeta
-	var err error
+	var ccipReaderReports []plugintypes.CommitPluginReportWithMeta
 	require.Eventually(t, func() bool {
-		reports, err = s.reader.CommitReportsGTETimestamp(
+		var err2 error
+		ccipReaderReports, err2 = s.reader.CommitReportsGTETimestamp(
 			ctx,
 			// Skips first report
 			//nolint:gosec // this won't overflow
 			time.Unix(int64(firstReportTs)+1, 0),
 			10,
 		)
-		require.NoError(t, err)
-		return len(reports) == numReports-1
+		require.NoError(t, err2)
+		return len(ccipReaderReports) == numReports-1
 	}, 30*time.Second, 50*time.Millisecond)
 
-	assert.Len(t, reports, numReports-1)
-	assert.Len(t, reports[0].Report.MerkleRoots, 1)
-	assert.Equal(t, chainS1, reports[0].Report.MerkleRoots[0].ChainSel)
-	assert.Equal(t, onRampAddress.Bytes(), []byte(reports[0].Report.MerkleRoots[0].OnRampAddress))
-	assert.Equal(t, cciptypes.SeqNum(10), reports[0].Report.MerkleRoots[0].SeqNumsRange.Start())
-	assert.Equal(t, cciptypes.SeqNum(20), reports[0].Report.MerkleRoots[0].SeqNumsRange.End())
-	assert.Equal(t, "0x0200000000000000000000000000000000000000000000000000000000000000",
-		reports[0].Report.MerkleRoots[0].MerkleRoot.String())
-	assert.Equal(t, tokenA.String(), string(reports[0].Report.PriceUpdates.TokenPriceUpdates[0].TokenID))
-	assert.Equal(t, uint64(1000), reports[0].Report.PriceUpdates.TokenPriceUpdates[0].Price.Uint64())
-	assert.Equal(t, chainD, reports[0].Report.PriceUpdates.GasPriceUpdates[0].ChainSel)
-	assert.Equal(t, uint64(90), reports[0].Report.PriceUpdates.GasPriceUpdates[0].GasPrice.Uint64())
+	// trim the first report to simulate the timestamp filter above.
+	onchainEvents = onchainEvents[1:]
+	require.Len(t, onchainEvents, numReports-1)
+
+	require.Len(t, ccipReaderReports, numReports-1)
+	for i := range onchainEvents {
+		// check blessed roots are deserialized correctly
+		requireEqualRoots(t, onchainEvents[i].BlessedMerkleRoots, ccipReaderReports[i].Report.BlessedMerkleRoots)
+
+		// check unblessed roots are deserialized correctly
+		requireEqualRoots(t, onchainEvents[i].UnblessedMerkleRoots, ccipReaderReports[i].Report.UnblessedMerkleRoots)
+
+		// check price updates are deserialized correctly
+		requireEqualPriceUpdates(t, onchainEvents[i].PriceUpdates, ccipReaderReports[i].Report.PriceUpdates)
+	}
 }
 
-func TestCCIPReader_CommitReportsGTETimestamp_RespectsFinality(t *testing.T) {
-	t.Parallel()
-	ctx := tests.Context(t)
-	var finalityDepth int64 = 10
-	s, _, onRampAddress := setupGetCommitGTETimestampTest(ctx, t, finalityDepth, false)
-
-	tokenA := common.HexToAddress("123")
-	const numReports = 5
-
-	firstReportTs := emitCommitReports(ctx, t, s, numReports, tokenA, onRampAddress)
-
-	// Need to replay as sometimes the logs are not picked up by the log poller (?)
-	// Maybe another situation where chain reader doesn't register filters as expected.
-	require.NoError(t, s.lp.Replay(ctx, 1))
-
-	var reports []plugintypes.CommitPluginReportWithMeta
-	var err error
-	// Will not return any reports as the finality depth is not reached.
-	require.Never(t, func() bool {
-		reports, err = s.reader.CommitReportsGTETimestamp(
-			ctx,
-			// Skips first report
-			//nolint:gosec // this won't overflow
-			time.Unix(int64(firstReportTs)+1, 0),
-			10,
-		)
-		require.NoError(t, err)
-		return len(reports) == numReports-1
-	}, 20*time.Second, 50*time.Millisecond)
-
-	// Commit finality depth number of blocks.
-	for i := 0; i < int(finalityDepth); i++ {
-		s.sb.Commit()
+func requireEqualPriceUpdates(
+	t *testing.T,
+	onchainPriceUpdates ccip_reader_tester.InternalPriceUpdates,
+	ccipReaderPriceUpdates cciptypes.PriceUpdates,
+) {
+	// token price update equality
+	require.Equal(t, len(onchainPriceUpdates.TokenPriceUpdates), len(ccipReaderPriceUpdates.TokenPriceUpdates))
+	for i := range onchainPriceUpdates.TokenPriceUpdates {
+		require.Equal(t,
+			onchainPriceUpdates.TokenPriceUpdates[i].SourceToken.Bytes(),
+			hexutil.MustDecode(string(ccipReaderPriceUpdates.TokenPriceUpdates[i].TokenID)))
+		require.Equal(t,
+			onchainPriceUpdates.TokenPriceUpdates[i].UsdPerToken,
+			ccipReaderPriceUpdates.TokenPriceUpdates[i].Price.Int)
 	}
 
-	require.Eventually(t, func() bool {
-		reports, err = s.reader.CommitReportsGTETimestamp(
-			ctx,
-			// Skips first report
-			//nolint:gosec // this won't overflow
-			time.Unix(int64(firstReportTs)+1, 0),
-			10,
-		)
-		require.NoError(t, err)
-		return len(reports) == numReports-1
-	}, 30*time.Second, 50*time.Millisecond)
+	// gas price update equality
+	require.Equal(t, len(onchainPriceUpdates.GasPriceUpdates), len(ccipReaderPriceUpdates.GasPriceUpdates))
+	for i := range onchainPriceUpdates.GasPriceUpdates {
+		require.Equal(t,
+			onchainPriceUpdates.GasPriceUpdates[i].DestChainSelector,
+			uint64(ccipReaderPriceUpdates.GasPriceUpdates[i].ChainSel))
+		require.Equal(t,
+			onchainPriceUpdates.GasPriceUpdates[i].UsdPerUnitGas,
+			ccipReaderPriceUpdates.GasPriceUpdates[i].GasPrice.Int)
+	}
+}
 
-	assert.Len(t, reports, numReports-1)
-	assert.Len(t, reports[0].Report.MerkleRoots, 1)
-	assert.Equal(t, chainS1, reports[0].Report.MerkleRoots[0].ChainSel)
-	assert.Equal(t, onRampAddress.Bytes(), []byte(reports[0].Report.MerkleRoots[0].OnRampAddress))
-	assert.Equal(t, cciptypes.SeqNum(10), reports[0].Report.MerkleRoots[0].SeqNumsRange.Start())
-	assert.Equal(t, cciptypes.SeqNum(20), reports[0].Report.MerkleRoots[0].SeqNumsRange.End())
-	assert.Equal(t, "0x0200000000000000000000000000000000000000000000000000000000000000",
-		reports[0].Report.MerkleRoots[0].MerkleRoot.String())
-	assert.Equal(t, tokenA.String(), string(reports[0].Report.PriceUpdates.TokenPriceUpdates[0].TokenID))
-	assert.Equal(t, uint64(1000), reports[0].Report.PriceUpdates.TokenPriceUpdates[0].Price.Uint64())
-	assert.Equal(t, chainD, reports[0].Report.PriceUpdates.GasPriceUpdates[0].ChainSel)
-	assert.Equal(t, uint64(90), reports[0].Report.PriceUpdates.GasPriceUpdates[0].GasPrice.Uint64())
+func requireEqualRoots(
+	t *testing.T,
+	onchainRoots []ccip_reader_tester.InternalMerkleRoot,
+	ccipReaderRoots []cciptypes.MerkleRootChain,
+) {
+	require.Equal(t, len(onchainRoots), len(ccipReaderRoots))
+	for i := 0; i < len(onchainRoots); i++ {
+		require.Equal(t,
+			onchainRoots[i].SourceChainSelector,
+			uint64(ccipReaderRoots[i].ChainSel),
+		)
+
+		// onchain emits the padded address but ccip reader currently sets the unpadded address
+		// TODO: fix this!
+		require.Equal(t,
+			onchainRoots[i].OnRampAddress,
+			common.LeftPadBytes([]byte(ccipReaderRoots[i].OnRampAddress), 32),
+		)
+		require.Equal(t,
+			onchainRoots[i].MinSeqNr,
+			uint64(ccipReaderRoots[i].SeqNumsRange.Start()),
+		)
+		require.Equal(t,
+			onchainRoots[i].MaxSeqNr,
+			uint64(ccipReaderRoots[i].SeqNumsRange.End()),
+		)
+		require.Equal(t,
+			onchainRoots[i].MerkleRoot,
+			[32]byte(ccipReaderRoots[i].MerkleRoot),
+		)
+	}
 }
 
 func TestCCIPReader_ExecutedMessages(t *testing.T) {
@@ -453,11 +601,11 @@ func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 	t.Parallel()
 	ctx := tests.Context(t)
 
-	s := setupMsgsBetweenSeqNumsTest(ctx, t, false)
+	s := setupMsgsBetweenSeqNumsTest(ctx, t, false, chainSEVM)
 	_, err := s.contract.EmitCCIPMessageSent(s.auth, uint64(chainD), ccip_reader_tester.InternalEVM2AnyRampMessage{
 		Header: ccip_reader_tester.InternalRampMessageHeader{
 			MessageId:           [32]byte{1, 0, 0, 0, 0},
-			SourceChainSelector: uint64(chainS1),
+			SourceChainSelector: uint64(chainSEVM),
 			DestChainSelector:   uint64(chainD),
 			SequenceNumber:      10,
 		},
@@ -475,7 +623,7 @@ func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 	_, err = s.contract.EmitCCIPMessageSent(s.auth, uint64(chainD), ccip_reader_tester.InternalEVM2AnyRampMessage{
 		Header: ccip_reader_tester.InternalRampMessageHeader{
 			MessageId:           [32]byte{1, 0, 0, 0, 1},
-			SourceChainSelector: uint64(chainS1),
+			SourceChainSelector: uint64(chainSEVM),
 			DestChainSelector:   uint64(chainD),
 			SequenceNumber:      15,
 		},
@@ -500,7 +648,7 @@ func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 	require.Eventually(t, func() bool {
 		msgs, err = s.reader.MsgsBetweenSeqNums(
 			ctx,
-			chainS1,
+			chainSEVM,
 			cciptypes.NewSeqNumRange(5, 20),
 		)
 		require.NoError(t, err)
@@ -525,7 +673,7 @@ func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 	require.Equal(t, int64(4), msgs[1].TokenAmounts[1].Amount.Int64())
 
 	for _, msg := range msgs {
-		require.Equal(t, chainS1, msg.Header.SourceChainSelector)
+		require.Equal(t, chainSEVM, msg.Header.SourceChainSelector)
 		require.Equal(t, chainD, msg.Header.DestChainSelector)
 	}
 }
@@ -992,7 +1140,7 @@ func populateDatabaseForCommitReportAccepted(
 
 		// Create log entry
 		logs = append(logs, logpoller.Log{
-			EvmChainId:     ubig.New(new(big.Int).SetUint64(uint64(destChain))),
+			EVMChainID:     ubig.New(new(big.Int).SetUint64(uint64(destChain))),
 			LogIndex:       logIndex,
 			BlockHash:      utils.NewHash(),
 			BlockNumber:    blockNumber,
@@ -1112,7 +1260,7 @@ func populateDatabaseForExecutionStateChanged(
 
 		// Create log entry
 		logs = append(logs, logpoller.Log{
-			EvmChainId:     ubig.New(big.NewInt(0).SetUint64(uint64(destChain))),
+			EVMChainID:     ubig.New(big.NewInt(0).SetUint64(uint64(destChain))),
 			LogIndex:       logIndex,
 			BlockHash:      utils.NewHash(),
 			BlockNumber:    blockNumber,
@@ -1158,7 +1306,7 @@ func Benchmark_CCIPReader_MessageSentRanges(b *testing.B) {
 func benchmarkMessageSentRanges(b *testing.B, logsInserted int, startSeqNum, endSeqNum cciptypes.SeqNum) {
 	// Initialize test setup
 	ctx := tests.Context(b)
-	s := setupMsgsBetweenSeqNumsTest(ctx, b, true)
+	s := setupMsgsBetweenSeqNumsTest(ctx, b, true, chainS1)
 	expectedRangeLen := calculateExpectedRangeLen(logsInserted, startSeqNum, endSeqNum)
 
 	err := s.extendedCR.Bind(ctx, []types.BoundContract{
@@ -1267,7 +1415,7 @@ func populateDatabaseForMessageSent(
 
 		// Create log entry
 		logs = append(logs, logpoller.Log{
-			EvmChainId:     ubig.New(big.NewInt(0).SetUint64(uint64(sourceChain))),
+			EVMChainID:     ubig.New(big.NewInt(0).SetUint64(uint64(sourceChain))),
 			LogIndex:       logIndex,
 			BlockHash:      utils.NewHash(),
 			BlockNumber:    blockNumber,
@@ -1337,7 +1485,7 @@ func testSetupRealContracts(
 		PollPeriod:               time.Millisecond,
 		FinalityDepth:            0,
 		BackfillBatchSize:        10,
-		RpcBatchSize:             10,
+		RPCBatchSize:             10,
 		KeepFinalizedBlocksDepth: 100000,
 	}
 	lggr := logger.TestLogger(t)
@@ -1347,7 +1495,7 @@ func testSetupRealContracts(
 	for chain, bindings := range toBindContracts {
 		be := env.Env.Chains[uint64(chain)].Client.(*memory.Backend)
 		cl := client.NewSimulatedBackendClient(t, be.Sim, big.NewInt(0).SetUint64(uint64(chain)))
-		headTracker := headtracker.NewSimulatedHeadTracker(cl, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+		headTracker := headstest.NewSimulatedHeadTracker(cl, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
 		lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(0).SetUint64(uint64(chain)), db, lggr),
 			cl,
 			lggr,
@@ -1429,11 +1577,11 @@ func testSetup(
 		PollPeriod:               time.Millisecond,
 		FinalityDepth:            params.FinalityDepth,
 		BackfillBatchSize:        10,
-		RpcBatchSize:             10,
+		RPCBatchSize:             10,
 		KeepFinalizedBlocksDepth: 100000,
 	}
 	cl := client.NewSimulatedBackendClient(t, params.SimulatedBackend, big.NewInt(0).SetUint64(uint64(params.ReaderChain)))
-	headTracker := headtracker.NewSimulatedHeadTracker(cl, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+	headTracker := headstest.NewSimulatedHeadTracker(cl, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
 	orm := logpoller.NewORM(big.NewInt(0).SetUint64(uint64(params.ReaderChain)), db, lggr)
 	lp := logpoller.NewLogPoller(
 		orm,
@@ -1475,7 +1623,7 @@ func testSetup(
 	var otherCrs = make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chain, bindings := range params.ToBindContracts {
 		cl2 := client.NewSimulatedBackendClient(t, params.SimulatedBackend, big.NewInt(0).SetUint64(uint64(chain)))
-		headTracker2 := headtracker.NewSimulatedHeadTracker(cl2, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+		headTracker2 := headstest.NewSimulatedHeadTracker(cl2, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
 		lp2 := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(0).SetUint64(uint64(chain)), db, lggr),
 			cl2,
 			lggr,
