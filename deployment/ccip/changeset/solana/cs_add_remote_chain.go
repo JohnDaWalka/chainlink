@@ -71,8 +71,20 @@ func (cfg AddRemoteChainToSolanaConfig) Validate(e deployment.Environment) error
 		if remote == routerConfigAccount.SvmChainSelector {
 			return fmt.Errorf("cannot add remote chain %d with same chain selector as current chain %d", remote, cfg.ChainSelector)
 		}
-	}
+		if err := state.ValidateRamp(remote, cs.OnRamp); err != nil {
+			return err
+		}
+		routerDestChainPDA, err := solState.FindDestChainStatePDA(remote, chainState.Router)
+		if err != nil {
+			return fmt.Errorf("failed to find dest chain state pda for remote chain %d: %w", remote, err)
+		}
+		var destChainStateAccount solRouter.DestChain
+		err = chain.GetAccountDataBorshInto(context.Background(), routerDestChainPDA, &destChainStateAccount)
+		if err == nil {
+			return fmt.Errorf("remote %d is already configured on solana chain %d", remote, cfg.ChainSelector)
+		}
 
+	}
 	return nil
 }
 
@@ -113,12 +125,11 @@ func doAddRemoteChainToSolana(
 		remoteChainFamily, _ := chainsel.GetSelectorFamily(remoteChainSel)
 		switch remoteChainFamily {
 		case chainsel.FamilySolana:
-			return fmt.Errorf("support for solana chain as remote chain is not implemented yet %d", remoteChainSel)
+			onRampAddress := s.SolChains[remoteChainSel].Router.String()
+			addressBytes := []byte(onRampAddress)
+			copy(onRampBytes[:], addressBytes)
 		case chainsel.FamilyEVM:
 			onRampAddress := s.Chains[remoteChainSel].OnRamp.Address().String()
-			if onRampAddress == "" {
-				return fmt.Errorf("onramp address not found for chain %d", remoteChainSel)
-			}
 			addressBytes := []byte(onRampAddress)
 			copy(onRampBytes[:], addressBytes)
 		}

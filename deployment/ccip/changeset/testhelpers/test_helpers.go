@@ -424,7 +424,6 @@ func AddLane(
 ) {
 	var err error
 
-	// from family
 	fromFamily, _ := chainsel.GetSelectorFamily(from)
 	toFamily, _ := chainsel.GetSelectorFamily(to)
 
@@ -485,6 +484,7 @@ func AddLane(
 		changesets = append(changesets, evmSrcChangesets...)
 	}
 
+	fmt.Println("e.RmnEnabledSourceChains[from]", e.RmnEnabledSourceChains[from])
 	if toFamily == chainsel.FamilyEVM {
 		evmDstChangesets := []commoncs.ConfiguredChangeSet{
 			commoncs.Configure(
@@ -616,18 +616,26 @@ func RemoveLane(t *testing.T, e *DeployedEnv, src, dest uint64, isTestRouter boo
 }
 
 func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, state changeset.CCIPOnChainState, from, to uint64, isTestRouter bool) {
-	stateChainFrom := state.Chains[from]
+
+	gasPrices := map[uint64]*big.Int{
+		to: DefaultGasPrice,
+	}
+	fromFamily, _ := chainsel.GetSelectorFamily(from)
+	tokenPrices := map[common.Address]*big.Int{}
+	if fromFamily == chainsel.FamilyEVM {
+		stateChainFrom := state.Chains[from]
+		tokenPrices = map[common.Address]*big.Int{
+			stateChainFrom.LinkToken.Address(): DefaultLinkPrice,
+			stateChainFrom.Weth9.Address():     DefaultWethPrice,
+		}
+	}
+	fqCfg := changeset.DefaultFeeQuoterDestChainConfig(true, to)
 	AddLane(
 		t,
 		e,
 		from, to,
 		isTestRouter,
-		map[uint64]*big.Int{
-			to: DefaultGasPrice,
-		}, map[common.Address]*big.Int{
-			stateChainFrom.LinkToken.Address(): DefaultLinkPrice,
-			stateChainFrom.Weth9.Address():     DefaultWethPrice,
-		}, changeset.DefaultFeeQuoterDestChainConfig(true, to))
+		gasPrices, tokenPrices, fqCfg)
 }
 
 // AddLanesForAll adds densely connected lanes for all chains in the environment so that each chain
