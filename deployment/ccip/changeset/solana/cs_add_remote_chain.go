@@ -83,7 +83,6 @@ func (cfg AddRemoteChainToSolanaConfig) Validate(e deployment.Environment) error
 		if err == nil {
 			return fmt.Errorf("remote %d is already configured on solana chain %d", remote, cfg.ChainSelector)
 		}
-
 	}
 	return nil
 }
