@@ -1083,12 +1083,14 @@ func UpdateOffRampSourcesChangeset(e deployment.Environment, cfg UpdateOffRampSo
 		offRamp := state.Chains[chainSel].OffRamp
 		var args []offramp.OffRampSourceChainConfigArgs
 		for source, update := range updates {
+			// TODO: this needs to change for solana
 			router := common.HexToAddress("0x0")
 			if update.TestRouter {
 				router = state.Chains[chainSel].TestRouter.Address()
 			} else {
 				router = state.Chains[chainSel].Router.Address()
 			}
+			// TODO: this needs to change for solana
 			onRamp := state.Chains[source].OnRamp
 			args = append(args, offramp.OffRampSourceChainConfigArgs{
 				SourceChainSelector: source,
