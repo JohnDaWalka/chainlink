@@ -35,7 +35,7 @@ type delegate struct {
 	services.StateMachine
 
 	cfg          DelegateConfig
-	reportCodecs map[llotypes.ReportFormat]datastreamsllo.ReportCodec
+	reportCodecs map[llotypes.ReportFormat]datastreamsllo.ReportEncoder
 
 	src   datastreamsllo.ShouldRetireCache
 	ds    datastreamsllo.DataSource

@@ -9,12 +9,13 @@ import (
 )
 
 // NOTE: All supported codecs must be specified here
-func NewReportCodecs(lggr logger.Logger, donID uint32) map[llotypes.ReportFormat]llo.ReportCodec {
-	codecs := make(map[llotypes.ReportFormat]llo.ReportCodec)
+func NewReportCodecs(lggr logger.Logger, donID uint32) map[llotypes.ReportFormat]llo.ReportEncoder {
+	codecs := make(map[llotypes.ReportFormat]llo.ReportEncoder)
 
 	codecs[llotypes.ReportFormatJSON] = llo.JSONReportCodec{}
 	codecs[llotypes.ReportFormatEVMPremiumLegacy] = evm.NewReportCodecPremiumLegacy(lggr, donID)
 	codecs[llotypes.ReportFormatEVMABIEncodeUnpacked] = evm.NewReportCodecEVMABIEncodeUnpacked(lggr, donID)
+	codecs[llotypes.ReportFormatProto] = llo.ProtoReportCodec{}
 
 	return codecs
 }

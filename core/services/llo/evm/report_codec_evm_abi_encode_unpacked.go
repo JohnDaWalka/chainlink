@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	_ llo.ReportCodec = ReportCodecEVMABIEncodeUnpacked{}
+	_ llo.ReportEncoder = ReportCodecEVMABIEncodeUnpacked{}
 
 	zero = big.NewInt(0)
 )
