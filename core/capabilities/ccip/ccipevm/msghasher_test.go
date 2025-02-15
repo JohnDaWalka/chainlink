@@ -1,8 +1,10 @@
 package ccipevm
 
 import (
+	"bytes"
 	"context"
 	cryptorand "crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -17,6 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	agbinary "github.com/gagliardetto/binary"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipsolana"
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 	"github.com/stretchr/testify/require"
@@ -45,12 +49,68 @@ func TestMessageHasher_EVM2EVM(t *testing.T) {
 		{version: "v1", gasLimit: big.NewInt(rand.Int63()), chainSelector: 5009297550715157269},                  // ETH mainnet chain selector
 		{version: "v2", gasLimit: big.NewInt(rand.Int63()), allowOOO: false, chainSelector: 5009297550715157269}, // ETH mainnet chain selector
 		{version: "v2", gasLimit: big.NewInt(rand.Int63()), allowOOO: true, chainSelector: 5009297550715157269},  // ETH mainnet chain selector
+		{version: "v2", gasLimit: big.NewInt(rand.Int63()), allowOOO: true, chainSelector: 124615329519749607},   // Solana mainnet chain selector
 	}
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("tc_%d", i), func(tt *testing.T) {
 			testHasherEVM2EVM(ctx, tt, d, tc, tc.chainSelector)
 		})
 	}
+}
+
+func TestMessageHasher_Solana2EVM(t *testing.T) {
+	ctx := testutils.Context(t)
+	d := testSetup(t)
+
+	testCases := []solanaExtraArgs{
+		{gasLimit: big.NewInt(rand.Int63()), chainSelector: 124615329519749607, destGasAmount: rand.Uint32(), allowOOO: true}, // Solana mainnet chain selector
+	}
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("tc_%d", i), func(tt *testing.T) {
+			testHasherSolana2EVM(ctx, tt, d, tc, tc.chainSelector)
+		})
+	}
+}
+
+func testHasherSolana2EVM(ctx context.Context, t *testing.T, d *testSetupData, solExtraArgs solanaExtraArgs, sourceChainSelector uint64) {
+	ccipMsg := createSolana2EVMMessage(t, d.contract, solExtraArgs, sourceChainSelector)
+
+	var tokenAmounts []message_hasher.InternalAny2EVMTokenTransfer
+	for _, rta := range ccipMsg.TokenAmounts {
+		destGasAmount, err := abiDecodeUint32(rta.DestExecData)
+		require.NoError(t, err)
+
+		tokenAmounts = append(tokenAmounts, message_hasher.InternalAny2EVMTokenTransfer{
+			SourcePoolAddress: rta.SourcePoolAddress,
+			DestTokenAddress:  common.BytesToAddress(rta.DestTokenAddress),
+			ExtraData:         rta.ExtraData[:],
+			Amount:            rta.Amount.Int,
+			DestGasAmount:     destGasAmount,
+		})
+	}
+	evmMsg := message_hasher.InternalAny2EVMRampMessage{
+		Header: message_hasher.InternalRampMessageHeader{
+			MessageId:           ccipMsg.Header.MessageID,
+			SourceChainSelector: uint64(ccipMsg.Header.SourceChainSelector),
+			DestChainSelector:   uint64(ccipMsg.Header.DestChainSelector),
+			SequenceNumber:      uint64(ccipMsg.Header.SequenceNumber),
+			Nonce:               ccipMsg.Header.Nonce,
+		},
+		Sender:       ccipMsg.Sender,
+		Receiver:     common.BytesToAddress(ccipMsg.Receiver),
+		GasLimit:     solExtraArgs.gasLimit,
+		Data:         ccipMsg.Data,
+		TokenAmounts: tokenAmounts,
+	}
+
+	expectedHash, err := d.contract.Hash(&bind.CallOpts{Context: ctx}, evmMsg, ccipMsg.Header.OnRamp)
+	require.NoError(t, err)
+
+	evmMsgHasher := NewMessageHasherV1(logger.Test(t), ExtraDataCodec)
+	actualHash, err := evmMsgHasher.Hash(ctx, ccipMsg)
+	require.NoError(t, err)
+
+	require.Equal(t, fmt.Sprintf("%x", expectedHash), strings.TrimPrefix(actualHash.String(), "0x"))
 }
 
 func testHasherEVM2EVM(ctx context.Context, t *testing.T, d *testSetupData, evmExtraArgs evmExtraArgs, sourceChainSelector uint64) {
@@ -99,6 +159,13 @@ type evmExtraArgs struct {
 	gasLimit      *big.Int
 	allowOOO      bool
 	chainSelector uint64
+}
+
+type solanaExtraArgs struct {
+	gasLimit      *big.Int
+	chainSelector uint64
+	allowOOO      bool
+	destGasAmount uint32
 }
 
 func createEVM2EVMMessage(t *testing.T, messageHasher *message_hasher.MessageHasher, evmExtraArgs evmExtraArgs, sourceChainSelector uint64) cciptypes.Message {
@@ -150,6 +217,78 @@ func createEVM2EVMMessage(t *testing.T, messageHasher *message_hasher.MessageHas
 			ExtraData:         extraData[:],
 			Amount:            cciptypes.NewBigInt(big.NewInt(0).SetUint64(rand.Uint64())),
 			DestExecData:      encodedDestExecData,
+		})
+	}
+
+	return cciptypes.Message{
+		Header: cciptypes.RampMessageHeader{
+			MessageID:           messageID,
+			SourceChainSelector: cciptypes.ChainSelector(sourceChain),
+			DestChainSelector:   cciptypes.ChainSelector(destChain),
+			SequenceNumber:      cciptypes.SeqNum(seqNum),
+			Nonce:               nonce,
+			OnRamp:              abiEncodedAddress(t),
+		},
+		Sender:         abiEncodedAddress(t),
+		Receiver:       abiEncodedAddress(t),
+		Data:           messageData,
+		TokenAmounts:   tokenAmounts,
+		FeeToken:       abiEncodedAddress(t),
+		FeeTokenAmount: cciptypes.NewBigInt(big.NewInt(0).SetUint64(rand.Uint64())),
+		ExtraArgs:      extraArgsBytes,
+	}
+}
+
+func createSolana2EVMMessage(t *testing.T, messageHasher *message_hasher.MessageHasher, solExtraArgs solanaExtraArgs, sourceChainSelector uint64) cciptypes.Message {
+	messageID := utils.RandomBytes32()
+
+	sourceTokenData := make([]byte, rand.Intn(2048))
+	_, err := cryptorand.Read(sourceTokenData)
+	require.NoError(t, err)
+
+	sourceChain := sourceChainSelector
+	seqNum := rand.Uint64()
+	nonce := rand.Uint64()
+	destChain := rand.Uint64()
+
+	extraArgs := fee_quoter.EVMExtraArgsV2{
+		GasLimit:                 solExtraArgs.gasLimit,
+		AllowOutOfOrderExecution: solExtraArgs.allowOOO,
+	}
+
+	var buf bytes.Buffer
+	encoder := agbinary.NewBorshEncoder(&buf)
+	err = extraArgs.MarshalWithEncoder(encoder)
+	require.NoError(t, err)
+
+	extraArgsBytes := append(hexutil.MustDecode("0x181dcf10"), buf.Bytes()...)
+	require.NoError(t, err)
+
+	messageData := make([]byte, rand.Intn(2048))
+	_, err = cryptorand.Read(messageData)
+	require.NoError(t, err)
+
+	numTokens := rand.Intn(10)
+	var sourceTokenDatas [][]byte
+	for i := 0; i < numTokens; i++ {
+		sourceTokenDatas = append(sourceTokenDatas, sourceTokenData)
+	}
+
+	var tokenAmounts []cciptypes.RampTokenAmount
+	for i := 0; i < len(sourceTokenDatas); i++ {
+		extraData := utils.RandomBytes32()
+		encodedExecData := make([]byte, 4)
+		binary.LittleEndian.PutUint32(encodedExecData, solExtraArgs.destGasAmount)
+
+		require.NoError(t, err)
+
+		require.NoError(t, err)
+		tokenAmounts = append(tokenAmounts, cciptypes.RampTokenAmount{
+			SourcePoolAddress: abiEncodedAddress(t),
+			DestTokenAddress:  abiEncodedAddress(t),
+			ExtraData:         extraData[:],
+			Amount:            cciptypes.NewBigInt(big.NewInt(0).SetUint64(rand.Uint64())),
+			DestExecData:      encodedExecData,
 		})
 	}
 
