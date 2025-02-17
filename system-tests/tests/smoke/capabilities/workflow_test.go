@@ -14,6 +14,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -22,12 +23,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
-	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
-	"github.com/smartcontractkit/chainlink/deployment/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
-
-	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
@@ -42,7 +39,7 @@ import (
 	keystoneporconfig "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don/config/por"
 	libjobs "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don/jobs"
 	keystonepor "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don/jobs/por"
-	keystoneenv "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/environment"
+	libenv "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/environment"
 	keystonetypes "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
 )
 
@@ -92,6 +89,30 @@ type PriceProviderConfig struct {
 	Fake   *FakeConfig `toml:"fake"`
 	FeedID string      `toml:"feed_id" validate:"required"`
 	URL    string      `toml:"url"`
+}
+
+func (in *TestConfig) JdInput() (*jd.Input, error) {
+	if in.JD == nil {
+		return nil, fmt.Errorf("JD input is nil")
+	}
+
+	return in.JD, nil
+}
+
+func (in *TestConfig) NodeSetInput() ([]*keystonetypes.CapabilitiesAwareNodeSet, error) {
+	if in.NodeSets == nil {
+		return nil, fmt.Errorf("NodeSets input is nil")
+	}
+
+	return in.NodeSets, nil
+}
+
+func (in *TestConfig) BlockchainInput() (*blockchain.Input, error) {
+	if in.BlockchainA == nil {
+		return nil, fmt.Errorf("Blockchain input is nil")
+	}
+
+	return in.BlockchainA, nil
 }
 
 func validateInputsAndEnvVars(t *testing.T, in *TestConfig) {
@@ -171,7 +192,7 @@ func validateInputsAndEnvVars(t *testing.T, in *TestConfig) {
 	in.PriceProvider.FeedID = strings.TrimPrefix(in.PriceProvider.FeedID, "0x")
 }
 
-func registerPoRWorkflow(t *testing.T, in *TestConfig, workflowName string, keystoneEnv *keystonetypes.KeystoneEnvironment, priceProvider PriceProvider) {
+func registerPoRWorkflow(t *testing.T, in *TestConfig, workflowName string, keystoneEnv *keystonetypes.KeystoneEnvironment, priceProvider PriceProvider, feedConsumerAddr common.Address) {
 	require.NotNil(t, keystoneEnv, "keystone environment must be set")
 	require.NotNil(t, keystoneEnv.Environment, "environment must be set")
 	require.NotNil(t, keystoneEnv.SethClient, "seth client must be set")
@@ -180,7 +201,6 @@ func registerPoRWorkflow(t *testing.T, in *TestConfig, workflowName string, keys
 	require.NotNil(t, keystoneEnv.KeystoneContractAddresses, "keystone contract addresses must be set")
 	require.NotEmpty(t, keystoneEnv.KeystoneContractAddresses.CapabilitiesRegistryAddress, "capabilities registry address must be set")
 	require.NotEmpty(t, keystoneEnv.KeystoneContractAddresses.WorkflowRegistryAddress, "workflow registry address must be set")
-	require.NotEmpty(t, keystoneEnv.KeystoneContractAddresses.FeedsConsumerAddress, "feed consumer address must be set")
 	require.NotEmpty(t, keystoneEnv.DeployerPrivateKey, "deployer private key must be set")
 	require.NotEmpty(t, keystoneEnv.WorkflowDONID, "workflow DON ID must be set")
 
@@ -208,7 +228,7 @@ func registerPoRWorkflow(t *testing.T, in *TestConfig, workflowName string, keys
 	var workflowURL string
 	var workflowConfigURL string
 
-	workflowConfigFile, configErr := keystoneporcrecli.CreateConfigFile(keystoneEnv.KeystoneContractAddresses.FeedsConsumerAddress, in.PriceProvider.FeedID, priceProvider.URL())
+	workflowConfigFile, configErr := keystoneporcrecli.CreateConfigFile(feedConsumerAddr, in.PriceProvider.FeedID, priceProvider.URL())
 	require.NoError(t, configErr, "failed to create workflow config file")
 
 	// compile and upload the workflow, if we are not using an existing one
@@ -225,36 +245,6 @@ func registerPoRWorkflow(t *testing.T, in *TestConfig, workflowName string, keys
 
 	registerErr := libcrecli.RegisterWorkflow(workflowName, workflowURL, workflowConfigURL, settingsFile)
 	require.NoError(t, registerErr, "failed to register workflow")
-}
-
-func startNodeSets(t *testing.T, nsInputs []*keystonetypes.CapabilitiesAwareNodeSet, keystoneEnv *keystonetypes.KeystoneEnvironment) {
-	require.NotNil(t, keystoneEnv, "keystone environment must be set")
-	require.NotNil(t, keystoneEnv.Blockchain, "blockchain environment must be set")
-
-	// Hack for CI that allows us to dynamically set the chainlink image and version
-	// CTFv2 currently doesn't support dynamic image and version setting
-	if os.Getenv("CI") == "true" {
-		// Due to how we pass custom env vars to reusable workflow we need to use placeholders, so first we need to resolve what's the name of the target environment variable
-		// that stores chainlink version and then we can use it to resolve the image name
-		for i := range nsInputs {
-			image := fmt.Sprintf("%s:%s", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV))
-			for j := range nsInputs[i].NodeSpecs {
-				nsInputs[i].NodeSpecs[j].Node.Image = image
-			}
-		}
-	}
-
-	for _, nsInput := range nsInputs {
-		nodeset, err := ns.NewSharedDBNodeSet(nsInput.Input, keystoneEnv.Blockchain)
-		require.NoError(t, err, "failed to deploy node set")
-
-		keystoneEnv.NodeInput = append(keystoneEnv.NodeInput, nsInput)
-		keystoneEnv.WrappedNodeOutput = append(keystoneEnv.WrappedNodeOutput, &keystonetypes.WrappedNodeOutput{
-			Output:       nodeset,
-			NodeSetName:  nsInput.Name,
-			Capabilities: nsInput.Capabilities,
-		})
-	}
 }
 
 func logTestInfo(l zerolog.Logger, feedID, workflowName, feedConsumerAddr, forwarderAddr string) {
@@ -432,32 +422,10 @@ func (f *FakePriceProvider) URL() string {
 	return f.url
 }
 
-func startBlockchain(t *testing.T, in *TestConfig, keystoneEnv *keystonetypes.KeystoneEnvironment) {
-	bc, err := blockchain.NewBlockchainNetwork(in.BlockchainA)
-	require.NoError(t, err, "failed to create blockchain network")
-
-	pkey := os.Getenv("PRIVATE_KEY")
-	require.NotEmpty(t, pkey, "private key must not be empty")
-
-	sc, err := seth.NewClientBuilder().
-		WithRpcUrl(bc.Nodes[0].HostWSUrl).
-		WithPrivateKeys([]string{pkey}).
-		Build()
-	require.NoError(t, err, "failed to create seth client")
-
-	chainSelector, err := chainselectors.SelectorFromChainId(sc.Cfg.Network.ChainID)
-	require.NoError(t, err, "failed to get chain selector for chain id %d", sc.Cfg.Network.ChainID)
-
-	keystoneEnv.Blockchain = bc
-	keystoneEnv.SethClient = sc
-	keystoneEnv.DeployerPrivateKey = pkey
-	keystoneEnv.ChainSelector = chainSelector
-}
-
-func extraAllowedPortsAndIps(t *testing.T, testLogger zerolog.Logger, in *TestConfig, nodeOutput *ns.Output) ([]string, []int) {
+func extraAllowedPortsAndIps(testLogger zerolog.Logger, in *TestConfig, nodeOutput *ns.Output) ([]string, []int, error) {
 	// no need to allow anything, if we are using live feed
 	if in.PriceProvider.Fake == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// we need to explicitly allow the port used by the fake data provider
@@ -470,7 +438,6 @@ func extraAllowedPortsAndIps(t *testing.T, testLogger zerolog.Logger, in *TestCo
 	switch system {
 	case "darwin":
 		hostIP, err = libdon.ResolveHostDockerInternaIP(testLogger, nodeOutput)
-		require.NoError(t, err, "failed to resolve host.docker.internal IP")
 	case "linux":
 		// for linux framework already returns an IP, so we don't need to resolve it,
 		// but we need to remove the http:// prefix
@@ -478,12 +445,16 @@ func extraAllowedPortsAndIps(t *testing.T, testLogger zerolog.Logger, in *TestCo
 	default:
 		err = fmt.Errorf("unsupported OS: %s", system)
 	}
-	require.NoError(t, err, "failed to resolve host.docker.internal IP")
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to resolve host.docker.internal IP")
+	}
 
 	testLogger.Info().Msgf("Will allow IP %s and port %d for the fake data provider", hostIP, in.PriceProvider.Fake.Port)
 
 	ips, err := net.LookupIP("gist.githubusercontent.com")
-	require.NoError(t, err, "failed to resolve IP for gist.githubusercontent.com")
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to resolve IP for gist.githubusercontent.com")
+	}
 
 	gistIPs := make([]string, len(ips))
 	for i, ip := range ips {
@@ -492,82 +463,58 @@ func extraAllowedPortsAndIps(t *testing.T, testLogger zerolog.Logger, in *TestCo
 	}
 
 	// we also need to explicitly allow Gist's IP
-	return append(gistIPs, hostIP), []int{in.PriceProvider.Fake.Port}
+	return append(gistIPs, hostIP), []int{in.PriceProvider.Fake.Port}, nil
 }
 
-// TODO think whether we should structure it in a way that enforces some order of execution,
-// for example by making the outputs of one function inputs to another
-func prepareTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig) (*keystonetypes.KeystoneEnvironment, PriceProvider) {
-	keystoneEnv := &keystonetypes.KeystoneEnvironment{}
-	keystoneEnv.GatewayConnectorData = &keystonetypes.GatewayConnectorData{
-		Path: "/node",
-		Port: 5003,
+func prepareTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig) (*keystonetypes.KeystoneEnvironment, PriceProvider, common.Address) {
+	var priceProvider PriceProvider
+	var feedsConsumerAddress common.Address
+
+	registerPoRWorkflow := func(keystoneEnv *keystonetypes.KeystoneEnvironment) error {
+		// Get either a no-op price provider (for live endpoint)
+		// or a fake price provider (for mock endpoint)
+		priceProvider = setupPriceProvider(t, testLogger, in)
+
+		// Separated from Keystone deployment because it will soon be replaced with DF Cache
+		var err error
+		feedsConsumerAddress, err = libcontracts.DeployFeedsConsumer(testLogger, keystoneEnv)
+		if err != nil {
+			return errors.Wrap(err, "failed to deploy feeds consumer")
+		}
+
+		err = libcontracts.ConfigureFeedsConsumer(testLogger, keystoneEnv, in.WorkflowConfig.WorkflowName, feedsConsumerAddress)
+		if err != nil {
+			return errors.Wrap(err, "failed to configure feeds consumer")
+		}
+
+		// Register the workflow (either via CRE CLI or by calling the workflow registry directly; using only workflow DON id)
+		registerPoRWorkflow(t, in, in.WorkflowConfig.WorkflowName, keystoneEnv, priceProvider, feedsConsumerAddress)
+
+		return nil
 	}
 
-	// Create a new blockchain network and Seth client to interact with it
-	startBlockchain(t, in, keystoneEnv)
+	prepareJobSpecsAndNodeConfigs := func(keystoneEnv *keystonetypes.KeystoneEnvironment) (keystonetypes.DonsToConfigOverrides, map[uint32]keystonetypes.DonJobs, error) {
+		return prepareJobSpecsAndNodeConfigs(testLogger, in, keystoneEnv)
+	}
 
-	// Get either a no-op price provider (for live endpoint)
-	// or a fake price provider (for mock endpoint)
-	priceProvider := setupPriceProvider(t, testLogger, in)
+	keystoneEnv, err := libenv.StartAndConfigure(t, in, registerPoRWorkflow, prepareJobSpecsAndNodeConfigs)
+	require.NoError(t, err, "failed to start and configure keystone environment")
 
-	// Start job distributor
-	err := libjobs.StartJobDistributor(in.JD, keystoneEnv)
-	require.NoError(t, err, "failed to start job distributor")
-
-	// Deploy the DONs
-	startNodeSets(t, in.NodeSets, keystoneEnv)
-
-	// Prepare the CLD environment and figure out DON topology; configure chains for nodes and job distributor
-	err = keystoneenv.BuildTopologyAndCLDEnvironment(logger.NewSingleFileLogger(t), keystoneEnv)
-	require.NoError(t, err, "failed to build topology and CLD environment")
-
-	// Fund the nodes
-	err = libdon.FundNodes(keystoneEnv)
-	require.NoError(t, err, "failed to fund nodes")
-
-	// Deploy keystone contracts (forwarder, capability registry, ocr3 capability, workflow registry)
-	err = libcontracts.DeployKeystone(testLogger, keystoneEnv)
-	require.NoError(t, err, "failed to deploy keystone contracts")
-
-	// Separated from Keystone deployment because it will soon be replaced with DF Cache
-	err = libcontracts.DeployFeedsConsumer(testLogger, keystoneEnv)
-	require.NoError(t, err, "failed to deploy feeds consumer")
-
-	// Configure Workflow Registry and Feeds Consumer
-	err = libcontracts.ConfigureWorkflowRegistry(testLogger, keystoneEnv)
-	require.NoError(t, err, "failed to configure workflow registry")
-	err = libcontracts.ConfigureFeedsConsumer(testLogger, in.WorkflowConfig.WorkflowName, keystoneEnv)
-	require.NoError(t, err, "failed to configure feeds consumer")
-
-	// Register the workflow (either via CRE CLI or by calling the workflow registry directly; using only workflow DON id)
-	registerPoRWorkflow(t, in, in.WorkflowConfig.WorkflowName, keystoneEnv, priceProvider)
-
-	donToConfigs, donToJobSpecs := prepareJobSpecsAndNodeConfigs(t, testLogger, in, keystoneEnv)
-	err = libdon.Configure(t, testLogger, keystoneEnv, donToJobSpecs, donToConfigs)
-	require.NoError(t, err, "failed to configure nodes")
-
-	// CAUTION: It is crucial to configure OCR3 jobs on nodes before configuring the workflow contracts.
-	// Wait for OCR listeners to be ready before setting the configuration.
-	// If the ConfigSet event is missed, OCR protocol will not start.
-	// TODO make it fluent!
-	testLogger.Info().Msg("Waiting 30s for OCR listeners to be ready...")
-	time.Sleep(30 * time.Second)
-	testLogger.Info().Msg("Proceeding to set OCR3 configuration.")
-
-	// Configure the Forwarder, OCR3 and Capabilities contracts
-	err = libcontracts.ConfigureKeystone(keystoneEnv)
-	require.NoError(t, err, "failed to configure keystone contracts")
-
-	return keystoneEnv, priceProvider
+	return keystoneEnv, priceProvider, feedsConsumerAddress
 }
 
-func prepareJobSpecsAndNodeConfigs(t *testing.T, testLogger zerolog.Logger, in *TestConfig, keystoneEnv *keystonetypes.KeystoneEnvironment) (keystonetypes.DonsToConfigOverrides, map[uint32]keystonetypes.DonJobs) {
-	ips, ports := extraAllowedPortsAndIps(t, testLogger, in, keystoneEnv.WrappedNodeOutput[0].Output)
+func prepareJobSpecsAndNodeConfigs(testLogger zerolog.Logger, in *TestConfig, keystoneEnv *keystonetypes.KeystoneEnvironment) (keystonetypes.DonsToConfigOverrides, map[uint32]keystonetypes.DonJobs, error) {
+	ips, ports, err := extraAllowedPortsAndIps(testLogger, in, keystoneEnv.WrappedNodeOutput[0].Output)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to get extra allowed ports and IPs")
+	}
 
 	peeringData, err := libdon.FindPeeringData(keystoneEnv.DONTopology)
-	require.NoError(t, err, "failed to get peering data")
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to get peering data")
+	}
 
+	// prepare node configs
 	donToConfigs := make(keystonetypes.DonsToConfigOverrides)
 	var configErr error
 	for _, donTopology := range keystoneEnv.DONTopology {
@@ -584,7 +531,9 @@ func prepareJobSpecsAndNodeConfigs(t *testing.T, testLogger zerolog.Logger, in *
 			keystoneEnv.KeystoneContractAddresses.ForwarderAddress,
 			keystoneEnv.GatewayConnectorData,
 		)
-		require.NoError(t, configErr, "failed to define config for DON %d", donTopology.ID)
+		if configErr != nil {
+			return nil, nil, errors.Wrapf(configErr, "failed to define config for DON %d", donTopology.ID)
+		}
 	}
 
 	// define jobs
@@ -604,10 +553,12 @@ func prepareJobSpecsAndNodeConfigs(t *testing.T, testLogger zerolog.Logger, in *
 			cronCapabilityAssetFile,
 			*keystoneEnv.GatewayConnectorData,
 		)
-		require.NoError(t, jobSpecsErr, "failed to define job specs for DON %d", donTopology.ID)
+		if jobSpecsErr != nil {
+			return nil, nil, errors.Wrapf(jobSpecsErr, "failed to define job specs for DON %d", donTopology.ID)
+		}
 	}
 
-	return donToConfigs, donToJobSpecs
+	return donToConfigs, donToJobSpecs, nil
 }
 func TestKeystoneWithOCR3Workflow(t *testing.T) {
 	testLogger := framework.L
@@ -617,12 +568,12 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 	require.NoError(t, err, "couldn't load test config")
 	validateInputsAndEnvVars(t, in)
 
-	keystoneEnv, priceProvider := prepareTestEnvironment(t, testLogger, in)
+	keystoneEnv, priceProvider, feedConsumerAddr := prepareTestEnvironment(t, testLogger, in)
 
 	// Log extra information that might help debugging
 	t.Cleanup(func() {
 		if t.Failed() {
-			logTestInfo(testLogger, in.PriceProvider.FeedID, in.WorkflowConfig.WorkflowName, keystoneEnv.KeystoneContractAddresses.FeedsConsumerAddress.Hex(), keystoneEnv.KeystoneContractAddresses.ForwarderAddress.Hex())
+			logTestInfo(testLogger, in.PriceProvider.FeedID, in.WorkflowConfig.WorkflowName, feedConsumerAddr.Hex(), keystoneEnv.KeystoneContractAddresses.ForwarderAddress.Hex())
 
 			logDir := fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name())
 
@@ -647,7 +598,7 @@ func TestKeystoneWithOCR3Workflow(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(keystoneEnv.KeystoneContractAddresses.FeedsConsumerAddress, keystoneEnv.SethClient.Client)
+	feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(feedConsumerAddr, keystoneEnv.SethClient.Client)
 	require.NoError(t, err, "failed to create feeds consumer instance")
 
 	testLogger.Info().Msg("Waiting for feed to update...")

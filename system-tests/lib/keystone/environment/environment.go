@@ -2,31 +2,149 @@ package environment
 
 import (
 	"context"
-	"fmt"
-	"net/url"
 	"strings"
+	"testing"
+	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
-	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
-	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
+	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/blockchain"
+	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/contracts"
+	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don"
+	libjobs "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don/jobs"
+	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
 )
+
+// TODO think whether we should structure it in a way that enforces some order of execution,
+// for example by making the outputs of one function inputs to another
+func StartAndConfigure(
+	t *testing.T,
+	config types.KeystoneConfiguration,
+	registerWorkflowFn types.KeystoneEnvironmentConsumerFn,
+	prepareJobSpecsAndNodeConfigsFn types.JobAndConfigProducingFn,
+) (*types.KeystoneEnvironment, error) {
+	testLogger := framework.L
+	keystoneEnv, err := Start(cldlogger.NewSingleFileLogger(t), testLogger, config)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to start keystone environment")
+	}
+
+	// Configure Workflow Registry and Feeds Consumer
+	err = libcontracts.ConfigureWorkflowRegistry(testLogger, keystoneEnv)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure workflow registry")
+	}
+
+	// Register the workflow(s) with workflow registry and execute whaterver preparatory steps are needed
+	err = registerWorkflowFn(keystoneEnv)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to register workflow")
+	}
+
+	donToConfigs, donToJobSpecs, err := prepareJobSpecsAndNodeConfigsFn(keystoneEnv)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to prepare job specs and node configs")
+	}
+
+	err = libdon.Configure(t, testLogger, keystoneEnv, donToJobSpecs, donToConfigs)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure nodes")
+	}
+
+	// CAUTION: It is crucial to configure OCR3 jobs on nodes before configuring the workflow contracts.
+	// Wait for OCR listeners to be ready before setting the configuration.
+	// If the ConfigSet event is missed, OCR protocol will not start.
+	testLogger.Info().Msg("Waiting 30s for OCR listeners to be ready...")
+	time.Sleep(30 * time.Second)
+	testLogger.Info().Msg("Proceeding to set OCR3 configuration.")
+
+	// Configure the Forwarder, OCR3 and Capabilities contracts
+	err = libcontracts.ConfigureKeystone(keystoneEnv)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure keystone contracts")
+	}
+
+	return keystoneEnv, nil
+}
+
+func Start(cldLogger logger.Logger, testLogger zerolog.Logger, config types.KeystoneConfiguration) (*types.KeystoneEnvironment, error) {
+	keystoneEnv := &types.KeystoneEnvironment{}
+	keystoneEnv.GatewayConnectorData = &types.GatewayConnectorData{
+		Path: "/node",
+		Port: 5003,
+	}
+
+	bcInput, err := config.BlockchainInput()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get blockchain input")
+	}
+
+	// Create a new blockchain network and Seth client to interact with it
+	err = blockchain.Start(bcInput, keystoneEnv)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to start blockchain")
+	}
+
+	jdInput, err := config.JdInput()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get JD input")
+	}
+
+	// Start job distributor
+	err = libjobs.StartJobDistributor(jdInput, keystoneEnv)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to start job distributor")
+	}
+
+	nodeSetInput, err := config.NodeSetInput()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get node set input")
+	}
+
+	// Deploy the DONs
+	err = libdon.Start(nodeSetInput, keystoneEnv)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to start node sets")
+	}
+
+	// Prepare the CLD environment and figure out DON topology; configure chains for nodes and job distributor
+	err = BuildTopologyAndCLDEnvironment(cldLogger, keystoneEnv)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build topology and CLD environment")
+	}
+
+	// Fund the nodes
+	err = libdon.FundNodes(keystoneEnv)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fund nodes")
+	}
+
+	// Deploy keystone contracts (forwarder, capability registry, ocr3 capability, workflow registry)
+	err = libcontracts.DeployKeystone(testLogger, keystoneEnv)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to deploy keystone contracts")
+	}
+
+	return keystoneEnv, nil
+}
 
 func BuildTopologyAndCLDEnvironment(lgr logger.Logger, keystoneEnv *types.KeystoneEnvironment) error {
 	err := buildChainlinkDeploymentEnv(lgr, keystoneEnv)
 	if err != nil {
 		return errors.Wrap(err, "failed to build chainlink deployment environment")
 	}
-	err = don.BuildDONTopology(keystoneEnv)
+	err = libdon.BuildDONTopology(keystoneEnv)
 	if err != nil {
 		return errors.Wrap(err, "failed to build DON topology")
 	}
@@ -62,7 +180,7 @@ func buildChainlinkDeploymentEnv(lgr logger.Logger, keystoneEnv *types.KeystoneE
 
 	for i, nodeOutput := range keystoneEnv.WrappedNodeOutput {
 		// assume that each nodeset has only one bootstrap node
-		nodeInfo, err := getNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, 1)
+		nodeInfo, err := libnode.GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, 1)
 		if err != nil {
 			return errors.Wrap(err, "failed to get node info")
 		}
@@ -124,43 +242,4 @@ func buildChainlinkDeploymentEnv(lgr logger.Logger, keystoneEnv *types.KeystoneE
 	}
 
 	return nil
-}
-
-// copied from Bala's unmerged PR: https://github.com/smartcontractkit/chainlink/pull/15751
-// TODO: remove this once the PR is merged and import his function
-// IMPORTANT ADDITION:  prefix to differentiate between the different DONs
-func getNodeInfo(nodeOut *ns.Output, prefix string, bootstrapNodeCount int) ([]devenv.NodeInfo, error) {
-	var nodeInfo []devenv.NodeInfo
-	for i := 1; i <= len(nodeOut.CLNodes); i++ {
-		p2pURL, err := url.Parse(nodeOut.CLNodes[i-1].Node.DockerP2PUrl)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse p2p url: %w", err)
-		}
-		if i <= bootstrapNodeCount {
-			nodeInfo = append(nodeInfo, devenv.NodeInfo{
-				IsBootstrap: true,
-				Name:        fmt.Sprintf("%s_bootstrap-%d", prefix, i),
-				P2PPort:     p2pURL.Port(),
-				CLConfig: nodeclient.ChainlinkConfig{
-					URL:        nodeOut.CLNodes[i-1].Node.HostURL,
-					Email:      nodeOut.CLNodes[i-1].Node.APIAuthUser,
-					Password:   nodeOut.CLNodes[i-1].Node.APIAuthPassword,
-					InternalIP: nodeOut.CLNodes[i-1].Node.InternalIP,
-				},
-			})
-		} else {
-			nodeInfo = append(nodeInfo, devenv.NodeInfo{
-				IsBootstrap: false,
-				Name:        fmt.Sprintf("%s_node-%d", prefix, i),
-				P2PPort:     p2pURL.Port(),
-				CLConfig: nodeclient.ChainlinkConfig{
-					URL:        nodeOut.CLNodes[i-1].Node.HostURL,
-					Email:      nodeOut.CLNodes[i-1].Node.APIAuthUser,
-					Password:   nodeOut.CLNodes[i-1].Node.APIAuthPassword,
-					InternalIP: nodeOut.CLNodes[i-1].Node.InternalIP,
-				},
-			})
-		}
-	}
-	return nodeInfo, nil
 }

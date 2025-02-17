@@ -12,12 +12,22 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 )
 
+type KeystoneConfiguration interface {
+	JdInput() (*jd.Input, error)
+	NodeSetInput() ([]*CapabilitiesAwareNodeSet, error)
+	BlockchainInput() (*blockchain.Input, error)
+}
+
+type KeystoneEnvironmentConsumerFn = func(keystoneEnv *KeystoneEnvironment) error
+
+type JobAndConfigProducingFn = func(keystoneEnv *KeystoneEnvironment) (DonsToConfigOverrides, DonsToJobSpecs, error)
+
 type KeystoneContractAddresses struct {
 	CapabilitiesRegistryAddress common.Address
 	ForwarderAddress            common.Address
 	OCR3CapabilityAddress       common.Address
 	WorkflowRegistryAddress     common.Address
-	FeedsConsumerAddress        common.Address
+	// FeedsConsumerAddress        common.Address
 }
 
 type DonJobs = map[JobDescription][]*jobv1.ProposeJobRequest

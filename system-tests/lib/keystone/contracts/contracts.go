@@ -370,44 +370,44 @@ func ConfigureWorkflowRegistry(testLogger zerolog.Logger, keystoneEnv *types.Key
 	return nil
 }
 
-func DeployFeedsConsumer(testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment) error {
+func DeployFeedsConsumer(testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment) (common.Address, error) {
 	if keystoneEnv == nil {
-		return errors.New("keystone environment must be set")
+		return common.Address{}, errors.New("keystone environment must be set")
 	}
 	if keystoneEnv.Environment == nil {
-		return errors.New("environment must be set")
+		return common.Address{}, errors.New("environment must be set")
 	}
 	if keystoneEnv.ChainSelector == 0 {
-		return errors.New("chain selector must be set")
+		return common.Address{}, errors.New("chain selector must be set")
 	}
 	if keystoneEnv.SethClient == nil {
-		return errors.New("seth client must be set")
+		return common.Address{}, errors.New("seth client must be set")
 	}
 	if keystoneEnv.WorkflowDONID == 0 {
-		return errors.New("workflow DON ID must be set")
+		return common.Address{}, errors.New("workflow DON ID must be set")
 	}
 	if keystoneEnv.KeystoneContractAddresses == nil {
-		return errors.New("keystone contract addresses must be set")
+		return common.Address{}, errors.New("keystone contract addresses must be set")
 	}
 	if keystoneEnv.KeystoneContractAddresses.ForwarderAddress == (common.Address{}) {
-		return errors.New("forwarder address must be set")
+		return common.Address{}, errors.New("forwarder address must be set")
 	}
 
 	output, err := keystone_changeset.DeployFeedsConsumer(*keystoneEnv.Environment, &keystone_changeset.DeployFeedsConsumerRequest{
 		ChainSelector: keystoneEnv.ChainSelector,
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to deploy feeds_consumer contract")
+		return common.Address{}, errors.Wrap(err, "failed to deploy feeds_consumer contract")
 	}
 
 	err = keystoneEnv.Environment.ExistingAddresses.Merge(output.AddressBook)
 	if err != nil {
-		return errors.Wrap(err, "failed to merge address book")
+		return common.Address{}, errors.Wrap(err, "failed to merge address book")
 	}
 
 	addresses, err := keystoneEnv.Environment.ExistingAddresses.AddressesForChain(keystoneEnv.ChainSelector)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get addresses for chain %d from the address book", keystoneEnv.ChainSelector)
+		return common.Address{}, errors.Wrapf(err, "failed to get addresses for chain %d from the address book", keystoneEnv.ChainSelector)
 	}
 
 	var feedsConsumerAddress common.Address
@@ -420,15 +420,13 @@ func DeployFeedsConsumer(testLogger zerolog.Logger, keystoneEnv *types.KeystoneE
 	}
 
 	if feedsConsumerAddress == (common.Address{}) {
-		return errors.New("failed to find FeedConsumer address in the address book")
+		return common.Address{}, errors.New("failed to find FeedConsumer address in the address book")
 	}
 
-	keystoneEnv.KeystoneContractAddresses.FeedsConsumerAddress = feedsConsumerAddress
-
-	return nil
+	return feedsConsumerAddress, nil
 }
 
-func ConfigureFeedsConsumer(testLogger zerolog.Logger, workflowName string, keystoneEnv *types.KeystoneEnvironment) error {
+func ConfigureFeedsConsumer(testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment, workflowName string, feedsConsumerAddress common.Address) error {
 	if keystoneEnv == nil {
 		return errors.New("keystone environment must be set")
 	}
@@ -450,13 +448,10 @@ func ConfigureFeedsConsumer(testLogger zerolog.Logger, workflowName string, keys
 	if keystoneEnv.KeystoneContractAddresses.ForwarderAddress == (common.Address{}) {
 		return errors.New("forwarder address must be set")
 	}
-	if keystoneEnv.KeystoneContractAddresses.FeedsConsumerAddress == (common.Address{}) {
-		return errors.New("feeds consumer address must be set")
-	}
 
 	// configure Keystone Feeds Consumer contract, so it can accept reports from the forwarder contract,
 	// that come from our workflow that is owned by the root private key
-	feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(keystoneEnv.KeystoneContractAddresses.FeedsConsumerAddress, keystoneEnv.SethClient.Client)
+	feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(feedsConsumerAddress, keystoneEnv.SethClient.Client)
 	if err != nil {
 		return errors.Wrap(err, "failed to create feeds consumer instance")
 	}

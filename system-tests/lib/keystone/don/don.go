@@ -1,6 +1,8 @@
 package don
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
@@ -10,11 +12,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don/jobs"
-	keystoneflags "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/flags"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
 )
 
@@ -125,7 +128,7 @@ func BuildDONTopology(keystoneEnv *types.KeystoneEnvironment) error {
 
 	// one DON to do everything
 	if len(keystoneEnv.Dons) == 1 {
-		flags, err := keystoneflags.NodeSetFlags(keystoneEnv.NodeInput[0])
+		flags, err := flags.NodeSetFlags(keystoneEnv.NodeInput[0])
 		if err != nil {
 			return errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", keystoneEnv.NodeInput[0].Name)
 		}
@@ -139,7 +142,7 @@ func BuildDONTopology(keystoneEnv *types.KeystoneEnvironment) error {
 		}
 	} else {
 		for i, don := range keystoneEnv.Dons {
-			flags, err := keystoneflags.NodeSetFlags(keystoneEnv.NodeInput[i])
+			flags, err := flags.NodeSetFlags(keystoneEnv.NodeInput[i])
 			if err != nil {
 				return errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", keystoneEnv.NodeInput[i].Name)
 			}
@@ -154,7 +157,7 @@ func BuildDONTopology(keystoneEnv *types.KeystoneEnvironment) error {
 		}
 	}
 
-	maybeID, err := keystoneflags.OneDONTopologyWithFlag(keystoneEnv.DONTopology, types.WorkflowDON)
+	maybeID, err := flags.OneDONTopologyWithFlag(keystoneEnv.DONTopology, types.WorkflowDON)
 	if err != nil {
 		return errors.Wrap(err, "failed to get workflow DON ID")
 	}
@@ -183,4 +186,43 @@ func ResolveHostDockerInternaIP(testLogger zerolog.Logger, nsOutput *ns.Output) 
 	testLogger.Info().Msgf("Resolved host.docker.internal to %s", matches[1])
 
 	return matches[1], nil
+}
+
+func Start(nsInputs []*types.CapabilitiesAwareNodeSet, keystoneEnv *types.KeystoneEnvironment) error {
+	if keystoneEnv == nil {
+		return errors.New("keystone environment must be set")
+	}
+
+	if keystoneEnv.Blockchain == nil {
+		return errors.New("blockchain environment must be set")
+	}
+
+	// Hack for CI that allows us to dynamically set the chainlink image and version
+	// CTFv2 currently doesn't support dynamic image and version setting
+	if os.Getenv("CI") == "true" {
+		// Due to how we pass custom env vars to reusable workflow we need to use placeholders, so first we need to resolve what's the name of the target environment variable
+		// that stores chainlink version and then we can use it to resolve the image name
+		for i := range nsInputs {
+			image := fmt.Sprintf("%s:%s", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV))
+			for j := range nsInputs[i].NodeSpecs {
+				nsInputs[i].NodeSpecs[j].Node.Image = image
+			}
+		}
+	}
+
+	for _, nsInput := range nsInputs {
+		nodeset, err := ns.NewSharedDBNodeSet(nsInput.Input, keystoneEnv.Blockchain)
+		if err != nil {
+			return errors.Wrap(err, "failed to deploy node set")
+		}
+
+		keystoneEnv.NodeInput = append(keystoneEnv.NodeInput, nsInput)
+		keystoneEnv.WrappedNodeOutput = append(keystoneEnv.WrappedNodeOutput, &types.WrappedNodeOutput{
+			Output:       nodeset,
+			NodeSetName:  nsInput.Name,
+			Capabilities: nsInput.Capabilities,
+		})
+	}
+
+	return nil
 }
