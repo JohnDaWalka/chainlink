@@ -30,7 +30,6 @@ import (
 )
 
 type OrchestratorTxStore interface {
-	Abandon(context.Context, *big.Int, common.Address) error
 	Add(addresses ...common.Address) error
 	FetchUnconfirmedTransactionAtNonceWithCount(context.Context, uint64, common.Address) (*txmtypes.Transaction, int, error)
 	FindTxWithIdempotencyKey(context.Context, string) (*txmtypes.Transaction, error)
@@ -223,7 +222,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) RegisterResumeCallback(fn txmgr.ResumeC
 	o.resumeCallback = fn
 }
 
-func (o *Orchestrator[BLOCK_HASH, HEAD]) Reset(addr common.Address, abandon bool) (err error) {
+func (o *Orchestrator[BLOCK_HASH, HEAD]) Reset(addr common.Address, abandon bool) error {
 	ok := o.IfStarted(func() {
 		if abandon {
 			o.chReset <- &addr
