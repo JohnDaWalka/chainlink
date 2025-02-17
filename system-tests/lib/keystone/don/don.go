@@ -18,10 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
 )
 
-const (
-	GistIP = "185.199.108.133"
-)
-
 func Configure(t *testing.T, testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment, donToJobSpecs types.DonsToJobSpecs, donToConfigOverrides types.DonsToConfigOverrides) error {
 	if keystoneEnv == nil {
 		return errors.New("keystone environment must not be nil")

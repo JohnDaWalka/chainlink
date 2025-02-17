@@ -29,10 +29,10 @@
   cre_cli_version = "v0.0.2"
 
   [workflow_config.compiled_config]
-    binary_url = "https://gist.githubusercontent.com/Tofel/e5aef5a3e926a127f38174a6755382c5/raw/cb7b2a56b37e333fe0bdce07b79538c4ce332f5f/binary.wasm.br"
+    binary_url = "https://gist.githubusercontent.com/Tofel/74e06d05e39005747a2944416ad65b5c/raw/cb7b2a56b37e333fe0bdce07b79538c4ce332f5f/binary.wasm.br"
     # if fake is enabled AND we do not compile a new workflow, this config needs to use URL pointing to IP, on which Docker host is available in Linux systems
     # since that's the OS of our CI runners.
-    config_url = "https://gist.githubusercontent.com/Tofel/f7975a7fcece2aa515f40bd1b63ff17a/raw/4ddbb4118fe89e83b8b35eb8ffa65e556ee03da7/config.json3536924967"
+    config_url = "https://gist.githubusercontent.com/Tofel/170939f881125be5fc42e002da601e87/raw/6f590d50a751a43ff8a8242e1ae440cfe452a9e3/config.json4085795709"
 
 [[nodesets]]
   nodes = 5

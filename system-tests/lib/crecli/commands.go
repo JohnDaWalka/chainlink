@@ -38,7 +38,7 @@ func CompileWorkflow(workflowFolder string, configFile, settingsFile *os.File) (
 
 	re := regexp.MustCompile(`Gist URL=([^\s]+)`)
 	matches := re.FindAllStringSubmatch(outputBuffer.String(), -1)
-	if len(matches) != 3 {
+	if len(matches) < 2 {
 		return CompilationResult{}, errors.New("failed to find gist URLs in compile output")
 	}
 

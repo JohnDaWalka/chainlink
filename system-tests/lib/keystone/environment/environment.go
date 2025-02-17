@@ -38,9 +38,6 @@ func buildChainlinkDeploymentEnv(lgr logger.Logger, keystoneEnv *types.KeystoneE
 	if keystoneEnv == nil {
 		return errors.New("keystone environment must be set")
 	}
-	if keystoneEnv.Environment == nil {
-		return errors.New("environment must be set")
-	}
 	if keystoneEnv.Blockchain == nil {
 		return errors.New("blockchain must be set")
 	}

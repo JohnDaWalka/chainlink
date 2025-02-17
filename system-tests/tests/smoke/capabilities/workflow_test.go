@@ -495,7 +495,7 @@ func extraAllowedPortsAndIps(t *testing.T, testLogger zerolog.Logger, in *TestCo
 	return append(gistIPs, hostIP), []int{in.PriceProvider.Fake.Port}
 }
 
-// TODO think whether we should structure it in a way that envforces some order of execution,
+// TODO think whether we should structure it in a way that enforces some order of execution,
 // for example by making the outputs of one function inputs to another
 func prepareTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig) (*keystonetypes.KeystoneEnvironment, PriceProvider) {
 	keystoneEnv := &keystonetypes.KeystoneEnvironment{}
