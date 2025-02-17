@@ -27,7 +27,7 @@ import (
 )
 
 var (
-	_ llo.ReportCodec = ReportCodecPremiumLegacy{}
+	_ llo.ReportEncoder = ReportCodecPremiumLegacy{}
 )
 
 type ReportCodecPremiumLegacy struct {
