@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import {ERC1967Proxy} from "../../../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {BurnMintERC20PausableUUPS} from "../../../../../token/ERC20/upgradeable/BurnMintERC20PausableUUPS.sol";
-import {BurnMintERC20PausableUUPSSetup} from "./BurnMintERC20PausableUUPSSetup.t.sol";
+import {BurnMintERC20UUPS} from "../../../../../token/ERC20/upgradeable/BurnMintERC20UUPS.sol";
+import {ERC20UpgradableBaseTest_pausing} from "../ERC20UpgradableBaseTest.pausing.t.sol";
 
 interface IUpgradeableProxy {
   function upgradeToAndCall(address, bytes memory) external payable;
@@ -48,35 +50,57 @@ contract MockBurnMintERC20PausableUUPSV2 is BurnMintERC20PausableUUPS {
   }
 }
 
-contract BurnMintERC20PausableUUPS_upgrade is BurnMintERC20PausableUUPSSetup {
+contract BurnMintERC20PausableUUPS_upgrade is ERC20UpgradableBaseTest_pausing {
+  BurnMintERC20PausableUUPS internal s_burnMintERC20PausableUUPS;
+  address internal s_uupsProxy;
+
+  function setUp() public virtual override {
+    address implementation = address(new BurnMintERC20PausableUUPS());
+
+    s_uupsProxy = address(
+      new ERC1967Proxy(
+        implementation,
+        abi.encodeCall(
+          BurnMintERC20UUPS.initialize,
+          (NAME, SYMBOL, DECIMALS, MAX_SUPPLY, PRE_MINT, DEFAULT_ADMIN, DEFAULT_UPGRADER)
+        )
+      )
+    );
+
+    s_burnMintERC20PausableUUPS = BurnMintERC20PausableUUPS(s_uupsProxy);
+
+    changePrank(DEFAULT_ADMIN);
+    s_burnMintERC20PausableUUPS.grantRole(s_burnMintERC20PausableUUPS.PAUSER_ROLE(), DEFAULT_PAUSER);
+    s_burnMintERC20PausableUUPS.grantMintAndBurnRoles(i_mockPool);
+  }
+
   function test_Upgrade() public {
-    uint256 amount = 1e18;
-    address s_defaultFreezer = makeAddr("s_defaultFreezer");
+    address defaultFreezer = makeAddr("defaultFreezer");
 
-    changePrank(s_defaultAdmin);
-    s_burnMintERC20PausableUUPS.grantMintAndBurnRoles(s_defaultAdmin);
-    s_burnMintERC20PausableUUPS.mint(STRANGER, amount);
+    changePrank(DEFAULT_ADMIN);
+    s_burnMintERC20PausableUUPS.grantMintAndBurnRoles(DEFAULT_ADMIN);
+    s_burnMintERC20PausableUUPS.mint(STRANGER, AMOUNT);
 
-    assertEq(s_burnMintERC20PausableUUPS.balanceOf(STRANGER), amount);
-    assertEq(s_burnMintERC20PausableUUPS.totalSupply(), amount);
+    assertEq(s_burnMintERC20PausableUUPS.balanceOf(STRANGER), AMOUNT);
+    assertEq(s_burnMintERC20PausableUUPS.totalSupply(), AMOUNT);
 
     // Upgrade to the new version
-    changePrank(s_defaultUpgrader);
+    changePrank(DEFAULT_UPGRADER);
     MockBurnMintERC20PausableUUPSV2 newImplementation = new MockBurnMintERC20PausableUUPSV2();
 
     IUpgradeableProxy(s_uupsProxy).upgradeToAndCall(
       address(newImplementation),
-      abi.encodeCall(MockBurnMintERC20PausableUUPSV2.initializeFreezerRole, (s_defaultFreezer))
+      abi.encodeCall(MockBurnMintERC20PausableUUPSV2.initializeFreezerRole, (defaultFreezer))
     );
 
     newImplementation = MockBurnMintERC20PausableUUPSV2(s_uupsProxy);
 
     // Validate that the new implementation keeps track of the balances from the previous version
-    assertEq(newImplementation.balanceOf(STRANGER), amount);
-    assertEq(newImplementation.totalSupply(), amount);
+    assertEq(newImplementation.balanceOf(STRANGER), AMOUNT);
+    assertEq(newImplementation.totalSupply(), AMOUNT);
 
     // Validate that the new functionality works as expected
-    changePrank(s_defaultFreezer);
+    changePrank(defaultFreezer);
     newImplementation.freeze(STRANGER);
 
     changePrank(STRANGER);
@@ -86,6 +110,6 @@ contract BurnMintERC20PausableUUPS_upgrade is BurnMintERC20PausableUUPSSetup {
         STRANGER
       )
     );
-    newImplementation.transfer(OWNER, amount);
+    newImplementation.transfer(OWNER, AMOUNT);
   }
 }
