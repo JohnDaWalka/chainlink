@@ -20,7 +20,8 @@ type PluginConfig struct {
 	GasPriceSubunitsPipeline string `json:"gasPriceSubunitsSource"`
 	JuelsPerFeeCoinPipeline  string `json:"juelsPerFeeCoinSource"`
 	// JuelsPerFeeCoinCache is disabled when nil
-	JuelsPerFeeCoinCache *JuelsPerFeeCoinCache `json:"juelsPerFeeCoinCache"`
+	JuelsPerFeeCoinCache *JuelsPerFeeCoinCache        `json:"juelsPerFeeCoinCache"`
+	DeviationFunc        *DeviationFunctionDefinition `json:"deviationFunc"`
 }
 
 type JuelsPerFeeCoinCache struct {

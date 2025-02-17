@@ -148,7 +148,19 @@ func NewMedianServices(ctx context.Context,
 		gasPriceSubunitsDataSource = &median.ZeroDataSource{}
 	}
 
+	var deviationFunc libocr_median.DeviationFunc
+	if pluginConfig.DeviationFunc != nil {
+		deviationFunc = pluginConfig.DeviationFunc.Func()
+	}
+
 	if cmdName := env.MedianPlugin.Cmd.Get(); cmdName != "" {
+		if deviationFunc != nil {
+			// NOTE: We could add support for this option to LOOPS and remove
+			// the check later if necessary
+			err = errors.New("custom deviationFunc is not supported when using a custom median plugin")
+			abort()
+			return
+		}
 		// use unique logger names so we can use it to register a loop
 		medianLggr := lggr.Named("Median").Named(spec.ContractID).Named(spec.GetID())
 		envVars, err2 := plugins.ParseEnvFile(env.MedianPlugin.Env.Get())
@@ -171,7 +183,7 @@ func NewMedianServices(ctx context.Context,
 		argsNoPlugin.ReportingPluginFactory = median
 		srvs = append(srvs, median)
 	} else {
-		argsNoPlugin.ReportingPluginFactory, err = median.NewPlugin(lggr).NewMedianFactory(ctx, medianProvider, spec.ContractID, dataSource, juelsPerFeeCoinSource, gasPriceSubunitsDataSource, errorLog)
+		argsNoPlugin.ReportingPluginFactory, err = median.NewPlugin(lggr).NewMedianFactory(ctx, medianProvider, spec.ContractID, dataSource, juelsPerFeeCoinSource, gasPriceSubunitsDataSource, errorLog, median.WithDeviationFunc(deviationFunc))
 		if err != nil {
 			err = fmt.Errorf("failed to create median factory: %w", err)
 			abort()
