@@ -179,7 +179,6 @@ func TestAddTokenPool(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, solTestTokenPool.LockAndRelease_PoolType, configAccount.PoolType)
 		require.Equal(t, tokenAddress, configAccount.Config.Mint)
-		// try minting after this and see if the pool or the deployer key is the authority
 
 		// test SetupTokenPoolForRemoteChain results
 		remoteChainConfigPDA, _, _ := solTokenUtil.TokenPoolChainConfigPDA(evmChain, tokenAddress, state.SolChains[solChain].TokenPool)

@@ -103,8 +103,9 @@ func initializeRouter(
 	externalTokenPoolsSignerPDA, _, _ := solState.FindExternalTokenPoolsSignerPDA(ccipRouterProgram)
 
 	instruction, err := solRouter.NewInitializeInstruction(
-		chain.Selector,     // chain selector
-		solana.PublicKey{}, // fee aggregator
+		chain.Selector, // chain selector
+		// this is where the fee aggregator address would go (but have written a separate changeset to set that)
+		solana.PublicKey{},
 		feeQuoterAddress,
 		linkTokenAddress, // link token mint
 		routerConfigPDA,
@@ -436,8 +437,14 @@ type SetFeeAggregatorConfig struct {
 }
 
 func (cfg SetFeeAggregatorConfig) Validate(e deployment.Environment) error {
-	state, _ := cs.LoadOnchainState(e)
-	chainState := state.SolChains[cfg.ChainSelector]
+	state, err := cs.LoadOnchainState(e)
+	if err != nil {
+		return fmt.Errorf("failed to load onchain state: %w", err)
+	}
+	chainState, chainExists := state.SolChains[cfg.ChainSelector]
+	if !chainExists {
+		return fmt.Errorf("chain %d not found in existing state", cfg.ChainSelector)
+	}
 	chain := e.SolChains[cfg.ChainSelector]
 
 	if err := validateRouterConfig(chain, chainState); err != nil {

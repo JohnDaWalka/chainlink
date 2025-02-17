@@ -416,109 +416,23 @@ func MakeEVMExtraArgsV2(gasLimit uint64, allowOOO bool) []byte {
 func AddLane(
 	t *testing.T,
 	e *DeployedEnv,
+	state changeset.CCIPOnChainState,
 	from, to uint64,
 	isTestRouter bool,
-	gasprice map[uint64]*big.Int,
-	tokenPrices map[common.Address]*big.Int,
 	fqCfg fee_quoter.FeeQuoterDestChainConfig,
 ) {
 	var err error
-
 	fromFamily, _ := chainsel.GetSelectorFamily(from)
 	toFamily, _ := chainsel.GetSelectorFamily(to)
-
 	changesets := []commoncs.ConfiguredChangeSet{}
-
 	if fromFamily == chainsel.FamilyEVM {
-		evmSrcChangesets := []commoncs.ConfiguredChangeSet{
-			commoncs.Configure(
-				deployment.CreateLegacyChangeSet(changeset.UpdateOnRampsDestsChangeset),
-				changeset.UpdateOnRampDestsConfig{
-					UpdatesByChain: map[uint64]map[uint64]changeset.OnRampDestinationUpdate{
-						from: {
-							to: {
-								IsEnabled:        true,
-								TestRouter:       isTestRouter,
-								AllowListEnabled: false,
-							},
-						},
-					},
-				},
-			),
-			commoncs.Configure(
-				deployment.CreateLegacyChangeSet(changeset.UpdateFeeQuoterPricesChangeset),
-				changeset.UpdateFeeQuoterPricesConfig{
-					PricesByChain: map[uint64]changeset.FeeQuoterPriceUpdatePerSource{
-						from: {
-							TokenPrices: tokenPrices,
-							GasPrices:   gasprice,
-						},
-					},
-				},
-			),
-			commoncs.Configure(
-				deployment.CreateLegacyChangeSet(changeset.UpdateFeeQuoterDestsChangeset),
-				changeset.UpdateFeeQuoterDestsConfig{
-					UpdatesByChain: map[uint64]map[uint64]fee_quoter.FeeQuoterDestChainConfig{
-						from: {
-							to: fqCfg,
-						},
-					},
-				},
-			),
-			commoncs.Configure(
-				deployment.CreateLegacyChangeSet(changeset.UpdateRouterRampsChangeset),
-				changeset.UpdateRouterRampsConfig{
-					TestRouter: isTestRouter,
-					UpdatesByChain: map[uint64]changeset.RouterUpdates{
-						// onRamp update on source chain
-						from: {
-							OnRampUpdates: map[uint64]bool{
-								to: true,
-							},
-						},
-					},
-				},
-			),
-		}
+		evmSrcChangesets := addEVMSrcChangesets(from, to, isTestRouter, state, fqCfg)
 		changesets = append(changesets, evmSrcChangesets...)
 	}
-
-	fmt.Println("e.RmnEnabledSourceChains[from]", e.RmnEnabledSourceChains[from])
 	if toFamily == chainsel.FamilyEVM {
-		evmDstChangesets := []commoncs.ConfiguredChangeSet{
-			commoncs.Configure(
-				deployment.CreateLegacyChangeSet(changeset.UpdateOffRampSourcesChangeset),
-				changeset.UpdateOffRampSourcesConfig{
-					UpdatesByChain: map[uint64]map[uint64]changeset.OffRampSourceUpdate{
-						to: {
-							from: {
-								IsEnabled:                 true,
-								TestRouter:                isTestRouter,
-								IsRMNVerificationDisabled: !e.RmnEnabledSourceChains[from],
-							},
-						},
-					},
-				},
-			),
-			commoncs.Configure(
-				deployment.CreateLegacyChangeSet(changeset.UpdateRouterRampsChangeset),
-				changeset.UpdateRouterRampsConfig{
-					TestRouter: isTestRouter,
-					UpdatesByChain: map[uint64]changeset.RouterUpdates{
-						// offramp update on dest chain
-						to: {
-							OffRampUpdates: map[uint64]bool{
-								from: true,
-							},
-						},
-					},
-				},
-			),
-		}
+		evmDstChangesets := addEVMDestChangesets(e, to, from, isTestRouter)
 		changesets = append(changesets, evmDstChangesets...)
 	}
-
 	if fromFamily == chainsel.FamilySolana {
 		changesets = append(changesets, addLaneSolanaChangesets(t, from, to, toFamily)...)
 	}
@@ -569,6 +483,102 @@ func addLaneSolanaChangesets(t *testing.T, solChainSelector, remoteChainSelector
 	return solanaChangesets
 }
 
+func addEVMSrcChangesets(from, to uint64, isTestRouter bool, state changeset.CCIPOnChainState, fqCfg fee_quoter.FeeQuoterDestChainConfig) []commoncs.ConfiguredChangeSet {
+	stateChainFrom := state.Chains[from]
+	tokenPrices := map[common.Address]*big.Int{
+		stateChainFrom.LinkToken.Address(): DefaultLinkPrice,
+		stateChainFrom.Weth9.Address():     DefaultWethPrice,
+	}
+	evmSrcChangesets := []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(
+			deployment.CreateLegacyChangeSet(changeset.UpdateOnRampsDestsChangeset),
+			changeset.UpdateOnRampDestsConfig{
+				UpdatesByChain: map[uint64]map[uint64]changeset.OnRampDestinationUpdate{
+					from: {
+						to: {
+							IsEnabled:        true,
+							TestRouter:       isTestRouter,
+							AllowListEnabled: false,
+						},
+					},
+				},
+			},
+		),
+		commoncs.Configure(
+			deployment.CreateLegacyChangeSet(changeset.UpdateFeeQuoterPricesChangeset),
+			changeset.UpdateFeeQuoterPricesConfig{
+				PricesByChain: map[uint64]changeset.FeeQuoterPriceUpdatePerSource{
+					from: {
+						TokenPrices: tokenPrices,
+						GasPrices: map[uint64]*big.Int{
+							to: DefaultGasPrice,
+						},
+					},
+				},
+			},
+		),
+		commoncs.Configure(
+			deployment.CreateLegacyChangeSet(changeset.UpdateFeeQuoterDestsChangeset),
+			changeset.UpdateFeeQuoterDestsConfig{
+				UpdatesByChain: map[uint64]map[uint64]fee_quoter.FeeQuoterDestChainConfig{
+					from: {
+						to: fqCfg,
+					},
+				},
+			},
+		),
+		commoncs.Configure(
+			deployment.CreateLegacyChangeSet(changeset.UpdateRouterRampsChangeset),
+			changeset.UpdateRouterRampsConfig{
+				TestRouter: isTestRouter,
+				UpdatesByChain: map[uint64]changeset.RouterUpdates{
+					// onRamp update on source chain
+					from: {
+						OnRampUpdates: map[uint64]bool{
+							to: true,
+						},
+					},
+				},
+			},
+		),
+	}
+	return evmSrcChangesets
+}
+
+func addEVMDestChangesets(e *DeployedEnv, to, from uint64, isTestRouter bool) []commoncs.ConfiguredChangeSet {
+	evmDstChangesets := []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(
+			deployment.CreateLegacyChangeSet(changeset.UpdateOffRampSourcesChangeset),
+			changeset.UpdateOffRampSourcesConfig{
+				UpdatesByChain: map[uint64]map[uint64]changeset.OffRampSourceUpdate{
+					to: {
+						from: {
+							IsEnabled:                 true,
+							TestRouter:                isTestRouter,
+							IsRMNVerificationDisabled: !e.RmnEnabledSourceChains[from],
+						},
+					},
+				},
+			},
+		),
+		commoncs.Configure(
+			deployment.CreateLegacyChangeSet(changeset.UpdateRouterRampsChangeset),
+			changeset.UpdateRouterRampsConfig{
+				TestRouter: isTestRouter,
+				UpdatesByChain: map[uint64]changeset.RouterUpdates{
+					// offramp update on dest chain
+					to: {
+						OffRampUpdates: map[uint64]bool{
+							from: true,
+						},
+					},
+				},
+			},
+		),
+	}
+	return evmDstChangesets
+}
+
 // RemoveLane removes a lane between the source and destination chains in the deployed environment.
 func RemoveLane(t *testing.T, e *DeployedEnv, src, dest uint64, isTestRouter bool) {
 	var err error
@@ -616,26 +626,8 @@ func RemoveLane(t *testing.T, e *DeployedEnv, src, dest uint64, isTestRouter boo
 }
 
 func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, state changeset.CCIPOnChainState, from, to uint64, isTestRouter bool) {
-
-	gasPrices := map[uint64]*big.Int{
-		to: DefaultGasPrice,
-	}
-	fromFamily, _ := chainsel.GetSelectorFamily(from)
-	tokenPrices := map[common.Address]*big.Int{}
-	if fromFamily == chainsel.FamilyEVM {
-		stateChainFrom := state.Chains[from]
-		tokenPrices = map[common.Address]*big.Int{
-			stateChainFrom.LinkToken.Address(): DefaultLinkPrice,
-			stateChainFrom.Weth9.Address():     DefaultWethPrice,
-		}
-	}
 	fqCfg := changeset.DefaultFeeQuoterDestChainConfig(true, to)
-	AddLane(
-		t,
-		e,
-		from, to,
-		isTestRouter,
-		gasPrices, tokenPrices, fqCfg)
+	AddLane(t, e, state, from, to, isTestRouter, fqCfg)
 }
 
 // AddLanesForAll adds densely connected lanes for all chains in the environment so that each chain
