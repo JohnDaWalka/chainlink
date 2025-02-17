@@ -1,17 +1,19 @@
 package v1_0
 
 import (
+	"cmp"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"slices"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/deployment/common/view/types"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	capabilities_registry "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 )
 
@@ -36,6 +38,20 @@ func (v *CapabilityRegistryView) MarshalJSON() ([]byte, error) {
 		Dons            []DonView             `json:"dons,omitempty"`
 		DonCapabilities []DonDenormalizedView `json:"don_capabilities_summary,omitempty"`
 	}
+
+	slices.SortFunc(v.Capabilities, func(a CapabilityView, b CapabilityView) int {
+		return strings.Compare(a.ID, b.ID)
+	})
+	slices.SortFunc(v.Nodes, func(a NodeView, b NodeView) int {
+		return strings.Compare(a.P2pId.String(), b.P2pId.String())
+	})
+	slices.SortFunc(v.Nops, func(a NopView, b NopView) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	slices.SortFunc(v.Dons, func(a DonView, b DonView) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
+
 	a := Alias{
 		ContractMetaData: v.ContractMetaData,
 		Capabilities:     v.Capabilities,
@@ -48,6 +64,9 @@ func (v *CapabilityRegistryView) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	a.DonCapabilities = dc
+	slices.SortFunc(a.DonCapabilities, func(a DonDenormalizedView, b DonDenormalizedView) int {
+		return cmp.Compare(a.Don.ID, b.Don.ID)
+	})
 	return json.MarshalIndent(&a, "", " ")
 }
 
