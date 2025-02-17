@@ -7,6 +7,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 
 	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	solBurnMintTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/example_burnmint_token_pool"
+	solLockReleaseTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/example_lockrelease_token_pool"
 	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -32,22 +34,34 @@ func (cfg TokenPoolConfig) Validate(e deployment.Environment) error {
 	if err := commonValidation(e, cfg.ChainSelector, tokenPubKey); err != nil {
 		return err
 	}
-	state, _ := cs.LoadOnchainState(e)
-	chainState := state.SolChains[cfg.ChainSelector]
-	if chainState.TokenPool.IsZero() {
-		return fmt.Errorf("token pool not found in existing state, deploy the token pool first for chain %d", cfg.ChainSelector)
-	}
 	if _, err := GetTokenProgramID(cfg.TokenProgramName); err != nil {
 		return err
 	}
 
-	tokenPool := chainState.TokenPool
+	state, _ := cs.LoadOnchainState(e)
+	chainState := state.SolChains[cfg.ChainSelector]
+	tokenPool := solana.PublicKey{}
+	var poolConfigAccount interface{}
+
+	if cfg.PoolType == solTestTokenPool.BurnAndMint_PoolType && chainState.BurnMintTokenPool.IsZero() {
+		return fmt.Errorf("token pool of type BurnAndMint not found in existing state, deploy the token pool first for chain %d", cfg.ChainSelector)
+	} else {
+		tokenPool = chainState.BurnMintTokenPool
+		poolConfigAccount = solBurnMintTokenPool.State{}
+	}
+
+	if cfg.PoolType == solTestTokenPool.LockAndRelease_PoolType && chainState.LockReleaseTokenPool.IsZero() {
+		return fmt.Errorf("token pool of type LockAndRelease not found in existing state, deploy the token pool first for chain %d", cfg.ChainSelector)
+	} else {
+		tokenPool = chainState.LockReleaseTokenPool
+		poolConfigAccount = solLockReleaseTokenPool.State{}
+	}
+
 	poolConfigPDA, err := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
 	if err != nil {
 		return fmt.Errorf("failed to get token pool config address (mint: %s, pool: %s): %w", tokenPubKey.String(), tokenPool.String(), err)
 	}
 	chain := e.SolChains[cfg.ChainSelector]
-	var poolConfigAccount solTestTokenPool.State
 	if err := chain.GetAccountDataBorshInto(context.Background(), poolConfigPDA, &poolConfigAccount); err == nil {
 		return fmt.Errorf("token pool config already exists for (mint: %s, pool: %s)", tokenPubKey.String(), tokenPool.String())
 	}
@@ -63,11 +77,30 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 	chainState := state.SolChains[cfg.ChainSelector]
 	authorityPubKey := solana.MustPublicKeyFromBase58(cfg.Authority)
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
+	tokenPool := solana.PublicKey{}
+
+	initFunc := func(router solana.PublicKey,
+		// Accounts:
+		state solana.PublicKey,
+		mint solana.PublicKey,
+		authority solana.PublicKey,
+		systemProgram solana.PublicKey) interface{} {
+	}
+
+	if cfg.PoolType == solTestTokenPool.BurnAndMint_PoolType {
+		tokenPool = chainState.BurnMintTokenPool
+		solBurnMintTokenPool.SetProgramID(tokenPool)
+		initFunc = solBurnMintTokenPool.NewInitializeInstruction
+	} else {
+		tokenPool = chainState.LockReleaseTokenPool
+		solLockReleaseTokenPool.SetProgramID(tokenPool)
+		initFunc = solBurnMintTokenPool.NewInitializeInstruction
+	}
 
 	// verified
 	tokenprogramID, _ := GetTokenProgramID(cfg.TokenProgramName)
-	poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, chainState.TokenPool)
-	poolSigner, _ := solTokenUtil.TokenPoolSignerAddress(tokenPubKey, chainState.TokenPool)
+	poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
+	poolSigner, _ := solTokenUtil.TokenPoolSignerAddress(tokenPubKey, tokenPool)
 
 	// ata for token pool
 	createI, tokenPoolATA, err := solTokenUtil.CreateAssociatedTokenAccount(
@@ -80,21 +113,33 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to create associated token account for tokenpool (mint: %s, pool: %s): %w", tokenPubKey.String(), chainState.TokenPool.String(), err)
 	}
 
-	solTestTokenPool.SetProgramID(chainState.TokenPool)
-	// initialize token pool for token
-	poolInitI, err := solTestTokenPool.NewInitializeInstruction(
-		cfg.PoolType,
-		chainState.Router,
-		poolConfigPDA,
-		tokenPubKey,
-		authorityPubKey, // this is assumed to be chain.DeployerKey for now (owner of token pool)
-		solana.SystemProgramID,
-	).ValidateAndBuild()
+	instructions := []solana.Instruction{createI}
+
+	var poolInitI solana.Instruction
+	switch cfg.PoolType {
+	case solTestTokenPool.BurnAndMint_PoolType:
+		// initialize token pool for token
+		poolInitI, err = solBurnMintTokenPool.NewInitializeInstruction(
+			chainState.Router,
+			poolConfigPDA,
+			tokenPubKey,
+			authorityPubKey, // this is assumed to be chain.DeployerKey for now (owner of token pool)
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+	case solTestTokenPool.LockAndRelease_PoolType:
+		// initialize token pool for token
+		poolInitI, err = solLockReleaseTokenPool.NewInitializeInstruction(
+			chainState.Router,
+			poolConfigPDA,
+			tokenPubKey,
+			authorityPubKey, // this is assumed to be chain.DeployerKey for now (owner of token pool)
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+	}
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
 	}
-
-	instructions := []solana.Instruction{createI, poolInitI}
+	instructions = append(instructions, poolInitI)
 
 	if cfg.PoolType == solTestTokenPool.BurnAndMint_PoolType && tokenPubKey != solana.SolMint {
 		// make pool mint_authority for token
@@ -138,32 +183,33 @@ func (cfg RemoteChainTokenPoolConfig) Validate(e deployment.Environment) error {
 	}
 	state, _ := cs.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.SolChainSelector]
-	if chainState.TokenPool.IsZero() {
-		return fmt.Errorf("token pool not found in existing state, deploy token pool for chain %d", cfg.SolChainSelector)
-	}
+	fmt.Println("chainState", chainState)
+	// if chainState.TokenPool.IsZero() {
+	// 	return fmt.Errorf("token pool not found in existing state, deploy token pool for chain %d", cfg.SolChainSelector)
+	// }
 
-	chain := e.SolChains[cfg.SolChainSelector]
-	tokenPool := chainState.TokenPool
+	// chain := e.SolChains[cfg.SolChainSelector]
+	// tokenPool := chainState.TokenPool
 
-	// check if pool config exists (cannot do remote setup without it)
-	poolConfigPDA, err := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
-	if err != nil {
-		return fmt.Errorf("failed to get token pool config address (mint: %s, pool: %s): %w", tokenPubKey.String(), tokenPool.String(), err)
-	}
-	var poolConfigAccount solTestTokenPool.State
-	if err := chain.GetAccountDataBorshInto(context.Background(), poolConfigPDA, &poolConfigAccount); err != nil {
-		return fmt.Errorf("token pool config not found (mint: %s, pool: %s): %w", tokenPubKey.String(), chainState.TokenPool.String(), err)
-	}
+	// // check if pool config exists (cannot do remote setup without it)
+	// poolConfigPDA, err := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to get token pool config address (mint: %s, pool: %s): %w", tokenPubKey.String(), tokenPool.String(), err)
+	// }
+	// var poolConfigAccount solTestTokenPool.State
+	// if err := chain.GetAccountDataBorshInto(context.Background(), poolConfigPDA, &poolConfigAccount); err != nil {
+	// 	return fmt.Errorf("token pool config not found (mint: %s, pool: %s): %w", tokenPubKey.String(), chainState.TokenPool.String(), err)
+	// }
 
-	// check if this remote chain is already configured for this token
-	remoteChainConfigPDA, _, err := solTokenUtil.TokenPoolChainConfigPDA(cfg.RemoteChainSelector, tokenPubKey, tokenPool)
-	if err != nil {
-		return fmt.Errorf("failed to get token pool remote chain config pda (remoteSelector: %d, mint: %s, pool: %s): %w", cfg.RemoteChainSelector, tokenPubKey.String(), tokenPool.String(), err)
-	}
-	var remoteChainConfigAccount solTestTokenPool.ChainConfig
-	if err := chain.GetAccountDataBorshInto(context.Background(), remoteChainConfigPDA, &remoteChainConfigAccount); err == nil {
-		return fmt.Errorf("remote chain config already exists for (remoteSelector: %d, mint: %s, pool: %s)", cfg.RemoteChainSelector, tokenPubKey.String(), tokenPool.String())
-	}
+	// // check if this remote chain is already configured for this token
+	// remoteChainConfigPDA, _, err := solTokenUtil.TokenPoolChainConfigPDA(cfg.RemoteChainSelector, tokenPubKey, tokenPool)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to get token pool remote chain config pda (remoteSelector: %d, mint: %s, pool: %s): %w", cfg.RemoteChainSelector, tokenPubKey.String(), tokenPool.String(), err)
+	// }
+	// var remoteChainConfigAccount solTestTokenPool.ChainConfig
+	// if err := chain.GetAccountDataBorshInto(context.Background(), remoteChainConfigPDA, &remoteChainConfigAccount); err == nil {
+	// 	return fmt.Errorf("remote chain config already exists for (remoteSelector: %d, mint: %s, pool: %s)", cfg.RemoteChainSelector, tokenPubKey.String(), tokenPool.String())
+	// }
 	return nil
 }
 

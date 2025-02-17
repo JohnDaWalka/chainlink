@@ -378,24 +378,40 @@ func deployChainContractsSolana(
 	}
 
 	// TOKEN POOL DEPLOY
-	var tokenPoolProgram solana.PublicKey
-	if chainState.TokenPool.IsZero() {
-		// TODO: there should be two token pools deployed one of each type (lock/burn)
-		// separate token pools are not ready yet
-		programID, err := chain.DeployProgram(e.Logger, "test_token_pool")
+	var burnMintTokenPoolProgram solana.PublicKey
+	var lockReleaseTokenPoolProgram solana.PublicKey
+	if chainState.BurnMintTokenPool.IsZero() {
+		programID, err := chain.DeployProgram(e.Logger, "example_burnmint_token_pool")
 		if err != nil {
 			return fmt.Errorf("failed to deploy program: %w", err)
 		}
-		tv := deployment.NewTypeAndVersion(changeset.TokenPool, deployment.Version1_0_0)
-		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
-		tokenPoolProgram = solana.MustPublicKeyFromBase58(programID)
+		tv := deployment.NewTypeAndVersion(changeset.BurnMintTokenPool, deployment.Version1_0_0)
 		err = ab.Save(chain.Selector, programID, tv)
 		if err != nil {
 			return fmt.Errorf("failed to save address: %w", err)
 		}
+		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
+		burnMintTokenPoolProgram = solana.MustPublicKeyFromBase58(programID)
 	} else {
-		e.Logger.Infow("Using existing token pool", "addr", chainState.TokenPool.String())
-		tokenPoolProgram = chainState.TokenPool
+		e.Logger.Infow("Using existing token pool", "addr", chainState.BurnMintTokenPool.String())
+		burnMintTokenPoolProgram = chainState.BurnMintTokenPool
+	}
+
+	if chainState.LockReleaseTokenPool.IsZero() {
+		programID, err := chain.DeployProgram(e.Logger, "example_lockrelease_token_pool")
+		if err != nil {
+			return fmt.Errorf("failed to deploy program: %w", err)
+		}
+		tv := deployment.NewTypeAndVersion(changeset.LockReleaseTokenPool, deployment.Version1_0_0)
+		err = ab.Save(chain.Selector, programID, tv)
+		if err != nil {
+			return fmt.Errorf("failed to save address: %w", err)
+		}
+		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
+		lockReleaseTokenPoolProgram = solana.MustPublicKeyFromBase58(programID)
+	} else {
+		e.Logger.Infow("Using existing token pool", "addr", chainState.LockReleaseTokenPool.String())
+		lockReleaseTokenPoolProgram = chainState.LockReleaseTokenPool
 	}
 
 	externalExecutionConfigPDA, _, _ := solState.FindExternalExecutionConfigPDA(ccipRouterProgram)
@@ -408,7 +424,8 @@ func deployChainContractsSolana(
 	if err := solCommonUtil.ExtendLookupTable(e.GetContext(), chain.Client, addressLookupTable, *chain.DeployerKey,
 		[]solana.PublicKey{
 			// token pools
-			tokenPoolProgram,
+			burnMintTokenPoolProgram,
+			lockReleaseTokenPoolProgram,
 			// offramp
 			offRampAddress,
 			offRampConfigPDA,
