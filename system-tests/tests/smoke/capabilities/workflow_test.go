@@ -93,7 +93,7 @@ type PriceProviderConfig struct {
 
 func (in *TestConfig) JdInput() (*jd.Input, error) {
 	if in.JD == nil {
-		return nil, fmt.Errorf("JD input is nil")
+		return nil, errors.New("JD input is nil")
 	}
 
 	return in.JD, nil
@@ -101,7 +101,7 @@ func (in *TestConfig) JdInput() (*jd.Input, error) {
 
 func (in *TestConfig) NodeSetInput() ([]*keystonetypes.CapabilitiesAwareNodeSet, error) {
 	if in.NodeSets == nil {
-		return nil, fmt.Errorf("NodeSets input is nil")
+		return nil, errors.New("NodeSets input is nil")
 	}
 
 	return in.NodeSets, nil
@@ -109,7 +109,7 @@ func (in *TestConfig) NodeSetInput() ([]*keystonetypes.CapabilitiesAwareNodeSet,
 
 func (in *TestConfig) BlockchainInput() (*blockchain.Input, error) {
 	if in.BlockchainA == nil {
-		return nil, fmt.Errorf("Blockchain input is nil")
+		return nil, errors.New("Blockchain input is nil")
 	}
 
 	return in.BlockchainA, nil

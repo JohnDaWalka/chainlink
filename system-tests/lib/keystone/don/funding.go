@@ -16,22 +16,16 @@ func FundNodes(keystoneEnv *keystonetypes.KeystoneEnvironment) error {
 	if keystoneEnv == nil {
 		return errors.New("keystone environment must not be nil")
 	}
-	if keystoneEnv.SethClient == nil {
-		return errors.New("seth client must be set")
-	}
-	if len(keystoneEnv.Dons) == 0 {
-		return errors.New("dons must be set")
-	}
 
-	for _, don := range keystoneEnv.Dons {
+	for _, don := range keystoneEnv.MustDons() {
 		for _, node := range don.Nodes {
-			_, err := libfunding.SendFunds(zerolog.Logger{}, keystoneEnv.SethClient, libtypes.FundsToSend{
-				ToAddress:  common.HexToAddress(node.AccountAddr[keystoneEnv.SethClient.Cfg.Network.ChainID]),
+			_, err := libfunding.SendFunds(zerolog.Logger{}, keystoneEnv.MustSethClient(), libtypes.FundsToSend{
+				ToAddress:  common.HexToAddress(node.AccountAddr[keystoneEnv.MustSethClient().Cfg.Network.ChainID]),
 				Amount:     big.NewInt(5000000000000000000),
-				PrivateKey: keystoneEnv.SethClient.MustGetRootPrivateKey(),
+				PrivateKey: keystoneEnv.MustSethClient().MustGetRootPrivateKey(),
 			})
 			if err != nil {
-				return errors.Wrapf(err, "failed to send funds to node %s", node.AccountAddr[keystoneEnv.SethClient.Cfg.Network.ChainID])
+				return errors.Wrapf(err, "failed to send funds to node %s", node.AccountAddr[keystoneEnv.MustSethClient().Cfg.Network.ChainID])
 			}
 		}
 	}

@@ -27,7 +27,6 @@ type KeystoneContractAddresses struct {
 	ForwarderAddress            common.Address
 	OCR3CapabilityAddress       common.Address
 	WorkflowRegistryAddress     common.Address
-	// FeedsConsumerAddress        common.Address
 }
 
 type DonJobs = map[JobDescription][]*jobv1.ProposeJobRequest
@@ -111,4 +110,88 @@ type GatewayConnectorData struct {
 	Host string // do not set, it will be set dynamically
 	Path string
 	Port int
+}
+
+func (k *KeystoneEnvironment) MustCLDEnvironment() *deployment.Environment {
+	if k.Environment == nil {
+		panic("CLD environment must be set")
+	}
+	return k.Environment
+}
+
+func (k *KeystoneEnvironment) MustBlockchain() *blockchain.Output {
+	if k.Blockchain == nil {
+		panic("blockchain must be set")
+	}
+	return k.Blockchain
+}
+
+func (k *KeystoneEnvironment) MustWrappedNodeOutput() []*WrappedNodeOutput {
+	if k.WrappedNodeOutput == nil {
+		panic("wrapped node output must be set")
+	}
+	return k.WrappedNodeOutput
+}
+
+func (k *KeystoneEnvironment) MustJD() *jd.Output {
+	if k.JD == nil {
+		panic("job distributor must be set")
+	}
+	return k.JD
+}
+
+func (k *KeystoneEnvironment) MustSethClient() *seth.Client {
+	if k.SethClient == nil {
+		panic("seth client must be set")
+	}
+	return k.SethClient
+}
+
+func (k *KeystoneEnvironment) MustDONTopology() []*DONTopology {
+	if k.DONTopology == nil {
+		panic("DON topology must not be empty")
+	}
+	return k.DONTopology
+}
+
+func (k *KeystoneEnvironment) MustKeystoneContractAddresses() *KeystoneContractAddresses {
+	if k.KeystoneContractAddresses == nil {
+		panic("keystone contract addresses must be set")
+	}
+	return k.KeystoneContractAddresses
+}
+
+func (k *KeystoneEnvironment) MustGatewayConnectorData() *GatewayConnectorData {
+	if k.GatewayConnectorData == nil {
+		panic("gateway connector data must be set")
+	}
+	return k.GatewayConnectorData
+}
+
+func (k *KeystoneEnvironment) MustNodeInput() []*CapabilitiesAwareNodeSet {
+	if k.NodeInput == nil {
+		panic("node input must be set")
+	}
+	return k.NodeInput
+}
+
+func (k *KeystoneEnvironment) MustDons() []*devenv.DON {
+	if k.Dons == nil {
+		panic("dons must be set")
+	}
+	return k.Dons
+}
+
+func (k *KeystoneEnvironment) MustWorkflowDONID() uint32 {
+	if k.WorkflowDONID == 0 {
+		panic("workflow DON ID must be set")
+	}
+	return k.WorkflowDONID
+}
+
+func (k *KeystoneEnvironment) MustChainSelector() uint64 {
+	if k.ChainSelector == 0 {
+		panic("chain selector must be set")
+	}
+	return k.ChainSelector
 }

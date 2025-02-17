@@ -156,29 +156,11 @@ func buildChainlinkDeploymentEnv(lgr logger.Logger, keystoneEnv *types.KeystoneE
 	if keystoneEnv == nil {
 		return errors.New("keystone environment must be set")
 	}
-	if keystoneEnv.Blockchain == nil {
-		return errors.New("blockchain must be set")
-	}
-	if keystoneEnv.WrappedNodeOutput == nil {
-		return errors.New("wrapped node output must be set")
-	}
-	if keystoneEnv.JD == nil {
-		return errors.New("job distributor must be set")
-	}
-	if keystoneEnv.SethClient == nil {
-		return errors.New("seth client must be set")
-	}
-	if len(keystoneEnv.Blockchain.Nodes) < 1 {
-		return errors.New("expected at least one node in the blockchain output")
-	}
-	if len(keystoneEnv.WrappedNodeOutput) < 1 {
-		return errors.New("expected at least one node in the wrapped node output")
-	}
 
-	envs := make([]*deployment.Environment, len(keystoneEnv.WrappedNodeOutput))
-	keystoneEnv.Dons = make([]*devenv.DON, len(keystoneEnv.WrappedNodeOutput))
+	envs := make([]*deployment.Environment, len(keystoneEnv.MustWrappedNodeOutput()))
+	keystoneEnv.Dons = make([]*devenv.DON, len(keystoneEnv.MustWrappedNodeOutput()))
 
-	for i, nodeOutput := range keystoneEnv.WrappedNodeOutput {
+	for i, nodeOutput := range keystoneEnv.MustWrappedNodeOutput() {
 		// assume that each nodeset has only one bootstrap node
 		nodeInfo, err := libnode.GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, 1)
 		if err != nil {
@@ -186,8 +168,8 @@ func buildChainlinkDeploymentEnv(lgr logger.Logger, keystoneEnv *types.KeystoneE
 		}
 
 		jdConfig := devenv.JDConfig{
-			GRPC:     keystoneEnv.JD.HostGRPCUrl,
-			WSRPC:    keystoneEnv.JD.DockerWSRPCUrl,
+			GRPC:     keystoneEnv.MustJD().HostGRPCUrl,
+			WSRPC:    keystoneEnv.MustJD().DockerWSRPCUrl,
 			Creds:    insecure.NewCredentials(),
 			NodeInfo: nodeInfo,
 		}
@@ -196,18 +178,18 @@ func buildChainlinkDeploymentEnv(lgr logger.Logger, keystoneEnv *types.KeystoneE
 			JDConfig: jdConfig,
 			Chains: []devenv.ChainConfig{
 				{
-					ChainID:   keystoneEnv.SethClient.Cfg.Network.ChainID,
-					ChainName: keystoneEnv.SethClient.Cfg.Network.Name,
-					ChainType: strings.ToUpper(keystoneEnv.Blockchain.Family),
+					ChainID:   keystoneEnv.MustSethClient().Cfg.Network.ChainID,
+					ChainName: keystoneEnv.MustSethClient().Cfg.Network.Name,
+					ChainType: strings.ToUpper(keystoneEnv.MustBlockchain().Family),
 					WSRPCs: []devenv.CribRPCs{{
-						External: keystoneEnv.Blockchain.Nodes[0].HostWSUrl,
-						Internal: keystoneEnv.Blockchain.Nodes[0].DockerInternalWSUrl,
+						External: keystoneEnv.MustBlockchain().Nodes[0].HostWSUrl,
+						Internal: keystoneEnv.MustBlockchain().Nodes[0].DockerInternalWSUrl,
 					}},
 					HTTPRPCs: []devenv.CribRPCs{{
-						External: keystoneEnv.Blockchain.Nodes[0].HostHTTPUrl,
-						Internal: keystoneEnv.Blockchain.Nodes[0].DockerInternalHTTPUrl,
+						External: keystoneEnv.MustBlockchain().Nodes[0].HostHTTPUrl,
+						Internal: keystoneEnv.MustBlockchain().Nodes[0].DockerInternalHTTPUrl,
 					}},
-					DeployerKey: keystoneEnv.SethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
+					DeployerKey: keystoneEnv.MustSethClient().NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
 				},
 			},
 		}

@@ -26,12 +26,6 @@ func PrintTestDebug(testName string, l zerolog.Logger, keystoneEnv *types.Keysto
 		l.Error().Msg("❌ Keystone environment is nil")
 		return
 	}
-	if keystoneEnv.DONTopology == nil {
-		l.Error().Msg("❌ DON topology is nil")
-	}
-	if keystoneEnv.Blockchain == nil {
-		l.Error().Msg("❌ Blockchain is nil")
-	}
 
 	l.Info().Msg("🔍 Debug information from Chainlink Node logs:")
 
@@ -45,7 +39,7 @@ func PrintTestDebug(testName string, l zerolog.Logger, keystoneEnv *types.Keysto
 		}
 	}()
 
-	for _, donTopology := range keystoneEnv.DONTopology {
+	for _, donTopology := range keystoneEnv.MustDONTopology() {
 		logFiles, err := getLogFileHandles(testName, l, donTopology.NodeOutput.Output)
 		if err != nil {
 			l.Error().Err(err).Msg("Failed to get log file handles. No debug information will be printed")
@@ -82,7 +76,7 @@ func PrintTestDebug(testName string, l zerolog.Logger, keystoneEnv *types.Keysto
 			l.Info().Msg("✅ Reports were sent")
 
 			// debug report transmissions
-			ReportTransmissions(logFiles, l, keystoneEnv.Blockchain.Nodes[0].HostWSUrl)
+			ReportTransmissions(logFiles, l, keystoneEnv.MustBlockchain().Nodes[0].HostWSUrl)
 		}
 
 		// Add support for new capabilities here as needed, if there is some specific debug information to be printed

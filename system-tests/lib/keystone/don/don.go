@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
@@ -25,47 +24,8 @@ func Configure(t *testing.T, testLogger zerolog.Logger, keystoneEnv *types.Keyst
 	if keystoneEnv == nil {
 		return errors.New("keystone environment must not be nil")
 	}
-	if keystoneEnv.Environment == nil {
-		return errors.New("environment must be set")
-	}
-	if keystoneEnv.Blockchain == nil {
-		return errors.New("blockchain must be set")
-	}
-	if keystoneEnv.WrappedNodeOutput == nil {
-		return errors.New("wrapped node output must be set")
-	}
-	if keystoneEnv.JD == nil {
-		return errors.New("job distributor must be set")
-	}
-	if keystoneEnv.SethClient == nil {
-		return errors.New("seth client must be set")
-	}
-	if len(keystoneEnv.DONTopology) == 0 {
-		return errors.New("DON topology must not be empty")
-	}
-	if keystoneEnv.KeystoneContractAddresses == nil {
-		return errors.New("keystone contract addresses must be set")
-	}
-	if keystoneEnv.KeystoneContractAddresses.CapabilitiesRegistryAddress == (common.Address{}) {
-		return errors.New("capabilities registry address must be set")
-	}
-	if keystoneEnv.KeystoneContractAddresses.OCR3CapabilityAddress == (common.Address{}) {
-		return errors.New("OCR3 capability address must be set")
-	}
-	if keystoneEnv.KeystoneContractAddresses.ForwarderAddress == (common.Address{}) {
-		return errors.New("forwarder address must be set")
-	}
-	if keystoneEnv.KeystoneContractAddresses.WorkflowRegistryAddress == (common.Address{}) {
-		return errors.New("workflow registry address must be set")
-	}
-	if len(keystoneEnv.DONTopology) == 0 {
-		return errors.New("expected at least one DON topology")
-	}
-	if keystoneEnv.GatewayConnectorData == nil {
-		return errors.New("gateway connector data must be set")
-	}
 
-	for i, donTopology := range keystoneEnv.DONTopology {
+	for i, donTopology := range keystoneEnv.MustDONTopology() {
 		if configOverrides, ok := donToConfigOverrides[donTopology.ID]; ok {
 			for j, configOverride := range configOverrides {
 				if len(donTopology.NodeInput.NodeSpecs)-1 < j {
@@ -74,28 +34,28 @@ func Configure(t *testing.T, testLogger zerolog.Logger, keystoneEnv *types.Keyst
 				donTopology.NodeInput.NodeSpecs[j].Node.TestConfigOverrides = configOverride
 			}
 			var setErr error
-			keystoneEnv.DONTopology[i].NodeOutput, setErr = config.Set(t, donTopology.NodeInput, keystoneEnv.Blockchain)
+			keystoneEnv.MustDONTopology()[i].NodeOutput, setErr = config.Set(t, donTopology.NodeInput, keystoneEnv.MustBlockchain())
 			if setErr != nil {
 				return errors.Wrap(setErr, "failed to set node output")
 			}
 		}
 	}
 
-	nodeOutputs := make([]*types.WrappedNodeOutput, 0, len(keystoneEnv.DONTopology))
-	for i := range keystoneEnv.DONTopology {
-		nodeOutputs = append(nodeOutputs, keystoneEnv.DONTopology[i].NodeOutput)
+	nodeOutputs := make([]*types.WrappedNodeOutput, 0, len(keystoneEnv.MustDONTopology()))
+	for i := range keystoneEnv.MustDONTopology() {
+		nodeOutputs = append(nodeOutputs, keystoneEnv.MustDONTopology()[i].NodeOutput)
 	}
 
 	// after restarting the nodes, we need to reinitialize the JD clients otherwise
 	// communication between JD and nodes will fail due to invalidated session cookie
 	var jdErr error
-	keystoneEnv.Environment, jdErr = jobs.ReinitialiseJDClients(keystoneEnv.Environment, keystoneEnv.JD, nodeOutputs...)
+	keystoneEnv.Environment, jdErr = jobs.ReinitialiseJDClients(keystoneEnv.MustCLDEnvironment(), keystoneEnv.MustJD(), nodeOutputs...)
 	if jdErr != nil {
 		return errors.Wrap(jdErr, "failed to reinitialize JD clients")
 	}
-	for _, donTopology := range keystoneEnv.DONTopology {
+	for _, donTopology := range keystoneEnv.MustDONTopology() {
 		if jobSpecs, ok := donToJobSpecs[donTopology.ID]; ok {
-			createErr := jobs.Create(keystoneEnv.Environment.Offchain, donTopology.DON, donTopology.Flags, jobSpecs)
+			createErr := jobs.Create(keystoneEnv.MustCLDEnvironment().Offchain, donTopology.DON, donTopology.Flags, jobSpecs)
 			if createErr != nil {
 				return errors.Wrapf(createErr, "failed to create jobs for DON %d", donTopology.ID)
 			}
@@ -111,53 +71,41 @@ func BuildDONTopology(keystoneEnv *types.KeystoneEnvironment) error {
 	if keystoneEnv == nil {
 		return errors.New("keystone environment must not be nil")
 	}
-	if keystoneEnv.NodeInput == nil {
-		return errors.New("node input must be set")
-	}
-	if len(keystoneEnv.Dons) == 0 {
-		return errors.New("Dons must be set")
-	}
-	if len(keystoneEnv.WrappedNodeOutput) == 0 {
-		return errors.New("wrapped node output must be set")
-	}
-	if len(keystoneEnv.Dons) != len(keystoneEnv.WrappedNodeOutput) {
-		return errors.New("number of DONs and node outputs must match")
-	}
 
-	keystoneEnv.DONTopology = make([]*types.DONTopology, len(keystoneEnv.Dons))
+	keystoneEnv.DONTopology = make([]*types.DONTopology, len(keystoneEnv.MustDons()))
 
 	// one DON to do everything
-	if len(keystoneEnv.Dons) == 1 {
-		flags, err := flags.NodeSetFlags(keystoneEnv.NodeInput[0])
+	if len(keystoneEnv.MustDons()) == 1 {
+		flags, err := flags.NodeSetFlags(keystoneEnv.MustNodeInput()[0])
 		if err != nil {
-			return errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", keystoneEnv.NodeInput[0].Name)
+			return errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", keystoneEnv.MustNodeInput()[0].Name)
 		}
 
 		keystoneEnv.DONTopology[0] = &types.DONTopology{
-			DON:        keystoneEnv.Dons[0],
-			NodeInput:  keystoneEnv.NodeInput[0],
-			NodeOutput: keystoneEnv.WrappedNodeOutput[0],
+			DON:        keystoneEnv.MustDons()[0],
+			NodeInput:  keystoneEnv.MustNodeInput()[0],
+			NodeOutput: keystoneEnv.MustWrappedNodeOutput()[0],
 			ID:         1,
 			Flags:      flags,
 		}
 	} else {
-		for i, don := range keystoneEnv.Dons {
-			flags, err := flags.NodeSetFlags(keystoneEnv.NodeInput[i])
+		for i, don := range keystoneEnv.MustDons() {
+			flags, err := flags.NodeSetFlags(keystoneEnv.MustNodeInput()[i])
 			if err != nil {
-				return errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", keystoneEnv.NodeInput[i].Name)
+				return errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", keystoneEnv.MustNodeInput()[i].Name)
 			}
 
 			keystoneEnv.DONTopology[i] = &types.DONTopology{
 				DON:        don,
-				NodeInput:  keystoneEnv.NodeInput[i],
-				NodeOutput: keystoneEnv.WrappedNodeOutput[i],
+				NodeInput:  keystoneEnv.MustNodeInput()[i],
+				NodeOutput: keystoneEnv.MustWrappedNodeOutput()[i],
 				ID:         libc.MustSafeUint32(i + 1),
 				Flags:      flags,
 			}
 		}
 	}
 
-	maybeID, err := flags.OneDONTopologyWithFlag(keystoneEnv.DONTopology, types.WorkflowDON)
+	maybeID, err := flags.OneDONTopologyWithFlag(keystoneEnv.MustDONTopology(), types.WorkflowDON)
 	if err != nil {
 		return errors.Wrap(err, "failed to get workflow DON ID")
 	}
@@ -193,10 +141,6 @@ func Start(nsInputs []*types.CapabilitiesAwareNodeSet, keystoneEnv *types.Keysto
 		return errors.New("keystone environment must be set")
 	}
 
-	if keystoneEnv.Blockchain == nil {
-		return errors.New("blockchain environment must be set")
-	}
-
 	// Hack for CI that allows us to dynamically set the chainlink image and version
 	// CTFv2 currently doesn't support dynamic image and version setting
 	if os.Getenv("CI") == "true" {
@@ -211,13 +155,13 @@ func Start(nsInputs []*types.CapabilitiesAwareNodeSet, keystoneEnv *types.Keysto
 	}
 
 	for _, nsInput := range nsInputs {
-		nodeset, err := ns.NewSharedDBNodeSet(nsInput.Input, keystoneEnv.Blockchain)
+		nodeset, err := ns.NewSharedDBNodeSet(nsInput.Input, keystoneEnv.MustBlockchain())
 		if err != nil {
 			return errors.Wrap(err, "failed to deploy node set")
 		}
 
-		keystoneEnv.NodeInput = append(keystoneEnv.NodeInput, nsInput)
-		keystoneEnv.WrappedNodeOutput = append(keystoneEnv.WrappedNodeOutput, &types.WrappedNodeOutput{
+		keystoneEnv.NodeInput = append(keystoneEnv.MustNodeInput(), nsInput)
+		keystoneEnv.WrappedNodeOutput = append(keystoneEnv.MustWrappedNodeOutput(), &types.WrappedNodeOutput{
 			Output:       nodeset,
 			NodeSetName:  nsInput.Name,
 			Capabilities: nsInput.Capabilities,
