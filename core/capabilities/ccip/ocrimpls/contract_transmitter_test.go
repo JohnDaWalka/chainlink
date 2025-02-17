@@ -31,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink-integrations/evm/gas"
 	"github.com/smartcontractkit/chainlink-integrations/evm/keystore"
 	"github.com/smartcontractkit/chainlink-integrations/evm/logpoller"
+	evmtestutils "github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
 	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
@@ -203,7 +204,7 @@ func newTestUniverse(t *testing.T, ks *keyringsAndSigners[[]byte]) *testUniverse
 	t.Helper()
 
 	db := pgtest.NewSqlxDB(t)
-	owner := testutils.MustNewSimTransactor(t)
+	owner := evmtestutils.MustNewSimTransactor(t)
 
 	// create many transmitters but only need to fund one, rest are to get
 	// setOCR3Config to pass.
