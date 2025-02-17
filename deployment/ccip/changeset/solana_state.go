@@ -31,17 +31,29 @@ var (
 // SolCCIPChainState holds public keys for all the currently deployed CCIP programs
 // on a chain. If a key has zero value, it means the program does not exist on the chain.
 type SolCCIPChainState struct {
-	LinkToken                 solana.PublicKey
-	Router                    solana.PublicKey
-	Timelock                  solana.PublicKey
+	// tokens
+	LinkToken     solana.PublicKey
+	WSOL          solana.PublicKey
+	SPL2022Tokens []solana.PublicKey
+
+	// base contracts
+	Router    solana.PublicKey
+	FeeQuoter solana.PublicKey
+	OffRamp   solana.PublicKey
+
+	// base token pools
+	BurnMintTokenPool    solana.PublicKey
+	LockReleaseTokenPool solana.PublicKey
+
+	// mcms
+	Timelock solana.PublicKey
+
+	// ancillary addresses
 	OfframpAddressLookupTable solana.PublicKey
-	Receiver                  solana.PublicKey // for tests only
-	SPL2022Tokens             []solana.PublicKey
-	TokenPool                 solana.PublicKey
-	WSOL                      solana.PublicKey
-	FeeQuoter                 solana.PublicKey
-	OffRamp                   solana.PublicKey
 	FeeAggregator             solana.PublicKey
+
+	// test addresses
+	Receiver solana.PublicKey // for tests only
 
 	// PDAs to avoid redundant lookups
 	RouterConfigPDA      solana.PublicKey
@@ -105,9 +117,12 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 		case SPL2022Tokens:
 			pub := solana.MustPublicKeyFromBase58(address)
 			state.SPL2022Tokens = append(state.SPL2022Tokens, pub)
-		case TokenPool:
+		case BurnMintTokenPool:
 			pub := solana.MustPublicKeyFromBase58(address)
-			state.TokenPool = pub
+			state.BurnMintTokenPool = pub
+		case LockReleaseTokenPool:
+			pub := solana.MustPublicKeyFromBase58(address)
+			state.LockReleaseTokenPool = pub
 		case RemoteSource:
 			pub := solana.MustPublicKeyFromBase58(address)
 			// Labels should only have one entry
