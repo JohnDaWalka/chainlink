@@ -34,9 +34,9 @@ require (
 	github.com/prometheus/client_golang v1.20.5
 	github.com/shopspring/decimal v1.4.0
 	github.com/smartcontractkit/chainlink-automation v0.8.1
-	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250205141137-8f50d72601bb
+	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250214231858-f365e2bdecea
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250128203428-08031923fbe5
-	github.com/smartcontractkit/chainlink-integrations/evm v0.0.0-20250211220805-23e1d9f38c6b
+	github.com/smartcontractkit/chainlink-integrations/evm v0.0.0-20250213145514-41d874782c02
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.22
 	github.com/smartcontractkit/libocr v0.0.0-20241223215956-e5b78d8e3919
 	github.com/spf13/cobra v1.8.1
@@ -305,8 +305,8 @@ require (
 	github.com/shirou/gopsutil/v3 v3.24.3 // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.0.0-salt-fix // indirect
 	github.com/smartcontractkit/chain-selectors v1.0.40 // indirect
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250214122756-01c6c2d85aee // indirect
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250213152537-b5aba80335b1 // indirect
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250214202341-4190f2db1c01 // indirect
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250214202341-4190f2db1c01 // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.1 // indirect
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250207205350-420ccacab78a // indirect
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250211162441-3d6cea220efb // indirect
