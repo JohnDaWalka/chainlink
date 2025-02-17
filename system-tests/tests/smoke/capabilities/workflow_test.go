@@ -544,7 +544,8 @@ func prepareTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestCon
 	registerPoRWorkflow(t, in, in.WorkflowConfig.WorkflowName, keystoneEnv, priceProvider)
 
 	donToConfigs, donToJobSpecs := prepareJobSpecsAndNodeConfigs(t, testLogger, in, keystoneEnv)
-	libdon.Configure(t, testLogger, keystoneEnv, donToJobSpecs, donToConfigs)
+	err = libdon.Configure(t, testLogger, keystoneEnv, donToJobSpecs, donToConfigs)
+	require.NoError(t, err, "failed to configure nodes")
 
 	// CAUTION: It is crucial to configure OCR3 jobs on nodes before configuring the workflow contracts.
 	// Wait for OCR listeners to be ready before setting the configuration.
