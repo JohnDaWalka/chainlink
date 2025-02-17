@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 
 	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainconfig"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	solanacodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
@@ -21,6 +24,170 @@ const (
 	destTokenAddress        = "Info.AbstractReports.Messages.TokenAmounts.DestTokenAddress"
 	merkleRootChainSelector = "Info.MerkleRoots.ChainSel"
 )
+
+type SolanaCommitPluginReport struct {
+	ReportContext int8 //from ReportContextByteWords
+	Report        []byte
+}
+
+type ReferenceAccountData struct {
+	SomeField int
+	Router    []byte
+}
+
+type TokenPoolAddressData struct {
+	LookupTable []byte
+}
+
+// This type would exists in CCIP code base and would be just Report or ExecuteReport, not something custom for Solana only.
+type ReportPreTransform struct {
+	ReportContext  [2][32]byte
+	Report         []byte
+	Info           ccipocr3.ExecuteReportInfo
+	AbstractReport ccip_offramp.ExecutionReportSingleChain
+}
+
+// Matches the specific type in Solana. Replaces the ReportPostTransform in chainlink-solana.
+type SolanaReport struct {
+	ReportPreTransform
+	//ReportContext  [2][32]byte
+	//Report         []byte
+	//Info           ccipocr3.ExecuteReportInfo
+	//AbstractReport ccip_offramp.ExecutionReportSingleChain
+	TokenIndexes []byte
+}
+
+// Sample function that creates and adapter function for submitting a transaction to a Solana program and get the required set of accounts and lookup tables for creating the transaction.
+func getWriteAdapterFunc(accountConstant string, routerProgramAddress string, someLookupTableAddress string, poolLookupTableAddress string) chainconfig.WriteAdapterFunc {
+	return func(input any, adapterSupport chainconfig.SolanaAdapterSupport, writeContext chainconfig.WriteContext) (chainconfig.WriteAdapterOutput, error) {
+
+		accountsMeta := []solana.AccountMeta{}
+		executeReport := input.(ReportPreTransform)
+
+		// Current ChainWriter configuration patterns implementation using the Adapter API.
+		// Example for Account constant
+		accountsMeta = append(accountsMeta, solana.AccountMeta{
+			PublicKey:  adapterSupport.ToPublicKey(accountConstant),
+			IsSigner:   true,
+			IsWritable: false,
+		})
+
+		// Example for Account Lookup -> Get one or many accounts based on the data of a field (which may be an array) in the input args
+		receiverAddress := adapterSupport.ToPublicKey(executeReport.Info.AbstractReports[0].Messages[0].Receiver.String())
+		accountsMeta = append(accountsMeta, solana.AccountMeta{
+			PublicKey:  receiverAddress,
+			IsSigner:   true,
+			IsWritable: false,
+		})
+
+		// Example for Accounts From Lookup Table -> From the lookup tables configured get all the accounts or only some based on indexes defined in the config.
+		lookupTableData := adapterSupport.GetLookupTableData(adapterSupport.ToPublicKey(someLookupTableAddress))
+		// We can select a few indexes from the lookup table or all of them
+		accountsMeta = append(accountsMeta, solana.AccountMeta{
+			PublicKey:  lookupTableData[0],
+			IsSigner:   true,
+			IsWritable: false,
+		})
+
+		// Example for PDA Lookups -> Defines one of [Account constant, Account Lookup, Accounts from Lookup Table] to discover one or multiple accounts. Then for all those accounts it looks for PDA accounts associated based on the seeds configured (the same seeds for all accounts). Seeds can be static or dynamic (meaning they come from the inputs)
+		// Dynamic seeds can also come from reading into other accounts on chain.
+		poolLookupTablePublicKey := adapterSupport.ToPublicKey(poolLookupTableAddress)
+		rootAccountAddress := adapterSupport.GetLookupTableData(poolLookupTablePublicKey)[2]
+		poolAccounts, err := adapterSupport.GetPDAAddresses(rootAccountAddress, []chainwriter.Seed{
+			{Static: []byte("ccip_tokenpool_billing")},
+			{Dynamic: chainwriter.AccountLookup{Location: destTokenAddress}},
+			{Dynamic: chainwriter.AccountLookup{Location: destChainSelectorPath}},
+		})
+		if err != nil {
+			return chainconfig.WriteAdapterOutput{}, err
+		}
+		for _, poolAccount := range poolAccounts {
+			accountsMeta = append(accountsMeta, solana.AccountMeta{
+				PublicKey:  poolAccount,
+				IsWritable: true,
+				IsSigner:   false,
+			})
+		}
+
+		// Example for ArgsTransform implementation for CCIP. Current implementation makes chainlink-solana to depend on CCIP code base. In this case we brake that dependency since the adapter for CCIP-Solana would be then one depending on CCIP code base and chainlink-solana.
+		// We also remove the need for the CCIP code base to required changes like ReportPreTransform/ReportPostTransform for Solana.
+		offRampAddress := adapterSupport.ToPublicKey(writeContext.ToAddress)
+		pdaAddresses, err := adapterSupport.GetPDAAddresses(offRampAddress, []chainwriter.Seed{
+			{Static: []byte("reference_addresses")},
+		})
+		if err != nil {
+			return chainconfig.WriteAdapterOutput{}, err
+		}
+		referenceProgramData := ReferenceAccountData{}
+		routers := solana.PublicKeySlice{}
+		for _, pdaAddress := range pdaAddresses {
+			adapterSupport.GetDataAccount(pdaAddress, &referenceProgramData)
+			routers = append(routers, adapterSupport.ToPublicKey(string(referenceProgramData.Router)))
+		}
+		routerAddress := routers[0]
+		destTokenAddresses := []string{}
+		for _, abstractReport := range executeReport.Info.AbstractReports {
+			for _, message := range abstractReport.Messages {
+				for _, tokenAmount := range message.TokenAmounts {
+					destTokenAddresses = append(destTokenAddresses, tokenAmount.DestTokenAddress.String())
+				}
+			}
+
+		}
+		staticSeeds := []chainwriter.Seed{{Static: []byte("token_admin_registry")}}
+		for _, destTokenAddress := range destTokenAddresses {
+			staticSeeds = append(staticSeeds, chainwriter.Seed{
+				Static: []byte(destTokenAddress),
+			})
+		}
+
+		tokenAdminRegistryAndTokenPooolAddresses, err := adapterSupport.GetPDAAddresses(routerAddress, staticSeeds)
+		if err != nil {
+			return chainconfig.WriteAdapterOutput{}, err
+		}
+
+		// First address would have a different kind of data but for simplifying the example let's assume all of the address have the same data type
+		addressData := TokenPoolAddressData{}
+		tokenPoolAddresses := solana.PublicKeySlice{}
+		for _, address := range tokenAdminRegistryAndTokenPooolAddresses {
+			adapterSupport.GetDataAccount(address, &addressData)
+			tokenPoolAddresses = append(tokenPoolAddresses, adapterSupport.ToPublicKey(string(addressData.LookupTable)))
+		}
+
+		tokenIndexes := []uint8{}
+		for i, account := range accountsMeta {
+			for _, address := range tokenPoolAddresses {
+				if account.PublicKey == address {
+					if i > 255 {
+						return chainconfig.WriteAdapterOutput{}, fmt.Errorf("index %d out of range for uint8", i)
+					}
+					tokenIndexes = append(tokenIndexes, uint8(i)) //nolint:gosec
+				}
+			}
+		}
+		if len(tokenIndexes) != len(tokenPoolAddresses) {
+			return chainconfig.WriteAdapterOutput{}, fmt.Errorf("missing token pools in accounts")
+		}
+
+		// Data Transformation to chain on-chain expected data structures / inputs
+		onChainData := SolanaReport{
+			ReportPreTransform: executeReport,
+			TokenIndexes:       tokenIndexes,
+		}
+
+		someLookupTablePublicKey := adapterSupport.ToPublicKey(someLookupTableAddress)
+
+		// No need to modify the report but we need to provide the collected set of accounts that must be sent with the transaction.
+		return chainconfig.WriteAdapterOutput{
+			Data: onChainData,
+			LookupTables: map[solana.PublicKey]solana.PublicKeySlice{
+				//TODO review this with Silas.
+				someLookupTablePublicKey: adapterSupport.GetLookupTableData(someLookupTablePublicKey),
+			},
+			AccountsMeta: accountsMeta,
+		}, nil
+	}
+}
 
 func getCommitMethodConfig(fromAddress string, routerProgramAddress string, commonAddressesLookupTable solana.PublicKey) chainwriter.MethodConfig {
 	sysvarInstructionsAddress := solana.SysVarInstructionsPubkey.String()
@@ -35,11 +202,15 @@ func getCommitMethodConfig(fromAddress string, routerProgramAddress string, comm
 			},
 		},
 		ChainSpecificName: "commit",
+		// Adapter function gets configured here. It resolved the accounts required, the lookup tables to use and knows how to transform the input to the a type that can be serialized to send to the solana program.
+		WriteAdapter: getWriteAdapterFunc(commonAddressesLookupTable.String(), routerProgramAddress, "SOME_LOOKUP_TABLE_ADDRESS", "POOL_LOOKUP_TABLE_ADDRESS"),
+		// This is how configure the different lookup tables - This would not be needed if using the adapter function
 		LookupTables: chainwriter.LookupTables{
 			StaticLookupTables: []solana.PublicKey{
 				commonAddressesLookupTable,
 			},
 		},
+		// This is how configure the different patterns - This would not be needed if using the adapter function
 		Accounts: []chainwriter.Lookup{
 			getRouterAccountConfig(routerProgramAddress),
 			chainwriter.PDALookups{
@@ -302,7 +473,8 @@ func GetSolanaChainWriterConfig(routerProgramAddress string, commonAddressesLook
 					"execute": getExecuteMethodConfig(fromAddress, routerProgramAddress, commonAddressesLookupTable),
 					"commit":  getCommitMethodConfig(fromAddress, routerProgramAddress, commonAddressesLookupTable),
 				},
-				IDL: ccipRouterIDL},
+				IDL: ccipRouterIDL,
+			},
 		},
 	}
 
