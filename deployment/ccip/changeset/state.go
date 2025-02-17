@@ -173,6 +173,13 @@ func (c CCIPChainState) LinkTokenAddress() (common.Address, error) {
 	return common.Address{}, errors.New("no link token found in the state")
 }
 
+func (c CCIPChainState) OnRampBytes() ([]byte, error) {
+	if c.OnRamp != nil {
+		return c.OnRamp.Address().Bytes(), nil
+	}
+	return nil, errors.New("no onramp found in the state")
+}
+
 func (c CCIPChainState) GenerateView() (view.ChainView, error) {
 	chainView := view.NewChain()
 	if c.Router != nil {

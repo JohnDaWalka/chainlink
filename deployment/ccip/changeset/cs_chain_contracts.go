@@ -1096,11 +1096,11 @@ func UpdateOffRampSourcesChangeset(e deployment.Environment, cfg UpdateOffRampSo
 			sourceChainFamily, _ := chain_selectors.GetSelectorFamily(source)
 
 			onRampBytes := []byte{}
+			// can ignore err as validation checks for nil addresses
 			if sourceChainFamily == chain_selectors.FamilyEVM {
-				onRampBytes = state.Chains[source].OnRamp.Address().Bytes()
+				onRampBytes, _ = state.Chains[source].OnRampBytes()
 			} else if sourceChainFamily == chain_selectors.FamilySolana {
-				// for solana the router contract has the onramp logic
-				onRampBytes = state.SolChains[source].Router.Bytes()
+				onRampBytes, _ = state.SolChains[source].OnRampBytes()
 			}
 
 			args = append(args, offramp.OffRampSourceChainConfigArgs{
