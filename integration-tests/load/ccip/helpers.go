@@ -67,6 +67,7 @@ func subscribeCommitEvents(
 	errChan chan error,
 	wg *sync.WaitGroup,
 	metricPipe chan messageData,
+	gasPricesWg *sync.WaitGroup,
 ) {
 	defer wg.Done()
 
@@ -75,6 +76,7 @@ func subscribeCommitEvents(
 		"startblock", startBlock,
 	)
 	seenMessages := make(map[uint64][]uint64)
+	gasPricesCommitted := make(map[uint64]struct{})
 	expectedRange := make(map[uint64]ccipocr3.SeqNumRange)
 	completedSrcChains := make(map[uint64]bool)
 	for _, srcChain := range srcChains {
@@ -126,6 +128,23 @@ func subscribeCommitEvents(
 						}
 						metricPipe <- data
 						seenMessages[mr.SourceChainSelector] = append(seenMessages[mr.SourceChainSelector], i)
+					}
+				}
+				if len(report.PriceUpdates.GasPriceUpdates) > 0 {
+					for _, update := range report.PriceUpdates.GasPriceUpdates {
+						if gasPricesCommitted[update.DestChainSelector] != struct{}{} {
+							gasPricesCommitted[update.DestChainSelector] = struct{}{}
+							println("gas price for Dest from Src", chainSelector, update.DestChainSelector, update.UsdPerUnitGas.Uint64())
+							gasPricesWg.Done()
+						}
+					}
+				}
+			} else if len(report.PriceUpdates.GasPriceUpdates) > 0 {
+				for _, update := range report.PriceUpdates.GasPriceUpdates {
+					if gasPricesCommitted[update.DestChainSelector] != struct{}{} {
+						gasPricesCommitted[update.DestChainSelector] = struct{}{}
+						println("gas price for Dest from Src", chainSelector, update.DestChainSelector, update.UsdPerUnitGas.Uint64())
+						gasPricesWg.Done()
 					}
 				}
 			}

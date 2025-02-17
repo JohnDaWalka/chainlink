@@ -86,6 +86,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 	// gunMap holds a destinationGun for every enabled destination chain
 	gunMap := make(map[uint64]*DestinationGun)
 	p := wasp.NewProfile()
+	var gasPricesWg sync.WaitGroup
 	// Only create a destination gun if we have decided to send traffic to this chain
 	for ind := range *userOverrides.NumDestinationChains {
 		cs := env.AllChainSelectors()[ind]
@@ -100,6 +101,9 @@ func TestCCIPLoad_RPS(t *testing.T) {
 		var wg2 sync.WaitGroup
 		wg2.Add(len(other))
 		for _, src := range other {
+			gasPrice, err := state.Chains[cs].FeeQuoter.GetDestinationChainGasPrice(&bind.CallOpts{}, src)
+			require.NoError(t, err)
+			println("gas price for Dest from Src", src, cs, gasPrice.Value.String(), gasPrice.Timestamp)
 			go func(src uint64) {
 				defer wg2.Done()
 				mu.Lock()
@@ -138,6 +142,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 		finalSeqNrExecChannels[cs] = make(chan finalSeqNrReport)
 
 		wg.Add(2)
+		gasPricesWg.Add(len(otherChains))
 		go subscribeCommitEvents(
 			ctx,
 			lggr,
@@ -149,7 +154,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 			finalSeqNrCommitChannels[cs],
 			errChan,
 			&wg,
-			mm.InputChan)
+			mm.InputChan, &gasPricesWg)
 		go subscribeExecutionEvents(
 			ctx,
 			lggr,
@@ -166,6 +171,9 @@ func TestCCIPLoad_RPS(t *testing.T) {
 
 	requestFrequency, err := time.ParseDuration(*userOverrides.RequestFrequency)
 	require.NoError(t, err)
+
+	// wait until all gas prices were committed for all lanes
+	gasPricesWg.Wait()
 
 	for _, gun := range gunMap {
 		p.Add(wasp.NewGenerator(&wasp.Config{
