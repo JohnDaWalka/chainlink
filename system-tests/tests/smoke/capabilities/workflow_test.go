@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
@@ -99,40 +100,43 @@ func no0xPrefix(fl validator.FieldLevel) bool {
 
 func disabledInCI(fl validator.FieldLevel) bool {
 	if os.Getenv("CI") == "true" {
-		return fl.Field().Bool() == false
+		return !fl.Field().Bool()
 	}
 
 	return true
 }
 
 func registerNoCRENoCompilationTranslation(v *validator.Validate, trans ut.Translator) {
-	err := v.RegisterTranslation("no_cre_no_compilation", trans, func(ut ut.Translator) error {
+	_ = v.RegisterTranslation("no_cre_no_compilation", trans, func(ut ut.Translator) error {
 		return ut.Add("no_cre_no_compilation", "{0} must be false when UseCRECLI is false, it is not possible to compile a workflow without it", true)
 	}, func(ut ut.Translator, fe validator.FieldError) string {
 		t, _ := ut.T("no_cre_no_compilation", fe.Field())
 		return t
 	})
-	if err != nil {
-		// ignore error
-	}
 }
 
 func registerNoFolderLocationTranslation(v *validator.Validate, trans ut.Translator) {
-	err := v.RegisterTranslation("folder_required_if_compiling", trans, func(ut ut.Translator) error {
+	_ = v.RegisterTranslation("folder_required_if_compiling", trans, func(ut ut.Translator) error {
 		return ut.Add("folder_required_if_compiling", "{0} must set, when compiling the workflow", true)
 	}, func(ut ut.Translator, fe validator.FieldError) string {
 		t, _ := ut.T("folder_required_if_compiling", fe.Field())
 		return t
 	})
-	if err != nil {
-		// ignore error
-	}
 }
 
 func init() {
-	framework.Validator.RegisterValidation("no_cre_no_compilation", noCRENoCompilation)
-	framework.Validator.RegisterValidation("no0xPrefix", no0xPrefix)
-	framework.Validator.RegisterValidation("disabled_in_ci", disabledInCI)
+	err := framework.Validator.RegisterValidation("no_cre_no_compilation", noCRENoCompilation)
+	if err != nil {
+		panic(errors.Wrap(err, "failed to register no_cre_no_compilation validator"))
+	}
+	err = framework.Validator.RegisterValidation("no0xPrefix", no0xPrefix)
+	if err != nil {
+		panic(errors.Wrap(err, "failed to register no0xPrefix validator"))
+	}
+	err = framework.Validator.RegisterValidation("disabled_in_ci", disabledInCI)
+	if err != nil {
+		panic(errors.Wrap(err, "failed to register disabled_in_ci validator"))
+	}
 
 	if framework.ValidatorTranslator != nil {
 		registerNoCRENoCompilationTranslation(framework.Validator, framework.ValidatorTranslator)
@@ -604,9 +608,9 @@ func CreateInfrastructure(
 
 	nodeOutput := make([]*keystonetypes.WrappedNodeOutput, 0, len(input.nodeSetInput))
 	for _, nsInput := range input.nodeSetInput {
-		nodeset, err := ns.NewSharedDBNodeSet(nsInput.Input, blockchainOutput)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to deploy node set names %s", nsInput.Name)
+		nodeset, nodesetErr := ns.NewSharedDBNodeSet(nsInput.Input, blockchainOutput)
+		if nodesetErr != nil {
+			return nil, errors.Wrapf(nodesetErr, "failed to deploy node set names %s", nsInput.Name)
 		}
 
 		nodeOutput = append(nodeOutput, &keystonetypes.WrappedNodeOutput{
@@ -727,7 +731,8 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		blockchain:                  envOutput.blockchainOutput,
 	}
 
-	registerPoRWorkflow(registerInput)
+	err = registerPoRWorkflow(registerInput)
+	require.NoError(t, err, "failed to register PoR workflow")
 	// Workflow-specific configuration -- END
 
 	// Universal setup -- CONTINUED
@@ -876,7 +881,7 @@ func TestKeystoneWithOCR3Workflow_SingleDon_MockedPrice(t *testing.T) {
 	in, err := framework.Load[TestConfig](t)
 	require.NoError(t, err, "couldn't load test config")
 	validateEnvVars(t, in)
-	require.Equal(t, 1, len(in.NodeSets), "expected 1 node set in the test config")
+	require.Len(t, in.NodeSets, 1, "expected 1 node set in the test config")
 
 	err = downloadBinaryFiles(in)
 	require.NoError(t, err, "failed to download binary files")
@@ -960,7 +965,7 @@ func TestKeystoneWithOCR3Workflow_TwoDons_LivePrice(t *testing.T) {
 	in, err := framework.Load[TestConfig](t)
 	require.NoError(t, err, "couldn't load test config")
 	validateEnvVars(t, in)
-	require.Equal(t, 2, len(in.NodeSets), "expected 2 node sets in the test config")
+	require.Len(t, in.NodeSets, 2, "expected 2 node sets in the test config")
 
 	err = downloadBinaryFiles(in)
 	require.NoError(t, err, "failed to download binary files")
