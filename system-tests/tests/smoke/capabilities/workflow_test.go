@@ -1,7 +1,6 @@
 package capabilities_test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -14,8 +13,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
+	ut "github.com/go-playground/universal-translator"
+	"github.com/go-playground/validator/v10"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
@@ -58,55 +60,102 @@ const (
 )
 
 type TestConfig struct {
-	BlockchainA    *blockchain.Input    `toml:"blockchain_a" validate:"required"`
-	NodeSets       []*ns.Input          `toml:"nodesets" validate:"required"`
-	WorkflowConfig *WorkflowConfig      `toml:"workflow_config" validate:"required"`
-	JD             *jd.Input            `toml:"jd" validate:"required"`
-	PriceProvider  *PriceProviderConfig `toml:"price_provider"`
+	BlockchainA    *blockchain.Input `toml:"blockchain_a" validate:"required"`
+	NodeSets       []*ns.Input       `toml:"nodesets" validate:"required"`
+	WorkflowConfig *WorkflowConfig   `toml:"workflow_config" validate:"required"`
+	JD             *jd.Input         `toml:"jd" validate:"required"`
+	Fake           *fake.Input       `toml:"fake"`
 }
 
 type WorkflowConfig struct {
 	UseCRECLI                bool `toml:"use_cre_cli"`
-	ShouldCompileNewWorkflow bool `toml:"should_compile_new_workflow"`
+	ShouldCompileNewWorkflow bool `toml:"should_compile_new_workflow" validate:"no_cre_no_compilation,disabled_in_ci"`
 	// Tells the test where the workflow to compile is located
-	WorkflowFolderLocation *string             `toml:"workflow_folder_location"`
-	CompiledWorkflowConfig *CompiledConfig     `toml:"compiled_config"`
-	DependenciesConfig     *DependenciesConfig `toml:"dependencies"`
+	WorkflowFolderLocation *string             `toml:"workflow_folder_location" validate:"required_if=ShouldCompileNewWorkflow true"`
+	CompiledWorkflowConfig *CompiledConfig     `toml:"compiled_config" validate:"required_if=ShouldCompileNewWorkflow false"`
+	DependenciesConfig     *DependenciesConfig `toml:"dependencies" validate:"required"`
 	WorkflowName           string              `toml:"workflow_name" validate:"required" `
+	FeedID                 string              `toml:"feed_id" validate:"required,no0xPrefix"`
+}
+
+// noCRENoCompilation is a custom validator for the tag "no_cre_no_compilation".
+// It ensures that if UseCRECLI is false, then ShouldCompileNewWorkflow must also be false.
+func noCRENoCompilation(fl validator.FieldLevel) bool {
+	// Use Parent() to access the WorkflowConfig struct.
+	wc, ok := fl.Parent().Interface().(WorkflowConfig)
+	if !ok {
+		return false
+	}
+	// If not using CRE CLI and ShouldCompileNewWorkflow is true, fail validation.
+	if !wc.UseCRECLI && fl.Field().Bool() {
+		return false
+	}
+	return true
+}
+
+func no0xPrefix(fl validator.FieldLevel) bool {
+	return !strings.HasPrefix(fl.Field().String(), "0x")
+}
+
+func disabledInCI(fl validator.FieldLevel) bool {
+	if os.Getenv("CI") == "true" {
+		return fl.Field().Bool() == false
+	}
+
+	return true
+}
+
+func registerNoCRENoCompilationTranslation(v *validator.Validate, trans ut.Translator) {
+	err := v.RegisterTranslation("no_cre_no_compilation", trans, func(ut ut.Translator) error {
+		return ut.Add("no_cre_no_compilation", "{0} must be false when UseCRECLI is false, it is not possible to compile a workflow without it", true)
+	}, func(ut ut.Translator, fe validator.FieldError) string {
+		t, _ := ut.T("no_cre_no_compilation", fe.Field())
+		return t
+	})
+	if err != nil {
+		// ignore error
+	}
+}
+
+func registerNoFolderLocationTranslation(v *validator.Validate, trans ut.Translator) {
+	err := v.RegisterTranslation("folder_required_if_compiling", trans, func(ut ut.Translator) error {
+		return ut.Add("folder_required_if_compiling", "{0} must set, when compiling the workflow", true)
+	}, func(ut ut.Translator, fe validator.FieldError) string {
+		t, _ := ut.T("folder_required_if_compiling", fe.Field())
+		return t
+	})
+	if err != nil {
+		// ignore error
+	}
+}
+
+func init() {
+	framework.Validator.RegisterValidation("no_cre_no_compilation", noCRENoCompilation)
+	framework.Validator.RegisterValidation("no0xPrefix", no0xPrefix)
+	framework.Validator.RegisterValidation("disabled_in_ci", disabledInCI)
+
+	if framework.ValidatorTranslator != nil {
+		registerNoCRENoCompilationTranslation(framework.Validator, framework.ValidatorTranslator)
+		registerNoFolderLocationTranslation(framework.Validator, framework.ValidatorTranslator)
+	}
 }
 
 // Defines relases/versions of test dependencies that will be downloaded from Github
 type DependenciesConfig struct {
-	CapabiltiesVersion string `toml:"capabilities_version"`
-	CRECLIVersion      string `toml:"cre_cli_version"`
+	CapabiltiesVersion string `toml:"capabilities_version" validate:"required"`
+	CRECLIVersion      string `toml:"cre_cli_version" validate:"required"`
 }
 
 // Defines the location of already compiled workflow binary and config files
 // They will be used if WorkflowConfig.ShouldCompileNewWorkflow is `false`
 // Otherwise test will compile and upload a new workflow
 type CompiledConfig struct {
-	BinaryURL string `toml:"binary_url"`
-	ConfigURL string `toml:"config_url"`
+	BinaryURL string `toml:"binary_url" validate:"required"`
+	ConfigURL string `toml:"config_url" validate:"required"`
 }
 
-type FakeConfig struct {
-	*fake.Input
-	Prices []float64 `toml:"prices"`
-}
-
-type PriceProviderConfig struct {
-	Fake   *FakeConfig `toml:"fake"`
-	FeedID string      `toml:"feed_id" validate:"required"`
-	URL    string      `toml:"url"`
-}
-
-func validateCommonInputsAndEnvVars(t *testing.T, in *TestConfig) {
+func validateEnvVars(t *testing.T, in *TestConfig) {
 	require.NotEmpty(t, os.Getenv("PRIVATE_KEY"), "PRIVATE_KEY env var must be set")
-	require.NotEmpty(t, in.WorkflowConfig.DependenciesConfig, "dependencies config must be set")
-
-	if !in.WorkflowConfig.UseCRECLI {
-		require.False(t, in.WorkflowConfig.ShouldCompileNewWorkflow, "if you are not using CRE CLI you cannot compile a new workflow")
-	}
 
 	var ghReadToken string
 	// this is a small hack to avoid changing the reusable workflow
@@ -128,7 +177,6 @@ func validateCommonInputsAndEnvVars(t *testing.T, in *TestConfig) {
 		 are tied to account not to repository. Currently, we have no service account in the CI at all. And using a token that's tied to personal account of a developer
 		 is not a good idea. So, for now, we are only allowing the `existing` mode in CI.
 		*/
-		require.False(t, in.WorkflowConfig.ShouldCompileNewWorkflow, "you cannot compile a new workflow in the CI as of now due to issues with generating a gist write token")
 
 		// we use this special function to subsitute a placeholder env variable with the actual environment variable name
 		// it is defined in .github/e2e-tests.yml as '{{ env.GITHUB_API_TOKEN }}'
@@ -138,32 +186,39 @@ func validateCommonInputsAndEnvVars(t *testing.T, in *TestConfig) {
 	}
 
 	require.NotEmpty(t, ghReadToken, ghReadTokenEnvVarName+" env var must be set")
-	require.NotEmpty(t, in.WorkflowConfig.DependenciesConfig.CapabiltiesVersion, "capabilities_version must be set in the dependencies config")
-
-	_, err := keystonecapabilities.DownloadCapabilityFromRelease(ghReadToken, in.WorkflowConfig.DependenciesConfig.CapabiltiesVersion, cronCapabilityAssetFile)
-	require.NoError(t, err, "failed to download cron capability. Make sure token has content:read permissions to the capabilities repo")
 
 	if in.WorkflowConfig.UseCRECLI {
-		require.NotEmpty(t, in.WorkflowConfig.DependenciesConfig.CRECLIVersion, "chainlink_cli_version must be set in the dependencies config")
-
-		err = libcrecli.DownloadAndInstallChainlinkCLI(ghReadToken, in.WorkflowConfig.DependenciesConfig.CRECLIVersion)
-		require.NoError(t, err, "failed to download and install CRE CLI. Make sure token has content:read permissions to the dev-platform repo")
-
 		if in.WorkflowConfig.ShouldCompileNewWorkflow {
 			gistWriteToken := os.Getenv("GIST_WRITE_TOKEN")
 			require.NotEmpty(t, gistWriteToken, "GIST_WRITE_TOKEN must be set to use CRE CLI to compile workflows. It requires gist:read and gist:write permissions")
 			err := os.Setenv("GITHUB_API_TOKEN", gistWriteToken)
 			require.NoError(t, err, "failed to set GITHUB_API_TOKEN env var")
-			require.NotEmpty(t, in.WorkflowConfig.WorkflowFolderLocation, "workflow_folder_location must be set, when compiling new workflow")
+		}
+	}
+}
+
+// this is a small hack to avoid changing the reusable workflow, which doesn't allow to run any pre-execution hooks
+func downloadBinaryFiles(in *TestConfig) error {
+	var ghReadToken string
+	if os.Getenv("CI") == "true" {
+		ghReadToken = ctfconfig.MustReadEnvVar_String(ghReadTokenEnvVarName)
+	} else {
+		ghReadToken = os.Getenv(ghReadTokenEnvVarName)
+	}
+
+	_, err := keystonecapabilities.DownloadCapabilityFromRelease(ghReadToken, in.WorkflowConfig.DependenciesConfig.CapabiltiesVersion, cronCapabilityAssetFile)
+	if err != nil {
+		return errors.Wrap(err, "failed to download cron capability. Make sure token has content:read permissions to the capabilities repo")
+	}
+
+	if in.WorkflowConfig.UseCRECLI {
+		err = libcrecli.DownloadAndInstallChainlinkCLI(ghReadToken, in.WorkflowConfig.DependenciesConfig.CRECLIVersion)
+		if err != nil {
+			return errors.Wrap(err, "failed to download and install CRE CLI. Make sure token has content:read permissions to the dev-platform repo")
 		}
 	}
 
-	if in.PriceProvider.Fake == nil {
-		require.NotEmpty(t, in.PriceProvider.URL, "URL must be set in the price provider config, if fake provider is not used")
-	}
-
-	// make sure the feed id is in the correct format
-	in.PriceProvider.FeedID = strings.TrimPrefix(in.PriceProvider.FeedID, "0x")
+	return nil
 }
 
 type registerPoRWorkflowInput struct {
@@ -248,17 +303,19 @@ func logTestInfo(l zerolog.Logger, feedID, workflowName, feedConsumerAddr, forwa
 	l.Info().Msgf("KeystoneForwarder address: %s", forwarderAddr)
 }
 
-func setupFakeDataProvider(t *testing.T, testLogger zerolog.Logger, in *TestConfig, priceIndex *int) string {
-	_, err := fake.NewFakeDataProvider(in.PriceProvider.Fake.Input)
-	require.NoError(t, err, "failed to set up fake data provider")
+func setupFakeDataProvider(testLogger zerolog.Logger, input *fake.Input, expectedPrices []float64, priceIndex *int) (string, error) {
+	_, err := fake.NewFakeDataProvider(input)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to set up fake data provider")
+	}
 	fakeAPIPath := "/fake/api/price"
 	host := framework.HostDockerInternal()
-	fakeFinalURL := fmt.Sprintf("%s:%d%s", host, in.PriceProvider.Fake.Port, fakeAPIPath)
+	fakeFinalURL := fmt.Sprintf("%s:%d%s", host, input.Port, fakeAPIPath)
 
 	getPriceResponseFn := func() map[string]interface{} {
 		response := map[string]interface{}{
 			"accountName": "TrueUSD",
-			"totalTrust":  in.PriceProvider.Fake.Prices[*priceIndex],
+			"totalTrust":  expectedPrices[*priceIndex],
 			"ripcord":     false,
 			"updatedAt":   time.Now().Format(time.RFC3339),
 		}
@@ -276,17 +333,11 @@ func setupFakeDataProvider(t *testing.T, testLogger zerolog.Logger, in *TestConf
 	err = fake.Func("GET", fakeAPIPath, func(c *gin.Context) {
 		c.JSON(200, getPriceResponseFn())
 	})
-	require.NoError(t, err, "failed to set up fake data provider")
-
-	return fakeFinalURL
-}
-
-func setupPriceProvider(t *testing.T, testLogger zerolog.Logger, in *TestConfig) PriceProvider {
-	if in.PriceProvider.Fake != nil {
-		return NewFakePriceProvider(t, testLogger, in)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to set up fake data provider")
 	}
 
-	return NewLivePriceProvider(t, testLogger, in)
+	return fakeFinalURL, nil
 }
 
 // PriceProvider abstracts away the logic of checking whether the feed has been correctly updated
@@ -297,26 +348,25 @@ func setupPriceProvider(t *testing.T, testLogger zerolog.Logger, in *TestConfig)
 type PriceProvider interface {
 	URL() string
 	NextPrice(price *big.Int, elapsed time.Duration) bool
-	CheckPrices()
+	ExpectedPrices() []*big.Int
+	ActualPrices() []*big.Int
 }
 
-// LivePriceProvider is a PriceProvider implementation that uses a live feed to get the price, typically http://api.real-time-reserves.verinumus.io
-type LivePriceProvider struct {
-	t            *testing.T
+// TrueUSDPriceProvider is a PriceProvider implementation that uses a live feed to get the price
+type TrueUSDPriceProvider struct {
 	testLogger   zerolog.Logger
 	url          string
 	actualPrices []*big.Int
 }
 
-func NewLivePriceProvider(t *testing.T, testLogger zerolog.Logger, in *TestConfig) PriceProvider {
-	return &LivePriceProvider{
+func NewTrueUSDPriceProvider(testLogger zerolog.Logger) PriceProvider {
+	return &TrueUSDPriceProvider{
 		testLogger: testLogger,
-		url:        in.PriceProvider.URL,
-		t:          t,
+		url:        "https://api.real-time-reserves.verinumus.io/v1/chainlink/proof-of-reserves/TrueUSD",
 	}
 }
 
-func (l *LivePriceProvider) NextPrice(price *big.Int, elapsed time.Duration) bool {
+func (l *TrueUSDPriceProvider) NextPrice(price *big.Int, elapsed time.Duration) bool {
 	// if price is nil or 0 it means that the feed hasn't been updated yet
 	if price == nil || price.Cmp(big.NewInt(0)) == 0 {
 		return true
@@ -329,15 +379,20 @@ func (l *LivePriceProvider) NextPrice(price *big.Int, elapsed time.Duration) boo
 	return false
 }
 
-func (l *LivePriceProvider) URL() string {
+func (l *TrueUSDPriceProvider) URL() string {
 	return l.url
 }
 
-func (l *LivePriceProvider) CheckPrices() {
+func (l *TrueUSDPriceProvider) ExpectedPrices() []*big.Int {
 	// we don't have a way to check the price in the live feed, so we always assume it's correct
 	// as long as it's != 0. And we only wait for the first price to be set.
-	require.NotEmpty(l.t, l.actualPrices, "no prices found in the feed")
-	require.NotEqual(l.t, l.actualPrices[0], big.NewInt(0), "price found in the feed is 0")
+	return l.actualPrices
+}
+
+func (l *TrueUSDPriceProvider) ActualPrices() []*big.Int {
+	// we don't have a way to check the price in the live feed, so we always assume it's correct
+	// as long as it's != 0. And we only wait for the first price to be set.
+	return l.actualPrices
 }
 
 // FakePriceProvider is a PriceProvider implementation that uses a mocked feed to get the price
@@ -351,22 +406,27 @@ type FakePriceProvider struct {
 	actualPrices   []*big.Int
 }
 
-func NewFakePriceProvider(t *testing.T, testLogger zerolog.Logger, in *TestConfig) PriceProvider {
+func NewFakePriceProvider(testLogger zerolog.Logger, in *TestConfig) (PriceProvider, error) {
 	priceIndex := ptr.Ptr(0)
-	expectedPrices := make([]*big.Int, len(in.PriceProvider.Fake.Prices))
-	for i, p := range in.PriceProvider.Fake.Prices {
+	expectedPricesFloat64 := []float64{182.9, 122.01}
+	expectedPrices := make([]*big.Int, len(expectedPricesFloat64))
+	for i, p := range expectedPricesFloat64 {
 		// convert float64 to big.Int by multiplying by 100
 		// just like the PoR workflow does
 		expectedPrices[i] = libc.Float64ToBigInt(p)
 	}
 
+	url, err := setupFakeDataProvider(testLogger, in.Fake, expectedPricesFloat64, priceIndex)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to set up fake data provider")
+	}
+
 	return &FakePriceProvider{
-		t:              t,
 		testLogger:     testLogger,
 		expectedPrices: expectedPrices,
 		priceIndex:     priceIndex,
-		url:            setupFakeDataProvider(t, testLogger, in, priceIndex),
-	}
+		url:            url,
+	}, nil
 }
 
 func (f *FakePriceProvider) priceAlreadyFound(price *big.Int) bool {
@@ -406,21 +466,19 @@ func (f *FakePriceProvider) NextPrice(price *big.Int, elapsed time.Duration) boo
 	return true
 }
 
-func (f *FakePriceProvider) CheckPrices() {
-	require.EqualValues(f.t, f.expectedPrices, f.actualPrices, "prices found in the feed do not match prices set in the mock")
-	f.testLogger.Info().Msgf("All %d mocked prices were found in the feed", len(f.expectedPrices))
+func (f *FakePriceProvider) ActualPrices() []*big.Int {
+	return f.actualPrices
+}
+
+func (f *FakePriceProvider) ExpectedPrices() []*big.Int {
+	return f.expectedPrices
 }
 
 func (f *FakePriceProvider) URL() string {
 	return f.url
 }
 
-func extraAllowedPortsAndIps(testLogger zerolog.Logger, priceProviderConfig *PriceProviderConfig, nodeOutput *ns.Output) ([]string, []int, error) {
-	// no need to allow anything, if we are using live feed
-	if priceProviderConfig.Fake == nil {
-		return nil, nil, nil
-	}
-
+func extraAllowedPortsAndIps(testLogger zerolog.Logger, fakePort int, nodeOutput *ns.Output) ([]string, []int, error) {
 	// we need to explicitly allow the port used by the fake data provider
 	// and IP corresponding to host.docker.internal or the IP of the host machine, if we are running on Linux,
 	// because that's where the fake data provider is running
@@ -442,7 +500,7 @@ func extraAllowedPortsAndIps(testLogger zerolog.Logger, priceProviderConfig *Pri
 		return nil, nil, errors.Wrap(err, "failed to resolve host.docker.internal IP")
 	}
 
-	testLogger.Info().Msgf("Will allow IP %s and port %d for the fake data provider", hostIP, priceProviderConfig.Fake.Port)
+	testLogger.Info().Msgf("Will allow IP %s and port %d for the fake data provider", hostIP, fakePort)
 
 	ips, err := net.LookupIP("gist.githubusercontent.com")
 	if err != nil {
@@ -456,7 +514,7 @@ func extraAllowedPortsAndIps(testLogger zerolog.Logger, priceProviderConfig *Pri
 	}
 
 	// we also need to explicitly allow Gist's IP
-	return append(gistIPs, hostIP), []int{priceProviderConfig.Fake.Port}, nil
+	return append(gistIPs, hostIP), []int{fakePort}, nil
 }
 
 type InfrastructureInput struct {
@@ -606,7 +664,7 @@ type setupOutput struct {
 }
 
 // TODO to each input add output and cache, same way sergey did in ctfv2
-func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig, mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet) *setupOutput {
+func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig, priceProvider PriceProvider, mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet) *setupOutput {
 	// Universal setup -- START
 	envInput := InfrastructureInput{
 		jdInput:         in.JD,
@@ -638,8 +696,6 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	// Universal setup -- END
 
 	// Workflow-specific configuration -- START
-	priceProvider := setupPriceProvider(t, testLogger, in)
-
 	deployFeedConsumerInput := keystonetypes.DeployFeedConsumerInput{
 		ChainSelector: envOutput.chainSelector,
 		CldEnv:        envOutput.cldEnv,
@@ -661,7 +717,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		WorkflowConfig:              in.WorkflowConfig,
 		chainSelector:               envOutput.chainSelector,
 		workflowDonID:               envOutput.donTopology.WorkflowDONID,
-		feedID:                      in.PriceProvider.FeedID,
+		feedID:                      in.WorkflowConfig.FeedID,
 		workflowRegistryAddress:     keystoneContractsOutput.WorkflowRegistryAddress,
 		feedConsumerAddress:         deployFeedsConsumerOutput.Address,
 		capabilitiesRegistryAddress: keystoneContractsOutput.CapabilitiesRegistryAddress,
@@ -675,9 +731,16 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	// Workflow-specific configuration -- END
 
 	// Universal setup -- CONTINUED
+	// Allow extra IPs and ports for the fake data provider, which is running on host machine and requires explicit whitelisting
+	var extraAllowedIPs []string
+	var extraAllowedPorts []int
+	if _, ok := priceProvider.(*FakePriceProvider); ok {
+		extraAllowedIPs, extraAllowedPorts, err = extraAllowedPortsAndIps(testLogger, in.Fake.Port, envOutput.donTopology.MetaDons[0].NodeOutput.Output)
+		require.NoError(t, err, "failed to get extra allowed ports and IPs")
+	}
+
 	// Prepare job specs and node configs
 	configsAndJobsInput := jobsAndConfigsInput{
-		PriceProviderConfig:         in.PriceProvider,
 		donTopology:                 envOutput.donTopology,
 		blockchainOutput:            envOutput.blockchainOutput,
 		gatewayConnectorOutput:      envOutput.gatewayConnector,
@@ -686,9 +749,11 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		capabilitiesRegistryAddress: keystoneContractsOutput.CapabilitiesRegistryAddress,
 		ocr3capabilityAddress:       keystoneContractsOutput.OCR3CapabilityAddress,
 		cldEnv:                      envOutput.cldEnv,
+		extraAllowedIPs:             extraAllowedIPs,
+		extraAllowedPorts:           extraAllowedPorts,
 	}
 
-	configsAndJobsOutput, err := prepareJobSpecsAndNodeConfigs(testLogger, configsAndJobsInput)
+	configsAndJobsOutput, err := prepareJobSpecsAndNodeConfigs(configsAndJobsInput)
 	require.NoError(t, err, "failed to prepare job specs and node configs")
 
 	// Configure nodes and create jobs
@@ -732,7 +797,6 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 }
 
 type jobsAndConfigsInput struct {
-	*PriceProviderConfig
 	donTopology                 *keystonetypes.DonTopology
 	blockchainOutput            *blockchain.Output
 	gatewayConnectorOutput      *keystonetypes.GatewayConnectorOutput
@@ -741,6 +805,8 @@ type jobsAndConfigsInput struct {
 	capabilitiesRegistryAddress common.Address
 	ocr3capabilityAddress       common.Address
 	cldEnv                      *deployment.Environment
+	extraAllowedIPs             []string
+	extraAllowedPorts           []int
 }
 
 type jobsAndConfigsOutput struct {
@@ -748,12 +814,7 @@ type jobsAndConfigsOutput struct {
 	nodeToConfigOverrides keystonetypes.DonsToConfigOverrides
 }
 
-func prepareJobSpecsAndNodeConfigs(testLogger zerolog.Logger, input jobsAndConfigsInput) (*jobsAndConfigsOutput, error) {
-	ips, ports, err := extraAllowedPortsAndIps(testLogger, input.PriceProviderConfig, input.donTopology.MetaDons[0].NodeOutput.Output)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get extra allowed ports and IPs")
-	}
-
+func prepareJobSpecsAndNodeConfigs(input jobsAndConfigsInput) (*jobsAndConfigsOutput, error) {
 	peeringData, err := libdon.FindPeeringData(input.donTopology.MetaDons)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get peering data")
@@ -793,8 +854,8 @@ func prepareJobSpecsAndNodeConfigs(testLogger zerolog.Logger, input jobsAndConfi
 			input.ocr3capabilityAddress,
 			donTopology.ID,
 			donTopology.Flags,
-			ports,
-			ips,
+			input.extraAllowedPorts,
+			input.extraAllowedIPs,
 			cronCapabilityAssetFile,
 			*input.gatewayConnectorOutput,
 		)
@@ -808,14 +869,17 @@ func prepareJobSpecsAndNodeConfigs(testLogger zerolog.Logger, input jobsAndConfi
 		donToJobSpecs:         donToJobSpecs,
 	}, nil
 }
-func TestKeystoneWithOCR3Workflow_SingleDon(t *testing.T) {
+func TestKeystoneWithOCR3Workflow_SingleDon_MockedPrice(t *testing.T) {
 	testLogger := framework.L
 
-	// Load test configuration
+	// Load and validate test configuration
 	in, err := framework.Load[TestConfig](t)
 	require.NoError(t, err, "couldn't load test config")
-	validateCommonInputsAndEnvVars(t, in)
+	validateEnvVars(t, in)
 	require.Equal(t, 1, len(in.NodeSets), "expected 1 node set in the test config")
+
+	err = downloadBinaryFiles(in)
+	require.NoError(t, err, "failed to download binary files")
 
 	// Assign all capabilities to the single node set
 	mustSetCapabilitiesFn := func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet {
@@ -828,12 +892,15 @@ func TestKeystoneWithOCR3Workflow_SingleDon(t *testing.T) {
 		}
 	}
 
-	setupOutput := setupTestEnvironment(t, testLogger, in, mustSetCapabilitiesFn)
+	priceProvider, priceErr := NewFakePriceProvider(testLogger, in)
+	require.NoError(t, priceErr, "failed to create fake price provider")
+
+	setupOutput := setupTestEnvironment(t, testLogger, in, priceProvider, mustSetCapabilitiesFn)
 
 	// Log extra information that might help debugging
 	t.Cleanup(func() {
 		if t.Failed() {
-			logTestInfo(testLogger, in.PriceProvider.FeedID, in.WorkflowConfig.WorkflowName, setupOutput.feedsConsumerAddress.Hex(), setupOutput.forwarderAddress.Hex())
+			logTestInfo(testLogger, in.WorkflowConfig.FeedID, in.WorkflowConfig.WorkflowName, setupOutput.feedsConsumerAddress.Hex(), setupOutput.forwarderAddress.Hex())
 
 			logDir := fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name())
 
@@ -857,49 +924,46 @@ func TestKeystoneWithOCR3Workflow_SingleDon(t *testing.T) {
 		}
 	})
 
-	// It can take a while before the first report is produced, particularly on CI.
-	timeout := 5 * time.Minute
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	testLogger.Info().Msg("Waiting for feed to update...")
+	timeout := 5 * time.Minute // It can take a while before the first report is produced, particularly on CI.
 
 	feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(setupOutput.feedsConsumerAddress, setupOutput.sethClient.Client)
 	require.NoError(t, err, "failed to create feeds consumer instance")
 
-	testLogger.Info().Msg("Waiting for feed to update...")
 	startTime := time.Now()
-	feedBytes := common.HexToHash(in.PriceProvider.FeedID)
+	feedBytes := common.HexToHash(in.WorkflowConfig.FeedID)
 
-	for {
-		select {
-		case <-ctx.Done():
-			testLogger.Error().Msgf("feed did not update, timeout after %s", timeout)
-			t.FailNow()
-		case <-time.After(10 * time.Second):
-			elapsed := time.Since(startTime).Round(time.Second)
-			price, _, err := feedsConsumerInstance.GetPrice(
-				setupOutput.sethClient.NewCallOpts(),
-				feedBytes,
-			)
-			require.NoError(t, err, "failed to get price from Keystone Consumer contract")
+	assert.Eventually(t, func() bool {
+		elapsed := time.Since(startTime).Round(time.Second)
+		price, _, err := feedsConsumerInstance.GetPrice(
+			setupOutput.sethClient.NewCallOpts(),
+			feedBytes,
+		)
+		require.NoError(t, err, "failed to get price from Keystone Consumer contract")
 
-			if !setupOutput.priceProvider.NextPrice(price, elapsed) {
-				// check if all expected prices were found and finish the test
-				setupOutput.priceProvider.CheckPrices()
-				return
-			}
+		hasNextPrice := setupOutput.priceProvider.NextPrice(price, elapsed)
+		if !hasNextPrice {
 			testLogger.Info().Msgf("Feed not updated yet, waiting for %s", elapsed)
 		}
-	}
+
+		return !hasNextPrice
+	}, timeout, 10*time.Second, "feed did not update, timeout after: %s", timeout)
+
+	require.EqualValues(t, priceProvider.ExpectedPrices(), priceProvider.ActualPrices(), "prices do not match")
+	testLogger.Info().Msgf("All %d prices were found in the feed", len(priceProvider.ExpectedPrices()))
 }
 
-func TestKeystoneWithOCR3Workflow_TwoDons(t *testing.T) {
+func TestKeystoneWithOCR3Workflow_TwoDons_LivePrice(t *testing.T) {
 	testLogger := framework.L
 
-	// Load test configuration
+	// Load and validate test configuration
 	in, err := framework.Load[TestConfig](t)
 	require.NoError(t, err, "couldn't load test config")
-	validateCommonInputsAndEnvVars(t, in)
+	validateEnvVars(t, in)
 	require.Equal(t, 2, len(in.NodeSets), "expected 2 node sets in the test config")
+
+	err = downloadBinaryFiles(in)
+	require.NoError(t, err, "failed to download binary files")
 
 	mustSetCapabilitiesFn := func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet {
 		return []*keystonetypes.CapabilitiesAwareNodeSet{
@@ -916,12 +980,13 @@ func TestKeystoneWithOCR3Workflow_TwoDons(t *testing.T) {
 		}
 	}
 
-	setupOutput := setupTestEnvironment(t, testLogger, in, mustSetCapabilitiesFn)
+	priceProvider := NewTrueUSDPriceProvider(testLogger)
+	setupOutput := setupTestEnvironment(t, testLogger, in, priceProvider, mustSetCapabilitiesFn)
 
 	// Log extra information that might help debugging
 	t.Cleanup(func() {
 		if t.Failed() {
-			logTestInfo(testLogger, in.PriceProvider.FeedID, in.WorkflowConfig.WorkflowName, setupOutput.feedsConsumerAddress.Hex(), setupOutput.forwarderAddress.Hex())
+			logTestInfo(testLogger, in.WorkflowConfig.FeedID, in.WorkflowConfig.WorkflowName, setupOutput.feedsConsumerAddress.Hex(), setupOutput.forwarderAddress.Hex())
 
 			logDir := fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name())
 
@@ -945,37 +1010,31 @@ func TestKeystoneWithOCR3Workflow_TwoDons(t *testing.T) {
 		}
 	})
 
-	// It can take a while before the first report is produced, particularly on CI.
-	timeout := 5 * time.Minute
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	testLogger.Info().Msg("Waiting for feed to update...")
+	timeout := 5 * time.Minute // It can take a while before the first report is produced, particularly on CI.
 
 	feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(setupOutput.feedsConsumerAddress, setupOutput.sethClient.Client)
 	require.NoError(t, err, "failed to create feeds consumer instance")
 
-	testLogger.Info().Msg("Waiting for feed to update...")
 	startTime := time.Now()
-	feedBytes := common.HexToHash(in.PriceProvider.FeedID)
+	feedBytes := common.HexToHash(in.WorkflowConfig.FeedID)
 
-	for {
-		select {
-		case <-ctx.Done():
-			testLogger.Error().Msgf("feed did not update, timeout after %s", timeout)
-			t.FailNow()
-		case <-time.After(10 * time.Second):
-			elapsed := time.Since(startTime).Round(time.Second)
-			price, _, err := feedsConsumerInstance.GetPrice(
-				setupOutput.sethClient.NewCallOpts(),
-				feedBytes,
-			)
-			require.NoError(t, err, "failed to get price from Keystone Consumer contract")
+	assert.Eventually(t, func() bool {
+		elapsed := time.Since(startTime).Round(time.Second)
+		price, _, err := feedsConsumerInstance.GetPrice(
+			setupOutput.sethClient.NewCallOpts(),
+			feedBytes,
+		)
+		require.NoError(t, err, "failed to get price from Keystone Consumer contract")
 
-			if !setupOutput.priceProvider.NextPrice(price, elapsed) {
-				// check if all expected prices were found and finish the test
-				setupOutput.priceProvider.CheckPrices()
-				return
-			}
+		hasNextPrice := setupOutput.priceProvider.NextPrice(price, elapsed)
+		if !hasNextPrice {
 			testLogger.Info().Msgf("Feed not updated yet, waiting for %s", elapsed)
 		}
-	}
+
+		return !hasNextPrice
+	}, timeout, 10*time.Second, "feed did not update, timeout after: %s", timeout)
+
+	require.EqualValues(t, priceProvider.ExpectedPrices(), priceProvider.ActualPrices(), "prices do not match")
+	testLogger.Info().Msgf("All %d prices were found in the feed", len(priceProvider.ExpectedPrices()))
 }

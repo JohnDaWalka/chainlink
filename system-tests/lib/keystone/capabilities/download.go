@@ -3,11 +3,13 @@ package capabilities
 import (
 	"os"
 
-	libgithub "github.com/smartcontractkit/chainlink/system-tests/lib/github"
+	// libgithub "github.com/smartcontractkit/chainlink/system-tests/lib/github"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/client"
 )
 
 func DownloadCapabilityFromRelease(ghToken, version, assetFileName string) (string, error) {
-	content, err := libgithub.DownloadGHAssetFromRelease("smartcontractkit", "capabilities", version, assetFileName, ghToken)
+	ghClient := client.NewGithubClient(ghToken)
+	content, err := ghClient.DownloadAssetFromRelease("smartcontractkit", "capabilities", version, assetFileName)
 	if err != nil {
 		return "", err
 	}

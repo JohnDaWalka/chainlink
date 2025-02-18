@@ -8,8 +8,7 @@ import (
 	"runtime"
 
 	"github.com/pkg/errors"
-
-	"github.com/smartcontractkit/chainlink/system-tests/lib/github"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/client"
 )
 
 func DownloadAndInstallChainlinkCLI(ghToken, version string) error {
@@ -31,7 +30,9 @@ func DownloadAndInstallChainlinkCLI(ghToken, version string) error {
 	}
 
 	CRECLIAssetFile := fmt.Sprintf("cre_%s_%s_%s.tar.gz", version, system, arch)
-	content, err := github.DownloadGHAssetFromRelease("smartcontractkit", "dev-platform", version, CRECLIAssetFile, ghToken)
+
+	ghClient := client.NewGithubClient(ghToken)
+	content, err := ghClient.DownloadAssetFromRelease("smartcontractkit", "dev-platform", version, CRECLIAssetFile)
 	if err != nil {
 		return errors.Wrapf(err, "failed to download CRE CLI asset %s", CRECLIAssetFile)
 	}
