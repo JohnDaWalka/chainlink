@@ -160,7 +160,13 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 	return nil
 }
 
-func DeployKeystone(testLogger zerolog.Logger, input types.KeystoneContractsInput) (*types.KeystoneContractOutput, error) {
+func DeployKeystone(testLogger zerolog.Logger, input *types.KeystoneContractsInput) (*types.KeystoneContractOutput, error) {
+	if input == nil {
+		return nil, errors.New("input is nil")
+	}
+	if input.Out != nil && input.Out.UseCache {
+		return input.Out, nil
+	}
 	var err error
 	forwarderAddress, err := DeployKeystoneForwarder(testLogger, input.CldEnv, input.ChainSelector)
 	if err != nil {
@@ -179,12 +185,15 @@ func DeployKeystone(testLogger zerolog.Logger, input types.KeystoneContractsInpu
 		return nil, errors.Wrap(err, "failed to deploy Workflow Registry contract")
 	}
 
-	return &types.KeystoneContractOutput{
+	out := &types.KeystoneContractOutput{
 		ForwarderAddress:            forwarderAddress,
 		OCR3CapabilityAddress:       oCR3CapabilityAddress,
 		CapabilitiesRegistryAddress: capabilitiesRegistryAddress,
 		WorkflowRegistryAddress:     workflowRegistryAddress,
-	}, nil
+	}
+
+	input.Out = out
+	return out, nil
 }
 
 func DeployOCR3(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
@@ -312,14 +321,21 @@ func DeployWorkflowRegistry(testLogger zerolog.Logger, ctfEnv *deployment.Enviro
 	return workflowRegistryAddr, nil
 }
 
-func ConfigureWorkflowRegistry(testLogger zerolog.Logger, input types.WorkflowRegistryInput) error {
+func ConfigureWorkflowRegistry(testLogger zerolog.Logger, input *types.WorkflowRegistryInput) (*types.WorkflowRegistryOutput, error) {
+	if input == nil {
+		return nil, errors.New("input is nil")
+	}
+	if input.Out != nil && input.Out.UseCache {
+		return input.Out, nil
+	}
+
 	_, err := workflow_registry_changeset.UpdateAllowedDons(*input.CldEnv, &workflow_registry_changeset.UpdateAllowedDonsRequest{
 		RegistryChainSel: input.ChainSelector,
 		DonIDs:           input.AllowedDonIDs,
 		Allowed:          true,
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to update allowed Dons")
+		return nil, errors.Wrap(err, "failed to update allowed Dons")
 	}
 
 	addresses := make([]string, 0, len(input.WorkflowOwners))
@@ -333,13 +349,27 @@ func ConfigureWorkflowRegistry(testLogger zerolog.Logger, input types.WorkflowRe
 		Allowed:          true,
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to update authorized addresses")
+		return nil, errors.Wrap(err, "failed to update authorized addresses")
 	}
 
-	return nil
+	out := &types.WorkflowRegistryOutput{
+		ChainSelector:  input.ChainSelector,
+		AllowedDonIDs:  input.AllowedDonIDs,
+		WorkflowOwners: input.WorkflowOwners,
+	}
+
+	input.Out = out
+	return out, nil
 }
 
-func DeployFeedsConsumer(testLogger zerolog.Logger, input types.DeployFeedConsumerInput) (*types.DeployFeedConsumerOutput, error) {
+func DeployFeedsConsumer(testLogger zerolog.Logger, input *types.DeployFeedConsumerInput) (*types.DeployFeedConsumerOutput, error) {
+	if input == nil {
+		return nil, errors.New("input is nil")
+	}
+
+	if input.Out != nil && input.Out.UseCache {
+		return input.Out, nil
+	}
 	output, err := keystone_changeset.DeployFeedsConsumer(*input.CldEnv, &keystone_changeset.DeployFeedsConsumerRequest{
 		ChainSelector: input.ChainSelector,
 	})
@@ -370,17 +400,22 @@ func DeployFeedsConsumer(testLogger zerolog.Logger, input types.DeployFeedConsum
 		return nil, errors.New("failed to find FeedConsumer address in the address book")
 	}
 
-	return &types.DeployFeedConsumerOutput{
-		Address: feedsConsumerAddress,
-	}, nil
+	out := &types.DeployFeedConsumerOutput{
+		FeedConsumerAddress: feedsConsumerAddress,
+	}
+
+	input.Out = out
+	return out, nil
 }
 
-func ConfigureFeedsConsumer(testLogger zerolog.Logger, input types.ConfigureFeedConsumerInput) error {
-	// configure Keystone Feeds Consumer contract, so it can accept reports from the forwarder contract,
-	// that come from our workflow that is owned by the root private key
+func ConfigureFeedsConsumer(testLogger zerolog.Logger, input *types.ConfigureFeedConsumerInput) (*types.ConfigureFeedConsumerOutput, error) {
+	if input == nil {
+		return nil, errors.New("input is nil")
+	}
+
 	feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(input.FeedConsumerAddress, input.SethClient.Client)
 	if err != nil {
-		return errors.Wrap(err, "failed to create feeds consumer instance")
+		return nil, errors.Wrap(err, "failed to create feeds consumer instance")
 	}
 
 	// Prepare hex-encoded and truncated workflow name
@@ -415,8 +450,16 @@ func ConfigureFeedsConsumer(testLogger zerolog.Logger, input types.ConfigureFeed
 		truncatedNames, // allowed workflow names
 	))
 	if decodeErr != nil {
-		return errors.Wrap(decodeErr, "failed to set config for feeds consumer")
+		return nil, errors.Wrap(decodeErr, "failed to set config for feeds consumer")
 	}
 
-	return nil
+	out := &types.ConfigureFeedConsumerOutput{
+		FeedConsumerAddress:   input.FeedConsumerAddress,
+		AllowedSenders:        input.AllowedSenders,
+		AllowedWorkflowOwners: input.AllowedWorkflowOwners,
+		AllowedWorkflowNames:  input.AllowedWorkflowNames,
+	}
+
+	input.Out = out
+	return out, nil
 }

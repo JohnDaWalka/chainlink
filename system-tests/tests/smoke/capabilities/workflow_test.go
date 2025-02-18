@@ -61,11 +61,14 @@ const (
 )
 
 type TestConfig struct {
-	BlockchainA    *blockchain.Input `toml:"blockchain_a" validate:"required"`
-	NodeSets       []*ns.Input       `toml:"nodesets" validate:"required"`
-	WorkflowConfig *WorkflowConfig   `toml:"workflow_config" validate:"required"`
-	JD             *jd.Input         `toml:"jd" validate:"required"`
-	Fake           *fake.Input       `toml:"fake"`
+	BlockchainA                   *blockchain.Input                      `toml:"blockchain_a" validate:"required"`
+	NodeSets                      []*ns.Input                            `toml:"nodesets" validate:"required"`
+	WorkflowConfig                *WorkflowConfig                        `toml:"workflow_config" validate:"required"`
+	JD                            *jd.Input                              `toml:"jd" validate:"required"`
+	Fake                          *fake.Input                            `toml:"fake"`
+	KeystoneContracts             *keystonetypes.KeystoneContractsInput  `toml:"keystone_contracts"`
+	WorkflowRegistryConfiguration *keystonetypes.WorkflowRegistryInput   `toml:"workflow_registry_configuration"`
+	FeedConsumer                  *keystonetypes.DeployFeedConsumerInput `toml:"feed_consumer"`
 }
 
 type WorkflowConfig struct {
@@ -572,6 +575,8 @@ func CreateInfrastructure(
 	sethClient, err := seth.NewClientBuilder().
 		WithRpcUrl(blockchainOutput.Nodes[0].HostWSUrl).
 		WithPrivateKeys([]string{pkey}).
+		// do not check if there's a pending nonce nor check node health
+		WithProtections(false, false, seth.MustMakeDuration(time.Second)).
 		Build()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create seth client")
@@ -669,7 +674,6 @@ type setupOutput struct {
 	donTopology          *keystonetypes.DonTopology
 }
 
-// TODO to each input add output and cache, same way sergey did in ctfv2
 func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig, priceProvider PriceProvider, mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet) *setupOutput {
 	// Universal setup -- START
 	envInput := InfrastructureInput{
@@ -681,7 +685,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	require.NoError(t, err, "failed to start environment")
 
 	// Deploy keystone contracts (forwarder, capability registry, ocr3 capability, workflow registry)
-	keystoneContractsInput := keystonetypes.KeystoneContractsInput{
+	keystoneContractsInput := &keystonetypes.KeystoneContractsInput{
 		ChainSelector: envOutput.chainSelector,
 		CldEnv:        envOutput.cldEnv,
 	}
@@ -690,33 +694,33 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	require.NoError(t, err, "failed to deploy keystone contracts")
 
 	// Configure Workflow Registry
-	workflowRegistryInput := keystonetypes.WorkflowRegistryInput{
+	workflowRegistryInput := &keystonetypes.WorkflowRegistryInput{
 		ChainSelector:  envOutput.chainSelector,
 		CldEnv:         envOutput.cldEnv,
 		AllowedDonIDs:  []uint32{envOutput.donTopology.WorkflowDONID},
 		WorkflowOwners: []common.Address{envOutput.sethClient.MustGetRootKeyAddress()},
 	}
 
-	err = libcontracts.ConfigureWorkflowRegistry(testLogger, workflowRegistryInput)
+	_, err = libcontracts.ConfigureWorkflowRegistry(testLogger, workflowRegistryInput)
 	require.NoError(t, err, "failed to configure workflow registry")
 	// Universal setup -- END
 
 	// Workflow-specific configuration -- START
-	deployFeedConsumerInput := keystonetypes.DeployFeedConsumerInput{
+	deployFeedConsumerInput := &keystonetypes.DeployFeedConsumerInput{
 		ChainSelector: envOutput.chainSelector,
 		CldEnv:        envOutput.cldEnv,
 	}
 	deployFeedsConsumerOutput, err := libcontracts.DeployFeedsConsumer(testLogger, deployFeedConsumerInput)
 	require.NoError(t, err, "failed to deploy feeds consumer")
 
-	configureFeedConsumerInput := keystonetypes.ConfigureFeedConsumerInput{
+	configureFeedConsumerInput := &keystonetypes.ConfigureFeedConsumerInput{
 		SethClient:            envOutput.sethClient,
-		FeedConsumerAddress:   deployFeedsConsumerOutput.Address,
+		FeedConsumerAddress:   deployFeedsConsumerOutput.FeedConsumerAddress,
 		AllowedSenders:        []common.Address{keystoneContractsOutput.ForwarderAddress},
 		AllowedWorkflowOwners: []common.Address{envOutput.sethClient.MustGetRootKeyAddress()},
 		AllowedWorkflowNames:  []string{in.WorkflowConfig.WorkflowName},
 	}
-	err = libcontracts.ConfigureFeedsConsumer(testLogger, configureFeedConsumerInput)
+	_, err = libcontracts.ConfigureFeedsConsumer(testLogger, configureFeedConsumerInput)
 	require.NoError(t, err, "failed to configure feeds consumer")
 
 	registerInput := registerPoRWorkflowInput{
@@ -725,7 +729,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		workflowDonID:               envOutput.donTopology.WorkflowDONID,
 		feedID:                      in.WorkflowConfig.FeedID,
 		workflowRegistryAddress:     keystoneContractsOutput.WorkflowRegistryAddress,
-		feedConsumerAddress:         deployFeedsConsumerOutput.Address,
+		feedConsumerAddress:         deployFeedsConsumerOutput.FeedConsumerAddress,
 		capabilitiesRegistryAddress: keystoneContractsOutput.CapabilitiesRegistryAddress,
 		priceProvider:               priceProvider,
 		sethClient:                  envOutput.sethClient,
@@ -772,10 +776,8 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		DonToJobSpecs:        configsAndJobsOutput.donToJobSpecs,
 		DonToConfigOverrides: configsAndJobsOutput.nodeToConfigOverrides,
 	}
-	configureDonOutput, err := libdon.Configure(t, testLogger, configureDonInput)
+	_, err = libdon.Configure(t, testLogger, configureDonInput)
 	require.NoError(t, err, "failed to configure nodes and create jobs")
-
-	_ = configureDonOutput
 
 	// CAUTION: It is crucial to configure OCR3 jobs on nodes before configuring the workflow contracts.
 	// Wait for OCR listeners to be ready before setting the configuration.
@@ -793,9 +795,14 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	err = libcontracts.ConfigureKeystone(configureKeystoneInput)
 	require.NoError(t, err, "failed to configure keystone contracts")
 
+	// Set inputs in the test config, so that they can be saved
+	in.KeystoneContracts = keystoneContractsInput
+	in.FeedConsumer = deployFeedConsumerInput
+	in.WorkflowRegistryConfiguration = workflowRegistryInput
+
 	return &setupOutput{
 		priceProvider:        priceProvider,
-		feedsConsumerAddress: deployFeedsConsumerOutput.Address,
+		feedsConsumerAddress: deployFeedsConsumerOutput.FeedConsumerAddress,
 		forwarderAddress:     keystoneContractsOutput.ForwarderAddress,
 		sethClient:           envOutput.sethClient,
 		blockchainOutput:     envOutput.blockchainOutput,

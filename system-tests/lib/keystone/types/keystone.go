@@ -36,39 +36,60 @@ type NodeIndexToConfigOverrides = map[int]string
 type DonsToConfigOverrides = map[uint32]NodeIndexToConfigOverrides
 
 type KeystoneContractsInput struct {
-	ChainSelector uint64
-	CldEnv        *deployment.Environment
+	ChainSelector uint64                  `toml:"-"`
+	CldEnv        *deployment.Environment `toml:"-"`
+	Out           *KeystoneContractOutput `toml:"out"`
 }
 
 type KeystoneContractOutput struct {
-	CapabilitiesRegistryAddress common.Address
-	ForwarderAddress            common.Address
-	OCR3CapabilityAddress       common.Address
-	WorkflowRegistryAddress     common.Address
+	UseCache                    bool           `toml:"use_cache"`
+	CapabilitiesRegistryAddress common.Address `toml:"capabilities_registry_address"`
+	ForwarderAddress            common.Address `toml:"forwarder_address"`
+	OCR3CapabilityAddress       common.Address `toml:"ocr3_capability_address"`
+	WorkflowRegistryAddress     common.Address `toml:"workflow_registry_address"`
 }
 
 type WorkflowRegistryInput struct {
-	ChainSelector  uint64
-	CldEnv         *deployment.Environment
-	AllowedDonIDs  []uint32
-	WorkflowOwners []common.Address
+	ChainSelector  uint64                  `toml:"-"`
+	CldEnv         *deployment.Environment `toml:"-"`
+	AllowedDonIDs  []uint32                `toml:"-"`
+	WorkflowOwners []common.Address        `toml:"-"`
+	Out            *WorkflowRegistryOutput `toml:"out"`
+}
+
+type WorkflowRegistryOutput struct {
+	UseCache       bool             `toml:"use_cache"`
+	ChainSelector  uint64           `toml:"chain_selector"`
+	AllowedDonIDs  []uint32         `toml:"allowed_don_ids"`
+	WorkflowOwners []common.Address `toml:"workflow_owners"`
 }
 
 type DeployFeedConsumerInput struct {
-	ChainSelector uint64
-	CldEnv        *deployment.Environment
+	ChainSelector uint64                    `toml:"-"`
+	CldEnv        *deployment.Environment   `toml:"-"`
+	Out           *DeployFeedConsumerOutput `toml:"out"`
 }
 
 type DeployFeedConsumerOutput struct {
-	Address common.Address
+	UseCache            bool           `toml:"use_cache"`
+	FeedConsumerAddress common.Address `toml:"feed_consumer_address"`
 }
 
 type ConfigureFeedConsumerInput struct {
-	SethClient            *seth.Client
-	FeedConsumerAddress   common.Address
-	AllowedSenders        []common.Address
-	AllowedWorkflowOwners []common.Address
-	AllowedWorkflowNames  []string
+	SethClient            *seth.Client                 `toml:"-"`
+	FeedConsumerAddress   common.Address               `toml:"-"`
+	AllowedSenders        []common.Address             `toml:"-"`
+	AllowedWorkflowOwners []common.Address             `toml:"-"`
+	AllowedWorkflowNames  []string                     `toml:"-"`
+	Out                   *ConfigureFeedConsumerOutput `toml:"out"`
+}
+
+type ConfigureFeedConsumerOutput struct {
+	UseCache              bool             `toml:"use_cache"`
+	FeedConsumerAddress   common.Address   `toml:"feed_consumer_address"`
+	AllowedSenders        []common.Address `toml:"allowed_senders"`
+	AllowedWorkflowOwners []common.Address `toml:"allowed_workflow_owners"`
+	AllowedWorkflowNames  []string         `toml:"allowed_workflow_names"`
 }
 
 type WrappedNodeOutput struct {
