@@ -48,7 +48,7 @@ func (gp EstimateProvider) CalculateMerkleTreeGas(numRequests int) uint64 {
 		return 0
 	}
 	merkleProofBytes := (math.Ceil(math.Log2(float64(numRequests))))*32 + (1+2)*32 // only ever one outer root hash
-	return uint64(merkleProofBytes * CalldataGasPerByteBase)
+	return uint64(merkleProofBytes*CalldataGasPerByteBase + ExecutionStateProcessingOverheadGas + SupportsInterfaceCheck)
 }
 
 // return the size of bytes for msg tokens
@@ -109,8 +109,6 @@ func (gp EstimateProvider) CalculateMessageMaxGasWithError(msg cciptypes.Message
 	return DestGasOverhead +
 		messageGasLimit.Uint64() +
 		messageCallDataGas +
-		ExecutionStateProcessingOverheadGas +
-		SupportsInterfaceCheck +
 		adminRegistryOverhead +
 		rateLimiterOverhead +
 		PerTokenOverheadGas*uint64(numTokens) +
