@@ -33,8 +33,6 @@
     config_url = "https://gist.githubusercontent.com/Tofel/cdd80b48ef6c6faf44c10a6673043a4a/raw/871c0b69c032edb4c1371fe896c10b973a93eb06/config.json1025406406"
 
 [[nodesets]]
-  capabilities = ["cron", "custom-compute", "ocr3"]
-  don_type = "workflow"
   nodes = 5
   override_mode = "each"
   http_port_range_start = 10100
@@ -145,8 +143,6 @@
       """
 
 [[nodesets]]
-  don_type = "capabilities"
-  capabilities = ["write-evm"]
   nodes = 3
   override_mode = "each"
   http_port_range_start = 10200

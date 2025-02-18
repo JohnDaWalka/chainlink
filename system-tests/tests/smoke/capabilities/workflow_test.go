@@ -58,11 +58,11 @@ const (
 )
 
 type TestConfig struct {
-	BlockchainA    *blockchain.Input                         `toml:"blockchain_a" validate:"required"`
-	NodeSets       []*keystonetypes.CapabilitiesAwareNodeSet `toml:"nodesets" validate:"required"`
-	WorkflowConfig *WorkflowConfig                           `toml:"workflow_config" validate:"required"`
-	JD             *jd.Input                                 `toml:"jd" validate:"required"`
-	PriceProvider  *PriceProviderConfig                      `toml:"price_provider"`
+	BlockchainA    *blockchain.Input    `toml:"blockchain_a" validate:"required"`
+	NodeSets       []*ns.Input          `toml:"nodesets" validate:"required"`
+	WorkflowConfig *WorkflowConfig      `toml:"workflow_config" validate:"required"`
+	JD             *jd.Input            `toml:"jd" validate:"required"`
+	PriceProvider  *PriceProviderConfig `toml:"price_provider"`
 }
 
 type WorkflowConfig struct {
@@ -100,31 +100,7 @@ type PriceProviderConfig struct {
 	URL    string      `toml:"url"`
 }
 
-func (in *TestConfig) JdInput() (*jd.Input, error) {
-	if in.JD == nil {
-		return nil, errors.New("JD input is nil")
-	}
-
-	return in.JD, nil
-}
-
-func (in *TestConfig) NodeSetInput() ([]*keystonetypes.CapabilitiesAwareNodeSet, error) {
-	if in.NodeSets == nil {
-		return nil, errors.New("NodeSets input is nil")
-	}
-
-	return in.NodeSets, nil
-}
-
-func (in *TestConfig) BlockchainInput() (*blockchain.Input, error) {
-	if in.BlockchainA == nil {
-		return nil, errors.New("Blockchain input is nil")
-	}
-
-	return in.BlockchainA, nil
-}
-
-func validateInputsAndEnvVars(t *testing.T, in *TestConfig) {
+func validateCommonInputsAndEnvVars(t *testing.T, in *TestConfig) {
 	require.NotEmpty(t, os.Getenv("PRIVATE_KEY"), "PRIVATE_KEY env var must be set")
 	require.NotEmpty(t, in.WorkflowConfig.DependenciesConfig, "dependencies config must be set")
 
@@ -184,17 +160,6 @@ func validateInputsAndEnvVars(t *testing.T, in *TestConfig) {
 
 	if in.PriceProvider.Fake == nil {
 		require.NotEmpty(t, in.PriceProvider.URL, "URL must be set in the price provider config, if fake provider is not used")
-	}
-
-	if len(in.NodeSets) == 1 {
-		noneEmpty := in.NodeSets[0].DONType != "" && len(in.NodeSets[0].Capabilities) > 0
-		bothEmpty := in.NodeSets[0].DONType == "" && len(in.NodeSets[0].Capabilities) == 0
-		require.True(t, noneEmpty || bothEmpty, "either both DONType and Capabilities must be set or both must be empty, when using only one node set")
-	} else {
-		for _, nodeSet := range in.NodeSets {
-			require.NotEmpty(t, nodeSet.Capabilities, "capabilities must be set for each node set")
-			require.NotEmpty(t, nodeSet.DONType, "don_type must be set for each node set")
-		}
 	}
 
 	// make sure the feed id is in the correct format
@@ -641,11 +606,11 @@ type setupOutput struct {
 }
 
 // TODO to each input add output and cache, same way sergey did in ctfv2
-func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig) *setupOutput {
+func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig, mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet) *setupOutput {
 	// Universal setup -- START
 	envInput := InfrastructureInput{
 		jdInput:         in.JD,
-		nodeSetInput:    in.NodeSets,
+		nodeSetInput:    mustSetCapabilitiesFn(in.NodeSets),
 		blockchainInput: in.BlockchainA,
 	}
 	envOutput, err := CreateInfrastructure(cldlogger.NewSingleFileLogger(t), testLogger, envInput)
@@ -843,15 +808,115 @@ func prepareJobSpecsAndNodeConfigs(testLogger zerolog.Logger, input jobsAndConfi
 		donToJobSpecs:         donToJobSpecs,
 	}, nil
 }
-func TestKeystoneWithOCR3Workflow(t *testing.T) {
+func TestKeystoneWithOCR3Workflow_SingleDon(t *testing.T) {
 	testLogger := framework.L
 
 	// Load test configuration
 	in, err := framework.Load[TestConfig](t)
 	require.NoError(t, err, "couldn't load test config")
-	validateInputsAndEnvVars(t, in)
+	validateCommonInputsAndEnvVars(t, in)
+	require.Equal(t, 1, len(in.NodeSets), "expected 1 node set in the test config")
 
-	setupOutput := setupTestEnvironment(t, testLogger, in)
+	// Assign all capabilities to the single node set
+	mustSetCapabilitiesFn := func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet {
+		return []*keystonetypes.CapabilitiesAwareNodeSet{
+			{
+				Input:        input[0],
+				Capabilities: keystonetypes.SingleDonFlags,
+				DONType:      keystonetypes.WorkflowDON,
+			},
+		}
+	}
+
+	setupOutput := setupTestEnvironment(t, testLogger, in, mustSetCapabilitiesFn)
+
+	// Log extra information that might help debugging
+	t.Cleanup(func() {
+		if t.Failed() {
+			logTestInfo(testLogger, in.PriceProvider.FeedID, in.WorkflowConfig.WorkflowName, setupOutput.feedsConsumerAddress.Hex(), setupOutput.forwarderAddress.Hex())
+
+			logDir := fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name())
+
+			removeErr := os.RemoveAll(logDir)
+			if removeErr != nil {
+				testLogger.Error().Err(removeErr).Msg("failed to remove log directory")
+				return
+			}
+
+			_, saveErr := framework.SaveContainerLogs(logDir)
+			if saveErr != nil {
+				testLogger.Error().Err(saveErr).Msg("failed to save container logs")
+				return
+			}
+
+			debugInput := keystonetypes.DebugInput{
+				DonTopology:      setupOutput.donTopology,
+				BlockchainOutput: setupOutput.blockchainOutput,
+			}
+			lidebug.PrintTestDebug(t.Name(), testLogger, debugInput)
+		}
+	})
+
+	// It can take a while before the first report is produced, particularly on CI.
+	timeout := 5 * time.Minute
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(setupOutput.feedsConsumerAddress, setupOutput.sethClient.Client)
+	require.NoError(t, err, "failed to create feeds consumer instance")
+
+	testLogger.Info().Msg("Waiting for feed to update...")
+	startTime := time.Now()
+	feedBytes := common.HexToHash(in.PriceProvider.FeedID)
+
+	for {
+		select {
+		case <-ctx.Done():
+			testLogger.Error().Msgf("feed did not update, timeout after %s", timeout)
+			t.FailNow()
+		case <-time.After(10 * time.Second):
+			elapsed := time.Since(startTime).Round(time.Second)
+			price, _, err := feedsConsumerInstance.GetPrice(
+				setupOutput.sethClient.NewCallOpts(),
+				feedBytes,
+			)
+			require.NoError(t, err, "failed to get price from Keystone Consumer contract")
+
+			if !setupOutput.priceProvider.NextPrice(price, elapsed) {
+				// check if all expected prices were found and finish the test
+				setupOutput.priceProvider.CheckPrices()
+				return
+			}
+			testLogger.Info().Msgf("Feed not updated yet, waiting for %s", elapsed)
+		}
+	}
+}
+
+func TestKeystoneWithOCR3Workflow_TwoDons(t *testing.T) {
+	testLogger := framework.L
+
+	// Load test configuration
+	in, err := framework.Load[TestConfig](t)
+	require.NoError(t, err, "couldn't load test config")
+	validateCommonInputsAndEnvVars(t, in)
+	require.Equal(t, 2, len(in.NodeSets), "expected 2 node sets in the test config")
+
+	mustSetCapabilitiesFn := func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet {
+		return []*keystonetypes.CapabilitiesAwareNodeSet{
+			{
+				Input:        input[0],
+				Capabilities: []string{keystonetypes.OCR3Capability, keystonetypes.CustomComputeCapability, keystonetypes.CronCapability},
+				DONType:      keystonetypes.WorkflowDON,
+			},
+			{
+				Input:        input[1],
+				Capabilities: []string{keystonetypes.WriteEVMCapability},
+				DONType:      keystonetypes.CapabilitiesDON, // <----- it's crucial to set the correct DON type
+			},
+		}
+	}
+
+	setupOutput := setupTestEnvironment(t, testLogger, in, mustSetCapabilitiesFn)
 
 	// Log extra information that might help debugging
 	t.Cleanup(func() {
