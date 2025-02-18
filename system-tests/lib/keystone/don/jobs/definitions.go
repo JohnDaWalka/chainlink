@@ -22,13 +22,15 @@ var (
 )
 
 func BootstrapOCR3(nodeID string, ocr3CapabilityAddress common.Address, chainID uint64) *jobv1.ProposeJobRequest {
+	uuid := uuid.NewString()
+
 	return &jobv1.ProposeJobRequest{
 		NodeId: nodeID,
 		Spec: fmt.Sprintf(`
 	type = "bootstrap"
 	schemaVersion = 1
 	externalJobID = "%s"
-	name = "Botostrap"
+	name = "Botostrap-%s"
 	contractID = "%s"
 	contractConfigTrackerPollInterval = "1s"
 	contractConfigConfirmations = 1
@@ -37,7 +39,8 @@ func BootstrapOCR3(nodeID string, ocr3CapabilityAddress common.Address, chainID 
 	chainID = %d
 	providerType = "ocr3-capability"
 `,
-			uuid.NewString(),
+			uuid,
+			uuid[0:8],
 			ocr3CapabilityAddress.Hex(),
 			chainID),
 	}
@@ -55,11 +58,13 @@ func BootstrapGateway(don *devenv.DON, chainID uint64, donID uint32, extraAllowe
 		)
 	}
 
+	uuid := uuid.NewString()
+
 	gatewayJobSpec := fmt.Sprintf(`
 	type = "gateway"
 	schemaVersion = 1
 	externalJobID = "%s"
-	name = "Gateway"
+	name = "Gateway-%s"
 	forwardingAllowed = false
 	[gatewayConfig.ConnectionManagerConfig]
 	AuthChallengeLen = 10
@@ -99,7 +104,8 @@ func BootstrapGateway(don *devenv.DON, chainID uint64, donID uint32, extraAllowe
 	[gatewayConfig.HTTPClientConfig]
 	MaxResponseBytes = 100_000_000
 `,
-		uuid.NewString(),
+		uuid,
+		uuid[0:8],
 		strconv.FormatUint(uint64(donID), 10),
 		gatewayMembers,
 		gatewayConnectorData.Path,
@@ -148,6 +154,8 @@ func ExternalCapabilityPath(binaryName string) string {
 }
 
 func WorkerStandardCapability(nodeID, name, command, config string) *jobv1.ProposeJobRequest {
+	uuid := uuid.NewString()
+
 	return &jobv1.ProposeJobRequest{
 		NodeId: nodeID,
 		Spec: fmt.Sprintf(`
@@ -159,21 +167,23 @@ func WorkerStandardCapability(nodeID, name, command, config string) *jobv1.Propo
 	command = "%s"
 	config = %s
 `,
-			uuid.NewString(),
-			name,
+			uuid,
+			name+"-"+uuid[0:8],
 			command,
 			config),
 	}
 }
 
 func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress common.Address, ocr2KeyBundleID string, ocrPeeringData types.OCRPeeringData, chainID uint64) *jobv1.ProposeJobRequest {
+	uuid := uuid.NewString()
+
 	return &jobv1.ProposeJobRequest{
 		NodeId: nodeID,
 		Spec: fmt.Sprintf(`
 	type = "offchainreporting2"
 	schemaVersion = 1
 	externalJobID = "%s"
-	name = "Keystone OCR3 Consensus Capability"
+	name = "ocr3-consensus-%s"
 	contractID = "%s"
 	ocrKeyBundleID = "%s"
 	p2pv2Bootstrappers = [
@@ -195,7 +205,8 @@ func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress common.Addr
 	[onchainSigningStrategy.config]
 	evm = "%s"
 `,
-			uuid.NewString(),
+			uuid,
+			uuid[0:8],
 			ocr3CapabilityAddress,
 			ocr2KeyBundleID,
 			ocrPeeringData.OCRBootstraperPeerID,

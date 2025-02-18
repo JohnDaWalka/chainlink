@@ -402,7 +402,6 @@ func (l *TrueUSDPriceProvider) ActualPrices() []*big.Int {
 // FakePriceProvider is a PriceProvider implementation that uses a mocked feed to get the price
 // It returns a configured price sequence and makes sure that the feed has been correctly updated
 type FakePriceProvider struct {
-	t              *testing.T
 	testLogger     zerolog.Logger
 	priceIndex     *int
 	url            string
@@ -458,7 +457,9 @@ func (f *FakePriceProvider) NextPrice(price *big.Int, elapsed time.Duration) boo
 			return false
 		}
 
-		require.Less(f.t, len(f.actualPrices), len(f.expectedPrices), "more prices found than expected")
+		if len(f.actualPrices) > len(f.expectedPrices) {
+			panic("more prices found than expected")
+		}
 		f.testLogger.Info().Msgf("Changing price provider price to %s", f.expectedPrices[len(f.actualPrices)].String())
 		*f.priceIndex = len(f.actualPrices)
 
