@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
 )
 
-func globalBootstraperNodeData(donTopologies []*types.DONTopology) (string, string, error) {
+func globalBootstraperNodeData(donTopologies []*types.DonWithMetadata) (string, string, error) {
 	if len(donTopologies) == 1 {
 		// if there is only one DON, then the global bootstrapper is the bootstrap node of the DON
 		peerID, err := node.ToP2PID(donTopologies[0].DON.Nodes[0], node.KeyExtractingTransformFn)
@@ -37,7 +37,7 @@ func globalBootstraperNodeData(donTopologies []*types.DONTopology) (string, stri
 	return "", "", errors.New("expected at least one DON topology")
 }
 
-func FindPeeringData(donTopologies []*types.DONTopology) (types.PeeringData, error) {
+func FindPeeringData(donTopologies []*types.DonWithMetadata) (types.PeeringData, error) {
 	globalBootstraperPeerID, globalBootstraperHost, err := globalBootstraperNodeData(donTopologies)
 	if err != nil {
 		return types.PeeringData{}, err

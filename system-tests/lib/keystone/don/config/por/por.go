@@ -27,7 +27,7 @@ func Define(
 	capRegAddr,
 	workflowRegistryAddr,
 	forwarderAddress common.Address,
-	gatewayConnectorData *types.GatewayConnectorData,
+	gatewayConnectorData *types.GatewayConnectorOutput,
 ) (types.NodeIndexToConfigOverrides, error) {
 	// prepare required variables
 	donBootstrapNodePeerID, err := node.ToP2PID(don.Nodes[0], node.KeyExtractingTransformFn)

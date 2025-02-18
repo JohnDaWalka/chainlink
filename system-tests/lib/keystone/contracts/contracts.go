@@ -24,18 +24,14 @@ import (
 	keystonenode "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don/node"
 )
 
-func ConfigureKeystone(keystoneEnv *types.KeystoneEnvironment) error {
-	if keystoneEnv == nil {
-		return errors.New("keystone environment must be set")
-	}
+func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
+	donCapabilities := make([]keystone_changeset.DonCapabilities, 0, len(input.DonTopology.MetaDons))
 
-	donCapabilities := make([]keystone_changeset.DonCapabilities, 0, len(keystoneEnv.MustDONTopology()))
-
-	for _, donTopology := range keystoneEnv.DONTopology {
+	for _, metaDon := range input.DonTopology.MetaDons {
 		var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 		// check what capabilities each DON has and register them with Capabilities Registry contract
-		if flags.HasFlag(donTopology.Flags, types.CronCapability) {
+		if flags.HasFlag(metaDon.Flags, types.CronCapability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
 					LabelledName:   "cron-trigger",
@@ -46,7 +42,7 @@ func ConfigureKeystone(keystoneEnv *types.KeystoneEnvironment) error {
 			})
 		}
 
-		if flags.HasFlag(donTopology.Flags, types.CustomComputeCapability) {
+		if flags.HasFlag(metaDon.Flags, types.CustomComputeCapability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
 					LabelledName:   "custom-compute",
@@ -57,7 +53,7 @@ func ConfigureKeystone(keystoneEnv *types.KeystoneEnvironment) error {
 			})
 		}
 
-		if flags.HasFlag(donTopology.Flags, types.OCR3Capability) {
+		if flags.HasFlag(metaDon.Flags, types.OCR3Capability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
 					LabelledName:   "offchain_reporting",
@@ -69,7 +65,7 @@ func ConfigureKeystone(keystoneEnv *types.KeystoneEnvironment) error {
 			})
 		}
 
-		if flags.HasFlag(donTopology.Flags, types.WriteEVMCapability) {
+		if flags.HasFlag(metaDon.Flags, types.WriteEVMCapability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
 					LabelledName:   "write_geth-testnet",
@@ -83,8 +79,8 @@ func ConfigureKeystone(keystoneEnv *types.KeystoneEnvironment) error {
 
 		// Add support for new capabilities here as needed
 
-		donPeerIDs := make([]string, len(donTopology.DON.Nodes)-1)
-		for i, node := range donTopology.DON.Nodes {
+		donPeerIDs := make([]string, len(metaDon.DON.Nodes)-1)
+		for i, node := range metaDon.DON.Nodes {
 			if i == 0 {
 				continue
 			}
@@ -100,11 +96,11 @@ func ConfigureKeystone(keystoneEnv *types.KeystoneEnvironment) error {
 		// we only need to assign P2P IDs to NOPs, since `ConfigureInitialContractsChangeset` method
 		// will take care of creating DON to Nodes mapping
 		nop := keystone_changeset.NOP{
-			Name:  fmt.Sprintf("NOP for %s DON", donTopology.NodeOutput.NodeSetName),
+			Name:  fmt.Sprintf("NOP for %s DON", metaDon.NodeOutput.NodeSetName),
 			Nodes: donPeerIDs,
 		}
 
-		donName := donTopology.NodeOutput.NodeSetName + "-don"
+		donName := metaDon.NodeOutput.NodeSetName + "-don"
 		donCapabilities = append(donCapabilities, keystone_changeset.DonCapabilities{
 			Name:         donName,
 			F:            1,
@@ -115,10 +111,10 @@ func ConfigureKeystone(keystoneEnv *types.KeystoneEnvironment) error {
 
 	var transmissionSchedule []int
 
-	for _, donTopology := range keystoneEnv.MustDONTopology() {
-		if flags.HasFlag(donTopology.Flags, types.OCR3Capability) {
+	for _, metaDon := range input.DonTopology.MetaDons {
+		if flags.HasFlag(metaDon.Flags, types.OCR3Capability) {
 			// this schedule makes sure that all worker nodes are transmitting OCR3 reports
-			transmissionSchedule = []int{len(donTopology.DON.Nodes) - 1}
+			transmissionSchedule = []int{len(metaDon.DON.Nodes) - 1}
 			break
 		}
 	}
@@ -151,12 +147,12 @@ func ConfigureKeystone(keystoneEnv *types.KeystoneEnvironment) error {
 	}
 
 	cfg := keystone_changeset.InitialContractsCfg{
-		RegistryChainSel: keystoneEnv.ChainSelector,
+		RegistryChainSel: input.ChainSelector,
 		Dons:             donCapabilities,
 		OCR3Config:       &oracleConfig,
 	}
 
-	_, err := keystone_changeset.ConfigureInitialContractsChangeset(*keystoneEnv.MustCLDEnvironment(), cfg)
+	_, err := keystone_changeset.ConfigureInitialContractsChangeset(*input.CldEnv, cfg)
 	if err != nil {
 		return errors.Wrap(err, "failed to configure initial contracts")
 	}
@@ -164,35 +160,34 @@ func ConfigureKeystone(keystoneEnv *types.KeystoneEnvironment) error {
 	return nil
 }
 
-func DeployKeystone(testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment) error {
-	if keystoneEnv == nil {
-		return errors.New("keystone environment must be set")
-	}
-
-	keystoneEnv.KeystoneContractAddresses = &types.KeystoneContractAddresses{}
-
+func DeployKeystone(testLogger zerolog.Logger, input types.KeystoneContractsInput) (*types.KeystoneContractOutput, error) {
 	var err error
-	keystoneEnv.KeystoneContractAddresses.ForwarderAddress, err = deployKeystoneForwarder(testLogger, keystoneEnv.MustCLDEnvironment(), keystoneEnv.MustChainSelector())
+	forwarderAddress, err := DeployKeystoneForwarder(testLogger, input.CldEnv, input.ChainSelector)
 	if err != nil {
-		return errors.Wrap(err, "failed to deploy Keystone Forwarder contract")
+		return nil, errors.Wrap(err, "failed to deploy Keystone Forwarder contract")
 	}
-	keystoneEnv.KeystoneContractAddresses.OCR3CapabilityAddress, err = deployOCR3(testLogger, keystoneEnv.MustCLDEnvironment(), keystoneEnv.MustChainSelector())
+	oCR3CapabilityAddress, err := DeployOCR3(testLogger, input.CldEnv, input.ChainSelector)
 	if err != nil {
-		return errors.Wrap(err, "failed to deploy OCR3 contract")
+		return nil, errors.Wrap(err, "failed to deploy OCR3 contract")
 	}
-	keystoneEnv.KeystoneContractAddresses.CapabilitiesRegistryAddress, err = deployCapabilitiesRegistry(testLogger, keystoneEnv.MustCLDEnvironment(), keystoneEnv.MustChainSelector())
+	capabilitiesRegistryAddress, err := DeployCapabilitiesRegistry(testLogger, input.CldEnv, input.ChainSelector)
 	if err != nil {
-		return errors.Wrap(err, "failed to deploy Capabilities Registry contract")
+		return nil, errors.Wrap(err, "failed to deploy Capabilities Registry contract")
 	}
-	keystoneEnv.KeystoneContractAddresses.WorkflowRegistryAddress, err = deployWorkflowRegistry(testLogger, keystoneEnv.MustCLDEnvironment(), keystoneEnv.MustChainSelector())
+	workflowRegistryAddress, err := DeployWorkflowRegistry(testLogger, input.CldEnv, input.ChainSelector)
 	if err != nil {
-		return errors.Wrap(err, "failed to deploy Workflow Registry contract")
+		return nil, errors.Wrap(err, "failed to deploy Workflow Registry contract")
 	}
 
-	return nil
+	return &types.KeystoneContractOutput{
+		ForwarderAddress:            forwarderAddress,
+		OCR3CapabilityAddress:       oCR3CapabilityAddress,
+		CapabilitiesRegistryAddress: capabilitiesRegistryAddress,
+		WorkflowRegistryAddress:     workflowRegistryAddress,
+	}, nil
 }
 
-func deployOCR3(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
+func DeployOCR3(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
 	output, err := keystone_changeset.DeployOCR3(*ctfEnv, chainSelector)
 	if err != nil {
 		return common.Address{}, errors.Wrap(err, "failed to deploy OCR3 contract")
@@ -223,7 +218,7 @@ func deployOCR3(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chain
 	return ocr3capabilityAddr, nil
 }
 
-func deployCapabilitiesRegistry(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
+func DeployCapabilitiesRegistry(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
 	output, err := keystone_changeset.DeployCapabilityRegistry(*ctfEnv, chainSelector)
 	if err != nil {
 		return common.Address{}, errors.Wrap(err, "failed to deploy Capabilities Registry contract")
@@ -254,7 +249,7 @@ func deployCapabilitiesRegistry(testLogger zerolog.Logger, ctfEnv *deployment.En
 	return capabilitiesRegistryAddr, nil
 }
 
-func deployKeystoneForwarder(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
+func DeployKeystoneForwarder(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
 	output, err := keystone_changeset.DeployForwarder(*ctfEnv, keystone_changeset.DeployForwarderRequest{
 		ChainSelectors: []uint64{chainSelector},
 	})
@@ -287,7 +282,7 @@ func deployKeystoneForwarder(testLogger zerolog.Logger, ctfEnv *deployment.Envir
 	return forwarderAddress, nil
 }
 
-func deployWorkflowRegistry(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
+func DeployWorkflowRegistry(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
 	output, err := workflow_registry_changeset.Deploy(*ctfEnv, chainSelector)
 	if err != nil {
 		return common.Address{}, errors.Wrap(err, "failed to deploy workflow registry contract")
@@ -317,23 +312,24 @@ func deployWorkflowRegistry(testLogger zerolog.Logger, ctfEnv *deployment.Enviro
 	return workflowRegistryAddr, nil
 }
 
-func ConfigureWorkflowRegistry(testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment) error {
-	if keystoneEnv == nil {
-		return errors.New("keystone environment must be set")
-	}
-
-	_, err := workflow_registry_changeset.UpdateAllowedDons(*keystoneEnv.MustCLDEnvironment(), &workflow_registry_changeset.UpdateAllowedDonsRequest{
-		RegistryChainSel: keystoneEnv.MustChainSelector(),
-		DonIDs:           []uint32{keystoneEnv.MustWorkflowDONID()},
+func ConfigureWorkflowRegistry(testLogger zerolog.Logger, input types.WorkflowRegistryInput) error {
+	_, err := workflow_registry_changeset.UpdateAllowedDons(*input.CldEnv, &workflow_registry_changeset.UpdateAllowedDonsRequest{
+		RegistryChainSel: input.ChainSelector,
+		DonIDs:           input.AllowedDonIDs,
 		Allowed:          true,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to update allowed Dons")
 	}
 
-	_, err = workflow_registry_changeset.UpdateAuthorizedAddresses(*keystoneEnv.MustCLDEnvironment(), &workflow_registry_changeset.UpdateAuthorizedAddressesRequest{
-		RegistryChainSel: keystoneEnv.MustChainSelector(),
-		Addresses:        []string{keystoneEnv.MustSethClient().MustGetRootKeyAddress().Hex()},
+	addresses := make([]string, 0, len(input.WorkflowOwners))
+	for _, owner := range input.WorkflowOwners {
+		addresses = append(addresses, owner.Hex())
+	}
+
+	_, err = workflow_registry_changeset.UpdateAuthorizedAddresses(*input.CldEnv, &workflow_registry_changeset.UpdateAuthorizedAddressesRequest{
+		RegistryChainSel: input.ChainSelector,
+		Addresses:        addresses,
 		Allowed:          true,
 	})
 	if err != nil {
@@ -343,26 +339,22 @@ func ConfigureWorkflowRegistry(testLogger zerolog.Logger, keystoneEnv *types.Key
 	return nil
 }
 
-func DeployFeedsConsumer(testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment) (common.Address, error) {
-	if keystoneEnv == nil {
-		return common.Address{}, errors.New("keystone environment must be set")
-	}
-
-	output, err := keystone_changeset.DeployFeedsConsumer(*keystoneEnv.MustCLDEnvironment(), &keystone_changeset.DeployFeedsConsumerRequest{
-		ChainSelector: keystoneEnv.MustChainSelector(),
+func DeployFeedsConsumer(testLogger zerolog.Logger, input types.DeployFeedConsumerInput) (*types.DeployFeedConsumerOutput, error) {
+	output, err := keystone_changeset.DeployFeedsConsumer(*input.CldEnv, &keystone_changeset.DeployFeedsConsumerRequest{
+		ChainSelector: input.ChainSelector,
 	})
 	if err != nil {
-		return common.Address{}, errors.Wrap(err, "failed to deploy feeds_consumer contract")
+		return nil, errors.Wrap(err, "failed to deploy feeds_consumer contract")
 	}
 
-	err = keystoneEnv.MustCLDEnvironment().ExistingAddresses.Merge(output.AddressBook)
+	err = input.CldEnv.ExistingAddresses.Merge(output.AddressBook)
 	if err != nil {
-		return common.Address{}, errors.Wrap(err, "failed to merge address book")
+		return nil, errors.Wrap(err, "failed to merge address book")
 	}
 
-	addresses, err := keystoneEnv.MustCLDEnvironment().ExistingAddresses.AddressesForChain(keystoneEnv.MustChainSelector())
+	addresses, err := input.CldEnv.ExistingAddresses.AddressesForChain(input.ChainSelector)
 	if err != nil {
-		return common.Address{}, errors.Wrapf(err, "failed to get addresses for chain %d from the address book", keystoneEnv.MustChainSelector())
+		return nil, errors.Wrapf(err, "failed to get addresses for chain %d from the address book", input.ChainSelector)
 	}
 
 	var feedsConsumerAddress common.Address
@@ -375,26 +367,24 @@ func DeployFeedsConsumer(testLogger zerolog.Logger, keystoneEnv *types.KeystoneE
 	}
 
 	if feedsConsumerAddress == (common.Address{}) {
-		return common.Address{}, errors.New("failed to find FeedConsumer address in the address book")
+		return nil, errors.New("failed to find FeedConsumer address in the address book")
 	}
 
-	return feedsConsumerAddress, nil
+	return &types.DeployFeedConsumerOutput{
+		Address: feedsConsumerAddress,
+	}, nil
 }
 
-func ConfigureFeedsConsumer(testLogger zerolog.Logger, keystoneEnv *types.KeystoneEnvironment, workflowName string, feedsConsumerAddress common.Address) error {
-	if keystoneEnv == nil {
-		return errors.New("keystone environment must be set")
-	}
-
+func ConfigureFeedsConsumer(testLogger zerolog.Logger, input types.ConfigureFeedConsumerInput) error {
 	// configure Keystone Feeds Consumer contract, so it can accept reports from the forwarder contract,
 	// that come from our workflow that is owned by the root private key
-	feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(feedsConsumerAddress, keystoneEnv.MustSethClient().Client)
+	feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(input.FeedConsumerAddress, input.SethClient.Client)
 	if err != nil {
 		return errors.Wrap(err, "failed to create feeds consumer instance")
 	}
 
 	// Prepare hex-encoded and truncated workflow name
-	var workflowNameBytes [10]byte
+
 	var HashTruncateName = func(name string) string {
 		// Compute SHA-256 hash of the input string
 		hash := sha256.Sum256([]byte(name))
@@ -408,15 +398,21 @@ func ConfigureFeedsConsumer(testLogger zerolog.Logger, keystoneEnv *types.Keysto
 		return string(truncated)
 	}
 
-	truncated := HashTruncateName(workflowName)
-	copy(workflowNameBytes[:], []byte(truncated))
+	truncatedNames := make([][10]byte, 0, len(input.AllowedWorkflowNames))
+	for _, workflowName := range input.AllowedWorkflowNames {
+		var workflowNameBytes [10]byte
+		truncated := HashTruncateName(workflowName)
+		copy(workflowNameBytes[:], []byte(truncated))
 
-	_, decodeErr := keystoneEnv.SethClient.Decode(feedsConsumerInstance.SetConfig(
-		keystoneEnv.SethClient.NewTXOpts(),
-		[]common.Address{keystoneEnv.MustKeystoneContractAddresses().ForwarderAddress}, // allowed senders
-		[]common.Address{keystoneEnv.MustSethClient().MustGetRootKeyAddress()},         // allowed workflow owners
+		truncatedNames = append(truncatedNames, workflowNameBytes)
+	}
+
+	_, decodeErr := input.SethClient.Decode(feedsConsumerInstance.SetConfig(
+		input.SethClient.NewTXOpts(),
+		input.AllowedSenders,        // forwarder contract!!!
+		input.AllowedWorkflowOwners, // allowed workflow owners
 		// here we need to use hex-encoded workflow name converted to []byte
-		[][10]byte{workflowNameBytes}, // allowed workflow names
+		truncatedNames, // allowed workflow names
 	))
 	if decodeErr != nil {
 		return errors.Wrap(decodeErr, "failed to set config for feeds consumer")

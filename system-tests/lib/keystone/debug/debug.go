@@ -21,12 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
 )
 
-func PrintTestDebug(testName string, l zerolog.Logger, keystoneEnv *types.KeystoneEnvironment) {
-	if keystoneEnv == nil {
-		l.Error().Msg("❌ Keystone environment is nil")
-		return
-	}
-
+func PrintTestDebug(testName string, l zerolog.Logger, input types.DebugInput) {
 	l.Info().Msg("🔍 Debug information from Chainlink Node logs:")
 
 	var allLogFiles []*os.File
@@ -39,7 +34,7 @@ func PrintTestDebug(testName string, l zerolog.Logger, keystoneEnv *types.Keysto
 		}
 	}()
 
-	for _, donTopology := range keystoneEnv.MustDONTopology() {
+	for _, donTopology := range input.DonTopology.MetaDons {
 		logFiles, err := getLogFileHandles(testName, l, donTopology.NodeOutput.Output)
 		if err != nil {
 			l.Error().Err(err).Msg("Failed to get log file handles. No debug information will be printed")
@@ -76,7 +71,7 @@ func PrintTestDebug(testName string, l zerolog.Logger, keystoneEnv *types.Keysto
 			l.Info().Msg("✅ Reports were sent")
 
 			// debug report transmissions
-			ReportTransmissions(logFiles, l, keystoneEnv.MustBlockchain().Nodes[0].HostWSUrl)
+			ReportTransmissions(logFiles, l, input.BlockchainOutput.Nodes[0].HostWSUrl)
 		}
 
 		// Add support for new capabilities here as needed, if there is some specific debug information to be printed

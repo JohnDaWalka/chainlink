@@ -2,14 +2,11 @@ package jobs
 
 import (
 	"context"
-	"fmt"
-	"os"
 
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
-	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 
@@ -52,20 +49,4 @@ func ReinitialiseJDClients(ctfEnv *deployment.Environment, jdOutput *jd.Output, 
 	ctfEnv.Offchain = offchainClients[0]
 
 	return ctfEnv, nil
-}
-
-func StartJobDistributor(jdInput *jd.Input, keystoneEnv *types.KeystoneEnvironment) error {
-	if os.Getenv("CI") == "true" {
-		jdImage := ctfconfig.MustReadEnvVar_String(E2eJobDistributorImageEnvVarName)
-		jdVersion := os.Getenv(E2eJobDistributorVersionEnvVarName)
-		jdInput.Image = fmt.Sprintf("%s:%s", jdImage, jdVersion)
-	}
-	jdOutput, err := jd.NewJD(jdInput)
-	if err != nil {
-		return errors.Wrap(err, "failed to create new job distributor")
-	}
-
-	keystoneEnv.JD = jdOutput
-
-	return nil
 }

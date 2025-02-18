@@ -206,6 +206,10 @@ func (n *Node) Labels() []*ptypes.Label {
 	return n.labels
 }
 
+func (n *Node) AddLabel(label *ptypes.Label) {
+	n.labels = append(n.labels, label)
+}
+
 // CreateCCIPOCRSupportedChains creates a JobDistributorChainConfig for the node.
 // It works under assumption that the node is already registered with the job distributor.
 // It expects bootstrap nodes to have label with key "type" and value as "bootstrap".

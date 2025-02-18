@@ -8,8 +8,8 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
 )
 
-func DONTopologyWithFlag(donTopologies []*types.DONTopology, flag string) []*types.DONTopology {
-	var result []*types.DONTopology
+func DONTopologyWithFlag(donTopologies []*types.DonWithMetadata, flag string) []*types.DonWithMetadata {
+	var result []*types.DonWithMetadata
 
 	for _, donTopology := range donTopologies {
 		if HasFlag(donTopology.Flags, flag) {
@@ -24,7 +24,7 @@ func HasFlag(values []string, flag string) bool {
 	return slices.Contains(values, flag)
 }
 
-func OneDONTopologyWithFlag(donTopologies []*types.DONTopology, flag string) (*types.DONTopology, error) {
+func OneDONTopologyWithFlag(donTopologies []*types.DonWithMetadata, flag string) (*types.DonWithMetadata, error) {
 	donTopologies = DONTopologyWithFlag(donTopologies, flag)
 	if len(donTopologies) != 1 {
 		return nil, errors.Errorf("expected exactly one DON topology with flag %s, got %d", flag, len(donTopologies))

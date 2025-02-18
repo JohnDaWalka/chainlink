@@ -43,7 +43,7 @@ func BootstrapOCR3(nodeID string, ocr3CapabilityAddress common.Address, chainID 
 	}
 }
 
-func BootstrapGateway(don *devenv.DON, chainID uint64, donID uint32, extraAllowedPorts []int, extraAllowedIps []string, gatewayConnectorData types.GatewayConnectorData) *jobv1.ProposeJobRequest {
+func BootstrapGateway(don *devenv.DON, chainID uint64, donID uint32, extraAllowedPorts []int, extraAllowedIps []string, gatewayConnectorData types.GatewayConnectorOutput) *jobv1.ProposeJobRequest {
 	var gatewayMembers string
 	for i := 1; i < len(don.Nodes); i++ {
 		gatewayMembers += fmt.Sprintf(`
