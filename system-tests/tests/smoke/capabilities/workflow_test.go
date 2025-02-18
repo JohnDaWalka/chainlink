@@ -411,7 +411,8 @@ type FakePriceProvider struct {
 
 func NewFakePriceProvider(testLogger zerolog.Logger, in *TestConfig) (PriceProvider, error) {
 	priceIndex := ptr.Ptr(0)
-	expectedPricesFloat64 := []float64{182.9, 122.01}
+	// Add more prices here as needed
+	expectedPricesFloat64 := []float64{182.9}
 	expectedPrices := make([]*big.Int, len(expectedPricesFloat64))
 	for i, p := range expectedPricesFloat64 {
 		// convert float64 to big.Int by multiplying by 100
