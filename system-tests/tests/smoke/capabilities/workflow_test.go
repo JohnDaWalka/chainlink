@@ -79,7 +79,7 @@ type WorkflowConfig struct {
 	CompiledWorkflowConfig *CompiledConfig     `toml:"compiled_config" validate:"required_if=ShouldCompileNewWorkflow false"`
 	DependenciesConfig     *DependenciesConfig `toml:"dependencies" validate:"required"`
 	WorkflowName           string              `toml:"workflow_name" validate:"required" `
-	FeedID                 string              `toml:"feed_id" validate:"required,no0xPrefix"`
+	FeedID                 string              `toml:"feed_id" validate:"required,startsnotwith=0x"`
 }
 
 // noCRENoCompilation is a custom validator for the tag "no_cre_no_compilation".
@@ -95,10 +95,6 @@ func noCRENoCompilation(fl validator.FieldLevel) bool {
 		return false
 	}
 	return true
-}
-
-func no0xPrefix(fl validator.FieldLevel) bool {
-	return !strings.HasPrefix(fl.Field().String(), "0x")
 }
 
 func disabledInCI(fl validator.FieldLevel) bool {
@@ -131,10 +127,6 @@ func init() {
 	err := framework.Validator.RegisterValidation("no_cre_no_compilation", noCRENoCompilation)
 	if err != nil {
 		panic(errors.Wrap(err, "failed to register no_cre_no_compilation validator"))
-	}
-	err = framework.Validator.RegisterValidation("no0xPrefix", no0xPrefix)
-	if err != nil {
-		panic(errors.Wrap(err, "failed to register no0xPrefix validator"))
 	}
 	err = framework.Validator.RegisterValidation("disabled_in_ci", disabledInCI)
 	if err != nil {
