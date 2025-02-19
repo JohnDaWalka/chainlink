@@ -958,6 +958,22 @@ func DeployTransferableTokenSolana(
 				},
 			},
 		),
+		commoncs.Configure(
+			deployment.CreateLegacyChangeSet(changeset_solana.AddBillingTokenForRemoteChain),
+			changeset_solana.BillingTokenForRemoteChainConfig{
+				ChainSelector:       solChainSel,
+				RemoteChainSelector: evmChainSel,
+				TokenPubKey:         solTokenAddress.String(),
+				Config: solFeeQuoter.TokenTransferFeeConfig{
+					MinFeeUsdcents:    800,
+					MaxFeeUsdcents:    1600,
+					DeciBps:           0,
+					DestGasOverhead:   100,
+					DestBytesOverhead: 100,
+					IsEnabled:         true,
+				},
+			},
+		),
 	)
 
 	require.NoError(t, err)
