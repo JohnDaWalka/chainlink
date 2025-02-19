@@ -17,6 +17,9 @@ import (
 )
 
 func GenerateConfigs(input types.GeneratePoRConfigsInput) (types.NodeIndexToConfigOverrides, error) {
+	if err := input.Validate(); err != nil {
+		return nil, errors.Wrap(err, "input validation failed")
+	}
 	configOverrides := make(types.NodeIndexToConfigOverrides)
 
 	chainIDInt, err := strconv.Atoi(input.BlockchainOutput.ChainID)

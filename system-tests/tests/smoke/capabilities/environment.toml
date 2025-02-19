@@ -7,6 +7,7 @@
   # change to your version
   image = "jd-test-1:latest"
 
+# fake data provider used as a mocked price source
 [fake]
   port = 8171
 

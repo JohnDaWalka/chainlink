@@ -19,6 +19,10 @@ import (
 )
 
 func Configure(t *testing.T, testLogger zerolog.Logger, input types.ConfigureDonInput) (*types.ConfigureDonOutput, error) {
+	if err := input.Validate(); err != nil {
+		return nil, errors.Wrap(err, "input validation failed")
+	}
+
 	for i, donTopology := range input.DonTopology.MetaDons {
 		if configOverrides, ok := input.DonToConfigOverrides[donTopology.ID]; ok {
 			for j, configOverride := range configOverrides {

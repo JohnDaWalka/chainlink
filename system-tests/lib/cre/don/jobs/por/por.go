@@ -22,6 +22,9 @@ import (
 // if there's no job spec for the given JobDescription we would use the standard one, that could be easier
 // than having to define the job spec for each JobDescription manually, in case someone wants to change one parameter
 func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, error) {
+	if err := input.Validate(); err != nil {
+		return nil, errors.Wrap(err, "input validation failed")
+	}
 	jobSpecs := make(types.DonJobs)
 
 	chainIDInt, err := strconv.Atoi(input.BlockchainOutput.ChainID)

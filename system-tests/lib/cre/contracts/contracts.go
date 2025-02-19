@@ -25,6 +25,10 @@ import (
 )
 
 func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
+	if err := input.Validate(); err != nil {
+		return errors.Wrap(err, "input validation failed")
+	}
+
 	donCapabilities := make([]keystone_changeset.DonCapabilities, 0, len(input.DonTopology.MetaDons))
 
 	for _, metaDon := range input.DonTopology.MetaDons {
@@ -164,9 +168,15 @@ func DeployKeystone(testLogger zerolog.Logger, input *types.KeystoneContractsInp
 	if input == nil {
 		return nil, errors.New("input is nil")
 	}
+
 	if input.Out != nil && input.Out.UseCache {
 		return input.Out, nil
 	}
+
+	if err := input.Validate(); err != nil {
+		return nil, errors.Wrap(err, "input validation failed")
+	}
+
 	var err error
 	forwarderAddress, err := DeployKeystoneForwarder(testLogger, input.CldEnv, input.ChainSelector)
 	if err != nil {
@@ -329,6 +339,10 @@ func ConfigureWorkflowRegistry(testLogger zerolog.Logger, input *types.WorkflowR
 		return input.Out, nil
 	}
 
+	if err := input.Validate(); err != nil {
+		return nil, errors.Wrap(err, "input validation failed")
+	}
+
 	_, err := workflow_registry_changeset.UpdateAllowedDons(*input.CldEnv, &workflow_registry_changeset.UpdateAllowedDonsRequest{
 		RegistryChainSel: input.ChainSelector,
 		DonIDs:           input.AllowedDonIDs,
@@ -366,10 +380,14 @@ func DeployFeedsConsumer(testLogger zerolog.Logger, input *types.DeployFeedConsu
 	if input == nil {
 		return nil, errors.New("input is nil")
 	}
-
 	if input.Out != nil && input.Out.UseCache {
 		return input.Out, nil
 	}
+
+	if err := input.Validate(); err != nil {
+		return nil, errors.Wrap(err, "input validation failed")
+	}
+
 	output, err := keystone_changeset.DeployFeedsConsumer(*input.CldEnv, &keystone_changeset.DeployFeedsConsumerRequest{
 		ChainSelector: input.ChainSelector,
 	})
@@ -411,6 +429,13 @@ func DeployFeedsConsumer(testLogger zerolog.Logger, input *types.DeployFeedConsu
 func ConfigureFeedsConsumer(testLogger zerolog.Logger, input *types.ConfigureFeedConsumerInput) (*types.ConfigureFeedConsumerOutput, error) {
 	if input == nil {
 		return nil, errors.New("input is nil")
+	}
+	if input.Out != nil && input.Out.UseCache {
+		return input.Out, nil
+	}
+
+	if err := input.Validate(); err != nil {
+		return nil, errors.Wrap(err, "input validation failed")
 	}
 
 	feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(input.FeedConsumerAddress, input.SethClient.Client)

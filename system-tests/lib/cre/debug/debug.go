@@ -24,6 +24,12 @@ import (
 func PrintTestDebug(testName string, l zerolog.Logger, input types.DebugInput) {
 	l.Info().Msg("🔍 Debug information from Chainlink Node logs:")
 
+	if err := input.Validate(); err != nil {
+		l.Error().Err(err).Msg("Input validation failed. No debug information will be printed")
+
+		return
+	}
+
 	var allLogFiles []*os.File
 
 	defer func() {
