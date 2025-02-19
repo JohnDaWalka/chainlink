@@ -1,22 +1,22 @@
 [Network]
-selected_networks = ["0G_TESTNET_NEWTON"]
+selected_networks = ["PLUME_DEVNET"]
 
 [Soak.Common]
-chainlink_node_funding = 2
+chainlink_node_funding = 0.3
 
-[Soak.OCR]
-[Soak.OCR.Common]
+[Soak.OCR2]
+[Soak.OCR2.Common]
 test_duration = "4h"
 
-[Soak.OCR.Soak]
+[Soak.OCR2.Soak]
 time_between_rounds = "5m"
 
-[OCR.Common]
+[OCR2.Common]
 number_of_contracts = 2
 
-[Network.EVMNetworks.0G_TESTNET_NEWTON]
-evm_name = "0g-testnet-newton"
-evm_chain_id = 16600
+[Network.EVMNetworks.PLUME_DEVNET]
+evm_name = "plume-devnet"
+evm_chain_id = 98864
 client_implementation = "Ethereum"
 evm_simulated = false
 evm_chainlink_transaction_limit = 5000
