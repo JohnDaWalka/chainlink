@@ -1,6 +1,8 @@
 package capabilities_test
 
 import (
+	"crypto/ecdsa"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -11,7 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-gonic/gin"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
@@ -21,8 +25,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
@@ -30,9 +36,12 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
@@ -45,6 +54,7 @@ import (
 	keystoneporconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/por"
 	libjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	keystonepor "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/por"
+	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	libenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	keystonetypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	libcrecli "github.com/smartcontractkit/chainlink/system-tests/lib/crecli"
@@ -486,7 +496,7 @@ func (f *FakePriceProvider) URL() string {
 	return f.url
 }
 
-func extraAllowedPortsAndIps(testLogger zerolog.Logger, fakePort int, nodeOutput *ns.Output) ([]string, []int, error) {
+func extraAllowedPortsAndIps(testLogger zerolog.Logger, fakePort int) ([]string, []int, error) {
 	// we need to explicitly allow the port used by the fake data provider
 	// and IP corresponding to host.docker.internal or the IP of the host machine, if we are running on Linux,
 	// because that's where the fake data provider is running
@@ -496,7 +506,7 @@ func extraAllowedPortsAndIps(testLogger zerolog.Logger, fakePort int, nodeOutput
 	system := runtime.GOOS
 	switch system {
 	case "darwin":
-		hostIP, err = libdon.ResolveHostDockerInternaIP(testLogger, nodeOutput)
+		hostIP = "192.168.65.1"
 	case "linux":
 		// for linux framework already returns an IP, so we don't need to resolve it,
 		// but we need to remove the http:// prefix
@@ -525,6 +535,45 @@ func extraAllowedPortsAndIps(testLogger zerolog.Logger, fakePort int, nodeOutput
 	return append(gistIPs, hostIP), []int{fakePort}, nil
 }
 
+// func extraAllowedPortsAndIps(testLogger zerolog.Logger, fakePort int, nodeOutput *ns.Output) ([]string, []int, error) {
+// 	// we need to explicitly allow the port used by the fake data provider
+// 	// and IP corresponding to host.docker.internal or the IP of the host machine, if we are running on Linux,
+// 	// because that's where the fake data provider is running
+// 	var hostIP string
+// 	var err error
+
+// 	system := runtime.GOOS
+// 	switch system {
+// 	case "darwin":
+// 		hostIP, err = libdon.ResolveHostDockerInternaIP(testLogger, nodeOutput)
+// 	case "linux":
+// 		// for linux framework already returns an IP, so we don't need to resolve it,
+// 		// but we need to remove the http:// prefix
+// 		hostIP = strings.ReplaceAll(framework.HostDockerInternal(), "http://", "")
+// 	default:
+// 		err = fmt.Errorf("unsupported OS: %s", system)
+// 	}
+// 	if err != nil {
+// 		return nil, nil, errors.Wrap(err, "failed to resolve host.docker.internal IP")
+// 	}
+
+// 	testLogger.Info().Msgf("Will allow IP %s and port %d for the fake data provider", hostIP, fakePort)
+
+// 	ips, err := net.LookupIP("gist.githubusercontent.com")
+// 	if err != nil {
+// 		return nil, nil, errors.Wrap(err, "failed to resolve IP for gist.githubusercontent.com")
+// 	}
+
+// 	gistIPs := make([]string, len(ips))
+// 	for i, ip := range ips {
+// 		gistIPs[i] = ip.To4().String()
+// 		testLogger.Debug().Msgf("Resolved IP for gist.githubusercontent.com: %s", gistIPs[i])
+// 	}
+
+// 	// we also need to explicitly allow Gist's IP
+// 	return append(gistIPs, hostIP), []int{fakePort}, nil
+// }
+
 type InfrastructureInput struct {
 	jdInput         *jd.Input
 	nodeSetInput    []*keystonetypes.CapabilitiesAwareNodeSet
@@ -532,12 +581,12 @@ type InfrastructureInput struct {
 }
 
 type InfrastructureOutput struct {
-	chainSelector      uint64
-	nodeOuput          []*keystonetypes.WrappedNodeOutput
-	blockchainOutput   *blockchain.Output
-	jdOutput           *jd.Output
-	cldEnv             *deployment.Environment
-	donTopology        *keystonetypes.DonTopology
+	chainSelector uint64
+	// nodeOuput          []*keystonetypes.WrappedNodeOutput
+	blockchainOutput *blockchain.Output
+	jdOutput         *jd.Output
+	// cldEnv             *deployment.Environment
+	// donTopology        *keystonetypes.DonTopology
 	sethClient         *seth.Client
 	deployerPrivateKey string
 	gatewayConnector   *keystonetypes.GatewayConnectorOutput
@@ -612,48 +661,13 @@ func CreateInfrastructure(
 		}
 	}
 
-	nodeOutput := make([]*keystonetypes.WrappedNodeOutput, 0, len(input.nodeSetInput))
-	for _, nsInput := range input.nodeSetInput {
-		nodeset, nodesetErr := ns.NewSharedDBNodeSet(nsInput.Input, blockchainOutput)
-		if nodesetErr != nil {
-			return nil, errors.Wrapf(nodesetErr, "failed to deploy node set names %s", nsInput.Name)
-		}
-
-		nodeOutput = append(nodeOutput, &keystonetypes.WrappedNodeOutput{
-			Output:       nodeset,
-			NodeSetName:  nsInput.Name,
-			Capabilities: nsInput.Capabilities,
-		})
-	}
-
-	// Prepare the CLD environment and figure out DON topology; configure chains for nodes and job distributor
-	// Ugly glue hack ¯\_(ツ)_/¯
-	cldEnv, donTopology, err := libenv.BuildTopologyAndCLDEnvironment(cldLogger, input.nodeSetInput, jdOutput, nodeOutput, blockchainOutput, sethClient)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to build topology and CLD environment")
-	}
-
-	// Fund the nodes
-	for _, metaDon := range donTopology.MetaDons {
-		for _, node := range metaDon.DON.Nodes {
-			_, err := libfunding.SendFunds(zerolog.Logger{}, sethClient, libtypes.FundsToSend{
-				ToAddress:  common.HexToAddress(node.AccountAddr[sethClient.Cfg.Network.ChainID]),
-				Amount:     big.NewInt(5000000000000000000),
-				PrivateKey: sethClient.MustGetRootPrivateKey(),
-			})
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to send funds to node %s", node.AccountAddr[sethClient.Cfg.Network.ChainID])
-			}
-		}
-	}
-
 	return &InfrastructureOutput{
-		chainSelector:      chainSelector,
-		nodeOuput:          nodeOutput,
-		blockchainOutput:   blockchainOutput,
-		jdOutput:           jdOutput,
-		cldEnv:             cldEnv,
-		donTopology:        donTopology,
+		chainSelector: chainSelector,
+		// nodeOuput:          nodeOutput,
+		blockchainOutput: blockchainOutput,
+		jdOutput:         jdOutput,
+		// cldEnv:             cldEnv,
+		// donTopology:        donTopology,
 		sethClient:         sethClient,
 		deployerPrivateKey: pkey,
 		gatewayConnector: &keystonetypes.GatewayConnectorOutput{
@@ -673,6 +687,55 @@ type setupOutput struct {
 	donTopology          *keystonetypes.DonTopology
 }
 
+func generateP2PKeys(pwd string, n int) ([][]byte, []string, error) {
+	encryptedP2PKeyJSONs := make([][]byte, 0)
+	peerIDs := make([]string, 0)
+	for i := 0; i < n; i++ {
+		key, err := p2pkey.NewV2()
+		if err != nil {
+			return nil, peerIDs, err
+		}
+		d, err := key.ToEncryptedJSON(pwd, utils.DefaultScryptParams)
+		if err != nil {
+			return nil, peerIDs, err
+		}
+		encryptedP2PKeyJSONs = append(encryptedP2PKeyJSONs, d)
+		peerIDs = append(peerIDs, key.PeerID().String())
+	}
+	return encryptedP2PKeyJSONs, peerIDs, nil
+}
+
+func NewETHKey(password string) ([]byte, common.Address, error) {
+	privateKey, err := ecdsa.GenerateKey(crypto.S256(), rand.Reader)
+	var address common.Address
+	if err != nil {
+		return nil, address, errors.Wrap(err, "failed to generate private key")
+	}
+	address = crypto.PubkeyToAddress(privateKey.PublicKey)
+	jsonKey, err := keystore.EncryptKey(&keystore.Key{
+		PrivateKey: privateKey,
+		Address:    address,
+	}, password, keystore.StandardScryptN, keystore.StandardScryptP)
+	if err != nil {
+		return nil, address, errors.Wrap(err, "failed to encrypt the keystore")
+	}
+	return jsonKey, address, nil
+}
+
+func generateEVMKeys(pwd string, n int) ([][]byte, []common.Address, error) {
+	encryptedEVMKeyJSONs := make([][]byte, 0)
+	addresses := make([]common.Address, 0)
+	for i := 0; i < n; i++ {
+		key, addr, err := NewETHKey(pwd)
+		if err != nil {
+			return nil, addresses, err
+		}
+		encryptedEVMKeyJSONs = append(encryptedEVMKeyJSONs, key)
+		addresses = append(addresses, addr)
+	}
+	return encryptedEVMKeyJSONs, addresses, nil
+}
+
 func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig, priceProvider PriceProvider, binaryDownloadOutput binaryDownloadOutput, mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet) *setupOutput {
 	// Universal setup -- START
 	envInput := InfrastructureInput{
@@ -680,34 +743,234 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		nodeSetInput:    mustSetCapabilitiesFn(in.NodeSets),
 		blockchainInput: in.BlockchainA,
 	}
-	envOutput, err := CreateInfrastructure(cldlogger.NewSingleFileLogger(t), testLogger, envInput)
+	singeFileLogger := cldlogger.NewSingleFileLogger(t)
+	envOutput, err := CreateInfrastructure(singeFileLogger, testLogger, envInput)
 	require.NoError(t, err, "failed to start environment")
+
+	chainsConfig := []devenv.ChainConfig{
+		{
+			ChainID:   envOutput.sethClient.Cfg.Network.ChainID,
+			ChainName: envOutput.sethClient.Cfg.Network.Name,
+			ChainType: strings.ToUpper(envOutput.blockchainOutput.Family),
+			WSRPCs: []devenv.CribRPCs{{
+				External: envOutput.blockchainOutput.Nodes[0].HostWSUrl,
+				Internal: envOutput.blockchainOutput.Nodes[0].DockerInternalWSUrl,
+			}},
+			HTTPRPCs: []devenv.CribRPCs{{
+				External: envOutput.blockchainOutput.Nodes[0].HostHTTPUrl,
+				Internal: envOutput.blockchainOutput.Nodes[0].DockerInternalHTTPUrl,
+			}},
+			DeployerKey: envOutput.sethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
+		},
+	}
+
+	chains, err := devenv.NewChains(singeFileLogger, chainsConfig)
+	require.NoError(t, err, "failed to create chains")
+
+	chainsOnlyCld := &deployment.Environment{
+		Logger:            singeFileLogger,
+		Chains:            chains,
+		ExistingAddresses: deployment.NewMemoryAddressBook(),
+	}
 
 	// Deploy keystone contracts (forwarder, capability registry, ocr3 capability, workflow registry)
 	keystoneContractsInput := &keystonetypes.KeystoneContractsInput{
 		ChainSelector: envOutput.chainSelector,
-		CldEnv:        envOutput.cldEnv,
+		CldEnv:        chainsOnlyCld,
 	}
 
 	keystoneContractsOutput, err := libcontracts.DeployKeystone(testLogger, keystoneContractsInput)
 	require.NoError(t, err, "failed to deploy keystone contracts")
 
+	nodeInputs := mustSetCapabilitiesFn(in.NodeSets)
+	inputDonTopology, err := libdon.BuildInputDONTopology(nodeInputs)
+	require.NoError(t, err, "failed to build input DON topology")
+
 	// Configure Workflow Registry
 	workflowRegistryInput := &keystonetypes.WorkflowRegistryInput{
 		ChainSelector:  envOutput.chainSelector,
-		CldEnv:         envOutput.cldEnv,
-		AllowedDonIDs:  []uint32{envOutput.donTopology.WorkflowDONID},
+		CldEnv:         chainsOnlyCld,
+		AllowedDonIDs:  []uint32{inputDonTopology.WorkflowDONID},
 		WorkflowOwners: []common.Address{envOutput.sethClient.MustGetRootKeyAddress()},
 	}
 
 	_, err = libcontracts.ConfigureWorkflowRegistry(testLogger, workflowRegistryInput)
 	require.NoError(t, err, "failed to configure workflow registry")
-	// Universal setup -- END
+
+	// Allow extra IPs and ports for the fake data provider, which is running on host machine and requires explicit whitelisting
+	var extraAllowedIPs []string
+	var extraAllowedPorts []int
+	if _, ok := priceProvider.(*FakePriceProvider); ok {
+		extraAllowedIPs, extraAllowedPorts, err = extraAllowedPortsAndIps(testLogger, in.Fake.Port) // donTopology.MetaDons[0].NodeOutput.Output)
+		require.NoError(t, err, "failed to get extra allowed ports and IPs")
+	}
+
+	// Prepare job specs and node configs
+	configsAndJobsInput := jobsAndConfigsInput{
+		donTopology:                 inputDonTopology,
+		blockchainOutput:            envOutput.blockchainOutput,
+		gatewayConnectorOutput:      envOutput.gatewayConnector,
+		workflowRegistryAddress:     keystoneContractsOutput.WorkflowRegistryAddress,
+		forwarderAddress:            keystoneContractsOutput.ForwarderAddress,
+		capabilitiesRegistryAddress: keystoneContractsOutput.CapabilitiesRegistryAddress,
+		ocr3capabilityAddress:       keystoneContractsOutput.OCR3CapabilityAddress,
+		cldEnv:                      chainsOnlyCld,
+		extraAllowedIPs:             extraAllowedIPs,
+		extraAllowedPorts:           extraAllowedPorts,
+	}
+
+	// Generate keys
+	donToP2PKeys := make(map[uint32][][]byte)
+	donToP2PIDs := make(map[uint32][]string)
+	for _, don := range inputDonTopology.MetaDons {
+		keys, p2pIDs, err := generateP2PKeys("", don.NodeInput.Nodes)
+		require.NoError(t, err, "failed to generate P2P keys")
+		donToP2PKeys[don.ID] = keys
+		donToP2PIDs[don.ID] = p2pIDs
+	}
+
+	donToEthKeys := make(map[uint32][][]byte)
+	donToEthAddresses := make(map[uint32][]common.Address)
+	for _, don := range inputDonTopology.MetaDons {
+		keys, addresses, err := generateEVMKeys("", don.NodeInput.Nodes)
+		require.NoError(t, err, "failed to generate EVM keys")
+		donToEthKeys[don.ID] = keys
+		donToEthAddresses[don.ID] = addresses
+	}
+
+	var donsWithMeta []keystonetypes.DonWithMeta
+	for i, don := range inputDonTopology.MetaDons {
+		newDon := keystonetypes.DonWithLabelsAndNodes{
+			DonFlags: don.Flags(),
+		}
+		for j := range don.NodeInput.NodeSpecs {
+			nodeWithLabels := keystonetypes.NodeWithLabels{}
+			nodeType := keystonetypes.WorkerNode
+			if j == 0 {
+				nodeType = keystonetypes.BootstrapNode
+			}
+			nodeWithLabels.AddLabel(&ptypes.Label{
+				Key:   libnode.RoleLabelKey,
+				Value: ptr.Ptr(nodeType),
+			})
+			nodeWithLabels.AddLabel(&ptypes.Label{
+				Key:   devenv.NodeLabelP2PIDType,
+				Value: ptr.Ptr(donToP2PIDs[uint32(i+1)][j]),
+			})
+			nodeWithLabels.AddLabel(&ptypes.Label{
+				Key:   libnode.EthAddressKey,
+				Value: ptr.Ptr(donToEthAddresses[uint32(i+1)][j].Hex()),
+			})
+			nodeWithLabels.AddLabel(&ptypes.Label{
+				Key:   libnode.NodeIndexKey,
+				Value: ptr.Ptr(fmt.Sprint(j)),
+			})
+			nodeWithLabels.AddLabel(&ptypes.Label{
+				Key: libnode.HostLabelKey,
+				// TODO this will only work with Docker, for CRIB we need a different approach
+				Value: ptr.Ptr(fmt.Sprintf("%s-node%d", don.NodeInput.Name, j)),
+			})
+
+			newDon.DonNodes = append(newDon.DonNodes, &nodeWithLabels)
+		}
+		donsWithMeta = append(donsWithMeta, &newDon)
+	}
+
+	peeringData, err := libdon.FindPeeringData(donsWithMeta)
+	require.NoError(t, err, "failed to get peering data")
+	// prepare node configs
+	donToConfigs := make(keystonetypes.DonsToConfigOverrides)
+
+	var configErr error
+	for i, donTopology := range configsAndJobsInput.donTopology.MetaDons {
+		donToConfigs[donTopology.ID], configErr = keystoneporconfig.GenerateConfigs(
+			keystonetypes.GeneratePoRConfigsInput{
+				Don:                         donTopology.DON,
+				DonWithMeta:                 donsWithMeta[i],
+				NodeInput:                   donTopology.NodeInput,
+				BlockchainOutput:            configsAndJobsInput.blockchainOutput,
+				DonID:                       donTopology.ID,
+				Flags:                       donTopology.Flags(),
+				PeeringData:                 peeringData,
+				CapabilitiesRegistryAddress: configsAndJobsInput.capabilitiesRegistryAddress,
+				WorkflowRegistryAddress:     configsAndJobsInput.workflowRegistryAddress,
+				ForwarderAddress:            configsAndJobsInput.forwarderAddress,
+				GatewayConnectorOutput:      configsAndJobsInput.gatewayConnectorOutput,
+			},
+		)
+		require.NoError(t, configErr, "failed to define config for DON %d", donTopology.ID)
+	}
+
+	for i, donTopology := range inputDonTopology.MetaDons {
+		if configOverrides, ok := donToConfigs[donTopology.ID]; ok {
+			for j, configOverride := range configOverrides {
+				if len(donTopology.NodeInput.NodeSpecs)-1 < j {
+					t.FailNow()
+				}
+				nodeInputs[i].NodeSpecs[j].Node.TestConfigOverrides = configOverride
+			}
+		}
+	}
+
+	nodeOutput := make([]*keystonetypes.WrappedNodeOutput, 0, len(nodeInputs))
+	for _, nsInput := range nodeInputs {
+		nodeset, nodesetErr := ns.NewSharedDBNodeSet(nsInput.Input, envOutput.blockchainOutput)
+		require.NoError(t, nodesetErr, "failed to deploy node set names %s", nsInput.Name)
+
+		nodeOutput = append(nodeOutput, &keystonetypes.WrappedNodeOutput{
+			Output:       nodeset,
+			NodeSetName:  nsInput.Name,
+			Capabilities: nsInput.Capabilities,
+		})
+	}
+
+	for i, out := range nodeOutput {
+		c, err := clclient.New(out.Output.CLNodes)
+		require.NoError(t, err, "failed to create chainlink client")
+
+		err = clclient.ImportEVMKeys(c, donToEthKeys[uint32(i+1)], envOutput.blockchainOutput.ChainID)
+		require.NoError(t, err, "failed to import EVM keys")
+
+		err = clclient.ImportP2PKeys(c, donToP2PKeys[uint32(i+1)])
+		require.NoError(t, err, "failed to import P2P keys")
+
+		// delete the other p2p keys
+		for j, client := range c {
+			p2pKeys, err := client.MustReadP2PKeys()
+			require.NoError(t, err, "failed to read P2P keys")
+
+			fmt.Println("Genereated P2P keys for node ", donToP2PIDs[uint32(i+1)][j])
+			fmt.Println("P2P keys for node ", j+1)
+			for _, key := range p2pKeys.Data {
+				fmt.Println(fmt.Sprint(j+1) + "-id: " + fmt.Sprint(key.Attributes.ID))
+				fmt.Println(fmt.Sprint(j+1) + "-peer id: " + key.Attributes.PeerID)
+
+				// TODO remove old keys
+			}
+		}
+	}
+
+	// Prepare the CLD environment and figure out DON topology; configure chains for nodes and job distributor
+	// Ugly glue hack ¯\_(ツ)_/¯
+	cldEnv, donTopology, err := libenv.BuildTopologyAndCLDEnvironment(singeFileLogger, nodeInputs, envOutput.jdOutput, nodeOutput, envOutput.blockchainOutput, envOutput.sethClient)
+	require.NoError(t, err, "failed to build topology and CLD environment")
+
+	// Fund the nodes
+	for _, metaDon := range donTopology.MetaDons {
+		for _, node := range metaDon.DON.Nodes {
+			_, err := libfunding.SendFunds(zerolog.Logger{}, envOutput.sethClient, libtypes.FundsToSend{
+				ToAddress:  common.HexToAddress(node.AccountAddr[envOutput.sethClient.Cfg.Network.ChainID]),
+				Amount:     big.NewInt(5000000000000000000),
+				PrivateKey: envOutput.sethClient.MustGetRootPrivateKey(),
+			})
+			require.NoError(t, err, "failed to send funds to node %s", node.AccountAddr[envOutput.sethClient.Cfg.Network.ChainID])
+		}
+	}
 
 	// Workflow-specific configuration -- START
 	deployFeedConsumerInput := &keystonetypes.DeployFeedConsumerInput{
 		ChainSelector: envOutput.chainSelector,
-		CldEnv:        envOutput.cldEnv,
+		CldEnv:        chainsOnlyCld,
 	}
 	deployFeedsConsumerOutput, err := libcontracts.DeployFeedsConsumer(testLogger, deployFeedConsumerInput)
 	require.NoError(t, err, "failed to deploy feeds consumer")
@@ -725,7 +988,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	registerInput := registerPoRWorkflowInput{
 		WorkflowConfig:              in.WorkflowConfig,
 		chainSelector:               envOutput.chainSelector,
-		workflowDonID:               envOutput.donTopology.WorkflowDONID,
+		workflowDonID:               inputDonTopology.WorkflowDONID,
 		feedID:                      in.WorkflowConfig.FeedID,
 		workflowRegistryAddress:     keystoneContractsOutput.WorkflowRegistryAddress,
 		feedConsumerAddress:         deployFeedsConsumerOutput.FeedConsumerAddress,
@@ -741,41 +1004,39 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	require.NoError(t, err, "failed to register PoR workflow")
 	// Workflow-specific configuration -- END
 
-	// Universal setup -- CONTINUED
-	// Allow extra IPs and ports for the fake data provider, which is running on host machine and requires explicit whitelisting
-	var extraAllowedIPs []string
-	var extraAllowedPorts []int
-	if _, ok := priceProvider.(*FakePriceProvider); ok {
-		extraAllowedIPs, extraAllowedPorts, err = extraAllowedPortsAndIps(testLogger, in.Fake.Port, envOutput.donTopology.MetaDons[0].NodeOutput.Output)
-		require.NoError(t, err, "failed to get extra allowed ports and IPs")
+	donToJobSpecs := make(map[uint32]keystonetypes.DonJobs)
+	var jobSpecsErr error
+	for _, donTopology := range donTopology.MetaDons {
+		donToJobSpecs[donTopology.ID], jobSpecsErr = keystonepor.GenerateJobSpecs(
+			keystonetypes.GeneratePoRJobSpecsInput{
+				CldEnv:                 cldEnv,
+				Don:                    donTopology.DON,
+				NodeOutput:             donTopology.NodeOutput,
+				BlockchainOutput:       envOutput.blockchainOutput,
+				DonID:                  donTopology.ID,
+				Flags:                  donTopology.Flags(),
+				OCR3CapabilityAddress:  keystoneContractsOutput.OCR3CapabilityAddress,
+				ExtraAllowedPorts:      extraAllowedPorts,
+				ExtraAllowedIPs:        extraAllowedIPs,
+				CronCapBinName:         cronCapabilityAssetFile,
+				GatewayConnectorOutput: *envOutput.gatewayConnector,
+			},
+		)
+		require.NoError(t, jobSpecsErr, "failed to define job specs for DON %d", donTopology.ID)
 	}
-
-	// Prepare job specs and node configs
-	configsAndJobsInput := jobsAndConfigsInput{
-		donTopology:                 envOutput.donTopology,
-		blockchainOutput:            envOutput.blockchainOutput,
-		gatewayConnectorOutput:      envOutput.gatewayConnector,
-		workflowRegistryAddress:     keystoneContractsOutput.WorkflowRegistryAddress,
-		forwarderAddress:            keystoneContractsOutput.ForwarderAddress,
-		capabilitiesRegistryAddress: keystoneContractsOutput.CapabilitiesRegistryAddress,
-		ocr3capabilityAddress:       keystoneContractsOutput.OCR3CapabilityAddress,
-		cldEnv:                      envOutput.cldEnv,
-		extraAllowedIPs:             extraAllowedIPs,
-		extraAllowedPorts:           extraAllowedPorts,
-	}
-
-	configsAndJobsOutput, err := prepareJobSpecsAndNodeConfigs(configsAndJobsInput)
-	require.NoError(t, err, "failed to prepare job specs and node configs")
 
 	// Configure nodes and create jobs
 	configureDonInput := keystonetypes.ConfigureDonInput{
-		CldEnv:               envOutput.cldEnv,
-		BlockchainOutput:     envOutput.blockchainOutput,
-		JdOutput:             envOutput.jdOutput,
-		DonTopology:          envOutput.donTopology,
-		DonToJobSpecs:        configsAndJobsOutput.donToJobSpecs,
-		DonToConfigOverrides: configsAndJobsOutput.nodeToConfigOverrides,
+		CldEnv:           cldEnv,
+		BlockchainOutput: envOutput.blockchainOutput,
+		JdOutput:         envOutput.jdOutput,
+		DonTopology:      donTopology,
+		DonToJobSpecs:    donToJobSpecs,
+		// DonToConfigOverrides: configsAndJobsOutput.nodeToConfigOverrides,
 	}
+
+	// TODO remove config from input and make its application optional, only create jobs
+
 	_, err = libdon.Configure(t, testLogger, configureDonInput)
 	require.NoError(t, err, "failed to configure nodes and create jobs")
 
@@ -789,8 +1050,8 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	// Configure the Forwarder, OCR3 and Capabilities contracts
 	configureKeystoneInput := keystonetypes.ConfigureKeystoneInput{
 		ChainSelector: envOutput.chainSelector,
-		CldEnv:        envOutput.cldEnv,
-		DonTopology:   envOutput.donTopology,
+		CldEnv:        cldEnv,
+		DonTopology:   donTopology,
 	}
 	err = libcontracts.ConfigureKeystone(configureKeystoneInput)
 	require.NoError(t, err, "failed to configure keystone contracts")
@@ -806,7 +1067,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		forwarderAddress:     keystoneContractsOutput.ForwarderAddress,
 		sethClient:           envOutput.sethClient,
 		blockchainOutput:     envOutput.blockchainOutput,
-		donTopology:          envOutput.donTopology,
+		donTopology:          donTopology,
 	}
 }
 
@@ -828,64 +1089,64 @@ type jobsAndConfigsOutput struct {
 	nodeToConfigOverrides keystonetypes.DonsToConfigOverrides
 }
 
-func prepareJobSpecsAndNodeConfigs(input jobsAndConfigsInput) (*jobsAndConfigsOutput, error) {
-	peeringData, err := libdon.FindPeeringData(input.donTopology.MetaDons)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get peering data")
-	}
+// func prepareJobSpecsAndNodeConfigs(input jobsAndConfigsInput) (*jobsAndConfigsOutput, error) {
+// 	peeringData, err := libdon.FindPeeringData(input.donTopology.MetaDons)
+// 	if err != nil {
+// 		return nil, errors.Wrap(err, "failed to get peering data")
+// 	}
 
-	// prepare node configs
-	donToConfigs := make(keystonetypes.DonsToConfigOverrides)
-	var configErr error
-	for _, donTopology := range input.donTopology.MetaDons {
-		donToConfigs[donTopology.ID], configErr = keystoneporconfig.GenerateConfigs(
-			keystonetypes.GeneratePoRConfigsInput{
-				Don:                         donTopology.DON,
-				NodeInput:                   donTopology.NodeInput,
-				BlockchainOutput:            input.blockchainOutput,
-				DonID:                       donTopology.ID,
-				Flags:                       donTopology.Flags,
-				PeeringData:                 peeringData,
-				CapabilitiesRegistryAddress: input.capabilitiesRegistryAddress,
-				WorkflowRegistryAddress:     input.workflowRegistryAddress,
-				ForwarderAddress:            input.forwarderAddress,
-				GatewayConnectorOutput:      input.gatewayConnectorOutput,
-			},
-		)
-		if configErr != nil {
-			return nil, errors.Wrapf(configErr, "failed to define config for DON %d", donTopology.ID)
-		}
-	}
+// 	// prepare node configs
+// 	donToConfigs := make(keystonetypes.DonsToConfigOverrides)
+// 	var configErr error
+// 	for _, donTopology := range input.donTopology.MetaDons {
+// 		donToConfigs[donTopology.ID], configErr = keystoneporconfig.GenerateConfigs(
+// 			keystonetypes.GeneratePoRConfigsInput{
+// 				Don:                         donTopology.DON,
+// 				NodeInput:                   donTopology.NodeInput,
+// 				BlockchainOutput:            input.blockchainOutput,
+// 				DonID:                       donTopology.ID,
+// 				Flags:                       donTopology.Flags,
+// 				PeeringData:                 peeringData,
+// 				CapabilitiesRegistryAddress: input.capabilitiesRegistryAddress,
+// 				WorkflowRegistryAddress:     input.workflowRegistryAddress,
+// 				ForwarderAddress:            input.forwarderAddress,
+// 				GatewayConnectorOutput:      input.gatewayConnectorOutput,
+// 			},
+// 		)
+// 		if configErr != nil {
+// 			return nil, errors.Wrapf(configErr, "failed to define config for DON %d", donTopology.ID)
+// 		}
+// 	}
 
-	// define jobs
-	donToJobSpecs := make(map[uint32]keystonetypes.DonJobs)
-	var jobSpecsErr error
-	for _, donTopology := range input.donTopology.MetaDons {
-		donToJobSpecs[donTopology.ID], jobSpecsErr = keystonepor.GenerateJobSpecs(
-			keystonetypes.GeneratePoRJobSpecsInput{
-				CldEnv:                 input.cldEnv,
-				Don:                    donTopology.DON,
-				NodeOutput:             donTopology.NodeOutput,
-				BlockchainOutput:       input.blockchainOutput,
-				DonID:                  donTopology.ID,
-				Flags:                  donTopology.Flags,
-				OCR3CapabilityAddress:  input.ocr3capabilityAddress,
-				ExtraAllowedPorts:      input.extraAllowedPorts,
-				ExtraAllowedIPs:        input.extraAllowedIPs,
-				CronCapBinName:         cronCapabilityAssetFile,
-				GatewayConnectorOutput: *input.gatewayConnectorOutput,
-			},
-		)
-		if jobSpecsErr != nil {
-			return nil, errors.Wrapf(jobSpecsErr, "failed to define job specs for DON %d", donTopology.ID)
-		}
-	}
+// 	// define jobs
+// 	donToJobSpecs := make(map[uint32]keystonetypes.DonJobs)
+// 	var jobSpecsErr error
+// 	for _, donTopology := range input.donTopology.MetaDons {
+// 		donToJobSpecs[donTopology.ID], jobSpecsErr = keystonepor.GenerateJobSpecs(
+// 			keystonetypes.GeneratePoRJobSpecsInput{
+// 				CldEnv:                 input.cldEnv,
+// 				Don:                    donTopology.DON,
+// 				NodeOutput:             donTopology.NodeOutput,
+// 				BlockchainOutput:       input.blockchainOutput,
+// 				DonID:                  donTopology.ID,
+// 				Flags:                  donTopology.Flags,
+// 				OCR3CapabilityAddress:  input.ocr3capabilityAddress,
+// 				ExtraAllowedPorts:      input.extraAllowedPorts,
+// 				ExtraAllowedIPs:        input.extraAllowedIPs,
+// 				CronCapBinName:         cronCapabilityAssetFile,
+// 				GatewayConnectorOutput: *input.gatewayConnectorOutput,
+// 			},
+// 		)
+// 		if jobSpecsErr != nil {
+// 			return nil, errors.Wrapf(jobSpecsErr, "failed to define job specs for DON %d", donTopology.ID)
+// 		}
+// 	}
 
-	return &jobsAndConfigsOutput{
-		nodeToConfigOverrides: donToConfigs,
-		donToJobSpecs:         donToJobSpecs,
-	}, nil
-}
+//		return &jobsAndConfigsOutput{
+//			nodeToConfigOverrides: donToConfigs,
+//			donToJobSpecs:         donToJobSpecs,
+//		}, nil
+//	}
 func TestKeystoneWithOCR3Workflow_SingleDon_MockedPrice(t *testing.T) {
 	testLogger := framework.L
 

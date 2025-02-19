@@ -12,7 +12,7 @@ func DONTopologyWithFlag(donTopologies []*types.DonWithMetadata, flag string) []
 	var result []*types.DonWithMetadata
 
 	for _, donTopology := range donTopologies {
-		if HasFlag(donTopology.Flags, flag) {
+		if HasFlag(donTopology.Flags(), flag) {
 			result = append(result, donTopology)
 		}
 	}

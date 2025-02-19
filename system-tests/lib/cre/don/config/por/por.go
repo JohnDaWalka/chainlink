@@ -17,9 +17,9 @@ import (
 )
 
 func GenerateConfigs(input types.GeneratePoRConfigsInput) (types.NodeIndexToConfigOverrides, error) {
-	if err := input.Validate(); err != nil {
-		return nil, errors.Wrap(err, "input validation failed")
-	}
+	// if err := input.Validate(); err != nil {
+	// 	return nil, errors.Wrap(err, "input validation failed")
+	// }
 	configOverrides := make(types.NodeIndexToConfigOverrides)
 
 	chainIDInt, err := strconv.Atoi(input.BlockchainOutput.ChainID)
@@ -29,12 +29,12 @@ func GenerateConfigs(input types.GeneratePoRConfigsInput) (types.NodeIndexToConf
 	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
 
 	// find bootstrap node
-	bootstrapNode, err := node.FindOneWithLabel(input.Don, &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.BootstrapNode)})
+	bootstrapNode, err := node.FindOneWithLabel(input.DonWithMeta.Nodes(), &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.BootstrapNode)})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find bootstrap node")
 	}
 
-	donBootstrapNodePeerID, err := node.ToP2PID(*bootstrapNode, node.KeyExtractingTransformFn)
+	donBootstrapNodePeerID, err := node.ToP2PID(bootstrapNode, node.KeyExtractingTransformFn)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get bootstrap node peer ID")
 	}
@@ -74,7 +74,7 @@ func GenerateConfigs(input types.GeneratePoRConfigsInput) (types.NodeIndexToConf
 	}
 
 	// find worker nodes
-	workflowNodeSet, err := node.FindManyWithLabel(input.Don, &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.WorkerNode)})
+	workflowNodeSet, err := node.FindManyWithLabel(input.DonWithMeta.Nodes(), &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.WorkerNode)})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes")
 	}
@@ -91,7 +91,19 @@ func GenerateConfigs(input types.GeneratePoRConfigsInput) (types.NodeIndexToConf
 		}
 
 		configOverrides[nodeIndex] = config.WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost, input.PeeringData, chainIDUint64, input.CapabilitiesRegistryAddress, input.BlockchainOutput.Nodes[0].DockerInternalHTTPUrl, input.BlockchainOutput.Nodes[0].DockerInternalWSUrl)
-		nodeEthAddr := common.HexToAddress(workflowNodeSet[i].AccountAddr[chainIDUint64])
+		var nodeEthAddr common.Address
+		for _, label := range workflowNodeSet[i].Labels() {
+			if label.Key == node.EthAddressKey {
+				if label.Value == nil {
+					return nil, errors.New("eth address label value is nil")
+				}
+				if *label.Value == "" {
+					return nil, errors.New("eth address label value is empty")
+				}
+				nodeEthAddr = common.HexToAddress(*label.Value)
+				break
+			}
+		}
 
 		if keystoneflags.HasFlag(input.Flags, types.WriteEVMCapability) {
 			configOverrides[nodeIndex] += config.WorkerWriteEMV(

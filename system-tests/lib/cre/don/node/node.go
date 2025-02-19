@@ -29,23 +29,24 @@ func KeyExtractingTransformFn(value string) string {
 	return value
 }
 
-func ToP2PID(node devenv.Node, transformFn stringTransformer) (string, error) {
+func ToP2PID(node types.NodeWithMeta, transformFn stringTransformer) (string, error) {
 	for _, label := range node.Labels() {
 		if label.Key == devenv.NodeLabelP2PIDType {
 			if label.Value == nil {
-				return "", fmt.Errorf("p2p label value is nil for node %s", node.Name)
+				return "", fmt.Errorf("p2p label value is nil for node %s", node)
 			}
 			return transformFn(*label.Value), nil
 		}
 	}
 
-	return "", fmt.Errorf("p2p label not found for node %s", node.Name)
+	return "", fmt.Errorf("p2p label not found for node %s", node)
 }
 
 const (
-	RoleLabelKey = "role"
-	HostLabelKey = "host"
-	NodeIndexKey = "node_index"
+	RoleLabelKey  = "role"
+	HostLabelKey  = "host"
+	NodeIndexKey  = "node_index"
+	EthAddressKey = "eth_address"
 )
 
 // copied from Bala's unmerged PR: https://github.com/smartcontractkit/chainlink/pull/15751
@@ -97,31 +98,31 @@ func GetNodeInfo(nodeOut *ns.Output, prefix string, bootstrapNodeCount int) ([]d
 	return nodeInfo, nil
 }
 
-func FindOneWithLabel(nodes *devenv.DON, wantedLabel *ptypes.Label) (*devenv.Node, error) {
+func FindOneWithLabel(nodes []types.NodeWithMeta, wantedLabel *ptypes.Label) (types.NodeWithMeta, error) {
 	if wantedLabel == nil {
 		return nil, errors.New("label is nil")
 	}
-	for _, node := range nodes.Nodes {
+	for _, node := range nodes {
 		for _, label := range node.Labels() {
 			if wantedLabel.Key == label.Key && equalLabels(wantedLabel.Value, label.Value) {
-				return &node, nil
+				return node, nil
 			}
 		}
 	}
 	return nil, fmt.Errorf("node with label %s=%s not found", wantedLabel.Key, *wantedLabel.Value)
 }
 
-func FindManyWithLabel(nodes *devenv.DON, wantedLabel *ptypes.Label) ([]*devenv.Node, error) {
+func FindManyWithLabel(nodes []types.NodeWithMeta, wantedLabel *ptypes.Label) ([]types.NodeWithMeta, error) {
 	if wantedLabel == nil {
 		return nil, errors.New("label is nil")
 	}
 
-	var foundNodes []*devenv.Node
+	var foundNodes []types.NodeWithMeta
 
-	for _, node := range nodes.Nodes {
+	for _, node := range nodes {
 		for _, label := range node.Labels() {
 			if wantedLabel.Key == label.Key && equalLabels(wantedLabel.Value, label.Value) {
-				foundNodes = append(foundNodes, &node)
+				foundNodes = append(foundNodes, node)
 			}
 		}
 	}

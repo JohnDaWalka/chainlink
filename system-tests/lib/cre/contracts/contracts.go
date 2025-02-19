@@ -35,7 +35,7 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 		var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 		// check what capabilities each DON has and register them with Capabilities Registry contract
-		if flags.HasFlag(metaDon.Flags, types.CronCapability) {
+		if flags.HasFlag(metaDon.Flags(), types.CronCapability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
 					LabelledName:   "cron-trigger",
@@ -46,7 +46,7 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 			})
 		}
 
-		if flags.HasFlag(metaDon.Flags, types.CustomComputeCapability) {
+		if flags.HasFlag(metaDon.Flags(), types.CustomComputeCapability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
 					LabelledName:   "custom-compute",
@@ -57,7 +57,7 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 			})
 		}
 
-		if flags.HasFlag(metaDon.Flags, types.OCR3Capability) {
+		if flags.HasFlag(metaDon.Flags(), types.OCR3Capability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
 					LabelledName:   "offchain_reporting",
@@ -69,7 +69,7 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 			})
 		}
 
-		if flags.HasFlag(metaDon.Flags, types.WriteEVMCapability) {
+		if flags.HasFlag(metaDon.Flags(), types.WriteEVMCapability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
 					LabelledName:   "write_geth-testnet",
@@ -89,7 +89,7 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 				continue
 			}
 
-			p2pID, err := keystonenode.ToP2PID(node, keystonenode.NoOpTransformFn)
+			p2pID, err := keystonenode.ToP2PID(&node, keystonenode.NoOpTransformFn)
 			if err != nil {
 				return errors.Wrapf(err, "failed to get p2p id for node %s", node.Name)
 			}
@@ -116,7 +116,7 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 	var transmissionSchedule []int
 
 	for _, metaDon := range input.DonTopology.MetaDons {
-		if flags.HasFlag(metaDon.Flags, types.OCR3Capability) {
+		if flags.HasFlag(metaDon.Flags(), types.OCR3Capability) {
 			// this schedule makes sure that all worker nodes are transmitting OCR3 reports
 			transmissionSchedule = []int{len(metaDon.DON.Nodes) - 1}
 			break

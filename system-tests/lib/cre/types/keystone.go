@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
@@ -247,6 +248,7 @@ type GatewayConnectorOutput struct {
 type GeneratePoRJobSpecsInput struct {
 	CldEnv                 *deployment.Environment
 	Don                    *devenv.DON
+	DonWithMeta            DonWithMeta
 	NodeOutput             *WrappedNodeOutput
 	BlockchainOutput       *blockchain.Output
 	DonID                  uint32
@@ -295,6 +297,7 @@ func (g *GeneratePoRJobSpecsInput) Validate() error {
 
 type GeneratePoRConfigsInput struct {
 	Don                         *devenv.DON
+	DonWithMeta                 DonWithMeta
 	NodeInput                   *CapabilitiesAwareNodeSet
 	BlockchainOutput            *blockchain.Output
 	DonID                       uint32
@@ -350,7 +353,54 @@ type DonWithMetadata struct {
 	NodeInput  *CapabilitiesAwareNodeSet
 	NodeOutput *WrappedNodeOutput
 	ID         uint32
-	Flags      []string
+	DonFlags   []string
+}
+
+func (d *DonWithMetadata) Flags() []string {
+	return d.DonFlags
+}
+
+func (d *DonWithMetadata) Nodes() []NodeWithMeta {
+	nodes := make([]NodeWithMeta, len(d.DON.Nodes))
+	for i, n := range d.DON.Nodes {
+		nodes[i] = &NodeWithLabels{labels: n.Labels()}
+	}
+	return nodes
+}
+
+type DonWithLabelsAndNodes struct {
+	DonNodes []NodeWithMeta
+	DonFlags []string
+}
+
+func (d *DonWithLabelsAndNodes) Flags() []string {
+	return d.DonFlags
+}
+
+func (d *DonWithLabelsAndNodes) Nodes() []NodeWithMeta {
+	return d.DonNodes
+}
+
+type NodeWithLabels struct {
+	labels []*ptypes.Label
+}
+
+func (n *NodeWithLabels) Labels() []*ptypes.Label {
+	return n.labels
+}
+
+func (n *NodeWithLabels) AddLabel(label *ptypes.Label) {
+	n.labels = append(n.labels, label)
+}
+
+type NodeWithMeta interface {
+	Labels() []*ptypes.Label
+	AddLabel(label *ptypes.Label)
+}
+
+type DonWithMeta interface {
+	Flags() []string
+	Nodes() []NodeWithMeta
 }
 
 type DonTopology struct {

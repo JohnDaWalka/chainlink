@@ -11,6 +11,7 @@ import (
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 
+	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
@@ -33,12 +34,12 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 	}
 	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
 
-	bootstrapNode, err := node.FindOneWithLabel(input.Don, &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.BootstrapNode)})
+	bootstrapNode, err := node.FindOneWithLabel(input.DonWithMeta.Nodes(), &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.BootstrapNode)})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find bootstrap node")
 	}
 
-	donBootstrapNodePeerID, err := node.ToP2PID(*bootstrapNode, node.KeyExtractingTransformFn)
+	donBootstrapNodePeerID, err := node.ToP2PID(bootstrapNode, node.KeyExtractingTransformFn)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get bootstrap node peer ID")
 	}
@@ -55,9 +56,14 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 		return nil, errors.New("failed to get bootstrap node host from labels")
 	}
 
+	donBootstrapNodeP2PID, err := node.ToP2PID(bootstrapNode, node.KeyExtractingTransformFn)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get bootstrap node peer ID")
+	}
+
 	// configuration of bootstrap node
 	if keystoneflags.HasFlag(input.Flags, types.OCR3Capability) {
-		jobSpecs[types.JobDescription{Flag: types.OCR3Capability, NodeType: types.BootstrapNode}] = []*jobv1.ProposeJobRequest{jobs.BootstrapOCR3(bootstrapNode.NodeID, input.OCR3CapabilityAddress, chainIDUint64)}
+		jobSpecs[types.JobDescription{Flag: types.OCR3Capability, NodeType: types.BootstrapNode}] = []*jobv1.ProposeJobRequest{jobs.BootstrapOCR3(donBootstrapNodeP2PID, input.OCR3CapabilityAddress, chainIDUint64)}
 	}
 
 	// if it's a workflow DON or it has custom compute capability, we need to create a gateway job
@@ -71,15 +77,20 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 		Port:                 5001,
 	}
 
-	workflowNodeSet, err := node.FindManyWithLabel(input.Don, &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.WorkerNode)})
+	workflowNodeSet, err := node.FindManyWithLabel(input.DonWithMeta.Nodes(), &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.WorkerNode)})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes")
 	}
 
 	// configuration of worker nodes
-	for _, node := range workflowNodeSet {
+	for _, n := range workflowNodeSet {
+		nodeP2PID, err := node.ToP2PID(n, node.KeyExtractingTransformFn)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get bootstrap node peer ID")
+		}
+
 		if keystoneflags.HasFlag(input.Flags, types.CronCapability) {
-			jobSpec := jobs.WorkerStandardCapability(node.NodeID, "cron-capabilities", jobs.ExternalCapabilityPath(input.CronCapBinName), jobs.EmptyStdCapConfig)
+			jobSpec := jobs.WorkerStandardCapability(nodeP2PID, "cron-capabilities", jobs.ExternalCapabilityPath(input.CronCapBinName), jobs.EmptyStdCapConfig)
 			jobDesc := types.JobDescription{Flag: types.CronCapability, NodeType: types.WorkerNode}
 
 			if _, ok := jobSpecs[jobDesc]; !ok {
@@ -99,7 +110,7 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 				perSenderBurst = 5
 				"""`
 
-			jobSpec := jobs.WorkerStandardCapability(node.NodeID, "custom-compute", "__builtin_custom-compute-action", config)
+			jobSpec := jobs.WorkerStandardCapability(nodeP2PID, "custom-compute", "__builtin_custom-compute-action", config)
 			jobDesc := types.JobDescription{Flag: types.CustomComputeCapability, NodeType: types.WorkerNode}
 
 			if _, ok := jobSpecs[jobDesc]; !ok {
@@ -109,8 +120,36 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 			}
 		}
 
+		var nodeEthAddr common.Address
+		for _, label := range n.Labels() {
+			if label.Key == node.EthAddressKey {
+				if label.Value == nil {
+					return nil, errors.New("eth address label value is nil")
+				}
+				if *label.Value == "" {
+					return nil, errors.New("eth address label value is empty")
+				}
+				nodeEthAddr = common.HexToAddress(*label.Value)
+				break
+			}
+		}
+
+		var ocr2KeyBundleID string
+		for _, label := range n.Labels() {
+			if label.Key == devenv.NodeOCR2KeyBundleIDType {
+				if label.Value == nil {
+					return nil, errors.New("ocr2 key bundle id label value is nil")
+				}
+				if *label.Value == "" {
+					return nil, errors.New("ocr2 key bundle id label value is empty")
+				}
+				nodeEthAddr = common.HexToAddress(*label.Value)
+				break
+			}
+		}
+
 		if keystoneflags.HasFlag(input.Flags, types.OCR3Capability) {
-			jobSpec := jobs.WorkerOCR3(node.NodeID, input.OCR3CapabilityAddress, common.HexToAddress(node.AccountAddr[chainIDUint64]), node.Ocr2KeyBundleID, ocrPeeringData, chainIDUint64)
+			jobSpec := jobs.WorkerOCR3(nodeP2PID, input.OCR3CapabilityAddress, nodeEthAddr, ocr2KeyBundleID, ocrPeeringData, chainIDUint64)
 			jobDesc := types.JobDescription{Flag: types.OCR3Capability, NodeType: types.WorkerNode}
 
 			if _, ok := jobSpecs[jobDesc]; !ok {

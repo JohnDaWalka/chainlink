@@ -28,6 +28,7 @@ const (
 	NodeLabelP2PIDType      = "p2p_id"
 	NodeLabelValueBootstrap = "bootstrap"
 	NodeLabelValuePlugin    = "plugin"
+	NodeOCR2KeyBundleIDType = "ocr2_key_bundle_id"
 )
 
 // NodeInfo holds the information required to create a node
@@ -263,6 +264,12 @@ func (n *Node) CreateCCIPOCRSupportedChains(ctx context.Context, chains []JDChai
 			return fmt.Errorf("no OCR2 key bundle id found for node %s", n.Name)
 		}
 		n.Ocr2KeyBundleID = ocr2BundleId
+
+		n.labels = append(n.labels, &ptypes.Label{
+			Key:   NodeOCR2KeyBundleIDType,
+			Value: &ocr2BundleId,
+		})
+
 		// fetch node labels to know if the node is bootstrap or plugin
 		// if multi address is set, then it's a bootstrap node
 		isBootstrap := n.multiAddr != ""

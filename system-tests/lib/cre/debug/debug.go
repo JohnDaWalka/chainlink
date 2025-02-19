@@ -52,7 +52,7 @@ func PrintTestDebug(testName string, l zerolog.Logger, input types.DebugInput) {
 		// assuming one bootstrap node
 		workflowNodeCount := len(donTopology.NodeOutput.CLNodes) - 1
 
-		if flags.HasFlag(donTopology.Flags, types.WorkflowDON) {
+		if flags.HasFlag(donTopology.Flags(), types.WorkflowDON) {
 			if !checkIfWorkflowWasExecuting(logFiles, workflowNodeCount) {
 				l.Error().Msg("❌ Workflow was not executing")
 				return
@@ -60,7 +60,7 @@ func PrintTestDebug(testName string, l zerolog.Logger, input types.DebugInput) {
 			l.Info().Msg("✅ Workflow was executing")
 		}
 
-		if flags.HasFlag(donTopology.Flags, types.OCR3Capability) {
+		if flags.HasFlag(donTopology.Flags(), types.OCR3Capability) {
 			if !checkIfOCRWasExecuting(logFiles, workflowNodeCount) {
 				l.Error().Msg("❌ OCR was not executing")
 				return
@@ -68,7 +68,7 @@ func PrintTestDebug(testName string, l zerolog.Logger, input types.DebugInput) {
 			l.Info().Msg("✅ OCR was executing")
 		}
 
-		if flags.HasFlag(donTopology.Flags, types.WriteEVMCapability) {
+		if flags.HasFlag(donTopology.Flags(), types.WriteEVMCapability) {
 			if !checkIfAtLeastOneReportWasSent(logFiles, workflowNodeCount) {
 				l.Error().Msg("❌ Reports were not sent")
 				return
