@@ -219,7 +219,7 @@ func TestBilling(t *testing.T) {
 	bigNum.FillBytes(value[:])
 	e, err = commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(changeset_solana.AddBillingToken),
+			deployment.CreateLegacyChangeSet(changeset_solana.AddBillingTokenChangeset),
 			changeset_solana.BillingTokenConfig{
 				ChainSelector:    solChain,
 				TokenPubKey:      tokenAddress.String(),

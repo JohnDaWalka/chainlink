@@ -2,6 +2,7 @@ package solana
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
@@ -398,10 +399,51 @@ func deployChainContractsSolana(
 		tokenPoolProgram = chainState.TokenPool
 	}
 
+	// SETUP BILLING
+	// TODO: random value for now, fixed in Terrys upgrade PR
+	// as we take in separate config for solana deploy where we can configure this
+	// and also EnableExecutionAfter
+	value := [28]uint8{}
+	bigNum, _ := new(big.Int).SetString("19816680000000000000", 10)
+	bigNum.FillBytes(value[:])
+
+	// link
+	if err := AddBillingToken(
+		e, chain, feeQuoterAddress, ccipRouterProgram, deployment.SPL2022Tokens,
+		solFeeQuoter.BillingTokenConfig{
+			Enabled: true,
+			Mint:    chainState.LinkToken,
+			UsdPerToken: solFeeQuoter.TimestampedPackedU224{
+				Value:     value,
+				Timestamp: int64(100),
+			},
+			PremiumMultiplierWeiPerEth: 100,
+		},
+	); err != nil {
+		return err
+	}
+
+	// wsol
+	if err := AddBillingToken(
+		e, chain, feeQuoterAddress, ccipRouterProgram, deployment.SPLTokens,
+		solFeeQuoter.BillingTokenConfig{
+			Enabled: true,
+			Mint:    chainState.WSOL,
+			UsdPerToken: solFeeQuoter.TimestampedPackedU224{
+				Value:     value,
+				Timestamp: int64(100),
+			},
+			PremiumMultiplierWeiPerEth: 100,
+		},
+	); err != nil {
+		return err
+	}
+
 	externalExecutionConfigPDA, _, _ := solState.FindExternalExecutionConfigPDA(ccipRouterProgram)
 	externalTokenPoolsSignerPDA, _, _ := solState.FindExternalTokenPoolsSignerPDA(ccipRouterProgram)
 	feeBillingSignerPDA, _, _ := solState.FindFeeBillingSignerPDA(ccipRouterProgram)
 	linkFqBillingConfigPDA, _, _ := solState.FindFqBillingTokenConfigPDA(chainState.LinkToken, feeQuoterAddress)
+	wsolFqBillingConfigPDA, _, _ := solState.FindFqBillingTokenConfigPDA(chainState.WSOL, feeQuoterAddress)
 	offRampReferenceAddressesPDA, _, _ := solState.FindOfframpReferenceAddressesPDA(offRampAddress)
 	offRampBillingSignerPDA, _, _ := solState.FindOfframpBillingSignerPDA(offRampAddress)
 
@@ -424,10 +466,10 @@ func deployChainContractsSolana(
 			feeQuoterConfigPDA,
 			feeQuoterAddress,
 			linkFqBillingConfigPDA,
+			wsolFqBillingConfigPDA,
 		}); err != nil {
 		return fmt.Errorf("failed to extend lookup table: %w", err)
 	}
-
 	return nil
 }
 

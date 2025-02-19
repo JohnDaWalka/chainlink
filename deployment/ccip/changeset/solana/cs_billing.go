@@ -17,7 +17,7 @@ import (
 	cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 )
 
-var _ deployment.ChangeSet[BillingTokenConfig] = AddBillingToken
+var _ deployment.ChangeSet[BillingTokenConfig] = AddBillingTokenChangeset
 var _ deployment.ChangeSet[BillingTokenForRemoteChainConfig] = AddBillingTokenForRemoteChain
 
 // ADD BILLING TOKEN
@@ -55,32 +55,25 @@ func (cfg BillingTokenConfig) Validate(e deployment.Environment) error {
 	return nil
 }
 
-func AddBillingToken(e deployment.Environment, cfg BillingTokenConfig) (deployment.ChangesetOutput, error) {
-	if err := cfg.Validate(e); err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-	chain, ok := e.SolChains[cfg.ChainSelector]
-	if !ok {
-		return deployment.ChangesetOutput{}, fmt.Errorf("chain selector %d not found in environment", cfg.ChainSelector)
-	}
-	state, _ := cs.LoadOnchainState(e)
-	chainState := state.SolChains[cfg.ChainSelector]
-	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
-	// verified
-	tokenprogramID, _ := GetTokenProgramID(cfg.TokenProgramName)
-	tokenBillingPDA, _, _ := solState.FindFqBillingTokenConfigPDA(tokenPubKey, chainState.FeeQuoter)
-
-	// addressing errcheck in the next PR
-	billingSignerPDA, _, _ := solState.FindFeeBillingSignerPDA(chainState.Router)
-	token2022Receiver, _, _ := solTokenUtil.FindAssociatedTokenAddress(tokenprogramID, tokenPubKey, billingSignerPDA)
-
-	e.Logger.Infow("chainState.FeeQuoterConfigPDA", "feeQuoterConfigPDA", chainState.FeeQuoterConfigPDA.String())
-	solFeeQuoter.SetProgramID(chainState.FeeQuoter)
+func AddBillingToken(
+	e deployment.Environment,
+	chain deployment.SolChain,
+	feeQuoterAddress solana.PublicKey,
+	routerAddress solana.PublicKey,
+	tokenProgramName string,
+	billingConfig solFeeQuoter.BillingTokenConfig,
+) error {
+	tokenPubKey := solana.MustPublicKeyFromBase58(billingConfig.Mint.String())
+	tokenBillingPDA, _, _ := solState.FindFqBillingTokenConfigPDA(tokenPubKey, feeQuoterAddress)
+	billingSignerPDA, _, _ := solState.FindFeeBillingSignerPDA(routerAddress)
+	tokenProgramID, _ := GetTokenProgramID(tokenProgramName)
+	token2022Receiver, _, _ := solTokenUtil.FindAssociatedTokenAddress(tokenProgramID, tokenPubKey, billingSignerPDA)
+	feeQuoterConfigPDA, _, _ := solState.FindFqConfigPDA(feeQuoterAddress)
 	ixConfig, cerr := solFeeQuoter.NewAddBillingTokenConfigInstruction(
-		cfg.Config,
-		chainState.FeeQuoterConfigPDA,
+		billingConfig,
+		feeQuoterConfigPDA,
 		tokenBillingPDA,
-		tokenprogramID,
+		tokenProgramID,
 		tokenPubKey,
 		token2022Receiver,
 		chain.DeployerKey.PublicKey(), // ccip admin
@@ -89,13 +82,31 @@ func AddBillingToken(e deployment.Environment, cfg BillingTokenConfig) (deployme
 		solana.SystemProgramID,
 	).ValidateAndBuild()
 	if cerr != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", cerr)
+		return fmt.Errorf("failed to generate instructions: %w", cerr)
 	}
-
 	instructions := []solana.Instruction{ixConfig}
 	if err := chain.Confirm(instructions); err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
+		return fmt.Errorf("failed to confirm instructions: %w", err)
 	}
+	return nil
+}
+
+func AddBillingTokenChangeset(e deployment.Environment, cfg BillingTokenConfig) (deployment.ChangesetOutput, error) {
+	if err := cfg.Validate(e); err != nil {
+		return deployment.ChangesetOutput{}, err
+	}
+	chain := e.SolChains[cfg.ChainSelector]
+	state, _ := cs.LoadOnchainState(e)
+	chainState := state.SolChains[cfg.ChainSelector]
+
+	solFeeQuoter.SetProgramID(chainState.FeeQuoter)
+
+	if err := AddBillingToken(e, chain, chainState.FeeQuoter, chainState.Router, cfg.TokenProgramName, cfg.Config); err != nil {
+		return deployment.ChangesetOutput{}, err
+	}
+
+	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
+	tokenBillingPDA, _, _ := solState.FindFqBillingTokenConfigPDA(tokenPubKey, chainState.FeeQuoter)
 
 	if err := solCommonUtil.ExtendLookupTable(
 		e.GetContext(),
