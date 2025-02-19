@@ -16,12 +16,12 @@ type CompilationResult struct {
 	SecretsURL  string
 }
 
-func CompileWorkflow(workflowFolder string, configFile, settingsFile *os.File) (CompilationResult, error) {
+func CompileWorkflow(creCLICommandPath, workflowFolder string, configFile, settingsFile *os.File) (CompilationResult, error) {
 	var outputBuffer bytes.Buffer
 
 	// the CLI expects the workflow code to be located in the same directory as its `go.mod`` file. That's why we assume that the file, which
 	// contains the entrypoint method is always named `main.go`. This is a limitation of the CLI, which we can't change.
-	compileCmd := exec.Command(CRECLICommand, "workflow", "compile", "-S", settingsFile.Name(), "-c", configFile.Name(), "main.go") // #nosec G204
+	compileCmd := exec.Command(creCLICommandPath, "workflow", "compile", "-S", settingsFile.Name(), "-c", configFile.Name(), "main.go") // #nosec G204
 	compileCmd.Stdout = &outputBuffer
 	compileCmd.Stderr = &outputBuffer
 	compileCmd.Dir = workflowFolder
@@ -58,8 +58,8 @@ func CompileWorkflow(workflowFolder string, configFile, settingsFile *os.File) (
 	}, nil
 }
 
-func RegisterWorkflow(workflowName, workflowURL, configURL string, settingsFile *os.File) error {
-	registerCmd := exec.Command(CRECLICommand, "workflow", "register", workflowName, "-b", workflowURL, "-c", configURL, "-S", settingsFile.Name(), "-v") // #nosec G204
+func RegisterWorkflow(creCLICommandPath, workflowName, workflowURL, configURL string, settingsFile *os.File) error {
+	registerCmd := exec.Command(creCLICommandPath, "workflow", "register", workflowName, "-b", workflowURL, "-c", configURL, "-S", settingsFile.Name(), "-v") // #nosec G204
 	registerCmd.Stdout = os.Stdout
 	registerCmd.Stderr = os.Stderr
 	if err := registerCmd.Start(); err != nil {

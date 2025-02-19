@@ -11,7 +11,7 @@ import (
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
 var (

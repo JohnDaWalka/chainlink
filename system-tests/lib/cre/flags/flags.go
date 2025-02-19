@@ -5,7 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
 func DONTopologyWithFlag(donTopologies []*types.DonWithMetadata, flag string) []*types.DonWithMetadata {

@@ -14,9 +14,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
-	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don"
-	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don/node"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
+	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
+	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
 func BuildTopologyAndCLDEnvironment(lgr logger.Logger, nodeSetInput []*types.CapabilitiesAwareNodeSet, jdOutput *jd.Output, nodeSetOutput []*types.WrappedNodeOutput, blockchainOutput *blockchain.Output, sethClient *seth.Client) (*deployment.Environment, *types.DonTopology, error) {

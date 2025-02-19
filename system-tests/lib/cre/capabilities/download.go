@@ -3,7 +3,6 @@ package capabilities
 import (
 	"os"
 
-	// libgithub "github.com/smartcontractkit/chainlink/system-tests/lib/github"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/client"
 )
 

@@ -10,8 +10,8 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don/node"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
 const (

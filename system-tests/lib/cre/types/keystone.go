@@ -128,6 +128,33 @@ type GatewayConnectorOutput struct {
 	Port int
 }
 
+type GeneratePoRJobSpecsInput struct {
+	CldEnv                 *deployment.Environment
+	Don                    *devenv.DON
+	NodeOutput             *WrappedNodeOutput
+	BlockchainOutput       *blockchain.Output
+	DonID                  uint32
+	Flags                  []string
+	OCR3CapabilityAddress  common.Address
+	ExtraAllowedPorts      []int
+	ExtraAllowedIPs        []string
+	CronCapBinName         string
+	GatewayConnectorOutput GatewayConnectorOutput
+}
+
+type GeneratePoRConfigsInput struct {
+	Don                         *devenv.DON
+	NodeInput                   *CapabilitiesAwareNodeSet
+	BlockchainOutput            *blockchain.Output
+	DonID                       uint32
+	Flags                       []string
+	PeeringData                 PeeringData
+	CapabilitiesRegistryAddress common.Address
+	WorkflowRegistryAddress     common.Address
+	ForwarderAddress            common.Address
+	GatewayConnectorOutput      *GatewayConnectorOutput
+}
+
 // DonWithMetadata is a struct that holds the DON references and various metadata
 type DonWithMetadata struct {
 	DON        *devenv.DON

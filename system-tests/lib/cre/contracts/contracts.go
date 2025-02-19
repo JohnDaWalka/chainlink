@@ -18,10 +18,10 @@ import (
 
 	workflow_registry_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/workflowregistry"
 
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/flags"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 
-	keystonenode "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don/node"
+	keystonenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 )
 
 func ConfigureKeystone(input types.ConfigureKeystoneInput) error {

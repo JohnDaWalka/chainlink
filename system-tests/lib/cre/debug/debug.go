@@ -17,8 +17,8 @@ import (
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/flags"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
 func PrintTestDebug(testName string, l zerolog.Logger, input types.DebugInput) {

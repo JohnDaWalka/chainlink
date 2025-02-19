@@ -12,11 +12,6 @@ const (
 	CRECLISettingsFileName = ".cre-cli-settings.yaml"
 )
 
-var (
-	// absolute path to the CRE CLI binary
-	CRECLICommand string
-)
-
 type Settings struct {
 	DevPlatform  DevPlatform  `yaml:"dev-platform"`
 	UserWorkflow UserWorkflow `yaml:"user-workflow"`

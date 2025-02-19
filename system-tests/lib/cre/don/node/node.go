@@ -1,17 +1,21 @@
 package node
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 )
 
-type StringTransformer func(string) string
+type stringTransformer func(string) string
 
 func NoOpTransformFn(value string) string {
 	return value
@@ -25,7 +29,7 @@ func KeyExtractingTransformFn(value string) string {
 	return value
 }
 
-func ToP2PID(node devenv.Node, transformFn StringTransformer) (string, error) {
+func ToP2PID(node devenv.Node, transformFn stringTransformer) (string, error) {
 	for _, label := range node.Labels() {
 		if label.Key == devenv.NodeLabelP2PIDType {
 			if label.Value == nil {
@@ -37,6 +41,12 @@ func ToP2PID(node devenv.Node, transformFn StringTransformer) (string, error) {
 
 	return "", fmt.Errorf("p2p label not found for node %s", node.Name)
 }
+
+const (
+	RoleLabelKey = "role"
+	HostLabelKey = "host"
+	NodeIndexKey = "node_index"
+)
 
 // copied from Bala's unmerged PR: https://github.com/smartcontractkit/chainlink/pull/15751
 // TODO: remove this once the PR is merged and import his function
@@ -59,6 +69,11 @@ func GetNodeInfo(nodeOut *ns.Output, prefix string, bootstrapNodeCount int) ([]d
 					Password:   nodeOut.CLNodes[i-1].Node.APIAuthPassword,
 					InternalIP: nodeOut.CLNodes[i-1].Node.InternalIP,
 				},
+				Labels: map[string]string{
+					HostLabelKey: nodeOut.CLNodes[i-1].Node.ContainerName,
+					NodeIndexKey: strconv.Itoa(i - 1),
+					RoleLabelKey: types.BootstrapNode,
+				},
 			})
 		} else {
 			nodeInfo = append(nodeInfo, devenv.NodeInfo{
@@ -71,8 +86,59 @@ func GetNodeInfo(nodeOut *ns.Output, prefix string, bootstrapNodeCount int) ([]d
 					Password:   nodeOut.CLNodes[i-1].Node.APIAuthPassword,
 					InternalIP: nodeOut.CLNodes[i-1].Node.InternalIP,
 				},
+				Labels: map[string]string{
+					HostLabelKey: nodeOut.CLNodes[i-1].Node.ContainerName,
+					NodeIndexKey: strconv.Itoa(i - 1),
+					RoleLabelKey: types.WorkerNode,
+				},
 			})
 		}
 	}
 	return nodeInfo, nil
+}
+
+func FindOneWithLabel(nodes *devenv.DON, wantedLabel *ptypes.Label) (*devenv.Node, error) {
+	if wantedLabel == nil {
+		return nil, errors.New("label is nil")
+	}
+	for _, node := range nodes.Nodes {
+		for _, label := range node.Labels() {
+			if wantedLabel.Key == label.Key && equalLabels(wantedLabel.Value, label.Value) {
+				return &node, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("node with label %s=%s not found", wantedLabel.Key, *wantedLabel.Value)
+}
+
+func FindManyWithLabel(nodes *devenv.DON, wantedLabel *ptypes.Label) ([]*devenv.Node, error) {
+	if wantedLabel == nil {
+		return nil, errors.New("label is nil")
+	}
+
+	var foundNodes []*devenv.Node
+
+	for _, node := range nodes.Nodes {
+		for _, label := range node.Labels() {
+			if wantedLabel.Key == label.Key && equalLabels(wantedLabel.Value, label.Value) {
+				foundNodes = append(foundNodes, &node)
+			}
+		}
+	}
+
+	if len(foundNodes) == 0 {
+		return nil, fmt.Errorf("node with label %s=%s not found", wantedLabel.Key, *wantedLabel.Value)
+	}
+
+	return foundNodes, nil
+}
+
+func equalLabels(first, second *string) bool {
+	if first == nil && second == nil {
+		return true
+	}
+	if first == nil || second == nil {
+		return false
+	}
+	return *first == *second
 }

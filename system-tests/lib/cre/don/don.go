@@ -12,10 +12,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don/config"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/don/jobs"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/flags"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
 func Configure(t *testing.T, testLogger zerolog.Logger, input types.ConfigureDonInput) (*types.ConfigureDonOutput, error) {
@@ -42,6 +42,7 @@ func Configure(t *testing.T, testLogger zerolog.Logger, input types.ConfigureDon
 
 	// after restarting the nodes, we need to reinitialize the JD clients otherwise
 	// communication between JD and nodes will fail due to invalidated session cookie
+	// TODO remove if our idea with pre-generating & importing keys works and we do not need to restart the nodes
 	jdOutput, jdErr := jobs.ReinitialiseJDClients(input.CldEnv, input.JdOutput, nodeOutputs...)
 	if jdErr != nil {
 		return nil, errors.Wrap(jdErr, "failed to reinitialize JD clients")
@@ -80,14 +81,14 @@ func BuildDONTopology(dons []*devenv.DON, nodeSetInput []*types.CapabilitiesAwar
 			Flags:      flags,
 		}
 	} else {
-		for i, don := range dons {
+		for i := range dons {
 			flags, err := flags.NodeSetFlags(nodeSetInput[i])
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[i].Name)
 			}
 
 			donWithMeta[i] = &types.DonWithMetadata{
-				DON:        don,
+				DON:        dons[i],
 				NodeInput:  nodeSetInput[i],
 				NodeOutput: nodeSetOutput[i],
 				ID:         libc.MustSafeUint32(i + 1),

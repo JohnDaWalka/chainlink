@@ -11,8 +11,8 @@ import (
 
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 
-	keystoneflags "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/flags"
-	types "github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
+	keystoneflags "github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
+	types "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
 var SupportedJobs = []types.JobDescription{

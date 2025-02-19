@@ -6,7 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/system-tests/lib/keystone/types"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
 func BootstrapEVM(donBootstrapNodePeerID string, chainID uint64, capabilitiesRegistryAddress common.Address, httpRPC, wsRPC string) string {
