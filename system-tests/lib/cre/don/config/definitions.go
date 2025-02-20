@@ -93,6 +93,7 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, peeringData 
 
 	[[EVM]]
 	ChainID = '%d'
+	AutoCreateKey = false
 
 	[[EVM.Nodes]]
 	Name = 'anvil'

@@ -14,25 +14,25 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
-	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
+	// libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
-func BuildTopologyAndCLDEnvironment(lgr logger.Logger, nodeSetInput []*types.CapabilitiesAwareNodeSet, jdOutput *jd.Output, nodeSetOutput []*types.WrappedNodeOutput, blockchainOutput *blockchain.Output, sethClient *seth.Client) (*deployment.Environment, *types.DonTopology, error) {
-	env, dons, err := buildChainlinkDeploymentEnv(lgr, jdOutput, nodeSetOutput, blockchainOutput, sethClient)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to build chainlink deployment environment")
-	}
-	donTopology, err := libdon.BuildDONTopology(dons, nodeSetInput, nodeSetOutput)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to build DON topology")
-	}
+// func BuildTopologyAndCLDEnvironment(lgr logger.Logger, nodeSetInput []*types.CapabilitiesAwareNodeSet, jdOutput *jd.Output, nodeSetOutput []*types.WrappedNodeOutput, blockchainOutput *blockchain.Output, sethClient *seth.Client) (*deployment.Environment, *types.DonTopology, error) {
+// 	env, dons, err := buildChainlinkDeploymentEnv(lgr, jdOutput, nodeSetOutput, blockchainOutput, sethClient)
+// 	if err != nil {
+// 		return nil, nil, errors.Wrap(err, "failed to build chainlink deployment environment")
+// 	}
+// 	donTopology, err := libdon.BuildDONTopology(dons, nodeSetInput, nodeSetOutput)
+// 	if err != nil {
+// 		return nil, nil, errors.Wrap(err, "failed to build DON topology")
+// 	}
 
-	return env, donTopology, nil
-}
+// 	return env, donTopology, nil
+// }
 
-func buildChainlinkDeploymentEnv(lgr logger.Logger, jdOutput *jd.Output, nodeSetOutput []*types.WrappedNodeOutput, blockchainOutput *blockchain.Output, sethClient *seth.Client) (*deployment.Environment, []*devenv.DON, error) {
+func BuildChainlinkDeploymentEnv(lgr logger.Logger, jdOutput *jd.Output, nodeSetOutput []*types.WrappedNodeOutput, blockchainOutput *blockchain.Output, sethClient *seth.Client) (*deployment.Environment, []*devenv.DON, error) {
 	envs := make([]*deployment.Environment, len(nodeSetOutput))
 	dons := make([]*devenv.DON, len(nodeSetOutput))
 

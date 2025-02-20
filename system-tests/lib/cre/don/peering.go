@@ -10,9 +10,9 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
-func globalBootstraperNodeData(donTopologies []types.DonWithMeta) (string, string, error) {
-	var findHost = func(n types.NodeWithMeta) string {
-		for _, label := range n.Labels() {
+func globalBootstraperNodeData(topology *types.Topology) (string, string, error) {
+	var findHost = func(n *types.NodeMetadata) string {
+		for _, label := range n.Labels {
 			if label.Key == node.HostLabelKey {
 				return *label.Value
 			}
@@ -20,8 +20,8 @@ func globalBootstraperNodeData(donTopologies []types.DonWithMeta) (string, strin
 		return ""
 	}
 
-	if len(donTopologies) == 1 {
-		bootstrapNode, err := node.FindOneWithLabel(donTopologies[0].Nodes(), &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.BootstrapNode)})
+	if len(topology.Metadata) == 1 {
+		bootstrapNode, err := node.FindOneWithLabel(topology.Metadata[0].NodesMetadata, &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.BootstrapNode)})
 		if err != nil {
 			return "", "", errors.Wrap(err, "failed to find bootstrap node")
 		}
@@ -38,12 +38,12 @@ func globalBootstraperNodeData(donTopologies []types.DonWithMeta) (string, strin
 		}
 
 		return peerID, bootstrapNodeHost, nil
-	} else if len(donTopologies) > 1 {
+	} else if len(topology.Metadata) > 1 {
 		// if there's more than one DON, then peering capabilitity needs to point to the same bootstrap node
 		// for all the DONs, and so we need to find it first. For us, it will always be the bootstrap node of the workflow DON.
-		for _, donTopology := range donTopologies {
-			if flags.HasFlag(donTopology.Flags(), types.WorkflowDON) {
-				bootstrapNode, err := node.FindOneWithLabel(donTopology.Nodes(), &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.BootstrapNode)})
+		for _, donTopology := range topology.Metadata {
+			if flags.HasFlag(donTopology.Flags, types.WorkflowDON) {
+				bootstrapNode, err := node.FindOneWithLabel(donTopology.NodesMetadata, &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.BootstrapNode)})
 				if err != nil {
 					return "", "", errors.Wrap(err, "failed to find bootstrap node")
 				}
@@ -68,7 +68,7 @@ func globalBootstraperNodeData(donTopologies []types.DonWithMeta) (string, strin
 	return "", "", errors.New("expected at least one DON topology")
 }
 
-func FindPeeringData(donTopologies []types.DonWithMeta) (types.PeeringData, error) {
+func FindPeeringData(donTopologies *types.Topology) (types.PeeringData, error) {
 	globalBootstraperPeerID, globalBootstraperHost, err := globalBootstraperNodeData(donTopologies)
 	if err != nil {
 		return types.PeeringData{}, err

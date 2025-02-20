@@ -29,8 +29,8 @@ func KeyExtractingTransformFn(value string) string {
 	return value
 }
 
-func ToP2PID(node types.NodeWithMeta, transformFn stringTransformer) (string, error) {
-	for _, label := range node.Labels() {
+func ToP2PID(node *types.NodeMetadata, transformFn stringTransformer) (string, error) {
+	for _, label := range node.Labels {
 		if label.Key == devenv.NodeLabelP2PIDType {
 			if label.Value == nil {
 				return "", fmt.Errorf("p2p label value is nil for node %s", node)
@@ -98,12 +98,12 @@ func GetNodeInfo(nodeOut *ns.Output, prefix string, bootstrapNodeCount int) ([]d
 	return nodeInfo, nil
 }
 
-func FindOneWithLabel(nodes []types.NodeWithMeta, wantedLabel *ptypes.Label) (types.NodeWithMeta, error) {
+func FindOneWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label) (*types.NodeMetadata, error) {
 	if wantedLabel == nil {
 		return nil, errors.New("label is nil")
 	}
 	for _, node := range nodes {
-		for _, label := range node.Labels() {
+		for _, label := range node.Labels {
 			if wantedLabel.Key == label.Key && equalLabels(wantedLabel.Value, label.Value) {
 				return node, nil
 			}
@@ -112,15 +112,15 @@ func FindOneWithLabel(nodes []types.NodeWithMeta, wantedLabel *ptypes.Label) (ty
 	return nil, fmt.Errorf("node with label %s=%s not found", wantedLabel.Key, *wantedLabel.Value)
 }
 
-func FindManyWithLabel(nodes []types.NodeWithMeta, wantedLabel *ptypes.Label) ([]types.NodeWithMeta, error) {
+func FindManyWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label) ([]*types.NodeMetadata, error) {
 	if wantedLabel == nil {
 		return nil, errors.New("label is nil")
 	}
 
-	var foundNodes []types.NodeWithMeta
+	var foundNodes []*types.NodeMetadata
 
 	for _, node := range nodes {
-		for _, label := range node.Labels() {
+		for _, label := range node.Labels {
 			if wantedLabel.Key == label.Key && equalLabels(wantedLabel.Value, label.Value) {
 				foundNodes = append(foundNodes, node)
 			}

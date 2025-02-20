@@ -29,13 +29,13 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 		return errors.Wrap(err, "input validation failed")
 	}
 
-	donCapabilities := make([]keystone_changeset.DonCapabilities, 0, len(input.DonTopology.MetaDons))
+	donCapabilities := make([]keystone_changeset.DonCapabilities, 0, len(input.Topology.Metadata))
 
-	for _, metaDon := range input.DonTopology.MetaDons {
+	for _, donMetadata := range input.Topology.Metadata {
 		var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 		// check what capabilities each DON has and register them with Capabilities Registry contract
-		if flags.HasFlag(metaDon.Flags(), types.CronCapability) {
+		if flags.HasFlag(donMetadata.Flags, types.CronCapability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
 					LabelledName:   "cron-trigger",
@@ -46,7 +46,7 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 			})
 		}
 
-		if flags.HasFlag(metaDon.Flags(), types.CustomComputeCapability) {
+		if flags.HasFlag(donMetadata.Flags, types.CustomComputeCapability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
 					LabelledName:   "custom-compute",
@@ -57,7 +57,7 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 			})
 		}
 
-		if flags.HasFlag(metaDon.Flags(), types.OCR3Capability) {
+		if flags.HasFlag(donMetadata.Flags, types.OCR3Capability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
 					LabelledName:   "offchain_reporting",
@@ -69,7 +69,7 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 			})
 		}
 
-		if flags.HasFlag(metaDon.Flags(), types.WriteEVMCapability) {
+		if flags.HasFlag(donMetadata.Flags, types.WriteEVMCapability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
 					LabelledName:   "write_geth-testnet",
@@ -83,15 +83,15 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 
 		// Add support for new capabilities here as needed
 
-		donPeerIDs := make([]string, len(metaDon.DON.Nodes)-1)
-		for i, node := range metaDon.DON.Nodes {
+		donPeerIDs := make([]string, len(donMetadata.NodesMetadata)-1)
+		for i, node := range donMetadata.NodesMetadata {
 			if i == 0 {
 				continue
 			}
 
-			p2pID, err := keystonenode.ToP2PID(&node, keystonenode.NoOpTransformFn)
+			p2pID, err := keystonenode.ToP2PID(node, keystonenode.NoOpTransformFn)
 			if err != nil {
-				return errors.Wrapf(err, "failed to get p2p id for node %s", node.Name)
+				return errors.Wrapf(err, "failed to get p2p id for node %d", i)
 			}
 
 			donPeerIDs[i-1] = p2pID
@@ -100,11 +100,11 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 		// we only need to assign P2P IDs to NOPs, since `ConfigureInitialContractsChangeset` method
 		// will take care of creating DON to Nodes mapping
 		nop := keystone_changeset.NOP{
-			Name:  fmt.Sprintf("NOP for %s DON", metaDon.NodeOutput.NodeSetName),
+			Name:  fmt.Sprintf("NOP for %s DON", donMetadata.Name),
 			Nodes: donPeerIDs,
 		}
 
-		donName := metaDon.NodeOutput.NodeSetName + "-don"
+		donName := donMetadata.Name + "-don"
 		donCapabilities = append(donCapabilities, keystone_changeset.DonCapabilities{
 			Name:         donName,
 			F:            1,
@@ -115,10 +115,10 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 
 	var transmissionSchedule []int
 
-	for _, metaDon := range input.DonTopology.MetaDons {
-		if flags.HasFlag(metaDon.Flags(), types.OCR3Capability) {
+	for _, metaDon := range input.Topology.Metadata {
+		if flags.HasFlag(metaDon.Flags, types.OCR3Capability) {
 			// this schedule makes sure that all worker nodes are transmitting OCR3 reports
-			transmissionSchedule = []int{len(metaDon.DON.Nodes) - 1}
+			transmissionSchedule = []int{len(metaDon.NodesMetadata) - 1}
 			break
 		}
 	}

@@ -34,7 +34,7 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 	}
 	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
 
-	bootstrapNode, err := node.FindOneWithLabel(input.DonWithMeta.Nodes(), &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.BootstrapNode)})
+	bootstrapNode, err := node.FindOneWithLabel(input.DonWithMetadata.NodesMetadata, &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.BootstrapNode)})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find bootstrap node")
 	}
@@ -45,7 +45,7 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 	}
 
 	var donBootstrapNodeHost string
-	for _, label := range bootstrapNode.Labels() {
+	for _, label := range bootstrapNode.Labels {
 		if label.Key == node.HostLabelKey {
 			donBootstrapNodeHost = *label.Value
 			break
@@ -68,7 +68,7 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 
 	// if it's a workflow DON or it has custom compute capability, we need to create a gateway job
 	if keystoneflags.HasFlag(input.Flags, types.WorkflowDON) || keystoneflags.HasFlag(input.Flags, types.CustomComputeCapability) {
-		jobSpecs[types.JobDescription{Flag: types.WorkflowDON, NodeType: types.BootstrapNode}] = []*jobv1.ProposeJobRequest{jobs.BootstrapGateway(input.Don, chainIDUint64, input.DonID, input.ExtraAllowedPorts, input.ExtraAllowedIPs, input.GatewayConnectorOutput)}
+		jobSpecs[types.JobDescription{Flag: types.WorkflowDON, NodeType: types.BootstrapNode}] = []*jobv1.ProposeJobRequest{jobs.BootstrapGateway(input.DonWithMetadata.DON, chainIDUint64, input.DonID, input.ExtraAllowedPorts, input.ExtraAllowedIPs, input.GatewayConnectorOutput)}
 	}
 
 	ocrPeeringData := types.OCRPeeringData{
@@ -77,7 +77,7 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 		Port:                 5001,
 	}
 
-	workflowNodeSet, err := node.FindManyWithLabel(input.DonWithMeta.Nodes(), &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.WorkerNode)})
+	workflowNodeSet, err := node.FindManyWithLabel(input.DonWithMetadata.NodesMetadata, &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.WorkerNode)})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes")
 	}
@@ -121,7 +121,7 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 		}
 
 		var nodeEthAddr common.Address
-		for _, label := range n.Labels() {
+		for _, label := range n.Labels {
 			if label.Key == node.EthAddressKey {
 				if label.Value == nil {
 					return nil, errors.New("eth address label value is nil")
@@ -135,7 +135,7 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 		}
 
 		var ocr2KeyBundleID string
-		for _, label := range n.Labels() {
+		for _, label := range n.Labels {
 			if label.Key == devenv.NodeOCR2KeyBundleIDType {
 				if label.Value == nil {
 					return nil, errors.New("ocr2 key bundle id label value is nil")

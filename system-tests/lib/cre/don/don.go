@@ -10,12 +10,30 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
+
+func CreateJobs(testLogger zerolog.Logger, input types.CreateJobsInput) error {
+	// if err := input.Validate(); err != nil {
+	// 	return errors.Wrap(err, "input validation failed")
+	// }
+
+	for _, don := range input.DonTopology.Dons {
+		if jobSpecs, ok := input.DonToJobSpecs[don.ID]; ok {
+			createErr := jobs.Create(input.CldEnv.Offchain, don.DON, don.Flags, jobSpecs)
+			if createErr != nil {
+				return errors.Wrapf(createErr, "failed to create jobs for DON %d", don.ID)
+			}
+		} else {
+			testLogger.Warn().Msgf("No job specs found for DON %d", don.ID)
+		}
+	}
+
+	return nil
+}
 
 func Configure(t *testing.T, testLogger zerolog.Logger, input types.ConfigureDonInput) (*types.ConfigureDonOutput, error) {
 	if err := input.Validate(); err != nil {
@@ -51,14 +69,14 @@ func Configure(t *testing.T, testLogger zerolog.Logger, input types.ConfigureDon
 	// 	return nil, errors.Wrap(jdErr, "failed to reinitialize JD clients")
 	// }
 
-	for _, donTopology := range input.DonTopology.MetaDons {
-		if jobSpecs, ok := input.DonToJobSpecs[donTopology.ID]; ok {
-			createErr := jobs.Create(input.CldEnv.Offchain, donTopology.DON, donTopology.Flags(), jobSpecs)
+	for _, don := range input.DonTopology.Dons {
+		if jobSpecs, ok := input.DonToJobSpecs[don.ID]; ok {
+			createErr := jobs.Create(input.CldEnv.Offchain, don.DON, don.Flags, jobSpecs)
 			if createErr != nil {
-				return nil, errors.Wrapf(createErr, "failed to create jobs for DON %d", donTopology.ID)
+				return nil, errors.Wrapf(createErr, "failed to create jobs for DON %d", don.ID)
 			}
 		} else {
-			testLogger.Warn().Msgf("No job specs found for DON %d", donTopology.ID)
+			testLogger.Warn().Msgf("No job specs found for DON %d", don.ID)
 		}
 	}
 
@@ -67,8 +85,8 @@ func Configure(t *testing.T, testLogger zerolog.Logger, input types.ConfigureDon
 	}, nil
 }
 
-func BuildInputDONTopology(nodeSetInput []*types.CapabilitiesAwareNodeSet) (*types.DonTopology, error) {
-	donWithMeta := make([]*types.DonWithMetadata, len(nodeSetInput))
+func BuildTopology(nodeSetInput []*types.CapabilitiesAwareNodeSet) (*types.Topology, error) {
+	donWithMeta := make([]*types.DonMetadata, len(nodeSetInput))
 
 	// one DON to do everything
 	if len(nodeSetInput) == 1 {
@@ -77,10 +95,12 @@ func BuildInputDONTopology(nodeSetInput []*types.CapabilitiesAwareNodeSet) (*typ
 			return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[0].Name)
 		}
 
-		donWithMeta[0] = &types.DonWithMetadata{
-			NodeInput: nodeSetInput[0],
-			ID:        1,
-			DonFlags:  flags,
+		donWithMeta[0] = &types.DonMetadata{
+			ID:    1,
+			Flags: flags,
+			// NodeSet:       nodeSetInput[0],
+			NodesMetadata: make([]*types.NodeMetadata, len(nodeSetInput[0].NodeSpecs)),
+			Name:          nodeSetInput[0].Name,
 		}
 	} else {
 		for i := range nodeSetInput {
@@ -89,10 +109,12 @@ func BuildInputDONTopology(nodeSetInput []*types.CapabilitiesAwareNodeSet) (*typ
 				return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[i].Name)
 			}
 
-			donWithMeta[i] = &types.DonWithMetadata{
-				NodeInput: nodeSetInput[i],
-				ID:        libc.MustSafeUint32(i + 1),
-				DonFlags:  flags,
+			donWithMeta[i] = &types.DonMetadata{
+				ID:    libc.MustSafeUint32(i + 1),
+				Flags: flags,
+				// NodeSet:       nodeSetInput[i], // TODO can I get rid of this? It's required further downstream :/
+				NodesMetadata: make([]*types.NodeMetadata, len(nodeSetInput[i].NodeSpecs)),
+				Name:          nodeSetInput[0].Name,
 			}
 		}
 	}
@@ -102,56 +124,97 @@ func BuildInputDONTopology(nodeSetInput []*types.CapabilitiesAwareNodeSet) (*typ
 		return nil, errors.Wrap(err, "failed to get workflow DON ID")
 	}
 
-	return &types.DonTopology{
-		MetaDons:      donWithMeta,
+	return &types.Topology{
+		Metadata:      donWithMeta,
 		WorkflowDONID: maybeID.ID,
 	}, nil
 }
 
-func BuildDONTopology(dons []*devenv.DON, nodeSetInput []*types.CapabilitiesAwareNodeSet, nodeSetOutput []*types.WrappedNodeOutput) (*types.DonTopology, error) {
-	donWithMeta := make([]*types.DonWithMetadata, len(dons))
+// func BuildInputDONTopology(nodeSetInput []*types.CapabilitiesAwareNodeSet) (*types.DonTopology, error) {
+// 	donWithMeta := make([]*types.DonWithMetadata, len(nodeSetInput))
 
-	// one DON to do everything
-	if len(dons) == 1 {
-		flags, err := flags.NodeSetFlags(nodeSetInput[0])
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[0].Name)
-		}
+// 	// one DON to do everything
+// 	if len(nodeSetInput) == 1 {
+// 		flags, err := flags.NodeSetFlags(nodeSetInput[0])
+// 		if err != nil {
+// 			return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[0].Name)
+// 		}
 
-		donWithMeta[0] = &types.DonWithMetadata{
-			DON:        dons[0],
-			NodeInput:  nodeSetInput[0],
-			NodeOutput: nodeSetOutput[0],
-			ID:         1,
-			DonFlags:   flags,
-		}
-	} else {
-		for i := range dons {
-			flags, err := flags.NodeSetFlags(nodeSetInput[i])
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[i].Name)
-			}
+// 		donWithMeta[0] = &types.DonWithMetadata{
+// 			NodeInput: nodeSetInput[0],
+// 			ID:        1,
+// 			DonFlags:  flags,
+// 		}
+// 	} else {
+// 		for i := range nodeSetInput {
+// 			flags, err := flags.NodeSetFlags(nodeSetInput[i])
+// 			if err != nil {
+// 				return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[i].Name)
+// 			}
 
-			donWithMeta[i] = &types.DonWithMetadata{
-				DON:        dons[i],
-				NodeInput:  nodeSetInput[i],
-				NodeOutput: nodeSetOutput[i],
-				ID:         libc.MustSafeUint32(i + 1),
-				DonFlags:   flags,
-			}
-		}
-	}
+// 			donWithMeta[i] = &types.DonWithMetadata{
+// 				NodeInput: nodeSetInput[i],
+// 				ID:        libc.MustSafeUint32(i + 1),
+// 				DonFlags:  flags,
+// 			}
+// 		}
+// 	}
 
-	maybeID, err := flags.OneDONTopologyWithFlag(donWithMeta, types.WorkflowDON)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get workflow DON ID")
-	}
+// 	maybeID, err := flags.OneDONTopologyWithFlag(donWithMeta, types.WorkflowDON)
+// 	if err != nil {
+// 		return nil, errors.Wrap(err, "failed to get workflow DON ID")
+// 	}
 
-	return &types.DonTopology{
-		MetaDons:      donWithMeta,
-		WorkflowDONID: maybeID.ID,
-	}, nil
-}
+// 	return &types.DonTopology{
+// 		MetaDons:      donWithMeta,
+// 		WorkflowDONID: maybeID.ID,
+// 	}, nil
+// }
+
+// func BuildDONTopology(dons []*devenv.DON, nodeSetInput []*types.CapabilitiesAwareNodeSet, nodeSetOutput []*types.WrappedNodeOutput) (*types.DonTopology, error) {
+// 	donWithMeta := make([]*types.DonWithMetadata, len(dons))
+
+// 	// one DON to do everything
+// 	if len(dons) == 1 {
+// 		flags, err := flags.NodeSetFlags(nodeSetInput[0])
+// 		if err != nil {
+// 			return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[0].Name)
+// 		}
+
+// 		donWithMeta[0] = &types.DonWithMetadata{
+// 			DON:        dons[0],
+// 			NodeInput:  nodeSetInput[0],
+// 			NodeOutput: nodeSetOutput[0],
+// 			ID:         1,
+// 			DonFlags:   flags,
+// 		}
+// 	} else {
+// 		for i := range dons {
+// 			flags, err := flags.NodeSetFlags(nodeSetInput[i])
+// 			if err != nil {
+// 				return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[i].Name)
+// 			}
+
+// 			donWithMeta[i] = &types.DonWithMetadata{
+// 				DON:        dons[i],
+// 				NodeInput:  nodeSetInput[i],
+// 				NodeOutput: nodeSetOutput[i],
+// 				ID:         libc.MustSafeUint32(i + 1),
+// 				DonFlags:   flags,
+// 			}
+// 		}
+// 	}
+
+// 	maybeID, err := flags.OneDONTopologyWithFlag(donWithMeta, types.WorkflowDON)
+// 	if err != nil {
+// 		return nil, errors.Wrap(err, "failed to get workflow DON ID")
+// 	}
+
+// 	return &types.DonTopology{
+// 		MetaDons:      donWithMeta,
+// 		WorkflowDONID: maybeID.ID,
+// 	}, nil
+// }
 
 // In order to whitelist host IP in the gateway, we need to resolve the host.docker.internal to the host IP,
 // and since CL image doesn't have dig or nslookup, we need to use curl.

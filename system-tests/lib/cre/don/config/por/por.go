@@ -29,7 +29,7 @@ func GenerateConfigs(input types.GeneratePoRConfigsInput) (types.NodeIndexToConf
 	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
 
 	// find bootstrap node
-	bootstrapNode, err := node.FindOneWithLabel(input.DonWithMeta.Nodes(), &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.BootstrapNode)})
+	bootstrapNode, err := node.FindOneWithLabel(input.DonMetadata.NodesMetadata, &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.BootstrapNode)})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find bootstrap node")
 	}
@@ -40,7 +40,7 @@ func GenerateConfigs(input types.GeneratePoRConfigsInput) (types.NodeIndexToConf
 	}
 
 	var donBootstrapNodeHost string
-	for _, label := range bootstrapNode.Labels() {
+	for _, label := range bootstrapNode.Labels {
 		if label.Key == node.HostLabelKey {
 			donBootstrapNodeHost = *label.Value
 			break
@@ -52,7 +52,7 @@ func GenerateConfigs(input types.GeneratePoRConfigsInput) (types.NodeIndexToConf
 	}
 
 	var nodeIndex int
-	for _, label := range bootstrapNode.Labels() {
+	for _, label := range bootstrapNode.Labels {
 		if label.Key == node.NodeIndexKey {
 			nodeIndex, err = strconv.Atoi(*label.Value)
 			if err != nil {
@@ -74,14 +74,14 @@ func GenerateConfigs(input types.GeneratePoRConfigsInput) (types.NodeIndexToConf
 	}
 
 	// find worker nodes
-	workflowNodeSet, err := node.FindManyWithLabel(input.DonWithMeta.Nodes(), &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.WorkerNode)})
+	workflowNodeSet, err := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.WorkerNode)})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes")
 	}
 
 	for i := range workflowNodeSet {
 		var nodeIndex int
-		for _, label := range workflowNodeSet[i].Labels() {
+		for _, label := range workflowNodeSet[i].Labels {
 			if label.Key == node.NodeIndexKey {
 				nodeIndex, err = strconv.Atoi(*label.Value)
 				if err != nil {
@@ -92,7 +92,7 @@ func GenerateConfigs(input types.GeneratePoRConfigsInput) (types.NodeIndexToConf
 
 		configOverrides[nodeIndex] = config.WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost, input.PeeringData, chainIDUint64, input.CapabilitiesRegistryAddress, input.BlockchainOutput.Nodes[0].DockerInternalHTTPUrl, input.BlockchainOutput.Nodes[0].DockerInternalWSUrl)
 		var nodeEthAddr common.Address
-		for _, label := range workflowNodeSet[i].Labels() {
+		for _, label := range workflowNodeSet[i].Labels {
 			if label.Key == node.EthAddressKey {
 				if label.Value == nil {
 					return nil, errors.New("eth address label value is nil")

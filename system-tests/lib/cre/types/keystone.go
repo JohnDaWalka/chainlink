@@ -158,6 +158,12 @@ type WrappedNodeOutput struct {
 	Capabilities []string
 }
 
+type CreateJobsInput struct {
+	CldEnv        *deployment.Environment
+	DonTopology   *DonTopology
+	DonToJobSpecs DonsToJobSpecs
+}
+
 type ConfigureDonInput struct {
 	CldEnv               *deployment.Environment
 	BlockchainOutput     *blockchain.Output
@@ -177,8 +183,8 @@ func (c *ConfigureDonInput) Validate() error {
 	if c.DonTopology == nil {
 		return errors.New("don topology not set")
 	}
-	if len(c.DonTopology.MetaDons) == 0 {
-		return errors.New("meta dons not set")
+	if len(c.DonTopology.Dons) == 0 {
+		return errors.New("topology dons not set")
 	}
 	if c.JdOutput == nil {
 		return errors.New("jd output not set")
@@ -198,17 +204,24 @@ type ConfigureDonOutput struct {
 }
 
 type DebugInput struct {
-	DonTopology      *DonTopology
+	DebugDons        []*DebugDon
 	BlockchainOutput *blockchain.Output
 }
 
+type DebugDon struct {
+	Flags          []string
+	ContainerNames []string
+	NodesMetadata  []*NodeMetadata
+}
+
 func (d *DebugInput) Validate() error {
-	if d.DonTopology == nil {
+	if d.DebugDons == nil {
 		return errors.New("don topology not set")
 	}
-	if len(d.DonTopology.MetaDons) == 0 {
-		return errors.New("meta dons not set")
+	if len(d.DebugDons) == 0 {
+		return errors.New("debug don not set")
 	}
+	// TODO add more validations
 	if d.BlockchainOutput == nil {
 		return errors.New("blockchain output not set")
 	}
@@ -218,7 +231,7 @@ func (d *DebugInput) Validate() error {
 
 type ConfigureKeystoneInput struct {
 	ChainSelector uint64
-	DonTopology   *DonTopology
+	Topology      *Topology
 	CldEnv        *deployment.Environment
 }
 
@@ -226,10 +239,10 @@ func (c *ConfigureKeystoneInput) Validate() error {
 	if c.ChainSelector == 0 {
 		return errors.New("chain selector not set")
 	}
-	if c.DonTopology == nil {
+	if c.Topology == nil {
 		return errors.New("don topology not set")
 	}
-	if len(c.DonTopology.MetaDons) == 0 {
+	if len(c.Topology.Metadata) == 0 {
 		return errors.New("meta dons not set")
 	}
 	if c.CldEnv == nil {
@@ -246,10 +259,11 @@ type GatewayConnectorOutput struct {
 }
 
 type GeneratePoRJobSpecsInput struct {
-	CldEnv                 *deployment.Environment
-	Don                    *devenv.DON
-	DonWithMeta            DonWithMeta
-	NodeOutput             *WrappedNodeOutput
+	CldEnv *deployment.Environment
+	// Don                    *devenv.DON
+	// DonMetadata            DonMetadata
+	DonWithMetadata DonWithMetadata
+	// NodeOutput             *WrappedNodeOutput
 	BlockchainOutput       *blockchain.Output
 	DonID                  uint32
 	Flags                  []string
@@ -264,15 +278,18 @@ func (g *GeneratePoRJobSpecsInput) Validate() error {
 	if g.CldEnv == nil {
 		return errors.New("chainlink deployment env not set")
 	}
-	if g.Don == nil {
-		return errors.New("don not set")
+	// if g.Don == nil {
+	// 	return errors.New("don not set")
+	// }
+	if len(g.DonWithMetadata.NodesMetadata) == 0 {
+		return errors.New("metadata nodes not set")
 	}
-	if len(g.Don.Nodes) == 0 {
+	if len(g.DonWithMetadata.DON.Nodes) == 0 {
 		return errors.New("don nodes not set")
 	}
-	if g.NodeOutput == nil {
-		return errors.New("node output not set")
-	}
+	// if g.NodeOutput == nil {
+	// 	return errors.New("node output not set")
+	// }
 	if g.BlockchainOutput == nil {
 		return errors.New("blockchain output not set")
 	}
@@ -296,9 +313,9 @@ func (g *GeneratePoRJobSpecsInput) Validate() error {
 }
 
 type GeneratePoRConfigsInput struct {
-	Don                         *devenv.DON
-	DonWithMeta                 DonWithMeta
-	NodeInput                   *CapabilitiesAwareNodeSet
+	// Don                         *devenv.DON
+	DonMetadata *DonMetadata
+	// NodeInput                   *CapabilitiesAwareNodeSet
 	BlockchainOutput            *blockchain.Output
 	DonID                       uint32
 	Flags                       []string
@@ -310,15 +327,15 @@ type GeneratePoRConfigsInput struct {
 }
 
 func (g *GeneratePoRConfigsInput) Validate() error {
-	if g.Don == nil {
-		return errors.New("don not set")
-	}
-	if len(g.Don.Nodes) == 0 {
+	// if g.Don == nil {
+	// 	return errors.New("don not set")
+	// }
+	if len(g.DonMetadata.NodesMetadata) == 0 {
 		return errors.New("don nodes not set")
 	}
-	if g.NodeInput == nil {
-		return errors.New("node input not set")
-	}
+	// if g.NodeInput == nil {
+	// 	return errors.New("node input not set")
+	// }
 	if g.BlockchainOutput == nil {
 		return errors.New("blockchain output not set")
 	}
@@ -347,65 +364,57 @@ func (g *GeneratePoRConfigsInput) Validate() error {
 	return nil
 }
 
+type ToplogyInput struct {
+	NodeSetInput    []*CapabilitiesAwareNodeSet
+	DonToEthAddress map[uint32][]common.Address
+}
+
 // DonWithMetadata is a struct that holds the DON references and various metadata
+// type DonWithMetadata struct {
+// 	DON        *devenv.DON
+// 	NodeInput  *CapabilitiesAwareNodeSet
+// 	NodeOutput *WrappedNodeOutput
+// 	ID         uint32
+// 	DonFlags   []string
+// }
+
+// func (d *DonWithMetadata) Flags() []string {
+// 	return d.DonFlags
+// }
+
+// func (d *DonWithMetadata) Nodes() []*NodeMetadata {
+// 	nodes := make([]*NodeMetadata, len(d.DON.Nodes))
+// 	for i, n := range d.DON.Nodes {
+// 		nodes[i] = &NodeMetadata{Labels: n.Labels()}
+// 	}
+// 	return nodes
+// }
+
 type DonWithMetadata struct {
-	DON        *devenv.DON
-	NodeInput  *CapabilitiesAwareNodeSet
-	NodeOutput *WrappedNodeOutput
-	ID         uint32
-	DonFlags   []string
+	DON *devenv.DON
+	*DonMetadata
 }
 
-func (d *DonWithMetadata) Flags() []string {
-	return d.DonFlags
+type DonMetadata struct {
+	NodesMetadata []*NodeMetadata
+	Flags         []string
+	ID            uint32
+	Name          string
+	// TODO ideally this one wouldn't be here at all
+	// NodeSet *CapabilitiesAwareNodeSet
+}
+type NodeMetadata struct {
+	Labels []*ptypes.Label
 }
 
-func (d *DonWithMetadata) Nodes() []NodeWithMeta {
-	nodes := make([]NodeWithMeta, len(d.DON.Nodes))
-	for i, n := range d.DON.Nodes {
-		nodes[i] = &NodeWithLabels{labels: n.Labels()}
-	}
-	return nodes
-}
-
-type DonWithLabelsAndNodes struct {
-	DonNodes []NodeWithMeta
-	DonFlags []string
-}
-
-func (d *DonWithLabelsAndNodes) Flags() []string {
-	return d.DonFlags
-}
-
-func (d *DonWithLabelsAndNodes) Nodes() []NodeWithMeta {
-	return d.DonNodes
-}
-
-type NodeWithLabels struct {
-	labels []*ptypes.Label
-}
-
-func (n *NodeWithLabels) Labels() []*ptypes.Label {
-	return n.labels
-}
-
-func (n *NodeWithLabels) AddLabel(label *ptypes.Label) {
-	n.labels = append(n.labels, label)
-}
-
-type NodeWithMeta interface {
-	Labels() []*ptypes.Label
-	AddLabel(label *ptypes.Label)
-}
-
-type DonWithMeta interface {
-	Flags() []string
-	Nodes() []NodeWithMeta
+type Topology struct {
+	WorkflowDONID uint32
+	Metadata      []*DonMetadata
 }
 
 type DonTopology struct {
-	WorkflowDONID uint32
-	MetaDons      []*DonWithMetadata
+	WorkflowDonID uint32
+	Dons          []*DonWithMetadata
 }
 
 type CapabilitiesAwareNodeSet struct {
