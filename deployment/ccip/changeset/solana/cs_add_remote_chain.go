@@ -15,8 +15,6 @@ import (
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 
-	chainsel "github.com/smartcontractkit/chain-selectors"
-
 	"github.com/smartcontractkit/chainlink/deployment"
 	cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -134,14 +132,7 @@ func doAddRemoteChainToSolana(
 	for remoteChainSel, update := range updates {
 		var onRampBytes [64]byte
 		// already verified, skipping errcheck
-		remoteChainFamily, _ := chainsel.GetSelectorFamily(remoteChainSel)
-		var addressBytes []byte
-		switch remoteChainFamily {
-		case chainsel.FamilySolana:
-			addressBytes, _ = s.SolChains[remoteChainSel].OnRampBytes()
-		case chainsel.FamilyEVM:
-			addressBytes, _ = s.Chains[remoteChainSel].OnRampBytes()
-		}
+		addressBytes, _ := s.GetOnRampAddressBytes(remoteChainSel)
 		addressBytes = common.LeftPadBytes(addressBytes, 64)
 		copy(onRampBytes[:], addressBytes)
 

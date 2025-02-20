@@ -166,10 +166,3 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 	state.WSOL = solana.SolMint
 	return state, nil
 }
-
-func (c SolCCIPChainState) OnRampBytes() ([]byte, error) {
-	if !c.Router.IsZero() {
-		return c.Router.Bytes(), nil
-	}
-	return nil, errors.New("no onramp found in the state")
-}
