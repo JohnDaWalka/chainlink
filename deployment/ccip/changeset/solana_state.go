@@ -2,6 +2,7 @@ package changeset
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/gagliardetto/solana-go"
@@ -18,6 +19,7 @@ var (
 	TokenPool                 deployment.ContractType = "TokenPool"
 	Receiver                  deployment.ContractType = "Receiver"
 	SPL2022Tokens             deployment.ContractType = "SPL2022Tokens"
+	SPLTokens                 deployment.ContractType = "SPLTokens"
 	WSOL                      deployment.ContractType = "WSOL"
 	FeeAggregator             deployment.ContractType = "FeeAggregator"
 	// for PDAs from AddRemoteChainToSolana
@@ -36,6 +38,7 @@ type SolCCIPChainState struct {
 	OfframpAddressLookupTable solana.PublicKey
 	Receiver                  solana.PublicKey // for tests only
 	SPL2022Tokens             []solana.PublicKey
+	SPLTokens                 []solana.PublicKey
 	TokenPool                 solana.PublicKey
 	BurnMintTokenPool         solana.PublicKey
 	LockReleaseTokenPool      solana.PublicKey
@@ -82,6 +85,7 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 		SourceChainStatePDAs: make(map[uint64]solana.PublicKey),
 		DestChainStatePDAs:   make(map[uint64]solana.PublicKey),
 		SPL2022Tokens:        make([]solana.PublicKey, 0),
+		SPLTokens:            make([]solana.PublicKey, 0),
 		TokenPoolLookupTable: make(map[solana.PublicKey]solana.PublicKey),
 	}
 	for address, tvStr := range addresses {
@@ -106,6 +110,9 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 		case SPL2022Tokens:
 			pub := solana.MustPublicKeyFromBase58(address)
 			state.SPL2022Tokens = append(state.SPL2022Tokens, pub)
+		case SPLTokens:
+			pub := solana.MustPublicKeyFromBase58(address)
+			state.SPLTokens = append(state.SPLTokens, pub)
 		case TokenPool:
 			pub := solana.MustPublicKeyFromBase58(address)
 			state.TokenPool = pub
@@ -173,4 +180,18 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 	}
 	state.WSOL = solana.SolMint
 	return state, nil
+}
+
+func (s SolCCIPChainState) TokenToTokenProgram(tokenAddress solana.PublicKey) (solana.PublicKey, error) {
+	for _, spl2022Token := range s.SPL2022Tokens {
+		if spl2022Token.Equals(tokenAddress) {
+			return solana.Token2022ProgramID, nil
+		}
+	}
+	for _, splToken := range s.SPLTokens {
+		if splToken.Equals(tokenAddress) {
+			return solana.TokenProgramID, nil
+		}
+	}
+	return solana.PublicKey{}, fmt.Errorf("token program not found for token address %s", tokenAddress.String())
 }
