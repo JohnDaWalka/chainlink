@@ -160,15 +160,14 @@ func TestAddTokenPool(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		for tokenProgramName, tokenAddress := range tokenMap {
+		for _, tokenAddress := range tokenMap {
 			e, err = commonchangeset.Apply(t, e, nil,
 				commonchangeset.Configure(
 					deployment.CreateLegacyChangeSet(changeset_solana.AddTokenPool),
 					changeset_solana.TokenPoolConfig{
-						ChainSelector:    solChain,
-						TokenPubKey:      tokenAddress.String(),
-						TokenProgramName: tokenProgramName,
-						PoolType:         testCase.poolType,
+						ChainSelector: solChain,
+						TokenPubKey:   tokenAddress.String(),
+						PoolType:      testCase.poolType,
 						// this works for testing, but if we really want some other authority we need to pass in a private key for signing purposes
 						Authority: e.SolChains[solChain].DeployerKey.PublicKey().String(),
 					},

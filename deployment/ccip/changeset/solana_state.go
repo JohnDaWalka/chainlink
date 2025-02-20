@@ -39,13 +39,13 @@ type SolCCIPChainState struct {
 	Receiver                  solana.PublicKey // for tests only
 	SPL2022Tokens             []solana.PublicKey
 	SPLTokens                 []solana.PublicKey
-	TokenPool                 solana.PublicKey
-	BurnMintTokenPool         solana.PublicKey
-	LockReleaseTokenPool      solana.PublicKey
-	WSOL                      solana.PublicKey
-	FeeQuoter                 solana.PublicKey
-	OffRamp                   solana.PublicKey
-	FeeAggregator             solana.PublicKey
+	// TokenPool                 solana.PublicKey
+	BurnMintTokenPool    solana.PublicKey
+	LockReleaseTokenPool solana.PublicKey
+	WSOL                 solana.PublicKey
+	FeeQuoter            solana.PublicKey
+	OffRamp              solana.PublicKey
+	FeeAggregator        solana.PublicKey
 
 	// PDAs to avoid redundant lookups
 	RouterConfigPDA      solana.PublicKey
@@ -86,13 +86,16 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 		DestChainStatePDAs:   make(map[uint64]solana.PublicKey),
 		SPL2022Tokens:        make([]solana.PublicKey, 0),
 		SPLTokens:            make([]solana.PublicKey, 0),
+		WSOL:                 solana.SolMint,
 		TokenPoolLookupTable: make(map[solana.PublicKey]solana.PublicKey),
 	}
+
 	for address, tvStr := range addresses {
 		switch tvStr.Type {
 		case commontypes.LinkToken:
 			pub := solana.MustPublicKeyFromBase58(address)
 			state.LinkToken = pub
+			state.SPL2022Tokens = append(state.SPL2022Tokens, state.LinkToken)
 		case Router:
 			pub := solana.MustPublicKeyFromBase58(address)
 			state.Router = pub
@@ -113,9 +116,9 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 		case SPLTokens:
 			pub := solana.MustPublicKeyFromBase58(address)
 			state.SPLTokens = append(state.SPLTokens, pub)
-		case TokenPool:
-			pub := solana.MustPublicKeyFromBase58(address)
-			state.TokenPool = pub
+		// case TokenPool:
+		// 	pub := solana.MustPublicKeyFromBase58(address)
+		// 	state.TokenPool = pub
 		case RemoteSource:
 			pub := solana.MustPublicKeyFromBase58(address)
 			// Labels should only have one entry
@@ -178,7 +181,6 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 			continue
 		}
 	}
-	state.WSOL = solana.SolMint
 	return state, nil
 }
 

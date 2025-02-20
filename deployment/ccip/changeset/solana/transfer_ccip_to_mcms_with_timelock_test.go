@@ -282,11 +282,10 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T) (deployment.Environmen
 		commonchangeset.Configure(
 			deployment.CreateLegacyChangeSet(solanachangesets.AddTokenPool),
 			solanachangesets.TokenPoolConfig{
-				ChainSelector:    solChain1,
-				TokenPubKey:      tokenAddress.String(),
-				TokenProgramName: deployment.SPL2022Tokens,
-				PoolType:         test_token_pool.LockAndRelease_PoolType,
-				Authority:        e.SolChains[solChain1].DeployerKey.PublicKey().String(),
+				ChainSelector: solChain1,
+				TokenPubKey:   tokenAddress.String(),
+				PoolType:      test_token_pool.LockAndRelease_PoolType,
+				Authority:     e.SolChains[solChain1].DeployerKey.PublicKey().String(),
 			},
 		),
 	})

@@ -24,11 +24,10 @@ var _ deployment.ChangeSet[TokenPoolConfig] = AddTokenPool
 var _ deployment.ChangeSet[RemoteChainTokenPoolConfig] = SetupTokenPoolForRemoteChain
 
 type TokenPoolConfig struct {
-	ChainSelector    uint64
-	PoolType         solTestTokenPool.PoolType
-	Authority        string
-	TokenPubKey      string
-	TokenProgramName string
+	ChainSelector uint64
+	PoolType      solTestTokenPool.PoolType
+	Authority     string
+	TokenPubKey   string
 }
 
 func (cfg TokenPoolConfig) Validate(e deployment.Environment) error {
@@ -38,11 +37,9 @@ func (cfg TokenPoolConfig) Validate(e deployment.Environment) error {
 	}
 	state, _ := cs.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
-	if chainState.TokenPool.IsZero() {
-		return fmt.Errorf("token pool not found in existing state, deploy the token pool first for chain %d", cfg.ChainSelector)
-	}
-	if _, err := GetTokenProgramID(cfg.TokenProgramName); err != nil {
-		return err
+
+	if _, err := chainState.TokenToTokenProgram(tokenPubKey); err != nil {
+		return fmt.Errorf("failed to get token program for token address %s: %w", tokenPubKey.String(), err)
 	}
 
 	var tokenPool solana.PublicKey
@@ -95,7 +92,7 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 	}
 
 	// verified
-	tokenprogramID, _ := GetTokenProgramID(cfg.TokenProgramName)
+	tokenprogramID, _ := chainState.TokenToTokenProgram(tokenPubKey)
 	poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
 	poolSigner, _ := solTokenUtil.TokenPoolSignerAddress(tokenPubKey, tokenPool)
 
@@ -107,7 +104,7 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 		chain.DeployerKey.PublicKey(),
 	)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to create associated token account for tokenpool (mint: %s, pool: %s): %w", tokenPubKey.String(), chainState.TokenPool.String(), err)
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to create associated token account for tokenpool (mint: %s, pool: %s): %w", tokenPubKey.String(), tokenPool.String(), err)
 	}
 	instructions := []solana.Instruction{createI}
 
@@ -178,9 +175,9 @@ func (cfg RemoteChainTokenPoolConfig) Validate(e deployment.Environment) error {
 	}
 	state, _ := cs.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.SolChainSelector]
-	if chainState.TokenPool.IsZero() {
-		return fmt.Errorf("token pool not found in existing state, deploy token pool for chain %d", cfg.SolChainSelector)
-	}
+	// if chainState.TokenPool.IsZero() {
+	// 	return fmt.Errorf("token pool not found in existing state, deploy token pool for chain %d", cfg.SolChainSelector)
+	// }
 
 	chain := e.SolChains[cfg.SolChainSelector]
 

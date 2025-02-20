@@ -379,30 +379,28 @@ func deployChainContractsSolana(
 	}
 
 	// TOKEN POOL DEPLOY
-	var tokenPoolProgram solana.PublicKey
-	if chainState.TokenPool.IsZero() {
-		// TODO: there should be two token pools deployed one of each type (lock/burn)
-		// separate token pools are not ready yet
-		programID, err := chain.DeployProgram(e.Logger, "test_token_pool")
-		if err != nil {
-			return fmt.Errorf("failed to deploy program: %w", err)
-		}
-		tv := deployment.NewTypeAndVersion(changeset.TokenPool, deployment.Version1_0_0)
-		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
-		tokenPoolProgram = solana.MustPublicKeyFromBase58(programID)
-		err = ab.Save(chain.Selector, programID, tv)
-		if err != nil {
-			return fmt.Errorf("failed to save address: %w", err)
-		}
-	} else {
-		e.Logger.Infow("Using existing token pool", "addr", chainState.TokenPool.String())
-		tokenPoolProgram = chainState.TokenPool
-	}
+	// var tokenPoolProgram solana.PublicKey
+	// if chainState.TokenPool.IsZero() {
+	// 	// TODO: there should be two token pools deployed one of each type (lock/burn)
+	// 	// separate token pools are not ready yet
+	// 	programID, err := chain.DeployProgram(e.Logger, "test_token_pool")
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to deploy program: %w", err)
+	// 	}
+	// 	tv := deployment.NewTypeAndVersion(changeset.TokenPool, deployment.Version1_0_0)
+	// 	e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
+	// 	tokenPoolProgram = solana.MustPublicKeyFromBase58(programID)
+	// 	err = ab.Save(chain.Selector, programID, tv)
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to save address: %w", err)
+	// 	}
+	// } else {
+	// 	e.Logger.Infow("Using existing token pool", "addr", chainState.TokenPool.String())
+	// 	tokenPoolProgram = chainState.TokenPool
+	// }
 
 	var burnMintTokenPool solana.PublicKey
 	if chainState.BurnMintTokenPool.IsZero() {
-		// TODO: there should be two token pools deployed one of each type (lock/burn)
-		// separate token pools are not ready yet
 		programID, err := chain.DeployProgram(e.Logger, "example_burnmint_token_pool")
 		if err != nil {
 			return fmt.Errorf("failed to deploy program: %w", err)
@@ -421,8 +419,6 @@ func deployChainContractsSolana(
 
 	var lockReleaseTokenPool solana.PublicKey
 	if chainState.LockReleaseTokenPool.IsZero() {
-		// TODO: there should be two token pools deployed one of each type (lock/burn)
-		// separate token pools are not ready yet
 		programID, err := chain.DeployProgram(e.Logger, "example_lockrelease_token_pool")
 		if err != nil {
 			return fmt.Errorf("failed to deploy program: %w", err)
@@ -490,7 +486,7 @@ func deployChainContractsSolana(
 	if err := solCommonUtil.ExtendLookupTable(e.GetContext(), chain.Client, addressLookupTable, *chain.DeployerKey,
 		[]solana.PublicKey{
 			// token pools
-			tokenPoolProgram,
+			// tokenPoolProgram,
 			burnMintTokenPool,
 			lockReleaseTokenPool,
 			// offramp

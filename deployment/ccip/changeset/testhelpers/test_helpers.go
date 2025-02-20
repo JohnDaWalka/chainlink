@@ -907,18 +907,17 @@ func DeployTransferableTokenSolana(
 			// deploy token pool and set the burn/mint authority to the tokenPool
 			deployment.CreateLegacyChangeSet(changeset_solana.AddTokenPool),
 			changeset_solana.TokenPoolConfig{
-				ChainSelector:    solChainSel,
-				TokenPubKey:      solTokenAddress.String(),
-				TokenProgramName: deployment.SPL2022Tokens,
-				PoolType:         solTestTokenPool.BurnAndMint_PoolType,
-				Authority:        solDeployerKey.String(),
+				ChainSelector: solChainSel,
+				TokenPubKey:   solTokenAddress.String(),
+				PoolType:      solTestTokenPool.BurnAndMint_PoolType,
+				Authority:     solDeployerKey.String(),
 			},
 		),
 	)
 	require.NoError(t, err)
 
 	// configure evm
-	poolConfigPDA, err := solTokenUtil.TokenPoolConfigAddress(solTokenAddress, state.SolChains[solChainSel].TokenPool)
+	poolConfigPDA, err := solTokenUtil.TokenPoolConfigAddress(solTokenAddress, state.SolChains[solChainSel].BurnMintTokenPool)
 	require.NoError(t, err)
 	err = setTokenPoolCounterPart(e.Chains[evmChainSel], evmPool, evmDeployer, solChainSel, solTokenAddress.Bytes(), poolConfigPDA.Bytes())
 	require.NoError(t, err)
