@@ -229,7 +229,7 @@ var SolanaProgramIDs = map[string]string{
 	"ccip_router":                    solTestConfig.CcipRouterProgram.String(),
 	"test_token_pool":                solTestConfig.CcipTokenPoolProgram.String(),
 	"example_burnmint_token_pool":    "TokenPooL11111111111111111111111111BurnMint",
-	"example_lockrelease_token_pool": "TokenPooL11111111111111111111111111LockRelease",
+	"example_lockrelease_token_pool": "TokenPooL11111111111111111111111LockReLease",
 	"fee_quoter":                     solTestConfig.FeeQuoterProgram.String(),
 	"test_ccip_receiver":             solTestConfig.CcipLogicReceiver.String(),
 	"ccip_offramp":                   solTestConfig.CcipOfframpProgram.String(),

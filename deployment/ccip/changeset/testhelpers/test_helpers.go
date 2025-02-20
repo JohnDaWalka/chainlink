@@ -1564,7 +1564,7 @@ func SavePreloadedSolAddresses(t *testing.T, e deployment.Environment, solChainS
 	err = e.ExistingAddresses.Save(solChainSelector, "TokenPooL11111111111111111111111111BurnMint", tv)
 	require.NoError(t, err)
 	tv = deployment.NewTypeAndVersion(changeset.LockReleaseTokenPool, deployment.Version1_0_0)
-	err = e.ExistingAddresses.Save(solChainSelector, "TokenPooL11111111111111111111111111LockRelease", tv)
+	err = e.ExistingAddresses.Save(solChainSelector, "TokenPooL11111111111111111111111LockReLease", tv)
 	require.NoError(t, err)
 	tv = deployment.NewTypeAndVersion(commontypes.ManyChainMultisigProgram, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["mcm"], tv)
