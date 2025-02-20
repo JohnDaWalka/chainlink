@@ -399,6 +399,46 @@ func deployChainContractsSolana(
 		tokenPoolProgram = chainState.TokenPool
 	}
 
+	var burnMintTokenPool solana.PublicKey
+	if chainState.BurnMintTokenPool.IsZero() {
+		// TODO: there should be two token pools deployed one of each type (lock/burn)
+		// separate token pools are not ready yet
+		programID, err := chain.DeployProgram(e.Logger, "example_burnmint_token_pool")
+		if err != nil {
+			return fmt.Errorf("failed to deploy program: %w", err)
+		}
+		tv := deployment.NewTypeAndVersion(changeset.BurnMintTokenPool, deployment.Version1_0_0)
+		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
+		burnMintTokenPool = solana.MustPublicKeyFromBase58(programID)
+		err = ab.Save(chain.Selector, programID, tv)
+		if err != nil {
+			return fmt.Errorf("failed to save address: %w", err)
+		}
+	} else {
+		e.Logger.Infow("Using existing burn mint token pool", "addr", chainState.BurnMintTokenPool.String())
+		burnMintTokenPool = chainState.BurnMintTokenPool
+	}
+
+	var lockReleaseTokenPool solana.PublicKey
+	if chainState.LockReleaseTokenPool.IsZero() {
+		// TODO: there should be two token pools deployed one of each type (lock/burn)
+		// separate token pools are not ready yet
+		programID, err := chain.DeployProgram(e.Logger, "example_lockrelease_token_pool")
+		if err != nil {
+			return fmt.Errorf("failed to deploy program: %w", err)
+		}
+		tv := deployment.NewTypeAndVersion(changeset.LockReleaseTokenPool, deployment.Version1_0_0)
+		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
+		lockReleaseTokenPool = solana.MustPublicKeyFromBase58(programID)
+		err = ab.Save(chain.Selector, programID, tv)
+		if err != nil {
+			return fmt.Errorf("failed to save address: %w", err)
+		}
+	} else {
+		e.Logger.Infow("Using existing lock release token pool", "addr", chainState.LockReleaseTokenPool.String())
+		lockReleaseTokenPool = chainState.LockReleaseTokenPool
+	}
+
 	// SETUP BILLING
 	// TODO: random value for now, fixed in Terrys upgrade PR
 	// as we take in separate config for solana deploy where we can configure this
@@ -451,6 +491,8 @@ func deployChainContractsSolana(
 		[]solana.PublicKey{
 			// token pools
 			tokenPoolProgram,
+			burnMintTokenPool,
+			lockReleaseTokenPool,
 			// offramp
 			offRampAddress,
 			offRampConfigPDA,
