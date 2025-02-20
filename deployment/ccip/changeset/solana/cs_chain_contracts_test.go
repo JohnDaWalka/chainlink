@@ -7,6 +7,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
 
+	solBaseTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
 	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	solFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
@@ -123,17 +124,17 @@ func TestAddTokenPool(t *testing.T) {
 	require.NoError(t, err)
 	newTokenAddress := state.SolChains[solChain].SPL2022Tokens[0]
 
-	remoteConfig := solTestTokenPool.RemoteConfig{
+	remoteConfig := solBaseTokenPool.RemoteConfig{
 		PoolAddresses: []solTestTokenPool.RemoteAddress{{Address: []byte{1, 2, 3}}},
 		TokenAddress:  solTestTokenPool.RemoteAddress{Address: []byte{4, 5, 6}},
 		Decimals:      9,
 	}
-	inboundConfig := solTestTokenPool.RateLimitConfig{
+	inboundConfig := solBaseTokenPool.RateLimitConfig{
 		Enabled:  true,
 		Capacity: uint64(1000),
 		Rate:     1,
 	}
-	outboundConfig := solTestTokenPool.RateLimitConfig{
+	outboundConfig := solBaseTokenPool.RateLimitConfig{
 		Enabled:  false,
 		Capacity: 0,
 		Rate:     0,
@@ -144,49 +145,63 @@ func TestAddTokenPool(t *testing.T) {
 		deployment.SPLTokens:     state.SolChains[solChain].WSOL,
 	}
 
-	for tokenProgramName, tokenAddress := range tokenMap {
-		e, err = commonchangeset.Apply(t, e, nil,
-			commonchangeset.Configure(
-				deployment.CreateLegacyChangeSet(changeset_solana.AddTokenPool),
-				changeset_solana.TokenPoolConfig{
-					ChainSelector:    solChain,
-					TokenPubKey:      tokenAddress.String(),
-					TokenProgramName: tokenProgramName,
-					PoolType:         solTestTokenPool.LockAndRelease_PoolType,
-					// this works for testing, but if we really want some other authority we need to pass in a private key for signing purposes
-					Authority: e.SolChains[solChain].DeployerKey.PublicKey().String(),
-				},
-			),
-			commonchangeset.Configure(
-				deployment.CreateLegacyChangeSet(changeset_solana.SetupTokenPoolForRemoteChain),
-				changeset_solana.RemoteChainTokenPoolConfig{
-					SolChainSelector:    solChain,
-					RemoteChainSelector: evmChain,
-					SolTokenPubKey:      tokenAddress.String(),
-					RemoteConfig:        remoteConfig,
-					InboundRateLimit:    inboundConfig,
-					OutboundRateLimit:   outboundConfig,
-				},
-			),
-		)
-		require.NoError(t, err)
-
-		// test AddTokenPool results
-		poolConfigPDA, err := solTokenUtil.TokenPoolConfigAddress(tokenAddress, state.SolChains[solChain].TokenPool)
-		require.NoError(t, err)
-		var configAccount solTestTokenPool.State
-		err = e.SolChains[solChain].GetAccountDataBorshInto(ctx, poolConfigPDA, &configAccount)
-		require.NoError(t, err)
-		require.Equal(t, solTestTokenPool.LockAndRelease_PoolType, configAccount.PoolType)
-		require.Equal(t, tokenAddress, configAccount.Config.Mint)
-
-		// test SetupTokenPoolForRemoteChain results
-		remoteChainConfigPDA, _, _ := solTokenUtil.TokenPoolChainConfigPDA(evmChain, tokenAddress, state.SolChains[solChain].TokenPool)
-		var remoteChainConfigAccount solTestTokenPool.ChainConfig
-		err = e.SolChains[solChain].GetAccountDataBorshInto(ctx, remoteChainConfigPDA, &remoteChainConfigAccount)
-		require.NoError(t, err)
-		require.Equal(t, uint8(9), remoteChainConfigAccount.Base.Remote.Decimals)
+	type poolTestType struct {
+		poolType    solTestTokenPool.PoolType
+		poolAddress solana.PublicKey
 	}
+	testCases := []poolTestType{
+		{
+			poolType:    solTestTokenPool.BurnAndMint_PoolType,
+			poolAddress: state.SolChains[solChain].BurnMintTokenPool,
+		},
+		{
+			poolType:    solTestTokenPool.LockAndRelease_PoolType,
+			poolAddress: state.SolChains[solChain].LockReleaseTokenPool,
+		},
+	}
+	for _, testCase := range testCases {
+		for tokenProgramName, tokenAddress := range tokenMap {
+			e, err = commonchangeset.Apply(t, e, nil,
+				commonchangeset.Configure(
+					deployment.CreateLegacyChangeSet(changeset_solana.AddTokenPool),
+					changeset_solana.TokenPoolConfig{
+						ChainSelector:    solChain,
+						TokenPubKey:      tokenAddress.String(),
+						TokenProgramName: tokenProgramName,
+						PoolType:         testCase.poolType,
+						// this works for testing, but if we really want some other authority we need to pass in a private key for signing purposes
+						Authority: e.SolChains[solChain].DeployerKey.PublicKey().String(),
+					},
+				),
+				commonchangeset.Configure(
+					deployment.CreateLegacyChangeSet(changeset_solana.SetupTokenPoolForRemoteChain),
+					changeset_solana.RemoteChainTokenPoolConfig{
+						SolChainSelector:    solChain,
+						RemoteChainSelector: evmChain,
+						SolTokenPubKey:      tokenAddress.String(),
+						RemoteConfig:        remoteConfig,
+						InboundRateLimit:    inboundConfig,
+						OutboundRateLimit:   outboundConfig,
+						PoolType:            testCase.poolType,
+					},
+				),
+			)
+			require.NoError(t, err)
+			// test AddTokenPool results
+			configAccount := solTestTokenPool.State{}
+			poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenAddress, testCase.poolAddress)
+			err = e.SolChains[solChain].GetAccountDataBorshInto(ctx, poolConfigPDA, &configAccount)
+			require.NoError(t, err)
+			require.Equal(t, tokenAddress, configAccount.Config.Mint)
+			// test SetupTokenPoolForRemoteChain results
+			remoteChainConfigPDA, _, _ := solTokenUtil.TokenPoolChainConfigPDA(evmChain, tokenAddress, testCase.poolAddress)
+			var remoteChainConfigAccount solTestTokenPool.ChainConfig
+			err = e.SolChains[solChain].GetAccountDataBorshInto(ctx, remoteChainConfigPDA, &remoteChainConfigAccount)
+			require.NoError(t, err)
+			require.Equal(t, uint8(9), remoteChainConfigAccount.Base.Remote.Decimals)
+		}
+	}
+
 }
 
 func TestBilling(t *testing.T) {
@@ -402,7 +417,7 @@ func TestPoolLookupTable(t *testing.T) {
 			changeset_solana.TokenPoolLookupTableConfig{
 				ChainSelector: solChain,
 				TokenPubKey:   tokenAddress.String(),
-				TokenProgram:  deployment.SPL2022Tokens,
+				PoolType:      solTestTokenPool.BurnAndMint_PoolType,
 			},
 		),
 	)
@@ -445,7 +460,6 @@ func TestPoolLookupTable(t *testing.T) {
 			changeset_solana.SetPoolConfig{
 				ChainSelector:                     solChain,
 				TokenPubKey:                       tokenAddress.String(),
-				PoolLookupTable:                   lookupTablePubKey.String(),
 				TokenAdminRegistryAdminPrivateKey: tokenAdminRegistryAdminPrivKey.String(),
 				WritableIndexes:                   []uint8{3, 4, 7},
 			},
