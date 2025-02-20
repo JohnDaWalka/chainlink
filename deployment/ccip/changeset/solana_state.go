@@ -37,6 +37,8 @@ type SolCCIPChainState struct {
 	Receiver                  solana.PublicKey // for tests only
 	SPL2022Tokens             []solana.PublicKey
 	TokenPool                 solana.PublicKey
+	BurnMintTokenPool         solana.PublicKey
+	LockReleaseTokenPool      solana.PublicKey
 	WSOL                      solana.PublicKey
 	FeeQuoter                 solana.PublicKey
 	OffRamp                   solana.PublicKey
@@ -158,6 +160,12 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 		case FeeAggregator:
 			pub := solana.MustPublicKeyFromBase58(address)
 			state.FeeAggregator = pub
+		case BurnMintTokenPool:
+			pub := solana.MustPublicKeyFromBase58(address)
+			state.BurnMintTokenPool = pub
+		case LockReleaseTokenPool:
+			pub := solana.MustPublicKeyFromBase58(address)
+			state.LockReleaseTokenPool = pub
 		default:
 			log.Warn().Str("address", address).Str("type", string(tvStr.Type)).Msg("Unknown address type")
 			continue
