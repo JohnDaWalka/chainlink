@@ -2,7 +2,7 @@
 selected_networks = ["CRONOS_ZKEVM_TESTNET_SEPOLIA"]
 
 [Soak.Common]
-chainlink_node_funding = 30
+chainlink_node_funding = 50
 
 [Soak.OCR]
 [Soak.OCR.Common]
