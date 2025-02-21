@@ -63,7 +63,7 @@ func DeploySolanaToken(e deployment.Environment, cfg DeploySolanaTokenConfig) (d
 	}
 	err = chain.Confirm(instructions, solCommomUtil.AddSigners(mintPrivKey))
 	if err != nil {
-		e.Logger.Errorw("Failed to confirm instructions for link token deployment", "chain", chain.String(), "err", err)
+		e.Logger.Errorw("Failed to confirm instructions for token deployment", "chain", chain.String(), "err", err)
 		return deployment.ChangesetOutput{}, err
 	}
 
@@ -71,7 +71,7 @@ func DeploySolanaToken(e deployment.Environment, cfg DeploySolanaTokenConfig) (d
 	tv := deployment.NewTypeAndVersion(deployment.ContractType(cfg.TokenProgramName), deployment.Version1_0_0)
 	err = newAddresses.Save(cfg.ChainSelector, mint.String(), tv)
 	if err != nil {
-		e.Logger.Errorw("Failed to save link token", "chain", chain.String(), "err", err)
+		e.Logger.Errorw("Failed to save token", "chain", chain.String(), "err", err)
 		return deployment.ChangesetOutput{}, err
 	}
 
