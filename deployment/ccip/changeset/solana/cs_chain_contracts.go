@@ -28,13 +28,13 @@ var _ deployment.ChangeSet[SetFeeAggregatorConfig] = SetFeeAggregator
 // GetTokenProgramID returns the program ID for the given token program name
 func GetTokenProgramID(programName deployment.ContractType) (solana.PublicKey, error) {
 	tokenPrograms := map[deployment.ContractType]solana.PublicKey{
-		cs.SPLTokens:     solana.TokenProgramID, // not used yet
+		cs.SPLTokens:     solana.TokenProgramID,
 		cs.SPL2022Tokens: solana.Token2022ProgramID,
 	}
 
 	programID, ok := tokenPrograms[programName]
 	if !ok {
-		return solana.PublicKey{}, fmt.Errorf("invalid token program: %s. Must be one of: %s, %s", programName, deployment.SPLTokens, deployment.SPL2022Tokens)
+		return solana.PublicKey{}, fmt.Errorf("invalid token program: %s. Must be one of: %s, %s", programName, cs.SPLTokens, cs.SPL2022Tokens)
 	}
 	return programID, nil
 }
