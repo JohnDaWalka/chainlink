@@ -167,7 +167,7 @@ func TestAddTokenPool(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		for _, tokenAddress := range tokenMap {
-			e, err := commonchangeset.Apply(t, e, nil,
+			e, err = commonchangeset.Apply(t, e, nil,
 				commonchangeset.Configure(
 					deployment.CreateLegacyChangeSet(ccipChangesetSolana.AddTokenPool),
 					ccipChangesetSolana.TokenPoolConfig{
