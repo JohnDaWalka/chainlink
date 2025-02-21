@@ -878,8 +878,7 @@ func DeployTransferableTokenSolana(
 
 	state, err = changeset.LoadOnchainState(e)
 	require.NoError(t, err)
-	// index 0 is link token
-	solTokenAddress := state.SolChains[solChainSel].SPL2022Tokens[1]
+	solTokenAddress := state.SolChains[solChainSel].SPL2022Tokens[0]
 	solDeployerKey := e.SolChains[solChainSel].DeployerKey.PublicKey()
 	e, err = commoncs.Apply(t, e, nil,
 		commoncs.Configure(
