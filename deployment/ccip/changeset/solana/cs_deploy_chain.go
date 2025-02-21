@@ -21,6 +21,8 @@ import (
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 )
 
+var _ deployment.ChangeSet[DeployChainContractsConfig] = DeployChainContractsChangeset
+
 type DeployChainContractsConfig struct {
 	HomeChainSelector      uint64
 	ContractParamsPerChain map[uint64]ChainContractParams
@@ -40,12 +42,22 @@ type OffRampParams struct {
 	EnableExecutionAfter int64
 }
 
-var _ deployment.ChangeSet[DeployChainContractsConfig] = DeployChainContractsChangeset
+func (c DeployChainContractsConfig) Validate() error {
+	if err := deployment.IsValidChainSelector(c.HomeChainSelector); err != nil {
+		return fmt.Errorf("invalid home chain selector: %d - %w", c.HomeChainSelector, err)
+	}
+	for cs := range c.ContractParamsPerChain {
+		if err := deployment.IsValidChainSelector(cs); err != nil {
+			return fmt.Errorf("invalid chain selector: %d - %w", cs, err)
+		}
+	}
+	return nil
+}
 
 func DeployChainContractsChangeset(e deployment.Environment, c DeployChainContractsConfig) (deployment.ChangesetOutput, error) {
-	// if err := c.Validate(); err != nil {
-	// 	return deployment.ChangesetOutput{}, fmt.Errorf("invalid DeployChainContractsConfig: %w", err)
-	// }
+	if err := c.Validate(); err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("invalid DeployChainContractsConfig: %w", err)
+	}
 	newAddresses := deployment.NewMemoryAddressBook()
 	existingState, err := changeset.LoadOnchainState(e)
 	if err != nil {
@@ -438,29 +450,6 @@ func deployChainContractsSolana(
 		lockReleaseTokenPool = chainState.LockReleaseTokenPool
 	}
 
-	// SETUP BILLING
-	// // link
-	// if err := AddBillingToken(
-	// 	e, chain, feeQuoterAddress, ccipRouterProgram, cs.SPL2022Tokens,
-	// 	solFeeQuoter.BillingTokenConfig{
-	// 		Enabled: true,
-	// 		Mint:    chainState.LinkToken,
-	// 	},
-	// ); err != nil {
-	// 	return err
-	// }
-
-	// // wsol
-	// if err := AddBillingToken(
-	// 	e, chain, feeQuoterAddress, ccipRouterProgram, cs.SPLTokens,
-	// 	solFeeQuoter.BillingTokenConfig{
-	// 		Enabled: true,
-	// 		Mint:    chainState.WSOL,
-	// 	},
-	// ); err != nil {
-	// 	return err
-	// }
-
 	for _, billingConfig := range params.FeeQuoterParams.BillingConfig {
 		if err := AddBillingToken(
 			e, chain, chainState, billingConfig,
@@ -480,7 +469,6 @@ func deployChainContractsSolana(
 	if err := solCommonUtil.ExtendLookupTable(e.GetContext(), chain.Client, addressLookupTable, *chain.DeployerKey,
 		[]solana.PublicKey{
 			// token pools
-			// tokenPoolProgram,
 			burnMintTokenPool,
 			lockReleaseTokenPool,
 			// offramp
