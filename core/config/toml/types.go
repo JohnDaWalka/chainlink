@@ -263,8 +263,8 @@ func (e *EthKey) ValidateConfig() (err error) {
 }
 
 type P2PKey struct {
-	PrivateKey *models.Secret
-	PublicKey  *models.Secret
+	JSON     *models.Secret
+	Password *models.Secret
 }
 
 func (p *P2PKey) SetFrom(f *P2PKey) (err error) {
@@ -272,20 +272,27 @@ func (p *P2PKey) SetFrom(f *P2PKey) (err error) {
 	if err != nil {
 		return err
 	}
-	if v := f.PrivateKey; v != nil {
-		p.PrivateKey = v
+	if v := f.JSON; v != nil {
+		p.JSON = v
 	}
-	if v := f.PublicKey; v != nil {
-		p.PublicKey = v
+	if v := f.Password; v != nil {
+		p.Password = v
 	}
 	return nil
 }
 func (p *P2PKey) validateMerge(f *P2PKey) (err error) {
-	if p.PrivateKey != nil && f.PrivateKey != nil {
+	if p.JSON != nil && f.JSON != nil {
 		err = multierr.Append(err, configutils.ErrOverride{Name: "PrivateKey"})
 	}
-	if p.PublicKey != nil && f.PublicKey != nil {
+	if p.Password != nil && f.Password != nil {
 		err = multierr.Append(err, configutils.ErrOverride{Name: "PublicKey"})
+	}
+	return err
+}
+
+func (p *P2PKey) ValidateConfig() (err error) {
+	if (p.JSON != nil) != (p.Password != nil) {
+		err = multierr.Append(err, configutils.ErrInvalid{Name: "P2PKey", Value: p.JSON, Msg: "all fields must be nil or non-nil"})
 	}
 	return err
 }

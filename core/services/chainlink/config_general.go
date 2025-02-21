@@ -523,6 +523,10 @@ func (g *generalConfig) ImportedEthKey() coreconfig.EthKeyConfig {
 	return &importedEthKeyConfig{s: g.secrets.EthKey}
 }
 
+func (g *generalConfig) ImportedP2PKey() coreconfig.P2PSecretConfig {
+	return &importedP2PKeyConfig{s: g.secrets.P2PKey}
+}
+
 func (g *generalConfig) Tracing() coreconfig.Tracing {
 	return &tracingConfig{s: g.c.Tracing}
 }

@@ -20,4 +20,5 @@ type GeneralConfig interface {
 	ConfigTOML() (user, effective string)
 
 	ImportedEthKey() coreconfig.EthKeyConfig
+	ImportedP2PKey() coreconfig.P2PSecretConfig
 }
