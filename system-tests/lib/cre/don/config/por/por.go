@@ -58,6 +58,7 @@ func GenerateConfigs(input types.GeneratePoRConfigsInput) (types.NodeIndexToConf
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to convert node index to int")
 			}
+			break
 		}
 	}
 
