@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 )
@@ -98,7 +99,7 @@ func TestDeployChainContractsChangesetSolana(t *testing.T) {
 				HomeChainSelector: homeChainSel,
 				ContractParamsPerChain: map[uint64]cs_solana.ChainContractParamsSolana{
 					solChainSelectors[0]: {
-						EnableExecutionAfter: 1800,
+						EnableExecutionAfter: int64(globals.PermissionLessExecutionThreshold.Seconds()),
 					},
 				},
 			},

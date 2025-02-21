@@ -113,7 +113,7 @@ func TestAddTokenPool(t *testing.T) {
 			deployment.CreateLegacyChangeSet(changeset_solana.DeploySolanaToken),
 			changeset_solana.DeploySolanaTokenConfig{
 				ChainSelector:    solChain,
-				TokenProgramName: deployment.SPL2022Tokens,
+				TokenProgramName: ccipChangeset.SPL2022Tokens,
 				TokenDecimals:    9,
 			},
 		),

@@ -14,7 +14,7 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 )
 
-var (
+const (
 	OfframpAddressLookupTable deployment.ContractType = "OfframpAddressLookupTable"
 	TokenPool                 deployment.ContractType = "TokenPool"
 	Receiver                  deployment.ContractType = "Receiver"
