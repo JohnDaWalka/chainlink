@@ -753,6 +753,8 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 				nodeSecretString, err := toml.Marshal(nodeSecret)
 				require.NoError(t, err, "failed to marshal node secrets")
 
+				fmt.Println(string(nodeSecretString))
+
 				envInput.nodeSetInput[i].NodeSpecs[j].Node.TestSecretsOverrides = string(nodeSecretString)
 			}
 		}
