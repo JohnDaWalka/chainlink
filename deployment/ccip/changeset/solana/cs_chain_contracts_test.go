@@ -304,11 +304,11 @@ func TestTokenAdminRegistry(t *testing.T) {
 
 	state, err := ccipChangeset.LoadOnchainStateSolana(e)
 	require.NoError(t, err)
-	tokenAddress := state.SolChains[solChain].SPL2022Tokens[0]
 	tokenAdminRegistryAdminPrivKey, _ := solana.NewRandomPrivateKey()
 
-	// We have to do run the ViaOwnerInstruction testcase for linkToken as we already register a PDA for tokenAddress in the previous testcase
 	linkTokenAddress := state.SolChains[solChain].LinkToken
+	// index 0 is link token
+	tokenAddress := state.SolChains[solChain].SPL2022Tokens[1]
 
 	e, err = commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(

@@ -116,9 +116,6 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 		case SPLTokens:
 			pub := solana.MustPublicKeyFromBase58(address)
 			state.SPLTokens = append(state.SPLTokens, pub)
-		// case TokenPool:
-		// 	pub := solana.MustPublicKeyFromBase58(address)
-		// 	state.TokenPool = pub
 		case RemoteSource:
 			pub := solana.MustPublicKeyFromBase58(address)
 			// Labels should only have one entry

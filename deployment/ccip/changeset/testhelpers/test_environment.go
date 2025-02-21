@@ -549,7 +549,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 
 	for _, chain := range solChains {
 		solContractParams[chain] = solana.ChainContractParamsSolana{
-			EnableExecutionAfter: 1800,
+			EnableExecutionAfter: int64(globals.PermissionLessExecutionThreshold.Seconds()),
 		}
 	}
 
