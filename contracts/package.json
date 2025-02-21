@@ -11,6 +11,8 @@
     "prettier:write": "prettier '**/*' --write --ignore-unknown",
     "publish-beta": "pnpm publish --tag beta",
     "publish-prod": "npm dist-tag add @chainlink/contracts-ccip@1.6.0 latest",
+    "solhint": "solhint --max-warnings 0 \"./src/v0.8/**/*.sol\"",
+    "solhint-test": "solhint --config \".solhint-test.json\"  --ignore-path \".solhintignore-test\" --max-warnings 0 \"./src/v0.8/**/*.sol\"",
     "compile": "./scripts/native_solc_compile_all_ccip",
     "prepublishOnly": "pnpm compile",
     "copy:ccip-files": "cp ./release/ccip/package.json release/ccip/pnpm-lock.yaml ./release/ccip/README.md ./",
