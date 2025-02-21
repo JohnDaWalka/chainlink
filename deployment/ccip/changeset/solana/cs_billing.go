@@ -22,10 +22,9 @@ var _ deployment.ChangeSet[BillingTokenForRemoteChainConfig] = AddBillingTokenFo
 
 // ADD BILLING TOKEN
 type BillingTokenConfig struct {
-	ChainSelector    uint64
-	TokenPubKey      string
-	TokenProgramName deployment.ContractType
-	Config           solFeeQuoter.BillingTokenConfig
+	ChainSelector uint64
+	TokenPubKey   string
+	Config        solFeeQuoter.BillingTokenConfig
 }
 
 func (cfg BillingTokenConfig) Validate(e deployment.Environment) error {
@@ -33,14 +32,14 @@ func (cfg BillingTokenConfig) Validate(e deployment.Environment) error {
 	if err := commonValidation(e, cfg.ChainSelector, tokenPubKey); err != nil {
 		return err
 	}
-	if _, err := GetTokenProgramID(cfg.TokenProgramName); err != nil {
-		return err
-	}
 
 	chain := e.SolChains[cfg.ChainSelector]
 	state, _ := cs.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
 	if err := validateFeeQuoterConfig(chain, chainState); err != nil {
+		return err
+	}
+	if _, err := chainState.TokenToTokenProgram(tokenPubKey); err != nil {
 		return err
 	}
 	// check if already setup
@@ -58,17 +57,15 @@ func (cfg BillingTokenConfig) Validate(e deployment.Environment) error {
 func AddBillingToken(
 	e deployment.Environment,
 	chain deployment.SolChain,
-	feeQuoterAddress solana.PublicKey,
-	routerAddress solana.PublicKey,
-	tokenProgramName deployment.ContractType,
+	chainState cs.SolCCIPChainState,
 	billingConfig solFeeQuoter.BillingTokenConfig,
 ) error {
 	tokenPubKey := solana.MustPublicKeyFromBase58(billingConfig.Mint.String())
-	tokenBillingPDA, _, _ := solState.FindFqBillingTokenConfigPDA(tokenPubKey, feeQuoterAddress)
-	billingSignerPDA, _, _ := solState.FindFeeBillingSignerPDA(routerAddress)
-	tokenProgramID, _ := GetTokenProgramID(tokenProgramName)
+	tokenBillingPDA, _, _ := solState.FindFqBillingTokenConfigPDA(tokenPubKey, chainState.FeeQuoter)
+	billingSignerPDA, _, _ := solState.FindFeeBillingSignerPDA(chainState.Router)
+	tokenProgramID, _ := chainState.TokenToTokenProgram(tokenPubKey)
 	token2022Receiver, _, _ := solTokenUtil.FindAssociatedTokenAddress(tokenProgramID, tokenPubKey, billingSignerPDA)
-	feeQuoterConfigPDA, _, _ := solState.FindFqConfigPDA(feeQuoterAddress)
+	feeQuoterConfigPDA, _, _ := solState.FindFqConfigPDA(chainState.FeeQuoter)
 	ixConfig, cerr := solFeeQuoter.NewAddBillingTokenConfigInstruction(
 		billingConfig,
 		feeQuoterConfigPDA,
@@ -101,7 +98,7 @@ func AddBillingTokenChangeset(e deployment.Environment, cfg BillingTokenConfig) 
 
 	solFeeQuoter.SetProgramID(chainState.FeeQuoter)
 
-	if err := AddBillingToken(e, chain, chainState.FeeQuoter, chainState.Router, cfg.TokenProgramName, cfg.Config); err != nil {
+	if err := AddBillingToken(e, chain, chainState, cfg.Config); err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
 
