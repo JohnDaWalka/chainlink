@@ -20,7 +20,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
-	changeset_solana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
+	ccipChangeSetSolana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/fee_quoter"
@@ -457,10 +457,10 @@ func addLaneSolanaChangesets(t *testing.T, solChainSelector, remoteChainSelector
 	}
 	solanaChangesets := []commoncs.ConfiguredChangeSet{
 		commoncs.Configure(
-			deployment.CreateLegacyChangeSet(changeset_solana.AddRemoteChainToSolana),
-			changeset_solana.AddRemoteChainToSolanaConfig{
+			deployment.CreateLegacyChangeSet(ccipChangeSetSolana.AddRemoteChainToSolana),
+			ccipChangeSetSolana.AddRemoteChainToSolanaConfig{
 				ChainSelector: solChainSelector,
-				UpdatesByChain: map[uint64]changeset_solana.RemoteChainConfigSolana{
+				UpdatesByChain: map[uint64]ccipChangeSetSolana.RemoteChainConfigSolana{
 					remoteChainSelector: {
 						EnabledAsSource:         true,
 						RouterDestinationConfig: solRouter.DestChainConfig{},
@@ -866,8 +866,8 @@ func DeployTransferableTokenSolana(
 	e, err = commoncs.Apply(t, e, nil,
 		commoncs.Configure(
 			// this makes the deployer the mint authority by default
-			deployment.CreateLegacyChangeSet(changeset_solana.DeploySolanaToken),
-			changeset_solana.DeploySolanaTokenConfig{
+			deployment.CreateLegacyChangeSet(ccipChangeSetSolana.DeploySolanaToken),
+			ccipChangeSetSolana.DeploySolanaTokenConfig{
 				ChainSelector:    solChainSel,
 				TokenProgramName: changeset.SPL2022Tokens,
 				TokenDecimals:    9,
@@ -884,8 +884,8 @@ func DeployTransferableTokenSolana(
 	e, err = commoncs.Apply(t, e, nil,
 		commoncs.Configure(
 			// create the ata for the deployerKey
-			deployment.CreateLegacyChangeSet(changeset_solana.CreateSolanaTokenATA),
-			changeset_solana.CreateSolanaTokenATAConfig{
+			deployment.CreateLegacyChangeSet(ccipChangeSetSolana.CreateSolanaTokenATA),
+			ccipChangeSetSolana.CreateSolanaTokenATAConfig{
 				ChainSelector: solChainSel,
 				TokenPubkey:   solTokenAddress,
 				TokenProgram:  changeset.SPL2022Tokens,
@@ -894,11 +894,10 @@ func DeployTransferableTokenSolana(
 		),
 		commoncs.Configure(
 			// mint the token to the deployerKey
-			deployment.CreateLegacyChangeSet(changeset_solana.MintSolanaToken),
-			changeset_solana.MintSolanaTokenConfig{
+			deployment.CreateLegacyChangeSet(ccipChangeSetSolana.MintSolanaToken),
+			ccipChangeSetSolana.MintSolanaTokenConfig{
 				ChainSelector: solChainSel,
 				TokenPubkey:   solTokenAddress.String(),
-				TokenProgram:  changeset.SPL2022Tokens,
 				AmountToAddress: map[string]uint64{
 					solDeployerKey.String(): uint64(1000),
 				},
@@ -906,8 +905,8 @@ func DeployTransferableTokenSolana(
 		),
 		commoncs.Configure(
 			// deploy token pool and set the burn/mint authority to the tokenPool
-			deployment.CreateLegacyChangeSet(changeset_solana.AddTokenPool),
-			changeset_solana.TokenPoolConfig{
+			deployment.CreateLegacyChangeSet(ccipChangeSetSolana.AddTokenPool),
+			ccipChangeSetSolana.TokenPoolConfig{
 				ChainSelector: solChainSel,
 				TokenPubKey:   solTokenAddress.String(),
 				PoolType:      solTestTokenPool.BurnAndMint_PoolType,
@@ -929,8 +928,8 @@ func DeployTransferableTokenSolana(
 	// configure solana
 	e, err = commoncs.Apply(t, e, nil,
 		commoncs.Configure(
-			deployment.CreateLegacyChangeSet(changeset_solana.SetupTokenPoolForRemoteChain),
-			changeset_solana.RemoteChainTokenPoolConfig{
+			deployment.CreateLegacyChangeSet(ccipChangeSetSolana.SetupTokenPoolForRemoteChain),
+			ccipChangeSetSolana.RemoteChainTokenPoolConfig{
 				SolChainSelector:    solChainSel,
 				RemoteChainSelector: evmChainSel,
 				SolTokenPubKey:      solTokenAddress.String(),
@@ -959,8 +958,8 @@ func DeployTransferableTokenSolana(
 			},
 		),
 		commoncs.Configure(
-			deployment.CreateLegacyChangeSet(changeset_solana.AddBillingTokenForRemoteChain),
-			changeset_solana.BillingTokenForRemoteChainConfig{
+			deployment.CreateLegacyChangeSet(ccipChangeSetSolana.AddBillingTokenForRemoteChain),
+			ccipChangeSetSolana.BillingTokenForRemoteChainConfig{
 				ChainSelector:       solChainSel,
 				RemoteChainSelector: evmChainSel,
 				TokenPubKey:         solTokenAddress.String(),

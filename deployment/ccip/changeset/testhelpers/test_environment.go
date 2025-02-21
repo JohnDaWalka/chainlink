@@ -28,7 +28,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
-	changeset_solana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
+	ccipChangeSetSolana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
@@ -526,7 +526,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	// no proposals to be made, timelock can be passed as nil here
 	var apps []commonchangeset.ConfiguredChangeSet
 	evmContractParams := make(map[uint64]changeset.ChainContractParams)
-	solContractParams := make(map[uint64]changeset_solana.ChainContractParams)
+	solContractParams := make(map[uint64]ccipChangeSetSolana.ChainContractParams)
 	evmChains := []uint64{}
 	for _, chain := range allChains {
 		if _, ok := e.Env.Chains[chain]; ok {
@@ -555,8 +555,8 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	state, err := changeset.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	for _, chain := range solChains {
-		solContractParams[chain] = changeset_solana.ChainContractParams{
-			FeeQuoterParams: changeset_solana.FeeQuoterParams{
+		solContractParams[chain] = ccipChangeSetSolana.ChainContractParams{
+			FeeQuoterParams: ccipChangeSetSolana.FeeQuoterParams{
 				DefaultMaxFeeJuelsPerMsg: solBinary.Uint128{Lo: 300000000, Hi: 0, Endianness: nil},
 				BillingConfig: []solFeeQuoter.BillingTokenConfig{
 					{
@@ -579,7 +579,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 					},
 				},
 			},
-			OffRampParams: changeset_solana.OffRampParams{
+			OffRampParams: ccipChangeSetSolana.OffRampParams{
 				EnableExecutionAfter: int64(globals.PermissionLessExecutionThreshold.Seconds()),
 			},
 		}
@@ -606,8 +606,8 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(changeset_solana.DeployChainContractsChangeset),
-			changeset_solana.DeployChainContractsConfig{
+			deployment.CreateLegacyChangeSet(ccipChangeSetSolana.DeployChainContractsChangeset),
+			ccipChangeSetSolana.DeployChainContractsConfig{
 				HomeChainSelector:      e.HomeChainSel,
 				ContractParamsPerChain: solContractParams,
 			},
@@ -800,7 +800,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		),
 		commonchangeset.Configure(
 			// Enable the OCR config on the remote chains.
-			deployment.CreateLegacyChangeSet(changeset_solana.SetOCR3ConfigSolana),
+			deployment.CreateLegacyChangeSet(ccipChangeSetSolana.SetOCR3ConfigSolana),
 			changeset.SetOCR3OffRampConfig{
 				HomeChainSel:       e.HomeChainSel,
 				RemoteChainSels:    solChains,

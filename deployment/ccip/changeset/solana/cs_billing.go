@@ -14,7 +14,7 @@ import (
 	ata "github.com/gagliardetto/solana-go/programs/associated-token-account"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	ccipChangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 )
 
 var _ deployment.ChangeSet[BillingTokenConfig] = AddBillingTokenChangeset
@@ -34,7 +34,7 @@ func (cfg BillingTokenConfig) Validate(e deployment.Environment) error {
 	}
 
 	chain := e.SolChains[cfg.ChainSelector]
-	state, _ := cs.LoadOnchainState(e)
+	state, _ := ccipChangeset.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
 	if err := validateFeeQuoterConfig(chain, chainState); err != nil {
 		return err
@@ -57,7 +57,7 @@ func (cfg BillingTokenConfig) Validate(e deployment.Environment) error {
 func AddBillingToken(
 	e deployment.Environment,
 	chain deployment.SolChain,
-	chainState cs.SolCCIPChainState,
+	chainState ccipChangeset.SolCCIPChainState,
 	billingConfig solFeeQuoter.BillingTokenConfig,
 ) error {
 	tokenPubKey := solana.MustPublicKeyFromBase58(billingConfig.Mint.String())
@@ -93,7 +93,7 @@ func AddBillingTokenChangeset(e deployment.Environment, cfg BillingTokenConfig) 
 		return deployment.ChangesetOutput{}, err
 	}
 	chain := e.SolChains[cfg.ChainSelector]
-	state, _ := cs.LoadOnchainState(e)
+	state, _ := ccipChangeset.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
 
 	solFeeQuoter.SetProgramID(chainState.FeeQuoter)
@@ -132,7 +132,7 @@ func (cfg BillingTokenForRemoteChainConfig) Validate(e deployment.Environment) e
 	if err := commonValidation(e, cfg.ChainSelector, tokenPubKey); err != nil {
 		return err
 	}
-	state, _ := cs.LoadOnchainState(e)
+	state, _ := ccipChangeset.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
 	chain := e.SolChains[cfg.ChainSelector]
 	if err := validateFeeQuoterConfig(chain, chainState); err != nil {
@@ -156,7 +156,7 @@ func AddBillingTokenForRemoteChain(e deployment.Environment, cfg BillingTokenFor
 	}
 
 	chain := e.SolChains[cfg.ChainSelector]
-	state, _ := cs.LoadOnchainState(e)
+	state, _ := ccipChangeset.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
 	remoteBillingPDA, _, _ := solState.FindFqPerChainPerTokenConfigPDA(cfg.RemoteChainSelector, tokenPubKey, chainState.FeeQuoter)

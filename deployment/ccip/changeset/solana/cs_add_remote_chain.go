@@ -16,7 +16,7 @@ import (
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	ccipChangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commonState "github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 )
@@ -28,7 +28,7 @@ type AddRemoteChainToSolanaConfig struct {
 	UpdatesByChain map[uint64]RemoteChainConfigSolana
 	// Disallow mixing MCMS/non-MCMS per chain for simplicity.
 	// (can still be achieved by calling this function multiple times)
-	MCMS *cs.MCMSConfig
+	MCMS *ccipChangeset.MCMSConfig
 }
 
 type RemoteChainConfigSolana struct {
@@ -40,7 +40,7 @@ type RemoteChainConfigSolana struct {
 }
 
 func (cfg AddRemoteChainToSolanaConfig) Validate(e deployment.Environment) error {
-	state, err := cs.LoadOnchainState(e)
+	state, err := ccipChangeset.LoadOnchainState(e)
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
 	}
@@ -82,7 +82,7 @@ func (cfg AddRemoteChainToSolanaConfig) Validate(e deployment.Environment) error
 		if remote == routerConfigAccount.SvmChainSelector {
 			return fmt.Errorf("cannot add remote chain %d with same chain selector as current chain %d", remote, cfg.ChainSelector)
 		}
-		if err := state.ValidateRamp(remote, cs.OnRamp); err != nil {
+		if err := state.ValidateRamp(remote, ccipChangeset.OnRamp); err != nil {
 			return err
 		}
 		routerDestChainPDA, err := solState.FindDestChainStatePDA(remote, chainState.Router)
@@ -104,7 +104,7 @@ func AddRemoteChainToSolana(e deployment.Environment, cfg AddRemoteChainToSolana
 		return deployment.ChangesetOutput{}, err
 	}
 
-	s, err := cs.LoadOnchainState(e)
+	s, err := ccipChangeset.LoadOnchainState(e)
 	if err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
@@ -119,7 +119,7 @@ func AddRemoteChainToSolana(e deployment.Environment, cfg AddRemoteChainToSolana
 
 func doAddRemoteChainToSolana(
 	e deployment.Environment,
-	s cs.CCIPOnChainState,
+	s ccipChangeset.CCIPOnChainState,
 	chainSel uint64,
 	updates map[uint64]RemoteChainConfigSolana,
 	ab deployment.AddressBook) error {
@@ -209,7 +209,7 @@ func doAddRemoteChainToSolana(
 			return fmt.Errorf("failed to confirm instructions: %w", err)
 		}
 
-		tv := deployment.NewTypeAndVersion(cs.RemoteDest, deployment.Version1_0_0)
+		tv := deployment.NewTypeAndVersion(ccipChangeset.RemoteDest, deployment.Version1_0_0)
 		remoteChainSelStr := strconv.FormatUint(remoteChainSel, 10)
 		tv.AddLabel(remoteChainSelStr)
 		err = ab.Save(chainSel, routerRemoteStatePDA.String(), tv)
@@ -217,7 +217,7 @@ func doAddRemoteChainToSolana(
 			return fmt.Errorf("failed to save dest chain state to address book: %w", err)
 		}
 
-		tv = deployment.NewTypeAndVersion(cs.RemoteSource, deployment.Version1_0_0)
+		tv = deployment.NewTypeAndVersion(ccipChangeset.RemoteSource, deployment.Version1_0_0)
 		tv.AddLabel(remoteChainSelStr)
 		err = ab.Save(chainSel, allowedOffRampRemotePDA.String(), tv)
 		if err != nil {

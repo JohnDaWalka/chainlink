@@ -8,8 +8,9 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
-	cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	// "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	ccipChangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	// "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 
 	solBinary "github.com/gagliardetto/binary"
 	solRpc "github.com/gagliardetto/solana-go/rpc"
@@ -59,13 +60,13 @@ func DeployChainContractsChangeset(e deployment.Environment, c DeployChainContra
 		return deployment.ChangesetOutput{}, fmt.Errorf("invalid DeployChainContractsConfig: %w", err)
 	}
 	newAddresses := deployment.NewMemoryAddressBook()
-	existingState, err := changeset.LoadOnchainState(e)
+	existingState, err := ccipChangeset.LoadOnchainState(e)
 	if err != nil {
 		e.Logger.Errorw("Failed to load existing onchain state", "err", err)
 		return deployment.ChangesetOutput{}, err
 	}
 
-	err = changeset.ValidateHomeChainState(e, c.HomeChainSelector, existingState)
+	err = ccipChangeset.ValidateHomeChainState(e, c.HomeChainSelector, existingState)
 	if err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
@@ -270,7 +271,7 @@ func deployChainContractsSolana(
 	ab deployment.AddressBook,
 	params ChainContractParams,
 ) error {
-	state, err := changeset.LoadOnchainStateSolana(e)
+	state, err := ccipChangeset.LoadOnchainStateSolana(e)
 	if err != nil {
 		e.Logger.Errorw("Failed to load existing onchain state", "err", err)
 		return err
@@ -304,7 +305,7 @@ func deployChainContractsSolana(
 		if err != nil {
 			return fmt.Errorf("failed to create lookup table: %w", err)
 		}
-		err = ab.Save(chain.Selector, addressLookupTable.String(), deployment.NewTypeAndVersion(changeset.OfframpAddressLookupTable, deployment.Version1_0_0))
+		err = ab.Save(chain.Selector, addressLookupTable.String(), deployment.NewTypeAndVersion(ccipChangeset.OfframpAddressLookupTable, deployment.Version1_0_0))
 		if err != nil {
 			return fmt.Errorf("failed to save address: %w", err)
 		}
@@ -319,7 +320,7 @@ func deployChainContractsSolana(
 			return fmt.Errorf("failed to deploy program: %w", err)
 		}
 
-		tv := deployment.NewTypeAndVersion(changeset.FeeQuoter, deployment.Version1_0_0)
+		tv := deployment.NewTypeAndVersion(ccipChangeset.FeeQuoter, deployment.Version1_0_0)
 		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
 
 		feeQuoterAddress = solana.MustPublicKeyFromBase58(programID)
@@ -342,7 +343,7 @@ func deployChainContractsSolana(
 			return fmt.Errorf("failed to deploy program: %w", err)
 		}
 
-		tv := deployment.NewTypeAndVersion(changeset.Router, deployment.Version1_0_0)
+		tv := deployment.NewTypeAndVersion(ccipChangeset.Router, deployment.Version1_0_0)
 		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
 
 		ccipRouterProgram = solana.MustPublicKeyFromBase58(programID)
@@ -364,7 +365,7 @@ func deployChainContractsSolana(
 		if err != nil {
 			return fmt.Errorf("failed to deploy program: %w", err)
 		}
-		tv := deployment.NewTypeAndVersion(changeset.OffRamp, deployment.Version1_0_0)
+		tv := deployment.NewTypeAndVersion(ccipChangeset.OffRamp, deployment.Version1_0_0)
 		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
 		offRampAddress = solana.MustPublicKeyFromBase58(programID)
 		err = ab.Save(chain.Selector, programID, tv)
@@ -420,7 +421,7 @@ func deployChainContractsSolana(
 		if err != nil {
 			return fmt.Errorf("failed to deploy program: %w", err)
 		}
-		tv := deployment.NewTypeAndVersion(changeset.BurnMintTokenPool, deployment.Version1_0_0)
+		tv := deployment.NewTypeAndVersion(ccipChangeset.BurnMintTokenPool, deployment.Version1_0_0)
 		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
 		burnMintTokenPool = solana.MustPublicKeyFromBase58(programID)
 		err = ab.Save(chain.Selector, programID, tv)
@@ -438,7 +439,7 @@ func deployChainContractsSolana(
 		if err != nil {
 			return fmt.Errorf("failed to deploy program: %w", err)
 		}
-		tv := deployment.NewTypeAndVersion(changeset.LockReleaseTokenPool, deployment.Version1_0_0)
+		tv := deployment.NewTypeAndVersion(ccipChangeset.LockReleaseTokenPool, deployment.Version1_0_0)
 		e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
 		lockReleaseTokenPool = solana.MustPublicKeyFromBase58(programID)
 		err = ab.Save(chain.Selector, programID, tv)
@@ -499,7 +500,7 @@ type SetFeeAggregatorConfig struct {
 }
 
 func (cfg SetFeeAggregatorConfig) Validate(e deployment.Environment) error {
-	state, err := cs.LoadOnchainState(e)
+	state, err := ccipChangeset.LoadOnchainState(e)
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
 	}
@@ -530,7 +531,7 @@ func SetFeeAggregator(e deployment.Environment, cfg SetFeeAggregatorConfig) (dep
 		return deployment.ChangesetOutput{}, err
 	}
 
-	state, _ := cs.LoadOnchainState(e)
+	state, _ := ccipChangeset.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
 	chain := e.SolChains[cfg.ChainSelector]
 
@@ -552,7 +553,7 @@ func SetFeeAggregator(e deployment.Environment, cfg SetFeeAggregatorConfig) (dep
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
 	}
 	newAddresses := deployment.NewMemoryAddressBook()
-	err = newAddresses.Save(cfg.ChainSelector, cfg.FeeAggregator, deployment.NewTypeAndVersion(changeset.FeeAggregator, deployment.Version1_0_0))
+	err = newAddresses.Save(cfg.ChainSelector, cfg.FeeAggregator, deployment.NewTypeAndVersion(ccipChangeset.FeeAggregator, deployment.Version1_0_0))
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to save address: %w", err)
 	}

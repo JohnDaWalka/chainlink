@@ -287,7 +287,7 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T) (deployment.Environmen
 	testhelpers.ValidateSolanaState(t, e, solChainSelectors)
 	state, err := changeset.LoadOnchainStateSolana(e)
 	require.NoError(t, err)
-	tokenAddress := state.SolChains[solChain1].SPL2022Tokens[0]
+	tokenAddress := state.SolChains[solChain1].SPL2022Tokens[1]
 
 	e, err = commonchangeset.ApplyChangesets(t, e, nil, []commonchangeset.ConfiguredChangeSet{
 		commonchangeset.Configure(

@@ -9,7 +9,7 @@ import (
 	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	ccipChangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 )
 
@@ -32,8 +32,8 @@ func btoi(b bool) uint8 {
 // run after the candidate is confirmed to be working correctly.
 // Multichain is especially helpful for NOP rotations where we have
 // to touch all the chain to change signers.
-func SetOCR3ConfigSolana(e deployment.Environment, cfg cs.SetOCR3OffRampConfig) (deployment.ChangesetOutput, error) {
-	state, err := cs.LoadOnchainState(e)
+func SetOCR3ConfigSolana(e deployment.Environment, cfg ccipChangeset.SetOCR3OffRampConfig) (deployment.ChangesetOutput, error) {
+	state, err := ccipChangeset.LoadOnchainState(e)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
@@ -105,7 +105,7 @@ func SetOCR3ConfigSolana(e deployment.Environment, cfg cs.SetOCR3OffRampConfig) 
 func isOCR3ConfigSetOnOffRampSolana(
 	e deployment.Environment,
 	chain deployment.SolChain,
-	chainState cs.SolCCIPChainState,
+	chainState ccipChangeset.SolCCIPChainState,
 	args []internal.MultiOCR3BaseOCRConfigArgsSolana,
 ) (bool, error) {
 	var configAccount solOffRamp.Config

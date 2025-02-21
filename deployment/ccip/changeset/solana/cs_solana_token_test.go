@@ -64,7 +64,6 @@ func TestSolanaTokenOps(t *testing.T) {
 			changeset_solana.MintSolanaTokenConfig{
 				ChainSelector: solChain1,
 				TokenPubkey:   tokenAddress.String(),
-				TokenProgram:  ccipChangeset.SPL2022Tokens,
 				AmountToAddress: map[string]uint64{
 					deployerKey.String():    uint64(1000),
 					testUserPubKey.String(): uint64(1000),

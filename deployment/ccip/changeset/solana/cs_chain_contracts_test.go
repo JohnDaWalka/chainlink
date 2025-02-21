@@ -17,7 +17,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 	ccipChangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
-	changeset_solana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
+	ccipChangesetSolana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -53,10 +53,10 @@ func TestAddRemoteChain(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(changeset_solana.AddRemoteChainToSolana),
-			changeset_solana.AddRemoteChainToSolanaConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.AddRemoteChainToSolana),
+			ccipChangesetSolana.AddRemoteChainToSolanaConfig{
 				ChainSelector: solChain,
-				UpdatesByChain: map[uint64]changeset_solana.RemoteChainConfigSolana{
+				UpdatesByChain: map[uint64]ccipChangesetSolana.RemoteChainConfigSolana{
 					evmChain: {
 						EnabledAsSource:         true,
 						RouterDestinationConfig: solRouter.DestChainConfig{},
@@ -110,8 +110,8 @@ func TestAddTokenPool(t *testing.T) {
 
 	e, err := commonchangeset.Apply(t, tenv.Env, nil,
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(changeset_solana.DeploySolanaToken),
-			changeset_solana.DeploySolanaTokenConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.DeploySolanaToken),
+			ccipChangesetSolana.DeploySolanaTokenConfig{
 				ChainSelector:    solChain,
 				TokenProgramName: ccipChangeset.SPL2022Tokens,
 				TokenDecimals:    9,
@@ -163,8 +163,8 @@ func TestAddTokenPool(t *testing.T) {
 		for _, tokenAddress := range tokenMap {
 			e, err = commonchangeset.Apply(t, e, nil,
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(changeset_solana.AddTokenPool),
-					changeset_solana.TokenPoolConfig{
+					deployment.CreateLegacyChangeSet(ccipChangesetSolana.AddTokenPool),
+					ccipChangesetSolana.TokenPoolConfig{
 						ChainSelector: solChain,
 						TokenPubKey:   tokenAddress.String(),
 						PoolType:      testCase.poolType,
@@ -173,8 +173,8 @@ func TestAddTokenPool(t *testing.T) {
 					},
 				),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(changeset_solana.SetupTokenPoolForRemoteChain),
-					changeset_solana.RemoteChainTokenPoolConfig{
+					deployment.CreateLegacyChangeSet(ccipChangesetSolana.SetupTokenPoolForRemoteChain),
+					ccipChangesetSolana.RemoteChainTokenPoolConfig{
 						SolChainSelector:    solChain,
 						RemoteChainSelector: evmChain,
 						SolTokenPubKey:      tokenAddress.String(),
@@ -213,8 +213,8 @@ func TestBilling(t *testing.T) {
 
 	e, err := commonchangeset.Apply(t, tenv.Env, nil,
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(changeset_solana.DeploySolanaToken),
-			changeset_solana.DeploySolanaTokenConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.DeploySolanaToken),
+			ccipChangesetSolana.DeploySolanaTokenConfig{
 				ChainSelector:    solChain,
 				TokenProgramName: ccipChangeset.SPL2022Tokens,
 				TokenDecimals:    9,
@@ -233,8 +233,8 @@ func TestBilling(t *testing.T) {
 	bigNum.FillBytes(value[:])
 	e, err = commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(changeset_solana.AddBillingTokenChangeset),
-			changeset_solana.BillingTokenConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.AddBillingTokenChangeset),
+			ccipChangesetSolana.BillingTokenConfig{
 				ChainSelector: solChain,
 				TokenPubKey:   tokenAddress.String(),
 				Config: solFeeQuoter.BillingTokenConfig{
@@ -249,8 +249,8 @@ func TestBilling(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(changeset_solana.AddBillingTokenForRemoteChain),
-			changeset_solana.BillingTokenForRemoteChainConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.AddBillingTokenForRemoteChain),
+			ccipChangesetSolana.BillingTokenForRemoteChainConfig{
 				ChainSelector:       solChain,
 				RemoteChainSelector: evmChain,
 				TokenPubKey:         tokenAddress.String(),
@@ -291,8 +291,8 @@ func TestTokenAdminRegistry(t *testing.T) {
 
 	e, err := commonchangeset.Apply(t, tenv.Env, nil,
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(changeset_solana.DeploySolanaToken),
-			changeset_solana.DeploySolanaTokenConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.DeploySolanaToken),
+			ccipChangesetSolana.DeploySolanaTokenConfig{
 				ChainSelector:    solChain,
 				TokenProgramName: ccipChangeset.SPL2022Tokens,
 				TokenDecimals:    9,
@@ -312,22 +312,22 @@ func TestTokenAdminRegistry(t *testing.T) {
 	e, err = commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(
 			// register token admin registry for tokenAddress via admin instruction
-			deployment.CreateLegacyChangeSet(changeset_solana.RegisterTokenAdminRegistry),
-			changeset_solana.RegisterTokenAdminRegistryConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.RegisterTokenAdminRegistry),
+			ccipChangesetSolana.RegisterTokenAdminRegistryConfig{
 				ChainSelector:           solChain,
 				TokenPubKey:             tokenAddress.String(),
 				TokenAdminRegistryAdmin: tokenAdminRegistryAdminPrivKey.PublicKey().String(),
-				RegisterType:            changeset_solana.ViaGetCcipAdminInstruction,
+				RegisterType:            ccipChangesetSolana.ViaGetCcipAdminInstruction,
 			},
 		),
 		commonchangeset.Configure(
 			// register token admin registry for linkToken via owner instruction
-			deployment.CreateLegacyChangeSet(changeset_solana.RegisterTokenAdminRegistry),
-			changeset_solana.RegisterTokenAdminRegistryConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.RegisterTokenAdminRegistry),
+			ccipChangesetSolana.RegisterTokenAdminRegistryConfig{
 				ChainSelector:           solChain,
 				TokenPubKey:             linkTokenAddress.String(),
 				TokenAdminRegistryAdmin: tokenAdminRegistryAdminPrivKey.PublicKey().String(),
-				RegisterType:            changeset_solana.ViaOwnerInstruction,
+				RegisterType:            ccipChangesetSolana.ViaOwnerInstruction,
 			},
 		),
 	)
@@ -350,8 +350,8 @@ func TestTokenAdminRegistry(t *testing.T) {
 	e, err = commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(
 			// accept admin role for tokenAddress
-			deployment.CreateLegacyChangeSet(changeset_solana.AcceptAdminRoleTokenAdminRegistry),
-			changeset_solana.AcceptAdminRoleTokenAdminRegistryConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.AcceptAdminRoleTokenAdminRegistry),
+			ccipChangesetSolana.AcceptAdminRoleTokenAdminRegistryConfig{
 				ChainSelector:              solChain,
 				TokenPubKey:                tokenAddress.String(),
 				NewRegistryAdminPrivateKey: tokenAdminRegistryAdminPrivKey.String(),
@@ -369,8 +369,8 @@ func TestTokenAdminRegistry(t *testing.T) {
 	e, err = commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(
 			// transfer admin role for tokenAddress
-			deployment.CreateLegacyChangeSet(changeset_solana.TransferAdminRoleTokenAdminRegistry),
-			changeset_solana.TransferAdminRoleTokenAdminRegistryConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.TransferAdminRoleTokenAdminRegistry),
+			ccipChangesetSolana.TransferAdminRoleTokenAdminRegistryConfig{
 				ChainSelector:                  solChain,
 				TokenPubKey:                    tokenAddress.String(),
 				NewRegistryAdminPublicKey:      newTokenAdminRegistryAdminPrivKey.PublicKey().String(),
@@ -394,8 +394,8 @@ func TestPoolLookupTable(t *testing.T) {
 	e, err := commonchangeset.Apply(t, tenv.Env, nil,
 		commonchangeset.Configure(
 			// deploy token
-			deployment.CreateLegacyChangeSet(changeset_solana.DeploySolanaToken),
-			changeset_solana.DeploySolanaTokenConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.DeploySolanaToken),
+			ccipChangesetSolana.DeploySolanaTokenConfig{
 				ChainSelector:    solChain,
 				TokenProgramName: ccipChangeset.SPL2022Tokens,
 				TokenDecimals:    9,
@@ -411,8 +411,8 @@ func TestPoolLookupTable(t *testing.T) {
 	e, err = commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(
 			// add token pool lookup table
-			deployment.CreateLegacyChangeSet(changeset_solana.AddTokenPoolLookupTable),
-			changeset_solana.TokenPoolLookupTableConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.AddTokenPoolLookupTable),
+			ccipChangesetSolana.TokenPoolLookupTableConfig{
 				ChainSelector: solChain,
 				TokenPubKey:   tokenAddress.String(),
 				PoolType:      solTestTokenPool.BurnAndMint_PoolType,
@@ -435,18 +435,18 @@ func TestPoolLookupTable(t *testing.T) {
 	e, err = commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(
 			// register token admin registry for linkToken via owner instruction
-			deployment.CreateLegacyChangeSet(changeset_solana.RegisterTokenAdminRegistry),
-			changeset_solana.RegisterTokenAdminRegistryConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.RegisterTokenAdminRegistry),
+			ccipChangesetSolana.RegisterTokenAdminRegistryConfig{
 				ChainSelector:           solChain,
 				TokenPubKey:             tokenAddress.String(),
 				TokenAdminRegistryAdmin: tokenAdminRegistryAdminPrivKey.PublicKey().String(),
-				RegisterType:            changeset_solana.ViaGetCcipAdminInstruction,
+				RegisterType:            ccipChangesetSolana.ViaGetCcipAdminInstruction,
 			},
 		),
 		commonchangeset.Configure(
 			// accept admin role for tokenAddress
-			deployment.CreateLegacyChangeSet(changeset_solana.AcceptAdminRoleTokenAdminRegistry),
-			changeset_solana.AcceptAdminRoleTokenAdminRegistryConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.AcceptAdminRoleTokenAdminRegistry),
+			ccipChangesetSolana.AcceptAdminRoleTokenAdminRegistryConfig{
 				ChainSelector:              solChain,
 				TokenPubKey:                tokenAddress.String(),
 				NewRegistryAdminPrivateKey: tokenAdminRegistryAdminPrivKey.String(),
@@ -454,8 +454,8 @@ func TestPoolLookupTable(t *testing.T) {
 		),
 		commonchangeset.Configure(
 			// set pool -> this updates tokenAdminRegistryPDA, hence above changeset is required
-			deployment.CreateLegacyChangeSet(changeset_solana.SetPool),
-			changeset_solana.SetPoolConfig{
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.SetPool),
+			ccipChangesetSolana.SetPoolConfig{
 				ChainSelector:                     solChain,
 				TokenPubKey:                       tokenAddress.String(),
 				TokenAdminRegistryAdminPrivateKey: tokenAdminRegistryAdminPrivKey.String(),

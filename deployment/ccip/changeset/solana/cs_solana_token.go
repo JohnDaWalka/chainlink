@@ -8,6 +8,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink/deployment"
+	ccipChangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 
 	solCommomUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -83,17 +84,19 @@ func DeploySolanaToken(e deployment.Environment, cfg DeploySolanaTokenConfig) (d
 
 type MintSolanaTokenConfig struct {
 	ChainSelector   uint64
-	TokenProgram    deployment.ContractType
 	TokenPubkey     string
 	AmountToAddress map[string]uint64 // address -> amount
 }
 
 func (cfg MintSolanaTokenConfig) Validate(e deployment.Environment) error {
 	chain := e.SolChains[cfg.ChainSelector]
-	// get addresses
 	tokenAddress := solana.MustPublicKeyFromBase58(cfg.TokenPubkey)
-	// get token program id
-	tokenprogramID, err := GetTokenProgramID(cfg.TokenProgram)
+	state, err := ccipChangeset.LoadOnchainState(e)
+	if err != nil {
+		return err
+	}
+	chainState := state.SolChains[cfg.ChainSelector]
+	tokenprogramID, err := chainState.TokenToTokenProgram(tokenAddress)
 	if err != nil {
 		return err
 	}
@@ -121,10 +124,12 @@ func MintSolanaToken(e deployment.Environment, cfg MintSolanaTokenConfig) (deplo
 	}
 	// get chain
 	chain := e.SolChains[cfg.ChainSelector]
+	state, _ := ccipChangeset.LoadOnchainState(e)
+	chainState := state.SolChains[cfg.ChainSelector]
 	// get addresses
 	tokenAddress := solana.MustPublicKeyFromBase58(cfg.TokenPubkey)
 	// get token program id
-	tokenprogramID, _ := GetTokenProgramID(cfg.TokenProgram)
+	tokenprogramID, _ := chainState.TokenToTokenProgram(tokenAddress)
 
 	// get mint instructions
 	instructions := []solana.Instruction{}
