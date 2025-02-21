@@ -89,7 +89,7 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 		WSOL:                 solana.SolMint,
 		TokenPoolLookupTable: make(map[solana.PublicKey]solana.PublicKey),
 	}
-
+	state.SPLTokens = append(state.SPLTokens, state.WSOL)
 	for address, tvStr := range addresses {
 		switch tvStr.Type {
 		case commontypes.LinkToken:
