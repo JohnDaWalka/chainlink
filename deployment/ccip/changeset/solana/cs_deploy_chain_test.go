@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	solBinary "github.com/gagliardetto/binary"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	cs_solana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
@@ -94,12 +95,17 @@ func TestDeployChainContractsChangesetSolana(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(cs_solana.DeployChainContractsChangesetSolana),
-			cs_solana.DeployChainContractsConfigSolana{
+			deployment.CreateLegacyChangeSet(cs_solana.DeployChainContractsChangeset),
+			cs_solana.DeployChainContractsConfig{
 				HomeChainSelector: homeChainSel,
-				ContractParamsPerChain: map[uint64]cs_solana.ChainContractParamsSolana{
+				ContractParamsPerChain: map[uint64]cs_solana.ChainContractParams{
 					solChainSelectors[0]: {
-						EnableExecutionAfter: int64(globals.PermissionLessExecutionThreshold.Seconds()),
+						FeeQuoterParams: cs_solana.FeeQuoterParams{
+							DefaultMaxFeeJuelsPerMsg: solBinary.Uint128{Lo: 300000000, Hi: 0, Endianness: nil},
+						},
+						OffRampParams: cs_solana.OffRampParams{
+							EnableExecutionAfter: int64(globals.PermissionLessExecutionThreshold.Seconds()),
+						},
 					},
 				},
 			},

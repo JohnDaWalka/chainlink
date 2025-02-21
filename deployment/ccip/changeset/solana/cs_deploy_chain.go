@@ -21,19 +21,28 @@ import (
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 )
 
-type DeployChainContractsConfigSolana struct {
+type DeployChainContractsConfig struct {
 	HomeChainSelector      uint64
-	ContractParamsPerChain map[uint64]ChainContractParamsSolana
+	ContractParamsPerChain map[uint64]ChainContractParams
 }
 
-type ChainContractParamsSolana struct {
-	EnableExecutionAfter     int64
+type ChainContractParams struct {
+	FeeQuoterParams FeeQuoterParams
+	OffRampParams   OffRampParams
+}
+
+type FeeQuoterParams struct {
 	DefaultMaxFeeJuelsPerMsg solBinary.Uint128
+	BillingConfig            []solFeeQuoter.BillingTokenConfig
 }
 
-var _ deployment.ChangeSet[DeployChainContractsConfigSolana] = DeployChainContractsChangesetSolana
+type OffRampParams struct {
+	EnableExecutionAfter int64
+}
 
-func DeployChainContractsChangesetSolana(e deployment.Environment, c DeployChainContractsConfigSolana) (deployment.ChangesetOutput, error) {
+var _ deployment.ChangeSet[DeployChainContractsConfig] = DeployChainContractsChangeset
+
+func DeployChainContractsChangeset(e deployment.Environment, c DeployChainContractsConfig) (deployment.ChangesetOutput, error) {
 	// if err := c.Validate(); err != nil {
 	// 	return deployment.ChangesetOutput{}, fmt.Errorf("invalid DeployChainContractsConfig: %w", err)
 	// }
@@ -143,7 +152,7 @@ func initializeFeeQuoter(
 	linkTokenAddress solana.PublicKey,
 	feeQuoterAddress solana.PublicKey,
 	offRampAddress solana.PublicKey,
-	params ChainContractParamsSolana,
+	params FeeQuoterParams,
 ) error {
 	programData, err := solProgramData(e, chain, feeQuoterAddress)
 	if err != nil {
@@ -161,6 +170,9 @@ func initializeFeeQuoter(
 		feeQuoterAddress,
 		programData.Address,
 	).ValidateAndBuild()
+	if err != nil {
+		return fmt.Errorf("failed to build instruction: %w", err)
+	}
 
 	offRampBillingSignerPDA, _, _ := solState.FindOfframpBillingSignerPDA(offRampAddress)
 	fqAllowedPriceUpdaterOfframpPDA, _, _ := solState.FindFqAllowedPriceUpdaterPDA(offRampBillingSignerPDA, feeQuoterAddress)
@@ -190,7 +202,7 @@ func intializeOffRamp(
 	feeQuoterAddress solana.PublicKey,
 	offRampAddress solana.PublicKey,
 	addressLookupTable solana.PublicKey,
-	params ChainContractParamsSolana,
+	params OffRampParams,
 ) error {
 	programData, err := solProgramData(e, chain, offRampAddress)
 	if err != nil {
@@ -244,7 +256,7 @@ func deployChainContractsSolana(
 	e deployment.Environment,
 	chain deployment.SolChain,
 	ab deployment.AddressBook,
-	params ChainContractParamsSolana,
+	params ChainContractParams,
 ) error {
 	state, err := changeset.LoadOnchainStateSolana(e)
 	if err != nil {
@@ -358,7 +370,7 @@ func deployChainContractsSolana(
 	feeQuoterConfigPDA, _, _ := solState.FindFqConfigPDA(feeQuoterAddress)
 	err = chain.GetAccountDataBorshInto(e.GetContext(), feeQuoterConfigPDA, &fqConfig)
 	if err != nil {
-		if err2 := initializeFeeQuoter(e, chain, ccipRouterProgram, chainState.LinkToken, feeQuoterAddress, offRampAddress, params); err2 != nil {
+		if err2 := initializeFeeQuoter(e, chain, ccipRouterProgram, chainState.LinkToken, feeQuoterAddress, offRampAddress, params.FeeQuoterParams); err2 != nil {
 			return err2
 		}
 	} else {
@@ -383,7 +395,7 @@ func deployChainContractsSolana(
 	offRampConfigPDA, _, _ := solState.FindOfframpConfigPDA(offRampAddress)
 	err = chain.GetAccountDataBorshInto(e.GetContext(), offRampConfigPDA, &offRampConfigAccount)
 	if err != nil {
-		if err2 := intializeOffRamp(e, chain, ccipRouterProgram, feeQuoterAddress, offRampAddress, addressLookupTable, params); err2 != nil {
+		if err2 := intializeOffRamp(e, chain, ccipRouterProgram, feeQuoterAddress, offRampAddress, addressLookupTable, params.OffRampParams); err2 != nil {
 			return err2
 		}
 	} else {
@@ -427,26 +439,34 @@ func deployChainContractsSolana(
 	}
 
 	// SETUP BILLING
-	// link
-	if err := AddBillingToken(
-		e, chain, feeQuoterAddress, ccipRouterProgram, cs.SPL2022Tokens,
-		solFeeQuoter.BillingTokenConfig{
-			Enabled: true,
-			Mint:    chainState.LinkToken,
-		},
-	); err != nil {
-		return err
-	}
+	// // link
+	// if err := AddBillingToken(
+	// 	e, chain, feeQuoterAddress, ccipRouterProgram, cs.SPL2022Tokens,
+	// 	solFeeQuoter.BillingTokenConfig{
+	// 		Enabled: true,
+	// 		Mint:    chainState.LinkToken,
+	// 	},
+	// ); err != nil {
+	// 	return err
+	// }
 
-	// wsol
-	if err := AddBillingToken(
-		e, chain, feeQuoterAddress, ccipRouterProgram, cs.SPLTokens,
-		solFeeQuoter.BillingTokenConfig{
-			Enabled: true,
-			Mint:    chainState.WSOL,
-		},
-	); err != nil {
-		return err
+	// // wsol
+	// if err := AddBillingToken(
+	// 	e, chain, feeQuoterAddress, ccipRouterProgram, cs.SPLTokens,
+	// 	solFeeQuoter.BillingTokenConfig{
+	// 		Enabled: true,
+	// 		Mint:    chainState.WSOL,
+	// 	},
+	// ); err != nil {
+	// 	return err
+	// }
+
+	for _, billingConfig := range params.FeeQuoterParams.BillingConfig {
+		if err := AddBillingToken(
+			e, chain, chainState, billingConfig,
+		); err != nil {
+			return err
+		}
 	}
 
 	externalExecutionConfigPDA, _, _ := solState.FindExternalExecutionConfigPDA(ccipRouterProgram)
