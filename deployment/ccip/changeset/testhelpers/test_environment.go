@@ -525,7 +525,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	// no proposals to be made, timelock can be passed as nil here
 	var apps []commonchangeset.ConfiguredChangeSet
 	evmContractParams := make(map[uint64]changeset.ChainContractParams)
-	solContractParams := make(map[uint64]changeset.ChainContractParams)
+	solContractParams := make(map[uint64]solana.ChainContractParamsSolana)
 	evmChains := []uint64{}
 	for _, chain := range allChains {
 		if _, ok := e.Env.Chains[chain]; ok {
@@ -548,9 +548,8 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	}
 
 	for _, chain := range solChains {
-		solContractParams[chain] = changeset.ChainContractParams{
-			FeeQuoterParams: changeset.DefaultFeeQuoterParams(),
-			OffRampParams:   changeset.DefaultOffRampParams(),
+		solContractParams[chain] = solana.ChainContractParamsSolana{
+			EnableExecutionAfter: 1800,
 		}
 	}
 
@@ -576,7 +575,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		),
 		commonchangeset.Configure(
 			deployment.CreateLegacyChangeSet(solana.DeployChainContractsChangesetSolana),
-			changeset.DeployChainContractsConfig{
+			solana.DeployChainContractsConfigSolana{
 				HomeChainSelector:      e.HomeChainSel,
 				ContractParamsPerChain: solContractParams,
 			},

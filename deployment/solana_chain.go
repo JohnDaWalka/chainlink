@@ -15,7 +15,6 @@ import (
 	solRpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
 
-	solBinary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -23,12 +22,9 @@ import (
 )
 
 var (
-	SolDefaultCommitment        = rpc.CommitmentConfirmed
-	SolDefaultGasLimit          = solBinary.Uint128{Lo: 3000, Hi: 0, Endianness: nil}
-	SolDefaultMaxFeeJuelsPerMsg = solBinary.Uint128{Lo: 300000000, Hi: 0, Endianness: nil}
-	SPL2022Tokens               = "SPL2022Tokens"
-	SPLTokens                   = "SPLTokens"
-	EnableExecutionAfter        = int64(1800) // 30min
+	SolDefaultCommitment = rpc.CommitmentConfirmed
+	SPL2022Tokens        = "SPL2022Tokens"
+	SPLTokens            = "SPLTokens"
 )
 
 // SolChain represents a Solana chain.

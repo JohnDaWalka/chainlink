@@ -94,12 +94,11 @@ func TestDeployChainContractsChangesetSolana(t *testing.T) {
 		),
 		commonchangeset.Configure(
 			deployment.CreateLegacyChangeSet(cs_solana.DeployChainContractsChangesetSolana),
-			changeset.DeployChainContractsConfig{
+			cs_solana.DeployChainContractsConfigSolana{
 				HomeChainSelector: homeChainSel,
-				ContractParamsPerChain: map[uint64]changeset.ChainContractParams{
+				ContractParamsPerChain: map[uint64]cs_solana.ChainContractParamsSolana{
 					solChainSelectors[0]: {
-						FeeQuoterParams: changeset.DefaultFeeQuoterParams(),
-						OffRampParams:   changeset.DefaultOffRampParams(),
+						EnableExecutionAfter: 1800,
 					},
 				},
 			},

@@ -2,7 +2,6 @@ package solana
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
@@ -22,12 +21,22 @@ import (
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 )
 
-var _ deployment.ChangeSet[changeset.DeployChainContractsConfig] = DeployChainContractsChangesetSolana
+type DeployChainContractsConfigSolana struct {
+	HomeChainSelector      uint64
+	ContractParamsPerChain map[uint64]ChainContractParamsSolana
+}
 
-func DeployChainContractsChangesetSolana(e deployment.Environment, c changeset.DeployChainContractsConfig) (deployment.ChangesetOutput, error) {
-	if err := c.Validate(); err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("invalid DeployChainContractsConfig: %w", err)
-	}
+type ChainContractParamsSolana struct {
+	EnableExecutionAfter     int64
+	DefaultMaxFeeJuelsPerMsg solBinary.Uint128
+}
+
+var _ deployment.ChangeSet[DeployChainContractsConfigSolana] = DeployChainContractsChangesetSolana
+
+func DeployChainContractsChangesetSolana(e deployment.Environment, c DeployChainContractsConfigSolana) (deployment.ChangesetOutput, error) {
+	// if err := c.Validate(); err != nil {
+	// 	return deployment.ChangesetOutput{}, fmt.Errorf("invalid DeployChainContractsConfig: %w", err)
+	// }
 	newAddresses := deployment.NewMemoryAddressBook()
 	existingState, err := changeset.LoadOnchainState(e)
 	if err != nil {
@@ -40,7 +49,7 @@ func DeployChainContractsChangesetSolana(e deployment.Environment, c changeset.D
 		return deployment.ChangesetOutput{}, err
 	}
 
-	for chainSel := range c.ContractParamsPerChain {
+	for chainSel, params := range c.ContractParamsPerChain {
 		if _, exists := existingState.SupportedChains()[chainSel]; !exists {
 			return deployment.ChangesetOutput{}, fmt.Errorf("chain %d not supported", chainSel)
 		}
@@ -53,7 +62,7 @@ func DeployChainContractsChangesetSolana(e deployment.Environment, c changeset.D
 		if existingState.SolChains[chainSel].LinkToken.IsZero() {
 			return deployment.ChangesetOutput{}, fmt.Errorf("fee tokens not found for chain %d", chainSel)
 		}
-		err = deployChainContractsSolana(e, chain, newAddresses)
+		err = deployChainContractsSolana(e, chain, newAddresses, params)
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy CCIP contracts", "err", err, "newAddresses", newAddresses)
 			return deployment.ChangesetOutput{}, err
@@ -134,6 +143,7 @@ func initializeFeeQuoter(
 	linkTokenAddress solana.PublicKey,
 	feeQuoterAddress solana.PublicKey,
 	offRampAddress solana.PublicKey,
+	params ChainContractParamsSolana,
 ) error {
 	programData, err := solProgramData(e, chain, feeQuoterAddress)
 	if err != nil {
@@ -143,7 +153,7 @@ func initializeFeeQuoter(
 
 	instruction, err := solFeeQuoter.NewInitializeInstruction(
 		linkTokenAddress,
-		deployment.SolDefaultMaxFeeJuelsPerMsg,
+		params.DefaultMaxFeeJuelsPerMsg,
 		ccipRouterProgram,
 		feeQuoterConfigPDA,
 		chain.DeployerKey.PublicKey(),
@@ -180,6 +190,7 @@ func intializeOffRamp(
 	feeQuoterAddress solana.PublicKey,
 	offRampAddress solana.PublicKey,
 	addressLookupTable solana.PublicKey,
+	params ChainContractParamsSolana,
 ) error {
 	programData, err := solProgramData(e, chain, offRampAddress)
 	if err != nil {
@@ -211,7 +222,7 @@ func intializeOffRamp(
 
 	initConfigIx, err := solOffRamp.NewInitializeConfigInstruction(
 		chain.Selector,
-		deployment.EnableExecutionAfter,
+		params.EnableExecutionAfter,
 		offRampConfigPDA,
 		chain.DeployerKey.PublicKey(),
 		solana.SystemProgramID,
@@ -233,6 +244,7 @@ func deployChainContractsSolana(
 	e deployment.Environment,
 	chain deployment.SolChain,
 	ab deployment.AddressBook,
+	params ChainContractParamsSolana,
 ) error {
 	state, err := changeset.LoadOnchainStateSolana(e)
 	if err != nil {
@@ -346,7 +358,7 @@ func deployChainContractsSolana(
 	feeQuoterConfigPDA, _, _ := solState.FindFqConfigPDA(feeQuoterAddress)
 	err = chain.GetAccountDataBorshInto(e.GetContext(), feeQuoterConfigPDA, &fqConfig)
 	if err != nil {
-		if err2 := initializeFeeQuoter(e, chain, ccipRouterProgram, chainState.LinkToken, feeQuoterAddress, offRampAddress); err2 != nil {
+		if err2 := initializeFeeQuoter(e, chain, ccipRouterProgram, chainState.LinkToken, feeQuoterAddress, offRampAddress, params); err2 != nil {
 			return err2
 		}
 	} else {
@@ -371,33 +383,12 @@ func deployChainContractsSolana(
 	offRampConfigPDA, _, _ := solState.FindOfframpConfigPDA(offRampAddress)
 	err = chain.GetAccountDataBorshInto(e.GetContext(), offRampConfigPDA, &offRampConfigAccount)
 	if err != nil {
-		if err2 := intializeOffRamp(e, chain, ccipRouterProgram, feeQuoterAddress, offRampAddress, addressLookupTable); err2 != nil {
+		if err2 := intializeOffRamp(e, chain, ccipRouterProgram, feeQuoterAddress, offRampAddress, addressLookupTable, params); err2 != nil {
 			return err2
 		}
 	} else {
 		e.Logger.Infow("Offramp already initialized, skipping initialization", "chain", chain.String())
 	}
-
-	// TOKEN POOL DEPLOY
-	// var tokenPoolProgram solana.PublicKey
-	// if chainState.TokenPool.IsZero() {
-	// 	// TODO: there should be two token pools deployed one of each type (lock/burn)
-	// 	// separate token pools are not ready yet
-	// 	programID, err := chain.DeployProgram(e.Logger, "test_token_pool")
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to deploy program: %w", err)
-	// 	}
-	// 	tv := deployment.NewTypeAndVersion(changeset.TokenPool, deployment.Version1_0_0)
-	// 	e.Logger.Infow("Deployed contract", "Contract", tv.String(), "addr", programID, "chain", chain.String())
-	// 	tokenPoolProgram = solana.MustPublicKeyFromBase58(programID)
-	// 	err = ab.Save(chain.Selector, programID, tv)
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to save address: %w", err)
-	// 	}
-	// } else {
-	// 	e.Logger.Infow("Using existing token pool", "addr", chainState.TokenPool.String())
-	// 	tokenPoolProgram = chainState.TokenPool
-	// }
 
 	var burnMintTokenPool solana.PublicKey
 	if chainState.BurnMintTokenPool.IsZero() {
@@ -436,24 +427,12 @@ func deployChainContractsSolana(
 	}
 
 	// SETUP BILLING
-	// TODO: random value for now, fixed in Terrys upgrade PR
-	// as we take in separate config for solana deploy where we can configure this
-	// and also EnableExecutionAfter
-	value := [28]uint8{}
-	bigNum, _ := new(big.Int).SetString("19816680000000000000", 10)
-	bigNum.FillBytes(value[:])
-
 	// link
 	if err := AddBillingToken(
 		e, chain, feeQuoterAddress, ccipRouterProgram, deployment.SPL2022Tokens,
 		solFeeQuoter.BillingTokenConfig{
 			Enabled: true,
 			Mint:    chainState.LinkToken,
-			UsdPerToken: solFeeQuoter.TimestampedPackedU224{
-				Value:     value,
-				Timestamp: int64(100),
-			},
-			PremiumMultiplierWeiPerEth: 100,
 		},
 	); err != nil {
 		return err
@@ -465,11 +444,6 @@ func deployChainContractsSolana(
 		solFeeQuoter.BillingTokenConfig{
 			Enabled: true,
 			Mint:    chainState.WSOL,
-			UsdPerToken: solFeeQuoter.TimestampedPackedU224{
-				Value:     value,
-				Timestamp: int64(100),
-			},
-			PremiumMultiplierWeiPerEth: 100,
 		},
 	); err != nil {
 		return err
