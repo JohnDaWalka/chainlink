@@ -429,7 +429,7 @@ func deployChainContractsSolana(
 	// SETUP BILLING
 	// link
 	if err := AddBillingToken(
-		e, chain, feeQuoterAddress, ccipRouterProgram, deployment.SPL2022Tokens,
+		e, chain, feeQuoterAddress, ccipRouterProgram, cs.SPL2022Tokens,
 		solFeeQuoter.BillingTokenConfig{
 			Enabled: true,
 			Mint:    chainState.LinkToken,
@@ -440,7 +440,7 @@ func deployChainContractsSolana(
 
 	// wsol
 	if err := AddBillingToken(
-		e, chain, feeQuoterAddress, ccipRouterProgram, deployment.SPLTokens,
+		e, chain, feeQuoterAddress, ccipRouterProgram, cs.SPLTokens,
 		solFeeQuoter.BillingTokenConfig{
 			Enabled: true,
 			Mint:    chainState.WSOL,

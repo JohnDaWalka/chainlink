@@ -258,7 +258,7 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T) (deployment.Environmen
 			deployment.CreateLegacyChangeSet(solanachangesets.DeploySolanaToken),
 			solanachangesets.DeploySolanaTokenConfig{
 				ChainSelector:    solChain1,
-				TokenProgramName: deployment.SPL2022Tokens,
+				TokenProgramName: changeset.SPL2022Tokens,
 				TokenDecimals:    9,
 			},
 		),

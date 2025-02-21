@@ -21,7 +21,7 @@ var _ deployment.ChangeSet[CreateSolanaTokenATAConfig] = CreateSolanaTokenATA
 // might need to take authority private key if it needs to sign that
 type DeploySolanaTokenConfig struct {
 	ChainSelector    uint64
-	TokenProgramName string
+	TokenProgramName deployment.ContractType
 	TokenDecimals    uint8
 }
 
@@ -83,7 +83,7 @@ func DeploySolanaToken(e deployment.Environment, cfg DeploySolanaTokenConfig) (d
 
 type MintSolanaTokenConfig struct {
 	ChainSelector   uint64
-	TokenProgram    string
+	TokenProgram    deployment.ContractType
 	TokenPubkey     string
 	AmountToAddress map[string]uint64 // address -> amount
 }
@@ -153,7 +153,7 @@ func MintSolanaToken(e deployment.Environment, cfg MintSolanaTokenConfig) (deplo
 type CreateSolanaTokenATAConfig struct {
 	ChainSelector uint64
 	TokenPubkey   solana.PublicKey
-	TokenProgram  string
+	TokenProgram  deployment.ContractType
 	ATAList       []string // addresses to create ATAs for
 }
 

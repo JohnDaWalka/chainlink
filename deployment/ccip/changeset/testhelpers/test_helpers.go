@@ -869,7 +869,7 @@ func DeployTransferableTokenSolana(
 			deployment.CreateLegacyChangeSet(changeset_solana.DeploySolanaToken),
 			changeset_solana.DeploySolanaTokenConfig{
 				ChainSelector:    solChainSel,
-				TokenProgramName: deployment.SPL2022Tokens,
+				TokenProgramName: changeset.SPL2022Tokens,
 				TokenDecimals:    9,
 			},
 		),
@@ -887,7 +887,7 @@ func DeployTransferableTokenSolana(
 			changeset_solana.CreateSolanaTokenATAConfig{
 				ChainSelector: solChainSel,
 				TokenPubkey:   solTokenAddress,
-				TokenProgram:  deployment.SPL2022Tokens,
+				TokenProgram:  changeset.SPL2022Tokens,
 				ATAList:       []string{solDeployerKey.String()},
 			},
 		),
@@ -897,7 +897,7 @@ func DeployTransferableTokenSolana(
 			changeset_solana.MintSolanaTokenConfig{
 				ChainSelector: solChainSel,
 				TokenPubkey:   solTokenAddress.String(),
-				TokenProgram:  deployment.SPL2022Tokens,
+				TokenProgram:  changeset.SPL2022Tokens,
 				AmountToAddress: map[string]uint64{
 					solDeployerKey.String(): uint64(1000),
 				},

@@ -32,7 +32,7 @@ func TestSolanaTokenOps(t *testing.T) {
 			deployment.CreateLegacyChangeSet(changeset_solana.DeploySolanaToken),
 			changeset_solana.DeploySolanaTokenConfig{
 				ChainSelector:    solChain1,
-				TokenProgramName: deployment.SPL2022Tokens,
+				TokenProgramName: ccipChangeset.SPL2022Tokens,
 				TokenDecimals:    9,
 			},
 		),
@@ -54,7 +54,7 @@ func TestSolanaTokenOps(t *testing.T) {
 			changeset_solana.CreateSolanaTokenATAConfig{
 				ChainSelector: solChain1,
 				TokenPubkey:   tokenAddress,
-				TokenProgram:  deployment.SPL2022Tokens,
+				TokenProgram:  ccipChangeset.SPL2022Tokens,
 				ATAList:       []string{deployerKey.String(), testUserPubKey.String()},
 			},
 		),
@@ -64,7 +64,7 @@ func TestSolanaTokenOps(t *testing.T) {
 			changeset_solana.MintSolanaTokenConfig{
 				ChainSelector: solChain1,
 				TokenPubkey:   tokenAddress.String(),
-				TokenProgram:  deployment.SPL2022Tokens,
+				TokenProgram:  ccipChangeset.SPL2022Tokens,
 				AmountToAddress: map[string]uint64{
 					deployerKey.String():    uint64(1000),
 					testUserPubKey.String(): uint64(1000),

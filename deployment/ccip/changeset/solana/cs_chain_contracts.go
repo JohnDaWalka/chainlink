@@ -26,10 +26,10 @@ var _ deployment.ChangeSet[SetFeeAggregatorConfig] = SetFeeAggregator
 
 // HELPER FUNCTIONS
 // GetTokenProgramID returns the program ID for the given token program name
-func GetTokenProgramID(programName string) (solana.PublicKey, error) {
-	tokenPrograms := map[string]solana.PublicKey{
-		deployment.SPLTokens:     solana.TokenProgramID, // not used yet
-		deployment.SPL2022Tokens: solana.Token2022ProgramID,
+func GetTokenProgramID(programName deployment.ContractType) (solana.PublicKey, error) {
+	tokenPrograms := map[deployment.ContractType]solana.PublicKey{
+		cs.SPLTokens:     solana.TokenProgramID, // not used yet
+		cs.SPL2022Tokens: solana.Token2022ProgramID,
 	}
 
 	programID, ok := tokenPrograms[programName]

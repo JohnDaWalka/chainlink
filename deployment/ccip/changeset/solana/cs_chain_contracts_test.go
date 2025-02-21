@@ -216,7 +216,7 @@ func TestBilling(t *testing.T) {
 			deployment.CreateLegacyChangeSet(changeset_solana.DeploySolanaToken),
 			changeset_solana.DeploySolanaTokenConfig{
 				ChainSelector:    solChain,
-				TokenProgramName: deployment.SPL2022Tokens,
+				TokenProgramName: ccipChangeset.SPL2022Tokens,
 				TokenDecimals:    9,
 			},
 		),
@@ -237,7 +237,7 @@ func TestBilling(t *testing.T) {
 			changeset_solana.BillingTokenConfig{
 				ChainSelector:    solChain,
 				TokenPubKey:      tokenAddress.String(),
-				TokenProgramName: deployment.SPL2022Tokens,
+				TokenProgramName: ccipChangeset.SPL2022Tokens,
 				Config: solFeeQuoter.BillingTokenConfig{
 					Enabled: true,
 					Mint:    tokenAddress,
@@ -295,7 +295,7 @@ func TestTokenAdminRegistry(t *testing.T) {
 			deployment.CreateLegacyChangeSet(changeset_solana.DeploySolanaToken),
 			changeset_solana.DeploySolanaTokenConfig{
 				ChainSelector:    solChain,
-				TokenProgramName: deployment.SPL2022Tokens,
+				TokenProgramName: ccipChangeset.SPL2022Tokens,
 				TokenDecimals:    9,
 			},
 		),
@@ -398,7 +398,7 @@ func TestPoolLookupTable(t *testing.T) {
 			deployment.CreateLegacyChangeSet(changeset_solana.DeploySolanaToken),
 			changeset_solana.DeploySolanaTokenConfig{
 				ChainSelector:    solChain,
-				TokenProgramName: deployment.SPL2022Tokens,
+				TokenProgramName: ccipChangeset.SPL2022Tokens,
 				TokenDecimals:    9,
 			},
 		),

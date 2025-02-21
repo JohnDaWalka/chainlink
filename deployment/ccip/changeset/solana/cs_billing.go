@@ -24,7 +24,7 @@ var _ deployment.ChangeSet[BillingTokenForRemoteChainConfig] = AddBillingTokenFo
 type BillingTokenConfig struct {
 	ChainSelector    uint64
 	TokenPubKey      string
-	TokenProgramName string
+	TokenProgramName deployment.ContractType
 	Config           solFeeQuoter.BillingTokenConfig
 }
 
@@ -60,7 +60,7 @@ func AddBillingToken(
 	chain deployment.SolChain,
 	feeQuoterAddress solana.PublicKey,
 	routerAddress solana.PublicKey,
-	tokenProgramName string,
+	tokenProgramName deployment.ContractType,
 	billingConfig solFeeQuoter.BillingTokenConfig,
 ) error {
 	tokenPubKey := solana.MustPublicKeyFromBase58(billingConfig.Mint.String())
