@@ -24,6 +24,24 @@ import (
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 )
 
+func deployToken(t *testing.T, tenv deployment.Environment, solChain uint64) (deployment.Environment, solana.PublicKey, error) {
+	e, err := commonchangeset.Apply(t, tenv, nil,
+		commonchangeset.Configure(
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.DeploySolanaToken),
+			ccipChangesetSolana.DeploySolanaTokenConfig{
+				ChainSelector:    solChain,
+				TokenProgramName: ccipChangeset.SPL2022Tokens,
+				TokenDecimals:    9,
+			},
+		),
+	)
+	require.NoError(t, err)
+	state, err := ccipChangeset.LoadOnchainStateSolana(e)
+	require.NoError(t, err)
+	tokenAddress := state.SolChains[solChain].SPL2022Tokens[0]
+	return e, tokenAddress, err
+}
+
 func TestAddRemoteChain(t *testing.T) {
 	t.Parallel()
 	ctx := testcontext.Get(t)
@@ -107,23 +125,10 @@ func TestAddTokenPool(t *testing.T) {
 
 	evmChain := tenv.Env.AllChainSelectors()[0]
 	solChain := tenv.Env.AllChainSelectorsSolana()[0]
-
-	e, err := commonchangeset.Apply(t, tenv.Env, nil,
-		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(ccipChangesetSolana.DeploySolanaToken),
-			ccipChangesetSolana.DeploySolanaTokenConfig{
-				ChainSelector:    solChain,
-				TokenProgramName: ccipChangeset.SPL2022Tokens,
-				TokenDecimals:    9,
-			},
-		),
-	)
+	e, newTokenAddress, err := deployToken(t, tenv.Env, solChain)
 	require.NoError(t, err)
-
 	state, err := ccipChangeset.LoadOnchainStateSolana(e)
 	require.NoError(t, err)
-	newTokenAddress := state.SolChains[solChain].SPL2022Tokens[1]
-
 	remoteConfig := solBaseTokenPool.RemoteConfig{
 		PoolAddresses: []solTestTokenPool.RemoteAddress{{Address: []byte{1, 2, 3}}},
 		TokenAddress:  solTestTokenPool.RemoteAddress{Address: []byte{4, 5, 6}},
@@ -161,7 +166,7 @@ func TestAddTokenPool(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		for _, tokenAddress := range tokenMap {
-			e, err = commonchangeset.Apply(t, e, nil,
+			e, err := commonchangeset.Apply(t, e, nil,
 				commonchangeset.Configure(
 					deployment.CreateLegacyChangeSet(ccipChangesetSolana.AddTokenPool),
 					ccipChangesetSolana.TokenPoolConfig{
@@ -169,7 +174,7 @@ func TestAddTokenPool(t *testing.T) {
 						TokenPubKey:   tokenAddress.String(),
 						PoolType:      testCase.poolType,
 						// this works for testing, but if we really want some other authority we need to pass in a private key for signing purposes
-						Authority: e.SolChains[solChain].DeployerKey.PublicKey().String(),
+						Authority: tenv.Env.SolChains[solChain].DeployerKey.PublicKey().String(),
 					},
 				),
 				commonchangeset.Configure(
@@ -211,21 +216,10 @@ func TestBilling(t *testing.T) {
 	evmChain := tenv.Env.AllChainSelectors()[0]
 	solChain := tenv.Env.AllChainSelectorsSolana()[0]
 
-	e, err := commonchangeset.Apply(t, tenv.Env, nil,
-		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(ccipChangesetSolana.DeploySolanaToken),
-			ccipChangesetSolana.DeploySolanaTokenConfig{
-				ChainSelector:    solChain,
-				TokenProgramName: ccipChangeset.SPL2022Tokens,
-				TokenDecimals:    9,
-			},
-		),
-	)
+	e, tokenAddress, err := deployToken(t, tenv.Env, solChain)
 	require.NoError(t, err)
-
 	state, err := ccipChangeset.LoadOnchainStateSolana(e)
 	require.NoError(t, err)
-	tokenAddress := state.SolChains[solChain].SPL2022Tokens[1]
 	validTimestamp := int64(100)
 	value := [28]uint8{}
 	bigNum, ok := new(big.Int).SetString("19816680000000000000", 10)
@@ -286,28 +280,14 @@ func TestTokenAdminRegistry(t *testing.T) {
 	t.Parallel()
 	ctx := testcontext.Get(t)
 	tenv, _ := testhelpers.NewMemoryEnvironment(t, testhelpers.WithSolChains(1))
-
 	solChain := tenv.Env.AllChainSelectorsSolana()[0]
-
-	e, err := commonchangeset.Apply(t, tenv.Env, nil,
-		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(ccipChangesetSolana.DeploySolanaToken),
-			ccipChangesetSolana.DeploySolanaTokenConfig{
-				ChainSelector:    solChain,
-				TokenProgramName: ccipChangeset.SPL2022Tokens,
-				TokenDecimals:    9,
-			},
-		),
-	)
+	e, tokenAddress, err := deployToken(t, tenv.Env, solChain)
 	require.NoError(t, err)
-
 	state, err := ccipChangeset.LoadOnchainStateSolana(e)
 	require.NoError(t, err)
-	tokenAdminRegistryAdminPrivKey, _ := solana.NewRandomPrivateKey()
-
 	linkTokenAddress := state.SolChains[solChain].LinkToken
-	// index 0 is link token
-	tokenAddress := state.SolChains[solChain].SPL2022Tokens[1]
+
+	tokenAdminRegistryAdminPrivKey, _ := solana.NewRandomPrivateKey()
 
 	e, err = commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(
@@ -388,26 +368,10 @@ func TestPoolLookupTable(t *testing.T) {
 	t.Parallel()
 	ctx := testcontext.Get(t)
 	tenv, _ := testhelpers.NewMemoryEnvironment(t, testhelpers.WithSolChains(1))
-
 	solChain := tenv.Env.AllChainSelectorsSolana()[0]
 
-	e, err := commonchangeset.Apply(t, tenv.Env, nil,
-		commonchangeset.Configure(
-			// deploy token
-			deployment.CreateLegacyChangeSet(ccipChangesetSolana.DeploySolanaToken),
-			ccipChangesetSolana.DeploySolanaTokenConfig{
-				ChainSelector:    solChain,
-				TokenProgramName: ccipChangeset.SPL2022Tokens,
-				TokenDecimals:    9,
-			},
-		),
-	)
+	e, tokenAddress, err := deployToken(t, tenv.Env, solChain)
 	require.NoError(t, err)
-
-	state, err := ccipChangeset.LoadOnchainStateSolana(e)
-	require.NoError(t, err)
-	tokenAddress := state.SolChains[solChain].SPL2022Tokens[1]
-
 	e, err = commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(
 			// add token pool lookup table
@@ -415,13 +379,11 @@ func TestPoolLookupTable(t *testing.T) {
 			ccipChangesetSolana.TokenPoolLookupTableConfig{
 				ChainSelector: solChain,
 				TokenPubKey:   tokenAddress.String(),
-				PoolType:      solTestTokenPool.BurnAndMint_PoolType,
 			},
 		),
 	)
 	require.NoError(t, err)
-
-	state, err = ccipChangeset.LoadOnchainStateSolana(e)
+	state, err := ccipChangeset.LoadOnchainStateSolana(e)
 	require.NoError(t, err)
 	lookupTablePubKey := state.SolChains[solChain].TokenPoolLookupTable[tokenAddress]
 
