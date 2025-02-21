@@ -519,6 +519,10 @@ func (g *generalConfig) Threshold() coreconfig.Threshold {
 	return &thresholdConfig{s: g.secrets.Threshold}
 }
 
+func (g *generalConfig) ImportedEthKey() coreconfig.EthKeyConfig {
+	return &importedEthKeyConfig{s: g.secrets.EthKey}
+}
+
 func (g *generalConfig) Tracing() coreconfig.Tracing {
 	return &tracingConfig{s: g.c.Tracing}
 }

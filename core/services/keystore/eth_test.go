@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"os"
 	"sort"
 	"sync/atomic"
 	"testing"
@@ -444,6 +445,7 @@ func Test_EthKeyStore_E2E(t *testing.T) {
 		retrievedKey, err := ks.Get(ctx, key.ID())
 		require.NoError(t, err)
 		require.Equal(t, importedKey, retrievedKey)
+		os.WriteFile("/tmp/ethkey.json", exportJSON, 0644)
 	})
 
 	t.Run("adds an externally created key / deletes a key", func(t *testing.T) {

@@ -21,6 +21,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/guregu/null.v4"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
 	"github.com/smartcontractkit/chainlink-integrations/evm/gas"
 	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
@@ -378,11 +379,28 @@ func (s *Shell) runNode(c *cli.Context) error {
 	legacyEVMChains := app.GetRelayers().LegacyEVMChains()
 
 	if s.Config.EVMEnabled() {
+		// ensure any imported keys are imported
+		if s.Config.ImportedEthKey().JSON() != "" {
+			lggr.Debug("Importing eth key")
+			id, err := chain_selectors.GetChainIDFromSelector(s.Config.ImportedEthKey().ChainDetails().ChainSelector)
+			if err != nil {
+				s.errorOut(errors.Wrapf(err, "error getting chain id from selector when trying to import eth key %v", s.Config.ImportedEthKey().JSON()))
+			}
+			cid, _ := big.NewInt(0).SetString(id, 10)
+			if cid == nil {
+				return s.errorOut(fmt.Errorf("error converting chain id '%s' to big int", id))
+			}
+			_, err = app.GetKeyStore().Eth().Import(rootCtx, []byte(s.Config.ImportedEthKey().JSON()), s.Config.ImportedEthKey().Password(), cid)
+			if err != nil {
+				return s.errorOut(errors.Wrap(err, "error importing eth key"))
+			}
+		}
 		chainList, err2 := legacyEVMChains.List()
 		if err2 != nil {
 			return fmt.Errorf("error listing legacy evm chains: %w", err2)
 		}
 		for _, ch := range chainList {
+
 			if ch.Config().EVM().AutoCreateKey() {
 				lggr.Debugf("AutoCreateKey=true, will ensure EVM key for chain %s", ch.ID())
 				err2 := app.GetKeyStore().Eth().EnsureKeys(rootCtx, ch.ID())

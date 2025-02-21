@@ -13,6 +13,7 @@ import (
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	ocrcommontypes "github.com/smartcontractkit/libocr/commontypes"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -123,6 +124,8 @@ type Secrets struct {
 	Prometheus PrometheusSecrets        `toml:",omitempty"`
 	Mercury    MercurySecrets           `toml:",omitempty"`
 	Threshold  ThresholdKeyShareSecrets `toml:",omitempty"`
+	EthKey     EthKey                   `toml:",omitempty"`
+	P2PKey     P2PKey                   `toml:",omitempty"`
 }
 
 func dbURLPasswordComplexity(err error) string {
@@ -213,6 +216,77 @@ func (d *DatabaseSecrets) validateMerge(f *DatabaseSecrets) (err error) {
 		err = multierr.Append(err, configutils.ErrOverride{Name: "URL"})
 	}
 
+	return err
+}
+
+type EthKey struct {
+	JSON     *models.Secret
+	Selector *chain_selectors.ChainDetails
+	Password *models.Secret
+}
+
+func (e *EthKey) SetFrom(f *EthKey) (err error) {
+	err = e.validateMerge(f)
+	if err != nil {
+		return err
+	}
+	if v := f.JSON; v != nil {
+		e.JSON = v
+	}
+	if v := f.Password; v != nil {
+		e.Password = v
+	}
+	if v := f.Selector; v != nil {
+		e.Selector = v
+	}
+	return nil
+}
+
+func (e *EthKey) validateMerge(f *EthKey) (err error) {
+	if e.JSON != nil && f.JSON != nil {
+		err = multierr.Append(err, configutils.ErrOverride{Name: "PrivateKey"})
+	}
+	if e.Selector != nil && f.Selector != nil {
+		err = multierr.Append(err, configutils.ErrOverride{Name: "Selector"})
+	}
+	if e.Password != nil && f.Password != nil {
+		err = multierr.Append(err, configutils.ErrOverride{Name: "Password"})
+	}
+	return err
+}
+
+func (e *EthKey) ValidateConfig() (err error) {
+	if (e.JSON != nil) != (e.Password != nil) && (e.Password != nil) != (e.Selector != nil) {
+		err = multierr.Append(err, configutils.ErrInvalid{Name: "EthKey", Value: e.JSON, Msg: "all fields must be nil or non-nil"})
+	}
+	return err
+}
+
+type P2PKey struct {
+	PrivateKey *models.Secret
+	PublicKey  *models.Secret
+}
+
+func (p *P2PKey) SetFrom(f *P2PKey) (err error) {
+	err = p.validateMerge(f)
+	if err != nil {
+		return err
+	}
+	if v := f.PrivateKey; v != nil {
+		p.PrivateKey = v
+	}
+	if v := f.PublicKey; v != nil {
+		p.PublicKey = v
+	}
+	return nil
+}
+func (p *P2PKey) validateMerge(f *P2PKey) (err error) {
+	if p.PrivateKey != nil && f.PrivateKey != nil {
+		err = multierr.Append(err, configutils.ErrOverride{Name: "PrivateKey"})
+	}
+	if p.PublicKey != nil && f.PublicKey != nil {
+		err = multierr.Append(err, configutils.ErrOverride{Name: "PublicKey"})
+	}
 	return err
 }
 

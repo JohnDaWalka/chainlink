@@ -12,3 +12,5 @@ type P2P interface {
 	TraceLogging() bool
 	Enabled() bool
 }
+
+type P2PSecretConfig interface{}
