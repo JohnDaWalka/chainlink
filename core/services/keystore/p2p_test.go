@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -83,6 +84,7 @@ func Test_P2PKeyStore_E2E(t *testing.T) {
 		retrievedKey, err := ks.Get(key.PeerID())
 		require.NoError(t, err)
 		require.Equal(t, importedKey, retrievedKey)
+		os.WriteFile("/tmp/p2pkey.json", exportJSON, 0644)
 	})
 
 	t.Run("adds an externally created key / deletes a key", func(t *testing.T) {

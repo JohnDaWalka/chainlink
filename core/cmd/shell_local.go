@@ -444,7 +444,15 @@ func (s *Shell) runNode(c *cli.Context) error {
 			return errors.Wrap(err2, "failed to ensure ocr key")
 		}
 	}
+
 	if s.Config.P2P().Enabled() {
+		if s.Config.ImportedEthKey().JSON() != "" {
+			lggr.Debug("Importing p2p key")
+			_, err2 := app.GetKeyStore().P2P().Import(rootCtx, []byte(s.Config.ImportedEthKey().JSON()), s.Config.ImportedEthKey().Password())
+			if err2 != nil {
+				return s.errorOut(errors.Wrap(err2, "error importing p2p key"))
+			}
+		}
 		err2 := app.GetKeyStore().P2P().EnsureKey(rootCtx)
 		if err2 != nil {
 			return errors.Wrap(err2, "failed to ensure p2p key")
