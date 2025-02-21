@@ -122,7 +122,7 @@ func TestAddTokenPool(t *testing.T) {
 
 	state, err := ccipChangeset.LoadOnchainStateSolana(e)
 	require.NoError(t, err)
-	newTokenAddress := state.SolChains[solChain].SPL2022Tokens[0]
+	newTokenAddress := state.SolChains[solChain].SPL2022Tokens[1]
 
 	remoteConfig := solBaseTokenPool.RemoteConfig{
 		PoolAddresses: []solTestTokenPool.RemoteAddress{{Address: []byte{1, 2, 3}}},
@@ -140,9 +140,9 @@ func TestAddTokenPool(t *testing.T) {
 		Rate:     0,
 	}
 
-	tokenMap := map[string]solana.PublicKey{
-		deployment.SPL2022Tokens: newTokenAddress,
-		deployment.SPLTokens:     state.SolChains[solChain].WSOL,
+	tokenMap := map[deployment.ContractType]solana.PublicKey{
+		ccipChangeset.SPL2022Tokens: newTokenAddress,
+		ccipChangeset.SPLTokens:     state.SolChains[solChain].WSOL,
 	}
 
 	type poolTestType struct {
@@ -225,7 +225,7 @@ func TestBilling(t *testing.T) {
 
 	state, err := ccipChangeset.LoadOnchainStateSolana(e)
 	require.NoError(t, err)
-	tokenAddress := state.SolChains[solChain].SPL2022Tokens[0]
+	tokenAddress := state.SolChains[solChain].SPL2022Tokens[1]
 	validTimestamp := int64(100)
 	value := [28]uint8{}
 	bigNum, ok := new(big.Int).SetString("19816680000000000000", 10)
@@ -235,9 +235,8 @@ func TestBilling(t *testing.T) {
 		commonchangeset.Configure(
 			deployment.CreateLegacyChangeSet(changeset_solana.AddBillingTokenChangeset),
 			changeset_solana.BillingTokenConfig{
-				ChainSelector:    solChain,
-				TokenPubKey:      tokenAddress.String(),
-				TokenProgramName: ccipChangeset.SPL2022Tokens,
+				ChainSelector: solChain,
+				TokenPubKey:   tokenAddress.String(),
 				Config: solFeeQuoter.BillingTokenConfig{
 					Enabled: true,
 					Mint:    tokenAddress,
@@ -407,7 +406,7 @@ func TestPoolLookupTable(t *testing.T) {
 
 	state, err := ccipChangeset.LoadOnchainStateSolana(e)
 	require.NoError(t, err)
-	tokenAddress := state.SolChains[solChain].SPL2022Tokens[0]
+	tokenAddress := state.SolChains[solChain].SPL2022Tokens[1]
 
 	e, err = commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(
