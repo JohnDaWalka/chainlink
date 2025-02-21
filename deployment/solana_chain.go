@@ -23,8 +23,6 @@ import (
 
 var (
 	SolDefaultCommitment = rpc.CommitmentConfirmed
-	SPL2022Tokens        = "SPL2022Tokens"
-	SPLTokens            = "SPLTokens"
 )
 
 // SolChain represents a Solana chain.
