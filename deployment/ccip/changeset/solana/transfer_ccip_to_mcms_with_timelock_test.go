@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
 	solBinary "github.com/gagliardetto/binary"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	solanachangesets "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"

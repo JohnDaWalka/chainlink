@@ -21,6 +21,7 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 
 	solBinary "github.com/gagliardetto/binary"
+
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	solFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"

@@ -248,7 +248,7 @@ func SetupTokenPoolForRemoteChain(e deployment.Environment, cfg RemoteChainToken
 	chainState := state.SolChains[cfg.SolChainSelector]
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.SolTokenPubKey)
 
-	instructions := []solana.Instruction{}
+	var instructions []solana.Instruction
 	var err error
 	switch cfg.PoolType {
 	case solTestTokenPool.BurnAndMint_PoolType:
@@ -386,10 +386,7 @@ func (cfg TokenPoolLookupTableConfig) Validate(e deployment.Environment) error {
 	if err != nil {
 		return fmt.Errorf("failed to get token program for token address %s: %w", tokenPubKey.String(), err)
 	}
-	if err := validatePoolDeployment(chainState, cfg.PoolType, cfg.ChainSelector); err != nil {
-		return err
-	}
-	return nil
+	return validatePoolDeployment(chainState, cfg.PoolType, cfg.ChainSelector)
 }
 
 func AddTokenPoolLookupTable(e deployment.Environment, cfg TokenPoolLookupTableConfig) (deployment.ChangesetOutput, error) {
