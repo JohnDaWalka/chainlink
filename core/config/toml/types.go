@@ -125,7 +125,32 @@ type Secrets struct {
 	Mercury    MercurySecrets           `toml:",omitempty"`
 	Threshold  ThresholdKeyShareSecrets `toml:",omitempty"`
 	EthKey     EthKey                   `toml:",omitempty"`
+	EthKeys    EthKeysWrapper           `toml:",omitempty"`
 	P2PKey     P2PKey                   `toml:",omitempty"`
+}
+
+type EthKeysWrapper struct {
+	EthKeys []*EthKey
+}
+
+func (e *EthKeysWrapper) SetFrom(f *EthKeysWrapper) (err error) {
+	err = e.validateMerge(f)
+	if err != nil {
+		return err
+	}
+	e = &EthKeysWrapper{
+		EthKeys: make([]*EthKey, 0, len(f.EthKeys)),
+	}
+	copy(e.EthKeys, f.EthKeys)
+
+	return nil
+}
+
+func (e *EthKeysWrapper) validateMerge(f *EthKeysWrapper) (err error) {
+	if e == nil || f == nil {
+		return nil
+	}
+	return nil
 }
 
 func dbURLPasswordComplexity(err error) string {
@@ -220,9 +245,9 @@ func (d *DatabaseSecrets) validateMerge(f *DatabaseSecrets) (err error) {
 }
 
 type EthKey struct {
-	JSON     *models.Secret
-	Selector *chain_selectors.ChainDetails
-	Password *models.Secret
+	JSON         *models.Secret
+	ChainDetails *chain_selectors.ChainDetails
+	Password     *models.Secret
 }
 
 func (e *EthKey) SetFrom(f *EthKey) (err error) {
@@ -236,8 +261,8 @@ func (e *EthKey) SetFrom(f *EthKey) (err error) {
 	if v := f.Password; v != nil {
 		e.Password = v
 	}
-	if v := f.Selector; v != nil {
-		e.Selector = v
+	if v := f.ChainDetails; v != nil {
+		e.ChainDetails = v
 	}
 	return nil
 }
@@ -246,7 +271,7 @@ func (e *EthKey) validateMerge(f *EthKey) (err error) {
 	if e.JSON != nil && f.JSON != nil {
 		err = multierr.Append(err, configutils.ErrOverride{Name: "PrivateKey"})
 	}
-	if e.Selector != nil && f.Selector != nil {
+	if e.ChainDetails != nil && f.ChainDetails != nil {
 		err = multierr.Append(err, configutils.ErrOverride{Name: "Selector"})
 	}
 	if e.Password != nil && f.Password != nil {
@@ -256,7 +281,7 @@ func (e *EthKey) validateMerge(f *EthKey) (err error) {
 }
 
 func (e *EthKey) ValidateConfig() (err error) {
-	if (e.JSON != nil) != (e.Password != nil) && (e.Password != nil) != (e.Selector != nil) {
+	if (e.JSON != nil) != (e.Password != nil) && (e.Password != nil) != (e.ChainDetails != nil) {
 		err = multierr.Append(err, configutils.ErrInvalid{Name: "EthKey", Value: e.JSON, Msg: "all fields must be nil or non-nil"})
 	}
 	return err
