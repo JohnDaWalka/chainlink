@@ -56,7 +56,9 @@ func commonValidation(e deployment.Environment, selector uint64, tokenPubKey sol
 		return nil
 	}
 	exists := false
-	for _, token := range chainState.SPL2022Tokens {
+	allTokens := chainState.SPL2022Tokens
+	allTokens = append(allTokens, chainState.SPLTokens...)
+	for _, token := range allTokens {
 		if token.Equals(tokenPubKey) {
 			exists = true
 			break
