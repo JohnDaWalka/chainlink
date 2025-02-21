@@ -89,13 +89,11 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 		WSOL:                 solana.SolMint,
 		TokenPoolLookupTable: make(map[solana.PublicKey]solana.PublicKey),
 	}
-	state.SPLTokens = append(state.SPLTokens, state.WSOL)
 	for address, tvStr := range addresses {
 		switch tvStr.Type {
 		case commontypes.LinkToken:
 			pub := solana.MustPublicKeyFromBase58(address)
 			state.LinkToken = pub
-			state.SPL2022Tokens = append(state.SPL2022Tokens, state.LinkToken)
 		case Router:
 			pub := solana.MustPublicKeyFromBase58(address)
 			state.Router = pub
@@ -182,6 +180,12 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 }
 
 func (s SolCCIPChainState) TokenToTokenProgram(tokenAddress solana.PublicKey) (solana.PublicKey, error) {
+	if tokenAddress.Equals(s.LinkToken) {
+		return solana.Token2022ProgramID, nil
+	}
+	if tokenAddress.Equals(s.WSOL) {
+		return solana.TokenProgramID, nil
+	}
 	for _, spl2022Token := range s.SPL2022Tokens {
 		if spl2022Token.Equals(tokenAddress) {
 			return solana.Token2022ProgramID, nil
