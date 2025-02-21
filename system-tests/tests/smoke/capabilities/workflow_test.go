@@ -3,6 +3,7 @@ package capabilities_test
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"net"
@@ -17,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
@@ -401,12 +402,9 @@ type InfrastructureInput struct {
 }
 
 type InfrastructureOutput struct {
-	chainSelector uint64
-	// nodeOuput          []*keystonetypes.WrappedNodeOutput
-	blockchainOutput *blockchain.Output
-	jdOutput         *jd.Output
-	// cldEnv             *deployment.Environment
-	// donTopology        *keystonetypes.DonTopology
+	chainSelector      uint64
+	blockchainOutput   *blockchain.Output
+	jdOutput           *jd.Output
 	sethClient         *seth.Client
 	deployerPrivateKey string
 	gatewayConnector   *keystonetypes.GatewayConnectorOutput
@@ -508,22 +506,44 @@ type setupOutput struct {
 	nodeOutput           []*keystonetypes.WrappedNodeOutput
 }
 
-func generateP2PKeys(pwd string, n int) ([][]byte, []string, error) {
-	encryptedP2PKeyJSONs := make([][]byte, 0)
-	peerIDs := make([]string, 0)
+type NodeEthKeySelector struct {
+	ChainSelector uint64 `toml:"ChainSelector"`
+}
+type NodeEthKey struct {
+	JSON     string             `toml:"JSON"`
+	Password string             `toml:"Password"`
+	Selector NodeEthKeySelector `toml:"Selector"`
+}
+
+type NodeP2PKey struct {
+	PrivateKey string `toml:"PrivateKey"`
+	PublicKey  string `toml:"PublicKey"`
+}
+
+type p2pGenerationResult struct {
+	encryptedP2PKeyJSONs [][]byte
+	peerIDs              []string
+	publicHexKeys        []string
+	privateKeys          []string
+}
+
+func generateP2PKeys(pwd string, n int) (*p2pGenerationResult, error) {
+	result := &p2pGenerationResult{}
 	for i := 0; i < n; i++ {
 		key, err := p2pkey.NewV2()
 		if err != nil {
-			return nil, peerIDs, err
+			return nil, err
 		}
 		d, err := key.ToEncryptedJSON(pwd, utils.DefaultScryptParams)
 		if err != nil {
-			return nil, peerIDs, err
+			return nil, err
 		}
-		encryptedP2PKeyJSONs = append(encryptedP2PKeyJSONs, d)
-		peerIDs = append(peerIDs, key.PeerID().String())
+		result.encryptedP2PKeyJSONs = append(result.encryptedP2PKeyJSONs, d)
+		result.peerIDs = append(result.peerIDs, key.PeerID().String())
+		result.publicHexKeys = append(result.publicHexKeys, key.PublicKeyHex())
+		result.privateKeys = append(result.privateKeys, hex.EncodeToString(key.Raw()))
 	}
-	return encryptedP2PKeyJSONs, peerIDs, nil
+	return result, nil
 }
 
 // TODO update in the CTF, I need the public addresses
@@ -628,21 +648,17 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	}
 
 	// Generate keys
-	donToP2PKeys := make(map[uint32][][]byte)
-	donToP2PIDs := make(map[uint32][]string)
-	for _, donMetadata := range topology.Metadata {
-		keys, p2pIDs, err := generateP2PKeys("", len(donMetadata.NodesMetadata))
-		require.NoError(t, err, "failed to generate P2P keys")
-		donToP2PKeys[donMetadata.ID] = keys
-		donToP2PIDs[donMetadata.ID] = p2pIDs
-	}
-
+	donToP2PKeys := make(map[uint32]*p2pGenerationResult)
 	donToEthKeys := make(map[uint32][][]byte)
 	donToEthAddresses := make(map[uint32][]common.Address)
 	for _, donMetadata := range topology.Metadata {
-		keys, addresses, err := generateEVMKeys("", len(donMetadata.NodesMetadata))
+		p2pKeys, err := generateP2PKeys("", len(donMetadata.NodesMetadata))
+		require.NoError(t, err, "failed to generate P2P keys")
+		donToP2PKeys[donMetadata.ID] = p2pKeys
+
+		ethKeys, addresses, err := generateEVMKeys("", len(donMetadata.NodesMetadata))
 		require.NoError(t, err, "failed to generate EVM keys")
-		donToEthKeys[donMetadata.ID] = keys
+		donToEthKeys[donMetadata.ID] = ethKeys
 		donToEthAddresses[donMetadata.ID] = addresses
 	}
 
@@ -659,7 +675,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 			})
 			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
 				Key:   devenv.NodeLabelP2PIDType,
-				Value: ptr.Ptr(donToP2PIDs[uint32(i+1)][j]),
+				Value: ptr.Ptr(donToP2PKeys[uint32(i+1)].peerIDs[j]),
 			})
 			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
 				Key:   libnode.EthAddressKey,
@@ -710,6 +726,34 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 					t.FailNow()
 				}
 				envInput.nodeSetInput[i].NodeSpecs[j].Node.TestConfigOverrides = configOverride
+
+				ethKey := donToEthKeys[uint32(i+1)][j]
+				p2pPublicKey := donToP2PKeys[uint32(i+1)].publicHexKeys[j]
+				p2pPrivateKey := donToP2PKeys[uint32(i+1)].privateKeys[j]
+
+				type NodeSecret struct {
+					EthKey NodeEthKey `toml:"EthKey"`
+					P2PKey NodeP2PKey `toml:"P2PKey"`
+				}
+
+				nodeSecret := NodeSecret{
+					EthKey: NodeEthKey{
+						JSON:     string(ethKey),
+						Password: "",
+						Selector: NodeEthKeySelector{
+							ChainSelector: envOutput.chainSelector,
+						},
+					},
+					P2PKey: NodeP2PKey{
+						PrivateKey: p2pPrivateKey,
+						PublicKey:  p2pPublicKey,
+					},
+				}
+
+				nodeSecretString, err := toml.Marshal(nodeSecret)
+				require.NoError(t, err, "failed to marshal node secrets")
+
+				envInput.nodeSetInput[i].NodeSpecs[j].Node.TestSecretsOverrides = string(nodeSecretString)
 			}
 		}
 	}
@@ -726,36 +770,36 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		})
 	}
 
-	for i, out := range nodeOutput {
-		c, err := clclient.New(out.Output.CLNodes)
-		require.NoError(t, err, "failed to create chainlink client")
+	// for i, out := range nodeOutput {
+	// 	c, err := clclient.New(out.Output.CLNodes)
+	// 	require.NoError(t, err, "failed to create chainlink client")
 
-		err = clclient.ImportEVMKeys(c, donToEthKeys[uint32(i+1)], envOutput.blockchainOutput.ChainID)
-		require.NoError(t, err, "failed to import EVM keys")
+	// 	err = clclient.ImportEVMKeys(c, donToEthKeys[uint32(i+1)], envOutput.blockchainOutput.ChainID)
+	// 	require.NoError(t, err, "failed to import EVM keys")
 
-		err = clclient.ImportP2PKeys(c, donToP2PKeys[uint32(i+1)])
-		require.NoError(t, err, "failed to import P2P keys")
+	// 	err = clclient.ImportP2PKeys(c, donToP2PKeys[uint32(i+1)].encryptedP2PKeyJSONs)
+	// 	require.NoError(t, err, "failed to import P2P keys")
 
-		// delete the other p2p keys
-		for j, client := range c {
-			p2pKeys, err := client.MustReadP2PKeys()
-			require.NoError(t, err, "failed to read P2P keys")
+	// 	// // delete the other p2p keys
+	// 	// for j, client := range c {
+	// 	// 	p2pKeys, err := client.MustReadP2PKeys()
+	// 	// 	require.NoError(t, err, "failed to read P2P keys")
 
-			fmt.Println("Genereated P2P keys for node ", donToP2PIDs[uint32(i+1)][j])
-			fmt.Println("P2P keys for node ", j+1)
-			for _, key := range p2pKeys.Data {
-				fmt.Println(fmt.Sprint(j+1) + "-id: " + fmt.Sprint(key.Attributes.ID))
-				fmt.Println(fmt.Sprint(j+1) + "-peer id: " + key.Attributes.PeerID)
+	// 	// 	fmt.Println("Genereated P2P keys for node", donToP2PKeys[uint32(i+1)].peerIDs[j])
+	// 	// 	fmt.Println("P2P keys for node", j+1)
+	// 	// 	for _, key := range p2pKeys.Data {
 
-				// TODO remove old keys
-			}
-		}
-	}
+	// 	// 		// TODO remove old keys
+	// 	// 	}
+	// 	// }
+	// }
 
 	// Prepare the CLD environment and figure out DON topology; configure chains for nodes and job distributor
 	// Ugly glue hack ¯\_(ツ)_/¯
 	cldEnv, dons, err := libenv.BuildChainlinkDeploymentEnv(singeFileLogger, envOutput.jdOutput, nodeOutput, envOutput.blockchainOutput, envOutput.sethClient)
 	require.NoError(t, err, "failed to build chainlink deployment environment")
+
+	cldEnv.ExistingAddresses = chainsOnlyCld.ExistingAddresses
 
 	donTopology := &keystonetypes.DonTopology{}
 	donTopology.WorkflowDonID = topology.WorkflowDONID
