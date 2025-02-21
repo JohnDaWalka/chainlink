@@ -20,12 +20,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
+	solBinary "github.com/gagliardetto/binary"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	solanachangesets "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
 	commonState "github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
@@ -244,12 +246,17 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T) (deployment.Environmen
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(solanachangesets.DeployChainContractsChangesetSolana),
-			solanachangesets.DeployChainContractsConfigSolana{
+			deployment.CreateLegacyChangeSet(solanachangesets.DeployChainContractsChangeset),
+			solanachangesets.DeployChainContractsConfig{
 				HomeChainSelector: homeChainSel,
-				ContractParamsPerChain: map[uint64]solanachangesets.ChainContractParamsSolana{
+				ContractParamsPerChain: map[uint64]solanachangesets.ChainContractParams{
 					solChain1: {
-						EnableExecutionAfter: 1800,
+						FeeQuoterParams: solanachangesets.FeeQuoterParams{
+							DefaultMaxFeeJuelsPerMsg: solBinary.Uint128{Lo: 300000000, Hi: 0, Endianness: nil},
+						},
+						OffRampParams: solanachangesets.OffRampParams{
+							EnableExecutionAfter: int64(globals.PermissionLessExecutionThreshold.Seconds()),
+						},
 					},
 				},
 			},
