@@ -407,6 +407,15 @@ type NodeMetadata struct {
 	Labels []*ptypes.Label
 }
 
+func (n *NodeMetadata) HasLabel(label *ptypes.Label) bool {
+	for _, l := range n.Labels {
+		if l.Key == label.Key && ((l.Value == nil && label.Value == nil) || *l.Value == *label.Value) {
+			return true
+		}
+	}
+	return false
+}
+
 type Topology struct {
 	WorkflowDONID uint32
 	Metadata      []*DonMetadata

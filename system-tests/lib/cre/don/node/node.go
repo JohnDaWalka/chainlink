@@ -46,6 +46,7 @@ const (
 	RoleLabelKey  = "role"
 	HostLabelKey  = "host"
 	NodeIndexKey  = "node_index"
+	NodeIdKey     = "node_id"
 	EthAddressKey = "eth_address"
 )
 

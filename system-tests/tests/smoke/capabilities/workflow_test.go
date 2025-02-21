@@ -317,46 +317,7 @@ func logTestInfo(l zerolog.Logger, feedID, workflowName, feedConsumerAddr, forwa
 	l.Info().Msgf("KeystoneForwarder address: %s", forwarderAddr)
 }
 
-func extraAllowedPortsAndIps(testLogger zerolog.Logger, fakePort int) ([]string, []int, error) {
-	// we need to explicitly allow the port used by the fake data provider
-	// and IP corresponding to host.docker.internal or the IP of the host machine, if we are running on Linux,
-	// because that's where the fake data provider is running
-	var hostIP string
-	var err error
-
-	system := runtime.GOOS
-	switch system {
-	case "darwin":
-		hostIP = "192.168.65.1"
-	case "linux":
-		// for linux framework already returns an IP, so we don't need to resolve it,
-		// but we need to remove the http:// prefix
-		hostIP = strings.ReplaceAll(framework.HostDockerInternal(), "http://", "")
-	default:
-		err = fmt.Errorf("unsupported OS: %s", system)
-	}
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to resolve host.docker.internal IP")
-	}
-
-	testLogger.Info().Msgf("Will allow IP %s and port %d for the fake data provider", hostIP, fakePort)
-
-	ips, err := net.LookupIP("gist.githubusercontent.com")
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to resolve IP for gist.githubusercontent.com")
-	}
-
-	gistIPs := make([]string, len(ips))
-	for i, ip := range ips {
-		gistIPs[i] = ip.To4().String()
-		testLogger.Debug().Msgf("Resolved IP for gist.githubusercontent.com: %s", gistIPs[i])
-	}
-
-	// we also need to explicitly allow Gist's IP
-	return append(gistIPs, hostIP), []int{fakePort}, nil
-}
-
-// func extraAllowedPortsAndIps(testLogger zerolog.Logger, fakePort int, nodeOutput *ns.Output) ([]string, []int, error) {
+// func extraAllowedPortsAndIps(testLogger zerolog.Logger, fakePort int) ([]string, []int, error) {
 // 	// we need to explicitly allow the port used by the fake data provider
 // 	// and IP corresponding to host.docker.internal or the IP of the host machine, if we are running on Linux,
 // 	// because that's where the fake data provider is running
@@ -366,7 +327,7 @@ func extraAllowedPortsAndIps(testLogger zerolog.Logger, fakePort int) ([]string,
 // 	system := runtime.GOOS
 // 	switch system {
 // 	case "darwin":
-// 		hostIP, err = libdon.ResolveHostDockerInternaIP(testLogger, nodeOutput)
+// 		hostIP = "192.168.65.254"
 // 	case "linux":
 // 		// for linux framework already returns an IP, so we don't need to resolve it,
 // 		// but we need to remove the http:// prefix
@@ -394,6 +355,45 @@ func extraAllowedPortsAndIps(testLogger zerolog.Logger, fakePort int) ([]string,
 // 	// we also need to explicitly allow Gist's IP
 // 	return append(gistIPs, hostIP), []int{fakePort}, nil
 // }
+
+func extraAllowedPortsAndIps(testLogger zerolog.Logger, fakePort int, containerName string) ([]string, []int, error) {
+	// we need to explicitly allow the port used by the fake data provider
+	// and IP corresponding to host.docker.internal or the IP of the host machine, if we are running on Linux,
+	// because that's where the fake data provider is running
+	var hostIP string
+	var err error
+
+	system := runtime.GOOS
+	switch system {
+	case "darwin":
+		hostIP, err = libdon.ResolveHostDockerInternaIP(testLogger, containerName)
+	case "linux":
+		// for linux framework already returns an IP, so we don't need to resolve it,
+		// but we need to remove the http:// prefix
+		hostIP = strings.ReplaceAll(framework.HostDockerInternal(), "http://", "")
+	default:
+		err = fmt.Errorf("unsupported OS: %s", system)
+	}
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to resolve host.docker.internal IP")
+	}
+
+	testLogger.Info().Msgf("Will allow IP %s and port %d for the fake data provider", hostIP, fakePort)
+
+	ips, err := net.LookupIP("gist.githubusercontent.com")
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to resolve IP for gist.githubusercontent.com")
+	}
+
+	gistIPs := make([]string, len(ips))
+	for i, ip := range ips {
+		gistIPs[i] = ip.To4().String()
+		testLogger.Debug().Msgf("Resolved IP for gist.githubusercontent.com: %s", gistIPs[i])
+	}
+
+	// we also need to explicitly allow Gist's IP
+	return append(gistIPs, hostIP), []int{fakePort}, nil
+}
 
 type InfrastructureInput struct {
 	jdInput         *jd.Input
@@ -480,12 +480,9 @@ func CreateInfrastructure(
 	}
 
 	return &InfrastructureOutput{
-		chainSelector: chainSelector,
-		// nodeOuput:          nodeOutput,
-		blockchainOutput: blockchainOutput,
-		jdOutput:         jdOutput,
-		// cldEnv:             cldEnv,
-		// donTopology:        donTopology,
+		chainSelector:      chainSelector,
+		blockchainOutput:   blockchainOutput,
+		jdOutput:           jdOutput,
 		sethClient:         sethClient,
 		deployerPrivateKey: pkey,
 		gatewayConnector: &keystonetypes.GatewayConnectorOutput{
@@ -651,7 +648,9 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	var extraAllowedIPs []string
 	var extraAllowedPorts []int
 	if _, ok := priceProvider.(*FakePriceProvider); ok {
-		extraAllowedIPs, extraAllowedPorts, err = extraAllowedPortsAndIps(testLogger, in.Fake.Port) // donTopology.MetaDons[0].NodeOutput.Output)
+		// it doesn't really matter which container we will use to resolve the host.docker.internal IP
+		// it will be the same for all of them
+		extraAllowedIPs, extraAllowedPorts, err = extraAllowedPortsAndIps(testLogger, in.Fake.Port, envOutput.blockchainOutput.ContainerName)
 		require.NoError(t, err, "failed to get extra allowed ports and IPs")
 	}
 
@@ -673,6 +672,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	for i, donMetadata := range topology.Metadata {
 		for j := range donMetadata.NodesMetadata {
 			nodeWithLabels := keystonetypes.NodeMetadata{}
+			// TODO use flag from devenv, not this one (bootstrap/plugin)
 			nodeType := keystonetypes.WorkerNode
 			if j == 0 {
 				nodeType = keystonetypes.BootstrapNode
@@ -782,6 +782,23 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	cldEnv, dons, err := libenv.BuildChainlinkDeploymentEnv(singeFileLogger, envOutput.jdOutput, nodeOutput, envOutput.blockchainOutput, envOutput.sethClient)
 	require.NoError(t, err, "failed to build chainlink deployment environment")
 
+	for i, don := range dons {
+		for j, node := range topology.Metadata[i].NodesMetadata {
+			node.Labels = append(node.Labels, &ptypes.Label{
+				Key:   libnode.NodeIdKey,
+				Value: ptr.Ptr(don.NodeIds()[j]),
+			})
+
+			// add only new labels, we need to avoid duplicates, because nodeInfo struct passed to libenv.BuildChainlinkDeploymentEnv
+			// already contains some labels that we needed to add before to create config
+			for _, donLabel := range don.Nodes[j].Labels() {
+				if !node.HasLabel(donLabel) {
+					node.Labels = append(node.Labels, donLabel)
+				}
+			}
+		}
+	}
+
 	cldEnv.ExistingAddresses = chainsOnlyCld.ExistingAddresses
 
 	donTopology := &keystonetypes.DonTopology{}
@@ -878,7 +895,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	// If the ConfigSet event is missed, OCR protocol will not start.
 	testLogger.Info().Msg("Waiting 30s for OCR listeners to be ready...")
 	time.Sleep(30 * time.Second)
-	testLogger.Info().Msg("Proceeding to set OCR3 configuration.")
+	testLogger.Info().Msg("Proceeding to set OCR3 and Keystone configuration...")
 
 	// Configure the Forwarder, OCR3 and Capabilities contracts
 	configureKeystoneInput := keystonetypes.ConfigureKeystoneInput{

@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
@@ -46,15 +45,16 @@ func BootstrapOCR3(nodeID string, ocr3CapabilityAddress common.Address, chainID 
 	}
 }
 
-func BootstrapGateway(don *devenv.DON, chainID uint64, donID uint32, extraAllowedPorts []int, extraAllowedIps []string, gatewayConnectorData types.GatewayConnectorOutput) *jobv1.ProposeJobRequest {
+func BootstrapGateway(bootstrapNodeID string, gatewayMemembersEthAddresses []string, chainID uint64, donID uint32, extraAllowedPorts []int, extraAllowedIps []string, gatewayConnectorData types.GatewayConnectorOutput) *jobv1.ProposeJobRequest {
 	var gatewayMembers string
-	for i := 1; i < len(don.Nodes); i++ {
+
+	for i := 0; i < len(gatewayMemembersEthAddresses); i++ {
 		gatewayMembers += fmt.Sprintf(`
 	[[gatewayConfig.Dons.Members]]
 	Address = "%s"
 	Name = "Node %d"`,
-			don.Nodes[i].AccountAddr[chainID],
-			i,
+			gatewayMemembersEthAddresses[i],
+			i+1,
 		)
 	}
 
@@ -140,7 +140,7 @@ func BootstrapGateway(don *devenv.DON, chainID uint64, donID uint32, extraAllowe
 	}
 
 	return &jobv1.ProposeJobRequest{
-		NodeId: don.Nodes[0].NodeID,
+		NodeId: bootstrapNodeID,
 		Spec:   gatewayJobSpec,
 	}
 }

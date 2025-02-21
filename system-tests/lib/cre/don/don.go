@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
@@ -218,8 +217,7 @@ func BuildTopology(nodeSetInput []*types.CapabilitiesAwareNodeSet) (*types.Topol
 
 // In order to whitelist host IP in the gateway, we need to resolve the host.docker.internal to the host IP,
 // and since CL image doesn't have dig or nslookup, we need to use curl.
-func ResolveHostDockerInternaIP(testLogger zerolog.Logger, nsOutput *ns.Output) (string, error) {
-	containerName := nsOutput.CLNodes[0].Node.ContainerName
+func ResolveHostDockerInternaIP(testLogger zerolog.Logger, containerName string) (string, error) {
 	cmd := []string{"curl", "-v", "http://host.docker.internal"}
 	output, err := framework.ExecContainer(containerName, cmd)
 	if err != nil {
