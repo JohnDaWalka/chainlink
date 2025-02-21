@@ -32,6 +32,7 @@ func deployToken(t *testing.T, tenv deployment.Environment, solChain uint64) (de
 				ChainSelector:    solChain,
 				TokenProgramName: ccipChangeset.SPL2022Tokens,
 				TokenDecimals:    9,
+				TokenSymbol:      "TEST_TOKEN",
 			},
 		),
 	)

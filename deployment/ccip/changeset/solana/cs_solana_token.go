@@ -24,6 +24,7 @@ type DeploySolanaTokenConfig struct {
 	ChainSelector    uint64
 	TokenProgramName deployment.ContractType
 	TokenDecimals    uint8
+	TokenSymbol      string
 }
 
 func NewTokenInstruction(chain deployment.SolChain, cfg DeploySolanaTokenConfig) ([]solana.Instruction, solana.PrivateKey, error) {
@@ -69,6 +70,7 @@ func DeploySolanaToken(e deployment.Environment, cfg DeploySolanaTokenConfig) (d
 
 	newAddresses := deployment.NewMemoryAddressBook()
 	tv := deployment.NewTypeAndVersion(deployment.ContractType(cfg.TokenProgramName), deployment.Version1_0_0)
+	tv.AddLabel(cfg.TokenSymbol)
 	err = newAddresses.Save(cfg.ChainSelector, mint.String(), tv)
 	if err != nil {
 		e.Logger.Errorw("Failed to save token", "chain", chain.String(), "err", err)

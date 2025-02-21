@@ -34,6 +34,7 @@ func TestSolanaTokenOps(t *testing.T) {
 				ChainSelector:    solChain1,
 				TokenProgramName: ccipChangeset.SPL2022Tokens,
 				TokenDecimals:    9,
+				TokenSymbol:      "TEST_TOKEN",
 			},
 		),
 	)
