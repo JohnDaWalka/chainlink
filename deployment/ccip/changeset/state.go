@@ -289,6 +289,13 @@ func (c CCIPChainState) GenerateView() (view.ChainView, error) {
 			chainView.LockReleaseTokenPool = helpers.AddValueToNestedMap(chainView.LockReleaseTokenPool, tokenPool.Address().Hex(), string(tokenSymbol), tokenPoolView)
 		}
 	}
+	for version, tokenPool := range c.USDCTokenPools {
+		tokenPoolView, err := v1_5_1.GenerateUSDCTokenPoolView(tokenPool)
+		if err != nil {
+			return chainView, errors.Wrapf(err, "failed to generate USDC token pool view for %s", tokenPool.Address().String())
+		}
+		chainView.USDCTokenPool = helpers.AddValueToNestedMap(chainView.USDCTokenPool, tokenPool.Address().Hex(), version.String(), tokenPoolView)
+	}
 	if c.NonceManager != nil {
 		nmView, err := v1_6.GenerateNonceManagerView(c.NonceManager)
 		if err != nil {
