@@ -23,6 +23,22 @@ import (
 var _ deployment.ChangeSet[TokenPoolConfig] = AddTokenPool
 var _ deployment.ChangeSet[RemoteChainTokenPoolConfig] = SetupTokenPoolForRemoteChain
 
+func validatePoolDeployment(s cs.SolCCIPChainState, poolType solTestTokenPool.PoolType, selector uint64) error {
+	switch poolType {
+	case solTestTokenPool.BurnAndMint_PoolType:
+		if s.BurnMintTokenPool.IsZero() {
+			return fmt.Errorf("token pool of type BurnAndMint not found in existing state, deploy the token pool first for chain %d", selector)
+		}
+	case solTestTokenPool.LockAndRelease_PoolType:
+		if s.LockReleaseTokenPool.IsZero() {
+			return fmt.Errorf("token pool of type LockAndRelease not found in existing state, deploy the token pool first for chain %d", selector)
+		}
+	default:
+		return fmt.Errorf("invalid pool type: %s", poolType)
+	}
+	return nil
+}
+
 type TokenPoolConfig struct {
 	ChainSelector uint64
 	PoolType      solTestTokenPool.PoolType
@@ -42,22 +58,21 @@ func (cfg TokenPoolConfig) Validate(e deployment.Environment) error {
 		return fmt.Errorf("failed to get token program for token address %s: %w", tokenPubKey.String(), err)
 	}
 
+	if err := validatePoolDeployment(chainState, cfg.PoolType, cfg.ChainSelector); err != nil {
+		return err
+	}
+
 	var tokenPool solana.PublicKey
 	var poolConfigAccount interface{}
 
-	if cfg.PoolType == solTestTokenPool.BurnAndMint_PoolType {
-		if chainState.BurnMintTokenPool.IsZero() {
-			return fmt.Errorf("token pool of type BurnAndMint not found in existing state, deploy the token pool first for chain %d", cfg.ChainSelector)
-		}
+	switch cfg.PoolType {
+	case solTestTokenPool.BurnAndMint_PoolType:
 		tokenPool = chainState.BurnMintTokenPool
 		poolConfigAccount = solBurnMintTokenPool.State{}
-	} else if cfg.PoolType == solTestTokenPool.LockAndRelease_PoolType {
-		if chainState.LockReleaseTokenPool.IsZero() {
-			return fmt.Errorf("token pool of type LockAndRelease not found in existing state, deploy the token pool first for chain %d", cfg.ChainSelector)
-		}
+	case solTestTokenPool.LockAndRelease_PoolType:
 		tokenPool = chainState.LockReleaseTokenPool
 		poolConfigAccount = solLockReleaseTokenPool.State{}
-	} else {
+	default:
 		return fmt.Errorf("invalid pool type: %s", cfg.PoolType)
 	}
 
@@ -128,6 +143,11 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 			authorityPubKey, // this is assumed to be chain.DeployerKey for now (owner of token pool)
 			solana.SystemProgramID,
 		).ValidateAndBuild()
+	default:
+		return deployment.ChangesetOutput{}, fmt.Errorf("invalid pool type: %s", cfg.PoolType)
+	}
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
 	}
 
 	instructions = append(instructions, poolInitI)
@@ -175,31 +195,26 @@ func (cfg RemoteChainTokenPoolConfig) Validate(e deployment.Environment) error {
 	}
 	state, _ := cs.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.SolChainSelector]
-	// if chainState.TokenPool.IsZero() {
-	// 	return fmt.Errorf("token pool not found in existing state, deploy token pool for chain %d", cfg.SolChainSelector)
-	// }
-
 	chain := e.SolChains[cfg.SolChainSelector]
+
+	if err := validatePoolDeployment(chainState, cfg.PoolType, cfg.SolChainSelector); err != nil {
+		return err
+	}
 
 	var tokenPool solana.PublicKey
 	var poolConfigAccount interface{}
 	var remoteChainConfigAccount interface{}
 
-	if cfg.PoolType == solTestTokenPool.BurnAndMint_PoolType {
-		if chainState.BurnMintTokenPool.IsZero() {
-			return fmt.Errorf("token pool of type BurnAndMint not found in existing state, deploy the token pool first for chain %d", cfg.SolChainSelector)
-		}
+	switch cfg.PoolType {
+	case solTestTokenPool.BurnAndMint_PoolType:
 		tokenPool = chainState.BurnMintTokenPool
 		poolConfigAccount = solBurnMintTokenPool.State{}
 		remoteChainConfigAccount = solBurnMintTokenPool.ChainConfig{}
-	} else if cfg.PoolType == solTestTokenPool.LockAndRelease_PoolType {
-		if chainState.LockReleaseTokenPool.IsZero() {
-			return fmt.Errorf("token pool of type LockAndRelease not found in existing state, deploy the token pool first for chain %d", cfg.SolChainSelector)
-		}
+	case solTestTokenPool.LockAndRelease_PoolType:
 		tokenPool = chainState.LockReleaseTokenPool
 		poolConfigAccount = solLockReleaseTokenPool.State{}
 		remoteChainConfigAccount = solLockReleaseTokenPool.ChainConfig{}
-	} else {
+	default:
 		return fmt.Errorf("invalid pool type: %s", cfg.PoolType)
 	}
 
@@ -240,6 +255,8 @@ func SetupTokenPoolForRemoteChain(e deployment.Environment, cfg RemoteChainToken
 		instructions, err = getInstructionsForBurnMint(chain, chainState, cfg)
 	case solTestTokenPool.LockAndRelease_PoolType:
 		instructions, err = getInstructionsForLockRelease(chain, chainState, cfg)
+	default:
+		return deployment.ChangesetOutput{}, fmt.Errorf("invalid pool type: %s", cfg.PoolType)
 	}
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
@@ -369,18 +386,9 @@ func (cfg TokenPoolLookupTableConfig) Validate(e deployment.Environment) error {
 	if err != nil {
 		return fmt.Errorf("failed to get token program for token address %s: %w", tokenPubKey.String(), err)
 	}
-	if cfg.PoolType == solTestTokenPool.BurnAndMint_PoolType {
-		if chainState.BurnMintTokenPool.IsZero() {
-			return fmt.Errorf("token pool not found in existing state, deploy the token pool first for chain %d", cfg.ChainSelector)
-		}
-	} else if cfg.PoolType == solTestTokenPool.LockAndRelease_PoolType {
-		if chainState.LockReleaseTokenPool.IsZero() {
-			return fmt.Errorf("token pool not found in existing state, deploy the token pool first for chain %d", cfg.ChainSelector)
-		}
-	} else {
-		return fmt.Errorf("invalid pool type: %s", cfg.PoolType)
+	if err := validatePoolDeployment(chainState, cfg.PoolType, cfg.ChainSelector); err != nil {
+		return err
 	}
-
 	return nil
 }
 
