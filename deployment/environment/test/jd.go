@@ -312,51 +312,6 @@ func (s *store) put(n *wrappedNode) {
 	s.p2pToID[p2pKey(n.Node.PeerID.String())] = n.NodeID
 }
 
-type UnimplementedJobServiceClient struct{}
-
-func (s *UnimplementedJobServiceClient) BatchProposeJob(ctx context.Context, in *jobv1.BatchProposeJobRequest, opts ...grpc.CallOption) (*jobv1.BatchProposeJobResponse, error) {
-	// TODO CCIP-3108  implement me
-	panic("implement me")
-}
-
-func (s *UnimplementedJobServiceClient) DeleteJob(ctx context.Context, in *jobv1.DeleteJobRequest, opts ...grpc.CallOption) (*jobv1.DeleteJobResponse, error) {
-	panic("unimplemented")
-}
-
-func (s *UnimplementedJobServiceClient) UpdateJob(ctx context.Context, in *jobv1.UpdateJobRequest, opts ...grpc.CallOption) (*jobv1.UpdateJobResponse, error) {
-	panic("unimplemented")
-}
-
-// GetJob implements job.JobServiceClient.
-func (s *UnimplementedJobServiceClient) GetJob(ctx context.Context, in *jobv1.GetJobRequest, opts ...grpc.CallOption) (*jobv1.GetJobResponse, error) {
-	panic("unimplemented")
-}
-
-// GetProposal implements job.JobServiceClient.
-func (s *UnimplementedJobServiceClient) GetProposal(ctx context.Context, in *jobv1.GetProposalRequest, opts ...grpc.CallOption) (*jobv1.GetProposalResponse, error) {
-	panic("unimplemented")
-}
-
-// ListJobs implements job.JobServiceClient.
-func (s *UnimplementedJobServiceClient) ListJobs(ctx context.Context, in *jobv1.ListJobsRequest, opts ...grpc.CallOption) (*jobv1.ListJobsResponse, error) {
-	panic("unimplemented")
-}
-
-// ListProposals implements job.JobServiceClient.
-func (s *UnimplementedJobServiceClient) ListProposals(ctx context.Context, in *jobv1.ListProposalsRequest, opts ...grpc.CallOption) (*jobv1.ListProposalsResponse, error) {
-	panic("unimplemented")
-}
-
-// ProposeJob implements job.JobServiceClient.
-func (s *UnimplementedJobServiceClient) ProposeJob(ctx context.Context, in *jobv1.ProposeJobRequest, opts ...grpc.CallOption) (*jobv1.ProposeJobResponse, error) {
-	panic("unimplemented")
-}
-
-// RevokeJob implements job.JobServiceClient.
-func (s *UnimplementedJobServiceClient) RevokeJob(ctx context.Context, in *jobv1.RevokeJobRequest, opts ...grpc.CallOption) (*jobv1.RevokeJobResponse, error) {
-	panic("unimplemented")
-}
-
 type UnimplementedCSAServiceClient struct{}
 
 func (s *UnimplementedCSAServiceClient) GetKeypair(ctx context.Context, in *csav1.GetKeypairRequest, opts ...grpc.CallOption) (*csav1.GetKeypairResponse, error) {
