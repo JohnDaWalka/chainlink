@@ -56,7 +56,7 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 		return nil, errors.New("failed to get bootstrap node host from labels")
 	}
 
-	donBootstrapNodeP2PID, err := node.ToP2PID(bootstrapNode, node.KeyExtractingTransformFn)
+	donBootstrapNodeP2PID, err := node.ToP2PID(bootstrapNode, node.NoOpTransformFn)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get bootstrap node peer ID")
 	}
@@ -84,9 +84,9 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 
 	// configuration of worker nodes
 	for _, n := range workflowNodeSet {
-		nodeP2PID, err := node.ToP2PID(n, node.KeyExtractingTransformFn)
+		nodeP2PID, err := node.ToP2PID(n, node.NoOpTransformFn)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get bootstrap node peer ID")
+			return nil, errors.Wrap(err, "failed to find node's peer ID")
 		}
 
 		if keystoneflags.HasFlag(input.Flags, types.CronCapability) {

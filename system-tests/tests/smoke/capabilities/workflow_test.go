@@ -516,6 +516,11 @@ type NodeEthKey struct {
 }
 
 type NodeP2PKey struct {
+	JSON     string `toml:"JSON"`
+	Password string `toml:"Password"`
+}
+
+type NodeP2PKey_Old struct {
 	PrivateKey string `toml:"PrivateKey"`
 	PublicKey  string `toml:"PublicKey"`
 }
@@ -538,6 +543,9 @@ func generateP2PKeys(pwd string, n int) (*p2pGenerationResult, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		fmt.Println("P2P ID:" + key.PeerID().String())
+
 		result.encryptedP2PKeyJSONs = append(result.encryptedP2PKeyJSONs, d)
 		result.peerIDs = append(result.peerIDs, key.PeerID().String())
 		result.publicHexKeys = append(result.publicHexKeys, key.PublicKeyHex())
@@ -728,8 +736,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 				envInput.nodeSetInput[i].NodeSpecs[j].Node.TestConfigOverrides = configOverride
 
 				ethKey := donToEthKeys[uint32(i+1)][j]
-				p2pPublicKey := donToP2PKeys[uint32(i+1)].publicHexKeys[j]
-				p2pPrivateKey := donToP2PKeys[uint32(i+1)].privateKeys[j]
+				p2pKey := donToP2PKeys[uint32(i+1)].encryptedP2PKeyJSONs[j]
 
 				type NodeSecret struct {
 					EthKey NodeEthKey `toml:"EthKey"`
@@ -745,15 +752,13 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 						},
 					},
 					P2PKey: NodeP2PKey{
-						PrivateKey: p2pPrivateKey,
-						PublicKey:  p2pPublicKey,
+						JSON:     string(p2pKey),
+						Password: "",
 					},
 				}
 
 				nodeSecretString, err := toml.Marshal(nodeSecret)
 				require.NoError(t, err, "failed to marshal node secrets")
-
-				fmt.Println(string(nodeSecretString))
 
 				envInput.nodeSetInput[i].NodeSpecs[j].Node.TestSecretsOverrides = string(nodeSecretString)
 			}
@@ -771,30 +776,6 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 			Capabilities: nodeSetInput.Capabilities,
 		})
 	}
-
-	// for i, out := range nodeOutput {
-	// 	c, err := clclient.New(out.Output.CLNodes)
-	// 	require.NoError(t, err, "failed to create chainlink client")
-
-	// 	err = clclient.ImportEVMKeys(c, donToEthKeys[uint32(i+1)], envOutput.blockchainOutput.ChainID)
-	// 	require.NoError(t, err, "failed to import EVM keys")
-
-	// 	err = clclient.ImportP2PKeys(c, donToP2PKeys[uint32(i+1)].encryptedP2PKeyJSONs)
-	// 	require.NoError(t, err, "failed to import P2P keys")
-
-	// 	// // delete the other p2p keys
-	// 	// for j, client := range c {
-	// 	// 	p2pKeys, err := client.MustReadP2PKeys()
-	// 	// 	require.NoError(t, err, "failed to read P2P keys")
-
-	// 	// 	fmt.Println("Genereated P2P keys for node", donToP2PKeys[uint32(i+1)].peerIDs[j])
-	// 	// 	fmt.Println("P2P keys for node", j+1)
-	// 	// 	for _, key := range p2pKeys.Data {
-
-	// 	// 		// TODO remove old keys
-	// 	// 	}
-	// 	// }
-	// }
 
 	// Prepare the CLD environment and figure out DON topology; configure chains for nodes and job distributor
 	// Ugly glue hack ¯\_(ツ)_/¯

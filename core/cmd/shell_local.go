@@ -446,9 +446,9 @@ func (s *Shell) runNode(c *cli.Context) error {
 	}
 
 	if s.Config.P2P().Enabled() {
-		if s.Config.ImportedEthKey().JSON() != "" {
+		if s.Config.ImportedP2PKey().JSON() != "" {
 			lggr.Debug("Importing p2p key")
-			_, err2 := app.GetKeyStore().P2P().Import(rootCtx, []byte(s.Config.ImportedEthKey().JSON()), s.Config.ImportedEthKey().Password())
+			_, err2 := app.GetKeyStore().P2P().Import(rootCtx, []byte(s.Config.ImportedP2PKey().JSON()), s.Config.ImportedP2PKey().Password())
 			if err2 != nil {
 				return s.errorOut(errors.Wrap(err2, "error importing p2p key"))
 			}

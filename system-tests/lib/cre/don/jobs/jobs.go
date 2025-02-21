@@ -51,7 +51,11 @@ func Create(offChainClient deployment.OffchainClient, don *devenv.DON, flags []s
 
 	var finalErr error
 	for err := range errCh {
-		finalErr = errors.Wrap(finalErr, err.Error())
+		if finalErr == nil {
+			finalErr = err
+		} else {
+			finalErr = errors.Wrap(finalErr, err.Error())
+		}
 	}
 
 	if finalErr != nil {
