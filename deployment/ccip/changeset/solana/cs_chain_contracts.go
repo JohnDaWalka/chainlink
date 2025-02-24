@@ -13,9 +13,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	ccipChangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
 )
 
-var _ deployment.ChangeSet[ccipChangeset.SetOCR3OffRampConfig] = SetOCR3ConfigSolana
+var _ deployment.ChangeSet[v1_6.SetOCR3OffRampConfig] = SetOCR3ConfigSolana
 var _ deployment.ChangeSet[AddRemoteChainToSolanaConfig] = AddRemoteChainToSolana
 var _ deployment.ChangeSet[BillingTokenConfig] = AddBillingTokenChangeset
 var _ deployment.ChangeSet[BillingTokenForRemoteChainConfig] = AddBillingTokenForRemoteChain

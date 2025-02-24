@@ -1,14 +1,18 @@
 package changeset
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	"github.com/rs/zerolog/log"
 
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+
+	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
@@ -57,6 +61,16 @@ type SolCCIPChainState struct {
 	OffRampStatePDA      solana.PublicKey
 }
 
+func FetchOfframpLookupTable(ctx context.Context, chain deployment.SolChain, offRampAddress solana.PublicKey) (solana.PublicKey, error) {
+	var referenceAddressesAccount solOffRamp.ReferenceAddresses
+	offRampReferenceAddressesPDA, _, _ := solState.FindOfframpReferenceAddressesPDA(offRampAddress)
+	err := chain.GetAccountDataBorshInto(ctx, offRampReferenceAddressesPDA, &referenceAddressesAccount)
+	if err != nil {
+		return solana.PublicKey{}, fmt.Errorf("failed to get offramp reference addresses: %w", err)
+	}
+	return referenceAddressesAccount.OfframpLookupTable, nil
+}
+
 func LoadOnchainStateSolana(e deployment.Environment) (CCIPOnChainState, error) {
 	state := CCIPOnChainState{
 		SolChains: make(map[uint64]SolCCIPChainState),
@@ -89,6 +103,9 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 		WSOL:                 solana.SolMint,
 		TokenPoolLookupTable: make(map[solana.PublicKey]solana.PublicKey),
 	}
+	// Most programs upgraded in place, but some are not so we always want to
+	// load the latest version
+	versions := make(map[deployment.ContractType]semver.Version)
 	for address, tvStr := range addresses {
 		switch tvStr.Type {
 		case commontypes.LinkToken:
@@ -102,9 +119,6 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 				return state, err
 			}
 			state.RouterConfigPDA = routerConfigPDA
-		case OfframpAddressLookupTable:
-			pub := solana.MustPublicKeyFromBase58(address)
-			state.OfframpAddressLookupTable = pub
 		case Receiver:
 			pub := solana.MustPublicKeyFromBase58(address)
 			state.Receiver = pub
@@ -150,6 +164,15 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 			}
 			state.FeeQuoterConfigPDA = feeQuoterConfigPDA
 		case OffRamp:
+			offRampVersion, ok := versions[OffRamp]
+			// if we have an offramp version, we need to make sure it's a newer version
+			if ok {
+				// if the version is not newer, skip this address
+				if offRampVersion.GreaterThan(&tvStr.Version) {
+					log.Debug().Str("address", address).Str("type", string(tvStr.Type)).Msg("Skipping offramp address, already loaded newer version")
+					continue
+				}
+			}
 			pub := solana.MustPublicKeyFromBase58(address)
 			state.OffRamp = pub
 			offRampConfigPDA, _, err := solState.FindOfframpConfigPDA(state.OffRamp)
@@ -175,6 +198,12 @@ func LoadChainStateSolana(chain deployment.SolChain, addresses map[string]deploy
 			log.Warn().Str("address", address).Str("type", string(tvStr.Type)).Msg("Unknown address type")
 			continue
 		}
+		existingVersion, ok := versions[tvStr.Type]
+		// This shouldn't happen, so we want to log it
+		if ok {
+			log.Warn().Str("existingVersion", existingVersion.String()).Str("type", string(tvStr.Type)).Msg("Duplicate address type found")
+		}
+		versions[tvStr.Type] = tvStr.Version
 	}
 	return state, nil
 }
@@ -197,4 +226,14 @@ func (s SolCCIPChainState) TokenToTokenProgram(tokenAddress solana.PublicKey) (s
 		}
 	}
 	return solana.PublicKey{}, fmt.Errorf("token program not found for token address %s", tokenAddress.String())
+}
+
+func FindSolanaAddress(tv deployment.TypeAndVersion, addresses map[string]deployment.TypeAndVersion) solana.PublicKey {
+	for address, tvStr := range addresses {
+		if tv.String() == tvStr.String() {
+			pub := solana.MustPublicKeyFromBase58(address)
+			return pub
+		}
+	}
+	return solana.PublicKey{}
 }

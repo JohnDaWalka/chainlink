@@ -105,10 +105,15 @@ func AddBillingTokenChangeset(e deployment.Environment, cfg BillingTokenConfig) 
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
 	tokenBillingPDA, _, _ := solState.FindFqBillingTokenConfigPDA(tokenPubKey, chainState.FeeQuoter)
 
+	addressLookupTable, err := ccipChangeset.FetchOfframpLookupTable(e.GetContext(), chain, chainState.OffRamp)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get offramp reference addresses: %w", err)
+	}
+
 	if err := solCommonUtil.ExtendLookupTable(
 		e.GetContext(),
 		chain.Client,
-		chainState.OfframpAddressLookupTable,
+		addressLookupTable,
 		*chain.DeployerKey,
 		[]solana.PublicKey{tokenBillingPDA},
 	); err != nil {
@@ -178,10 +183,15 @@ func AddBillingTokenForRemoteChain(e deployment.Environment, cfg BillingTokenFor
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
 	}
 
+	addressLookupTable, err := ccipChangeset.FetchOfframpLookupTable(e.GetContext(), chain, chainState.OffRamp)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get offramp reference addresses: %w", err)
+	}
+
 	if err := solCommonUtil.ExtendLookupTable(
 		e.GetContext(),
 		chain.Client,
-		chainState.OfframpAddressLookupTable,
+		addressLookupTable,
 		*chain.DeployerKey,
 		[]solana.PublicKey{remoteBillingPDA},
 	); err != nil {
