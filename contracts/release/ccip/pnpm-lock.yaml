@@ -14,6 +14,12 @@ importers:
       '@changesets/get-github-info':
         specifier: ^0.6.0
         version: 0.6.0
+      '@openzeppelin/contracts':
+        specifier: 4.9.3
+        version: 4.9.3
+      '@openzeppelin/contracts-upgradeable':
+        specifier: 4.9.3
+        version: 4.9.3
       semver:
         specifier: ^7.6.3
         version: 7.7.1
@@ -161,6 +167,12 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
+
+  '@openzeppelin/contracts-upgradeable@4.9.3':
+    resolution: {integrity: sha512-jjaHAVRMrE4UuZNfDwjlLGDxTHWIOwTJS2ldnc278a0gevfXfPr8hxKEVBGFBE96kl2G3VHDZhUimw/+G3TG2A==}
+
+  '@openzeppelin/contracts@4.9.3':
+    resolution: {integrity: sha512-He3LieZ1pP2TNt5JbkPA4PNT9WC3gOTOlDcFGJW4Le4QKqwmiNJCRt44APfxMxvq7OugU/cqYuPcSBzOw38DAg==}
 
   '@pkgr/core@0.1.1':
     resolution: {integrity: sha512-cq8o4cWH0ibXh9VGi5P20Tu9XF/0fFXl9EUinr9QfTM7a7p0oTA4iJRCQWppXR1Pg8dSM0UCItCkPwsk9qWWYA==}
@@ -1113,6 +1125,10 @@ snapshots:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.0
+
+  '@openzeppelin/contracts-upgradeable@4.9.3': {}
+
+  '@openzeppelin/contracts@4.9.3': {}
 
   '@pkgr/core@0.1.1': {}
 
