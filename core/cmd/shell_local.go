@@ -28,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/build"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/sessions"
@@ -393,9 +394,22 @@ func (s *Shell) runNode(c *cli.Context) error {
 			}
 			_, err = app.GetKeyStore().Eth().Import(rootCtx, []byte(k.JSON()), k.Password(), cid)
 			if err != nil {
+				if errors.Is(err, keystore.ErrKeyExists) {
+					lggr.Debugf("Eth key %s already exists for chain %v", k.JSON(), k.ChainDetails())
+					continue
+				}
 				return s.errorOut(errors.Wrap(err, "error importing eth key"))
 			}
+			lggr.Debugf("Imported eth key %s for chain %v", k.JSON(), k.ChainDetails())
+			got, err := app.GetKeyStore().Eth().EnabledKeysForChain(rootCtx, cid)
+			if err != nil {
+				return s.errorOut(errors.Wrap(err, "error getting eth keys"))
+			}
+			if len(got) == 0 {
+				return s.errorOut(fmt.Errorf("error importing eth key %s for chain %v", k.JSON(), k.ChainDetails()))
+			}
 		}
+
 		chainList, err2 := legacyEVMChains.List()
 		if err2 != nil {
 			return fmt.Errorf("error listing legacy evm chains: %w", err2)
@@ -451,8 +465,13 @@ func (s *Shell) runNode(c *cli.Context) error {
 			lggr.Debug("Importing p2p key")
 			_, err2 := app.GetKeyStore().P2P().Import(rootCtx, []byte(s.Config.ImportedP2PKey().JSON()), s.Config.ImportedP2PKey().Password())
 			if err2 != nil {
-				return s.errorOut(errors.Wrap(err2, "error importing p2p key"))
+				if errors.Is(err2, keystore.ErrKeyExists) {
+					lggr.Debugf("P2P key already exists %s", s.Config.ImportedP2PKey().JSON())
+				} else {
+					return s.errorOut(errors.Wrap(err2, "error importing p2p key"))
+				}
 			}
+
 		}
 		err2 := app.GetKeyStore().P2P().EnsureKey(rootCtx)
 		if err2 != nil {

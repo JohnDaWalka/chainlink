@@ -962,13 +962,13 @@ func (f fileAPIInitializer) Initialize(ctx context.Context, orm sessions.BasicAd
 	}
 
 	// If there are no users in the database, create initial admin user from session request from file creds
-	if len(dbUsers) == 0 {
-		user, err2 := sessions.NewUser(request.Email, request.Password, sessions.UserRoleAdmin)
-		if err2 != nil {
-			return user, errors.Wrap(err2, "failed to instantiate new user")
-		}
-		return user, orm.CreateUser(ctx, &user)
+	//	if len(dbUsers) == 0 {
+	user, err2 := sessions.NewUser(request.Email, request.Password, sessions.UserRoleAdmin)
+	if err2 != nil {
+		return user, errors.Wrap(err2, "failed to instantiate new user")
 	}
+	//return user, orm.CreateUser(ctx, &user)
+	//	}
 
 	// Attempt to contextually return the correct admin user, CLI access here implies admin
 	if adminUser, found := attemptAssumeAdminUser(dbUsers, lggr); found {
@@ -976,7 +976,7 @@ func (f fileAPIInitializer) Initialize(ctx context.Context, orm sessions.BasicAd
 	}
 
 	// Otherwise, multiple admin users exist, attempt to load email specified in session request
-	user, err := orm.FindUser(ctx, request.Email)
+	user, err = orm.FindUser(ctx, request.Email)
 	if err != nil {
 		return sessions.User{}, err
 	}

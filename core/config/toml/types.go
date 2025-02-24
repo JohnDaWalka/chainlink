@@ -146,14 +146,14 @@ func (e *EthKeysWrapper) SetFrom(f *EthKeysWrapper) (err error) {
 }
 
 func (e *EthKeysWrapper) validateMerge(f *EthKeysWrapper) (err error) {
-	var have map[uint64]struct{}
+	var have map[int]struct{}
 	if e != nil && f != nil {
 		for _, ethKey := range e.Keys {
-			have[ethKey.ChainDetails.ChainSelector] = struct{}{}
+			have[*ethKey.ID] = struct{}{}
 		}
 		for _, ethKey := range f.Keys {
-			if _, ok := have[ethKey.ChainDetails.ChainSelector]; ok {
-				err = multierr.Append(err, configutils.ErrOverride{Name: fmt.Sprintf("EthKeys: %d", ethKey.ChainDetails.ChainSelector)})
+			if _, ok := have[*ethKey.ID]; ok {
+				err = multierr.Append(err, configutils.ErrOverride{Name: fmt.Sprintf("EthKeys: %d", *ethKey.ID)})
 			}
 		}
 	}
@@ -161,7 +161,6 @@ func (e *EthKeysWrapper) validateMerge(f *EthKeysWrapper) (err error) {
 }
 
 func (e *EthKeysWrapper) ValidateConfig() (err error) {
-	panic("EthKeysWrapper.ValidateConfig() should not be called")
 	for i, ethKey := range e.Keys {
 		if err := ethKey.ValidateConfig(); err != nil {
 			err = multierr.Append(err, configutils.ErrInvalid{Name: fmt.Sprintf("EthKeys[%d]", i), Value: ethKey, Msg: "invalid EthKey"})
@@ -262,9 +261,11 @@ func (d *DatabaseSecrets) validateMerge(f *DatabaseSecrets) (err error) {
 }
 
 type EthKey struct {
-	JSON         *models.Secret
-	ChainDetails *chain_selectors.ChainDetails
-	Password     *models.Secret
+	JSON *models.Secret
+	ID   *int
+	//	ChainDetails *chain_selectors.ChainDetails
+
+	Password *models.Secret
 }
 
 func (e *EthKey) SetFrom(f *EthKey) (err error) {
@@ -278,8 +279,8 @@ func (e *EthKey) SetFrom(f *EthKey) (err error) {
 	if v := f.Password; v != nil {
 		e.Password = v
 	}
-	if v := f.ChainDetails; v != nil {
-		e.ChainDetails = v
+	if v := f.ID; v != nil {
+		e.ID = v
 	}
 	return nil
 }
@@ -288,7 +289,7 @@ func (e *EthKey) validateMerge(f *EthKey) (err error) {
 	if e.JSON != nil && f.JSON != nil {
 		err = multierr.Append(err, configutils.ErrOverride{Name: "PrivateKey"})
 	}
-	if e.ChainDetails != nil && f.ChainDetails != nil {
+	if e.ID != nil && f.ID != nil {
 		err = multierr.Append(err, configutils.ErrOverride{Name: "Selector"})
 	}
 	if e.Password != nil && f.Password != nil {
@@ -298,14 +299,15 @@ func (e *EthKey) validateMerge(f *EthKey) (err error) {
 }
 
 func (e *EthKey) ValidateConfig() (err error) {
-	if (e.JSON != nil) != (e.Password != nil) && (e.Password != nil) != (e.ChainDetails != nil) {
+	if (e.JSON != nil) != (e.Password != nil) && (e.Password != nil) != (e.ID != nil) {
 		err = multierr.Append(err, configutils.ErrInvalid{Name: "EthKey", Value: e.JSON, Msg: "all fields must be nil or non-nil"})
 	}
 	// require valid selector
-	if e.ChainDetails != nil {
-		_, ok := chain_selectors.ChainBySelector(*&e.ChainDetails.ChainSelector)
+	if e.ID != nil {
+		_, ok := chain_selectors.ChainByEvmChainID(uint64(*e.ID))
+		//_, ok := chain_selectors.ChainBySelector(*&e.ID.ChainSelector)
 		if !ok {
-			err = multierr.Append(err, configutils.ErrInvalid{Name: "ChainSelector", Value: e.ChainDetails.ChainSelector, Msg: "invalid chain selector"})
+			err = multierr.Append(err, configutils.ErrInvalid{Name: "ChainSelector", Value: e.ID, Msg: "invalid chain selector"})
 		}
 	}
 	return err

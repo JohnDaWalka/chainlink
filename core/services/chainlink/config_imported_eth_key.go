@@ -18,10 +18,17 @@ func (t *importedEthKeyConfig) JSON() string {
 }
 
 func (t *importedEthKeyConfig) ChainDetails() chain_selectors.ChainDetails {
-	if t.s.ChainDetails == nil {
+	if t.s.ID == nil {
 		return chain_selectors.ChainDetails{}
 	}
-	return *t.s.ChainDetails
+	d, ok := chain_selectors.ChainByEvmChainID(uint64(*t.s.ID))
+	if !ok {
+		return chain_selectors.ChainDetails{}
+	}
+	return chain_selectors.ChainDetails{
+		ChainSelector: d.Selector,
+		ChainName:     d.Name,
+	}
 }
 
 func (t *importedEthKeyConfig) Password() string {
