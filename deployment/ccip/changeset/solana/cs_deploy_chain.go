@@ -733,6 +733,9 @@ func deployChainContractsSolana(
 	var burnMintTokenPool solana.PublicKey
 	if chainState.BurnMintTokenPool.IsZero() {
 		burnMintTokenPool, err = DeployAndMaybeSaveToAddressBook(e, chain, ab, BurnMintTokenPool, deployment.Version1_0_0, false)
+		if err != nil {
+			return ixns, fmt.Errorf("failed to deploy program: %w", err)
+		}
 		needTokenPoolinLookupTable = true
 	} else {
 		e.Logger.Infow("Using existing burn mint token pool", "addr", chainState.BurnMintTokenPool.String())
@@ -742,6 +745,9 @@ func deployChainContractsSolana(
 	var lockReleaseTokenPool solana.PublicKey
 	if chainState.LockReleaseTokenPool.IsZero() {
 		lockReleaseTokenPool, err = DeployAndMaybeSaveToAddressBook(e, chain, ab, LockReleaseTokenPool, deployment.Version1_0_0, false)
+		if err != nil {
+			return ixns, fmt.Errorf("failed to deploy program: %w", err)
+		}
 		needTokenPoolinLookupTable = true
 	} else {
 		e.Logger.Infow("Using existing lock release token pool", "addr", chainState.LockReleaseTokenPool.String())
