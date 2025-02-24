@@ -9,7 +9,6 @@ require (
 	github.com/NethermindEth/juno v0.3.1
 	github.com/NethermindEth/starknet.go v0.7.1-0.20240401080518-34a506f3cfdb
 	github.com/andybalholm/brotli v1.1.1
-	github.com/aptos-labs/aptos-go-sdk v1.5.0
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
 	github.com/cometbft/cometbft v0.37.5
@@ -127,6 +126,7 @@ require (
 )
 
 require (
+	github.com/aptos-labs/aptos-go-sdk v1.5.0 // indirect
 	github.com/bytecodealliance/wasmtime-go/v28 v28.0.0 // indirect
 	github.com/coder/websocket v1.8.12 // indirect
 	github.com/hasura/go-graphql-client v0.13.1 // indirect
