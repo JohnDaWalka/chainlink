@@ -22,6 +22,9 @@ const (
 	ViaOwnerInstruction
 )
 
+// TEST ROUTER ? -> do i need to RegisterTokenAdminRegistry on test router for testing token transfers ?
+// test token pool registered in the test router
+
 type RegisterTokenAdminRegistryConfig struct {
 	ChainSelector           uint64
 	TokenPubKey             string

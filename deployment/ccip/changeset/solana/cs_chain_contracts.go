@@ -71,6 +71,7 @@ func commonValidation(e deployment.Environment, selector uint64, tokenPubKey sol
 	return nil
 }
 
+// TEST ROUTER ? -> can easily check for test router here
 func validateRouterConfig(chain deployment.SolChain, chainState ccipChangeset.SolCCIPChainState) error {
 	if chainState.Router.IsZero() {
 		return fmt.Errorf("router not found in existing state, deploy the router first for chain %d", chain.Selector)
@@ -108,4 +109,74 @@ func validateOffRampConfig(chain deployment.SolChain, chainState ccipChangeset.S
 		return fmt.Errorf("offramp config not found in existing state, initialize the offramp first %d", chain.Selector)
 	}
 	return nil
+}
+
+type SetFeeAggregatorConfig struct {
+	ChainSelector uint64
+	FeeAggregator string
+}
+
+func (cfg SetFeeAggregatorConfig) Validate(e deployment.Environment) error {
+	state, err := ccipChangeset.LoadOnchainState(e)
+	if err != nil {
+		return fmt.Errorf("failed to load onchain state: %w", err)
+	}
+	chainState, chainExists := state.SolChains[cfg.ChainSelector]
+	if !chainExists {
+		return fmt.Errorf("chain %d not found in existing state", cfg.ChainSelector)
+	}
+	chain := e.SolChains[cfg.ChainSelector]
+
+	if err := validateRouterConfig(chain, chainState); err != nil {
+		return err
+	}
+
+	// Validate fee aggregator address is valid
+	if _, err := solana.PublicKeyFromBase58(cfg.FeeAggregator); err != nil {
+		return fmt.Errorf("invalid fee aggregator address: %w", err)
+	}
+
+	if chainState.FeeAggregator.Equals(solana.MustPublicKeyFromBase58(cfg.FeeAggregator)) {
+		return fmt.Errorf("fee aggregator %s is already set on chain %d", cfg.FeeAggregator, cfg.ChainSelector)
+	}
+
+	return nil
+}
+
+func SetFeeAggregator(e deployment.Environment, cfg SetFeeAggregatorConfig) (deployment.ChangesetOutput, error) {
+	if err := cfg.Validate(e); err != nil {
+		return deployment.ChangesetOutput{}, err
+	}
+
+	state, _ := ccipChangeset.LoadOnchainState(e)
+	chainState := state.SolChains[cfg.ChainSelector]
+	chain := e.SolChains[cfg.ChainSelector]
+
+	feeAggregatorPubKey := solana.MustPublicKeyFromBase58(cfg.FeeAggregator)
+	routerConfigPDA, _, _ := solState.FindConfigPDA(chainState.Router)
+
+	solRouter.SetProgramID(chainState.Router)
+	instruction, err := solRouter.NewUpdateFeeAggregatorInstruction(
+		feeAggregatorPubKey,
+		routerConfigPDA,
+		chain.DeployerKey.PublicKey(),
+		solana.SystemProgramID,
+	).ValidateAndBuild()
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to build instruction: %w", err)
+	}
+
+	if err := chain.Confirm([]solana.Instruction{instruction}); err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
+	}
+	newAddresses := deployment.NewMemoryAddressBook()
+	err = newAddresses.Save(cfg.ChainSelector, cfg.FeeAggregator, deployment.NewTypeAndVersion(ccipChangeset.FeeAggregator, deployment.Version1_0_0))
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to save address: %w", err)
+	}
+
+	e.Logger.Infow("Set new fee aggregator", "chain", chain.String(), "fee_aggregator", feeAggregatorPubKey.String())
+	return deployment.ChangesetOutput{
+		AddressBook: newAddresses,
+	}, nil
 }

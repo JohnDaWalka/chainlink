@@ -220,6 +220,7 @@ func solProgramSize(e *deployment.Environment, chain deployment.SolChain, progra
 	return programBytes, nil
 }
 
+// TEST ROUTER ? -> can call for test router easily with actual fee quoter ?
 func initializeRouter(
 	e deployment.Environment,
 	chain deployment.SolChain,
@@ -279,7 +280,7 @@ func initializeFeeQuoter(
 	instruction, err := solFeeQuoter.NewInitializeInstruction(
 		linkTokenAddress,
 		params.DefaultMaxFeeJuelsPerMsg,
-		ccipRouterProgram,
+		ccipRouterProgram, // TEST ROUTER ?
 		feeQuoterConfigPDA,
 		chain.DeployerKey.PublicKey(),
 		solana.SystemProgramID,
@@ -333,7 +334,7 @@ func initializeOffRamp(
 
 	initIx, err := solOffRamp.NewInitializeInstruction(
 		offRampReferenceAddressesPDA,
-		ccipRouterProgram,
+		ccipRouterProgram, // TEST ROUTER ? this is easy to configure
 		feeQuoterAddress,
 		addressLookupTable,
 		offRampStatePDA,
@@ -597,6 +598,8 @@ func deployChainContractsSolana(
 	}
 	solRouter.SetProgramID(ccipRouterProgram)
 
+	// TEST ROUTER ? -> can easily deploy test router here
+
 	// OFFRAMP DEPLOY
 	var offRampAddress solana.PublicKey
 	// gather lookup table keys from other deploys
@@ -687,6 +690,8 @@ func deployChainContractsSolana(
 		e.Logger.Infow("Router already initialized, skipping initialization", "chain", chain.String())
 	}
 
+	// TEST ROUTER ? -> can easily initialize test router here but with test fee quoter or actual fee quoter ?
+
 	// OFFRAMP INITIALIZE
 	var offRampConfigAccount solOffRamp.Config
 	offRampConfigPDA, _, _ := solState.FindOfframpConfigPDA(offRampAddress)
@@ -730,6 +735,7 @@ func deployChainContractsSolana(
 		e.Logger.Infow("Offramp already initialized, skipping initialization", "chain", chain.String())
 	}
 
+	// TOKEN POOL DEPLOY
 	var burnMintTokenPool solana.PublicKey
 	if chainState.BurnMintTokenPool.IsZero() {
 		burnMintTokenPool, err = DeployAndMaybeSaveToAddressBook(e, chain, ab, BurnMintTokenPool, deployment.Version1_0_0, false)
@@ -754,6 +760,8 @@ func deployChainContractsSolana(
 		lockReleaseTokenPool = chainState.LockReleaseTokenPool
 	}
 
+	// BILLING
+	// TEST ROUTER ?
 	for _, billingConfig := range params.FeeQuoterParams.BillingConfig {
 		if err := AddBillingToken(
 			e, chain, chainState, billingConfig,
@@ -762,6 +770,7 @@ func deployChainContractsSolana(
 		}
 	}
 
+	// LOOK UP TABLE
 	if needFQinLookupTable {
 		linkFqBillingConfigPDA, _, _ := solState.FindFqBillingTokenConfigPDA(chainState.LinkToken, feeQuoterAddress)
 		wsolFqBillingConfigPDA, _, _ := solState.FindFqBillingTokenConfigPDA(chainState.WSOL, feeQuoterAddress)
@@ -775,6 +784,7 @@ func deployChainContractsSolana(
 		}...)
 	}
 
+	// TEST ROUTER ? should we add test router related accounts here or not required ?
 	if needRouterinLookupTable {
 		externalExecutionConfigPDA, _, _ := solState.FindExternalExecutionConfigPDA(ccipRouterProgram)
 		externalTokenPoolsSignerPDA, _, _ := solState.FindExternalTokenPoolsSignerPDA(ccipRouterProgram)
@@ -999,74 +1009,4 @@ func generateCloseBufferIxn(
 	)
 
 	return instruction, nil
-}
-
-type SetFeeAggregatorConfig struct {
-	ChainSelector uint64
-	FeeAggregator string
-}
-
-func (cfg SetFeeAggregatorConfig) Validate(e deployment.Environment) error {
-	state, err := ccipChangeset.LoadOnchainState(e)
-	if err != nil {
-		return fmt.Errorf("failed to load onchain state: %w", err)
-	}
-	chainState, chainExists := state.SolChains[cfg.ChainSelector]
-	if !chainExists {
-		return fmt.Errorf("chain %d not found in existing state", cfg.ChainSelector)
-	}
-	chain := e.SolChains[cfg.ChainSelector]
-
-	if err := validateRouterConfig(chain, chainState); err != nil {
-		return err
-	}
-
-	// Validate fee aggregator address is valid
-	if _, err := solana.PublicKeyFromBase58(cfg.FeeAggregator); err != nil {
-		return fmt.Errorf("invalid fee aggregator address: %w", err)
-	}
-
-	if chainState.FeeAggregator.Equals(solana.MustPublicKeyFromBase58(cfg.FeeAggregator)) {
-		return fmt.Errorf("fee aggregator %s is already set on chain %d", cfg.FeeAggregator, cfg.ChainSelector)
-	}
-
-	return nil
-}
-
-func SetFeeAggregator(e deployment.Environment, cfg SetFeeAggregatorConfig) (deployment.ChangesetOutput, error) {
-	if err := cfg.Validate(e); err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-
-	state, _ := ccipChangeset.LoadOnchainState(e)
-	chainState := state.SolChains[cfg.ChainSelector]
-	chain := e.SolChains[cfg.ChainSelector]
-
-	feeAggregatorPubKey := solana.MustPublicKeyFromBase58(cfg.FeeAggregator)
-	routerConfigPDA, _, _ := solState.FindConfigPDA(chainState.Router)
-
-	solRouter.SetProgramID(chainState.Router)
-	instruction, err := solRouter.NewUpdateFeeAggregatorInstruction(
-		feeAggregatorPubKey,
-		routerConfigPDA,
-		chain.DeployerKey.PublicKey(),
-		solana.SystemProgramID,
-	).ValidateAndBuild()
-	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to build instruction: %w", err)
-	}
-
-	if err := chain.Confirm([]solana.Instruction{instruction}); err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
-	}
-	newAddresses := deployment.NewMemoryAddressBook()
-	err = newAddresses.Save(cfg.ChainSelector, cfg.FeeAggregator, deployment.NewTypeAndVersion(ccipChangeset.FeeAggregator, deployment.Version1_0_0))
-	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to save address: %w", err)
-	}
-
-	e.Logger.Infow("Set new fee aggregator", "chain", chain.String(), "fee_aggregator", feeAggregatorPubKey.String())
-	return deployment.ChangesetOutput{
-		AddressBook: newAddresses,
-	}, nil
 }

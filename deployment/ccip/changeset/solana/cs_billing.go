@@ -64,6 +64,7 @@ func AddBillingToken(
 	tokenBillingPDA, _, _ := solState.FindFqBillingTokenConfigPDA(tokenPubKey, chainState.FeeQuoter)
 	billingSignerPDA, _, _ := solState.FindFeeBillingSignerPDA(chainState.Router)
 	tokenProgramID, _ := chainState.TokenToTokenProgram(tokenPubKey)
+	// pda that is tied to router
 	token2022Receiver, _, _ := solTokenUtil.FindAssociatedTokenAddress(tokenProgramID, tokenPubKey, billingSignerPDA)
 	feeQuoterConfigPDA, _, _ := solState.FindFqConfigPDA(chainState.FeeQuoter)
 	ixConfig, cerr := solFeeQuoter.NewAddBillingTokenConfigInstruction(
@@ -72,7 +73,7 @@ func AddBillingToken(
 		tokenBillingPDA,
 		tokenProgramID,
 		tokenPubKey,
-		token2022Receiver,
+		token2022Receiver,             // this is initialising a token account -> where billed funds are accumulated
 		chain.DeployerKey.PublicKey(), // ccip admin
 		billingSignerPDA,
 		ata.ProgramID,

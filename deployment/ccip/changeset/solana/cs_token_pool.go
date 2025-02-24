@@ -126,6 +126,8 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 	switch cfg.PoolType {
 	case solTestTokenPool.BurnAndMint_PoolType:
 		// initialize token pool for token
+		// TEST ROUTER ? -> i will need to add a token pool with test router here ?
+		// but then this needs to be another token pool not the real one and if its another token pool -> easy
 		poolInitI, err = solBurnMintTokenPool.NewInitializeInstruction(
 			chainState.Router,
 			poolConfigPDA,
