@@ -25,7 +25,7 @@ const (
 	destTokenAddress              = "Info.AbstractReports.Messages.TokenAmounts.DestTokenAddress"
 	receiverAddress               = "Info.AbstractReports.Messages.Receiver"
 	merkleRootSourceChainSelector = "Info.MerkleRoots.ChainSel"
-	merkleRoot                    = "Info.MerkleRoots.MerkleRoot"
+	merkleRoot                    = "Info.MerkleRoots.MerkleRoots"
 )
 
 func getCommitMethodConfig(fromAddress string, offrampProgramAddress string, destChainSelector uint64, priceOnly bool) chainwriter.MethodConfig {

@@ -9,6 +9,7 @@ require (
 	github.com/NethermindEth/juno v0.3.1
 	github.com/NethermindEth/starknet.go v0.7.1-0.20240401080518-34a506f3cfdb
 	github.com/andybalholm/brotli v1.1.1
+	github.com/aptos-labs/aptos-go-sdk v1.5.0
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
 	github.com/cometbft/cometbft v0.37.5
@@ -44,7 +45,7 @@ require (
 	github.com/hashicorp/go-envparse v0.1.0
 	github.com/hashicorp/go-plugin v1.6.2
 	github.com/hashicorp/go-retryablehttp v0.7.7
-	github.com/hdevalence/ed25519consensus v0.1.0
+	github.com/hdevalence/ed25519consensus v0.2.0
 	github.com/imdario/mergo v0.3.16
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgx/v4 v4.18.3
@@ -127,6 +128,8 @@ require (
 
 require (
 	github.com/bytecodealliance/wasmtime-go/v28 v28.0.0 // indirect
+	github.com/coder/websocket v1.8.12 // indirect
+	github.com/hasura/go-graphql-client v0.13.1 // indirect
 	github.com/pion/dtls/v2 v2.2.7 // indirect
 	github.com/pion/logging v0.2.2 // indirect
 	github.com/pion/stun/v2 v2.0.0 // indirect
