@@ -136,10 +136,10 @@ func TestAddRemoteChain(t *testing.T) {
 				},
 			),
 			commonchangeset.Configure(
-				deployment.CreateLegacyChangeSet(changeset_solana.AddRemoteChainToSolana),
-				changeset_solana.AddRemoteChainToSolanaConfig{
+				deployment.CreateLegacyChangeSet(ccipChangesetSolana.AddRemoteChainToSolana),
+				ccipChangesetSolana.AddRemoteChainToSolanaConfig{
 					ChainSelector: solChain,
-					UpdatesByChain: map[uint64]changeset_solana.RemoteChainConfigSolana{
+					UpdatesByChain: map[uint64]ccipChangesetSolana.RemoteChainConfigSolana{
 						evmChain2: {
 							EnabledAsSource:         true,
 							RouterDestinationConfig: solRouter.DestChainConfig{},

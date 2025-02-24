@@ -1438,7 +1438,8 @@ func (c SetOCR3OffRampConfig) validateRemoteChain(e *deployment.Environment, sta
 		if err != nil {
 			return fmt.Errorf("error loading MCMS state for chain %d: %w", chainSelector, err)
 		}
-		if err := commoncs.ValidateOwnershipSolana(e.GetContext(), c.MCMS != nil, e.SolChains[chainSelector].DeployerKey.PublicKey(), mcmState.TimelockProgram, mcmState.TimelockSeed, chainState.Router); err != nil {
+		timelockSignerPDA := commonState.GetTimelockSignerPDA(mcmState.TimelockProgram, mcmState.TimelockSeed)
+		if err := commoncs.ValidateOwnershipSolanaCommon(c.MCMS != nil, e.SolChains[chainSelector].DeployerKey.PublicKey(), timelockSignerPDA, chainState.Router); err != nil {
 			return err
 		}
 	case chain_selectors.FamilyEVM:
