@@ -18,7 +18,13 @@ type GeneralConfig interface {
 	TronConfigs() RawConfigs
 	// ConfigTOML returns both the user provided and effective configuration as TOML.
 	ConfigTOML() (user, effective string)
+	ImportedSecretConfig
+}
 
-	ImportedEthKey() coreconfig.EthKeyConfig
+// ImportedSecretConfig is a configuration for imported secrets
+// to be imported into the keystore upon startup.
+type ImportedSecretConfig interface {
+	ImportedEthKey() coreconfig.EthKeyConfig // TODO rm this once EthKeys is working
 	ImportedP2PKey() coreconfig.P2PSecretConfig
+	ImportedEthKeys() coreconfig.EthKeyConfigs
 }

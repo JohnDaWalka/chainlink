@@ -1,13 +1,16 @@
 package toml
 
 import (
+	"bytes"
 	"fmt"
 	"net/url"
 	"strings"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink/v2/core/build"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -575,6 +578,42 @@ func TestMercuryTLS_ValidateTLSCertPath(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEthKeysWrapper_TOMLSerialization(t *testing.T) {
+	ethKeysWrapper := EthKeysWrapper{
+		EthKeys: []*EthKey{
+			{JSON: ptr(models.Secret("key1")), Password: ptr(models.Secret("pass1")), ChainDetails: &chain_selectors.ChainDetails{ChainSelector: 1, ChainName: "foo"}},
+			{JSON: ptr(models.Secret("key2")), Password: ptr(models.Secret("pass2")), ChainDetails: &chain_selectors.ChainDetails{ChainSelector: 99, ChainName: "bar"}},
+		},
+	}
+
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf)
+	err := enc.Encode(ethKeysWrapper)
+	assert.NoError(t, err)
+
+	var decoded EthKeysWrapper
+	err = toml.NewDecoder(strings.NewReader(buf.String())).Decode(&decoded)
+	assert.NoError(t, err)
+	assert.Equal(t, len(ethKeysWrapper.EthKeys), len(decoded.EthKeys))
+}
+
+func TestEthKeysWrapper_SetFrom(t *testing.T) {
+	ethKeysWrapper1 := EthKeysWrapper{
+		EthKeys: []*EthKey{
+			{JSON: ptr(models.Secret("key1")), Password: ptr(models.Secret("pass1"))},
+		},
+	}
+	ethKeysWrapper2 := EthKeysWrapper{
+		EthKeys: []*EthKey{
+			{JSON: ptr(models.Secret("key1")), Password: ptr(models.Secret("pass1"))},
+		},
+	}
+
+	err := ethKeysWrapper1.SetFrom(&ethKeysWrapper2)
+	assert.NoError(t, err)
+	assert.Equal(t, ethKeysWrapper2, ethKeysWrapper1)
 }
 
 // ptr is a utility function for converting a value to a pointer to the value.

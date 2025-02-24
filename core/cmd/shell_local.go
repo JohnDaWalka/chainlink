@@ -380,17 +380,18 @@ func (s *Shell) runNode(c *cli.Context) error {
 
 	if s.Config.EVMEnabled() {
 		// ensure any imported keys are imported
-		if s.Config.ImportedEthKey().JSON() != "" {
+		for _, k := range s.Config.ImportedEthKeys().List() {
+			//if s.Config.ImportedEthKey().JSON() != "" {
 			lggr.Debug("Importing eth key")
-			id, err := chain_selectors.GetChainIDFromSelector(s.Config.ImportedEthKey().ChainDetails().ChainSelector)
+			id, err := chain_selectors.GetChainIDFromSelector(k.ChainDetails().ChainSelector)
 			if err != nil {
-				s.errorOut(errors.Wrapf(err, "error getting chain id from selector when trying to import eth key %v", s.Config.ImportedEthKey().JSON()))
+				s.errorOut(errors.Wrapf(err, "error getting chain id from selector when trying to import eth key %v", k.JSON()))
 			}
 			cid, _ := big.NewInt(0).SetString(id, 10)
 			if cid == nil {
 				return s.errorOut(fmt.Errorf("error converting chain id '%s' to big int", id))
 			}
-			_, err = app.GetKeyStore().Eth().Import(rootCtx, []byte(s.Config.ImportedEthKey().JSON()), s.Config.ImportedEthKey().Password(), cid)
+			_, err = app.GetKeyStore().Eth().Import(rootCtx, []byte(k.JSON()), k.Password(), cid)
 			if err != nil {
 				return s.errorOut(errors.Wrap(err, "error importing eth key"))
 			}

@@ -11,3 +11,7 @@ type EthKeyConfig interface {
 	// Password is the password used to encrypt the key.
 	Password() string
 }
+
+type EthKeyConfigs interface {
+	List() []EthKeyConfig
+}
