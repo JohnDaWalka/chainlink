@@ -124,13 +124,12 @@ type Secrets struct {
 	Prometheus PrometheusSecrets        `toml:",omitempty"`
 	Mercury    MercurySecrets           `toml:",omitempty"`
 	Threshold  ThresholdKeyShareSecrets `toml:",omitempty"`
-	EthKey     EthKey                   `toml:",omitempty"`
-	EthKeys    EthKeysWrapper           `toml:",omitempty"`
+	EVM        EthKeysWrapper           `toml:",omitempty"`
 	P2PKey     P2PKey                   `toml:",omitempty"`
 }
 
 type EthKeysWrapper struct {
-	EthKeys []*EthKey
+	Keys []*EthKey
 }
 
 func (e *EthKeysWrapper) SetFrom(f *EthKeysWrapper) (err error) {
@@ -138,21 +137,21 @@ func (e *EthKeysWrapper) SetFrom(f *EthKeysWrapper) (err error) {
 	if err != nil {
 		return err
 	}
-	e.EthKeys = make([]*EthKey, len(f.EthKeys))
-	for i := range f.EthKeys {
-		e.EthKeys[i] = f.EthKeys[i]
+	e.Keys = make([]*EthKey, len(f.Keys))
+	for i := range f.Keys {
+		e.Keys[i] = f.Keys[i]
 	}
-	fmt.Printf("EthKeysWrapper.SetFrom: %v", e.EthKeys)
+	fmt.Printf("EthKeysWrapper.SetFrom: %v", e.Keys)
 	return nil
 }
 
 func (e *EthKeysWrapper) validateMerge(f *EthKeysWrapper) (err error) {
 	var have map[uint64]struct{}
 	if e != nil && f != nil {
-		for _, ethKey := range e.EthKeys {
+		for _, ethKey := range e.Keys {
 			have[ethKey.ChainDetails.ChainSelector] = struct{}{}
 		}
-		for _, ethKey := range f.EthKeys {
+		for _, ethKey := range f.Keys {
 			if _, ok := have[ethKey.ChainDetails.ChainSelector]; ok {
 				err = multierr.Append(err, configutils.ErrOverride{Name: fmt.Sprintf("EthKeys: %d", ethKey.ChainDetails.ChainSelector)})
 			}
@@ -163,7 +162,7 @@ func (e *EthKeysWrapper) validateMerge(f *EthKeysWrapper) (err error) {
 
 func (e *EthKeysWrapper) ValidateConfig() (err error) {
 	panic("EthKeysWrapper.ValidateConfig() should not be called")
-	for i, ethKey := range e.EthKeys {
+	for i, ethKey := range e.Keys {
 		if err := ethKey.ValidateConfig(); err != nil {
 			err = multierr.Append(err, configutils.ErrInvalid{Name: fmt.Sprintf("EthKeys[%d]", i), Value: ethKey, Msg: "invalid EthKey"})
 		}

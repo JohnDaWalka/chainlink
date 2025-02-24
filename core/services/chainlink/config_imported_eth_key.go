@@ -36,13 +36,13 @@ type importedEthKeyConfigs struct {
 }
 
 func (t *importedEthKeyConfigs) List() []config.EthKeyConfig {
-	res := make([]config.EthKeyConfig, len(t.s.EthKeys))
+	res := make([]config.EthKeyConfig, len(t.s.Keys))
 
-	if len(t.s.EthKeys) == 0 {
+	if len(t.s.Keys) == 0 {
 		return res
 	}
 
-	for i, v := range t.s.EthKeys {
+	for i, v := range t.s.Keys {
 		res[i] = &importedEthKeyConfig{s: *v}
 	}
 	return res

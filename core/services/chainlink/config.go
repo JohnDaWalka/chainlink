@@ -404,12 +404,10 @@ func (s *Secrets) SetFrom(f *Secrets) (err error) {
 		err = multierr.Append(err, commonconfig.NamedMultiErrorList(err2, "Threshold"))
 	}
 
-	if err2 := s.EthKey.SetFrom(&f.EthKey); err2 != nil {
-		err = multierr.Append(err, commonconfig.NamedMultiErrorList(err2, "EthKey"))
-	}
-	if err2 := s.EthKeys.SetFrom(&f.EthKeys); err2 != nil {
+	if err2 := s.EVM.SetFrom(&f.EVM); err2 != nil {
 		err = multierr.Append(err, commonconfig.NamedMultiErrorList(err2, "EthKeys"))
 	}
+
 	if err2 := s.P2PKey.SetFrom(&f.P2PKey); err2 != nil {
 		err = multierr.Append(err, commonconfig.NamedMultiErrorList(err2, "P2PKey"))
 	}

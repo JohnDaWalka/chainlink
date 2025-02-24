@@ -582,7 +582,7 @@ func TestMercuryTLS_ValidateTLSCertPath(t *testing.T) {
 
 func TestEthKeysWrapper_TOMLSerialization(t *testing.T) {
 	ethKeysWrapper := EthKeysWrapper{
-		EthKeys: []*EthKey{
+		Keys: []*EthKey{
 			{JSON: ptr(models.Secret("key1")), Password: ptr(models.Secret("pass1")), ChainDetails: &chain_selectors.ChainDetails{ChainSelector: 1, ChainName: "foo"}},
 			{JSON: ptr(models.Secret("key2")), Password: ptr(models.Secret("pass2")), ChainDetails: &chain_selectors.ChainDetails{ChainSelector: 99, ChainName: "bar"}},
 		},
@@ -596,17 +596,17 @@ func TestEthKeysWrapper_TOMLSerialization(t *testing.T) {
 	var decoded EthKeysWrapper
 	err = toml.NewDecoder(strings.NewReader(buf.String())).Decode(&decoded)
 	assert.NoError(t, err)
-	assert.Equal(t, len(ethKeysWrapper.EthKeys), len(decoded.EthKeys))
+	assert.Equal(t, len(ethKeysWrapper.Keys), len(decoded.Keys))
 }
 
 func TestEthKeysWrapper_SetFrom(t *testing.T) {
 	ethKeysWrapper1 := EthKeysWrapper{
-		EthKeys: []*EthKey{
+		Keys: []*EthKey{
 			{JSON: ptr(models.Secret("key1")), Password: ptr(models.Secret("pass1"))},
 		},
 	}
 	ethKeysWrapper2 := EthKeysWrapper{
-		EthKeys: []*EthKey{
+		Keys: []*EthKey{
 			{JSON: ptr(models.Secret("key1")), Password: ptr(models.Secret("pass1"))},
 		},
 	}
