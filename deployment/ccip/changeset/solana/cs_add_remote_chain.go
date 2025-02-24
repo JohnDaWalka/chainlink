@@ -22,7 +22,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	ccipChangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
-	cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 
 	"github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -226,7 +225,7 @@ func doAddRemoteChainToSolana(
 			return txns, fmt.Errorf("failed to generate instructions: %w", err)
 		}
 		if routerUsingMCMS {
-			tx, err := BuildMCMSTxn(routerIx, ccipRouterID.String(), cs.Router)
+			tx, err := BuildMCMSTxn(routerIx, ccipRouterID.String(), ccipChangeset.Router)
 			if err != nil {
 				return txns, fmt.Errorf("failed to create transaction: %w", err)
 			}
@@ -274,7 +273,7 @@ func doAddRemoteChainToSolana(
 			return txns, fmt.Errorf("failed to generate instructions: %w", err)
 		}
 		if feeQuoterUsingMCMS {
-			tx, err := BuildMCMSTxn(feeQuoterIx, feeQuoterID.String(), cs.FeeQuoter)
+			tx, err := BuildMCMSTxn(feeQuoterIx, feeQuoterID.String(), ccipChangeset.FeeQuoter)
 			if err != nil {
 				return txns, fmt.Errorf("failed to create transaction: %w", err)
 			}
