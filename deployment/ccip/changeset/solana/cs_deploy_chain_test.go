@@ -103,29 +103,6 @@ func TestDeployChainContractsChangesetSolana(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(ccipChangesetSolana.DeployChainContractsChangeset),
-			ccipChangesetSolana.DeployChainContractsConfig{
-				HomeChainSelector: homeChainSel,
-				ContractParamsPerChain: map[uint64]ccipChangesetSolana.ChainContractParams{
-					solChainSelectors[0]: {
-						FeeQuoterParams: ccipChangesetSolana.FeeQuoterParams{
-							DefaultMaxFeeJuelsPerMsg: solBinary.Uint128{Lo: 300000000, Hi: 0, Endianness: nil},
-						},
-						OffRampParams: ccipChangesetSolana.OffRampParams{
-							EnableExecutionAfter: int64(globals.PermissionLessExecutionThreshold.Seconds()),
-						},
-					},
-				},
-			},
-		),
-		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(ccipChangesetSolana.SetFeeAggregator),
-			ccipChangesetSolana.SetFeeAggregatorConfig{
-				ChainSelector: solChainSelectors[0],
-				FeeAggregator: feeAggregatorPubKey.String(),
-			},
-		),
-		commonchangeset.Configure(
 			deployment.CreateLegacyChangeSet(commonchangeset.DeployMCMSWithTimelockV2),
 			map[uint64]commontypes.MCMSWithTimelockConfigV2{
 				solChainSelectors[0]: {
@@ -137,6 +114,7 @@ func TestDeployChainContractsChangesetSolana(t *testing.T) {
 			},
 		),
 	)
+	require.NoError(t, err)
 	addresses, err := e.ExistingAddresses.AddressesForChain(solChainSelectors[0])
 	require.NoError(t, err)
 	mcmState, err := commonState.MaybeLoadMCMSWithTimelockChainStateSolana(e.SolChains[solChainSelectors[0]], addresses)
