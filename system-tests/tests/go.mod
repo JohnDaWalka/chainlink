@@ -16,6 +16,9 @@ replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
 replace github.com/smartcontractkit/chainlink/system-tests/lib => ../lib
 
+//TODO remove
+replace github.com/smartcontractkit/chainlink-testing-framework/framework => ../../../chainlink-testing-framework/framework
+
 require (
 	github.com/ethereum/go-ethereum v1.15.0
 	github.com/gin-gonic/gin v1.10.0

@@ -43,10 +43,8 @@ func ToP2PID(node *types.NodeMetadata, transformFn stringTransformer) (string, e
 }
 
 const (
-	RoleLabelKey  = "role"
 	HostLabelKey  = "host"
-	NodeIndexKey  = "node_index"
-	NodeIdKey     = "node_id"
+	IndexKey      = "node_index"
 	EthAddressKey = "eth_address"
 )
 
@@ -72,9 +70,9 @@ func GetNodeInfo(nodeOut *ns.Output, prefix string, bootstrapNodeCount int) ([]d
 					InternalIP: nodeOut.CLNodes[i-1].Node.InternalIP,
 				},
 				Labels: map[string]string{
-					HostLabelKey: nodeOut.CLNodes[i-1].Node.ContainerName,
-					NodeIndexKey: strconv.Itoa(i - 1),
-					RoleLabelKey: types.BootstrapNode,
+					HostLabelKey:            nodeOut.CLNodes[i-1].Node.ContainerName,
+					IndexKey:                strconv.Itoa(i - 1),
+					devenv.NodeLabelKeyType: devenv.NodeLabelValueBootstrap,
 				},
 			})
 		} else {
@@ -89,9 +87,9 @@ func GetNodeInfo(nodeOut *ns.Output, prefix string, bootstrapNodeCount int) ([]d
 					InternalIP: nodeOut.CLNodes[i-1].Node.InternalIP,
 				},
 				Labels: map[string]string{
-					HostLabelKey: nodeOut.CLNodes[i-1].Node.ContainerName,
-					NodeIndexKey: strconv.Itoa(i - 1),
-					RoleLabelKey: types.WorkerNode,
+					HostLabelKey:            nodeOut.CLNodes[i-1].Node.ContainerName,
+					IndexKey:                strconv.Itoa(i - 1),
+					devenv.NodeLabelKeyType: devenv.NodeLabelValuePlugin,
 				},
 			})
 		}

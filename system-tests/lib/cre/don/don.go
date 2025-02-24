@@ -1,24 +1,29 @@
 package don
 
 import (
+	"fmt"
 	"regexp"
-	"testing"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 
+	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
+	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
+	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
 )
 
-func CreateJobs(testLogger zerolog.Logger, input types.CreateJobsInput) error {
-	// if err := input.Validate(); err != nil {
-	// 	return errors.Wrap(err, "input validation failed")
-	// }
+func CreateJobs(testLogger zerolog.Logger, input cretypes.CreateJobsInput) error {
+	if err := input.Validate(); err != nil {
+		return errors.Wrap(err, "input validation failed")
+	}
 
 	for _, don := range input.DonTopology.Dons {
 		if jobSpecs, ok := input.DonToJobSpecs[don.ID]; ok {
@@ -34,58 +39,8 @@ func CreateJobs(testLogger zerolog.Logger, input types.CreateJobsInput) error {
 	return nil
 }
 
-func Configure(t *testing.T, testLogger zerolog.Logger, input types.ConfigureDonInput) (*types.ConfigureDonOutput, error) {
-	if err := input.Validate(); err != nil {
-		return nil, errors.Wrap(err, "input validation failed")
-	}
-
-	// for i, donTopology := range input.DonTopology.MetaDons {
-	// 	if configOverrides, ok := input.DonToConfigOverrides[donTopology.ID]; ok {
-	// 		for j, configOverride := range configOverrides {
-	// 			if len(donTopology.NodeInput.NodeSpecs)-1 < j {
-	// 				return nil, errors.Errorf("config override index out of bounds: %d", j)
-	// 			}
-	// 			donTopology.NodeInput.NodeSpecs[j].Node.TestConfigOverrides = configOverride
-	// 		}
-	// 		var setErr error
-	// 		input.DonTopology.MetaDons[i].NodeOutput, setErr = config.Set(t, donTopology.NodeInput, input.BlockchainOutput)
-	// 		if setErr != nil {
-	// 			return nil, errors.Wrap(setErr, "failed to set node output")
-	// 		}
-	// 	}
-	// }
-
-	// nodeOutputs := make([]*types.WrappedNodeOutput, 0, len(input.DonTopology.MetaDons))
-	// for i := range input.DonTopology.MetaDons {
-	// 	nodeOutputs = append(nodeOutputs, input.DonTopology.MetaDons[i].NodeOutput)
-	// }
-
-	// after restarting the nodes, we need to reinitialize the JD clients otherwise
-	// communication between JD and nodes will fail due to invalidated session cookie
-	// TODO remove if our idea with pre-generating & importing keys works and we do not need to restart the nodes
-	// jdOutput, jdErr := jobs.ReinitialiseJDClients(input.CldEnv, input.JdOutput, nodeOutputs...)
-	// if jdErr != nil {
-	// 	return nil, errors.Wrap(jdErr, "failed to reinitialize JD clients")
-	// }
-
-	for _, don := range input.DonTopology.Dons {
-		if jobSpecs, ok := input.DonToJobSpecs[don.ID]; ok {
-			createErr := jobs.Create(input.CldEnv.Offchain, don.DON, don.Flags, jobSpecs)
-			if createErr != nil {
-				return nil, errors.Wrapf(createErr, "failed to create jobs for DON %d", don.ID)
-			}
-		} else {
-			testLogger.Warn().Msgf("No job specs found for DON %d", don.ID)
-		}
-	}
-
-	return &types.ConfigureDonOutput{
-		JdOutput: nil,
-	}, nil
-}
-
-func BuildTopology(nodeSetInput []*types.CapabilitiesAwareNodeSet) (*types.Topology, error) {
-	donWithMeta := make([]*types.DonMetadata, len(nodeSetInput))
+func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet) (*cretypes.Topology, error) {
+	donsWithMetadata := make([]*cretypes.DonMetadata, len(nodeSetInput))
 
 	// one DON to do everything
 	if len(nodeSetInput) == 1 {
@@ -94,11 +49,10 @@ func BuildTopology(nodeSetInput []*types.CapabilitiesAwareNodeSet) (*types.Topol
 			return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[0].Name)
 		}
 
-		donWithMeta[0] = &types.DonMetadata{
-			ID:    1,
-			Flags: flags,
-			// NodeSet:       nodeSetInput[0],
-			NodesMetadata: make([]*types.NodeMetadata, len(nodeSetInput[0].NodeSpecs)),
+		donsWithMetadata[0] = &cretypes.DonMetadata{
+			ID:            1,
+			Flags:         flags,
+			NodesMetadata: make([]*cretypes.NodeMetadata, len(nodeSetInput[0].NodeSpecs)),
 			Name:          nodeSetInput[0].Name,
 		}
 	} else {
@@ -108,116 +62,152 @@ func BuildTopology(nodeSetInput []*types.CapabilitiesAwareNodeSet) (*types.Topol
 				return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[i].Name)
 			}
 
-			donWithMeta[i] = &types.DonMetadata{
-				ID:    libc.MustSafeUint32(i + 1),
-				Flags: flags,
-				// NodeSet:       nodeSetInput[i], // TODO can I get rid of this? It's required further downstream :/
-				NodesMetadata: make([]*types.NodeMetadata, len(nodeSetInput[i].NodeSpecs)),
+			donsWithMetadata[i] = &cretypes.DonMetadata{
+				ID:            libc.MustSafeUint32(i + 1),
+				Flags:         flags,
+				NodesMetadata: make([]*cretypes.NodeMetadata, len(nodeSetInput[i].NodeSpecs)),
 				Name:          nodeSetInput[0].Name,
 			}
 		}
 	}
 
-	maybeID, err := flags.OneDONTopologyWithFlag(donWithMeta, types.WorkflowDON)
+	for i, donMetadata := range donsWithMetadata {
+		for j := range donMetadata.NodesMetadata {
+			nodeWithLabels := cretypes.NodeMetadata{}
+			nodeType := devenv.NodeLabelValuePlugin
+			if nodeSetInput[i].BootstrapNodeIndex != -1 && j == nodeSetInput[i].BootstrapNodeIndex {
+				nodeType = devenv.NodeLabelValueBootstrap
+			}
+			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
+				Key:   devenv.NodeLabelKeyType,
+				Value: ptr.Ptr(nodeType),
+			})
+			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
+				Key:   libnode.IndexKey,
+				Value: ptr.Ptr(fmt.Sprint(j)),
+			})
+			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
+				Key: libnode.HostLabelKey,
+				// TODO this will only work with Docker, for CRIB we need a different approach
+				Value: ptr.Ptr(fmt.Sprintf("%s-node%d", donMetadata.Name, j)),
+			})
+
+			donsWithMetadata[i].NodesMetadata[j] = &nodeWithLabels
+		}
+	}
+
+	maybeID, err := flags.OneDonMetadataWithFlag(donsWithMetadata, cretypes.WorkflowDON)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get workflow DON ID")
 	}
 
-	return &types.Topology{
-		Metadata:      donWithMeta,
+	return &cretypes.Topology{
+		Metadata:      donsWithMetadata,
 		WorkflowDONID: maybeID.ID,
 	}, nil
 }
 
-// func BuildInputDONTopology(nodeSetInput []*types.CapabilitiesAwareNodeSet) (*types.DonTopology, error) {
-// 	donWithMeta := make([]*types.DonWithMetadata, len(nodeSetInput))
+func GenereteKeys(input *cretypes.GenerateKeysInput) (*cretypes.Topology, *cretypes.GenerateKeysOutput, error) {
+	if input == nil {
+		return nil, nil, errors.New("input is nil")
+	}
 
-// 	// one DON to do everything
-// 	if len(nodeSetInput) == 1 {
-// 		flags, err := flags.NodeSetFlags(nodeSetInput[0])
-// 		if err != nil {
-// 			return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[0].Name)
-// 		}
+	if err := input.Validate(); err != nil {
+		return nil, nil, errors.Wrap(err, "input validation failed")
+	}
 
-// 		donWithMeta[0] = &types.DonWithMetadata{
-// 			NodeInput: nodeSetInput[0],
-// 			ID:        1,
-// 			DonFlags:  flags,
-// 		}
-// 	} else {
-// 		for i := range nodeSetInput {
-// 			flags, err := flags.NodeSetFlags(nodeSetInput[i])
-// 			if err != nil {
-// 				return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[i].Name)
-// 			}
+	output := &cretypes.GenerateKeysOutput{
+		EVMKeys: make(cretypes.DonsToEVMKeys),
+		P2PKeys: make(cretypes.DonsToP2PKeys),
+	}
 
-// 			donWithMeta[i] = &types.DonWithMetadata{
-// 				NodeInput: nodeSetInput[i],
-// 				ID:        libc.MustSafeUint32(i + 1),
-// 				DonFlags:  flags,
-// 			}
-// 		}
-// 	}
+	for _, donMetadata := range input.Topology.Metadata {
+		if input.GenerateP2PKeys {
+			p2pKeys, err := crypto.GenerateP2PKeys(input.Password, len(donMetadata.NodesMetadata))
+			if err != nil {
+				return nil, nil, errors.Wrap(err, "failed to generate P2P keys")
+			}
+			output.P2PKeys[donMetadata.ID] = p2pKeys
 
-// 	maybeID, err := flags.OneDONTopologyWithFlag(donWithMeta, types.WorkflowDON)
-// 	if err != nil {
-// 		return nil, errors.Wrap(err, "failed to get workflow DON ID")
-// 	}
+			for idx, node := range donMetadata.NodesMetadata {
+				node.Labels = append(node.Labels, &ptypes.Label{
+					Key:   devenv.NodeLabelP2PIDType,
+					Value: ptr.Ptr(p2pKeys.PeerIDs[idx]),
+				})
+			}
+		}
 
-// 	return &types.DonTopology{
-// 		MetaDons:      donWithMeta,
-// 		WorkflowDONID: maybeID.ID,
-// 	}, nil
-// }
+		if input.GenerateEVMKeys {
+			evmKeys, err := crypto.GenerateEVMKeys(input.Password, len(donMetadata.NodesMetadata))
+			if err != nil {
+				return nil, nil, errors.Wrap(err, "failed to generate EVM keys")
+			}
+			evmKeys.ChainSelector = input.ChainSelector
+			output.EVMKeys[donMetadata.ID] = evmKeys
 
-// func BuildDONTopology(dons []*devenv.DON, nodeSetInput []*types.CapabilitiesAwareNodeSet, nodeSetOutput []*types.WrappedNodeOutput) (*types.DonTopology, error) {
-// 	donWithMeta := make([]*types.DonWithMetadata, len(dons))
+			for idx, node := range donMetadata.NodesMetadata {
+				node.Labels = append(node.Labels, &ptypes.Label{
+					Key:   libnode.EthAddressKey,
+					Value: ptr.Ptr(evmKeys.PublicAddresses[idx].Hex()),
+				})
+			}
+		}
+	}
 
-// 	// one DON to do everything
-// 	if len(dons) == 1 {
-// 		flags, err := flags.NodeSetFlags(nodeSetInput[0])
-// 		if err != nil {
-// 			return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[0].Name)
-// 		}
-
-// 		donWithMeta[0] = &types.DonWithMetadata{
-// 			DON:        dons[0],
-// 			NodeInput:  nodeSetInput[0],
-// 			NodeOutput: nodeSetOutput[0],
-// 			ID:         1,
-// 			DonFlags:   flags,
-// 		}
-// 	} else {
-// 		for i := range dons {
-// 			flags, err := flags.NodeSetFlags(nodeSetInput[i])
-// 			if err != nil {
-// 				return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[i].Name)
-// 			}
-
-// 			donWithMeta[i] = &types.DonWithMetadata{
-// 				DON:        dons[i],
-// 				NodeInput:  nodeSetInput[i],
-// 				NodeOutput: nodeSetOutput[i],
-// 				ID:         libc.MustSafeUint32(i + 1),
-// 				DonFlags:   flags,
-// 			}
-// 		}
-// 	}
-
-// 	maybeID, err := flags.OneDONTopologyWithFlag(donWithMeta, types.WorkflowDON)
-// 	if err != nil {
-// 		return nil, errors.Wrap(err, "failed to get workflow DON ID")
-// 	}
-
-// 	return &types.DonTopology{
-// 		MetaDons:      donWithMeta,
-// 		WorkflowDONID: maybeID.ID,
-// 	}, nil
-// }
+	return input.Topology, output, nil
+}
 
 // In order to whitelist host IP in the gateway, we need to resolve the host.docker.internal to the host IP,
 // and since CL image doesn't have dig or nslookup, we need to use curl.
 func ResolveHostDockerInternaIP(testLogger zerolog.Logger, containerName string) (string, error) {
+	if isCurlInstalled(containerName) {
+		return resolveDockerHostWithCurl(containerName)
+	} else if isNsLookupInstalled(containerName) {
+		return resolveDockerHostWithNsLookup(containerName)
+	}
+
+	return "", errors.New("neither curl nor nslookup is installed")
+}
+
+func isNsLookupInstalled(containerName string) bool {
+	cmd := []string{"which", "nslookup"}
+	output, err := framework.ExecContainer(containerName, cmd)
+
+	if err != nil || output == "" {
+		return false
+	}
+
+	return true
+}
+
+func resolveDockerHostWithNsLookup(containerName string) (string, error) {
+	cmd := []string{"nslookup", "host.docker.internal"}
+	output, err := framework.ExecContainer(containerName, cmd)
+	if err != nil {
+		return "", err
+	}
+
+	re := regexp.MustCompile(`host.docker.internal(\n|\r)Address:\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)`)
+	matches := re.FindStringSubmatch(output)
+	if len(matches) < 2 {
+		return "", errors.New("failed to extract IP address from curl output")
+	}
+
+	return matches[2], nil
+}
+
+func isCurlInstalled(containerName string) bool {
+	cmd := []string{"which", "curl"}
+	output, err := framework.ExecContainer(containerName, cmd)
+
+	if err != nil || output == "" {
+		return false
+	}
+
+	return true
+}
+
+func resolveDockerHostWithCurl(containerName string) (string, error) {
 	cmd := []string{"curl", "-v", "http://host.docker.internal"}
 	output, err := framework.ExecContainer(containerName, cmd)
 	if err != nil {
@@ -227,11 +217,8 @@ func ResolveHostDockerInternaIP(testLogger zerolog.Logger, containerName string)
 	re := regexp.MustCompile(`.*Trying ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*`)
 	matches := re.FindStringSubmatch(output)
 	if len(matches) < 2 {
-		testLogger.Error().Msgf("failed to extract IP address from curl output:\n%s", output)
 		return "", errors.New("failed to extract IP address from curl output")
 	}
-
-	testLogger.Info().Msgf("Resolved host.docker.internal to %s", matches[1])
 
 	return matches[1], nil
 }

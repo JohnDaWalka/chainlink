@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
-func DONTopologyWithFlag(donTopologies []*types.DonMetadata, flag string) []*types.DonMetadata {
+func DonMetadataWithFlag(donTopologies []*types.DonMetadata, flag string) []*types.DonMetadata {
 	var result []*types.DonMetadata
 
 	for _, donTopology := range donTopologies {
@@ -24,8 +24,8 @@ func HasFlag(values []string, flag string) bool {
 	return slices.Contains(values, flag)
 }
 
-func OneDONTopologyWithFlag(donTopologies []*types.DonMetadata, flag string) (*types.DonMetadata, error) {
-	donTopologies = DONTopologyWithFlag(donTopologies, flag)
+func OneDonMetadataWithFlag(donTopologies []*types.DonMetadata, flag string) (*types.DonMetadata, error) {
+	donTopologies = DonMetadataWithFlag(donTopologies, flag)
 	if len(donTopologies) != 1 {
 		return nil, errors.Errorf("expected exactly one DON topology with flag %s, got %d", flag, len(donTopologies))
 	}

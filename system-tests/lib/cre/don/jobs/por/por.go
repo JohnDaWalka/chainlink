@@ -34,7 +34,7 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 	}
 	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
 
-	bootstrapNode, err := node.FindOneWithLabel(input.DonWithMetadata.NodesMetadata, &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.BootstrapNode)})
+	bootstrapNode, err := node.FindOneWithLabel(input.DonWithMetadata.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValueBootstrap))})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find bootstrap node")
 	}
@@ -58,7 +58,7 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 
 	var bootstrapNodeID string
 	for _, label := range bootstrapNode.Labels {
-		if label.Key == node.NodeIdKey {
+		if label.Key == devenv.NodeIDKeyType {
 			bootstrapNodeID = *label.Value
 			break
 		}
@@ -68,7 +68,7 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 		return nil, errors.New("failed to get bootstrap node id from labels")
 	}
 
-	workflowNodeSet, err := node.FindManyWithLabel(input.DonWithMetadata.NodesMetadata, &ptypes.Label{Key: node.RoleLabelKey, Value: ptr.Ptr(types.WorkerNode)})
+	workflowNodeSet, err := node.FindManyWithLabel(input.DonWithMetadata.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValuePlugin))})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes")
 	}
@@ -109,7 +109,7 @@ func GenerateJobSpecs(input types.GeneratePoRJobSpecsInput) (types.DonJobs, erro
 	for _, workerNode := range workflowNodeSet {
 		var nodeID string
 		for _, label := range workerNode.Labels {
-			if label.Key == node.NodeIdKey {
+			if label.Key == devenv.NodeIDKeyType {
 				nodeID = *label.Value
 				break
 			}

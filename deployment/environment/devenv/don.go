@@ -29,6 +29,7 @@ const (
 	NodeLabelValueBootstrap = "bootstrap"
 	NodeLabelValuePlugin    = "plugin"
 	NodeOCR2KeyBundleIDType = "ocr2_key_bundle_id"
+	NodeIDKeyType           = "node_id"
 )
 
 // NodeInfo holds the information required to create a node
@@ -150,6 +151,11 @@ func NewRegisteredDON(ctx context.Context, nodeInfo []NodeInfo, jd JobDistributo
 		if err != nil {
 			return nil, fmt.Errorf("failed to set up job distributor in node %s: %w", info.Name, err)
 		}
+
+		node.labels = append(node.labels, &ptypes.Label{
+			Key:   NodeIDKeyType,
+			Value: ptr(node.NodeID),
+		})
 
 		don.Nodes = append(don.Nodes, *node)
 	}
