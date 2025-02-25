@@ -102,6 +102,8 @@ jobs:
           persist-credentials: false
       - name: Setup NodeJS
         uses: ./.github/actions/setup-nodejs
+      - name: Install Foundry
+        uses: ./.github/actions/install-solidity-foundry
       - name: Run Prepublish test
         working-directory: contracts
         run: pnpm prepublishOnly
@@ -217,6 +219,9 @@ jobs:
       - name: Setup NodeJS
         uses: ./.github/actions/setup-nodejs
 
+      - name: Install Foundry
+        uses: ./.github/actions/install-solidity-foundry
+
       - name: Version package.json
         working-directory: contracts
         shell: bash
@@ -262,6 +267,9 @@ jobs:
 
       - name: Setup NodeJS
         uses: ./.github/actions/setup-nodejs
+
+      - name: Install Foundry
+        uses: ./.github/actions/install-solidity-foundry
 
       - name: Validate version
         working-directory: contracts
