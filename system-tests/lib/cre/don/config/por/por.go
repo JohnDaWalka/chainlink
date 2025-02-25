@@ -4,7 +4,6 @@ import (
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
@@ -16,13 +15,12 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	keystoneflags "github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
 
 func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndexToOverride, error) {
-	// if err := input.Validate(); err != nil {
-	// 	return nil, errors.Wrap(err, "input validation failed")
-	// }
+	if err := input.Validate(); err != nil {
+		return nil, errors.Wrap(err, "input validation failed")
+	}
 	configOverrides := make(cretypes.NodeIndexToOverride)
 
 	chainIDInt, err := strconv.Atoi(input.BlockchainOutput.ChainID)
@@ -135,44 +133,4 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 	}
 
 	return configOverrides, nil
-}
-
-func GenerateSecrets(input *cretypes.GenerateSecretsInput) (cretypes.NodeIndexToOverride, error) {
-	if input == nil {
-		return nil, errors.New("input is nil")
-	}
-	if err := input.Validate(); err != nil {
-		return nil, errors.Wrap(err, "input validation failed")
-	}
-
-	overrides := make(cretypes.NodeIndexToOverride)
-
-	for i := range input.DonMetadata.NodesMetadata {
-		nodeSecret := types.NodeSecret{}
-		if input.EVMKeys != nil {
-			nodeSecret.EthKey = types.NodeEthKey{
-				JSON:     string((*input.EVMKeys).EncryptedJSONs[i]),
-				Password: input.EVMKeys.Password,
-				Selector: types.NodeEthKeySelector{
-					ChainSelector: input.EVMKeys.ChainSelector,
-				},
-			}
-		}
-
-		if input.P2PKeys != nil {
-			nodeSecret.P2PKey = types.NodeP2PKey{
-				JSON:     string((*input.P2PKeys).EncryptedJSONs[i]),
-				Password: input.P2PKeys.Password,
-			}
-		}
-
-		nodeSecretString, err := toml.Marshal(nodeSecret)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to marshal node secrets")
-		}
-
-		overrides[i] = string(nodeSecretString)
-	}
-
-	return overrides, nil
 }

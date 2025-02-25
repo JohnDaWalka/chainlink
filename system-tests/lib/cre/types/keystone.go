@@ -423,17 +423,30 @@ type OCRPeeringData struct {
 	Port                 int
 }
 
+type EMVKeysToGenerate struct {
+	ChainSelector uint64
+	ChainName     string
+}
+
 type GenerateKeysInput struct {
-	GenerateEVMKeys bool
-	ChainSelector   uint64
-	GenerateP2PKeys bool
-	Topology        *Topology
-	Password        string
+	EMVKeysToGenerate []EMVKeysToGenerate
+	GenerateP2PKeys   bool
+	Topology          *Topology
+	Password          string
 }
 
 func (g *GenerateKeysInput) Validate() error {
-	if g.ChainSelector == 0 {
-		return errors.New("chain selector not set")
+	if len(g.EMVKeysToGenerate) > 0 {
+		for _, chainData := range g.EMVKeysToGenerate {
+			if chainData.ChainSelector == 0 {
+				return errors.New("chain selector not set")
+			}
+
+			if chainData.ChainName == "" {
+				return errors.New("chain name not set")
+			}
+
+		}
 	}
 	if g.Topology == nil {
 		return errors.New("topology not set")
@@ -463,4 +476,40 @@ func (g *GenerateSecretsInput) Validate() error {
 		return errors.New("don metadata not set")
 	}
 	return nil
+}
+
+type FullCLDEnvironmentInput struct {
+	JdOutput          *jd.Output
+	BlockchainOutput  *blockchain.Output
+	SethClient        *seth.Client
+	NodeSetOutput     []*WrappedNodeOutput
+	ExistingAddresses deployment.AddressBook
+	Topology          *Topology
+}
+
+func (f *FullCLDEnvironmentInput) Validate() error {
+	if f.JdOutput == nil {
+		return errors.New("jd output not set")
+	}
+	if f.BlockchainOutput == nil {
+		return errors.New("blockchain output not set")
+	}
+	if f.SethClient == nil {
+		return errors.New("seth client not set")
+	}
+	if len(f.NodeSetOutput) == 0 {
+		return errors.New("node set output not set")
+	}
+	if f.Topology == nil {
+		return errors.New("topology not set")
+	}
+	if len(f.Topology.Metadata) == 0 {
+		return errors.New("metadata not set")
+	}
+	return nil
+}
+
+type FullCLDEnvironmentOutput struct {
+	Environment *deployment.Environment
+	DonTopology *DonTopology
 }

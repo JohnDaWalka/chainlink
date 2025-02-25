@@ -42,6 +42,7 @@ import (
 	keystoneporconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/por"
 	libjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	keystonepor "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/por"
+	keystonesecrets "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
 	libenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	keystonetypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	libcrecli "github.com/smartcontractkit/chainlink/system-tests/lib/crecli"
@@ -465,6 +466,8 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	envOutput, err := CreateInfrastructure(singeFileLogger, testLogger, envInput)
 	require.NoError(t, err, "failed to start environment")
 
+	// Deploy keystone contracts (forwarder, capability registry, ocr3 capability, workflow registry)
+	// but first, we need to create deployment.Environment that will have chain information in order to deploy contracts with CLD
 	chainsConfig := []devenv.ChainConfig{
 		{
 			ChainID:   envOutput.sethClient.Cfg.Network.ChainID,
@@ -482,8 +485,6 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		},
 	}
 
-	// Deploy keystone contracts (forwarder, capability registry, ocr3 capability, workflow registry)
-	// but first, we need to create deployment.Environment that will have chain information in order to deploy contracts with CLD
 	chains, err := devenv.NewChains(singeFileLogger, chainsConfig)
 	require.NoError(t, err, "failed to create chains")
 
@@ -504,11 +505,17 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	topology, err := libdon.BuildTopology(envInput.nodeSetInput)
 	require.NoError(t, err, "failed to build input DON topology")
 
+	// Generate EVM and P2P keys, which are needed to prepare the node configs
+	// That way we can pass them final configs and do away with restarting the nodes
 	var keys *keystonetypes.GenerateKeysOutput
 	generateKeysInput := &keystonetypes.GenerateKeysInput{
-		GenerateEVMKeys: true,
+		EMVKeysToGenerate: []keystonetypes.EMVKeysToGenerate{
+			{
+				ChainSelector: envOutput.chainSelector,
+				ChainName:     fmt.Sprintf("%s-%s", envOutput.blockchainOutput.Family, envOutput.blockchainOutput.ChainID),
+			},
+		},
 		GenerateP2PKeys: true,
-		ChainSelector:   envOutput.chainSelector,
 		Topology:        topology,
 		Password:        "",
 	}
@@ -536,61 +543,9 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		require.NoError(t, err, "failed to get extra allowed ports and IPs")
 	}
 
-	// // Generate keys
-	// donToP2PKeys := make(map[uint32]*p2pGenerationResult)
-	// donToEthKeys := make(map[uint32][][]byte)
-	// donToEthAddresses := make(map[uint32][]common.Address)
-	// for _, donMetadata := range topology.Metadata {
-	// 	p2pKeys, err := generateP2PKeys("", len(donMetadata.NodesMetadata))
-	// 	require.NoError(t, err, "failed to generate P2P keys")
-	// 	donToP2PKeys[donMetadata.ID] = p2pKeys
-
-	// 	ethKeys, addresses, err := generateEVMKeys("", len(donMetadata.NodesMetadata))
-	// 	require.NoError(t, err, "failed to generate EVM keys")
-	// 	donToEthKeys[donMetadata.ID] = ethKeys
-	// 	donToEthAddresses[donMetadata.ID] = addresses
-	// }
-
-	// for i, donMetadata := range topology.Metadata {
-	// 	for j := range donMetadata.NodesMetadata {
-	// 		nodeWithLabels := keystonetypes.NodeMetadata{}
-	// 		nodeType := devenv.NodeLabelValuePlugin
-	// 		if j == 0 {
-	// 			nodeType = devenv.NodeLabelValueBootstrap
-	// 		}
-	// 		nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
-	// 			Key:   devenv.NodeLabelKeyType,
-	// 			Value: ptr.Ptr(nodeType),
-	// 		})
-	// 		nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
-	// 			Key:   devenv.NodeLabelP2PIDType,
-	// 			Value: ptr.Ptr(donToP2PKeys[uint32(i+1)].peerIDs[j]),
-	// 		})
-	// 		nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
-	// 			Key:   libnode.EthAddressKey,
-	// 			Value: ptr.Ptr(donToEthAddresses[uint32(i+1)][j].Hex()),
-	// 		})
-	// 		nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
-	// 			Key:   libnode.NodeIndexKey,
-	// 			Value: ptr.Ptr(fmt.Sprint(j)),
-	// 		})
-	// 		nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
-	// 			Key: libnode.HostLabelKey,
-	// 			// TODO this will only work with Docker, for CRIB we need a different approach
-	// 			Value: ptr.Ptr(fmt.Sprintf("%s-node%d", donMetadata.Name, j)),
-	// 		})
-
-	// 		topology.Metadata[i].NodesMetadata[j] = &nodeWithLabels
-	// 	}
-	// }
-
 	peeringData, err := libdon.FindPeeringData(topology)
 	require.NoError(t, err, "failed to get peering data")
-	// donToConfigs := make(keystonetypes.DonsToOverrides)
-	// donsToSecrets := make(keystonetypes.DonsToOverrides)
 
-	// var configErr error
-	// var secretsErr error
 	for i, donMetadata := range topology.Metadata {
 		config, configErr := keystoneporconfig.GenerateConfigs(
 			keystonetypes.GeneratePoRConfigsInput{
@@ -619,7 +574,8 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 			secretsInput.P2PKeys = p2pKeys
 		}
 
-		secrets, secretsErr := keystoneporconfig.GenerateSecrets(
+		// EVM and P2P keys will be provided to nodes as secrets
+		secrets, secretsErr := keystonesecrets.GenerateSecrets(
 			secretsInput,
 		)
 		require.NoError(t, secretsErr, "failed to define secrets for DON %d", donMetadata.ID)
@@ -629,45 +585,6 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 			envInput.nodeSetInput[i].NodeSpecs[j].Node.TestSecretsOverrides = secrets[j]
 		}
 	}
-
-	// for i, donMetadata := range topology.Metadata {
-	// 	if configOverrides, ok := donToConfigs[donMetadata.ID]; ok {
-	// 		for j, configOverride := range configOverrides {
-	// 			if len(envInput.nodeSetInput[i].NodeSpecs)-1 < j {
-	// 				testLogger.Error().Msgf("Node %d has no config override", j)
-	// 				t.FailNow()
-	// 			}
-	// 			envInput.nodeSetInput[i].NodeSpecs[j].Node.TestConfigOverrides = configOverride
-
-	// 			ethKey := donToEthKeys[uint32(i+1)][j]
-	// 			p2pKey := donToP2PKeys[uint32(i+1)].encryptedP2PKeyJSONs[j]
-
-	// 			type NodeSecret struct {
-	// 				EthKey NodeEthKey `toml:"EthKey"`
-	// 				P2PKey NodeP2PKey `toml:"P2PKey"`
-	// 			}
-
-	// 			nodeSecret := NodeSecret{
-	// 				EthKey: NodeEthKey{
-	// 					JSON:     string(ethKey),
-	// 					Password: "",
-	// 					Selector: NodeEthKeySelector{
-	// 						ChainSelector: envOutput.chainSelector,
-	// 					},
-	// 				},
-	// 				P2PKey: NodeP2PKey{
-	// 					JSON:     string(p2pKey),
-	// 					Password: "",
-	// 				},
-	// 			}
-
-	// 			nodeSecretString, err := toml.Marshal(nodeSecret)
-	// 			require.NoError(t, err, "failed to marshal node secrets")
-
-	// 			envInput.nodeSetInput[i].NodeSpecs[j].Node.TestSecretsOverrides = string(nodeSecretString)
-	// 		}
-	// 	}
-	// }
 
 	nodeOutput := make([]*keystonetypes.WrappedNodeOutput, 0, len(envInput.nodeSetInput))
 	for _, nodeSetInput := range envInput.nodeSetInput {
@@ -681,43 +598,21 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		})
 	}
 
-	// Prepare the CLD environment and figure out DON topology; configure chains for nodes and job distributor
+	// Prepare the CLD environment that's required by the keystone changeset
 	// Ugly glue hack ¯\_(ツ)_/¯
-	cldEnv, dons, err := libenv.BuildChainlinkDeploymentEnv(singeFileLogger, envOutput.jdOutput, nodeOutput, envOutput.blockchainOutput, envOutput.sethClient)
+	fullCldInput := &keystonetypes.FullCLDEnvironmentInput{
+		JdOutput:          envOutput.jdOutput,
+		BlockchainOutput:  envOutput.blockchainOutput,
+		SethClient:        envOutput.sethClient,
+		NodeSetOutput:     nodeOutput,
+		ExistingAddresses: chainsOnlyCld.ExistingAddresses,
+		Topology:          topology,
+	}
+	fullCldOutput, err := libenv.BuildFullCLDEnvironment(singeFileLogger, fullCldInput)
 	require.NoError(t, err, "failed to build chainlink deployment environment")
 
-	for i, don := range dons {
-		for j, node := range topology.Metadata[i].NodesMetadata {
-			// node.Labels = append(node.Labels, &ptypes.Label{
-			// 	Key:   libnode.NodeIdKey,
-			// 	Value: ptr.Ptr(don.NodeIds()[j]),
-			// })
-
-			// add only new labels, we need to avoid duplicates, because nodeInfo struct passed to libenv.BuildChainlinkDeploymentEnv
-			// already contains some labels that we needed to add before to create config
-			for _, donLabel := range don.Nodes[j].Labels() {
-				if !node.HasLabel(donLabel) {
-					node.Labels = append(node.Labels, donLabel)
-				}
-			}
-		}
-	}
-
-	// TODO this should go to a method that will wrap BuildChainlinkDeploymentEnv and merging of labels and creation of DonTopology
-	cldEnv.ExistingAddresses = chainsOnlyCld.ExistingAddresses
-
-	donTopology := &keystonetypes.DonTopology{}
-	donTopology.WorkflowDonID = topology.WorkflowDONID
-
-	for i, donMetadata := range topology.Metadata {
-		donTopology.Dons = append(donTopology.Dons, &keystonetypes.DonWithMetadata{
-			DON:         dons[i],
-			DonMetadata: donMetadata,
-		})
-	}
-
 	// Fund the nodes
-	for _, metaDon := range donTopology.Dons {
+	for _, metaDon := range fullCldOutput.DonTopology.Dons {
 		for _, node := range metaDon.DON.Nodes {
 			_, err := libfunding.SendFunds(zerolog.Logger{}, envOutput.sethClient, libtypes.FundsToSend{
 				ToAddress:  common.HexToAddress(node.AccountAddr[envOutput.sethClient.Cfg.Network.ChainID]),
@@ -727,6 +622,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 			require.NoError(t, err, "failed to send funds to node %s", node.AccountAddr[envOutput.sethClient.Cfg.Network.ChainID])
 		}
 	}
+	// Universal setup -- END
 
 	// Workflow-specific configuration -- START
 	deployFeedConsumerInput := &keystonetypes.DeployFeedConsumerInput{
@@ -749,7 +645,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	registerInput := registerPoRWorkflowInput{
 		WorkflowConfig:              in.WorkflowConfig,
 		chainSelector:               envOutput.chainSelector,
-		workflowDonID:               donTopology.WorkflowDonID,
+		workflowDonID:               fullCldOutput.DonTopology.WorkflowDonID,
 		feedID:                      in.WorkflowConfig.FeedID,
 		workflowRegistryAddress:     keystoneContractsOutput.WorkflowRegistryAddress,
 		feedConsumerAddress:         deployFeedsConsumerOutput.FeedConsumerAddress,
@@ -763,14 +659,13 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 
 	err = registerPoRWorkflow(registerInput)
 	require.NoError(t, err, "failed to register PoR workflow")
-	// Workflow-specific configuration -- END
 
 	donToJobSpecs := make(map[uint32]keystonetypes.DonJobs)
 	var jobSpecsErr error
-	for _, donWithMetadata := range donTopology.Dons {
+	for _, donWithMetadata := range fullCldOutput.DonTopology.Dons {
 		donToJobSpecs[donWithMetadata.ID], jobSpecsErr = keystonepor.GenerateJobSpecs(
 			keystonetypes.GeneratePoRJobSpecsInput{
-				CldEnv:                 cldEnv,
+				CldEnv:                 fullCldOutput.Environment,
 				DonWithMetadata:        *donWithMetadata,
 				BlockchainOutput:       envOutput.blockchainOutput,
 				DonID:                  donWithMetadata.ID,
@@ -785,27 +680,29 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		require.NoError(t, jobSpecsErr, "failed to define job specs for DON %d", donWithMetadata.ID)
 	}
 
-	// Configure nodes and create jobs
+	// Create jobs
 	createJobsInput := keystonetypes.CreateJobsInput{
-		CldEnv:        cldEnv,
-		DonTopology:   donTopology,
+		CldEnv:        fullCldOutput.Environment,
+		DonTopology:   fullCldOutput.DonTopology,
 		DonToJobSpecs: donToJobSpecs,
 	}
 
 	err = libdon.CreateJobs(testLogger, createJobsInput)
 	require.NoError(t, err, "failed to configure nodes and create jobs")
+	// Workflow-specific configuration -- END
 
+	// Universal setup -- CONTINUED
 	// CAUTION: It is crucial to configure OCR3 jobs on nodes before configuring the workflow contracts.
 	// Wait for OCR listeners to be ready before setting the configuration.
 	// If the ConfigSet event is missed, OCR protocol will not start.
-	testLogger.Info().Msg("Waiting 30s for OCR listeners to be ready...")
-	time.Sleep(30 * time.Second)
+	testLogger.Info().Msg("Waiting 45s for OCR listeners to be ready...")
+	time.Sleep(45 * time.Second)
 	testLogger.Info().Msg("Proceeding to set OCR3 and Keystone configuration...")
 
 	// Configure the Forwarder, OCR3 and Capabilities contracts
 	configureKeystoneInput := keystonetypes.ConfigureKeystoneInput{
 		ChainSelector: envOutput.chainSelector,
-		CldEnv:        cldEnv,
+		CldEnv:        fullCldOutput.Environment,
 		Topology:      topology,
 	}
 	err = libcontracts.ConfigureKeystone(configureKeystoneInput)
@@ -822,7 +719,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		forwarderAddress:     keystoneContractsOutput.ForwarderAddress,
 		sethClient:           envOutput.sethClient,
 		blockchainOutput:     envOutput.blockchainOutput,
-		donTopology:          donTopology,
+		donTopology:          fullCldOutput.DonTopology,
 		nodeOutput:           nodeOutput,
 	}
 }

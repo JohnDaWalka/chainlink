@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
 
 func CreateJobs(testLogger zerolog.Logger, input cretypes.CreateJobsInput) error {
@@ -137,12 +138,18 @@ func GenereteKeys(input *cretypes.GenerateKeysInput) (*cretypes.Topology, *crety
 			}
 		}
 
-		if input.GenerateEVMKeys {
+		if input.EMVKeysToGenerate != nil {
 			evmKeys, err := crypto.GenerateEVMKeys(input.Password, len(donMetadata.NodesMetadata))
 			if err != nil {
 				return nil, nil, errors.Wrap(err, "failed to generate EVM keys")
 			}
-			evmKeys.ChainSelector = input.ChainSelector
+			for _, chain := range input.EMVKeysToGenerate {
+				evmKeys.Chains = append(evmKeys.Chains, types.EVMKeysToChains{
+					ChainSelector: chain.ChainSelector,
+					ChainName:     chain.ChainName,
+				})
+			}
+
 			output.EVMKeys[donMetadata.ID] = evmKeys
 
 			for idx, node := range donMetadata.NodesMetadata {
@@ -151,6 +158,7 @@ func GenereteKeys(input *cretypes.GenerateKeysInput) (*cretypes.Topology, *crety
 					Value: ptr.Ptr(evmKeys.PublicAddresses[idx].Hex()),
 				})
 			}
+
 		}
 	}
 
