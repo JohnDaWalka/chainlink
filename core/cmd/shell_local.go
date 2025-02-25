@@ -22,12 +22,15 @@ import (
 	"gopkg.in/guregu/null.v4"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
 	"github.com/smartcontractkit/chainlink-integrations/evm/gas"
 	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
+
 	"github.com/smartcontractkit/chainlink/v2/core/build"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/sessions"
@@ -381,27 +384,31 @@ func (s *Shell) runNode(c *cli.Context) error {
 	if s.Config.EVMEnabled() {
 		// ensure any imported keys are imported
 		for _, k := range s.Config.ImportedEthKeys().List() {
-			//if s.Config.ImportedEthKey().JSON() != "" {
 			lggr.Debug("Importing eth key")
-			id, err := chain_selectors.GetChainIDFromSelector(k.ChainDetails().ChainSelector)
+			id, err2 := chain_selectors.GetChainIDFromSelector(k.ChainDetails().ChainSelector)
 			if err != nil {
-				s.errorOut(errors.Wrapf(err, "error getting chain id from selector when trying to import eth key %v", k.JSON()))
+				return s.errorOut(errors.Wrapf(err2, "error getting chain id from selector when trying to import eth key %v", k.JSON()))
 			}
 			cid, _ := big.NewInt(0).SetString(id, 10)
 			if cid == nil {
 				return s.errorOut(fmt.Errorf("error converting chain id '%s' to big int", id))
 			}
-			_, err = app.GetKeyStore().Eth().Import(rootCtx, []byte(k.JSON()), k.Password(), cid)
-			if err != nil {
-				return s.errorOut(errors.Wrap(err, "error importing eth key"))
+			_, err2 = app.GetKeyStore().Eth().Import(rootCtx, []byte(k.JSON()), k.Password(), cid)
+			if err2 != nil {
+				if errors.Is(err, keystore.ErrKeyExists) {
+					lggr.Debugf("Eth key %s already exists for chain %v", k.JSON(), k.ChainDetails())
+					continue
+				}
+				return s.errorOut(errors.Wrap(err2, "error importing eth key"))
 			}
+			lggr.Debugf("Imported eth key %s for chain %v", k.JSON(), k.ChainDetails())
 		}
+
 		chainList, err2 := legacyEVMChains.List()
 		if err2 != nil {
 			return fmt.Errorf("error listing legacy evm chains: %w", err2)
 		}
 		for _, ch := range chainList {
-
 			if ch.Config().EVM().AutoCreateKey() {
 				lggr.Debugf("AutoCreateKey=true, will ensure EVM key for chain %s", ch.ID())
 				err2 := app.GetKeyStore().Eth().EnsureKeys(rootCtx, ch.ID())
@@ -448,9 +455,11 @@ func (s *Shell) runNode(c *cli.Context) error {
 
 	if s.Config.P2P().Enabled() {
 		if s.Config.ImportedP2PKey().JSON() != "" {
-			lggr.Debug("Importing p2p key")
+			lggr.Debugf("Importing p2p key %s", s.Config.ImportedP2PKey().JSON())
 			_, err2 := app.GetKeyStore().P2P().Import(rootCtx, []byte(s.Config.ImportedP2PKey().JSON()), s.Config.ImportedP2PKey().Password())
-			if err2 != nil {
+			if errors.Is(err2, keystore.ErrKeyExists) {
+				lggr.Debugf("P2P key already exists %s", s.Config.ImportedP2PKey().JSON())
+			} else if err2 != nil {
 				return s.errorOut(errors.Wrap(err2, "error importing p2p key"))
 			}
 		}
