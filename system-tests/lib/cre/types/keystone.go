@@ -423,31 +423,14 @@ type OCRPeeringData struct {
 	Port                 int
 }
 
-type EMVKeysToGenerate struct {
-	ChainSelector uint64
-	ChainName     string
-}
-
 type GenerateKeysInput struct {
-	EMVKeysToGenerate []EMVKeysToGenerate
-	GenerateP2PKeys   bool
-	Topology          *Topology
-	Password          string
+	GenerateEVMKeysForChainIDs []int
+	GenerateP2PKeys            bool
+	Topology                   *Topology
+	Password                   string
 }
 
 func (g *GenerateKeysInput) Validate() error {
-	if len(g.EMVKeysToGenerate) > 0 {
-		for _, chainData := range g.EMVKeysToGenerate {
-			if chainData.ChainSelector == 0 {
-				return errors.New("chain selector not set")
-			}
-
-			if chainData.ChainName == "" {
-				return errors.New("chain name not set")
-			}
-
-		}
-	}
 	if g.Topology == nil {
 		return errors.New("topology not set")
 	}

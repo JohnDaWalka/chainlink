@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -508,16 +509,14 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	// Generate EVM and P2P keys, which are needed to prepare the node configs
 	// That way we can pass them final configs and do away with restarting the nodes
 	var keys *keystonetypes.GenerateKeysOutput
+	chainIDInt, err := strconv.Atoi(envOutput.blockchainOutput.ChainID)
+	require.NoError(t, err, "failed to convert chain ID to int")
+
 	generateKeysInput := &keystonetypes.GenerateKeysInput{
-		EMVKeysToGenerate: []keystonetypes.EMVKeysToGenerate{
-			{
-				ChainSelector: envOutput.chainSelector,
-				ChainName:     fmt.Sprintf("%s-%s", envOutput.blockchainOutput.Family, envOutput.blockchainOutput.ChainID),
-			},
-		},
-		GenerateP2PKeys: true,
-		Topology:        topology,
-		Password:        "",
+		GenerateEVMKeysForChainIDs: []int{chainIDInt},
+		GenerateP2PKeys:            true,
+		Topology:                   topology,
+		Password:                   "",
 	}
 	topology, keys, err = libdon.GenereteKeys(generateKeysInput)
 	require.NoError(t, err, "failed to generate keys")

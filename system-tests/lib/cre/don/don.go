@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
 
 func CreateJobs(testLogger zerolog.Logger, input cretypes.CreateJobsInput) error {
@@ -67,7 +66,7 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet) (*cretypes
 				ID:            libc.MustSafeUint32(i + 1),
 				Flags:         flags,
 				NodesMetadata: make([]*cretypes.NodeMetadata, len(nodeSetInput[i].NodeSpecs)),
-				Name:          nodeSetInput[0].Name,
+				Name:          nodeSetInput[i].Name,
 			}
 		}
 	}
@@ -123,6 +122,7 @@ func GenereteKeys(input *cretypes.GenerateKeysInput) (*cretypes.Topology, *crety
 	}
 
 	for _, donMetadata := range input.Topology.Metadata {
+		fmt.Println("DON ID: " + fmt.Sprint(donMetadata.ID))
 		if input.GenerateP2PKeys {
 			p2pKeys, err := crypto.GenerateP2PKeys(input.Password, len(donMetadata.NodesMetadata))
 			if err != nil {
@@ -135,20 +135,16 @@ func GenereteKeys(input *cretypes.GenerateKeysInput) (*cretypes.Topology, *crety
 					Key:   devenv.NodeLabelP2PIDType,
 					Value: ptr.Ptr(p2pKeys.PeerIDs[idx]),
 				})
+				fmt.Println("[Node_" + fmt.Sprint(idx) + "]Peer ID: " + p2pKeys.PeerIDs[idx])
 			}
 		}
 
-		if input.EMVKeysToGenerate != nil {
+		if len(input.GenerateEVMKeysForChainIDs) > 0 {
 			evmKeys, err := crypto.GenerateEVMKeys(input.Password, len(donMetadata.NodesMetadata))
 			if err != nil {
 				return nil, nil, errors.Wrap(err, "failed to generate EVM keys")
 			}
-			for _, chain := range input.EMVKeysToGenerate {
-				evmKeys.Chains = append(evmKeys.Chains, types.EVMKeysToChains{
-					ChainSelector: chain.ChainSelector,
-					ChainName:     chain.ChainName,
-				})
-			}
+			evmKeys.ChainIDs = append(evmKeys.ChainIDs, input.GenerateEVMKeysForChainIDs...)
 
 			output.EVMKeys[donMetadata.ID] = evmKeys
 
