@@ -173,7 +173,7 @@ func (c *CreateJobsInput) Validate() error {
 	if c.DonTopology == nil {
 		return errors.New("don topology not set")
 	}
-	if len(c.DonTopology.Dons) == 0 {
+	if len(c.DonTopology.DonsWithMetadata) == 0 {
 		return errors.New("topology dons not set")
 	}
 	if len(c.DonToJobSpecs) == 0 {
@@ -202,7 +202,7 @@ func (c *ConfigureDonInput) Validate() error {
 	if c.DonTopology == nil {
 		return errors.New("don topology not set")
 	}
-	if len(c.DonTopology.Dons) == 0 {
+	if len(c.DonTopology.DonsWithMetadata) == 0 {
 		return errors.New("topology dons not set")
 	}
 	if c.JdOutput == nil {
@@ -240,7 +240,17 @@ func (d *DebugInput) Validate() error {
 	if len(d.DebugDons) == 0 {
 		return errors.New("debug don not set")
 	}
-	// TODO add more validations
+	for _, don := range d.DebugDons {
+		if len(don.ContainerNames) == 0 {
+			return errors.New("container names not set")
+		}
+		if len(don.NodesMetadata) == 0 {
+			return errors.New("nodes metadata not set")
+		}
+		if len(don.Flags) == 0 {
+			return errors.New("flags not set")
+		}
+	}
 	if d.BlockchainOutput == nil {
 		return errors.New("blockchain output not set")
 	}
@@ -261,7 +271,7 @@ func (c *ConfigureKeystoneInput) Validate() error {
 	if c.Topology == nil {
 		return errors.New("don topology not set")
 	}
-	if len(c.Topology.Metadata) == 0 {
+	if len(c.Topology.DonsMetadata) == 0 {
 		return errors.New("meta dons not set")
 	}
 	if c.CldEnv == nil {
@@ -283,8 +293,7 @@ type GatewayConnectorOutput struct {
 	Port int
 }
 
-type GeneratePoRJobSpecsInputs struct {
-	CldEnv                 *deployment.Environment
+type GeneratePoRJobSpecsInput struct {
 	DonsWithMetadata       []*DonWithMetadata
 	BlockchainOutput       *blockchain.Output
 	OCR3CapabilityAddress  common.Address
@@ -294,52 +303,9 @@ type GeneratePoRJobSpecsInputs struct {
 	GatewayConnectorOutput GatewayConnectorOutput
 }
 
-func (g *GeneratePoRJobSpecsInputs) Validate() error {
-	if g.CldEnv == nil {
-		return errors.New("chainlink deployment env not set")
-	}
+func (g *GeneratePoRJobSpecsInput) Validate() error {
 	if len(g.DonsWithMetadata) == 0 {
 		return errors.New("metadata dons not set")
-	}
-	if g.BlockchainOutput == nil {
-		return errors.New("blockchain output not set")
-	}
-	if g.OCR3CapabilityAddress == (common.Address{}) {
-		return errors.New("ocr3 capability address not set")
-	}
-	if g.CronCapBinName == "" {
-		return errors.New("cron cap bin name not set")
-	}
-	if g.GatewayConnectorOutput.Path == "" {
-		return errors.New("gateway connector path is not set")
-	}
-	if g.GatewayConnectorOutput.Port == 0 {
-		return errors.New("gateway connector port is not set")
-	}
-
-	return nil
-}
-
-type GeneratePoRJobSpecsInput struct {
-	CldEnv                 *deployment.Environment
-	DonWithMetadata        DonWithMetadata
-	BlockchainOutput       *blockchain.Output
-	OCR3CapabilityAddress  common.Address
-	ExtraAllowedPorts      []int
-	ExtraAllowedIPs        []string
-	CronCapBinName         string
-	GatewayConnectorOutput GatewayConnectorOutput
-}
-
-func (g *GeneratePoRJobSpecsInput) Validate() error {
-	if g.CldEnv == nil {
-		return errors.New("chainlink deployment env not set")
-	}
-	if len(g.DonWithMetadata.NodesMetadata) == 0 {
-		return errors.New("metadata nodes not set")
-	}
-	if len(g.DonWithMetadata.DON.Nodes) == 0 {
-		return errors.New("don nodes not set")
 	}
 	if g.BlockchainOutput == nil {
 		return errors.New("blockchain output not set")
@@ -365,7 +331,7 @@ type GeneratePoRConfigsInput struct {
 	BlockchainOutput            *blockchain.Output
 	DonID                       uint32
 	Flags                       []string
-	PeeringData                 PeeringData
+	PeeringData                 CapabilitiesPeeringData
 	CapabilitiesRegistryAddress common.Address
 	WorkflowRegistryAddress     common.Address
 	ForwarderAddress            common.Address
@@ -385,7 +351,7 @@ func (g *GeneratePoRConfigsInput) Validate() error {
 	if len(g.Flags) == 0 {
 		return errors.New("flags not set")
 	}
-	if g.PeeringData == (PeeringData{}) {
+	if g.PeeringData == (CapabilitiesPeeringData{}) {
 		return errors.New("peering data not set")
 	}
 	if g.CapabilitiesRegistryAddress == (common.Address{}) {
@@ -434,24 +400,25 @@ func (n *NodeMetadata) HasLabel(label *ptypes.Label) bool {
 }
 
 type Topology struct {
-	WorkflowDONID uint32
-	Metadata      []*DonMetadata
+	WorkflowDONID          uint32
+	DonsMetadata           []*DonMetadata
+	GatewayConnectorOutput *GatewayConnectorOutput
 }
 
 type DonTopology struct {
-	WorkflowDonID uint32
-	Dons          []*DonWithMetadata
+	WorkflowDonID    uint32
+	DonsWithMetadata []*DonWithMetadata
 }
 
 type CapabilitiesAwareNodeSet struct {
 	*ns.Input
 	Capabilities       []string
 	DONTypes           []string
-	BootstrapNodeIndex int // -1 -> no bootstrap
-	GatewayNodeIndex   int // -1 -> no gateway
+	BootstrapNodeIndex int // -1 -> no bootstrap, only used if the DON doesn't hae the GatewayDON flag
+	GatewayNodeIndex   int // -1 -> no gateway, only used if the DON has the GatewayDON flag
 }
 
-type PeeringData struct {
+type CapabilitiesPeeringData struct {
 	GlobalBootstraperPeerID string
 	GlobalBootstraperHost   string
 	Port                    int
@@ -474,8 +441,11 @@ func (g *GenerateKeysInput) Validate() error {
 	if g.Topology == nil {
 		return errors.New("topology not set")
 	}
-	if len(g.Topology.Metadata) == 0 {
+	if len(g.Topology.DonsMetadata) == 0 {
 		return errors.New("metadata not set")
+	}
+	if g.Topology.WorkflowDONID == 0 {
+		return errors.New("workflow don id not set")
 	}
 	return nil
 }
@@ -498,6 +468,20 @@ func (g *GenerateSecretsInput) Validate() error {
 	if g.DonMetadata == nil {
 		return errors.New("don metadata not set")
 	}
+	if g.EVMKeys != nil {
+		if len(g.EVMKeys.ChainIDs) == 0 {
+			return errors.New("chain ids not set")
+		}
+		if len(g.EVMKeys.EncryptedJSONs) == 0 {
+			return errors.New("encrypted jsons not set")
+		}
+	}
+	if g.P2PKeys != nil {
+		if len(g.P2PKeys.EncryptedJSONs) == 0 {
+			return errors.New("encrypted jsons not set")
+		}
+	}
+
 	return nil
 }
 
@@ -526,8 +510,11 @@ func (f *FullCLDEnvironmentInput) Validate() error {
 	if f.Topology == nil {
 		return errors.New("topology not set")
 	}
-	if len(f.Topology.Metadata) == 0 {
+	if len(f.Topology.DonsMetadata) == 0 {
 		return errors.New("metadata not set")
+	}
+	if f.Topology.WorkflowDONID == 0 {
+		return errors.New("workflow don id not set")
 	}
 	return nil
 }

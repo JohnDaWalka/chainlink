@@ -3,6 +3,7 @@ package don
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -15,7 +16,6 @@ import (
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
-	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
@@ -26,7 +26,7 @@ func CreateJobs(testLogger zerolog.Logger, input cretypes.CreateJobsInput) error
 		return errors.Wrap(err, "input validation failed")
 	}
 
-	for _, don := range input.DonTopology.Dons {
+	for _, don := range input.DonTopology.DonsWithMetadata {
 		if jobSpecs, ok := input.DonToJobSpecs[don.ID]; ok {
 			createErr := jobs.Create(input.CldEnv.Offchain, don.DON, don.Flags, jobSpecs)
 			if createErr != nil {
@@ -41,6 +41,7 @@ func CreateJobs(testLogger zerolog.Logger, input cretypes.CreateJobsInput) error
 }
 
 func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet) (*cretypes.Topology, error) {
+	topology := &cretypes.Topology{}
 	donsWithMetadata := make([]*cretypes.DonMetadata, len(nodeSetInput))
 
 	// one DON to do everything
@@ -84,22 +85,32 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet) (*cretypes
 				Value: ptr.Ptr(nodeType),
 			})
 
+			// TODO this will only work with Docker, for CRIB we need a different approach
+			// that will need to be aware of namespace name and node naming pattern
+			host := fmt.Sprintf("%s-node%d", donMetadata.Name, j)
+
 			if nodeSetInput[i].GatewayNodeIndex != -1 && j == nodeSetInput[i].GatewayNodeIndex {
 				nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
 					Key:   node.ExtraRolesKey,
 					Value: ptr.Ptr(cretypes.GatewayNode),
 				})
+
+				topology.GatewayConnectorOutput = &cretypes.GatewayConnectorOutput{
+					Path: "/node",
+					Port: 5003,
+					Host: host,
+					// do not set gateway connector dons, they will be resolved automatically
+				}
 			}
 
 			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
-				Key:   libnode.IndexKey,
-				Value: ptr.Ptr(fmt.Sprint(j)),
+				Key:   node.IndexKey,
+				Value: ptr.Ptr(strconv.Itoa(j)),
 			})
 
 			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
-				Key: libnode.HostLabelKey,
-				// TODO this will only work with Docker, for CRIB we need a different approach
-				Value: ptr.Ptr(fmt.Sprintf("%s-node%d", donMetadata.Name, j)),
+				Key:   node.HostLabelKey,
+				Value: ptr.Ptr(host),
 			})
 
 			donsWithMetadata[i].NodesMetadata[j] = &nodeWithLabels
@@ -111,10 +122,10 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet) (*cretypes
 		return nil, errors.Wrap(err, "failed to get workflow DON ID")
 	}
 
-	return &cretypes.Topology{
-		Metadata:      donsWithMetadata,
-		WorkflowDONID: maybeID.ID,
-	}, nil
+	topology.DonsMetadata = donsWithMetadata
+	topology.WorkflowDONID = maybeID.ID
+
+	return topology, nil
 }
 
 func GenereteKeys(input *cretypes.GenerateKeysInput) (*cretypes.Topology, *cretypes.GenerateKeysOutput, error) {
@@ -131,8 +142,7 @@ func GenereteKeys(input *cretypes.GenerateKeysInput) (*cretypes.Topology, *crety
 		P2PKeys: make(cretypes.DonsToP2PKeys),
 	}
 
-	for _, donMetadata := range input.Topology.Metadata {
-		fmt.Println("DON ID: " + fmt.Sprint(donMetadata.ID))
+	for _, donMetadata := range input.Topology.DonsMetadata {
 		if input.GenerateP2PKeys {
 			p2pKeys, err := crypto.GenerateP2PKeys(input.Password, len(donMetadata.NodesMetadata))
 			if err != nil {
@@ -145,7 +155,6 @@ func GenereteKeys(input *cretypes.GenerateKeysInput) (*cretypes.Topology, *crety
 					Key:   devenv.NodeLabelP2PIDType,
 					Value: ptr.Ptr(p2pKeys.PeerIDs[idx]),
 				})
-				fmt.Println("[Node_" + fmt.Sprint(idx) + "]Peer ID: " + p2pKeys.PeerIDs[idx])
 			}
 		}
 
@@ -158,13 +167,12 @@ func GenereteKeys(input *cretypes.GenerateKeysInput) (*cretypes.Topology, *crety
 
 			output.EVMKeys[donMetadata.ID] = evmKeys
 
-			for idx, node := range donMetadata.NodesMetadata {
-				node.Labels = append(node.Labels, &ptypes.Label{
-					Key:   libnode.EthAddressKey,
+			for idx, nodeMetadata := range donMetadata.NodesMetadata {
+				nodeMetadata.Labels = append(nodeMetadata.Labels, &ptypes.Label{
+					Key:   node.EthAddressKey,
 					Value: ptr.Ptr(evmKeys.PublicAddresses[idx].Hex()),
 				})
 			}
-
 		}
 	}
 

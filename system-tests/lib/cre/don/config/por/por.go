@@ -23,24 +23,31 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 	}
 	configOverrides := make(cretypes.NodeIndexToOverride)
 
+	// if it's only a gateway DON, we don't need to generate any extra configuration, the default one will do
+	if keystoneflags.HasFlag(input.Flags, cretypes.GatewayDON) && (!keystoneflags.HasFlag(input.Flags, cretypes.WorkflowDON) && !keystoneflags.HasFlag(input.Flags, cretypes.CapabilitiesDON)) {
+		return configOverrides, nil
+	}
+
 	chainIDInt, err := strconv.Atoi(input.BlockchainOutput.ChainID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to convert chain ID to int")
 	}
 	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
 
-	// find bootstrap node
+	// find bootstrap node for the Don
+	var donBootstrapNodeHost string
+	var donBootstrapNodePeerID string
+
 	bootstrapNode, err := node.FindOneWithLabel(input.DonMetadata.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValueBootstrap))}, node.EqualLabels)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find bootstrap node")
 	}
 
-	donBootstrapNodePeerID, err := node.ToP2PID(bootstrapNode, node.KeyExtractingTransformFn)
+	donBootstrapNodePeerID, err = node.ToP2PID(bootstrapNode, node.KeyExtractingTransformFn)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get bootstrap node peer ID")
 	}
 
-	var donBootstrapNodeHost string
 	for _, label := range bootstrapNode.Labels {
 		if label.Key == node.HostLabelKey {
 			donBootstrapNodeHost = *label.Value
@@ -63,36 +70,11 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 		}
 	}
 
-	// generat configuration for the bootstrap node
+	// generate configuration for the bootstrap node
 	configOverrides[nodeIndex] = config.BootstrapEVM(donBootstrapNodePeerID, chainIDUint64, input.CapabilitiesRegistryAddress, input.BlockchainOutput.Nodes[0].DockerInternalHTTPUrl, input.BlockchainOutput.Nodes[0].DockerInternalWSUrl)
 
 	if keystoneflags.HasFlag(input.Flags, cretypes.WorkflowDON) {
 		configOverrides[nodeIndex] += config.BoostrapDon2DonPeering(input.PeeringData)
-	}
-
-	if keystoneflags.HasFlag(input.Flags, cretypes.GatewayDON) {
-		if input.GatewayConnectorOutput == nil {
-			return nil, errors.New("GatewayConnectorOutput is required for Gateway DON")
-		}
-
-		gatewayNode, err := node.FindOneWithLabel(input.DonMetadata.NodesMetadata, &ptypes.Label{Key: node.ExtraRolesKey, Value: ptr.Ptr(string(cretypes.GatewayNode))}, node.LabelContains)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to find bootstrap node")
-		}
-
-		var gatewayHost string
-		for _, label := range gatewayNode.Labels {
-			if label.Key == node.HostLabelKey {
-				gatewayHost = *label.Value
-				break
-			}
-		}
-
-		if gatewayHost == "" {
-			return nil, errors.New("failed to get gateway host from labels")
-		}
-
-		input.GatewayConnectorOutput.Host = gatewayHost
 	}
 
 	// find worker nodes
@@ -112,6 +94,7 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 			}
 		}
 
+		// for now we just assume that every worker node is connected to one EVM chain
 		configOverrides[nodeIndex] = config.WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost, input.PeeringData, chainIDUint64, input.CapabilitiesRegistryAddress, input.BlockchainOutput.Nodes[0].DockerInternalHTTPUrl, input.BlockchainOutput.Nodes[0].DockerInternalWSUrl)
 		var nodeEthAddr common.Address
 		for _, label := range workflowNodeSet[i].Labels {

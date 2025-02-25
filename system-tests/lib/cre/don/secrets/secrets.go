@@ -24,7 +24,7 @@ func GenerateSecrets(input *cretypes.GenerateSecretsInput) (cretypes.NodeIndexTo
 			nodeSecret.EthKeys = types.NodeEthKeyWrapper{}
 			for _, chainID := range input.EVMKeys.ChainIDs {
 				nodeSecret.EthKeys.EthKeys = append(nodeSecret.EthKeys.EthKeys, types.NodeEthKey{
-					JSON:     string((*input.EVMKeys).EncryptedJSONs[i]),
+					JSON:     string(input.EVMKeys.EncryptedJSONs[i]),
 					Password: input.EVMKeys.Password,
 					ChainID:  chainID,
 				})
@@ -33,7 +33,7 @@ func GenerateSecrets(input *cretypes.GenerateSecretsInput) (cretypes.NodeIndexTo
 
 		if input.P2PKeys != nil {
 			nodeSecret.P2PKey = types.NodeP2PKey{
-				JSON:     string((*input.P2PKeys).EncryptedJSONs[i]),
+				JSON:     string(input.P2PKeys.EncryptedJSONs[i]),
 				Password: input.P2PKeys.Password,
 			}
 		}

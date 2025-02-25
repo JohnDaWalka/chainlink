@@ -24,6 +24,10 @@ func HasFlag(values []string, flag string) bool {
 	return slices.Contains(values, flag)
 }
 
+func HasOnlyOneFlag(values []string, flag string) bool {
+	return slices.Contains(values, flag) && len(values) == 1
+}
+
 func OneDonMetadataWithFlag(donTopologies []*types.DonMetadata, flag string) (*types.DonMetadata, error) {
 	donTopologies = DonMetadataWithFlag(donTopologies, flag)
 	if len(donTopologies) != 1 {

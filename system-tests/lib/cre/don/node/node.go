@@ -15,6 +15,13 @@ import (
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 )
 
+const (
+	HostLabelKey  = "host"
+	IndexKey      = "node_index"
+	EthAddressKey = "eth_address"
+	ExtraRolesKey = "extra_roles"
+)
+
 type stringTransformer func(string) string
 
 func NoOpTransformFn(value string) string {
@@ -41,13 +48,6 @@ func ToP2PID(node *types.NodeMetadata, transformFn stringTransformer) (string, e
 
 	return "", fmt.Errorf("p2p label not found for node %s", node)
 }
-
-const (
-	HostLabelKey  = "host"
-	IndexKey      = "node_index"
-	EthAddressKey = "eth_address"
-	ExtraRolesKey = "extra_roles"
-)
 
 // copied from Bala's unmerged PR: https://github.com/smartcontractkit/chainlink/pull/15751
 // TODO: remove this once the PR is merged and import his function
@@ -98,7 +98,7 @@ func GetNodeInfo(nodeOut *ns.Output, prefix string, bootstrapNodeCount int) ([]d
 	return nodeInfo, nil
 }
 
-func FindOneWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label, labelMatcherFn LabelMatcherFn) (*types.NodeMetadata, error) {
+func FindOneWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label, labelMatcherFn labelMatcherFn) (*types.NodeMetadata, error) {
 	if wantedLabel == nil {
 		return nil, errors.New("label is nil")
 	}
@@ -112,7 +112,7 @@ func FindOneWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label, la
 	return nil, fmt.Errorf("node with label %s=%s not found", wantedLabel.Key, *wantedLabel.Value)
 }
 
-func FindManyWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label, labelMatcherFn LabelMatcherFn) ([]*types.NodeMetadata, error) {
+func FindManyWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label, labelMatcherFn labelMatcherFn) ([]*types.NodeMetadata, error) {
 	if wantedLabel == nil {
 		return nil, errors.New("label is nil")
 	}
@@ -134,7 +134,23 @@ func FindManyWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label, l
 	return foundNodes, nil
 }
 
-type LabelMatcherFn func(first, second *string) bool
+func FindLabelValue(node *types.NodeMetadata, labelKey string) (string, error) {
+	for _, label := range node.Labels {
+		if label.Key == labelKey {
+			if label.Value == nil {
+				return "", fmt.Errorf("label %s found, but its value is nil", labelKey)
+			}
+			if *label.Value == "" {
+				return "", fmt.Errorf("label %s found, but its value is empty", labelKey)
+			}
+			return *label.Value, nil
+		}
+	}
+
+	return "", fmt.Errorf("label %s not found", labelKey)
+}
+
+type labelMatcherFn func(first, second *string) bool
 
 func EqualLabels(first, second *string) bool {
 	if first == nil && second == nil {
