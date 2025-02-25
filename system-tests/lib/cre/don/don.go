@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
@@ -46,7 +47,7 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet) (*cretypes
 	if len(nodeSetInput) == 1 {
 		flags, err := flags.NodeSetFlags(nodeSetInput[0])
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[0].Name)
+			return nil, errors.Wrapf(err, "failed to get flags for nodeset %s", nodeSetInput[0].Name)
 		}
 
 		donsWithMetadata[0] = &cretypes.DonMetadata{
@@ -59,7 +60,7 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet) (*cretypes
 		for i := range nodeSetInput {
 			flags, err := flags.NodeSetFlags(nodeSetInput[i])
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to convert string flags to bitmap for nodeset %s", nodeSetInput[i].Name)
+				return nil, errors.Wrapf(err, "failed to get flags for nodeset %s", nodeSetInput[i].Name)
 			}
 
 			donsWithMetadata[i] = &cretypes.DonMetadata{
@@ -82,10 +83,19 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet) (*cretypes
 				Key:   devenv.NodeLabelKeyType,
 				Value: ptr.Ptr(nodeType),
 			})
+
+			if nodeSetInput[i].GatewayNodeIndex != -1 && j == nodeSetInput[i].GatewayNodeIndex {
+				nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
+					Key:   node.ExtraRolesKey,
+					Value: ptr.Ptr(cretypes.GatewayNode),
+				})
+			}
+
 			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
 				Key:   libnode.IndexKey,
 				Value: ptr.Ptr(fmt.Sprint(j)),
 			})
+
 			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
 				Key: libnode.HostLabelKey,
 				// TODO this will only work with Docker, for CRIB we need a different approach

@@ -46,11 +46,12 @@ const (
 	HostLabelKey  = "host"
 	IndexKey      = "node_index"
 	EthAddressKey = "eth_address"
+	ExtraRolesKey = "extra_roles"
 )
 
 // copied from Bala's unmerged PR: https://github.com/smartcontractkit/chainlink/pull/15751
 // TODO: remove this once the PR is merged and import his function
-// IMPORTANT ADDITION:  prefix to differentiate between the different DONs
+// IMPORTANT ADDITION: prefix to differentiate between the different DONs
 func GetNodeInfo(nodeOut *ns.Output, prefix string, bootstrapNodeCount int) ([]devenv.NodeInfo, error) {
 	var nodeInfo []devenv.NodeInfo
 	for i := 1; i <= len(nodeOut.CLNodes); i++ {
@@ -97,13 +98,13 @@ func GetNodeInfo(nodeOut *ns.Output, prefix string, bootstrapNodeCount int) ([]d
 	return nodeInfo, nil
 }
 
-func FindOneWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label) (*types.NodeMetadata, error) {
+func FindOneWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label, labelMatcherFn LabelMatcherFn) (*types.NodeMetadata, error) {
 	if wantedLabel == nil {
 		return nil, errors.New("label is nil")
 	}
 	for _, node := range nodes {
 		for _, label := range node.Labels {
-			if wantedLabel.Key == label.Key && equalLabels(wantedLabel.Value, label.Value) {
+			if wantedLabel.Key == label.Key && labelMatcherFn(wantedLabel.Value, label.Value) {
 				return node, nil
 			}
 		}
@@ -111,7 +112,7 @@ func FindOneWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label) (*
 	return nil, fmt.Errorf("node with label %s=%s not found", wantedLabel.Key, *wantedLabel.Value)
 }
 
-func FindManyWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label) ([]*types.NodeMetadata, error) {
+func FindManyWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label, labelMatcherFn LabelMatcherFn) ([]*types.NodeMetadata, error) {
 	if wantedLabel == nil {
 		return nil, errors.New("label is nil")
 	}
@@ -120,7 +121,7 @@ func FindManyWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label) (
 
 	for _, node := range nodes {
 		for _, label := range node.Labels {
-			if wantedLabel.Key == label.Key && equalLabels(wantedLabel.Value, label.Value) {
+			if wantedLabel.Key == label.Key && labelMatcherFn(wantedLabel.Value, label.Value) {
 				foundNodes = append(foundNodes, node)
 			}
 		}
@@ -133,7 +134,9 @@ func FindManyWithLabel(nodes []*types.NodeMetadata, wantedLabel *ptypes.Label) (
 	return foundNodes, nil
 }
 
-func equalLabels(first, second *string) bool {
+type LabelMatcherFn func(first, second *string) bool
+
+func EqualLabels(first, second *string) bool {
 	if first == nil && second == nil {
 		return true
 	}
@@ -141,4 +144,15 @@ func equalLabels(first, second *string) bool {
 		return false
 	}
 	return *first == *second
+}
+
+func LabelContains(first, second *string) bool {
+	if first == nil && second == nil {
+		return true
+	}
+	if first == nil || second == nil {
+		return false
+	}
+
+	return strings.Contains(*first, *second)
 }

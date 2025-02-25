@@ -2,7 +2,6 @@ package jobs
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -45,17 +44,36 @@ func BootstrapOCR3(nodeID string, ocr3CapabilityAddress common.Address, chainID 
 	}
 }
 
-func BootstrapGateway(bootstrapNodeID string, gatewayMemembersEthAddresses []string, chainID uint64, donID uint32, extraAllowedPorts []int, extraAllowedIps []string, gatewayConnectorData types.GatewayConnectorOutput) *jobv1.ProposeJobRequest {
-	var gatewayMembers string
+func Gateway(bootstrapNodeID string, chainID uint64, donID uint32, extraAllowedPorts []int, extraAllowedIps []string, gatewayConnectorData types.GatewayConnectorOutput) *jobv1.ProposeJobRequest {
+	var gatewayDons string
 
-	for i := 0; i < len(gatewayMemembersEthAddresses); i++ {
-		gatewayMembers += fmt.Sprintf(`
+	for _, don := range gatewayConnectorData.Dons {
+		var gatewayMembers string
+
+		for i := 0; i < len(don.MembersEthAddresses); i++ {
+			gatewayMembers += fmt.Sprintf(`
 	[[gatewayConfig.Dons.Members]]
 	Address = "%s"
 	Name = "Node %d"`,
-			gatewayMemembersEthAddresses[i],
-			i+1,
-		)
+				don.MembersEthAddresses[i],
+				i+1,
+			)
+		}
+
+		gatewayDons += fmt.Sprintf(`
+		[[gatewayConfig.Dons]]
+		DonId = "%d"
+		F = 1
+		HandlerName = "web-api-capabilities"
+			[gatewayConfig.Dons.HandlerConfig]
+			MaxAllowedMessageAgeSec = 1_000
+				[gatewayConfig.Dons.HandlerConfig.NodeRateLimiter]
+				GlobalBurst = 10
+				GlobalRPS = 50
+				PerSenderBurst = 10
+				PerSenderRPS = 10
+			%s
+		`, don.ID, gatewayMembers)
 	}
 
 	uuid := uuid.NewString()
@@ -71,18 +89,7 @@ func BootstrapGateway(bootstrapNodeID string, gatewayMemembersEthAddresses []str
 	AuthGatewayId = "por_gateway"
 	AuthTimestampToleranceSec = 5
 	HeartbeatIntervalSec = 20
-	[[gatewayConfig.Dons]]
-	DonId = "%s"
-	F = 1
-	HandlerName = "web-api-capabilities"
-		[gatewayConfig.Dons.HandlerConfig]
-		MaxAllowedMessageAgeSec = 1_000
-			[gatewayConfig.Dons.HandlerConfig.NodeRateLimiter]
-			GlobalBurst = 10
-			GlobalRPS = 50
-			PerSenderBurst = 10
-			PerSenderRPS = 10
-		%s
+	%s
 	[gatewayConfig.NodeServerConfig]
 	HandshakeTimeoutMillis = 1_000
 	MaxRequestBytes = 100_000
@@ -106,8 +113,7 @@ func BootstrapGateway(bootstrapNodeID string, gatewayMemembersEthAddresses []str
 `,
 		uuid,
 		uuid[0:8],
-		strconv.FormatUint(uint64(donID), 10),
-		gatewayMembers,
+		gatewayDons,
 		gatewayConnectorData.Path,
 		gatewayConnectorData.Port,
 	)

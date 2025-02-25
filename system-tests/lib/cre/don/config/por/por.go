@@ -30,7 +30,7 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
 
 	// find bootstrap node
-	bootstrapNode, err := node.FindOneWithLabel(input.DonMetadata.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValueBootstrap))})
+	bootstrapNode, err := node.FindOneWithLabel(input.DonMetadata.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValueBootstrap))}, node.EqualLabels)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find bootstrap node")
 	}
@@ -68,15 +68,35 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 
 	if keystoneflags.HasFlag(input.Flags, cretypes.WorkflowDON) {
 		configOverrides[nodeIndex] += config.BoostrapDon2DonPeering(input.PeeringData)
+	}
 
+	if keystoneflags.HasFlag(input.Flags, cretypes.GatewayDON) {
 		if input.GatewayConnectorOutput == nil {
-			return nil, errors.New("GatewayConnectorOutput is required for Workflow DON")
+			return nil, errors.New("GatewayConnectorOutput is required for Gateway DON")
 		}
-		input.GatewayConnectorOutput.Host = donBootstrapNodeHost
+
+		gatewayNode, err := node.FindOneWithLabel(input.DonMetadata.NodesMetadata, &ptypes.Label{Key: node.ExtraRolesKey, Value: ptr.Ptr(string(cretypes.GatewayNode))}, node.LabelContains)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to find bootstrap node")
+		}
+
+		var gatewayHost string
+		for _, label := range gatewayNode.Labels {
+			if label.Key == node.HostLabelKey {
+				gatewayHost = *label.Value
+				break
+			}
+		}
+
+		if gatewayHost == "" {
+			return nil, errors.New("failed to get gateway host from labels")
+		}
+
+		input.GatewayConnectorOutput.Host = gatewayHost
 	}
 
 	// find worker nodes
-	workflowNodeSet, err := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValuePlugin))})
+	workflowNodeSet, err := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValuePlugin))}, node.EqualLabels)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes")
 	}

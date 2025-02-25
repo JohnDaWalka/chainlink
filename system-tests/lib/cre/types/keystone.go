@@ -21,6 +21,7 @@ type NodeType = string
 const (
 	BootstrapNode NodeType = "bootstrap"
 	WorkerNode    NodeType = "worker"
+	GatewayNode   NodeType = "gateway"
 )
 
 type JobDescription struct {
@@ -270,18 +271,59 @@ func (c *ConfigureKeystoneInput) Validate() error {
 	return nil
 }
 
+type GatewayConnectorDons struct {
+	MembersEthAddresses []string
+	ID                  uint32
+}
+
 type GatewayConnectorOutput struct {
-	Host string // do not set, it will be set dynamically
+	Dons []GatewayConnectorDons // do not set, it will be set dynamically
+	Host string                 // do not set, it will be set dynamically
 	Path string
 	Port int
+}
+
+type GeneratePoRJobSpecsInputs struct {
+	CldEnv                 *deployment.Environment
+	DonsWithMetadata       []*DonWithMetadata
+	BlockchainOutput       *blockchain.Output
+	OCR3CapabilityAddress  common.Address
+	ExtraAllowedPorts      []int
+	ExtraAllowedIPs        []string
+	CronCapBinName         string
+	GatewayConnectorOutput GatewayConnectorOutput
+}
+
+func (g *GeneratePoRJobSpecsInputs) Validate() error {
+	if g.CldEnv == nil {
+		return errors.New("chainlink deployment env not set")
+	}
+	if len(g.DonsWithMetadata) == 0 {
+		return errors.New("metadata dons not set")
+	}
+	if g.BlockchainOutput == nil {
+		return errors.New("blockchain output not set")
+	}
+	if g.OCR3CapabilityAddress == (common.Address{}) {
+		return errors.New("ocr3 capability address not set")
+	}
+	if g.CronCapBinName == "" {
+		return errors.New("cron cap bin name not set")
+	}
+	if g.GatewayConnectorOutput.Path == "" {
+		return errors.New("gateway connector path is not set")
+	}
+	if g.GatewayConnectorOutput.Port == 0 {
+		return errors.New("gateway connector port is not set")
+	}
+
+	return nil
 }
 
 type GeneratePoRJobSpecsInput struct {
 	CldEnv                 *deployment.Environment
 	DonWithMetadata        DonWithMetadata
 	BlockchainOutput       *blockchain.Output
-	DonID                  uint32
-	Flags                  []string
 	OCR3CapabilityAddress  common.Address
 	ExtraAllowedPorts      []int
 	ExtraAllowedIPs        []string
@@ -302,20 +344,17 @@ func (g *GeneratePoRJobSpecsInput) Validate() error {
 	if g.BlockchainOutput == nil {
 		return errors.New("blockchain output not set")
 	}
-	if g.DonID == 0 {
-		return errors.New("don id not set")
-	}
-	if len(g.Flags) == 0 {
-		return errors.New("flags not set")
-	}
 	if g.OCR3CapabilityAddress == (common.Address{}) {
 		return errors.New("ocr3 capability address not set")
 	}
 	if g.CronCapBinName == "" {
 		return errors.New("cron cap bin name not set")
 	}
-	if g.GatewayConnectorOutput == (GatewayConnectorOutput{}) {
-		return errors.New("gateway connector output not set")
+	if g.GatewayConnectorOutput.Path == "" {
+		return errors.New("gateway connector path is not set")
+	}
+	if g.GatewayConnectorOutput.Port == 0 {
+		return errors.New("gateway connector port is not set")
 	}
 
 	return nil
@@ -406,9 +445,10 @@ type DonTopology struct {
 
 type CapabilitiesAwareNodeSet struct {
 	*ns.Input
-	Capabilities       []string // `toml:"capabilities"`
-	DONType            string   // `toml:"don_type"`
-	BootstrapNodeIndex int      // -1 -> no bootstrap
+	Capabilities       []string
+	DONTypes           []string
+	BootstrapNodeIndex int // -1 -> no bootstrap
+	GatewayNodeIndex   int // -1 -> no gateway
 }
 
 type PeeringData struct {

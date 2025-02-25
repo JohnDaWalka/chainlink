@@ -6,6 +6,7 @@ type CapabilityFlag = string
 const (
 	WorkflowDON     CapabilityFlag = "workflow"
 	CapabilitiesDON CapabilityFlag = "capabilities"
+	GatewayDON      CapabilityFlag = "gateway"
 )
 
 // Capabilities

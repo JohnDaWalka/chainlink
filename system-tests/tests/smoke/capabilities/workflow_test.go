@@ -442,6 +442,7 @@ func CreateInfrastructure(
 			Path: "/node",
 			Port: 5003,
 			// do not set the host, it will be resolved automatically
+			// do not set gateway connector dons, they will be resolved automatically
 		},
 	}, nil
 }
@@ -659,25 +660,39 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	err = registerPoRWorkflow(registerInput)
 	require.NoError(t, err, "failed to register PoR workflow")
 
-	donToJobSpecs := make(map[uint32]keystonetypes.DonJobs)
-	var jobSpecsErr error
-	for _, donWithMetadata := range fullCldOutput.DonTopology.Dons {
-		donToJobSpecs[donWithMetadata.ID], jobSpecsErr = keystonepor.GenerateJobSpecs(
-			keystonetypes.GeneratePoRJobSpecsInput{
-				CldEnv:                 fullCldOutput.Environment,
-				DonWithMetadata:        *donWithMetadata,
-				BlockchainOutput:       envOutput.blockchainOutput,
-				DonID:                  donWithMetadata.ID,
-				Flags:                  donWithMetadata.Flags,
-				OCR3CapabilityAddress:  keystoneContractsOutput.OCR3CapabilityAddress,
-				ExtraAllowedPorts:      extraAllowedPorts,
-				ExtraAllowedIPs:        extraAllowedIPs,
-				CronCapBinName:         cronCapabilityAssetFile,
-				GatewayConnectorOutput: *envOutput.gatewayConnector,
-			},
-		)
-		require.NoError(t, jobSpecsErr, "failed to define job specs for DON %d", donWithMetadata.ID)
-	}
+	donToJobSpecs, jobSpecsErr := keystonepor.GenerateAllJobSpecs(
+		&keystonetypes.GeneratePoRJobSpecsInputs{
+			CldEnv:                 fullCldOutput.Environment,
+			BlockchainOutput:       envOutput.blockchainOutput,
+			DonsWithMetadata:       fullCldOutput.DonTopology.Dons,
+			OCR3CapabilityAddress:  keystoneContractsOutput.OCR3CapabilityAddress,
+			ExtraAllowedPorts:      extraAllowedPorts,
+			ExtraAllowedIPs:        extraAllowedIPs,
+			CronCapBinName:         cronCapabilityAssetFile,
+			GatewayConnectorOutput: *envOutput.gatewayConnector,
+		},
+	)
+	require.NoError(t, jobSpecsErr, "failed to define job specs for DONs")
+
+	// donToJobSpecs := make(keystonetypes.DonsToJobSpecs)
+	// var jobSpecsErr error
+	// for _, donWithMetadata := range fullCldOutput.DonTopology.Dons {
+	// 	donToJobSpecs[donWithMetadata.ID], jobSpecsErr = keystonepor.GenerateJobSpecs(
+	// 		keystonetypes.GeneratePoRJobSpecsInput{
+	// 			CldEnv:                 fullCldOutput.Environment,
+	// 			DonWithMetadata:        *donWithMetadata,
+	// 			BlockchainOutput:       envOutput.blockchainOutput,
+	// 			DonID:                  donWithMetadata.ID,
+	// 			Flags:                  donWithMetadata.Flags,
+	// 			OCR3CapabilityAddress:  keystoneContractsOutput.OCR3CapabilityAddress,
+	// 			ExtraAllowedPorts:      extraAllowedPorts,
+	// 			ExtraAllowedIPs:        extraAllowedIPs,
+	// 			CronCapBinName:         cronCapabilityAssetFile,
+	// 			GatewayConnectorOutput: *envOutput.gatewayConnector,
+	// 		},
+	// 	)
+	// 	require.NoError(t, jobSpecsErr, "failed to define job specs for DON %d", donWithMetadata.ID)
+	// }
 
 	// Create jobs
 	createJobsInput := keystonetypes.CreateJobsInput{
@@ -741,8 +756,9 @@ func TestKeystoneWithOCR3Workflow_SingleDon_MockedPrice(t *testing.T) {
 			{
 				Input:              input[0],
 				Capabilities:       keystonetypes.SingleDonFlags,
-				DONType:            keystonetypes.WorkflowDON,
+				DONTypes:           []string{keystonetypes.WorkflowDON, keystonetypes.GatewayDON},
 				BootstrapNodeIndex: 0,
+				GatewayNodeIndex:   0,
 			},
 		}
 	}
@@ -838,13 +854,14 @@ func TestKeystoneWithOCR3Workflow_TwoDons_LivePrice(t *testing.T) {
 			{
 				Input:              input[0],
 				Capabilities:       []string{keystonetypes.OCR3Capability, keystonetypes.CustomComputeCapability, keystonetypes.CronCapability},
-				DONType:            keystonetypes.WorkflowDON,
+				DONTypes:           []string{keystonetypes.WorkflowDON, keystonetypes.GatewayDON},
 				BootstrapNodeIndex: 0,
+				GatewayNodeIndex:   0,
 			},
 			{
 				Input:              input[1],
 				Capabilities:       []string{keystonetypes.WriteEVMCapability},
-				DONType:            keystonetypes.CapabilitiesDON, // <----- it's crucial to set the correct DON type
+				DONTypes:           []string{keystonetypes.CapabilitiesDON}, // <----- it's crucial to set the correct DON type
 				BootstrapNodeIndex: 0,
 			},
 		}

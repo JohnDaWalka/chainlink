@@ -22,7 +22,7 @@ func globalBootstraperNodeData(topology *types.Topology) (string, string, error)
 	}
 
 	if len(topology.Metadata) == 1 {
-		bootstrapNode, err := node.FindOneWithLabel(topology.Metadata[0].NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValueBootstrap))})
+		bootstrapNode, err := node.FindOneWithLabel(topology.Metadata[0].NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValueBootstrap))}, node.EqualLabels)
 		if err != nil {
 			return "", "", errors.Wrap(err, "failed to find bootstrap node")
 		}
@@ -44,7 +44,7 @@ func globalBootstraperNodeData(topology *types.Topology) (string, string, error)
 		// for all the DONs, and so we need to find it first. For us, it will always be the bootstrap node of the workflow DON.
 		for _, donTopology := range topology.Metadata {
 			if flags.HasFlag(donTopology.Flags, types.WorkflowDON) {
-				bootstrapNode, err := node.FindOneWithLabel(donTopology.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValueBootstrap))})
+				bootstrapNode, err := node.FindOneWithLabel(donTopology.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValueBootstrap))}, node.EqualLabels)
 				if err != nil {
 					return "", "", errors.Wrap(err, "failed to find bootstrap node")
 				}
