@@ -143,7 +143,7 @@ func (j JobClient) ListNodeChainConfigs(ctx context.Context, in *nodev1.ListNode
 	if len(in.Filter.NodeIds) != 1 {
 		return nil, errors.New("only one node id is supported")
 	}
-	n, err := j.nodeStore.get(in.Filter.NodeIds[0]) //j.Nodes[in.Filter.NodeIds[0]]
+	n, err := j.nodeStore.get(in.Filter.NodeIds[0]) // j.Nodes[in.Filter.NodeIds[0]]
 	if err != nil {
 		return nil, fmt.Errorf("node id not found: %s", in.Filter.NodeIds[0])
 	}

@@ -387,7 +387,7 @@ func NewNode(
 	})
 	keys := CreateKeys(t, app, chains, solchains)
 
-	//JD
+	// JD
 
 	setupJD(t, app)
 	return &Node{
@@ -614,7 +614,7 @@ func (e KeystoreSim) CSA() keystore.CSA {
 
 func setupJD(t *testing.T, app chainlink.Application) {
 	secret := randomBytes32(t)
-	pkey, err := crypto.PublicKeyFromHex(hex.EncodeToString(secret[:]))
+	pkey, err := crypto.PublicKeyFromHex(hex.EncodeToString(secret))
 	m := feeds2.RegisterManagerParams{
 		Name:      "In memory env test",
 		URI:       "http://dev.null:8080",

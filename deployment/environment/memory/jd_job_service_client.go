@@ -62,7 +62,6 @@ func (j *JobServiceClient) BatchProposeJob(ctx context.Context, in *jobv1.BatchP
 		out.SuccessResponses[id] = resp
 	}
 	return out, totalErr
-
 }
 
 func (j *JobServiceClient) UpdateJob(ctx context.Context, in *jobv1.UpdateJobRequest, opts ...grpc.CallOption) (*jobv1.UpdateJobResponse, error) {
@@ -101,7 +100,6 @@ func (j *JobServiceClient) ListJobs(ctx context.Context, in *jobv1.ListJobsReque
 	return &jobv1.ListJobsResponse{
 		Jobs: jbs,
 	}, nil
-
 }
 
 func (j *JobServiceClient) ListProposals(ctx context.Context, in *jobv1.ListProposalsRequest, opts ...grpc.CallOption) (*jobv1.ListProposalsResponse, error) {
@@ -131,17 +129,27 @@ func (j *JobServiceClient) ProposeJob(ctx context.Context, in *jobv1.ProposeJobR
 		return nil, fmt.Errorf("failed to load job spec: %w", err)
 	}
 	if extractor.ExternalJobID == "" {
-		return nil, fmt.Errorf("externalJobID is required")
+		return nil, errors.New("externalJobID is required")
+	}
+
+	// must auto increment the version to avoid collision on the node side
+	proposals, err := j.proposalStore.list(&jobv1.ListProposalsRequest_Filter{
+		JobIds: []string{extractor.ExternalJobID},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list proposals: %w", err)
 	}
 
 	appProposalID, err := n.App.GetFeedsService().ProposeJob(ctx, &feeds.ProposeJobArgs{
 		FeedsManagerID: 1,
 		Spec:           in.Spec,
+		RemoteUUID:     uuid.MustParse(extractor.ExternalJobID),
+		Version:        int32(len(proposals) + 1),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to propose job: %w", err)
 	}
-
+	fmt.Printf("proposed job uuid %s with id, spec, version: %d\n%s\n%d\n", extractor.ExternalJobID, appProposalID, in.Spec, len(proposals)+1)
 	// auto approve for now
 	proposedSpec, err := n.App.GetFeedsService().ListSpecsByJobProposalIDs(ctx, []int64{appProposalID})
 	if err != nil {
@@ -323,7 +331,7 @@ func (m *mapJobStore) list(filter *jobv1.ListJobsRequest_Filter) ([]*jobv1.Job, 
 	}
 
 	wantedJobIDs := make(map[string]struct{})
-	// use node ids to contruct wanted job ids
+	// use node ids to construct wanted job ids
 	if filter.NodeIds != nil {
 		for _, nodeID := range filter.NodeIds {
 			jobIDs, ok := m.nodesToJobIDs[nodeID]
@@ -344,7 +352,6 @@ func (m *mapJobStore) list(filter *jobv1.ListJobsRequest_Filter) ([]*jobv1.Job, 
 				wantedJobIDs[jobID] = struct{}{}
 			}
 		}
-
 	} else if filter.Ids != nil {
 		for _, jobID := range filter.Ids {
 			wantedJobIDs[jobID] = struct{}{}

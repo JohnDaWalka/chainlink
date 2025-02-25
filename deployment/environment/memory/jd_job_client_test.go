@@ -82,7 +82,6 @@ func TestJobClientJobAPI(t *testing.T) {
 			require.Error(t, err)
 			assert.Nil(t, getResp)
 		})
-
 	})
 
 	t.Run("ListJobs", func(t *testing.T) {
@@ -124,7 +123,7 @@ func TestJobClientJobAPI(t *testing.T) {
 				},
 				checkResp: func(t *testing.T, resp *jobv1.ListJobsResponse) {
 					require.NotNil(t, resp)
-					assert.Len(t, resp.Jobs, 0)
+					assert.Empty(t, resp.Jobs)
 				},
 			},
 		}
@@ -211,7 +210,7 @@ func TestJobClientJobAPI(t *testing.T) {
 				},
 				checkResp: func(t *testing.T, resp *jobv1.ListProposalsResponse) {
 					require.NotNil(t, resp)
-					assert.Len(t, resp.Proposals, 0, "expected no proposals %v", resp.Proposals)
+					assert.Empty(t, resp.Proposals, "expected no proposals %v", resp.Proposals)
 				},
 			},
 		}
@@ -228,7 +227,6 @@ func TestJobClientJobAPI(t *testing.T) {
 			})
 		}
 	})
-
 }
 
 func ptr(s string) *string {
