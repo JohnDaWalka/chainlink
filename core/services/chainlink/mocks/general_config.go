@@ -693,19 +693,19 @@ func (_c *GeneralConfig_FluxMonitor_Call) RunAndReturn(run func() config.FluxMon
 }
 
 // ImportedEthKeys provides a mock function with no fields
-func (_m *GeneralConfig) ImportedEthKeys() config.EthKeyConfigs {
+func (_m *GeneralConfig) ImportedEthKeys() config.ImportableEthKeyLister {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for ImportedEthKeys")
 	}
 
-	var r0 config.EthKeyConfigs
-	if rf, ok := ret.Get(0).(func() config.EthKeyConfigs); ok {
+	var r0 config.ImportableEthKeyLister
+	if rf, ok := ret.Get(0).(func() config.ImportableEthKeyLister); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(config.EthKeyConfigs)
+			r0 = ret.Get(0).(config.ImportableEthKeyLister)
 		}
 	}
 
@@ -729,30 +729,30 @@ func (_c *GeneralConfig_ImportedEthKeys_Call) Run(run func()) *GeneralConfig_Imp
 	return _c
 }
 
-func (_c *GeneralConfig_ImportedEthKeys_Call) Return(_a0 config.EthKeyConfigs) *GeneralConfig_ImportedEthKeys_Call {
+func (_c *GeneralConfig_ImportedEthKeys_Call) Return(_a0 config.ImportableEthKeyLister) *GeneralConfig_ImportedEthKeys_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *GeneralConfig_ImportedEthKeys_Call) RunAndReturn(run func() config.EthKeyConfigs) *GeneralConfig_ImportedEthKeys_Call {
+func (_c *GeneralConfig_ImportedEthKeys_Call) RunAndReturn(run func() config.ImportableEthKeyLister) *GeneralConfig_ImportedEthKeys_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ImportedP2PKey provides a mock function with no fields
-func (_m *GeneralConfig) ImportedP2PKey() config.P2PSecretConfig {
+func (_m *GeneralConfig) ImportedP2PKey() config.ImportableKey {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for ImportedP2PKey")
 	}
 
-	var r0 config.P2PSecretConfig
-	if rf, ok := ret.Get(0).(func() config.P2PSecretConfig); ok {
+	var r0 config.ImportableKey
+	if rf, ok := ret.Get(0).(func() config.ImportableKey); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(config.P2PSecretConfig)
+			r0 = ret.Get(0).(config.ImportableKey)
 		}
 	}
 
@@ -776,12 +776,12 @@ func (_c *GeneralConfig_ImportedP2PKey_Call) Run(run func()) *GeneralConfig_Impo
 	return _c
 }
 
-func (_c *GeneralConfig_ImportedP2PKey_Call) Return(_a0 config.P2PSecretConfig) *GeneralConfig_ImportedP2PKey_Call {
+func (_c *GeneralConfig_ImportedP2PKey_Call) Return(_a0 config.ImportableKey) *GeneralConfig_ImportedP2PKey_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *GeneralConfig_ImportedP2PKey_Call) RunAndReturn(run func() config.P2PSecretConfig) *GeneralConfig_ImportedP2PKey_Call {
+func (_c *GeneralConfig_ImportedP2PKey_Call) RunAndReturn(run func() config.ImportableKey) *GeneralConfig_ImportedP2PKey_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -12,11 +12,3 @@ type P2P interface {
 	TraceLogging() bool
 	Enabled() bool
 }
-
-type P2PSecretConfig interface {
-	// JSON must be a valid JSON string conforming to the
-	// the geth keystore format.
-	JSON() string
-	// Password is the password used to encrypt the key.
-	Password() string
-}

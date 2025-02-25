@@ -24,6 +24,6 @@ type GeneralConfig interface {
 // ImportedSecretConfig is a configuration for imported secrets
 // to be imported into the keystore upon startup.
 type ImportedSecretConfig interface {
-	ImportedP2PKey() coreconfig.P2PSecretConfig
-	ImportedEthKeys() coreconfig.EthKeyConfigs
+	ImportedP2PKey() coreconfig.ImportableKey
+	ImportedEthKeys() coreconfig.ImportableEthKeyLister
 }

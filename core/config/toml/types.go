@@ -124,29 +124,29 @@ type Secrets struct {
 	Prometheus PrometheusSecrets        `toml:",omitempty"`
 	Mercury    MercurySecrets           `toml:",omitempty"`
 	Threshold  ThresholdKeyShareSecrets `toml:",omitempty"`
-	EVM        EthKeysWrapper           `toml:",omitempty"`
+	EVM        EthKeys                  `toml:",omitempty"`
 	P2PKey     P2PKey                   `toml:",omitempty"`
 }
 
-type EthKeysWrapper struct {
+type EthKeys struct {
 	Keys []*EthKey
 }
 
-func (e *EthKeysWrapper) SetFrom(f *EthKeysWrapper) (err error) {
+func (e *EthKeys) SetFrom(f *EthKeys) (err error) {
 	err = e.validateMerge(f)
 	if err != nil {
 		return err
 	}
-	e.Keys = make([]*EthKey, len(f.Keys))
-	for i := range f.Keys {
-		e.Keys[i] = f.Keys[i]
+	if f == nil || len(f.Keys) == 0 {
+		return nil
 	}
-	fmt.Printf("EthKeysWrapper.SetFrom: %v", e.Keys)
+	e.Keys = make([]*EthKey, len(f.Keys))
+	copy(e.Keys, f.Keys)
 	return nil
 }
 
-func (e *EthKeysWrapper) validateMerge(f *EthKeysWrapper) (err error) {
-	var have map[int]struct{}
+func (e *EthKeys) validateMerge(f *EthKeys) (err error) {
+	have := make(map[int]struct{})
 	if e != nil && f != nil {
 		for _, ethKey := range e.Keys {
 			have[*ethKey.ID] = struct{}{}
@@ -160,9 +160,9 @@ func (e *EthKeysWrapper) validateMerge(f *EthKeysWrapper) (err error) {
 	return nil
 }
 
-func (e *EthKeysWrapper) ValidateConfig() (err error) {
+func (e *EthKeys) ValidateConfig() (err error) {
 	for i, ethKey := range e.Keys {
-		if err := ethKey.ValidateConfig(); err != nil {
+		if err2 := ethKey.ValidateConfig(); err2 != nil {
 			err = multierr.Append(err, configutils.ErrInvalid{Name: fmt.Sprintf("EthKeys[%d]", i), Value: ethKey, Msg: "invalid EthKey"})
 		}
 	}
@@ -261,10 +261,8 @@ func (d *DatabaseSecrets) validateMerge(f *DatabaseSecrets) (err error) {
 }
 
 type EthKey struct {
-	JSON *models.Secret
-	ID   *int
-	//	ChainDetails *chain_selectors.ChainDetails
-
+	JSON     *models.Secret
+	ID       *int // TODO: consider using a chain selector instead. tried using chain_selectors.ChainDetails but toml lib barfed on the embedded uint64
 	Password *models.Secret
 }
 
@@ -302,10 +300,9 @@ func (e *EthKey) ValidateConfig() (err error) {
 	if (e.JSON != nil) != (e.Password != nil) && (e.Password != nil) != (e.ID != nil) {
 		err = multierr.Append(err, configutils.ErrInvalid{Name: "EthKey", Value: e.JSON, Msg: "all fields must be nil or non-nil"})
 	}
-	// require valid selector
+	// require valid id
 	if e.ID != nil {
-		_, ok := chain_selectors.ChainByEvmChainID(uint64(*e.ID))
-		//_, ok := chain_selectors.ChainBySelector(*&e.ID.ChainSelector)
+		_, ok := chain_selectors.ChainByEvmChainID(uint64(*e.ID)) //nolint:gosec // disable G115
 		if !ok {
 			err = multierr.Append(err, configutils.ErrInvalid{Name: "ChainSelector", Value: e.ID, Msg: "invalid chain selector"})
 		}
@@ -333,10 +330,10 @@ func (p *P2PKey) SetFrom(f *P2PKey) (err error) {
 }
 func (p *P2PKey) validateMerge(f *P2PKey) (err error) {
 	if p.JSON != nil && f.JSON != nil {
-		err = multierr.Append(err, configutils.ErrOverride{Name: "PrivateKey"})
+		err = multierr.Append(err, configutils.ErrOverride{Name: "JSON"})
 	}
 	if p.Password != nil && f.Password != nil {
-		err = multierr.Append(err, configutils.ErrOverride{Name: "PublicKey"})
+		err = multierr.Append(err, configutils.ErrOverride{Name: "Password"})
 	}
 	return err
 }

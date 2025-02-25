@@ -9,6 +9,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink/v2/core/build"
@@ -579,8 +580,8 @@ func TestMercuryTLS_ValidateTLSCertPath(t *testing.T) {
 	}
 }
 
-func TestEthKeysWrapper_TOMLSerialization(t *testing.T) {
-	ethKeysWrapper := EthKeysWrapper{
+func TestEthKeys_TOMLSerialization(t *testing.T) {
+	ethKeysWrapper := EthKeys{
 		Keys: []*EthKey{
 			{JSON: ptr(models.Secret("key1")), Password: ptr(models.Secret("pass1")), ID: ptr(1)},
 			{JSON: ptr(models.Secret("key2")), Password: ptr(models.Secret("pass2")), ID: ptr(99)},
@@ -590,24 +591,24 @@ func TestEthKeysWrapper_TOMLSerialization(t *testing.T) {
 	var buf bytes.Buffer
 	enc := toml.NewEncoder(&buf)
 	err := enc.Encode(ethKeysWrapper)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	var decoded EthKeysWrapper
+	var decoded EthKeys
 	err = toml.NewDecoder(strings.NewReader(buf.String())).Decode(&decoded)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, len(ethKeysWrapper.Keys), len(decoded.Keys))
 }
 
-func TestEthKeysWrapper_SetFrom(t *testing.T) {
-	ethKeysWrapper1 := &EthKeysWrapper{}
-	ethKeysWrapper2 := EthKeysWrapper{
+func TestEthKeys_SetFrom(t *testing.T) {
+	ethKeysWrapper1 := &EthKeys{}
+	ethKeysWrapper2 := EthKeys{
 		Keys: []*EthKey{
 			{JSON: ptr(models.Secret("key1")), Password: ptr(models.Secret("pass1")), ID: ptr(1)},
 		},
 	}
 
 	err := ethKeysWrapper1.SetFrom(&ethKeysWrapper2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, ethKeysWrapper2, *ethKeysWrapper1)
 }
 
