@@ -399,6 +399,7 @@ func CreateInfrastructure(
 
 		input.blockchainInput.Out = &blockchain.Output{}
 		input.blockchainInput.Out.UseCache = true
+		input.blockchainInput.Out.ChainID = "1337"
 		input.blockchainInput.Out.Nodes = []*blockchain.Node{
 			{
 				HostWSUrl:             fmt.Sprintf("wss://%s-geth-1337-ws.main.stage.cldev.sh", cribNamespace),
@@ -561,7 +562,9 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	// If using live endpoint, we don't need to do this
 	var extraAllowedIPs []string
 	var extraAllowedPorts []int
-	if _, ok := priceProvider.(*FakePriceProvider); ok {
+
+	// TODO we'd need to have a way to deploy fake price provider to CRIB, now we don't as there's no Docker container and no defined deployment
+	if _, ok := priceProvider.(*FakePriceProvider); ok && os.Getenv("CRIB") != "true" {
 		// it doesn't really matter which container we will use to resolve the host.docker.internal IP, it will be the same for all of them
 		// here we will blokchain container, because by that time it will be running
 		extraAllowedIPs, extraAllowedPorts, err = extraAllowedPortsAndIps(testLogger, in.Fake.Port, envOutput.blockchainOutput.ContainerName)
@@ -621,13 +624,27 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		in.JD.Out.DockerGRPCUrl = jdGRPCHost
 		// is WS needed?
 
-		envInput.nodeSetInput[0].Out = &ns.Output{}
-		envInput.nodeSetInput[0].Out.UseCache = true
-		envInput.nodeSetInput[0].Out.CLNodes = []*clnode.Output{
-			{
-				// TODO add node URLs
-				// what about PG?
-			},
+		envInput.nodeSetInput[0].Input.Out = &ns.Output{}
+		envInput.nodeSetInput[0].Input.Out.UseCache = true
+		envInput.nodeSetInput[0].Input.Out.CLNodes = []*clnode.Output{}
+		for i := range envInput.nodeSetInput[0].NodeSpecs {
+			nodeName := "base"
+			//TODO check bootstrap flag
+			if i == 0 {
+				nodeName = "base-bt"
+			}
+			envInput.nodeSetInput[0].Input.Out.CLNodes = append(envInput.nodeSetInput[0].Out.CLNodes, &clnode.Output{
+				UseCache: true,
+				Node: &clnode.NodeOut{
+					APIAuthUser:     "admin@chain.link",
+					APIAuthPassword: "hWDmgcub2gUhyrG6cxriqt7T",
+					HostURL:         fmt.Sprintf("http://%s-%s-%d.main.stage.cldev.sh:80", os.Getenv("CRIB_NAMESPACE"), nodeName, i),
+					DockerURL:       fmt.Sprintf("http://%s-%s-%d.main.stage.cldev.sh:80", os.Getenv("CRIB_NAMESPACE"), nodeName, i),
+					DockerP2PUrl:    fmt.Sprintf("http://%s-%s-%d.main.stage.cldev.sh:6690", os.Getenv("CRIB_NAMESPACE"), nodeName, i),
+					InternalIP:      nodeName + "-" + strconv.Itoa(i),
+				},
+			})
+
 		}
 	}
 
