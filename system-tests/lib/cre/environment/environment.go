@@ -7,8 +7,6 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
@@ -82,23 +80,20 @@ func BuildFullCLDEnvironment(lgr logger.Logger, input *types.FullCLDEnvironmentI
 
 	for i, don := range dons {
 		for j, node := range input.Topology.DonsMetadata[i].NodesMetadata {
-			// add only new labels, we need to avoid duplicates, because nodeInfo struct passed to libenv.BuildChainlinkDeploymentEnv
-			// already contains some labels that we needed to add before to create config
-			for _, donLabel := range don.Nodes[j].Labels() {
-				if !node.HasLabel(donLabel) {
-					node.Labels = append(node.Labels, donLabel)
-				}
-			}
-
-			// both required for job creation
-			node.Labels = append(node.Labels, &ptypes.Label{
-				Key:   libnode.NodeIDKeyType,
-				Value: ptr.Ptr(don.NodeIds()[j]),
+			// both are required for job creation
+			node.Labels = append(node.Labels, &types.Label{
+				Key:   libnode.NodeIDKey,
+				Value: don.NodeIds()[j],
 			})
 
-			node.Labels = append(node.Labels, &ptypes.Label{
-				Key:   libnode.NodeOCR2KeyBundleIDType,
-				Value: ptr.Ptr(don.Nodes[j].Ocr2KeyBundleID),
+			node.Labels = append(node.Labels, &types.Label{
+				Key:   libnode.NodeOCR2KeyBundleIDKey,
+				Value: don.Nodes[j].Ocr2KeyBundleID,
+			})
+
+			node.Labels = append(node.Labels, &types.Label{
+				Key:   libnode.NodeOCR2KeyBundleIDKey,
+				Value: don.Nodes[j].Ocr2KeyBundleID,
 			})
 		}
 	}

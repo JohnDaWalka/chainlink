@@ -4,21 +4,14 @@
   docker_cmd_params = ["-b", "5"]
 
 [jd]
-  # change to your version
-  image = "job-distributor:latest"
-
-# fake data provider used as a mocked price source
-[fake]
-  port = 8171
+  image = "injected-at-runtime"
 
 [workflow_config]
-	workflow_name = "abcdefgasd"
+  workflow_name = "abcdefgasd"
   feed_id = "018bfe8840700040000000000000000000000000000000000000000000000000"
 
   use_cre_cli = true
-  should_compile_new_workflow = true
-  # workflow_folder_location = "path-to-folder-with-main.go-of-your-workflow"
-  workflow_folder_location = "/Users/bartektofel/Downloads/workflow_test"
+  should_compile_new_workflow = false
 
   [workflow_config.dependencies]
   capabilities_version = "v1.0.0-alpha"
@@ -42,9 +35,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      # docker_ctx = "../../../.."
-      # docker_file = "plugins/chainlink.Dockerfile"
-      image = "chainlink-tmp"
+      image = "injected-at-runtime"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
@@ -61,9 +52,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      # docker_ctx = "../../../.."
-      # docker_file = "plugins/chainlink.Dockerfile"
-      image = "chainlink-tmp"
+      image = "injected-at-runtime"
       capabilities = ["./amd64_cron"]
       user_config_overrides = """
       [Feature]
@@ -81,9 +70,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      # docker_ctx = "../../../.."
-      # docker_file = "plugins/chainlink.Dockerfile"
-      image = "chainlink-tmp"
+      image = "injected-at-runtime"
       capabilities = ["./amd64_cron"]
       user_config_overrides = """
       [Feature]
@@ -101,9 +88,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      # docker_ctx = "../../../.."
-      # docker_file = "plugins/chainlink.Dockerfile"
-      image = "chainlink-tmp"
+      image = "injected-at-runtime"
       capabilities = ["./amd64_cron"]
       user_config_overrides = """
       [Feature]
@@ -121,10 +106,70 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      # docker_ctx = "../../../.."
-      # docker_file = "plugins/chainlink.Dockerfile"
-      image = "chainlink-tmp"
+      image = "injected-at-runtime"
       capabilities = ["./amd64_cron"]
+      user_config_overrides = """
+      [Feature]
+			LogPoller = true
+
+			[OCR2]
+			Enabled = true
+			DatabaseTimeout = '1s'
+
+			[P2P.V2]
+			Enabled = true
+			ListenAddresses = ['0.0.0.0:5001']
+      """
+
+[[nodesets]]
+  nodes = 3
+  override_mode = "each"
+  http_port_range_start = 10200
+  name = "capabilities"
+
+  [nodesets.db]
+    image = "postgres:12.0"
+    port = 13100
+    volume_name = "capabilities_volume"
+
+  [[nodesets.node_specs]]
+
+    [nodesets.node_specs.node]
+      image = "injected-at-runtime"
+      user_config_overrides = """
+      [Feature]
+			LogPoller = true
+
+			[OCR2]
+			Enabled = true
+			DatabaseTimeout = '1s'
+
+			[P2P.V2]
+			Enabled = true
+			ListenAddresses = ['0.0.0.0:5001']
+      """
+
+  [[nodesets.node_specs]]
+
+    [nodesets.node_specs.node]
+      image = "injected-at-runtime"
+      user_config_overrides = """
+      [Feature]
+			LogPoller = true
+
+			[OCR2]
+			Enabled = true
+			DatabaseTimeout = '1s'
+
+			[P2P.V2]
+			Enabled = true
+			ListenAddresses = ['0.0.0.0:5001']
+      """
+
+  [[nodesets.node_specs]]
+
+    [nodesets.node_specs.node]
+      image = "injected-at-runtime"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
