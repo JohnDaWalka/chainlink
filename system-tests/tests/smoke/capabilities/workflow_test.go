@@ -939,7 +939,6 @@ func TestKeystoneWithOCR3Workflow_ThreeDons_LivePrice(t *testing.T) {
 				Capabilities:       []string{keystonetypes.OCR3Capability, keystonetypes.CustomComputeCapability, keystonetypes.CronCapability},
 				DONTypes:           []string{keystonetypes.WorkflowDON},
 				BootstrapNodeIndex: 0,
-				GatewayNodeIndex:   0,
 			},
 			{
 				Input:              input[1],

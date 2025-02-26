@@ -347,17 +347,24 @@ type DonMetadata struct {
 	ID            uint32
 	Name          string
 }
-type NodeMetadata struct {
-	Labels []*ptypes.Label
+
+type Label struct {
+	Key   string
+	Value string
 }
 
-func (n *NodeMetadata) HasLabel(label *ptypes.Label) bool {
-	for _, l := range n.Labels {
-		if l.Key == label.Key && ((l.Value == nil && label.Value == nil) || *l.Value == *label.Value) {
-			return true
-		}
+func LabelFromProto(p *ptypes.Label) (*Label, error) {
+	if p.Value == nil {
+		return nil, errors.New("value not set")
 	}
-	return false
+	return &Label{
+		Key:   p.Key,
+		Value: *p.Value,
+	}, nil
+}
+
+type NodeMetadata struct {
+	Labels []*Label
 }
 
 type Topology struct {

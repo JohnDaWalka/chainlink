@@ -6,10 +6,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
-
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
@@ -38,7 +34,7 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 	var donBootstrapNodeHost string
 	var donBootstrapNodePeerID string
 
-	bootstrapNode, err := node.FindOneWithLabel(input.DonMetadata.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValueBootstrap))}, node.EqualLabels)
+	bootstrapNode, err := node.FindOneWithLabel(input.DonMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.BootstrapNode}, node.EqualLabels)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find bootstrap node")
 	}
@@ -50,7 +46,7 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 
 	for _, label := range bootstrapNode.Labels {
 		if label.Key == node.HostLabelKey {
-			donBootstrapNodeHost = *label.Value
+			donBootstrapNodeHost = label.Value
 			break
 		}
 	}
@@ -62,7 +58,7 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 	var nodeIndex int
 	for _, label := range bootstrapNode.Labels {
 		if label.Key == node.IndexKey {
-			nodeIndex, err = strconv.Atoi(*label.Value)
+			nodeIndex, err = strconv.Atoi(label.Value)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to convert node index to int")
 			}
@@ -78,7 +74,7 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 	}
 
 	// find worker nodes
-	workflowNodeSet, err := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValuePlugin))}, node.EqualLabels)
+	workflowNodeSet, err := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.WorkerNode}, node.EqualLabels)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes")
 	}
@@ -87,7 +83,7 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 		var nodeIndex int
 		for _, label := range workflowNodeSet[i].Labels {
 			if label.Key == node.IndexKey {
-				nodeIndex, err = strconv.Atoi(*label.Value)
+				nodeIndex, err = strconv.Atoi(label.Value)
 				if err != nil {
 					return nil, errors.Wrap(err, "failed to convert node index to int")
 				}
@@ -99,13 +95,10 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 		var nodeEthAddr common.Address
 		for _, label := range workflowNodeSet[i].Labels {
 			if label.Key == node.EthAddressKey {
-				if label.Value == nil {
-					return nil, errors.New("eth address label value is nil")
-				}
-				if *label.Value == "" {
+				if label.Value == "" {
 					return nil, errors.New("eth address label value is empty")
 				}
-				nodeEthAddr = common.HexToAddress(*label.Value)
+				nodeEthAddr = common.HexToAddress(label.Value)
 				break
 			}
 		}

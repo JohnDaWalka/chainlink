@@ -8,11 +8,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
-	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
@@ -76,13 +73,13 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet) (*cretypes
 	for i, donMetadata := range donsWithMetadata {
 		for j := range donMetadata.NodesMetadata {
 			nodeWithLabels := cretypes.NodeMetadata{}
-			nodeType := devenv.NodeLabelValuePlugin
+			nodeType := cretypes.WorkerNode
 			if nodeSetInput[i].BootstrapNodeIndex != -1 && j == nodeSetInput[i].BootstrapNodeIndex {
-				nodeType = devenv.NodeLabelValueBootstrap
+				nodeType = cretypes.BootstrapNode
 			}
-			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
-				Key:   devenv.NodeLabelKeyType,
-				Value: ptr.Ptr(nodeType),
+			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
+				Key:   node.NodeTypeKey,
+				Value: nodeType,
 			})
 
 			// TODO this will only work with Docker, for CRIB we need a different approach
@@ -90,9 +87,9 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet) (*cretypes
 			host := fmt.Sprintf("%s-node%d", donMetadata.Name, j)
 
 			if nodeSetInput[i].GatewayNodeIndex != -1 && j == nodeSetInput[i].GatewayNodeIndex {
-				nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
+				nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
 					Key:   node.ExtraRolesKey,
-					Value: ptr.Ptr(cretypes.GatewayNode),
+					Value: cretypes.GatewayNode,
 				})
 
 				topology.GatewayConnectorOutput = &cretypes.GatewayConnectorOutput{
@@ -103,14 +100,14 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet) (*cretypes
 				}
 			}
 
-			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
+			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
 				Key:   node.IndexKey,
-				Value: ptr.Ptr(strconv.Itoa(j)),
+				Value: strconv.Itoa(j),
 			})
 
-			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &ptypes.Label{
+			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
 				Key:   node.HostLabelKey,
-				Value: ptr.Ptr(host),
+				Value: host,
 			})
 
 			donsWithMetadata[i].NodesMetadata[j] = &nodeWithLabels
@@ -139,19 +136,19 @@ func AddKeysToTopology(topology *cretypes.Topology, keys *cretypes.GenerateKeysO
 
 	for _, donMetadata := range topology.DonsMetadata {
 		if p2pKeys, ok := keys.P2PKeys[donMetadata.ID]; ok {
-			for idx, node := range donMetadata.NodesMetadata {
-				node.Labels = append(node.Labels, &ptypes.Label{
-					Key:   devenv.NodeLabelP2PIDType,
-					Value: ptr.Ptr(p2pKeys.PeerIDs[idx]),
+			for idx, nodeMetadata := range donMetadata.NodesMetadata {
+				nodeMetadata.Labels = append(nodeMetadata.Labels, &cretypes.Label{
+					Key:   node.NodeP2PIDKey,
+					Value: p2pKeys.PeerIDs[idx],
 				})
 			}
 		}
 
 		if evmKeys, ok := keys.EVMKeys[donMetadata.ID]; ok {
 			for idx, nodeMetadata := range donMetadata.NodesMetadata {
-				nodeMetadata.Labels = append(nodeMetadata.Labels, &ptypes.Label{
+				nodeMetadata.Labels = append(nodeMetadata.Labels, &cretypes.Label{
 					Key:   node.EthAddressKey,
-					Value: ptr.Ptr(evmKeys.PublicAddresses[idx].Hex()),
+					Value: evmKeys.PublicAddresses[idx].Hex(),
 				})
 			}
 		}

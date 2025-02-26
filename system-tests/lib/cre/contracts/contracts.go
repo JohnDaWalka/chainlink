@@ -11,11 +11,8 @@ import (
 	"github.com/rs/zerolog"
 
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
-	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
@@ -94,9 +91,9 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 
 		// Add support for new capabilities here as needed
 
-		workerNodes, workerNodesErr := node.FindManyWithLabel(donMetadata.NodesMetadata, &ptypes.Label{
-			Key:   devenv.NodeLabelKeyType,
-			Value: ptr.Ptr(devenv.NodeLabelValuePlugin),
+		workerNodes, workerNodesErr := node.FindManyWithLabel(donMetadata.NodesMetadata, &types.Label{
+			Key:   node.NodeTypeKey,
+			Value: types.WorkerNode,
 		}, node.EqualLabels)
 
 		if workerNodesErr != nil {
@@ -133,9 +130,9 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 
 	for _, metaDon := range input.Topology.DonsMetadata {
 		if flags.HasFlag(metaDon.Flags, types.OCR3Capability) {
-			workerNodes, workerNodesErr := node.FindManyWithLabel(metaDon.NodesMetadata, &ptypes.Label{
-				Key:   devenv.NodeLabelKeyType,
-				Value: ptr.Ptr(devenv.NodeLabelValuePlugin),
+			workerNodes, workerNodesErr := node.FindManyWithLabel(metaDon.NodesMetadata, &types.Label{
+				Key:   node.NodeTypeKey,
+				Value: types.WorkerNode,
 			}, node.EqualLabels)
 
 			if workerNodesErr != nil {
