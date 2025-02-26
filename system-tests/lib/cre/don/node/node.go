@@ -16,10 +16,12 @@ import (
 )
 
 const (
-	HostLabelKey  = "host"
-	IndexKey      = "node_index"
-	EthAddressKey = "eth_address"
-	ExtraRolesKey = "extra_roles"
+	HostLabelKey            = "host"
+	IndexKey                = "node_index"
+	EthAddressKey           = "eth_address"
+	ExtraRolesKey           = "extra_roles"
+	NodeIDKeyType           = "node_id"
+	NodeOCR2KeyBundleIDType = "ocr2_key_bundle_id"
 )
 
 type stringTransformer func(string) string

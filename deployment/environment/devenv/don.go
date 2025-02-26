@@ -28,8 +28,6 @@ const (
 	NodeLabelP2PIDType      = "p2p_id"
 	NodeLabelValueBootstrap = "bootstrap"
 	NodeLabelValuePlugin    = "plugin"
-	NodeOCR2KeyBundleIDType = "ocr2_key_bundle_id"
-	NodeIDKeyType           = "node_id"
 )
 
 // NodeInfo holds the information required to create a node
@@ -152,11 +150,6 @@ func NewRegisteredDON(ctx context.Context, nodeInfo []NodeInfo, jd JobDistributo
 			return nil, fmt.Errorf("failed to set up job distributor in node %s: %w", info.Name, err)
 		}
 
-		node.labels = append(node.labels, &ptypes.Label{
-			Key:   NodeIDKeyType,
-			Value: ptr(node.NodeID),
-		})
-
 		don.Nodes = append(don.Nodes, *node)
 	}
 	return don, nil
@@ -270,11 +263,6 @@ func (n *Node) CreateCCIPOCRSupportedChains(ctx context.Context, chains []JDChai
 			return fmt.Errorf("no OCR2 key bundle id found for node %s", n.Name)
 		}
 		n.Ocr2KeyBundleID = ocr2BundleId
-
-		n.labels = append(n.labels, &ptypes.Label{
-			Key:   NodeOCR2KeyBundleIDType,
-			Value: &ocr2BundleId,
-		})
 
 		// fetch node labels to know if the node is bootstrap or plugin
 		// if multi address is set, then it's a bootstrap node

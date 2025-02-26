@@ -103,7 +103,7 @@ func generateDonJobSpecs(
 			return nil, errors.Wrap(nodeErr, "failed to find bootstrap node")
 		}
 
-		gatewayNodeID, gatewayErr := node.FindLabelValue(gatewayNode, devenv.NodeIDKeyType)
+		gatewayNodeID, gatewayErr := node.FindLabelValue(gatewayNode, node.NodeIDKeyType)
 		if gatewayErr != nil {
 			return nil, errors.Wrap(gatewayErr, "failed to get gateway node id from labels")
 		}
@@ -127,7 +127,7 @@ func generateDonJobSpecs(
 		return nil, errors.Wrap(hostErr, "failed to get bootstrap node host from labels")
 	}
 
-	bootstrapNodeID, nodeIDErr := node.FindLabelValue(bootstrapNode, devenv.NodeIDKeyType)
+	bootstrapNodeID, nodeIDErr := node.FindLabelValue(bootstrapNode, node.NodeIDKeyType)
 	if nodeIDErr != nil {
 		return nil, errors.Wrap(nodeIDErr, "failed to get bootstrap node id from labels")
 	}
@@ -151,7 +151,7 @@ func generateDonJobSpecs(
 	}
 
 	for _, workerNode := range workflowNodeSet {
-		nodeID, nodeIDErr := node.FindLabelValue(workerNode, devenv.NodeIDKeyType)
+		nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKeyType)
 		if nodeIDErr != nil {
 			return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 		}
@@ -192,7 +192,7 @@ func generateDonJobSpecs(
 			return nil, errors.Wrap(ethErr, "failed to get eth address from labels")
 		}
 
-		ocr2KeyBundleID, ocr2Err := node.FindLabelValue(workerNode, devenv.NodeOCR2KeyBundleIDType)
+		ocr2KeyBundleID, ocr2Err := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDType)
 		if ocr2Err != nil {
 			return nil, errors.Wrap(ocr2Err, "failed to get ocr2 key bundle id from labels")
 		}

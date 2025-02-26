@@ -17,11 +17,11 @@ import (
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
-func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndexToOverride, error) {
+func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndexToConfigOverride, error) {
 	if err := input.Validate(); err != nil {
 		return nil, errors.Wrap(err, "input validation failed")
 	}
-	configOverrides := make(cretypes.NodeIndexToOverride)
+	configOverrides := make(cretypes.NodeIndexToConfigOverride)
 
 	// if it's only a gateway DON, we don't need to generate any extra configuration, the default one will do
 	if keystoneflags.HasFlag(input.Flags, cretypes.GatewayDON) && (!keystoneflags.HasFlag(input.Flags, cretypes.WorkflowDON) && !keystoneflags.HasFlag(input.Flags, cretypes.CapabilitiesDON)) {

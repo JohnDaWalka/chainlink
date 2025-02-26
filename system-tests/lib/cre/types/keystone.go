@@ -37,8 +37,8 @@ type ConfigDescription struct {
 type DonJobs = map[JobDescription][]*jobv1.ProposeJobRequest
 type DonsToJobSpecs = map[uint32]DonJobs
 
-type NodeIndexToOverride = map[int]string
-type DonsToOverrides = map[uint32]NodeIndexToOverride
+type NodeIndexToConfigOverride = map[int]string
+type NodeIndexToSecretsOverride = map[int]string
 
 type KeystoneContractsInput struct {
 	ChainSelector uint64                  `toml:"-"`
@@ -181,45 +181,6 @@ func (c *CreateJobsInput) Validate() error {
 	}
 
 	return nil
-}
-
-type ConfigureDonInput struct {
-	CldEnv               *deployment.Environment
-	BlockchainOutput     *blockchain.Output
-	DonTopology          *DonTopology
-	JdOutput             *jd.Output
-	DonToJobSpecs        DonsToJobSpecs
-	DonToConfigOverrides DonsToOverrides
-}
-
-func (c *ConfigureDonInput) Validate() error {
-	if c.CldEnv == nil {
-		return errors.New("chainlink deployment env not set")
-	}
-	if c.BlockchainOutput == nil {
-		return errors.New("blockchain output not set")
-	}
-	if c.DonTopology == nil {
-		return errors.New("don topology not set")
-	}
-	if len(c.DonTopology.DonsWithMetadata) == 0 {
-		return errors.New("topology dons not set")
-	}
-	if c.JdOutput == nil {
-		return errors.New("jd output not set")
-	}
-	if len(c.DonToJobSpecs) == 0 {
-		return errors.New("don to job specs not set")
-	}
-	if len(c.DonToConfigOverrides) == 0 {
-		return errors.New("don to config overrides not set")
-	}
-
-	return nil
-}
-
-type ConfigureDonOutput struct {
-	JdOutput *deployment.OffchainClient
 }
 
 type DebugInput struct {

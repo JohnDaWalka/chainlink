@@ -514,8 +514,11 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		Topology:                   topology,
 		Password:                   "", // since the test runs on private ephemeral blockchain we don't use real keys and do not care a lot about the password
 	}
-	topology, keys, err = libdon.GenereteKeys(generateKeysInput)
+	keys, err = libdon.GenereteKeys(generateKeysInput)
 	require.NoError(t, err, "failed to generate keys")
+
+	topology, err = libdon.AddKeysToTopology(topology, keys)
+	require.NoError(t, err, "failed to add keys to topology")
 
 	// Configure Workflow Registry contract
 	workflowRegistryInput := &keystonetypes.WorkflowRegistryInput{

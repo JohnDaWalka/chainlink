@@ -7,6 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
@@ -87,6 +89,17 @@ func BuildFullCLDEnvironment(lgr logger.Logger, input *types.FullCLDEnvironmentI
 					node.Labels = append(node.Labels, donLabel)
 				}
 			}
+
+			// both required for job creation
+			node.Labels = append(node.Labels, &ptypes.Label{
+				Key:   libnode.NodeIDKeyType,
+				Value: ptr.Ptr(don.NodeIds()[j]),
+			})
+
+			node.Labels = append(node.Labels, &ptypes.Label{
+				Key:   libnode.NodeOCR2KeyBundleIDType,
+				Value: ptr.Ptr(don.Nodes[j].Ocr2KeyBundleID),
+			})
 		}
 	}
 

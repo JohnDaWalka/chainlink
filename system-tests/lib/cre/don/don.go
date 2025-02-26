@@ -128,13 +128,45 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet) (*cretypes
 	return topology, nil
 }
 
-func GenereteKeys(input *cretypes.GenerateKeysInput) (*cretypes.Topology, *cretypes.GenerateKeysOutput, error) {
+func AddKeysToTopology(topology *cretypes.Topology, keys *cretypes.GenerateKeysOutput) (*cretypes.Topology, error) {
+	if topology == nil {
+		return nil, errors.New("topology is nil")
+	}
+
+	if keys == nil {
+		return nil, errors.New("keys is nil")
+	}
+
+	for _, donMetadata := range topology.DonsMetadata {
+		if p2pKeys, ok := keys.P2PKeys[donMetadata.ID]; ok {
+			for idx, node := range donMetadata.NodesMetadata {
+				node.Labels = append(node.Labels, &ptypes.Label{
+					Key:   devenv.NodeLabelP2PIDType,
+					Value: ptr.Ptr(p2pKeys.PeerIDs[idx]),
+				})
+			}
+		}
+
+		if evmKeys, ok := keys.EVMKeys[donMetadata.ID]; ok {
+			for idx, nodeMetadata := range donMetadata.NodesMetadata {
+				nodeMetadata.Labels = append(nodeMetadata.Labels, &ptypes.Label{
+					Key:   node.EthAddressKey,
+					Value: ptr.Ptr(evmKeys.PublicAddresses[idx].Hex()),
+				})
+			}
+		}
+	}
+
+	return topology, nil
+}
+
+func GenereteKeys(input *cretypes.GenerateKeysInput) (*cretypes.GenerateKeysOutput, error) {
 	if input == nil {
-		return nil, nil, errors.New("input is nil")
+		return nil, errors.New("input is nil")
 	}
 
 	if err := input.Validate(); err != nil {
-		return nil, nil, errors.Wrap(err, "input validation failed")
+		return nil, errors.Wrap(err, "input validation failed")
 	}
 
 	output := &cretypes.GenerateKeysOutput{
@@ -146,37 +178,23 @@ func GenereteKeys(input *cretypes.GenerateKeysInput) (*cretypes.Topology, *crety
 		if input.GenerateP2PKeys {
 			p2pKeys, err := crypto.GenerateP2PKeys(input.Password, len(donMetadata.NodesMetadata))
 			if err != nil {
-				return nil, nil, errors.Wrap(err, "failed to generate P2P keys")
+				return nil, errors.Wrap(err, "failed to generate P2P keys")
 			}
 			output.P2PKeys[donMetadata.ID] = p2pKeys
-
-			for idx, node := range donMetadata.NodesMetadata {
-				node.Labels = append(node.Labels, &ptypes.Label{
-					Key:   devenv.NodeLabelP2PIDType,
-					Value: ptr.Ptr(p2pKeys.PeerIDs[idx]),
-				})
-			}
 		}
 
 		if len(input.GenerateEVMKeysForChainIDs) > 0 {
 			evmKeys, err := crypto.GenerateEVMKeys(input.Password, len(donMetadata.NodesMetadata))
 			if err != nil {
-				return nil, nil, errors.Wrap(err, "failed to generate EVM keys")
+				return nil, errors.Wrap(err, "failed to generate EVM keys")
 			}
 			evmKeys.ChainIDs = append(evmKeys.ChainIDs, input.GenerateEVMKeysForChainIDs...)
 
 			output.EVMKeys[donMetadata.ID] = evmKeys
-
-			for idx, nodeMetadata := range donMetadata.NodesMetadata {
-				nodeMetadata.Labels = append(nodeMetadata.Labels, &ptypes.Label{
-					Key:   node.EthAddressKey,
-					Value: ptr.Ptr(evmKeys.PublicAddresses[idx].Hex()),
-				})
-			}
 		}
 	}
 
-	return input.Topology, output, nil
+	return output, nil
 }
 
 // In order to whitelist host IP in the gateway, we need to resolve the host.docker.internal to the host IP,

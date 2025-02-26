@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
 
-func GenerateSecrets(input *cretypes.GenerateSecretsInput) (cretypes.NodeIndexToOverride, error) {
+func GenerateSecrets(input *cretypes.GenerateSecretsInput) (cretypes.NodeIndexToSecretsOverride, error) {
 	if input == nil {
 		return nil, errors.New("input is nil")
 	}
@@ -16,7 +16,7 @@ func GenerateSecrets(input *cretypes.GenerateSecretsInput) (cretypes.NodeIndexTo
 		return nil, errors.Wrap(err, "input validation failed")
 	}
 
-	overrides := make(cretypes.NodeIndexToOverride)
+	overrides := make(cretypes.NodeIndexToSecretsOverride)
 
 	for i := range input.DonMetadata.NodesMetadata {
 		nodeSecret := types.NodeSecret{}

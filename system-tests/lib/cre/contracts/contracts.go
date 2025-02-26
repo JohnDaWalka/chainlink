@@ -11,8 +11,11 @@ import (
 	"github.com/rs/zerolog"
 
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
@@ -22,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	keystonenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 )
 
@@ -90,18 +94,23 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 
 		// Add support for new capabilities here as needed
 
-		donPeerIDs := make([]string, len(donMetadata.NodesMetadata)-1)
-		for i, node := range donMetadata.NodesMetadata {
-			if i == 0 {
-				continue
-			}
+		workerNodes, workerNodesErr := node.FindManyWithLabel(donMetadata.NodesMetadata, &ptypes.Label{
+			Key:   devenv.NodeLabelKeyType,
+			Value: ptr.Ptr(devenv.NodeLabelValuePlugin),
+		}, node.EqualLabels)
 
+		if workerNodesErr != nil {
+			return errors.Wrap(workerNodesErr, "failed to find worker nodes")
+		}
+
+		donPeerIDs := make([]string, len(workerNodes))
+		for i, node := range workerNodes {
 			p2pID, err := keystonenode.ToP2PID(node, keystonenode.NoOpTransformFn)
 			if err != nil {
 				return errors.Wrapf(err, "failed to get p2p id for node %d", i)
 			}
 
-			donPeerIDs[i-1] = p2pID
+			donPeerIDs[i] = p2pID
 		}
 
 		// we only need to assign P2P IDs to NOPs, since `ConfigureInitialContractsChangeset` method
@@ -124,8 +133,17 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput) error {
 
 	for _, metaDon := range input.Topology.DonsMetadata {
 		if flags.HasFlag(metaDon.Flags, types.OCR3Capability) {
+			workerNodes, workerNodesErr := node.FindManyWithLabel(metaDon.NodesMetadata, &ptypes.Label{
+				Key:   devenv.NodeLabelKeyType,
+				Value: ptr.Ptr(devenv.NodeLabelValuePlugin),
+			}, node.EqualLabels)
+
+			if workerNodesErr != nil {
+				return errors.Wrap(workerNodesErr, "failed to find worker nodes")
+			}
+
 			// this schedule makes sure that all worker nodes are transmitting OCR3 reports
-			transmissionSchedule = []int{len(metaDon.NodesMetadata) - 1}
+			transmissionSchedule = []int{len(workerNodes)}
 			break
 		}
 	}
