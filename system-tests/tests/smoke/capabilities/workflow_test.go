@@ -23,6 +23,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/clnode"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
@@ -49,6 +50,7 @@ import (
 	libcrecli "github.com/smartcontractkit/chainlink/system-tests/lib/crecli"
 	keystoneporcrecli "github.com/smartcontractkit/chainlink/system-tests/lib/crecli/por"
 	libfunding "github.com/smartcontractkit/chainlink/system-tests/lib/funding"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/types"
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
 
@@ -360,6 +362,7 @@ type InfrastructureOutput struct {
 	jdOutput           *jd.Output
 	sethClient         *seth.Client
 	deployerPrivateKey string
+	infraDetails       types.InfraDetails
 }
 
 func CreateInfrastructure(
@@ -377,6 +380,33 @@ func CreateInfrastructure(
 
 	if len(input.nodeSetInput) == 0 {
 		return nil, errors.New("node set input is empty")
+	}
+
+	output := &InfrastructureOutput{}
+
+	if os.Getenv("CRIB") == "true" {
+		// call devspace with "devspace run deploy-chains"
+		fmt.Println("Manually deploy chains using devspace")
+		cribNamespace := os.Getenv("CRIB_NAMESPACE")
+		if cribNamespace == "" {
+			return nil, errors.New("CRIB_NAMESPACE env var must be set")
+		}
+
+		output.infraDetails = types.InfraDetails{
+			InfraType: types.InfraType_CRIB,
+			Namespace: cribNamespace,
+		}
+
+		input.blockchainInput.Out = &blockchain.Output{}
+		input.blockchainInput.Out.UseCache = true
+		input.blockchainInput.Out.Nodes = []*blockchain.Node{
+			{
+				HostWSUrl:             fmt.Sprintf("wss://%s-geth-1337-ws.main.stage.cldev.sh", cribNamespace),
+				HostHTTPUrl:           fmt.Sprintf("https://%s-geth-1337-http.main.stage.cldev.sh", cribNamespace),
+				DockerInternalWSUrl:   fmt.Sprintf("wss://%s-geth-1337-ws.main.stage.cldev.sh", cribNamespace),
+				DockerInternalHTTPUrl: fmt.Sprintf("https://%s-geth-1337-http.main.stage.cldev.sh", cribNamespace),
+			},
+		}
 	}
 
 	// Create a new blockchain network and Seth client to interact with it
@@ -412,11 +442,6 @@ func CreateInfrastructure(
 		input.jdInput.Image = fmt.Sprintf("%s:%s", jdImage, jdVersion)
 	}
 
-	jdOutput, err := jd.NewJD(input.jdInput)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create new job distributor")
-	}
-
 	// Deploy the DONs
 	// Hack for CI that allows us to dynamically set the chainlink image and version
 	// CTFv2 currently doesn't support dynamic image and version setting
@@ -431,13 +456,13 @@ func CreateInfrastructure(
 		}
 	}
 
-	return &InfrastructureOutput{
-		chainSelector:      chainSelector,
-		blockchainOutput:   blockchainOutput,
-		jdOutput:           jdOutput,
-		sethClient:         sethClient,
-		deployerPrivateKey: pkey,
-	}, nil
+	output.chainSelector = chainSelector
+	output.blockchainOutput = blockchainOutput
+	// jdOutput:           jdOutput
+	output.sethClient = sethClient
+	output.deployerPrivateKey = pkey
+
+	return output, nil
 }
 
 type setupOutput struct {
@@ -457,6 +482,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		nodeSetInput:    mustSetCapabilitiesFn(in.NodeSets),
 		blockchainInput: in.BlockchainA,
 	}
+
 	singeFileLogger := cldlogger.NewSingleFileLogger(t)
 	envOutput, err := CreateInfrastructure(singeFileLogger, testLogger, envInput)
 	require.NoError(t, err, "failed to start environment")
@@ -499,7 +525,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 
 	// Translate node input to structure required further down the road and put as much information
 	// as we have at this point in labels. It will be used to generate node configs
-	topology, err := libdon.BuildTopology(envInput.nodeSetInput)
+	topology, err := libdon.BuildTopology(envInput.nodeSetInput, envOutput.infraDetails)
 	require.NoError(t, err, "failed to build input DON topology")
 
 	// Generate EVM and P2P keys, which are needed to prepare the node configs
@@ -584,6 +610,31 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 			envInput.nodeSetInput[i].NodeSpecs[j].Node.TestSecretsOverrides = secrets[j]
 		}
 	}
+
+	// deploy don (it includes JD) manually
+	fmt.Println("Run devspace run deploy-don manually")
+	if os.Getenv("CRIB") == "true" {
+		in.JD.Out = &jd.Output{}
+		in.JD.Out.UseCache = true
+		jdGRPCHost := fmt.Sprintf("grpc://%s-job-distributor-grpc.main.stage.cldev.sh", os.Getenv("CRIB_NAMESPACE"))
+		in.JD.Out.HostGRPCUrl = jdGRPCHost
+		in.JD.Out.DockerGRPCUrl = jdGRPCHost
+		// is WS needed?
+
+		envInput.nodeSetInput[0].Out = &ns.Output{}
+		envInput.nodeSetInput[0].Out.UseCache = true
+		envInput.nodeSetInput[0].Out.CLNodes = []*clnode.Output{
+			{
+				// TODO add node URLs
+				// what about PG?
+			},
+		}
+	}
+
+	jdOutput, err := jd.NewJD(in.JD)
+	require.NoError(t, err, "failed to create new job distributor")
+
+	envOutput.jdOutput = jdOutput
 
 	nodeOutput := make([]*keystonetypes.WrappedNodeOutput, 0, len(envInput.nodeSetInput))
 	for _, nodeSetInput := range envInput.nodeSetInput {
