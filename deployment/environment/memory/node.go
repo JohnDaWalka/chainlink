@@ -18,8 +18,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/test-go/testify/mock"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/maps"
 
@@ -615,6 +615,7 @@ func (e KeystoreSim) CSA() keystore.CSA {
 func setupJD(t *testing.T, app chainlink.Application) {
 	secret := randomBytes32(t)
 	pkey, err := crypto.PublicKeyFromHex(hex.EncodeToString(secret))
+	require.NoError(t, err)
 	m := feeds2.RegisterManagerParams{
 		Name:      "In memory env test",
 		URI:       "http://dev.null:8080",

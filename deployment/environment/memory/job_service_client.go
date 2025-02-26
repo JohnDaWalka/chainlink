@@ -139,12 +139,12 @@ func (j *JobServiceClient) ProposeJob(ctx context.Context, in *jobv1.ProposeJobR
 	if err != nil {
 		return nil, fmt.Errorf("failed to list proposals: %w", err)
 	}
-
+	proposalVersion := int32(len(proposals) + 1) //nolint:gosec // G115
 	appProposalID, err := n.App.GetFeedsService().ProposeJob(ctx, &feeds.ProposeJobArgs{
 		FeedsManagerID: 1,
 		Spec:           in.Spec,
 		RemoteUUID:     uuid.MustParse(extractor.ExternalJobID),
-		Version:        int32(len(proposals) + 1),
+		Version:        proposalVersion,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to propose job: %w", err)
@@ -155,10 +155,11 @@ func (j *JobServiceClient) ProposeJob(ctx context.Context, in *jobv1.ProposeJobR
 	if err != nil {
 		return nil, fmt.Errorf("failed to list specs: %w", err)
 	}
-	if len(proposedSpec) != 1 {
-		return nil, fmt.Errorf("expected 1 spec, got %d", len(proposedSpec))
+	// possible to have multiple specs for the same job proposal id; take the last one
+	if len(proposedSpec) == 0 {
+		return nil, fmt.Errorf("no specs found for job proposal id: %d", appProposalID)
 	}
-	err = n.App.GetFeedsService().ApproveSpec(ctx, proposedSpec[0].ID, true)
+	err = n.App.GetFeedsService().ApproveSpec(ctx, proposedSpec[len(proposedSpec)-1].ID, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to approve job: %w", err)
 	}
@@ -167,7 +168,8 @@ func (j *JobServiceClient) ProposeJob(ctx context.Context, in *jobv1.ProposeJobR
 	p := &jobv1.ProposeJobResponse{Proposal: &jobv1.Proposal{
 		// make the proposal id the same as the job id for further reference
 		// if you are changing this make sure to change the GetProposal and ListJobs method implementation
-		Id: storeProposalID,
+		Id:       storeProposalID,
+		Revision: int64(proposalVersion),
 		// Auto approve for now
 		Status:             jobv1.ProposalStatus_PROPOSAL_STATUS_APPROVED,
 		DeliveryStatus:     jobv1.ProposalDeliveryStatus_PROPOSAL_DELIVERY_STATUS_DELIVERED,
@@ -193,7 +195,7 @@ func (j *JobServiceClient) ProposeJob(ctx context.Context, in *jobv1.ProposeJobR
 		defer func() {
 			// cleanup if we fail to save the job
 			if storeErr != nil {
-				j.proposalStore.delete(storeProposalID)
+				j.proposalStore.delete(storeProposalID) //nolint:errcheck // ignore error nothing to do
 			}
 		}()
 
@@ -332,7 +334,8 @@ func (m *mapJobStore) list(filter *jobv1.ListJobsRequest_Filter) ([]*jobv1.Job, 
 
 	wantedJobIDs := make(map[string]struct{})
 	// use node ids to construct wanted job ids
-	if filter.NodeIds != nil {
+	switch {
+	case filter.NodeIds != nil:
 		for _, nodeID := range filter.NodeIds {
 			jobIDs, ok := m.nodesToJobIDs[nodeID]
 			if !ok {
@@ -342,7 +345,7 @@ func (m *mapJobStore) list(filter *jobv1.ListJobsRequest_Filter) ([]*jobv1.Job, 
 				wantedJobIDs[jobID] = struct{}{}
 			}
 		}
-	} else if filter.Uuids != nil {
+	case filter.Uuids != nil:
 		for _, uuid := range filter.Uuids {
 			jobIDs, ok := m.uuidToJobIDs[uuid]
 			if !ok {
@@ -352,11 +355,14 @@ func (m *mapJobStore) list(filter *jobv1.ListJobsRequest_Filter) ([]*jobv1.Job, 
 				wantedJobIDs[jobID] = struct{}{}
 			}
 		}
-	} else if filter.Ids != nil {
+	case filter.Ids != nil:
 		for _, jobID := range filter.Ids {
 			wantedJobIDs[jobID] = struct{}{}
 		}
+	default:
+		panic("this should never happen because of the nil filter check")
 	}
+
 	for _, job := range m.jobs {
 		if _, ok := wantedJobIDs[job.Id]; ok {
 			jobs = append(jobs, job)

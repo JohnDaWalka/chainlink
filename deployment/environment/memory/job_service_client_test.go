@@ -16,6 +16,99 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 )
 
+func TestJobClientProposeJob(t *testing.T) {
+	t.Parallel()
+	ctx := testutils.Context(t)
+	chains, _ := memory.NewMemoryChains(t, 1, 1)
+	ports := freeport.GetN(t, 1)
+	testNode := memory.NewNode(t, ports[0], chains, nil, zapcore.DebugLevel, false, deployment.CapabilityRegistryConfig{})
+
+	// Set up the JobClient with a mock node
+	nodeID := "node-1"
+	nodes := map[string]memory.Node{
+		nodeID: *testNode,
+	}
+	jobClient := memory.NewMemoryJobClient(nodes)
+
+	type testCase struct {
+		name      string
+		req       *jobv1.ProposeJobRequest
+		checkErr  func(t *testing.T, err error)
+		checkResp func(t *testing.T, resp *jobv1.ProposeJobResponse)
+	}
+	cases := []testCase{
+		{
+			name: "valid request",
+			req: &jobv1.ProposeJobRequest{
+				NodeId: "node-1",
+				Spec:   testJobProposalTOML(t, "f1ac5211-ab79-4c31-ba1c-0997b72db466"),
+			},
+			checkResp: func(t *testing.T, resp *jobv1.ProposeJobResponse) {
+				assert.NotNil(t, resp)
+				assert.Equal(t, int64(1), resp.Proposal.Revision)
+				assert.Equal(t, jobv1.ProposalStatus_PROPOSAL_STATUS_APPROVED, resp.Proposal.Status)
+				assert.Equal(t, jobv1.ProposalDeliveryStatus_PROPOSAL_DELIVERY_STATUS_DELIVERED, resp.Proposal.DeliveryStatus)
+				assert.Equal(t, "f1ac5211-ab79-4c31-ba1c-0997b72db466", resp.Proposal.JobId)
+				assert.Equal(t, testJobProposalTOML(t, "f1ac5211-ab79-4c31-ba1c-0997b72db466"), resp.Proposal.Spec)
+			},
+		},
+		{
+			name: "idempotent request bumps version",
+			req: &jobv1.ProposeJobRequest{
+				NodeId: "node-1",
+				Spec:   testJobProposalTOML(t, "f1ac5211-ab79-4c31-ba1c-0997b72db466"),
+			},
+			// the feeds service doesn't allow duplicate job names
+			checkResp: func(t *testing.T, resp *jobv1.ProposeJobResponse) {
+				assert.NotNil(t, resp)
+				assert.Equal(t, int64(2), resp.Proposal.Revision)
+				assert.Equal(t, jobv1.ProposalStatus_PROPOSAL_STATUS_APPROVED, resp.Proposal.Status)
+				assert.Equal(t, jobv1.ProposalDeliveryStatus_PROPOSAL_DELIVERY_STATUS_DELIVERED, resp.Proposal.DeliveryStatus)
+				assert.Equal(t, "f1ac5211-ab79-4c31-ba1c-0997b72db466", resp.Proposal.JobId)
+				assert.Equal(t, testJobProposalTOML(t, "f1ac5211-ab79-4c31-ba1c-0997b72db466"), resp.Proposal.Spec)
+			},
+		},
+		{
+			name: "another request",
+			req: &jobv1.ProposeJobRequest{
+				NodeId: "node-1",
+				Spec:   testJobProposalTOML(t, "11115211-ab79-4c31-ba1c-0997b72aaaaa"),
+			},
+			checkResp: func(t *testing.T, resp *jobv1.ProposeJobResponse) {
+				assert.NotNil(t, resp)
+				assert.Equal(t, int64(1), resp.Proposal.Revision)
+				assert.Equal(t, jobv1.ProposalStatus_PROPOSAL_STATUS_APPROVED, resp.Proposal.Status)
+				assert.Equal(t, jobv1.ProposalDeliveryStatus_PROPOSAL_DELIVERY_STATUS_DELIVERED, resp.Proposal.DeliveryStatus)
+				assert.Equal(t, "11115211-ab79-4c31-ba1c-0997b72aaaaa", resp.Proposal.JobId)
+				assert.Equal(t, testJobProposalTOML(t, "11115211-ab79-4c31-ba1c-0997b72aaaaa"), resp.Proposal.Spec)
+			},
+		},
+		{
+			name: "node does not exist",
+			req: &jobv1.ProposeJobRequest{
+				NodeId: "node-2",
+				Spec:   testJobProposalTOML(t, "f1ac5211-ab79-4c31-ba1c-0997b72db466"),
+			},
+			checkErr: func(t *testing.T, err error) {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "node not found")
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// Call the ProposeJob method
+			resp, err := jobClient.ProposeJob(ctx, c.req)
+			if c.checkErr != nil {
+				c.checkErr(t, err)
+				return
+			}
+			require.NoError(t, err)
+			c.checkResp(t, resp)
+		})
+	}
+}
+
 func TestJobClientJobAPI(t *testing.T) {
 	t.Parallel()
 	ctx := testutils.Context(t)
@@ -239,56 +332,10 @@ func testJobProposalTOML(t *testing.T, externalJobId string) string {
 type = "standardcapabilities"
 schemaVersion = 1
 externalJobID = "%s"
-name = "hacking"
+name = "hacking-%s"
 forwardingAllowed = false
 command = "/home/capabilities/nowhere"
 config = ""
 `
-	return fmt.Sprintf(tomlString, externalJobId)
-}
-
-func setupOne(t *testing.T) *memory.JobClient {
-	t.Helper()
-	ctx := testutils.Context(t)
-	// Create a new memory node
-
-	chains, _ := memory.NewMemoryChains(t, 1, 1)
-	ports := freeport.GetN(t, 1)
-	testNode := memory.NewNode(t, ports[0], chains, nil, zapcore.DebugLevel, false, deployment.CapabilityRegistryConfig{})
-
-	// Set up the JobClient with a mock node
-	nodeID := "node-1"
-	externalJobID := "f1ac5211-ab79-4c31-ba1c-0997b72db466"
-	// need some non-ocr job type to avoid the ocr validation and the p2pwrapper check
-
-	jobSpecToml := testJobProposalTOML(t, externalJobID)
-	nodes := map[string]memory.Node{
-		nodeID: *testNode,
-	}
-	jobClient := memory.NewMemoryJobClient(nodes)
-
-	// Create a mock request
-	req := &jobv1.ProposeJobRequest{
-		NodeId: nodeID,
-		Spec:   jobSpecToml,
-		Labels: []*ptypes.Label{
-			{
-				Key:   "label-key",
-				Value: ptr("label-value"),
-			},
-		},
-	}
-
-	// Call the ProposeJob method
-	resp, err := jobClient.ProposeJob(ctx, req)
-
-	// Validate the response
-	require.NoError(t, err)
-	assert.NotNil(t, resp)
-	assert.Equal(t, externalJobID, resp.Proposal.Id)
-	assert.Equal(t, jobv1.ProposalStatus_PROPOSAL_STATUS_APPROVED, resp.Proposal.Status)
-	assert.Equal(t, jobv1.ProposalDeliveryStatus_PROPOSAL_DELIVERY_STATUS_DELIVERED, resp.Proposal.DeliveryStatus)
-	assert.Equal(t, jobSpecToml, resp.Proposal.Spec)
-	assert.Equal(t, externalJobID, resp.Proposal.JobId)
-	return jobClient
+	return fmt.Sprintf(tomlString, externalJobId, externalJobId)
 }

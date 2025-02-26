@@ -645,7 +645,7 @@ func (s *service) ProposeJob(ctx context.Context, args *ProposeJobArgs) (int64, 
 
 		if exists {
 			// note: CLO auto-increments the version number on re-proposal, so this should never happen
-			return 0, fmt.Errorf("external job id %d: version conflict: version %d already exists at job proposal id %d %v", args.RemoteUUID, args.Version, existing.ID, *existing)
+			return 0, fmt.Errorf("external job id %s: version conflict: version %d already exists at job proposal id %d %v", args.RemoteUUID, args.Version, existing.ID, *existing)
 		}
 	}
 
