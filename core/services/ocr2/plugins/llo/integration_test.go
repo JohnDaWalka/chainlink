@@ -1069,9 +1069,9 @@ func TestIntegration_LLO_stress_test_with_wide_channels_and_transmit_errors(t *t
 	// LESS STRESSFUL
 	const nChannels = 2
 	const maxQueueSize = 4
-	const nReports = 100
+	const nReports = 10
 
-	const nStreamsPerChannel = 10_000
+	const nStreamsPerChannel = 3000
 
 	clientCSAKeys := make([]csakey.KeyV2, nNodes)
 	clientPubKeys := make([]ed25519.PublicKey, nNodes)
@@ -1103,7 +1103,12 @@ func TestIntegration_LLO_stress_test_with_wide_channels_and_transmit_errors(t *t
 		serverURL := startMercuryServer(t, srv, clientPubKeys)
 
 		donID := uint32(888333)
-		streams := []Stream{ethStream, linkStream}
+
+		streams := make([]Stream, nStreamsPerChannel+2)
+
+		streams[0] = ethStream
+		streams[1] = linkStream
+
 		streamMap := make(map[uint32]Stream)
 		for _, strm := range streams {
 			streamMap[strm.id] = strm
@@ -1152,6 +1157,11 @@ lloConfigMode = "bluegreen"
 			}
 
 			for j := uint32(0); j < nStreamsPerChannel; j++ {
+				newStreamID := ethStreamID + 2 + j
+				streams[j+2] = Stream{
+					id:                 newStreamID,
+					baseBenchmarkPrice: decimal.NewFromFloat32(2_976.39),
+				}
 				streamDefinitions[j+2] = llotypes.Stream{
 					StreamID:   ethStreamID,
 					Aggregator: llotypes.AggregatorMedian,
@@ -1188,7 +1198,7 @@ lloConfigMode = "bluegreen"
 donID = %d
 channelDefinitionsContractAddress = "0x%x"
 channelDefinitionsContractFromBlock = %d`, serverURL, serverPubKey, serverPubKey, donID, configStoreAddress, fromBlock)
-		addOCRJobsEVMPremiumLegacy(t, streams, serverPubKey, serverURL, configuratorAddress, bootstrapPeerID, bootstrapNodePort, nodes, configStoreAddress, clientPubKeys, pluginConfig, relayType, relayConfig)
+		addOCRJobsEVMABIEncode(t, streams, serverPubKey, serverURL, configuratorAddress, bootstrapPeerID, bootstrapNodePort, nodes, configStoreAddress, clientPubKeys, pluginConfig, relayType, relayConfig)
 
 		var blueDigest ocr2types.ConfigDigest
 

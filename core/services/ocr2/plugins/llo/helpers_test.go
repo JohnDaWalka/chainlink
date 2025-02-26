@@ -466,6 +466,75 @@ func createBridge(t *testing.T, bridgeName string, resultJSON string, borm bridg
 	}))
 }
 
+func addOCRJobsEVMABIEncode(
+	t *testing.T,
+	streams []Stream,
+	serverPubKey ed25519.PublicKey,
+	serverURL string,
+	configuratorAddress common.Address,
+	bootstrapPeerID string,
+	bootstrapNodePort int,
+	nodes []Node,
+	configStoreAddress common.Address,
+	clientPubKeys []ed25519.PublicKey,
+	pluginConfig,
+	relayType,
+	relayConfig string) (jobIDs map[int]map[uint32]int32) {
+	// node idx => stream id => job id
+	jobIDs = make(map[int]map[uint32]int32)
+	// Add OCR jobs - one per feed on each node
+	for i, node := range nodes {
+		if jobIDs[i] == nil {
+			jobIDs[i] = make(map[uint32]int32)
+		}
+		for j, strm := range streams {
+			// assume that streams are native, link and additionals are quote
+			if j < 2 {
+				var name string
+				if j == 0 {
+					name = "nativeprice"
+				} else {
+					name = "linkprice"
+				}
+				name = fmt.Sprintf("%s-%d-%d", name, strm.id, j)
+				bmBridge := createSingleDecimalBridge(t, name, i, strm.baseBenchmarkPrice, node.App.BridgeORM())
+				jobID := addSingleDecimalStreamJob(
+					t,
+					node,
+					strm.id,
+					bmBridge,
+				)
+				jobIDs[i][strm.id] = jobID
+			} else {
+				name := "medianprice"
+
+				name = fmt.Sprintf("%s-%d-%d", name, strm.id, j)
+				bmBridge := createSingleDecimalBridge(t, name, i, strm.baseBenchmarkPrice, node.App.BridgeORM())
+				jobID := addSingleDecimalStreamJob(
+					t,
+					node,
+					strm.id,
+					bmBridge,
+				)
+				jobIDs[i][strm.id] = jobID
+			}
+		}
+		addLLOJob(
+			t,
+			node,
+			configuratorAddress,
+			bootstrapPeerID,
+			bootstrapNodePort,
+			clientPubKeys[i],
+			"feed-1",
+			pluginConfig,
+			relayType,
+			relayConfig,
+		)
+	}
+	return jobIDs
+}
+
 func addOCRJobsEVMPremiumLegacy(
 	t *testing.T,
 	streams []Stream,
