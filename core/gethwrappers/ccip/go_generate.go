@@ -40,3 +40,6 @@ package ccip
 
 // EncodingUtils
 //go:generate go run ../generation/wrap.go ccip EncodingUtils ccip_encoding_utils latest
+
+// AptosUtils
+//go:generate go run ../generation/wrap.go ccip AptosUtils ccip_aptos_utils latest
