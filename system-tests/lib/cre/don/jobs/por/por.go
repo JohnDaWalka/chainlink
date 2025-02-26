@@ -7,12 +7,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
-	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
@@ -36,7 +33,7 @@ func GenerateJobSpecs(input *types.GeneratePoRJobSpecsInput) (types.DonsToJobSpe
 	for _, donWithMetadata := range input.DonsWithMetadata {
 		// if it's a workflow DON or it has custom compute capability, it needs access to gateway connector
 		if creflags.HasFlag(donWithMetadata.Flags, types.WorkflowDON) || creflags.HasFlag(donWithMetadata.Flags, types.CustomComputeCapability) {
-			workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValuePlugin))}, node.EqualLabels)
+			workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.WorkerNode}, node.EqualLabels)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to find worker nodes")
 			}
@@ -98,12 +95,12 @@ func generateDonJobSpecs(
 
 	// create job specs for the gateway node
 	if creflags.HasFlag(donWithMetadata.Flags, types.GatewayDON) {
-		gatewayNode, nodeErr := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &ptypes.Label{Key: node.ExtraRolesKey, Value: ptr.Ptr(types.GatewayNode)}, node.LabelContains)
+		gatewayNode, nodeErr := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.ExtraRolesKey, Value: types.GatewayNode}, node.LabelContains)
 		if nodeErr != nil {
 			return nil, errors.Wrap(nodeErr, "failed to find bootstrap node")
 		}
 
-		gatewayNodeID, gatewayErr := node.FindLabelValue(gatewayNode, node.NodeIDKeyType)
+		gatewayNodeID, gatewayErr := node.FindLabelValue(gatewayNode, node.NodeIDKey)
 		if gatewayErr != nil {
 			return nil, errors.Wrap(gatewayErr, "failed to get gateway node id from labels")
 		}
@@ -112,7 +109,7 @@ func generateDonJobSpecs(
 	}
 
 	// look for boostrap node and then for required values in its labels
-	bootstrapNode, err := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValueBootstrap))}, node.EqualLabels)
+	bootstrapNode, err := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.BootstrapNode}, node.EqualLabels)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find bootstrap node")
 	}
@@ -127,7 +124,7 @@ func generateDonJobSpecs(
 		return nil, errors.Wrap(hostErr, "failed to get bootstrap node host from labels")
 	}
 
-	bootstrapNodeID, nodeIDErr := node.FindLabelValue(bootstrapNode, node.NodeIDKeyType)
+	bootstrapNodeID, nodeIDErr := node.FindLabelValue(bootstrapNode, node.NodeIDKey)
 	if nodeIDErr != nil {
 		return nil, errors.Wrap(nodeIDErr, "failed to get bootstrap node id from labels")
 	}
@@ -144,14 +141,14 @@ func generateDonJobSpecs(
 	}
 
 	// create job specs for the worker nodes
-	workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValuePlugin))}, node.EqualLabels)
+	workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.WorkerNode}, node.EqualLabels)
 	if err != nil {
 		// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 		return nil, errors.Wrap(err, "failed to find worker nodes")
 	}
 
 	for _, workerNode := range workflowNodeSet {
-		nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKeyType)
+		nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
 		if nodeIDErr != nil {
 			return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 		}
@@ -192,7 +189,7 @@ func generateDonJobSpecs(
 			return nil, errors.Wrap(ethErr, "failed to get eth address from labels")
 		}
 
-		ocr2KeyBundleID, ocr2Err := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDType)
+		ocr2KeyBundleID, ocr2Err := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDKey)
 		if ocr2Err != nil {
 			return nil, errors.Wrap(ocr2Err, "failed to get ocr2 key bundle id from labels")
 		}

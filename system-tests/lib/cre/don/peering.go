@@ -3,9 +3,6 @@ package don
 import (
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
@@ -13,7 +10,7 @@ import (
 
 func globalBootstraperNodeData(topology *types.Topology) (string, string, error) {
 	if len(topology.DonsMetadata) == 1 {
-		bootstrapNode, err := node.FindOneWithLabel(topology.DonsMetadata[0].NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValueBootstrap))}, node.EqualLabels)
+		bootstrapNode, err := node.FindOneWithLabel(topology.DonsMetadata[0].NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.BootstrapNode}, node.EqualLabels)
 		if err != nil {
 			return "", "", errors.Wrap(err, "failed to find bootstrap node")
 		}
@@ -35,7 +32,7 @@ func globalBootstraperNodeData(topology *types.Topology) (string, string, error)
 		// for all the DONs, and so we need to find it first. For us, it will always be the bootstrap node of the workflow DON.
 		for _, donTopology := range topology.DonsMetadata {
 			if flags.HasFlag(donTopology.Flags, types.WorkflowDON) {
-				bootstrapNode, err := node.FindOneWithLabel(donTopology.NodesMetadata, &ptypes.Label{Key: devenv.NodeLabelKeyType, Value: ptr.Ptr(string(devenv.NodeLabelValueBootstrap))}, node.EqualLabels)
+				bootstrapNode, err := node.FindOneWithLabel(donTopology.NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.BootstrapNode}, node.EqualLabels)
 				if err != nil {
 					return "", "", errors.Wrap(err, "failed to find bootstrap node")
 				}
