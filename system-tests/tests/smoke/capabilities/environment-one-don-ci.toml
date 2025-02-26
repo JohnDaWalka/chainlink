@@ -4,7 +4,7 @@
   docker_cmd_params = ["-b", "5"]
 
 [jd]
-  image = "replace-me"
+  image = "injected-at-runtime"
 
 [fake]
   port = 8171
@@ -41,7 +41,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      image = "replace-me"
+      image = "injected-at-runtime"
       user_config_overrides = """
       [Feature]
 			LogPoller = true
@@ -58,7 +58,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      image = "replace-me"
+      image = "injected-at-runtime"
       capabilities = ["./amd64_cron"]
       user_config_overrides = """
       [Feature]
@@ -76,7 +76,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      image = "replace-me"
+      image = "injected-at-runtime"
       capabilities = ["./amd64_cron"]
       user_config_overrides = """
       [Feature]
@@ -94,7 +94,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      image = "replace-me"
+      image = "injected-at-runtime"
       capabilities = ["./amd64_cron"]
       user_config_overrides = """
       [Feature]
@@ -112,7 +112,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      image = "replace-me"
+      image = "injected-at-runtime"
       capabilities = ["./amd64_cron"]
       user_config_overrides = """
       [Feature]
