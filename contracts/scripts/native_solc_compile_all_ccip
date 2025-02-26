@@ -91,9 +91,9 @@ compileContract test/mocks/MockE2EUSDCTransmitter
 compileContract test/helpers/CCIPReaderTester
 # Offchain test encoding utils
 compileContract test/helpers/EncodingUtils
+# Aptos encoding utils
+compileContract test/helpers/AptosUtils
 
 # Message Transformer On/OffRamps
 compileContract offRamp/OffRampWithMessageTransformer
 compileContract onRamp/OnRampWithMessageTransformer
-
-
