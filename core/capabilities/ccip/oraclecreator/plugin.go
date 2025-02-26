@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipaptos"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipsolana"
 	solanaconfig "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/solana"
@@ -58,6 +59,7 @@ var extraDataCodec = ccipcommon.NewExtraDataCodec(
 	ccipcommon.NewExtraDataCodecParams(
 		ccipevm.ExtraDataDecoder{},
 		ccipsolana.ExtraDataDecoder{},
+		ccipaptos.ExtraDataDecoder{},
 	),
 )
 
