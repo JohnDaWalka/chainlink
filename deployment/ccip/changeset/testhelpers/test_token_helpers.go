@@ -130,7 +130,7 @@ func SetupTwoChainEnvironmentWithTokens(
 		e, err = commoncs.Apply(t, e, timelockContracts,
 			commoncs.Configure(
 				deployment.CreateLegacyChangeSet(commoncs.TransferToMCMSWithTimelock),
-				commoncs.TransferToMCMSWithTimelockConfig{
+				commontypes.TransferToMCMSWithTimelockConfig{
 					ContractsByChain: timelockOwnedContractsByChain,
 					MinDelay:         0,
 				},
@@ -208,7 +208,7 @@ func DeployTestTokenPools(
 		e, err = commoncs.Apply(t, e, timelockContracts,
 			commoncs.Configure(
 				deployment.CreateLegacyChangeSet(commoncs.TransferToMCMSWithTimelock),
-				commoncs.TransferToMCMSWithTimelockConfig{
+				commontypes.TransferToMCMSWithTimelockConfig{
 					ContractsByChain: timelockOwnedContractsByChain,
 					MinDelay:         0,
 				},

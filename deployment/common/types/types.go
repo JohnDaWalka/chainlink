@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/config"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
@@ -66,6 +68,25 @@ type MCMSWithTimelockConfigV2 struct {
 	Proposer         mcmstypes.Config
 	TimelockMinDelay *big.Int
 	Label            *string
+}
+
+// TransferToMCMSWithTimelockConfig holds the configuration for an ownership transfer changeset
+type TransferToMCMSWithTimelockConfig struct {
+	ContractsByChain map[uint64][]common.Address
+	MinDelay         time.Duration // MinDelay is for the accept ownership proposal
+}
+
+// TransferToMCMSWithTimelockConfigSolana holds the configuration for an ownership transfer changeset
+type TransferToMCMSWithTimelockConfigSolana struct {
+	ContractsByChain map[uint64][]OwnableSolanaContract
+	MinDelay         time.Duration // MinDelay is for the accept ownership proposal
+}
+
+type OwnableSolanaContract struct {
+	ProgramID solana.PublicKey
+	Seed      [32]byte
+	OwnerPDA  solana.PublicKey
+	Type      deployment.ContractType
 }
 
 type OCRParameters struct {

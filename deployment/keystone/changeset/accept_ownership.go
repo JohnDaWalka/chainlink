@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 )
 
 type AcceptAllOwnershipRequest struct {
@@ -35,7 +36,7 @@ func AcceptAllOwnershipsProposal(e deployment.Environment, req *AcceptAllOwnersh
 	contracts := r.ContractSets[chainSelector]
 
 	// Construct the configuration
-	cfg := changeset.TransferToMCMSWithTimelockConfig{
+	cfg := commontypes.TransferToMCMSWithTimelockConfig{
 		ContractsByChain: map[uint64][]common.Address{
 			chainSelector: contracts.TransferableContracts(),
 		},

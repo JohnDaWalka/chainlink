@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 )
 
 type mintConfig struct {
@@ -236,7 +237,7 @@ func TestDeployerGroupMCMS(t *testing.T) {
 			_, err = commonchangeset.Apply(t, e.Env, timelocksPerChain,
 				commonchangeset.Configure(
 					deployment.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelock),
-					commonchangeset.TransferToMCMSWithTimelockConfig{
+					commontypes.TransferToMCMSWithTimelockConfig{
 						ContractsByChain: contractsByChain,
 						MinDelay:         0,
 					},
@@ -313,7 +314,7 @@ func TestDeployerGroupGenerateMultipleProposals(t *testing.T) {
 	_, err = commonchangeset.Apply(t, e.Env, timelocksPerChain,
 		commonchangeset.Configure(
 			deployment.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelock),
-			commonchangeset.TransferToMCMSWithTimelockConfig{
+			commontypes.TransferToMCMSWithTimelockConfig{
 				ContractsByChain: contractsByChain,
 				MinDelay:         0,
 			},
@@ -377,7 +378,7 @@ func TestDeployerGroupMultipleProposalsMCMS(t *testing.T) {
 	_, err = commonchangeset.Apply(t, e.Env, timelocksPerChain,
 		commonchangeset.Configure(
 			deployment.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelock),
-			commonchangeset.TransferToMCMSWithTimelockConfig{
+			commontypes.TransferToMCMSWithTimelockConfig{
 				ContractsByChain: contractsByChain,
 				MinDelay:         0,
 			},

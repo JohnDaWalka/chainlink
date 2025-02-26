@@ -48,7 +48,7 @@ func TestTransferToMCMSWithTimelock(t *testing.T) {
 		},
 		Configure(
 			deployment.CreateLegacyChangeSet(TransferToMCMSWithTimelock),
-			TransferToMCMSWithTimelockConfig{
+			types.TransferToMCMSWithTimelockConfig{
 				ContractsByChain: map[uint64][]common.Address{
 					chain1: {link.LinkToken.Address()},
 				},
@@ -113,7 +113,7 @@ func TestTransferToMCMSWithTimelockV2(t *testing.T) {
 		},
 		Configure(
 			deployment.CreateLegacyChangeSet(TransferToMCMSWithTimelockV2),
-			TransferToMCMSWithTimelockConfig{
+			types.TransferToMCMSWithTimelockConfig{
 				ContractsByChain: map[uint64][]common.Address{
 					chain1: {link.LinkToken.Address()},
 				},

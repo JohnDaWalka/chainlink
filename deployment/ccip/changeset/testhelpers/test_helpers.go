@@ -1693,7 +1693,7 @@ func GenTestTransferOwnershipConfig(
 	e DeployedEnv,
 	chains []uint64,
 	state changeset.CCIPOnChainState,
-) commoncs.TransferToMCMSWithTimelockConfig {
+) commontypes.TransferToMCMSWithTimelockConfig {
 	var (
 		timelocksPerChain = make(map[uint64]common.Address)
 		contracts         = make(map[uint64][]common.Address)
@@ -1722,7 +1722,7 @@ func GenTestTransferOwnershipConfig(
 		state.Chains[e.HomeChainSel].RMNHome.Address(),
 	)
 
-	return commoncs.TransferToMCMSWithTimelockConfig{
+	return commontypes.TransferToMCMSWithTimelockConfig{
 		ContractsByChain: contracts,
 	}
 }

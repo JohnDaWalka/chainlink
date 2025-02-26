@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/common/view/v1_0"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
@@ -178,7 +179,7 @@ func TestRemoveDons(t *testing.T) {
 		},
 		commoncs.Configure(
 			deployment.CreateLegacyChangeSet(commoncs.TransferToMCMSWithTimelock),
-			commoncs.TransferToMCMSWithTimelockConfig{
+			commontypes.TransferToMCMSWithTimelockConfig{
 				ContractsByChain: map[uint64][]common.Address{
 					e.HomeChainSel: {homeChain.CapabilityRegistry.Address()},
 				},

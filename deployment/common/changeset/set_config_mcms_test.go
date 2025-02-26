@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
@@ -85,7 +86,7 @@ func TestSetConfigMCMSVariants(t *testing.T) {
 				return []commonchangeset.ConfiguredChangeSet{
 					commonchangeset.Configure(
 						deployment.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelock),
-						commonchangeset.TransferToMCMSWithTimelockConfig{
+						commontypes.TransferToMCMSWithTimelockConfig{
 							ContractsByChain: map[uint64][]common.Address{
 								chainSel: {mcmsState.ProposerMcm.Address(), mcmsState.BypasserMcm.Address(), mcmsState.CancellerMcm.Address()},
 							},
@@ -194,7 +195,7 @@ func TestSetConfigMCMSV2Variants(t *testing.T) {
 				return []commonchangeset.ConfiguredChangeSet{
 					commonchangeset.Configure(
 						deployment.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelockV2),
-						commonchangeset.TransferToMCMSWithTimelockConfig{
+						commontypes.TransferToMCMSWithTimelockConfig{
 							ContractsByChain: map[uint64][]common.Address{
 								chainSel: {mcmsState.ProposerMcm.Address(), mcmsState.BypasserMcm.Address(), mcmsState.CancellerMcm.Address()},
 							},

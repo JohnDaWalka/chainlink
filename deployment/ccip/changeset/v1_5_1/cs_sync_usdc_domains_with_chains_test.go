@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_5_1"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 )
 
@@ -207,7 +208,7 @@ func TestSyncUSDCDomainsWithChainsChangeset(t *testing.T) {
 				e, err = commoncs.Apply(t, e, timelockContracts,
 					commonchangeset.Configure(
 						deployment.CreateLegacyChangeSet(commoncs.TransferToMCMSWithTimelockV2),
-						commoncs.TransferToMCMSWithTimelockConfig{
+						commontypes.TransferToMCMSWithTimelockConfig{
 							ContractsByChain: timelockOwnedContractsByChain,
 							MinDelay:         0,
 						},

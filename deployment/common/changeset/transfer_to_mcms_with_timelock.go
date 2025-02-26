@@ -24,12 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 )
 
-type TransferToMCMSWithTimelockConfig struct {
-	ContractsByChain map[uint64][]common.Address
-	// MinDelay is for the accept ownership proposal
-	MinDelay time.Duration
-}
-
 type Ownable interface {
 	Owner(opts *bind.CallOpts) (common.Address, error)
 	TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*gethtypes.Transaction, error)
@@ -50,38 +44,38 @@ func LoadOwnableContract(addr common.Address, client bind.ContractBackend) (comm
 	return owner, c, nil
 }
 
-func (t TransferToMCMSWithTimelockConfig) Validate(e deployment.Environment) error {
-	for chainSelector, contracts := range t.ContractsByChain {
-		for _, contract := range contracts {
-			// Cannot transfer an unknown address.
-			// Note this also assures non-zero addresses.
-			if exists, err := deployment.AddressBookContains(e.ExistingAddresses, chainSelector, contract.String()); err != nil || !exists {
-				if err != nil {
-					return fmt.Errorf("failed to check address book: %w", err)
-				}
-				return fmt.Errorf("contract %s not found in address book", contract)
-			}
-			owner, _, err := LoadOwnableContract(contract, e.Chains[chainSelector].Client)
-			if err != nil {
-				return fmt.Errorf("failed to load ownable: %w", err)
-			}
-			if owner != e.Chains[chainSelector].DeployerKey.From {
-				return fmt.Errorf("contract %s is not owned by the deployer key", contract)
-			}
-		}
-		// If there is no timelock and mcms proposer on the chain, the transfer will fail.
-		if _, err := deployment.SearchAddressBook(e.ExistingAddresses, chainSelector, types.RBACTimelock); err != nil {
-			return fmt.Errorf("timelock not present on the chain %w", err)
-		}
-		if _, err := deployment.SearchAddressBook(e.ExistingAddresses, chainSelector, types.ProposerManyChainMultisig); err != nil {
-			return fmt.Errorf("mcms proposer not present on the chain %w", err)
-		}
-	}
+// func (t types.TransferToMCMSWithTimelockConfig) Validate(e deployment.Environment) error {
+// 	for chainSelector, contracts := range t.ContractsByChain {
+// 		for _, contract := range contracts {
+// 			// Cannot transfer an unknown address.
+// 			// Note this also assures non-zero addresses.
+// 			if exists, err := deployment.AddressBookContains(e.ExistingAddresses, chainSelector, contract.String()); err != nil || !exists {
+// 				if err != nil {
+// 					return fmt.Errorf("failed to check address book: %w", err)
+// 				}
+// 				return fmt.Errorf("contract %s not found in address book", contract)
+// 			}
+// 			owner, _, err := LoadOwnableContract(contract, e.Chains[chainSelector].Client)
+// 			if err != nil {
+// 				return fmt.Errorf("failed to load ownable: %w", err)
+// 			}
+// 			if owner != e.Chains[chainSelector].DeployerKey.From {
+// 				return fmt.Errorf("contract %s is not owned by the deployer key", contract)
+// 			}
+// 		}
+// 		// If there is no timelock and mcms proposer on the chain, the transfer will fail.
+// 		if _, err := deployment.SearchAddressBook(e.ExistingAddresses, chainSelector, types.RBACTimelock); err != nil {
+// 			return fmt.Errorf("timelock not present on the chain %w", err)
+// 		}
+// 		if _, err := deployment.SearchAddressBook(e.ExistingAddresses, chainSelector, types.ProposerManyChainMultisig); err != nil {
+// 			return fmt.Errorf("mcms proposer not present on the chain %w", err)
+// 		}
+// 	}
+//
+// 	return nil
+// }
 
-	return nil
-}
-
-var _ deployment.ChangeSet[TransferToMCMSWithTimelockConfig] = TransferToMCMSWithTimelock
+var _ deployment.ChangeSet[types.TransferToMCMSWithTimelockConfig] = TransferToMCMSWithTimelock
 
 // TransferToMCMSWithTimelock creates a changeset that transfers ownership of all the
 // contracts in the provided configuration to the timelock on the chain and generates
@@ -92,9 +86,9 @@ var _ deployment.ChangeSet[TransferToMCMSWithTimelockConfig] = TransferToMCMSWit
 // Deprecated: Use TransferToMCMSWithTimelockV2 instead.
 func TransferToMCMSWithTimelock(
 	e deployment.Environment,
-	cfg TransferToMCMSWithTimelockConfig,
+	cfg types.TransferToMCMSWithTimelockConfig,
 ) (deployment.ChangesetOutput, error) {
-	if err := cfg.Validate(e); err != nil {
+	if err := ValidateTransferToMCMSWithTimelockConfig(cfg, e); err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
 	var batches []timelock.BatchChainOperation
@@ -150,14 +144,14 @@ func TransferToMCMSWithTimelock(
 	return deployment.ChangesetOutput{Proposals: []timelock.MCMSWithTimelockProposal{*proposal}}, nil
 }
 
-var _ deployment.ChangeSet[TransferToMCMSWithTimelockConfig] = TransferToMCMSWithTimelockV2
+var _ deployment.ChangeSet[types.TransferToMCMSWithTimelockConfig] = TransferToMCMSWithTimelockV2
 
 // TransferToMCMSWithTimelockV2 is a reimplementation of TransferToMCMSWithTimelock which uses the new MCMS library.
 func TransferToMCMSWithTimelockV2(
 	e deployment.Environment,
-	cfg TransferToMCMSWithTimelockConfig,
+	cfg types.TransferToMCMSWithTimelockConfig,
 ) (deployment.ChangesetOutput, error) {
-	if err := cfg.Validate(e); err != nil {
+	if err := ValidateTransferToMCMSWithTimelockConfig(cfg, e); err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
 	batches := []mcmstypes.BatchOperation{}
@@ -342,4 +336,35 @@ func RenounceTimelockDeployer(e deployment.Environment, cfg RenounceTimelockDepl
 	}
 	e.Logger.Infof("revoked deployer key from owning contract %s", tl.Address().Hex())
 	return deployment.ChangesetOutput{}, nil
+}
+
+func ValidateTransferToMCMSWithTimelockConfig(cfg types.TransferToMCMSWithTimelockConfig, e deployment.Environment) error {
+	for chainSelector, contracts := range cfg.ContractsByChain {
+		for _, contract := range contracts {
+			// Cannot transfer an unknown address.
+			// Note this also assures non-zero addresses.
+			if exists, err := deployment.AddressBookContains(e.ExistingAddresses, chainSelector, contract.String()); err != nil || !exists {
+				if err != nil {
+					return fmt.Errorf("failed to check address book: %w", err)
+				}
+				return fmt.Errorf("contract %s not found in address book", contract)
+			}
+			owner, _, err := LoadOwnableContract(contract, e.Chains[chainSelector].Client)
+			if err != nil {
+				return fmt.Errorf("failed to load ownable: %w", err)
+			}
+			if owner != e.Chains[chainSelector].DeployerKey.From {
+				return fmt.Errorf("contract %s is not owned by the deployer key", contract)
+			}
+		}
+		// If there is no timelock and mcms proposer on the chain, the transfer will fail.
+		if _, err := deployment.SearchAddressBook(e.ExistingAddresses, chainSelector, types.RBACTimelock); err != nil {
+			return fmt.Errorf("timelock not present on the chain %w", err)
+		}
+		if _, err := deployment.SearchAddressBook(e.ExistingAddresses, chainSelector, types.ProposerManyChainMultisig); err != nil {
+			return fmt.Errorf("mcms proposer not present on the chain %w", err)
+		}
+	}
+
+	return nil
 }
