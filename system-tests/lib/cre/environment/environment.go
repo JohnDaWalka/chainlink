@@ -38,6 +38,7 @@ func BuildFullCLDEnvironment(lgr logger.Logger, input *types.FullCLDEnvironmentI
 			return nil, errors.Wrap(err, "failed to get node info")
 		}
 		allNodesInfo = append(allNodesInfo, nodeInfo...)
+		allNodesInfo = append(allNodesInfo, nodeInfo...)
 
 		jdConfig := devenv.JDConfig{
 			GRPC:     input.JdOutput.HostGRPCUrl,
