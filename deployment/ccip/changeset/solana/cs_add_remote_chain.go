@@ -40,6 +40,8 @@ type AddRemoteChainToSolanaConfig struct {
 	RouterAuthority    solana.PublicKey
 	FeeQuoterAuthority solana.PublicKey
 	OffRampAuthority   solana.PublicKey
+
+	TestRouter bool
 }
 
 type RemoteChainConfigSolana struct {
@@ -57,7 +59,7 @@ func (cfg AddRemoteChainToSolanaConfig) Validate(e deployment.Environment) error
 	}
 	chainState := state.SolChains[cfg.ChainSelector]
 	chain := e.SolChains[cfg.ChainSelector]
-	if err := validateRouterConfig(chain, chainState); err != nil {
+	if err := validateRouterConfig(chain, chainState, cfg.TestRouter); err != nil {
 		return err
 	}
 	if err := validateFeeQuoterConfig(chain, chainState); err != nil {
@@ -76,8 +78,10 @@ func (cfg AddRemoteChainToSolanaConfig) Validate(e deployment.Environment) error
 	if !ok {
 		return fmt.Errorf("chain %d not found in environment", cfg.ChainSelector)
 	}
-	if err := ccipChangeset.ValidateOwnershipSolana(&e, chain, routerUsingMCMS, e.SolChains[cfg.ChainSelector].DeployerKey.PublicKey(), chainState.Router, ccipChangeset.Router); err != nil {
-		return fmt.Errorf("failed to validate ownership: %w", err)
+	if !cfg.TestRouter {
+		if err := ccipChangeset.ValidateOwnershipSolana(&e, chain, routerUsingMCMS, e.SolChains[cfg.ChainSelector].DeployerKey.PublicKey(), chainState.Router, ccipChangeset.Router); err != nil {
+			return fmt.Errorf("failed to validate ownership: %w", err)
+		}
 	}
 	if err := ccipChangeset.ValidateOwnershipSolana(&e, chain, feeQuoterUsingMCMS, e.SolChains[cfg.ChainSelector].DeployerKey.PublicKey(), chainState.FeeQuoter, ccipChangeset.FeeQuoter); err != nil {
 		return fmt.Errorf("failed to validate ownership: %w", err)
@@ -85,9 +89,11 @@ func (cfg AddRemoteChainToSolanaConfig) Validate(e deployment.Environment) error
 	if err := ccipChangeset.ValidateOwnershipSolana(&e, chain, offRampUsingMCMS, e.SolChains[cfg.ChainSelector].DeployerKey.PublicKey(), chainState.OffRamp, ccipChangeset.OffRamp); err != nil {
 		return fmt.Errorf("failed to validate ownership: %w", err)
 	}
+
+	routerProgramAddress, routerConfigPDA, _ := chainState.GetRouterInfo(cfg.TestRouter)
 	var routerConfigAccount solRouter.Config
 	// already validated that router config exists
-	_ = chain.GetAccountDataBorshInto(context.Background(), chainState.RouterConfigPDA, &routerConfigAccount)
+	_ = chain.GetAccountDataBorshInto(context.Background(), routerConfigPDA, &routerConfigAccount)
 
 	supportedChains := state.SupportedChains()
 	for remote := range cfg.UpdatesByChain {
@@ -100,7 +106,7 @@ func (cfg AddRemoteChainToSolanaConfig) Validate(e deployment.Environment) error
 		if err := state.ValidateRamp(remote, ccipChangeset.OnRamp); err != nil {
 			return err
 		}
-		routerDestChainPDA, err := solState.FindDestChainStatePDA(remote, chainState.Router)
+		routerDestChainPDA, err := solState.FindDestChainStatePDA(remote, routerProgramAddress)
 		if err != nil {
 			return fmt.Errorf("failed to find dest chain state pda for remote chain %d: %w", remote, err)
 		}
@@ -180,6 +186,11 @@ func doAddRemoteChainToSolana(
 	updates := cfg.UpdatesByChain
 	chain := e.SolChains[chainSel]
 	ccipRouterID := s.SolChains[chainSel].Router
+	routerConfigPDA := s.SolChains[chainSel].RouterConfigPDA
+	if cfg.TestRouter {
+		ccipRouterID = s.SolChains[chainSel].TestRouter
+		routerConfigPDA, _, _ = solState.FindConfigPDA(s.SolChains[chainSel].TestRouter)
+	}
 	feeQuoterID := s.SolChains[chainSel].FeeQuoter
 	offRampID := s.SolChains[chainSel].OffRamp
 	routerUsingMCMS := cfg.MCMS != nil && !cfg.RouterAuthority.IsZero()
@@ -217,7 +228,7 @@ func doAddRemoteChainToSolana(
 			remoteChainSel,
 			update.RouterDestinationConfig,
 			routerRemoteStatePDA,
-			s.SolChains[chainSel].RouterConfigPDA,
+			routerConfigPDA,
 			authority,
 			solana.SystemProgramID,
 		).ValidateAndBuild()
@@ -238,7 +249,7 @@ func doAddRemoteChainToSolana(
 			remoteChainSel,
 			offRampID,
 			allowedOffRampRemotePDA,
-			s.SolChains[chainSel].RouterConfigPDA,
+			routerConfigPDA,
 			authority,
 			solana.SystemProgramID,
 		).ValidateAndBuild()
@@ -284,7 +295,7 @@ func doAddRemoteChainToSolana(
 
 		solOffRamp.SetProgramID(offRampID)
 		validSourceChainConfig := solOffRamp.SourceChainConfig{
-			OnRamp:    [2][64]byte{onRampBytes, [64]byte{}},
+			// OnRamp:    [2][64]byte{onRampBytes, [64]byte{}},
 			IsEnabled: update.EnabledAsSource,
 		}
 		if offRampUsingMCMS {

@@ -39,10 +39,11 @@ func validatePoolDeployment(s ccipChangeset.SolCCIPChainState, poolType solTestT
 }
 
 type TokenPoolConfig struct {
-	ChainSelector uint64
-	PoolType      solTestTokenPool.PoolType
-	Authority     string
-	TokenPubKey   string
+	ChainSelector    uint64
+	PoolType         solTestTokenPool.PoolType
+	AuthorityPrivKey string
+	TokenPubKey      string
+	TestRouter       bool
 }
 
 func (cfg TokenPoolConfig) Validate(e deployment.Environment) error {
@@ -55,6 +56,12 @@ func (cfg TokenPoolConfig) Validate(e deployment.Environment) error {
 
 	if _, err := chainState.TokenToTokenProgram(tokenPubKey); err != nil {
 		return fmt.Errorf("failed to get token program for token address %s: %w", tokenPubKey.String(), err)
+	}
+
+	if cfg.TestRouter {
+		if chainState.TestRouter.IsZero() {
+			return fmt.Errorf("test router not found in existing state, deploy the test router first for chain %d", cfg.ChainSelector)
+		}
 	}
 
 	if err := validatePoolDeployment(chainState, cfg.PoolType, cfg.ChainSelector); err != nil {
@@ -93,7 +100,8 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 	chain := e.SolChains[cfg.ChainSelector]
 	state, _ := ccipChangeset.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
-	authorityPubKey := solana.MustPublicKeyFromBase58(cfg.Authority)
+	authorityPrivKey := solana.MustPrivateKeyFromBase58(cfg.AuthorityPrivKey)
+	authorityPubKey := authorityPrivKey.PublicKey()
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
 	tokenPool := solana.PublicKey{}
 
@@ -111,7 +119,7 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 	poolSigner, _ := solTokenUtil.TokenPoolSignerAddress(tokenPubKey, tokenPool)
 
 	// ata for token pool
-	createI, tokenPoolATA, err := solTokenUtil.CreateAssociatedTokenAccount(
+	createATAIx, tokenPoolATA, err := solTokenUtil.CreateAssociatedTokenAccount(
 		tokenprogramID,
 		tokenPubKey,
 		poolSigner,
@@ -120,26 +128,28 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to create associated token account for tokenpool (mint: %s, pool: %s): %w", tokenPubKey.String(), tokenPool.String(), err)
 	}
-	instructions := []solana.Instruction{createI}
+	instructions := []solana.Instruction{createATAIx}
 
+	// initialize token pool pda
+	routerProgramAddress, _, _ := chainState.GetRouterInfo(cfg.TestRouter)
 	var poolInitI solana.Instruction
 	switch cfg.PoolType {
 	case solTestTokenPool.BurnAndMint_PoolType:
 		// initialize token pool for token
 		poolInitI, err = solBurnMintTokenPool.NewInitializeInstruction(
-			chainState.Router,
+			routerProgramAddress,
 			poolConfigPDA,
 			tokenPubKey,
-			authorityPubKey, // this is assumed to be chain.DeployerKey for now (owner of token pool)
+			authorityPubKey,
 			solana.SystemProgramID,
 		).ValidateAndBuild()
 	case solTestTokenPool.LockAndRelease_PoolType:
 		// initialize token pool for token
 		poolInitI, err = solLockReleaseTokenPool.NewInitializeInstruction(
-			chainState.Router,
+			routerProgramAddress,
 			poolConfigPDA,
 			tokenPubKey,
-			authorityPubKey, // this is assumed to be chain.DeployerKey for now (owner of token pool)
+			authorityPubKey,
 			solana.SystemProgramID,
 		).ValidateAndBuild()
 	default:
@@ -148,9 +158,9 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
 	}
-
 	instructions = append(instructions, poolInitI)
 
+	// set mint authority for token
 	if cfg.PoolType == solTestTokenPool.BurnAndMint_PoolType && tokenPubKey != solana.SolMint {
 		// make pool mint_authority for token
 		authI, err := solTokenUtil.SetTokenMintAuthority(
@@ -171,6 +181,9 @@ func AddTokenPool(e deployment.Environment, cfg TokenPoolConfig) (deployment.Cha
 	}
 	e.Logger.Infow("Created new token pool config", "token_pool_ata", tokenPoolATA.String(), "pool_config", poolConfigPDA.String(), "pool_signer", poolSigner.String())
 	e.Logger.Infow("Set mint authority", "poolSigner", poolSigner.String())
+
+	// authorityPrivKey := chain.DeployerKey // assuming the authority is the deployer key
+	// table, err := solCommonUtil.CreateLookupTable(ctx, client, *authorityPrivKey)
 
 	return deployment.ChangesetOutput{}, nil
 }
@@ -372,6 +385,7 @@ type TokenPoolLookupTableConfig struct {
 	ChainSelector uint64
 	TokenPubKey   string
 	PoolType      solTestTokenPool.PoolType
+	TestRouter    bool
 }
 
 func (cfg TokenPoolLookupTableConfig) Validate(e deployment.Environment) error {
@@ -405,7 +419,8 @@ func AddTokenPoolLookupTable(e deployment.Environment, cfg TokenPoolLookupTableC
 	} else if cfg.PoolType == solTestTokenPool.LockAndRelease_PoolType {
 		tokenPool = chainState.LockReleaseTokenPool
 	}
-	tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, chainState.Router)
+	routerProgramAddress, _, _ := chainState.GetRouterInfo(cfg.TestRouter)
+	tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
 	tokenPoolChainConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
 	tokenPoolSigner, _ := solTokenUtil.TokenPoolSignerAddress(tokenPubKey, tokenPool)
 	tokenProgram, _ := chainState.TokenToTokenProgram(tokenPubKey)
@@ -453,6 +468,7 @@ type SetPoolConfig struct {
 	TokenPubKey                       string
 	TokenAdminRegistryAdminPrivateKey string
 	WritableIndexes                   []uint8
+	TestRouter                        bool
 }
 
 func (cfg SetPoolConfig) Validate(e deployment.Environment) error {
@@ -463,16 +479,17 @@ func (cfg SetPoolConfig) Validate(e deployment.Environment) error {
 	state, _ := ccipChangeset.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
 	chain := e.SolChains[cfg.ChainSelector]
-	if err := validateRouterConfig(chain, chainState); err != nil {
+	if err := validateRouterConfig(chain, chainState, cfg.TestRouter); err != nil {
 		return err
 	}
-	tokenAdminRegistryPDA, _, err := solState.FindTokenAdminRegistryPDA(tokenPubKey, chainState.Router)
+	routerProgramAddress, _, _ := chainState.GetRouterInfo(cfg.TestRouter)
+	tokenAdminRegistryPDA, _, err := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
 	if err != nil {
-		return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), chainState.Router.String(), err)
+		return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), routerProgramAddress.String(), err)
 	}
 	var tokenAdminRegistryAccount solRouter.TokenAdminRegistry
 	if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
-		return fmt.Errorf("token admin registry not found for (mint: %s, router: %s), cannot set pool", tokenPubKey.String(), chainState.Router.String())
+		return fmt.Errorf("token admin registry not found for (mint: %s, router: %s), cannot set pool", tokenPubKey.String(), routerProgramAddress.String())
 	}
 	if _, ok := chainState.TokenPoolLookupTable[tokenPubKey]; !ok {
 		return fmt.Errorf("token pool lookup table not found for (mint: %s)", tokenPubKey.String())
@@ -490,8 +507,9 @@ func SetPool(e deployment.Environment, cfg SetPoolConfig) (deployment.ChangesetO
 	state, _ := ccipChangeset.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
-	routerConfigPDA, _, _ := solState.FindConfigPDA(chainState.Router)
-	tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, chainState.Router)
+	routerProgramAddress, routerConfigPDA, _ := chainState.GetRouterInfo(cfg.TestRouter)
+	solRouter.SetProgramID(routerProgramAddress)
+	tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
 	tokenAdminRegistryAdminPrivKey := solana.MustPrivateKeyFromBase58(cfg.TokenAdminRegistryAdminPrivateKey)
 	lookupTablePubKey := chainState.TokenPoolLookupTable[tokenPubKey]
 

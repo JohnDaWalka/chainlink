@@ -237,6 +237,7 @@ var SolanaProgramIDs = map[string]string{
 	"timelock":                       solTestConfig.TimelockProgram.String(),
 	"access_controller":              solTestConfig.AccessControllerProgram.String(),
 	"external_program_cpi_stub":      solTestConfig.ExternalCpiStubProgram.String(),
+	"test_router":                    "J23Fc14oeqDFANRMASqxs7epSfTF18P2w8JCGbhai4kP",
 }
 
 var once = &sync.Once{}

@@ -27,6 +27,7 @@ type RegisterTokenAdminRegistryConfig struct {
 	TokenPubKey             string
 	TokenAdminRegistryAdmin string
 	RegisterType            RegisterTokenAdminRegistryType
+	TestRouter              bool
 }
 
 func (cfg RegisterTokenAdminRegistryConfig) Validate(e deployment.Environment) error {
@@ -45,16 +46,17 @@ func (cfg RegisterTokenAdminRegistryConfig) Validate(e deployment.Environment) e
 	state, _ := ccipChangeset.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
 	chain := e.SolChains[cfg.ChainSelector]
-	if err := validateRouterConfig(chain, chainState); err != nil {
+	if err := validateRouterConfig(chain, chainState, cfg.TestRouter); err != nil {
 		return err
 	}
-	tokenAdminRegistryPDA, _, err := solState.FindTokenAdminRegistryPDA(tokenPubKey, chainState.Router)
+	routerProgramAddress, _, _ := chainState.GetRouterInfo(cfg.TestRouter)
+	tokenAdminRegistryPDA, _, err := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
 	if err != nil {
-		return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), chainState.Router.String(), err)
+		return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), routerProgramAddress.String(), err)
 	}
 	var tokenAdminRegistryAccount solRouter.TokenAdminRegistry
 	if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
-		return fmt.Errorf("token admin registry already exists for (mint: %s, router: %s)", tokenPubKey.String(), chainState.Router.String())
+		return fmt.Errorf("token admin registry already exists for (mint: %s, router: %s)", tokenPubKey.String(), routerProgramAddress.String())
 	}
 	return nil
 }
@@ -67,9 +69,11 @@ func RegisterTokenAdminRegistry(e deployment.Environment, cfg RegisterTokenAdmin
 	state, _ := ccipChangeset.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
+	routerProgramAddress, routerConfigPDA, _ := chainState.GetRouterInfo(cfg.TestRouter)
+	solRouter.SetProgramID(routerProgramAddress)
 
 	// verified
-	tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, chainState.Router)
+	tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
 	tokenAdminRegistryAdmin := solana.MustPublicKeyFromBase58(cfg.TokenAdminRegistryAdmin)
 
 	var instruction *solRouter.Instruction
@@ -79,7 +83,7 @@ func RegisterTokenAdminRegistry(e deployment.Environment, cfg RegisterTokenAdmin
 	case ViaGetCcipAdminInstruction:
 		instruction, err = solRouter.NewCcipAdminProposeAdministratorInstruction(
 			tokenAdminRegistryAdmin, // admin of the tokenAdminRegistry PDA
-			chainState.RouterConfigPDA,
+			routerConfigPDA,
 			tokenAdminRegistryPDA, // this gets created
 			tokenPubKey,
 			chain.DeployerKey.PublicKey(), // (ccip admin)
@@ -92,7 +96,7 @@ func RegisterTokenAdminRegistry(e deployment.Environment, cfg RegisterTokenAdmin
 		// the token mint authority signs and makes itself the authority of the tokenAdminRegistry PDA
 		instruction, err = solRouter.NewOwnerProposeAdministratorInstruction(
 			tokenAdminRegistryAdmin, // admin of the tokenAdminRegistry PDA
-			chainState.RouterConfigPDA,
+			routerConfigPDA,
 			tokenAdminRegistryPDA, // this gets created
 			tokenPubKey,
 			chain.DeployerKey.PublicKey(), // (token mint authority) becomes the authority of the tokenAdminRegistry PDA
@@ -117,6 +121,7 @@ type TransferAdminRoleTokenAdminRegistryConfig struct {
 	TokenPubKey                    string
 	NewRegistryAdminPublicKey      string
 	CurrentRegistryAdminPrivateKey string
+	TestRouter                     bool
 }
 
 func (cfg TransferAdminRoleTokenAdminRegistryConfig) Validate(e deployment.Environment) error {
@@ -139,16 +144,17 @@ func (cfg TransferAdminRoleTokenAdminRegistryConfig) Validate(e deployment.Envir
 	state, _ := ccipChangeset.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
 	chain := e.SolChains[cfg.ChainSelector]
-	if err := validateRouterConfig(chain, chainState); err != nil {
+	if err := validateRouterConfig(chain, chainState, cfg.TestRouter); err != nil {
 		return err
 	}
-	tokenAdminRegistryPDA, _, err := solState.FindTokenAdminRegistryPDA(tokenPubKey, chainState.Router)
+	routerProgramAddress, _, _ := chainState.GetRouterInfo(cfg.TestRouter)
+	tokenAdminRegistryPDA, _, err := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
 	if err != nil {
-		return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), chainState.Router.String(), err)
+		return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), routerProgramAddress.String(), err)
 	}
 	var tokenAdminRegistryAccount solRouter.TokenAdminRegistry
 	if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
-		return fmt.Errorf("token admin registry not found for (mint: %s, router: %s), cannot transfer admin role", tokenPubKey.String(), chainState.Router.String())
+		return fmt.Errorf("token admin registry not found for (mint: %s, router: %s), cannot transfer admin role", tokenPubKey.String(), routerProgramAddress.String())
 	}
 	return nil
 }
@@ -161,16 +167,16 @@ func TransferAdminRoleTokenAdminRegistry(e deployment.Environment, cfg TransferA
 	state, _ := ccipChangeset.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
-
-	// verified
-	tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, chainState.Router)
+	routerProgramAddress, routerConfigPDA, _ := chainState.GetRouterInfo(cfg.TestRouter)
+	solRouter.SetProgramID(routerProgramAddress)
+	tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
 
 	currentRegistryAdminPrivateKey := solana.MustPrivateKeyFromBase58(cfg.CurrentRegistryAdminPrivateKey)
 	newRegistryAdminPubKey := solana.MustPublicKeyFromBase58(cfg.NewRegistryAdminPublicKey)
 
 	ix1, err := solRouter.NewTransferAdminRoleTokenAdminRegistryInstruction(
 		newRegistryAdminPubKey,
-		chainState.RouterConfigPDA,
+		routerConfigPDA,
 		tokenAdminRegistryPDA,
 		tokenPubKey,
 		currentRegistryAdminPrivateKey.PublicKey(),
@@ -191,6 +197,7 @@ type AcceptAdminRoleTokenAdminRegistryConfig struct {
 	ChainSelector              uint64
 	TokenPubKey                string
 	NewRegistryAdminPrivateKey string
+	TestRouter                 bool
 }
 
 func (cfg AcceptAdminRoleTokenAdminRegistryConfig) Validate(e deployment.Environment) error {
@@ -201,16 +208,17 @@ func (cfg AcceptAdminRoleTokenAdminRegistryConfig) Validate(e deployment.Environ
 	state, _ := ccipChangeset.LoadOnchainState(e)
 	chainState := state.SolChains[cfg.ChainSelector]
 	chain := e.SolChains[cfg.ChainSelector]
-	if err := validateRouterConfig(chain, chainState); err != nil {
+	if err := validateRouterConfig(chain, chainState, cfg.TestRouter); err != nil {
 		return err
 	}
-	tokenAdminRegistryPDA, _, err := solState.FindTokenAdminRegistryPDA(tokenPubKey, chainState.Router)
+	routerProgramAddress, _, _ := chainState.GetRouterInfo(cfg.TestRouter)
+	tokenAdminRegistryPDA, _, err := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
 	if err != nil {
-		return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), chainState.Router.String(), err)
+		return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), routerProgramAddress.String(), err)
 	}
 	var tokenAdminRegistryAccount solRouter.TokenAdminRegistry
 	if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
-		return fmt.Errorf("token admin registry not found for (mint: %s, router: %s), cannot accept admin role", tokenPubKey.String(), chainState.Router.String())
+		return fmt.Errorf("token admin registry not found for (mint: %s, router: %s), cannot accept admin role", tokenPubKey.String(), routerProgramAddress.String())
 	}
 	// check if accepting admin is the pending admin
 	newRegistryAdminPrivateKey := solana.MustPrivateKeyFromBase58(cfg.NewRegistryAdminPrivateKey)
@@ -234,12 +242,14 @@ func AcceptAdminRoleTokenAdminRegistry(e deployment.Environment, cfg AcceptAdmin
 	chainState := state.SolChains[cfg.ChainSelector]
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.TokenPubKey)
 	newRegistryAdminPrivateKey := solana.MustPrivateKeyFromBase58(cfg.NewRegistryAdminPrivateKey)
+	routerProgramAddress, routerConfigPDA, _ := chainState.GetRouterInfo(cfg.TestRouter)
+	solRouter.SetProgramID(routerProgramAddress)
 
 	// verified
-	tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, chainState.Router)
+	tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
 
 	ix1, err := solRouter.NewAcceptAdminRoleTokenAdminRegistryInstruction(
-		chainState.RouterConfigPDA,
+		routerConfigPDA,
 		tokenAdminRegistryPDA,
 		tokenPubKey,
 		newRegistryAdminPrivateKey.PublicKey(),

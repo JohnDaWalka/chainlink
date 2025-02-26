@@ -133,12 +133,19 @@ func copyFile(srcFile string, destDir string) error {
 }
 
 // Build the project with Anchor
-func buildProject(e deployment.Environment) error {
+func buildProject(e deployment.Environment, onlyRouter bool) error {
 	solanaDir := filepath.Join(cloneDir, anchorDir, "..")
 	e.Logger.Debugw("Building project", "solanaDir", solanaDir)
-	output, err := runCommand("make", []string{"docker-build-contracts"}, solanaDir)
-	if err != nil {
-		return fmt.Errorf("anchor build failed: %s %w", output, err)
+	if onlyRouter {
+		output, err := runCommand("make", []string{"docker-build-test-router"}, solanaDir)
+		if err != nil {
+			return fmt.Errorf("anchor build failed: %s %w", output, err)
+		}
+	} else {
+		output, err := runCommand("make", []string{"docker-build-contracts"}, solanaDir)
+		if err != nil {
+			return fmt.Errorf("anchor build failed: %s %w", output, err)
+		}
 	}
 	return nil
 }
@@ -152,6 +159,7 @@ type BuildSolanaConfig struct {
 	// Forces re-clone of git directory. Useful for forcing regeneration of keys
 	CleanGitDir bool
 	UpgradeKeys map[deployment.ContractType]string
+	OnlyRouter  bool
 }
 
 func BuildSolanaChangeset(e deployment.Environment, config BuildSolanaConfig) (deployment.ChangesetOutput, error) {
@@ -184,7 +192,7 @@ func BuildSolanaChangeset(e deployment.Environment, config BuildSolanaConfig) (d
 	}
 
 	// Build the project with Anchor
-	if err := buildProject(e); err != nil {
+	if err := buildProject(e, config.OnlyRouter); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("error building project: %w", err)
 	}
 

@@ -906,10 +906,10 @@ func DeployTransferableTokenSolana(
 			// deploy token pool and set the burn/mint authority to the tokenPool
 			deployment.CreateLegacyChangeSet(ccipChangeSetSolana.AddTokenPool),
 			ccipChangeSetSolana.TokenPoolConfig{
-				ChainSelector: solChainSel,
-				TokenPubKey:   solTokenAddress.String(),
-				PoolType:      solTestTokenPool.BurnAndMint_PoolType,
-				Authority:     solDeployerKey.String(),
+				ChainSelector:    solChainSel,
+				TokenPubKey:      solTokenAddress.String(),
+				PoolType:         solTestTokenPool.BurnAndMint_PoolType,
+				AuthorityPrivKey: solDeployerKey.String(),
 			},
 		),
 	)
@@ -956,6 +956,7 @@ func DeployTransferableTokenSolana(
 				},
 			},
 		),
+		// TODO: i dont need to make this a billing token ?
 		commoncs.Configure(
 			deployment.CreateLegacyChangeSet(ccipChangeSetSolana.AddBillingTokenForRemoteChain),
 			ccipChangeSetSolana.BillingTokenForRemoteChainConfig{
@@ -972,6 +973,7 @@ func DeployTransferableTokenSolana(
 				},
 			},
 		),
+		// TODO: set token admin registry here
 	)
 
 	require.NoError(t, err)
@@ -1546,11 +1548,11 @@ func SavePreloadedSolAddresses(t *testing.T, e deployment.Environment, solChainS
 	tv := deployment.NewTypeAndVersion(changeset.Router, deployment.Version1_0_0)
 	err := e.ExistingAddresses.Save(solChainSelector, solTestConfig.CcipRouterProgram.String(), tv)
 	require.NoError(t, err)
+	tv = deployment.NewTypeAndVersion(changeset.TestRouter, deployment.Version1_0_0)
+	err = e.ExistingAddresses.Save(solChainSelector, "J23Fc14oeqDFANRMASqxs7epSfTF18P2w8JCGbhai4kP", tv)
+	require.NoError(t, err)
 	tv = deployment.NewTypeAndVersion(changeset.Receiver, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, solTestConfig.CcipLogicReceiver.String(), tv)
-	require.NoError(t, err)
-	tv = deployment.NewTypeAndVersion(changeset.TokenPool, deployment.Version1_0_0)
-	err = e.ExistingAddresses.Save(solChainSelector, solTestConfig.CcipTokenPoolProgram.String(), tv)
 	require.NoError(t, err)
 	tv = deployment.NewTypeAndVersion(changeset.FeeQuoter, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, solTestConfig.FeeQuoterProgram.String(), tv)
