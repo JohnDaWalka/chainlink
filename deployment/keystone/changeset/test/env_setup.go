@@ -2,10 +2,12 @@ package test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"math/big"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,6 +20,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	ocrcommontypes "github.com/smartcontractkit/libocr/commontypes"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -28,8 +32,12 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/workflowregistry"
+	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
 
 type DonConfig struct {
@@ -44,9 +52,56 @@ type DonConfig struct {
 	generatedKeys []importableKeys
 }
 
+type BootstrapConfig struct {
+	Name   string
+	N      int
+	Labels map[string]string
+
+	generatedKeys []importableKeys
+	bootstrappers []bootstrapperMetadata
+}
+
+func (b *BootstrapConfig) Locations() []ocrcommontypes.BootstrapperLocator {
+	locations := make([]ocrcommontypes.BootstrapperLocator, len(b.bootstrappers))
+	for i, bs := range b.bootstrappers {
+		locations[i] = bs.location()
+	}
+	return locations
+}
+
+type bootstrapperMetadata struct {
+	port      int
+	importKey keystore.ImportableKey
+}
+
+func (b bootstrapperMetadata) mustPeerID() p2pkey.PeerID {
+	var x p2pkey.EncryptedP2PKeyExport
+	err := json.Unmarshal([]byte(b.importKey.JSON), &x)
+	if err != nil {
+		panic(fmt.Sprintf("failed to unmarshal bootstrapper key: %v", err))
+	}
+	return x.PeerID
+}
+
+func (b bootstrapperMetadata) location() ocrcommontypes.BootstrapperLocator {
+	return ocrcommontypes.BootstrapperLocator{
+		PeerID: b.mustPeerID().String(),
+		Addrs:  []string{}, // TODO
+	}
+}
+
+func (b *BootstrapConfig) generateKeys(t *testing.T, ks *keystore.TestKeystore) {
+	if b.generatedKeys != nil {
+		return
+	}
+	b.generatedKeys = generateKeys(t, ks, generateKeysCfg{
+		N: b.N,
+	})
+}
+
 type importableKeys struct {
-	P2P     keystore.ImportableKey
-	EthKeys map[int]keystore.ImportableEthKey
+	P2P     keystore.ImportableKey            // required
+	EthKeys map[int]keystore.ImportableEthKey // optional
 }
 type CapabilityNaturalKey struct {
 	LabelledName string
@@ -60,7 +115,7 @@ func (c DonConfig) Validate() error {
 	return nil
 }
 
-func (c *DonConfig) GenerateKeys(t *testing.T, ks *keystore.TestKeystore) {
+func (c *DonConfig) generateKeys(t *testing.T, ks *keystore.TestKeystore) {
 	if c.generatedKeys != nil {
 		return
 	}
@@ -68,6 +123,39 @@ func (c *DonConfig) GenerateKeys(t *testing.T, ks *keystore.TestKeystore) {
 		N:                 c.N,
 		EVMChainSelectors: c.ChainSelectors,
 	})
+}
+
+func (c *DonConfig) GenerateOpts() map[string][]func(c *chainlink.Config, s *chainlink.Secrets) {
+	return nil
+}
+
+type capabilitiesTOMLConfigurer struct {
+	d2dListener string
+	don2don     []ocrcommontypes.BootstrapperLocator
+	capCfg      deployment.CapabilityRegistryConfig
+	wfCfg       *deployment.CapabilityRegistryConfig
+}
+
+func (c *capabilitiesTOMLConfigurer) generate() *toml.Capabilities {
+	capabilities := &toml.Capabilities{}
+	capabilities.Peering.PeerID = nil
+	capabilities.Peering.V2.Enabled = ptr(true)
+	capabilities.Peering.V2.ListenAddresses = ptr([]string{c.d2dListener})
+	capabilities.Peering.V2.DefaultBootstrappers = ptr(c.don2don)
+	capabilities.ExternalRegistry.NetworkID = ptr(relay.NetworkEVM)
+	capabilities.ExternalRegistry.ChainID = ptr(strconv.FormatUint(uint64(c.capCfg.EVMChainID), 10))
+	capabilities.ExternalRegistry.Address = ptr(c.capCfg.Contract.String())
+	if c.wfCfg != nil {
+		capabilities.WorkflowRegistry.NetworkID = ptr(relay.NetworkEVM)
+		capabilities.WorkflowRegistry.ChainID = ptr(strconv.FormatUint(uint64(c.wfCfg.EVMChainID), 10))
+		capabilities.WorkflowRegistry.Address = ptr(c.wfCfg.Contract.String())
+	}
+	// todo gateway
+	return capabilities
+}
+
+func ptr[T any](v T) *T {
+	return &v
 }
 
 type testEnvIface interface {
