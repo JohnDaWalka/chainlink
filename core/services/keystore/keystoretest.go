@@ -4,8 +4,14 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
@@ -78,4 +84,14 @@ func NewInMemory(ds sqlutil.DataSource, scryptParams utils.ScryptParams, lggr lo
 		vrf:        newVRFKeyStore(km),
 		workflow:   newWorkflowKeyStore(km),
 	}
+}
+
+func NewTestKeyStore(t *testing.T) Master {
+	t.Helper()
+	db := pgtest.NewSqlxDB(t)
+	ks := New(db, utils.FastScryptParams, logger.TestLogger(t))
+
+	err := ks.Unlock(tests.Context(t), "password")
+	require.NoError(t, err)
+	return ks
 }
