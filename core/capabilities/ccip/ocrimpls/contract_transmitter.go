@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 )
@@ -27,6 +28,7 @@ type ToCalldataFunc func(
 	report ocr3types.ReportWithInfo[[]byte],
 	rs, ss [][32]byte,
 	vs [32]byte,
+	codec cciptypes.ExtraDataCodec,
 ) (contract string, method string, args any, err error)
 
 // NewToCommitCalldataFunc returns a ToCalldataFunc that is used to generate the calldata for the commit method.
@@ -38,6 +40,7 @@ func NewToCommitCalldataFunc(defaultMethod, priceOnlyMethod string) ToCalldataFu
 		report ocr3types.ReportWithInfo[[]byte],
 		rs, ss [][32]byte,
 		vs [32]byte,
+		_ cciptypes.ExtraDataCodec,
 	) (contract string, method string, args any, err error) {
 		// Note that the name of the struct field is very important, since the encoder used
 		// by the chainwriter uses mapstructure, which will use the struct field name to map
@@ -87,6 +90,7 @@ func ToExecCalldata(
 	report ocr3types.ReportWithInfo[[]byte],
 	_, _ [][32]byte,
 	_ [32]byte,
+	extraDataCodec cciptypes.ExtraDataCodec,
 ) (contract string, method string, args any, err error) {
 	// Note that the name of the struct field is very important, since the encoder used
 	// by the chainwriter uses mapstructure, which will use the struct field name to map
@@ -106,26 +110,68 @@ func ToExecCalldata(
 		}
 	}
 
+	extraDataDecoded := ExtraDataDecoded{}
+	if extraDataCodec != nil {
+		var err error
+		extraDataDecoded, err = decodeExecData(info, extraDataCodec)
+		if err != nil {
+			return "", "", nil, err
+		}
+	}
+
 	return consts.ContractNameOffRamp,
 		consts.MethodExecute,
 		struct {
 			ReportContext [2][32]byte
 			Report        []byte
 			Info          ccipocr3.ExecuteReportInfo
+			ExtraData     ExtraDataDecoded
 		}{
 			ReportContext: rawReportCtx,
 			Report:        report.Report,
 			Info:          info,
+			ExtraData:     extraDataDecoded,
 		}, nil
 }
 
 var _ ocr3types.ContractTransmitter[[]byte] = &ccipTransmitter{}
+
+type ExtraDataDecoded struct {
+	ExtraArgsDecoded    map[string]any
+	DestExecDataDecoded []map[string]any
+}
+
+func decodeExecData(report ccipocr3.ExecuteReportInfo, codec ccipocr3.ExtraDataCodec) (ExtraDataDecoded, error) {
+	// only one report one message, since this is a stop-gap solution for solana
+	if len(report.AbstractReports) != 1 && len(report.AbstractReports[0].Messages) != 1 {
+		return ExtraDataDecoded{}, errors.New("unexpected report length")
+	}
+	message := report.AbstractReports[0].Messages[0]
+	extraDataDecoded := ExtraDataDecoded{}
+
+	var err error
+	extraDataDecoded.ExtraArgsDecoded, err = codec.DecodeExtraArgs(message.ExtraArgs, report.AbstractReports[0].SourceChainSelector)
+	if err != nil {
+		return ExtraDataDecoded{}, err
+	}
+	destExecDataDecoded := make([]map[string]any, len(message.TokenAmounts))
+	for i, tokenAmount := range message.TokenAmounts {
+		destExecDataDecoded[i], err = codec.DecodeTokenAmountDestExecData(tokenAmount.DestExecData, report.AbstractReports[0].SourceChainSelector)
+		if err != nil {
+			return ExtraDataDecoded{}, err
+		}
+	}
+	extraDataDecoded.DestExecDataDecoded = destExecDataDecoded
+
+	return extraDataDecoded, nil
+}
 
 type ccipTransmitter struct {
 	cw             commontypes.ContractWriter
 	fromAccount    ocrtypes.Account
 	offrampAddress string
 	toCalldataFn   ToCalldataFunc
+	extraDataCodec cciptypes.ExtraDataCodec
 }
 
 func XXXNewContractTransmitterTestsOnly(
@@ -139,8 +185,10 @@ func XXXNewContractTransmitterTestsOnly(
 	wrappedToCalldataFunc := func(rawReportCtx [2][32]byte,
 		report ocr3types.ReportWithInfo[[]byte],
 		rs, ss [][32]byte,
-		vs [32]byte) (string, string, any, error) {
-		_, _, args, err := toCalldataFn(rawReportCtx, report, rs, ss, vs)
+		vs [32]byte,
+		extraDataCodec cciptypes.ExtraDataCodec) (string, string, any, error) {
+
+		_, _, args, err := toCalldataFn(rawReportCtx, report, rs, ss, vs, extraDataCodec)
 		return contractName, method, args, err
 	}
 	return &ccipTransmitter{
@@ -169,12 +217,14 @@ func NewExecContractTransmitter(
 	cw commontypes.ContractWriter,
 	fromAccount ocrtypes.Account,
 	offrampAddress string,
+	extraDataCodec cciptypes.ExtraDataCodec,
 ) ocr3types.ContractTransmitter[[]byte] {
 	return &ccipTransmitter{
 		cw:             cw,
 		fromAccount:    fromAccount,
 		offrampAddress: offrampAddress,
 		toCalldataFn:   ToExecCalldata,
+		extraDataCodec: extraDataCodec,
 	}
 }
 
@@ -217,7 +267,7 @@ func (c *ccipTransmitter) Transmit(
 	}
 
 	// chain writer takes in the raw calldata and packs it on its own.
-	contract, method, args, err := c.toCalldataFn(rawReportCtx, reportWithInfo, rs, ss, vs)
+	contract, method, args, err := c.toCalldataFn(rawReportCtx, reportWithInfo, rs, ss, vs, c.extraDataCodec)
 	if err != nil {
 		return fmt.Errorf("failed to generate call data: %w", err)
 	}
