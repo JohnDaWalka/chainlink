@@ -240,10 +240,6 @@ func (w *launcher) Launch(ctx context.Context, state *registrysyncer.LocalRegist
 				return err
 			}
 		}
-	} else { // TODO: get rid of this. This unblocks us from using the workflow syncer.
-		w.workflowDonNotifier.NotifyDonSet(capabilities.DON{
-			ID: 1,
-		})
 	}
 
 	// Finally, if I'm in a capability DON, let's enable external access
