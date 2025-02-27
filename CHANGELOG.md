@@ -1,6 +1,6 @@
 # Changelog Chainlink Core
 
-## 2.21.0 - UNRELEASED
+## 2.21.0 - 2025-02-27
 
 ### Minor Changes
 
@@ -89,6 +89,8 @@
 - [#16061](https://github.com/smartcontractkit/chainlink/pull/16061) [`1328d2f653`](https://github.com/smartcontractkit/chainlink/commit/1328d2f653e131c064a4acf28319db67454a5090) - Increase Zircuit's NoNewFinalizedHeadsThreshold to 40 minutes #nops
 
 - [#15977](https://github.com/smartcontractkit/chainlink/pull/15977) [`d2fa4bcbbf`](https://github.com/smartcontractkit/chainlink/commit/d2fa4bcbbfe783844238dcd33cb0813fac06d4d4) - #added a new way to calculate CCIP gas deviation thresholds using a sliding curve approach
+
+- [#16417](https://github.com/smartcontractkit/chainlink/pull/16417) [`1bbddbf048`](https://github.com/smartcontractkit/chainlink/commit/1bbddbf04878dbe0b3c000679822d612842b968b) - fixes inability to approve multiple jobs with same command for standard capabilities
 
 ## 2.20.0 - 2025-01-30
 
