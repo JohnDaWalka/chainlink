@@ -25,6 +25,7 @@ func TestSolanaTokenOps(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
 		SolChains: 1,
+		Chains:    1,
 	})
 	solChain1 := e.AllChainSelectorsSolana()[0]
 	e, err := commonchangeset.Apply(t, e, nil,

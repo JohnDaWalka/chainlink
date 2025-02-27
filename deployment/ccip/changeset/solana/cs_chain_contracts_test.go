@@ -480,6 +480,14 @@ func TestTokenAdminRegistry(t *testing.T) {
 				RegisterType:            ccipChangesetSolana.ViaOwnerInstruction,
 			},
 		),
+		commonchangeset.Configure(
+			// add token pool lookup table
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.AddTokenPoolLookupTable),
+			ccipChangesetSolana.TokenPoolLookupTableConfig{
+				ChainSelector: solChain,
+				TokenPubKey:   tokenAddress.String(),
+			},
+		),
 	)
 	require.NoError(t, err)
 
@@ -497,6 +505,15 @@ func TestTokenAdminRegistry(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, tokenAdminRegistryAdminPrivKey.PublicKey(), linkTokenAdminRegistryAccount.PendingAdministrator)
 
+	// lookup table test
+	state, err = ccipChangeset.LoadOnchainStateSolana(e)
+	require.NoError(t, err)
+	lookupTablePubKey := state.SolChains[solChain].TokenPoolLookupTable[tokenAddress]
+	lookupTableEntries0, err := solCommonUtil.GetAddressLookupTable(ctx, e.SolChains[solChain].Client, lookupTablePubKey)
+	require.NoError(t, err)
+	require.Equal(t, lookupTablePubKey, lookupTableEntries0[0])
+	require.Equal(t, tokenAddress, lookupTableEntries0[7])
+
 	e, err = commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(
 			// accept admin role for tokenAddress
@@ -507,6 +524,16 @@ func TestTokenAdminRegistry(t *testing.T) {
 				NewRegistryAdminPrivateKey: tokenAdminRegistryAdminPrivKey.String(),
 			},
 		),
+		commonchangeset.Configure(
+			// set pool -> this updates tokenAdminRegistryPDA, hence above changeset is required
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.SetPool),
+			ccipChangesetSolana.SetPoolConfig{
+				ChainSelector:                     solChain,
+				TokenPubKey:                       tokenAddress.String(),
+				TokenAdminRegistryAdminPrivateKey: tokenAdminRegistryAdminPrivKey.String(),
+				WritableIndexes:                   []uint8{3, 4, 7},
+			},
+		),
 	)
 	require.NoError(t, err)
 	err = e.SolChains[solChain].GetAccountDataBorshInto(ctx, tokenAdminRegistryPDA, &tokenAdminRegistryAccount)
@@ -514,6 +541,7 @@ func TestTokenAdminRegistry(t *testing.T) {
 	// confirm that the administrator is the deployer key
 	require.Equal(t, tokenAdminRegistryAdminPrivKey.PublicKey(), tokenAdminRegistryAccount.Administrator)
 	require.Equal(t, solana.PublicKey{}, tokenAdminRegistryAccount.PendingAdministrator)
+	require.Equal(t, lookupTablePubKey, tokenAdminRegistryAccount.LookupTable)
 
 	newTokenAdminRegistryAdminPrivKey, _ := solana.NewRandomPrivateKey()
 	e, err = commonchangeset.Apply(t, e, nil,
