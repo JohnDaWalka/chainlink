@@ -108,6 +108,11 @@ func generateDonJobSpecs(
 		jobSpecs[types.JobDescription{Flag: types.GatewayDON, NodeType: types.GatewayNode}] = []*jobv1.ProposeJobRequest{jobs.AnyGateway(gatewayNodeID, chainIDUint64, donWithMetadata.ID, extraAllowedPorts, extraAllowedIPs, gatewayConnectorOutput)}
 	}
 
+	// if it's only a gateway node, we don't need to create any other job specs
+	if creflags.HasOnlyOneFlag(donWithMetadata.Flags, types.GatewayDON) {
+		return jobSpecs, nil
+	}
+
 	// look for boostrap node and then for required values in its labels
 	bootstrapNode, err := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.BootstrapNode}, node.EqualLabels)
 	if err != nil {

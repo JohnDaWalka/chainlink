@@ -14,10 +14,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
@@ -615,8 +617,52 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	}
 
 	// deploy don (it includes JD) manually
-	fmt.Println("Run devspace run deploy-don manually")
 	if os.Getenv("CRIB") == "true" {
+		type Chainlink struct {
+			V2Config map[string]string `yaml:"v2Config"`
+			V2Secret map[string]string `yaml:"v2Secret"`
+		}
+		type Override struct {
+			Chainlink `yaml:"chainlink"`
+		}
+
+		type HelmValues struct {
+			Overrides []Override `yaml:"overrides"`
+		}
+
+		fmt.Println("Save config and secret overrides")
+		helmValues := HelmValues{
+			Overrides: []Override{},
+		}
+
+		for _, spec := range envInput.nodeSetInput[0].NodeSpecs {
+			// unmarshall and marshall to conver it into proper multi-line string
+			// that will be correctly serliazed to YAML
+			var data interface{}
+			tomlErr := toml.Unmarshal([]byte(spec.Node.TestConfigOverrides), &data)
+			require.NoError(t, tomlErr, "failed to unmarshal toml")
+			newTOMLBytes, err := toml.Marshal(data)
+			require.NoError(t, err, "failed to marshal toml")
+
+			override := Override{
+				Chainlink: Chainlink{
+					V2Config: map[string]string{"05-overrides.toml": string(newTOMLBytes)},
+					V2Secret: map[string]string{"05-secrets.toml": spec.Node.TestSecretsOverrides},
+				},
+			}
+
+			helmValues.Overrides = append(helmValues.Overrides, override)
+		}
+
+		marshalled, err := yaml.Marshal(helmValues)
+		require.NoError(t, err, "failed to marshal helm values")
+
+		writeErr := os.WriteFile("cre-overrides.yaml", []byte(marshalled), 0644)
+		require.NoError(t, writeErr, "failed to write helm values to file")
+
+		// save configs and secrets to a single file
+		fmt.Println("Run devspace run deploy-don manually")
+
 		in.JD.Out = &jd.Output{}
 		in.JD.Out.UseCache = true
 		jdGRPCHost := fmt.Sprintf("grpc://%s-job-distributor-grpc.main.stage.cldev.sh", os.Getenv("CRIB_NAMESPACE"))
@@ -644,7 +690,6 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 					InternalIP:      nodeName + "-" + strconv.Itoa(i),
 				},
 			})
-
 		}
 	}
 
@@ -1007,7 +1052,6 @@ func TestKeystoneWithOCR3Workflow_ThreeDons_LivePrice(t *testing.T) {
 				Capabilities:       []string{keystonetypes.OCR3Capability, keystonetypes.CustomComputeCapability, keystonetypes.CronCapability},
 				DONTypes:           []string{keystonetypes.WorkflowDON},
 				BootstrapNodeIndex: 0,
-				GatewayNodeIndex:   0,
 			},
 			{
 				Input:              input[1],
