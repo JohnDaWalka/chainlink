@@ -217,24 +217,14 @@ func WithFinalityDepths(finalityDepths map[uint64]uint32) ConfigOpt {
 	}
 }
 
-type ImportableKey struct {
-	JSON     string // the JSON of the key, form dependent on the key type
-	Password string // the password to decrypt the key
-}
-
-func WithImportedP2PKey(key ImportableKey) ConfigOpt {
+func WithImportedP2PKey(key keystore.ImportableKey) ConfigOpt {
 	return func(c *chainlink.Config, s *chainlink.Secrets) {
 		s.P2PKey.JSON = ptr(models.Secret(key.JSON))
 		s.P2PKey.Password = ptr(models.Secret(key.Password))
 	}
 }
 
-type ImportableEthKey struct {
-	EVMChainID uint64 // the chain ID of the key. NOT the selector
-	ImportableKey
-}
-
-func WithImportedEthKeys(keys []ImportableEthKey) ConfigOpt {
+func WithImportedEthKeys(keys []keystore.ImportableEthKey) ConfigOpt {
 	return func(c *chainlink.Config, s *chainlink.Secrets) {
 		s.EVM.Keys = make([]*configv2.EthKey, 0, len(keys))
 		for i, key := range keys {
@@ -433,38 +423,6 @@ func NewNode(
 		Keys:       keys,
 		Addr:       net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 		IsBoostrap: bootstrap,
-	}
-}
-
-func generateEthKeys(t *testing.T, ks keystore.Eth, chainIDs ...*big.Int) []ImportableEthKey {
-	ctx := tests.Context(t)
-	out := make([]ImportableEthKey, len(chainIDs))
-	for i, chainID := range chainIDs {
-		k, err := ks.Create(ctx, chainID)
-		require.NoError(t, err)
-		json, err := ks.Export(ctx, k.ID(), "password")
-		require.NoError(t, err)
-		out[i] = ImportableEthKey{
-			EVMChainID: chainID.Uint64(),
-			ImportableKey: ImportableKey{
-				JSON:     string(json),
-				Password: "password",
-			},
-		}
-	}
-
-	return out
-}
-
-func generateP2PKey(t *testing.T, ks keystore.P2P) ImportableKey {
-	ctx := tests.Context(t)
-	k, err := ks.Create(ctx)
-	require.NoError(t, err)
-	json, err := ks.Export(k.PeerID(), "password")
-	require.NoError(t, err)
-	return ImportableKey{
-		JSON:     string(json),
-		Password: "password",
 	}
 }
 

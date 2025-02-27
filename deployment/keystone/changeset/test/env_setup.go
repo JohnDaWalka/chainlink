@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/maps"
+
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -26,6 +29,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/workflowregistry"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 )
 
 type DonConfig struct {
@@ -36,8 +40,14 @@ type DonConfig struct {
 	Labels           map[string]string                             // optional
 	RegistryChainSel uint64                                        // require, must be the same for all dons
 	ChainSelectors   []uint64                                      // optional chains
+
+	generatedKeys []importableKeys
 }
 
+type importableKeys struct {
+	P2P     keystore.ImportableKey
+	EthKeys map[int]keystore.ImportableEthKey
+}
 type CapabilityNaturalKey struct {
 	LabelledName string
 	Version      string
@@ -48,6 +58,16 @@ func (c DonConfig) Validate() error {
 		return errors.New("N must be at least 4")
 	}
 	return nil
+}
+
+func (c *DonConfig) GenerateKeys(t *testing.T, ks *keystore.TestKeystore) {
+	if c.generatedKeys != nil {
+		return
+	}
+	c.generatedKeys = generateKeys(t, ks, generateKeysCfg{
+		N:                 c.N,
+		EVMChainSelectors: c.ChainSelectors,
+	})
 }
 
 type testEnvIface interface {
@@ -494,4 +514,43 @@ func validateDon(t *testing.T, gotRegistry *kcr.CapabilitiesRegistry, nodes test
 		}
 	}
 	require.True(t, found, "don not found in registry")
+}
+
+type generateKeysCfg struct {
+	N                 int      // number of nodes to generate keys for
+	EVMChainSelectors []uint64 // only evm supported in the core node secrets today
+}
+
+func generateKeys(t *testing.T, ks *keystore.TestKeystore, c generateKeysCfg) []importableKeys {
+	keys := make([]importableKeys, c.N)
+	for i := 0; i < c.N; i++ {
+		keys[i] = importableKeys{
+			P2P:     ks.GenerateP2PKey(),
+			EthKeys: make(map[int]keystore.ImportableEthKey, len(c.EVMChainSelectors)),
+		}
+		evmChainIDs := make([]*big.Int, len(c.EVMChainSelectors))
+		for j, sel := range c.EVMChainSelectors {
+			cid, err := chain_selectors.GetChainIDFromSelector(sel)
+			require.NoError(t, err)
+			id, ok := big.NewInt(0).SetString(cid, 10)
+			require.True(t, ok)
+			evmChainIDs[j] = id
+		}
+
+		// under the hood, the keystore adds the same key to all the chains, so we only need to add it once
+		k, err := ks.Eth().Create(tests.Context(t), evmChainIDs...)
+		require.NoError(t, err)
+		json, err := ks.Eth().Export(tests.Context(t), k.ID(), "password")
+		require.NoError(t, err)
+		for j, chainID := range evmChainIDs {
+			keys[i].EthKeys[j] = keystore.ImportableEthKey{
+				EVMChainID: chainID.Uint64(),
+				ImportableKey: keystore.ImportableKey{
+					JSON:     string(json),
+					Password: "password",
+				},
+			}
+		}
+	}
+	return keys
 }

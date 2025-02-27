@@ -2,7 +2,6 @@ package memory
 
 import (
 	"maps"
-	"math/big"
 	"slices"
 	"testing"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 )
 
 func TestNode(t *testing.T) {
@@ -53,26 +51,4 @@ func TestNode(t *testing.T) {
 			assert.Equal(t, node.Keys.PeerID.String(), cc.Ocr2Config.P2PKeyBundle.PeerId, "chain %d", i)
 		}
 	})
-}
-
-func TestGenerateEthKeys(t *testing.T) {
-	// Create a mock keystore
-	ks := keystore.NewTestKeyStore(t)
-
-	// Define 20 chain IDs
-	chainIDs := make([]*big.Int, 20)
-	for i := 0; i < 20; i++ {
-		chainIDs[i] = big.NewInt(int64(i + 1))
-	}
-
-	// Generate 20 Ethereum keys
-	keys := generateEthKeys(t, ks.Eth(), chainIDs...)
-
-	// Validate the generated keys
-	require.Len(t, keys, 20)
-	for i, key := range keys {
-		assert.Equal(t, chainIDs[i].Uint64(), key.EVMChainID)
-		assert.NotEmpty(t, key.JSON)
-		assert.Equal(t, "password", key.Password)
-	}
 }
