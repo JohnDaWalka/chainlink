@@ -1302,6 +1302,32 @@ MaxConfigSize = '50.00kb' # Default
 ```
 MaxConfigSize is the maximum size of a config that can be fetched from the given config url.
 
+## Workflows
+```toml
+[Workflows]
+```
+
+
+## Workflows.Limits
+```toml
+[Workflows.Limits]
+Global = 200 # Default
+PerOwner = 200 # Default
+```
+
+
+### Global
+```toml
+Global = 200 # Default
+```
+Global is the maximum number of workflows that can be registered globally.
+
+### PerOwner
+```toml
+PerOwner = 200 # Default
+```
+PerOwner is the maximum number of workflows that can be registered per owner.
+
 ## Capabilities.ExternalRegistry
 ```toml
 [Capabilities.ExternalRegistry]
