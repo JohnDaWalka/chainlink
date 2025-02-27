@@ -838,15 +838,28 @@ func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsRes
 		err = deployment.DecodeErr(capabilities_registry.CapabilitiesRegistryABI, err)
 		return nil, fmt.Errorf("failed to call GetDONs: %w", err)
 	}
+
+	// Generate a set of DON ID hashes
+	// A DON ID hash is a sorted hash of all p2p ids in the don +
+	// its capabilities.
+	// We add the capabilities to allow multiple virtual DONs covering
+	// the same node set as long as the capabilities are different.
 	existingDONs := make(map[string]struct{})
 	for _, donInfo := range donInfos {
-		existingDONs[sortedHash(donInfo.NodeP2PIds)] = struct{}{}
+		ids := [][32]byte{}
+		ids = append(ids, donInfo.NodeP2PIds...)
+
+		for _, c := range donInfo.CapabilityConfigurations {
+			ids = append(ids, c.CapabilityId)
+		}
+
+		existingDONs[sortedHash(ids)] = struct{}{}
 	}
 	lggr.Infow("fetched existing DONs...", "len", len(donInfos), "lenByNodesHash", len(existingDONs))
 
 	mcmsOps := make([]mcms.Operation, 0)
 	for _, don := range req.DonsToRegister {
-		var p2pIds [][32]byte
+		var ids [][32]byte
 		for _, n := range don.Nodes {
 			if n.IsBootstrap {
 				continue
@@ -855,10 +868,14 @@ func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsRes
 			if !ok {
 				return nil, fmt.Errorf("node params not found for non-bootstrap node %s", n.NodeID)
 			}
-			p2pIds = append(p2pIds, p2pID)
+			ids = append(ids, p2pID)
 		}
 
-		p2pSortedHash := sortedHash(p2pIds)
+		for _, c := range req.DonToCapabilities[don.Name] {
+			ids = append(ids, c.ID)
+		}
+
+		p2pSortedHash := sortedHash(ids)
 		p2pIdsToDon[p2pSortedHash] = don.Name
 
 		if _, ok := existingDONs[p2pSortedHash]; ok {
