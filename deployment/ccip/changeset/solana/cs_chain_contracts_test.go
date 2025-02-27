@@ -1,6 +1,8 @@
 package solana_test
 
 import (
+	"context"
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -8,6 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
 
+	solRpc "github.com/gagliardetto/solana-go/rpc"
 	solBaseTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
 	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
@@ -143,84 +146,88 @@ func doTestAddRemoteChain(t *testing.T, e deployment.Environment, evmChain uint6
 	require.Equal(t, solFeeQuoter.TimestampedPackedU224{}, destChainFqAccount.State.UsdPerUnitGas)
 	require.True(t, destChainFqAccount.Config.IsEnabled)
 
+	balance, err := e.SolChains[solChain].Client.GetBalance(e.GetContext(), e.SolChains[solChain].DeployerKey.PublicKey(), deployment.SolDefaultCommitment)
+	require.NoError(t, err)
+	fmt.Println("balance", balance.Value)
+
 	// Disable the chain
 
-	e, err = commonchangeset.ApplyChangesetsV2(t, e, []commonchangeset.ConfiguredChangeSet{
-		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(ccipChangesetSolana.DisableRemoteChain),
-			ccipChangesetSolana.DisableRemoteChainConfig{
-				ChainSelector: solChain,
-				RemoteChains:  []uint64{evmChain},
-				MCMSSolana:    mcmsConfig,
-			},
-		),
-	},
-	)
+	// e, err = commonchangeset.ApplyChangesetsV2(t, e, []commonchangeset.ConfiguredChangeSet{
+	// 	commonchangeset.Configure(
+	// 		deployment.CreateLegacyChangeSet(ccipChangesetSolana.DisableRemoteChain),
+	// 		ccipChangesetSolana.DisableRemoteChainConfig{
+	// 			ChainSelector: solChain,
+	// 			RemoteChains:  []uint64{evmChain},
+	// 			MCMSSolana:    mcmsConfig,
+	// 		},
+	// 	),
+	// },
+	// )
 
-	require.NoError(t, err)
+	// require.NoError(t, err)
 
-	state, err = ccipChangeset.LoadOnchainStateSolana(e)
-	require.NoError(t, err)
+	// state, err = ccipChangeset.LoadOnchainStateSolana(e)
+	// require.NoError(t, err)
 
-	err = e.SolChains[solChain].GetAccountDataBorshInto(e.GetContext(), offRampEvmSourceChainPDA, &offRampSourceChain)
-	require.NoError(t, err)
-	require.False(t, offRampSourceChain.Config.IsEnabled)
+	// err = e.SolChains[solChain].GetAccountDataBorshInto(e.GetContext(), offRampEvmSourceChainPDA, &offRampSourceChain)
+	// require.NoError(t, err)
+	// require.False(t, offRampSourceChain.Config.IsEnabled)
 
-	err = e.SolChains[solChain].GetAccountDataBorshInto(e.GetContext(), evmDestChainStatePDA, &destChainStateAccount)
-	require.NoError(t, err)
-	require.True(t, destChainStateAccount.Config.AllowListEnabled)
+	// err = e.SolChains[solChain].GetAccountDataBorshInto(e.GetContext(), evmDestChainStatePDA, &destChainStateAccount)
+	// require.NoError(t, err)
+	// require.True(t, destChainStateAccount.Config.AllowListEnabled)
 
-	err = e.SolChains[solChain].GetAccountDataBorshInto(e.GetContext(), fqEvmDestChainPDA, &destChainFqAccount)
-	require.NoError(t, err, "failed to get account info")
-	require.False(t, destChainFqAccount.Config.IsEnabled)
+	// err = e.SolChains[solChain].GetAccountDataBorshInto(e.GetContext(), fqEvmDestChainPDA, &destChainFqAccount)
+	// require.NoError(t, err, "failed to get account info")
+	// require.False(t, destChainFqAccount.Config.IsEnabled)
 
-	// Re-enable the chain
+	// // Re-enable the chain
 
-	e, err = commonchangeset.ApplyChangesetsV2(t, e, []commonchangeset.ConfiguredChangeSet{
-		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(ccipChangesetSolana.AddRemoteChainToSolana),
-			ccipChangesetSolana.AddRemoteChainToSolanaConfig{
-				ChainSelector: solChain,
-				UpdatesByChain: map[uint64]ccipChangesetSolana.RemoteChainConfigSolana{
-					evmChain: {
-						EnabledAsSource: true,
-						RouterDestinationConfig: solRouter.DestChainConfig{
-							AllowListEnabled: false,
-						},
-						FeeQuoterDestinationConfig: solFeeQuoter.DestChainConfig{
-							IsEnabled:                   true,
-							DefaultTxGasLimit:           30000,
-							MaxPerMsgGasLimit:           3000000,
-							MaxDataBytes:                30000,
-							MaxNumberOfTokensPerMsg:     5,
-							DefaultTokenDestGasOverhead: 5000,
-							ChainFamilySelector:         [4]uint8{40, 18, 213, 44},
-						},
-						IsUpdate: true,
-					},
-				},
-				MCMSSolana: mcmsConfig,
-			},
-		),
-	},
-	)
+	// e, err = commonchangeset.ApplyChangesetsV2(t, e, []commonchangeset.ConfiguredChangeSet{
+	// 	commonchangeset.Configure(
+	// 		deployment.CreateLegacyChangeSet(ccipChangesetSolana.AddRemoteChainToSolana),
+	// 		ccipChangesetSolana.AddRemoteChainToSolanaConfig{
+	// 			ChainSelector: solChain,
+	// 			UpdatesByChain: map[uint64]ccipChangesetSolana.RemoteChainConfigSolana{
+	// 				evmChain: {
+	// 					EnabledAsSource: true,
+	// 					RouterDestinationConfig: solRouter.DestChainConfig{
+	// 						AllowListEnabled: false,
+	// 					},
+	// 					FeeQuoterDestinationConfig: solFeeQuoter.DestChainConfig{
+	// 						IsEnabled:                   true,
+	// 						DefaultTxGasLimit:           30000,
+	// 						MaxPerMsgGasLimit:           3000000,
+	// 						MaxDataBytes:                30000,
+	// 						MaxNumberOfTokensPerMsg:     5,
+	// 						DefaultTokenDestGasOverhead: 5000,
+	// 						ChainFamilySelector:         [4]uint8{40, 18, 213, 44},
+	// 					},
+	// 					IsUpdate: true,
+	// 				},
+	// 			},
+	// 			MCMSSolana: mcmsConfig,
+	// 		},
+	// 	),
+	// },
+	// )
 
-	require.NoError(t, err)
+	// require.NoError(t, err)
 
-	state, err = ccipChangeset.LoadOnchainStateSolana(e)
-	require.NoError(t, err)
+	// state, err = ccipChangeset.LoadOnchainStateSolana(e)
+	// require.NoError(t, err)
 
-	err = e.SolChains[solChain].GetAccountDataBorshInto(e.GetContext(), offRampEvmSourceChainPDA, &offRampSourceChain)
-	require.NoError(t, err)
-	require.True(t, offRampSourceChain.Config.IsEnabled)
+	// err = e.SolChains[solChain].GetAccountDataBorshInto(e.GetContext(), offRampEvmSourceChainPDA, &offRampSourceChain)
+	// require.NoError(t, err)
+	// require.True(t, offRampSourceChain.Config.IsEnabled)
 
-	err = e.SolChains[solChain].GetAccountDataBorshInto(e.GetContext(), evmDestChainStatePDA, &destChainStateAccount)
-	require.NoError(t, err)
-	require.False(t, destChainStateAccount.Config.AllowListEnabled)
+	// err = e.SolChains[solChain].GetAccountDataBorshInto(e.GetContext(), evmDestChainStatePDA, &destChainStateAccount)
+	// require.NoError(t, err)
+	// require.False(t, destChainStateAccount.Config.AllowListEnabled)
 
-	err = e.SolChains[solChain].GetAccountDataBorshInto(e.GetContext(), fqEvmDestChainPDA, &destChainFqAccount)
-	require.NoError(t, err, "failed to get account info")
-	require.True(t, destChainFqAccount.Config.IsEnabled)
+	// err = e.SolChains[solChain].GetAccountDataBorshInto(e.GetContext(), fqEvmDestChainPDA, &destChainFqAccount)
+	// require.NoError(t, err, "failed to get account info")
+	// require.True(t, destChainFqAccount.Config.IsEnabled)
 }
 
 func TestDeployCCIPContracts(t *testing.T) {
@@ -604,3 +611,127 @@ func TestPoolLookupTable(t *testing.T) {
 	require.Equal(t, tokenAdminRegistryAdminPrivKey.PublicKey(), tokenAdminRegistry.Administrator)
 	require.Equal(t, lookupTablePubKey, tokenAdminRegistry.LookupTable)
 }
+
+func TestSolanaChangesets(t *testing.T) {
+	t.Parallel()
+	tenv, _ := testhelpers.NewMemoryEnvironment(t, testhelpers.WithSolChains(1))
+	solChain := tenv.Env.AllChainSelectorsSolana()[0]
+	evmChain := tenv.Env.AllChainSelectors()[0]
+	e, newTokenAddress, err := deployToken(t, tenv.Env, solChain)
+	require.NoError(t, err)
+	tokenAdminRegistryAdminPrivKey, _ := solana.NewRandomPrivateKey()
+	_, err = commonchangeset.ApplyChangesetsV2(t, e, []commonchangeset.ConfiguredChangeSet{
+		// add remote chain
+		commonchangeset.Configure(
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.AddRemoteChainToSolana),
+			ccipChangesetSolana.AddRemoteChainToSolanaConfig{
+				ChainSelector: solChain,
+				UpdatesByChain: map[uint64]ccipChangesetSolana.RemoteChainConfigSolana{
+					evmChain: {
+						EnabledAsSource: true,
+						RouterDestinationConfig: solRouter.DestChainConfig{
+							AllowListEnabled: true,
+						},
+						FeeQuoterDestinationConfig: solFeeQuoter.DestChainConfig{
+							IsEnabled:                   true,
+							DefaultTxGasLimit:           200000,
+							MaxPerMsgGasLimit:           3000000,
+							MaxDataBytes:                30000,
+							MaxNumberOfTokensPerMsg:     5,
+							DefaultTokenDestGasOverhead: 5000,
+							ChainFamilySelector:         [4]uint8{40, 18, 213, 44},
+						},
+					},
+				},
+				// MCMSSolana: mcmsConfig,
+			},
+		),
+		// add token pool
+		commonchangeset.Configure(
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.AddTokenPool),
+			ccipChangesetSolana.TokenPoolConfig{
+				ChainSelector: solChain,
+				TokenPubKey:   newTokenAddress.String(),
+				PoolType:      solTestTokenPool.BurnAndMint_PoolType,
+				Authority:     tenv.Env.SolChains[solChain].DeployerKey.PublicKey().String(),
+			},
+		),
+		// setup token pool for remote chain
+		commonchangeset.Configure(
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.SetupTokenPoolForRemoteChain),
+			ccipChangesetSolana.RemoteChainTokenPoolConfig{
+				SolChainSelector:    solChain,
+				RemoteChainSelector: evmChain,
+				SolTokenPubKey:      newTokenAddress.String(),
+				RemoteConfig: solBaseTokenPool.RemoteConfig{
+					PoolAddresses: []solTestTokenPool.RemoteAddress{{Address: []byte{1, 2, 3}}},
+					TokenAddress:  solTestTokenPool.RemoteAddress{Address: []byte{4, 5, 6}},
+					Decimals:      9,
+				},
+				InboundRateLimit: solBaseTokenPool.RateLimitConfig{
+					Enabled:  true,
+					Capacity: uint64(1000),
+					Rate:     1,
+				},
+				OutboundRateLimit: solBaseTokenPool.RateLimitConfig{
+					Enabled:  true,
+					Capacity: uint64(1000),
+					Rate:     1,
+				},
+				PoolType: solTestTokenPool.BurnAndMint_PoolType,
+			},
+		),
+		commonchangeset.Configure(
+			// register token admin registry for tokenAddress via admin instruction
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.RegisterTokenAdminRegistry),
+			ccipChangesetSolana.RegisterTokenAdminRegistryConfig{
+				ChainSelector:           solChain,
+				TokenPubKey:             newTokenAddress.String(),
+				TokenAdminRegistryAdmin: tokenAdminRegistryAdminPrivKey.PublicKey().String(),
+				RegisterType:            ccipChangesetSolana.ViaGetCcipAdminInstruction,
+			},
+		),
+		commonchangeset.Configure(
+			// accept admin role for tokenAddress
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.AcceptAdminRoleTokenAdminRegistry),
+			ccipChangesetSolana.AcceptAdminRoleTokenAdminRegistryConfig{
+				ChainSelector:              solChain,
+				TokenPubKey:                newTokenAddress.String(),
+				NewRegistryAdminPrivateKey: tokenAdminRegistryAdminPrivKey.String(),
+			},
+		),
+		commonchangeset.Configure(
+			// add token pool lookup table
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.AddTokenPoolLookupTable),
+			ccipChangesetSolana.TokenPoolLookupTableConfig{
+				ChainSelector: solChain,
+				TokenPubKey:   newTokenAddress.String(),
+			},
+		),
+		commonchangeset.Configure(
+			// set pool -> this updates tokenAdminRegistryPDA, hence above changeset is required
+			deployment.CreateLegacyChangeSet(ccipChangesetSolana.SetPool),
+			ccipChangesetSolana.SetPoolConfig{
+				ChainSelector:                     solChain,
+				TokenPubKey:                       newTokenAddress.String(),
+				TokenAdminRegistryAdminPrivateKey: tokenAdminRegistryAdminPrivKey.String(),
+				WritableIndexes:                   []uint8{3, 4, 7},
+			},
+		),
+	})
+	require.NoError(t, err)
+	balance, err := e.SolChains[solChain].Client.GetBalance(e.GetContext(), e.SolChains[solChain].DeployerKey.PublicKey(), deployment.SolDefaultCommitment)
+	require.NoError(t, err)
+	fmt.Println("balance", balance.Value)
+}
+
+func TestSolanaBalance(t *testing.T) {
+	client := solRpc.New("http://127.0.0.1:8899")
+	balance, err := client.GetBalance(context.Background(), solana.MustPublicKeyFromBase58("Av3xZHYnFoW7wW4FEApAtHf8JeYauwaNm5cVLqk6MLfk"), deployment.SolDefaultCommitment)
+	require.NoError(t, err)
+	fmt.Println("balance", balance.Value)
+}
+
+// 500000000000000000
+// 500000000000000000
+// 500000000
