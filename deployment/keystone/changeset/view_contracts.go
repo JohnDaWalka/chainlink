@@ -157,6 +157,7 @@ func GenerateForwarderView(ctx context.Context, f *forwarder.KeystoneForwarder) 
 	//    and extracting the config from the logs, but we don't have access to the transaction hash needed for this.
 	// 2. Using `CodeAt()` to find the block number in which the contract was created, and use that.
 	//    We would have to go from block number 0 to find it, which in the end is similar what's done here.
+
 	configIterator, err := f.FilterConfigSet(&bind.FilterOpts{
 		Start:   0,
 		End:     nil,
