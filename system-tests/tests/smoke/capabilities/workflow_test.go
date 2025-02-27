@@ -485,7 +485,6 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		nodeSetInput:    mustSetCapabilitiesFn(in.NodeSets),
 		blockchainInput: in.BlockchainA,
 	}
-
 	singeFileLogger := cldlogger.NewSingleFileLogger(t)
 	envOutput, err := CreateInfrastructure(singeFileLogger, testLogger, envInput)
 	require.NoError(t, err, "failed to start environment")
