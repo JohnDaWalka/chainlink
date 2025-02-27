@@ -1033,26 +1033,26 @@ func DeployTestRouter(
 
 	// not working
 	// turn offramp to test router
-	// var referenceAddressesAccount solOffRamp.ReferenceAddresses
-	// offRampReferenceAddressesPDA, _, _ := solState.FindOfframpReferenceAddressesPDA(chainState.OffRamp)
-	// err = chain.GetAccountDataBorshInto(e.GetContext(), offRampReferenceAddressesPDA, &referenceAddressesAccount)
-	// if err != nil {
-	// 	return deployment.ChangesetOutput{}, fmt.Errorf("failed to get offramp reference addresses: %w", err)
-	// }
-	// solOffRamp.SetProgramID(chainState.OffRamp)
-	// fmt.Println("referenceAddressesAccount.Router", referenceAddressesAccount.Router.String())
-	// ix, err := solOffRamp.NewUpdateReferenceAddressesInstruction(
-	// 	ccipRouterProgram,
-	// 	referenceAddressesAccount.FeeQuoter,
-	// 	referenceAddressesAccount.OfframpLookupTable,
-	// 	chainState.OffRampConfigPDA,
-	// 	offRampReferenceAddressesPDA,
-	// 	chain.DeployerKey.PublicKey(),
-	// ).ValidateAndBuild()
-	// if err != nil {
-	// 	return deployment.ChangesetOutput{}, fmt.Errorf("failed to build instruction: %w", err)
-	// }
-	// instructions = append(instructions, ix)
+	var referenceAddressesAccount solOffRamp.ReferenceAddresses
+	offRampReferenceAddressesPDA, _, _ := solState.FindOfframpReferenceAddressesPDA(chainState.OffRamp)
+	err = chain.GetAccountDataBorshInto(e.GetContext(), offRampReferenceAddressesPDA, &referenceAddressesAccount)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get offramp reference addresses: %w", err)
+	}
+	solOffRamp.SetProgramID(chainState.OffRamp)
+	fmt.Println("referenceAddressesAccount.Router", referenceAddressesAccount.Router.String())
+	ix, err := solOffRamp.NewUpdateReferenceAddressesInstruction(
+		ccipRouterProgram,
+		referenceAddressesAccount.FeeQuoter,
+		referenceAddressesAccount.OfframpLookupTable,
+		chainState.OffRampConfigPDA,
+		offRampReferenceAddressesPDA,
+		chain.DeployerKey.PublicKey(),
+	).ValidateAndBuild()
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to build instruction: %w", err)
+	}
+	instructions = append(instructions, ix)
 
 	// // create ata for test router for wsol and link token
 	billingSignerPDA, _, _ := solState.FindFeeBillingSignerPDA(ccipRouterProgram)
