@@ -72,7 +72,7 @@ func TestLabelSet_List(t *testing.T) {
 
 		labels := ms.List()
 
-		assert.Len(t, labels, 0, "expected 0 labels in the list")
+		assert.Empty(t, labels, "expected 0 labels in the list")
 	})
 }
 
