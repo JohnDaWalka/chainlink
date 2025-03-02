@@ -8,11 +8,13 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/test"
 )
 
@@ -41,11 +43,16 @@ func TestDeployForwarder(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, addrs, 1)
 
+		chainSel := env.AllChainSelectors()[1]
 		// only forwarder on chain 1
-		require.NotEqual(t, registrySel, env.AllChainSelectors()[1])
-		oaddrs, err := resp.AddressBook.AddressesForChain(env.AllChainSelectors()[1])
+		require.NotEqual(t, registrySel, chainSel)
+		oaddrs, err := resp.AddressBook.AddressesForChain(chainSel)
 		require.NoError(t, err)
 		require.Len(t, oaddrs, 1)
+		for _, tv := range oaddrs {
+			require.True(t, tv.Labels.Contains(internal.DeploymentHashLabel))
+			require.True(t, tv.Labels.Contains(internal.DeploymentBlockLabel))
+		}
 	})
 }
 
