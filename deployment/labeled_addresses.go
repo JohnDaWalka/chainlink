@@ -29,12 +29,11 @@ func (la LabeledAddresses) And(labels ...string) LabeledAddresses {
 		}
 
 		if filterByLabels {
-			keep := true
 			for _, label := range labels {
-				keep = keep && tv.Labels.Contains(label)
-			}
-			if keep {
-				filtered[addr] = tv
+				if tv.Labels.Contains(label) {
+					filtered[addr] = tv
+					break
+				}
 			}
 		}
 	}
