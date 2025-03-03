@@ -111,6 +111,24 @@ func (te EnvWrapper) ContractSets() map[uint64]changeset.ContractSet {
 	return r.ContractSets
 }
 
+func (te EnvWrapper) ForwardersContractSet() map[uint64]changeset.ContractSet {
+	allAddrs, err := te.Env.ExistingAddresses.Addresses()
+	require.NoError(te.t, err)
+	labels := make(map[uint64][]string)
+	for chainSelector, addr := range allAddrs {
+		for _, tv := range addr {
+			labels[chainSelector] = append(labels[chainSelector], tv.Labels.List()...)
+		}
+	}
+	r, err := changeset.GetContractSets(te.Env.Logger, &changeset.GetContractSetsRequest{
+		Chains:      te.Env.Chains,
+		AddressBook: te.Env.ExistingAddresses,
+		Labels:      labels,
+	})
+	require.NoError(te.t, err)
+	return r.ContractSets
+}
+
 func (te EnvWrapper) CapabilitiesRegistry() *kcr.CapabilitiesRegistry {
 	r, err := changeset.GetContractSets(te.Env.Logger, &changeset.GetContractSetsRequest{
 		Chains:      te.Env.Chains,

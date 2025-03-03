@@ -50,8 +50,10 @@ func TestDeployForwarder(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, oaddrs, 1)
 		for _, tv := range oaddrs {
-			require.True(t, tv.Labels.Contains(internal.DeploymentHashLabel))
-			require.True(t, tv.Labels.Contains(internal.DeploymentBlockLabel))
+			labelsList := tv.Labels.List()
+			require.Len(t, labelsList, 2, "expected exactly 2 labels")
+			require.Contains(t, labelsList[0], internal.DeploymentBlockLabel)
+			require.Contains(t, labelsList[1], internal.DeploymentHashLabel)
 		}
 	})
 }
@@ -86,7 +88,7 @@ func TestConfigureForwarders(t *testing.T) {
 				require.Empty(t, csOut.Proposals)
 				// check that forwarder
 				// TODO set up a listener to check that the forwarder is configured
-				contractSet := te.ContractSets()
+				contractSet := te.ForwardersContractSet()
 				for selector := range te.Env.Chains {
 					cs, ok := contractSet[selector]
 					require.True(t, ok)
