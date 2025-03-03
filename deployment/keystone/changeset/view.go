@@ -15,6 +15,8 @@ var _ deployment.ViewState = ViewKeystone
 
 func ViewKeystone(e deployment.Environment) (json.Marshaler, error) {
 	lggr := e.Logger
+	// TODO: using forwarder labels, we will have to load the forwarder contract set as a standalone search
+	// so we can have all contracts available to generate the view
 	state, err := GetContractSets(e.Logger, &GetContractSetsRequest{
 		Chains:      e.Chains,
 		AddressBook: e.ExistingAddresses,

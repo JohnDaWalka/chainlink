@@ -88,7 +88,7 @@ func TestConfigureForwarders(t *testing.T) {
 				require.Empty(t, csOut.Proposals)
 				// check that forwarder
 				// TODO set up a listener to check that the forwarder is configured
-				contractSet := te.ForwardersContractSet()
+				contractSet := te.ContractSets()
 				for selector := range te.Env.Chains {
 					cs, ok := contractSet[selector]
 					require.True(t, ok)

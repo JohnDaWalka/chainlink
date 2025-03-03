@@ -65,7 +65,7 @@ func (c *KeystoneForwarderDeployer) deploy(req DeployRequest) (*DeployResponse, 
 	tv.Labels.Add(fmt.Sprintf("%s: %s", DeploymentBlockLabel, txReceipt.BlockNumber.String()))
 	resp := &DeployResponse{
 		Address: forwarderAddr,
-		Tx:      tx.Hash(),
+		Tx:      txHash,
 		Tv:      tv,
 	}
 	c.contract = forwarder
@@ -85,23 +85,9 @@ type ConfigureForwarderContractsResponse struct {
 // ConfigureForwardContracts configures the forwarder contracts on all chains for the given DONS
 // the address book is required to contain the an address of the deployed forwarder contract for every chain in the environment
 func ConfigureForwardContracts(env *deployment.Environment, req ConfigureForwarderContractsRequest) (*ConfigureForwarderContractsResponse, error) {
-	allAddrs, err := env.ExistingAddresses.Addresses()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get all addresses: %w", err)
-	}
-	// We now need the labels as part of the request, since the contract sets are filtered based on the labels.
-	// If no labels are provided, it will only load contracts with no labels, and we don't want that.
-	// See [KeystoneForwarderDeployer.deploy()] for how the labels are added.
-	var labels []string
-	for _, addr := range allAddrs {
-		for _, tv := range addr {
-			labels = append(labels, tv.Labels.List()...)
-		}
-	}
 	contractSetsResp, err := GetContractSets(env.Logger, &GetContractSetsRequest{
 		Chains:      env.Chains,
 		AddressBook: env.ExistingAddresses,
-		Labels:      labels,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contract sets: %w", err)
