@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/mcms"
@@ -162,12 +161,6 @@ func doAddRemoteChainToSolana(
 	}
 
 	for remoteChainSel, update := range updates {
-		var onRampBytes [64]byte
-		// already verified, skipping errcheck
-		addressBytes, _ := s.GetOnRampAddressBytes(remoteChainSel)
-		addressBytes = common.LeftPadBytes(addressBytes, 64)
-		copy(onRampBytes[:], addressBytes)
-
 		// verified while loading state
 		fqRemoteChainPDA, _, _ := solState.FindFqDestChainPDA(remoteChainSel, feeQuoterID)
 		routerRemoteStatePDA, _ := solState.FindDestChainStatePDA(remoteChainSel, ccipRouterID)
@@ -285,8 +278,14 @@ func doAddRemoteChainToSolana(
 		}
 
 		solOffRamp.SetProgramID(offRampID)
+		var onRampAddress solOffRamp.OnRampAddress
+		addressBytes, _ := s.GetOnRampAddressBytes(remoteChainSel)
+		copy(onRampAddress.Bytes[:], addressBytes)
+		addressBytesLen := len(addressBytes)
+
+		onRampAddress.Len = uint32(addressBytesLen)
 		validSourceChainConfig := solOffRamp.SourceChainConfig{
-			OnRamp:    [2][64]byte{onRampBytes, [64]byte{}},
+			OnRamp:    [2]solOffRamp.OnRampAddress{onRampAddress, {}},
 			IsEnabled: update.EnabledAsSource,
 		}
 		if offRampUsingMCMS {
