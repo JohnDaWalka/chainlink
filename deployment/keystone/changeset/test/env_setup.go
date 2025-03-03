@@ -114,10 +114,10 @@ func (te EnvWrapper) ContractSets() map[uint64]changeset.ContractSet {
 func (te EnvWrapper) ForwardersContractSet() map[uint64]changeset.ContractSet {
 	allAddrs, err := te.Env.ExistingAddresses.Addresses()
 	require.NoError(te.t, err)
-	labels := make(map[uint64][]string)
-	for chainSelector, addr := range allAddrs {
+	var labels []string
+	for _, addr := range allAddrs {
 		for _, tv := range addr {
-			labels[chainSelector] = append(labels[chainSelector], tv.Labels.List()...)
+			labels = append(labels, tv.Labels.List()...)
 		}
 	}
 	r, err := changeset.GetContractSets(te.Env.Logger, &changeset.GetContractSetsRequest{
