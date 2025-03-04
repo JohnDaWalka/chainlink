@@ -1,6 +1,7 @@
 package changeset
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -73,8 +74,8 @@ func (cs ContractSet) TransferableContracts() []common.Address {
 }
 
 // View is a view of the keystone chain
-// It is best effort and logs errors
-func (cs ContractSet) View(lggr logger.Logger) (KeystoneChainView, error) {
+// It is best-effort and logs errors
+func (cs ContractSet) View(ctx context.Context, lggr logger.Logger) (KeystoneChainView, error) {
 	out := NewKeystoneChainView()
 	var allErrs error
 	if cs.CapabilitiesRegistry != nil {
