@@ -300,12 +300,14 @@ require (
 	github.com/sethvargo/go-retry v0.2.4 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.24.3 // indirect
-	github.com/smartcontractkit/ccip-owner-contracts v0.0.0-salt-fix // indirect
-	github.com/smartcontractkit/chain-selectors v1.0.40 // indirect
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250212131315-e9b53b05b02a // indirect
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250211204327-6aca485891a7 // indirect
-	github.com/smartcontractkit/chainlink-feeds v0.1.1 // indirect
-	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250207205350-420ccacab78a // indirect
+	github.com/shoenig/go-m1cpu v0.1.6 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
+	github.com/smartcontractkit/chain-selectors v1.0.43 // indirect
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250228192734-cb6d70c3a866 // indirect
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250225130625-4a632b0b1e61 // indirect
+	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 // indirect
+	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250227163723-3c71fefea680 // indirect
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250211162441-3d6cea220efb // indirect
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.6.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.4.0 // indirect
