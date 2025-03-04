@@ -3,12 +3,16 @@ package infra
 import (
 	"fmt"
 
+	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
 
-func Host(nodeIndex int, donName string, infraDetails types.InfraDetails) string {
+func Host(nodeIndex int, nodeType cretypes.CapabilityFlag, donName string, infraDetails types.InfraDetails) string {
 	if infraDetails.InfraType == types.InfraType_CRIB {
-		return fmt.Sprintf("%s-ccip-%d.main.stage.cldev.sh", infraDetails.Namespace, nodeIndex)
+		if nodeType == cretypes.BootstrapNode {
+			return fmt.Sprintf("base-bt-%d-gtwnode", nodeIndex)
+		}
+		return fmt.Sprintf("base-%d", nodeIndex)
 	}
 
 	return fmt.Sprintf("%s-node%d", donName, nodeIndex)

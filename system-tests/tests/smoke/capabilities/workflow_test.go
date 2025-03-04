@@ -1,10 +1,12 @@
 package capabilities_test
 
 import (
+	"crypto/tls"
 	"fmt"
 	"math/big"
 	"net"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -19,7 +21,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
@@ -46,6 +49,7 @@ import (
 	keystoneporconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/por"
 	libjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	keystonepor "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/por"
+	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	keystonesecrets "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
 	libenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	keystonetypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
@@ -193,8 +197,8 @@ func validateEnvVars(t *testing.T, in *TestConfig) {
 		if in.WorkflowConfig.ShouldCompileNewWorkflow {
 			gistWriteToken := os.Getenv("GIST_WRITE_TOKEN")
 			require.NotEmpty(t, gistWriteToken, "GIST_WRITE_TOKEN must be set to use CRE CLI to compile workflows. It requires gist:read and gist:write permissions")
-			err := os.Setenv("GITHUB_API_TOKEN", gistWriteToken)
-			require.NoError(t, err, "failed to set GITHUB_API_TOKEN env var")
+			err := os.Setenv("CRE_GITHUB_API_TOKEN", gistWriteToken)
+			require.NoError(t, err, "failed to set CRE_GITHUB_API_TOKEN env var")
 		}
 	}
 }
@@ -397,12 +401,13 @@ func CreateInfrastructure(
 		input.blockchainInput.Out = &blockchain.Output{}
 		input.blockchainInput.Out.UseCache = true
 		input.blockchainInput.Out.ChainID = "1337"
+		input.blockchainInput.Out.Family = "evm"
 		input.blockchainInput.Out.Nodes = []*blockchain.Node{
 			{
 				HostWSUrl:             fmt.Sprintf("wss://%s-geth-1337-ws.main.stage.cldev.sh", cribNamespace),
 				HostHTTPUrl:           fmt.Sprintf("https://%s-geth-1337-http.main.stage.cldev.sh", cribNamespace),
-				DockerInternalWSUrl:   fmt.Sprintf("wss://%s-geth-1337-ws.main.stage.cldev.sh", cribNamespace),
-				DockerInternalHTTPUrl: fmt.Sprintf("https://%s-geth-1337-http.main.stage.cldev.sh", cribNamespace),
+				DockerInternalWSUrl:   "ws://geth-1337:8546",
+				DockerInternalHTTPUrl: "http://geth-1337:8544",
 			},
 		}
 	}
@@ -456,7 +461,6 @@ func CreateInfrastructure(
 
 	output.chainSelector = chainSelector
 	output.blockchainOutput = blockchainOutput
-	// jdOutput:           jdOutput
 	output.sethClient = sethClient
 	output.deployerPrivateKey = pkey
 
@@ -612,24 +616,13 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 
 	// deploy don (it includes JD) manually
 	if os.Getenv("CRIB") == "true" {
-		type Chainlink struct {
-			V2Config map[string]string `yaml:"v2Config"`
-			V2Secret map[string]string `yaml:"v2Secret"`
-		}
-		type Override struct {
-			Chainlink `yaml:"chainlink"`
-		}
-
-		type HelmValues struct {
-			Overrides []Override `yaml:"overrides"`
-		}
-
 		fmt.Println("Save config and secret overrides")
-		helmValues := HelmValues{
-			Overrides: []Override{},
-		}
 
-		for _, spec := range envInput.nodeSetInput[0].NodeSpecs {
+		cribConfigsDir := filepath.Join(".", "crib-configs")
+		err = os.MkdirAll(cribConfigsDir, os.ModePerm)
+		require.NoError(t, err, "failed to create crib-configs directory")
+
+		for i, spec := range envInput.nodeSetInput[0].NodeSpecs {
 			// unmarshall and marshall to conver it into proper multi-line string
 			// that will be correctly serliazed to YAML
 			var data interface{}
@@ -638,49 +631,71 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 			newTOMLBytes, err := toml.Marshal(data)
 			require.NoError(t, err, "failed to marshal toml")
 
-			override := Override{
-				Chainlink: Chainlink{
-					V2Config: map[string]string{"05-overrides.toml": string(newTOMLBytes)},
-					V2Secret: map[string]string{"05-secrets.toml": spec.Node.TestSecretsOverrides},
-				},
+			idxToUse := i
+			configPattern := fmt.Sprintf("config-override-bt-%d.toml", idxToUse)
+			secretPattern := fmt.Sprintf("secrets-override-bt-%d.toml", idxToUse)
+			if i > 0 {
+				idxToUse = i - 1
+				configPattern = fmt.Sprintf("config-override-%d.toml", idxToUse)
+				secretPattern = fmt.Sprintf("secrets-override-%d.toml", idxToUse)
 			}
 
-			helmValues.Overrides = append(helmValues.Overrides, override)
+			writeErr := os.WriteFile(filepath.Join(cribConfigsDir, configPattern), newTOMLBytes, 0644)
+			require.NoError(t, writeErr, "failed to write config override for node %d to file", i)
+
+			writeErr = os.WriteFile(filepath.Join(cribConfigsDir, secretPattern), []byte(spec.Node.TestSecretsOverrides), 0644)
+			require.NoError(t, writeErr, "failed to write secrets override for node %d to file", i)
 		}
 
-		marshalled, err := yaml.Marshal(helmValues)
-		require.NoError(t, err, "failed to marshal helm values")
-
-		writeErr := os.WriteFile("cre-overrides.yaml", []byte(marshalled), 0644)
-		require.NoError(t, writeErr, "failed to write helm values to file")
-
 		// save configs and secrets to a single file
-		fmt.Println("Run devspace run deploy-don manually")
+		fmt.Println("Run devspace run deploy-dons manually")
 
 		in.JD.Out = &jd.Output{}
 		in.JD.Out.UseCache = true
-		jdGRPCHost := fmt.Sprintf("grpc://%s-job-distributor-grpc.main.stage.cldev.sh", os.Getenv("CRIB_NAMESPACE"))
+		jdGRPCHost := fmt.Sprintf("%s-job-distributor-grpc.main.stage.cldev.sh:443", os.Getenv("CRIB_NAMESPACE"))
+		jdWSSHost := "job-distributor-noderpc-lb:80"
 		in.JD.Out.HostGRPCUrl = jdGRPCHost
 		in.JD.Out.DockerGRPCUrl = jdGRPCHost
-		// is WS needed?
+		in.JD.Out.DockerWSRPCUrl = jdWSSHost
+		in.JD.Out.HostWSRPCUrl = jdWSSHost
 
 		envInput.nodeSetInput[0].Input.Out = &ns.Output{}
 		envInput.nodeSetInput[0].Input.Out.UseCache = true
 		envInput.nodeSetInput[0].Input.Out.CLNodes = []*clnode.Output{}
-		for i := range envInput.nodeSetInput[0].NodeSpecs {
-			nodeName := "base"
-			//TODO check bootstrap flag
-			if i == 0 {
-				nodeName = "base-bt"
-			}
+
+		bootstrapNodes, err := libnode.FindManyWithLabel(topology.DonsMetadata[0].NodesMetadata, &keystonetypes.Label{Key: libnode.NodeTypeKey, Value: keystonetypes.BootstrapNode}, libnode.EqualLabels)
+		require.NoError(t, err, "failed to find bootstrap nodes")
+
+		for i := range bootstrapNodes {
+			nodeName := "base-bt"
+
 			envInput.nodeSetInput[0].Input.Out.CLNodes = append(envInput.nodeSetInput[0].Out.CLNodes, &clnode.Output{
 				UseCache: true,
 				Node: &clnode.NodeOut{
 					APIAuthUser:     "admin@chain.link",
 					APIAuthPassword: "hWDmgcub2gUhyrG6cxriqt7T",
 					HostURL:         fmt.Sprintf("http://%s-%s-%d.main.stage.cldev.sh:80", os.Getenv("CRIB_NAMESPACE"), nodeName, i),
-					DockerURL:       fmt.Sprintf("http://%s-%s-%d.main.stage.cldev.sh:80", os.Getenv("CRIB_NAMESPACE"), nodeName, i),
-					DockerP2PUrl:    fmt.Sprintf("http://%s-%s-%d.main.stage.cldev.sh:6690", os.Getenv("CRIB_NAMESPACE"), nodeName, i),
+					DockerURL:       fmt.Sprintf("http://%s-%s-%d:80", os.Getenv("CRIB_NAMESPACE"), nodeName, i),
+					DockerP2PUrl:    fmt.Sprintf("http://%s-%s-%d:6690", os.Getenv("CRIB_NAMESPACE"), nodeName, i),
+					InternalIP:      nodeName + "-" + strconv.Itoa(i),
+				},
+			})
+		}
+
+		workerNodes, err := libnode.FindManyWithLabel(topology.DonsMetadata[0].NodesMetadata, &keystonetypes.Label{Key: libnode.NodeTypeKey, Value: keystonetypes.WorkerNode}, libnode.EqualLabels)
+		require.NoError(t, err, "failed to find worker nodes")
+
+		for i := range workerNodes {
+			nodeName := "base"
+
+			envInput.nodeSetInput[0].Input.Out.CLNodes = append(envInput.nodeSetInput[0].Out.CLNodes, &clnode.Output{
+				UseCache: true,
+				Node: &clnode.NodeOut{
+					APIAuthUser:     "admin@chain.link",
+					APIAuthPassword: "hWDmgcub2gUhyrG6cxriqt7T",
+					HostURL:         fmt.Sprintf("http://%s-%s-%d.main.stage.cldev.sh:80", os.Getenv("CRIB_NAMESPACE"), nodeName, i),
+					DockerURL:       fmt.Sprintf("http://%s-%s-%d:80", os.Getenv("CRIB_NAMESPACE"), nodeName, i),
+					DockerP2PUrl:    fmt.Sprintf("http://%s-%s-%d:6690", os.Getenv("CRIB_NAMESPACE"), nodeName, i),
 					InternalIP:      nodeName + "-" + strconv.Itoa(i),
 				},
 			})
@@ -714,7 +729,17 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		ExistingAddresses: chainsOnlyCld.ExistingAddresses,
 		Topology:          topology,
 	}
-	fullCldOutput, err := libenv.BuildFullCLDEnvironment(singeFileLogger, fullCldInput)
+
+	var creds credentials.TransportCredentials
+	if os.Getenv("CRIB") == "true" {
+		creds = credentials.NewTLS(&tls.Config{
+			MinVersion: tls.VersionTLS12,
+		})
+	} else {
+		creds = insecure.NewCredentials()
+	}
+
+	fullCldOutput, err := libenv.BuildFullCLDEnvironment(singeFileLogger, fullCldInput, creds)
 	require.NoError(t, err, "failed to build chainlink deployment environment")
 
 	// Fund the nodes
@@ -785,6 +810,8 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		DonTopology:   fullCldOutput.DonTopology,
 		DonToJobSpecs: donToJobSpecs,
 	}
+
+	//TODO should we remove jobs first, if it's running in CRIB? or at least jobs of certain types?
 
 	err = libdon.CreateJobs(testLogger, createJobsInput)
 	require.NoError(t, err, "failed to configure nodes and create jobs")

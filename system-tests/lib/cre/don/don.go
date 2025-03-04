@@ -83,7 +83,7 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraDetai
 				Value: nodeType,
 			})
 
-			host := infra.Host(j, donMetadata.Name, infraDetails)
+			host := infra.Host(j, nodeType, donMetadata.Name, infraDetails)
 
 			if nodeSetInput[i].GatewayNodeIndex != -1 && j == nodeSetInput[i].GatewayNodeIndex {
 				nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
