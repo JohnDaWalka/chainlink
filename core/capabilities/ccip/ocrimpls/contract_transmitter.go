@@ -14,8 +14,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 )
 
@@ -28,7 +28,7 @@ type ToCalldataFunc func(
 	report ocr3types.ReportWithInfo[[]byte],
 	rs, ss [][32]byte,
 	vs [32]byte,
-	codec cciptypes.ExtraDataCodec,
+	codec ccipcommon.ExtraDataCodec,
 ) (contract string, method string, args any, err error)
 
 // NewToCommitCalldataFunc returns a ToCalldataFunc that is used to generate the calldata for the commit method.
@@ -40,7 +40,7 @@ func NewToCommitCalldataFunc(defaultMethod, priceOnlyMethod string) ToCalldataFu
 		report ocr3types.ReportWithInfo[[]byte],
 		rs, ss [][32]byte,
 		vs [32]byte,
-		_ cciptypes.ExtraDataCodec,
+		_ ccipcommon.ExtraDataCodec,
 	) (contract string, method string, args any, err error) {
 		// Note that the name of the struct field is very important, since the encoder used
 		// by the chainwriter uses mapstructure, which will use the struct field name to map
@@ -90,7 +90,7 @@ func ToExecCalldata(
 	report ocr3types.ReportWithInfo[[]byte],
 	_, _ [][32]byte,
 	_ [32]byte,
-	extraDataCodec cciptypes.ExtraDataCodec,
+	extraDataCodec ccipcommon.ExtraDataCodec,
 ) (contract string, method string, args any, err error) {
 	// Note that the name of the struct field is very important, since the encoder used
 	// by the chainwriter uses mapstructure, which will use the struct field name to map
@@ -171,7 +171,7 @@ type ccipTransmitter struct {
 	fromAccount    ocrtypes.Account
 	offrampAddress string
 	toCalldataFn   ToCalldataFunc
-	extraDataCodec cciptypes.ExtraDataCodec
+	extraDataCodec ccipcommon.ExtraDataCodec
 }
 
 func XXXNewContractTransmitterTestsOnly(
@@ -186,7 +186,7 @@ func XXXNewContractTransmitterTestsOnly(
 		report ocr3types.ReportWithInfo[[]byte],
 		rs, ss [][32]byte,
 		vs [32]byte,
-		extraDataCodec cciptypes.ExtraDataCodec) (string, string, any, error) {
+		extraDataCodec ccipcommon.ExtraDataCodec) (string, string, any, error) {
 
 		_, _, args, err := toCalldataFn(rawReportCtx, report, rs, ss, vs, extraDataCodec)
 		return contractName, method, args, err
@@ -217,7 +217,7 @@ func NewExecContractTransmitter(
 	cw commontypes.ContractWriter,
 	fromAccount ocrtypes.Account,
 	offrampAddress string,
-	extraDataCodec cciptypes.ExtraDataCodec,
+	extraDataCodec ccipcommon.ExtraDataCodec,
 ) ocr3types.ContractTransmitter[[]byte] {
 	return &ccipTransmitter{
 		cw:             cw,
