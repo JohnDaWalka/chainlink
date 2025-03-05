@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-integrations/evm/config/toml"
 	"github.com/smartcontractkit/chainlink-integrations/evm/types"
 	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
+
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 )
 
@@ -194,6 +195,13 @@ func (c *MockConfig) SetFinalityDepth(fd uint32)     { c.finalityDepth = fd }
 func (c *MockConfig) FinalityTagEnabled() bool       { return c.finalityTagEnabled }
 
 func MakeTestConfigs(t *testing.T) (*MockConfig, *TestDatabaseConfig, *TestEvmConfig) {
+	db := &TestDatabaseConfig{defaultQueryTimeout: utils.DefaultQueryTimeout}
+	ec := &TestEvmConfig{BumpThreshold: 42, MaxInFlight: uint32(42), MaxQueued: uint64(0), ReaperInterval: time.Duration(0), ReaperThreshold: time.Duration(0), RpcDefaultBatchSize: uint32(250)}
+	config := &MockConfig{EvmConfig: ec}
+	return config, db, ec
+}
+
+func MakeTestConfigsEx() (*MockConfig, *TestDatabaseConfig, *TestEvmConfig) {
 	db := &TestDatabaseConfig{defaultQueryTimeout: utils.DefaultQueryTimeout}
 	ec := &TestEvmConfig{BumpThreshold: 42, MaxInFlight: uint32(42), MaxQueued: uint64(0), ReaperInterval: time.Duration(0), ReaperThreshold: time.Duration(0), RpcDefaultBatchSize: uint32(250)}
 	config := &MockConfig{EvmConfig: ec}
