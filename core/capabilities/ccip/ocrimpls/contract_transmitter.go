@@ -57,7 +57,7 @@ func NewToCommitCalldataFunc(defaultMethod, priceOnlyMethod string) ToCalldataFu
 		}
 
 		method = defaultMethod
-		if priceOnlyMethod != "" && len(info.MerkleRoots) == 0 && len(info.TokenPrices) > 0 {
+		if priceOnlyMethod != "" && len(info.MerkleRoots) == 0 && len(info.TokenPriceUpdates) > 0 {
 			method = priceOnlyMethod
 		}
 
@@ -141,7 +141,7 @@ type ExtraDataDecoded struct {
 	DestExecDataDecoded []map[string]any
 }
 
-func decodeExecData(report ccipocr3.ExecuteReportInfo, codec ccipocr3.ExtraDataCodec) (ExtraDataDecoded, error) {
+func decodeExecData(report ccipocr3.ExecuteReportInfo, codec ccipcommon.ExtraDataCodec) (ExtraDataDecoded, error) {
 	// only one report one message, since this is a stop-gap solution for solana
 	if len(report.AbstractReports) != 1 && len(report.AbstractReports[0].Messages) != 1 {
 		return ExtraDataDecoded{}, errors.New("unexpected report length")
@@ -187,7 +187,6 @@ func XXXNewContractTransmitterTestsOnly(
 		rs, ss [][32]byte,
 		vs [32]byte,
 		extraDataCodec ccipcommon.ExtraDataCodec) (string, string, any, error) {
-
 		_, _, args, err := toCalldataFn(rawReportCtx, report, rs, ss, vs, extraDataCodec)
 		return contractName, method, args, err
 	}
