@@ -133,8 +133,11 @@ var _ ocr3types.ContractTransmitter[[]byte] = &ccipTransmitter{}
 
 func decodeExecData(report ccipocr3.ExecuteReportInfo, codec ccipcommon.ExtraDataCodec) (ccipcommon.ExtraDataDecoded, error) {
 	// only one report one message, since this is a stop-gap solution for solana
-	if len(report.AbstractReports) != 1 && len(report.AbstractReports[0].Messages) != 1 {
-		return ccipcommon.ExtraDataDecoded{}, errors.New("unexpected report length")
+	if len(report.AbstractReports) != 1 {
+		return ccipcommon.ExtraDataDecoded{}, fmt.Errorf("unexpected report length, expected 1, got %d", len(report.AbstractReports))
+	}
+	if len(report.AbstractReports[0].Messages) != 1 {
+		return ccipcommon.ExtraDataDecoded{}, fmt.Errorf("unexpected message length, expected 1, got %d", len(report.AbstractReports[0].Messages))
 	}
 	message := report.AbstractReports[0].Messages[0]
 	extraDataDecoded := ccipcommon.ExtraDataDecoded{}
