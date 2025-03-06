@@ -1915,6 +1915,12 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	msgData := msg.Data
 
 	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
+	log.Info().Str("Source Chain", sourceCCIP.Common.ChainClient.GetNetworkName()).Str("Fee", fee.String()).Msg("Calculated fee Before")
+	base := big.NewInt(10)
+	exponent := big.NewInt(10)
+	tenToThePowerOf18 := new(big.Int).Exp(base, exponent, nil)
+	fee = new(big.Int).Mul(fee, tenToThePowerOf18)
+	// fee = fee.Mul(fee, big.NewInt(2))
 	if err != nil {
 		log.Info().Interface("Msg", msg).Msg("CCIP msg")
 		reason, _ := blockchain.RPCErrorFromError(err)
@@ -1924,6 +1930,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 		return common.Hash{}, d, nil, nil, fmt.Errorf("failed getting the fee: %w", err)
 	}
 	log.Info().Str("Fee", fee.String()).Msg("Calculated fee")
+	// log.Info().Str("Source Chain", sourceCCIP.Common.ChainClient.GetNetworkName()).Str("Fee", fee.String()).Msg("Calculated fee After")
 
 	var sendTx *types.Transaction
 	timeNow := time.Now()
@@ -2608,11 +2615,22 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 			var value any
 			var foundAsRoot, ok bool
 			value, foundAsRoot = destCCIP.ReportBlessedWatcher.Load(CommitReport.MerkleRoot)
+			lggr.Info().Bool("ReportBlessedWatcher found", foundAsRoot)
+			// Looping over the map and printing the keys
+			destCCIP.ReportBlessedWatcher.Range(func(key, value any) bool {
+				lggr.Info().Any("ReportBlessedWatcher Key", key)
+				return true // Continue iterating
+			})
+			destCCIP.ReportBlessedBySeqNum.Range(func(key, value any) bool {
+				lggr.Info().Any("ReportBlessedBySeqNum Key", key)
+				return true // Continue iterating
+			})
 			receivedAt := time.Now().UTC()
 			ok = foundAsRoot
 			if !foundAsRoot {
 				// if the value is not found as root, check if it is found as sequence number
 				value, ok = destCCIP.ReportBlessedBySeqNum.Load(seqNum)
+				lggr.Info().Bool("ReportBlessedBySeqNum found", foundAsRoot)
 			}
 			if ok && value != nil {
 				vLogs, exists := value.(*contracts.LogInfo)
