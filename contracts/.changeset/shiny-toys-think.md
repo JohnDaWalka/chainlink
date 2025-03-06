@@ -2,4 +2,4 @@
 '@chainlink/contracts': minor
 ---
 
-#removed Unused operatorforwarder contracts.
+#removed [CCIP-5323] Unused operatorforwarder contracts.
