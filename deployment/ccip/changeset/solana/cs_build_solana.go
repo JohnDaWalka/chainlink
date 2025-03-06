@@ -225,12 +225,12 @@ func BuildSolana(e deployment.Environment, config BuildSolanaConfig) error {
 		return fmt.Errorf("failed to read deploy directory: %w", err)
 	}
 
-	if config.TestRouter {
-		files, err = filterRouterFiles(files)
-		if err != nil {
-			return fmt.Errorf("failed to filter router files: %w", err)
-		}
-	}
+	// if config.TestRouter {
+	// 	files, err = filterRouterFiles(files)
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to filter router files: %w", err)
+	// 	}
+	// }
 
 	for _, file := range files {
 		filePath := filepath.Join(deployFilePath, file.Name())
