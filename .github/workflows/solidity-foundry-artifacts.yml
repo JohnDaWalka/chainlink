@@ -13,7 +13,6 @@ on:
           - "keystone"
           - "l2ep"
           - "llo-feeds"
-          - "operatorforwarder"
           - "shared"
           - "vrf"
           - "workflow"
