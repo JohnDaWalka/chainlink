@@ -84,6 +84,7 @@ const (
 	REPORT_V2
 	REPORT_V3
 	REPORT_V4
+	REPORT_V5
 	_
 )
 
@@ -115,3 +116,4 @@ func (f FeedID) IsV1() bool { return f.Version() == REPORT_V1 }
 func (f FeedID) IsV2() bool { return f.Version() == REPORT_V2 }
 func (f FeedID) IsV3() bool { return f.Version() == REPORT_V3 }
 func (f FeedID) IsV4() bool { return f.Version() == REPORT_V4 }
+func (f FeedID) IsV5() bool { return f.Version() == REPORT_V5 }
