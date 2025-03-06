@@ -1,6 +1,7 @@
 package don
 
 import (
+	"os"
 	"regexp"
 	"strconv"
 
@@ -91,10 +92,15 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraDetai
 					Value: cretypes.GatewayNode,
 				})
 
+				gatewayHost := host
+				if os.Getenv("CRIB") == "true" {
+					gatewayHost += "-gtwnode"
+				}
+
 				topology.GatewayConnectorOutput = &cretypes.GatewayConnectorOutput{
 					Path: "/node",
 					Port: 5003,
-					Host: host,
+					Host: gatewayHost,
 					// do not set gateway connector dons, they will be resolved automatically
 				}
 			}

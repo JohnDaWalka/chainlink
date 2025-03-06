@@ -1,15 +1,18 @@
 package capabilities_test
 
 import (
+	"bufio"
 	"crypto/tls"
 	"fmt"
 	"math/big"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -387,7 +390,7 @@ func CreateInfrastructure(
 
 	if os.Getenv("CRIB") == "true" {
 		// call devspace with "devspace run deploy-chains"
-		fmt.Println("Manually deploy chains using devspace")
+		// fmt.Println("Manually deploy chains using devspace")
 		cribNamespace := os.Getenv("CRIB_NAMESPACE")
 		if cribNamespace == "" {
 			return nil, errors.New("CRIB_NAMESPACE env var must be set")
@@ -477,8 +480,98 @@ type setupOutput struct {
 	nodeOutput           []*keystonetypes.WrappedNodeOutput
 }
 
+type NixShell struct {
+	cmd    *exec.Cmd
+	stdin  *bufio.Writer
+	stdout *bufio.Reader
+	mu     sync.Mutex
+}
+
+func NewNixShell(folder string) (*NixShell, error) {
+	cmd := exec.Command("nix", "develop", "--command", "sh")
+	// cmd := exec.Command("nix", "develop")
+	cmd.Dir = folder
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+
+	return &NixShell{
+		cmd:    cmd,
+		stdin:  bufio.NewWriter(stdin),
+		stdout: bufio.NewReader(stdout),
+	}, nil
+}
+
+func (ns *NixShell) RunCommand(command string) (string, error) {
+	ns.mu.Lock()
+	defer ns.mu.Unlock()
+
+	endMarker := "END_OF_COMMAND_OUTPUT"
+	fullCommand := fmt.Sprintf("%s; echo %s\n", command, endMarker)
+
+	_, err := ns.stdin.WriteString(fullCommand)
+	if err != nil {
+		return "", err
+	}
+	if err := ns.stdin.Flush(); err != nil {
+		return "", err
+	}
+
+	var output strings.Builder
+	for {
+		line, err := ns.stdout.ReadString('\n')
+		fmt.Print(line)
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(line) == endMarker {
+			break
+		}
+		output.WriteString(line)
+	}
+
+	return strings.TrimSpace(output.String()), nil
+}
+
+func (ns *NixShell) Close() error {
+	return ns.cmd.Process.Kill()
+}
+
 func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig, priceProvider PriceProvider, binaryDownloadOutput binaryDownloadOutput, mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet) *setupOutput {
 	// Universal setup -- START
+	var nixShell *NixShell
+	if os.Getenv("CRIB") == "true" {
+		var err error
+		nixShell, err = NewNixShell("/Users/bartektofel/Desktop/repos/crib/deployments/cre")
+		require.NoError(t, err, "failed to create Nix shell")
+
+		t.Cleanup(func() {
+			_ = nixShell.Close()
+		})
+
+		_, err = nixShell.RunCommand("crib init")
+		require.NoError(t, err, "failed to run crib init")
+
+		_, err = nixShell.RunCommand("devspace purge")
+		require.NoError(t, err, "failed to run devspace purge")
+
+		_, err = nixShell.RunCommand("devspace run deploy-chains")
+		require.NoError(t, err, "failed to run devspace run deploy-chains")
+
+		// for some reason sometimes chains aren't ready yet, we need to add a fluent wait here
+		// just like the one we have for don/jd
+		time.Sleep(5 * time.Second)
+	}
+
 	envInput := InfrastructureInput{
 		jdInput:         in.JD,
 		nodeSetInput:    mustSetCapabilitiesFn(in.NodeSets),
@@ -648,7 +741,9 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		}
 
 		// save configs and secrets to a single file
-		fmt.Println("Run devspace run deploy-dons manually")
+		// fmt.Println("Run devspace run deploy-dons manually")
+		_, err = nixShell.RunCommand("devspace run deploy-dons")
+		require.NoError(t, err, "failed to run devspace run deploy-dons")
 
 		in.JD.Out = &jd.Output{}
 		in.JD.Out.UseCache = true
@@ -753,43 +848,6 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 			require.NoError(t, fundingErr, "failed to send funds to node %s", node.AccountAddr[envOutput.sethClient.Cfg.Network.ChainID])
 		}
 	}
-	// Universal setup -- END
-
-	// Workflow-specific configuration -- START
-	deployFeedConsumerInput := &keystonetypes.DeployFeedConsumerInput{
-		ChainSelector: envOutput.chainSelector,
-		CldEnv:        chainsOnlyCld,
-	}
-	deployFeedsConsumerOutput, err := libcontracts.DeployFeedsConsumer(testLogger, deployFeedConsumerInput)
-	require.NoError(t, err, "failed to deploy feeds consumer")
-
-	configureFeedConsumerInput := &keystonetypes.ConfigureFeedConsumerInput{
-		SethClient:            envOutput.sethClient,
-		FeedConsumerAddress:   deployFeedsConsumerOutput.FeedConsumerAddress,
-		AllowedSenders:        []common.Address{keystoneContractsOutput.ForwarderAddress},
-		AllowedWorkflowOwners: []common.Address{envOutput.sethClient.MustGetRootKeyAddress()},
-		AllowedWorkflowNames:  []string{in.WorkflowConfig.WorkflowName},
-	}
-	_, err = libcontracts.ConfigureFeedsConsumer(testLogger, configureFeedConsumerInput)
-	require.NoError(t, err, "failed to configure feeds consumer")
-
-	registerInput := registerPoRWorkflowInput{
-		WorkflowConfig:              in.WorkflowConfig,
-		chainSelector:               envOutput.chainSelector,
-		workflowDonID:               fullCldOutput.DonTopology.WorkflowDonID,
-		feedID:                      in.WorkflowConfig.FeedID,
-		workflowRegistryAddress:     keystoneContractsOutput.WorkflowRegistryAddress,
-		feedConsumerAddress:         deployFeedsConsumerOutput.FeedConsumerAddress,
-		capabilitiesRegistryAddress: keystoneContractsOutput.CapabilitiesRegistryAddress,
-		priceProvider:               priceProvider,
-		sethClient:                  envOutput.sethClient,
-		deployerPrivateKey:          envOutput.deployerPrivateKey,
-		blockchain:                  envOutput.blockchainOutput,
-		binaryDownloadOutput:        binaryDownloadOutput,
-	}
-
-	err = registerPoRWorkflow(registerInput)
-	require.NoError(t, err, "failed to register PoR workflow")
 
 	donToJobSpecs, jobSpecsErr := keystonepor.GenerateJobSpecs(
 		&keystonetypes.GeneratePoRJobSpecsInput{
@@ -833,6 +891,43 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	}
 	err = libcontracts.ConfigureKeystone(configureKeystoneInput)
 	require.NoError(t, err, "failed to configure keystone contracts")
+
+	// Workflow-specific configuration -- START
+	deployFeedConsumerInput := &keystonetypes.DeployFeedConsumerInput{
+		ChainSelector: envOutput.chainSelector,
+		CldEnv:        chainsOnlyCld,
+	}
+	deployFeedsConsumerOutput, err := libcontracts.DeployFeedsConsumer(testLogger, deployFeedConsumerInput)
+	require.NoError(t, err, "failed to deploy feeds consumer")
+
+	configureFeedConsumerInput := &keystonetypes.ConfigureFeedConsumerInput{
+		SethClient:            envOutput.sethClient,
+		FeedConsumerAddress:   deployFeedsConsumerOutput.FeedConsumerAddress,
+		AllowedSenders:        []common.Address{keystoneContractsOutput.ForwarderAddress},
+		AllowedWorkflowOwners: []common.Address{envOutput.sethClient.MustGetRootKeyAddress()},
+		AllowedWorkflowNames:  []string{in.WorkflowConfig.WorkflowName},
+	}
+	_, err = libcontracts.ConfigureFeedsConsumer(testLogger, configureFeedConsumerInput)
+	require.NoError(t, err, "failed to configure feeds consumer")
+
+	registerInput := registerPoRWorkflowInput{
+		WorkflowConfig:              in.WorkflowConfig,
+		chainSelector:               envOutput.chainSelector,
+		workflowDonID:               fullCldOutput.DonTopology.WorkflowDonID,
+		feedID:                      in.WorkflowConfig.FeedID,
+		workflowRegistryAddress:     keystoneContractsOutput.WorkflowRegistryAddress,
+		feedConsumerAddress:         deployFeedsConsumerOutput.FeedConsumerAddress,
+		capabilitiesRegistryAddress: keystoneContractsOutput.CapabilitiesRegistryAddress,
+		priceProvider:               priceProvider,
+		sethClient:                  envOutput.sethClient,
+		deployerPrivateKey:          envOutput.deployerPrivateKey,
+		blockchain:                  envOutput.blockchainOutput,
+		binaryDownloadOutput:        binaryDownloadOutput,
+	}
+
+	err = registerPoRWorkflow(registerInput)
+	require.NoError(t, err, "failed to register PoR workflow")
+	// Workflow-specific configuration -- END
 
 	// Set inputs in the test config, so that they can be saved
 	in.KeystoneContracts = keystoneContractsInput
@@ -878,6 +973,103 @@ func TestKeystoneWithOCR3Workflow_SingleDon_MockedPrice(t *testing.T) {
 	priceProvider, priceErr := NewFakePriceProvider(testLogger, in.Fake)
 	require.NoError(t, priceErr, "failed to create fake price provider")
 
+	setupOutput := setupTestEnvironment(t, testLogger, in, priceProvider, *binaryDownloadOutput, mustSetCapabilitiesFn)
+
+	// Log extra information that might help debugging
+	t.Cleanup(func() {
+		if t.Failed() {
+			logTestInfo(testLogger, in.WorkflowConfig.FeedID, in.WorkflowConfig.WorkflowName, setupOutput.feedsConsumerAddress.Hex(), setupOutput.forwarderAddress.Hex())
+
+			logDir := fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name())
+
+			removeErr := os.RemoveAll(logDir)
+			if removeErr != nil {
+				testLogger.Error().Err(removeErr).Msg("failed to remove log directory")
+				return
+			}
+
+			_, saveErr := framework.SaveContainerLogs(logDir)
+			if saveErr != nil {
+				testLogger.Error().Err(saveErr).Msg("failed to save container logs")
+				return
+			}
+
+			debugDons := make([]*keystonetypes.DebugDon, 0, len(setupOutput.donTopology.DonsWithMetadata))
+			for i, donWithMetadata := range setupOutput.donTopology.DonsWithMetadata {
+				containerNames := make([]string, 0, len(donWithMetadata.NodesMetadata))
+				for _, output := range setupOutput.nodeOutput[i].Output.CLNodes {
+					containerNames = append(containerNames, output.Node.ContainerName)
+				}
+				debugDons = append(debugDons, &keystonetypes.DebugDon{
+					NodesMetadata:  donWithMetadata.NodesMetadata,
+					Flags:          donWithMetadata.Flags,
+					ContainerNames: containerNames,
+				})
+			}
+
+			debugInput := keystonetypes.DebugInput{
+				DebugDons:        debugDons,
+				BlockchainOutput: setupOutput.blockchainOutput,
+			}
+			lidebug.PrintTestDebug(t.Name(), testLogger, debugInput)
+		}
+	})
+
+	testLogger.Info().Msg("Waiting for feed to update...")
+	timeout := 5 * time.Minute // It can take a while before the first report is produced, particularly on CI.
+
+	feedsConsumerInstance, err := feeds_consumer.NewKeystoneFeedsConsumer(setupOutput.feedsConsumerAddress, setupOutput.sethClient.Client)
+	require.NoError(t, err, "failed to create feeds consumer instance")
+
+	startTime := time.Now()
+	feedBytes := common.HexToHash(in.WorkflowConfig.FeedID)
+
+	assert.Eventually(t, func() bool {
+		elapsed := time.Since(startTime).Round(time.Second)
+		price, _, err := feedsConsumerInstance.GetPrice(
+			setupOutput.sethClient.NewCallOpts(),
+			feedBytes,
+		)
+		require.NoError(t, err, "failed to get price from Keystone Consumer contract")
+
+		hasNextPrice := setupOutput.priceProvider.NextPrice(price, elapsed)
+		if !hasNextPrice {
+			testLogger.Info().Msgf("Feed not updated yet, waiting for %s", elapsed)
+		}
+
+		return !hasNextPrice
+	}, timeout, 10*time.Second, "feed did not update, timeout after: %s", timeout)
+
+	require.EqualValues(t, priceProvider.ExpectedPrices(), priceProvider.ActualPrices(), "prices do not match")
+	testLogger.Info().Msgf("All %d prices were found in the feed", len(priceProvider.ExpectedPrices()))
+}
+
+func TestKeystoneWithOCR3Workflow_SingleDon_LivePrice(t *testing.T) {
+	testLogger := framework.L
+
+	// Load and validate test configuration
+	in, err := framework.Load[TestConfig](t)
+	require.NoError(t, err, "couldn't load test config")
+	validateEnvVars(t, in)
+	require.Len(t, in.NodeSets, 1, "expected 1 node set in the test config")
+
+	binaryDownloadOutput, err := downloadBinaryFiles(in)
+	require.NoError(t, err, "failed to download binary files")
+
+	// Assign all capabilities to the single node set
+	mustSetCapabilitiesFn := func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet {
+		return []*keystonetypes.CapabilitiesAwareNodeSet{
+			{
+				Input:              input[0],
+				Capabilities:       keystonetypes.SingleDonFlags,
+				DONTypes:           []string{keystonetypes.WorkflowDON, keystonetypes.GatewayDON},
+				BootstrapNodeIndex: 0,
+				GatewayNodeIndex:   0,
+			},
+		}
+	}
+
+	priceProvider := NewTrueUSDPriceProvider(testLogger)
 	setupOutput := setupTestEnvironment(t, testLogger, in, priceProvider, *binaryDownloadOutput, mustSetCapabilitiesFn)
 
 	// Log extra information that might help debugging
