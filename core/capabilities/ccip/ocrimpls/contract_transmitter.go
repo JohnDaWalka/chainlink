@@ -110,7 +110,7 @@ func ToExecCalldata(
 		}
 	}
 
-	extraDataDecoded := ExtraDataDecoded{}
+	extraDataDecoded := ccipcommon.ExtraDataDecoded{}
 	if extraDataCodec != nil {
 		var err error
 		extraDataDecoded, err = decodeExecData(info, extraDataCodec)
@@ -121,12 +121,7 @@ func ToExecCalldata(
 
 	return consts.ContractNameOffRamp,
 		consts.MethodExecute,
-		struct {
-			ReportContext [2][32]byte
-			Report        []byte
-			Info          ccipocr3.ExecuteReportInfo
-			ExtraData     ExtraDataDecoded
-		}{
+		ccipcommon.ExecCallData{
 			ReportContext: rawReportCtx,
 			Report:        report.Report,
 			Info:          info,
@@ -136,29 +131,24 @@ func ToExecCalldata(
 
 var _ ocr3types.ContractTransmitter[[]byte] = &ccipTransmitter{}
 
-type ExtraDataDecoded struct {
-	ExtraArgsDecoded    map[string]any
-	DestExecDataDecoded []map[string]any
-}
-
-func decodeExecData(report ccipocr3.ExecuteReportInfo, codec ccipcommon.ExtraDataCodec) (ExtraDataDecoded, error) {
+func decodeExecData(report ccipocr3.ExecuteReportInfo, codec ccipcommon.ExtraDataCodec) (ccipcommon.ExtraDataDecoded, error) {
 	// only one report one message, since this is a stop-gap solution for solana
 	if len(report.AbstractReports) != 1 && len(report.AbstractReports[0].Messages) != 1 {
-		return ExtraDataDecoded{}, errors.New("unexpected report length")
+		return ccipcommon.ExtraDataDecoded{}, errors.New("unexpected report length")
 	}
 	message := report.AbstractReports[0].Messages[0]
-	extraDataDecoded := ExtraDataDecoded{}
+	extraDataDecoded := ccipcommon.ExtraDataDecoded{}
 
 	var err error
 	extraDataDecoded.ExtraArgsDecoded, err = codec.DecodeExtraArgs(message.ExtraArgs, report.AbstractReports[0].SourceChainSelector)
 	if err != nil {
-		return ExtraDataDecoded{}, err
+		return ccipcommon.ExtraDataDecoded{}, err
 	}
 	destExecDataDecoded := make([]map[string]any, len(message.TokenAmounts))
 	for i, tokenAmount := range message.TokenAmounts {
 		destExecDataDecoded[i], err = codec.DecodeTokenAmountDestExecData(tokenAmount.DestExecData, report.AbstractReports[0].SourceChainSelector)
 		if err != nil {
-			return ExtraDataDecoded{}, err
+			return ccipcommon.ExtraDataDecoded{}, err
 		}
 	}
 	extraDataDecoded.DestExecDataDecoded = destExecDataDecoded

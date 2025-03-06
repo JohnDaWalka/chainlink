@@ -98,6 +98,7 @@ require (
 	github.com/unrolled/secure v1.13.0
 	github.com/urfave/cli v1.22.14
 	github.com/wk8/go-ordered-map/v2 v2.1.8
+	github.com/zeebo/assert v1.3.0
 	go.dedis.ch/fixbuf v1.0.3
 	go.dedis.ch/kyber/v3 v3.1.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin v0.49.0
