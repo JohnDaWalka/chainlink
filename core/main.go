@@ -1,5 +1,7 @@
 package core
 
+// test
+
 import (
 	"fmt"
 	"log"
