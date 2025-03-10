@@ -190,6 +190,9 @@ func (d *db) WriteConfig(ctx context.Context, c ocrtypes.ContractConfig) error {
 		offchain_config = EXCLUDED.offchain_config,
 		updated_at = NOW()
 	`
+
+	d.lggr.Info("Writing OCR2 config", "ocr2_oracle_spec_id", d.oracleSpecID, "ocr2_plugin_id", d.pluginID)
+
 	_, err := d.ds.ExecContext(ctx, stmt,
 		d.oracleSpecID,
 		d.pluginID,
