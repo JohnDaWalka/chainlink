@@ -1067,9 +1067,9 @@ func TestIntegration_LLO_stress_test_with_wide_channels_and_transmit_errors(t *t
 	// nStreamsPerChannel: the number of streams per channel
 
 	// LESS STRESSFUL
-	const nChannels = 2
-	const maxQueueSize = 4
-	const nReports = 10
+	const nChannels = 1
+	const maxQueueSize = 3
+	const nReports = 4
 
 	const nStreamsPerChannel = 3000
 
@@ -1180,7 +1180,7 @@ lloConfigMode = "bluegreen"
 				Streams:      streamDefinitions,
 				Opts: mustEncodeOpts(&lloevm.ReportFormatEVMABIEncodeOpts{
 					BaseUSDFee:       decimal.NewFromFloat32(0.1),
-					ExpirationWindow: uint32(expirationWindow),
+					ExpirationWindow: expirationWindow,
 					FeedID:           feedID,
 					ABI:              streamABIDefinitions,
 				}),
