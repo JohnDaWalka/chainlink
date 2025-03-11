@@ -98,8 +98,19 @@ wrappers-all: pnpmdep mockery abigen ## Recompiles solidity contracts and their 
 	go generate ../core/gethwrappers/go_generate.go
 
 .PHONY: setup_zksolc
-setup_zksolc: ## Download and install zksolc
+setup_zksolc:
 	./scripts/setup_zksolc
+
+.PHONY: compile_zksolc
+compile_zksolc:
+	./scripts/zksync_solc_compile shared/token/ERC677/LinkToken
+
+.PHONY: wrap_zksolc
+wrap_zksolc:
+	go generate ../core/gethwrappers/generation/generate/zk/go_generate_zk.go
+
+.PHONY: all_zksolc
+all_zksolc: setup_zksolc compile_zksolc wrap_zksolc
 
 # Use this to generate compiled JSON artifacts for gauntlet-plus-plus.
 # This is currently only used for CCIP.

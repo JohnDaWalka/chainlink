@@ -25,4 +25,6 @@ var ZkBytecode = common.Hex2Bytes("%s")
 		fmt.Printf("Error writing destination file: %v\n", err)
 		os.Exit(1)
 	}
+
+	fmt.Printf("Generated file: %s\n", os.Args[2])
 }
