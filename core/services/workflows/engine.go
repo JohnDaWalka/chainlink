@@ -566,6 +566,7 @@ func generateExecutionID(workflowID, eventID string) (string, error) {
 func (e *Engine) startExecution(ctx context.Context, executionID string, event *values.Map) error {
 	lggr := e.logger.With("event", event, platform.KeyWorkflowExecutionID, executionID)
 	lggr.Debug("executing on a trigger event")
+	createdAt := time.Now()
 	ec := &store.WorkflowExecution{
 		Steps: map[string]*store.WorkflowExecutionStep{
 			workflows.KeywordTrigger: {
@@ -580,6 +581,7 @@ func (e *Engine) startExecution(ctx context.Context, executionID string, event *
 		WorkflowID:  e.workflow.id,
 		ExecutionID: executionID,
 		Status:      store.StatusStarted,
+		CreatedAt:   &createdAt,
 	}
 
 	dbWex, err := e.executionStates.Add(ctx, ec)
@@ -812,11 +814,48 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 	l := e.logger.With(platform.KeyStepRef, msg.stepRef, platform.KeyWorkflowExecutionID, msg.state.ExecutionID)
 	cma := e.cma.With(platform.KeyStepRef, msg.stepRef, platform.KeyWorkflowExecutionID, msg.state.ExecutionID)
 
+	curStepID := "UNSET"
+	curStep, verr := e.workflow.Vertex(msg.stepRef)
+	if verr == nil {
+		curStepID = curStep.ID
+	} else {
+		l.Errorf("failed to resolve step in workflow; error %v", verr)
+	}
+
+	// Fetch the workflow execution to get CreatedAt
+	ex, getErr := e.executionStates.Get(ctx, msg.state.ExecutionID)
+	if getErr != nil {
+		l.Errorf("failed to get execution state: %v", getErr)
+	}
+
 	l.Debug("executing on a step event")
 	stepState := &store.WorkflowExecutionStep{
 		Outputs:     store.StepOutput{},
 		ExecutionID: msg.state.ExecutionID,
 		Ref:         msg.stepRef,
+	}
+
+	// Check if the overall workflow execution has timed out
+	if ex.CreatedAt != nil && e.clock.Since(*ex.CreatedAt) > e.maxExecutionDuration {
+		lmsg := "workflow execution timed out"
+		l.Error(lmsg)
+		logCustMsg(ctx, cma, lmsg, l)
+		stepState.Status = store.StatusTimeout
+		stepState.Outputs.Err = errors.New("workflow execution timed out")
+
+		// Let's try and emit the stepUpdate.
+		// If the context is canceled, we'll just drop the update.
+		// This means the engine is shutting down and the
+		// receiving loop may not pick up any messages we emit.
+		// Note: When full persistence support is added, any hanging steps
+		// like this one will get picked up again and will be reprocessed.
+		e.logger.Debugf("trying to send step state update for execution %s with status %s", stepState.ExecutionID, stepState.Status)
+		err := e.stepUpdatesChMap.send(ctx, stepState.ExecutionID, *stepState)
+		if err != nil {
+			l.Errorf("failed to issue step state update; error %v", err)
+		}
+		l.Debugf("sent step state update for execution %s with status %s", stepState.ExecutionID, stepState.Status)
+		return
 	}
 
 	logCustMsg(ctx, cma, "executing step", l)
@@ -825,13 +864,6 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 	inputs, outputs, err := e.executeStep(ctx, l, msg)
 	stepExecutionDuration := time.Since(stepExecutionStartTime).Seconds()
 
-	curStepID := "UNSET"
-	curStep, verr := e.workflow.Vertex(msg.stepRef)
-	if verr == nil {
-		curStepID = curStep.ID
-	} else {
-		l.Errorf("failed to resolve step in workflow; error %v", verr)
-	}
 	e.metrics.with(platform.KeyCapabilityID, curStepID).updateWorkflowStepDurationHistogram(ctx, int64(stepExecutionDuration))
 
 	var stepStatus string
@@ -859,12 +891,6 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 	stepState.Outputs.Err = err
 	stepState.Inputs = inputs
 
-	// Let's try and emit the stepUpdate.
-	// If the context is canceled, we'll just drop the update.
-	// This means the engine is shutting down and the
-	// receiving loop may not pick up any messages we emit.
-	// Note: When full persistence support is added, any hanging steps
-	// like this one will get picked up again and will be reprocessed.
 	l.Debugf("trying to send step state update for execution %s with status %s", stepState.ExecutionID, stepStatus)
 	err = e.stepUpdatesChMap.send(ctx, stepState.ExecutionID, *stepState)
 	if err != nil {

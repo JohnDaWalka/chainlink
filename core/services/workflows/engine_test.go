@@ -989,7 +989,7 @@ func TestEngine_TimesOutOldExecutions(t *testing.T) {
 			c.clock = clock
 		},
 	)
-	clock.Advance(15 * time.Minute)
+	clock.Advance(defaultMaxExecutionDuration + 1*time.Nanosecond)
 	servicetest.Run(t, eng)
 
 	_ = getExecutionID(t, eng, hooks)
