@@ -299,3 +299,16 @@ func solChain(t *testing.T, chainID uint64, adminKey *solana.PrivateKey) (string
 
 	return url, wsURL, nil
 }
+
+func getKeyedTransactorsWithPks(t *testing.T, chainID uint64, pks []string, gasPrice *big.Int) ([]*bind.TransactOpts, error) {
+	transactors := make([]*bind.TransactOpts, 0)
+	for _, pk := range pks {
+		privateKey, err := crypto.HexToECDSA(pk)
+		require.NoError(t, err)
+		transactor, err := bind.NewKeyedTransactorWithChainID(privateKey, big.NewInt(int64(chainID)))
+		transactor.GasPrice = gasPrice
+		require.NoError(t, err)
+		transactors = append(transactors, transactor)
+	}
+	return transactors, nil
+}

@@ -202,7 +202,7 @@ github.com/block-vision/sui-go-sdk v1.0.6 h1:FysCc4TJC8v4BEBbCjJPDR4iR5eKqJT1dxG
 github.com/block-vision/sui-go-sdk v1.0.6/go.mod h1:FyK1vGE8lWm9QA1fdQpf1agfXQSMbPT8AV1BICgx6d8=
 github.com/bradleyjkemp/cupaloy/v2 v2.6.0 h1:knToPYa2xtfg42U3I6punFEjaGFKWQRXJwj0JTv4mTs=
 github.com/bradleyjkemp/cupaloy/v2 v2.6.0/go.mod h1:bm7JXdkRd4BHJk9HpwqAI8BoAY1lps46Enkdqw6aRX0=
-github.com/btcsuite/btcd v0.22.0-beta h1:LTDpDKUM5EeOFBPM8IXpinEcmZ6FWfNZbE3lfrfdnWo=
+github.com/btcsuite/btcd v0.24.0 h1:gL3uHE/IaFj6fcZSu03SvqPMSx7s/dPzfpG/atRwWdo=
 github.com/btcsuite/btcd/btcec/v2 v2.3.4 h1:3EJjcN70HCu/mwqlUsGK8GcNVyLVxFDlWurTXGPFfiQ=
 github.com/btcsuite/btcd/btcec/v2 v2.3.4/go.mod h1:zYzJ8etWJQIv1Ogk7OzpWjowwOdXY1W/17j2MW85J04=
 github.com/btcsuite/btcd/btcutil v1.1.6 h1:zFL2+c3Lb9gEgqKNzowKUPQNb8jV7v5Oaodi/AYFd6c=
@@ -1190,8 +1190,8 @@ github.com/smartcontractkit/chainlink-protos/svr v1.1.0 h1:79Z9N9dMbMVRGaLoDPAQ+
 github.com/smartcontractkit/chainlink-protos/svr v1.1.0/go.mod h1:TcOliTQU6r59DwG4lo3U+mFM9WWyBHGuFkkxQpvSujo=
 github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250219165127-be60782e4448 h1:AlnRJ3c4TNuZQWNrwgc7Zq+Y+ylJhZ1ZtSmWlPt3SXo=
 github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250219165127-be60782e4448/go.mod h1:aFm1QC/n99mVeBDtv0SE0co56+IECY6Y1fR3OfNYy3c=
-github.com/smartcontractkit/chainlink-testing-framework/framework v0.5.3 h1:CeZqFz/si4YBnYE1118mtc4FBLs2Za1qohYAeLZTI+o=
-github.com/smartcontractkit/chainlink-testing-framework/framework v0.5.3/go.mod h1:9b5ugzYeKkwbxZ9yMOoxUaPiONDLC/QLCncarDFnhwk=
+github.com/smartcontractkit/chainlink-testing-framework/framework v0.5.9-0.20250306221638-b69254295c5e h1:7VC48urb5prko9wvZuu2ZEIND46LlZedyrVG6WK4AXI=
+github.com/smartcontractkit/chainlink-testing-framework/framework v0.5.9-0.20250306221638-b69254295c5e/go.mod h1:tnyujVNgajqe67i2/0iwS4Y3mvbA30XBQWLEAArpwfw=
 github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.22 h1:W3doYLVoZN8VwJb/kAZsbDjW+6cgZPgNTcQHJUH9JrA=
 github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.22/go.mod h1:70JLBXQncNHyW63ik4PvPQGjQGZ1xK67MKrDanVAk2w=
 github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.10 h1:Yf+n3T/fnUWcYyfe7bsygV4sWAkNo0QhN58APJFIKIc=
@@ -1329,6 +1329,8 @@ github.com/zeebo/assert v1.3.0/go.mod h1:Pq9JiuJQpG8JLJdtkwrJESF0Foym2/D9XMU5ciN
 github.com/zeebo/xxh3 v1.0.2 h1:xZmwmqxHZA8AI603jOQ0tMqmBr9lPeFwGg6d+xy9DC0=
 github.com/zeebo/xxh3 v1.0.2/go.mod h1:5NWz9Sef7zIDm2JHfFlcQvNekmcEl9ekUZQQKCYaDcA=
 github.com/zenazn/goji v0.9.0/go.mod h1:7S9M489iMyHBNxwZnk9/EHS098H4/F6TATF2mIxtB1Q=
+github.com/zksync-sdk/zksync2-go v1.0.0 h1:DTFnNCr8ZUfpMWQ0V8CAvn9kTSF0svNRfqSsDRzOMUg=
+github.com/zksync-sdk/zksync2-go v1.0.0/go.mod h1:AwxRw2lrtrcoYbl0LytVASNE/Vwz1wZ3WZ3X8rjLn3o=
 github.com/zondax/hid v0.9.2 h1:WCJFnEDMiqGF64nlZz28E9qLVZ0KSJ7xpc5DLEyma2U=
 github.com/zondax/hid v0.9.2/go.mod h1:l5wttcP0jwtdLjqjMMWFVEE7d1zO0jvSPA9OPZxWpEM=
 github.com/zondax/ledger-go v0.14.3 h1:wEpJt2CEcBJ428md/5MgSLsXLBos98sBOyxNmCjfUCw=

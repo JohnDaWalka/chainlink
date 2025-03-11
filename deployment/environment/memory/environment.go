@@ -11,12 +11,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gagliardetto/solana-go"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
 	"go.uber.org/zap/zapcore"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -49,6 +52,7 @@ func GetProgramsPath() string {
 type MemoryEnvironmentConfig struct {
 	Chains             int
 	SolChains          int
+	ZKChains           int
 	NumOfUsersPerChain int
 	Nodes              int
 	Bootstraps         int
@@ -78,6 +82,55 @@ func NewMemoryChains(t *testing.T, numChains int, numUsers int) (map[uint64]depl
 		users[sel] = chain.Users
 	}
 	return generateMemoryChain(t, mchains), users
+}
+
+func NewZKChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
+	chains := make(map[uint64]deployment.Chain)
+
+	for i := 0; i < numChains; i++ {
+		chainId := chainsel.TEST_90000051.EvmChainID + uint64(i)
+
+		output, err := blockchain.NewBlockchainNetwork(&blockchain.Input{
+			Type:    "anvil-zksync",
+			ChainID: strconv.FormatUint(chainId, 10),
+			Port:    strconv.FormatInt(int64(freeport.GetN(t, 1)[0]), 10),
+		})
+		require.NoError(t, err)
+
+		testcontainers.CleanupContainer(t, output.Container)
+
+		sel, err := chainsel.SelectorFromChainId(chainId)
+		require.NoError(t, err)
+
+		client, err := ethclient.Dial(output.Nodes[0].HostHTTPUrl)
+		require.NoError(t, err)
+		defer client.Close()
+
+		gasPrice, err := client.SuggestGasPrice(context.Background())
+		require.NoError(t, err)
+
+		keyedTransactors, err := getKeyedTransactorsWithPks(t, chainId, blockchain.AnvilZKSyncRichAccountPks, gasPrice)
+		require.NoError(t, err)
+
+		chain := deployment.Chain{
+			Selector:    sel,
+			Client:      client,
+			DeployerKey: keyedTransactors[0],
+			Users:       keyedTransactors[1:],
+			Confirm: func(tx *types.Transaction) (uint64, error) {
+				receipt, err := bind.WaitMined(context.Background(), client, tx)
+				if err != nil {
+					return 0, err
+				}
+				return receipt.Status, nil
+			},
+			IsZK: true,
+		}
+
+		chains[sel] = chain
+	}
+
+	return chains
 }
 
 func NewMemoryChainsSol(t *testing.T, numChains int) map[uint64]deployment.SolChain {
@@ -220,6 +273,10 @@ func NewMemoryEnvironmentFromChainsNodes(
 func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Level, config MemoryEnvironmentConfig) deployment.Environment {
 	chains, _ := NewMemoryChains(t, config.Chains, config.NumOfUsersPerChain)
 	solChains := NewMemoryChainsSol(t, config.SolChains)
+	zkChains := NewZKChains(t, config.ZKChains)
+	for chainSel, chain := range zkChains {
+		chains[chainSel] = chain
+	}
 	nodes := NewNodes(t, logLevel, chains, solChains, config.Nodes, config.Bootstraps, config.RegistryConfig)
 	var nodeIDs []string
 	for id := range nodes {

@@ -201,6 +201,15 @@ func ApplyChangesetsV2(t *testing.T, e deployment.Environment, changesetApplicat
 	return currentEnv, nil
 }
 
+func ApplyDeployLinkToken(t *testing.T, e deployment.Environment, config []uint64) (deployment.Environment, error) {
+	return ApplyChangesets(t, e, nil, []ConfiguredChangeSet{
+		Configure(
+			deployment.CreateLegacyChangeSet(DeployLinkToken),
+			config,
+		),
+	})
+}
+
 func DeployLinkTokenTest(t *testing.T, solChains int) {
 	lggr := logger.Test(t)
 	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
@@ -215,12 +224,7 @@ func DeployLinkTokenTest(t *testing.T, solChains int) {
 		config = append(config, solChain1)
 	}
 
-	e, err := ApplyChangesets(t, e, nil, []ConfiguredChangeSet{
-		Configure(
-			deployment.CreateLegacyChangeSet(DeployLinkToken),
-			config,
-		),
-	})
+	e, err := ApplyDeployLinkToken(t, e, config)
 	require.NoError(t, err)
 	addrs, err := e.ExistingAddresses.AddressesForChain(chain1)
 	require.NoError(t, err)
