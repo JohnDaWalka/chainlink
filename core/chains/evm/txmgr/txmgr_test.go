@@ -390,6 +390,7 @@ func TestTxm_CreateTransaction(t *testing.T) {
 }
 
 func BenchmarkCreateTransaction(b *testing.B) {
+<<<<<<< HEAD
 
 	var t testing.TB = b
 	db := testutils.NewSqlxDB(b)
@@ -397,10 +398,18 @@ func BenchmarkCreateTransaction(b *testing.B) {
 	kst := cltest.NewKeyStore(t, db)
 
 	_, fromAddress := cltest.MustInsertRandomKey(t, kst.Eth())
+=======
+	db := testutils.NewSqlxDB(b)
+	//txStore := cltest.NewTestTxStore(t, db)
+	kst := cltest.NewKeyStore(b, db)
+
+	_, fromAddress := cltest.MustInsertRandomKey(b, kst.Eth())
+>>>>>>> 8c696b1b45e834c664c79f6a219112d7614a6465
 	toAddress := testutils.NewAddress()
 	gasLimit := uint64(1000)
 	payload := []byte{1, 2, 3}
 
+<<<<<<< HEAD
 	config, dbConfig, evmConfig := txmgr.MakeTestConfigsEx()
 
 	ethClient := clienttest.NewClient(t)
@@ -417,6 +426,24 @@ func BenchmarkCreateTransaction(b *testing.B) {
 	strategy.On("PruneQueue", mock.Anything, mock.Anything).Return(nil, nil)
 	for n := 0; n < b.N; n++ {
 		txm.CreateTransaction(tests.Context(t), txmgr.TxRequest{
+=======
+	config, dbConfig, evmConfig := txmgr.MakeTestConfigs(b)
+
+	ethClient := clienttest.NewClient(b)
+	ethClient.On("ConfiguredChainID").Return(big.NewInt(0)).Maybe()
+
+	estimator, err := gas.NewEstimator(logger.Test(b), ethClient, config.ChainType(), ethClient.ConfiguredChainID(), evmConfig.GasEstimator(), nil)
+	require.NoError(b, err)
+	txm, err := makeTestEvmTxm(b, db, ethClient, estimator, evmConfig, evmConfig.GasEstimator(), evmConfig.Transactions(), dbConfig, dbConfig.Listener(), kst.Eth())
+	require.NoError(b, err)
+
+	subject := uuid.New()
+	strategy := newMockTxStrategy(b)
+	strategy.On("Subject").Return(uuid.NullUUID{UUID: subject, Valid: true})
+	strategy.On("PruneQueue", mock.Anything, mock.Anything).Return(nil, nil)
+	for n := 0; n < b.N; n++ {
+		txm.CreateTransaction(tests.Context(b), txmgr.TxRequest{
+>>>>>>> 8c696b1b45e834c664c79f6a219112d7614a6465
 			FromAddress:    fromAddress,
 			ToAddress:      toAddress,
 			EncodedPayload: payload,
@@ -889,7 +916,7 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	})
 }
 
-func newTxStore(t *testing.T, db *sqlx.DB) txmgr.EvmTxStore {
+func newTxStore(t testing.TB, db *sqlx.DB) txmgr.EvmTxStore {
 	return txmgr.NewTxStore(db, logger.Test(t))
 }
 
@@ -914,7 +941,7 @@ func newEthReceipt(blockNumber int64, blockHash common.Hash, txHash common.Hash,
 	return r
 }
 
-func mustInsertEthReceipt(t *testing.T, txStore txmgr.TestEvmTxStore, blockNumber int64, blockHash common.Hash, txHash common.Hash) txmgr.Receipt {
+func mustInsertEthReceipt(t testing.TB, txStore txmgr.TestEvmTxStore, blockNumber int64, blockHash common.Hash, txHash common.Hash) txmgr.Receipt {
 	r := newEthReceipt(blockNumber, blockHash, txHash, 0x1)
 	id, err := txStore.InsertReceipt(tests.Context(t), &r.Receipt)
 	require.NoError(t, err)
@@ -931,13 +958,13 @@ func mustInsertRevertedEthReceipt(t *testing.T, txStore txmgr.TestEvmTxStore, bl
 }
 
 // Inserts into evm.receipts but does not update evm.txes or evm.tx_attempts
-func mustInsertConfirmedEthTxWithReceipt(t *testing.T, txStore txmgr.TestEvmTxStore, fromAddress common.Address, nonce, blockNum int64) (etx txmgr.Tx) {
+func mustInsertConfirmedEthTxWithReceipt(t testing.TB, txStore txmgr.TestEvmTxStore, fromAddress common.Address, nonce, blockNum int64) (etx txmgr.Tx) {
 	etx = cltest.MustInsertConfirmedEthTxWithLegacyAttempt(t, txStore, nonce, blockNum, fromAddress)
 	mustInsertEthReceipt(t, txStore, blockNum, utils.NewHash(), etx.TxAttempts[0].Hash)
 	return etx
 }
 
-func mustInsertFatalErrorEthTx(t *testing.T, txStore txmgr.TestEvmTxStore, fromAddress common.Address) txmgr.Tx {
+func mustInsertFatalErrorEthTx(t testing.TB, txStore txmgr.TestEvmTxStore, fromAddress common.Address) txmgr.Tx {
 	etx := cltest.NewEthTx(fromAddress)
 	etx.Error = null.StringFrom("something exploded")
 	etx.State = txmgrcommon.TxFatalError
@@ -946,7 +973,7 @@ func mustInsertFatalErrorEthTx(t *testing.T, txStore txmgr.TestEvmTxStore, fromA
 	return etx
 }
 
-func mustInsertUnconfirmedEthTxWithAttemptState(t *testing.T, txStore txmgr.TestEvmTxStore, nonce int64, fromAddress common.Address, txAttemptState txmgrtypes.TxAttemptState, opts ...interface{}) txmgr.Tx {
+func mustInsertUnconfirmedEthTxWithAttemptState(t testing.TB, txStore txmgr.TestEvmTxStore, nonce int64, fromAddress common.Address, txAttemptState txmgrtypes.TxAttemptState, opts ...interface{}) txmgr.Tx {
 	etx := cltest.MustInsertUnconfirmedEthTx(t, txStore, nonce, fromAddress, opts...)
 	attempt := cltest.NewLegacyEthTxAttempt(t, etx.ID)
 	ctx := tests.Context(t)
@@ -1039,7 +1066,7 @@ func mustInsertConfirmedMissingReceiptEthTxWithLegacyAttempt(
 	return etx
 }
 
-func mustInsertInProgressEthTxWithAttempt(t *testing.T, txStore txmgr.TestEvmTxStore, nonce evmtypes.Nonce, fromAddress common.Address) txmgr.Tx {
+func mustInsertInProgressEthTxWithAttempt(t testing.TB, txStore txmgr.TestEvmTxStore, nonce evmtypes.Nonce, fromAddress common.Address) txmgr.Tx {
 	etx := cltest.NewEthTx(fromAddress)
 	ctx := tests.Context(t)
 
