@@ -34,6 +34,9 @@ compileContract() {
 
   # Copy the generated abi files to a single folder
   cp "$CONTRACTS_DIR"/solc/$PROJECT/"$contract"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi
+
+  # generarte zk bindings
+  ./scripts/zksync_solc_compile $PROJECT/"$1"
 }
 
 # Define optimization overrides in this function. Anything that is not an override will use the default value

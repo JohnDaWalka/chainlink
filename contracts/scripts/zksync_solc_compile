@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
 
 set -e
-
-echo " ┌─────────────────────────────┐"
-echo " │   Compiling Link Token...   │"
-echo " │         with zksolc         │"
-echo " └─────────────────────────────┘"
-
 CONTRACT=$1
+SRC=src/v0.8/"$CONTRACT".sol
+echo "Compiling $SRC with zksolc"
 
 ../tools/bin/zksolc -O3 \
     --bin --metadata-literal --metadata-hash none \
     --evm-version paris \
     -o zksolc/"$CONTRACT" --overwrite \
-    src/v0.8/"$CONTRACT".sol
+    $SRC

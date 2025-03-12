@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+set -e
+
+echo " ┌─────────────────────────────┐"
+echo " │   Compiling Link Token...   │"
+echo " │         with zksolc         │"
+echo " └─────────────────────────────┘"
+
+./scripts/zksync_solc_compile shared/token/ERC677/LinkToken

@@ -5,26 +5,30 @@ import (
 	"os"
 )
 
-func main() {
-	bytecode, err := os.ReadFile(os.Args[1])
-	if err != nil {
-		fmt.Printf("Error reading source file: %v\n", err)
-		os.Exit(1)
-	}
-
-	template := fmt.Sprintf(`// Generated code - DO NOT EDIT.
+const template = `// Code generated - DO NOT EDIT.
 package %s
 
 import "github.com/ethereum/go-ethereum/common"
 
 var ZkBytecode = common.Hex2Bytes("%s")
-`, os.Args[3], string(bytecode)[2:])
+`
 
-	err = os.WriteFile(os.Args[2], []byte(template), 0600)
+func main() {
+	srcFile := os.Args[1]
+	dstFile := os.Args[2]
+	pkgName := os.Args[3]
+
+	fmt.Printf("Generating zk bytecode binding for %s\n", pkgName)
+
+	bytecode, err := os.ReadFile(srcFile)
 	if err != nil {
-		fmt.Printf("Error writing destination file: %v\n", err)
-		os.Exit(1)
+		panic(err)
 	}
 
-	fmt.Printf("Generated file: %s\n", os.Args[2])
+	content := []byte(fmt.Sprintf(template, os.Args[3], string(bytecode)[2:]))
+
+	err = os.WriteFile(dstFile, content, 0600)
+	if err != nil {
+		panic(err)
+	}
 }
