@@ -491,7 +491,7 @@ func genMessages(
 			Data:         []byte(fmt.Sprintf("hello world %d", i)),
 			TokenAmounts: nil,
 			FeeToken:     common.HexToAddress("0x0"),
-			ExtraArgs:    testhelpers.MakeEVMExtraArgsV2(50_000, false),
+			ExtraArgs:    testhelpers.MakeGenericExtraArgsV2(50_000, false),
 		}
 
 		fee, err := sourceRouter.GetFee(&bind.CallOpts{Context: ctx}, destChainSelector, msg)

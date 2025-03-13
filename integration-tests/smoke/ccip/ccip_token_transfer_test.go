@@ -141,7 +141,7 @@ func TestTokenTransfer(t *testing.T) {
 				},
 			},
 			Receiver:  state.Chains[sourceChain].Receiver.Address(),
-			ExtraArgs: testhelpers.MakeEVMExtraArgsV2(300_000, false),
+			ExtraArgs: testhelpers.MakeGenericExtraArgsV2(300_000, false),
 			ExpectedTokenBalances: map[common.Address]*big.Int{
 				selfServeSrcToken.Address(): new(big.Int).Add(oneE18, oneE18),
 				srcToken.Address():          oneE18,
@@ -163,7 +163,7 @@ func TestTokenTransfer(t *testing.T) {
 				},
 			},
 			Receiver:  utils.RandomAddress(),
-			ExtraArgs: testhelpers.MakeEVMExtraArgsV2(1, false),
+			ExtraArgs: testhelpers.MakeGenericExtraArgsV2(1, false),
 			ExpectedTokenBalances: map[common.Address]*big.Int{
 				selfServeSrcToken.Address(): oneE18,
 				srcToken.Address():          new(big.Int).Add(oneE18, oneE18),
@@ -186,7 +186,7 @@ func TestTokenTransfer(t *testing.T) {
 			},
 			Receiver:  state.Chains[sourceChain].Receiver.Address(),
 			Data:      []byte("this should be reverted because gasLimit is too low, no tokens are transferred as well"),
-			ExtraArgs: testhelpers.MakeEVMExtraArgsV2(1, false),
+			ExtraArgs: testhelpers.MakeGenericExtraArgsV2(1, false),
 			ExpectedTokenBalances: map[common.Address]*big.Int{
 				selfServeSrcToken.Address(): big.NewInt(0),
 				srcToken.Address():          big.NewInt(0),

@@ -53,7 +53,7 @@ func Test_calculateMessageMaxGas(t *testing.T) {
 			args: args{
 				dataLen:          5,
 				numTokens:        2,
-				extraArgs:        makeExtraArgsV2(200_000, true),
+				extraArgs:        makeGenericExtraArgsV2(200_000, true),
 				tokenGasOverhead: 100,
 			},
 			want: 922_464,
@@ -63,7 +63,7 @@ func Test_calculateMessageMaxGas(t *testing.T) {
 			args: args{
 				dataLen:          5,
 				numTokens:        2,
-				extraArgs:        makeExtraArgsV2(200_000, false),
+				extraArgs:        makeGenericExtraArgsV2(200_000, false),
 				tokenGasOverhead: 100,
 			},
 			want: 922_464,
@@ -120,7 +120,7 @@ func TestCalculateMaxGas(t *testing.T) {
 			numRequests:      3,
 			dataLength:       len([]byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0}),
 			numberOfTokens:   1,
-			extraArgs:        makeExtraArgsV2(200_000, true),
+			extraArgs:        makeGenericExtraArgsV2(200_000, true),
 			tokenGasOverhead: 10,
 			want:             628_518,
 		},
@@ -154,10 +154,10 @@ func makeExtraArgsV1(gasLimit uint64) []byte {
 	return extraArgs
 }
 
-func makeExtraArgsV2(gasLimit uint64, allowOOO bool) []byte {
+func makeGenericExtraArgsV2(gasLimit uint64, allowOOO bool) []byte {
 	// extra args is the tag followed by the gas limit and allowOOO abi-encoded.
 	var extraArgs []byte
-	extraArgs = append(extraArgs, evmExtraArgsV2Tag...)
+	extraArgs = append(extraArgs, genericExtraArgsV2...)
 	gasLimitBytes := new(big.Int).SetUint64(gasLimit).Bytes()
 	// pad from the left to 32 bytes
 	gasLimitBytes = common.LeftPadBytes(gasLimitBytes, 32)

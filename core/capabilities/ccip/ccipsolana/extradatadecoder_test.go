@@ -75,7 +75,7 @@ func Test_decodeExtraArgs(t *testing.T) {
 		err := extraArgs.MarshalWithEncoder(encoder)
 		require.NoError(t, err)
 
-		output, err := extraDataDecoder.DecodeExtraArgsToMap(append(evmExtraArgsV2Tag, buf.Bytes()...))
+		output, err := extraDataDecoder.DecodeExtraArgsToMap(append(genericExtraArgsV2Tag, buf.Bytes()...))
 		require.NoError(t, err)
 		require.Len(t, output, 2)
 

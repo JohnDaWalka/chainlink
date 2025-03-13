@@ -121,7 +121,7 @@ func TestIntegration_CCIP(t *testing.T) {
 				tokenAmount := big.NewInt(500000003) // prime number
 				gasLimit := big.NewInt(200_003)      // prime number
 
-				extraArgs, err2 := testhelpers.GetEVMExtraArgsV2(gasLimit, test.allowOutOfOrderExecution)
+				extraArgs, err2 := testhelpers.GetGenericExtraArgsV2(gasLimit, test.allowOutOfOrderExecution)
 				require.NoError(t, err2)
 
 				sourceBalances, err2 := testhelpers.GetBalances(t, []testhelpers.BalanceReq{
@@ -269,7 +269,7 @@ func TestIntegration_CCIP(t *testing.T) {
 					if i%2 == 0 {
 						allowOutOfOrderExecution = true
 					}
-					extraArgs, err2 := testhelpers.GetEVMExtraArgsV2(txGasLimit, allowOutOfOrderExecution)
+					extraArgs, err2 := testhelpers.GetGenericExtraArgsV2(txGasLimit, allowOutOfOrderExecution)
 					require.NoError(t, err2)
 					msg := router.ClientEVM2AnyMessage{
 						Receiver: testhelpers.MustEncodeAddress(t, ccipTH.Dest.Receivers[0].Receiver.Address()),
@@ -476,7 +476,7 @@ func TestIntegration_CCIP(t *testing.T) {
 				ccipTH.SetNopsOnRamp(t, nopsAndWeights)
 
 				// send a message
-				extraArgs, err := testhelpers.GetEVMExtraArgsV2(big.NewInt(200_000), test.allowOutOfOrderExecution)
+				extraArgs, err := testhelpers.GetGenericExtraArgsV2(big.NewInt(200_000), test.allowOutOfOrderExecution)
 				require.NoError(t, err)
 
 				// FeeToken is empty, indicating it should use native token

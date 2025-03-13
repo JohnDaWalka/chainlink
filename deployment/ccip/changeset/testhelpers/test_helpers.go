@@ -81,8 +81,12 @@ const (
 )
 
 var (
-	// bytes4 public constant EVM_EXTRA_ARGS_V2_TAG = 0x181dcf10;
-	evmExtraArgsV2Tag = hexutil.MustDecode("0x181dcf10")
+	// bytes4 public constant GENERIC_EXTRA_ARGS_V2_TAG = 0x181dcf10;
+	// Tag to indicate a gas limit (or dest chain equivalent processing units) and Out Of Order Execution. This tag is
+	// available for multiple chain families. If there is no chain family specific tag, this is the default available
+	// for a chain.
+	// Note: not available for Solana VM based chains.
+	genericExtraArgsV2Tag = hexutil.MustDecode("0x181dcf10")
 
 	routerABI = abihelpers.MustParseABI(router.RouterABI)
 
@@ -393,12 +397,12 @@ func DoSendRequest(
 	return it.Event, nil
 }
 
-// MakeEVMExtraArgsV2 creates the extra args for the EVM2Any message that is destined
+// MakeGenericExtraArgsV2 creates the extra args for the EVM2Any message that is destined
 // for an EVM chain. The extra args contain the gas limit and allow out of order flag.
-func MakeEVMExtraArgsV2(gasLimit uint64, allowOOO bool) []byte {
+func MakeGenericExtraArgsV2(gasLimit uint64, allowOOO bool) []byte {
 	// extra args is the tag followed by the gas limit and allowOOO abi-encoded.
 	var extraArgs []byte
-	extraArgs = append(extraArgs, evmExtraArgsV2Tag...)
+	extraArgs = append(extraArgs, genericExtraArgsV2Tag...)
 	gasLimitBytes := new(big.Int).SetUint64(gasLimit).Bytes()
 	// pad from the left to 32 bytes
 	gasLimitBytes = common.LeftPadBytes(gasLimitBytes, 32)

@@ -155,8 +155,8 @@ func Test_CCIPMessaging(t *testing.T) {
 				Nonce:                  out.Nonce,
 				Receiver:               state.Chains[destChain].Receiver.Address(),
 				MsgData:                []byte("hello CCIPReceiver with low exec gas"),
-				ExtraArgs:              testhelpers.MakeEVMExtraArgsV2(1, false), // 1 gas is too low.
-				ExpectedExecutionState: testhelpers.EXECUTION_STATE_FAILURE,      // state would be failed onchain due to low gas
+				ExtraArgs:              testhelpers.MakeGenericExtraArgsV2(1, false), // 1 gas is too low.
+				ExpectedExecutionState: testhelpers.EXECUTION_STATE_FAILURE,          // state would be failed onchain due to low gas
 			},
 		)
 

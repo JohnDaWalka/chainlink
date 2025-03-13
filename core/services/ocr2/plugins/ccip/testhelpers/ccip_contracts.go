@@ -77,6 +77,9 @@ var (
 	DestChainSelector   = uint64(3379446385462418246)
 
 	TokenDecimals = uint8(18)
+
+	// see Client.sol.
+	GenericExtraArgsV2Tag = hexutil.MustDecode("0x181dcf10")
 )
 
 // Backwards compat, in principle these statuses are version dependent
@@ -1300,16 +1303,13 @@ func GetEVMExtraArgsV1(gasLimit *big.Int, strict bool) ([]byte, error) {
 	return append(EVMV1Tag, encodedArgs...), nil
 }
 
-func GetEVMExtraArgsV2(gasLimit *big.Int, allowOutOfOrder bool) ([]byte, error) {
-	// see Client.sol.
-	EVMV2Tag := hexutil.MustDecode("0x181dcf10")
-
+func GetGenericExtraArgsV2(gasLimit *big.Int, allowOutOfOrder bool) ([]byte, error) {
 	encodedArgs, err := utils.ABIEncode(`[{"type":"uint256"},{"type":"bool"}]`, gasLimit, allowOutOfOrder)
 	if err != nil {
 		return nil, err
 	}
 
-	return append(EVMV2Tag, encodedArgs...), nil
+	return append(GenericExtraArgsV2Tag, encodedArgs...), nil
 }
 
 type ManualExecArgs struct {

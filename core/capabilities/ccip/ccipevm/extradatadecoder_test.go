@@ -32,7 +32,7 @@ func Test_decodeExtraData(t *testing.T) {
 	})
 
 	t.Run("decode extra args into map evm v2", func(t *testing.T) {
-		encoded, err := d.contract.EncodeEVMExtraArgsV2(nil, message_hasher.ClientGenericExtraArgsV2{
+		encoded, err := d.contract.EncodeGenericExtraArgsV2(nil, message_hasher.ClientGenericExtraArgsV2{
 			GasLimit:                 gasLimit,
 			AllowOutOfOrderExecution: true,
 		})

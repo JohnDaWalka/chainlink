@@ -128,7 +128,7 @@ func Test_OutOfOrderExecution(t *testing.T) {
 		tokenTransfer,
 		firstReceiver,
 		nil,
-		testhelpers.MakeEVMExtraArgsV2(0, true),
+		testhelpers.MakeGenericExtraArgsV2(0, true),
 	)
 	expectedStatuses[firstMessage.SequenceNumber] = testhelpers.EXECUTION_STATE_SUCCESS
 	t.Logf("Out of order messages sent from chain %d to chain %d with sequence number %d",
@@ -165,7 +165,7 @@ func Test_OutOfOrderExecution(t *testing.T) {
 		tokenTransfer,
 		thirdReceiver,
 		nil,
-		testhelpers.MakeEVMExtraArgsV2(0, false),
+		testhelpers.MakeGenericExtraArgsV2(0, false),
 	)
 	t.Logf("Ordered token transfer from chain %d to chain %d with sequence number %d",
 		sourceChain, destChain, thirdMessage.SequenceNumber,
@@ -183,7 +183,7 @@ func Test_OutOfOrderExecution(t *testing.T) {
 		tokenTransfer,
 		fourthReceiver,
 		[]byte("this message has enough gas to execute"),
-		testhelpers.MakeEVMExtraArgsV2(300_000, true),
+		testhelpers.MakeGenericExtraArgsV2(300_000, true),
 	)
 	expectedStatuses[fourthMessage.SequenceNumber] = testhelpers.EXECUTION_STATE_SUCCESS
 	t.Logf("Out of order programmable token transfer from chain %d to chain %d with sequence number %d",
@@ -201,7 +201,7 @@ func Test_OutOfOrderExecution(t *testing.T) {
 			Data:         nil,
 			TokenAmounts: tokenTransfer,
 			FeeToken:     common.HexToAddress("0x0"),
-			ExtraArgs:    testhelpers.MakeEVMExtraArgsV2(0, false),
+			ExtraArgs:    testhelpers.MakeGenericExtraArgsV2(0, false),
 		}))
 	require.NoError(t, err)
 	expectedStatuses[fifthMessage.SequenceNumber] = testhelpers.EXECUTION_STATE_SUCCESS

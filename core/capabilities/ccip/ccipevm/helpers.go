@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	svmV1DecodeName    = "decodeSVMExtraArgsV1"
-	evmV1DecodeName    = "decodeEVMExtraArgsV1"
-	evmV2DecodeName    = "decodeEVMExtraArgsV2"
-	evmDestExecDataKey = "destGasAmount"
+	svmV1DecodeName     = "decodeSVMExtraArgsV1"
+	evmV1DecodeName     = "decodeEVMExtraArgsV1"
+	genericV2DecodeName = "decodeGenericExtraArgsV2"
+	evmDestExecDataKey  = "destGasAmount"
 )
 
 var (
@@ -38,8 +38,8 @@ func decodeExtraArgsV1V2(extraArgs []byte) (gasLimit *big.Int, err error) {
 	var method string
 	if bytes.Equal(extraArgs[:4], evmExtraArgsV1Tag) {
 		method = evmV1DecodeName
-	} else if bytes.Equal(extraArgs[:4], evmExtraArgsV2Tag) {
-		method = evmV2DecodeName
+	} else if bytes.Equal(extraArgs[:4], genericExtraArgsV2) {
+		method = genericV2DecodeName
 	} else {
 		return nil, fmt.Errorf("unknown extra args tag: %x", extraArgs)
 	}

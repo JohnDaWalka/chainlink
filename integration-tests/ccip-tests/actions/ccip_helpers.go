@@ -1883,7 +1883,7 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 	if matchErr != nil {
 		extraArgs, err = testhelpers.GetEVMExtraArgsV1(gasLimit, false)
 	} else {
-		extraArgs, err = testhelpers.GetEVMExtraArgsV2(gasLimit, allowOutOfOrder)
+		extraArgs, err = testhelpers.GetGenericExtraArgsV2(gasLimit, allowOutOfOrder)
 	}
 	if err != nil {
 		return router.ClientEVM2AnyMessage{}, fmt.Errorf("failed getting extra args: %w", err)

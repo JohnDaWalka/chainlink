@@ -24,8 +24,12 @@ var (
 	// bytes4(keccak256("CCIP SVMExtraArgsV1"));
 	svmExtraArgsV1Tag = hexutil.MustDecode("0x1f3b3aba")
 
-	// bytes4(keccak256("CCIP EVMExtraArgsV2"));
-	evmExtraArgsV2Tag = hexutil.MustDecode("0x181dcf10")
+	// bytes4 public constant GENERIC_EXTRA_ARGS_V2_TAG = 0x181dcf10;
+	// Tag to indicate a gas limit (or dest chain equivalent processing units) and Out Of Order Execution. This tag is
+	// available for multiple chain families. If there is no chain family specific tag, this is the default available
+	// for a chain.
+	// Note: not available for Solana VM based chains.
+	genericExtraArgsV2Tag = hexutil.MustDecode("0x181dcf10")
 )
 
 // ExtraDataDecoder is a helper struct for decoding extra data
@@ -41,7 +45,7 @@ func (d ExtraDataDecoder) DecodeExtraArgsToMap(extraArgs cciptypes.Bytes) (map[s
 	var typ reflect.Type
 	outputMap := make(map[string]any)
 	switch string(extraArgs[:4]) {
-	case string(evmExtraArgsV2Tag):
+	case string(genericExtraArgsV2Tag):
 		var args fee_quoter.EVMExtraArgsV2
 		decoder := agbinary.NewBorshDecoder(extraArgs[4:])
 		err := args.UnmarshalWithDecoder(decoder)

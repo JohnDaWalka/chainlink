@@ -189,7 +189,7 @@ func TestUSDCTokenTransfer(t *testing.T) {
 			ExpectedTokenBalances: map[common.Address]*big.Int{
 				bChainUSDC.Address(): new(big.Int).SetUint64(0),
 			},
-			ExtraArgs:      testhelpers.MakeEVMExtraArgsV2(1, false),
+			ExtraArgs:      testhelpers.MakeGenericExtraArgsV2(1, false),
 			ExpectedStatus: testhelpers.EXECUTION_STATE_FAILURE,
 		},
 		{

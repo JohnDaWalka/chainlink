@@ -34,8 +34,8 @@ func (d ExtraDataDecoder) DecodeExtraArgsToMap(extraArgs cciptypes.Bytes) (map[s
 		// for EVMExtraArgs, the first four bytes is the method name
 		method = evmV1DecodeName
 		extraByteOffset = 4
-	case string(evmExtraArgsV2Tag):
-		method = evmV2DecodeName
+	case string(genericExtraArgsV2):
+		method = genericV2DecodeName
 		extraByteOffset = 4
 	case string(svmExtraArgsV1Tag):
 		// for SVMExtraArgs there's the four bytes plus another 32 bytes padding for the dynamic array

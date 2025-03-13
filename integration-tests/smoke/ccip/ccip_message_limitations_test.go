@@ -87,7 +87,7 @@ func Test_CCIPMessageLimitations(t *testing.T) {
 				Receiver:  common.LeftPadBytes(onChainState.Chains[testSetup.DestChain].Receiver.Address().Bytes(), 32),
 				Data:      []byte(strings.Repeat("0", int(testSetup.SrcFeeQuoterDestChainConfig.MaxDataBytes))),
 				FeeToken:  common.HexToAddress("0x0"),
-				ExtraArgs: testhelpers.MakeEVMExtraArgsV2(uint64(testSetup.SrcFeeQuoterDestChainConfig.MaxPerMsgGasLimit), true),
+				ExtraArgs: testhelpers.MakeGenericExtraArgsV2(uint64(testSetup.SrcFeeQuoterDestChainConfig.MaxPerMsgGasLimit), true),
 			},
 		},
 		//{ // TODO: exec plugin never executed this message. CCIP-4471
@@ -101,7 +101,7 @@ func Test_CCIPMessageLimitations(t *testing.T) {
 		//			{Token: srcToken.Address(), Amount: big.NewInt(1)},
 		//		}, int(chain0DestConfig.MaxNumberOfTokensPerMsg)),
 		//		FeeToken:  common.HexToAddress("0x0"),
-		//		ExtraArgs: changeset.MakeEVMExtraArgsV2(uint64(chain0DestConfig.MaxPerMsgGasLimit), true),
+		//		ExtraArgs: changeset.MakeGenericExtraArgsV2(uint64(chain0DestConfig.MaxPerMsgGasLimit), true),
 		//	},
 		//},
 		{
@@ -138,7 +138,7 @@ func Test_CCIPMessageLimitations(t *testing.T) {
 				Data:         []byte("abc"),
 				TokenAmounts: []router.ClientEVMTokenAmount{},
 				FeeToken:     common.HexToAddress("0x0"),
-				ExtraArgs:    testhelpers.MakeEVMExtraArgsV2(uint64(testSetup.SrcFeeQuoterDestChainConfig.MaxPerMsgGasLimit)+1, true),
+				ExtraArgs:    testhelpers.MakeGenericExtraArgsV2(uint64(testSetup.SrcFeeQuoterDestChainConfig.MaxPerMsgGasLimit)+1, true),
 			},
 			ExpRevert: true,
 		},

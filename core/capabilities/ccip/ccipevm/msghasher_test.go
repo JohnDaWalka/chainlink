@@ -126,7 +126,7 @@ func createEVM2EVMMessage(t *testing.T, messageHasher *message_hasher.MessageHas
 		})
 		require.NoError(t, err)
 	} else if evmExtraArgs.version == "v2" {
-		extraArgsBytes, err = messageHasher.EncodeEVMExtraArgsV2(nil, message_hasher.ClientGenericExtraArgsV2{
+		extraArgsBytes, err = messageHasher.EncodeGenericExtraArgsV2(nil, message_hasher.ClientGenericExtraArgsV2{
 			GasLimit:                 evmExtraArgs.gasLimit,
 			AllowOutOfOrderExecution: evmExtraArgs.allowOOO,
 		})
@@ -354,7 +354,7 @@ func TestMessagerHasher_againstRmnSharedVector(t *testing.T) {
 		require.Equal(t, rmnMsgHash, msgH.String(), "rmn hash and my hash should match")
 	})
 
-	t.Run("solana", func(t *testing.T) {
+	t.Run("solana -> evm message", func(t *testing.T) {
 		key, err := solanago.NewRandomPrivateKey()
 		require.NoError(t, err)
 
@@ -372,10 +372,6 @@ func TestMessagerHasher_againstRmnSharedVector(t *testing.T) {
 		destGasAmount := uint32(10)
 		destExecData := make([]byte, 4)
 		binary.LittleEndian.PutUint32(destExecData, destGasAmount)
-
-		// evmExtraArgsV2Tag from SVM on-chain contract
-		// https://github.com/smartcontractkit/chainlink-ccip/blob/1b2ee24da54bddef8f3943dc84102686f2890f87/chains/solana/contracts/programs/ccip-router/src/extra_args.rs#L9
-		evmExtraArgsV2 := hexutil.MustDecode("0x181dcf10")
 
 		var (
 			// header fields
@@ -420,7 +416,7 @@ func TestMessagerHasher_againstRmnSharedVector(t *testing.T) {
 				Sender:         senderAddress,
 				Data:           hexutil.MustDecode(dataField),
 				Receiver:       receiverAddress,
-				ExtraArgs:      append(evmExtraArgsV2, extraArgsbuf.Bytes()...),
+				ExtraArgs:      append(genericExtraArgsV2, extraArgsbuf.Bytes()...),
 				FeeToken:       key.PublicKey().Bytes(),
 				FeeTokenAmount: cciptypes.NewBigInt(feeTokenAmount),
 				FeeValueJuels:  cciptypes.NewBigInt(feeValueJuels),
