@@ -2,15 +2,9 @@ package changeset
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 
 	"golang.org/x/sync/errgroup"
-
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/zksync-sdk/zksync2-go/contracts/contractdeployer"
-	"github.com/zksync-sdk/zksync2-go/utils"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -22,6 +16,7 @@ import (
 	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
 	"github.com/smartcontractkit/chainlink/deployment"
+	changesets_zksync "github.com/smartcontractkit/chainlink/deployment/common/changeset/zksync"
 	"github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/link_token"
@@ -116,13 +111,8 @@ func deployLinkTokenContractEVM(
 	chain deployment.Chain,
 	ab deployment.AddressBook,
 ) (*deployment.ContractDeploy[*link_token.LinkToken], error) {
-	// we will need to refactor this to enable it for the rest of
-	// the contracts
-	innerDeployFn := deployLinkTokenContractEVMFunc
-	if chain.IsZK {
-		innerDeployFn = deployLinkTokenContractZKVMFunc
-	}
-	linkToken, err := deployment.DeployContract[*link_token.LinkToken](lggr, chain, ab, innerDeployFn)
+	deployFn := changesets_zksync.WrapDeployFn(chain, deployLinkTokenContractEVMFunc, link_token.ZkBytecode, link_token.NewLinkToken)
+	linkToken, err := deployment.DeployContract[*link_token.LinkToken](lggr, chain, ab, deployFn)
 	if err != nil {
 		lggr.Errorw("Failed to deploy link token", "chain", chain.String(), "err", err)
 		return linkToken, err
@@ -135,53 +125,6 @@ func deployLinkTokenContractEVMFunc(chain deployment.Chain) deployment.ContractD
 		chain.DeployerKey,
 		chain.Client,
 	)
-	return deployment.ContractDeploy[*link_token.LinkToken]{
-		Address:  linkTokenAddr,
-		Contract: linkToken,
-		Tx:       tx,
-		Tv:       deployment.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0),
-		Err:      err2,
-	}
-}
-
-func wrapErr(err error) deployment.ContractDeploy[*link_token.LinkToken] {
-	return deployment.ContractDeploy[*link_token.LinkToken]{
-		Err: err,
-	}
-}
-
-func deployLinkTokenContractZKVMFunc(chain deployment.Chain) deployment.ContractDeploy[*link_token.LinkToken] {
-	contractDeployerAddress := utils.ContractDeployerAddress
-	contractDeployer, err := contractdeployer.NewIContractDeployer(contractDeployerAddress, chain.Client)
-	if err != nil {
-		return wrapErr(err)
-	}
-
-	salt := make([]byte, 32)
-	rand.Read(salt)
-	bytecodeHash, err := utils.HashBytecode(link_token.ZkBytecode)
-	if err != nil {
-		return wrapErr(err)
-	}
-
-	chain.DeployerKey.GasPrice, err = chain.Client.SuggestGasPrice(context.Background())
-	if err != nil {
-		return wrapErr(err)
-	}
-
-	tx, err := contractDeployer.Create2(chain.DeployerKey, [32]byte(salt), [32]byte(bytecodeHash), link_token.ZkBytecode)
-	if err != nil {
-		return wrapErr(err)
-	}
-
-	receipt, err := bind.WaitMined(context.Background(), chain.Client, tx)
-	if err != nil {
-		return wrapErr(err)
-	}
-
-	linkTokenAddr := common.HexToAddress("0x" + receipt.Logs[1].Topics[3].String()[2+32*2-40:])
-	linkToken, err2 := link_token.NewLinkToken(linkTokenAddr, chain.Client)
-
 	return deployment.ContractDeploy[*link_token.LinkToken]{
 		Address:  linkTokenAddr,
 		Contract: linkToken,
