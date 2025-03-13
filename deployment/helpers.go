@@ -167,8 +167,7 @@ func DeployContract[C any](
 		return nil, contractDeploy.Err
 	}
 	var err error
-	if contractDeploy.Tx != nil {
-		// assumed confirmed
+	if !chain.IsZK { // tx is confirmed in deploy
 		_, err := chain.Confirm(contractDeploy.Tx)
 		if err != nil {
 			lggr.Errorw("Failed to confirm deployment", "chain", chain.String(), "Contract", contractDeploy.Tv.String(), "err", err)
