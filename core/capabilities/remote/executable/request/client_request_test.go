@@ -3,7 +3,6 @@ package request_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -31,7 +30,7 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 
 	numCapabilityPeers := 2
 	capabilityPeers := make([]p2ptypes.PeerID, numCapabilityPeers)
-	for i := range numCapabilityPeers {
+	for i := 0; i < numCapabilityPeers; i++ {
 		capabilityPeers[i] = NewP2PPeerID(t)
 	}
 
@@ -50,7 +49,7 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 
 	numWorkflowPeers := 2
 	workflowPeers := make([]p2ptypes.PeerID, numWorkflowPeers)
-	for i := range numWorkflowPeers {
+	for i := 0; i < numWorkflowPeers; i++ {
 		workflowPeers[i] = NewP2PPeerID(t)
 	}
 
@@ -100,7 +99,8 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 	}
 
 	t.Run("Send second message with different response", func(t *testing.T) {
-		ctx := t.Context()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
 		request, err := request.NewClientExecuteRequest(ctx, lggr, capabilityRequest, capInfo,
@@ -142,7 +142,8 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 	})
 
 	t.Run("Send second message from non calling Don peer", func(t *testing.T) {
-		ctx := t.Context()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
 		request, err := request.NewClientExecuteRequest(ctx, lggr, capabilityRequest, capInfo,
@@ -167,7 +168,8 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 	})
 
 	t.Run("Send second message from same peer as first message", func(t *testing.T) {
-		ctx := t.Context()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
 		request, err := request.NewClientExecuteRequest(ctx, lggr, capabilityRequest, capInfo,
@@ -189,7 +191,8 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 	})
 
 	t.Run("Send second message with same error as first", func(t *testing.T) {
-		ctx := t.Context()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
 		request, err := request.NewClientExecuteRequest(ctx, lggr, capabilityRequest, capInfo,
@@ -209,7 +212,7 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 			Payload:         rawResponse,
 			MessageId:       []byte("messageID"),
 			Error:           types.Error_INTERNAL_ERROR,
-			ErrorMsg:        assert.AnError.Error(),
+			ErrorMsg:        "an error",
 		}
 
 		msgWithError.Sender = capabilityPeers[0][:]
@@ -222,11 +225,12 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 
 		response := <-request.ResponseChan()
 
-		assert.Equal(t, fmt.Sprintf("%s : %s", types.Error_INTERNAL_ERROR, assert.AnError.Error()), response.Err.Error())
+		assert.Equal(t, "an error", response.Err.Error())
 	})
 
 	t.Run("Send second message with different error to first", func(t *testing.T) {
-		ctx := t.Context()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
 		request, err := request.NewClientExecuteRequest(ctx, lggr, capabilityRequest, capInfo,
@@ -275,7 +279,8 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 	})
 
 	t.Run("Execute Request", func(t *testing.T) {
-		ctx := t.Context()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		dispatcher := &clientRequestTestDispatcher{msgs: make(chan *types.MessageBody, 100)}
 		request, err := request.NewClientExecuteRequest(ctx, lggr, capabilityRequest, capInfo,
