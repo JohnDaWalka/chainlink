@@ -2,16 +2,15 @@ package changesets_zksync
 
 import (
 	"context"
-	"crypto/rand"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/zksync-sdk/zksync2-go/contracts/contractdeployer"
-	"github.com/zksync-sdk/zksync2-go/utils"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/zksync-sdk/zksync2-go/accounts"
+	"github.com/zksync-sdk/zksync2-go/clients"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/common/types"
 )
 
 type DeployFn[C any] func(chain deployment.Chain) deployment.ContractDeploy[*C]
@@ -23,9 +22,10 @@ func WrapDeployFn[C any](
 	getAbi func() (*abi.ABI, error),
 	args []interface{},
 	newContract func(common.Address, bind.ContractBackend) (*C, error),
+	tv deployment.TypeAndVersion,
 ) DeployFn[C] {
 	if c.IsZK {
-		return wrapZKDeployFn(zkBytecode, args, getAbi, newContract)
+		return wrapZKDeployFn(zkBytecode, args, getAbi, newContract, tv)
 	} else {
 		return deployEVM
 	}
@@ -42,62 +42,48 @@ func wrapZKDeployFn[C any](
 	args []interface{},
 	getAbi func() (*abi.ABI, error),
 	newContract func(common.Address, bind.ContractBackend) (*C, error),
+	tv deployment.TypeAndVersion,
 ) func(chain deployment.Chain) deployment.ContractDeploy[*C] {
 	return func(chain deployment.Chain) deployment.ContractDeploy[*C] {
-		contractDeployerAddress := utils.ContractDeployerAddress
-		contractDeployer, err := contractdeployer.NewIContractDeployer(contractDeployerAddress, chain.Client)
+		pk := common.Hex2Bytes(chain.DeployerPk)
+		client := clients.NewClient(chain.Client.(*ethclient.Client).Client())
+		wallet, err := accounts.NewWallet(pk, client, nil)
 		if err != nil {
 			return wrapErr[C](err)
 		}
 
-		salt := make([]byte, 32)
-		rand.Read(salt)
-
-		input := make([]byte, len(bytecode))
-		copy(input, bytecode)
-
+		var calldata []byte
 		if len(args) > 0 {
 			abi, err := getAbi()
 			if err != nil {
 				return wrapErr[C](err)
 			}
-
-			data, err := abi.Pack("", args...)
+			calldata, err = abi.Pack("", args...)
 			if err != nil {
 				return wrapErr[C](err)
 			}
-
-			input = append(input, data...)
 		}
 
-		bytecodeHash, err := utils.HashBytecode(input)
+		txHash, err := wallet.Deploy(nil, accounts.Create2Transaction{
+			Bytecode: bytecode,
+			Calldata: calldata})
 		if err != nil {
 			return wrapErr[C](err)
 		}
 
-		chain.DeployerKey.GasPrice, err = chain.Client.SuggestGasPrice(context.Background())
+		receipt, err := client.WaitMined(context.Background(), txHash)
 		if err != nil {
 			return wrapErr[C](err)
 		}
 
-		tx, err := contractDeployer.Create2(chain.DeployerKey, [32]byte(salt), [32]byte(bytecodeHash), input)
-		if err != nil {
-			return wrapErr[C](err)
-		}
-
-		receipt, err := bind.WaitMined(context.Background(), chain.Client, tx)
-		if err != nil {
-			return wrapErr[C](err)
-		}
-
-		address := common.HexToAddress("0x" + receipt.Logs[1].Topics[3].String()[2+32*2-40:])
-		linkToken, err2 := newContract(address, chain.Client)
+		address := receipt.ContractAddress
+		contract, err2 := newContract(address, chain.Client)
 
 		return deployment.ContractDeploy[*C]{
 			Address:  address,
-			Contract: linkToken,
-			Tx:       tx,
-			Tv:       deployment.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0),
+			Contract: contract,
+			Tx:       nil,
+			Tv:       tv,
 			Err:      err2,
 		}
 	}

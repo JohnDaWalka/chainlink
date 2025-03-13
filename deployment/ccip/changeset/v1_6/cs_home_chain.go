@@ -108,6 +108,7 @@ func deployCapReg(
 			}, nil
 		}
 	}
+	tv := deployment.NewTypeAndVersion(changeset.CapabilitiesRegistry, deployment.Version1_0_0)
 	capReg, err := deployment.DeployContract(lggr, chain, ab, changesets_zksync.WrapDeployFn(chain,
 		func(chain deployment.Chain) deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry] {
 			crAddr, tx, cr, err2 := capabilities_registry.DeployCapabilitiesRegistry(
@@ -115,9 +116,9 @@ func deployCapReg(
 				chain.Client,
 			)
 			return deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
-				Address: crAddr, Contract: cr, Tv: deployment.NewTypeAndVersion(changeset.CapabilitiesRegistry, deployment.Version1_0_0), Tx: tx, Err: err2,
+				Address: crAddr, Contract: cr, Tv: tv, Tx: tx, Err: err2,
 			}
-		}, capabilities_registry.ZkBytecode, nil, nil, capabilities_registry.NewCapabilitiesRegistry))
+		}, capabilities_registry.ZkBytecode, nil, nil, capabilities_registry.NewCapabilitiesRegistry, tv))
 	if err != nil {
 		lggr.Errorw("Failed to deploy capreg", "chain", chain.String(), "err", err)
 		return nil, err
@@ -152,6 +153,7 @@ func deployHomeChain(
 		lggr.Infow("CCIPHome already deployed", "addr", state.Chains[chain.Selector].CCIPHome.Address().String())
 		ccipHomeAddr = state.Chains[chain.Selector].CCIPHome.Address()
 	} else {
+		tv := deployment.NewTypeAndVersion(changeset.CCIPHome, deployment.Version1_6_0)
 		ccipHome, err := deployment.DeployContract(lggr, chain, ab, changesets_zksync.WrapDeployFn(chain,
 			func(chain deployment.Chain) deployment.ContractDeploy[*ccip_home.CCIPHome] {
 				ccAddr, tx, cc, err2 := ccip_home.DeployCCIPHome(
@@ -160,9 +162,9 @@ func deployHomeChain(
 					capReg.Address,
 				)
 				return deployment.ContractDeploy[*ccip_home.CCIPHome]{
-					Address: ccAddr, Tv: deployment.NewTypeAndVersion(changeset.CCIPHome, deployment.Version1_6_0), Tx: tx, Err: err2, Contract: cc,
+					Address: ccAddr, Tv: tv, Tx: tx, Err: err2, Contract: cc,
 				}
-			}, ccip_home.ZkBytecode, ccip_home.CCIPHomeMetaData.GetAbi, []any{capReg.Address}, ccip_home.NewCCIPHome))
+			}, ccip_home.ZkBytecode, ccip_home.CCIPHomeMetaData.GetAbi, []any{capReg.Address}, ccip_home.NewCCIPHome, tv))
 		if err != nil {
 			lggr.Errorw("Failed to deploy CCIPHome", "chain", chain.String(), "err", err)
 			return nil, err
@@ -173,6 +175,7 @@ func deployHomeChain(
 	if state.Chains[chain.Selector].RMNHome != nil {
 		lggr.Infow("RMNHome already deployed", "addr", state.Chains[chain.Selector].RMNHome.Address().String())
 	} else {
+		tv := deployment.NewTypeAndVersion(changeset.RMNHome, deployment.Version1_6_0)
 		rmnHomeContract, err := deployment.DeployContract(lggr, chain, ab, changesets_zksync.WrapDeployFn(chain,
 			func(chain deployment.Chain) deployment.ContractDeploy[*rmn_home.RMNHome] {
 				rmnAddr, tx, rmn, err2 := rmn_home.DeployRMNHome(
@@ -180,9 +183,9 @@ func deployHomeChain(
 					chain.Client,
 				)
 				return deployment.ContractDeploy[*rmn_home.RMNHome]{
-					Address: rmnAddr, Tv: deployment.NewTypeAndVersion(changeset.RMNHome, deployment.Version1_6_0), Tx: tx, Err: err2, Contract: rmn,
+					Address: rmnAddr, Tv: tv, Tx: tx, Err: err2, Contract: rmn,
 				}
-			}, rmn_home.ZkBytecode, nil, nil, rmn_home.NewRMNHome),
+			}, rmn_home.ZkBytecode, nil, nil, rmn_home.NewRMNHome, tv),
 		)
 		if err != nil {
 			lggr.Errorw("Failed to deploy RMNHome", "chain", chain.String(), "err", err)

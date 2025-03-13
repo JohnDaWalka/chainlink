@@ -116,6 +116,7 @@ func NewZKChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 			Selector:    sel,
 			Client:      client,
 			DeployerKey: keyedTransactors[0],
+			DeployerPk:  blockchain.AnvilZKSyncRichAccountPks[0],
 			Users:       keyedTransactors[1:],
 			Confirm: func(tx *types.Transaction) (uint64, error) {
 				receipt, err := bind.WaitMined(context.Background(), client, tx)

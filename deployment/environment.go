@@ -57,6 +57,7 @@ type Chain struct {
 	Client   OnchainClient
 	// Note the Sign function can be abstract supporting a variety of key storage mechanisms (e.g. KMS etc).
 	DeployerKey *bind.TransactOpts
+	DeployerPk  string
 	Confirm     func(tx *types.Transaction) (uint64, error)
 	// Users are a set of keys that can be used to interact with the chain.
 	// These are distinct from the deployer key.

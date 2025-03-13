@@ -111,6 +111,7 @@ func deployLinkTokenContractEVM(
 	chain deployment.Chain,
 	ab deployment.AddressBook,
 ) (*deployment.ContractDeploy[*link_token.LinkToken], error) {
+	tv := deployment.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0)
 	linkToken, err := deployment.DeployContract[*link_token.LinkToken](lggr, chain, ab, changesets_zksync.WrapDeployFn(chain,
 		func(chain deployment.Chain) deployment.ContractDeploy[*link_token.LinkToken] {
 			linkTokenAddr, tx, linkToken, err2 := link_token.DeployLinkToken(
@@ -121,10 +122,10 @@ func deployLinkTokenContractEVM(
 				Address:  linkTokenAddr,
 				Contract: linkToken,
 				Tx:       tx,
-				Tv:       deployment.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0),
+				Tv:       tv,
 				Err:      err2,
 			}
-		}, link_token.ZkBytecode, nil, nil, link_token.NewLinkToken))
+		}, link_token.ZkBytecode, nil, nil, link_token.NewLinkToken, tv))
 	if err != nil {
 		lggr.Errorw("Failed to deploy link token", "chain", chain.String(), "err", err)
 		return linkToken, err
