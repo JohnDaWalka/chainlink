@@ -25,6 +25,8 @@ compileContract () {
        --extra-output-files bin abi \
        -o $CONTRACTS_DIR/solc/$PROJECT/$contract"
   $command
+  
+  ./scripts/zksync_solc_compile $PROJECT/"$1"
 }
 
 compileContract CapabilitiesRegistry

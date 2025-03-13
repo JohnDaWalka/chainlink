@@ -5,6 +5,7 @@ package ccip
 
 //go:generate go run ../generation/wrap.go ccip CCIPHome ccip_home latest
 //go:generate go run ../generation/generate/zk/wrap_zk_bytecode.go ../../../contracts/zksolc/ccip/capability/CCIPHome/CCIPHome.sol/CCIPHome.zbin ../ccip/generated/latest/ccip_home/zk_bytecode.go ccip_home
+//go:generate cp generated/latest/ccip_home/zk_bytecode.go generated/v1_6_0/ccip_home
 
 //go:generate go run ../generation/wrap.go ccip OnRamp onramp latest
 //go:generate go run ../generation/generate/zk/wrap_zk_bytecode.go ../../../contracts/zksolc/ccip/onRamp/OnRamp/OnRamp.sol/OnRamp.zbin ../ccip/generated/latest/onramp/zk_bytecode.go onramp
@@ -41,6 +42,7 @@ package ccip
 
 //go:generate go run ../generation/wrap.go ccip RMNHome rmn_home latest
 //go:generate go run ../generation/generate/zk/wrap_zk_bytecode.go ../../../contracts/zksolc/ccip/rmn/RMNHome/RMNHome.sol/RMNHome.zbin ../ccip/generated/latest/rmn_home/zk_bytecode.go rmn_home
+//go:generate cp generated/latest/rmn_home/zk_bytecode.go generated/v1_6_0/rmn_home
 
 // Pools
 //go:generate go run ../generation/wrap.go ccip BurnMintTokenPool burn_mint_token_pool latest

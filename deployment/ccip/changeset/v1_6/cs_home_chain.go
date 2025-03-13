@@ -10,22 +10,24 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/maps"
+
 	mcmslib "github.com/smartcontractkit/mcms"
 	mcmssdk "github.com/smartcontractkit/mcms/sdk"
 	mcmsevmsdk "github.com/smartcontractkit/mcms/sdk/evm"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	changesets_zksync "github.com/smartcontractkit/chainlink/deployment/common/changeset/zksync"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/rmn_home"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	capabilities_registry "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 )
 
@@ -106,7 +108,7 @@ func deployCapReg(
 			}, nil
 		}
 	}
-	capReg, err := deployment.DeployContract(lggr, chain, ab,
+	capReg, err := deployment.DeployContract(lggr, chain, ab, changesets_zksync.WrapDeployFn(chain,
 		func(chain deployment.Chain) deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry] {
 			crAddr, tx, cr, err2 := capabilities_registry.DeployCapabilitiesRegistry(
 				chain.DeployerKey,
@@ -115,7 +117,7 @@ func deployCapReg(
 			return deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
 				Address: crAddr, Contract: cr, Tv: deployment.NewTypeAndVersion(changeset.CapabilitiesRegistry, deployment.Version1_0_0), Tx: tx, Err: err2,
 			}
-		})
+		}, capabilities_registry.ZkBytecode, nil, nil, capabilities_registry.NewCapabilitiesRegistry))
 	if err != nil {
 		lggr.Errorw("Failed to deploy capreg", "chain", chain.String(), "err", err)
 		return nil, err
@@ -150,8 +152,7 @@ func deployHomeChain(
 		lggr.Infow("CCIPHome already deployed", "addr", state.Chains[chain.Selector].CCIPHome.Address().String())
 		ccipHomeAddr = state.Chains[chain.Selector].CCIPHome.Address()
 	} else {
-		ccipHome, err := deployment.DeployContract(
-			lggr, chain, ab,
+		ccipHome, err := deployment.DeployContract(lggr, chain, ab, changesets_zksync.WrapDeployFn(chain,
 			func(chain deployment.Chain) deployment.ContractDeploy[*ccip_home.CCIPHome] {
 				ccAddr, tx, cc, err2 := ccip_home.DeployCCIPHome(
 					chain.DeployerKey,
@@ -161,7 +162,7 @@ func deployHomeChain(
 				return deployment.ContractDeploy[*ccip_home.CCIPHome]{
 					Address: ccAddr, Tv: deployment.NewTypeAndVersion(changeset.CCIPHome, deployment.Version1_6_0), Tx: tx, Err: err2, Contract: cc,
 				}
-			})
+			}, ccip_home.ZkBytecode, ccip_home.CCIPHomeMetaData.GetAbi, []any{capReg.Address}, ccip_home.NewCCIPHome))
 		if err != nil {
 			lggr.Errorw("Failed to deploy CCIPHome", "chain", chain.String(), "err", err)
 			return nil, err
@@ -172,8 +173,7 @@ func deployHomeChain(
 	if state.Chains[chain.Selector].RMNHome != nil {
 		lggr.Infow("RMNHome already deployed", "addr", state.Chains[chain.Selector].RMNHome.Address().String())
 	} else {
-		rmnHomeContract, err := deployment.DeployContract(
-			lggr, chain, ab,
+		rmnHomeContract, err := deployment.DeployContract(lggr, chain, ab, changesets_zksync.WrapDeployFn(chain,
 			func(chain deployment.Chain) deployment.ContractDeploy[*rmn_home.RMNHome] {
 				rmnAddr, tx, rmn, err2 := rmn_home.DeployRMNHome(
 					chain.DeployerKey,
@@ -182,7 +182,7 @@ func deployHomeChain(
 				return deployment.ContractDeploy[*rmn_home.RMNHome]{
 					Address: rmnAddr, Tv: deployment.NewTypeAndVersion(changeset.RMNHome, deployment.Version1_6_0), Tx: tx, Err: err2, Contract: rmn,
 				}
-			},
+			}, rmn_home.ZkBytecode, nil, nil, rmn_home.NewRMNHome),
 		)
 		if err != nil {
 			lggr.Errorw("Failed to deploy RMNHome", "chain", chain.String(), "err", err)

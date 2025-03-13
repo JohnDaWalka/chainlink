@@ -29,6 +29,21 @@ func TestDeployHomeChain(t *testing.T) {
 		Chains:     2,
 		Nodes:      4,
 	})
+	deployHomeChainTest(t, e)
+}
+
+func TestDeployHomeChainZK(t *testing.T) {
+	t.Parallel()
+	lggr := logger.TestLogger(t)
+	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
+		Bootstraps: 1,
+		ZKChains:   2,
+		Nodes:      4,
+	})
+	deployHomeChainTest(t, e)
+}
+
+func deployHomeChainTest(t *testing.T, e deployment.Environment) {
 	homeChainSel := e.AllChainSelectors()[0]
 	nodes, err := deployment.NodeInfo(e.NodeIDs, e.Offchain)
 	require.NoError(t, err)

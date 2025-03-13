@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/zksync-sdk/zksync2-go/contracts/contractdeployer"
@@ -19,10 +20,12 @@ func WrapDeployFn[C any](
 	c deployment.Chain,
 	deployEVM DeployFn[C],
 	zkBytecode []byte,
+	getAbi func() (*abi.ABI, error),
+	args []interface{},
 	newContract func(common.Address, bind.ContractBackend) (*C, error),
 ) DeployFn[C] {
 	if c.IsZK {
-		return wrapZKDeployFn(zkBytecode, newContract)
+		return wrapZKDeployFn(zkBytecode, args, getAbi, newContract)
 	} else {
 		return deployEVM
 	}
@@ -36,6 +39,8 @@ func wrapErr[C any](err error) deployment.ContractDeploy[*C] {
 
 func wrapZKDeployFn[C any](
 	bytecode []byte,
+	args []interface{},
+	getAbi func() (*abi.ABI, error),
 	newContract func(common.Address, bind.ContractBackend) (*C, error),
 ) func(chain deployment.Chain) deployment.ContractDeploy[*C] {
 	return func(chain deployment.Chain) deployment.ContractDeploy[*C] {
@@ -47,7 +52,25 @@ func wrapZKDeployFn[C any](
 
 		salt := make([]byte, 32)
 		rand.Read(salt)
-		bytecodeHash, err := utils.HashBytecode(bytecode)
+
+		input := make([]byte, len(bytecode))
+		copy(input, bytecode)
+
+		if len(args) > 0 {
+			abi, err := getAbi()
+			if err != nil {
+				return wrapErr[C](err)
+			}
+
+			data, err := abi.Pack("", args...)
+			if err != nil {
+				return wrapErr[C](err)
+			}
+
+			input = append(input, data...)
+		}
+
+		bytecodeHash, err := utils.HashBytecode(input)
 		if err != nil {
 			return wrapErr[C](err)
 		}
@@ -57,7 +80,7 @@ func wrapZKDeployFn[C any](
 			return wrapErr[C](err)
 		}
 
-		tx, err := contractDeployer.Create2(chain.DeployerKey, [32]byte(salt), [32]byte(bytecodeHash), bytecode)
+		tx, err := contractDeployer.Create2(chain.DeployerKey, [32]byte(salt), [32]byte(bytecodeHash), input)
 		if err != nil {
 			return wrapErr[C](err)
 		}
