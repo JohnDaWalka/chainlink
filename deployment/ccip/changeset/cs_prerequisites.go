@@ -6,8 +6,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -190,6 +191,11 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 		if chainState.MockRMN == nil {
 			rmn, err := deployment.DeployContract(lggr, chain, ab,
 				func(chain deployment.Chain) deployment.ContractDeploy[*mock_rmn_contract.MockRMNContract] {
+					if chain.IsZK {
+						return deployment.ContractDeploy[*mock_rmn_contract.MockRMNContract]{
+							Err: errors.New("RMN contract is not supported on ZK chains"),
+						}
+					}
 					rmnAddress, tx2, rmnC, err2 := mock_rmn_contract.DeployMockRMNContract(
 						chain.DeployerKey,
 						chain.Client,
