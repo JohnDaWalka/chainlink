@@ -4,8 +4,6 @@
 
 ### Minor Changes
 
-- [#16755](https://github.com/smartcontractkit/chainlink/pull/16755) [`928fa92d33`](https://github.com/smartcontractkit/chainlink/commit/928fa92d337e0e8ccc896d49dab260e62184934c) - Bump to start the next version
-
 - [#16575](https://github.com/smartcontractkit/chainlink/pull/16575) [`79ce88cc5a`](https://github.com/smartcontractkit/chainlink/commit/79ce88cc5ab0c9920e035b9abc79ab58b828a3e4) - Upgrade LLO protocol to support sub-seconds reports. #nops #added
 
   NOTE: Protocol version 0 does NOT support gapless handover on sub-second reports. You must upgrade to version 1 for that.
