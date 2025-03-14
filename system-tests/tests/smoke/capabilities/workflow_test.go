@@ -2,9 +2,7 @@ package capabilities_test
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
-	"io"
 	"math/big"
 	"net"
 	"os"
@@ -31,7 +29,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/clnode"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
@@ -59,6 +56,7 @@ import (
 	libcrecli "github.com/smartcontractkit/chainlink/system-tests/lib/crecli"
 	keystoneporcrecli "github.com/smartcontractkit/chainlink/system-tests/lib/crecli/por"
 	libfunding "github.com/smartcontractkit/chainlink/system-tests/lib/funding"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 	libnix "github.com/smartcontractkit/chainlink/system-tests/lib/nix"
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
@@ -68,6 +66,7 @@ const (
 	ghReadTokenEnvVarName              = "GITHUB_READ_TOKEN"
 	E2eJobDistributorImageEnvVarName   = "E2E_JD_IMAGE"
 	E2eJobDistributorVersionEnvVarName = "E2E_JD_VERSION"
+	cribConfigsDir                     = "crib-configs"
 )
 
 type TestConfig struct {
@@ -79,28 +78,7 @@ type TestConfig struct {
 	KeystoneContracts             *keystonetypes.KeystoneContractsInput  `toml:"keystone_contracts"`
 	WorkflowRegistryConfiguration *keystonetypes.WorkflowRegistryInput   `toml:"workflow_registry_configuration"`
 	FeedConsumer                  *keystonetypes.DeployFeedConsumerInput `toml:"feed_consumer"`
-	Infra                         *InfraInput                            `toml:"infra" validate:"required"`
-}
-
-type InfraInput struct {
-	InfraType string     `toml:"type" validate:"oneof=crib docker"`
-	CRIB      *CRIBInput `toml:"crib"`
-}
-
-type CRIBInput struct {
-	Namespace string `toml:"namespace" validate:"required"`
-	// absolute path to the folder with CRIB CRE
-	FolderLocation string `toml:"folder_location" validate:"required"`
-	Provider       string `toml:"provider" validate:"oneof=aws kind"`
-	// required for cost attribution in AWS
-	TeamInput *TeamInput `toml:"team_input" validate:"required_if=Provider aws"`
-}
-
-type TeamInput struct {
-	Team       string `toml:"team" validate:"required"`
-	Product    string `toml:"product" validate:"required"`
-	CostCenter string `toml:"cost_center" validate:"required"`
-	Component  string `toml:"component" validate:"required"`
+	Infra                         *libtypes.InfraInput                   `toml:"infra" validate:"required"`
 }
 
 type WorkflowConfig struct {
@@ -376,49 +354,34 @@ func extraAllowedPortsAndIps(testLogger zerolog.Logger, fakePort int, containerN
 	return append(gistIPs, hostIP), []int{fakePort}, nil
 }
 
-type InfrastructureInput struct {
-	jdInput         *jd.Input
+type BlockchainInput struct {
 	nodeSetInput    []*keystonetypes.CapabilitiesAwareNodeSet
 	blockchainInput *blockchain.Input
-	infraInput      *InfraInput
+	infraInput      *libtypes.InfraInput
 	nixShell        *libnix.NixShell
 }
 
-type InfrastructureOutput struct {
+type BlockchainOutput struct {
 	chainSelector      uint64
 	blockchainOutput   *blockchain.Output
-	jdOutput           *jd.Output
 	sethClient         *seth.Client
 	deployerPrivateKey string
-	infraDetails       libtypes.InfraDetails
 }
 
-func CreateInfrastructure(
+func CreateBlockchains(
 	cldLogger logger.Logger,
 	testLogger zerolog.Logger,
-	input InfrastructureInput,
-) (*InfrastructureOutput, error) {
+	input BlockchainInput,
+) (*BlockchainOutput, error) {
 	if input.blockchainInput == nil {
 		return nil, errors.New("blockchain input is nil")
-	}
-
-	if input.jdInput == nil {
-		return nil, errors.New("JD input is nil")
 	}
 
 	if len(input.nodeSetInput) == 0 {
 		return nil, errors.New("node set input is empty")
 	}
 
-	output := &InfrastructureOutput{}
-
 	if input.infraInput.InfraType == libtypes.InfraType_CRIB {
-		//TODO move somewhere else?
-		output.infraDetails = libtypes.InfraDetails{
-			InfraType: libtypes.InfraType_CRIB,
-			Namespace: input.infraInput.CRIB.Namespace,
-		}
-
 		if input.nixShell == nil {
 			return nil, errors.New("nix shell is required, when using CRIB")
 		}
@@ -431,44 +394,13 @@ func CreateInfrastructure(
 			return nil, errors.Wrap(err, "failed to run devspace run deploy-geth-chain")
 		}
 
-		//TODO move to lib
-		type ChainURLs struct {
-			HTTPHostURL     string `json:"http_host_url"`
-			WSHostURL       string `json:"ws_host_url"`
-			HTTPInternalURL string `json:"http_internal_url"`
-			WSInternalURL   string `json:"ws_internal_url"`
-		}
-
-		fileName := filepath.Join(".", "crib-configs", fmt.Sprintf("chain-%s-urls.json", input.blockchainInput.ChainID))
-		file, err := os.Open(fileName)
+		// TODO read family from blockchain input
+		blockchainOut, err := infra.ReadBlockchainUrl(filepath.Join(".", cribConfigsDir), "evm", input.blockchainInput.ChainID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to open file %s", fileName)
-		}
-		defer file.Close()
-
-		byteValue, err := io.ReadAll(file)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to read file %s", fileName)
-		}
-		chainURLs := ChainURLs{}
-
-		err = json.Unmarshal(byteValue, &chainURLs)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal JSON from file %s", fileName)
+			return nil, errors.Wrap(err, "failed to read blockchain URLs")
 		}
 
-		input.blockchainInput.Out = &blockchain.Output{}
-		input.blockchainInput.Out.UseCache = true
-		input.blockchainInput.Out.ChainID = input.blockchainInput.ChainID
-		input.blockchainInput.Out.Family = "evm"
-		input.blockchainInput.Out.Nodes = []*blockchain.Node{
-			{
-				HostWSUrl:             chainURLs.WSHostURL,
-				HostHTTPUrl:           chainURLs.HTTPHostURL,
-				DockerInternalWSUrl:   chainURLs.WSInternalURL,
-				DockerInternalHTTPUrl: chainURLs.HTTPInternalURL,
-			},
-		}
+		input.blockchainInput.Out = blockchainOut
 	}
 
 	// Create a new blockchain network and Seth client to interact with it
@@ -497,13 +429,6 @@ func CreateInfrastructure(
 		return nil, errors.Wrapf(err, "failed to get chain selector for chain id %d", sethClient.Cfg.Network.ChainID)
 	}
 
-	// Start job distributor
-	if os.Getenv("CI") == "true" {
-		jdImage := ctfconfig.MustReadEnvVar_String(E2eJobDistributorImageEnvVarName)
-		jdVersion := os.Getenv(E2eJobDistributorVersionEnvVarName)
-		input.jdInput.Image = fmt.Sprintf("%s:%s", jdImage, jdVersion)
-	}
-
 	// Deploy the DONs
 	// Hack for CI that allows us to dynamically set the chainlink image and version
 	// CTFv2 currently doesn't support dynamic image and version setting
@@ -518,12 +443,27 @@ func CreateInfrastructure(
 		}
 	}
 
-	output.chainSelector = chainSelector
-	output.blockchainOutput = blockchainOutput
-	output.sethClient = sethClient
-	output.deployerPrivateKey = pkey
+	return &BlockchainOutput{
+		chainSelector:      chainSelector,
+		blockchainOutput:   blockchainOutput,
+		sethClient:         sethClient,
+		deployerPrivateKey: pkey,
+	}, nil
+}
 
-	return output, nil
+func CreateJobDistributor(input *jd.Input) (*jd.Output, error) {
+	if os.Getenv("CI") == "true" {
+		jdImage := ctfconfig.MustReadEnvVar_String(E2eJobDistributorImageEnvVarName)
+		jdVersion := os.Getenv(E2eJobDistributorVersionEnvVarName)
+		input.Image = fmt.Sprintf("%s:%s", jdImage, jdVersion)
+	}
+
+	jdOutput, err := jd.NewJD(input)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create new job distributor")
+	}
+
+	return jdOutput, nil
 }
 
 type setupOutput struct {
@@ -538,8 +478,7 @@ type setupOutput struct {
 
 func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig, priceProvider PriceProvider, binaryDownloadOutput binaryDownloadOutput, mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet) *setupOutput {
 	// Universal setup -- START
-	envInput := InfrastructureInput{
-		jdInput:         in.JD,
+	envInput := BlockchainInput{
 		nodeSetInput:    mustSetCapabilitiesFn(in.NodeSets),
 		blockchainInput: in.BlockchainA,
 		infraInput:      in.Infra,
@@ -562,8 +501,8 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 			globalEnvVars["CHAINLINK_COMPONENT"] = in.Infra.CRIB.TeamInput.Component
 		}
 
-		cribConfigDirAbs, absErr := filepath.Abs(filepath.Join(".", "crib-configs"))
-		require.NoError(t, absErr, "failed to get absolute path to crib-configs")
+		cribConfigDirAbs, absErr := filepath.Abs(filepath.Join(".", cribConfigsDir))
+		require.NoError(t, absErr, "failed to get absolute path to crib configs dir %s", cribConfigsDir)
 
 		globalEnvVars["CRE_CONFIG_DIR"] = cribConfigDirAbs
 
@@ -584,7 +523,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	}
 
 	singeFileLogger := cldlogger.NewSingleFileLogger(t)
-	envOutput, err := CreateInfrastructure(singeFileLogger, testLogger, envInput)
+	envOutput, err := CreateBlockchains(singeFileLogger, testLogger, envInput)
 	require.NoError(t, err, "failed to start environment")
 
 	// Deploy keystone contracts (forwarder, capability registry, ocr3 capability, workflow registry)
@@ -625,7 +564,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 
 	// Translate node input to structure required further down the road and put as much information
 	// as we have at this point in labels. It will be used to generate node configs
-	topology, err := libdon.BuildTopology(envInput.nodeSetInput, envOutput.infraDetails)
+	topology, err := libdon.BuildTopology(envInput.nodeSetInput, *envInput.infraInput)
 	require.NoError(t, err, "failed to build input DON topology")
 
 	// Generate EVM and P2P keys, which are needed to prepare the node configs
@@ -718,9 +657,9 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 
 		for j, donMetadata := range topology.DonsMetadata {
 			deployDonEnvVars := map[string]string{}
-			cribConfigsDir := filepath.Join(".", "crib-configs", donMetadata.Name)
-			err = os.MkdirAll(cribConfigsDir, os.ModePerm)
-			require.NoError(t, err, "failed to create crib-configs directory for", donMetadata.Name)
+			cribConfigsDirAbs := filepath.Join(".", cribConfigsDir, donMetadata.Name)
+			err = os.MkdirAll(cribConfigsDirAbs, os.ModePerm)
+			require.NoError(t, err, "failed to create crib configs directory '%s' for", cribConfigsDirAbs, donMetadata.Name)
 
 			dockerImages := []string{}
 			for _, nodeSpec := range envInput.nodeSetInput[j].NodeSpecs {
@@ -760,10 +699,10 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 				newTOMLBytes, err := toml.Marshal(data)
 				require.NoError(t, err, "failed to marshal toml")
 
-				writeErr := os.WriteFile(filepath.Join(cribConfigsDir, fmt.Sprintf("config-override-bt-%d.toml", i)), newTOMLBytes, 0644)
+				writeErr := os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("config-override-bt-%d.toml", i)), newTOMLBytes, 0644)
 				require.NoError(t, writeErr, "failed to write config override for node %d to file", i)
 
-				writeErr = os.WriteFile(filepath.Join(cribConfigsDir, fmt.Sprintf("secrets-override-bt-%d.toml", i)), []byte(envInput.nodeSetInput[j].NodeSpecs[nodeIndex].Node.TestSecretsOverrides), 0644)
+				writeErr = os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("secrets-override-bt-%d.toml", i)), []byte(envInput.nodeSetInput[j].NodeSpecs[nodeIndex].Node.TestSecretsOverrides), 0644)
 				require.NoError(t, writeErr, "failed to write secrets override for node %d to file", i)
 			}
 
@@ -785,131 +724,25 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 				newTOMLBytes, err := toml.Marshal(data)
 				require.NoError(t, err, "failed to marshal toml")
 
-				writeErr := os.WriteFile(filepath.Join(cribConfigsDir, fmt.Sprintf("config-override-%d.toml", i)), newTOMLBytes, 0644)
+				writeErr := os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("config-override-%d.toml", i)), newTOMLBytes, 0644)
 				require.NoError(t, writeErr, "failed to write config override for node %d to file", i)
 
-				writeErr = os.WriteFile(filepath.Join(cribConfigsDir, fmt.Sprintf("secrets-override-%d.toml", i)), []byte(envInput.nodeSetInput[j].NodeSpecs[nodeIndex].Node.TestSecretsOverrides), 0644)
+				writeErr = os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("secrets-override-%d.toml", i)), []byte(envInput.nodeSetInput[j].NodeSpecs[nodeIndex].Node.TestSecretsOverrides), 0644)
 				require.NoError(t, writeErr, "failed to write secrets override for node %d to file", i)
 			}
 
-			envInput.nodeSetInput[j].Input.Out = &ns.Output{}
-			envInput.nodeSetInput[j].Input.Out.UseCache = true
-			envInput.nodeSetInput[j].Input.Out.CLNodes = []*clnode.Output{}
-
-			// //TODO remove these url creations and read them from JSON
-			// for i := range bootstrapNodes {
-			// 	nodeName := fmt.Sprintf("%s-bt", donMetadata.Name)
-
-			// 	envInput.nodeSetInput[j].Input.Out.CLNodes = append(envInput.nodeSetInput[j].Out.CLNodes, &clnode.Output{
-			// 		UseCache: true,
-			// 		Node: &clnode.NodeOut{
-			// 			APIAuthUser:     "admin@chain.link",
-			// 			APIAuthPassword: "hWDmgcub2gUhyrG6cxriqt7T",
-			// 			HostURL:         fmt.Sprintf("http://%s-%s-%d.main.stage.cldev.sh:80", in.Infra.CRIB.Namespace, nodeName, i),
-			// 			DockerURL:       fmt.Sprintf("http://%s-%s-%d:80", in.Infra.CRIB.Namespace, nodeName, i),
-			// 			DockerP2PUrl:    fmt.Sprintf("http://%s-%s-%d:6690", in.Infra.CRIB.Namespace, nodeName, i),
-			// 			InternalIP:      nodeName + "-" + strconv.Itoa(i),
-			// 		},
-			// 	})
-			// }
-
-			// for i := range workerNodes {
-			// 	nodeName := donMetadata.Name
-
-			// 	envInput.nodeSetInput[j].Input.Out.CLNodes = append(envInput.nodeSetInput[j].Out.CLNodes, &clnode.Output{
-			// 		UseCache: true,
-			// 		Node: &clnode.NodeOut{
-			// 			APIAuthUser:     "admin@chain.link",
-			// 			APIAuthPassword: "hWDmgcub2gUhyrG6cxriqt7T",
-			// 			HostURL:         fmt.Sprintf("http://%s-%s-%d.main.stage.cldev.sh:80", in.Infra.CRIB.Namespace, nodeName, i),
-			// 			DockerURL:       fmt.Sprintf("http://%s-%s-%d:80", in.Infra.CRIB.Namespace, nodeName, i),
-			// 			DockerP2PUrl:    fmt.Sprintf("http://%s-%s-%d:6690", in.Infra.CRIB.Namespace, nodeName, i),
-			// 			InternalIP:      nodeName + "-" + strconv.Itoa(i),
-			// 		},
-			// 	})
-			// }
-
-			// CRIB will deploy gateway only if don_type == "gateway"
 			deployDonEnvVars["DON_BOOT_NODE_COUNT"] = strconv.Itoa(len(bootstrapNodes))
 			deployDonEnvVars["DON_NODE_COUNT"] = fmt.Sprint(len(workerNodes))
+			// IMPORTANT: CRIB will deploy gateway only if don_type == "gateway"
 			deployDonEnvVars["DON_TYPE"] = donMetadata.Name
 
 			_, err = nixShell.RunCommandWithEnvVars("devspace run deploy-don", deployDonEnvVars)
 			require.NoError(t, err, "failed to run devspace run deploy-dons")
 
-			//TODO move to lib
-			type DonURL struct {
-				HostURL        string `json:"host_url"`
-				InternalURL    string `json:"internal_url"`
-				P2PInternalURL string `json:"p2p_internal_url"`
-				InternalIP     string `json:"internal_ip"`
-			}
+			nsOutput, err := infra.ReadNodeSetUrls(filepath.Join(".", cribConfigsDir), donMetadata)
+			require.NoError(t, err, "failed to read node set URLs from file")
 
-			type DonURLs struct {
-				BootstrapNodes []DonURL `json:"bootstrap_nodes"`
-				WorkerNodes    []DonURL `json:"worker_nodes"`
-			}
-
-			type DonAPICredentials struct {
-				Username string `json:"username"`
-				Password string `json:"password"`
-			}
-
-			fileName := filepath.Join(".", "crib-configs", fmt.Sprintf("don-%s-urls.json", donMetadata.Name))
-			file, err := os.Open(fileName)
-			require.NoError(t, err, "failed to open file %s", fileName)
-			defer file.Close()
-
-			byteValue, err := io.ReadAll(file)
-			require.NoError(t, err, "failed to read file %s", fileName)
-			donURLs := DonURLs{}
-
-			err = json.Unmarshal(byteValue, &donURLs)
-			require.NoError(t, err, "failed to unmarshal JSON from file %s", fileName)
-
-			// read API credentials
-			fileName = filepath.Join(".", "crib-configs", "don-api-credentials.json")
-			file, err = os.Open(fileName)
-			require.NoError(t, err, "failed to open file %s", fileName)
-			defer file.Close()
-
-			byteValue, err = io.ReadAll(file)
-			require.NoError(t, err, "failed to read file %s", fileName)
-			apiCredentials := DonAPICredentials{}
-
-			err = json.Unmarshal(byteValue, &apiCredentials)
-			require.NoError(t, err, "failed to unmarshal JSON from file %s", fileName)
-
-			require.Equal(t, len(bootstrapNodes), len(donURLs.BootstrapNodes), "number of bootstrap nodes in JSON file must match the number of bootstrap nodes in the DON")
-			require.Equal(t, len(workerNodes), len(donURLs.WorkerNodes), "number of worker nodes in JSON file must match the number of worker nodes in the DON")
-
-			for i := range bootstrapNodes {
-				envInput.nodeSetInput[j].Input.Out.CLNodes = append(envInput.nodeSetInput[j].Out.CLNodes, &clnode.Output{
-					UseCache: true,
-					Node: &clnode.NodeOut{
-						APIAuthUser:     apiCredentials.Username,
-						APIAuthPassword: apiCredentials.Password,
-						HostURL:         donURLs.BootstrapNodes[i].HostURL,
-						DockerURL:       donURLs.BootstrapNodes[i].InternalURL,
-						DockerP2PUrl:    donURLs.BootstrapNodes[i].P2PInternalURL,
-						InternalIP:      donURLs.BootstrapNodes[i].InternalIP,
-					},
-				})
-			}
-
-			for i := range workerNodes {
-				envInput.nodeSetInput[j].Input.Out.CLNodes = append(envInput.nodeSetInput[j].Out.CLNodes, &clnode.Output{
-					UseCache: true,
-					Node: &clnode.NodeOut{
-						APIAuthUser:     apiCredentials.Username,
-						APIAuthPassword: apiCredentials.Password,
-						HostURL:         donURLs.WorkerNodes[i].HostURL,
-						DockerURL:       donURLs.WorkerNodes[i].InternalURL,
-						DockerP2PUrl:    donURLs.WorkerNodes[i].P2PInternalURL,
-						InternalIP:      donURLs.WorkerNodes[i].InternalIP,
-					},
-				})
-			}
+			envInput.nodeSetInput[j].Out = nsOutput
 		}
 
 		imgTagIndex := strings.LastIndex(in.JD.Image, ":")
@@ -921,38 +754,14 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		_, err = nixShell.RunCommandWithEnvVars("devspace run deploy-jd", jdEnvVars)
 		require.NoError(t, err, "failed to run devspace run deploy-jd")
 
-		//TODO move to lib
-		type JdURLs struct {
-			GRPCHostURL     string `json:"grpc_host_url"`
-			GRCPInternalUrl string `json:"grpc_internal_url"`
-			WSHostURL       string `json:"ws_host_url"`
-			WSInternalURL   string `json:"ws_internal_url"`
-		}
+		jdOut, err := infra.ReadJdUrl(filepath.Join(".", cribConfigsDir))
+		require.NoError(t, err, "failed to read JD URLs from file")
 
-		fileName := filepath.Join(".", "crib-configs", "jd-urls.json")
-		file, err := os.Open(fileName)
-		require.NoError(t, err, "failed to open file %s", fileName)
-		defer file.Close()
-
-		byteValue, err := io.ReadAll(file)
-		require.NoError(t, err, "failed to read file %s", fileName)
-		jdURLs := JdURLs{}
-
-		err = json.Unmarshal(byteValue, &jdURLs)
-		require.NoError(t, err, "failed to unmarshal JSON from file %s", fileName)
-
-		in.JD.Out = &jd.Output{}
-		in.JD.Out.UseCache = true
-		in.JD.Out.HostGRPCUrl = jdURLs.GRPCHostURL
-		in.JD.Out.HostWSRPCUrl = jdURLs.WSHostURL
-		in.JD.Out.DockerGRPCUrl = jdURLs.GRCPInternalUrl
-		in.JD.Out.DockerWSRPCUrl = jdURLs.WSInternalURL
+		in.JD.Out = jdOut
 	}
 
-	jdOutput, err := jd.NewJD(in.JD)
+	jdOutput, err := CreateJobDistributor(in.JD)
 	require.NoError(t, err, "failed to create new job distributor")
-
-	envOutput.jdOutput = jdOutput
 
 	nodeOutput := make([]*keystonetypes.WrappedNodeOutput, 0, len(envInput.nodeSetInput))
 	for _, nodeSetInput := range envInput.nodeSetInput {
@@ -969,7 +778,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	// Prepare the CLD environment that's required by the keystone changeset
 	// Ugly glue hack ¯\_(ツ)_/¯
 	fullCldInput := &keystonetypes.FullCLDEnvironmentInput{
-		JdOutput:          envOutput.jdOutput,
+		JdOutput:          jdOutput,
 		BlockchainOutput:  envOutput.blockchainOutput,
 		SethClient:        envOutput.sethClient,
 		NodeSetOutput:     nodeOutput,
@@ -977,6 +786,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		Topology:          topology,
 	}
 
+	// We need to use TLS for CRIB, because it exposes HTTPS endpoints
 	var creds credentials.TransportCredentials
 	if in.Infra.InfraType == libtypes.InfraType_CRIB {
 		creds = credentials.NewTLS(&tls.Config{
@@ -1001,6 +811,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		}
 	}
 
+	// Generate and propose jobs (they will auto-accepted)
 	donToJobSpecs, jobSpecsErr := keystonepor.GenerateJobSpecs(
 		&keystonetypes.GeneratePoRJobSpecsInput{
 			BlockchainOutput:       envOutput.blockchainOutput,
@@ -1014,7 +825,6 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	)
 	require.NoError(t, jobSpecsErr, "failed to define job specs for DONs")
 
-	// Create jobs
 	createJobsInput := keystonetypes.CreateJobsInput{
 		CldEnv:        fullCldOutput.Environment,
 		DonTopology:   fullCldOutput.DonTopology,
@@ -1022,15 +832,13 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	}
 
 	//TODO should we remove jobs first, if it's running in CRIB? or at least jobs of certain types?
-
 	err = libdon.CreateJobs(testLogger, createJobsInput)
 	require.NoError(t, err, "failed to configure nodes and create jobs")
-	// Workflow-specific configuration -- END
 
-	// Universal setup -- CONTINUED
 	// CAUTION: It is crucial to configure OCR3 jobs on nodes before configuring the workflow contracts.
 	// Wait for OCR listeners to be ready before setting the configuration.
 	// If the ConfigSet event is missed, OCR protocol will not start.
+	// TODO: workflow/core team should expose a way for us to check if the OCR listener is ready
 	testLogger.Info().Msg("Waiting 45s for OCR listeners to be ready...")
 	time.Sleep(45 * time.Second)
 	testLogger.Info().Msg("Proceeding to set OCR3 and Keystone configuration...")
@@ -1044,6 +852,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	err = libcontracts.ConfigureKeystone(configureKeystoneInput)
 	require.NoError(t, err, "failed to configure keystone contracts")
 
+	// Universal setup -- END
 	// Workflow-specific configuration -- START
 	deployFeedConsumerInput := &keystonetypes.DeployFeedConsumerInput{
 		ChainSelector: envOutput.chainSelector,
