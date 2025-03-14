@@ -6,9 +6,7 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"path/filepath"
 	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -17,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
-	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -44,19 +41,18 @@ import (
 
 	keystonecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
 	lidebug "github.com/smartcontractkit/chainlink/system-tests/lib/cre/debug"
 	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	keystoneporconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/por"
 	libjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	keystonepor "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/por"
-	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	keystonesecrets "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
 	libenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	keystonetypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	libcrecli "github.com/smartcontractkit/chainlink/system-tests/lib/crecli"
 	keystoneporcrecli "github.com/smartcontractkit/chainlink/system-tests/lib/crecli/por"
 	libfunding "github.com/smartcontractkit/chainlink/system-tests/lib/funding"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 	libnix "github.com/smartcontractkit/chainlink/system-tests/lib/nix"
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
@@ -354,8 +350,7 @@ func extraAllowedPortsAndIps(testLogger zerolog.Logger, fakePort int, containerN
 	return append(gistIPs, hostIP), []int{fakePort}, nil
 }
 
-type BlockchainInput struct {
-	nodeSetInput    []*keystonetypes.CapabilitiesAwareNodeSet
+type BlockchainsInput struct {
 	blockchainInput *blockchain.Input
 	infraInput      *libtypes.InfraInput
 	nixShell        *libnix.NixShell
@@ -371,36 +366,24 @@ type BlockchainOutput struct {
 func CreateBlockchains(
 	cldLogger logger.Logger,
 	testLogger zerolog.Logger,
-	input BlockchainInput,
+	input BlockchainsInput,
 ) (*BlockchainOutput, error) {
 	if input.blockchainInput == nil {
 		return nil, errors.New("blockchain input is nil")
 	}
 
-	if len(input.nodeSetInput) == 0 {
-		return nil, errors.New("node set input is empty")
-	}
-
 	if input.infraInput.InfraType == libtypes.InfraType_CRIB {
-		if input.nixShell == nil {
-			return nil, errors.New("nix shell is required, when using CRIB")
+		deployCribBlockchainInput := &keystonetypes.DeployCribBlockchainInput{
+			BlockchainInput: input.blockchainInput,
+			NixShell:        input.nixShell,
+			CribConfigsDir:  cribConfigsDir,
 		}
 
-		gethChainEnvVars := map[string]string{
-			"CHAIN_ID": input.blockchainInput.ChainID,
+		var blockchainErr error
+		input.blockchainInput.Out, blockchainErr = crib.DeployBlockchain(deployCribBlockchainInput)
+		if blockchainErr != nil {
+			return nil, errors.Wrap(blockchainErr, "failed to deploy blockchain")
 		}
-		_, err := input.nixShell.RunCommandWithEnvVars("devspace run deploy-geth-chain", gethChainEnvVars)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to run devspace run deploy-geth-chain")
-		}
-
-		// TODO read family from blockchain input
-		blockchainOut, err := infra.ReadBlockchainUrl(filepath.Join(".", cribConfigsDir), "evm", input.blockchainInput.ChainID)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to read blockchain URLs")
-		}
-
-		input.blockchainInput.Out = blockchainOut
 	}
 
 	// Create a new blockchain network and Seth client to interact with it
@@ -427,20 +410,6 @@ func CreateBlockchains(
 	chainSelector, err := chainselectors.SelectorFromChainId(sethClient.Cfg.Network.ChainID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get chain selector for chain id %d", sethClient.Cfg.Network.ChainID)
-	}
-
-	// Deploy the DONs
-	// Hack for CI that allows us to dynamically set the chainlink image and version
-	// CTFv2 currently doesn't support dynamic image and version setting
-	if os.Getenv("CI") == "true" {
-		// Due to how we pass custom env vars to reusable workflow we need to use placeholders, so first we need to resolve what's the name of the target environment variable
-		// that stores chainlink version and then we can use it to resolve the image name
-		for i := range input.nodeSetInput {
-			image := fmt.Sprintf("%s:%s", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV))
-			for j := range input.nodeSetInput[i].NodeSpecs {
-				input.nodeSetInput[i].NodeSpecs[j].Node.Image = image
-			}
-		}
 	}
 
 	return &BlockchainOutput{
@@ -478,70 +447,54 @@ type setupOutput struct {
 
 func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig, priceProvider PriceProvider, binaryDownloadOutput binaryDownloadOutput, mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet) *setupOutput {
 	// Universal setup -- START
-	envInput := BlockchainInput{
-		nodeSetInput:    mustSetCapabilitiesFn(in.NodeSets),
-		blockchainInput: in.BlockchainA,
-		infraInput:      in.Infra,
-	}
 
 	// NixShell is only required, when using CRIB, but we want to run commands in the same "nix develop" context
 	// and we need to have this reference in the outer scope
 	var nixShell *libnix.NixShell
 	if in.Infra.InfraType == libtypes.InfraType_CRIB {
-		var err error
-		globalEnvVars := map[string]string{
-			"PROVIDER":           in.Infra.CRIB.Provider,
-			"DEVSPACE_NAMESPACE": in.Infra.CRIB.Namespace,
+		startNixShellInput := &keystonetypes.StartNixShellInput{
+			InfraInput:     in.Infra,
+			CribConfigsDir: cribConfigsDir,
 		}
 
-		if in.Infra.CRIB.Provider == "aws" {
-			globalEnvVars["CHAINLINK_TEAM"] = in.Infra.CRIB.TeamInput.Team
-			globalEnvVars["CHAINLINK_PRODUCT"] = in.Infra.CRIB.TeamInput.Product
-			globalEnvVars["CHAINLINK_COST_CENTER"] = in.Infra.CRIB.TeamInput.CostCenter
-			globalEnvVars["CHAINLINK_COMPONENT"] = in.Infra.CRIB.TeamInput.Component
-		}
-
-		cribConfigDirAbs, absErr := filepath.Abs(filepath.Join(".", cribConfigsDir))
-		require.NoError(t, absErr, "failed to get absolute path to crib configs dir %s", cribConfigsDir)
-
-		globalEnvVars["CRE_CONFIG_DIR"] = cribConfigDirAbs
-
-		// this will run `nix develop`, which will login to all ECRs and set up the environment
-		// by running `crib init`
-		nixShell, err = libnix.NewNixShell(in.Infra.CRIB.FolderLocation, globalEnvVars)
-		require.NoError(t, err, "failed to create Nix shell")
+		var nixErr error
+		nixShell, nixErr = crib.StartNixShell(startNixShellInput)
+		require.NoError(t, nixErr, "failed to start Nix shell")
 
 		t.Cleanup(func() {
 			_ = nixShell.Close()
 		})
+	}
 
-		// we need to run `devspace purge` to clean up the environment, in case our namespace is already used
-		_, err = nixShell.RunCommand("devspace purge")
-		require.NoError(t, err, "failed to run devspace purge")
+	//TODO where to move this?
+	nodeSetInput := mustSetCapabilitiesFn(in.NodeSets)
 
-		envInput.nixShell = nixShell
+	blockchainsInput := BlockchainsInput{
+		blockchainInput: in.BlockchainA,
+		infraInput:      in.Infra,
+		nixShell:        nixShell,
 	}
 
 	singeFileLogger := cldlogger.NewSingleFileLogger(t)
-	envOutput, err := CreateBlockchains(singeFileLogger, testLogger, envInput)
+	blockchainsOutput, err := CreateBlockchains(singeFileLogger, testLogger, blockchainsInput)
 	require.NoError(t, err, "failed to start environment")
 
 	// Deploy keystone contracts (forwarder, capability registry, ocr3 capability, workflow registry)
 	// but first, we need to create deployment.Environment that will contain only chain information in order to deploy contracts with the CLD
 	chainsConfig := []devenv.ChainConfig{
 		{
-			ChainID:   envOutput.sethClient.Cfg.Network.ChainID,
-			ChainName: envOutput.sethClient.Cfg.Network.Name,
-			ChainType: strings.ToUpper(envOutput.blockchainOutput.Family),
+			ChainID:   blockchainsOutput.sethClient.Cfg.Network.ChainID,
+			ChainName: blockchainsOutput.sethClient.Cfg.Network.Name,
+			ChainType: strings.ToUpper(blockchainsOutput.blockchainOutput.Family),
 			WSRPCs: []devenv.CribRPCs{{
-				External: envOutput.blockchainOutput.Nodes[0].HostWSUrl,
-				Internal: envOutput.blockchainOutput.Nodes[0].DockerInternalWSUrl,
+				External: blockchainsOutput.blockchainOutput.Nodes[0].HostWSUrl,
+				Internal: blockchainsOutput.blockchainOutput.Nodes[0].DockerInternalWSUrl,
 			}},
 			HTTPRPCs: []devenv.CribRPCs{{
-				External: envOutput.blockchainOutput.Nodes[0].HostHTTPUrl,
-				Internal: envOutput.blockchainOutput.Nodes[0].DockerInternalHTTPUrl,
+				External: blockchainsOutput.blockchainOutput.Nodes[0].HostHTTPUrl,
+				Internal: blockchainsOutput.blockchainOutput.Nodes[0].DockerInternalHTTPUrl,
 			}},
-			DeployerKey: envOutput.sethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the RPC node
+			DeployerKey: blockchainsOutput.sethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the RPC node
 		},
 	}
 
@@ -555,7 +508,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	}
 
 	keystoneContractsInput := &keystonetypes.KeystoneContractsInput{
-		ChainSelector: envOutput.chainSelector,
+		ChainSelector: blockchainsOutput.chainSelector,
 		CldEnv:        chainsOnlyCld,
 	}
 
@@ -564,13 +517,13 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 
 	// Translate node input to structure required further down the road and put as much information
 	// as we have at this point in labels. It will be used to generate node configs
-	topology, err := libdon.BuildTopology(envInput.nodeSetInput, *envInput.infraInput)
+	topology, err := libdon.BuildTopology(nodeSetInput, *blockchainsInput.infraInput)
 	require.NoError(t, err, "failed to build input DON topology")
 
 	// Generate EVM and P2P keys, which are needed to prepare the node configs
 	// That way we can pass them final configs and do away with restarting the nodes
 	var keys *keystonetypes.GenerateKeysOutput
-	chainIDInt, err := strconv.Atoi(envOutput.blockchainOutput.ChainID)
+	chainIDInt, err := strconv.Atoi(blockchainsOutput.blockchainOutput.ChainID)
 	require.NoError(t, err, "failed to convert chain ID to int")
 
 	generateKeysInput := &keystonetypes.GenerateKeysInput{
@@ -587,10 +540,10 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 
 	// Configure Workflow Registry contract
 	workflowRegistryInput := &keystonetypes.WorkflowRegistryInput{
-		ChainSelector:  envOutput.chainSelector,
+		ChainSelector:  blockchainsOutput.chainSelector,
 		CldEnv:         chainsOnlyCld,
 		AllowedDonIDs:  []uint32{topology.WorkflowDONID},
-		WorkflowOwners: []common.Address{envOutput.sethClient.MustGetRootKeyAddress()},
+		WorkflowOwners: []common.Address{blockchainsOutput.sethClient.MustGetRootKeyAddress()},
 	}
 
 	_, err = libcontracts.ConfigureWorkflowRegistry(testLogger, workflowRegistryInput)
@@ -605,7 +558,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	if _, ok := priceProvider.(*FakePriceProvider); ok && in.Infra.InfraType == "docker" {
 		// it doesn't really matter which container we will use to resolve the host.docker.internal IP, it will be the same for all of them
 		// here we will blokchain container, because by that time it will be running
-		extraAllowedIPs, extraAllowedPorts, err = extraAllowedPortsAndIps(testLogger, in.Fake.Port, envOutput.blockchainOutput.ContainerName)
+		extraAllowedIPs, extraAllowedPorts, err = extraAllowedPortsAndIps(testLogger, in.Fake.Port, blockchainsOutput.blockchainOutput.ContainerName)
 		require.NoError(t, err, "failed to get extra allowed ports and IPs")
 	}
 
@@ -616,7 +569,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		config, configErr := keystoneporconfig.GenerateConfigs(
 			keystonetypes.GeneratePoRConfigsInput{
 				DonMetadata:                 donMetadata,
-				BlockchainOutput:            envOutput.blockchainOutput,
+				BlockchainOutput:            blockchainsOutput.blockchainOutput,
 				DonID:                       donMetadata.ID,
 				Flags:                       donMetadata.Flags,
 				PeeringData:                 peeringData,
@@ -647,125 +600,70 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		require.NoError(t, secretsErr, "failed to define secrets for DON %d", donMetadata.ID)
 
 		for j := range donMetadata.NodesMetadata {
-			envInput.nodeSetInput[i].NodeSpecs[j].Node.TestConfigOverrides = config[j]
-			envInput.nodeSetInput[i].NodeSpecs[j].Node.TestSecretsOverrides = secrets[j]
+			nodeSetInput[i].NodeSpecs[j].Node.TestConfigOverrides = config[j]
+			nodeSetInput[i].NodeSpecs[j].Node.TestSecretsOverrides = secrets[j]
+		}
+	}
+
+	// Deploy the DONs
+	// Hack for CI that allows us to dynamically set the chainlink image and version
+	// CTFv2 currently doesn't support dynamic image and version setting
+	if os.Getenv("CI") == "true" {
+		// Due to how we pass custom env vars to reusable workflow we need to use placeholders, so first we need to resolve what's the name of the target environment variable
+		// that stores chainlink version and then we can use it to resolve the image name
+		for i := range nodeSetInput {
+			image := fmt.Sprintf("%s:%s", os.Getenv(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV), ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV))
+			for j := range nodeSetInput[i].NodeSpecs {
+				nodeSetInput[i].NodeSpecs[j].Node.Image = image
+			}
 		}
 	}
 
 	if in.Infra.InfraType == libtypes.InfraType_CRIB {
 		testLogger.Info().Msg("Saving node configs and secret overrides")
 
-		for j, donMetadata := range topology.DonsMetadata {
-			deployDonEnvVars := map[string]string{}
-			cribConfigsDirAbs := filepath.Join(".", cribConfigsDir, donMetadata.Name)
-			err = os.MkdirAll(cribConfigsDirAbs, os.ModePerm)
-			require.NoError(t, err, "failed to create crib configs directory '%s' for", cribConfigsDirAbs, donMetadata.Name)
-
-			dockerImages := []string{}
-			for _, nodeSpec := range envInput.nodeSetInput[j].NodeSpecs {
-				require.Empty(t, nodeSpec.Node.DockerContext, "docker context is not supported in CRIB. Please remove docker_ctx from the node spec")
-				require.Empty(t, nodeSpec.Node.DockerFilePath, "dockerfile is not supported in CRIB. Please remove docker_file from the node spec")
-				require.Empty(t, nodeSpec.Node.CapabilitiesBinaryPaths, "capabilities binaries are not supported in CRIB. Please use a Docker image that already contains the capabilities and remove capabilities_binary_paths from the node spec")
-				require.Empty(t, nodeSpec.Node.CapabilityContainerDir, "capabilities binaries are not supported in CRIB. Please use a Docker image that already contains the capabilities and remove capability_container_dir from the node spec")
-
-				if slices.Contains(dockerImages, nodeSpec.Node.Image) {
-					continue
-
-				}
-				dockerImages = append(dockerImages, nodeSpec.Node.Image)
-			}
-			require.Len(t, dockerImages, 1, "all nodes in each nodeset must use the same Docker image")
-			imgTagIndex := strings.LastIndex(dockerImages[0], ":")
-			require.Greater(t, imgTagIndex, -1, "docker image must have an explicit tag, but it was: %s", dockerImages[0])
-
-			deployDonEnvVars["DEVSPACE_IMAGE"] = dockerImages[0][:imgTagIndex]
-			deployDonEnvVars["DEVSPACE_IMAGE_TAG"] = dockerImages[0][imgTagIndex+1:] // +1 to exclude the colon
-
-			bootstrapNodes, err := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &keystonetypes.Label{Key: libnode.NodeTypeKey, Value: keystonetypes.BootstrapNode}, libnode.EqualLabels)
-			require.NoError(t, err, "failed to find bootstrap nodes")
-
-			for i, btNode := range bootstrapNodes {
-				nodeIndexStr, err := libnode.FindLabelValue(btNode, libnode.IndexKey)
-				require.NoError(t, err, "failed to find node index")
-
-				nodeIndex, err := strconv.Atoi(nodeIndexStr)
-				require.NoError(t, err, "failed to convert node index to int")
-
-				// unmarshall and marshall to conver it into proper multi-line string
-				// that will be correctly serliazed to YAML
-				var data interface{}
-				tomlErr := toml.Unmarshal([]byte(envInput.nodeSetInput[j].NodeSpecs[nodeIndex].Node.TestConfigOverrides), &data)
-				require.NoError(t, tomlErr, "failed to unmarshal toml")
-				newTOMLBytes, err := toml.Marshal(data)
-				require.NoError(t, err, "failed to marshal toml")
-
-				writeErr := os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("config-override-bt-%d.toml", i)), newTOMLBytes, 0644)
-				require.NoError(t, writeErr, "failed to write config override for node %d to file", i)
-
-				writeErr = os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("secrets-override-bt-%d.toml", i)), []byte(envInput.nodeSetInput[j].NodeSpecs[nodeIndex].Node.TestSecretsOverrides), 0644)
-				require.NoError(t, writeErr, "failed to write secrets override for node %d to file", i)
-			}
-
-			workerNodes, err := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &keystonetypes.Label{Key: libnode.NodeTypeKey, Value: keystonetypes.WorkerNode}, libnode.EqualLabels)
-			require.NoError(t, err, "failed to find worker nodes")
-
-			for i, workerNode := range workerNodes {
-				nodeIndexStr, err := libnode.FindLabelValue(workerNode, libnode.IndexKey)
-				require.NoError(t, err, "failed to find node index")
-
-				nodeIndex, err := strconv.Atoi(nodeIndexStr)
-				require.NoError(t, err, "failed to convert node index to int")
-
-				// unmarshall and marshall to conver it into proper multi-line string
-				// that will be correctly serliazed to YAML
-				var data interface{}
-				tomlErr := toml.Unmarshal([]byte(envInput.nodeSetInput[j].NodeSpecs[nodeIndex].Node.TestConfigOverrides), &data)
-				require.NoError(t, tomlErr, "failed to unmarshal toml")
-				newTOMLBytes, err := toml.Marshal(data)
-				require.NoError(t, err, "failed to marshal toml")
-
-				writeErr := os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("config-override-%d.toml", i)), newTOMLBytes, 0644)
-				require.NoError(t, writeErr, "failed to write config override for node %d to file", i)
-
-				writeErr = os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("secrets-override-%d.toml", i)), []byte(envInput.nodeSetInput[j].NodeSpecs[nodeIndex].Node.TestSecretsOverrides), 0644)
-				require.NoError(t, writeErr, "failed to write secrets override for node %d to file", i)
-			}
-
-			deployDonEnvVars["DON_BOOT_NODE_COUNT"] = strconv.Itoa(len(bootstrapNodes))
-			deployDonEnvVars["DON_NODE_COUNT"] = fmt.Sprint(len(workerNodes))
-			// IMPORTANT: CRIB will deploy gateway only if don_type == "gateway"
-			deployDonEnvVars["DON_TYPE"] = donMetadata.Name
-
-			_, err = nixShell.RunCommandWithEnvVars("devspace run deploy-don", deployDonEnvVars)
-			require.NoError(t, err, "failed to run devspace run deploy-dons")
-
-			nsOutput, err := infra.ReadNodeSetUrls(filepath.Join(".", cribConfigsDir), donMetadata)
-			require.NoError(t, err, "failed to read node set URLs from file")
-
-			envInput.nodeSetInput[j].Out = nsOutput
+		deployCribDonsInput := &keystonetypes.DeployCribDonsInput{
+			Topology:       topology,
+			NodeSetInputs:  nodeSetInput,
+			NixShell:       nixShell,
+			CribConfigsDir: cribConfigsDir,
 		}
 
-		imgTagIndex := strings.LastIndex(in.JD.Image, ":")
-		require.Greater(t, imgTagIndex, -1, "docker image must have an explicit tag, but it was: %s", in.JD.Image)
+		var devspaceErr error
+		nodeSetInput, devspaceErr = crib.DeployDons(deployCribDonsInput)
+		require.NoError(t, devspaceErr, "failed to deploy Dons with devspace")
 
-		jdEnvVars := map[string]string{
-			"JOB_DISTRIBUTOR_IMAGE_TAG": in.JD.Image[imgTagIndex+1:], // +1 to exclude the colon
+		// imgTagIndex := strings.LastIndex(in.JD.Image, ":")
+		// require.Greater(t, imgTagIndex, -1, "docker image must have an explicit tag, but it was: %s", in.JD.Image)
+
+		// jdEnvVars := map[string]string{
+		// 	"JOB_DISTRIBUTOR_IMAGE_TAG": in.JD.Image[imgTagIndex+1:], // +1 to exclude the colon
+		// }
+		// _, err = nixShell.RunCommandWithEnvVars("devspace run deploy-jd", jdEnvVars)
+		// require.NoError(t, err, "failed to run devspace run deploy-jd")
+
+		// jdOut, err := infra.ReadJdUrl(filepath.Join(".", cribConfigsDir))
+		// require.NoError(t, err, "failed to read JD URLs from file")
+
+		// in.JD.Out = jdOut
+
+		deployCribJdInput := &keystonetypes.DeployCribJdInput{
+			JDInput:        in.JD,
+			NixShell:       nixShell,
+			CribConfigsDir: cribConfigsDir,
 		}
-		_, err = nixShell.RunCommandWithEnvVars("devspace run deploy-jd", jdEnvVars)
-		require.NoError(t, err, "failed to run devspace run deploy-jd")
 
-		jdOut, err := infra.ReadJdUrl(filepath.Join(".", cribConfigsDir))
-		require.NoError(t, err, "failed to read JD URLs from file")
-
-		in.JD.Out = jdOut
+		var jdErr error
+		in.JD.Out, jdErr = crib.DeployJd(deployCribJdInput)
+		require.NoError(t, jdErr, "failed to deploy JD with devspace")
 	}
 
 	jdOutput, err := CreateJobDistributor(in.JD)
 	require.NoError(t, err, "failed to create new job distributor")
 
-	nodeOutput := make([]*keystonetypes.WrappedNodeOutput, 0, len(envInput.nodeSetInput))
-	for _, nodeSetInput := range envInput.nodeSetInput {
-		nodeset, nodesetErr := ns.NewSharedDBNodeSet(nodeSetInput.Input, envOutput.blockchainOutput)
+	nodeOutput := make([]*keystonetypes.WrappedNodeOutput, 0, len(nodeSetInput))
+	for _, nodeSetInput := range nodeSetInput {
+		nodeset, nodesetErr := ns.NewSharedDBNodeSet(nodeSetInput.Input, blockchainsOutput.blockchainOutput)
 		require.NoError(t, nodesetErr, "failed to deploy node set named %s", nodeSetInput.Name)
 
 		nodeOutput = append(nodeOutput, &keystonetypes.WrappedNodeOutput{
@@ -779,8 +677,8 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	// Ugly glue hack ¯\_(ツ)_/¯
 	fullCldInput := &keystonetypes.FullCLDEnvironmentInput{
 		JdOutput:          jdOutput,
-		BlockchainOutput:  envOutput.blockchainOutput,
-		SethClient:        envOutput.sethClient,
+		BlockchainOutput:  blockchainsOutput.blockchainOutput,
+		SethClient:        blockchainsOutput.sethClient,
 		NodeSetOutput:     nodeOutput,
 		ExistingAddresses: chainsOnlyCld.ExistingAddresses,
 		Topology:          topology,
@@ -802,19 +700,19 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	// Fund the nodes
 	for _, metaDon := range fullCldOutput.DonTopology.DonsWithMetadata {
 		for _, node := range metaDon.DON.Nodes {
-			_, fundingErr := libfunding.SendFunds(zerolog.Logger{}, envOutput.sethClient, libtypes.FundsToSend{
-				ToAddress:  common.HexToAddress(node.AccountAddr[envOutput.sethClient.Cfg.Network.ChainID]),
+			_, fundingErr := libfunding.SendFunds(zerolog.Logger{}, blockchainsOutput.sethClient, libtypes.FundsToSend{
+				ToAddress:  common.HexToAddress(node.AccountAddr[blockchainsOutput.sethClient.Cfg.Network.ChainID]),
 				Amount:     big.NewInt(5000000000000000000),
-				PrivateKey: envOutput.sethClient.MustGetRootPrivateKey(),
+				PrivateKey: blockchainsOutput.sethClient.MustGetRootPrivateKey(),
 			})
-			require.NoError(t, fundingErr, "failed to send funds to node %s", node.AccountAddr[envOutput.sethClient.Cfg.Network.ChainID])
+			require.NoError(t, fundingErr, "failed to send funds to node %s", node.AccountAddr[blockchainsOutput.sethClient.Cfg.Network.ChainID])
 		}
 	}
 
 	// Generate and propose jobs (they will auto-accepted)
 	donToJobSpecs, jobSpecsErr := keystonepor.GenerateJobSpecs(
 		&keystonetypes.GeneratePoRJobSpecsInput{
-			BlockchainOutput:       envOutput.blockchainOutput,
+			BlockchainOutput:       blockchainsOutput.blockchainOutput,
 			DonsWithMetadata:       fullCldOutput.DonTopology.DonsWithMetadata,
 			OCR3CapabilityAddress:  keystoneContractsOutput.OCR3CapabilityAddress,
 			ExtraAllowedPorts:      extraAllowedPorts,
@@ -845,7 +743,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 
 	// Configure the Forwarder, OCR3 and Capabilities contracts
 	configureKeystoneInput := keystonetypes.ConfigureKeystoneInput{
-		ChainSelector: envOutput.chainSelector,
+		ChainSelector: blockchainsOutput.chainSelector,
 		CldEnv:        fullCldOutput.Environment,
 		Topology:      topology,
 	}
@@ -855,17 +753,17 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	// Universal setup -- END
 	// Workflow-specific configuration -- START
 	deployFeedConsumerInput := &keystonetypes.DeployFeedConsumerInput{
-		ChainSelector: envOutput.chainSelector,
+		ChainSelector: blockchainsOutput.chainSelector,
 		CldEnv:        chainsOnlyCld,
 	}
 	deployFeedsConsumerOutput, err := libcontracts.DeployFeedsConsumer(testLogger, deployFeedConsumerInput)
 	require.NoError(t, err, "failed to deploy feeds consumer")
 
 	configureFeedConsumerInput := &keystonetypes.ConfigureFeedConsumerInput{
-		SethClient:            envOutput.sethClient,
+		SethClient:            blockchainsOutput.sethClient,
 		FeedConsumerAddress:   deployFeedsConsumerOutput.FeedConsumerAddress,
 		AllowedSenders:        []common.Address{keystoneContractsOutput.ForwarderAddress},
-		AllowedWorkflowOwners: []common.Address{envOutput.sethClient.MustGetRootKeyAddress()},
+		AllowedWorkflowOwners: []common.Address{blockchainsOutput.sethClient.MustGetRootKeyAddress()},
 		AllowedWorkflowNames:  []string{in.WorkflowConfig.WorkflowName},
 	}
 	_, err = libcontracts.ConfigureFeedsConsumer(testLogger, configureFeedConsumerInput)
@@ -873,16 +771,16 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 
 	registerInput := registerPoRWorkflowInput{
 		WorkflowConfig:              in.WorkflowConfig,
-		chainSelector:               envOutput.chainSelector,
+		chainSelector:               blockchainsOutput.chainSelector,
 		workflowDonID:               fullCldOutput.DonTopology.WorkflowDonID,
 		feedID:                      in.WorkflowConfig.FeedID,
 		workflowRegistryAddress:     keystoneContractsOutput.WorkflowRegistryAddress,
 		feedConsumerAddress:         deployFeedsConsumerOutput.FeedConsumerAddress,
 		capabilitiesRegistryAddress: keystoneContractsOutput.CapabilitiesRegistryAddress,
 		priceProvider:               priceProvider,
-		sethClient:                  envOutput.sethClient,
-		deployerPrivateKey:          envOutput.deployerPrivateKey,
-		blockchain:                  envOutput.blockchainOutput,
+		sethClient:                  blockchainsOutput.sethClient,
+		deployerPrivateKey:          blockchainsOutput.deployerPrivateKey,
+		blockchain:                  blockchainsOutput.blockchainOutput,
 		binaryDownloadOutput:        binaryDownloadOutput,
 	}
 
@@ -899,8 +797,8 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		priceProvider:        priceProvider,
 		feedsConsumerAddress: deployFeedsConsumerOutput.FeedConsumerAddress,
 		forwarderAddress:     keystoneContractsOutput.ForwarderAddress,
-		sethClient:           envOutput.sethClient,
-		blockchainOutput:     envOutput.blockchainOutput,
+		sethClient:           blockchainsOutput.sethClient,
+		blockchainOutput:     blockchainsOutput.blockchainOutput,
 		donTopology:          fullCldOutput.DonTopology,
 		nodeOutput:           nodeOutput,
 	}
