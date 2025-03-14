@@ -8,7 +8,6 @@ import (
 
 	"github.com/hashicorp/consul/sdk/freeport"
 
-	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 
@@ -75,7 +74,7 @@ func (m *LoopRegistry) Register(id string) (*RegisteredLoop, error) {
 
 	if m.cfgDatabase != nil {
 		dbURL := m.cfgDatabase.URL()
-		envCfg.DatabaseURL = (*commonconfig.SecretURL)(&dbURL)
+		envCfg.DatabaseURL = &dbURL
 		envCfg.DatabaseIdleInTxSessionTimeout = m.cfgDatabase.DefaultIdleInTxSessionTimeout()
 		envCfg.DatabaseLockTimeout = m.cfgDatabase.DefaultLockTimeout()
 		envCfg.DatabaseQueryTimeout = m.cfgDatabase.DefaultQueryTimeout()
