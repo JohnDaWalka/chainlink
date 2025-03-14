@@ -1,19 +1,18 @@
 package capabilities_test
 
 import (
-	"bufio"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -60,6 +59,7 @@ import (
 	libcrecli "github.com/smartcontractkit/chainlink/system-tests/lib/crecli"
 	keystoneporcrecli "github.com/smartcontractkit/chainlink/system-tests/lib/crecli/por"
 	libfunding "github.com/smartcontractkit/chainlink/system-tests/lib/funding"
+	libnix "github.com/smartcontractkit/chainlink/system-tests/lib/nix"
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
 
@@ -88,9 +88,19 @@ type InfraInput struct {
 }
 
 type CRIBInput struct {
-	Namespace      string `toml:"namespace" validate:"required"`
+	Namespace string `toml:"namespace" validate:"required"`
+	// absolute path to the folder with CRIB CRE
 	FolderLocation string `toml:"folder_location" validate:"required"`
-	Provider       string `toml:"provider" validate:"required"`
+	Provider       string `toml:"provider" validate:"oneof=aws kind"`
+	// required for cost attribution in AWS
+	TeamInput *TeamInput `toml:"team_input" validate:"required_if=Provider aws"`
+}
+
+type TeamInput struct {
+	Team       string `toml:"team" validate:"required"`
+	Product    string `toml:"product" validate:"required"`
+	CostCenter string `toml:"cost_center" validate:"required"`
+	Component  string `toml:"component" validate:"required"`
 }
 
 type WorkflowConfig struct {
@@ -371,6 +381,7 @@ type InfrastructureInput struct {
 	nodeSetInput    []*keystonetypes.CapabilitiesAwareNodeSet
 	blockchainInput *blockchain.Input
 	infraInput      *InfraInput
+	nixShell        *libnix.NixShell
 }
 
 type InfrastructureOutput struct {
@@ -402,9 +413,48 @@ func CreateInfrastructure(
 	output := &InfrastructureOutput{}
 
 	if input.infraInput.InfraType == libtypes.InfraType_CRIB {
+		//TODO move somewhere else?
 		output.infraDetails = libtypes.InfraDetails{
 			InfraType: libtypes.InfraType_CRIB,
 			Namespace: input.infraInput.CRIB.Namespace,
+		}
+
+		if input.nixShell == nil {
+			return nil, errors.New("nix shell is required, when using CRIB")
+		}
+
+		gethChainEnvVars := map[string]string{
+			"CHAIN_ID": input.blockchainInput.ChainID,
+		}
+		_, err := input.nixShell.RunCommandWithEnvVars("devspace run deploy-geth-chain", gethChainEnvVars)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to run devspace run deploy-geth-chain")
+		}
+
+		//TODO move to lib
+		type ChainURLs struct {
+			HTTPHostURL     string `json:"http_host_url"`
+			WSHostURL       string `json:"ws_host_url"`
+			HTTPInternalURL string `json:"http_internal_url"`
+			WSInternalURL   string `json:"ws_internal_url"`
+		}
+
+		fileName := filepath.Join(".", "crib-configs", fmt.Sprintf("chain-%s-urls.json", input.blockchainInput.ChainID))
+		file, err := os.Open(fileName)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to open file %s", fileName)
+		}
+		defer file.Close()
+
+		byteValue, err := io.ReadAll(file)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to read file %s", fileName)
+		}
+		chainURLs := ChainURLs{}
+
+		err = json.Unmarshal(byteValue, &chainURLs)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to unmarshal JSON from file %s", fileName)
 		}
 
 		input.blockchainInput.Out = &blockchain.Output{}
@@ -413,10 +463,10 @@ func CreateInfrastructure(
 		input.blockchainInput.Out.Family = "evm"
 		input.blockchainInput.Out.Nodes = []*blockchain.Node{
 			{
-				HostWSUrl:             fmt.Sprintf("wss://%s-geth-%s-ws.main.stage.cldev.sh", input.infraInput.CRIB.Namespace, input.blockchainInput.Out.ChainID),
-				HostHTTPUrl:           fmt.Sprintf("https://%s-geth-%s-http.main.stage.cldev.sh", input.infraInput.CRIB.Namespace, input.blockchainInput.Out.ChainID),
-				DockerInternalWSUrl:   fmt.Sprintf("ws://geth-%s:8546", input.blockchainInput.Out.ChainID),
-				DockerInternalHTTPUrl: fmt.Sprintf("http://geth-%s:8544", input.blockchainInput.Out.ChainID),
+				HostWSUrl:             chainURLs.WSHostURL,
+				HostHTTPUrl:           chainURLs.HTTPHostURL,
+				DockerInternalWSUrl:   chainURLs.WSInternalURL,
+				DockerInternalHTTPUrl: chainURLs.HTTPInternalURL,
 			},
 		}
 	}
@@ -486,107 +536,8 @@ type setupOutput struct {
 	nodeOutput           []*keystonetypes.WrappedNodeOutput
 }
 
-type NixShell struct {
-	cmd    *exec.Cmd
-	stdin  *bufio.Writer
-	stdout *bufio.Reader
-	mu     sync.Mutex
-}
-
-func NewNixShell(folder string, globalEnvVars map[string]string) (*NixShell, error) {
-	cmd := exec.Command("nix", "develop", "--command", "sh")
-	cmd.Dir = folder
-
-	// Set global environment variables available to all subsequent commands
-	cmd.Env = os.Environ()
-	fmt.Println("Nix shell will use the following global environment variables:")
-	for key, value := range globalEnvVars {
-		fmt.Printf("%s=%s\n", key, value)
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
-	}
-
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, err
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-
-	return &NixShell{
-		cmd:    cmd,
-		stdin:  bufio.NewWriter(stdin),
-		stdout: bufio.NewReader(stdout),
-	}, nil
-}
-
-func (ns *NixShell) RunCommand(command string) (string, error) {
-	return ns.RunCommandWithEnvVars(command, map[string]string{})
-}
-
-const ErrCommandFailed = "command failed with exit code"
-
-func (ns *NixShell) RunCommandWithEnvVars(command string, envVars map[string]string) (string, error) {
-	ns.mu.Lock()
-	defer ns.mu.Unlock()
-
-	// send stderr to stdout, append exit code to the end of the output and
-	// end marker to signal the end of the command output
-	endMarker := "END_OF_COMMAND_OUTPUT"
-	fullCommand := fmt.Sprintf("%s 2>&1; echo %s $?\n", command, endMarker)
-
-	// Set environment variables
-	if len(envVars) > 0 {
-		fmt.Println("Setting the following command-specific environment variables:")
-	}
-	for key, value := range envVars {
-		fmt.Printf("%s=%s\n", key, value)
-		_, err := ns.stdin.WriteString(fmt.Sprintf("export %s=%s\n", key, value))
-		if err != nil {
-			return "", err
-		}
-	}
-
-	_, err := ns.stdin.WriteString(fullCommand)
-	if err != nil {
-		return "", err
-	}
-	if err := ns.stdin.Flush(); err != nil {
-		return "", err
-	}
-
-	var output strings.Builder
-	var exitCode int
-	for {
-		line, err := ns.stdout.ReadString('\n')
-		fmt.Print(line)
-		if err != nil {
-			return "", err
-		}
-		if strings.HasPrefix(line, endMarker) {
-			fmt.Sscanf(line, endMarker+" %d", &exitCode)
-			break
-		}
-		output.WriteString(line)
-	}
-
-	if exitCode != 0 {
-		return output.String(), fmt.Errorf("%s %d", ErrCommandFailed, exitCode)
-	}
-
-	return strings.TrimSpace(output.String()), nil
-}
-
-func (ns *NixShell) Close() error {
-	return ns.cmd.Process.Kill()
-}
-
 func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig, priceProvider PriceProvider, binaryDownloadOutput binaryDownloadOutput, mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet) *setupOutput {
+	// Universal setup -- START
 	envInput := InfrastructureInput{
 		jdInput:         in.JD,
 		nodeSetInput:    mustSetCapabilitiesFn(in.NodeSets),
@@ -594,14 +545,21 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		infraInput:      in.Infra,
 	}
 
-	// Universal setup -- START
-	var nixShell *NixShell
+	// NixShell is only required, when using CRIB, but we want to run commands in the same "nix develop" context
+	// and we need to have this reference in the outer scope
+	var nixShell *libnix.NixShell
 	if in.Infra.InfraType == libtypes.InfraType_CRIB {
 		var err error
 		globalEnvVars := map[string]string{
 			"PROVIDER":           in.Infra.CRIB.Provider,
 			"DEVSPACE_NAMESPACE": in.Infra.CRIB.Namespace,
-			// TODO add team-related variabled for cost attribution
+		}
+
+		if in.Infra.CRIB.Provider == "aws" {
+			globalEnvVars["CHAINLINK_TEAM"] = in.Infra.CRIB.TeamInput.Team
+			globalEnvVars["CHAINLINK_PRODUCT"] = in.Infra.CRIB.TeamInput.Product
+			globalEnvVars["CHAINLINK_COST_CENTER"] = in.Infra.CRIB.TeamInput.CostCenter
+			globalEnvVars["CHAINLINK_COMPONENT"] = in.Infra.CRIB.TeamInput.Component
 		}
 
 		cribConfigDirAbs, absErr := filepath.Abs(filepath.Join(".", "crib-configs"))
@@ -609,18 +567,20 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 
 		globalEnvVars["CRE_CONFIG_DIR"] = cribConfigDirAbs
 
-		nixShell, err = NewNixShell(in.Infra.CRIB.FolderLocation, globalEnvVars)
+		// this will run `nix develop`, which will login to all ECRs and set up the environment
+		// by running `crib init`
+		nixShell, err = libnix.NewNixShell(in.Infra.CRIB.FolderLocation, globalEnvVars)
 		require.NoError(t, err, "failed to create Nix shell")
 
 		t.Cleanup(func() {
 			_ = nixShell.Close()
 		})
 
+		// we need to run `devspace purge` to clean up the environment, in case our namespace is already used
 		_, err = nixShell.RunCommand("devspace purge")
 		require.NoError(t, err, "failed to run devspace purge")
 
-		_, err = nixShell.RunCommand("devspace run deploy-geth-chain")
-		require.NoError(t, err, "failed to run devspace run deploy-geth-chain")
+		envInput.nixShell = nixShell
 	}
 
 	singeFileLogger := cldlogger.NewSingleFileLogger(t)
@@ -836,38 +796,38 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 			envInput.nodeSetInput[j].Input.Out.UseCache = true
 			envInput.nodeSetInput[j].Input.Out.CLNodes = []*clnode.Output{}
 
-			//TODO remove these url creations and read them from JSON
-			for i := range bootstrapNodes {
-				nodeName := fmt.Sprintf("%s-bt", donMetadata.Name)
+			// //TODO remove these url creations and read them from JSON
+			// for i := range bootstrapNodes {
+			// 	nodeName := fmt.Sprintf("%s-bt", donMetadata.Name)
 
-				envInput.nodeSetInput[j].Input.Out.CLNodes = append(envInput.nodeSetInput[j].Out.CLNodes, &clnode.Output{
-					UseCache: true,
-					Node: &clnode.NodeOut{
-						APIAuthUser:     "admin@chain.link",
-						APIAuthPassword: "hWDmgcub2gUhyrG6cxriqt7T",
-						HostURL:         fmt.Sprintf("http://%s-%s-%d.main.stage.cldev.sh:80", in.Infra.CRIB.Namespace, nodeName, i),
-						DockerURL:       fmt.Sprintf("http://%s-%s-%d:80", in.Infra.CRIB.Namespace, nodeName, i),
-						DockerP2PUrl:    fmt.Sprintf("http://%s-%s-%d:6690", in.Infra.CRIB.Namespace, nodeName, i),
-						InternalIP:      nodeName + "-" + strconv.Itoa(i),
-					},
-				})
-			}
+			// 	envInput.nodeSetInput[j].Input.Out.CLNodes = append(envInput.nodeSetInput[j].Out.CLNodes, &clnode.Output{
+			// 		UseCache: true,
+			// 		Node: &clnode.NodeOut{
+			// 			APIAuthUser:     "admin@chain.link",
+			// 			APIAuthPassword: "hWDmgcub2gUhyrG6cxriqt7T",
+			// 			HostURL:         fmt.Sprintf("http://%s-%s-%d.main.stage.cldev.sh:80", in.Infra.CRIB.Namespace, nodeName, i),
+			// 			DockerURL:       fmt.Sprintf("http://%s-%s-%d:80", in.Infra.CRIB.Namespace, nodeName, i),
+			// 			DockerP2PUrl:    fmt.Sprintf("http://%s-%s-%d:6690", in.Infra.CRIB.Namespace, nodeName, i),
+			// 			InternalIP:      nodeName + "-" + strconv.Itoa(i),
+			// 		},
+			// 	})
+			// }
 
-			for i := range workerNodes {
-				nodeName := donMetadata.Name
+			// for i := range workerNodes {
+			// 	nodeName := donMetadata.Name
 
-				envInput.nodeSetInput[j].Input.Out.CLNodes = append(envInput.nodeSetInput[j].Out.CLNodes, &clnode.Output{
-					UseCache: true,
-					Node: &clnode.NodeOut{
-						APIAuthUser:     "admin@chain.link",
-						APIAuthPassword: "hWDmgcub2gUhyrG6cxriqt7T",
-						HostURL:         fmt.Sprintf("http://%s-%s-%d.main.stage.cldev.sh:80", in.Infra.CRIB.Namespace, nodeName, i),
-						DockerURL:       fmt.Sprintf("http://%s-%s-%d:80", in.Infra.CRIB.Namespace, nodeName, i),
-						DockerP2PUrl:    fmt.Sprintf("http://%s-%s-%d:6690", in.Infra.CRIB.Namespace, nodeName, i),
-						InternalIP:      nodeName + "-" + strconv.Itoa(i),
-					},
-				})
-			}
+			// 	envInput.nodeSetInput[j].Input.Out.CLNodes = append(envInput.nodeSetInput[j].Out.CLNodes, &clnode.Output{
+			// 		UseCache: true,
+			// 		Node: &clnode.NodeOut{
+			// 			APIAuthUser:     "admin@chain.link",
+			// 			APIAuthPassword: "hWDmgcub2gUhyrG6cxriqt7T",
+			// 			HostURL:         fmt.Sprintf("http://%s-%s-%d.main.stage.cldev.sh:80", in.Infra.CRIB.Namespace, nodeName, i),
+			// 			DockerURL:       fmt.Sprintf("http://%s-%s-%d:80", in.Infra.CRIB.Namespace, nodeName, i),
+			// 			DockerP2PUrl:    fmt.Sprintf("http://%s-%s-%d:6690", in.Infra.CRIB.Namespace, nodeName, i),
+			// 			InternalIP:      nodeName + "-" + strconv.Itoa(i),
+			// 		},
+			// 	})
+			// }
 
 			// CRIB will deploy gateway only if don_type == "gateway"
 			deployDonEnvVars["DON_BOOT_NODE_COUNT"] = strconv.Itoa(len(bootstrapNodes))
@@ -877,27 +837,116 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 			_, err = nixShell.RunCommandWithEnvVars("devspace run deploy-don", deployDonEnvVars)
 			require.NoError(t, err, "failed to run devspace run deploy-dons")
 
-			//todo remove after ingress check is fixed for gateway-mock
-			time.Sleep(15 * time.Second)
+			//TODO move to lib
+			type DonURL struct {
+				HostURL        string `json:"host_url"`
+				InternalURL    string `json:"internal_url"`
+				P2PInternalURL string `json:"p2p_internal_url"`
+				InternalIP     string `json:"internal_ip"`
+			}
+
+			type DonURLs struct {
+				BootstrapNodes []DonURL `json:"bootstrap_nodes"`
+				WorkerNodes    []DonURL `json:"worker_nodes"`
+			}
+
+			type DonAPICredentials struct {
+				Username string `json:"username"`
+				Password string `json:"password"`
+			}
+
+			fileName := filepath.Join(".", "crib-configs", fmt.Sprintf("don-%s-urls.json", donMetadata.Name))
+			file, err := os.Open(fileName)
+			require.NoError(t, err, "failed to open file %s", fileName)
+			defer file.Close()
+
+			byteValue, err := io.ReadAll(file)
+			require.NoError(t, err, "failed to read file %s", fileName)
+			donURLs := DonURLs{}
+
+			err = json.Unmarshal(byteValue, &donURLs)
+			require.NoError(t, err, "failed to unmarshal JSON from file %s", fileName)
+
+			// read API credentials
+			fileName = filepath.Join(".", "crib-configs", "don-api-credentials.json")
+			file, err = os.Open(fileName)
+			require.NoError(t, err, "failed to open file %s", fileName)
+			defer file.Close()
+
+			byteValue, err = io.ReadAll(file)
+			require.NoError(t, err, "failed to read file %s", fileName)
+			apiCredentials := DonAPICredentials{}
+
+			err = json.Unmarshal(byteValue, &apiCredentials)
+			require.NoError(t, err, "failed to unmarshal JSON from file %s", fileName)
+
+			require.Equal(t, len(bootstrapNodes), len(donURLs.BootstrapNodes), "number of bootstrap nodes in JSON file must match the number of bootstrap nodes in the DON")
+			require.Equal(t, len(workerNodes), len(donURLs.WorkerNodes), "number of worker nodes in JSON file must match the number of worker nodes in the DON")
+
+			for i := range bootstrapNodes {
+				envInput.nodeSetInput[j].Input.Out.CLNodes = append(envInput.nodeSetInput[j].Out.CLNodes, &clnode.Output{
+					UseCache: true,
+					Node: &clnode.NodeOut{
+						APIAuthUser:     apiCredentials.Username,
+						APIAuthPassword: apiCredentials.Password,
+						HostURL:         donURLs.BootstrapNodes[i].HostURL,
+						DockerURL:       donURLs.BootstrapNodes[i].InternalURL,
+						DockerP2PUrl:    donURLs.BootstrapNodes[i].P2PInternalURL,
+						InternalIP:      donURLs.BootstrapNodes[i].InternalIP,
+					},
+				})
+			}
+
+			for i := range workerNodes {
+				envInput.nodeSetInput[j].Input.Out.CLNodes = append(envInput.nodeSetInput[j].Out.CLNodes, &clnode.Output{
+					UseCache: true,
+					Node: &clnode.NodeOut{
+						APIAuthUser:     apiCredentials.Username,
+						APIAuthPassword: apiCredentials.Password,
+						HostURL:         donURLs.WorkerNodes[i].HostURL,
+						DockerURL:       donURLs.WorkerNodes[i].InternalURL,
+						DockerP2PUrl:    donURLs.WorkerNodes[i].P2PInternalURL,
+						InternalIP:      donURLs.WorkerNodes[i].InternalIP,
+					},
+				})
+			}
 		}
 
-		jdImageSplit := strings.Split(in.JD.Image, ":")
-		require.Len(t, jdImageSplit, 2, "JD image must have an explicit tag")
+		imgTagIndex := strings.LastIndex(in.JD.Image, ":")
+		require.Greater(t, imgTagIndex, -1, "docker image must have an explicit tag, but it was: %s", in.JD.Image)
 
 		jdEnvVars := map[string]string{
-			"JOB_DISTRIBUTOR_IMAGE_TAG": jdImageSplit[1],
+			"JOB_DISTRIBUTOR_IMAGE_TAG": in.JD.Image[imgTagIndex+1:], // +1 to exclude the colon
 		}
 		_, err = nixShell.RunCommandWithEnvVars("devspace run deploy-jd", jdEnvVars)
 		require.NoError(t, err, "failed to run devspace run deploy-jd")
 
+		//TODO move to lib
+		type JdURLs struct {
+			GRPCHostURL     string `json:"grpc_host_url"`
+			GRCPInternalUrl string `json:"grpc_internal_url"`
+			WSHostURL       string `json:"ws_host_url"`
+			WSInternalURL   string `json:"ws_internal_url"`
+		}
+
+		fileName := filepath.Join(".", "crib-configs", "jd-urls.json")
+		file, err := os.Open(fileName)
+		require.NoError(t, err, "failed to open file %s", fileName)
+		defer file.Close()
+
+		byteValue, err := io.ReadAll(file)
+		require.NoError(t, err, "failed to read file %s", fileName)
+		jdURLs := JdURLs{}
+
+		err = json.Unmarshal(byteValue, &jdURLs)
+		require.NoError(t, err, "failed to unmarshal JSON from file %s", fileName)
+
 		in.JD.Out = &jd.Output{}
 		in.JD.Out.UseCache = true
-		jdGRPCHost := fmt.Sprintf("%s-job-distributor-grpc.main.stage.cldev.sh:443", in.Infra.CRIB.Namespace)
-		jdWSSHost := "job-distributor-noderpc-lb:80"
-		in.JD.Out.HostGRPCUrl = jdGRPCHost
-		in.JD.Out.DockerGRPCUrl = jdGRPCHost
-		in.JD.Out.DockerWSRPCUrl = jdWSSHost
-		in.JD.Out.HostWSRPCUrl = jdWSSHost
+		in.JD.Out.HostGRPCUrl = jdURLs.GRPCHostURL
+		in.JD.Out.HostWSRPCUrl = jdURLs.WSHostURL
+		in.JD.Out.DockerGRPCUrl = jdURLs.GRCPInternalUrl
+		in.JD.Out.DockerWSRPCUrl = jdURLs.WSInternalURL
 	}
 
 	jdOutput, err := jd.NewJD(in.JD)
