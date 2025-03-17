@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package registry_module_owner_custom
+package// Code generated - DO NOT EDIT.
+registry_module_owner_custom
 
 import "github.com/ethereum/go-ethereum/common"
 

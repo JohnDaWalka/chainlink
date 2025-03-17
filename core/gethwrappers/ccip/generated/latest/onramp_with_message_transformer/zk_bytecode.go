@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package onramp_with_message_transformer
+package// Code generated - DO NOT EDIT.
+onramp_with_message_transformer
 
 import "github.com/ethereum/go-ethereum/common"
 

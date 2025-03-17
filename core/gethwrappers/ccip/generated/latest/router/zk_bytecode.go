@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package router
+package// Code generated - DO NOT EDIT.
+router
 
 import "github.com/ethereum/go-ethereum/common"
 

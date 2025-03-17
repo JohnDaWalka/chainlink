@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package nonce_manager
+package// Code generated - DO NOT EDIT.
+nonce_manager
 
 import "github.com/ethereum/go-ethereum/common"
 

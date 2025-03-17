@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package multi_aggregate_rate_limiter
+package// Code generated - DO NOT EDIT.
+multi_aggregate_rate_limiter
 
 import "github.com/ethereum/go-ethereum/common"
 

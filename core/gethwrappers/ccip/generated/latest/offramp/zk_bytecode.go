@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package offramp
+package// Code generated - DO NOT EDIT.
+offramp
 
 import "github.com/ethereum/go-ethereum/common"
 

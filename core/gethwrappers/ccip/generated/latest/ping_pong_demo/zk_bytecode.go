@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package ping_pong_demo
+package// Code generated - DO NOT EDIT.
+ping_pong_demo
 
 import "github.com/ethereum/go-ethereum/common"
 

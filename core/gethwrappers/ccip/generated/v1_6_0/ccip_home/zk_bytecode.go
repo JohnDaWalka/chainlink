@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package ccip_home
+package// Code generated - DO NOT EDIT.
+ccip_home
 
 import "github.com/ethereum/go-ethereum/common"
 

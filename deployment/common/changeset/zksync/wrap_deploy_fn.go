@@ -6,12 +6,28 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/zksync-sdk/zksync2-go/accounts"
 	"github.com/zksync-sdk/zksync2-go/clients"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 )
+
+type DeployEVMFn[C any] func(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *C, error)
+type DeployZKFn[C any] func(auth *bind.TransactOpts, ethClient *ethclient.Client, pk string, args ...interface{}) (common.Address, *types.Transaction, *C, error)
+
+func PickDeployFn[C any](
+	c deployment.Chain,
+	deployEVM DeployEVMFn[C],
+	deployZk DeployZKFn[C],
+) (common.Address, *types.Transaction, *C, error) {
+	if c.IsZK {
+		return deployZk(c.DeployerKey, c.Client.(*ethclient.Client), c.DeployerPk)
+	}
+
+	return deployEVM(c.DeployerKey, c.Client)
+}
 
 type DeployFn[C any] func(chain deployment.Chain) deployment.ContractDeploy[*C]
 

@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package rmn_home
+package// Code generated - DO NOT EDIT.
+rmn_home
 
 import "github.com/ethereum/go-ethereum/common"
 

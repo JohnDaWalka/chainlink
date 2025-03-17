@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package fee_quoter
+package// Code generated - DO NOT EDIT.
+fee_quoter
 
 import "github.com/ethereum/go-ethereum/common"
 

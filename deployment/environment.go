@@ -22,6 +22,8 @@ import (
 	types2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	types3 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/zksync-sdk/zksync2-go/accounts"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	csav1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/csa"
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
@@ -57,12 +59,16 @@ type Chain struct {
 	Client   OnchainClient
 	// Note the Sign function can be abstract supporting a variety of key storage mechanisms (e.g. KMS etc).
 	DeployerKey *bind.TransactOpts
-	DeployerPk  string
 	Confirm     func(tx *types.Transaction) (uint64, error)
 	// Users are a set of keys that can be used to interact with the chain.
 	// These are distinct from the deployer key.
 	Users []*bind.TransactOpts
-	IsZK  bool
+
+	// for zksync chains
+	IsZK bool
+	// DeployerPk string
+	DeployerZk *accounts.Wallet
+	// deployer zk wallet
 }
 
 func (c Chain) String() string {

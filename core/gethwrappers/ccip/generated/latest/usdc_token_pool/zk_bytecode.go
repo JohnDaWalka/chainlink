@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package usdc_token_pool
+package// Code generated - DO NOT EDIT.
+usdc_token_pool
 
 import "github.com/ethereum/go-ethereum/common"
 

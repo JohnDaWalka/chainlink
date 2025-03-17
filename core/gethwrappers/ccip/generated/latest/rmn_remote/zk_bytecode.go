@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package rmn_remote
+package// Code generated - DO NOT EDIT.
+rmn_remote
 
 import "github.com/ethereum/go-ethereum/common"
 

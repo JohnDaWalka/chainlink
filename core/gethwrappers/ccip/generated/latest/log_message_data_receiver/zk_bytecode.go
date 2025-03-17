@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package log_message_data_receiver
+package// Code generated - DO NOT EDIT.
+log_message_data_receiver
 
 import "github.com/ethereum/go-ethereum/common"
 

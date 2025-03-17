@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package offramp_with_message_transformer
+package// Code generated - DO NOT EDIT.
+offramp_with_message_transformer
 
 import "github.com/ethereum/go-ethereum/common"
 

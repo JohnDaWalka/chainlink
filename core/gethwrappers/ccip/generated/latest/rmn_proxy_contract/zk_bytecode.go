@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package rmn_proxy_contract
+package// Code generated - DO NOT EDIT.
+rmn_proxy_contract
 
 import "github.com/ethereum/go-ethereum/common"
 

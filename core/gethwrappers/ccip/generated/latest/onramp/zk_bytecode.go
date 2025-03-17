@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package onramp
+package// Code generated - DO NOT EDIT.
+onramp
 
 import "github.com/ethereum/go-ethereum/common"
 

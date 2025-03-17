@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package token_admin_registry
+package// Code generated - DO NOT EDIT.
+token_admin_registry
 
 import "github.com/ethereum/go-ethereum/common"
 

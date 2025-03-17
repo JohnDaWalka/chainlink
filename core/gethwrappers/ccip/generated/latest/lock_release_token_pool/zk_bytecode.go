@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package lock_release_token_pool
+package// Code generated - DO NOT EDIT.
+lock_release_token_pool
 
 import "github.com/ethereum/go-ethereum/common"
 

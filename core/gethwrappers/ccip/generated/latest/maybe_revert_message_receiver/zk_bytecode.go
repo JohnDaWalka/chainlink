@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package maybe_revert_message_receiver
+package// Code generated - DO NOT EDIT.
+maybe_revert_message_receiver
 
 import "github.com/ethereum/go-ethereum/common"
 

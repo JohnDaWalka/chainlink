@@ -1,5 +1,5 @@
-// Code generated - DO NOT EDIT.
-package burn_mint_token_pool
+package// Code generated - DO NOT EDIT.
+burn_mint_token_pool
 
 import "github.com/ethereum/go-ethereum/common"
 
