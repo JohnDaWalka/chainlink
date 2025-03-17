@@ -60,6 +60,13 @@ contract BurnMintERC20PausableFreezableTransparentTest is
     );
   }
 
+  function test_Freeze_RevertWhen_RecipientIsAddressZero() public {
+    should_Freeze_RevertWhen_RecipientIsAddressZero(
+      address(s_burnMintERC20PausableFreezableTransparent),
+      BurnMintERC20PausableFreezableTransparent.BurnMintERC20PausableFreezableTransparent__InvalidRecipient.selector
+    );
+  }
+
   function test_Freeze_RevertWhen_RecipientIsImplementationItself() public {
     should_Freeze_RevertWhen_RecipientIsImplementationItself(
       address(s_burnMintERC20PausableFreezableTransparent),

@@ -46,6 +46,7 @@ contract BurnMintERC20PausableFreezableTransparent is BurnMintERC20PausableTrans
   /// @dev Requires the caller to have the FREEZER_ROLE.
   /// @dev Can be called even if the contract is paused.
   function freeze(address account) public onlyRole(FREEZER_ROLE) {
+    if (account == address(0)) revert BurnMintERC20PausableFreezableTransparent__InvalidRecipient(account);
     if (account == address(this)) revert BurnMintERC20PausableFreezableTransparent__InvalidRecipient(account);
 
     BurnMintERC20PausableFreezableTransparentStorage storage $ = _getBurnMintERC20PausableFreezableTransparentStorage();

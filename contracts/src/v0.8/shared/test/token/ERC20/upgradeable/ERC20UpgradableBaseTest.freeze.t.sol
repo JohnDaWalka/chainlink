@@ -37,6 +37,14 @@ contract ERC20UpgradableBaseTest_freeze is ERC20UpgradableBaseTest {
     IERC20UpgradeableBase(implementation).freeze(OWNER);
   }
 
+  function should_Freeze_RevertWhen_RecipientIsAddressZero(address implementation, bytes4 errorSelector) public {
+    changePrank(DEFAULT_FREEZER);
+
+    vm.expectRevert(abi.encodeWithSelector(errorSelector, address(0)));
+
+    IERC20UpgradeableBase(implementation).freeze(address(0));
+  }
+
   function should_Freeze_RevertWhen_RecipientIsImplementationItself(
     address implementation,
     bytes4 errorSelector

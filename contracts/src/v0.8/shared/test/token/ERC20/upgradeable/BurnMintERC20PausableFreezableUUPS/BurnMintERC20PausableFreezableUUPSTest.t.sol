@@ -52,6 +52,13 @@ contract BurnMintERC20PausableFreezableUUPSTest is ERC20UpgradableBaseTest_freez
     );
   }
 
+  function test_Freeze_RevertWhen_RecipientIsAddressZero() public {
+    should_Freeze_RevertWhen_RecipientIsAddressZero(
+      address(s_burnMintERC20PausableFreezableUUPS),
+      BurnMintERC20PausableFreezableUUPS.BurnMintERC20PausableFreezableUUPS__InvalidRecipient.selector
+    );
+  }
+
   function test_Freeze_RevertWhen_RecipientIsImplementationItself() public {
     should_Freeze_RevertWhen_RecipientIsImplementationItself(
       address(s_burnMintERC20PausableFreezableUUPS),
