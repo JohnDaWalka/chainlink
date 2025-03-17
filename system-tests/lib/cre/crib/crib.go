@@ -60,7 +60,7 @@ func StartNixShell(input *types.StartNixShellInput) (*nix.Shell, error) {
 	}
 
 	// we need to run `devspace purge` to clean up the environment, in case our namespace is already used
-	_, err = nixShell.RunCommand("devspace purge")
+	_, err = nixShell.RunCommand("devspace purge --no-warn")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to run devspace purge")
 	}
@@ -80,9 +80,9 @@ func DeployBlockchain(input *types.DeployCribBlockchainInput) (*blockchain.Outpu
 	gethChainEnvVars := map[string]string{
 		"CHAIN_ID": input.BlockchainInput.ChainID,
 	}
-	_, err := input.NixShell.RunCommandWithEnvVars("devspace run deploy-geth-chain", gethChainEnvVars)
+	_, err := input.NixShell.RunCommandWithEnvVars("devspace run deploy-geth-chain --no-warn", gethChainEnvVars)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to run devspace run deploy-geth-chain")
+		return nil, errors.Wrap(err, "failed to run devspace run deploy-geth-chain --no-warn")
 	}
 
 	// TODO chain family should be dynamic, but currently we don't have in the input (it's set in the output depending on blockchain type)
@@ -212,7 +212,7 @@ func DeployDons(input *types.DeployCribDonsInput) ([]*types.CapabilitiesAwareNod
 		// IMPORTANT: CRIB will deploy gateway only if don_type == "gateway", in other cases the value don type has no impact apart from being used in release/service/etc names
 		deployDonEnvVars["DON_TYPE"] = donMetadata.Name
 
-		_, err = input.NixShell.RunCommandWithEnvVars("devspace run deploy-don", deployDonEnvVars)
+		_, err = input.NixShell.RunCommandWithEnvVars("devspace run deploy-don --no-warn", deployDonEnvVars)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to run devspace run deploy-don")
 		}
@@ -245,7 +245,7 @@ func DeployJd(input *types.DeployCribJdInput) (*jd.Output, error) {
 	jdEnvVars := map[string]string{
 		"JOB_DISTRIBUTOR_IMAGE_TAG": imgTagIndex,
 	}
-	_, err = input.NixShell.RunCommandWithEnvVars("devspace run deploy-jd", jdEnvVars)
+	_, err = input.NixShell.RunCommandWithEnvVars("devspace run deploy-jd --no-warn", jdEnvVars)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to run devspace run deploy-jd")
 	}

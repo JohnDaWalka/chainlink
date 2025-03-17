@@ -48,7 +48,7 @@ func ValidateTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraIn
 		}
 
 		for _, nodeSet := range nodeSetInput {
-			if infraInput.InfraType == types.CRIB && nodeSet.Name != "gateway" {
+			if infraInput.InfraType == types.CRIB && slices.Contains(nodeSetInput[0].DONTypes, cretypes.GatewayDON) && nodeSet.Name != "gateway" {
 				return errors.New("when using CRIB gateway nodeSet with the Gateway DON must be named 'gateway', but got " + nodeSet.Name)
 			}
 		}
