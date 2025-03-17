@@ -7,6 +7,8 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
 
+// Unfortunately, we need to construct some of these URLs before any environment is created, because they are used
+// in CL node configs. This introduces a coupling between Helm charts used by CRIB and Docker container names used by CTFv2.
 func Host(nodeIndex int, nodeType cretypes.CapabilityFlag, donName string, infraDetails types.InfraInput) string {
 	if infraDetails.InfraType == types.InfraType_CRIB {
 		if nodeType == cretypes.BootstrapNode {

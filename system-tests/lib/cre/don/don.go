@@ -2,7 +2,6 @@ package don
 
 import (
 	"regexp"
-	"slices"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -72,11 +71,11 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput
 		}
 	}
 
-	for i, donMetadata := range donsWithMetadata {
-		for j := range donMetadata.NodesMetadata {
+	for donIdx, donMetadata := range donsWithMetadata {
+		for nodeIdx := range donMetadata.NodesMetadata {
 			nodeWithLabels := cretypes.NodeMetadata{}
 			nodeType := cretypes.WorkerNode
-			if nodeSetInput[i].BootstrapNodeIndex != -1 && j == nodeSetInput[i].BootstrapNodeIndex {
+			if nodeSetInput[donIdx].BootstrapNodeIndex != -1 && nodeIdx == nodeSetInput[donIdx].BootstrapNodeIndex {
 				nodeType = cretypes.BootstrapNode
 			}
 			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
@@ -86,30 +85,36 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput
 
 			// TODO think whether it would make sense for infraInput to also hold functions that resolve hostnames for various infra and node types
 			// and use it with some default, so that we can easily modify it with little effort
-			host := infra.Host(j, nodeType, donMetadata.Name, infraInput)
+			host := infra.Host(nodeIdx, nodeType, donMetadata.Name, infraInput)
 
-			if slices.Contains(nodeSetInput[i].DONTypes, cretypes.GatewayDON) && nodeSetInput[i].GatewayNodeIndex != -1 && j == nodeSetInput[i].GatewayNodeIndex {
-				nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
-					Key:   node.ExtraRolesKey,
-					Value: cretypes.GatewayNode,
-				})
-
-				gatewayHost := host
-				if infraInput.InfraType == types.InfraType_CRIB {
-					gatewayHost += "-gtwnode"
+			if flags.HasFlag(donMetadata.Flags, cretypes.GatewayDON) {
+				if infraInput.InfraType == types.InfraType_CRIB && donMetadata.Name != "gateway" {
+					return nil, errors.New("when using CRIB gateway nodeSet must be named 'gateway', but got " + donMetadata.Name)
 				}
 
-				topology.GatewayConnectorOutput = &cretypes.GatewayConnectorOutput{
-					Path: "/node",
-					Port: 5003,
-					Host: gatewayHost,
-					// do not set gateway connector dons, they will be resolved automatically
+				if nodeSetInput[donIdx].GatewayNodeIndex != -1 && nodeIdx == nodeSetInput[donIdx].GatewayNodeIndex {
+					nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
+						Key:   node.ExtraRolesKey,
+						Value: cretypes.GatewayNode,
+					})
+
+					gatewayHost := host
+					if infraInput.InfraType == types.InfraType_CRIB {
+						gatewayHost += "-gtwnode"
+					}
+
+					topology.GatewayConnectorOutput = &cretypes.GatewayConnectorOutput{
+						Path: "/node",
+						Port: 5003,
+						Host: gatewayHost,
+						// do not set gateway connector dons, they will be resolved automatically
+					}
 				}
 			}
 
 			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
 				Key:   node.IndexKey,
-				Value: strconv.Itoa(j),
+				Value: strconv.Itoa(nodeIdx),
 			})
 
 			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
@@ -117,7 +122,7 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput
 				Value: host,
 			})
 
-			donsWithMetadata[i].NodesMetadata[j] = &nodeWithLabels
+			donsWithMetadata[donIdx].NodesMetadata[nodeIdx] = &nodeWithLabels
 		}
 	}
 

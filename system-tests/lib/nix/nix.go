@@ -19,6 +19,8 @@ type NixShell struct {
 	mu     sync.Mutex
 }
 
+const ErrCommandFailed = "command failed with exit code"
+
 func NewNixShell(folder string, globalEnvVars map[string]string) (*NixShell, error) {
 	cmd := exec.Command("nix", "develop", "--command", "sh")
 	cmd.Dir = folder
@@ -55,18 +57,16 @@ func (ns *NixShell) RunCommand(command string) (string, error) {
 	return ns.RunCommandWithEnvVars(command, map[string]string{})
 }
 
-const ErrCommandFailed = "command failed with exit code"
-
 func (ns *NixShell) RunCommandWithEnvVars(command string, envVars map[string]string) (string, error) {
 	ns.mu.Lock()
 	defer ns.mu.Unlock()
 
 	// send stderr to stdout, append exit code to the end of the output and
-	// end marker to signal the end of the command output
+	// add end marker to signal the end of the command output
 	endMarker := "END_OF_COMMAND_OUTPUT"
 	fullCommand := fmt.Sprintf("%s 2>&1; echo %s $?\n", command, endMarker)
 
-	// Set environment variables
+	// Set command-specific environment variables
 	if len(envVars) > 0 {
 		fmt.Println("Setting the following command-specific environment variables:")
 	}
@@ -86,6 +86,7 @@ func (ns *NixShell) RunCommandWithEnvVars(command string, envVars map[string]str
 		return "", err
 	}
 
+	// read output until the end marker is found
 	var output strings.Builder
 	var exitCode int
 	for {

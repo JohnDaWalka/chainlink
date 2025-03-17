@@ -11,11 +11,14 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/clnode"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/nix"
+
+	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
 
 func StartNixShell(input *types.StartNixShellInput) (*nix.NixShell, error) {
@@ -36,7 +39,7 @@ func StartNixShell(input *types.StartNixShellInput) (*nix.NixShell, error) {
 		globalEnvVars[key] = value
 	}
 
-	if input.InfraInput.CRIB.Provider == "aws" {
+	if strings.EqualFold(input.InfraInput.CRIB.Provider, libtypes.CribProvider_AWS) {
 		globalEnvVars["CHAINLINK_TEAM"] = input.InfraInput.CRIB.TeamInput.Team
 		globalEnvVars["CHAINLINK_PRODUCT"] = input.InfraInput.CRIB.TeamInput.Product
 		globalEnvVars["CHAINLINK_COST_CENTER"] = input.InfraInput.CRIB.TeamInput.CostCenter
@@ -83,8 +86,8 @@ func DeployBlockchain(input *types.DeployCribBlockchainInput) (*blockchain.Outpu
 		return nil, errors.Wrap(err, "failed to run devspace run deploy-geth-chain")
 	}
 
-	// TODO read family from blockchain input
-	blockchainOut, err := infra.ReadBlockchainUrl(filepath.Join(".", input.CribConfigsDir), "evm", input.BlockchainInput.ChainID)
+	// TODO chain family should be dynamic, but currently we don't have in the input (it's set in the output depending on blockchain type)
+	blockchainOut, err := infra.ReadBlockchainURL(filepath.Join(".", input.CribConfigsDir), "evm", input.BlockchainInput.ChainID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read blockchain URLs")
 	}
@@ -110,41 +113,23 @@ func DeployDons(input *types.DeployCribDonsInput) ([]*types.CapabilitiesAwareNod
 		}
 
 		// validate that all nodes in the same node set use the same Docker image
-		dockerImages := []string{}
-		for _, nodeSpec := range input.NodeSetInputs[j].NodeSpecs {
-			if nodeSpec.Node.DockerContext != "" {
-				return nil, fmt.Errorf("docker context is not supported in CRIB. Please remove docker_ctx from the node spec")
-			}
-			if nodeSpec.Node.DockerFilePath != "" {
-				return nil, fmt.Errorf("dockerfile is not supported in CRIB. Please remove docker_file from the node spec")
-			}
-
-			// TODO use kubectl cp to copy them?
-			if len(nodeSpec.Node.CapabilitiesBinaryPaths) > 0 {
-				return nil, fmt.Errorf("capabilities binaries are not supported in CRIB. Please use a Docker image that already contains the capabilities and remove capabilities_binary_paths from the node spec")
-			}
-			if nodeSpec.Node.CapabilityContainerDir != "" {
-				return nil, fmt.Errorf("capabilities binaries are not supported in CRIB. Please use a Docker image that already contains the capabilities and remove capability_container_dir from the node spec")
-			}
-
-			if slices.Contains(dockerImages, nodeSpec.Node.Image) {
-				continue
-
-			}
-			dockerImages = append(dockerImages, nodeSpec.Node.Image)
+		dockerImage, dockerImagesErr := nodesetDockerImage(input.NodeSetInputs[j].NodeSpecs)
+		if dockerImagesErr != nil {
+			return nil, errors.Wrap(dockerImagesErr, "failed to validate node set Docker images")
 		}
 
-		if len(dockerImages) != 1 {
-			return nil, fmt.Errorf("all nodes in each nodeset must use the same Docker image, but %d different images were found", len(dockerImages))
+		imageName, imageErr := dockerImageName(dockerImage)
+		if imageErr != nil {
+			return nil, errors.Wrap(imageErr, "failed to get image name")
 		}
 
-		imgTagIndex := strings.LastIndex(dockerImages[0], ":")
-		if imgTagIndex == -1 {
-			return nil, fmt.Errorf("docker image must have an explicit tag, but it was: %s", dockerImages[0])
+		imageTag, imageErr := dockerImageTag(dockerImage)
+		if imageErr != nil {
+			return nil, errors.Wrap(imageErr, "failed to get image tag")
 		}
 
-		deployDonEnvVars["DEVSPACE_IMAGE"] = dockerImages[0][:imgTagIndex]
-		deployDonEnvVars["DEVSPACE_IMAGE_TAG"] = dockerImages[0][imgTagIndex+1:] // +1 to exclude the colon
+		deployDonEnvVars["DEVSPACE_IMAGE"] = imageName
+		deployDonEnvVars["DEVSPACE_IMAGE_TAG"] = imageTag
 
 		bootstrapNodes, err := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &types.Label{Key: libnode.NodeTypeKey, Value: types.BootstrapNode}, libnode.EqualLabels)
 		if err != nil {
@@ -167,31 +152,73 @@ func DeployDons(input *types.DeployCribDonsInput) ([]*types.CapabilitiesAwareNod
 			return newTOMLBytes, nil
 		}
 
-		for i, btNode := range bootstrapNodes {
-			nodeIndexStr, err := libnode.FindLabelValue(btNode, libnode.IndexKey)
+		var writeOverrides = func(nodeMetadata *types.NodeMetadata, i int, nodeType types.NodeType) error {
+			nodeIndexStr, err := libnode.FindLabelValue(nodeMetadata, libnode.IndexKey)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to find node index for bootstrap node %d in nodeset %s", i, donMetadata.Name)
+				return errors.Wrapf(err, "failed to find node index for %s node %d in nodeset %s", nodeType, i, donMetadata.Name)
 			}
 
 			nodeIndex, err := strconv.Atoi(nodeIndexStr)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to convert node index '%s' to int for bootstrap node %d in nodeset %s", nodeIndexStr, i, donMetadata.Name)
+				return errors.Wrapf(err, "failed to convert node index '%s' to int for %s node %d in nodeset %s", nodeIndexStr, nodeType, i, donMetadata.Name)
 			}
 
 			cleanToml, tomlErr := cleanToml(input.NodeSetInputs[j].NodeSpecs[nodeIndex].Node.TestConfigOverrides)
 			if tomlErr != nil {
-				return nil, errors.Wrap(tomlErr, "failed to clean TOML")
+				return errors.Wrap(tomlErr, "failed to clean TOML")
 			}
 
-			writeErr := os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("config-override-bt-%d.toml", i)), cleanToml, 0644)
-			if writeErr != nil {
-				return nil, errors.Wrapf(writeErr, "failed to write config override for bootstrap node %d to file", i)
+			configFileMask := "config-override-bt-%d.toml"
+			secretsFileMask := "secrets-override-bt-%d.toml"
+
+			if nodeType != types.BootstrapNode {
+				configFileMask = "config-override-%d.toml"
+				secretsFileMask = "secrets-override-%d.toml"
 			}
 
-			writeErr = os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("secrets-override-bt-%d.toml", i)), []byte(input.NodeSetInputs[j].NodeSpecs[nodeIndex].Node.TestSecretsOverrides), 0644)
+			writeErr := os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf(configFileMask, i)), cleanToml, 0600)
 			if writeErr != nil {
-				return nil, errors.Wrapf(writeErr, "failed to write secrets override for bootstrap node %d to file", i)
+				return errors.Wrapf(writeErr, "failed to write config override for bootstrap node %d to file", i)
 			}
+
+			writeErr = os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf(secretsFileMask, i)), []byte(input.NodeSetInputs[j].NodeSpecs[nodeIndex].Node.TestSecretsOverrides), 0600)
+			if writeErr != nil {
+				return errors.Wrapf(writeErr, "failed to write secrets override for bootstrap node %d to file", i)
+			}
+
+			return nil
+		}
+
+		for i, btNode := range bootstrapNodes {
+			writeErr := writeOverrides(btNode, i, types.BootstrapNode)
+			if writeErr != nil {
+				return nil, writeErr
+			}
+
+			// nodeIndexStr, err := libnode.FindLabelValue(btNode, libnode.IndexKey)
+			// if err != nil {
+			// 	return nil, errors.Wrapf(err, "failed to find node index for bootstrap node %d in nodeset %s", i, donMetadata.Name)
+			// }
+
+			// nodeIndex, err := strconv.Atoi(nodeIndexStr)
+			// if err != nil {
+			// 	return nil, errors.Wrapf(err, "failed to convert node index '%s' to int for bootstrap node %d in nodeset %s", nodeIndexStr, i, donMetadata.Name)
+			// }
+
+			// cleanToml, tomlErr := cleanToml(input.NodeSetInputs[j].NodeSpecs[nodeIndex].Node.TestConfigOverrides)
+			// if tomlErr != nil {
+			// 	return nil, errors.Wrap(tomlErr, "failed to clean TOML")
+			// }
+
+			// writeErr := os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("config-override-bt-%d.toml", i)), cleanToml, 0644)
+			// if writeErr != nil {
+			// 	return nil, errors.Wrapf(writeErr, "failed to write config override for bootstrap node %d to file", i)
+			// }
+
+			// writeErr = os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("secrets-override-bt-%d.toml", i)), []byte(input.NodeSetInputs[j].NodeSpecs[nodeIndex].Node.TestSecretsOverrides), 0644)
+			// if writeErr != nil {
+			// 	return nil, errors.Wrapf(writeErr, "failed to write secrets override for bootstrap node %d to file", i)
+			// }
 		}
 
 		workerNodes, err := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &types.Label{Key: libnode.NodeTypeKey, Value: types.WorkerNode}, libnode.EqualLabels)
@@ -200,30 +227,34 @@ func DeployDons(input *types.DeployCribDonsInput) ([]*types.CapabilitiesAwareNod
 		}
 
 		for i, workerNode := range workerNodes {
-			nodeIndexStr, err := libnode.FindLabelValue(workerNode, libnode.IndexKey)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to find node index for worker node %d in nodeset %s", i, donMetadata.Name)
-			}
-
-			nodeIndex, err := strconv.Atoi(nodeIndexStr)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to convert node index '%s' to int for worker node %d in nodeset %s", nodeIndexStr, i, donMetadata.Name)
-			}
-
-			cleanToml, tomlErr := cleanToml(input.NodeSetInputs[j].NodeSpecs[nodeIndex].Node.TestConfigOverrides)
-			if tomlErr != nil {
-				return nil, errors.Wrap(tomlErr, "failed to clean TOML")
-			}
-
-			writeErr := os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("config-override-%d.toml", i)), cleanToml, 0644)
+			writeErr := writeOverrides(workerNode, i, types.WorkerNode)
 			if writeErr != nil {
-				return nil, errors.Wrapf(writeErr, "failed to write config override for worker node %d to file", i)
+				return nil, writeErr
 			}
+			// nodeIndexStr, err := libnode.FindLabelValue(workerNode, libnode.IndexKey)
+			// if err != nil {
+			// 	return nil, errors.Wrapf(err, "failed to find node index for worker node %d in nodeset %s", i, donMetadata.Name)
+			// }
 
-			writeErr = os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("secrets-override-%d.toml", i)), []byte(input.NodeSetInputs[j].NodeSpecs[nodeIndex].Node.TestSecretsOverrides), 0644)
-			if writeErr != nil {
-				return nil, errors.Wrapf(writeErr, "failed to write secrets override for worker node %d to file", i)
-			}
+			// nodeIndex, err := strconv.Atoi(nodeIndexStr)
+			// if err != nil {
+			// 	return nil, errors.Wrapf(err, "failed to convert node index '%s' to int for worker node %d in nodeset %s", nodeIndexStr, i, donMetadata.Name)
+			// }
+
+			// cleanToml, tomlErr := cleanToml(input.NodeSetInputs[j].NodeSpecs[nodeIndex].Node.TestConfigOverrides)
+			// if tomlErr != nil {
+			// 	return nil, errors.Wrap(tomlErr, "failed to clean TOML")
+			// }
+
+			// writeErr := os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("config-override-%d.toml", i)), cleanToml, 0644)
+			// if writeErr != nil {
+			// 	return nil, errors.Wrapf(writeErr, "failed to write config override for worker node %d to file", i)
+			// }
+
+			// writeErr = os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("secrets-override-%d.toml", i)), []byte(input.NodeSetInputs[j].NodeSpecs[nodeIndex].Node.TestSecretsOverrides), 0644)
+			// if writeErr != nil {
+			// 	return nil, errors.Wrapf(writeErr, "failed to write secrets override for worker node %d to file", i)
+			// }
 		}
 
 		deployDonEnvVars["DON_BOOT_NODE_COUNT"] = strconv.Itoa(len(bootstrapNodes))
@@ -236,7 +267,7 @@ func DeployDons(input *types.DeployCribDonsInput) ([]*types.CapabilitiesAwareNod
 			return nil, errors.Wrap(err, "failed to run devspace run deploy-don")
 		}
 
-		nsOutput, err := infra.ReadNodeSetUrls(filepath.Join(".", input.CribConfigsDir), donMetadata)
+		nsOutput, err := infra.ReadNodeSetURL(filepath.Join(".", input.CribConfigsDir), donMetadata)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to read node set URLs from file")
 		}
@@ -256,23 +287,73 @@ func DeployJd(input *types.DeployCribJdInput) (*jd.Output, error) {
 		return nil, valErr
 	}
 
-	imgTagIndex := strings.LastIndex(input.JDInput.Image, ":")
-	if imgTagIndex == -1 {
-		return nil, fmt.Errorf("docker image must have an explicit tag, but it was: %s", input.JDInput.Image)
+	imgTagIndex, err := dockerImageTag(input.JDInput.Image)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get image tag")
 	}
 
 	jdEnvVars := map[string]string{
-		"JOB_DISTRIBUTOR_IMAGE_TAG": input.JDInput.Image[imgTagIndex+1:], // +1 to exclude the colon
+		"JOB_DISTRIBUTOR_IMAGE_TAG": imgTagIndex,
 	}
-	_, err := input.NixShell.RunCommandWithEnvVars("devspace run deploy-jd", jdEnvVars)
+	_, err = input.NixShell.RunCommandWithEnvVars("devspace run deploy-jd", jdEnvVars)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to run devspace run deploy-jd")
 	}
 
-	jdOut, err := infra.ReadJdUrl(filepath.Join(".", input.CribConfigsDir))
+	jdOut, err := infra.ReadJdURL(filepath.Join(".", input.CribConfigsDir))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read JD URL from file")
 	}
 
 	return jdOut, nil
+}
+
+func nodesetDockerImage(nodeSpecs []*clnode.Input) (string, error) {
+	dockerImages := []string{}
+	for _, nodeSpec := range nodeSpecs {
+		if nodeSpec.Node.DockerContext != "" {
+			return "", fmt.Errorf("docker context is not supported in CRIB. Please remove docker_ctx from the node spec")
+		}
+		if nodeSpec.Node.DockerFilePath != "" {
+			return "", fmt.Errorf("dockerfile is not supported in CRIB. Please remove docker_file from the node spec")
+		}
+
+		// TODO use kubectl cp to copy them?
+		if len(nodeSpec.Node.CapabilitiesBinaryPaths) > 0 {
+			return "", fmt.Errorf("capabilities binaries are not supported in CRIB. Please use a Docker image that already contains the capabilities and remove capabilities_binary_paths from the node spec")
+		}
+		if nodeSpec.Node.CapabilityContainerDir != "" {
+			return "", fmt.Errorf("capabilities binaries are not supported in CRIB. Please use a Docker image that already contains the capabilities and remove capability_container_dir from the node spec")
+		}
+
+		if slices.Contains(dockerImages, nodeSpec.Node.Image) {
+			continue
+
+		}
+		dockerImages = append(dockerImages, nodeSpec.Node.Image)
+	}
+
+	if len(dockerImages) != 1 {
+		return "", fmt.Errorf("all nodes in each nodeset must use the same Docker image, but %d different images were found", len(dockerImages))
+	}
+
+	return dockerImages[0], nil
+}
+
+func dockerImageName(image string) (string, error) {
+	imgTagIndex := strings.LastIndex(image, ":")
+	if imgTagIndex == -1 {
+		return "", fmt.Errorf("docker image must have an explicit tag, but it was: %s", image)
+	}
+
+	return image[:imgTagIndex], nil
+}
+
+func dockerImageTag(image string) (string, error) {
+	imgTagIndex := strings.LastIndex(image, ":")
+	if imgTagIndex == -1 {
+		return "", fmt.Errorf("docker image must have an explicit tag, but it was: %s", image)
+	}
+
+	return image[imgTagIndex+1:], nil // +1 to exclude the colon
 }

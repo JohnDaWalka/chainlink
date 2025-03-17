@@ -373,6 +373,10 @@ func CreateBlockchains(
 	}
 
 	if input.infraInput.InfraType == libtypes.InfraType_CRIB {
+		if input.nixShell == nil {
+			return nil, errors.New("nix shell is nil")
+		}
+
 		deployCribBlockchainInput := &keystonetypes.DeployCribBlockchainInput{
 			BlockchainInput: input.blockchainInput,
 			NixShell:        input.nixShell,
@@ -448,8 +452,8 @@ type setupOutput struct {
 func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig, priceProvider PriceProvider, binaryDownloadOutput binaryDownloadOutput, mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet) *setupOutput {
 	// Universal setup -- START
 
-	// NixShell is only required, when using CRIB, but we want to run commands in the same "nix develop" context
-	// and we need to have this reference in the outer scope
+	// NixShell is only required, when using CRIB, because we want to run commands in the same "nix develop" context
+	// We need to have this reference in the outer scope, because subsequent functions will need it
 	var nixShell *libnix.NixShell
 	if in.Infra.InfraType == libtypes.InfraType_CRIB {
 		startNixShellInput := &keystonetypes.StartNixShellInput{
@@ -466,7 +470,6 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		})
 	}
 
-	//TODO where to move this?
 	nodeSetInput := mustSetCapabilitiesFn(in.NodeSets)
 
 	blockchainsInput := BlockchainsInput{
@@ -554,12 +557,15 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	var extraAllowedIPs []string
 	var extraAllowedPorts []int
 
-	// TODO we'd need to have a way to deploy fake price provider to CRIB, now we don't as there's no Docker container and no defined deployment
-	if _, ok := priceProvider.(*FakePriceProvider); ok && in.Infra.InfraType == "docker" {
+	if _, ok := priceProvider.(*FakePriceProvider); ok {
+		// In the future we might need to have a way to deploy fake price provider to CRIB, now we don't as it is not Dockerised and there are no Helm charts for it
+		require.Equal(t, libtypes.InfraType_Docker, in.Infra.InfraType, "fake data provider is only supported in Docker infra")
+
 		// it doesn't really matter which container we will use to resolve the host.docker.internal IP, it will be the same for all of them
 		// here we will blokchain container, because by that time it will be running
 		extraAllowedIPs, extraAllowedPorts, err = extraAllowedPortsAndIps(testLogger, in.Fake.Port, blockchainsOutput.blockchainOutput.ContainerName)
 		require.NoError(t, err, "failed to get extra allowed ports and IPs")
+
 	}
 
 	peeringData, err := libdon.FindPeeringData(topology)
@@ -632,20 +638,6 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		var devspaceErr error
 		nodeSetInput, devspaceErr = crib.DeployDons(deployCribDonsInput)
 		require.NoError(t, devspaceErr, "failed to deploy Dons with devspace")
-
-		// imgTagIndex := strings.LastIndex(in.JD.Image, ":")
-		// require.Greater(t, imgTagIndex, -1, "docker image must have an explicit tag, but it was: %s", in.JD.Image)
-
-		// jdEnvVars := map[string]string{
-		// 	"JOB_DISTRIBUTOR_IMAGE_TAG": in.JD.Image[imgTagIndex+1:], // +1 to exclude the colon
-		// }
-		// _, err = nixShell.RunCommandWithEnvVars("devspace run deploy-jd", jdEnvVars)
-		// require.NoError(t, err, "failed to run devspace run deploy-jd")
-
-		// jdOut, err := infra.ReadJdUrl(filepath.Join(".", cribConfigsDir))
-		// require.NoError(t, err, "failed to read JD URLs from file")
-
-		// in.JD.Out = jdOut
 
 		deployCribJdInput := &keystonetypes.DeployCribJdInput{
 			JDInput:        in.JD,
@@ -729,7 +721,8 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		DonToJobSpecs: donToJobSpecs,
 	}
 
-	//TODO should we remove jobs first, if it's running in CRIB? or at least jobs of certain types?
+	// TODO in the future, maybe should we remove all jobs first, if it's running in CRIB? or at least jobs of certain types?
+	// that would allow us to run the same test multiple times without the need to restart the whole environment
 	err = libdon.CreateJobs(testLogger, createJobsInput)
 	require.NoError(t, err, "failed to configure nodes and create jobs")
 

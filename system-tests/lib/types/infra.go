@@ -7,6 +7,13 @@ const (
 	InfraType_Docker InfraType = "docker"
 )
 
+type CribProvider = string
+
+const (
+	CribProvider_AWS  CribProvider = "aws"
+	CribProvider_Kind CribProvider = "kind"
+)
+
 type InfraInput struct {
 	InfraType string     `toml:"type" validate:"oneof=crib docker"`
 	CRIB      *CRIBInput `toml:"crib"`

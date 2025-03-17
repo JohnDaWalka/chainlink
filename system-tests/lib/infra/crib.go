@@ -18,23 +18,29 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
 
-func ReadBlockchainUrl(cribConfigsDir, chainType, chainID string) (*blockchain.Output, error) {
+func ReadBlockchainURL(cribConfigsDir, chainType, chainID string) (*blockchain.Output, error) {
 	fileName := filepath.Join(cribConfigsDir, fmt.Sprintf("chain-%s-urls.json", chainID))
-	file, err := os.Open(fileName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open file %s", fileName)
-	}
-	defer file.Close()
+	// file, err := os.Open(fileName)
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err, "failed to open file %s", fileName)
+	// }
+	// defer file.Close()
 
-	byteValue, err := io.ReadAll(file)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read file %s", fileName)
-	}
+	// byteValue, err := io.ReadAll(file)
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err, "failed to read file %s", fileName)
+	// }
+	// chainURLs := types.ChainURLs{}
+
+	// err = json.Unmarshal(byteValue, &chainURLs)
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err, "failed to unmarshal JSON from file %s", fileName)
+	// }
+
 	chainURLs := types.ChainURLs{}
-
-	err = json.Unmarshal(byteValue, &chainURLs)
+	err := readAndUnmarshalJSON(fileName, &chainURLs)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal JSON from file %s", fileName)
+		return nil, errors.Wrap(err, "failed to read and unmarshal chain URLs JSON")
 	}
 
 	out := &blockchain.Output{}
@@ -53,23 +59,29 @@ func ReadBlockchainUrl(cribConfigsDir, chainType, chainID string) (*blockchain.O
 	return out, nil
 }
 
-func ReadJdUrl(cribConfigsDir string) (*jd.Output, error) {
+func ReadJdURL(cribConfigsDir string) (*jd.Output, error) {
 	fileName := filepath.Join(cribConfigsDir, "jd-urls.json")
-	file, err := os.Open(fileName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open file %s", fileName)
-	}
-	defer file.Close()
+	// file, err := os.Open(fileName)
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err, "failed to open file %s", fileName)
+	// }
+	// defer file.Close()
 
-	byteValue, err := io.ReadAll(file)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read file %s", fileName)
-	}
+	// byteValue, err := io.ReadAll(file)
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err, "failed to read file %s", fileName)
+	// }
+	// jdURLs := types.JdURLs{}
+
+	// err = json.Unmarshal(byteValue, &jdURLs)
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err, "failed to unmarshal JSON from file %s", fileName)
+	// }
+
 	jdURLs := types.JdURLs{}
-
-	err = json.Unmarshal(byteValue, &jdURLs)
+	err := readAndUnmarshalJSON(fileName, &jdURLs)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal JSON from file %s", fileName)
+		return nil, errors.Wrap(err, "failed to read and unmarshal JD URLs JSON")
 	}
 
 	out := &jd.Output{}
@@ -82,44 +94,57 @@ func ReadJdUrl(cribConfigsDir string) (*jd.Output, error) {
 	return out, nil
 }
 
-func ReadNodeSetUrls(cribConfigsDir string, donMetadata *cretypes.DonMetadata) (*ns.Output, error) {
+func ReadNodeSetURL(cribConfigsDir string, donMetadata *cretypes.DonMetadata) (*ns.Output, error) {
 	donFileName := filepath.Join(cribConfigsDir, fmt.Sprintf("don-%s-urls.json", donMetadata.Name))
 
 	// read DON URLs
-	donFile, err := os.Open(donFileName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open file %s", donFileName)
-	}
-	defer donFile.Close()
+	// donFile, err := os.Open(donFileName)
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err, "failed to open file %s", donFileName)
+	// }
+	// defer donFile.Close()
 
-	donByteValue, err := io.ReadAll(donFile)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read file %s", donFileName)
-	}
+	// donByteValue, err := io.ReadAll(donFile)
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err, "failed to read file %s", donFileName)
+	// }
+	// donURLs := types.DonURLs{}
+
+	// err = json.Unmarshal(donByteValue, &donURLs)
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err, "failed to unmarshal JSON from file %s", donFileName)
+	// }
+
 	donURLs := types.DonURLs{}
-
-	err = json.Unmarshal(donByteValue, &donURLs)
+	err := readAndUnmarshalJSON(donFileName, &donURLs)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal JSON from file %s", donFileName)
+		return nil, errors.Wrap(err, "failed to read and unmarshal don URLs JSON")
 	}
 
 	// read API credentials
 	credsFileName := filepath.Join(".", "crib-configs", "don-api-credentials.json")
-	credsFile, err := os.Open(credsFileName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open file %s", credsFileName)
-	}
-	defer credsFile.Close()
+	// credsFile, err := os.Open(credsFileName)
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err, "failed to open file %s", credsFileName)
+	// }
+	// defer credsFile.Close()
 
-	credsByteValue, err := io.ReadAll(credsFile)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read file %s", credsFileName)
-	}
+	// credsByteValue, err := io.ReadAll(credsFile)
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err, "failed to read file %s", credsFileName)
+	// }
+	// apiCredentials := types.DonAPICredentials{}
+
+	// err = json.Unmarshal(credsByteValue, &apiCredentials)
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err, "failed to unmarshal JSON from file %s", credsFileName)
+	// }
+
 	apiCredentials := types.DonAPICredentials{}
 
-	err = json.Unmarshal(credsByteValue, &apiCredentials)
+	err = readAndUnmarshalJSON(credsFileName, &donURLs)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal JSON from file %s", credsFileName)
+		return nil, errors.Wrap(err, "failed to read and unmarshal don API credentials JSON")
 	}
 
 	bootstrapNodes, err := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{Key: libnode.NodeTypeKey, Value: cretypes.BootstrapNode}, libnode.EqualLabels)
@@ -173,4 +198,24 @@ func ReadNodeSetUrls(cribConfigsDir string, donMetadata *cretypes.DonMetadata) (
 	}
 
 	return out, nil
+}
+
+func readAndUnmarshalJSON[Type any](fileName string, target *Type) error {
+	file, err := os.Open(fileName)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open file %s", fileName)
+	}
+	defer file.Close()
+
+	byteValue, err := io.ReadAll(file)
+	if err != nil {
+		return errors.Wrapf(err, "failed to read file %s", fileName)
+	}
+
+	err = json.Unmarshal(byteValue, target)
+	if err != nil {
+		return errors.Wrapf(err, "failed to unmarshal JSON from file %s", fileName)
+	}
+
+	return nil
 }
