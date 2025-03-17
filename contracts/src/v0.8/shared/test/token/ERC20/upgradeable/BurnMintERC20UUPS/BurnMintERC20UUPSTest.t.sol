@@ -95,6 +95,23 @@ contract BurnMintERC20UUPSTest is
     should_Initialize_WithPreMint(address(newBurnMintERC20UUPS), newPreMint);
   }
 
+  function test_Initialize_RevertWhen_PreMintExceedsMaxSupply() public {
+    uint256 newPreMint = MAX_SUPPLY + 1;
+    address implementation = address(new BurnMintERC20UUPS());
+
+    vm.expectRevert(
+      abi.encodeWithSelector(BurnMintERC20UUPS.BurnMintERC20UUPS__MaxSupplyExceeded.selector, newPreMint)
+    );
+
+    new ERC1967Proxy(
+      implementation,
+      abi.encodeCall(
+        BurnMintERC20UUPS.initialize,
+        (NAME, SYMBOL, DECIMALS, MAX_SUPPLY, newPreMint, DEFAULT_ADMIN, DEFAULT_UPGRADER)
+      )
+    );
+  }
+
   function test_Initialize_RevertWhen_AlreadyInitialized() public {
     vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
     s_burnMintERC20UUPS.initialize(NAME, SYMBOL, DECIMALS, MAX_SUPPLY, PRE_MINT, DEFAULT_ADMIN, DEFAULT_UPGRADER);

@@ -88,6 +88,24 @@ contract BurnMintERC20TransparentTest is
     should_Initialize_WithPreMint(address(newBurnMintERC20Transparent), newPreMint);
   }
 
+  function test_Initialize_RevertWhen_PreMintExceedsMaxSupply() public {
+    uint256 newPreMint = MAX_SUPPLY + 1;
+    address implementation = address(new BurnMintERC20Transparent());
+
+    vm.expectRevert(
+      abi.encodeWithSelector(BurnMintERC20Transparent.BurnMintERC20Transparent__MaxSupplyExceeded.selector, newPreMint)
+    );
+
+    new TransparentUpgradeableProxy(
+      implementation,
+      INITIAL_OWNER_ADDRESS_FOR_PROXY_ADMIN,
+      abi.encodeCall(
+        BurnMintERC20Transparent.initialize,
+        (NAME, SYMBOL, DECIMALS, MAX_SUPPLY, newPreMint, DEFAULT_ADMIN)
+      )
+    );
+  }
+
   function test_Initialize_RevertWhen_AlreadyInitialized() public {
     vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
     s_burnMintERC20Transparent.initialize(NAME, SYMBOL, DECIMALS, MAX_SUPPLY, PRE_MINT, DEFAULT_ADMIN);
