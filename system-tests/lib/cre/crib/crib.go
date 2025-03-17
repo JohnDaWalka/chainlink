@@ -10,24 +10,23 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/clnode"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/nix"
-
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
 
-func StartNixShell(input *types.StartNixShellInput) (*nix.NixShell, error) {
+func StartNixShell(input *types.StartNixShellInput) (*nix.Shell, error) {
 	if input == nil {
-		return nil, fmt.Errorf("input is nil")
+		return nil, errors.New("StartNixShellInput is nil")
 	}
 
 	if valErr := input.Validate(); valErr != nil {
-		return nil, valErr
+		return nil, errors.Wrap(valErr, "input validation failed")
 	}
 
 	globalEnvVars := map[string]string{
@@ -39,7 +38,7 @@ func StartNixShell(input *types.StartNixShellInput) (*nix.NixShell, error) {
 		globalEnvVars[key] = value
 	}
 
-	if strings.EqualFold(input.InfraInput.CRIB.Provider, libtypes.CribProvider_AWS) {
+	if strings.EqualFold(input.InfraInput.CRIB.Provider, libtypes.AWS) {
 		globalEnvVars["CHAINLINK_TEAM"] = input.InfraInput.CRIB.TeamInput.Team
 		globalEnvVars["CHAINLINK_PRODUCT"] = input.InfraInput.CRIB.TeamInput.Product
 		globalEnvVars["CHAINLINK_COST_CENTER"] = input.InfraInput.CRIB.TeamInput.CostCenter
@@ -71,11 +70,11 @@ func StartNixShell(input *types.StartNixShellInput) (*nix.NixShell, error) {
 
 func DeployBlockchain(input *types.DeployCribBlockchainInput) (*blockchain.Output, error) {
 	if input == nil {
-		return nil, fmt.Errorf("input is nil")
+		return nil, errors.New("DeployCribBlockchainInput is nil")
 	}
 
 	if valErr := input.Validate(); valErr != nil {
-		return nil, valErr
+		return nil, errors.Wrap(valErr, "input validation failed")
 	}
 
 	gethChainEnvVars := map[string]string{
@@ -97,11 +96,11 @@ func DeployBlockchain(input *types.DeployCribBlockchainInput) (*blockchain.Outpu
 
 func DeployDons(input *types.DeployCribDonsInput) ([]*types.CapabilitiesAwareNodeSet, error) {
 	if input == nil {
-		return nil, fmt.Errorf("input is nil")
+		return nil, errors.New("DeployCribDonsInput is nil")
 	}
 
 	if valErr := input.Validate(); valErr != nil {
-		return nil, valErr
+		return nil, errors.Wrap(valErr, "input validation failed")
 	}
 
 	for j, donMetadata := range input.Topology.DonsMetadata {
@@ -113,7 +112,7 @@ func DeployDons(input *types.DeployCribDonsInput) ([]*types.CapabilitiesAwareNod
 		}
 
 		// validate that all nodes in the same node set use the same Docker image
-		dockerImage, dockerImagesErr := nodesetDockerImage(input.NodeSetInputs[j].NodeSpecs)
+		dockerImage, dockerImagesErr := nodesetDockerImage(input.NodeSetInputs[j])
 		if dockerImagesErr != nil {
 			return nil, errors.Wrap(dockerImagesErr, "failed to validate node set Docker images")
 		}
@@ -144,23 +143,23 @@ func DeployDons(input *types.DeployCribDonsInput) ([]*types.CapabilitiesAwareNod
 			if tomlErr != nil {
 				return nil, errors.Wrapf(tomlErr, "failed to unmarshal toml: %s", tomlStr)
 			}
-			newTOMLBytes, err := toml.Marshal(data)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to marshal toml")
+			newTOMLBytes, marshallErr := toml.Marshal(data)
+			if marshallErr != nil {
+				return nil, errors.Wrap(marshallErr, "failed to marshal toml")
 			}
 
 			return newTOMLBytes, nil
 		}
 
 		var writeOverrides = func(nodeMetadata *types.NodeMetadata, i int, nodeType types.NodeType) error {
-			nodeIndexStr, err := libnode.FindLabelValue(nodeMetadata, libnode.IndexKey)
-			if err != nil {
-				return errors.Wrapf(err, "failed to find node index for %s node %d in nodeset %s", nodeType, i, donMetadata.Name)
+			nodeIndexStr, findErr := libnode.FindLabelValue(nodeMetadata, libnode.IndexKey)
+			if findErr != nil {
+				return errors.Wrapf(findErr, "failed to find node index for %s node %d in nodeset %s", nodeType, i, donMetadata.Name)
 			}
 
-			nodeIndex, err := strconv.Atoi(nodeIndexStr)
-			if err != nil {
-				return errors.Wrapf(err, "failed to convert node index '%s' to int for %s node %d in nodeset %s", nodeIndexStr, nodeType, i, donMetadata.Name)
+			nodeIndex, convErr := strconv.Atoi(nodeIndexStr)
+			if convErr != nil {
+				return errors.Wrapf(convErr, "failed to convert node index '%s' to int for %s node %d in nodeset %s", nodeIndexStr, nodeType, i, donMetadata.Name)
 			}
 
 			cleanToml, tomlErr := cleanToml(input.NodeSetInputs[j].NodeSpecs[nodeIndex].Node.TestConfigOverrides)
@@ -194,31 +193,6 @@ func DeployDons(input *types.DeployCribDonsInput) ([]*types.CapabilitiesAwareNod
 			if writeErr != nil {
 				return nil, writeErr
 			}
-
-			// nodeIndexStr, err := libnode.FindLabelValue(btNode, libnode.IndexKey)
-			// if err != nil {
-			// 	return nil, errors.Wrapf(err, "failed to find node index for bootstrap node %d in nodeset %s", i, donMetadata.Name)
-			// }
-
-			// nodeIndex, err := strconv.Atoi(nodeIndexStr)
-			// if err != nil {
-			// 	return nil, errors.Wrapf(err, "failed to convert node index '%s' to int for bootstrap node %d in nodeset %s", nodeIndexStr, i, donMetadata.Name)
-			// }
-
-			// cleanToml, tomlErr := cleanToml(input.NodeSetInputs[j].NodeSpecs[nodeIndex].Node.TestConfigOverrides)
-			// if tomlErr != nil {
-			// 	return nil, errors.Wrap(tomlErr, "failed to clean TOML")
-			// }
-
-			// writeErr := os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("config-override-bt-%d.toml", i)), cleanToml, 0644)
-			// if writeErr != nil {
-			// 	return nil, errors.Wrapf(writeErr, "failed to write config override for bootstrap node %d to file", i)
-			// }
-
-			// writeErr = os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("secrets-override-bt-%d.toml", i)), []byte(input.NodeSetInputs[j].NodeSpecs[nodeIndex].Node.TestSecretsOverrides), 0644)
-			// if writeErr != nil {
-			// 	return nil, errors.Wrapf(writeErr, "failed to write secrets override for bootstrap node %d to file", i)
-			// }
 		}
 
 		workerNodes, err := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &types.Label{Key: libnode.NodeTypeKey, Value: types.WorkerNode}, libnode.EqualLabels)
@@ -231,35 +205,11 @@ func DeployDons(input *types.DeployCribDonsInput) ([]*types.CapabilitiesAwareNod
 			if writeErr != nil {
 				return nil, writeErr
 			}
-			// nodeIndexStr, err := libnode.FindLabelValue(workerNode, libnode.IndexKey)
-			// if err != nil {
-			// 	return nil, errors.Wrapf(err, "failed to find node index for worker node %d in nodeset %s", i, donMetadata.Name)
-			// }
-
-			// nodeIndex, err := strconv.Atoi(nodeIndexStr)
-			// if err != nil {
-			// 	return nil, errors.Wrapf(err, "failed to convert node index '%s' to int for worker node %d in nodeset %s", nodeIndexStr, i, donMetadata.Name)
-			// }
-
-			// cleanToml, tomlErr := cleanToml(input.NodeSetInputs[j].NodeSpecs[nodeIndex].Node.TestConfigOverrides)
-			// if tomlErr != nil {
-			// 	return nil, errors.Wrap(tomlErr, "failed to clean TOML")
-			// }
-
-			// writeErr := os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("config-override-%d.toml", i)), cleanToml, 0644)
-			// if writeErr != nil {
-			// 	return nil, errors.Wrapf(writeErr, "failed to write config override for worker node %d to file", i)
-			// }
-
-			// writeErr = os.WriteFile(filepath.Join(cribConfigsDirAbs, fmt.Sprintf("secrets-override-%d.toml", i)), []byte(input.NodeSetInputs[j].NodeSpecs[nodeIndex].Node.TestSecretsOverrides), 0644)
-			// if writeErr != nil {
-			// 	return nil, errors.Wrapf(writeErr, "failed to write secrets override for worker node %d to file", i)
-			// }
 		}
 
 		deployDonEnvVars["DON_BOOT_NODE_COUNT"] = strconv.Itoa(len(bootstrapNodes))
-		deployDonEnvVars["DON_NODE_COUNT"] = fmt.Sprint(len(workerNodes))
-		// IMPORTANT: CRIB will deploy gateway only if don_type == "gateway"
+		deployDonEnvVars["DON_NODE_COUNT"] = strconv.Itoa(len(workerNodes))
+		// IMPORTANT: CRIB will deploy gateway only if don_type == "gateway", in other cases the value don type has no impact apart from being used in release/service/etc names
 		deployDonEnvVars["DON_TYPE"] = donMetadata.Name
 
 		_, err = input.NixShell.RunCommandWithEnvVars("devspace run deploy-don", deployDonEnvVars)
@@ -280,11 +230,11 @@ func DeployDons(input *types.DeployCribDonsInput) ([]*types.CapabilitiesAwareNod
 
 func DeployJd(input *types.DeployCribJdInput) (*jd.Output, error) {
 	if input == nil {
-		return nil, fmt.Errorf("input is nil")
+		return nil, errors.New("DeployCribJdInput is nil")
 	}
 
 	if valErr := input.Validate(); valErr != nil {
-		return nil, valErr
+		return nil, errors.Wrap(valErr, "input validation failed")
 	}
 
 	imgTagIndex, err := dockerImageTag(input.JDInput.Image)
@@ -308,33 +258,32 @@ func DeployJd(input *types.DeployCribJdInput) (*jd.Output, error) {
 	return jdOut, nil
 }
 
-func nodesetDockerImage(nodeSpecs []*clnode.Input) (string, error) {
+func nodesetDockerImage(nodeSet *types.CapabilitiesAwareNodeSet) (string, error) {
 	dockerImages := []string{}
-	for _, nodeSpec := range nodeSpecs {
+	for nodeIdx, nodeSpec := range nodeSet.NodeSpecs {
 		if nodeSpec.Node.DockerContext != "" {
-			return "", fmt.Errorf("docker context is not supported in CRIB. Please remove docker_ctx from the node spec")
+			return "", fmt.Errorf("docker context is not supported in CRIB. Please remove docker_ctx from the node at index %d in nodeSet %s", nodeIdx, nodeSet.Name)
 		}
 		if nodeSpec.Node.DockerFilePath != "" {
-			return "", fmt.Errorf("dockerfile is not supported in CRIB. Please remove docker_file from the node spec")
+			return "", fmt.Errorf("dockerfile is not supported in CRIB. Please remove docker_file from the node spec at index %d in nodeSet %s", nodeIdx, nodeSet.Name)
 		}
 
 		// TODO use kubectl cp to copy them?
 		if len(nodeSpec.Node.CapabilitiesBinaryPaths) > 0 {
-			return "", fmt.Errorf("capabilities binaries are not supported in CRIB. Please use a Docker image that already contains the capabilities and remove capabilities_binary_paths from the node spec")
+			return "", fmt.Errorf("capabilities binaries are not supported in CRIB. Please use a Docker image that already contains the capabilities and remove capabilities_binary_paths from the node spec at index %d in nodeSet %s", nodeIdx, nodeSet.Name)
 		}
 		if nodeSpec.Node.CapabilityContainerDir != "" {
-			return "", fmt.Errorf("capabilities binaries are not supported in CRIB. Please use a Docker image that already contains the capabilities and remove capability_container_dir from the node spec")
+			return "", fmt.Errorf("capabilities binaries are not supported in CRIB. Please use a Docker image that already contains the capabilities and remove capability_container_dir from the node spec at index %d in nodeSet %s", nodeIdx, nodeSet.Name)
 		}
 
 		if slices.Contains(dockerImages, nodeSpec.Node.Image) {
 			continue
-
 		}
 		dockerImages = append(dockerImages, nodeSpec.Node.Image)
 	}
 
 	if len(dockerImages) != 1 {
-		return "", fmt.Errorf("all nodes in each nodeset must use the same Docker image, but %d different images were found", len(dockerImages))
+		return "", fmt.Errorf("all nodes in each nodeSet %s must use the same Docker image, but %d different images were found", nodeSet.Name, len(dockerImages))
 	}
 
 	return dockerImages[0], nil

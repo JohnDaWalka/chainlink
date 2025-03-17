@@ -342,11 +342,19 @@ func (c *client) login() error {
 	}
 	defer res.Body.Close()
 
-	cookieHeader := res.Header.Get("Set-Cookie")
-	if cookieHeader == "" {
-		return errors.New("no cookie found in header")
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("login failed with status code: %d", res.StatusCode)
 	}
 
-	c.cookie = strings.Split(cookieHeader, ";")[0]
-	return nil
+	// we have seen both variations of the header, especially in AWS some ingress classes might change the case
+	cookieHeaders := []string{"Set-Cookie", "set-cookie"}
+	for _, header := range cookieHeaders {
+		cookieHeader := res.Header.Get(header)
+		if cookieHeader != "" {
+			c.cookie = strings.Split(cookieHeader, ";")[0]
+			return nil
+		}
+	}
+
+	return fmt.Errorf("no set-cookie found in header (tried: %s). Most probably login failed, do check credentials. Response code was: %d", strings.Join(cookieHeaders, ","), res.StatusCode)
 }

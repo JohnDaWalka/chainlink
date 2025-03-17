@@ -2,6 +2,7 @@ package don
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -32,6 +33,24 @@ func CreateJobs(testLogger zerolog.Logger, input cretypes.CreateJobsInput) error
 			}
 		} else {
 			testLogger.Warn().Msgf("No job specs found for DON %d", don.ID)
+		}
+	}
+
+	return nil
+}
+
+func ValidateTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput types.InfraInput) error {
+	if infraInput.InfraType == types.CRIB {
+		if len(nodeSetInput) == 1 && slices.Contains(nodeSetInput[0].DONTypes, cretypes.GatewayDON) {
+			if len(nodeSetInput[0].Capabilities) > 1 {
+				return errors.New("you must use at least 2 nodeSets when using CRIB and gateway DON. Gateway DON must be in a separate nodeSet and it must be named 'gateway'")
+			}
+		}
+
+		for _, nodeSet := range nodeSetInput {
+			if infraInput.InfraType == types.CRIB && nodeSet.Name != "gateway" {
+				return errors.New("when using CRIB gateway nodeSet with the Gateway DON must be named 'gateway', but got " + nodeSet.Name)
+			}
 		}
 	}
 
@@ -88,10 +107,6 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput
 			host := infra.Host(nodeIdx, nodeType, donMetadata.Name, infraInput)
 
 			if flags.HasFlag(donMetadata.Flags, cretypes.GatewayDON) {
-				if infraInput.InfraType == types.InfraType_CRIB && donMetadata.Name != "gateway" {
-					return nil, errors.New("when using CRIB gateway nodeSet must be named 'gateway', but got " + donMetadata.Name)
-				}
-
 				if nodeSetInput[donIdx].GatewayNodeIndex != -1 && nodeIdx == nodeSetInput[donIdx].GatewayNodeIndex {
 					nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
 						Key:   node.ExtraRolesKey,
@@ -99,7 +114,7 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput
 					})
 
 					gatewayHost := host
-					if infraInput.InfraType == types.InfraType_CRIB {
+					if infraInput.InfraType == types.CRIB {
 						gatewayHost += "-gtwnode"
 					}
 

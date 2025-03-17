@@ -9,10 +9,10 @@ import (
 	"sync"
 )
 
-// NixShell is a wrapper around a nix shell process. It allows to run commands
+// Shell is a wrapper around a nix shell process. It allows to run commands
 // in the same context, preserving the environment variables set in the shell
 // and the state set by initial execution of "nix develop".
-type NixShell struct {
+type Shell struct {
 	cmd    *exec.Cmd
 	stdin  *bufio.Writer
 	stdout *bufio.Reader
@@ -21,7 +21,7 @@ type NixShell struct {
 
 const ErrCommandFailed = "command failed with exit code"
 
-func NewNixShell(folder string, globalEnvVars map[string]string) (*NixShell, error) {
+func NewNixShell(folder string, globalEnvVars map[string]string) (*Shell, error) {
 	cmd := exec.Command("nix", "develop", "--command", "sh")
 	cmd.Dir = folder
 
@@ -46,18 +46,18 @@ func NewNixShell(folder string, globalEnvVars map[string]string) (*NixShell, err
 		return nil, err
 	}
 
-	return &NixShell{
+	return &Shell{
 		cmd:    cmd,
 		stdin:  bufio.NewWriter(stdin),
 		stdout: bufio.NewReader(stdout),
 	}, nil
 }
 
-func (ns *NixShell) RunCommand(command string) (string, error) {
+func (ns *Shell) RunCommand(command string) (string, error) {
 	return ns.RunCommandWithEnvVars(command, map[string]string{})
 }
 
-func (ns *NixShell) RunCommandWithEnvVars(command string, envVars map[string]string) (string, error) {
+func (ns *Shell) RunCommandWithEnvVars(command string, envVars map[string]string) (string, error) {
 	ns.mu.Lock()
 	defer ns.mu.Unlock()
 
@@ -96,7 +96,10 @@ func (ns *NixShell) RunCommandWithEnvVars(command string, envVars map[string]str
 			return "", err
 		}
 		if strings.HasPrefix(line, endMarker) {
-			fmt.Sscanf(line, endMarker+" %d", &exitCode)
+			_, scanRrr := fmt.Sscanf(line, endMarker+" %d", &exitCode)
+			if scanRrr != nil {
+				exitCode = 1
+			}
 			break
 		}
 		output.WriteString(line)
@@ -109,6 +112,6 @@ func (ns *NixShell) RunCommandWithEnvVars(command string, envVars map[string]str
 	return strings.TrimSpace(output.String()), nil
 }
 
-func (ns *NixShell) Close() error {
+func (ns *Shell) Close() error {
 	return ns.cmd.Process.Kill()
 }
