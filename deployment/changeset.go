@@ -6,6 +6,8 @@ import (
 
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 	"github.com/smartcontractkit/mcms"
+
+	"github.com/smartcontractkit/chainlink/deployment/operations"
 )
 
 var (
@@ -109,6 +111,7 @@ type ChangesetOutput struct {
 	DescribedTimelockProposals []string
 	MCMSProposals              []mcms.Proposal
 	AddressBook                AddressBook
+	Reports                    []operations.Report[any, any]
 }
 
 // ViewState produces a product specific JSON representation of
