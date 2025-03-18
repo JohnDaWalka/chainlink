@@ -131,7 +131,6 @@ contract BurnMintERC20UUPS is
     return _getBurnMintERC20UUPSStorage().maxSupply;
   }
 
-  /// @dev Uses OZ ERC20Upgradeable _update to disallow transfers, minting and burning to/from address(0).
   /// @dev Disallows minting and transferring to address(this).
   function _update(address from, address to, uint256 value) internal virtual override {
     if (to == address(this)) revert BurnMintERC20UUPS__InvalidRecipient(to);

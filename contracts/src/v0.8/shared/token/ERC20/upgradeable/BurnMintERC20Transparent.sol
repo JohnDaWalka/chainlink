@@ -123,7 +123,7 @@ contract BurnMintERC20Transparent is
     return $.maxSupply;
   }
 
-  /// @dev Disallows sending to address(this)
+  /// @dev Disallows minting and transferring to address(this).
   function _update(address from, address to, uint256 value) internal virtual override {
     if (to == address(this)) revert BurnMintERC20Transparent__InvalidRecipient(to);
 
