@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {IERC1822Proxiable} from "../../../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/draft-IERC1822.sol";
 import {ERC1967Proxy} from "../../../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {BurnMintERC20UUPS, Initializable} from "../../../../../token/ERC20/upgradeable/BurnMintERC20UUPS.sol";
+import {BurnMintERC20UUPS, Initializable, UUPSUpgradeable} from "../../../../../token/ERC20/upgradeable/BurnMintERC20UUPS.sol";
 
 import {ERC20UpgradableBaseTest_approve} from "../ERC20UpgradableBaseTest.approve.t.sol";
 import {ERC20UpgradableBaseTest_burn} from "../ERC20UpgradableBaseTest.burn.t.sol";
@@ -126,6 +126,18 @@ contract BurnMintERC20UUPSTest is
 
     vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
     newBurnMintERC20UUPS.initialize(NAME, SYMBOL, DECIMALS, MAX_SUPPLY, PRE_MINT, DEFAULT_ADMIN, DEFAULT_UPGRADER);
+  }
+
+  function test_ProxiableUUID() public {
+    BurnMintERC20UUPS implementation = new BurnMintERC20UUPS();
+    bytes32 proxiableUUID = IERC1822Proxiable(address(implementation)).proxiableUUID();
+    bytes32 expectedProxiableUUID = bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1);
+    assertEq(proxiableUUID, expectedProxiableUUID);
+  }
+
+  function test_ProxiableUUID_RevertWhen_CalledThroughProxy() public {
+    vm.expectRevert(abi.encodeWithSelector(UUPSUpgradeable.UUPSUnauthorizedCallContext.selector));
+    IERC1822Proxiable(s_burnMintERC20UUPS).proxiableUUID();
   }
 
   // ================================================================
