@@ -16,7 +16,6 @@ var ccipOffRampIDL = idl.FetchCCIPOfframpIDL()
 var ccipFeeQuoterIDL = idl.FetchFeeQuoterIDL()
 var ccipRmnRemoteIDL = idl.FetchRMNRemoteIDL()
 
-// TODO add events when Querying is finished
 func DestContractReaderConfig() (config.ContractReader, error) {
 	var offRampIDL solanacodec.IDL
 	if err := json.Unmarshal([]byte(ccipOffRampIDL), &offRampIDL); err != nil {
@@ -412,7 +411,6 @@ func DestContractReaderConfig() (config.ContractReader, error) {
 	}, nil
 }
 
-// TODO add events when Querying is finished
 func SourceContractReaderConfig() (config.ContractReader, error) {
 	var routerIDL solanacodec.IDL
 	if err := json.Unmarshal([]byte(ccipRouterIDL), &routerIDL); err != nil {

@@ -6,15 +6,12 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
 
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	soltestutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
-	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	solstate "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	soltokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -306,7 +303,8 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 			},
 			Receiver: state.SolChains[destChain].Receiver.Bytes(),
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-				{destToken.Bytes(), oneE9},
+				// due to the differences in decimals, 1e9 on EVM results to 1 on SVM
+				{destToken.Bytes(), big.NewInt(1)},
 			},
 			ExtraArgs:      extraArgs,
 			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
@@ -461,27 +459,27 @@ func TestTokenTransfer_Solana2EVM(t *testing.T) {
 	// END: extract as MintAndAllow on Solana
 
 	// ---
-	// emptyEVMExtraArgsV2 := []byte{}
-	// extraArgs := emptyEVMExtraArgsV2
+	emptyEVMExtraArgsV2 := []byte{}
+	extraArgs := emptyEVMExtraArgsV2
 
-	extraArgs := soltestutils.MustSerializeExtraArgs(t, fee_quoter.EVMExtraArgsV2{
-		GasLimit: bin.Uint128{Lo: 500_000, Hi: 0}, // TODO: why is default not enough
-	}, solccip.EVMExtraArgsV2Tag)
+	// extraArgs := soltestutils.MustSerializeExtraArgs(t, fee_quoter.EVMExtraArgsV2{
+	// 	GasLimit: bin.Uint128{Lo: 500_000, Hi: 0}, // TODO: why is default not enough
+	// }, solccip.EVMExtraArgsV2Tag)
 
 	tcs := []testhelpers.TestTransferRequest{
 		{
-			Name:        "Send token to EOA",
+			Name:        "Send token to contract",
 			SourceChain: sourceChain,
 			DestChain:   destChain,
 			SolTokens: []ccip_router.SVMTokenAmount{
 				{
 					Token:  srcToken,
-					Amount: 1, // oneE9
+					Amount: 1,
 				},
 			},
-			// Receiver: state.Chains[destChain].Receiver.Address().Bytes(),
-			Receiver: utils.RandomAddress().Bytes(),
+			Receiver: state.Chains[destChain].Receiver.Address().Bytes(),
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
+				// due to the differences in decimals, 1 on SVM results to 1e9 on EVM
 				{destToken.Address().Bytes(), new(big.Int).SetUint64(oneE9)},
 			},
 			ExtraArgs:      extraArgs,
