@@ -50,7 +50,7 @@ func StartNixShell(input *types.StartNixShellInput) (*nix.Shell, error) {
 		return nil, errors.Wrapf(absErr, "failed to get absolute path to crib configs dir %s", input.CribConfigsDir)
 	}
 
-	globalEnvVars["CRE_CONFIG_DIR"] = cribConfigDirAbs
+	globalEnvVars["CONFIG_OVERRIDES_DIR"] = cribConfigDirAbs
 
 	// this will run `nix develop`, which will login to all ECRs and set up the environment
 	// by running `crib init`
@@ -80,9 +80,9 @@ func DeployBlockchain(input *types.DeployCribBlockchainInput) (*blockchain.Outpu
 	gethChainEnvVars := map[string]string{
 		"CHAIN_ID": input.BlockchainInput.ChainID,
 	}
-	_, err := input.NixShell.RunCommandWithEnvVars("devspace run deploy-geth-chain --no-warn", gethChainEnvVars)
+	_, err := input.NixShell.RunCommandWithEnvVars("devspace run deploy-custom-geth-chain --no-warn", gethChainEnvVars)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to run devspace run deploy-geth-chain --no-warn")
+		return nil, errors.Wrap(err, "failed to run devspace run deploy-custom-geth-chain --no-warn")
 	}
 
 	// TODO chain family should be dynamic, but currently we don't have in the input (it's set in the output depending on blockchain type)
