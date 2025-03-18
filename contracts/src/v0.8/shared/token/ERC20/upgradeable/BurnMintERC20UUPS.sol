@@ -10,6 +10,7 @@ import {UUPSUpgradeable} from "../../../../vendor/openzeppelin-solidity-upgradea
 import {ERC20BurnableUpgradeable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
 import {IAccessControl} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/access/IAccessControl.sol";
 import {IERC20} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC20.sol";
+import {IERC1822Proxiable} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/draft-IERC1822.sol";
 import {IERC165} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 contract BurnMintERC20UUPS is
@@ -112,6 +113,7 @@ contract BurnMintERC20UUPS is
       interfaceId == type(IBurnMintERC20Upgradeable).interfaceId ||
       interfaceId == type(IERC165).interfaceId ||
       interfaceId == type(IAccessControl).interfaceId ||
+      interfaceId == type(IERC1822Proxiable).interfaceId ||
       interfaceId == type(IGetCCIPAdmin).interfaceId;
   }
 

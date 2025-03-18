@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import {IERC1822Proxiable} from "../../../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/draft-IERC1822.sol";
 import {ERC1967Proxy} from "../../../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {BurnMintERC20UUPS, Initializable} from "../../../../../token/ERC20/upgradeable/BurnMintERC20UUPS.sol";
 
@@ -133,6 +134,7 @@ contract BurnMintERC20UUPSTest is
 
   function test_SupportsInterface() public view {
     should_SupportsInterface(s_burnMintERC20UUPS);
+    assertTrue(s_burnMintERC20UUPS.supportsInterface(type(IERC1822Proxiable).interfaceId));
   }
 
   // ================================================================
