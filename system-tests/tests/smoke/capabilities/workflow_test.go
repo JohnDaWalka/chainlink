@@ -835,6 +835,11 @@ func TestKeystoneWithOCR3Workflow_SingleDon_MockedPrice(t *testing.T) {
 		if t.Failed() {
 			logTestInfo(testLogger, in.WorkflowConfig.FeedID, in.WorkflowConfig.WorkflowName, setupOutput.feedsConsumerAddress.Hex(), setupOutput.forwarderAddress.Hex())
 
+			// log scanning is not supported for CRIB
+			if in.Infra.InfraType == libtypes.CRIB {
+				return
+			}
+
 			logDir := fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name())
 
 			removeErr := os.RemoveAll(logDir)
@@ -940,6 +945,11 @@ func TestKeystoneWithOCR3Workflow_GatewayDon_MockedPrice(t *testing.T) {
 	t.Cleanup(func() {
 		if t.Failed() {
 			logTestInfo(testLogger, in.WorkflowConfig.FeedID, in.WorkflowConfig.WorkflowName, setupOutput.feedsConsumerAddress.Hex(), setupOutput.forwarderAddress.Hex())
+
+			// log scanning is not supported for CRIB
+			if in.Infra.InfraType == libtypes.CRIB {
+				return
+			}
 
 			logDir := fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name())
 
@@ -1049,6 +1059,11 @@ func TestKeystoneWithOCR3Workflow_CapabilitiesDons_LivePrice(t *testing.T) {
 	t.Cleanup(func() {
 		if t.Failed() {
 			logTestInfo(testLogger, in.WorkflowConfig.FeedID, in.WorkflowConfig.WorkflowName, setupOutput.feedsConsumerAddress.Hex(), setupOutput.forwarderAddress.Hex())
+
+			// log scanning is not supported for CRIB
+			if in.Infra.InfraType == libtypes.CRIB {
+				return
+			}
 
 			logDir := fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name())
 

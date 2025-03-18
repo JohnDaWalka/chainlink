@@ -187,6 +187,7 @@ func (c *CreateJobsInput) Validate() error {
 type DebugInput struct {
 	DebugDons        []*DebugDon
 	BlockchainOutput *blockchain.Output
+	InfraInput       *types.InfraInput
 }
 
 type DebugDon struct {
@@ -215,6 +216,9 @@ func (d *DebugInput) Validate() error {
 	}
 	if d.BlockchainOutput == nil {
 		return errors.New("blockchain output not set")
+	}
+	if d.InfraInput == nil {
+		return errors.New("infra input not set")
 	}
 
 	return nil
