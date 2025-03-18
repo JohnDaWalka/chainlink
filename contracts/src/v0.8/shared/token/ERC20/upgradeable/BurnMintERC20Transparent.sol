@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {IGetCCIPAdmin} from "../../../../ccip/interfaces/IGetCCIPAdmin.sol";
 import {IBurnMintERC20Upgradeable} from "../../../../shared/token/ERC20/upgradeable/IBurnMintERC20Upgradeable.sol";
 
-import {AccessControlUpgradeable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/access/AccessControlUpgradeable.sol";
+import {AccessControlDefaultAdminRulesUpgradeable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {Initializable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/proxy/utils/Initializable.sol";
 import {ERC20BurnableUpgradeable} from "../../../../vendor/openzeppelin-solidity-upgradeable/v5.0.2/contracts/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
 import {IAccessControl} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/access/IAccessControl.sol";
@@ -17,7 +17,7 @@ contract BurnMintERC20Transparent is
   IGetCCIPAdmin,
   IERC165,
   ERC20BurnableUpgradeable,
-  AccessControlUpgradeable
+  AccessControlDefaultAdminRulesUpgradeable
 {
   error BurnMintERC20Transparent__MaxSupplyExceeded(uint256 supplyAfterMint);
   error BurnMintERC20Transparent__InvalidRecipient(address recipient);
@@ -98,7 +98,7 @@ contract BurnMintERC20Transparent is
   /// @inheritdoc IERC165
   function supportsInterface(
     bytes4 interfaceId
-  ) public pure virtual override(AccessControlUpgradeable, IERC165) returns (bool) {
+  ) public pure virtual override(AccessControlDefaultAdminRulesUpgradeable, IERC165) returns (bool) {
     return
       interfaceId == type(IERC20).interfaceId ||
       interfaceId == type(IBurnMintERC20Upgradeable).interfaceId ||
