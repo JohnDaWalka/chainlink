@@ -20,8 +20,8 @@ contract BurnMintERC20PausableTransparent is BurnMintERC20Transparent, PausableU
   }
 
   /// @notice Unpauses the implementation.
-  /// @dev Requires the caller to have the PAUSER_ROLE.
-  function unpause() public onlyRole(PAUSER_ROLE) {
+  /// @dev Requires the caller to have the DEFAULT_ADMIN_ROLE.
+  function unpause() public onlyRole(DEFAULT_ADMIN_ROLE) {
     _unpause();
 
     emit Unpaused(msg.sender);

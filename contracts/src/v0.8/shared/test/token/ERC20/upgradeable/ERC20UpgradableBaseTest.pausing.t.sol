@@ -24,8 +24,9 @@ contract ERC20UpgradableBaseTest_pausing is ERC20UpgradableBaseTest {
     changePrank(DEFAULT_PAUSER);
     IERC20UpgradeableBase(implementation).pause();
 
+    changePrank(DEFAULT_ADMIN);
     vm.expectEmit();
-    emit PausableUpgradeable.Unpaused(DEFAULT_PAUSER);
+    emit PausableUpgradeable.Unpaused(DEFAULT_ADMIN);
     IERC20UpgradeableBase(implementation).unpause();
 
     assertFalse(PausableUpgradeable(implementation).paused());
@@ -50,14 +51,17 @@ contract ERC20UpgradableBaseTest_pausing is ERC20UpgradableBaseTest {
     IERC20UpgradeableBase(implementation).pause();
   }
 
-  function should_Unpause_RevertWhen_CallerDoesNotHavePauserRole(address implementation, bytes32 PAUSER_ROLE) public {
+  function should_Unpause_RevertWhen_CallerDoesNotHaveDefaultAdminRole(
+    address implementation,
+    bytes32 DEFAULT_ADMIN_ROLE
+  ) public {
     changePrank(DEFAULT_PAUSER);
     IERC20UpgradeableBase(implementation).pause();
 
     changePrank(STRANGER);
 
     vm.expectRevert(
-      abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, STRANGER, PAUSER_ROLE)
+      abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, STRANGER, DEFAULT_ADMIN_ROLE)
     );
 
     IERC20UpgradeableBase(implementation).unpause();

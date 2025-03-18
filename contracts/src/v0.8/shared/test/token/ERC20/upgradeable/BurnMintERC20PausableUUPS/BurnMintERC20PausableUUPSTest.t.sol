@@ -48,10 +48,10 @@ contract BurnMintERC20PausableUUPSTest is ERC20UpgradableBaseTest_pausing {
     );
   }
 
-  function test_Unpause_RevertWhen_CallerDoesNotHavePauserRole() public {
-    should_Unpause_RevertWhen_CallerDoesNotHavePauserRole(
+  function test_Unpause_RevertWhen_CallerDoesNotHaveDefaultAdminRole() public {
+    should_Unpause_RevertWhen_CallerDoesNotHaveDefaultAdminRole(
       address(s_burnMintERC20PausableUUPS),
-      s_burnMintERC20PausableUUPS.PAUSER_ROLE()
+      s_burnMintERC20PausableUUPS.DEFAULT_ADMIN_ROLE()
     );
   }
 
