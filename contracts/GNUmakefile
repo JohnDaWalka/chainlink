@@ -37,6 +37,10 @@ pnpmdep: ## Install solidity contract dependencies through pnpm
 abigen: ## Build & install abigen.
 	../tools/bin/build_abigen
 
+.PHONY: zksolc
+zksolc: ## Build & install abigen.
+	../tools/bin/install_zksolc
+
 .PHONY: mockery
 mockery: $(mockery) ## Install mockery.
 	go install github.com/vektra/mockery/v2@v2.52.3

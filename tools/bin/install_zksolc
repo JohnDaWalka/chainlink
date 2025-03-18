@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+set -e
+
+BIN_DIR="$(realpath "$(dirname $0)")"
+
+logVersion()  {
+    "$BIN_DIR/zksolc" --version
+}
+
+# Check if zksolc already exists
+if [ -f "$BIN_DIR/zksolc" ]; then
+    result="$("$BIN_DIR/zksolc" --version)"
+    if echo "$result" | grep -q "ZKsync v1.5.3"; then
+        echo "$result"
+        exit 0
+    else
+        echo "zksolc version does not match expected version. reinstalling..."
+    fi
+fi
+
+ZKSOLC_VERSION=1.5.3
+GITHUB_URL="https://api.github.com/repos/matter-labs/era-compiler-solidity/releases/tags/$ZKSOLC_VERSION"
+
+OS=$(uname -s)
+if [ "$OS" = "Darwin" ]; then
+    if [ "$(uname -m)" = "arm64" ]; then
+        ASSET_NAME="zksolc-macosx-arm64-v${ZKSOLC_VERSION}"
+    else
+        ASSET_NAME="zksolc-macosx-amd64-v${ZKSOLC_VERSION}"
+    fi
+elif [ "$OS" = "Linux" ]; then
+    ASSET_NAME="zksolc-linux-amd64-gnu-v${ZKSOLC_VERSION}"
+else
+    echo "Unsupported operating system: $OS"
+    exit 1
+fi
+
+ASSET_URL=$(curl --silent "$GITHUB_URL" | jq -r ".assets[] | select(.name == \"$ASSET_NAME\") | .browser_download_url")
+if [ -z "$ASSET_URL" ]; then
+  echo "Error: Could not find the asset $ASSET_NAME in release $ZKSOLC_VERSION ($ASSET_URL)."
+  exit 1
+fi
+
+mkdir -p "$BIN_DIR"
+curl -L "$ASSET_URL" -o "$BIN_DIR/zksolc"
+chmod +x "$BIN_DIR/zksolc"
+logVersion
