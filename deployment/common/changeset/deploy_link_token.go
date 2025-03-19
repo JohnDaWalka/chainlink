@@ -4,16 +4,19 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/gagliardetto/solana-go"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	solCommomUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/common/changeset/zksync"
 	"github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/link_token"
@@ -110,10 +113,7 @@ func deployLinkTokenContractEVM(
 ) (*deployment.ContractDeploy[*link_token.LinkToken], error) {
 	linkToken, err := deployment.DeployContract[*link_token.LinkToken](lggr, chain, ab,
 		func(chain deployment.Chain) deployment.ContractDeploy[*link_token.LinkToken] {
-			linkTokenAddr, tx, linkToken, err2 := link_token.DeployLinkToken(
-				chain.DeployerKey,
-				chain.Client,
-			)
+			linkTokenAddr, tx, linkToken, err2 := zksync.PickDeployFn[*link_token.LinkToken](chain, link_token.DeployLinkToken, link_token.DeployLinkTokenZk)
 			return deployment.ContractDeploy[*link_token.LinkToken]{
 				Address:  linkTokenAddr,
 				Contract: linkToken,
