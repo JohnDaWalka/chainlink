@@ -186,11 +186,6 @@ func DestContractReaderConfig() (config.ContractReader, error) {
 						InputModifications: codec.ModifiersConfig{&codec.RenameModifierConfig{Fields: map[string]string{"NewChainSelector": "SourceChainSelector"}}},
 						OutputModifications: codec.ModifiersConfig{
 							&codec.PropertyExtractorConfig{FieldName: "Config"},
-							// TODO, onchain comment cays that both can be populated, but EVM contracts only have 1, so we take first here
-							//	  // OnRamp addresses supported from the source chain, each of them has a 64 byte address. So this can hold 2 addresses.
-							//    // If only one address is configured, then the space for the second address must be zeroed.
-							//    // Each address must be right padded with zeros if it is less than 64 bytes.
-							&codec.ElementExtractorFromOnchainModifierConfig{Extractions: map[string]*codec.ElementExtractorLocation{"OnRamp": &locationFirst}},
 							// TODO: figure out how this will be properly configured, if it has to be added to SVM state
 							&codec.HardCodeModifierConfig{OffChainValues: map[string]any{"IsRMNVerificationDisabled": true}},
 						},
