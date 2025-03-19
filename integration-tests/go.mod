@@ -46,6 +46,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.46
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250319145818-73e7ea68d9fe
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250319145818-73e7ea68d9fe
 	github.com/smartcontractkit/chainlink-common v0.5.1-0.20250319144518-218b4debc6c7
 	github.com/smartcontractkit/chainlink-integrations/evm v0.0.0-20250317165050-f8c18e1f415e
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0
@@ -439,7 +440,6 @@ require (
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250319145818-73e7ea68d9fe // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250319152737-3be36043bbaf // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 // indirect
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250317154237-afa0f9b81806 // indirect
@@ -568,6 +568,8 @@ require (
 )
 
 replace (
+	// requires https://github.com/gagliardetto/binary/pull/12 to parse optional values in ParseEventSol
+	github.com/gagliardetto/binary => github.com/archseer/binary v0.0.0-20250226104222-b87d7f4fd58a
 	// replicating the replace directive on cosmos SDK
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
