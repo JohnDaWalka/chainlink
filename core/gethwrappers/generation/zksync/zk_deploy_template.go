@@ -25,17 +25,22 @@ func DeployPlaceholderContractNameZk(auth *bind.TransactOpts, ethClient *ethclie
 		}
 	}
 
-	txHash, err := wallet.Deploy(&accounts.TransactOpts{
-		Nonce:     auth.Nonce,
-		Value:     auth.Value,
-		GasPrice:  auth.GasPrice,
-		GasLimit:  auth.GasLimit,
-		GasFeeCap: auth.GasFeeCap,
-		GasTipCap: auth.GasTipCap,
-		Context:   auth.Context,
-	}, accounts.Create2Transaction{
+	var deployOpts *accounts.TransactOpts
+	if auth != nil {
+		deployOpts = &accounts.TransactOpts{
+			Nonce:     auth.Nonce,
+			Value:     auth.Value,
+			GasPrice:  auth.GasPrice,
+			GasLimit:  auth.GasLimit,
+			GasFeeCap: auth.GasFeeCap,
+			GasTipCap: auth.GasTipCap,
+			Context:   auth.Context,
+		}
+	}
+	txHash, err := wallet.Deploy(deployOpts, accounts.Create2Transaction{
 		Bytecode: ZkBytecode,
-		Calldata: calldata})
+		Calldata: calldata,
+	})
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
