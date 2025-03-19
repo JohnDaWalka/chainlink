@@ -99,11 +99,11 @@ func DestContractReaderConfig() (config.ContractReader, error) {
 						},
 					},
 					consts.MethodNameOffRampLatestConfigDetails: {
-						ChainSpecificName:   "Config",
-						ReadType:            config.Account,
-						PDADefinition:       solanacodec.PDATypeDef{Prefix: []byte("config")},
+						ChainSpecificName: "Config",
+						ReadType:          config.Account,
+						PDADefinition:     solanacodec.PDATypeDef{Prefix: []byte("config")},
+						// TODO: OutputModifications are currently disabled and a special workaround is built into chainlink-solana for now
 						OutputModifications: codec.ModifiersConfig{
-							// TODO why does Solana have two of these in an array, but EVM has one
 							// &codec.WrapperModifierConfig{
 							// 	Fields: map[string]string{"Ocr3": "OcrConfig"},
 							// },
