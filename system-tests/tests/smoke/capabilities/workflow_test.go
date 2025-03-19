@@ -741,7 +741,8 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		CldEnv:        fullCldOutput.Environment,
 		Topology:      topology,
 	}
-	err = libcontracts.ConfigureKeystone(configureKeystoneInput)
+
+	err = libcontracts.ConfigureKeystone(configureKeystoneInput, []keystonetypes.DONCapabilityWithConfigFactoryFn{libcontracts.DefaultCapabilityFactoryFn})
 	require.NoError(t, err, "failed to configure keystone contracts")
 
 	// Universal setup -- END
