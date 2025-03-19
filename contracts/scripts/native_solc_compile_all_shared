@@ -36,7 +36,9 @@ compileContract() {
 
   # only Link Token as demonstration
   if [ "$contract" = "LinkToken" ]; then
-    "$(dirname "$0")/zksync_solc_compile" $IN $CONTRACTS_DIR/zksolc/$PROJECT/$contract $CONTRACTS_DIR/src/v0.8
+    forge build $IN --zksync \
+      --root $CONTRACTS_DIR \
+      --use 0.8.19
   fi
 }
 

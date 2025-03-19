@@ -4,7 +4,6 @@ tmp/
 .pnp
 .pnp.js
 tools/bin/abigen
-tools/bin/zksolc
 
 /chainlink
 core/chainlink

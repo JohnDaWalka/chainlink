@@ -37,9 +37,9 @@ pnpmdep: ## Install solidity contract dependencies through pnpm
 abigen: ## Build & install abigen.
 	../tools/bin/build_abigen
 
-.PHONY: zksolc
-zksolc: ## Build & install abigen.
-	../tools/bin/install_zksolc
+.PHONY: foundry-zksync
+foundry-zksync:
+	../tools/bin/install_foundry_zksync
 
 .PHONY: mockery
 mockery: $(mockery) ## Install mockery.

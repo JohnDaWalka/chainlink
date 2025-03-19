@@ -32,7 +32,7 @@ func main() {
 	genwrapper.GenWrapper(abiPath, binPath, className, pkgName, outDirSuffix)
 
 	if pkgName == "link_token" {
-		zksolcBinPath := rootDir + "contracts/zksolc/" + project + "/" + className + "/" + className + ".sol/" + className + ".zbin"
+		zksolcBinPath := rootDir + "contracts/zkout/" + className + ".sol/" + className + ".json"
 
 		zksyncwrapper.WrapZksyncDeploy(zksolcBinPath, className, pkgName, outDirSuffix)
 	}

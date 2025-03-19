@@ -29,3 +29,7 @@ runs:
       uses: foundry-rs/foundry-toolchain@de808b1eea699e761c404bda44ba8f21aba30b2c # v1.3.1
       with:
         version: ${{ steps.extract-foundry-version.outputs.foundry-version }}
+
+    - name: Install Foundry ZKSync
+      working-directory: ${{ inputs.working-directory }}
+      run: make foundry-zksync

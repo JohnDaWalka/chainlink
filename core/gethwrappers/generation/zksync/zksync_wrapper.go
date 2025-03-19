@@ -2,6 +2,7 @@ package zksyncwrapper
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/format"
@@ -108,8 +109,17 @@ func declareDeployFunction(contractName string) ast.Decl {
 }
 
 func declareBytecodeVar(srcFile string) ast.Decl {
-	bytecode, err := os.ReadFile(srcFile)
+	jsonData, err := os.ReadFile(srcFile)
 	if err != nil {
+		panic(err)
+	}
+
+	var bytecodeData struct {
+		Bytecode struct {
+			Object string `json:"object"`
+		} `json:"bytecode"`
+	}
+	if err := json.Unmarshal(jsonData, &bytecodeData); err != nil {
 		panic(err)
 	}
 
@@ -126,7 +136,7 @@ func declareBytecodeVar(srcFile string) ast.Decl {
 						Args: []ast.Expr{
 							&ast.BasicLit{
 								Kind:  token.STRING,
-								Value: fmt.Sprintf(`"%s"`, bytecode[2:])}}}}}}}
+								Value: fmt.Sprintf(`"%s"`, bytecodeData.Bytecode.Object)}}}}}}}
 }
 
 func writeFile(fileNode *ast.File, dstFile string) {
