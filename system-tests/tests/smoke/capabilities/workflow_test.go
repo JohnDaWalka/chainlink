@@ -567,7 +567,6 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		// here we will blokchain container, because by that time it will be running
 		extraAllowedIPs, extraAllowedPorts, err = extraAllowedPortsAndIps(testLogger, in.Fake.Port, blockchainsOutput.blockchainOutput.ContainerName)
 		require.NoError(t, err, "failed to get extra allowed ports and IPs")
-
 	}
 
 	peeringData, err := libdon.FindPeeringData(topology)
