@@ -36,7 +36,7 @@ compileContract() {
 
   # only Link Token as demonstration
   if [ "$contract" = "LinkToken" ]; then
-    "$(dirname "$0")/zksync_solc_compile" $IN $CONTRACTS_DIR/zksolc/$PROJECT/$contract
+    "$(dirname "$0")/zksync_solc_compile" $IN $CONTRACTS_DIR/zksolc/$PROJECT/$contract $CONTRACTS_DIR/src/v0.8
   fi
 }
 

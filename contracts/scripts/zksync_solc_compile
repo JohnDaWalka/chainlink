@@ -4,13 +4,15 @@ set -e
 
 IN=$1
 OUT=$2
+ALLOW_PATHS=$3
 
 TOOLS_DIR="$(cd "$(dirname "$0")"/../../tools && pwd -P)"
 
 echo "Compiling $IN with zksolc"
 
-"$TOOLS_DIR/bin/zksolc" -O3 \
-    --bin --metadata-literal --metadata-hash none \
-    --evm-version paris \
+"$TOOLS_DIR/bin/zksolc" --bin \
+    --metadata-literal --metadata-hash none \
+    --evm-version paris -O3 \
+    --allow-paths $ALLOW_PATHS \
     -o $OUT --overwrite \
     $IN
