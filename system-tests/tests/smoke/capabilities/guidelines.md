@@ -112,7 +112,7 @@ Before running tests in CRIB, follow these steps:
    cost_center = "crib"
    component = "crib"
    ```
-
+7. **Start VPN** - If using AWS.
 ---
 
 ## Setting Docker Images for CRIB Execution
@@ -274,10 +274,25 @@ Ensure `DON_TYPE` matches the `name` field in your TOML config:
 - CRIB does **not** support the mocked data source used in PoR smoke tests, as it runs outside a container.
 - Only tests using **live endpoints** can be executed in CRIB.
 
-
 ### Environment variables
 - Some are set by the Go code, others are taken from `./deployments/cre/.env` and applied when `nix develop` is run. Make sure that variables set from Go code are not present in `.env` file as it might lead to inconsistent behaviour.
 
+### DNS propagation
+- When running in AWS DNS propagation of Ingress domains might be painfully slow. Be patient and try again if failures occur.
+- Ingress check on `kind` cluster is also sometimes faulty and fails, even though all systems are operational. Currently, the only remedy is re-running.
+
+### Connection Issues
+If you encounter connection problems:
+Check pod health:
+```bash
+kubectl get pods
+```
+
+Ensure all pods show "Running" status.
+View pod logs:
+```bash
+kubectl logs <POD_NAME>
+```
 ---
 
 ## Adding a New Capability
