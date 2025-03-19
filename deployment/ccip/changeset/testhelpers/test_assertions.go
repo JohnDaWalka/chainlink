@@ -471,7 +471,10 @@ func SolEventEmitter[T any](
 						Until:      until,
 					},
 				)
-				require.NoError(t, err)
+				if err != nil {
+					errorCh <- err
+					return
+				}
 
 				if len(txSigs) == 0 {
 					continue
@@ -497,15 +500,20 @@ func SolEventEmitter[T any](
 							MaxSupportedTransactionVersion: &v,
 						},
 					)
-					require.NoError(t, err)
-					require.NotNil(t, tx)
+					if err != nil {
+						errorCh <- err
+						return
+					}
 
 					var event T
 					err = solcommon.ParseEvent(tx.Meta.LogMessages, eventType, &event, solconfig.PrintEvents)
 					if err != nil && strings.Contains(err.Error(), "event not found") {
 						continue
 					}
-					require.NoError(t, err)
+					if err != nil {
+						errorCh <- err
+						return
+					}
 
 					select {
 					case ch <- event:
