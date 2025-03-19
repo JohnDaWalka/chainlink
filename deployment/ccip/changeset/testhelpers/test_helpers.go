@@ -1825,7 +1825,7 @@ func WaitForTheTokenBalanceSol(
 			"token", token,
 			"receiver", receiver,
 		)
-		return uint64(balance) == expected //nolint:gosec
+		return uint64(balance) == expected //nolint:gosec // value is always unsigned
 	}, tests.WaitTimeout(t), 100*time.Millisecond)
 }
 
