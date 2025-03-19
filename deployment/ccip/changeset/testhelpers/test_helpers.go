@@ -573,8 +573,6 @@ func SendRequestSol(
 	ix, err := base.ValidateAndBuild()
 	require.NoError(t, err)
 
-	fmt.Printf("IX LEN: %v %v\n", len(base.AccountMetaSlice), len(ix.Accounts()))
-
 	// for some reason onchain doesn't see extraAccounts
 
 	ixs := []solana.Instruction{ix}
