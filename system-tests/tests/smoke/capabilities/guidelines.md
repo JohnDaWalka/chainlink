@@ -259,6 +259,13 @@ Ensure `DON_TYPE` matches the `name` field in your TOML config:
 
 ---
 
+## Switching from kind to AWS provider
+Since `kind` provider uses `/ets/hosts` for routing you **must remove** all entries added previously if you are using the same namespace you used in `kind`. Otherwise traffic will be incorrectly redirected to localhost instead of AWS.
+
+It is thus advised to change namespace names, when switching providers.
+
+---
+
 ## CRIB Limitations & Considerations
 
 ### Gateway DON
