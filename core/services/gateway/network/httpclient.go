@@ -3,13 +3,10 @@ package network
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/doyensec/safeurl"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -23,13 +20,6 @@ type HTTPClient interface {
 type HTTPClientConfig struct {
 	MaxResponseBytes uint32
 	DefaultTimeout   time.Duration
-	BlockedIPs       []string
-	BlockedIPsCIDR   []string
-	AllowedPorts     []int
-	AllowedSchemes   []string
-
-	// for testing
-	allowedIPs []string
 }
 
 var (
@@ -38,27 +28,6 @@ var (
 	defaultMaxResponseBytes = uint32(26.4 * utils.KB)
 	defaultTimeout          = 5 * time.Second
 )
-
-func (c *HTTPClientConfig) ApplyDefaults() {
-	if len(c.AllowedPorts) == 0 {
-		c.AllowedPorts = defaultAllowedPorts
-	}
-
-	if len(c.AllowedSchemes) == 0 {
-		c.AllowedSchemes = defaultAllowedSchemes
-	}
-
-	if c.MaxResponseBytes == 0 {
-		c.MaxResponseBytes = defaultMaxResponseBytes
-	}
-
-	if c.DefaultTimeout == 0 {
-		c.DefaultTimeout = defaultTimeout
-	}
-
-	// safeurl automatically blocks internal IPs so no need
-	// to set defaults here.
-}
 
 type HTTPRequest struct {
 	Method  string
@@ -79,7 +48,7 @@ type HTTPResponse struct {
 }
 
 type httpClient struct {
-	client *safeurl.WrappedClient
+	client *http.Client
 	config HTTPClientConfig
 	lggr   logger.Logger
 }
@@ -87,27 +56,14 @@ type httpClient struct {
 // NewHTTPClient creates a new NewHTTPClient
 // As of now, the client does not support TLS configuration but may be extended in the future
 func NewHTTPClient(config HTTPClientConfig, lggr logger.Logger) (HTTPClient, error) {
-	config.ApplyDefaults()
-	safeConfig := safeurl.
-		GetConfigBuilder().
-		SetTimeout(config.DefaultTimeout).
-		SetAllowedIPs([]string{"172.18.0.13", "172.18.0.14", "172.18.0.15", "172.18.0.16", "172.18.0.17"}...).
-		SetAllowedPorts(config.AllowedPorts...).
-		SetAllowedSchemes(config.AllowedSchemes...).
-		SetBlockedIPs(config.BlockedIPs...).
-		SetBlockedIPsCIDR(config.BlockedIPsCIDR...).
-		SetCheckRedirect(disableRedirects).
-		Build()
-
 	return &httpClient{
 		config: config,
-		client: safeurl.Client(safeConfig),
-		lggr:   lggr,
+		client: &http.Client{
+			Timeout:   config.DefaultTimeout,
+			Transport: http.DefaultTransport,
+		},
+		lggr: lggr,
 	}, nil
-}
-
-func disableRedirects(req *http.Request, via []*http.Request) error {
-	return errors.New("redirects are not allowed")
 }
 
 func (c *httpClient) Send(ctx context.Context, req HTTPRequest) (*HTTPResponse, error) {
