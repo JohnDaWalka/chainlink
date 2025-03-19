@@ -32,6 +32,7 @@ import (
 	mnCfg "github.com/smartcontractkit/chainlink-framework/multinode/config"
 
 	solrpc "github.com/gagliardetto/solana-go/rpc"
+
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -506,11 +507,9 @@ func CreateKeys(t *testing.T,
 }
 
 func FundSolAccounts(ctx context.Context, accounts []solana.PublicKey, solanaGoClient *solrpc.Client, t *testing.T) {
-	sigs := []solana.Signature{}
 	for _, v := range accounts {
-		sig, err := solanaGoClient.RequestAirdrop(ctx, v, 1000*solana.LAMPORTS_PER_SOL, solrpc.CommitmentConfirmed)
+		_, err := solanaGoClient.RequestAirdrop(ctx, v, 1000*solana.LAMPORTS_PER_SOL, solrpc.CommitmentConfirmed)
 		require.NoError(t, err)
-		sigs = append(sigs, sig)
 	}
 	// we don't wait for confirmation so we don't block the tests, it'll take a while before nodes start transmitting
 }

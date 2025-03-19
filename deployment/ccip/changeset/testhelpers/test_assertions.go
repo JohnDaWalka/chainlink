@@ -24,6 +24,7 @@ import (
 	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 

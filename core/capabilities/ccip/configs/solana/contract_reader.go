@@ -103,14 +103,14 @@ func DestContractReaderConfig() (config.ContractReader, error) {
 						ReadType:          config.Account,
 						PDADefinition:     solanacodec.PDATypeDef{Prefix: []byte("config")},
 						// TODO: OutputModifications are currently disabled and a special workaround is built into chainlink-solana for now
-						OutputModifications: codec.ModifiersConfig{
-							// &codec.WrapperModifierConfig{
-							// 	Fields: map[string]string{"Ocr3": "OcrConfig"},
-							// },
-							// &codec.PropertyExtractorConfig{FieldName: "Ocr3"},
-							// &codec.ElementExtractorFromOnchainModifierConfig{Extractions: map[string]*codec.ElementExtractorLocation{"OcrConfig": &locationFirst}},
-							// &codec.ByteToBooleanModifierConfig{Fields: []string{"OcrConfig.ConfigInfo.IsSignatureVerificationEnabled"}},
-						},
+						// OutputModifications: codec.ModifiersConfig{
+						// 	&codec.WrapperModifierConfig{
+						// 		Fields: map[string]string{"Ocr3": "OcrConfig"},
+						// 	},
+						// 	&codec.PropertyExtractorConfig{FieldName: "Ocr3"},
+						// 	&codec.ElementExtractorFromOnchainModifierConfig{Extractions: map[string]*codec.ElementExtractorLocation{"OcrConfig": &locationFirst}},
+						// 	&codec.ByteToBooleanModifierConfig{Fields: []string{"OcrConfig.ConfigInfo.IsSignatureVerificationEnabled"}},
+						// },
 					},
 					consts.MethodNameGetLatestPriceSequenceNumber: {
 						ChainSpecificName: "GlobalState",
@@ -323,7 +323,7 @@ func DestContractReaderConfig() (config.ContractReader, error) {
 							Prefix: []byte("config"),
 						},
 						OutputModifications: codec.ModifiersConfig{
-							&codec.HardCodeModifierConfig{OffChainValues: map[string]any{"WrappedNative": solana.WrappedSol}},
+							&codec.HardCodeModifierConfig{OffChainValues: map[string]any{"WrappedNative": solana.WrappedSol.String()}},
 							&codec.PropertyExtractorConfig{FieldName: "WrappedNative"},
 							// TODO: error: process Router results: get router wrapped native result: invalid type: '': source data must be an array or slice, got string"
 						},
