@@ -109,7 +109,7 @@ func TestTokenTransfer(t *testing.T) {
 			},
 			Receiver: utils.RandomAddress().Bytes(),
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-				{destToken.Address().Bytes(), oneE18},
+				{Token: destToken.Address().Bytes(), Amount: oneE18},
 			},
 			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
 		},
@@ -125,7 +125,7 @@ func TestTokenTransfer(t *testing.T) {
 			},
 			Receiver: state.Chains[destChain].Receiver.Address().Bytes(),
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-				{destToken.Address().Bytes(), oneE18},
+				{Token: destToken.Address().Bytes(), Amount: oneE18},
 			},
 			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
 		},
@@ -150,8 +150,8 @@ func TestTokenTransfer(t *testing.T) {
 			Receiver:  state.Chains[sourceChain].Receiver.Address().Bytes(),
 			ExtraArgs: testhelpers.MakeEVMExtraArgsV2(300_000, false),
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-				{selfServeSrcToken.Address().Bytes(), new(big.Int).Add(oneE18, oneE18)},
-				{srcToken.Address().Bytes(), oneE18},
+				{Token: selfServeSrcToken.Address().Bytes(), Amount: new(big.Int).Add(oneE18, oneE18)},
+				{Token: srcToken.Address().Bytes(), Amount: oneE18},
 			},
 			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
 		},
@@ -172,8 +172,8 @@ func TestTokenTransfer(t *testing.T) {
 			Receiver:  utils.RandomAddress().Bytes(),
 			ExtraArgs: testhelpers.MakeEVMExtraArgsV2(1, false),
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-				{selfServeSrcToken.Address().Bytes(), oneE18},
-				{srcToken.Address().Bytes(), new(big.Int).Add(oneE18, oneE18)},
+				{Token: selfServeSrcToken.Address().Bytes(), Amount: oneE18},
+				{Token: srcToken.Address().Bytes(), Amount: new(big.Int).Add(oneE18, oneE18)},
 			},
 			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
 		},
@@ -195,8 +195,8 @@ func TestTokenTransfer(t *testing.T) {
 			Data:      []byte("this should be reverted because gasLimit is too low, no tokens are transferred as well"),
 			ExtraArgs: testhelpers.MakeEVMExtraArgsV2(1, false),
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-				{selfServeSrcToken.Address().Bytes(), big.NewInt(0)},
-				{srcToken.Address().Bytes(), big.NewInt(0)},
+				{Token: selfServeSrcToken.Address().Bytes(), Amount: big.NewInt(0)},
+				{Token: srcToken.Address().Bytes(), Amount: big.NewInt(0)},
 			},
 			ExpectedStatus: testhelpers.EXECUTION_STATE_FAILURE,
 		},
@@ -287,6 +287,7 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 		TokenReceiver: tokenReceiver,
 		// Accounts: accounts,
 	})
+	require.NoError(t, err)
 
 	// TODO: test both with ATA pre-initialized and not
 
@@ -304,7 +305,7 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 			Receiver: state.SolChains[destChain].Receiver.Bytes(),
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
 				// due to the differences in decimals, 1e9 on EVM results to 1 on SVM
-				{destToken.Bytes(), big.NewInt(1)},
+				{Token: destToken.Bytes(), Amount: big.NewInt(1)},
 			},
 			ExtraArgs:      extraArgs,
 			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
@@ -480,7 +481,7 @@ func TestTokenTransfer_Solana2EVM(t *testing.T) {
 			Receiver: state.Chains[destChain].Receiver.Address().Bytes(),
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
 				// due to the differences in decimals, 1 on SVM results to 1e9 on EVM
-				{destToken.Address().Bytes(), new(big.Int).SetUint64(oneE9)},
+				{Token: destToken.Address().Bytes(), Amount: new(big.Int).SetUint64(oneE9)},
 			},
 			ExtraArgs:      extraArgs,
 			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
