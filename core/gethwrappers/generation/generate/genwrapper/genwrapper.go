@@ -8,6 +8,22 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers"
 )
 
+func GetOutPath(pkgName, outDirSuffixInput string) string {
+	fmt.Println("Generating", pkgName, "contract wrapper")
+
+	cwd, err := os.Getwd() // gethwrappers directory
+	if err != nil {
+		gethwrappers.Exit("could not get working directory", err)
+	}
+	outDir := filepath.Join(cwd, "generated", outDirSuffixInput, pkgName)
+	if mkdErr := os.MkdirAll(outDir, 0700); err != nil {
+		gethwrappers.Exit(
+			fmt.Sprintf("failed to create wrapper dir, outDirSuffixInput: %s (could be empty)", outDirSuffixInput),
+			mkdErr)
+	}
+	return outDir
+}
+
 // GenWrapper generates a contract wrapper for the given contract.
 //
 // abiPath is the path to the contract's ABI JSON file.
@@ -25,18 +41,7 @@ import (
 // the <project>/generated, so the overridden location would be
 // <project>/generated/<outDirSuffixInput>/<pkgName>/<pkgName>.go.
 func GenWrapper(abiPath, binPath, className, pkgName, outDirSuffixInput string) {
-	fmt.Println("Generating", pkgName, "contract wrapper")
-
-	cwd, err := os.Getwd() // gethwrappers directory
-	if err != nil {
-		gethwrappers.Exit("could not get working directory", err)
-	}
-	outDir := filepath.Join(cwd, "generated", outDirSuffixInput, pkgName)
-	if mkdErr := os.MkdirAll(outDir, 0700); err != nil {
-		gethwrappers.Exit(
-			fmt.Sprintf("failed to create wrapper dir, outDirSuffixInput: %s (could be empty)", outDirSuffixInput),
-			mkdErr)
-	}
+	outDir := GetOutPath(pkgName, outDirSuffixInput)
 	outPath := filepath.Join(outDir, pkgName+".go")
 
 	gethwrappers.Abigen(gethwrappers.AbigenArgs{

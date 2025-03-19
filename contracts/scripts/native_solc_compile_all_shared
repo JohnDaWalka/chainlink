@@ -22,15 +22,22 @@ compileContract() {
     PROJECT=$2
   fi
 
+  IN=$CONTRACTS_DIR/src/v0.8/$PROJECT/"$1.sol"
+
   # We override the foundry.toml Solidity version to not change the bytecode.
   local command
-  command="forge build $CONTRACTS_DIR/src/v0.8/$PROJECT/"$1.sol" \
+  command="forge build $IN \
    --root $CONTRACTS_DIR \
    --extra-output-files bin abi \
    --use 0.8.19 \
    -o $CONTRACTS_DIR/solc/$PROJECT/$contract"
 
   $command
+
+  # only Link Token as demonstration
+  if [ "$contract" = "LinkToken" ]; then
+    "$(dirname "$0")/zksync_solc_compile" $IN $CONTRACTS_DIR/zksolc/$PROJECT/$contract
+  fi
 }
 
 compileContract interfaces/AggregatorV3Interface
@@ -48,5 +55,3 @@ compileContract mocks/WERC20Mock
 compileContract openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20 vendor
 compileContract multicall/ebd8b64/src/Multicall3 vendor
 compileContract canonical-weth/WETH9 vendor
-
-"$(dirname "$0")/zksync_solc_compile" shared/token/ERC677 LinkToken

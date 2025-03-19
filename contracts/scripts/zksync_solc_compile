@@ -2,17 +2,15 @@
 
 set -e
 
-CONTRACTS_DIR="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; cd ../ && pwd -P )"
-PROJECT=$1
-CONTRACT=$2
-SRC=$CONTRACTS_DIR/src/v0.8/$PROJECT/"$CONTRACT.sol"
+IN=$1
+OUT=$2
 
 TOOLS_DIR="$(cd "$(dirname "$0")"/../../tools && pwd -P)"
 
-echo "Compiling $SRC with zksolc"
+echo "Compiling $IN with zksolc"
 
 "$TOOLS_DIR/bin/zksolc" -O3 \
     --bin --metadata-literal --metadata-hash none \
     --evm-version paris \
-    -o zksolc/"$PROJECT" --overwrite \
-    $SRC
+    -o $OUT --overwrite \
+    $IN

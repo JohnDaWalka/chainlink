@@ -45,6 +45,7 @@ require (
 	github.com/smartcontractkit/mcms v0.14.0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.35.0
+	github.com/zksync-sdk/zksync2-go v1.0.0
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa
@@ -111,7 +112,9 @@ require (
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/block-vision/sui-go-sdk v1.0.6 // indirect
+	github.com/btcsuite/btcd v0.24.2 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4 // indirect
+	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
@@ -367,6 +370,7 @@ require (
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
+	github.com/stephenlacy/go-ethereum-hdwallet v0.0.0-20230913225845-a4fa94429863 // indirect
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/supranational/blst v0.3.14 // indirect
@@ -379,6 +383,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.13 // indirect
 	github.com/tklauser/numcpus v0.7.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
+	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/urfave/cli/v2 v2.27.5 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.11 // indirect
@@ -466,3 +471,5 @@ replace (
 	github.com/sourcegraph/sourcegraph/lib => github.com/sourcegraph/sourcegraph-public-snapshot/lib v0.0.0-20240822153003-c864f15af264
 	github.com/testcontainers/testcontainers-go => github.com/testcontainers/testcontainers-go v0.34.0
 )
+
+replace github.com/smartcontractkit/chainlink-testing-framework/framework => github.com/smartcontractkit/chainlink-testing-framework/framework v0.6.2-0.20250318182922-042c74ef9ab7

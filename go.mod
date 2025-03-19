@@ -98,6 +98,7 @@ require (
 	github.com/unrolled/secure v1.13.0
 	github.com/urfave/cli v1.22.14
 	github.com/wk8/go-ordered-map/v2 v2.1.8
+	github.com/zksync-sdk/zksync2-go v1.0.0
 	go.dedis.ch/fixbuf v1.0.3
 	go.dedis.ch/kyber/v3 v3.1.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin v0.49.0
@@ -174,6 +175,8 @@ require (
 	github.com/bgentry/speakeasy v0.1.1-0.20220910012023-760eaf8b6816 // indirect
 	github.com/bits-and-blooms/bitset v1.17.0 // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect
+	github.com/btcsuite/btcd v0.24.2 // indirect
+	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
@@ -318,6 +321,7 @@ require (
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
+	github.com/stephenlacy/go-ethereum-hdwallet v0.0.0-20230913225845-a4fa94429863 // indirect
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/supranational/blst v0.3.14 // indirect
@@ -328,6 +332,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.13 // indirect
 	github.com/tklauser/numcpus v0.7.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
+	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722 // indirect
 	github.com/urfave/cli/v2 v2.27.5 // indirect
