@@ -267,7 +267,7 @@ func Test_CCIPMessaging_EVM2Solana(t *testing.T) {
 			solana.SystemProgramID,
 		}
 		extraArgs, err := SerializeSVMExtraArgs(message_hasher.ClientSVMExtraArgsV1{
-			// Accounts: accounts,
+			Accounts: accounts,
 		})
 
 		require.NoError(t, err)
