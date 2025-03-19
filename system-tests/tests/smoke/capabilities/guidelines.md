@@ -66,252 +66,217 @@ Alternatively, if you have access to the Docker image repository where it's stor
 
 In the CI test code modifies the config during runtime to production JD image hardcoded in the [.github/e2e-tests.yml](.github/e2e-tests.yml) file as `E2E_JD_VERSION` env var.
 
-## Docker vs k8s
+## Docker vs Kubernetes (k8s)
 
-Following TOML configuration bit controls, whether the test is executed in Docker or in Kubernetes:
+The following TOML configuration determines whether a test is executed in Docker or Kubernetes:
+
 ```toml
 [infra]
-  # either "docker" or "crib"
+  # Choose either "docker" or "crib"
   type = "crib"
 ```
 
-The only way to execute in k8s is through CRIB. And CRIB supports both local local cluster (`kind`) or AWS. When executing in CRIB this config part is required:
+The only way to execute tests in Kubernetes (k8s) is through CRIB, which supports both a local cluster (`kind`) and AWS. When executing in CRIB, you must provide the following configuration:
+
 ```toml
-  [infra.crib]
+[infra.crib]
   namespace = "crib-local"
   folder_location = "$(pwd of crib repository)/deployments/cre"
-  # either "aws" or "kind"
+  # Choose either "aws" or "kind"
   provider = "kind"
 ```
 
-### k8s/CRIB requriements
+---
 
-Before you can run your test in CRIB there are several steps, that need to be taken.
+## CRIB Requirements
 
-First of all, follow the steps outlined in the [CRIB instructions](https://smartcontract-it.atlassian.net/wiki/spaces/INFRA/pages/660145339/General+CRIB+-+Deploy+Access+Instructions).
-Second of all, as soon as possible get the AWS role required by CRIB, if you plan to run it in AWS. Running in local `kind` cluster doesn't require any roles at all.
+Before running tests in CRIB, follow these steps:
 
-One thing to keep in mind is that if you are using `kind` provider you need to download Docker registry image **manually** by running:
+1. **Read the CRIB Instructions** – Follow the [CRIB deployment guide](https://smartcontract-it.atlassian.net/wiki/spaces/INFRA/pages/660145339/General+CRIB+-+Deploy+Access+Instructions).
+2. **Obtain AWS Role** – If you plan to run tests on AWS, acquire the necessary AWS role for CRIB. Running on a local `kind` cluster does not require any roles.
+3. **Manually Download Docker Registry Image** – If using the `kind` provider, download the required Docker registry image:
+   ```bash
+   docker pull registry:2
+   ```
+4. **Clone the CRIB Repository** – Clone the [CRIB repository](https://github.com/smartcontractkit/crib) and determine its absolute path using `pwd`.
+5. **Update the TOML Configuration** – Set the `folder_location` parameter to the absolute path of the `deployments/cre` folder within the CRIB repository.
+   ```toml
+   [infra.crib]
+   folder_location = "/Users/me/repositories/crib/deployments/cre"
+   ```
+6. **Adjust Namespace and Provider** – If using AWS, you **must** provide cost attribution details:
+   ```toml
+   [infra.crib.team_input]
+   team = "your team"
+   product = "name of the product you are working on"
+   cost_center = "crib"
+   component = "crib"
+   ```
+
+---
+
+## Setting Docker Images for CRIB Execution
+
+CRIB does **not** support dynamically built Docker images from local `Dockerfile`s during test execution. Using the following TOML configuration will result in an error:
+
+```toml
+[nodesets.node_specs.node]
+  docker_ctx = "../../../.."
+  docker_file = "plugins/chainlink.Dockerfile"
+```
+
+Instead, you **must** use the `image` key:
+
+```toml
+[nodesets.node_specs.node]
+  image = "localhost:5001/chainlink:112b9323-plugins-cron"
+```
+
+### Image Restrictions
+- Each nodeset **must** use the same Docker image.
+- The image tag **must** be explicit (omitting tag, so that implicitly `latest` is used is **not** supported).
+
+#### Job Distribution (JD) Image
+Currently, CRIB reads only the **image tag** from the TOML configuration. The following setting:
+
+```toml
+[jd]
+  image = "jd-test-1:my-awesome-tag"
+```
+
+Will result in CRIB using an image from the main AWS ECR repository with the tag `my-awesome-tag`.
+
+If an image tag is omitted, an error will occur:
+
+```toml
+[jd]
+  image = "jd-test-1"  # This will fail
+```
+
+---
+
+## Running Tests in Local Kubernetes (`kind`)
+
+### Docker Registry Setup
+Ensure you have pulled the `registry:2` Docker image:
 ```bash
 docker pull registry:2
 ```
 
-Start by cloning the [CRIB repository](https://github.com/smartcontractkit/crib). Check it's absolute path (e.g. using `pwd`) and write it down.
+### Hostname Routing
+All routing to the `kind` cluster is done via `/etc/hosts`. CRIB automatically adds new host entries for detected ingresses, but since `/etc/hosts` is protected, root privileges are required. However, running tests does **not** allow interactive password input, leading to failures when new hostnames must be added.
 
-Open the TOML configuration file of the test you want to run and enter the absolute path of the `deployments/cre` folder inside CRIB folder. Assuming that the CRIB repo was cloned to `/Users/me/repositories/crib` you should enter `/Users/me/repositories/crib/deployments/cre`:
-```toml
-  [infra.crib]
-  folder_location = "/Users/me/repositories/crib/deployments/cre"
-```
+#### Workarounds
+1. **Manually add `/etc/hosts` entries** (tedious but straightforward).
+2. **Run `devspace` manually** for each chain/DON before starting tests. This allows CRIB to add entries while you enter the root password interactively.
 
-Adjust `namespace` and `provider` parameters. If you plan to use `aws` provider, then you absolutely must also supply cost attribution details:
-```toml
-[infra.crib.team_input]
-	team = "your team"
-	product = "name of product you are working on"
-	cost_center= "crib"
-	component= "crib"
-```
+### Manually Adding `/etc/hosts` Entries
+For each component, manually add the following entries:
 
-Now it's time to set Docker images that will be used. CRIB execution doesn't support images built dynamically from local `Dockerfile`s during test execution, that's why this part of nodset TOML configuration will error:
-```toml
-    [nodesets.node_specs.node]
-      docker_ctx = "../../../.."
-      docker_file = "plugins/chainlink.Dockerfile"
-```
-
-Therefore you must use the `image` key:
-```toml
-    [nodesets.node_specs.node]
-      image = "localhost:5001/chainlink:112b9323-plugins-cron"
-```
-
-Following restrictions need to borne in mind:
-* each nodeset must use the same Docker image
-* image tag needs to be explicit (omitting it, to implicitly indicate using `latest` is not supported)
-
-When it comes to Job Distribution image, due to current limitations we will read only the **image tag* from the TOML config. So that this:
-```toml
-[jd]
-  # change to your version
-  image = "jd-test-1:my-awesome-tag"
-```
-
-Will be result in CRIB effectively using image corresponding to our main AWS ECR with `my-awesome-tag` tag. In the future we will allow to configure JD image name via TOML, similarly to how it works for the node.
-Also, image tag needs to be explicit, this will error:
-```toml
-[jd]
-  # change to your version
-  image = "jd-test-1"
-```
-
-Now, if you want to run the test in your local k8s cluster, you need to execute a couple more steps.
-
-#### Docker registry
-Make sure you have pulled `registry:2` Docker image.
-
-### Hostname routing
-Currently all the routing to `kind` cluster is done via `/etc/hosts` file. This comes with a certain handicap. CRIB automatically adds entries to it for every new ingress it detects, but since this file is protected it requires root privillages. At the same time,
-when you are running a test you don't have access to interactive shell, so that you could enter the password. The result is a guaranteed failure each time a new hostname needs to be added.
-
-There are two ways of dealing with it:
-- adding `/etc/hosts` entries manually
-- running devespace manually for each chain/DON that your test will use so that CRIB can add these entries and you can input your root password
-
-#### Adding entries manually
-A painful, but maybe most straightforward process. Painful, because there are many different entries to add with different naming patterns.
-
-#### Geth chain
-Two entries for each blockchain:
+#### Geth Chain
 ```bash
 127.0.0.1 <NAMESPACE>-geth-<CHAIN_ID>-http.main.stage.cldev.sh
 127.0.0.1 <NAMESPACE>-geth-<CHAIN_ID>-ws.main.stage.cldev.sh
 ```
-
 Example:
 ```bash
 127.0.0.1 crib-local-geth-1337-http.main.stage.cldev.sh
 127.0.0.1 crib-local-geth-1337-ws.main.stage.cldev.sh
 ```
 
-#### Job distributor
-One entry:
+#### Job Distributor
 ```bash
 127.0.0.1 <NAMESPACE>-job-distributor-grpc.main.stage.cldev.sh
 ```
-
 Example:
 ```bash
 127.0.0.1 crib-local-job-distributor-grpc.main.stage.cldev.sh
 ```
 
-#### Chainlink nodes
-Multiple entries depending on the node count and don type.
-
-For bootstrap node we use the following pattern:
+#### Chainlink Nodes
+For bootstrap nodes:
 ```bash
 127.0.0.1 <NAMESPACE>-<DON_TYPE>-bt-<INDEX>.main.stage.cldev.sh
 ```
-
-For example, if you have only 1 bootstrap node in DON with `DON_TYPE=workflow`:
-```bash
-127.0.0.1 crib-local-workflow-bt-0.main.stage.cldev.sh
-```
-
-For worker nodes we use the following pattern:
+For worker nodes:
 ```bash
 127.0.0.1 <NAMESPACE>-<DON_TYPE>-<INDEX>.main.stage.cldev.sh
 ```
 
-For example, if you have 3 worker nodes in DON with `DON_TYPE=workflow`:
+Example (1 bootstrap + 3 worker nodes in `workflow` DON):
 ```bash
+127.0.0.1 crib-local-workflow-bt-0.main.stage.cldev.sh
 127.0.0.1 crib-local-workflow-0.main.stage.cldev.sh
 127.0.0.1 crib-local-workflow-1.main.stage.cldev.sh
 127.0.0.1 crib-local-workflow-2.main.stage.cldev.sh
 ```
 
-### Adding hostnames via devspace
-This is a semi-automatic, and maybe slightly less painful way to go about adding required entries, but it might take more time, because all services will actually need to be created and started before CRIB adds any entries to `/etc/hosts`. But here we go...
+### Automating Hostname Setup with `devspace`
+Run the following commands **inside the `cre/deployment` subfolder** and a shell where `nix develop` was executed:
 
-All commands need to be executed inside `cre/deployment` subfolder in your CRIB repo **and** in a shell in which you previously run `nix develop`!
-
-#### Geth chain
-For each blockchain your tests will use you need to execute:
+#### Geth Chain
 ```bash
 CHAIN_ID=<CHAIN_ID> devspace run deploy-custom-geth-chain
 ```
-
-Once ingress is created you will be prompted for your root password and CRIB will add entries to `/etc/hosts` file.
-
-#### Job distributor
+#### Job Distributor
 ```bash
 devspace run deploy-jd
 ```
-
-#### Chainlink nodes
+#### Chainlink Nodes
 ```bash
-DON_TYPE=<type of don> DON_NODE_COUNT=<number of worker nodes> DON_BOOT_NODE_COUNT=<number of boostrap nodes> devspace run deploy-don
+DON_TYPE=<type of don> DON_NODE_COUNT=<number of worker nodes> DON_BOOT_NODE_COUNT=<number of bootstrap nodes> devspace run deploy-don
 ```
 
-Which means that if your topology has 3 DONs you need to run that command 3 times, each time using correct type and nodes count.
+Ensure `DON_TYPE` matches the `name` field in your TOML config:
 
-For gateway DON you should set boot node count to `0`, and don node count to `1`.
-
-You need to make sure that `DON_TYPE` for each DON matches the `name` field in each nodeset defined in TOML config:
-```
+```toml
 [[nodesets]]
   nodes = 5
-  override_mode = "each"
-  http_port_range_start = 10100
   name = "workflow"
 ```
 
-Node count should also match the TOML config. One thing to bear in mind: your TOML config contains total numnber of nodes in a DON (bootstrap + worker nodes), but it knows nothing
-about their roles (bootstrap or worker). That is set in your Go code and for the time being for each DON only 1 bootstrap node is supported and you can only select, which node that will be
-by specifying it's index in the nodeset:
-```go
-		return []*keystonetypes.CapabilitiesAwareNodeSet{
-			{
-				Input:              input[0],
-				Capabilities:       keystonetypes.SingleDonFlags,
-				DONTypes:           []string{keystonetypes.WorkflowDON},
-				BootstrapNodeIndex: 0,                                    // <---- index of bootstrap node in the TOML nodeset
-			},
-    }
-```
+---
 
-### k8s deployment flow
-Brief description of the current flow is given below, so that if things go south you might have some idea where to look.
-1. Start a `nix develop` shell wrapper, in which all `devspace` commands will be executed
-    1. Set environment variables that will be used for all commands (based on TOML config):
-        1. `PROVIDER`
-        2. `DEVSPACE_NAMESPACE`
-        3. `CONFIG_OVERRIDES_DIR`
-    2. If provider is `AWS` set also:
-        1. `CHAINLINK_TEAM`
-        2. `CHAINLINK_PRODUCT`
-        3. `CHAINLINK_COST_CENTER`
-        4. `CHAINLINK_COMPONENT`
-2. Start N blockchains
-    1. Set `CHAIN_ID` environment variable based on TOML config
-    2. Execute: `devspace run deploy-custom-geth-chain`
-    3. Read blockchain endpoints from `chain-<CHAIN_ID>-urls.json` file
-3. Deploy keystone contracts
-4. Generate CL node configs and secrets and save them to `./crib-configs` directory and `nodeset.Name` subfolder
-5. Start **each** DON:
-    1. Set following environment variables:
-        1. `DEVSPACE_IMAGE`
-        2. `DEVSPACE_IMAGE_TAG`
-        3. `DON_BOOT_NODE_COUNT`
-        4. `DON_NODE_COUNT`
-        5. `DON_TYPE`
-    2. Execute: `devspace run deploy-don`
-    3. Read DON urls from `don-<DON_TYPE>-urls.json` file
-6. Start Job Distributor
-    1. Set following environment variables:
-        1. `JOB_DISTRIBUTOR_IMAGE_TAG`
-    2. Execute: `devspace run deploy-jd`
-    3. Read JD urls from: `jd-url.json` file
-6. Create jobs, configure CRE contracts (same as in case of Docker)
+## CRIB Deployment Flow
 
-Extra clarifications:
-* CRIB knows where to look for CL node config and secret overrides via `CONFIG_OVERRIDES_DIR` env var
-* all JSON files with URLs are seved in the `./crib-configs` folder
+1. **Initialize a `nix develop` shell** and set environment variables.
+    - Set environment variables: `PROVIDER`, `DEVSPACE_NAMESPACE`, `CONFIG_OVERRIDES_DIR`
+2. **Start Blockchains**:
+   - Set `CHAIN_ID` from TOML.
+   - Deploy with `devspace run deploy-custom-geth-chain`.
+   - Read endpoints from `chain-<CHAIN_ID>-urls.json`.
+3. **Deploy Keystone Contracts**.
+4. **Generate CL Node Configs & Secrets** (stored in `./crib-configs`).
+5. **Start Each DON**:
+   - Set environment variables: `DEVSPACE_IMAGE`, `DEVSPACE_IMAGE_TAG`, `DON_BOOT_NODE_COUNT`, `DON_NODE_COUNT` and `DON_TYPE`.
+   - Deploy with `devspace run deploy-don`.
+   - Read DON URLs from `don-<DON_TYPE>-urls.json`.
+6. **Start Job Distributor**:
+   - Set environment variable: `JOB_DISTRIBUTOR_IMAGE_TAG`.
+   - Deploy with `devspace run deploy-jd`.
+   - Read JD URLs from `jd-url.json`.
+7. **Create Jobs & Configure CRE Contracts** (same as Docker).
+
+---
+
+## CRIB Limitations & Considerations
+
+### Gateway DON
+- Must always be on a **dedicated node**.
+- Identified using `DON_TYPE=gateway`.
+- No bootstrap node required, but multiple worker nodes are allowed.
+
+### Capabilities Binaries
+- Unlike Docker, k8s does not support copying capability binaries into a running container.
+- Use a pre-built Docker image containing the necessary capabilities.
+
+### Mocked Price Provider
+- CRIB does **not** support the mocked data source used in PoR smoke tests, as it runs outside a container.
+- Only tests using **live endpoints** can be executed in CRIB.
 
 
-### CRIB quirks/limitations
-
-#### Gateway DON
-One thing to bear in mind is currently CRIB requires the gateway to **always live on a dedicated node** (i.e. you cannot deploy just a single DON to act as gateway DON and workflow + capabilities DON).
-Also, you indicate it that it's a gateway by using `DON_TYPE=gateway`. There is currently no other way to tell it that that DON is a gateway DON.
-
-You should also know that this DON doesn't require a bootstrap node, but that it can have multiple workder nodes (although Go code doesn't support orchestrating multiple gateway nodes within the same gateway DON).
-
-#### Capabilities binaries
-When running tests in Docker we simply copy indicated capabilities binaries to a running container. Currently, nothing similar is supported for k8s. If you to use a Docker image that already has the capabilities inside.
-
-#### Mocked price provider
-It is impossible to use mocked data source used in the PoR smoke test with CRIB, because the service that provides it is not dockerised and run on the host machine. We might add that support in the future, but currently only a test that uses a live endpoint can be used with CRIB.
+### Environment variables
+- Some are set by the Go code, others are taken from `./deployments/cre/.env` and applied when `nix develop` is run. Make sure that variables set from Go code are not present in `.env` file as it might lead to inconsistent behaviour.
 
 ---
 
