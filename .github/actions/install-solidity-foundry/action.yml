@@ -31,6 +31,7 @@ runs:
         version: ${{ steps.extract-foundry-version.outputs.foundry-version }}
 
     - name: Download binaries
+      shell: bash
       run: |
         # https://docs.zksync.io/zksync-era/tooling/foundry/installation#installing-for-ci-in-github-actions
         wget -qc https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz -O - | tar -xz
