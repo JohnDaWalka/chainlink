@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/smartcontractkit/wsrpc/logger"
+	"github.com/smartcontractkit/chainlink-common/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonState "github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
@@ -207,7 +207,6 @@ func DeployLinkTokenTest(t *testing.T, solChains int) {
 		Chains:    1,
 		SolChains: solChains,
 	})
-
 	chain1 := e.AllChainSelectors()[0]
 	config := []uint64{chain1}
 	var solChain1 uint64
