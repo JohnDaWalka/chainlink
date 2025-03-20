@@ -33,7 +33,6 @@ runs:
     - name: Download binaries
       shell: bash
       run: |
-        wget -qc https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.11/foundry_zksync_v0.0.11_linux_amd64.tar.gz -O - | tar -xz
-        mkdir zksync
-        mv forge zksync
-        echo "$(pwd)/zksync" >> $GITHUB_PATH
+        mkdir -p ~/.zksync
+        wget -qc https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.11/foundry_zksync_v0.0.11_linux_amd64.tar.gz -O - | tar -xz -C ~/.zksync
+        echo "$HOME/.zksync" >> $GITHUB_PATH
