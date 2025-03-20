@@ -98,18 +98,18 @@ func NewZKChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 	chains := make(map[uint64]deployment.Chain)
 
 	for i := 0; i < numChains; i++ {
-		chainId := chainsel.TEST_90000051.EvmChainID + uint64(i)
+		chainID := chainsel.TEST_90000051.EvmChainID + uint64(i) //nolint:gosec
 
 		output, err := blockchain.NewBlockchainNetwork(&blockchain.Input{
 			Type:    "anvil-zksync",
-			ChainID: strconv.FormatUint(chainId, 10),
+			ChainID: strconv.FormatUint(chainID, 10),
 			Port:    strconv.FormatInt(int64(freeport.GetN(t, 1)[0]), 10),
 		})
 		require.NoError(t, err)
 
 		testcontainers.CleanupContainer(t, output.Container)
 
-		sel, err := chainsel.SelectorFromChainId(chainId)
+		sel, err := chainsel.SelectorFromChainId(chainID)
 		require.NoError(t, err)
 
 		client, err := ethclient.Dial(output.Nodes[0].HostHTTPUrl)
@@ -122,7 +122,7 @@ func NewZKChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 		for _, pk := range blockchain.AnvilZKSyncRichAccountPks {
 			privateKey, err := crypto.HexToECDSA(pk)
 			require.NoError(t, err)
-			transactor, err := bind.NewKeyedTransactorWithChainID(privateKey, new(big.Int).SetUint64(uint64(chainsel.TEST_90000051.EvmChainID)))
+			transactor, err := bind.NewKeyedTransactorWithChainID(privateKey, new(big.Int).SetUint64(chainID))
 			transactor.GasPrice = gasPrice
 			require.NoError(t, err)
 			keyedTransactors = append(keyedTransactors, transactor)
