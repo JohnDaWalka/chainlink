@@ -118,8 +118,15 @@ func NewZKChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 		gasPrice, err := client.SuggestGasPrice(context.Background())
 		require.NoError(t, err)
 
-		keyedTransactors, err := getKeyedTransactorsWithPks(t, chainId, blockchain.AnvilZKSyncRichAccountPks, gasPrice)
-		require.NoError(t, err)
+		keyedTransactors := make([]*bind.TransactOpts, 0)
+		for _, pk := range blockchain.AnvilZKSyncRichAccountPks {
+			privateKey, err := crypto.HexToECDSA(pk)
+			require.NoError(t, err)
+			transactor, err := bind.NewKeyedTransactorWithChainID(privateKey, new(big.Int).SetUint64(uint64(chainsel.TEST_90000051.EvmChainID)))
+			transactor.GasPrice = gasPrice
+			require.NoError(t, err)
+			keyedTransactors = append(keyedTransactors, transactor)
+		}
 
 		zkClient := clients.NewClient(client.Client())
 		deployerZk, err := accounts.NewWallet(common.Hex2Bytes(blockchain.AnvilZKSyncRichAccountPks[0]), zkClient, nil)
@@ -220,19 +227,6 @@ func generateMemoryChainSol(inputs map[uint64]SolanaChain) map[uint64]deployment
 		}
 	}
 	return chains
-}
-
-func getKeyedTransactorsWithPks(t *testing.T, chainID uint64, pks []string, gasPrice *big.Int) ([]*bind.TransactOpts, error) {
-	transactors := make([]*bind.TransactOpts, 0)
-	for _, pk := range pks {
-		privateKey, err := crypto.HexToECDSA(pk)
-		require.NoError(t, err)
-		transactor, err := bind.NewKeyedTransactorWithChainID(privateKey, big.NewInt(int64(chainID)))
-		transactor.GasPrice = gasPrice
-		require.NoError(t, err)
-		transactors = append(transactors, transactor)
-	}
-	return transactors, nil
 }
 
 func NewNodes(

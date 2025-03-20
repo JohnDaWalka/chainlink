@@ -24,7 +24,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chain-selectors v1.0.46
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.5.8
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.6.2
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.0
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0
 	github.com/smartcontractkit/chainlink/system-tests/lib v0.0.0-00010101000000-000000000000
