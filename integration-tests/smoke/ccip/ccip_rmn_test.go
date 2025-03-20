@@ -721,7 +721,7 @@ func (tc rmnTestCase) sendMessages(t *testing.T, onChainState changeset.CCIPOnCh
 				TokenAmounts: nil,
 				FeeToken:     common.HexToAddress("0x0"),
 				ExtraArgs:    nil,
-			}, testhelpers.WithMiniumFee(new(big.Int).Mul(big.NewInt(1), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))))
+			}, testhelpers.WithMiniumFee(new(big.Int).Mul(big.NewInt(1), new(big.Int).Exp(big.NewInt(10), big.NewInt(16), nil))))
 			seqNumCommit[testhelpers.SourceDestPair{
 				SourceChainSelector: fromChain,
 				DestChainSelector:   toChain,
