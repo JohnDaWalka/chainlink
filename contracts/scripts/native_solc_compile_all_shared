@@ -22,15 +22,24 @@ compileContract() {
     PROJECT=$2
   fi
 
+  IN=$CONTRACTS_DIR/src/v0.8/$PROJECT/"$1.sol"
+
   # We override the foundry.toml Solidity version to not change the bytecode.
   local command
-  command="forge build $CONTRACTS_DIR/src/v0.8/$PROJECT/"$1.sol" \
+  command="forge build $IN \
    --root $CONTRACTS_DIR \
    --extra-output-files bin abi \
    --use 0.8.19 \
    -o $CONTRACTS_DIR/solc/$PROJECT/$contract"
 
   $command
+
+  # only Link Token as demonstration
+  if [ "$contract" = "LinkToken" ]; then
+    forge build $IN --zksync \
+      --root $CONTRACTS_DIR \
+      --use 0.8.19
+  fi
 }
 
 compileContract interfaces/AggregatorV3Interface

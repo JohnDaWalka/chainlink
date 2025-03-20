@@ -37,6 +37,15 @@ pnpmdep: ## Install solidity contract dependencies through pnpm
 abigen: ## Build & install abigen.
 	../tools/bin/build_abigen
 
+.PHONY: foundry-zksync
+foundry-zksync:
+	# https://docs.zksync.io/zksync-era/tooling/foundry/installation
+	curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync -o install-foundry-zksync
+	chmod +x install-foundry-zksync
+	./install-foundry-zksync
+	rm install-foundry-zksync
+	rm foundryup-zksync
+
 .PHONY: mockery
 mockery: $(mockery) ## Install mockery.
 	go install github.com/vektra/mockery/v2@v2.52.3
