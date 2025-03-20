@@ -12,7 +12,6 @@ import (
 
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 
-	keystoneflags "github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	types "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
@@ -51,36 +50,37 @@ func Create(offChainClient deployment.OffchainClient, don *devenv.DON, flags []s
 		return nil
 	}
 
-	if unknownErr := checkForUnknownJobs(jobSpecs); unknownErr != nil {
-		return errors.Wrap(unknownErr, "failed to create jobs")
-	}
+	// if unknownErr := checkForUnknownJobs(jobSpecs); unknownErr != nil {
+	// 	return errors.Wrap(unknownErr, "failed to create jobs")
+	// }
 
 	errCh := make(chan error, calculateJobCount(jobSpecs))
 	var wg sync.WaitGroup
 
-	for _, jobDesc := range SupportedJobs {
-		if keystoneflags.HasFlag(flags, jobDesc.Flag) {
-			if jobReqs, ok := jobSpecs[jobDesc]; ok {
-				for _, jobReq := range jobReqs {
-					wg.Add(1)
-					go func(jobReq *jobv1.ProposeJobRequest) {
-						defer wg.Done()
-						timeout := time.Second * 60
-						ctx, cancel := context.WithTimeout(context.Background(), timeout)
-						defer cancel()
-						_, err := offChainClient.ProposeJob(ctx, jobReq)
-						if err != nil {
-							errCh <- errors.Wrapf(err, "failed to propose job %s for node %s", jobDesc.Flag, jobReq.NodeId)
-						}
-						err = ctx.Err()
-						if err != nil {
-							errCh <- errors.Wrapf(err, "timed out after %s proposing job %s for node %s", timeout.String(), jobDesc.Flag, jobReq.NodeId)
-						}
-					}(jobReq)
+	// for _, jobDesc := range SupportedJobs {
+	// 	if keystoneflags.HasFlag(flags, jobDesc.Flag) {
+	for jobDesc, jobReqs := range jobSpecs {
+		// if jobReqs, ok := jobSpecs[jobDesc]; ok {
+		for _, jobReq := range jobReqs {
+			wg.Add(1)
+			go func(jobReq *jobv1.ProposeJobRequest) {
+				defer wg.Done()
+				timeout := time.Second * 60
+				ctx, cancel := context.WithTimeout(context.Background(), timeout)
+				defer cancel()
+				_, err := offChainClient.ProposeJob(ctx, jobReq)
+				if err != nil {
+					errCh <- errors.Wrapf(err, "failed to propose job %s for node %s", jobDesc.Flag, jobReq.NodeId)
 				}
-			}
+				err = ctx.Err()
+				if err != nil {
+					errCh <- errors.Wrapf(err, "timed out after %s proposing job %s for node %s", timeout.String(), jobDesc.Flag, jobReq.NodeId)
+				}
+			}(jobReq)
 		}
 	}
+	// 	}
+	// }
 
 	wg.Wait()
 	close(errCh)
