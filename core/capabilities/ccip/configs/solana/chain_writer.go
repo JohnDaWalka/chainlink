@@ -239,7 +239,7 @@ func getExecuteMethodConfig(fromAddress string, offrampProgramAddress string) ch
 				AccountLookup: &chainwriter.AccountLookup{
 					Name:       "UserAccounts",
 					Location:   "ExtraData.ExtraArgsDecoded.accounts",
-					IsWritable: chainwriter.MetaBool{BitmapLocation: "ExtraData.ExtraArgsDecoded.accountIsWritableBitmap"},
+					IsWritable: chainwriter.MetaBool{BitmapLocation: "ExtraData.ExtraArgsDecoded.accountIsWritableBitmap", StartIndex: 1},
 					IsSigner:   chainwriter.MetaBool{Value: false},
 				},
 				Optional: true,
