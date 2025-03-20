@@ -246,9 +246,17 @@ func retryCcipSendUntilNativeFeeIsSufficient(
 	defer func() { cfg.Sender.Value = nil }()
 
 	for {
-		fee, err := r.GetFee(&bind.CallOpts{Context: context.Background()}, cfg.DestChain, cfg.Evm2AnyMessage)
+		routerFee, err := r.GetFee(&bind.CallOpts{Context: context.Background()}, cfg.DestChain, cfg.Evm2AnyMessage)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get fee: %w", deployment.MaybeDataErr(err))
+		}
+
+		minFee := cfg.MiniumFee
+		fee := new(big.Int)
+		if minFee == nil || routerFee.Cmp(minFee) >= 0 {
+			fee.Set(routerFee)
+		} else {
+			fee.Set(minFee)
 		}
 
 		cfg.Sender.Value = fee
@@ -296,13 +304,17 @@ func TestSendRequest(
 	src, dest uint64,
 	testRouter bool,
 	evm2AnyMessage router.ClientEVM2AnyMessage,
+	opts ...SendReqOpts,
 ) (msgSentEvent *onramp.OnRampCCIPMessageSent) {
-	msgSentEvent, err := DoSendRequest(t, e, state,
+	allOpts := []SendReqOpts{
 		WithSender(e.Chains[src].DeployerKey),
 		WithSourceChain(src),
 		WithDestChain(dest),
 		WithTestRouter(testRouter),
-		WithEvm2AnyMessage(evm2AnyMessage))
+		WithEvm2AnyMessage(evm2AnyMessage),
+	}
+	allOpts = append(allOpts, opts...)
+	msgSentEvent, err := DoSendRequest(t, e, state, allOpts...)
 	require.NoError(t, err)
 	return msgSentEvent
 }
@@ -313,6 +325,7 @@ type CCIPSendReqConfig struct {
 	IsTestRouter   bool
 	Sender         *bind.TransactOpts
 	Evm2AnyMessage router.ClientEVM2AnyMessage
+	MiniumFee      *big.Int
 }
 
 type SendReqOpts func(*CCIPSendReqConfig)
@@ -320,6 +333,12 @@ type SendReqOpts func(*CCIPSendReqConfig)
 func WithSender(sender *bind.TransactOpts) SendReqOpts {
 	return func(c *CCIPSendReqConfig) {
 		c.Sender = sender
+	}
+}
+
+func WithMiniumFee(minFee *big.Int) SendReqOpts {
+	return func(c *CCIPSendReqConfig) {
+		c.MiniumFee = minFee
 	}
 }
 
