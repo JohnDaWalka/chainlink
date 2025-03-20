@@ -1153,7 +1153,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   ) internal {
     for (uint256 i = 0; i < destChainConfigArgs.length; ++i) {
       DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
-      uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
+      uint64 destChainSelector = destChainConfigArg.destChainSelector;
       DestChainConfig memory destChainConfig = destChainConfigArg.destChainConfig;
 
       // destChainSelector must be non-zero, defaultTxGasLimit must be set, must be less than maxPerMsgGasLimit
