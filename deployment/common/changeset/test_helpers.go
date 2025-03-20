@@ -8,12 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/smartcontractkit/wsrpc/logger"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonState "github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
-	"github.com/smartcontractkit/wsrpc/logger"
 )
 
 type ConfiguredChangeSet interface {
@@ -203,7 +204,8 @@ func ApplyChangesetsV2(t *testing.T, e deployment.Environment, changesetApplicat
 func DeployLinkTokenTest(t *testing.T, solChains int) {
 	lggr := logger.Test(t)
 	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
-		Chains: 1,
+		Chains:    1,
+		SolChains: solChains,
 	})
 
 	chain1 := e.AllChainSelectors()[0]
