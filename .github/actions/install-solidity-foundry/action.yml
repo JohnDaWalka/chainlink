@@ -33,4 +33,6 @@ runs:
     - name: Install Foundry ZKSync
       working-directory: ${{ inputs.working-directory }}
       shell: bash
-      run: sudo curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash
+      run: |
+        unset CI
+        make foundry-zksync
