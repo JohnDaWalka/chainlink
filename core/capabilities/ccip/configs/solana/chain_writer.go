@@ -244,6 +244,8 @@ func getExecuteMethodConfig(fromAddress string, offrampProgramAddress string) ch
 				},
 				Optional: true,
 			},
+			// user token account, token billing config, pool chain config, and pool lookup table accounts
+			// are appended to the accounts list in the CCIPExecute args transform for each token transfer
 		},
 		DebugIDLocation: "Info.AbstractReports.Messages.Header.MessageID",
 	}
