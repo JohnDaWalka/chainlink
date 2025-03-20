@@ -4,12 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	"github.com/gagliardetto/solana-go"
-
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	solCommomUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
