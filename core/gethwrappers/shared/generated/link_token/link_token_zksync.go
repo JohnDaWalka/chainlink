@@ -4,16 +4,14 @@ package link_token
 
 import (
 	"context"
-	
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/zksync-sdk/zksync2-go/accounts"
 	"github.com/zksync-sdk/zksync2-go/clients"
 	"github.com/zksync-sdk/zksync2-go/types"
 )
 
-func DeployLinkTokenZk(auth *bind.TransactOpts, ethClient *ethclient.Client, wallet accounts.Wallet, args ...interface{}) (common.Address, *types.Receipt, *LinkToken, error) {
+func DeployLinkTokenZk(deployOpts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ...interface{}) (common.Address, *types.Receipt, *LinkToken, error) {
 	var calldata []byte
 	if len(args) > 0 {
 		abi, err := LinkTokenMetaData.GetAbi()
@@ -26,18 +24,6 @@ func DeployLinkTokenZk(auth *bind.TransactOpts, ethClient *ethclient.Client, wal
 		}
 	}
 
-	var deployOpts *accounts.TransactOpts
-	if auth != nil {
-		deployOpts = &accounts.TransactOpts{
-			Nonce:     auth.Nonce,
-			Value:     auth.Value,
-			GasPrice:  auth.GasPrice,
-			GasLimit:  auth.GasLimit,
-			GasFeeCap: auth.GasFeeCap,
-			GasTipCap: auth.GasTipCap,
-			Context:   auth.Context,
-		}
-	}
 	txHash, err := wallet.Deploy(deployOpts, accounts.Create2Transaction{
 		Bytecode: ZkBytecode,
 		Calldata: calldata,
@@ -46,14 +32,13 @@ func DeployLinkTokenZk(auth *bind.TransactOpts, ethClient *ethclient.Client, wal
 		return common.Address{}, nil, nil, err
 	}
 
-	client := clients.NewClient(ethClient.Client())
 	receipt, err := client.WaitMined(context.Background(), txHash)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
 
 	address := receipt.ContractAddress
-	contract, err := NewLinkToken(address, ethClient)
+	contract, err := NewLinkToken(address, backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}

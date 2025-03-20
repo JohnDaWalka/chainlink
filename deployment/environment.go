@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/zksync-sdk/zksync2-go/accounts"
+	"github.com/zksync-sdk/zksync2-go/clients"
 	"google.golang.org/grpc"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -64,6 +65,7 @@ type Chain struct {
 	Users []*bind.TransactOpts
 	// ZK Sync deployment specifics
 	IsZk          bool
+	ClientZk      *clients.Client
 	DeployerKeyZk *accounts.Wallet
 }
 

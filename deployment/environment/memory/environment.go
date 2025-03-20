@@ -128,8 +128,8 @@ func NewZKChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 			keyedTransactors = append(keyedTransactors, transactor)
 		}
 
-		zkClient := clients.NewClient(client.Client())
-		deployerZk, err := accounts.NewWallet(common.Hex2Bytes(blockchain.AnvilZKSyncRichAccountPks[0]), zkClient, nil)
+		clientZk := clients.NewClient(client.Client())
+		deployerZk, err := accounts.NewWallet(common.Hex2Bytes(blockchain.AnvilZKSyncRichAccountPks[0]), clientZk, nil)
 		require.NoError(t, err)
 
 		chain := deployment.Chain{
@@ -145,6 +145,7 @@ func NewZKChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 				return receipt.Status, nil
 			},
 			IsZk:          true,
+			ClientZk:      clientZk,
 			DeployerKeyZk: deployerZk,
 		}
 

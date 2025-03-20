@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/ethereum/go-ethereum/ethclient"
-
 	"github.com/smartcontractkit/chainlink/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
@@ -34,7 +32,7 @@ func TestLinkTokenViewZk(t *testing.T) {
 		ZkChains: 1,
 	})
 	chain := e.Chains[e.AllChainSelectors()[0]]
-	_, receipt, lt, err := link_token.DeployLinkTokenZk(nil, chain.Client.(*ethclient.Client), *chain.DeployerKeyZk)
+	_, receipt, lt, err := link_token.DeployLinkTokenZk(nil, chain.ClientZk, chain.DeployerKeyZk, chain.Client)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), receipt.Status)
 

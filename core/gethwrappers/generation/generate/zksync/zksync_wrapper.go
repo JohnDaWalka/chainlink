@@ -46,10 +46,8 @@ const comment = `// Code generated - DO NOT EDIT.
 func declareImports() ast.Decl {
 	values := []string{
 		`"context"`,
-		``,
 		`"github.com/ethereum/go-ethereum/accounts/abi/bind"`,
 		`"github.com/ethereum/go-ethereum/common"`,
-		`"github.com/ethereum/go-ethereum/ethclient"`,
 		`"github.com/zksync-sdk/zksync2-go/accounts"`,
 		`"github.com/zksync-sdk/zksync2-go/clients"`,
 		`"github.com/zksync-sdk/zksync2-go/types"`,
@@ -80,7 +78,7 @@ func declareDeployFunction(contractName string) ast.Decl {
 		count = 0
 		index = 0
 	)
-	for count < 15 { // lines to skip
+	for count < 14 { // lines to skip
 		if template[index] == '\n' {
 			count++
 		}
@@ -95,12 +93,14 @@ func declareDeployFunction(contractName string) ast.Decl {
 		Type: &ast.FuncType{
 			Params: &ast.FieldList{
 				List: []*ast.Field{{
-					Names: []*ast.Ident{ast.NewIdent("auth")},
-					Type:  &ast.Ident{Name: "*bind.TransactOpts"}}, {
-					Names: []*ast.Ident{ast.NewIdent("ethClient")},
-					Type:  &ast.Ident{Name: "*ethclient.Client"}}, {
+					Names: []*ast.Ident{ast.NewIdent("deployOpts")},
+					Type:  &ast.Ident{Name: "*accounts.TransactOpts"}}, {
+					Names: []*ast.Ident{ast.NewIdent("client")},
+					Type:  &ast.Ident{Name: "*clients.Client"}}, {
 					Names: []*ast.Ident{ast.NewIdent("wallet")},
-					Type:  &ast.Ident{Name: "accounts.Wallet"}}, {
+					Type:  &ast.Ident{Name: "*accounts.Wallet"}}, {
+					Names: []*ast.Ident{ast.NewIdent("backend")},
+					Type:  &ast.Ident{Name: "bind.ContractBackend"}}, {
 					Names: []*ast.Ident{ast.NewIdent("args")},
 					Type:  &ast.Ellipsis{Elt: &ast.Ident{Name: "interface{}"}}}}},
 			Results: &ast.FieldList{
