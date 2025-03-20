@@ -98,7 +98,7 @@ func NewZKChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 	chains := make(map[uint64]deployment.Chain)
 
 	for i := 0; i < numChains; i++ {
-		chainID := chainsel.TEST_90000051.EvmChainID + uint64(i) //nolint:gosec
+		chainID := chainsel.TEST_90000051.EvmChainID + uint64(i) //nolint:gosec // it shouldn't overflow
 
 		output, err := blockchain.NewBlockchainNetwork(&blockchain.Input{
 			Type:    "anvil-zksync",
