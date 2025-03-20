@@ -19,6 +19,7 @@ import (
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	soltestutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
+	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solstate "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	soltokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -213,6 +214,9 @@ func Test_CCIPMessaging_EVM2Solana(t *testing.T) {
 	ctx := testhelpers.Context(t)
 	e, _, _ := testsetups.NewIntegrationEnvironment(t, testhelpers.WithSolChains(1))
 
+	// TODO: do this as part of setup
+	testhelpers.DeploySolanaCcipReceiver(t, e.Env)
+
 	state, err := changeset.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
@@ -266,11 +270,13 @@ func Test_CCIPMessaging_EVM2Solana(t *testing.T) {
 			receiverTargetAccountPDA,
 			solana.SystemProgramID,
 		}
-		extraArgs, err := SerializeSVMExtraArgs(message_hasher.ClientSVMExtraArgsV1{
-			Accounts: accounts,
-		})
 
+		extraArgs, err := SerializeSVMExtraArgs(message_hasher.ClientSVMExtraArgsV1{
+			AccountIsWritableBitmap: solccip.GenerateBitMapForIndexes([]int{0, 1}),
+			Accounts:                accounts,
+		})
 		require.NoError(t, err)
+
 		out = mt.Run(
 			mt.TestCase{
 				TestSetup:              setup,
