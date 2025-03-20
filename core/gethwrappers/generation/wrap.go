@@ -4,11 +4,10 @@ import (
 	"os"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generation/generate/genwrapper"
-	zksyncwrapper "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generation/zksync"
 )
 
 var (
-	rootDir = "../../../"
+	rootDir = "../../../contracts/solc/"
 )
 
 func main() {
@@ -23,17 +22,11 @@ func main() {
 
 	// Once vrf is moved to its own subfolder we can delete this rootDir override.
 	if project == "vrf" || project == "automation" {
-		rootDir = "../../"
+		rootDir = "../../contracts/solc/"
 	}
 
-	abiPath := rootDir + "contracts/solc/" + project + "/" + className + "/" + className + ".sol/" + className + ".abi.json"
-	binPath := rootDir + "contracts/solc/" + project + "/" + className + "/" + className + ".sol/" + className + ".bin"
+	abiPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".abi.json"
+	binPath := rootDir + project + "/" + className + "/" + className + ".sol/" + className + ".bin"
 
 	genwrapper.GenWrapper(abiPath, binPath, className, pkgName, outDirSuffix)
-
-	if pkgName == "link_token" {
-		zksolcBinPath := rootDir + "contracts/zkout/" + className + ".sol/" + className + ".json"
-
-		zksyncwrapper.WrapZksyncDeploy(zksolcBinPath, className, pkgName, outDirSuffix)
-	}
 }

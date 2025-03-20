@@ -11,12 +11,22 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generation/generate/genwrapper"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers"
 )
 
 func WrapZksyncDeploy(zksyncBytecodePath, className, pkgName, outDirSuffixInput string) {
 	fmt.Printf("Generating zk bytecode binding for %s\n", pkgName)
-	outDir := genwrapper.GetOutPath(pkgName, outDirSuffixInput)
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		gethwrappers.Exit("could not get working directory", err)
+	}
+	outDir := filepath.Join(cwd, "generated", outDirSuffixInput, pkgName)
+	if mkdErr := os.MkdirAll(outDir, 0700); err != nil {
+		gethwrappers.Exit(
+			fmt.Sprintf("failed to create wrapper dir, outDirSuffixInput: %s (could be empty)", outDirSuffixInput),
+			mkdErr)
+	}
 	outPath := filepath.Join(outDir, pkgName+"_zksync.go")
 
 	fileNode := &ast.File{
@@ -26,7 +36,6 @@ func WrapZksyncDeploy(zksyncBytecodePath, className, pkgName, outDirSuffixInput 
 			declareDeployFunction(className),
 			declareBytecodeVar(zksyncBytecodePath)}}
 
-	println(outPath)
 	writeFile(fileNode, outPath)
 }
 
@@ -59,7 +68,7 @@ func declareImports() ast.Decl {
 }
 
 func declareDeployFunction(contractName string) ast.Decl {
-	data, err := os.ReadFile("../generation/zksync/zk_deploy_template.go")
+	data, err := os.ReadFile("../generation/generate/zksync/zk_deploy_template.go")
 	if err != nil {
 		panic(err)
 	}
