@@ -698,7 +698,6 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 			if tc.RMNEnabled {
 				if ocrParams.CommitOffChainConfig != nil {
 					ocrParams.CommitOffChainConfig.RMNEnabled = true
-					ocrParams.OCRParameters.DeltaRound = 15 * time.Second
 				}
 			} else {
 				if ocrParams.CommitOffChainConfig != nil {
