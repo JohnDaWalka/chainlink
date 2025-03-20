@@ -39,7 +39,12 @@ abigen: ## Build & install abigen.
 
 .PHONY: foundry-zksync
 foundry-zksync:
-	../tools/bin/install_foundry_zksync
+	# https://docs.zksync.io/zksync-era/tooling/foundry/installation
+	curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync -o install-foundry-zksync
+	chmod +x install-foundry-zksync
+	./install-foundry-zksync
+	rm install-foundry-zksync
+	rm foundryup-zksync
 
 .PHONY: mockery
 mockery: $(mockery) ## Install mockery.
