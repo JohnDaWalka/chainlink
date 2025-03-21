@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
@@ -17,6 +18,7 @@ type reportingPlugin[RI any] struct {
 	chainID      string
 	plugin       string
 	configDigest string
+	lggr         logger.Logger
 
 	// Prometheus components for tracking metrics
 	reportsGenerated *prometheus.CounterVec
@@ -34,6 +36,7 @@ func newReportingPlugin[RI any](
 	durations *prometheus.HistogramVec,
 	sizes *prometheus.CounterVec,
 	status *prometheus.GaugeVec,
+	lggr logger.Logger,
 ) *reportingPlugin[RI] {
 	return &reportingPlugin[RI]{
 		ReportingPlugin:  origin,
@@ -44,6 +47,7 @@ func newReportingPlugin[RI any](
 		durations:        durations,
 		sizes:            sizes,
 		status:           status,
+		lggr:             lggr,
 	}
 }
 
@@ -149,6 +153,13 @@ func withObservedExecution[RI, R any](
 		Observe(float64(time.Since(start)))
 
 	p.updateStatus(true)
+
+	p.lggr.Debugw("tracking plugin latency",
+		"plugin", p.plugin,
+		"function", function,
+		"latency", time.Since(start),
+		"success", success,
+	)
 
 	return result, err
 }

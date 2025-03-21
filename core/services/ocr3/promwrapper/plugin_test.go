@@ -10,6 +10,7 @@ import (
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -22,15 +23,15 @@ func Test_ReportsGeneratedGauge(t *testing.T) {
 
 	plugin1 := newReportingPlugin(
 		fakePlugin[uint]{reports: make([]ocr3types.ReportPlus[uint], 2)},
-		"123", "empty", "abc", promOCR3ReportsGenerated, promOCR3Durations, promOCR3Sizes, promOCR3PluginStatus,
+		"123", "empty", "abc", promOCR3ReportsGenerated, promOCR3Durations, promOCR3Sizes, promOCR3PluginStatus, logger.Test(t),
 	)
 	plugin2 := newReportingPlugin(
 		fakePlugin[bool]{reports: make([]ocr3types.ReportPlus[bool], 10), observationSize: pluginObservationSize, outcomeSize: pluginOutcomeSize},
-		"solana", "different_plugin", "abc", promOCR3ReportsGenerated, promOCR3Durations, promOCR3Sizes, promOCR3PluginStatus,
+		"solana", "different_plugin", "abc", promOCR3ReportsGenerated, promOCR3Durations, promOCR3Sizes, promOCR3PluginStatus, logger.Test(t),
 	)
 	plugin3 := newReportingPlugin(
 		fakePlugin[string]{err: errors.New("error")},
-		"1234", "empty", "abc", promOCR3ReportsGenerated, promOCR3Durations, promOCR3Sizes, promOCR3PluginStatus,
+		"1234", "empty", "abc", promOCR3ReportsGenerated, promOCR3Durations, promOCR3Sizes, promOCR3PluginStatus, logger.Test(t),
 	)
 
 	r1, err := plugin1.Reports(tests.Context(t), 1, nil)
@@ -85,15 +86,15 @@ func Test_ReportsGeneratedGauge(t *testing.T) {
 func Test_DurationHistograms(t *testing.T) {
 	plugin1 := newReportingPlugin(
 		fakePlugin[uint]{},
-		"123", "empty", "abc", promOCR3ReportsGenerated, promOCR3Durations, promOCR3Sizes, promOCR3PluginStatus,
+		"123", "empty", "abc", promOCR3ReportsGenerated, promOCR3Durations, promOCR3Sizes, promOCR3PluginStatus, logger.Test(t),
 	)
 	plugin2 := newReportingPlugin(
 		fakePlugin[uint]{err: errors.New("error")},
-		"123", "empty", "abc", promOCR3ReportsGenerated, promOCR3Durations, promOCR3Sizes, promOCR3PluginStatus,
+		"123", "empty", "abc", promOCR3ReportsGenerated, promOCR3Durations, promOCR3Sizes, promOCR3PluginStatus, logger.Test(t),
 	)
 	plugin3 := newReportingPlugin(
 		fakePlugin[uint]{},
-		"solana", "commit", "abc", promOCR3ReportsGenerated, promOCR3Durations, promOCR3Sizes, promOCR3PluginStatus,
+		"solana", "commit", "abc", promOCR3ReportsGenerated, promOCR3Durations, promOCR3Sizes, promOCR3PluginStatus, logger.Test(t),
 	)
 
 	for _, p := range []*reportingPlugin[uint]{plugin1, plugin2, plugin3} {

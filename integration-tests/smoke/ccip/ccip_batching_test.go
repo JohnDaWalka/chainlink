@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -93,6 +94,9 @@ func Test_CCIPBatching_MaxBatchSizeEVM(t *testing.T) {
 		}
 		errs = make(chan error, len(transactors))
 	)
+
+	// wait for oracles to come up
+	time.Sleep(120 * time.Second)
 
 	for _, transactor := range transactors {
 		go func() {

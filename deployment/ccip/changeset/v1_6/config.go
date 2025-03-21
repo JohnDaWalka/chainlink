@@ -39,7 +39,7 @@ var (
 	// Used for only testing with simulated chains
 	OcrParamsForTest = CCIPOCRParams{
 		OCRParameters: types.OCRParameters{
-			DeltaProgress:                           30 * time.Second, // Lower DeltaProgress can lead to timeouts when running tests locally
+			DeltaProgress:                           10 * time.Minute, // Lower DeltaProgress can lead to timeouts when running tests locally
 			DeltaResend:                             10 * time.Second,
 			DeltaInitial:                            20 * time.Second,
 			DeltaRound:                              2 * time.Second,
@@ -47,10 +47,10 @@ var (
 			DeltaCertifiedCommitRequest:             10 * time.Second,
 			DeltaStage:                              10 * time.Second,
 			Rmax:                                    50,
-			MaxDurationQuery:                        10 * time.Second,
-			MaxDurationObservation:                  10 * time.Second,
-			MaxDurationShouldAcceptAttestedReport:   10 * time.Second,
-			MaxDurationShouldTransmitAcceptedReport: 10 * time.Second,
+			MaxDurationQuery:                        2 * time.Minute,
+			MaxDurationObservation:                  2 * time.Minute,
+			MaxDurationShouldAcceptAttestedReport:   2 * time.Minute,
+			MaxDurationShouldTransmitAcceptedReport: 2 * time.Minute,
 		},
 		CommitOffChainConfig: &pluginconfig.CommitOffchainConfig{
 			RemoteGasPriceBatchWriteFrequency:  *config.MustNewDuration(globals.RemoteGasPriceBatchWriteFrequency),

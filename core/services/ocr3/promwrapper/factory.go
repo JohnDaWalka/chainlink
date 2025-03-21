@@ -2,6 +2,7 @@ package promwrapper
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -49,6 +50,7 @@ func (r ReportingPluginFactory[RI]) NewReportingPlugin(ctx context.Context, conf
 		promOCR3Durations,
 		promOCR3Sizes,
 		promOCR3PluginStatus,
+		logger.Named(r.lggr, fmt.Sprintf("PromwrapperPlugin.%s", r.plugin)),
 	)
 	return wrapped, info, err
 }
