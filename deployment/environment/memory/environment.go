@@ -126,7 +126,7 @@ func generateMemoryChain(t *testing.T, inputs map[uint64]EVMChain) map[uint64]de
 						if err == nil && errReason != "" {
 							return 0, fmt.Errorf("tx %s reverted,error reason: %s chain %s", tx.Hash().Hex(), errReason, chainInfo.ChainName)
 						}
-						return 0, fmt.Errorf("tx %s reverted, could not decode error reason chain %s", tx.Hash().Hex(), chainInfo.ChainName)
+						return 0, fmt.Errorf("tx %s reverted, could not decode error reason chain %s, %w", tx.Hash().Hex(), chainInfo.ChainName, err)
 					}
 					return receipt.BlockNumber.Uint64(), nil
 				}
