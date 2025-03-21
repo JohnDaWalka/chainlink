@@ -471,7 +471,7 @@ func TestV1_5_Message_RMNRemote_Curse_Uncurse(t *testing.T) {
 		select {
 		case <-commitFound:
 			return
-		case <-time.Tick(3 * time.Minute):
+		case <-time.Tick(5 * time.Minute):
 			err = tLocalEnv.RestartChainlinkNodes(t)
 			require.NoError(t, err)
 		case <-time.Tick(timeUntilTimeout):
