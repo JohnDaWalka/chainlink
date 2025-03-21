@@ -58,7 +58,7 @@ import (
 )
 
 const (
-	cronCapabilityAssetFile            = "amd64_cron"
+	cronCapabilityAssetFile            = "/home/capabilities/amd64_cron"
 	ghReadTokenEnvVarName              = "GITHUB_READ_TOKEN"
 	E2eJobDistributorImageEnvVarName   = "E2E_JD_IMAGE"
 	E2eJobDistributorVersionEnvVarName = "E2E_JD_VERSION"
@@ -710,7 +710,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 			OCR3CapabilityAddress:  keystoneContractsOutput.OCR3CapabilityAddress,
 			ExtraAllowedPorts:      extraAllowedPorts,
 			ExtraAllowedIPs:        extraAllowedIPs,
-			CronCapBinName:         cronCapabilityAssetFile,
+			CronCapBinPath:         cronCapabilityAssetFile,
 			GatewayConnectorOutput: *topology.GatewayConnectorOutput,
 		},
 	)

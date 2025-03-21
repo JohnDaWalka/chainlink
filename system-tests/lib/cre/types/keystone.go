@@ -266,7 +266,7 @@ type GeneratePoRJobSpecsInput struct {
 	OCR3CapabilityAddress  common.Address
 	ExtraAllowedPorts      []int
 	ExtraAllowedIPs        []string
-	CronCapBinName         string
+	CronCapBinPath         string
 	GatewayConnectorOutput GatewayConnectorOutput
 }
 
@@ -280,8 +280,8 @@ func (g *GeneratePoRJobSpecsInput) Validate() error {
 	if g.OCR3CapabilityAddress == (common.Address{}) {
 		return errors.New("ocr3 capability address not set")
 	}
-	if g.CronCapBinName == "" {
-		return errors.New("cron cap bin name not set")
+	if g.CronCapBinPath == "" {
+		return errors.New("cron cap bin path not set")
 	}
 	if g.GatewayConnectorOutput.Path == "" {
 		return errors.New("gateway connector path is not set")

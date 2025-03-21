@@ -58,7 +58,7 @@ func GenerateJobSpecs(input *types.GeneratePoRJobSpecsInput) (types.DonsToJobSpe
 			input.BlockchainOutput,
 			donWithMetadata,
 			input.OCR3CapabilityAddress,
-			input.CronCapBinName,
+			input.CronCapBinPath,
 			input.ExtraAllowedPorts,
 			input.ExtraAllowedIPs,
 			gatewayConnectorData,
@@ -80,7 +80,7 @@ func generateDonJobSpecs(
 	blockchainOutput *blockchain.Output,
 	donWithMetadata *types.DonWithMetadata,
 	oCR3CapabilityAddress common.Address,
-	cronCapBinName string,
+	cronCapBinPath string,
 	extraAllowedPorts []int,
 	extraAllowedIPs []string,
 	gatewayConnectorOutput types.GatewayConnectorOutput,
@@ -159,7 +159,7 @@ func generateDonJobSpecs(
 		}
 
 		if creflags.HasFlag(donWithMetadata.Flags, types.CronCapability) {
-			jobSpec := jobs.WorkerStandardCapability(nodeID, "cron-capability", jobs.ExternalCapabilityPath(cronCapBinName), jobs.EmptyStdCapConfig)
+			jobSpec := jobs.WorkerStandardCapability(nodeID, "cron-capability", cronCapBinPath, jobs.EmptyStdCapConfig)
 			jobDesc := types.JobDescription{Flag: types.CronCapability, NodeType: types.WorkerNode}
 
 			if _, ok := jobSpecs[jobDesc]; !ok {
