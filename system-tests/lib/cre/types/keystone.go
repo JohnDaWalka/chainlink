@@ -566,6 +566,7 @@ type StartNixShellInput struct {
 	InfraInput     *types.InfraInput
 	CribConfigsDir string
 	ExtraEnvVars   map[string]string
+	PurgeNamespace bool
 }
 
 func (s *StartNixShellInput) Validate() error {
