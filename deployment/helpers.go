@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -59,6 +60,7 @@ func GetErrorReasonFromTx(client bind.ContractBackend, from common.Address, tx *
 	}
 	_, err := client.CallContract(context.Background(), call, receipt.BlockNumber)
 	if err != nil {
+		log.Error("Error calling contract", "err", err)
 		errorReason, err := parseError(err)
 		if err == nil {
 			return errorReason, nil
