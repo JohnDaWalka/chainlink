@@ -230,6 +230,19 @@ func ConfirmCommitForAllWithExpectedSeqNums(
 					},
 					true,
 				))
+			case chainsel.FamilyAptos:
+				return commonutils.JustError(ConfirmCommitWithExpectedSeqNumRangeAptos(
+					t,
+					srcChain,
+					e.AptosChains[dstChain],
+					state.AptosChains[dstChain],
+					startBlock,
+					ccipocr3.SeqNumRange{
+						ccipocr3.SeqNum(expectedSeqNum),
+						ccipocr3.SeqNum(expectedSeqNum),
+					},
+					true,
+				))
 			default:
 				return fmt.Errorf("unsupported chain family; %v", family)
 			}

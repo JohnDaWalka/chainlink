@@ -10,7 +10,6 @@ import (
 	mcmsSolana "github.com/smartcontractkit/mcms/sdk/solana"
 	mcmsTypes "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -113,7 +112,7 @@ func SetOCR3ConfigSolana(e deployment.Environment, cfg v1_6.SetOCR3OffRampConfig
 		}
 		for _, arg := range args {
 			instruction, err := solOffRamp.NewSetOcrConfigInstruction(
-				ccip_offramp.OcrPluginType(arg.OCRPluginType),
+				arg.OCRPluginType,
 				solOffRamp.Ocr3ConfigInfo{
 					ConfigDigest:                   arg.ConfigDigest,
 					F:                              arg.F,

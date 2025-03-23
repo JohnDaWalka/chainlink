@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
@@ -137,6 +138,9 @@ func getLatestNonce(tc TestCase) uint64 {
 		// we ignore the error because the account might not exist yet
 		_ = solcommon.GetAccountDataBorshInto(ctx, client, noncePDA, solconfig.DefaultCommitment, &nonceCounterAccount)
 		latestNonce = nonceCounterAccount.Counter
+	case chain_selectors.FamilyAptos:
+		// TODO(aptos): we only support out of order execution so return zero
+		latestNonce = 0
 	}
 	return latestNonce
 }
@@ -170,6 +174,15 @@ func Run(tc TestCase) (out TestCaseOutput) {
 			TokenAmounts: nil,
 			Data:         tc.MsgData,
 			ExtraArgs:    tc.ExtraArgs,
+		}
+	case chain_selectors.FamilyAptos:
+		msg = testhelpers.Aptos2AnyMessage{
+			Receiver:      common.LeftPadBytes(tc.Receiver, 32),
+			Data:          tc.MsgData,
+			TokenAmounts:  nil,
+			FeeToken:      aptos.AccountZero,
+			FeeTokenStore: aptos.AccountZero,
+			ExtraArgs:     tc.ExtraArgs,
 		}
 
 	default:
@@ -224,7 +237,7 @@ func Run(tc TestCase) (out TestCaseOutput) {
 		require.NoError(tc.T, err)
 
 		// Solana doesn't support catching CPI errors, so nonces can't be ordered
-		unorderedExec := family == chain_selectors.FamilySolana
+		unorderedExec := family == chain_selectors.FamilySolana || family == chain_selectors.FamilyAptos
 
 		if !unorderedExec {
 			latestNonce := getLatestNonce(tc)

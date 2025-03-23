@@ -57,6 +57,7 @@ func DeployLinkToken(e deployment.Environment, chains []uint64) (deployment.Chan
 				return err
 			}
 		}
+
 		deployGrp.Go(func() error {
 			err := deployFn()
 			if err != nil {
