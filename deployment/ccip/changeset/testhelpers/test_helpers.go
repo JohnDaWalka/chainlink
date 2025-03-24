@@ -259,6 +259,8 @@ func retryCcipSendUntilNativeFeeIsSufficient(
 			fee.Set(minFee)
 		}
 
+		cfg.Sender.GasLimit = 25000000
+
 		cfg.Sender.Value = fee
 
 		tx, err := r.CcipSend(cfg.Sender, cfg.DestChain, cfg.Evm2AnyMessage)
