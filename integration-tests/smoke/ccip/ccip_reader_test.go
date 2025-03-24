@@ -605,7 +605,7 @@ func TestCCIPReader_ExecutedMessages_SingleChain(t *testing.T) {
 		return len(executedMsgs[chainS1]) == 2
 	}, tests.WaitTimeout(t), 50*time.Millisecond)
 
-	assert.Equal(t, []cciptypes.SeqNum{14, 15}, executedMsgs)
+	assert.Equal(t, []cciptypes.SeqNum{14, 15}, executedMsgs[chainS1])
 }
 
 func TestCCIPReader_ExecutedMessages_MultiChain(t *testing.T) {
@@ -642,10 +642,10 @@ func TestCCIPReader_ExecutedMessages_MultiChain(t *testing.T) {
 		return executedMsgs[chainS1][0] == 15 && executedMsgs[chainS2][0] == 15
 	}, tests.WaitTimeout(t), 50*time.Millisecond)
 
-	assert.Equal(t, []cciptypes.SeqNum{14, 15}, executedMsgs)
+	assert.Equal(t, []cciptypes.SeqNum{14, 15}, executedMsgs[chainS1])
 	assert.Equal(t, 2, len(executedMsgs))
-	assert.Equal(t, 15, executedMsgs[chainS1])
-	assert.Equal(t, 15, executedMsgs[chainS2])
+	assert.Equal(t, cciptypes.SeqNum(15), executedMsgs[chainS1])
+	assert.Equal(t, cciptypes.SeqNum(15), executedMsgs[chainS2])
 }
 
 func TestCCIPReader_ExecutedMessages_MultiChainDisjoint(t *testing.T) {
@@ -680,13 +680,12 @@ func TestCCIPReader_ExecutedMessages_MultiChainDisjoint(t *testing.T) {
 			primitives.Unconfirmed,
 		)
 		require.NoError(t, err)
-		return executedMsgs[chainS1][0] == 14 && executedMsgs[chainS2][0] == 15
+		return len(executedMsgs) == 2
 	}, tests.WaitTimeout(t), 50*time.Millisecond)
 
 	assert.Equal(t, []cciptypes.SeqNum{14, 15}, executedMsgs)
-	assert.Equal(t, 2, len(executedMsgs))
-	assert.Equal(t, 3, len(executedMsgs[chainS1]))
-	assert.Equal(t, 2, len(executedMsgs[chainS2]))
+	assert.Len(t, executedMsgs[chainS1], 3)
+	assert.Len(t, executedMsgs[chainS2], 2)
 	assert.Equal(t, []cciptypes.SeqNum{15, 17, 70}, executedMsgs[chainS1])
 	assert.Equal(t, []cciptypes.SeqNum{15, 16}, executedMsgs[chainS2])
 }
