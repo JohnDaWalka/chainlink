@@ -270,7 +270,10 @@ func retryCcipSendUntilNativeFeeIsSufficient(
 
 		blockNum, err := e.Chains[cfg.SourceChain].Confirm(tx)
 		if err != nil {
+			e.Logger.Error("Failed to confirm CCIP message", err)
 			if strings.Contains(err.Error(), errCodeInsufficientFee) {
+				e.Logger.Infof("Insufficient fee, retrying with fee %s", fee.String())
+				time.Sleep(2 * time.Second)
 				continue
 			}
 			return nil, 0, fmt.Errorf("failed to confirm CCIP message: %w", deployment.MaybeDataErr(err))
