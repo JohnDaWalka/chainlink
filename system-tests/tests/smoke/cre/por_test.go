@@ -1,4 +1,4 @@
-package capabilities_test
+package cre_test
 
 import (
 	"crypto/tls"
@@ -17,6 +17,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/credentials"
@@ -240,7 +241,7 @@ type registerPoRWorkflowInput struct {
 	workflowRegistryAddress     common.Address
 	feedConsumerAddress         common.Address
 	capabilitiesRegistryAddress common.Address
-	priceProvider               PriceProvider
+	priceProvider               cre.PriceProvider
 	sethClient                  *seth.Client
 	deployerPrivateKey          string
 	blockchain                  *blockchain.Output
@@ -440,7 +441,7 @@ func CreateJobDistributor(input *jd.Input) (*jd.Output, error) {
 }
 
 type setupOutput struct {
-	priceProvider        PriceProvider
+	priceProvider        cre.PriceProvider
 	feedsConsumerAddress common.Address
 	forwarderAddress     common.Address
 	sethClient           *seth.Client
@@ -449,7 +450,7 @@ type setupOutput struct {
 	nodeOutput           []*keystonetypes.WrappedNodeOutput
 }
 
-func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig, priceProvider PriceProvider, binaryDownloadOutput binaryDownloadOutput, mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet) *setupOutput {
+func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig, priceProvider cre.PriceProvider, binaryDownloadOutput binaryDownloadOutput, mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet) *setupOutput {
 	// Universal setup -- START
 
 	nodeSetInput := mustSetCapabilitiesFn(in.NodeSets)
@@ -559,7 +560,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	var extraAllowedIPs []string
 	var extraAllowedPorts []int
 
-	if _, ok := priceProvider.(*FakePriceProvider); ok {
+	if _, ok := priceProvider.(*cre.FakePriceProvider); ok {
 		// In the future we might need to have a way to deploy fake price provider to CRIB, now we don't as it is not Dockerised and there are no Helm charts for it
 		require.Equal(t, libtypes.Docker, in.Infra.InfraType, "fake data provider is only supported in Docker infra")
 
@@ -824,7 +825,7 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MockedPrice(t *testing.T) {
 		}
 	}
 
-	priceProvider, priceErr := NewFakePriceProvider(testLogger, in.Fake)
+	priceProvider, priceErr := cre.NewFakePriceProvider(testLogger, in.Fake)
 	require.NoError(t, priceErr, "failed to create fake price provider")
 
 	setupOutput := setupTestEnvironment(t, testLogger, in, priceProvider, *binaryDownloadOutput, mustSetCapabilitiesFn)
@@ -935,7 +936,7 @@ func TestCRE_OCR3_PoR_Workflow_GatewayDon_MockedPrice(t *testing.T) {
 		}
 	}
 
-	priceProvider, priceErr := NewFakePriceProvider(testLogger, in.Fake)
+	priceProvider, priceErr := cre.NewFakePriceProvider(testLogger, in.Fake)
 	require.NoError(t, priceErr, "failed to create fake price provider")
 
 	setupOutput := setupTestEnvironment(t, testLogger, in, priceProvider, *binaryDownloadOutput, mustSetCapabilitiesFn)
@@ -1051,7 +1052,7 @@ func TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice(t *testing.T) {
 		}
 	}
 
-	priceProvider := NewTrueUSDPriceProvider(testLogger)
+	priceProvider := cre.NewTrueUSDPriceProvider(testLogger)
 	setupOutput := setupTestEnvironment(t, testLogger, in, priceProvider, *binaryDownloadOutput, mustSetCapabilitiesFn)
 
 	// Log extra information that might help debugging

@@ -50,14 +50,14 @@ The test requires several environment variables. Below is a launch configuration
   "mode": "test",
   "program": "${workspaceFolder}/integration-tests/smoke/capabilities",
   "env": {
-    "CTF_CONFIGS": "environment.toml",
-    "PRIVATE_KEY": "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-    "GITHUB_GIST_API_TOKEN": "your-gist-read:write-fpat-token",
-    "GITHUB_CAP_API_TOKEN": "your-capabilities-repo-content-read-fpat-token"
+     "CTF_CONFIGS": "environment-one-don.toml",
+     "PRIVATE_KEY": "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", 
+     "GITHUB_READ_TOKEN": "your-capabilities-repo-content-read-fpat-token",
+     "GIST_WRITE_TOKEN": "your-gist-read:write-fpat-token"
   },
   "args": [
     "-test.run",
-    "TestKeystoneWithOCR3Workflow"
+    "TestCRE_OCR3_PoR_Workflow_SingleDon_MockedPrice"
   ]
 }
 ```
@@ -356,7 +356,7 @@ const (
 	CronCapability          CapabilityFlag = "cron"
 	CustomComputeCapability CapabilityFlag = "custom-compute"
 	WriteEVMCapability      CapabilityFlag = "write-evm"
-  WriteAptosCapability    CapabilityFlag = "write-aptos"               // <------------ New entry
+    WriteAptosCapability    CapabilityFlag = "write-aptos"               // <------------ New entry
 
 	// Add more capabilities as needed
 )
