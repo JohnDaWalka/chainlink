@@ -78,6 +78,67 @@ var DefaultCapabilityFactoryFn = func(donFlags []string) []keystone_changeset.DO
 	return capabilities
 }
 
+var WebAPICapabilityFactoryFn = func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
+	var capabilities []keystone_changeset.DONCapabilityWithConfig
+
+	if flags.HasFlag(donFlags, types.LogTriggerCapability) {
+		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
+			Capability: kcr.CapabilitiesRegistryCapability{
+				LabelledName:   "web-api-trigger",
+				Version:        "1.0.0",
+				CapabilityType: 0, // TRIGGER
+			},
+			Config: &capabilitiespb.CapabilityConfig{},
+		})
+	}
+
+	if flags.HasFlag(donFlags, types.WebAPITargetCapability) {
+		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
+			Capability: kcr.CapabilitiesRegistryCapability{
+				LabelledName:   "web-api-target",
+				Version:        "1.0.0",
+				CapabilityType: 3, // TARGET
+				ResponseType:   1, // OBSERVATION_IDENTICAL
+			},
+			Config: &capabilitiespb.CapabilityConfig{},
+		})
+	}
+
+	return capabilities
+}
+
+var ChainReaderCapabilityFactory = func(chainID int, chainFamily string) func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
+	return func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
+		var capabilities []keystone_changeset.DONCapabilityWithConfig
+
+		if flags.HasFlag(donFlags, types.LogTriggerCapability) {
+			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
+				Capability: kcr.CapabilitiesRegistryCapability{
+					LabelledName:   fmt.Sprintf("log-event-trigger-%s-%d", chainFamily, chainID),
+					Version:        "1.0.0",
+					CapabilityType: 0, // TRIGGER
+					ResponseType:   0, // REPORT
+				},
+				Config: &capabilitiespb.CapabilityConfig{},
+			})
+		}
+
+		if flags.HasFlag(donFlags, types.ReadContractCapability) {
+			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
+				Capability: kcr.CapabilitiesRegistryCapability{
+					LabelledName:   fmt.Sprintf("read-contract-%s-%d", chainFamily, chainID),
+					Version:        "1.0.0",
+					CapabilityType: 0, // TRIGGER
+					ResponseType:   0, // REPORT
+				},
+				Config: &capabilitiespb.CapabilityConfig{},
+			})
+		}
+
+		return capabilities
+	}
+}
+
 func ConfigureKeystone(input types.ConfigureKeystoneInput, capabilityFactoryFns []types.DONCapabilityWithConfigFactoryFn) error {
 	if err := input.Validate(); err != nil {
 		return errors.Wrap(err, "input validation failed")

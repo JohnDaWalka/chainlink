@@ -15,56 +15,22 @@ import (
 	types "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
-var SupportedJobs = []types.JobDescription{
-	{Flag: types.OCR3Capability, NodeType: types.BootstrapNode},
-	{Flag: types.WorkflowDON, NodeType: types.BootstrapNode},
-	{Flag: types.CustomComputeCapability, NodeType: types.BootstrapNode},
-	{Flag: types.CronCapability, NodeType: types.WorkerNode},
-	{Flag: types.CustomComputeCapability, NodeType: types.WorkerNode},
-	{Flag: types.OCR3Capability, NodeType: types.WorkerNode},
-	{Flag: types.GatewayDON, NodeType: types.GatewayDON},
-
-	// add more jobs as needed
-}
-
-func checkForUnknownJobs(jobSpecs types.DonJobs) error {
-	for jobDesc := range jobSpecs {
-		found := false
-		for _, supportedJob := range SupportedJobs {
-			if jobDesc.Flag == supportedJob.Flag {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return errors.Errorf("unknown job type %s", jobDesc.Flag)
-		}
-	}
-
-	return nil
-}
-
 func Create(offChainClient deployment.OffchainClient, don *devenv.DON, flags []string, jobSpecs types.DonJobs) error {
 	if len(jobSpecs) == 0 {
 		return nil
 	}
 
-	// if unknownErr := checkForUnknownJobs(jobSpecs); unknownErr != nil {
-	// 	return errors.Wrap(unknownErr, "failed to create jobs")
-	// }
-
 	errCh := make(chan error, calculateJobCount(jobSpecs))
 	var wg sync.WaitGroup
+	sem := make(chan struct{}, 5)
 
-	// for _, jobDesc := range SupportedJobs {
-	// 	if keystoneflags.HasFlag(flags, jobDesc.Flag) {
 	for jobDesc, jobReqs := range jobSpecs {
-		// if jobReqs, ok := jobSpecs[jobDesc]; ok {
 		for _, jobReq := range jobReqs {
 			wg.Add(1)
+			sem <- struct{}{}
 			go func(jobReq *jobv1.ProposeJobRequest) {
 				defer wg.Done()
+				defer func() { <-sem }()
 				timeout := time.Second * 60
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
@@ -79,8 +45,6 @@ func Create(offChainClient deployment.OffchainClient, don *devenv.DON, flags []s
 			}(jobReq)
 		}
 	}
-	// 	}
-	// }
 
 	wg.Wait()
 	close(errCh)

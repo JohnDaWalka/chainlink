@@ -189,17 +189,17 @@ func generateDonJobSpecs(
 			}
 		}
 
-		nodeEthAddr, ethErr := node.FindLabelValue(workerNode, node.EthAddressKey)
-		if ethErr != nil {
-			return nil, errors.Wrap(ethErr, "failed to get eth address from labels")
-		}
-
-		ocr2KeyBundleID, ocr2Err := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDKey)
-		if ocr2Err != nil {
-			return nil, errors.Wrap(ocr2Err, "failed to get ocr2 key bundle id from labels")
-		}
-
 		if creflags.HasFlag(donWithMetadata.Flags, types.OCR3Capability) {
+			nodeEthAddr, ethErr := node.FindLabelValue(workerNode, node.EthAddressKey)
+			if ethErr != nil {
+				return nil, errors.Wrap(ethErr, "failed to get eth address from labels")
+			}
+
+			ocr2KeyBundleID, ocr2Err := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDKey)
+			if ocr2Err != nil {
+				return nil, errors.Wrap(ocr2Err, "failed to get ocr2 key bundle id from labels")
+			}
+
 			jobSpec := jobs.WorkerOCR3(nodeID, oCR3CapabilityAddress, nodeEthAddr, ocr2KeyBundleID, ocrPeeringData, chainIDUint64)
 			jobDesc := types.JobDescription{Flag: types.OCR3Capability, NodeType: types.WorkerNode}
 
