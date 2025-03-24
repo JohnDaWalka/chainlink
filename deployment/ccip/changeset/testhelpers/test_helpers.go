@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/fee_quoter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/message_hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 
@@ -631,6 +632,19 @@ func MakeEVMExtraArgsV2(gasLimit uint64, allowOOO bool) []byte {
 	extraArgs = append(extraArgs, gasLimitBytes...)
 	extraArgs = append(extraArgs, allowOOOBytes...)
 	return extraArgs
+}
+
+// NOTE: this is EVM specific (EVM->SVM)
+const SVMExtraArgsV1Tag = "0x1f3b3aba"
+
+func SerializeSVMExtraArgs(data message_hasher.ClientSVMExtraArgsV1) ([]byte, error) {
+	tagBytes := hexutil.MustDecode(SVMExtraArgsV1Tag)
+	abi, err := message_hasher.MessageHasherMetaData.GetAbi()
+	if err != nil {
+		return nil, err
+	}
+	v, err := abi.Methods["encodeSVMExtraArgsV1"].Inputs.Pack(data)
+	return append(tagBytes, v...), err
 }
 
 func AddLane(

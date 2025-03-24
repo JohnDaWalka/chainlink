@@ -283,7 +283,7 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 	tokenReceiver, _, ferr := soltokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, destToken, state.SolChains[destChain].Receiver)
 	require.NoError(t, ferr)
 
-	extraArgs, err := SerializeSVMExtraArgs(message_hasher.ClientSVMExtraArgsV1{
+	extraArgs, err := testhelpers.SerializeSVMExtraArgs(message_hasher.ClientSVMExtraArgsV1{
 		TokenReceiver: tokenReceiver,
 		// Accounts: accounts,
 	})
