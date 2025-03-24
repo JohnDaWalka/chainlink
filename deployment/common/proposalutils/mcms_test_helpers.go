@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	aptosapi "github.com/aptos-labs/aptos-go-sdk/api"
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -15,12 +16,16 @@ import (
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/mcms"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	aptosutil "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/utils"
 	mcmslib "github.com/smartcontractkit/mcms"
 	mcmssdk "github.com/smartcontractkit/mcms/sdk"
+	mcmsaptossdk "github.com/smartcontractkit/mcms/sdk/aptos"
 	mcmsevmsdk "github.com/smartcontractkit/mcms/sdk/evm"
 	mcmssolanasdk "github.com/smartcontractkit/mcms/sdk/solana"
+	"github.com/smartcontractkit/mcms/types"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -121,6 +126,18 @@ func SignMCMSTimelockProposal(t *testing.T, env deployment.Environment, proposal
 		converters[chainSel] = mcmssolanasdk.TimelockConverter{}
 		inspectorsMap[chainSel] = mcmssolanasdk.NewInspector(chain.Client)
 	}
+	for chainSelector, chain := range env.AptosChains {
+		_, err := chainsel.AptosChainIdFromSelector(chainSelector)
+		require.NoError(t, err)
+		chainSel := mcmstypes.ChainSelector(chainSelector)
+		converters[chainSel] = mcmsaptossdk.NewTimelockConverter()
+		roleFromAction := map[types.TimelockAction]mcmsaptossdk.TimelockRole{
+			types.TimelockActionSchedule: mcmsaptossdk.TimelockRoleProposer,
+			types.TimelockActionBypass:   mcmsaptossdk.TimelockRoleBypasser,
+			types.TimelockActionCancel:   mcmsaptossdk.TimelockRoleCanceller,
+		}
+		inspectorsMap[chainSel] = mcmsaptossdk.NewInspector(chain.Client, roleFromAction[proposal.Action])
+	}
 
 	p, _, err := proposal.Convert(env.GetContext(), converters)
 	require.NoError(t, err)
@@ -163,7 +180,6 @@ func SignMCMSProposal(t *testing.T, env deployment.Environment, proposal *mcmsli
 		converters[chainSel] = &mcmssolanasdk.TimelockConverter{}
 		inspectorsMap[chainSel] = mcmssolanasdk.NewInspector(chain.Client)
 	}
-
 	proposal.UseSimulatedBackend(true)
 
 	signable, err := mcmslib.NewSignable(proposal, inspectorsMap)
@@ -215,6 +231,15 @@ func ExecuteMCMSProposalV2(t *testing.T, env deployment.Environment, proposal *m
 				env.SolChains[uint64(op.ChainSelector)].URL,
 				env.SolChains[uint64(op.ChainSelector)].DeployerKey.PublicKey().String(),
 			)
+		case chainsel.FamilyAptos:
+			encoder := encoders[op.ChainSelector].(*mcmsaptossdk.Encoder)
+			executorsMap[op.ChainSelector] = mcmsaptossdk.NewExecutor(
+				env.AptosChains[uint64(op.ChainSelector)].Client,
+				env.AptosChains[uint64(op.ChainSelector)].DeployerSigner,
+				encoder,
+				mcmsaptossdk.TimelockRoleProposer,
+			)
+			t.Logf("[ExecuteMCMSProposalV2] Using Aptos chain with chainSelector=%d", uint64(op.ChainSelector))
 
 		default:
 			require.FailNow(t, "unsupported chain family")
@@ -245,6 +270,16 @@ func ExecuteMCMSProposalV2(t *testing.T, env deployment.Environment, proposal *m
 				return fmt.Errorf("[ExecuteMCMSProposalV2] Confirm failed: %w", err)
 			}
 		}
+		// TODO: Confirm Aptos transaction properly
+		if family == chainsel.FamilyAptos {
+			chain := env.AptosChains[uint64(chainSelector)]
+			tx := root.RawData.(*aptosapi.PendingTransaction)
+			t.Logf("[ExecuteMCMSProposalV2] SetRoot Aptos tx hash: %s", tx.Hash)
+			err = aptosutil.ConfirmTx(chain, tx.Hash)
+			if err != nil {
+				return fmt.Errorf("[ExecuteMCMSProposalV2] Confirm failed: %w", err)
+			}
+		}
 	}
 
 	// execute each operation sequentially
@@ -263,6 +298,15 @@ func ExecuteMCMSProposalV2(t *testing.T, env deployment.Environment, proposal *m
 			evmTransaction := result.RawData.(*gethtypes.Transaction)
 			t.Logf("[ExecuteMCMSProposalV2] Operation %d EVM tx hash: %s", i, evmTransaction.Hash().String())
 			_, err = chain.Confirm(evmTransaction)
+			if err != nil {
+				return fmt.Errorf("[ExecuteMCMSProposalV2] Confirm failed: %w", err)
+			}
+		}
+		if family == chainsel.FamilyAptos {
+			chain := env.AptosChains[uint64(op.ChainSelector)]
+			tx := result.RawData.(*aptosapi.PendingTransaction)
+			t.Logf("[ExecuteMCMSProposalV2] Operation %d Aptos tx hash: %s", i, tx.Hash)
+			err = aptosutil.ConfirmTx(chain, tx.Hash)
 			if err != nil {
 				return fmt.Errorf("[ExecuteMCMSProposalV2] Confirm failed: %w", err)
 			}
@@ -296,6 +340,11 @@ func ExecuteMCMSTimelockProposalV2(t *testing.T, env deployment.Environment, tim
 				env.SolChains[uint64(op.ChainSelector)].Client,
 				*env.SolChains[uint64(op.ChainSelector)].DeployerKey)
 
+		case chainsel.FamilyAptos:
+			executorsMap[op.ChainSelector] = mcmsaptossdk.NewTimelockExecutor(
+				env.AptosChains[uint64(op.ChainSelector)].Client,
+				env.AptosChains[uint64(op.ChainSelector)].DeployerSigner)
+
 		default:
 			require.FailNow(t, "unsupported chain family")
 		}
@@ -304,9 +353,13 @@ func ExecuteMCMSTimelockProposalV2(t *testing.T, env deployment.Environment, tim
 	timelockExecutable, err := mcmslib.NewTimelockExecutable(env.GetContext(), timelockProposal, executorsMap)
 	require.NoError(t, err)
 
-	require.Eventually(t, func() bool {
-		return timelockExecutable.IsReady(env.GetContext()) == nil
-	}, 5*time.Second, 50*time.Millisecond)
+	isReady := func() error {
+		err := timelockExecutable.IsReady(env.GetContext())
+		return err
+	}
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.NoErrorf(collect, isReady(), "Proposal is not ready")
+	}, 100*time.Second, 50*time.Millisecond)
 
 	// execute each operation sequentially
 	var tx = mcmstypes.TransactionResult{}
@@ -329,6 +382,16 @@ func ExecuteMCMSTimelockProposalV2(t *testing.T, env deployment.Environment, tim
 			chain := env.Chains[uint64(op.ChainSelector)]
 			evmTransaction := tx.RawData.(*gethtypes.Transaction)
 			_, err = chain.Confirm(evmTransaction)
+			if err != nil {
+				return fmt.Errorf("[ExecuteMCMSTimelockProposalV2] Confirm failed: %w", err)
+			}
+		}
+
+		// TODO: Confirm Aptos transaction properly
+		if family == chainsel.FamilyAptos {
+			chain := env.AptosChains[uint64(op.ChainSelector)]
+			aptosTx := tx.RawData.(*aptosapi.PendingTransaction)
+			err = aptosutil.ConfirmTx(chain, aptosTx.Hash)
 			if err != nil {
 				return fmt.Errorf("[ExecuteMCMSTimelockProposalV2] Confirm failed: %w", err)
 			}
