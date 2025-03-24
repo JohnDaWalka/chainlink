@@ -1640,58 +1640,37 @@ func DefaultRouterMessage(receiverAddress common.Address) router.ClientEVM2AnyMe
 }
 
 // TODO: this should be linked to the solChain function
-func SavePreloadedSolAddresses(e deployment.Environment, solChainSelector uint64) error {
+func SavePreloadedSolAddresses(t *testing.T, e deployment.Environment, solChainSelector uint64) {
 	tv := deployment.NewTypeAndVersion(changeset.Router, deployment.Version1_0_0)
 	err := e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["ccip_router"], tv)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err)
 	tv = deployment.NewTypeAndVersion(changeset.Receiver, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["test_ccip_receiver"], tv)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err)
 	tv = deployment.NewTypeAndVersion(changeset.FeeQuoter, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["fee_quoter"], tv)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err)
 	tv = deployment.NewTypeAndVersion(changeset.OffRamp, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["ccip_offramp"], tv)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err)
 	tv = deployment.NewTypeAndVersion(changeset.BurnMintTokenPool, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["burnmint_token_pool"], tv)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err)
 	tv = deployment.NewTypeAndVersion(changeset.LockReleaseTokenPool, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["lockrelease_token_pool"], tv)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err)
 	tv = deployment.NewTypeAndVersion(commontypes.ManyChainMultisigProgram, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["mcm"], tv)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err)
 	tv = deployment.NewTypeAndVersion(commontypes.AccessControllerProgram, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["access_controller"], tv)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err)
 	tv = deployment.NewTypeAndVersion(commontypes.RBACTimelockProgram, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["timelock"], tv)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err)
 	tv = deployment.NewTypeAndVersion(changeset.RMNRemote, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["rmn_remote"], tv)
-	if err != nil {
-		return err
-	}
-	return nil
+	require.NoError(t, err)
 }
 
 func ValidateSolanaState(t *testing.T, e deployment.Environment, solChainSelectors []uint64) {

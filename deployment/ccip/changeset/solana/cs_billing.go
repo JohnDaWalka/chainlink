@@ -534,7 +534,7 @@ func WithdrawBilledFunds(e deployment.Environment, cfg WithdrawBilledFundsConfig
 	billingSignerPDA, _, _ := solState.FindFeeBillingSignerPDA(chainState.Router)
 	tokenProgramID, _ := chainState.TokenToTokenProgram(tokenPubKey)
 	tokenReceiverPDA, _, _ := solTokenUtil.FindAssociatedTokenAddress(tokenProgramID, tokenPubKey, billingSignerPDA)
-	feeAggregatorATA, _, _ := solTokenUtil.FindAssociatedTokenAddress(tokenProgramID, tokenPubKey, chainState.GetFeeAggregator(chain))
+	feeAggregatorATA, _, _ := solTokenUtil.FindAssociatedTokenAddress(tokenProgramID, tokenPubKey, chainState.FeeAggregator)
 	routerConfigPDA, _, _ := solState.FindConfigPDA(chainState.Router)
 	routerUsingMCMS := cfg.MCMSSolana != nil && cfg.MCMSSolana.RouterOwnedByTimelock
 

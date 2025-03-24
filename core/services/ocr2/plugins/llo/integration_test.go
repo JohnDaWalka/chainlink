@@ -735,7 +735,6 @@ lloConfigMode = "bluegreen"
 		deribitFundingRateStreamID := uint32(9)
 		deribitFundingTimeStreamID := uint32(10)
 		deribitFundingIntervalHoursStreamID := uint32(11)
-		timestampedStonkPriceStreamID := uint32(12)
 
 		mustEncodeOpts := func(opts any) []byte {
 			encoded, err := json.Marshal(opts)
@@ -747,7 +746,6 @@ lloConfigMode = "bluegreen"
 
 		const simpleStreamlinedChannelID = 5
 		const complexStreamlinedChannelID = 6
-		const sampleTimestampsStockPriceChannelID = 7
 
 		dexBasedAssetFeedID := utils.NewHash()
 		rwaFeedID := utils.NewHash()
@@ -755,7 +753,6 @@ lloConfigMode = "bluegreen"
 		fundingRateFeedID := utils.NewHash()
 		simpleStreamlinedFeedID := pad32bytes(simpleStreamlinedChannelID)
 		complexStreamlinedFeedID := pad32bytes(complexStreamlinedChannelID)
-		sampleTimestampsStockPriceFeedID := pad32bytes(sampleTimestampsStockPriceChannelID)
 
 		// Channel definitions
 		channelDefinitions := llotypes.ChannelDefinitions{
@@ -789,9 +786,19 @@ lloConfigMode = "bluegreen"
 					ExpirationWindow: expirationWindow,
 					FeedID:           dexBasedAssetFeedID,
 					ABI: []lloevm.ABIEncoder{
-						newSingleABIEncoder("int192", standardMultiplier),
-						newSingleABIEncoder("int192", nil),
-						newSingleABIEncoder("int192", nil),
+						lloevm.ABIEncoder{
+							StreamID:   dexBasedAssetPriceStreamID,
+							Type:       "int192",
+							Multiplier: standardMultiplier,
+						},
+						lloevm.ABIEncoder{
+							StreamID: baseMarketDepthStreamID,
+							Type:     "int192",
+						},
+						lloevm.ABIEncoder{
+							StreamID: quoteMarketDepthStreamID,
+							Type:     "int192",
+						},
 					},
 				}),
 			},
@@ -817,7 +824,10 @@ lloConfigMode = "bluegreen"
 					ExpirationWindow: expirationWindow,
 					FeedID:           rwaFeedID,
 					ABI: []lloevm.ABIEncoder{
-						newSingleABIEncoder("uint32", nil),
+						{
+							StreamID: marketStatusStreamID,
+							Type:     "uint32",
+						},
 					},
 				}),
 			},
@@ -843,7 +853,11 @@ lloConfigMode = "bluegreen"
 					ExpirationWindow: expirationWindow,
 					FeedID:           benchmarkPriceFeedID,
 					ABI: []lloevm.ABIEncoder{
-						newSingleABIEncoder("int192", standardMultiplier),
+						{
+							StreamID:   benchmarkPriceStreamID,
+							Type:       "int192",
+							Multiplier: standardMultiplier,
+						},
 					},
 				}),
 			},
@@ -889,12 +903,30 @@ lloConfigMode = "bluegreen"
 					ExpirationWindow: expirationWindow,
 					FeedID:           fundingRateFeedID,
 					ABI: []lloevm.ABIEncoder{
-						newSingleABIEncoder("int192", nil),
-						newSingleABIEncoder("int192", nil),
-						newSingleABIEncoder("int192", nil),
-						newSingleABIEncoder("int192", nil),
-						newSingleABIEncoder("int192", nil),
-						newSingleABIEncoder("int192", nil),
+						{
+							StreamID: binanceFundingRateStreamID,
+							Type:     "int192",
+						},
+						{
+							StreamID: binanceFundingTimeStreamID,
+							Type:     "int192",
+						},
+						{
+							StreamID: binanceFundingIntervalHoursStreamID,
+							Type:     "int192",
+						},
+						{
+							StreamID: deribitFundingRateStreamID,
+							Type:     "int192",
+						},
+						{
+							StreamID: deribitFundingTimeStreamID,
+							Type:     "int192",
+						},
+						{
+							StreamID: deribitFundingIntervalHoursStreamID,
+							Type:     "int192",
+						},
 					},
 				}),
 			},
@@ -909,7 +941,11 @@ lloConfigMode = "bluegreen"
 				},
 				Opts: mustEncodeOpts(&lloevm.ReportFormatEVMStreamlinedOpts{
 					ABI: []lloevm.ABIEncoder{
-						newSingleABIEncoder("int128", standardMultiplier),
+						{
+							StreamID:   ethStreamID,
+							Type:       "int160",
+							Multiplier: standardMultiplier,
+						},
 					},
 				}),
 			},
@@ -932,21 +968,23 @@ lloConfigMode = "bluegreen"
 				},
 				Opts: mustEncodeOpts(&lloevm.ReportFormatEVMStreamlinedOpts{
 					ABI: []lloevm.ABIEncoder{
-						newSingleABIEncoder("int192", standardMultiplier),
-						newSingleABIEncoder("int8", ubig.NewI(1)),
-						newSingleABIEncoder("uint64", ubig.NewI(100)),
+						{
+							StreamID:   ethStreamID,
+							Type:       "int192",
+							Multiplier: standardMultiplier,
+						},
+						{
+							StreamID:   linkStreamID,
+							Type:       "int8",
+							Multiplier: ubig.NewI(10),
+						},
+						{
+							StreamID:   dexBasedAssetPriceStreamID,
+							Type:       "uint64",
+							Multiplier: ubig.NewI(100),
+						},
 					},
 				}),
-			},
-			// Sample timestamped stock price schema/RWA
-			sampleTimestampsStockPriceChannelID: {
-				ReportFormat: llotypes.ReportFormatJSON,
-				Streams: []llotypes.Stream{
-					{
-						StreamID:   timestampedStonkPriceStreamID,
-						Aggregator: llotypes.AggregatorMedian,
-					},
-				},
 			},
 		}
 		url, sha := newChannelDefinitionsServer(t, channelDefinitions)
@@ -975,14 +1013,7 @@ channelDefinitionsContractFromBlock = %d`, serverURL, serverPubKey, donID, confi
 	"deribitFundingTime": "1630000000",
 	"deribitFundingIntervalHours": "8",
 	"ethPrice": "3976.39",
-	"linkPrice": "23.45",
-	"stonk": {
-	  "result": "1234.5678",
-	  "timestamps": {
-		"providerIndicatedTimeUnixMs": 1742314713000,
-		"providerDataReceivedUnixMs": 1742314713050
-	  }
-	}
+	"linkPrice": "23.45"
 }`
 
 		pricePipeline := fmt.Sprintf(`
@@ -1017,12 +1048,8 @@ dp          [type=bridge name="%s" requestData="{\\"data\\":{\\"data\\":\\"foo\\
 
 market_status_parse   [type=jsonparse path="result,marketStatus" streamID=%d];
 
-stonk_price_parse   [type=jsonparse path="result,stonk"];
-merge [type=merge left="$(stonk_price_parse)" right="{\\"streamValueType\\":%d}" streamID=%d];
-
 dp -> market_status_parse;
-dp -> stonk_price_parse -> merge;
-`, bridgeName, marketStatusStreamID, datastreamsllo.LLOStreamValue_TimestampedStreamValue, timestampedStonkPriceStreamID)
+`, bridgeName, marketStatusStreamID)
 
 		benchmarkPricePipeline := fmt.Sprintf(`
 dp          [type=bridge name="%s" requestData="{\\"data\\":{\\"data\\":\\"foo\\"}}"];
@@ -1060,7 +1087,6 @@ dp -> binance_funding_interval_hours_parse -> binance_funding_interval_hours_dec
 dp -> deribit_funding_rate_parse -> deribit_funding_rate_decimal;
 dp -> deribit_funding_time_parse -> deribit_funding_time_decimal;
 dp -> deribit_funding_interval_hours_parse -> deribit_funding_interval_hours_decimal;
-
 `, bridgeName, binanceFundingRateStreamID, binanceFundingTimeStreamID, binanceFundingIntervalHoursStreamID, deribitFundingRateStreamID, deribitFundingTimeStreamID, deribitFundingIntervalHoursStreamID)
 
 		for i, node := range nodes {
@@ -1072,7 +1098,6 @@ dp -> deribit_funding_interval_hours_parse -> deribit_funding_interval_hours_dec
 			addStreamSpec(t, node, "rwaPipeline", nil, rwaPipeline)
 			addStreamSpec(t, node, "benchmarkPricePipeline", nil, benchmarkPricePipeline)
 			addStreamSpec(t, node, "fundingRatePipeline", nil, fundingRatePipeline)
-
 			addLLOJob(
 				t,
 				node,
@@ -1094,13 +1119,12 @@ dp -> deribit_funding_interval_hours_parse -> deribit_funding_interval_hours_dec
 
 		// NOTE: Wait for one of each type of report
 		feedIDs := map[[32]byte]struct{}{
-			dexBasedAssetFeedID:              {},
-			rwaFeedID:                        {},
-			benchmarkPriceFeedID:             {},
-			fundingRateFeedID:                {},
-			simpleStreamlinedFeedID:          {},
-			complexStreamlinedFeedID:         {},
-			sampleTimestampsStockPriceFeedID: {},
+			dexBasedAssetFeedID:      {},
+			rwaFeedID:                {},
+			benchmarkPriceFeedID:     {},
+			fundingRateFeedID:        {},
+			simpleStreamlinedFeedID:  {},
+			complexStreamlinedFeedID: {},
 		}
 
 		for pckt := range packetCh {
@@ -1217,45 +1241,29 @@ dp -> deribit_funding_interval_hours_parse -> deribit_funding_interval_hours_dec
 				assert.Len(t, payload, 32+2+lenReport+1+int(numSigs)*65)
 
 				// report contents check
-				// uint32 report format
-				// uint32 channel ID
-				rfBytes := report[:4]
-				rf := binary.BigEndian.Uint32(rfBytes)
-				assert.Equal(t, uint32(llotypes.ReportFormatEVMStreamlined), rf)
-				cidBytes := report[4:8]
+				cidBytes := report[:4]
 				cid := binary.BigEndian.Uint32(cidBytes)
 				switch cid {
 				case simpleStreamlinedChannelID:
 					assert.Len(t, report, 32)
-					tsbytes := report[8:16]
+					tsbytes := report[4:12]
 					ts := binary.BigEndian.Uint64(tsbytes)
 					assert.GreaterOrEqual(t, ts, uint64(testStartTimeStamp.Unix())) //nolint:gosec // g115
-					// int128
-					assert.Equal(t, "00000000000000d78f7f252ecf870000", hex.EncodeToString(report[16:]))
+					// int160
+					assert.Equal(t, "0000000000000000000000d78f7f252ecf870000", hex.EncodeToString(report[12:]))
 				case complexStreamlinedChannelID:
-					assert.Len(t, report, 49)
-					tsbytes := report[8:16]
+					assert.Len(t, report, 45)
+					tsbytes := report[4:12]
 					ts := binary.BigEndian.Uint64(tsbytes)
 					assert.GreaterOrEqual(t, ts, uint64(testStartTimeStamp.Unix())) //nolint:gosec // g115
-					// int192, int8, uint64 stream values
-					assert.Equal(t, "000000000000000000000000000000d78f7f252ecf870000", hex.EncodeToString(report[16:40]))
-					assert.Equal(t, "17", hex.EncodeToString(report[40:41]))
-					assert.Equal(t, "0000000000048aa7", hex.EncodeToString(report[41:]))
+					// int192, int8, uint64
+					assert.Equal(t, "000000000000000000000000000000d78f7f252ecf870000", hex.EncodeToString(report[12:36]))
+					assert.Equal(t, "ea", hex.EncodeToString(report[36:37]))
+					assert.Equal(t, "0000000000048aa7", hex.EncodeToString(report[37:]))
 				default:
 					t.Fatalf("unexpected channel: %d", cid)
 				}
 				delete(feedIDs, pad32bytes(cid))
-			case uint32(llotypes.ReportFormatJSON):
-				v := make(map[string]interface{})
-				err := json.Unmarshal(req.Payload, &v)
-				require.NoError(t, err)
-				report := v["report"].(map[string]interface{})
-				cid := report["ChannelID"].(float64)
-				delete(feedIDs, pad32bytes(uint32(cid)))
-				assert.Len(t, report["Values"].([]interface{}), 1)
-				tsv := report["Values"].([]interface{})[0].(map[string]interface{})
-				assert.Equal(t, 2, int(tsv["t"].(float64)))
-				assert.Equal(t, `TSV{ObservedAtNanoseconds: 1742314713000000000, StreamValue: {"t":0,"v":"1234.5678"}}`, tsv["v"].(string))
 			default:
 				t.Fatalf("unexpected report format: %d", req.ReportFormat)
 			}
@@ -2103,19 +2111,4 @@ func pad32bytes(d uint32) [32]byte {
 	var result [32]byte
 	binary.BigEndian.PutUint32(result[28:], d)
 	return result
-}
-
-func newSingleABIEncoder(typ string, multiplier *ubig.Big) (enc lloevm.ABIEncoder) {
-	if multiplier == nil {
-		err := json.Unmarshal([]byte(fmt.Sprintf(`{"type":"%s"}`, typ)), &enc)
-		if err != nil {
-			panic(err)
-		}
-		return
-	}
-	err := json.Unmarshal([]byte(fmt.Sprintf(`{"type":"%s","multiplier":"%s"}`, typ, multiplier.String())), &enc)
-	if err != nil {
-		panic(err)
-	}
-	return
 }

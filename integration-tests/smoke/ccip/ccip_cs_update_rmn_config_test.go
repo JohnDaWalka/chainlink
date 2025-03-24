@@ -335,11 +335,11 @@ func TestSetRMNRemoteOnRMNProxy(t *testing.T) {
 	t.Parallel()
 	e, _ := testhelpers.NewMemoryEnvironment(t, testhelpers.WithNoJobsAndContracts())
 	allChains := e.Env.AllChainSelectors()
-	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfigV2)
+	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfig)
 	var err error
 	prereqCfgs := make([]changeset.DeployPrerequisiteConfigPerChain, 0)
 	for _, c := range e.Env.AllChainSelectors() {
-		mcmsCfg[c] = proposalutils.SingleGroupTimelockConfigV2(t)
+		mcmsCfg[c] = proposalutils.SingleGroupTimelockConfig(t)
 		prereqCfgs = append(prereqCfgs, changeset.DeployPrerequisiteConfigPerChain{
 			ChainSelector: c,
 		})
@@ -358,7 +358,7 @@ func TestSetRMNRemoteOnRMNProxy(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(commonchangeset.DeployMCMSWithTimelockV2),
+			deployment.CreateLegacyChangeSet(commonchangeset.DeployMCMSWithTimelock),
 			mcmsCfg,
 		),
 	)

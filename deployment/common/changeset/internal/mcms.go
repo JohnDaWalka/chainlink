@@ -1,15 +1,15 @@
-package mcmsnew
+package internal
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-
-	bindings "github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
-	evmMcms "github.com/smartcontractkit/mcms/sdk/evm"
-	mcmsTypes "github.com/smartcontractkit/mcms/types"
+	"github.com/smartcontractkit/ccip-owner-contracts/pkg/config"
+	owner_helpers "github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/deployment"
-	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
+	"github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/common/view/v1_0"
 )
 
@@ -23,31 +23,18 @@ func WithLabel(label string) DeployMCMSOption {
 	}
 }
 
-// MCMSWithTimelockEVMDeploy holds a bundle of MCMS contract deploys.
-type MCMSWithTimelockEVMDeploy struct {
-	Canceller *deployment.ContractDeploy[*bindings.ManyChainMultiSig]
-	Bypasser  *deployment.ContractDeploy[*bindings.ManyChainMultiSig]
-	Proposer  *deployment.ContractDeploy[*bindings.ManyChainMultiSig]
-	Timelock  *deployment.ContractDeploy[*bindings.RBACTimelock]
-	CallProxy *deployment.ContractDeploy[*bindings.CallProxy]
-}
-
-func deployMCMSWithConfigEVM(
+func DeployMCMSWithConfig(
 	contractType deployment.ContractType,
 	lggr logger.Logger,
 	chain deployment.Chain,
 	ab deployment.AddressBook,
-	mcmConfig mcmsTypes.Config,
+	mcmConfig config.Config,
 	options ...DeployMCMSOption,
-) (*deployment.ContractDeploy[*bindings.ManyChainMultiSig], error) {
-	groupQuorums, groupParents, signerAddresses, signerGroups, err := evmMcms.ExtractSetConfigInputs(&mcmConfig)
-	if err != nil {
-		lggr.Errorw("Failed to extract set config inputs", "chain", chain.String(), "err", err)
-		return nil, err
-	}
-	mcm, err := deployment.DeployContract(lggr, chain, ab,
-		func(chain deployment.Chain) deployment.ContractDeploy[*bindings.ManyChainMultiSig] {
-			mcmAddr, tx, mcm, err2 := bindings.DeployManyChainMultiSig(
+) (*deployment.ContractDeploy[*owner_helpers.ManyChainMultiSig], error) {
+	groupQuorums, groupParents, signerAddresses, signerGroups := mcmConfig.ExtractSetConfigInputs()
+	mcm, err := deployment.DeployContract[*owner_helpers.ManyChainMultiSig](lggr, chain, ab,
+		func(chain deployment.Chain) deployment.ContractDeploy[*owner_helpers.ManyChainMultiSig] {
+			mcmAddr, tx, mcm, err2 := owner_helpers.DeployManyChainMultiSig(
 				chain.DeployerKey,
 				chain.Client,
 			)
@@ -57,7 +44,7 @@ func deployMCMSWithConfigEVM(
 				option(&tv)
 			}
 
-			return deployment.ContractDeploy[*bindings.ManyChainMultiSig]{
+			return deployment.ContractDeploy[*owner_helpers.ManyChainMultiSig]{
 				Address: mcmAddr, Contract: mcm, Tx: tx, Tv: tv, Err: err2,
 			}
 		})
@@ -73,45 +60,72 @@ func deployMCMSWithConfigEVM(
 		groupParents,
 		false,
 	)
-	if _, err := deployment.ConfirmIfNoError(chain, mcmsTx, err); err != nil {
+	if _, err := deployment.ConfirmIfNoErrorWithABI(chain, mcmsTx, owner_helpers.ManyChainMultiSigABI, err); err != nil {
 		lggr.Errorw("Failed to confirm mcm config", "chain", chain.String(), "err", err)
 		return mcm, err
 	}
 	return mcm, nil
 }
 
-// DeployMCMSWithTimelockContractsEVM deploys an MCMS for
-// each of the timelock roles Bypasser, ProposerMcm, Canceller on an EVM chain.
+// MCMSWithTimelockDeploy holds a bundle of MCMS contract deploys.
+type MCMSWithTimelockDeploy struct {
+	Canceller *deployment.ContractDeploy[*owner_helpers.ManyChainMultiSig]
+	Bypasser  *deployment.ContractDeploy[*owner_helpers.ManyChainMultiSig]
+	Proposer  *deployment.ContractDeploy[*owner_helpers.ManyChainMultiSig]
+	Timelock  *deployment.ContractDeploy[*owner_helpers.RBACTimelock]
+	CallProxy *deployment.ContractDeploy[*owner_helpers.CallProxy]
+}
+
+func DeployMCMSWithTimelockContractsBatch(
+	lggr logger.Logger,
+	chains map[uint64]deployment.Chain,
+	ab deployment.AddressBook,
+	cfgByChain map[uint64]types.MCMSWithTimelockConfig,
+) error {
+	deployGrp := errgroup.Group{}
+	for chainSel, cfg := range cfgByChain {
+		cfg := cfg
+		chainSel := chainSel
+		deployGrp.Go(func() error {
+			_, err := DeployMCMSWithTimelockContracts(lggr, chains[chainSel], ab, cfg)
+			return err
+		})
+	}
+	return deployGrp.Wait()
+}
+
+// DeployMCMSWithTimelockContracts deploys an MCMS for
+// each of the timelock roles Bypasser, ProposerMcm, Canceller.
 // MCMS contracts for the given configuration
 // as well as the timelock. It's not necessarily the only way to use
 // the timelock and MCMS, but its reasonable pattern.
-func DeployMCMSWithTimelockContractsEVM(
+func DeployMCMSWithTimelockContracts(
 	lggr logger.Logger,
 	chain deployment.Chain,
 	ab deployment.AddressBook,
-	config commontypes.MCMSWithTimelockConfigV2,
-) (*MCMSWithTimelockEVMDeploy, error) {
+	config types.MCMSWithTimelockConfig,
+) (*MCMSWithTimelockDeploy, error) {
 	opts := []DeployMCMSOption{}
 	if config.Label != nil {
 		opts = append(opts, WithLabel(*config.Label))
 	}
 
-	bypasser, err := deployMCMSWithConfigEVM(commontypes.BypasserManyChainMultisig, lggr, chain, ab, config.Bypasser, opts...)
+	bypasser, err := DeployMCMSWithConfig(types.BypasserManyChainMultisig, lggr, chain, ab, config.Bypasser, opts...)
 	if err != nil {
 		return nil, err
 	}
-	canceller, err := deployMCMSWithConfigEVM(commontypes.CancellerManyChainMultisig, lggr, chain, ab, config.Canceller, opts...)
+	canceller, err := DeployMCMSWithConfig(types.CancellerManyChainMultisig, lggr, chain, ab, config.Canceller, opts...)
 	if err != nil {
 		return nil, err
 	}
-	proposer, err := deployMCMSWithConfigEVM(commontypes.ProposerManyChainMultisig, lggr, chain, ab, config.Proposer, opts...)
+	proposer, err := DeployMCMSWithConfig(types.ProposerManyChainMultisig, lggr, chain, ab, config.Proposer, opts...)
 	if err != nil {
 		return nil, err
 	}
 
 	timelock, err := deployment.DeployContract(lggr, chain, ab,
-		func(chain deployment.Chain) deployment.ContractDeploy[*bindings.RBACTimelock] {
-			timelock, tx2, cc, err2 := bindings.DeployRBACTimelock(
+		func(chain deployment.Chain) deployment.ContractDeploy[*owner_helpers.RBACTimelock] {
+			timelock, tx2, cc, err2 := owner_helpers.DeployRBACTimelock(
 				chain.DeployerKey,
 				chain.Client,
 				config.TimelockMinDelay,
@@ -127,12 +141,12 @@ func DeployMCMSWithTimelockContractsEVM(
 				[]common.Address{bypasser.Address},                                      // bypassers
 			)
 
-			tv := deployment.NewTypeAndVersion(commontypes.RBACTimelock, deployment.Version1_0_0)
+			tv := deployment.NewTypeAndVersion(types.RBACTimelock, deployment.Version1_0_0)
 			if config.Label != nil {
 				tv.AddLabel(*config.Label)
 			}
 
-			return deployment.ContractDeploy[*bindings.RBACTimelock]{
+			return deployment.ContractDeploy[*owner_helpers.RBACTimelock]{
 				Address: timelock, Contract: cc, Tx: tx2, Tv: tv, Err: err2,
 			}
 		})
@@ -142,19 +156,19 @@ func DeployMCMSWithTimelockContractsEVM(
 	}
 
 	callProxy, err := deployment.DeployContract(lggr, chain, ab,
-		func(chain deployment.Chain) deployment.ContractDeploy[*bindings.CallProxy] {
-			callProxy, tx2, cc, err2 := bindings.DeployCallProxy(
+		func(chain deployment.Chain) deployment.ContractDeploy[*owner_helpers.CallProxy] {
+			callProxy, tx2, cc, err2 := owner_helpers.DeployCallProxy(
 				chain.DeployerKey,
 				chain.Client,
 				timelock.Address,
 			)
 
-			tv := deployment.NewTypeAndVersion(commontypes.CallProxy, deployment.Version1_0_0)
+			tv := deployment.NewTypeAndVersion(types.CallProxy, deployment.Version1_0_0)
 			if config.Label != nil {
 				tv.AddLabel(*config.Label)
 			}
 
-			return deployment.ContractDeploy[*bindings.CallProxy]{
+			return deployment.ContractDeploy[*owner_helpers.CallProxy]{
 				Address: callProxy, Contract: cc, Tx: tx2, Tv: tv, Err: err2,
 			}
 		})
@@ -186,7 +200,7 @@ func DeployMCMSWithTimelockContractsEVM(
 	}
 	// After the proposer cycle is validated,
 	// we can remove the deployer as an admin.
-	return &MCMSWithTimelockEVMDeploy{
+	return &MCMSWithTimelockDeploy{
 		Canceller: canceller,
 		Bypasser:  bypasser,
 		Proposer:  proposer,

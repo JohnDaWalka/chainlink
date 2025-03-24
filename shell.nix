@@ -4,7 +4,7 @@ with pkgs; let
   postgresql = postgresql_15;
   nodejs = nodejs-18_x;
   nodePackages = pkgs.nodePackages.override {inherit nodejs;};
-  pnpm = pnpm_10;
+  pnpm = pnpm_9;
 
   version = "v2.0.18";
   getBinDerivation =

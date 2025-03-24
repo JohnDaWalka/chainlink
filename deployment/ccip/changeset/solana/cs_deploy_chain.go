@@ -32,7 +32,6 @@ import (
 	solTestReceiver "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
-	solanaMCMS "github.com/smartcontractkit/chainlink/deployment/common/changeset/solana/mcms"
 )
 
 var _ deployment.ChangeSet[DeployChainContractsConfig] = DeployChainContractsChangeset
@@ -54,12 +53,9 @@ func getTypeToProgramDeployName() map[deployment.ContractType]string {
 
 type DeployChainContractsConfig struct {
 	HomeChainSelector      uint64
-	ChainSelector          uint64
-	ContractParamsPerChain ChainContractParams
+	ContractParamsPerChain map[uint64]ChainContractParams
 	UpgradeConfig          UpgradeConfig
-	BuildConfig            *BuildSolanaConfig
-	// TODO: add validation for this
-	MCMSWithTimelockConfig types.MCMSWithTimelockConfigV2
+	BuildConfig            BuildSolanaConfig
 }
 
 type ChainContractParams struct {
@@ -109,87 +105,83 @@ func (cfg UpgradeConfig) Validate(e deployment.Environment, chainSelector uint64
 	return ValidateMCMSConfig(e, chainSelector, cfg.MCMS)
 }
 
-func (c DeployChainContractsConfig) Validate(e deployment.Environment) error {
+func (c DeployChainContractsConfig) Validate() error {
 	if err := deployment.IsValidChainSelector(c.HomeChainSelector); err != nil {
 		return fmt.Errorf("invalid home chain selector: %d - %w", c.HomeChainSelector, err)
 	}
-	if err := deployment.IsValidChainSelector(c.ChainSelector); err != nil {
-		return fmt.Errorf("invalid chain selector: %d - %w", c.ChainSelector, err)
-	}
-	family, _ := chainsel.GetSelectorFamily(c.ChainSelector)
-	if family != chainsel.FamilySolana {
-		return fmt.Errorf("chain %d is not a solana chain", c.ChainSelector)
-	}
-	if err := c.UpgradeConfig.Validate(e, c.ChainSelector); err != nil {
-		return fmt.Errorf("invalid UpgradeConfig: %w", err)
-	}
-	existingState, err := ccipChangeset.LoadOnchainState(e)
-	if err != nil {
-		return fmt.Errorf("failed to load existing onchain state: %w", err)
-	}
-	if _, exists := existingState.SupportedChains()[c.ChainSelector]; !exists {
-		return fmt.Errorf("chain %d not supported", c.ChainSelector)
+	for cs := range c.ContractParamsPerChain {
+		if err := deployment.IsValidChainSelector(cs); err != nil {
+			return fmt.Errorf("invalid chain selector: %d - %w", cs, err)
+		}
 	}
 	return nil
 }
 
 func DeployChainContractsChangeset(e deployment.Environment, c DeployChainContractsConfig) (deployment.ChangesetOutput, error) {
-	if err := c.Validate(e); err != nil {
+	if err := c.Validate(); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("invalid DeployChainContractsConfig: %w", err)
 	}
 	newAddresses := deployment.NewMemoryAddressBook()
-	existingState, _ := ccipChangeset.LoadOnchainState(e)
-	err := v1_6.ValidateHomeChainState(e, c.HomeChainSelector, existingState)
+	existingState, err := ccipChangeset.LoadOnchainState(e)
+	if err != nil {
+		e.Logger.Errorw("Failed to load existing onchain state", "err", err)
+		return deployment.ChangesetOutput{}, err
+	}
+
+	err = v1_6.ValidateHomeChainState(e, c.HomeChainSelector, existingState)
 	if err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
 
-	chainSel := c.ChainSelector
-	chain := e.SolChains[chainSel]
-	if existingState.SolChains[chainSel].LinkToken.IsZero() {
-		return deployment.ChangesetOutput{}, fmt.Errorf("fee tokens not found for chain %d", chainSel)
-	}
-
-	// prepare artifacts
-	// artifacts will already exist if running locally as chain spin up fetches them
-	// on CI they wont be present and we want to fetch them here
-	if c.BuildConfig != nil {
-		e.Logger.Debugw("Building solana artifacts", "gitCommitSha", c.BuildConfig.GitCommitSha)
-		err = BuildSolana(e, *c.BuildConfig)
+	if c.BuildConfig.GitCommitSha != "" {
+		err = BuildSolana(e, c.BuildConfig)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to build solana: %w", err)
 		}
-	} else {
-		e.Logger.Debugw("Skipping solana build as no build config provided")
 	}
 
-	if err := c.UpgradeConfig.Validate(e, chainSel); err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("invalid UpgradeConfig: %w", err)
-	}
-	addresses, _ := e.ExistingAddresses.AddressesForChain(chainSel)
-	mcmState, _ := state.MaybeLoadMCMSWithTimelockChainStateSolana(chain, addresses)
 	timelocks := map[uint64]string{}
 	proposers := map[uint64]string{}
 	inspectors := map[uint64]sdk.Inspector{}
 	var batches []mcmsTypes.BatchOperation
-	timelocks[chainSel] = mcmsSolana.ContractAddress(
-		mcmState.TimelockProgram,
-		mcmsSolana.PDASeed(mcmState.TimelockSeed),
-	)
-	proposers[chainSel] = mcmsSolana.ContractAddress(mcmState.McmProgram, mcmsSolana.PDASeed(mcmState.ProposerMcmSeed))
-	inspectors[chainSel] = mcmsSolana.NewInspector(chain.Client)
+	for chainSel := range c.ContractParamsPerChain {
+		if _, exists := existingState.SupportedChains()[chainSel]; !exists {
+			return deployment.ChangesetOutput{}, fmt.Errorf("chain %d not supported", chainSel)
+		}
+		// already validated family
+		family, _ := chainsel.GetSelectorFamily(chainSel)
+		if family != chainsel.FamilySolana {
+			return deployment.ChangesetOutput{}, fmt.Errorf("chain %d is not a solana chain", chainSel)
+		}
+		chain := e.SolChains[chainSel]
+		if existingState.SolChains[chainSel].LinkToken.IsZero() {
+			return deployment.ChangesetOutput{}, fmt.Errorf("fee tokens not found for chain %d", chainSel)
+		}
+		if err := c.UpgradeConfig.Validate(e, chainSel); err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("invalid UpgradeConfig: %w", err)
+		}
+		addresses, _ := e.ExistingAddresses.AddressesForChain(chainSel)
+		mcmState, _ := state.MaybeLoadMCMSWithTimelockChainStateSolana(chain, addresses)
 
-	mcmsTxs, err := deployChainContractsSolana(e, chain, newAddresses, c)
-	if err != nil {
-		e.Logger.Errorw("Failed to deploy CCIP contracts", "err", err, "newAddresses", newAddresses)
-		return deployment.ChangesetOutput{}, err
-	}
-	// create proposals for txns
-	if len(mcmsTxs) > 0 {
-		batches = append(batches, mcmsTypes.BatchOperation{
-			ChainSelector: mcmsTypes.ChainSelector(chainSel),
-			Transactions:  mcmsTxs,
-		})
+		timelocks[chainSel] = mcmsSolana.ContractAddress(
+			mcmState.TimelockProgram,
+			mcmsSolana.PDASeed(mcmState.TimelockSeed),
+		)
+		proposers[chainSel] = mcmsSolana.ContractAddress(mcmState.McmProgram, mcmsSolana.PDASeed(mcmState.ProposerMcmSeed))
+		inspectors[chainSel] = mcmsSolana.NewInspector(chain.Client)
+
+		mcmsTxs, err := deployChainContractsSolana(e, chain, newAddresses, c)
+		if err != nil {
+			e.Logger.Errorw("Failed to deploy CCIP contracts", "err", err, "newAddresses", newAddresses)
+			return deployment.ChangesetOutput{}, err
+		}
+		// create proposals for txns
+		if len(mcmsTxs) > 0 {
+			batches = append(batches, mcmsTypes.BatchOperation{
+				ChainSelector: mcmsTypes.ChainSelector(chainSel),
+				Transactions:  mcmsTxs,
+			})
+		}
 	}
 
 	if len(batches) > 0 {
@@ -455,7 +447,7 @@ func deployChainContractsSolana(
 		return txns, fmt.Errorf("failed to get link token address for chain %s", chain.String())
 	}
 
-	params := config.ContractParamsPerChain
+	params := config.ContractParamsPerChain[chain.Selector]
 
 	// FEE QUOTER DEPLOY
 	var feeQuoterAddress solana.PublicKey
@@ -689,46 +681,38 @@ func deployChainContractsSolana(
 		lockReleaseTokenPool = chainState.LockReleaseTokenPool
 	}
 
-	// MCMS
-	// this should selectively deploy anything if required
-	// TODO: bad check
-	if config.MCMSWithTimelockConfig.TimelockMinDelay != nil {
-		_, err = solanaMCMS.DeployMCMSWithTimelockProgramsSolana(e, chain, ab, config.MCMSWithTimelockConfig)
+	if config.UpgradeConfig.NewAccessControllerVersion != nil ||
+		config.UpgradeConfig.NewTimelockVersion != nil ||
+		config.UpgradeConfig.NewMCMVersion != nil {
+		addresses, err := e.ExistingAddresses.AddressesForChain(chain.Selector)
 		if err != nil {
-			return txns, fmt.Errorf("failed to deploy MCMS with timelock programs: %w", err)
+			return txns, fmt.Errorf("failed to get existing addresses: %w", err)
 		}
-	}
-	addresses, err := e.ExistingAddresses.AddressesForChain(chain.Selector)
-	if err != nil {
-		return txns, fmt.Errorf("failed to get existing addresses: %w", err)
-	}
-	mcmState, err := state.MaybeLoadMCMSWithTimelockChainStateSolana(chain, addresses)
-	if err != nil {
-		return txns, fmt.Errorf("failed to load MCMS with timelock chain state: %w", err)
-	}
-	if config.UpgradeConfig.NewAccessControllerVersion != nil {
-		e.Logger.Infow("Generating instruction for upgrading access controller", "chain", chain.String())
-		newTxns, err := generateUpgradeTxns(e, chain, ab, config, config.UpgradeConfig.NewAccessControllerVersion, mcmState.AccessControllerProgram, types.AccessControllerProgram)
+		mcmState, err := state.MaybeLoadMCMSWithTimelockChainStateSolana(chain, addresses)
 		if err != nil {
-			return txns, fmt.Errorf("failed to generate upgrade txns: %w", err)
+			return txns, fmt.Errorf("failed to load MCMS with timelock chain state: %w", err)
 		}
-		txns = append(txns, newTxns...)
-	}
-	if config.UpgradeConfig.NewTimelockVersion != nil {
-		e.Logger.Infow("Generate instruction for upgrading timelock", "chain", chain.String())
-		newTxns, err := generateUpgradeTxns(e, chain, ab, config, config.UpgradeConfig.NewTimelockVersion, mcmState.TimelockProgram, types.RBACTimelockProgram)
-		if err != nil {
-			return txns, fmt.Errorf("failed to generate upgrade txns: %w", err)
+		if config.UpgradeConfig.NewAccessControllerVersion != nil {
+			newTxns, err := generateUpgradeTxns(e, chain, ab, config, config.UpgradeConfig.NewAccessControllerVersion, mcmState.AccessControllerProgram, types.AccessControllerProgram)
+			if err != nil {
+				return txns, fmt.Errorf("failed to generate upgrade txns: %w", err)
+			}
+			txns = append(txns, newTxns...)
 		}
-		txns = append(txns, newTxns...)
-	}
-	if config.UpgradeConfig.NewMCMVersion != nil {
-		e.Logger.Infow("Generate instruction for upgrading mcms", "chain", chain.String())
-		newTxns, err := generateUpgradeTxns(e, chain, ab, config, config.UpgradeConfig.NewMCMVersion, mcmState.McmProgram, types.ManyChainMultisigProgram)
-		if err != nil {
-			return txns, fmt.Errorf("failed to generate upgrade txns: %w", err)
+		if config.UpgradeConfig.NewTimelockVersion != nil {
+			newTxns, err := generateUpgradeTxns(e, chain, ab, config, config.UpgradeConfig.NewTimelockVersion, mcmState.TimelockProgram, types.RBACTimelockProgram)
+			if err != nil {
+				return txns, fmt.Errorf("failed to generate upgrade txns: %w", err)
+			}
+			txns = append(txns, newTxns...)
 		}
-		txns = append(txns, newTxns...)
+		if config.UpgradeConfig.NewMCMVersion != nil {
+			newTxns, err := generateUpgradeTxns(e, chain, ab, config, config.UpgradeConfig.NewMCMVersion, mcmState.McmProgram, types.ManyChainMultisigProgram)
+			if err != nil {
+				return txns, fmt.Errorf("failed to generate upgrade txns: %w", err)
+			}
+			txns = append(txns, newTxns...)
+		}
 	}
 
 	// BILLING
@@ -800,7 +784,6 @@ func generateUpgradeTxns(
 	programID solana.PublicKey,
 	contractType deployment.ContractType,
 ) ([]mcmsTypes.Transaction, error) {
-	e.Logger.Infow("Generating instruction for upgrading contract", "contractType", contractType)
 	txns := make([]mcmsTypes.Transaction, 0)
 	bufferProgram, err := DeployAndMaybeSaveToAddressBook(e, chain, ab, contractType, *newVersion, true)
 	if err != nil {
@@ -1003,11 +986,7 @@ func (cfg SetFeeAggregatorConfig) Validate(e deployment.Environment) error {
 		return fmt.Errorf("invalid fee aggregator address: %w", err)
 	}
 
-	if solana.MustPublicKeyFromBase58(cfg.FeeAggregator).IsZero() {
-		return errors.New("fee aggregator address cannot be zero")
-	}
-
-	if chainState.GetFeeAggregator(chain).Equals(solana.MustPublicKeyFromBase58(cfg.FeeAggregator)) {
+	if chainState.FeeAggregator.Equals(solana.MustPublicKeyFromBase58(cfg.FeeAggregator)) {
 		return fmt.Errorf("fee aggregator %s is already set on chain %d", cfg.FeeAggregator, cfg.ChainSelector)
 	}
 
@@ -1046,6 +1025,11 @@ func SetFeeAggregator(e deployment.Environment, cfg SetFeeAggregatorConfig) (dep
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to build instruction: %w", err)
 	}
+	newAddresses := deployment.NewMemoryAddressBook()
+	err = newAddresses.Save(cfg.ChainSelector, cfg.FeeAggregator, deployment.NewTypeAndVersion(ccipChangeset.FeeAggregator, deployment.Version1_0_0))
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to save address: %w", err)
+	}
 
 	if routerUsingMCMS {
 		tx, err := BuildMCMSTxn(instruction, chainState.Router.String(), ccipChangeset.Router)
@@ -1059,6 +1043,7 @@ func SetFeeAggregator(e deployment.Environment, cfg SetFeeAggregatorConfig) (dep
 		}
 		return deployment.ChangesetOutput{
 			MCMSTimelockProposals: []mcms.TimelockProposal{*proposal},
+			AddressBook:           newAddresses,
 		}, nil
 	}
 
@@ -1067,7 +1052,9 @@ func SetFeeAggregator(e deployment.Environment, cfg SetFeeAggregatorConfig) (dep
 	}
 	e.Logger.Infow("Set new fee aggregator", "chain", chain.String(), "fee_aggregator", feeAggregatorPubKey.String())
 
-	return deployment.ChangesetOutput{}, nil
+	return deployment.ChangesetOutput{
+		AddressBook: newAddresses,
+	}, nil
 }
 
 type DeployForTestConfig struct {
@@ -1088,7 +1075,7 @@ func (cfg DeployForTestConfig) Validate(e deployment.Environment) error {
 	return validateRouterConfig(chain, chainState)
 }
 
-func DeployReceiverForTest(e deployment.Environment, cfg DeployForTestConfig) (deployment.ChangesetOutput, error) {
+func DeployForTest(e deployment.Environment, cfg DeployForTestConfig) (deployment.ChangesetOutput, error) {
 	if err := cfg.Validate(e); err != nil {
 		return deployment.ChangesetOutput{}, err
 	}

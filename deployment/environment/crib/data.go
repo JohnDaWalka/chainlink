@@ -5,23 +5,21 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 )
 
 type OutputReader struct {
-	cribEnvStateDirPath string
+	outputDir string
 }
 
-// NewOutputReader creates new instance
-func NewOutputReader(cribEnvStateDirPath string) *OutputReader {
-	return &OutputReader{cribEnvStateDirPath: cribEnvStateDirPath}
+func NewOutputReader(outputDir string) *OutputReader {
+	return &OutputReader{outputDir: outputDir}
 }
 
 func (r *OutputReader) ReadNodesDetails() NodesDetails {
-	byteValue := r.readCRIBDataFile(NodesDetailsFileName)
+	byteValue := r.readFile(NodesDetailsFileName)
 
 	var result NodesDetails
 
@@ -35,7 +33,7 @@ func (r *OutputReader) ReadNodesDetails() NodesDetails {
 }
 
 func (r *OutputReader) ReadRMNNodeConfigs() []RMNNodeConfig {
-	byteValue := r.readCRIBDataFile(RMNNodeIdentitiesFileName)
+	byteValue := r.readFile(RMNNodeIdentitiesFileName)
 
 	var result []RMNNodeConfig
 
@@ -49,7 +47,7 @@ func (r *OutputReader) ReadRMNNodeConfigs() []RMNNodeConfig {
 }
 
 func (r *OutputReader) ReadChainConfigs() []devenv.ChainConfig {
-	byteValue := r.readCRIBDataFile(ChainsConfigsFileName)
+	byteValue := r.readFile(ChainsConfigsFileName)
 
 	var result []devenv.ChainConfig
 
@@ -63,7 +61,7 @@ func (r *OutputReader) ReadChainConfigs() []devenv.ChainConfig {
 }
 
 func (r *OutputReader) ReadAddressBook() *deployment.AddressBookMap {
-	byteValue := r.readCRIBDataFile(AddressBookFileName)
+	byteValue := r.readFile(AddressBookFileName)
 
 	var result map[uint64]map[string]deployment.TypeAndVersion
 
@@ -76,9 +74,8 @@ func (r *OutputReader) ReadAddressBook() *deployment.AddressBookMap {
 	return deployment.NewMemoryAddressBookFromMap(result)
 }
 
-func (r *OutputReader) readCRIBDataFile(fileName string) []byte {
-	dataDirPath := path.Join(r.cribEnvStateDirPath, "data")
-	file, err := os.Open(fmt.Sprintf("%s/%s", dataDirPath, fileName))
+func (r *OutputReader) readFile(fileName string) []byte {
+	file, err := os.Open(fmt.Sprintf("%s/%s", r.outputDir, fileName))
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		panic(err)

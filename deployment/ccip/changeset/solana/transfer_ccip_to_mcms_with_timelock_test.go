@@ -207,8 +207,21 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T) (deployment.Environmen
 	require.NoError(t, err)
 	// Fund account for fees
 	testutils.FundAccounts(e.GetContext(), []solana.PrivateKey{*solChain.DeployerKey}, solChain.Client, t)
-	err = testhelpers.SavePreloadedSolAddresses(e, solChainSelectors[0])
-	require.NoError(t, err)
+	cfg := make(map[uint64]commontypes.MCMSWithTimelockConfig)
+	contractParams := make(map[uint64]v1_6.ChainContractParams)
+	for _, chain := range solChainSelectors {
+		contractParams[chain] = v1_6.ChainContractParams{
+			FeeQuoterParams: v1_6.DefaultFeeQuoterParams(),
+			OffRampParams:   v1_6.DefaultOffRampParams(),
+		}
+	}
+	prereqCfg := make([]changeset.DeployPrerequisiteConfigPerChain, 0)
+	for _, chain := range e.AllChainSelectors() {
+		prereqCfg = append(prereqCfg, changeset.DeployPrerequisiteConfigPerChain{
+			ChainSelector: chain,
+		})
+	}
+	testhelpers.SavePreloadedSolAddresses(t, e, solChainSelectors[0])
 	e, err = commonchangeset.ApplyChangesets(t, e, nil, []commonchangeset.ConfiguredChangeSet{
 		commonchangeset.Configure(
 			deployment.CreateLegacyChangeSet(v1_6.DeployHomeChainChangeset),
@@ -227,16 +240,27 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T) (deployment.Environmen
 			selectors,
 		),
 		commonchangeset.Configure(
+			deployment.CreateLegacyChangeSet(commonchangeset.DeployMCMSWithTimelock),
+			cfg,
+		),
+		commonchangeset.Configure(
+			deployment.CreateLegacyChangeSet(changeset.DeployPrerequisitesChangeset),
+			changeset.DeployPrerequisiteConfig{
+				Configs: prereqCfg,
+			},
+		),
+		commonchangeset.Configure(
 			deployment.CreateLegacyChangeSet(solanachangesets.DeployChainContractsChangeset),
 			solanachangesets.DeployChainContractsConfig{
 				HomeChainSelector: homeChainSel,
-				ChainSelector:     solChain1,
-				ContractParamsPerChain: solanachangesets.ChainContractParams{
-					FeeQuoterParams: solanachangesets.FeeQuoterParams{
-						DefaultMaxFeeJuelsPerMsg: solBinary.Uint128{Lo: 300000000, Hi: 0, Endianness: nil},
-					},
-					OffRampParams: solanachangesets.OffRampParams{
-						EnableExecutionAfter: int64(globals.PermissionLessExecutionThreshold.Seconds()),
+				ContractParamsPerChain: map[uint64]solanachangesets.ChainContractParams{
+					solChain1: {
+						FeeQuoterParams: solanachangesets.FeeQuoterParams{
+							DefaultMaxFeeJuelsPerMsg: solBinary.Uint128{Lo: 300000000, Hi: 0, Endianness: nil},
+						},
+						OffRampParams: solanachangesets.OffRampParams{
+							EnableExecutionAfter: int64(globals.PermissionLessExecutionThreshold.Seconds()),
+						},
 					},
 				},
 			},

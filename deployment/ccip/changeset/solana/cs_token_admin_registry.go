@@ -10,7 +10,6 @@ import (
 	"github.com/smartcontractkit/mcms"
 	mcmsTypes "github.com/smartcontractkit/mcms/types"
 
-	solCommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
 	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 
@@ -61,7 +60,7 @@ func (cfg RegisterTokenAdminRegistryConfig) Validate(e deployment.Environment) e
 	if err != nil {
 		return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), routerProgramAddress.String(), err)
 	}
-	var tokenAdminRegistryAccount solCommon.TokenAdminRegistry
+	var tokenAdminRegistryAccount solRouter.TokenAdminRegistry
 	if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err == nil {
 		return fmt.Errorf("token admin registry already exists for (mint: %s, router: %s)", tokenPubKey.String(), routerProgramAddress.String())
 	}
@@ -221,7 +220,7 @@ func (cfg TransferAdminRoleTokenAdminRegistryConfig) Validate(e deployment.Envir
 	if err != nil {
 		return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), routerProgramAddress.String(), err)
 	}
-	var tokenAdminRegistryAccount solCommon.TokenAdminRegistry
+	var tokenAdminRegistryAccount solRouter.TokenAdminRegistry
 	if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
 		return fmt.Errorf("token admin registry not found for (mint: %s, router: %s), cannot transfer admin role", tokenPubKey.String(), routerProgramAddress.String())
 	}
@@ -321,7 +320,7 @@ func (cfg AcceptAdminRoleTokenAdminRegistryConfig) Validate(e deployment.Environ
 	if err != nil {
 		return fmt.Errorf("failed to find token admin registry pda (mint: %s, router: %s): %w", tokenPubKey.String(), routerProgramAddress.String(), err)
 	}
-	var tokenAdminRegistryAccount solCommon.TokenAdminRegistry
+	var tokenAdminRegistryAccount solRouter.TokenAdminRegistry
 	if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
 		return fmt.Errorf("token admin registry not found for (mint: %s, router: %s), cannot accept admin role", tokenPubKey.String(), routerProgramAddress.String())
 	}

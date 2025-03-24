@@ -1,4 +1,4 @@
-package mcmsnew_test
+package internal_test
 
 import (
 	"encoding/json"
@@ -66,7 +66,6 @@ func TestDeployMCMSWithTimelockContracts(t *testing.T) {
 	mcmsState, err := state.MaybeLoadMCMSWithTimelockChainState(chains[chainsel.TEST_90000001.Selector], addresses)
 	require.NoError(t, err)
 	v, err := mcmsState.GenerateMCMSWithTimelockView()
-	require.NoError(t, err)
 	b, err := json.MarshalIndent(v, "", "  ")
 	require.NoError(t, err)
 	t.Log(string(b))
