@@ -2,6 +2,8 @@
 
 ## 2.22.0 - 2025-03-19
 
+:warning: On **May 31, 2025**, Ubuntu 20.04 will reach end-of-life and will no longer receive security updates. We strongly encourage you to begin upgrading your environments to a stable support Ubuntu versions. **We are bumping the Chainlink image to 24.04 in this release.** We will continue to provide an image that is 20.04 as well to ensure there is ample time to upgrade and remove support as it goes to eol.
+
 ### Minor Changes
 
 - [#16755](https://github.com/smartcontractkit/chainlink/pull/16755) [`928fa92d33`](https://github.com/smartcontractkit/chainlink/commit/928fa92d337e0e8ccc896d49dab260e62184934c) - Bump to start the next version
