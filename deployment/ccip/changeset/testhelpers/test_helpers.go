@@ -262,6 +262,7 @@ func retryCcipSendUntilNativeFeeIsSufficient(
 		cfg.Sender.GasLimit = 25000000
 
 		cfg.Sender.Value = fee
+		e.Logger.Infof("Sending CCIP message with %+v cfg, with fee %s", cfg, fee.String())
 
 		tx, err := r.CcipSend(cfg.Sender, cfg.DestChain, cfg.Evm2AnyMessage)
 		if err != nil {
