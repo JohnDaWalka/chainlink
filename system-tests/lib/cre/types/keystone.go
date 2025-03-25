@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
+	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/nix"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
@@ -289,7 +290,7 @@ type GeneratePoRJobSpecsInput struct {
 	OCR3CapabilityAddress  common.Address
 	ExtraAllowedPorts      []int
 	ExtraAllowedIPs        []string
-	CronCapBinName         string
+	CronCapBinPath         string
 	GatewayConnectorOutput GatewayConnectorOutput
 }
 
@@ -303,8 +304,8 @@ func (g *GeneratePoRJobSpecsInput) Validate() error {
 	if g.OCR3CapabilityAddress == (common.Address{}) {
 		return errors.New("ocr3 capability address not set")
 	}
-	if g.CronCapBinName == "" {
-		return errors.New("cron cap bin name not set")
+	if g.CronCapBinPath == "" {
+		return errors.New("cron cap bin path not set")
 	}
 	if g.GatewayConnectorOutput.Path == "" {
 		return errors.New("gateway connector path is not set")
@@ -589,6 +590,7 @@ type StartNixShellInput struct {
 	InfraInput     *types.InfraInput
 	CribConfigsDir string
 	ExtraEnvVars   map[string]string
+	PurgeNamespace bool
 }
 
 func (s *StartNixShellInput) Validate() error {
@@ -600,3 +602,5 @@ func (s *StartNixShellInput) Validate() error {
 	}
 	return nil
 }
+
+type DONCapabilityWithConfigFactoryFn = func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig
