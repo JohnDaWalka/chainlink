@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	ag_binary "github.com/gagliardetto/binary"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
 )
 
