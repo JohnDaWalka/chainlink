@@ -31,4 +31,6 @@ interface ICapabilityConfiguration {
     uint64 donCapabilityConfigCount,
     uint32 donId
   ) external;
+
+  function getNextDONId() external view returns (uint32);
 }
