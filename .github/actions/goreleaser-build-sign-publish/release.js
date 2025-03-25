@@ -75,11 +75,51 @@ function main() {
 }
 
 function printSummary(results) {
-  const passed = results.filter((result) => result.success);
-  const failed = results.filter((result) => !result.success);
+  const processedResults = results.map((result) => {
+    const [ regRepo, tag ] = result.image.split(":");
+    const [ registry, repository ] = regRepo.split("/")
+
+    return {
+      image: result.image,
+      success: result.success,
+      message: result.message,
+      registry,
+      repository,
+      tag,
+    };
+  });
+
+  const stepSummaryFile = process.env.GITHUB_STEP_SUMMARY;
+  if (stepSummaryFile && fs.existsSync(stepSummaryFile)) {
+
+    const markdownTableHeader = `| Status | Image | Contains Plugins? | Architecture |`;
+    const markdownTableSeparator = `| --- | --- | --- | --- |`;
+    const markdownTableRow = results.map((result) => {
+      const status = result.success ? "✅" : "❌";
+      const plugins = result.tag.includes("plugins") ? "✅" : "❌";
+      const arch = result.tag.includes("amd64") ? "amd64" : "arm64";
+
+      return `| ${status} |  ${result.repository}:${result.tag} | ${plugins} | ${arch} |`;
+    });
+
+    const markdownSummary = [
+      `## Chainlink Docker Image Summary`,
+      `\n`,
+
+      markdownTableHeader,
+      markdownTableSeparator,
+      ...markdownTableRow
+    ].join("\n");
+
+    fs.writeFileSync(stepSummaryFile, markdownSummary);
+  }
+
+
+  const passed = processedResults.filter((result) => result.success);
+  const failed = processedResults.filter((result) => !result.success);
 
   console.log("\nSummary:");
-  console.log(`Total images checked: ${results.length}`);
+  console.log(`Total images checked: ${processedResults.length}`);
   console.log(`Passed: ${passed.length}`);
   console.log(`Failed: ${failed.length}`);
 
