@@ -885,12 +885,12 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     uint256 gasLimit
   ) internal pure {
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM) {
-      //return Internal._validateEVMAddress(destAddress);
+      return Internal._validateEVMAddress(destAddress);
     }
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_SVM) {
       return Internal._validateSVMAddress(destAddress, gasLimit > 0);
     }
-    //revert InvalidChainFamilySelector(chainFamilySelector);
+    revert InvalidChainFamilySelector(chainFamilySelector);
   }
 
   /// @notice Parse and validate the SVM specific Extra Args Bytes.
