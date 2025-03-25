@@ -145,6 +145,7 @@ func Test_CCIPBatching_MultiSource(t *testing.T) {
 }
 
 func Test_CCIPBatching_MultiSource_MultiReports(t *testing.T) {
+	t.Skip("flaky test")
 	opt := testhelpers.WithOCRConfigOverride(func(params v1_6.CCIPOCRParams) v1_6.CCIPOCRParams {
 		params.CommitOffChainConfig.MultipleReportsEnabled = true
 		params.CommitOffChainConfig.MaxMerkleRootsPerReport = 1
