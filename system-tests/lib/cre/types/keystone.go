@@ -124,6 +124,9 @@ type ConfigureFeedConsumerInput struct {
 	AllowedSenders        []common.Address             `toml:"-"`
 	AllowedWorkflowOwners []common.Address             `toml:"-"`
 	AllowedWorkflowNames  []string                     `toml:"-"`
+	AppendAllowedSenders  []common.Address             `toml:"-"`
+	AppendWorkflowOwners  []common.Address             `toml:"-"`
+	AppendWorkflowNames   []string                     `toml:"-"`
 	Out                   *ConfigureFeedConsumerOutput `toml:"out"`
 }
 
@@ -134,14 +137,35 @@ func (c *ConfigureFeedConsumerInput) Validate() error {
 	if c.FeedConsumerAddress == (common.Address{}) {
 		return errors.New("feed consumer address not set")
 	}
-	if len(c.AllowedSenders) == 0 {
-		return errors.New("allowed senders not set")
-	}
-	if len(c.AllowedWorkflowOwners) == 0 {
-		return errors.New("allowed workflow owners not set")
-	}
-	if len(c.AllowedWorkflowNames) == 0 {
-		return errors.New("allowed workflow names not set")
+
+	if len(c.AppendAllowedSenders) == 0 && len(c.AppendWorkflowOwners) == 0 && len(c.AppendWorkflowNames) == 0 {
+		if len(c.AllowedSenders) == 0 {
+			return errors.New("allowed senders not set")
+		}
+		if len(c.AllowedWorkflowOwners) == 0 {
+			return errors.New("allowed workflow owners not set")
+		}
+		if len(c.AllowedWorkflowNames) == 0 {
+			return errors.New("allowed workflow names not set")
+		}
+	} else {
+		if len(c.AllowedSenders) > 0 || len(c.AllowedWorkflowOwners) > 0 || len(c.AllowedWorkflowNames) > 0 {
+			return errors.New("allowed senders, allowed workflow owners, allowed workflow names must not be set if you're setting append allowed senders, append workflow owners, append workflow names")
+		}
+
+		atLeastOneSet := false
+		if len(c.AppendAllowedSenders) > 0 {
+			atLeastOneSet = true
+		}
+		if len(c.AppendWorkflowOwners) > 0 {
+			atLeastOneSet = true
+		}
+		if len(c.AppendWorkflowNames) > 0 {
+			atLeastOneSet = true
+		}
+		if !atLeastOneSet {
+			return errors.New("at least one of append allowed senders, append workflow owners, append workflow names must be set if you're not setting allowed senders, allowed workflow owners, allowed workflow names")
+		}
 	}
 
 	return nil

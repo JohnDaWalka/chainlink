@@ -480,24 +480,50 @@ func ConfigureFeedsConsumer(testLogger zerolog.Logger, input *types.ConfigureFee
 		return string(truncated)
 	}
 
-	truncatedNames := make([][10]byte, 0, len(input.AllowedWorkflowNames))
-	for _, workflowName := range input.AllowedWorkflowNames {
-		var workflowNameBytes [10]byte
-		truncated := HashTruncateName(workflowName)
-		copy(workflowNameBytes[:], []byte(truncated))
+	// set entirely new config
+	if len(input.AllowedWorkflowOwners) > 0 && len(input.AllowedWorkflowNames) > 0 && len(input.AllowedSenders) > 0 {
+		truncatedNames := make([][10]byte, 0, len(input.AllowedWorkflowNames))
+		for _, workflowName := range input.AllowedWorkflowNames {
+			var workflowNameBytes [10]byte
+			truncated := HashTruncateName(workflowName)
+			copy(workflowNameBytes[:], []byte(truncated))
 
-		truncatedNames = append(truncatedNames, workflowNameBytes)
+			truncatedNames = append(truncatedNames, workflowNameBytes)
+		}
+
+		_, decodeErr := input.SethClient.Decode(feedsConsumerInstance.SetConfig(
+			input.SethClient.NewTXOpts(),
+			input.AllowedSenders,        // forwarder contract!!!
+			input.AllowedWorkflowOwners, // allowed workflow owners
+			// here we need to use hex-encoded workflow name converted to []byte
+			truncatedNames, // allowed workflow names
+		))
+		if decodeErr != nil {
+			return nil, errors.Wrap(decodeErr, "failed to set config for feeds consumer")
+		}
 	}
 
-	_, decodeErr := input.SethClient.Decode(feedsConsumerInstance.SetConfig(
-		input.SethClient.NewTXOpts(),
-		input.AllowedSenders,        // forwarder contract!!!
-		input.AllowedWorkflowOwners, // allowed workflow owners
-		// here we need to use hex-encoded workflow name converted to []byte
-		truncatedNames, // allowed workflow names
-	))
-	if decodeErr != nil {
-		return nil, errors.Wrap(decodeErr, "failed to set config for feeds consumer")
+	// append to existing config
+	if len(input.AppendAllowedSenders) > 0 && len(input.AppendWorkflowNames) > 0 && len(input.AppendWorkflowOwners) > 0 {
+		truncatedNames := make([][10]byte, 0, len(input.AppendWorkflowNames))
+		for _, workflowName := range input.AppendWorkflowNames {
+			var workflowNameBytes [10]byte
+			truncated := HashTruncateName(workflowName)
+			copy(workflowNameBytes[:], []byte(truncated))
+
+			truncatedNames = append(truncatedNames, workflowNameBytes)
+		}
+
+		_, decodeErr := input.SethClient.Decode(feedsConsumerInstance.AppendConfig(
+			input.SethClient.NewTXOpts(),
+			input.AppendAllowedSenders, // forwarder contract!!!
+			input.AppendWorkflowOwners, // allowed workflow owners
+			// here we need to use hex-encoded workflow name converted to []byte
+			truncatedNames, // allowed workflow names
+		))
+		if decodeErr != nil {
+			return nil, errors.Wrap(decodeErr, "failed to append config for feeds consumer")
+		}
 	}
 
 	out := &types.ConfigureFeedConsumerOutput{
