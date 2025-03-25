@@ -1,0 +1,14 @@
+name: Custom Go Mod Validation
+
+on:
+  pull_request:
+
+jobs:
+  go-mod-validation-debug:
+    name: custom go.mod validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate go.mod
+        uses: smartcontractkit/.github/apps/go-mod-validator@debug/go-mod-validation
