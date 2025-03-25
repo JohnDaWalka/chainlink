@@ -88,6 +88,7 @@ type launcher struct {
 func (l *launcher) Launch(ctx context.Context, state *registrysyncer.LocalRegistry) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
+	fmt.Printf("DEBUG: Launch called with new state - %d DONs received\n", len(state.IDsToDONs))
 	l.lggr.Debugw("Received new state from syncer", "dons", state.IDsToDONs)
 	l.latestState = *state
 	return nil
@@ -139,6 +140,7 @@ func (l *launcher) Start(context.Context) error {
 // monitor calls tick() at regular intervals to check for changes in the capability registry.
 func (l *launcher) monitor() {
 	defer l.wg.Done()
+	fmt.Printf("DEBUG: monitor started with tick interval %v\n", l.tickInterval)
 	ticker := time.NewTicker(l.tickInterval)
 
 	ctx, cancel := l.stopChan.NewCtx()
@@ -159,6 +161,7 @@ func (l *launcher) monitor() {
 // tick gets the latest registry state and processes the diff between the current and latest state.
 // This may lead to starting or stopping OCR instances.
 func (l *launcher) tick(ctx context.Context) error {
+	fmt.Printf("DEBUG: tick called\n")
 	// Ensure that the home chain reader is healthy.
 	// For new jobs it may be possible that the home chain reader is not yet ready
 	// so we won't be able to fetch configs and start any OCR instances.
@@ -188,6 +191,8 @@ func (l *launcher) tick(ctx context.Context) error {
 // for any removed OCR instances, it will shut them down.
 // for any updated OCR instances, it will restart them with the new configuration.
 func (l *launcher) processDiff(ctx context.Context, diff diffResult) error {
+	fmt.Printf("DEBUG: processDiff called with %d added, %d removed, %d updated DONs\n",
+		len(diff.added), len(diff.removed), len(diff.updated))
 	err := l.processRemoved(diff.removed)
 	err = multierr.Append(err, l.processAdded(ctx, diff.added))
 	err = multierr.Append(err, l.processUpdate(ctx, diff.updated))
@@ -198,6 +203,7 @@ func (l *launcher) processDiff(ctx context.Context, diff diffResult) error {
 // processUpdate will manage when configurations of an existing don are updated
 // If new oracles are needed, they are created and started. Old ones will be shut down
 func (l *launcher) processUpdate(ctx context.Context, updated map[registrysyncer.DonID]registrysyncer.DON) error {
+	fmt.Printf("DEBUG: processUpdate called for %d DONS\n", len(updated))
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -243,6 +249,7 @@ func (l *launcher) processUpdate(ctx context.Context, updated map[registrysyncer
 // processAdded is for when a new don is created. We know that all oracles
 // must be created and started
 func (l *launcher) processAdded(ctx context.Context, added map[registrysyncer.DonID]registrysyncer.DON) error {
+	fmt.Printf("DEBUG: processAdded called for %d DONS\n", len(added))
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -286,6 +293,7 @@ func (l *launcher) processAdded(ctx context.Context, added map[registrysyncer.Do
 
 // processRemoved handles the situation when an entire DON is removed
 func (l *launcher) processRemoved(removed map[registrysyncer.DonID]registrysyncer.DON) error {
+	fmt.Printf("DEBUG: processRemoved called for %d DONS\n", len(removed))
 	l.lock.Lock()
 	defer l.lock.Unlock()
 

@@ -297,6 +297,7 @@ func NewNode(
 		}
 		c.Solana = solConfigs
 
+		fmt.Printf("DEBUG: Aptos Chains: %+v\n", aptoschains)
 		var aptosConfigs chainlink.RawConfigs
 		for chainID, chain := range aptoschains {
 			aptosChainID, err := chainsel.GetChainIDFromSelector(chainID)
@@ -306,6 +307,7 @@ func NewNode(
 			aptosConfigs = append(aptosConfigs, createAptosChainConfig(aptosChainID, chain))
 		}
 		c.Aptos = aptosConfigs
+		fmt.Printf("DEBUG: Aptos Configs: %+v\n", c.Aptos)
 
 		for _, opt := range configOpts {
 			opt(c)
@@ -379,6 +381,7 @@ func NewNode(
 	initOps := []chainlink.CoreRelayerChainInitFunc{
 		chainlink.InitEVM(context.Background(), relayerFactory, evmOpts),
 		chainlink.InitSolana(context.Background(), relayerFactory, solanaOpts),
+		chainlink.InitAptos(ctx, relayerFactory, master.Aptos(), cfg.AptosConfigs()),
 	}
 	rci, err := chainlink.NewCoreRelayerChainInteroperators(initOps...)
 	require.NoError(t, err)

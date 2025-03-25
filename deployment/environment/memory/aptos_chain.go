@@ -152,13 +152,13 @@ func createAptosChainConfig(chainID string, chain deployment.AptosChain) chainli
 
 	chainConfig["Enabled"] = true
 	chainConfig["ChainID"] = chainID
-	chainConfig["NetworkName"] = "aptos-local"
-	chainConfig["NetworkNameFull"] = "aptos-local"
+	chainConfig["NetworkName"] = "aptos"
+	chainConfig["NetworkNameFull"] = "aptos"
 	chainConfig["Nodes"] = []any{
 		map[string]any{
 			"Name": "primary",
 			// TODO(aptos): fill out URL correctly
-			"URL": "http://localhost:8080",
+			"URL": "http://localhost:8080/v1",
 		},
 	}
 

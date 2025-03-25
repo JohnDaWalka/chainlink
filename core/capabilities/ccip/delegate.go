@@ -149,6 +149,8 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch all relayers: %w", err)
 	}
+	fmt.Printf("DEBUG: All relayers: %+v\n", allRelayers)
+
 	transmitterKeys, err := d.getTransmitterKeys(ctx, maps.Keys(allRelayers))
 	if err != nil {
 		return nil, err

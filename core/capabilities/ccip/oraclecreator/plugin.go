@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipaptos"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipsolana"
+	aptosconfig "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/aptos"
 	solanaconfig "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/solana"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/promwrapper"
 
@@ -155,6 +156,14 @@ func NewPluginOracleCreator(
 	homeChainSelector cciptypes.ChainSelector,
 	addressCodec cciptypes.AddressCodec,
 ) cctypes.OracleCreator {
+	fmt.Printf("DEBUG: Creating new plugin oracle creator with:\n")
+	fmt.Printf("  - jobID: %d\n", jobID)
+	fmt.Printf("  - externalJobID: %s\n", externalJobID)
+	fmt.Printf("  - homeChainSelector: %d\n", homeChainSelector)
+	fmt.Printf("  - num OCR key bundles: %d\n", len(ocrKeyBundles))
+	fmt.Printf("  - num transmitters: %d\n", len(transmitters))
+	fmt.Printf("  - num relayers: %d\n", len(relayers))
+	fmt.Printf("  - num bootstrapper locators: %d\n", len(bootstrapperLocators))
 	return &pluginOracleCreator{
 		ocrKeyBundles:         ocrKeyBundles,
 		transmitters:          transmitters,
@@ -181,7 +190,7 @@ func (i *pluginOracleCreator) Type() cctypes.OracleType {
 
 // Create implements types.OracleCreator.
 func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
-	fmt.Printf("DEBUG: Creating oracle for donID=%d, pluginType=%d, chainSelector=%d\n", donID, config.Config.PluginType, config.Config.ChainSelector)
+	fmt.Printf("DEBUG: Creating oracle plugin for donID=%d, pluginType=%d, chainSelector=%d\n", donID, config.Config.PluginType, config.Config.ChainSelector)
 	pluginType := cctypes.PluginType(config.Config.PluginType)
 	chainSelector := uint64(config.Config.ChainSelector)
 	destChainFamily, err := chainsel.GetSelectorFamily(chainSelector)
@@ -199,6 +208,7 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 	fmt.Printf("DEBUG: Destination chain ID: %s\n", destChainID)
 	destRelayID := types.NewRelayID(destChainFamily, destChainID)
 
+	fmt.Printf("DEBUG: Creating config tracker for donID=%d\n", donID)
 	configTracker := ocrimpls.NewConfigTracker(config, i.addressCodec)
 	publicConfig, err := configTracker.PublicConfig()
 	if err != nil {
@@ -313,6 +323,12 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 		OnchainKeyring:         onchainKeyring,
 		ReportingPluginFactory: factory,
 	}
+	fmt.Printf("DEBUG: Creating new OCR3 oracle with args:\n")
+	fmt.Printf("  - BinaryNetworkEndpointFactory: %v\n", oracleArgs.BinaryNetworkEndpointFactory != nil)
+	fmt.Printf("  - V2Bootstrappers: %d\n", len(oracleArgs.V2Bootstrappers))
+	fmt.Printf("  - ContractConfigTracker: %v\n", oracleArgs.ContractConfigTracker != nil)
+	fmt.Printf("  - ContractTransmitter: %v\n", oracleArgs.ContractTransmitter != nil)
+	fmt.Printf("  - MetricsRegisterer: %v\n", oracleArgs.MetricsRegisterer != nil)
 	oracle, err := libocr3.NewOracle(oracleArgs)
 	if err != nil {
 		fmt.Printf("DEBUG: Failed to create new oracle: %v\n", err)
@@ -341,6 +357,17 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 	publicConfig ocr3confighelper.PublicConfig,
 	offrampAddrStr string,
 ) (ocr3types.ReportingPluginFactory[[]byte], ocr3types.ContractTransmitter[[]byte], error) {
+	fmt.Printf("DEBUG: createFactoryAndTransmitter called with:\n"+
+		"  - donID: %d\n"+
+		"  - pluginType: %d\n"+
+		"  - destRelayID: %s\n"+
+		"  - num contractReaders: %d\n"+
+		"  - num chainWriters: %d\n"+
+		"  - num destFromAccounts: %d\n"+
+		"  - chain selector: %d\n"+
+		"  - offrampAddrStr: %s\n",
+		donID, config.Config.PluginType, destRelayID, len(contractReaders), len(chainWriters), len(destFromAccounts),
+		config.Config.ChainSelector, offrampAddrStr)
 	var factory ocr3types.ReportingPluginFactory[[]byte]
 	var transmitter ocr3types.ContractTransmitter[[]byte]
 
@@ -442,6 +469,11 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 	map[cciptypes.ChainSelector]types.ContractWriter,
 	error,
 ) {
+	fmt.Printf("DEBUG: createReadersAndWriters called with:\n")
+	fmt.Printf("  - destChainID: %s\n", destChainID)
+	fmt.Printf("  - pluginType: %s\n", pluginType)
+	fmt.Printf("  - destChainFamily: %s\n", destChainFamily)
+	fmt.Printf("  - destAddrStr: %s\n", destAddrStr)
 	ofc, err := decodeAndValidateOffchainConfig(pluginType, publicCfg)
 	if err != nil {
 		return nil, nil, err
@@ -466,8 +498,8 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 	for relayID, relayer := range i.relayers {
 		chainID := relayID.ChainID
 		relayChainFamily := relayID.Network
-		fmt.Printf("DEBUG: Relayer relayID: %+v chainID: %s relayChainFamily: %s\n", relayID, chainID, relayChainFamily)
 		chainDetails, err1 := chainsel.GetChainDetailsByChainIDAndFamily(chainID, relayChainFamily)
+		fmt.Printf("DEBUG: Relayer home %d relayID: %+v chainID: %s relayChainFamily: %s destChainID %s - chain selector %d\n", i.homeChainSelector, relayID, chainID, relayChainFamily, destChainID, chainDetails.ChainSelector)
 		chainSelector := cciptypes.ChainSelector(chainDetails.ChainSelector)
 		if err1 != nil {
 			return nil, nil, fmt.Errorf("failed to get chain selector from chain ID %s: %w", chainID, err1)
@@ -497,7 +529,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 				},
 			})
 			if err2 != nil {
-				return nil, nil, fmt.Errorf("failed to bind chain reader for dest chain %s's offramp at %s: %w", chainID, offrampAddress, err)
+				return nil, nil, fmt.Errorf("failed to bind chain reader for dest chain %s's offramp at %s: %w", chainID, offrampAddress, err2)
 			}
 		}
 
@@ -524,6 +556,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 
 		contractReaders[chainSelector] = cr
 		chainWriters[chainSelector] = cw
+		fmt.Printf("DEBUG: Relayer CREATED CR AND CW home %d relayID: %+v chainID: %s relayChainFamily: %s destChainID %s\n", i.homeChainSelector, relayID, chainID, relayChainFamily, destChainID)
 	}
 	return contractReaders, chainWriters, nil
 }
@@ -532,6 +565,7 @@ func decodeAndValidateOffchainConfig(
 	pluginType cctypes.PluginType,
 	publicConfig ocr3confighelper.PublicConfig,
 ) (offChainConfig, error) {
+	fmt.Printf("DEBUG: decodeAndValidateOffchainConfig called with pluginType=%s\n", pluginType)
 	var ofc offChainConfig
 	if pluginType == cctypes.PluginTypeCCIPExec {
 		execOffchainCfg, err1 := pluginconfig.DecodeExecuteOffchainConfig(publicConfig.ReportingPluginConfig)
@@ -567,6 +601,12 @@ func getChainReaderConfig(
 	chainSelector cciptypes.ChainSelector,
 	chainFamily string,
 ) ([]byte, error) {
+	fmt.Printf("DEBUG: getChainReaderConfig called with:\n")
+	fmt.Printf("  - chainID: %s\n", chainID)
+	fmt.Printf("  - destChainID: %s\n", destChainID)
+	fmt.Printf("  - homeChainID: %s\n", homeChainID)
+	fmt.Printf("  - chainSelector: %d\n", chainSelector)
+	fmt.Printf("  - chainFamily: %s\n", chainFamily)
 	// TODO: create a chain writer constructor interface and define family specific implementations in oraclecreator.plugin
 	switch chainFamily {
 	case relay.NetworkEVM:
@@ -619,6 +659,18 @@ func getChainReaderConfig(
 		}
 
 		return marshaledConfig, nil
+
+	case relay.NetworkAptos:
+		cfg, err := aptosconfig.GetChainReaderConfig()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get Aptos chain reader config: %w", err)
+		}
+		marshaledConfig, err := json.Marshal(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal Aptos chain reader config: %w", err)
+		}
+		return marshaledConfig, nil
+
 	default:
 		return nil, fmt.Errorf("unsupported chain family %s", chainFamily)
 	}
@@ -641,6 +693,10 @@ func createChainWriter(
 	chainFamily string,
 	offrampAddress []byte,
 ) (types.ContractWriter, error) {
+	fmt.Printf("DEBUG: createChainWriter called with:\n")
+	fmt.Printf("  - chainID: %s\n", chainID)
+	fmt.Printf("  - execBatchGasLimit: %d\n", execBatchGasLimit)
+	fmt.Printf("  - chainFamily: %s\n", chainFamily)
 	var err error
 	var chainWriterConfig []byte
 	transmitter, ok := transmitters[types.NewRelayID(chainFamily, chainID)]
@@ -674,6 +730,14 @@ func createChainWriter(
 		}
 		if chainWriterConfig, err = json.Marshal(evmConfig); err != nil {
 			return nil, fmt.Errorf("failed to marshal EVM chain writer config: %w", err)
+		}
+	case relay.NetworkAptos:
+		cfg, err := aptosconfig.GetChainWriterConfig(transmitter[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to get Aptos chain writer config: %w", err)
+		}
+		if chainWriterConfig, err = json.Marshal(cfg); err != nil {
+			return nil, fmt.Errorf("failed to marshal Aptos chain writer config: %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("unknown chain family %s", chainFamily)

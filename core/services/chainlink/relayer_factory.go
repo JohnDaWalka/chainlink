@@ -207,6 +207,7 @@ func (r *RelayerFactory) NewAptos(ks keystore.Aptos, chainCfgs RawConfigs) (map[
 }
 
 func (r *RelayerFactory) NewLOOPRelayer(name string, network string, plugin env.Plugin, ks coretypes.Keystore, chainCfgs RawConfigs) (map[types.RelayID]loop.Relayer, error) {
+	fmt.Printf("DEBUG: NewLOOPRelayer: %s\n", name)
 	relayers := make(map[types.RelayID]loop.Relayer)
 	lggr := r.Logger.Named(name)
 
@@ -223,6 +224,7 @@ func (r *RelayerFactory) NewLOOPRelayer(name string, network string, plugin env.
 	unique := make(map[string]struct{})
 	// create one relayer per chain id
 	for _, chainCfg := range chainCfgs {
+		fmt.Printf("DEBUG: NewLOOPRelayer: network %s chainid %+v\n", name, chainCfg.ChainID())
 		relayID := types.RelayID{Network: network, ChainID: chainCfg.ChainID()}
 		if _, alreadyExists := unique[relayID.Name()]; alreadyExists {
 			return nil, fmt.Errorf("duplicate chain definitions for %s", relayID.Name())

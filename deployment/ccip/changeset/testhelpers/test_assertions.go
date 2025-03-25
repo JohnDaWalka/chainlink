@@ -657,6 +657,18 @@ func ConfirmExecWithSeqNrsForAll(
 				if err != nil {
 					return err
 				}
+			case chainsel.FamilyAptos:
+				innerExecutionStates, err = ConfirmExecWithSeqNrsAptos(
+					t,
+					srcChain,
+					e.AptosChains[dstChain],
+					state.AptosChains[dstChain].CCIPAddress,
+					startBlock,
+					seqRange,
+				)
+				if err != nil {
+					return err
+				}
 			default:
 				return fmt.Errorf("unsupported chain family; %v", family)
 			}

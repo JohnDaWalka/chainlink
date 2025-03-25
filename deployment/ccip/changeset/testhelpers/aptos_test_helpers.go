@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-aptos/bindings/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
@@ -323,6 +324,8 @@ func ConfirmCommitWithExpectedSeqNumRangeAptos(
 	expectedSeqNumRange ccipocr3.SeqNumRange,
 	enforceSingleCommit bool,
 ) (any, error) {
+
+	time.Sleep(tests.WaitTimeout(t))
 	return nil, errors.New("TODO(aptos): ConfirmCommitWithExpectedSeqNumRangeAptos")
 }
 
@@ -336,4 +339,22 @@ func waitForTx(t *testing.T, client aptos.AptosRpcClient, txHash string, duratio
 		}
 	}
 	t.Fatalf("Failed to wait for transaction %s", txHash)
+}
+
+func ConfirmExecWithSeqNrsAptos(
+	t *testing.T,
+	sourceChain uint64,
+	dest deployment.AptosChain,
+	offRampAddress aptos.AccountAddress,
+	startBlock *uint64,
+	expectedSeqNrs []uint64,
+) (executionStates map[uint64]int, err error) {
+	time.Sleep(tests.WaitTimeout(t))
+	return nil, errors.New("TODO(aptos): ConfirmExecWithSeqNrsAptos")
+	//fmt.Printf("DEBUG: TODO(aptos): ConfirmExecWithSeqNrsAptos\n")
+	//seqNrsToWatch := make(map[uint64]int)
+	//for _, seqNr := range expectedSeqNrs {
+	//seqNrsToWatch[seqNr] = 0
+	//}
+	//return seqNrsToWatch, nil
 }
