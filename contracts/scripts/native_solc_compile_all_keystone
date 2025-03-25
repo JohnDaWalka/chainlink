@@ -31,4 +31,5 @@ compileContract CapabilitiesRegistry
 compileContract KeystoneForwarder
 compileContract OCR3Capability
 compileContract KeystoneFeedsConsumer
+compileContract PermissionlessKeystoneFeedsConsumer
 compileContract BalanceReader

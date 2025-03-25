@@ -23,7 +23,7 @@ contract PermissionlessKeystoneFeedsConsumer is IReceiver, OwnerIsCreator {
 
   mapping(bytes32 feedId => StoredFeedReport feedReport) internal s_feedReports;
 
-  function onReport(bytes calldata metadata, bytes calldata rawReport) external {
+  function onReport(bytes calldata /*metadata*/, bytes calldata rawReport) external {
     ReceivedFeedReport[] memory feeds = abi.decode(rawReport, (ReceivedFeedReport[]));
     for (uint256 i = 0; i < feeds.length; ++i) {
       s_feedReports[feeds[i].FeedId] = StoredFeedReport(feeds[i].Price, feeds[i].Timestamp);

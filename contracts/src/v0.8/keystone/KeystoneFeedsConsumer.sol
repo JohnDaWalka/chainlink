@@ -61,25 +61,6 @@ contract KeystoneFeedsConsumer is IReceiver, OwnerIsCreator {
     s_allowedWorkflowNamesList = _allowedWorkflowNamesList;
   }
 
-  function appendConfig(
-    address[] calldata _allowedSendersList,
-    address[] calldata _allowedWorkflowOwnersList,
-    bytes10[] calldata _allowedWorkflowNamesList
-  ) external onlyOwner {
-    for (uint32 i = 0; i < _allowedSendersList.length; ++i) {
-      s_allowedSenders[_allowedSendersList[i]] = true;
-      s_allowedSendersList.push(_allowedSendersList[i]);
-    }
-    for (uint32 i = 0; i < _allowedWorkflowOwnersList.length; ++i) {
-      s_allowedWorkflowOwners[_allowedWorkflowOwnersList[i]] = true;
-      s_allowedWorkflowOwnersList.push(_allowedWorkflowOwnersList[i]);
-    }
-    for (uint32 i = 0; i < _allowedWorkflowNamesList.length; ++i) {
-      s_allowedWorkflowNames[_allowedWorkflowNamesList[i]] = true;
-      s_allowedWorkflowNamesList.push(_allowedWorkflowNamesList[i]);
-    }
-  }
-
   function onReport(bytes calldata metadata, bytes calldata rawReport) external {
     if (!s_allowedSenders[msg.sender]) {
       revert UnauthorizedSender(msg.sender);
