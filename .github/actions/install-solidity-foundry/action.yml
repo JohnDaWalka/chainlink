@@ -30,7 +30,7 @@ runs:
       with:
         version: ${{ steps.extract-foundry-version.outputs.foundry-version }}
 
-    - name: Download binaries
+    - name: Install Foundry ZKSync
       shell: bash
       run: |
         mkdir -p ~/.zksync
