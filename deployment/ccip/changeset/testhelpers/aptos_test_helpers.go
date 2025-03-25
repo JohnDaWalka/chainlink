@@ -41,7 +41,7 @@ func (c AptosTestDeployPrerequisitesChangeSet) Apply(e deployment.Environment) (
 	onchainState, err := changeset.LoadOnchainState(e)
 	require.NoError(t, err)
 
-	fmt.Printf("DEBUG: AptosTestDeployPrerequisitesChangeSet: chain selectors: %+v onchainState: %+v\n", c.AptosChainSelectors)
+	fmt.Printf("DEBUG: AptosTestDeployPrerequisitesChangeSet: chain selectors: %+v\n", c.AptosChainSelectors)
 	for _, chainSelector := range c.AptosChainSelectors {
 		aptosChainState := onchainState.AptosChains[chainSelector]
 		// TODO: use a real token instead of APT
@@ -68,7 +68,7 @@ func (c AptosTestDeployContractsChangeSet) Apply(e deployment.Environment) (depl
 	onchainState, err := changeset.LoadOnchainState(e)
 	require.NoError(t, err)
 
-	fmt.Printf("DEBUG: AptosTestDeployContractsChangeSet: chain selectors: %+v onchainState: %+v\n", c.AptosChainSelectors, onchainState)
+	fmt.Printf("DEBUG: AptosTestDeployContractsChangeSet: chain selectors: %+v\n", c.AptosChainSelectors)
 
 	for _, chainSelector := range c.AptosChainSelectors {
 		aptosChain := e.AptosChains[chainSelector]
@@ -159,7 +159,7 @@ func (c AptosTestConfigureContractsChangeSet) Apply(e deployment.Environment) (d
 	onchainState, err := changeset.LoadOnchainState(e)
 	require.NoError(t, err)
 
-	fmt.Printf("DEBUG: AptosTestConfigureContractsChangeSet: chain selectors: %+v onchainState: %+v\n", c.AptosChainSelectors, onchainState)
+	fmt.Printf("DEBUG: AptosTestConfigureContractsChangeSet: chain selectors: %+v\n", c.AptosChainSelectors)
 
 	for _, chainSelector := range c.AptosChainSelectors {
 		aptosChain := e.AptosChains[chainSelector]

@@ -351,6 +351,17 @@ func ConfirmMultipleCommits(
 					enforceSingleCommit,
 				)
 				return err
+			case chainsel.FamilyAptos:
+				_, err := ConfirmCommitWithExpectedSeqNumRangeAptos(
+					t,
+					srcChain,
+					env.AptosChains[destChain],
+					state.AptosChains[destChain],
+					startBlocks[destChain],
+					seqRange,
+					enforceSingleCommit,
+				)
+				return err
 			default:
 				return fmt.Errorf("unsupported chain family; %v", family)
 			}
