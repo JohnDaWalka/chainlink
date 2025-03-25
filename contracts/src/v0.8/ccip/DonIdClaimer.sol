@@ -34,7 +34,7 @@ contract DonIDClaimer {
   function syncDonIdWithCapReg() external {
       address capabilitiesRegistry = i_capabilitiesRegistry;
       uint32 id = ICapabilityConfiguration(capabilitiesRegistry).getNextDONId();
-      donID = id - 1; 
+      donID = id; 
   } 
 }
  

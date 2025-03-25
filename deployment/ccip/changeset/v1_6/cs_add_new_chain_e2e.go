@@ -324,6 +324,7 @@ func addCandidatesForNewChainLogic(e deployment.Environment, c AddCandidatesForN
 		},
 		PluginInfo: SetCandidatePluginInfo{
 			PluginType: types.PluginTypeCCIPCommit,
+			// current only handles 1 newchain but can definitely handle > 1 new chain
 			OCRConfigPerRemoteChainSelector: map[uint64]CCIPOCRParams{
 				c.NewChain.Selector: c.NewChain.CommitOCRParams,
 			},
