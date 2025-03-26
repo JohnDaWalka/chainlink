@@ -46,12 +46,12 @@ Name = 'fake'
 WSURL = 'wss://foo.bar/ws'
 HTTPURL = 'https://foo.bar'
 
-[[Starknet]]
+[[Solana]]
 ChainID = 'Bar'
 
-[[Starknet.Nodes]]
+[[Solana.Nodes]]
 Name = 'primary'
-URL = 'http://stark.node'
+URL = 'http://solana.web'
 
 -- out.txt --
 ok EVM.1

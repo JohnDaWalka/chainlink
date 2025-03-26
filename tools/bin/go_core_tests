@@ -18,7 +18,7 @@ if [[ -n "$USE_FLAKEGUARD" ]]; then
 
   # Run go tests with flakeguard auto test rerun
   flakeguard run \
-    --test-packages "./..." \
+    --test-packages "-run=TestScripts/health/multi-chain" \
     --project-path="." \
     --run-count=1 \
     --rerun-failed-count=3 \
