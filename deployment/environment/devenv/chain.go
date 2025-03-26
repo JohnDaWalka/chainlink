@@ -2,6 +2,7 @@ package devenv
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -13,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/gorilla/websocket"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -152,6 +154,74 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]deployme
 					if receipt == nil {
 						return blockNumber, fmt.Errorf("receipt was nil for tx %s chain %s", tx.Hash().Hex(), chainInfo.ChainName)
 					}
+
+					rpcUrl := rpcConf.RPCs[0]
+					url, _ := rpcUrl.ToEndpoint()
+					logger.Infof("RPCUrl %s", rpcUrl.HTTPURL)
+
+					type TraceRequest struct {
+						JSONRPC string   `json:"jsonrpc"`
+						Method  string   `json:"method"`
+						Params  []string `json:"params"`
+						ID      int      `json:"id"`
+					}
+
+					type TraceResponse struct {
+						JSONRPC string          `json:"jsonrpc"`
+						Result  json.RawMessage `json:"result"`
+						Error   *struct {
+							Code    int    `json:"code"`
+							Message string `json:"message"`
+						} `json:"error,omitempty"`
+						ID int `json:"id"`
+					}
+
+					if receipt.Status == 0 {
+						// Make debug_traceTransaction call via WebSocket
+						logger.Debugf("Tracing transaction %s on chain %s", tx.Hash().Hex(), chainInfo.ChainName)
+						reqBody := TraceRequest{
+							JSONRPC: "2.0",
+							Method:  "debug_traceTransaction",
+							Params:  []string{tx.Hash().Hex()},
+							ID:      1,
+						}
+
+						jsonBody, err := json.Marshal(reqBody)
+						if err != nil {
+							logger.Errorf("Failed to marshal trace request: %v", err)
+						} else {
+							// Connect using a WebSocket client
+							ws, _, err := websocket.DefaultDialer.Dial(url, nil)
+							if err != nil {
+								logger.Errorf("Failed to connect to websocket endpoint: %v", err)
+							} else {
+								defer ws.Close()
+
+								// Send the JSON-RPC request over the WebSocket
+								if err := ws.WriteMessage(websocket.TextMessage, jsonBody); err != nil {
+									logger.Errorf("Failed to send trace request over websocket: %v", err)
+								} else {
+									// Read the response
+									_, message, err := ws.ReadMessage()
+									if err != nil {
+										logger.Errorf("Failed to read trace response from websocket: %v", err)
+									} else {
+										var traceResp TraceResponse
+										if err := json.Unmarshal(message, &traceResp); err != nil {
+											logger.Errorf("Failed to decode trace response: %v", err)
+										} else {
+											if traceResp.Error != nil {
+												logger.Errorf("Trace error: %s", traceResp.Error.Message)
+											} else {
+												logger.Debugf("Transaction %s trace result: %s", tx.Hash().Hex(), string(traceResp.Result))
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+
 					blockNumber = receipt.BlockNumber.Uint64()
 					if receipt.Status == 0 {
 						logger.Errorf("tx %s reverted chain %s, %w", tx.Hash().Hex(), chainInfo.ChainName, err)
