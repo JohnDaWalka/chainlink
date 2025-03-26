@@ -443,7 +443,7 @@ require (
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250325104625-225cb5a9190a // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.51.0 // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
-	github.com/smartcontractkit/libocr v0.0.0-20250325223731-8ef3f81904ea // indirect
+	github.com/smartcontractkit/libocr v0.0.0-20250326200842-40cc72279534 // indirect
 	github.com/smartcontractkit/mcms v0.14.0 // indirect
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20241009055228-33d0c0bf38de // indirect
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250318131857-4568a0f8d12d // indirect
