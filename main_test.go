@@ -49,7 +49,6 @@ var (
 	skipFlakyTests = map[string]string{ // test name: issue number
 		"TestScripts/nodes/evm/list/list":       "https://smartcontract-it.atlassian.net/browse/DX-107",
 		"TestScripts/keys/eth/list/unavailable": "https://smartcontract-it.atlassian.net/browse/DX-110",
-		"TestScripts/nodes/solana/list/list":    "https://smartcontract-it.atlassian.net/browse/CRE-155",
 		"TestScripts/health/default":            "https://smartcontract-it.atlassian.net/browse/DX-109",
 	}
 )
