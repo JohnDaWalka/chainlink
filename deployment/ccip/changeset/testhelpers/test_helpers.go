@@ -245,7 +245,10 @@ func retryCcipSendUntilNativeFeeIsSufficient(
 	const errCodeInsufficientFee = "0x07da6ee6"
 	defer func() { cfg.Sender.Value = nil }()
 
-	for {
+	maxRetries := 5
+	retryCount := 0
+
+	for retryCount <= maxRetries {
 		routerFee, err := r.GetFee(&bind.CallOpts{Context: context.Background()}, cfg.DestChain, cfg.Evm2AnyMessage)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get fee: %w", deployment.MaybeDataErr(err))
@@ -262,7 +265,7 @@ func retryCcipSendUntilNativeFeeIsSufficient(
 		cfg.Sender.GasLimit = 25000000
 
 		cfg.Sender.Value = fee
-		e.Logger.Infof("Sending CCIP message with %+v cfg, with fee %s", cfg, fee.String())
+		e.Logger.Infof("Sending CCIP message with %+v cfg, with fee %s (attempt %d/%d)", cfg, fee.String(), retryCount+1, maxRetries+1)
 
 		tx, err := r.CcipSend(cfg.Sender, cfg.DestChain, cfg.Evm2AnyMessage)
 		if err != nil {
@@ -274,14 +277,24 @@ func retryCcipSendUntilNativeFeeIsSufficient(
 			e.Logger.Error("Failed to confirm CCIP message", err)
 			if strings.Contains(err.Error(), errCodeInsufficientFee) {
 				e.Logger.Infof("Insufficient fee, retrying with fee %s", fee.String())
-				time.Sleep(2 * time.Second)
-				continue
+			} else {
+				e.Logger.Infof("Transaction failed, retrying (attempt %d/%d): %v", retryCount+1, maxRetries+1, err)
 			}
-			return nil, 0, fmt.Errorf("failed to confirm CCIP message: %w", deployment.MaybeDataErr(err))
+			retryCount++
+
+			if retryCount > maxRetries {
+				return nil, 0, fmt.Errorf("failed to confirm CCIP message after %d attempts: %w", maxRetries+1, deployment.MaybeDataErr(err))
+			}
+
+			time.Sleep(2 * time.Second)
+			continue
 		}
 
 		return tx, blockNum, nil
 	}
+
+	// This should never be reached due to the return in the retry check, but just in case
+	return nil, 0, fmt.Errorf("failed to confirm CCIP message after %d attempts", maxRetries+1)
 }
 
 // CCIPSendCalldata packs the calldata for the Router's ccipSend method.
