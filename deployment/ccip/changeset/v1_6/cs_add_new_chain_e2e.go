@@ -20,7 +20,6 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/latest/don_id_claimer"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/fee_quoter"
 )
 
@@ -290,15 +289,11 @@ func addCandidatesForNewChainLogic(e deployment.Environment, c AddCandidatesForN
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
-
-	txOpts := e.Chains[c.HomeChainSelector].DeployerKey
-	tx, err := state.Chains[c.HomeChainSelector].DonIdClaimer.ClaimNextDonID(txOpts)
+	donID, err := state.Chains[c.HomeChainSelector].CapabilityRegistry.GetNextDONId(&bind.CallOpts{
+		Context: e.GetContext(),
+	})
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to claim next DON ID: %w", err)
-	}
-
-	if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[c.HomeChainSelector], tx, don_id_claimer.DonIdClaimerABI, err); err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error confirming transaction for chain %s: %w", e.Chains[c.HomeChainSelector].String(), err)
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get next DON ID: %w", err)
 	}
 
 	// Add new chain config to the home chain
@@ -307,13 +302,6 @@ func addCandidatesForNewChainLogic(e deployment.Environment, c AddCandidatesForN
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to run UpdateChainConfigChangeset on home chain: %w", err)
 	}
 	allProposals = append(allProposals, out.MCMSTimelockProposals...)
-
-	donID, err := state.Chains[c.HomeChainSelector].DonIdClaimer.GetDonID(&bind.CallOpts{
-		Context: e.GetContext(),
-	})
-	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get next DON ID: %w", err)
-	}
 
 	// Add the DON to the registry and set candidate for the commit plugin
 	out, err = AddDonAndSetCandidateChangeset(e, AddDonAndSetCandidateChangesetConfig{
@@ -324,7 +312,6 @@ func addCandidatesForNewChainLogic(e deployment.Environment, c AddCandidatesForN
 		},
 		PluginInfo: SetCandidatePluginInfo{
 			PluginType: types.PluginTypeCCIPCommit,
-			// current only handles 1 newchain but can definitely handle > 1 new chain
 			OCRConfigPerRemoteChainSelector: map[uint64]CCIPOCRParams{
 				c.NewChain.Selector: c.NewChain.CommitOCRParams,
 			},
@@ -352,7 +339,7 @@ func addCandidatesForNewChainLogic(e deployment.Environment, c AddCandidatesForN
 				SkipChainConfigValidation: true,
 			},
 		},
-		DonIDOverrides: map[uint64]uint32{c.NewChain.Selector: uint32(donID.Uint64())},
+		DonIDOverrides: map[uint64]uint32{c.NewChain.Selector: donID},
 	})
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to run SetCandidateChangeset on home chain: %w", err)

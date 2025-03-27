@@ -5,6 +5,7 @@ package don_id_claimer
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
 )
 
 var (
@@ -28,17 +30,17 @@ var (
 	_ = abi.ConvertType
 )
 
-var DonIdClaimerMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"capabilitiesRegistry\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"claimNextDonID\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"donID\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getDonID\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setDONID\",\"inputs\":[{\"name\":\"donId\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"syncDonIdWithCapReg\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]}]",
-	Bin: "0x60a060405234801561001057600080fd5b506040516102be3803806102be83398101604081905261002f91610067565b6001600160a01b038116610056576040516342bcdf7f60e11b815260040160405180910390fd5b6001600160a01b0316608052610097565b60006020828403121561007957600080fd5b81516001600160a01b038116811461009057600080fd5b9392505050565b60805161020d6100b1600039600060a2015261020d6000f3fe608060405234801561001057600080fd5b50600436106100575760003560e01c80636a6339c11461005c5780636e74336b14610072578063756e6f461461007b5780638e16ff101461008c578063957120d214610096575b600080fd5b6000545b60405190815260200160405180910390f35b61006060005481565b610060610089366004610167565b90565b61009461009e565b005b61006061014e565b60007f0000000000000000000000000000000000000000000000000000000000000000905060008173ffffffffffffffffffffffffffffffffffffffff1663fcdc8efe6040518163ffffffff1660e01b8152600401602060405180830381865afa158015610110573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906101349190610180565b90506101416001826101c3565b63ffffffff166000555050565b6000805461015d9060016101e7565b6000819055919050565b60006020828403121561017957600080fd5b5035919050565b60006020828403121561019257600080fd5b815163ffffffff811681146101a657600080fd5b9392505050565b634e487b7160e01b600052601160045260246000fd5b63ffffffff8281168282160390808211156101e0576101e06101ad565b5092915050565b808201808211156101fa576101fa6101ad565b9291505056fea164736f6c6343000818000a",
+var DonIDClaimerMetaData = &bind.MetaData{
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"_capabilitiesRegistry\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"claimNextDONId\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getNextDONId\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isAuthorizedDeployer\",\"inputs\":[{\"name\":\"senderAddress\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setAuthorizedDeployer\",\"inputs\":[{\"name\":\"senderAddress\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"allowed\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"syncNextDONIdWithOffset\",\"inputs\":[{\"name\":\"offset\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"typeAndVersion\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"AuthorizedDeployerSet\",\"inputs\":[{\"name\":\"senderAddress\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"allowed\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DonIDClaimed\",\"inputs\":[{\"name\":\"claimer\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"donId\",\"type\":\"uint32\",\"indexed\":false,\"internalType\":\"uint32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DonIDSynced\",\"inputs\":[{\"name\":\"newDONId\",\"type\":\"uint32\",\"indexed\":false,\"internalType\":\"uint32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferRequested\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AccessForbidden\",\"inputs\":[{\"name\":\"sender\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"CannotTransferToSelf\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MustBeProposedOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OnlyCallableByOwner\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnerCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroAddressNotAllowed\",\"inputs\":[]}]",
+	Bin: "0x60a0806040523461014d57602081610abf803803809161001f8285610152565b83398101031261014d57516001600160a01b0381169081900361014d57331561013c57600180546001600160a01b03191633179055801561012b5760208160049260805233600052600282526040600020600160ff1982541617905560405192838092637e6e477f60e11b82525afa90811561011f576000916100d9575b506001805463ffffffff60a01b191660a09290921b63ffffffff60a01b16919091179055604051610933908161018c8239608051816104c80152f35b6020813d602011610117575b816100f260209383610152565b8101031261011357519063ffffffff8216820361011057503861009d565b80fd5b5080fd5b3d91506100e5565b6040513d6000823e3d90fd5b6342bcdf7f60e11b60005260046000fd5b639b15e16f60e01b60005260046000fd5b600080fd5b601f909101601f19168101906001600160401b0382119082101761017557604052565b634e487b7160e01b600052604160045260246000fdfe6080604052600436101561001257600080fd5b60003560e01c806309c43a58146107be578063181f5a77146106ac578063381780d31461064257806375c82b151461042e57806379ba50971461034557806385d60fa51461020b5780638da5cb5b146101b9578063f2fde38b146100c95763fcdc8efe1461007f57600080fd5b346100c45760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100c457602063ffffffff60015460a01c16604051908152f35b600080fd5b346100c45760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100c45773ffffffffffffffffffffffffffffffffffffffff6101156108b8565b61011d6108db565b1633811461018f57807fffffffffffffffffffffffff0000000000000000000000000000000000000000600054161760005573ffffffffffffffffffffffffffffffffffffffff600154167fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278600080a3005b7fdad89dca0000000000000000000000000000000000000000000000000000000060005260046000fd5b346100c45760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100c457602073ffffffffffffffffffffffffffffffffffffffff60015416604051908152f35b346100c45760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100c45733600052600260205260ff60406000205416156103175760015463ffffffff8160a01c166040518181527f5c1797088dea65fb15359febc2804939866c2a62e82aaecd8cf0032beb88996960203392a263ffffffff81146102e8576020917fffffffffffffffff00000000ffffffffffffffffffffffffffffffffffffffff77ffffffff00000000000000000000000000000000000000006001840160a01b16911617600155604051908152f35b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b7f9473075d000000000000000000000000000000000000000000000000000000006000523360045260246000fd5b346100c45760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100c45760005473ffffffffffffffffffffffffffffffffffffffff81163303610404577fffffffffffffffffffffffff00000000000000000000000000000000000000006001549133828416176001551660005573ffffffffffffffffffffffffffffffffffffffff3391167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3005b7f02b543c60000000000000000000000000000000000000000000000000000000060005260046000fd5b346100c45760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100c45760043563ffffffff81168091036100c45733600052600260205260ff6040600020541615610317576040517ffcdc8efe00000000000000000000000000000000000000000000000000000000815260208160048173ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000165afa9081156106365760009161058b575b5063ffffffff160163ffffffff81116102e85760207f8bc6bcd971d85963c2ab42056c4c2ff253723ce5a6ba5358d54e62ce7cf70b1d917fffffffffffffffff00000000ffffffffffffffffffffffffffffffffffffffff77ffffffff00000000000000000000000000000000000000006001549260a01b169116178060015563ffffffff6040519160a01c168152a1005b60203d60201161062f575b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f820116820182811067ffffffffffffffff821117610602576020918391604052810103126105fe57519063ffffffff821682036105fb575063ffffffff6104f9565b80fd5b5080fd5b6024847f4e487b710000000000000000000000000000000000000000000000000000000081526041600452fd5b503d610596565b6040513d6000823e3d90fd5b346100c45760207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100c45773ffffffffffffffffffffffffffffffffffffffff61068e6108b8565b166000526002602052602060ff604060002054166040519015158152f35b346100c45760007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100c4576040516040810181811067ffffffffffffffff82111761078f57604052601681527f446f6e4944436c61696d657220312e302e302d64657600000000000000000000602082015260405190602082528181519182602083015260005b8381106107775750507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f836000604080968601015201168101030190f35b60208282018101516040878401015285935001610737565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b346100c45760407ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3601126100c4576107f56108b8565b602435908115158092036100c45773ffffffffffffffffffffffffffffffffffffffff906108216108db565b1690811561088e5760207f016cd377780c9e2bbe411bc110907cdac96e95bd4bdc86f007cb3668ded01f4291836000526002825260406000207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0081541660ff8316179055604051908152a2005b7f8579befe0000000000000000000000000000000000000000000000000000000060005260046000fd5b6004359073ffffffffffffffffffffffffffffffffffffffff821682036100c457565b73ffffffffffffffffffffffffffffffffffffffff6001541633036108fc57565b7f2b5c74de0000000000000000000000000000000000000000000000000000000060005260046000fdfea164736f6c634300081a000a",
 }
 
-var DonIdClaimerABI = DonIdClaimerMetaData.ABI
+var DonIDClaimerABI = DonIDClaimerMetaData.ABI
 
-var DonIdClaimerBin = DonIdClaimerMetaData.Bin
+var DonIDClaimerBin = DonIDClaimerMetaData.Bin
 
-func DeployDonIdClaimer(auth *bind.TransactOpts, backend bind.ContractBackend, capabilitiesRegistry common.Address) (common.Address, *types.Transaction, *DonIdClaimer, error) {
-	parsed, err := DonIdClaimerMetaData.GetAbi()
+func DeployDonIDClaimer(auth *bind.TransactOpts, backend bind.ContractBackend, _capabilitiesRegistry common.Address) (common.Address, *types.Transaction, *DonIDClaimer, error) {
+	parsed, err := DonIDClaimerMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -46,233 +48,1014 @@ func DeployDonIdClaimer(auth *bind.TransactOpts, backend bind.ContractBackend, c
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(DonIdClaimerBin), backend, capabilitiesRegistry)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(DonIDClaimerBin), backend, _capabilitiesRegistry)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	return address, tx, &DonIdClaimer{address: address, abi: *parsed, DonIdClaimerCaller: DonIdClaimerCaller{contract: contract}, DonIdClaimerTransactor: DonIdClaimerTransactor{contract: contract}, DonIdClaimerFilterer: DonIdClaimerFilterer{contract: contract}}, nil
+	return address, tx, &DonIDClaimer{address: address, abi: *parsed, DonIDClaimerCaller: DonIDClaimerCaller{contract: contract}, DonIDClaimerTransactor: DonIDClaimerTransactor{contract: contract}, DonIDClaimerFilterer: DonIDClaimerFilterer{contract: contract}}, nil
 }
 
-type DonIdClaimer struct {
+type DonIDClaimer struct {
 	address common.Address
 	abi     abi.ABI
-	DonIdClaimerCaller
-	DonIdClaimerTransactor
-	DonIdClaimerFilterer
+	DonIDClaimerCaller
+	DonIDClaimerTransactor
+	DonIDClaimerFilterer
 }
 
-type DonIdClaimerCaller struct {
+type DonIDClaimerCaller struct {
 	contract *bind.BoundContract
 }
 
-type DonIdClaimerTransactor struct {
+type DonIDClaimerTransactor struct {
 	contract *bind.BoundContract
 }
 
-type DonIdClaimerFilterer struct {
+type DonIDClaimerFilterer struct {
 	contract *bind.BoundContract
 }
 
-type DonIdClaimerSession struct {
-	Contract     *DonIdClaimer
+type DonIDClaimerSession struct {
+	Contract     *DonIDClaimer
 	CallOpts     bind.CallOpts
 	TransactOpts bind.TransactOpts
 }
 
-type DonIdClaimerCallerSession struct {
-	Contract *DonIdClaimerCaller
+type DonIDClaimerCallerSession struct {
+	Contract *DonIDClaimerCaller
 	CallOpts bind.CallOpts
 }
 
-type DonIdClaimerTransactorSession struct {
-	Contract     *DonIdClaimerTransactor
+type DonIDClaimerTransactorSession struct {
+	Contract     *DonIDClaimerTransactor
 	TransactOpts bind.TransactOpts
 }
 
-type DonIdClaimerRaw struct {
-	Contract *DonIdClaimer
+type DonIDClaimerRaw struct {
+	Contract *DonIDClaimer
 }
 
-type DonIdClaimerCallerRaw struct {
-	Contract *DonIdClaimerCaller
+type DonIDClaimerCallerRaw struct {
+	Contract *DonIDClaimerCaller
 }
 
-type DonIdClaimerTransactorRaw struct {
-	Contract *DonIdClaimerTransactor
+type DonIDClaimerTransactorRaw struct {
+	Contract *DonIDClaimerTransactor
 }
 
-func NewDonIdClaimer(address common.Address, backend bind.ContractBackend) (*DonIdClaimer, error) {
-	abi, err := abi.JSON(strings.NewReader(DonIdClaimerABI))
+func NewDonIDClaimer(address common.Address, backend bind.ContractBackend) (*DonIDClaimer, error) {
+	abi, err := abi.JSON(strings.NewReader(DonIDClaimerABI))
 	if err != nil {
 		return nil, err
 	}
-	contract, err := bindDonIdClaimer(address, backend, backend, backend)
+	contract, err := bindDonIDClaimer(address, backend, backend, backend)
 	if err != nil {
 		return nil, err
 	}
-	return &DonIdClaimer{address: address, abi: abi, DonIdClaimerCaller: DonIdClaimerCaller{contract: contract}, DonIdClaimerTransactor: DonIdClaimerTransactor{contract: contract}, DonIdClaimerFilterer: DonIdClaimerFilterer{contract: contract}}, nil
+	return &DonIDClaimer{address: address, abi: abi, DonIDClaimerCaller: DonIDClaimerCaller{contract: contract}, DonIDClaimerTransactor: DonIDClaimerTransactor{contract: contract}, DonIDClaimerFilterer: DonIDClaimerFilterer{contract: contract}}, nil
 }
 
-func NewDonIdClaimerCaller(address common.Address, caller bind.ContractCaller) (*DonIdClaimerCaller, error) {
-	contract, err := bindDonIdClaimer(address, caller, nil, nil)
+func NewDonIDClaimerCaller(address common.Address, caller bind.ContractCaller) (*DonIDClaimerCaller, error) {
+	contract, err := bindDonIDClaimer(address, caller, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &DonIdClaimerCaller{contract: contract}, nil
+	return &DonIDClaimerCaller{contract: contract}, nil
 }
 
-func NewDonIdClaimerTransactor(address common.Address, transactor bind.ContractTransactor) (*DonIdClaimerTransactor, error) {
-	contract, err := bindDonIdClaimer(address, nil, transactor, nil)
+func NewDonIDClaimerTransactor(address common.Address, transactor bind.ContractTransactor) (*DonIDClaimerTransactor, error) {
+	contract, err := bindDonIDClaimer(address, nil, transactor, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &DonIdClaimerTransactor{contract: contract}, nil
+	return &DonIDClaimerTransactor{contract: contract}, nil
 }
 
-func NewDonIdClaimerFilterer(address common.Address, filterer bind.ContractFilterer) (*DonIdClaimerFilterer, error) {
-	contract, err := bindDonIdClaimer(address, nil, nil, filterer)
+func NewDonIDClaimerFilterer(address common.Address, filterer bind.ContractFilterer) (*DonIDClaimerFilterer, error) {
+	contract, err := bindDonIDClaimer(address, nil, nil, filterer)
 	if err != nil {
 		return nil, err
 	}
-	return &DonIdClaimerFilterer{contract: contract}, nil
+	return &DonIDClaimerFilterer{contract: contract}, nil
 }
 
-func bindDonIdClaimer(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
-	parsed, err := DonIdClaimerMetaData.GetAbi()
+func bindDonIDClaimer(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
+	parsed, err := DonIDClaimerMetaData.GetAbi()
 	if err != nil {
 		return nil, err
 	}
 	return bind.NewBoundContract(address, *parsed, caller, transactor, filterer), nil
 }
 
-func (_DonIdClaimer *DonIdClaimerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _DonIdClaimer.Contract.DonIdClaimerCaller.contract.Call(opts, result, method, params...)
+func (_DonIDClaimer *DonIDClaimerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _DonIDClaimer.Contract.DonIDClaimerCaller.contract.Call(opts, result, method, params...)
 }
 
-func (_DonIdClaimer *DonIdClaimerRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _DonIdClaimer.Contract.DonIdClaimerTransactor.contract.Transfer(opts)
+func (_DonIDClaimer *DonIDClaimerRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _DonIDClaimer.Contract.DonIDClaimerTransactor.contract.Transfer(opts)
 }
 
-func (_DonIdClaimer *DonIdClaimerRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _DonIdClaimer.Contract.DonIdClaimerTransactor.contract.Transact(opts, method, params...)
+func (_DonIDClaimer *DonIDClaimerRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _DonIDClaimer.Contract.DonIDClaimerTransactor.contract.Transact(opts, method, params...)
 }
 
-func (_DonIdClaimer *DonIdClaimerCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _DonIdClaimer.Contract.contract.Call(opts, result, method, params...)
+func (_DonIDClaimer *DonIDClaimerCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _DonIDClaimer.Contract.contract.Call(opts, result, method, params...)
 }
 
-func (_DonIdClaimer *DonIdClaimerTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _DonIdClaimer.Contract.contract.Transfer(opts)
+func (_DonIDClaimer *DonIDClaimerTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _DonIDClaimer.Contract.contract.Transfer(opts)
 }
 
-func (_DonIdClaimer *DonIdClaimerTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _DonIdClaimer.Contract.contract.Transact(opts, method, params...)
+func (_DonIDClaimer *DonIDClaimerTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _DonIDClaimer.Contract.contract.Transact(opts, method, params...)
 }
 
-func (_DonIdClaimer *DonIdClaimerCaller) DonID(opts *bind.CallOpts) (*big.Int, error) {
+func (_DonIDClaimer *DonIDClaimerCaller) GetNextDONId(opts *bind.CallOpts) (uint32, error) {
 	var out []interface{}
-	err := _DonIdClaimer.contract.Call(opts, &out, "donID")
+	err := _DonIDClaimer.contract.Call(opts, &out, "getNextDONId")
 
 	if err != nil {
-		return *new(*big.Int), err
+		return *new(uint32), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+	out0 := *abi.ConvertType(out[0], new(uint32)).(*uint32)
 
 	return out0, err
 
 }
 
-func (_DonIdClaimer *DonIdClaimerSession) DonID() (*big.Int, error) {
-	return _DonIdClaimer.Contract.DonID(&_DonIdClaimer.CallOpts)
+func (_DonIDClaimer *DonIDClaimerSession) GetNextDONId() (uint32, error) {
+	return _DonIDClaimer.Contract.GetNextDONId(&_DonIDClaimer.CallOpts)
 }
 
-func (_DonIdClaimer *DonIdClaimerCallerSession) DonID() (*big.Int, error) {
-	return _DonIdClaimer.Contract.DonID(&_DonIdClaimer.CallOpts)
+func (_DonIDClaimer *DonIDClaimerCallerSession) GetNextDONId() (uint32, error) {
+	return _DonIDClaimer.Contract.GetNextDONId(&_DonIDClaimer.CallOpts)
 }
 
-func (_DonIdClaimer *DonIdClaimerCaller) GetDonID(opts *bind.CallOpts) (*big.Int, error) {
+func (_DonIDClaimer *DonIDClaimerCaller) IsAuthorizedDeployer(opts *bind.CallOpts, senderAddress common.Address) (bool, error) {
 	var out []interface{}
-	err := _DonIdClaimer.contract.Call(opts, &out, "getDonID")
+	err := _DonIDClaimer.contract.Call(opts, &out, "isAuthorizedDeployer", senderAddress)
 
 	if err != nil {
-		return *new(*big.Int), err
+		return *new(bool), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
 
 	return out0, err
 
 }
 
-func (_DonIdClaimer *DonIdClaimerSession) GetDonID() (*big.Int, error) {
-	return _DonIdClaimer.Contract.GetDonID(&_DonIdClaimer.CallOpts)
+func (_DonIDClaimer *DonIDClaimerSession) IsAuthorizedDeployer(senderAddress common.Address) (bool, error) {
+	return _DonIDClaimer.Contract.IsAuthorizedDeployer(&_DonIDClaimer.CallOpts, senderAddress)
 }
 
-func (_DonIdClaimer *DonIdClaimerCallerSession) GetDonID() (*big.Int, error) {
-	return _DonIdClaimer.Contract.GetDonID(&_DonIdClaimer.CallOpts)
+func (_DonIDClaimer *DonIDClaimerCallerSession) IsAuthorizedDeployer(senderAddress common.Address) (bool, error) {
+	return _DonIDClaimer.Contract.IsAuthorizedDeployer(&_DonIDClaimer.CallOpts, senderAddress)
 }
 
-func (_DonIdClaimer *DonIdClaimerCaller) SetDONID(opts *bind.CallOpts, donId *big.Int) (*big.Int, error) {
+func (_DonIDClaimer *DonIDClaimerCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
-	err := _DonIdClaimer.contract.Call(opts, &out, "setDONID", donId)
+	err := _DonIDClaimer.contract.Call(opts, &out, "owner")
 
 	if err != nil {
-		return *new(*big.Int), err
+		return *new(common.Address), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
 
 }
 
-func (_DonIdClaimer *DonIdClaimerSession) SetDONID(donId *big.Int) (*big.Int, error) {
-	return _DonIdClaimer.Contract.SetDONID(&_DonIdClaimer.CallOpts, donId)
+func (_DonIDClaimer *DonIDClaimerSession) Owner() (common.Address, error) {
+	return _DonIDClaimer.Contract.Owner(&_DonIDClaimer.CallOpts)
 }
 
-func (_DonIdClaimer *DonIdClaimerCallerSession) SetDONID(donId *big.Int) (*big.Int, error) {
-	return _DonIdClaimer.Contract.SetDONID(&_DonIdClaimer.CallOpts, donId)
+func (_DonIDClaimer *DonIDClaimerCallerSession) Owner() (common.Address, error) {
+	return _DonIDClaimer.Contract.Owner(&_DonIDClaimer.CallOpts)
 }
 
-func (_DonIdClaimer *DonIdClaimerTransactor) ClaimNextDonID(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _DonIdClaimer.contract.Transact(opts, "claimNextDonID")
+func (_DonIDClaimer *DonIDClaimerCaller) TypeAndVersion(opts *bind.CallOpts) (string, error) {
+	var out []interface{}
+	err := _DonIDClaimer.contract.Call(opts, &out, "typeAndVersion")
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
 }
 
-func (_DonIdClaimer *DonIdClaimerSession) ClaimNextDonID() (*types.Transaction, error) {
-	return _DonIdClaimer.Contract.ClaimNextDonID(&_DonIdClaimer.TransactOpts)
+func (_DonIDClaimer *DonIDClaimerSession) TypeAndVersion() (string, error) {
+	return _DonIDClaimer.Contract.TypeAndVersion(&_DonIDClaimer.CallOpts)
 }
 
-func (_DonIdClaimer *DonIdClaimerTransactorSession) ClaimNextDonID() (*types.Transaction, error) {
-	return _DonIdClaimer.Contract.ClaimNextDonID(&_DonIdClaimer.TransactOpts)
+func (_DonIDClaimer *DonIDClaimerCallerSession) TypeAndVersion() (string, error) {
+	return _DonIDClaimer.Contract.TypeAndVersion(&_DonIDClaimer.CallOpts)
 }
 
-func (_DonIdClaimer *DonIdClaimerTransactor) SyncDonIdWithCapReg(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _DonIdClaimer.contract.Transact(opts, "syncDonIdWithCapReg")
+func (_DonIDClaimer *DonIDClaimerTransactor) AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _DonIDClaimer.contract.Transact(opts, "acceptOwnership")
 }
 
-func (_DonIdClaimer *DonIdClaimerSession) SyncDonIdWithCapReg() (*types.Transaction, error) {
-	return _DonIdClaimer.Contract.SyncDonIdWithCapReg(&_DonIdClaimer.TransactOpts)
+func (_DonIDClaimer *DonIDClaimerSession) AcceptOwnership() (*types.Transaction, error) {
+	return _DonIDClaimer.Contract.AcceptOwnership(&_DonIDClaimer.TransactOpts)
 }
 
-func (_DonIdClaimer *DonIdClaimerTransactorSession) SyncDonIdWithCapReg() (*types.Transaction, error) {
-	return _DonIdClaimer.Contract.SyncDonIdWithCapReg(&_DonIdClaimer.TransactOpts)
+func (_DonIDClaimer *DonIDClaimerTransactorSession) AcceptOwnership() (*types.Transaction, error) {
+	return _DonIDClaimer.Contract.AcceptOwnership(&_DonIDClaimer.TransactOpts)
 }
 
-func (_DonIdClaimer *DonIdClaimer) Address() common.Address {
-	return _DonIdClaimer.address
+func (_DonIDClaimer *DonIDClaimerTransactor) ClaimNextDONId(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _DonIDClaimer.contract.Transact(opts, "claimNextDONId")
 }
 
-type DonIdClaimerInterface interface {
-	DonID(opts *bind.CallOpts) (*big.Int, error)
+func (_DonIDClaimer *DonIDClaimerSession) ClaimNextDONId() (*types.Transaction, error) {
+	return _DonIDClaimer.Contract.ClaimNextDONId(&_DonIDClaimer.TransactOpts)
+}
 
-	GetDonID(opts *bind.CallOpts) (*big.Int, error)
+func (_DonIDClaimer *DonIDClaimerTransactorSession) ClaimNextDONId() (*types.Transaction, error) {
+	return _DonIDClaimer.Contract.ClaimNextDONId(&_DonIDClaimer.TransactOpts)
+}
 
-	SetDONID(opts *bind.CallOpts, donId *big.Int) (*big.Int, error)
+func (_DonIDClaimer *DonIDClaimerTransactor) SetAuthorizedDeployer(opts *bind.TransactOpts, senderAddress common.Address, allowed bool) (*types.Transaction, error) {
+	return _DonIDClaimer.contract.Transact(opts, "setAuthorizedDeployer", senderAddress, allowed)
+}
 
-	ClaimNextDonID(opts *bind.TransactOpts) (*types.Transaction, error)
+func (_DonIDClaimer *DonIDClaimerSession) SetAuthorizedDeployer(senderAddress common.Address, allowed bool) (*types.Transaction, error) {
+	return _DonIDClaimer.Contract.SetAuthorizedDeployer(&_DonIDClaimer.TransactOpts, senderAddress, allowed)
+}
 
-	SyncDonIdWithCapReg(opts *bind.TransactOpts) (*types.Transaction, error)
+func (_DonIDClaimer *DonIDClaimerTransactorSession) SetAuthorizedDeployer(senderAddress common.Address, allowed bool) (*types.Transaction, error) {
+	return _DonIDClaimer.Contract.SetAuthorizedDeployer(&_DonIDClaimer.TransactOpts, senderAddress, allowed)
+}
+
+func (_DonIDClaimer *DonIDClaimerTransactor) SyncNextDONIdWithOffset(opts *bind.TransactOpts, offset uint32) (*types.Transaction, error) {
+	return _DonIDClaimer.contract.Transact(opts, "syncNextDONIdWithOffset", offset)
+}
+
+func (_DonIDClaimer *DonIDClaimerSession) SyncNextDONIdWithOffset(offset uint32) (*types.Transaction, error) {
+	return _DonIDClaimer.Contract.SyncNextDONIdWithOffset(&_DonIDClaimer.TransactOpts, offset)
+}
+
+func (_DonIDClaimer *DonIDClaimerTransactorSession) SyncNextDONIdWithOffset(offset uint32) (*types.Transaction, error) {
+	return _DonIDClaimer.Contract.SyncNextDONIdWithOffset(&_DonIDClaimer.TransactOpts, offset)
+}
+
+func (_DonIDClaimer *DonIDClaimerTransactor) TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error) {
+	return _DonIDClaimer.contract.Transact(opts, "transferOwnership", to)
+}
+
+func (_DonIDClaimer *DonIDClaimerSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
+	return _DonIDClaimer.Contract.TransferOwnership(&_DonIDClaimer.TransactOpts, to)
+}
+
+func (_DonIDClaimer *DonIDClaimerTransactorSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
+	return _DonIDClaimer.Contract.TransferOwnership(&_DonIDClaimer.TransactOpts, to)
+}
+
+type DonIDClaimerAuthorizedDeployerSetIterator struct {
+	Event *DonIDClaimerAuthorizedDeployerSet
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *DonIDClaimerAuthorizedDeployerSetIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(DonIDClaimerAuthorizedDeployerSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(DonIDClaimerAuthorizedDeployerSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *DonIDClaimerAuthorizedDeployerSetIterator) Error() error {
+	return it.fail
+}
+
+func (it *DonIDClaimerAuthorizedDeployerSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type DonIDClaimerAuthorizedDeployerSet struct {
+	SenderAddress common.Address
+	Allowed       bool
+	Raw           types.Log
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) FilterAuthorizedDeployerSet(opts *bind.FilterOpts, senderAddress []common.Address) (*DonIDClaimerAuthorizedDeployerSetIterator, error) {
+
+	var senderAddressRule []interface{}
+	for _, senderAddressItem := range senderAddress {
+		senderAddressRule = append(senderAddressRule, senderAddressItem)
+	}
+
+	logs, sub, err := _DonIDClaimer.contract.FilterLogs(opts, "AuthorizedDeployerSet", senderAddressRule)
+	if err != nil {
+		return nil, err
+	}
+	return &DonIDClaimerAuthorizedDeployerSetIterator{contract: _DonIDClaimer.contract, event: "AuthorizedDeployerSet", logs: logs, sub: sub}, nil
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) WatchAuthorizedDeployerSet(opts *bind.WatchOpts, sink chan<- *DonIDClaimerAuthorizedDeployerSet, senderAddress []common.Address) (event.Subscription, error) {
+
+	var senderAddressRule []interface{}
+	for _, senderAddressItem := range senderAddress {
+		senderAddressRule = append(senderAddressRule, senderAddressItem)
+	}
+
+	logs, sub, err := _DonIDClaimer.contract.WatchLogs(opts, "AuthorizedDeployerSet", senderAddressRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(DonIDClaimerAuthorizedDeployerSet)
+				if err := _DonIDClaimer.contract.UnpackLog(event, "AuthorizedDeployerSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) ParseAuthorizedDeployerSet(log types.Log) (*DonIDClaimerAuthorizedDeployerSet, error) {
+	event := new(DonIDClaimerAuthorizedDeployerSet)
+	if err := _DonIDClaimer.contract.UnpackLog(event, "AuthorizedDeployerSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type DonIDClaimerDonIDClaimedIterator struct {
+	Event *DonIDClaimerDonIDClaimed
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *DonIDClaimerDonIDClaimedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(DonIDClaimerDonIDClaimed)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(DonIDClaimerDonIDClaimed)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *DonIDClaimerDonIDClaimedIterator) Error() error {
+	return it.fail
+}
+
+func (it *DonIDClaimerDonIDClaimedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type DonIDClaimerDonIDClaimed struct {
+	Claimer common.Address
+	DonId   uint32
+	Raw     types.Log
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) FilterDonIDClaimed(opts *bind.FilterOpts, claimer []common.Address) (*DonIDClaimerDonIDClaimedIterator, error) {
+
+	var claimerRule []interface{}
+	for _, claimerItem := range claimer {
+		claimerRule = append(claimerRule, claimerItem)
+	}
+
+	logs, sub, err := _DonIDClaimer.contract.FilterLogs(opts, "DonIDClaimed", claimerRule)
+	if err != nil {
+		return nil, err
+	}
+	return &DonIDClaimerDonIDClaimedIterator{contract: _DonIDClaimer.contract, event: "DonIDClaimed", logs: logs, sub: sub}, nil
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) WatchDonIDClaimed(opts *bind.WatchOpts, sink chan<- *DonIDClaimerDonIDClaimed, claimer []common.Address) (event.Subscription, error) {
+
+	var claimerRule []interface{}
+	for _, claimerItem := range claimer {
+		claimerRule = append(claimerRule, claimerItem)
+	}
+
+	logs, sub, err := _DonIDClaimer.contract.WatchLogs(opts, "DonIDClaimed", claimerRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(DonIDClaimerDonIDClaimed)
+				if err := _DonIDClaimer.contract.UnpackLog(event, "DonIDClaimed", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) ParseDonIDClaimed(log types.Log) (*DonIDClaimerDonIDClaimed, error) {
+	event := new(DonIDClaimerDonIDClaimed)
+	if err := _DonIDClaimer.contract.UnpackLog(event, "DonIDClaimed", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type DonIDClaimerDonIDSyncedIterator struct {
+	Event *DonIDClaimerDonIDSynced
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *DonIDClaimerDonIDSyncedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(DonIDClaimerDonIDSynced)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(DonIDClaimerDonIDSynced)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *DonIDClaimerDonIDSyncedIterator) Error() error {
+	return it.fail
+}
+
+func (it *DonIDClaimerDonIDSyncedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type DonIDClaimerDonIDSynced struct {
+	NewDONId uint32
+	Raw      types.Log
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) FilterDonIDSynced(opts *bind.FilterOpts) (*DonIDClaimerDonIDSyncedIterator, error) {
+
+	logs, sub, err := _DonIDClaimer.contract.FilterLogs(opts, "DonIDSynced")
+	if err != nil {
+		return nil, err
+	}
+	return &DonIDClaimerDonIDSyncedIterator{contract: _DonIDClaimer.contract, event: "DonIDSynced", logs: logs, sub: sub}, nil
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) WatchDonIDSynced(opts *bind.WatchOpts, sink chan<- *DonIDClaimerDonIDSynced) (event.Subscription, error) {
+
+	logs, sub, err := _DonIDClaimer.contract.WatchLogs(opts, "DonIDSynced")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(DonIDClaimerDonIDSynced)
+				if err := _DonIDClaimer.contract.UnpackLog(event, "DonIDSynced", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) ParseDonIDSynced(log types.Log) (*DonIDClaimerDonIDSynced, error) {
+	event := new(DonIDClaimerDonIDSynced)
+	if err := _DonIDClaimer.contract.UnpackLog(event, "DonIDSynced", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type DonIDClaimerOwnershipTransferRequestedIterator struct {
+	Event *DonIDClaimerOwnershipTransferRequested
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *DonIDClaimerOwnershipTransferRequestedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(DonIDClaimerOwnershipTransferRequested)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(DonIDClaimerOwnershipTransferRequested)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *DonIDClaimerOwnershipTransferRequestedIterator) Error() error {
+	return it.fail
+}
+
+func (it *DonIDClaimerOwnershipTransferRequestedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type DonIDClaimerOwnershipTransferRequested struct {
+	From common.Address
+	To   common.Address
+	Raw  types.Log
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*DonIDClaimerOwnershipTransferRequestedIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _DonIDClaimer.contract.FilterLogs(opts, "OwnershipTransferRequested", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return &DonIDClaimerOwnershipTransferRequestedIterator{contract: _DonIDClaimer.contract, event: "OwnershipTransferRequested", logs: logs, sub: sub}, nil
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) WatchOwnershipTransferRequested(opts *bind.WatchOpts, sink chan<- *DonIDClaimerOwnershipTransferRequested, from []common.Address, to []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _DonIDClaimer.contract.WatchLogs(opts, "OwnershipTransferRequested", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(DonIDClaimerOwnershipTransferRequested)
+				if err := _DonIDClaimer.contract.UnpackLog(event, "OwnershipTransferRequested", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) ParseOwnershipTransferRequested(log types.Log) (*DonIDClaimerOwnershipTransferRequested, error) {
+	event := new(DonIDClaimerOwnershipTransferRequested)
+	if err := _DonIDClaimer.contract.UnpackLog(event, "OwnershipTransferRequested", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type DonIDClaimerOwnershipTransferredIterator struct {
+	Event *DonIDClaimerOwnershipTransferred
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *DonIDClaimerOwnershipTransferredIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(DonIDClaimerOwnershipTransferred)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(DonIDClaimerOwnershipTransferred)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *DonIDClaimerOwnershipTransferredIterator) Error() error {
+	return it.fail
+}
+
+func (it *DonIDClaimerOwnershipTransferredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type DonIDClaimerOwnershipTransferred struct {
+	From common.Address
+	To   common.Address
+	Raw  types.Log
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*DonIDClaimerOwnershipTransferredIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _DonIDClaimer.contract.FilterLogs(opts, "OwnershipTransferred", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return &DonIDClaimerOwnershipTransferredIterator{contract: _DonIDClaimer.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *DonIDClaimerOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _DonIDClaimer.contract.WatchLogs(opts, "OwnershipTransferred", fromRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(DonIDClaimerOwnershipTransferred)
+				if err := _DonIDClaimer.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_DonIDClaimer *DonIDClaimerFilterer) ParseOwnershipTransferred(log types.Log) (*DonIDClaimerOwnershipTransferred, error) {
+	event := new(DonIDClaimerOwnershipTransferred)
+	if err := _DonIDClaimer.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+func (_DonIDClaimer *DonIDClaimer) ParseLog(log types.Log) (generated.AbigenLog, error) {
+	switch log.Topics[0] {
+	case _DonIDClaimer.abi.Events["AuthorizedDeployerSet"].ID:
+		return _DonIDClaimer.ParseAuthorizedDeployerSet(log)
+	case _DonIDClaimer.abi.Events["DonIDClaimed"].ID:
+		return _DonIDClaimer.ParseDonIDClaimed(log)
+	case _DonIDClaimer.abi.Events["DonIDSynced"].ID:
+		return _DonIDClaimer.ParseDonIDSynced(log)
+	case _DonIDClaimer.abi.Events["OwnershipTransferRequested"].ID:
+		return _DonIDClaimer.ParseOwnershipTransferRequested(log)
+	case _DonIDClaimer.abi.Events["OwnershipTransferred"].ID:
+		return _DonIDClaimer.ParseOwnershipTransferred(log)
+
+	default:
+		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
+	}
+}
+
+func (DonIDClaimerAuthorizedDeployerSet) Topic() common.Hash {
+	return common.HexToHash("0x016cd377780c9e2bbe411bc110907cdac96e95bd4bdc86f007cb3668ded01f42")
+}
+
+func (DonIDClaimerDonIDClaimed) Topic() common.Hash {
+	return common.HexToHash("0x5c1797088dea65fb15359febc2804939866c2a62e82aaecd8cf0032beb889969")
+}
+
+func (DonIDClaimerDonIDSynced) Topic() common.Hash {
+	return common.HexToHash("0x8bc6bcd971d85963c2ab42056c4c2ff253723ce5a6ba5358d54e62ce7cf70b1d")
+}
+
+func (DonIDClaimerOwnershipTransferRequested) Topic() common.Hash {
+	return common.HexToHash("0xed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae1278")
+}
+
+func (DonIDClaimerOwnershipTransferred) Topic() common.Hash {
+	return common.HexToHash("0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0")
+}
+
+func (_DonIDClaimer *DonIDClaimer) Address() common.Address {
+	return _DonIDClaimer.address
+}
+
+type DonIDClaimerInterface interface {
+	GetNextDONId(opts *bind.CallOpts) (uint32, error)
+
+	IsAuthorizedDeployer(opts *bind.CallOpts, senderAddress common.Address) (bool, error)
+
+	Owner(opts *bind.CallOpts) (common.Address, error)
+
+	TypeAndVersion(opts *bind.CallOpts) (string, error)
+
+	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
+
+	ClaimNextDONId(opts *bind.TransactOpts) (*types.Transaction, error)
+
+	SetAuthorizedDeployer(opts *bind.TransactOpts, senderAddress common.Address, allowed bool) (*types.Transaction, error)
+
+	SyncNextDONIdWithOffset(opts *bind.TransactOpts, offset uint32) (*types.Transaction, error)
+
+	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
+
+	FilterAuthorizedDeployerSet(opts *bind.FilterOpts, senderAddress []common.Address) (*DonIDClaimerAuthorizedDeployerSetIterator, error)
+
+	WatchAuthorizedDeployerSet(opts *bind.WatchOpts, sink chan<- *DonIDClaimerAuthorizedDeployerSet, senderAddress []common.Address) (event.Subscription, error)
+
+	ParseAuthorizedDeployerSet(log types.Log) (*DonIDClaimerAuthorizedDeployerSet, error)
+
+	FilterDonIDClaimed(opts *bind.FilterOpts, claimer []common.Address) (*DonIDClaimerDonIDClaimedIterator, error)
+
+	WatchDonIDClaimed(opts *bind.WatchOpts, sink chan<- *DonIDClaimerDonIDClaimed, claimer []common.Address) (event.Subscription, error)
+
+	ParseDonIDClaimed(log types.Log) (*DonIDClaimerDonIDClaimed, error)
+
+	FilterDonIDSynced(opts *bind.FilterOpts) (*DonIDClaimerDonIDSyncedIterator, error)
+
+	WatchDonIDSynced(opts *bind.WatchOpts, sink chan<- *DonIDClaimerDonIDSynced) (event.Subscription, error)
+
+	ParseDonIDSynced(log types.Log) (*DonIDClaimerDonIDSynced, error)
+
+	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*DonIDClaimerOwnershipTransferRequestedIterator, error)
+
+	WatchOwnershipTransferRequested(opts *bind.WatchOpts, sink chan<- *DonIDClaimerOwnershipTransferRequested, from []common.Address, to []common.Address) (event.Subscription, error)
+
+	ParseOwnershipTransferRequested(log types.Log) (*DonIDClaimerOwnershipTransferRequested, error)
+
+	FilterOwnershipTransferred(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*DonIDClaimerOwnershipTransferredIterator, error)
+
+	WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *DonIDClaimerOwnershipTransferred, from []common.Address, to []common.Address) (event.Subscription, error)
+
+	ParseOwnershipTransferred(log types.Log) (*DonIDClaimerOwnershipTransferred, error)
+
+	ParseLog(log types.Log) (generated.AbigenLog, error)
 
 	Address() common.Address
 }
