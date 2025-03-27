@@ -5,10 +5,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	kslib "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
-
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 )
 
 type AcceptAllOwnershipRequest struct {
@@ -25,7 +24,7 @@ func AcceptAllOwnershipsProposal(e deployment.Environment, req *AcceptAllOwnersh
 	chain := e.Chains[chainSelector]
 	addrBook := e.ExistingAddresses
 
-	r, err := kslib.GetContractSets(e.Logger, &kslib.GetContractSetsRequest{
+	r, err := GetContractSets(e.Logger, &GetContractSetsRequest{
 		Chains: map[uint64]deployment.Chain{
 			req.ChainSelector: chain,
 		},
@@ -41,7 +40,7 @@ func AcceptAllOwnershipsProposal(e deployment.Environment, req *AcceptAllOwnersh
 		ContractsByChain: map[uint64][]common.Address{
 			chainSelector: contracts.TransferableContracts(),
 		},
-		MinDelay: minDelay,
+		MCMSConfig: proposalutils.TimelockConfig{MinDelay: minDelay},
 	}
 
 	// Create and return the changeset

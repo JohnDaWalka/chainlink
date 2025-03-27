@@ -1,35 +1,25 @@
 package workflowkey
 
 import (
+	"crypto/ed25519"
 	cryptorand "crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/nacl/box"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/internal"
 )
 
-type Raw []byte
-
-func (raw Raw) Key() Key {
-	privateKey := [32]byte(raw)
+func KeyFor(raw internal.Raw) Key {
+	privateKey := [32]byte(raw.Bytes())
 	return Key{
 		privateKey: &privateKey,
 		publicKey:  curve25519PubKeyFromPrivateKey(privateKey),
 	}
-}
-
-func (raw Raw) String() string {
-	return fmt.Sprintf("<%s Raw Private Key>", keyTypeIdentifier)
-}
-
-func (raw Raw) GoString() string {
-	return raw.String()
-}
-
-func (raw Raw) Bytes() []byte {
-	return ([]byte)(raw)
 }
 
 type Key struct {
@@ -69,10 +59,10 @@ func (k Key) ID() string {
 	return k.PublicKeyString()
 }
 
-func (k Key) Raw() Raw {
+func (k Key) Raw() internal.Raw {
 	raw := make([]byte, curve25519.PointSize)
 	copy(raw, k.privateKey[:])
-	return Raw(raw)
+	return internal.NewRaw(raw)
 }
 
 func (k Key) String() string {
@@ -120,4 +110,17 @@ func curve25519PubKeyFromPrivateKey(privateKey [curve25519.PointSize]byte) *[cur
 	curve25519.ScalarBaseMult(&publicKey, &privateKey)
 
 	return &publicKey
+}
+
+func MustNewXXXTestingOnly(k *big.Int) Key {
+	seed := make([]byte, ed25519.SeedSize)
+	copy(seed, k.Bytes())
+	privKey := ed25519.NewKeyFromSeed(seed)
+
+	var privateKey [32]byte
+	copy(privateKey[:], privKey.Seed())
+	return Key{
+		privateKey: &privateKey,
+		publicKey:  curve25519PubKeyFromPrivateKey(privateKey),
+	}
 }

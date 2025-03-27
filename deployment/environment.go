@@ -27,6 +27,8 @@ import (
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 
+	"github.com/smartcontractkit/chainlink/deployment/operations"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 )
 
@@ -107,6 +109,8 @@ type Environment struct {
 	Offchain          OffchainClient
 	GetContext        func() context.Context
 	OCRSecrets        OCRSecrets
+	// OperationsBundle contains dependencies required by the operations API.
+	OperationsBundle operations.Bundle
 }
 
 func NewEnvironment(
@@ -130,6 +134,8 @@ func NewEnvironment(
 		Offchain:          offchain,
 		GetContext:        ctx,
 		OCRSecrets:        secrets,
+		// default to memory reporter as that is the only reporter available for now
+		OperationsBundle: operations.NewBundle(ctx, logger, operations.NewMemoryReporter()),
 	}
 }
 
@@ -332,6 +338,7 @@ type Node struct {
 	NodeID         string
 	Name           string
 	CSAKey         string
+	WorkflowKey    string
 	SelToOCRConfig map[chain_selectors.ChainDetails]OCRConfig
 	PeerID         p2pkey.PeerID
 	IsBootstrap    bool
@@ -359,6 +366,10 @@ func (n Node) OCRConfigForChainSelector(chainSel uint64) (OCRConfig, bool) {
 	want, err := chain_selectors.GetChainDetailsByChainIDAndFamily(id, fam)
 	if err != nil {
 		return OCRConfig{}, false
+	}
+	// only applicable for test related simulated chains, the chains don't have a name
+	if want.ChainName == "" {
+		want.ChainName = strconv.FormatUint(want.ChainSelector, 10)
 	}
 	c, ok := n.SelToOCRConfig[want]
 	return c, ok
@@ -491,6 +502,7 @@ func NewNodeFromJD(jdNode *nodev1.Node, chainConfigs []*nodev1.ChainConfig) (*No
 		NodeID:         jdNode.Id,
 		Name:           jdNode.Name,
 		CSAKey:         jdNode.PublicKey,
+		WorkflowKey:    jdNode.GetWorkflowKey(),
 		SelToOCRConfig: make(map[chain_selectors.ChainDetails]OCRConfig),
 	}
 	var goldenConfig *nodev1.ChainConfig
@@ -516,6 +528,7 @@ func NewNodeFromJD(jdNode *nodev1.Node, chainConfigs []*nodev1.ChainConfig) (*No
 		NodeID:         jdNode.Id,
 		Name:           jdNode.Name,
 		CSAKey:         jdNode.PublicKey,
+		WorkflowKey:    jdNode.GetWorkflowKey(),
 		SelToOCRConfig: selToOCRConfig,
 		IsBootstrap:    bootstrap,
 		PeerID:         MustPeerIDFromString(goldenConfig.Ocr2Config.P2PKeyBundle.PeerId),
@@ -579,6 +592,10 @@ func chainToDetails(c *nodev1.Chain) (chain_selectors.ChainDetails, error) {
 	details, err := chain_selectors.GetChainDetailsByChainIDAndFamily(c.Id, family)
 	if err != nil {
 		return chain_selectors.ChainDetails{}, err
+	}
+	// only applicable for test related simulated chains, the chains don't have a name
+	if details.ChainName == "" {
+		details.ChainName = strconv.FormatUint(details.ChainSelector, 10)
 	}
 	return details, nil
 }

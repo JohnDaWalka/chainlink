@@ -3,6 +3,7 @@ package changeset
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -17,6 +18,10 @@ import (
 
 type TokenSymbol string
 
+func (ts TokenSymbol) String() string {
+	return string(ts)
+}
+
 const (
 	LinkSymbol   TokenSymbol = "LINK"
 	WethSymbol   TokenSymbol = "WETH"
@@ -24,6 +29,9 @@ const (
 	WBNBSymbol   TokenSymbol = "WBNB"
 	WPOLSymbol   TokenSymbol = "WPOL"
 	USDCSymbol   TokenSymbol = "USDC"
+	CCIPBnMSymbol   TokenSymbol = "CCIP-BnM"
+	CCIPLnMSymbol   TokenSymbol = "CCIP-LnM"
+	CLCCIPLnMSymbol TokenSymbol = "clCCIP-LnM"
 	USDCName     string      = "USD Coin"
 	LinkDecimals             = 18
 	WethDecimals             = 18
@@ -126,4 +134,10 @@ func (tc *TokenConfig) GetTokenInfo(
 	}
 
 	return tokenToAggregate
+}
+
+type TokenDetails interface {
+	Address() common.Address
+	Symbol(opts *bind.CallOpts) (string, error)
+	Decimals(opts *bind.CallOpts) (uint8, error)
 }

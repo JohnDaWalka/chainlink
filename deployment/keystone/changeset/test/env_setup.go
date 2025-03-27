@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -21,7 +22,7 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	envtest "github.com/smartcontractkit/chainlink/deployment/environment/test"
-	kschangeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/workflowregistry"
@@ -51,7 +52,7 @@ func (c DonConfig) Validate() error {
 }
 
 type testEnvIface interface {
-	ContractSets() map[uint64]internal.ContractSet
+	ContractSets() map[uint64]changeset.ContractSet
 	CapabilitiesRegistry() *kcr.CapabilitiesRegistry
 	CapabilityInfos() []kcr.CapabilitiesRegistryCapabilityInfo
 	Nops() []kcr.CapabilitiesRegistryNodeOperatorAdded
@@ -102,8 +103,8 @@ type EnvWrapper struct {
 	dons testDons
 }
 
-func (te EnvWrapper) ContractSets() map[uint64]internal.ContractSet {
-	r, err := internal.GetContractSets(te.Env.Logger, &internal.GetContractSetsRequest{
+func (te EnvWrapper) ContractSets() map[uint64]changeset.ContractSet {
+	r, err := changeset.GetContractSets(te.Env.Logger, &changeset.GetContractSetsRequest{
 		Chains:      te.Env.Chains,
 		AddressBook: te.Env.ExistingAddresses,
 	})
@@ -112,7 +113,7 @@ func (te EnvWrapper) ContractSets() map[uint64]internal.ContractSet {
 }
 
 func (te EnvWrapper) CapabilitiesRegistry() *kcr.CapabilitiesRegistry {
-	r, err := internal.GetContractSets(te.Env.Logger, &internal.GetContractSetsRequest{
+	r, err := changeset.GetContractSets(te.Env.Logger, &changeset.GetContractSetsRequest{
 		Chains:      te.Env.Chains,
 		AddressBook: te.Env.ExistingAddresses,
 	})
@@ -155,22 +156,25 @@ func initEnv(t *testing.T, nChains int) (registryChainSel uint64, env deployment
 	// we choose to use changesets to deploy the initial contracts because that's how it's done in the real world
 	// this requires a initial environment to house the address book
 	env = deployment.Environment{
+		GetContext: func() context.Context {
+			return testcontext.Get(t)
+		},
 		Logger:            logger.Test(t),
 		Chains:            chains,
 		ExistingAddresses: deployment.NewMemoryAddressBook(),
 	}
 	env, err := commonchangeset.Apply(t, env, nil,
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(kschangeset.DeployCapabilityRegistry),
+			deployment.CreateLegacyChangeSet(changeset.DeployCapabilityRegistry),
 			registryChainSel,
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(kschangeset.DeployOCR3),
+			deployment.CreateLegacyChangeSet(changeset.DeployOCR3),
 			registryChainSel,
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(kschangeset.DeployForwarder),
-			kschangeset.DeployForwarderRequest{},
+			deployment.CreateLegacyChangeSet(changeset.DeployForwarder),
+			changeset.DeployForwarderRequest{},
 		),
 		commonchangeset.Configure(
 			deployment.CreateLegacyChangeSet(workflowregistry.Deploy),
@@ -263,7 +267,7 @@ func setupTestEnv(t *testing.T, c EnvWrapperConfig) EnvWrapper {
 	}
 	var allDons = []internal.DonCapabilities{wfDonCapabilities, cwDonCapabilities, assetDonCapabilities}
 
-	csOut, err := kschangeset.ConfigureInitialContractsChangeset(env, kschangeset.InitialContractsCfg{
+	csOut, err := changeset.ConfigureInitialContractsChangeset(env, changeset.InitialContractsCfg{
 		RegistryChainSel: registryChainSel,
 		Dons:             allDons,
 		OCR3Config:       &ocr3Config,
@@ -271,12 +275,12 @@ func setupTestEnv(t *testing.T, c EnvWrapperConfig) EnvWrapper {
 	require.NoError(t, err)
 	require.Nil(t, csOut.AddressBook, "no new addresses should be created in configure initial contracts")
 
-	req := &internal.GetContractSetsRequest{
+	req := &changeset.GetContractSetsRequest{
 		Chains:      env.Chains,
 		AddressBook: env.ExistingAddresses,
 	}
 
-	contractSetsResp, err := internal.GetContractSets(lggr, req)
+	contractSetsResp, err := changeset.GetContractSets(lggr, req)
 	require.NoError(t, err)
 	require.Len(t, contractSetsResp.ContractSets, len(env.Chains))
 	// check the registry
@@ -311,7 +315,7 @@ func setupTestEnv(t *testing.T, c EnvWrapperConfig) EnvWrapper {
 		)
 		require.NoError(t, err)
 		// extract the MCMS address
-		r, err := internal.GetContractSets(lggr, &internal.GetContractSetsRequest{
+		r, err := changeset.GetContractSets(lggr, &changeset.GetContractSetsRequest{
 			Chains:      env.Chains,
 			AddressBook: env.ExistingAddresses,
 		})
@@ -327,8 +331,8 @@ func setupTestEnv(t *testing.T, c EnvWrapperConfig) EnvWrapper {
 					sel: {Timelock: mcms.Timelock, CallProxy: mcms.CallProxy},
 				},
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(kschangeset.AcceptAllOwnershipsProposal),
-					&kschangeset.AcceptAllOwnershipRequest{
+					deployment.CreateLegacyChangeSet(changeset.AcceptAllOwnershipsProposal),
+					&changeset.AcceptAllOwnershipRequest{
 						ChainSelector: sel,
 						MinDelay:      0,
 					},

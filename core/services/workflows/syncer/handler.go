@@ -3,6 +3,7 @@ package syncer
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
@@ -10,6 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,11 +26,13 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/platform"
+	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/workflowkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/ratelimiter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/store"
+	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncerlimiter"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -176,6 +181,8 @@ type eventHandler struct {
 	encryptionKey            workflowkey.Key
 	engineFactory            engineFactoryFn
 	ratelimiter              *ratelimiter.RateLimiter
+	workflowLimits           *syncerlimiter.Limits
+	decryptSecrets           func(data []byte, owner string) (map[string]string, error)
 }
 
 type Event interface {
@@ -214,6 +221,7 @@ func NewEventHandler(
 	clock clockwork.Clock,
 	encryptionKey workflowkey.Key,
 	ratelimiter *ratelimiter.RateLimiter,
+	workflowLimits *syncerlimiter.Limits,
 	opts ...func(*eventHandler),
 ) *eventHandler {
 	eh := &eventHandler{
@@ -230,14 +238,29 @@ func NewEventHandler(
 		secretsFreshnessDuration: defaultSecretsFreshnessDuration,
 		encryptionKey:            encryptionKey,
 		ratelimiter:              ratelimiter,
+		workflowLimits:           workflowLimits,
+		decryptSecrets: func(data []byte, owner string) (map[string]string, error) {
+			secretsPayload := secrets.EncryptedSecretsResult{}
+			err := json.Unmarshal(data, &secretsPayload)
+			if err != nil {
+				return nil, fmt.Errorf("could not unmarshal secrets: %w", err)
+			}
+
+			return secrets.DecryptSecretsForNode(secretsPayload, encryptionKey, owner)
+		},
 	}
 	eh.engineFactory = eh.engineFactoryFn
 	eh.limits.ApplyDefaults()
+
 	for _, o := range opts {
 		o(eh)
 	}
 
 	return eh
+}
+
+func (h *eventHandler) Close() error {
+	return services.MultiCloser(h.engineRegistry.PopAll()).Close()
 }
 
 func (h *eventHandler) refreshSecrets(ctx context.Context, workflowOwner, workflowName, workflowID, secretsURLHash string) (string, error) {
@@ -300,17 +323,7 @@ func (h *eventHandler) SecretsFor(ctx context.Context, workflowOwner, hexWorkflo
 		}
 	}
 
-	res := secrets.EncryptedSecretsResult{}
-	err = json.Unmarshal([]byte(secretsPayload), &res)
-	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal secrets: %w", err)
-	}
-
-	return secrets.DecryptSecretsForNode(
-		res,
-		h.encryptionKey,
-		workflowOwner,
-	)
+	return h.decryptSecrets([]byte(secretsPayload), workflowOwner)
 }
 
 func (h *eventHandler) Handle(ctx context.Context, event Event) error {
@@ -456,6 +469,17 @@ func (w workflowName) Hex() string {
 	return hexName
 }
 
+func messageID(url string, parts ...string) string {
+	h := sha256.New()
+	h.Write([]byte(url))
+	for _, p := range parts {
+		h.Write([]byte(p))
+	}
+	hash := hex.EncodeToString(h.Sum(nil))
+	p := []string{ghcapabilities.MethodWorkflowSyncer, hash}
+	return strings.Join(p, "/")
+}
+
 // workflowRegisteredEvent handles the WorkflowRegisteredEvent event type.
 func (h *eventHandler) workflowRegisteredEvent(
 	ctx context.Context,
@@ -470,10 +494,24 @@ func (h *eventHandler) workflowRegisteredEvent(
 	// Always fetch secrets from the SecretsURL
 	var secrets []byte
 	if payload.SecretsURL != "" {
-		secrets, err = h.fetchFn(ctx, payload.SecretsURL, safeUint32(h.limits.MaxSecretsSize))
-		if err != nil {
-			return fmt.Errorf("failed to fetch secrets from %s : %w", payload.SecretsURL, err)
+		wid := hex.EncodeToString(payload.WorkflowID[:])
+		req := ghcapabilities.Request{
+			URL:              payload.SecretsURL,
+			Method:           http.MethodGet,
+			MaxResponseBytes: safeUint32(h.limits.MaxSecretsSize),
+			WorkflowID:       wid,
 		}
+		fetchedSecrets, fetchErr := h.fetchFn(ctx, messageID(payload.SecretsURL, wid), req)
+		if fetchErr != nil {
+			return fmt.Errorf("failed to fetch secrets from %s : %w", payload.SecretsURL, fetchErr)
+		}
+
+		// sanity check by decoding the secrets
+		_, decryptErr := h.decryptSecrets(fetchedSecrets, hex.EncodeToString(payload.WorkflowOwner))
+		if decryptErr != nil {
+			return fmt.Errorf("failed to decrypt secrets %s: %w", payload.SecretsURL, decryptErr)
+		}
+		secrets = fetchedSecrets
 	}
 
 	// Calculate the hash of the binary and config files
@@ -488,7 +526,7 @@ func (h *eventHandler) workflowRegisteredEvent(
 	}
 
 	// Ensure that there is no running workflow engine for the given workflow ID.
-	if h.engineRegistry.IsRunning(hex.EncodeToString(payload.WorkflowID[:])) {
+	if h.engineRegistry.Contains(hex.EncodeToString(payload.WorkflowID[:])) {
 		return fmt.Errorf("workflow is already running, so not starting it : %s", hex.EncodeToString(payload.WorkflowID[:]))
 	}
 
@@ -517,6 +555,7 @@ func (h *eventHandler) workflowRegisteredEvent(
 		BinaryURL:     payload.BinaryURL,
 		ConfigURL:     payload.ConfigURL,
 	}
+
 	if _, err = h.orm.UpsertWorkflowSpecWithSecrets(ctx, entry, payload.SecretsURL, hex.EncodeToString(urlHash), string(secrets)); err != nil {
 		return fmt.Errorf("failed to upsert workflow spec with secrets: %w", err)
 	}
@@ -545,8 +584,8 @@ func (h *eventHandler) workflowRegisteredEvent(
 		return fmt.Errorf("failed to start workflow engine: %w", err)
 	}
 
-	// This shouldn't happen because we call the handler serially and
-	// check for running engines above, see the call to engineRegistry.IsRunning.
+	// This shouldn't fail because we call the handler serially and
+	// check for running engines above, see the call to engineRegistry.Contains.
 	if err := h.engineRegistry.Add(wfID, engine); err != nil {
 		return fmt.Errorf("invariant violation: %w", err)
 	}
@@ -575,7 +614,16 @@ func (h *eventHandler) getWorkflowArtifacts(
 		binary, decodedBinary, config []byte
 		err                           error
 	)
-	if binary, err = h.fetchFn(ctx, payload.BinaryURL, safeUint32(h.limits.MaxBinarySize)); err != nil {
+
+	wid := hex.EncodeToString(payload.WorkflowID[:])
+	req := ghcapabilities.Request{
+		URL:              payload.BinaryURL,
+		Method:           http.MethodGet,
+		MaxResponseBytes: safeUint32(h.limits.MaxBinarySize),
+		WorkflowID:       wid,
+	}
+	binary, err = h.fetchFn(ctx, messageID(payload.BinaryURL, wid), req)
+	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch binary from %s : %w", payload.BinaryURL, err)
 	}
 
@@ -584,7 +632,14 @@ func (h *eventHandler) getWorkflowArtifacts(
 	}
 
 	if payload.ConfigURL != "" {
-		if config, err = h.fetchFn(ctx, payload.ConfigURL, safeUint32(h.limits.MaxConfigSize)); err != nil {
+		req := ghcapabilities.Request{
+			URL:              payload.ConfigURL,
+			Method:           http.MethodGet,
+			MaxResponseBytes: safeUint32(h.limits.MaxConfigSize),
+			WorkflowID:       wid,
+		}
+		config, err = h.fetchFn(ctx, messageID(payload.ConfigURL, wid), req)
+		if err != nil {
 			return nil, nil, fmt.Errorf("failed to fetch config from %s : %w", payload.ConfigURL, err)
 		}
 	}
@@ -610,6 +665,7 @@ func (h *eventHandler) engineFactoryFn(ctx context.Context, id string, owner str
 		Binary:         binary,
 		SecretsFetcher: h,
 		RateLimiter:    h.ratelimiter,
+		WorkflowLimits: h.workflowLimits,
 	}
 	return workflows.NewEngine(ctx, cfg)
 }
@@ -677,7 +733,7 @@ func (h *eventHandler) workflowActivatedEvent(
 	}
 
 	// Do nothing if the workflow is already active
-	if spec.Status == job.WorkflowSpecStatusActive && h.engineRegistry.IsRunning(hex.EncodeToString(payload.WorkflowID[:])) {
+	if spec.Status == job.WorkflowSpecStatusActive && h.engineRegistry.Contains(hex.EncodeToString(payload.WorkflowID[:])) {
 		return nil
 	}
 
@@ -736,10 +792,25 @@ func (h *eventHandler) forceUpdateSecretsEvent(
 		return "", fmt.Errorf("failed to get URL by hash %s : %w", hash, err)
 	}
 
+	ownerHex := hex.EncodeToString(payload.Owner)
+	req := ghcapabilities.Request{
+		URL:              url,
+		Method:           http.MethodGet,
+		MaxResponseBytes: safeUint32(h.limits.MaxSecretsSize),
+		// TODO -- fix, but this is used for rate limiting purposes
+		WorkflowID: hex.EncodeToString(payload.Owner),
+	}
 	// Fetch the contents of the secrets file from the url via the fetcher
-	secrets, err := h.fetchFn(ctx, url, safeUint32(h.limits.MaxSecretsSize))
+	secrets, err := h.fetchFn(ctx, messageID(url, ownerHex), req)
 	if err != nil {
 		return "", err
+	}
+
+	// Sanity check the payload and ensure we can decrypt it.
+	// If we can't, let's return an error and we won't store the result in the DB.
+	_, err = h.decryptSecrets(secrets, hex.EncodeToString(payload.Owner))
+	if err != nil {
+		return "", fmt.Errorf("failed to validate secrets: could not decrypt: %w", err)
 	}
 
 	h.lastFetchedAtMap.Set(hash, h.clock.Now())
@@ -755,7 +826,7 @@ func (h *eventHandler) forceUpdateSecretsEvent(
 // tryEngineCleanup attempts to stop the workflow engine for the given workflow ID.  Does nothing if the
 // workflow engine is not running.
 func (h *eventHandler) tryEngineCleanup(wfID string) error {
-	if h.engineRegistry.IsRunning(wfID) {
+	if h.engineRegistry.Contains(wfID) {
 		// Remove the engine from the registry
 		e, err := h.engineRegistry.Pop(wfID)
 		if err != nil {

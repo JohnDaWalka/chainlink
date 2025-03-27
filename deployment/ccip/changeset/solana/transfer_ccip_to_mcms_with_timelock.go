@@ -3,7 +3,6 @@ package solana
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -13,7 +12,7 @@ import (
 	mcmsTypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	state2 "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/common/types"
@@ -26,18 +25,22 @@ type CCIPContractsToTransfer struct {
 	Router    bool
 	FeeQuoter bool
 	OffRamp   bool
+	// Token Pool PDA -> Token Mint
+	LockReleaseTokenPools map[solana.PublicKey]solana.PublicKey
+	BurnMintTokenPools    map[solana.PublicKey]solana.PublicKey
+	RMNRemote             bool
 }
 
 type TransferCCIPToMCMSWithTimelockSolanaConfig struct {
 	// ContractsByChain is a map of chain selector the contracts we want to transfer.
 	// Each contract set to true will be transferred
 	ContractsByChain map[uint64]CCIPContractsToTransfer
-	// MinDelay is for the accept ownership proposal
-	MinDelay time.Duration
+	// MCMSCfg is for the accept ownership proposal
+	MCMSCfg proposalutils.TimelockConfig
 }
 
 // ValidateContracts checks if the required contracts are present on the chain
-func ValidateContracts(state changeset.SolCCIPChainState, chainSelector uint64, contracts CCIPContractsToTransfer) error {
+func ValidateContracts(state state2.SolCCIPChainState, chainSelector uint64, contracts CCIPContractsToTransfer) error {
 	contractChecks := []struct {
 		enabled bool
 		value   solana.PublicKey
@@ -46,6 +49,7 @@ func ValidateContracts(state changeset.SolCCIPChainState, chainSelector uint64, 
 		{contracts.Router, state.Router, "Router"},
 		{contracts.FeeQuoter, state.FeeQuoter, "FeeQuoter"},
 		{contracts.OffRamp, state.OffRamp, "OffRamp"},
+		{contracts.RMNRemote, state.RMNRemote, "RMNRemote"},
 	}
 
 	for _, check := range contractChecks {
@@ -58,7 +62,7 @@ func ValidateContracts(state changeset.SolCCIPChainState, chainSelector uint64, 
 }
 
 func (cfg TransferCCIPToMCMSWithTimelockSolanaConfig) Validate(e deployment.Environment) error {
-	ccipState, err := changeset.LoadOnchainStateSolana(e)
+	ccipState, err := state2.LoadOnchainStateSolana(e)
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
 	}
@@ -131,7 +135,7 @@ func TransferCCIPToMCMSWithTimelockSolana(
 	}
 	var batches []mcmsTypes.BatchOperation
 
-	ccipState, err := changeset.LoadOnchainStateSolana(e)
+	ccipState, err := state2.LoadOnchainStateSolana(e)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
@@ -200,16 +204,70 @@ func TransferCCIPToMCMSWithTimelockSolana(
 				Transactions:  mcmsTxs,
 			})
 		}
+		for tokenPoolConfigPDA, tokenMint := range contractsToTransfer.LockReleaseTokenPools {
+			mcmsTxs, err := transferOwnershipLockReleaseTokenPools(
+				ccipState,
+				tokenPoolConfigPDA,
+				tokenMint,
+				chainSelector,
+				solChain,
+				mcmState.TimelockProgram,
+				mcmState.TimelockSeed,
+			)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership of lock-release token pools: %w", err)
+			}
+			batches = append(batches, mcmsTypes.BatchOperation{
+				ChainSelector: mcmsTypes.ChainSelector(chainSelector),
+				Transactions:  mcmsTxs,
+			})
+		}
+
+		for tokenPoolConfigPDA, tokenMint := range contractsToTransfer.BurnMintTokenPools {
+			mcmsTxs, err := transferOwnershipBurnMintTokenPools(
+				ccipState,
+				tokenPoolConfigPDA,
+				tokenMint,
+				chainSelector,
+				solChain,
+				mcmState.TimelockProgram,
+				mcmState.TimelockSeed,
+			)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership of burn-mint token pools: %w", err)
+			}
+			batches = append(batches, mcmsTypes.BatchOperation{
+				ChainSelector: mcmsTypes.ChainSelector(chainSelector),
+				Transactions:  mcmsTxs,
+			})
+		}
+
+		if contractsToTransfer.RMNRemote {
+			mcmsTxs, err := transferOwnershipRMNRemote(
+				ccipState,
+				chainSelector,
+				solChain,
+				mcmState.TimelockProgram,
+				mcmState.TimelockSeed,
+			)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership of rmnremote: %w", err)
+			}
+			batches = append(batches, mcmsTypes.BatchOperation{
+				ChainSelector: mcmsTypes.ChainSelector(chainSelector),
+				Transactions:  mcmsTxs,
+			})
+		}
 	}
 
 	proposal, err := proposalutils.BuildProposalFromBatchesV2(
-		e.GetContext(),
+		e,
 		timelocks,
 		proposers,
 		inspectors,
 		batches,
 		"proposal to transfer ownership of CCIP contracts to timelock",
-		cfg.MinDelay)
+		cfg.MCMSCfg)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to build proposal: %w", err)
 	}
