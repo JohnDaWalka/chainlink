@@ -547,7 +547,7 @@ func (s CCIPOnChainState) OffRampPermissionLessExecutionThresholdSeconds(ctx con
 		if err != nil {
 			return 0, fmt.Errorf("failed to get offramp dynamic config for Aptos chain %d: %w", selector, err)
 		}
-		return offrampDynamicConfig.PermissionlessExecutionThresholdSecs, nil
+		return offrampDynamicConfig.PermissionlessExecutionThresholdSeconds, nil
 	}
 	return 0, fmt.Errorf("unsupported chain family %s", family)
 }

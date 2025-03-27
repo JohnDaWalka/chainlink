@@ -62,6 +62,16 @@ func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 						Params: []chainreader.AptosFunctionParam{},
 						// TODO: field renames
 					},
+					consts.MethodNameGetSourceChainConfig: {
+						Name: "get_source_chain_config",
+						Params: []chainreader.AptosFunctionParam{
+							{
+								Name:     "sourceChainSelector",
+								Type:     "u64",
+								Required: true,
+							},
+						},
+					},
 				},
 				Events: map[string]*chainreader.ChainReaderEvent{
 					consts.EventNameExecutionStateChanged: {
