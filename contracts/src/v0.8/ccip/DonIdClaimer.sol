@@ -23,6 +23,10 @@ contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
   error ZeroAddressNotAllowed();
   error AccessForbidden(address sender); 
 
+  event AuthorizedDeployerSet(address indexed senderAddress, bool allowed);
+  event DonIDClaimed(address indexed claimer, uint32 donId);
+  event DonIDSynced(uint32 newDONId);
+
   string public constant override typeAndVersion = "DonIDClaimer 1.0.0-dev";
   /// @notice The next available DON ID that is claimed and incremented
   uint32 private s_nextDONId;  
@@ -32,6 +36,7 @@ contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice Mapping to track authorized deployed keys 
   mapping(address => bool) private authorizedDeployers; 
+
 
   /// @notice Initializes the contract with the CapabilitiesRegistry address
   /// @param _capabilitiesRegistry The address of the CapabilitiesRegistry contract
@@ -58,6 +63,8 @@ contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev The function increments s_nextDONId after returning the current value
   /// @return uint32 The DON ID that was claimed
   function claimNextDONId() external onlyAuthorizedDeployer returns (uint32) {
+    emit DonIDClaimed(msg.sender, s_nextDONId);
+
     return s_nextDONId++;
   }
 
@@ -65,7 +72,9 @@ contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
   /// @param offset The offset to adjust the donID (useful when certain DON IDs are dropped)
   /// @dev This can be used to synchronize with the CapabilitiesRegistry after some actions have occurred
   function syncNextDONIdWithOffset(uint32 offset) external onlyAuthorizedDeployer {
-      s_nextDONId = i_capabilitiesRegistry.getNextDONId() + offset;
+    s_nextDONId = i_capabilitiesRegistry.getNextDONId() + offset;
+
+    emit DonIDSynced(s_nextDONId);
   } 
 
   /// @notice Sets authorization status for a deployer address
@@ -75,12 +84,14 @@ contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
   function setAuthorizedDeployer(address senderAddress, bool allowed) external onlyOwner {
     if (senderAddress == address(0)) revert ZeroAddressNotAllowed();  
     authorizedDeployers[senderAddress] = allowed;
+
+    emit AuthorizedDeployerSet(senderAddress, allowed);
   }
 
   /// @notice Returns the next available donID
   /// @return uint32 The next available donID to be claimed
   function getNextDONId() external view returns (uint32) {
-      return s_nextDONId; 
+    return s_nextDONId; 
   }
 
   /// @notice Checks if an address is an authorized deployer
