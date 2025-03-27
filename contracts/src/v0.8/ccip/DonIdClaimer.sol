@@ -2,8 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
+import {Ownable2StepMsgSender} from "../shared/access/Ownable2StepMsgSender.sol";
 
-interface ICapabilityRegistry {
+interface ICapabilitiesRegistry {
     /// @notice Gets the next available DON ID from the CapabilitiesRegistry
     /// @return uint32 The next available DON ID
     function getNextDONId() external view returns (uint32);
@@ -18,37 +19,37 @@ interface ICapabilityRegistry {
 /// @dev The contract maintains its own internal counter for DON IDs and ensures
 /// the next available ID is claimed and tracked by the contract. The sync function
 /// allows for alignment with the CapabilitiesRegistry.
-contract DonIDClaimer is ITypeAndVersion {
+contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
   error ZeroAddressNotAllowed();
-  error Unauthorized(address caller);
+  error AccessForbidden(address sender); 
 
-  string public constant override typeAndVersion = "DonIdClaimer 1.0.0-dev";
+  string public constant override typeAndVersion = "DonIDClaimer 1.0.0-dev";
   /// @notice The next available DON ID that is claimed and incremented
   uint32 private s_nextDONId;  
 
   /// @notice The address of the CapabilitiesRegistry contract used to fetch the next DON ID
-  address private immutable i_capabilitiesRegistry;
+  ICapabilitiesRegistry private immutable i_capabilitiesRegistry;
 
   /// @notice Mapping to track authorized deployed keys 
-  mapping(address => bool) private authorizedDeployer; 
+  mapping(address => bool) private authorizedDeployers; 
 
   /// @notice Initializes the contract with the CapabilitiesRegistry address
-  /// @param capabilitiesRegistry The address of the CapabilitiesRegistry contract
-  constructor(address capabilitiesRegistry) {
-    if (capabilitiesRegistry == address(0)) revert ZeroAddressNotAllowed();  
-    i_capabilitiesRegistry = capabilitiesRegistry;
+  /// @param _capabilitiesRegistry The address of the CapabilitiesRegistry contract
+  constructor(address _capabilitiesRegistry) {
+    if (_capabilitiesRegistry == address(0)) revert ZeroAddressNotAllowed();  
+    i_capabilitiesRegistry = ICapabilitiesRegistry(_capabilitiesRegistry);
 
     // Initializing the deployer authorization (owner can be the initial deployer)
-    authorizedDeployer[msg.sender] = true;
+    authorizedDeployers[msg.sender] = true;
 
     // Sync the initial s_nextDONId from the CapabilitiesRegistry contract
-    s_nextDONId = ICapabilityRegistry(i_capabilitiesRegistry).getNextDONId();
+    s_nextDONId = i_capabilitiesRegistry.getNextDONId();
   }
 
   /// @notice Modifier to check if the caller is an authorized deployer
   modifier onlyAuthorizedDeployer() {
-    if (!authorizedDeployer[msg.sender]) {
-      revert Unauthorized(msg.sender); 
+    if (!authorizedDeployers[msg.sender]) {
+      revert AccessForbidden(msg.sender); 
     }
     _;
   }
@@ -64,17 +65,16 @@ contract DonIDClaimer is ITypeAndVersion {
   /// @param offset The offset to adjust the donID (useful when certain DON IDs are dropped)
   /// @dev This can be used to synchronize with the CapabilitiesRegistry after some actions have occurred
   function syncNextDONIdWithOffset(uint32 offset) external onlyAuthorizedDeployer {
-      address capabilitiesRegistry = i_capabilitiesRegistry;
-      s_nextDONId = ICapabilityRegistry(capabilitiesRegistry).getNextDONId() + offset;
+      s_nextDONId = i_capabilitiesRegistry.getNextDONId() + offset;
   } 
 
   /// @notice Sets authorization status for a deployer address
   /// @param senderAddress The address to be added or removed as an authorized deployer
   /// @param allowed Boolean indicating whether the address is authorized (true) or revoked (false)
   /// @dev Can only be called by an existing authorized deployer
-  function setAuthorizedDeployer(address senderAddress, bool allowed) external onlyAuthorizedDeployer {
+  function setAuthorizedDeployer(address senderAddress, bool allowed) external onlyOwner {
     if (senderAddress == address(0)) revert ZeroAddressNotAllowed();  
-    authorizedDeployer[senderAddress] = allowed;
+    authorizedDeployers[senderAddress] = allowed;
   }
 
   /// @notice Returns the next available donID
@@ -87,6 +87,6 @@ contract DonIDClaimer is ITypeAndVersion {
   /// @param senderAddress The address to check for authorization
   /// @return bool True if the address is an authorized deployer, false otherwise
   function isAuthorizedDeployer(address senderAddress) external view returns (bool) {
-    return authorizedDeployer[senderAddress];
+    return authorizedDeployers[senderAddress];
   }
 }
