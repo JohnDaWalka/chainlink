@@ -44,6 +44,7 @@ func CCIPCapabilityJobspecChangeset(env deployment.Environment, _ any) (deployme
 		// pick first keybundle of each type (by default nodes will auto create one key of each type for each defined chain family)
 		keyBundles := map[string]string{}
 		for details, config := range node.SelToOCRConfig {
+			fmt.Printf("DEBUG cs_jobspec : processing chain selector %v for node %v\n", details.ChainSelector, node.PeerID)
 			family, err := chainsel.GetSelectorFamily(details.ChainSelector)
 			if err != nil {
 				env.Logger.Warnf("skipping unknown/invalid chain family for selector %v", details.ChainSelector)
@@ -57,6 +58,7 @@ func CCIPCapabilityJobspecChangeset(env deployment.Environment, _ any) (deployme
 				continue
 			}
 			keyBundles[family] = config.KeyBundleID
+			fmt.Printf("DEBUG cs_jobspec : assigned key bundle %s for chain family %s (selector %v) to node %v\n", config.KeyBundleID, family, details.ChainSelector, node.PeerID)
 		}
 
 		var spec string

@@ -1,6 +1,7 @@
 package testhelpers
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"github.com/pkg/errors"
@@ -8,11 +9,12 @@ import (
 	"testing"
 	"time"
 
+	ethbind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/bind"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip"
-	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_dummy_receiver"
-	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_router"
+	//"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_dummy_receiver"
+	//"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -26,7 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/onramp"
 
 	"github.com/aptos-labs/aptos-go-sdk"
-	"github.com/aptos-labs/aptos-go-sdk/api"
 )
 
 type AptosTestDeployPrerequisitesChangeSet struct {
@@ -97,19 +98,20 @@ func (c AptosTestDeployContractsChangeSet) deployAptosContracts(t *testing.T, e 
 
 	aptosChainState.CCIPAddress = ccipAddress
 
-	ccipRouterPendingTx, ccipRouterBindings, err := ccip_router.DeployToExistingObject(aptosChain.DeployerSigner, aptosChain.Client, ccipAddress, ccipAddress)
-	require.NoError(t, err)
-	logger.Infow("Deployed Aptos CCIP Router", "address", ccipAddress.String(), "pendingTx", ccipRouterPendingTx.TxnHash())
-	_ = ccipRouterBindings
-	waitForTx(t, aptosChain.Client, ccipRouterPendingTx.TxnHash(), time.Minute*1)
+	//ccipRouterPendingTx, ccipRouterBindings, err := ccip_router.DeployToExistingObject(aptosChain.DeployerSigner, aptosChain.Client, ccipAddress, ccipAddress)
+	//require.NoError(t, err)
+	//logger.Infow("Deployed Aptos CCIP Router", "address", ccipAddress.String(), "pendingTx", ccipRouterPendingTx.TxnHash())
+	//_ = ccipRouterBindings
+	//waitForTx(t, aptosChain.Client, ccipRouterPendingTx.TxnHash(), time.Minute*1)
 
-	ccipDummyReceiverAddress, ccipDummyReceiverPendingTx, ccipDummyReceiverBindings, err := ccip_dummy_receiver.DeployToObject(aptosChain.DeployerSigner, aptosChain.Client, ccipAddress)
-	require.NoError(t, err)
-	logger.Infow("Deployed Aptos CCIP Dummy Receiver", "address", ccipDummyReceiverAddress.String(), "pendingTx", ccipDummyReceiverPendingTx.TxnHash())
-	_ = ccipDummyReceiverBindings
-	waitForTx(t, aptosChain.Client, ccipDummyReceiverPendingTx.TxnHash(), time.Minute*1)
+	//ccipDummyReceiverAddress, ccipDummyReceiverPendingTx, ccipDummyReceiverBindings, err := ccip_dummy_receiver.DeployToObject(aptosChain.DeployerSigner, aptosChain.Client, ccipAddress)
+	//require.NoError(t, err)
+	//logger.Infow("Deployed Aptos CCIP Dummy Receiver", "address", ccipDummyReceiverAddress.String(), "pendingTx", ccipDummyReceiverPendingTx.TxnHash())
+	//_ = ccipDummyReceiverBindings
+	//waitForTx(t, aptosChain.Client, ccipDummyReceiverPendingTx.TxnHash(), time.Minute*1)
 
-	aptosChainState.ReceiverAddress = ccipDummyReceiverAddress
+	//aptosChainState.ReceiverAddress = ccipDummyReceiverAddress
+	aptosChainState.ReceiverAddress = aptos.AccountOne
 
 	transactOpts := &bind.TransactOpts{
 		Signer: aptosChain.DeployerSigner,
@@ -185,6 +187,18 @@ func (c AptosTestConfigureContractsChangeSet) configureAptosContracts(t *testing
 		chainSelector,
 	)
 	require.NoError(t, err)
+	fmt.Printf("Aptos DON ID: %+v\n", donID)
+
+	allCommitConfigs, err := onchainState.Chains[c.HomeChainSelector].CCIPHome.GetAllConfigs(&ethbind.CallOpts{
+		Context: context.Background(),
+	}, donID, 0)
+
+	allExecConfigs, err := onchainState.Chains[c.HomeChainSelector].CCIPHome.GetAllConfigs(&ethbind.CallOpts{
+		Context: context.Background(),
+	}, donID, 1)
+
+	fmt.Printf("DEBUG HOME CHAIN CCIPHome: commit configs: %+v\n", allCommitConfigs)
+	fmt.Printf("DEBUG HOME CHAIN CCIPHome: exec configs: %+v\n", allExecConfigs)
 
 	ocr3Args, err := internal.BuildSetOCR3ConfigArgsAptos(
 		donID, onchainState.Chains[c.HomeChainSelector].CCIPHome, chainSelector, globals.ConfigTypeActive)
@@ -212,7 +226,9 @@ func (c AptosTestConfigureContractsChangeSet) configureAptosContracts(t *testing
 	for _, transmitter := range commitArgs.Transmitters {
 		commitTransmitters = append(commitTransmitters, aptos.AccountAddress(transmitter))
 	}
-	ccipBindings.Offramp.SetOcr3Config(transactOpts, commitArgs.ConfigDigest[:], uint8(types.PluginTypeCCIPCommit), commitArgs.F, commitArgs.IsSignatureVerificationEnabled, commitSigners, commitTransmitters)
+	pendingTx, err := ccipBindings.Offramp.SetOcr3Config(transactOpts, commitArgs.ConfigDigest[:], uint8(types.PluginTypeCCIPCommit), commitArgs.F, commitArgs.IsSignatureVerificationEnabled, commitSigners, commitTransmitters)
+	require.NoError(t, err)
+	waitForTx(t, aptosChain.Client, pendingTx.TxnHash(), time.Minute*1)
 
 	execSigners := [][]byte{}
 	for _, signer := range execArgs.Signers {
@@ -222,9 +238,13 @@ func (c AptosTestConfigureContractsChangeSet) configureAptosContracts(t *testing
 	for _, transmitter := range execArgs.Transmitters {
 		execTransmitters = append(execTransmitters, aptos.AccountAddress(transmitter))
 	}
-	ccipBindings.Offramp.SetOcr3Config(transactOpts, execArgs.ConfigDigest[:], uint8(types.PluginTypeCCIPCommit), execArgs.F, execArgs.IsSignatureVerificationEnabled, execSigners, execTransmitters)
+	pendingTx, err = ccipBindings.Offramp.SetOcr3Config(transactOpts, execArgs.ConfigDigest[:], uint8(types.PluginTypeCCIPExec), execArgs.F, execArgs.IsSignatureVerificationEnabled, execSigners, execTransmitters)
+	require.NoError(t, err)
+	waitForTx(t, aptosChain.Client, pendingTx.TxnHash(), time.Minute*1)
 
 	logger.Infow("Confirmed")
+
+	time.Sleep(time.Second * 5000000)
 }
 
 func addLaneAptosChangesets(t *testing.T, e *DeployedEnv, from, to uint64, fromFamily, toFamily string) []commoncs.ConfiguredChangeSet {
@@ -330,15 +350,9 @@ func ConfirmCommitWithExpectedSeqNumRangeAptos(
 }
 
 func waitForTx(t *testing.T, client aptos.AptosRpcClient, txHash string, duration time.Duration) {
-	stopTime := time.Now().Add(duration)
-	for time.Now().Before(stopTime) {
-		time.Sleep(time.Second * 1)
-		txInfo, err := client.TransactionByHash(txHash)
-		if err == nil && txInfo.Type != api.TransactionVariantPending {
-			return
-		}
-	}
-	t.Fatalf("Failed to wait for transaction %s", txHash)
+	userTx, err := client.WaitForTransaction(txHash, aptos.PollTimeout(duration))
+	require.NoError(t, err)
+	require.True(t, userTx.Success, "transaction failed: %s", userTx.VmStatus)
 }
 
 func ConfirmExecWithSeqNrsAptos(

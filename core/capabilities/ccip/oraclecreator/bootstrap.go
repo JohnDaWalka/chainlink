@@ -149,12 +149,31 @@ func (i *bootstrapOracleCreator) Create(ctx context.Context, _ uint32, config cc
 	// TODO: add an api that returns chain family.
 	// NOTE: this doesn't really matter for the bootstrap node, it doesn't do anything on-chain.
 	// Its for the monitoring endpoint generation below.
-	chainID, err := chainsel.ChainIdFromSelector(uint64(config.Config.ChainSelector))
+	chainID, err := chainsel.GetChainIDFromSelector(uint64(config.Config.ChainSelector))
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to get chain ID from selector: %w", err)
+		return nil, fmt.Errorf("failed to get chain ID from selector DEBUG BOOTSTRAP %d: %w", uint64(config.Config.ChainSelector), err)
 	}
 
-	destChainFamily := chaintype.EVM
+	family, err := chainsel.GetSelectorFamily(uint64(config.Config.ChainSelector))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain family from selector %d DEBUG BOOTSTRAP: %w", config.Config.ChainSelector, err)
+	}
+
+	var destChainFamily chaintype.ChainType
+
+	switch family {
+	case chainsel.FamilyEVM:
+		destChainFamily = chaintype.EVM
+	case chainsel.FamilyAptos:
+		destChainFamily = chaintype.Aptos
+	case chainsel.FamilySolana:
+		destChainFamily = chaintype.Solana
+	default:
+		return nil, fmt.Errorf("unsupported chain family %s", family)
+	}
+
+	//destChainFamily := chaintype.EVM
 	destRelayID := types.NewRelayID(string(destChainFamily), fmt.Sprintf("%d", chainID))
 
 	oraclePeerIDs := make([]ragep2ptypes.PeerID, 0, len(config.Config.Nodes))

@@ -68,7 +68,7 @@ func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 						EventHandleStructName: "OffRampState",
 						EventHandleFieldName:  "execution_state_changed_events",
 						EventAccountAddress:   "state_object::get_object_address",
-						EventFieldRenames: map[string]chainreader.RenamedEventField{
+						EventFieldRenames: map[string]chainreader.RenamedField{
 							"source_chain_selector": {
 								NewName: "SourceChainSelector",
 							},
@@ -90,20 +90,20 @@ func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 						EventHandleStructName: "OffRampState",
 						EventHandleFieldName:  "commit_report_accepted_events",
 						EventAccountAddress:   "state_object::get_object_address",
-						EventFieldRenames: map[string]chainreader.RenamedEventField{
+						EventFieldRenames: map[string]chainreader.RenamedField{
 							"blessed_merkle_roots": {
 								NewName: "BlessedMerkleRoots",
-								SubFieldRenames: map[string]chainreader.RenamedEventField{
+								SubFieldRenames: map[string]chainreader.RenamedField{
 									"source_chain_selector": {
 										NewName: "SourceChainSelector",
 									},
 									"on_ramp_address": {
 										NewName: "OnRampAddress",
 									},
-									"min_sequence_number": {
+									"min_seq_nr": {
 										NewName: "MinSeqNr",
 									},
-									"max_sequence_number": {
+									"max_seq_nr": {
 										NewName: "MaxSeqNr",
 									},
 									"merkle_root": {
@@ -113,7 +113,7 @@ func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 							},
 							"unblessed_merkle_roots": {
 								NewName: "UnblessedMerkleRoots",
-								SubFieldRenames: map[string]chainreader.RenamedEventField{
+								SubFieldRenames: map[string]chainreader.RenamedField{
 									"source_chain_selector": {
 										NewName: "SourceChainSelector",
 									},
@@ -133,10 +133,10 @@ func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 							},
 							"price_updates": {
 								NewName: "PriceUpdates",
-								SubFieldRenames: map[string]chainreader.RenamedEventField{
+								SubFieldRenames: map[string]chainreader.RenamedField{
 									"token_price_updates": {
 										NewName: "TokenPriceUpdates",
-										SubFieldRenames: map[string]chainreader.RenamedEventField{
+										SubFieldRenames: map[string]chainreader.RenamedField{
 											"source_token": {
 												NewName: "SourceToken",
 											},
@@ -147,7 +147,7 @@ func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 									},
 									"gas_price_updates": {
 										NewName: "GasPriceUpdates",
-										SubFieldRenames: map[string]chainreader.RenamedEventField{
+										SubFieldRenames: map[string]chainreader.RenamedField{
 											"dest_chain_selector": {
 												NewName: "DestChainSelector",
 											},

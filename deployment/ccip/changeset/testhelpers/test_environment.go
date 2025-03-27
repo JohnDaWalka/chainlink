@@ -446,6 +446,7 @@ func NewEnvironmentWithPrerequisitesContracts(t *testing.T, tEnv TestEnvironment
 	e := NewEnvironment(t, tEnv)
 	evmChains := e.Env.AllChainSelectors()
 	solChains := e.Env.AllChainSelectorsSolana()
+	aptosChains := e.Env.AllChainSelectorsAptos()
 	//nolint:gocritic // we need to segregate EVM and Solana chains
 	allChains := append(evmChains, solChains...)
 	if len(solChains) > 0 {
@@ -499,7 +500,6 @@ func NewEnvironmentWithPrerequisitesContracts(t *testing.T, tEnv TestEnvironment
 	)
 	require.NoError(t, err)
 
-	aptosChains := e.Env.AllChainSelectorsAptos()
 	if len(aptosChains) > 0 {
 		e.Env, err = commonchangeset.Apply(t, e.Env, nil,
 			AptosTestDeployPrerequisitesChangeSet{
@@ -794,6 +794,8 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		ocrOverride := tc.OCRConfigOverride
 		commitOCRConfigs[chain] = v1_6.DeriveOCRParamsForCommit(v1_6.SimulationTest, e.FeedChainSel, tokenInfo, ocrOverride)
 		execOCRConfigs[chain] = v1_6.DeriveOCRParamsForExec(v1_6.SimulationTest, tokenDataProviders, ocrOverride)
+		fmt.Printf("DEBUG: Aptos chain %d: commit config in test environment: %+v\n", chain, commitOCRConfigs[chain])
+		fmt.Printf("DEBUG: Aptos chain %d: exec config in test environment: %+v\n", chain, execOCRConfigs[chain])
 		chainConfigs[chain] = v1_6.ChainConfig{
 			Readers: nodeInfo.NonBootstraps().PeerIDs(),
 			// #nosec G115 - Overflow is not a concern in this test scenario

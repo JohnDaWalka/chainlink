@@ -152,8 +152,8 @@ func createAptosChainConfig(chainID string, chain deployment.AptosChain) chainli
 
 	chainConfig["Enabled"] = true
 	chainConfig["ChainID"] = chainID
-	chainConfig["NetworkName"] = "aptos"
-	chainConfig["NetworkNameFull"] = "aptos"
+	chainConfig["NetworkName"] = "aptos-localnet"
+	chainConfig["NetworkNameFull"] = "aptos-localnet"
 	chainConfig["Nodes"] = []any{
 		map[string]any{
 			"Name": "primary",

@@ -40,6 +40,7 @@ func New(
 	tickInterval time.Duration,
 	oracleCreator cctypes.OracleCreator,
 ) *launcher {
+	lggr.Infow("Creating new CCIP Launcher", "capabilityID", capabilityID, "myP2PID", myP2PID, "tickInterval", tickInterval)
 	return &launcher{
 		myP2PID:         myP2PID,
 		capabilityID:    capabilityID,
@@ -97,6 +98,7 @@ func (l *launcher) Launch(ctx context.Context, state *registrysyncer.LocalRegist
 func (l *launcher) getLatestState() registrysyncer.LocalRegistry {
 	l.lock.RLock()
 	defer l.lock.RUnlock()
+	fmt.Printf("DEBUG: getLatestState returning state with %d DONs\n", len(l.latestState.IDsToDONs))
 	return l.latestState
 }
 
@@ -112,27 +114,41 @@ func (l *launcher) runningDONIDs() []registrysyncer.DonID {
 
 // Close implements job.ServiceCtx.
 func (l *launcher) Close() error {
+	fmt.Printf("DEBUG: Close called\n")
 	return l.StateMachine.StopOnce("launcher", func() error {
+		fmt.Printf("DEBUG: Stopping launcher internal components\n")
 		// shut down the monitor goroutine.
 		close(l.stopChan)
 		l.wg.Wait()
+		fmt.Printf("DEBUG: Monitor goroutine stopped\n")
 
 		// shut down all running oracles.
 		var err error
-		for _, ceDep := range l.instances {
+		l.lock.RLock()
+		instanceCount := len(l.instances)
+		l.lock.RUnlock()
+		fmt.Printf("DEBUG: Shutting down %d DON instances\n", instanceCount)
+		l.lock.RLock()
+		for donID, ceDep := range l.instances {
+			fmt.Printf("DEBUG: Closing plugins for DON ID %d\n", donID)
 			err = multierr.Append(err, ceDep.CloseAll())
 		}
+		l.lock.RUnlock()
 
+		fmt.Printf("DEBUG: Launcher Close finished, error: %v\n", err)
 		return err
 	})
 }
 
 // Start implements job.ServiceCtx.
 func (l *launcher) Start(context.Context) error {
+	fmt.Printf("DEBUG: Start called\n")
 	return l.StartOnce("launcher", func() error {
+		fmt.Printf("DEBUG: Starting launcher internal components\n")
 		l.stopChan = make(chan struct{})
 		l.wg.Add(1)
 		go l.monitor()
+		fmt.Printf("DEBUG: Launcher Start finished\n")
 		return nil
 	})
 }
@@ -166,22 +182,29 @@ func (l *launcher) tick(ctx context.Context) error {
 	// For new jobs it may be possible that the home chain reader is not yet ready
 	// so we won't be able to fetch configs and start any OCR instances.
 	if ready := l.homeChainReader.Ready(); ready != nil {
+		fmt.Printf("DEBUG: tick - home chain reader not ready: %v\n", ready)
 		return fmt.Errorf("home chain reader is not ready: %w", ready)
 	}
+	fmt.Printf("DEBUG: tick - home chain reader is ready\n")
 
 	// Fetch the latest state from the capability registry and determine if we need to
 	// launch or update any OCR instances.
 	latestState := l.getLatestState()
+	fmt.Printf("DEBUG: tick - got latest state with %d DONs\n", len(latestState.IDsToDONs))
 
 	diffRes, err := diff(l.capabilityID, l.regState, latestState)
 	if err != nil {
+		fmt.Printf("DEBUG: tick - failed to diff states: %v\n", err)
 		return fmt.Errorf("failed to diff capability registry states: %w", err)
 	}
+	fmt.Printf("DEBUG: tick - diff result: added=%d, removed=%d, updated=%d\n", len(diffRes.added), len(diffRes.removed), len(diffRes.updated))
 
 	err = l.processDiff(ctx, diffRes)
 	if err != nil {
+		fmt.Printf("DEBUG: tick - failed to process diff: %v\n", err)
 		return fmt.Errorf("failed to process diff: %w", err)
 	}
+	fmt.Printf("DEBUG: tick - successfully processed diff\n")
 
 	return nil
 }
@@ -193,10 +216,26 @@ func (l *launcher) tick(ctx context.Context) error {
 func (l *launcher) processDiff(ctx context.Context, diff diffResult) error {
 	fmt.Printf("DEBUG: processDiff called with %d added, %d removed, %d updated DONs\n",
 		len(diff.added), len(diff.removed), len(diff.updated))
-	err := l.processRemoved(diff.removed)
-	err = multierr.Append(err, l.processAdded(ctx, diff.added))
-	err = multierr.Append(err, l.processUpdate(ctx, diff.updated))
 
+	fmt.Printf("DEBUG: processDiff - processing removed DONs (%d)\n", len(diff.removed))
+	err := l.processRemoved(diff.removed)
+	if err != nil {
+		fmt.Printf("DEBUG: processDiff - error processing removed DONs: %v\n", err)
+	}
+
+	fmt.Printf("DEBUG: processDiff - processing added DONs (%d)\n", len(diff.added))
+	err = multierr.Append(err, l.processAdded(ctx, diff.added))
+	if err != nil {
+		fmt.Printf("DEBUG: processDiff - error processing added DONs: %v\n", err)
+	}
+
+	fmt.Printf("DEBUG: processDiff - processing updated DONs (%d)\n", len(diff.updated))
+	err = multierr.Append(err, l.processUpdate(ctx, diff.updated))
+	if err != nil {
+		fmt.Printf("DEBUG: processDiff - error processing updated DONs: %v\n", err)
+	}
+
+	fmt.Printf("DEBUG: processDiff finished, final error: %v\n", err)
 	return err
 }
 

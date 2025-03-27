@@ -393,10 +393,13 @@ func BuildOCR3ConfigForCCIPHome(
 	commitOffchainCfg *pluginconfig.CommitOffchainConfig,
 	execOffchainCfg *pluginconfig.ExecuteOffchainConfig,
 ) (map[types.PluginType]ccip_home.CCIPHomeOCR3Config, error) {
+	fmt.Printf("DEBUG: BuildOCR3ConfigForCCIPHome destSelector %d\n", destSelector)
 	chainConfig, err := ccipHome.GetChainConfig(nil, destSelector)
 	if err != nil {
-		return nil, fmt.Errorf("can't get chain config for %d: %w", destSelector, err)
+		panic(err)
+		//return nil, fmt.Errorf("can't get chain config for %d: %w", destSelector, err)
 	}
+	fmt.Printf("DEBUG: BuildOCR3ConfigForCCIPHome destSelector %d chainConfig %+v\n", destSelector, chainConfig)
 	var p2pIDs [][32]byte
 	// Get OCR3 Config from helper
 	var schedule []int
