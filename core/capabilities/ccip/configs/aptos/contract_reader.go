@@ -7,8 +7,37 @@ import (
 
 func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 	return chainreader.ChainReaderConfig{
+		IsLoopPlugin: true,
 		Modules: map[string]*chainreader.ChainReaderModule{
 			// TODO: more offramp config and other modules
+			consts.ContractNameFeeQuoter: {
+				Name: "fee_quoter",
+				Functions: map[string]*chainreader.ChainReaderFunction{
+					consts.MethodNameFeeQuoterGetTokenPrice: {
+						Name: "get_token_price",
+						Params: []chainreader.AptosFunctionParam{
+							{
+								Name:     "token",
+								Type:     "address",
+								Required: true,
+							},
+						},
+					},
+					consts.MethodNameFeeQuoterGetTokenPrices: {
+						Name: "get_token_prices",
+						Params: []chainreader.AptosFunctionParam{
+							{
+								Name:     "tokens",
+								Type:     "vector<address>",
+								Required: true,
+							},
+						},
+					},
+					consts.MethodNameFeeQuoterGetStaticConfig: {
+						Name: "get_static_config",
+					},
+				},
+			},
 			consts.ContractNameOffRamp: {
 				Name: "offramp",
 				Functions: map[string]*chainreader.ChainReaderFunction{
@@ -49,17 +78,14 @@ func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 						// TODO: change to ocr config struct, field renames
 					},
 					consts.MethodNameGetLatestPriceSequenceNumber: {
-						Name:   "get_latest_price_sequence_number",
-						Params: []chainreader.AptosFunctionParam{},
+						Name: "get_latest_price_sequence_number",
 					},
 					consts.MethodNameOffRampGetStaticConfig: {
-						Name:   "get_static_config",
-						Params: []chainreader.AptosFunctionParam{},
+						Name: "get_static_config",
 						// TODO: field renames
 					},
 					consts.MethodNameOffRampGetDynamicConfig: {
-						Name:   "get_dynamic_config",
-						Params: []chainreader.AptosFunctionParam{},
+						Name: "get_dynamic_config",
 						// TODO: field renames
 					},
 					consts.MethodNameGetSourceChainConfig: {

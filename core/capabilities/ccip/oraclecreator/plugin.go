@@ -522,6 +522,10 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			return nil, nil, err1
 		}
 
+		if relayChainFamily == relay.NetworkAptos {
+			cr = aptosconfig.NewWrappedChainReader(i.lggr, cr)
+		}
+
 		if chainID == destChainID && destChainFamily == relayChainFamily {
 			offrampAddress := destAddrStr
 			fmt.Printf("DEBUG: BINDING OFFRAMP ADDRESS %s\n", offrampAddress)
