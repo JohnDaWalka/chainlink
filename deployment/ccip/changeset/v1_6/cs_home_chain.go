@@ -118,10 +118,8 @@ func deployCapReg(
 	}
 	capReg, err := deployment.DeployContract(lggr, chain, ab,
 		func(chain deployment.Chain) deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry] {
-			crAddr, tx, cr, err2 := capabilities_registry.DeployCapabilitiesRegistry(
-				chain.DeployerKey,
-				chain.Client,
-			)
+			crAddr, tx, cr, err2 := deployment.PickXVMDeployFn(chain,
+				capabilities_registry.DeployCapabilitiesRegistry, capabilities_registry.DeployCapabilitiesRegistryZk)
 			return deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
 				Address: crAddr, Contract: cr, Tv: deployment.NewTypeAndVersion(changeset.CapabilitiesRegistry, deployment.Version1_0_0), Tx: tx, Err: err2,
 			}
@@ -163,9 +161,7 @@ func deployHomeChain(
 		ccipHome, err := deployment.DeployContract(
 			lggr, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*ccip_home.CCIPHome] {
-				ccAddr, tx, cc, err2 := ccip_home.DeployCCIPHome(
-					chain.DeployerKey,
-					chain.Client,
+				ccAddr, tx, cc, err2 := deployment.PickXVMDeployFn(chain, ccip_home.DeployCCIPHome, ccip_home.DeployCCIPHomeZk,
 					capReg.Address,
 				)
 				return deployment.ContractDeploy[*ccip_home.CCIPHome]{
@@ -185,10 +181,7 @@ func deployHomeChain(
 		rmnHomeContract, err := deployment.DeployContract(
 			lggr, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*rmn_home.RMNHome] {
-				rmnAddr, tx, rmn, err2 := rmn_home.DeployRMNHome(
-					chain.DeployerKey,
-					chain.Client,
-				)
+				rmnAddr, tx, rmn, err2 := deployment.PickXVMDeployFn(chain, rmn_home.DeployRMNHome, rmn_home.DeployRMNHomeZk)
 				return deployment.ContractDeploy[*rmn_home.RMNHome]{
 					Address: rmnAddr, Tv: deployment.NewTypeAndVersion(changeset.RMNHome, deployment.Version1_6_0), Tx: tx, Err: err2, Contract: rmn,
 				}
