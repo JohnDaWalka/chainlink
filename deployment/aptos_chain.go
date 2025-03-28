@@ -16,5 +16,5 @@ type AptosChain struct {
 
 func (c AptosChain) GetOfframpDynamicConfig(ccipAddress aptos.AccountAddress) (module_offramp.DynamicConfig, error) {
 	ccipBindings := ccip.Bind(ccipAddress, c.Client)
-	return ccipBindings.Offramp.GetDynamicConfig(&bind.CallOpts{})
+	return ccipBindings.Offramp().GetDynamicConfig(&bind.CallOpts{})
 }
