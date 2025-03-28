@@ -241,14 +241,10 @@ func NewNode(
 		if err != nil {
 			t.Fatal(err)
 		}
-		evmchain := EVMChain{
+		evmchains[evmChainID] = EVMChain{
+			Backend:     chain.Client.(*Backend).Sim,
 			DeployerKey: chain.DeployerKey,
 		}
-		backend, ok := chain.Client.(*Backend)
-		if ok {
-			evmchain.Backend = backend.Sim
-		}
-		evmchains[evmChainID] = evmchain
 	}
 
 	// Do not want to load fixtures as they contain a dummy chainID.
@@ -307,9 +303,7 @@ func NewNode(
 	// Create clients for the core node backed by sim.
 	clients := make(map[uint64]client.Client)
 	for chainID, chain := range evmchains {
-		if chain.Backend != nil {
-			clients[chainID] = client.NewSimulatedBackendClient(t, chain.Backend, big.NewInt(int64(chainID)))
-		}
+		clients[chainID] = client.NewSimulatedBackendClient(t, chain.Backend, big.NewInt(int64(chainID)))
 	}
 
 	master := keystore.New(db, utils.FastScryptParams, lggr)
@@ -333,7 +327,7 @@ func NewNode(
 			fc.GenEthClient = func(i *big.Int) client.Client {
 				ethClient, ok := clients[i.Uint64()]
 				if !ok {
-					return client.NewNullClient(i, lggr)
+					t.Fatal("no backend for chainID", i)
 				}
 				return ethClient
 			}
@@ -444,12 +438,10 @@ func CreateKeys(t *testing.T,
 			}
 			transmitters[chain.Selector] = transmitter.String()
 
-			backend, ok := chain.Client.(*Backend)
-			if ok {
-				fundAddress(t, chain.DeployerKey, transmitter, assets.Ether(1000).ToInt(), backend.Sim)
-				// need to look more into it, but it seems like with sim chains nodes are sending txs with 0x from address
-				fundAddress(t, chain.DeployerKey, common.Address{}, assets.Ether(1000).ToInt(), backend.Sim)
-			}
+			backend := chain.Client.(*Backend).Sim
+			fundAddress(t, chain.DeployerKey, transmitter, assets.Ether(1000).ToInt(), backend)
+			// need to look more into it, but it seems like with sim chains nodes are sending txs with 0x from address
+			fundAddress(t, chain.DeployerKey, common.Address{}, assets.Ether(1000).ToInt(), backend)
 		case chainsel.FamilyAptos:
 			err = app.GetKeyStore().Aptos().EnsureKey(ctx)
 			require.NoError(t, err, "failed to create key for aptos")
