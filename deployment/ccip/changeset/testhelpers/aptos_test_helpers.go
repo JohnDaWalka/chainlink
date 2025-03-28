@@ -117,7 +117,7 @@ func (c AptosTestDeployContractsChangeSet) deployAptosContracts(t *testing.T, e 
 		Signer: aptosChain.DeployerSigner,
 	}
 
-	pendingTx, err := ccipBindings.Onramp.Initialize(transactOpts, chainSelector, adminAddress, []uint64{}, []bool{}, []bool{})
+	pendingTx, err := ccipBindings.Onramp().Initialize(transactOpts, chainSelector, adminAddress, []uint64{}, []bool{}, []bool{})
 	require.NoError(t, err)
 	logger.Infow("Initialized Onramp", "pendingTx", pendingTx.TxnHash())
 	waitForTx(t, aptosChain.Client, pendingTx.TxnHash(), time.Minute*1)
@@ -125,17 +125,17 @@ func (c AptosTestDeployContractsChangeSet) deployAptosContracts(t *testing.T, e 
 	// TODO: actually figure out where this value comes from
 	//                                 failed to apply changeset at index 1: invalid changeset config: validate plugin info PluginType: CCIPCommit, Chains: [909606746561742123 5548718428018410741 4457093679053095497]: invalid ccip ocr params: invalid execute off-chain config: MessageVisibilityInterval=8h0m0s does not match the permissionlessExecutionThresholdSeconds in dynamic config =0 for chain 4457093679053095497
 	permissionlessExecutionThresholdSecs := uint32(60 * 60 * 8)
-	pendingTx, err = ccipBindings.Offramp.Initialize(transactOpts, chainSelector, permissionlessExecutionThresholdSecs, []uint64{}, []bool{}, []bool{}, [][]byte{})
+	pendingTx, err = ccipBindings.Offramp().Initialize(transactOpts, chainSelector, permissionlessExecutionThresholdSecs, []uint64{}, []bool{}, []bool{}, [][]byte{})
 	require.NoError(t, err)
 	logger.Infow("Initialized Offramp", "pendingTx", pendingTx.TxnHash())
 	waitForTx(t, aptosChain.Client, pendingTx.TxnHash(), time.Minute*1)
 
-	pendingTx, err = ccipBindings.FeeQuoter.Initialize(transactOpts, uint64(1000000), aptosChainState.LinkTokenAddress, uint64(1000000), []aptos.AccountAddress{aptosChainState.LinkTokenAddress})
+	pendingTx, err = ccipBindings.FeeQuoter().Initialize(transactOpts, uint64(1000000), aptosChainState.LinkTokenAddress, uint64(1000000), []aptos.AccountAddress{aptosChainState.LinkTokenAddress})
 	logger.Infow("Initialized FeeQuoter", "pendingTx", pendingTx.TxnHash())
 	require.NoError(t, err)
 	waitForTx(t, aptosChain.Client, pendingTx.TxnHash(), time.Minute*1)
 
-	pendingTx, err = ccipBindings.RMNRemote.Initialize(transactOpts, chainSelector)
+	pendingTx, err = ccipBindings.RMNRemote().Initialize(transactOpts, chainSelector)
 	logger.Infow("Initialized RMNRemote", "pendingTx", pendingTx.TxnHash())
 	require.NoError(t, err)
 	waitForTx(t, aptosChain.Client, pendingTx.TxnHash(), time.Minute*1)
@@ -220,34 +220,34 @@ func (c AptosTestConfigureContractsChangeSet) configureAptosContracts(t *testing
 
 	commitSigners := [][]byte{}
 	for _, signer := range commitArgs.Signers {
-		commitSigners = append(commitSigners, signer.Bytes())
+		commitSigners = append(commitSigners, signer)
+		fmt.Printf("DEBUG: configureAptosContracts commit signer %x\n", signer)
 	}
 	commitTransmitters := []aptos.AccountAddress{}
 	for _, transmitter := range commitArgs.Transmitters {
 		commitTransmitters = append(commitTransmitters, aptos.AccountAddress(transmitter))
 	}
-	pendingTx, err := ccipBindings.Offramp.SetOcr3Config(transactOpts, commitArgs.ConfigDigest[:], uint8(types.PluginTypeCCIPCommit), commitArgs.F, commitArgs.IsSignatureVerificationEnabled, commitSigners, commitTransmitters)
+	pendingTx, err := ccipBindings.Offramp().SetOcr3Config(transactOpts, commitArgs.ConfigDigest[:], uint8(types.PluginTypeCCIPCommit), commitArgs.F, commitArgs.IsSignatureVerificationEnabled, commitSigners, commitTransmitters)
 	require.NoError(t, err)
 	waitForTx(t, aptosChain.Client, pendingTx.TxnHash(), time.Minute*1)
 
 	execSigners := [][]byte{}
 	for _, signer := range execArgs.Signers {
-		execSigners = append(execSigners, signer.Bytes())
+		execSigners = append(execSigners, signer)
 	}
 	execTransmitters := []aptos.AccountAddress{}
 	for _, transmitter := range execArgs.Transmitters {
 		execTransmitters = append(execTransmitters, aptos.AccountAddress(transmitter))
 	}
-	pendingTx, err = ccipBindings.Offramp.SetOcr3Config(transactOpts, execArgs.ConfigDigest[:], uint8(types.PluginTypeCCIPExec), execArgs.F, execArgs.IsSignatureVerificationEnabled, execSigners, execTransmitters)
+	pendingTx, err = ccipBindings.Offramp().SetOcr3Config(transactOpts, execArgs.ConfigDigest[:], uint8(types.PluginTypeCCIPExec), execArgs.F, execArgs.IsSignatureVerificationEnabled, execSigners, execTransmitters)
 	require.NoError(t, err)
 	waitForTx(t, aptosChain.Client, pendingTx.TxnHash(), time.Minute*1)
 
 	logger.Infow("Confirmed")
-
-	time.Sleep(time.Second * 5000000)
 }
 
 func addLaneAptosChangesets(t *testing.T, e *DeployedEnv, from, to uint64, fromFamily, toFamily string) []commoncs.ConfiguredChangeSet {
+	fmt.Printf("DEBUG: addLaneAptosChangesets %d to %d / %s to %s", from, to, fromFamily, toFamily)
 	return []commoncs.ConfiguredChangeSet{AptosTestAddLaneChangeSet{
 		T:                 t,
 		fromChainSelector: from,
@@ -293,13 +293,13 @@ func (c AptosTestAddLaneChangeSet) Apply(e deployment.Environment) (deployment.C
 
 	evmChainState := onchainState.Chains[c.fromChainSelector]
 	evmOnrampAddress := evmChainState.OnRamp.Address().Bytes()
-	fmt.Printf("DEBUG: AptosTestAddLaneChangeSet: EVM onramp address: %s\n", hex.EncodeToString(evmOnrampAddress))
+	fmt.Printf("DEBUG: AptosTestAddLaneChangeSet: EVM chain selector: %d - EVM onramp address: %s\n", c.fromChainSelector, hex.EncodeToString(evmOnrampAddress))
 
 	sourceChainSelectors := []uint64{c.fromChainSelector}
 	sourceChainsIsEnabled := []bool{true}
 	sourceChainsIsRMNVerificationDisabled := []bool{true}
 	sourceChainsOnramps := [][]byte{evmOnrampAddress}
-	pendingTx, err := ccipBindings.Offramp.ApplySourceChainConfigUpdates(transactOpts, sourceChainSelectors, sourceChainsIsEnabled, sourceChainsIsRMNVerificationDisabled, sourceChainsOnramps)
+	pendingTx, err := ccipBindings.Offramp().ApplySourceChainConfigUpdates(transactOpts, sourceChainSelectors, sourceChainsIsEnabled, sourceChainsIsRMNVerificationDisabled, sourceChainsOnramps)
 	require.NoError(t, err)
 	waitForTx(t, aptosChain.Client, pendingTx.TxnHash(), time.Minute*1)
 
@@ -344,6 +344,7 @@ func ConfirmCommitWithExpectedSeqNumRangeAptos(
 	expectedSeqNumRange ccipocr3.SeqNumRange,
 	enforceSingleCommit bool,
 ) (any, error) {
+	fmt.Printf("DEBUG: ConfirmCommitWithExpectedSeqNumRangeAptos srcSelector: %d, startBlock: %+v, expectedSeqNumRange: %+v, enforceSingleCommit: %+v\n", srcSelector, startBlock, expectedSeqNumRange, enforceSingleCommit)
 
 	time.Sleep(tests.WaitTimeout(t))
 	return nil, errors.New("TODO(aptos): ConfirmCommitWithExpectedSeqNumRangeAptos")
@@ -363,6 +364,7 @@ func ConfirmExecWithSeqNrsAptos(
 	startBlock *uint64,
 	expectedSeqNrs []uint64,
 ) (executionStates map[uint64]int, err error) {
+	fmt.Printf("DEBUG: ConfirmExecWithSeqNrsAptos srcSelector: %d, dest: %s, startBlock: %+v, expectedSeqNrs: %+v\n", sourceChain, startBlock, expectedSeqNrs)
 	time.Sleep(tests.WaitTimeout(t))
 	return nil, errors.New("TODO(aptos): ConfirmExecWithSeqNrsAptos")
 	//fmt.Printf("DEBUG: TODO(aptos): ConfirmExecWithSeqNrsAptos\n")

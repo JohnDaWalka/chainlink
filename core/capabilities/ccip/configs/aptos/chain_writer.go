@@ -1,51 +1,70 @@
 package aptosconfig
 
 import (
-	"encoding/hex"
 	"fmt"
 
-	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
 	"github.com/smartcontractkit/chainlink-aptos/relayer/chainreader"
 	"github.com/smartcontractkit/chainlink-aptos/relayer/chainwriter"
-	"golang.org/x/crypto/sha3"
+	"github.com/smartcontractkit/chainlink-aptos/relayer/utils"
 )
 
 func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, error) {
-	pubKeyBytes, err := hex.DecodeString(publicKeyStr)
+	fromAddress, err := utils.HexPublicKeyToAddress(publicKeyStr)
 	if err != nil {
-		return chainwriter.ChainWriterConfig{}, fmt.Errorf("failed to decode Aptos public key %s: %w", publicKeyStr, err)
-	}
-	authKey := sha3.Sum256(append([]byte(pubKeyBytes), 0x00))
-	fromAddressStr := fmt.Sprintf("%064x", authKey)
-
-	var fromAddress aptos.AccountAddress
-	err = fromAddress.ParseStringRelaxed(fromAddressStr)
-	if err != nil {
-		return chainwriter.ChainWriterConfig{}, fmt.Errorf("failed to parse Aptos from address %s: %w", fromAddressStr, err)
+		return chainwriter.ChainWriterConfig{}, fmt.Errorf("failed to parse Aptos address from public key %s: %w", publicKeyStr, err)
 	}
 
-	fmt.Printf("DEBUG: Aptos GetChainWriterConfig: fromAddressStr=%s, pubKeyStr=%s\n", fromAddressStr, publicKeyStr)
+	fmt.Printf("DEBUG: Aptos GetChainWriterConfig: fromAddressStr=%s, pubKeyStr=%s\n", fromAddress.String(), publicKeyStr)
 
 	return chainwriter.ChainWriterConfig{
 		Modules: map[string]*chainwriter.ChainWriterModule{
-			"forwarder": {
+			consts.ContractNameOffRamp: {
 				Functions: map[string]*chainwriter.ChainWriterFunction{
-					"report": {
-						PublicKey: publicKeyStr,
+					consts.MethodCommit: {
+						PublicKey:   publicKeyStr,
+						FromAddress: fromAddress.String(),
 						Params: []chainreader.AptosFunctionParam{
 							{
-								Name:     "Receiver",
-								Type:     "address",
-								Required: true,
-							},
-							{
-								Name:     "RawReport",
-								Type:     "vector<u8>", // report_context | metadata | report
-								Required: true,
-							},
-							{
-								Name:     "Signatures",
+								Name:     "ReportContext",
 								Type:     "vector<vector<u8>>",
+								Required: true,
+							},
+							{
+								Name:     "Report",
+								Type:     "vector<u8>",
+								Required: true,
+							},
+							{
+								Name:     "Rs",
+								Type:     "vector<vector<u8>>",
+								Required: true,
+							},
+							{
+								Name:     "Ss",
+								Type:     "vector<vector<u8>>",
+								Required: true,
+							},
+							{
+								Name:     "Vs",
+								Type:     "vector<u8>",
+								Required: true,
+							},
+						},
+					},
+					consts.MethodExecute: {
+						PublicKey:   publicKeyStr,
+						FromAddress: fromAddress.String(),
+						Params: []chainreader.AptosFunctionParam{
+							{
+								Name:     "ReportContext",
+								Type:     "vector<vector<u8>>",
+								Required: true,
+							},
+							{
+								Name:     "Report",
+								Type:     "vector<u8>",
 								Required: true,
 							},
 						},

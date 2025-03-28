@@ -48,6 +48,8 @@ func XXXNewContractTransmitterTestsOnly(
 	offrampAddress string,
 	toCalldataFn ToCalldataFunc,
 ) ocr3types.ContractTransmitter[[]byte] {
+	fmt.Printf("DEBUG: TRANSMITTER: Creating new transmitter with contractName=%s method=%s offrampAddress=%s\n",
+		contractName, method, offrampAddress)
 	wrappedToCalldataFunc := func(rawReportCtx [2][32]byte,
 		report ocr3types.ReportWithInfo[[]byte],
 		rs, ss [][32]byte,
@@ -66,6 +68,7 @@ func XXXNewContractTransmitterTestsOnly(
 
 // FromAccount implements ocr3types.ContractTransmitter.
 func (c *ccipTransmitter) FromAccount(context.Context) (ocrtypes.Account, error) {
+	fmt.Printf("DEBUG: TRANSMITTER: FromAccount returning %s\n", c.fromAccount)
 	return c.fromAccount, nil
 }
 
@@ -77,6 +80,8 @@ func (c *ccipTransmitter) Transmit(
 	reportWithInfo ocr3types.ReportWithInfo[[]byte],
 	sigs []ocrtypes.AttributedOnchainSignature,
 ) error {
+	fmt.Printf("DEBUG: TRANSMITTER: Transmit called with fromAccount=%s configDigest=%s seqNr=%d reportWithInfoLen=%d sigsCount=%d\n",
+		c.fromAccount, configDigest.String(), seqNr, len(reportWithInfo.Report), len(sigs))
 	var rs [][32]byte
 	var ss [][32]byte
 	var vs [32]byte
@@ -84,6 +89,7 @@ func (c *ccipTransmitter) Transmit(
 		return errors.New("too many signatures, maximum is 32")
 	}
 	for i, as := range sigs {
+		fmt.Printf("DEBUG: TRANSMITTER: Processing signature %+v from %+v\n", i, as.Signer)
 		r, s, v, err := evmutil.SplitSignature(as.Signature)
 		if err != nil {
 			return fmt.Errorf("failed to split signature: %w", err)
@@ -97,13 +103,17 @@ func (c *ccipTransmitter) Transmit(
 	// reportContext[0]: ConfigDigest
 	// reportContext[1]: 24 byte padding, 8 byte sequence number
 	rawReportCtx := ocr2key.RawReportContext3(configDigest, seqNr)
+	fmt.Printf("DEBUG: TRANSMITTER: Generated rawReportCtx=%+v\n", rawReportCtx)
 
 	if c.toCalldataFn == nil {
 		return errors.New("toCalldataFn is nil")
 	}
 
 	// chain writer takes in the raw calldata and packs it on its own.
+	fmt.Printf("DEBUG: TRANSMITTER: Calling toCalldataFn with rs=%d ss=%d vs=%+v\n", len(rs), len(ss), vs)
 	contract, method, args, err := c.toCalldataFn(rawReportCtx, reportWithInfo, rs, ss, vs, c.extraDataCodec)
+	fmt.Printf("DEBUG: TRANSMITTER: Got contract=%s method=%s argsLen=%d err=%v\n",
+		contract, method, args, err)
 	if err != nil {
 		return fmt.Errorf("failed to generate call data: %w", err)
 	}
@@ -116,6 +126,8 @@ func (c *ccipTransmitter) Transmit(
 		return fmt.Errorf("failed to generate UUID: %w", err)
 	}
 	zero := big.NewInt(0)
+	fmt.Printf("DEBUG: TRANSMITTER: Submitting tx with fromAccount=%s contract=%s method=%s offramp=%s meta=%+v\n",
+		c.fromAccount, contract, method, c.offrampAddress, meta)
 	if err := c.cw.SubmitTransaction(ctx, contract, method, args,
 		fmt.Sprintf("%s-%s-%s", contract, c.offrampAddress, txID.String()),
 		c.offrampAddress, &meta, zero); err != nil {

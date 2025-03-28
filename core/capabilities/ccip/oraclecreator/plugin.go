@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -98,7 +99,7 @@ var plugins = map[string]plugin{
 		GasEstimateProvider:        ccipaptos.NewGasEstimateProvider(),
 		RMNCrypto:                  func(lggr logger.Logger) cciptypes.RMNCrypto { return nil },
 		PriceOnlyCommitFn:          consts.MethodCommitPriceOnly,
-		ContractTransmitterFactory: &ocrimpls.SVMContractTransmitterFactory{},
+		ContractTransmitterFactory: &ocrimpls.AptosContractTransmitterFactory{},
 	},
 }
 
@@ -284,7 +285,7 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 		fmt.Printf("DEBUG: No transmitter found for dest relay ID %s\n", destRelayID)
 		return nil, fmt.Errorf("no transmitter found for dest relay ID %s, can't create contract transmitter", destRelayID)
 	}
-	fmt.Printf("DEBUG: Found %d transmitters for dest relay ID %s\n", len(destFromAccounts), destRelayID)
+	fmt.Printf("DEBUG: Found %d transmitters for dest relay ID %s - %s\n", len(destFromAccounts), destRelayID, strings.Join(destFromAccounts, " "))
 
 	// TODO: Extract the correct transmitter address from the destsFromAccount
 	factory, transmitter, err := i.createFactoryAndTransmitter(

@@ -279,7 +279,7 @@ func NewNode(
 		c.OCR2.Enabled = ptr(true)
 		c.OCR2.ContractPollInterval = config.MustNewDuration(5 * time.Second)
 
-		c.Log.Level = ptr(configv2.LogLevel(logLevel))
+		c.Log.Level = ptr(configv2.LogLevel(zapcore.DebugLevel))
 
 		var evmConfigs v2toml.EVMConfigs
 		for chainID := range evmchains {

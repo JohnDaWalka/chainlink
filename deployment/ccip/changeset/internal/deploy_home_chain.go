@@ -206,7 +206,7 @@ type MultiOCR3BaseOCRConfigArgsAptos struct {
 	OcrPluginType                  uint8
 	F                              uint8
 	IsSignatureVerificationEnabled bool
-	Signers                        []common.Address
+	Signers                        [][]byte
 	Transmitters                   [][]byte
 }
 
@@ -250,10 +250,10 @@ func BuildSetOCR3ConfigArgsAptos(
 			return nil, err
 		}
 
-		var signerAddresses []common.Address
+		var signerAddresses [][]byte
 		var transmitterAddresses [][]byte
 		for _, node := range configForOCR3.Config.Nodes {
-			signerAddresses = append(signerAddresses, common.BytesToAddress(node.SignerKey))
+			signerAddresses = append(signerAddresses, node.SignerKey)
 			transmitterAddresses = append(transmitterAddresses, node.TransmitterKey)
 		}
 
@@ -419,6 +419,7 @@ func BuildOCR3ConfigForCCIPHome(
 				PeerID:            cfg.PeerID.String()[4:],
 			}, ConfigEncryptionPublicKey: cfg.ConfigEncryptionPublicKey,
 		})
+		fmt.Printf("DEBUG: oracle id destSelector %d onchain pub key %x transmit account %s\n", destSelector, cfg.OnchainPublicKey, cfg.TransmitAccount)
 	}
 
 	// Add DON on capability registry contract
@@ -476,6 +477,7 @@ func BuildOCR3ConfigForCCIPHome(
 		signersBytes := make([][]byte, len(signers))
 		for i, signer := range signers {
 			signersBytes[i] = signer
+			fmt.Printf("DEBUG: post ocr3config helper destSelector %d signer %x\n", destSelector, signer)
 		}
 
 		transmittersBytes := make([][]byte, len(transmitters))
