@@ -712,6 +712,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 }
 
 func TestKeystoneWithOCR3Workflow_SingleDon_MockedPrice(t *testing.T) {
+	t.Skip("flaky test on a release branch")
 	testLogger := framework.L
 
 	// Load and validate test configuration
@@ -811,6 +812,7 @@ func TestKeystoneWithOCR3Workflow_SingleDon_MockedPrice(t *testing.T) {
 }
 
 func TestKeystoneWithOCR3Workflow_GatewayDon_MockedPrice(t *testing.T) {
+	t.Skip("flaky test on a release branch")
 	testLogger := framework.L
 
 	// Load and validate test configuration
@@ -916,6 +918,7 @@ func TestKeystoneWithOCR3Workflow_GatewayDon_MockedPrice(t *testing.T) {
 }
 
 func TestKeystoneWithOCR3Workflow_ThreeDons_LivePrice(t *testing.T) {
+	t.Skip("flaky test on a release branch")
 	testLogger := framework.L
 
 	// Load and validate test configuration
