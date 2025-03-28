@@ -23,8 +23,11 @@ compileContract() {
   contract=$(basename "$1")
   echo "Compiling" "$contract"
 
+  local in
+  in=$CONTRACTS_DIR/src/v0.8/$PROJECT/"$1.sol"
+
   local command
-  command="forge build $CONTRACTS_DIR/src/v0.8/$PROJECT/"$1.sol" \
+  command="forge build $in \
    --root $CONTRACTS_DIR \
    $(getOptimizations "$contract") \
    --extra-output-files bin abi \
@@ -34,6 +37,10 @@ compileContract() {
 
   # Copy the generated abi files to a single folder
   cp "$CONTRACTS_DIR"/solc/$PROJECT/"$contract"/"$contract".sol/"$contract".abi.json "$ABI_DIR""$contract".abi
+
+  forge build $in --zksync \
+    --root $CONTRACTS_DIR
+
 }
 
 # Define optimization overrides in this function. Anything that is not an override will use the default value

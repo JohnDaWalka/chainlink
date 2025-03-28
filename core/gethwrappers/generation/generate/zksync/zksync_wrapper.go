@@ -8,26 +8,11 @@ import (
 	"go/format"
 	"go/token"
 	"os"
-	"path/filepath"
 	"strings"
-
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers"
 )
 
-func WrapZksyncDeploy(zksyncBytecodePath, className, pkgName, outDirSuffixInput string) {
+func WrapZksyncDeploy(zksyncBytecodePath, className, pkgName, outPath string) {
 	fmt.Printf("Generating zk bytecode binding for %s\n", pkgName)
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		gethwrappers.Exit("could not get working directory", err)
-	}
-	outDir := filepath.Join(cwd, "generated", outDirSuffixInput, pkgName)
-	if mkdErr := os.MkdirAll(outDir, 0700); err != nil {
-		gethwrappers.Exit(
-			fmt.Sprintf("failed to create wrapper dir, outDirSuffixInput: %s (could be empty)", outDirSuffixInput),
-			mkdErr)
-	}
-	outPath := filepath.Join(outDir, pkgName+"_zksync.go")
 
 	fileNode := &ast.File{
 		Name: ast.NewIdent(pkgName),

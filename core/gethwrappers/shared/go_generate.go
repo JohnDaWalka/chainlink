@@ -5,7 +5,6 @@ package gethwrappers
 //go:generate go run ../generation/wrap.go shared BurnMintERC677 burn_mint_erc677
 //go:generate go run ../generation/wrap.go shared ERC677 erc677
 //go:generate go run ../generation/wrap.go shared LinkToken link_token
-//go:generate go run ../generation/zksync/wrapper/wrap.go LinkToken link_token
 //go:generate go run ../generation/wrap.go shared BurnMintERC20 burn_mint_erc20
 //go:generate go run ../generation/wrap.go shared WERC20Mock werc20_mock
 //go:generate go run ../generation/wrap.go shared ChainReaderTester chain_reader_tester
@@ -18,3 +17,9 @@ package gethwrappers
 //go:generate go run ../generation/wrap.go vendor ERC20 erc20
 //go:generate go run ../generation/wrap.go vendor Multicall3 multicall3
 //go:generate go run ../generation/wrap.go vendor WETH9 weth9
+
+// zksync generation
+//go:generate go run ../generation/zksync/wrapper/wrap.go shared BurnMintERC677 burn_mint_erc677
+//go:generate go run ../generation/zksync/wrapper/wrap.go shared LinkToken link_token
+//go:generate go run ../generation/zksync/wrapper/wrap.go shared Multicall3 multicall3
+//go:generate go run ../generation/zksync/wrapper/wrap.go shared WETH9 weth9
