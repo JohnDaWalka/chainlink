@@ -1044,8 +1044,8 @@ runner-test-matrix:
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.9.0
-      E2E_RMN_RAGEPROXY_VERSION: 678509b
-      E2E_RMN_AFN2PROXY_VERSION: 678509b
+      E2E_RMN_RAGEPROXY_VERSION: master-amd6416f5d86
+      E2E_RMN_AFN2PROXY_VERSION: master-amd64-10b42b2
       CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_MultipleMessagesOnOneLaneNoWaitForExec$
@@ -1060,8 +1060,8 @@ runner-test-matrix:
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.9.0
-      E2E_RMN_RAGEPROXY_VERSION: 678509b
-      E2E_RMN_AFN2PROXY_VERSION: 678509b
+      E2E_RMN_RAGEPROXY_VERSION: master-amd6416f5d86
+      E2E_RMN_AFN2PROXY_VERSION: master-amd64-10b42b2
       CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_NotEnoughObservers$
@@ -1076,8 +1076,8 @@ runner-test-matrix:
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.9.0
-      E2E_RMN_RAGEPROXY_VERSION: 678509b
-      E2E_RMN_AFN2PROXY_VERSION: 678509b
+      E2E_RMN_RAGEPROXY_VERSION: master-amd6416f5d86
+      E2E_RMN_AFN2PROXY_VERSION: master-amd64-10b42b2
       CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_DifferentSigners$
@@ -1092,8 +1092,8 @@ runner-test-matrix:
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.9.0
-      E2E_RMN_RAGEPROXY_VERSION: 678509b
-      E2E_RMN_AFN2PROXY_VERSION: 678509b
+      E2E_RMN_RAGEPROXY_VERSION: master-amd6416f5d86
+      E2E_RMN_AFN2PROXY_VERSION: master-amd64-10b42b2
       CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_NotEnoughSigners$
@@ -1108,8 +1108,8 @@ runner-test-matrix:
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.9.0
-      E2E_RMN_RAGEPROXY_VERSION: 678509b
-      E2E_RMN_AFN2PROXY_VERSION: 678509b
+      E2E_RMN_RAGEPROXY_VERSION: master-amd6416f5d86
+      E2E_RMN_AFN2PROXY_VERSION: master-amd64-10b42b2
       CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_DifferentRmnNodesForDifferentChains$
@@ -1124,8 +1124,8 @@ runner-test-matrix:
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.9.0
-      E2E_RMN_RAGEPROXY_VERSION: 678509b
-      E2E_RMN_AFN2PROXY_VERSION: 678509b
+      E2E_RMN_RAGEPROXY_VERSION: master-amd6416f5d86
+      E2E_RMN_AFN2PROXY_VERSION: master-amd64-10b42b2
       CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_TwoMessagesOneSourceChainCursed$
@@ -1140,8 +1140,8 @@ runner-test-matrix:
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.9.0
-      E2E_RMN_RAGEPROXY_VERSION: 678509b
-      E2E_RMN_AFN2PROXY_VERSION: 678509b
+      E2E_RMN_RAGEPROXY_VERSION: master-amd6416f5d86
+      E2E_RMN_AFN2PROXY_VERSION: master-amd64-10b42b2
       CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_GlobalCurseTwoMessagesOnTwoLanes$
@@ -1156,8 +1156,8 @@ runner-test-matrix:
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.9.0
-      E2E_RMN_RAGEPROXY_VERSION: 678509b
-      E2E_RMN_AFN2PROXY_VERSION: 678509b
+      E2E_RMN_RAGEPROXY_VERSION: master-amd6416f5d86
+      E2E_RMN_AFN2PROXY_VERSION: master-amd64-10b42b2
       CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_IncorrectSig$
@@ -1172,8 +1172,8 @@ runner-test-matrix:
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.9.0
-      E2E_RMN_RAGEPROXY_VERSION: 678509b
-      E2E_RMN_AFN2PROXY_VERSION: 678509b
+      E2E_RMN_RAGEPROXY_VERSION: master-amd6416f5d86
+      E2E_RMN_AFN2PROXY_VERSION: master-amd64-10b42b2
       CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_rmn_test.go:^TestRMN_TwoMessagesOnTwoLanesIncludingBatchingWithTemporaryPause$
@@ -1188,8 +1188,8 @@ runner-test-matrix:
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
       E2E_JD_VERSION: 0.9.0
-      E2E_RMN_RAGEPROXY_VERSION: 678509b
-      E2E_RMN_AFN2PROXY_VERSION: 678509b
+      E2E_RMN_RAGEPROXY_VERSION: master-amd6416f5d86
+      E2E_RMN_AFN2PROXY_VERSION: master-amd64-10b42b2
       CCIP_V16_TEST_ENV: docker
 
   - id: smoke/ccip/ccip_jobspec_test.go.go:TestDeleteCCIPJobs
