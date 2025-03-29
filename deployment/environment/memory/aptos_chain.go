@@ -140,8 +140,8 @@ func aptosChain(t *testing.T, chainSelector uint64, adminAddress aptos.AccountAd
 	require.True(t, ready, "Aptos network not ready")
 	time.Sleep(15 * time.Second) // we have slot errors that force retries if the chain is not given enough time to boot
 
-	// incase we didn't use the default account above
-	_, err = framework.ExecContainer(containerName, []string{"aptos", "account", "fund-with-faucet", "--account", adminAddress.String()})
+	// if we used the default account, it's already funded, but we need more to give to transmitters
+	_, err = framework.ExecContainer(containerName, []string{"aptos", "account", "fund-with-faucet", "--account", adminAddress.String(), "--amount", "100000000000"})
 	require.NoError(t, err)
 
 	return client

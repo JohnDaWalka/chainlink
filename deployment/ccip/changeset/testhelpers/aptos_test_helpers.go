@@ -16,6 +16,7 @@ import (
 	//"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_dummy_receiver"
 	//"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/mcms"
+	"github.com/smartcontractkit/chainlink-aptos/relayer/utils"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -225,7 +226,9 @@ func (c AptosTestConfigureContractsChangeSet) configureAptosContracts(t *testing
 	}
 	commitTransmitters := []aptos.AccountAddress{}
 	for _, transmitter := range commitArgs.Transmitters {
-		commitTransmitters = append(commitTransmitters, aptos.AccountAddress(transmitter))
+		address, err := utils.PublicKeyBytesToAddress(transmitter)
+		require.NoError(t, err)
+		commitTransmitters = append(commitTransmitters, address)
 	}
 	pendingTx, err := ccipBindings.Offramp().SetOcr3Config(transactOpts, commitArgs.ConfigDigest[:], uint8(types.PluginTypeCCIPCommit), commitArgs.F, commitArgs.IsSignatureVerificationEnabled, commitSigners, commitTransmitters)
 	require.NoError(t, err)
@@ -237,13 +240,35 @@ func (c AptosTestConfigureContractsChangeSet) configureAptosContracts(t *testing
 	}
 	execTransmitters := []aptos.AccountAddress{}
 	for _, transmitter := range execArgs.Transmitters {
-		execTransmitters = append(execTransmitters, aptos.AccountAddress(transmitter))
+		address, err := utils.PublicKeyBytesToAddress(transmitter)
+		require.NoError(t, err)
+		execTransmitters = append(execTransmitters, address)
 	}
 	pendingTx, err = ccipBindings.Offramp().SetOcr3Config(transactOpts, execArgs.ConfigDigest[:], uint8(types.PluginTypeCCIPExec), execArgs.F, execArgs.IsSignatureVerificationEnabled, execSigners, execTransmitters)
 	require.NoError(t, err)
 	waitForTx(t, aptosChain.Client, pendingTx.TxnHash(), time.Minute*1)
 
-	logger.Infow("Confirmed")
+	logger.Infow("Aptos contracts configured")
+
+	for _, transmitter := range append(commitTransmitters, execTransmitters...) {
+		// 10 APT
+		entryFunction, err := aptos.CoinTransferPayload(nil, transmitter, 1000000000)
+		require.NoError(t, err)
+
+		rawTxn, err := aptosChain.Client.BuildTransaction(aptosChain.DeployerSigner.AccountAddress(), aptos.TransactionPayload{Payload: entryFunction})
+		require.NoError(t, err)
+
+		signedTxn, err := rawTxn.SignedTransaction(aptosChain.DeployerSigner)
+		require.NoError(t, err)
+
+		// 10 APT
+		submitResult, err := aptosChain.Client.SubmitTransaction(signedTxn)
+		require.NoError(t, err)
+
+		waitForTx(t, aptosChain.Client, submitResult.Hash, time.Minute*1)
+
+		fmt.Printf("Sent 10 APT to transmitter %s\n", transmitter.String())
+	}
 }
 
 func addLaneAptosChangesets(t *testing.T, e *DeployedEnv, from, to uint64, fromFamily, toFamily string) []commoncs.ConfiguredChangeSet {
