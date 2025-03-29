@@ -90,8 +90,12 @@ func (akr *aptosKeyring) Verify(publicKey ocrtypes.OnchainPublicKey, reportCtx o
 	return akr.verifyBlob(publicKey, hash, signature)
 }
 
-func (akr *aptosKeyring) Verify3(publicKey ocrtypes.OnchainPublicKey, cd ocrtypes.ConfigDigest, seqNr uint64, r ocrtypes.Report, signature []byte) bool {
-	return false
+func (akr *aptosKeyring) Verify3(publicKey ocrtypes.OnchainPublicKey, digest ocrtypes.ConfigDigest, seqNr uint64, r ocrtypes.Report, signature []byte) bool {
+	sigData, err := akr.reportToSigData3(digest, seqNr, r)
+	if err != nil {
+		return false
+	}
+	return akr.verifyBlob(publicKey, sigData, signature)
 }
 
 func (akr *aptosKeyring) verifyBlob(pubkey ocrtypes.OnchainPublicKey, b, sig []byte) bool {

@@ -23,6 +23,7 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 			consts.ContractNameOffRamp: {
 				Functions: map[string]*chainwriter.ChainWriterFunction{
 					consts.MethodCommit: {
+						Name:        "commit",
 						PublicKey:   publicKeyStr,
 						FromAddress: fromAddress.String(),
 						Params: []chainreader.AptosFunctionParam{
@@ -37,23 +38,14 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 								Required: true,
 							},
 							{
-								Name:     "Rs",
+								Name:     "Signatures",
 								Type:     "vector<vector<u8>>",
-								Required: true,
-							},
-							{
-								Name:     "Ss",
-								Type:     "vector<vector<u8>>",
-								Required: true,
-							},
-							{
-								Name:     "Vs",
-								Type:     "vector<u8>",
 								Required: true,
 							},
 						},
 					},
 					consts.MethodExecute: {
+						Name:        "execute",
 						PublicKey:   publicKeyStr,
 						FromAddress: fromAddress.String(),
 						Params: []chainreader.AptosFunctionParam{

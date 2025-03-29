@@ -11,7 +11,7 @@ import (
 	"github.com/aptos-labs/aptos-go-sdk"
 
 	"github.com/smartcontractkit/chainlink-aptos/relayer/chainreader"
-	//"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
+	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -95,9 +95,11 @@ func (a *wrappedChainReader) GetLatestValue(ctx context.Context, readIdentifier 
 		return err
 	}
 
-	err = json.Unmarshal(convertedResult, returnVal)
+	fmt.Printf("DEBUG: wrappedChainReader.GetLatestValue convertedResult: %s\n", string(convertedResult))
+
+	err = a.decodeGLVReturnValue(readIdentifier, convertedResult, returnVal)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to decode GetLatestValue return value: %w", err)
 	}
 
 	return nil
@@ -106,6 +108,28 @@ func (a *wrappedChainReader) GetLatestValue(ctx context.Context, readIdentifier 
 //func (c *wrappedChainReader) GetLatestValueWithHeadData(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params, retVal any) (*types.Head, error) {
 //return nil, errors.New("TODO")
 //}
+
+func (a *wrappedChainReader) decodeGLVReturnValue(label string, jsonBytes []byte, returnVal any) error {
+	var unmarshalledData []any
+	err := json.Unmarshal(jsonBytes, &unmarshalledData)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal %s GetLatestValue result (`%s`): %w", label, string(jsonBytes), err)
+	}
+
+	var unwrappedData any
+	if len(unmarshalledData) == 1 {
+		unwrappedData = unmarshalledData[0]
+	} else {
+		unwrappedData = unmarshalledData
+	}
+
+	err = codec.DecodeAptosJsonValue(unwrappedData, returnVal)
+	if err != nil {
+		return fmt.Errorf("failed to decode %s GetLatestValue JSON value (`%s`) to %T: %w", label, string(jsonBytes), returnVal, err)
+	}
+
+	return nil
+}
 
 func (a *wrappedChainReader) BatchGetLatestValues(ctx context.Context, request types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
 	convertedRequest := types.BatchGetLatestValuesRequest{}
@@ -140,12 +164,12 @@ func (a *wrappedChainReader) BatchGetLatestValues(ctx context.Context, request t
 			convertedResult := types.BatchReadResult{ReadName: result.ReadName}
 			if resultError == nil {
 				resultPointer := resultValue.(*[]byte)
+				err := a.decodeGLVReturnValue(result.ReadName, *resultPointer, read.ReturnVal)
 				if err != nil {
-					return nil, err
+					resultError = fmt.Errorf("failed to decode BatchGetLatestValue return value: %w", err)
 				}
-				err = json.Unmarshal(*resultPointer, read.ReturnVal)
-				convertedResult.SetResult(read.ReturnVal, err)
 			}
+			convertedResult.SetResult(read.ReturnVal, resultError)
 			convertedBatch = append(convertedBatch, convertedResult)
 		}
 		convertedResult[contract] = convertedBatch

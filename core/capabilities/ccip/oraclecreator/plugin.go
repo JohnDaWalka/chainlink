@@ -157,14 +157,8 @@ func NewPluginOracleCreator(
 	homeChainSelector cciptypes.ChainSelector,
 	addressCodec cciptypes.AddressCodec,
 ) cctypes.OracleCreator {
-	fmt.Printf("DEBUG: Creating new plugin oracle creator with:\n")
-	fmt.Printf("  - jobID: %d\n", jobID)
-	fmt.Printf("  - externalJobID: %s\n", externalJobID)
-	fmt.Printf("  - homeChainSelector: %d\n", homeChainSelector)
-	fmt.Printf("  - num OCR key bundles: %d\n", len(ocrKeyBundles))
-	fmt.Printf("  - num transmitters: %d\n", len(transmitters))
-	fmt.Printf("  - num relayers: %d\n", len(relayers))
-	fmt.Printf("  - num bootstrapper locators: %d\n", len(bootstrapperLocators))
+	fmt.Printf(`DEBUG: Creating new plugin oracle creator with: - jobID: %d - externalJobID: %s - homeChainSelector: %d - num OCR key bundles: %d - num transmitters: %d - num relayers: %d - num bootstrapper locators: %d - address codec %T - key bundles %+v
+	`, jobID, externalJobID, homeChainSelector, len(ocrKeyBundles), len(transmitters), len(relayers), len(bootstrapperLocators), addressCodec, ocrKeyBundles)
 	return &pluginOracleCreator{
 		ocrKeyBundles:         ocrKeyBundles,
 		transmitters:          transmitters,
@@ -307,7 +301,7 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 		LocalConfig:           defaultLocalConfig(),
 		Logger: ocrcommon.NewOCRWrapper(
 			i.lggr.
-				Named(fmt.Sprintf("CCIP%sOCR3", pluginType.String())).
+				Named(fmt.Sprintf("OCR3-%s-%d", pluginType.String(), config.Config.ChainSelector)).
 				Named(destRelayID.String()).
 				Named(offrampAddrStr),
 			false,
@@ -754,6 +748,14 @@ func createChainWriter(
 	cw, err := relayer.NewContractWriter(ctx, chainWriterConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chain writer for chain %s: %w", chainID, err)
+	}
+
+	if chainFamily == relay.NetworkAptos {
+		components, err := cw.GetFeeComponents(ctx)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("DEBUG: chain writer fee components: %+v\n", components)
 	}
 
 	return cw, nil

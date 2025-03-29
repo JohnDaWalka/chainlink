@@ -10,6 +10,30 @@ func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 		IsLoopPlugin: true,
 		Modules: map[string]*chainreader.ChainReaderModule{
 			// TODO: more offramp config and other modules
+			consts.ContractNameRMNRemote: {
+				Name: "rmn_remote",
+				Functions: map[string]*chainreader.ChainReaderFunction{
+					consts.MethodNameGetReportDigestHeader: {
+						Name: "get_report_digest_header",
+					},
+					consts.MethodNameGetVersionedConfig: {
+						Name: "get_versioned_config",
+					},
+					consts.MethodNameGetCursedSubjects: {
+						Name: "get_cursed_subjects",
+					},
+				},
+			},
+
+			consts.ContractNameRMNProxy: {
+				Name: "rmn_remote",
+				Functions: map[string]*chainreader.ChainReaderFunction{
+					consts.MethodNameGetARM: {
+						Name: "get_arm",
+					},
+				},
+			},
+
 			consts.ContractNameFeeQuoter: {
 				Name: "fee_quoter",
 				Functions: map[string]*chainreader.ChainReaderFunction{

@@ -17,9 +17,7 @@ import (
 type AptosCommitCallArgs struct {
 	ReportContext [2][32]byte `mapstructure:"ReportContext"`
 	Report        []byte      `mapstructure:"Report"`
-	Rs            [][32]byte  `mapstructure:"Rs"`
-	Ss            [][32]byte  `mapstructure:"Ss"`
-	Vs            [32]byte    `mapstructure:"Vs"`
+	Signatures    [][96]byte  `mapstructure:"Signatures"`
 }
 
 // AptosExecCallArgs defines the calldata structure for an Aptos execute transaction.
@@ -32,12 +30,11 @@ type AptosExecCallArgs struct {
 type AptosContractTransmitterFactory struct{}
 
 // NewAptosCommitCalldataFunc returns a ToCalldataFunc for Aptos commits that omits any Info object.
-func NewAptosCommitCalldataFunc(commitMethod string) ToCalldataFunc {
+func NewAptosCommitCalldataFunc(commitMethod string) ToEd25519CalldataFunc {
 	return func(
 		rawReportCtx [2][32]byte,
 		report ocr3types.ReportWithInfo[[]byte],
-		rs, ss [][32]byte,
-		vs [32]byte,
+		signatures [][96]byte,
 		_ ccipcommon.ExtraDataCodec,
 	) (string, string, any, error) {
 		return consts.ContractNameOffRamp,
@@ -45,9 +42,7 @@ func NewAptosCommitCalldataFunc(commitMethod string) ToCalldataFunc {
 			AptosCommitCallArgs{
 				ReportContext: rawReportCtx,
 				Report:        report.Report,
-				Rs:            rs,
-				Ss:            ss,
-				Vs:            vs,
+				Signatures:    signatures,
 			},
 			nil
 	}
@@ -61,10 +56,10 @@ func (f *AptosContractTransmitterFactory) NewCommitTransmitter(
 	commitMethod, _ string, // priceOnlyMethod is ignored for Aptos
 ) ocr3types.ContractTransmitter[[]byte] {
 	return &ccipTransmitter{
-		cw:             cw,
-		fromAccount:    fromAccount,
-		offrampAddress: offrampAddress,
-		toCalldataFn:   NewAptosCommitCalldataFunc(commitMethod),
+		cw:                  cw,
+		fromAccount:         fromAccount,
+		offrampAddress:      offrampAddress,
+		toEd25519CalldataFn: NewAptosCommitCalldataFunc(commitMethod),
 	}
 }
 
