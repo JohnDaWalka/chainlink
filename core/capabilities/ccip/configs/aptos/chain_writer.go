@@ -21,6 +21,7 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 	return chainwriter.ChainWriterConfig{
 		Modules: map[string]*chainwriter.ChainWriterModule{
 			consts.ContractNameOffRamp: {
+				Name: "offramp",
 				Functions: map[string]*chainwriter.ChainWriterFunction{
 					consts.MethodCommit: {
 						Name:        "commit",

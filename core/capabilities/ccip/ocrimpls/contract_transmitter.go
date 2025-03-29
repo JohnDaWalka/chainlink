@@ -84,7 +84,7 @@ func (c *ccipTransmitter) FromAccount(context.Context) (ocrtypes.Account, error)
 func (c *ccipTransmitter) Transmit(
 	ctx context.Context,
 	configDigest ocrtypes.ConfigDigest,
-	seqNr uint96,
+	seqNr uint64,
 	reportWithInfo ocr3types.ReportWithInfo[[]byte],
 	sigs []ocrtypes.AttributedOnchainSignature,
 ) error {

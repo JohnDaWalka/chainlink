@@ -2,20 +2,12 @@ package ccipaptos
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"math/big"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/aptos-labs/aptos-go-sdk/bcs"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/ccip_aptos_utils"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-)
-
-var (
-	aptosUtilsABI = abihelpers.MustParseABI(ccip_aptos_utils.AptosUtilsABI)
 )
 
 // CommitPluginCodecV1 is a codec for encoding and decoding commit plugin reports.
@@ -27,168 +19,149 @@ func NewCommitPluginCodecV1() *CommitPluginCodecV1 {
 }
 
 func (c *CommitPluginCodecV1) Encode(ctx context.Context, report cciptypes.CommitPluginReport) ([]byte, error) {
-	isBlessed := make(map[cciptypes.ChainSelector]bool)
-	for _, root := range report.BlessedMerkleRoots {
-		isBlessed[root.ChainSel] = true
-	}
-
-	blessedMerkleRoots := make([]ccip_aptos_utils.AptosUtilsMerkleRoot, 0, len(report.BlessedMerkleRoots))
-	unblessedMerkleRoots := make([]ccip_aptos_utils.AptosUtilsMerkleRoot, 0, len(report.UnblessedMerkleRoots))
-
-	for _, root := range append(report.BlessedMerkleRoots, report.UnblessedMerkleRoots...) {
-		imr := ccip_aptos_utils.AptosUtilsMerkleRoot{
-			SourceChainSelector: uint64(root.ChainSel),
-			OnRampAddress:       root.OnRampAddress,
-			MinSequenceNumber:   uint64(root.SeqNumsRange.Start()),
-			MaxSequenceNumber:   uint64(root.SeqNumsRange.End()),
-			MerkleRoot:          root.MerkleRoot,
-		}
-		if isBl, ok := isBlessed[root.ChainSel]; ok && isBl {
-			blessedMerkleRoots = append(blessedMerkleRoots, imr)
-		} else {
-			unblessedMerkleRoots = append(unblessedMerkleRoots, imr)
-		}
-	}
-
-	rmnSignatures := make([]ccip_aptos_utils.AptosUtilsRMNSignature, 0, len(report.RMNSignatures))
-	for _, sig := range report.RMNSignatures {
-		rmnSignatures = append(rmnSignatures, ccip_aptos_utils.AptosUtilsRMNSignature{
-			R: sig.R,
-			S: sig.S,
-		})
-	}
-
-	tokenPriceUpdates := make([]ccip_aptos_utils.AptosUtilsTokenPriceUpdate, 0, len(report.PriceUpdates.TokenPriceUpdates))
-	for _, update := range report.PriceUpdates.TokenPriceUpdates {
-		if !addressIsValid(string(update.TokenID)) {
-			return nil, fmt.Errorf("invalid token address: %s", update.TokenID)
-		}
-		if update.Price.IsEmpty() {
-			return nil, fmt.Errorf("empty price for token: %s", update.TokenID)
-		}
-		sourceToken, err := addressStringToBytes32(string(update.TokenID))
+	s := &bcs.Serializer{}
+	bcs.SerializeSequenceWithFunction(report.PriceUpdates.TokenPriceUpdates, s, func(s *bcs.Serializer, item cciptypes.TokenPrice) {
+		sourceToken := aptos.AccountAddress{}
+		err := sourceToken.ParseStringRelaxed(string(item.TokenID))
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert token address to bytes32: %w", err)
+			s.SetError(fmt.Errorf("failed to parse source token address: %w", err))
+			return
 		}
-		tokenPriceUpdates = append(tokenPriceUpdates, ccip_aptos_utils.AptosUtilsTokenPriceUpdate{
-			SourceToken: sourceToken,
-			UsdPerToken: update.Price.Int,
-		})
+		s.Struct(&sourceToken)
+		s.U256(*item.Price.Int)
+	})
+	if s.Error() != nil {
+		return nil, fmt.Errorf("failed to serialize TokenPriceUpdates: %w", s.Error())
+	}
+	bcs.SerializeSequenceWithFunction(report.PriceUpdates.GasPriceUpdates, s, func(s *bcs.Serializer, item cciptypes.GasPriceChain) {
+		s.U64(uint64(item.ChainSel))
+		s.U256(*item.GasPrice.Int)
+	})
+	if s.Error() != nil {
+		return nil, fmt.Errorf("failed to serialize GasPriceUpdates: %w", s.Error())
+	}
+	bcs.SerializeSequenceWithFunction(report.BlessedMerkleRoots, s, func(s *bcs.Serializer, item cciptypes.MerkleRootChain) {
+		s.U64(uint64(item.ChainSel))
+		s.WriteBytes(item.OnRampAddress[:])
+		s.U64(uint64(item.SeqNumsRange.Start()))
+		s.U64(uint64(item.SeqNumsRange.End()))
+		s.FixedBytes(item.MerkleRoot[:])
+	})
+	if s.Error() != nil {
+		return nil, fmt.Errorf("failed to serialize BlessedMerkleRoots: %w", s.Error())
+	}
+	bcs.SerializeSequenceWithFunction(report.UnblessedMerkleRoots, s, func(s *bcs.Serializer, item cciptypes.MerkleRootChain) {
+		s.U64(uint64(item.ChainSel))
+		s.WriteBytes(item.OnRampAddress[:])
+		s.U64(uint64(item.SeqNumsRange.Start()))
+		s.U64(uint64(item.SeqNumsRange.End()))
+		s.FixedBytes(item.MerkleRoot[:])
+	})
+	if s.Error() != nil {
+		return nil, fmt.Errorf("failed to serialize UnblessedMerkleRoots: %w", s.Error())
+	}
+	bcs.SerializeSequenceWithFunction(report.RMNSignatures, s, func(s *bcs.Serializer, item cciptypes.RMNECDSASignature) {
+		s.FixedBytes(item.R[:])
+		s.FixedBytes(item.S[:])
+	})
+	if s.Error() != nil {
+		return nil, fmt.Errorf("failed to serialize RMNSignatures: %w", s.Error())
 	}
 
-	gasPriceUpdates := make([]ccip_aptos_utils.AptosUtilsGasPriceUpdate, 0, len(report.PriceUpdates.GasPriceUpdates))
-	for _, update := range report.PriceUpdates.GasPriceUpdates {
-		if update.GasPrice.IsEmpty() {
-			return nil, fmt.Errorf("empty gas price for chain: %d", update.ChainSel)
-		}
-
-		gasPriceUpdates = append(gasPriceUpdates, ccip_aptos_utils.AptosUtilsGasPriceUpdate{
-			DestChainSelector: uint64(update.ChainSel),
-			UsdPerUnitGas:     update.GasPrice.Int,
-		})
-	}
-
-	priceUpdates := ccip_aptos_utils.AptosUtilsPriceUpdates{
-		TokenPriceUpdates: tokenPriceUpdates,
-		GasPriceUpdates:   gasPriceUpdates,
-	}
-
-	commitReport := &ccip_aptos_utils.AptosUtilsCommitReport{
-		PriceUpdates:         priceUpdates,
-		BlessedMerkleRoots:   blessedMerkleRoots,
-		UnblessedMerkleRoots: unblessedMerkleRoots,
-		RmnSignatures:        rmnSignatures,
-	}
-
-	packed, err := aptosUtilsABI.Pack("exposeCommitReport", commitReport)
-	if err != nil {
-		return nil, fmt.Errorf("failed to pack commit report: %w", err)
-	}
-
-	return packed[4:], nil
+	return s.ToBytes(), nil
 }
 
-func (c *CommitPluginCodecV1) Decode(ctx context.Context, bytes []byte) (cciptypes.CommitPluginReport, error) {
-	method, ok := aptosUtilsABI.Methods["exposeCommitReport"]
-	if !ok {
-		return cciptypes.CommitPluginReport{}, errors.New("missing method exposeCommitReport")
-	}
+func (c *CommitPluginCodecV1) Decode(ctx context.Context, data []byte) (cciptypes.CommitPluginReport, error) {
+	des := bcs.NewDeserializer(data)
+	report := cciptypes.CommitPluginReport{}
 
-	unpacked, err := method.Inputs.Unpack(bytes)
-	if err != nil {
-		return cciptypes.CommitPluginReport{}, fmt.Errorf("failed to unpack commit report: %w", err)
-	}
-	if len(unpacked) != 1 {
-		return cciptypes.CommitPluginReport{}, fmt.Errorf("expected 1 argument, got %d", len(unpacked))
-	}
-
-	commitReport := *abi.ConvertType(unpacked[0], new(ccip_aptos_utils.AptosUtilsCommitReport)).(*ccip_aptos_utils.AptosUtilsCommitReport)
-
-	blessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(commitReport.BlessedMerkleRoots))
-	for _, root := range commitReport.BlessedMerkleRoots {
-		mrc := cciptypes.MerkleRootChain{
-			ChainSel:      cciptypes.ChainSelector(root.SourceChainSelector),
-			OnRampAddress: root.OnRampAddress,
-			SeqNumsRange: cciptypes.NewSeqNumRange(
-				cciptypes.SeqNum(root.MinSequenceNumber),
-				cciptypes.SeqNum(root.MaxSequenceNumber),
-			),
-			MerkleRoot: root.MerkleRoot,
+	report.PriceUpdates.TokenPriceUpdates = bcs.DeserializeSequenceWithFunction(des, func(des *bcs.Deserializer, item *cciptypes.TokenPrice) {
+		var sourceToken aptos.AccountAddress
+		des.Struct(&sourceToken)
+		if des.Error() != nil {
+			return
 		}
-		blessedMerkleRoots = append(blessedMerkleRoots, mrc)
-	}
-
-	unblessedMerkleRoots := make([]cciptypes.MerkleRootChain, 0, len(commitReport.UnblessedMerkleRoots))
-	for _, root := range commitReport.UnblessedMerkleRoots {
-		mrc := cciptypes.MerkleRootChain{
-			ChainSel:      cciptypes.ChainSelector(root.SourceChainSelector),
-			OnRampAddress: root.OnRampAddress,
-			SeqNumsRange: cciptypes.NewSeqNumRange(
-				cciptypes.SeqNum(root.MinSequenceNumber),
-				cciptypes.SeqNum(root.MaxSequenceNumber),
-			),
-			MerkleRoot: root.MerkleRoot,
+		item.TokenID = cciptypes.UnknownEncodedAddress(sourceToken.String())
+		price := des.U256()
+		if des.Error() != nil {
+			return
 		}
-		unblessedMerkleRoots = append(unblessedMerkleRoots, mrc)
+		item.Price = cciptypes.NewBigInt(&price)
+	})
+
+	if des.Error() != nil {
+		return cciptypes.CommitPluginReport{}, fmt.Errorf("failed to deserialize TokenPriceUpdates: %w", des.Error())
 	}
 
-	tokenPriceUpdates := make([]cciptypes.TokenPrice, 0, len(commitReport.PriceUpdates.TokenPriceUpdates))
-	for _, update := range commitReport.PriceUpdates.TokenPriceUpdates {
-		sourceTokenStr, err := addressBytesToString(update.SourceToken[:])
-		if err != nil {
-			return cciptypes.CommitPluginReport{}, fmt.Errorf("failed to convert token address %v to string: %w", update.SourceToken, err)
+	report.PriceUpdates.GasPriceUpdates = bcs.DeserializeSequenceWithFunction(des, func(des *bcs.Deserializer, item *cciptypes.GasPriceChain) {
+		item.ChainSel = cciptypes.ChainSelector(des.U64())
+		if des.Error() != nil {
+			return
 		}
-		tokenPriceUpdates = append(tokenPriceUpdates, cciptypes.TokenPrice{
-			TokenID: cciptypes.UnknownEncodedAddress(sourceTokenStr),
-			Price:   cciptypes.NewBigInt(big.NewInt(0).Set(update.UsdPerToken)),
-		})
+		gasPrice := des.U256()
+		if des.Error() != nil {
+			return
+		}
+		item.GasPrice = cciptypes.NewBigInt(&gasPrice)
+	})
+	if des.Error() != nil {
+		return cciptypes.CommitPluginReport{}, fmt.Errorf("failed to deserialize GasPriceUpdates: %w", des.Error())
 	}
 
-	gasPriceUpdates := make([]cciptypes.GasPriceChain, 0, len(commitReport.PriceUpdates.GasPriceUpdates))
-	for _, update := range commitReport.PriceUpdates.GasPriceUpdates {
-		gasPriceUpdates = append(gasPriceUpdates, cciptypes.GasPriceChain{
-			GasPrice: cciptypes.NewBigInt(big.NewInt(0).Set(update.UsdPerUnitGas)),
-			ChainSel: cciptypes.ChainSelector(update.DestChainSelector),
-		})
+	deserializeMerkleRootChain := func(des *bcs.Deserializer, item *cciptypes.MerkleRootChain) {
+		item.ChainSel = cciptypes.ChainSelector(des.U64())
+		if des.Error() != nil {
+			return
+		}
+		onRampAddrBytes := des.ReadBytes()
+		if des.Error() != nil {
+			return
+		}
+		item.OnRampAddress = onRampAddrBytes
+		startSeqNum := des.U64()
+		if des.Error() != nil {
+			return
+		}
+		endSeqNum := des.U64()
+		if des.Error() != nil {
+			return
+		}
+		item.SeqNumsRange = cciptypes.NewSeqNumRange(cciptypes.SeqNum(startSeqNum), cciptypes.SeqNum(endSeqNum))
+		des.ReadFixedBytesInto(item.MerkleRoot[:])
+		if des.Error() != nil {
+			return
+		}
 	}
 
-	rmnSignatures := make([]cciptypes.RMNECDSASignature, 0, len(commitReport.RmnSignatures))
-	for _, sig := range commitReport.RmnSignatures {
-		rmnSignatures = append(rmnSignatures, cciptypes.RMNECDSASignature{
-			R: sig.R,
-			S: sig.S,
-		})
+	report.BlessedMerkleRoots = bcs.DeserializeSequenceWithFunction(des, deserializeMerkleRootChain)
+	if des.Error() != nil {
+		return cciptypes.CommitPluginReport{}, fmt.Errorf("failed to deserialize BlessedMerkleRoots: %w", des.Error())
 	}
 
-	return cciptypes.CommitPluginReport{
-		BlessedMerkleRoots:   blessedMerkleRoots,
-		UnblessedMerkleRoots: unblessedMerkleRoots,
-		PriceUpdates: cciptypes.PriceUpdates{
-			TokenPriceUpdates: tokenPriceUpdates,
-			GasPriceUpdates:   gasPriceUpdates,
-		},
-		RMNSignatures: rmnSignatures,
-	}, nil
+	report.UnblessedMerkleRoots = bcs.DeserializeSequenceWithFunction(des, deserializeMerkleRootChain)
+	if des.Error() != nil {
+		return cciptypes.CommitPluginReport{}, fmt.Errorf("failed to deserialize UnblessedMerkleRoots: %w", des.Error())
+	}
+
+	report.RMNSignatures = bcs.DeserializeSequenceWithFunction(des, func(des *bcs.Deserializer, item *cciptypes.RMNECDSASignature) {
+		des.ReadFixedBytesInto(item.R[:])
+		if des.Error() != nil {
+			return
+		}
+		des.ReadFixedBytesInto(item.S[:])
+		if des.Error() != nil {
+			return
+		}
+	})
+	if des.Error() != nil {
+		return cciptypes.CommitPluginReport{}, fmt.Errorf("failed to deserialize RMNSignatures: %w", des.Error())
+	}
+
+	if des.Remaining() > 0 {
+		return cciptypes.CommitPluginReport{}, fmt.Errorf("unexpected remaining bytes after decoding: %d", des.Remaining())
+	}
+
+	return report, nil
 }
 
 // Ensure CommitPluginCodec implements the CommitPluginCodec interface

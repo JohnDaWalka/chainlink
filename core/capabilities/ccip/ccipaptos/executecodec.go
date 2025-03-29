@@ -12,8 +12,12 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/ccip_aptos_utils"
 )
+
+var aptosUtilsABI = abihelpers.MustParseABI(ccip_aptos_utils.AptosUtilsABI)
 
 // ExecutePluginCodecV1 is a codec for encoding and decoding execute plugin reports.
 // Compatible with ccip::offramp version 1.6.0
