@@ -4,6 +4,8 @@ package usdc_token_pool
 
 import (
 	"context"
+	"crypto/rand"
+	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/zksync-sdk/zksync2-go/accounts"
@@ -24,9 +26,19 @@ func DeployUSDCTokenPoolZk(deployOpts *accounts.TransactOpts, client *clients.Cl
 		}
 	}
 
+	salt := make([]byte, 32)
+	n, err := rand.Read(salt)
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	if n != len(salt) {
+		return common.Address{}, nil, nil, fmt.Errorf("failed to read random bytes: expected %d, got %d", len(salt), n)
+	}
+
 	txHash, err := wallet.Deploy(deployOpts, accounts.Create2Transaction{
 		Bytecode: ZkBytecode,
 		Calldata: calldata,
+		Salt:     salt,
 	})
 	if err != nil {
 		return common.Address{}, nil, nil, err

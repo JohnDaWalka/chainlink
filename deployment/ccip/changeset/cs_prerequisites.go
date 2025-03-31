@@ -6,8 +6,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -171,9 +172,7 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	case deployOpts.LegacyDeploymentCfg != nil && deployOpts.LegacyDeploymentCfg.RMNConfig != nil:
 		rmn, err := deployment.DeployContract(lggr, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*rmn_contract.RMNContract] {
-				rmnAddress, tx2, rmnC, err2 := rmn_contract.DeployRMNContract(
-					chain.DeployerKey,
-					chain.Client,
+				rmnAddress, tx2, rmnC, err2 := deployment.PickXVMDeployFn(chain, rmn_contract.DeployRMNContract, rmn_contract.DeployRMNContractZk,
 					*deployOpts.LegacyDeploymentCfg.RMNConfig,
 				)
 				return deployment.ContractDeploy[*rmn_contract.RMNContract]{
@@ -190,10 +189,7 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 		if chainState.MockRMN == nil {
 			rmn, err := deployment.DeployContract(lggr, chain, ab,
 				func(chain deployment.Chain) deployment.ContractDeploy[*mock_rmn_contract.MockRMNContract] {
-					rmnAddress, tx2, rmnC, err2 := mock_rmn_contract.DeployMockRMNContract(
-						chain.DeployerKey,
-						chain.Client,
-					)
+					rmnAddress, tx2, rmnC, err2 := deployment.PickXVMDeployFn(chain, mock_rmn_contract.DeployMockRMNContract, mock_rmn_contract.DeployMockRMNContractZk)
 					return deployment.ContractDeploy[*mock_rmn_contract.MockRMNContract]{
 						Address: rmnAddress, Contract: rmnC, Tx: tx2, Tv: deployment.NewTypeAndVersion(MockRMN, deployment.Version1_0_0), Err: err2,
 					}
@@ -211,9 +207,7 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	if rmnProxy == nil {
 		RMNProxy, err := deployment.DeployContract(lggr, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*rmn_proxy_contract.RMNProxy] {
-				rmnProxyAddr, tx2, rmnProxy2, err2 := rmn_proxy_contract.DeployRMNProxy(
-					chain.DeployerKey,
-					chain.Client,
+				rmnProxyAddr, tx2, rmnProxy2, err2 := deployment.PickXVMDeployFn(chain, rmn_proxy_contract.DeployRMNProxy, rmn_proxy_contract.DeployRMNProxyZk,
 					rmnAddr,
 				)
 				return deployment.ContractDeploy[*rmn_proxy_contract.RMNProxy]{
@@ -262,9 +256,9 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	if tokenAdminReg == nil {
 		tokenAdminRegistry, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*token_admin_registry.TokenAdminRegistry] {
-				tokenAdminRegistryAddr, tx2, tokenAdminRegistry, err2 := token_admin_registry.DeployTokenAdminRegistry(
-					chain.DeployerKey,
-					chain.Client)
+				tokenAdminRegistryAddr, tx2, tokenAdminRegistry, err2 := deployment.PickXVMDeployFn(chain,
+					token_admin_registry.DeployTokenAdminRegistry,
+					token_admin_registry.DeployTokenAdminRegistryZk)
 				return deployment.ContractDeploy[*token_admin_registry.TokenAdminRegistry]{
 					Address: tokenAdminRegistryAddr, Contract: tokenAdminRegistry, Tx: tx2, Tv: deployment.NewTypeAndVersion(TokenAdminRegistry, deployment.Version1_5_0), Err: err2,
 				}
@@ -280,9 +274,9 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	if registryModule == nil {
 		customRegistryModule, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*registry_module_owner_custom.RegistryModuleOwnerCustom] {
-				regModAddr, tx2, regMod, err2 := registry_module_owner_custom.DeployRegistryModuleOwnerCustom(
-					chain.DeployerKey,
-					chain.Client,
+				regModAddr, tx2, regMod, err2 := deployment.PickXVMDeployFn(chain,
+					registry_module_owner_custom.DeployRegistryModuleOwnerCustom,
+					registry_module_owner_custom.DeployRegistryModuleOwnerCustomZk,
 					tokenAdminReg.Address())
 				return deployment.ContractDeploy[*registry_module_owner_custom.RegistryModuleOwnerCustom]{
 					Address: regModAddr, Contract: regMod, Tx: tx2, Tv: deployment.NewTypeAndVersion(RegistryModule, deployment.Version1_5_0), Err: err2,
@@ -318,10 +312,7 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	if weth9Contract == nil {
 		weth, err := deployment.DeployContract(lggr, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*weth9.WETH9] {
-				weth9Addr, tx2, weth9c, err2 := weth9.DeployWETH9(
-					chain.DeployerKey,
-					chain.Client,
-				)
+				weth9Addr, tx2, weth9c, err2 := deployment.PickXVMDeployFn(chain, weth9.DeployWETH9, weth9.DeployWETH9Zk)
 				return deployment.ContractDeploy[*weth9.WETH9]{
 					Address: weth9Addr, Contract: weth9c, Tx: tx2, Tv: deployment.NewTypeAndVersion(WETH9, deployment.Version1_0_0), Err: err2,
 				}
@@ -340,9 +331,7 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	if r == nil {
 		routerContract, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*router.Router] {
-				routerAddr, tx2, routerC, err2 := router.DeployRouter(
-					chain.DeployerKey,
-					chain.Client,
+				routerAddr, tx2, routerC, err2 := deployment.PickXVMDeployFn(chain, router.DeployRouter, router.DeployRouterZk,
 					weth9Contract.Address(),
 					rmnProxy.Address(),
 				)
@@ -362,10 +351,7 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	if deployOpts.Multicall3Enabled && mc3 == nil {
 		_, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*multicall3.Multicall3] {
-				multicall3Addr, tx2, multicall3Wrapper, err2 := multicall3.DeployMulticall3(
-					chain.DeployerKey,
-					chain.Client,
-				)
+				multicall3Addr, tx2, multicall3Wrapper, err2 := deployment.PickXVMDeployFn(chain, multicall3.DeployMulticall3, multicall3.DeployMulticall3Zk)
 				return deployment.ContractDeploy[*multicall3.Multicall3]{
 					Address: multicall3Addr, Contract: multicall3Wrapper, Tx: tx2, Tv: deployment.NewTypeAndVersion(Multicall3, deployment.Version1_0_0), Err: err2,
 				}
@@ -395,9 +381,9 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	if chainState.Receiver == nil {
 		_, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*maybe_revert_message_receiver.MaybeRevertMessageReceiver] {
-				receiverAddr, tx, receiver, err2 := maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(
-					chain.DeployerKey,
-					chain.Client,
+				receiverAddr, tx, receiver, err2 := deployment.PickXVMDeployFn(chain,
+					maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver,
+					maybe_revert_message_receiver.DeployMaybeRevertMessageReceiverZk,
 					false,
 				)
 				return deployment.ContractDeploy[*maybe_revert_message_receiver.MaybeRevertMessageReceiver]{
@@ -420,9 +406,9 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 			}
 			_, err := deployment.DeployContract(lggr, chain, ab,
 				func(chain deployment.Chain) deployment.ContractDeploy[*price_registry_1_2_0.PriceRegistry] {
-					priceRegAddr, tx2, priceRegAddrC, err2 := price_registry_1_2_0.DeployPriceRegistry(
-						chain.DeployerKey,
-						chain.Client,
+					priceRegAddr, tx2, priceRegAddrC, err2 := deployment.PickXVMDeployFn(chain,
+						price_registry_1_2_0.DeployPriceRegistry,
+						price_registry_1_2_0.DeployPriceRegistryZk,
 						nil,
 						[]common.Address{weth9Contract.Address(), linkAddr},
 						deployOpts.LegacyDeploymentCfg.PriceRegStalenessThreshold,
@@ -458,9 +444,9 @@ func deployUSDC(
 ) {
 	token, err := deployment.DeployContract(lggr, chain, addresses,
 		func(chain deployment.Chain) deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
-			tokenAddress, tx, tokenContract, err2 := burn_mint_erc677.DeployBurnMintERC677(
-				chain.DeployerKey,
-				chain.Client,
+			tokenAddress, tx, tokenContract, err2 := deployment.PickXVMDeployFn(chain,
+				burn_mint_erc677.DeployBurnMintERC677,
+				burn_mint_erc677.DeployBurnMintERC677Zk,
 				USDCName,
 				string(USDCSymbol),
 				UsdcDecimals,
@@ -491,9 +477,9 @@ func deployUSDC(
 
 	transmitter, err := deployment.DeployContract(lggr, chain, addresses,
 		func(chain deployment.Chain) deployment.ContractDeploy[*mock_usdc_token_transmitter.MockE2EUSDCTransmitter] {
-			transmitterAddress, tx, transmitterContract, err2 := mock_usdc_token_transmitter.DeployMockE2EUSDCTransmitter(
-				chain.DeployerKey,
-				chain.Client,
+			transmitterAddress, tx, transmitterContract, err2 := deployment.PickXVMDeployFn(chain,
+				mock_usdc_token_transmitter.DeployMockE2EUSDCTransmitter,
+				mock_usdc_token_transmitter.DeployMockE2EUSDCTransmitterZk,
 				0,
 				reader.AllAvailableDomains()[chain.Selector],
 				token.Address,
@@ -513,9 +499,9 @@ func deployUSDC(
 
 	messenger, err := deployment.DeployContract(lggr, chain, addresses,
 		func(chain deployment.Chain) deployment.ContractDeploy[*mock_usdc_token_messenger.MockE2EUSDCTokenMessenger] {
-			messengerAddress, tx, messengerContract, err2 := mock_usdc_token_messenger.DeployMockE2EUSDCTokenMessenger(
-				chain.DeployerKey,
-				chain.Client,
+			messengerAddress, tx, messengerContract, err2 := deployment.PickXVMDeployFn(chain,
+				mock_usdc_token_messenger.DeployMockE2EUSDCTokenMessenger,
+				mock_usdc_token_messenger.DeployMockE2EUSDCTokenMessengerZk,
 				0,
 				transmitter.Address,
 			)
@@ -534,9 +520,9 @@ func deployUSDC(
 
 	tokenPool, err := deployment.DeployContract(lggr, chain, addresses,
 		func(chain deployment.Chain) deployment.ContractDeploy[*usdc_token_pool.USDCTokenPool] {
-			tokenPoolAddress, tx, tokenPoolContract, err2 := usdc_token_pool.DeployUSDCTokenPool(
-				chain.DeployerKey,
-				chain.Client,
+			tokenPoolAddress, tx, tokenPoolContract, err2 := deployment.PickXVMDeployFn(chain,
+				usdc_token_pool.DeployUSDCTokenPool,
+				usdc_token_pool.DeployUSDCTokenPoolZk,
 				messenger.Address,
 				token.Address,
 				[]common.Address{},

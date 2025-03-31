@@ -8,8 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
@@ -310,9 +311,7 @@ func deployChainContractsEVM(e deployment.Environment, chain deployment.Chain, a
 		// TODO: Correctly configure RMN remote.
 		rmnRemote, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*rmn_remote.RMNRemote] {
-				rmnRemoteAddr, tx, rmnRemote, err2 := rmn_remote.DeployRMNRemote(
-					chain.DeployerKey,
-					chain.Client,
+				rmnRemoteAddr, tx, rmnRemote, err2 := deployment.PickXVMDeployFn(chain, rmn_remote.DeployRMNRemote, rmn_remote.DeployRMNRemoteZk,
 					chain.Selector,
 					rmnLegacyAddr,
 				)
@@ -350,9 +349,9 @@ func deployChainContractsEVM(e deployment.Environment, chain deployment.Chain, a
 	if chainState.TestRouter == nil {
 		_, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*router.Router] {
-				routerAddr, tx2, routerC, err2 := router.DeployRouter(
-					chain.DeployerKey,
-					chain.Client,
+				routerAddr, tx2, routerC, err2 := deployment.PickXVMDeployFn(chain,
+					router.DeployRouter,
+					router.DeployRouterZk,
 					chainState.Weth9.Address(),
 					RMNProxy.Address(),
 				)
@@ -372,9 +371,9 @@ func deployChainContractsEVM(e deployment.Environment, chain deployment.Chain, a
 	if chainState.NonceManager == nil {
 		nonceManager, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*nonce_manager.NonceManager] {
-				nonceManagerAddr, tx2, nonceManager, err2 := nonce_manager.DeployNonceManager(
-					chain.DeployerKey,
-					chain.Client,
+				nonceManagerAddr, tx2, nonceManager, err2 := deployment.PickXVMDeployFn(chain,
+					nonce_manager.DeployNonceManager,
+					nonce_manager.DeployNonceManagerZk,
 					[]common.Address{}, // Need to add onRamp after
 				)
 				return deployment.ContractDeploy[*nonce_manager.NonceManager]{
@@ -393,9 +392,9 @@ func deployChainContractsEVM(e deployment.Environment, chain deployment.Chain, a
 	if chainState.FeeQuoter == nil {
 		feeQuoter, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*fee_quoter.FeeQuoter] {
-				prAddr, tx2, pr, err2 := fee_quoter.DeployFeeQuoter(
-					chain.DeployerKey,
-					chain.Client,
+				prAddr, tx2, pr, err2 := deployment.PickXVMDeployFn(chain,
+					fee_quoter.DeployFeeQuoter,
+					fee_quoter.DeployFeeQuoterZk,
 					fee_quoter.FeeQuoterStaticConfig{
 						MaxFeeJuelsPerMsg:            contractParams.FeeQuoterParams.MaxFeeJuelsPerMsg,
 						LinkToken:                    linkTokenContractAddr,
@@ -433,9 +432,9 @@ func deployChainContractsEVM(e deployment.Environment, chain deployment.Chain, a
 	if onRampContract == nil {
 		onRamp, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*onramp.OnRamp] {
-				onRampAddr, tx2, onRamp, err2 := onramp.DeployOnRamp(
-					chain.DeployerKey,
-					chain.Client,
+				onRampAddr, tx2, onRamp, err2 := deployment.PickXVMDeployFn(chain,
+					onramp.DeployOnRamp,
+					onramp.DeployOnRampZk,
 					onramp.OnRampStaticConfig{
 						ChainSelector:      chain.Selector,
 						RmnRemote:          RMNProxy.Address(),
@@ -464,9 +463,9 @@ func deployChainContractsEVM(e deployment.Environment, chain deployment.Chain, a
 	if offRampContract == nil {
 		offRamp, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*offramp.OffRamp] {
-				offRampAddr, tx2, offRamp, err2 := offramp.DeployOffRamp(
-					chain.DeployerKey,
-					chain.Client,
+				offRampAddr, tx2, offRamp, err2 := deployment.PickXVMDeployFn(chain,
+					offramp.DeployOffRamp,
+					offramp.DeployOffRampZk,
 					offramp.OffRampStaticConfig{
 						ChainSelector:        chain.Selector,
 						GasForCallExactCheck: contractParams.OffRampParams.GasForCallExactCheck,

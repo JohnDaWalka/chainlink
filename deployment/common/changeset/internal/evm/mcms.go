@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/deployment"
+	mcmszksync "github.com/smartcontractkit/chainlink/deployment/common/changeset/internal/zksync"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/common/view/v1_0"
 )
@@ -47,10 +48,7 @@ func deployMCMSWithConfigEVM(
 	}
 	mcm, err := deployment.DeployContract(lggr, chain, ab,
 		func(chain deployment.Chain) deployment.ContractDeploy[*bindings.ManyChainMultiSig] {
-			mcmAddr, tx, mcm, err2 := bindings.DeployManyChainMultiSig(
-				chain.DeployerKey,
-				chain.Client,
-			)
+			mcmAddr, tx, mcm, err2 := deployment.PickXVMDeployFn(chain, bindings.DeployManyChainMultiSig, mcmszksync.DeployManyChainMultiSigZk)
 
 			tv := deployment.NewTypeAndVersion(contractType, deployment.Version1_0_0)
 			for _, option := range options {
@@ -100,6 +98,7 @@ func DeployMCMSWithTimelockContractsEVM(
 	if err != nil {
 		return nil, err
 	}
+	println("HERE!")
 	canceller, err := deployMCMSWithConfigEVM(commontypes.CancellerManyChainMultisig, lggr, chain, ab, config.Canceller, opts...)
 	if err != nil {
 		return nil, err
@@ -111,9 +110,7 @@ func DeployMCMSWithTimelockContractsEVM(
 
 	timelock, err := deployment.DeployContract(lggr, chain, ab,
 		func(chain deployment.Chain) deployment.ContractDeploy[*bindings.RBACTimelock] {
-			timelock, tx2, cc, err2 := bindings.DeployRBACTimelock(
-				chain.DeployerKey,
-				chain.Client,
+			timelock, tx2, cc, err2 := deployment.PickXVMDeployFn(chain, bindings.DeployRBACTimelock, mcmszksync.DeployRBACTimelockZk,
 				config.TimelockMinDelay,
 				// Deployer is the initial admin.
 				// TODO: Could expose this as config?
@@ -143,9 +140,7 @@ func DeployMCMSWithTimelockContractsEVM(
 
 	callProxy, err := deployment.DeployContract(lggr, chain, ab,
 		func(chain deployment.Chain) deployment.ContractDeploy[*bindings.CallProxy] {
-			callProxy, tx2, cc, err2 := bindings.DeployCallProxy(
-				chain.DeployerKey,
-				chain.Client,
+			callProxy, tx2, cc, err2 := deployment.PickXVMDeployFn(chain, bindings.DeployCallProxy, mcmszksync.DeployCallProxyZk,
 				timelock.Address,
 			)
 

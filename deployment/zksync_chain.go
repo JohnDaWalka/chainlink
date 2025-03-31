@@ -11,7 +11,7 @@ import (
 	zkTypes "github.com/zksync-sdk/zksync2-go/types"
 )
 
-// type DeployEVMFn[C any] func(auth *bind.TransactOpts, backend bind.ContractBackend, args ...any) (common.Address, *types.Transaction, *C, error)
+// type DeployEVMFn[C any] func(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *C, error)
 type DeployZKVMFn[C any] func(deployOpts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, args ...any) (common.Address, *zkTypes.Receipt, *C, error)
 
 func PickXVMDeployFn[C any](

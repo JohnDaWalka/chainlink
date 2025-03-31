@@ -2,13 +2,15 @@ package internal
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/config"
 	owner_helpers "github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink/deployment"
+	mcmszksync "github.com/smartcontractkit/chainlink/deployment/common/changeset/internal/zksync"
 	"github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/common/view/v1_0"
 )
@@ -34,10 +36,7 @@ func DeployMCMSWithConfig(
 	groupQuorums, groupParents, signerAddresses, signerGroups := mcmConfig.ExtractSetConfigInputs()
 	mcm, err := deployment.DeployContract[*owner_helpers.ManyChainMultiSig](lggr, chain, ab,
 		func(chain deployment.Chain) deployment.ContractDeploy[*owner_helpers.ManyChainMultiSig] {
-			mcmAddr, tx, mcm, err2 := owner_helpers.DeployManyChainMultiSig(
-				chain.DeployerKey,
-				chain.Client,
-			)
+			mcmAddr, tx, mcm, err2 := deployment.PickXVMDeployFn(chain, owner_helpers.DeployManyChainMultiSig, mcmszksync.DeployManyChainMultiSigZk)
 
 			tv := deployment.NewTypeAndVersion(contractType, deployment.Version1_0_0)
 			for _, option := range options {
@@ -125,9 +124,7 @@ func DeployMCMSWithTimelockContracts(
 
 	timelock, err := deployment.DeployContract(lggr, chain, ab,
 		func(chain deployment.Chain) deployment.ContractDeploy[*owner_helpers.RBACTimelock] {
-			timelock, tx2, cc, err2 := owner_helpers.DeployRBACTimelock(
-				chain.DeployerKey,
-				chain.Client,
+			timelock, tx2, cc, err2 := deployment.PickXVMDeployFn(chain, owner_helpers.DeployRBACTimelock, mcmszksync.DeployRBACTimelockZk,
 				config.TimelockMinDelay,
 				// Deployer is the initial admin.
 				// TODO: Could expose this as config?
@@ -157,9 +154,7 @@ func DeployMCMSWithTimelockContracts(
 
 	callProxy, err := deployment.DeployContract(lggr, chain, ab,
 		func(chain deployment.Chain) deployment.ContractDeploy[*owner_helpers.CallProxy] {
-			callProxy, tx2, cc, err2 := owner_helpers.DeployCallProxy(
-				chain.DeployerKey,
-				chain.Client,
+			callProxy, tx2, cc, err2 := deployment.PickXVMDeployFn(chain, owner_helpers.DeployCallProxy, mcmszksync.DeployCallProxyZk,
 				timelock.Address,
 			)
 

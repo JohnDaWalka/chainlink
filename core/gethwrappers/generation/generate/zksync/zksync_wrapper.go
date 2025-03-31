@@ -28,17 +28,21 @@ const comment = `// Code generated - DO NOT EDIT.
 // This file is a generated binding and any manual changes will be lost.
 `
 
+var importValues = []string{
+	`"context"`,
+	`"crypto/rand"`,
+	`"fmt"`,
+	`"github.com/ethereum/go-ethereum/accounts/abi/bind"`,
+	`"github.com/ethereum/go-ethereum/common"`,
+	`"github.com/zksync-sdk/zksync2-go/accounts"`,
+	`"github.com/zksync-sdk/zksync2-go/clients"`,
+	`"github.com/zksync-sdk/zksync2-go/types"`,
+}
+
 func declareImports() ast.Decl {
-	values := []string{
-		`"context"`,
-		`"github.com/ethereum/go-ethereum/accounts/abi/bind"`,
-		`"github.com/ethereum/go-ethereum/common"`,
-		`"github.com/zksync-sdk/zksync2-go/accounts"`,
-		`"github.com/zksync-sdk/zksync2-go/clients"`,
-		`"github.com/zksync-sdk/zksync2-go/types"`,
-	}
-	specs := make([]ast.Spec, len(values))
-	for i, value := range values {
+
+	specs := make([]ast.Spec, len(importValues))
+	for i, value := range importValues {
 		specs[i] = &ast.ImportSpec{
 			Path: &ast.BasicLit{
 				Kind:  token.STRING,
@@ -63,7 +67,7 @@ func declareDeployFunction(contractName string) ast.Decl {
 		count = 0
 		index = 0
 	)
-	for count < 14 { // lines to skip
+	for count < len(importValues)+8 { // lines to skip
 		if template[index] == '\n' {
 			count++
 		}

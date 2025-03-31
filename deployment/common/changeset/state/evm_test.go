@@ -8,13 +8,15 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	bindings "github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
-	mcmsevmsdk "github.com/smartcontractkit/mcms/sdk/evm"
-	mcmstypes "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	bindings "github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
+	mcmsevmsdk "github.com/smartcontractkit/mcms/sdk/evm"
+	mcmstypes "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink/deployment"
+	mcmszksync "github.com/smartcontractkit/chainlink/deployment/common/changeset/internal/zksync"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
@@ -139,7 +141,7 @@ func deployMCMEvm(
 ) *bindings.ManyChainMultiSig {
 	t.Helper()
 
-	_, tx, contract, err := bindings.DeployManyChainMultiSig(chain.DeployerKey, chain.Client)
+	_, tx, contract, err := deployment.PickXVMDeployFn(chain, bindings.DeployManyChainMultiSig, mcmszksync.DeployManyChainMultiSigZk)
 	require.NoError(t, err)
 	_, err = chain.Confirm(tx)
 	require.NoError(t, err)
@@ -159,8 +161,8 @@ func deployTimelockEvm(
 	proposers, executors, cancellers, bypassers []common.Address,
 ) *bindings.RBACTimelock {
 	t.Helper()
-	_, tx, contract, err := bindings.DeployRBACTimelock(
-		chain.DeployerKey, chain.Client, minDelay, admin, proposers, executors, cancellers, bypassers)
+	_, tx, contract, err := deployment.PickXVMDeployFn(chain, bindings.DeployRBACTimelock, mcmszksync.DeployRBACTimelockZk,
+		minDelay, admin, proposers, executors, cancellers, bypassers)
 	require.NoError(t, err)
 	_, err = chain.Confirm(tx)
 	require.NoError(t, err)
@@ -172,7 +174,7 @@ func deployCallProxyEvm(
 	t *testing.T, chain deployment.Chain, target common.Address,
 ) *bindings.CallProxy {
 	t.Helper()
-	_, tx, contract, err := bindings.DeployCallProxy(chain.DeployerKey, chain.Client, target)
+	_, tx, contract, err := deployment.PickXVMDeployFn(chain, bindings.DeployCallProxy, mcmszksync.DeployCallProxyZk, target)
 	require.NoError(t, err)
 	_, err = chain.Confirm(tx)
 	require.NoError(t, err)
