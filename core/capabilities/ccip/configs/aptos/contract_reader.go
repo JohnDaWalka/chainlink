@@ -180,10 +180,10 @@ func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 									"on_ramp_address": {
 										NewName: "OnRampAddress",
 									},
-									"min_sequence_number": {
+									"min_seq_nr": {
 										NewName: "MinSeqNr",
 									},
-									"max_sequence_number": {
+									"max_seq_nr": {
 										NewName: "MaxSeqNr",
 									},
 									"merkle_root": {

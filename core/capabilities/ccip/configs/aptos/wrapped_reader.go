@@ -4,11 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	//"strings"
+	"reflect"
+	"strings"
 	//"errors"
 	//"iter"
-
-	"github.com/aptos-labs/aptos-go-sdk"
 
 	"github.com/smartcontractkit/chainlink-aptos/relayer/chainreader"
 	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
@@ -20,8 +19,9 @@ import (
 )
 
 func NewWrappedChainReader(logger logger.Logger, cr types.ContractReader) types.ContractReader {
+	fmt.Printf("DEBUG: wrappedChainReader.NewWrappedChainReader\n")
 	config, _ := GetChainReaderConfig()
-	return &wrappedChainReader{logger: logger, cr: cr, config: config, moduleAddresses: map[string]aptos.AccountAddress{}}
+	return &wrappedChainReader{logger: logger, cr: cr, config: config, moduleAddresses: map[string]string{}}
 }
 
 type wrappedChainReader struct {
@@ -30,7 +30,7 @@ type wrappedChainReader struct {
 	logger          logger.Logger
 	cr              types.ContractReader
 	config          chainreader.ChainReaderConfig
-	moduleAddresses map[string]aptos.AccountAddress
+	moduleAddresses map[string]string
 }
 
 func (a *wrappedChainReader) Name() string {
@@ -53,36 +53,19 @@ func (a *wrappedChainReader) Close() error {
 	return a.cr.Close()
 }
 
-func (a *wrappedChainReader) getFunctionConfig(_address string, contractName string, method string) (*chainreader.ChainReaderFunction, error) {
-	// Source the read configuration, by contract name
-	address, ok := a.moduleAddresses[contractName]
-	if !ok {
-		return &chainreader.ChainReaderFunction{}, fmt.Errorf("no bound address for module %s", contractName)
-	}
-
-	// Notice: the address in the readIdentifier should match the bound address, by contract name
-	if address.String() != _address {
-		return &chainreader.ChainReaderFunction{}, fmt.Errorf("bound address %s for module %s does not match read address %s", address, contractName, _address)
-	}
-
-	moduleConfig, ok := a.config.Modules[contractName]
-	if !ok {
-		return &chainreader.ChainReaderFunction{}, fmt.Errorf("no such contract: %s", contractName)
-	}
-
-	if moduleConfig.Functions == nil {
-		return &chainreader.ChainReaderFunction{}, fmt.Errorf("no functions for contract: %s", contractName)
-	}
-
-	functionConfig, ok := moduleConfig.Functions[method]
-	if !ok {
-		return &chainreader.ChainReaderFunction{}, fmt.Errorf("no such method: %s", method)
-	}
-
-	return functionConfig, nil
-}
-
 func (a *wrappedChainReader) GetLatestValue(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params, returnVal any) error {
+	readComponents := strings.Split(readIdentifier, "-")
+	if len(readComponents) != 3 {
+		return fmt.Errorf("invalid read identifier: %s", readIdentifier)
+	}
+
+	_, contractName, _ := readComponents[0], readComponents[1], readComponents[2]
+
+	_, ok := a.moduleAddresses[contractName]
+	if !ok {
+		return fmt.Errorf("no such contract: %s", contractName)
+	}
+
 	convertedResult := []byte{}
 
 	jsonParamBytes, err := json.Marshal(params)
@@ -90,9 +73,15 @@ func (a *wrappedChainReader) GetLatestValue(ctx context.Context, readIdentifier 
 		return fmt.Errorf("failed to marshal params: %+w", err)
 	}
 
+	// we always bind before calling query functions, because the LOOP plugin may have restarted.
+	err = a.cr.Bind(ctx, a.getBindings())
+	if err != nil {
+		return fmt.Errorf("failed to re-bind before GetLatestValue: %w", err)
+	}
+
 	err = a.cr.GetLatestValue(ctx, readIdentifier, confidenceLevel, jsonParamBytes, &convertedResult)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to call GetLatestValue over LOOP: %w", err)
 	}
 
 	fmt.Printf("DEBUG: wrappedChainReader.GetLatestValue convertedResult: %s\n", string(convertedResult))
@@ -100,32 +89,6 @@ func (a *wrappedChainReader) GetLatestValue(ctx context.Context, readIdentifier 
 	err = a.decodeGLVReturnValue(readIdentifier, convertedResult, returnVal)
 	if err != nil {
 		return fmt.Errorf("failed to decode GetLatestValue return value: %w", err)
-	}
-
-	return nil
-}
-
-//func (c *wrappedChainReader) GetLatestValueWithHeadData(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params, retVal any) (*types.Head, error) {
-//return nil, errors.New("TODO")
-//}
-
-func (a *wrappedChainReader) decodeGLVReturnValue(label string, jsonBytes []byte, returnVal any) error {
-	var unmarshalledData []any
-	err := json.Unmarshal(jsonBytes, &unmarshalledData)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal %s GetLatestValue result (`%s`): %w", label, string(jsonBytes), err)
-	}
-
-	var unwrappedData any
-	if len(unmarshalledData) == 1 {
-		unwrappedData = unmarshalledData[0]
-	} else {
-		unwrappedData = unmarshalledData
-	}
-
-	err = codec.DecodeAptosJsonValue(unwrappedData, returnVal)
-	if err != nil {
-		return fmt.Errorf("failed to decode %s GetLatestValue JSON value (`%s`) to %T: %w", label, string(jsonBytes), returnVal, err)
 	}
 
 	return nil
@@ -147,6 +110,12 @@ func (a *wrappedChainReader) BatchGetLatestValues(ctx context.Context, request t
 			})
 		}
 		convertedRequest[contract] = convertedBatch
+	}
+
+	// we always bind before calling query functions, because the LOOP plugin may have restarted.
+	err := a.cr.Bind(ctx, a.getBindings())
+	if err != nil {
+		return nil, fmt.Errorf("failed to re-bind before BatchGetLatestValues: %w", err)
 	}
 
 	result, err := a.cr.BatchGetLatestValues(ctx, convertedRequest)
@@ -179,28 +148,57 @@ func (a *wrappedChainReader) BatchGetLatestValues(ctx context.Context, request t
 }
 
 func (a *wrappedChainReader) QueryKey(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
-	// TODO
-	return a.cr.QueryKey(ctx, contract, filter, limitAndSort, sequenceDataType)
-}
-
-//func (a *wrappedChainReader) QueryKeys(ctx context.Context, filters []types.ContractKeyFilter, limitAndSort query.LimitAndSort) (iter.Seq2[string, types.Sequence], error) {
-
-//return nil, errors.New("TODO")
-//}
-
-func (a *wrappedChainReader) Bind(ctx context.Context, bindings []types.BoundContract) error {
-	newBindings := map[string]aptos.AccountAddress{}
-	for _, binding := range bindings {
-		moduleAddress := &aptos.AccountAddress{}
-		err := moduleAddress.ParseStringRelaxed(binding.Address)
-		if err != nil {
-			return fmt.Errorf("failed to convert module address %s: %+w", binding.Address, err)
-		}
-		newBindings[binding.Name] = *moduleAddress
+	err := a.cr.Bind(ctx, a.getBindings())
+	if err != nil {
+		return nil, fmt.Errorf("failed to re-bind before BatchGetLatestValues: %w", err)
 	}
 
-	for name, address := range newBindings {
-		a.moduleAddresses[name] = address
+	// the relay wrapper calls getContractEncodedType which defaults to returning a map[string]any
+	// https://github.com/smartcontractkit/chainlink-common/blob/fe3ec4466fb5adfffd8fc77eef1cef67c4a918cc/pkg/loop/internal/relayer/pluginprovider/contractreader/contract_reader.go#L1033
+	// in ccipChainReader.ExecutedMessages, it's a primitive
+
+	convertedExpressions := []query.Expression{}
+	for _, expr := range filter.Expressions {
+		convertedExpressions = append(convertedExpressions, query.Expression{
+			Comparator: expr.Comparator,
+			Value:      expr.Value,
+			Operator:   expr.Operator,
+		})
+	}
+
+	convertedFilter := query.KeyFilter{
+		Key:         filter.Key,
+		Expressions: convertedExpressions,
+	}
+
+	sequences, err := a.cr.QueryKey(ctx, contract, filter, limitAndSort, &[]byte{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to call QueryKey over LOOP: %w", err)
+	}
+
+	for i, sequence := range sequences {
+		jsonBytes := sequence.Data.(*[]byte)
+		jsonData := map[string]any{}
+		err := json.Unmarshal(*jsonBytes, &jsonData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal LOOP sourced JSON event data (`%s`): %w", string(*jsonBytes), err)
+		}
+
+		eventData := reflect.New(reflect.TypeOf(sequenceDataType).Elem()).Interface()
+		err = codec.DecodeAptosJsonValue(jsonData, &eventData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode LOOP sourced event data (`%s`) into an Aptos value: %+w", string(*jsonBytes), err)
+		}
+
+		sequences[i].Data = eventData
+	}
+
+	return sequences, nil
+}
+
+func (a *wrappedChainReader) Bind(ctx context.Context, bindings []types.BoundContract) error {
+	for _, binding := range bindings {
+		a.moduleAddresses[binding.Name] = binding.Address
 	}
 
 	return a.cr.Bind(ctx, bindings)
@@ -215,5 +213,44 @@ func (a *wrappedChainReader) Unbind(ctx context.Context, bindings []types.BoundC
 			return fmt.Errorf("no such binding: %s", key)
 		}
 	}
-	return a.cr.Unbind(ctx, bindings)
+
+	// we ignore unbind errors, because if the LOOP plugin restarted, the binding would not exist.
+	_ = a.cr.Unbind(ctx, bindings)
+
+	return nil
+}
+
+func (a *wrappedChainReader) getBindings() []types.BoundContract {
+	bindings := []types.BoundContract{}
+
+	for name, address := range a.moduleAddresses {
+		bindings = append(bindings, types.BoundContract{
+			Address: address,
+			Name:    name,
+		})
+	}
+
+	return bindings
+}
+
+func (a *wrappedChainReader) decodeGLVReturnValue(label string, jsonBytes []byte, returnVal any) error {
+	var unmarshalledData []any
+	err := json.Unmarshal(jsonBytes, &unmarshalledData)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal %s GetLatestValue result (`%s`): %w", label, string(jsonBytes), err)
+	}
+
+	var unwrappedData any
+	if len(unmarshalledData) == 1 {
+		unwrappedData = unmarshalledData[0]
+	} else {
+		unwrappedData = unmarshalledData
+	}
+
+	err = codec.DecodeAptosJsonValue(unwrappedData, returnVal)
+	if err != nil {
+		return fmt.Errorf("failed to decode %s GetLatestValue JSON value (`%s`) to %T: %w", label, string(jsonBytes), returnVal, err)
+	}
+
+	return nil
 }

@@ -17,8 +17,8 @@ func (a AddressCodec) AddressStringToBytes(addr string) ([]byte, error) {
 }
 
 func addressBytesToString(addr []byte) (string, error) {
-	if len(addr) != 32 {
-		return "", fmt.Errorf("invalid Aptos address length, expected 32, got %d", len(addr))
+	if len(addr) < 1 || len(addr) > 32 {
+		return "", fmt.Errorf("invalid Aptos address length (%d)", len(addr))
 	}
 
 	return fmt.Sprintf("0x%064x", addr), nil
