@@ -1729,8 +1729,8 @@ func (o *orm) loadJobSpecErrors(ctx context.Context, jb *Job) error {
 	return errors.Wrapf(o.ds.SelectContext(ctx, &jb.JobSpecErrors, `SELECT * FROM job_spec_errors WHERE job_id = $1`, jb.ID), "failed to load job spec errors for job %d", jb.ID)
 }
 
-func validateDualTransmissionHint(vals []interface{}) error {
-	accepted := []string{"contract_address", "function_selector", "logs", "calldata", "default_logs"}
+func validateDualTransmissionHint(vals []interface{}) error {	
+	accepted := []string{"contract_address", "function_selector", "logs", "calldata", "default_logs", "full"}
 	for _, v := range vals {
 		valString, ok := v.(string)
 		if !ok {
