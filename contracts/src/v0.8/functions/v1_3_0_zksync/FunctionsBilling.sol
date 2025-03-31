@@ -153,7 +153,7 @@ abstract contract FunctionsBilling is Routable, IFunctionsBilling {
 
   function _getJuelsFromUsd(uint256 amountUsd) private view returns (uint96) {
     (uint256 usdPerLink, uint8 decimals) = getUsdPerUnitLink();
-    // (usd) * (10**18 juels/link) * (10**decimals) / (link / usd) = juels
+    // (usd) * (10**18 juels/link) * (10**decimals) / (usd / link) = juels
     // There are only 1e9*1e18 = 1e27 juels in existence, should not exceed uint96 (2^96 ~ 7e28)
     return SafeCast.toUint96((amountUsd * 10 ** (18 + decimals)) / usdPerLink);
   }
@@ -335,7 +335,7 @@ abstract contract FunctionsBilling is Routable, IFunctionsBilling {
       // Saves on storage writes that would otherwise be charged to the user
       s_feePool += commitment.donFee;
       // Pay the operation fee to the Coordinator owner
-      s_withdrawableTokens[_owner()] += commitment.adminFee; // OperationFee is used in the slot for Admin Fee in the Offchain Commitment. Admin Fee is set to 0 in the Router (enforced by line 316 in FunctionsBilling.sol).
+      s_withdrawableTokens[_owner()] += commitment.adminFee; // OperationFee is used in the slot for Admin Fee in the Offchain Commitment. Admin Fee is set to 0 in the Router (enforced by line 310 in FunctionsBilling.sol).
       emit RequestBilled({
         requestId: requestId,
         juelsPerGas: juelsPerGas,
