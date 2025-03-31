@@ -147,11 +147,8 @@ type Engine struct {
 	sendMeteringReport func(report *MeteringReport, name string, ID string, execID string)
 }
 
-func (e *Engine) Start(_ context.Context) error {
+func (e *Engine) Start(ctx context.Context) error {
 	return e.StartOnce("Engine", func() error {
-		// create a new context, since the one passed in via Start is short-lived.
-		ctx, _ := e.stopCh.NewCtx()
-
 		// validate if adding another workflow would exceed either the global or per owner engine count limit
 		ownerAllow, globalAllow := e.workflowLimits.Allow(e.workflow.owner)
 		if !globalAllow {
@@ -170,14 +167,14 @@ func (e *Engine) Start(_ context.Context) error {
 
 		e.wg.Add(e.maxWorkerLimit)
 		for i := 0; i < e.maxWorkerLimit; i++ {
-			go e.worker(ctx)
+			go e.worker()
 		}
 
 		e.wg.Add(1)
-		go e.init(ctx)
+		go e.init()
 
 		e.wg.Add(1)
-		go e.heartbeat(ctx)
+		go e.heartbeat()
 
 		return nil
 	})
@@ -331,8 +328,10 @@ func (e *Engine) initializeCapability(ctx context.Context, step *step) error {
 //  4. Registers for trigger events now that all capabilities are resolved
 //
 // Steps 1-3 are retried every 5 seconds until successful.
-func (e *Engine) init(ctx context.Context) {
+func (e *Engine) init() {
 	defer e.wg.Done()
+	ctx, cancel := e.stopCh.NewCtx()
+	defer cancel()
 
 	retryErr := retryable(ctx, e.logger, e.retryMs, e.maxRetries, func() error {
 		// first wait for localDON to return a non-error response; this depends
@@ -571,7 +570,7 @@ func (e *Engine) handleStepUpdate(ctx context.Context, stepUpdate store.Workflow
 		return err
 	}
 
-	workflowIsFullyProcessed, status, err := e.isWorkflowFullyProcessed(ctx, state)
+	workflowIsFullyProcessed, status, err := e.isWorkflowFullyProcessed(state)
 	if err != nil {
 		return err
 	}
@@ -691,8 +690,10 @@ func (e *Engine) finishExecution(ctx context.Context, cma custmsg.MessageEmitter
 // worker is responsible for:
 //   - handling a `pendingStepRequests`
 //   - starting a new execution when a trigger emits a message on `triggerEvents`
-func (e *Engine) worker(ctx context.Context) {
+func (e *Engine) worker() {
 	defer e.wg.Done()
+	ctx, cancel := e.stopCh.NewCtx()
+	defer cancel()
 
 	for {
 		select {
@@ -1014,7 +1015,7 @@ func (e *Engine) deregisterTrigger(ctx context.Context, t *triggerCapability, tr
 	return nil
 }
 
-func (e *Engine) isWorkflowFullyProcessed(ctx context.Context, state store.WorkflowExecution) (bool, string, error) {
+func (e *Engine) isWorkflowFullyProcessed(state store.WorkflowExecution) (bool, string, error) {
 	statuses := map[string]string{}
 	// we need to first propagate the status of the errored status if it exists...
 	err := e.workflow.walkDo(workflows.KeywordTrigger, func(s *step) error {
@@ -1104,8 +1105,10 @@ func (e *Engine) isWorkflowFullyProcessed(ctx context.Context, state store.Workf
 }
 
 // heartbeat runs by default every defaultHeartbeatCadence minutes
-func (e *Engine) heartbeat(ctx context.Context) {
+func (e *Engine) heartbeat() {
 	defer e.wg.Done()
+	ctx, cancel := e.stopCh.NewCtx()
+	defer cancel()
 
 	ticker := time.NewTicker(e.heartbeatCadence)
 	defer ticker.Stop()

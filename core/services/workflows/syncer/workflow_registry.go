@@ -201,11 +201,10 @@ func NewWorkflowRegistry(
 // and one for handling the events.
 func (w *workflowRegistry) Start(_ context.Context) error {
 	return w.StartOnce(w.Name(), func() error {
-		ctx, cancel := w.stopCh.NewCtx()
-
 		w.wg.Add(1)
 		go func() {
 			defer w.wg.Done()
+			ctx, cancel := w.stopCh.NewCtx()
 			defer cancel()
 
 			w.lggr.Debugw("Waiting for DON...")
