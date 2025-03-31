@@ -67,8 +67,7 @@ func (f *AptosContractTransmitterFactory) NewCommitTransmitter(
 var AptosExecCallDataFunc = func(
 	rawReportCtx [2][32]byte,
 	report ocr3types.ReportWithInfo[[]byte],
-	_, _ [][32]byte,
-	_ [32]byte,
+	signatures [][96]byte,
 	_ ccipcommon.ExtraDataCodec,
 ) (contract string, method string, args any, err error) {
 	return consts.ContractNameOffRamp,
@@ -86,10 +85,10 @@ func (f *AptosContractTransmitterFactory) NewExecTransmitter(
 	offrampAddress string,
 ) ocr3types.ContractTransmitter[[]byte] {
 	return &ccipTransmitter{
-		cw:             cw,
-		fromAccount:    fromAccount,
-		offrampAddress: offrampAddress,
-		toCalldataFn:   AptosExecCallDataFunc,
+		cw:                  cw,
+		fromAccount:         fromAccount,
+		offrampAddress:      offrampAddress,
+		toEd25519CalldataFn: AptosExecCallDataFunc,
 		extraDataCodec: ccipcommon.NewExtraDataCodec(
 			ccipcommon.NewExtraDataCodecParams(ccipevm.ExtraDataDecoder{}, ccipsolana.ExtraDataDecoder{}, ccipaptos.ExtraDataDecoder{}),
 		),

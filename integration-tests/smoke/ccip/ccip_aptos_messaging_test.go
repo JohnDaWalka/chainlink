@@ -62,8 +62,8 @@ func Test_CCIPMessaging_EVM2Aptos(t *testing.T) {
 				Nonce:     nonce,
 				Receiver:  ccipChainState.ReceiverAddress[:],
 				MsgData:   []byte("hello CCIPReceiver"),
-				// TODO: extra args
-				ExtraArgs:              nil,
+				// true for out of order execution, which is necessary and enforced for Aptos
+				ExtraArgs:              testhelpers.MakeEVMExtraArgsV2(100000, true),
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
 				ExtraAssertions: []func(t *testing.T){
 					func(t *testing.T) {

@@ -6,8 +6,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
+
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/ccip_aptos_utils"
 )
 
 // ExtraDataDecoder is a concrete implementation of ccipcommon.ExtraDataDecoder
@@ -17,6 +21,8 @@ type ExtraDataDecoder struct{}
 const (
 	aptosDestExecDataKey = "destGasAmount"
 )
+
+var aptosUtilsABI = abihelpers.MustParseABI(ccip_aptos_utils.AptosUtilsABI)
 
 var (
 	// bytes4 public constant EVM_EXTRA_ARGS_V1_TAG = 0x97a657c9;

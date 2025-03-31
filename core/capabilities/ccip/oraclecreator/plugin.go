@@ -55,6 +55,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
+
+	aptosloop "github.com/smartcontractkit/chainlink-aptos/relayer/chainreader/loop"
 )
 
 var _ cctypes.OracleCreator = &pluginOracleCreator{}
@@ -519,7 +521,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 		}
 
 		if relayChainFamily == relay.NetworkAptos {
-			cr = aptosconfig.NewWrappedChainReader(i.lggr, cr)
+			cr = aptosloop.NewLoopChainReader(i.lggr, cr)
 		}
 
 		fmt.Printf("DEBUG: createReadersAndWriters chainID %+v destChainID %+v destChainFamily %+v relayChainFamily %+v\n", chainID, destChainID, destChainFamily, relayChainFamily)

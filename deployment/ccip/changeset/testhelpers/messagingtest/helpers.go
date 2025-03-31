@@ -2,6 +2,7 @@ package messagingtest
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -238,6 +239,7 @@ func Run(tc TestCase) (out TestCaseOutput) {
 
 		// Solana doesn't support catching CPI errors, so nonces can't be ordered
 		unorderedExec := family == chain_selectors.FamilySolana || family == chain_selectors.FamilyAptos
+		fmt.Printf("DEBUG: messagingtest.Run unorderedExec: %v\n", unorderedExec)
 
 		if !unorderedExec {
 			latestNonce := getLatestNonce(tc)

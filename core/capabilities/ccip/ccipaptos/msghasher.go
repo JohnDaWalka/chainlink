@@ -85,13 +85,18 @@ func (h *MessageHasherV1) Hash(ctx context.Context, msg cciptypes.Message) (ccip
 		})
 	}
 
-	metaDataHashInput, err := computeMetadataHash(uint64(msg.Header.SourceChainSelector), uint64(msg.Header.DestChainSelector), common.LeftPadBytes(msg.Header.OnRamp, 32))
+	fmt.Printf("DEBUG MSGHASHER: header %+v\n", msg.Header)
+
+	// one difference from EVM is that we don't left pad the OnRamp to 32 bytes here, we use the source chain's canonical bytes encoding directly.
+	metaDataHashInput, err := computeMetadataHash(uint64(msg.Header.SourceChainSelector), uint64(msg.Header.DestChainSelector), msg.Header.OnRamp)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("abi encode metadata hash input: %w", err)
 	}
 
 	lggr.Debugw("metadata hash preimage",
 		"metaDataHashInput", hexutil.Encode(metaDataHashInput[:]))
+
+	fmt.Printf("DEBUG MSGHASHER: metadata hash preimage metaDataHashInput=%s\n", hexutil.Encode(metaDataHashInput[:]))
 
 	// Need to decode the extra args to get the gas limit.
 	// TODO: we assume that extra args is always abi-encoded for now, but we need
@@ -110,6 +115,8 @@ func (h *MessageHasherV1) Hash(ctx context.Context, msg cciptypes.Message) (ccip
 
 	lggr.Debugw("decoded msg gas limit", "gasLimit", gasLimit)
 
+	fmt.Printf("DEBUG MSGHASHER: decoded msg gas limit gasLimit=%d\n", gasLimit)
+
 	receiverAddress, err := addressBytesToBytes32(msg.Receiver)
 	if err != nil {
 		return [32]byte{}, err
@@ -123,6 +130,8 @@ func (h *MessageHasherV1) Hash(ctx context.Context, msg cciptypes.Message) (ccip
 	lggr.Debugw("final message hash result",
 		"msgHash", hexutil.Encode(msgHash[:]),
 	)
+
+	fmt.Printf("DEBUG MSGHASHER: final message hash result msgHash=%s\n", hexutil.Encode(msgHash[:]))
 
 	return msgHash, nil
 }

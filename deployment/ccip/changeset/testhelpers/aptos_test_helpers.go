@@ -13,7 +13,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/bind"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip"
-	//"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_dummy_receiver"
+	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_dummy_receiver"
 	//"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/mcms"
 	"github.com/smartcontractkit/chainlink-aptos/relayer/utils"
@@ -105,14 +105,14 @@ func (c AptosTestDeployContractsChangeSet) deployAptosContracts(t *testing.T, e 
 	//_ = ccipRouterBindings
 	//waitForTx(t, aptosChain.Client, ccipRouterPendingTx.TxnHash(), time.Minute*1)
 
-	//ccipDummyReceiverAddress, ccipDummyReceiverPendingTx, ccipDummyReceiverBindings, err := ccip_dummy_receiver.DeployToObject(aptosChain.DeployerSigner, aptosChain.Client, ccipAddress)
-	//require.NoError(t, err)
-	//logger.Infow("Deployed Aptos CCIP Dummy Receiver", "address", ccipDummyReceiverAddress.String(), "pendingTx", ccipDummyReceiverPendingTx.TxnHash())
-	//_ = ccipDummyReceiverBindings
-	//waitForTx(t, aptosChain.Client, ccipDummyReceiverPendingTx.TxnHash(), time.Minute*1)
+	ccipDummyReceiverAddress, ccipDummyReceiverPendingTx, ccipDummyReceiverBindings, err := ccip_dummy_receiver.DeployToObject(aptosChain.DeployerSigner, aptosChain.Client, ccipAddress, mcmsAddress)
+	require.NoError(t, err)
+	logger.Infow("Deployed Aptos CCIP Dummy Receiver", "address", ccipDummyReceiverAddress.String(), "pendingTx", ccipDummyReceiverPendingTx.TxnHash())
+	_ = ccipDummyReceiverBindings
+	waitForTx(t, aptosChain.Client, ccipDummyReceiverPendingTx.TxnHash(), time.Minute*1)
 
-	//aptosChainState.ReceiverAddress = ccipDummyReceiverAddress
-	aptosChainState.ReceiverAddress = aptos.AccountOne
+	aptosChainState.ReceiverAddress = ccipDummyReceiverAddress
+	//aptosChainState.ReceiverAddress = aptos.AccountOne
 
 	transactOpts := &bind.TransactOpts{
 		Signer: aptosChain.DeployerSigner,
