@@ -111,6 +111,8 @@ contract DataFeedsCache is IDataFeedsCache, IReceiver, ITokenRecover, ITypeAndVe
   error InvalidWorkflowName(bytes10 workflowName);
   error UnauthorizedCaller(address caller);
   error NoMappingForSender(address proxy);
+  error StaleReport();
+  error InvalidPermission();
 
   modifier onlyFeedAdmin() {
     if (!s_feedAdmins[msg.sender]) revert UnauthorizedCaller(msg.sender);
@@ -460,12 +462,20 @@ contract DataFeedsCache is IDataFeedsCache, IReceiver, ITokenRecover, ITypeAndVe
         bytes32 permission = _createReportHash(dataId, msg.sender, workflowOwner, workflowName);
         if (!s_writePermissions[permission]) {
           emit InvalidUpdatePermission(dataId, msg.sender, workflowOwner, workflowName);
-          continue;
+          if (numReport == 1) {
+            revert InvalidPermission();
+          } else {
+            continue;
+          }
         }
 
         if (decodedDecimalReport.timestamp <= s_latestDecimalReports[dataId].timestamp) {
           emit StaleDecimalReport(dataId, decodedDecimalReport.timestamp, s_latestDecimalReports[dataId].timestamp);
-          continue;
+          if (numReport == 1) {
+            revert StaleReport();
+          } else {
+            continue;
+          }
         }
 
         StoredDecimalReport memory decimalReport =
@@ -498,12 +508,20 @@ contract DataFeedsCache is IDataFeedsCache, IReceiver, ITokenRecover, ITypeAndVe
         bytes32 permission = _createReportHash(dataId, msg.sender, workflowOwner, workflowName);
         if (!s_writePermissions[permission]) {
           emit InvalidUpdatePermission(dataId, msg.sender, workflowOwner, workflowName);
-          continue;
+          if (numReport == 1) {
+            revert InvalidPermission();
+          } else {
+            continue;
+          }
         }
 
         if (decodedBundleReport.timestamp <= s_latestBundleReports[dataId].timestamp) {
           emit StaleBundleReport(dataId, decodedBundleReport.timestamp, s_latestBundleReports[dataId].timestamp);
-          continue;
+          if (numReport == 1) {
+            revert StaleReport();
+          } else {
+            continue;
+          }
         }
 
         StoredBundleReport memory bundleReport =
