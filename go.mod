@@ -72,7 +72,7 @@ require (
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/shirou/gopsutil/v3 v3.24.3
 	github.com/shopspring/decimal v1.4.0
-	github.com/smartcontractkit/chain-selectors v1.0.47
+	github.com/smartcontractkit/chain-selectors v1.0.48-0.20250401004828-2a5326e7a8a7
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250328164303-7af29b7beefb
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250327092605-1990b9f79aa3
@@ -377,3 +377,5 @@ replace (
 
 	github.com/sourcegraph/sourcegraph/lib => github.com/sourcegraph/sourcegraph-public-snapshot/lib v0.0.0-20240822153003-c864f15af264
 )
+
+// replace github.com/smartcontractkit/chain-selectors => /Users/finleydecker/Work/one-click/submodules/chain-selectors
