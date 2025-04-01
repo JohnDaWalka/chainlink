@@ -696,9 +696,9 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 
 	// Prepare the CLD environment that's required by the keystone changeset
 	// Ugly glue hack ¯\_(ツ)_/¯
-	fullCldOutput, err := devenv.NewEnvironmentBuilder(singeFileLogger, creds).
-		WithJDOutput(jdOutput).
-		WithBlockchainOutput(blockchainsOutput.blockchainOutput).
+	fullCldOutput, err := devenv.NewEnvironmentBuilder(singeFileLogger).
+		WithJobDistributor(jdOutput, creds).
+		WithBlockchains(blockchainsOutput.blockchainOutput).
 		WithSethClient(blockchainsOutput.sethClient).
 		WithExistingAddresses(chainsOnlyCld.ExistingAddresses).
 		WithTopology(topology).

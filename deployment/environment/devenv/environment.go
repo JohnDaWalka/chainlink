@@ -76,37 +76,45 @@ type EnvironmentWithTopology struct {
 }
 
 type EnvironmentBuilder struct {
-	JDOutput          *jd.Output
-	BlockchainOutput  *blockchain.Output
-	SethClient        *seth.Client
-	NodeSetOutput     []*types.WrappedNodeOutput
-	ExistingAddresses deployment.AddressBook
-	Topology          *types.Topology
-	errs              []string
+	jdOutput          *jd.Output
+	blockchainOutput  *blockchain.Output
+	sethClient        *seth.Client
+	nodeSetOutput     []*types.WrappedNodeOutput
+	existingAddresses deployment.AddressBook
+	topology          *types.Topology
 	credentials       credentials.TransportCredentials
 	logger            logger.Logger
+	errs              []string
 }
 
-func NewEnvironmentBuilder(lgr logger.Logger, credentials credentials.TransportCredentials) *EnvironmentBuilder {
-	return &EnvironmentBuilder{
-		logger:      lgr,
-		credentials: credentials,
+func NewEnvironmentBuilder(lgr logger.Logger) *EnvironmentBuilder {
+	b := &EnvironmentBuilder{
+		logger: lgr,
 	}
-}
 
-func (b *EnvironmentBuilder) WithJDOutput(jdOutput *jd.Output) *EnvironmentBuilder {
-	if jdOutput == nil {
-		b.errs = append(b.errs, "jd output not set")
+	if lgr == nil {
+		b.errs = append(b.errs, "logger not set")
 	}
-	b.JDOutput = jdOutput
 	return b
 }
 
-func (b *EnvironmentBuilder) WithBlockchainOutput(blockchainOutput *blockchain.Output) *EnvironmentBuilder {
+func (b *EnvironmentBuilder) WithJobDistributor(jdOutput *jd.Output, jdTransportCredentials credentials.TransportCredentials) *EnvironmentBuilder {
+	if jdOutput == nil {
+		b.errs = append(b.errs, "jd output not set")
+	}
+	if jdTransportCredentials == nil {
+		b.errs = append(b.errs, "jd credentials not set")
+	}
+	b.jdOutput = jdOutput
+	b.credentials = jdTransportCredentials
+	return b
+}
+
+func (b *EnvironmentBuilder) WithBlockchains(blockchainOutput *blockchain.Output) *EnvironmentBuilder {
 	if blockchainOutput == nil {
 		b.errs = append(b.errs, "blockchain output not set")
 	}
-	b.BlockchainOutput = blockchainOutput
+	b.blockchainOutput = blockchainOutput
 	return b
 }
 
@@ -114,20 +122,20 @@ func (b *EnvironmentBuilder) WithSethClient(sethClient *seth.Client) *Environmen
 	if sethClient == nil {
 		b.errs = append(b.errs, "seth client not set")
 	}
-	b.SethClient = sethClient
+	b.sethClient = sethClient
 	return b
 }
 
 func (b *EnvironmentBuilder) WithNodeSetOutput(nodeSetOutput []*types.WrappedNodeOutput) *EnvironmentBuilder {
-	if nodeSetOutput == nil || len(b.NodeSetOutput) == 0 {
+	if nodeSetOutput == nil || len(b.nodeSetOutput) == 0 {
 		b.errs = append(b.errs, "node set output not set")
 	}
-	b.NodeSetOutput = nodeSetOutput
+	b.nodeSetOutput = nodeSetOutput
 	return b
 }
 
 func (b *EnvironmentBuilder) WithExistingAddresses(existingAddresses deployment.AddressBook) *EnvironmentBuilder {
-	b.ExistingAddresses = existingAddresses
+	b.existingAddresses = existingAddresses
 	return b
 }
 
@@ -142,7 +150,7 @@ func (b *EnvironmentBuilder) WithTopology(topology *types.Topology) *Environment
 		}
 	}
 
-	b.Topology = topology
+	b.topology = topology
 	return b
 }
 
@@ -151,30 +159,28 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 		return nil, errors.New("validation errors: " + strings.Join(b.errs, ", "))
 	}
 
-	input := b
-
-	envs := make([]*deployment.Environment, len(input.NodeSetOutput))
-	dons := make([]*DON, len(input.NodeSetOutput))
+	envs := make([]*deployment.Environment, len(b.nodeSetOutput))
+	dons := make([]*DON, len(b.nodeSetOutput))
 
 	var allNodesInfo []NodeInfo
 	chains := []ChainConfig{
 		{
-			ChainID:   input.SethClient.Cfg.Network.ChainID,
-			ChainName: input.SethClient.Cfg.Network.Name,
-			ChainType: strings.ToUpper(input.BlockchainOutput.Family),
+			ChainID:   b.sethClient.Cfg.Network.ChainID,
+			ChainName: b.sethClient.Cfg.Network.Name,
+			ChainType: strings.ToUpper(b.blockchainOutput.Family),
 			WSRPCs: []CribRPCs{{
-				External: input.BlockchainOutput.Nodes[0].HostWSUrl,
-				Internal: input.BlockchainOutput.Nodes[0].DockerInternalWSUrl,
+				External: b.blockchainOutput.Nodes[0].HostWSUrl,
+				Internal: b.blockchainOutput.Nodes[0].DockerInternalWSUrl,
 			}},
 			HTTPRPCs: []CribRPCs{{
-				External: input.BlockchainOutput.Nodes[0].HostHTTPUrl,
-				Internal: input.BlockchainOutput.Nodes[0].DockerInternalHTTPUrl,
+				External: b.blockchainOutput.Nodes[0].HostHTTPUrl,
+				Internal: b.blockchainOutput.Nodes[0].DockerInternalHTTPUrl,
 			}},
-			DeployerKey: input.SethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
+			DeployerKey: b.sethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
 		},
 	}
 
-	for i, nodeOutput := range input.NodeSetOutput {
+	for i, nodeOutput := range b.nodeSetOutput {
 		// assume that each nodeset has only one bootstrap node
 		nodeInfo, err := GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, 1)
 		if err != nil {
@@ -189,8 +195,8 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 		}
 
 		jdConfig := JDConfig{
-			GRPC:     input.JDOutput.HostGRPCUrl,
-			WSRPC:    input.JDOutput.DockerWSRPCUrl,
+			GRPC:     b.jdOutput.HostGRPCUrl,
+			WSRPC:    b.jdOutput.DockerWSRPCUrl,
 			Creds:    b.credentials,
 			NodeInfo: nodeInfo,
 		}
@@ -215,7 +221,7 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 	}
 
 	for i, don := range dons {
-		for j, node := range input.Topology.DonsMetadata[i].NodesMetadata {
+		for j, node := range b.topology.DonsMetadata[i].NodesMetadata {
 			// both are required for job creation
 			node.Labels = append(node.Labels, &types.Label{
 				Key:   types.NodeIDKey,
@@ -237,13 +243,13 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 	var jd deployment.OffchainClient
 	var err error
 
-	if len(input.NodeSetOutput) > 0 {
+	if len(b.nodeSetOutput) > 0 {
 		// We create a new instance of JD client using `allNodesInfo` instead of `nodeInfo` to ensure that it can interact with all nodes.
 		// Otherwise, JD would fail to accept job proposals for unknown nodes, even though it would still propose jobs to them. And that
 		// would be happening silently, without any error messages, and we wouldn't know about it until much later.
 		jd, err = NewJDClient(context.Background(), JDConfig{
-			GRPC:     input.JDOutput.HostGRPCUrl,
-			WSRPC:    input.JDOutput.DockerWSRPCUrl,
+			GRPC:     b.jdOutput.HostGRPCUrl,
+			WSRPC:    b.jdOutput.DockerWSRPCUrl,
 			Creds:    b.credentials,
 			NodeInfo: allNodesInfo,
 		})
@@ -259,7 +265,7 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 		Environment: &deployment.Environment{
 			Name:              envs[0].Name,
 			Logger:            envs[0].Logger,
-			ExistingAddresses: input.ExistingAddresses,
+			ExistingAddresses: b.existingAddresses,
 			Chains:            envs[0].Chains,
 			Offchain:          jd,
 			OCRSecrets:        envs[0].OCRSecrets,
@@ -268,11 +274,11 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 		},
 	}
 
-	if b.Topology != nil {
+	if b.topology != nil {
 		donTopology := &DonTopology{}
-		donTopology.WorkflowDonID = input.Topology.WorkflowDONID
+		donTopology.WorkflowDonID = b.topology.WorkflowDONID
 
-		for i, donMetadata := range input.Topology.DonsMetadata {
+		for i, donMetadata := range b.topology.DonsMetadata {
 			donTopology.DonsWithMetadata = append(donTopology.DonsWithMetadata, &DonWithMetadata{
 				DON:         dons[i],
 				DonMetadata: donMetadata,
