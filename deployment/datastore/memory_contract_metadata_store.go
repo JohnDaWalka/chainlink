@@ -4,27 +4,27 @@ import (
 	"sync"
 )
 
-type ContractMetadataStore interface {
-	Store[ContractMetadataKey, ContractMetadata]
+type ContractMetadataStore[M Cloneable[M]] interface {
+	Store[ContractMetadataKey, ContractMetadata[M]]
 }
 
-type MutableContractMetadataStore interface {
-	MutableStore[ContractMetadataKey, ContractMetadata]
+type MutableContractMetadataStore[M Cloneable[M]] interface {
+	MutableStore[ContractMetadataKey, ContractMetadata[M]]
 }
 
-var _ ContractMetadataStore = &MemoryContractMetadataStore{}
-var _ MutableContractMetadataStore = &MemoryContractMetadataStore{}
+var _ ContractMetadataStore[DefaultMetadata] = &MemoryContractMetadataStore[DefaultMetadata]{}
+var _ MutableContractMetadataStore[DefaultMetadata] = &MemoryContractMetadataStore[DefaultMetadata]{}
 
-type MemoryContractMetadataStore struct {
+type MemoryContractMetadataStore[M Cloneable[M]] struct {
 	mu      sync.RWMutex
-	records []ContractMetadata
+	records []ContractMetadata[M]
 }
 
-func NewInMemoryContractMetadataStore() MemoryContractMetadataStore {
-	return MemoryContractMetadataStore{records: []ContractMetadata{}}
+func NewMemoryContractMetadataStore[M Cloneable[M]]() *MemoryContractMetadataStore[M] {
+	return &MemoryContractMetadataStore[M]{records: []ContractMetadata[M]{}}
 }
 
-func (s *MemoryContractMetadataStore) indexOf(key ContractMetadataKey) int {
+func (s *MemoryContractMetadataStore[M]) indexOf(key ContractMetadataKey) int {
 	for i, record := range s.records {
 		if record.Key().Equals(key) {
 			return i
@@ -33,40 +33,40 @@ func (s *MemoryContractMetadataStore) indexOf(key ContractMetadataKey) int {
 	return -1
 }
 
-func (s *MemoryContractMetadataStore) Get(key ContractMetadataKey) (ContractMetadata, error) {
+func (s *MemoryContractMetadataStore[M]) Get(key ContractMetadataKey) (ContractMetadata[M], error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	idx := s.indexOf(key)
 	if idx == -1 {
-		return ContractMetadata{}, ErrContractMetadataNotFound
+		return ContractMetadata[M]{}, ErrContractMetadataNotFound
 	}
 	return s.records[idx].Clone(), nil
 }
 
-func (s *MemoryContractMetadataStore) Fetch() ([]ContractMetadata, error) {
+func (s *MemoryContractMetadataStore[M]) Fetch() ([]ContractMetadata[M], error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	records := []ContractMetadata{}
+	records := []ContractMetadata[M]{}
 	for _, record := range s.records {
 		records = append(records, record.Clone())
 	}
 	return records, nil
 }
 
-func (s *MemoryContractMetadataStore) Filter(filters ...FilterFunc[ContractMetadataKey, ContractMetadata]) []ContractMetadata {
+func (s *MemoryContractMetadataStore[M]) Filter(filters ...FilterFunc[ContractMetadataKey, ContractMetadata[M]]) []ContractMetadata[M] {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	records := append([]ContractMetadata{}, s.records...)
+	records := append([]ContractMetadata[M]{}, s.records...)
 	for _, filter := range filters {
 		records = filter(records)
 	}
 	return records
 }
 
-func (s *MemoryContractMetadataStore) Add(record ContractMetadata) error {
+func (s *MemoryContractMetadataStore[M]) Add(record ContractMetadata[M]) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -78,7 +78,7 @@ func (s *MemoryContractMetadataStore) Add(record ContractMetadata) error {
 	return nil
 }
 
-func (s *MemoryContractMetadataStore) AddOrUpdate(record ContractMetadata) error {
+func (s *MemoryContractMetadataStore[M]) AddOrUpdate(record ContractMetadata[M]) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -91,7 +91,7 @@ func (s *MemoryContractMetadataStore) AddOrUpdate(record ContractMetadata) error
 	return nil
 }
 
-func (s *MemoryContractMetadataStore) Update(record ContractMetadata) error {
+func (s *MemoryContractMetadataStore[M]) Update(record ContractMetadata[M]) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -103,7 +103,7 @@ func (s *MemoryContractMetadataStore) Update(record ContractMetadata) error {
 	return nil
 }
 
-func (s *MemoryContractMetadataStore) Delete(key ContractMetadataKey) error {
+func (s *MemoryContractMetadataStore[M]) Delete(key ContractMetadataKey) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
