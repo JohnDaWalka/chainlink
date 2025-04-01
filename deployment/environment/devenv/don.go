@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/web/sdk/client"
 
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
+	"github.com/smartcontractkit/chainlink/deployment/environment/types"
 )
 
 const (
@@ -44,6 +45,15 @@ type NodeInfo struct {
 
 type DON struct {
 	Nodes []Node
+}
+
+type DonWithMetadata struct {
+	DON *DON
+	*types.DonMetadata
+}
+type DonTopology struct {
+	WorkflowDonID    uint32
+	DonsWithMetadata []*DonWithMetadata
 }
 
 func (don *DON) PluginNodes() []Node {

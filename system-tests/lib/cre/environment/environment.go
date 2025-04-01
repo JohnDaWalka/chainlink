@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
+// todo: move to chainlink deployments
 func BuildFullCLDEnvironment(lgr logger.Logger, input *types.FullCLDEnvironmentInput, credentials credentials.TransportCredentials) (*types.FullCLDEnvironmentOutput, error) {
 	if input == nil {
 		return nil, errors.New("input is nil")
