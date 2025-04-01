@@ -70,52 +70,88 @@ func NewEnvironment(ctx func() context.Context, lggr logger.Logger, config Envir
 	), jd.don, nil
 }
 
-type FullCLDEnvironmentOutput struct {
+type EnvironmentWithTopology struct {
 	Environment *deployment.Environment
 	DonTopology *DonTopology
 }
 
-type FullCLDEnvironmentInput struct {
-	JdOutput          *jd.Output
+type EnvironmentBuilder struct {
+	JDOutput          *jd.Output
 	BlockchainOutput  *blockchain.Output
 	SethClient        *seth.Client
 	NodeSetOutput     []*types.WrappedNodeOutput
 	ExistingAddresses deployment.AddressBook
 	Topology          *types.Topology
+	errs              []string
+	credentials       credentials.TransportCredentials
+	logger            logger.Logger
 }
 
-func (f *FullCLDEnvironmentInput) Validate() error {
-	if f.JdOutput == nil {
-		return errors.New("jd output not set")
+func NewEnvironmentBuilder(lgr logger.Logger, credentials credentials.TransportCredentials) *EnvironmentBuilder {
+	return &EnvironmentBuilder{
+		logger:      lgr,
+		credentials: credentials,
 	}
-	if f.BlockchainOutput == nil {
-		return errors.New("blockchain output not set")
-	}
-	if f.SethClient == nil {
-		return errors.New("seth client not set")
-	}
-	if len(f.NodeSetOutput) == 0 {
-		return errors.New("node set output not set")
-	}
-	if f.Topology == nil {
-		return errors.New("topology not set")
-	}
-	if len(f.Topology.DonsMetadata) == 0 {
-		return errors.New("metadata not set")
-	}
-	if f.Topology.WorkflowDONID == 0 {
-		return errors.New("workflow don id not set")
-	}
-	return nil
 }
 
-func BuildFullCLDEnvironment(lgr logger.Logger, input *FullCLDEnvironmentInput, credentials credentials.TransportCredentials) (*FullCLDEnvironmentOutput, error) {
-	if input == nil {
-		return nil, errors.New("input is nil")
+func (b *EnvironmentBuilder) WithJDOutput(jdOutput *jd.Output) *EnvironmentBuilder {
+	if jdOutput == nil {
+		b.errs = append(b.errs, "jd output not set")
 	}
-	if err := input.Validate(); err != nil {
-		return nil, errors.Wrap(err, "input validation failed")
+	b.JDOutput = jdOutput
+	return b
+}
+
+func (b *EnvironmentBuilder) WithBlockchainOutput(blockchainOutput *blockchain.Output) *EnvironmentBuilder {
+	if blockchainOutput == nil {
+		b.errs = append(b.errs, "blockchain output not set")
 	}
+	b.BlockchainOutput = blockchainOutput
+	return b
+}
+
+func (b *EnvironmentBuilder) WithSethClient(sethClient *seth.Client) *EnvironmentBuilder {
+	if sethClient == nil {
+		b.errs = append(b.errs, "seth client not set")
+	}
+	b.SethClient = sethClient
+	return b
+}
+
+func (b *EnvironmentBuilder) WithNodeSetOutput(nodeSetOutput []*types.WrappedNodeOutput) *EnvironmentBuilder {
+	if nodeSetOutput == nil || len(b.NodeSetOutput) == 0 {
+		b.errs = append(b.errs, "node set output not set")
+	}
+	b.NodeSetOutput = nodeSetOutput
+	return b
+}
+
+func (b *EnvironmentBuilder) WithExistingAddresses(existingAddresses deployment.AddressBook) *EnvironmentBuilder {
+	b.ExistingAddresses = existingAddresses
+	return b
+}
+
+// WithTopology Topology is required for CRE DONs
+func (b *EnvironmentBuilder) WithTopology(topology *types.Topology) *EnvironmentBuilder {
+	if topology != nil {
+		if len(topology.DonsMetadata) == 0 {
+			b.errs = append(b.errs, "metadata not set")
+		}
+		if topology.WorkflowDONID == 0 {
+			b.errs = append(b.errs, "workflow don id not set")
+		}
+	}
+
+	b.Topology = topology
+	return b
+}
+
+func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
+	if len(b.errs) > 0 {
+		return nil, errors.New("validation errors: " + strings.Join(b.errs, ", "))
+	}
+
+	input := b
 
 	envs := make([]*deployment.Environment, len(input.NodeSetOutput))
 	dons := make([]*DON, len(input.NodeSetOutput))
@@ -153,9 +189,9 @@ func BuildFullCLDEnvironment(lgr logger.Logger, input *FullCLDEnvironmentInput, 
 		}
 
 		jdConfig := JDConfig{
-			GRPC:     input.JdOutput.HostGRPCUrl,
-			WSRPC:    input.JdOutput.DockerWSRPCUrl,
-			Creds:    credentials,
+			GRPC:     input.JDOutput.HostGRPCUrl,
+			WSRPC:    input.JDOutput.DockerWSRPCUrl,
+			Creds:    b.credentials,
 			NodeInfo: nodeInfo,
 		}
 
@@ -164,7 +200,7 @@ func BuildFullCLDEnvironment(lgr logger.Logger, input *FullCLDEnvironmentInput, 
 			Chains:   chains,
 		}
 
-		env, don, err := NewEnvironment(context.Background, lgr, devenvConfig)
+		env, don, err := NewEnvironment(context.Background, b.logger, devenvConfig)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create environment")
 		}
@@ -206,9 +242,9 @@ func BuildFullCLDEnvironment(lgr logger.Logger, input *FullCLDEnvironmentInput, 
 		// Otherwise, JD would fail to accept job proposals for unknown nodes, even though it would still propose jobs to them. And that
 		// would be happening silently, without any error messages, and we wouldn't know about it until much later.
 		jd, err = NewJDClient(context.Background(), JDConfig{
-			GRPC:     input.JdOutput.HostGRPCUrl,
-			WSRPC:    input.JdOutput.DockerWSRPCUrl,
-			Creds:    credentials,
+			GRPC:     input.JDOutput.HostGRPCUrl,
+			WSRPC:    input.JDOutput.DockerWSRPCUrl,
+			Creds:    b.credentials,
 			NodeInfo: allNodesInfo,
 		})
 		if err != nil {
@@ -219,7 +255,7 @@ func BuildFullCLDEnvironment(lgr logger.Logger, input *FullCLDEnvironmentInput, 
 	}
 
 	// we assume that all DONs run on the same chain and that there's only one chain
-	output := &FullCLDEnvironmentOutput{
+	output := &EnvironmentWithTopology{
 		Environment: &deployment.Environment{
 			Name:              envs[0].Name,
 			Logger:            envs[0].Logger,
@@ -232,17 +268,19 @@ func BuildFullCLDEnvironment(lgr logger.Logger, input *FullCLDEnvironmentInput, 
 		},
 	}
 
-	donTopology := &DonTopology{}
-	donTopology.WorkflowDonID = input.Topology.WorkflowDONID
+	if b.Topology != nil {
+		donTopology := &DonTopology{}
+		donTopology.WorkflowDonID = input.Topology.WorkflowDONID
 
-	for i, donMetadata := range input.Topology.DonsMetadata {
-		donTopology.DonsWithMetadata = append(donTopology.DonsWithMetadata, &DonWithMetadata{
-			DON:         dons[i],
-			DonMetadata: donMetadata,
-		})
+		for i, donMetadata := range input.Topology.DonsMetadata {
+			donTopology.DonsWithMetadata = append(donTopology.DonsWithMetadata, &DonWithMetadata{
+				DON:         dons[i],
+				DonMetadata: donMetadata,
+			})
+		}
+
+		output.DonTopology = donTopology
 	}
-
-	output.DonTopology = donTopology
 
 	return output, nil
 }

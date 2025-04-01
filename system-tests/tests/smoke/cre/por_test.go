@@ -684,17 +684,6 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		})
 	}
 
-	// Prepare the CLD environment that's required by the keystone changeset
-	// Ugly glue hack ¯\_(ツ)_/¯
-	fullCldInput := &devenv.FullCLDEnvironmentInput{
-		JdOutput:          jdOutput,
-		BlockchainOutput:  blockchainsOutput.blockchainOutput,
-		SethClient:        blockchainsOutput.sethClient,
-		NodeSetOutput:     nodeOutput,
-		ExistingAddresses: chainsOnlyCld.ExistingAddresses,
-		Topology:          topology,
-	}
-
 	// We need to use TLS for CRIB, because it exposes HTTPS endpoints
 	var creds credentials.TransportCredentials
 	if in.Infra.InfraType == libtypes.CRIB {
@@ -705,7 +694,16 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		creds = insecure.NewCredentials()
 	}
 
-	fullCldOutput, err := devenv.BuildFullCLDEnvironment(singeFileLogger, fullCldInput, creds)
+	// Prepare the CLD environment that's required by the keystone changeset
+	// Ugly glue hack ¯\_(ツ)_/¯
+	fullCldOutput, err := devenv.NewEnvironmentBuilder(singeFileLogger, creds).
+		WithJDOutput(jdOutput).
+		WithBlockchainOutput(blockchainsOutput.blockchainOutput).
+		WithSethClient(blockchainsOutput.sethClient).
+		WithExistingAddresses(chainsOnlyCld.ExistingAddresses).
+		WithTopology(topology).
+		Build()
+
 	require.NoError(t, err, "failed to build chainlink deployment environment")
 
 	// Fund the nodes

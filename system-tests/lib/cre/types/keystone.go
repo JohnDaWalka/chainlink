@@ -436,11 +436,6 @@ func (f *FullCLDEnvironmentInput) Validate() error {
 	return nil
 }
 
-type FullCLDEnvironmentOutput struct {
-	Environment *deployment.Environment
-	DonTopology *devenv.DonTopology
-}
-
 type DeployCribDonsInput struct {
 	Topology       *cldtypes.Topology
 	NodeSetInputs  []*CapabilitiesAwareNodeSet
