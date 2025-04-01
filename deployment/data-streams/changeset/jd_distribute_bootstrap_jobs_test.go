@@ -12,7 +12,6 @@ import (
 )
 
 func TestDistributeBootstrapJobSpecs(t *testing.T) {
-	t.Skip("Flaky Test: https://smartcontract-it.atlassian.net/browse/DX-196")
 	t.Parallel()
 
 	e := testutil.NewMemoryEnv(t, false, 1)
@@ -66,7 +65,7 @@ func TestDistributeBootstrapJobSpecs(t *testing.T) {
 				require.NoError(t, err)
 			} else {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.wantErr)
+				require.Contains(t, err.Error(), *tt.wantErr)
 			}
 		})
 	}
