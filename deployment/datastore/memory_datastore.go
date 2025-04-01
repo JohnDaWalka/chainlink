@@ -20,16 +20,14 @@ type BaseDataStore[R AddressRefStore] interface {
 	Addresses() R
 }
 
-// DataStore is an interface that defines the operations for a
+// DataStore is an interface that defines the operations for a read-only data store.
 type DataStore interface {
-	Merger[DataStore]
-
 	BaseDataStore[AddressRefStore]
 }
 
 // MutableDataStore is an interface that defines the operations for a mutable data store.
 type MutableDataStore interface {
-	Merger[MutableDataStore]
+	Merger[DataStore]
 	Sealer[DataStore]
 
 	BaseDataStore[MutableAddressRefStore]
@@ -61,7 +59,7 @@ func (s *MemoryDataStore) Addresses() MutableAddressRefStore {
 }
 
 // Merge merges the given mutable data store into the current MemoryDataStore.
-func (s *MemoryDataStore) Merge(other MutableDataStore) error {
+func (s *MemoryDataStore) Merge(other DataStore) error {
 	addressRefs, err := other.Addresses().Fetch()
 	if err != nil {
 		return err
@@ -88,20 +86,4 @@ type sealedMemoryDataStore struct {
 // It implements the BaseDataStore interface.
 func (s *sealedMemoryDataStore) Addresses() AddressRefStore {
 	return s.AddressRefStore
-}
-
-// Merge merges the given data store into the current sealedMemoryDataStore.
-func (s *sealedMemoryDataStore) Merge(other DataStore) error {
-	addressRefs, err := other.Addresses().Fetch()
-	if err != nil {
-		return err
-	}
-
-	for _, addressRef := range addressRefs {
-		if err := s.AddressRefStore.AddOrUpdate(addressRef); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
