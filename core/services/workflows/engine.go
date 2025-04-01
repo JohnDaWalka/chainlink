@@ -461,6 +461,9 @@ func (e *Engine) registerTrigger(ctx context.Context, t *triggerCapability, trig
 // `executionState`.
 func (e *Engine) stepUpdateLoop(ctx context.Context, executionID string, stepUpdateCh chan store.WorkflowExecutionStep, workflowCreatedAt *time.Time) {
 	defer e.wg.Done()
+	var cancel context.CancelFunc
+	ctx, cancel = e.stopCh.Ctx(ctx)
+	defer cancel()
 	lggr := e.logger.With(platform.KeyWorkflowExecutionID, executionID)
 	e.logger.Debugf("running stepUpdateLoop for execution %s", executionID)
 	for {
@@ -546,7 +549,7 @@ func (e *Engine) startExecution(ctx context.Context, executionID string, event *
 		return nil
 	}
 	e.wg.Add(1)
-	go e.stepUpdateLoop(ctx, executionID, ch, dbWex.CreatedAt)
+	go e.stepUpdateLoop(context.WithoutCancel(ctx), executionID, ch, dbWex.CreatedAt)
 
 	for _, td := range triggerDependents {
 		e.queueIfReady(*ec, td)
