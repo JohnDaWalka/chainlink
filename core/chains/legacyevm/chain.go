@@ -7,9 +7,8 @@ import (
 	"math/big"
 	"strconv"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	gotoml "github.com/pelletier/go-toml/v2"
-	"go.uber.org/multierr"
-
 	common "github.com/smartcontractkit/chainlink-common/pkg/chains"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -31,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/log"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
+	"go.uber.org/multierr"
 )
 
 type Chain interface {
@@ -420,6 +420,18 @@ func (c *chain) LatestHead(_ context.Context) (types.Head, error) {
 		Height:    strconv.FormatInt(latestChain.BlockNumber(), 10),
 		Hash:      latestChain.Hash.Bytes(),
 		Timestamp: uint64(latestChain.Timestamp.Unix()),
+	}, nil
+}
+
+func (c *chain) GetBalance(ctx context.Context, address string) (types.TokenBalance, error) {
+	balance, err := c.Client().BalanceAt(ctx, ethcommon.HexToAddress(address), nil)
+	if err != nil {
+		return types.TokenBalance{}, err
+	}
+
+	return types.TokenBalance{
+		Balance:  balance,
+		Decimals: 18, // move to chainlink integrations
 	}, nil
 }
 

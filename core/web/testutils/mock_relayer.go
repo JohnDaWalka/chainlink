@@ -8,6 +8,7 @@ import (
 )
 
 type MockRelayer struct {
+	TokenBalance commontypes.TokenBalance
 	Head         commontypes.Head
 	ChainStatus  commontypes.ChainStatus
 	NodeStatuses []commontypes.NodeStatus
@@ -43,6 +44,10 @@ func (m MockRelayer) NewContractReader(_ context.Context, _ []byte) (commontypes
 
 func (m MockRelayer) LatestHead(_ context.Context) (commontypes.Head, error) {
 	return m.Head, nil
+}
+
+func (m MockRelayer) GetBalance(_ context.Context, _ string) (commontypes.TokenBalance, error) {
+	return m.TokenBalance, nil
 }
 
 func (m MockRelayer) GetChainStatus(ctx context.Context) (commontypes.ChainStatus, error) {

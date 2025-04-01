@@ -281,6 +281,10 @@ func (r *Relayer) LatestHead(ctx context.Context) (commontypes.Head, error) {
 	return r.chain.LatestHead(ctx)
 }
 
+func (r *Relayer) GetBalance(ctx context.Context, address string) (commontypes.TokenBalance, error) {
+	return r.chain.GetBalance(ctx, address)
+}
+
 func (r *Relayer) GetChainStatus(ctx context.Context) (commontypes.ChainStatus, error) {
 	return r.chain.GetChainStatus(ctx)
 }

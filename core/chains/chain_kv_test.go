@@ -94,6 +94,11 @@ func (s *testChainService) LatestHead(_ context.Context) (head types.Head, err e
 	return
 }
 
+// Implement [types.GetBalance] interface
+func (s *testChainService) GetBalance(_ context.Context, _ string) (balance types.TokenBalance, err error) {
+	return
+}
+
 // Implement [types.ChainService] interface
 func (s *testChainService) GetChainStatus(ctx context.Context) (stat types.ChainStatus, err error) {
 	return
