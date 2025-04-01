@@ -85,7 +85,8 @@ func (c AptosTestDeployContractsChangeSet) deployAptosContracts(t *testing.T, e 
 	logger := logger.Test(t)
 	adminAddress := aptosChain.DeployerSigner.AccountAddress()
 
-	mcmsAddress, mcmsPendingTx, mcmsBindings, err := mcms.DeployToResourceAccount(aptosChain.DeployerSigner, aptosChain.Client)
+	mcmsSeed := fmt.Sprintf("%s", time.Now().UnixNano())
+	mcmsAddress, mcmsPendingTx, mcmsBindings, err := mcms.DeployToResourceAccount(aptosChain.DeployerSigner, aptosChain.Client, mcmsSeed)
 	require.NoError(t, err)
 	logger.Infow("Deployed Aptos MCMS", "address", mcmsAddress.String(), "pendingTx", mcmsPendingTx.TxnHash())
 	_ = mcmsBindings
