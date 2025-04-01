@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -144,7 +145,7 @@ func WorkerWorkflowRegistry(workflowRegistryAddr common.Address, chainID uint64)
 	)
 }
 
-func WorkerGateway(nodeAddress common.Address, chainID uint64, donID uint32, gatewayConnectorData types.GatewayConnectorOutput) string {
+func WorkerGateway(nodeAddress common.Address, chainID uint64, donID uint32, gatewayConnectorData cldtypes.GatewayConnectorOutput) string {
 	gatewayURL := fmt.Sprintf("ws://%s:%d/%s", gatewayConnectorData.Host, 5003, "node")
 
 	return fmt.Sprintf(`

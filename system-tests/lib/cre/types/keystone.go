@@ -2,12 +2,12 @@ package types
 
 import (
 	"errors"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"slices"
 
 	"github.com/ethereum/go-ethereum/common"
 
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
-	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
@@ -152,15 +152,9 @@ type ConfigureFeedConsumerOutput struct {
 	AllowedWorkflowNames  []string         `toml:"allowed_workflow_names"`
 }
 
-type WrappedNodeOutput struct {
-	*ns.Output
-	NodeSetName  string
-	Capabilities []string
-}
-
 type CreateJobsInput struct {
 	CldEnv        *deployment.Environment
-	DonTopology   *DonTopology
+	DonTopology   *devenv.DonTopology
 	DonToJobSpecs DonsToJobSpecs
 }
 
@@ -190,7 +184,7 @@ type DebugInput struct {
 type DebugDon struct {
 	Flags          []string
 	ContainerNames []string
-	NodesMetadata  []*NodeMetadata
+	NodesMetadata  []*cldtypes.NodeMetadata
 }
 
 func (d *DebugInput) Validate() error {
@@ -223,7 +217,7 @@ func (d *DebugInput) Validate() error {
 
 type ConfigureKeystoneInput struct {
 	ChainSelector uint64
-	Topology      *Topology
+	Topology      *cldtypes.Topology
 	CldEnv        *deployment.Environment
 }
 
@@ -244,27 +238,15 @@ func (c *ConfigureKeystoneInput) Validate() error {
 	return nil
 }
 
-type GatewayConnectorDons struct {
-	MembersEthAddresses []string
-	ID                  uint32
-}
-
-type GatewayConnectorOutput struct {
-	Dons []GatewayConnectorDons // do not set, it will be set dynamically
-	Host string                 // do not set, it will be set dynamically
-	Path string
-	Port int
-}
-
 type GeneratePoRJobSpecsInput struct {
-	DonsWithMetadata       []*DonWithMetadata
+	DonsWithMetadata       []*devenv.DonWithMetadata
 	BlockchainOutput       *blockchain.Output
 	OCR3CapabilityAddress  common.Address
 	ExtraAllowedPorts      []int
 	ExtraAllowedIPs        []string
 	ExtraAllowedIPsCIDR    []string
 	CronCapBinPath         string
-	GatewayConnectorOutput GatewayConnectorOutput
+	GatewayConnectorOutput cldtypes.GatewayConnectorOutput
 }
 
 func (g *GeneratePoRJobSpecsInput) Validate() error {
@@ -291,7 +273,7 @@ func (g *GeneratePoRJobSpecsInput) Validate() error {
 }
 
 type GeneratePoRConfigsInput struct {
-	DonMetadata                 *DonMetadata
+	DonMetadata                 *cldtypes.DonMetadata
 	BlockchainOutput            *blockchain.Output
 	DonID                       uint32
 	Flags                       []string
@@ -299,7 +281,7 @@ type GeneratePoRConfigsInput struct {
 	CapabilitiesRegistryAddress common.Address
 	WorkflowRegistryAddress     common.Address
 	ForwarderAddress            common.Address
-	GatewayConnectorOutput      *GatewayConnectorOutput
+	GatewayConnectorOutput      *cldtypes.GatewayConnectorOutput
 	SkipGateway                 bool // Skip gateway config for workflow yaml test
 }
 
@@ -345,48 +327,6 @@ type ToplogyInput struct {
 	DonToEthAddress map[uint32][]common.Address
 }
 
-type DonWithMetadata struct {
-	DON *devenv.DON
-	*DonMetadata
-}
-
-type DonMetadata struct {
-	NodesMetadata []*NodeMetadata
-	Flags         []string
-	ID            uint32
-	Name          string
-}
-
-type Label struct {
-	Key   string
-	Value string
-}
-
-func LabelFromProto(p *ptypes.Label) (*Label, error) {
-	if p.Value == nil {
-		return nil, errors.New("value not set")
-	}
-	return &Label{
-		Key:   p.Key,
-		Value: *p.Value,
-	}, nil
-}
-
-type NodeMetadata struct {
-	Labels []*Label
-}
-
-type Topology struct {
-	WorkflowDONID          uint32
-	DonsMetadata           []*DonMetadata
-	GatewayConnectorOutput *GatewayConnectorOutput
-}
-
-type DonTopology struct {
-	WorkflowDonID    uint32
-	DonsWithMetadata []*DonWithMetadata
-}
-
 type CapabilitiesAwareNodeSet struct {
 	*ns.Input
 	Capabilities       []string
@@ -410,7 +350,7 @@ type OCRPeeringData struct {
 type GenerateKeysInput struct {
 	GenerateEVMKeysForChainIDs []int
 	GenerateP2PKeys            bool
-	Topology                   *Topology
+	Topology                   *cldtypes.Topology
 	Password                   string
 }
 
@@ -436,7 +376,7 @@ type GenerateKeysOutput struct {
 }
 
 type GenerateSecretsInput struct {
-	DonMetadata *DonMetadata
+	DonMetadata *cldtypes.DonMetadata
 	EVMKeys     *types.EVMKeys
 	P2PKeys     *types.P2PKeys
 }
@@ -466,9 +406,9 @@ type FullCLDEnvironmentInput struct {
 	JdOutput          *jd.Output
 	BlockchainOutput  *blockchain.Output
 	SethClient        *seth.Client
-	NodeSetOutput     []*WrappedNodeOutput
+	NodeSetOutput     []*cldtypes.WrappedNodeOutput
 	ExistingAddresses deployment.AddressBook
-	Topology          *Topology
+	Topology          *cldtypes.Topology
 }
 
 func (f *FullCLDEnvironmentInput) Validate() error {
@@ -498,11 +438,11 @@ func (f *FullCLDEnvironmentInput) Validate() error {
 
 type FullCLDEnvironmentOutput struct {
 	Environment *deployment.Environment
-	DonTopology *DonTopology
+	DonTopology *devenv.DonTopology
 }
 
 type DeployCribDonsInput struct {
-	Topology       *Topology
+	Topology       *cldtypes.Topology
 	NodeSetInputs  []*CapabilitiesAwareNodeSet
 	NixShell       *nix.Shell
 	CribConfigsDir string

@@ -631,7 +631,7 @@ createJobsInput := keystonetypes.CreateJobsInput{
 
 // assuming there's only 1 DON in topology and that its ID is 1
 // we want to create that workflow for all worker nodes, bootstrap doesn't need it
-workflowNodeSet, err := node.FindManyWithLabel(donTopology[0].NodesMetadata, &keystonetypes.Label{Key: libnode.NodeTypeKey, Value: keystonetypes.WorkerNode}, libnode.EqualLabels)
+workflowNodeSet, err := node.FindManyWithLabel(donTopology[0].NodesMetadata, &cldtypes.Label{Key: libnode.NodeTypeKey, Value: keystonetypes.WorkerNode}, libnode.EqualLabels)
 if err != nil {
   // there should be no DON without worker nodes, even gateway DON is composed of a single worker node
   return nil, errors.Wrap(err, "failed to find worker nodes")

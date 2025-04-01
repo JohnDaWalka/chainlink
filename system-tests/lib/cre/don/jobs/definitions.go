@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"fmt"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -41,7 +42,7 @@ func BootstrapOCR3(nodeID string, ocr3CapabilityAddress common.Address, chainID 
 	}
 }
 
-func AnyGateway(bootstrapNodeID string, chainID uint64, donID uint32, extraAllowedPorts []int, extraAllowedIps, extrAallowedIPsCIDR []string, gatewayConnectorData types.GatewayConnectorOutput) *jobv1.ProposeJobRequest {
+func AnyGateway(bootstrapNodeID string, chainID uint64, donID uint32, extraAllowedPorts []int, extraAllowedIps, extrAallowedIPsCIDR []string, gatewayConnectorData cldtypes.GatewayConnectorOutput) *jobv1.ProposeJobRequest {
 	var gatewayDons string
 
 	for _, don := range gatewayConnectorData.Dons {

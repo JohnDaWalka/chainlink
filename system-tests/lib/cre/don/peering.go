@@ -2,15 +2,16 @@ package don
 
 import (
 	"github.com/pkg/errors"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
-func globalBootstraperNodeData(topology *types.Topology) (string, string, error) {
+func globalBootstraperNodeData(topology *cldtypes.Topology) (string, string, error) {
 	if len(topology.DonsMetadata) == 1 {
-		bootstrapNode, err := node.FindOneWithLabel(topology.DonsMetadata[0].NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.BootstrapNode}, node.EqualLabels)
+		bootstrapNode, err := node.FindOneWithLabel(topology.DonsMetadata[0].NodesMetadata, &cldtypes.Label{Key: cldtypes.NodeTypeKey, Value: types.BootstrapNode}, node.EqualLabels)
 		if err != nil {
 			return "", "", errors.Wrap(err, "failed to find bootstrap node")
 		}
@@ -21,7 +22,7 @@ func globalBootstraperNodeData(topology *types.Topology) (string, string, error)
 			return "", "", errors.Wrap(err, "failed to get peer ID for the bootstrap node")
 		}
 
-		bootstrapNodeHost, hostErr := node.FindLabelValue(bootstrapNode, node.HostLabelKey)
+		bootstrapNodeHost, hostErr := node.FindLabelValue(bootstrapNode, cldtypes.HostLabelKey)
 		if hostErr != nil {
 			return "", "", errors.Wrap(hostErr, "failed to get bootstrap node host from labels")
 		}
@@ -32,7 +33,7 @@ func globalBootstraperNodeData(topology *types.Topology) (string, string, error)
 		// for all the DONs, and so we need to find it first. For us, it will always be the bootstrap node of the workflow DON.
 		for _, donTopology := range topology.DonsMetadata {
 			if flags.HasFlag(donTopology.Flags, types.WorkflowDON) {
-				bootstrapNode, err := node.FindOneWithLabel(donTopology.NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.BootstrapNode}, node.EqualLabels)
+				bootstrapNode, err := node.FindOneWithLabel(donTopology.NodesMetadata, &cldtypes.Label{Key: cldtypes.NodeTypeKey, Value: types.BootstrapNode}, node.EqualLabels)
 				if err != nil {
 					return "", "", errors.Wrap(err, "failed to find bootstrap node")
 				}
@@ -42,7 +43,7 @@ func globalBootstraperNodeData(topology *types.Topology) (string, string, error)
 					return "", "", errors.Wrapf(err, "failed to get peer ID for workernode %s", "CHANGE ME")
 				}
 
-				bootstrapNodeHost, hostErr := node.FindLabelValue(bootstrapNode, node.HostLabelKey)
+				bootstrapNodeHost, hostErr := node.FindLabelValue(bootstrapNode, cldtypes.HostLabelKey)
 				if hostErr != nil {
 					return "", "", errors.Wrap(hostErr, "failed to get bootstrap node host from labels")
 				}
@@ -57,7 +58,7 @@ func globalBootstraperNodeData(topology *types.Topology) (string, string, error)
 	return "", "", errors.New("expected at least one DON topology")
 }
 
-func FindPeeringData(donTopologies *types.Topology) (types.CapabilitiesPeeringData, error) {
+func FindPeeringData(donTopologies *cldtypes.Topology) (types.CapabilitiesPeeringData, error) {
 	globalBootstraperPeerID, globalBootstraperHost, err := globalBootstraperNodeData(donTopologies)
 	if err != nil {
 		return types.CapabilitiesPeeringData{}, err

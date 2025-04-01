@@ -2,6 +2,8 @@ package chainreader
 
 import (
 	"fmt"
+	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/pkg/errors"
 
@@ -11,20 +13,20 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
-func GenerateJobSpecs(donTopology *types.DonTopology, chainID int, networkFamily, logEventTriggerBinaryPath, readContractBinaryPath string) (types.DonsToJobSpecs, error) {
+func GenerateJobSpecs(donTopology *devenv.DonTopology, chainID int, networkFamily, logEventTriggerBinaryPath, readContractBinaryPath string) (types.DonsToJobSpecs, error) {
 	if donTopology == nil {
 		return nil, errors.New("topology is nil")
 	}
 	donToJobSpecs := make(types.DonsToJobSpecs)
 
 	for _, donWithMetadata := range donTopology.DonsWithMetadata {
-		workflowNodeSet, err := libnode.FindManyWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: libnode.NodeTypeKey, Value: types.WorkerNode}, libnode.EqualLabels)
+		workflowNodeSet, err := libnode.FindManyWithLabel(donWithMetadata.NodesMetadata, &cldtypes.Label{Key: cldtypes.NodeTypeKey, Value: types.WorkerNode}, libnode.EqualLabels)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}
 
 		for _, workerNode := range workflowNodeSet {
-			nodeID, nodeIDErr := libnode.FindLabelValue(workerNode, libnode.NodeIDKey)
+			nodeID, nodeIDErr := libnode.FindLabelValue(workerNode, cldtypes.NodeIDKey)
 			if nodeIDErr != nil {
 				return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 			}

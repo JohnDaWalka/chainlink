@@ -1,6 +1,7 @@
 package flags
 
 import (
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"slices"
 
 	"github.com/pkg/errors"
@@ -8,8 +9,8 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
-func DonMetadataWithFlag(donTopologies []*types.DonMetadata, flag string) []*types.DonMetadata {
-	var result []*types.DonMetadata
+func DonMetadataWithFlag(donTopologies []*cldtypes.DonMetadata, flag string) []*cldtypes.DonMetadata {
+	var result []*cldtypes.DonMetadata
 
 	for _, donTopology := range donTopologies {
 		if HasFlag(donTopology.Flags, flag) {
@@ -28,7 +29,7 @@ func HasOnlyOneFlag(values []string, flag string) bool {
 	return slices.Contains(values, flag) && len(values) == 1
 }
 
-func OneDonMetadataWithFlag(donTopologies []*types.DonMetadata, flag string) (*types.DonMetadata, error) {
+func OneDonMetadataWithFlag(donTopologies []*cldtypes.DonMetadata, flag string) (*cldtypes.DonMetadata, error) {
 	donTopologies = DonMetadataWithFlag(donTopologies, flag)
 	if len(donTopologies) != 1 {
 		return nil, errors.Errorf("expected exactly one DON topology with flag %s, got %d", flag, len(donTopologies))

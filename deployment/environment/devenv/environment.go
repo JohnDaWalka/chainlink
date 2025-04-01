@@ -182,17 +182,17 @@ func BuildFullCLDEnvironment(lgr logger.Logger, input *FullCLDEnvironmentInput, 
 		for j, node := range input.Topology.DonsMetadata[i].NodesMetadata {
 			// both are required for job creation
 			node.Labels = append(node.Labels, &types.Label{
-				Key:   NodeIDKey,
+				Key:   types.NodeIDKey,
 				Value: don.NodeIds()[j],
 			})
 
 			node.Labels = append(node.Labels, &types.Label{
-				Key:   NodeOCR2KeyBundleIDKey,
+				Key:   types.NodeOCR2KeyBundleIDKey,
 				Value: don.Nodes[j].Ocr2KeyBundleID,
 			})
 
 			node.Labels = append(node.Labels, &types.Label{
-				Key:   NodeOCR2KeyBundleIDKey,
+				Key:   types.NodeOCR2KeyBundleIDKey,
 				Value: don.Nodes[j].Ocr2KeyBundleID,
 			})
 		}

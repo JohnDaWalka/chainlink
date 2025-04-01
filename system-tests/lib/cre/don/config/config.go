@@ -1,6 +1,7 @@
 package config
 
 import (
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"testing"
 	"time"
 
@@ -12,11 +13,11 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
-func Set(t *testing.T, nodeInput *types.CapabilitiesAwareNodeSet, bc *blockchain.Output) (*types.WrappedNodeOutput, error) {
+func Set(t *testing.T, nodeInput *types.CapabilitiesAwareNodeSet, bc *blockchain.Output) (*cldtypes.WrappedNodeOutput, error) {
 	nodeset, err := ns.UpgradeNodeSet(t, nodeInput.Input, bc, 5*time.Second)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to upgrade node set")
 	}
 
-	return &types.WrappedNodeOutput{Output: nodeset, NodeSetName: nodeInput.Name, Capabilities: nodeInput.Capabilities}, nil
+	return &cldtypes.WrappedNodeOutput{Output: nodeset, NodeSetName: nodeInput.Name, Capabilities: nodeInput.Capabilities}, nil
 }

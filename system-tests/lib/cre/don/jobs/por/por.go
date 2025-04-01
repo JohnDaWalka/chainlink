@@ -3,6 +3,8 @@ package por
 import (
 	"context"
 	"fmt"
+	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"strconv"
 	"time"
 
@@ -21,7 +23,7 @@ import (
 )
 
 func GenerateJobSpecs(input *types.GeneratePoRJobSpecsInput,
-	customJobsFn func(types.DonJobs, *types.DonWithMetadata) (types.DonJobs, error)) (types.DonsToJobSpecs, error) {
+	customJobsFn func(types.DonJobs, *devenv.DonWithMetadata) (types.DonJobs, error)) (types.DonsToJobSpecs, error) {
 	if input == nil {
 		return nil, errors.New("input is nil")
 	}
@@ -37,7 +39,7 @@ func GenerateJobSpecs(input *types.GeneratePoRJobSpecsInput,
 	for _, donWithMetadata := range input.DonsWithMetadata {
 		// if it's a workflow DON or it has custom compute capability, it needs access to gateway connector
 		if creflags.HasFlag(donWithMetadata.Flags, types.WorkflowDON) || creflags.HasFlag(donWithMetadata.Flags, types.CustomComputeCapability) {
-			workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.WorkerNode}, node.EqualLabels)
+			workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &cldtypes.Label{Key: cldtypes.NodeTypeKey, Value: types.WorkerNode}, node.EqualLabels)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to find worker nodes")
 			}
@@ -45,12 +47,12 @@ func GenerateJobSpecs(input *types.GeneratePoRJobSpecsInput,
 			ethAddresses := make([]string, len(workflowNodeSet))
 			var ethAddressErr error
 			for i, n := range workflowNodeSet {
-				ethAddresses[i], ethAddressErr = node.FindLabelValue(n, node.EthAddressKey)
+				ethAddresses[i], ethAddressErr = node.FindLabelValue(n, cldtypes.EthAddressKey)
 				if ethAddressErr != nil {
 					return nil, errors.Wrap(ethAddressErr, "failed to get eth address from labels")
 				}
 			}
-			gatewayConnectorData.Dons = append(gatewayConnectorData.Dons, types.GatewayConnectorDons{
+			gatewayConnectorData.Dons = append(gatewayConnectorData.Dons, cldtypes.GatewayConnectorDons{
 				MembersEthAddresses: ethAddresses,
 				ID:                  donWithMetadata.DonMetadata.ID,
 			})
@@ -84,14 +86,14 @@ func GenerateJobSpecs(input *types.GeneratePoRJobSpecsInput,
 // than having to define the job spec for each JobDescription manually, in case someone wants to change one parameter
 func generateDonJobSpecs(
 	blockchainOutput *blockchain.Output,
-	donWithMetadata *types.DonWithMetadata,
+	donWithMetadata *devenv.DonWithMetadata,
 	oCR3CapabilityAddress common.Address,
 	cronCapBinPath string,
 	extraAllowedPorts []int,
 	extraAllowedIPs []string,
 	extraAllowedIPsCIDR []string,
-	gatewayConnectorOutput types.GatewayConnectorOutput,
-	customJobsFn func(types.DonJobs, *types.DonWithMetadata) (types.DonJobs, error),
+	gatewayConnectorOutput cldtypes.GatewayConnectorOutput,
+	customJobsFn func(types.DonJobs, *devenv.DonWithMetadata) (types.DonJobs, error),
 ) (types.DonJobs, error) {
 	jobSpecs := make(types.DonJobs, 0)
 
@@ -103,12 +105,12 @@ func generateDonJobSpecs(
 
 	// create job specs for the gateway node
 	if creflags.HasFlag(donWithMetadata.Flags, types.GatewayDON) {
-		gatewayNode, nodeErr := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.ExtraRolesKey, Value: types.GatewayNode}, node.LabelContains)
+		gatewayNode, nodeErr := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &cldtypes.Label{Key: cldtypes.ExtraRolesKey, Value: types.GatewayNode}, node.LabelContains)
 		if nodeErr != nil {
 			return nil, errors.Wrap(nodeErr, "failed to find bootstrap node")
 		}
 
-		gatewayNodeID, gatewayErr := node.FindLabelValue(gatewayNode, node.NodeIDKey)
+		gatewayNodeID, gatewayErr := node.FindLabelValue(gatewayNode, cldtypes.NodeIDKey)
 		if gatewayErr != nil {
 			return nil, errors.Wrap(gatewayErr, "failed to get gateway node id from labels")
 		}
@@ -122,7 +124,7 @@ func generateDonJobSpecs(
 	}
 
 	// look for boostrap node and then for required values in its labels
-	bootstrapNode, err := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.BootstrapNode}, node.EqualLabels)
+	bootstrapNode, err := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &cldtypes.Label{Key: cldtypes.NodeTypeKey, Value: types.BootstrapNode}, node.EqualLabels)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find bootstrap node")
 	}
@@ -132,12 +134,12 @@ func generateDonJobSpecs(
 		return nil, errors.Wrap(err, "failed to get bootstrap node peer ID")
 	}
 
-	donBootstrapNodeHost, hostErr := node.FindLabelValue(bootstrapNode, node.HostLabelKey)
+	donBootstrapNodeHost, hostErr := node.FindLabelValue(bootstrapNode, cldtypes.HostLabelKey)
 	if hostErr != nil {
 		return nil, errors.Wrap(hostErr, "failed to get bootstrap node host from labels")
 	}
 
-	bootstrapNodeID, nodeIDErr := node.FindLabelValue(bootstrapNode, node.NodeIDKey)
+	bootstrapNodeID, nodeIDErr := node.FindLabelValue(bootstrapNode, cldtypes.NodeIDKey)
 	if nodeIDErr != nil {
 		return nil, errors.Wrap(nodeIDErr, "failed to get bootstrap node id from labels")
 	}
@@ -154,14 +156,14 @@ func generateDonJobSpecs(
 	}
 
 	// create job specs for the worker nodes
-	workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.WorkerNode}, node.EqualLabels)
+	workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &cldtypes.Label{Key: cldtypes.NodeTypeKey, Value: types.WorkerNode}, node.EqualLabels)
 	if err != nil {
 		// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 		return nil, errors.Wrap(err, "failed to find worker nodes")
 	}
 
 	for _, workerNode := range workflowNodeSet {
-		nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
+		nodeID, nodeIDErr := node.FindLabelValue(workerNode, cldtypes.NodeIDKey)
 		if nodeIDErr != nil {
 			return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 		}
@@ -183,12 +185,12 @@ func generateDonJobSpecs(
 		}
 
 		if creflags.HasFlag(donWithMetadata.Flags, types.OCR3Capability) {
-			nodeEthAddr, ethErr := node.FindLabelValue(workerNode, node.EthAddressKey)
+			nodeEthAddr, ethErr := node.FindLabelValue(workerNode, cldtypes.EthAddressKey)
 			if ethErr != nil {
 				return nil, errors.Wrap(ethErr, "failed to get eth address from labels")
 			}
 
-			ocr2KeyBundleID, ocr2Err := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDKey)
+			ocr2KeyBundleID, ocr2Err := node.FindLabelValue(workerNode, cldtypes.NodeOCR2KeyBundleIDKey)
 			if ocr2Err != nil {
 				return nil, errors.Wrap(ocr2Err, "failed to get ocr2 key bundle id from labels")
 			}

@@ -10,9 +10,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
@@ -57,9 +57,9 @@ func ValidateTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraIn
 	return nil
 }
 
-func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput types.InfraInput) (*cretypes.Topology, error) {
-	topology := &cretypes.Topology{}
-	donsWithMetadata := make([]*cretypes.DonMetadata, len(nodeSetInput))
+func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput types.InfraInput) (*cldtypes.Topology, error) {
+	topology := &cldtypes.Topology{}
+	donsWithMetadata := make([]*cldtypes.DonMetadata, len(nodeSetInput))
 
 	for i := range nodeSetInput {
 		flags, err := flags.NodeSetFlags(nodeSetInput[i])
@@ -67,23 +67,23 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput
 			return nil, errors.Wrapf(err, "failed to get flags for nodeset %s", nodeSetInput[i].Name)
 		}
 
-		donsWithMetadata[i] = &cretypes.DonMetadata{
+		donsWithMetadata[i] = &cldtypes.DonMetadata{
 			ID:            libc.MustSafeUint32(i + 1),
 			Flags:         flags,
-			NodesMetadata: make([]*cretypes.NodeMetadata, len(nodeSetInput[i].NodeSpecs)),
+			NodesMetadata: make([]*cldtypes.NodeMetadata, len(nodeSetInput[i].NodeSpecs)),
 			Name:          nodeSetInput[i].Name,
 		}
 	}
 
 	for donIdx, donMetadata := range donsWithMetadata {
 		for nodeIdx := range donMetadata.NodesMetadata {
-			nodeWithLabels := cretypes.NodeMetadata{}
+			nodeWithLabels := cldtypes.NodeMetadata{}
 			nodeType := cretypes.WorkerNode
 			if nodeSetInput[donIdx].BootstrapNodeIndex != -1 && nodeIdx == nodeSetInput[donIdx].BootstrapNodeIndex {
 				nodeType = cretypes.BootstrapNode
 			}
-			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
-				Key:   node.NodeTypeKey,
+			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cldtypes.Label{
+				Key:   cldtypes.NodeTypeKey,
 				Value: nodeType,
 			})
 
@@ -93,8 +93,8 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput
 
 			if flags.HasFlag(donMetadata.Flags, cretypes.GatewayDON) {
 				if nodeSetInput[donIdx].GatewayNodeIndex != -1 && nodeIdx == nodeSetInput[donIdx].GatewayNodeIndex {
-					nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
-						Key:   node.ExtraRolesKey,
+					nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cldtypes.Label{
+						Key:   cldtypes.ExtraRolesKey,
 						Value: cretypes.GatewayNode,
 					})
 
@@ -103,7 +103,7 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput
 						gatewayHost += "-gtwnode"
 					}
 
-					topology.GatewayConnectorOutput = &cretypes.GatewayConnectorOutput{
+					topology.GatewayConnectorOutput = &cldtypes.GatewayConnectorOutput{
 						Path: "/node",
 						Port: 5003,
 						Host: gatewayHost,
@@ -112,13 +112,13 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput
 				}
 			}
 
-			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
-				Key:   node.IndexKey,
+			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cldtypes.Label{
+				Key:   cldtypes.IndexKey,
 				Value: strconv.Itoa(nodeIdx),
 			})
 
-			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
-				Key:   node.HostLabelKey,
+			nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cldtypes.Label{
+				Key:   cldtypes.HostLabelKey,
 				Value: host,
 			})
 
@@ -137,7 +137,7 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput
 	return topology, nil
 }
 
-func AddKeysToTopology(topology *cretypes.Topology, keys *cretypes.GenerateKeysOutput) (*cretypes.Topology, error) {
+func AddKeysToTopology(topology *cldtypes.Topology, keys *cretypes.GenerateKeysOutput) (*cldtypes.Topology, error) {
 	if topology == nil {
 		return nil, errors.New("topology is nil")
 	}
@@ -149,8 +149,8 @@ func AddKeysToTopology(topology *cretypes.Topology, keys *cretypes.GenerateKeysO
 	for _, donMetadata := range topology.DonsMetadata {
 		if p2pKeys, ok := keys.P2PKeys[donMetadata.ID]; ok {
 			for idx, nodeMetadata := range donMetadata.NodesMetadata {
-				nodeMetadata.Labels = append(nodeMetadata.Labels, &cretypes.Label{
-					Key:   node.NodeP2PIDKey,
+				nodeMetadata.Labels = append(nodeMetadata.Labels, &cldtypes.Label{
+					Key:   cldtypes.NodeP2PIDKey,
 					Value: p2pKeys.PeerIDs[idx],
 				})
 			}
@@ -158,8 +158,8 @@ func AddKeysToTopology(topology *cretypes.Topology, keys *cretypes.GenerateKeysO
 
 		if evmKeys, ok := keys.EVMKeys[donMetadata.ID]; ok {
 			for idx, nodeMetadata := range donMetadata.NodesMetadata {
-				nodeMetadata.Labels = append(nodeMetadata.Labels, &cretypes.Label{
-					Key:   node.EthAddressKey,
+				nodeMetadata.Labels = append(nodeMetadata.Labels, &cldtypes.Label{
+					Key:   cldtypes.EthAddressKey,
 					Value: evmKeys.PublicAddresses[idx].Hex(),
 				})
 			}

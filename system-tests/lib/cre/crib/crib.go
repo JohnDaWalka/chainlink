@@ -2,6 +2,7 @@ package crib
 
 import (
 	"fmt"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"os"
 	"path/filepath"
 	"slices"
@@ -132,7 +133,7 @@ func DeployDons(input *types.DeployCribDonsInput) ([]*types.CapabilitiesAwareNod
 		deployDonEnvVars["DEVSPACE_IMAGE"] = imageName
 		deployDonEnvVars["DEVSPACE_IMAGE_TAG"] = imageTag
 
-		bootstrapNodes, err := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &types.Label{Key: libnode.NodeTypeKey, Value: types.BootstrapNode}, libnode.EqualLabels)
+		bootstrapNodes, err := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &cldtypes.Label{Key: cldtypes.NodeTypeKey, Value: types.BootstrapNode}, libnode.EqualLabels)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to find bootstrap nodes")
 		}
@@ -153,8 +154,8 @@ func DeployDons(input *types.DeployCribDonsInput) ([]*types.CapabilitiesAwareNod
 			return newTOMLBytes, nil
 		}
 
-		var writeOverrides = func(nodeMetadata *types.NodeMetadata, i int, nodeType types.NodeType) error {
-			nodeIndexStr, findErr := libnode.FindLabelValue(nodeMetadata, libnode.IndexKey)
+		var writeOverrides = func(nodeMetadata *cldtypes.NodeMetadata, i int, nodeType types.NodeType) error {
+			nodeIndexStr, findErr := libnode.FindLabelValue(nodeMetadata, cldtypes.IndexKey)
 			if findErr != nil {
 				return errors.Wrapf(findErr, "failed to find node index for %s node %d in nodeset %s", nodeType, i, donMetadata.Name)
 			}
@@ -197,7 +198,7 @@ func DeployDons(input *types.DeployCribDonsInput) ([]*types.CapabilitiesAwareNod
 			}
 		}
 
-		workerNodes, err := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &types.Label{Key: libnode.NodeTypeKey, Value: types.WorkerNode}, libnode.EqualLabels)
+		workerNodes, err := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &cldtypes.Label{Key: cldtypes.NodeTypeKey, Value: types.WorkerNode}, libnode.EqualLabels)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}

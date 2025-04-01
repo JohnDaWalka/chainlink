@@ -1,6 +1,7 @@
 package por
 
 import (
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -34,7 +35,7 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 	var donBootstrapNodeHost string
 	var donBootstrapNodePeerID string
 
-	bootstrapNode, err := node.FindOneWithLabel(input.DonMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.BootstrapNode}, node.EqualLabels)
+	bootstrapNode, err := node.FindOneWithLabel(input.DonMetadata.NodesMetadata, &cldtypes.Label{Key: cldtypes.NodeTypeKey, Value: cretypes.BootstrapNode}, node.EqualLabels)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find bootstrap node")
 	}
@@ -45,7 +46,7 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 	}
 
 	for _, label := range bootstrapNode.Labels {
-		if label.Key == node.HostLabelKey {
+		if label.Key == cldtypes.HostLabelKey {
 			donBootstrapNodeHost = label.Value
 			break
 		}
@@ -57,7 +58,7 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 
 	var nodeIndex int
 	for _, label := range bootstrapNode.Labels {
-		if label.Key == node.IndexKey {
+		if label.Key == cldtypes.IndexKey {
 			nodeIndex, err = strconv.Atoi(label.Value)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to convert node index to int")
@@ -74,7 +75,7 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 	}
 
 	// find worker nodes
-	workflowNodeSet, err := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.WorkerNode}, node.EqualLabels)
+	workflowNodeSet, err := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &cldtypes.Label{Key: cldtypes.NodeTypeKey, Value: cretypes.WorkerNode}, node.EqualLabels)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes")
 	}
@@ -82,7 +83,7 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 	for i := range workflowNodeSet {
 		var nodeIndex int
 		for _, label := range workflowNodeSet[i].Labels {
-			if label.Key == node.IndexKey {
+			if label.Key == cldtypes.IndexKey {
 				nodeIndex, err = strconv.Atoi(label.Value)
 				if err != nil {
 					return nil, errors.Wrap(err, "failed to convert node index to int")
@@ -94,7 +95,7 @@ func GenerateConfigs(input cretypes.GeneratePoRConfigsInput) (cretypes.NodeIndex
 		configOverrides[nodeIndex] = config.WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost, input.PeeringData, chainIDUint64, input.CapabilitiesRegistryAddress, input.BlockchainOutput.Nodes[0].DockerInternalHTTPUrl, input.BlockchainOutput.Nodes[0].DockerInternalWSUrl)
 		var nodeEthAddr common.Address
 		for _, label := range workflowNodeSet[i].Labels {
-			if label.Key == node.EthAddressKey {
+			if label.Key == cldtypes.EthAddressKey {
 				if label.Value == "" {
 					return nil, errors.New("eth address label value is empty")
 				}

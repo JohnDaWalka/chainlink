@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -173,8 +174,8 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput, capabilityFactoryFns 
 			capabilities = append(capabilities, factoryFn(donMetadata.Flags)...)
 		}
 
-		workerNodes, workerNodesErr := node.FindManyWithLabel(donMetadata.NodesMetadata, &types.Label{
-			Key:   node.NodeTypeKey,
+		workerNodes, workerNodesErr := node.FindManyWithLabel(donMetadata.NodesMetadata, &cldtypes.Label{
+			Key:   cldtypes.NodeTypeKey,
 			Value: types.WorkerNode,
 		}, node.EqualLabels)
 
@@ -212,8 +213,8 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput, capabilityFactoryFns 
 
 	for _, metaDon := range input.Topology.DonsMetadata {
 		if flags.HasFlag(metaDon.Flags, types.OCR3Capability) {
-			workerNodes, workerNodesErr := node.FindManyWithLabel(metaDon.NodesMetadata, &types.Label{
-				Key:   node.NodeTypeKey,
+			workerNodes, workerNodesErr := node.FindManyWithLabel(metaDon.NodesMetadata, &cldtypes.Label{
+				Key:   cldtypes.NodeTypeKey,
 				Value: types.WorkerNode,
 			}, node.EqualLabels)
 

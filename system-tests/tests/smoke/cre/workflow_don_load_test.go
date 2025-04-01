@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"math/rand/v2"
 	"os"
 	"strconv"
@@ -109,14 +111,14 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 	}
 
 	// Create function that will append test specific jobs
-	createCustomJobsFunc := func(jobSpecs keystonetypes.DonJobs, donWithMetadata *keystonetypes.DonWithMetadata) (keystonetypes.DonJobs, error) {
-		workflowNodeSet, err2 := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &keystonetypes.Label{Key: node.NodeTypeKey, Value: keystonetypes.WorkerNode}, node.EqualLabels)
+	createCustomJobsFunc := func(jobSpecs keystonetypes.DonJobs, donWithMetadata *devenv.DonWithMetadata) (keystonetypes.DonJobs, error) {
+		workflowNodeSet, err2 := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &cldtypes.Label{Key: cldtypes.NodeTypeKey, Value: keystonetypes.WorkerNode}, node.EqualLabels)
 		if err2 != nil {
 			// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 			return nil, errors.Wrap(err2, "failed to find worker nodes")
 		}
 		for _, workerNode := range workflowNodeSet {
-			nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
+			nodeID, nodeIDErr := node.FindLabelValue(workerNode, cldtypes.NodeIDKey)
 			if nodeIDErr != nil {
 				return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 			}

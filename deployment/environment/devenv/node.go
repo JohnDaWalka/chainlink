@@ -12,17 +12,6 @@ import (
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 )
 
-const (
-	NodeTypeKey            = "type"
-	HostLabelKey           = "host"
-	IndexKey               = "node_index"
-	EthAddressKey          = "eth_address"
-	ExtraRolesKey          = "extra_roles"
-	NodeIDKey              = "node_id"
-	NodeOCR2KeyBundleIDKey = "ocr2_key_bundle_id"
-	NodeP2PIDKey           = "p2p_id"
-)
-
 type stringTransformer func(string) string
 
 func NoOpTransformFn(value string) string {
@@ -39,7 +28,7 @@ func KeyExtractingTransformFn(value string) string {
 
 func ToP2PID(node *types.NodeMetadata, transformFn stringTransformer) (string, error) {
 	for _, label := range node.Labels {
-		if label.Key == NodeP2PIDKey {
+		if label.Key == types.NodeP2PIDKey {
 			if label.Value == "" {
 				return "", errors.New("p2p label value is empty for node")
 			}
@@ -72,7 +61,7 @@ func GetNodeInfo(nodeOut *ns.Output, prefix string, bootstrapNodeCount int) ([]N
 					InternalIP: nodeOut.CLNodes[i-1].Node.InternalIP,
 				},
 				Labels: map[string]string{
-					NodeTypeKey: types.BootstrapNode,
+					types.NodeTypeKey: types.BootstrapNode,
 				},
 			})
 		} else {
@@ -87,7 +76,7 @@ func GetNodeInfo(nodeOut *ns.Output, prefix string, bootstrapNodeCount int) ([]N
 					InternalIP: nodeOut.CLNodes[i-1].Node.InternalIP,
 				},
 				Labels: map[string]string{
-					NodeTypeKey: types.WorkerNode,
+					types.NodeTypeKey: types.WorkerNode,
 				},
 			})
 		}

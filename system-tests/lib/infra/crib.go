@@ -3,6 +3,7 @@ package infra
 import (
 	"encoding/json"
 	"fmt"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"io"
 	"os"
 	"path/filepath"
@@ -61,7 +62,7 @@ func ReadJdURL(cribConfigsDir string) (*jd.Output, error) {
 	return out, nil
 }
 
-func ReadNodeSetURL(cribConfigsDir string, donMetadata *cretypes.DonMetadata) (*ns.Output, error) {
+func ReadNodeSetURL(cribConfigsDir string, donMetadata *cldtypes.DonMetadata) (*ns.Output, error) {
 	// read DON URLs
 	donFileName := filepath.Join(cribConfigsDir, fmt.Sprintf("don-%s-urls.json", donMetadata.Name))
 	donURLs := types.DonURLs{}
@@ -79,12 +80,12 @@ func ReadNodeSetURL(cribConfigsDir string, donMetadata *cretypes.DonMetadata) (*
 		return nil, errors.Wrap(err, "failed to read and unmarshal don API credentials JSON")
 	}
 
-	bootstrapNodes, err := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{Key: libnode.NodeTypeKey, Value: cretypes.BootstrapNode}, libnode.EqualLabels)
+	bootstrapNodes, err := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &cldtypes.Label{Key: cldtypes.NodeTypeKey, Value: cretypes.BootstrapNode}, libnode.EqualLabels)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find bootstrap nodes")
 	}
 
-	workerNodes, err := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{Key: libnode.NodeTypeKey, Value: cretypes.WorkerNode}, libnode.EqualLabels)
+	workerNodes, err := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &cldtypes.Label{Key: cldtypes.NodeTypeKey, Value: cretypes.WorkerNode}, libnode.EqualLabels)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find worker nodes")
 	}

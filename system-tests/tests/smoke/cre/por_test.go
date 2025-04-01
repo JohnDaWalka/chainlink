@@ -44,6 +44,7 @@ import (
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
@@ -53,7 +54,6 @@ import (
 	keystonepor "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/por"
 	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	keystonesecrets "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
-	libenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	keystonetypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	libcrecli "github.com/smartcontractkit/chainlink/system-tests/lib/crecli"
@@ -438,11 +438,11 @@ type setupOutput struct {
 	forwarderAddress     common.Address
 	sethClient           *seth.Client
 	blockchainOutput     *blockchain.Output
-	donTopology          *keystonetypes.DonTopology
-	nodeOutput           []*keystonetypes.WrappedNodeOutput
+	donTopology          *devenv.DonTopology
+	nodeOutput           []*cldtypes.WrappedNodeOutput
 }
 
-func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig, priceProvider PriceProvider, mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet, customJobsFn func(keystonetypes.DonJobs, *keystonetypes.DonWithMetadata) (keystonetypes.DonJobs, error), capabilityFactoryFns func([]string) []keystone_changeset.DONCapabilityWithConfig) *setupOutput {
+func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfig, priceProvider PriceProvider, mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet, customJobsFn func(keystonetypes.DonJobs, *devenv.DonWithMetadata) (keystonetypes.DonJobs, error), capabilityFactoryFns func([]string) []keystone_changeset.DONCapabilityWithConfig) *setupOutput {
 	// Universal setup -- START
 
 	nodeSetInput := mustSetCapabilitiesFn(in.NodeSets)
@@ -611,14 +611,14 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		// TODO: add similar support for CRIB
 		if in.Infra.InfraType == libtypes.Docker {
 			if flags.HasFlag(donMetadata.Flags, keystonetypes.CronCapability) {
-				workerNodes, wErr := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &keystonetypes.Label{
-					Key:   libnode.NodeTypeKey,
+				workerNodes, wErr := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &cldtypes.Label{
+					Key:   cldtypes.NodeTypeKey,
 					Value: keystonetypes.WorkerNode,
 				}, libnode.EqualLabels)
 				require.NoError(t, wErr, "failed to find worker nodes")
 
 				for _, node := range workerNodes {
-					nodeIndexStr, nErr := libnode.FindLabelValue(node, libnode.IndexKey)
+					nodeIndexStr, nErr := libnode.FindLabelValue(node, cldtypes.IndexKey)
 					require.NoError(t, nErr, "failed to find index label")
 
 					nodeIndex, nIErr := strconv.Atoi(nodeIndexStr)
@@ -672,12 +672,12 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	jdOutput, err := CreateJobDistributor(in.JD)
 	require.NoError(t, err, "failed to create new job distributor")
 
-	nodeOutput := make([]*keystonetypes.WrappedNodeOutput, 0, len(nodeSetInput))
+	nodeOutput := make([]*cldtypes.WrappedNodeOutput, 0, len(nodeSetInput))
 	for _, nodeSetInput := range nodeSetInput {
 		nodeset, nodesetErr := ns.NewSharedDBNodeSet(nodeSetInput.Input, blockchainsOutput.blockchainOutput)
 		require.NoError(t, nodesetErr, "failed to deploy node set named %s", nodeSetInput.Name)
 
-		nodeOutput = append(nodeOutput, &keystonetypes.WrappedNodeOutput{
+		nodeOutput = append(nodeOutput, &cldtypes.WrappedNodeOutput{
 			Output:       nodeset,
 			NodeSetName:  nodeSetInput.Name,
 			Capabilities: nodeSetInput.Capabilities,
@@ -686,7 +686,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 
 	// Prepare the CLD environment that's required by the keystone changeset
 	// Ugly glue hack ¯\_(ツ)_/¯
-	fullCldInput := &keystonetypes.FullCLDEnvironmentInput{
+	fullCldInput := &devenv.FullCLDEnvironmentInput{
 		JdOutput:          jdOutput,
 		BlockchainOutput:  blockchainsOutput.blockchainOutput,
 		SethClient:        blockchainsOutput.sethClient,
@@ -705,7 +705,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 		creds = insecure.NewCredentials()
 	}
 
-	fullCldOutput, err := libenv.BuildFullCLDEnvironment(singeFileLogger, fullCldInput, creds)
+	fullCldOutput, err := devenv.BuildFullCLDEnvironment(singeFileLogger, fullCldInput, creds)
 	require.NoError(t, err, "failed to build chainlink deployment environment")
 
 	// Fund the nodes
