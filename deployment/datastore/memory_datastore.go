@@ -115,4 +115,3 @@ func (s *sealedMemoryDataStore[M]) Addresses() AddressRefStore {
 func (s *sealedMemoryDataStore[M]) Metadata() ContractMetadataStore[M] {
 	return s.MetadataStore
 }
-
