@@ -698,7 +698,10 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	// Ugly glue hack ¯\_(ツ)_/¯
 	fullCldOutput, err := devenv.NewEnvironmentBuilder(singeFileLogger).
 		WithJobDistributor(jdOutput, creds).
-		WithBlockchains(blockchainsOutput.blockchainOutput).
+		WithBlockchains(
+			map[string]*blockchain.Output{
+				blockchainsOutput.blockchainOutput.ChainID: blockchainsOutput.blockchainOutput,
+			}).
 		WithSethClients([]*seth.Client{blockchainsOutput.sethClient}).
 		WithExistingAddresses(chainsOnlyCld.ExistingAddresses).
 		WithTopology(topology).

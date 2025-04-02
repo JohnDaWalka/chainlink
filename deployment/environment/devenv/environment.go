@@ -3,8 +3,8 @@ package devenv
 import (
 	"context"
 	"fmt"
+	"strconv"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
@@ -79,7 +79,7 @@ type EnvironmentWithTopology struct {
 
 type EnvironmentBuilder struct {
 	jdOutput          *jd.Output
-	blockchainOutput  *blockchain.Output
+	blockchainOutputs types.ChainIDToBlockchainOutputs
 	sethClients       []*seth.Client
 	nodeSetOutput     []*types.WrappedNodeOutput
 	existingAddresses deployment.AddressBook
@@ -112,11 +112,11 @@ func (b *EnvironmentBuilder) WithJobDistributor(jdOutput *jd.Output, jdTransport
 	return b
 }
 
-func (b *EnvironmentBuilder) WithBlockchains(blockchainOutput *blockchain.Output) *EnvironmentBuilder {
-	if blockchainOutput == nil {
-		b.errs = append(b.errs, "blockchain output not set")
+func (b *EnvironmentBuilder) WithBlockchains(blockchainOutputs types.ChainIDToBlockchainOutputs) *EnvironmentBuilder {
+	if len(blockchainOutputs) == 0 {
+		b.errs = append(b.errs, "blockchain outputs not set")
 	}
-	b.blockchainOutput = blockchainOutput
+	b.blockchainOutputs = blockchainOutputs
 	return b
 }
 
@@ -168,17 +168,18 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 	chains := make([]ChainConfig, 0)
 
 	for _, sethClient := range b.sethClients {
+		blockchainOutput := b.blockchainOutputs[strconv.FormatInt(sethClient.ChainID, 10)]
 		chainConfig := ChainConfig{
 			ChainID:   sethClient.Cfg.Network.ChainID,
 			ChainName: sethClient.Cfg.Network.Name,
-			ChainType: strings.ToUpper(b.blockchainOutput.Family),
+			ChainType: strings.ToUpper(blockchainOutput.Family),
 			WSRPCs: []CribRPCs{{
-				External: b.blockchainOutput.Nodes[0].HostWSUrl,
-				Internal: b.blockchainOutput.Nodes[0].DockerInternalWSUrl,
+				External: blockchainOutput.Nodes[0].HostWSUrl,
+				Internal: blockchainOutput.Nodes[0].DockerInternalWSUrl,
 			}},
 			HTTPRPCs: []CribRPCs{{
-				External: b.blockchainOutput.Nodes[0].HostHTTPUrl,
-				Internal: b.blockchainOutput.Nodes[0].DockerInternalHTTPUrl,
+				External: blockchainOutput.Nodes[0].HostHTTPUrl,
+				Internal: blockchainOutput.Nodes[0].DockerInternalHTTPUrl,
 			}},
 			DeployerKey: sethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
 		}

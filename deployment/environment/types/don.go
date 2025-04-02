@@ -3,8 +3,11 @@ package types
 import (
 	"errors"
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 )
+
+type ChainIDToBlockchainOutputs map[string]*blockchain.Output
 
 type NodeType = string
 

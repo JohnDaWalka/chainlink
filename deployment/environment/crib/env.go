@@ -18,6 +18,11 @@ func NewDevspaceEnvFromStateDir(envStateDir string) CRIBEnv {
 }
 
 func (c CRIBEnv) GetConfig(key string) (DeployOutput, error) {
+	// todo: read new fields
+	// JDOutput:          nil,
+	// BlockchainOutputs: nil,
+	// NodesetOutput:     nil,
+
 	reader := NewOutputReader(c.cribEnvStateDirPath)
 	nodesDetails := reader.ReadNodesDetails()
 	chainConfigs := reader.ReadChainConfigs()
@@ -30,9 +35,12 @@ func (c CRIBEnv) GetConfig(key string) (DeployOutput, error) {
 	}
 
 	return DeployOutput{
-		AddressBook: reader.ReadAddressBook(),
-		NodeIDs:     nodesDetails.NodeIDs,
-		Chains:      chainConfigs,
+		NodeIDs:           nodesDetails.NodeIDs,
+		Chains:            chainConfigs,
+		AddressBook:       reader.ReadAddressBook(),
+		JDOutput:          nil,
+		BlockchainOutputs: nil,
+		NodesetOutput:     nil,
 	}, nil
 }
 
