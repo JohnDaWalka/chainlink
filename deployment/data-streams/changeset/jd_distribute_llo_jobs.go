@@ -2,6 +2,7 @@ package changeset
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -157,19 +158,19 @@ func chainConfigs(ctx context.Context, e deployment.Environment, chainID string,
 
 func (f CsDistributeLLOJobSpecs) VerifyPreconditions(_ deployment.Environment, config CsDistributeLLOJobSpecsConfig) error {
 	if config.ChainSelectorEVM == 0 {
-		return fmt.Errorf("chain selector is required")
+		return errors.New("chain selector is required")
 	}
 	if config.Filter == nil {
-		return fmt.Errorf("filter is required")
+		return errors.New("filter is required")
 	}
 	if config.ConfigMode != "bluegreen" {
 		return fmt.Errorf("invalid config mode: %s", config.ConfigMode)
 	}
 	if config.ChannelConfigStoreAddr == (common.Address{}) {
-		return fmt.Errorf("channel config store address is required")
+		return errors.New("channel config store address is required")
 	}
 	if len(config.Servers) == 0 {
-		return fmt.Errorf("servers map is required")
+		return errors.New("servers map is required")
 	}
 
 	return nil
