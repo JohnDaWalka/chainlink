@@ -3,13 +3,15 @@ package devenv
 import (
 	"context"
 	"fmt"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
+	"strings"
+
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/credentials"
-	"strings"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
