@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
-	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"math/rand/v2"
 	"os"
 	"strconv"
@@ -16,6 +14,9 @@ import (
 	"testing"
 	"text/template"
 	"time"
+
+	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"

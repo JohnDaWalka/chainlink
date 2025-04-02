@@ -2,8 +2,9 @@ package config
 
 import (
 	"fmt"
-	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"strconv"
+
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/ethereum/go-ethereum/common"
 

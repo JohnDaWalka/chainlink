@@ -1,9 +1,10 @@
 package config
 
 import (
-	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"testing"
 	"time"
+
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/pkg/errors"
 

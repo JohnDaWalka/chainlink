@@ -3,10 +3,11 @@ package infra
 import (
 	"encoding/json"
 	"fmt"
-	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"io"
 	"os"
 	"path/filepath"
+
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/pkg/errors"
 

@@ -2,6 +2,7 @@ package chainreader
 
 import (
 	"fmt"
+
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 

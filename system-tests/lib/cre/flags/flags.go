@@ -1,8 +1,9 @@
 package flags
 
 import (
-	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"slices"
+
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/pkg/errors"
 

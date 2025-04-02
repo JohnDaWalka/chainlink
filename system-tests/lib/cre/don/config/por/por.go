@@ -1,8 +1,9 @@
 package por
 
 import (
-	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"strconv"
+
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"

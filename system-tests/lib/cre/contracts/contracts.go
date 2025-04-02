@@ -4,8 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"strings"
+
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"

@@ -3,8 +3,9 @@ package node
 import (
 	"errors"
 	"fmt"
-	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"strings"
+
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 )
 
 type stringTransformer func(string) string

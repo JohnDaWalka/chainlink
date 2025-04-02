@@ -3,10 +3,11 @@ package por
 import (
 	"context"
 	"fmt"
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
-	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"strconv"
 	"time"
+
+	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"

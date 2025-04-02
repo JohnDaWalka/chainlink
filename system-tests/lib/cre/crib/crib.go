@@ -2,12 +2,13 @@ package crib
 
 import (
 	"fmt"
-	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
