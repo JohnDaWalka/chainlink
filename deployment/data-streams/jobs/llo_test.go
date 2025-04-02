@@ -64,7 +64,7 @@ func TestLLOJobSpec_MarshalTOML(t *testing.T) {
 			spec: LLOJobSpec{
 				Base: Base{
 					Name:          "Test-DON",
-					Type: "offchainreporting2",
+					Type:          "offchainreporting2",
 					SchemaVersion: 1,
 					ExternalJobID: uuid.MustParse("00000000-0000-0000-0000-000000000000"),
 				},
@@ -97,7 +97,7 @@ func TestLLOJobSpec_MarshalTOML(t *testing.T) {
 			spec: LLOJobSpec{
 				Base: Base{
 					Name:          "Empty-DON-Test",
-					Type: "offchainreporting2",
+					Type:          "offchainreporting2",
 					SchemaVersion: 1,
 					ExternalJobID: uuid.MustParse("00000000-0000-0000-0000-000000000000"),
 				},
