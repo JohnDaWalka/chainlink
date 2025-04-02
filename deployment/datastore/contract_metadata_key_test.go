@@ -20,7 +20,7 @@ func TestContractMetadataKey_Equals(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "Different chain",
+			name:     "Different chain selector",
 			key1:     NewContractMetadataKey(1, "0x1234567890abcdef"),
 			key2:     NewContractMetadataKey(2, "0x1234567890abcdef"),
 			expected: false,
@@ -47,11 +47,11 @@ func TestContractMetadataKey_Equals(t *testing.T) {
 }
 
 func TestContractMetadataKey(t *testing.T) {
-	chain := uint64(1)
+	chainSelector := uint64(1)
 	address := "0x1234567890abcdef"
 
-	key := NewContractMetadataKey(chain, address)
+	key := NewContractMetadataKey(chainSelector, address)
 
-	require.Equal(t, chain, key.ChainSelector(), "ChainSelector should return the correct chain ID")
+	require.Equal(t, chainSelector, key.ChainSelector(), "ChainSelector should return the correct chain selector")
 	require.Equal(t, address, key.Address(), "Address should return the correct address")
 }
