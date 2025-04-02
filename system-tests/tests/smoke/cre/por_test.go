@@ -699,7 +699,7 @@ func setupTestEnvironment(t *testing.T, testLogger zerolog.Logger, in *TestConfi
 	fullCldOutput, err := devenv.NewEnvironmentBuilder(singeFileLogger).
 		WithJobDistributor(jdOutput, creds).
 		WithBlockchains(blockchainsOutput.blockchainOutput).
-		WithSethClient(blockchainsOutput.sethClient).
+		WithSethClients([]*seth.Client{blockchainsOutput.sethClient}).
 		WithExistingAddresses(chainsOnlyCld.ExistingAddresses).
 		WithTopology(topology).
 		Build()

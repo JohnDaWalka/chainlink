@@ -80,7 +80,7 @@ type EnvironmentWithTopology struct {
 type EnvironmentBuilder struct {
 	jdOutput          *jd.Output
 	blockchainOutput  *blockchain.Output
-	sethClient        *seth.Client
+	sethClients       []*seth.Client
 	nodeSetOutput     []*types.WrappedNodeOutput
 	existingAddresses deployment.AddressBook
 	topology          *types.Topology
@@ -120,11 +120,11 @@ func (b *EnvironmentBuilder) WithBlockchains(blockchainOutput *blockchain.Output
 	return b
 }
 
-func (b *EnvironmentBuilder) WithSethClient(sethClient *seth.Client) *EnvironmentBuilder {
-	if sethClient == nil {
-		b.errs = append(b.errs, "seth client not set")
+func (b *EnvironmentBuilder) WithSethClients(sethClients []*seth.Client) *EnvironmentBuilder {
+	if len(sethClients) == 0 {
+		b.errs = append(b.errs, "seth clients not set")
 	}
-	b.sethClient = sethClient
+	b.sethClients = sethClients
 	return b
 }
 
@@ -165,10 +165,12 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 	dons := make([]*DON, len(b.nodeSetOutput))
 
 	var allNodesInfo []NodeInfo
-	chains := []ChainConfig{
-		{
-			ChainID:   b.sethClient.Cfg.Network.ChainID,
-			ChainName: b.sethClient.Cfg.Network.Name,
+	chains := make([]ChainConfig, 0)
+
+	for _, sethClient := range b.sethClients {
+		chainConfig := ChainConfig{
+			ChainID:   sethClient.Cfg.Network.ChainID,
+			ChainName: sethClient.Cfg.Network.Name,
 			ChainType: strings.ToUpper(b.blockchainOutput.Family),
 			WSRPCs: []CribRPCs{{
 				External: b.blockchainOutput.Nodes[0].HostWSUrl,
@@ -178,8 +180,9 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 				External: b.blockchainOutput.Nodes[0].HostHTTPUrl,
 				Internal: b.blockchainOutput.Nodes[0].DockerInternalHTTPUrl,
 			}},
-			DeployerKey: b.sethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
-		},
+			DeployerKey: sethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
+		}
+		chains = append(chains, chainConfig)
 	}
 
 	for i, nodeOutput := range b.nodeSetOutput {
