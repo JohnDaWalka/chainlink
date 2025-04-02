@@ -21,7 +21,7 @@ type BaseDataStore[T Cloneable[T], R AddressRefStore, M ContractMetadataStore[T]
 	Metadata() M
 }
 
-// DataStore is an interface that defines the operations for a
+// DataStore is an interface that defines the operations for a read-only data store.
 type DataStore[T Cloneable[T]] interface {
 	BaseDataStore[T, AddressRefStore, ContractMetadataStore[T]]
 }
