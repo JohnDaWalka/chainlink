@@ -254,6 +254,7 @@ func (t *telemeter) collectObservationTelemetry(p interface{}, opts llo.DSOpts) 
 		telemType = synchronization.LLOObservation
 		v.DonId = t.donID
 		msg = v
+		t.eng.Infow("Sending LLOObservationTelemetry telemetry")
 	default:
 		t.eng.Warnw("Unknown telemetry type", "type", fmt.Sprintf("%T", p))
 		return
