@@ -49,7 +49,7 @@ func TestMemoryContractMetadataStore_indexOf(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store := MemoryContractMetadataStore[DefaultMetadata]{records: tt.givenState}
+			store := MemoryContractMetadataStore[DefaultMetadata]{Records: tt.givenState}
 			idx := store.indexOf(tt.giveKey)
 			assert.Equal(t, tt.expectedIndex, idx)
 		})
@@ -92,7 +92,7 @@ func TestMemoryContractMetadataStore_Add(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store := MemoryContractMetadataStore[DefaultMetadata]{records: tt.givenState}
+			store := MemoryContractMetadataStore[DefaultMetadata]{Records: tt.givenState}
 			err := store.Add(tt.giveRecord)
 
 			if tt.expectedError != nil {
@@ -100,7 +100,7 @@ func TestMemoryContractMetadataStore_Add(t *testing.T) {
 				assert.Equal(t, tt.expectedError, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedState, store.records)
+				assert.Equal(t, tt.expectedState, store.Records)
 			}
 		})
 	}
@@ -149,12 +149,12 @@ func TestMemoryContractMetadataStore_AddOrUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store := MemoryContractMetadataStore[DefaultMetadata]{records: tt.givenState}
+			store := MemoryContractMetadataStore[DefaultMetadata]{Records: tt.givenState}
 			// Check the error for the in-memory store, which will always be nil for the
 			// in memory implementation, to satisfy the linter
 			err := store.AddOrUpdate(tt.giveRecord)
 			require.NoError(t, err)
-			assert.Equal(t, tt.expectedState, store.records)
+			assert.Equal(t, tt.expectedState, store.Records)
 		})
 	}
 }
@@ -201,7 +201,7 @@ func TestMemoryContractMetadataStore_Update(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store := MemoryContractMetadataStore[DefaultMetadata]{records: tt.givenState}
+			store := MemoryContractMetadataStore[DefaultMetadata]{Records: tt.givenState}
 			err := store.Update(tt.giveRecord)
 
 			if tt.expectedError != nil {
@@ -209,7 +209,7 @@ func TestMemoryContractMetadataStore_Update(t *testing.T) {
 				assert.Equal(t, tt.expectedError, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedState, store.records)
+				assert.Equal(t, tt.expectedState, store.Records)
 			}
 		})
 	}
@@ -269,7 +269,7 @@ func TestMemoryMemoryContractMetadataStore_Delete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store := MemoryContractMetadataStore[DefaultMetadata]{records: tt.givenState}
+			store := MemoryContractMetadataStore[DefaultMetadata]{Records: tt.givenState}
 			err := store.Delete(tt.giveKey)
 
 			if tt.expectedError != nil {
@@ -277,7 +277,7 @@ func TestMemoryMemoryContractMetadataStore_Delete(t *testing.T) {
 				assert.Equal(t, tt.expectedError, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedState, store.records)
+				assert.Equal(t, tt.expectedState, store.Records)
 			}
 		})
 	}
@@ -326,7 +326,7 @@ func TestMemoryContractMetadataStore_Fetch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store := MemoryContractMetadataStore[DefaultMetadata]{records: tt.givenState}
+			store := MemoryContractMetadataStore[DefaultMetadata]{Records: tt.givenState}
 			records, err := store.Fetch()
 
 			if tt.expectedError != nil {
@@ -382,7 +382,7 @@ func TestMemoryContractMetadataStore_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store := MemoryContractMetadataStore[DefaultMetadata]{records: tt.givenState}
+			store := MemoryContractMetadataStore[DefaultMetadata]{Records: tt.givenState}
 			record, err := store.Get(tt.giveKey)
 
 			if tt.expectedError != nil {
@@ -460,7 +460,7 @@ func TestMemoryContractMetadataStore_Filter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store := MemoryContractMetadataStore[DefaultMetadata]{records: tt.givenState}
+			store := MemoryContractMetadataStore[DefaultMetadata]{Records: tt.givenState}
 			filteredRecords := store.Filter(tt.giveFilters...)
 			assert.Equal(t, tt.expectedResult, filteredRecords)
 		})

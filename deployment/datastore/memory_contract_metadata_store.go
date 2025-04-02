@@ -17,15 +17,15 @@ var _ MutableContractMetadataStore[DefaultMetadata] = &MemoryContractMetadataSto
 
 type MemoryContractMetadataStore[M Cloneable[M]] struct {
 	mu      sync.RWMutex
-	records []ContractMetadata[M]
+	Records []ContractMetadata[M] `json:"records"`
 }
 
 func NewMemoryContractMetadataStore[M Cloneable[M]]() *MemoryContractMetadataStore[M] {
-	return &MemoryContractMetadataStore[M]{records: []ContractMetadata[M]{}}
+	return &MemoryContractMetadataStore[M]{Records: []ContractMetadata[M]{}}
 }
 
 func (s *MemoryContractMetadataStore[M]) indexOf(key ContractMetadataKey) int {
-	for i, record := range s.records {
+	for i, record := range s.Records {
 		if record.Key().Equals(key) {
 			return i
 		}
@@ -41,7 +41,7 @@ func (s *MemoryContractMetadataStore[M]) Get(key ContractMetadataKey) (ContractM
 	if idx == -1 {
 		return ContractMetadata[M]{}, ErrContractMetadataNotFound
 	}
-	return s.records[idx].Clone(), nil
+	return s.Records[idx].Clone(), nil
 }
 
 func (s *MemoryContractMetadataStore[M]) Fetch() ([]ContractMetadata[M], error) {
@@ -49,7 +49,7 @@ func (s *MemoryContractMetadataStore[M]) Fetch() ([]ContractMetadata[M], error) 
 	defer s.mu.RUnlock()
 
 	records := []ContractMetadata[M]{}
-	for _, record := range s.records {
+	for _, record := range s.Records {
 		records = append(records, record.Clone())
 	}
 	return records, nil
@@ -59,7 +59,7 @@ func (s *MemoryContractMetadataStore[M]) Filter(filters ...FilterFunc[ContractMe
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	records := append([]ContractMetadata[M]{}, s.records...)
+	records := append([]ContractMetadata[M]{}, s.Records...)
 	for _, filter := range filters {
 		records = filter(records)
 	}
@@ -74,7 +74,7 @@ func (s *MemoryContractMetadataStore[M]) Add(record ContractMetadata[M]) error {
 	if idx != -1 {
 		return ErrContractMetadataExists
 	}
-	s.records = append(s.records, record)
+	s.Records = append(s.Records, record)
 	return nil
 }
 
@@ -84,10 +84,10 @@ func (s *MemoryContractMetadataStore[M]) AddOrUpdate(record ContractMetadata[M])
 
 	idx := s.indexOf(record.Key())
 	if idx == -1 {
-		s.records = append(s.records, record)
+		s.Records = append(s.Records, record)
 		return nil
 	}
-	s.records[idx] = record
+	s.Records[idx] = record
 	return nil
 }
 
@@ -99,7 +99,7 @@ func (s *MemoryContractMetadataStore[M]) Update(record ContractMetadata[M]) erro
 	if idx == -1 {
 		return ErrContractMetadataNotFound
 	}
-	s.records[idx] = record
+	s.Records[idx] = record
 	return nil
 }
 
@@ -111,6 +111,6 @@ func (s *MemoryContractMetadataStore[M]) Delete(key ContractMetadataKey) error {
 	if idx == -1 {
 		return ErrContractMetadataNotFound
 	}
-	s.records = append(s.records[:idx], s.records[idx+1:]...)
+	s.Records = append(s.Records[:idx], s.Records[idx+1:]...)
 	return nil
 }
