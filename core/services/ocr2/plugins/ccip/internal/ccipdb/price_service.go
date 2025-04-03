@@ -275,14 +275,20 @@ func (p *priceService) observeGasPriceUpdates(
 		return nil, errors.New("gasPriceEstimator is not set yet")
 	}
 
-	// Include wrapped native to identify the source native USD price, notice USD is in 1e18 scale, i.e. $1 = 1e18
-	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, []cciptypes.Address{p.sourceNative})
+	destChainID, err := chainselectors.ChainIdFromSelector(p.destChainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dest chain ID from selector %d: %w", p.destChainSelector, err)
+	}
 
+	sourceNativeTokenID := pricegetter.NewTokenID(p.sourceNative, destChainID) // TODO: use source chain ID
+
+	// Include wrapped native to identify the source native USD price, notice USD is in 1e18 scale, i.e. $1 = 1e18
+	rawTokenPricesUSD, err := p.priceGetter.GetTokenPrices(ctx, []pricegetter.TokenID{sourceNativeTokenID})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch source native price (%s): %w", p.sourceNative, err)
 	}
 
-	sourceNativePriceUSD, exists := rawTokenPricesUSD[p.sourceNative]
+	sourceNativePriceUSD, exists := rawTokenPricesUSD[sourceNativeTokenID]
 	if !exists {
 		return nil, fmt.Errorf("missing source native (%s) price", p.sourceNative)
 	}
