@@ -17,7 +17,7 @@ require (
 require (
 	github.com/docker/docker v27.4.1+incompatible
 	github.com/docker/go-connections v0.5.0
-	github.com/ethereum/go-ethereum v1.15.3
+	github.com/ethereum/go-ethereum v1.15.7
 	github.com/gkampitakis/go-snaps v0.5.4
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
