@@ -18,6 +18,15 @@ func TestContractMetadata_Clone(t *testing.T) {
 	assert.Equal(t, original.ChainSelector, cloned.ChainSelector)
 	assert.Equal(t, original.Address, cloned.Address)
 	assert.Equal(t, original.Metadata, cloned.Metadata)
+
+	// Modify the original and ensure the cloned remains unchanged
+	original.ChainSelector = 2
+	original.Address = "0x456"
+	original.Metadata = DefaultMetadata("updated data")
+
+	assert.NotEqual(t, original.ChainSelector, cloned.ChainSelector)
+	assert.NotEqual(t, original.Address, cloned.Address)
+	assert.NotEqual(t, original.Metadata, cloned.Metadata)
 }
 
 func TestContractMetadata_Key(t *testing.T) {
