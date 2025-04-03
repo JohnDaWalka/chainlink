@@ -99,12 +99,12 @@ func (d *DynamicPriceGetter) FilterConfiguredTokens(_ context.Context, tokens []
 // GetJobSpecTokenPricesUSD returns the prices of all tokens defined in the price getter.
 func (d *DynamicPriceGetter) GetJobSpecTokenPricesUSD(ctx context.Context) (map[TokenID]*big.Int, error) {
 	tokensForPricing := d.getAllTokensDefined()
-	return d.TokenPricesUSD(ctx, tokensForPricing)
+	return d.GetTokenPrices(ctx, tokensForPricing)
 }
 
-// TokenPricesUSD implements the PriceGetter interface.
-// It returns static prices stored in the price getter, and batch calls aggregators (one per chain) to retrieve aggregator-based prices.
-func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []TokenID) (map[TokenID]*big.Int, error) {
+// GetTokenPrices returns static prices stored in the price getter config, and batch
+// calls aggregators (one per chain) to retrieve aggregator-based prices.
+func (d *DynamicPriceGetter) GetTokenPrices(ctx context.Context, tokens []TokenID) (map[TokenID]*big.Int, error) {
 	prices, batchCallsPerChain, err := d.preparePricesAndBatchCallsPerChain(tokens)
 	if err != nil {
 		return nil, err

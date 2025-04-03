@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -1688,85 +1687,76 @@ func (d *Delegate) ccipCommitPriceGetter(
 	destChainID int64,
 ) (priceGetter ccip.AllTokensPriceGetter, err error) {
 	spec := jb.OCR2OracleSpec
-	withPipeline := strings.Trim(pluginJobSpecConfig.TokenPricesUSDPipeline, "\n\t ") != ""
-	if withPipeline {
-		priceGetter, err = ccip.NewPipelineGetter(pluginJobSpecConfig.TokenPricesUSDPipeline, d.pipelineRunner, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
-		if err != nil {
-			return nil, fmt.Errorf("creating pipeline price getter: %w", err)
-		}
-	} else {
-		// Use dynamic price getter.
-		if pluginJobSpecConfig.PriceGetterConfig == nil {
-			return nil, errors.New("priceGetterConfig is nil")
-		}
 
-		// Configure contract readers for all chains specified in the aggregator configurations.
-		// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
-		aggregatorChainsToContracts := make(map[uint64][]common.Address)
-		for _, priceCfg := range pluginJobSpecConfig.PriceGetterConfig.TokenPrices {
-			if priceCfg.AggregatorConfig == nil {
-				continue
-			}
-
-			aggCfg := priceCfg.AggregatorConfig
-			if _, ok := aggregatorChainsToContracts[aggCfg.ChainID]; !ok {
-				aggregatorChainsToContracts[aggCfg.ChainID] = make([]common.Address, 0)
-			}
-			aggregatorChainsToContracts[aggCfg.ChainID] = append(aggregatorChainsToContracts[aggCfg.ChainID], aggCfg.AggregatorContractAddress)
-		}
-
-		contractReaders := map[uint64]types.ContractReader{}
-
-		for chainID, aggregatorContracts := range aggregatorChainsToContracts {
-			relayID := types.RelayID{Network: spec.Relay, ChainID: strconv.FormatUint(chainID, 10)}
-			relay, rerr := d.RelayGetter.Get(relayID)
-			if rerr != nil {
-				return nil, fmt.Errorf("get relay by id=%v: %w", relayID, err)
-			}
-
-			contractsConfig := make(map[string]evmrelaytypes.ChainContractReader, len(aggregatorContracts))
-			for i := range aggregatorContracts {
-				contractsConfig[fmt.Sprintf("%v_%v", ccip.OffchainAggregator, i)] = evmrelaytypes.ChainContractReader{
-					ContractABI: ccip.OffChainAggregatorABI,
-					Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
-						"decimals": { // CR consumers choose an alias
-							ChainSpecificName: "decimals",
-						},
-						"latestRoundData": {
-							ChainSpecificName: "latestRoundData",
-						},
-					},
-				}
-			}
-			contractReaderConfig := evmrelaytypes.ChainReaderConfig{
-				Contracts: contractsConfig,
-			}
-
-			contractReaderConfigJSONBytes, jerr := json.Marshal(contractReaderConfig)
-			if jerr != nil {
-				return nil, fmt.Errorf("marshal contract reader config: %w", jerr)
-			}
-
-			contractReader, cerr := relay.NewContractReader(ctx, contractReaderConfigJSONBytes)
-			if cerr != nil {
-				return nil, fmt.Errorf("new ccip commit contract reader %w", cerr)
-			}
-
-			contractReaders[chainID] = contractReader
-		}
-
-		priceGetterCfg := *pluginJobSpecConfig.PriceGetterConfig
-		if err := priceGetterCfg.MoveDeprecatedFields(uint64(destChainID)); err != nil {
-			return nil, fmt.Errorf("move deprecated price getter fields: %w", err)
-		}
-		if err := priceGetterCfg.Validate(); err != nil {
-			return nil, fmt.Errorf("validate price getter config: %w", err)
-		}
-		priceGetter, err = ccip.NewDynamicPriceGetter(*pluginJobSpecConfig.PriceGetterConfig, contractReaders)
-		if err != nil {
-			return nil, fmt.Errorf("creating dynamic price getter: %w", err)
-		}
+	// Use dynamic price getter.
+	if pluginJobSpecConfig.PriceGetterConfig == nil {
+		return nil, errors.New("priceGetterConfig is nil")
 	}
+
+	// Configure contract readers for all chains specified in the aggregator configurations.
+	// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
+	aggregatorChainsToContracts := make(map[uint64][]common.Address)
+	for _, priceCfg := range pluginJobSpecConfig.PriceGetterConfig.TokenPrices {
+		if priceCfg.AggregatorConfig == nil {
+			continue
+		}
+
+		aggCfg := priceCfg.AggregatorConfig
+		if _, ok := aggregatorChainsToContracts[aggCfg.ChainID]; !ok {
+			aggregatorChainsToContracts[aggCfg.ChainID] = make([]common.Address, 0)
+		}
+		aggregatorChainsToContracts[aggCfg.ChainID] = append(aggregatorChainsToContracts[aggCfg.ChainID], aggCfg.AggregatorContractAddress)
+	}
+
+	contractReaders := map[uint64]types.ContractReader{}
+
+	for chainID, aggregatorContracts := range aggregatorChainsToContracts {
+		relayID := types.RelayID{Network: spec.Relay, ChainID: strconv.FormatUint(chainID, 10)}
+		relay, rerr := d.RelayGetter.Get(relayID)
+		if rerr != nil {
+			return nil, fmt.Errorf("get relay by id=%v: %w", relayID, err)
+		}
+
+		contractsConfig := make(map[string]evmrelaytypes.ChainContractReader, len(aggregatorContracts))
+		for i := range aggregatorContracts {
+			contractsConfig[fmt.Sprintf("%v_%v", ccip.OffchainAggregator, i)] = evmrelaytypes.ChainContractReader{
+				ContractABI: ccip.OffChainAggregatorABI,
+				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
+					"decimals": { // CR consumers choose an alias
+						ChainSpecificName: "decimals",
+					},
+					"latestRoundData": {
+						ChainSpecificName: "latestRoundData",
+					},
+				},
+			}
+		}
+		contractReaderConfig := evmrelaytypes.ChainReaderConfig{
+			Contracts: contractsConfig,
+		}
+
+		contractReaderConfigJSONBytes, jerr := json.Marshal(contractReaderConfig)
+		if jerr != nil {
+			return nil, fmt.Errorf("marshal contract reader config: %w", jerr)
+		}
+
+		contractReader, cerr := relay.NewContractReader(ctx, contractReaderConfigJSONBytes)
+		if cerr != nil {
+			return nil, fmt.Errorf("new ccip commit contract reader %w", cerr)
+		}
+
+		contractReaders[chainID] = contractReader
+	}
+
+	priceGetterCfg := pluginJobSpecConfig.PriceGetterConfig
+	if err := priceGetterCfg.MoveDeprecatedFields(uint64(destChainID)); err != nil {
+		return nil, fmt.Errorf("move deprecated price getter fields: %w", err)
+	}
+	priceGetter, err = ccip.NewDynamicPriceGetter(*priceGetterCfg, contractReaders)
+	if err != nil {
+		return nil, fmt.Errorf("creating dynamic price getter: %w", err)
+	}
+
 	return priceGetter, nil
 }
 

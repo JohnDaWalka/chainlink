@@ -19,6 +19,7 @@ import (
 
 var _ PriceGetter = &PipelineGetter{}
 
+// Deprecated: not used
 type PipelineGetter struct {
 	source        string
 	runner        pipeline.Runner

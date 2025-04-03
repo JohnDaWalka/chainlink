@@ -2,19 +2,18 @@ package pricegetter
 
 import (
 	"context"
+	"io"
 	"math/big"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 )
 
-type PriceGetter interface {
-	cciptypes.PriceGetter
-}
-
 type AllTokensPriceGetter interface {
-	PriceGetter
 	// GetJobSpecTokenPricesUSD returns all token prices defined in the jobspec.
 	GetJobSpecTokenPricesUSD(ctx context.Context) (map[TokenID]*big.Int, error)
+	// GetTokenPrices returns the prices for the provided tokens in USD.
+	GetTokenPrices(ctx context.Context, tokens []TokenID) (map[TokenID]*big.Int, error)
+	io.Closer
 }
 
 // TokenID is a struct that represents a token's address and chain ID.
