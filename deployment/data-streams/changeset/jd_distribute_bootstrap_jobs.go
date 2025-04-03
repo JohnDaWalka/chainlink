@@ -65,12 +65,14 @@ func (CsDistributeBootstrapJobSpecs) Apply(e deployment.Environment, cfg CsDistr
 			Labels: labels,
 		})
 	}
-	err = proposeAllOrNothing(ctx, e.Offchain, proposals)
+	proposedJobs, err := proposeAllOrNothing(ctx, e.Offchain, proposals)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to propose all bootstrap jobs: %w", err)
 	}
 
-	return deployment.ChangesetOutput{}, nil
+	return deployment.ChangesetOutput{
+		Jobs: proposedJobs,
+	}, nil
 }
 
 func (f CsDistributeBootstrapJobSpecs) VerifyPreconditions(e deployment.Environment, config CsDistributeBootstrapJobSpecsConfig) error {

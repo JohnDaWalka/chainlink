@@ -120,12 +120,14 @@ func (CsDistributeLLOJobSpecs) Apply(e deployment.Environment, cfg CsDistributeL
 			Labels: labels,
 		})
 	}
-	err = proposeAllOrNothing(ctx, e.Offchain, proposals)
+	proposedJobs, err := proposeAllOrNothing(ctx, e.Offchain, proposals)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to propose all oracle jobs: %w", err)
 	}
 
-	return deployment.ChangesetOutput{}, nil
+	return deployment.ChangesetOutput{
+		Jobs: proposedJobs,
+	}, nil
 }
 
 // chainConfigs returns a map of node IDs to their chain configs for the given chain ID.
