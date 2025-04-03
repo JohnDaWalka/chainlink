@@ -928,10 +928,13 @@ func newCREServices(
 						},
 					))
 
+				engineRegistry := syncer.NewEngineRegistry()
+
 				eventHandler := syncer.NewEventHandler(
 					lggr,
 					workflowstore.NewInMemoryStore(lggr, clockwork.NewRealClock()),
 					opts.CapabilitiesRegistry,
+					engineRegistry,
 					custmsg.NewLabeler(),
 					workflowRateLimiter,
 					workflowLimits,
@@ -955,6 +958,7 @@ func newCREServices(
 					},
 					eventHandler,
 					workflowDonNotifier,
+					engineRegistry,
 				)
 
 				srvcs = append(srvcs, wfSyncer)

@@ -168,6 +168,7 @@ func Test_EventHandlerStateSync(t *testing.T) {
 			},
 			err: nil,
 		},
+		nil,
 		syncer.WithTicker(eventPollTicker.C),
 	)
 
@@ -296,6 +297,7 @@ func Test_InitialStateSync(t *testing.T) {
 			},
 			err: nil,
 		},
+		nil,
 		syncer.WithTicker(make(chan time.Time)),
 	)
 
@@ -382,8 +384,10 @@ func Test_SecretsWorker(t *testing.T) {
 
 	store := artifacts.NewStore(lggr, orm, fetcherFn, clockwork.NewFakeClock(), encryptionKey, emitter)
 
+	engineRegistry := syncer.NewEngineRegistry()
+
 	handler := &testSecretsWorkEventHandler{
-		wrappedHandler: syncer.NewEventHandler(lggr, nil, nil,
+		wrappedHandler: syncer.NewEventHandler(lggr, nil, nil, engineRegistry,
 			emitter, rl, wl, store),
 		registeredCh: make(chan syncer.Event, 1),
 	}
@@ -402,6 +406,7 @@ func Test_SecretsWorker(t *testing.T) {
 			},
 			err: nil,
 		},
+		engineRegistry,
 		syncer.WithTicker(giveTicker.C),
 	)
 
@@ -484,6 +489,7 @@ func Test_RegistrySyncer_SkipsEventsNotBelongingToDON(t *testing.T) {
 			},
 			err: nil,
 		},
+		nil,
 		syncer.WithTicker(giveTicker.C),
 	)
 
@@ -549,7 +555,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyPaused(t *testing.T) {
 
 	store := artifacts.NewStore(lggr, orm, fetcherFn, clockwork.NewFakeClock(), workflowkey.Key{}, emitter)
 
-	handler := syncer.NewEventHandler(lggr, nil, nil,
+	handler := syncer.NewEventHandler(lggr, nil, nil, nil,
 		emitter, rl, wl, store, syncer.WithEngineRegistry(er))
 
 	worker := syncer.NewWorkflowRegistry(
@@ -566,6 +572,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyPaused(t *testing.T) {
 			},
 			err: nil,
 		},
+		nil,
 		syncer.WithTicker(giveTicker.C),
 	)
 
@@ -580,7 +587,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyPaused(t *testing.T) {
 
 	// Require the secrets contents to eventually be updated
 	require.Eventually(t, func() bool {
-		_, err = er.Get("test-wf")
+		_, err = er.Get(syncer.EngineRegistryKey{Owner: backendTH.ContractsOwner.From.Bytes(), Name: "test-wf"})
 		if err == nil {
 			return false
 		}
@@ -654,7 +661,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyActivated(t *testing.T) {
 
 	store := artifacts.NewStore(lggr, orm, fetcherFn, clockwork.NewFakeClock(), workflowkey.Key{}, emitter)
 
-	handler := syncer.NewEventHandler(lggr, nil, nil,
+	handler := syncer.NewEventHandler(lggr, nil, nil, nil,
 		emitter, rl, wl, store, syncer.WithEngineRegistry(er), syncer.WithEngineFactoryFn(mf.new))
 
 	worker := syncer.NewWorkflowRegistry(
@@ -671,6 +678,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyActivated(t *testing.T) {
 			},
 			err: nil,
 		},
+		nil,
 		syncer.WithTicker(giveTicker.C),
 	)
 
@@ -685,7 +693,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyActivated(t *testing.T) {
 
 	// Require the secrets contents to eventually be updated
 	require.Eventually(t, func() bool {
-		_, err := er.Get("test-wf")
+		_, err = er.Get(syncer.EngineRegistryKey{Owner: backendTH.ContractsOwner.From.Bytes(), Name: "test-wf"})
 		if err != nil {
 			return err != nil
 		}
