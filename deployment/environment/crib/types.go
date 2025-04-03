@@ -36,7 +36,7 @@ func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput,
 	for _, chain := range output.BlockchainOutputs {
 		if chain.Family == "evm" {
 			sethClient, err := seth.NewClientBuilder().
-				WithRpcUrl(chain.Nodes[0].HostWSUrl).
+				WithRpcUrl(chain.Nodes[0].ExternalWSUrl).
 				WithPrivateKeys([]string{deployerKey}).
 				Build()
 			if err != nil {

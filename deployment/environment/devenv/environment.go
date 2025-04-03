@@ -174,12 +174,12 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 			ChainName: sethClient.Cfg.Network.Name,
 			ChainType: strings.ToUpper(blockchainOutput.Family),
 			WSRPCs: []CribRPCs{{
-				External: blockchainOutput.Nodes[0].HostWSUrl,
-				Internal: blockchainOutput.Nodes[0].DockerInternalWSUrl,
+				External: blockchainOutput.Nodes[0].ExternalWSUrl,
+				Internal: blockchainOutput.Nodes[0].InternalWSUrl,
 			}},
 			HTTPRPCs: []CribRPCs{{
-				External: blockchainOutput.Nodes[0].HostHTTPUrl,
-				Internal: blockchainOutput.Nodes[0].DockerInternalHTTPUrl,
+				External: blockchainOutput.Nodes[0].ExternalHTTPUrl,
+				Internal: blockchainOutput.Nodes[0].InternalHTTPUrl,
 			}},
 			DeployerKey: sethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
 		}
@@ -201,8 +201,8 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 		}
 
 		jdConfig := JDConfig{
-			GRPC:     b.jdOutput.HostGRPCUrl,
-			WSRPC:    b.jdOutput.DockerWSRPCUrl,
+			GRPC:     b.jdOutput.ExternalGRPCUrl,
+			WSRPC:    b.jdOutput.InternalWSRPCUrl,
 			Creds:    b.credentials,
 			NodeInfo: nodeInfo,
 		}
@@ -254,8 +254,8 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 		// Otherwise, JD would fail to accept job proposals for unknown nodes, even though it would still propose jobs to them. And that
 		// would be happening silently, without any error messages, and we wouldn't know about it until much later.
 		jd, err = NewJDClient(context.Background(), JDConfig{
-			GRPC:     b.jdOutput.HostGRPCUrl,
-			WSRPC:    b.jdOutput.DockerWSRPCUrl,
+			GRPC:     b.jdOutput.ExternalGRPCUrl,
+			WSRPC:    b.jdOutput.InternalWSRPCUrl,
 			Creds:    b.credentials,
 			NodeInfo: allNodesInfo,
 		})
