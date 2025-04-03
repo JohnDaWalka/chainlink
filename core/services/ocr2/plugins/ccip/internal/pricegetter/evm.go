@@ -84,26 +84,11 @@ func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, contractReaders 
 	return &priceGetter, nil
 }
 
+// Deprecated: This method is not used anymore.
 // FilterConfiguredTokens implements the PriceGetter interface.
 // It filters a list of token addresses for only those that have a price resolution rule configured on the PriceGetterConfig
 func (d *DynamicPriceGetter) FilterConfiguredTokens(_ context.Context, tokens []cciptypes.Address) (configured []cciptypes.Address, unconfigured []cciptypes.Address, err error) {
-	configured = []cciptypes.Address{}
-	unconfigured = []cciptypes.Address{}
-	for _, tk := range tokens {
-		evmAddr, err := ccipcalc.GenericAddrToEvm(tk)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if _, isAgg := d.cfg.AggregatorPrices[evmAddr]; isAgg {
-			configured = append(configured, tk)
-		} else if _, isStatic := d.cfg.StaticPrices[evmAddr]; isStatic {
-			configured = append(configured, tk)
-		} else {
-			unconfigured = append(unconfigured, tk)
-		}
-	}
-	return configured, unconfigured, nil
+	return nil, nil, fmt.Errorf("deprecated - not used")
 }
 
 // GetJobSpecTokenPricesUSD returns the prices of all tokens defined in the price getter.
@@ -124,15 +109,13 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []ccipty
 	return prices, nil
 }
 
+// TODO: include chain ids in the response
 func (d *DynamicPriceGetter) getAllTokensDefined() []cciptypes.Address {
-	tokens := make([]cciptypes.Address, 0)
+	tokens := make([]cciptypes.Address, 0, len(d.cfg.TokenPrices))
+	for _, cfg := range d.cfg.TokenPrices {
+		tokens = append(tokens, ccipcalc.EvmAddrToGeneric(cfg.TokenAddress))
+	}
 
-	for addr := range d.cfg.AggregatorPrices {
-		tokens = append(tokens, ccipcalc.EvmAddrToGeneric(addr))
-	}
-	for addr := range d.cfg.StaticPrices {
-		tokens = append(tokens, ccipcalc.EvmAddrToGeneric(addr))
-	}
 	return tokens
 }
 
@@ -261,6 +244,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 // preparePricesAndBatchCallsPerChain uses this price getter to prepare for a list of tokens:
 // - the map of token address to their prices (static prices)
 // - the map of and batch calls per chain for the given tokens (dynamic prices)
+// TODO: accept chain ids along with tokens
 func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, map[uint64]*batchCallsForChain, error) {
 	prices := make(map[cciptypes.Address]*big.Int, len(tokens))
 	batchCallsPerChain := make(map[uint64]*batchCallsForChain)
@@ -269,7 +253,17 @@ func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []cciptyp
 		return nil, nil, err
 	}
 	for _, tk := range evmAddrs {
-		if aggCfg, isAgg := d.cfg.AggregatorPrices[tk]; isAgg {
+		var priceCfg config.TokenPriceConfig
+		for _, cfg := range d.cfg.TokenPrices {
+			if cfg.TokenAddress == tk { // TODO: and cfg.ChainID == chainID and performance optimize
+				priceCfg = cfg
+				break
+			}
+		}
+
+		switch {
+		case priceCfg.AggregatorConfig != nil:
+			aggCfg := priceCfg.AggregatorConfig
 			// Batch calls for aggregator-based token prices (one per chain).
 			if _, exists := batchCallsPerChain[aggCfg.ChainID]; !exists {
 				batchCallsPerChain[aggCfg.ChainID] = &batchCallsForChain{
@@ -290,10 +284,9 @@ func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []cciptyp
 				aggCfg.AggregatorContractAddress,
 			))
 			chainCalls.tokenOrder = append(chainCalls.tokenOrder, tk)
-		} else if staticCfg, isStatic := d.cfg.StaticPrices[tk]; isStatic {
-			// Fill static prices.
-			prices[ccipcalc.EvmAddrToGeneric(tk)] = staticCfg.Price
-		} else {
+		case priceCfg.StaticConfig != nil:
+			prices[ccipcalc.EvmAddrToGeneric(tk)] = priceCfg.StaticConfig.Price
+		default:
 			return nil, nil, fmt.Errorf("no price resolution rule for token %s", tk.Hex())
 		}
 	}

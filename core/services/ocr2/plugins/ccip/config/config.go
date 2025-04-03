@@ -177,6 +177,10 @@ func (c *DynamicPriceGetterConfig) Validate() error {
 				return fmt.Errorf("static chain id is zero: %v", cfg)
 			}
 		}
+
+		if cfg.AggregatorConfig == nil && cfg.StaticConfig == nil {
+			return fmt.Errorf("no price configuration defined: %v", cfg)
+		}
 	}
 	return nil
 }

@@ -376,6 +376,33 @@ func TestDynamicPriceGetterConfig(t *testing.T) {
 			expCfg:   DynamicPriceGetterConfig{TokenPrices: expTokenPrices},
 			expError: true,
 		},
+		{
+			name: "both aggregator and static price config are empty for the first token",
+			jsonCfg: `
+				{
+				  "tokenPrices" : [ {
+				    "tokenAddress" : "0x0820c05e1fba1244763a494a52272170c321cad3",
+				    "chainID" : "1010"
+				  }, {
+				    "tokenAddress" : "0x4a98bb4d65347016a7ab6f85bea24b129c9a1272",
+				    "chainID" : "1010",
+				    "aggregatorConfig" : {
+				      "chainID" : "1337",
+				      "contractAddress" : "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
+				    }
+				  }, {
+				    "tokenAddress" : "0xec8c353470ccaa4f43067fcde40558e084a12927",
+				    "chainID" : "1010",
+				    "staticConfig" : {
+				      "chainID" : "1057",
+				      "price" : 1000000000000000000
+				    }
+				  } ]
+				}
+			`,
+			expCfg:   DynamicPriceGetterConfig{TokenPrices: expTokenPrices},
+			expError: true,
+		},
 	}
 
 	for _, tc := range testCases {

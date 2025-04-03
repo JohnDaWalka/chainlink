@@ -1697,11 +1697,15 @@ func (d *Delegate) ccipCommitPriceGetter(ctx context.Context, lggr logger.Sugare
 		// Configure contract readers for all chains specified in the aggregator configurations.
 		// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
 		aggregatorChainsToContracts := make(map[uint64][]common.Address)
-		for _, aggCfg := range pluginJobSpecConfig.PriceGetterConfig.AggregatorPrices {
+		for _, priceCfg := range pluginJobSpecConfig.PriceGetterConfig.TokenPrices {
+			if priceCfg.AggregatorConfig == nil {
+				continue
+			}
+
+			aggCfg := priceCfg.AggregatorConfig
 			if _, ok := aggregatorChainsToContracts[aggCfg.ChainID]; !ok {
 				aggregatorChainsToContracts[aggCfg.ChainID] = make([]common.Address, 0)
 			}
-
 			aggregatorChainsToContracts[aggCfg.ChainID] = append(aggregatorChainsToContracts[aggCfg.ChainID], aggCfg.AggregatorContractAddress)
 		}
 
