@@ -42,8 +42,26 @@ func (c CommitPluginConfig) Encode() ([]byte, error) {
 
 // DynamicPriceGetterConfig specifies which configuration to use for getting the price of tokens (map keys).
 type DynamicPriceGetterConfig struct {
+	// TokenPrices is a list of token price configurations, specifies how each token price will be fetched.
+	TokenPrices []TokenPriceConfig `json:"tokenPrices"`
+	// Deprecated: use TokenPrices instead.
 	AggregatorPrices map[common.Address]AggregatorPriceConfig `json:"aggregatorPrices"`
-	StaticPrices     map[common.Address]StaticPriceConfig     `json:"staticPrices"`
+	// Deprecated: use TokenPrices instead.
+	StaticPrices map[common.Address]StaticPriceConfig `json:"staticPrices"`
+}
+
+// TokenPriceConfig specifies the configuration for a token price.
+type TokenPriceConfig struct {
+	// TokenAddress is the address of the token on the chain that is deployed on.
+	TokenAddress common.Address `json:"tokenAddress"`
+
+	// ChainID is the chain ID of the chain that the token is deployed on.
+	// In a single lane scenario it is either the source or the dest chain.
+	ChainID uint64 `json:"chainID,string"`
+
+	// Exactly one of AggregatorConfig or StaticConfig must be set. It defines the source of the price.
+	AggregatorConfig *AggregatorPriceConfig `json:"aggregatorConfig,omitempty"`
+	StaticConfig     *StaticPriceConfig     `json:"staticConfig,omitempty"`
 }
 
 // AggregatorPriceConfig specifies a price retrieved from an aggregator contract.
@@ -71,33 +89,92 @@ func (c *DynamicPriceGetterConfig) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, (*Alias)(c))
 }
 
+// IsDeprecated returns true if the config uses the deprecated fields.
+func (c *DynamicPriceGetterConfig) IsDeprecated() bool {
+	return len(c.AggregatorPrices) > 0 || len(c.StaticPrices) > 0
+}
+
+// MoveDeprecatedFields moves the deprecated fields to the new field, assuming all tokens are on the specified chain.
+func (c *DynamicPriceGetterConfig) MoveDeprecatedFields(chainID uint64) error {
+	if !c.IsDeprecated() {
+		return nil
+	}
+
+	if len(c.TokenPrices) > 0 {
+		return fmt.Errorf("config is deprecated but contains the new 'TokenPrices' field - remove deprecated fields")
+	}
+
+	tokenPricesCfg := make([]TokenPriceConfig, 0, len(c.AggregatorPrices)+len(c.StaticPrices))
+
+	for tokenAddr, aggrCfg := range c.AggregatorPrices {
+		tokenPricesCfg = append(tokenPricesCfg, TokenPriceConfig{
+			TokenAddress:     tokenAddr,
+			ChainID:          chainID,
+			AggregatorConfig: &aggrCfg,
+		})
+	}
+
+	for tokenAddr, staticCfg := range c.StaticPrices {
+		tokenPricesCfg = append(tokenPricesCfg, TokenPriceConfig{
+			TokenAddress: tokenAddr,
+			ChainID:      chainID,
+			StaticConfig: &staticCfg,
+		})
+	}
+
+	c.TokenPrices = tokenPricesCfg
+	c.AggregatorPrices = nil
+	c.StaticPrices = nil
+	return nil
+}
+
+// Validate checks the configuration for errors.
 func (c *DynamicPriceGetterConfig) Validate() error {
-	for addr, v := range c.AggregatorPrices {
-		if addr == utils.ZeroAddress {
-			return errors.New("token address is zero")
-		}
-		if v.AggregatorContractAddress == utils.ZeroAddress {
-			return errors.New("aggregator contract address is zero")
-		}
-		if v.ChainID == 0 {
-			return errors.New("chain id is zero")
-		}
+	if c.IsDeprecated() {
+		return errors.New("DynamicPriceGetterConfig: config is deprecated, please use TokenPrices field")
 	}
 
-	for addr, v := range c.StaticPrices {
-		if addr == utils.ZeroAddress {
-			return errors.New("token address is zero")
-		}
-		if v.ChainID == 0 {
-			return errors.New("chain id is zero")
-		}
+	type tokenKey struct {
+		ChainID      uint64
+		TokenAddress common.Address
 	}
 
-	// Ensure no duplication in token price resolution rules.
-	if c.AggregatorPrices != nil && c.StaticPrices != nil {
-		for tk := range c.AggregatorPrices {
-			if _, exists := c.StaticPrices[tk]; exists {
-				return fmt.Errorf("token %s defined in both aggregator and static price rules", tk)
+	seenTokens := make(map[tokenKey]struct{})
+
+	for _, cfg := range c.TokenPrices {
+		if cfg.TokenAddress == utils.ZeroAddress {
+			return fmt.Errorf("token address is zero: %v", cfg)
+		}
+
+		if cfg.ChainID == 0 {
+			return fmt.Errorf("chain id is zero: %v", cfg)
+		}
+
+		if cfg.AggregatorConfig != nil && cfg.StaticConfig != nil {
+			return fmt.Errorf("both aggregator and static price configuration is defined: %v", cfg)
+		}
+
+		k := tokenKey{ChainID: cfg.ChainID, TokenAddress: cfg.TokenAddress}
+		if _, seen := seenTokens[k]; seen {
+			return fmt.Errorf("duplicate token price configuration, (token, chain) pair appears twice: %v", cfg)
+		}
+		seenTokens[k] = struct{}{}
+
+		if cfg.AggregatorConfig != nil {
+			if cfg.AggregatorConfig.AggregatorContractAddress == utils.ZeroAddress {
+				return fmt.Errorf("aggregator contract address is zero: %v", cfg)
+			}
+			if cfg.AggregatorConfig.ChainID == 0 {
+				return fmt.Errorf("aggregator chain id is zero: %v", cfg)
+			}
+		}
+
+		if cfg.StaticConfig != nil {
+			if cfg.StaticConfig.Price == nil {
+				return fmt.Errorf("static price is nil: %v", cfg)
+			}
+			if cfg.StaticConfig.ChainID == 0 {
+				return fmt.Errorf("static chain id is zero: %v", cfg)
 			}
 		}
 	}

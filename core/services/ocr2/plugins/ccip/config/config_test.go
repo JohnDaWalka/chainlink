@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -205,30 +206,195 @@ func TestUSDCValidate(t *testing.T) {
 	}
 }
 
-func TestUnmarshallDynamicPriceConfig(t *testing.T) {
-	jsonCfg := `
-{
-	"aggregatorPrices": {
-		"0x0820c05e1fba1244763a494a52272170c321cad3": {
-			"chainID": "1000",
-			"contractAddress": "0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"
+func TestDynamicPriceGetterConfig(t *testing.T) {
+	// this test goes through unmarshal -> move deprecated -> validate -> assert equal to expected
+	// for verifying e2e config loading and validation
+	const destChainID = 1010
+
+	expTokenPrices := []TokenPriceConfig{
+		{
+			TokenAddress: common.HexToAddress("0x0820c05e1fba1244763a494a52272170c321cad3"),
+			ChainID:      destChainID,
+			AggregatorConfig: &AggregatorPriceConfig{
+				ChainID:                   1000,
+				AggregatorContractAddress: common.HexToAddress("0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"),
+			},
 		},
-		"0x4a98bb4d65347016a7ab6f85bea24b129c9a1272": {
-			"chainID": "1337",
-			"contractAddress": "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
-		}
-	},
-	"staticPrices": {
-		"0xec8c353470ccaa4f43067fcde40558e084a12927": {
-			"chainID": "1057",
-			"price": 1000000000000000000
-		}
+		{
+			TokenAddress: common.HexToAddress("0x4a98bb4d65347016a7ab6f85bea24b129c9a1272"),
+			ChainID:      destChainID,
+			AggregatorConfig: &AggregatorPriceConfig{
+				ChainID:                   1337,
+				AggregatorContractAddress: common.HexToAddress("0xb80244cc8b0bb18db071c150b36e9bcb8310b236"),
+			},
+		},
+		{
+			TokenAddress: common.HexToAddress("0xec8c353470ccaa4f43067fcde40558e084a12927"),
+			ChainID:      destChainID,
+			StaticConfig: &StaticPriceConfig{
+				ChainID: 1057,
+				Price:   big.NewInt(1000000000000000000),
+			},
+		},
 	}
-}
-`
-	var cfg DynamicPriceGetterConfig
-	err := json.Unmarshal([]byte(jsonCfg), &cfg)
-	require.NoError(t, err)
-	err = cfg.Validate()
-	require.NoError(t, err)
+
+	testCases := []struct {
+		name     string
+		jsonCfg  string
+		expCfg   DynamicPriceGetterConfig
+		expError bool
+	}{
+		{
+			name:     "empty json cfg",
+			jsonCfg:  "{}",
+			expCfg:   DynamicPriceGetterConfig{},
+			expError: false,
+		},
+		{
+			name: "valid json cfg",
+			jsonCfg: `
+				{
+				  "tokenPrices" : [ {
+				    "tokenAddress" : "0x0820c05e1fba1244763a494a52272170c321cad3",
+				    "chainID" : "1010",
+				    "aggregatorConfig" : {
+				      "chainID" : "1000",
+				      "contractAddress" : "0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"
+				    }
+				  }, {
+				    "tokenAddress" : "0x4a98bb4d65347016a7ab6f85bea24b129c9a1272",
+				    "chainID" : "1010",
+				    "aggregatorConfig" : {
+				      "chainID" : "1337",
+				      "contractAddress" : "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
+				    }
+				  }, {
+				    "tokenAddress" : "0xec8c353470ccaa4f43067fcde40558e084a12927",
+				    "chainID" : "1010",
+				    "staticConfig" : {
+				      "chainID" : "1057",
+				      "price" : 1000000000000000000
+				    }
+				  } ]
+				}
+			`,
+			expCfg:   DynamicPriceGetterConfig{TokenPrices: expTokenPrices},
+			expError: false,
+		},
+		{
+			name: "deprecated json config should be migrated",
+			jsonCfg: `
+				{
+					"aggregatorPrices": {
+						"0x0820c05e1fba1244763a494a52272170c321cad3": {
+							"chainID": "1000",
+							"contractAddress": "0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"
+						},
+						"0x4a98bb4d65347016a7ab6f85bea24b129c9a1272": {
+							"chainID": "1337",
+							"contractAddress": "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
+						}
+					},
+					"staticPrices": {
+						"0xec8c353470ccaa4f43067fcde40558e084a12927": {
+							"chainID": "1057",
+							"price": 1000000000000000000
+						}
+					}
+				}
+			`,
+			expCfg:   DynamicPriceGetterConfig{TokenPrices: expTokenPrices},
+			expError: false,
+		},
+		{
+			name: "duplicate token in config first and third have same token address and chain",
+			jsonCfg: `
+				{
+				  "tokenPrices" : [ {
+				    "tokenAddress" : "0x0820c05e1fba1244763a494a52272170c321cad3",
+				    "chainID" : "1010",
+				    "aggregatorConfig" : {
+				      "chainID" : "1000",
+				      "contractAddress" : "0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"
+				    }
+				  }, {
+				    "tokenAddress" : "0x4a98bb4d65347016a7ab6f85bea24b129c9a1272",
+				    "chainID" : "1010",
+				    "aggregatorConfig" : {
+				      "chainID" : "1337",
+				      "contractAddress" : "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
+				    }
+				  }, {
+				    "tokenAddress" : "0x0820c05e1fba1244763a494a52272170c321cad3",
+				    "chainID" : "1010",
+				    "staticConfig" : {
+				      "chainID" : "1057",
+				      "price" : 1000000000000000000
+				    }
+				  } ]
+				}
+			`,
+			expCfg:   DynamicPriceGetterConfig{TokenPrices: expTokenPrices},
+			expError: true,
+		},
+		{
+			name: "both static and aggregator configs are provided for the second token",
+			jsonCfg: `
+				{
+				  "tokenPrices": [
+				    {
+				      "tokenAddress": "0x0820c05e1fba1244763a494a52272170c321cad3",
+				      "chainID": "1010",
+				      "aggregatorConfig": {
+				        "chainID": "1000",
+				        "contractAddress": "0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"
+				      }
+				    },
+				    {
+				      "tokenAddress": "0x4a98bb4d65347016a7ab6f85bea24b129c9a1272",
+				      "chainID": "1010",
+				      "aggregatorConfig": {
+				        "chainID": "1337",
+				        "contractAddress": "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
+				      },
+				      "staticConfig": {
+				        "chainID": "1057",
+				        "price": 1000000000000000000
+				      }
+				    },
+				    {
+				      "tokenAddress": "0xec8c353470ccaa4f43067fcde40558e084a12927",
+				      "chainID": "1010",
+				      "staticConfig": {
+				        "chainID": "1057",
+				        "price": 1000000000000000000
+				      }
+				    }
+				  ]
+				}
+			`,
+			expCfg:   DynamicPriceGetterConfig{TokenPrices: expTokenPrices},
+			expError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var cfg DynamicPriceGetterConfig
+			err := json.Unmarshal([]byte(tc.jsonCfg), &cfg)
+			require.NoError(t, err)
+
+			require.NoError(t, err)
+			require.NoError(t, cfg.MoveDeprecatedFields(destChainID))
+
+			err = cfg.Validate()
+			if tc.expError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.True(t, reflect.DeepEqual(tc.expCfg, cfg))
+		})
+	}
 }
