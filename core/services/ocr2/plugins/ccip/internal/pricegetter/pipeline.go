@@ -3,6 +3,7 @@ package pricegetter
 import (
 	"context"
 	"math/big"
+	"sort"
 	"strings"
 	"time"
 
@@ -25,9 +26,10 @@ type PipelineGetter struct {
 	externalJobID uuid.UUID
 	name          string
 	lggr          logger.Logger
+	destChainID   int64
 }
 
-func NewPipelineGetter(source string, runner pipeline.Runner, jobID int32, externalJobID uuid.UUID, name string, lggr logger.Logger) (*PipelineGetter, error) {
+func NewPipelineGetter(source string, runner pipeline.Runner, jobID int32, externalJobID uuid.UUID, name string, lggr logger.Logger, destChainID int64) (*PipelineGetter, error) {
 	_, err := pipeline.Parse(source)
 	if err != nil {
 		return nil, err
@@ -40,6 +42,7 @@ func NewPipelineGetter(source string, runner pipeline.Runner, jobID int32, exter
 		externalJobID: externalJobID,
 		name:          name,
 		lggr:          lggr,
+		destChainID:   destChainID,
 	}, nil
 }
 
@@ -58,50 +61,74 @@ func (d *PipelineGetter) FilterConfiguredTokens(ctx context.Context, tokens []cc
 	return configured, unconfigured, nil
 }
 
-func (d *PipelineGetter) GetJobSpecTokenPricesUSD(ctx context.Context) (map[cciptypes.Address]*big.Int, error) {
+// GetJobSpecTokenPricesUSD gets all the tokens listed in the results.
+// DEPRECATED: it does not support tokens with the same address on different chains.
+// It treats every token as destination chain token.
+func (d *PipelineGetter) GetJobSpecTokenPricesUSD(ctx context.Context) (map[TokenID]*big.Int, error) {
 	prices, err := d.getPricesFromRunner(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	tokenPrices := make(map[cciptypes.Address]*big.Int)
+	tokenPrices := make(map[TokenID]*big.Int)
 	for tokenAddressStr, rawPrice := range prices {
-		tokenAddressStr := ccipcalc.HexToAddress(tokenAddressStr)
+		tokenAddress := ccipcalc.HexToAddress(tokenAddressStr)
+
 		castedPrice, err := parseutil.ParseBigIntFromAny(rawPrice)
 		if err != nil {
 			return nil, err
 		}
 
-		tokenPrices[tokenAddressStr] = castedPrice
+		tokenPrices[NewTokenID(tokenAddress, uint64(d.destChainID))] = castedPrice
 	}
 
 	return tokenPrices, nil
 }
 
-func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
+// GetTokenPrices is Deprecated: not used, should be removed.
+// NOTE: Does not support tokens with the same address on different chains.
+func (d *PipelineGetter) GetTokenPrices(ctx context.Context, tokenIDs []TokenID) (map[TokenID]*big.Int, error) {
+	tokenChains := make(map[cciptypes.Address]uint64)
+	tokenSet := mapset.NewSet[cciptypes.Address]()
+	for _, tokenID := range tokenIDs {
+		tokenSet.Add(tokenID.Address)
+		tokenChains[tokenID.Address] = tokenID.ChainID
+	}
+	tokens := tokenSet.ToSlice()
+	sort.Slice(tokens, func(i, j int) bool { return strings.ToLower(string(tokens[i])) < strings.ToLower(string(tokens[j])) })
+
 	prices, err := d.getPricesFromRunner(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	providedTokensSet := mapset.NewSet(tokens...)
-	tokenPrices := make(map[cciptypes.Address]*big.Int)
+	tokenPrices := make(map[TokenID]*big.Int)
 	for tokenAddressStr, rawPrice := range prices {
-		tokenAddressStr := ccipcalc.HexToAddress(tokenAddressStr)
+		tokenAddress := ccipcalc.HexToAddress(tokenAddressStr)
+		tokenChain, ok := tokenChains[tokenAddress]
+		if !ok {
+			return nil, errors.Errorf("token %s not found in tokenChains map", tokenAddressStr)
+		}
+
 		castedPrice, err := parseutil.ParseBigIntFromAny(rawPrice)
 		if err != nil {
 			return nil, err
 		}
 
-		if providedTokensSet.Contains(tokenAddressStr) {
-			tokenPrices[tokenAddressStr] = castedPrice
+		if providedTokensSet.Contains(tokenAddress) {
+			tokenPrices[NewTokenID(tokenAddress, tokenChain)] = castedPrice
 		}
 	}
 
 	// The mapping of token address to source of token price has to live offchain.
 	// Best we can do is sanity check that the token price spec covers all our desired execution token prices.
 	for _, token := range tokens {
-		if _, ok := tokenPrices[token]; !ok {
+		tokenChain, ok := tokenChains[token]
+		if !ok {
+			return nil, errors.Errorf("token %s not found in tokenChains map", token)
+		}
+		if _, ok := tokenPrices[NewTokenID(token, tokenChain)]; !ok {
 			return nil, errors.Errorf("missing token %s from tokensForFeeCoin spec, got %v", token, prices)
 		}
 	}
