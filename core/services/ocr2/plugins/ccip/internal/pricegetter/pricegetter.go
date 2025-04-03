@@ -14,5 +14,18 @@ type PriceGetter interface {
 type AllTokensPriceGetter interface {
 	PriceGetter
 	// GetJobSpecTokenPricesUSD returns all token prices defined in the jobspec.
-	GetJobSpecTokenPricesUSD(ctx context.Context) (map[cciptypes.Address]*big.Int, error)
+	GetJobSpecTokenPricesUSD(ctx context.Context) (map[TokenID]*big.Int, error)
+}
+
+// TokenID is a struct that represents a token's address and chain ID.
+type TokenID struct {
+	Address cciptypes.Address
+	ChainID uint64
+}
+
+func NewTokenID(address cciptypes.Address, chainID uint64) TokenID {
+	return TokenID{
+		Address: address,
+		ChainID: chainID,
+	}
 }

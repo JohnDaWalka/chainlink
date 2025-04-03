@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -98,35 +97,37 @@ func (d *DynamicPriceGetter) FilterConfiguredTokens(_ context.Context, tokens []
 }
 
 // GetJobSpecTokenPricesUSD returns the prices of all tokens defined in the price getter.
-func (d *DynamicPriceGetter) GetJobSpecTokenPricesUSD(ctx context.Context) (map[cciptypes.Address]*big.Int, error) {
-	return d.TokenPricesUSD(ctx, d.getAllTokensDefined())
+func (d *DynamicPriceGetter) GetJobSpecTokenPricesUSD(ctx context.Context) (map[TokenID]*big.Int, error) {
+	tokensForPricing := d.getAllTokensDefined()
+	return d.TokenPricesUSD(ctx, tokensForPricing)
 }
 
 // TokenPricesUSD implements the PriceGetter interface.
 // It returns static prices stored in the price getter, and batch calls aggregators (one per chain) to retrieve aggregator-based prices.
-func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
+func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []TokenID) (map[TokenID]*big.Int, error) {
 	prices, batchCallsPerChain, err := d.preparePricesAndBatchCallsPerChain(tokens)
 	if err != nil {
 		return nil, err
 	}
+
 	if err = d.performBatchCalls(ctx, batchCallsPerChain, prices); err != nil {
 		return nil, err
 	}
 	return prices, nil
 }
 
-// TODO: include chain ids in the response
-func (d *DynamicPriceGetter) getAllTokensDefined() []cciptypes.Address {
-	tokens := make([]cciptypes.Address, 0, len(d.cfg.TokenPrices))
+func (d *DynamicPriceGetter) getAllTokensDefined() []TokenID {
+	tokens := make([]TokenID, 0, len(d.cfg.TokenPrices))
 	for _, cfg := range d.cfg.TokenPrices {
-		tokens = append(tokens, ccipcalc.EvmAddrToGeneric(cfg.TokenAddress))
+		tokenID := NewTokenID(ccipcalc.EvmAddrToGeneric(cfg.TokenAddress), cfg.ChainID)
+		tokens = append(tokens, tokenID)
 	}
 
 	return tokens
 }
 
 // performBatchCalls performs batch calls on all chains to retrieve token prices.
-func (d *DynamicPriceGetter) performBatchCalls(ctx context.Context, batchCallsPerChain map[uint64]*batchCallsForChain, prices map[cciptypes.Address]*big.Int) error {
+func (d *DynamicPriceGetter) performBatchCalls(ctx context.Context, batchCallsPerChain map[uint64]*batchCallsForChain, prices map[TokenID]*big.Int) error {
 	for chainID, batchCalls := range batchCallsPerChain {
 		if err := d.performBatchCall(ctx, chainID, batchCalls, prices); err != nil {
 			return err
@@ -136,7 +137,7 @@ func (d *DynamicPriceGetter) performBatchCalls(ctx context.Context, batchCallsPe
 }
 
 // performBatchCall performs a batch call on a given chain to retrieve token prices.
-func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint64, batchCalls *batchCallsForChain, prices map[cciptypes.Address]*big.Int) (err error) {
+func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint64, batchCalls *batchCallsForChain, prices map[TokenID]*big.Int) (err error) {
 	nbDecimalCalls := len(batchCalls.decimalCalls)
 	nbLatestRoundDataCalls := len(batchCalls.decimalCalls)
 	nbCalls := len(batchCalls.decimalCalls)
@@ -242,7 +243,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 		} else if decimalsCR[i] > 18 {
 			latestRoundAnswerCR[i].Div(latestRoundAnswerCR[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimalsCR[i])-18), nil))
 		}
-		prices[ccipcalc.EvmAddrToGeneric(batchCalls.tokenOrder[i])] = latestRoundAnswerCR[i]
+		prices[batchCalls.tokenOrder[i]] = latestRoundAnswerCR[i]
 	}
 	return nil
 }
@@ -251,17 +252,19 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 // - the map of token address to their prices (static prices)
 // - the map of and batch calls per chain for the given tokens (dynamic prices)
 // TODO: accept chain ids along with tokens
-func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, map[uint64]*batchCallsForChain, error) {
-	prices := make(map[cciptypes.Address]*big.Int, len(tokens))
+func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []TokenID) (map[TokenID]*big.Int, map[uint64]*batchCallsForChain, error) {
+	prices := make(map[TokenID]*big.Int, len(tokens))
 	batchCallsPerChain := make(map[uint64]*batchCallsForChain)
-	evmAddrs, err := ccipcalc.GenericAddrsToEvm(tokens...)
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, tk := range evmAddrs {
+
+	for _, tk := range tokens {
+		tkAddr, err := ccipcalc.GenericAddrToEvm(tk.Address)
+		if err != nil {
+			return nil, nil, fmt.Errorf("converting token address %v to evm address: %w", tk, err)
+		}
+
 		var priceCfg config.TokenPriceConfig
 		for _, cfg := range d.cfg.TokenPrices {
-			if cfg.TokenAddress == tk { // TODO: and cfg.ChainID == chainID and performance optimize
+			if cfg.TokenAddress == tkAddr && cfg.ChainID == tk.ChainID {
 				priceCfg = cfg
 				break
 			}
@@ -275,7 +278,7 @@ func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []cciptyp
 				batchCallsPerChain[aggCfg.ChainID] = &batchCallsForChain{
 					decimalCalls:         []rpclib.EvmCall{},
 					latestRoundDataCalls: []rpclib.EvmCall{},
-					tokenOrder:           []common.Address{},
+					tokenOrder:           []TokenID{},
 				}
 			}
 			chainCalls := batchCallsPerChain[aggCfg.ChainID]
@@ -291,9 +294,9 @@ func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []cciptyp
 			))
 			chainCalls.tokenOrder = append(chainCalls.tokenOrder, tk)
 		case priceCfg.StaticConfig != nil:
-			prices[ccipcalc.EvmAddrToGeneric(tk)] = priceCfg.StaticConfig.Price
+			prices[tk] = priceCfg.StaticConfig.Price
 		default:
-			return nil, nil, fmt.Errorf("no price resolution rule for token %s", tk.Hex())
+			return nil, nil, fmt.Errorf("no price resolution rule for token: %v", tk)
 		}
 	}
 	return prices, batchCallsPerChain, nil
@@ -303,7 +306,7 @@ func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []cciptyp
 type batchCallsForChain struct {
 	decimalCalls         []rpclib.EvmCall
 	latestRoundDataCalls []rpclib.EvmCall
-	tokenOrder           []common.Address // required to maintain the order of the batched rpc calls for mapping the results.
+	tokenOrder           []TokenID // required to maintain the order of the batched rpc calls for mapping the results.
 }
 
 func (d *DynamicPriceGetter) Close() error {

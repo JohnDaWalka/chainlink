@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"slices"
 	"sort"
 	"sync"
 	"time"
 
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -19,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
@@ -319,7 +318,7 @@ func (p *priceService) observeGasPriceUpdates(
 func (p *priceService) observeTokenPriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
-) (tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
+) (tokenPricesUSD map[pricegetter.TokenID]*big.Int, err error) {
 	if p.destPriceRegistryReader == nil {
 		return nil, errors.New("destPriceRegistry is not set yet")
 	}
@@ -337,20 +336,15 @@ func (p *priceService) observeTokenPriceUpdates(
 
 	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
 
-	sourceNativeEvmAddr, err := ccipcalc.GenericAddrToEvm(p.sourceNative)
+	destChainID, err := chainselectors.ChainIdFromSelector(p.destChainSelector)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert source native to EVM address: %w", err)
+		return nil, fmt.Errorf("failed to get dest chain ID from selector %d: %w", p.destChainSelector, err)
 	}
 
 	// Filter out source native token only if source native not in dest tokens
-	var finalDestTokens []cciptypes.Address
+	var finalDestTokens []pricegetter.TokenID
 	for token := range rawTokenPricesUSD {
-		tokenEvmAddr, err2 := ccipcalc.GenericAddrToEvm(token)
-		if err2 != nil {
-			return nil, fmt.Errorf("failed to convert token to EVM address: %w", err)
-		}
-
-		if tokenEvmAddr != sourceNativeEvmAddr {
+		if token.ChainID == destChainID {
 			finalDestTokens = append(finalDestTokens, token)
 		}
 	}
@@ -362,23 +356,31 @@ func (p *priceService) observeTokenPriceUpdates(
 	onchainDestTokens := ccipcommon.FlattenedAndSortedTokens(fee, bridged)
 	lggr.Debugw("Destination tokens", "destTokens", onchainDestTokens)
 
-	onchainTokensEvmAddr, err := ccipcalc.GenericAddrsToEvm(onchainDestTokens...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert sorted lane tokens to EVM addresses: %w", err)
-	}
+	// TODO: this hasSameDestAddress is wrong
+	//onchainTokensEvmAddr, err := ccipcalc.GenericAddrsToEvm(onchainDestTokens...)
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed to convert sorted lane tokens to EVM addresses: %w", err)
+	//}
 	// Check for case where sourceNative has same address as one of the dest tokens (example: WETH in Base and Optimism)
-	hasSameDestAddress := slices.Contains(onchainTokensEvmAddr, sourceNativeEvmAddr)
-
-	if hasSameDestAddress {
-		finalDestTokens = append(finalDestTokens, p.sourceNative)
-	}
+	//hasSameDestAddress := slices.Contains(onchainTokensEvmAddr, sourceNativeEvmAddr)
+	//if hasSameDestAddress {
+	//	finalDestTokens = append(finalDestTokens, p.sourceNative)
+	//}
 
 	// Sort tokens to make the order deterministic, easier for testing and debugging
 	sort.Slice(finalDestTokens, func(i, j int) bool {
-		return finalDestTokens[i] < finalDestTokens[j]
+		if finalDestTokens[i].Address == finalDestTokens[j].Address {
+			return finalDestTokens[i].ChainID < finalDestTokens[j].ChainID
+		}
+		return finalDestTokens[i].Address < finalDestTokens[j].Address
 	})
 
-	destTokensDecimals, err := p.destPriceRegistryReader.GetTokensDecimals(ctx, finalDestTokens)
+	destTokenAddresses := make([]cciptypes.Address, len(finalDestTokens))
+	for i, token := range finalDestTokens {
+		destTokenAddresses[i] = token.Address
+	}
+
+	destTokensDecimals, err := p.destPriceRegistryReader.GetTokensDecimals(ctx, destTokenAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("get tokens decimals: %w", err)
 	}
@@ -387,7 +389,7 @@ func (p *priceService) observeTokenPriceUpdates(
 		return nil, errors.New("mismatched token decimals and tokens")
 	}
 
-	tokenPricesUSD = make(map[cciptypes.Address]*big.Int, len(rawTokenPricesUSD))
+	tokenPricesUSD = make(map[pricegetter.TokenID]*big.Int)
 	for i, token := range finalDestTokens {
 		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], destTokensDecimals[i])
 	}
@@ -414,7 +416,8 @@ func (p *priceService) writeGasPricesToDB(ctx context.Context, sourceGasPriceUSD
 	return err
 }
 
-func (p *priceService) writeTokenPricesToDB(ctx context.Context, tokenPricesUSD map[cciptypes.Address]*big.Int) error {
+// TODO: update db to support token ids that are not addresses
+func (p *priceService) writeTokenPricesToDB(ctx context.Context, tokenPricesUSD map[pricegetter.TokenID]*big.Int) error {
 	if tokenPricesUSD == nil {
 		return nil
 	}
@@ -423,7 +426,7 @@ func (p *priceService) writeTokenPricesToDB(ctx context.Context, tokenPricesUSD 
 
 	for token, price := range tokenPricesUSD {
 		tokenPrices = append(tokenPrices, cciporm.TokenPrice{
-			TokenAddr:  string(token),
+			TokenAddr:  string(token.Address),
 			TokenPrice: assets.NewWei(price),
 		})
 	}
