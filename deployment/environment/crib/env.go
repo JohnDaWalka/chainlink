@@ -5,6 +5,9 @@ const (
 	NodesDetailsFileName      = "nodes-details.json"
 	ChainsConfigsFileName     = "chains-details.json"
 	RMNNodeIdentitiesFileName = "rmn-node-identities.json"
+	JDOutputFileName          = "jd-output.json"
+	BlockChainsOutputFileName = "blockchains-output.json"
+	NodeSetOutputFileName     = "nodeset-output.json"
 )
 
 type CRIBEnv struct {
