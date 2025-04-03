@@ -35,6 +35,7 @@ type CsDistributeLLOJobSpecsConfig struct {
 
 	ChannelConfigStoreAddr      common.Address
 	ChannelConfigStoreFromBlock uint64
+	ConfiguratorAddress         string
 
 	// Servers is a list of Data Engine Producer endpoints, where the key is the server URL and the value is its public key.
 	//
@@ -49,7 +50,7 @@ func (CsDistributeLLOJobSpecs) Apply(e deployment.Environment, cfg CsDistributeL
 	ctx, cancel := context.WithTimeout(e.GetContext(), defaultJobSpecsTimeout)
 	defer cancel()
 
-	chainID, addresses, err := chainAndAddresses(e, cfg.ChainSelectorEVM)
+	chainID, _, err := chainAndAddresses(e, cfg.ChainSelectorEVM)
 	if err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
@@ -60,12 +61,6 @@ func (CsDistributeLLOJobSpecs) Apply(e deployment.Environment, cfg CsDistributeL
 			Key: utils.DonIdentifier(cfg.Filter.DONID, cfg.Filter.DONName),
 		})
 
-	// Search for the Configurator address in the address book by DON ID
-	configuratorAddress, err := findConfiguratorAddressByDON(addresses, cfg.Filter.DONID)
-	if err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-
 	// nils will be filled out later with n-specific values:
 	lloSpec := &jobs.LLOJobSpec{
 		Base: jobs.Base{
@@ -74,7 +69,7 @@ func (CsDistributeLLOJobSpecs) Apply(e deployment.Environment, cfg CsDistributeL
 			SchemaVersion: 1,
 			ExternalJobID: uuid.New(),
 		},
-		ContractID:                        configuratorAddress,
+		ContractID:                        cfg.ConfiguratorAddress,
 		P2PV2Bootstrappers:                nil,
 		OCRKeyBundleID:                    nil,
 		MaxTaskDuration:                   lloJobMaxTaskDuration,

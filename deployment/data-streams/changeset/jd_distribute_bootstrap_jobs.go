@@ -16,8 +16,9 @@ import (
 var _ deployment.ChangeSetV2[CsDistributeBootstrapJobSpecsConfig] = CsDistributeBootstrapJobSpecs{}
 
 type CsDistributeBootstrapJobSpecsConfig struct {
-	ChainSelectorEVM uint64
-	Filter           *jd.ListFilter
+	ChainSelectorEVM    uint64
+	Filter              *jd.ListFilter
+	ConfiguratorAddress string
 }
 
 type CsDistributeBootstrapJobSpecs struct{}
@@ -26,7 +27,7 @@ func (CsDistributeBootstrapJobSpecs) Apply(e deployment.Environment, cfg CsDistr
 	ctx, cancel := context.WithTimeout(e.GetContext(), defaultJobSpecsTimeout)
 	defer cancel()
 
-	chainID, addresses, err := chainAndAddresses(e, cfg.ChainSelectorEVM)
+	chainID, _, err := chainAndAddresses(e, cfg.ChainSelectorEVM)
 	if err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
@@ -37,14 +38,8 @@ func (CsDistributeBootstrapJobSpecs) Apply(e deployment.Environment, cfg CsDistr
 			Key: utils.DonIdentifier(cfg.Filter.DONID, cfg.Filter.DONName),
 		})
 
-	// Search for the Configurator address in the address book by DON ID
-	configuratorAddress, err := findConfiguratorAddressByDON(addresses, cfg.Filter.DONID)
-	if err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-
 	bootstrapSpec := jobs.NewBootstrapSpec(
-		configuratorAddress,
+		cfg.ConfiguratorAddress,
 		cfg.Filter.DONID,
 		jobs.RelayTypeEVM,
 		jobs.RelayConfig{

@@ -17,17 +17,6 @@ const (
 	defaultJobSpecsTimeout = 120 * time.Second
 )
 
-// TODO: This file needs to be renamed and rethought. It's a good first step, though.
-
-func findConfiguratorAddressByDON(addresses map[string]deployment.TypeAndVersion, donID uint64) (string, error) {
-	for address, contract := range addresses {
-		if contract.Type == "Configurator" && contract.Labels.Contains(fmt.Sprintf("don-%d", donID)) {
-			return address, nil
-		}
-	}
-	return "", fmt.Errorf("Configurator contract not found for DON %d", donID)
-}
-
 func chainAndAddresses(e deployment.Environment, chainSel uint64) (chainID string, addresses map[string]deployment.TypeAndVersion, err error) {
 	chainID, err = chainsel.GetChainIDFromSelector(chainSel)
 	if err != nil {

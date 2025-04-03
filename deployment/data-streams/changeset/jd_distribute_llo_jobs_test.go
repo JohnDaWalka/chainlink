@@ -22,7 +22,8 @@ func TestDistributeLLOJobSpecs(t *testing.T) {
 	chainSelector := e.AllChainSelectors()[0]
 
 	// insert a Configurator address for the given DON
-	err := e.ExistingAddresses.Save(chainSelector, "0x4170ed0880ac9a755fd29b2688956bd959f923f4",
+	configuratorAddr := "0x4170ed0880ac9a755fd29b2688956bd959f923f4"
+	err := e.ExistingAddresses.Save(chainSelector, configuratorAddr,
 		deployment.TypeAndVersion{
 			Type:    "Configurator",
 			Version: deployment.Version1_0_0,
@@ -42,6 +43,7 @@ func TestDistributeLLOJobSpecs(t *testing.T) {
 		ConfigMode:                  "bluegreen",
 		ChannelConfigStoreAddr:      common.HexToAddress("DEAD"),
 		ChannelConfigStoreFromBlock: 0,
+		ConfiguratorAddress:         configuratorAddr,
 		Servers: map[string]string{
 			"mercury-pipeline-testnet-producer.TEST.cldev.cloud:1340": "0000005187b1498c0ccb2e56d5ee8040a03a4955822ed208749b474058fc3f9c",
 		},
