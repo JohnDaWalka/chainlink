@@ -17,9 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
-var _ PriceGetter = &PipelineGetter{}
-
-// Deprecated: not used
+// Deprecated: not used, should be removed
 type PipelineGetter struct {
 	source        string
 	runner        pipeline.Runner
