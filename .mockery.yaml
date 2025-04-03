@@ -352,10 +352,6 @@ packages:
       dir: "{{ .InterfaceDir }}/"
       outpkg: pricegetter
     interfaces:
-      PriceGetter:
-        config:
-          mockname: "Mock{{ .InterfaceName }}"
-          filename: mock.go
       AllTokensPriceGetter:
         config:
           mockname: "Mock{{ .InterfaceName }}"

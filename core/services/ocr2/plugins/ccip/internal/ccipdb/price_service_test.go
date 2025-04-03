@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
-	"slices"
 	"sort"
 	"testing"
 	"time"
 
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -100,9 +100,9 @@ func TestPriceService_writeTokenPrices(t *testing.T) {
 	destChainSelector := uint64(12345)
 	sourceChainSelector := uint64(67890)
 
-	tokenPrices := map[cciptypes.Address]*big.Int{
-		"0x123": big.NewInt(2e18),
-		"0x234": big.NewInt(3e18),
+	tokenPrices := map[pricegetter.TokenID]*big.Int{
+		pricegetter.NewTokenID("0x123", destChainSelector): big.NewInt(2e18),
+		pricegetter.NewTokenID("0x234", destChainSelector): big.NewInt(3e18),
 	}
 
 	expectedTokenPriceUpdate := []cciporm.TokenPrice{
@@ -143,7 +143,7 @@ func TestPriceService_writeTokenPrices(t *testing.T) {
 			}
 
 			mockOrm := ccipmocks.NewORM(t)
-			mockOrm.On("UpsertTokenPricesForDestChain", ctx, destChainSelector, expectedTokenPriceUpdate, tokenPriceUpdateInterval).
+			mockOrm.EXPECT().UpsertTokenPricesForDestChain(ctx, destChainSelector, expectedTokenPriceUpdate, tokenPriceUpdateInterval).
 				Return(int64(len(expectedTokenPriceUpdate)), tokenPricesError).Once()
 
 			priceService := NewPriceService(
@@ -169,14 +169,15 @@ func TestPriceService_writeTokenPrices(t *testing.T) {
 func TestPriceService_observeGasPriceUpdates(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	jobId := int32(1)
-	destChainSelector := uint64(12345)
-	sourceChainSelector := uint64(67890)
+	destChain := chainselectors.TEST_98865
+	sourceChain := chainselectors.TEST_1000
+
 	sourceNativeToken := cciptypes.Address(utils.RandomAddress().String())
 
 	testCases := []struct {
 		name                 string
 		sourceNativeToken    cciptypes.Address
-		priceGetterRespData  map[cciptypes.Address]*big.Int
+		priceGetterRespData  map[pricegetter.TokenID]*big.Int
 		priceGetterRespErr   error
 		feeEstimatorRespFee  *big.Int
 		feeEstimatorRespErr  error
@@ -187,8 +188,8 @@ func TestPriceService_observeGasPriceUpdates(t *testing.T) {
 		{
 			name:              "base",
 			sourceNativeToken: sourceNativeToken,
-			priceGetterRespData: map[cciptypes.Address]*big.Int{
-				sourceNativeToken: val1e18(100),
+			priceGetterRespData: map[pricegetter.TokenID]*big.Int{
+				pricegetter.NewTokenID(sourceNativeToken, sourceChain.EvmChainID): val1e18(100),
 			},
 			priceGetterRespErr:   nil,
 			feeEstimatorRespFee:  big.NewInt(10),
@@ -207,8 +208,8 @@ func TestPriceService_observeGasPriceUpdates(t *testing.T) {
 		{
 			name:              "price getter did not return source native gas price",
 			sourceNativeToken: sourceNativeToken,
-			priceGetterRespData: map[cciptypes.Address]*big.Int{
-				"0x1": val1e18(100),
+			priceGetterRespData: map[pricegetter.TokenID]*big.Int{
+				pricegetter.NewTokenID("0x1", destChain.EvmChainID): val1e18(100),
 			},
 			priceGetterRespErr: nil,
 			expErr:             true,
@@ -216,9 +217,10 @@ func TestPriceService_observeGasPriceUpdates(t *testing.T) {
 		{
 			name:              "dynamic fee cap overrides legacy",
 			sourceNativeToken: sourceNativeToken,
-			priceGetterRespData: map[cciptypes.Address]*big.Int{
-				sourceNativeToken: val1e18(100),
+			priceGetterRespData: map[pricegetter.TokenID]*big.Int{
+				pricegetter.NewTokenID(sourceNativeToken, sourceChain.EvmChainID): val1e18(100),
 			},
+
 			priceGetterRespErr:   nil,
 			feeEstimatorRespFee:  big.NewInt(20),
 			feeEstimatorRespErr:  nil,
@@ -229,8 +231,8 @@ func TestPriceService_observeGasPriceUpdates(t *testing.T) {
 		{
 			name:              "nil gas price",
 			sourceNativeToken: sourceNativeToken,
-			priceGetterRespData: map[cciptypes.Address]*big.Int{
-				sourceNativeToken: val1e18(100),
+			priceGetterRespData: map[pricegetter.TokenID]*big.Int{
+				pricegetter.NewTokenID(sourceNativeToken, sourceChain.EvmChainID): val1e18(100),
 			},
 			feeEstimatorRespFee: nil,
 			maxGasPrice:         1e18,
@@ -246,13 +248,22 @@ func TestPriceService_observeGasPriceUpdates(t *testing.T) {
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
 			defer gasPriceEstimator.AssertExpectations(t)
 
-			priceGetter.On("TokenPricesUSD", mock.Anything, []cciptypes.Address{tc.sourceNativeToken}).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
+			priceGetter.EXPECT().GetTokenPrices(mock.Anything, []pricegetter.TokenID{
+				pricegetter.NewTokenID(tc.sourceNativeToken, sourceChain.EvmChainID),
+			}).Return(tc.priceGetterRespData, tc.priceGetterRespErr).Maybe()
 
 			if tc.maxGasPrice > 0 {
-				gasPriceEstimator.On("GetGasPrice", mock.Anything).Return(tc.feeEstimatorRespFee, tc.feeEstimatorRespErr)
+				gasPriceEstimator.On("GetGasPrice", mock.Anything).
+					Return(tc.feeEstimatorRespFee, tc.feeEstimatorRespErr).Maybe()
 				if tc.feeEstimatorRespFee != nil {
-					pUSD := ccipcalc.CalculateUsdPerUnitGas(tc.feeEstimatorRespFee, tc.priceGetterRespData[tc.sourceNativeToken])
-					gasPriceEstimator.On("DenoteInUSD", mock.Anything, mock.Anything, mock.Anything).Return(pUSD, nil)
+					sourceNativePrice, ok := tc.priceGetterRespData[pricegetter.NewTokenID(tc.sourceNativeToken, sourceChain.EvmChainID)]
+					if ok {
+						pUSD := ccipcalc.CalculateUsdPerUnitGas(
+							tc.feeEstimatorRespFee,
+							sourceNativePrice,
+						)
+						gasPriceEstimator.On("DenoteInUSD", mock.Anything, mock.Anything, mock.Anything).Return(pUSD, nil)
+					}
 				}
 			}
 
@@ -260,8 +271,8 @@ func TestPriceService_observeGasPriceUpdates(t *testing.T) {
 				lggr,
 				nil,
 				jobId,
-				destChainSelector,
-				sourceChainSelector,
+				destChain.Selector,
+				sourceChain.Selector,
 				tc.sourceNativeToken,
 				priceGetter,
 				nil,
@@ -282,9 +293,9 @@ func TestPriceService_observeGasPriceUpdates(t *testing.T) {
 func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	jobId := int32(1)
-	destChainSelector := uint64(12345)
-	sourceChainSelector := uint64(67890)
-	sourceNativeToken := cciptypes.Address(utils.RandomAddress().String())
+	destChain := chainselectors.TEST_98865
+	sourceChain := chainselectors.TEST_1000
+	sourceNativeTokenAddr := cciptypes.Address(utils.RandomAddress().String())
 
 	const nTokens = 10
 	tokens := make([]cciptypes.Address, nTokens)
@@ -293,60 +304,66 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 	}
 	sort.Slice(tokens, func(i, j int) bool { return tokens[i] < tokens[j] })
 
+	token0 := pricegetter.NewTokenID(tokens[0], destChain.EvmChainID)
+	token1 := pricegetter.NewTokenID(tokens[1], destChain.EvmChainID)
+	token2 := pricegetter.NewTokenID(tokens[2], destChain.EvmChainID)
+	token3 := pricegetter.NewTokenID(tokens[3], destChain.EvmChainID)
+	srcNativeToken := pricegetter.NewTokenID(sourceNativeTokenAddr, sourceChain.EvmChainID)
+
 	testCases := []struct {
 		name                string
 		destTokens          []cciptypes.Address
-		tokenDecimals       map[cciptypes.Address]uint8
+		tokenDecimals       map[pricegetter.TokenID]uint8
 		sourceNativeToken   cciptypes.Address
 		filterOutTokens     []cciptypes.Address
-		priceGetterRespData map[cciptypes.Address]*big.Int
+		priceGetterRespData map[pricegetter.TokenID]*big.Int
 		priceGetterRespErr  error
-		expTokenPricesUSD   map[cciptypes.Address]*big.Int
+		expTokenPricesUSD   map[pricegetter.TokenID]*big.Int
 		expErr              bool
 		expDecimalErr       bool
 	}{
 		{
 			name: "base case with src native token not equals to dest token",
-			tokenDecimals: map[cciptypes.Address]uint8{ // only destination tokens
-				tokens[1]: 18,
-				tokens[2]: 12,
+			tokenDecimals: map[pricegetter.TokenID]uint8{ // only destination tokens
+				token1: 18,
+				token2: 12,
 			},
-			sourceNativeToken: sourceNativeToken,
-			priceGetterRespData: map[cciptypes.Address]*big.Int{ // should return all tokens (including source native token)
-				sourceNativeToken: val1e18(100),
-				tokens[1]:         val1e18(200),
-				tokens[2]:         val1e18(300),
+			sourceNativeToken: sourceNativeTokenAddr,
+			priceGetterRespData: map[pricegetter.TokenID]*big.Int{ // should return all tokens (including source native token)
+				srcNativeToken: val1e18(100),
+				token1:         val1e18(200),
+				token2:         val1e18(300),
 			},
 			priceGetterRespErr: nil,
-			expTokenPricesUSD: map[cciptypes.Address]*big.Int{ // should only return the tokens in destination chain
-				tokens[1]: val1e18(200),
-				tokens[2]: val1e18(300 * 1e6),
+			expTokenPricesUSD: map[pricegetter.TokenID]*big.Int{ // should only return the tokens in destination chain
+				token1: val1e18(200),
+				token2: val1e18(300 * 1e6),
 			},
 			expErr: false,
 		},
 		{
 			name: "base case with src native token equals to dest token",
-			tokenDecimals: map[cciptypes.Address]uint8{
-				sourceNativeToken: 18,
-				tokens[1]:         12,
+			tokenDecimals: map[pricegetter.TokenID]uint8{
+				srcNativeToken: 18,
+				token1:         12,
 			},
-			sourceNativeToken: sourceNativeToken,
-			priceGetterRespData: map[cciptypes.Address]*big.Int{
-				sourceNativeToken: val1e18(100),
-				tokens[1]:         val1e18(200),
+			sourceNativeToken: sourceNativeTokenAddr,
+			priceGetterRespData: map[pricegetter.TokenID]*big.Int{
+				srcNativeToken: val1e18(100),
+				token1:         val1e18(200),
 			},
 			priceGetterRespErr: nil,
-			expTokenPricesUSD: map[cciptypes.Address]*big.Int{
-				sourceNativeToken: val1e18(100),
-				tokens[1]:         val1e18(200 * 1e6),
+			expTokenPricesUSD: map[pricegetter.TokenID]*big.Int{
+				//srcNativeToken: val1e18(100), // source native is not reported since it's not on dest
+				token1: val1e18(200 * 1e6),
 			},
 			expErr: false,
 		},
 		{
 			name: "price getter returned an error",
-			tokenDecimals: map[cciptypes.Address]uint8{
-				tokens[0]: 18,
-				tokens[1]: 18,
+			tokenDecimals: map[pricegetter.TokenID]uint8{
+				token0: 18,
+				token1: 18,
 			},
 			sourceNativeToken:   tokens[0],
 			priceGetterRespData: nil,
@@ -356,36 +373,36 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 		{
 			name:       "price getter returns more prices than destTokens",
 			destTokens: []cciptypes.Address{tokens[1]},
-			tokenDecimals: map[cciptypes.Address]uint8{
-				tokens[1]: 18,
-				tokens[2]: 12,
-				tokens[3]: 18,
+			tokenDecimals: map[pricegetter.TokenID]uint8{
+				token1: 18,
+				token2: 12,
+				token3: 18,
 			},
-			sourceNativeToken: sourceNativeToken,
-			priceGetterRespData: map[cciptypes.Address]*big.Int{
-				sourceNativeToken: val1e18(100),
-				tokens[1]:         val1e18(200),
-				tokens[2]:         val1e18(300),
-				tokens[3]:         val1e18(400),
+			sourceNativeToken: sourceNativeTokenAddr,
+			priceGetterRespData: map[pricegetter.TokenID]*big.Int{
+				srcNativeToken: val1e18(100),
+				token1:         val1e18(200),
+				token2:         val1e18(300),
+				token3:         val1e18(400),
 			},
-			expTokenPricesUSD: map[cciptypes.Address]*big.Int{
-				tokens[1]: val1e18(200),
-				tokens[2]: val1e18(300 * 1e6),
-				tokens[3]: val1e18(400),
+			expTokenPricesUSD: map[pricegetter.TokenID]*big.Int{
+				token1: val1e18(200),
+				token2: val1e18(300 * 1e6),
+				token3: val1e18(400),
 			},
 		},
 		{
 			name: "price getter returns more prices with missing decimals",
-			tokenDecimals: map[cciptypes.Address]uint8{
-				tokens[1]: 18,
-				tokens[2]: 12,
+			tokenDecimals: map[pricegetter.TokenID]uint8{
+				token1: 18,
+				token2: 12,
 			},
-			sourceNativeToken: sourceNativeToken,
-			priceGetterRespData: map[cciptypes.Address]*big.Int{
-				sourceNativeToken: val1e18(100),
-				tokens[1]:         val1e18(200),
-				tokens[2]:         val1e18(300),
-				tokens[3]:         val1e18(400),
+			sourceNativeToken: sourceNativeTokenAddr,
+			priceGetterRespData: map[pricegetter.TokenID]*big.Int{
+				srcNativeToken: val1e18(100),
+				token1:         val1e18(200),
+				token2:         val1e18(300),
+				token3:         val1e18(400),
 			},
 			priceGetterRespErr: nil,
 			expErr:             true,
@@ -393,32 +410,32 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 		},
 		{
 			name: "price getter skipped a requested price",
-			tokenDecimals: map[cciptypes.Address]uint8{
-				tokens[0]: 18,
+			tokenDecimals: map[pricegetter.TokenID]uint8{
+				token0: 18,
 			},
 			sourceNativeToken: tokens[0],
-			priceGetterRespData: map[cciptypes.Address]*big.Int{
-				tokens[0]: val1e18(100),
+			priceGetterRespData: map[pricegetter.TokenID]*big.Int{
+				token0: val1e18(100),
 			},
 			priceGetterRespErr: nil,
-			expTokenPricesUSD: map[cciptypes.Address]*big.Int{
-				tokens[0]: val1e18(100),
+			expTokenPricesUSD: map[pricegetter.TokenID]*big.Int{
+				token0: val1e18(100),
 			},
 			expErr: false,
 		},
 		{
 			name: "nil token price",
-			tokenDecimals: map[cciptypes.Address]uint8{
-				tokens[0]: 18,
-				tokens[1]: 18,
-				tokens[2]: 18,
+			tokenDecimals: map[pricegetter.TokenID]uint8{
+				token0: 18,
+				token1: 18,
+				token2: 18,
 			},
 			sourceNativeToken: tokens[0],
 			filterOutTokens:   []cciptypes.Address{tokens[2]},
-			priceGetterRespData: map[cciptypes.Address]*big.Int{
-				tokens[0]: nil,
-				tokens[1]: val1e18(200),
-				tokens[2]: val1e18(300),
+			priceGetterRespData: map[pricegetter.TokenID]*big.Int{
+				token0: nil,
+				token1: val1e18(200),
+				token2: val1e18(300),
 			},
 			expErr: true,
 		},
@@ -432,7 +449,7 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 			var destTokens []cciptypes.Address
 			if len(tc.destTokens) == 0 {
 				for tk := range tc.tokenDecimals {
-					destTokens = append(destTokens, tk)
+					destTokens = append(destTokens, tk.Address)
 				}
 			} else {
 				destTokens = tc.destTokens
@@ -440,8 +457,8 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 
 			finalDestTokens := make([]cciptypes.Address, 0, len(destTokens))
 			for addr := range tc.priceGetterRespData {
-				if (tc.sourceNativeToken != addr) || (slices.Contains(destTokens, addr)) {
-					finalDestTokens = append(finalDestTokens, addr)
+				if addr.ChainID == destChain.EvmChainID {
+					finalDestTokens = append(finalDestTokens, addr.Address)
 				}
 			}
 			sort.Slice(finalDestTokens, func(i, j int) bool {
@@ -450,7 +467,7 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 
 			var destDecimals []uint8
 			for _, token := range finalDestTokens {
-				destDecimals = append(destDecimals, tc.tokenDecimals[token])
+				destDecimals = append(destDecimals, tc.tokenDecimals[pricegetter.NewTokenID(token, destChain.EvmChainID)])
 			}
 
 			priceGetter.On("GetJobSpecTokenPricesUSD", mock.Anything).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
@@ -472,8 +489,8 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 				lggr,
 				nil,
 				jobId,
-				destChainSelector,
-				sourceChainSelector,
+				destChain.Selector,
+				sourceChain.Selector,
 				tc.sourceNativeToken,
 				priceGetter,
 				offRampReader,
@@ -753,26 +770,26 @@ func checkResultLen(t *testing.T, priceService PriceService, destChainSelector u
 func TestPriceService_priceWriteInBackground(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	jobId := int32(1)
-	destChainSelector := uint64(12345)
-	sourceChainSelector := uint64(67890)
+	destChain := chainselectors.TEST_98865
+	sourceChain := chainselectors.TEST_1000
 	ctx := tests.Context(t)
 
-	sourceNative := cciptypes.Address(utils.RandomAddress().String())
-	feeToken := cciptypes.Address(utils.RandomAddress().String())
-	destToken1 := cciptypes.Address(utils.RandomAddress().String())
-	destToken2 := cciptypes.Address(utils.RandomAddress().String())
+	sourceNative := pricegetter.NewTokenID(cciptypes.Address(utils.RandomAddress().String()), sourceChain.EvmChainID)
+	feeToken := pricegetter.NewTokenID(cciptypes.Address(utils.RandomAddress().String()), destChain.EvmChainID)
+	destToken1 := pricegetter.NewTokenID(cciptypes.Address(utils.RandomAddress().String()), destChain.EvmChainID)
+	destToken2 := pricegetter.NewTokenID(cciptypes.Address(utils.RandomAddress().String()), destChain.EvmChainID)
 
-	feeTokens := []cciptypes.Address{feeToken}
-	rampTokens := []cciptypes.Address{destToken1, destToken2}
+	feeTokens := []pricegetter.TokenID{feeToken}
+	rampTokens := []pricegetter.TokenID{destToken1, destToken2}
 
-	laneTokens := []cciptypes.Address{sourceNative, feeToken, destToken1, destToken2}
+	laneTokens := []pricegetter.TokenID{sourceNative, feeToken, destToken1, destToken2}
 	// sort laneTokens
 	sort.Slice(laneTokens, func(i, j int) bool {
-		return laneTokens[i] < laneTokens[j]
+		return laneTokens[i].Address < laneTokens[j].Address
 	})
-	laneTokenDecimals := []uint8{18, 18, 18, 18}
+	laneTokenDecimals := []uint8{18, 18, 18}
 
-	tokens := []cciptypes.Address{sourceNative, feeToken, destToken1, destToken2}
+	tokens := []pricegetter.TokenID{sourceNative, feeToken, destToken1, destToken2}
 	tokenPrices := []int64{2, 3, 4, 5}
 	gasPrice := big.NewInt(10)
 
@@ -784,21 +801,25 @@ func TestPriceService_priceWriteInBackground(t *testing.T) {
 	gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
 	defer gasPriceEstimator.AssertExpectations(t)
 
-	priceGetter.On("TokenPricesUSD", mock.Anything, []cciptypes.Address{sourceNative}).Return(map[cciptypes.Address]*big.Int{
+	priceGetter.EXPECT().GetTokenPrices(mock.Anything, []pricegetter.TokenID{tokens[0]}).Return(map[pricegetter.TokenID]*big.Int{
 		tokens[0]: val1e18(tokenPrices[0]),
 	}, nil)
 
-	priceGetter.On("GetJobSpecTokenPricesUSD", mock.Anything).Return(map[cciptypes.Address]*big.Int{
+	priceGetter.On("GetJobSpecTokenPricesUSD", mock.Anything).Return(map[pricegetter.TokenID]*big.Int{
 		tokens[0]: val1e18(tokenPrices[0]),
 		tokens[1]: val1e18(tokenPrices[1]),
 		tokens[2]: val1e18(tokenPrices[2]),
 		tokens[3]: val1e18(tokenPrices[3]),
 	}, nil)
 
-	destTokens := append(rampTokens, sourceNative)
+	destTokenAddrs := make([]cciptypes.Address, 0)
+	for _, tk := range append(rampTokens, feeTokens...) {
+		destTokenAddrs = append(destTokenAddrs, tk.Address)
+	}
+
 	offRampReader := ccipdatamocks.NewOffRampReader(t)
 	offRampReader.On("GetTokens", mock.Anything).Return(cciptypes.OffRampTokens{
-		DestinationTokens: destTokens,
+		DestinationTokens: destTokenAddrs,
 	}, nil).Maybe()
 
 	gasPriceEstimator.On("GetGasPrice", mock.Anything).Return(gasPrice, nil)
@@ -806,16 +827,17 @@ func TestPriceService_priceWriteInBackground(t *testing.T) {
 	gasPriceEstimator.On("DenoteInUSD", mock.Anything, mock.Anything, mock.Anything).Return(pUSD, nil)
 
 	destPriceReg := ccipdatamocks.NewPriceRegistryReader(t)
-	destPriceReg.On("GetTokensDecimals", mock.Anything, laneTokens).Return(laneTokenDecimals, nil).Maybe()
+	sort.Slice(destTokenAddrs, func(i, j int) bool { return destTokenAddrs[i] < destTokenAddrs[j] })
+	destPriceReg.On("GetTokensDecimals", mock.Anything, destTokenAddrs).Return(laneTokenDecimals, nil).Maybe()
 	destPriceReg.On("GetFeeTokens", mock.Anything).Return(feeTokens, nil).Maybe()
 
 	priceService := NewPriceService(
 		lggr,
 		orm,
 		jobId,
-		destChainSelector,
-		sourceChainSelector,
-		tokens[0],
+		destChain.Selector,
+		sourceChain.Selector,
+		tokens[0].Address,
 		priceGetter,
 		offRampReader,
 	).(*priceService)
@@ -829,7 +851,7 @@ func TestPriceService_priceWriteInBackground(t *testing.T) {
 	priceService.tokenUpdateInterval = tokenUpdateInterval
 
 	// initially, db is empty
-	assert.NoError(t, checkResultLen(t, priceService, destChainSelector, 0, 0))
+	assert.NoError(t, checkResultLen(t, priceService, destChain.Selector, 0, 0))
 
 	// starts PriceService in the background
 	assert.NoError(t, priceService.Start(ctx))
@@ -837,7 +859,7 @@ func TestPriceService_priceWriteInBackground(t *testing.T) {
 	// setting dynamicConfig triggers initial price update
 	err := priceService.UpdateDynamicConfig(ctx, gasPriceEstimator, destPriceReg)
 	assert.NoError(t, err)
-	assert.NoError(t, checkResultLen(t, priceService, destChainSelector, 1, len(laneTokens)))
+	assert.NoError(t, checkResultLen(t, priceService, destChain.Selector, 1, len(laneTokens)))
 
 	assert.NoError(t, priceService.Close())
 }

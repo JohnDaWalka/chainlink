@@ -19,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -275,12 +274,12 @@ func (p *priceService) observeGasPriceUpdates(
 		return nil, errors.New("gasPriceEstimator is not set yet")
 	}
 
-	destChainID, err := chainselectors.ChainIdFromSelector(p.destChainSelector)
+	sourceChainID, err := chainselectors.ChainIdFromSelector(p.sourceChainSelector)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get dest chain ID from selector %d: %w", p.destChainSelector, err)
+		return nil, fmt.Errorf("failed to get source chain ID from selector %d: %w", p.sourceChainSelector, err)
 	}
 
-	sourceNativeTokenID := pricegetter.NewTokenID(p.sourceNative, destChainID) // TODO: use source chain ID
+	sourceNativeTokenID := pricegetter.NewTokenID(p.sourceNative, sourceChainID)
 
 	// Include wrapped native to identify the source native USD price, notice USD is in 1e18 scale, i.e. $1 = 1e18
 	rawTokenPricesUSD, err := p.priceGetter.GetTokenPrices(ctx, []pricegetter.TokenID{sourceNativeTokenID})
@@ -336,7 +335,7 @@ func (p *priceService) observeTokenPriceUpdates(
 	// Verify no price returned by price getter is nil
 	for token, price := range rawTokenPricesUSD {
 		if price == nil {
-			return nil, fmt.Errorf("Token price is nil for token %s", token)
+			return nil, fmt.Errorf("token price is nil for token %v", token)
 		}
 	}
 
@@ -347,7 +346,6 @@ func (p *priceService) observeTokenPriceUpdates(
 		return nil, fmt.Errorf("failed to get dest chain ID from selector %d: %w", p.destChainSelector, err)
 	}
 
-	// Filter out source native token only if source native not in dest tokens
 	var finalDestTokens []pricegetter.TokenID
 	for token := range rawTokenPricesUSD {
 		if token.ChainID == destChainID {
@@ -355,14 +353,14 @@ func (p *priceService) observeTokenPriceUpdates(
 		}
 	}
 
-	fee, bridged, err := ccipcommon.GetDestinationTokens(ctx, p.offRampReader, p.destPriceRegistryReader)
-	if err != nil {
-		return nil, fmt.Errorf("get destination tokens: %w", err)
-	}
-	onchainDestTokens := ccipcommon.FlattenedAndSortedTokens(fee, bridged)
-	lggr.Debugw("Destination tokens", "destTokens", onchainDestTokens)
-
 	// TODO: this hasSameDestAddress is wrong
+	//fee, bridged, err := ccipcommon.GetDestinationTokens(ctx, p.offRampReader, p.destPriceRegistryReader)
+	//if err != nil {
+	//	return nil, fmt.Errorf("get destination tokens: %w", err)
+	//}
+	//onchainDestTokens := ccipcommon.FlattenedAndSortedTokens(fee, bridged)
+	//lggr.Debugw("Destination tokens", "destTokens", onchainDestTokens)
+	// Filter out source native token only if source native not in dest tokens
 	//onchainTokensEvmAddr, err := ccipcalc.GenericAddrsToEvm(onchainDestTokens...)
 	//if err != nil {
 	//	return nil, fmt.Errorf("failed to convert sorted lane tokens to EVM addresses: %w", err)
