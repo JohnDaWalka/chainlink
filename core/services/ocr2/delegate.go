@@ -1672,7 +1672,7 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 	}
 
-	priceGetter, err := d.ccipCommitPriceGetter(ctx, lggr, pluginJobSpecConfig, jb)
+	priceGetter, err := d.ccipCommitPriceGetter(ctx, lggr, pluginJobSpecConfig, jb, dstChainID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create price getter: %w", err)
 	}
@@ -1680,7 +1680,13 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 	return ccipcommit.NewCommitServices(ctx, d.ds, srcProvider, dstProvider, priceGetter, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, int64(srcChainID), dstChainID, logError)
 }
 
-func (d *Delegate) ccipCommitPriceGetter(ctx context.Context, lggr logger.SugaredLogger, pluginJobSpecConfig ccipconfig.CommitPluginJobSpecConfig, jb job.Job) (priceGetter ccip.AllTokensPriceGetter, err error) {
+func (d *Delegate) ccipCommitPriceGetter(
+	ctx context.Context,
+	lggr logger.SugaredLogger,
+	pluginJobSpecConfig ccipconfig.CommitPluginJobSpecConfig,
+	jb job.Job,
+	destChainID int64,
+) (priceGetter ccip.AllTokensPriceGetter, err error) {
 	spec := jb.OCR2OracleSpec
 	withPipeline := strings.Trim(pluginJobSpecConfig.TokenPricesUSDPipeline, "\n\t ") != ""
 	if withPipeline {
@@ -1749,6 +1755,13 @@ func (d *Delegate) ccipCommitPriceGetter(ctx context.Context, lggr logger.Sugare
 			contractReaders[chainID] = contractReader
 		}
 
+		priceGetterCfg := *pluginJobSpecConfig.PriceGetterConfig
+		if err := priceGetterCfg.MoveDeprecatedFields(uint64(destChainID)); err != nil {
+			return nil, fmt.Errorf("move deprecated price getter fields: %w", err)
+		}
+		if err := priceGetterCfg.Validate(); err != nil {
+			return nil, fmt.Errorf("validate price getter config: %w", err)
+		}
 		priceGetter, err = ccip.NewDynamicPriceGetter(*pluginJobSpecConfig.PriceGetterConfig, contractReaders)
 		if err != nil {
 			return nil, fmt.Errorf("creating dynamic price getter: %w", err)

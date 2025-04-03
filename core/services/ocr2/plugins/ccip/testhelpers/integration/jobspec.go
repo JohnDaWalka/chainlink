@@ -204,7 +204,7 @@ func (params CCIPJobSpecParams) ValidateCommitJobSpec() error {
 	// NB: only validate the dynamic price getter config if present since we could also be using the pipeline instead.
 	// NB: make this test mandatory once we switch to dynamic price getter only.
 	if params.PriceGetterConfig != "" {
-		if _, err := pricegetter.NewDynamicPriceGetterConfig(params.PriceGetterConfig); err != nil {
+		if _, err := pricegetter.NewDynamicPriceGetterConfig(params.PriceGetterConfig, params.DestEvmChainId); err != nil {
 			return fmt.Errorf("invalid price getter config: %w", err)
 		}
 	}

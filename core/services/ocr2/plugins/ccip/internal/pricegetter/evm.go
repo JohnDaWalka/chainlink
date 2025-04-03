@@ -57,12 +57,18 @@ type DynamicPriceGetter struct {
 	aggregatorAbi   abi.ABI
 }
 
-func NewDynamicPriceGetterConfig(configJson string) (config.DynamicPriceGetterConfig, error) {
+// TODO: explain why destChainID is provided and mark as deprecated
+func NewDynamicPriceGetterConfig(configJson string, destChainID uint64) (config.DynamicPriceGetterConfig, error) {
 	priceGetterConfig := config.DynamicPriceGetterConfig{}
 	err := json.Unmarshal([]byte(configJson), &priceGetterConfig)
 	if err != nil {
 		return config.DynamicPriceGetterConfig{}, fmt.Errorf("parsing dynamic price getter config: %w", err)
 	}
+
+	if err := priceGetterConfig.MoveDeprecatedFields(destChainID); err != nil {
+		return config.DynamicPriceGetterConfig{}, fmt.Errorf("moving deprecated fields: %w", err)
+	}
+
 	err = priceGetterConfig.Validate()
 	if err != nil {
 		return config.DynamicPriceGetterConfig{}, fmt.Errorf("validating price getter config: %w", err)
