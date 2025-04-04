@@ -246,6 +246,7 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 				return
 			}
 
+			// Start goroutines to gather changes from Workflow Registry contract
 			switch w.syncStrategy {
 			case SyncStrategyEvent:
 				w.syncUsingEventStrategy(ctx, don, reader)
@@ -253,12 +254,20 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 				w.syncUsingReconciliationStrategy(ctx, don, reader)
 			}
 
-			go func() {
-				w.wg.Add(1)
-				defer w.wg.Done()
-				w.handleEventLoop(ctx)
-			}()
-
+			// Handle events from the events channel
+			w.lggr.Debug("running handleEventLoop")
+			for {
+				select {
+				case <-ctx.Done():
+					w.lggr.Debug("shutting down handleEventLoop")
+					return
+				case event := <-w.eventCh:
+					err := w.handler.Handle(ctx, event)
+					if err != nil {
+						w.lggr.Errorw("failed to handle event", "err", err, "type", event.GetEventType())
+					}
+				}
+			}
 		}()
 
 		return nil
@@ -283,22 +292,6 @@ func (w *workflowRegistry) HealthReport() map[string]error {
 
 func (w *workflowRegistry) Name() string {
 	return name
-}
-
-func (w *workflowRegistry) handleEventLoop(ctx context.Context) {
-	w.lggr.Debug("running handleEventLoop")
-	for {
-		select {
-		case <-ctx.Done():
-			w.lggr.Debug("shutting down handleEventLoop")
-			return
-		case event := <-w.eventCh:
-			err := w.handler.Handle(ctx, event)
-			if err != nil {
-				w.lggr.Errorw("failed to handle event", "err", err, "type", event.GetEventType())
-			}
-		}
-	}
 }
 
 // readRegistryEventsLoop polls the contract for events and sends them to the events channel for handling.
