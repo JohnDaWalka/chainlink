@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {MockCapabilitiesRegistry} from "./mocks/MockCapabilitiesRegistry.sol";
 import {Ownable2Step} from "../../shared/access/Ownable2Step.sol";
 import {DonIDClaimer} from "../DonIDClaimer.sol";
+import {MockCapabilitiesRegistry} from "./mocks/MockCapabilitiesRegistry.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract DonIDClaimerTest is Test {
@@ -29,7 +29,9 @@ contract DonIDClaimerTest is Test {
 
     // Now test the normal constructor behavior with a valid address
     DonIDClaimer validDonIDClaimer = new DonIDClaimer(address(s_mockRegistry));
-    assertEq(validDonIDClaimer.getNextDONId(), INITIAL_CLAIM_ID, "Initial DON ID should be set correctly from the registry");
+    assertEq(
+      validDonIDClaimer.getNextDONId(), INITIAL_CLAIM_ID, "Initial DON ID should be set correctly from the registry"
+    );
   }
 
   function test_ClaimNextDONId() public {

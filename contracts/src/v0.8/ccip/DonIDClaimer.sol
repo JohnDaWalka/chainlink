@@ -22,7 +22,7 @@ interface ICapabilitiesRegistry {
 /// allows for alignment with the CapabilitiesRegistry.
 contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
   using EnumerableSet for EnumerableSet.AddressSet;
-    
+
   error ZeroAddressNotAllowed();
   error AccessForbidden(address sender);
 
@@ -89,13 +89,13 @@ contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev Can only be called by an existing authorized deployer
   function setAuthorizedDeployer(address senderAddress, bool allowed) external onlyOwner {
     if (senderAddress == address(0)) revert ZeroAddressNotAllowed();
-    
+
     if (allowed) {
       s_authorizedDeployers.add(senderAddress);
     } else {
       s_authorizedDeployers.remove(senderAddress);
     }
- 
+
     emit AuthorizedDeployerSet(senderAddress, allowed);
   }
 
