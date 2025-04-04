@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Ownable2StepMsgSender} from "../shared/access/Ownable2StepMsgSender.sol";
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
+import {EnumerableSet} from "../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 interface ICapabilitiesRegistry {
   /// @notice Gets the next available DON ID from the CapabilitiesRegistry
@@ -20,6 +21,8 @@ interface ICapabilitiesRegistry {
 /// the next available ID is claimed and tracked by the contract. The sync function
 /// allows for alignment with the CapabilitiesRegistry.
 contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
+  using EnumerableSet for EnumerableSet.AddressSet;
+    
   error ZeroAddressNotAllowed();
   error AccessForbidden(address sender);
 
@@ -27,15 +30,15 @@ contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
   event DonIDClaimed(address indexed claimer, uint32 donId);
   event DonIDSynced(uint32 newDONId);
 
-  string public constant override typeAndVersion = "DonIDClaimer 1.0.0-dev";
+  string public constant override typeAndVersion = "DonIDClaimer 1.6.1";
   /// @notice The next available DON ID that is claimed and incremented
   uint32 private s_nextDONId;
 
   /// @notice The address of the CapabilitiesRegistry contract used to fetch the next DON ID
   ICapabilitiesRegistry private immutable i_capabilitiesRegistry;
 
-  /// @notice Mapping to track authorized deployed keys
-  mapping(address => bool) private s_authorizedDeployers;
+  /// @notice List to track authorized deployed keys
+  EnumerableSet.AddressSet private s_authorizedDeployers;
 
   /// @notice Initializes the contract with the CapabilitiesRegistry address
   /// @param _capabilitiesRegistry The address of the CapabilitiesRegistry contract
@@ -46,7 +49,7 @@ contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
     i_capabilitiesRegistry = ICapabilitiesRegistry(_capabilitiesRegistry);
 
     // Initializing the deployer authorization (owner can be the initial deployer)
-    s_authorizedDeployers[msg.sender] = true;
+    s_authorizedDeployers.add(msg.sender);
 
     // Sync the initial s_nextDONId from the CapabilitiesRegistry contract
     s_nextDONId = i_capabilitiesRegistry.getNextDONId();
@@ -54,7 +57,7 @@ contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
 
   /// @notice Modifier to check if the caller is an authorized deployer
   modifier onlyAuthorizedDeployer() {
-    if (!s_authorizedDeployers[msg.sender]) {
+    if (!s_authorizedDeployers.contains(msg.sender)) {
       revert AccessForbidden(msg.sender);
     }
     _;
@@ -86,8 +89,13 @@ contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
   /// @dev Can only be called by an existing authorized deployer
   function setAuthorizedDeployer(address senderAddress, bool allowed) external onlyOwner {
     if (senderAddress == address(0)) revert ZeroAddressNotAllowed();
-    s_authorizedDeployers[senderAddress] = allowed;
-
+    
+    if (allowed) {
+      s_authorizedDeployers.add(senderAddress);
+    } else {
+      s_authorizedDeployers.remove(senderAddress);
+    }
+ 
     emit AuthorizedDeployerSet(senderAddress, allowed);
   }
 
@@ -103,6 +111,6 @@ contract DonIDClaimer is ITypeAndVersion, Ownable2StepMsgSender {
   function isAuthorizedDeployer(
     address senderAddress
   ) external view returns (bool) {
-    return s_authorizedDeployers[senderAddress];
+    return s_authorizedDeployers.contains(senderAddress);
   }
 }

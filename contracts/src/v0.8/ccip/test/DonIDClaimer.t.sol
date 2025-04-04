@@ -1,25 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {MockCapabilitiesRegistry} from "./mocks/MockCapabilitiesRegistry.sol";
 import {Ownable2Step} from "../../shared/access/Ownable2Step.sol";
 import {DonIDClaimer} from "../DonIDClaimer.sol";
 import {Test} from "forge-std/Test.sol";
 
-contract MockCapabilitiesRegistry {
-  uint32 private s_nextDonId;
-
-  constructor(
-    uint32 _initialDonId
-  ) {
-    s_nextDonId = _initialDonId;
-  }
-
-  function getNextDONId() external view returns (uint32) {
-    return s_nextDonId;
-  }
-}
-
 contract DonIDClaimerTest is Test {
+  uint32 internal constant INITIAL_CLAIM_ID = 100;
   DonIDClaimer private s_donIDClaimer;
   MockCapabilitiesRegistry private s_mockRegistry;
   address private s_owner = address(0x1);
@@ -28,7 +16,7 @@ contract DonIDClaimerTest is Test {
 
   function setUp() public {
     vm.startPrank(s_owner);
-    s_mockRegistry = new MockCapabilitiesRegistry(100);
+    s_mockRegistry = new MockCapabilitiesRegistry(INITIAL_CLAIM_ID);
     s_donIDClaimer = new DonIDClaimer(address(s_mockRegistry));
     s_donIDClaimer.setAuthorizedDeployer(s_deployer, true);
     vm.stopPrank();
@@ -41,30 +29,30 @@ contract DonIDClaimerTest is Test {
 
     // Now test the normal constructor behavior with a valid address
     DonIDClaimer validDonIDClaimer = new DonIDClaimer(address(s_mockRegistry));
-    assertEq(validDonIDClaimer.getNextDONId(), 100, "Initial DON ID should be set correctly from the registry");
+    assertEq(validDonIDClaimer.getNextDONId(), INITIAL_CLAIM_ID, "Initial DON ID should be set correctly from the registry");
   }
 
   function test_ClaimNextDONId() public {
-    vm.expectEmit(true, true, true, true);
-    emit DonIDClaimer.DonIDClaimed(s_deployer, 100);
-
     vm.prank(s_deployer);
+    vm.expectEmit();
+    emit DonIDClaimer.DonIDClaimed(s_deployer, INITIAL_CLAIM_ID);
+
     uint32 claimedId = s_donIDClaimer.claimNextDONId();
-    assertEq(claimedId, 100, "Claimed DON ID should be 100");
-    assertEq(s_donIDClaimer.getNextDONId(), 101, "Next DON ID should be incremented to 101");
+    assertEq(claimedId, INITIAL_CLAIM_ID, "Claimed DON ID should be 100");
+    assertEq(s_donIDClaimer.getNextDONId(), INITIAL_CLAIM_ID + 1, "Next DON ID should be incremented to 101");
   }
 
   function test_SyncNextDONIdWithOffset() public {
-    vm.expectEmit(true, true, true, true);
-    emit DonIDClaimer.DonIDSynced(110);
+    vm.expectEmit();
+    emit DonIDClaimer.DonIDSynced(INITIAL_CLAIM_ID + 10);
 
     vm.prank(s_deployer);
     s_donIDClaimer.syncNextDONIdWithOffset(10);
-    assertEq(s_donIDClaimer.getNextDONId(), 110, "Next DON ID should be 110 after offset");
+    assertEq(s_donIDClaimer.getNextDONId(), INITIAL_CLAIM_ID + 10, "Next DON ID should be 110 after offset");
   }
 
   function test_SetAuthorizedDeployer() public {
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit DonIDClaimer.AuthorizedDeployerSet(s_unauthorized, true);
 
     vm.prank(s_owner);
