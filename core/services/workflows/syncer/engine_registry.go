@@ -47,7 +47,6 @@ func NewEngineRegistry() *EngineRegistry {
 func (r *EngineRegistry) Add(key EngineRegistryKey, engine services.Service, workflowID [32]byte) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
 	k := key.keyFor()
 	if _, found := r.engines[k]; found {
 		return errors.New("attempting to register duplicate engine")
@@ -65,10 +64,7 @@ func (r *EngineRegistry) Add(key EngineRegistryKey, engine services.Service, wor
 func (r *EngineRegistry) Get(key EngineRegistryKey) (ServiceWithMetadata, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-
-	k := key.keyFor()
-
-	engine, found := r.engines[k]
+	engine, found := r.engines[key.keyFor()]
 	if !found {
 		return ServiceWithMetadata{}, errNotFound
 	}
@@ -79,7 +75,6 @@ func (r *EngineRegistry) Get(key EngineRegistryKey) (ServiceWithMetadata, error)
 func (r *EngineRegistry) GetAll() []ServiceWithMetadata {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-
 	engines := []ServiceWithMetadata{}
 	for _, enginWithMetadata := range r.engines {
 		engines = append(engines, enginWithMetadata)
@@ -91,10 +86,7 @@ func (r *EngineRegistry) GetAll() []ServiceWithMetadata {
 func (r *EngineRegistry) Contains(key EngineRegistryKey) bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-
-	k := key.keyFor()
-
-	_, found := r.engines[k]
+	_, found := r.engines[key.keyFor()]
 	return found
 }
 
@@ -102,9 +94,7 @@ func (r *EngineRegistry) Contains(key EngineRegistryKey) bool {
 func (r *EngineRegistry) Pop(key EngineRegistryKey) (ServiceWithMetadata, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
 	k := key.keyFor()
-
 	engine, ok := r.engines[k]
 	if !ok {
 		return ServiceWithMetadata{}, fmt.Errorf("pop failed: %w", errNotFound)
@@ -117,7 +107,6 @@ func (r *EngineRegistry) Pop(key EngineRegistryKey) (ServiceWithMetadata, error)
 func (r *EngineRegistry) PopAll() []ServiceWithMetadata {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
 	all := slices.Collect(maps.Values(r.engines))
 	r.engines = make(map[string]ServiceWithMetadata)
 	return all

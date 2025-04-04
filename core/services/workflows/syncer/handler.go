@@ -3,6 +3,7 @@ package syncer
 import (
 	"bytes"
 	"context"
+	"errors"
 
 	"encoding/hex"
 	"fmt"
@@ -162,9 +163,9 @@ func NewEventHandler(
 	workflowLimits *syncerlimiter.Limits,
 	workflowArtifacts WorkflowArtifactsStore,
 	opts ...func(*eventHandler),
-) *eventHandler {
+) (*eventHandler, error) {
 	if engineRegistry == nil {
-		engineRegistry = NewEngineRegistry()
+		return nil, errors.New("engine registry must be provided")
 	}
 
 	eh := &eventHandler{
@@ -182,7 +183,7 @@ func NewEventHandler(
 		o(eh)
 	}
 
-	return eh
+	return eh, nil
 }
 
 func (h *eventHandler) Close() error {

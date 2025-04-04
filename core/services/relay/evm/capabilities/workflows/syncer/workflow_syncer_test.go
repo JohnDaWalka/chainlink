@@ -152,7 +152,7 @@ func Test_EventHandlerStateSync(t *testing.T) {
 	testEventHandler := newTestEvtHandler()
 
 	// Create the registry
-	registry := syncer.NewWorkflowRegistry(
+	registry, err := syncer.NewWorkflowRegistry(
 		lggr,
 		func(ctx context.Context, bytes []byte) (syncer.ContractReader, error) {
 			return backendTH.NewContractReader(ctx, t, bytes)
@@ -171,6 +171,7 @@ func Test_EventHandlerStateSync(t *testing.T) {
 		nil,
 		syncer.WithTicker(eventPollTicker.C),
 	)
+	require.NoError(t, err)
 
 	servicetest.Run(t, registry)
 
@@ -281,7 +282,7 @@ func Test_InitialStateSync(t *testing.T) {
 	testEventHandler := newTestEvtHandler()
 
 	// Create the worker
-	worker := syncer.NewWorkflowRegistry(
+	worker, err := syncer.NewWorkflowRegistry(
 		lggr,
 		func(ctx context.Context, bytes []byte) (syncer.ContractReader, error) {
 			return backendTH.NewContractReader(ctx, t, bytes)
@@ -300,6 +301,7 @@ func Test_InitialStateSync(t *testing.T) {
 		nil,
 		syncer.WithTicker(make(chan time.Time)),
 	)
+	require.NoError(t, err)
 
 	servicetest.Run(t, worker)
 
@@ -386,13 +388,15 @@ func Test_SecretsWorker(t *testing.T) {
 
 	engineRegistry := syncer.NewEngineRegistry()
 
+	evtHandler, err := syncer.NewEventHandler(lggr, nil, nil, engineRegistry,
+		emitter, rl, wl, store)
+	require.NoError(t, err)
 	handler := &testSecretsWorkEventHandler{
-		wrappedHandler: syncer.NewEventHandler(lggr, nil, nil, engineRegistry,
-			emitter, rl, wl, store),
-		registeredCh: make(chan syncer.Event, 1),
+		wrappedHandler: evtHandler,
+		registeredCh:   make(chan syncer.Event, 1),
 	}
 
-	worker := syncer.NewWorkflowRegistry(
+	worker, err := syncer.NewWorkflowRegistry(
 		lggr,
 		func(ctx context.Context, bytes []byte) (syncer.ContractReader, error) {
 			return backendTH.NewContractReader(ctx, t, bytes)
@@ -409,6 +413,7 @@ func Test_SecretsWorker(t *testing.T) {
 		engineRegistry,
 		syncer.WithTicker(giveTicker.C),
 	)
+	require.NoError(t, err)
 
 	// setup contract state to allow the secrets to be updated
 	updateAllowedDONs(t, backendTH, wfRegistryC, []uint32{donID}, true)
@@ -475,7 +480,7 @@ func Test_RegistrySyncer_SkipsEventsNotBelongingToDON(t *testing.T) {
 
 	handler := newTestEvtHandler()
 
-	worker := syncer.NewWorkflowRegistry(
+	worker, err := syncer.NewWorkflowRegistry(
 		lggr,
 		func(ctx context.Context, bytes []byte) (syncer.ContractReader, error) {
 			return backendTH.NewContractReader(ctx, t, bytes)
@@ -492,6 +497,7 @@ func Test_RegistrySyncer_SkipsEventsNotBelongingToDON(t *testing.T) {
 		nil,
 		syncer.WithTicker(giveTicker.C),
 	)
+	require.NoError(t, err)
 
 	// setup contract state to allow the secrets to be updated
 	updateAllowedDONs(t, backendTH, wfRegistryC, []uint32{donID, otherDonID}, true)
@@ -555,10 +561,11 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyPaused(t *testing.T) {
 
 	store := artifacts.NewStore(lggr, orm, fetcherFn, clockwork.NewFakeClock(), workflowkey.Key{}, emitter)
 
-	handler := syncer.NewEventHandler(lggr, nil, nil, nil,
+	handler, err := syncer.NewEventHandler(lggr, nil, nil, nil,
 		emitter, rl, wl, store, syncer.WithEngineRegistry(er))
+	require.NoError(t, err)
 
-	worker := syncer.NewWorkflowRegistry(
+	worker, err := syncer.NewWorkflowRegistry(
 		lggr,
 		func(ctx context.Context, bytes []byte) (syncer.ContractReader, error) {
 			return backendTH.NewContractReader(ctx, t, bytes)
@@ -575,6 +582,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyPaused(t *testing.T) {
 		nil,
 		syncer.WithTicker(giveTicker.C),
 	)
+	require.NoError(t, err)
 
 	// setup contract state to allow the secrets to be updated
 	updateAllowedDONs(t, backendTH, wfRegistryC, []uint32{donID}, true)
@@ -661,10 +669,11 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyActivated(t *testing.T) {
 
 	store := artifacts.NewStore(lggr, orm, fetcherFn, clockwork.NewFakeClock(), workflowkey.Key{}, emitter)
 
-	handler := syncer.NewEventHandler(lggr, nil, nil, nil,
+	handler, err := syncer.NewEventHandler(lggr, nil, nil, nil,
 		emitter, rl, wl, store, syncer.WithEngineRegistry(er), syncer.WithEngineFactoryFn(mf.new))
+	require.NoError(t, err)
 
-	worker := syncer.NewWorkflowRegistry(
+	worker, err := syncer.NewWorkflowRegistry(
 		lggr,
 		func(ctx context.Context, bytes []byte) (syncer.ContractReader, error) {
 			return backendTH.NewContractReader(ctx, t, bytes)
@@ -681,6 +690,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyActivated(t *testing.T) {
 		nil,
 		syncer.WithTicker(giveTicker.C),
 	)
+	require.NoError(t, err)
 
 	// setup contract state to allow the secrets to be updated
 	updateAllowedDONs(t, backendTH, wfRegistryC, []uint32{donID}, true)
