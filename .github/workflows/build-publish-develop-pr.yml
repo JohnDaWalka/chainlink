@@ -31,6 +31,7 @@ env:
   # Use github.sha here otherwise a race condition exists if
   # a commit is pushed to develop before merge is run.
   CHECKOUT_REF: ${{ github.event.inputs.git_ref || github.sha }}
+  CAPABILITIES_REPO_SHA: "d47e69a0a62dabb95df658585cc9229d2c4a4b32"
 
 jobs:
   image-tag:
@@ -115,6 +116,7 @@ jobs:
           repository: smartcontractkit/capabilities
           token: ${{ steps.token.outputs.access-token }}
           path: capabilities
+          ref: ${{ env.CAPABILITIES_REPO_REF }}
 
       - name: Configure aws credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
