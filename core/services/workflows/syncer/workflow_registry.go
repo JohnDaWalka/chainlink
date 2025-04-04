@@ -63,15 +63,6 @@ const (
 	defaultSyncStrategy        = SyncStrategyEvent
 )
 
-func (s *SyncStrategy) Validate() error {
-	switch *s {
-	case SyncStrategyEvent:
-	case SyncStrategyReconciliation:
-		return nil
-	}
-	return errors.New(fmt.Sprintf("SyncStrategy must be one of: %s, %s", SyncStrategyEvent, SyncStrategyReconciliation))
-}
-
 type WorkflowStatus uint8
 
 const (
@@ -205,9 +196,12 @@ func NewWorkflowRegistry(
 
 	// TODO: take in SyncStrategy from toml config
 	strat := SyncStrategy(defaultSyncStrategy)
-	err := strat.Validate()
-	if err != nil {
-		return nil, err
+	switch strat {
+	case SyncStrategyEvent:
+	case SyncStrategyReconciliation:
+		break
+	default:
+		return nil, errors.New(fmt.Sprintf("SyncStrategy must be one of: %s, %s", SyncStrategyEvent, SyncStrategyReconciliation))
 	}
 
 	wr := &workflowRegistry{
@@ -233,28 +227,39 @@ func NewWorkflowRegistry(
 // Start begins the workflowRegistry service.
 func (w *workflowRegistry) Start(_ context.Context) error {
 	return w.StartOnce(w.Name(), func() error {
-		ctx, _ := w.stopCh.NewCtx()
-
-		w.lggr.Debugw("Waiting for DON...")
-		don, err := w.workflowDonNotifier.WaitForDon(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to wait for don: %w", err)
-		}
-
-		reader, err := w.newWorkflowRegistryContractReader(ctx)
-		if err != nil {
-			return fmt.Errorf("contract reader unavailable : %w", err)
-		}
-
-		switch w.syncStrategy {
-		case SyncStrategyEvent:
-			w.syncUsingEventStrategy(ctx, don, reader)
-		case SyncStrategyReconciliation:
-			w.syncUsingReconciliationStrategy(ctx, don, reader)
-		}
-
+		ctx, cancel := w.stopCh.NewCtx()
 		w.wg.Add(1)
-		go w.handleEventLoop(ctx)
+		go func() {
+			defer w.wg.Done()
+			defer cancel()
+
+			w.lggr.Debugw("Waiting for DON...")
+			don, err := w.workflowDonNotifier.WaitForDon(ctx)
+			if err != nil {
+				w.lggr.Errorw("failed to wait for don", "err", err)
+				return
+			}
+
+			reader, err := w.newWorkflowRegistryContractReader(ctx)
+			if err != nil {
+				w.lggr.Criticalf("contract reader unavailable : %s", err)
+				return
+			}
+
+			switch w.syncStrategy {
+			case SyncStrategyEvent:
+				w.syncUsingEventStrategy(ctx, don, reader)
+			case SyncStrategyReconciliation:
+				w.syncUsingReconciliationStrategy(ctx, don, reader)
+			}
+
+			go func() {
+				w.wg.Add(1)
+				defer w.wg.Done()
+				w.handleEventLoop(ctx)
+			}()
+
+		}()
 
 		return nil
 	})
@@ -281,18 +286,13 @@ func (w *workflowRegistry) Name() string {
 }
 
 func (w *workflowRegistry) handleEventLoop(ctx context.Context) {
-	defer w.wg.Done()
 	w.lggr.Debug("running handleEventLoop")
 	for {
 		select {
 		case <-ctx.Done():
 			w.lggr.Debug("shutting down handleEventLoop")
 			return
-		case event, open := <-w.eventCh:
-			if !open {
-				w.lggr.Debug("handleEventLoop channel closed, shutting down handleEventLoop")
-				return
-			}
+		case event := <-w.eventCh:
 			err := w.handler.Handle(ctx, event)
 			if err != nil {
 				w.lggr.Errorw("failed to handle event", "err", err, "type", event.GetEventType())
@@ -303,8 +303,6 @@ func (w *workflowRegistry) handleEventLoop(ctx context.Context) {
 
 // readRegistryEventsLoop polls the contract for events and sends them to the events channel for handling.
 func (w *workflowRegistry) readRegistryEventsLoop(ctx context.Context, eventTypes []WorkflowRegistryEventType, don capabilities.DON, reader ContractReader, lastReadBlockNumber string) {
-	defer w.wg.Done()
-
 	ticker := w.getTicker()
 
 	var keyQueries = make([]types.ContractKeyFilter, 0, len(eventTypes))
@@ -444,9 +442,11 @@ func (w *workflowRegistry) syncUsingEventStrategy(ctx context.Context, don capab
 		WorkflowRegisteredEvent,
 		WorkflowUpdatedEvent,
 	}
-
-	w.wg.Add(1)
-	go w.readRegistryEventsLoop(ctx, ets, don, reader, loadWorkflowsHead.Height)
+	go func() {
+		w.wg.Add(1)
+		defer w.wg.Done()
+		go w.readRegistryEventsLoop(ctx, ets, don, reader, loadWorkflowsHead.Height)
+	}()
 }
 
 // workflowMetadataToEvents compares the workflow registry workflow metadata state against the engine registry's state.
@@ -543,15 +543,14 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 // syncUsingReconciliationStrategy syncs workflow registry contract state by polling the workflow metadata state and comparing to local state.
 // It still watches for ForceUpdateSecretsEvents, which can't be reconciled through workflow metadata state.
 func (w *workflowRegistry) syncUsingReconciliationStrategy(ctx context.Context, don capabilities.DON, reader ContractReader) {
-	workflowMetadata, loadWorkflowsHead, err := w.getWorkflowMetadata(ctx, don, reader)
+	_, loadWorkflowsHead, err := w.getWorkflowMetadata(ctx, don, reader)
 	if err != nil {
-		w.lggr.Errorw("failed to load initial workflows", "err", err)
+		w.lggr.Errorw("failed to load workflows head", "err", err)
 	}
-	w.workflowMetadataToEvents(ctx, workflowMetadata, don.ID)
 
 	// Poll for changes in workflow state
-	w.wg.Add(1)
 	go func() {
+		w.wg.Add(1)
 		defer w.wg.Done()
 		ticker := w.getTicker()
 		for {
@@ -573,8 +572,11 @@ func (w *workflowRegistry) syncUsingReconciliationStrategy(ctx context.Context, 
 	ets := []WorkflowRegistryEventType{
 		ForceUpdateSecretsEvent,
 	}
-	w.wg.Add(1)
-	go w.readRegistryEventsLoop(ctx, ets, don, reader, loadWorkflowsHead.Height)
+	go func() {
+		w.wg.Add(1)
+		defer w.wg.Done()
+		go w.readRegistryEventsLoop(ctx, ets, don, reader, loadWorkflowsHead.Height)
+	}()
 }
 
 // getTicker returns the ticker that the workflowRegistry will use to poll for events.  If the ticker
