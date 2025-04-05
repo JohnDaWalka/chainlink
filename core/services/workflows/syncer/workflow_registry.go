@@ -190,19 +190,8 @@ func NewWorkflowRegistry(
 	engineRegistry *EngineRegistry,
 	opts ...func(*workflowRegistry),
 ) (*workflowRegistry, error) {
-	if engineRegistry == nil {
-		return nil, errors.New("engine registry must be provided")
-	}
-
 	// TODO: take in SyncStrategy from toml config
 	strat := SyncStrategy(defaultSyncStrategy)
-	switch strat {
-	case SyncStrategyEvent:
-	case SyncStrategyReconciliation:
-		break
-	default:
-		return nil, errors.New(fmt.Sprintf("SyncStrategy must be one of: %s, %s", SyncStrategyEvent, SyncStrategyReconciliation))
-	}
 
 	wr := &workflowRegistry{
 		lggr:                    lggr,
@@ -219,6 +208,18 @@ func NewWorkflowRegistry(
 
 	for _, opt := range opts {
 		opt(wr)
+	}
+
+	if engineRegistry == nil {
+		return nil, errors.New("engine registry must be provided")
+	}
+
+	switch strat {
+	case SyncStrategyEvent:
+	case SyncStrategyReconciliation:
+		break
+	default:
+		return nil, errors.New(fmt.Sprintf("SyncStrategy must be one of: %s, %s", SyncStrategyEvent, SyncStrategyReconciliation))
 	}
 
 	return wr, nil

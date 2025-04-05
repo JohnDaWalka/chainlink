@@ -164,10 +164,6 @@ func NewEventHandler(
 	workflowArtifacts WorkflowArtifactsStore,
 	opts ...func(*eventHandler),
 ) (*eventHandler, error) {
-	if engineRegistry == nil {
-		return nil, errors.New("engine registry must be provided")
-	}
-
 	eh := &eventHandler{
 		lggr:                   lggr,
 		workflowStore:          workflowStore,
@@ -181,6 +177,10 @@ func NewEventHandler(
 	eh.engineFactory = eh.engineFactoryFn
 	for _, o := range opts {
 		o(eh)
+	}
+
+	if engineRegistry == nil {
+		return nil, errors.New("engine registry must be provided")
 	}
 
 	return eh, nil
