@@ -168,7 +168,7 @@ func Test_EventHandlerStateSync(t *testing.T) {
 			},
 			err: nil,
 		},
-		nil,
+		syncer.NewEngineRegistry(),
 		syncer.WithTicker(eventPollTicker.C),
 	)
 	require.NoError(t, err)
@@ -252,6 +252,11 @@ func Test_InitialStateSync(t *testing.T) {
 	backendTH := testutils.NewEVMBackendTH(t)
 	donID := uint32(1)
 
+	eventPollTicker := time.NewTicker(50 * time.Millisecond)
+	defer eventPollTicker.Stop()
+
+	eventCh := make(chan syncer.Event, 1000)
+
 	// Deploy a test workflow_registry
 	wfRegistryAddr, _, wfRegistryC, err := workflow_registry_wrapper.DeployWorkflowRegistry(backendTH.ContractsOwner, backendTH.Backend.Client())
 	backendTH.Backend.Commit()
@@ -298,15 +303,25 @@ func Test_InitialStateSync(t *testing.T) {
 			},
 			err: nil,
 		},
-		nil,
-		syncer.WithTicker(make(chan time.Time)),
+		syncer.NewEngineRegistry(),
+		syncer.WithTicker(eventPollTicker.C),
+		syncer.WithEventCh(eventCh),
 	)
 	require.NoError(t, err)
 
 	servicetest.Run(t, worker)
 
+	events := 0
 	require.Eventually(t, func() bool {
-		return len(testEventHandler.GetEvents()) == numberWorkflows
+		evt, ok := <-eventCh
+		fmt.Println(evt)
+		for ok {
+			events++
+			fmt.Println(ok)
+			_, ok = <-eventCh
+		}
+		fmt.Println(events, numberWorkflows)
+		return events == numberWorkflows
 	}, tests.WaitTimeout(t), time.Second)
 
 	for _, event := range testEventHandler.GetEvents() {
@@ -494,7 +509,7 @@ func Test_RegistrySyncer_SkipsEventsNotBelongingToDON(t *testing.T) {
 			},
 			err: nil,
 		},
-		nil,
+		syncer.NewEngineRegistry(),
 		syncer.WithTicker(giveTicker.C),
 	)
 	require.NoError(t, err)
@@ -579,7 +594,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyPaused(t *testing.T) {
 			},
 			err: nil,
 		},
-		nil,
+		syncer.NewEngineRegistry(),
 		syncer.WithTicker(giveTicker.C),
 	)
 	require.NoError(t, err)
@@ -687,7 +702,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyActivated(t *testing.T) {
 			},
 			err: nil,
 		},
-		nil,
+		syncer.NewEngineRegistry(),
 		syncer.WithTicker(giveTicker.C),
 	)
 	require.NoError(t, err)
@@ -712,6 +727,74 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyActivated(t *testing.T) {
 		_, err = orm.GetWorkflowSpec(ctx, owner, "test-wf")
 		return err == nil
 	}, tests.WaitTimeout(t), time.Second)
+}
+
+func Test_StratReconciliation_InitialStateSync(t *testing.T) {
+	lggr := logger.TestLogger(t)
+	backendTH := testutils.NewEVMBackendTH(t)
+	donID := uint32(1)
+
+	// Deploy a test workflow_registry
+	wfRegistryAddr, _, wfRegistryC, err := workflow_registry_wrapper.DeployWorkflowRegistry(backendTH.ContractsOwner, backendTH.Backend.Client())
+	backendTH.Backend.Commit()
+	require.NoError(t, err)
+
+	// setup contract state to allow the secrets to be updated
+	updateAllowedDONs(t, backendTH, wfRegistryC, []uint32{donID}, true)
+	updateAuthorizedAddress(t, backendTH, wfRegistryC, []common.Address{backendTH.ContractsOwner.From}, true)
+
+	// The number of workflows should be greater than the workflow registry contracts pagination limit to ensure
+	// that the syncer will query the contract multiple times to get the full list of workflows
+	numberWorkflows := 250
+	for i := 0; i < numberWorkflows; i++ {
+		var workflowID [32]byte
+		_, err = rand.Read((workflowID)[:])
+		require.NoError(t, err)
+		workflow := RegisterWorkflowCMD{
+			Name:       fmt.Sprintf("test-wf-%d", i),
+			DonID:      donID,
+			Status:     uint8(1),
+			SecretsURL: "someurl",
+			BinaryURL:  "someurl",
+		}
+		workflow.ID = workflowID
+		registerWorkflow(t, backendTH, wfRegistryC, workflow)
+	}
+
+	testEventHandler := newTestEvtHandler()
+
+	// Create the worker
+	worker, err := syncer.NewWorkflowRegistry(
+		lggr,
+		func(ctx context.Context, bytes []byte) (syncer.ContractReader, error) {
+			return backendTH.NewContractReader(ctx, t, bytes)
+		},
+		wfRegistryAddr.Hex(),
+		syncer.WorkflowEventPollerConfig{
+			QueryCount: 20,
+		},
+		testEventHandler,
+		&testDonNotifier{
+			don: capabilities.DON{
+				ID: donID,
+			},
+			err: nil,
+		},
+		syncer.NewEngineRegistry(),
+		syncer.WithTicker(make(chan time.Time)),
+		syncer.WithSyncStrategyReconciliation,
+	)
+	require.NoError(t, err)
+
+	servicetest.Run(t, worker)
+
+	require.Eventually(t, func() bool {
+		return len(testEventHandler.GetEvents()) == numberWorkflows
+	}, tests.WaitTimeout(t), time.Second)
+
+	for _, event := range testEventHandler.GetEvents() {
+		assert.Equal(t, syncer.WorkflowRegisteredEvent, event.GetEventType())
+	}
 }
 
 func updateAuthorizedAddress(

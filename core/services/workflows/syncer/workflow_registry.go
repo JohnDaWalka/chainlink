@@ -27,7 +27,8 @@ import (
 const name = "WorkflowRegistrySyncer"
 
 var (
-	defaultTickInterval                    = 12 * time.Second
+	defaultTickInterval                    = 2 * time.Second
+	defaultQueueSize                       = 100
 	WorkflowRegistryContractName           = "WorkflowRegistry"
 	GetWorkflowMetadataListByDONMethodName = "getWorkflowMetadataListByDON"
 )
@@ -167,6 +168,19 @@ func WithTicker(ticker <-chan time.Time) func(*workflowRegistry) {
 	}
 }
 
+// WithSyncStrategyReconciliation allows external callers to change the sync strategy to reconciliation mode.
+func WithSyncStrategyReconciliation(wr *workflowRegistry) {
+	wr.syncStrategy = SyncStrategyReconciliation
+}
+
+// WithEventCh allows external callers to pass in an event channel. This is useful
+// for testing the event channel.
+func WithEventCh(eventCh chan Event) func(*workflowRegistry) {
+	return func(wr *workflowRegistry) {
+		wr.eventCh = eventCh
+	}
+}
+
 type evtHandler interface {
 	io.Closer
 	Handle(ctx context.Context, event Event) error
@@ -191,15 +205,15 @@ func NewWorkflowRegistry(
 	opts ...func(*workflowRegistry),
 ) (*workflowRegistry, error) {
 	// TODO: take in SyncStrategy from toml config
-	strat := SyncStrategy(defaultSyncStrategy)
+	strategy := SyncStrategy(defaultSyncStrategy)
 
 	wr := &workflowRegistry{
 		lggr:                    lggr,
 		newContractReaderFn:     newContractReaderFn,
 		workflowRegistryAddress: addr,
 		eventPollerCfg:          eventPollerConfig,
-		syncStrategy:            strat,
-		eventCh:                 make(chan Event),
+		syncStrategy:            strategy,
+		eventCh:                 make(chan Event, defaultQueueSize),
 		stopCh:                  make(services.StopChan),
 		handler:                 handler,
 		workflowDonNotifier:     workflowDonNotifier,
@@ -214,7 +228,7 @@ func NewWorkflowRegistry(
 		return nil, errors.New("engine registry must be provided")
 	}
 
-	switch strat {
+	switch strategy {
 	case SyncStrategyEvent:
 	case SyncStrategyReconciliation:
 		break
@@ -277,6 +291,7 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 
 func (w *workflowRegistry) Close() error {
 	return w.StopOnce(w.Name(), func() error {
+		close(w.eventCh)
 		close(w.stopCh)
 		w.wg.Wait()
 		return w.handler.Close()
@@ -439,7 +454,7 @@ func (w *workflowRegistry) syncUsingEventStrategy(ctx context.Context, don capab
 	go func() {
 		w.wg.Add(1)
 		defer w.wg.Done()
-		go w.readRegistryEventsLoop(ctx, ets, don, reader, loadWorkflowsHead.Height)
+		w.readRegistryEventsLoop(ctx, ets, don, reader, loadWorkflowsHead.Height)
 	}()
 }
 
@@ -547,9 +562,11 @@ func (w *workflowRegistry) syncUsingReconciliationStrategy(ctx context.Context, 
 		w.wg.Add(1)
 		defer w.wg.Done()
 		ticker := w.getTicker()
+		w.lggr.Debug("running readRegistryStateLoop")
 		for {
 			select {
 			case <-ctx.Done():
+				w.lggr.Debug("shutting down readRegistryStateLoop")
 				return
 			case <-ticker:
 				workflowMetadata, _, err := w.getWorkflowMetadata(ctx, don, reader)
@@ -569,7 +586,7 @@ func (w *workflowRegistry) syncUsingReconciliationStrategy(ctx context.Context, 
 	go func() {
 		w.wg.Add(1)
 		defer w.wg.Done()
-		go w.readRegistryEventsLoop(ctx, ets, don, reader, loadWorkflowsHead.Height)
+		w.readRegistryEventsLoop(ctx, ets, don, reader, loadWorkflowsHead.Height)
 	}()
 }
 
