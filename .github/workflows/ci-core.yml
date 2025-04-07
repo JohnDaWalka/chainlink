@@ -214,6 +214,10 @@ jobs:
       contents: read
       actions: read
     steps:
+      - name: Telemetry
+        if: ${{ needs.run-frequency.outputs.should-use-self-hosted == 'true' && matrix.type.cmd != 'go_core_fuzz' }}
+        uses: erikburt/workflow-telemetry-action@feat/per-core-cpu
+
       - name: Enable S3 Cache for Self-Hosted Runners
         if: ${{ needs.run-frequency.outputs.should-use-self-hosted == 'true' && matrix.type.cmd != 'go_core_fuzz' }}
         uses: runs-on/action@66d4449b717b5462159659523d1241051ff470b9 # v1
@@ -251,7 +255,7 @@ jobs:
           # race/fuzz tests don't benefit repeated caching, so restore from develop's build cache
           restore-build-cache-only: ${{ matrix.type.cmd == 'go_core_fuzz' }}
           build-cache-version: ${{ matrix.type.cmd }}
-          use-tmpfs: ${{ needs.run-frequency.outputs.should-use-self-hosted == 'true' && matrix.type.cmd != 'go_core_fuzz' }}
+          # use-tmpfs: ${{ needs.run-frequency.outputs.should-use-self-hosted == 'true' && matrix.type.cmd != 'go_core_fuzz' }}
 
       - name: Setup Solana
         if: ${{ matrix.type.should-run == 'true' }}

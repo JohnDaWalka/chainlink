@@ -157,3 +157,14 @@ runs:
         restore-keys: |
           ${{ steps.build-cache-keys.outputs.key-prefix }}
           ${{ steps.build-cache-keys.outputs.develop-key-prefix }}
+
+    - name: Debug
+      shell: bash
+      run: |
+        echo "Go Build ${{ steps.cache-dir.outputs.gobuildcache }}"
+        ls -la ${{ steps.go-cache-dir.outputs.gobuildcache }}
+        ls -la ${{ steps.go-cache-dir.outputs.gobuildcache }}/..
+
+        echo "Go mod ${{ steps.cache-dir.outputs.gomodcache }}"
+        ls -la ${{ steps.go-cache-dir.outputs.gomodcache }}
+        ls -la ${{ steps.go-cache-dir.outputs.gomodcache }}
