@@ -226,7 +226,10 @@ jobs:
         if: ${{ needs.run-frequency.outputs.should-use-self-hosted == 'true' && matrix.type.cmd != 'go_core_fuzz' }}
         shell: bash
         run: |
+          ls -la
           sudo mount -t tmpfs -o size=48G †mpfs ${{ github.workspace }}
+          sudo chown runner:runner ${{ github.workspace }}
+          sudo chmod 755 ${{ github.workspace }}
 
       - name: Checkout the repo
         uses: actions/checkout@v4
@@ -255,7 +258,7 @@ jobs:
           # race/fuzz tests don't benefit repeated caching, so restore from develop's build cache
           restore-build-cache-only: ${{ matrix.type.cmd == 'go_core_fuzz' }}
           build-cache-version: ${{ matrix.type.cmd }}
-          # use-tmpfs: ${{ needs.run-frequency.outputs.should-use-self-hosted == 'true' && matrix.type.cmd != 'go_core_fuzz' }}
+          use-tmpfs: ${{ needs.run-frequency.outputs.should-use-self-hosted == 'true' && matrix.type.cmd != 'go_core_fuzz' }}
 
       - name: Setup Solana
         if: ${{ matrix.type.should-run == 'true' }}

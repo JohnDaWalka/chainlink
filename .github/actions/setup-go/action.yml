@@ -71,6 +71,8 @@ runs:
       run: |
         mkdir -p ${{ steps.go-cache-dir.outputs.gobuildcache }}
         sudo mount -t tmpfs -o size=16G tmpfs ${{ steps.go-cache-dir.outputs.gobuildcache }}
+        sudo chown runner:runner ${{ steps.go-cache-dir.outputs.gobuildcache }}
+        sudo chmod 755 ${{ steps.go-cache-dir.outputs.gobuildcache }}
 
     - name: Set go module path
       id: go-module-path
@@ -157,14 +159,3 @@ runs:
         restore-keys: |
           ${{ steps.build-cache-keys.outputs.key-prefix }}
           ${{ steps.build-cache-keys.outputs.develop-key-prefix }}
-
-    - name: Debug
-      shell: bash
-      run: |
-        echo "Go Build ${{ steps.cache-dir.outputs.gobuildcache }}"
-        ls -la ${{ steps.go-cache-dir.outputs.gobuildcache }}
-        ls -la ${{ steps.go-cache-dir.outputs.gobuildcache }}/..
-
-        echo "Go mod ${{ steps.cache-dir.outputs.gomodcache }}"
-        ls -la ${{ steps.go-cache-dir.outputs.gomodcache }}
-        ls -la ${{ steps.go-cache-dir.outputs.gomodcache }}
