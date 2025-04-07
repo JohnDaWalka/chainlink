@@ -277,6 +277,10 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 					w.lggr.Debug("shutting down handleEventLoop")
 					return
 				case event := <-w.eventCh:
+					fmt.Println(event)
+					if event == nil {
+						continue
+					}
 					err := w.handler.Handle(ctx, event)
 					if err != nil {
 						w.lggr.Errorw("failed to handle event", "err", err, "type", event.GetEventType())
@@ -569,6 +573,7 @@ func (w *workflowRegistry) syncUsingReconciliationStrategy(ctx context.Context, 
 				return
 			case <-ticker:
 				workflowMetadata, _, err := w.getWorkflowMetadata(ctx, don, reader)
+				fmt.Println(workflowMetadata)
 				if err != nil {
 					w.lggr.Errorw("failed to get registry state", "err", err)
 					continue

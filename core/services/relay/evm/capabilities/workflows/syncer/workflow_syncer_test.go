@@ -557,8 +557,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyPaused(t *testing.T) {
 
 	store := artifacts.NewStore(lggr, orm, fetcherFn, clockwork.NewFakeClock(), workflowkey.Key{}, emitter)
 
-	handler, err := syncer.NewEventHandler(lggr, nil, nil, nil,
-		emitter, rl, wl, store, syncer.WithEngineRegistry(er))
+	handler, err := syncer.NewEventHandler(lggr, nil, nil, er, emitter, rl, wl, store)
 	require.NoError(t, err)
 
 	worker, err := syncer.NewWorkflowRegistry(
@@ -575,7 +574,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyPaused(t *testing.T) {
 			},
 			err: nil,
 		},
-		syncer.NewEngineRegistry(),
+		er,
 		syncer.WithTicker(giveTicker.C),
 	)
 	require.NoError(t, err)
@@ -665,8 +664,8 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyActivated(t *testing.T) {
 
 	store := artifacts.NewStore(lggr, orm, fetcherFn, clockwork.NewFakeClock(), workflowkey.Key{}, emitter)
 
-	handler, err := syncer.NewEventHandler(lggr, nil, nil, nil,
-		emitter, rl, wl, store, syncer.WithEngineRegistry(er), syncer.WithEngineFactoryFn(mf.new))
+	handler, err := syncer.NewEventHandler(lggr, nil, nil, er,
+		emitter, rl, wl, store, syncer.WithEngineFactoryFn(mf.new))
 	require.NoError(t, err)
 
 	worker, err := syncer.NewWorkflowRegistry(
@@ -683,7 +682,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyActivated(t *testing.T) {
 			},
 			err: nil,
 		},
-		syncer.NewEngineRegistry(),
+		er,
 		syncer.WithTicker(giveTicker.C),
 	)
 	require.NoError(t, err)
@@ -762,7 +761,6 @@ func Test_StratReconciliation_InitialStateSync(t *testing.T) {
 			err: nil,
 		},
 		syncer.NewEngineRegistry(),
-		syncer.WithTicker(make(chan time.Time)),
 		syncer.WithSyncStrategyReconciliation,
 	)
 	require.NoError(t, err)
