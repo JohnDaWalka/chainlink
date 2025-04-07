@@ -25,6 +25,11 @@ inputs:
     description: |
       Only restore the build cache, don't automatically update/upload it.
     default: "false"
+  use-tmpfs:
+    description: |
+      Use tmpfs for the build cache. This is faster, but not persistent across jobs.
+      This is only available on Linux runners.
+    default: "false"
 
 runs:
   using: composite
@@ -59,6 +64,13 @@ runs:
       run: |
         echo "gomodcache=$(go env GOMODCACHE)" >> $GITHUB_OUTPUT
         echo "gobuildcache=$(go env GOCACHE)" >> $GITHUB_OUTPUT
+
+    - name: Setup tmpfs
+      if: ${{ inputs.use-tmpfs == 'true' && runner.os == 'Linux' }}
+      shell: bash
+      run: |
+        mkdir -p ${{ steps.go-cache-dir.outputs.gobuildcache }}
+        sudo mount -t tmpfs -o size=16G tmpfs ${{ steps.go-cache-dir.outputs.gobuildcache }}
 
     - name: Set go module path
       id: go-module-path
