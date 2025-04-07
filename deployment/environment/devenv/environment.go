@@ -186,9 +186,14 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 		chains = append(chains, chainConfig)
 	}
 
-	for i, nodeOutput := range b.nodeSetOutput {
+	for idx, nodeOutput := range b.nodeSetOutput {
+		// check how many bootstrap nodes we have in each DON
+		bootstrapNodes, err := FindManyWithLabel(b.topology.DonsMetadata[idx].NodesMetadata, &types.Label{Key: types.NodeTypeKey, Value: types.BootstrapNode}, EqualLabels)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to find bootstrap nodes")
+		}
 		// assume that each nodeset has only one bootstrap node
-		nodeInfo, err := GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, 1)
+		nodeInfo, err := GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, len(bootstrapNodes))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get node info")
 		}
