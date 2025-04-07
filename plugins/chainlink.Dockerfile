@@ -12,6 +12,7 @@ RUN go mod download
 # Env vars needed for chainlink build
 ARG COMMIT_SHA
 ARG APTOS_RELAYER_GIT_REF
+ARG CAPABILITIES_GIT_REF
 ARG COSMOS_SHA
 ARG STARKNET_SHA
 # Flag to control installation of private plugins (default: false)
@@ -42,6 +43,7 @@ RUN make install-ocr3-capability
 # Install LOOP Plugins
 RUN make install-plugins \
   APTOS_RELAYER_GIT_REF=${APTOS_RELAYER_GIT_REF} \
+  CAPABILITIES_GIT_REF=${CAPABILITIES_GIT_REF} \
   COSMOS_SHA=${COSMOS_SHA} \
   STARKNET_SHA=${STARKNET_SHA} \
   CL_INSTALL_PRIVATE_PLUGINS=${CL_INSTALL_PRIVATE_PLUGINS}
