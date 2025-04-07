@@ -76,7 +76,7 @@ require (
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250407102550-fbd77983055c
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250327092605-1990b9f79aa3
-	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250407100046-dfdf9600557b
+	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250407135536-34869361009f
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250325191518-036bb568a69d
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250407094203-82c959593df2
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135
@@ -85,7 +85,7 @@ require (
 	github.com/smartcontractkit/chainlink-integrations/evm v0.0.0-20250402183906-b7e976bc0c24
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.5.0
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250404135440-77cf27b13c10
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250407152952-51a1dabfc8ca
 	github.com/smartcontractkit/libocr v0.0.0-20250328171017-609ec10a5510
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20241009055228-33d0c0bf38de
 	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20241009055228-33d0c0bf38de

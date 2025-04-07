@@ -47,7 +47,7 @@ require (
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250407102550-fbd77983055c
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250331144401-209a0783b7d2
-	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250407100046-dfdf9600557b
+	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250407135536-34869361009f
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250407094203-82c959593df2
 	github.com/smartcontractkit/chainlink-integrations/evm v0.0.0-20250402183906-b7e976bc0c24
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0
@@ -451,7 +451,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.5.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go v0.0.0-20250131130834-15e0d4cde2a6 // indirect
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250404135440-77cf27b13c10 // indirect
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250407152952-51a1dabfc8ca // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.7.0 // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/mcms v0.14.0 // indirect

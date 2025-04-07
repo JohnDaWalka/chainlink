@@ -26,7 +26,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/smartcontractkit/chain-selectors v1.0.47
-	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250407100046-dfdf9600557b
+	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250407135536-34869361009f
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250325191518-036bb568a69d
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250407094203-82c959593df2
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0
@@ -429,7 +429,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.5.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go v0.0.0-20250131130834-15e0d4cde2a6 // indirect
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250404135440-77cf27b13c10 // indirect
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250407152952-51a1dabfc8ca // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.50.0 // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/mcms v0.14.0 // indirect
