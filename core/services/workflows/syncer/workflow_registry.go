@@ -264,7 +264,7 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 			// Start goroutines to gather changes from Workflow Registry contract
 			switch w.syncStrategy {
 			case SyncStrategyEvent:
-				w.syncUsingEventStrategy(ctx, don, reader)
+				go w.syncUsingEventStrategy(ctx, don, reader)
 			case SyncStrategyReconciliation:
 				w.syncUsingReconciliationStrategy(ctx, don, reader)
 			}
@@ -451,11 +451,10 @@ func (w *workflowRegistry) syncUsingEventStrategy(ctx context.Context, don capab
 		WorkflowRegisteredEvent,
 		WorkflowUpdatedEvent,
 	}
-	go func() {
-		w.wg.Add(1)
-		defer w.wg.Done()
-		w.readRegistryEventsLoop(ctx, ets, don, reader, loadWorkflowsHead.Height)
-	}()
+
+	w.wg.Add(1)
+	defer w.wg.Done()
+	w.readRegistryEventsLoop(ctx, ets, don, reader, loadWorkflowsHead.Height)
 }
 
 // workflowMetadataToEvents compares the workflow registry workflow metadata state against the engine registry's state.
@@ -464,7 +463,7 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 	var events []workflowAsEvent
 
 	// Keep track of which of the engines in the engineRegistry have been touched
-	engineKeyMap := map[string]bool{}
+	seenMap := map[string]bool{}
 
 	for _, wfMeta := range workflowMetadata {
 		// TODO: ensure that the WorkflowRegisteredEvent clears the engine registry as the very last step
@@ -488,7 +487,7 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 				Data:      toRegisteredEvent,
 				EventType: WorkflowRegisteredEvent,
 			})
-			engineKeyMap[currWfID] = true
+			seenMap[currWfID] = true
 			continue
 		}
 
@@ -510,14 +509,14 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 				Data:      toUpdatedEvent,
 				EventType: WorkflowUpdatedEvent,
 			})
-			engineKeyMap[currWfID] = true
+			seenMap[currWfID] = true
 			continue
 		}
 
 		// if the workflow engine is in the registry, the metadata is the same, and the status is active
 		// then the workflow is unchanged. mark as seen.
 		if WorkflowStatus(wfMeta.Status) == WorkflowStatusActive {
-			engineKeyMap[wfMeta.WorkflowName+hex.EncodeToString(wfMeta.Owner)] = true
+			seenMap[wfMeta.WorkflowName+hex.EncodeToString(wfMeta.Owner)] = true
 			continue
 		}
 
@@ -529,7 +528,7 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 	allEngines := w.engineRegistry.GetAll()
 	for _, engine := range allEngines {
 		prevWfID := hex.EncodeToString(engine.workflowID[:])
-		_, exists := engineKeyMap[prevWfID]
+		_, exists := seenMap[prevWfID]
 		if !exists {
 			toDeletedEvent := WorkflowRegistryWorkflowDeletedV1{
 				WorkflowID:    engine.workflowID,

@@ -246,26 +246,18 @@ func Test_EventHandlerStateSync(t *testing.T) {
 		return false
 	}, tests.WaitTimeout(t), time.Second)
 }
-
 func Test_InitialStateSync(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	backendTH := testutils.NewEVMBackendTH(t)
 	donID := uint32(1)
 
-	eventPollTicker := time.NewTicker(50 * time.Millisecond)
-	defer eventPollTicker.Stop()
-
-	eventCh := make(chan syncer.Event, 1000)
-
 	// Deploy a test workflow_registry
 	wfRegistryAddr, _, wfRegistryC, err := workflow_registry_wrapper.DeployWorkflowRegistry(backendTH.ContractsOwner, backendTH.Backend.Client())
 	backendTH.Backend.Commit()
 	require.NoError(t, err)
-
 	// setup contract state to allow the secrets to be updated
 	updateAllowedDONs(t, backendTH, wfRegistryC, []uint32{donID}, true)
 	updateAuthorizedAddress(t, backendTH, wfRegistryC, []common.Address{backendTH.ContractsOwner.From}, true)
-
 	// The number of workflows should be greater than the workflow registry contracts pagination limit to ensure
 	// that the syncer will query the contract multiple times to get the full list of workflows
 	numberWorkflows := 250
@@ -283,7 +275,6 @@ func Test_InitialStateSync(t *testing.T) {
 		workflow.ID = workflowID
 		registerWorkflow(t, backendTH, wfRegistryC, workflow)
 	}
-
 	testEventHandler := newTestEvtHandler()
 
 	// Create the worker
@@ -304,24 +295,14 @@ func Test_InitialStateSync(t *testing.T) {
 			err: nil,
 		},
 		syncer.NewEngineRegistry(),
-		syncer.WithTicker(eventPollTicker.C),
-		syncer.WithEventCh(eventCh),
+		syncer.WithTicker(make(chan time.Time)),
 	)
 	require.NoError(t, err)
 
 	servicetest.Run(t, worker)
 
-	events := 0
 	require.Eventually(t, func() bool {
-		evt, ok := <-eventCh
-		fmt.Println(evt)
-		for ok {
-			events++
-			fmt.Println(ok)
-			_, ok = <-eventCh
-		}
-		fmt.Println(events, numberWorkflows)
-		return events == numberWorkflows
+		return len(testEventHandler.GetEvents()) == numberWorkflows
 	}, tests.WaitTimeout(t), time.Second)
 
 	for _, event := range testEventHandler.GetEvents() {
