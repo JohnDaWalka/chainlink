@@ -9,11 +9,11 @@ contract MockCapabilitiesRegistryTest is Test {
   uint32 internal constant INITIAL_DON_ID = 100;
 
   function setUp() public {
-    s_mockCapabilitiesRegistry = new MockCapabilitiesRegistry(s_initialDonId);
+    s_mockCapabilitiesRegistry = new MockCapabilitiesRegistry(INITIAL_DON_ID);
   }
 
   function testGetNextDONId() public {
-    uint32 nextDonId = mockCapabilitiesRegistry.getNextDONId();
-    assertEq(nextDonId, s_initialDonId, "The next DON ID should match the initial value.");
+    uint32 memory nextDonId = mockCapabilitiesRegistry.getNextDONId();
+    assertEq(nextDonId, INITIAL_DON_ID, "The next DON ID should match the initial value.");
   }
 }
