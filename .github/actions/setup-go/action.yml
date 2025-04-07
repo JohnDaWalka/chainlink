@@ -69,6 +69,11 @@ runs:
       if: ${{ inputs.use-tmpfs == 'true' && runner.os == 'Linux' }}
       shell: bash
       run: |
+        mkdir -p ${{ steps.go-cache-dir.outputs.gomodcache }}
+        sudo mount -t tmpfs -o size=8G tmpfs ${{ steps.go-cache-dir.outputs.gomodcache }}
+        sudo chown runner:runner ${{ steps.go-cache-dir.outputs.gomodcache }}
+        sudo chmod 755 ${{ steps.go-cache-dir.outputs.gomodcache }}
+
         mkdir -p ${{ steps.go-cache-dir.outputs.gobuildcache }}
         sudo mount -t tmpfs -o size=16G tmpfs ${{ steps.go-cache-dir.outputs.gobuildcache }}
         sudo chown runner:runner ${{ steps.go-cache-dir.outputs.gobuildcache }}
