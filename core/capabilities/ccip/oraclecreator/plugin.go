@@ -482,6 +482,14 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			return nil, nil, fmt.Errorf("failed to start chain writer for chain %s: %w", chainID, err4)
 		}
 
+		// TODO
+		//cc, err := relayer.NewChainCapabilities(ctx)
+		//if err != nil {
+		//	return nil, nil, err
+		//}
+		//
+		//contractReaders[chainSelector] = chain_capabilities.NewCCIPReader(cr, cc, chainID, relayChainFamily)
+
 		contractReaders[chainSelector] = cr
 		chainWriters[chainSelector] = cw
 	}
