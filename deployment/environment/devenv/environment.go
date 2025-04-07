@@ -222,8 +222,8 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 			return nil, errors.Wrap(err, "failed to create environment")
 		}
 
-		envs[i] = env
-		dons[i] = don
+		envs[idx] = env
+		dons[idx] = don
 	}
 
 	var nodeIDs []string
