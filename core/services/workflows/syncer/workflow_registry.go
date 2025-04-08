@@ -499,6 +499,8 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 					Data:      toRegisteredEvent,
 					EventType: WorkflowRegisteredEvent,
 				})
+			case nil:
+				fallthrough
 			default:
 				// if the workflow is active, the workflow engine is in the engine registry, but the metadata has changed
 				// then handle as updated event
@@ -525,6 +527,8 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 			// if the workflow is active, the workflow engine is in the engine registry, and the metadata is the same
 			// then the workflow is unchanged. no events.
 
+		case WorkflowStatusPaused:
+			fallthrough
 		default:
 			// if the workflow isn't active
 			// then the workflow has been paused. NOOP - to be handled below as a deleted event, which clears the DB workflow spec.
