@@ -180,4 +180,4 @@ flake.lock @smartcontractkit/core
 
 
 # Runs-On
-./github/runs-on.yml @smartcontractkit/prodsec-public
+./.github/runs-on.yml @smartcontractkit/prodsec-public
