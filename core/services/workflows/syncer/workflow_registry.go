@@ -233,7 +233,7 @@ func NewWorkflowRegistry(
 	case SyncStrategyReconciliation:
 		break
 	default:
-		return nil, errors.New(fmt.Sprintf("SyncStrategy must be one of: %s, %s", SyncStrategyEvent, SyncStrategyReconciliation))
+		return nil, fmt.Errorf("SyncStrategy must be one of: %s, %s", SyncStrategyEvent, SyncStrategyReconciliation)
 	}
 
 	return wr, nil
@@ -561,8 +561,8 @@ func (w *workflowRegistry) syncUsingReconciliationStrategy(ctx context.Context, 
 	}
 
 	// Poll for changes in workflow state
+	w.wg.Add(1)
 	go func() {
-		w.wg.Add(1)
 		defer w.wg.Done()
 		ticker := w.getTicker()
 		w.lggr.Debug("running readRegistryStateLoop")
@@ -587,8 +587,8 @@ func (w *workflowRegistry) syncUsingReconciliationStrategy(ctx context.Context, 
 	ets := []WorkflowRegistryEventType{
 		ForceUpdateSecretsEvent,
 	}
+	w.wg.Add(1)
 	go func() {
-		w.wg.Add(1)
 		defer w.wg.Done()
 		w.readRegistryEventsLoop(ctx, ets, don, reader, loadWorkflowsHead.Height)
 	}()
