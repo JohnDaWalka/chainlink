@@ -814,6 +814,7 @@ func setupJobSpecsControllerTestsWithJobs(t *testing.T) (*cltest.TestApplication
 		c.P2P.V2.Enabled = ptr(true)
 		c.P2P.V2.ListenAddresses = &[]string{fmt.Sprintf("127.0.0.1:%d", freeport.GetOne(t))}
 		c.P2P.PeerID = &cltest.DefaultP2PPeerID
+		c.EVM[0].ChainID = ubig.New(testutils.FixtureChainID)
 	})
 	app := cltest.NewApplicationWithConfigAndKey(t, cfg, cltest.DefaultP2PKey)
 
@@ -840,7 +841,7 @@ func setupJobSpecsControllerTestsWithJobs(t *testing.T) (*cltest.TestApplication
 	drSpec := fmt.Sprintf(`
 		type                = "directrequest"
 		schemaVersion       = 1
-		evmChainID          = "0"
+		evmChainID          = "%s"
 		name                = "example eth request event spec"
 		contractAddress     = "0x613a38AC1659769640aaE063C651F48E0250454C"
 		externalJobID       = "%s"
@@ -851,7 +852,7 @@ func setupJobSpecsControllerTestsWithJobs(t *testing.T) (*cltest.TestApplication
 		    ds1_multiply [type=multiply times=100];
 		    ds1 -> ds1_parse -> ds1_multiply;
 		"""
-		`, uuid.New())
+		`, testutils.FixtureChainID.String(), uuid.New())
 
 	erejb, err := directrequest.ValidatedDirectRequestSpec(drSpec)
 	require.NoError(t, err)
