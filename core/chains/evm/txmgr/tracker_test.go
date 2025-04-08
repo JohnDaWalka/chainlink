@@ -24,7 +24,7 @@ import (
 func newTestEvmTrackerSetup(t *testing.T) (*txmgr.Tracker, txmgr.TestEvmTxStore) {
 	db := testutils.NewSqlxDB(t)
 	txStore := cltest.NewTestTxStore(t, db)
-	chainID := big.NewInt(0)
+	chainID := testutils.FixtureChainID
 	ethKeyStore := cltest.NewKeyStore(t, db).Eth()
 	var enabledAddresses []common.Address
 	_, addr1 := cltest.MustInsertRandomKey(t, ethKeyStore, *ubig.NewI(chainID.Int64()))
