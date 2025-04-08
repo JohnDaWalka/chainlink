@@ -160,7 +160,7 @@ func TestShell_ListETHKeys_Disabled(t *testing.T) {
 	assert.Nil(t, balances[0].LinkBalance)
 	assert.Nil(t, balances[0].MaxGasPriceWei)
 	assert.Equal(t, []string{
-		k.Address.String(), "0", "Unknown", "Unknown", "false",
+		k.Address.String(), testutils.FixtureChainID.String(), "Unknown", "Unknown", "false",
 		balances[0].UpdatedAt.String(), balances[0].CreatedAt.String(), "None",
 	}, balances[0].ToRow())
 }
