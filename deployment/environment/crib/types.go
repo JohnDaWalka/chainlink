@@ -2,6 +2,7 @@ package crib
 
 import (
 	"crypto/tls"
+	"time"
 
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/credentials"
@@ -75,6 +76,7 @@ func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput,
 			sethClient, err := seth.NewClientBuilder().
 				WithRpcUrl(chain.Nodes[0].ExternalWSUrl).
 				WithPrivateKeys([]string{deployerKey}).
+				WithProtections(false, false, seth.MustMakeDuration(1*time.Minute)).
 				Build()
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to build sethClient")
