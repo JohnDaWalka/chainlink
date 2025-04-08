@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -198,6 +199,36 @@ func (e Environment) AllChainSelectorsSolana() []uint64 {
 		return selectors[i] < selectors[j]
 	})
 	return selectors
+}
+
+func (e Environment) AllChainSelectorsAllFamilies() []uint64 {
+	selectors := make([]uint64, 0, len(e.Chains)+len(e.SolChains)+len(e.AptosChains))
+	for sel := range e.Chains {
+		selectors = append(selectors, sel)
+	}
+	for sel := range e.SolChains {
+		selectors = append(selectors, sel)
+	}
+	for sel := range e.AptosChains {
+		selectors = append(selectors, sel)
+	}
+	sort.Slice(selectors, func(i, j int) bool {
+		return selectors[i] < selectors[j]
+	})
+	return selectors
+}
+
+func (e Environment) AllChainSelectorsAllFamiliesExcluding(excluding []uint64) []uint64 {
+	selectors := e.AllChainSelectorsAllFamilies()
+	ret := make([]uint64, 0)
+	// remove the excluded selectors
+	for _, sel := range selectors {
+		if slices.Contains(excluding, sel) {
+			continue
+		}
+		ret = append(ret, sel)
+	}
+	return ret
 }
 
 func (e Environment) AllDeployerKeys() []common.Address {
@@ -607,7 +638,18 @@ func chainToDetails(c *nodev1.Chain) (chain_selectors.ChainDetails, error) {
 	default:
 		return chain_selectors.ChainDetails{}, fmt.Errorf("unsupported chain type %s", c.Type)
 	}
-
+	if family == chain_selectors.FamilySolana {
+		// Temporary workaround to handle cases when solana chainId was not using the standard genesis hash,
+		// but using old strings mainnet/testnet/devnet.
+		switch c.Id {
+		case "mainnet":
+			c.Id = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
+		case "devnet":
+			c.Id = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
+		case "testnet":
+			c.Id = "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY"
+		}
+	}
 	details, err := chain_selectors.GetChainDetailsByChainIDAndFamily(c.Id, family)
 	if err != nil {
 		return chain_selectors.ChainDetails{}, err

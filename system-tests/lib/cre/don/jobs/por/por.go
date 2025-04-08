@@ -14,14 +14,31 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	creflags "github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
-func GenerateJobSpecs(input *types.GeneratePoRJobSpecsInput,
-	customJobsFn func(types.DonJobs, *types.DonWithMetadata) (types.DonJobs, error)) (types.DonsToJobSpecs, error) {
+var PoRJobSpecFactoryFn = func(cronBinaryPath string, extraAllowedPorts []int, extraAllowedIps, extraAllowedIPsCIDR []string) types.JobSpecFactoryFn {
+	return func(input *types.JobSpecFactoryInput) (types.DonsToJobSpecs, error) {
+		return GenerateJobSpecs(
+			&types.GeneratePoRJobSpecsInput{
+				BlockchainOutput:       input.BlockchainOutput,
+				DonsWithMetadata:       input.DonTopology.DonsWithMetadata,
+				OCR3CapabilityAddress:  input.KeystoneContractsOutput.OCR3CapabilityAddress,
+				ExtraAllowedPorts:      extraAllowedPorts,
+				ExtraAllowedIPs:        extraAllowedIps,
+				ExtraAllowedIPsCIDR:    extraAllowedIPsCIDR,
+				CronCapBinPath:         cronBinaryPath,
+				GatewayConnectorOutput: *input.DonTopology.GatewayConnectorOutput,
+			},
+		)
+	}
+}
+
+func GenerateJobSpecs(input *types.GeneratePoRJobSpecsInput) (types.DonsToJobSpecs, error) {
 	if input == nil {
 		return nil, errors.New("input is nil")
 	}
@@ -33,10 +50,10 @@ func GenerateJobSpecs(input *types.GeneratePoRJobSpecsInput,
 	gatewayConnectorData := input.GatewayConnectorOutput
 
 	// we need to iterate over all DONs to see which need gateway connector and create a map of Don IDs and ETH addresses (which identify nodes that can use the connector)
-	// This map will be used to configure the gateway job on the node that runs it. Ccurrently, we support only a single gateway connector, even if CRE supports multiple
+	// This map will be used to configure the gateway job on the node that runs it. Currently, we support only a single gateway connector, even if CRE supports multiple
 	for _, donWithMetadata := range input.DonsWithMetadata {
 		// if it's a workflow DON or it has custom compute capability, it needs access to gateway connector
-		if creflags.HasFlag(donWithMetadata.Flags, types.WorkflowDON) || creflags.HasFlag(donWithMetadata.Flags, types.CustomComputeCapability) {
+		if creflags.HasFlag(donWithMetadata.Flags, types.WorkflowDON) || don.NodeNeedsGateway(donWithMetadata.Flags) {
 			workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.WorkerNode}, node.EqualLabels)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to find worker nodes")
@@ -67,7 +84,6 @@ func GenerateJobSpecs(input *types.GeneratePoRJobSpecsInput,
 			input.ExtraAllowedIPs,
 			input.ExtraAllowedIPsCIDR,
 			gatewayConnectorData,
-			customJobsFn,
 		)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to generate job specs for don %d", donWithMetadata.DonMetadata.ID)
@@ -91,7 +107,6 @@ func generateDonJobSpecs(
 	extraAllowedIPs []string,
 	extraAllowedIPsCIDR []string,
 	gatewayConnectorOutput types.GatewayConnectorOutput,
-	customJobsFn func(types.DonJobs, *types.DonWithMetadata) (types.DonJobs, error),
 ) (types.DonJobs, error) {
 	jobSpecs := make(types.DonJobs, 0)
 
@@ -121,43 +136,61 @@ func generateDonJobSpecs(
 		return jobSpecs, nil
 	}
 
-	// look for boostrap node and then for required values in its labels
-	bootstrapNode, err := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.BootstrapNode}, node.EqualLabels)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to find bootstrap node")
-	}
-
-	donBootstrapNodePeerID, err := node.ToP2PID(bootstrapNode, node.KeyExtractingTransformFn)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get bootstrap node peer ID")
-	}
-
-	donBootstrapNodeHost, hostErr := node.FindLabelValue(bootstrapNode, node.HostLabelKey)
-	if hostErr != nil {
-		return nil, errors.Wrap(hostErr, "failed to get bootstrap node host from labels")
-	}
-
-	bootstrapNodeID, nodeIDErr := node.FindLabelValue(bootstrapNode, node.NodeIDKey)
-	if nodeIDErr != nil {
-		return nil, errors.Wrap(nodeIDErr, "failed to get bootstrap node id from labels")
-	}
-
-	// create job specs for the bootstrap node
-	if creflags.HasFlag(donWithMetadata.Flags, types.OCR3Capability) {
-		jobSpecs = append(jobSpecs, jobs.BootstrapOCR3(bootstrapNodeID, oCR3CapabilityAddress, chainIDUint64))
-	}
-
-	ocrPeeringData := types.OCRPeeringData{
-		OCRBootstraperPeerID: donBootstrapNodePeerID,
-		OCRBootstraperHost:   donBootstrapNodeHost,
-		Port:                 5001,
-	}
-
 	// create job specs for the worker nodes
 	workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.WorkerNode}, node.EqualLabels)
 	if err != nil {
 		// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 		return nil, errors.Wrap(err, "failed to find worker nodes")
+	}
+
+	if creflags.HasFlag(donWithMetadata.Flags, types.OCR3Capability) {
+		// look for boostrap node and then for required values in its labels
+		bootstrapNode, bootErr := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.NodeTypeKey, Value: types.BootstrapNode}, node.EqualLabels)
+		if bootErr != nil {
+			return nil, errors.Wrap(bootErr, "failed to find bootstrap node")
+		}
+
+		donBootstrapNodePeerID, pIDErr := node.ToP2PID(bootstrapNode, node.KeyExtractingTransformFn)
+		if pIDErr != nil {
+			return nil, errors.Wrap(pIDErr, "failed to get bootstrap node peer ID")
+		}
+
+		donBootstrapNodeHost, hostErr := node.FindLabelValue(bootstrapNode, node.HostLabelKey)
+		if hostErr != nil {
+			return nil, errors.Wrap(hostErr, "failed to get bootstrap node host from labels")
+		}
+
+		bootstrapNodeID, nodeIDErr := node.FindLabelValue(bootstrapNode, node.NodeIDKey)
+		if nodeIDErr != nil {
+			return nil, errors.Wrap(nodeIDErr, "failed to get bootstrap node id from labels")
+		}
+
+		// create job specs for the bootstrap node
+		jobSpecs = append(jobSpecs, jobs.BootstrapOCR3(bootstrapNodeID, oCR3CapabilityAddress, chainIDUint64))
+
+		ocrPeeringData := types.OCRPeeringData{
+			OCRBootstraperPeerID: donBootstrapNodePeerID,
+			OCRBootstraperHost:   donBootstrapNodeHost,
+			Port:                 5001,
+		}
+
+		for _, workerNode := range workflowNodeSet {
+			nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
+			if nodeIDErr != nil {
+				return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
+			}
+
+			nodeEthAddr, ethErr := node.FindLabelValue(workerNode, node.EthAddressKey)
+			if ethErr != nil {
+				return nil, errors.Wrap(ethErr, "failed to get eth address from labels")
+			}
+
+			ocr2KeyBundleID, ocr2Err := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDKey)
+			if ocr2Err != nil {
+				return nil, errors.Wrap(ocr2Err, "failed to get ocr2 key bundle id from labels")
+			}
+			jobSpecs = append(jobSpecs, jobs.WorkerOCR3(nodeID, oCR3CapabilityAddress, nodeEthAddr, ocr2KeyBundleID, ocrPeeringData, chainIDUint64))
+		}
 	}
 
 	for _, workerNode := range workflowNodeSet {
@@ -180,27 +213,6 @@ func generateDonJobSpecs(
 				perSenderBurst = 5
 				"""`
 			jobSpecs = append(jobSpecs, jobs.WorkerStandardCapability(nodeID, "custom-compute", "__builtin_custom-compute-action", config))
-		}
-
-		if creflags.HasFlag(donWithMetadata.Flags, types.OCR3Capability) {
-			nodeEthAddr, ethErr := node.FindLabelValue(workerNode, node.EthAddressKey)
-			if ethErr != nil {
-				return nil, errors.Wrap(ethErr, "failed to get eth address from labels")
-			}
-
-			ocr2KeyBundleID, ocr2Err := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDKey)
-			if ocr2Err != nil {
-				return nil, errors.Wrap(ocr2Err, "failed to get ocr2 key bundle id from labels")
-			}
-			jobSpecs = append(jobSpecs, jobs.WorkerOCR3(nodeID, oCR3CapabilityAddress, nodeEthAddr, ocr2KeyBundleID, ocrPeeringData, chainIDUint64))
-		}
-
-		// Insert custom jobs, test specific
-		if customJobsFn != nil {
-			jobSpecs, err = customJobsFn(jobSpecs, donWithMetadata)
-			if err != nil {
-				return nil, err
-			}
 		}
 	}
 
