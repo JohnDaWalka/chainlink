@@ -1,6 +1,7 @@
 package evm
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -30,7 +31,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	forwarder "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/targets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	relayevmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
@@ -59,7 +59,7 @@ func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal contract reader config %v", err)
+		return nil, fmt.Errorf("failed to marshal contract reader config %w", err)
 	}
 	cr, err := relayer.NewContractReader(ctx, contractReaderConfigEncoded)
 	if err != nil {
