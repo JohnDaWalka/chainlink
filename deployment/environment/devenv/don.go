@@ -18,6 +18,7 @@ import (
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 
 	clclient "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/web/sdk/client"
 
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
@@ -52,8 +53,9 @@ type DonWithMetadata struct {
 	*types.DonMetadata
 }
 type DonTopology struct {
-	WorkflowDonID    uint32
-	DonsWithMetadata []*DonWithMetadata
+	WorkflowDonID          uint32
+	GatewayConnectorOutput *cldtypes.GatewayConnectorOutput
+	DonsWithMetadata       []*DonWithMetadata
 }
 
 func (don *DON) PluginNodes() []Node {

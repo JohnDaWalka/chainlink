@@ -1,28 +1,18 @@
 package capabilities
 
 import (
-	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
+	"fmt"
 	"strconv"
 
 	"github.com/pkg/errors"
 
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
-var DefaultBinariesPathsFactory = func(cronBinaryPath string) types.CapabilitiesBinaryPathFactoryFn {
-	return func(donMetadata *cldtypes.DonMetadata) ([]string, error) {
-		binaries := []string{}
-		if flags.HasFlag(donMetadata.Flags, types.CronCapability) {
-			binaries = append(binaries, cronBinaryPath)
-		}
-
-		return binaries, nil
-	}
-}
-
-func AppendBinariesPathsNodeSpec(nodeSetInput *types.CapabilitiesAwareNodeSet, donMetadata *cldtypes.DonMetadata, pathFactoryFns []types.CapabilitiesBinaryPathFactoryFn) (*types.CapabilitiesAwareNodeSet, error) {
+func AppendBinariesPathsNodeSpec(nodeSetInput *types.CapabilitiesAwareNodeSet, donMetadata *cldtypes.DonMetadata, customBinariesPaths map[types.CapabilityFlag]string) (*types.CapabilitiesAwareNodeSet, error) {
 	// if no capabilities are defined in TOML, but DON has ones that we know require custom binaries
 	// append them to the node specification
 	hasCapabilitiesBinaries := false
@@ -34,37 +24,34 @@ func AppendBinariesPathsNodeSpec(nodeSetInput *types.CapabilitiesAwareNodeSet, d
 	}
 
 	if !hasCapabilitiesBinaries {
-		binariesToAppend := []string{}
-		for _, pathFactoryFn := range pathFactoryFns {
-			binaries, err := pathFactoryFn(donMetadata)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to get capabilities binaries' paths")
+		for capabilityFlag, binaryPath := range customBinariesPaths {
+			if binaryPath == "" {
+				return nil, fmt.Errorf("binary path for capability %s is empty", capabilityFlag)
 			}
 
-			binariesToAppend = append(binariesToAppend, binaries...)
-		}
+			if flags.HasFlag(donMetadata.Flags, capabilityFlag) {
+				workerNodes, wErr := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &cldtypes.Label{
+					Key:   cldtypes.NodeTypeKey,
+					Value: types.WorkerNode,
+				}, libnode.EqualLabels)
+				if wErr != nil {
+					return nil, errors.Wrap(wErr, "failed to find worker nodes")
+				}
 
-		workerNodes, wErr := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &cldtypes.Label{
-			Key:   cldtypes.NodeTypeKey,
-			Value: types.WorkerNode,
-		}, libnode.EqualLabels)
+				for _, node := range workerNodes {
+					nodeIndexStr, nErr := libnode.FindLabelValue(node, cldtypes.IndexKey)
+					if nErr != nil {
+						return nil, errors.Wrap(nErr, "failed to find index label")
+					}
 
-		if wErr != nil {
-			return nil, errors.Wrap(wErr, "failed to find worker nodes")
-		}
+					nodeIndex, nIErr := strconv.Atoi(nodeIndexStr)
+					if nIErr != nil {
+						return nil, errors.Wrap(nIErr, "failed to convert index label value to int")
+					}
 
-		for _, node := range workerNodes {
-			nodeIndexStr, nErr := libnode.FindLabelValue(node, cldtypes.IndexKey)
-			if nErr != nil {
-				return nil, errors.Wrap(nErr, "failed to find node index in labels")
+					nodeSetInput.NodeSpecs[nodeIndex].Node.CapabilitiesBinaryPaths = append(nodeSetInput.NodeSpecs[nodeIndex].Node.CapabilitiesBinaryPaths, binaryPath)
+				}
 			}
-
-			nodeIndex, nIErr := strconv.Atoi(nodeIndexStr)
-			if nIErr != nil {
-				return nil, errors.Wrap(nIErr, "failed to convert index to int")
-			}
-
-			nodeSetInput.NodeSpecs[nodeIndex].Node.CapabilitiesBinaryPaths = append(nodeSetInput.NodeSpecs[nodeIndex].Node.CapabilitiesBinaryPaths, binariesToAppend...)
 		}
 	}
 

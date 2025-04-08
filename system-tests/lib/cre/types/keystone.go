@@ -2,7 +2,6 @@ package types
 
 import (
 	"errors"
-	"slices"
 
 	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
@@ -40,9 +39,9 @@ type NodeIndexToConfigOverride = map[int]string
 type NodeIndexToSecretsOverride = map[int]string
 
 type KeystoneContractsInput struct {
-	ChainSelector uint64                  `toml:"-"`
-	CldEnv        *deployment.Environment `toml:"-"`
-	Out           *KeystoneContractOutput `toml:"out"`
+	ChainSelector uint64                   `toml:"-"`
+	CldEnv        *deployment.Environment  `toml:"-"`
+	Out           *KeystoneContractsOutput `toml:"out"`
 }
 
 func (k *KeystoneContractsInput) Validate() error {
@@ -55,7 +54,7 @@ func (k *KeystoneContractsInput) Validate() error {
 	return nil
 }
 
-type KeystoneContractOutput struct {
+type KeystoneContractsOutput struct {
 	UseCache                    bool           `toml:"use_cache"`
 	CapabilitiesRegistryAddress common.Address `toml:"capabilities_registry_address"`
 	ForwarderAddress            common.Address `toml:"forwarder_address"`
@@ -282,8 +281,7 @@ type GeneratePoRConfigsInput struct {
 	CapabilitiesRegistryAddress common.Address
 	WorkflowRegistryAddress     common.Address
 	ForwarderAddress            common.Address
-	GatewayConnectorOutput      *cldtypes.GatewayConnectorOutput
-	SkipGateway                 bool // Skip gateway config for workflow yaml test
+	GatewayConnectorOutput      *cldtypes.GatewayConnectorOutput // optional, automatically set if some DON in the topology has the GatewayDON flag
 }
 
 func (g *GeneratePoRConfigsInput) Validate() error {
@@ -310,14 +308,6 @@ func (g *GeneratePoRConfigsInput) Validate() error {
 	}
 	if g.ForwarderAddress == (common.Address{}) {
 		return errors.New("forwarder address not set")
-	}
-
-	if slices.Contains(g.DonMetadata.Flags, GatewayDON) {
-		if g.GatewayConnectorOutput == nil {
-			return errors.New("gateway connector output not set")
-		}
-	} else {
-		g.SkipGateway = true // If not gateway is present then skip configuration
 	}
 
 	return nil
@@ -518,6 +508,13 @@ func (s *StartNixShellInput) Validate() error {
 	return nil
 }
 
-type DONCapabilityWithConfigFactoryFn = func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig
-
+type DONCapabilityWithConfigFactoryFn = func(donFlags []CapabilityFlag) []keystone_changeset.DONCapabilityWithConfig
 type CapabilitiesBinaryPathFactoryFn = func(donMetadata *cldtypes.DonMetadata) ([]string, error)
+type JobSpecFactoryFn = func(input *JobSpecFactoryInput) (DonsToJobSpecs, error)
+
+type JobSpecFactoryInput struct {
+	CldEnvironment          *deployment.Environment
+	BlockchainOutput        *blockchain.Output
+	DonTopology             *devenv.DonTopology
+	KeystoneContractsOutput *KeystoneContractsOutput
+}
