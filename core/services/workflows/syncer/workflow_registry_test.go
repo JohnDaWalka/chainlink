@@ -312,4 +312,124 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		_, err = readEventCh(eventCh)
 		require.ErrorContains(t, err, errNoEvent)
 	})
+
+	t.Run("Paused workflow doesn't start a new workflow", func(t *testing.T) {
+		lggr := logger.TestLogger(t)
+		ctx := testutils.Context(t)
+		donID := uint32(1)
+		workflowDonNotifier := capabilities.NewDonNotifier()
+		// No engines are in the workflow registry
+		er := NewEngineRegistry()
+		wr, err := NewWorkflowRegistry(
+			lggr,
+			func(ctx context.Context, bytes []byte) (ContractReader, error) {
+				return nil, nil
+			},
+			"",
+			WorkflowEventPollerConfig{
+				QueryCount: 20,
+			},
+			&eventHandler{},
+			workflowDonNotifier,
+			er,
+		)
+		require.NoError(t, err)
+
+		// Capture messages on event channel
+		eventCh := make(chan Event, 100)
+		wr.eventCh = eventCh
+
+		wfID := [32]byte{1}
+		owner := []byte{}
+		status := uint8(1)
+		wfName := "wf name 1"
+		binaryURL := "b1"
+		configURL := "c1"
+		secretsURL := "s1"
+		metadata := []GetWorkflowMetadata{
+			{
+				WorkflowID:   wfID,
+				Owner:        owner,
+				DonID:        donID,
+				Status:       status,
+				WorkflowName: wfName,
+				BinaryURL:    binaryURL,
+				ConfigURL:    configURL,
+				SecretsURL:   secretsURL,
+			},
+		}
+
+		wr.workflowMetadataToEvents(ctx, metadata, donID)
+
+		// No events on the channel
+		_, err = readEventCh(eventCh)
+		require.ErrorContains(t, err, errNoEvent)
+	})
+
+	t.Run("Paused workflow deletes a running workflow", func(t *testing.T) {
+		lggr := logger.TestLogger(t)
+		ctx := testutils.Context(t)
+		donID := uint32(1)
+		workflowDonNotifier := capabilities.NewDonNotifier()
+		// Engine already in the workflow registry
+		er := NewEngineRegistry()
+		wfID := [32]byte{1}
+		owner := []byte{}
+		wfName := "wf name 1"
+		er.Add(EngineRegistryKey{Owner: owner, Name: wfName}, &mockService{}, wfID)
+		wr, err := NewWorkflowRegistry(
+			lggr,
+			func(ctx context.Context, bytes []byte) (ContractReader, error) {
+				return nil, nil
+			},
+			"",
+			WorkflowEventPollerConfig{
+				QueryCount: 20,
+			},
+			&eventHandler{},
+			workflowDonNotifier,
+			er,
+		)
+		require.NoError(t, err)
+
+		// Capture messages on event channel
+		eventCh := make(chan Event, 100)
+		wr.eventCh = eventCh
+
+		// The workflow metadata gets updated
+		status := uint8(1)
+		binaryURL := "b1"
+		configURL := "c1"
+		secretsURL := "s1"
+		metadata := []GetWorkflowMetadata{
+			{
+				WorkflowID:   wfID,
+				Owner:        owner,
+				DonID:        donID,
+				Status:       status,
+				WorkflowName: wfName,
+				BinaryURL:    binaryURL,
+				ConfigURL:    configURL,
+				SecretsURL:   secretsURL,
+			},
+		}
+
+		wr.workflowMetadataToEvents(ctx, metadata, donID)
+
+		// The first event is WorkflowDeletedEvent
+		event, err := readEventCh(eventCh)
+		require.NoError(t, err)
+		require.Equal(t, WorkflowDeletedEvent, event.GetEventType())
+		expectedUpdatedEvent := WorkflowRegistryWorkflowDeletedV1{
+			WorkflowID:    wfID,
+			WorkflowOwner: owner,
+			DonID:         donID,
+			WorkflowName:  wfName,
+		}
+		require.Equal(t, expectedUpdatedEvent, event.GetData())
+
+		// No other events on the channel
+		event, err = readEventCh(eventCh)
+		require.ErrorContains(t, err, errNoEvent)
+	})
 }
