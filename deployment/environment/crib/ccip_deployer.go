@@ -168,9 +168,6 @@ func validateEnvFromCRIBOutput(envFromOutput *devenv.EnvironmentWithTopology) er
 	if envFromOutput.Environment == nil {
 		return errors.New("envFromOutput.Environment is nil")
 	}
-	if len(envFromOutput.DONs) != 1 {
-		return errors.New("only one DON is allowed in environment")
-	}
 	if envFromOutput.DonTopology == nil {
 		return errors.New("envFromOutput.DonTopology is nil")
 	}
@@ -241,14 +238,14 @@ func ConnectCCIPLanes(ctx context.Context, lggr logger.Logger, envConfig devenv.
 
 // ConfigureCCIPOCR is a group of changesets used from CRIB to redeploy the chainlink don on an existing setup
 func ConfigureCCIPOCR(ctx context.Context, lggr logger.Logger, envFromOutput *devenv.EnvironmentWithTopology, homeChainSel, feedChainSel uint64, deployOutput DeployOutput, rmnEnabled bool) (CCIPOnChainDeployOutput, error) {
-	e := envFromOutput.Environment
-	if len(envFromOutput.DONs) != 1 {
-		return CCIPOnChainDeployOutput{}, errors.New("only one DON is allowed in environment")
+	err := validateEnvFromCRIBOutput(envFromOutput)
+	if err != nil {
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("invalid envFromOutput: %w", err)
 	}
-	don := envFromOutput.DONs[0]
+	e := envFromOutput.Environment
+	don := envFromOutput.DonTopology.DonsWithMetadata[0].DON
 
 	lggr.Infow("resetting ocr...")
-	var err error
 	*e, err = mustOCR(e, homeChainSel, feedChainSel, false, rmnEnabled)
 	if err != nil {
 		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to apply changesets for setting up OCR: %w", err)

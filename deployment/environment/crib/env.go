@@ -2,6 +2,7 @@ package crib
 
 import (
 	"github.com/pkg/errors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/deployment/environment/types"
 )

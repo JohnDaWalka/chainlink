@@ -1,8 +1,9 @@
 package crib
 
 import (
-	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 	"testing"
+
+	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

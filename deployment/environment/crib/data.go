@@ -3,14 +3,16 @@ package crib
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
+	"path"
+
 	"github.com/pkg/errors"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/clnode"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
-	"io"
-	"os"
-	"path"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"

@@ -2,12 +2,14 @@ package crib
 
 import (
 	"crypto/tls"
+
 	"github.com/pkg/errors"
+	"google.golang.org/grpc/credentials"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/clnode"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"github.com/smartcontractkit/chainlink/deployment/environment/types"
-	"google.golang.org/grpc/credentials"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -37,7 +39,7 @@ func BuildTopology(nodeOutputs []*clnode.Output) *types.Topology {
 	nodesMetadata := make([]*types.NodeMetadata, 0)
 
 	// Add Node labels required to  build environment
-	for i, _ := range nodeOutputs {
+	for i := range nodeOutputs {
 		nodeWithLabels := types.NodeMetadata{}
 		nodeType := types.WorkerNode
 		if i == 0 {
