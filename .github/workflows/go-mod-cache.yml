@@ -46,11 +46,11 @@ jobs:
         run:  go mod download
 
   go-cache-self-hosted:
-    name: Go Cache
+    name: Go Cache (Self-Hosted)
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on:
       - runs-on=${{ github.run_id }}
-      - runner=4core-8gb-large-ubuntu-s3
+      - runner=standard-x64
     steps:
       # enable runs-on magic cache
       - uses: runs-on/action@66d4449b717b5462159659523d1241051ff470b9 # v1
