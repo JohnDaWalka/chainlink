@@ -478,7 +478,7 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 
 		// if the workflow isn't active
 		// then the workflow has been paused. NOOP - to be handled below as a deleted event, which clears the DB workflow spec.
-		if WorkflowStatus(wfMeta.Status) == WorkflowStatusActive {
+		if WorkflowStatus(wfMeta.Status) != WorkflowStatusActive {
 			continue
 		}
 
