@@ -17,7 +17,7 @@ replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 replace github.com/smartcontractkit/chainlink/system-tests/lib => ../lib
 
 require (
-	github.com/ethereum/go-ethereum v1.15.3
+	github.com/ethereum/go-ethereum v1.15.6
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-playground/universal-translator v0.18.1
 	github.com/go-playground/validator/v10 v10.25.0
@@ -35,7 +35,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.0
 	github.com/smartcontractkit/chainlink/system-tests/lib v0.0.0-20250402195829-918b2a02a926
-	github.com/smartcontractkit/libocr v0.0.0-20250328171017-609ec10a5510
+	github.com/smartcontractkit/libocr v0.0.0-20250407191733-4c599143abf9
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.10.0
 )

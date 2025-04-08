@@ -17,7 +17,7 @@ require (
 	github.com/avast/retry-go/v4 v4.6.1
 	github.com/aws/aws-sdk-go v1.54.19
 	github.com/deckarep/golang-set/v2 v2.6.0
-	github.com/ethereum/go-ethereum v1.15.3
+	github.com/ethereum/go-ethereum v1.15.6
 	github.com/gagliardetto/binary v0.8.0
 	github.com/gagliardetto/solana-go v1.12.0
 	github.com/go-resty/resty/v2 v2.15.3
@@ -42,7 +42,7 @@ require (
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250404135440-77cf27b13c10
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.7.0
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.22
-	github.com/smartcontractkit/libocr v0.0.0-20250328171017-609ec10a5510
+	github.com/smartcontractkit/libocr v0.0.0-20250407191733-4c599143abf9
 	github.com/smartcontractkit/mcms v0.14.0
 	github.com/spf13/cast v1.7.1
 	github.com/stretchr/testify v1.10.0
@@ -462,6 +462,8 @@ require (
 )
 
 replace (
+	// delay upgrading due to breaking changes with chain id 0
+	github.com/ethereum/go-ethereum => github.com/ethereum/go-ethereum v1.15.3
 	// replicating the replace directive on cosmos SDK
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	github.com/testcontainers/testcontainers-go => github.com/testcontainers/testcontainers-go v0.34.0
