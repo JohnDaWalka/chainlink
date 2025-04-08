@@ -27,8 +27,8 @@ import (
 const name = "WorkflowRegistrySyncer"
 
 var (
-	defaultTickInterval                    = 2 * time.Second
-	defaultQueueSize                       = 100
+	defaultTickInterval                    = 12 * time.Second
+	defaultQueueSize                       = 1000
 	WorkflowRegistryContractName           = "WorkflowRegistry"
 	GetWorkflowMetadataListByDONMethodName = "getWorkflowMetadataListByDON"
 )
@@ -169,8 +169,10 @@ func WithTicker(ticker <-chan time.Time) func(*workflowRegistry) {
 }
 
 // WithSyncStrategyReconciliation allows external callers to change the sync strategy to reconciliation mode.
-func WithSyncStrategyReconciliation(wr *workflowRegistry) {
-	wr.syncStrategy = SyncStrategyReconciliation
+func WithSyncStrategy(strategy SyncStrategy) func(*workflowRegistry) {
+	return func(wr *workflowRegistry) {
+		wr.syncStrategy = strategy
+	}
 }
 
 // WithEventCh allows external callers to pass in an event channel. This is useful
@@ -277,7 +279,6 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 					w.lggr.Debug("shutting down handleEventLoop")
 					return
 				case event := <-w.eventCh:
-					fmt.Println(event)
 					if event == nil {
 						continue
 					}
@@ -472,7 +473,7 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 	for _, wfMeta := range workflowMetadata {
 		// TODO: ensure that the WorkflowRegisteredEvent clears the engine registry as the very last step
 		engine, getErr := w.engineRegistry.Get(EngineRegistryKey{Owner: wfMeta.Owner, Name: wfMeta.WorkflowName})
-		currWfID := hex.EncodeToString(wfMeta.WorkflowID[:])
+		engineKey := wfMeta.WorkflowName + hex.EncodeToString(wfMeta.Owner)
 
 		// if there is no engine in the engine registry
 		// then handle as registered event
@@ -491,12 +492,13 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 				Data:      toRegisteredEvent,
 				EventType: WorkflowRegisteredEvent,
 			})
-			seenMap[currWfID] = true
+			seenMap[engineKey] = true
 			continue
 		}
 
 		// if the workflow engine is in the registry, but the metadata has changed
 		// then handle as updated event
+		currWfID := hex.EncodeToString(wfMeta.WorkflowID[:])
 		prevWfID := hex.EncodeToString(engine.workflowID[:])
 		if currWfID != prevWfID {
 			toUpdatedEvent := WorkflowRegistryWorkflowUpdatedV1{
@@ -513,14 +515,14 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 				Data:      toUpdatedEvent,
 				EventType: WorkflowUpdatedEvent,
 			})
-			seenMap[currWfID] = true
+			seenMap[engineKey] = true
 			continue
 		}
 
 		// if the workflow engine is in the registry, the metadata is the same, and the status is active
 		// then the workflow is unchanged. mark as seen.
 		if WorkflowStatus(wfMeta.Status) == WorkflowStatusActive {
-			seenMap[wfMeta.WorkflowName+hex.EncodeToString(wfMeta.Owner)] = true
+			seenMap[engineKey] = true
 			continue
 		}
 
@@ -531,8 +533,8 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 	// Shut down engines that are no longer in the contract's latest workflow metadata state
 	allEngines := w.engineRegistry.GetAll()
 	for _, engine := range allEngines {
-		prevWfID := hex.EncodeToString(engine.workflowID[:])
-		_, exists := seenMap[prevWfID]
+		engineKey := engine.workflowName + hex.EncodeToString(engine.workflowOwner)
+		_, exists := seenMap[engineKey]
 		if !exists {
 			toDeletedEvent := WorkflowRegistryWorkflowDeletedV1{
 				WorkflowID:    engine.workflowID,
@@ -573,7 +575,6 @@ func (w *workflowRegistry) syncUsingReconciliationStrategy(ctx context.Context, 
 				return
 			case <-ticker:
 				workflowMetadata, _, err := w.getWorkflowMetadata(ctx, don, reader)
-				fmt.Println(workflowMetadata)
 				if err != nil {
 					w.lggr.Errorw("failed to get registry state", "err", err)
 					continue
