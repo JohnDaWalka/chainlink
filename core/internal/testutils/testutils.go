@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-integrations/evm/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -39,9 +41,9 @@ const (
 )
 
 // FixtureChainID matches the chain always added by fixtures.sql
-// It is set to 0 since no real chain ever has this ID and allows a virtual
+// It is set since no real chain ever has this ID and allows a virtual
 // "test" chain ID to be used without clashes
-var FixtureChainID = big.NewInt(0)
+var FixtureChainID = big.NewInt(types.NullClientChainID)
 
 // SimulatedChainID is the chain ID for the go-ethereum simulated backend
 var SimulatedChainID = big.NewInt(1337)
