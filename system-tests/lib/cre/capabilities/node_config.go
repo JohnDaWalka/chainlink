@@ -1,6 +1,7 @@
 package capabilities
 
 import (
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -11,7 +12,7 @@ import (
 )
 
 var DefaultBinariesPathsFactory = func(cronBinaryPath string) types.CapabilitiesBinaryPathFactoryFn {
-	return func(donMetadata *types.DonMetadata) ([]string, error) {
+	return func(donMetadata *cldtypes.DonMetadata) ([]string, error) {
 		binaries := []string{}
 		if flags.HasFlag(donMetadata.Flags, types.CronCapability) {
 			binaries = append(binaries, cronBinaryPath)
@@ -21,7 +22,7 @@ var DefaultBinariesPathsFactory = func(cronBinaryPath string) types.Capabilities
 	}
 }
 
-func AppendBinariesPathsNodeSpec(nodeSetInput *types.CapabilitiesAwareNodeSet, donMetadata *types.DonMetadata, pathFactoryFns []types.CapabilitiesBinaryPathFactoryFn) (*types.CapabilitiesAwareNodeSet, error) {
+func AppendBinariesPathsNodeSpec(nodeSetInput *types.CapabilitiesAwareNodeSet, donMetadata *cldtypes.DonMetadata, pathFactoryFns []types.CapabilitiesBinaryPathFactoryFn) (*types.CapabilitiesAwareNodeSet, error) {
 	// if no capabilities are defined in TOML, but DON has ones that we know require custom binaries
 	// append them to the node specification
 	hasCapabilitiesBinaries := false
@@ -43,8 +44,8 @@ func AppendBinariesPathsNodeSpec(nodeSetInput *types.CapabilitiesAwareNodeSet, d
 			binariesToAppend = append(binariesToAppend, binaries...)
 		}
 
-		workerNodes, wErr := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &types.Label{
-			Key:   libnode.NodeTypeKey,
+		workerNodes, wErr := libnode.FindManyWithLabel(donMetadata.NodesMetadata, &cldtypes.Label{
+			Key:   cldtypes.NodeTypeKey,
 			Value: types.WorkerNode,
 		}, libnode.EqualLabels)
 
@@ -53,7 +54,7 @@ func AppendBinariesPathsNodeSpec(nodeSetInput *types.CapabilitiesAwareNodeSet, d
 		}
 
 		for _, node := range workerNodes {
-			nodeIndexStr, nErr := libnode.FindLabelValue(node, libnode.IndexKey)
+			nodeIndexStr, nErr := libnode.FindLabelValue(node, cldtypes.IndexKey)
 			if nErr != nil {
 				return nil, errors.Wrap(nErr, "failed to find node index in labels")
 			}

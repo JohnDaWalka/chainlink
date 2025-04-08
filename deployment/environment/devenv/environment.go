@@ -101,12 +101,20 @@ func NewEnvironmentBuilder(lgr logger.Logger) *EnvironmentBuilder {
 }
 
 func (b *EnvironmentBuilder) WithJobDistributor(jdOutput *jd.Output, jdTransportCredentials credentials.TransportCredentials) *EnvironmentBuilder {
-	if jdOutput == nil {
-		b.errs = append(b.errs, "jd output not set")
-	}
 	if jdTransportCredentials == nil {
 		b.errs = append(b.errs, "jd credentials not set")
 	}
+	if jdOutput == nil {
+		b.errs = append(b.errs, "jd output not set")
+		return b
+	}
+	if jdOutput.ExternalGRPCUrl == "" {
+		b.errs = append(b.errs, "external gRPC url not set")
+	}
+	if jdOutput.InternalWSRPCUrl == "" {
+		b.errs = append(b.errs, "internal wsRPC url not set")
+	}
+
 	b.jdOutput = jdOutput
 	b.credentials = jdTransportCredentials
 	return b
@@ -129,8 +137,11 @@ func (b *EnvironmentBuilder) WithSethClients(sethClients []*seth.Client) *Enviro
 }
 
 func (b *EnvironmentBuilder) WithNodeSetOutput(nodeSetOutput []*types.WrappedNodeOutput) *EnvironmentBuilder {
-	if nodeSetOutput == nil || len(b.nodeSetOutput) == 0 {
+	if nodeSetOutput == nil {
 		b.errs = append(b.errs, "node set output not set")
+	}
+	if len(nodeSetOutput) == 0 {
+		b.errs = append(b.errs, "node set outputs are empty")
 	}
 	b.nodeSetOutput = nodeSetOutput
 	return b
@@ -201,7 +212,7 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 
 		// if DON has no capabilities we don't need to create chain configs (e.g. for gateway nodes)
 		// we indicate to `NewEnvironment` that it should skip chain creation by passing an empty chain config
-		if len(nodeOutput.Capabilities) == 0 {
+		if len(nodeOutput.Capabilities) == 0 && nodeOutput.NodeSetType != "ccip" {
 			chains = []ChainConfig{}
 		}
 
@@ -217,9 +228,11 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 			Chains:   chains,
 		}
 
+		b.logger.Infow("creating CLD environment")
 		env, don, err := NewEnvironment(context.Background, b.logger, devenvConfig)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to create environment")
+			b.logger.Errorw("failed to create CLD devenv environment", "envConfig", devenvConfig, "err", err)
+			return nil, errors.Wrap(err, "failed to create devenv environment")
 		}
 
 		envs[idx] = env
@@ -254,7 +267,7 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 	var jd deployment.OffchainClient
 	var err error
 
-	if len(b.nodeSetOutput) > 0 {
+	if len(b.nodeSetOutput) > 0 && b.nodeSetOutput[0].NodeSetType != "ccip" {
 		// We create a new instance of JD client using `allNodesInfo` instead of `nodeInfo` to ensure that it can interact with all nodes.
 		// Otherwise, JD would fail to accept job proposals for unknown nodes, even though it would still propose jobs to them. And that
 		// would be happening silently, without any error messages, and we wouldn't know about it until much later.

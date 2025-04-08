@@ -1,0 +1,47 @@
+[
+  {
+    "APIAuthUser": "fake@chain.link",
+    "APIAuthPassword": "generated",
+    "ContainerName": "",
+    "ExternalURL": "http://crib-local-ccip-bt-0.local:80",
+    "InternalURL": "ccip-bt-0",
+    "InternalP2PUrl": "http://ccip-bt-0:5001",
+    "InternalIP": ""
+  },
+  {
+    "APIAuthUser": "fake@chain.link",
+    "APIAuthPassword": "generated",
+    "ContainerName": "",
+    "ExternalURL": "http://crib-local-ccip-0.local:80",
+    "InternalURL": "ccip-0",
+    "InternalP2PUrl": "http://ccip-0:5001",
+    "InternalIP": ""
+  },
+  {
+    "APIAuthUser": "fake@chain.link",
+    "APIAuthPassword": "generated",
+    "ContainerName": "",
+    "ExternalURL": "http://crib-local-ccip-1.local:80",
+    "InternalURL": "ccip-1",
+    "InternalP2PUrl": "http://ccip-1:5001",
+    "InternalIP": ""
+  },
+  {
+    "APIAuthUser": "fake@chain.link",
+    "APIAuthPassword": "generated",
+    "ContainerName": "",
+    "ExternalURL": "http://crib-local-ccip-2.local:80",
+    "InternalURL": "ccip-2",
+    "InternalP2PUrl": "http://ccip-2:5001",
+    "InternalIP": ""
+  },
+  {
+    "APIAuthUser": "fake@chain.link",
+    "APIAuthPassword": "generated",
+    "ContainerName": "",
+    "ExternalURL": "http://crib-local-ccip-3.local:80",
+    "InternalURL": "ccip-3",
+    "InternalP2PUrl": "http://ccip-3:5001",
+    "InternalIP": ""
+  }
+]

@@ -1,7 +1,9 @@
 package crib
 
 import (
+	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink/deployment/environment/types"
 )
 
 const (
@@ -19,7 +21,7 @@ type CRIBEnv struct {
 	cribEnvStateDirPath string
 }
 
-func NewDevspaceEnvFromStateDir(lggr logger.Logger, envStateDir string) CRIBEnv {
+func NewCRIBEnvFromStateDir(lggr logger.Logger, envStateDir string) CRIBEnv {
 	return CRIBEnv{
 		lggr:                lggr,
 		cribEnvStateDirPath: envStateDir,
@@ -27,11 +29,6 @@ func NewDevspaceEnvFromStateDir(lggr logger.Logger, envStateDir string) CRIBEnv 
 }
 
 func (c CRIBEnv) GetConfig(key string) (DeployOutput, error) {
-	// todo: read new fields
-	// JDOutput:          nil,
-	// BlockchainOutputs: nil,
-	// NodesetOutput:     nil,
-
 	reader := NewOutputReader(c.cribEnvStateDirPath)
 	nodesDetails, err := reader.ReadNodesDetails()
 	if err != nil {
@@ -39,7 +36,7 @@ func (c CRIBEnv) GetConfig(key string) (DeployOutput, error) {
 	}
 	chainConfigs, err := reader.ReadChainConfigs()
 	if err != nil {
-		return DeployOutput{}, err
+		return DeployOutput{}, errors.Wrapf(err, "failed to read chain configs from %s", c.cribEnvStateDirPath)
 	}
 	for i, chain := range chainConfigs {
 		err := chain.SetDeployerKey(&key)
@@ -51,16 +48,36 @@ func (c CRIBEnv) GetConfig(key string) (DeployOutput, error) {
 
 	addressBook, err := reader.ReadAddressBook()
 	if err != nil {
-		return DeployOutput{}, err
+		return DeployOutput{}, errors.Wrapf(err, "failed to read address book")
+	}
+
+	jdOutput, err := reader.ReadJDOutput()
+	if err != nil {
+		return DeployOutput{}, errors.Wrap(err, "error reading jd output")
+	}
+
+	blockchainOutputs, err := reader.ReadBlockchainOutputs()
+	if err != nil {
+		return DeployOutput{}, errors.Wrap(err, "error reading blockchain outputs")
+	}
+
+	nodeSetOutput, err := reader.ReadNodeSetOutput()
+	if err != nil {
+		return DeployOutput{}, errors.Wrap(err, "error reading node set output")
 	}
 
 	return DeployOutput{
 		NodeIDs:           nodesDetails.NodeIDs,
 		Chains:            chainConfigs,
 		AddressBook:       addressBook,
-		JDOutput:          nil,
-		BlockchainOutputs: nil,
-		NodesetOutput:     nil,
+		JDOutput:          jdOutput,
+		BlockchainOutputs: types.ChainIDToBlockchainOutputsFromArray(blockchainOutputs),
+		NodesetOutput: &types.WrappedNodeOutput{
+			Output:       nodeSetOutput,
+			NodeSetName:  "CRIB-CCIP",
+			NodeSetType:  "ccip",
+			Capabilities: []string{},
+		},
 	}, nil
 }
 

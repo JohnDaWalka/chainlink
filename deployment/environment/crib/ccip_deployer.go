@@ -106,31 +106,32 @@ func DeployHomeChainContracts(ctx context.Context, lggr logger.Logger, envConfig
 }
 
 // DeployCCIPAndAddLanes is the actual ccip setup once the nodes are initialized.
-func DeployCCIPAndAddLanes(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook, rmnEnabled bool) (DeployCCIPOutput, error) {
-	e, don, err := devenv.NewEnvironment(func() context.Context { return ctx }, lggr, envConfig)
+func DeployCCIPAndAddLanes(ctx context.Context, lggr logger.Logger, envFromOutput *devenv.EnvironmentWithTopology, homeChainSel, feedChainSel uint64, deployOutput DeployOutput, rmnEnabled bool) (CCIPOnChainDeployOutput, error) {
+	err := validateEnvFromCRIBOutput(envFromOutput)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to initiate new environment: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("invalid envFromOutput: %w", err)
 	}
-	e.ExistingAddresses = ab
+	e := envFromOutput.Environment
+	don := envFromOutput.DonTopology.DonsWithMetadata[0].DON
 
 	// ------ Part 1 -----
 	// Setup because we only need to deploy the contracts and distribute job specs
 	lggr.Infow("setting up chains...")
 	*e, err = setupChains(lggr, e, homeChainSel)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to apply changesets for setting up chain: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to apply changesets for setting up chain: %w", err)
 	}
 
 	state, err := changeset.LoadOnchainState(*e)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
 
 	lggr.Infow("setting up lanes...")
 	// Add all lanes
 	*e, err = setupLanes(e, state)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to apply changesets for connecting lanes: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to apply changesets for connecting lanes: %w", err)
 	}
 	// ------ Part 1 -----
 
@@ -138,7 +139,7 @@ func DeployCCIPAndAddLanes(ctx context.Context, lggr logger.Logger, envConfig de
 	lggr.Infow("setting up ocr...")
 	*e, err = mustOCR(e, homeChainSel, feedChainSel, true, rmnEnabled)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to apply changesets for setting up OCR: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to apply changesets for setting up OCR: %w", err)
 	}
 
 	// distribute funds to transmitters
@@ -147,25 +148,47 @@ func DeployCCIPAndAddLanes(ctx context.Context, lggr logger.Logger, envConfig de
 	lggr.Infow("distributing funds...")
 	err = distributeTransmitterFunds(lggr, don.PluginNodes(), *e)
 	if err != nil {
-		return DeployCCIPOutput{}, err
+		return CCIPOnChainDeployOutput{}, err
 	}
 
 	addresses, err := e.ExistingAddresses.Addresses()
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to convert address book to address book map: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to convert address book to address book map: %w", err)
 	}
-	return DeployCCIPOutput{
+	return CCIPOnChainDeployOutput{
 		AddressBook: *deployment.NewMemoryAddressBookFromMap(addresses),
 		NodeIDs:     e.NodeIDs,
 	}, nil
 }
 
+func validateEnvFromCRIBOutput(envFromOutput *devenv.EnvironmentWithTopology) error {
+	if envFromOutput == nil {
+		return errors.New("envFromOutput is nil")
+	}
+	if envFromOutput.Environment == nil {
+		return errors.New("envFromOutput.Environment is nil")
+	}
+	if len(envFromOutput.DONs) != 1 {
+		return errors.New("only one DON is allowed in environment")
+	}
+	if envFromOutput.DonTopology == nil {
+		return errors.New("envFromOutput.DonTopology is nil")
+	}
+	if len(envFromOutput.DonTopology.DonsWithMetadata) == 0 {
+		return errors.New("envFromOutput.DonsWithMetadata is empty")
+	}
+	if envFromOutput.DonTopology.DonsWithMetadata[0].DON == nil {
+		return errors.New("donWithMetadata is empty")
+	}
+	return nil
+}
+
 // DeployCCIPChains is a group of changesets used from CRIB to set up new chains
 // It sets up CCIP contracts on all chains. We expect that MCMS has already been deployed and set up
-func DeployCCIPChains(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook) (DeployCCIPOutput, error) {
+func DeployCCIPChains(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook) (CCIPOnChainDeployOutput, error) {
 	e, _, err := devenv.NewEnvironment(func() context.Context { return ctx }, lggr, envConfig)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to initiate new environment: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to initiate new environment: %w", err)
 	}
 	e.ExistingAddresses = ab
 
@@ -173,13 +196,13 @@ func DeployCCIPChains(ctx context.Context, lggr logger.Logger, envConfig devenv.
 	lggr.Infow("setting up chains...")
 	*e, err = setupChains(lggr, e, homeChainSel)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to apply changesets for setting up chain: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to apply changesets for setting up chain: %w", err)
 	}
 	addresses, err := e.ExistingAddresses.Addresses()
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to get convert address book to address book map: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to get convert address book to address book map: %w", err)
 	}
-	return DeployCCIPOutput{
+	return CCIPOnChainDeployOutput{
 		AddressBook: *deployment.NewMemoryAddressBookFromMap(addresses),
 		NodeIDs:     e.NodeIDs,
 	}, nil
@@ -187,58 +210,59 @@ func DeployCCIPChains(ctx context.Context, lggr logger.Logger, envConfig devenv.
 
 // ConnectCCIPLanes is a group of changesets used from CRIB to set up new lanes
 // It creates a fully connected mesh where all chains are connected to all chains
-func ConnectCCIPLanes(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook) (DeployCCIPOutput, error) {
+func ConnectCCIPLanes(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook) (CCIPOnChainDeployOutput, error) {
 	e, _, err := devenv.NewEnvironment(func() context.Context { return ctx }, lggr, envConfig)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to initiate new environment: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to initiate new environment: %w", err)
 	}
 	e.ExistingAddresses = ab
 
 	state, err := changeset.LoadOnchainState(*e)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
 
 	lggr.Infow("setting up lanes...")
 	// Add all lanes
 	*e, err = setupLanes(e, state)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to apply changesets for connecting lanes: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to apply changesets for connecting lanes: %w", err)
 	}
 
 	addresses, err := e.ExistingAddresses.Addresses()
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to get convert address book to address book map: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to get convert address book to address book map: %w", err)
 	}
-	return DeployCCIPOutput{
+	return CCIPOnChainDeployOutput{
 		AddressBook: *deployment.NewMemoryAddressBookFromMap(addresses),
 		NodeIDs:     e.NodeIDs,
 	}, nil
 }
 
 // ConfigureCCIPOCR is a group of changesets used from CRIB to redeploy the chainlink don on an existing setup
-func ConfigureCCIPOCR(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook, rmnEnabled bool) (DeployCCIPOutput, error) {
-	e, don, err := devenv.NewEnvironment(func() context.Context { return ctx }, lggr, envConfig)
-	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to initiate new environment: %w", err)
+func ConfigureCCIPOCR(ctx context.Context, lggr logger.Logger, envFromOutput *devenv.EnvironmentWithTopology, homeChainSel, feedChainSel uint64, deployOutput DeployOutput, rmnEnabled bool) (CCIPOnChainDeployOutput, error) {
+	e := envFromOutput.Environment
+	if len(envFromOutput.DONs) != 1 {
+		return CCIPOnChainDeployOutput{}, errors.New("only one DON is allowed in environment")
 	}
-	e.ExistingAddresses = ab
+	don := envFromOutput.DONs[0]
 
 	lggr.Infow("resetting ocr...")
+	var err error
 	*e, err = mustOCR(e, homeChainSel, feedChainSel, false, rmnEnabled)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to apply changesets for setting up OCR: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to apply changesets for setting up OCR: %w", err)
 	}
 	err = distributeTransmitterFunds(lggr, don.PluginNodes(), *e)
 	if err != nil {
-		return DeployCCIPOutput{}, err
+		return CCIPOnChainDeployOutput{}, err
 	}
 
 	addresses, err := e.ExistingAddresses.Addresses()
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to get convert address book to address book map: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to get convert address book to address book map: %w", err)
 	}
-	return DeployCCIPOutput{
+	return CCIPOnChainDeployOutput{
 		AddressBook: *deployment.NewMemoryAddressBookFromMap(addresses),
 		NodeIDs:     e.NodeIDs,
 	}, nil
@@ -246,10 +270,10 @@ func ConfigureCCIPOCR(ctx context.Context, lggr logger.Logger, envConfig devenv.
 
 // FundCCIPTransmitters is used from CRIB to provide funds to the node transmitters
 // This function sends funds from the deployer key to the chainlink node transmitters
-func FundCCIPTransmitters(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, ab deployment.AddressBook) (DeployCCIPOutput, error) {
+func FundCCIPTransmitters(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, ab deployment.AddressBook) (CCIPOnChainDeployOutput, error) {
 	e, don, err := devenv.NewEnvironment(func() context.Context { return ctx }, lggr, envConfig)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to initiate new environment: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to initiate new environment: %w", err)
 	}
 	e.ExistingAddresses = ab
 
@@ -259,14 +283,14 @@ func FundCCIPTransmitters(ctx context.Context, lggr logger.Logger, envConfig dev
 	lggr.Infow("distributing funds...")
 	err = distributeTransmitterFunds(lggr, don.PluginNodes(), *e)
 	if err != nil {
-		return DeployCCIPOutput{}, err
+		return CCIPOnChainDeployOutput{}, err
 	}
 
 	addresses, err := e.ExistingAddresses.Addresses()
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to get convert address book to address book map: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to get convert address book to address book map: %w", err)
 	}
-	return DeployCCIPOutput{
+	return CCIPOnChainDeployOutput{
 		AddressBook: *deployment.NewMemoryAddressBookFromMap(addresses),
 		NodeIDs:     e.NodeIDs,
 	}, nil
@@ -274,6 +298,7 @@ func FundCCIPTransmitters(ctx context.Context, lggr logger.Logger, envConfig dev
 
 func setupChains(lggr logger.Logger, e *deployment.Environment, homeChainSel uint64) (deployment.Environment, error) {
 	chainSelectors := e.AllChainSelectors()
+	lggr.Infow("setting up chains...", "chainSelectors", chainSelectors)
 	chainConfigs := make(map[uint64]v1_6.ChainConfig)
 	nodeInfo, err := deployment.NodeInfo(e.NodeIDs, e.Offchain)
 	if err != nil {
@@ -646,10 +671,10 @@ type RMNNodeConfig struct {
 	Passphrase        string
 }
 
-func SetupRMNNodeOnAllChains(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook, nodes []RMNNodeConfig) (DeployCCIPOutput, error) {
+func SetupRMNNodeOnAllChains(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook, nodes []RMNNodeConfig) (CCIPOnChainDeployOutput, error) {
 	e, _, err := devenv.NewEnvironment(func() context.Context { return ctx }, lggr, envConfig)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to create environment: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to create environment: %w", err)
 	}
 
 	e.ExistingAddresses = ab
@@ -677,7 +702,7 @@ func SetupRMNNodeOnAllChains(ctx context.Context, lggr logger.Logger, envConfig 
 	})
 
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to update dynamic off ramp config: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to update dynamic off ramp config: %w", err)
 	}
 
 	rmnNodes := make([]rmn_home.RMNHomeNode, len(nodes))
@@ -717,18 +742,18 @@ func SetupRMNNodeOnAllChains(ctx context.Context, lggr logger.Logger, envConfig 
 		),
 	)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to set rmn node candidate: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to set rmn node candidate: %w", err)
 	}
 
 	state, err := changeset.LoadOnchainState(env)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to load chain state: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to load chain state: %w", err)
 	}
 
 	configDigest, err := state.Chains[homeChainSel].RMNHome.GetCandidateDigest(nil)
 
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to get rmn home candidate digest: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to get rmn home candidate digest: %w", err)
 	}
 
 	env, err = commonchangeset.Apply(nil, *e, nil,
@@ -741,7 +766,7 @@ func SetupRMNNodeOnAllChains(ctx context.Context, lggr logger.Logger, envConfig 
 		),
 	)
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to promote rmn node candidate: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to promote rmn node candidate: %w", err)
 	}
 
 	signers := make([]rmn_remote.RMNRemoteSigner, len(nodes))
@@ -767,14 +792,14 @@ func SetupRMNNodeOnAllChains(ctx context.Context, lggr logger.Logger, envConfig 
 		})
 	}
 	if err := g.Wait(); err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to set rmn remote config: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to set rmn remote config: %w", err)
 	}
 
 	addresses, err := env.ExistingAddresses.Addresses()
 	if err != nil {
-		return DeployCCIPOutput{}, fmt.Errorf("failed to get existing addresses: %w", err)
+		return CCIPOnChainDeployOutput{}, fmt.Errorf("failed to get existing addresses: %w", err)
 	}
-	return DeployCCIPOutput{
+	return CCIPOnChainDeployOutput{
 		AddressBook: *deployment.NewMemoryAddressBookFromMap(addresses),
 		NodeIDs:     e.NodeIDs,
 	}, nil

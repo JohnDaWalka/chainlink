@@ -7,8 +7,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 )
 
-type ChainIDToBlockchainOutputs map[string]*blockchain.Output
-
 type NodeType = string
 
 const (
@@ -43,6 +41,16 @@ func LabelFromProto(p *ptypes.Label) (*Label, error) {
 	}, nil
 }
 
+type ChainIDToBlockchainOutputs map[string]blockchain.Output
+
+func ChainIDToBlockchainOutputsFromArray(outputs []blockchain.Output) map[string]blockchain.Output {
+	mappedOutputs := make(map[string]blockchain.Output, len(outputs))
+	for _, output := range outputs {
+		mappedOutputs[output.ChainID] = output
+	}
+	return mappedOutputs
+}
+
 type NodeMetadata struct {
 	Labels []*Label
 }
@@ -74,6 +82,8 @@ type Topology struct {
 
 type WrappedNodeOutput struct {
 	*simple_node_set.Output
-	NodeSetName  string
+	NodeSetName string
+	// NodeSetType is either "chainlink" or "ccip"
+	NodeSetType  string
 	Capabilities []string
 }

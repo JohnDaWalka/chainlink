@@ -1,0 +1,36 @@
+[
+  {
+    "ChainID": 1337,
+    "ChainName": "evm-simulated-1337",
+    "ChainType": "EVM",
+    "WSRPCs": [
+      {
+        "External": "wss://crib-local-geth-1337-ws.local",
+        "Internal": "ws://geth-1337-ws:8546"
+      }
+    ],
+    "HTTPRPCs": [
+      {
+        "External": "https://crib-local-geth-1337-http.local:443",
+        "Internal": "http://geth-1337:8544"
+      }
+    ]
+  },
+  {
+    "ChainID": 2337,
+    "ChainName": "evm-simulated-2337",
+    "ChainType": "EVM",
+    "WSRPCs": [
+      {
+        "External": "wss://crib-local-geth-2337-ws.local",
+        "Internal": "ws://geth-2337-ws:8546"
+      }
+    ],
+    "HTTPRPCs": [
+      {
+        "External": "https://crib-local-geth-2337-http.local:443",
+        "Internal": "http://geth-2337:8544"
+      }
+    ]
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "NodeIDs": [
+    "node_4k2u6va2vAUgAgLoNh1t2",
+    "node_PisHSUAiewvnWkX1dy3JN",
+    "node_6TQ9ceLSw3c2S8ffcPjaf",
+    "node_wQDQkrW2JLvTcfoNqc1vs",
+    "node_KmJqk1zANCtpYFJLiVEaa"
+  ],
+  "BootstrapNode": {
+    "P2PID": "12D3KooWRUEzcX7JcsqfJPP3fgYEya8YLAqxeTP5JQNbNJ9t8BzS",
+    "InternalHost": "ccip-bt-0",
+    "Port": "5001"
+  }
+}

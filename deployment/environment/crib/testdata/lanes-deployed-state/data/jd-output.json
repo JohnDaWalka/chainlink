@@ -1,0 +1,7 @@
+{
+  "UseCache": false,
+  "ExternalGRPCUrl": "crib-local-job-distributor-grpc.local:443",
+  "InternalGRPCUrl": "",
+  "ExternalWSRPCUrl": "",
+  "InternalWSRPCUrl": "job-distributor-noderpc-lb:80"
+}
