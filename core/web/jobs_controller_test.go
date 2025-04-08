@@ -315,7 +315,7 @@ func TestJobController_Create_HappyPath(t *testing.T) {
 		{
 			name: "directrequest-with-requesters-and-min-contract-payment",
 			tomlTemplate: func(nameAndExternalJobID string) string {
-				return fmt.Sprintf(testspecs.DirectRequestSpecWithRequestersAndMinContractPaymentTemplate, nameAndExternalJobID, nameAndExternalJobID)
+				return fmt.Sprintf(testspecs.DirectRequestSpecWithRequestersAndMinContractPaymentTemplate, nameAndExternalJobID, nameAndExternalJobID, testutils.FixtureChainID.String())
 			},
 			assertion: func(t *testing.T, nameAndExternalJobID string, r *http.Response) {
 				require.Equal(t, http.StatusOK, r.StatusCode)
@@ -340,7 +340,7 @@ func TestJobController_Create_HappyPath(t *testing.T) {
 		{
 			name: "fluxmonitor",
 			tomlTemplate: func(nameAndExternalJobID string) string {
-				return fmt.Sprintf(testspecs.FluxMonitorSpecTemplate, nameAndExternalJobID, nameAndExternalJobID)
+				return fmt.Sprintf(testspecs.FluxMonitorSpecTemplate, nameAndExternalJobID, nameAndExternalJobID, testutils.FixtureChainID.String())
 			},
 			assertion: func(t *testing.T, nameAndExternalJobID string, r *http.Response) {
 				require.Equal(t, http.StatusInternalServerError, r.StatusCode)

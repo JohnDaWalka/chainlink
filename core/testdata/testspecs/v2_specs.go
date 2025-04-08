@@ -93,7 +93,7 @@ minContractPaymentLinkJuels  = "1000000000000000000000"
 name                         = "%s"
 contractAddress              = "0x613a38AC1659769640aaE063C651F48E0250454C"
 externalJobID                = "%s"
-evmChainID                   = 0
+evmChainID                   = %s
 observationSource            = """
     ds1          [type=http method=GET url="http://example.com" allowunrestrictednetworkaccess="true"];
     ds1_parse    [type=jsonparse path="USD"];
@@ -107,7 +107,7 @@ schemaVersion       = 1
 name                = "%s"
 contractAddress     = "0x3cCad4715152693fE3BC4460591e3D3Fbd071b42"
 externalJobID       =  "%s"
-evmChainID          = 0
+evmChainID          = %s
 threshold = 0.5
 absoluteThreshold = 0.0 # optional
 
@@ -148,7 +148,7 @@ observationSource = """
 	ds -> ds_parse -> ds_multiply;
 """
 [relayConfig]
-chainID = 0
+chainID = %s
 [pluginConfig]
 `
 	WebhookSpecNoBodyTemplate = `
@@ -275,7 +275,7 @@ func GetDirectRequestSpecWithUUID(u uuid.UUID) string {
 }
 
 func GetOCR2EVMSpecMinimal() string {
-	return fmt.Sprintf(OCR2EVMSpecMinimalTemplate, uuid.New())
+	return fmt.Sprintf(OCR2EVMSpecMinimalTemplate, uuid.New(), testutils.FixtureChainID.String())
 }
 
 func GetWebhookSpecNoBody(u uuid.UUID, fetchBridge, submitBridge string) string {
@@ -485,7 +485,7 @@ decode_log->generate_proof->estimate_gas->simulate_fulfillment
 		observationSource = params.ObservationSource
 	}
 	if params.EVMChainID == "" {
-		params.EVMChainID = "0"
+		params.EVMChainID = testutils.FixtureChainID.String()
 	}
 	template := `
 externalJobID = "%s"
@@ -1046,5 +1046,5 @@ juelsPerFeeCoinSource = """
 	ds -> ds_parse -> ds_multiply;
 """
 [relayConfig]
-chainID = 0
+chainID = %s
 `

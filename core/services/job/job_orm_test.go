@@ -2148,7 +2148,7 @@ func TestORM_CreateJob_OCR2_With_DualTransmission(t *testing.T) {
 	require.NoError(t, keyStore.OCR2().Add(ctx, cltest.DefaultOCR2Key))
 	_, transmitterID := cltest.MustInsertRandomKey(t, keyStore.Eth())
 
-	baseJobSpec := fmt.Sprintf(testspecs.OCR2EVMDualTransmissionSpecMinimalTemplate, transmitterID.String())
+	baseJobSpec := fmt.Sprintf(testspecs.OCR2EVMDualTransmissionSpecMinimalTemplate, transmitterID.String(), testutils.FixtureChainID.String())
 
 	lggr := logger.TestLogger(t)
 	pipelineORM := pipeline.NewORM(db, lggr, config.JobPipeline().MaxSuccessfulRuns())
@@ -2321,7 +2321,7 @@ func TestORM_CreateJob_KeyLocking(t *testing.T) {
 	dtTransmitterAddress := cltest.MustGenerateRandomKey(t)
 	ks.Eth().XXXTestingOnlyAdd(ctx, dtTransmitterAddress)
 
-	baseJobSpec := fmt.Sprintf(testspecs.OCR2EVMDualTransmissionSpecMinimalTemplate, transmitterID.String())
+	baseJobSpec := fmt.Sprintf(testspecs.OCR2EVMDualTransmissionSpecMinimalTemplate, transmitterID.String(), testutils.FixtureChainID.String())
 
 	lggr := logger.TestLogger(t)
 	pipelineORM := pipeline.NewORM(db, lggr, config.JobPipeline().MaxSuccessfulRuns())
