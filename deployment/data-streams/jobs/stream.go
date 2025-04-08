@@ -4,6 +4,16 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+type StreamType string
+
+const (
+	StreamTypeQuote        = StreamType("quote")
+	StreamTypeMedian       = StreamType("median")
+	StreamTypeMarketStatus = StreamType("market-status")
+	StreamTypeDataLink     = StreamType("data-link")
+	StreamTypeConsolidated = StreamType("consolidated")
+)
+
 type Datasource struct {
 	BridgeName string
 	ReqData    string
@@ -20,17 +30,18 @@ type Pipeline interface {
 type BaseObservationSource struct {
 	Datasources   []Datasource
 	AllowedFaults int
-	Benchmark     ReportFieldLLO
 }
 
 type QuoteObservationSource struct {
 	BaseObservationSource
-	Bid ReportFieldLLO
-	Ask ReportFieldLLO
+	Bid       ReportFieldLLO
+	Benchmark ReportFieldLLO
+	Ask       ReportFieldLLO
 }
 
 type MedianObservationSource struct {
 	BaseObservationSource
+	Benchmark ReportFieldLLO
 }
 
 func renderObservationTemplate(fname string, obs any) (string, error) {

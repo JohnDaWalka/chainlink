@@ -115,9 +115,9 @@ func TestStreamJobSpec_Median_MarshalTOML(t *testing.T) {
 						},
 					},
 					AllowedFaults: 2,
-					Benchmark: ReportFieldLLO{
-						ResultPath: "data,median",
-					},
+				},
+				Benchmark: ReportFieldLLO{
+					ResultPath: "data,median",
 				},
 			},
 			want: medianSpecTOMLMultiple,
@@ -137,9 +137,9 @@ func TestStreamJobSpec_Median_MarshalTOML(t *testing.T) {
 				BaseObservationSource: BaseObservationSource{
 					Datasources:   []Datasource{},
 					AllowedFaults: 1,
-					Benchmark: ReportFieldLLO{
-						ResultPath: "data,empty",
-					},
+				},
+				Benchmark: ReportFieldLLO{
+					ResultPath: "data,empty",
 				},
 			},
 			want: medianSpecTOMLEmpty,
@@ -189,12 +189,12 @@ func TestStreamJobSpec_Quote_MarshalTOML(t *testing.T) {
 						},
 					},
 					AllowedFaults: 3,
-					Benchmark: ReportFieldLLO{
-						ResultPath: "data,benchmark",
-					},
 				},
 				Bid: ReportFieldLLO{
 					ResultPath: "data,bid",
+				},
+				Benchmark: ReportFieldLLO{
+					ResultPath: "data,benchmark",
 				},
 				Ask: ReportFieldLLO{
 					ResultPath: "data,ask",
@@ -217,12 +217,12 @@ func TestStreamJobSpec_Quote_MarshalTOML(t *testing.T) {
 				BaseObservationSource: BaseObservationSource{
 					Datasources:   []Datasource{},
 					AllowedFaults: 1,
-					Benchmark: ReportFieldLLO{
-						ResultPath: "data,empty",
-					},
 				},
 				Bid: ReportFieldLLO{
 					ResultPath: "data,emptyBid",
+				},
+				Benchmark: ReportFieldLLO{
+					ResultPath: "data,empty",
 				},
 				Ask: ReportFieldLLO{
 					ResultPath: "data,emptyAsk",
