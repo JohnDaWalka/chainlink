@@ -11,6 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/backoff"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
@@ -25,6 +26,7 @@ const (
 	DefaultWorkflowRPS    = 5.0
 	DefaultWorkflowBurst  = 50
 	defaultFetchTimeoutMs = 20_000
+	defaultMaxTries       = 5
 
 	errorOutgoingRatelimitGlobal   = "global limit of gateways requests has been exceeded"
 	errorOutgoingRatelimitWorkflow = "workflow exceeded limit of gateways requests"
@@ -73,7 +75,6 @@ func NewOutgoingConnectorHandler(gc connector.GatewayConnector, config ServiceCo
 }
 
 // HandleSingleNodeRequest sends a request to first available gateway node and blocks until response is received
-// TODO: handle retries
 func (c *OutgoingConnectorHandler) HandleSingleNodeRequest(ctx context.Context, messageID string, req capabilities.Request) (*api.Message, error) {
 	workflowAllow, globalAllow := c.outgoingRateLimiter.AllowVerbose(req.WorkflowID)
 	if !workflowAllow {
@@ -96,7 +97,21 @@ func (c *OutgoingConnectorHandler) HandleSingleNodeRequest(ctx context.Context, 
 
 	operation := c.toRetryable(ctx, messageID, req)
 
-	return operation()
+	if req.WithRetries == nil || !*req.WithRetries {
+		return operation()
+	}
+
+	var maxTries uint
+	if req.MaxTries == nil || *req.MaxTries == 0 || *req.MaxTries > defaultMaxTries {
+		maxTries = defaultMaxTries
+	}
+
+	opts := []backoff.RetryOption{
+		backoff.WithBackOff(backoff.NewExponentialBackOff()),
+		backoff.WithMaxElapsedTime(time.Duration(req.TimeoutMs) * time.Millisecond),
+		backoff.WithMaxTries(maxTries),
+	}
+	return backoff.Retry(ctx, operation, opts...)
 }
 
 func (c *OutgoingConnectorHandler) toRetryable(ctx context.Context, messageID string, req capabilities.Request) func() (*api.Message, error) {

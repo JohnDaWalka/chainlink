@@ -3,11 +3,13 @@ package capabilities
 import "errors"
 
 type Request struct {
-	URL       string            `json:"url"`                 // URL to query, only http and https protocols are supported.
-	Method    string            `json:"method,omitempty"`    // HTTP verb, defaults to GET.
-	Headers   map[string]string `json:"headers,omitempty"`   // HTTP headers, defaults to empty.
-	Body      []byte            `json:"body,omitempty"`      // HTTP request body
-	TimeoutMs uint32            `json:"timeoutMs,omitempty"` // Timeout in milliseconds
+	URL         string            `json:"url"`                   // URL to query, only http and https protocols are supported.
+	Method      string            `json:"method,omitempty"`      // HTTP verb, defaults to GET.
+	Headers     map[string]string `json:"headers,omitempty"`     // HTTP headers, defaults to empty.
+	Body        []byte            `json:"body,omitempty"`        // HTTP request body
+	TimeoutMs   uint32            `json:"timeoutMs,omitempty"`   // Timeout in milliseconds
+	WithRetries *bool             `json:"withRetries,omitempty"` // Set to true to enable retry logic for requests
+	MaxTries    *uint             `json:"maxTries,omitempty"`    // Max number of times to retry a request, 0 implies no retries
 
 	// Maximum number of bytes to read from the response body.  If the gateway max response size is smaller than this value, the gateway max response size will be used.
 	MaxResponseBytes uint32 `json:"maxBytes,omitempty"`
