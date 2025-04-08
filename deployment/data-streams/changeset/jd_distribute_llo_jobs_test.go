@@ -90,7 +90,7 @@ func TestDistributeLLOJobSpecs(t *testing.T) {
 			if tt.prepConfFn != nil {
 				conf = tt.prepConfFn(tt.config)
 			}
-			_, err = changeset.ApplyChangesetsV2(t,
+			_, _, err = changeset.ApplyChangesetsV2(t,
 				tt.env,
 				[]changeset.ConfiguredChangeSet{
 					changeset.Configure(cs, conf),

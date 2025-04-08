@@ -56,7 +56,7 @@ func TestDistributeBootstrapJobSpecs(t *testing.T) {
 	cs := CsDistributeBootstrapJobSpecs{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err = changeset.ApplyChangesetsV2(t,
+			_, _, err = changeset.ApplyChangesetsV2(t,
 				tt.env,
 				[]changeset.ConfiguredChangeSet{
 					changeset.Configure(cs, tt.config),
