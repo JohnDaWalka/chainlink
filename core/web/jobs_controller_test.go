@@ -117,7 +117,7 @@ func TestJobController_Create_DirectRequest_Fast(t *testing.T) {
 			defer wg.Done()
 
 			body, err := json.Marshal(web.CreateJobRequest{
-				TOML: fmt.Sprintf(testspecs.DirectRequestSpecNoExternalJobID, i),
+				TOML: fmt.Sprintf(testspecs.DirectRequestSpecNoExternalJobID, i, testutils.FixtureChainID.String()),
 			})
 			require.NoError(t, err)
 
@@ -205,10 +205,10 @@ func TestJobController_Create_HappyPath(t *testing.T) {
                                   name                        = "%s"
                                   contractAddress             = "0x9E40733cC9df84636505f4e6Db28DCa0dC5D1bba"
                                   fromAddress                 = "0xa8037A20989AFcBC51798de9762b351D63ff462e"
-                                  evmChainID                  = 0
+                                  evmChainID                  = %s
                                   minIncomingConfigurations   = 1
                                   externalJobID               = "%s"
-                             `, nameAndExternalJobID, nameAndExternalJobID)
+                             `, nameAndExternalJobID, testutils.FixtureChainID.String(), nameAndExternalJobID)
 			},
 			assertion: func(t *testing.T, nameAndExternalJobID string, r *http.Response) {
 				require.Equal(t, http.StatusInternalServerError, r.StatusCode)
@@ -699,6 +699,7 @@ func TestJobsController_Update_NonExistentID(t *testing.T) {
 		c.P2P.V2.Enabled = ptr(true)
 		c.P2P.V2.ListenAddresses = &[]string{fmt.Sprintf("127.0.0.1:%d", freeport.GetOne(t))}
 		c.P2P.PeerID = &cltest.DefaultP2PPeerID
+		c.EVM[0].ChainID = ubig.New(testutils.FixtureChainID)
 	})
 	app := cltest.NewApplicationWithConfigAndKey(t, cfg, cltest.DefaultP2PKey)
 

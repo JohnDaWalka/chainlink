@@ -63,7 +63,7 @@ type                = "directrequest"
 schemaVersion       = 1
 name                = "%s"
 contractAddress     = "0x613a38AC1659769640aaE063C651F48E0250454C"
-evmChainID 			= "0"
+evmChainID 			= "%s"
 observationSource   = """
     ds1          [type=http method=GET url="http://example.com" allowunrestrictednetworkaccess="true"];
     ds1_parse    [type=jsonparse path="USD"];
@@ -77,7 +77,7 @@ schemaVersion       = 1
 name                = "%s"
 contractAddress     = "0x613a38AC1659769640aaE063C651F48E0250454C"
 externalJobID       = "%s"
-evmChainID 			= "0"
+evmChainID 			= "%s"
 observationSource   = """
     ds1          [type=http method=GET url="http://example.com" allowunrestrictednetworkaccess="true"];
     ds1_parse    [type=jsonparse path="USD"];
@@ -271,7 +271,7 @@ func GetDirectRequestSpec() string {
 }
 
 func GetDirectRequestSpecWithUUID(u uuid.UUID) string {
-	return fmt.Sprintf(DirectRequestSpecTemplate, u, u)
+	return fmt.Sprintf(DirectRequestSpecTemplate, u, u, testutils.FixtureChainID.String())
 }
 
 func GetOCR2EVMSpecMinimal() string {
@@ -595,7 +595,7 @@ func GenerateOCRSpec(params OCRSpecParams) OCRSpec {
 		ds2BridgeName = params.DS2BridgeName
 	}
 
-	evmChainID := "0"
+	evmChainID := testutils.FixtureChainID.String()
 	if params.EVMChainID != "" {
 		evmChainID = params.EVMChainID
 	}

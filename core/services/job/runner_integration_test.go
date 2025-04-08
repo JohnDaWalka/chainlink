@@ -211,7 +211,7 @@ func TestRunner(t *testing.T) {
 		jb, err := ocr.ValidatedOracleSpecToml(config, legacyChains, fmt.Sprintf(`
 			type               = "offchainreporting"
 			schemaVersion      = 1
-			evmChainID         = 0
+			evmChainID         = %s
 			transmitterID 	   = "%s"	
 			contractAddress    = "0x613a38AC1659769640aaE063C651F48E0250454C"
 			isBootstrapPeer    = false
@@ -230,7 +230,7 @@ func TestRunner(t *testing.T) {
 			ds1 -> ds1_parse -> ds1_multiply -> answer1;
 			answer1      [type=median index=0];
 			"""
-		`, placeHolderAddress.String()))
+		`, testutils.FixtureChainID.String(), placeHolderAddress.String()))
 		require.NoError(t, err)
 		// Should error creating it
 		err = jobORM.CreateJob(ctx, &jb)
