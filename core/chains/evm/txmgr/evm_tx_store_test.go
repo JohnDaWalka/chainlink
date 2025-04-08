@@ -372,7 +372,7 @@ func TestORM_SetBroadcastBeforeBlockNum(t *testing.T) {
 	t.Parallel()
 
 	db := testutils.NewSqlxDB(t)
-	cfg := configtest.NewChainScopedConfig(t, nil)
+	cfg := configtest.NewChainScopedConfig(t, overrideDefaultID)
 	txStore := cltest.NewTestTxStore(t, db)
 	ethKeyStore := cltest.NewKeyStore(t, db).Eth()
 	ethClient := clienttest.NewClientWithDefaultChainID(t)
@@ -1860,6 +1860,7 @@ func TestORM_UpdateTxStatesToFinalizedUsingTxHashes(t *testing.T) {
 			State:              txmgrcommon.TxConfirmed,
 			BroadcastAt:        &broadcast,
 			InitialBroadcastAt: &broadcast,
+			ChainID:            testutils.FixtureChainID,
 		}
 		err := txStore.InsertTx(ctx, tx)
 		require.NoError(t, err)
@@ -2063,6 +2064,7 @@ func mustInsertTerminallyStuckTxWithAttempt(t testing.TB, txStore txmgr.TestEvmT
 		BroadcastAt:        &broadcast,
 		InitialBroadcastAt: &broadcast,
 		Error:              null.StringFrom(client.TerminallyStuckMsg),
+		ChainID:            testutils.FixtureChainID,
 	}
 	require.NoError(t, txStore.InsertTx(ctx, &tx))
 	attempt := cltest.NewLegacyEthTxAttempt(t, tx.ID)

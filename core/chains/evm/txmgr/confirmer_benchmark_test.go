@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-integrations/evm/keys/keystest"
 	"github.com/smartcontractkit/chainlink-integrations/evm/testutils"
 	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
+	ubig "github.com/smartcontractkit/chainlink-integrations/evm/utils/big"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -25,6 +26,7 @@ func BenchmarkEthConfirmer(b *testing.B) {
 	ethClient := clienttest.NewClientWithDefaultChainID(b)
 	evmcfg := configtest.NewChainScopedConfig(b, func(c *toml.EVMConfig) {
 		c.GasEstimator.PriceMax = assets.GWei(500)
+		c.ChainID = ubig.New(testutils.FixtureChainID)
 	})
 
 	blockNum := int64(100)

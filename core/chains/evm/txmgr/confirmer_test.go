@@ -27,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-framework/multinode"
 	"github.com/smartcontractkit/chainlink-integrations/evm/keys"
 	"github.com/smartcontractkit/chainlink-integrations/evm/keys/keystest"
+	ubig "github.com/smartcontractkit/chainlink-integrations/evm/utils/big"
 
 	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
 	"github.com/smartcontractkit/chainlink-integrations/evm/client"
@@ -1280,10 +1281,11 @@ func TestEthConfirmer_RebroadcastWhereNecessary_TerminallyUnderpriced_ThenGoesTh
 
 	memKS := keystest.NewMemoryChainStore()
 	fromAddress := memKS.MustCreate(t)
-	kst := keys.NewChainStore(memKS, big.NewInt(0))
+	kst := keys.NewChainStore(memKS, testutils.FixtureChainID)
 
 	evmcfg := configtest.NewChainScopedConfig(t, func(c *toml.EVMConfig) {
 		c.GasEstimator.PriceMax = assets.GWei(500)
+		c.ChainID = ubig.New(testutils.FixtureChainID)
 	})
 
 	currentHead := int64(30)
@@ -1363,7 +1365,7 @@ func TestEthConfirmer_RebroadcastWhereNecessary_WhenOutOfEth(t *testing.T) {
 	fromAddress := memKS.MustCreate(t)
 	ethKeyStore := keys.NewChainStore(memKS, ethClient.ConfiguredChainID())
 
-	config := configtest.NewChainScopedConfig(t, nil)
+	config := configtest.NewChainScopedConfig(t, overrideDefaultID)
 	currentHead := int64(30)
 	oldEnough := int64(19)
 	nonce := int64(0)
@@ -1545,8 +1547,8 @@ func TestEthConfirmer_ForceRebroadcast(t *testing.T) {
 
 	memKS := keystest.NewMemoryChainStore()
 	fromAddress := memKS.MustCreate(t)
-	config := configtest.NewChainScopedConfig(t, nil)
-	ethKeyStore := keys.NewChainStore(memKS, big.NewInt(0))
+	config := configtest.NewChainScopedConfig(t, overrideDefaultID)
+	ethKeyStore := keys.NewChainStore(memKS, testutils.FixtureChainID)
 
 	mustCreateUnstartedGeneratedTx(t, txStore, fromAddress, config.EVM().ChainID())
 	mustInsertInProgressEthTx(t, txStore, 0, fromAddress)
@@ -1665,6 +1667,7 @@ func TestEthConfirmer_ProcessStuckTransactions(t *testing.T) {
 		c.Transactions.AutoPurge.Enabled = ptr(true)
 		c.Transactions.AutoPurge.Threshold = ptr(autoPurgeThreshold)
 		c.Transactions.AutoPurge.MinAttempts = ptr(autoPurgeMinAttempts)
+		c.ChainID = ubig.New(testutils.FixtureChainID)
 	})
 	ge := evmcfg.EVM().GasEstimator()
 	txBuilder := txmgr.NewEvmTxAttemptBuilder(*ethClient.ConfiguredChainID(), ge, ethKeyStore, feeEstimator)

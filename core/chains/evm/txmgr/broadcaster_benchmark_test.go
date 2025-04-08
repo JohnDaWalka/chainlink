@@ -54,7 +54,7 @@ func BenchmarkEthBroadcaster_ProcessUnstartedEthTxs_Success(b *testing.B) {
 		State:          txmgrcommon.TxUnstarted,
 	}
 
-	evmcfg := configtest.NewChainScopedConfig(b, nil)
+	evmcfg := configtest.NewChainScopedConfig(b, overrideDefaultID)
 	checkerFactory := &txmgr.CheckerFactory{Client: ethClient}
 	lggr := logger.Test(b)
 	nonceTracker := txmgr.NewNonceTracker(lggr, txStore, txmgr.NewEvmTxmClient(ethClient, nil))

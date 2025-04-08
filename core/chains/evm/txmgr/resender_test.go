@@ -41,7 +41,7 @@ func Test_EthResender_resendUnconfirmed(t *testing.T) {
 	fromAddress := memKS.MustCreate(t)
 	fromAddress2 := memKS.MustCreate(t)
 	fromAddress3 := memKS.MustCreate(t)
-	ethKeyStore := keys.NewChainStore(memKS, big.NewInt(0))
+	ethKeyStore := keys.NewChainStore(memKS, testutils.FixtureChainID)
 
 	txStore := cltest.NewTestTxStore(t, db)
 
@@ -108,7 +108,7 @@ func Test_EthResender_alertUnconfirmed(t *testing.T) {
 	ethClient := clienttest.NewClientWithDefaultChainID(t)
 	memKS := keystest.NewMemoryChainStore()
 	fromAddress := memKS.MustCreate(t)
-	ethKeyStore := keys.NewChainStore(memKS, big.NewInt(0))
+	ethKeyStore := keys.NewChainStore(memKS, testutils.FixtureChainID)
 
 	ethClient.On("IsL2").Return(false).Maybe()
 	// Set this to the smallest non-zero value possible for the attempt to be eligible for resend
@@ -153,7 +153,7 @@ func Test_EthResender_Start(t *testing.T) {
 	txStore := cltest.NewTestTxStore(t, db)
 	memKS := keystest.NewMemoryChainStore()
 	fromAddress := memKS.MustCreate(t)
-	ethKeyStore := keys.NewChainStore(memKS, big.NewInt(0))
+	ethKeyStore := keys.NewChainStore(memKS, testutils.FixtureChainID)
 	lggr := logger.Test(t)
 
 	t.Run("resends transactions that have been languishing unconfirmed for too long", func(t *testing.T) {
