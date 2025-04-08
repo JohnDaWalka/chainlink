@@ -218,7 +218,7 @@ jobs:
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
       # TODO: Figure out how to add "runs-on=${{ github.run_id }}/" to the self-hosted runner label (probably better off incorporating into citool)
-      self_hosted_runner_label: ${{ needs.self-hosted-runners.outputs.should-use == 'true' && 'cpu=16+32/ram=32+128/family=c6id+m6id+m6idn+c5ad+r6id/extras=s3-cache' || '' }}
+      self_hosted_runner_label: ${{ needs.self-hosted-runners.outputs.should-use == 'true' && 'runs-on/cpu=16+32/ram=32+128/family=c6id+m6id+m6idn+c5ad+r6id/extras=s3-cache' || '' }}
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
