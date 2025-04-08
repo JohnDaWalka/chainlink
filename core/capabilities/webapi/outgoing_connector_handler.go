@@ -45,6 +45,12 @@ type OutgoingConnectorHandler struct {
 	outgoingRateLimiter *common.RateLimiter
 	responses           *responses
 	selectorOpts        []func(*RoundRobinSelector)
+
+	// toRetryableFunc is a func that may be injected and returns a parameter free
+	// operation that may be retried
+	toRetryableFunc func(context.Context, string, capabilities.Request) func() (*api.Message, error)
+
+	toBackoffOpts func(time.Duration, uint) []backoff.RetryOption
 }
 
 func NewOutgoingConnectorHandler(gc connector.GatewayConnector, config ServiceConfig, method string, lgger logger.Logger, opts ...func(*RoundRobinSelector)) (*OutgoingConnectorHandler, error) {
@@ -62,8 +68,7 @@ func NewOutgoingConnectorHandler(gc connector.GatewayConnector, config ServiceCo
 	if !validMethod(method) {
 		return nil, fmt.Errorf("invalid outgoing connector handler method: %s", method)
 	}
-
-	return &OutgoingConnectorHandler{
+	och := &OutgoingConnectorHandler{
 		gc:                  gc,
 		method:              method,
 		responses:           newResponses(),
@@ -71,7 +76,10 @@ func NewOutgoingConnectorHandler(gc connector.GatewayConnector, config ServiceCo
 		incomingRateLimiter: incomingRateLimiter,
 		lggr:                lgger,
 		selectorOpts:        opts,
-	}, nil
+	}
+	och.toRetryableFunc = och.toRetryable
+
+	return och, nil
 }
 
 // HandleSingleNodeRequest sends a request to first available gateway node and blocks until response is received
@@ -95,23 +103,30 @@ func (c *OutgoingConnectorHandler) HandleSingleNodeRequest(ctx context.Context, 
 	ctx, cancel := context.WithTimeout(ctx, timeoutDuration+margin)
 	defer cancel()
 
-	operation := c.toRetryable(ctx, messageID, req)
+	operation := c.toRetryableFunc(ctx, messageID, req)
 
 	if req.WithRetries == nil || !*req.WithRetries {
 		return operation()
 	}
 
-	var maxTries uint
-	if req.MaxTries == nil || *req.MaxTries == 0 || *req.MaxTries > defaultMaxTries {
-		maxTries = defaultMaxTries
+	maxTries := uint(defaultMaxTries)
+	if req.MaxTries != nil && *req.MaxTries <= defaultMaxTries {
+		maxTries = *req.MaxTries
 	}
 
-	opts := []backoff.RetryOption{
+	return backoff.Retry(ctx, operation, c.getBackoffOpts(time.Duration(req.TimeoutMs)*time.Millisecond, maxTries)...)
+}
+
+func (c *OutgoingConnectorHandler) getBackoffOpts(d time.Duration, maxTries uint) []backoff.RetryOption {
+	if c.toBackoffOpts != nil {
+		return c.toBackoffOpts(d, maxTries)
+	}
+
+	return []backoff.RetryOption{
 		backoff.WithBackOff(backoff.NewExponentialBackOff()),
-		backoff.WithMaxElapsedTime(time.Duration(req.TimeoutMs) * time.Millisecond),
+		backoff.WithMaxElapsedTime(d),
 		backoff.WithMaxTries(maxTries),
 	}
-	return backoff.Retry(ctx, operation, opts...)
 }
 
 func (c *OutgoingConnectorHandler) toRetryable(ctx context.Context, messageID string, req capabilities.Request) func() (*api.Message, error) {
@@ -356,6 +371,7 @@ func incomingRateLimiterConfigDefaults(config common.RateLimiterConfig) common.R
 	}
 	return config
 }
+
 func outgoingRateLimiterConfigDefaults(config common.RateLimiterConfig) common.RateLimiterConfig {
 	if config.GlobalBurst == 0 {
 		config.GlobalBurst = DefaultGlobalBurst

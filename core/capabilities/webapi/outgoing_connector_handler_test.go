@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/backoff"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
@@ -172,6 +174,49 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 			URL: testURL,
 		})
 		require.NoError(t, err)
+	})
+
+	t.Run("uses retry to recover from failure once", func(t *testing.T) {
+		msgID := "msgID"
+		testURL := "http://localhost:8080"
+		withRetries := true
+		maxTries := uint(2)
+		count := uint(0)
+		_, ch := newFunctionWithDefaultConfig(
+			t,
+			nil,
+		)
+
+		ch.toRetryableFunc = func(ctx context.Context, messageID string, req ghcapabilities.Request) func() (*api.Message, error) {
+			return func() (*api.Message, error) {
+				count++
+				if count > maxTries-1 {
+					return gatewayResponse(t, msgID), nil
+				}
+				return nil, assert.AnError
+			}
+		}
+
+		ch.toBackoffOpts = func(d time.Duration, tries uint) []backoff.RetryOption {
+			require.Equal(t, time.Duration(defaultFetchTimeoutMs)*time.Millisecond, d)
+			return []backoff.RetryOption{
+				backoff.WithBackOff(&backoff.ZeroBackOff{}),
+				backoff.WithMaxTries(tries),
+			}
+		}
+
+		// build the expected body with the default timeout
+		req := ghcapabilities.Request{
+			URL:         testURL,
+			TimeoutMs:   defaultFetchTimeoutMs,
+			WithRetries: &withRetries,
+			MaxTries:    &maxTries,
+		}
+
+		resp, err := ch.HandleSingleNodeRequest(t.Context(), msgID, req)
+		require.NoError(t, err)
+		require.True(t, count == maxTries, "got count %d, wanted %d", count, maxTries)
+		require.Equal(t, msgID, resp.Body.MessageId)
 	})
 
 	t.Run("uses timeout", func(t *testing.T) {
@@ -350,7 +395,9 @@ func newFunction(t *testing.T, mockFn func(*gcmocks.GatewayConnector), serviceCo
 	log := logger.TestLogger(t)
 	connector := gcmocks.NewGatewayConnector(t)
 
-	mockFn(connector)
+	if mockFn != nil {
+		mockFn(connector)
+	}
 
 	connectorHandler, err := NewOutgoingConnectorHandler(connector, serviceConfig, ghcapabilities.MethodComputeAction, log, WithFixedStart())
 	require.NoError(t, err)
