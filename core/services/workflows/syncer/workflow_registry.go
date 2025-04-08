@@ -471,11 +471,18 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 	seenMap := map[string]bool{}
 
 	for _, wfMeta := range workflowMetadata {
-		// TODO: ensure that the WorkflowRegisteredEvent clears the engine registry as the very last step
+		// TODO: ensure that the WorkflowRegisteredEvent sets the engine registry as the very last step
+		// TODO: ensure that the WorkflowDeletedEvent clears the engine registry as the very last step
 		engine, getErr := w.engineRegistry.Get(EngineRegistryKey{Owner: wfMeta.Owner, Name: wfMeta.WorkflowName})
 		engineKey := wfMeta.WorkflowName + hex.EncodeToString(wfMeta.Owner)
 
-		// if there is no engine in the engine registry
+		// if the workflow isn't active
+		// then the workflow has been paused. NOOP - to be handled below as a deleted event, which clears the DB workflow spec.
+		if WorkflowStatus(wfMeta.Status) == WorkflowStatusActive {
+			continue
+		}
+
+		// if the workflow is active, and there is no engine in the engine registry
 		// then handle as registered event
 		if getErr != nil {
 			toRegisteredEvent := WorkflowRegistryWorkflowRegisteredV1{
@@ -496,7 +503,7 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 			continue
 		}
 
-		// if the workflow engine is in the registry, but the metadata has changed
+		// if the workflow is active, the workflow engine is in the registry, but the metadata has changed
 		// then handle as updated event
 		currWfID := hex.EncodeToString(wfMeta.WorkflowID[:])
 		prevWfID := hex.EncodeToString(engine.workflowID[:])
@@ -519,15 +526,12 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 			continue
 		}
 
-		// if the workflow engine is in the registry, the metadata is the same, and the status is active
+		// if the workflow is active, the workflow engine is in the registry, and the metadata is the same
 		// then the workflow is unchanged. mark as seen.
 		if WorkflowStatus(wfMeta.Status) == WorkflowStatusActive {
 			seenMap[engineKey] = true
 			continue
 		}
-
-		// if the workflow engine is in the registry, the metadata is the same, but the status isn't active
-		// then the workflow has been paused. NOOP - to be handled below as a deleted event, which clears the DB workflow spec.
 	}
 
 	// Shut down engines that are no longer in the contract's latest workflow metadata state
@@ -556,6 +560,7 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 
 // syncUsingReconciliationStrategy syncs workflow registry contract state by polling the workflow metadata state and comparing to local state.
 // It still watches for ForceUpdateSecretsEvents, which can't be reconciled through workflow metadata state.
+// NOTE: In this mode paused states will be treated as a deleted workflow. Workflows will not be registered as paused.
 func (w *workflowRegistry) syncUsingReconciliationStrategy(ctx context.Context, don capabilities.DON, reader ContractReader) {
 	_, loadWorkflowsHead, err := w.getWorkflowMetadata(ctx, don, reader)
 	if err != nil {

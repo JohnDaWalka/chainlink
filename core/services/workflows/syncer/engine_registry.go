@@ -19,8 +19,7 @@ type EngineRegistryKey struct {
 }
 
 // KeyFor generates a key that will be used to identify the engine in the engine registry.
-// This is used instead of a Workflow ID, because the WID will change
-// if the workflow code is modified.
+// This is used instead of a Workflow ID, because the WID will change if the workflow code is modified.
 func (k EngineRegistryKey) keyFor() string {
 	return hex.EncodeToString(k.Owner) + "-" + name
 }
