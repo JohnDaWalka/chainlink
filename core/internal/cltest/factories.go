@@ -141,6 +141,7 @@ func EmptyCLIContext() *cli.Context {
 
 func NewEthTx(fromAddress common.Address) txmgr.Tx {
 	return txmgr.Tx{
+		ChainID:        testutils.FixtureChainID,
 		FromAddress:    fromAddress,
 		ToAddress:      testutils.NewAddress(),
 		EncodedPayload: []byte{1, 2, 3},
@@ -206,7 +207,6 @@ func MustInsertConfirmedEthTxWithLegacyAttempt(t testing.TB, txStore txmgr.TestE
 	timeNow := time.Now()
 	etx := NewEthTx(fromAddress)
 	ctx := testutils.Context(t)
-
 	etx.BroadcastAt = &timeNow
 	etx.InitialBroadcastAt = &timeNow
 	n := evmtypes.Nonce(nonce)
