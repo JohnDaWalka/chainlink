@@ -6,17 +6,6 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-type StreamType string
-
-const (
-	StreamTypeQuote        = StreamType("quote")
-	StreamTypeMedian       = StreamType("median")
-	StreamTypeMarketStatus = StreamType("market-status")
-	StreamTypeDataLink     = StreamType("data-link")
-	// StreamTypeConsolidated is used for the consolidated stream type
-	StreamTypeConsolidated = StreamType("consolidated")
-)
-
 type Datasource struct {
 	BridgeName string
 	ReqData    string
@@ -62,7 +51,7 @@ func (median MedianReportFields) GetStreamType() StreamType {
 type StreamJobSpec struct {
 	Base
 
-	StreamID          string `toml:"streamID"`
+	StreamID          uint32 `toml:"streamID"`
 	ObservationSource string `toml:"observationSource,multiline,omitempty"`
 }
 

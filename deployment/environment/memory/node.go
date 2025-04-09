@@ -16,6 +16,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -69,6 +70,7 @@ type Node struct {
 	Keys       Keys
 	Addr       net.TCPAddr
 	IsBoostrap bool
+	Labels     []*ptypes.Label
 }
 
 func (n Node) MultiAddr() string {

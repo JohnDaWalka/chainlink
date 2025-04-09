@@ -11,7 +11,7 @@ const medianSpecTOMLMultiple = `name = 'BTC/USD-Test'
 type = 'stream'
 schemaVersion = 1
 externalJobID = '00000000-0000-0000-0000-000000000000'
-streamID = '1000'
+streamID = 1000
 observationSource = """
 // data source 1
 ds1_payload [type=bridge name=\"bridge-bridge1\" timeout=\"50s\" requestData={\"data\":{\"endpoint\":\"test1\"}}];
@@ -31,7 +31,7 @@ const medianSpecTOMLEmpty = `name = 'Empty-Median-Test'
 type = 'stream'
 schemaVersion = 1
 externalJobID = '00000000-0000-0000-0000-000000000000'
-streamID = '2000'
+streamID = 2000
 observationSource = """
 benchmark_price [type=median allowedFaults=1 index=0];
 """
@@ -41,16 +41,16 @@ const quoteSpecTOMLMultiple = `name = 'BTC/USD-Quote'
 type = 'stream'
 schemaVersion = 1
 externalJobID = '00000000-0000-0000-0000-000000000000'
-streamID = '3000'
+streamID = 3000
 observationSource = """
 // data source 1
-ds1_payload [type=bridge name=\"bridge-bridge1\" timeout=\"50s\" requestData={\"data\":{\"endpoint\":\"quote1\"}}];
+ds1_payload [type=bridge name=\"bridge-bridge1\" timeout=\"50s\" requestData="{\\"data\\":{\\"endpoint\\":\\"quote1\\"}}"];
 
 ds1_benchmark [type=jsonparse path=\"data,benchmark\"];
 ds1_bid [type=jsonparse path=\"data,bid\"];
 ds1_ask [type=jsonparse path=\"data,ask\"];
 // data source 2
-ds2_payload [type=bridge name=\"bridge-bridge2\" timeout=\"50s\" requestData={\"data\":{\"endpoint\":\"quote2\"}}];
+ds2_payload [type=bridge name=\"bridge-bridge2\" timeout=\"50s\" requestData="{\\"data\\":{\\"endpoint\\":\\"quote2\\"}}"];
 
 ds2_benchmark [type=jsonparse path=\"data,benchmark\"];
 ds2_bid [type=jsonparse path=\"data,bid\"];
@@ -73,7 +73,7 @@ const quoteSpecTOMLEmpty = `name = 'Empty-Quote-Test'
 type = 'stream'
 schemaVersion = 1
 externalJobID = '00000000-0000-0000-0000-000000000000'
-streamID = '4000'
+streamID = 4000
 observationSource = """
 benchmark_price [type=median allowedFaults=1 index=0];
 
@@ -100,7 +100,7 @@ func TestStreamJobSpec_Median_MarshalTOML(t *testing.T) {
 					SchemaVersion: 1,
 					ExternalJobID: uuid.MustParse("00000000-0000-0000-0000-000000000000"),
 				},
-				StreamID: "1000",
+				StreamID: 1000,
 			},
 			base: BaseObservationSource{
 				Datasources: []Datasource{
@@ -131,7 +131,7 @@ func TestStreamJobSpec_Median_MarshalTOML(t *testing.T) {
 					SchemaVersion: 1,
 					ExternalJobID: uuid.MustParse("00000000-0000-0000-0000-000000000000"),
 				},
-				StreamID: "2000",
+				StreamID: 2000,
 			},
 			base: BaseObservationSource{
 				Datasources:   []Datasource{},
@@ -175,7 +175,7 @@ func TestStreamJobSpec_Quote_MarshalTOML(t *testing.T) {
 					SchemaVersion: 1,
 					ExternalJobID: uuid.MustParse("00000000-0000-0000-0000-000000000000"),
 				},
-				StreamID: "3000",
+				StreamID: 3000,
 			},
 			base: BaseObservationSource{
 				Datasources: []Datasource{
@@ -212,7 +212,7 @@ func TestStreamJobSpec_Quote_MarshalTOML(t *testing.T) {
 					SchemaVersion: 1,
 					ExternalJobID: uuid.MustParse("00000000-0000-0000-0000-000000000000"),
 				},
-				StreamID: "4000",
+				StreamID: 4000,
 			},
 			base: BaseObservationSource{
 				Datasources:   []Datasource{},
@@ -250,7 +250,7 @@ type invalidStreamTypeReportFields struct {
 }
 
 func (rf invalidStreamTypeReportFields) GetStreamType() StreamType {
-	return StreamType("invalid")
+	return "invalid"
 }
 
 func TestStreamJobSpec_SetObservationSource_Error(t *testing.T) {

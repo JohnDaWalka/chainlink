@@ -5,10 +5,15 @@ import (
 	"testing"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
 	commonstate "github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/jd"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/pointer"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -70,6 +75,7 @@ type MemoryEnvConfig struct {
 	ShouldDeployMCMS      bool
 	ShouldDeployLinkToken bool
 	NumNodes              int
+	NodeLabels            []*ptypes.Label
 }
 
 type MemoryEnv struct {
@@ -90,6 +96,21 @@ func NewMemoryEnvV2(t *testing.T, cfg MemoryEnvConfig) MemoryEnv {
 	env := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memEnvConf)
 	chainSelector := env.AllChainSelectors()[0]
 	chain := env.Chains[chainSelector]
+
+	// Apply labels to nodes.
+	for _, nid := range env.NodeIDs {
+		r, err := env.Offchain.GetNode(t.Context(), &node.GetNodeRequest{
+			Id: nid,
+		})
+		require.NoError(t, err)
+		_, err = env.Offchain.UpdateNode(t.Context(), &node.UpdateNodeRequest{
+			Id:        r.Node.Id,
+			Name:      r.Node.Name,
+			PublicKey: r.Node.PublicKey,
+			Labels:    cfg.NodeLabels,
+		})
+		require.NoError(t, err)
+	}
 
 	var linkTokenState *commonstate.LinkTokenState
 	if cfg.ShouldDeployLinkToken {
@@ -209,4 +230,25 @@ func GetMCMSConfig(useMCMS bool) *dsTypes.MCMSConfig {
 		return &dsTypes.MCMSConfig{MinDelay: 0, OverrideRoot: true}
 	}
 	return nil
+}
+
+func GetNodeLabels(donID uint64, donName string, env string) []*ptypes.Label {
+	return []*ptypes.Label{
+		{
+			Key:   utils.DonIdentifier(donID, donName),
+			Value: nil,
+		},
+		{
+			Key:   "nodeType",
+			Value: pointer.To(jd.NodeTypeOracle.String()),
+		},
+		{
+			Key:   "environment",
+			Value: pointer.To(env),
+		},
+		{
+			Key:   "product",
+			Value: pointer.To(jd.ProductLabel),
+		},
+	}
 }

@@ -24,14 +24,13 @@ type CsDistributeStreamJobSpecsConfig struct {
 }
 
 type StreamSpecConfig struct {
-	StreamID   string
+	StreamID   uint32
 	Name       string
 	StreamType jobs.StreamType
 	// ReportFields should be QuoteReportFields, MedianReportFields, etc., based on the stream type.
 	ReportFields    jobs.ReportFields
 	EARequestParams EARequestParams
 	APIs            []string
-	AllowedFaults   int
 }
 
 type EARequestParams struct {
@@ -90,7 +89,7 @@ func (CsDistributeStreamJobSpecs) Apply(e deployment.Environment, cfg CsDistribu
 func generateJobSpec(cc StreamSpecConfig) (spec *jobs.StreamJobSpec, err error) {
 	spec = &jobs.StreamJobSpec{
 		Base: jobs.Base{
-			Name:          fmt.Sprintf("%s | %s", cc.Name, cc.StreamID),
+			Name:          fmt.Sprintf("%s | %d", cc.Name, cc.StreamID),
 			Type:          jobs.JobSpecTypeStream,
 			SchemaVersion: 1,
 			ExternalJobID: uuid.New(),
@@ -98,9 +97,10 @@ func generateJobSpec(cc StreamSpecConfig) (spec *jobs.StreamJobSpec, err error) 
 		StreamID: cc.StreamID,
 	}
 
+	datasources := generateDatasources(cc)
 	base := jobs.BaseObservationSource{
-		Datasources:   generateDatasources(cc),
-		AllowedFaults: cc.AllowedFaults,
+		Datasources:   datasources,
+		AllowedFaults: len(datasources) - 1,
 	}
 
 	err = spec.SetObservationSource(base, cc.ReportFields)
@@ -113,8 +113,8 @@ func generateDatasources(cc StreamSpecConfig) []jobs.Datasource {
 	params := cc.EARequestParams
 	for i, api := range cc.APIs {
 		dss[i] = jobs.Datasource{
-			BridgeName: fmt.Sprintf("bridge-%s", api),
-			ReqData:    fmt.Sprintf(`{"data":{"endpoint":"%s","from":"%s","to":"%s"}}`, params.Endpoint, params.From, params.To),
+			BridgeName: api,
+			ReqData:    fmt.Sprintf(`"{\"data\":{\"endpoint\":\"%s\",\"from\":\"%s\",\"to\":\"%s\"}}"`, params.Endpoint, params.From, params.To),
 		}
 	}
 	return dss
@@ -129,6 +129,26 @@ func (f CsDistributeStreamJobSpecs) VerifyPreconditions(_ deployment.Environment
 	}
 	if config.Streams == nil || len(config.Streams) == 0 {
 		return errors.New("streams are required")
+	}
+	for _, s := range config.Streams {
+		if s.StreamID == 0 {
+			return errors.New("streamID is required for each stream")
+		}
+		if s.Name == "" {
+			return errors.New("name is required for each stream")
+		}
+		if !s.StreamType.Valid() {
+			return errors.New("stream type is not valid")
+		}
+		if s.ReportFields == nil {
+			return errors.New("report fields are required for each stream")
+		}
+		if s.EARequestParams.Endpoint == "" {
+			return errors.New("endpoint is required for each EARequestParam on each stream")
+		}
+		if len(s.APIs) == 0 {
+			return errors.New("at least one API is required for each stream")
+		}
 	}
 
 	return nil

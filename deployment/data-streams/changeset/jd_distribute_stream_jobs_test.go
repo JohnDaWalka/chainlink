@@ -18,10 +18,15 @@ import (
 func TestDistributeStreamJobSpecs(t *testing.T) {
 	t.Parallel()
 
+	const donID = 1
+	const donName = "don"
+	const env = "env"
+
 	memEnv := testutil.NewMemoryEnvV2(t, testutil.MemoryEnvConfig{
 		ShouldDeployMCMS:      false,
 		ShouldDeployLinkToken: false,
 		NumNodes:              1,
+		NodeLabels:            testutil.GetNodeLabels(donID, donName, env),
 	})
 
 	// pick the first EVM chain selector
@@ -92,23 +97,33 @@ ask_price [type=median allowedFaults=3 index=2];
 	config := CsDistributeStreamJobSpecsConfig{
 		ChainSelectorEVM: chainSelector,
 		Filter: &jd.ListFilter{
-			DONID:    1,
-			DONName:  "don",
+			DONID:    donID,
+			DONName:  donName,
 			EnvLabel: "env",
 			Size:     1,
 		},
 		Streams: []StreamSpecConfig{
 			{
-				StreamID:   "1000001038",
+				StreamID:   1000001038,
 				Name:       "ICP/USD-RefPrice",
 				StreamType: jobs.StreamTypeQuote,
+				ReportFields: jobs.QuoteReportFields{
+					Bid: jobs.ReportFieldLLO{
+						ResultPath: "data,bid",
+					},
+					Benchmark: jobs.ReportFieldLLO{
+						ResultPath: "data,mid",
+					},
+					Ask: jobs.ReportFieldLLO{
+						ResultPath: "data,ask",
+					},
+				},
 				EARequestParams: EARequestParams{
 					Endpoint: "cryptolwba",
 					From:     "ICP",
 					To:       "USD",
 				},
-				APIs:          []string{"elwood", "gsr", "ncfx", "tiingo"},
-				AllowedFaults: 3,
+				APIs: []string{"elwood", "gsr", "ncfx", "tiingo"},
 			},
 		},
 	}
@@ -127,6 +142,7 @@ ask_price [type=median allowedFaults=3 index=2];
 			config:   config,
 			wantSpec: renderedSpec,
 		},
+		// TODO: Cover all failure cases.
 	}
 
 	cs := CsDistributeStreamJobSpecs{}
