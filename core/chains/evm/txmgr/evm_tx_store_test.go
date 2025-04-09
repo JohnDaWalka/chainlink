@@ -658,7 +658,7 @@ func TestORM_FindTxesPendingCallback(t *testing.T) {
 func Test_FindTxWithIdempotencyKey(t *testing.T) {
 	t.Parallel()
 	db := testutils.NewSqlxDB(t)
-	cfg := configtest.NewChainScopedConfig(t, nil)
+	cfg := configtest.NewChainScopedConfig(t, overrideDefaultID)
 	txStore := cltest.NewTestTxStore(t, db)
 	ethKeyStore := cltest.NewKeyStore(t, db).Eth()
 	_, fromAddress := cltest.MustInsertRandomKeyReturningState(t, ethKeyStore)
@@ -673,11 +673,11 @@ func Test_FindTxWithIdempotencyKey(t *testing.T) {
 	t.Run("returns transaction if it exists", func(t *testing.T) {
 		idempotencyKey := "777"
 		cfg.EVM().ChainID()
-		etx := mustCreateUnstartedGeneratedTx(t, txStore, fromAddress, big.NewInt(0),
+		etx := mustCreateUnstartedGeneratedTx(t, txStore, fromAddress, testutils.FixtureChainID,
 			txRequestWithIdempotencyKey(idempotencyKey))
 		require.Equal(t, idempotencyKey, *etx.IdempotencyKey)
 
-		res, err := txStore.FindTxWithIdempotencyKey(tests.Context(t), idempotencyKey, big.NewInt(0))
+		res, err := txStore.FindTxWithIdempotencyKey(tests.Context(t), idempotencyKey, testutils.FixtureChainID)
 		require.NoError(t, err)
 		assert.Equal(t, etx.Sequence, res.Sequence)
 		require.Equal(t, idempotencyKey, *res.IdempotencyKey)

@@ -109,7 +109,7 @@ func TestStuckTxDetector_FindPotentialStuckTxs(t *testing.T) {
 	t.Parallel()
 
 	db := testutils.NewSqlxDB(t)
-	config := configtest.NewChainScopedConfig(t, nil)
+	config := configtest.NewChainScopedConfig(t, overrideDefaultID)
 	txStore := cltest.NewTestTxStore(t, db)
 	ethKeyStore := cltest.NewKeyStore(t, db).Eth()
 	ctx := tests.Context(t)

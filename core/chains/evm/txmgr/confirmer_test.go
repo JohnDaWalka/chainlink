@@ -102,7 +102,7 @@ func TestEthConfirmer_Lifecycle(t *testing.T) {
 	t.Parallel()
 
 	db := testutils.NewSqlxDB(t)
-	config := configtest.NewChainScopedConfig(t, nil)
+	config := configtest.NewChainScopedConfig(t, overrideDefaultID)
 	txStore := newTxStore(t, db)
 
 	memKS := keystest.NewMemoryChainStore()
@@ -421,7 +421,7 @@ func TestEthConfirmer_FindTxsRequiringRebroadcast(t *testing.T) {
 
 	ethClient := clienttest.NewClientWithDefaultChainID(t)
 
-	evmcfg := configtest.NewChainScopedConfig(t, nil)
+	evmcfg := configtest.NewChainScopedConfig(t, overrideDefaultID)
 
 	memKS := keystest.NewMemoryChainStore()
 	fromAddress := memKS.MustCreate(t)

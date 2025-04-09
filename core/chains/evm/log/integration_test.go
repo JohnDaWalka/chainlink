@@ -32,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/testutils"
 	evmtypes "github.com/smartcontractkit/chainlink-evm/pkg/types"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
+	ubig "github.com/smartcontractkit/chainlink-evm/pkg/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/log"
 	logmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/log/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
@@ -1668,6 +1669,7 @@ func newBroadcasterHelperWithEthClient(t *testing.T, ethClient evmclient.Client,
 		c.Database.LogQueries = ptr(true)
 		finality := uint32(10)
 		c.EVM[0].FinalityDepth = &finality
+		c.EVM[0].ChainID = ubig.New(testutils.FixtureChainID)
 
 		if overridesFn != nil {
 			overridesFn(c, s)
