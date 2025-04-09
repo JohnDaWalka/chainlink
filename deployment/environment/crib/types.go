@@ -69,7 +69,7 @@ func BuildTopology(nodeOutputs []*clnode.Output) *types.Topology {
 	}
 }
 
-func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput, deployerKey string) (*devenv.EnvironmentWithTopology, error) {
+func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput, deployerKey string) (*deployment.Environment, *devenv.DON, error) {
 	sethClients := make([]*seth.Client, 0)
 	for _, chain := range output.BlockchainOutputs {
 		if chain.Family == "evm" {
@@ -79,20 +79,17 @@ func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput,
 				WithProtections(false, false, seth.MustMakeDuration(1*time.Minute)).
 				Build()
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to build sethClient")
+				return nil, nil, errors.Wrap(err, "failed to build sethClient")
 			}
 			sethClients = append(sethClients, sethClient)
 		}
 		// todo: add solana handling here
 	}
 
-	topology := BuildTopology(output.NodesetOutput.CLNodes)
-
-	env, err := devenv.NewEnvironmentBuilder(lggr).
+	env, don, err := devenv.NewCCIPEnvironmentBuilder(lggr).
 		WithNodeSets([]*types.WrappedNodeOutput{
 			output.NodesetOutput,
 		}).
-		WithTopology(topology).
 		WithJobDistributor(output.JDOutput, credentials.NewTLS(&tls.Config{
 			MinVersion: tls.VersionTLS12,
 		})).
@@ -101,8 +98,8 @@ func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput,
 		WithExistingAddresses(output.AddressBook).
 		Build()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build environment from CRIB deploy output")
+		return nil, nil, errors.Wrap(err, "failed to build environment from CRIB deploy output")
 	}
 
-	return env, nil
+	return env, don, nil
 }

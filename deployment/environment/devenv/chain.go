@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"math/big"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -173,4 +177,27 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]deployme
 		return true
 	})
 	return chains, err
+}
+
+func chainsFromBlockchainOutputs(sethClients []*seth.Client, blockchainOutputs cldtypes.ChainIDToBlockchainOutputs) []ChainConfig {
+	chains := make([]ChainConfig, 0)
+	for _, sethClient := range sethClients {
+		blockchainOutput := blockchainOutputs[strconv.FormatInt(sethClient.ChainID, 10)]
+		chainConfig := ChainConfig{
+			ChainID:   sethClient.Cfg.Network.ChainID,
+			ChainName: sethClient.Cfg.Network.Name,
+			ChainType: strings.ToUpper(blockchainOutput.Family),
+			WSRPCs: []CribRPCs{{
+				External: blockchainOutput.Nodes[0].ExternalWSUrl,
+				Internal: blockchainOutput.Nodes[0].InternalWSUrl,
+			}},
+			HTTPRPCs: []CribRPCs{{
+				External: blockchainOutput.Nodes[0].ExternalHTTPUrl,
+				Internal: blockchainOutput.Nodes[0].InternalHTTPUrl,
+			}},
+			DeployerKey: sethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
+		}
+		chains = append(chains, chainConfig)
+	}
+	return chains
 }

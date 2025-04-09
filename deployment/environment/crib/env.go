@@ -76,7 +76,6 @@ func (c CRIBEnv) GetConfig(key string) (DeployOutput, error) {
 		NodesetOutput: &types.WrappedNodeOutput{
 			Output:       nodeSetOutput,
 			NodeSetName:  "CRIB-CCIP",
-			NodeSetType:  "ccip",
 			Capabilities: []string{},
 		},
 	}, nil

@@ -83,8 +83,6 @@ type Topology struct {
 
 type WrappedNodeOutput struct {
 	*simple_node_set.Output
-	NodeSetName string
-	// NodeSetType is either "chainlink" or "ccip"
-	NodeSetType  string
+	NodeSetName  string
 	Capabilities []string
 }

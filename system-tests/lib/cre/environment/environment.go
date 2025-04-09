@@ -345,7 +345,7 @@ func SetupTestEnvironment(
 
 	// Prepare the CLD environment that's required by the keystone changeset
 	// Ugly glue hack ¯\_(ツ)_/¯
-	fullCldOutput, cldErr := devenv.NewEnvironmentBuilder(singeFileLogger).
+	fullCldOutput, cldErr := devenv.NewCREEnvironmentBuilder(singeFileLogger).
 		WithJobDistributor(jdOutput, creds).
 		WithNodeSets(nodeOutput).
 		WithBlockchains(

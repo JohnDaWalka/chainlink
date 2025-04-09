@@ -33,9 +33,8 @@ func TestStaging_CCIP_Load(t *testing.T) {
 	cribEnv := crib.NewCRIBEnvFromStateDir(lggr, *userOverrides.CribEnvDirectory)
 	cribDeployOutput, err := cribEnv.GetConfig(sourceKey)
 	require.NoError(t, err)
-	environmentFromCribOutput, err := crib.NewDeployEnvironmentFromCribOutput(lggr, cribDeployOutput, simChainTestKey)
+	env, _, err := crib.NewDeployEnvironmentFromCribOutput(lggr, cribDeployOutput, simChainTestKey)
 	require.NoError(t, err)
-	env := environmentFromCribOutput.Environment
 	require.NotNil(t, env)
 	userOverrides.Validate(t, env)
 	state, err := ccipchangeset.LoadOnchainState(*env)
