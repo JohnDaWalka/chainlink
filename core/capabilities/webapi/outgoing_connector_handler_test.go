@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/backoff"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
@@ -325,6 +326,142 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		})
 		require.Error(t, err)
 		require.ErrorContains(t, err, errorOutgoingRatelimitGlobal)
+	})
+}
+
+func Test_handleSingleNodeRequest(t *testing.T) {
+	t.Run("OK-success on first attempt", func(t *testing.T) {
+		wantCalls := 1
+		maxRetries := defaultMaxRetries
+		gotCalls := 0
+		opts := []backoff.RetryOption{
+			backoff.WithBackOff(&backoff.ZeroBackOff{}),
+		}
+		msgID := "msgID"
+		req := ghcapabilities.Request{
+			MaxRetries: uint32(maxRetries),
+		}
+		och := &OutgoingConnectorHandler{}
+		sendRequest := func(_ context.Context) (*api.Message, error) {
+			gotCalls++
+			return gatewayResponse(t, msgID), nil
+		}
+
+		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries), opts...)
+		require.NoError(t, err)
+		require.Equal(t, msgID, resp.Body.MessageId)
+		require.Equal(t, wantCalls, gotCalls)
+	})
+
+	t.Run("OK-success on first retry", func(t *testing.T) {
+		wantCalls := 2
+		maxRetries := wantCalls + 1
+		gotCalls := 0
+		opts := []backoff.RetryOption{
+			backoff.WithBackOff(&backoff.ZeroBackOff{}),
+		}
+		msgID := "msgID"
+		req := ghcapabilities.Request{
+			MaxRetries: uint32(maxRetries),
+		}
+		och := &OutgoingConnectorHandler{}
+		sendRequest := func(_ context.Context) (*api.Message, error) {
+			gotCalls++
+			if gotCalls == wantCalls {
+				return gatewayResponse(t, msgID), nil
+			}
+			return nil, assert.AnError
+		}
+
+		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries), opts...)
+		require.NoError(t, err)
+		require.Equal(t, msgID, resp.Body.MessageId)
+		require.Equal(t, wantCalls, gotCalls)
+	})
+
+	t.Run("OK-success on last retry", func(t *testing.T) {
+		wantCalls := 3
+		gotCalls := 0
+		opts := []backoff.RetryOption{
+			backoff.WithBackOff(&backoff.ZeroBackOff{}),
+		}
+		msgID := "msgID"
+		req := ghcapabilities.Request{
+			MaxRetries: uint32(wantCalls),
+		}
+		och := &OutgoingConnectorHandler{}
+		sendRequest := func(_ context.Context) (*api.Message, error) {
+			gotCalls++
+			if gotCalls == wantCalls {
+				return gatewayResponse(t, msgID), nil
+			}
+			return nil, assert.AnError
+		}
+
+		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries), opts...)
+		require.NoError(t, err)
+		require.Equal(t, msgID, resp.Body.MessageId)
+		require.Equal(t, wantCalls, gotCalls)
+	})
+
+	t.Run("OK-zero max retries calls once", func(t *testing.T) {
+		wantCalls := 1
+		gotCalls := 0
+
+		msgID := "msgID"
+		req := ghcapabilities.Request{}
+		och := &OutgoingConnectorHandler{}
+		sendRequest := func(_ context.Context) (*api.Message, error) {
+			gotCalls++
+			return gatewayResponse(t, msgID), nil
+		}
+
+		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries))
+		require.NoError(t, err)
+		require.Equal(t, msgID, resp.Body.MessageId)
+		require.Equal(t, wantCalls, gotCalls)
+	})
+
+	t.Run("NOK-sendRequest always errors upto max retries", func(t *testing.T) {
+		wantCalls := 3
+		gotCalls := 0
+		opts := []backoff.RetryOption{
+			backoff.WithBackOff(&backoff.ZeroBackOff{}),
+		}
+
+		req := ghcapabilities.Request{
+			MaxRetries: uint32(wantCalls),
+		}
+		och := &OutgoingConnectorHandler{}
+		sendRequest := func(_ context.Context) (*api.Message, error) {
+			gotCalls++
+			return nil, assert.AnError
+		}
+
+		_, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries), opts...)
+		require.Error(t, err)
+		require.Equal(t, wantCalls, gotCalls)
+	})
+
+	t.Run("NOK-max retries is capped", func(t *testing.T) {
+		wantCalls := defaultMaxRetries
+		maxRetries := 100
+		gotCalls := 0
+		opts := []backoff.RetryOption{
+			backoff.WithBackOff(&backoff.ZeroBackOff{}),
+		}
+		req := ghcapabilities.Request{
+			MaxRetries: uint32(maxRetries),
+		}
+		och := &OutgoingConnectorHandler{}
+		sendRequest := func(_ context.Context) (*api.Message, error) {
+			gotCalls++
+			return nil, assert.AnError
+		}
+
+		_, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries), opts...)
+		require.Error(t, err)
+		require.Equal(t, uint(wantCalls), uint(gotCalls))
 	})
 }
 

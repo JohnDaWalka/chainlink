@@ -26,6 +26,7 @@ const (
 	DefaultWorkflowRPS    = 5.0
 	DefaultWorkflowBurst  = 50
 	defaultFetchTimeoutMs = 20_000
+	defaultMaxRetries     = 3
 
 	errorOutgoingRatelimitGlobal   = "global limit of gateways requests has been exceeded"
 	errorOutgoingRatelimitWorkflow = "workflow exceeded limit of gateways requests"
@@ -79,30 +80,49 @@ func (c *OutgoingConnectorHandler) HandleSingleNodeRequest(ctx context.Context, 
 	if req.TimeoutMs == 0 {
 		req.TimeoutMs = defaultFetchTimeoutMs
 	}
-	sendRequest := c.createSendRequest(ctx, messageID, req)
-	return c.createHandleSingleNodeRequest(sendRequest)(ctx, messageID, req)
+
+	// Create a subcontext with the timeout plus some margin for the gateway to process the request
+	timeoutDuration := time.Duration(req.TimeoutMs) * time.Millisecond
+	margin := 100 * time.Millisecond
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeoutDuration+margin)
+	defer cancel()
+
+	sendRequest := c.createSendRequest(messageID, req)
+
+	return c.handleSingleNodeRequest(ctxWithTimeout, sendRequest, uint(req.MaxRetries))
 }
 
-func (c *OutgoingConnectorHandler) createHandleSingleNodeRequest(sendRequest func() (*api.Message, error), opts ...backoff.RetryOption) func(context.Context, string, capabilities.Request) (*api.Message, error) {
-	return func(ctx context.Context, messageID string, req capabilities.Request) (*api.Message, error) {
-		if req.MaxRetries > 0 {
-			defaultOpts := []backoff.RetryOption{
-				backoff.WithBackOff(backoff.NewExponentialBackOff()),
-				backoff.WithMaxElapsedTime(time.Duration(req.TimeoutMs) * time.Millisecond),
-				backoff.WithMaxTries(uint(req.MaxRetries)),
-			}
-
-			// override default opts with incoming opts, if any
-			opts = append(defaultOpts, opts...)
-			return backoff.Retry(ctx, sendRequest, opts...)
+// handleSingleNodeRequest accepts a blocking function that returns an api message and error and either calls it directly or with
+// a backoff.
+func (c *OutgoingConnectorHandler) handleSingleNodeRequest(
+	ctx context.Context,
+	sendRequest func(context.Context) (*api.Message, error),
+	maxRetries uint,
+	opts ...backoff.RetryOption,
+) (*api.Message, error) {
+	if maxRetries > 0 {
+		defaultOpts := []backoff.RetryOption{
+			backoff.WithBackOff(backoff.NewExponentialBackOff()),
+			backoff.WithMaxTries(min(defaultMaxRetries, maxRetries)),
 		}
 
-		return sendRequest()
+		// override default opts with incoming opts, if any
+		opts = append(defaultOpts, opts...)
+
+		// create a parameter free operation for retries
+		operation := func() (*api.Message, error) {
+			return sendRequest(ctx)
+		}
+		return backoff.Retry(ctx, operation, opts...)
 	}
+
+	return sendRequest(ctx)
 }
 
-func (c *OutgoingConnectorHandler) createSendRequest(ctx context.Context, messageID string, req capabilities.Request) func() (*api.Message, error) {
-	return func() (*api.Message, error) {
+// createSendRequest closes over a message ID and request to create a function that blocks on call
+// until a message and error are returned.
+func (c *OutgoingConnectorHandler) createSendRequest(messageID string, req capabilities.Request) func(context.Context) (*api.Message, error) {
+	return func(ctx context.Context) (*api.Message, error) {
 		lggr := logger.With(c.lggr, "messageID", messageID, "workflowID", req.WorkflowID)
 		workflowAllow, globalAllow := c.outgoingRateLimiter.AllowVerbose(req.WorkflowID)
 		if !workflowAllow {
@@ -111,12 +131,6 @@ func (c *OutgoingConnectorHandler) createSendRequest(ctx context.Context, messag
 		if !globalAllow {
 			return nil, errors.New(errorOutgoingRatelimitGlobal)
 		}
-
-		// Create a subcontext with the timeout plus some margin for the gateway to process the request
-		timeoutDuration := time.Duration(req.TimeoutMs) * time.Millisecond
-		margin := 100 * time.Millisecond
-		ctx, cancel := context.WithTimeout(ctx, timeoutDuration+margin)
-		defer cancel()
 
 		payload, err := json.Marshal(req)
 		if err != nil {
