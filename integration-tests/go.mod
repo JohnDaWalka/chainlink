@@ -45,11 +45,10 @@ require (
 	github.com/slack-go/slack v0.15.0
 	github.com/smartcontractkit/chain-selectors v1.0.55
 	github.com/smartcontractkit/chainlink-automation v0.8.1
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250513174048-af3e6b6d21fb
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250513174048-af3e6b6d21fb
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250509155341-2b5a5170a351
-	github.com/smartcontractkit/chainlink-deployments-framework v0.0.15-0.20250508081139-ee24199564bd
-	github.com/smartcontractkit/chainlink-evm v0.0.0-20250512171455-818eb49fe8ee
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250408103656-875e982e6437
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250408172557-9bce44d32d44
+	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250407100046-dfdf9600557b
+	github.com/smartcontractkit/chainlink-evm v0.0.0-20250410012411-577291fb3438
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.5
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.4
@@ -546,10 +545,10 @@ require (
 	go4.org/netipx v0.0.0-20230125063823-8449b0a6169f // indirect
 	golang.org/x/arch v0.11.0 // indirect
 	golang.org/x/mod v0.24.0 // indirect
-	golang.org/x/net v0.39.0 // indirect
-	golang.org/x/oauth2 v0.27.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
-	golang.org/x/term v0.31.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/oauth2 v0.26.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
 	golang.org/x/tools v0.32.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect

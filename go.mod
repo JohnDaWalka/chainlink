@@ -74,11 +74,11 @@ require (
 	github.com/shopspring/decimal v1.4.0
 	github.com/smartcontractkit/chain-selectors v1.0.55
 	github.com/smartcontractkit/chainlink-automation v0.8.1
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250513174048-af3e6b6d21fb
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250513174048-af3e6b6d21fb
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250509155341-2b5a5170a351
-	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250417193446-eeb0a7d1e049
-	github.com/smartcontractkit/chainlink-evm v0.0.0-20250512171455-818eb49fe8ee
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250408103656-875e982e6437
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250327092605-1990b9f79aa3
+	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250407100046-dfdf9600557b
+	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250325191518-036bb568a69d
+	github.com/smartcontractkit/chainlink-evm v0.0.0-20250410012411-577291fb3438
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250509160340-4f4a9265e657
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250502210357-2df484128afa
@@ -113,11 +113,11 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.37.0
-	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
+	golang.org/x/crypto v0.36.0
+	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa
 	golang.org/x/mod v0.24.0
-	golang.org/x/sync v0.13.0
-	golang.org/x/term v0.31.0
+	golang.org/x/sync v0.12.0
+	golang.org/x/term v0.30.0
 	golang.org/x/time v0.10.0
 	gonum.org/v1/gonum v0.15.1
 	google.golang.org/grpc v1.71.0

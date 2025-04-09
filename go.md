@@ -42,7 +42,6 @@ flowchart LR
 	click chainlink-data-streams href "https://github.com/smartcontractkit/chainlink-data-streams"
 	chainlink-evm --> chainlink-framework/capabilities
 	chainlink-evm --> chainlink-framework/chains
-	chainlink-evm --> chainlink-protos/svr
 	click chainlink-evm href "https://github.com/smartcontractkit/chainlink-evm"
 	chainlink-feeds --> chainlink-common
 	click chainlink-feeds href "https://github.com/smartcontractkit/chainlink-feeds"
@@ -54,8 +53,6 @@ flowchart LR
 	click chainlink-framework/metrics href "https://github.com/smartcontractkit/chainlink-framework"
 	chainlink-framework/multinode --> chainlink-framework/metrics
 	click chainlink-framework/multinode href "https://github.com/smartcontractkit/chainlink-framework"
-	chainlink-protos/billing/go --> chainlink-protos/workflows/go
-	click chainlink-protos/billing/go href "https://github.com/smartcontractkit/chainlink-protos"
 	chainlink-protos/orchestrator --> wsrpc
 	click chainlink-protos/orchestrator href "https://github.com/smartcontractkit/chainlink-protos"
 	chainlink-protos/rmn/v1.6/go
@@ -182,7 +179,6 @@ flowchart LR
 	click chainlink-deployments-framework href "https://github.com/smartcontractkit/chainlink-deployments-framework"
 	chainlink-evm --> chainlink-framework/capabilities
 	chainlink-evm --> chainlink-framework/chains
-	chainlink-evm --> chainlink-protos/svr
 	click chainlink-evm href "https://github.com/smartcontractkit/chainlink-evm"
 	chainlink-feeds --> chainlink-common
 	click chainlink-feeds href "https://github.com/smartcontractkit/chainlink-feeds"
@@ -194,8 +190,6 @@ flowchart LR
 	click chainlink-framework/metrics href "https://github.com/smartcontractkit/chainlink-framework"
 	chainlink-framework/multinode --> chainlink-framework/metrics
 	click chainlink-framework/multinode href "https://github.com/smartcontractkit/chainlink-framework"
-	chainlink-protos/billing/go --> chainlink-protos/workflows/go
-	click chainlink-protos/billing/go href "https://github.com/smartcontractkit/chainlink-protos"
 	chainlink-protos/job-distributor
 	click chainlink-protos/job-distributor href "https://github.com/smartcontractkit/chainlink-protos"
 	chainlink-protos/orchestrator --> wsrpc
