@@ -21,25 +21,24 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
+	"github.com/smartcontractkit/chainlink-evm/pkg/keys/keystest"
 	"github.com/smartcontractkit/chainlink-framework/chains/fees"
 	txmgrcommon "github.com/smartcontractkit/chainlink-framework/chains/txmgr"
 	txmgrtypes "github.com/smartcontractkit/chainlink-framework/chains/txmgr/types"
 	"github.com/smartcontractkit/chainlink-framework/multinode"
-	"github.com/smartcontractkit/chainlink-integrations/evm/keys"
-	"github.com/smartcontractkit/chainlink-integrations/evm/keys/keystest"
-	ubig "github.com/smartcontractkit/chainlink-integrations/evm/utils/big"
 
-	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
-	"github.com/smartcontractkit/chainlink-integrations/evm/client"
-	"github.com/smartcontractkit/chainlink-integrations/evm/client/clienttest"
-	evmconfig "github.com/smartcontractkit/chainlink-integrations/evm/config"
-	"github.com/smartcontractkit/chainlink-integrations/evm/config/configtest"
-	"github.com/smartcontractkit/chainlink-integrations/evm/config/toml"
-	"github.com/smartcontractkit/chainlink-integrations/evm/gas"
-	gasmocks "github.com/smartcontractkit/chainlink-integrations/evm/gas/mocks"
-	"github.com/smartcontractkit/chainlink-integrations/evm/testutils"
-	evmtypes "github.com/smartcontractkit/chainlink-integrations/evm/types"
-	"github.com/smartcontractkit/chainlink-integrations/evm/utils"
+	"github.com/smartcontractkit/chainlink-evm/pkg/assets"
+	"github.com/smartcontractkit/chainlink-evm/pkg/client"
+	"github.com/smartcontractkit/chainlink-evm/pkg/client/clienttest"
+	evmconfig "github.com/smartcontractkit/chainlink-evm/pkg/config"
+	"github.com/smartcontractkit/chainlink-evm/pkg/config/configtest"
+	"github.com/smartcontractkit/chainlink-evm/pkg/config/toml"
+	"github.com/smartcontractkit/chainlink-evm/pkg/gas"
+	gasmocks "github.com/smartcontractkit/chainlink-evm/pkg/gas/mocks"
+	"github.com/smartcontractkit/chainlink-evm/pkg/testutils"
+	evmtypes "github.com/smartcontractkit/chainlink-evm/pkg/types"
+	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
@@ -1281,11 +1280,10 @@ func TestEthConfirmer_RebroadcastWhereNecessary_TerminallyUnderpriced_ThenGoesTh
 
 	memKS := keystest.NewMemoryChainStore()
 	fromAddress := memKS.MustCreate(t)
-	kst := keys.NewChainStore(memKS, testutils.FixtureChainID)
+	kst := keys.NewChainStore(memKS, big.NewInt(0))
 
 	evmcfg := configtest.NewChainScopedConfig(t, func(c *toml.EVMConfig) {
 		c.GasEstimator.PriceMax = assets.GWei(500)
-		c.ChainID = ubig.New(testutils.FixtureChainID)
 	})
 
 	currentHead := int64(30)
@@ -1365,7 +1363,7 @@ func TestEthConfirmer_RebroadcastWhereNecessary_WhenOutOfEth(t *testing.T) {
 	fromAddress := memKS.MustCreate(t)
 	ethKeyStore := keys.NewChainStore(memKS, ethClient.ConfiguredChainID())
 
-	config := configtest.NewChainScopedConfig(t, overrideDefaultID)
+	config := configtest.NewChainScopedConfig(t, nil)
 	currentHead := int64(30)
 	oldEnough := int64(19)
 	nonce := int64(0)
@@ -1547,8 +1545,8 @@ func TestEthConfirmer_ForceRebroadcast(t *testing.T) {
 
 	memKS := keystest.NewMemoryChainStore()
 	fromAddress := memKS.MustCreate(t)
-	config := configtest.NewChainScopedConfig(t, overrideDefaultID)
-	ethKeyStore := keys.NewChainStore(memKS, testutils.FixtureChainID)
+	config := configtest.NewChainScopedConfig(t, nil)
+	ethKeyStore := keys.NewChainStore(memKS, big.NewInt(0))
 
 	mustCreateUnstartedGeneratedTx(t, txStore, fromAddress, config.EVM().ChainID())
 	mustInsertInProgressEthTx(t, txStore, 0, fromAddress)
@@ -1667,7 +1665,6 @@ func TestEthConfirmer_ProcessStuckTransactions(t *testing.T) {
 		c.Transactions.AutoPurge.Enabled = ptr(true)
 		c.Transactions.AutoPurge.Threshold = ptr(autoPurgeThreshold)
 		c.Transactions.AutoPurge.MinAttempts = ptr(autoPurgeMinAttempts)
-		c.ChainID = ubig.New(testutils.FixtureChainID)
 	})
 	ge := evmcfg.EVM().GasEstimator()
 	txBuilder := txmgr.NewEvmTxAttemptBuilder(*ethClient.ConfiguredChainID(), ge, ethKeyStore, feeEstimator)
