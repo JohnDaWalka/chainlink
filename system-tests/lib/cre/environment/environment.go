@@ -347,6 +347,7 @@ func SetupTestEnvironment(
 	// Ugly glue hack ¯\_(ツ)_/¯
 	fullCldOutput, cldErr := devenv.NewEnvironmentBuilder(singeFileLogger).
 		WithJobDistributor(jdOutput, creds).
+		WithNodeSets(nodeOutput).
 		WithBlockchains(
 			map[string]blockchain.Output{
 				blockchainsOutput.BlockchainOutput.ChainID: *blockchainsOutput.BlockchainOutput,

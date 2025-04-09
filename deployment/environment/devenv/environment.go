@@ -137,7 +137,7 @@ func (b *EnvironmentBuilder) WithSethClients(sethClients []*seth.Client) *Enviro
 	return b
 }
 
-func (b *EnvironmentBuilder) WithNodeSetOutput(nodeSetOutput []*types.WrappedNodeOutput) *EnvironmentBuilder {
+func (b *EnvironmentBuilder) WithNodeSets(nodeSetOutput []*types.WrappedNodeOutput) *EnvironmentBuilder {
 	if nodeSetOutput == nil {
 		b.errs = append(b.errs, "node set output not set")
 	}
@@ -153,7 +153,6 @@ func (b *EnvironmentBuilder) WithExistingAddresses(existingAddresses deployment.
 	return b
 }
 
-// WithTopology Topology is required for CRE DONs
 func (b *EnvironmentBuilder) WithTopology(topology *types.Topology) *EnvironmentBuilder {
 	if topology != nil {
 		if len(topology.DonsMetadata) == 0 {
@@ -171,6 +170,18 @@ func (b *EnvironmentBuilder) WithTopology(topology *types.Topology) *Environment
 func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 	if len(b.errs) > 0 {
 		return nil, errors.New("validation errors: " + strings.Join(b.errs, ", "))
+	}
+	if b.topology == nil {
+		return nil, errors.New("topology not set")
+	}
+	if b.blockchainOutputs == nil {
+		return nil, errors.New("blockchain outputs not set")
+	}
+	if b.nodeSetOutput == nil {
+		return nil, errors.New("nodeSetOutput not set")
+	}
+	if b.jdOutput == nil {
+		return nil, errors.New("jd output not set")
 	}
 
 	envs := make([]*deployment.Environment, len(b.nodeSetOutput))

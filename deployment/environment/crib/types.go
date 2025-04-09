@@ -89,7 +89,7 @@ func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput,
 	topology := BuildTopology(output.NodesetOutput.CLNodes)
 
 	env, err := devenv.NewEnvironmentBuilder(lggr).
-		WithNodeSetOutput([]*types.WrappedNodeOutput{
+		WithNodeSets([]*types.WrappedNodeOutput{
 			output.NodesetOutput,
 		}).
 		WithTopology(topology).
