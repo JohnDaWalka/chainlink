@@ -2,6 +2,7 @@ package don
 
 import (
 	"github.com/pkg/errors"
+
 	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"

@@ -5,12 +5,13 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"math/big"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	pkgerrors "github.com/pkg/errors"
@@ -30,10 +31,10 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
-	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 
 	libcaps "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"

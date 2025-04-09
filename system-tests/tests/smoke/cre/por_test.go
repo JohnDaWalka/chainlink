@@ -2,12 +2,13 @@ package cre
 
 import (
 	"fmt"
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 
 	"github.com/ethereum/go-ethereum/common"
 	ut "github.com/go-playground/universal-translator"
