@@ -15,6 +15,7 @@ import (
 	"github.com/urfave/cli"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-evm/pkg/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/cmd"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -303,7 +304,7 @@ func TestJob_ToRows(t *testing.T) {
 var directRequestSpecTemplate string
 
 func getDirectRequestSpec() string {
-	return fmt.Sprintf(directRequestSpecTemplate, uuid.New(), uuid.New())
+	return fmt.Sprintf(directRequestSpecTemplate, testutils.FixtureChainID.String(), uuid.New(), uuid.New())
 }
 
 func TestShell_ListFindJobs(t *testing.T) {
@@ -311,6 +312,7 @@ func TestShell_ListFindJobs(t *testing.T) {
 
 	app := startNewApplicationV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
 		c.EVM[0].Enabled = ptr(true)
+		c.EVM[0].ChainID = big.New(testutils.FixtureChainID)
 	})
 	client, r := app.NewShellAndRenderer()
 
