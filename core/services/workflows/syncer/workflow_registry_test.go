@@ -122,7 +122,8 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		wfID := [32]byte{1}
 		owner := []byte{}
 		wfName := "wf name 1"
-		er.Add(EngineRegistryKey{Owner: owner, Name: wfName}, &mockService{}, wfID)
+		err := er.Add(EngineRegistryKey{Owner: owner, Name: wfName}, &mockService{}, wfID)
+		require.NoError(t, err)
 		wr, err := NewWorkflowRegistry(
 			lggr,
 			func(ctx context.Context, bytes []byte) (ContractReader, error) {
@@ -180,7 +181,7 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		require.Equal(t, expectedUpdatedEvent, event.GetData())
 
 		// No other events on the channel
-		event, err = readEventCh(eventCh)
+		_, err = readEventCh(eventCh)
 		require.ErrorContains(t, err, errNoEvent)
 	})
 
@@ -194,7 +195,8 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		wfID := [32]byte{1}
 		owner := []byte{}
 		wfName := "wf name 1"
-		er.Add(EngineRegistryKey{Owner: owner, Name: wfName}, &mockService{}, wfID)
+		err := er.Add(EngineRegistryKey{Owner: owner, Name: wfName}, &mockService{}, wfID)
+		require.NoError(t, err)
 		wr, err := NewWorkflowRegistry(
 			lggr,
 			func(ctx context.Context, bytes []byte) (ContractReader, error) {
@@ -232,7 +234,7 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		require.Equal(t, expectedUpdatedEvent, event.GetData())
 
 		// No other events on the channel
-		event, err = readEventCh(eventCh)
+		_, err = readEventCh(eventCh)
 		require.ErrorContains(t, err, errNoEvent)
 	})
 
@@ -305,7 +307,8 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		require.ErrorContains(t, err, errNoEvent)
 
 		// Add the workflow to the engine registry as the handler would
-		er.Add(EngineRegistryKey{Owner: owner, Name: wfName}, &mockService{}, wfID)
+		err = er.Add(EngineRegistryKey{Owner: owner, Name: wfName}, &mockService{}, wfID)
+		require.NoError(t, err)
 
 		// Repeated ticks do not make any new events
 		wr.workflowMetadataToEvents(ctx, metadata, donID)
@@ -376,7 +379,8 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		wfID := [32]byte{1}
 		owner := []byte{}
 		wfName := "wf name 1"
-		er.Add(EngineRegistryKey{Owner: owner, Name: wfName}, &mockService{}, wfID)
+		err := er.Add(EngineRegistryKey{Owner: owner, Name: wfName}, &mockService{}, wfID)
+		require.NoError(t, err)
 		wr, err := NewWorkflowRegistry(
 			lggr,
 			func(ctx context.Context, bytes []byte) (ContractReader, error) {
@@ -429,7 +433,7 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		require.Equal(t, expectedUpdatedEvent, event.GetData())
 
 		// No other events on the channel
-		event, err = readEventCh(eventCh)
+		_, err = readEventCh(eventCh)
 		require.ErrorContains(t, err, errNoEvent)
 	})
 }
