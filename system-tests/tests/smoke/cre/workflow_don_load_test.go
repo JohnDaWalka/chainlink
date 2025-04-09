@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
+	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
@@ -17,9 +19,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
-	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
-
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -99,8 +98,8 @@ type loadTestSetupOutput struct {
 	feedsConsumerAddress common.Address
 	forwarderAddress     common.Address
 	blockchainOutput     *blockchain.Output
-	donTopology          *keystonetypes.DonTopology
-	nodeOutput           []*keystonetypes.WrappedNodeOutput
+	donTopology          *devenv.DonTopology
+	nodeOutput           []*cldtypes.WrappedNodeOutput
 }
 
 func setupLoadTestEnvironment(
@@ -203,13 +202,13 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 
 		for _, donWithMetadata := range input.DonTopology.DonsWithMetadata {
 			jobSpecs := make(keystonetypes.DonJobs, 0)
-			workflowNodeSet, err2 := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &keystonetypes.Label{Key: node.NodeTypeKey, Value: keystonetypes.WorkerNode}, node.EqualLabels)
+			workflowNodeSet, err2 := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &cldtypes.Label{Key: cldtypes.NodeTypeKey, Value: keystonetypes.WorkerNode}, node.EqualLabels)
 			if err2 != nil {
 				// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 				return nil, errors.Wrap(err2, "failed to find worker nodes")
 			}
 			for _, workerNode := range workflowNodeSet {
-				nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
+				nodeID, nodeIDErr := node.FindLabelValue(workerNode, cldtypes.NodeIDKey)
 				if nodeIDErr != nil {
 					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 				}
