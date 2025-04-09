@@ -43,7 +43,7 @@ require (
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250408163915-4e13e0299b51
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.7.2
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.22
-	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2
+	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.10
 	github.com/smartcontractkit/libocr v0.0.0-20250408131511-c90716988ee0
 	github.com/smartcontractkit/mcms v0.14.0
 	github.com/spf13/cast v1.7.1
