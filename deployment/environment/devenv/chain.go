@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"math/big"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	"golang.org/x/sync/errgroup"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	cldtypes "github.com/smartcontractkit/chainlink/deployment/environment/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"

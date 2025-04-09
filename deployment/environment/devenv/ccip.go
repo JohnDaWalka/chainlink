@@ -2,15 +2,18 @@ package devenv
 
 import (
 	"context"
+
+	"google.golang.org/grpc/credentials"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	"github.com/smartcontractkit/chainlink/deployment/datastore"
-	"google.golang.org/grpc/credentials"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	"strings"
 
 	"github.com/pkg/errors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink/deployment"
