@@ -476,7 +476,7 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 		engine, engineErr := w.engineRegistry.Get(EngineRegistryKey{Owner: wfMeta.Owner, Name: wfMeta.WorkflowName})
 		currWfID := hex.EncodeToString(wfMeta.WorkflowID[:])
 		prevWfID := hex.EncodeToString(engine.workflowID[:])
-		logger := w.lggr.With(currWfID)
+		logger := w.lggr.With("workflowID", currWfID)
 
 		switch {
 		// if the workflow is active, but unable to get engine from the engine registry
