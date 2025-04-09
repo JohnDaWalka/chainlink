@@ -156,25 +156,6 @@ func DeployCCIPAndAddLanes(ctx context.Context, lggr logger.Logger, e *deploymen
 	}, nil
 }
 
-func validateEnvFromCRIBOutput(envFromOutput *devenv.EnvironmentWithTopology) error {
-	if envFromOutput == nil {
-		return errors.New("envFromOutput is nil")
-	}
-	if envFromOutput.Environment == nil {
-		return errors.New("envFromOutput.Environment is nil")
-	}
-	if envFromOutput.DonTopology == nil {
-		return errors.New("envFromOutput.DonTopology is nil")
-	}
-	if len(envFromOutput.DonTopology.DonsWithMetadata) == 0 {
-		return errors.New("envFromOutput.DonsWithMetadata is empty")
-	}
-	if envFromOutput.DonTopology.DonsWithMetadata[0].DON == nil {
-		return errors.New("donWithMetadata is empty")
-	}
-	return nil
-}
-
 // DeployCCIPChains is a group of changesets used from CRIB to set up new chains
 // It sets up CCIP contracts on all chains. We expect that MCMS has already been deployed and set up
 func DeployCCIPChains(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook) (CCIPOnChainDeployOutput, error) {

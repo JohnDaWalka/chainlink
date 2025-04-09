@@ -1,9 +1,6 @@
 package types
 
 import (
-	"errors"
-
-	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 )
@@ -30,16 +27,6 @@ const (
 type Label struct {
 	Key   string
 	Value string
-}
-
-func LabelFromProto(p *ptypes.Label) (*Label, error) {
-	if p.Value == nil {
-		return nil, errors.New("value not set")
-	}
-	return &Label{
-		Key:   p.Key,
-		Value: *p.Value,
-	}, nil
 }
 
 type ChainIDToBlockchainOutputs map[string]blockchain.Output

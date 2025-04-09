@@ -98,6 +98,9 @@ func (b *CREEnvironmentBuilder) WithExistingAddresses(existingAddresses deployme
 }
 
 func (b *CREEnvironmentBuilder) WithTopology(topology *types.Topology) *CREEnvironmentBuilder {
+	if topology == nil {
+		b.errs = append(b.errs, "topology not set")
+	}
 	if topology != nil {
 		if len(topology.DonsMetadata) == 0 {
 			b.errs = append(b.errs, "metadata not set")
