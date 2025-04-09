@@ -71,6 +71,7 @@ func TestRunner(t *testing.T) {
 		c.OCR.TransmitterAddress = &taddress
 		c.OCR2.DatabaseTimeout = commonconfig.MustNewDuration(time.Second)
 		c.OCR2.ContractTransmitterTransmitTimeout = commonconfig.MustNewDuration(time.Second)
+
 		c.Insecure.OCRDevelopmentMode = ptr(true)
 	})
 
@@ -454,9 +455,9 @@ answer1      [type=median index=0];
 		schemaVersion      = 1
 		contractAddress    = "%s"
 		isBootstrapPeer    = true
-		evmChainID		   = "0"
+		evmChainID		   = "%s"
 `
-		s = fmt.Sprintf(s, cltest.NewEIP55Address())
+		s = fmt.Sprintf(s, cltest.NewEIP55Address(), testutils.FixtureChainID.String())
 		jb, err := ocr.ValidatedOracleSpecToml(config, legacyChains, s)
 		require.NoError(t, err)
 		err = toml.Unmarshal([]byte(s), &jb)
@@ -492,7 +493,7 @@ answer1      [type=median index=0];
 		kb, err := keyStore.OCR().Create(ctx)
 		require.NoError(t, err)
 
-		s := fmt.Sprintf(minimalNonBootstrapTemplate, cltest.NewEIP55Address(), transmitterAddress.Hex(), kb.ID(), "http://blah.com", "")
+		s := fmt.Sprintf(minimalNonBootstrapTemplate, cltest.NewEIP55Address(), transmitterAddress.Hex(), kb.ID(), testutils.FixtureChainID.String(), "http://blah.com", "")
 		jb, err := ocr.ValidatedOracleSpecToml(config, legacyChains, s)
 		require.NoError(t, err)
 		err = toml.Unmarshal([]byte(s), &jb)
@@ -524,7 +525,7 @@ answer1      [type=median index=0];
 	})
 
 	t.Run("test min bootstrap", func(t *testing.T) {
-		s := fmt.Sprintf(minimalBootstrapTemplate, cltest.NewEIP55Address())
+		s := fmt.Sprintf(minimalBootstrapTemplate, cltest.NewEIP55Address(), testutils.FixtureChainID.String())
 		jb, err := ocr.ValidatedOracleSpecToml(config, legacyChains, s)
 		require.NoError(t, err)
 		err = toml.Unmarshal([]byte(s), &jb)
@@ -584,7 +585,7 @@ answer1      [type=median index=0];
 			kb, err := keyStore.OCR().Create(ctx)
 			require.NoError(t, err)
 
-			s := fmt.Sprintf(minimalNonBootstrapTemplate, cltest.NewEIP55Address(), transmitterAddress.Hex(), kb.ID(), "http://blah.com", "")
+			s := fmt.Sprintf(minimalNonBootstrapTemplate, cltest.NewEIP55Address(), transmitterAddress.Hex(), kb.ID(), testutils.FixtureChainID.String(), "http://blah.com", "")
 			jb, err := ocr.ValidatedOracleSpecToml(config, legacyChains2, s)
 			require.NoError(t, err)
 			err = toml.Unmarshal([]byte(s), &jb)
@@ -634,7 +635,7 @@ answer1      [type=median index=0];
 		// Create a keystore with an ocr key bundle and p2p key.
 		kb, err := keyStore.OCR().Create(ctx)
 		require.NoError(t, err)
-		spec := fmt.Sprintf(ocrJobSpecTemplate, testutils.NewAddress().Hex(), kb.ID(), transmitterAddress.Hex(), fmt.Sprintf(simpleFetchDataSourceTemplate, "blah", true))
+		spec := fmt.Sprintf(ocrJobSpecTemplate, testutils.NewAddress().Hex(), testutils.FixtureChainID.String(), kb.ID(), transmitterAddress.Hex(), fmt.Sprintf(simpleFetchDataSourceTemplate, "blah", true))
 		jb := makeOCRJobSpecFromToml(t, spec)
 
 		// Create an OCR job
