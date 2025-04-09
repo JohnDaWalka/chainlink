@@ -471,67 +471,60 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 	seenMap := map[string]bool{}
 
 	for _, wfMeta := range workflowMetadata {
-		switch WorkflowStatus(wfMeta.Status) {
-		case WorkflowStatusActive:
-			// mark as seen.
+		// TODO: ensure that the WorkflowRegisteredEvent sets the engine registry as the very last step
+		// TODO: ensure that the WorkflowDeletedEvent clears the engine registry as the very last step
+		engine, engineErr := w.engineRegistry.Get(EngineRegistryKey{Owner: wfMeta.Owner, Name: wfMeta.WorkflowName})
+		currWfID := hex.EncodeToString(wfMeta.WorkflowID[:])
+		prevWfID := hex.EncodeToString(engine.workflowID[:])
+		logger := w.lggr.With(currWfID)
+
+		switch {
+		// if the workflow is active, but unable to get engine from the engine registry
+		// then handle as registered event
+		case wfMeta.Status == uint8(WorkflowStatusActive) && engineErr != nil:
+			toRegisteredEvent := WorkflowRegistryWorkflowRegisteredV1{
+				WorkflowID:    wfMeta.WorkflowID,
+				WorkflowOwner: wfMeta.Owner,
+				DonID:         wfMeta.DonID,
+				Status:        wfMeta.Status,
+				WorkflowName:  wfMeta.WorkflowName,
+				BinaryURL:     wfMeta.BinaryURL,
+				ConfigURL:     wfMeta.ConfigURL,
+				SecretsURL:    wfMeta.SecretsURL,
+			}
+			events = append(events, workflowAsEvent{
+				Data:      toRegisteredEvent,
+				EventType: WorkflowRegisteredEvent,
+			})
 			engineKey := wfMeta.WorkflowName + hex.EncodeToString(wfMeta.Owner)
 			seenMap[engineKey] = true
 
-			// TODO: ensure that the WorkflowRegisteredEvent sets the engine registry as the very last step
-			// TODO: ensure that the WorkflowDeletedEvent clears the engine registry as the very last step
-			engine, getErr := w.engineRegistry.Get(EngineRegistryKey{Owner: wfMeta.Owner, Name: wfMeta.WorkflowName})
-
-			switch getErr {
-			// if the workflow is active, but unable to get engine from the engine registry
-			// then handle as registered event
-			case errNotFound:
-				toRegisteredEvent := WorkflowRegistryWorkflowRegisteredV1{
-					WorkflowID:    wfMeta.WorkflowID,
-					WorkflowOwner: wfMeta.Owner,
-					DonID:         wfMeta.DonID,
-					Status:        wfMeta.Status,
-					WorkflowName:  wfMeta.WorkflowName,
-					BinaryURL:     wfMeta.BinaryURL,
-					ConfigURL:     wfMeta.ConfigURL,
-					SecretsURL:    wfMeta.SecretsURL,
-				}
-				events = append(events, workflowAsEvent{
-					Data:      toRegisteredEvent,
-					EventType: WorkflowRegisteredEvent,
-				})
-			case nil:
-				fallthrough
-			default:
-				// if the workflow is active, the workflow engine is in the engine registry, but the metadata has changed
-				// then handle as updated event
-				currWfID := hex.EncodeToString(wfMeta.WorkflowID[:])
-				prevWfID := hex.EncodeToString(engine.workflowID[:])
-				if currWfID != prevWfID {
-					toUpdatedEvent := WorkflowRegistryWorkflowUpdatedV1{
-						OldWorkflowID: engine.workflowID,
-						NewWorkflowID: wfMeta.WorkflowID,
-						WorkflowOwner: wfMeta.Owner,
-						DonID:         wfMeta.DonID,
-						WorkflowName:  wfMeta.WorkflowName,
-						BinaryURL:     wfMeta.BinaryURL,
-						ConfigURL:     wfMeta.ConfigURL,
-						SecretsURL:    wfMeta.SecretsURL,
-					}
-					events = append(events, workflowAsEvent{
-						Data:      toUpdatedEvent,
-						EventType: WorkflowUpdatedEvent,
-					})
-				}
+		// if the workflow is active, the workflow engine is in the engine registry, but the metadata has changed
+		// then handle as updated event
+		case wfMeta.Status == uint8(WorkflowStatusActive) && currWfID != prevWfID:
+			toUpdatedEvent := WorkflowRegistryWorkflowUpdatedV1{
+				OldWorkflowID: engine.workflowID,
+				NewWorkflowID: wfMeta.WorkflowID,
+				WorkflowOwner: wfMeta.Owner,
+				DonID:         wfMeta.DonID,
+				WorkflowName:  wfMeta.WorkflowName,
+				BinaryURL:     wfMeta.BinaryURL,
+				ConfigURL:     wfMeta.ConfigURL,
+				SecretsURL:    wfMeta.SecretsURL,
 			}
+			events = append(events, workflowAsEvent{
+				Data:      toUpdatedEvent,
+				EventType: WorkflowUpdatedEvent,
+			})
+			engineKey := wfMeta.WorkflowName + hex.EncodeToString(wfMeta.Owner)
+			seenMap[engineKey] = true
 
-			// if the workflow is active, the workflow engine is in the engine registry, and the metadata is the same
-			// then the workflow is unchanged. no events.
-
-		case WorkflowStatusPaused:
-			fallthrough
+		// Paused means we skip for processing as a deleted event
+		// To be handled below as a deleted event, which clears the DB workflow spec.
+		case wfMeta.Status == uint8(WorkflowStatusPaused):
+			logger.Debugf("Workflow is paused")
 		default:
-			// if the workflow isn't active
-			// then the workflow has been paused. NOOP - to be handled below as a deleted event, which clears the DB workflow spec.
+			logger.Errorf("Unable to determine difference from workflow metadata")
 		}
 	}
 
