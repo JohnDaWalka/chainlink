@@ -3,6 +3,7 @@ package devenv
 import (
 	"context"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
+	"github.com/smartcontractkit/chainlink/deployment/datastore"
 	"google.golang.org/grpc/credentials"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
@@ -154,10 +155,14 @@ func (b *CCIPEnvironmentBuilder) Build() (*deployment.Environment, *DON, error) 
 		Logger:            envs[0].Logger,
 		ExistingAddresses: b.existingAddresses,
 		Chains:            envs[0].Chains,
-		Offchain:          jobDistributor,
-		OCRSecrets:        envs[0].OCRSecrets,
-		GetContext:        envs[0].GetContext,
-		NodeIDs:           nodeIDs,
+		DataStore: datastore.NewMemoryDataStore[
+			datastore.DefaultMetadata,
+			datastore.DefaultMetadata,
+		]().Seal(),
+		Offchain:   jobDistributor,
+		OCRSecrets: envs[0].OCRSecrets,
+		GetContext: envs[0].GetContext,
+		NodeIDs:    nodeIDs,
 	}
 
 	return environment, dons[0], nil
