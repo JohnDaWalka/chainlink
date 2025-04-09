@@ -2,8 +2,9 @@ package crib
 
 import (
 	"crypto/tls"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/credentials"
@@ -15,10 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
-)
-
-const (
-	CRIB_ENV_NAME = "Crib Environment"
 )
 
 type CCIPInfraAndOnChainDeployOutput struct {
