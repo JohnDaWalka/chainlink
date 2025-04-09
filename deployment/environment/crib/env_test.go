@@ -28,12 +28,12 @@ func TestShouldProvideEnvironmentConfig(t *testing.T) {
 	assert.Equal(t, "2337", config.BlockchainOutputs["2337"].ChainID)
 
 	assert.NotNil(t, config.NodesetOutput)
-	assert.NotNil(t, config.NodesetOutput.Output)
-	assert.NotEmpty(t, config.NodesetOutput.Output.CLNodes)
-	assert.Len(t, config.NodesetOutput.Output.CLNodes, 5)
+	assert.NotNil(t, config.NodesetOutput)
+	assert.NotEmpty(t, config.NodesetOutput.CLNodes)
+	assert.Len(t, config.NodesetOutput.CLNodes, 5)
 	assert.NotNil(t, config.NodesetOutput.CLNodes[0].Node)
 	assert.NotEmpty(t, config.NodesetOutput.CLNodes[0].Node.ExternalURL)
-	assert.Equal(t, "http://crib-local-ccip-bt-0.local:80", config.NodesetOutput.Output.CLNodes[0].Node.ExternalURL)
+	assert.Equal(t, "http://crib-local-ccip-bt-0.local:80", config.NodesetOutput.CLNodes[0].Node.ExternalURL)
 
 	assert.NotNil(t, config.JDOutput)
 	assert.NotEmpty(t, config.JDOutput.ExternalGRPCUrl)

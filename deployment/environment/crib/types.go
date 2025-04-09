@@ -2,12 +2,12 @@ package crib
 
 import (
 	"crypto/tls"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"time"
 
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/clnode"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"github.com/smartcontractkit/chainlink/deployment/environment/types"
@@ -21,13 +21,14 @@ const (
 	CRIB_ENV_NAME = "Crib Environment"
 )
 
-type DeployOutput struct {
+type CCIPInfraAndOnChainDeployOutput struct {
+	// todo: Replace usages of NodeIDs, Chains to rely on new CTF based output types like BlockchainOutputs and NodesetOutput
 	NodeIDs           []string
 	Chains            []devenv.ChainConfig   // chain selector -> Chain Config
 	AddressBook       deployment.AddressBook // Addresses of all contracts
 	JDOutput          *jd.Output
 	BlockchainOutputs types.ChainIDToBlockchainOutputs
-	NodesetOutput     *types.WrappedNodeOutput
+	NodesetOutput     *simple_node_set.Output
 }
 
 type CCIPOnChainDeployOutput struct {
@@ -35,41 +36,7 @@ type CCIPOnChainDeployOutput struct {
 	NodeIDs     []string
 }
 
-// BuildTopology In CCIP we don't need topology, but we use it here as a wrapper to provide Nodes with Metadata
-func BuildTopology(nodeOutputs []*clnode.Output) *types.Topology {
-	nodesMetadata := make([]*types.NodeMetadata, 0)
-
-	// Add Node labels required to  build environment
-	for i := range nodeOutputs {
-		nodeWithLabels := types.NodeMetadata{}
-		nodeType := types.WorkerNode
-		if i == 0 {
-			nodeType = types.BootstrapNode
-		}
-
-		nodeWithLabels.Labels = append(nodeWithLabels.Labels, &types.Label{
-			Key:   types.NodeTypeKey,
-			Value: nodeType,
-		})
-
-		nodesMetadata = append(nodesMetadata, &nodeWithLabels)
-	}
-
-	donsWithMetadata := []*types.DonMetadata{
-		{
-			NodesMetadata: nodesMetadata,
-			Name:          "CCIP DON",
-		},
-	}
-
-	return &types.Topology{
-		// set some dummy ID as this is required field
-		WorkflowDONID: uint32(1),
-		DonsMetadata:  donsWithMetadata,
-	}
-}
-
-func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput, deployerKey string) (*deployment.Environment, *devenv.DON, error) {
+func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output CCIPInfraAndOnChainDeployOutput, deployerKey string) (*deployment.Environment, *devenv.DON, error) {
 	sethClients := make([]*seth.Client, 0)
 	for _, chain := range output.BlockchainOutputs {
 		if chain.Family == "evm" {
@@ -87,9 +54,7 @@ func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput,
 	}
 
 	env, don, err := devenv.NewCCIPEnvironmentBuilder(lggr).
-		WithNodeSets([]*types.WrappedNodeOutput{
-			output.NodesetOutput,
-		}).
+		WithNodeSet(output.NodesetOutput).
 		WithJobDistributor(output.JDOutput, credentials.NewTLS(&tls.Config{
 			MinVersion: tls.VersionTLS12,
 		})).

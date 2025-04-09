@@ -106,7 +106,7 @@ func DeployHomeChainContracts(ctx context.Context, lggr logger.Logger, envConfig
 }
 
 // DeployCCIPAndAddLanes is the actual ccip setup once the nodes are initialized.
-func DeployCCIPAndAddLanes(ctx context.Context, lggr logger.Logger, e *deployment.Environment, don *devenv.DON, homeChainSel, feedChainSel uint64, deployOutput DeployOutput, rmnEnabled bool) (CCIPOnChainDeployOutput, error) {
+func DeployCCIPAndAddLanes(ctx context.Context, lggr logger.Logger, e *deployment.Environment, don *devenv.DON, homeChainSel, feedChainSel uint64, deployOutput CCIPInfraAndOnChainDeployOutput, rmnEnabled bool) (CCIPOnChainDeployOutput, error) {
 	var err error
 
 	// ------ Part 1 -----
@@ -232,7 +232,7 @@ func ConnectCCIPLanes(ctx context.Context, lggr logger.Logger, envConfig devenv.
 }
 
 // ConfigureCCIPOCR is a group of changesets used from CRIB to redeploy the chainlink don on an existing setup
-func ConfigureCCIPOCR(ctx context.Context, lggr logger.Logger, e *deployment.Environment, don *devenv.DON, homeChainSel, feedChainSel uint64, deployOutput DeployOutput, rmnEnabled bool) (CCIPOnChainDeployOutput, error) {
+func ConfigureCCIPOCR(ctx context.Context, lggr logger.Logger, e *deployment.Environment, don *devenv.DON, homeChainSel, feedChainSel uint64, deployOutput CCIPInfraAndOnChainDeployOutput, rmnEnabled bool) (CCIPOnChainDeployOutput, error) {
 	var err error
 
 	lggr.Infow("resetting ocr...")

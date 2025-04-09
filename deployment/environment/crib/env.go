@@ -29,7 +29,7 @@ func NewCRIBEnvFromStateDir(lggr logger.Logger, envStateDir string) CRIBEnv {
 	}
 }
 
-func (c CRIBEnv) GetConfig(key string) (DeployOutput, error) {
+func (c CRIBEnv) GetConfig(key string) (CCIPInfraAndOnChainDeployOutput, error) {
 	reader := NewOutputReader(c.cribEnvStateDirPath)
 	nodesDetails, err := reader.ReadNodesDetails()
 	if err != nil {
@@ -37,47 +37,43 @@ func (c CRIBEnv) GetConfig(key string) (DeployOutput, error) {
 	}
 	chainConfigs, err := reader.ReadChainConfigs()
 	if err != nil {
-		return DeployOutput{}, errors.Wrapf(err, "failed to read chain configs from %s", c.cribEnvStateDirPath)
+		return CCIPInfraAndOnChainDeployOutput{}, errors.Wrapf(err, "failed to read chain configs from %s", c.cribEnvStateDirPath)
 	}
 	for i, chain := range chainConfigs {
 		err := chain.SetDeployerKey(&key)
 		if err != nil {
-			return DeployOutput{}, err
+			return CCIPInfraAndOnChainDeployOutput{}, err
 		}
 		chainConfigs[i] = chain
 	}
 
 	addressBook, err := reader.ReadAddressBook()
 	if err != nil {
-		return DeployOutput{}, errors.Wrapf(err, "failed to read address book")
+		return CCIPInfraAndOnChainDeployOutput{}, errors.Wrapf(err, "failed to read address book")
 	}
 
 	jdOutput, err := reader.ReadJDOutput()
 	if err != nil {
-		return DeployOutput{}, errors.Wrap(err, "error reading jd output")
+		return CCIPInfraAndOnChainDeployOutput{}, errors.Wrap(err, "error reading jd output")
 	}
 
 	blockchainOutputs, err := reader.ReadBlockchainOutputs()
 	if err != nil {
-		return DeployOutput{}, errors.Wrap(err, "error reading blockchain outputs")
+		return CCIPInfraAndOnChainDeployOutput{}, errors.Wrap(err, "error reading blockchain outputs")
 	}
 
 	nodeSetOutput, err := reader.ReadNodeSetOutput()
 	if err != nil {
-		return DeployOutput{}, errors.Wrap(err, "error reading node set output")
+		return CCIPInfraAndOnChainDeployOutput{}, errors.Wrap(err, "error reading node set output")
 	}
 
-	return DeployOutput{
+	return CCIPInfraAndOnChainDeployOutput{
 		NodeIDs:           nodesDetails.NodeIDs,
 		Chains:            chainConfigs,
 		AddressBook:       addressBook,
 		JDOutput:          jdOutput,
 		BlockchainOutputs: types.ChainIDToBlockchainOutputsFromArray(blockchainOutputs),
-		NodesetOutput: &types.WrappedNodeOutput{
-			Output:       nodeSetOutput,
-			NodeSetName:  "CRIB-CCIP",
-			Capabilities: []string{},
-		},
+		NodesetOutput:     nodeSetOutput,
 	}, nil
 }
 

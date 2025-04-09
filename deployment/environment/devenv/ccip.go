@@ -2,12 +2,11 @@ package devenv
 
 import (
 	"context"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
 	"google.golang.org/grpc/credentials"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
-	"github.com/smartcontractkit/chainlink/deployment/datastore"
-
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	"strings"
@@ -24,9 +23,8 @@ type CCIPEnvironmentBuilder struct {
 	jdOutput          *jd.Output
 	blockchainOutputs types.ChainIDToBlockchainOutputs
 	// todo: replace this with an array of transactOpts
-	sethClients []*seth.Client
-	// todo: eliminate wrapper, as we don't use capabilities
-	nodeSetOutput     []*types.WrappedNodeOutput
+	sethClients       []*seth.Client
+	nodeSetOutput     *simple_node_set.Output
 	existingAddresses deployment.AddressBook
 	credentials       credentials.TransportCredentials
 	logger            logger.Logger
@@ -80,12 +78,9 @@ func (b *CCIPEnvironmentBuilder) WithSethClients(sethClients []*seth.Client) *CC
 	return b
 }
 
-func (b *CCIPEnvironmentBuilder) WithNodeSets(nodeSetOutput []*types.WrappedNodeOutput) *CCIPEnvironmentBuilder {
+func (b *CCIPEnvironmentBuilder) WithNodeSet(nodeSetOutput *simple_node_set.Output) *CCIPEnvironmentBuilder {
 	if nodeSetOutput == nil {
 		b.errs = append(b.errs, "node set output not set")
-	}
-	if len(nodeSetOutput) == 0 {
-		b.errs = append(b.errs, "node set outputs are empty")
 	}
 	b.nodeSetOutput = nodeSetOutput
 	return b
@@ -110,63 +105,34 @@ func (b *CCIPEnvironmentBuilder) Build() (*deployment.Environment, *DON, error) 
 		return nil, nil, errors.New("jd output not set")
 	}
 
-	envs := make([]*deployment.Environment, len(b.nodeSetOutput))
-	dons := make([]*DON, len(b.nodeSetOutput))
-
-	var allNodesInfo []NodeInfo
 	chains := chainsFromBlockchainOutputs(b.sethClients, b.blockchainOutputs)
 
-	for idx, nodeOutput := range b.nodeSetOutput {
-		nodeInfo, err := GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, 1)
-		if err != nil {
-			return nil, nil, errors.Wrap(err, "failed to get node info")
-		}
-		allNodesInfo = append(allNodesInfo, nodeInfo...)
-
-		jdConfig := JDConfig{
-			GRPC:     b.jdOutput.ExternalGRPCUrl,
-			WSRPC:    b.jdOutput.InternalWSRPCUrl,
-			Creds:    b.credentials,
-			NodeInfo: nodeInfo,
-		}
-
-		devenvConfig := EnvironmentConfig{
-			JDConfig: jdConfig,
-			Chains:   chains,
-		}
-
-		b.logger.Infow("creating CLD environment")
-		env, don, err := NewEnvironment(context.Background, b.logger, devenvConfig)
-		if err != nil {
-			return nil, nil, errors.Wrap(err, "failed to create a CLD environment")
-		}
-
-		envs[idx] = env
-		dons[idx] = don
+	// In CCIP we assume that there is one bootstrap node
+	// prefix is hardcoded to simplify the setup
+	allNodesInfo, err := GetNodeInfo(b.nodeSetOutput, "ccip", 1)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to get node info")
 	}
 
-	var nodeIDs []string
-	for _, env := range envs {
-		nodeIDs = append(nodeIDs, env.NodeIDs...)
+	jdConfig := JDConfig{
+		GRPC:     b.jdOutput.ExternalGRPCUrl,
+		WSRPC:    b.jdOutput.InternalWSRPCUrl,
+		Creds:    b.credentials,
+		NodeInfo: allNodesInfo,
 	}
 
-	jobDistributor := envs[0].Offchain
-
-	// we assume that all DONs run on the same chain and that there's only one chain
-	environment := &deployment.Environment{
-		Name:              envs[0].Name,
-		Logger:            envs[0].Logger,
-		ExistingAddresses: b.existingAddresses,
-		Chains:            envs[0].Chains,
-		DataStore: datastore.NewMemoryDataStore[
-			datastore.DefaultMetadata,
-			datastore.DefaultMetadata,
-		]().Seal(),
-		Offchain:   jobDistributor,
-		OCRSecrets: envs[0].OCRSecrets,
-		GetContext: envs[0].GetContext,
-		NodeIDs:    nodeIDs,
+	devenvConfig := EnvironmentConfig{
+		JDConfig: jdConfig,
+		Chains:   chains,
 	}
 
-	return environment, dons[0], nil
+	b.logger.Infow("creating CLD environment")
+	env, don, err := NewEnvironment(context.Background, b.logger, devenvConfig)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to create a CLD environment")
+	}
+
+	env.ExistingAddresses = b.existingAddresses
+
+	return env, don, nil
 }
