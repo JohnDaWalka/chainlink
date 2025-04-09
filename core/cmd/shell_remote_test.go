@@ -23,6 +23,7 @@ import (
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-evm/pkg/client/clienttest"
+	"github.com/smartcontractkit/chainlink-evm/pkg/utils/big"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink/v2/core/auth"
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
@@ -121,6 +122,7 @@ func TestShell_ReplayBlocks(t *testing.T) {
 		c.EVM[0].NonceAutoSync = ptr(false)
 		c.EVM[0].BalanceMonitor.Enabled = ptr(false)
 		c.EVM[0].GasEstimator.Mode = ptr("FixedPrice")
+		c.EVM[0].ChainID = big.New(testutils.FixtureChainID)
 
 		solCfg := &config.TOMLConfig{
 			ChainID: ptr("devnet"),
@@ -140,7 +142,7 @@ func TestShell_ReplayBlocks(t *testing.T) {
 	c := cli.NewContext(nil, set, nil)
 	assert.ErrorContains(t, client.ReplayFromBlock(c), "chain id does not match any local chains")
 
-	require.NoError(t, set.Set("chain-id", "0"))
+	require.NoError(t, set.Set("chain-id", testutils.FixtureChainID.String()))
 	c = cli.NewContext(nil, set, nil)
 	assert.NoError(t, client.ReplayFromBlock(c))
 

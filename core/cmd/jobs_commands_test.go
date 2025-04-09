@@ -379,6 +379,7 @@ func TestShell_CreateJobV2(t *testing.T) {
 		c.EVM[0].Enabled = ptr(true)
 		c.EVM[0].NonceAutoSync = ptr(false)
 		c.EVM[0].BalanceMonitor.Enabled = ptr(false)
+		c.EVM[0].ChainID = big.New(testutils.FixtureChainID)
 		c.EVM[0].GasEstimator.Mode = ptr("FixedPrice")
 	}, func(opts *startOptions) {
 		opts.FlagsAndDeps = append(opts.FlagsAndDeps, cltest.DefaultP2PKey)
@@ -391,7 +392,7 @@ func TestShell_CreateJobV2(t *testing.T) {
 	flagSetApplyFromAction(client.CreateJob, fs, "")
 
 	nameAndExternalJobID := uuid.New()
-	spec := fmt.Sprintf(ocrBootstrapSpec, nameAndExternalJobID, nameAndExternalJobID)
+	spec := fmt.Sprintf(ocrBootstrapSpec, nameAndExternalJobID, nameAndExternalJobID, testutils.FixtureChainID.String())
 	require.NoError(t, fs.Parse([]string{spec}))
 
 	err := client.CreateJob(cli.NewContext(nil, fs, nil))

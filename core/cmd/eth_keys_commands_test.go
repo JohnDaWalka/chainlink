@@ -189,7 +189,7 @@ func TestShell_CreateETHKey(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
 
-	id := big.NewInt(0)
+	id := testutils.FixtureChainID
 
 	set := flag.NewFlagSet("test", 0)
 	flagSetApplyFromAction(client.CreateETHKey, set, "")
