@@ -203,7 +203,7 @@ func generateDonJobSpecs(
 		}
 
 		if creflags.HasFlag(donWithMetadata.Flags, types.CronCapability) {
-			jobSpecs = append(jobSpecs, jobs.WorkerStandardCapability(nodeID, "cron-capability", cronCapBinPath, jobs.EmptyStdCapConfig))
+			jobSpecs = append(jobSpecs, jobs.WorkerStandardCapability(nodeID, types.CronCapability, cronCapBinPath, jobs.EmptyStdCapConfig))
 		}
 
 		if creflags.HasFlag(donWithMetadata.Flags, types.CustomComputeCapability) {
@@ -215,7 +215,7 @@ func generateDonJobSpecs(
 				perSenderRPS = 1.0
 				perSenderBurst = 5
 				"""`
-			jobSpecs = append(jobSpecs, jobs.WorkerStandardCapability(nodeID, "custom-compute", "__builtin_custom-compute-action", config))
+			jobSpecs = append(jobSpecs, jobs.WorkerStandardCapability(nodeID, types.CustomComputeCapability, "__builtin_custom-compute-action", config))
 		}
 	}
 
