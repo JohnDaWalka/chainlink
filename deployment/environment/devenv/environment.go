@@ -215,14 +215,13 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to find bootstrap nodes")
 		}
-		// assume that each nodeset has only one bootstrap node
 		nodeInfo, err := GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, len(bootstrapNodes))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get node info")
 		}
 		allNodesInfo = append(allNodesInfo, nodeInfo...)
 
-		// if DON has no capabilities we don't need to create chain configs (e.g. for gateway nodes)
+		// if DON has no capabilities and is not a CCIP DON, we don't need to create chain configs (e.g. for gateway nodes)
 		// we indicate to `NewEnvironment` that it should skip chain creation by passing an empty chain config
 		if len(nodeOutput.Capabilities) == 0 && nodeOutput.NodeSetType != "ccip" {
 			chains = []ChainConfig{}
@@ -243,8 +242,7 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 		b.logger.Infow("creating CLD environment")
 		env, don, err := NewEnvironment(context.Background, b.logger, devenvConfig)
 		if err != nil {
-			b.logger.Errorw("failed to create CLD devenv environment", "envConfig", devenvConfig, "err", err)
-			return nil, errors.Wrap(err, "failed to create devenv environment")
+			return nil, errors.Wrap(err, "failed to create a CLD environment")
 		}
 
 		envs[idx] = env
@@ -311,8 +309,10 @@ func (b *EnvironmentBuilder) Build() (*EnvironmentWithTopology, error) {
 	}
 
 	if b.topology != nil {
-		donTopology := &DonTopology{}
-		donTopology.WorkflowDonID = b.topology.WorkflowDONID
+		donTopology := &DonTopology{
+			GatewayConnectorOutput: b.topology.GatewayConnectorOutput,
+			WorkflowDonID:          b.topology.WorkflowDONID,
+		}
 
 		for i, donMetadata := range b.topology.DonsMetadata {
 			donTopology.DonsWithMetadata = append(donTopology.DonsWithMetadata, &DonWithMetadata{
