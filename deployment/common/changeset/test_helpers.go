@@ -214,6 +214,18 @@ func DeployLinkTokenTest(t *testing.T, solChains int) {
 		Chains:    1,
 		SolChains: solChains,
 	})
+	deployLinkTokenTestWithEnv(t, e, solChains)
+}
+
+func DeployLinkTokenTestZk(t *testing.T) {
+	lggr := logger.Test(t)
+	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
+		ZkChains: 1,
+	})
+	deployLinkTokenTestWithEnv(t, e, 0)
+}
+
+func deployLinkTokenTestWithEnv(t *testing.T, e deployment.Environment, solChains int) {
 	chain1 := e.AllChainSelectors()[0]
 	config := []uint64{chain1}
 	var solChain1 uint64

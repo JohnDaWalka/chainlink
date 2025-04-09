@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
+
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -172,10 +173,13 @@ func DeployContract[C any](
 		lggr.Errorw("Failed to deploy contract", "chain", chain.String(), "err", contractDeploy.Err)
 		return nil, contractDeploy.Err
 	}
-	_, err := chain.Confirm(contractDeploy.Tx)
-	if err != nil {
-		lggr.Errorw("Failed to confirm deployment", "chain", chain.String(), "Contract", contractDeploy.Tv.String(), "err", err)
-		return nil, err
+	var err error
+	if !chain.IsZk {
+		_, err = chain.Confirm(contractDeploy.Tx)
+		if err != nil {
+			lggr.Errorw("Failed to confirm deployment", "chain", chain.String(), "Contract", contractDeploy.Tv.String(), "err", err)
+			return nil, err
+		}
 	}
 	lggr.Infow("Deployed contract", "Contract", contractDeploy.Tv.String(), "addr", contractDeploy.Address, "chain", chain.String())
 	err = addressBook.Save(chain.Selector, contractDeploy.Address.String(), contractDeploy.Tv)

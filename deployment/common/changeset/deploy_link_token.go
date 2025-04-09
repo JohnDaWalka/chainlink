@@ -4,10 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/gagliardetto/solana-go"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	solCommomUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -110,7 +115,14 @@ func deployLinkTokenContractEVM(
 ) (*deployment.ContractDeploy[*link_token.LinkToken], error) {
 	linkToken, err := deployment.DeployContract[*link_token.LinkToken](lggr, chain, ab,
 		func(chain deployment.Chain) deployment.ContractDeploy[*link_token.LinkToken] {
-			linkTokenAddr, tx, linkToken, err2 := link_token.DeployLinkToken(
+			deployLinkToken := link_token.DeployLinkToken
+			if chain.IsZk {
+				deployLinkToken = func(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *ethTypes.Transaction, *link_token.LinkToken, error) {
+					address, _, contract, err := link_token.DeployLinkTokenZk(nil, chain.ClientZk, chain.DeployerKeyZk, chain.Client)
+					return address, nil, contract, err
+				}
+			}
+			linkTokenAddr, tx, linkToken, err2 := deployLinkToken(
 				chain.DeployerKey,
 				chain.Client,
 			)
