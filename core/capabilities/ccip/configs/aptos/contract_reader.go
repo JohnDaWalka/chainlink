@@ -18,6 +18,8 @@ func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 					},
 					consts.MethodNameGetVersionedConfig: {
 						Name: "get_versioned_config",
+						// ref: https://github.com/smartcontractkit/chainlink-ccip/blob/bee7c32c71cf0aec594c051fef328b4a7281a1fc/pkg/reader/ccip.go#L1440
+						ResultTupleToStruct: []string{"version", "config"},
 					},
 					consts.MethodNameGetCursedSubjects: {
 						Name: "get_cursed_subjects",
@@ -99,7 +101,9 @@ func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 								Required: true,
 							},
 						},
-						// TODO: change to ocr config struct, field renames
+						// wrap the returned OCR config
+						// https://github.com/smartcontractkit/chainlink-ccip/blob/bee7c32c71cf0aec594c051fef328b4a7281a1fc/pkg/reader/ccip.go#L141
+						ResultTupleToStruct: []string{"ocr_config"},
 					},
 					consts.MethodNameGetLatestPriceSequenceNumber: {
 						Name: "get_latest_price_sequence_number",
