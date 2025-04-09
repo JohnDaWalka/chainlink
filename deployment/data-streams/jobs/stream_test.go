@@ -1,7 +1,6 @@
 package jobs
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -86,10 +85,11 @@ ask_price [type=median allowedFaults=1 index=2];
 
 func TestStreamJobSpec_Median_MarshalTOML(t *testing.T) {
 	testCases := []struct {
-		name string
-		spec StreamJobSpec
-		obs  MedianObservationSource
-		want string
+		name   string
+		spec   StreamJobSpec
+		base   BaseObservationSource
+		fields ReportFields
+		want   string
 	}{
 		{
 			name: "multiple datasources with valid paths",
@@ -102,20 +102,20 @@ func TestStreamJobSpec_Median_MarshalTOML(t *testing.T) {
 				},
 				StreamID: "1000",
 			},
-			obs: MedianObservationSource{
-				BaseObservationSource: BaseObservationSource{
-					Datasources: []Datasource{
-						{
-							BridgeName: "bridge1",
-							ReqData:    `{"data":{"endpoint":"test1"}}`,
-						},
-						{
-							BridgeName: "bridge2",
-							ReqData:    `{"data":{"endpoint":"test2"}}`,
-						},
+			base: BaseObservationSource{
+				Datasources: []Datasource{
+					{
+						BridgeName: "bridge1",
+						ReqData:    `{"data":{"endpoint":"test1"}}`,
 					},
-					AllowedFaults: 2,
+					{
+						BridgeName: "bridge2",
+						ReqData:    `{"data":{"endpoint":"test2"}}`,
+					},
 				},
+				AllowedFaults: 2,
+			},
+			fields: MedianReportFields{
 				Benchmark: ReportFieldLLO{
 					ResultPath: "data,median",
 				},
@@ -133,13 +133,13 @@ func TestStreamJobSpec_Median_MarshalTOML(t *testing.T) {
 				},
 				StreamID: "2000",
 			},
-			obs: MedianObservationSource{
-				BaseObservationSource: BaseObservationSource{
-					Datasources:   []Datasource{},
-					AllowedFaults: 1,
-				},
+			base: BaseObservationSource{
+				Datasources:   []Datasource{},
+				AllowedFaults: 1,
+			},
+			fields: MedianReportFields{
 				Benchmark: ReportFieldLLO{
-					ResultPath: "data,empty",
+					ResultPath: "data,median",
 				},
 			},
 			want: medianSpecTOMLEmpty,
@@ -148,7 +148,7 @@ func TestStreamJobSpec_Median_MarshalTOML(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.spec.SetObservationSource(tc.obs)
+			err := tc.spec.SetObservationSource(tc.base, tc.fields)
 			require.NoError(t, err)
 			tomlBytes, err := tc.spec.MarshalTOML()
 			require.NoError(t, err)
@@ -160,10 +160,11 @@ func TestStreamJobSpec_Median_MarshalTOML(t *testing.T) {
 
 func TestStreamJobSpec_Quote_MarshalTOML(t *testing.T) {
 	testCases := []struct {
-		name string
-		spec StreamJobSpec
-		obs  QuoteObservationSource
-		want string
+		name   string
+		spec   StreamJobSpec
+		base   BaseObservationSource
+		fields ReportFields
+		want   string
 	}{
 		{
 			name: "multiple datasources with valid paths",
@@ -176,20 +177,20 @@ func TestStreamJobSpec_Quote_MarshalTOML(t *testing.T) {
 				},
 				StreamID: "3000",
 			},
-			obs: QuoteObservationSource{
-				BaseObservationSource: BaseObservationSource{
-					Datasources: []Datasource{
-						{
-							BridgeName: "bridge1",
-							ReqData:    `{"data":{"endpoint":"quote1"}}`,
-						},
-						{
-							BridgeName: "bridge2",
-							ReqData:    `{"data":{"endpoint":"quote2"}}`,
-						},
+			base: BaseObservationSource{
+				Datasources: []Datasource{
+					{
+						BridgeName: "bridge1",
+						ReqData:    `{"data":{"endpoint":"quote1"}}`,
 					},
-					AllowedFaults: 3,
+					{
+						BridgeName: "bridge2",
+						ReqData:    `{"data":{"endpoint":"quote2"}}`,
+					},
 				},
+				AllowedFaults: 3,
+			},
+			fields: QuoteReportFields{
 				Bid: ReportFieldLLO{
 					ResultPath: "data,bid",
 				},
@@ -213,11 +214,11 @@ func TestStreamJobSpec_Quote_MarshalTOML(t *testing.T) {
 				},
 				StreamID: "4000",
 			},
-			obs: QuoteObservationSource{
-				BaseObservationSource: BaseObservationSource{
-					Datasources:   []Datasource{},
-					AllowedFaults: 1,
-				},
+			base: BaseObservationSource{
+				Datasources:   []Datasource{},
+				AllowedFaults: 1,
+			},
+			fields: QuoteReportFields{
 				Bid: ReportFieldLLO{
 					ResultPath: "data,emptyBid",
 				},
@@ -234,7 +235,7 @@ func TestStreamJobSpec_Quote_MarshalTOML(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.spec.SetObservationSource(tc.obs)
+			err := tc.spec.SetObservationSource(tc.base, tc.fields)
 			require.NoError(t, err)
 
 			tomlBytes, err := tc.spec.MarshalTOML()
@@ -245,23 +246,16 @@ func TestStreamJobSpec_Quote_MarshalTOML(t *testing.T) {
 	}
 }
 
-type errorPipeline struct{}
+type invalidStreamTypeReportFields struct {
+}
 
-func (e errorPipeline) Render() (string, error) {
-	return "", errors.New("forced error")
+func (rf invalidStreamTypeReportFields) GetStreamType() StreamType {
+	return StreamType("invalid")
 }
 
 func TestStreamJobSpec_SetObservationSource_Error(t *testing.T) {
-	spec := StreamJobSpec{
-		Base: Base{
-			Name:          "Error-Test",
-			Type:          "stream",
-			SchemaVersion: 1,
-			ExternalJobID: uuid.MustParse("00000000-0000-0000-0000-000000000000"),
-		},
-		StreamID: "5000",
-	}
-	err := spec.SetObservationSource(errorPipeline{})
+	errSpec := StreamJobSpec{}
+	err := errSpec.SetObservationSource(BaseObservationSource{}, invalidStreamTypeReportFields{})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "forced error")
+	require.Contains(t, err.Error(), "unsupported stream type")
 }

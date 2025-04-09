@@ -24,9 +24,11 @@ type CsDistributeStreamJobSpecsConfig struct {
 }
 
 type StreamSpecConfig struct {
-	StreamID        string
-	Name            string
-	StreamType      jobs.StreamType
+	StreamID   string
+	Name       string
+	StreamType jobs.StreamType
+	// ReportFields should be QuoteReportFields, MedianReportFields, etc., based on the stream type.
+	ReportFields    jobs.ReportFields
 	EARequestParams EARequestParams
 	APIs            []string
 	AllowedFaults   int
@@ -57,15 +59,14 @@ func (CsDistributeStreamJobSpecs) Apply(e deployment.Environment, cfg CsDistribu
 
 	var proposals []*jobv1.ProposeJobRequest
 	for _, s := range cfg.Streams {
-		spec, err := generateJobSpec(s)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to create stream spec: %w", err)
-		}
-
 		for _, n := range oracleNodes {
+			spec, err := generateJobSpec(s)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to create stream job spec: %w", err)
+			}
 			renderedSpec, err := spec.MarshalTOML()
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to marshal stream spec: %w", err)
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to marshal stream job spec: %w", err)
 			}
 
 			proposals = append(proposals, &jobv1.ProposeJobRequest{
@@ -86,55 +87,31 @@ func (CsDistributeStreamJobSpecs) Apply(e deployment.Environment, cfg CsDistribu
 	}, nil
 }
 
-func generateJobSpec(ssc StreamSpecConfig) (spec *jobs.StreamJobSpec, err error) {
+func generateJobSpec(cc StreamSpecConfig) (spec *jobs.StreamJobSpec, err error) {
 	spec = &jobs.StreamJobSpec{
 		Base: jobs.Base{
-			Name:          fmt.Sprintf("%s | %d", ssc.Name, ssc.StreamID),
+			Name:          fmt.Sprintf("%s | %s", cc.Name, cc.StreamID),
 			Type:          jobs.JobSpecTypeStream,
 			SchemaVersion: 1,
 			ExternalJobID: uuid.New(),
 		},
-		StreamID: ssc.StreamID,
+		StreamID: cc.StreamID,
 	}
 
 	base := jobs.BaseObservationSource{
-		Datasources:   generateDatasources(ssc),
-		AllowedFaults: ssc.AllowedFaults,
+		Datasources:   generateDatasources(cc),
+		AllowedFaults: cc.AllowedFaults,
 	}
 
-	switch ssc.StreamType {
-	case jobs.StreamTypeQuote:
-		err = spec.SetObservationSource(jobs.QuoteObservationSource{
-			BaseObservationSource: base,
-			Bid: jobs.ReportFieldLLO{
-				ResultPath: "data,bid", // TODO maybe "data,result" for all?
-			},
-			Benchmark: jobs.ReportFieldLLO{
-				ResultPath: "data,mid",
-			},
-			Ask: jobs.ReportFieldLLO{
-				ResultPath: "data,ask",
-			},
-		})
-	case jobs.StreamTypeMedian:
-		err = spec.SetObservationSource(jobs.MedianObservationSource{
-			BaseObservationSource: base,
-			Benchmark: jobs.ReportFieldLLO{
-				ResultPath: "data,mid",
-			},
-		})
-		// TODO Add the rest of the stream types.
-	default:
-		return nil, fmt.Errorf("unsupported stream type: %s", ssc.StreamType)
-	}
+	err = spec.SetObservationSource(base, cc.ReportFields)
 
 	return spec, err
 }
 
-func generateDatasources(ssc StreamSpecConfig) []jobs.Datasource {
-	dss := make([]jobs.Datasource, len(ssc.APIs))
-	params := ssc.EARequestParams
-	for i, api := range ssc.APIs {
+func generateDatasources(cc StreamSpecConfig) []jobs.Datasource {
+	dss := make([]jobs.Datasource, len(cc.APIs))
+	params := cc.EARequestParams
+	for i, api := range cc.APIs {
 		dss[i] = jobs.Datasource{
 			BridgeName: fmt.Sprintf("bridge-%s", api),
 			ReqData:    fmt.Sprintf(`{"data":{"endpoint":"%s","from":"%s","to":"%s"}}`, params.Endpoint, params.From, params.To),
