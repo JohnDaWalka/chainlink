@@ -354,6 +354,7 @@ func (f *outgoingConnectorFetcherFactory) NewFetcher(log logger.Logger, emitter 
 			Body:       req.Body,
 			TimeoutMs:  req.TimeoutMs,
 			WorkflowID: req.Metadata.WorkflowID,
+			MaxRetries: req.MaxRetries,
 		})
 		if err != nil {
 			return nil, err

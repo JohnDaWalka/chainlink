@@ -11,6 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/backoff"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
@@ -73,77 +74,100 @@ func NewOutgoingConnectorHandler(gc connector.GatewayConnector, config ServiceCo
 }
 
 // HandleSingleNodeRequest sends a request to first available gateway node and blocks until response is received
-// TODO: handle retries
 func (c *OutgoingConnectorHandler) HandleSingleNodeRequest(ctx context.Context, messageID string, req capabilities.Request) (*api.Message, error) {
-	lggr := logger.With(c.lggr, "messageID", messageID, "workflowID", req.WorkflowID)
-	workflowAllow, globalAllow := c.outgoingRateLimiter.AllowVerbose(req.WorkflowID)
-	if !workflowAllow {
-		return nil, errors.New(errorOutgoingRatelimitWorkflow)
-	}
-	if !globalAllow {
-		return nil, errors.New(errorOutgoingRatelimitGlobal)
-	}
-
 	// set default timeout if not provided for all outgoing requests
 	if req.TimeoutMs == 0 {
 		req.TimeoutMs = defaultFetchTimeoutMs
 	}
+	sendRequest := c.createSendRequest(ctx, messageID, req)
+	return c.createHandleSingleNodeRequest(sendRequest)(ctx, messageID, req)
+}
 
-	// Create a subcontext with the timeout plus some margin for the gateway to process the request
-	timeoutDuration := time.Duration(req.TimeoutMs) * time.Millisecond
-	margin := 100 * time.Millisecond
-	ctx, cancel := context.WithTimeout(ctx, timeoutDuration+margin)
-	defer cancel()
-
-	payload, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal fetch request: %w", err)
-	}
-
-	ch, err := c.responses.new(messageID)
-	if err != nil {
-		return nil, fmt.Errorf("duplicate message received for ID: %s", messageID)
-	}
-	defer c.responses.cleanup(messageID)
-
-	lggr.Debugw("sending request to gateway")
-
-	body := &api.MessageBody{
-		MessageId: messageID,
-		DonId:     c.gc.DonID(),
-		Method:    c.method,
-		Payload:   payload,
-	}
-
-	selectedGateway, err := c.awaitConnection(ctx, awaitContext{
-		messageID:  messageID,
-		workflowID: req.WorkflowID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if err := c.gc.SignAndSendToGateway(ctx, selectedGateway, body); err != nil {
-		return nil, errors.Wrap(err, "failed to send request to gateway")
-	}
-
-	select {
-	case resp := <-ch:
-		switch resp.Body.Method {
-		case api.MethodInternalError:
-			var errPayload api.JsonRPCError
-			err := json.Unmarshal(resp.Body.Payload, &errPayload)
-			if err != nil {
-				lggr.Errorw("failed to unmarshal err payload", "err", err)
-				return nil, errors.New("unknown internal error")
+func (c *OutgoingConnectorHandler) createHandleSingleNodeRequest(sendRequest func() (*api.Message, error), opts ...backoff.RetryOption) func(context.Context, string, capabilities.Request) (*api.Message, error) {
+	return func(ctx context.Context, messageID string, req capabilities.Request) (*api.Message, error) {
+		if req.MaxRetries > 0 {
+			defaultOpts := []backoff.RetryOption{
+				backoff.WithBackOff(backoff.NewExponentialBackOff()),
+				backoff.WithMaxElapsedTime(time.Duration(req.TimeoutMs) * time.Millisecond),
+				backoff.WithMaxTries(uint(req.MaxRetries)),
 			}
-			return nil, errors.New(errPayload.Message)
-		default:
-			lggr.Debugw("received response from gateway")
-			return resp, nil
+
+			// override default opts with incoming opts, if any
+			opts = append(defaultOpts, opts...)
+			return backoff.Retry(ctx, sendRequest, opts...)
 		}
-	case <-ctx.Done():
-		return nil, ctx.Err()
+
+		return sendRequest()
+	}
+}
+
+func (c *OutgoingConnectorHandler) createSendRequest(ctx context.Context, messageID string, req capabilities.Request) func() (*api.Message, error) {
+	return func() (*api.Message, error) {
+		lggr := logger.With(c.lggr, "messageID", messageID, "workflowID", req.WorkflowID)
+		workflowAllow, globalAllow := c.outgoingRateLimiter.AllowVerbose(req.WorkflowID)
+		if !workflowAllow {
+			return nil, errors.New(errorOutgoingRatelimitWorkflow)
+		}
+		if !globalAllow {
+			return nil, errors.New(errorOutgoingRatelimitGlobal)
+		}
+
+		// Create a subcontext with the timeout plus some margin for the gateway to process the request
+		timeoutDuration := time.Duration(req.TimeoutMs) * time.Millisecond
+		margin := 100 * time.Millisecond
+		ctx, cancel := context.WithTimeout(ctx, timeoutDuration+margin)
+		defer cancel()
+
+		payload, err := json.Marshal(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal fetch request: %w", err)
+		}
+
+		ch, err := c.responses.new(messageID)
+		if err != nil {
+			return nil, fmt.Errorf("duplicate message received for ID: %s", messageID)
+		}
+		defer c.responses.cleanup(messageID)
+
+		lggr.Debugw("sending request to gateway")
+
+		body := &api.MessageBody{
+			MessageId: messageID,
+			DonId:     c.gc.DonID(),
+			Method:    c.method,
+			Payload:   payload,
+		}
+
+		selectedGateway, err := c.awaitConnection(ctx, awaitContext{
+			messageID:  messageID,
+			workflowID: req.WorkflowID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if err := c.gc.SignAndSendToGateway(ctx, selectedGateway, body); err != nil {
+			return nil, errors.Wrap(err, "failed to send request to gateway")
+		}
+
+		select {
+		case resp := <-ch:
+			switch resp.Body.Method {
+			case api.MethodInternalError:
+				var errPayload api.JsonRPCError
+				err := json.Unmarshal(resp.Body.Payload, &errPayload)
+				if err != nil {
+					lggr.Errorw("failed to unmarshal err payload", "err", err)
+					return nil, errors.New("unknown internal error")
+				}
+				return nil, errors.New(errPayload.Message)
+			default:
+				lggr.Debugw("received response from gateway")
+				return resp, nil
+			}
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 }
 
