@@ -372,7 +372,7 @@ func TestORM_SetBroadcastBeforeBlockNum(t *testing.T) {
 	t.Parallel()
 
 	db := testutils.NewSqlxDB(t)
-	cfg := configtest.NewChainScopedConfig(t, overrideDefaultID)
+	cfg := configtest.NewChainScopedConfig(t, nil)
 	txStore := cltest.NewTestTxStore(t, db)
 	ethKeyStore := cltest.NewKeyStore(t, db).Eth()
 	ethClient := clienttest.NewClientWithDefaultChainID(t)
@@ -658,7 +658,7 @@ func TestORM_FindTxesPendingCallback(t *testing.T) {
 func Test_FindTxWithIdempotencyKey(t *testing.T) {
 	t.Parallel()
 	db := testutils.NewSqlxDB(t)
-	cfg := configtest.NewChainScopedConfig(t, overrideDefaultID)
+	cfg := configtest.NewChainScopedConfig(t, nil)
 	txStore := cltest.NewTestTxStore(t, db)
 	ethKeyStore := cltest.NewKeyStore(t, db).Eth()
 	_, fromAddress := cltest.MustInsertRandomKeyReturningState(t, ethKeyStore)

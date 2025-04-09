@@ -22,7 +22,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/client"
 	"github.com/smartcontractkit/chainlink-evm/pkg/config/configtest"
-	"github.com/smartcontractkit/chainlink-evm/pkg/config/toml"
 	"github.com/smartcontractkit/chainlink-evm/pkg/heads/headstest"
 	"github.com/smartcontractkit/chainlink-evm/pkg/logpoller"
 	"github.com/smartcontractkit/chainlink-evm/pkg/testutils"
@@ -33,12 +32,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/forwarders"
 )
 
-var overrideDefaultID = func(c *toml.EVMConfig) { c.ChainID = ubig.New(testutils.FixtureChainID) }
-
 func TestFwdMgr_MaybeForwardTransaction(t *testing.T) {
 	lggr := logger.Test(t)
 	db := testutils.NewSqlxDB(t)
-	evmcfg := configtest.NewChainScopedConfig(t, overrideDefaultID)
+	evmcfg := configtest.NewChainScopedConfig(t, nil)
 	owner := testutils.MustNewSimTransactor(t)
 	ctx := testutils.Context(t)
 
@@ -107,7 +104,7 @@ func TestFwdMgr_AccountUnauthorizedToForward_SkipsForwarding(t *testing.T) {
 	lggr := logger.Test(t)
 	db := testutils.NewSqlxDB(t)
 	ctx := testutils.Context(t)
-	evmcfg := configtest.NewChainScopedConfig(t, overrideDefaultID)
+	evmcfg := configtest.NewChainScopedConfig(t, nil)
 	owner := testutils.MustNewSimTransactor(t)
 	b := simulated.NewBackend(types.GenesisAlloc{
 		owner.From: {
@@ -156,7 +153,7 @@ func TestFwdMgr_InvalidForwarderForOCR2FeedsStates(t *testing.T) {
 	lggr := logger.Test(t)
 	db := testutils.NewSqlxDB(t)
 	ctx := testutils.Context(t)
-	evmcfg := configtest.NewChainScopedConfig(t, overrideDefaultID)
+	evmcfg := configtest.NewChainScopedConfig(t, nil)
 	owner := testutils.MustNewSimTransactor(t)
 	ec := simulated.NewBackend(types.GenesisAlloc{
 		owner.From: {

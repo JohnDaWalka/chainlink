@@ -102,7 +102,7 @@ func TestEthConfirmer_Lifecycle(t *testing.T) {
 	t.Parallel()
 
 	db := testutils.NewSqlxDB(t)
-	config := configtest.NewChainScopedConfig(t, overrideDefaultID)
+	config := configtest.NewChainScopedConfig(t, nil)
 	txStore := newTxStore(t, db)
 
 	memKS := keystest.NewMemoryChainStore()
@@ -421,7 +421,7 @@ func TestEthConfirmer_FindTxsRequiringRebroadcast(t *testing.T) {
 
 	ethClient := clienttest.NewClientWithDefaultChainID(t)
 
-	evmcfg := configtest.NewChainScopedConfig(t, overrideDefaultID)
+	evmcfg := configtest.NewChainScopedConfig(t, nil)
 
 	memKS := keystest.NewMemoryChainStore()
 	fromAddress := memKS.MustCreate(t)
@@ -1365,7 +1365,7 @@ func TestEthConfirmer_RebroadcastWhereNecessary_WhenOutOfEth(t *testing.T) {
 	fromAddress := memKS.MustCreate(t)
 	ethKeyStore := keys.NewChainStore(memKS, ethClient.ConfiguredChainID())
 
-	config := configtest.NewChainScopedConfig(t, overrideDefaultID)
+	config := configtest.NewChainScopedConfig(t, nil)
 	currentHead := int64(30)
 	oldEnough := int64(19)
 	nonce := int64(0)
@@ -1547,7 +1547,7 @@ func TestEthConfirmer_ForceRebroadcast(t *testing.T) {
 
 	memKS := keystest.NewMemoryChainStore()
 	fromAddress := memKS.MustCreate(t)
-	config := configtest.NewChainScopedConfig(t, overrideDefaultID)
+	config := configtest.NewChainScopedConfig(t, nil)
 	ethKeyStore := keys.NewChainStore(memKS, testutils.FixtureChainID)
 
 	mustCreateUnstartedGeneratedTx(t, txStore, fromAddress, config.EVM().ChainID())
