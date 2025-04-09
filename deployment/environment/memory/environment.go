@@ -47,6 +47,7 @@ func GetProgramsPath() string {
 type MemoryEnvironmentConfig struct {
 	Chains             int
 	SolChains          int
+	ZkChains           int
 	NumOfUsersPerChain int
 	Nodes              int
 	Bootstraps         int
@@ -218,6 +219,10 @@ func NewMemoryEnvironmentFromChainsNodes(
 func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Level, config MemoryEnvironmentConfig) deployment.Environment {
 	chains, _ := NewMemoryChains(t, config.Chains, config.NumOfUsersPerChain)
 	solChains := NewMemoryChainsSol(t, config.SolChains)
+	zkChains := NewZKChains(t, config.ZkChains)
+	for chainSel, chain := range zkChains {
+		chains[chainSel] = chain
+	}
 	nodes := NewNodes(t, logLevel, chains, solChains, config.Nodes, config.Bootstraps, config.RegistryConfig)
 	var nodeIDs []string
 	for id := range nodes {
