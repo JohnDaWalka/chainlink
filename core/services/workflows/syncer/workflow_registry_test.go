@@ -65,10 +65,6 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		// Capture messages on event channel
-		eventCh := make(chan Event, 100)
-		wr.eventCh = eventCh
-
 		wfID := [32]byte{1}
 		owner := []byte{}
 		status := uint8(0)
@@ -89,12 +85,11 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 			},
 		}
 
-		wr.workflowMetadataToEvents(ctx, metadata, donID)
+		events := wr.workflowMetadataToEvents(ctx, metadata, donID)
 
-		// The first event is WorkflowRegisteredEvent
-		event, err := readEventCh(eventCh)
-		require.NoError(t, err)
-		require.Equal(t, WorkflowRegisteredEvent, event.GetEventType())
+		// The only event is WorkflowRegisteredEvent
+		require.Equal(t, 1, len(events))
+		require.Equal(t, WorkflowRegisteredEvent, events[0].GetEventType())
 		expectedRegisteredEvent := WorkflowRegistryWorkflowRegisteredV1{
 			WorkflowID:    wfID,
 			WorkflowOwner: owner,
@@ -105,11 +100,7 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 			ConfigURL:     configURL,
 			SecretsURL:    secretsURL,
 		}
-		require.Equal(t, expectedRegisteredEvent, event.GetData())
-
-		// No other events on the channel
-		_, err = readEventCh(eventCh)
-		require.ErrorContains(t, err, errNoEvent)
+		require.Equal(t, expectedRegisteredEvent, events[0].GetData())
 	})
 
 	t.Run("WorkflowUpdatedEvent", func(t *testing.T) {
@@ -139,10 +130,6 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		// Capture messages on event channel
-		eventCh := make(chan Event, 100)
-		wr.eventCh = eventCh
-
 		// The workflow metadata gets updated
 		wfID2 := [32]byte{2}
 		status := uint8(0)
@@ -162,12 +149,11 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 			},
 		}
 
-		wr.workflowMetadataToEvents(ctx, metadata, donID)
+		events := wr.workflowMetadataToEvents(ctx, metadata, donID)
 
-		// The first event is WorkflowUpdatedEvent
-		event, err := readEventCh(eventCh)
-		require.NoError(t, err)
-		require.Equal(t, WorkflowUpdatedEvent, event.GetEventType())
+		// The only event is WorkflowUpdatedEvent
+		require.Equal(t, 1, len(events))
+		require.Equal(t, WorkflowUpdatedEvent, events[0].GetEventType())
 		expectedUpdatedEvent := WorkflowRegistryWorkflowUpdatedV1{
 			OldWorkflowID: wfID,
 			NewWorkflowID: wfID2,
@@ -178,11 +164,7 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 			ConfigURL:     configURL,
 			SecretsURL:    secretsURL,
 		}
-		require.Equal(t, expectedUpdatedEvent, event.GetData())
-
-		// No other events on the channel
-		_, err = readEventCh(eventCh)
-		require.ErrorContains(t, err, errNoEvent)
+		require.Equal(t, expectedUpdatedEvent, events[0].GetData())
 	})
 
 	t.Run("WorkflowDeletedEvent", func(t *testing.T) {
@@ -212,30 +194,21 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		// Capture messages on event channel
-		eventCh := make(chan Event, 100)
-		wr.eventCh = eventCh
-
 		// The workflow metadata is empty
 		metadata := []GetWorkflowMetadata{}
 
-		wr.workflowMetadataToEvents(ctx, metadata, donID)
+		events := wr.workflowMetadataToEvents(ctx, metadata, donID)
 
-		// The first event is WorkflowDeletedEvent
-		event, err := readEventCh(eventCh)
-		require.NoError(t, err)
-		require.Equal(t, WorkflowDeletedEvent, event.GetEventType())
+		// The only event is WorkflowDeletedEvent
+		require.Equal(t, 1, len(events))
+		require.Equal(t, WorkflowDeletedEvent, events[0].GetEventType())
 		expectedUpdatedEvent := WorkflowRegistryWorkflowDeletedV1{
 			WorkflowID:    wfID,
 			WorkflowOwner: owner,
 			DonID:         donID,
 			WorkflowName:  wfName,
 		}
-		require.Equal(t, expectedUpdatedEvent, event.GetData())
-
-		// No other events on the channel
-		_, err = readEventCh(eventCh)
-		require.ErrorContains(t, err, errNoEvent)
+		require.Equal(t, expectedUpdatedEvent, events[0].GetData())
 	})
 
 	t.Run("No change", func(t *testing.T) {
@@ -260,10 +233,6 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		// Capture messages on event channel
-		eventCh := make(chan Event, 100)
-		wr.eventCh = eventCh
-
 		wfID := [32]byte{1}
 		owner := []byte{}
 		status := uint8(0)
@@ -284,12 +253,11 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 			},
 		}
 
-		wr.workflowMetadataToEvents(ctx, metadata, donID)
+		events := wr.workflowMetadataToEvents(ctx, metadata, donID)
 
-		// The first event is WorkflowRegisteredEvent
-		event, err := readEventCh(eventCh)
-		require.NoError(t, err)
-		require.Equal(t, WorkflowRegisteredEvent, event.GetEventType())
+		// The only event is WorkflowRegisteredEvent
+		require.Equal(t, 1, len(events))
+		require.Equal(t, WorkflowRegisteredEvent, events[0].GetEventType())
 		expectedRegisteredEvent := WorkflowRegistryWorkflowRegisteredV1{
 			WorkflowID:    wfID,
 			WorkflowOwner: owner,
@@ -300,23 +268,18 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 			ConfigURL:     configURL,
 			SecretsURL:    secretsURL,
 		}
-		require.Equal(t, expectedRegisteredEvent, event.GetData())
-
-		// No other events on the channel
-		_, err = readEventCh(eventCh)
-		require.ErrorContains(t, err, errNoEvent)
+		require.Equal(t, expectedRegisteredEvent, events[0].GetData())
 
 		// Add the workflow to the engine registry as the handler would
 		err = er.Add(EngineRegistryKey{Owner: owner, Name: wfName}, &mockService{}, wfID)
 		require.NoError(t, err)
 
 		// Repeated ticks do not make any new events
-		wr.workflowMetadataToEvents(ctx, metadata, donID)
-		_, err = readEventCh(eventCh)
-		require.ErrorContains(t, err, errNoEvent)
+		events = wr.workflowMetadataToEvents(ctx, metadata, donID)
+		require.Equal(t, 0, len(events))
 	})
 
-	t.Run("Paused workflow doesn't start a new workflow", func(t *testing.T) {
+	t.Run("A paused workflow doesn't start a new workflow", func(t *testing.T) {
 		lggr := logger.TestLogger(t)
 		ctx := testutils.Context(t)
 		donID := uint32(1)
@@ -338,10 +301,6 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		// Capture messages on event channel
-		eventCh := make(chan Event, 100)
-		wr.eventCh = eventCh
-
 		wfID := [32]byte{1}
 		owner := []byte{}
 		status := uint8(1)
@@ -362,14 +321,12 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 			},
 		}
 
-		wr.workflowMetadataToEvents(ctx, metadata, donID)
-
-		// No events on the channel
-		_, err = readEventCh(eventCh)
-		require.ErrorContains(t, err, errNoEvent)
+		events := wr.workflowMetadataToEvents(ctx, metadata, donID)
+		// No events
+		require.Equal(t, 0, len(events))
 	})
 
-	t.Run("Paused workflow deletes a running workflow", func(t *testing.T) {
+	t.Run("A paused workflow deletes a running workflow", func(t *testing.T) {
 		lggr := logger.TestLogger(t)
 		ctx := testutils.Context(t)
 		donID := uint32(1)
@@ -396,10 +353,6 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		// Capture messages on event channel
-		eventCh := make(chan Event, 100)
-		wr.eventCh = eventCh
-
 		// The workflow metadata gets updated
 		status := uint8(1)
 		binaryURL := "b1"
@@ -418,22 +371,17 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 			},
 		}
 
-		wr.workflowMetadataToEvents(ctx, metadata, donID)
+		events := wr.workflowMetadataToEvents(ctx, metadata, donID)
 
-		// The first event is WorkflowDeletedEvent
-		event, err := readEventCh(eventCh)
-		require.NoError(t, err)
-		require.Equal(t, WorkflowDeletedEvent, event.GetEventType())
+		// The only event is WorkflowDeletedEvent
+		require.Equal(t, 1, len(events))
+		require.Equal(t, WorkflowDeletedEvent, events[0].GetEventType())
 		expectedUpdatedEvent := WorkflowRegistryWorkflowDeletedV1{
 			WorkflowID:    wfID,
 			WorkflowOwner: owner,
 			DonID:         donID,
 			WorkflowName:  wfName,
 		}
-		require.Equal(t, expectedUpdatedEvent, event.GetData())
-
-		// No other events on the channel
-		_, err = readEventCh(eventCh)
-		require.ErrorContains(t, err, errNoEvent)
+		require.Equal(t, expectedUpdatedEvent, events[0].GetData())
 	})
 }

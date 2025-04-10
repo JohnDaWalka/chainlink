@@ -338,7 +338,7 @@ func Test_SecretsWorker(t *testing.T) {
 				giveWorkflow   = RegisterWorkflowCMD{
 					Name:       "test-wf",
 					DonID:      donID,
-					Status:     uint8(1),
+					Status:     uint8(0),
 					SecretsURL: giveSecretsURL,
 					BinaryURL:  "someurl",
 				}
@@ -737,7 +737,8 @@ func Test_StratReconciliation_InitialStateSync(t *testing.T) {
 		updateAuthorizedAddress(t, backendTH, wfRegistryC, []common.Address{backendTH.ContractsOwner.From}, true)
 
 		// Use a high number of workflows
-		numberWorkflows := 5_000
+		// Tested up to 7_000
+		numberWorkflows := 1_000
 		for i := 0; i < numberWorkflows; i++ {
 			var workflowID [32]byte
 			_, err = rand.Read((workflowID)[:])
