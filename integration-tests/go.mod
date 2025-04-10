@@ -49,7 +49,7 @@ require (
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250408103656-875e982e6437
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250408172557-9bce44d32d44
-	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250409175305-175440040ac1
+	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250409205209-deaaa9be64b7
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250408161604-b6539361da24
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.5
@@ -159,6 +159,8 @@ require (
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/cli/safeexec v1.0.0 // indirect
+	github.com/cloudevents/sdk-go/binding/format/protobuf/v2 v2.15.2 // indirect
+	github.com/cloudevents/sdk-go/v2 v2.16.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/cockroachdb/errors v1.11.3 // indirect
@@ -203,6 +205,7 @@ require (
 	github.com/doyensec/safeurl v0.2.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.7.0 // indirect
+	github.com/ebitengine/purego v0.8.2 // indirect
 	github.com/edsrzf/mmap-go v1.2.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/esote/minmaxheap v1.0.0 // indirect
@@ -441,7 +444,7 @@ require (
 	github.com/sethvargo/go-retry v0.2.4 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.24.3 // indirect
-	github.com/shoenig/go-m1cpu v0.1.6 // indirect
+	github.com/shirou/gopsutil/v4 v4.25.2 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250325191518-036bb568a69d // indirect

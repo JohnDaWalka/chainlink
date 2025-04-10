@@ -35,7 +35,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.49
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250408103656-875e982e6437
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250408172557-9bce44d32d44
-	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250409175305-175440040ac1
+	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250409205209-deaaa9be64b7
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250408161604-b6539361da24
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250402142713-6529d36f91f3
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0
@@ -128,6 +128,8 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/chaos-mesh/chaos-mesh/api v0.0.0-20240821051457-da69c6d9617a // indirect
+	github.com/cloudevents/sdk-go/binding/format/protobuf/v2 v2.15.2 // indirect
+	github.com/cloudevents/sdk-go/v2 v2.16.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/cockroachdb/errors v1.11.3 // indirect
