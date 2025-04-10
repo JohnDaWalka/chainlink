@@ -2,7 +2,6 @@ package syncer
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,11 +9,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-)
-
-const (
-	errChanClosed = "channel closed"
-	errNoEvent    = "no event"
 )
 
 type mockService struct{}
@@ -28,19 +22,6 @@ func (m *mockService) HealthReport() map[string]error { return map[string]error{
 func (m *mockService) Ready() error { return nil }
 
 func (m *mockService) Name() string { return "svc" }
-
-func readEventCh(ch chan Event) (Event, error) {
-	select {
-	case event, ok := <-ch:
-		if ok {
-			return event, nil
-		} else {
-			return nil, errors.New(errChanClosed)
-		}
-	default:
-		return nil, errors.New(errNoEvent)
-	}
-}
 
 func Test_workflowMetadataToEvents(t *testing.T) {
 	t.Run("WorkflowRegisteredEvent", func(t *testing.T) {
@@ -88,7 +69,7 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		events := wr.workflowMetadataToEvents(ctx, metadata, donID)
 
 		// The only event is WorkflowRegisteredEvent
-		require.Equal(t, 1, len(events))
+		require.Len(t, events, 1)
 		require.Equal(t, WorkflowRegisteredEvent, events[0].GetEventType())
 		expectedRegisteredEvent := WorkflowRegistryWorkflowRegisteredV1{
 			WorkflowID:    wfID,
@@ -152,7 +133,7 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		events := wr.workflowMetadataToEvents(ctx, metadata, donID)
 
 		// The only event is WorkflowUpdatedEvent
-		require.Equal(t, 1, len(events))
+		require.Len(t, events, 1)
 		require.Equal(t, WorkflowUpdatedEvent, events[0].GetEventType())
 		expectedUpdatedEvent := WorkflowRegistryWorkflowUpdatedV1{
 			OldWorkflowID: wfID,
@@ -200,7 +181,7 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		events := wr.workflowMetadataToEvents(ctx, metadata, donID)
 
 		// The only event is WorkflowDeletedEvent
-		require.Equal(t, 1, len(events))
+		require.Len(t, events, 1)
 		require.Equal(t, WorkflowDeletedEvent, events[0].GetEventType())
 		expectedUpdatedEvent := WorkflowRegistryWorkflowDeletedV1{
 			WorkflowID:    wfID,
@@ -256,7 +237,7 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		events := wr.workflowMetadataToEvents(ctx, metadata, donID)
 
 		// The only event is WorkflowRegisteredEvent
-		require.Equal(t, 1, len(events))
+		require.Len(t, events, 1)
 		require.Equal(t, WorkflowRegisteredEvent, events[0].GetEventType())
 		expectedRegisteredEvent := WorkflowRegistryWorkflowRegisteredV1{
 			WorkflowID:    wfID,
@@ -276,7 +257,7 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 
 		// Repeated ticks do not make any new events
 		events = wr.workflowMetadataToEvents(ctx, metadata, donID)
-		require.Equal(t, 0, len(events))
+		require.Empty(t, events)
 	})
 
 	t.Run("A paused workflow doesn't start a new workflow", func(t *testing.T) {
@@ -323,7 +304,7 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 
 		events := wr.workflowMetadataToEvents(ctx, metadata, donID)
 		// No events
-		require.Equal(t, 0, len(events))
+		require.Empty(t, events)
 	})
 
 	t.Run("A paused workflow deletes a running workflow", func(t *testing.T) {
@@ -374,7 +355,7 @@ func Test_workflowMetadataToEvents(t *testing.T) {
 		events := wr.workflowMetadataToEvents(ctx, metadata, donID)
 
 		// The only event is WorkflowDeletedEvent
-		require.Equal(t, 1, len(events))
+		require.Len(t, events, 1)
 		require.Equal(t, WorkflowDeletedEvent, events[0].GetEventType())
 		expectedUpdatedEvent := WorkflowRegistryWorkflowDeletedV1{
 			WorkflowID:    wfID,
