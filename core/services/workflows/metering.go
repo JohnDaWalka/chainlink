@@ -8,11 +8,11 @@ import (
 	"github.com/shopspring/decimal"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
+	"github.com/smartcontractkit/chainlink-common/pkg/metering/pb"
 )
 
 const (
-	MeteringReportSchema string = "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb/capabilities.proto"
+	MeteringReportSchema string = "github.com/smartcontractkit/chainlink-common/pkg/metering/pb/metering.proto"
 	MeteringReportDomain string = "platform"
 	MeteringReportEntity string = "MeteringReport"
 	MeteringProtoPkg     string = "pb"
