@@ -8,8 +8,9 @@ import (
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	dftypes "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds"
-	dfevm "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds/evm"
 	"github.com/smartcontractkit/chainlink-evm/pkg/report/monitor"
+	"github.com/smartcontractkit/chainlink-evm/pkg/report/pb/data-feeds/on-chain/registry"
+	wt "github.com/smartcontractkit/chainlink-evm/pkg/report/pb/platform"
 	"github.com/smartcontractkit/chainlink-evm/pkg/writetarget"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
@@ -93,7 +94,16 @@ func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain
 		return nil, fmt.Errorf("failed to get chain info: %w", err)
 	}
 
-	beholder, err := writetarget.NewMonitor(ctx, lggr, dfevm.DecodeAsFeedUpdated)
+	registryMetrics, err := registry.NewMetrics()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new registry metrics: %w", err)
+	}
+
+	dfProcessor := &dataFeedsProcessor{
+		metrics: registryMetrics,
+	}
+
+	beholder, err := writetarget.NewMonitor(lggr, []monitor.ProtoProcessor{dfProcessor})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Aptos WT monitor client: %+w", err)
 	}
