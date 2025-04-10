@@ -4,13 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	dftypes "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds"
+	processor "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds/processor"
+
 	"github.com/smartcontractkit/chainlink-evm/pkg/report/monitor"
 	"github.com/smartcontractkit/chainlink-evm/pkg/report/pb/data-feeds/on-chain/registry"
-	wt "github.com/smartcontractkit/chainlink-evm/pkg/report/pb/platform"
 	"github.com/smartcontractkit/chainlink-evm/pkg/writetarget"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
@@ -24,7 +32,7 @@ import (
 	relayevmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
-func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain, gasLimitDefault uint64, lggr logger.Logger) (*targets.WriteTarget, error) {
+func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain, gasLimitDefault uint64, lggr logger.Logger) (capabilities.TargetCapability, error) {
 	// generate ID based on chain selector
 	id := GenerateWriteTargetName(chain.ID().Uint64())
 
@@ -99,9 +107,7 @@ func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain
 		return nil, fmt.Errorf("failed to create new registry metrics: %w", err)
 	}
 
-	dfProcessor := &dataFeedsProcessor{
-		metrics: registryMetrics,
-	}
+	dfProcessor := processor.NewDataFeedsProcessor(registryMetrics)
 
 	beholder, err := writetarget.NewMonitor(lggr, []monitor.ProtoProcessor{dfProcessor})
 	if err != nil {
