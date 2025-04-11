@@ -16214,6 +16214,7 @@ TendermintURL is the HTTP(S) tendermint endpoint for this node.
 [[Solana]]
 ChainID = 'mainnet' # Example
 Enabled = false # Default
+BlockTime = '500ms' # Default
 BalancePollPeriod = '5s' # Default
 ConfirmPollPeriod = '500ms' # Default
 OCR2CachePollPeriod = '1s' # Default
@@ -16235,6 +16236,7 @@ BlockHistoryPollPeriod = '5s' # Default
 BlockHistorySize = 1 # Default
 ComputeUnitLimitDefault = 200_000 # Default
 EstimateComputeUnitLimit = false # Default
+LogPollerStartingLookback = '24h0m0s' # Default
 ```
 
 
@@ -16249,6 +16251,12 @@ ChainID is the Solana chain ID. Must be one of: mainnet, testnet, devnet, localn
 Enabled = false # Default
 ```
 Enabled enables this chain.
+
+### BlockTime
+```toml
+BlockTime = '500ms' # Default
+```
+BlockTime specifies the average time between blocks on this chain
 
 ### BalancePollPeriod
 ```toml
@@ -16380,6 +16388,12 @@ ComputeUnitLimitDefault is the compute units limit applied to transactions unles
 EstimateComputeUnitLimit = false # Default
 ```
 EstimateComputeUnitLimit enables or disables compute unit limit estimations per transaction. If estimations return 0 used compute, the ComputeUnitLimitDefault value is used, if set.
+
+### LogPollerStartingLookback
+```toml
+LogPollerStartingLookback = '24h0m0s' # Default
+```
+LogPollerStartingLookback
 
 ## Solana.MultiNode
 ```toml
