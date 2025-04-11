@@ -139,7 +139,7 @@ runs:
         PRIMARY_KEY="${KEY_PREFIX}-${CURRENT_BRANCH}-${SHORT_SHA}"
         echo "primary-key=${PRIMARY_KEY}" >> $GITHUB_OUTPUT
 
-        if [ "$CURRENT_BRANCH" = "$DEFAULT_BRANCH" ]; then
+        if [ "$CURRENT_BRANCH" = "$CURRENT_BRANCH" ]; then
           exit 0
         fi
 
