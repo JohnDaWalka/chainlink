@@ -2,6 +2,7 @@ package testhelpers
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -778,6 +779,28 @@ func MakeEVMExtraArgsV2(gasLimit uint64, allowOOO bool) []byte {
 	}
 	// pad from the left to 32 bytes
 	allowOOOBytes = common.LeftPadBytes(allowOOOBytes, 32)
+
+	extraArgs = append(extraArgs, gasLimitBytes...)
+	extraArgs = append(extraArgs, allowOOOBytes...)
+	return extraArgs
+}
+
+func MakeSVM2EVMExtraArgsV2(gasLimit uint64, allowOOO bool) []byte {
+	// extra args is the tag followed by the gas limit and allowOOO borsh-encoded.
+	var extraArgs []byte
+	extraArgs = append(extraArgs, evmExtraArgsV2Tag...)
+
+	gasLimitBytes := make([]byte, 8) // uint64 requires 8 bytes
+	binary.LittleEndian.PutUint64(gasLimitBytes, gasLimit)
+	gasLimitBytes = common.RightPadBytes(gasLimitBytes, 32) // pad from the right to 32 bytes for borsh-encoding
+
+	// borsh-encode allowOOO
+	var allowOOOBytes []byte
+	if allowOOO {
+		allowOOOBytes = append(allowOOOBytes, 1)
+	} else {
+		allowOOOBytes = append(allowOOOBytes, 0)
+	}
 
 	extraArgs = append(extraArgs, gasLimitBytes...)
 	extraArgs = append(extraArgs, allowOOOBytes...)
