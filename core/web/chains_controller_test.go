@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/config/toml"
 	"github.com/smartcontractkit/chainlink-evm/pkg/types"
 	ubig "github.com/smartcontractkit/chainlink-evm/pkg/utils/big"
+
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/configtest"
@@ -237,6 +238,7 @@ func Test_SolanaChainsController_Show(t *testing.T) {
 					ID:      validID,
 					Enabled: true,
 					Config: `ChainID = 'Chainlink-12'
+BlockTime = '500ms'
 BalancePollPeriod = '5s'
 ConfirmPollPeriod = '500ms'
 OCR2CachePollPeriod = '1s'
@@ -258,6 +260,7 @@ BlockHistoryPollPeriod = '5s'
 BlockHistorySize = 1
 ComputeUnitLimitDefault = 200000
 EstimateComputeUnitLimit = false
+LogPollerStartingLookback = '24h0m0s'
 Nodes = []
 
 [MultiNode]
