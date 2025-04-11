@@ -882,11 +882,13 @@ func newEthReceipt(blockNumber int64, blockHash common.Hash, txHash common.Hash,
 	transactionIndex := uint(cltest.NewRandomPositiveInt64())
 
 	receipt := evmtypes.Receipt{
-		BlockNumber:      big.NewInt(blockNumber),
-		BlockHash:        blockHash,
-		TxHash:           txHash,
-		TransactionIndex: transactionIndex,
-		Status:           status,
+		BlockNumber:       big.NewInt(blockNumber),
+		BlockHash:         blockHash,
+		TxHash:            txHash,
+		TransactionIndex:  transactionIndex,
+		GasUsed:           123,
+		EffectiveGasPrice: big.NewInt(55),
+		Status:            status,
 	}
 
 	r := txmgr.Receipt{
