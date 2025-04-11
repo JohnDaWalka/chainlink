@@ -3,16 +3,15 @@
 ```mermaid
 flowchart LR
   subgraph chains
+    chainlink-aptos
     chainlink-cosmos
+    chainlink-evm
     chainlink-solana
     chainlink-starknet/relayer
-    chainlink-integrations/evm
   end
 
   subgraph products
     chainlink-automation
-    chainlink-ccip
-    chainlink-ccip/chains/solana
     chainlink-data-streams
     chainlink-feeds
     chainlink-functions
@@ -107,16 +106,15 @@ flowchart LR
 ```mermaid
 flowchart LR
   subgraph chains
+    chainlink-aptos
     chainlink-cosmos
+    chainlink-evm
     chainlink-solana
     chainlink-starknet/relayer
-    chainlink-integrations/evm
   end
 
   subgraph products
     chainlink-automation
-    chainlink-ccip
-    chainlink-ccip/chains/solana
     chainlink-data-streams
     chainlink-feeds
     chainlink-functions
