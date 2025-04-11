@@ -3,6 +3,8 @@
 ChainID = 'mainnet' # Example
 # Enabled enables this chain.
 Enabled = false # Default
+# BlockTime specifies the average time between blocks on this chain
+BlockTime = '500ms' # Default
 # BalancePollPeriod is the rate to poll for SOL balance and update Prometheus metrics.
 BalancePollPeriod = '5s' # Default
 # ConfirmPollPeriod is the rate to poll for signature confirmation.
@@ -50,6 +52,8 @@ BlockHistorySize = 1 # Default
 ComputeUnitLimitDefault = 200_000 # Default
 # EstimateComputeUnitLimit enables or disables compute unit limit estimations per transaction. If estimations return 0 used compute, the ComputeUnitLimitDefault value is used, if set.
 EstimateComputeUnitLimit = false # Default
+# LogPollerStartingLookback
+LogPollerStartingLookback = '24h0m0s' # Default
 
 [Solana.MultiNode]
 # Enabled enables the multinode feature.

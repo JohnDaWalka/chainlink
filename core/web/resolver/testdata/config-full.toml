@@ -487,6 +487,7 @@ SendOnly = true
 [[Solana]]
 ChainID = 'mainnet'
 Enabled = false
+BlockTime = '500ms'
 BalancePollPeriod = '1m0s'
 ConfirmPollPeriod = '1s'
 OCR2CachePollPeriod = '1m0s'
@@ -508,6 +509,7 @@ BlockHistoryPollPeriod = '5s'
 BlockHistorySize = 1
 ComputeUnitLimitDefault = 200000
 EstimateComputeUnitLimit = false
+LogPollerStartingLookback = '24h0m0s'
 
 [Solana.MultiNode]
 Enabled = false
