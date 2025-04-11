@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/backoff"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
@@ -330,24 +329,25 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 }
 
 func Test_handleSingleNodeRequest(t *testing.T) {
+	lggr := logger.TestLogger(t)
 	t.Run("OK-success on first attempt", func(t *testing.T) {
 		wantCalls := 1
 		maxRetries := defaultMaxRetries
 		gotCalls := 0
-		opts := []backoff.RetryOption{
-			backoff.WithBackOff(&backoff.ZeroBackOff{}),
-		}
+
 		msgID := "msgID"
 		req := ghcapabilities.Request{
 			MaxRetries: uint32(maxRetries),
 		}
-		och := &OutgoingConnectorHandler{}
+		och := &OutgoingConnectorHandler{
+			lggr: lggr,
+		}
 		sendRequest := func(_ context.Context) (*api.Message, error) {
 			gotCalls++
 			return gatewayResponse(t, msgID), nil
 		}
 
-		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries), opts...)
+		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries))
 		require.NoError(t, err)
 		require.Equal(t, msgID, resp.Body.MessageId)
 		require.Equal(t, wantCalls, gotCalls)
@@ -357,14 +357,14 @@ func Test_handleSingleNodeRequest(t *testing.T) {
 		wantCalls := 2
 		maxRetries := wantCalls + 1
 		gotCalls := 0
-		opts := []backoff.RetryOption{
-			backoff.WithBackOff(&backoff.ZeroBackOff{}),
-		}
+
 		msgID := "msgID"
 		req := ghcapabilities.Request{
 			MaxRetries: uint32(maxRetries),
 		}
-		och := &OutgoingConnectorHandler{}
+		och := &OutgoingConnectorHandler{
+			lggr: lggr,
+		}
 		sendRequest := func(_ context.Context) (*api.Message, error) {
 			gotCalls++
 			if gotCalls == wantCalls {
@@ -373,7 +373,7 @@ func Test_handleSingleNodeRequest(t *testing.T) {
 			return nil, assert.AnError
 		}
 
-		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries), opts...)
+		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries))
 		require.NoError(t, err)
 		require.Equal(t, msgID, resp.Body.MessageId)
 		require.Equal(t, wantCalls, gotCalls)
@@ -382,14 +382,14 @@ func Test_handleSingleNodeRequest(t *testing.T) {
 	t.Run("OK-success on last retry", func(t *testing.T) {
 		wantCalls := 3
 		gotCalls := 0
-		opts := []backoff.RetryOption{
-			backoff.WithBackOff(&backoff.ZeroBackOff{}),
-		}
+
 		msgID := "msgID"
 		req := ghcapabilities.Request{
 			MaxRetries: uint32(wantCalls),
 		}
-		och := &OutgoingConnectorHandler{}
+		och := &OutgoingConnectorHandler{
+			lggr: lggr,
+		}
 		sendRequest := func(_ context.Context) (*api.Message, error) {
 			gotCalls++
 			if gotCalls == wantCalls {
@@ -398,7 +398,7 @@ func Test_handleSingleNodeRequest(t *testing.T) {
 			return nil, assert.AnError
 		}
 
-		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries), opts...)
+		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries))
 		require.NoError(t, err)
 		require.Equal(t, msgID, resp.Body.MessageId)
 		require.Equal(t, wantCalls, gotCalls)
@@ -410,7 +410,9 @@ func Test_handleSingleNodeRequest(t *testing.T) {
 
 		msgID := "msgID"
 		req := ghcapabilities.Request{}
-		och := &OutgoingConnectorHandler{}
+		och := &OutgoingConnectorHandler{
+			lggr: lggr,
+		}
 		sendRequest := func(_ context.Context) (*api.Message, error) {
 			gotCalls++
 			return gatewayResponse(t, msgID), nil
@@ -423,44 +425,71 @@ func Test_handleSingleNodeRequest(t *testing.T) {
 	})
 
 	t.Run("NOK-sendRequest always errors upto max retries", func(t *testing.T) {
-		wantCalls := 3
+		giveRetries := 3
+		wantCalls := giveRetries + 1
 		gotCalls := 0
-		opts := []backoff.RetryOption{
-			backoff.WithBackOff(&backoff.ZeroBackOff{}),
-		}
 
 		req := ghcapabilities.Request{
-			MaxRetries: uint32(wantCalls),
+			MaxRetries: uint32(giveRetries),
 		}
-		och := &OutgoingConnectorHandler{}
+		och := &OutgoingConnectorHandler{
+			lggr: lggr,
+		}
 		sendRequest := func(_ context.Context) (*api.Message, error) {
 			gotCalls++
 			return nil, assert.AnError
 		}
 
-		_, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries), opts...)
+		_, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries))
 		require.Error(t, err)
 		require.Equal(t, wantCalls, gotCalls)
 	})
 
 	t.Run("NOK-max retries is capped", func(t *testing.T) {
-		wantCalls := defaultMaxRetries
+		wantCalls := defaultMaxRetries + 1
 		maxRetries := 100
 		gotCalls := 0
-		opts := []backoff.RetryOption{
-			backoff.WithBackOff(&backoff.ZeroBackOff{}),
-		}
+
 		req := ghcapabilities.Request{
 			MaxRetries: uint32(maxRetries),
 		}
-		och := &OutgoingConnectorHandler{}
+		och := &OutgoingConnectorHandler{
+			lggr: lggr,
+		}
 		sendRequest := func(_ context.Context) (*api.Message, error) {
 			gotCalls++
 			return nil, assert.AnError
 		}
 
-		_, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries), opts...)
+		_, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries))
 		require.Error(t, err)
+		require.Equal(t, uint(wantCalls), uint(gotCalls))
+	})
+
+	t.Run("NOK-context cancelation overrides max retries", func(t *testing.T) {
+		wantCalls := 2
+		maxRetries := 3
+		gotCalls := 0
+		ctx, cancel := context.WithCancel(t.Context())
+
+		req := ghcapabilities.Request{
+			MaxRetries: uint32(maxRetries),
+		}
+		och := &OutgoingConnectorHandler{
+			lggr: lggr,
+		}
+		sendRequest := func(childCtx context.Context) (*api.Message, error) {
+			gotCalls++
+			if gotCalls == wantCalls {
+				cancel()
+				return nil, childCtx.Err()
+			}
+			return nil, assert.AnError
+		}
+
+		_, err := och.handleSingleNodeRequest(ctx, sendRequest, uint(req.MaxRetries))
+		require.Error(t, err)
+		require.ErrorContains(t, err, "context canceled")
 		require.Equal(t, uint(wantCalls), uint(gotCalls))
 	})
 }

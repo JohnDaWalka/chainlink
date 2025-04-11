@@ -11,7 +11,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/backoff"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/retry"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
@@ -93,27 +94,17 @@ func (c *OutgoingConnectorHandler) HandleSingleNodeRequest(ctx context.Context, 
 }
 
 // handleSingleNodeRequest accepts a blocking function that returns an api message and error and either calls it directly or with
-// a backoff.
+// a retry strategy.
 func (c *OutgoingConnectorHandler) handleSingleNodeRequest(
 	ctx context.Context,
 	sendRequest func(context.Context) (*api.Message, error),
 	maxRetries uint,
-	opts ...backoff.RetryOption,
 ) (*api.Message, error) {
 	if maxRetries > 0 {
-		defaultOpts := []backoff.RetryOption{
-			backoff.WithBackOff(backoff.NewExponentialBackOff()),
-			backoff.WithMaxTries(min(defaultMaxRetries, maxRetries)),
+		strategy := &retry.Strategy[*api.Message]{
+			MaxRetries: min(maxRetries, defaultMaxRetries),
 		}
-
-		// override default opts with incoming opts, if any
-		opts = append(defaultOpts, opts...)
-
-		// create a parameter free operation for retries
-		operation := func() (*api.Message, error) {
-			return sendRequest(ctx)
-		}
-		return backoff.Retry(ctx, operation, opts...)
+		return strategy.Do(ctx, c.lggr, sendRequest)
 	}
 
 	return sendRequest(ctx)
@@ -371,6 +362,7 @@ func incomingRateLimiterConfigDefaults(config common.RateLimiterConfig) common.R
 	}
 	return config
 }
+
 func outgoingRateLimiterConfigDefaults(config common.RateLimiterConfig) common.RateLimiterConfig {
 	if config.GlobalBurst == 0 {
 		config.GlobalBurst = DefaultGlobalBurst
