@@ -526,7 +526,7 @@ func SendRequestSol(
 	e deployment.Environment,
 	state changeset.CCIPOnChainState,
 	cfg *CCIPSendReqConfig,
-) (*onramp.OnRampCCIPMessageSent, error) { // TODO: chain independent return vailue
+) (*onramp.OnRampCCIPMessageSent, error) { // TODO: chain independent return value
 	s := state.SolChains[cfg.SourceChain]
 
 	message := cfg.Message.(ccip_router.SVM2AnyMessage)
@@ -535,11 +535,6 @@ func SendRequestSol(
 	// TODO: sender from cfg is ignored for now
 	sender := e.SolChains[cfg.SourceChain].DeployerKey
 
-	// if fee token is 0, fallback to WSOL
-	if message.FeeToken.IsZero() {
-		message.FeeToken = s.WSOL
-	}
-
 	e.Logger.Infof("Sending CCIP request from chain selector %d to chain selector %d from sender %s",
 		cfg.SourceChain, cfg.DestChain, sender.String())
 
@@ -547,6 +542,16 @@ func SendRequestSol(
 	ctx := e.GetContext()
 
 	destinationChainSelector := cfg.DestChain
+
+	// If fee token is the zero-address, use zero-address user ATA
+	feeTokenUserATA := solana.PublicKey{}
+	if !message.FeeToken.IsZero() {
+		var err error
+		feeTokenUserATA, _, err = soltokens.FindAssociatedTokenAddress(solana.TokenProgramID, message.FeeToken, sender.PublicKey())
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	destinationChainStatePDA, err := solstate.FindDestChainStatePDA(destinationChainSelector, s.Router)
 	if err != nil {
@@ -558,14 +563,19 @@ func SendRequestSol(
 		return nil, err
 	}
 
-	feeToken := message.FeeToken
+	feeTokenMint := message.FeeToken
+	if feeTokenMint.IsZero() {
+		// If fee token is native SOL, so message.FeeToken is 0, then keep the message.FeeToken as 0
+		// but in the accounts list specify the WSOL mint account
+		feeTokenMint = s.WSOL
+	}
 
 	linkFqBillingConfigPDA, _, err := solstate.FindFqBillingTokenConfigPDA(s.LinkToken, s.FeeQuoter)
 	if err != nil {
 		return nil, err
 	}
 
-	feeTokenFqBillingConfigPDA, _, err := solstate.FindFqBillingTokenConfigPDA(feeToken, s.FeeQuoter)
+	feeTokenFqBillingConfigPDA, _, err := solstate.FindFqBillingTokenConfigPDA(feeTokenMint, s.FeeQuoter)
 	if err != nil {
 		return nil, err
 	}
@@ -575,12 +585,7 @@ func SendRequestSol(
 		return nil, err
 	}
 
-	feeTokenUserATA, _, err := soltokens.FindAssociatedTokenAddress(solana.TokenProgramID, feeToken, sender.PublicKey())
-	if err != nil {
-		return nil, err
-	}
-
-	feeTokenReceiverATA, _, err := soltokens.FindAssociatedTokenAddress(solana.TokenProgramID, feeToken, billingSignerPDA)
+	feeTokenReceiverATA, _, err := soltokens.FindAssociatedTokenAddress(solana.TokenProgramID, feeTokenMint, billingSignerPDA)
 	if err != nil {
 		return nil, err
 	}
@@ -605,7 +610,7 @@ func SendRequestSol(
 		sender.PublicKey(),
 		solana.SystemProgramID,
 		solana.TokenProgramID,
-		feeToken,
+		feeTokenMint,
 		feeTokenUserATA,
 		feeTokenReceiverATA,
 		billingSignerPDA,
@@ -618,7 +623,12 @@ func SendRequestSol(
 		rmnRemoteCursesPDA,
 		s.RMNRemoteConfigPDA,
 	)
-	base.GetFeeTokenUserAssociatedAccountAccount().WRITE()
+	if !feeTokenUserATA.IsZero() {
+		// When paying with a non-native token (i.e. any SPL token), the user ATA must be writable so we can
+		// debit the fees. If paying with native SOL, then the ATA passed in is just a zero-address placeholder,
+		// and that can't be marked as writable.
+		base.GetFeeTokenUserAssociatedAccountAccount().WRITE()
+	}
 
 	addressTables := map[solana.PublicKey]solana.PublicKeySlice{}
 
