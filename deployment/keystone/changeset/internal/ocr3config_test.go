@@ -18,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/view"
+	kcsTypes "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 )
 
@@ -85,7 +86,7 @@ var ocr3Cfg = `
 func Test_configureOCR3Request_generateOCR3Config(t *testing.T) {
 	nodes := loadTestData(t, "testdata/testnet_wf_view.json")
 
-	var cfg OracleConfig
+	var cfg kcsTypes.OracleConfig
 	err := json.Unmarshal([]byte(ocr3Cfg), &cfg)
 	require.NoError(t, err)
 	r := configureOCR3Request{

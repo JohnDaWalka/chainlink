@@ -26,7 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/view"
 	common_v1_0 "github.com/smartcontractkit/chainlink/deployment/common/view/v1_0"
-	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/types"
 )
 
 type KeystoneChainView struct {
@@ -38,12 +38,12 @@ type KeystoneChainView struct {
 }
 
 type OCR3ConfigView struct {
-	Signers               []string              `json:"signers"`
-	Transmitters          []ocr2types.Account   `json:"transmitters"`
-	F                     uint8                 `json:"f"`
-	OnchainConfig         []byte                `json:"onchainConfig"`
-	OffchainConfigVersion uint64                `json:"offchainConfigVersion"`
-	OffchainConfig        internal.OracleConfig `json:"offchainConfig"`
+	Signers               []string            `json:"signers"`
+	Transmitters          []ocr2types.Account `json:"transmitters"`
+	F                     uint8               `json:"f"`
+	OnchainConfig         []byte              `json:"onchainConfig"`
+	OffchainConfigVersion uint64              `json:"offchainConfigVersion"`
+	OffchainConfig        types.OracleConfig  `json:"offchainConfig"`
 }
 
 type ForwarderView struct {
@@ -117,7 +117,7 @@ func GenerateOCR3ConfigView(ctx context.Context, ocr3Cap ocr3_capability.OCR3Cap
 	if err = proto.Unmarshal(publicConfig.ReportingPluginConfig, &cfg); err != nil {
 		return OCR3ConfigView{}, err
 	}
-	oracleConfig := internal.OracleConfig{
+	oracleConfig := types.OracleConfig{
 		MaxQueryLengthBytes:       cfg.MaxQueryLengthBytes,
 		MaxObservationLengthBytes: cfg.MaxObservationLengthBytes,
 		MaxReportLengthBytes:      cfg.MaxReportLengthBytes,
@@ -171,7 +171,7 @@ func GenerateForwarderView(ctx context.Context, f *forwarder.KeystoneForwarder, 
 		// If we don't have previous views, we will start from the deployment block number
 		// which is stored in the forwarder's type and version labels.
 		var deploymentBlock uint64
-		lblPrefix := internal.DeploymentBlockLabel + ": "
+		lblPrefix := types.DeploymentBlockLabel + ": "
 		tvStr, err := f.TypeAndVersion(nil)
 		if err != nil {
 			return nil, fmt.Errorf("error getting TypeAndVersion for forwarder: %w", err)

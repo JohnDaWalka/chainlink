@@ -9,13 +9,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	forwarder "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
 	"github.com/smartcontractkit/chainlink/deployment"
-)
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
+	kcsTypes "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/types"
 
-const (
-	DeploymentBlockLabel = "deployment-block"
-	DeploymentHashLabel  = "deployment-hash"
+	forwarder "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
 )
 
 type KeystoneForwarderDeployer struct {
@@ -61,8 +59,8 @@ func (c *KeystoneForwarderDeployer) deploy(ctx context.Context, req DeployReques
 	if err != nil {
 		return nil, fmt.Errorf("failed to get transaction receipt: %w", err)
 	}
-	tv.Labels.Add(fmt.Sprintf("%s: %s", DeploymentHashLabel, txHash.Hex()))
-	tv.Labels.Add(fmt.Sprintf("%s: %s", DeploymentBlockLabel, txReceipt.BlockNumber.String()))
+	tv.Labels.Add(fmt.Sprintf("%s: %s", kcsTypes.DeploymentHashLabel, txHash.Hex()))
+	tv.Labels.Add(fmt.Sprintf("%s: %s", kcsTypes.DeploymentBlockLabel, txReceipt.BlockNumber.String()))
 	resp := &DeployResponse{
 		Address: forwarderAddr,
 		Tx:      txHash,
@@ -86,7 +84,7 @@ type ConfigureForwarderContractsResponse struct {
 // ConfigureForwardContracts configures the forwarder contracts on all chains for the given DONS
 // the address book is required to contain the an address of the deployed forwarder contract for every chain in the environment
 func ConfigureForwardContracts(env *deployment.Environment, req ConfigureForwarderContractsRequest) (*ConfigureForwarderContractsResponse, error) {
-	contractSetsResp, err := GetContractSets(env.Logger, &GetContractSetsRequest{
+	contractSetsResp, err := contracts.GetContractSets(env.Logger, &contracts.GetContractSetsRequest{
 		Chains:      env.Chains,
 		AddressBook: env.ExistingAddresses,
 	})
@@ -101,11 +99,11 @@ func ConfigureForwardContracts(env *deployment.Environment, req ConfigureForward
 			continue
 		}
 		// get the forwarder contract for the chain
-		contracts, ok := contractSetsResp.ContractSets[chain.Selector]
+		contractSet, ok := contractSetsResp.ContractSets[chain.Selector]
 		if !ok {
 			return nil, fmt.Errorf("failed to get contract set for chain %d", chain.Selector)
 		}
-		ops, err := configureForwarder(env.Logger, chain, contracts.Forwarder, req.Dons, req.UseMCMS)
+		ops, err := configureForwarder(env.Logger, chain, contractSet.Forwarder, req.Dons, req.UseMCMS)
 		if err != nil {
 			return nil, fmt.Errorf("failed to configure forwarder for chain selector %d: %w", chain.Selector, err)
 		}

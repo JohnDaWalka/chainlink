@@ -17,8 +17,8 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
-	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/test"
+	kcsTypes "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/types"
 )
 
 func TestDeployForwarder(t *testing.T) {
@@ -56,8 +56,8 @@ func TestDeployForwarder(t *testing.T) {
 		for _, tv := range oaddrs {
 			labelsList := tv.Labels.List()
 			require.Len(t, labelsList, 2, "expected exactly 2 labels")
-			require.Contains(t, labelsList[0], internal.DeploymentBlockLabel)
-			require.Contains(t, labelsList[1], internal.DeploymentHashLabel)
+			require.Contains(t, labelsList[0], kcsTypes.DeploymentBlockLabel)
+			require.Contains(t, labelsList[1], kcsTypes.DeploymentHashLabel)
 		}
 	})
 }

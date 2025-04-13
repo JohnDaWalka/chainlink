@@ -14,26 +14,29 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	chainsel "github.com/smartcontractkit/chain-selectors"
-	mcmstypes "github.com/smartcontractkit/mcms/types"
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	mcmstypes "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
+	kcsTypes "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/types"
 
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	kf "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
-	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 )
 
 type ConfigureContractsRequest struct {
 	RegistryChainSel uint64
 	Env              *deployment.Environment
 
-	Dons       []DonCapabilities // externally sourced based on the environment
-	OCR3Config *OracleConfig     // TODO: probably should be a map of don to config; but currently we only have one wf don therefore one config
+	Dons       []DonCapabilities      // externally sourced based on the environment
+	OCR3Config *kcsTypes.OracleConfig // TODO: probably should be a map of don to config; but currently we only have one wf don therefore one config
 }
 
 func (r ConfigureContractsRequest) Validate() error {
@@ -67,7 +70,7 @@ func ConfigureContracts(ctx context.Context, lggr logger.Logger, req ConfigureCo
 		return nil, fmt.Errorf("invalid request: %w", err)
 	}
 
-	contractSetsResp, err := GetContractSets(lggr, &GetContractSetsRequest{
+	contractSetsResp, err := contracts.GetContractSets(lggr, &contracts.GetContractSetsRequest{
 		Chains:      req.Env.Chains,
 		AddressBook: req.Env.ExistingAddresses,
 	})
@@ -147,7 +150,7 @@ func GetRegistryContract(e *deployment.Environment, registryChainSel uint64) (*c
 		return nil, deployment.Chain{}, fmt.Errorf("chain %d not found in environment", registryChainSel)
 	}
 
-	contractSetsResp, err := GetContractSets(e.Logger, &GetContractSetsRequest{
+	contractSetsResp, err := contracts.GetContractSets(e.Logger, &contracts.GetContractSetsRequest{
 		Chains:      e.Chains,
 		AddressBook: e.ExistingAddresses,
 	})
@@ -290,13 +293,13 @@ func ConfigureRegistry(ctx context.Context, lggr logger.Logger, req *ConfigureRe
 
 // Depreciated: use changeset.ConfigureOCR3Contract instead
 // ocr3 contract on the registry chain for the wf dons
-func ConfigureOCR3Contract(env *deployment.Environment, chainSel uint64, dons []RegisteredDon, cfg *OracleConfig) error {
+func ConfigureOCR3Contract(env *deployment.Environment, chainSel uint64, dons []RegisteredDon, cfg *kcsTypes.OracleConfig) error {
 	registryChain, ok := env.Chains[chainSel]
 	if !ok {
 		return fmt.Errorf("chain %d not found in environment", chainSel)
 	}
 
-	contractSetsResp, err := GetContractSets(env.Logger, &GetContractSetsRequest{
+	contractSetsResp, err := contracts.GetContractSets(env.Logger, &contracts.GetContractSetsRequest{
 		Chains:      env.Chains,
 		AddressBook: env.ExistingAddresses,
 	})
@@ -309,12 +312,12 @@ func ConfigureOCR3Contract(env *deployment.Environment, chainSel uint64, dons []
 			continue
 		}
 		// only on the registry chain
-		contracts, ok := contractSetsResp.ContractSets[chainSel]
+		contractSet, ok := contractSetsResp.ContractSets[chainSel]
 		if !ok {
 			return fmt.Errorf("failed to get contract set for chain %d", chainSel)
 		}
 
-		contract, err := contracts.getOCR3Contract(nil)
+		contract, err := contractSet.GetOCR3Contract(nil)
 		if err != nil {
 			env.Logger.Errorf("failed to get OCR3 contract: %s", err)
 			return fmt.Errorf("failed to get OCR3 contract: %w", err)
@@ -343,7 +346,7 @@ type ConfigureOCR3Config struct {
 	ChainSel   uint64
 	NodeIDs    []string
 	Address    *common.Address // address of the OCR3 contract to configure
-	OCR3Config *OracleConfig
+	OCR3Config *kcsTypes.OracleConfig
 	DryRun     bool
 
 	UseMCMS bool
@@ -360,19 +363,19 @@ func ConfigureOCR3ContractFromJD(env *deployment.Environment, cfg ConfigureOCR3C
 	if !ok {
 		return nil, fmt.Errorf("chain %d not found in environment", cfg.ChainSel)
 	}
-	contractSetsResp, err := GetContractSets(env.Logger, &GetContractSetsRequest{
+	contractSetsResp, err := contracts.GetContractSets(env.Logger, &contracts.GetContractSetsRequest{
 		Chains:      env.Chains,
 		AddressBook: env.ExistingAddresses,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contract sets: %w", err)
 	}
-	contracts, ok := contractSetsResp.ContractSets[cfg.ChainSel]
+	contractSet, ok := contractSetsResp.ContractSets[cfg.ChainSel]
 	if !ok {
 		return nil, fmt.Errorf("failed to get contract set for chain %d", cfg.ChainSel)
 	}
 
-	contract, err := contracts.getOCR3Contract(cfg.Address)
+	contract, err := contractSet.GetOCR3Contract(cfg.Address)
 	if err != nil {
 		env.Logger.Errorf("%sfailed to get OCR3 contract at %s : %s", prefix, cfg.Address, err)
 		return nil, fmt.Errorf("failed to get OCR3 contract: %w", err)

@@ -26,78 +26,14 @@ import (
 	kocr3 "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/ocr3_capability_1_0_0"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
+	kcsTypes "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 )
 
 type TopLevelConfigSource struct {
-	OracleConfig OracleConfig
-}
-
-type OracleConfig struct {
-	MaxQueryLengthBytes       uint32
-	MaxObservationLengthBytes uint32
-	MaxReportLengthBytes      uint32
-	MaxOutcomeLengthBytes     uint32
-	MaxReportCount            uint32
-	MaxBatchSize              uint32
-	OutcomePruningThreshold   uint64
-	UniqueReports             bool
-	RequestTimeout            time.Duration
-
-	DeltaProgressMillis               uint32
-	DeltaResendMillis                 uint32
-	DeltaInitialMillis                uint32
-	DeltaRoundMillis                  uint32
-	DeltaGraceMillis                  uint32
-	DeltaCertifiedCommitRequestMillis uint32
-	DeltaStageMillis                  uint32
-	MaxRoundsPerEpoch                 uint64
-	TransmissionSchedule              []int
-
-	MaxDurationQueryMillis          uint32
-	MaxDurationObservationMillis    uint32
-	MaxDurationShouldAcceptMillis   uint32
-	MaxDurationShouldTransmitMillis uint32
-
-	MaxFaultyOracles int
-}
-
-func (oc *OracleConfig) UnmarshalJSON(data []byte) error {
-	type aliasT OracleConfig
-	temp := &struct {
-		RequestTimeout string `json:"RequestTimeout"`
-		*aliasT
-	}{
-		aliasT: (*aliasT)(oc),
-	}
-	if err := json.Unmarshal(data, temp); err != nil {
-		return fmt.Errorf("failed to unmarshal OracleConfig: %w", err)
-	}
-
-	if temp.RequestTimeout == "" {
-		oc.RequestTimeout = 0
-	} else {
-		requestTimeout, err := time.ParseDuration(temp.RequestTimeout)
-		if err != nil {
-			return fmt.Errorf("failed to parse RequestTimeout: %w", err)
-		}
-		oc.RequestTimeout = requestTimeout
-	}
-
-	return nil
-}
-
-func (oc OracleConfig) MarshalJSON() ([]byte, error) {
-	type aliasT OracleConfig
-	return json.Marshal(&struct {
-		RequestTimeout string `json:"RequestTimeout"`
-		*aliasT
-	}{
-		RequestTimeout: oc.RequestTimeout.String(),
-		aliasT:         (*aliasT)(&oc),
-	})
+	OracleConfig kcsTypes.OracleConfig
 }
 
 type NodeKeys struct {
@@ -190,7 +126,7 @@ func (c *OCR2OracleConfig) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func GenerateOCR3Config(cfg OracleConfig, nca []NodeKeys, secrets deployment.OCRSecrets) (OCR2OracleConfig, error) {
+func GenerateOCR3Config(cfg kcsTypes.OracleConfig, nca []NodeKeys, secrets deployment.OCRSecrets) (OCR2OracleConfig, error) {
 	// the transmission schedule is very specific; arguably it should be not be a parameter
 	if len(cfg.TransmissionSchedule) != 1 || cfg.TransmissionSchedule[0] != len(nca) {
 		return OCR2OracleConfig{}, fmt.Errorf("transmission schedule must have exactly one entry, matching the len of the number of nodes want [%d], got %v", len(nca), cfg.TransmissionSchedule)
@@ -347,7 +283,7 @@ func GenerateOCR3Config(cfg OracleConfig, nca []NodeKeys, secrets deployment.OCR
 }
 
 type configureOCR3Request struct {
-	cfg        *OracleConfig
+	cfg        *kcsTypes.OracleConfig
 	chain      deployment.Chain
 	contract   *kocr3.OCR3Capability
 	nodes      []deployment.Node
