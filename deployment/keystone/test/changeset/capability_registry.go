@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 
@@ -34,7 +35,7 @@ func HydrateCapabilityRegistry(t *testing.T, v v1_0.CapabilityRegistryView, env 
 		return nil, fmt.Errorf("failed to deploy contract: %w", err)
 	}
 
-	resp, err := changeset.GetContractSets(env.Logger, &changeset.GetContractSetsRequest{
+	resp, err := contracts.GetContractSets(env.Logger, &contracts.GetContractSetsRequest{
 		Chains:      env.Chains,
 		AddressBook: changesetOutput.AddressBook,
 	})

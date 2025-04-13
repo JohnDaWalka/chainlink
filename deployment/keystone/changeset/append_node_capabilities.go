@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	"github.com/smartcontractkit/mcms"
 	"github.com/smartcontractkit/mcms/sdk"
 	"github.com/smartcontractkit/mcms/types"
@@ -65,12 +66,12 @@ func AppendNodeCapabilities(env deployment.Environment, req *AppendNodeCapabilit
 	return out, nil
 }
 
-func (req *AppendNodeCapabilitiesRequest) convert(e deployment.Environment) (*internal.AppendNodeCapabilitiesRequest, *ContractSetV2, error) {
+func (req *AppendNodeCapabilitiesRequest) convert(e deployment.Environment) (*internal.AppendNodeCapabilitiesRequest, *contracts.ContractSetV2, error) {
 	if err := req.Validate(e); err != nil {
 		return nil, nil, fmt.Errorf("failed to validate UpdateNodeCapabilitiesRequest: %w", err)
 	}
 	registryChain := e.Chains[req.RegistryChainSel] // exists because of the validation above
-	resp, err := GetContractSetsV2(e.Logger, GetContractSetsRequestV2{
+	resp, err := contracts.GetContractSetsV2(e.Logger, contracts.GetContractSetsRequestV2{
 		Chains:      map[uint64]deployment.Chain{req.RegistryChainSel: registryChain},
 		AddressBook: e.ExistingAddresses,
 	})

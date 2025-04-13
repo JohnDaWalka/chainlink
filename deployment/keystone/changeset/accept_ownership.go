@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -24,7 +25,7 @@ func AcceptAllOwnershipsProposal(e deployment.Environment, req *AcceptAllOwnersh
 	chain := e.Chains[chainSelector]
 	addrBook := e.ExistingAddresses
 
-	r, err := GetContractSetsV2(e.Logger, GetContractSetsRequestV2{
+	r, err := contracts.GetContractSetsV2(e.Logger, contracts.GetContractSetsRequestV2{
 		Chains: map[uint64]deployment.Chain{
 			req.ChainSelector: chain,
 		},

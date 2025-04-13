@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	mcmssdk "github.com/smartcontractkit/mcms/sdk"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
@@ -89,7 +90,7 @@ func ConfigureForwardContracts(env deployment.Environment, req ConfigureForwardC
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to configure forward contracts: %w", err)
 	}
 
-	cresp, err := GetContractSetsV2(env.Logger, GetContractSetsRequestV2{
+	cresp, err := contracts.GetContractSetsV2(env.Logger, contracts.GetContractSetsRequestV2{
 		Chains:      env.Chains,
 		AddressBook: env.ExistingAddresses,
 	})

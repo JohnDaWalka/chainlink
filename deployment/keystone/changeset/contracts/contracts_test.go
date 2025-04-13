@@ -1,9 +1,10 @@
-package changeset_test
+package contracts_test
 
 import (
 	"testing"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -31,11 +32,11 @@ func TestGetOwnableContract(t *testing.T) {
 		addrBook := deployment.NewMemoryAddressBook()
 		targetAddr := testutils.NewAddress()
 		targetAddrStr := targetAddr.String()
-		tv := deployment.TypeAndVersion{Type: changeset.CapabilitiesRegistry, Version: deployment.Version1_1_0}
+		tv := deployment.TypeAndVersion{Type: contracts.CapabilitiesRegistry, Version: deployment.Version1_1_0}
 		err := addrBook.Save(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector, targetAddrStr, tv)
 		require.NoError(t, err)
 
-		c, err := changeset.GetOwnableContract[*capabilities_registry.CapabilitiesRegistry](addrBook, chain, &targetAddrStr)
+		c, err := contracts.GetOwnableContract[*capabilities_registry.CapabilitiesRegistry](addrBook, chain, &targetAddrStr)
 		require.NoError(t, err)
 		assert.NotNil(t, c)
 		contract := *c
@@ -51,8 +52,8 @@ func TestGetOwnableContract(t *testing.T) {
 		targetAddr2 := testutils.NewAddress()
 		targetAddrStr2 := targetAddr2.String()
 		mockAddresses := map[string]deployment.TypeAndVersion{
-			targetAddrStr2: {Type: changeset.KeystoneForwarder, Version: deployment.Version1_1_0},
-			targetAddrStr1: {Type: changeset.KeystoneForwarder, Version: deployment.Version1_1_0},
+			targetAddrStr2: {Type: contracts.KeystoneForwarder, Version: deployment.Version1_1_0},
+			targetAddrStr1: {Type: contracts.KeystoneForwarder, Version: deployment.Version1_1_0},
 		}
 		err := addrBook.Save(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector, targetAddrStr1, mockAddresses[targetAddrStr1])
 		require.NoError(t, err)
@@ -60,7 +61,7 @@ func TestGetOwnableContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// No target address provided
-		_, err = changeset.GetOwnableContract[*forwarder.KeystoneForwarder](addrBook, chain, nil)
+		_, err = contracts.GetOwnableContract[*forwarder.KeystoneForwarder](addrBook, chain, nil)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "multiple contracts")
@@ -80,7 +81,7 @@ func TestGetOwnableContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// No target address provided
-		_, err = changeset.GetOwnableContract[*forwarder.KeystoneForwarder](addrBook, chain, nil)
+		_, err = contracts.GetOwnableContract[*forwarder.KeystoneForwarder](addrBook, chain, nil)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no contract of type")
@@ -95,12 +96,12 @@ func TestGetOwnableContract(t *testing.T) {
 		nonExistentAddrStr := nonExistentAddr.String()
 		addrBook := deployment.NewMemoryAddressBook()
 		mockAddresses := map[string]deployment.TypeAndVersion{
-			targetAddrStr: {Type: changeset.CapabilitiesRegistry, Version: deployment.Version1_1_0},
+			targetAddrStr: {Type: contracts.CapabilitiesRegistry, Version: deployment.Version1_1_0},
 		}
 		err := addrBook.Save(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector, targetAddrStr, mockAddresses[targetAddrStr])
 		require.NoError(t, err)
 
-		_, err = changeset.GetOwnableContract[*capabilities_registry.CapabilitiesRegistry](addrBook, chain, &nonExistentAddrStr)
+		_, err = contracts.GetOwnableContract[*capabilities_registry.CapabilitiesRegistry](addrBook, chain, &nonExistentAddrStr)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found in address book")
@@ -138,7 +139,7 @@ func TestGetOwnerTypeAndVersion(t *testing.T) {
 
 		addrBook := env.ExistingAddresses
 
-		contract, err := changeset.GetOwnableContract[*capabilities_registry.CapabilitiesRegistry](addrBook, chain, &targetAddrStr)
+		contract, err := contracts.GetOwnableContract[*capabilities_registry.CapabilitiesRegistry](addrBook, chain, &targetAddrStr)
 		require.NoError(t, err)
 		owner, err := (*contract).Owner(nil)
 		require.NoError(t, err)
@@ -148,7 +149,7 @@ func TestGetOwnerTypeAndVersion(t *testing.T) {
 		err = addrBook.Save(chain.Selector, owner.Hex(), mockAddresses[owner.Hex()])
 		require.NoError(t, err)
 
-		tv, err := changeset.GetOwnerTypeAndVersion(*contract, addrBook, chain)
+		tv, err := contracts.GetOwnerTypeAndVersion(*contract, addrBook, chain)
 		require.NoError(t, err)
 		assert.Equal(t, types.RBACTimelock, tv.Type)
 		assert.Equal(t, deployment.Version1_0_0, tv.Version)
@@ -174,10 +175,10 @@ func TestGetOwnerTypeAndVersion(t *testing.T) {
 			break // Just take the first one
 		}
 		addrBook := env.ExistingAddresses
-		contract, err := changeset.GetOwnableContract[*capabilities_registry.CapabilitiesRegistry](addrBook, chain, &targetAddrStr)
+		contract, err := contracts.GetOwnableContract[*capabilities_registry.CapabilitiesRegistry](addrBook, chain, &targetAddrStr)
 		require.NoError(t, err)
 
-		ownerTV, err := changeset.GetOwnerTypeAndVersion(*contract, addrBook, chain)
+		ownerTV, err := contracts.GetOwnerTypeAndVersion(*contract, addrBook, chain)
 
 		require.NoError(t, err)
 		assert.Nil(t, ownerTV)
@@ -217,19 +218,19 @@ func TestNewOwnable(t *testing.T) {
 
 		addrBook := env.ExistingAddresses
 
-		contract, err := changeset.GetOwnableContract[*capabilities_registry.CapabilitiesRegistry](addrBook, chain, &targetAddrStr)
+		contract, err := contracts.GetOwnableContract[*capabilities_registry.CapabilitiesRegistry](addrBook, chain, &targetAddrStr)
 		require.NoError(t, err)
 		owner, err := (*contract).Owner(nil)
 		require.NoError(t, err)
 
 		// Setup owner as non-MCMS contract
 		mockAddresses := map[string]deployment.TypeAndVersion{
-			owner.Hex(): {Type: changeset.CapabilitiesRegistry, Version: deployment.Version1_0_0},
+			owner.Hex(): {Type: contracts.CapabilitiesRegistry, Version: deployment.Version1_0_0},
 		}
 		err = addrBook.Save(chain.Selector, owner.Hex(), mockAddresses[owner.Hex()])
 		require.NoError(t, err)
 
-		ownedContract, err := changeset.NewOwnable(*contract, addrBook, chain)
+		ownedContract, err := contracts.NewOwnable(*contract, addrBook, chain)
 		require.NoError(t, err)
 
 		// Verify the owned contract contains the contract but no MCMS contracts
@@ -261,7 +262,7 @@ func TestNewOwnable(t *testing.T) {
 
 		addrBook := env.ExistingAddresses
 
-		contract, err := changeset.GetOwnableContract[*capabilities_registry.CapabilitiesRegistry](addrBook, chain, &targetAddrStr)
+		contract, err := contracts.GetOwnableContract[*capabilities_registry.CapabilitiesRegistry](addrBook, chain, &targetAddrStr)
 		require.NoError(t, err)
 		owner, err := (*contract).Owner(nil)
 		require.NoError(t, err)
@@ -273,7 +274,7 @@ func TestNewOwnable(t *testing.T) {
 		err = addrBook.Save(chain.Selector, owner.Hex(), mockAddresses[owner.Hex()])
 		require.NoError(t, err)
 
-		ownedContract, err := changeset.NewOwnable(*contract, addrBook, chain)
+		ownedContract, err := contracts.NewOwnable(*contract, addrBook, chain)
 
 		require.NoError(t, err)
 		assert.Equal(t, (*contract).Address(), ownedContract.Contract.Address())
@@ -304,13 +305,13 @@ func TestNewOwnable(t *testing.T) {
 
 		addrBook := env.ExistingAddresses
 
-		contract, err := changeset.GetOwnableContract[*capabilities_registry.CapabilitiesRegistry](addrBook, chain, &targetAddrStr)
+		contract, err := contracts.GetOwnableContract[*capabilities_registry.CapabilitiesRegistry](addrBook, chain, &targetAddrStr)
 		require.NoError(t, err)
 
 		// Don't add owner to address book, so lookup will return nil TV and no error
 
 		// Call NewOwnable, should not fail because owner is not in address book, but should return a non-MCMS contract
-		ownableContract, err := changeset.NewOwnable(*contract, addrBook, chain)
+		ownableContract, err := contracts.NewOwnable(*contract, addrBook, chain)
 		require.NoError(t, err)
 		assert.NotNil(t, ownableContract)
 		assert.Nil(t, ownableContract.McmsContracts)

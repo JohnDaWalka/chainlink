@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	"github.com/smartcontractkit/mcms"
 	mcmssdk "github.com/smartcontractkit/mcms/sdk"
 	"github.com/smartcontractkit/mcms/types"
@@ -197,7 +198,7 @@ func AddNodes(env deployment.Environment, req *AddNodesRequest) (deployment.Chan
 		return deployment.ChangesetOutput{}, fmt.Errorf("invalid request: %w", err)
 	}
 
-	contractSetResp, err := GetContractSetsV2(env.Logger, GetContractSetsRequestV2{
+	contractSetResp, err := contracts.GetContractSetsV2(env.Logger, contracts.GetContractSetsRequestV2{
 		Chains:      env.Chains,
 		AddressBook: env.ExistingAddresses,
 	})

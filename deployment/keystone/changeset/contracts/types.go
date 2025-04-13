@@ -1,4 +1,4 @@
-package changeset
+package contracts
 
 import "github.com/smartcontractkit/chainlink/deployment"
 

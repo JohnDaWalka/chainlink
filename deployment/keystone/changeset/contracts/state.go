@@ -1,4 +1,4 @@
-package changeset
+package contracts
 
 import (
 	"context"
@@ -7,18 +7,15 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
-	"github.com/smartcontractkit/chainlink/deployment"
-	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
-	common_v1_0 "github.com/smartcontractkit/chainlink/deployment/common/view/v1_0"
-	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	forwarder "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
 	ocr3_capability "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/ocr3_capability_1_0_0"
 	workflow_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/workflow_registry_wrapper"
+	"github.com/smartcontractkit/chainlink/deployment"
+	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	common_v1_0 "github.com/smartcontractkit/chainlink/deployment/common/view/v1_0"
 )
 
 type GetContractSetsRequest struct {
@@ -41,18 +38,6 @@ type ContractSet struct {
 	Forwarder            *forwarder.KeystoneForwarder
 	CapabilitiesRegistry *capabilities_registry.CapabilitiesRegistry
 	WorkflowRegistry     *workflow_registry.WorkflowRegistry
-}
-
-func (cs ContractSet) Convert() internal.ContractSet {
-	return internal.ContractSet{
-		MCMSWithTimelockState: commonchangeset.MCMSWithTimelockState{
-			MCMSWithTimelockContracts: cs.MCMSWithTimelockContracts,
-		},
-		Forwarder:            cs.Forwarder,
-		WorkflowRegistry:     cs.WorkflowRegistry,
-		OCR3:                 cs.OCR3,
-		CapabilitiesRegistry: cs.CapabilitiesRegistry,
-	}
 }
 
 func (cs ContractSet) TransferableContracts() []common.Address {

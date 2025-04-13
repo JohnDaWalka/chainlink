@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	"github.com/smartcontractkit/mcms"
 	"github.com/smartcontractkit/mcms/sdk"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
@@ -84,7 +85,7 @@ func ConfigureOCR3Contract(env deployment.Environment, cfg ConfigureOCR3Config) 
 		if resp.Ops == nil {
 			return out, errors.New("expected MCMS operation to be non-nil")
 		}
-		r, err := GetContractSetsV2(env.Logger, GetContractSetsRequestV2{
+		r, err := contracts.GetContractSetsV2(env.Logger, contracts.GetContractSetsRequestV2{
 			Chains:      env.Chains,
 			AddressBook: env.ExistingAddresses,
 		})

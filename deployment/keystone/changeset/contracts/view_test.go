@@ -1,4 +1,4 @@
-package changeset_test
+package contracts_test
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -89,13 +90,13 @@ func TestKeystoneView(t *testing.T) {
 		require.NoError(t, err)
 
 		var prevView json.RawMessage = []byte("{}")
-		a, err := changeset.ViewKeystone(env.Env, prevView)
+		a, err := contracts.ViewKeystone(env.Env, prevView)
 		require.NoError(t, err)
 		b, err := a.MarshalJSON()
 		require.NoError(t, err)
 		require.NotEmpty(t, b)
 
-		var outView changeset.KeystoneView
+		var outView contracts.KeystoneView
 		require.NoError(t, json.Unmarshal(b, &outView))
 
 		chainID, err := chain_selectors.ChainIdFromSelector(registryChain)
@@ -126,13 +127,13 @@ func TestKeystoneView(t *testing.T) {
 		require.NoError(t, env.Env.ExistingAddresses.Merge(resp.AddressBook))
 
 		var prevView json.RawMessage = []byte("{}")
-		a, err := changeset.ViewKeystone(env.Env, prevView)
+		a, err := contracts.ViewKeystone(env.Env, prevView)
 		require.NoError(t, err)
 		b, err := a.MarshalJSON()
 		require.NoError(t, err)
 		require.NotEmpty(t, b)
 
-		var outView changeset.KeystoneView
+		var outView contracts.KeystoneView
 		require.NoError(t, json.Unmarshal(b, &outView))
 		chainID, err := chain_selectors.ChainIdFromSelector(registryChain)
 		require.NoError(t, err)
@@ -165,7 +166,7 @@ func TestKeystoneView(t *testing.T) {
 		_, err = changeset.ConfigureOCR3Contract(env.Env, cfg)
 		require.NoError(t, err)
 		var prevView json.RawMessage = []byte("{}")
-		_, err = changeset.ViewKeystone(env.Env, prevView)
+		_, err = contracts.ViewKeystone(env.Env, prevView)
 		require.ErrorContains(t, err, "failed to view chain")
 		require.ErrorContains(t, err, "DeltaRound (0s) must be less than DeltaProgress (0s)")
 	})

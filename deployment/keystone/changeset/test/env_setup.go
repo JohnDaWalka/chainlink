@@ -6,6 +6,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/maps"
@@ -50,7 +51,7 @@ func (c DonConfig) Validate() error {
 }
 
 type testEnvIface interface {
-	ContractSets() map[uint64]changeset.ContractSet
+	ContractSets() map[uint64]contracts.ContractSet
 	CapabilitiesRegistry() *kcr.CapabilitiesRegistry
 	CapabilityInfos() []kcr.CapabilitiesRegistryCapabilityInfo
 	Nops() []kcr.CapabilitiesRegistryNodeOperatorAdded
@@ -101,8 +102,8 @@ type EnvWrapper struct {
 	dons testDons
 }
 
-func (te EnvWrapper) ContractSets() map[uint64]changeset.ContractSet {
-	r, err := changeset.GetContractSets(te.Env.Logger, &changeset.GetContractSetsRequest{
+func (te EnvWrapper) ContractSets() map[uint64]contracts.ContractSet {
+	r, err := contracts.GetContractSets(te.Env.Logger, &contracts.GetContractSetsRequest{
 		Chains:      te.Env.Chains,
 		AddressBook: te.Env.ExistingAddresses,
 	})
@@ -111,7 +112,7 @@ func (te EnvWrapper) ContractSets() map[uint64]changeset.ContractSet {
 }
 
 func (te EnvWrapper) CapabilitiesRegistry() *kcr.CapabilitiesRegistry {
-	r, err := changeset.GetContractSets(te.Env.Logger, &changeset.GetContractSetsRequest{
+	r, err := contracts.GetContractSets(te.Env.Logger, &contracts.GetContractSetsRequest{
 		Chains:      te.Env.Chains,
 		AddressBook: te.Env.ExistingAddresses,
 	})
@@ -272,12 +273,12 @@ func setupTestEnv(t *testing.T, c EnvWrapperConfig) EnvWrapper {
 	require.NoError(t, err)
 	require.Nil(t, csOut.AddressBook, "no new addresses should be created in configure initial contracts")
 
-	req := changeset.GetContractSetsRequestV2{
+	req := contracts.GetContractSetsRequestV2{
 		Chains:      env.Chains,
 		AddressBook: env.ExistingAddresses,
 	}
 
-	contractSetsResp, err := changeset.GetContractSetsV2(lggr, req)
+	contractSetsResp, err := contracts.GetContractSetsV2(lggr, req)
 	require.NoError(t, err)
 	require.Len(t, contractSetsResp.ContractSets, len(env.Chains))
 	// check the registry
@@ -313,7 +314,7 @@ func setupTestEnv(t *testing.T, c EnvWrapperConfig) EnvWrapper {
 		require.NoError(t, err)
 		// extract the MCMS address using `GetContractSets` instead of `GetContractSetsV2` because the latter
 		// expects contracts to already be owned by MCMS
-		r, err := changeset.GetContractSets(lggr, &changeset.GetContractSetsRequest{
+		r, err := contracts.GetContractSets(lggr, &contracts.GetContractSetsRequest{
 			Chains:      env.Chains,
 			AddressBook: env.ExistingAddresses,
 		})

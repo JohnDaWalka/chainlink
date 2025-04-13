@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	"github.com/smartcontractkit/mcms"
 	mcmssdk "github.com/smartcontractkit/mcms/sdk"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
@@ -37,7 +38,7 @@ func AddCapabilities(env deployment.Environment, req *AddCapabilitiesRequest) (d
 	if !ok {
 		return deployment.ChangesetOutput{}, fmt.Errorf("registry chain selector %d does not exist in environment", req.RegistryChainSel)
 	}
-	cs, err := GetContractSetsV2(env.Logger, GetContractSetsRequestV2{
+	cs, err := contracts.GetContractSetsV2(env.Logger, contracts.GetContractSetsRequestV2{
 		Chains:      map[uint64]deployment.Chain{req.RegistryChainSel: registryChain},
 		AddressBook: env.ExistingAddresses,
 	})

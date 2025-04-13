@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	mcmslib "github.com/smartcontractkit/mcms"
 	"github.com/smartcontractkit/mcms/sdk"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
@@ -38,7 +39,7 @@ type mcmsTransaction struct {
 	Description string
 	Address     common.Address
 	ChainSel    uint64
-	ContractSet *changeset.ContractSet
+	ContractSet *contracts.ContractSet
 	Env         deployment.Environment
 }
 

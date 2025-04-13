@@ -1,4 +1,4 @@
-package changeset
+package contracts
 
 import (
 	"context"
@@ -38,12 +38,12 @@ type KeystoneChainView struct {
 }
 
 type OCR3ConfigView struct {
-	Signers               []string            `json:"signers"`
-	Transmitters          []ocr2types.Account `json:"transmitters"`
-	F                     uint8               `json:"f"`
-	OnchainConfig         []byte              `json:"onchainConfig"`
-	OffchainConfigVersion uint64              `json:"offchainConfigVersion"`
-	OffchainConfig        OracleConfig        `json:"offchainConfig"`
+	Signers               []string              `json:"signers"`
+	Transmitters          []ocr2types.Account   `json:"transmitters"`
+	F                     uint8                 `json:"f"`
+	OnchainConfig         []byte                `json:"onchainConfig"`
+	OffchainConfigVersion uint64                `json:"offchainConfigVersion"`
+	OffchainConfig        internal.OracleConfig `json:"offchainConfig"`
 }
 
 type ForwarderView struct {
@@ -117,7 +117,7 @@ func GenerateOCR3ConfigView(ctx context.Context, ocr3Cap ocr3_capability.OCR3Cap
 	if err = proto.Unmarshal(publicConfig.ReportingPluginConfig, &cfg); err != nil {
 		return OCR3ConfigView{}, err
 	}
-	oracleConfig := OracleConfig{
+	oracleConfig := internal.OracleConfig{
 		MaxQueryLengthBytes:       cfg.MaxQueryLengthBytes,
 		MaxObservationLengthBytes: cfg.MaxObservationLengthBytes,
 		MaxReportLengthBytes:      cfg.MaxReportLengthBytes,

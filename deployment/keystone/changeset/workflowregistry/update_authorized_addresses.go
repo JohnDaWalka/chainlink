@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 
@@ -34,7 +35,7 @@ func (r *UpdateAuthorizedAddressesRequest) Validate() error {
 }
 
 func getWorkflowRegistry(env deployment.Environment, chainSel uint64) (*workflow_registry.WorkflowRegistry, error) {
-	resp, err := changeset.GetContractSets(env.Logger, &changeset.GetContractSetsRequest{
+	resp, err := contracts.GetContractSets(env.Logger, &contracts.GetContractSetsRequest{
 		Chains:      env.Chains,
 		AddressBook: env.ExistingAddresses,
 	})
@@ -56,7 +57,7 @@ func UpdateAuthorizedAddresses(env deployment.Environment, req *UpdateAuthorized
 		return deployment.ChangesetOutput{}, err
 	}
 
-	resp, err := changeset.GetContractSets(env.Logger, &changeset.GetContractSetsRequest{
+	resp, err := contracts.GetContractSets(env.Logger, &contracts.GetContractSetsRequest{
 		Chains:      env.Chains,
 		AddressBook: env.ExistingAddresses,
 	})

@@ -1,4 +1,4 @@
-package changeset
+package contracts
 
 import (
 	"encoding/json"
@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonview "github.com/smartcontractkit/chainlink/deployment/common/view"
 )
