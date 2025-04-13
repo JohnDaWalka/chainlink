@@ -13,7 +13,7 @@ import (
 )
 
 // ExecutePluginCodecV1 is a codec for encoding and decoding execute plugin reports.
-// Compatible with ccip::offramp version 1.6.0
+// Compatible with ccip_offramp::offramp version 1.6.0
 type ExecutePluginCodecV1 struct {
 	extraDataCodec ccipcommon.ExtraDataCodec
 }
@@ -216,6 +216,7 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 	if des.Error() != nil {
 		return report, fmt.Errorf("failed to deserialize nonce: %w", des.Error())
 	}
+
 	// --- End Message Header ---
 
 	// 7. sender: vector<u8>
@@ -321,6 +322,13 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 	if des.Remaining() > 0 {
 		return report, fmt.Errorf("unexpected remaining bytes after decoding: %d", des.Remaining())
 	}
+
+	// Set empty fields
+	message.Header.MsgHash = cciptypes.Bytes32{}
+	message.Header.OnRamp = cciptypes.UnknownAddress{}
+	message.FeeToken = cciptypes.UnknownAddress{}
+	message.ExtraArgs = cciptypes.Bytes{}
+	message.FeeTokenAmount = cciptypes.BigInt{}
 
 	// Assemble the final report
 	chainReport.Messages = []cciptypes.Message{message}

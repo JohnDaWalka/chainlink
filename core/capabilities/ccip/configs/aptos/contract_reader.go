@@ -62,6 +62,16 @@ func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 					consts.MethodNameFeeQuoterGetStaticConfig: {
 						Name: "get_static_config",
 					},
+					consts.MethodNameGetFeePriceUpdate: {
+						Name: "get_dest_chain_gas_price",
+						Params: []chainreader.AptosFunctionParam{
+							{
+								Name:     "destChainSelector",
+								Type:     "u64",
+								Required: true,
+							},
+						},
+					},
 				},
 			},
 			consts.ContractNameOffRamp: {
@@ -128,10 +138,15 @@ func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 					},
 				},
 				Events: map[string]*chainreader.ChainReaderEvent{
+					consts.EventNameCCIPMessageSent: {
+						EventHandleStructName: "OnRampState",
+						EventHandleFieldName:  "ccip_message_sent_events",
+						EventAccountAddress:   "onramp::get_state_address",
+					},
 					consts.EventNameExecutionStateChanged: {
 						EventHandleStructName: "OffRampState",
 						EventHandleFieldName:  "execution_state_changed_events",
-						EventAccountAddress:   "state_object::get_object_address",
+						EventAccountAddress:   "offramp::get_state_address",
 						EventFieldRenames: map[string]chainreader.RenamedField{
 							"source_chain_selector": {
 								NewName: "SourceChainSelector",
@@ -153,7 +168,7 @@ func GetChainReaderConfig() (chainreader.ChainReaderConfig, error) {
 					consts.EventNameCommitReportAccepted: {
 						EventHandleStructName: "OffRampState",
 						EventHandleFieldName:  "commit_report_accepted_events",
-						EventAccountAddress:   "state_object::get_object_address",
+						EventAccountAddress:   "offramp::get_state_address",
 						EventFieldRenames: map[string]chainreader.RenamedField{
 							"blessed_merkle_roots": {
 								NewName: "BlessedMerkleRoots",

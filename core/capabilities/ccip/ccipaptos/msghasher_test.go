@@ -6,8 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/ccip_aptos_utils"
 )
 
 // the equivalent test with the same values exists in the Aptos offramp.move contract, see test_calculate_message_hash
@@ -45,7 +43,7 @@ func TestComputeMessageDataHash(t *testing.T) {
 	copy(destToken1[:], destToken1Bytes)
 	extraData1, err := hexutil.Decode("0x00112233")
 	require.NoError(t, err)
-	token1 := ccip_aptos_utils.AptosUtilsAny2AptosTokenTransfer{
+	token1 := any2AptosTokenTransfer{
 		SourcePoolAddress: srcPool1,
 		DestTokenAddress:  destToken1,
 		DestGasAmount:     10000,
@@ -60,7 +58,7 @@ func TestComputeMessageDataHash(t *testing.T) {
 	copy(destToken2[:], destToken2Bytes)
 	extraData2, err := hexutil.Decode("0xffeeddcc")
 	require.NoError(t, err)
-	token2 := ccip_aptos_utils.AptosUtilsAny2AptosTokenTransfer{
+	token2 := any2AptosTokenTransfer{
 		SourcePoolAddress: srcPool2,
 		DestTokenAddress:  destToken2,
 		DestGasAmount:     20000,
@@ -68,7 +66,7 @@ func TestComputeMessageDataHash(t *testing.T) {
 		Amount:            big.NewInt(5000000),
 	}
 
-	tokens := []ccip_aptos_utils.AptosUtilsAny2AptosTokenTransfer{token1, token2}
+	tokens := []any2AptosTokenTransfer{token1, token2}
 
 	computedHash, err := computeMessageDataHash(metadataHash, messageID, receiver, sequenceNumber, gasLimit, nonce, sender, data, tokens)
 	require.NoError(t, err)
