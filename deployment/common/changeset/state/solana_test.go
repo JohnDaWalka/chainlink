@@ -14,8 +14,6 @@ import (
 
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	solanaMCMS "github.com/smartcontractkit/chainlink/deployment/common/changeset/solana/mcms"
@@ -26,7 +24,7 @@ import (
 )
 
 func TestMCMSWithTimelockState_GenerateMCMSWithTimelockViewSolana(t *testing.T) {
-	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-404")
+	// tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-404")
 
 	t.Parallel()
 	envConfig := memory.MemoryEnvironmentConfig{SolChains: 1}
