@@ -37,14 +37,11 @@ flowchart LR
 	click chainlink-common href "https://github.com/smartcontractkit/chainlink-common"
 	chainlink-data-streams --> chainlink-common
 	click chainlink-data-streams href "https://github.com/smartcontractkit/chainlink-data-streams"
-	chainlink-evm --> chainlink-framework/capabilities
 	chainlink-evm --> chainlink-framework/chains
 	chainlink-evm --> chainlink-integrations/evm
 	click chainlink-evm href "https://github.com/smartcontractkit/chainlink-evm"
 	chainlink-feeds --> chainlink-common
 	click chainlink-feeds href "https://github.com/smartcontractkit/chainlink-feeds"
-	chainlink-framework/capabilities --> chainlink-common
-	click chainlink-framework/capabilities href "https://github.com/smartcontractkit/chainlink-framework"
 	chainlink-framework/chains --> chainlink-framework/multinode
 	click chainlink-framework/chains href "https://github.com/smartcontractkit/chainlink-framework"
 	chainlink-framework/multinode --> chainlink-common
@@ -88,7 +85,6 @@ flowchart LR
 	click chainlink-ccip-repo href "https://github.com/smartcontractkit/chainlink-ccip"
 
 	subgraph chainlink-framework-repo[chainlink-framework]
-		 chainlink-framework/capabilities
 		 chainlink-framework/chains
 		 chainlink-framework/multinode
 	end
@@ -150,14 +146,11 @@ flowchart LR
 	click chainlink-common href "https://github.com/smartcontractkit/chainlink-common"
 	chainlink-data-streams --> chainlink-common
 	click chainlink-data-streams href "https://github.com/smartcontractkit/chainlink-data-streams"
-	chainlink-evm --> chainlink-framework/capabilities
 	chainlink-evm --> chainlink-framework/chains
 	chainlink-evm --> chainlink-integrations/evm
 	click chainlink-evm href "https://github.com/smartcontractkit/chainlink-evm"
 	chainlink-feeds --> chainlink-common
 	click chainlink-feeds href "https://github.com/smartcontractkit/chainlink-feeds"
-	chainlink-framework/capabilities --> chainlink-common
-	click chainlink-framework/capabilities href "https://github.com/smartcontractkit/chainlink-framework"
 	chainlink-framework/chains --> chainlink-framework/multinode
 	click chainlink-framework/chains href "https://github.com/smartcontractkit/chainlink-framework"
 	chainlink-framework/multinode --> chainlink-common
@@ -255,7 +248,6 @@ flowchart LR
 	click chainlink-ccip-repo href "https://github.com/smartcontractkit/chainlink-ccip"
 
 	subgraph chainlink-framework-repo[chainlink-framework]
-		 chainlink-framework/capabilities
 		 chainlink-framework/chains
 		 chainlink-framework/multinode
 	end
