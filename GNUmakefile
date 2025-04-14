@@ -10,7 +10,7 @@ CL_INSTALL_PRIVATE_PLUGINS ?= false
 
 # LOOP Plugin version defaults
 ifndef COSMOS_SHA
-override COSMOS_SHA = "f740e9ae54e79762991bdaf8ad6b50363261c056"
+override COSMOS_SHA = "2b3d33091ea758924ef906cc71cf45fe61094884"
 endif
 ifndef STARKNET_SHA
 override STARKNET_SHA = "9a780650af4708e4bd9b75495feff2c5b4054e46"

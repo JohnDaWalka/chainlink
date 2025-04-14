@@ -78,7 +78,7 @@ ENV CL_SOLANA_CMD=chainlink-solana
 COPY --from=buildgo /go/bin/chainlink-starknet /usr/local/bin/
 
 # Dependency of CosmWasm/wasmd
-COPY --from=buildgo /go/pkg/mod/github.com/\!cosm\!wasm/wasmvm@v*/internal/api/libwasmvm.*.so /usr/lib/
+COPY --from=buildgo /go/pkg/mod/github.com/\!cosm\!wasm/wasmvm/v2@v*/internal/api/libwasmvm.*.so /usr/lib/
 RUN chmod 755 /usr/lib/libwasmvm.*.so
 
 # CCIP specific
