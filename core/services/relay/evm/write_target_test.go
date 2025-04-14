@@ -51,7 +51,7 @@ func newMockedEncodeTransmissionInfo() ([]byte, error) {
 		InvalidReceiver: false,
 		State:           0,
 		Success:         false,
-		TransmissionId:  [32]byte{},
+		TransmissionID:  [32]byte{},
 		Transmitter:     common.HexToAddress("0x0"),
 	}
 
@@ -94,7 +94,7 @@ func newMockedEncodeTransmissionInfo() ([]byte, error) {
 	buffer.Write(padSuccess)
 
 	// Encode TransmissionId (as bytes32)
-	buffer.Write(info.TransmissionId[:])
+	buffer.Write(info.TransmissionID[:])
 
 	// Encode Transmitter (as address)
 	buffer.Write(info.Transmitter.Bytes())
