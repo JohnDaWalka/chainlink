@@ -6,12 +6,12 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	mcmssdk "github.com/smartcontractkit/mcms/sdk"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 )
 
