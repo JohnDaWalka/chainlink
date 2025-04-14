@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	"github.com/smartcontractkit/mcms"
 	mcmssdk "github.com/smartcontractkit/mcms/sdk"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
@@ -12,6 +11,7 @@ import (
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 )
 
