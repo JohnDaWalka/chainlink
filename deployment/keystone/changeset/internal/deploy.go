@@ -18,6 +18,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
@@ -293,6 +294,8 @@ func ConfigureRegistry(ctx context.Context, lggr logger.Logger, req *ConfigureRe
 
 // Depreciated: use changeset.ConfigureOCR3Contract instead
 // ocr3 contract on the registry chain for the wf dons
+//
+//revive:disable:confusing-naming
 func ConfigureOCR3Contract(env *deployment.Environment, chainSel uint64, dons []RegisteredDon, cfg *kcsTypes.OracleConfig) error {
 	registryChain, ok := env.Chains[chainSel]
 	if !ok {
