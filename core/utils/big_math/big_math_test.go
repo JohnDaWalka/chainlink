@@ -8,7 +8,7 @@ import (
 )
 
 func TestFail(t *testing.T) {
-	require.Equal(t, 0, 1)
+	require.Equal(t, 0, 2)
 }
 
 func TestMax(t *testing.T) {
