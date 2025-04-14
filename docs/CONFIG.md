@@ -1316,7 +1316,9 @@ MaxConfigSize is the maximum size of a config that can be fetched from the given
 SyncStrategy = 'reconciliation' # Default
 ```
 SyncStrategy is the strategy that will be used to bring the node up to date with the latest Workflow Registry contract state.
-Options are: event which watches for contract events or reconciliation which diffs workflow metadata state.
+Options are:
+* "event" - watches for and takes action upon contract events
+* "reconciliation" - diffs workflow metadata state against what is currently running in the local Engine Registry.
 
 ## Workflows
 ```toml
