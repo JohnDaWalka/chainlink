@@ -7,6 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestFail(t *testing.T) {
+	require.Equal(t, 0, 1)
+}
+
 func TestMax(t *testing.T) {
 	m := Max(big.NewInt(1), big.NewInt(2))
 	require.Equal(t, 0, big.NewInt(2).Cmp(m))
