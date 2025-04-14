@@ -487,6 +487,7 @@ func TestConfig_Marshal(t *testing.T) {
 			MaxBinarySize:           ptr(utils.FileSize(20 * utils.MB)),
 			MaxEncryptedSecretsSize: ptr(utils.FileSize(26.4 * utils.KB)),
 			MaxConfigSize:           ptr(utils.FileSize(50 * utils.KB)),
+			SyncStrategy:            ptr("reconciliation"),
 		},
 		Dispatcher: toml.Dispatcher{
 			SupportedVersion:   ptr(1),
