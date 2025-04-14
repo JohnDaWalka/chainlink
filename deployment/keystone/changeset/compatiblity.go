@@ -1,11 +1,14 @@
 package changeset
 
-import "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
+import (
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/types"
+)
 
 //TODO: KS-673 refactor internal package to reduce and remove the duplication
 
 // OracleConfig is the configuration for an oracle
-type OracleConfig = internal.OracleConfig
+type OracleConfig = types.OracleConfig
 
 // OCR3OnchainConfig is the onchain configuration of an OCR2 contract
 type OCR3OnchainConfig = internal.OCR2OracleConfig

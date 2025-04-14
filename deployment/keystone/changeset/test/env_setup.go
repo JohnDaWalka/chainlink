@@ -6,7 +6,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/maps"
@@ -22,7 +21,9 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	envtest "github.com/smartcontractkit/chainlink/deployment/environment/test"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/types"
 
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/workflowregistry"
@@ -259,7 +260,7 @@ func setupTestEnv(t *testing.T, c EnvWrapperConfig) EnvWrapper {
 		},
 	}
 
-	var ocr3Config = internal.OracleConfig{
+	var ocr3Config = types.OracleConfig{
 		MaxFaultyOracles:     dons.Get(c.WFDonConfig.Name).F(),
 		TransmissionSchedule: []int{dons.Get(c.WFDonConfig.Name).N()},
 	}
