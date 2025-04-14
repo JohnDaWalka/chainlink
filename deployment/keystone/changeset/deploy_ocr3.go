@@ -7,14 +7,15 @@ import (
 	"io"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	"github.com/smartcontractkit/mcms"
 	"github.com/smartcontractkit/mcms/sdk"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/contracts"
 	kslib "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
+	kcsTypes "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/types"
 )
 
 var _ deployment.ChangeSet[uint64] = DeployOCR3
@@ -41,7 +42,7 @@ type ConfigureOCR3Config struct {
 	ChainSel             uint64
 	NodeIDs              []string
 	Address              *common.Address // address of the OCR3 contract to configure
-	OCR3Config           *kslib.OracleConfig
+	OCR3Config           *kcsTypes.OracleConfig
 	DryRun               bool
 	WriteGeneratedConfig io.Writer // if not nil, write the generated config to this writer as JSON [OCR2OracleConfig]
 

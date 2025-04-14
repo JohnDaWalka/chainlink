@@ -8,6 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	kslib "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
+	kcsTypes "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/types"
 )
 
 var _ deployment.ChangeSet[InitialContractsCfg] = ConfigureInitialContractsChangeset
@@ -15,7 +16,7 @@ var _ deployment.ChangeSet[InitialContractsCfg] = ConfigureInitialContractsChang
 type InitialContractsCfg struct {
 	RegistryChainSel uint64
 	Dons             []kslib.DonCapabilities
-	OCR3Config       *kslib.OracleConfig
+	OCR3Config       *kcsTypes.OracleConfig
 }
 
 func ConfigureInitialContractsChangeset(e deployment.Environment, cfg InitialContractsCfg) (deployment.ChangesetOutput, error) {
