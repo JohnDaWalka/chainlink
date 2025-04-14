@@ -337,7 +337,7 @@ func Test_handleSingleNodeRequest(t *testing.T) {
 
 		msgID := "msgID"
 		req := ghcapabilities.Request{
-			MaxRetries: uint32(maxRetries),
+			MaxRetries: maxRetries,
 		}
 		och := &OutgoingConnectorHandler{
 			lggr: lggr,
@@ -347,20 +347,20 @@ func Test_handleSingleNodeRequest(t *testing.T) {
 			return gatewayResponse(t, msgID), nil
 		}
 
-		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries))
+		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, req.MaxRetries)
 		require.NoError(t, err)
 		require.Equal(t, msgID, resp.Body.MessageId)
 		require.Equal(t, wantCalls, gotCalls)
 	})
 
 	t.Run("OK-success on first retry", func(t *testing.T) {
-		wantCalls := 2
+		wantCalls := uint32(2)
 		maxRetries := wantCalls + 1
-		gotCalls := 0
+		gotCalls := uint32(0)
 
 		msgID := "msgID"
 		req := ghcapabilities.Request{
-			MaxRetries: uint32(maxRetries),
+			MaxRetries: maxRetries,
 		}
 		och := &OutgoingConnectorHandler{
 			lggr: lggr,
@@ -373,19 +373,19 @@ func Test_handleSingleNodeRequest(t *testing.T) {
 			return nil, assert.AnError
 		}
 
-		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries))
+		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, req.MaxRetries)
 		require.NoError(t, err)
 		require.Equal(t, msgID, resp.Body.MessageId)
 		require.Equal(t, wantCalls, gotCalls)
 	})
 
 	t.Run("OK-success on last retry", func(t *testing.T) {
-		wantCalls := 3
-		gotCalls := 0
+		wantCalls := uint32(3)
+		gotCalls := uint32(0)
 
 		msgID := "msgID"
 		req := ghcapabilities.Request{
-			MaxRetries: uint32(wantCalls),
+			MaxRetries: wantCalls,
 		}
 		och := &OutgoingConnectorHandler{
 			lggr: lggr,
@@ -398,7 +398,7 @@ func Test_handleSingleNodeRequest(t *testing.T) {
 			return nil, assert.AnError
 		}
 
-		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries))
+		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, req.MaxRetries)
 		require.NoError(t, err)
 		require.Equal(t, msgID, resp.Body.MessageId)
 		require.Equal(t, wantCalls, gotCalls)
@@ -418,19 +418,19 @@ func Test_handleSingleNodeRequest(t *testing.T) {
 			return gatewayResponse(t, msgID), nil
 		}
 
-		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries))
+		resp, err := och.handleSingleNodeRequest(t.Context(), sendRequest, req.MaxRetries)
 		require.NoError(t, err)
 		require.Equal(t, msgID, resp.Body.MessageId)
 		require.Equal(t, wantCalls, gotCalls)
 	})
 
 	t.Run("NOK-sendRequest always errors upto max retries", func(t *testing.T) {
-		giveRetries := 3
+		giveRetries := uint32(3)
 		wantCalls := giveRetries + 1
-		gotCalls := 0
+		gotCalls := uint32(0)
 
 		req := ghcapabilities.Request{
-			MaxRetries: uint32(giveRetries),
+			MaxRetries: giveRetries,
 		}
 		och := &OutgoingConnectorHandler{
 			lggr: lggr,
@@ -440,18 +440,18 @@ func Test_handleSingleNodeRequest(t *testing.T) {
 			return nil, assert.AnError
 		}
 
-		_, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries))
+		_, err := och.handleSingleNodeRequest(t.Context(), sendRequest, req.MaxRetries)
 		require.Error(t, err)
 		require.Equal(t, wantCalls, gotCalls)
 	})
 
 	t.Run("NOK-max retries is capped", func(t *testing.T) {
 		wantCalls := defaultMaxRetries + 1
-		maxRetries := 100
-		gotCalls := 0
+		maxRetries := uint32(100)
+		gotCalls := uint32(0)
 
 		req := ghcapabilities.Request{
-			MaxRetries: uint32(maxRetries),
+			MaxRetries: maxRetries,
 		}
 		och := &OutgoingConnectorHandler{
 			lggr: lggr,
@@ -461,19 +461,19 @@ func Test_handleSingleNodeRequest(t *testing.T) {
 			return nil, assert.AnError
 		}
 
-		_, err := och.handleSingleNodeRequest(t.Context(), sendRequest, uint(req.MaxRetries))
+		_, err := och.handleSingleNodeRequest(t.Context(), sendRequest, req.MaxRetries)
 		require.Error(t, err)
-		require.Equal(t, uint(wantCalls), uint(gotCalls))
+		require.Equal(t, wantCalls, gotCalls)
 	})
 
 	t.Run("NOK-context cancelation overrides max retries", func(t *testing.T) {
 		wantCalls := 2
-		maxRetries := 3
+		maxRetries := uint32(3)
 		gotCalls := 0
 		ctx, cancel := context.WithCancel(t.Context())
 
 		req := ghcapabilities.Request{
-			MaxRetries: uint32(maxRetries),
+			MaxRetries: maxRetries,
 		}
 		och := &OutgoingConnectorHandler{
 			lggr: lggr,
@@ -487,10 +487,10 @@ func Test_handleSingleNodeRequest(t *testing.T) {
 			return nil, assert.AnError
 		}
 
-		_, err := och.handleSingleNodeRequest(ctx, sendRequest, uint(req.MaxRetries))
+		_, err := och.handleSingleNodeRequest(ctx, sendRequest, req.MaxRetries)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "context canceled")
-		require.Equal(t, uint(wantCalls), uint(gotCalls))
+		require.Equal(t, wantCalls, gotCalls)
 	})
 }
 

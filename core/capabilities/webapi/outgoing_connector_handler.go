@@ -27,7 +27,7 @@ const (
 	DefaultWorkflowRPS    = 5.0
 	DefaultWorkflowBurst  = 50
 	defaultFetchTimeoutMs = 20_000
-	defaultMaxRetries     = 3
+	defaultMaxRetries     = uint32(3)
 
 	errorOutgoingRatelimitGlobal   = "global limit of gateways requests has been exceeded"
 	errorOutgoingRatelimitWorkflow = "workflow exceeded limit of gateways requests"
@@ -90,7 +90,7 @@ func (c *OutgoingConnectorHandler) HandleSingleNodeRequest(ctx context.Context, 
 
 	sendRequest := c.createSendRequest(messageID, req)
 
-	return c.handleSingleNodeRequest(ctxWithTimeout, sendRequest, uint(req.MaxRetries))
+	return c.handleSingleNodeRequest(ctxWithTimeout, sendRequest, req.MaxRetries)
 }
 
 // handleSingleNodeRequest accepts a blocking function that returns an api message and error and either calls it directly or with
@@ -98,11 +98,11 @@ func (c *OutgoingConnectorHandler) HandleSingleNodeRequest(ctx context.Context, 
 func (c *OutgoingConnectorHandler) handleSingleNodeRequest(
 	ctx context.Context,
 	sendRequest func(context.Context) (*api.Message, error),
-	maxRetries uint,
+	maxRetries uint32,
 ) (*api.Message, error) {
 	if maxRetries > 0 {
 		strategy := &retry.Strategy[*api.Message]{
-			MaxRetries: min(maxRetries, defaultMaxRetries),
+			MaxRetries: uint(min(maxRetries, defaultMaxRetries)),
 		}
 		return strategy.Do(ctx, c.lggr, sendRequest)
 	}
