@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/test"
+	kcsTypes "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/types"
 )
 
 func TestDeployOCR3(t *testing.T) {
@@ -51,7 +52,7 @@ func TestConfigureOCR3(t *testing.T) {
 	t.Parallel()
 
 	nWfNodes := 4
-	c := internal.OracleConfig{
+	c := kcsTypes.OracleConfig{
 		MaxFaultyOracles:     1,
 		DeltaProgressMillis:  12345,
 		TransmissionSchedule: []int{nWfNodes},
