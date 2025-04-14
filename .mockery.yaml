@@ -406,3 +406,4 @@ packages:
   github.com/smartcontractkit/chainlink/v2/core/capabilities/targets:
     interfaces:
       ContractValueGetter:
+
