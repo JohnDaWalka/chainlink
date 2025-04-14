@@ -2,6 +2,7 @@ package changeset
 
 import (
 	"context"
+	std_errors "errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -552,18 +553,18 @@ func (c CCIPOnChainState) EVMMCMSStateByChain() map[uint64]commonstate.MCMSWithT
 	return mcmsStateByChain
 }
 
-func (s CCIPOnChainState) OffRampPermissionLessExecutionThresholdSeconds(ctx context.Context, env deployment.Environment, selector uint64) (uint32, error) {
+func (c CCIPOnChainState) OffRampPermissionLessExecutionThresholdSeconds(ctx context.Context, env deployment.Environment, selector uint64) (uint32, error) {
 	family, err := chain_selectors.GetSelectorFamily(selector)
 	if err != nil {
 		return 0, err
 	}
 	switch family {
 	case chain_selectors.FamilyEVM:
-		c, ok := s.Chains[selector]
+		chain, ok := c.Chains[selector]
 		if !ok {
 			return 0, fmt.Errorf("chain %d not found in the state", selector)
 		}
-		offRamp := c.OffRamp
+		offRamp := chain.OffRamp
 		if offRamp == nil {
 			return 0, fmt.Errorf("offramp not found in the state for chain %d", selector)
 		}
@@ -575,7 +576,7 @@ func (s CCIPOnChainState) OffRampPermissionLessExecutionThresholdSeconds(ctx con
 		}
 		return dCfg.PermissionLessExecutionThresholdSeconds, nil
 	case chain_selectors.FamilySolana:
-		c, ok := s.SolChains[selector]
+		chainState, ok := c.SolChains[selector]
 		if !ok {
 			return 0, fmt.Errorf("chain %d not found in the state", selector)
 		}
@@ -583,11 +584,11 @@ func (s CCIPOnChainState) OffRampPermissionLessExecutionThresholdSeconds(ctx con
 		if !ok {
 			return 0, fmt.Errorf("solana chain %d not found in the environment", selector)
 		}
-		if c.OffRamp.IsZero() {
+		if chainState.OffRamp.IsZero() {
 			return 0, fmt.Errorf("offramp not found in existing state, deploy the offramp first for chain %d", selector)
 		}
 		var offRampConfig solOffRamp.Config
-		offRampConfigPDA, _, _ := solState.FindOfframpConfigPDA(c.OffRamp)
+		offRampConfigPDA, _, _ := solState.FindOfframpConfigPDA(chainState.OffRamp)
 		err := chain.GetAccountDataBorshInto(context.Background(), offRampConfigPDA, &offRampConfig)
 		if err != nil {
 			return 0, fmt.Errorf("offramp config not found in existing state, initialize the offramp first %d", chain.Selector)
@@ -598,8 +599,8 @@ func (s CCIPOnChainState) OffRampPermissionLessExecutionThresholdSeconds(ctx con
 	return 0, fmt.Errorf("unsupported chain family %s", family)
 }
 
-func (s CCIPOnChainState) Validate() error {
-	for sel, chain := range s.Chains {
+func (c CCIPOnChainState) Validate() error {
+	for sel, chain := range c.Chains {
 		// cannot have static link and link together
 		if chain.LinkToken != nil && chain.StaticLinkToken != nil {
 			return fmt.Errorf("cannot have both link and static link token on the same chain %d", sel)
@@ -608,10 +609,10 @@ func (s CCIPOnChainState) Validate() error {
 	return nil
 }
 
-func (s CCIPOnChainState) GetAllProposerMCMSForChains(chains []uint64) (map[uint64]*gethwrappers.ManyChainMultiSig, error) {
+func (c CCIPOnChainState) GetAllProposerMCMSForChains(chains []uint64) (map[uint64]*gethwrappers.ManyChainMultiSig, error) {
 	multiSigs := make(map[uint64]*gethwrappers.ManyChainMultiSig)
 	for _, chain := range chains {
-		chainState, ok := s.Chains[chain]
+		chainState, ok := c.Chains[chain]
 		if !ok {
 			return nil, fmt.Errorf("chain %d not found", chain)
 		}
@@ -623,10 +624,10 @@ func (s CCIPOnChainState) GetAllProposerMCMSForChains(chains []uint64) (map[uint
 	return multiSigs, nil
 }
 
-func (s CCIPOnChainState) GetAllTimeLocksForChains(chains []uint64) (map[uint64]common.Address, error) {
+func (c CCIPOnChainState) GetAllTimeLocksForChains(chains []uint64) (map[uint64]common.Address, error) {
 	timelocks := make(map[uint64]common.Address)
 	for _, chain := range chains {
-		chainState, ok := s.Chains[chain]
+		chainState, ok := c.Chains[chain]
 		if !ok {
 			return nil, fmt.Errorf("chain %d not found", chain)
 		}
@@ -638,18 +639,129 @@ func (s CCIPOnChainState) GetAllTimeLocksForChains(chains []uint64) (map[uint64]
 	return timelocks, nil
 }
 
-func (s CCIPOnChainState) SupportedChains() map[uint64]struct{} {
+func (c CCIPOnChainState) SupportedChains() map[uint64]struct{} {
 	chains := make(map[uint64]struct{})
-	for chain := range s.Chains {
+	for chain := range c.Chains {
 		chains[chain] = struct{}{}
 	}
-	for chain := range s.SolChains {
+	for chain := range c.SolChains {
 		chains[chain] = struct{}{}
 	}
 	return chains
 }
 
-func (s CCIPOnChainState) View(e *deployment.Environment, chains []uint64) (map[string]view.ChainView, map[string]view.SolChainView, error) {
+// EnforceMCMSUsageIfProd determines if an MCMS config should be enforced for this particular environment.
+// It checks if the CCIPHome and CapabilitiesRegistry contracts are owned by the Timelock because all other contracts should follow this precedent.
+// If the home chain contracts are owned by the Timelock and no mcmsConfig is provided, this function will return an error.
+func (c CCIPOnChainState) EnforceMCMSUsageIfProd(ctx context.Context, mcmsConfig *proposalutils.TimelockConfig) error {
+	// Instead of accepting a homeChainSelector, we simply look for the CCIPHome and CapabilitiesRegistry in state.
+	// This is because the home chain selector is not always available in the input to a changeset.
+	// Also, if the underlying rules to EnforceMCMSUsageIfProd change (i.e. what determines "prod" changes),
+	// we can simply update the function body without worrying about the function signature.
+	var ccipHome *ccip_home.CCIPHome
+	var capReg *capabilities_registry.CapabilitiesRegistry
+	var homeChainSelector uint64
+	for selector, chain := range c.Chains {
+		if chain.CCIPHome == nil || chain.CapabilityRegistry == nil {
+			continue
+		}
+		// This condition impacts the ability of this function to determine MCMS enforcement.
+		// As such, we return an error if we find multiple chains with home chain contracts.
+		if ccipHome != nil {
+			return errors.New("multiple chains with CCIPHome and CapabilitiesRegistry contracts found")
+		}
+		ccipHome = chain.CCIPHome
+		capReg = chain.CapabilityRegistry
+		homeChainSelector = selector
+	}
+	// It is not the job of this function to enforce the existence of home chain contracts.
+	// Some tests don't deploy these contracts, and we don't want to fail them.
+	// We simply say that MCMS is not enforced in such environments.
+	if ccipHome == nil {
+		return nil
+	}
+	// If the timelock contract is not found on the home chain,
+	// we know that MCMS is not enforced.
+	timelock := c.Chains[homeChainSelector].Timelock
+	if timelock == nil {
+		return nil
+	}
+	ccipHomeOwner, err := ccipHome.Owner(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return fmt.Errorf("failed to get CCIP home owner: %w", err)
+	}
+	capRegOwner, err := capReg.Owner(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return fmt.Errorf("failed to get capabilities registry owner: %w", err)
+	}
+	if ccipHomeOwner != capRegOwner {
+		return fmt.Errorf("CCIPHome and CapabilitiesRegistry owners do not match: %s != %s", ccipHomeOwner.String(), capRegOwner.String())
+	}
+	// If CCIPHome & CapabilitiesRegistry are owned by timelock, then MCMS is enforced.
+	if ccipHomeOwner == timelock.Address() && mcmsConfig == nil {
+		return errors.New("MCMS is enforced for environment (i.e. CCIPHome & CapReg are owned by timelock), but no MCMS config was provided")
+	}
+
+	return nil
+}
+
+// ValidateOwnershipOfChain validates the ownership of every CCIP contract on a chain.
+// If mcmsConfig is nil, the expected owner of each contract is the chain's deployer key.
+// If provided, the expected owner is the Timelock contract.
+func (c CCIPOnChainState) ValidateOwnershipOfChain(e deployment.Environment, chainSel uint64, mcmsConfig *proposalutils.TimelockConfig) error {
+	chain, ok := e.Chains[chainSel]
+	if !ok {
+		return fmt.Errorf("chain with selector %d not found in the environment", chainSel)
+	}
+
+	chainState, ok := c.Chains[chainSel]
+	if !ok {
+		return fmt.Errorf("%s not found in the state", chain)
+	}
+	if chainState.Timelock == nil {
+		return fmt.Errorf("timelock not found on %s", chain)
+	}
+
+	ownedContracts := map[string]commoncs.Ownable{
+		"router":             chainState.Router,
+		"feeQuoter":          chainState.FeeQuoter,
+		"offRamp":            chainState.OffRamp,
+		"onRamp":             chainState.OnRamp,
+		"nonceManager":       chainState.NonceManager,
+		"rmnRemote":          chainState.RMNRemote,
+		"rmnProxy":           chainState.RMNProxy,
+		"tokenAdminRegistry": chainState.TokenAdminRegistry,
+	}
+	var wg sync.WaitGroup
+	errs := make(chan error, len(ownedContracts))
+	for contractName, contract := range ownedContracts {
+		wg.Add(1)
+		go func(name string, c commoncs.Ownable) {
+			defer wg.Done()
+			if c == nil {
+				errs <- fmt.Errorf("missing %s contract on %s", name, chain)
+				return
+			}
+			err := commoncs.ValidateOwnership(e.GetContext(), mcmsConfig != nil, chain.DeployerKey.From, chainState.Timelock.Address(), contract)
+			if err != nil {
+				errs <- fmt.Errorf("failed to validate ownership of %s contract on %s: %w", name, chain, err)
+			}
+		}(contractName, contract)
+	}
+	wg.Wait()
+	close(errs)
+	var multiErr error
+	for err := range errs {
+		multiErr = std_errors.Join(multiErr, err)
+	}
+	if multiErr != nil {
+		return multiErr
+	}
+
+	return nil
+}
+
+func (c CCIPOnChainState) View(e *deployment.Environment, chains []uint64) (map[string]view.ChainView, map[string]view.SolChainView, error) {
 	m := make(map[string]view.ChainView)
 	mu := sync.Mutex{}
 	sm := make(map[string]view.SolChainView)
@@ -677,10 +789,10 @@ func (s CCIPOnChainState) View(e *deployment.Environment, chains []uint64) (map[
 			}
 			switch family {
 			case chain_selectors.FamilyEVM:
-				if _, ok := s.Chains[chainSelector]; !ok {
+				if _, ok := c.Chains[chainSelector]; !ok {
 					return fmt.Errorf("chain not supported %d", chainSelector)
 				}
-				chainState := s.Chains[chainSelector]
+				chainState := c.Chains[chainSelector]
 				chainView, err := chainState.GenerateView()
 				if err != nil {
 					return err
@@ -691,10 +803,10 @@ func (s CCIPOnChainState) View(e *deployment.Environment, chains []uint64) (map[
 				m[name] = chainView
 				mu.Unlock()
 			case chain_selectors.FamilySolana:
-				if _, ok := s.SolChains[chainSelector]; !ok {
+				if _, ok := c.SolChains[chainSelector]; !ok {
 					return fmt.Errorf("chain not supported %d", chainSelector)
 				}
-				chainState := s.SolChains[chainSelector]
+				chainState := c.SolChains[chainSelector]
 				chainView, err := chainState.GenerateView(e.SolChains[chainSelector])
 				if err != nil {
 					return err
@@ -713,7 +825,7 @@ func (s CCIPOnChainState) View(e *deployment.Environment, chains []uint64) (map[
 	return m, sm, grp.Wait()
 }
 
-func (s CCIPOnChainState) GetOffRampAddressBytes(chainSelector uint64) ([]byte, error) {
+func (c CCIPOnChainState) GetOffRampAddressBytes(chainSelector uint64) ([]byte, error) {
 	family, err := chain_selectors.GetSelectorFamily(chainSelector)
 	if err != nil {
 		return nil, err
@@ -722,9 +834,9 @@ func (s CCIPOnChainState) GetOffRampAddressBytes(chainSelector uint64) ([]byte, 
 	var offRampAddress []byte
 	switch family {
 	case chain_selectors.FamilyEVM:
-		offRampAddress = s.Chains[chainSelector].OffRamp.Address().Bytes()
+		offRampAddress = c.Chains[chainSelector].OffRamp.Address().Bytes()
 	case chain_selectors.FamilySolana:
-		offRampAddress = s.SolChains[chainSelector].OffRamp.Bytes()
+		offRampAddress = c.SolChains[chainSelector].OffRamp.Bytes()
 	default:
 		return nil, fmt.Errorf("unsupported chain family %s", family)
 	}
@@ -732,7 +844,7 @@ func (s CCIPOnChainState) GetOffRampAddressBytes(chainSelector uint64) ([]byte, 
 	return offRampAddress, nil
 }
 
-func (s CCIPOnChainState) GetOnRampAddressBytes(chainSelector uint64) ([]byte, error) {
+func (c CCIPOnChainState) GetOnRampAddressBytes(chainSelector uint64) ([]byte, error) {
 	family, err := chain_selectors.GetSelectorFamily(chainSelector)
 	if err != nil {
 		return nil, err
@@ -741,15 +853,15 @@ func (s CCIPOnChainState) GetOnRampAddressBytes(chainSelector uint64) ([]byte, e
 	var onRampAddressBytes []byte
 	switch family {
 	case chain_selectors.FamilyEVM:
-		if s.Chains[chainSelector].OnRamp == nil {
+		if c.Chains[chainSelector].OnRamp == nil {
 			return nil, fmt.Errorf("no onramp found in the state for chain %d", chainSelector)
 		}
-		onRampAddressBytes = s.Chains[chainSelector].OnRamp.Address().Bytes()
+		onRampAddressBytes = c.Chains[chainSelector].OnRamp.Address().Bytes()
 	case chain_selectors.FamilySolana:
-		if s.SolChains[chainSelector].Router.IsZero() {
+		if c.SolChains[chainSelector].Router.IsZero() {
 			return nil, fmt.Errorf("no router found in the state for chain %d", chainSelector)
 		}
-		onRampAddressBytes = s.SolChains[chainSelector].Router.Bytes()
+		onRampAddressBytes = c.SolChains[chainSelector].Router.Bytes()
 	default:
 		return nil, fmt.Errorf("unsupported chain family %s", family)
 	}
@@ -757,14 +869,14 @@ func (s CCIPOnChainState) GetOnRampAddressBytes(chainSelector uint64) ([]byte, e
 	return onRampAddressBytes, nil
 }
 
-func (s CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType deployment.ContractType) error {
+func (c CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType deployment.ContractType) error {
 	family, err := chain_selectors.GetSelectorFamily(chainSelector)
 	if err != nil {
 		return err
 	}
 	switch family {
 	case chain_selectors.FamilyEVM:
-		chainState, exists := s.Chains[chainSelector]
+		chainState, exists := c.Chains[chainSelector]
 		if !exists {
 			return fmt.Errorf("chain %d does not exist", chainSelector)
 		}
@@ -782,7 +894,7 @@ func (s CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType deployment
 		}
 
 	case chain_selectors.FamilySolana:
-		chainState, exists := s.SolChains[chainSelector]
+		chainState, exists := c.SolChains[chainSelector]
 		if !exists {
 			return fmt.Errorf("chain %d does not exist", chainSelector)
 		}
