@@ -20,7 +20,7 @@ var (
 // ChangeSet is equivalent to ChangeLogic
 // Deprecated: use the ChangeLogic type, or an instance of a ChangeSetV2 in infrastructure or validation code.
 type ChangeSet[C any] func(e Environment, config C) (ChangesetOutput, error)
-
+// TEST CHANGE FOR CI TRIGGER
 // ChangeLogic encapsulates the active behavior of a ChangeSetV2.
 // The config struct contains environment-specific inputs for this logical change. For example, it might contain
 // the chainSelectors against which this change logic should be applied, or certain contract addresses or configuration
