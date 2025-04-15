@@ -353,6 +353,7 @@ func (h *Store) GetSecretsURLHash(workflowOwner []byte, secretsURL []byte) ([]by
 	return urlHash, nil
 }
 
+// DeleteWorkflowArtifacts removes the workflow spec from the database. Does not error if not found.
 func (h *Store) DeleteWorkflowArtifacts(ctx context.Context, workflowOwner string, workflowName string, workflowID string) error {
 	err := h.orm.DeleteWorkflowSpec(ctx, workflowOwner, workflowName)
 	if err != nil {

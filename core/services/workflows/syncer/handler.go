@@ -334,103 +334,102 @@ func (w workflowName) Hex() string {
 	return hexName
 }
 
-// workflowRegisteredEvent handles the WorkflowRegisteredEvent event type.
+// workflowRegisteredEvent handles the WorkflowRegisteredEvent event type. This method must remain idempotent.
 func (h *eventHandler) workflowRegisteredEvent(
 	ctx context.Context,
 	payload WorkflowRegistryWorkflowRegisteredV1,
 ) error {
 	wfID := hex.EncodeToString(payload.WorkflowID[:])
+	owner := hex.EncodeToString(payload.WorkflowOwner)
 
-	decodedBinary, config, err := h.workflowArtifactsStore.FetchWorkflowArtifacts(ctx, wfID, payload.BinaryURL, payload.ConfigURL)
+	// If there is not a workflow spec in the database, then fetch artifacts and create it
+	spec, err := h.workflowArtifactsStore.GetWorkflowSpec(ctx, owner, payload.WorkflowName)
 	if err != nil {
-		return err
-	}
-
-	// Always fetch secrets from the SecretsURL
-	var secrets []byte
-	if payload.SecretsURL != "" {
-		secrets, err = h.workflowArtifactsStore.GetSecrets(ctx, payload.SecretsURL, payload.WorkflowID, payload.WorkflowOwner)
+		decodedBinary, config, err := h.workflowArtifactsStore.FetchWorkflowArtifacts(ctx, wfID, payload.BinaryURL, payload.ConfigURL)
 		if err != nil {
-			return fmt.Errorf("failed to get secrets: %w", err)
+			return err
+		}
+
+		// Always fetch secrets from the SecretsURL
+		var secrets []byte
+		if payload.SecretsURL != "" {
+			secrets, err = h.workflowArtifactsStore.GetSecrets(ctx, payload.SecretsURL, payload.WorkflowID, payload.WorkflowOwner)
+			if err != nil {
+				return fmt.Errorf("failed to get secrets: %w", err)
+			}
+		}
+
+		// Calculate the hash of the binary and config files
+		hash, err := pkgworkflows.GenerateWorkflowID(payload.WorkflowOwner, payload.WorkflowName, decodedBinary, config, payload.SecretsURL)
+		if err != nil {
+			return fmt.Errorf("failed to generate workflow id: %w", err)
+		}
+
+		// Pre-check: verify that the workflowID matches; if it doesn't abort and log an error via Beholder.
+		if !bytes.Equal(hash[:], payload.WorkflowID[:]) {
+			return fmt.Errorf("workflowID mismatch: %x != %x", hash, payload.WorkflowID)
+		}
+
+		// Save the workflow secrets
+		urlHash, err := h.workflowArtifactsStore.GetSecretsURLHash(payload.WorkflowOwner, []byte(payload.SecretsURL))
+		if err != nil {
+			return fmt.Errorf("failed to get secrets URL hash: %w", err)
+		}
+
+		status := job.WorkflowSpecStatusActive
+		if payload.Status == 1 {
+			status = job.WorkflowSpecStatusPaused
+		}
+
+		// Create a new entry in the workflow_spec table corresponding for the new workflow, with the contents of the binaryURL + configURL in the table
+		entry := &job.WorkflowSpec{
+			Workflow:      hex.EncodeToString(decodedBinary),
+			Config:        string(config),
+			WorkflowID:    wfID,
+			Status:        status,
+			WorkflowOwner: owner,
+			WorkflowName:  payload.WorkflowName,
+			SpecType:      job.WASMFile,
+			BinaryURL:     payload.BinaryURL,
+			ConfigURL:     payload.ConfigURL,
+		}
+
+		if _, err = h.workflowArtifactsStore.UpsertWorkflowSpecWithSecrets(ctx, entry, payload.SecretsURL, hex.EncodeToString(urlHash), string(secrets)); err != nil {
+			return fmt.Errorf("failed to upsert workflow spec with secrets: %w", err)
 		}
 	}
 
-	// Calculate the hash of the binary and config files
-	hash, err := pkgworkflows.GenerateWorkflowID(payload.WorkflowOwner, payload.WorkflowName, decodedBinary, config, payload.SecretsURL)
-	if err != nil {
-		return fmt.Errorf("failed to generate workflow id: %w", err)
-	}
+	// If there is no engine in the engine registry, then create it, start it, and register it
+	engineKey := EngineRegistryKey{Owner: payload.WorkflowOwner, Name: payload.WorkflowName}
+	if !h.engineRegistry.Contains(engineKey) {
+		decodedBinary, err := hex.DecodeString(spec.Workflow)
+		if err != nil {
+			return fmt.Errorf("failed to create workflow engine: %w", err)
+		}
+		// Start a new WorkflowEngine instance, and add it to local engine registry
+		engine, err := h.engineFactory(
+			ctx,
+			wfID,
+			owner,
+			workflowName{
+				name: payload.WorkflowName,
+			},
+			[]byte(spec.Config),
+			decodedBinary,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create workflow engine: %w", err)
+		}
 
-	// Pre-check: verify that the workflowID matches; if it doesn’t abort and log an error via Beholder.
-	if !bytes.Equal(hash[:], payload.WorkflowID[:]) {
-		return fmt.Errorf("workflowID mismatch: %x != %x", hash, payload.WorkflowID)
-	}
+		if err := engine.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start workflow engine: %w", err)
+		}
 
-	// Ensure that there is no running workflow engine for the given workflow owner/name.
-	key := EngineRegistryKey{
-		Owner: payload.WorkflowOwner, Name: payload.WorkflowName,
-	}
-	if h.engineRegistry.Contains(key) {
-		return fmt.Errorf("workflow is already running, so not starting it : %s", wfID)
-	}
-
-	// Save the workflow secrets
-	urlHash, err := h.workflowArtifactsStore.GetSecretsURLHash(payload.WorkflowOwner, []byte(payload.SecretsURL))
-	if err != nil {
-		return fmt.Errorf("failed to get secrets URL hash: %w", err)
-	}
-
-	// Create a new entry in the workflow_spec table corresponding for the new workflow, with the contents of the binaryURL + configURL in the table
-	status := job.WorkflowSpecStatusActive
-	if payload.Status == 1 {
-		status = job.WorkflowSpecStatusPaused
-	}
-
-	owner := hex.EncodeToString(payload.WorkflowOwner)
-	entry := &job.WorkflowSpec{
-		Workflow:      hex.EncodeToString(decodedBinary),
-		Config:        string(config),
-		WorkflowID:    wfID,
-		Status:        status,
-		WorkflowOwner: owner,
-		WorkflowName:  payload.WorkflowName,
-		SpecType:      job.WASMFile,
-		BinaryURL:     payload.BinaryURL,
-		ConfigURL:     payload.ConfigURL,
-	}
-
-	if _, err = h.workflowArtifactsStore.UpsertWorkflowSpecWithSecrets(ctx, entry, payload.SecretsURL, hex.EncodeToString(urlHash), string(secrets)); err != nil {
-		return fmt.Errorf("failed to upsert workflow spec with secrets: %w", err)
-	}
-
-	if status != job.WorkflowSpecStatusActive {
-		h.lggr.Debugw("workflow is marked as paused, so not starting it", "workflow", wfID)
-		return nil
-	}
-
-	// If status == active, start a new WorkflowEngine instance, and add it to local engine registry
-	engine, err := h.engineFactory(
-		ctx,
-		wfID,
-		owner,
-		workflowName{
-			name: payload.WorkflowName,
-		},
-		config,
-		decodedBinary,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create workflow engine: %w", err)
-	}
-
-	if err := engine.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start workflow engine: %w", err)
-	}
-
-	if err := h.engineRegistry.Add(key, engine, payload.WorkflowID); err != nil {
-		// This shouldn't happen because we call the handler serially and
-		// check for running engines above, see the call to engineRegistry.Contains.
-		return fmt.Errorf("invariant violation: %w", err)
+		if err := h.engineRegistry.Add(engineKey, engine, payload.WorkflowID); err != nil {
+			// This shouldn't happen because we call the handler serially and
+			// check for running engines above, see the call to engineRegistry.Contains.
+			return fmt.Errorf("invariant violation: %w", err)
+		}
 	}
 
 	return nil
@@ -551,18 +550,22 @@ func (h *eventHandler) workflowActivatedEvent(
 	return h.workflowRegisteredEvent(ctx, registeredEvent)
 }
 
-// workflowDeletedEvent handles the WorkflowDeletedEvent event type.
+// workflowDeletedEvent handles the WorkflowDeletedEvent event type. This method must remain idempotent.
 func (h *eventHandler) workflowDeletedEvent(
 	ctx context.Context,
 	payload WorkflowRegistryWorkflowDeletedV1,
 ) error {
-	if err := h.tryEngineCleanup(payload.WorkflowOwner, payload.WorkflowName); err != nil {
-		return err
-	}
-
+	// The workflow spec in the DB is used to store the latest workflow details
+	// Clean up first
 	if err := h.workflowArtifactsStore.DeleteWorkflowArtifacts(ctx, hex.EncodeToString(payload.WorkflowOwner),
 		payload.WorkflowName, hex.EncodeToString(payload.WorkflowID[:])); err != nil {
 		return fmt.Errorf("failed to delete workflow artifacts: %w", err)
+	}
+
+	// Whether the workflow is actually running is determined by if the engine is in the engine registry
+	// Clean up second
+	if err := h.tryEngineCleanup(payload.WorkflowOwner, payload.WorkflowName); err != nil {
+		return err
 	}
 
 	return nil
@@ -575,8 +578,8 @@ func (h *eventHandler) tryEngineCleanup(workflowOwner []byte, workflowName strin
 		Owner: workflowOwner, Name: workflowName,
 	}
 	if h.engineRegistry.Contains(key) {
-		// Remove the engine from the registry
-		e, err := h.engineRegistry.Pop(key)
+		// Get the engine from the registry
+		e, err := h.engineRegistry.Get(key)
 		if err != nil {
 			return fmt.Errorf("failed to get workflow engine: %w", err)
 		}
@@ -584,6 +587,12 @@ func (h *eventHandler) tryEngineCleanup(workflowOwner []byte, workflowName strin
 		// Stop the engine
 		if err := e.Close(); err != nil {
 			return fmt.Errorf("failed to close workflow engine: %w", err)
+		}
+
+		// Remove the engine from the registry
+		_, err = h.engineRegistry.Pop(key)
+		if err != nil {
+			return fmt.Errorf("failed to remove workflow engine: %w", err)
 		}
 	}
 	return nil
