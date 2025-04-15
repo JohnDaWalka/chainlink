@@ -89,7 +89,7 @@ func repoSetup(e deployment.Environment, chain deployment.SolChain, gitCommitSha
 	if err != nil {
 		return errors.New("anchor-cli not installed in path")
 	}
-	e.Logger.Debug("Anchor version command output ", output)
+	e.Logger.Debugw("Anchor version command output", "output", output)
 	anchorVersion, err := parseAnchorVersion(output)
 	if err != nil {
 		return fmt.Errorf("error parsing anchor version: %w", err)
@@ -115,7 +115,7 @@ func updateIDL(e deployment.Environment, idlFile string, programID string) error
 	if err := json.Unmarshal(idlBytes, &idl); err != nil {
 		return fmt.Errorf("failed to parse legacy IDL: %w", err)
 	}
-	e.Logger.Debugw("Updating IDL with program ID", "programID", programID)
+	e.Logger.Debugw("Updating IDL with programID", "programID", programID)
 	idl["metadata"] = map[string]interface{}{
 		"address": programID,
 	}
