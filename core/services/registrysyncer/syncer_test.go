@@ -368,6 +368,7 @@ func TestReader_Integration(t *testing.T) {
 		nodeSet[1]: nodesInfo[1],
 		nodeSet[2]: nodesInfo[2],
 	}, s.IDsToNodes)
+	require.Fail(t, "hack")
 }
 
 func TestSyncer_DBIntegration(t *testing.T) {

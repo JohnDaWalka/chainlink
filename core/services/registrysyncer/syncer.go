@@ -61,6 +61,7 @@ type registrySyncer struct {
 	lggr              logger.Logger
 	mu                sync.RWMutex
 	doPeriodicLogging func() bool
+	current           *LocalRegistry
 }
 
 var _ services.Service = &registrySyncer{}
@@ -95,6 +96,10 @@ func New(
 		initReader: newReader,
 		orm:        orm,
 		getPeerID:  getPeerID,
+		current:    new(LocalRegistry),
+		doPeriodicLogging: func() bool {
+			return false
+		},
 	}, nil
 }
 
@@ -205,6 +210,9 @@ func (s *registrySyncer) updateStateLoop() {
 			if err := s.orm.AddLocalRegistry(ctx, *localRegistry); err != nil {
 				s.lggr.Errorw("failed to save state to local registry", "error", err)
 			}
+			s.mu.Lock()
+			s.current = localRegistry
+			s.mu.Unlock()
 		}
 	}
 }
@@ -308,7 +316,6 @@ func (s *registrySyncer) Sync(ctx context.Context, isInitialSync bool) error {
 			latestRegistry.getPeerID = s.getPeerID
 		}
 		s.lggr.Infow("initial local registry", "registry", latestRegistry)
-
 	}
 
 	if latestRegistry == nil {
@@ -316,11 +323,11 @@ func (s *registrySyncer) Sync(ctx context.Context, isInitialSync bool) error {
 		if err != nil {
 			return fmt.Errorf("failed to sync with remote registry: %w", err)
 		}
-		if diff := latestRegistry.Diff(importedRegistry); diff != "" {
-			s.lggr.Infow("remote registry diff", "diff", diff)
-		}
 
 		latestRegistry = importedRegistry
+		if diff := s.current.Diff(latestRegistry); diff != "" {
+			s.lggr.Infow("remote registry diff", "diff", diff)
+		}
 		if s.doPeriodicLogging() {
 			s.lggr.Infow("remote registry dump", "registry", latestRegistry)
 		}
