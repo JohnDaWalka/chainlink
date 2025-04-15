@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 
@@ -34,6 +37,18 @@ type LocalRegistry struct {
 	IDsToDONs         map[DonID]DON
 	IDsToNodes        map[p2ptypes.PeerID]kcr.INodeInfoProviderNodeInfo
 	IDsToCapabilities map[string]Capability
+}
+
+func (l *LocalRegistry) Diff(other *LocalRegistry) string {
+	header := "LocalRegistry Diff: "
+	var diff strings.Builder
+	diff.WriteString(cmp.Diff(l.IDsToDONs, other.IDsToDONs))
+	diff.WriteString(cmp.Diff(l.IDsToNodes, other.IDsToNodes))
+	diff.WriteString(cmp.Diff(l.IDsToCapabilities, other.IDsToCapabilities))
+	if diff.Len() != 0 {
+		return header + "\n" + diff.String()
+	}
+	return ""
 }
 
 func NewLocalRegistry(

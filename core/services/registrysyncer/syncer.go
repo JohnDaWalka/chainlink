@@ -57,9 +57,10 @@ type registrySyncer struct {
 
 	updateChan chan *LocalRegistry
 
-	wg   sync.WaitGroup
-	lggr logger.Logger
-	mu   sync.RWMutex
+	wg                sync.WaitGroup
+	lggr              logger.Logger
+	mu                sync.RWMutex
+	doPeriodicLogging func() bool
 }
 
 var _ services.Service = &registrySyncer{}
@@ -168,11 +169,16 @@ func (s *registrySyncer) syncLoop() {
 		s.lggr.Errorw("failed to sync with remote registry", "error", err)
 	}
 
+	tickCount := 0
+	s.doPeriodicLogging = func() bool {
+		return tickCount%10 == 0
+	}
 	for {
 		select {
 		case <-s.stopCh:
 			return
 		case <-ticker.C:
+			tickCount++
 			s.lggr.Debug("starting regular sync with the remote registry")
 			err := s.Sync(ctx, false)
 			if err != nil {
@@ -281,6 +287,7 @@ func (s *registrySyncer) Sync(ctx context.Context, isInitialSync bool) error {
 	}
 
 	if s.reader == nil {
+		s.lggr.Infow("creating new contract reader", "address", s.capabilitiesContract.Address)
 		reader, err := s.initReader(ctx, s.lggr, s.relayer, s.capabilitiesContract)
 		if err != nil {
 			return err
@@ -293,7 +300,6 @@ func (s *registrySyncer) Sync(ctx context.Context, isInitialSync bool) error {
 	var err error
 
 	if isInitialSync {
-		s.lggr.Debug("syncing with local registry")
 		latestRegistry, err = s.orm.LatestLocalRegistry(ctx)
 		if err != nil {
 			s.lggr.Warnw("failed to sync with local registry, using remote registry instead", "error", err)
@@ -301,15 +307,23 @@ func (s *registrySyncer) Sync(ctx context.Context, isInitialSync bool) error {
 			latestRegistry.lggr = s.lggr
 			latestRegistry.getPeerID = s.getPeerID
 		}
+		s.lggr.Infow("initial local registry", "registry", latestRegistry)
+
 	}
 
 	if latestRegistry == nil {
-		s.lggr.Debug("syncing with remote registry")
 		importedRegistry, err := s.importOnchainRegistry(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to sync with remote registry: %w", err)
 		}
+		if diff := latestRegistry.Diff(importedRegistry); diff != "" {
+			s.lggr.Infow("remote registry diff", "diff", diff)
+		}
+
 		latestRegistry = importedRegistry
+		if s.doPeriodicLogging() {
+			s.lggr.Infow("remote registry dump", "registry", latestRegistry)
+		}
 		// Attempt to send local registry to the update channel without blocking
 		// This is to prevent the tests from hanging if they are not calling `Start()` on the syncer
 		select {
