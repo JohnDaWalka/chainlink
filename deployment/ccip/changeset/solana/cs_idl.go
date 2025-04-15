@@ -46,7 +46,7 @@ func parseAnchorVersion(output string) (string, error) {
 
 // create Anchor.toml file to simulate anchor workspace
 func writeAnchorToml(e deployment.Environment, filename, anchorVersion, cluster, wallet string) error {
-	e.Logger.Debug("Writing Anchor.toml", filename, anchorVersion, cluster, wallet)
+	e.Logger.Debugw("Writing Anchor.toml", "filename", filename, "anchorVersion", anchorVersion, "cluster", cluster, "wallet", wallet)
 	config := map[string]interface{}{
 		"toolchain": map[string]string{
 			"anchor_version": anchorVersion,
@@ -56,6 +56,7 @@ func writeAnchorToml(e deployment.Environment, filename, anchorVersion, cluster,
 			"wallet":  wallet,
 		},
 	}
+	e.Logger.Debugw("Anchor.toml config", "config", config)
 
 	tree, err := toml.TreeFromMap(config)
 	if err != nil {
@@ -88,7 +89,7 @@ func repoSetup(e deployment.Environment, chain deployment.SolChain, gitCommitSha
 	if err != nil {
 		return errors.New("anchor-cli not installed in path")
 	}
-	e.Logger.Debug("Anchor version command output", output)
+	e.Logger.Debug("Anchor version command output ", output)
 	anchorVersion, err := parseAnchorVersion(output)
 	if err != nil {
 		return fmt.Errorf("error parsing anchor version: %w", err)
@@ -114,7 +115,7 @@ func updateIDL(e deployment.Environment, idlFile string, programID string) error
 	if err := json.Unmarshal(idlBytes, &idl); err != nil {
 		return fmt.Errorf("failed to parse legacy IDL: %w", err)
 	}
-	e.Logger.Debug("Updating IDL with program ID", programID)
+	e.Logger.Debugw("Updating IDL with program ID", "programID", programID)
 	idl["metadata"] = map[string]interface{}{
 		"address": programID,
 	}
