@@ -111,6 +111,7 @@ type ChangesetOutput struct {
 	Proposals                  []timelock.MCMSWithTimelockProposal
 	MCMSTimelockProposals      []mcms.TimelockProposal
 	DescribedTimelockProposals []string
+	DummyOutput                []string
 	MCMSProposals              []mcms.Proposal
 	AddressBook                AddressBook
 	DataStore                  datastore.MutableDataStore[datastore.DefaultMetadata, datastore.DefaultMetadata]
