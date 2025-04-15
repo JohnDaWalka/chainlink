@@ -127,6 +127,65 @@ func (_c *ContractWriter_GetFeeComponents_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// GetTransactionFee provides a mock function with given fields: ctx, transactionID
+func (_m *ContractWriter) GetTransactionFee(ctx context.Context, transactionID string) (*types.TransactionFee, error) {
+	ret := _m.Called(ctx, transactionID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetTransactionFee")
+	}
+
+	var r0 *types.TransactionFee
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.TransactionFee, error)); ok {
+		return rf(ctx, transactionID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *types.TransactionFee); ok {
+		r0 = rf(ctx, transactionID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.TransactionFee)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, transactionID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ContractWriter_GetTransactionFee_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTransactionFee'
+type ContractWriter_GetTransactionFee_Call struct {
+	*mock.Call
+}
+
+// GetTransactionFee is a helper method to define mock.On call
+//   - ctx context.Context
+//   - transactionID string
+func (_e *ContractWriter_Expecter) GetTransactionFee(ctx interface{}, transactionID interface{}) *ContractWriter_GetTransactionFee_Call {
+	return &ContractWriter_GetTransactionFee_Call{Call: _e.mock.On("GetTransactionFee", ctx, transactionID)}
+}
+
+func (_c *ContractWriter_GetTransactionFee_Call) Run(run func(ctx context.Context, transactionID string)) *ContractWriter_GetTransactionFee_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *ContractWriter_GetTransactionFee_Call) Return(_a0 *types.TransactionFee, _a1 error) *ContractWriter_GetTransactionFee_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *ContractWriter_GetTransactionFee_Call) RunAndReturn(run func(context.Context, string) (*types.TransactionFee, error)) *ContractWriter_GetTransactionFee_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetTransactionStatus provides a mock function with given fields: ctx, transactionID
 func (_m *ContractWriter) GetTransactionStatus(ctx context.Context, transactionID string) (types.TransactionStatus, error) {
 	ret := _m.Called(ctx, transactionID)
