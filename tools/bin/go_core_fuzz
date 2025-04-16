@@ -4,8 +4,7 @@ set +e
 
 SCRIPT_PATH=`dirname "$0"`; SCRIPT_PATH=`eval "cd \"$SCRIPT_PATH\" && pwd"`
 OUTPUT_FILE=${OUTPUT_FILE:-"./output.txt"}
-# DEBUG: Check that the fix is working as expected
-FUZZ_TIMEOUT_MINUTES=${FUZZ_TIMEOUT_MINUTES:-"7"}
+FUZZ_TIMEOUT_MINUTES=${FUZZ_TIMEOUT_MINUTES:-"4"}
 
 TOTAL_SECONDS=$((FUZZ_TIMEOUT_MINUTES * 60))
 if (( TOTAL_SECONDS >= 180 )); then
