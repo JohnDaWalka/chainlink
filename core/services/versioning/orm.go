@@ -92,7 +92,7 @@ func CheckVersion(ctx context.Context, ds sqlutil.DataSource, lggr logger.Logger
 		return nil, nil, errors.Errorf("Application version %q is not valid semver", appVersion)
 	}
 	if dbv.GreaterThan(appv) {
-		return nil, nil, errors.Errorf("Application version (%s) is lower than database version (%s). Only Chainlink %s or higher can be run on this database", appv, dbv, dbv)
+		lggr.Warnf("Application version (%s) is lower than database version (%s). Only Chainlink %s or higher can be run on this database", appv, dbv, dbv)
 	}
 	return appv, dbv, nil
 }
