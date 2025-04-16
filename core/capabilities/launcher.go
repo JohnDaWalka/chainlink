@@ -144,7 +144,7 @@ func (w *launcher) Name() string {
 }
 
 func (w *launcher) Launch(ctx context.Context, state *registrysyncer.LocalRegistry) error {
-	w.lggr.Debug("CapabilitiesLauncher triggered...")
+	w.lggr.Debugw("CapabilitiesLauncher triggered", "local registry", state)
 	w.registry.SetLocalRegistry(state)
 
 	allDONIDs := []registrysyncer.DonID{}

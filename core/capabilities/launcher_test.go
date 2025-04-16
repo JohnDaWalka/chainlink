@@ -154,6 +154,10 @@ func TestLauncher(t *testing.T) {
 					ID:             "streams-trigger@1.0.0",
 					CapabilityType: capabilities.CapabilityTypeTrigger,
 				},
+				"something": {
+					ID:             "streams-trigger:label_value@2.0.0",
+					CapabilityType: capabilities.CapabilityTypeTrigger,
+				},
 				fullTargetID: {
 					ID:             "write-chain_evm_1@1.0.0",
 					CapabilityType: capabilities.CapabilityTypeTarget,
@@ -481,7 +485,8 @@ func TestLauncher_RemoteTriggerModeAggregatorShim(t *testing.T) {
 		randomWord(),
 	}
 
-	fullTriggerCapID := "log-event-trigger-evm-43113@1.0.0"
+	//fullTriggerCapID := "log-event-trigger-evm-43113@1.0.0"
+	fullTriggerCapID := "streams-trigger@1.0.0"
 	fullTargetID := "write-chain_evm_1@1.0.0"
 	triggerCapID := randomWord()
 	targetCapID := randomWord()
@@ -799,9 +804,11 @@ func TestLauncher_WiresUpClientsForPublicWorkflowDON(t *testing.T) {
 		randomWord(),
 	}
 
-	fullTriggerCapID := "streams-trigger@1.0.0"
+	fullTriggerCapID := "streams-trigger:something_else-2@1.0.0"
+	fullTriggerCapID2 := "streams-trigger:label_value-1@2.0.0"
 	fullTargetID := "write-chain_evm_1@1.0.0"
 	triggerCapID := randomWord()
+	triggerCapID2 := randomWord()
 	targetCapID := randomWord()
 	dID := uint32(1)
 	capDonID := uint32(2)
@@ -845,6 +852,9 @@ func TestLauncher_WiresUpClientsForPublicWorkflowDON(t *testing.T) {
 					fullTriggerCapID: {
 						Config: cfg,
 					},
+					fullTriggerCapID2: {
+						Config: cfg,
+					},
 					fullTargetID: {
 						Config: cfg,
 					},
@@ -854,6 +864,10 @@ func TestLauncher_WiresUpClientsForPublicWorkflowDON(t *testing.T) {
 		IDsToCapabilities: map[string]registrysyncer.Capability{
 			fullTriggerCapID: {
 				ID:             fullTriggerCapID,
+				CapabilityType: capabilities.CapabilityTypeTrigger,
+			},
+			fullTriggerCapID2: {
+				ID:             fullTriggerCapID2,
 				CapabilityType: capabilities.CapabilityTypeTrigger,
 			},
 			fullTargetID: {
@@ -867,28 +881,28 @@ func TestLauncher_WiresUpClientsForPublicWorkflowDON(t *testing.T) {
 				Signer:              randomWord(),
 				P2pId:               capabilityDonNodes[0],
 				EncryptionPublicKey: randomWord(),
-				HashedCapabilityIds: [][32]byte{triggerCapID, targetCapID},
+				HashedCapabilityIds: [][32]byte{triggerCapID, triggerCapID2, targetCapID},
 			},
 			capabilityDonNodes[1]: {
 				NodeOperatorId:      1,
 				Signer:              randomWord(),
 				P2pId:               capabilityDonNodes[1],
 				EncryptionPublicKey: randomWord(),
-				HashedCapabilityIds: [][32]byte{triggerCapID, targetCapID},
+				HashedCapabilityIds: [][32]byte{triggerCapID, triggerCapID2, targetCapID},
 			},
 			capabilityDonNodes[2]: {
 				NodeOperatorId:      1,
 				Signer:              randomWord(),
 				P2pId:               capabilityDonNodes[2],
 				EncryptionPublicKey: randomWord(),
-				HashedCapabilityIds: [][32]byte{triggerCapID, targetCapID},
+				HashedCapabilityIds: [][32]byte{triggerCapID, triggerCapID2, targetCapID},
 			},
 			capabilityDonNodes[3]: {
 				NodeOperatorId:      1,
 				Signer:              randomWord(),
 				P2pId:               capabilityDonNodes[3],
 				EncryptionPublicKey: randomWord(),
-				HashedCapabilityIds: [][32]byte{triggerCapID, targetCapID},
+				HashedCapabilityIds: [][32]byte{triggerCapID, triggerCapID2, targetCapID},
 			},
 			workflowDonNodes[0]: {
 				NodeOperatorId:      1,
@@ -926,6 +940,7 @@ func TestLauncher_WiresUpClientsForPublicWorkflowDON(t *testing.T) {
 	)
 
 	dispatcher.On("SetReceiver", fullTriggerCapID, capDonID, mock.AnythingOfType("*remote.triggerSubscriber")).Return(nil)
+	dispatcher.On("SetReceiver", fullTriggerCapID2, capDonID, mock.AnythingOfType("*remote.triggerSubscriber")).Return(nil)
 	dispatcher.On("SetReceiver", fullTargetID, capDonID, mock.AnythingOfType("*executable.client")).Return(nil)
 
 	err = launcher.Launch(t.Context(), state)
@@ -933,6 +948,9 @@ func TestLauncher_WiresUpClientsForPublicWorkflowDON(t *testing.T) {
 	defer launcher.Close()
 
 	_, err = registry.Get(t.Context(), fullTriggerCapID)
+	require.NoError(t, err)
+
+	_, err = registry.Get(t.Context(), fullTriggerCapID2)
 	require.NoError(t, err)
 
 	_, err = registry.Get(t.Context(), fullTargetID)
