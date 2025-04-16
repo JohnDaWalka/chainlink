@@ -259,6 +259,7 @@ func (w *launcher) Launch(ctx context.Context, state *registrysyncer.LocalRegist
 
 func (w *launcher) addRemoteCapabilities(ctx context.Context, myDON registrysyncer.DON, remoteDON registrysyncer.DON, state *registrysyncer.LocalRegistry) error {
 	for cid, c := range remoteDON.CapabilityConfigurations {
+		w.lggr.Debugw("addRemoteCapabilites: remote capability", "id", cid, "donID", remoteDON.ID)
 		capability, ok := state.IDsToCapabilities[cid]
 		if !ok {
 			return fmt.Errorf("could not find capability matching id %s", cid)
@@ -272,6 +273,7 @@ func (w *launcher) addRemoteCapabilities(ctx context.Context, myDON registrysync
 		switch capability.CapabilityType {
 		case capabilities.CapabilityTypeTrigger:
 			newTriggerFn := func(info capabilities.CapabilityInfo) (capabilityService, error) {
+				w.lggr.Debugw("addRemoteCapabilites: remote trigger", "id", info.ID, "donID", remoteDON.ID)
 				var aggregator remotetypes.Aggregator
 				switch {
 				case strings.HasPrefix(info.ID, "streams-trigger"):

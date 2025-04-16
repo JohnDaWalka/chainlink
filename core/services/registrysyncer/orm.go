@@ -15,6 +15,11 @@ import (
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 )
 
+type serializableRegistry struct {
+	IDsToDONs         map[DonID]DON
+	IDsToNodes        map[p2ptypes.PeerID]capabilitiesRegistryNodeInfo
+	IDsToCapabilities map[string]Capability
+}
 type capabilitiesRegistryNodeInfo struct {
 	NodeOperatorId      uint32            `json:"nodeOperatorId"`
 	ConfigCount         uint32            `json:"configCount"`
@@ -26,7 +31,7 @@ type capabilitiesRegistryNodeInfo struct {
 	CapabilitiesDONIds  []string          `json:"capabilitiesDONIds"`
 }
 
-func (l *LocalRegistry) MarshalJSON() ([]byte, error) {
+func (l *LocalRegistry) asSerializable() *serializableRegistry {
 	idsToNodes := make(map[p2ptypes.PeerID]capabilitiesRegistryNodeInfo)
 	for k, v := range l.IDsToNodes {
 		hashedCapabilityIds := make([]p2ptypes.PeerID, len(v.HashedCapabilityIds))
@@ -49,15 +54,15 @@ func (l *LocalRegistry) MarshalJSON() ([]byte, error) {
 		}
 	}
 
-	b, err := json.Marshal(&struct {
-		IDsToDONs         map[DonID]DON
-		IDsToNodes        map[p2ptypes.PeerID]capabilitiesRegistryNodeInfo
-		IDsToCapabilities map[string]Capability
-	}{
+	return &serializableRegistry{
 		IDsToDONs:         l.IDsToDONs,
 		IDsToNodes:        idsToNodes,
 		IDsToCapabilities: l.IDsToCapabilities,
-	})
+	}
+}
+
+func (l *LocalRegistry) MarshalJSON() ([]byte, error) {
+	b, err := json.Marshal(l.asSerializable())
 	if err != nil {
 		return []byte{}, err
 	}

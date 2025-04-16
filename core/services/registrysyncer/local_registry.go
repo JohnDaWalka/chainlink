@@ -37,8 +37,8 @@ type LocalRegistry struct {
 }
 
 type RegistryDiff struct {
-	Added   LocalRegistry `json:"added"`
-	Removed LocalRegistry `json:"removed"`
+	Added   *serializableRegistry `json:"added"`
+	Removed *serializableRegistry `json:"removed"`
 }
 
 func (l *LocalRegistry) Diff(other *LocalRegistry) (RegistryDiff, bool) {
@@ -93,8 +93,8 @@ func (l *LocalRegistry) Diff(other *LocalRegistry) (RegistryDiff, bool) {
 		return len(r.IDsToDONs) > 0 || len(r.IDsToNodes) > 0 || len(r.IDsToCapabilities) > 0
 	}
 	return RegistryDiff{
-		Added:   added,
-		Removed: removed,
+		Added:   added.asSerializable(),
+		Removed: removed.asSerializable(),
 	}, (notEmpty(added) || notEmpty(removed))
 }
 
