@@ -83,6 +83,8 @@ func New(
 		return nil, fmt.Errorf("failed to create syncer metric labeler: %w", err)
 	}
 
+	periodicLogger := time.NewTicker(1 * time.Minute)
+
 	return &registrySyncer{
 		metrics:    metricLabeler,
 		stopCh:     make(services.StopChan),
@@ -98,7 +100,12 @@ func New(
 		getPeerID:  getPeerID,
 		current:    new(LocalRegistry),
 		doPeriodicLogging: func() bool {
-			return false
+			select {
+			case <-periodicLogger.C:
+				return true
+			default:
+				return false
+			}
 		},
 	}, nil
 }
@@ -174,16 +181,11 @@ func (s *registrySyncer) syncLoop() {
 		s.lggr.Errorw("failed to sync with remote registry", "error", err)
 	}
 
-	tickCount := 0
-	s.doPeriodicLogging = func() bool {
-		return tickCount%10 == 0
-	}
 	for {
 		select {
 		case <-s.stopCh:
 			return
 		case <-ticker.C:
-			tickCount++
 			s.lggr.Debug("starting regular sync with the remote registry")
 			err := s.Sync(ctx, false)
 			if err != nil {
@@ -325,7 +327,7 @@ func (s *registrySyncer) Sync(ctx context.Context, isInitialSync bool) error {
 		}
 
 		latestRegistry = importedRegistry
-		if diff := s.current.Diff(latestRegistry); diff != "" {
+		if diff, exists := s.current.Diff(latestRegistry); exists {
 			s.lggr.Infow("remote registry diff", "diff", diff)
 		}
 		if s.doPeriodicLogging() {

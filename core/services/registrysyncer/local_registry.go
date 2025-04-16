@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
-
-	"github.com/google/go-cmp/cmp"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 
@@ -39,16 +36,66 @@ type LocalRegistry struct {
 	IDsToCapabilities map[string]Capability
 }
 
-func (l *LocalRegistry) Diff(other *LocalRegistry) string {
-	header := "LocalRegistry Diff: "
-	var diff strings.Builder
-	diff.WriteString(cmp.Diff(l.IDsToDONs, other.IDsToDONs))
-	diff.WriteString(cmp.Diff(l.IDsToNodes, other.IDsToNodes))
-	diff.WriteString(cmp.Diff(l.IDsToCapabilities, other.IDsToCapabilities))
-	if diff.Len() != 0 {
-		return header + "\n" + diff.String()
+type RegistryDiff struct {
+	Added   LocalRegistry `json:"added"`
+	Removed LocalRegistry `json:"removed"`
+}
+
+func (l *LocalRegistry) Diff(other *LocalRegistry) (RegistryDiff, bool) {
+	added := LocalRegistry{
+		IDsToDONs:         make(map[DonID]DON),
+		IDsToNodes:        make(map[p2ptypes.PeerID]kcr.INodeInfoProviderNodeInfo),
+		IDsToCapabilities: make(map[string]Capability),
 	}
-	return ""
+	removed := LocalRegistry{
+		IDsToDONs:         make(map[DonID]DON),
+		IDsToNodes:        make(map[p2ptypes.PeerID]kcr.INodeInfoProviderNodeInfo),
+		IDsToCapabilities: make(map[string]Capability),
+	}
+
+	// Compare IDsToDONs
+	for key, value := range l.IDsToDONs {
+		if _, exists := other.IDsToDONs[key]; !exists {
+			removed.IDsToDONs[key] = value
+		}
+	}
+	for key, value := range other.IDsToDONs {
+		if _, exists := l.IDsToDONs[key]; !exists {
+			added.IDsToDONs[key] = value
+		}
+	}
+
+	// Compare IDsToNodes
+	for key, value := range l.IDsToNodes {
+		if _, exists := other.IDsToNodes[key]; !exists {
+			removed.IDsToNodes[key] = value
+		}
+	}
+	for key, value := range other.IDsToNodes {
+		if _, exists := l.IDsToNodes[key]; !exists {
+			added.IDsToNodes[key] = value
+		}
+	}
+
+	// Compare IDsToCapabilities
+	for key, value := range l.IDsToCapabilities {
+		if _, exists := other.IDsToCapabilities[key]; !exists {
+			removed.IDsToCapabilities[key] = value
+		}
+	}
+	for key, value := range other.IDsToCapabilities {
+		if _, exists := l.IDsToCapabilities[key]; !exists {
+			added.IDsToCapabilities[key] = value
+		}
+	}
+
+	notEmpty := func(r LocalRegistry) bool {
+		return len(r.IDsToDONs) > 0 || len(r.IDsToNodes) > 0 || len(r.IDsToCapabilities) > 0
+	}
+	return RegistryDiff{
+		Added:   added,
+		Removed: removed,
+	}, (notEmpty(added) || notEmpty(removed))
 }
 
 func NewLocalRegistry(
