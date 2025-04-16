@@ -56,10 +56,14 @@ type RPC struct {
 }
 
 type PoRWorkflowConfig struct {
-	FeedID          string `json:"feed_id"`
-	URL             string `json:"url"`
-	ConsumerAddress string `json:"consumer_address"`
-	WriteTargetName string `json:"write_target_name"`
+	FeedID               string `json:"feed_id"`
+	URL                  string `json:"url"`
+	ConsumerAddress      string `json:"consumer_address"`
+	WriteTargetName      string `json:"write_target_name"`
+	BalanceReaderAddress string `json:"balance_reader_address"`
+	ReadTargetName       string `json:"read_target_name"`
+	FundedAddress        string `json:"funded_address"`
+	ExpectedFundAmount   string `json:"expected_fund_amount"`
 }
 
 func PrepareCRECLISettingsFile(workflowOwner, capRegAddr, workflowRegistryAddr common.Address, dataFeedsCacheAddress *common.Address, donID uint32, chainSelector uint64, rpcHTTPURL string) (*os.File, error) {

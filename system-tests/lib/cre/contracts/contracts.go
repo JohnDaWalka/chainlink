@@ -309,6 +309,39 @@ func DeployKeystone(testLogger zerolog.Logger, input *types.KeystoneContractsInp
 	return out, nil
 }
 
+func DeployBalanceReader(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
+	output, err := keystone_changeset.DeployBalanceReader(*ctfEnv, keystone_changeset.DeployBalanceReaderRequest{
+		ChainSelectors: []uint64{chainSelector},
+	})
+	if err != nil {
+		return common.Address{}, errors.Wrap(err, "failed to deploy BalanceReader")
+	}
+
+	err = ctfEnv.ExistingAddresses.Merge(output.AddressBook)
+	if err != nil {
+		return common.Address{}, errors.Wrap(err, "failed to merge address book")
+	}
+
+	addresses, err := ctfEnv.ExistingAddresses.AddressesForChain(chainSelector)
+	if err != nil {
+		return common.Address{}, errors.Wrapf(err, "failed to get addresses for chain %d from the address book", chainSelector)
+	}
+
+	var balanceReaderAddr common.Address
+	for addrStr, tv := range addresses {
+		if strings.Contains(tv.String(), "BalanceReader") {
+			balanceReaderAddr = common.HexToAddress(addrStr)
+			testLogger.Info().Msgf("Deployed BalanceReader contract at %s", balanceReaderAddr.Hex())
+			break
+		}
+	}
+	if balanceReaderAddr == (common.Address{}) {
+		return common.Address{}, errors.New("failed to find BalanceReader address in the address book")
+	}
+
+	return balanceReaderAddr, nil
+}
+
 func DeployOCR3(testLogger zerolog.Logger, ctfEnv *deployment.Environment, chainSelector uint64) (common.Address, error) {
 	output, err := keystone_changeset.DeployOCR3(*ctfEnv, chainSelector)
 	if err != nil {

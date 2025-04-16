@@ -155,6 +155,7 @@ func (f *FakePriceProvider) priceAlreadyFound(price *big.Int) bool {
 }
 
 func (f *FakePriceProvider) NextPrice(price *big.Int, elapsed time.Duration) bool {
+	f.testLogger.Info().Msgf("received a price %s after %s", price, elapsed)
 	// if price is nil or 0 it means that the feed hasn't been updated yet
 	if price == nil || price.Cmp(big.NewInt(0)) == 0 {
 		f.testLogger.Info().Msgf("Feed not updated yet, waiting for %s", elapsed)

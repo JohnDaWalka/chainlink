@@ -11,13 +11,24 @@ import (
 	libcrecli "github.com/smartcontractkit/chainlink/system-tests/lib/crecli"
 )
 
-func CreateConfigFile(feedsConsumerAddress common.Address, feedID, dataURL, writeTargetName string) (*os.File, error) {
+type ConfigFileInput struct {
+	FundedAddress        common.Address
+	BalanceReaderAddress common.Address
+	FeedsConsumerAddress common.Address
+	FeedID               string
+	DataURL              string
+	WriteTargetName      string
+	ReadTargetName       string
+	ExpectedFundAmount   string
+}
+
+func CreateConfigFile(in ConfigFileInput) (*os.File, error) {
 	configFile, err := os.CreateTemp("", "config.json")
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create workflow config file")
 	}
 
-	cleanFeedID := strings.TrimPrefix(feedID, "0x")
+	cleanFeedID := strings.TrimPrefix(in.FeedID, "0x")
 	feedLength := len(cleanFeedID)
 
 	if feedLength < 32 {
@@ -31,10 +42,14 @@ func CreateConfigFile(feedsConsumerAddress common.Address, feedID, dataURL, writ
 	feedIDToUse := "0x" + cleanFeedID
 
 	workflowConfig := libcrecli.PoRWorkflowConfig{
-		FeedID:          feedIDToUse,
-		URL:             dataURL,
-		ConsumerAddress: feedsConsumerAddress.Hex(),
-		WriteTargetName: writeTargetName,
+		FeedID:               feedIDToUse,
+		URL:                  in.DataURL,
+		ConsumerAddress:      in.FeedsConsumerAddress.Hex(),
+		FundedAddress:        in.FundedAddress.Hex(),
+		BalanceReaderAddress: in.BalanceReaderAddress.Hex(),
+		ReadTargetName:       in.ReadTargetName,
+		WriteTargetName:      in.WriteTargetName,
+		ExpectedFundAmount:   in.ExpectedFundAmount,
 	}
 
 	configMarshalled, err := json.Marshal(workflowConfig)
