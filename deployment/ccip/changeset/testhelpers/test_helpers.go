@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
+	ccipchangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/message_hasher"
@@ -397,6 +398,14 @@ func TestSendRequest(
 	return msgSentEvent
 }
 
+type CCIPSendReqSolOpts struct {
+	TokenToTokenPoolType map[solana.PublicKey]deployment.ContractType
+}
+
+type CCIPSendReqOpts struct {
+	Solana CCIPSendReqSolOpts
+}
+
 type CCIPSendReqConfig struct {
 	SourceChain  uint64
 	DestChain    uint64
@@ -404,6 +413,7 @@ type CCIPSendReqConfig struct {
 	Sender       *bind.TransactOpts
 	Message      any
 	MaxRetries   int // Number of retries for errors (excluding insufficient fee errors)
+	Options      CCIPSendReqOpts
 }
 
 type SendReqOpts func(*CCIPSendReqConfig)
@@ -449,6 +459,12 @@ func WithSourceChain(sourceChain uint64) SendReqOpts {
 func WithDestChain(destChain uint64) SendReqOpts {
 	return func(c *CCIPSendReqConfig) {
 		c.DestChain = destChain
+	}
+}
+
+func WithSolOptions(opts CCIPSendReqSolOpts) SendReqOpts {
+	return func(c *CCIPSendReqConfig) {
+		c.Options.Solana = opts
 	}
 }
 
@@ -631,7 +647,26 @@ func SendRequestSol(
 	// Append token accounts to the account metas
 	for _, tokenAmount := range message.TokenAmounts {
 		token := tokenAmount.Token
-		tokenPool, err := soltokens.NewTokenPool(solana.Token2022ProgramID, s.BurnMintTokenPool, token)
+
+		// TODO: can we infer this from onchain state?
+		tokenPoolPubKey := s.BurnMintTokenPool
+		tokenPoolType := cfg.Options.Solana.TokenToTokenPoolType[token]
+		switch tokenPoolType {
+		case ccipchangeset.LockReleaseTokenPool:
+			tokenPoolPubKey = s.LockReleaseTokenPool
+			break
+		case ccipchangeset.BurnMintTokenPool:
+			tokenPoolPubKey = s.BurnMintTokenPool
+			break
+		default:
+			if tokenPoolType == "" {
+				e.Logger.Warnf("no token pool type specified for token '%s' - defaulting to BurnAndMint", tokenAmount.Token.String())
+			} else {
+				e.Logger.Warnf("token pool type '%s' is not supported - defaulting to BurnAndMint", tokenPoolType)
+			}
+		}
+
+		tokenPool, err := soltokens.NewTokenPool(solana.Token2022ProgramID, tokenPoolPubKey, token)
 		if err != nil {
 			return nil, err
 		}
@@ -647,7 +682,7 @@ func SendRequestSol(
 
 		// invalid config account, maybe this billing stuff isn't right
 
-		chainPDA, _, err := soltokens.TokenPoolChainConfigPDA(cfg.DestChain, token, s.BurnMintTokenPool)
+		chainPDA, _, err := soltokens.TokenPoolChainConfigPDA(cfg.DestChain, token, tokenPoolPubKey)
 		if err != nil {
 			return nil, err
 		}
