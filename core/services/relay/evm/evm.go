@@ -977,6 +977,10 @@ func (r *Relayer) NewContractReader(ctx context.Context, chainReaderConfig []byt
 	return NewChainReaderService(ctx, r.lggr, r.chain.LogPoller(), r.chain.HeadTracker(), r.chain.Client(), *cfg)
 }
 
+func (r *Relayer) NewEVMChain(ctx context.Context) (commontypes.EVMChain, error) {
+	return NewEVMChain(ctx, r.lggr, r.chain.TxManager())
+}
+
 func (r *Relayer) NewMedianProvider(ctx context.Context, rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.MedianProvider, error) {
 	lggr := logger.Sugared(r.lggr).Named("MedianProvider").Named(rargs.ExternalJobID.String())
 	relayOpts := types.NewRelayOpts(rargs)

@@ -178,10 +178,6 @@ func (w *chainWriter) GetTransactionStatus(ctx context.Context, transactionID st
 	return w.txm.GetTransactionStatus(ctx, transactionID)
 }
 
-func (w *chainWriter) GetTransactionFee(ctx context.Context, transactionID string) (*commontypes.TransactionFee, error) {
-	return w.txm.GetTransactionFee(ctx, transactionID)
-}
-
 // GetFeeComponents the execution and data availability (L1Oracle) fees for the chain.
 // Dynamic fees (introduced in EIP-1559) include a fee cap and a tip cap. If the dyanmic fee is not available,
 // (if the chain doesn't support dynamic TXs) the legacy GasPrice is used.
