@@ -17,7 +17,6 @@ on:
     - cron: "0 0,6,12,18 * * *"
   workflow_dispatch:
 
-
 jobs:
   filter:
     name: Detect Changes
@@ -215,6 +214,12 @@ jobs:
       contents: read
       actions: read
     steps:
+      - name: debug info
+        if: ${{ matrix.type.is-self-hosted == 'true' }}
+        run: |
+          ls -la /home/runner/_work
+          du -h --max-depth=2 /home/runner/_work
+
       - name: Enable S3 Cache for Self-Hosted Runners
         if: ${{ matrix.type.is-self-hosted == 'true' }}
         uses: runs-on/action@66d4449b717b5462159659523d1241051ff470b9 # v1
@@ -229,24 +234,31 @@ jobs:
             exit 0
           fi
 
-          # Define the directories to mount as tuples of source:destination
-          DIRS=(
-            "/home/runner/_work/runner-go:/home/runner/go"
-            "/home/runner/_work/runner-cache:/home/runner/.cache"
-          )
+          # Mount /home/runner/go as tmpfs
+          mkdir -p "/home/runner/go"
+          sudo mount -t tmpfs -o mode=755 tmpfs "/home/runner/go"
+          sudo chown -R $(id -u):$(id -g) "/home/runner/go"
+          echo "Successfully mounted tmpfs to /home/runner/go"
 
-          # Process each directory pair
-          for DIR_PAIR in "${DIRS[@]}"; do
-            SRC_DIR=$(echo $DIR_PAIR | cut -d':' -f1)
-            DEST_DIR=$(echo $DIR_PAIR | cut -d':' -f2)
+          # Mount /home/runner/.cache as tmpfs
+          mkdir -p "/home/runner/.cache"
+          sudo mount -t tmpfs -o mode=755 tmpfs "/home/runner/.cache"
+          sudo chown -R $(id -u):$(id -g) "/home/runner/.cache"
+          echo "Successfully mounted tmpfs to /home/runner/.cache"
 
-            sudo mkdir -m 755 "$SRC_DIR"
-            sudo chown -R $(id -u):$(id -g) "$SRC_DIR"
+          # Create overlay mount for /home/runner/_work
+          # Create directories for overlay mount
+          sudo mkdir -p /tmp/work_overlay/upper
+          sudo mkdir -p /tmp/work_overlay/work
 
-            mkdir -p "$DEST_DIR"
-            sudo mount --bind "$SRC_DIR" "$DEST_DIR"
-            echo "Successfully mounted $SRC_DIR to $DEST_DIR"
-          done
+          # Mount tmpfs for the upper layer
+          sudo mount -t tmpfs tmpfs /tmp/work_overlay/upper
+          sudo chown -R $(id -u):$(id -g) /tmp/work_overlay/upper
+
+          # Create overlay mount with original content visible but changes going to tmpfs
+          sudo mount -t overlay -o lowerdir=/home/runner/_work,upperdir=/tmp/work_overlay/upper,workdir=/tmp/work_overlay/work overlay /home/runner/_work
+          sudo chown -R $(id -u):$(id -g) "/home/runner/_work"
+          echo "Successfully created overlay mount for /home/runner/_work with tmpfs upper layer"
 
       - name: Checkout the repo
         if: ${{ matrix.type.should-run == 'true' }}
@@ -672,7 +684,7 @@ jobs:
         shell: bash
         env:
           SHOULD_USE_SELF_HOSTED: ${{ steps.use-self-hosted.outputs.self-hosted-runners || 'true' }}
-          SH_UNIT_TEST_RUNNER: runs-on=${{ github.run_id}}/cpu=32+64/ram=64+128/family=c6id+m6id+m6idn/spot=false/extras=s3-cache
+          SH_UNIT_TEST_RUNNER: runs-on=${{ github.run_id}}/cpu=32/ram=128/family=m6i/spot=false/extras=s3-cache
           SH_RACE_TEST_RUNNER: runs-on=${{ github.run_id}}/cpu=64+128/ram=128+128/family=c7+m7/disk=large/spot=false/extras=s3-cache
           GH_UNIT_TEST_RUNNER: ubuntu22.04-32cores-128GB
         run: |
