@@ -217,8 +217,8 @@ jobs:
       - name: debug info
         if: ${{ matrix.type.is-self-hosted == 'true' }}
         run: |
-          ls -la /home/runner/_work
-          du -h --max-depth=2 /home/runner/_work
+          ls -la /home/runner/_work/chainlink/chainlink
+          du -h --max-depth=2 /home/runner/_work/chainlink
 
       - name: Enable S3 Cache for Self-Hosted Runners
         if: ${{ matrix.type.is-self-hosted == 'true' }}
@@ -233,32 +233,21 @@ jobs:
             echo "::warning::/home/runner/_work does not exist, skipping mount."
             exit 0
           fi
-
-          # Mount /home/runner/go as tmpfs
-          mkdir -p "/home/runner/go"
-          sudo mount -t tmpfs -o mode=755 tmpfs "/home/runner/go"
-          sudo chown -R $(id -u):$(id -g) "/home/runner/go"
-          echo "Successfully mounted tmpfs to /home/runner/go"
-
-          # Mount /home/runner/.cache as tmpfs
-          mkdir -p "/home/runner/.cache"
-          sudo mount -t tmpfs -o mode=755 tmpfs "/home/runner/.cache"
-          sudo chown -R $(id -u):$(id -g) "/home/runner/.cache"
-          echo "Successfully mounted tmpfs to /home/runner/.cache"
-
-          # Create overlay mount for /home/runner/_work
-          # Create directories for overlay mount
-          sudo mkdir -p /tmp/work_overlay/upper
-          sudo mkdir -p /tmp/work_overlay/work
-
-          # Mount tmpfs for the upper layer
-          sudo mount -t tmpfs tmpfs /tmp/work_overlay/upper
-          sudo chown -R $(id -u):$(id -g) /tmp/work_overlay/upper
-
-          # Create overlay mount with original content visible but changes going to tmpfs
-          sudo mount -t overlay -o lowerdir=/home/runner/_work,upperdir=/tmp/work_overlay/upper,workdir=/tmp/work_overlay/work overlay /home/runner/_work
-          sudo chown -R $(id -u):$(id -g) "/home/runner/_work"
-          echo "Successfully created overlay mount for /home/runner/_work with tmpfs upper layer"
+          # Define the directories to mount as tuples of source:destination
+          DIRS=(
+            "/home/runner/_work/runner-go:/home/runner/go"
+            "/home/runner/_work/runner-cache:/home/runner/.cache"
+          )
+          # Process each directory pair
+          for DIR_PAIR in "${DIRS[@]}"; do
+            SRC_DIR=$(echo $DIR_PAIR | cut -d':' -f1)
+            DEST_DIR=$(echo $DIR_PAIR | cut -d':' -f2)
+            sudo mkdir -m 755 "$SRC_DIR"
+            sudo chown -R $(id -u):$(id -g) "$SRC_DIR"
+            mkdir -p "$DEST_DIR"
+            sudo mount --bind "$SRC_DIR" "$DEST_DIR"
+            echo "Successfully mounted $SRC_DIR to $DEST_DIR"
+          done
 
       - name: Checkout the repo
         if: ${{ matrix.type.should-run == 'true' }}
@@ -452,6 +441,12 @@ jobs:
           payload: |
             channel: ${{ secrets.SLACK_TOPIC_DATA_RACES_CHANNEL_ID}}
             text: "Race Tests Failed: <${{ steps.print-races.outputs.run_url }}|Run>"
+
+      - name: debug info
+        if: ${{ matrix.type.is-self-hosted == 'true' }}
+        run: |
+          ls -la /home/runner/_work/chainlink/chainlink
+          du -h --max-depth=2 /home/runner/_work/chainlink
 
   core-scripts-tests:
     name: test-scripts
