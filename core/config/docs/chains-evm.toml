@@ -501,10 +501,10 @@ WSURL = 'wss://web.socket/test' # Example
 # HTTPURL is the HTTP(S) endpoint for this node. Required for all nodes.
 HTTPURL = 'https://foo.web' # Example
 
-# The HTTPURLExtraWrite is an undocumented config option used only for chains that require
+# HTTPURLExtraWrite is an undocumented config option used only for chains that require
 # an additional URL in conjunction to the standard JSON-RPC URL
 # Supports TRON (different write path)
-HTTPURLExtraWrite = 'https://kitties.meow.web'
+HTTPURLExtraWrite = 'https://kitties.meow.web' # Example
 # SendOnly limits usage to sending transaction broadcasts only. With this enabled, only HTTPURL is required, and WSURL is not used.
 SendOnly = false # Default
 # Order of the node in the pool, will takes effect if `SelectionMode` is `PriorityLevel` or will be used as a tie-breaker for `HighestHead` and `TotalDifficulty`
