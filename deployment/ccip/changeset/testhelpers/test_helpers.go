@@ -646,24 +646,19 @@ func SendRequestSol(
 
 	// Append token accounts to the account metas
 	for _, tokenAmount := range message.TokenAmounts {
+		tokenPoolPubKey := s.BurnMintTokenPool
 		token := tokenAmount.Token
 
 		// TODO: can we infer this from onchain state?
-		tokenPoolPubKey := s.BurnMintTokenPool
 		tokenPoolType := cfg.Options.Solana.TokenToTokenPoolType[token]
-		switch tokenPoolType {
-		case ccipchangeset.LockReleaseTokenPool:
+		if tokenPoolType == "" {
+			e.Logger.Warnf("no token pool type specified for token '%s' - defaulting to BurnAndMint", tokenAmount.Token.String())
+		} else if tokenPoolType == ccipchangeset.LockReleaseTokenPool {
 			tokenPoolPubKey = s.LockReleaseTokenPool
-			break
-		case ccipchangeset.BurnMintTokenPool:
+		} else if tokenPoolType == ccipchangeset.BurnMintTokenPool {
 			tokenPoolPubKey = s.BurnMintTokenPool
-			break
-		default:
-			if tokenPoolType == "" {
-				e.Logger.Warnf("no token pool type specified for token '%s' - defaulting to BurnAndMint", tokenAmount.Token.String())
-			} else {
-				e.Logger.Warnf("token pool type '%s' is not supported - defaulting to BurnAndMint", tokenPoolType)
-			}
+		} else {
+			e.Logger.Warnf("token pool type '%s' is not supported - defaulting to BurnAndMint", tokenPoolType)
 		}
 
 		tokenPool, err := soltokens.NewTokenPool(solana.Token2022ProgramID, tokenPoolPubKey, token)
