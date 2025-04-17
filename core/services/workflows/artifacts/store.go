@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	"github.com/jpillora/backoff"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/custmsg"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -49,6 +50,69 @@ func (l *lastFetchedAtMap) Get(url string) (time.Time, bool) {
 func newLastFetchedAtMap() *lastFetchedAtMap {
 	return &lastFetchedAtMap{
 		m: map[string]time.Time{},
+	}
+}
+
+type backoffEntry struct {
+	lastAttemptAt time.Time
+	backoff       backoff.Backoff
+}
+
+type fetchBackoffMap struct {
+	m map[string]backoffEntry
+	sync.RWMutex
+}
+
+func (l *fetchBackoffMap) Increment(url string, at time.Time) {
+	l.Lock()
+	defer l.Unlock()
+	previous, ok := l.m[url]
+	var bo backoff.Backoff
+	if ok {
+		bo = previous.backoff
+		previous.backoff.Duration()
+	} else {
+		bo = backoff.Backoff{
+			Min:    1 * time.Second,
+			Max:    120 * time.Second,
+			Factor: 2,
+		}
+	}
+	l.m[url] = backoffEntry{
+		lastAttemptAt: at,
+		backoff:       bo,
+	}
+}
+
+func (l *fetchBackoffMap) Clear(url string) {
+	_, ok := l.get(url)
+	if ok {
+		l.Lock()
+		defer l.Unlock()
+		delete(l.m, url)
+	}
+}
+
+func (l *fetchBackoffMap) get(url string) (backoffEntry, bool) {
+	l.RLock()
+	defer l.RUnlock()
+	failedFetches, ok := l.m[url]
+	return failedFetches, ok
+}
+
+func (l *fetchBackoffMap) ShouldBackoff(url string, currentTime time.Time) bool {
+	backoffEntry, ok := l.get(url)
+	if !ok {
+		return false
+	}
+	backoffDuration := backoffEntry.backoff.ForAttempt(backoffEntry.backoff.Attempt())
+	backoffEnd := backoffEntry.lastAttemptAt.Add(backoffDuration)
+	return currentTime.After(backoffEnd)
+}
+
+func newFetchBackoffMap() *fetchBackoffMap {
+	return &fetchBackoffMap{
+		m: map[string]backoffEntry{},
 	}
 }
 
@@ -120,6 +184,8 @@ type Store struct {
 	// fetchFn is a function that fetches the contents of a URL with a limit on the size of the response.
 	fetchFn FetcherFunc
 
+	fetchBackoffMap *fetchBackoffMap
+
 	lastFetchedAtMap         *lastFetchedAtMap
 	clock                    clockwork.Clock
 	secretsFreshnessDuration time.Duration
@@ -155,6 +221,7 @@ func NewStoreWithDecryptSecretsFn(lggr logger.Logger, orm WorkflowRegistryDS, fe
 		lggr:                     lggr,
 		orm:                      orm,
 		fetchFn:                  fetchFn,
+		fetchBackoffMap:          newFetchBackoffMap(),
 		lastFetchedAtMap:         newLastFetchedAtMap(),
 		clock:                    clock,
 		limits:                   limits,
@@ -199,10 +266,12 @@ func (h *Store) FetchWorkflowArtifacts(ctx context.Context, workflowID, binaryUR
 	}
 	binary, err = h.fetchFn(ctx, messageID(binaryURL, workflowID), req)
 	if err != nil {
+		h.fetchBackoffMap.Increment(binaryURL, h.clock.Now())
 		return nil, nil, fmt.Errorf("failed to fetch binary from %s : %w", binaryURL, err)
 	}
 
 	if decodedBinary, err = base64.StdEncoding.DecodeString(string(binary)); err != nil {
+		h.fetchBackoffMap.Increment(binaryURL, h.clock.Now())
 		return nil, nil, fmt.Errorf("failed to decode binary: %w", err)
 	}
 
@@ -215,9 +284,14 @@ func (h *Store) FetchWorkflowArtifacts(ctx context.Context, workflowID, binaryUR
 		}
 		config, err = h.fetchFn(ctx, messageID(configURL, workflowID), req)
 		if err != nil {
+			h.fetchBackoffMap.Increment(configURL, h.clock.Now())
 			return nil, nil, fmt.Errorf("failed to fetch config from %s : %w", configURL, err)
 		}
+		h.fetchBackoffMap.Clear(configURL)
 	}
+
+	h.fetchBackoffMap.Clear(binaryURL)
+
 	return decodedBinary, config, nil
 }
 
@@ -231,14 +305,18 @@ func (h *Store) GetSecrets(ctx context.Context, secretsURL string, workflowID [3
 	}
 	fetchedSecrets, fetchErr := h.fetchFn(ctx, messageID(secretsURL, wid), req)
 	if fetchErr != nil {
+		h.fetchBackoffMap.Increment(secretsURL, h.clock.Now())
 		return nil, fmt.Errorf("failed to fetch secrets from %s : %w", secretsURL, fetchErr)
 	}
 
 	// sanity check by decoding the secrets
 	_, decryptErr := h.decryptSecrets(fetchedSecrets, hex.EncodeToString(workflowOwner))
 	if decryptErr != nil {
+		h.fetchBackoffMap.Increment(secretsURL, h.clock.Now())
 		return nil, fmt.Errorf("failed to decrypt secrets %s: %w", secretsURL, decryptErr)
 	}
+
+	h.fetchBackoffMap.Clear(secretsURL)
 
 	return fetchedSecrets, nil
 }
@@ -380,6 +458,10 @@ func (h *Store) GetWasmBinary(ctx context.Context, workflowID string) ([]byte, e
 	}
 
 	return decodedBinary, nil
+}
+
+func (h *Store) ShouldBackoffFetch(url string) bool {
+	return h.fetchBackoffMap.ShouldBackoff(url, h.clock.Now())
 }
 
 func (h *Store) refreshSecrets(ctx context.Context, workflowOwner, workflowName, workflowID, secretsURLHash string) (string, error) {

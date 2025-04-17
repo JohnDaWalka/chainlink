@@ -137,6 +137,7 @@ func WithEngineFactoryFn(efn engineFactoryFn) func(*eventHandler) {
 }
 
 type WorkflowArtifactsStore interface {
+	ShouldBackoffFetch(url string) bool
 	FetchWorkflowArtifacts(ctx context.Context, workflowID, binaryURL, configURL string) ([]byte, []byte, error)
 	GetWorkflowSpec(ctx context.Context, workflowOwner string, workflowName string) (*job.WorkflowSpec, error)
 	UpsertWorkflowSpec(ctx context.Context, spec *job.WorkflowSpec) (int64, error)
@@ -345,12 +346,27 @@ func (h *eventHandler) workflowRegisteredEvent(
 	// If there is not a workflow spec in the database, then fetch artifacts and create it
 	spec, err := h.workflowArtifactsStore.GetWorkflowSpec(ctx, owner, payload.WorkflowName)
 	if err != nil {
+		// Check backoffs. If any are in backoff, fail early.
+		backoffBinaryFetch := h.workflowArtifactsStore.ShouldBackoffFetch(payload.BinaryURL)
+		if backoffBinaryFetch {
+			return errors.New("backing off from repeated failing fetch attempts to the Binary URL")
+		}
+		backoffConfigFetch := h.workflowArtifactsStore.ShouldBackoffFetch(payload.ConfigURL)
+		if backoffConfigFetch {
+			return errors.New("backing off from repeated failing fetch attempts to the Config URL")
+		}
+		if payload.SecretsURL != "" {
+			backoffSecretsFetch := h.workflowArtifactsStore.ShouldBackoffFetch(payload.SecretsURL)
+			if backoffSecretsFetch {
+				return errors.New("backing off from repeated failing fetch attempts to the Secrets URL")
+			}
+		}
+
 		decodedBinary, config, err := h.workflowArtifactsStore.FetchWorkflowArtifacts(ctx, wfID, payload.BinaryURL, payload.ConfigURL)
 		if err != nil {
 			return err
 		}
 
-		// Always fetch secrets from the SecretsURL
 		var secrets []byte
 		if payload.SecretsURL != "" {
 			secrets, err = h.workflowArtifactsStore.GetSecrets(ctx, payload.SecretsURL, payload.WorkflowID, payload.WorkflowOwner)
@@ -370,12 +386,6 @@ func (h *eventHandler) workflowRegisteredEvent(
 			return fmt.Errorf("workflowID mismatch: %x != %x", hash, payload.WorkflowID)
 		}
 
-		// Save the workflow secrets
-		urlHash, err := h.workflowArtifactsStore.GetSecretsURLHash(payload.WorkflowOwner, []byte(payload.SecretsURL))
-		if err != nil {
-			return fmt.Errorf("failed to get secrets URL hash: %w", err)
-		}
-
 		status := job.WorkflowSpecStatusActive
 		if payload.Status == 1 {
 			status = job.WorkflowSpecStatusPaused
@@ -392,6 +402,11 @@ func (h *eventHandler) workflowRegisteredEvent(
 			SpecType:      job.WASMFile,
 			BinaryURL:     payload.BinaryURL,
 			ConfigURL:     payload.ConfigURL,
+		}
+
+		urlHash, err := h.workflowArtifactsStore.GetSecretsURLHash(payload.WorkflowOwner, []byte(payload.SecretsURL))
+		if err != nil {
+			return fmt.Errorf("failed to get secrets URL hash: %w", err)
 		}
 
 		if _, err = h.workflowArtifactsStore.UpsertWorkflowSpecWithSecrets(ctx, entry, payload.SecretsURL, hex.EncodeToString(urlHash), string(secrets)); err != nil {
