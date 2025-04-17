@@ -644,6 +644,11 @@ func SendRequestSol(
 	solconfig.FeeQuoterProgram = s.FeeQuoter
 	solconfig.CcipRouterProgram = s.Router
 
+	tokenPoolTypeToAddress := map[deployment.ContractType]solana.PublicKey{
+		ccipchangeset.LockReleaseTokenPool: s.LockReleaseTokenPool,
+		ccipchangeset.BurnMintTokenPool:    s.BurnMintTokenPool,
+	}
+
 	// Append token accounts to the account metas
 	for _, tokenAmount := range message.TokenAmounts {
 		tokenPoolPubKey := s.BurnMintTokenPool
@@ -651,14 +656,14 @@ func SendRequestSol(
 
 		// TODO: can we infer this from onchain state?
 		tokenPoolType := cfg.Options.Solana.TokenToTokenPoolType[token]
-		if tokenPoolType == "" {
-			e.Logger.Warnf("no token pool type specified for token '%s' - defaulting to BurnAndMint", tokenAmount.Token.String())
-		} else if tokenPoolType == ccipchangeset.LockReleaseTokenPool {
-			tokenPoolPubKey = s.LockReleaseTokenPool
-		} else if tokenPoolType == ccipchangeset.BurnMintTokenPool {
-			tokenPoolPubKey = s.BurnMintTokenPool
+		if pubKey, exists := tokenPoolTypeToAddress[tokenPoolType]; exists {
+			tokenPoolPubKey = pubKey
 		} else {
-			e.Logger.Warnf("token pool type '%s' is not supported - defaulting to BurnAndMint", tokenPoolType)
+			if tokenPoolType == "" {
+				e.Logger.Warnf("no token pool type specified for token '%s' - defaulting to BurnAndMint", tokenAmount.Token.String())
+			} else {
+				e.Logger.Warnf("token pool type '%s' is not supported - defaulting to BurnAndMint", tokenPoolType)
+			}
 		}
 
 		tokenPool, err := soltokens.NewTokenPool(solana.Token2022ProgramID, tokenPoolPubKey, token)
