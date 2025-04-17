@@ -461,5 +461,8 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-// replicating the replace directive on cosmos SDK
-replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
+replace (
+	// replicating the replace directive on cosmos SDK
+	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
+	github.com/prometheus/common => github.com/prometheus/common v0.62.0
+)
