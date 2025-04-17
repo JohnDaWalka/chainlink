@@ -5,7 +5,6 @@ import (
 	"math"
 	"math/big"
 	"net"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -1712,12 +1711,6 @@ func assertValidationError(t *testing.T, invalid interface{ Validate() error }, 
 	t.Helper()
 	if err := invalid.Validate(); assert.Error(t, err) {
 		got := err.Error()
-		f, _ := os.Create("actual.txt")
-		f.WriteString(got)
-		f.Close()
-		f, _ = os.Create("exp.txt")
-		f.WriteString(expMsg)
-		f.Close()
 		assert.Equal(t, expMsg, got, diff.Diff(expMsg, got))
 
 	}
