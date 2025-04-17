@@ -233,20 +233,19 @@ jobs:
             echo "::warning::/home/runner/_work does not exist, skipping mount."
             exit 0
           fi
-          # Define the directories to mount as tuples of source:destination
+
           DIRS=(
-            "/home/runner/_work/runner-go:/home/runner/go"
-            "/home/runner/_work/runner-cache:/home/runner/.cache"
+            "home/runner/go"
+            "/home/runner/.cache"
+            "/home/runner/_work/chainlink/chainlink"
           )
           # Process each directory pair
-          for DIR_PAIR in "${DIRS[@]}"; do
-            SRC_DIR=$(echo $DIR_PAIR | cut -d':' -f1)
-            DEST_DIR=$(echo $DIR_PAIR | cut -d':' -f2)
-            sudo mkdir -m 755 "$SRC_DIR"
-            sudo chown -R $(id -u):$(id -g) "$SRC_DIR"
-            mkdir -p "$DEST_DIR"
-            sudo mount --bind "$SRC_DIR" "$DEST_DIR"
-            echo "Successfully mounted $SRC_DIR to $DEST_DIR"
+          for DIR_PATH in "${DIRS[@]}"; do
+            echo "tmpfs mounting ${DIR_PATH}"
+            sudo mkdir -p "${DIR_PATH}"
+            sudo mount -t tmpfs -o mode=755 tmpfs "${DIR_PATH}"
+            sudo chown -R $(id -u):$(id -g) "${DIR_PATH}"
+            echo "Successfully mounted tmpfs to ${DIR_PATH}"
           done
 
       - name: Checkout the repo
