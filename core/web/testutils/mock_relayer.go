@@ -41,6 +41,10 @@ func (m MockRelayer) NewContractReader(_ context.Context, _ []byte) (commontypes
 	panic("not implemented")
 }
 
+func (m MockRelayer) NewEVMChain(_ context.Context) (commontypes.EVMChain, error) {
+	panic("not implemented")
+}
+
 func (m MockRelayer) LatestHead(_ context.Context) (commontypes.Head, error) {
 	return m.Head, nil
 }
