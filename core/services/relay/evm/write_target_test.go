@@ -46,13 +46,13 @@ import (
 
 var forwardABI = evmtypes.MustGetABI(forwarder.KeystoneForwarderMetaData.ABI)
 
-func newMockedEncodeTransmissionInfo() ([]byte, error) {
+func newMockedEncodeTransmissionInfo(state uint8) ([]byte, error) {
 	info := evm.TransmissionInfo{
 		GasLimit:        big.NewInt(0),
 		InvalidReceiver: false,
 		State:           state,
 		Success:         false,
-		TransmissionID:  [32]byte{},
+		TransmissionId:  [32]byte{},
 		Transmitter:     common.HexToAddress("0x0"),
 	}
 	var buffer bytes.Buffer
@@ -111,7 +111,7 @@ func TestEvmWrite(t *testing.T) {
 	mockCall, err := newMockedEncodeTransmissionInfo(0)
 	require.NoError(t, err)
 
-	evmClient.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(mockCall, nil).Maybe()
+	evmClient.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(mockCall, nil).Times(3)
 	evmClient.On("CodeAt", mock.Anything, mock.Anything, mock.Anything).Return([]byte("test"), nil)
 
 	txManager.On("GetTransactionStatus", mock.Anything, mock.Anything).Return(commontypes.Finalized, nil).Maybe()
@@ -164,7 +164,7 @@ func TestEvmWrite(t *testing.T) {
 	require.Len(t, registeredCapabilities, 1) // WriteTarget should be added to the registry
 
 	reportID := [2]byte{0x00, 0x01}
-	reportMetadata := evm.ReportV1Metadata{
+	reportMetadata := dftypes.Metadata{
 		Version:             1,
 		WorkflowExecutionID: [32]byte{},
 		Timestamp:           0,
@@ -242,7 +242,6 @@ func TestEvmWrite(t *testing.T) {
 			Inputs:   validInputs,
 		}
 
-		// TODO: This successfully makes sure a tx is created and submitted, but it doesn't check if the tx is actually sent. Is there a E2E test?
 		_, err = capability.Execute(ctx, req)
 		require.NoError(t, err)
 	})

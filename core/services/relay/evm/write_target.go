@@ -17,7 +17,11 @@ import (
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink-evm/pkg/report/monitor"
+	dftypes "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds"
+	processor "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds/processor"
+
+	monitor "github.com/smartcontractkit/chainlink-evm/pkg/monitor/beholder"
+	"github.com/smartcontractkit/chainlink-evm/pkg/monitoring/pb/data-feeds/on-chain/registry"
 	"github.com/smartcontractkit/chainlink-evm/pkg/writetarget"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
@@ -100,7 +104,14 @@ func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain
 		return nil, fmt.Errorf("failed to get chain info: %w", err)
 	}
 
-	beholder, err := writetarget.NewMonitor(ctx, lggr)
+	registryMetrics, err := registry.NewMetrics()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new registry metrics: %w", err)
+	}
+
+	dfProcessor := processor.NewDataFeedsProcessor(registryMetrics)
+
+	beholder, err := writetarget.NewMonitor(lggr, []monitor.ProtoProcessor{dfProcessor})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Aptos WT monitor client: %+w", err)
 	}
@@ -215,41 +226,11 @@ func evaluate(rawRequest capabilities.CapabilityRequest) (receiver string, err e
 	return r.Config.Address, nil
 }
 
-func decodeReportMetadata(data []byte) (metadata ReportV1Metadata, err error) {
+func decodeReportMetadata(data []byte) (metadata dftypes.Metadata, err error) {
 	if len(data) < metadata.Length() {
 		return metadata, fmt.Errorf("data too short: %d bytes", len(data))
 	}
 	return metadata, binary.Read(bytes.NewReader(data[:metadata.Length()]), binary.BigEndian, &metadata)
-}
-
-func (rm ReportV1Metadata) Encode() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.BigEndian, rm)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func (rm ReportV1Metadata) Length() int {
-	bytes, err := rm.Encode()
-	if err != nil {
-		return 0
-	}
-	return len(bytes)
-}
-
-// Note: This should be a shared type that the OCR3 package validates as well
-type ReportV1Metadata struct {
-	Version             uint8
-	WorkflowExecutionID [32]byte
-	Timestamp           uint32
-	DonID               uint32
-	DonConfigVersion    uint32
-	WorkflowCID         [32]byte
-	WorkflowName        [10]byte
-	WorkflowOwner       [20]byte
-	ReportID            [2]byte
 }
 
 func getChainInfo(chainID uint64) (monitor.ChainInfo, error) {
