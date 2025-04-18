@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/example_ccip_sender"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -399,12 +400,14 @@ func TestSendRequest(
 }
 
 type CCIPSendReqConfig struct {
-	SourceChain  uint64
-	DestChain    uint64
-	IsTestRouter bool
-	Sender       *bind.TransactOpts
-	Message      any
-	MaxRetries   int // Number of retries for errors (excluding insufficient fee errors)
+	SourceChain              uint64
+	DestChain                uint64
+	IsTestRouter             bool
+	Sender                   *bind.TransactOpts
+	Message                  any
+	MaxRetries               int // Number of retries for errors (excluding insufficient fee errors)
+	UseSolCCIPSenderContract bool
+	TokenReceiver            solana.PublicKey
 }
 
 type SendReqOpts func(*CCIPSendReqConfig)
@@ -598,6 +601,45 @@ func SendRequestSol(
 	rmnRemoteCursesPDA, _, err := solstate.FindRMNRemoteCursesPDA(s.RMNRemote)
 	if err != nil {
 		return nil, err
+	}
+
+	if cfg.UseSolCCIPSenderContract {
+		base := example_ccip_sender.NewCcipSendInstruction(
+			destinationChainSelector,
+			[]example_ccip_sender.SVMTokenAmount{
+				{
+					Token: message.TokenAmounts[0].Token,
+					Amount:  message.TokenAmounts[0].Amount,
+				},
+			},
+			message.Data,
+			message.FeeToken,
+			[]byte{}, // no tokenIndexes
+			// Accounts:
+			s.RouterConfigPDA,
+			destinationChainStatePDA,
+			noncePDA,
+			sender.PublicKey(),
+			solana.SystemProgramID,
+			s.Router,
+
+			ccipConfig ag_solanago.PublicKey,
+			ccipDestChainState ag_solanago.PublicKey,
+			ccipSenderNonce ag_solanago.PublicKey,
+			ccipFeeTokenProgram ag_solanago.PublicKey,
+			ccipFeeTokenMint ag_solanago.PublicKey,
+			ccipFeeTokenUserAta ag_solanago.PublicKey,
+			ccipFeeTokenReceiver ag_solanago.PublicKey,
+			ccipFeeBillingSigner ag_solanago.PublicKey,
+			ccipFeeQuoter ag_solanago.PublicKey,
+			ccipFeeQuoterConfig ag_solanago.PublicKey,
+			ccipFeeQuoterDestChain ag_solanago.PublicKey,
+			ccipFeeQuoterBillingTokenConfig ag_solanago.PublicKey,
+			ccipFeeQuoterLinkTokenConfig ag_solanago.PublicKey,
+			ccipRmnRemote ag_solanago.PublicKey,
+			ccipRmnRemoteCurses ag_solanago.PublicKey,
+			ccipRmnRemoteConfig ag_solanago.PublicKey)
+		)
 	}
 
 	base := ccip_router.NewCcipSendInstruction(
