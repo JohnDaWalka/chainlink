@@ -50,7 +50,7 @@ RUN make install-plugins \
 
 # -----------------------------------------------------------------------------
 # Final image: common base stage for the final images
-FROM ubuntu:24.04 AS final-base
+FROM ubuntu:20.04 AS final-base
 
 ARG CHAINLINK_USER=root
 ENV DEBIAN_FRONTEND=noninteractive
