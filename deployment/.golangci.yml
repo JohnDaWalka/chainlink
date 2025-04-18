@@ -165,6 +165,10 @@ linters-settings:
   nolintlint:
     require-specific: true
     require-explanation: true
+  staticcheck:
+    checks:
+      - all
+      - -SA1019 # Disable deprecated functions usage check since we have alot of them
 issues:
   exclude-rules:
     - text: "^var-naming: don't use an underscore in package name"
