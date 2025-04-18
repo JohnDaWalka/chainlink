@@ -2,4 +2,4 @@
 "chainlink": patch
 ---
 
-Bump chainlink-solana
+#updated Bump chainlink-solana
