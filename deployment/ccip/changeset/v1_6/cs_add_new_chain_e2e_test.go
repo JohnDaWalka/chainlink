@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
+
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 )
 
@@ -280,7 +282,7 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 			var newChainSelector uint64
 			var linkAddress common.Address
 			remoteChainSelectors := make([]uint64, 0, len(chainIDs)-1)
-			addressesByChain := make(map[uint64]map[string]deployment.TypeAndVersion, len(chainIDs)-1)
+			addressesByChain := make(map[uint64]map[string]cldf.TypeAndVersion, len(chainIDs)-1)
 			for _, selector := range e.AllChainSelectors() {
 				if selector != deployedEnvironment.HomeChainSel && newChainSelector == 0 {
 					newChainSelector = selector
@@ -292,7 +294,7 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 					addressesByChain[selector] = addrs
 				}
 			}
-			e.ExistingAddresses = deployment.NewMemoryAddressBookFromMap(addressesByChain)
+			e.ExistingAddresses = cldf.NewMemoryAddressBookFromMap(addressesByChain)
 			state, err = changeset.LoadOnchainState(e)
 			require.NoError(t, err, "must load onchain state")
 
@@ -405,7 +407,7 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 					ExistingContracts: []commoncs.Contract{
 						{
 							Address:        linkAddress.Hex(),
-							TypeAndVersion: deployment.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0),
+							TypeAndVersion: cldf.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0),
 							ChainSelector:  newChainSelector,
 						},
 					},

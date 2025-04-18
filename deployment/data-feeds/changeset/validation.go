@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	commonTypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -36,11 +37,11 @@ func ValidateCacheForChain(env deployment.Environment, chainSelector uint64, cac
 	return nil
 }
 
-func ValidateMCMSAddresses(ab deployment.AddressBook, chainSelector uint64) error {
-	if _, err := deployment.SearchAddressBook(ab, chainSelector, commonTypes.RBACTimelock); err != nil {
+func ValidateMCMSAddresses(ab cldf.AddressBook, chainSelector uint64) error {
+	if _, err := cldf.SearchAddressBook(ab, chainSelector, commonTypes.RBACTimelock); err != nil {
 		return fmt.Errorf("timelock not present on the chain %w", err)
 	}
-	if _, err := deployment.SearchAddressBook(ab, chainSelector, commonTypes.ProposerManyChainMultisig); err != nil {
+	if _, err := cldf.SearchAddressBook(ab, chainSelector, commonTypes.ProposerManyChainMultisig); err != nil {
 		return fmt.Errorf("mcms proposer not present on the chain %w", err)
 	}
 	return nil

@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/datastore"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -23,7 +25,7 @@ func TestChangeSetLegacyFunction_PassingCase(t *testing.T) {
 	csv2 := deployment.CreateChangeSet(
 		func(e deployment.Environment, config uint32) (deployment.ChangesetOutput, error) {
 			executedCs = true
-			return deployment.ChangesetOutput{AddressBook: deployment.NewMemoryAddressBook()}, nil
+			return deployment.ChangesetOutput{AddressBook: cldf.NewMemoryAddressBook()}, nil
 		},
 		func(e deployment.Environment, config uint32) error {
 			executedValidator = true
@@ -48,7 +50,7 @@ func TestChangeSetLegacyFunction_ErrorCase(t *testing.T) {
 	csv2 := deployment.CreateChangeSet(
 		func(e deployment.Environment, config uint32) (deployment.ChangesetOutput, error) {
 			executedCs = true
-			return deployment.ChangesetOutput{AddressBook: deployment.NewMemoryAddressBook()}, nil
+			return deployment.ChangesetOutput{AddressBook: cldf.NewMemoryAddressBook()}, nil
 		},
 		func(e deployment.Environment, config uint32) error {
 			executedValidator = true
@@ -67,7 +69,7 @@ func NewNoopEnvironment(t *testing.T) deployment.Environment {
 	return *deployment.NewEnvironment(
 		"noop",
 		logger.TestLogger(t),
-		deployment.NewMemoryAddressBook(),
+		cldf.NewMemoryAddressBook(),
 		datastore.NewMemoryDataStore[
 			datastore.DefaultMetadata,
 			datastore.DefaultMetadata,

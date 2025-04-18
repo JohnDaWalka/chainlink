@@ -16,6 +16,7 @@ import (
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 	"golang.org/x/exp/maps"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	evminternal "github.com/smartcontractkit/chainlink/deployment/common/changeset/internal/evm"
 	solanaMCMS "github.com/smartcontractkit/chainlink/deployment/common/changeset/solana/mcms"
@@ -39,7 +40,7 @@ var (
 func DeployMCMSWithTimelockV2(
 	env deployment.Environment, cfgByChain map[uint64]types.MCMSWithTimelockConfigV2,
 ) (deployment.ChangesetOutput, error) {
-	newAddresses := deployment.NewMemoryAddressBook()
+	newAddresses := cldf.NewMemoryAddressBook()
 
 	for chainSel, cfg := range cfgByChain {
 		family, err := chain_selectors.GetSelectorFamily(chainSel)
@@ -56,7 +57,7 @@ func DeployMCMSWithTimelockV2(
 			s, err := state.MaybeLoadMCMSWithTimelockState(env, []uint64{chainSel})
 			if err != nil {
 				// if the state is not found for chain, we assume it's a fresh deployment
-				if !strings.Contains(err.Error(), deployment.ErrChainNotFound.Error()) {
+				if !strings.Contains(err.Error(), cldf.ErrChainNotFound.Error()) {
 					return deployment.ChangesetOutput{}, err
 				}
 			}

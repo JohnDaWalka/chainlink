@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commonstate "github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
@@ -80,7 +81,7 @@ func NewDataStreamsEnvironment(t *testing.T, opts DataStreamsTestEnvOptions) (Da
 		)
 		require.NoError(t, err)
 
-		fmAddressHex, err := deployment.SearchAddressBook(env.ExistingAddresses, testutil.TestChain.Selector, types.FeeManager)
+		fmAddressHex, err := cldf.SearchAddressBook(env.ExistingAddresses, testutil.TestChain.Selector, types.FeeManager)
 		require.NoError(t, err)
 		feeManagerAddress = common.HexToAddress(fmAddressHex)
 		e = env

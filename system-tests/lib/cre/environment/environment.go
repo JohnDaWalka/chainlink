@@ -26,6 +26,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
@@ -151,7 +153,7 @@ func SetupTestEnvironment(
 	chainsOnlyCld := &deployment.Environment{
 		Logger:            singeFileLogger,
 		Chains:            chains,
-		ExistingAddresses: deployment.NewMemoryAddressBook(),
+		ExistingAddresses: cldf.NewMemoryAddressBook(),
 		GetContext: func() context.Context {
 			return ctx
 		},

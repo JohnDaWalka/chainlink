@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -158,7 +159,7 @@ func initEnv(t *testing.T, nChains int) (registryChainSel uint64, env deployment
 		GetContext:        t.Context,
 		Logger:            logger.Test(t),
 		Chains:            chains,
-		ExistingAddresses: deployment.NewMemoryAddressBook(),
+		ExistingAddresses: cldf.NewMemoryAddressBook(),
 	}
 
 	env, err := commonchangeset.Apply(t, env, nil,
@@ -388,7 +389,7 @@ func setupViewOnlyNodeTest(t *testing.T, registryChainSel uint64, chains map[uin
 	env := deployment.NewEnvironment(
 		"view only nodes",
 		logger.Test(t),
-		deployment.NewMemoryAddressBook(),
+		cldf.NewMemoryAddressBook(),
 		datastore.NewMemoryDataStore[
 			datastore.DefaultMetadata,
 			datastore.DefaultMetadata,

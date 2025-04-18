@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/datastore"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
@@ -12,7 +13,7 @@ import (
 type MyChangeSet struct{}
 
 func (m MyChangeSet) Apply(e Environment, config uint64) (ChangesetOutput, error) {
-	return ChangesetOutput{AddressBook: NewMemoryAddressBook()}, nil
+	return ChangesetOutput{AddressBook: cldf.NewMemoryAddressBook()}, nil
 }
 func (m MyChangeSet) VerifyPreconditions(e Environment, config uint64) error {
 	return nil
@@ -26,7 +27,7 @@ func TestChangeSetNormalType(t *testing.T) {
 	verify := cs.VerifyPreconditions(e, 5)
 	require.NoError(t, verify)
 	out, _ := cs.Apply(e, 5)
-	require.Equal(t, NewMemoryAddressBook(), out.AddressBook)
+	require.Equal(t, cldf.NewMemoryAddressBook(), out.AddressBook)
 }
 
 func TestChangeSetConstructionComposedFromLambdas(t *testing.T) {
@@ -36,7 +37,7 @@ func TestChangeSetConstructionComposedFromLambdas(t *testing.T) {
 	var cs = CreateChangeSet(
 		// Don't do this in real life, this is for a test. Make nice tested functions.
 		func(e Environment, config string) (ChangesetOutput, error) {
-			return ChangesetOutput{AddressBook: NewMemoryAddressBook()}, nil
+			return ChangesetOutput{AddressBook: cldf.NewMemoryAddressBook()}, nil
 		},
 		func(e Environment, config string) error {
 			return nil
@@ -45,13 +46,13 @@ func TestChangeSetConstructionComposedFromLambdas(t *testing.T) {
 	verify := cs.VerifyPreconditions(e, "foo")
 	require.NoError(t, verify)
 	out, _ := cs.Apply(e, "foo")
-	require.Equal(t, NewMemoryAddressBook(), out.AddressBook)
+	require.Equal(t, cldf.NewMemoryAddressBook(), out.AddressBook)
 }
 
 var fakeChangeSet = CreateChangeSet(oldSchool, oldSchoolVerify)
 
 func oldSchool(e Environment, config uint32) (ChangesetOutput, error) {
-	return ChangesetOutput{AddressBook: NewMemoryAddressBook()}, nil
+	return ChangesetOutput{AddressBook: cldf.NewMemoryAddressBook()}, nil
 }
 func oldSchoolVerify(e Environment, _ uint32) error {
 	return nil
@@ -65,7 +66,7 @@ func TestChangeSetComposedType(t *testing.T) {
 	verify := fakeChangeSet.VerifyPreconditions(e, 5)
 	require.NoError(t, verify)
 	out, _ := fakeChangeSet.Apply(e, 5)
-	require.Equal(t, NewMemoryAddressBook(), out.AddressBook)
+	require.Equal(t, cldf.NewMemoryAddressBook(), out.AddressBook)
 }
 
 // TestChangeSetLegacyFunction tests using legacy ChangeSet functions (but just naturally conforming to the type,
@@ -77,7 +78,7 @@ func TestChangeSetLegacyFunctionWithStandardChangeSetFunction(t *testing.T) {
 	verify := cs.VerifyPreconditions(e, 5)
 	require.NoError(t, verify)
 	out, _ := cs.Apply(e, 5)
-	require.Equal(t, NewMemoryAddressBook(), out.AddressBook)
+	require.Equal(t, cldf.NewMemoryAddressBook(), out.AddressBook)
 }
 
 // TestChangeSetLegacyFunction tests using legacy ChangeSet (strongly declared as a ChangeSet[C]) in the wrapper.
@@ -89,14 +90,14 @@ func TestChangeSetLegacyFunction(t *testing.T) {
 	verify := cs.VerifyPreconditions(e, 5)
 	require.NoError(t, verify)
 	out, _ := cs.Apply(e, 5)
-	require.Equal(t, NewMemoryAddressBook(), out.AddressBook)
+	require.Equal(t, cldf.NewMemoryAddressBook(), out.AddressBook)
 }
 
 func NewNoopEnvironment(t *testing.T) Environment {
 	return *NewEnvironment(
 		"noop",
 		logger.TestLogger(t),
-		NewMemoryAddressBook(),
+		cldf.NewMemoryAddressBook(),
 		datastore.NewMemoryDataStore[
 			datastore.DefaultMetadata,
 			datastore.DefaultMetadata,

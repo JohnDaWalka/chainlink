@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/mcms/sdk"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	kslib "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
@@ -20,7 +21,7 @@ var _ deployment.ChangeSet[uint64] = DeployOCR3
 
 func DeployOCR3(env deployment.Environment, registryChainSel uint64) (deployment.ChangesetOutput, error) {
 	lggr := env.Logger
-	ab := deployment.NewMemoryAddressBook()
+	ab := cldf.NewMemoryAddressBook()
 	// ocr3 only deployed on registry chain
 	c, ok := env.Chains[registryChainSel]
 	if !ok {

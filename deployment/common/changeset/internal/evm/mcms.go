@@ -18,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -26,11 +27,11 @@ import (
 )
 
 // DeployMCMSOption is a function that modifies a TypeAndVersion before or after deployment.
-type DeployMCMSOption func(*deployment.TypeAndVersion)
+type DeployMCMSOption func(*cldf.TypeAndVersion)
 
 // WithLabel is a functional option that sets a label on the TypeAndVersion.
 func WithLabel(label string) DeployMCMSOption {
-	return func(tv *deployment.TypeAndVersion) {
+	return func(tv *cldf.TypeAndVersion) {
 		tv.AddLabel(label)
 	}
 }
@@ -45,10 +46,10 @@ type MCMSWithTimelockEVMDeploy struct {
 }
 
 func DeployMCMSWithConfigEVM(
-	contractType deployment.ContractType,
+	contractType cldf.ContractType,
 	lggr logger.Logger,
 	chain deployment.Chain,
-	ab deployment.AddressBook,
+	ab cldf.AddressBook,
 	mcmConfig mcmsTypes.Config,
 	options ...DeployMCMSOption,
 ) (*deployment.ContractDeploy[*bindings.ManyChainMultiSig], error) {
@@ -64,7 +65,7 @@ func DeployMCMSWithConfigEVM(
 				chain.Client,
 			)
 
-			tv := deployment.NewTypeAndVersion(contractType, deployment.Version1_0_0)
+			tv := cldf.NewTypeAndVersion(contractType, deployment.Version1_0_0)
 			for _, option := range options {
 				option(&tv)
 			}
@@ -101,7 +102,7 @@ func DeployMCMSWithTimelockContractsEVM(
 	ctx context.Context,
 	lggr logger.Logger,
 	chain deployment.Chain,
-	ab deployment.AddressBook,
+	ab cldf.AddressBook,
 	config commontypes.MCMSWithTimelockConfigV2,
 	state *state.MCMSWithTimelockState,
 ) (*proposalutils.MCMSWithTimelockContracts, error) {
@@ -171,7 +172,7 @@ func DeployMCMSWithTimelockContractsEVM(
 					[]common.Address{bypasser.Address()},                                          // bypassers
 				)
 
-				tv := deployment.NewTypeAndVersion(commontypes.RBACTimelock, deployment.Version1_0_0)
+				tv := cldf.NewTypeAndVersion(commontypes.RBACTimelock, deployment.Version1_0_0)
 				if config.Label != nil {
 					tv.AddLabel(*config.Label)
 				}
@@ -199,7 +200,7 @@ func DeployMCMSWithTimelockContractsEVM(
 					timelock.Address(),
 				)
 
-				tv := deployment.NewTypeAndVersion(commontypes.CallProxy, deployment.Version1_0_0)
+				tv := cldf.NewTypeAndVersion(commontypes.CallProxy, deployment.Version1_0_0)
 				if config.Label != nil {
 					tv.AddLabel(*config.Label)
 				}

@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/message_hasher"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	ccipChangeSetSolana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
@@ -167,7 +168,7 @@ func ReplayLogs(t *testing.T, oc deployment.OffchainClient, replayBlocks map[uin
 
 func DeployTestContracts(t *testing.T,
 	lggr logger.Logger,
-	ab deployment.AddressBook,
+	ab cldf.AddressBook,
 	homeChainSel,
 	feedChainSel uint64,
 	chains map[uint64]deployment.Chain,
@@ -181,7 +182,7 @@ func DeployTestContracts(t *testing.T,
 				chain.Client,
 			)
 			return deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
-				Address: crAddr, Contract: cr, Tv: deployment.NewTypeAndVersion(changeset.CapabilitiesRegistry, deployment.Version1_0_0), Tx: tx, Err: err2,
+				Address: crAddr, Contract: cr, Tv: cldf.NewTypeAndVersion(changeset.CapabilitiesRegistry, deployment.Version1_0_0), Tx: tx, Err: err2,
 			}
 		})
 	require.NoError(t, err)
@@ -1072,12 +1073,12 @@ func ToPackedFee(execFee, daFee *big.Int) *big.Int {
 
 func DeployFeeds(
 	lggr logger.Logger,
-	ab deployment.AddressBook,
+	ab cldf.AddressBook,
 	chain deployment.Chain,
 	linkPrice *big.Int,
 	wethPrice *big.Int,
 ) (map[string]common.Address, error) {
-	linkTV := deployment.NewTypeAndVersion(changeset.PriceFeed, deployment.Version1_0_0)
+	linkTV := cldf.NewTypeAndVersion(changeset.PriceFeed, deployment.Version1_0_0)
 	mockLinkFeed := func(chain deployment.Chain) deployment.ContractDeploy[*aggregator_v3_interface.AggregatorV3Interface] {
 		linkFeed, tx, _, err1 := mock_v3_aggregator_contract.DeployMockV3Aggregator(
 			chain.DeployerKey,
@@ -1125,7 +1126,7 @@ func DeployFeeds(
 
 func deploySingleFeed(
 	lggr logger.Logger,
-	ab deployment.AddressBook,
+	ab cldf.AddressBook,
 	chain deployment.Chain,
 	deployFunc func(deployment.Chain) deployment.ContractDeploy[*aggregator_v3_interface.AggregatorV3Interface],
 	symbol changeset.TokenSymbol,
@@ -1159,7 +1160,7 @@ func DeployTransferableToken(
 	src, dst uint64,
 	srcActor, dstActor *bind.TransactOpts,
 	state changeset.CCIPOnChainState,
-	addresses deployment.AddressBook,
+	addresses cldf.AddressBook,
 	token string,
 ) (*burn_mint_erc677.BurnMintERC677, *burn_mint_token_pool.BurnMintTokenPool, *burn_mint_erc677.BurnMintERC677, *burn_mint_token_pool.BurnMintTokenPool, error) {
 	// Deploy token and pools
@@ -1204,7 +1205,7 @@ func DeployTransferableTokenSolana(
 	e deployment.Environment,
 	evmChainSel, solChainSel uint64,
 	evmDeployer *bind.TransactOpts,
-	addresses deployment.AddressBook,
+	addresses cldf.AddressBook,
 	evmTokenName string,
 ) (*burn_mint_erc677.BurnMintERC677,
 	*burn_mint_token_pool.BurnMintTokenPool, solana.PublicKey, error) {
@@ -1405,7 +1406,7 @@ func deployTokenPoolsInParallel(
 	src, dst uint64,
 	srcActor, dstActor *bind.TransactOpts,
 	state changeset.CCIPOnChainState,
-	addresses deployment.AddressBook,
+	addresses cldf.AddressBook,
 	token string,
 ) (
 	*burn_mint_erc677.BurnMintERC677,
@@ -1590,7 +1591,7 @@ func deployTransferTokenOneEnd(
 	lggr logger.Logger,
 	chain deployment.Chain,
 	deployer *bind.TransactOpts,
-	addressBook deployment.AddressBook,
+	addressBook cldf.AddressBook,
 	tokenSymbol string,
 ) (*burn_mint_erc677.BurnMintERC677, *burn_mint_token_pool.BurnMintTokenPool, error) {
 	var rmnAddress, routerAddress string
@@ -1599,10 +1600,10 @@ func deployTransferTokenOneEnd(
 		return nil, nil, err
 	}
 	for address, v := range chainAddresses {
-		if deployment.NewTypeAndVersion(changeset.ARMProxy, deployment.Version1_0_0).Equal(v) {
+		if cldf.NewTypeAndVersion(changeset.ARMProxy, deployment.Version1_0_0).Equal(v) {
 			rmnAddress = address
 		}
-		if deployment.NewTypeAndVersion(changeset.Router, deployment.Version1_2_0).Equal(v) {
+		if cldf.NewTypeAndVersion(changeset.Router, deployment.Version1_2_0).Equal(v) {
 			routerAddress = address
 		}
 		if rmnAddress != "" && routerAddress != "" {
@@ -1623,7 +1624,7 @@ func deployTransferTokenOneEnd(
 				big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
 			)
 			return deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
-				Address: tokenAddress, Contract: token, Tx: tx, Tv: deployment.NewTypeAndVersion(changeset.BurnMintToken, deployment.Version1_0_0), Err: err2,
+				Address: tokenAddress, Contract: token, Tx: tx, Tv: cldf.NewTypeAndVersion(changeset.BurnMintToken, deployment.Version1_0_0), Err: err2,
 			}
 		})
 	if err != nil {
@@ -1652,7 +1653,7 @@ func deployTransferTokenOneEnd(
 				common.HexToAddress(routerAddress),
 			)
 			return deployment.ContractDeploy[*burn_mint_token_pool.BurnMintTokenPool]{
-				Address: tokenPoolAddress, Contract: tokenPoolContract, Tx: tx, Tv: deployment.NewTypeAndVersion(changeset.BurnMintTokenPool, deployment.Version1_5_1), Err: err2,
+				Address: tokenPoolAddress, Contract: tokenPoolContract, Tx: tx, Tv: cldf.NewTypeAndVersion(changeset.BurnMintTokenPool, deployment.Version1_5_1), Err: err2,
 			}
 		})
 	if err != nil {
@@ -2045,52 +2046,52 @@ func DefaultRouterMessage(receiverAddress common.Address) router.ClientEVM2AnyMe
 
 // TODO: this should be linked to the solChain function
 func SavePreloadedSolAddresses(e deployment.Environment, solChainSelector uint64) error {
-	tv := deployment.NewTypeAndVersion(changeset.Router, deployment.Version1_0_0)
+	tv := cldf.NewTypeAndVersion(changeset.Router, deployment.Version1_0_0)
 	err := e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["ccip_router"], tv)
 	if err != nil {
 		return err
 	}
-	tv = deployment.NewTypeAndVersion(changeset.Receiver, deployment.Version1_0_0)
+	tv = cldf.NewTypeAndVersion(changeset.Receiver, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["test_ccip_receiver"], tv)
 	if err != nil {
 		return err
 	}
-	tv = deployment.NewTypeAndVersion(changeset.FeeQuoter, deployment.Version1_0_0)
+	tv = cldf.NewTypeAndVersion(changeset.FeeQuoter, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["fee_quoter"], tv)
 	if err != nil {
 		return err
 	}
-	tv = deployment.NewTypeAndVersion(changeset.OffRamp, deployment.Version1_0_0)
+	tv = cldf.NewTypeAndVersion(changeset.OffRamp, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["ccip_offramp"], tv)
 	if err != nil {
 		return err
 	}
-	tv = deployment.NewTypeAndVersion(changeset.BurnMintTokenPool, deployment.Version1_0_0)
+	tv = cldf.NewTypeAndVersion(changeset.BurnMintTokenPool, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["burnmint_token_pool"], tv)
 	if err != nil {
 		return err
 	}
-	tv = deployment.NewTypeAndVersion(changeset.LockReleaseTokenPool, deployment.Version1_0_0)
+	tv = cldf.NewTypeAndVersion(changeset.LockReleaseTokenPool, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["lockrelease_token_pool"], tv)
 	if err != nil {
 		return err
 	}
-	tv = deployment.NewTypeAndVersion(commontypes.ManyChainMultisigProgram, deployment.Version1_0_0)
+	tv = cldf.NewTypeAndVersion(commontypes.ManyChainMultisigProgram, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["mcm"], tv)
 	if err != nil {
 		return err
 	}
-	tv = deployment.NewTypeAndVersion(commontypes.AccessControllerProgram, deployment.Version1_0_0)
+	tv = cldf.NewTypeAndVersion(commontypes.AccessControllerProgram, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["access_controller"], tv)
 	if err != nil {
 		return err
 	}
-	tv = deployment.NewTypeAndVersion(commontypes.RBACTimelockProgram, deployment.Version1_0_0)
+	tv = cldf.NewTypeAndVersion(commontypes.RBACTimelockProgram, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["timelock"], tv)
 	if err != nil {
 		return err
 	}
-	tv = deployment.NewTypeAndVersion(changeset.RMNRemote, deployment.Version1_0_0)
+	tv = cldf.NewTypeAndVersion(changeset.RMNRemote, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["rmn_remote"], tv)
 	if err != nil {
 		return err

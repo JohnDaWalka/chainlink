@@ -12,6 +12,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
@@ -478,7 +480,7 @@ type FullCLDEnvironmentInput struct {
 	BlockchainOutput  *blockchain.Output
 	SethClient        *seth.Client
 	NodeSetOutput     []*WrappedNodeOutput
-	ExistingAddresses deployment.AddressBook
+	ExistingAddresses cldf.AddressBook
 	Topology          *Topology
 }
 

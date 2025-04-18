@@ -12,6 +12,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/registry_module_owner_custom"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_5_1"
@@ -107,7 +109,7 @@ func TestDeployTokenPoolFactoryChangeset(t *testing.T) {
 								chain.DeployerKey,
 								chain.Client)
 							return deployment.ContractDeploy[*token_admin_registry.TokenAdminRegistry]{
-								Address: tokenAdminRegistryAddr, Contract: tokenAdminRegistry, Tx: tx2, Tv: deployment.NewTypeAndVersion(changeset.TokenAdminRegistry, deployment.Version1_5_0), Err: err2,
+								Address: tokenAdminRegistryAddr, Contract: tokenAdminRegistry, Tx: tx2, Tv: cldf.NewTypeAndVersion(changeset.TokenAdminRegistry, deployment.Version1_5_0), Err: err2,
 							}
 						})
 					require.NoError(t, err, "failed to deploy token admin registry")
@@ -122,7 +124,7 @@ func TestDeployTokenPoolFactoryChangeset(t *testing.T) {
 								utils.RandomAddress(),
 							)
 							return deployment.ContractDeploy[*rmn_proxy_contract.RMNProxy]{
-								Address: rmnProxyAddr, Contract: rmnProxy2, Tx: tx2, Tv: deployment.NewTypeAndVersion(changeset.ARMProxy, deployment.Version1_0_0), Err: err2,
+								Address: rmnProxyAddr, Contract: rmnProxy2, Tx: tx2, Tv: cldf.NewTypeAndVersion(changeset.ARMProxy, deployment.Version1_0_0), Err: err2,
 							}
 						})
 					require.NoError(t, err, "failed to deploy RMN proxy")
@@ -138,7 +140,7 @@ func TestDeployTokenPoolFactoryChangeset(t *testing.T) {
 								rmnProxy.Address,
 							)
 							return deployment.ContractDeploy[*router.Router]{
-								Address: routerAddr, Contract: routerC, Tx: tx2, Tv: deployment.NewTypeAndVersion(changeset.Router, deployment.Version1_2_0), Err: err2,
+								Address: routerAddr, Contract: routerC, Tx: tx2, Tv: cldf.NewTypeAndVersion(changeset.Router, deployment.Version1_2_0), Err: err2,
 							}
 						})
 					require.NoError(t, err, "failed to deploy router")
@@ -151,7 +153,7 @@ func TestDeployTokenPoolFactoryChangeset(t *testing.T) {
 								tokenAdminRegistry.Address,
 							)
 							return deployment.ContractDeploy[*registry_module_owner_custom.RegistryModuleOwnerCustom]{
-								Address: regModAddr, Contract: regMod, Tx: tx2, Tv: deployment.NewTypeAndVersion(changeset.RegistryModule, deployment.Version1_6_0), Err: err2,
+								Address: regModAddr, Contract: regMod, Tx: tx2, Tv: cldf.NewTypeAndVersion(changeset.RegistryModule, deployment.Version1_6_0), Err: err2,
 							}
 						})
 					require.NoError(t, err, "failed to deploy registry module")
@@ -170,7 +172,7 @@ func TestDeployTokenPoolFactoryChangeset(t *testing.T) {
 								chain.Client,
 								state.Chains[selector].TokenAdminRegistry.Address())
 							return deployment.ContractDeploy[*registry_module_owner_custom.RegistryModuleOwnerCustom]{
-								Address: regModAddr, Contract: regMod, Tx: tx2, Tv: deployment.NewTypeAndVersion(changeset.RegistryModule, deployment.Version1_6_0), Err: err2,
+								Address: regModAddr, Contract: regMod, Tx: tx2, Tv: cldf.NewTypeAndVersion(changeset.RegistryModule, deployment.Version1_6_0), Err: err2,
 							}
 						})
 					require.NoError(t, err, "failed to deploy registry module")

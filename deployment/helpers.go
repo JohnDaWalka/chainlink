@@ -19,6 +19,8 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 // OCRSecrets are used to disseminate a shared secret to OCR nodes
@@ -155,7 +157,7 @@ type ContractDeploy[C any] struct {
 	Address  common.Address     // We leave this incase a Go binding doesn't have Address()
 	Contract C                  // Expected to be a Go binding
 	Tx       *types.Transaction // Incase the caller needs for example tx hash info for
-	Tv       TypeAndVersion
+	Tv       cldf.TypeAndVersion
 	Err      error
 }
 
@@ -169,7 +171,7 @@ type ContractDeploy[C any] struct {
 func DeployContract[C any](
 	lggr logger.Logger,
 	chain Chain,
-	addressBook AddressBook,
+	addressBook cldf.AddressBook,
 	deploy func(chain Chain) ContractDeploy[C],
 ) (*ContractDeploy[C], error) {
 	contractDeploy := deploy(chain)

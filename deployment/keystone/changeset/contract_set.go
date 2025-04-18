@@ -7,6 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
@@ -25,7 +27,7 @@ type ContractSetV2 struct {
 
 // GetContractSetsRequestV2 is the request structure for getting contract sets.
 type GetContractSetsRequestV2 struct {
-	AddressBook deployment.AddressBook
+	AddressBook cldf.AddressBook
 	Chains      map[uint64]deployment.Chain
 	Labels      []string
 }
@@ -84,7 +86,7 @@ func GetContractSetsV2(lggr logger.Logger, req GetContractSetsRequestV2) (*GetCo
 
 		// Forwarder addresses now have informative labels, but we don't want them to be ignored if no labels are provided for filtering.
 		// If labels are provided, just filter by those.
-		forwarderAddrs := make(map[string]deployment.TypeAndVersion)
+		forwarderAddrs := make(map[string]cldf.TypeAndVersion)
 		if len(req.Labels) == 0 {
 			for addr, tv := range addresses {
 				if tv.Type == KeystoneForwarder {
@@ -111,10 +113,10 @@ func GetContractSetsV2(lggr logger.Logger, req GetContractSetsRequestV2) (*GetCo
 	return out, nil
 }
 
-func loadContractSetV2(lggr logger.Logger, addressBook deployment.AddressBook, chain deployment.Chain, addresses map[string]deployment.TypeAndVersion) (*ContractSetV2, error) {
+func loadContractSetV2(lggr logger.Logger, addressBook cldf.AddressBook, chain deployment.Chain, addresses map[string]cldf.TypeAndVersion) (*ContractSetV2, error) {
 	var out ContractSetV2
 
-	handlers := map[deployment.ContractType]func(string) error{
+	handlers := map[cldf.ContractType]func(string) error{
 		OCR3Capability: func(addr string) error {
 			contract, err := GetOwnedContract[*ocr3_capability.OCR3Capability](addressBook, chain, addr)
 			if err != nil {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 )
 
@@ -15,7 +16,7 @@ func Deploy(env deployment.Environment, registrySelector uint64) (deployment.Cha
 	if !ok {
 		return deployment.ChangesetOutput{}, errors.New("chain not found in environment")
 	}
-	ab := deployment.NewMemoryAddressBook()
+	ab := cldf.NewMemoryAddressBook()
 	wrResp, err := deployWorkflowRegistry(chain, ab)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy WorkflowRegistry: %w", err)

@@ -12,6 +12,7 @@ import (
 	mcmsSolana "github.com/smartcontractkit/mcms/sdk/solana"
 	mcmsTypes "github.com/smartcontractkit/mcms/types"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	ccipChangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
@@ -70,11 +71,11 @@ func ValidateMCMSConfigSolana(
 func ValidateMCMSConfig(e deployment.Environment, chainSelector uint64, mcms *proposalutils.TimelockConfig) error {
 	if mcms != nil {
 		// If there is no timelock and mcms proposer on the chain, the transfer will fail.
-		timelockID, err := deployment.SearchAddressBook(e.ExistingAddresses, chainSelector, types.RBACTimelock)
+		timelockID, err := cldf.SearchAddressBook(e.ExistingAddresses, chainSelector, types.RBACTimelock)
 		if err != nil {
 			return fmt.Errorf("timelock not present on the chain %w", err)
 		}
-		proposerID, err := deployment.SearchAddressBook(e.ExistingAddresses, chainSelector, types.ProposerManyChainMultisig)
+		proposerID, err := cldf.SearchAddressBook(e.ExistingAddresses, chainSelector, types.ProposerManyChainMultisig)
 		if err != nil {
 			return fmt.Errorf("mcms proposer not present on the chain %w", err)
 		}
@@ -129,7 +130,7 @@ func BuildProposalsForTxns(
 	return proposal, nil
 }
 
-func BuildMCMSTxn(ixn solana.Instruction, programID string, contractType deployment.ContractType) (*mcmsTypes.Transaction, error) {
+func BuildMCMSTxn(ixn solana.Instruction, programID string, contractType cldf.ContractType) (*mcmsTypes.Transaction, error) {
 	data, err := ixn.Data()
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract data: %w", err)
@@ -170,7 +171,7 @@ func GetAuthorityForIxn(
 	e *deployment.Environment,
 	chain deployment.SolChain,
 	mcms *MCMSConfigSolana,
-	contractType deployment.ContractType,
+	contractType cldf.ContractType,
 	tokenAddress solana.PublicKey, // used for burnmint and lockrelease
 ) (solana.PublicKey, error) {
 	if mcms == nil {

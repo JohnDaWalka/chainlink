@@ -13,6 +13,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/erc20"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 )
@@ -124,7 +126,7 @@ func DeployUSDCTokenPoolContractsChangeset(env deployment.Environment, c DeployU
 	if err := c.Validate(env); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("invalid DeployUSDCTokenPoolContractsConfig: %w", err)
 	}
-	newAddresses := deployment.NewMemoryAddressBook()
+	newAddresses := cldf.NewMemoryAddressBook()
 
 	state, err := changeset.LoadOnchainState(env)
 	if err != nil {
@@ -147,7 +149,7 @@ func DeployUSDCTokenPoolContractsChangeset(env deployment.Environment, c DeployU
 				return deployment.ContractDeploy[*usdc_token_pool.USDCTokenPool]{
 					Address:  poolAddress,
 					Contract: usdcTokenPool,
-					Tv:       deployment.NewTypeAndVersion(changeset.USDCTokenPool, deployment.Version1_5_1),
+					Tv:       cldf.NewTypeAndVersion(changeset.USDCTokenPool, deployment.Version1_5_1),
 					Tx:       tx,
 					Err:      err,
 				}

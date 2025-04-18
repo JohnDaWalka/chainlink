@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	ccipChangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	ccipChangesetSolana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
 	changeset_solana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
@@ -112,7 +113,7 @@ func doTestTokenPool(t *testing.T, mcms bool) {
 	inboundConfig := rateLimitConfig
 	outboundConfig := rateLimitConfig
 
-	tokenMap := map[deployment.ContractType]solana.PublicKey{
+	tokenMap := map[cldf.ContractType]solana.PublicKey{
 		ccipChangeset.SPL2022Tokens: newTokenAddress,
 		ccipChangeset.SPLTokens:     state.SolChains[solChain].WSOL,
 	}

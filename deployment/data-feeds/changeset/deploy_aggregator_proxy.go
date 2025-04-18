@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/types"
 )
@@ -16,7 +17,7 @@ var DeployAggregatorProxyChangeset = deployment.CreateChangeSet(deployAggregator
 
 func deployAggregatorProxyLogic(env deployment.Environment, c types.DeployAggregatorProxyConfig) (deployment.ChangesetOutput, error) {
 	lggr := env.Logger
-	ab := deployment.NewMemoryAddressBook()
+	ab := cldf.NewMemoryAddressBook()
 
 	for index, chainSelector := range c.ChainsToDeploy {
 		chain := env.Chains[chainSelector]

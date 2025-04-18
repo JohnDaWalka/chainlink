@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	kslib "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 )
@@ -16,7 +17,7 @@ func DeployCapabilityRegistry(env deployment.Environment, registrySelector uint6
 	if !ok {
 		return deployment.ChangesetOutput{}, errors.New("chain not found in environment")
 	}
-	ab := deployment.NewMemoryAddressBook()
+	ab := cldf.NewMemoryAddressBook()
 	capabilitiesRegistryResp, err := kslib.DeployCapabilitiesRegistry(chain, ab)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy CapabilitiesRegistry: %w", err)

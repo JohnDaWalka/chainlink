@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/datastore"
 )
 
@@ -115,7 +116,7 @@ type ChangesetOutput struct {
 	MCMSProposals              []mcms.Proposal
 	// Deprecated: AddressBook is deprecated and will be removed in future versions.
 	// Use DataStore instead
-	AddressBook AddressBook
+	AddressBook cldf.AddressBook
 	DataStore   datastore.MutableDataStore[datastore.DefaultMetadata, datastore.DefaultMetadata]
 	// Reports are populated by the Operations API with the
 	// results of the operations executed in the changeset.

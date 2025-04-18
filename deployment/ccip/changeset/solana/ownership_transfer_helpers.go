@@ -13,6 +13,7 @@ import (
 	lockrelease "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/lockrelease_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	state2 "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
@@ -43,7 +44,7 @@ func transferAndWrapAcceptOwnership(
 	configPDA solana.PublicKey, // e.g. for routerConfigPDA or a token-pool config
 	deployer solana.PublicKey, // the “from” authority
 	solChain deployment.SolChain, // used for solChain.Confirm
-	label deployment.ContractType, // e.g. "Router" or "TokenPool"
+	label cldf.ContractType, // e.g. "Router" or "TokenPool"
 ) (mcmsTypes.Transaction, error) {
 	// 1. Build the instruction that transfers ownership to the timelock
 	ixTransfer, err := buildTransfer(proposedOwner, configPDA, deployer)

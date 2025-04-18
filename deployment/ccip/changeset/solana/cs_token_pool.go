@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	ccipChangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 )
@@ -75,7 +76,7 @@ func validatePoolDeployment(
 }
 
 // append mcms txns generated from solanainstructions
-func appendTxs(instructions []solana.Instruction, tokenPool solana.PublicKey, poolType deployment.ContractType, txns *[]mcmsTypes.Transaction) error {
+func appendTxs(instructions []solana.Instruction, tokenPool solana.PublicKey, poolType cldf.ContractType, txns *[]mcmsTypes.Transaction) error {
 	for _, ixn := range instructions {
 		tx, err := BuildMCMSTxn(ixn, tokenPool.String(), poolType)
 		if err != nil {
@@ -803,8 +804,8 @@ func AddTokenPoolLookupTable(e deployment.Environment, cfg TokenPoolLookupTableC
 	if err := solCommonUtil.AwaitSlotChange(ctx, client); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to await slot change while extending lookup table: %w", err)
 	}
-	newAddressBook := deployment.NewMemoryAddressBook()
-	tv := deployment.NewTypeAndVersion(ccipChangeset.TokenPoolLookupTable, deployment.Version1_0_0)
+	newAddressBook := cldf.NewMemoryAddressBook()
+	tv := cldf.NewTypeAndVersion(ccipChangeset.TokenPoolLookupTable, deployment.Version1_0_0)
 	tv.Labels.Add(tokenPubKey.String())
 	if err := newAddressBook.Save(cfg.ChainSelector, table.String(), tv); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to save tokenpool address lookup table: %w", err)
@@ -956,7 +957,7 @@ func ConfigureTokenPoolAllowList(e deployment.Environment, cfg ConfigureTokenPoo
 	var ix solana.Instruction
 	var tokenPoolUsingMcms bool
 	var programID solana.PublicKey
-	var contractType deployment.ContractType
+	var contractType cldf.ContractType
 	switch cfg.PoolType {
 	case solTestTokenPool.BurnAndMint_PoolType:
 		poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, chainState.BurnMintTokenPool)
@@ -1074,7 +1075,7 @@ func RemoveFromTokenPoolAllowList(e deployment.Environment, cfg RemoveFromAllowL
 	var ix solana.Instruction
 	var tokenPoolUsingMcms bool
 	var programID solana.PublicKey
-	var contractType deployment.ContractType
+	var contractType cldf.ContractType
 	switch cfg.PoolType {
 	case solTestTokenPool.BurnAndMint_PoolType:
 		poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, chainState.BurnMintTokenPool)
@@ -1418,7 +1419,7 @@ func TokenPoolOps(e deployment.Environment, cfg TokenPoolOpsCfg) (deployment.Cha
 	var ix solana.Instruction
 	var tokenPoolUsingMcms bool
 	var programID solana.PublicKey
-	var contractType deployment.ContractType
+	var contractType cldf.ContractType
 	ixns := make([]solana.Instruction, 0)
 	switch cfg.PoolType {
 	case solTestTokenPool.BurnAndMint_PoolType:

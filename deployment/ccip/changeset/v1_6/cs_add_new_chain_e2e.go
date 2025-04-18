@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 	mcmslib "github.com/smartcontractkit/mcms"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
@@ -18,6 +19,7 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 )
 
@@ -182,7 +184,7 @@ func addCandidatesForNewChainPrecondition(e deployment.Environment, c AddCandida
 }
 
 func addCandidatesForNewChainLogic(e deployment.Environment, c AddCandidatesForNewChainConfig) (deployment.ChangesetOutput, error) {
-	newAddresses := deployment.NewMemoryAddressBook()
+	newAddresses := cldf.NewMemoryAddressBook()
 	var allProposals []mcmslib.TimelockProposal
 
 	// Save existing contracts
@@ -855,7 +857,7 @@ func connectRampsAndRouters(
 // END ConnectNewChainChangeset
 ///////////////////////////////////
 
-func runAndSaveAddresses(fn func() (deployment.ChangesetOutput, error), newAddresses deployment.AddressBook, existingAddresses deployment.AddressBook) error {
+func runAndSaveAddresses(fn func() (deployment.ChangesetOutput, error), newAddresses cldf.AddressBook, existingAddresses cldf.AddressBook) error {
 	output, err := fn()
 	if err != nil {
 		return fmt.Errorf("failed to run changeset: %w", err)

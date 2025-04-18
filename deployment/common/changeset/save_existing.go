@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 
 	"github.com/mr-tron/base58"
@@ -19,7 +20,7 @@ var (
 
 type Contract struct {
 	Address        string
-	TypeAndVersion deployment.TypeAndVersion
+	TypeAndVersion cldf.TypeAndVersion
 	ChainSelector  uint64
 }
 
@@ -73,7 +74,7 @@ func SaveExistingContractsChangeset(env deployment.Environment, cfg ExistingCont
 	if err != nil {
 		return deployment.ChangesetOutput{}, errors.Wrapf(deployment.ErrInvalidConfig, "%v", err)
 	}
-	ab := deployment.NewMemoryAddressBook()
+	ab := cldf.NewMemoryAddressBook()
 	for _, ec := range cfg.ExistingContracts {
 		err = ab.Save(ec.ChainSelector, ec.Address, ec.TypeAndVersion)
 		if err != nil {

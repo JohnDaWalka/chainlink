@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/types"
 )
@@ -14,7 +15,7 @@ var DeployCacheChangeset = deployment.CreateChangeSet(deployCacheLogic, deployCa
 
 func deployCacheLogic(env deployment.Environment, c types.DeployConfig) (deployment.ChangesetOutput, error) {
 	lggr := env.Logger
-	ab := deployment.NewMemoryAddressBook()
+	ab := cldf.NewMemoryAddressBook()
 	for _, chainSelector := range c.ChainsToDeploy {
 		chain := env.Chains[chainSelector]
 		cacheResponse, err := DeployCache(chain, c.Labels)

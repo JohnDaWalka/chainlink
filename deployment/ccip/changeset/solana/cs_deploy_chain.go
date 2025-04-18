@@ -14,6 +14,7 @@ import (
 	mcmsSolana "github.com/smartcontractkit/mcms/sdk/solana"
 	mcmsTypes "github.com/smartcontractkit/mcms/types"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	ccipChangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
@@ -37,8 +38,8 @@ import (
 
 var _ deployment.ChangeSet[DeployChainContractsConfig] = DeployChainContractsChangeset
 
-func getTypeToProgramDeployName() map[deployment.ContractType]string {
-	return map[deployment.ContractType]string{
+func getTypeToProgramDeployName() map[cldf.ContractType]string {
+	return map[cldf.ContractType]string{
 		ccipChangeset.Router:               deployment.RouterProgramName,
 		ccipChangeset.OffRamp:              deployment.OffRampProgramName,
 		ccipChangeset.FeeQuoter:            deployment.FeeQuoterProgramName,
@@ -148,7 +149,7 @@ func DeployChainContractsChangeset(e deployment.Environment, c DeployChainContra
 	if err := c.Validate(e); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("invalid DeployChainContractsConfig: %w", err)
 	}
-	newAddresses := deployment.NewMemoryAddressBook()
+	newAddresses := cldf.NewMemoryAddressBook()
 	existingState, _ := ccipChangeset.LoadOnchainState(e)
 	err := v1_6.ValidateHomeChainState(e, c.HomeChainSelector, existingState)
 	if err != nil {
@@ -231,8 +232,8 @@ func DeployChainContractsChangeset(e deployment.Environment, c DeployChainContra
 func DeployAndMaybeSaveToAddressBook(
 	e deployment.Environment,
 	chain deployment.SolChain,
-	ab deployment.AddressBook,
-	contractType deployment.ContractType,
+	ab cldf.AddressBook,
+	contractType cldf.ContractType,
 	version semver.Version,
 	isUpgrade bool) (solana.PublicKey, error) {
 	programName := getTypeToProgramDeployName()[contractType]
@@ -245,7 +246,7 @@ func DeployAndMaybeSaveToAddressBook(
 	e.Logger.Infow("Deployed program", "Program", contractType, "addr", programID, "chain", chain.String(), "isUpgrade", isUpgrade)
 
 	if !isUpgrade {
-		tv := deployment.NewTypeAndVersion(contractType, version)
+		tv := cldf.NewTypeAndVersion(contractType, version)
 		err = ab.Save(chain.Selector, programID, tv)
 		if err != nil {
 			return solana.PublicKey{}, fmt.Errorf("failed to save address: %w", err)
@@ -257,7 +258,7 @@ func DeployAndMaybeSaveToAddressBook(
 func deployChainContractsSolana(
 	e deployment.Environment,
 	chain deployment.SolChain,
-	ab deployment.AddressBook,
+	ab cldf.AddressBook,
 	config DeployChainContractsConfig,
 ) ([]mcmsTypes.Transaction, error) {
 	// we may need to gather instructions and submit them as part of MCMS
@@ -335,7 +336,7 @@ func deployChainContractsSolana(
 			return txns, fmt.Errorf("failed to deploy program: %w", err)
 		}
 	} else if config.UpgradeConfig.NewOffRampVersion != nil {
-		tv := deployment.NewTypeAndVersion(ccipChangeset.OffRamp, *config.UpgradeConfig.NewOffRampVersion)
+		tv := cldf.NewTypeAndVersion(ccipChangeset.OffRamp, *config.UpgradeConfig.NewOffRampVersion)
 		existingAddresses, err := e.ExistingAddresses.AddressesForChain(chain.Selector)
 		if err != nil {
 			return txns, fmt.Errorf("failed to get existing addresses: %w", err)
@@ -801,11 +802,11 @@ func initializeRMNRemote(
 func generateUpgradeTxns(
 	e deployment.Environment,
 	chain deployment.SolChain,
-	ab deployment.AddressBook,
+	ab cldf.AddressBook,
 	config DeployChainContractsConfig,
 	newVersion *semver.Version,
 	programID solana.PublicKey,
-	contractType deployment.ContractType,
+	contractType cldf.ContractType,
 ) ([]mcmsTypes.Transaction, error) {
 	e.Logger.Infow("Generating instruction for upgrading contract", "contractType", contractType)
 	txns := make([]mcmsTypes.Transaction, 0)

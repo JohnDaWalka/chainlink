@@ -6,14 +6,15 @@ import (
 
 	"github.com/aptos-labs/aptos-go-sdk"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 )
 
 const (
-	AptosMCMSType     deployment.ContractType = "AptosManyChainMultisig"
-	AptosCCIPType     deployment.ContractType = "AptosCCIP"
-	AptosReceiverType deployment.ContractType = "AptosReceiver"
+	AptosMCMSType     cldf.ContractType = "AptosManyChainMultisig"
+	AptosCCIPType     cldf.ContractType = "AptosCCIP"
+	AptosReceiverType cldf.ContractType = "AptosReceiver"
 )
 
 type AptosCCIPChainState struct {
@@ -33,10 +34,10 @@ func LoadOnchainStateAptos(env deployment.Environment) (map[uint64]AptosCCIPChai
 		addresses, err := env.ExistingAddresses.AddressesForChain(chainSelector)
 		if err != nil {
 			// Chain not found in address book, initialize empty
-			if !errors.Is(err, deployment.ErrChainNotFound) {
+			if !errors.Is(err, cldf.ErrChainNotFound) {
 				return aptosChains, err
 			}
-			addresses = make(map[string]deployment.TypeAndVersion)
+			addresses = make(map[string]cldf.TypeAndVersion)
 		}
 		chainState, err := loadAptosChainStateFromAddresses(addresses)
 		if err != nil {
@@ -47,7 +48,7 @@ func LoadOnchainStateAptos(env deployment.Environment) (map[uint64]AptosCCIPChai
 	return aptosChains, nil
 }
 
-func loadAptosChainStateFromAddresses(addresses map[string]deployment.TypeAndVersion) (AptosCCIPChainState, error) {
+func loadAptosChainStateFromAddresses(addresses map[string]cldf.TypeAndVersion) (AptosCCIPChainState, error) {
 	chainState := AptosCCIPChainState{}
 	for addrStr, typeAndVersion := range addresses {
 		// Parse address

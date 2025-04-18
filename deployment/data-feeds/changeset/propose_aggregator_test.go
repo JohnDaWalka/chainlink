@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	commonTypes "github.com/smartcontractkit/chainlink/deployment/common/types"
@@ -51,7 +52,7 @@ func TestProposeAggregator(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	proxyAddress, err := deployment.SearchAddressBook(newEnv.ExistingAddresses, chainSelector, "AggregatorProxy")
+	proxyAddress, err := cldf.SearchAddressBook(newEnv.ExistingAddresses, chainSelector, "AggregatorProxy")
 	require.NoError(t, err)
 
 	newEnv, err = commonChangesets.Apply(t, newEnv, nil,

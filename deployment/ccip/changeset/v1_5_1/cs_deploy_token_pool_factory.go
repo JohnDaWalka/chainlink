@@ -6,6 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/token_pool_factory"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 )
@@ -77,7 +79,7 @@ func deployTokenPoolFactoryPrecondition(e deployment.Environment, config DeployT
 }
 
 func deployTokenPoolFactoryLogic(e deployment.Environment, config DeployTokenPoolFactoryConfig) (deployment.ChangesetOutput, error) {
-	addressBook := deployment.NewMemoryAddressBook()
+	addressBook := cldf.NewMemoryAddressBook()
 	state, err := changeset.LoadOnchainState(e)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
@@ -107,7 +109,7 @@ func deployTokenPoolFactoryLogic(e deployment.Environment, config DeployTokenPoo
 					Address:  address,
 					Contract: tokenPoolFactory,
 					Tx:       tx,
-					Tv:       deployment.NewTypeAndVersion(changeset.TokenPoolFactory, deployment.Version1_5_1),
+					Tv:       cldf.NewTypeAndVersion(changeset.TokenPoolFactory, deployment.Version1_5_1),
 					Err:      err,
 				}
 			},

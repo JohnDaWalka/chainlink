@@ -30,6 +30,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/datastore"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
@@ -106,7 +107,7 @@ type Environment struct {
 	Logger logger.Logger
 	// Deprecated: AddressBook is deprecated and will be removed in future versions.
 	// Use DataStore instead
-	ExistingAddresses AddressBook
+	ExistingAddresses cldf.AddressBook
 	DataStore         datastore.DataStore[
 		datastore.DefaultMetadata,
 		datastore.DefaultMetadata,
@@ -125,7 +126,7 @@ type Environment struct {
 func NewEnvironment(
 	name string,
 	logger logger.Logger,
-	existingAddrs AddressBook,
+	existingAddrs cldf.AddressBook,
 	dataStore datastore.DataStore[
 		datastore.DefaultMetadata,
 		datastore.DefaultMetadata,
@@ -157,7 +158,7 @@ func NewEnvironment(
 
 // Clone creates a copy of the environment with a new reference to the address book.
 func (e Environment) Clone() Environment {
-	ab := NewMemoryAddressBook()
+	ab := cldf.NewMemoryAddressBook()
 	if err := ab.Merge(e.ExistingAddresses); err != nil {
 		panic(fmt.Sprintf("failed to copy address book: %v", err))
 	}

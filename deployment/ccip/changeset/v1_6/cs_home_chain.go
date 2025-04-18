@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -61,7 +62,7 @@ func DeployHomeChainChangeset(env deployment.Environment, cfg DeployHomeChainCon
 	if err != nil {
 		return deployment.ChangesetOutput{}, errors.Wrapf(deployment.ErrInvalidConfig, "%v", err)
 	}
-	ab := deployment.NewMemoryAddressBook()
+	ab := cldf.NewMemoryAddressBook()
 	// Note we also deploy the cap reg.
 	_, err = deployHomeChain(env.Logger, env, ab, env.Chains[cfg.HomeChainSel], cfg.RMNStaticConfig, cfg.RMNDynamicConfig, cfg.NodeOperators, cfg.NodeP2PIDsPerNodeOpAdmin)
 	if err != nil {
@@ -117,7 +118,7 @@ func (c DeployHomeChainConfig) Validate() error {
 func deployCapReg(
 	lggr logger.Logger,
 	state changeset.CCIPOnChainState,
-	ab deployment.AddressBook,
+	ab cldf.AddressBook,
 	chain deployment.Chain,
 ) (*deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry], error) {
 	homeChainState, exists := state.Chains[chain.Selector]
@@ -126,7 +127,7 @@ func deployCapReg(
 		if cr != nil {
 			lggr.Infow("Found CapabilitiesRegistry in chain state", "address", cr.Address().String())
 			return &deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
-				Address: cr.Address(), Contract: cr, Tv: deployment.NewTypeAndVersion(changeset.CapabilitiesRegistry, deployment.Version1_0_0),
+				Address: cr.Address(), Contract: cr, Tv: cldf.NewTypeAndVersion(changeset.CapabilitiesRegistry, deployment.Version1_0_0),
 			}, nil
 		}
 	}
@@ -137,7 +138,7 @@ func deployCapReg(
 				chain.Client,
 			)
 			return deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
-				Address: crAddr, Contract: cr, Tv: deployment.NewTypeAndVersion(changeset.CapabilitiesRegistry, deployment.Version1_0_0), Tx: tx, Err: err2,
+				Address: crAddr, Contract: cr, Tv: cldf.NewTypeAndVersion(changeset.CapabilitiesRegistry, deployment.Version1_0_0), Tx: tx, Err: err2,
 			}
 		})
 	if err != nil {
@@ -150,7 +151,7 @@ func deployCapReg(
 func deployHomeChain(
 	lggr logger.Logger,
 	e deployment.Environment,
-	ab deployment.AddressBook,
+	ab cldf.AddressBook,
 	chain deployment.Chain,
 	rmnHomeStatic rmn_home.RMNHomeStaticConfig,
 	rmnHomeDynamic rmn_home.RMNHomeDynamicConfig,
@@ -183,7 +184,7 @@ func deployHomeChain(
 					capReg.Address,
 				)
 				return deployment.ContractDeploy[*ccip_home.CCIPHome]{
-					Address: ccAddr, Tv: deployment.NewTypeAndVersion(changeset.CCIPHome, deployment.Version1_6_0), Tx: tx, Err: err2, Contract: cc,
+					Address: ccAddr, Tv: cldf.NewTypeAndVersion(changeset.CCIPHome, deployment.Version1_6_0), Tx: tx, Err: err2, Contract: cc,
 				}
 			})
 		if err != nil {
@@ -204,7 +205,7 @@ func deployHomeChain(
 					chain.Client,
 				)
 				return deployment.ContractDeploy[*rmn_home.RMNHome]{
-					Address: rmnAddr, Tv: deployment.NewTypeAndVersion(changeset.RMNHome, deployment.Version1_6_0), Tx: tx, Err: err2, Contract: rmn,
+					Address: rmnAddr, Tv: cldf.NewTypeAndVersion(changeset.RMNHome, deployment.Version1_6_0), Tx: tx, Err: err2, Contract: rmn,
 				}
 			},
 		)

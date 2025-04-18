@@ -5,6 +5,7 @@ import (
 	"maps"
 	"slices"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 )
@@ -19,7 +20,7 @@ type DeployBalanceReaderRequest struct {
 // callers must merge the output addressbook with the existing one
 func DeployBalanceReader(env deployment.Environment, cfg DeployBalanceReaderRequest) (deployment.ChangesetOutput, error) {
 	lggr := env.Logger
-	ab := deployment.NewMemoryAddressBook()
+	ab := cldf.NewMemoryAddressBook()
 	selectors := cfg.ChainSelectors
 	if len(selectors) == 0 {
 		selectors = slices.Collect(maps.Keys(env.Chains))
