@@ -3,7 +3,6 @@ package evm
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commonservices "github.com/smartcontractkit/chainlink-common/pkg/services"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -23,14 +22,11 @@ func NewEVMChain(_ context.Context, lggr logger.Logger, txm evmtxmgr.TxManager) 
 	}, nil
 }
 
-func (e *EVMChain) ReadContract(ctx context.Context, method string, encodedParams []byte) ([]byte, error) {
-	return nil, errors.New("yet to implement")
-}
-
 // GetTransactionFee retrieves the fee of a transaction in the underlying chain's TXM
 func (e *EVMChain) GetTransactionFee(ctx context.Context, transactionID string) (*commontypes.TransactionFee, error) {
 	return e.txm.GetTransactionFee(ctx, transactionID)
 }
+
 func (e *EVMChain) Close() error {
 	return e.StopOnce(e.Name(), func() error {
 		return nil
