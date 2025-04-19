@@ -787,7 +787,7 @@ func MatchTokenToTokenPool(ctx context.Context, client *rpc.Client, tokenPubKey 
 
 	tokenPoolPubKeyStrs := make([]string, len(tokenPoolPubKeys))
 	for i, tokenPoolPubKey := range tokenPoolPubKeys {
-		tokenPoolPubKeyStrs[i] = tokenPoolPubKey.String()
+		tokenPoolPubKeyStrs[i] = "'" + tokenPoolPubKey.String() + "'"
 	}
 
 	msg := "token with public key '%s' is not associated with any of the following token pools: [ %s ]"
