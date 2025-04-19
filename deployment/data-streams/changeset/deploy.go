@@ -40,7 +40,6 @@ func DeployContractV2[C Contract](
 	e deployment.Environment,
 	dataStore ds.MutableDataStore[SerializedContractMetadata, ds.DefaultMetadata],
 	metadata SerializedContractMetadata,
-	ab deployment.AddressBook,
 	chain deployment.Chain,
 	deployFn ContractDeployFn[C],
 ) (*ContractDeployment[C], error) {
@@ -78,13 +77,6 @@ func DeployContractV2[C Contract](
 		},
 	); err != nil {
 		return nil, fmt.Errorf("failed to save contract metadata: %w", err)
-	}
-
-	// Maintained for some existing backwards compatibility. Remove after fully migrated to datastore
-	err = ab.Save(chain.Selector, contractDeployment.Address.String(), contractDeployment.Tv)
-	if err != nil {
-		e.Logger.Errorw("Failed to save contract address", "err", err)
-		return nil, err
 	}
 
 	return contractDeployment, nil

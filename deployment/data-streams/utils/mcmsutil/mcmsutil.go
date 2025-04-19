@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
+	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
 	"github.com/smartcontractkit/mcms"
 	mcmslib "github.com/smartcontractkit/mcms"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
@@ -97,34 +99,41 @@ func ExecuteOrPropose(
 
 // TransferToMCMSWithTimelockForTypeAndVersion transfers ownership of the contracts of a specific type and version to the
 // MCMS timelock on that chain. The output will contain an MCMS timelock proposal for "AcceptOwnership" of those contracts
-// The address book should be recently deployed addresses that are being transferred to MCMS and should not be in e.ExistingAddresses
-func TransferToMCMSWithTimelockForTypeAndVersion(e deployment.Environment, ab deployment.AddressBook,
+// The dataStore should be recently deployed addresses that are being transferred to MCMS and
+// should not be in `e` Environment
+func TransferToMCMSWithTimelockForTypeAndVersion(e deployment.Environment,
+	dataStore *ds.MemoryDataStore[changeset.SerializedContractMetadata, ds.DefaultMetadata],
 	filter deployment.TypeAndVersion, mcmsConfig proposalutils.TimelockConfig) (deployment.ChangesetOutput, error) {
+	// Map: chainselector -> List[Address]
 	contractAddresses := make(map[uint64][]common.Address)
-	addresses, err := ab.Addresses()
-	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get addresses from address book: %w", err)
+
+	records := dataStore.Addresses().Filter(
+		ds.AddressRefByType(ds.ContractType(filter.Type)),
+		ds.AddressRefByVersion(&filter.Version),
+	)
+
+	for _, addressRef := range records {
+		chainSelector := addressRef.ChainSelector
+		contractAddresses[chainSelector] = append(contractAddresses[chainSelector], common.HexToAddress(addressRef.Address))
 	}
 
-	for chainSelector, addressToTypeAndVersion := range addresses {
-		for address, typeAndVersion := range addressToTypeAndVersion {
-			if typeAndVersion.Type == filter.Type && typeAndVersion.Version == filter.Version {
-				contractAddresses[chainSelector] = append(contractAddresses[chainSelector], common.HexToAddress(address))
-			}
+	// Adapter: Convert from DataStore -> AddressBook is needed for TransferToMCMSWithTimelockV2 changeset
+	// This should be removed once the changeset is updated to use the DataStore directly
+	newAndExistingAddresses := deployment.NewMemoryAddressBook()
+	for _, addressRef := range records {
+		typeAndVersion := deployment.NewTypeAndVersion(deployment.ContractType(addressRef.Type), *addressRef.Version)
+		err := newAndExistingAddresses.Save(addressRef.ChainSelector, addressRef.Address, typeAndVersion)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to save addressRef to addressbook: %w", err)
 		}
 	}
-
 	// create a merged addressbook with the existing + new addresses. Sub-changesets will need all addresses
 	// This is required when chaining together changesets
-	abTemp := deployment.NewMemoryAddressBook()
-	if err := abTemp.Merge(ab); err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed merging new addresses into temp addresses: %w", err)
-	}
-	if err := abTemp.Merge(e.ExistingAddresses); err != nil {
+	// Need addresses from Env (the timelock ones)
+	if err := newAndExistingAddresses.Merge(e.ExistingAddresses); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed merging existing addresses into temp addresses: %w", err)
 	}
-
-	e.ExistingAddresses = abTemp
+	e.ExistingAddresses = newAndExistingAddresses
 
 	transferCs := deployment.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelockV2)
 	transferCfg := commonchangeset.TransferToMCMSWithTimelockConfig{
@@ -137,8 +146,8 @@ func TransferToMCMSWithTimelockForTypeAndVersion(e deployment.Environment, ab de
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer contracts to MCMS: %w", err)
 	}
 
+	// TODO consider to make this return the timelock proposals
 	return deployment.ChangesetOutput{
-		AddressBook:           ab,
 		MCMSTimelockProposals: transferOut.MCMSTimelockProposals,
 	}, nil
 }

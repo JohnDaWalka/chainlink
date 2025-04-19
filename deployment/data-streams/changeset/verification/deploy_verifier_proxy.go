@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
+	"github.com/smartcontractkit/mcms"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/verifier_proxy_v0_5_0"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -49,26 +50,26 @@ func (cfg DeployVerifierProxyConfig) Validate() error {
 }
 
 func (v *verifierProxyDeploy) Apply(e deployment.Environment, cc DeployVerifierProxyConfig) (deployment.ChangesetOutput, error) {
-	// Create an in-memory data store to store the  address references, contract metadata and env metadata changes.
+	// Create an in-memory data store to store the address references, contract metadata fow newly deployed contracts
 	dataStore := ds.NewMemoryDataStore[
 		changeset.SerializedContractMetadata,
 		ds.DefaultMetadata,
 	]()
 
-	ab := deployment.NewMemoryAddressBook()
-	err := deploy(e, dataStore, ab, cc)
+	err := deploy(e, dataStore, cc)
 	if err != nil {
 		e.Logger.Errorw("Failed to deploy VerifierProxy", "err", err)
 		return deployment.ChangesetOutput{}, deployment.MaybeDataErr(err)
 	}
 
-	// TODO make addressbook here from the data store
-	//ab := dataStore.AddressRefStore.Records
-	//deployment.NewMemoryAddressBookFromMap()
-
+	var proposals []mcms.TimelockProposal
 	if cc.Ownership.ShouldTransfer && cc.Ownership.MCMSProposalConfig != nil {
 		filter := deployment.NewTypeAndVersion(types.VerifierProxy, deployment.Version0_5_0)
-		return mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, ab, filter, *cc.Ownership.MCMSProposalConfig)
+		res, err := mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, dataStore, filter, *cc.Ownership.MCMSProposalConfig)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
+		}
+		proposals = res.MCMSTimelockProposals
 	}
 
 	sealedDs, err := ds.ToDefault(dataStore.Seal())
@@ -77,8 +78,8 @@ func (v *verifierProxyDeploy) Apply(e deployment.Environment, cc DeployVerifierP
 	}
 
 	return deployment.ChangesetOutput{
-		AddressBook: ab, // TODO remove
-		DataStore:   sealedDs,
+		DataStore:             sealedDs,
+		MCMSTimelockProposals: proposals,
 	}, nil
 }
 
@@ -91,7 +92,6 @@ func (v *verifierProxyDeploy) VerifyPreconditions(_ deployment.Environment, cc D
 
 func deploy(e deployment.Environment,
 	dataStore ds.MutableDataStore[changeset.SerializedContractMetadata, ds.DefaultMetadata],
-	ab deployment.AddressBook,
 	cfg DeployVerifierProxyConfig) error {
 	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("invalid DeployVerifierProxyConfig: %w", err)
@@ -111,7 +111,7 @@ func deploy(e deployment.Environment,
 		}
 
 		deployProxy := cfg.ChainsToDeploy[chainSel]
-		_, err = changeset.DeployContractV2[*verifier_proxy_v0_5_0.VerifierProxy](e, dataStore, serialized, ab, chain, verifyProxyDeployFn(deployProxy))
+		_, err = changeset.DeployContractV2[*verifier_proxy_v0_5_0.VerifierProxy](e, dataStore, serialized, chain, verifyProxyDeployFn(deployProxy))
 		if err != nil {
 			return fmt.Errorf("failed to deploy verifier proxy: %w", err)
 		}
