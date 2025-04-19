@@ -16260,6 +16260,9 @@ BlockHistoryBatchLoadSize = 20 # Default
 ComputeUnitLimitDefault = 200_000 # Default
 EstimateComputeUnitLimit = false # Default
 LogPollerStartingLookback = '24h0m0s' # Default
+LogPollerMaxRetries = 18 # Default
+LogPollerLargeQueueNotify = 200 #default
+LogPollerWorkerCount = 8 # Default
 ```
 
 
@@ -16424,7 +16427,25 @@ EstimateComputeUnitLimit enables or disables compute unit limit estimations per 
 ```toml
 LogPollerStartingLookback = '24h0m0s' # Default
 ```
-LogPollerStartingLookback
+LogPollerStartingLookback determines how long the node can be down for without missing any logs when it comes back online. A shorter lookback window allows a node which has been down for a long period of time to catch up quickly. A longer lookback window will result in fewer logs missed (eg. none, if the downtime did not exceed the lookback window) but take longer for the node to get caught up. 
+
+### LogPollerMaxRetries
+```
+LogPollerMaxRetries = 18 # Default
+```
+LogPollerMaxRetries specifies how many times LogPoller will retry fetching slots or logs after an error. The wait timeout between each retry doubles after each retry, starting at 100ms. Default of 18 retries will only give up after ~ 14 hours.  
+
+### LogPollerLargeQueueNotify
+```
+LogPollerLargeQueueNotify = 200 #default
+```
+LogPollerLargeQueueNotify is the min threshold queue size at which Solana LogPoller starts warning of a large queue. This may need to be adjusted based on available system resources.  
+
+### LogPollerWorkerCount
+```
+LogPollerWorkerCount = 8 # Default
+```
+LogPollerWorkerCount determines how many concurrent worker threads Solana LogPoller uses to fetch logs.
 
 ## Solana.MultiNode
 ```toml
