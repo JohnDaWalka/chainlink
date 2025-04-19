@@ -36,10 +36,10 @@ func TestContractMetadata(t *testing.T) {
 
 	// Later, retrieve and deserialize
 	retrievedSerialized := contractMetadata.Metadata
-	retrievedVerifier, err := retrievedSerialized.ToVerifierMetadata()
-	if err != nil {
-		// handle error
-	}
+	//retrievedVerifier, err := retrievedSerialized.ToVerifierMetadata()
+	//if err != nil {
+	//	// handle error
+	//}
 
 	//vpm := verification.VerifierProxyMetadata{
 	//	AccessControllerAddress: "0x123",

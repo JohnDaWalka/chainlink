@@ -6,10 +6,9 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
-
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
+	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/verifier_proxy_v0_5_0"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -50,20 +49,36 @@ func (cfg DeployVerifierProxyConfig) Validate() error {
 }
 
 func (v *verifierProxyDeploy) Apply(e deployment.Environment, cc DeployVerifierProxyConfig) (deployment.ChangesetOutput, error) {
+	// Create an in-memory data store to store the  address references, contract metadata and env metadata changes.
+	dataStore := ds.NewMemoryDataStore[
+		changeset.SerializedContractMetadata,
+		ds.DefaultMetadata,
+	]()
+
 	ab := deployment.NewMemoryAddressBook()
-	err := deploy(e, ab, cc)
+	err := deploy(e, dataStore, ab, cc)
 	if err != nil {
-		e.Logger.Errorw("Failed to deploy VerifierProxy", "err", err, "addresses", ab)
-		return deployment.ChangesetOutput{AddressBook: ab}, deployment.MaybeDataErr(err)
+		e.Logger.Errorw("Failed to deploy VerifierProxy", "err", err)
+		return deployment.ChangesetOutput{}, deployment.MaybeDataErr(err)
 	}
+
+	// TODO make addressbook here from the data store
+	//ab := dataStore.AddressRefStore.Records
+	//deployment.NewMemoryAddressBookFromMap()
 
 	if cc.Ownership.ShouldTransfer && cc.Ownership.MCMSProposalConfig != nil {
 		filter := deployment.NewTypeAndVersion(types.VerifierProxy, deployment.Version0_5_0)
 		return mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, ab, filter, *cc.Ownership.MCMSProposalConfig)
 	}
 
+	sealedDs, err := ds.ToDefault(dataStore.Seal())
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to default format: %w", err)
+	}
+
 	return deployment.ChangesetOutput{
-		AddressBook: ab,
+		AddressBook: ab, // TODO remove
+		DataStore:   sealedDs,
 	}, nil
 }
 
@@ -74,35 +89,31 @@ func (v *verifierProxyDeploy) VerifyPreconditions(_ deployment.Environment, cc D
 	return nil
 }
 
-func deploy(e deployment.Environment, ab deployment.AddressBook, cfg DeployVerifierProxyConfig) error {
+func deploy(e deployment.Environment,
+	dataStore ds.MutableDataStore[changeset.SerializedContractMetadata, ds.DefaultMetadata],
+	ab deployment.AddressBook,
+	cfg DeployVerifierProxyConfig) error {
 	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("invalid DeployVerifierProxyConfig: %w", err)
 	}
 
-	for chainSel := range cfg.ChainsToDeploy {
+	for chainSel, chainCfg := range cfg.ChainsToDeploy {
 		chain, ok := e.Chains[chainSel]
 		if !ok {
 			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}
+		verifierProxyMetadata := changeset.VerifierProxyMetadata{
+			AccessControllerAddress: chainCfg.AccessControllerAddress.String(),
+		}
+		serialized, err := changeset.NewVerifierProxyMetadata(verifierProxyMetadata)
+		if err != nil {
+			return fmt.Errorf("failed to serialize verifier metadata: %w", err)
+		}
+
 		deployProxy := cfg.ChainsToDeploy[chainSel]
-		_, err := changeset.DeployContract[*verifier_proxy_v0_5_0.VerifierProxy](e, ab, chain, verifyProxyDeployFn(deployProxy))
+		_, err = changeset.DeployContractV2[*verifier_proxy_v0_5_0.VerifierProxy](e, dataStore, serialized, ab, chain, verifyProxyDeployFn(deployProxy))
 		if err != nil {
-			return err
-		}
-		chainAddresses, err := ab.AddressesForChain(chain.Selector)
-		if err != nil {
-			e.Logger.Errorw("Failed to get chain addresses", "err", err)
-			return err
-		}
-		chainState, err := changeset.LoadChainState(e.Logger, chain, chainAddresses)
-		if err != nil {
-			e.Logger.Errorw("Failed to load chain state", "err", err)
-			return err
-		}
-		if len(chainState.VerifierProxys) == 0 {
-			errNoCCS := errors.New("no VerifierProxy on chain")
-			e.Logger.Error(errNoCCS)
-			return errNoCCS
+			return fmt.Errorf("failed to deploy verifier proxy: %w", err)
 		}
 	}
 

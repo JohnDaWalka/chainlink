@@ -32,12 +32,12 @@ func TestDeployVerifierProxy(t *testing.T) {
 		Version: *semver.MustParse("0.5.0"),
 	}
 
-	e, err := commonChangesets.Apply(t, testEnv.Environment, testEnv.Timelocks,
+	e, _, err := commonChangesets.ApplyChangesetsV2(t, testEnv.Environment, []commonChangesets.ConfiguredChangeSet{
 		commonChangesets.Configure(
 			DeployVerifierProxyChangeset,
 			cc,
 		),
-	)
+	})
 	require.NoError(t, err)
 
 	verifierProxyAddr, err := dsutil.MaybeFindEthAddress(e.ExistingAddresses, testutil.TestChain.Selector, types.VerifierProxy)
@@ -48,4 +48,5 @@ func TestDeployVerifierProxy(t *testing.T) {
 	owner, _, err := commonChangesets.LoadOwnableContract(verifierProxyAddr, chain.Client)
 	require.NoError(t, err)
 	require.Equal(t, testEnv.Timelocks[testutil.TestChain.Selector].Timelock.Address(), owner)
+
 }
