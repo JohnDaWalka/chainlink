@@ -20,7 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
-	ccipchangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/message_hasher"
@@ -54,6 +53,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
 	solCommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
 	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
@@ -83,6 +83,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 )
 
 const (
@@ -398,14 +399,6 @@ func TestSendRequest(
 	return msgSentEvent
 }
 
-type CCIPSendReqSolOpts struct {
-	TokenToTokenPoolType map[solana.PublicKey]deployment.ContractType
-}
-
-type CCIPSendReqOpts struct {
-	Solana CCIPSendReqSolOpts
-}
-
 type CCIPSendReqConfig struct {
 	SourceChain  uint64
 	DestChain    uint64
@@ -413,7 +406,6 @@ type CCIPSendReqConfig struct {
 	Sender       *bind.TransactOpts
 	Message      any
 	MaxRetries   int // Number of retries for errors (excluding insufficient fee errors)
-	Options      CCIPSendReqOpts
 }
 
 type SendReqOpts func(*CCIPSendReqConfig)
@@ -459,12 +451,6 @@ func WithSourceChain(sourceChain uint64) SendReqOpts {
 func WithDestChain(destChain uint64) SendReqOpts {
 	return func(c *CCIPSendReqConfig) {
 		c.DestChain = destChain
-	}
-}
-
-func WithSolOptions(opts CCIPSendReqSolOpts) SendReqOpts {
-	return func(c *CCIPSendReqConfig) {
-		c.Options.Solana = opts
 	}
 }
 
@@ -542,13 +528,17 @@ func SendRequestSol(
 	state changeset.CCIPOnChainState,
 	cfg *CCIPSendReqConfig,
 ) (*onramp.OnRampCCIPMessageSent, error) { // TODO: chain independent return vailue
+	ctx := e.GetContext()
+
 	s := state.SolChains[cfg.SourceChain]
+	c := e.SolChains[cfg.SourceChain]
 
+	destinationChainSelector := cfg.DestChain
 	message := cfg.Message.(ccip_router.SVM2AnyMessage)
+	client := c.Client
 
-	// Set default sender if not provided
-	// TODO: sender from cfg is ignored for now
-	sender := e.SolChains[cfg.SourceChain].DeployerKey
+	// TODO: sender from cfg is EVM specific - need to revisit for Solana
+	sender := c.DeployerKey
 
 	// if fee token is 0, fallback to WSOL
 	if message.FeeToken.IsZero() {
@@ -556,12 +546,7 @@ func SendRequestSol(
 	}
 
 	e.Logger.Infof("Sending CCIP request from chain selector %d to chain selector %d from sender %s",
-		cfg.SourceChain, cfg.DestChain, sender.String())
-
-	client := e.SolChains[cfg.SourceChain].Client
-	ctx := e.GetContext()
-
-	destinationChainSelector := cfg.DestChain
+		cfg.SourceChain, cfg.DestChain, sender.PublicKey().String())
 
 	destinationChainStatePDA, err := solstate.FindDestChainStatePDA(destinationChainSelector, s.Router)
 	if err != nil {
@@ -644,29 +629,16 @@ func SendRequestSol(
 	solconfig.FeeQuoterProgram = s.FeeQuoter
 	solconfig.CcipRouterProgram = s.Router
 
-	tokenPoolTypeToAddress := map[deployment.ContractType]solana.PublicKey{
-		ccipchangeset.LockReleaseTokenPool: s.LockReleaseTokenPool,
-		ccipchangeset.BurnMintTokenPool:    s.BurnMintTokenPool,
-	}
-
 	// Append token accounts to the account metas
 	for _, tokenAmount := range message.TokenAmounts {
-		tokenPoolPubKey := s.BurnMintTokenPool
-		token := tokenAmount.Token
+		tokenPubKey := tokenAmount.Token
 
-		// TODO: can we infer this from onchain state?
-		tokenPoolType := cfg.Options.Solana.TokenToTokenPoolType[token]
-		if pubKey, exists := tokenPoolTypeToAddress[tokenPoolType]; exists {
-			tokenPoolPubKey = pubKey
-		} else {
-			if tokenPoolType == "" {
-				e.Logger.Warnf("no token pool type specified for token '%s' - defaulting to BurnAndMint", tokenAmount.Token.String())
-			} else {
-				e.Logger.Warnf("token pool type '%s' is not supported - defaulting to BurnAndMint", tokenPoolType)
-			}
+		tokenPoolPubKey, err := MatchTokenToTokenPool(ctx, client, tokenPubKey, []solana.PublicKey{s.LockReleaseTokenPool, s.BurnMintTokenPool})
+		if err != nil {
+			return nil, err
 		}
 
-		tokenPool, err := soltokens.NewTokenPool(solana.Token2022ProgramID, tokenPoolPubKey, token)
+		tokenPool, err := soltokens.NewTokenPool(solana.Token2022ProgramID, tokenPoolPubKey, tokenPubKey)
 		if err != nil {
 			return nil, err
 		}
@@ -682,21 +654,21 @@ func SendRequestSol(
 
 		// invalid config account, maybe this billing stuff isn't right
 
-		chainPDA, _, err := soltokens.TokenPoolChainConfigPDA(cfg.DestChain, token, tokenPoolPubKey)
+		chainPDA, _, err := soltokens.TokenPoolChainConfigPDA(cfg.DestChain, tokenPubKey, tokenPoolPubKey)
 		if err != nil {
 			return nil, err
 		}
 
 		tokenPool.Chain[cfg.DestChain] = chainPDA
 
-		billingPDA, _, err := solstate.FindFqPerChainPerTokenConfigPDA(cfg.DestChain, token, s.FeeQuoter)
+		billingPDA, _, err := solstate.FindFqPerChainPerTokenConfigPDA(cfg.DestChain, tokenPubKey, s.FeeQuoter)
 		if err != nil {
 			return nil, err
 		}
 
 		tokenPool.Billing[cfg.DestChain] = billingPDA
 
-		userTokenAccount, _, err := soltokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, token, sender.PublicKey())
+		userTokenAccount, _, err := soltokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, tokenPubKey, sender.PublicKey())
 		if err != nil {
 			return nil, err
 		}
@@ -792,6 +764,34 @@ func ConvertSolanaCrossChainAmountToBigInt(amount ccip_router.CrossChainAmount) 
 	bytes := amount.LeBytes[:]
 	slices.Reverse(bytes) // convert to big-endian
 	return big.NewInt(0).SetBytes(bytes)
+}
+
+func MatchTokenToTokenPool(ctx context.Context, client *rpc.Client, tokenPubKey solana.PublicKey, tokenPoolPubKeys solana.PublicKeySlice) (solana.PublicKey, error) {
+	for _, tokenPoolPubKey := range tokenPoolPubKeys {
+		tokenPoolConfigAddress, err := soltokens.TokenPoolConfigAddress(tokenPubKey, tokenPoolPubKey)
+		if err != nil {
+			return solana.PublicKey{}, err
+		}
+
+		var tokenPoolConfig base_token_pool.BaseConfig
+		err = solcommon.GetAccountDataBorshInto(ctx, client, tokenPoolConfigAddress, solconfig.DefaultCommitment, &tokenPoolConfig)
+		if errors.Is(err, rpc.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return solana.PublicKey{}, err
+		}
+
+		return tokenPoolPubKey, nil
+	}
+
+	tokenPoolPubKeyStrs := make([]string, len(tokenPoolPubKeys))
+	for i, tokenPoolPubKey := range tokenPoolPubKeys {
+		tokenPoolPubKeyStrs[i] = tokenPoolPubKey.String()
+	}
+
+	msg := "token with public key '%s' is not associated with any of the following token pools: [ %s ]"
+	return solana.PublicKey{}, fmt.Errorf(msg, tokenPubKey.String(), strings.Join(tokenPoolPubKeyStrs, ", "))
 }
 
 // MakeEVMExtraArgsV2 creates the extra args for the EVM2Any message that is destined
