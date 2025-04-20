@@ -1,4 +1,4 @@
-package changeset
+package metadata
 
 import (
 	"encoding/json"
@@ -98,6 +98,6 @@ func NewVerifierProxyMetadata(metadata VerifierProxyMetadata) (SerializedContrac
 	}
 
 	return SerializedContractMetadata{
-		Type:    dstypes.VerifierProxy.String(),		Content: content,
+		Type: dstypes.VerifierProxy.String(), Content: content,
 	}, nil
 }

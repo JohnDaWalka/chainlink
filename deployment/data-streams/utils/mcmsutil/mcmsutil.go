@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
 	"github.com/smartcontractkit/mcms"
 	mcmslib "github.com/smartcontractkit/mcms"
@@ -102,7 +102,7 @@ func ExecuteOrPropose(
 // The dataStore should be recently deployed addresses that are being transferred to MCMS and
 // should not be in `e` Environment
 func TransferToMCMSWithTimelockForTypeAndVersion(e deployment.Environment,
-	dataStore *ds.MemoryDataStore[changeset.SerializedContractMetadata, ds.DefaultMetadata],
+	dataStore *ds.MemoryDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata],
 	filter deployment.TypeAndVersion, mcmsConfig proposalutils.TimelockConfig) (deployment.ChangesetOutput, error) {
 	// Map: chainselector -> List[Address]
 	contractAddresses := make(map[uint64][]common.Address)
@@ -146,7 +146,6 @@ func TransferToMCMSWithTimelockForTypeAndVersion(e deployment.Environment,
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer contracts to MCMS: %w", err)
 	}
 
-	// TODO consider to make this return the timelock proposals
 	return deployment.ChangesetOutput{
 		MCMSTimelockProposals: transferOut.MCMSTimelockProposals,
 	}, nil

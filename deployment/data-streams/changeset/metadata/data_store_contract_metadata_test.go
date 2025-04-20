@@ -1,4 +1,4 @@
-package changeset
+package metadata
 
 import (
 	"testing"

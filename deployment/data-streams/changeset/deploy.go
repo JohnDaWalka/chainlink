@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
 )
 
@@ -38,8 +39,8 @@ var _ deployment.ChangeSetV2[DeployChannelConfigStoreConfig] = DeployChannelConf
 // DeployContractV2 deploys a contract and saves the address to datastore.
 func DeployContractV2[C Contract](
 	e deployment.Environment,
-	dataStore ds.MutableDataStore[SerializedContractMetadata, ds.DefaultMetadata],
-	metadata SerializedContractMetadata,
+	dataStore ds.MutableDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata],
+	contractMetadata metadata.SerializedContractMetadata,
 	chain deployment.Chain,
 	deployFn ContractDeployFn[C],
 ) (*ContractDeployment[C], error) {
@@ -70,10 +71,10 @@ func DeployContractV2[C Contract](
 
 	// Add a new ContractMetadata entry for the newly deployed contract
 	if err = dataStore.ContractMetadata().Add(
-		ds.ContractMetadata[SerializedContractMetadata]{
+		ds.ContractMetadata[metadata.SerializedContractMetadata]{
 			ChainSelector: chain.Selector,
 			Address:       contractDeployment.Address.String(),
-			Metadata:      metadata,
+			Metadata:      contractMetadata,
 		},
 	); err != nil {
 		return nil, fmt.Errorf("failed to save contract metadata: %w", err)

@@ -7,6 +7,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
 	"github.com/smartcontractkit/mcms"
@@ -52,7 +53,7 @@ func (cfg DeployVerifierProxyConfig) Validate() error {
 func (v *verifierProxyDeploy) Apply(e deployment.Environment, cc DeployVerifierProxyConfig) (deployment.ChangesetOutput, error) {
 	// Create an in-memory data store to store the address references, contract metadata fow newly deployed contracts
 	dataStore := ds.NewMemoryDataStore[
-		changeset.SerializedContractMetadata,
+		metadata.SerializedContractMetadata,
 		ds.DefaultMetadata,
 	]()
 
@@ -91,7 +92,7 @@ func (v *verifierProxyDeploy) VerifyPreconditions(_ deployment.Environment, cc D
 }
 
 func deploy(e deployment.Environment,
-	dataStore ds.MutableDataStore[changeset.SerializedContractMetadata, ds.DefaultMetadata],
+	dataStore ds.MutableDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata],
 	cfg DeployVerifierProxyConfig) error {
 	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("invalid DeployVerifierProxyConfig: %w", err)
@@ -102,10 +103,10 @@ func deploy(e deployment.Environment,
 		if !ok {
 			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}
-		verifierProxyMetadata := changeset.VerifierProxyMetadata{
+		verifierProxyMetadata := metadata.VerifierProxyMetadata{
 			AccessControllerAddress: chainCfg.AccessControllerAddress.String(),
 		}
-		serialized, err := changeset.NewVerifierProxyMetadata(verifierProxyMetadata)
+		serialized, err := metadata.NewVerifierProxyMetadata(verifierProxyMetadata)
 		if err != nil {
 			return fmt.Errorf("failed to serialize verifier metadata: %w", err)
 		}
