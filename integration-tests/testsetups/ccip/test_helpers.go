@@ -421,6 +421,10 @@ func CreateDockerEnv(t *testing.T, v1_6TestConfig *testhelpers.TestConfigs) (
 		WithChainlinkNodeLogScanner(logScannerSettings).
 		WithStandardCleanup()
 
+	if v1_6TestConfig.SkipCleanup {
+		builder = builder.WithoutCleanup()
+	}
+
 	// if private ethereum networks are provided, we will use them to create the test environment
 	// otherwise we will use the network URLs provided in the network config
 	if len(privateEthereumNetworks) > 0 {

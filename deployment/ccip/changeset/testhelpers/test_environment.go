@@ -94,6 +94,8 @@ type TestConfigs struct {
 	// to potentially override default configs.
 	ExtraConfigTomls []string
 	CLNodeConfigOpts []memory.ConfigOpt
+
+	SkipCleanup bool // skip cleanup of the environment
 }
 
 func (tc *TestConfigs) Validate() error {
@@ -141,6 +143,12 @@ type TestOps func(testCfg *TestConfigs)
 func WithLogMessagesToIgnore(logMessages []LogMessageToIgnore) TestOps {
 	return func(testCfg *TestConfigs) {
 		testCfg.LogMessagesToIgnore = logMessages
+	}
+}
+
+func WithSkipCleanUp() TestOps {
+	return func(testCfg *TestConfigs) {
+		testCfg.SkipCleanup = true
 	}
 }
 
