@@ -105,7 +105,7 @@ func TransferToMCMSWithTimelockForTypeAndVersion(e deployment.Environment,
 	dataStore *ds.MemoryDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata],
 	filter deployment.TypeAndVersion, mcmsConfig proposalutils.TimelockConfig) (deployment.ChangesetOutput, error) {
 	// Map: chainselector -> List[Address]
-	contractAddresses := make(map[uint64][]common.Address)
+	contractAddressesToTransfer := make(map[uint64][]common.Address)
 
 	records := dataStore.Addresses().Filter(
 		ds.AddressRefByType(ds.ContractType(filter.Type)),
@@ -114,19 +114,16 @@ func TransferToMCMSWithTimelockForTypeAndVersion(e deployment.Environment,
 
 	for _, addressRef := range records {
 		chainSelector := addressRef.ChainSelector
-		contractAddresses[chainSelector] = append(contractAddresses[chainSelector], common.HexToAddress(addressRef.Address))
+		contractAddressesToTransfer[chainSelector] = append(contractAddressesToTransfer[chainSelector], common.HexToAddress(addressRef.Address))
 	}
 
 	// Adapter: Convert from DataStore -> AddressBook is needed for TransferToMCMSWithTimelockV2 changeset
 	// This should be removed once the changeset is updated to use the DataStore directly
-	newAndExistingAddresses := deployment.NewMemoryAddressBook()
-	for _, addressRef := range records {
-		typeAndVersion := deployment.NewTypeAndVersion(deployment.ContractType(addressRef.Type), *addressRef.Version)
-		err := newAndExistingAddresses.Save(addressRef.ChainSelector, addressRef.Address, typeAndVersion)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to save addressRef to addressbook: %w", err)
-		}
+	newAndExistingAddresses, err := deployment.DataStoreToAddressBook(dataStore.Seal())
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to address book: %w", err)
 	}
+
 	// create a merged addressbook with the existing + new addresses. Sub-changesets will need all addresses
 	// This is required when chaining together changesets
 	// Need addresses from Env (the timelock ones)
@@ -137,7 +134,7 @@ func TransferToMCMSWithTimelockForTypeAndVersion(e deployment.Environment,
 
 	transferCs := deployment.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelockV2)
 	transferCfg := commonchangeset.TransferToMCMSWithTimelockConfig{
-		ContractsByChain: contractAddresses,
+		ContractsByChain: contractAddressesToTransfer,
 		MCMSConfig:       mcmsConfig,
 	}
 

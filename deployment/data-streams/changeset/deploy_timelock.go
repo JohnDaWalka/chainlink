@@ -9,8 +9,10 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
+	"github.com/smartcontractkit/chainlink/deployment/datastore"
 )
 
 var DeployAndTransferMCMSChangeset = deployment.CreateChangeSet(deployAndTransferMcmsLogic, deployAndTransferMcmsPrecondition)
@@ -39,12 +41,17 @@ func deployAndTransferMcmsLogic(e deployment.Environment, cc DeployMCMSConfig) (
 		commontypes.CancellerManyChainMultisig,
 	}
 
+	ds, err := deployment.AddressBookToNewDataStore[metadata.SerializedContractMetadata, datastore.DefaultMetadata](mcmsOut.AddressBook)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to address book: %w", err)
+	}
+
 	var proposals []mcms.TimelockProposal
 	if cc.Ownership.ShouldTransfer && cc.Ownership.MCMSProposalConfig != nil {
 		for _, contractType := range transferContracts {
 			// all MCMS contracts are version 1.0.0 right now
 			contractFilter := deployment.NewTypeAndVersion(contractType, deployment.Version1_0_0)
-			contractTransfer, err := mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, mcmsOut.AddressBook, contractFilter, *cc.Ownership.MCMSProposalConfig)
+			contractTransfer, err := mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, ds, contractFilter, *cc.Ownership.MCMSProposalConfig)
 			if err != nil {
 				return deployment.ChangesetOutput{AddressBook: mcmsOut.AddressBook}, fmt.Errorf("failed to transfer %s to MCMS: %w", contractType, err)
 			}

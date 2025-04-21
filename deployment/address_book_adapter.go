@@ -4,6 +4,9 @@ import "github.com/smartcontractkit/chainlink/deployment/datastore"
 
 // AddressBookToDataStore converts an AddressBook to a DataStore
 // AddressBook is deprecated and will be removed in the future. You can use this function to migrate or interact with legacy code that uses AddressBook.
+// You can call this with your custom metadata like this:
+//
+//	ds, err := deployment.AddressBookToDataStore[metadata.CustomContractMetaData, datastore.CustomEnvMetaData](addressBook)
 func AddressBookToDataStore[CM datastore.Cloneable[CM], EM datastore.Cloneable[EM]](ab AddressBook) (datastore.DataStore[CM, EM], error) {
 	ds := datastore.NewMemoryDataStore[CM, EM]()
 
