@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
+	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
 
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 
@@ -42,6 +44,10 @@ func (cc DeployFeeManagerConfig) Validate() error {
 
 func deployFeeManagerLogic(e deployment.Environment, cc DeployFeeManagerConfig) (deployment.ChangesetOutput, error) {
 	ab := deployment.NewMemoryAddressBook()
+	dataStore := ds.NewMemoryDataStore[
+		metadata.SerializedContractMetadata,
+		ds.DefaultMetadata,
+	]()
 	err := deployFeeManager(e, ab, cc)
 	if err != nil {
 		e.Logger.Errorw("Failed to deploy FeeManager", "err", err, "addresses", ab)
@@ -50,7 +56,7 @@ func deployFeeManagerLogic(e deployment.Environment, cc DeployFeeManagerConfig) 
 
 	if cc.Ownership.ShouldTransfer && cc.Ownership.MCMSProposalConfig != nil {
 		filter := deployment.NewTypeAndVersion(types.FeeManager, deployment.Version0_5_0)
-		return mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, ab, filter, *cc.Ownership.MCMSProposalConfig)
+		return mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, dataStore, filter, *cc.Ownership.MCMSProposalConfig)
 	}
 
 	return deployment.ChangesetOutput{

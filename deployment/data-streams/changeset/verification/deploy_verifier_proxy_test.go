@@ -3,15 +3,16 @@ package verification
 import (
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/datastore"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
-	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
-
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/testutil"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 )
@@ -21,7 +22,7 @@ func TestDeployVerifierProxy(t *testing.T) {
 
 	cc := DeployVerifierProxyConfig{
 		ChainsToDeploy: map[uint64]DeployVerifierProxy{
-			testutil.TestChain.Selector: {AccessControllerAddress: common.Address{}},
+			testutil.TestChain.Selector: {AccessControllerAddress: common.HexToAddress("0x001")},
 		},
 		Ownership: types.OwnershipSettings{
 			ShouldTransfer: true,
@@ -29,7 +30,7 @@ func TestDeployVerifierProxy(t *testing.T) {
 				MinDelay: 0,
 			},
 		},
-		Version: *semver.MustParse("0.5.0"),
+		Version: deployment.Version0_5_0,
 	}
 
 	e, _, err := commonChangesets.ApplyChangesetsV2(t, testEnv.Environment, []commonChangesets.ConfiguredChangeSet{
@@ -40,13 +41,36 @@ func TestDeployVerifierProxy(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	verifierProxyAddr, err := dsutil.MaybeFindEthAddress(e.ExistingAddresses, testutil.TestChain.Selector, types.VerifierProxy)
+	envDatastore, err := datastore.FromDefault[
+		metadata.SerializedContractMetadata,
+		datastore.DefaultMetadata,
+	](e.DataStore)
 	require.NoError(t, err)
 
-	chain := e.Chains[testutil.TestChain.Selector]
-
-	owner, _, err := commonChangesets.LoadOwnableContract(verifierProxyAddr, chain.Client)
+	// Verify Contract Is Deployed
+	record, err := envDatastore.Addresses().Get(
+		datastore.NewAddressRefKey(testutil.TestChain.Selector, datastore.ContractType(types.VerifierProxy), &deployment.Version0_5_0, ""),
+	)
 	require.NoError(t, err)
-	require.Equal(t, testEnv.Timelocks[testutil.TestChain.Selector].Timelock.Address(), owner)
+	require.NotNil(t, record)
+
+	// Store address for other tests
+	t.Run("VerifyMetadata", func(t *testing.T) {
+		cm, err := envDatastore.ContractMetadata().Get(
+			datastore.NewContractMetadataKey(record.ChainSelector, record.Address),
+		)
+		require.NoError(t, err)
+
+		vpm, err := cm.Metadata.ToVerifierProxyMetadata()
+		require.NoError(t, err)
+		assert.Equal(t, common.HexToAddress("0x001"), common.HexToAddress(vpm.AccessControllerAddress))
+	})
+
+	t.Run("VerifyOwnershipTransferred", func(t *testing.T) {
+		chain := e.Chains[testutil.TestChain.Selector]
+		owner, _, err := commonChangesets.LoadOwnableContract(common.HexToAddress(record.Address), chain.Client)
+		require.NoError(t, err)
+		assert.Equal(t, testEnv.Timelocks[testutil.TestChain.Selector].Timelock.Address(), owner)
+	})
 
 }

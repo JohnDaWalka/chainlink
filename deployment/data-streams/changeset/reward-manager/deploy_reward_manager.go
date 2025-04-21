@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
+	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
 
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 
@@ -39,6 +41,10 @@ func (cc DeployRewardManagerConfig) Validate() error {
 
 func deployRewardManagerLogic(e deployment.Environment, cc DeployRewardManagerConfig) (deployment.ChangesetOutput, error) {
 	ab := deployment.NewMemoryAddressBook()
+	dataStore := ds.NewMemoryDataStore[
+		metadata.SerializedContractMetadata,
+		ds.DefaultMetadata,
+	]()
 	err := deployRewardManager(e, ab, cc)
 	if err != nil {
 		e.Logger.Errorw("Failed to deploy RewardManager", "err", err, "addresses", ab)
@@ -47,7 +53,7 @@ func deployRewardManagerLogic(e deployment.Environment, cc DeployRewardManagerCo
 
 	if cc.Ownership.ShouldTransfer && cc.Ownership.MCMSProposalConfig != nil {
 		filter := deployment.NewTypeAndVersion(types.RewardManager, deployment.Version0_5_0)
-		return mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, ab, filter, *cc.Ownership.MCMSProposalConfig)
+		return mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, dataStore, filter, *cc.Ownership.MCMSProposalConfig)
 	}
 
 	return deployment.ChangesetOutput{

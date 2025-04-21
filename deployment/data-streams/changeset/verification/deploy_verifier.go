@@ -5,6 +5,9 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
+	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
+	"github.com/smartcontractkit/mcms"
 
 	verifier "github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/verifier_v0_5_0"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -37,19 +40,35 @@ func (cc DeployVerifierConfig) Validate() error {
 }
 
 func deployVerifierLogic(e deployment.Environment, cc DeployVerifierConfig) (deployment.ChangesetOutput, error) {
-	ab := deployment.NewMemoryAddressBook()
-	err := deployVerifier(e, ab, cc)
+	dataStore := ds.NewMemoryDataStore[
+		metadata.SerializedContractMetadata,
+		ds.DefaultMetadata,
+	]()
+	err := deployVerifier(e, dataStore, cc)
 	if err != nil {
-		e.Logger.Errorw("Failed to deploy Verifier", "err", err, "addresses", ab)
-		return deployment.ChangesetOutput{AddressBook: ab}, deployment.MaybeDataErr(err)
+		e.Logger.Errorw("Failed to deploy Verifier", "err", err)
+		return deployment.ChangesetOutput{}, deployment.MaybeDataErr(err)
 	}
 
+	var proposals []mcms.TimelockProposal
 	if cc.Ownership.ShouldTransfer && cc.Ownership.MCMSProposalConfig != nil {
 		filter := deployment.NewTypeAndVersion(types.Verifier, deployment.Version0_5_0)
-		return mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, ab, filter, *cc.Ownership.MCMSProposalConfig)
+		res, err := mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, dataStore, filter, *cc.Ownership.MCMSProposalConfig)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
+		}
+		proposals = res.MCMSTimelockProposals
 	}
 
-	return deployment.ChangesetOutput{AddressBook: ab}, nil
+	sealedDs, err := ds.ToDefault(dataStore.Seal())
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to default format: %w", err)
+	}
+
+	return deployment.ChangesetOutput{
+		DataStore:             sealedDs,
+		MCMSTimelockProposals: proposals,
+	}, nil
 }
 
 func deployVerifierPrecondition(_ deployment.Environment, cc DeployVerifierConfig) error {
@@ -60,35 +79,26 @@ func deployVerifierPrecondition(_ deployment.Environment, cc DeployVerifierConfi
 	return nil
 }
 
-func deployVerifier(e deployment.Environment, ab deployment.AddressBook, cc DeployVerifierConfig) error {
+func deployVerifier(e deployment.Environment, dataStore ds.MutableDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata], cc DeployVerifierConfig) error {
 	if err := cc.Validate(); err != nil {
 		return fmt.Errorf("invalid DeployVerifierConfig: %w", err)
 	}
 
-	for chainSel := range cc.ChainsToDeploy {
+	for chainSel, chainCfg := range cc.ChainsToDeploy {
 		chain, ok := e.Chains[chainSel]
 		if !ok {
 			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}
-		deployVerifier := cc.ChainsToDeploy[chainSel]
-		_, err := changeset.DeployContract(e, ab, chain, VerifierDeployFn(deployVerifier.VerifierProxyAddress))
-		if err != nil {
-			return err
+		verifierMetadata := metadata.VerifierMetadata{
+			VerifierProxyAddress: chainCfg.VerifierProxyAddress.String(),
 		}
-		chainAddresses, err := ab.AddressesForChain(chain.Selector)
+		serialized, err := metadata.NewVerifierMetadata(verifierMetadata)
 		if err != nil {
-			e.Logger.Errorw("Failed to get chain addresses", "err", err)
-			return err
+			return fmt.Errorf("failed to serialize verifier metadata: %w", err)
 		}
-		chainState, err := changeset.LoadChainState(e.Logger, chain, chainAddresses)
+		_, err = changeset.DeployContractV2(e, dataStore, serialized, chain, VerifierDeployFn(chainCfg.VerifierProxyAddress))
 		if err != nil {
-			e.Logger.Errorw("Failed to load chain state", "err", err)
-			return err
-		}
-		if len(chainState.Verifiers) == 0 {
-			errNoCCS := errors.New("no Verifier on chain")
-			e.Logger.Error(errNoCCS)
-			return errNoCCS
+			return fmt.Errorf("failed to deploy verifier: %w", err)
 		}
 	}
 

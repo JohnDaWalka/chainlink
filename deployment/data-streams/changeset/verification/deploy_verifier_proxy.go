@@ -108,11 +108,11 @@ func deploy(e deployment.Environment,
 		}
 		serialized, err := metadata.NewVerifierProxyMetadata(verifierProxyMetadata)
 		if err != nil {
-			return fmt.Errorf("failed to serialize verifier metadata: %w", err)
+			return fmt.Errorf("failed to serialize verifier proxy metadata: %w", err)
 		}
 
 		deployProxy := cfg.ChainsToDeploy[chainSel]
-		_, err = changeset.DeployContractV2[*verifier_proxy_v0_5_0.VerifierProxy](e, dataStore, serialized, chain, verifyProxyDeployFn(deployProxy))
+		_, err = changeset.DeployContractV2(e, dataStore, serialized, chain, verifyProxyDeployFn(deployProxy))
 		if err != nil {
 			return fmt.Errorf("failed to deploy verifier proxy: %w", err)
 		}
