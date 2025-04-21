@@ -9,16 +9,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-
-	"github.com/smartcontractkit/chainlink/deployment/common/changeset/example"
-	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/common/changeset/example"
+	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 )
@@ -56,154 +54,7 @@ func setupLinkTransferTestEnv(t *testing.T) deployment.Environment {
 	return env
 }
 
-// TestLinkTransferMCMS tests the LinkTransfer changeset by sending LINK from a timelock contract
-// to the deployer key via mcms proposal.
-func TestLinkTransferMCMS(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-
-	env := setupLinkTransferTestEnv(t)
-	chainSelector := env.AllChainSelectors()[0]
-	chain := env.Chains[chainSelector]
-	addrs, err := env.ExistingAddresses.AddressesForChain(chainSelector)
-	require.NoError(t, err)
-	require.Len(t, addrs, 6)
-
-	mcmsState, err := changeset.MaybeLoadMCMSWithTimelockChainState(chain, addrs)
-	require.NoError(t, err)
-	linkState, err := changeset.MaybeLoadLinkTokenChainState(chain, addrs)
-	require.NoError(t, err)
-	timelockAddress := mcmsState.Timelock.Address()
-
-	// Mint some funds
-	// grant minter permissions
-	tx, err := linkState.LinkToken.GrantMintRole(chain.DeployerKey, chain.DeployerKey.From)
-	require.NoError(t, err)
-	_, err = deployment.ConfirmIfNoError(chain, tx, err)
-	require.NoError(t, err)
-
-	tx, err = linkState.LinkToken.Mint(chain.DeployerKey, timelockAddress, big.NewInt(750))
-	require.NoError(t, err)
-	_, err = deployment.ConfirmIfNoError(chain, tx, err)
-	require.NoError(t, err)
-
-	timelocks := map[uint64]*proposalutils.TimelockExecutionContracts{
-		chainSelector: {
-			Timelock:  mcmsState.Timelock,
-			CallProxy: mcmsState.CallProxy,
-		},
-	}
-	// Apply the changeset
-	_, err = changeset.Apply(t, env, timelocks,
-		// the changeset produces proposals, ApplyChangesets will sign & execute them.
-		// in practice, signing and executing are separated processes.
-		changeset.Configure(
-			deployment.CreateLegacyChangeSet(example.LinkTransfer),
-			&example.LinkTransferConfig{
-				From: timelockAddress,
-				Transfers: map[uint64][]example.TransferConfig{
-					chainSelector: {
-						{
-							To:    chain.DeployerKey.From,
-							Value: big.NewInt(500),
-						},
-					},
-				},
-				McmsConfig: &proposalutils.TimelockConfig{
-					MinDelay:     0,
-					OverrideRoot: true,
-				},
-			},
-		),
-	)
-	require.NoError(t, err)
-
-	// Check new balances
-	endBalance, err := linkState.LinkToken.BalanceOf(&bind.CallOpts{Context: ctx}, chain.DeployerKey.From)
-	require.NoError(t, err)
-	expectedBalance := big.NewInt(500)
-	require.Equal(t, expectedBalance, endBalance)
-
-	// check timelock balance
-	endBalance, err = linkState.LinkToken.BalanceOf(&bind.CallOpts{Context: ctx}, timelockAddress)
-	require.NoError(t, err)
-	expectedBalance = big.NewInt(250)
-	require.Equal(t, expectedBalance, endBalance)
-}
-
-// TestLinkTransfer tests the LinkTransfer changeset by sending LINK from a timelock contract to the deployer key.
-func TestLinkTransfer(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-
-	env := setupLinkTransferTestEnv(t)
-	chainSelector := env.AllChainSelectors()[0]
-	chain := env.Chains[chainSelector]
-	addrs, err := env.ExistingAddresses.AddressesForChain(chainSelector)
-	require.NoError(t, err)
-	require.Len(t, addrs, 6)
-
-	mcmsState, err := changeset.MaybeLoadMCMSWithTimelockChainState(chain, addrs)
-	require.NoError(t, err)
-	linkState, err := changeset.MaybeLoadLinkTokenChainState(chain, addrs)
-	require.NoError(t, err)
-	timelockAddress := mcmsState.Timelock.Address()
-
-	// Mint some funds
-	// grant minter permissions
-	tx, err := linkState.LinkToken.GrantMintRole(chain.DeployerKey, chain.DeployerKey.From)
-	require.NoError(t, err)
-	_, err = deployment.ConfirmIfNoError(chain, tx, err)
-	require.NoError(t, err)
-
-	tx, err = linkState.LinkToken.Mint(chain.DeployerKey, chain.DeployerKey.From, big.NewInt(750))
-	require.NoError(t, err)
-	_, err = deployment.ConfirmIfNoError(chain, tx, err)
-	require.NoError(t, err)
-
-	timelocks := map[uint64]*proposalutils.TimelockExecutionContracts{
-		chainSelector: {
-			Timelock:  mcmsState.Timelock,
-			CallProxy: mcmsState.CallProxy,
-		},
-	}
-
-	// Apply the changeset
-	_, err = changeset.Apply(t, env, timelocks,
-		// the changeset produces proposals, ApplyChangesets will sign & execute them.
-		// in practice, signing and executing are separated processes.
-		changeset.Configure(
-			deployment.CreateLegacyChangeSet(example.LinkTransfer),
-			&example.LinkTransferConfig{
-				From: chain.DeployerKey.From,
-				Transfers: map[uint64][]example.TransferConfig{
-					chainSelector: {
-						{
-							To:    timelockAddress,
-							Value: big.NewInt(500),
-						},
-					},
-				},
-				// No MCMSConfig here means we'll execute the txs directly.
-			},
-		),
-	)
-	require.NoError(t, err)
-
-	// Check new balances
-	endBalance, err := linkState.LinkToken.BalanceOf(&bind.CallOpts{Context: ctx}, chain.DeployerKey.From)
-	require.NoError(t, err)
-	expectedBalance := big.NewInt(250)
-	require.Equal(t, expectedBalance, endBalance)
-
-	// check timelock balance
-	endBalance, err = linkState.LinkToken.BalanceOf(&bind.CallOpts{Context: ctx}, timelockAddress)
-	require.NoError(t, err)
-	expectedBalance = big.NewInt(500)
-	require.Equal(t, expectedBalance, endBalance)
-}
-
-func TestValidate(t *testing.T) {
+func Test_LinkTransferConfig_Validate(t *testing.T) {
 	env := setupLinkTransferTestEnv(t)
 	chainSelector := env.AllChainSelectors()[0]
 	chain := env.Chains[chainSelector]
@@ -371,6 +222,81 @@ func TestValidate(t *testing.T) {
 	}
 }
 
+func Test_LinkTransfer_Apply(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	env := setupLinkTransferTestEnv(t)
+	chainSelector := env.AllChainSelectors()[0]
+	chain := env.Chains[chainSelector]
+	addrs, err := env.ExistingAddresses.AddressesForChain(chainSelector) //nolint:staticcheck // Deprecated function will be removed with full migration to datastore
+	require.NoError(t, err)
+	require.Len(t, addrs, 6)
+
+	mcmsState, err := changeset.MaybeLoadMCMSWithTimelockChainState(chain, addrs)
+	require.NoError(t, err)
+	linkState, err := changeset.MaybeLoadLinkTokenChainState(chain, addrs) //nolint:staticcheck // Remove this once deprecated function is removed
+	require.NoError(t, err)
+	timelockAddress := mcmsState.Timelock.Address()
+
+	// Mint some funds
+	// grant minter permissions
+	tx, err := linkState.LinkToken.GrantMintRole(chain.DeployerKey, chain.DeployerKey.From)
+	require.NoError(t, err)
+	_, err = deployment.ConfirmIfNoError(chain, tx, err)
+	require.NoError(t, err)
+
+	tx, err = linkState.LinkToken.Mint(chain.DeployerKey, timelockAddress, big.NewInt(750))
+	require.NoError(t, err)
+	_, err = deployment.ConfirmIfNoError(chain, tx, err)
+	require.NoError(t, err)
+
+	timelocks := map[uint64]*proposalutils.TimelockExecutionContracts{
+		chainSelector: {
+			Timelock:  mcmsState.Timelock,
+			CallProxy: mcmsState.CallProxy,
+		},
+	}
+
+	// Apply the changeset
+	_, err = changeset.Apply(t, env, timelocks,
+		// the changeset produces proposals, ApplyChangesets will sign & execute them.
+		// in practice, signing and executing are separated processes.
+		changeset.Configure(
+			example.LinkTransfer{},
+			&example.LinkTransferConfig{
+				From: timelockAddress,
+				Transfers: map[uint64][]example.TransferConfig{
+					chainSelector: {
+						{
+							To:    chain.DeployerKey.From,
+							Value: big.NewInt(500),
+						},
+					},
+				},
+				McmsConfig: &proposalutils.TimelockConfig{
+					MinDelay:     0,
+					OverrideRoot: true,
+				},
+			},
+		),
+	)
+	require.NoError(t, err)
+
+	// Check new balances
+	endBalance, err := linkState.LinkToken.BalanceOf(&bind.CallOpts{Context: ctx}, chain.DeployerKey.From)
+	require.NoError(t, err)
+	expectedBalance := big.NewInt(500)
+	require.Equal(t, expectedBalance, endBalance)
+
+	// check timelock balance
+	endBalance, err = linkState.LinkToken.BalanceOf(&bind.CallOpts{Context: ctx}, timelockAddress)
+	require.NoError(t, err)
+	expectedBalance = big.NewInt(250)
+	require.Equal(t, expectedBalance, endBalance)
+}
+
+// Deprecated: Can be removed once LinkTransfer is the only version in use.
 func TestLinkTransferMCMSV2(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -406,6 +332,7 @@ func TestLinkTransferMCMSV2(t *testing.T) {
 			CallProxy: mcmsState.CallProxy,
 		},
 	}
+
 	// Apply the changeset
 	_, err = changeset.Apply(t, env, timelocks,
 		// the changeset produces proposals, ApplyChangesets will sign & execute them.
