@@ -225,6 +225,7 @@ func NewNode(
 	port int, // Port for the P2P V2 listener.
 	chains map[uint64]deployment.Chain,
 	solchains map[uint64]deployment.SolChain,
+	aptoschains map[uint64]deployment.AptosChain,
 	logLevel zapcore.Level,
 	bootstrap bool,
 	registryConfig deployment.CapabilityRegistryConfig,
@@ -276,7 +277,7 @@ func NewNode(
 		c.OCR2.Enabled = ptr(true)
 		c.OCR2.ContractPollInterval = config.MustNewDuration(5 * time.Second)
 
-		c.Log.Level = ptr(configv2.LogLevel(logLevel))
+		c.Log.Level = ptr(configv2.LogLevel(zapcore.DebugLevel))
 
 		var evmConfigs v2toml.EVMConfigs
 		for chainID := range evmchains {
@@ -293,6 +294,18 @@ func NewNode(
 			solConfigs = append(solConfigs, createSolanaChainConfig(solanaChainID, chain))
 		}
 		c.Solana = solConfigs
+
+		fmt.Printf("DEBUG: Aptos Chains: %+v\n", aptoschains)
+		var aptosConfigs chainlink.RawConfigs
+		for chainID, chain := range aptoschains {
+			aptosChainID, err := chainsel.GetChainIDFromSelector(chainID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			aptosConfigs = append(aptosConfigs, createAptosChainConfig(aptosChainID, chain))
+		}
+		c.Aptos = aptosConfigs
+		fmt.Printf("DEBUG: Aptos Configs: %+v\n", c.Aptos)
 
 		for _, opt := range configOpts {
 			opt(c)
@@ -366,6 +379,7 @@ func NewNode(
 	initOps := []chainlink.CoreRelayerChainInitFunc{
 		chainlink.InitEVM(context.Background(), relayerFactory, evmOpts),
 		chainlink.InitSolana(context.Background(), relayerFactory, solanaOpts),
+		chainlink.InitAptos(ctx, relayerFactory, master.Aptos(), cfg.AptosConfigs()),
 	}
 	rci, err := chainlink.NewCoreRelayerChainInteroperators(initOps...)
 	require.NoError(t, err)
@@ -388,7 +402,7 @@ func NewNode(
 	t.Cleanup(func() {
 		require.NoError(t, db.Close())
 	})
-	keys := CreateKeys(t, app, chains, solchains)
+	keys := CreateKeys(t, app, chains, solchains, aptoschains)
 
 	// JD
 
@@ -398,6 +412,7 @@ func NewNode(
 		Chains: slices.Concat(
 			maps.Keys(chains),
 			maps.Keys(solchains),
+			maps.Keys(aptoschains),
 		),
 		Keys:       keys,
 		Addr:       net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
@@ -417,6 +432,7 @@ func CreateKeys(t *testing.T,
 	app chainlink.Application,
 	chains map[uint64]deployment.Chain,
 	solchains map[uint64]deployment.SolChain,
+	aptoschains map[uint64]deployment.AptosChain,
 ) Keys {
 	ctx := tests.Context(t)
 	_, err := app.GetKeyStore().P2P().Create(ctx)
@@ -501,8 +517,7 @@ func CreateKeys(t *testing.T,
 
 			transmitter := keys[0]
 			transmitters[chain.Selector] = transmitter.ID()
-
-			// TODO: funding
+			// TODO(aptos): funding
 		case chainsel.FamilyStarknet:
 			err = app.GetKeyStore().StarkNet().EnsureKey(ctx)
 			require.NoError(t, err, "failed to create key for starknet")
@@ -542,6 +557,28 @@ func CreateKeys(t *testing.T,
 		transmitters[chain] = transmitter.ID()
 
 		// TODO: funding
+	}
+
+	if len(aptoschains) > 0 {
+		ctype := chaintype.Aptos
+		err = app.GetKeyStore().OCR2().EnsureKeys(ctx, ctype)
+		require.NoError(t, err)
+		keys, err := app.GetKeyStore().OCR2().GetAllOfType(ctype)
+		require.NoError(t, err)
+		require.Len(t, keys, 1)
+		keybundle := keys[0]
+		keybundles[ctype] = keybundle
+
+		err = app.GetKeyStore().Aptos().EnsureKey(ctx)
+		require.NoError(t, err, "failed to create key for solana")
+
+		aptoskeys, err := app.GetKeyStore().Aptos().GetAll()
+		require.NoError(t, err)
+		require.Len(t, aptoskeys, 1)
+		transmitter := aptoskeys[0]
+		for chainSelector := range aptoschains {
+			transmitters[chainSelector] = transmitter.ID()
+		}
 	}
 
 	return Keys{

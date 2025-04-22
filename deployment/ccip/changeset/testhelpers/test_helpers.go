@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -59,6 +60,10 @@ import (
 	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
+
+	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	solstate "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	soltokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_5_1/burn_mint_token_pool"
@@ -359,6 +364,28 @@ func DoSendRequest(
 	for _, opt := range opts {
 		opt(cfg)
 	}
+	family, err := chainsel.GetSelectorFamily(cfg.SourceChain)
+	require.NoError(t, err)
+
+	switch family {
+	case chainsel.FamilyEVM:
+		return SendRequestEVM(t, e, state, cfg)
+	case chainsel.FamilySolana:
+		return SendRequestSol(t, e, state, cfg)
+	case chainsel.FamilyAptos:
+		return SendRequestAptos(t, e, state, cfg)
+	default:
+		t.Errorf("send request: unsupported chain family: %v", family)
+		return nil, nil
+	}
+}
+
+func SendRequestEVM(
+	t *testing.T,
+	e deployment.Environment,
+	state changeset.CCIPOnChainState,
+	cfg *CCIPSendReqConfig,
+) (*onramp.OnRampCCIPMessageSent, error) {
 	// Set default sender if not provided
 	if cfg.Sender == nil {
 		cfg.Sender = e.Chains[cfg.SourceChain].DeployerKey
@@ -391,6 +418,15 @@ func DoSendRequest(
 		cfg.IsTestRouter,
 	)
 	return it.Event, nil
+}
+
+func SendRequestSol(
+	t *testing.T,
+	e deployment.Environment,
+	state changeset.CCIPOnChainState,
+	cfg *CCIPSendReqConfig,
+) (*onramp.OnRampCCIPMessageSent, error) { // TODO: chain independent return vailue
+	return nil, errors.New("not implemented")
 }
 
 // MakeEVMExtraArgsV2 creates the extra args for the EVM2Any message that is destined
@@ -444,6 +480,9 @@ func AddLane(
 	}
 	if toFamily == chainsel.FamilySolana {
 		changesets = append(changesets, addLaneSolanaChangesets(t, to, from, fromFamily)...)
+	}
+	if fromFamily == chainsel.FamilyAptos || toFamily == chainsel.FamilyAptos {
+		changesets = append(changesets, addLaneAptosChangesets(t, e, from, to, fromFamily, toFamily)...)
 	}
 
 	e.Env, err = commoncs.ApplyChangesets(t, e.Env, e.TimelockContracts(t), changesets)
@@ -670,8 +709,16 @@ func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, st
 // AddLanesForAll adds densely connected lanes for all chains in the environment so that each chain
 // is connected to every other chain except itself.
 func AddLanesForAll(t *testing.T, e *DeployedEnv, state changeset.CCIPOnChainState) {
-	for source := range e.Env.Chains {
-		for dest := range e.Env.Chains {
+	chains := []uint64{}
+	allEvmChainSelectors := maps.Keys(e.Env.Chains)
+	allSolChainSelectors := maps.Keys(e.Env.SolChains)
+	allAptosChainSelectors := maps.Keys(e.Env.AptosChains)
+	chains = slices.AppendSeq(chains, allEvmChainSelectors)
+	chains = slices.AppendSeq(chains, allSolChainSelectors)
+	chains = slices.AppendSeq(chains, allAptosChainSelectors)
+
+	for _, source := range chains {
+		for _, dest := range chains {
 			if source != dest {
 				AddLaneWithDefaultPricesAndFeeQuoterConfig(t, e, state, source, dest, false)
 			}

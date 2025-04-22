@@ -38,6 +38,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
+	"github.com/aptos-labs/aptos-go-sdk"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/view"
 	viewv1_0 "github.com/smartcontractkit/chainlink/deployment/ccip/view/v1_0"
@@ -529,6 +531,23 @@ func (s CCIPOnChainState) OffRampPermissionLessExecutionThresholdSeconds(ctx con
 		}
 		// #nosec G115
 		return uint32(offRampConfig.EnableManualExecutionAfter), nil
+	case chain_selectors.FamilyAptos:
+		c, ok := s.AptosChains[selector]
+		if !ok {
+			return 0, fmt.Errorf("chain %d does not exist in state", selector)
+		}
+		chain, ok := env.AptosChains[selector]
+		if !ok {
+			return 0, fmt.Errorf("chain %d does not exist in env", selector)
+		}
+		if c.CCIPAddress == aptos.AccountZero {
+			return 0, fmt.Errorf("ccip not found in existing state, deploy the ccip first for Aptos chain %d", selector)
+		}
+		offrampDynamicConfig, err := chain.GetOfframpDynamicConfig(c.CCIPAddress)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get offramp dynamic config for Aptos chain %d: %w", selector, err)
+		}
+		return offrampDynamicConfig.PermissionlessExecutionThresholdSeconds, nil
 	}
 	return 0, fmt.Errorf("unsupported chain family %s", family)
 }
@@ -579,6 +598,9 @@ func (s CCIPOnChainState) SupportedChains() map[uint64]struct{} {
 		chains[chain] = struct{}{}
 	}
 	for chain := range s.SolChains {
+		chains[chain] = struct{}{}
+	}
+	for chain := range s.AptosChains {
 		chains[chain] = struct{}{}
 	}
 	return chains
@@ -636,6 +658,9 @@ func (s CCIPOnChainState) GetOffRampAddressBytes(chainSelector uint64) ([]byte, 
 		offRampAddress = s.Chains[chainSelector].OffRamp.Address().Bytes()
 	case chain_selectors.FamilySolana:
 		offRampAddress = s.SolChains[chainSelector].OffRamp.Bytes()
+	case chain_selectors.FamilyAptos:
+		ccipAddress := s.AptosChains[chainSelector].CCIPAddress
+		offRampAddress = ccipAddress[:]
 	default:
 		return nil, fmt.Errorf("unsupported chain family %s", family)
 	}
@@ -661,6 +686,9 @@ func (s CCIPOnChainState) GetOnRampAddressBytes(chainSelector uint64) ([]byte, e
 			return nil, fmt.Errorf("no router found in the state for chain %d", chainSelector)
 		}
 		onRampAddressBytes = s.SolChains[chainSelector].Router.Bytes()
+	case chain_selectors.FamilyAptos:
+		ccipAddress := s.AptosChains[chainSelector].CCIPAddress
+		onRampAddressBytes = ccipAddress[:]
 	default:
 		return nil, fmt.Errorf("unsupported chain family %s", family)
 	}
@@ -710,6 +738,15 @@ func (s CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType deployment
 			return fmt.Errorf("unknown ramp type %s", rampType)
 		}
 
+	case chain_selectors.FamilyAptos:
+		chainState, exists := s.AptosChains[chainSelector]
+		if !exists {
+			return fmt.Errorf("chain %d does not exist", chainSelector)
+		}
+		if chainState.CCIPAddress == aptos.AccountZero {
+			return fmt.Errorf("ccip contract does not exist on aptos chain %d", chainSelector)
+		}
+
 	default:
 		return fmt.Errorf("unknown chain family %s", family)
 	}
@@ -721,9 +758,14 @@ func LoadOnchainState(e deployment.Environment) (CCIPOnChainState, error) {
 	if err != nil {
 		return CCIPOnChainState{}, err
 	}
+	aptosState, err := LoadOnchainStateAptos(e)
+	if err != nil {
+		return CCIPOnChainState{}, err
+	}
 	state := CCIPOnChainState{
-		Chains:    make(map[uint64]CCIPChainState),
-		SolChains: solState.SolChains,
+		Chains:      make(map[uint64]CCIPChainState),
+		SolChains:   solState.SolChains,
+		AptosChains: aptosState.AptosChains,
 	}
 	for chainSelector, chain := range e.Chains {
 		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)

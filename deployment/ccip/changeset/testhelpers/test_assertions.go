@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 
+	chainsel "github.com/smartcontractkit/chainlink/chainlink-selectors"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/offramp"
@@ -186,18 +187,57 @@ func ConfirmCommitForAllWithExpectedSeqNums(
 				startBlock = startBlocks[dstChain]
 			}
 
-			return commonutils.JustError(ConfirmCommitWithExpectedSeqNumRange(
-				t,
-				srcChain,
-				e.Chains[dstChain],
-				state.Chains[dstChain].OffRamp,
-				startBlock,
-				ccipocr3.SeqNumRange{
-					ccipocr3.SeqNum(expectedSeqNum),
-					ccipocr3.SeqNum(expectedSeqNum),
-				},
-				true,
-			))
+			family, err := chainsel.GetSelectorFamily(dstChain)
+			if err != nil {
+				return err
+			}
+			switch family {
+			case chainsel.FamilyEVM:
+				return commonutils.JustError(ConfirmCommitWithExpectedSeqNumRange(
+					t,
+					srcChain,
+					e.Chains[dstChain],
+					state.Chains[dstChain].OffRamp,
+					startBlock,
+					ccipocr3.SeqNumRange{
+						ccipocr3.SeqNum(expectedSeqNum),
+						ccipocr3.SeqNum(expectedSeqNum),
+					},
+					true,
+				))
+			case chainsel.FamilySolana:
+				var startSlot uint64
+				if startBlock != nil {
+					startSlot = *startBlock
+				}
+				return commonutils.JustError(ConfirmCommitWithExpectedSeqNumRangeSol(
+					t,
+					srcChain,
+					e.SolChains[dstChain],
+					state.SolChains[dstChain].OffRamp,
+					startSlot,
+					ccipocr3.SeqNumRange{
+						ccipocr3.SeqNum(expectedSeqNum),
+						ccipocr3.SeqNum(expectedSeqNum),
+					},
+					true,
+				))
+			case chainsel.FamilyAptos:
+				return commonutils.JustError(ConfirmCommitWithExpectedSeqNumRangeAptos(
+					t,
+					srcChain,
+					e.AptosChains[dstChain],
+					state.AptosChains[dstChain],
+					startBlock,
+					ccipocr3.SeqNumRange{
+						ccipocr3.SeqNum(expectedSeqNum),
+						ccipocr3.SeqNum(expectedSeqNum),
+					},
+					true,
+				))
+			default:
+				return fmt.Errorf("unsupported chain family; %v", family)
+			}
 		})
 	}
 
@@ -272,16 +312,51 @@ func ConfirmMultipleCommits(
 		destChain := sourceDest.DestChainSelector
 
 		errGrp.Go(func() error {
-			_, err := ConfirmCommitWithExpectedSeqNumRange(
-				t,
-				srcChain,
-				chains[destChain],
-				state[destChain].OffRamp,
-				startBlocks[destChain],
-				seqRange,
-				enforceSingleCommit,
-			)
-			return err
+			family, err := chainsel.GetSelectorFamily(destChain)
+			if err != nil {
+				return err
+			}
+			switch family {
+			case chainsel.FamilyEVM:
+				_, err := ConfirmCommitWithExpectedSeqNumRange(
+					t,
+					srcChain,
+					env.Chains[destChain],
+					state.Chains[destChain].OffRamp,
+					startBlocks[destChain],
+					seqRange,
+					enforceSingleCommit,
+				)
+				return err
+			case chainsel.FamilySolana:
+				var startSlot uint64
+				if startBlocks[destChain] != nil {
+					startSlot = *startBlocks[destChain]
+				}
+				_, err := ConfirmCommitWithExpectedSeqNumRangeSol(
+					t,
+					srcChain,
+					env.SolChains[destChain],
+					state.SolChains[destChain].OffRamp,
+					startSlot,
+					seqRange,
+					enforceSingleCommit,
+				)
+				return err
+			case chainsel.FamilyAptos:
+				_, err := ConfirmCommitWithExpectedSeqNumRangeAptos(
+					t,
+					srcChain,
+					env.AptosChains[destChain],
+					state.AptosChains[destChain],
+					startBlocks[destChain],
+					seqRange,
+					enforceSingleCommit,
+				)
+				return err
+			default:
+				return fmt.Errorf("unsupported chain family; %v", family)
+			}
 		})
 	}
 
@@ -428,6 +503,52 @@ func ConfirmExecWithSeqNrsForAll(
 			)
 			if err != nil {
 				return err
+			}
+
+			var innerExecutionStates map[uint64]int
+			switch family {
+			case chainsel.FamilyEVM:
+				innerExecutionStates, err = ConfirmExecWithSeqNrs(
+					t,
+					srcChain,
+					e.Chains[dstChain],
+					state.Chains[dstChain].OffRamp,
+					startBlock,
+					seqRange,
+				)
+				if err != nil {
+					return err
+				}
+			case chainsel.FamilySolana:
+				var startSlot uint64
+				if startBlock != nil {
+					startSlot = *startBlock
+				}
+				innerExecutionStates, err = ConfirmExecWithSeqNrsSol(
+					t,
+					srcChain,
+					e.SolChains[dstChain],
+					state.SolChains[dstChain].OffRamp,
+					startSlot,
+					seqRange,
+				)
+				if err != nil {
+					return err
+				}
+			case chainsel.FamilyAptos:
+				innerExecutionStates, err = ConfirmExecWithSeqNrsAptos(
+					t,
+					srcChain,
+					e.AptosChains[dstChain],
+					state.AptosChains[dstChain].CCIPAddress,
+					startBlock,
+					seqRange,
+				)
+				if err != nil {
+					return err
+				}
+			default:
+				return fmt.Errorf("unsupported chain family; %v", family)
 			}
 
 			mx.Lock()

@@ -1,9 +1,12 @@
 package messagingtest
 
 import (
+	"context"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -116,10 +119,19 @@ func getLatestNonce(tc TestCase) uint64 {
 		}, tc.SourceChain, tc.Sender)
 		require.NoError(tc.T, err)
 	case chain_selectors.FamilySolana:
-		// var nonceCounterAccount ccip_router.Nonce
-		// err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
-		// require.NoError(t, err, "failed to get account info")
-		// require.Equal(t, uint64(1), nonceCounterAccount.Counter)
+		ctx := context.Background()
+		client := tc.Env.SolChains[tc.DestChain].Client
+		// TODO: solcommon.FindNoncePDA expected the sender to be a solana pubkey
+		chainSelectorLE := solcommon.Uint64ToLE(tc.DestChain)
+		noncePDA, _, err := solana.FindProgramAddress([][]byte{[]byte("nonce"), chainSelectorLE, tc.Sender}, tc.OnchainState.SolChains[tc.DestChain].Router)
+		require.NoError(tc.T, err)
+		var nonceCounterAccount ccip_router.Nonce
+		// we ignore the error because the account might not exist yet
+		_ = solcommon.GetAccountDataBorshInto(ctx, client, noncePDA, solconfig.DefaultCommitment, &nonceCounterAccount)
+		latestNonce = nonceCounterAccount.Counter
+	case chain_selectors.FamilyAptos:
+		// Aptos only supports out of order execution so return zero
+		latestNonce = 0
 	}
 	return latestNonce
 }
@@ -133,6 +145,40 @@ func Run(tc TestCase) (out TestCaseOutput) {
 	}
 
 	startBlocks := make(map[uint64]*uint64)
+
+	family, err := chain_selectors.GetSelectorFamily(tc.SourceChain)
+	require.NoError(tc.T, err)
+
+	var msg any
+	switch family {
+	case chain_selectors.FamilyEVM:
+		msg = router.ClientEVM2AnyMessage{
+			Receiver:     common.LeftPadBytes(tc.Receiver, 32),
+			Data:         tc.MsgData,
+			TokenAmounts: nil,
+			FeeToken:     common.HexToAddress("0x0"),
+			ExtraArgs:    tc.ExtraArgs,
+		}
+	case chain_selectors.FamilySolana:
+		msg = ccip_router.SVM2AnyMessage{
+			Receiver:     common.LeftPadBytes(tc.Receiver, 32),
+			TokenAmounts: nil,
+			Data:         tc.MsgData,
+			ExtraArgs:    tc.ExtraArgs,
+		}
+	case chain_selectors.FamilyAptos:
+		msg = testhelpers.Aptos2AnyMessage{
+			Receiver:      common.LeftPadBytes(tc.Receiver, 32),
+			Data:          tc.MsgData,
+			TokenAmounts:  nil,
+			FeeToken:      aptos.AccountZero,
+			FeeTokenStore: aptos.AccountZero,
+			ExtraArgs:     tc.ExtraArgs,
+		}
+
+	default:
+		tc.T.Errorf("unsupported source chain: %v", family)
+	}
 	msgSentEvent := testhelpers.TestSendRequest(
 		tc.T,
 		tc.Env,
@@ -192,11 +238,19 @@ func Run(tc TestCase) (out TestCaseOutput) {
 			}][msgSentEvent.SequenceNumber],
 		)
 
-		// check the sender latestNonce on the dest, should be incremented
-		latestNonce := getLatestNonce(tc)
-		require.Equal(tc.T, tc.Nonce+1, latestNonce)
-		out.Nonce = latestNonce
-		tc.T.Logf("confirmed nonce bump for sender %x, latestNonce %d", tc.Sender, latestNonce)
+		family, err := chain_selectors.GetSelectorFamily(tc.DestChain)
+		require.NoError(tc.T, err)
+
+		// Solana doesn't support catching CPI errors, so nonces can't be ordered
+		unorderedExec := family == chain_selectors.FamilySolana || family == chain_selectors.FamilyAptos
+		fmt.Printf("DEBUG: messagingtest.Run unorderedExec: %v\n", unorderedExec)
+
+		if !unorderedExec {
+			latestNonce := getLatestNonce(tc)
+			require.Equal(tc.T, tc.Nonce+1, latestNonce)
+			out.Nonce = latestNonce
+			tc.T.Logf("confirmed nonce bump for sender %x, latestNonce %d", tc.Sender, latestNonce)
+		}
 
 		for _, assertion := range tc.ExtraAssertions {
 			assertion(tc.T)
