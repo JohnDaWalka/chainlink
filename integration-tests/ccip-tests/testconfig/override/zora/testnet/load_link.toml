@@ -4,8 +4,7 @@ Data = """
 {
   "lane_configs": {
     "ETHEREUM_TESTNET": {
-      "is_native_fee_token": true,
-      "fee_token": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
+      "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
       "bridge_tokens": [
         "0x2Ca7afAC86D0b28d9f7e512b969cEaD9E3048303",
         "0x7f5E7C0BA70893d9b35BF519B44bD7Bf48BDB4e1",
@@ -149,8 +148,7 @@ Data = """
       }
     },
     "ZORA_TESTNET": {
-      "is_native_fee_token": true,
-      "fee_token": "0x4200000000000000000000000000000000000006",
+      "fee_token": "0xBEDDEB2DF8904cdBCFB6Bf29b91d122D5Ae4eb7e",
       "arm": "0x5E0E4a6dd125dEC21c3376f6Fc65AF6BD861eE64",
       "router": "0xC5c058814cb85bF52c83264e09da90CB4c932cb7",
       "price_registry": "0xE4d4dB78339A847B8d70C7e6e7e75d43e3700883",
@@ -175,6 +173,7 @@ Data = """
 
 [CCIP.Groups.load]
 NetworkPairs = ['ETHEREUM_TESTNET,ZORA_TESTNET']
+BiDirectionalLane = false
 PhaseTimeout = '50m'                   
 ExistingDeployment = true                         
 
@@ -184,12 +183,12 @@ DestGasLimit = 0 # change this to 0 gas limit if you are doing ccip-send to an E
 DataLength = 500
 
 [CCIP.Groups.load.LoadProfile]
-RequestPerUnitTime = [1]
-TimeUnit = '30m'
-TestDuration = '26h' # load test duration, not used for smoke tests
+RequestPerUnitTime = [2]
+TimeUnit = '1m'
+TestDuration = '1h' # load test duration, not used for smoke tests
 WaitBetweenChaosDuringLoad = '60h' # Duration to wait between each chaos injection during load test; only valid for chaos tests
 FailOnFirstErrorInLoad = false
-TestRunName = 'ETHEREUM_TESTNET-ZORA_TESTNET_NATIVE_fee_without_token_smoke'
+TestRunName = 'ETHEREUM_TESTNET-ZORA_TESTNET_LINK_fee_without_token_smoke'
 
 [CCIP.ContractVersions]
 PriceRegistry = 'latest'
@@ -199,35 +198,35 @@ TokenPool = 'latest'
 CommitStore = 'latest'
 
 [CCIP.Env]
-TTL = '28h'
+TTL = '3h'
 
 [CCIP.Env.Network]
 selected_networks = ['ETHEREUM_TESTNET', 'ZORA_TESTNET']
 
-#[CCIP.Env.Network.EVMNetworks.ZORA_TESTNET]
-#evm_name = 'ZORA_TESTNET'
-#evm_chain_id = 4200    # Replace with the chain ID of the destination network
-#evm_finality_tag = false   # Replace with the finality tag of the destination network
-#evm_finality_depth = 1000  # Replace with the finality depth of the destination network
-#evm_simulated = false 
-#client_implementation = 'Ethereum'  # Replace with the client implementation of the destination network
-#evm_chainlink_transaction_limit = 300000   # Replace with the chainlink transaction limit of the destination network
-#evm_transaction_timeout = '3m'
-#evm_minimum_confirmations = 1
-#evm_gas_estimation_buffer = 10000 
-#evm_supports_eip1559 = true    # Replace with the EIP-1559 support for the destination network
-#evm_default_gas_limit = 6000000
+[CCIP.Env.Network.EVMNetworks.ZORA_TESTNET]
+evm_name = 'ZORA_TESTNET'
+evm_chain_id = 999999999 				# Replace with the chain ID of the destination network
+evm_finality_tag = true 				# Replace with the finality tag of the destination network
+evm_finality_depth = 1000 				# Replace with the finality depth of the destination network
+evm_simulated = false 
+client_implementation = 'Ethereum' 				# Replace with the client implementation of the destination network
+evm_chainlink_transaction_limit = 300000 				# Replace with the chainlink transaction limit of the destination network
+evm_transaction_timeout = '3m'
+evm_minimum_confirmations = 1
+evm_gas_estimation_buffer = 10000 
+evm_supports_eip1559 = true 				# Replace with the EIP-1559 support for the destination network
+evm_default_gas_limit = 6000000 
 
-#[CCIP.Env.Network.EVMNetworks.ETHEREUM_TESTNET]
-#evm_name = 'ETHEREUM_TESTNET'
-#evm_chain_id = 4200    # Replace with the chain ID of the destination network
-#evm_finality_tag = false   # Replace with the finality tag of the destination network
-#evm_finality_depth = 1000  # Replace with the finality depth of the destination network
-#evm_simulated = false 
-#client_implementation = 'Ethereum'  # Replace with the client implementation of the destination network
-#evm_chainlink_transaction_limit = 300000   # Replace with the chainlink transaction limit of the destination network
-#evm_transaction_timeout = '3m'
-#evm_minimum_confirmations = 1
-#evm_gas_estimation_buffer = 10000 
-#evm_supports_eip1559 = true    # Replace with the EIP-1559 support for the destination network
-#evm_default_gas_limit = 6000000
+[CCIP.Env.Network.EVMNetworks.ETHEREUM_TESTNET]
+evm_name = 'ETHEREUM_TESTNET'
+evm_chain_id = 11155111
+evm_finality_tag = true
+evm_finality_depth = 1000
+evm_simulated = false
+client_implementation = 'Ethereum'
+evm_chainlink_transaction_limit = 5000
+evm_transaction_timeout = '3m'
+evm_minimum_confirmations = 1
+evm_gas_estimation_buffer = 10000
+evm_supports_eip1559 = true
+evm_default_gas_limit = 8000000

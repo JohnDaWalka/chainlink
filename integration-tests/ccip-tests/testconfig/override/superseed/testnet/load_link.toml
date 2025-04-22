@@ -173,6 +173,7 @@ Data = """
 
 [CCIP.Groups.load]
 NetworkPairs = ['ETHEREUM_TESTNET_1,SUPERSEED_TESTNET']
+BiDirectionalLane = false
 PhaseTimeout = '50m'                   
 ExistingDeployment = true                         
 
@@ -202,30 +203,30 @@ TTL = '3h'
 [CCIP.Env.Network]
 selected_networks = ['ETHEREUM_TESTNET_1', 'SUPERSEED_TESTNET']
 
-#[CCIP.Env.Network.EVMNetworks.SUPERSEED_TESTNET]
-#evm_name = 'SUPERSEED_TESTNET'
-#evm_chain_id = 4200    # Replace with the chain ID of the destination network
-#evm_finality_tag = false   # Replace with the finality tag of the destination network
-#evm_finality_depth = 1000  # Replace with the finality depth of the destination network
-#evm_simulated = false 
-#client_implementation = 'Ethereum'  # Replace with the client implementation of the destination network
-#evm_chainlink_transaction_limit = 300000   # Replace with the chainlink transaction limit of the destination network
-#evm_transaction_timeout = '3m'
-#evm_minimum_confirmations = 1
-#evm_gas_estimation_buffer = 10000 
-#evm_supports_eip1559 = true    # Replace with the EIP-1559 support for the destination network
-#evm_default_gas_limit = 6000000
+[CCIP.Env.Network.EVMNetworks.SUPERSEED_TESTNET]
+evm_name = 'SUPERSEED_TESTNET'
+evm_chain_id = 53302 				# Replace with the chain ID of the destination network
+evm_finality_tag = true 				# Replace with the finality tag of the destination network
+evm_finality_depth = 1000 				# Replace with the finality depth of the destination network
+evm_simulated = false 
+client_implementation = 'Ethereum' 				# Replace with the client implementation of the destination network
+evm_chainlink_transaction_limit = 300000 				# Replace with the chainlink transaction limit of the destination network
+evm_transaction_timeout = '3m'
+evm_minimum_confirmations = 1
+evm_gas_estimation_buffer = 10000 
+evm_supports_eip1559 = true 				# Replace with the EIP-1559 support for the destination network
+evm_default_gas_limit = 6000000 
 
-#[CCIP.Env.Network.EVMNetworks.ETHEREUM_TESTNET_1]
-#evm_name = 'ETHEREUM_TESTNET_1'
-#evm_chain_id = 4200    # Replace with the chain ID of the destination network
-#evm_finality_tag = false   # Replace with the finality tag of the destination network
-#evm_finality_depth = 1000  # Replace with the finality depth of the destination network
-#evm_simulated = false 
-#client_implementation = 'Ethereum'  # Replace with the client implementation of the destination network
-#evm_chainlink_transaction_limit = 300000   # Replace with the chainlink transaction limit of the destination network
-#evm_transaction_timeout = '3m'
-#evm_minimum_confirmations = 1
-#evm_gas_estimation_buffer = 10000 
-#evm_supports_eip1559 = true    # Replace with the EIP-1559 support for the destination network
-#evm_default_gas_limit = 6000000
+[CCIP.Env.Network.EVMNetworks.ETHEREUM_TESTNET_1]
+evm_name = 'ETHEREUM_TESTNET_1'
+evm_chain_id = 11155111
+evm_finality_tag = true
+evm_finality_depth = 1000
+evm_simulated = false
+client_implementation = 'Ethereum'
+evm_chainlink_transaction_limit = 5000
+evm_transaction_timeout = '3m'
+evm_minimum_confirmations = 1
+evm_gas_estimation_buffer = 10000
+evm_supports_eip1559 = true
+evm_default_gas_limit = 8000000
