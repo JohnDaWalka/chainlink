@@ -3,7 +3,7 @@
 Data = """
 {
   "lane_configs": {
-    "ETHEREUM_TESTNET-1": {
+    "ETHEREUM_TESTNET_1": {
       "is_native_fee_token": true,
       "fee_token": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
       "bridge_tokens": [
@@ -156,13 +156,13 @@ Data = """
       "price_registry": "0xec52c0b49E525bdf9E76e7c4e3F50E6571919d14",
       "wrapped_native": "0x4200000000000000000000000000000000000006",
       "src_contracts": {
-        "ETHEREUM_TESTNET-1": {
+        "ETHEREUM_TESTNET_1": {
           "on_ramp": "0xBc62962b28A138BCd890e633Fc2f4e976c5F1526",
           "deployed_at": 0
         }
       },
       "dest_contracts": {
-        "ETHEREUM_TESTNET-1": {
+        "ETHEREUM_TESTNET_1": {
           "off_ramp": "0xd09B08979EE423DFf3a7F1261c487f938eA0a46d",
           "commit_store": "0x1a452DaED577A8D04c10EA783A64edfa42025Ec3",
           "receiver_dapp": "0xdDBb6f358f290408D76847b4F602f0FD599295fd"
@@ -174,7 +174,7 @@ Data = """
 """
 
 [CCIP.Groups.load]
-NetworkPairs = ['ETHEREUM_TESTNET-1,SUPERSEED_TESTNET']
+NetworkPairs = ['ETHEREUM_TESTNET_1,SUPERSEED_TESTNET']
 PhaseTimeout = '50m'                   
 ExistingDeployment = true                         
 
@@ -189,7 +189,7 @@ TimeUnit = '30m'
 TestDuration = '26h' # load test duration, not used for smoke tests
 WaitBetweenChaosDuringLoad = '60h' # Duration to wait between each chaos injection during load test; only valid for chaos tests
 FailOnFirstErrorInLoad = false
-TestRunName = 'ETHEREUM_TESTNET-1-SUPERSEED_TESTNET_NATIVE_fee_without_token_smoke'
+TestRunName = 'ETHEREUM_TESTNET_1-SUPERSEED_TESTNET_NATIVE_fee_without_token_smoke'
 
 [CCIP.ContractVersions]
 PriceRegistry = 'latest'
@@ -202,7 +202,7 @@ CommitStore = 'latest'
 TTL = '28h'
 
 [CCIP.Env.Network]
-selected_networks = ['ETHEREUM_TESTNET-1', 'SUPERSEED_TESTNET']
+selected_networks = ['ETHEREUM_TESTNET_1', 'SUPERSEED_TESTNET']
 
 #[CCIP.Env.Network.EVMNetworks.SUPERSEED_TESTNET]
 #evm_name = 'SUPERSEED_TESTNET'
@@ -218,8 +218,8 @@ selected_networks = ['ETHEREUM_TESTNET-1', 'SUPERSEED_TESTNET']
 #evm_supports_eip1559 = true    # Replace with the EIP-1559 support for the destination network
 #evm_default_gas_limit = 6000000
 
-#[CCIP.Env.Network.EVMNetworks.ETHEREUM_TESTNET-1]
-#evm_name = 'ETHEREUM_TESTNET-1'
+#[CCIP.Env.Network.EVMNetworks.ETHEREUM_TESTNET_1]
+#evm_name = 'ETHEREUM_TESTNET_1'
 #evm_chain_id = 4200    # Replace with the chain ID of the destination network
 #evm_finality_tag = false   # Replace with the finality tag of the destination network
 #evm_finality_depth = 1000  # Replace with the finality depth of the destination network

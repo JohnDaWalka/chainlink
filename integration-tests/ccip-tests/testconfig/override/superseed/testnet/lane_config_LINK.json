@@ -1,6 +1,6 @@
 {
   "lane_configs": {
-    "ETHEREUM_TESTNET-1": {
+    "ETHEREUM_TESTNET_1": {
       "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
       "bridge_tokens": [
         "0x2Ca7afAC86D0b28d9f7e512b969cEaD9E3048303",
@@ -151,13 +151,13 @@
       "price_registry": "0xec52c0b49E525bdf9E76e7c4e3F50E6571919d14",
       "wrapped_native": "0x4200000000000000000000000000000000000006",
       "src_contracts": {
-        "ETHEREUM_TESTNET-1": {
+        "ETHEREUM_TESTNET_1": {
           "on_ramp": "0xBc62962b28A138BCd890e633Fc2f4e976c5F1526",
           "deployed_at": 0
         }
       },
       "dest_contracts": {
-        "ETHEREUM_TESTNET-1": {
+        "ETHEREUM_TESTNET_1": {
           "off_ramp": "0xd09B08979EE423DFf3a7F1261c487f938eA0a46d",
           "commit_store": "0x1a452DaED577A8D04c10EA783A64edfa42025Ec3",
           "receiver_dapp": "0xdDBb6f358f290408D76847b4F602f0FD599295fd"
