@@ -771,6 +771,9 @@ func TestConfig_Marshal(t *testing.T) {
 				ComputeUnitLimitDefault:   ptr[uint32](100_000),
 				EstimateComputeUnitLimit:  ptr(false),
 				LogPollerStartingLookback: commoncfg.MustNewDuration(24 * time.Hour),
+				LogPollerMaxRetries:       ptr(uint8(18)),
+				LogPollerLargeQueueNotify: ptr(200),
+				LogPollerWorkerCount:      ptr(uint64(8)),
 			},
 			MultiNode: mnCfg.MultiNodeConfig{
 				MultiNode: mnCfg.MultiNode{
@@ -1249,6 +1252,9 @@ BlockHistoryBatchLoadSize = 20
 ComputeUnitLimitDefault = 100000
 EstimateComputeUnitLimit = false
 LogPollerStartingLookback = '24h0m0s'
+LogPollerMaxRetries = 18
+LogPollerLargeQueueNotify = 200
+LogPollerWorkerCount = 8
 
 [Solana.MultiNode]
 Enabled = false

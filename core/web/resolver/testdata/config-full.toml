@@ -513,6 +513,9 @@ BlockHistoryBatchLoadSize = 20
 ComputeUnitLimitDefault = 200000
 EstimateComputeUnitLimit = false
 LogPollerStartingLookback = '24h0m0s'
+LogPollerMaxRetries = 18
+LogPollerLargeQueueNotify = 200
+LogPollerWorkerCount = 8
 
 [Solana.MultiNode]
 Enabled = false
