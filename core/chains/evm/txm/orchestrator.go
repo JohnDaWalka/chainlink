@@ -348,7 +348,7 @@ func (o *Orchestrator[BLOCK_HASH, HEAD]) GetTransactionStatus(ctx context.Contex
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) GetTransactionFee(ctx context.Context, transactionID string) (fee *commontypes.TransactionFee, err error) {
-	return
+	return nil, errors.New("unimplemented")
 }
 
 func (o *Orchestrator[BLOCK_HASH, HEAD]) SendNativeToken(ctx context.Context, chainID *big.Int, from, to common.Address, value big.Int, gasLimit uint64) (tx txmgrtypes.Tx[*big.Int, common.Address, common.Hash, common.Hash, evmtypes.Nonce, gas.EvmFee], err error) {
