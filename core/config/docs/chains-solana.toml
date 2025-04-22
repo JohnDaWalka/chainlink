@@ -65,7 +65,7 @@ LogPollerStartingLookback = '24h0m0s' # Default
 LogPollerMaxRetries = 18 # Default
 # LogPollerLargeQueueNotify is the min threshold queue size at which Solana LogPoller starts warning of a large queue.
 # This may need to be adjusted based on available system resources.
-LogPollerLargeQueueNotify = 200 #default
+LogPollerLargeQueueNotify = 200 # Default
 # LogPollerWorkerCount determines how many concurrent worker threads Solana LogPoller uses to fetch logs.
 LogPollerWorkerCount = 8 # Default
 
