@@ -30,7 +30,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.52
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250418172423-6b24a042d134
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250417193446-eeb0a7d1e049
-	github.com/smartcontractkit/chainlink-evm v0.0.0-20250417170522-d257e502409c
+	github.com/smartcontractkit/chainlink-evm v0.0.0-20250418155716-b70a99cec060
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.7.4
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.4
@@ -185,6 +185,7 @@ require (
 	github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/fatih/color v1.18.0 // indirect
+	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
@@ -423,7 +424,6 @@ require (
 	github.com/shirou/gopsutil/v4 v4.25.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
-	github.com/smartcontractkit/chain-selectors v1.0.52 // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250416111541-d25d5d65b1ff // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250411163110-21a13ceb3ac4 // indirect
@@ -437,6 +437,7 @@ require (
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250418121120-d978f41c57cc // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.50.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
+	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250422175525-b7575d96bd4d // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/mcms v0.16.1 // indirect
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20241009055228-33d0c0bf38de // indirect
@@ -563,6 +564,9 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+// gotron-sdk is not longer maintained
+replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20250422175525-b7575d96bd4d
 
 // v0.63.0 is not compatible with prometheus/prometheus v0.302.0. Remove after it has been updated.
 replace github.com/prometheus/common => github.com/prometheus/common v0.62.0

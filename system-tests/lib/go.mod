@@ -24,7 +24,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chain-selectors v1.0.52
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250418172423-6b24a042d134
-	github.com/smartcontractkit/chainlink-evm v0.0.0-20250417170522-d257e502409c
+	github.com/smartcontractkit/chainlink-evm v0.0.0-20250418155716-b70a99cec060
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.7.4
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.4
@@ -160,6 +160,7 @@ require (
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/fatih/color v1.18.0 // indirect
+	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
@@ -363,6 +364,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250418121120-d978f41c57cc // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
+	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250422175525-b7575d96bd4d // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/libocr v0.0.0-20250408131511-c90716988ee0 // indirect
 	github.com/smartcontractkit/mcms v0.16.1 // indirect
@@ -469,3 +471,6 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+// gotron-sdk is not longer maintained
+replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20250422175525-b7575d96bd4d
