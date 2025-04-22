@@ -47,6 +47,11 @@ var (
 	WorkflowDeletedEvent WorkflowRegistryEventType = "WorkflowDeletedV1"
 )
 
+var (
+	StatusActivated = uint8(0)
+	StatusPaused    = uint8(1)
+)
+
 type ORM interface {
 	artifacts.WorkflowSecretsDS
 	artifacts.WorkflowSpecsDS
@@ -403,9 +408,9 @@ func (h *eventHandler) workflowRegisteredEvent(
 
 func toSpecStatus(s uint8) job.WorkflowSpecStatus {
 	switch s {
-	case 0:
+	case StatusActivated:
 		return job.WorkflowSpecStatusActive
-	case 1:
+	case StatusPaused:
 		return job.WorkflowSpecStatusPaused
 	default:
 		return job.WorkflowSpecStatusDefault

@@ -29,6 +29,7 @@ const name = "WorkflowRegistrySyncer"
 
 var (
 	defaultTickInterval                    = 12 * time.Second
+	defaultMaxBackoffInterval              = 600 * time.Second
 	WorkflowRegistryContractName           = "WorkflowRegistry"
 	GetWorkflowMetadataListByDONMethodName = "getWorkflowMetadataListByDON"
 )
@@ -134,15 +135,13 @@ type workflowRegistry struct {
 	// close stopCh to stop the workflowRegistry.
 	stopCh services.StopChan
 
-	// events sent to the event channel to be handled.
-	eventCh chan Event
-
 	// all goroutines are waited on with wg.
 	wg sync.WaitGroup
 
 	// ticker is the interval at which the workflowRegistry will
 	// poll the contract for events, and poll the contract for the latest workflow metadata.
-	ticker <-chan time.Time
+	ticker  <-chan time.Time
+	backoff *backoffStrategy
 
 	lggr                    logger.Logger
 	workflowRegistryAddress string
@@ -198,12 +197,14 @@ func NewWorkflowRegistry(
 		newContractReaderFn:     newContractReaderFn,
 		workflowRegistryAddress: addr,
 		config:                  config,
-		eventCh:                 make(chan Event),
 		stopCh:                  make(services.StopChan),
 		handler:                 handler,
 		workflowDonNotifier:     workflowDonNotifier,
 		engineRegistry:          engineRegistry,
+		ticker:                  time.NewTicker(defaultTickInterval).C,
 	}
+
+	wr.backoff = newBackoffStrategy(lggr, handler.Handle, defaultTickInterval, defaultMaxBackoffInterval)
 
 	for _, opt := range opts {
 		opt(wr)
@@ -245,22 +246,61 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 			// Start goroutines to gather changes from Workflow Registry contract
 			switch w.config.SyncStrategy {
 			case SyncStrategyEvent:
-				w.syncUsingEventStrategy(ctx, don, reader)
-			case SyncStrategyReconciliation:
-				w.syncUsingReconciliationStrategy(ctx, don, reader)
-			}
+				eventCh := make(chan Event)
+				w.wg.Add(1)
+				go func() {
+					defer w.wg.Done()
+					w.syncUsingEventStrategy(ctx, don, reader, eventCh)
+				}()
 
-			// Handle events from the events channel
-			w.lggr.Debug("running handleEventLoop")
-			for {
-				select {
-				case <-ctx.Done():
-					w.lggr.Debug("shutting down handleEventLoop")
-					return
-				case event := <-w.eventCh:
-					err := w.handler.Handle(ctx, event)
-					if err != nil {
-						w.lggr.Errorw("failed to handle event", "err", err, "type", event.GetEventType())
+				// Handle events from the events channel
+				w.lggr.Debug("running handleEventLoop")
+				for {
+					select {
+					case <-ctx.Done():
+						w.lggr.Debug("shutting down handleEventLoop")
+						return
+					case event := <-eventCh:
+						err := w.handler.Handle(ctx, event)
+						if err != nil {
+							w.lggr.Errorw("failed to handle event", "err", err, "type", event.GetEventType())
+						}
+					}
+				}
+			case SyncStrategyReconciliation:
+				eventCh := make(chan Event)
+				w.wg.Add(1)
+				go func() {
+					defer w.wg.Done()
+					w.syncUsingReconciliationStrategy(ctx, don, reader, eventCh)
+				}()
+
+				updateSecretsCh := make(chan Event)
+				w.wg.Add(1)
+				go func() {
+					defer w.wg.Done()
+					ets := []WorkflowRegistryEventType{
+						ForceUpdateSecretsEvent,
+					}
+					w.readRegistryEventsLoop(ctx, ets, don, reader, updateSecretsCh)
+				}()
+
+				// Handle events coming from the eventsCh and the updateSecretsCh
+				// Although we handle them separately, we do so serially so that the
+				// events don't race one another.
+				w.lggr.Debug("running handleEventLoop")
+				for {
+					select {
+					case <-ctx.Done():
+						w.lggr.Debug("shutting down handleEventLoop")
+						return
+					case event := <-eventCh:
+						w.backoff.Apply(ctx, event)
+					case event := <-updateSecretsCh:
+						err := w.handler.Handle(ctx, event)
+						if err != nil {
+							w.lggr.Errorw("failed to handle event", "err", err, "type", event.GetEventType())
+						}
 					}
 				}
 			}
@@ -291,8 +331,13 @@ func (w *workflowRegistry) Name() string {
 }
 
 // readRegistryEventsLoop polls the contract for events and sends them to the events channel for handling.
-func (w *workflowRegistry) readRegistryEventsLoop(ctx context.Context, eventTypes []WorkflowRegistryEventType, don capabilities.DON, reader ContractReader, lastReadBlockNumber string) {
+func (w *workflowRegistry) readRegistryEventsLoop(ctx context.Context, eventTypes []WorkflowRegistryEventType, don capabilities.DON, reader ContractReader, eventCh chan Event) {
 	ticker := w.getTicker()
+
+	_, height, err := w.getWorkflowMetadata(ctx, don, reader)
+	if err != nil {
+		w.lggr.Errorw("failed to load initial workflows", "err", err)
+	}
 
 	var keyQueries = make([]types.ContractKeyFilter, 0, len(eventTypes))
 	for _, et := range eventTypes {
@@ -302,7 +347,7 @@ func (w *workflowRegistry) readRegistryEventsLoop(ctx context.Context, eventType
 				Key: string(et),
 				Expressions: []query.Expression{
 					query.Confidence(primitives.Finalized),
-					query.Block(lastReadBlockNumber, primitives.Gt),
+					query.Block(height.Height, primitives.Gt),
 				},
 			},
 			Contract: types.BoundContract{
@@ -342,7 +387,7 @@ func (w *workflowRegistry) readRegistryEventsLoop(ctx context.Context, eventType
 					EventType: WorkflowRegistryEventType(eventType),
 				})
 			}
-			w.lggr.Debugw("QueryKeys called", "logs", len(logs), "eventTypes", eventTypes, "lastReadBlockNumber", lastReadBlockNumber, "logCursor", cursor)
+			w.lggr.Debugw("QueryKeys called", "logs", len(logs), "eventTypes", eventTypes, "lastReadBlockNumber", height.Height, "logCursor", cursor)
 
 			// ChainReader QueryKey API provides logs including the cursor value and not
 			// after the cursor value. If the response only consists of the log corresponding
@@ -386,7 +431,7 @@ func (w *workflowRegistry) readRegistryEventsLoop(ctx context.Context, eventType
 				case <-ctx.Done():
 					w.lggr.Debug("readRegistryEventsLoop stopped during processing")
 					return
-				case w.eventCh <- event.Event:
+				case eventCh <- event.Event:
 				}
 			}
 		}
@@ -396,52 +441,47 @@ func (w *workflowRegistry) readRegistryEventsLoop(ctx context.Context, eventType
 // syncUsingEventStrategy syncs workflow registry contract state by watching for events on the contract.
 // It first loads the workflow metadata from the contract state as WorkflowRegistered events,
 // and then starts a goroutine with one loop for handling the events.
-func (w *workflowRegistry) syncUsingEventStrategy(ctx context.Context, don capabilities.DON, reader ContractReader) {
+func (w *workflowRegistry) syncUsingEventStrategy(ctx context.Context, don capabilities.DON, reader ContractReader, eventCh chan Event) {
 	w.lggr.Debugw("Loading initial workflows for DON", "DON", don.ID)
 
-	workflowMetadata, loadWorkflowsHead, err := w.getWorkflowMetadata(ctx, don, reader)
+	workflowMetadata, _, err := w.getWorkflowMetadata(ctx, don, reader)
 	if err != nil {
 		w.lggr.Errorw("failed to load initial workflows", "err", err)
 	}
 
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
-
-		w.lggr.Debugw("Rehydrating existing workflows", "len", len(workflowMetadata))
-		for _, workflow := range workflowMetadata {
-			select {
-			case <-ctx.Done():
-				w.lggr.Debug("shut down during initial workflow registration")
-				return
-			case w.eventCh <- workflowAsEvent{
-				Data: WorkflowRegistryWorkflowRegisteredV1{
-					WorkflowID:    workflow.WorkflowID,
-					WorkflowOwner: workflow.Owner,
-					DonID:         workflow.DonID,
-					Status:        workflow.Status,
-					WorkflowName:  workflow.WorkflowName,
-					BinaryURL:     workflow.BinaryURL,
-					ConfigURL:     workflow.ConfigURL,
-					SecretsURL:    workflow.SecretsURL,
-				},
-				EventType: WorkflowRegisteredEvent,
-			}:
-			}
+	w.lggr.Debugw("Rehydrating existing workflows", "len", len(workflowMetadata))
+	for _, workflow := range workflowMetadata {
+		select {
+		case <-ctx.Done():
+			w.lggr.Debug("shut down during initial workflow registration")
+			return
+		case eventCh <- workflowAsEvent{
+			Data: WorkflowRegistryWorkflowRegisteredV1{
+				WorkflowID:    workflow.WorkflowID,
+				WorkflowOwner: workflow.Owner,
+				DonID:         workflow.DonID,
+				Status:        workflow.Status,
+				WorkflowName:  workflow.WorkflowName,
+				BinaryURL:     workflow.BinaryURL,
+				ConfigURL:     workflow.ConfigURL,
+				SecretsURL:    workflow.SecretsURL,
+			},
+			EventType: WorkflowRegisteredEvent,
+		}:
 		}
+	}
 
-		// Poll for all workflow related events
-		ets := []WorkflowRegistryEventType{
-			ForceUpdateSecretsEvent,
-			WorkflowActivatedEvent,
-			WorkflowDeletedEvent,
-			WorkflowPausedEvent,
-			WorkflowRegisteredEvent,
-			WorkflowUpdatedEvent,
-		}
+	// Poll for all workflow related events
+	ets := []WorkflowRegistryEventType{
+		ForceUpdateSecretsEvent,
+		WorkflowActivatedEvent,
+		WorkflowDeletedEvent,
+		WorkflowPausedEvent,
+		WorkflowRegisteredEvent,
+		WorkflowUpdatedEvent,
+	}
 
-		w.readRegistryEventsLoop(ctx, ets, don, reader, loadWorkflowsHead.Height)
-	}()
+	w.readRegistryEventsLoop(ctx, ets, don, reader, eventCh)
 }
 
 // workflowMetadataToEvents compares the workflow registry workflow metadata state against the engine registry's state.
@@ -539,56 +579,38 @@ func (w *workflowRegistry) workflowMetadataToEvents(ctx context.Context, workflo
 // syncUsingReconciliationStrategy syncs workflow registry contract state by polling the workflow metadata state and comparing to local state.
 // It still watches for ForceUpdateSecretsEvents, which can't be reconciled through workflow metadata state.
 // NOTE: In this mode paused states will be treated as a deleted workflow. Workflows will not be registered as paused.
-func (w *workflowRegistry) syncUsingReconciliationStrategy(ctx context.Context, don capabilities.DON, reader ContractReader) {
-	_, loadWorkflowsHead, err := w.getWorkflowMetadata(ctx, don, reader)
-	if err != nil {
-		w.lggr.Errorw("failed to load workflows head", "err", err)
-	}
-
+func (w *workflowRegistry) syncUsingReconciliationStrategy(ctx context.Context, don capabilities.DON, reader ContractReader, eventCh chan Event) {
 	// Poll for changes in workflow state
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
-		ticker := w.getTicker()
-		w.lggr.Debug("running readRegistryStateLoop")
-		for {
-			select {
-			case <-ctx.Done():
-				w.lggr.Debug("shutting down readRegistryStateLoop")
-				return
-			case <-ticker:
-				workflowMetadata, _, err := w.getWorkflowMetadata(ctx, don, reader)
-				if err != nil {
-					w.lggr.Errorw("failed to get registry state", "err", err)
-					continue
-				}
-				events := w.workflowMetadataToEvents(ctx, workflowMetadata, don.ID)
-				// Send events generated from differences to the event channel to be handled
-				reconcileReport := map[string]int{}
-				for _, event := range events {
-					reconcileReport[string(event.EventType)]++
-					select {
-					case <-ctx.Done():
-						w.lggr.Debug("readRegistryStateLoop stopped during processing")
-						return
-					case w.eventCh <- event:
-					}
-				}
-
-				w.lggr.Debugw("generated events to reconcile", "num", len(events), "report", reconcileReport)
+	defer w.wg.Done()
+	ticker := w.getTicker()
+	w.lggr.Debug("running readRegistryStateLoop")
+	for {
+		select {
+		case <-ctx.Done():
+			w.lggr.Debug("shutting down readRegistryStateLoop")
+			return
+		case <-ticker:
+			workflowMetadata, _, err := w.getWorkflowMetadata(ctx, don, reader)
+			if err != nil {
+				w.lggr.Errorw("failed to get registry state", "err", err)
+				continue
 			}
-		}
-	}()
+			events := w.workflowMetadataToEvents(ctx, workflowMetadata, don.ID)
+			// Send events generated from differences to the event channel to be handled
+			reconcileReport := map[string]int{}
+			for _, event := range events {
+				reconcileReport[string(event.EventType)]++
+				select {
+				case <-ctx.Done():
+					w.lggr.Debug("readRegistryStateLoop stopped during processing")
+					return
+				case eventCh <- event:
+				}
+			}
 
-	// Poll for events for only ForceUpdateSecretsEvent
-	ets := []WorkflowRegistryEventType{
-		ForceUpdateSecretsEvent,
+			w.lggr.Debugw("generated events to reconcile", "num", len(events), "report", reconcileReport)
+		}
 	}
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
-		w.readRegistryEventsLoop(ctx, ets, don, reader, loadWorkflowsHead.Height)
-	}()
 }
 
 // getTicker returns the ticker that the workflowRegistry will use to poll for events.  If the ticker
