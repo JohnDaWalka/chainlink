@@ -802,7 +802,7 @@ func MakeSVM2EVMExtraArgsV2(gasLimit uint64, allowOOO bool) []byte {
 
 	gasLimitBytes := make([]byte, 8) // uint64 requires 8 bytes
 	binary.LittleEndian.PutUint64(gasLimitBytes, gasLimit)
-	gasLimitBytes = common.RightPadBytes(gasLimitBytes, 32) // pad from the right to 32 bytes for borsh-encoding
+	gasLimitBytes = common.RightPadBytes(gasLimitBytes, 16) // little-endian borsh-encoding of u128
 
 	// borsh-encode allowOOO
 	var allowOOOBytes []byte
