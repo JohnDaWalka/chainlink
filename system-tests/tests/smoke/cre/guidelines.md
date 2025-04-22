@@ -116,9 +116,9 @@ Download the CRE CLI binary compiled for your host machine's architecture from t
 
 ---
 
-### `cron` Binary
+### `cron` and `readcontract` Binary
 
-You must ensure the test environment has access to the `cron` capability binary. You can either:
+You must ensure the test environment has access to the `cron` and `readcontract` capability binaries. You can either:
 
 1. **Use a CL node image that already includes the binary**, or
 2. **Make the binary available on your host machine** so that the test can copy it into the running container.
@@ -127,6 +127,7 @@ If you choose the first option, comment out the relevant line in your TOML confi
 ```toml
 [workflow_config.dependencies]
   # cron_capability_binary_path = "./cron"
+  # read_contract_capability_binary_path = "./amd64_readcontract"
 ```
 
 If you choose the second option, update the relevant line in your TOML config to match the binary path:
@@ -134,6 +135,7 @@ If you choose the second option, update the relevant line in your TOML config to
 ```toml
 [workflow_config.dependencies]
   cron_capability_binary_path = "./some-folder/cron"
+  read_contract_capability_binary_path = "./some-folder/amd64_readcontract"
 ```
 
 To obtain the binary, you can:
