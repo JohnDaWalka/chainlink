@@ -184,8 +184,8 @@ DataLength = 500
 
 [CCIP.Groups.load.LoadProfile]
 RequestPerUnitTime = [1]
-TimeUnit = '12m'
-TestDuration = '6h' # load test duration, not used for smoke tests
+TimeUnit = '10m'
+TestDuration = '5h' # load test duration, not used for smoke tests
 WaitBetweenChaosDuringLoad = '60h' # Duration to wait between each chaos injection during load test; only valid for chaos tests
 FailOnFirstErrorInLoad = false
 TestRunName = 'ETHEREUM_TESTNET-ZORA_TESTNET_LINK_fee_without_token_smoke'
