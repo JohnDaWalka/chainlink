@@ -1,0 +1,231 @@
+[CCIP]
+[CCIP.Deployments]
+Data = """
+{
+  "lane_configs": {
+    "ETHEREUM_TESTNET": {
+      "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+      "bridge_tokens": [
+        "0x2Ca7afAC86D0b28d9f7e512b969cEaD9E3048303",
+        "0x7f5E7C0BA70893d9b35BF519B44bD7Bf48BDB4e1",
+        "0x7f5E7C0BA70893d9b35BF519B44bD7Bf48BDB4e1",
+        "0x5fD7CE2502FE82243F4e3b96F7d01E4db4D667Ca",
+        "0x5fD7CE2502FE82243F4e3b96F7d01E4db4D667Ca",
+        "0x3f235e789E1194365878631a2844cE432d8741d5",
+        "0x3f235e789E1194365878631a2844cE432d8741d5",
+        "0xB3c3977B0aC329A9035889929482a4c635B50573",
+        "0x7643B547ecF8d203e018AC91323c60D9ffeE5740",
+        "0x7643B547ecF8d203e018AC91323c60D9ffeE5740",
+        "0x98cB9e9f7Df29169F20a85a0392EbEC3291AA1E3",
+        "0x784c400D6fF625051d2f587dC0276E3A1ffD9cda",
+        "0x94025780a1aB58868D9B2dBBB775f44b32e8E6e5",
+        "0xFd57b4ddBf88a4e07fF4e34C487b99af2Fe82a05",
+        "0xFd57b4ddBf88a4e07fF4e34C487b99af2Fe82a05",
+        "0x466D489b6d36E7E3b824ef491C225F5830E81cC1",
+        "0x466D489b6d36E7E3b824ef491C225F5830E81cC1",
+        "0x94095e6514411C65E7809761F21eF0febe69A977",
+        "0x4ba734B67c765e37F81e8b0767E5f6f857ce2DfE",
+        "0x4ba734B67c765e37F81e8b0767E5f6f857ce2DfE",
+        "0x832bA6abcAdC68812be372F4ef20aAC268bA20B7",
+        "0x9C555844F48EE0856BF26384A3C42a41e9Ba9453",
+        "0x9C555844F48EE0856BF26384A3C42a41e9Ba9453",
+        "0x8f163123483D57A3fc0aeF641d69e380678fA24D",
+        "0x8f163123483D57A3fc0aeF641d69e380678fA24D",
+        "0xc4bF5CbDaBE595361438F8c6a187bDc330539c60",
+        "0xc4bF5CbDaBE595361438F8c6a187bDc330539c60",
+        "0xc4bF5CbDaBE595361438F8c6a187bDc330539c60",
+        "0xb7c8bCA891143221a34DB60A26639785C4839040",
+        "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+        "0xAc2D4A1A2A82689343Be5B7D51Ed3FdcCE5DFc90",
+        "0xAc2D4A1A2A82689343Be5B7D51Ed3FdcCE5DFc90",
+        "0x4e51e0a8a5e31Acb0a0B5EB9E5301a21DeBFAbbe",
+        "0x14f7b60b3234aCF3321198fE6d9792dE130a502c",
+        "0xB5F40AaBaB8025bBcE2Bf256592BC60036bc4819",
+        "0xB5F40AaBaB8025bBcE2Bf256592BC60036bc4819",
+        "0x2ABd0B368a2274950a6d68c931D6C9E0676acdAA",
+        "0x2ABd0B368a2274950a6d68c931D6C9E0676acdAA",
+        "0x739eD73D1EaCF70E454Cc0b77524152520644459",
+        "0x739eD73D1EaCF70E454Cc0b77524152520644459",
+        "0xc32454aDa507a5c1a8fe53D4af8304443fCd43d6",
+        "0xc32454aDa507a5c1a8fe53D4af8304443fCd43d6",
+        "0x82abB1864326A8A7e1A357FFA2270D09CCb867B9",
+        "0xF92E4b278380f39fADc24483C7baC61b73EE93F2",
+        "0x3F9f4e206F025e7D0E0d370914089361C4bc568e",
+        "0x3F9f4e206F025e7D0E0d370914089361C4bc568e",
+        "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+        "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+        "0x13613fb95931D7cC2F1ae3E30e5090220f818032",
+        "0x13613fb95931D7cC2F1ae3E30e5090220f818032",
+        "0x13613fb95931D7cC2F1ae3E30e5090220f818032",
+        "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
+        "0x0966031F4F90cE09E73CDeD814FE14A072bd3f75",
+        "0x0966031F4F90cE09E73CDeD814FE14A072bd3f75",
+        "0x5FBd716B93A307F59b2a614C41d0ec26BE21c48E",
+        "0x19518eA0A601bAE86b542CF65D73376e0a446CF3",
+        "0x19518eA0A601bAE86b542CF65D73376e0a446CF3",
+        "0x1b791d05E437C78039424749243F5A79E747525e",
+        "0x29Da11fAFe1D88779C101DcE609F89D102CBbE4D",
+        "0x11460e2815bd06d72f3ABc686C1564b306590128"
+      ],
+      "bridge_tokens_pools": [
+        "0xEbB98D3ff092f43823677A4C3BD6e314b84E4B99",
+        "0x18E6b9953e22627085a889fE966cb26630e90f2D",
+        "0x0e12Aa765E437Ac7389E7620556Df59D96E7b54F",
+        "0xd1b1BFEB480E8b546d3AB2d5bfF203a54F6cC170",
+        "0x739C40b22a96012fb51839Ed1b6124BD1d732491",
+        "0x8b4BA17c60A501b146c264ACd7176212EEabBd98",
+        "0x33181610b018204fa95bBc74C0752d6831f22dFF",
+        "0xAc8CFc3762a979628334a0E4C1026244498E821b",
+        "0x621a88b857cDcF4e6B98F37a43EF763cE432B563",
+        "0x8063356Cb053FD545A4c1D90d29Ded4B53FB8283",
+        "0x892b41Fc1c87C93b4ef20D24a0632Aaee5845f5E",
+        "0x5f217CE93e206D6F13B342aEEf53A084FA957745",
+        "0x3A1f9cc20b1301F5bbB1C98374c0FBdf6583CEDd",
+        "0xF081aCC599dFD65cdFD43934d2D8e2C7ad0277aE",
+        "0x38d1ef9619Cd40cf5482C045660Ae7C82Ada062c",
+        "0x658FdaC59a197D5166151640b7a673F7dF1Ba324",
+        "0x09EC713b931586eD6Aa5425eC4d9dA078a47B6b1",
+        "0x5A80462d5e15FCF75caCF8D0dBBf16B70476d029",
+        "0x1979F233768d53Ab76ec1ccb1183301d873aadFc",
+        "0x881f50A2A7F85a5F6F6367606dbB86F207bcb36E",
+        "0x0ea0D7B2b78DD3A926fC76d6875a287F0AEB158F",
+        "0x97BaE0fA5B6Edb564A9c48Add9ACCf62EC97A92a",
+        "0x03bd65FFA67E8dbE23c7857D22Ec91f073f567a0",
+        "0x0c64B8b9714d5a8cf303D44bc2eab4bc83C57128",
+        "0xb51d292c64AC47255F174ED20A22147Ac1bf85A2",
+        "0xEc2C54DB552069cceac2342e749FaF19c327864a",
+        "0x14A3298f667CCB3ad4B77878d80b353f6A10F183",
+        "0x7768248E1Ff75612c18324bad06bb393c1206980",
+        "0xA04c2cbbFA7bF7aDCBDe911216A0ba7e3f1e36b3",
+        "0xAF46BF6D19921e30bC5CC0043dC6dE91eDF00c98",
+        "0xAd08501392C1132E67B2F10C5086dD1fd08C7B1A",
+        "0xa40087726501a230eC44D7209BB5A368841F3605",
+        "0x4674E4aF8429c58B4d45135B1A4b31cACAc71C60",
+        "0x20650ebF0F3D634F97f4AeEf3f46412d596d4D34",
+        "0xFa7E275E36367263d389F059DbD503BD7b331050",
+        "0x4242B40aAbfb78a7a1dd323e17df9ee1bfF9fc15",
+        "0x9F1362a6BF85F6028972914D590b53074e6c7f0e",
+        "0x3a920ed740Ee4258D42f75a6831c1aCdA8A56b91",
+        "0xA54bdf524Db784785872D8E67206d444739359c4",
+        "0x1F25021B7B0c110CAB30b498b807FAdb28a7E1bE",
+        "0x2C70eefB56ca90CF0BdF8739a140539610681bD8",
+        "0x007478e11a44E706583b6bdbdd92874ca373b773",
+        "0x5c0B55dbd1335A7c96653788cF545a8c08148496",
+        "0x919b1d308e4477C88350C336537eC5AC9eE76d9a",
+        "0xA1359A617728ba49821B35696a54195204E0d962",
+        "0xeB3c82EC29b56964492D51A577C6329A9b159137",
+        "0xAff3fE524ea94118EF09DaDBE3c77ba6AA0005EC",
+        "0x3fF675B880aC9F67AC6f4342FfD9e99B80469bAd",
+        "0xBcFd462bA77c108a77297D426763E69858380987",
+        "0x8fC99CbA30d3dB44DA6d83b17216043606cE2BdB",
+        "0xEcc0EFa2C945022E5d8Cf0e7Bc94324834b987B8",
+        "0x968ee1e1A54B7d6273801AdefC4165823DeE6123",
+        "0x76B6D8acDd74387eA007EdaB2a6988103917d1C5",
+        "0x595ff82637D1Ef864632A79666b723E82FAD52A7",
+        "0x0966D38C58785aad00985A6Aa68D8fF30941852a",
+        "0x3C1e13DA7fcBB30c7695eFEe5CE9A800d27C91f8",
+        "0x31B0682ffe29E10bF626B23da1b10A5cBE4956d9",
+        "0x9B65749b38278060C5787Cce0391AC7f1094C8E8",
+        "0xC2a61Fb0C5b5DB20201F8c72a42D127D8eC0fd96",
+        "0x1C59Ed57BaEba90890445BdEf0BFE4ee0931e504"
+      ],
+      "arm": "0x27Da8735d8d1402cEc072C234759fbbB4dABBC4A",
+      "router": "0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59",
+      "price_registry": "0x9EF7D57a4ea30b9e37794E55b0C75F2A70275dCc",
+      "wrapped_native": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
+      "src_contracts": {
+        "ZORA_TESTNET": {
+          "on_ramp": "0xD6f4f3C6CB44791B549718ED6d80Bd4CceB342ea",
+          "deployed_at": 0
+        }
+      },
+      "dest_contracts": {
+        "ZORA_TESTNET": {
+          "off_ramp": "0x4d472DD88CcF827fda61FC8E6951f4C990Fed146",
+          "commit_store": "0x0eCA6284692eF8F97b27df3Ee1D2E94FEB7a53e0",
+          "receiver_dapp": "0xdDBb6f358f290408D76847b4F602f0FD599295fd"
+        }
+      }
+    },
+    "ZORA_TESTNET": {
+      "fee_token": "0xBEDDEB2DF8904cdBCFB6Bf29b91d122D5Ae4eb7e",
+      "arm": "0x5E0E4a6dd125dEC21c3376f6Fc65AF6BD861eE64",
+      "router": "0xC5c058814cb85bF52c83264e09da90CB4c932cb7",
+      "price_registry": "0xE4d4dB78339A847B8d70C7e6e7e75d43e3700883",
+      "wrapped_native": "0x4200000000000000000000000000000000000006",
+      "src_contracts": {
+        "ETHEREUM_TESTNET": {
+          "on_ramp": "0x5dA2fEd18b107C56db1d8f2174C0b50C6F8E4441",
+          "deployed_at": 0
+        }
+      },
+      "dest_contracts": {
+        "ETHEREUM_TESTNET": {
+          "off_ramp": "0x82C2604551F50e8cfB616E00E2B52020325327F0",
+          "commit_store": "0xe7597d503Fb5429f5092fA4581BF67a6EEeA157C",
+          "receiver_dapp": "0xdDBb6f358f290408D76847b4F602f0FD599295fd"
+        }
+      }
+    }
+  }
+}
+"""
+
+[CCIP.Groups.load]
+NetworkPairs = ['ETHEREUM_TESTNET,ZORA_TESTNET']
+PhaseTimeout = '50m'                   
+ExistingDeployment = true                         
+
+[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+MsgType = 'Data' # type of message to be sent, either 'Token' or 'DataWithToken' Or 'Data'
+DestGasLimit = 0 # change this to 0 gas limit if you are doing ccip-send to an EOA
+DataLength = 500
+
+[CCIP.Groups.load.LoadProfile]
+RequestPerUnitTime = [2]
+TimeUnit = '1m'
+TestDuration = '1h' # load test duration, not used for smoke tests
+WaitBetweenChaosDuringLoad = '60h' # Duration to wait between each chaos injection during load test; only valid for chaos tests
+FailOnFirstErrorInLoad = false
+TestRunName = 'ETHEREUM_TESTNET-ZORA_TESTNET_LINK_fee_without_token_smoke'
+
+[CCIP.ContractVersions]
+PriceRegistry = 'latest'
+OffRamp = 'latest'
+OnRamp = 'latest'
+TokenPool = 'latest'
+CommitStore = 'latest'
+
+[CCIP.Env]
+TTL = '3h'
+
+[CCIP.Env.Network]
+selected_networks = ['ETHEREUM_TESTNET', 'ZORA_TESTNET']
+
+#[CCIP.Env.Network.EVMNetworks.ZORA_TESTNET]
+#evm_name = 'ZORA_TESTNET'
+#evm_chain_id = 4200    # Replace with the chain ID of the destination network
+#evm_finality_tag = false   # Replace with the finality tag of the destination network
+#evm_finality_depth = 1000  # Replace with the finality depth of the destination network
+#evm_simulated = false 
+#client_implementation = 'Ethereum'  # Replace with the client implementation of the destination network
+#evm_chainlink_transaction_limit = 300000   # Replace with the chainlink transaction limit of the destination network
+#evm_transaction_timeout = '3m'
+#evm_minimum_confirmations = 1
+#evm_gas_estimation_buffer = 10000 
+#evm_supports_eip1559 = true    # Replace with the EIP-1559 support for the destination network
+#evm_default_gas_limit = 6000000
+
+#[CCIP.Env.Network.EVMNetworks.ETHEREUM_TESTNET]
+#evm_name = 'ETHEREUM_TESTNET'
+#evm_chain_id = 4200    # Replace with the chain ID of the destination network
+#evm_finality_tag = false   # Replace with the finality tag of the destination network
+#evm_finality_depth = 1000  # Replace with the finality depth of the destination network
+#evm_simulated = false 
+#client_implementation = 'Ethereum'  # Replace with the client implementation of the destination network
+#evm_chainlink_transaction_limit = 300000   # Replace with the chainlink transaction limit of the destination network
+#evm_transaction_timeout = '3m'
+#evm_minimum_confirmations = 1
+#evm_gas_estimation_buffer = 10000 
+#evm_supports_eip1559 = true    # Replace with the EIP-1559 support for the destination network
+#evm_default_gas_limit = 6000000
