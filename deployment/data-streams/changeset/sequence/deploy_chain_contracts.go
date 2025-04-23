@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
+	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
 	"github.com/smartcontractkit/mcms"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -29,13 +31,13 @@ type DeployDataStreams struct {
 }
 
 func deployDataStreamsLogic(e deployment.Environment, cc DeployDataStreamsConfig) (deployment.ChangesetOutput, error) {
-	newAddresses := deployment.NewMemoryAddressBook() // changeset output expects only new addresses
+	deployedAddresses := ds.NewMemoryDataStore[
+		metadata.SerializedContractMetadata,
+		ds.DefaultMetadata,
+	]()
 
-	// Clone env to avoid mutation
-	cloneEnv, err := cloneEnvironment(e)
-	if err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
+	// Prevents mutating environment state - injected environment is not expected to be updated during changeset Apply
+	cloneEnv := e.Clone()
 
 	var timelockProposals []mcms.TimelockProposal
 
@@ -47,7 +49,7 @@ func deployDataStreamsLogic(e deployment.Environment, cc DeployDataStreamsConfig
 		switch family {
 		case chain_selectors.FamilyEVM:
 			// Deploy each component of the system for this chain
-			chainProposals, err := deployChainComponentsEVM(cloneEnv, chainSel, cfg, newAddresses)
+			chainProposals, err := deployChainComponentsEVM(cloneEnv, chainSel, cfg, deployedAddresses)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy components for chain %d: %w", chainSel, err)
 			}
@@ -65,8 +67,13 @@ func deployDataStreamsLogic(e deployment.Environment, cc DeployDataStreamsConfig
 		timelockProposals = []mcms.TimelockProposal{mergedTimelockProposal}
 	}
 
+	sealedDs, err := ds.ToDefault(deployedAddresses.Seal())
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to default format: %w", err)
+	}
+
 	return deployment.ChangesetOutput{
-		AddressBook:           newAddresses,
+		DataStore:             sealedDs,
 		MCMSTimelockProposals: timelockProposals,
 	}, nil
 }

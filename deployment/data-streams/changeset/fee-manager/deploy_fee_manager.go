@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
+	"github.com/smartcontractkit/mcms"
 
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 
@@ -43,24 +44,34 @@ func (cc DeployFeeManagerConfig) Validate() error {
 }
 
 func deployFeeManagerLogic(e deployment.Environment, cc DeployFeeManagerConfig) (deployment.ChangesetOutput, error) {
-	ab := deployment.NewMemoryAddressBook()
 	dataStore := ds.NewMemoryDataStore[
 		metadata.SerializedContractMetadata,
 		ds.DefaultMetadata,
 	]()
-	err := deployFeeManager(e, ab, cc)
+	err := deployFeeManager(e, dataStore, cc)
 	if err != nil {
-		e.Logger.Errorw("Failed to deploy FeeManager", "err", err, "addresses", ab)
-		return deployment.ChangesetOutput{AddressBook: ab}, deployment.MaybeDataErr(err)
+		e.Logger.Errorw("Failed to deploy FeeManager", "err", err)
+		return deployment.ChangesetOutput{}, deployment.MaybeDataErr(err)
 	}
 
+	var proposals []mcms.TimelockProposal
 	if cc.Ownership.ShouldTransfer && cc.Ownership.MCMSProposalConfig != nil {
 		filter := deployment.NewTypeAndVersion(types.FeeManager, deployment.Version0_5_0)
-		return mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, dataStore, filter, *cc.Ownership.MCMSProposalConfig)
+		res, err := mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, dataStore, filter, *cc.Ownership.MCMSProposalConfig)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
+		}
+		proposals = res.MCMSTimelockProposals
+	}
+
+	sealedDs, err := ds.ToDefault(dataStore.Seal())
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to default format: %w", err)
 	}
 
 	return deployment.ChangesetOutput{
-		AddressBook: ab,
+		DataStore:             sealedDs,
+		MCMSTimelockProposals: proposals,
 	}, nil
 }
 
@@ -68,36 +79,41 @@ func deployFeeManagerPrecondition(_ deployment.Environment, cc DeployFeeManagerC
 	return cc.Validate()
 }
 
-func deployFeeManager(e deployment.Environment, ab deployment.AddressBook, cc DeployFeeManagerConfig) error {
+func deployFeeManager(e deployment.Environment,
+	dataStore ds.MutableDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata],
+	cc DeployFeeManagerConfig) error {
 	if err := cc.Validate(); err != nil {
 		return fmt.Errorf("invalid DeployFeeManagerConfig: %w", err)
 	}
 
-	for chainSel := range cc.ChainsToDeploy {
+	for chainSel, chainCfg := range cc.ChainsToDeploy {
 		chain, ok := e.Chains[chainSel]
 		if !ok {
 			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}
-		conf := cc.ChainsToDeploy[chainSel]
-		_, err := changeset.DeployContract(e, ab, chain, FeeManagerDeployFn(conf))
+		feeManagerMetadata := metadata.FeeManagerMetadata{
+			RewardManagerAddress: chainCfg.RewardManagerAddress.String(),
+			VerifierProxyAddress: chainCfg.VerifierProxyAddress.String(),
+			FeeTokens: []metadata.FeeToken{
+				{
+					TokenType: metadata.Link,
+					Address:   chainCfg.LinkTokenAddress.String(),
+				},
+				{
+					TokenType: metadata.Native,
+					Address:   chainCfg.NativeTokenAddress.String(),
+				},
+			},
+		}
+		serialized, err := metadata.NewFeeManagerMetadata(feeManagerMetadata)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to serialize verifier proxy metadata: %w", err)
 		}
-		chainAddresses, err := ab.AddressesForChain(chain.Selector)
+		_, err = changeset.DeployContractV2(e, dataStore, serialized, chain, FeeManagerDeployFn(chainCfg))
 		if err != nil {
-			e.Logger.Errorw("Failed to get chain addresses", "err", err)
-			return err
+			return fmt.Errorf("failed to deploy FeeManager: %w", err)
 		}
-		chainState, err := changeset.LoadChainState(e.Logger, chain, chainAddresses)
-		if err != nil {
-			e.Logger.Errorw("Failed to load chain state", "err", err)
-			return err
-		}
-		if len(chainState.FeeManagers) == 0 {
-			errNoCCS := errors.New("no FeeManager on chain")
-			e.Logger.Error(errNoCCS)
-			return errNoCCS
-		}
+
 	}
 
 	return nil

@@ -41,6 +41,7 @@ func deployAndTransferMcmsLogic(e deployment.Environment, cc DeployMCMSConfig) (
 		commontypes.CancellerManyChainMultisig,
 	}
 
+	// DeployMCMSWithTimelockV2 currently does not use the DataStore
 	ds, err := deployment.AddressBookToNewDataStore[metadata.SerializedContractMetadata, datastore.DefaultMetadata](mcmsOut.AddressBook)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to address book: %w", err)
@@ -53,20 +54,24 @@ func deployAndTransferMcmsLogic(e deployment.Environment, cc DeployMCMSConfig) (
 			contractFilter := deployment.NewTypeAndVersion(contractType, deployment.Version1_0_0)
 			contractTransfer, err := mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, ds, contractFilter, *cc.Ownership.MCMSProposalConfig)
 			if err != nil {
-				return deployment.ChangesetOutput{AddressBook: mcmsOut.AddressBook}, fmt.Errorf("failed to transfer %s to MCMS: %w", contractType, err)
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer %s to MCMS: %w", contractType, err)
 			}
 			proposals = append(proposals, contractTransfer.MCMSTimelockProposals...)
 		}
 	}
 
-	return deployment.ChangesetOutput{AddressBook: mcmsOut.AddressBook, MCMSTimelockProposals: proposals}, nil
+	sealedDs, err := datastore.ToDefault(ds.Seal())
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to default format: %w", err)
+	}
+
+	return deployment.ChangesetOutput{DataStore: sealedDs, MCMSTimelockProposals: proposals}, nil
 }
 
 func deployAndTransferMcmsPrecondition(_ deployment.Environment, cc DeployMCMSConfig) error {
 	if err := cc.Validate(); err != nil {
 		return fmt.Errorf("invalid DeployMCMSConfig: %w", err)
 	}
-
 	return nil
 }
 

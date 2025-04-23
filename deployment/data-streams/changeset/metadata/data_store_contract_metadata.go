@@ -5,8 +5,57 @@ import (
 	"fmt"
 
 	dstypes "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
+	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
+
+type DataStreamsMutableDataStore = ds.MutableDataStore[SerializedContractMetadata, ds.DefaultMetadata]
+type DataStreamsDataStore = ds.DataStore[SerializedContractMetadata, ds.DefaultMetadata]
+
+type RewardManagerMetadata struct {
+	FeeManagerAddress string
+	RecipientWeights  []RecipientWeights
+}
+
+// TokenType represents the type of token used for fees
+type TokenType string
+
+const (
+	// Native represents the native token of the blockchain (e.g., ETH on Ethereum)
+	Native TokenType = "Native"
+	// Link represents the LINK token
+	Link TokenType = "Link"
+)
+
+// String returns the string representation of the TokenType
+func (t TokenType) String() string {
+	return string(t)
+}
+
+type FeeToken struct {
+	TokenType TokenType
+	Address   string
+	Surcharge string
+}
+
+type StreamDiscounts struct {
+	Stream       string
+	DiscountType string
+	TokenType    TokenType
+	Value        string
+}
+
+type SubscriberDiscount struct {
+	SubscriberAddress string
+	SubscriberName    string
+	StreamDiscounts   []StreamDiscounts
+}
+
+type FeeManagerMetadata struct {
+	FeeTokens            []FeeToken
+	RewardManagerAddress string
+	VerifierProxyAddress string
+}
 
 type VerifierProxyMetadata struct {
 	FeeManagerAddress       string
@@ -77,6 +126,34 @@ func (s SerializedContractMetadata) ToVerifierProxyMetadata() (VerifierProxyMeta
 	return metadata, nil
 }
 
+// ToRewardManagerMetadata converts the serialized metadata to RewardManagerMetadata
+func (s SerializedContractMetadata) ToRewardManagerMetadata() (RewardManagerMetadata, error) {
+	if s.Type != dstypes.RewardManager.String() {
+		return RewardManagerMetadata{}, fmt.Errorf("metadata is not of type reward_manager")
+	}
+
+	var metadata RewardManagerMetadata
+	if err := json.Unmarshal(s.Content, &metadata); err != nil {
+		return RewardManagerMetadata{}, err
+	}
+
+	return metadata, nil
+}
+
+// ToFeeManagerMetadata converts the serialized metadata to FeeManagerMetadata
+func (s SerializedContractMetadata) ToFeeManagerMetadata() (FeeManagerMetadata, error) {
+	if s.Type != dstypes.FeeManager.String() {
+		return FeeManagerMetadata{}, fmt.Errorf("metadata is not of type fee_manager")
+	}
+
+	var metadata FeeManagerMetadata
+	if err := json.Unmarshal(s.Content, &metadata); err != nil {
+		return FeeManagerMetadata{}, err
+	}
+
+	return metadata, nil
+}
+
 // NewVerifierMetadata creates a new SerializedContractMetadata from a VerifierMetadata
 func NewVerifierMetadata(metadata VerifierMetadata) (SerializedContractMetadata, error) {
 	content, err := json.Marshal(metadata)
@@ -99,5 +176,31 @@ func NewVerifierProxyMetadata(metadata VerifierProxyMetadata) (SerializedContrac
 
 	return SerializedContractMetadata{
 		Type: dstypes.VerifierProxy.String(), Content: content,
+	}, nil
+}
+
+// NewRewardManagerMetadata creates a new SerializedContractMetadata from a RewardManagerMetadata
+func NewRewardManagerMetadata(metadata RewardManagerMetadata) (SerializedContractMetadata, error) {
+	content, err := json.Marshal(metadata)
+	if err != nil {
+		return SerializedContractMetadata{}, err
+	}
+
+	return SerializedContractMetadata{
+		Type:    dstypes.RewardManager.String(),
+		Content: content,
+	}, nil
+}
+
+// NewFeeManagerMetadata creates a new SerializedContractMetadata from a FeeManagerMetadata
+func NewFeeManagerMetadata(metadata FeeManagerMetadata) (SerializedContractMetadata, error) {
+	content, err := json.Marshal(metadata)
+	if err != nil {
+		return SerializedContractMetadata{}, err
+	}
+
+	return SerializedContractMetadata{
+		Type:    dstypes.FeeManager.String(),
+		Content: content,
 	}, nil
 }

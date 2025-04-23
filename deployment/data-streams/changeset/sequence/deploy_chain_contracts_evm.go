@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
+	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
 	"github.com/smartcontractkit/mcms"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -16,12 +18,12 @@ import (
 )
 
 // deployChainComponentsEVM deploys all necessary components for a single evm chain
-func deployChainComponentsEVM(env deployment.Environment, chain uint64, cfg DeployDataStreams, newAddresses deployment.AddressBook) ([]mcms.TimelockProposal, error) {
+func deployChainComponentsEVM(env deployment.Environment, chain uint64, cfg DeployDataStreams, dataStore metadata.DataStreamsMutableDataStore) ([]mcms.TimelockProposal, error) {
 	var timelockProposals []mcms.TimelockProposal
 
 	// Step 1: Deploy MCMS if configured
 	if cfg.Ownership.ShouldDeployMCMS {
-		mcmsProposals, err := deployMCMS(env, chain, cfg, newAddresses)
+		mcmsProposals, err := deployMCMS(env, chain, cfg, dataStore)
 		if err != nil {
 			return nil, fmt.Errorf("failed to deploy MCMS: %w", err)
 		}
@@ -65,7 +67,7 @@ func deployChainComponentsEVM(env deployment.Environment, chain uint64, cfg Depl
 }
 
 // deployVerifierProxy deploys VerifierProxy contract
-func deployVerifierProxy(env deployment.Environment, chain uint64, cfg DeployDataStreams, newAddresses deployment.AddressBook) (common.Address, []mcms.TimelockProposal, error) {
+func deployVerifierProxy(env deployment.Environment, chain uint64, cfg DeployDataStreams, newAddresses metadata.DataStreamsMutableDataStore) (common.Address, []mcms.TimelockProposal, error) {
 	verifierProxyCfg := verification.DeployVerifierProxyConfig{
 		ChainsToDeploy: map[uint64]verification.DeployVerifierProxy{
 			chain: {}, // Implement AccessController as needed
@@ -79,18 +81,16 @@ func deployVerifierProxy(env deployment.Environment, chain uint64, cfg DeployDat
 		return common.Address{}, nil, fmt.Errorf("failed to deploy verifier proxy on chain: %d err %w", chain, err)
 	}
 
-	if err := newAddresses.Merge(proxyOut.AddressBook); err != nil {
-		return common.Address{}, nil, fmt.Errorf("address book merge failed after verifier proxy deployment: %w", err)
+	if err := mergeNewAddresses(env, newAddresses, proxyOut.DataStore.Seal()); err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to merge new addresses: %w", err)
 	}
 
-	verifierProxyAddr, err := dsutil.MaybeFindEthAddress(newAddresses, chain, types.VerifierProxy)
-	if err != nil {
-		return common.Address{}, nil, fmt.Errorf("failed to find verifier proxy address: %w", err)
+	// Filter without version here should be safe as we only expect 1 address
+	records := newAddresses.Addresses().Filter(ds.AddressRefByType(ds.ContractType(types.VerifierProxy)))
+	if len(records) != 1 {
+		return common.Address{}, nil, fmt.Errorf("expected 1 verifier proxy address, found %d", len(records))
 	}
-
-	if err := env.ExistingAddresses.Merge(proxyOut.AddressBook); err != nil {
-		return common.Address{}, nil, fmt.Errorf("failed to merge verifier proxy address: %w", err)
-	}
+	verifierProxyAddr := common.HexToAddress(records[0].Address)
 
 	return verifierProxyAddr, proxyOut.MCMSTimelockProposals, nil
 }
@@ -330,8 +330,8 @@ func setFeeManagerOnRewardManager(env deployment.Environment, chain uint64, rewa
 	return nil
 }
 
-// deployMCMS deploys Multi-Chain Management System
-func deployMCMS(env deployment.Environment, chain uint64, cfg DeployDataStreams, newAddresses deployment.AddressBook) ([]mcms.TimelockProposal, error) {
+// deployMCMS deploys the MCMS contracts
+func deployMCMS(env deployment.Environment, chain uint64, cfg DeployDataStreams, cumulativeAddresses metadata.DataStreamsMutableDataStore) ([]mcms.TimelockProposal, error) {
 	mcmsDeployCfg := changeset.DeployMCMSConfig{
 		ChainsToDeploy: []uint64{chain},
 		Ownership:      cfg.Ownership.AsSettings(),
@@ -343,13 +343,37 @@ func deployMCMS(env deployment.Environment, chain uint64, cfg DeployDataStreams,
 		return nil, fmt.Errorf("failed to deploy MCMS on chain %d: %w", chain, err)
 	}
 
-	if err := newAddresses.Merge(mcmsDeployOut.AddressBook); err != nil {
-		return nil, fmt.Errorf("address book merge failed after MCMS deployment: %w", err)
-	}
-
-	if err := env.ExistingAddresses.Merge(mcmsDeployOut.AddressBook); err != nil {
-		return nil, fmt.Errorf("failed to merge existing addresses with mcms addresses: %w", err)
+	if err := mergeNewAddresses(env, cumulativeAddresses, mcmsDeployOut.DataStore.Seal()); err != nil {
+		return nil, fmt.Errorf("datastore merges failed after MCMS deployment: %w", err)
 	}
 
 	return mcmsDeployOut.MCMSTimelockProposals, nil
+}
+
+// mergeNewAddresses merges new addresses into the existing environment and cumulative address book
+// This is used when chaining together changesets and accumulating addresses while also updating
+// the environment with new addresses so that downstream operations can use them
+func mergeNewAddresses(env deployment.Environment,
+	cumulativeAddrs metadata.DataStreamsMutableDataStore,
+	newAddrs ds.DataStore[ds.DefaultMetadata, ds.DefaultMetadata]) error {
+
+	// Step 1 is update the existing environment to reflect newly deployed addresses
+	updatedEnvironmentAddrs, err := ds.ToDefault(newAddrs)
+	if err != nil {
+		return fmt.Errorf("failed to convert data store to default format: %w", err)
+	}
+	if err = updatedEnvironmentAddrs.Merge(env.DataStore); err != nil {
+		return fmt.Errorf("failed to merge new addresses into existing environment: %w", err)
+	}
+	env.DataStore = updatedEnvironmentAddrs.Seal()
+
+	// Step 2 update newAddresses which is returned at the end of the entire "sequence"
+	envDatastore, err := ds.FromDefault[metadata.SerializedContractMetadata, ds.DefaultMetadata](newAddrs)
+	if err != nil {
+		return fmt.Errorf("failed to convert data store from default format: %w", err)
+	}
+	if err = cumulativeAddrs.Merge(envDatastore); err != nil {
+		return fmt.Errorf("failed to merge new addresses into address book: %w", err)
+	}
+	return nil
 }
