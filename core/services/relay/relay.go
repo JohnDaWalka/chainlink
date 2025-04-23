@@ -38,6 +38,10 @@ type ServerAdapter struct {
 	types.Relayer
 }
 
+func (r *ServerAdapter) AsEVMRelayer() types.EVMRelayer {
+	return r.Relayer.AsEVMRelayer()
+}
+
 // NewServerAdapter returns a new ServerAdapter.
 func NewServerAdapter(r types.Relayer) *ServerAdapter {
 	return &ServerAdapter{Relayer: r}
