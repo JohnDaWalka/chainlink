@@ -22,6 +22,7 @@ const (
 	WebAPITriggerCapability CapabilityFlag = "web-api-trigger"
 	MockCapability          CapabilityFlag = "mock"
 	// Add more capabilities as needed
+	StreamTriggerV1 CapabilityFlag = "streams-trigger-v1"
 )
 
 // Job names for which there are no specific capabilities

@@ -120,6 +120,23 @@ var ChainWriterCapabilityFactory = func(chainID uint64) func(donFlags []string) 
 	}
 }
 
+var StreamsTriggerV1CapabilityFactory = func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
+	var capabilities []keystone_changeset.DONCapabilityWithConfig
+
+	if flags.HasFlag(donFlags, types.StreamTriggerV1) {
+		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
+			Capability: kcr.CapabilitiesRegistryCapability{
+				LabelledName:   "streams-trigger",
+				Version:        "1.0.0",
+				CapabilityType: 0, // TRIGGER
+			},
+			Config: &capabilitiespb.CapabilityConfig{},
+		})
+	}
+
+	return capabilities
+}
+
 var ChainReaderCapabilityFactory = func(chainID uint64, chainFamily string) func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
 	return func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
 		var capabilities []keystone_changeset.DONCapabilityWithConfig

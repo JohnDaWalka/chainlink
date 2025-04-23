@@ -1,0 +1,109 @@
+[blockchain_a]
+type = "anvil"
+chain_id = "1337"
+
+[jd]
+image = "localhost:5000/job-distributor:sha-707362c-amd64"
+
+[infra]
+# either "docker" or "crib"
+type = "docker"
+
+[workflow_config]
+workflow_name = "abcdefgasd"
+feed_id = "018e16c39e000320000000000000000000000000000000000000000000000000"
+
+[[nodesets]]
+nodes = 3
+override_mode = "all"
+http_port_range_start = 10100
+name = "asset"
+
+[nodesets.db]
+image = "postgres:12.0"
+port = 13001
+volume_name = "asset_volume"
+
+[[nodesets.node_specs]]
+[nodesets.node_specs.node]
+image = "localhost:5000/chainlink:develop"
+# omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
+user_config_overrides = """
+        [Feature]
+        LogPoller = true
+
+        [Log]
+        Level = 'debug'
+        JSONConsole = true
+        [OCR2]
+        Enabled = true
+        DatabaseTimeout = '1s'
+
+        [P2P.V2]
+        Enabled = true
+        ListenAddresses = ['0.0.0.0:5001']
+      """
+
+[[nodesets]]
+nodes = 6
+override_mode = "all"
+http_port_range_start = 10200
+name = "workflow"
+
+[nodesets.db]
+image = "postgres:12.0"
+port = 13002
+volume_name = "workflow_volume"
+
+[[nodesets.node_specs]]
+
+[nodesets.node_specs.node]
+image = "localhost:5000/chainlink:develop"
+# omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
+user_config_overrides = """
+        [Feature]
+        LogPoller = true
+
+        [Log]
+        Level = 'debug'
+        JSONConsole = true
+        [OCR2]
+        Enabled = true
+        DatabaseTimeout = '1s'
+
+        [P2P.V2]
+        Enabled = true
+        ListenAddresses = ['0.0.0.0:5001']
+      """
+
+[[nodesets]]
+nodes = 3
+override_mode = "all"
+http_port_range_start = 10300
+name = "writer"
+
+[nodesets.db]
+image = "postgres:12.0"
+port = 13003
+volume_name = "writer_volume"
+
+[[nodesets.node_specs]]
+
+[nodesets.node_specs.node]
+image = "localhost:5000/chainlink:develop"
+# omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
+user_config_overrides = """
+        [Feature]
+        LogPoller = true
+
+        [Log]
+        Level = 'debug'
+        JSONConsole = true
+        [OCR2]
+        Enabled = true
+        DatabaseTimeout = '1s'
+
+        [P2P.V2]
+        Enabled = true
+        ListenAddresses = ['0.0.0.0:5001']
+      """
