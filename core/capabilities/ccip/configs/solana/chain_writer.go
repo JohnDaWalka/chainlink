@@ -120,7 +120,7 @@ func getExecuteMethodConfig(fromAddress string, offrampProgramAddress string) ch
 		},
 		ChainSpecificName: "execute",
 		ArgsTransform:     "CCIPExecute",
-		ComputeUnitLimitOverheard: 150_000,
+		ComputeUnitLimitOverhead: 150_000,
 		LookupTables: chainwriter.LookupTables{
 			DerivedLookupTables: []chainwriter.DerivedLookupTable{
 				{
