@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonState "github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
@@ -186,9 +187,11 @@ func ApplyChangesetsV2(t *testing.T, e deployment.Environment, changesetApplicat
 				if err != nil {
 					return deployment.Environment{}, nil, err
 				}
-				err = proposalutils.ExecuteMCMSTimelockProposalV2(t, currentEnv, &prop)
-				if err != nil {
-					return deployment.Environment{}, nil, err
+				if prop.Action == types.TimelockActionSchedule {
+					err = proposalutils.ExecuteMCMSTimelockProposalV2(t, currentEnv, &prop)
+					if err != nil {
+						return deployment.Environment{}, nil, err
+					}
 				}
 			}
 		}

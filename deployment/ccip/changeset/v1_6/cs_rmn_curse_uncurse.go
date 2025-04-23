@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/gagliardetto/solana-go"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	solRmnRemote "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
@@ -57,29 +60,47 @@ func (c RMNCurseConfig) Validate(e deployment.Environment) error {
 	validSubjects := map[globals.Subject]struct{}{
 		globals.GlobalCurseSubject(): {},
 	}
-	for _, selector := range e.AllChainSelectors() {
+	for _, selector := range GetAllCursableChainsSelector(e) {
 		validSubjects[globals.SelectorToSubject(selector)] = struct{}{}
 	}
 
 	for _, curseAction := range c.CurseActions {
 		result := curseAction(e)
 		for _, action := range result {
-			targetChain := e.Chains[action.ChainSelector]
-			targetChainState, ok := state.Chains[action.ChainSelector]
-			if !ok {
-				return fmt.Errorf("chain %s not found in onchain state", targetChain.String())
-			}
-
-			if err := commoncs.ValidateOwnership(e.GetContext(), c.MCMS != nil, targetChain.DeployerKey.From, targetChainState.Timelock.Address(), targetChainState.RMNRemote); err != nil {
-				return fmt.Errorf("chain %s: %w", targetChain.String(), err)
-			}
-
 			if err = deployment.IsValidChainSelector(action.ChainSelector); err != nil {
-				return fmt.Errorf("invalid chain selector %d for chain %s", action.ChainSelector, targetChain.String())
+				return fmt.Errorf("invalid chain selector %d", action.ChainSelector)
 			}
 
 			if _, ok := validSubjects[action.SubjectToCurse]; !ok {
-				return fmt.Errorf("invalid subject %x for chain %s", action.SubjectToCurse, targetChain.String())
+				return fmt.Errorf("invalid subject %x for chain %s", action.SubjectToCurse)
+			}
+
+			family, err := chain_selectors.GetSelectorFamily(action.ChainSelector)
+			if err != nil {
+				return err
+			}
+
+			// TODO: Implement chain family agnostic validation
+			switch family {
+			case chain_selectors.FamilyEVM:
+				targetChain := e.Chains[action.ChainSelector]
+				targetChainState, ok := state.Chains[action.ChainSelector]
+				if !ok {
+					return fmt.Errorf("chain %s not found in onchain state", targetChain.String())
+				}
+
+				if err := commoncs.ValidateOwnership(e.GetContext(), c.MCMS != nil, targetChain.DeployerKey.From, targetChainState.Timelock.Address(), targetChainState.RMNRemote); err != nil {
+					return fmt.Errorf("chain %s: %w", targetChain.String(), err)
+				}
+			case chain_selectors.FamilySolana:
+				targetChain := e.SolChains[action.ChainSelector]
+				targetChainState, ok := state.SolChains[action.ChainSelector]
+				if !ok {
+					return fmt.Errorf("chain %s not found in onchain state", targetChain.String())
+				}
+				if err := changeset.ValidateOwnershipSolana(&e, targetChain, c.MCMS != nil, targetChainState.RMNRemote, changeset.RMNRemote, solana.PublicKey{}); err != nil {
+					return fmt.Errorf("chain %s: %w", targetChain.String(), err)
+				}
 			}
 		}
 	}
@@ -136,7 +157,7 @@ func CurseLaneBidirectionally(sourceSelector uint64, destinationSelector uint64)
 // CurseChain(A) will curse A with the global curse subject and curse B and C with the curse subject of A
 func CurseChain(chainSelector uint64) CurseAction {
 	return func(e deployment.Environment) []RMNCurseAction {
-		chainSelectors := e.AllChainSelectors()
+		chainSelectors := GetAllCursableChainsSelector(e)
 
 		// Curse all other chains to prevent onramp from sending message to the cursed chain
 		var curseActions []RMNCurseAction
@@ -157,9 +178,9 @@ func CurseChain(chainSelector uint64) CurseAction {
 }
 
 func FilterOutNotConnectedLanes(e deployment.Environment, curseActions []RMNCurseAction) ([]RMNCurseAction, error) {
-	state, err := changeset.LoadOnchainState(e)
+	cursableChains, err := GetCursableChains(e)
 	if err != nil {
-		e.Logger.Errorf("failed to load onchain state: %v", err)
+		e.Logger.Errorf("failed to load cursable chains: %v", err)
 		return nil, err
 	}
 	// Filter the curse action to only apply on the connected chains
@@ -170,16 +191,20 @@ func FilterOutNotConnectedLanes(e deployment.Environment, curseActions []RMNCurs
 			continue
 		}
 
+		targetChainSelector := action.ChainSelector
 		sourceChainSelector := globals.SubjectToSelector(action.SubjectToCurse)
-		sourceChain, err := state.Chains[sourceChainSelector].OffRamp.GetSourceChainConfig(nil, action.ChainSelector)
+
+		// Check if the target chain's offramp is configured for the source chain represented by the subject.
+		// If not, cursing messages from that source on the target chain doesn't make sense.
+		connected, err := cursableChains[targetChainSelector].IsConnectedToChain(sourceChainSelector)
 
 		if err != nil {
-			e.Logger.Errorf("failed to get source chain config: %v", err)
+			e.Logger.Errorf("failed to check if offramp on chain %d is configured for source chain %d: %v", targetChainSelector, sourceChainSelector, err)
 			return nil, err
 		}
 
-		if !sourceChain.IsEnabled {
-			e.Logger.Warnf("source chain %d is not enabled, skipping", sourceChainSelector)
+		if !connected {
+			e.Logger.Warnf("Offramp on chain %d is not configured for source chain %d, skipping curse action", targetChainSelector, sourceChainSelector)
 			continue
 		}
 
@@ -265,16 +290,16 @@ func RMNCurseChangeset(e deployment.Environment, cfg RMNCurseConfig) (deployment
 	// Group curse actions by chain selector
 	grouped := groupRMNSubjectBySelector(curseActions, true, true)
 	// For each chain in the environment get the RMNRemote contract and call curse
-	for selector, chain := range state.Chains {
-		deployer, err := deployerGroup.GetDeployer(selector)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get deployer for chain %d: %w", selector, err)
-		}
+	cursableChains, err := GetCursableChains(e)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get cursable chains: %w", err)
+	}
+	for selector, chain := range cursableChains {
 		if curseSubjects, ok := grouped[selector]; ok {
 			// Only curse the subjects that are not actually cursed
 			notAlreadyCursedSubjects := make([]globals.Subject, 0)
 			for _, subject := range curseSubjects {
-				cursed, err := chain.RMNRemote.IsCursed(nil, subject)
+				cursed, err := chain.IsSubjectCursed(subject)
 				if err != nil {
 					return deployment.ChangesetOutput{}, fmt.Errorf("failed to check if chain %d is cursed: %w", selector, err)
 				}
@@ -291,7 +316,7 @@ func RMNCurseChangeset(e deployment.Environment, cfg RMNCurseConfig) (deployment
 				continue
 			}
 
-			_, err := chain.RMNRemote.Curse0(deployer, notAlreadyCursedSubjects)
+			err := chain.Curse(deployerGroup, notAlreadyCursedSubjects)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to curse chain %d: %w", selector, err)
 			}
@@ -337,17 +362,16 @@ func RMNUncurseChangeset(e deployment.Environment, cfg RMNCurseConfig) (deployme
 	grouped := groupRMNSubjectBySelector(curseActions, false, false)
 
 	// For each chain in the environement get the RMNRemote contract and call uncurse
-	for selector, chain := range state.Chains {
-		deployer, err := deployerGroup.GetDeployer(selector)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get deployer for chain %d: %w", selector, err)
-		}
-
+	cursableChains, err := GetCursableChains(e)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get cursable chains: %w", err)
+	}
+	for selector, chain := range cursableChains {
 		if curseSubjects, ok := grouped[selector]; ok {
 			// Only keep the subject that are actually cursed
 			actuallyCursedSubjects := make([]globals.Subject, 0)
 			for _, subject := range curseSubjects {
-				cursed, err := chain.RMNRemote.IsCursed(nil, subject)
+				cursed, err := chain.IsSubjectCursed(subject)
 				if err != nil {
 					return deployment.ChangesetOutput{}, fmt.Errorf("failed to check if chain %d is cursed: %w", selector, err)
 				}
@@ -364,7 +388,7 @@ func RMNUncurseChangeset(e deployment.Environment, cfg RMNCurseConfig) (deployme
 				continue
 			}
 
-			_, err := chain.RMNRemote.Uncurse0(deployer, actuallyCursedSubjects)
+			err := chain.Uncurse(deployerGroup, actuallyCursedSubjects)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to uncurse chain %d: %w", selector, err)
 			}
@@ -373,4 +397,197 @@ func RMNUncurseChangeset(e deployment.Environment, cfg RMNCurseConfig) (deployme
 	}
 
 	return deployerGroup.Enact()
+}
+
+type CursableChain interface {
+	IsConnectedToChain(selector uint64) (bool, error)
+	IsSubjectCursed(subject globals.Subject) (bool, error)
+	Curse(deployerGroup *changeset.DeployerGroup, subjects []globals.Subject) error
+	Uncurse(deployerGroup *changeset.DeployerGroup, subjects []globals.Subject) error
+}
+
+type SolanaCursableChain struct {
+	selector uint64
+	env      deployment.Environment
+	chain    changeset.SolCCIPChainState
+}
+
+func (c SolanaCursableChain) IsSubjectCursed(subject globals.Subject) (bool, error) {
+	chain := c.env.SolChains[c.selector]
+	curseSubject := solRmnRemote.CurseSubject{
+		Value: subject,
+	}
+	rmnRemoteConfigPDA := c.chain.RMNRemoteConfigPDA
+	solRmnRemote.SetProgramID(c.chain.RMNRemote)
+	rmnRemoteCursesPDA := c.chain.RMNRemoteCursesPDA
+	ix, err := solRmnRemote.NewVerifyNotCursedInstruction(
+		curseSubject,
+		rmnRemoteCursesPDA,
+		rmnRemoteConfigPDA,
+	).ValidateAndBuild()
+	if err != nil {
+		return false, fmt.Errorf("failed to generate instructions: %w", err)
+	}
+	if err := chain.Confirm([]solana.Instruction{ix}); err != nil {
+		c.env.Logger.Infof("Curse already exists for chain %d and curse subject %v", c.selector, curseSubject)
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (c SolanaCursableChain) Curse(deployerGroup *changeset.DeployerGroup, subjects []globals.Subject) error {
+	rmnRemoteConfigPDA := c.chain.RMNRemoteConfigPDA
+	solRmnRemote.SetProgramID(c.chain.RMNRemote)
+	rmnRemoteCursesPDA := c.chain.RMNRemoteCursesPDA
+	deployer, err := deployerGroup.GetDeployerForSVM(c.selector)
+	if err != nil {
+		return fmt.Errorf("failed to get deployer for chain %d: %w", c.selector, err)
+	}
+	for _, subject := range subjects {
+		curseSubject := solRmnRemote.CurseSubject{
+			Value: subject,
+		}
+		deployer(func(authority solana.PublicKey) (solana.Instruction, string, deployment.ContractType, error) {
+			ix, err := solRmnRemote.NewCurseInstruction(
+				curseSubject,
+				rmnRemoteConfigPDA,
+				authority,
+				rmnRemoteCursesPDA,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+
+			if err != nil {
+				return nil, "", "", fmt.Errorf("failed to generate instructions: %w", err)
+			}
+
+			return ix, c.chain.RMNRemote.String(), changeset.RMNRemote, nil
+		})
+	}
+	return nil
+}
+
+func (c SolanaCursableChain) Uncurse(deployerGroup *changeset.DeployerGroup, subjects []globals.Subject) error {
+	rmnRemoteConfigPDA := c.chain.RMNRemoteConfigPDA
+	solRmnRemote.SetProgramID(c.chain.RMNRemote)
+	rmnRemoteCursesPDA := c.chain.RMNRemoteCursesPDA
+	deployer, err := deployerGroup.GetDeployerForSVM(c.selector)
+	if err != nil {
+		return fmt.Errorf("failed to get deployer for chain %d: %w", c.selector, err)
+	}
+	for _, subject := range subjects {
+		curseSubject := solRmnRemote.CurseSubject{
+			Value: subject,
+		}
+		deployer(func(authority solana.PublicKey) (solana.Instruction, string, deployment.ContractType, error) {
+			ix, err := solRmnRemote.NewUncurseInstruction(
+				curseSubject,
+				rmnRemoteConfigPDA,
+				authority,
+				rmnRemoteCursesPDA,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			if err != nil {
+				return nil, "", "", fmt.Errorf("failed to generate instructions: %w", err)
+			}
+			return ix, c.chain.RMNRemote.String(), changeset.RMNRemote, nil
+		})
+	}
+	return nil
+}
+
+func (c SolanaCursableChain) IsConnectedToChain(selector uint64) (bool, error) {
+	view, err := c.chain.GenerateView(c.env.SolChains[c.selector])
+	if err != nil {
+		return false, fmt.Errorf("failed to generate view for chain %d: %w", c.selector, err)
+	}
+	for _, offramp := range view.OffRamp {
+		for sel, _ := range offramp.SourceChains {
+			if sel == selector {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+type EvmCursableChain struct {
+	selector uint64
+	chain    changeset.CCIPChainState
+}
+
+func (c EvmCursableChain) IsConnectedToChain(selector uint64) (bool, error) {
+	config, err := c.chain.OffRamp.GetSourceChainConfig(nil, selector)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if chain %d is connected to chain %d: %w", c.selector, selector, err)
+	}
+	if !config.IsEnabled {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (c EvmCursableChain) IsSubjectCursed(subject globals.Subject) (bool, error) {
+	cursed, err := c.chain.RMNRemote.IsCursed(nil, subject)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if chain %d is cursed: %w", c.selector, err)
+	}
+	return cursed, nil
+}
+
+func (c EvmCursableChain) Curse(deployerGroup *changeset.DeployerGroup, subjects []globals.Subject) error {
+	deployer, err := deployerGroup.GetDeployer(c.selector)
+	if err != nil {
+		return fmt.Errorf("failed to get deployer for chain %d: %w", c.selector, err)
+	}
+
+	_, err = c.chain.RMNRemote.Curse0(deployer, subjects)
+	if err != nil {
+		return fmt.Errorf("failed to curse chain %d: %w", c.selector, err)
+	}
+	return nil
+}
+
+func (c EvmCursableChain) Uncurse(deployerGroup *changeset.DeployerGroup, subjects []globals.Subject) error {
+	deployer, err := deployerGroup.GetDeployer(c.selector)
+	if err != nil {
+		return fmt.Errorf("failed to get deployer for chain %d: %w", c.selector, err)
+	}
+
+	_, err = c.chain.RMNRemote.Uncurse0(deployer, subjects)
+	if err != nil {
+		return fmt.Errorf("failed to uncurse chain %d: %w", c.selector, err)
+	}
+	return nil
+}
+
+func GetCursableChains(env deployment.Environment) (map[uint64]CursableChain, error) {
+	state, err := changeset.LoadOnchainState(env)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load onchain state: %w", err)
+	}
+	cursableChains := make(map[uint64]CursableChain)
+	for selector, chain := range state.Chains {
+		cursableChains[selector] = EvmCursableChain{
+			selector: selector,
+			chain:    chain,
+		}
+	}
+
+	for selector, chain := range state.SolChains {
+		cursableChains[selector] = SolanaCursableChain{
+			selector: selector,
+			chain:    chain,
+			env:      env,
+		}
+	}
+
+	return cursableChains, nil
+}
+
+func GetAllCursableChainsSelector(env deployment.Environment) []uint64 {
+	selectors := make([]uint64, 0)
+	selectors = append(selectors, env.AllChainSelectors()...)
+	selectors = append(selectors, env.AllChainSelectorsSolana()...)
+	return selectors
 }
