@@ -48,6 +48,8 @@ func GenerateChainsZk(t *testing.T, numChains int) map[uint64]deployment.Chain {
 		gasPrice, err := client.SuggestGasPrice(context.Background())
 		require.NoError(t, err)
 
+		require.Greater(t, len(blockchain.AnvilZKSyncRichAccountPks), 1)
+
 		keyedTransactors := make([]*bind.TransactOpts, 0)
 		for _, pk := range blockchain.AnvilZKSyncRichAccountPks {
 			privateKey, err := crypto.HexToECDSA(pk)
@@ -57,6 +59,8 @@ func GenerateChainsZk(t *testing.T, numChains int) map[uint64]deployment.Chain {
 			require.NoError(t, err)
 			keyedTransactors = append(keyedTransactors, transactor)
 		}
+
+		require.Equal(t, len(blockchain.AnvilZKSyncRichAccountPks), len(keyedTransactors))
 
 		clientZk := clients.NewClient(client.Client())
 		deployerZk, err := accounts.NewWallet(common.Hex2Bytes(blockchain.AnvilZKSyncRichAccountPks[0]), clientZk, nil)
