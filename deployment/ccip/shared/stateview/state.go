@@ -95,6 +95,8 @@ type CCIPOnChainState struct {
 	Chains      map[uint64]evm.CCIPChainState
 	SolChains   map[uint64]solana.CCIPChainState
 	AptosChains map[uint64]aptosstate.CCIPChainState
+	// TODO: fix, add ton stateview
+	TonChains map[uint64]TonCCIPChainState
 }
 
 // ValidatePostDeploymentState should be called after the deployment and configuration for all contracts
@@ -637,10 +639,15 @@ func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
 	if err != nil {
 		return CCIPOnChainState{}, err
 	}
+	tonState, err := LoadOnchainStateTon(e)
+	if err != nil {
+		return CCIPOnChainState{}, err
+	}
 	state := CCIPOnChainState{
 		Chains:      make(map[uint64]evm.CCIPChainState),
 		SolChains:   solanaState.SolChains,
 		AptosChains: aptosChains,
+		TonChains:   tonState.TonChains,
 	}
 	for chainSelector, chain := range e.Chains {
 		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)
