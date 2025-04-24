@@ -27,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/rpc"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
@@ -167,14 +168,20 @@ type DependenciesConfig struct {
 const (
 	CronBinaryVersion   = "v1.0.2-alpha"
 	CRECLIBinaryVersion = "v0.1.5"
+
+	AuthorizationKeySecretName = "AUTH_KEY"
+	// TODO: use once we can run these tests in CI (https://smartcontract-it.atlassian.net/browse/DX-589)
+	// AuthorizationKey           = "12a-281j&@91.sj1:_}"
+	AuthorizationKey = ""
 )
 
 // Defines the location of already compiled workflow binary and config files
 // They will be used if WorkflowConfig.ShouldCompileNewWorkflow is `false`
 // Otherwise test will compile and upload a new workflow
 type CompiledConfig struct {
-	BinaryURL string `toml:"binary_url" validate:"required"`
-	ConfigURL string `toml:"config_url" validate:"required"`
+	BinaryURL  string `toml:"binary_url" validate:"required"`
+	ConfigURL  string `toml:"config_url" validate:"required"`
+	SecretsURL string `toml:"secrets_url"`
 }
 
 func validateEnvVars(t *testing.T, in *TestConfig) {
@@ -216,6 +223,7 @@ type registerPoRWorkflowInput struct {
 	creCLIsettingsFile      *os.File
 	balanceReaderAddress    common.Address
 	fundedAddress           common.Address
+	authKey                 string
 }
 
 type configureDataFeedsCacheInput struct {
@@ -313,7 +321,7 @@ func registerPoRWorkflow(input registerPoRWorkflowInput) error {
 			input.WorkflowConfig.WorkflowName,
 			input.WorkflowConfig.CompiledWorkflowConfig.BinaryURL,
 			&input.WorkflowConfig.CompiledWorkflowConfig.ConfigURL,
-			nil, // TODO pass secrets URL once support for them has been added
+			&input.WorkflowConfig.CompiledWorkflowConfig.SecretsURL,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to register workflow")
@@ -329,6 +337,11 @@ func registerPoRWorkflow(input registerPoRWorkflowInput) error {
 	}
 
 	// create workflow-specific config file
+	var secretNameToUse string
+	if input.authKey != "" {
+		secretNameToUse = AuthorizationKeySecretName
+	}
+
 	crCfg := `{"contracts":{"BalanceReader":{"contractABI":"[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"addresses\",\"type\":\"address[]\"}],\"name\":\"getNativeBalances\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]","contractPollingFilter":{"genericEventNames":null,"pollingFilter":{"topic2":null,"topic3":null,"topic4":null,"retention":"0s","maxLogsKept":0,"logsPerBlock":0}},"configs":{"getNativeBalances":"{  \"chainSpecificName\": \"getNativeBalances\"}"}}}}`
 	configInput := keystoneporcrecli.ConfigFileInput{
 		FundedAddress:        input.fundedAddress,
@@ -341,13 +354,33 @@ func registerPoRWorkflow(input registerPoRWorkflowInput) error {
 		ContractReaderConfig: crCfg,
 		ContractName:         "BalanceReader",
 		ContractMethod:       "getNativeBalances",
+		AuthKeySecretName:    secretNameToUse,
 	}
 	workflowConfigFile, configErr := keystoneporcrecli.CreateConfigFile(configInput)
+
 	if configErr != nil {
 		return errors.Wrap(configErr, "failed to create workflow config file")
 	}
-
 	workflowConfigFilePath := workflowConfigFile.Name()
+
+	// indicate to the CRE CLI that the secret will be shared between all nodes in the workflow by using specific suffix
+	authKeyEnvVarName := AuthorizationKeySecretName + libcrecli.SharedSecretEnvVarSuffix
+
+	var secretsFilePath *string
+	if input.authKey != "" {
+		// create workflow-specific secrets file using the CRE CLI, which contains a mapping of secret names to environment variables that hold them
+		// secrets will be read from the environment variables by the CRE CLI and encoded using nodes' public keys and when workflow executes it will
+		// be able to read all secrets, which after decoding will be set as environment variables with names specified in the secrets file
+		secrets := map[string][]string{
+			AuthorizationKeySecretName: {authKeyEnvVarName},
+		}
+
+		secretsFile, secretsErr := libcrecli.CreateSecretsFile(secrets)
+		if secretsErr != nil {
+			return errors.Wrap(secretsErr, "failed to create secrets file")
+		}
+		secretsFilePath = ptr.Ptr(secretsFile.Name())
+	}
 
 	registerWorkflowInput := keystonetypes.RegisterWorkflowWithCRECLIInput{
 		ChainSelector:            input.chainSelector,
@@ -363,13 +396,19 @@ func registerPoRWorkflow(input registerPoRWorkflowInput) error {
 
 	if input.WorkflowConfig.ShouldCompileNewWorkflow {
 		registerWorkflowInput.NewWorkflow = &keystonetypes.NewWorkflow{
-			FolderLocation: *input.WorkflowConfig.WorkflowFolderLocation,
-			ConfigFilePath: &workflowConfigFilePath,
+			FolderLocation:   *input.WorkflowConfig.WorkflowFolderLocation,
+			WorkflowFileName: "main.go",
+			ConfigFilePath:   &workflowConfigFilePath,
+			SecretsFilePath:  secretsFilePath,
+			Secrets: map[string]string{
+				authKeyEnvVarName: input.authKey,
+			},
 		}
 	} else {
 		registerWorkflowInput.ExistingWorkflow = &keystonetypes.ExistingWorkflow{
-			BinaryURL: input.WorkflowConfig.CompiledWorkflowConfig.BinaryURL,
-			ConfigURL: &input.WorkflowConfig.CompiledWorkflowConfig.ConfigURL,
+			BinaryURL:  input.WorkflowConfig.CompiledWorkflowConfig.BinaryURL,
+			ConfigURL:  &input.WorkflowConfig.CompiledWorkflowConfig.ConfigURL,
+			SecretsURL: &input.WorkflowConfig.CompiledWorkflowConfig.SecretsURL,
 		}
 	}
 
@@ -607,7 +646,7 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MockedPrice(t *testing.T) {
 		}
 	}
 
-	priceProvider, priceErr := NewFakePriceProvider(testLogger, in.Fake)
+	priceProvider, priceErr := NewFakePriceProvider(testLogger, in.Fake, AuthorizationKey)
 	require.NoError(t, priceErr, "failed to create fake price provider")
 
 	chainIDInt, chainErr := strconv.Atoi(in.BlockchainA.ChainID)
@@ -897,7 +936,7 @@ func TestCRE_OCR3_PoR_Workflow_GatewayDon_MockedPrice(t *testing.T) {
 		}
 	}
 
-	priceProvider, priceErr := NewFakePriceProvider(testLogger, in.Fake)
+	priceProvider, priceErr := NewFakePriceProvider(testLogger, in.Fake, AuthorizationKey)
 	require.NoError(t, priceErr, "failed to create fake price provider")
 
 	chainIDInt, chainErr := strconv.Atoi(in.BlockchainA.ChainID)

@@ -22,6 +22,7 @@ type ConfigFileInput struct {
 	ContractReaderConfig string
 	ContractName         string
 	ContractMethod       string
+	AuthKeySecretName    string
 }
 
 func CreateConfigFile(in ConfigFileInput) (*os.File, error) {
@@ -54,6 +55,7 @@ func CreateConfigFile(in ConfigFileInput) (*os.File, error) {
 		ContractReaderConfig: in.ContractReaderConfig,
 		ReadTargetName:       in.ReadTargetName,
 		WriteTargetName:      in.WriteTargetName,
+		AuthKeySecretName:    &in.AuthKeySecretName,
 	}
 
 	configMarshalled, err := json.Marshal(workflowConfig)

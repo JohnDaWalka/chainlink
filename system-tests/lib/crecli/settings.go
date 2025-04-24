@@ -56,17 +56,18 @@ type RPC struct {
 }
 
 type PoRWorkflowConfig struct {
-	FeedID               string `json:"feed_id,omitempty"`
-	URL                  string `json:"url,omitempty"`
-	ConsumerAddress      string `json:"consumer_address,omitempty"`
-	WriteTargetName      string `json:"write_target_name,omitempty"`
-	BalanceReaderAddress string `json:"balance_reader_address,omitempty"`
-	ContractReaderConfig string `json:"contract_reader_config,omitempty"`
-	ContractAddress      string `json:"contract_address,omitempty"`
-	ContractName         string `json:"contract_name,omitempty"`
-	ContractMethod       string `json:"contract_method,omitempty"`
-	ReadTargetName       string `json:"read_target_name,omitempty"`
-	FundedAddress        string `json:"funded_address,omitempty"`
+	FeedID               string  `json:"feed_id,omitempty"`
+	URL                  string  `json:"url,omitempty"`
+	ConsumerAddress      string  `json:"consumer_address,omitempty"`
+	WriteTargetName      string  `json:"write_target_name,omitempty"`
+	BalanceReaderAddress string  `json:"balance_reader_address,omitempty"`
+	ContractReaderConfig string  `json:"contract_reader_config,omitempty"`
+	ContractAddress      string  `json:"contract_address,omitempty"`
+	ContractName         string  `json:"contract_name,omitempty"`
+	ContractMethod       string  `json:"contract_method,omitempty"`
+	ReadTargetName       string  `json:"read_target_name,omitempty"`
+	FundedAddress        string  `json:"funded_address,omitempty"`
+	AuthKeySecretName    *string `json:"auth_key_secret_name,omitempty"`
 }
 
 func PrepareCRECLISettingsFile(workflowOwner, capRegAddr, workflowRegistryAddr common.Address, dataFeedsCacheAddress *common.Address, donID uint32, chainSelector uint64, rpcHTTPURL string) (*os.File, error) {
