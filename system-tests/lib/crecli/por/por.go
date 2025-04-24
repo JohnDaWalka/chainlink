@@ -19,7 +19,6 @@ type ConfigFileInput struct {
 	DataURL              string
 	WriteTargetName      string
 	ReadTargetName       string
-	ExpectedFundAmount   string
 	ContractReaderConfig string
 	ContractName         string
 	ContractMethod       string
@@ -55,7 +54,6 @@ func CreateConfigFile(in ConfigFileInput) (*os.File, error) {
 		ContractReaderConfig: in.ContractReaderConfig,
 		ReadTargetName:       in.ReadTargetName,
 		WriteTargetName:      in.WriteTargetName,
-		ExpectedFundAmount:   in.ExpectedFundAmount,
 	}
 
 	configMarshalled, err := json.Marshal(workflowConfig)

@@ -67,7 +67,6 @@ type PoRWorkflowConfig struct {
 	ContractMethod       string `json:"contract_method"`
 	ReadTargetName       string `json:"read_target_name"`
 	FundedAddress        string `json:"funded_address"`
-	ExpectedFundAmount   string `json:"expected_fund_amount"`
 }
 
 func PrepareCRECLISettingsFile(workflowOwner, capRegAddr, workflowRegistryAddr common.Address, dataFeedsCacheAddress *common.Address, donID uint32, chainSelector uint64, rpcHTTPURL string) (*os.File, error) {

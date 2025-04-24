@@ -335,7 +335,6 @@ func registerPoRWorkflow(input registerPoRWorkflowInput) error {
 		DataURL:              input.priceProvider.URL(),
 		ReadTargetName:       input.readTargetName,
 		WriteTargetName:      input.writeTargetName,
-		ExpectedFundAmount:   input.expectedFundingAmount.String(),
 		ContractReaderConfig: crCfg,
 		ContractName:         "BalanceReader",
 		ContractMethod:       "getNativeBalances",
