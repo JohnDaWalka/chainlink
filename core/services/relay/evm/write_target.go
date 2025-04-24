@@ -69,7 +69,7 @@ func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain
 		return nil, err
 	}
 
-	evm, err := relayer.AsEVMRelayer()
+	_, err = relayer.AsEVMRelayer()
 	if err != nil {
 		return nil, fmt.Errorf("failed to upgrade to evm relayer: %w", err)
 	}
