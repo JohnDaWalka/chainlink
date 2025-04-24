@@ -45,7 +45,7 @@ func GenerateChainsZk(t *testing.T, numChains int) map[uint64]deployment.Chain {
 		client, err := ethclient.Dial(output.Nodes[0].ExternalHTTPUrl)
 		require.NoError(t, err)
 
-		gasPrice, err := client.SuggestGasPrice(context.Background())
+		gasPrice, err := client.SuggestGasPrice(t.Context())
 		require.NoError(t, err)
 
 		require.Greater(t, len(blockchain.AnvilZKSyncRichAccountPks), 1)
