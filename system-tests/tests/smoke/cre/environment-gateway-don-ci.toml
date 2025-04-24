@@ -1,20 +1,4 @@
-
-[blockchain_a]
-  type = "anvil"
-  chain_id = "1337"
-
-[custom_anvil_miner]
-  block_speed_seconds = 5
-
-[jd]
-  image = "injected-at-runtime"
-
-[fake]
-  port = 8171
-
-[infra]
-  # either "docker" or "crib"
-  type = "docker"
+# this configuration should be used to override environment-gateway-don.toml in the CI
 
 [workflow_config]
 	workflow_name = "abcdefgasd"
@@ -34,66 +18,3 @@
     # unless test uses fake data provider. In that case the IP of the fake data provider will be different in the CI, because it uses linux not macOS operating system and that changes the IP
     # of 'host.docker.internal'. TL;DR is that when updating this config you can use config created during local execution, but you need to use data provider URL copied from the previous CI config.
     config_url = "https://gist.githubusercontent.com/Tofel/3905a87f22f105da5c0d7196ce7032c4/raw/63c982400f682a95580bf7b5b422aaf8ef4ba511/two_dons_config.json_03_04_2025"
-
-[[nodesets]]
-  nodes = 5
-  override_mode = "all"
-  http_port_range_start = 10100
-  name = "workflow"
-
-  [nodesets.db]
-    image = "postgres:12.0"
-    port = 13000
-    volume_name = "workflow_volume"
-
-  [[nodesets.node_specs]]
-    [nodesets.node_specs.node]
-      image = "injected-at-runtime"
-      # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
-      # capabilities = ['./cron']
-      user_config_overrides = """
-      [Feature]
-			LogPoller = true
-
-      [Log]
-      Level = 'debug'
-      JSONConsole = true
-
-			[OCR2]
-			Enabled = true
-			DatabaseTimeout = '1s'
-
-			[P2P.V2]
-			Enabled = true
-			ListenAddresses = ['0.0.0.0:5001']
-      """
-
-[[nodesets]]
-  nodes = 1
-  override_mode = "all"
-  http_port_range_start = 10300
-  name = "gateway"
-
-  [nodesets.db]
-    image = "postgres:12.0"
-    port = 13200
-
-  [[nodesets.node_specs]]
-    [nodesets.node_specs.node]
-      image = "injected-at-runtime"
-      user_config_overrides = """
-      [Feature]
-			LogPoller = true
-
-      [Log]
-      Level = 'debug'
-      JSONConsole = true
-
-			[OCR2]
-			Enabled = true
-			DatabaseTimeout = '1s'
-
-			[P2P.V2]
-			Enabled = true
-			ListenAddresses = ['0.0.0.0:5001']
-      """

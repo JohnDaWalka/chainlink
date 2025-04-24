@@ -221,7 +221,7 @@ runner-test-matrix:
       E2E_JD_VERSION: 0.9.0 # there is no latest tag for this repo, so we need to specify the version
       GITHUB_READ_TOKEN: "{{ env.GITHUB_API_TOKEN }}" # GATI-provided token that can read from capabilities and dev-platform repos
       CI: "true"
-      CTF_CONFIGS: "environment-one-don-ci.toml"
+      CTF_CONFIGS: "environment-one-don.toml,environment-one-don-ci.toml"
       # Anvil developer key, not a secret
       PRIVATE_KEY: "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
     test_go_project_path: system-tests
@@ -242,7 +242,7 @@ runner-test-matrix:
       E2E_JD_VERSION: 0.9.0 # there is no latest tag for this repo, so we need to specify the version
       GITHUB_READ_TOKEN: "{{ env.GITHUB_API_TOKEN }}" # GATI-provided token that can read from capabilities and dev-platform repos
       CI: "true"
-      CTF_CONFIGS: "environment-gateway-don-ci.toml"
+      CTF_CONFIGS: "environment-gateway-don.toml,environment-gateway-don-ci.toml"
       # Anvil developer key, not a secret
       PRIVATE_KEY: "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
     test_go_project_path: system-tests
@@ -263,7 +263,7 @@ runner-test-matrix:
       E2E_JD_VERSION: 0.9.0 # there is no latest tag for this repo, so we need to specify the version
       GITHUB_READ_TOKEN: "{{ env.GITHUB_API_TOKEN }}" # GATI-provided token that can read from capabilities and dev-platform repos
       CI: "true"
-      CTF_CONFIGS: "environment-capabilities-don-ci.toml"
+      CTF_CONFIGS: "environment-capabilities-don.toml,environment-capabilities-don-ci.toml"
       # Anvil developer key, not a secret
       PRIVATE_KEY: "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
     test_go_project_path: system-tests
@@ -1369,7 +1369,7 @@ runner-test-matrix:
       E2E_RMN_AFN2PROXY_VERSION: master-amd64-10b42b2
       CCIP_V16_TEST_ENV: docker
     test_go_project_path: integration-tests
-  
+
   - id: smoke/ccip/ccip_rmn_test.go:^Test_CCIPReorg_BelowFinality_OnSource_WithRMN_Block$
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
     test_env_type: docker
