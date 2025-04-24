@@ -66,6 +66,7 @@ type TestConfigs struct {
 	Chains                     int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
 	SolChains                  int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
 	AptosChains                int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
+	TonChains                  int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
 	ChainIDs                   []uint64 // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
 	NumOfUsersPerChain         int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
 	Nodes                      int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
@@ -255,6 +256,12 @@ func WithSolChains(numChains int) TestOps {
 func WithAptosChains(numChains int) TestOps {
 	return func(testCfg *TestConfigs) {
 		testCfg.AptosChains = numChains
+	}
+}
+
+func WithTonChains(numChains int) TestOps {
+	return func(testCfg *TestConfigs) {
+		testCfg.SolChains = numChains
 	}
 }
 

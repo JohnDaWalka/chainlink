@@ -96,6 +96,7 @@ type Environment struct {
 	Chains      map[uint64]Chain
 	SolChains   map[uint64]SolChain
 	AptosChains map[uint64]AptosChain
+	TonChains   map[uint64]TonChain
 	NodeIDs     []string
 	Offchain    deployment.OffchainClient
 	GetContext  func() context.Context
@@ -115,6 +116,7 @@ func NewEnvironment(
 	chains map[uint64]Chain,
 	solChains map[uint64]SolChain,
 	aptosChains map[uint64]AptosChain,
+	tonChains map[uint64]TonChain,
 	nodeIDs []string,
 	offchain deployment.OffchainClient,
 	ctx func() context.Context,
@@ -128,6 +130,7 @@ func NewEnvironment(
 		Chains:            chains,
 		SolChains:         solChains,
 		AptosChains:       aptosChains,
+		TonChains:         tonChains,
 		NodeIDs:           nodeIDs,
 		Offchain:          offchain,
 		GetContext:        ctx,

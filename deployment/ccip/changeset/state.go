@@ -687,6 +687,7 @@ type CCIPOnChainState struct {
 	Chains      map[uint64]CCIPChainState
 	SolChains   map[uint64]SolCCIPChainState
 	AptosChains map[uint64]AptosCCIPChainState
+	TonChains   map[uint64]TonCCIPChainState
 }
 
 // HomeChainSelector returns the selector of the home chain based on the presence of RMNHome, CapabilityRegistry and CCIPHome contracts.
@@ -1133,10 +1134,15 @@ func LoadOnchainState(e deployment.Environment) (CCIPOnChainState, error) {
 	if err != nil {
 		return CCIPOnChainState{}, err
 	}
+	tonState, err := LoadOnchainStateTon(e)
+	if err != nil {
+		return CCIPOnChainState{}, err
+	}
 	state := CCIPOnChainState{
 		Chains:      make(map[uint64]CCIPChainState),
 		SolChains:   solState.SolChains,
 		AptosChains: aptosChains,
+		TonChains:   tonState.TonChains,
 	}
 	for chainSelector, chain := range e.Chains {
 		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)
