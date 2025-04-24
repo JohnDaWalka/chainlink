@@ -61,6 +61,10 @@ type PoRWorkflowConfig struct {
 	ConsumerAddress      string `json:"consumer_address"`
 	WriteTargetName      string `json:"write_target_name"`
 	BalanceReaderAddress string `json:"balance_reader_address"`
+	ContractReaderConfig string `json:"contract_reader_config"`
+	ContractAddress      string `json:"contract_address"`
+	ContractName         string `json:"contract_name"`
+	ContractMethod       string `json:"contract_method"`
 	ReadTargetName       string `json:"read_target_name"`
 	FundedAddress        string `json:"funded_address"`
 	ExpectedFundAmount   string `json:"expected_fund_amount"`

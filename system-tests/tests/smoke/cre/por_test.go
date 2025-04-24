@@ -326,6 +326,7 @@ func registerPoRWorkflow(input registerPoRWorkflowInput) error {
 	}
 
 	// create workflow-specific config file
+	crCfg := `{"contracts":{"BalanceReader":{"contractABI":"[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"addresses\",\"type\":\"address[]\"}],\"name\":\"getNativeBalances\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]","contractPollingFilter":{"genericEventNames":null,"pollingFilter":{"topic2":null,"topic3":null,"topic4":null,"retention":"0s","maxLogsKept":0,"logsPerBlock":0}},"configs":{"getNativeBalances":"{  \"chainSpecificName\": \"getNativeBalances\"}"}}}}`
 	configInput := keystoneporcrecli.ConfigFileInput{
 		FundedAddress:        input.fundedAddress,
 		BalanceReaderAddress: input.balanceReaderAddress,
@@ -335,6 +336,9 @@ func registerPoRWorkflow(input registerPoRWorkflowInput) error {
 		ReadTargetName:       input.readTargetName,
 		WriteTargetName:      input.writeTargetName,
 		ExpectedFundAmount:   input.expectedFundingAmount.String(),
+		ContractReaderConfig: crCfg,
+		ContractName:         "BalanceReader",
+		ContractMethod:       "getNativeBalances",
 	}
 	workflowConfigFile, configErr := keystoneporcrecli.CreateConfigFile(configInput)
 	if configErr != nil {
@@ -402,9 +406,11 @@ func setupPoRTestEnvironment(
 	mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet,
 	capabilityFactoryFns []func([]string) []keystone_changeset.DONCapabilityWithConfig,
 ) *porSetupOutput {
-	extraAllowedPorts := []int{}
-	if _, ok := priceProvider.(*FakePriceProvider); ok {
+	expectedPrices := make([]*big.Int, 0)
+	extraAllowedPorts := make([]int, 0)
+	if fpp, ok := priceProvider.(*FakePriceProvider); ok {
 		extraAllowedPorts = append(extraAllowedPorts, in.Fake.Port)
+		expectedPrices = append(expectedPrices, fpp.expectedPrices...)
 	}
 
 	customBinariesPaths := map[string]string{}
@@ -471,8 +477,11 @@ func setupPoRTestEnvironment(
 	pub, _, err := seth.NewAddress()
 	require.NoError(t, err, "failed to generate new address")
 	fundedAddress := common.HexToAddress(pub)
-	fundingAmount := big.NewInt(42)
 
+	fundingAmount := (new(big.Int)).SetInt64(42)
+	if len(expectedPrices) >= 1 {
+		fundingAmount = expectedPrices[0]
+	}
 	_, fundingErr := libfunding.SendFunds(zerolog.Logger{}, universalSetupOutput.BlockchainOutput.SethClient, libtypes.FundsToSend{
 		ToAddress:  fundedAddress,
 		Amount:     fundingAmount,
@@ -701,7 +710,7 @@ func TestCRE_OCR3_ReadBalance_Workflow_SingleDon_MockedPrice(t *testing.T) {
 	// fake price provider without a data provider, price will be read on chain
 	priceProvider := &FakePriceProvider{
 		testLogger:     testLogger,
-		expectedPrices: []*big.Int{big.NewInt(42)},
+		expectedPrices: []*big.Int{big.NewInt(99)},
 		priceIndex:     ptr.Ptr(0),
 	}
 

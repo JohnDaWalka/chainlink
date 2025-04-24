@@ -20,6 +20,9 @@ type ConfigFileInput struct {
 	WriteTargetName      string
 	ReadTargetName       string
 	ExpectedFundAmount   string
+	ContractReaderConfig string
+	ContractName         string
+	ContractMethod       string
 }
 
 func CreateConfigFile(in ConfigFileInput) (*os.File, error) {
@@ -46,7 +49,10 @@ func CreateConfigFile(in ConfigFileInput) (*os.File, error) {
 		URL:                  in.DataURL,
 		ConsumerAddress:      in.FeedsConsumerAddress.Hex(),
 		FundedAddress:        in.FundedAddress.Hex(),
-		BalanceReaderAddress: in.BalanceReaderAddress.Hex(),
+		ContractAddress:      in.BalanceReaderAddress.Hex(),
+		ContractName:         in.ContractName,
+		ContractMethod:       in.ContractMethod,
+		ContractReaderConfig: in.ContractReaderConfig,
 		ReadTargetName:       in.ReadTargetName,
 		WriteTargetName:      in.WriteTargetName,
 		ExpectedFundAmount:   in.ExpectedFundAmount,
