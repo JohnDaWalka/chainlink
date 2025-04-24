@@ -590,50 +590,8 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MockedPrice(t *testing.T) {
 		[]keystonetypes.DONCapabilityWithConfigFactoryFn{libcontracts.DefaultCapabilityFactoryFn, libcontracts.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)))},
 	)
 
-	// Log extra information that might help debugging
 	t.Cleanup(func() {
-		if t.Failed() {
-			logTestInfo(testLogger, in.WorkflowConfig.FeedID, in.WorkflowConfig.WorkflowName, setupOutput.dataFeedsCacheAddress.Hex(), setupOutput.forwarderAddress.Hex())
-
-			// log scanning is not supported for CRIB
-			if in.Infra.InfraType == libtypes.CRIB {
-				return
-			}
-
-			logDir := fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name())
-
-			removeErr := os.RemoveAll(logDir)
-			if removeErr != nil {
-				testLogger.Error().Err(removeErr).Msg("failed to remove log directory")
-				return
-			}
-
-			_, saveErr := framework.SaveContainerLogs(logDir)
-			if saveErr != nil {
-				testLogger.Error().Err(saveErr).Msg("failed to save container logs")
-				return
-			}
-
-			debugDons := make([]*keystonetypes.DebugDon, 0, len(setupOutput.donTopology.DonsWithMetadata))
-			for i, donWithMetadata := range setupOutput.donTopology.DonsWithMetadata {
-				containerNames := make([]string, 0, len(donWithMetadata.NodesMetadata))
-				for _, output := range setupOutput.nodeOutput[i].Output.CLNodes {
-					containerNames = append(containerNames, output.Node.ContainerName)
-				}
-				debugDons = append(debugDons, &keystonetypes.DebugDon{
-					NodesMetadata:  donWithMetadata.NodesMetadata,
-					Flags:          donWithMetadata.Flags,
-					ContainerNames: containerNames,
-				})
-			}
-
-			debugInput := keystonetypes.DebugInput{
-				DebugDons:        debugDons,
-				BlockchainOutput: setupOutput.blockchainOutput,
-				InfraInput:       in.Infra,
-			}
-			lidebug.PrintTestDebug(t.Name(), testLogger, debugInput)
-		}
+		poRDebugFn(t, testLogger, in, setupOutput)
 	})
 
 	testLogger.Info().Msg("Waiting for feed to update...")
@@ -695,48 +653,7 @@ func TestCRE_OCR3_PoR_Workflow_GatewayDon_MockedPrice(t *testing.T) {
 
 	// Log extra information that might help debugging
 	t.Cleanup(func() {
-		if t.Failed() {
-			logTestInfo(testLogger, in.WorkflowConfig.FeedID, in.WorkflowConfig.WorkflowName, setupOutput.dataFeedsCacheAddress.Hex(), setupOutput.forwarderAddress.Hex())
-
-			// log scanning is not supported for CRIB
-			if in.Infra.InfraType == libtypes.CRIB {
-				return
-			}
-
-			logDir := fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name())
-
-			removeErr := os.RemoveAll(logDir)
-			if removeErr != nil {
-				testLogger.Error().Err(removeErr).Msg("failed to remove log directory")
-				return
-			}
-
-			_, saveErr := framework.SaveContainerLogs(logDir)
-			if saveErr != nil {
-				testLogger.Error().Err(saveErr).Msg("failed to save container logs")
-				return
-			}
-
-			debugDons := make([]*keystonetypes.DebugDon, 0, len(setupOutput.donTopology.DonsWithMetadata))
-			for i, donWithMetadata := range setupOutput.donTopology.DonsWithMetadata {
-				containerNames := make([]string, 0, len(donWithMetadata.NodesMetadata))
-				for _, output := range setupOutput.nodeOutput[i].Output.CLNodes {
-					containerNames = append(containerNames, output.Node.ContainerName)
-				}
-				debugDons = append(debugDons, &keystonetypes.DebugDon{
-					NodesMetadata:  donWithMetadata.NodesMetadata,
-					Flags:          donWithMetadata.Flags,
-					ContainerNames: containerNames,
-				})
-			}
-
-			debugInput := keystonetypes.DebugInput{
-				DebugDons:        debugDons,
-				BlockchainOutput: setupOutput.blockchainOutput,
-				InfraInput:       in.Infra,
-			}
-			lidebug.PrintTestDebug(t.Name(), testLogger, debugInput)
-		}
+		poRDebugFn(t, testLogger, in, setupOutput)
 	})
 
 	testLogger.Info().Msg("Waiting for feed to update...")
@@ -801,48 +718,7 @@ func TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice(t *testing.T) {
 
 	// Log extra information that might help debugging
 	t.Cleanup(func() {
-		if t.Failed() {
-			logTestInfo(testLogger, in.WorkflowConfig.FeedID, in.WorkflowConfig.WorkflowName, setupOutput.dataFeedsCacheAddress.Hex(), setupOutput.forwarderAddress.Hex())
-
-			// log scanning is not supported for CRIB
-			if in.Infra.InfraType == libtypes.CRIB {
-				return
-			}
-
-			logDir := fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name())
-
-			removeErr := os.RemoveAll(logDir)
-			if removeErr != nil {
-				testLogger.Error().Err(removeErr).Msg("failed to remove log directory")
-				return
-			}
-
-			_, saveErr := framework.SaveContainerLogs(logDir)
-			if saveErr != nil {
-				testLogger.Error().Err(saveErr).Msg("failed to save container logs")
-				return
-			}
-
-			debugDons := make([]*keystonetypes.DebugDon, 0, len(setupOutput.donTopology.DonsWithMetadata))
-			for i, donWithMetadata := range setupOutput.donTopology.DonsWithMetadata {
-				containerNames := make([]string, 0, len(donWithMetadata.NodesMetadata))
-				for _, output := range setupOutput.nodeOutput[i].Output.CLNodes {
-					containerNames = append(containerNames, output.Node.ContainerName)
-				}
-				debugDons = append(debugDons, &keystonetypes.DebugDon{
-					NodesMetadata:  donWithMetadata.NodesMetadata,
-					Flags:          donWithMetadata.Flags,
-					ContainerNames: containerNames,
-				})
-			}
-
-			debugInput := keystonetypes.DebugInput{
-				DebugDons:        debugDons,
-				BlockchainOutput: setupOutput.blockchainOutput,
-				InfraInput:       in.Infra,
-			}
-			lidebug.PrintTestDebug(t.Name(), testLogger, debugInput)
-		}
+		poRDebugFn(t, testLogger, in, setupOutput)
 	})
 
 	testLogger.Info().Msg("Waiting for feed to update...")
@@ -863,4 +739,49 @@ func TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice(t *testing.T) {
 
 	require.EqualValues(t, priceProvider.ExpectedPrices(), priceProvider.ActualPrices(), "prices do not match")
 	testLogger.Info().Msgf("All %d prices were found in the feed", len(priceProvider.ExpectedPrices()))
+}
+
+func poRDebugFn(t *testing.T, testLogger zerolog.Logger, in *TestConfig, setupOutput *porSetupOutput) {
+	if t.Failed() {
+		logTestInfo(testLogger, in.WorkflowConfig.FeedID, in.WorkflowConfig.WorkflowName, setupOutput.dataFeedsCacheAddress.Hex(), setupOutput.forwarderAddress.Hex())
+
+		// log scanning is not supported for CRIB
+		if in.Infra.InfraType == libtypes.CRIB {
+			return
+		}
+
+		logDir := fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name())
+
+		removeErr := os.RemoveAll(logDir)
+		if removeErr != nil {
+			testLogger.Error().Err(removeErr).Msg("failed to remove log directory")
+			return
+		}
+
+		_, saveErr := framework.SaveContainerLogs(logDir)
+		if saveErr != nil {
+			testLogger.Error().Err(saveErr).Msg("failed to save container logs")
+			return
+		}
+
+		debugDons := make([]*keystonetypes.DebugDon, 0, len(setupOutput.donTopology.DonsWithMetadata))
+		for i, donWithMetadata := range setupOutput.donTopology.DonsWithMetadata {
+			containerNames := make([]string, 0, len(donWithMetadata.NodesMetadata))
+			for _, output := range setupOutput.nodeOutput[i].Output.CLNodes {
+				containerNames = append(containerNames, output.Node.ContainerName)
+			}
+			debugDons = append(debugDons, &keystonetypes.DebugDon{
+				NodesMetadata:  donWithMetadata.NodesMetadata,
+				Flags:          donWithMetadata.Flags,
+				ContainerNames: containerNames,
+			})
+		}
+
+		debugInput := keystonetypes.DebugInput{
+			DebugDons:        debugDons,
+			BlockchainOutput: setupOutput.blockchainOutput,
+			InfraInput:       in.Infra,
+		}
+		lidebug.PrintTestDebug(t.Name(), testLogger, debugInput)
+	}
 }
