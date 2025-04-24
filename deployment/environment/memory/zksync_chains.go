@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -67,7 +68,9 @@ func GenerateChainsZk(t *testing.T, numChains int) map[uint64]deployment.Chain {
 			DeployerKey: keyedTransactors[0], // to use to interact with contracts
 			Users:       keyedTransactors[1:],
 			Confirm: func(tx *types.Transaction) (uint64, error) {
-				receipt, err := bind.WaitMined(context.Background(), client, tx)
+				ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+				defer cancel()
+				receipt, err := bind.WaitMined(ctx, client, tx)
 				if err != nil {
 					return 0, err
 				}
