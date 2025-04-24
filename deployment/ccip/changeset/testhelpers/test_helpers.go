@@ -63,7 +63,6 @@ import (
 	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	soltestutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solstate "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -644,8 +643,10 @@ func SendRequestSol(
 	// for some reason onchain doesn't see extraAccounts
 
 	ixs := []solana.Instruction{ix}
-	result := soltestutils.SendAndConfirmWithLookupTables(ctx, t, client, ixs, *sender, solconfig.DefaultCommitment, addressTables, solcommon.AddComputeUnitLimit(300_000))
-	require.NotNil(t, result)
+	result, err := solcommon.SendAndConfirmWithLookupTables(ctx, client, ixs, *sender, solconfig.DefaultCommitment, addressTables, solcommon.AddComputeUnitLimit(400_000))
+	if err != nil {
+		return nil, err
+	}
 
 	// check CCIP event
 	ccipMessageSentEvent := solccip.EventCCIPMessageSent{}
@@ -1222,7 +1223,34 @@ func DeployTransferableTokenSolana(
 				RemoteChainSelector: evmChainSel,
 				SolTokenPubKey:      solTokenAddress.String(),
 				PoolType:            solTestTokenPool.BurnAndMint_PoolType,
-				RemoteConfig: solTestTokenPool.RemoteConfig{
+				RemoteConfig: &solTestTokenPool.RemoteConfig{
+					// Needs to be empty on the initial setup
+					PoolAddresses: []solTestTokenPool.RemoteAddress{},
+					TokenAddress: solTestTokenPool.RemoteAddress{
+						Address: evmToken.Address().Bytes(),
+					},
+					Decimals: 18,
+				},
+				InboundRateLimit: &solTestTokenPool.RateLimitConfig{
+					Enabled:  true,
+					Capacity: uint64(1000e9),
+					Rate:     1,
+				},
+				OutboundRateLimit: &solTestTokenPool.RateLimitConfig{
+					Enabled:  true,
+					Capacity: uint64(1000e9),
+					Rate:     1,
+				},
+			},
+		),
+		commoncs.Configure(
+			deployment.CreateLegacyChangeSet(ccipChangeSetSolana.AppendRemoteTokenPool),
+			ccipChangeSetSolana.AppendRemoteTokenPoolConfig{
+				SolChainSelector:    solChainSel,
+				RemoteChainSelector: evmChainSel,
+				SolTokenPubKey:      solTokenAddress.String(),
+				PoolType:            solTestTokenPool.BurnAndMint_PoolType,
+				RemoteConfig: &solTestTokenPool.RemoteConfig{
 					// this can be potentially read from the state if we are given the token symbol
 					PoolAddresses: []solTestTokenPool.RemoteAddress{
 						{
@@ -1232,17 +1260,6 @@ func DeployTransferableTokenSolana(
 					TokenAddress: solTestTokenPool.RemoteAddress{
 						Address: evmToken.Address().Bytes(),
 					},
-					Decimals: 18,
-				},
-				InboundRateLimit: solTestTokenPool.RateLimitConfig{
-					Enabled:  true,
-					Capacity: uint64(1000e9),
-					Rate:     1,
-				},
-				OutboundRateLimit: solTestTokenPool.RateLimitConfig{
-					Enabled:  true,
-					Capacity: uint64(1000e9),
-					Rate:     1,
 				},
 			},
 		),
