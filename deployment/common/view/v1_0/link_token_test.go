@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/link_token"
+	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
@@ -22,6 +23,22 @@ func TestLinkTokenView(t *testing.T) {
 	require.NoError(t, err)
 	_, err = chain.Confirm(tx)
 	require.NoError(t, err)
+
+	testLinkTokenViewWithChain(t, chain, lt)
+}
+
+func TestLinkTokenViewZk(t *testing.T) {
+	e := memory.NewMemoryEnvironment(t, logger.TestLogger(t), zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
+		ZkChains: 1,
+	})
+	chain := e.Chains[e.AllChainSelectors()[0]]
+	_, _, lt, err := link_token.DeployLinkTokenZk(nil, chain.ClientZk, chain.DeployerKeyZk, chain.Client)
+	require.NoError(t, err)
+
+	testLinkTokenViewWithChain(t, chain, lt)
+}
+
+func testLinkTokenViewWithChain(t *testing.T, chain deployment.Chain, lt *link_token.LinkToken) {
 	v, err := GenerateLinkTokenView(lt)
 	require.NoError(t, err)
 
@@ -34,7 +51,7 @@ func TestLinkTokenView(t *testing.T) {
 	require.Empty(t, v.Burners)
 
 	// Add some minters
-	tx, err = lt.GrantMintAndBurnRoles(chain.DeployerKey, chain.DeployerKey.From)
+	tx, err := lt.GrantMintAndBurnRoles(chain.DeployerKey, chain.DeployerKey.From)
 	require.NoError(t, err)
 	_, err = chain.Confirm(tx)
 	require.NoError(t, err)
