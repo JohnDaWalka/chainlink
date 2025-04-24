@@ -470,8 +470,10 @@ func (th testHarness) setupPoRTestEnvironment(
 	capabilityFactoryFns []func([]string) []keystone_changeset.DONCapabilityWithConfig,
 ) *porSetupOutput {
 	extraAllowedPorts := make([]int, 0)
-	if _, ok := priceProvider.(*FakePriceProvider); ok {
-		extraAllowedPorts = append(extraAllowedPorts, in.Fake.Port)
+	if in.Fake != nil {
+		if _, ok := priceProvider.(*FakePriceProvider); ok {
+			extraAllowedPorts = append(extraAllowedPorts, in.Fake.Port)
+		}
 	}
 
 	bp, err := th.getBinaryPaths(in)
