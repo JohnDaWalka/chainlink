@@ -91,6 +91,7 @@ func NewMemoryChainsAptos(t *testing.T, numChains int) map[uint64]deployment.Apt
 	return GenerateChainsAptos(t, numChains)
 }
 
+// chain_selectors.TEST_90000051 onwards is reserved for zkchains
 func NewMemoryChainsZk(t *testing.T, numChains int) map[uint64]deployment.Chain {
 	return GenerateChainsZk(t, numChains)
 }
