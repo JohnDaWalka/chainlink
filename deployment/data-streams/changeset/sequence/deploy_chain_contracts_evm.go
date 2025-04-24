@@ -14,16 +14,15 @@ import (
 	rewardmanager "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/reward-manager"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/verification"
-	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 )
 
 // deployChainComponentsEVM deploys all necessary components for a single evm chain
-func deployChainComponentsEVM(env deployment.Environment, chain uint64, cfg DeployDataStreams, dataStore metadata.DataStreamsMutableDataStore) ([]mcms.TimelockProposal, error) {
+func deployChainComponentsEVM(env deployment.Environment, chain uint64, cfg DeployDataStreams, newAddresses metadata.DataStreamsMutableDataStore) ([]mcms.TimelockProposal, error) {
 	var timelockProposals []mcms.TimelockProposal
 
 	// Step 1: Deploy MCMS if configured
 	if cfg.Ownership.ShouldDeployMCMS {
-		mcmsProposals, err := deployMCMS(env, chain, cfg, dataStore)
+		mcmsProposals, err := deployMCMS(env, chain, cfg, newAddresses)
 		if err != nil {
 			return nil, fmt.Errorf("failed to deploy MCMS: %w", err)
 		}
@@ -96,7 +95,7 @@ func deployVerifierProxy(env deployment.Environment, chain uint64, cfg DeployDat
 }
 
 // deployVerifier deploys Verifier contract
-func deployVerifier(env deployment.Environment, chain uint64, cfg DeployDataStreams, verifierProxyAddr common.Address, newAddresses deployment.AddressBook) (common.Address, []mcms.TimelockProposal, error) {
+func deployVerifier(env deployment.Environment, chain uint64, cfg DeployDataStreams, verifierProxyAddr common.Address, newAddresses metadata.DataStreamsMutableDataStore) (common.Address, []mcms.TimelockProposal, error) {
 	verifierCfg := verification.DeployVerifierConfig{
 		ChainsToDeploy: map[uint64]verification.DeployVerifier{
 			chain: {VerifierProxyAddress: verifierProxyAddr},
@@ -109,18 +108,16 @@ func deployVerifier(env deployment.Environment, chain uint64, cfg DeployDataStre
 		return common.Address{}, nil, fmt.Errorf("failed to deploy verifier on chain %d: %w", chain, err)
 	}
 
-	if err := newAddresses.Merge(verifierOut.AddressBook); err != nil {
-		return common.Address{}, nil, fmt.Errorf("address book merge failed after verifier deployment: %w", err)
+	if err := mergeNewAddresses(env, newAddresses, verifierOut.DataStore.Seal()); err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to merge new addresses: %w", err)
 	}
 
-	verifierAddr, err := dsutil.MaybeFindEthAddress(newAddresses, chain, types.Verifier)
-	if err != nil {
-		return common.Address{}, nil, fmt.Errorf("failed to find verifier address: %w", err)
+	// Filter without version here should be safe as we only expect 1 address
+	records := newAddresses.Addresses().Filter(ds.AddressRefByType(ds.ContractType(types.Verifier)))
+	if len(records) != 1 {
+		return common.Address{}, nil, fmt.Errorf("expected 1 verifier proxy address, found %d", len(records))
 	}
-
-	if err := env.ExistingAddresses.Merge(verifierOut.AddressBook); err != nil {
-		return common.Address{}, nil, fmt.Errorf("failed to merge in verifier address: %w", err)
-	}
+	verifierAddr := common.HexToAddress(records[0].Address)
 
 	return verifierAddr, verifierOut.MCMSTimelockProposals, nil
 }
@@ -130,8 +127,8 @@ func initializeVerifier(env deployment.Environment, chain uint64, verifierProxyA
 	initVerifierCfg := verification.VerifierProxyInitializeVerifierConfig{
 		ConfigPerChain: map[uint64][]verification.InitializeVerifierConfig{
 			chain: {{
-				ContractAddress: verifierProxyAddr,
-				VerifierAddress: verifierAddr,
+				VerifierProxyAddress: verifierProxyAddr,
+				VerifierAddress:      verifierAddr,
 			}},
 		},
 	}
@@ -167,7 +164,7 @@ func setVerifierConfig(env deployment.Environment, chain uint64, cfg DeployDataS
 }
 
 // deployBillingComponents deploys and configures RewardManager and FeeManager
-func deployBillingComponents(env deployment.Environment, chain uint64, cfg DeployDataStreams, verifierProxyAddr common.Address, newAddresses deployment.AddressBook) ([]mcms.TimelockProposal, error) {
+func deployBillingComponents(env deployment.Environment, chain uint64, cfg DeployDataStreams, verifierProxyAddr common.Address, newAddresses metadata.DataStreamsMutableDataStore) ([]mcms.TimelockProposal, error) {
 	var timelockProposals []mcms.TimelockProposal
 
 	// Step 1: Deploy RewardManager
@@ -203,7 +200,7 @@ func deployBillingComponents(env deployment.Environment, chain uint64, cfg Deplo
 }
 
 // deployRewardManager deploys the RewardManager contract
-func deployRewardManager(env deployment.Environment, chain uint64, cfg DeployDataStreams, newAddresses deployment.AddressBook) (common.Address, []mcms.TimelockProposal, error) {
+func deployRewardManager(env deployment.Environment, chain uint64, cfg DeployDataStreams, newAddresses metadata.DataStreamsMutableDataStore) (common.Address, []mcms.TimelockProposal, error) {
 	rewardMgrCfg := rewardmanager.DeployRewardManagerConfig{
 		ChainsToDeploy: map[uint64]rewardmanager.DeployRewardManager{
 			chain: {LinkTokenAddress: cfg.Billing.Config.LinkTokenAddress},
@@ -216,24 +213,22 @@ func deployRewardManager(env deployment.Environment, chain uint64, cfg DeployDat
 		return common.Address{}, nil, fmt.Errorf("failed to deploy reward manager on chain %d: %w", chain, err)
 	}
 
-	if err := newAddresses.Merge(rmOut.AddressBook); err != nil {
-		return common.Address{}, nil, fmt.Errorf("address book merge failed after reward manager deployment: %w", err)
+	if err := mergeNewAddresses(env, newAddresses, rmOut.DataStore.Seal()); err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to merge new addresses: %w", err)
 	}
 
-	rewardMgrAddr, err := dsutil.MaybeFindEthAddress(newAddresses, chain, types.RewardManager)
-	if err != nil {
-		return common.Address{}, nil, fmt.Errorf("failed to find reward manager address: %w", err)
+	// Filter without version here should be safe as we only expect 1 address
+	records := newAddresses.Addresses().Filter(ds.AddressRefByType(ds.ContractType(types.RewardManager)))
+	if len(records) != 1 {
+		return common.Address{}, nil, fmt.Errorf("expected 1 verifier proxy address, found %d", len(records))
 	}
+	rmAddr := common.HexToAddress(records[0].Address)
 
-	if err := env.ExistingAddresses.Merge(rmOut.AddressBook); err != nil {
-		return common.Address{}, nil, fmt.Errorf("failed to merge in reward manager address: %w", err)
-	}
-
-	return rewardMgrAddr, rmOut.MCMSTimelockProposals, nil
+	return rmAddr, rmOut.MCMSTimelockProposals, nil
 }
 
 // deployFeeManager deploys the FeeManager contract
-func deployFeeManager(env deployment.Environment, chain uint64, cfg DeployDataStreams, verifierProxyAddr, rewardMgrAddr common.Address, newAddresses deployment.AddressBook) (common.Address, []mcms.TimelockProposal, error) {
+func deployFeeManager(env deployment.Environment, chain uint64, cfg DeployDataStreams, verifierProxyAddr, rewardMgrAddr common.Address, newAddresses metadata.DataStreamsMutableDataStore) (common.Address, []mcms.TimelockProposal, error) {
 	feeMgrCfg := feemanager.DeployFeeManagerConfig{
 		ChainsToDeploy: map[uint64]feemanager.DeployFeeManager{
 			chain: {
@@ -251,20 +246,18 @@ func deployFeeManager(env deployment.Environment, chain uint64, cfg DeployDataSt
 		return common.Address{}, nil, fmt.Errorf("failed to deploy fee manager on chain %d: %w", chain, err)
 	}
 
-	if err := newAddresses.Merge(fmOut.AddressBook); err != nil {
-		return common.Address{}, nil, fmt.Errorf("address book merge failed after fee manager deployment: %w", err)
+	if err := mergeNewAddresses(env, newAddresses, fmOut.DataStore.Seal()); err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to merge new addresses: %w", err)
 	}
 
-	feeManagerAddress, err := dsutil.MaybeFindEthAddress(newAddresses, chain, types.FeeManager)
-	if err != nil {
-		return common.Address{}, nil, fmt.Errorf("fee manager address not found for chain %d: %w", chain, err)
+	// Filter without version here should be safe as we only expect 1 address
+	records := newAddresses.Addresses().Filter(ds.AddressRefByType(ds.ContractType(types.FeeManager)))
+	if len(records) != 1 {
+		return common.Address{}, nil, fmt.Errorf("expected 1 verifier proxy address, found %d", len(records))
 	}
+	fmAddr := common.HexToAddress(records[0].Address)
 
-	if err := env.ExistingAddresses.Merge(fmOut.AddressBook); err != nil {
-		return common.Address{}, nil, fmt.Errorf("failed to merge in fee manager address: %w", err)
-	}
-
-	return feeManagerAddress, fmOut.MCMSTimelockProposals, nil
+	return fmAddr, fmOut.MCMSTimelockProposals, nil
 }
 
 // setNativeSurcharge sets the native surcharge on the FeeManager

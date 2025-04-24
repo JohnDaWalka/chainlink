@@ -68,7 +68,7 @@ func TestUnsetVerifier(t *testing.T) {
 			VerifierProxyInitializeVerifierConfig{
 				ConfigPerChain: map[uint64][]InitializeVerifierConfig{
 					testutil.TestChain.Selector: {
-						{VerifierAddress: verifierAddr, ContractAddress: verifierProxyAddr},
+						{VerifierAddress: verifierAddr, VerifierProxyAddress: verifierProxyAddr},
 					},
 				},
 			},

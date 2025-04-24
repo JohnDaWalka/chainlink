@@ -60,7 +60,7 @@ func TestInitializeVerifier(t *testing.T) {
 			VerifierProxyInitializeVerifierConfig{
 				ConfigPerChain: map[uint64][]InitializeVerifierConfig{
 					chainSelector: {
-						{VerifierAddress: verifierAddr, ContractAddress: verifierProxyAddr},
+						{VerifierAddress: verifierAddr, VerifierProxyAddress: verifierProxyAddr},
 					},
 				},
 			},

@@ -109,17 +109,18 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := tt.deployDataStreamsConfig
-			billingEnabled := cfg.ChainsToDeploy[testutil.TestChain.Selector].Billing.Enabled
+			chainSel := testutil.TestChain.Selector
+			billingEnabled := cfg.ChainsToDeploy[chainSel].Billing.Enabled
 
 			testEnv := testutil.NewMemoryEnvV2(t, testutil.MemoryEnvConfig{
 				ShouldDeployMCMS:      tt.hasExistingMcms,
 				ShouldDeployLinkToken: billingEnabled,
 			})
 
-			chain := testEnv.Environment.Chains[testutil.TestChain.Selector]
+			chain := testEnv.Environment.Chains[chainSel]
 
-			if cfg.ChainsToDeploy[testutil.TestChain.Selector].Billing.Enabled {
-				cfg.ChainsToDeploy[testutil.TestChain.Selector].Billing.Config.LinkTokenAddress = testEnv.LinkTokenState.LinkToken.Address()
+			if cfg.ChainsToDeploy[chainSel].Billing.Enabled {
+				cfg.ChainsToDeploy[chainSel].Billing.Config.LinkTokenAddress = testEnv.LinkTokenState.LinkToken.Address()
 			}
 
 			resp, _, err := commonChangesets.ApplyChangesetsV2(t, testEnv.Environment, []commonChangesets.ConfiguredChangeSet{
@@ -129,9 +130,9 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 
 			var timelockAddr common.Address
 			if tt.hasExistingMcms {
-				timelockAddr = testEnv.Timelocks[testutil.TestChain.Selector].Timelock.Address()
+				timelockAddr = testEnv.Timelocks[chainSel].Timelock.Address()
 			} else {
-				addresses, err := resp.ExistingAddresses.AddressesForChain(testutil.TestChain.Selector)
+				addresses, err := resp.ExistingAddresses.AddressesForChain(chainSel)
 				require.NoError(t, err)
 				mcmsState, err := commonstate.MaybeLoadMCMSWithTimelockChainState(chain, addresses)
 				require.NoError(t, err)
@@ -139,7 +140,7 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 			}
 
 			for _, contract := range tt.expectedContracts {
-				contractAddr, err := dsutil.MaybeFindEthAddress(resp.ExistingAddresses, testutil.TestChain.Selector, contract)
+				contractAddr, err := dsutil.MaybeFindEthAddress(resp.ExistingAddresses, chainSel, contract)
 				require.NoError(t, err, "failed to find %s address in address book", contract)
 				require.NotNil(t, "contractAddr", "address for %s was not found", contract)
 
@@ -147,7 +148,7 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 
 				require.NoError(t, err)
 
-				if cfg.ChainsToDeploy[testutil.TestChain.Selector].Ownership.ShouldTransfer {
+				if cfg.ChainsToDeploy[chainSel].Ownership.ShouldTransfer {
 					require.Equal(t, timelockAddr, owner, "%s contract owner should be the MCMS timelock", contract)
 				} else {
 					require.Equal(t, chain.DeployerKey.From, owner, "%s contract owner should be the deployer", contract)

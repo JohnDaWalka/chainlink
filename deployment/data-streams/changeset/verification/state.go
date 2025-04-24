@@ -22,13 +22,24 @@ func maybeLoadVerifierProxyState(e deployment.Environment, chainSel uint64, cont
 	if !ok {
 		return nil, fmt.Errorf("chain %d not found", chainSel)
 	}
-	addresses, err := e.ExistingAddresses.AddressesForChain(chainSel)
+
+	records, err := e.DataStore.Addresses().Fetch()
 	if err != nil {
-		return nil, fmt.Errorf("unable to load existing addresses for chain %d: %w", chainSel, err)
+		return nil, fmt.Errorf("failed to fetch addresses from datastore: %w", err)
 	}
-	tv, ok := addresses[contractAddr]
-	if !ok {
-		return nil, fmt.Errorf("unable to find VerifierProxy contract on chain %s (chain selector %d)", chain.Name(), chain.Selector)
+
+	var tv *deployment.TypeAndVersion
+	for _, record := range records {
+		if record.Address == contractAddr {
+			tv = &deployment.TypeAndVersion{
+				Type:    deployment.ContractType(record.Type),
+				Version: *record.Version,
+			}
+			break
+		}
+	}
+	if tv == nil {
+		return nil, fmt.Errorf("unable to find contract %s in datastore", contractAddr)
 	}
 
 	if tv.Type != types.VerifierProxy || tv.Version != deployment.Version0_5_0 {

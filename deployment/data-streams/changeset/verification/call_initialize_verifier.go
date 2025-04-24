@@ -26,8 +26,8 @@ type VerifierProxyInitializeVerifierConfig struct {
 }
 
 type InitializeVerifierConfig struct {
-	ContractAddress common.Address
-	VerifierAddress common.Address
+	VerifierProxyAddress common.Address
+	VerifierAddress      common.Address
 }
 
 func (v verifierProxyInitializeVerifier) Apply(e deployment.Environment, cfg VerifierProxyInitializeVerifierConfig) (deployment.ChangesetOutput, error) {
@@ -56,7 +56,7 @@ func GetInitializeVerifierTxs(e deployment.Environment, cfg VerifierProxyInitial
 	var preparedTxs []*txutil.PreparedTx
 	for chainSelector, configs := range cfg.ConfigPerChain {
 		for _, config := range configs {
-			state, err := maybeLoadVerifierProxyState(e, chainSelector, config.ContractAddress.String())
+			state, err := maybeLoadVerifierProxyState(e, chainSelector, config.VerifierProxyAddress.String())
 			if err != nil {
 				return nil, fmt.Errorf("failed to load verifier proxy state: %w", err)
 			}
