@@ -260,16 +260,13 @@ func ApplyChangesetsV2(t *testing.T, e deployment.Environment, changesetApplicat
 	return currentEnv, outputs, nil
 }
 
-func DeployLinkTokenTest(t *testing.T, solChains int) {
+func DeployLinkTokenTest(t *testing.T, memoryConfig memory.MemoryEnvironmentConfig) {
 	lggr := logger.Test(t)
-	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
-		Chains:    1,
-		SolChains: solChains,
-	})
+	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memoryConfig)
 	chain1 := e.AllChainSelectors()[0]
 	config := []uint64{chain1}
 	var solChain1 uint64
-	if solChains > 0 {
+	if memoryConfig.SolChains > 0 {
 		solChain1 = e.AllChainSelectorsSolana()[0]
 		config = append(config, solChain1)
 	}
@@ -290,7 +287,7 @@ func DeployLinkTokenTest(t *testing.T, solChains int) {
 	require.NoError(t, err)
 
 	// solana test
-	if solChains > 0 {
+	if memoryConfig.SolChains > 0 {
 		addrs, err = e.ExistingAddresses.AddressesForChain(solChain1)
 		require.NoError(t, err)
 		require.NotEmpty(t, addrs)
