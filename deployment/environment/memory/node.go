@@ -334,7 +334,7 @@ func NewNode(
 	clients := make(map[uint64]client.Client)
 	for chainID, chain := range evmchains {
 		if chain.Backend != nil {
-			clients[chainID] = client.NewSimulatedBackendClient(t, chain.Backend, big.NewInt(int64(chainID)))
+			clients[chainID] = client.NewSimulatedBackendClient(t, chain.Backend, big.NewInt(int64(chainID))) //nolint:gosec
 		}
 	}
 
