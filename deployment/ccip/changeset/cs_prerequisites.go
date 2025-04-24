@@ -5,9 +5,11 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -29,6 +31,16 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/multicall3"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/weth9"
+
+	factory_burn_mint_erc20_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/latest/factory_burn_mint_erc20"
+	maybe_revert_message_receiver_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/latest/maybe_revert_message_receiver"
+	token_pool_factory_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/latest/token_pool_factory"
+	rmn_proxy_contract_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/v1_0_0/rmn_proxy_contract"
+	router_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/v1_2_0/router"
+	mock_rmn_contract_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/v1_5_0/mock_rmn_contract"
+	token_admin_regisitry_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/v1_5_0/token_admin_registry"
+	registry_module_owner_custom_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/v1_6_0/registry_module_owner_custom"
+	weth9_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/weth9"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 )
@@ -204,10 +216,25 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 		if chainState.MockRMN == nil {
 			rmn, err := deployment.DeployContract(lggr, chain, ab,
 				func(chain deployment.Chain) deployment.ContractDeploy[*mock_rmn_contract.MockRMNContract] {
-					rmnAddress, tx2, rmnC, err2 := mock_rmn_contract.DeployMockRMNContract(
-						chain.DeployerKey,
-						chain.Client,
+					var (
+						rmnAddress common.Address
+						tx2        *types.Transaction
+						rmnC       *mock_rmn_contract.MockRMNContract
+						err2       error
 					)
+					if !chain.IsZk {
+						rmnAddress, tx2, rmnC, err2 = mock_rmn_contract.DeployMockRMNContract(
+							chain.DeployerKey,
+							chain.Client,
+						)
+					} else {
+						rmnAddress, _, rmnC, err2 = mock_rmn_contract_zk.DeployMockRMNContractZk(
+							nil,
+							chain.ClientZk,
+							chain.DeployerKeyZk,
+							chain.Client,
+						)
+					}
 					return deployment.ContractDeploy[*mock_rmn_contract.MockRMNContract]{
 						Address: rmnAddress, Contract: rmnC, Tx: tx2, Tv: deployment.NewTypeAndVersion(MockRMN, deployment.Version1_0_0), Err: err2,
 					}
@@ -225,11 +252,27 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	if rmnProxy == nil {
 		RMNProxy, err := deployment.DeployContract(lggr, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*rmn_proxy_contract.RMNProxy] {
-				rmnProxyAddr, tx2, rmnProxy2, err2 := rmn_proxy_contract.DeployRMNProxy(
-					chain.DeployerKey,
-					chain.Client,
-					rmnAddr,
+				var (
+					rmnProxyAddr common.Address
+					tx2          *types.Transaction
+					rmnProxy2    *rmn_proxy_contract.RMNProxy
+					err2         error
 				)
+				if !chain.IsZk {
+					rmnProxyAddr, tx2, rmnProxy2, err2 = rmn_proxy_contract.DeployRMNProxy(
+						chain.DeployerKey,
+						chain.Client,
+						rmnAddr,
+					)
+				} else {
+					rmnProxyAddr, _, rmnProxy2, err2 = rmn_proxy_contract_zk.DeployRMNProxyZk(
+						nil,
+						chain.ClientZk,
+						chain.DeployerKeyZk,
+						chain.Client,
+						rmnAddr,
+					)
+				}
 				return deployment.ContractDeploy[*rmn_proxy_contract.RMNProxy]{
 					Address: rmnProxyAddr, Contract: rmnProxy2, Tx: tx2, Tv: deployment.NewTypeAndVersion(ARMProxy, deployment.Version1_0_0), Err: err2,
 				}
@@ -276,9 +319,23 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	if tokenAdminReg == nil {
 		tokenAdminRegistry, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*token_admin_registry.TokenAdminRegistry] {
-				tokenAdminRegistryAddr, tx2, tokenAdminRegistry, err2 := token_admin_registry.DeployTokenAdminRegistry(
-					chain.DeployerKey,
-					chain.Client)
+				var (
+					tokenAdminRegistryAddr common.Address
+					tx2                    *types.Transaction
+					tokenAdminRegistry     *token_admin_registry.TokenAdminRegistry
+					err2                   error
+				)
+				if !chain.IsZk {
+					tokenAdminRegistryAddr, tx2, tokenAdminRegistry, err2 = token_admin_registry.DeployTokenAdminRegistry(
+						chain.DeployerKey,
+						chain.Client)
+				} else {
+					tokenAdminRegistryAddr, _, tokenAdminRegistry, err2 = token_admin_regisitry_zk.DeployTokenAdminRegistryZk(
+						nil,
+						chain.ClientZk,
+						chain.DeployerKeyZk,
+						chain.Client)
+				}
 				return deployment.ContractDeploy[*token_admin_registry.TokenAdminRegistry]{
 					Address: tokenAdminRegistryAddr, Contract: tokenAdminRegistry, Tx: tx2, Tv: deployment.NewTypeAndVersion(TokenAdminRegistry, deployment.Version1_5_0), Err: err2,
 				}
@@ -294,10 +351,26 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	if len(registryModules) == 0 {
 		customRegistryModule, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*registry_module_owner_custom.RegistryModuleOwnerCustom] {
-				regModAddr, tx2, regMod, err2 := registry_module_owner_custom.DeployRegistryModuleOwnerCustom(
-					chain.DeployerKey,
-					chain.Client,
-					tokenAdminReg.Address())
+				var (
+					regModAddr common.Address
+					tx2        *types.Transaction
+					regMod     *registry_module_owner_custom.RegistryModuleOwnerCustom
+					err2       error
+				)
+				if !chain.IsZk {
+					regModAddr, tx2, regMod, err2 = registry_module_owner_custom.DeployRegistryModuleOwnerCustom(
+						chain.DeployerKey,
+						chain.Client,
+						tokenAdminReg.Address())
+				} else {
+					regModAddr, _, regMod, err2 = registry_module_owner_custom_zk.DeployRegistryModuleOwnerCustomZk(
+						nil,
+						chain.ClientZk,
+						chain.DeployerKeyZk,
+						chain.Client,
+						tokenAdminReg.Address(),
+					)
+				}
 				return deployment.ContractDeploy[*registry_module_owner_custom.RegistryModuleOwnerCustom]{
 					Address: regModAddr, Contract: regMod, Tx: tx2, Tv: deployment.NewTypeAndVersion(RegistryModule, deployment.Version1_6_0), Err: err2,
 				}
@@ -340,10 +413,25 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	if weth9Contract == nil {
 		weth, err := deployment.DeployContract(lggr, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*weth9.WETH9] {
-				weth9Addr, tx2, weth9c, err2 := weth9.DeployWETH9(
-					chain.DeployerKey,
-					chain.Client,
+				var (
+					weth9Addr common.Address
+					tx2       *types.Transaction
+					weth9c    *weth9.WETH9
+					err2      error
 				)
+				if !chain.IsZk {
+					weth9Addr, tx2, weth9c, err2 = weth9.DeployWETH9(
+						chain.DeployerKey,
+						chain.Client,
+					)
+				} else {
+					weth9Addr, _, weth9c, err2 = weth9_zk.DeployWETH9Zk(
+						nil,
+						chain.ClientZk,
+						chain.DeployerKeyZk,
+						chain.Client,
+					)
+				}
 				return deployment.ContractDeploy[*weth9.WETH9]{
 					Address: weth9Addr, Contract: weth9c, Tx: tx2, Tv: deployment.NewTypeAndVersion(WETH9, deployment.Version1_0_0), Err: err2,
 				}
@@ -362,12 +450,29 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	if r == nil {
 		routerContract, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*router.Router] {
-				routerAddr, tx2, routerC, err2 := router.DeployRouter(
-					chain.DeployerKey,
-					chain.Client,
-					weth9Contract.Address(),
-					rmnProxy.Address(),
+				var (
+					routerAddr common.Address
+					tx2        *types.Transaction
+					routerC    *router.Router
+					err2       error
 				)
+				if !chain.IsZk {
+					routerAddr, tx2, routerC, err2 = router.DeployRouter(
+						chain.DeployerKey,
+						chain.Client,
+						weth9Contract.Address(),
+						rmnProxy.Address(),
+					)
+				} else {
+					routerAddr, _, routerC, err2 = router_zk.DeployRouterZk(
+						nil,
+						chain.ClientZk,
+						chain.DeployerKeyZk,
+						chain.Client,
+						weth9Contract.Address(),
+						rmnProxy.Address(),
+					)
+				}
 				return deployment.ContractDeploy[*router.Router]{
 					Address: routerAddr, Contract: routerC, Tx: tx2, Tv: deployment.NewTypeAndVersion(Router, deployment.Version1_2_0), Err: err2,
 				}
@@ -385,17 +490,36 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 		if tokenPoolFactory == nil {
 			_, err := deployment.DeployContract(e.Logger, chain, ab,
 				func(chain deployment.Chain) deployment.ContractDeploy[*token_pool_factory.TokenPoolFactory] {
-					tpfAddr, tx2, contract, err2 := token_pool_factory.DeployTokenPoolFactory(
-						chain.DeployerKey,
-						chain.Client,
-						tokenAdminReg.Address(),
-						// There will always be at least one registry module deployed at this point.
-						// We just use the first one here. If a different RegistryModule is desired,
-						// users can run DeployTokenPoolFactoryChangeset with the desired address.
-						registryModules[0].Address(),
-						rmnProxy.Address(),
-						r.Address(),
+					var (
+						tpfAddr  common.Address
+						tx2      *types.Transaction
+						contract *token_pool_factory.TokenPoolFactory
+						err2     error
 					)
+					if !chain.IsZk {
+						tpfAddr, tx2, contract, err2 = token_pool_factory.DeployTokenPoolFactory(
+							chain.DeployerKey,
+							chain.Client,
+							tokenAdminReg.Address(),
+							// There will always be at least one registry module deployed at this point.
+							// We just use the first one here. If a different RegistryModule is desired,
+							// users can run DeployTokenPoolFactoryChangeset with the desired address.
+							registryModules[0].Address(),
+							rmnProxy.Address(),
+							r.Address(),
+						)
+					} else {
+						tpfAddr, _, contract, err2 = token_pool_factory_zk.DeployTokenPoolFactoryZk(
+							nil,
+							chain.ClientZk,
+							chain.DeployerKeyZk,
+							chain.Client,
+							tokenAdminReg.Address(),
+							registryModules[0].Address(),
+							rmnProxy.Address(),
+							r.Address(),
+						)
+					}
 					return deployment.ContractDeploy[*token_pool_factory.TokenPoolFactory]{
 						Address: tpfAddr, Contract: contract, Tx: tx2, Tv: deployment.NewTypeAndVersion(TokenPoolFactory, deployment.Version1_5_1), Err: err2,
 					}
@@ -413,16 +537,37 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 		if factoryBurnMintERC20 == nil {
 			_, err := deployment.DeployContract(e.Logger, chain, ab,
 				func(chain deployment.Chain) deployment.ContractDeploy[*factory_burn_mint_erc20.FactoryBurnMintERC20] {
-					factoryBurnMintERC20Addr, tx2, contract, err2 := factory_burn_mint_erc20.DeployFactoryBurnMintERC20(
-						chain.DeployerKey,
-						chain.Client,
-						string(FactoryBurnMintERC20Symbol),
-						string(FactoryBurnMintERC20Symbol),
-						18,
-						big.NewInt(0),
-						big.NewInt(0),
-						chain.DeployerKey.From,
+					var (
+						factoryBurnMintERC20Addr common.Address
+						tx2                      *types.Transaction
+						contract                 *factory_burn_mint_erc20.FactoryBurnMintERC20
+						err2                     error
 					)
+					if !chain.IsZk {
+						factoryBurnMintERC20Addr, tx2, contract, err2 = factory_burn_mint_erc20.DeployFactoryBurnMintERC20(
+							chain.DeployerKey,
+							chain.Client,
+							string(FactoryBurnMintERC20Symbol),
+							string(FactoryBurnMintERC20Symbol),
+							18,
+							big.NewInt(0),
+							big.NewInt(0),
+							chain.DeployerKey.From,
+						)
+					} else {
+						factoryBurnMintERC20Addr, _, contract, err2 = factory_burn_mint_erc20_zk.DeployFactoryBurnMintERC20Zk(
+							nil,
+							chain.ClientZk,
+							chain.DeployerKeyZk,
+							chain.Client,
+							string(FactoryBurnMintERC20Symbol),
+							string(FactoryBurnMintERC20Symbol),
+							uint8(18),
+							big.NewInt(0),
+							big.NewInt(0),
+							chain.DeployerKey.From,
+						)
+					}
 					return deployment.ContractDeploy[*factory_burn_mint_erc20.FactoryBurnMintERC20]{
 						Address: factoryBurnMintERC20Addr, Contract: contract, Tx: tx2, Tv: deployment.NewTypeAndVersion(FactoryBurnMintERC20Token, deployment.Version1_0_0), Err: err2,
 					}
@@ -439,10 +584,25 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	if deployOpts.Multicall3Enabled && mc3 == nil {
 		_, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*multicall3.Multicall3] {
-				multicall3Addr, tx2, multicall3Wrapper, err2 := multicall3.DeployMulticall3(
-					chain.DeployerKey,
-					chain.Client,
+				var (
+					multicall3Addr    common.Address
+					tx2               *types.Transaction
+					multicall3Wrapper *multicall3.Multicall3
+					err2              error
 				)
+				if !chain.IsZk {
+					multicall3Addr, tx2, multicall3Wrapper, err2 = multicall3.DeployMulticall3(
+						chain.DeployerKey,
+						chain.Client,
+					)
+				} else {
+					multicall3Addr, _, multicall3Wrapper, err2 = multicall3.DeployMulticall3Zk(
+						nil,
+						chain.ClientZk,
+						chain.DeployerKeyZk,
+						chain.Client,
+					)
+				}
 				return deployment.ContractDeploy[*multicall3.Multicall3]{
 					Address: multicall3Addr, Contract: multicall3Wrapper, Tx: tx2, Tv: deployment.NewTypeAndVersion(Multicall3, deployment.Version1_0_0), Err: err2,
 				}
@@ -472,11 +632,27 @@ func deployPrerequisiteContracts(e deployment.Environment, ab deployment.Address
 	if chainState.Receiver == nil {
 		_, err := deployment.DeployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*maybe_revert_message_receiver.MaybeRevertMessageReceiver] {
-				receiverAddr, tx, receiver, err2 := maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(
-					chain.DeployerKey,
-					chain.Client,
-					false,
+				var (
+					receiverAddr common.Address
+					tx           *types.Transaction
+					receiver     *maybe_revert_message_receiver.MaybeRevertMessageReceiver
+					err2         error
 				)
+				if !chain.IsZk {
+					receiverAddr, tx, receiver, err2 = maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(
+						chain.DeployerKey,
+						chain.Client,
+						false,
+					)
+				} else {
+					receiverAddr, _, receiver, err2 = maybe_revert_message_receiver_zk.DeployMaybeRevertMessageReceiverZk(
+						nil,
+						chain.ClientZk,
+						chain.DeployerKeyZk,
+						chain.Client,
+						false,
+					)
+				}
 				return deployment.ContractDeploy[*maybe_revert_message_receiver.MaybeRevertMessageReceiver]{
 					Address: receiverAddr, Contract: receiver, Tx: tx, Tv: deployment.NewTypeAndVersion(CCIPReceiver, deployment.Version1_0_0), Err: err2,
 				}

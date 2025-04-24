@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -19,6 +20,21 @@ func TestDeployPrerequisites(t *testing.T) {
 		Chains:     2,
 		Nodes:      4,
 	})
+	testDeployPrerequisitesWithEnv(t, e)
+}
+
+func TestDeployPrerequisitesZk(t *testing.T) {
+	t.Parallel()
+	lggr := logger.TestLogger(t)
+	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
+		Bootstraps: 1,
+		ZkChains:   2,
+		Nodes:      4,
+	})
+	testDeployPrerequisitesWithEnv(t, e)
+}
+
+func testDeployPrerequisitesWithEnv(t *testing.T, e deployment.Environment) {
 	newChain := e.AllChainSelectors()[0]
 	cfg := changeset.DeployPrerequisiteConfig{
 		Configs: []changeset.DeployPrerequisiteConfigPerChain{
