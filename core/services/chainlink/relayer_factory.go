@@ -211,9 +211,14 @@ func (r *RelayerFactory) NewLOOPRelayer(name string, network string, plugin env.
 		return nil, fmt.Errorf("failed to parse env file %s: %w", envFile, err)
 	}
 
+	fmt.Println("CMD Name:", cmdName)
+	fmt.Println("CMD Env File:", envFile)
+	fmt.Println("ChainCfgs:", chainCfgs)
+
 	unique := make(map[string]struct{})
 	// create one relayer per chain id
 	for _, chainCfg := range chainCfgs {
+		fmt.Println("Creating relayer for chainID ", chainCfg.ChainID())
 		relayID := types.RelayID{Network: network, ChainID: chainCfg.ChainID()}
 		if _, alreadyExists := unique[relayID.Name()]; alreadyExists {
 			return nil, fmt.Errorf("duplicate chain definitions for %s", relayID.Name())

@@ -152,6 +152,7 @@ func ReplayLogs(t *testing.T, oc deployment.OffchainClient, replayBlocks map[uin
 
 	switch oc := oc.(type) {
 	case *memory.JobClient:
+		t.Logf("Is JobClient")
 		err = oc.ReplayLogs(t.Context(), replayBlocks)
 	case *devenv.JobDistributor:
 		err = oc.ReplayLogs(replayBlocks)
@@ -218,6 +219,12 @@ func LatestBlock(ctx context.Context, env deployment.Environment, chainSelector 
 		return block, nil
 	case chainsel.FamilySolana:
 		return env.SolChains[chainSelector].Client.GetSlot(ctx, solconfig.DefaultCommitment)
+	case chainsel.FamilyAptos:
+		chainInfo, err := env.AptosChains[chainSelector].Client.Info()
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to get chain info for chain %d", chainSelector)
+		}
+		return chainInfo.LedgerVersion(), nil
 	default:
 		return 0, errors.New("unsupported chain family")
 	}
@@ -229,6 +236,7 @@ func LatestBlocksByChain(ctx context.Context, env deployment.Environment) (map[u
 	chains := []uint64{}
 	chains = slices.AppendSeq(chains, maps.Keys(env.Chains))
 	chains = slices.AppendSeq(chains, maps.Keys(env.SolChains))
+	chains = slices.AppendSeq(chains, maps.Keys(env.AptosChains))
 	for _, selector := range chains {
 		block, err := LatestBlock(ctx, env, selector)
 		if err != nil {
@@ -477,6 +485,8 @@ func SendRequest(
 		return SendRequestEVM(e, state, cfg)
 	case chainsel.FamilySolana:
 		return SendRequestSol(e, state, cfg)
+	case chainsel.FamilyAptos:
+		panic("Aptos - not implemented")
 	default:
 		return nil, fmt.Errorf("send request: unsupported chain family: %v", family)
 	}

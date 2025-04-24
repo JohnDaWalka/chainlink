@@ -86,6 +86,7 @@ func (n Node) ReplayLogs(ctx context.Context, chains map[uint64]uint64) error {
 	for sel, block := range chains {
 		family, _ := chainsel.GetSelectorFamily(sel)
 		chainID, _ := chainsel.GetChainIDFromSelector(sel)
+		fmt.Printf("ReplayFromBlock: family: %q chainID: %q\n", family, chainID)
 		if err := n.App.ReplayFromBlock(ctx, family, chainID, block, false); err != nil {
 			return err
 		}

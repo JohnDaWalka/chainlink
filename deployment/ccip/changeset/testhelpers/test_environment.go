@@ -359,7 +359,9 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 
 	m.Chains = chains
 	m.SolChains = memory.NewMemoryChainsSol(t, tc.SolChains)
+	fmt.Println("Now starting aptos chains...")
 	m.AptosChains = memory.NewMemoryChainsAptos(t, tc.AptosChains)
+	fmt.Println("Aptos chains started: ", tc.AptosChains)
 	env := deployment.Environment{
 		Chains:      m.Chains,
 		SolChains:   m.SolChains,
@@ -915,7 +917,9 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	e.Env, err = commonchangeset.ApplyChangesets(t, e.Env, timelockContractsPerChain, apps)
 	require.NoError(t, err)
 
+	e.Env.Logger.Infow("Now replaying logs...", "replayBlocks", e.ReplayBlocks)
 	ReplayLogs(t, e.Env.Offchain, e.ReplayBlocks)
+	e.Env.Logger.Infof("Replayed all logs")
 
 	state, err = changeset.LoadOnchainState(e.Env)
 	require.NoError(t, err)

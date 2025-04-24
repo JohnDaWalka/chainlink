@@ -343,7 +343,10 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 		initOps = append(initOps, InitStarknet(relayerFactory, keyStore.StarkNet(), cfg.StarknetConfigs()))
 	}
 	if cfg.AptosEnabled() {
+		fmt.Println("APTOS is enabled")
 		initOps = append(initOps, InitAptos(relayerFactory, keyStore.Aptos(), cfg.AptosConfigs()))
+	} else {
+		fmt.Println("APTOS is disabled")
 	}
 	if cfg.TronEnabled() {
 		initOps = append(initOps, InitTron(relayerFactory, keyStore.Tron(), cfg.TronConfigs()))
@@ -1288,14 +1291,30 @@ func (app *ChainlinkApplication) ReplayFromBlock(ctx context.Context, chainFamil
 			chain.LogPoller().ReplayAsync(fromBlock)
 		}
 	default:
+		fmt.Println("Getting relayer:", chainFamily)
 		relayer, err := app.GetRelayers().Get(commontypes.RelayID{
 			Network: chainFamily,
 			ChainID: chainID,
 		})
 		if err != nil {
+			fmt.Println("Getting relayer error:", err)
 			return err
 		}
+		fmt.Println("Got relayer:", relayer, err)
+		fmt.Println("Name: ", relayer.Name())
+		fmt.Println("Now getting latest head...")
+		lh, err := relayer.LatestHead(ctx)
+		if err != nil {
+			fmt.Println("Error during relayer latest head:", err)
+			return err
+		}
+		fmt.Println("LatestHead: ", lh)
+		if err := relayer.Ready(); err != nil {
+			fmt.Println("Error during relayer ready:", err)
+		}
+		fmt.Println("relayer.Replay...", strconv.FormatUint(number, 10))
 		err = relayer.Replay(ctx, strconv.FormatUint(number, 10), map[string]any{})
+		fmt.Println("relayer.Replay error: ", err)
 		if err != nil {
 			return err
 		}

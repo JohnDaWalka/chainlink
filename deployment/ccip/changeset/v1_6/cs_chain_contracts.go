@@ -1542,6 +1542,7 @@ func SetOCR3OffRampChangeset(e deployment.Environment, cfg SetOCR3OffRampConfig)
 			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[remote], tx, offramp.OffRampABI, err); err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("error setting OCR3 config for chain %d: %w", remote, err)
 			}
+			e.Logger.Infow("OCR3 config set", "remote selector", remote)
 		} else {
 			if err != nil {
 				return deployment.ChangesetOutput{}, err
