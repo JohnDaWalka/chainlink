@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"golang.org/x/exp/maps"
 
 	"github.com/gagliardetto/solana-go"
@@ -482,7 +483,7 @@ func TestTokenTransfer_Solana2EVM(t *testing.T) {
 			Receiver: state.Chains[destChain].Receiver.Address().Bytes(),
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
 				// due to the differences in decimals, 1 on SVM results to 1e9 on EVM
-				{Token: destToken.Address().Bytes(), Amount: new(big.Int).SetUint64(oneE9)},
+				{Token: common.LeftPadBytes(destToken.Address().Bytes(), 32), Amount: new(big.Int).SetUint64(oneE9)},
 			},
 			ExtraArgs:      extraArgs,
 			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,

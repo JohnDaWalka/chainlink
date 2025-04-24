@@ -1323,7 +1323,7 @@ func DeployTransferableTokenSolana(
 					// Needs to be empty on the initial setup
 					PoolAddresses: []solTestTokenPool.RemoteAddress{},
 					TokenAddress: solTestTokenPool.RemoteAddress{
-						Address: evmToken.Address().Bytes(),
+						Address: common.LeftPadBytes(evmToken.Address().Bytes(), 32),
 					},
 					Decimals: 18,
 				},
@@ -1354,7 +1354,7 @@ func DeployTransferableTokenSolana(
 						},
 					},
 					TokenAddress: solTestTokenPool.RemoteAddress{
-						Address: evmToken.Address().Bytes(),
+						Address: common.LeftPadBytes(evmToken.Address().Bytes(), 32),
 					},
 				},
 			},
