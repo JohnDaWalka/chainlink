@@ -30,12 +30,12 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/sethvargo/go-retry v0.2.4
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0
-	github.com/smartcontractkit/chain-selectors v1.0.49
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250408103656-875e982e6437
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250408172557-9bce44d32d44
-	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250407100046-dfdf9600557b
-	github.com/smartcontractkit/chainlink-deployments-framework v0.0.3
-	github.com/smartcontractkit/chainlink-evm v0.0.0-20250417231223-c7342abcab9f
+	github.com/smartcontractkit/chain-selectors v1.0.52
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250422205932-c33527859fd6
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250411163110-21a13ceb3ac4
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250425164544-3e73f118c5e0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.0.4
+	github.com/smartcontractkit/chainlink-evm v0.0.0-20250425194527-99f5c4aaa871
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250402142713-6529d36f91f3
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.5.0

@@ -112,6 +112,7 @@ func TestEVMEncoder_Tuple(t *testing.T) {
 	wrapped, err := values.NewMap(config)
 	require.NoError(t, err)
 	enc, err := evm.NewEVMEncoder(wrapped)
+	
 	require.NoError(t, err)
 
 	// output of a DF2.0 aggregator + metadata fields appended by OCR

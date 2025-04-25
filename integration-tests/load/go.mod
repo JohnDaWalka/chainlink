@@ -26,12 +26,12 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.33.0
 	github.com/slack-go/slack v0.15.0
-	github.com/smartcontractkit/chain-selectors v1.0.49
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250408103656-875e982e6437
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250408172557-9bce44d32d44
-	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250407100046-dfdf9600557b
-	github.com/smartcontractkit/chainlink-evm v0.0.0-20250417231223-c7342abcab9f
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.7.2
+	github.com/smartcontractkit/chain-selectors v1.0.52
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250422205932-c33527859fd6
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250411163110-21a13ceb3ac4
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250425164544-3e73f118c5e0
+	github.com/smartcontractkit/chainlink-evm v0.0.0-20250425194527-99f5c4aaa871
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.7.4
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.5
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.4
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0

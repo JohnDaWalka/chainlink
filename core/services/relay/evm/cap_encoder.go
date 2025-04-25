@@ -12,6 +12,7 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	"github.com/smartcontractkit/chainlink-evm/pkg/abi"
+	"github.com/smartcontractkit/chainlink-evm/pkg/report/platform"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/codec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
@@ -134,6 +135,15 @@ func (c *capEncoder) Encode(ctx context.Context, input values.Map) ([]byte, erro
 	}
 
 	return prependMetadataFields(meta, userPayload)
+}
+
+func (c *capEncoder) Decode(ctx context.Context, raw []byte, into any, _ string) error {
+	report, err := platform.Decode(raw)
+	if err != nil {
+		return err
+	}
+	c.codec.Decode(ctx, report.Data, into, encoderName)
+	return nil
 }
 
 func prependMetadataFields(meta consensustypes.Metadata, userPayload []byte) ([]byte, error) {

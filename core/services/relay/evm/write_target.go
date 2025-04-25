@@ -2,6 +2,7 @@ package evm
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -14,7 +15,6 @@ import (
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
-	dftypes "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds"
 	processor "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds/processor"
 
 	monitor "github.com/smartcontractkit/chainlink-evm/pkg/monitor/beholder"
@@ -23,6 +23,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
+	ocr3types "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -193,42 +194,45 @@ func evaluate(rawRequest capabilities.CapabilityRequest) (receiver string, err e
 		return "", fmt.Errorf("unsupported report version: %d", reportMetadata.Version)
 	}
 
-	if hex.EncodeToString(reportMetadata.WorkflowExecutionID[:]) != rawRequest.Metadata.WorkflowExecutionID {
-		return "", fmt.Errorf("WorkflowExecutionID in the report does not match WorkflowExecutionID in the request metadata. Report WorkflowExecutionID: %+v, request WorkflowExecutionID: %+v", hex.EncodeToString(reportMetadata.WorkflowExecutionID[:]), rawRequest.Metadata.WorkflowExecutionID)
+	if reportMetadata.ExecutionID != rawRequest.Metadata.WorkflowExecutionID {
+		return "", fmt.Errorf("WorkflowExecutionID in the report does not match WorkflowExecutionID in the request metadata. Report WorkflowExecutionID: %+v, request WorkflowExecutionID: %+v", hex.EncodeToString([]byte(reportMetadata.ExecutionID)), rawRequest.Metadata.WorkflowExecutionID)
 	}
 
 	// case-insensitive verification of the owner address (so that a check-summed address matches its non-checksummed version).
-	if !strings.EqualFold(hex.EncodeToString(reportMetadata.WorkflowOwner[:]), rawRequest.Metadata.WorkflowOwner) {
-		return "", fmt.Errorf("WorkflowOwner in the report does not match WorkflowOwner in the request metadata. Report WorkflowOwner: %+v, request WorkflowOwner: %+v", hex.EncodeToString(reportMetadata.WorkflowOwner[:]), rawRequest.Metadata.WorkflowOwner)
+	if !strings.EqualFold(reportMetadata.WorkflowOwner, rawRequest.Metadata.WorkflowOwner) {
+		return "", fmt.Errorf("WorkflowOwner in the report does not match WorkflowOwner in the request metadata. Report WorkflowOwner: %+v, request WorkflowOwner: %+v", reportMetadata.WorkflowOwner, rawRequest.Metadata.WorkflowOwner)
 	}
 
-	// workflowNames are padded to 10bytes
-	decodedName, err := hex.DecodeString(rawRequest.Metadata.WorkflowName)
+	if !strings.EqualFold(reportMetadata.WorkflowName, rawRequest.Metadata.WorkflowName) {
+		return "", fmt.Errorf("WorkflowName in the report does not match WorkflowName in the request metadata. Report WorkflowName: %+v, request WorkflowName: %+v", reportMetadata.WorkflowName, rawRequest.Metadata.WorkflowName)
+	}
+
+	if reportMetadata.WorkflowID != rawRequest.Metadata.WorkflowID {
+		return "", fmt.Errorf("WorkflowID in the report does not match WorkflowID in the request metadata. Report WorkflowID: %+v, request WorkflowID: %+v", reportMetadata.WorkflowID, rawRequest.Metadata.WorkflowID)
+	}
+
+	byteID, err := hex.DecodeString(reportMetadata.ReportID)
 	if err != nil {
-		return "", err
-	}
-	var workflowName [10]byte
-	copy(workflowName[:], decodedName)
-	if !bytes.Equal(reportMetadata.WorkflowName[:], workflowName[:]) {
-		return "", fmt.Errorf("WorkflowName in the report does not match WorkflowName in the request metadata. Report WorkflowName: %+v, request WorkflowName: %+v", hex.EncodeToString(reportMetadata.WorkflowName[:]), hex.EncodeToString(workflowName[:]))
+		return "", fmt.Errorf("failed to decode report ID: %w", err)
 	}
 
-	if hex.EncodeToString(reportMetadata.WorkflowCID[:]) != rawRequest.Metadata.WorkflowID {
-		return "", fmt.Errorf("WorkflowID in the report does not match WorkflowID in the request metadata. Report WorkflowID: %+v, request WorkflowID: %+v", reportMetadata.WorkflowCID, rawRequest.Metadata.WorkflowID)
-	}
-
-	if !bytes.Equal(reportMetadata.ReportID[:], r.Inputs.SignedReport.ID) {
+	if !bytes.Equal(byteID, r.Inputs.SignedReport.ID) {
 		return "", fmt.Errorf("ReportID in the report does not match ReportID in the inputs. reportMetadata.ReportID: %x, Inputs.SignedReport.ID: %x", reportMetadata.ReportID, r.Inputs.SignedReport.ID)
 	}
 
 	return r.Config.Address, nil
 }
 
-func decodeReportMetadata(data []byte) (metadata dftypes.Metadata, err error) {
+func decodeReportMetadata(data []byte) (metadata ocr3types.Metadata, err error) {
 	if len(data) < metadata.Length() {
 		return metadata, fmt.Errorf("data too short: %d bytes", len(data))
 	}
-	return metadata, binary.Read(bytes.NewReader(data[:metadata.Length()]), binary.BigEndian, &metadata)
+	// don't need tail in this case
+	decoded, _, err := ocr3types.Decode(data)
+	if err != nil {
+		return metadata, fmt.Errorf("failed to decode report metadata: %w", err)
+	}
+	return decoded, nil
 }
 
 func getChainInfo(chainID uint64) (monitor.ChainInfo, error) {

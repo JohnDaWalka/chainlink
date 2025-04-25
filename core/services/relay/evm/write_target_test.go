@@ -25,8 +25,10 @@ import (
 	gasmocks "github.com/smartcontractkit/chainlink-evm/pkg/gas/mocks"
 	dftypes "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds"
 	"github.com/smartcontractkit/chainlink-evm/pkg/report/platform"
+
 	evmtypes "github.com/smartcontractkit/chainlink-evm/pkg/types"
 
+	ocr3types "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
 	forwarder "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
 	evmcapabilities "github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/targets"
@@ -164,16 +166,17 @@ func TestEvmWrite(t *testing.T) {
 	require.Len(t, registeredCapabilities, 1) // WriteTarget should be added to the registry
 
 	reportID := [2]byte{0x00, 0x01}
-	reportMetadata := dftypes.Metadata{
-		Version:             1,
-		WorkflowExecutionID: [32]byte{},
-		Timestamp:           0,
-		DonID:               0,
-		DonConfigVersion:    0,
-		WorkflowCID:         [32]byte{},
-		WorkflowName:        [10]byte{},
-		WorkflowOwner:       [20]byte{},
-		ReportID:            reportID,
+
+	reportMetadata := ocr3types.Metadata{
+		Version:          1,
+		ExecutionID:      "0102030405060708090a0b0c0d0e0f1000000000000000000000000000000000",
+		Timestamp:        1620000000,
+		DONID:            1,
+		DONConfigVersion: 1,
+		WorkflowID:       "1234567890123456789012345678901234567890123456789012345678901234",
+		WorkflowName:     "12345678901234567890",
+		WorkflowOwner:    "1234567890123456789012345678901234567890",
+		ReportID:         hex.EncodeToString(reportID[:]),
 	}
 
 	feedReports := dftypes.Reports{
@@ -208,10 +211,10 @@ func TestEvmWrite(t *testing.T) {
 	require.NoError(t, err)
 
 	validMetadata := capabilities.RequestMetadata{
-		WorkflowID:          hex.EncodeToString(reportMetadata.WorkflowCID[:]),
-		WorkflowOwner:       hex.EncodeToString(reportMetadata.WorkflowOwner[:]),
-		WorkflowName:        hex.EncodeToString(reportMetadata.WorkflowName[:]),
-		WorkflowExecutionID: hex.EncodeToString(reportMetadata.WorkflowExecutionID[:]),
+		WorkflowID:          reportMetadata.WorkflowID,
+		WorkflowOwner:       reportMetadata.WorkflowOwner,
+		WorkflowName:        reportMetadata.WorkflowName,
+		WorkflowExecutionID: reportMetadata.ExecutionID,
 	}
 
 	validConfig, err := values.NewMap(map[string]any{
