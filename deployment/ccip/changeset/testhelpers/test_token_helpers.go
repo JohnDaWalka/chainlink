@@ -25,8 +25,10 @@ import (
 )
 
 const (
-	LocalTokenDecimals                       = 18
-	TestTokenSymbol    changeset.TokenSymbol = "TEST"
+	LocalTokenDecimals                         = 18
+	TestTokenSymbol      changeset.TokenSymbol = "TEST"
+	CCIPLnMTokenSymbol   changeset.TokenSymbol = "CCIP-LnM"
+	CLCCIPLnMTokenSymbol changeset.TokenSymbol = "clCCIP-LnM"
 )
 
 // CreateSymmetricRateLimits is a utility to quickly create a rate limiter config with equal inbound and outbound values.

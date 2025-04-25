@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	mcmsTypes "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
+	"k8s.io/utils/pointer"
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/testutils"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
@@ -136,13 +137,26 @@ func TestAddTokenE2E(t *testing.T) {
 			}
 			recipientAddress := utils.RandomAddress()
 			topupAmount := big.NewInt(1000)
+			tokenSymbols := map[uint64]changeset.TokenSymbol{
+				selectorA: testhelpers.CCIPLnMTokenSymbol,
+				selectorB: testhelpers.CLCCIPLnMTokenSymbol,
+			}
+			poolType := map[changeset.TokenSymbol]deployment.ContractType{
+				testhelpers.CCIPLnMTokenSymbol:   changeset.LockReleaseTokenPool,
+				testhelpers.CLCCIPLnMTokenSymbol: changeset.BurnMintTokenPool,
+			}
+
+			symbol := testhelpers.TestTokenSymbol
 			// form the changeset input config
 			for _, chain := range e.AllChainSelectors() {
 				if addTokenE2EConfig.Tokens == nil {
 					addTokenE2EConfig.Tokens = make(map[changeset.TokenSymbol]v1_5_1.AddTokenE2EConfig)
 				}
-				if _, ok := addTokenE2EConfig.Tokens[testhelpers.TestTokenSymbol]; !ok {
-					addTokenE2EConfig.Tokens[testhelpers.TestTokenSymbol] = v1_5_1.AddTokenE2EConfig{
+				if test.withNewToken {
+					symbol = testhelpers.CCIPLnMTokenSymbol
+				}
+				if _, ok := addTokenE2EConfig.Tokens[symbol]; !ok {
+					addTokenE2EConfig.Tokens[symbol] = v1_5_1.AddTokenE2EConfig{
 						PoolConfig: make(map[uint64]v1_5_1.E2ETokenAndPoolConfig),
 					}
 				}
@@ -155,20 +169,23 @@ func TestAddTokenE2E(t *testing.T) {
 						rateLimiterPerChain[selectorA] = SelectorB2A
 					}
 				}
-				poolConfig := addTokenE2EConfig.Tokens[testhelpers.TestTokenSymbol].PoolConfig
+				poolConfig := addTokenE2EConfig.Tokens[symbol].PoolConfig
 				var deployPoolConfig *v1_5_1.DeployTokenPoolInput
 				var deployTokenConfig *v1_5_1.DeployTokenConfig
 				if test.withNewToken {
 					deployTokenConfig = &v1_5_1.DeployTokenConfig{
-						TokenName:     string(testhelpers.TestTokenSymbol),
-						TokenSymbol:   testhelpers.TestTokenSymbol,
+						TokenName:     string(tokenSymbols[chain]),
+						TokenSymbol:   tokenSymbols[chain],
 						TokenDecimals: testhelpers.LocalTokenDecimals,
 						MaxSupply:     big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
 						Type:          changeset.BurnMintToken,
-						PoolType:      changeset.BurnMintTokenPool,
+						PoolType:      poolType[tokenSymbols[chain]],
 						MintTokenForRecipients: map[common.Address]*big.Int{
 							recipientAddress: topupAmount,
 						},
+					}
+					if poolType[tokenSymbols[chain]] == changeset.LockReleaseTokenPool {
+						deployTokenConfig.AcceptLiquidity = pointer.Bool(false)
 					}
 				} else {
 					token := tokens[chain]
@@ -178,13 +195,17 @@ func TestAddTokenE2E(t *testing.T) {
 						LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 					}
 				}
-				poolConfig[chain] = v1_5_1.E2ETokenAndPoolConfig{
+				e2eTokenAndPoolConfig := v1_5_1.E2ETokenAndPoolConfig{
 					TokenDeploymentConfig: deployTokenConfig,
 					DeployPoolConfig:      deployPoolConfig,
 					PoolVersion:           deployment.Version1_5_1,
 					ExternalAdmin:         externalAdmin,
 					RateLimiterConfig:     rateLimiterPerChain,
 				}
+				if test.withNewToken && tokenSymbols[chain] == testhelpers.CLCCIPLnMTokenSymbol {
+					e2eTokenAndPoolConfig.OverrideTokenSymbol = testhelpers.CLCCIPLnMTokenSymbol
+				}
+				poolConfig[chain] = e2eTokenAndPoolConfig
 			}
 			// apply the changeset
 			e, err = commonchangeset.Apply(t, e, timelockContracts,
@@ -198,7 +219,7 @@ func TestAddTokenE2E(t *testing.T) {
 			if test.withNewToken {
 				// ensure the token is deployed
 				for chain, chainState := range state.Chains {
-					token, ok := chainState.BurnMintTokens677[testhelpers.TestTokenSymbol]
+					token, ok := chainState.BurnMintTokens677[tokenSymbols[chain]]
 					require.True(t, ok)
 					tokens[chain] = &deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
 						Address:  token.Address(),
@@ -216,28 +237,54 @@ func TestAddTokenE2E(t *testing.T) {
 			}
 			registryOnA := state.Chains[selectorA].TokenAdminRegistry
 			registryOnB := state.Chains[selectorB].TokenAdminRegistry
+			var poolOnSelectorA, poolOnSelectorB common.Address
 
-			poolOnSelectorB := state.Chains[selectorB].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1]
-			poolOnSelectorA := state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1]
+			if test.withNewToken {
+				poolOnSelectorB = state.Chains[selectorB].BurnMintTokenPools[tokenSymbols[selectorB]][deployment.Version1_5_1].Address()
+				poolOnSelectorA = state.Chains[selectorA].LockReleaseTokenPools[tokenSymbols[selectorA]][deployment.Version1_5_1].Address()
+			} else {
+				poolOnSelectorB = state.Chains[selectorB].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address()
+				poolOnSelectorA = state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address()
+			}
+
 			// validate end results
 			for chain, token := range tokens {
+				var tokenPoolC *token_pool.TokenPool
 				// check token pool is deployed
-				tokenpools, ok := state.Chains[chain].BurnMintTokenPools[testhelpers.TestTokenSymbol]
-				require.True(t, ok)
-				require.Len(t, tokenpools, 1)
-				tokenPoolC, err := token_pool.NewTokenPool(tokenpools[deployment.Version1_5_1].Address(), e.Chains[chain].Client)
-				require.NoError(t, err)
+				if test.withNewToken {
+					symbol = tokenSymbols[chain]
+					if poolType[tokenSymbols[chain]] == changeset.LockReleaseTokenPool {
+						tokenPools, ok := state.Chains[chain].LockReleaseTokenPools[testhelpers.CCIPLnMTokenSymbol]
+						require.True(t, ok)
+						require.Len(t, tokenPools, 1)
+						tokenPoolC, err = token_pool.NewTokenPool(tokenPools[deployment.Version1_5_1].Address(), e.Chains[chain].Client)
+						require.NoError(t, err)
+					} else {
+						tokenPools, ok := state.Chains[chain].BurnMintTokenPools[testhelpers.CLCCIPLnMTokenSymbol]
+						require.True(t, ok)
+						require.Len(t, tokenPools, 1)
+						tokenPoolC, err = token_pool.NewTokenPool(tokenPools[deployment.Version1_5_1].Address(), e.Chains[chain].Client)
+						require.NoError(t, err)
+					}
+				} else {
+					tokenPools, ok := state.Chains[chain].BurnMintTokenPools[testhelpers.TestTokenSymbol]
+					require.True(t, ok)
+					require.Len(t, tokenPools, 1)
+					tokenPoolC, err = token_pool.NewTokenPool(tokenPools[deployment.Version1_5_1].Address(), e.Chains[chain].Client)
+					require.NoError(t, err)
+				}
+
 				var rateLimiterConfig v1_5_1.RateLimiterConfig
 				var remotePoolAddr common.Address
 				var registry *token_admin_registry.TokenAdminRegistry
 				switch chain {
 				case selectorA:
 					rateLimiterConfig = SelectorA2B
-					remotePoolAddr = poolOnSelectorB.Address()
+					remotePoolAddr = poolOnSelectorB
 					registry = registryOnA
 				case selectorB:
 					rateLimiterConfig = SelectorB2A
-					remotePoolAddr = poolOnSelectorA.Address()
+					remotePoolAddr = poolOnSelectorA
 					registry = registryOnB
 				}
 				// check token pool is configured
@@ -247,7 +294,7 @@ func TestAddTokenE2E(t *testing.T) {
 					tokenPoolC,
 					[]common.Address{remotePoolAddr},
 					tokens,
-					testhelpers.TestTokenSymbol,
+					symbol,
 					chain,
 					rateLimiterConfig.Inbound.Rate, // inbound & outbound are the same in this test
 					rateLimiterConfig.Inbound.Capacity,

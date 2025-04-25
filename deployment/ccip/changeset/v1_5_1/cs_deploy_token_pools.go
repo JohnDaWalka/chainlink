@@ -62,13 +62,6 @@ func (i DeployTokenPoolInput) Validate(ctx context.Context, chain deployment.Cha
 	if err != nil {
 		return fmt.Errorf("failed to connect address %s with erc20 bindings: %w", i.TokenAddress, err)
 	}
-	symbol, err := token.Symbol(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return fmt.Errorf("failed to fetch symbol from token with address %s: %w", i.TokenAddress, err)
-	}
-	if symbol != string(tokenSymbol) {
-		return fmt.Errorf("symbol of token with address %s (%s) does not match expected symbol (%s)", i.TokenAddress, symbol, tokenSymbol)
-	}
 
 	// Validate localTokenDecimals against the decimals value on the token contract
 	decimals, err := token.Decimals(&bind.CallOpts{Context: ctx})
@@ -172,7 +165,7 @@ func DeployTokenPoolContractsChangeset(env deployment.Environment, c DeployToken
 			if err != nil {
 				return fmt.Errorf("failed to deploy token pool contract: %w", err)
 			}
-			if poolConfig.Type == changeset.BurnMintTokenPool {
+			if poolConfig.Type == changeset.BurnMintTokenPool || poolConfig.Type == changeset.LockReleaseTokenPool {
 				err := grantAccessToPool(env.GetContext(), chain, contract.Address, poolConfig.TokenAddress)
 				if err != nil {
 					return fmt.Errorf("failed to grant token pool access to token: %s %w", poolConfig.TokenAddress, err)

@@ -101,12 +101,15 @@ func (c *AddTokenE2EConfig) newConfigurePoolAndTokenAdminRegConfig(e deployment.
 			Version:             poolCfg.PoolVersion,
 			OverrideTokenSymbol: poolCfg.OverrideTokenSymbol,
 		}
-
 		// Populate the TokenAdminRegistryChangesetConfig for each chain.
 		if _, ok := c.configureTokenAdminReg.Pools[chain]; !ok {
 			c.configureTokenAdminReg.Pools[chain] = make(map[changeset.TokenSymbol]changeset.TokenPoolInfo)
 		}
-		c.configureTokenAdminReg.Pools[chain][symbol] = changeset.TokenPoolInfo{
+		tokenSymbol := symbol
+		if poolCfg.OverrideTokenSymbol != "" {
+			tokenSymbol = poolCfg.OverrideTokenSymbol
+		}
+		c.configureTokenAdminReg.Pools[chain][tokenSymbol] = changeset.TokenPoolInfo{
 			Version:       poolCfg.PoolVersion,
 			ExternalAdmin: poolCfg.ExternalAdmin,
 			Type:          poolCfg.DeployPoolConfig.Type,
@@ -197,11 +200,17 @@ func addTokenE2EPreconditionValidation(e deployment.Environment, config AddToken
 				return fmt.Errorf("must provide either DeploymentConfig or TokenDeploymentConfig for token %s: cannot provide both or neither", token)
 			}
 			if poolCfg.TokenDeploymentConfig != nil {
-				if poolCfg.TokenDeploymentConfig.TokenSymbol != token {
+				if poolCfg.OverrideTokenSymbol == "" && poolCfg.TokenDeploymentConfig.TokenSymbol != token {
 					return fmt.Errorf("token symbol %s in token deployment config does not match token %s", poolCfg.TokenDeploymentConfig.TokenSymbol, token)
 				}
 				if err := poolCfg.TokenDeploymentConfig.Validate(); err != nil {
 					return fmt.Errorf("failed to validate token deployment config for token %s: %w", token, err)
+				}
+				if poolCfg.OverrideTokenSymbol == token {
+					return fmt.Errorf("overriden token symbol %s in pool config cannot be same as token %s", poolCfg.OverrideTokenSymbol, token)
+				}
+				if poolCfg.OverrideTokenSymbol != "" && poolCfg.OverrideTokenSymbol != poolCfg.TokenDeploymentConfig.TokenSymbol {
+					return fmt.Errorf("overriden token symbol %s in pool config cannot be different from token deployment config %s", poolCfg.OverrideTokenSymbol, poolCfg.TokenDeploymentConfig.TokenSymbol)
 				}
 				// the rest of the internal fields are populated from the PoolConfig and it will be validated once the tokens are deployed
 			} else {
