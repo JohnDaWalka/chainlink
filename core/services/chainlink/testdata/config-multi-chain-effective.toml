@@ -698,7 +698,6 @@ FinalizedBlockOffset = 0
 Name = 'primary'
 URL = 'http://mainnet.solana.com'
 SendOnly = false
-Order = 1
 
 [[Solana]]
 ChainID = 'testnet'
@@ -750,4 +749,3 @@ FinalizedBlockOffset = 0
 Name = 'secondary'
 URL = 'http://testnet.solana.com'
 SendOnly = false
-Order = 2
