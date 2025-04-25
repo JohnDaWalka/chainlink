@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/spf13/cast"
 
 	bindings "github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
@@ -23,6 +24,8 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/common/view/v1_0"
+
+	bindings_zk "github.com/smartcontractkit/chainlink/deployment/common/changeset/internal/evm/zksync"
 )
 
 // DeployMCMSOption is a function that modifies a TypeAndVersion before or after deployment.
@@ -59,10 +62,25 @@ func DeployMCMSWithConfigEVM(
 	}
 	mcm, err := deployment.DeployContract(lggr, chain, ab,
 		func(chain deployment.Chain) deployment.ContractDeploy[*bindings.ManyChainMultiSig] {
-			mcmAddr, tx, mcm, err2 := bindings.DeployManyChainMultiSig(
-				chain.DeployerKey,
-				chain.Client,
+			var (
+				mcmAddr common.Address
+				tx      *types.Transaction
+				mcm     *bindings.ManyChainMultiSig
+				err2    error
 			)
+			if !chain.IsZk {
+				mcmAddr, tx, mcm, err2 = bindings.DeployManyChainMultiSig(
+					chain.DeployerKey,
+					chain.Client,
+				)
+			} else {
+				mcmAddr, _, mcm, err2 = bindings_zk.DeployManyChainMultiSigZk(
+					nil,
+					chain.ClientZk,
+					chain.DeployerKeyZk,
+					chain.Client,
+				)
+			}
 
 			tv := deployment.NewTypeAndVersion(contractType, deployment.Version1_0_0)
 			for _, option := range options {
@@ -155,21 +173,42 @@ func DeployMCMSWithTimelockContractsEVM(
 	if timelock == nil {
 		timelockC, err := deployment.DeployContract(lggr, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*bindings.RBACTimelock] {
-				timelock, tx2, cc, err2 := bindings.DeployRBACTimelock(
-					chain.DeployerKey,
-					chain.Client,
-					config.TimelockMinDelay,
-					// Deployer is the initial admin.
-					// TODO: Could expose this as config?
-					// Or keep this enforced to follow the same pattern?
-					chain.DeployerKey.From,
-					[]common.Address{proposer.Address()}, // proposers
-					// Executors field is empty here because we grant the executor role to the call proxy later
-					// and the call proxy cannot be deployed before the timelock.
-					[]common.Address{},
-					[]common.Address{canceller.Address(), proposer.Address(), bypasser.Address()}, // cancellers
-					[]common.Address{bypasser.Address()},                                          // bypassers
+				var (
+					timelock common.Address
+					tx2      *types.Transaction
+					cc       *bindings.RBACTimelock
+					err2     error
 				)
+				if !chain.IsZk {
+					timelock, tx2, cc, err2 = bindings.DeployRBACTimelock(
+						chain.DeployerKey,
+						chain.Client,
+						config.TimelockMinDelay,
+						// Deployer is the initial admin.
+						// TODO: Could expose this as config?
+						// Or keep this enforced to follow the same pattern?
+						chain.DeployerKey.From,
+						[]common.Address{proposer.Address()}, // proposers
+						// Executors field is empty here because we grant the executor role to the call proxy later
+						// and the call proxy cannot be deployed before the timelock.
+						[]common.Address{},
+						[]common.Address{canceller.Address(), proposer.Address(), bypasser.Address()}, // cancellers
+						[]common.Address{bypasser.Address()},                                          // bypassers
+					)
+				} else {
+					timelock, _, cc, err2 = bindings_zk.DeployRBACTimelockZk(
+						nil,
+						chain.ClientZk,
+						chain.DeployerKeyZk,
+						chain.Client,
+						config.TimelockMinDelay,
+						chain.DeployerKey.From,
+						[]common.Address{proposer.Address()}, // proposers
+						[]common.Address{},                   // executors
+						[]common.Address{canceller.Address(), proposer.Address(), bypasser.Address()}, // cancellers
+						[]common.Address{bypasser.Address()},                                          // bypassers
+					)
+				}
 
 				tv := deployment.NewTypeAndVersion(commontypes.RBACTimelock, deployment.Version1_0_0)
 				if config.Label != nil {
@@ -193,11 +232,27 @@ func DeployMCMSWithTimelockContractsEVM(
 	if callProxy == nil {
 		callProxyC, err := deployment.DeployContract(lggr, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*bindings.CallProxy] {
-				callProxy, tx2, cc, err2 := bindings.DeployCallProxy(
-					chain.DeployerKey,
-					chain.Client,
-					timelock.Address(),
+				var (
+					callProxy common.Address
+					tx2       *types.Transaction
+					cc        *bindings.CallProxy
+					err2      error
 				)
+				if !chain.IsZk {
+					callProxy, tx2, cc, err2 = bindings.DeployCallProxy(
+						chain.DeployerKey,
+						chain.Client,
+						timelock.Address(),
+					)
+				} else {
+					callProxy, _, cc, err2 = bindings_zk.DeployCallProxyZk(
+						nil,
+						chain.ClientZk,
+						chain.DeployerKeyZk,
+						chain.Client,
+						timelock.Address(),
+					)
+				}
 
 				tv := deployment.NewTypeAndVersion(commontypes.CallProxy, deployment.Version1_0_0)
 				if config.Label != nil {

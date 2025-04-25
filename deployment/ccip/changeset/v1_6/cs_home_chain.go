@@ -9,12 +9,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/maps"
+
 	mcmslib "github.com/smartcontractkit/mcms"
 	mcmssdk "github.com/smartcontractkit/mcms/sdk"
 	mcmsevmsdk "github.com/smartcontractkit/mcms/sdk/evm"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -29,6 +31,10 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
+
+	capabilities_registry_zk "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry"
+	ccip_home_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/v1_6_0/ccip_home"
+	rmn_home_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/v1_6_0/rmn_home"
 )
 
 var (
@@ -132,10 +138,29 @@ func deployCapReg(
 	}
 	capReg, err := deployment.DeployContract(lggr, chain, ab,
 		func(chain deployment.Chain) deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry] {
-			crAddr, tx, cr, err2 := capabilities_registry.DeployCapabilitiesRegistry(
-				chain.DeployerKey,
-				chain.Client,
+			var (
+				crAddr common.Address
+				tx     *types.Transaction
+				cr     *capabilities_registry.CapabilitiesRegistry
+				err2   error
 			)
+			if !chain.IsZk {
+				crAddr, tx, cr, err2 = capabilities_registry.DeployCapabilitiesRegistry(
+					chain.DeployerKey,
+					chain.Client,
+				)
+			} else {
+				crAddr, _, _, err2 = capabilities_registry_zk.DeployCapabilitiesRegistryZk(
+					nil,
+					chain.ClientZk,
+					chain.DeployerKeyZk,
+					chain.Client,
+				)
+				if err2 != nil {
+					return deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{Err: err2}
+				}
+				cr, err2 = capabilities_registry.NewCapabilitiesRegistry(crAddr, chain.Client)
+			}
 			return deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
 				Address: crAddr, Contract: cr, Tv: deployment.NewTypeAndVersion(changeset.CapabilitiesRegistry, deployment.Version1_0_0), Tx: tx, Err: err2,
 			}
@@ -177,11 +202,27 @@ func deployHomeChain(
 		ccipHome, err := deployment.DeployContract(
 			lggr, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*ccip_home.CCIPHome] {
-				ccAddr, tx, cc, err2 := ccip_home.DeployCCIPHome(
-					chain.DeployerKey,
-					chain.Client,
-					capReg.Address,
+				var (
+					ccAddr common.Address
+					tx     *types.Transaction
+					cc     *ccip_home.CCIPHome
+					err2   error
 				)
+				if !chain.IsZk {
+					ccAddr, tx, cc, err2 = ccip_home.DeployCCIPHome(
+						chain.DeployerKey,
+						chain.Client,
+						capReg.Address,
+					)
+				} else {
+					ccAddr, _, cc, err2 = ccip_home_zk.DeployCCIPHomeZk(
+						nil,
+						chain.ClientZk,
+						chain.DeployerKeyZk,
+						chain.Client,
+						capReg.Address,
+					)
+				}
 				return deployment.ContractDeploy[*ccip_home.CCIPHome]{
 					Address: ccAddr, Tv: deployment.NewTypeAndVersion(changeset.CCIPHome, deployment.Version1_6_0), Tx: tx, Err: err2, Contract: cc,
 				}
@@ -199,10 +240,25 @@ func deployHomeChain(
 		rmnHomeContract, err := deployment.DeployContract(
 			lggr, chain, ab,
 			func(chain deployment.Chain) deployment.ContractDeploy[*rmn_home.RMNHome] {
-				rmnAddr, tx, rmn, err2 := rmn_home.DeployRMNHome(
-					chain.DeployerKey,
-					chain.Client,
+				var (
+					rmnAddr common.Address
+					tx      *types.Transaction
+					rmn     *rmn_home.RMNHome
+					err2    error
 				)
+				if !chain.IsZk {
+					rmnAddr, tx, rmn, err2 = rmn_home.DeployRMNHome(
+						chain.DeployerKey,
+						chain.Client,
+					)
+				} else {
+					rmnAddr, _, rmn, err2 = rmn_home_zk.DeployRMNHomeZk(
+						nil,
+						chain.ClientZk,
+						chain.DeployerKeyZk,
+						chain.Client,
+					)
+				}
 				return deployment.ContractDeploy[*rmn_home.RMNHome]{
 					Address: rmnAddr, Tv: deployment.NewTypeAndVersion(changeset.RMNHome, deployment.Version1_6_0), Tx: tx, Err: err2, Contract: rmn,
 				}
