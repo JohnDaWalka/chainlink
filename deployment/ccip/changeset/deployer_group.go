@@ -363,6 +363,9 @@ func BuildTimelockPerChain(e deployment.Environment, state CCIPOnChainState) map
 func BuildTimelockAddressPerChain(e deployment.Environment, state CCIPOnChainState) map[uint64]string {
 	addressPerChain := make(map[uint64]string)
 	for _, chain := range e.Chains {
+		if state.Chains[chain.Selector].Timelock == nil {
+			continue
+		}
 		addressPerChain[chain.Selector] = state.Chains[chain.Selector].Timelock.Address().Hex()
 	}
 	return addressPerChain

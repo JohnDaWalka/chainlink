@@ -97,9 +97,10 @@ var (
 
 	routerABI = abihelpers.MustParseABI(router.RouterABI)
 
-	DefaultLinkPrice = deployment.E18Mult(20)
-	DefaultWethPrice = deployment.E18Mult(4000)
-	DefaultGasPrice  = ToPackedFee(big.NewInt(8e14), big.NewInt(0))
+	DefaultLinkPrice  = deployment.E18Mult(20)
+	DefaultWethPrice  = deployment.E18Mult(4000)
+	DefaultWAVAXPrice = deployment.E18Mult(25)
+	DefaultGasPrice   = ToPackedFee(big.NewInt(8e14), big.NewInt(0))
 
 	OneCoin     = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1))
 	TinyOneCoin = new(big.Int).SetUint64(1)

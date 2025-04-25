@@ -19,6 +19,7 @@ type LaneConfig struct {
 // Lanes accept different chain families
 type UpdateAptosLanesConfig struct {
 	// MCMSConfig defines the MCMS configuration for the changeset.
+	// TODO: This is for EVM only, reflect in name
 	MCMSConfig *proposalutils.TimelockConfig
 	// Lanes describes the lanes that we want to create.
 	Lanes []LaneConfig

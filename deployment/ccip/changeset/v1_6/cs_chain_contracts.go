@@ -1877,6 +1877,9 @@ func ApplyFeeTokensUpdatesFeeQuoterChangeset(e deployment.Environment, cfg Apply
 		for _, token := range updates.TokensToAdd {
 			tokensToAdd = append(tokensToAdd, tokenAddresses[token])
 		}
+		tkns, err := fq.GetFeeTokens(&bind.CallOpts{})
+		fmt.Println(tkns)
+
 		tx, err := fq.ApplyFeeTokensUpdates(txOpts, tokensToRemove, tokensToAdd)
 		if cfg.MCMSConfig == nil {
 			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {

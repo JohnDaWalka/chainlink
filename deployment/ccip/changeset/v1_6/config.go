@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
 	"github.com/smartcontractkit/chainlink/deployment/common/types"
 )
@@ -137,4 +138,15 @@ func DeriveOCRParamsForExec(
 		return params
 	}
 	return override(params)
+}
+
+func DeriveOCRConfigTypeFromSelector(chainsel uint64) OCRConfigChainType {
+	switch chainsel {
+	case chain_selectors.ETHEREUM_TESTNET_SEPOLIA.Selector,
+		chain_selectors.ETHEREUM_TESTNET_HOLESKY.Selector,
+		chain_selectors.ETHEREUM_MAINNET.Selector:
+		return Ethereum
+	default:
+		return Default
+	}
 }

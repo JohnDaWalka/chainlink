@@ -40,7 +40,7 @@ func updateOffRampSources(b operations.Bundle, deps AptosDeps, in UpdateOffRampS
 	for sourceChainSelector, update := range in.Updates {
 		sourceChainSelectors = append(sourceChainSelectors, sourceChainSelector)
 		sourceChainEnabled = append(sourceChainEnabled, update.IsEnabled)
-		sourceChainRMNVerificationDisabled = append(sourceChainRMNVerificationDisabled, update.IsRMNVerificationDisabled)
+		sourceChainRMNVerificationDisabled = append(sourceChainRMNVerificationDisabled, true)
 
 		onRampBytes, err := deps.CCIPOnChainState.GetOnRampAddressBytes(sourceChainSelector)
 		if err != nil {
