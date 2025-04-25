@@ -69,6 +69,11 @@ func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain
 		return nil, err
 	}
 
+	_, err = relayer.AsEVMRelayer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to upgrade to evm relayer: %w", err)
+	}
+
 	return targets.NewWriteTarget(logger.Named(lggr, "WriteTarget"), id, cr, cw, config.ForwarderAddress().String(), gasLimitDefault), nil
 }
 
