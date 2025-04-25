@@ -377,3 +377,6 @@ require (
 )
 
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20250422175525-b7575d96bd4d
+
+// Pinning chainlink-evm to 68a01140308b version to prevent accidental bumps [This should not be changed ccip-2.23 release]
+replace github.com/smartcontractkit/chainlink-evm => github.com/smartcontractkit/chainlink-evm v0.0.0-20250425122252-68a01140308b
