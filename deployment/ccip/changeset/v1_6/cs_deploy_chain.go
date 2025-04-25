@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 
+	// placeholders until merged into chainlink-ccip
 	router_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/v1_2_0/router"
 	fee_quoter_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/v1_6_0/fee_quoter"
 	nonce_manager_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/v1_6_0/nonce_manager"

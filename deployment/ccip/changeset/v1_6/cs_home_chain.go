@@ -32,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 
+	// placeholders until merged into chainlink-ccip
 	capabilities_registry_zk "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry"
 	ccip_home_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/v1_6_0/ccip_home"
 	rmn_home_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/v1_6_0/rmn_home"

@@ -32,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/multicall3"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/weth9"
 
+	// placeholders until merged into chainlink-ccip
 	factory_burn_mint_erc20_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/latest/factory_burn_mint_erc20"
 	maybe_revert_message_receiver_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/latest/maybe_revert_message_receiver"
 	token_pool_factory_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/latest/token_pool_factory"
