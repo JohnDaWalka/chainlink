@@ -1,16 +1,26 @@
 package cre
 
 import (
+	"bytes"
+	crand "crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"strconv"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
@@ -20,13 +30,16 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"github.com/smartcontractkit/chainlink/deployment"
+	clclient "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	lidebug "github.com/smartcontractkit/chainlink/system-tests/lib/cre/debug"
 	creconsensus "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/consensus"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	creenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	keystonetypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
@@ -46,6 +59,11 @@ type TestConfigAptos struct {
 	DataFeedsCacheContract        *keystonetypes.DeployDataFeedsCacheInput `toml:"data_feeds_cache"`
 	Infra                         *libtypes.InfraInput                     `toml:"infra" validate:"required"`
 	WorkflowConfig                *WorkflowConfigAptos                     `toml:"workflow_config" validate:"required"`
+	JobConfig                     *JobConfig                               `toml:"job_config"`
+}
+
+type JobConfig struct {
+	NrOfStreams int `toml:"nr_of_streams"`
 }
 
 type registerDFAptosWorkflowInput struct {
@@ -80,6 +98,7 @@ type dfAptosSetupOutput struct {
 	blockchainOutput      *blockchain.Output
 	donTopology           *keystonetypes.DonTopology
 	nodeOutput            []*keystonetypes.WrappedNodeOutput
+	fakeDPURL             string
 }
 
 func configureDFAptosCacheContract(testLogger zerolog.Logger, input *configureDFAptosCacheInput) error {
@@ -106,10 +125,8 @@ func setupDFAptosTestEnvironment(
 	in *TestConfigAptos,
 	mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet,
 	capabilityFactoryFns []func([]string) []keystone_changeset.DONCapabilityWithConfig,
+	jobSpecFactoryFns []keystonetypes.JobSpecFactoryFn,
 ) *dfAptosSetupOutput {
-	chainIDInt, err := strconv.Atoi(in.BlockchainA.ChainID)
-	require.NoError(t, err, "failed to convert chain ID to int")
-	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
 
 	universalSetupInput := creenv.SetupInput{
 		CapabilitiesAwareNodeSets:            mustSetCapabilitiesFn(in.NodeSets),
@@ -117,9 +134,7 @@ func setupDFAptosTestEnvironment(
 		BlockchainsInput:                     *in.BlockchainA,
 		JdInput:                              *in.JD,
 		InfraInput:                           *in.Infra,
-		JobSpecFactoryFunctions: []keystonetypes.JobSpecFactoryFn{
-			creconsensus.ConsensusJobSpecFactoryFn(chainIDUint64),
-		},
+		JobSpecFactoryFunctions:              jobSpecFactoryFns,
 	}
 
 	universalSetupOutput, setupErr := creenv.SetupTestEnvironment(testcontext.Get(t), testLogger, cldlogger.NewSingleFileLogger(t), universalSetupInput)
@@ -208,8 +223,83 @@ func TestCRE_DF_Aptos(t *testing.T) {
 		}
 	}
 
+	fakeDataProvider := fake.Input{
+		Port: 4431, //TODO @george-dorin: get from toml
+		Out:  nil,
+	}
+
+	fakeDPURL, err := setupFakeDataProviderDF(testLogger, &fakeDataProvider)
+	require.NoError(t, err, "cannot create fake data provider")
+
 	chainIDInt, chainErr := strconv.Atoi(in.BlockchainA.ChainID)
 	require.NoError(t, chainErr, "failed to convert chain ID to int")
+
+	streams := make([]streamsJob, 0)
+	for i := range in.JobConfig.NrOfStreams {
+		_, feedID := NewFeedID(t)
+		streams = append(streams, streamsJob{
+			JobName:    fmt.Sprintf("stream job %d", i),
+			JobID:      uuid.New().String(),
+			StreamID:   i + 1,
+			FeedID:     feedID,
+			ContractID: "",
+		})
+	}
+
+	DFJobSpecsFactoryFn := func(input *keystonetypes.JobSpecFactoryInput) (keystonetypes.DonsToJobSpecs, error) {
+		donTojobSpecs := make(keystonetypes.DonsToJobSpecs, 0)
+		for _, donWithMetadata := range input.DonTopology.DonsWithMetadata {
+			jobSpecs := make(keystonetypes.DonJobs, 0)
+			workflowNodeSet, err2 := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &keystonetypes.Label{Key: node.NodeTypeKey, Value: keystonetypes.WorkerNode}, node.EqualLabels)
+			if err2 != nil {
+				// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
+				return nil, errors.Wrap(err2, "failed to find worker nodes")
+			}
+			for _, workerNode := range workflowNodeSet {
+				nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
+				if nodeIDErr != nil {
+					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
+				}
+				if flags.HasFlag(donWithMetadata.Flags, keystonetypes.StreamTriggerV1) {
+					for _, s := range streams {
+						jobSpecs = append(jobSpecs, streamsTriggerV1Jobs(s, nodeID))
+					}
+				}
+			}
+			donTojobSpecs[donWithMetadata.ID] = jobSpecs
+
+			//Create bridges
+			if flags.HasFlag(donWithMetadata.Flags, keystonetypes.StreamTriggerV1) {
+				for _, n := range donWithMetadata.DON.Nodes {
+					err3 := n.CreateBridge(&clclient.BridgeTypeAttributes{
+						Name: "bridge-1",
+						URL:  fakeDPURL,
+					})
+					if err3 != nil {
+						return nil, err3
+					}
+					err3 = n.CreateBridge(&clclient.BridgeTypeAttributes{
+						Name: "bridge-2",
+						URL:  fakeDPURL,
+					})
+					if err3 != nil {
+						return nil, err3
+					}
+					err3 = n.CreateBridge(&clclient.BridgeTypeAttributes{
+						Name: "bridge-3",
+						URL:  fakeDPURL,
+					})
+					if err3 != nil {
+						return nil, err3
+					}
+				}
+			}
+		}
+		return donTojobSpecs, nil
+	}
+
+	require.NoError(t, err, "failed to convert chain ID to int")
+	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
 
 	setupOutput := setupDFAptosTestEnvironment(
 		t,
@@ -217,6 +307,10 @@ func TestCRE_DF_Aptos(t *testing.T) {
 		in,
 		mustSetCapabilitiesFn,
 		[]keystonetypes.DONCapabilityWithConfigFactoryFn{libcontracts.StreamsTriggerV1CapabilityFactory, libcontracts.DefaultCapabilityFactoryFn, libcontracts.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)))},
+		[]keystonetypes.JobSpecFactoryFn{
+			creconsensus.ConsensusJobSpecFactoryFn(chainIDUint64),
+			DFJobSpecsFactoryFn,
+		},
 	)
 
 	// Log extra information that might help debugging
@@ -265,9 +359,112 @@ func TestCRE_DF_Aptos(t *testing.T) {
 		}
 	})
 	fmt.Println(setupOutput)
+	fmt.Println("+_+_+_+_+_+_+_+_+")
+
+	time.Sleep(time.Hour)
 }
 func logTestInfoDFAptos(l zerolog.Logger, dataFeedsCacheAddr, forwarderAddr string) {
 	l.Info().Msg("------ Test configuration:")
 	l.Info().Msgf("DataFeedsCache address: %s", dataFeedsCacheAddr)
 	l.Info().Msgf("KeystoneForwarder address: %s", forwarderAddr)
+}
+
+func setupFakeDataProviderDF(testLogger zerolog.Logger, input *fake.Input) (string, error) {
+	_, err := fake.NewFakeDataProvider(input)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to set up fake data provider")
+	}
+	fakeAPIPath := "/fake/api/price"
+	host := framework.HostDockerInternal()
+	fakeFinalURL := fmt.Sprintf("%s:%d%s", host, input.Port, fakeAPIPath)
+
+	getPriceResponseFn := func() map[string]interface{} {
+		response := map[string]interface{}{
+			"price": rand.Int(),
+		}
+
+		marshalled, mErr := json.Marshal(response)
+		if mErr == nil {
+			testLogger.Info().Msgf("Returning response: %s", string(marshalled))
+		} else {
+			testLogger.Info().Msgf("Returning response: %v", response)
+		}
+
+		return response
+	}
+
+	err = fake.Func("GET", fakeAPIPath, func(c *gin.Context) {
+		c.JSON(200, getPriceResponseFn())
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "failed to set up fake data provider")
+	}
+
+	return fakeFinalURL, nil
+}
+
+type streamsJob struct {
+	JobName    string
+	JobID      string
+	StreamID   int
+	FeedID     string
+	ContractID string
+}
+
+func streamsTriggerV1Jobs(streamsJob streamsJob, nodeID string) *jobv1.ProposeJobRequest {
+	job := `
+type = "offchainreporting2"
+schemaVersion = 1
+name = "{{ .JobName }}"
+externalJobID = "{{ .JobID }}"
+forwardingAllowed = false
+maxTaskDuration = "0s"
+streamID = {{ .StreamID }}
+feedID = "{{ .FeedID }}"
+contractID = "{{ .ContractID }}"
+relay = "evm"
+pluginType = "mercury"
+observationSource = """
+// data source 1
+ds1_payload [type=bridge name="bridge-1" timeout="50s" requestData=""];
+ds1_benchmark [type=jsonparse path="price"];
+
+// data source 2
+ds2_payload [type=bridge name="bridge-2" timeout="50s" requestData=""];
+ds2_benchmark [type=jsonparse path="price"];
+
+// data source 3
+ds3_payload [type=bridge name="bridge-3" timeout="50s" requestData=""];
+ds3_benchmark [type=jsonparse path="price"];
+
+ds1_payload -> ds1_benchmark -> benchmark_price;
+ds2_payload -> ds2_benchmark -> benchmark_price;
+ds3_payload -> ds3_benchmark -> benchmark_price;
+benchmark_price [type=median allowedFaults=2 index=0];
+"""
+
+[relayConfig]
+chainID = 1337
+enableTriggerCapability = true
+`
+	tmpl, err := template.New("workflow").Parse(job)
+
+	if err != nil {
+		panic(err)
+	}
+	var renderedTemplate bytes.Buffer
+	err = tmpl.Execute(&renderedTemplate, streamsJob)
+	if err != nil {
+		panic(err)
+	}
+
+	return &jobv1.ProposeJobRequest{
+		NodeId: nodeID,
+		Spec:   renderedTemplate.String()}
+}
+func NewFeedID(t *testing.T) ([32]byte, string) {
+	buf := [32]byte{}
+	_, err := crand.Read(buf[:])
+	require.NoError(t, err, "cannot create feedID")
+	return buf, "0x" + hex.EncodeToString(buf[:])
 }

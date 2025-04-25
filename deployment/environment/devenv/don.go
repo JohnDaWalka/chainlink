@@ -533,6 +533,14 @@ func (n *Node) ExportOCR2Keys(id string) (*clclient.OCR2ExportKey, error) {
 	return keys, nil
 }
 
+func (n *Node) CreateBridge(bta *clclient.BridgeTypeAttributes) error {
+	_, err := n.restClient.CreateBridge(bta)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func ptr[T any](v T) *T {
 	return &v
 }
