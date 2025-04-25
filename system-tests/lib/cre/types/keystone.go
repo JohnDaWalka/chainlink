@@ -2,6 +2,7 @@ package types
 
 import (
 	"errors"
+	"os"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -93,13 +94,13 @@ type WorkflowRegistryOutput struct {
 	WorkflowOwners []common.Address `toml:"workflow_owners"`
 }
 
-type DeployFeedConsumerInput struct {
-	ChainSelector uint64                    `toml:"-"`
-	CldEnv        *deployment.Environment   `toml:"-"`
-	Out           *DeployFeedConsumerOutput `toml:"out"`
+type DeployDataFeedsCacheInput struct {
+	ChainSelector uint64                      `toml:"-"`
+	CldEnv        *deployment.Environment     `toml:"-"`
+	Out           *DeployDataFeedsCacheOutput `toml:"out"`
 }
 
-func (i *DeployFeedConsumerInput) Validate() error {
+func (i *DeployDataFeedsCacheInput) Validate() error {
 	if i.ChainSelector == 0 {
 		return errors.New("chain selector not set")
 	}
@@ -109,25 +110,48 @@ func (i *DeployFeedConsumerInput) Validate() error {
 	return nil
 }
 
-type DeployFeedConsumerOutput struct {
-	UseCache            bool           `toml:"use_cache"`
-	FeedConsumerAddress common.Address `toml:"feed_consumer_address"`
+type DeployDataFeedsCacheOutput struct {
+	UseCache              bool           `toml:"use_cache"`
+	DataFeedsCacheAddress common.Address `toml:"data_feeds_cache_address"`
+}
+type ConfigureDataFeedsCacheOutput struct {
+	UseCache              bool             `toml:"use_cache"`
+	DataFeedsCacheAddress common.Address   `toml:"data_feeds_cache_address"`
+	FeedIDs               []string         `toml:"feed_is"`
+	Descriptions          []string         `toml:"descriptions"`
+	AdminAddress          common.Address   `toml:"admin_address"`
+	AllowedSenders        []common.Address `toml:"allowed_senders"`
+	AllowedWorkflowOwners []common.Address `toml:"allowed_workflow_owners"`
+	AllowedWorkflowNames  []string         `toml:"allowed_workflow_names"`
 }
 
-type ConfigureFeedConsumerInput struct {
-	SethClient            *seth.Client                 `toml:"-"`
-	FeedConsumerAddress   common.Address               `toml:"-"`
-	AllowedSenders        []common.Address             `toml:"-"`
-	AllowedWorkflowOwners []common.Address             `toml:"-"`
-	AllowedWorkflowNames  []string                     `toml:"-"`
-	Out                   *ConfigureFeedConsumerOutput `toml:"out"`
+type ConfigureDataFeedsCacheInput struct {
+	CldEnv                *deployment.Environment        `toml:"-"`
+	ChainSelector         uint64                         `toml:"-"`
+	FeedIDs               []string                       `toml:"-"`
+	Descriptions          []string                       `toml:"-"`
+	DataFeedsCacheAddress common.Address                 `toml:"-"`
+	AdminAddress          common.Address                 `toml:"-"`
+	AllowedSenders        []common.Address               `toml:"-"`
+	AllowedWorkflowOwners []common.Address               `toml:"-"`
+	AllowedWorkflowNames  []string                       `toml:"-"`
+	Out                   *ConfigureDataFeedsCacheOutput `toml:"out"`
 }
 
-func (c *ConfigureFeedConsumerInput) Validate() error {
-	if c.SethClient == nil {
-		return errors.New("seth client not set")
+func (c *ConfigureDataFeedsCacheInput) Validate() error {
+	if c.CldEnv == nil {
+		return errors.New("chainlink deployment env not set")
 	}
-	if c.FeedConsumerAddress == (common.Address{}) {
+	if len(c.FeedIDs) == 0 {
+		return errors.New("feed ids not set")
+	}
+	if len(c.Descriptions) == 0 {
+		return errors.New("descriptions not set")
+	}
+	if c.ChainSelector == 0 {
+		return errors.New("chain selector not set")
+	}
+	if c.DataFeedsCacheAddress == (common.Address{}) {
 		return errors.New("feed consumer address not set")
 	}
 	if len(c.AllowedSenders) == 0 {
@@ -140,15 +164,11 @@ func (c *ConfigureFeedConsumerInput) Validate() error {
 		return errors.New("allowed workflow names not set")
 	}
 
-	return nil
-}
+	if (len(c.AllowedWorkflowNames) != len(c.AllowedWorkflowOwners)) || (len(c.AllowedWorkflowNames) != len(c.AllowedSenders)) {
+		return errors.New("allowed workflow names, owners and senders must have the same length")
+	}
 
-type ConfigureFeedConsumerOutput struct {
-	UseCache              bool             `toml:"use_cache"`
-	FeedConsumerAddress   common.Address   `toml:"feed_consumer_address"`
-	AllowedSenders        []common.Address `toml:"allowed_senders"`
-	AllowedWorkflowOwners []common.Address `toml:"allowed_workflow_owners"`
-	AllowedWorkflowNames  []string         `toml:"allowed_workflow_names"`
+	return nil
 }
 
 type WrappedNodeOutput struct {
@@ -403,6 +423,7 @@ type GenerateKeysInput struct {
 	GenerateP2PKeys            bool
 	Topology                   *Topology
 	Password                   string
+	Out                        *GenerateKeysOutput
 }
 
 func (g *GenerateKeysInput) Validate() error {
@@ -418,7 +439,13 @@ func (g *GenerateKeysInput) Validate() error {
 	return nil
 }
 
-type DonsToEVMKeys = map[uint32]*types.EVMKeys
+// chainID -> EVMKeys
+type ChainIDToEVMKeys = map[int]*types.EVMKeys
+
+// donID -> chainID -> EVMKeys
+type DonsToEVMKeys = map[uint32]ChainIDToEVMKeys
+
+// donID -> P2PKeys
 type DonsToP2PKeys = map[uint32]*types.P2PKeys
 
 type GenerateKeysOutput struct {
@@ -428,7 +455,7 @@ type GenerateKeysOutput struct {
 
 type GenerateSecretsInput struct {
 	DonMetadata *DonMetadata
-	EVMKeys     *types.EVMKeys
+	EVMKeys     ChainIDToEVMKeys
 	P2PKeys     *types.P2PKeys
 }
 
@@ -437,16 +464,33 @@ func (g *GenerateSecretsInput) Validate() error {
 		return errors.New("don metadata not set")
 	}
 	if g.EVMKeys != nil {
-		if len(g.EVMKeys.ChainIDs) == 0 {
+		if len(g.EVMKeys) == 0 {
 			return errors.New("chain ids not set")
 		}
-		if len(g.EVMKeys.EncryptedJSONs) == 0 {
-			return errors.New("encrypted jsons not set")
+		for chainID, evmKeys := range g.EVMKeys {
+			if len(evmKeys.EncryptedJSONs) == 0 {
+				return errors.New("encrypted jsons not set")
+			}
+			if len(evmKeys.PublicAddresses) == 0 {
+				return errors.New("public addresses not set")
+			}
+			if len(evmKeys.EncryptedJSONs) != len(evmKeys.PublicAddresses) {
+				return errors.New("encrypted jsons and public addresses must have the same length")
+			}
+			if chainID == 0 {
+				return errors.New("chain id 0 not allowed")
+			}
 		}
 	}
 	if g.P2PKeys != nil {
 		if len(g.P2PKeys.EncryptedJSONs) == 0 {
 			return errors.New("encrypted jsons not set")
+		}
+		if len(g.P2PKeys.PeerIDs) == 0 {
+			return errors.New("peer ids not set")
+		}
+		if len(g.P2PKeys.EncryptedJSONs) != len(g.P2PKeys.PeerIDs) {
+			return errors.New("encrypted jsons and peer ids must have the same length")
 		}
 	}
 
@@ -582,4 +626,71 @@ type JobSpecFactoryInput struct {
 	BlockchainOutput        *blockchain.Output
 	DonTopology             *DonTopology
 	KeystoneContractsOutput *KeystoneContractsOutput
+}
+
+type RegisterWorkflowWithCRECLIInput struct {
+	DoNotUseCRECLI           bool
+	ShouldCompileNewWorkflow bool
+	ChainSelector            uint64
+	WorkflowName             string
+	WorkflowDonID            uint32
+	WorkflowRegistryAddress  common.Address
+	WorkflowOwnerAddress     common.Address
+	CRECLIPrivateKey         string
+	CRECLIAbsPath            string
+	CRESettingsFile          *os.File
+	NewWorkflow              *NewWorkflow
+	ExistingWorkflow         *ExistingWorkflow
+}
+
+type NewWorkflow struct {
+	WorkflowFileName string
+	FolderLocation   string
+	ConfigFilePath   *string
+	SecretsFilePath  *string
+	Secrets          map[string]string
+}
+
+type ExistingWorkflow struct {
+	BinaryURL  string
+	ConfigURL  *string
+	SecretsURL *string
+}
+
+func (w *RegisterWorkflowWithCRECLIInput) Validate() error {
+	if w.ChainSelector == 0 {
+		return errors.New("ChainSelector is required")
+	}
+	if w.WorkflowName == "" {
+		return errors.New("WorkflowName is required")
+	}
+	if w.WorkflowDonID == 0 {
+		return errors.New("WorkflowDonID is required")
+	}
+	if w.CRECLIPrivateKey == "" {
+		return errors.New("CRECLIPrivateKey is required")
+	}
+	if w.CRESettingsFile == nil {
+		return errors.New("CRESettingsFile is required")
+	}
+	if w.NewWorkflow != nil && w.ExistingWorkflow != nil {
+		return errors.New("only one of NewWorkflow or ExistingWorkflow can be provided")
+	}
+	if w.ShouldCompileNewWorkflow && w.NewWorkflow == nil {
+		return errors.New("NewWorkflow is required when ShouldCompileNewWorkflow is true")
+	}
+	if !w.ShouldCompileNewWorkflow && w.ExistingWorkflow == nil {
+		return errors.New("ExistingWorkflow is required when ShouldCompileNewWorkflow is false")
+	}
+	if w.NewWorkflow != nil && w.NewWorkflow.FolderLocation == "" {
+		return errors.New("WorkflowFolderLocation is required when ShouldCompileNewWorkflow is true")
+	}
+	if w.NewWorkflow != nil && w.NewWorkflow.WorkflowFileName == "" {
+		return errors.New("WorkflowFileName is required when ShouldCompileNewWorkflow is true")
+	}
+	if w.ExistingWorkflow != nil && w.ExistingWorkflow.BinaryURL == "" {
+		return errors.New("BinaryURL is required when ShouldCompileNewWorkflow is false")
+	}
+
+	return nil
 }

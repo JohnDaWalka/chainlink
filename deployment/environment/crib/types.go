@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 )
@@ -32,8 +34,13 @@ func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput)
 		CRIB_ENV_NAME,
 		lggr,
 		output.AddressBook,
+		datastore.NewMemoryDataStore[
+			datastore.DefaultMetadata,
+			datastore.DefaultMetadata,
+		]().Seal(),
 		chains,
 		nil, // nil for solana chains, can use memory solana chain example when required
+		nil, // nil for aptos chains, can use memory solana chain example when required
 		output.NodeIDs,
 		nil, // todo: populate the offchain client using output.DON
 		func() context.Context { return context.Background() }, deployment.XXXGenerateTestOCRSecrets(),
