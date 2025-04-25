@@ -628,7 +628,7 @@ jobs:
           ref: ${{ needs.get_solana_sha.outputs.sha }}
       - name: Build contracts
         if: (needs.changes.outputs.core_changes == 'true' || github.event_name == 'workflow_dispatch') && needs.solana-test-image-exists.outputs.exists == 'false'
-        uses: smartcontractkit/chainlink-solana/.github/actions/build_contract_artifacts@741327bb76e3e41d5aed47c4954f2cc469bc511e # node20 update on may 10, 2024
+        uses: smartcontractkit/chainlink-solana/.github/actions/build_contract_artifacts@30ad97c0e9ca5c0327df9f0ea48578e486ffd468 # node20 update on may 10, 2024
         with:
           ref: ${{ needs.get_solana_sha.outputs.sha }}
           runner-os: ${{ runner.os }}
