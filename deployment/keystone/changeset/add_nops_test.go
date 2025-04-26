@@ -70,7 +70,7 @@ func TestAddNops(t *testing.T) {
 		req := &changeset.AddNopsRequest{
 			RegistryChainSel: te.RegistrySelector,
 			Nops:             nops,
-			MCMSConfig:       &changeset.MCMSConfig{MinDuration: 0},
+			TimelockConfig:   &proposalutils.TimelockConfig{MinDelay: 0},
 		}
 		csOut, err := changeset.AddNops(te.Env, req)
 		require.NoError(t, err)

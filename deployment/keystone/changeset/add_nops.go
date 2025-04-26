@@ -18,7 +18,7 @@ type AddNopsRequest = struct {
 	RegistryChainSel uint64
 	Nops             []kcr.CapabilitiesRegistryNodeOperator
 
-	MCMSConfig *MCMSConfig // if non-nil, the changes will be proposed using MCMS.
+	TimelockConfig *proposalutils.TimelockConfig // if non-nil, the changes will be proposed using MCMS.
 }
 
 var _ deployment.ChangeSet[*AddNopsRequest] = AddNops
@@ -43,7 +43,7 @@ func AddNops(env deployment.Environment, req *AddNopsRequest) (deployment.Change
 		return deployment.ChangesetOutput{}, fmt.Errorf("contract set not found for chain %d", req.RegistryChainSel)
 	}
 
-	useMCMS := req.MCMSConfig != nil
+	useMCMS := req.TimelockConfig != nil
 	req2 := internal.RegisterNOPSRequest{
 		Env:                   &env,
 		RegistryChainSelector: req.RegistryChainSel,
@@ -82,7 +82,7 @@ func AddNops(env deployment.Environment, req *AddNopsRequest) (deployment.Change
 			inspectorPerChain,
 			[]mcmstypes.BatchOperation{*resp.Ops},
 			"proposal to add NOPs",
-			proposalutils.TimelockConfig{MinDelay: req.MCMSConfig.MinDuration},
+			*req.TimelockConfig,
 		)
 		if err != nil {
 			return out, fmt.Errorf("failed to build proposal: %w", err)

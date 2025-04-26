@@ -21,7 +21,7 @@ type RemoveDONsRequest struct {
 	DONs             []uint32
 
 	// MCMSConfig is optional. If non-nil, the changes will be proposed using MCMS.
-	MCMSConfig *MCMSConfig
+	TimelockConfig *proposalutils.TimelockConfig
 }
 
 func (r *RemoveDONsRequest) Validate(e deployment.Environment) error {
@@ -43,7 +43,7 @@ func (r *RemoveDONsRequest) Validate(e deployment.Environment) error {
 }
 
 func (r RemoveDONsRequest) UseMCMS() bool {
-	return r.MCMSConfig != nil
+	return r.TimelockConfig != nil
 }
 
 // RemoveDONs removes a DON from the capabilities registry
@@ -105,7 +105,7 @@ func RemoveDONs(env deployment.Environment, req *RemoveDONsRequest) (deployment.
 			inspectorPerChain,
 			[]types.BatchOperation{*resp.Ops},
 			"proposal to remove dons",
-			proposalutils.TimelockConfig{MinDelay: req.MCMSConfig.MinDuration},
+			*req.TimelockConfig,
 		)
 		if err != nil {
 			return out, fmt.Errorf("failed to build proposal: %w", err)

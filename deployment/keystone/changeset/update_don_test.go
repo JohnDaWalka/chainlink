@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 
@@ -41,7 +42,7 @@ func TestUpdateDon(t *testing.T) {
 	type input struct {
 		te              test.EnvWrapper
 		nodeSetToUpdate []p2pkey.PeerID
-		mcmsConfig      *changeset.MCMSConfig
+		timelockConfig  *proposalutils.TimelockConfig
 	}
 	type testCase struct {
 		name     string
@@ -50,8 +51,8 @@ func TestUpdateDon(t *testing.T) {
 	}
 
 	var mcmsCases = []mcmsTestCase{
-		{name: "no mcms", mcmsConfig: nil},
-		{name: "with mcms", mcmsConfig: &changeset.MCMSConfig{MinDuration: 0}},
+		{name: "no mcms", timelockConfig: nil},
+		{name: "with mcms", timelockConfig: &proposalutils.TimelockConfig{MinDelay: 0}},
 	}
 
 	for _, mc := range mcmsCases {
@@ -60,7 +61,7 @@ func TestUpdateDon(t *testing.T) {
 			AssetDonConfig:  test.DonConfig{Name: "assetDon", N: 4},
 			WriterDonConfig: test.DonConfig{Name: "writerDon", N: 4},
 			NumChains:       1,
-			UseMCMS:         mc.mcmsConfig != nil,
+			UseMCMS:         mc.timelockConfig != nil,
 		})
 
 		t.Run(mc.name, func(t *testing.T) {
@@ -69,7 +70,7 @@ func TestUpdateDon(t *testing.T) {
 					name: "forbid wf update",
 					input: input{
 						nodeSetToUpdate: te.GetP2PIDs("wfDon"),
-						mcmsConfig:      mc.mcmsConfig,
+						timelockConfig:  mc.timelockConfig,
 						te:              te,
 					},
 					checkErr: func(t *testing.T, useMCMS bool, err error) {
@@ -82,7 +83,7 @@ func TestUpdateDon(t *testing.T) {
 					input: input{
 						te:              te,
 						nodeSetToUpdate: te.GetP2PIDs("writerDon"),
-						mcmsConfig:      mc.mcmsConfig,
+						timelockConfig:  mc.timelockConfig,
 					},
 				},
 			}
@@ -107,14 +108,14 @@ func TestUpdateDon(t *testing.T) {
 								Capability: capB, Config: capBCfg,
 							},
 						},
-						MCMSConfig: tc.input.mcmsConfig,
+						TimelockConfig: tc.input.timelockConfig,
 					}
 
 					csOut, err := changeset.UpdateDon(te.Env, &cfg)
 					if err != nil && tc.checkErr == nil {
 						t.Errorf("non nil err from UpdateDon %v but no checkErr func defined", err)
 					}
-					useMCMS := cfg.MCMSConfig != nil
+					useMCMS := cfg.TimelockConfig != nil
 					if !useMCMS {
 						if tc.checkErr != nil {
 							tc.checkErr(t, useMCMS, err)

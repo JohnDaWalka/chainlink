@@ -20,8 +20,8 @@ type AddCapabilitiesRequest struct {
 	RegistryChainSel uint64
 
 	Capabilities []kcr.CapabilitiesRegistryCapability
-	// MCMSConfig is optional. If non-nil, the changes will be proposed using MCMS.
-	MCMSConfig *MCMSConfig
+	// TimelockConfig is optional. If non-nil, the changes will be proposed using MCMS.
+	TimelockConfig *proposalutils.TimelockConfig
 }
 
 var _ deployment.ChangeSet[*AddCapabilitiesRequest] = AddCapabilities
@@ -48,7 +48,7 @@ func AddCapabilities(env deployment.Environment, req *AddCapabilitiesRequest) (d
 	if !exists {
 		return deployment.ChangesetOutput{}, fmt.Errorf("contract set not found for chain %d", req.RegistryChainSel)
 	}
-	useMCMS := req.MCMSConfig != nil
+	useMCMS := req.TimelockConfig != nil
 	ops, err := internal.AddCapabilities(env.Logger, contractSet.CapabilitiesRegistry.Contract, env.Chains[req.RegistryChainSel], req.Capabilities, useMCMS)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to add capabilities: %w", err)
@@ -79,7 +79,7 @@ func AddCapabilities(env deployment.Environment, req *AddCapabilitiesRequest) (d
 			inspectorPerChain,
 			[]mcmstypes.BatchOperation{*ops},
 			"proposal to add capabilities",
-			proposalutils.TimelockConfig{MinDelay: req.MCMSConfig.MinDuration},
+			*req.TimelockConfig,
 		)
 		if err != nil {
 			return out, fmt.Errorf("failed to build proposal: %w", err)

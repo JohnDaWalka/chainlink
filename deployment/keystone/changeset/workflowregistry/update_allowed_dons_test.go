@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
-	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/test"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/workflowregistry"
 )
@@ -84,7 +83,7 @@ func Test_UpdateAllowedDons_WithMCMS(t *testing.T) {
 		RegistryChainSel: te.RegistrySelector,
 		DonIDs:           []uint32{1},
 		Allowed:          true,
-		MCMSConfig:       &changeset.MCMSConfig{MinDuration: 0},
+		TimelockConfig:   &proposalutils.TimelockConfig{MinDelay: 0},
 	}
 
 	out, err := workflowregistry.UpdateAllowedDons(te.Env, req)

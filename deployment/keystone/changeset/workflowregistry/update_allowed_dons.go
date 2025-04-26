@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 
 	workflow_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/workflow_registry_wrapper"
+	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
@@ -20,7 +21,7 @@ type UpdateAllowedDonsRequest struct {
 	DonIDs           []uint32
 	Allowed          bool
 
-	MCMSConfig *changeset.MCMSConfig
+	TimelockConfig *proposalutils.TimelockConfig
 }
 
 func (r *UpdateAllowedDonsRequest) Validate() error {
@@ -56,9 +57,9 @@ func UpdateAllowedDons(env deployment.Environment, req *UpdateAllowedDonsRequest
 	}
 
 	var s strategy
-	if req.MCMSConfig != nil {
+	if req.TimelockConfig != nil {
 		s = &mcmsTransaction{
-			Config:      req.MCMSConfig,
+			Config:      req.TimelockConfig,
 			Description: "proposal to update allowed dons",
 			Address:     registry.Address(),
 			ChainSel:    req.RegistryChainSel,

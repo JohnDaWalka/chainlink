@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 
 	workflow_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/workflow_registry_wrapper"
+	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
@@ -22,7 +23,7 @@ type UpdateAuthorizedAddressesRequest struct {
 	Addresses []string
 	Allowed   bool
 
-	MCMSConfig *changeset.MCMSConfig
+	TimelockConfig *proposalutils.TimelockConfig
 }
 
 func (r *UpdateAuthorizedAddressesRequest) Validate() error {
@@ -81,9 +82,9 @@ func UpdateAuthorizedAddresses(env deployment.Environment, req *UpdateAuthorized
 	}
 
 	var s strategy
-	if req.MCMSConfig != nil {
+	if req.TimelockConfig != nil {
 		s = &mcmsTransaction{
-			Config:      req.MCMSConfig,
+			Config:      req.TimelockConfig,
 			Description: "proposal to update authorized addresses",
 			Address:     registry.Address(),
 			ChainSel:    chain.Selector,

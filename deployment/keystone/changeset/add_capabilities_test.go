@@ -59,7 +59,7 @@ func TestAddCapabilities(t *testing.T) {
 		req := &changeset.AddCapabilitiesRequest{
 			RegistryChainSel: te.RegistrySelector,
 			Capabilities:     capabilitiesToAdd,
-			MCMSConfig:       &changeset.MCMSConfig{MinDuration: 0},
+			TimelockConfig:   &proposalutils.TimelockConfig{MinDelay: 0},
 		}
 		csOut, err := changeset.AddCapabilities(te.Env, req)
 		require.NoError(t, err)

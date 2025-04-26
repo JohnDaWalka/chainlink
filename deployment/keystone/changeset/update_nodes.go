@@ -3,7 +3,6 @@ package changeset
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/mcms"
@@ -17,10 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 )
 
-type MCMSConfig struct {
-	MinDuration time.Duration
-}
-
 var _ deployment.ChangeSet[*UpdateNodesRequest] = UpdateNodes
 
 type UpdateNodesRequest struct {
@@ -28,7 +23,7 @@ type UpdateNodesRequest struct {
 	P2pToUpdates     map[p2pkey.PeerID]NodeUpdate
 
 	// MCMSConfig is optional. If non-nil, the changes will be proposed using MCMS.
-	MCMSConfig *MCMSConfig
+	TimelockConfig *proposalutils.TimelockConfig
 }
 
 func (r *UpdateNodesRequest) Validate(e deployment.Environment) error {
@@ -50,7 +45,7 @@ func (r *UpdateNodesRequest) Validate(e deployment.Environment) error {
 }
 
 func (r UpdateNodesRequest) UseMCMS() bool {
-	return r.MCMSConfig != nil
+	return r.TimelockConfig != nil
 }
 
 type NodeUpdate = internal.NodeUpdate
@@ -111,7 +106,7 @@ func UpdateNodes(env deployment.Environment, req *UpdateNodesRequest) (deploymen
 			inspectorPerChain,
 			[]types.BatchOperation{*resp.Ops},
 			"proposal to set update nodes",
-			proposalutils.TimelockConfig{MinDelay: req.MCMSConfig.MinDuration},
+			*req.TimelockConfig,
 		)
 		if err != nil {
 			return out, fmt.Errorf("failed to build proposal: %w", err)

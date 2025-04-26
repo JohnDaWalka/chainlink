@@ -56,8 +56,8 @@ type MutateNodeCapabilitiesRequest struct {
 	RegistryChainSel  uint64
 	P2pToCapabilities map[p2pkey.PeerID][]kcr.CapabilitiesRegistryCapability
 
-	// MCMSConfig is optional. If non-nil, the changes will be proposed using MCMS.
-	MCMSConfig *MCMSConfig
+	// TimelockConfig is optional. If non-nil, the changes will be proposed using MCMS.
+	TimelockConfig *proposalutils.TimelockConfig
 }
 
 func (req *MutateNodeCapabilitiesRequest) Validate(e deployment.Environment) error {
@@ -77,7 +77,7 @@ func (req *MutateNodeCapabilitiesRequest) Validate(e deployment.Environment) err
 }
 
 func (req *MutateNodeCapabilitiesRequest) UseMCMS() bool {
-	return req.MCMSConfig != nil
+	return req.TimelockConfig != nil
 }
 
 func (req *MutateNodeCapabilitiesRequest) updateNodeCapabilitiesImplRequest(e deployment.Environment) (*internal.UpdateNodeCapabilitiesImplRequest, *ContractSetV2, error) {
@@ -142,7 +142,7 @@ func UpdateNodeCapabilities(env deployment.Environment, req *UpdateNodeCapabilit
 			inspectorPerChain,
 			[]types.BatchOperation{*r.Ops},
 			"proposal to set update node capabilities",
-			proposalutils.TimelockConfig{MinDelay: req.MCMSConfig.MinDuration},
+			*req.TimelockConfig,
 		)
 		if err != nil {
 			return out, fmt.Errorf("failed to build proposal: %w", err)

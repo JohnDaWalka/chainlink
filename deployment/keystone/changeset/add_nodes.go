@@ -171,10 +171,10 @@ type AddNodesRequest struct {
 	RegistryChainSel uint64
 
 	CreateNodeRequests map[string]CreateNodeRequest
-	// MCMS is the configuration for the Multi-Chain Manager Service
+	// TimelockConfig is the configuration for the Multi-Chain Manager Service
 	// Required if the registry contract has be delegated to MCMS
 	// If nil, the registry contract will be used directly
-	MCMSConfig *MCMSConfig
+	TimelockConfig *proposalutils.TimelockConfig
 }
 
 func (r *AddNodesRequest) Validate() error {
@@ -219,7 +219,7 @@ func AddNodes(env deployment.Environment, req *AddNodesRequest) (deployment.Chan
 	}
 
 	var (
-		useMCMS       = req.MCMSConfig != nil
+		useMCMS       = req.TimelockConfig != nil
 		registryChain = env.Chains[req.RegistryChainSel]
 		registry      = contractSetResp.ContractSets[req.RegistryChainSel].CapabilitiesRegistry
 	)
@@ -259,7 +259,7 @@ func AddNodes(env deployment.Environment, req *AddNodesRequest) (deployment.Chan
 			inspectorPerChain,
 			[]types.BatchOperation{*resp.Ops},
 			"proposal to add nodes",
-			proposalutils.TimelockConfig{MinDelay: req.MCMSConfig.MinDuration},
+			*req.TimelockConfig,
 		)
 		if err != nil {
 			return out, fmt.Errorf("failed to build proposal: %w", err)

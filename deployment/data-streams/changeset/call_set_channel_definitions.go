@@ -139,7 +139,7 @@ func CallSetChannelDefinitions(e deployment.Environment, cfg SetChannelDefinitio
 	return deployment.ChangesetOutput{}, nil
 }
 
-func getTransactOpts(e deployment.Environment, chainSel uint64, mcmsConfig *MCMSConfig) *bind.TransactOpts {
+func getTransactOpts(e deployment.Environment, chainSel uint64, TimelockConfig *proposalutils.TimelockConfig) *bind.TransactOpts {
 	if mcmsConfig == nil {
 		return e.Chains[chainSel].DeployerKey
 	}
@@ -153,7 +153,7 @@ func transferOrBuildTx(
 	definition ChannelDefinition,
 	opts *bind.TransactOpts,
 	chain deployment.Chain,
-	mcmsConfig *MCMSConfig,
+	TimelockConfig *proposalutils.TimelockConfig,
 ) (*ethTypes.Transaction, error) {
 	if ccs == nil {
 		return nil, errors.New("provided ChannelConfigStore is nil")

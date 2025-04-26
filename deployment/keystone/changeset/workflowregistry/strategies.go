@@ -34,7 +34,7 @@ func (s *simpleTransaction) Apply(callFn func(opts *bind.TransactOpts) (*types.T
 }
 
 type mcmsTransaction struct {
-	Config      *changeset.MCMSConfig
+	Config      *proposalutils.TimelockConfig
 	Description string
 	Address     common.Address
 	ChainSel    uint64
@@ -76,7 +76,7 @@ func (m *mcmsTransaction) Apply(callFn func(opts *bind.TransactOpts) (*types.Tra
 		inspectorPerChain,
 		[]mcmstypes.BatchOperation{op},
 		m.Description,
-		proposalutils.TimelockConfig{MinDelay: m.Config.MinDuration},
+		*m.Config,
 	)
 	if err != nil {
 		return deployment.ChangesetOutput{}, err

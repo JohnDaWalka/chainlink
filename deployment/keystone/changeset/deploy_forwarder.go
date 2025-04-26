@@ -55,7 +55,7 @@ type ConfigureForwardContractsRequest struct {
 	RegistryChainSel uint64
 
 	// MCMSConfig is optional. If non-nil, the changes will be proposed using MCMS.
-	MCMSConfig *MCMSConfig
+	TimelockConfig *proposalutils.TimelockConfig
 	// Chains is optional. Defines chains for which request will be executed. If empty, runs for all available chains.
 	Chains map[uint64]struct{}
 }
@@ -68,7 +68,7 @@ func (r ConfigureForwardContractsRequest) Validate() error {
 }
 
 func (r ConfigureForwardContractsRequest) UseMCMS() bool {
-	return r.MCMSConfig != nil
+	return r.TimelockConfig != nil
 }
 
 func ConfigureForwardContracts(env deployment.Environment, req ConfigureForwardContractsRequest) (deployment.ChangesetOutput, error) {
@@ -125,9 +125,7 @@ func ConfigureForwardContracts(env deployment.Environment, req ConfigureForwardC
 				inspectorPerChain,
 				[]mcmstypes.BatchOperation{op},
 				"proposal to set forwarder config",
-				proposalutils.TimelockConfig{
-					MinDelay: req.MCMSConfig.MinDuration,
-				},
+				*req.TimelockConfig,
 			)
 			if err != nil {
 				return out, fmt.Errorf("failed to build proposal: %w", err)

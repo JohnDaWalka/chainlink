@@ -7,6 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 )
@@ -22,7 +23,7 @@ type UpdateDonRequest struct {
 	CapabilityConfigs []CapabilityConfig // if Config subfield is nil, a default config is used
 
 	// MCMSConfig is optional. If non-nil, the changes will be proposed using MCMS.
-	MCMSConfig *MCMSConfig
+	TimelockConfig *proposalutils.TimelockConfig
 }
 
 func (r *UpdateDonRequest) Validate() error {
@@ -36,7 +37,7 @@ func (r *UpdateDonRequest) Validate() error {
 }
 
 func (r UpdateDonRequest) UseMCMS() bool {
-	return r.MCMSConfig != nil
+	return r.TimelockConfig != nil
 }
 
 type UpdateDonResponse struct {
@@ -84,7 +85,7 @@ func appendRequest(r *UpdateDonRequest) *AppendNodeCapabilitiesRequest {
 	out := &AppendNodeCapabilitiesRequest{
 		RegistryChainSel:  r.RegistryChainSel,
 		P2pToCapabilities: make(map[p2pkey.PeerID][]kcr.CapabilitiesRegistryCapability),
-		MCMSConfig:        r.MCMSConfig,
+		TimelockConfig:    r.TimelockConfig,
 	}
 	for _, p2pid := range r.P2PIDs {
 		if _, exists := out.P2pToCapabilities[p2pid]; !exists {

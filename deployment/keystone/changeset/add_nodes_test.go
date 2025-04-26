@@ -17,8 +17,8 @@ import (
 )
 
 type mcmsTestCase struct {
-	name       string
-	mcmsConfig *changeset.MCMSConfig
+	name           string
+	timelockConfig *proposalutils.TimelockConfig
 }
 
 func TestAddNodes(t *testing.T) {
@@ -27,7 +27,7 @@ func TestAddNodes(t *testing.T) {
 	type input struct {
 		te                 test.EnvWrapper
 		CreateNodeRequests map[string]changeset.CreateNodeRequest
-		MCMSConfig         *changeset.MCMSConfig
+		TimelockConfig     *proposalutils.TimelockConfig
 	}
 	type testCase struct {
 		name     string
@@ -36,16 +36,16 @@ func TestAddNodes(t *testing.T) {
 	}
 
 	type mcmsCase struct {
-		name       string
-		mcmsConfig *changeset.MCMSConfig
+		name           string
+		timelockConfig *proposalutils.TimelockConfig
 	}
 
 	var mcCases = []mcmsCase{
-		{name: "no mcms", mcmsConfig: nil},
-		{name: "with mcms", mcmsConfig: &changeset.MCMSConfig{MinDuration: 0}},
+		{name: "no mcms", timelockConfig: nil},
+		{name: "with mcms", timelockConfig: &proposalutils.TimelockConfig{MinDelay: 0}},
 	}
 	for _, mcCase := range mcCases {
-		mcmsConfig := mcCase.mcmsConfig
+		mcmsConfig := mcCase.timelockConfig
 		t.Run(mcCase.name, func(t *testing.T) {
 			te := test.SetupContractTestEnv(t, test.EnvWrapperConfig{
 				WFDonConfig:     test.DonConfig{Name: "wfDon", N: 4},
@@ -70,7 +70,7 @@ func TestAddNodes(t *testing.T) {
 								P2PID:               testPeerID(t, "test-peer-id"),
 							},
 						},
-						MCMSConfig: mcmsConfig,
+						TimelockConfig: mcmsConfig,
 					},
 					checkErr: func(t *testing.T, useMCMS bool, err error) {
 						require.Error(t, err)
@@ -98,7 +98,7 @@ func TestAddNodes(t *testing.T) {
 								},
 							},
 						},
-						MCMSConfig: mcmsConfig,
+						TimelockConfig: mcmsConfig,
 					},
 					checkErr: func(t *testing.T, useMCMS bool, err error) {
 						require.Error(t, err)
@@ -126,7 +126,7 @@ func TestAddNodes(t *testing.T) {
 								},
 							},
 						},
-						MCMSConfig: mcmsConfig,
+						TimelockConfig: mcmsConfig,
 					},
 				},
 				{
@@ -157,7 +157,7 @@ func TestAddNodes(t *testing.T) {
 								},
 							},
 						},
-						MCMSConfig: mcmsConfig,
+						TimelockConfig: mcmsConfig,
 					},
 				},
 
@@ -189,7 +189,7 @@ func TestAddNodes(t *testing.T) {
 								},
 							},
 						},
-						MCMSConfig: mcmsConfig,
+						TimelockConfig: mcmsConfig,
 					},
 					checkErr: func(t *testing.T, useMCMS bool, err error) {
 						require.Error(t, err)
@@ -225,7 +225,7 @@ func TestAddNodes(t *testing.T) {
 								},
 							},
 						},
-						MCMSConfig: mcmsConfig,
+						TimelockConfig: mcmsConfig,
 					},
 					checkErr: func(t *testing.T, useMCMS bool, err error) {
 						require.Error(t, err)
@@ -245,13 +245,13 @@ func TestAddNodes(t *testing.T) {
 					req := &changeset.AddNodesRequest{
 						RegistryChainSel:   tc.input.te.RegistrySelector,
 						CreateNodeRequests: tc.input.CreateNodeRequests,
-						MCMSConfig:         tc.input.MCMSConfig,
+						TimelockConfig:     tc.input.TimelockConfig,
 					}
 					r, err := changeset.AddNodes(tc.input.te.Env, req)
 					if err != nil && tc.checkErr == nil {
 						t.Errorf("non nil err from Add Node %v but no checkErr func defined", err)
 					}
-					useMCMS := req.MCMSConfig != nil
+					useMCMS := req.TimelockConfig != nil
 					if !useMCMS {
 						if tc.checkErr != nil {
 							tc.checkErr(t, useMCMS, err)

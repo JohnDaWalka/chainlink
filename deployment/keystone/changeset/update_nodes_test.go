@@ -77,7 +77,7 @@ func TestUpdateNodes(t *testing.T) {
 		cfg := changeset.UpdateNodesRequest{
 			RegistryChainSel: te.RegistrySelector,
 			P2pToUpdates:     updates,
-			MCMSConfig:       &changeset.MCMSConfig{MinDuration: 0},
+			TimelockConfig:   &proposalutils.TimelockConfig{MinDelay: 0},
 		}
 
 		csOut, err := changeset.UpdateNodes(te.Env, &cfg)
@@ -99,7 +99,7 @@ func TestUpdateNodes(t *testing.T) {
 				&changeset.UpdateNodesRequest{
 					RegistryChainSel: te.RegistrySelector,
 					P2pToUpdates:     updates,
-					MCMSConfig:       &changeset.MCMSConfig{MinDuration: 0},
+					TimelockConfig:   &proposalutils.TimelockConfig{MinDelay: 0},
 				},
 			),
 		)

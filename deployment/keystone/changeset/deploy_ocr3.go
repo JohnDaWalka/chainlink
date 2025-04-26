@@ -45,11 +45,11 @@ type ConfigureOCR3Config struct {
 	WriteGeneratedConfig io.Writer // if not nil, write the generated config to this writer as JSON [OCR2OracleConfig]
 
 	// MCMSConfig is optional. If non-nil, the changes will be proposed using MCMS.
-	MCMSConfig *MCMSConfig
+	TimelockConfig *proposalutils.TimelockConfig
 }
 
 func (cfg ConfigureOCR3Config) UseMCMS() bool {
-	return cfg.MCMSConfig != nil
+	return cfg.TimelockConfig != nil
 }
 
 func ConfigureOCR3Contract(env deployment.Environment, cfg ConfigureOCR3Config) (deployment.ChangesetOutput, error) {
@@ -113,7 +113,7 @@ func ConfigureOCR3Contract(env deployment.Environment, cfg ConfigureOCR3Config) 
 			inspectorPerChain,
 			[]mcmstypes.BatchOperation{*resp.Ops},
 			"proposal to set OCR3 config",
-			proposalutils.TimelockConfig{MinDelay: cfg.MCMSConfig.MinDuration},
+			*cfg.TimelockConfig,
 		)
 		if err != nil {
 			return out, fmt.Errorf("failed to build proposal: %w", err)

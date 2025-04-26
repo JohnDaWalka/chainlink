@@ -126,7 +126,7 @@ func TestRemoveDONs(t *testing.T) {
 				DONs:             donIDs,
 			}
 			if tt.useMCMS {
-				req.MCMSConfig = &changeset.MCMSConfig{MinDuration: 0}
+				req.TimelockConfig = &proposalutils.TimelockConfig{MinDelay: 0}
 			}
 
 			// 4) Call the RemoveDONs changeset
