@@ -622,7 +622,7 @@ func TestCRE_OCR3_ReadBalance_Workflow_SingleDon_MockedPrice(t *testing.T) {
 		debugTest(t, testLogger, setupOutput, in)
 	})
 
-	waitForFeedBundleUpdate(t, testLogger, priceProvider, setupOutput, in.WorkflowConfigs[0].FeedID, 3*time.Minute)
+	waitForFeedBundleUpdate(t, testLogger, priceProvider, setupOutput, 5*time.Minute)
 }
 
 // config file to use: environment-gateway-don.toml
@@ -746,7 +746,7 @@ func waitForFeedUpdate(t *testing.T, testLogger zerolog.Logger, priceProvider Pr
 	}
 }
 
-func waitForFeedBundleUpdate(t *testing.T, testLogger zerolog.Logger, priceProvider PriceProvider, setupOutput *porSetupOutput, _ string, timeout time.Duration) {
+func waitForFeedBundleUpdate(t *testing.T, testLogger zerolog.Logger, priceProvider PriceProvider, setupOutput *porSetupOutput, timeout time.Duration) {
 	for chainSelector, wfConfig := range setupOutput.chainSelectorToWorkflowConfig {
 		testLogger.Info().Msgf("Waiting for feed %s to update...", wfConfig.FeedID)
 

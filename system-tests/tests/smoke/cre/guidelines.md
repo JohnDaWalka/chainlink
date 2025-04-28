@@ -103,20 +103,22 @@ Download the CLI binary for your system from the [dev-platform repo](https://git
 
 ---
 
-### `cron` Capability Binary
+### `cron` and `readcontract` Capability Binary
 
-This binary is needed for tests using the cron capability.
+You must ensure the test environment has access to the `cron` and `readcontract` capability binaries. You can either:
 
 **Option 1**: Use a CL node image that already includes the binary. If so, comment this in TOML:
 ```toml
 [workflow_config.dependencies]
   # cron_capability_binary_path = "./cron"
+  # read_contract_capability_binary_path = "./amd64_readcontract"
 ```
 
 **Option 2**: Provide a path to a locally built binary:
 ```toml
 [workflow_config.dependencies]
   cron_capability_binary_path = "./some-folder/cron"
+  read_contract_capability_binary_path = "./some-folder/amd64_readcontract"
 ```
 
 You can build it from [capabilities repo](https://github.com/smartcontractkit/capabilities) or download the release.
