@@ -363,6 +363,7 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 				ContractReaders:   contractReaders,
 				ContractWriters:   chainWriters,
 				RmnPeerClient:     rmnPeerClient,
+				EstimateProvider:  plugin.GasEstimateProvider,
 				RmnCrypto:         rmnCrypto})
 		factory = promwrapper.NewReportingPluginFactory[[]byte](factory, i.lggr, chainID, "CCIPCommit")
 		transmitter = plugins[chainFamily].ContractTransmitterFactory.NewCommitTransmitter(
