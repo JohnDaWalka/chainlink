@@ -81,7 +81,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250411163110-21a13ceb3ac4
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250423184741-8b59e5dd60e1
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250417193446-eeb0a7d1e049
-	github.com/smartcontractkit/chainlink-evm v0.0.0-20250425155235-eda82d8a83e6
+	github.com/smartcontractkit/chainlink-evm v0.0.0-20250428133125-80eeaec87835
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250421203809-e0f5602c126c
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250402142713-6529d36f91f3
@@ -378,8 +378,8 @@ require (
 
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20250422175525-b7575d96bd4d
 
-// Pinning chainlink-evm to eda82d8a83e6 version to prevent accidental bumps [This should not be changed ccip-2.23 release]
-replace github.com/smartcontractkit/chainlink-evm => github.com/smartcontractkit/chainlink-evm v0.0.0-20250425155235-eda82d8a83e6
+// Pinning chainlink-evm to 80eeaec87835 version to prevent accidental bumps [This should not be changed for ccip-2.23 release, corresponding chainlink-evm branch `2.23.1-ccip-hotfix-heder`]
+replace github.com/smartcontractkit/chainlink-evm => github.com/smartcontractkit/chainlink-evm v0.0.0-20250428133125-80eeaec87835
 
 // Pinning chainlink-solana to 30ad97c0e9ca version to prevent accidental bumps [This should not be changed ccip-2.23 release]
 replace github.com/smartcontractkit/chainlink-solana => github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250425213256-30ad97c0e9ca
