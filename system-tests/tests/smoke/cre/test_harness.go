@@ -1,7 +1,6 @@
 package cre
 
 import (
-	"fmt"
 	"math/big"
 	"os"
 
@@ -131,7 +130,7 @@ func buildPoRConfig(input registerPoRWorkflowInput) (*os.File, error) {
 
 func buildReadContractConfig(input registerPoRWorkflowInput) (*os.File, error) {
 	if input.readContractInput == nil {
-		return nil, fmt.Errorf("cannot build read contract config from nil input")
+		return nil, errors.New("cannot build read contract config from nil input")
 	}
 
 	var secretNameToUse *string

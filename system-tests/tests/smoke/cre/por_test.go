@@ -406,7 +406,7 @@ func (th *testHarness) setupPoRTestEnvironment(
 			require.NoError(t, err, "failed to deploy balance reader contract")
 
 			require.NoError(t,
-				universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(br.AddressBook), //nolint:staticcheck
+				universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(br.AddressBook), //nolint:staticcheck // won't migrate yet
 				"failed to merge address book with balance reader",
 			)
 
