@@ -3,6 +3,7 @@ package ccipevm
 import (
 	"fmt"
 	"math"
+	"math/big"
 
 	"github.com/pkg/errors"
 
@@ -127,4 +128,11 @@ func (gp EstimateProvider) CalculateMessageMaxGasWithError(msg cciptypes.Message
 		rateLimiterOverhead +
 		PerTokenOverheadGas*uint64(numTokens) + // TODO: remove
 		totalTokenDestGasOverhead, nil
+}
+
+// CalculateUsdPerUnitGas returns: (sourceGasPrice * usdPerFeeCoin) / 1e18
+func (gp EstimateProvider) CalculateUsdPerUnitGas(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) *big.Int {
+	// (wei / gas) * (usd / eth) * (1 eth / 1e18 wei)  = usd/gas
+	tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
+	return tmp.Div(tmp, big.NewInt(1e18))
 }

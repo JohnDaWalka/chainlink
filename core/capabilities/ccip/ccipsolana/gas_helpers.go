@@ -2,6 +2,7 @@ package ccipsolana
 
 import (
 	"fmt"
+	"math/big"
 
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 
@@ -68,4 +69,11 @@ func (gp EstimateProvider) CalculateMessageMaxGasWithError(msg cciptypes.Message
 	return DestGasOverhead +
 		totalTokenDestGasOverhead +
 		uint64(extraData.extraArgs.ComputeUnits), nil
+}
+
+// CalculateUsdPerUnitGas returns: (sourceGasPrice * usdPerFeeCoin) / 1e15
+func (gp EstimateProvider) CalculateUsdPerUnitGas(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) *big.Int {
+	// (lamport / gas) * (usd / lamport) * (1 sol / 1e15 lamport)  = usd/gas
+	tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
+	return tmp.Div(tmp, big.NewInt(1e15))
 }
