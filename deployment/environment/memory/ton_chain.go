@@ -11,9 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ton-labs/ton-go-sdk"
 	"github.com/xssnick/tonutils-go/ton/wallet"
-	"github.com/xssnick/tonutils-go/wallet"
 
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/stretchr/testify/require"
@@ -66,20 +64,20 @@ func createTonWallet(t *testing.T, useDefault bool) *wallet.Wallet {
 	}
 }
 
-func GenerateChainsTon(t *testing.T, numChains int) map[uint64]TonChain {
+func GenerateChainsTon(t *testing.T, numChains int) map[uint64]deployment.TonChain {
 	testTonChainSelectors := getTestTonChainSelectors()
 	if len(testTonChainSelectors) < numChains {
 		t.Fatalf("not enough test ton chain selectors available")
 	}
-	chains := make(map[uint64]TonChain)
+	chains := make(map[uint64]deployment.TonChain)
 	for i := 0; i < numChains; i++ {
 		chainID := testTonChainSelectors[i]
 		wallet := createTonWallet(t, true)
 
 		nodeClient := tonChain(t, chainID, *wallet.Address())
-		chains[chainID] = TonChain{
-			Client:         nodeClient,
-			DeployerWallet: wallet,
+		chains[chainID] = deployment.TonChain{
+			Client: nodeClient,
+			Wallet: wallet,
 		}
 	}
 	t.Logf("Created %d Ton chains: %+v", len(chains), chains)

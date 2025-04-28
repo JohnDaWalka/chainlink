@@ -53,6 +53,7 @@ type MemoryEnvironmentConfig struct {
 	SolChains          int
 	AptosChains        int
 	ZkChains           int
+	TonChains          int
 	NumOfUsersPerChain int
 	Nodes              int
 	Bootstraps         int
@@ -67,7 +68,8 @@ type NewNodesConfig struct {
 	// Solana chains to be configured. Optional.
 	SolChains map[uint64]cldf.SolChain
 	// Aptos chains to be configured. Optional.
-	AptosChains    map[uint64]cldf.AptosChain
+	AptosChains map[uint64]cldf.AptosChain
+	// TODO: add Ton chains
 	NumNodes       int
 	NumBootstraps  int
 	RegistryConfig deployment.CapabilityRegistryConfig
@@ -113,7 +115,11 @@ func NewMemoryChainsZk(t *testing.T, numChains int) map[uint64]cldf.Chain {
 	return GenerateChainsZk(t, numChains)
 }
 
-func NewMemoryChainsWithChainIDs(t *testing.T, chainIDs []uint64, numUsers int) (map[uint64]cldf.Chain, map[uint64][]*bind.TransactOpts) {
+func NewMemoryChainsTon(t *testing.T, numChains int) map[uint64]deployment.TonChain {
+	return GenerateChainsTon(t, numChains)
+}
+
+func NewMemoryChainsWithChainIDs(t *testing.T, chainIDs []uint64, numUsers int) (map[uint64]deployment.Chain, map[uint64][]*bind.TransactOpts) {
 	mchains := GenerateChainsWithIds(t, chainIDs, numUsers)
 	users := make(map[uint64][]*bind.TransactOpts)
 	for id, chain := range mchains {
@@ -203,10 +209,11 @@ func NewNodes(
 	// chainlink node in production.
 	for i := 0; i < cfg.NumBootstraps; i++ {
 		c := NewNodeConfig{
-			Port:           ports[i],
-			Chains:         cfg.Chains,
-			Solchains:      cfg.SolChains,
-			Aptoschains:    cfg.AptosChains,
+			Port:        ports[i],
+			Chains:      cfg.Chains,
+			Solchains:   cfg.SolChains,
+			Aptoschains: cfg.AptosChains,
+			// TODO: add Ton chains
 			LogLevel:       cfg.LogLevel,
 			Bootstrap:      true,
 			RegistryConfig: cfg.RegistryConfig,
@@ -241,6 +248,8 @@ func NewMemoryEnvironmentFromChainsNodes(
 	chains map[uint64]cldf.Chain,
 	solChains map[uint64]cldf.SolChain,
 	aptosChains map[uint64]cldf.AptosChain,
+	// TODO: bump CLDF and fix this
+	tonChains map[uint64]cldf.TonChain,
 	nodes map[string]Node,
 ) cldf.Environment {
 	var nodeIDs []string
@@ -258,6 +267,7 @@ func NewMemoryEnvironmentFromChainsNodes(
 		chains,
 		solChains,
 		aptosChains,
+		tonChains,
 		nodeIDs, // Note these have the p2p_ prefix.
 		NewMemoryJobClient(nodes),
 		ctx,
@@ -275,10 +285,11 @@ func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Lev
 		chains[chainSel] = chain
 	}
 	c := NewNodesConfig{
-		LogLevel:       logLevel,
-		Chains:         chains,
-		SolChains:      solChains,
-		AptosChains:    aptosChains,
+		LogLevel:    logLevel,
+		Chains:      chains,
+		SolChains:   solChains,
+		AptosChains: aptosChains,
+		// TODO: add Ton chains
 		NumNodes:       config.Nodes,
 		NumBootstraps:  config.Bootstraps,
 		RegistryConfig: config.RegistryConfig,
@@ -304,6 +315,7 @@ func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Lev
 		chains,
 		solChains,
 		aptosChains,
+		tonChains,
 		nodeIDs,
 		NewMemoryJobClient(nodes),
 		t.Context,

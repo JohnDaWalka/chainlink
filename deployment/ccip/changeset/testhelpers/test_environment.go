@@ -400,10 +400,11 @@ func (m *MemoryEnvironment) StartNodes(t *testing.T, crConfig deployment.Capabil
 	require.NotNil(t, m.DeployedEnv, "start chains and initiate deployed env first before starting nodes")
 	tc := m.TestConfig
 	c := memory.NewNodesConfig{
-		LogLevel:       zapcore.InfoLevel,
-		Chains:         m.Chains,
-		SolChains:      m.SolChains,
-		AptosChains:    m.AptosChains,
+		LogLevel:    zapcore.InfoLevel,
+		Chains:      m.Chains,
+		SolChains:   m.SolChains,
+		AptosChains: m.AptosChains,
+		// TODO: add support for Ton
 		NumNodes:       tc.Nodes,
 		NumBootstraps:  tc.Bootstraps,
 		RegistryConfig: crConfig,
@@ -419,7 +420,7 @@ func (m *MemoryEnvironment) StartNodes(t *testing.T, crConfig deployment.Capabil
 		})
 	}
 	m.nodes = nodes
-	m.DeployedEnv.Env = memory.NewMemoryEnvironmentFromChainsNodes(func() context.Context { return ctx }, lggr, m.Chains, m.SolChains, m.AptosChains, nodes)
+	m.DeployedEnv.Env = memory.NewMemoryEnvironmentFromChainsNodes(func() context.Context { return ctx }, lggr, m.Chains, m.SolChains, m.AptosChains, m.Env.TonChains, nodes)
 }
 
 func (m *MemoryEnvironment) DeleteJobs(ctx context.Context, jobIDs map[string][]string) error {
