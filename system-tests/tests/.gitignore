@@ -3,6 +3,8 @@
 # compiled cron capabilities, they should be downloaded by the test
 amd64_cron
 cron
+readcontract
+amd64_readcontract
 # workflow registration artifact, it's created anew every time the workflow is registered
 abcdefgasd*.yaml
 porfeed*.yaml
