@@ -25,13 +25,13 @@ import (
 	// "github.com/smartcontractkit/chainlink-ton/bindings/ccip_router"
 	// "github.com/smartcontractkit/chainlink-ton/bindings/mcms"
 	// "github.com/smartcontractkit/chainlink-ton/relayer/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/v1_6_0/onramp"
 	tonaddress "github.com/xssnick/tonutils-go/address"
 )
 

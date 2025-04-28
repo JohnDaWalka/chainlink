@@ -101,10 +101,7 @@ func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
 				ExtraAssertions: []func(t *testing.T){
 					func(t *testing.T) {
-						var receiverCounterAccount soltesthelpers.ReceiverCounter
-						err = solcommon.GetAccountDataBorshInto(ctx, e.Env.SolChains[destChain].Client, receiverTargetAccountPDA, solconfig.DefaultCommitment, &receiverCounterAccount)
-						require.NoError(t, err, "failed to get account info")
-						require.Equal(t, uint8(1), receiverCounterAccount.Value)
+						//TODO(ton): add asserts
 					},
 				},
 			},

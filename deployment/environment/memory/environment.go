@@ -50,6 +50,7 @@ type MemoryEnvironmentConfig struct {
 	Chains             int
 	SolChains          int
 	AptosChains        int
+	TonChains          int
 	NumOfUsersPerChain int
 	Nodes              int
 	Bootstraps         int
@@ -89,6 +90,10 @@ func NewMemoryChainsSol(t *testing.T, numChains int) map[uint64]deployment.SolCh
 
 func NewMemoryChainsAptos(t *testing.T, numChains int) map[uint64]deployment.AptosChain {
 	return GenerateChainsAptos(t, numChains)
+}
+
+func NewMemoryChainsTon(t *testing.T, numChains int) map[uint64]deployment.TonChain {
+	return GenerateChainsTon(t, numChains)
 }
 
 func NewMemoryChainsWithChainIDs(t *testing.T, chainIDs []uint64, numUsers int) (map[uint64]deployment.Chain, map[uint64][]*bind.TransactOpts) {
@@ -172,6 +177,7 @@ func NewNodes(
 	chains map[uint64]deployment.Chain,
 	solChains map[uint64]deployment.SolChain,
 	aptosChains map[uint64]deployment.AptosChain,
+	tonChains map[uint64]deployment.TonChain,
 	numNodes,
 	numBootstraps int,
 	registryConfig deployment.CapabilityRegistryConfig,
@@ -187,13 +193,13 @@ func NewNodes(
 	// since we won't run a bootstrapper and a plugin oracle on the same
 	// chainlink node in production.
 	for i := 0; i < numBootstraps; i++ {
-		node := NewNode(t, ports[i], chains, solChains, aptosChains, logLevel, true /* bootstrap */, registryConfig, customDBSetup, configOpts...)
+		node := NewNode(t, ports[i], chains, solChains, aptosChains, tonChains, logLevel, true /* bootstrap */, registryConfig, customDBSetup, configOpts...)
 		nodesByPeerID[node.Keys.PeerID.String()] = *node
 		// Note in real env, this ID is allocated by JD.
 	}
 	for i := 0; i < numNodes; i++ {
 		// grab port offset by numBootstraps, since above loop also takes some ports.
-		node := NewNode(t, ports[numBootstraps+i], chains, solChains, aptosChains, logLevel, false /* bootstrap */, registryConfig, customDBSetup, configOpts...)
+		node := NewNode(t, ports[numBootstraps+i], chains, solChains, aptosChains, tonChains, logLevel, false /* bootstrap */, registryConfig, customDBSetup, configOpts...)
 		nodesByPeerID[node.Keys.PeerID.String()] = *node
 		// Note in real env, this ID is allocated by JD.
 	}
@@ -206,6 +212,7 @@ func NewMemoryEnvironmentFromChainsNodes(
 	chains map[uint64]deployment.Chain,
 	solChains map[uint64]deployment.SolChain,
 	aptosChains map[uint64]deployment.AptosChain,
+	tonChains map[uint64]deployment.TonChain,
 	nodes map[string]Node,
 ) deployment.Environment {
 	var nodeIDs []string
@@ -223,6 +230,7 @@ func NewMemoryEnvironmentFromChainsNodes(
 		chains,
 		solChains,
 		aptosChains,
+		tonChains,
 		nodeIDs, // Note these have the p2p_ prefix.
 		NewMemoryJobClient(nodes),
 		ctx,
@@ -235,7 +243,8 @@ func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Lev
 	chains, _ := NewMemoryChains(t, config.Chains, config.NumOfUsersPerChain)
 	solChains := NewMemoryChainsSol(t, config.SolChains)
 	aptosChains := NewMemoryChainsAptos(t, config.AptosChains)
-	nodes := NewNodes(t, logLevel, chains, solChains, aptosChains, config.Nodes, config.Bootstraps, config.RegistryConfig, config.CustomDBSetup)
+	tonChains := NewMemoryChainsTon(t, config.TonChains)
+	nodes := NewNodes(t, logLevel, chains, solChains, aptosChains, tonChains, config.Nodes, config.Bootstraps, config.RegistryConfig, config.CustomDBSetup)
 	var nodeIDs []string
 	for id, node := range nodes {
 		require.NoError(t, node.App.Start(t.Context()))
@@ -255,6 +264,7 @@ func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Lev
 		chains,
 		solChains,
 		aptosChains,
+		tonChains,
 		nodeIDs,
 		NewMemoryJobClient(nodes),
 		t.Context,
