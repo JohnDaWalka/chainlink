@@ -66,6 +66,24 @@ type PoRWorkflowConfig struct {
 	ConsumerAddress   string  `json:"consumer_address"`
 	WriteTargetName   string  `json:"write_target_name"`
 	AuthKeySecretName *string `json:"auth_key_secret_name,omitempty"`
+	ReadBalanceReaderConfig
+}
+
+type ReadBalanceReaderConfig struct {
+	ContractAddress      string `json:"contract_address,omitempty"`
+	ContractName         string `json:"contract_name"`
+	ContractMethod       string `json:"contract_method"`
+	ContractReaderConfig string `json:"contract_reader_config,omitempty"`
+	ReadTargetName       string `json:"read_target_name,omitempty"`
+	FundedAddress        string `json:"funded_address,omitempty"`
+}
+
+func (c *PoRWorkflowConfig) SetFeedID(fID string) {
+	c.FeedID = fID
+}
+
+func (c *PoRWorkflowConfig) GetFeedID() string {
+	return c.FeedID
 }
 
 // rpcs: chainSelector -> url

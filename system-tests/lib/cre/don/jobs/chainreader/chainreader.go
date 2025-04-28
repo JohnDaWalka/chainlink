@@ -11,21 +11,21 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
-var ChainReaderJobSpecFactoryFn = func(chainID int, networkFamily, logEventTriggerBinaryPath, readContractBinaryPath string) types.JobSpecFactoryFn {
+var ChainReaderJobSpecFactoryFn = func(chainID uint64, networkFamily, logEventTriggerBinaryPath, readContractBinaryPath string) types.JobSpecFactoryFn {
 	return func(input *types.JobSpecFactoryInput) (types.DonsToJobSpecs, error) {
 		return GenerateJobSpecs(input.DonTopology, chainID, networkFamily, logEventTriggerBinaryPath, readContractBinaryPath)
 	}
 }
 
-var LogEventTriggerJobName = func(chainID int) string {
+var LogEventTriggerJobName = func(chainID uint64) string {
 	return fmt.Sprintf("log-event-trigger-%d", chainID)
 }
 
-var ReadContractJobName = func(chainID int) string {
+var ReadContractJobName = func(chainID uint64) string {
 	return fmt.Sprintf("read-contract-%d", chainID)
 }
 
-func GenerateJobSpecs(donTopology *types.DonTopology, chainID int, networkFamily, logEventTriggerBinaryPath, readContractBinaryPath string) (types.DonsToJobSpecs, error) {
+func GenerateJobSpecs(donTopology *types.DonTopology, chainID uint64, networkFamily, logEventTriggerBinaryPath, readContractBinaryPath string) (types.DonsToJobSpecs, error) {
 	if donTopology == nil {
 		return nil, errors.New("topology is nil")
 	}

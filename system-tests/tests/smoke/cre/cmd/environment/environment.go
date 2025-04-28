@@ -375,11 +375,12 @@ func startCLIEnvironment(topologyFlag string, extraAllowedPorts []int) (*creenv.
 		if chainErr != nil {
 			return nil, fmt.Errorf("failed to convert chain ID to int: %w", chainErr)
 		}
+		chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
 		capabilityFactoryFns = append(capabilityFactoryFns, crecontracts.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))))
 		capabilityFactoryFns = append(capabilityFactoryFns, crecontracts.ChainReaderCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
 
 		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, chainreader.ChainReaderJobSpecFactoryFn(
-			chainIDInt,
+			chainIDUint64,
 			"evm",
 			// path within the container/pod
 			filepath.Join(containerPath, filepath.Base(in.ExtraCapabilities.LogEventTriggerBinaryPath)),

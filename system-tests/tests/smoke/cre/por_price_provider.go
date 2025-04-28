@@ -243,6 +243,9 @@ func (f *FakePriceProvider) NextPrice(feedID string, price *big.Int, elapsed tim
 
 	if !f.priceAlreadyFound(cleanFeedID, price) {
 		f.testLogger.Info().Msgf("Feed %s updated after %s - price set, price=%s", cleanFeedID, elapsed, price)
+		if f.actualPrices == nil {
+			f.actualPrices = make(map[string][]*big.Int)
+		}
 		f.actualPrices[cleanFeedID] = append(f.actualPrices[cleanFeedID], price)
 
 		if len(f.actualPrices[cleanFeedID]) == len(f.expectedPrices[cleanFeedID]) {
