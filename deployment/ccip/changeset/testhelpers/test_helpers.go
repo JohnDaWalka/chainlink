@@ -38,9 +38,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
@@ -85,6 +86,9 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+
+	mock_ethusd_aggregator_wrapper_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/mock_ethusd_aggregator_wrapper"
+	mock_v3_aggregator_contract_zk "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/zksync/mock_v3_aggregator_contract"
 )
 
 const (
@@ -179,10 +183,25 @@ func DeployTestContracts(t *testing.T,
 ) deployment.CapabilityRegistryConfig {
 	capReg, err := deployment.DeployContract(lggr, chains[homeChainSel], ab,
 		func(chain deployment.Chain) deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry] {
-			crAddr, tx, cr, err2 := capabilities_registry.DeployCapabilitiesRegistry(
-				chain.DeployerKey,
-				chain.Client,
+			var (
+				crAddr common.Address
+				tx     *types.Transaction
+				cr     *capabilities_registry.CapabilitiesRegistry
+				err2   error
 			)
+			if !chain.IsZk {
+				crAddr, tx, cr, err2 = capabilities_registry.DeployCapabilitiesRegistry(
+					chain.DeployerKey,
+					chain.Client,
+				)
+			} else {
+				crAddr, _, cr, err2 = capabilities_registry.DeployCapabilitiesRegistryZk(
+					nil,
+					chain.ClientZk,
+					chain.DeployerKeyZk,
+					chain.Client,
+				)
+			}
 			return deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
 				Address: crAddr, Contract: cr, Tv: deployment.NewTypeAndVersion(changeset.CapabilitiesRegistry, deployment.Version1_0_0), Tx: tx, Err: err2,
 			}
@@ -1117,12 +1136,28 @@ func DeployFeeds(
 ) (map[string]common.Address, error) {
 	linkTV := deployment.NewTypeAndVersion(changeset.PriceFeed, deployment.Version1_0_0)
 	mockLinkFeed := func(chain deployment.Chain) deployment.ContractDeploy[*aggregator_v3_interface.AggregatorV3Interface] {
-		linkFeed, tx, _, err1 := mock_v3_aggregator_contract.DeployMockV3Aggregator(
-			chain.DeployerKey,
-			chain.Client,
-			changeset.LinkDecimals, // decimals
-			linkPrice,              // initialAnswer
+		var (
+			linkFeed common.Address
+			tx       *types.Transaction
+			err1     error
 		)
+		if !chain.IsZk {
+			linkFeed, tx, _, err1 = mock_v3_aggregator_contract.DeployMockV3Aggregator(
+				chain.DeployerKey,
+				chain.Client,
+				changeset.LinkDecimals, // decimals
+				linkPrice,              // initialAnswer
+			)
+		} else {
+			linkFeed, _, _, err1 = mock_v3_aggregator_contract_zk.DeployMockV3AggregatorZk(
+				nil,
+				chain.ClientZk,
+				chain.DeployerKeyZk,
+				chain.Client,
+				uint8(changeset.LinkDecimals),
+				linkPrice,
+			)
+		}
 		aggregatorCr, err2 := aggregator_v3_interface.NewAggregatorV3Interface(linkFeed, chain.Client)
 
 		return deployment.ContractDeploy[*aggregator_v3_interface.AggregatorV3Interface]{
@@ -1131,11 +1166,26 @@ func DeployFeeds(
 	}
 
 	mockWethFeed := func(chain deployment.Chain) deployment.ContractDeploy[*aggregator_v3_interface.AggregatorV3Interface] {
-		wethFeed, tx, _, err1 := mock_ethusd_aggregator_wrapper.DeployMockETHUSDAggregator(
-			chain.DeployerKey,
-			chain.Client,
-			wethPrice, // initialAnswer
+		var (
+			wethFeed common.Address
+			tx       *types.Transaction
+			err1     error
 		)
+		if !chain.IsZk {
+			wethFeed, tx, _, err1 = mock_ethusd_aggregator_wrapper.DeployMockETHUSDAggregator(
+				chain.DeployerKey,
+				chain.Client,
+				wethPrice, // initialAnswer
+			)
+		} else {
+			wethFeed, _, _, err1 = mock_ethusd_aggregator_wrapper_zk.DeployMockETHUSDAggregatorZk(
+				nil,
+				chain.ClientZk,
+				chain.DeployerKeyZk,
+				chain.Client,
+				wethPrice,
+			)
+		}
 		aggregatorCr, err2 := aggregator_v3_interface.NewAggregatorV3Interface(wethFeed, chain.Client)
 
 		return deployment.ContractDeploy[*aggregator_v3_interface.AggregatorV3Interface]{

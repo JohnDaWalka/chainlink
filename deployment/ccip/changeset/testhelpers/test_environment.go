@@ -66,6 +66,7 @@ type TestConfigs struct {
 	Chains                     int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
 	SolChains                  int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
 	AptosChains                int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
+	ZkChains                   int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
 	ChainIDs                   []uint64 // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
 	NumOfUsersPerChain         int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
 	Nodes                      int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
@@ -97,7 +98,7 @@ type TestConfigs struct {
 }
 
 func (tc *TestConfigs) Validate() error {
-	if tc.Chains < 2 {
+	if tc.Chains+tc.ZkChains < 2 {
 		return errors.New("chains must be at least 2")
 	}
 	if tc.Nodes < 4 {
@@ -258,6 +259,12 @@ func WithAptosChains(numChains int) TestOps {
 	}
 }
 
+func WithZkChains(numChains int) TestOps {
+	return func(testCfg *TestConfigs) {
+		testCfg.ZkChains = numChains
+	}
+}
+
 func WithNumOfUsersPerChain(numUsers int) TestOps {
 	return func(testCfg *TestConfigs) {
 		testCfg.NumOfUsersPerChain = numUsers
@@ -360,6 +367,11 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 	m.Chains = chains
 	m.SolChains = memory.NewMemoryChainsSol(t, tc.SolChains)
 	m.AptosChains = memory.NewMemoryChainsAptos(t, tc.AptosChains)
+	zkChains := memory.NewMemoryChainsZk(t, tc.ZkChains)
+	for id, chain := range zkChains {
+		chains[id] = chain
+		m.Chains[id] = chain
+	}
 	env := deployment.Environment{
 		Chains:      m.Chains,
 		SolChains:   m.SolChains,

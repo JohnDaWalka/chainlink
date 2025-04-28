@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"strconv"
 	"testing"
@@ -29,6 +30,7 @@ func GenerateChainsZk(t *testing.T, numChains int) map[uint64]deployment.Chain {
 
 	for i := 0; i < numChains; i++ {
 		chainID := chain_selectors.TEST_90000051.EvmChainID + uint64(i) //nolint:gosec // it shouldn't overflow
+		chainName := chain_selectors.TEST_90000051.Name                 //nolint:gosec // it shouldn't overflow
 
 		output, err := blockchain.NewBlockchainNetwork(&blockchain.Input{
 			Type:    "anvil-zksync",
@@ -76,9 +78,16 @@ func GenerateChainsZk(t *testing.T, numChains int) map[uint64]deployment.Chain {
 				defer cancel()
 				receipt, err := bind.WaitMined(ctx, client, tx)
 				if err != nil {
-					return 0, err
+					return 0, fmt.Errorf("tx %s failed to confirm: %w, chain %d", tx.Hash().Hex(), err, sel)
 				}
-				return receipt.Status, nil
+				if receipt.Status == 0 {
+					errReason, err := deployment.GetErrorReasonFromTx(client, keyedTransactors[0].From, tx, receipt)
+					if err == nil && errReason != "" {
+						return 0, fmt.Errorf("tx %s reverted,error reason: %s chain %s", tx.Hash().Hex(), errReason, chainName)
+					}
+					return 0, fmt.Errorf("tx %s reverted, could not decode error reason chain %s", tx.Hash().Hex(), chainName)
+				}
+				return receipt.BlockNumber.Uint64(), nil
 			},
 			IsZk:          true,
 			ClientZk:      clientZk,
