@@ -23,7 +23,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chain-selectors v1.0.52
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250423184741-8b59e5dd60e1
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250424173217-3df386365d0f
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250428133125-80eeaec87835
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.7.4
@@ -445,7 +445,7 @@ require (
 	gonum.org/v1/gonum v0.15.1 // indirect
 	google.golang.org/genproto v0.0.0-20250122153221-138b5a5a4fd4 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250219182151-9fdb1cabc7b2 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250422160041-2d3770c4ea7f // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/guregu/null.v4 v4.0.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect

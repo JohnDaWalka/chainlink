@@ -32,7 +32,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250425101833-7b7e760694ed
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250425163923-16aa375957b7
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250424173217-3df386365d0f
-	github.com/smartcontractkit/chainlink-evm v0.0.0-20250424162751-35c5921b8597
+	github.com/smartcontractkit/chainlink-evm v0.0.0-20250428133125-80eeaec87835
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.7.4
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.5
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.4
@@ -549,7 +549,7 @@ require (
 	google.golang.org/api v0.221.0 // indirect
 	google.golang.org/genproto v0.0.0-20250122153221-138b5a5a4fd4 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250219182151-9fdb1cabc7b2 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250422160041-2d3770c4ea7f // indirect
 	google.golang.org/grpc v1.71.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
