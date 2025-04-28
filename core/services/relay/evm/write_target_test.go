@@ -218,7 +218,8 @@ func TestEvmWrite(t *testing.T) {
 	}
 
 	validConfig, err := values.NewMap(map[string]any{
-		"Address": evmCfg.EVM().Workflow().ForwarderAddress().String(),
+		"address":   evmCfg.EVM().Workflow().ForwarderAddress().String(),
+		"processor": "EVMDF",
 	})
 	require.NoError(t, err)
 
