@@ -235,7 +235,9 @@ type NewNodeConfig struct {
 	// Solana chains to be configured. Optional.
 	Solchains map[uint64]cldf.SolChain
 	// Aptos chains to be configured. Optional.
-	Aptoschains    map[uint64]cldf.AptosChain
+	Aptoschains map[uint64]cldf.AptosChain
+	// TODO: bump CLDF and fix this
+	Tonchains      map[uint64]cldf.TonChain
 	LogLevel       zapcore.Level
 	Bootstrap      bool
 	RegistryConfig deployment.CapabilityRegistryConfig
@@ -329,6 +331,16 @@ func NewNode(
 			aptosConfigs = append(aptosConfigs, createAptosChainConfig(aptosChainID, chain))
 		}
 		c.Aptos = aptosConfigs
+
+		var tonConfigs chainlink.RawConfigs
+		for chainID, chain := range tonchains {
+			tonChainID, err := chainsel.GetChainIDFromSelector(chainID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tonConfigs = append(tonConfigs, createTonChainConfig(tonChainID, chain))
+		}
+		c.Ton = tonConfigs
 
 		for _, opt := range configOpts {
 			opt(c)

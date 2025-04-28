@@ -908,7 +908,7 @@ func AddLane(
 		changesets = append(changesets, addLaneSolanaChangesets(t, e, to, from, fromFamily)...)
 	}
 	if fromFamily == chainsel.FamilyTon || toFamily == chainsel.FamilyTon {
-		changesets = append(changesets, addLaneAptosChangesets(t, e, from, to, fromFamily, toFamily)...)
+		changesets = append(changesets, addLaneTonChangesets(t, e, from, to, fromFamily, toFamily)...)
 	}
 
 	e.Env, err = commoncs.ApplyChangesets(t, e.Env, e.TimelockContracts(t), changesets)
@@ -1140,8 +1140,10 @@ func AddLanesForAll(t *testing.T, e *DeployedEnv, state stateview.CCIPOnChainSta
 	chains := []uint64{}
 	allEvmChainSelectors := maps.Keys(e.Env.Chains)
 	allSolChainSelectors := maps.Keys(e.Env.SolChains)
+	allTonChainSelectors := maps.Keys(e.Env.TonChains)
 	chains = slices.AppendSeq(chains, allEvmChainSelectors)
 	chains = slices.AppendSeq(chains, allSolChainSelectors)
+	chains = slices.AppendSeq(chains, allTonChainSelectors)
 
 	for _, source := range chains {
 		for _, dest := range chains {
@@ -2205,25 +2207,6 @@ func DeploySolanaCcipReceiver(t *testing.T, e cldf.Environment) {
 		instruction, ixErr := solTestReceiver.NewInitializeInstruction(
 			chainState.Router,
 			solanastateview.FindReceiverTargetAccount(chainState.Receiver),
-			externalExecutionConfigPDA,
-			e.SolChains[solSelector].DeployerKey.PublicKey(),
-			solana.SystemProgramID,
-		).ValidateAndBuild()
-		require.NoError(t, ixErr)
-		err = e.SolChains[solSelector].Confirm([]solana.Instruction{instruction})
-		require.NoError(t, err)
-	}
-}
-
-func DeployTonCcipReceiver(t *testing.T, e deployment.Environment) {
-	state, err := changeset.LoadOnchainStateSolana(e)
-	require.NoError(t, err)
-	for solSelector, chainState := range state.SolChains {
-		solTestReceiver.SetProgramID(chainState.Receiver)
-		externalExecutionConfigPDA, _, _ := solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, chainState.Receiver)
-		instruction, ixErr := solTestReceiver.NewInitializeInstruction(
-			chainState.Router,
-			changeset.FindReceiverTargetAccount(chainState.Receiver),
 			externalExecutionConfigPDA,
 			e.SolChains[solSelector].DeployerKey.PublicKey(),
 			solana.SystemProgramID,
