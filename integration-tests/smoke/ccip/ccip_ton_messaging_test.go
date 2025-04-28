@@ -25,9 +25,6 @@ func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
 	ctx := testhelpers.Context(t)
 	e, _, _ := testsetups.NewIntegrationEnvironment(t, testhelpers.WithTonChains(1))
 
-	// TODO: do this as part of setup
-	testhelpers.DeployTonCcipReceiver(t, e.Env)
-
 	state, err := changeset.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 

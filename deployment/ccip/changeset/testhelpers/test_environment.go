@@ -496,6 +496,7 @@ func NewEnvironmentWithPrerequisitesContracts(t *testing.T, tEnv TestEnvironment
 	e := NewEnvironment(t, tEnv)
 	evmChains := e.Env.AllChainSelectors()
 	solChains := e.Env.AllChainSelectorsSolana()
+	tonChains := e.Env.AllChainSelectorsTon()
 	//nolint:gocritic // we need to segregate EVM and Solana chains
 	allChains := append(evmChains, solChains...)
 	// if len(solChains) > 0 {
@@ -551,6 +552,15 @@ func NewEnvironmentWithPrerequisitesContracts(t *testing.T, tEnv TestEnvironment
 		),
 	)
 	require.NoError(t, err)
+
+	if len(tonChains) > 0 {
+		e.Env, err = commonchangeset.Apply(t, e.Env, nil,
+			TonTestDeployPrerequisitesChangeSet{
+				T:                 t,
+				TonChainSelectors: tonChains,
+			})
+		require.NoError(t, err)
+	}
 	tEnv.UpdateDeployedEnvironment(e)
 	return e
 }

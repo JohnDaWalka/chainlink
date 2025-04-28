@@ -233,6 +233,7 @@ func NewNode(
 	chains map[uint64]deployment.Chain,
 	solchains map[uint64]deployment.SolChain,
 	aptoschains map[uint64]deployment.AptosChain,
+	tonchains map[uint64]deployment.TonChain,
 	logLevel zapcore.Level,
 	bootstrap bool,
 	registryConfig deployment.CapabilityRegistryConfig,
@@ -312,6 +313,16 @@ func NewNode(
 			aptosConfigs = append(aptosConfigs, createAptosChainConfig(aptosChainID, chain))
 		}
 		c.Aptos = aptosConfigs
+
+		var tonConfigs chainlink.RawConfigs
+		for chainID, chain := range tonchains {
+			tonChainID, err := chainsel.GetChainIDFromSelector(chainID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tonConfigs = append(tonConfigs, createTonChainConfig(tonChainID, chain))
+		}
+		c.Ton = tonConfigs
 
 		for _, opt := range configOpts {
 			opt(c)
