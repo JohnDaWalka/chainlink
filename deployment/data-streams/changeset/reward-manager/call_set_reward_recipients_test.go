@@ -7,18 +7,20 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
-
 	rewardManager "github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/reward_manager_v0_5_0"
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/testutil"
 )
 
 func runSetRewardRecipientsTest(t *testing.T, useMCMS bool) {
-	e := testutil.NewMemoryEnv(t, true)
+	testEnv := testutil.NewMemoryEnvV2(t, testutil.MemoryEnvConfig{
+		ShouldDeployMCMS:      useMCMS,
+		ShouldDeployLinkToken: true,
+	})
+	e := testEnv.Environment
 	chainSelector := testutil.TestChain.Selector
+	e, rewardManagerAddr := RewardManagerDeploy(t, testEnv)
 	chain := e.Chains[chainSelector]
-	e, rewardManagerAddr, _ := DeployRewardManagerAndLink(t, e)
 
 	var poolID [32]byte
 	copy(poolID[:], []byte("poolId"))
@@ -34,28 +36,21 @@ func runSetRewardRecipientsTest(t *testing.T, useMCMS bool) {
 		},
 	}
 
-	var timelocks map[uint64]*proposalutils.TimelockExecutionContracts
-	if useMCMS {
-		e, _, timelocks = testutil.DeployMCMS(t, e, map[uint64][]common.Address{
-			chainSelector: {rewardManagerAddr},
-		})
-	}
-
-	_, err := commonChangesets.Apply(
-		t, e, timelocks,
-		commonChangesets.Configure(
-			SetRewardRecipientsChangeset,
-			SetRewardRecipientsConfig{
-				ConfigsByChain: map[uint64][]SetRewardRecipients{
-					chainSelector: {{
-						RewardManagerAddress:      rewardManagerAddr,
-						PoolID:                    poolID,
-						RewardRecipientAndWeights: recipients,
-					}},
+	_, _, err := commonChangesets.ApplyChangesetsV2(
+		t, e, []commonChangesets.ConfiguredChangeSet{
+			commonChangesets.Configure(
+				SetRewardRecipientsChangeset,
+				SetRewardRecipientsConfig{
+					ConfigsByChain: map[uint64][]SetRewardRecipients{
+						chainSelector: {{
+							RewardManagerAddress:      rewardManagerAddr,
+							PoolID:                    poolID,
+							RewardRecipientAndWeights: recipients,
+						}},
+					},
+					MCMSConfig: testutil.GetMCMSConfig(useMCMS),
 				},
-				MCMSConfig: testutil.GetMCMSConfig(useMCMS),
-			},
-		),
+			)},
 	)
 	require.NoError(t, err)
 
