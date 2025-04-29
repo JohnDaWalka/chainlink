@@ -536,13 +536,14 @@ type porSetupOutput struct {
 	chainSelectorToWorkflowConfig   map[uint64]WorkflowConfig
 }
 
-func (th *testHarness) setupPoRTestEnvironment(
+func setupPoRTestEnvironment(
 	t *testing.T,
 	testLogger zerolog.Logger,
 	in *TestConfig,
 	priceProvider PriceProvider,
 	mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet,
 	capabilityFactoryFns []func([]string) []keystone_changeset.DONCapabilityWithConfig,
+	rcti *ReadContractTestInput,
 ) *porSetupOutput {
 	extraAllowedPorts := make([]int, 0)
 	if in.Fake != nil {
@@ -566,18 +567,6 @@ func (th *testHarness) setupPoRTestEnvironment(
 		cronBinaryPathInTheContainer = filepath.Join(containerPath, "cron")
 	}
 
-	var readContractBinaryPathInTheContainer string
-	if in.DependenciesConfig.CronCapabilityBinaryPath != "" {
-		// where cron binary is located in the container
-		readContractBinaryPathInTheContainer = filepath.Join(containerPath, filepath.Base(in.DependenciesConfig.ReadContractCapabilityBinaryPath))
-
-		// where cron binary is located on the host
-		customBinariesPaths[keystonetypes.ReadContractCapability] = in.DependenciesConfig.ReadContractCapabilityBinaryPath
-	} else {
-		// assume that if cron binary is already in the image it is in the default location and has default name
-		readContractBinaryPathInTheContainer = filepath.Join(containerPath, "cron")
-	}
-
 	firstBlockchain := in.Blockchains[0]
 
 	chainIDInt, err := strconv.Atoi(firstBlockchain.ChainID)
@@ -591,7 +580,19 @@ func (th *testHarness) setupPoRTestEnvironment(
 		crecompute.ComputeJobSpecFactoryFn,
 	}
 
-	if th.readContractInput != nil {
+	if rcti != nil {
+		var readContractBinaryPathInTheContainer string
+		if in.DependenciesConfig.CronCapabilityBinaryPath != "" {
+			// where cron binary is located in the container
+			readContractBinaryPathInTheContainer = filepath.Join(containerPath, filepath.Base(in.DependenciesConfig.ReadContractCapabilityBinaryPath))
+
+			// where cron binary is located on the host
+			customBinariesPaths[keystonetypes.ReadContractCapability] = in.DependenciesConfig.ReadContractCapabilityBinaryPath
+		} else {
+			// assume that if cron binary is already in the image it is in the default location and has default name
+			readContractBinaryPathInTheContainer = filepath.Join(containerPath, "cron")
+		}
+
 		jobSpecFactoryFuncs = append(
 			jobSpecFactoryFuncs,
 			crechainreader.ChainReaderJobSpecFactoryFn(chainIDUint64, "evm", "", readContractBinaryPathInTheContainer),
@@ -654,43 +655,6 @@ func (th *testHarness) setupPoRTestEnvironment(
 			configBuilder: buildPoRConfig,
 		})
 
-		var rci *readContractInput
-		if th.readContractInput != nil {
-			// override the config builder
-			wfRegistrar.configBuilder = buildReadContractConfig
-
-			// Deploy a balance reader and merge to address book
-			br, err := keystone_changeset.DeployBalanceReader(*universalSetupOutput.CldEnvironment, keystone_changeset.DeployBalanceReaderRequest{
-				ChainSelectors: []uint64{bo.ChainSelector},
-			})
-			require.NoError(t, err, "failed to deploy balance reader contract")
-
-			require.NoError(t,
-				universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(br.AddressBook), //nolint:staticcheck // won't migrate yet
-				"failed to merge address book with balance reader",
-			)
-
-			// create a new address and fund it
-			pub, _, err := seth.NewAddress()
-			require.NoError(t, err, "failed to generate new address")
-			fundedAddress := common.HexToAddress(pub)
-
-			_, fundingErr := libfunding.SendFunds(zerolog.Logger{}, bo.SethClient, libtypes.FundsToSend{
-				ToAddress:  fundedAddress,
-				Amount:     th.readContractInput.ExpectedFundingAmount,
-				PrivateKey: bo.SethClient.MustGetRootPrivateKey(),
-			})
-
-			require.NoError(t, fundingErr, "failed to fund address %s", fundedAddress)
-			rci = &readContractInput{
-				fundedAddress:        fundedAddress.Hex(),
-				readTargetName:       fmt.Sprintf("read-contract-%s-%d@1.0.0", "evm", bo.ChainID),
-				contractReaderConfig: `{"contracts":{"BalanceReader":{"contractABI":"[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"addresses\",\"type\":\"address[]\"}],\"name\":\"getNativeBalances\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]","contractPollingFilter":{"genericEventNames":null,"pollingFilter":{"topic2":null,"topic3":null,"topic4":null,"retention":"0s","maxLogsKept":0,"logsPerBlock":0}},"configs":{"getNativeBalances":"{  \"chainSpecificName\": \"getNativeBalances\"}"}}}}`,
-				contractName:         "BalanceReader",
-				contractMethod:       "getNativeBalances",
-			}
-		}
-
 		var creCLIAbsPath string
 		var creCLISettingsFile *os.File
 		if in.WorkflowConfigs[idx].UseCRECLI {
@@ -728,6 +692,43 @@ func (th *testHarness) setupPoRTestEnvironment(
 		}
 		dfConfigErr := configureDataFeedsCacheContract(testLogger, dfConfigInput)
 		require.NoError(t, dfConfigErr, "failed to configure data feeds cache")
+
+		var rci *readContractInput
+		if rcti != nil {
+			// override the config builder
+			wfRegistrar.configBuilder = buildReadContractConfig
+
+			// Deploy a balance reader and merge to address book
+			br, err := keystone_changeset.DeployBalanceReader(*universalSetupOutput.CldEnvironment, keystone_changeset.DeployBalanceReaderRequest{
+				ChainSelectors: []uint64{bo.ChainSelector},
+			})
+			require.NoError(t, err, "failed to deploy balance reader contract")
+
+			require.NoError(t,
+				universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(br.AddressBook), //nolint:staticcheck // won't migrate yet
+				"failed to merge address book with balance reader",
+			)
+
+			// create a new address and fund it
+			pub, _, err := seth.NewAddress()
+			require.NoError(t, err, "failed to generate new address")
+			fundedAddress := common.HexToAddress(pub)
+
+			_, fundingErr := libfunding.SendFunds(zerolog.Logger{}, bo.SethClient, libtypes.FundsToSend{
+				ToAddress:  fundedAddress,
+				Amount:     rcti.ExpectedFundingAmount,
+				PrivateKey: bo.SethClient.MustGetRootPrivateKey(),
+			})
+
+			require.NoError(t, fundingErr, "failed to fund address %s", fundedAddress)
+			rci = &readContractInput{
+				fundedAddress:        fundedAddress.Hex(),
+				readTargetName:       fmt.Sprintf("read-contract-%s-%d@1.0.0", "evm", bo.ChainID),
+				contractReaderConfig: `{"contracts":{"BalanceReader":{"contractABI":"[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"addresses\",\"type\":\"address[]\"}],\"name\":\"getNativeBalances\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]","contractPollingFilter":{"genericEventNames":null,"pollingFilter":{"topic2":null,"topic3":null,"topic4":null,"retention":"0s","maxLogsKept":0,"logsPerBlock":0}},"configs":{"getNativeBalances":"{  \"chainSpecificName\": \"getNativeBalances\"}"}}}}`,
+				contractName:         "BalanceReader",
+				contractMethod:       "getNativeBalances",
+			}
+		}
 
 		registerInput := registerPoRWorkflowInput{
 			WorkflowConfig:     in.WorkflowConfigs[idx],
@@ -801,7 +802,7 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice(t *testing.
 	targetChainID, chainErr := strconv.Atoi(targetChain.ChainID)
 	require.NoError(t, chainErr, "failed to convert target chain ID to int")
 
-	setupOutput := new(testHarness).setupPoRTestEnvironment(
+	setupOutput := setupPoRTestEnvironment(
 		t,
 		testLogger,
 		in,
@@ -815,6 +816,7 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice(t *testing.
 			chainwritercap.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(homeChainID))),
 			chainwritercap.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(targetChainID))),
 		},
+		nil,
 	)
 
 	// Log extra information that might help debugging
@@ -858,16 +860,13 @@ func TestCRE_OCR3_ReadBalance_Workflow_SingleDon_MockedPrice(t *testing.T) {
 				expectedReadAmount,
 			},
 		},
+		actualPrices: make(map[string][]*big.Int),
 	}
 
 	chainIDInt, chainErr := strconv.Atoi(in.Blockchains[0].ChainID)
 	require.NoError(t, chainErr, "failed to convert chain ID to int")
 
-	setupOutput := (&testHarness{
-		readContractInput: &ReadContractTestInput{
-			ExpectedFundingAmount: expectedReadAmount,
-		},
-	}).setupPoRTestEnvironment(
+	setupOutput := setupPoRTestEnvironment(
 		t,
 		testLogger,
 		in,
@@ -877,6 +876,9 @@ func TestCRE_OCR3_ReadBalance_Workflow_SingleDon_MockedPrice(t *testing.T) {
 			libcontracts.DefaultCapabilityFactoryFn,
 			libcontracts.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))),
 			libcontracts.ChainReaderCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"),
+		},
+		&ReadContractTestInput{
+			ExpectedFundingAmount: expectedReadAmount,
 		},
 	)
 
@@ -924,13 +926,13 @@ func TestCRE_OCR3_PoR_Workflow_GatewayDon_MockedPrice(t *testing.T) {
 	chainIDInt, chainErr := strconv.Atoi(firstBlockchain.ChainID)
 	require.NoError(t, chainErr, "failed to convert chain ID to int")
 
-	setupOutput := new(testHarness).setupPoRTestEnvironment(t, testLogger, in, priceProvider, mustSetCapabilitiesFn, []keystonetypes.DONCapabilityWithConfigFactoryFn{
+	setupOutput := setupPoRTestEnvironment(t, testLogger, in, priceProvider, mustSetCapabilitiesFn, []keystonetypes.DONCapabilityWithConfigFactoryFn{
 		webapicap.WebAPICapabilityFactoryFn,
 		computecap.ComputeCapabilityFactoryFn,
 		consensuscap.OCR3CapabilityFactoryFn,
 		croncap.CronCapabilityFactoryFn,
 		chainwritercap.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))),
-	})
+	}, nil)
 
 	// Log extra information that might help debugging
 	t.Cleanup(func() {
@@ -979,13 +981,13 @@ func TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice(t *testing.T) {
 	require.NoError(t, chainErr, "failed to convert chain ID to int")
 
 	priceProvider := NewTrueUSDPriceProvider(testLogger, []string{in.WorkflowConfigs[0].FeedID})
-	setupOutput := new(testHarness).setupPoRTestEnvironment(t, testLogger, in, priceProvider, mustSetCapabilitiesFn, []keystonetypes.DONCapabilityWithConfigFactoryFn{
+	setupOutput := setupPoRTestEnvironment(t, testLogger, in, priceProvider, mustSetCapabilitiesFn, []keystonetypes.DONCapabilityWithConfigFactoryFn{
 		webapicap.WebAPICapabilityFactoryFn,
 		computecap.ComputeCapabilityFactoryFn,
 		consensuscap.OCR3CapabilityFactoryFn,
 		croncap.CronCapabilityFactoryFn,
 		chainwritercap.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))),
-	})
+	}, nil)
 
 	// Log extra information that might help debugging
 	t.Cleanup(func() {
