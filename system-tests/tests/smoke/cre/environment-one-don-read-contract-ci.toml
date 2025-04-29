@@ -1,0 +1,73 @@
+[[blockchains]]
+type = "anvil"
+chain_id = "1337"
+
+[custom_anvil_miner]
+block_speed_seconds = 5
+
+[jd]
+# change to your version
+image = "injected-at-runtime"
+
+[infra]
+# either "docker" or "crib"
+type = "docker"
+
+[[workflow_configs]]
+workflow_name = "abcdefgasd"
+# 0x01 8e16c39e 0000 20 0000000000000000 = ETH/USD Benchmark Price with 0 decimals
+feed_id = "018e16c39e000320000000000000000000000000000000000000000000000000"
+
+use_cre_cli = true
+should_compile_new_workflow = false
+
+[workflow_configs.compiled_config]
+binary_url = "https://gist.githubusercontent.com/MStreet3/d40fe1a2989ff12e133bb6e70f5b4ad9/raw/3b8ee53514a734d62224b5653ad0612fb4f4d2b4/binary.wasm.br.b64"
+config_url = "https://gist.githubusercontent.com/MStreet3/434e2b2f4f7002d6fc3b78be695fc79c/raw/3564e39d768e95db74ba7ff7d98fe24b0a54db88/config.json3307773458"
+
+[dependencies]
+cron_capability_binary_path = "./cron"
+read_contract_capability_binary_path = "./amd64_readcontract"
+cre_cli_binary_path = "./cre_v0.1.5_darwin_arm64"
+
+[[nodesets]]
+nodes = 5
+override_mode = "all"
+http_port_range_start = 10100
+name = "workflow"
+
+[nodesets.db]
+image = "postgres:12.0"
+port = 13000
+volume_name = "workflow_volume"
+
+[[nodesets.node_specs]]
+
+[nodesets.node_specs.node]
+docker_ctx = "../../../.."
+docker_file = "plugins/chainlink.Dockerfile"
+# image = "public.ecr.aws/chainlink/chainlink:v2.22.1-por-beta.6-plugins"
+# omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
+# capabilities = ['./cron']
+user_config_overrides = """
+      [Telemetry]
+      Enabled = true
+      Endpoint = 'host.docker.internal:4317'
+      InsecureConnection = true
+      TraceSampleRatio = 1
+
+      [Log]
+      Level = 'debug'
+      JSONConsole = true
+
+      [Feature]
+			LogPoller = true
+
+			[OCR2]
+			Enabled = true
+			DatabaseTimeout = '1s'
+
+			[P2P.V2]
+			Enabled = true
+			ListenAddresses = ['0.0.0.0:5001']
+      """
