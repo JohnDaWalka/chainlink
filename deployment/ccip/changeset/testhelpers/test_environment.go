@@ -261,7 +261,7 @@ func WithAptosChains(numChains int) TestOps {
 
 func WithTonChains(numChains int) TestOps {
 	return func(testCfg *TestConfigs) {
-		testCfg.SolChains = numChains
+		testCfg.TonChains = numChains
 	}
 }
 
@@ -330,6 +330,7 @@ type MemoryEnvironment struct {
 	Chains      map[uint64]deployment.Chain
 	SolChains   map[uint64]deployment.SolChain
 	AptosChains map[uint64]deployment.AptosChain
+	TonChains   map[uint64]deployment.TonChain
 }
 
 func (m *MemoryEnvironment) TestConfigs() *TestConfigs {
@@ -367,10 +368,12 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 	m.Chains = chains
 	m.SolChains = memory.NewMemoryChainsSol(t, tc.SolChains)
 	m.AptosChains = memory.NewMemoryChainsAptos(t, tc.AptosChains)
+	m.TonChains = memory.NewMemoryChainsTon(t, tc.TonChains)
 	env := deployment.Environment{
 		Chains:      m.Chains,
 		SolChains:   m.SolChains,
 		AptosChains: m.AptosChains,
+		TonChains:   m.TonChains,
 	}
 	homeChainSel, feedSel := allocateCCIPChainSelectors(chains)
 	replayBlocks, err := LatestBlocksByChain(ctx, env)
@@ -388,7 +391,7 @@ func (m *MemoryEnvironment) StartNodes(t *testing.T, crConfig deployment.Capabil
 	require.NotNil(t, m.Chains, "start chains first, chains are empty")
 	require.NotNil(t, m.DeployedEnv, "start chains and initiate deployed env first before starting nodes")
 	tc := m.TestConfig
-	nodes := memory.NewNodes(t, zapcore.InfoLevel, m.Chains, m.SolChains, m.AptosChains, m.Env.TonChains, tc.Nodes, tc.Bootstraps, crConfig, nil, tc.CLNodeConfigOpts...)
+	nodes := memory.NewNodes(t, zapcore.InfoLevel, m.Chains, m.SolChains, m.AptosChains, m.TonChains, tc.Nodes, tc.Bootstraps, crConfig, nil, tc.CLNodeConfigOpts...)
 	ctx := testcontext.Get(t)
 	lggr := logger.Test(t)
 	for _, node := range nodes {
@@ -398,7 +401,7 @@ func (m *MemoryEnvironment) StartNodes(t *testing.T, crConfig deployment.Capabil
 		})
 	}
 	m.nodes = nodes
-	m.DeployedEnv.Env = memory.NewMemoryEnvironmentFromChainsNodes(func() context.Context { return ctx }, lggr, m.Chains, m.SolChains, m.AptosChains, m.Env.TonChains, nodes)
+	m.DeployedEnv.Env = memory.NewMemoryEnvironmentFromChainsNodes(func() context.Context { return ctx }, lggr, m.Chains, m.SolChains, m.AptosChains, m.TonChains, nodes)
 }
 
 func (m *MemoryEnvironment) DeleteJobs(ctx context.Context, jobIDs map[string][]string) error {
@@ -587,9 +590,11 @@ func NewEnvironmentWithJobsAndContracts(t *testing.T, tEnv TestEnvironment) Depl
 	evmChains := e.Env.AllChainSelectors()
 	solChains := e.Env.AllChainSelectorsSolana()
 	aptosChains := e.Env.AllChainSelectorsAptos()
+	tonChains := e.Env.AllChainSelectorsTon()
 	//nolint:gocritic // we need to segregate EVM and Solana chains
 	allChains := append(evmChains, solChains...)
 	allChains = append(allChains, aptosChains...)
+	allChains = append(allChains, tonChains...)
 	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfig)
 
 	for _, c := range e.Env.AllChainSelectors() {
