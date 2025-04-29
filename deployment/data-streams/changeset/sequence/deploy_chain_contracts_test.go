@@ -63,47 +63,47 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 			expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier, types.RewardManager, types.FeeManager,
 				commontypes.ProposerManyChainMultisig, commontypes.BypasserManyChainMultisig, commontypes.CancellerManyChainMultisig},
 		},
-		//{
-		//	name:            "Deploy no billing and MCMS",
-		//	hasExistingMcms: false,
-		//	deployDataStreamsConfig: DeployDataStreamsConfig{
-		//		ChainsToDeploy: map[uint64]DeployDataStreams{testutil.TestChain.Selector: {
-		//			VerifierConfig: verificationCfg,
-		//			Ownership: types.OwnershipFeature{
-		//				ShouldTransfer:     true,
-		//				MCMSProposalConfig: &proposalutils.TimelockConfig{MinDelay: 0},
-		//				ShouldDeployMCMS:   true,
-		//				DeployMCMSConfig:   &proposalCfg,
-		//			},
-		//		}},
-		//	},
-		//	expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier,
-		//		commontypes.ProposerManyChainMultisig, commontypes.BypasserManyChainMultisig, commontypes.CancellerManyChainMultisig},
-		//},
-		//{
-		//	name:            "Deploy no billing with existing MCMS",
-		//	hasExistingMcms: true,
-		//	deployDataStreamsConfig: DeployDataStreamsConfig{
-		//		ChainsToDeploy: map[uint64]DeployDataStreams{testutil.TestChain.Selector: {
-		//			VerifierConfig: verificationCfg,
-		//			Ownership: types.OwnershipFeature{
-		//				ShouldTransfer:     true,
-		//				MCMSProposalConfig: &proposalutils.TimelockConfig{MinDelay: 0},
-		//			},
-		//		}},
-		//	},
-		//	expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier},
-		//},
-		//{
-		//	name:            "Deploy but do not propose transfer",
-		//	hasExistingMcms: true,
-		//	deployDataStreamsConfig: DeployDataStreamsConfig{
-		//		ChainsToDeploy: map[uint64]DeployDataStreams{testutil.TestChain.Selector: {
-		//			VerifierConfig: verificationCfg,
-		//		}},
-		//	},
-		//	expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier},
-		//},
+		{
+			name:            "Deploy no billing and MCMS",
+			hasExistingMcms: false,
+			deployDataStreamsConfig: DeployDataStreamsConfig{
+				ChainsToDeploy: map[uint64]DeployDataStreams{testutil.TestChain.Selector: {
+					VerifierConfig: verificationCfg,
+					Ownership: types.OwnershipFeature{
+						ShouldTransfer:     true,
+						MCMSProposalConfig: &proposalutils.TimelockConfig{MinDelay: 0},
+						ShouldDeployMCMS:   true,
+						DeployMCMSConfig:   &proposalCfg,
+					},
+				}},
+			},
+			expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier,
+				commontypes.ProposerManyChainMultisig, commontypes.BypasserManyChainMultisig, commontypes.CancellerManyChainMultisig},
+		},
+		{
+			name:            "Deploy no billing with existing MCMS",
+			hasExistingMcms: true,
+			deployDataStreamsConfig: DeployDataStreamsConfig{
+				ChainsToDeploy: map[uint64]DeployDataStreams{testutil.TestChain.Selector: {
+					VerifierConfig: verificationCfg,
+					Ownership: types.OwnershipFeature{
+						ShouldTransfer:     true,
+						MCMSProposalConfig: &proposalutils.TimelockConfig{MinDelay: 0},
+					},
+				}},
+			},
+			expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier},
+		},
+		{
+			name:            "Deploy but do not propose transfer",
+			hasExistingMcms: true,
+			deployDataStreamsConfig: DeployDataStreamsConfig{
+				ChainsToDeploy: map[uint64]DeployDataStreams{testutil.TestChain.Selector: {
+					VerifierConfig: verificationCfg,
+				}},
+			},
+			expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier},
+		},
 	}
 
 	for _, tt := range tests {
@@ -123,17 +123,18 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 				cfg.ChainsToDeploy[chainSel].Billing.Config.LinkTokenAddress = testEnv.LinkTokenState.LinkToken.Address()
 			}
 
-			resp, _, err := commonChangesets.ApplyChangesetsV2(t, testEnv.Environment, []commonChangesets.ConfiguredChangeSet{
+			env, _, err := commonChangesets.ApplyChangesetsV2(t, testEnv.Environment, []commonChangesets.ConfiguredChangeSet{
 				commonChangesets.Configure(DeployDataStreamsChainContractsChangeset, cfg),
 			})
 			require.NoError(t, err)
 
 			var timelockAddr common.Address
 			if tt.hasExistingMcms {
+				// Deployed by test env
 				timelockAddr = testEnv.Timelocks[chainSel].Timelock.Address()
 			} else {
-				// TODO update to use datastore
-				addresses, err := resp.ExistingAddresses.AddressesForChain(chainSel)
+				// Deployed by changeset
+				addresses, err := dsutil.EnvironmentAddresses(env)
 				require.NoError(t, err)
 				mcmsState, err := commonstate.MaybeLoadMCMSWithTimelockChainState(chain, addresses)
 				require.NoError(t, err)
@@ -141,7 +142,7 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 			}
 
 			for _, contract := range tt.expectedContracts {
-				contractAddr, err := dsutil.MaybeFindEthAddress(resp.ExistingAddresses, chainSel, contract)
+				contractAddr, err := dsutil.MaybeFindEthAddress(env.ExistingAddresses, chainSel, contract)
 				require.NoError(t, err, "failed to find %s address in address book", contract)
 				require.NotNil(t, "contractAddr", "address for %s was not found", contract)
 

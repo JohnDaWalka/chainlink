@@ -1,13 +1,16 @@
-package deployment
+package utils
 
-import "github.com/smartcontractkit/chainlink/deployment/datastore"
+import (
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink/deployment"
+)
 
 // AddressBookToDataStore converts an AddressBook to a DataStore
 // AddressBook is deprecated and will be removed in the future. You can use this function to migrate or interact with legacy code that uses AddressBook.
 // You can call this with your custom metadata like this:
 //
 //	ds, err := deployment.AddressBookToDataStore[metadata.CustomContractMetaData, datastore.CustomEnvMetaData](addressBook)
-func AddressBookToDataStore[CM datastore.Cloneable[CM], EM datastore.Cloneable[EM]](ab AddressBook) (datastore.DataStore[CM, EM], error) {
+func AddressBookToDataStore[CM datastore.Cloneable[CM], EM datastore.Cloneable[EM]](ab deployment.AddressBook) (datastore.DataStore[CM, EM], error) {
 	ds := datastore.NewMemoryDataStore[CM, EM]()
 
 	// Get all addresses from the AddressBook
@@ -23,7 +26,7 @@ func AddressBookToDataStore[CM datastore.Cloneable[CM], EM datastore.Cloneable[E
 			addressRef := datastore.AddressRef{
 				Address:       address,
 				ChainSelector: chainSelector,
-				Labels:        datastore.LabelSet(tv.Labels),
+				Labels:        datastore.NewLabelSet(tv.Labels.List()...),
 				Type:          datastore.ContractType(tv.Type),
 				Version:       &tv.Version,
 			}
@@ -42,8 +45,8 @@ func AddressBookToDataStore[CM datastore.Cloneable[CM], EM datastore.Cloneable[E
 // DataStoreToAddressBook converts a DataStore to an AddressBook
 // DataStore ContractMetadata and EnvMetadata are not preserved in the AddressBook.
 // AddressBook is deprecated and will be removed in the future. You can use this function to migrate or interact with legacy code that uses AddressBook.
-func DataStoreToAddressBook[CM datastore.Cloneable[CM], EM datastore.Cloneable[EM]](ds datastore.DataStore[CM, EM]) (AddressBook, error) {
-	ab := NewMemoryAddressBook()
+func DataStoreToAddressBook[CM datastore.Cloneable[CM], EM datastore.Cloneable[EM]](ds datastore.DataStore[CM, EM]) (deployment.AddressBook, error) {
+	ab := deployment.NewMemoryAddressBook()
 
 	// Get all addresses from the DataStore
 	addressRefs, err := ds.Addresses().Fetch()
@@ -54,10 +57,10 @@ func DataStoreToAddressBook[CM datastore.Cloneable[CM], EM datastore.Cloneable[E
 	// For each address, create a TypeAndVersion and add it to the AddressBook
 	for _, addressRef := range addressRefs {
 		// Create a TypeAndVersion
-		tv := TypeAndVersion{
-			Type:    ContractType(addressRef.Type),
+		tv := deployment.TypeAndVersion{
+			Type:    deployment.ContractType(addressRef.Type),
 			Version: *addressRef.Version,
-			Labels:  LabelSet(addressRef.Labels),
+			Labels:  deployment.NewLabelSet(addressRef.Labels.List()...),
 		}
 
 		// Add the TypeAndVersion to the AddressBook
@@ -72,7 +75,7 @@ func DataStoreToAddressBook[CM datastore.Cloneable[CM], EM datastore.Cloneable[E
 
 // AddressBookToNewDataStore converts an AddressBook to a new mutable DataStore
 // AddressBook is deprecated and will be removed in the future. You can use this function to migrate or interact with legacy code that uses AddressBook.
-func AddressBookToNewDataStore[CM datastore.Cloneable[CM], EM datastore.Cloneable[EM]](ab AddressBook) (*datastore.MemoryDataStore[CM, EM], error) {
+func AddressBookToNewDataStore[CM datastore.Cloneable[CM], EM datastore.Cloneable[EM]](ab deployment.AddressBook) (*datastore.MemoryDataStore[CM, EM], error) {
 	ds := datastore.NewMemoryDataStore[CM, EM]()
 
 	// Get all addresses from the AddressBook
@@ -87,7 +90,7 @@ func AddressBookToNewDataStore[CM datastore.Cloneable[CM], EM datastore.Cloneabl
 			addressRef := datastore.AddressRef{
 				Address:       address,
 				ChainSelector: chainSelector,
-				Labels:        datastore.LabelSet(tv.Labels),
+				Labels:        datastore.NewLabelSet(tv.Labels.List()...),
 				Type:          datastore.ContractType(tv.Type),
 				Version:       &tv.Version,
 			}

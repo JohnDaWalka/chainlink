@@ -5,8 +5,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
-	"github.com/smartcontractkit/chainlink/deployment/datastore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 

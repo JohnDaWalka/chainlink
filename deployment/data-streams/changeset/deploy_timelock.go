@@ -4,15 +4,16 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/mcms"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
-	"github.com/smartcontractkit/chainlink/deployment/datastore"
 )
 
 var DeployAndTransferMCMSChangeset = deployment.CreateChangeSet(deployAndTransferMcmsLogic, deployAndTransferMcmsPrecondition)
@@ -42,7 +43,7 @@ func deployAndTransferMcmsLogic(e deployment.Environment, cc DeployMCMSConfig) (
 	}
 
 	// DeployMCMSWithTimelockV2 currently does not use the DataStore
-	ds, err := deployment.AddressBookToNewDataStore[metadata.SerializedContractMetadata, datastore.DefaultMetadata](mcmsOut.AddressBook)
+	ds, err := utils.AddressBookToNewDataStore[metadata.SerializedContractMetadata, datastore.DefaultMetadata](mcmsOut.AddressBook)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to address book: %w", err)
 	}

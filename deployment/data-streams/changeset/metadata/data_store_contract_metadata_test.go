@@ -3,7 +3,7 @@ package metadata
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink/deployment/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
 )
 

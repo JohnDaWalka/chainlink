@@ -5,8 +5,9 @@ import (
 	"fmt"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
-	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/mcms"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -70,7 +71,7 @@ func deployDataStreamsLogic(e deployment.Environment, cc DeployDataStreamsConfig
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to default format: %w", err)
 	}
 
-	ab, err := deployment.DataStoreToAddressBook(sealedDs.Seal())
+	ab, err := utils.DataStoreToAddressBook(sealedDs.Seal())
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to address book: %w", err)
 	}

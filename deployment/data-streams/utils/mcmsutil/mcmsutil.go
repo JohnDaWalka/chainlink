@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
-	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/mcms"
 	mcmslib "github.com/smartcontractkit/mcms"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
@@ -119,7 +120,7 @@ func TransferToMCMSWithTimelockForTypeAndVersion(e deployment.Environment,
 
 	// Adapter: Convert from DataStore -> AddressBook is needed for TransferToMCMSWithTimelockV2 changeset
 	// This should be removed once TransferToMCMSWithTimelockV2 is updated to use the DataStore or there is a new changeset which does
-	newAndExistingAddresses, err := deployment.DataStoreToAddressBook(newAddressDatastore.Seal())
+	newAndExistingAddresses, err := utils.DataStoreToAddressBook(newAddressDatastore.Seal())
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to address book: %w", err)
 	}
@@ -127,7 +128,7 @@ func TransferToMCMSWithTimelockForTypeAndVersion(e deployment.Environment,
 	// create a merged addressbook with the existing + new addresses. Sub-changesets will need all addresses
 	// This is required when chaining together changesets
 	// i.e. the MCMS timelock addresses
-	existingAddrs, err := deployment.DataStoreToAddressBook(e.DataStore)
+	existingAddrs, err := utils.DataStoreToAddressBook(e.DataStore)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert existing address book: %w", err)
 	}
