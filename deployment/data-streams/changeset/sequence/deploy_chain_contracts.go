@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	ds "github.com/smartcontractkit/chainlink/deployment/datastore"
 	"github.com/smartcontractkit/mcms"
@@ -25,9 +25,8 @@ type DeployDataStreamsConfig struct {
 
 type DeployDataStreams struct {
 	VerifierConfig verification.SetConfig
-
-	Billing   types.BillingFeature
-	Ownership types.OwnershipFeature
+	Billing        types.BillingFeature
+	Ownership      types.OwnershipFeature
 }
 
 func deployDataStreamsLogic(e deployment.Environment, cc DeployDataStreamsConfig) (deployment.ChangesetOutput, error) {
@@ -42,14 +41,13 @@ func deployDataStreamsLogic(e deployment.Environment, cc DeployDataStreamsConfig
 	var timelockProposals []mcms.TimelockProposal
 
 	for chainSel, cfg := range cc.ChainsToDeploy {
-		family, err := chain_selectors.GetSelectorFamily(chainSel)
+		family, err := chainselectors.GetSelectorFamily(chainSel)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get family for chain %d: %w", chainSel, err)
 		}
 		switch family {
-		case chain_selectors.FamilyEVM:
-			// Deploy each component of the system for this chain
-			chainProposals, err := deployChainComponentsEVM(cloneEnv, chainSel, cfg, deployedAddresses)
+		case chainselectors.FamilyEVM:
+			chainProposals, err := deployChainComponentsEVM(&cloneEnv, chainSel, cfg, deployedAddresses)
 			if err != nil {
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy components for chain %d: %w", chainSel, err)
 			}
@@ -72,7 +70,13 @@ func deployDataStreamsLogic(e deployment.Environment, cc DeployDataStreamsConfig
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to default format: %w", err)
 	}
 
+	ab, err := deployment.DataStoreToAddressBook(sealedDs.Seal())
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to address book: %w", err)
+	}
+
 	return deployment.ChangesetOutput{
+		AddressBook:           ab, // backwards compatibility. This will be removed in the future.
 		DataStore:             sealedDs,
 		MCMSTimelockProposals: timelockProposals,
 	}, nil
@@ -110,25 +114,4 @@ func (cc DeployDataStreamsConfig) Validate() error {
 		}
 	}
 	return nil
-}
-
-// cloneEnvironment creates a copy of the environment to prevent mutations
-func cloneEnvironment(e deployment.Environment) (deployment.Environment, error) {
-	existingAddresses, err := e.ExistingAddresses.Addresses()
-	if err != nil {
-		return deployment.Environment{}, fmt.Errorf("failed to get existing addresses: %w", err)
-	}
-	abClone := deployment.NewMemoryAddressBookFromMap(existingAddresses)
-
-	return deployment.Environment{
-		Name:              e.Name,
-		Logger:            e.Logger,
-		ExistingAddresses: abClone,
-		Chains:            e.Chains,
-		SolChains:         e.SolChains,
-		NodeIDs:           e.NodeIDs,
-		Offchain:          e.Offchain,
-		OCRSecrets:        e.OCRSecrets,
-		GetContext:        e.GetContext,
-	}, nil
 }

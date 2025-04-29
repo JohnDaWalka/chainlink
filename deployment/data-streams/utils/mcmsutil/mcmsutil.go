@@ -102,12 +102,12 @@ func ExecuteOrPropose(
 // The dataStore should be recently deployed addresses that are being transferred to MCMS and
 // should not be in `e` Environment
 func TransferToMCMSWithTimelockForTypeAndVersion(e deployment.Environment,
-	dataStore *ds.MemoryDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata],
+	newAddressDatastore *ds.MemoryDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata],
 	filter deployment.TypeAndVersion, mcmsConfig proposalutils.TimelockConfig) (deployment.ChangesetOutput, error) {
 	// Map: chainselector -> List[Address]
 	contractAddressesToTransfer := make(map[uint64][]common.Address)
 
-	records := dataStore.Addresses().Filter(
+	records := newAddressDatastore.Addresses().Filter(
 		ds.AddressRefByType(ds.ContractType(filter.Type)),
 		ds.AddressRefByVersion(&filter.Version),
 	)
@@ -118,16 +118,20 @@ func TransferToMCMSWithTimelockForTypeAndVersion(e deployment.Environment,
 	}
 
 	// Adapter: Convert from DataStore -> AddressBook is needed for TransferToMCMSWithTimelockV2 changeset
-	// This should be removed once the changeset is updated to use the DataStore directly
-	newAndExistingAddresses, err := deployment.DataStoreToAddressBook(dataStore.Seal())
+	// This should be removed once TransferToMCMSWithTimelockV2 is updated to use the DataStore or there is a new changeset which does
+	newAndExistingAddresses, err := deployment.DataStoreToAddressBook(newAddressDatastore.Seal())
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to address book: %w", err)
 	}
 
 	// create a merged addressbook with the existing + new addresses. Sub-changesets will need all addresses
 	// This is required when chaining together changesets
-	// Need addresses from Env (the timelock ones)
-	if err := newAndExistingAddresses.Merge(e.ExistingAddresses); err != nil {
+	// i.e. the MCMS timelock addresses
+	existingAddrs, err := deployment.DataStoreToAddressBook(e.DataStore)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert existing address book: %w", err)
+	}
+	if err := newAndExistingAddresses.Merge(existingAddrs); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed merging existing addresses into temp addresses: %w", err)
 	}
 	e.ExistingAddresses = newAndExistingAddresses

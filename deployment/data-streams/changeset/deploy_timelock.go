@@ -65,7 +65,10 @@ func deployAndTransferMcmsLogic(e deployment.Environment, cc DeployMCMSConfig) (
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to default format: %w", err)
 	}
 
-	return deployment.ChangesetOutput{DataStore: sealedDs, MCMSTimelockProposals: proposals}, nil
+	return deployment.ChangesetOutput{
+		AddressBook:           mcmsOut.AddressBook, // kept for backwards compatibility until AddressBook is removed
+		DataStore:             sealedDs,
+		MCMSTimelockProposals: proposals}, nil
 }
 
 func deployAndTransferMcmsPrecondition(_ deployment.Environment, cc DeployMCMSConfig) error {

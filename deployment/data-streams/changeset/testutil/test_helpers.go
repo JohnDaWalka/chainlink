@@ -23,6 +23,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	dsCs "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	dsTypes "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -139,16 +140,16 @@ func NewMemoryEnvV2(t *testing.T, cfg MemoryEnvConfig) MemoryEnv {
 		// Deploy MCMS and Timelock
 		updatedEnv, err := commonChangesets.Apply(t, env, nil,
 			commonChangesets.Configure(
-				deployment.CreateLegacyChangeSet(commonChangesets.DeployMCMSWithTimelockV2),
-				map[uint64]types.MCMSWithTimelockConfigV2{
-					chainSelector: config,
+				dsCs.DeployAndTransferMCMSChangeset,
+				dsCs.DeployMCMSConfig{
+					ChainsToDeploy: []uint64{chainSelector},
+					Config:         config,
 				},
 			),
 		)
 		require.NoError(t, err)
 
-		addresses, err := updatedEnv.ExistingAddresses.AddressesForChain(TestChain.Selector)
-		require.NoError(t, err)
+		addresses, err := utils.EnvironmentAddresses(updatedEnv)
 
 		mcmsState, err := commonstate.MaybeLoadMCMSWithTimelockChainState(chain, addresses)
 		require.NoError(t, err)

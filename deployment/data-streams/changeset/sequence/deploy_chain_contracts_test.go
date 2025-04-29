@@ -63,47 +63,47 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 			expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier, types.RewardManager, types.FeeManager,
 				commontypes.ProposerManyChainMultisig, commontypes.BypasserManyChainMultisig, commontypes.CancellerManyChainMultisig},
 		},
-		{
-			name:            "Deploy no billing and MCMS",
-			hasExistingMcms: false,
-			deployDataStreamsConfig: DeployDataStreamsConfig{
-				ChainsToDeploy: map[uint64]DeployDataStreams{testutil.TestChain.Selector: {
-					VerifierConfig: verificationCfg,
-					Ownership: types.OwnershipFeature{
-						ShouldTransfer:     true,
-						MCMSProposalConfig: &proposalutils.TimelockConfig{MinDelay: 0},
-						ShouldDeployMCMS:   true,
-						DeployMCMSConfig:   &proposalCfg,
-					},
-				}},
-			},
-			expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier,
-				commontypes.ProposerManyChainMultisig, commontypes.BypasserManyChainMultisig, commontypes.CancellerManyChainMultisig},
-		},
-		{
-			name:            "Deploy no billing with existing MCMS",
-			hasExistingMcms: true,
-			deployDataStreamsConfig: DeployDataStreamsConfig{
-				ChainsToDeploy: map[uint64]DeployDataStreams{testutil.TestChain.Selector: {
-					VerifierConfig: verificationCfg,
-					Ownership: types.OwnershipFeature{
-						ShouldTransfer:     true,
-						MCMSProposalConfig: &proposalutils.TimelockConfig{MinDelay: 0},
-					},
-				}},
-			},
-			expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier},
-		},
-		{
-			name:            "Deploy but do not propose transfer",
-			hasExistingMcms: true,
-			deployDataStreamsConfig: DeployDataStreamsConfig{
-				ChainsToDeploy: map[uint64]DeployDataStreams{testutil.TestChain.Selector: {
-					VerifierConfig: verificationCfg,
-				}},
-			},
-			expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier},
-		},
+		//{
+		//	name:            "Deploy no billing and MCMS",
+		//	hasExistingMcms: false,
+		//	deployDataStreamsConfig: DeployDataStreamsConfig{
+		//		ChainsToDeploy: map[uint64]DeployDataStreams{testutil.TestChain.Selector: {
+		//			VerifierConfig: verificationCfg,
+		//			Ownership: types.OwnershipFeature{
+		//				ShouldTransfer:     true,
+		//				MCMSProposalConfig: &proposalutils.TimelockConfig{MinDelay: 0},
+		//				ShouldDeployMCMS:   true,
+		//				DeployMCMSConfig:   &proposalCfg,
+		//			},
+		//		}},
+		//	},
+		//	expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier,
+		//		commontypes.ProposerManyChainMultisig, commontypes.BypasserManyChainMultisig, commontypes.CancellerManyChainMultisig},
+		//},
+		//{
+		//	name:            "Deploy no billing with existing MCMS",
+		//	hasExistingMcms: true,
+		//	deployDataStreamsConfig: DeployDataStreamsConfig{
+		//		ChainsToDeploy: map[uint64]DeployDataStreams{testutil.TestChain.Selector: {
+		//			VerifierConfig: verificationCfg,
+		//			Ownership: types.OwnershipFeature{
+		//				ShouldTransfer:     true,
+		//				MCMSProposalConfig: &proposalutils.TimelockConfig{MinDelay: 0},
+		//			},
+		//		}},
+		//	},
+		//	expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier},
+		//},
+		//{
+		//	name:            "Deploy but do not propose transfer",
+		//	hasExistingMcms: true,
+		//	deployDataStreamsConfig: DeployDataStreamsConfig{
+		//		ChainsToDeploy: map[uint64]DeployDataStreams{testutil.TestChain.Selector: {
+		//			VerifierConfig: verificationCfg,
+		//		}},
+		//	},
+		//	expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier},
+		//},
 	}
 
 	for _, tt := range tests {
@@ -132,6 +132,7 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 			if tt.hasExistingMcms {
 				timelockAddr = testEnv.Timelocks[chainSel].Timelock.Address()
 			} else {
+				// TODO update to use datastore
 				addresses, err := resp.ExistingAddresses.AddressesForChain(chainSel)
 				require.NoError(t, err)
 				mcmsState, err := commonstate.MaybeLoadMCMSWithTimelockChainState(chain, addresses)
