@@ -374,7 +374,7 @@ func (c *Config) SetFrom(f *Config) (err error) {
 		err = multierr.Append(err, commonconfig.NamedMultiErrorList(err6, "Tron"))
 	}
 
-	if err7 := c.Tron.SetFrom(f.Ton); err7 != nil {
+	if err7 := c.Ton.SetFrom(f.Ton); err7 != nil {
 		err = multierr.Append(err, commonconfig.NamedMultiErrorList(err7, "Ton"))
 	}
 
