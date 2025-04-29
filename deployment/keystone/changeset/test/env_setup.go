@@ -13,11 +13,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
-	"github.com/smartcontractkit/chainlink/deployment/datastore"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	envtest "github.com/smartcontractkit/chainlink/deployment/environment/test"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
@@ -399,7 +400,7 @@ func setupViewOnlyNodeTest(t *testing.T, registryChainSel uint64, chains map[uin
 		dons.NodeList().IDs(),
 		envtest.NewJDService(dons.NodeList()),
 		t.Context,
-		deployment.XXXGenerateTestOCRSecrets(),
+		cldf.XXXGenerateTestOCRSecrets(),
 	)
 
 	return dons, *env
