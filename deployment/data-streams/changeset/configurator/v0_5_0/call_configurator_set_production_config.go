@@ -4,13 +4,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/txutil"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/configurator"
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 )
 
 var SetProductionConfigChangeset = deployment.CreateChangeSet(setProductionConfigLogic, setProductionConfigPrecondition)
@@ -18,7 +19,7 @@ var SetProductionConfigChangeset = deployment.CreateChangeSet(setProductionConfi
 // SetProductionConfigConfig contains the parameters needed to set a production config.
 type SetProductionConfigConfig struct {
 	ConfigurationsByChain map[uint64][]SetProductionConfig
-	MCMSConfig            *changeset.MCMSConfig
+	MCMSConfig            *types.MCMSConfig
 }
 
 // SetProductionConfig groups the parameters for a production config call.
@@ -33,9 +34,7 @@ type SetProductionConfig struct {
 	OffchainConfig        []byte
 }
 
-func (pc SetProductionConfig) GetConfiguratorAddress() common.Address {
-	return pc.ConfiguratorAddress
-}
+func (pc SetProductionConfig) GetContractAddress() common.Address { return pc.ConfiguratorAddress }
 
 func (cfg SetProductionConfigConfig) Validate() error {
 	if len(cfg.ConfigurationsByChain) == 0 {
@@ -52,35 +51,31 @@ func setProductionConfigPrecondition(_ deployment.Environment, cfg SetProduction
 	return nil
 }
 
-func getTransactOpts(e deployment.Environment, chainSel uint64, mcmsConfig *changeset.MCMSConfig) *bind.TransactOpts {
-	if mcmsConfig == nil {
-		return e.Chains[chainSel].DeployerKey
-	}
-	return deployment.SimTransactOpts()
-}
-
-func setProductionConfigTx(
-	e deployment.Environment,
-	configuratorContract *configurator.Configurator,
-	prodCfg SetProductionConfig,
-	opts *bind.TransactOpts,
-	chain deployment.Chain,
-	mcmsConfig *changeset.MCMSConfig,
-) (*ethTypes.Transaction, error) {
-	tx, err := configuratorContract.SetProductionConfig(opts, prodCfg.ConfigID, prodCfg.Signers, prodCfg.OffchainTransmitters, prodCfg.F, prodCfg.OnchainConfig, prodCfg.OffchainConfigVersion, prodCfg.OffchainConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error packing setProductionConfig tx data: %w", err)
-	}
-
-	if mcmsConfig == nil {
-		if _, err := deployment.ConfirmIfNoError(chain, tx, nil); err != nil {
-			e.Logger.Errorw("Failed to confirm setProductionConfig tx", "chain", chain.String(), "err", err)
-			return nil, err
-		}
-	}
-	return tx, nil
-}
-
 func setProductionConfigLogic(e deployment.Environment, cfg SetProductionConfigConfig) (deployment.ChangesetOutput, error) {
-	return callSetConfigCommon(e, cfg.ConfigurationsByChain, cfg.MCMSConfig, "SetProductionConfig proposal", setProductionConfigTx)
+	txs, err := txutil.GetTxs(
+		e,
+		types.Configurator.String(),
+		cfg.ConfigurationsByChain,
+		LoadConfigurator,
+		doSetProductionConfig,
+	)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed building SetProductionConfig txs: %w", err)
+	}
+
+	return mcmsutil.ExecuteOrPropose(e, txs, cfg.MCMSConfig, "SetProductionConfig proposal")
+}
+
+func doSetProductionConfig(
+	c *configurator.Configurator,
+	prodCfg SetProductionConfig,
+) (*ethTypes.Transaction, error) {
+	return c.SetProductionConfig(deployment.SimTransactOpts(),
+		prodCfg.ConfigID,
+		prodCfg.Signers,
+		prodCfg.OffchainTransmitters,
+		prodCfg.F,
+		prodCfg.OnchainConfig,
+		prodCfg.OffchainConfigVersion,
+		prodCfg.OffchainConfig)
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	commonstate "github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/mcms"
@@ -27,7 +28,8 @@ func CreateMCMSProposal(e deployment.Environment, preparedTxs []*txutil.Prepared
 	for _, tx := range preparedTxs {
 		chainSelectors = append(chainSelectors, tx.ChainSelector)
 	}
-	mcmsStatePerChain, err := commonchangeset.MaybeLoadMCMSWithTimelockState(e, chainSelectors)
+
+	mcmsStatePerChain, err := commonstate.MaybeLoadMCMSWithTimelockState(e, chainSelectors)
 	if err != nil {
 		return nil, err
 	}

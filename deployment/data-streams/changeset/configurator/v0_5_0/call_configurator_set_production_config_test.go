@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/deployment"
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/testutil"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
@@ -29,12 +29,10 @@ func TestCallSetProductionConfig(t *testing.T) {
 
 	require.NoError(t, err)
 
-	ab, err := e.ExistingAddresses.Addresses()
+	configuratorAddrHex, err := dsutil.GetContractAddress(e.DataStore.Addresses(), types.Configurator)
 	require.NoError(t, err)
-	require.Len(t, ab, 1)
 
-	configuratorAddr, err := deployment.SearchAddressBook(e.ExistingAddresses, chainSelector, types.Configurator)
-	require.NoError(t, err)
+	configuratorAddr := common.HexToAddress(configuratorAddrHex)
 
 	onchainConfigHex := "0000000000000000000000000000000000000000000000000000000000000001" +
 		"0000000000000000000000000000000000000000000000000000000000000000"
@@ -43,7 +41,7 @@ func TestCallSetProductionConfig(t *testing.T) {
 	require.Len(t, onchainConfig, 64)
 
 	prodCfg := SetProductionConfig{
-		ConfiguratorAddress: common.HexToAddress(configuratorAddr),
+		ConfiguratorAddress: configuratorAddr,
 		ConfigID:            [32]byte{},
 		Signers: [][]byte{
 			{0x01}, {0x02}, {0x03}, {0x04},

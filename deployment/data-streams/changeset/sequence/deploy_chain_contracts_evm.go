@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
+	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/mcms"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -84,11 +85,11 @@ func deployVerifierProxy(env *deployment.Environment, chain uint64, cfg DeployDa
 	}
 
 	// Filter without version here should be safe as we only expect 1 address
-	records := newAddresses.Addresses().Filter(ds.AddressRefByType(ds.ContractType(types.VerifierProxy)))
-	if len(records) != 1 {
-		return common.Address{}, nil, fmt.Errorf("expected 1 verifier proxy address, found %d", len(records))
+	address, err := dsutil.GetContractAddress(newAddresses.Addresses(), types.VerifierProxy)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to get verifier proxy address: %w", err)
 	}
-	verifierProxyAddr := common.HexToAddress(records[0].Address)
+	verifierProxyAddr := common.HexToAddress(address)
 
 	return verifierProxyAddr, proxyOut.MCMSTimelockProposals, nil
 }
@@ -112,11 +113,11 @@ func deployVerifier(env *deployment.Environment, chain uint64, cfg DeployDataStr
 	}
 
 	// Filter without version here should be safe as we only expect 1 address
-	records := newAddresses.Addresses().Filter(ds.AddressRefByType(ds.ContractType(types.Verifier)))
-	if len(records) != 1 {
-		return common.Address{}, nil, fmt.Errorf("expected 1 verifier proxy address, found %d", len(records))
+	address, err := dsutil.GetContractAddress(newAddresses.Addresses(), types.Verifier)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to get verifier address: %w", err)
 	}
-	verifierAddr := common.HexToAddress(records[0].Address)
+	verifierAddr := common.HexToAddress(address)
 
 	return verifierAddr, verifierOut.MCMSTimelockProposals, nil
 }
@@ -217,11 +218,11 @@ func deployRewardManager(env *deployment.Environment, chain uint64, cfg DeployDa
 	}
 
 	// Filter without version here should be safe as we only expect 1 address
-	records := newAddresses.Addresses().Filter(ds.AddressRefByType(ds.ContractType(types.RewardManager)))
-	if len(records) != 1 {
-		return common.Address{}, nil, fmt.Errorf("expected 1 verifier proxy address, found %d", len(records))
+	address, err := dsutil.GetContractAddress(newAddresses.Addresses(), types.RewardManager)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to get verifier proxy address: %w", err)
 	}
-	rmAddr := common.HexToAddress(records[0].Address)
+	rmAddr := common.HexToAddress(address)
 
 	return rmAddr, rmOut.MCMSTimelockProposals, nil
 }
@@ -250,11 +251,11 @@ func deployFeeManager(env *deployment.Environment, chain uint64, cfg DeployDataS
 	}
 
 	// Filter without version here should be safe as we only expect 1 address
-	records := newAddresses.Addresses().Filter(ds.AddressRefByType(ds.ContractType(types.FeeManager)))
-	if len(records) != 1 {
-		return common.Address{}, nil, fmt.Errorf("expected 1 verifier proxy address, found %d", len(records))
+	address, err := dsutil.GetContractAddress(newAddresses.Addresses(), types.FeeManager)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("failed to get verifier proxy address: %w", err)
 	}
-	fmAddr := common.HexToAddress(records[0].Address)
+	fmAddr := common.HexToAddress(address)
 
 	return fmAddr, fmOut.MCMSTimelockProposals, nil
 }

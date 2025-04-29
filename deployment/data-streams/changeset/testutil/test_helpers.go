@@ -150,7 +150,6 @@ func NewMemoryEnvV2(t *testing.T, cfg MemoryEnvConfig) MemoryEnv {
 		require.NoError(t, err)
 
 		addresses, err := utils.EnvironmentAddresses(updatedEnv)
-
 		mcmsState, err := commonstate.MaybeLoadMCMSWithTimelockChainState(chain, addresses)
 		require.NoError(t, err)
 

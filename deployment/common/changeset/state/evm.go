@@ -6,7 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	bindings "github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
-
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/link_token"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -64,10 +64,17 @@ func MaybeLoadMCMSWithTimelockState(env deployment.Environment, chainSelectors [
 		if !ok {
 			return nil, fmt.Errorf("chain %d not found", chainSelector)
 		}
-		addressesChain, err := env.ExistingAddresses.AddressesForChain(chainSelector)
+
+		// Try to get addresses from DataStore first
+		addressesChain, err := loadAddressesFromDataStore(env.DataStore, chainSelector)
 		if err != nil {
-			return nil, err
+			// Fall back to AddressBook (deprecated)
+			addressesChain, err = env.ExistingAddresses.AddressesForChain(chainSelector)
+			if err != nil {
+				return nil, err
+			}
 		}
+
 		state, err := MaybeLoadMCMSWithTimelockChainState(chain, addressesChain)
 		if err != nil {
 			return nil, err
@@ -75,6 +82,22 @@ func MaybeLoadMCMSWithTimelockState(env deployment.Environment, chainSelectors [
 		result[chainSelector] = state
 	}
 	return result, nil
+}
+
+func loadAddressesFromDataStore(ds datastore.DataStore[datastore.DefaultMetadata, datastore.DefaultMetadata], chainSelector uint64) (map[string]deployment.TypeAndVersion, error) {
+	addresses := ds.Addresses().Filter(datastore.AddressRefByChainSelector(chainSelector))
+	if len(addresses) == 0 {
+		return nil, fmt.Errorf("no addresses found for chain %d", chainSelector)
+	}
+
+	addressesChain := make(map[string]deployment.TypeAndVersion)
+	for _, addressRef := range addresses {
+		addressesChain[addressRef.Address] = deployment.TypeAndVersion{
+			Type:    deployment.ContractType(addressRef.Type),
+			Version: *addressRef.Version,
+		}
+	}
+	return addressesChain, nil
 }
 
 // MaybeLoadMCMSWithTimelockChainState looks for the addresses corresponding to

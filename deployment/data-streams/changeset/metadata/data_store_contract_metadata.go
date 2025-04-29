@@ -51,6 +51,8 @@ type SubscriberDiscount struct {
 	StreamDiscounts   []StreamDiscounts
 }
 
+type ConfiguratorMetadata struct{}
+
 type FeeManagerMetadata struct {
 	FeeTokens            []FeeToken
 	RewardManagerAddress string
@@ -201,6 +203,18 @@ func NewFeeManagerMetadata(metadata FeeManagerMetadata) (SerializedContractMetad
 
 	return SerializedContractMetadata{
 		Type:    dstypes.FeeManager.String(),
+		Content: content,
+	}, nil
+}
+
+func NewConfiguratorMetadata(metadata ConfiguratorMetadata) (SerializedContractMetadata, error) {
+	content, err := json.Marshal(metadata)
+	if err != nil {
+		return SerializedContractMetadata{}, err
+	}
+
+	return SerializedContractMetadata{
+		Type:    dstypes.Configurator.String(),
 		Content: content,
 	}, nil
 }

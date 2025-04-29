@@ -92,8 +92,7 @@ func deployRewardManager(e deployment.Environment,
 		if !ok {
 			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}
-		rewardManagerMetadata := metadata.RewardManagerMetadata{}
-		serialized, err := metadata.NewRewardManagerMetadata(rewardManagerMetadata)
+		serialized, err := metadata.NewRewardManagerMetadata(metadata.RewardManagerMetadata{})
 		if err != nil {
 			return fmt.Errorf("failed to serialize verifier proxy metadata: %w", err)
 		}

@@ -3,19 +3,9 @@ package utils
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
-
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment"
 )
-
-func MaybeFindEthAddress(ab deployment.AddressBook, chain uint64, typ deployment.ContractType) (common.Address, error) {
-	addressHex, err := deployment.SearchAddressBook(ab, chain, typ)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to find contract %s address: %w", typ, err)
-	}
-	address := common.HexToAddress(addressHex)
-	return address, nil
-}
 
 func EnvironmentAddresses(e deployment.Environment) (addresses map[string]deployment.TypeAndVersion, err error) {
 	addresses = make(map[string]deployment.TypeAndVersion)
@@ -30,4 +20,13 @@ func EnvironmentAddresses(e deployment.Environment) (addresses map[string]deploy
 		}
 	}
 	return addresses, nil
+}
+
+// GetContractAddress returns the address for a specific contract type. Used when expecting only one contract
+func GetContractAddress(addresses datastore.AddressRefStore, contractType deployment.ContractType) (string, error) {
+	records := addresses.Filter(datastore.AddressRefByType(datastore.ContractType(contractType)))
+	if len(records) != 1 {
+		return "", fmt.Errorf("expected 1 %s address, found %d", contractType, len(records))
+	}
+	return records[0].Address, nil
 }

@@ -3,6 +3,7 @@ package v0_5_0
 import (
 	"testing"
 
+	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/stretchr/testify/require"
 
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -13,7 +14,7 @@ import (
 func TestDeployConfigurator(t *testing.T) {
 	e := testutil.NewMemoryEnv(t, true, 0)
 
-	out, err := commonChangesets.Apply(t, e, nil,
+	e, err := commonChangesets.Apply(t, e, nil,
 		commonChangesets.Configure(
 			DeployConfiguratorChangeset,
 			DeployConfiguratorConfig{
@@ -21,17 +22,9 @@ func TestDeployConfigurator(t *testing.T) {
 			},
 		),
 	)
-
 	require.NoError(t, err)
 
-	ab, err := out.ExistingAddresses.Addresses()
+	_, err = dsutil.GetContractAddress(e.DataStore.Addresses(), types.Configurator)
 	require.NoError(t, err)
-	require.Len(t, ab, 1)
 
-	for sel, addrMap := range ab {
-		require.Equal(t, testutil.TestChain.Selector, sel)
-		for _, tv := range addrMap {
-			require.Equal(t, types.Configurator, tv.Type)
-		}
-	}
 }
