@@ -79,14 +79,6 @@ type ReadBalanceReaderConfig struct {
 	FundedAddress        string `json:"funded_address,omitempty"`
 }
 
-func (c *PoRWorkflowConfig) SetFeedID(fID string) {
-	c.FeedID = fID
-}
-
-func (c *PoRWorkflowConfig) GetFeedID() string {
-	return c.FeedID
-}
-
 // rpcs: chainSelector -> url
 func PrepareCRECLISettingsFile(workflowOwner common.Address, addressBook deployment.AddressBook, donID uint32, homeChainSelector uint64, rpcs map[uint64]string) (*os.File, error) {
 	settingsFile, err := os.CreateTemp("", CRECLISettingsFileName)

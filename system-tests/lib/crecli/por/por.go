@@ -6,36 +6,25 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
+	libcrecli "github.com/smartcontractkit/chainlink/system-tests/lib/crecli"
 )
 
-type Config interface {
-	FeedIDGetter
-	FeedIDSetter
-}
-
-type FeedIDGetter interface {
-	GetFeedID() string
-}
-
-type FeedIDSetter interface {
-	SetFeedID(string)
-}
-
 func CreateConfigFile(
-	cfg Config,
+	cfg *libcrecli.PoRWorkflowConfig,
 ) (*os.File, error) {
-	fID, err := handleFeedID(cfg.GetFeedID())
+	fID, err := handleFeedID(cfg.FeedID)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg.SetFeedID(fID)
-	b, err := marshalConfig(cfg)
+	cfg.FeedID = fID
+	configMarshalled, err := json.Marshal(cfg)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to marshal workflow config")
 	}
 
-	return writeConfigFile(b)
+	return writeConfigFile(configMarshalled)
 }
 
 func handleFeedID(feedID string) (string, error) {
@@ -52,14 +41,6 @@ func handleFeedID(feedID string) (string, error) {
 
 	feedIDToUse := "0x" + cleanFeedID
 	return feedIDToUse, nil
-}
-
-func marshalConfig[T any](input T) ([]byte, error) {
-	configMarshalled, err := json.Marshal(input)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal workflow config")
-	}
-	return configMarshalled, nil
 }
 
 func writeConfigFile(configMarshalled []byte) (*os.File, error) {
