@@ -22,7 +22,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.33.0
-	github.com/smartcontractkit/chain-selectors v1.0.52
+	github.com/smartcontractkit/chain-selectors v1.0.53
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250424173217-3df386365d0f
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250428133125-80eeaec87835
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0
@@ -352,7 +352,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250429090811-2071365270c9 // indirect
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250429172937-8d7717f45f95 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250425163923-16aa375957b7 // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250417193446-eeb0a7d1e049 // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 // indirect
