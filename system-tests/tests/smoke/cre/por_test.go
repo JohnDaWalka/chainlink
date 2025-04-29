@@ -78,14 +78,6 @@ const (
 	AuthorizationKey = ""
 )
 
-type ReadContractTestInput struct {
-	ExpectedFundingAmount *big.Int
-}
-
-type testHarness struct {
-	readContractInput *ReadContractTestInput
-}
-
 // Defines the location of already compiled workflow binary and config files
 // They will be used if WorkflowConfig.ShouldCompileNewWorkflow is `false`
 // Otherwise test will compile and upload a new workflow
@@ -114,6 +106,10 @@ type WorkflowConfig struct {
 	CompiledWorkflowConfig *CompiledConfig `toml:"compiled_config" validate:"required_if=ShouldCompileNewWorkflow false"`
 	WorkflowName           string          `toml:"workflow_name" validate:"required" `
 	FeedID                 string          `toml:"feed_id" validate:"required,startsnotwith=0x"`
+}
+
+type ReadContractTestInput struct {
+	ExpectedFundingAmount *big.Int
 }
 
 type readContractInput struct {
@@ -174,6 +170,8 @@ func buildPoRConfig(input registerPoRWorkflowInput) (*os.File, error) {
 	return workflowConfigFile, nil
 }
 
+// buildReadContractConfig accepts the PoR Workflow Input, deploys a balance reader
+// contract and builds the necessary config.
 func buildReadContractConfig(input registerPoRWorkflowInput) (*os.File, error) {
 	if input.readContractInput == nil {
 		return nil, errors.New("cannot build read contract config from nil input")
