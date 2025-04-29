@@ -13,7 +13,10 @@ import (
 )
 
 func TestCallActivateConfig(t *testing.T) {
-	e := testutil.NewMemoryEnv(t, true)
+	testEnv := testutil.NewMemoryEnvV2(t, testutil.MemoryEnvConfig{
+		ShouldDeployMCMS: true,
+	})
+	e := testEnv.Environment
 	chainSelector := testutil.TestChain.Selector
 
 	e, _, verifierAddr := DeployVerifierProxyAndVerifier(t, e)

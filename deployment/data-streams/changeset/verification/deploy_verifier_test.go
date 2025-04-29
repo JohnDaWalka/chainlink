@@ -3,7 +3,6 @@ package verification
 import (
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
@@ -38,12 +37,7 @@ func TestDeployVerifier(t *testing.T) {
 
 	require.NoError(t, err)
 
-	envDatastore, err := datastore.FromDefault[
-		metadata.SerializedContractMetadata,
-		datastore.DefaultMetadata,
-	](e.DataStore)
-	require.NoError(t, err)
-	record, err := envDatastore.Addresses().Get(
+	record, err := e.DataStore.Addresses().Get(
 		datastore.NewAddressRefKey(testutil.TestChain.Selector, datastore.ContractType(types.VerifierProxy), &deployment.Version0_5_0, ""),
 	)
 	require.NoError(t, err)
@@ -69,16 +63,15 @@ func TestDeployVerifier(t *testing.T) {
 
 	require.NoError(t, err)
 
-	envDatastore, err = datastore.FromDefault[
+	envDatastore, err := datastore.FromDefault[
 		metadata.SerializedContractMetadata,
 		datastore.DefaultMetadata,
 	](e.DataStore)
 	require.NoError(t, err)
 
 	// Verify Contract Is Deployed
-	version := *semver.MustParse("0.5.0")
 	record, err = envDatastore.Addresses().Get(
-		datastore.NewAddressRefKey(testutil.TestChain.Selector, datastore.ContractType(types.Verifier), &version, ""),
+		datastore.NewAddressRefKey(testutil.TestChain.Selector, datastore.ContractType(types.Verifier), &deployment.Version0_5_0, ""),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, record)

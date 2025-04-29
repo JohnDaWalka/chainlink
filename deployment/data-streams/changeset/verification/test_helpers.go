@@ -3,6 +3,7 @@ package verification
 import (
 	"testing"
 
+	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
 
 	dsTypes "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
@@ -43,10 +44,9 @@ func DeployVerifierProxyAndVerifier(
 	require.NoError(t, err, "deploying verifier proxy should not fail")
 
 	// Get the VerifierProxy address
-	verifierProxyAddrHex, err := deployment.SearchAddressBook(env.ExistingAddresses, chainSelector, dsTypes.VerifierProxy)
-	require.NoError(t, err, "unable to find verifier proxy address in address book")
-	verifierProxyAddr = common.HexToAddress(verifierProxyAddrHex)
-	require.NotEqual(t, common.Address{}, verifierProxyAddr, "verifier proxy should not be zero address")
+	record, err := env.DataStore.Addresses().Get(ds.NewAddressRefKey(chainSelector, ds.ContractType(dsTypes.VerifierProxy), &deployment.Version0_5_0, ""))
+	require.NoError(t, err)
+	verifierProxyAddr = common.HexToAddress(record.Address)
 
 	// 2) Deploy Verifier
 	deployVerifierCfg := DeployVerifierConfig{
@@ -65,10 +65,9 @@ func DeployVerifierProxyAndVerifier(
 	require.NoError(t, err, "deploying verifier should not fail")
 
 	// Get the Verifier address
-	verifierAddrHex, err := deployment.SearchAddressBook(env.ExistingAddresses, chainSelector, dsTypes.Verifier)
-	require.NoError(t, err, "unable to find verifier address in address book")
-	verifierAddr = common.HexToAddress(verifierAddrHex)
-	require.NotEqual(t, common.Address{}, verifierAddr, "verifier should not be zero address")
+	record, err = env.DataStore.Addresses().Get(ds.NewAddressRefKey(chainSelector, ds.ContractType(dsTypes.Verifier), &deployment.Version0_5_0, ""))
+	require.NoError(t, err)
+	verifierAddr = common.HexToAddress(record.Address)
 
 	// 3) Initialize the VerifierProxy
 	initCfg := VerifierProxyInitializeVerifierConfig{
@@ -88,9 +87,6 @@ func DeployVerifierProxyAndVerifier(
 		),
 	)
 	require.NoError(t, err, "initializing verifier proxy should not fail")
-
-	t.Logf("VerifierProxy deployed at %s, Verifier deployed at %s, and successfully initialized",
-		verifierProxyAddrHex, verifierAddrHex)
 
 	return env, verifierProxyAddr, verifierAddr
 }

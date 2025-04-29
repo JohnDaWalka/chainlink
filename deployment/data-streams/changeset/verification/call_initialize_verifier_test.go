@@ -3,12 +3,12 @@ package verification
 import (
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/verifier_proxy_v0_5_0"
-	"github.com/smartcontractkit/chainlink/deployment"
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/testutil"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
@@ -25,16 +25,16 @@ func TestInitializeVerifier(t *testing.T) {
 				ChainsToDeploy: map[uint64]DeployVerifierProxy{
 					chainSelector: {AccessControllerAddress: common.Address{}},
 				},
-				Version: *semver.MustParse("0.5.0"),
+				Version: deployment.Version0_5_0,
 			},
 		),
 	)
 	require.NoError(t, err)
 
 	// Ensure the VerifierProxy was deployed
-	verifierProxyAddrHex, err := deployment.SearchAddressBook(e.ExistingAddresses, chainSelector, types.VerifierProxy)
+	record, err := e.DataStore.Addresses().Get(ds.NewAddressRefKey(chainSelector, ds.ContractType(types.VerifierProxy), &deployment.Version0_5_0, ""))
 	require.NoError(t, err)
-	verifierProxyAddr := common.HexToAddress(verifierProxyAddrHex)
+	verifierProxyAddr := common.HexToAddress(record.Address)
 
 	// Deploy Verifier
 	e, err = commonChangesets.Apply(t, e, nil,
@@ -50,9 +50,9 @@ func TestInitializeVerifier(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ensure the Verifier was deployed
-	verifierAddrHex, err := deployment.SearchAddressBook(e.ExistingAddresses, chainSelector, types.Verifier)
+	record, err = e.DataStore.Addresses().Get(ds.NewAddressRefKey(chainSelector, ds.ContractType(types.Verifier), &deployment.Version0_5_0, ""))
 	require.NoError(t, err)
-	verifierAddr := common.HexToAddress(verifierAddrHex)
+	verifierAddr := common.HexToAddress(record.Address)
 
 	e, err = commonChangesets.Apply(t, e, nil,
 		commonChangesets.Configure(

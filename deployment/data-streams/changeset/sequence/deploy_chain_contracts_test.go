@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -38,7 +39,7 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 		name                    string
 		hasExistingMcms         bool
 		deployDataStreamsConfig DeployDataStreamsConfig
-		expectedContracts       []deployment.ContractType
+		expectedContracts       []deployment.TypeAndVersion
 	}{
 		{
 			name:            "Deploy with billing and MCMS",
@@ -60,8 +61,15 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 					},
 				}},
 			},
-			expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier, types.RewardManager, types.FeeManager,
-				commontypes.ProposerManyChainMultisig, commontypes.BypasserManyChainMultisig, commontypes.CancellerManyChainMultisig},
+			expectedContracts: []deployment.TypeAndVersion{
+				deployment.NewTypeAndVersion(types.VerifierProxy, deployment.Version0_5_0),
+				deployment.NewTypeAndVersion(types.Verifier, deployment.Version0_5_0),
+				deployment.NewTypeAndVersion(types.RewardManager, deployment.Version0_5_0),
+				deployment.NewTypeAndVersion(types.FeeManager, deployment.Version0_5_0),
+				deployment.NewTypeAndVersion(commontypes.ProposerManyChainMultisig, deployment.Version1_0_0),
+				deployment.NewTypeAndVersion(commontypes.BypasserManyChainMultisig, deployment.Version1_0_0),
+				deployment.NewTypeAndVersion(commontypes.CancellerManyChainMultisig, deployment.Version1_0_0),
+			},
 		},
 		{
 			name:            "Deploy no billing and MCMS",
@@ -77,8 +85,13 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 					},
 				}},
 			},
-			expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier,
-				commontypes.ProposerManyChainMultisig, commontypes.BypasserManyChainMultisig, commontypes.CancellerManyChainMultisig},
+			expectedContracts: []deployment.TypeAndVersion{
+				deployment.NewTypeAndVersion(types.VerifierProxy, deployment.Version0_5_0),
+				deployment.NewTypeAndVersion(types.Verifier, deployment.Version0_5_0),
+				deployment.NewTypeAndVersion(commontypes.ProposerManyChainMultisig, deployment.Version1_0_0),
+				deployment.NewTypeAndVersion(commontypes.BypasserManyChainMultisig, deployment.Version1_0_0),
+				deployment.NewTypeAndVersion(commontypes.CancellerManyChainMultisig, deployment.Version1_0_0),
+			},
 		},
 		{
 			name:            "Deploy no billing with existing MCMS",
@@ -92,7 +105,10 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 					},
 				}},
 			},
-			expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier},
+			expectedContracts: []deployment.TypeAndVersion{
+				deployment.NewTypeAndVersion(types.VerifierProxy, deployment.Version0_5_0),
+				deployment.NewTypeAndVersion(types.Verifier, deployment.Version0_5_0),
+			},
 		},
 		{
 			name:            "Deploy but do not propose transfer",
@@ -102,7 +118,10 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 					VerifierConfig: verificationCfg,
 				}},
 			},
-			expectedContracts: []deployment.ContractType{types.VerifierProxy, types.Verifier},
+			expectedContracts: []deployment.TypeAndVersion{
+				deployment.NewTypeAndVersion(types.VerifierProxy, deployment.Version0_5_0),
+				deployment.NewTypeAndVersion(types.Verifier, deployment.Version0_5_0),
+			},
 		},
 	}
 
@@ -142,11 +161,12 @@ func TestDeployDataStreamsContracts(t *testing.T) {
 			}
 
 			for _, contract := range tt.expectedContracts {
-				contractAddr, err := dsutil.MaybeFindEthAddress(env.ExistingAddresses, chainSel, contract)
-				require.NoError(t, err, "failed to find %s address in address book", contract)
-				require.NotNil(t, "contractAddr", "address for %s was not found", contract)
-
-				owner, _, err := commonChangesets.LoadOwnableContract(contractAddr, chain.Client)
+				record, err := env.DataStore.Addresses().Get(
+					datastore.NewAddressRefKey(testutil.TestChain.Selector, datastore.ContractType(contract.Type), &contract.Version, ""),
+				)
+				require.NoError(t, err)
+				contractAddress := common.HexToAddress(record.Address)
+				owner, _, err := commonChangesets.LoadOwnableContract(contractAddress, chain.Client)
 
 				require.NoError(t, err)
 
