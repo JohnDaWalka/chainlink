@@ -61,7 +61,9 @@ func createTonWallet(t *testing.T, useDefault bool) *wallet.Wallet {
 		require.NoError(t, err)
 		return wallet
 	} else {
-		wallet, err := wallet.FromSeed(nil, "", ver, false)
+		_, privateKey, err := ed25519.GenerateKey(nil)
+		require.NoError(t, err)
+		wallet, err := wallet.FromPrivateKey(nil, privateKey, ver)
 		require.NoError(t, err)
 		return wallet
 	}
