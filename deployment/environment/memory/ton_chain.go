@@ -4,9 +4,11 @@ import (
 	//"crypto/secp256k1"
 	//"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	//"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	"context"
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"strconv"
 	"testing"
 	"time"
@@ -21,6 +23,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/xssnick/tonutils-go/liteclient"
 	"github.com/xssnick/tonutils-go/ton"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -33,17 +36,17 @@ type TonChain struct {
 }
 
 func getTestTonChainSelectors() []uint64 {
-	// TODO: CTF to support different chain ids, need to investigate if it's possible (thru node config.yaml?)
 	return []uint64{chainsel.TON_LOCALNET.Selector}
 }
 
 func createTonWallet(t *testing.T, useDefault bool) *wallet.Wallet {
 	// TON wallet contract version
-	ver := wallet.V5R1Final
+	ver := wallet.V3R2
 
 	if useDefault {
 		addressStr := blockchain.DefaultTonAccount
 		defaultAddress, err := tonaddress.ParseAddr(addressStr)
+		_ = defaultAddress
 		require.NoError(t, err)
 
 		privateKeyStr := blockchain.DefaultTonPrivateKey
@@ -86,6 +89,7 @@ func GenerateChainsTon(t *testing.T, numChains int) map[uint64]deployment.TonCha
 
 func tonChain(t *testing.T, chainID uint64, adminAddress tonaddress.Address) *ton.APIClient {
 	t.Helper()
+	ctx := context.Background()
 
 	// TODO(ton): integrate Ton into CTF (https://smartcontract-it.atlassian.net/browse/NONEVM-1685)
 	// initialize the docker network used by CTF
@@ -116,19 +120,42 @@ func tonChain(t *testing.T, chainID uint64, adminAddress tonaddress.Address) *to
 		require.NoError(t, err)
 		containerName = output.ContainerName
 		testcontainers.CleanupContainer(t, output.Container)
-		url = output.Nodes[0].ExternalHTTPUrl + "/v1"
+		url = output.Nodes[0].ExternalHTTPUrl + "/localhost.global.config.json"
 		break
 	}
+	_ = containerName
 
 	fmt.Printf("DEBUG: ton chain url: %s\n", url)
 
-	client, err := ton.NewAPIClient().NewNodeClient(url, 0)
+	connectionPool := liteclient.NewConnectionPool()
+
+	// move this to a ton config module
+	var (
+	// FaucetWalletSeed  = "viable model canvas decade neck soap turtle asthma bench crouch bicycle grief history envelope valid intact invest like offer urban adjust popular draft coral"
+	// FaucetSubWalletID = 42
+	// FaucetWalletVer   = wallet.V3R2
+	)
+
+	// get config
+	cfg, err := liteclient.GetConfigFromUrl(context.Background(), url)
+	if err != nil {
+		log.Fatalln("get config err: ", err.Error())
+		return nil
+	}
+
+	// connect to lite servers
+	err = connectionPool.AddConnectionsFromConfig(context.Background(), cfg)
 	require.NoError(t, err)
+
+	// api client with full proof checks
+	client := ton.NewAPIClient(connectionPool, ton.ProofCheckPolicyFast)
+	client.SetTrustedBlockFromConfig(cfg)
 
 	var ready bool
 	for i := 0; i < 30; i++ {
 		time.Sleep(time.Second)
-		_, err := client.GetChainId()
+		_, err := client.GetMasterchainInfo(ctx)
+		require.NoError(t, err)
 		if err != nil {
 			t.Logf("API server not ready yet (attempt %d): %+v\n", i+1, err)
 			continue
@@ -139,9 +166,9 @@ func tonChain(t *testing.T, chainID uint64, adminAddress tonaddress.Address) *to
 	require.True(t, ready, "Ton network not ready")
 	time.Sleep(15 * time.Second) // we have slot errors that force retries if the chain is not given enough time to boot
 
-	// if we used the default account, it's already funded, but we need more to give to transmitters
-	_, err = framework.ExecContainer(containerName, []string{"ton", "account", "fund-with-faucet", "--account", adminAddress.String(), "--amount", "100000000000"})
-	require.NoError(t, err)
+	// TODO(ton): fund transmitter and default wallets
+	//_, err = framework.ExecContainer(containerName, []string{"ton", "account", "fund-with-faucet", "--account", adminAddress.String(), "--amount", "100000000000"})
+	// require.NoError(t, err)
 
 	return client
 }
@@ -157,7 +184,7 @@ func createTonChainConfig(chainID string, chain deployment.TonChain) chainlink.R
 		map[string]any{
 			"Name": "primary",
 			// TODO(ton): fill out URL correctly
-			"URL": "http://localhost:8080/v1",
+			"URL": "http://localhost:8000/localhost.global.config.json",
 		},
 	}
 
