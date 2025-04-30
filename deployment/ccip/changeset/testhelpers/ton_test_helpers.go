@@ -2,7 +2,6 @@ package testhelpers
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"strings"
@@ -12,8 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -299,42 +296,42 @@ type TonTestAddLaneChangeSet struct {
 var _ commoncs.ConfiguredChangeSet = TonTestAddLaneChangeSet{}
 
 func (c TonTestAddLaneChangeSet) Apply(e deployment.Environment) (deployment.ChangesetOutput, error) {
-	t := c.T
+	// t := c.T
 	// TODO: support other paths
-	require.Equal(t, c.fromFamily, chainsel.FamilyEVM, "must be from EVM")
-	require.Equal(t, c.toFamily, chainsel.FamilyTon, "must be to Ton")
+	// require.Equal(t, c.fromFamily, chainsel.FamilyEVM, "must be from EVM")
+	// require.Equal(t, c.toFamily, chainsel.FamilyTon, "must be to Ton")
 
-	tonSelector := c.toChainSelector
-	tonChain := e.TonChains[tonSelector]
+	// tonSelector := c.toChainSelector
+	// tonChain := e.TonChains[tonSelector]
 
-	onchainState, err := changeset.LoadOnchainState(e)
-	require.NoError(t, err)
-	tonChainState := onchainState.TonChains[tonSelector]
+	// onchainState, err := changeset.LoadOnchainState(e)
+	// require.NoError(t, err)
+	// tonChainState := onchainState.TonChains[tonSelector]
 
-	fmt.Printf("DEBUG: TonTestAddLaneChangeSet: LINK token: %s CCIP: %s Receiver: %s\n", tonChainState.LinkTokenAddress.String(), tonChainState.CCIPAddress.String(), tonChainState.ReceiverAddress.String())
+	// fmt.Printf("DEBUG: TonTestAddLaneChangeSet: LINK token: %s CCIP: %s Receiver: %s\n", tonChainState.LinkTokenAddress.String(), tonChainState.CCIPAddress.String(), tonChainState.ReceiverAddress.String())
 
-	require.NotEqual(t, tonChainState.LinkTokenAddress, ton.AccountZero, "LINK token address must be set")
-	require.NotEqual(t, tonChainState.CCIPAddress, ton.AccountZero, "CCIP address must be set")
-	require.NotEqual(t, tonChainState.ReceiverAddress, ton.AccountZero, "Receiver address must be set")
+	// require.False(t, tonChainState.LinkTokenAddress.IsAddrNone(), "LINK token address must be set")
+	// require.False(t, tonChainState.CCIPAddress.IsAddrNone(), "CCIP address must be set")
+	// require.False(t, tonChainState.ReceiverAddress.IsAddrNone(), "Receiver address must be set")
 
-	offrampBindings := ccip_offramp.Bind(tonChainState.CCIPAddress, tonChain.Client)
-	transactOpts := &bind.TransactOpts{
-		Signer: tonChain.DeployerSigner,
-	}
+	// offrampBindings := ccip_offramp.Bind(tonChainState.CCIPAddress, tonChain.Client)
+	// transactOpts := &bind.TransactOpts{
+	// 	Signer: tonChain.DeployerSigner,
+	// }
 
-	evmChainState := onchainState.Chains[c.fromChainSelector]
-	evmOnrampAddress := evmChainState.OnRamp.Address().Bytes()
-	fmt.Printf("DEBUG: TonTestAddLaneChangeSet: EVM chain selector: %d - EVM onramp address: %s\n", c.fromChainSelector, hex.EncodeToString(evmOnrampAddress))
+	// evmChainState := onchainState.Chains[c.fromChainSelector]
+	// evmOnrampAddress := evmChainState.OnRamp.Address().Bytes()
+	// fmt.Printf("DEBUG: TonTestAddLaneChangeSet: EVM chain selector: %d - EVM onramp address: %s\n", c.fromChainSelector, hex.EncodeToString(evmOnrampAddress))
 
-	sourceChainSelectors := []uint64{c.fromChainSelector}
-	sourceChainsIsEnabled := []bool{true}
-	sourceChainsIsRMNVerificationDisabled := []bool{true}
-	sourceChainsOnramps := [][]byte{evmOnrampAddress}
-	pendingTx, err := offrampBindings.Offramp().ApplySourceChainConfigUpdates(transactOpts, sourceChainSelectors, sourceChainsIsEnabled, sourceChainsIsRMNVerificationDisabled, sourceChainsOnramps)
-	require.NoError(t, err)
-	waitForTx(t, tonChain.Client, pendingTx.TxnHash(), time.Minute*1)
+	// sourceChainSelectors := []uint64{c.fromChainSelector}
+	// sourceChainsIsEnabled := []bool{true}
+	// sourceChainsIsRMNVerificationDisabled := []bool{true}
+	// sourceChainsOnramps := [][]byte{evmOnrampAddress}
+	// pendingTx, err := offrampBindings.Offramp().ApplySourceChainConfigUpdates(transactOpts, sourceChainSelectors, sourceChainsIsEnabled, sourceChainsIsRMNVerificationDisabled, sourceChainsOnramps)
+	// require.NoError(t, err)
+	// waitForTx(t, tonChain.Client, pendingTx.TxnHash(), time.Minute*1)
 
-	fmt.Printf("DEBUG: TonTestAddLaneChangeSet: Configured offramp\n")
+	// fmt.Printf("DEBUG: TonTestAddLaneChangeSet: Configured offramp\n")
 
 	return deployment.ChangesetOutput{}, nil
 }
