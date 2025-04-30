@@ -47,7 +47,6 @@ import (
 	croncap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/cron"
 	webapicap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapi"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
-	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	lidebug "github.com/smartcontractkit/chainlink/system-tests/lib/cre/debug"
 	gatewayconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/gateway"
 	crechainreader "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/chainreader"
@@ -137,10 +136,6 @@ type registerPoRWorkflowInput struct {
 	readContractInput  *readContractInput
 }
 
-type workflowRegistrar struct {
-	configBuilder ConfigBuilderFunc
-}
-
 type ConfigBuilderFunc func(registerPoRWorkflowInput) (*os.File, error)
 
 // create PoR workflow-specific config file
@@ -170,7 +165,7 @@ func buildPoRConfig(input registerPoRWorkflowInput) (*os.File, error) {
 	return workflowConfigFile, nil
 }
 
-// buildReadContractConfig accepts the PoR Workflow Input, deploys a balance reader
+// buildReadContractConfig accepts the PoR Workflow Input, finds the deployed balance reader
 // contract and builds the necessary config.
 func buildReadContractConfig(input registerPoRWorkflowInput) (*os.File, error) {
 	if input.readContractInput == nil {
@@ -214,7 +209,7 @@ func buildReadContractConfig(input registerPoRWorkflowInput) (*os.File, error) {
 	return workflowConfigFile, nil
 }
 
-func (wr *workflowRegistrar) registerWorkflow(input registerPoRWorkflowInput) error {
+func registerWorkflow(input registerPoRWorkflowInput, configBuilder ConfigBuilderFunc) error {
 	// Register workflow directly using the provided binary URL and optionally config and secrets URLs
 	// This is a legacy solution, probably we can remove it soon, but there's still quite a lot of people
 	// who have no access to dev-platform repo, so they cannot use the CRE CLI
@@ -246,7 +241,7 @@ func (wr *workflowRegistrar) registerWorkflow(input registerPoRWorkflowInput) er
 		return errors.Wrap(err, "failed to set CRE_ETH_PRIVATE_KEY")
 	}
 
-	workflowConfigFile, configErr := wr.configBuilder(input)
+	workflowConfigFile, configErr := configBuilder(input)
 	if configErr != nil {
 		return errors.Wrap(configErr, "failed to create workflow config file")
 	}
@@ -511,7 +506,7 @@ func configureDataFeedsCacheContract(testLogger zerolog.Logger, input *configure
 		AllowedWorkflowOwners: []common.Address{input.sethClient.MustGetRootKeyAddress()},
 	}
 
-	_, configErr := libcontracts.ConfigureDataFeedsCache(testLogger, configInput)
+	_, configErr := crecontracts.ConfigureDataFeedsCache(testLogger, configInput)
 
 	return configErr
 }
@@ -534,69 +529,66 @@ type porSetupOutput struct {
 	chainSelectorToWorkflowConfig   map[uint64]WorkflowConfig
 }
 
+func getDefaultJobSpecFactoryFuncs(in *TestConfig, chainIDInt int, cronBinaryPath string) ([]keystonetypes.JobSpecFactoryFn, []int, error) {
+	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
+
+	extraAllowedPorts := make([]int, 0)
+	if in.Fake != nil {
+		extraAllowedPorts = append(extraAllowedPorts, in.Fake.Port)
+	}
+
+	return []keystonetypes.JobSpecFactoryFn{
+		creconsensus.ConsensusJobSpecFactoryFn(chainIDUint64),
+		crecron.CronJobSpecFactoryFn(cronBinaryPath),
+		cregateway.GatewayJobSpecFactoryFn(extraAllowedPorts, []string{}, []string{"0.0.0.0/0"}),
+		crecompute.ComputeJobSpecFactoryFn,
+	}, extraAllowedPorts, nil
+}
+
+func setBinaryPath(in *TestConfig, paths map[string]string, capType keystonetypes.CapabilityFlag, defaultLocation string) (string, error) {
+	containerPath, pathErr := capabilities.DefaultContainerDirectory(in.Infra.InfraType)
+	if pathErr != nil {
+		return "", errors.New("failed to get default container directory")
+	}
+
+	// assume that if binary is already in the image it is in the default location and has default name
+	pathInTheContainer := filepath.Join(containerPath, defaultLocation)
+	switch capType {
+	case keystonetypes.CronCapability:
+		if in.DependenciesConfig.CronCapabilityBinaryPath != "" {
+			// where cron binary is located in the container
+			pathInTheContainer = filepath.Join(containerPath, filepath.Base(in.DependenciesConfig.CronCapabilityBinaryPath))
+
+			// where cron binary is located on the host
+			paths[capType] = in.DependenciesConfig.CronCapabilityBinaryPath
+		}
+	case keystonetypes.ReadContractCapability:
+		if in.DependenciesConfig.ReadContractCapabilityBinaryPath != "" {
+			// where readcontract binary is located in the container
+			pathInTheContainer = filepath.Join(containerPath, filepath.Base(in.DependenciesConfig.ReadContractCapabilityBinaryPath))
+
+			// where readcontract binary is located in the container
+			paths[capType] = in.DependenciesConfig.ReadContractCapabilityBinaryPath
+		}
+	default:
+		return "", errors.New("attempt to add unhandled capability")
+	}
+	return pathInTheContainer, nil
+}
+
 func setupPoRTestEnvironment(
 	t *testing.T,
 	testLogger zerolog.Logger,
 	in *TestConfig,
 	priceProvider PriceProvider,
+	configBuilder ConfigBuilderFunc,
+	customBinariesPaths map[string]string,
+	extraAllowedPorts []int,
 	mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet,
 	capabilityFactoryFns []func([]string) []keystone_changeset.DONCapabilityWithConfig,
+	jobSpecFactoryFuncs []keystonetypes.JobSpecFactoryFn,
 	rcti *ReadContractTestInput,
 ) *porSetupOutput {
-	extraAllowedPorts := make([]int, 0)
-	if in.Fake != nil {
-		if _, ok := priceProvider.(*FakePriceProvider); ok {
-			extraAllowedPorts = append(extraAllowedPorts, in.Fake.Port)
-		}
-	}
-
-	customBinariesPaths := map[string]string{}
-	containerPath, pathErr := capabilities.DefaultContainerDirectory(in.Infra.InfraType)
-	require.NoError(t, pathErr, "failed to get default container directory")
-
-	var cronBinaryPathInTheContainer string
-	if in.DependenciesConfig.CronCapabilityBinaryPath != "" {
-		// where cron binary is located in the container
-		cronBinaryPathInTheContainer = filepath.Join(containerPath, filepath.Base(in.DependenciesConfig.CronCapabilityBinaryPath))
-		// where cron binary is located on the host
-		customBinariesPaths[keystonetypes.CronCapability] = in.DependenciesConfig.CronCapabilityBinaryPath
-	} else {
-		// assume that if cron binary is already in the image it is in the default location and has default name
-		cronBinaryPathInTheContainer = filepath.Join(containerPath, "cron")
-	}
-
-	firstBlockchain := in.Blockchains[0]
-
-	chainIDInt, err := strconv.Atoi(firstBlockchain.ChainID)
-	require.NoError(t, err, "failed to convert chain ID to int")
-	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
-
-	jobSpecFactoryFuncs := []keystonetypes.JobSpecFactoryFn{
-		creconsensus.ConsensusJobSpecFactoryFn(chainIDUint64),
-		crecron.CronJobSpecFactoryFn(cronBinaryPathInTheContainer),
-		cregateway.GatewayJobSpecFactoryFn(extraAllowedPorts, []string{}, []string{"0.0.0.0/0"}),
-		crecompute.ComputeJobSpecFactoryFn,
-	}
-
-	if rcti != nil {
-		var readContractBinaryPathInTheContainer string
-		if in.DependenciesConfig.CronCapabilityBinaryPath != "" {
-			// where cron binary is located in the container
-			readContractBinaryPathInTheContainer = filepath.Join(containerPath, filepath.Base(in.DependenciesConfig.ReadContractCapabilityBinaryPath))
-
-			// where cron binary is located on the host
-			customBinariesPaths[keystonetypes.ReadContractCapability] = in.DependenciesConfig.ReadContractCapabilityBinaryPath
-		} else {
-			// assume that if cron binary is already in the image it is in the default location and has default name
-			readContractBinaryPathInTheContainer = filepath.Join(containerPath, "cron")
-		}
-
-		jobSpecFactoryFuncs = append(
-			jobSpecFactoryFuncs,
-			crechainreader.ChainReaderJobSpecFactoryFn(chainIDUint64, "evm", "", readContractBinaryPathInTheContainer),
-		)
-	}
-
 	universalSetupInput := creenv.SetupInput{
 		CapabilitiesAwareNodeSets:            mustSetCapabilitiesFn(in.NodeSets),
 		CapabilitiesContractFactoryFunctions: capabilityFactoryFns,
@@ -649,10 +641,6 @@ func setupPoRTestEnvironment(
 		mergeErr := universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(dfOutput.AddressBook) //nolint:staticcheck // won't migrate now
 		require.NoError(t, mergeErr, "failed to merge address book")
 
-		wfRegistrar := (&workflowRegistrar{
-			configBuilder: buildPoRConfig,
-		})
-
 		var creCLIAbsPath string
 		var creCLISettingsFile *os.File
 		if in.WorkflowConfigs[idx].UseCRECLI {
@@ -693,9 +681,6 @@ func setupPoRTestEnvironment(
 
 		var rci *readContractInput
 		if rcti != nil {
-			// override the config builder
-			wfRegistrar.configBuilder = buildReadContractConfig
-
 			// Deploy a balance reader and merge to address book
 			br, err := keystone_changeset.DeployBalanceReader(*universalSetupOutput.CldEnvironment, keystone_changeset.DeployBalanceReaderRequest{
 				ChainSelectors: []uint64{bo.ChainSelector},
@@ -744,7 +729,7 @@ func setupPoRTestEnvironment(
 			readContractInput:  rci,
 		}
 
-		workflowErr := wfRegistrar.registerWorkflow(registerInput)
+		workflowErr := registerWorkflow(registerInput, configBuilder)
 		require.NoError(t, workflowErr, "failed to register PoR workflow")
 	}
 	// Workflow-specific configuration -- END
@@ -800,11 +785,21 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice(t *testing.
 	targetChainID, chainErr := strconv.Atoi(targetChain.ChainID)
 	require.NoError(t, chainErr, "failed to convert target chain ID to int")
 
+	customBinaryPaths := make(map[string]string, 0)
+	cronBinaryPathInTheContainer, err := setBinaryPath(in, customBinaryPaths, keystonetypes.CronCapability, "cron")
+	require.NoError(t, err, "failed to set cron path")
+
+	jobSpecFactoryFuncs, extraAllowedPorts, err := getDefaultJobSpecFactoryFuncs(in, homeChainID, cronBinaryPathInTheContainer)
+	require.NoError(t, err, "failed to get default job spec factory funcs")
+
 	setupOutput := setupPoRTestEnvironment(
 		t,
 		testLogger,
 		in,
 		priceProvider,
+		buildPoRConfig,
+		customBinaryPaths,
+		extraAllowedPorts,
 		mustSetCapabilitiesFn,
 		[]keystonetypes.DONCapabilityWithConfigFactoryFn{
 			webapicap.WebAPICapabilityFactoryFn,
@@ -814,6 +809,7 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice(t *testing.
 			chainwritercap.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(homeChainID))),
 			chainwritercap.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(targetChainID))),
 		},
+		jobSpecFactoryFuncs,
 		nil,
 	)
 
@@ -861,20 +857,39 @@ func TestCRE_OCR3_ReadBalance_Workflow_SingleDon_MockedPrice(t *testing.T) {
 		actualPrices: make(map[string][]*big.Int),
 	}
 
+	customBinaryPaths := make(map[string]string, 0)
+	cronBinaryPathInTheContainer, err := setBinaryPath(in, customBinaryPaths, keystonetypes.CronCapability, "cron")
+	require.NoError(t, err, "failed to set cron path")
+
+	readContractBinaryPathInTheContainer, err := setBinaryPath(in, customBinaryPaths, keystonetypes.ReadContractCapability, "readcontract")
+	require.NoError(t, err, "failed to set readcontract path")
+
 	chainIDInt, chainErr := strconv.Atoi(in.Blockchains[0].ChainID)
 	require.NoError(t, chainErr, "failed to convert chain ID to int")
+
+	jobSpecFactoryFuncs, _, err := getDefaultJobSpecFactoryFuncs(in, chainIDInt, cronBinaryPathInTheContainer)
+	require.NoError(t, err, "failed to get default job spec factory funcs")
+
+	jobSpecFactoryFuncs = append(
+		jobSpecFactoryFuncs,
+		crechainreader.ChainReaderJobSpecFactoryFn(libc.MustSafeUint64(int64(chainIDInt)), "evm", "", readContractBinaryPathInTheContainer),
+	)
 
 	setupOutput := setupPoRTestEnvironment(
 		t,
 		testLogger,
 		in,
 		priceProvider,
+		buildReadContractConfig,
+		customBinaryPaths,
+		[]int{},
 		mustSetCapabilitiesFn,
 		[]keystonetypes.DONCapabilityWithConfigFactoryFn{
-			libcontracts.DefaultCapabilityFactoryFn,
-			libcontracts.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))),
-			libcontracts.ChainReaderCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"),
+			crecontracts.DefaultCapabilityFactoryFn,
+			crecontracts.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))),
+			crecontracts.ChainReaderCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"),
 		},
+		jobSpecFactoryFuncs,
 		&ReadContractTestInput{
 			ExpectedFundingAmount: expectedReadAmount,
 		},
@@ -924,13 +939,32 @@ func TestCRE_OCR3_PoR_Workflow_GatewayDon_MockedPrice(t *testing.T) {
 	chainIDInt, chainErr := strconv.Atoi(firstBlockchain.ChainID)
 	require.NoError(t, chainErr, "failed to convert chain ID to int")
 
-	setupOutput := setupPoRTestEnvironment(t, testLogger, in, priceProvider, mustSetCapabilitiesFn, []keystonetypes.DONCapabilityWithConfigFactoryFn{
-		webapicap.WebAPICapabilityFactoryFn,
-		computecap.ComputeCapabilityFactoryFn,
-		consensuscap.OCR3CapabilityFactoryFn,
-		croncap.CronCapabilityFactoryFn,
-		chainwritercap.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))),
-	}, nil)
+	customBinaryPaths := make(map[string]string, 0)
+	cronBinaryPathInTheContainer, err := setBinaryPath(in, customBinaryPaths, keystonetypes.CronCapability, "cron")
+	require.NoError(t, err, "failed to set cron path")
+
+	jobSpecFactoryFuncs, extraAllowedPorts, err := getDefaultJobSpecFactoryFuncs(in, chainIDInt, cronBinaryPathInTheContainer)
+	require.NoError(t, err, "failed to get default job spec factory funcs")
+
+	setupOutput := setupPoRTestEnvironment(
+		t,
+		testLogger,
+		in,
+		priceProvider,
+		buildPoRConfig,
+		customBinaryPaths,
+		extraAllowedPorts,
+		mustSetCapabilitiesFn,
+		[]keystonetypes.DONCapabilityWithConfigFactoryFn{
+			webapicap.WebAPICapabilityFactoryFn,
+			computecap.ComputeCapabilityFactoryFn,
+			consensuscap.OCR3CapabilityFactoryFn,
+			croncap.CronCapabilityFactoryFn,
+			chainwritercap.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))),
+		},
+		jobSpecFactoryFuncs,
+		nil,
+	)
 
 	// Log extra information that might help debugging
 	t.Cleanup(func() {
@@ -978,14 +1012,32 @@ func TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice(t *testing.T) {
 	chainIDInt, chainErr := strconv.Atoi(firstBlockchain.ChainID)
 	require.NoError(t, chainErr, "failed to convert chain ID to int")
 
+	customBinaryPaths := make(map[string]string, 0)
+	cronBinaryPathInTheContainer, err := setBinaryPath(in, customBinaryPaths, keystonetypes.CronCapability, "cron")
+	require.NoError(t, err, "failed to set cron path")
+
+	jobSpecFactoryFuncs, extraAllowedPorts, err := getDefaultJobSpecFactoryFuncs(in, chainIDInt, cronBinaryPathInTheContainer)
+	require.NoError(t, err, "failed to get default job spec factory funcs")
+
 	priceProvider := NewTrueUSDPriceProvider(testLogger, []string{in.WorkflowConfigs[0].FeedID})
-	setupOutput := setupPoRTestEnvironment(t, testLogger, in, priceProvider, mustSetCapabilitiesFn, []keystonetypes.DONCapabilityWithConfigFactoryFn{
-		webapicap.WebAPICapabilityFactoryFn,
-		computecap.ComputeCapabilityFactoryFn,
-		consensuscap.OCR3CapabilityFactoryFn,
-		croncap.CronCapabilityFactoryFn,
-		chainwritercap.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))),
-	}, nil)
+	setupOutput := setupPoRTestEnvironment(
+		t,
+		testLogger,
+		in,
+		priceProvider,
+		buildPoRConfig,
+		customBinaryPaths,
+		extraAllowedPorts,
+		mustSetCapabilitiesFn, []keystonetypes.DONCapabilityWithConfigFactoryFn{
+			webapicap.WebAPICapabilityFactoryFn,
+			computecap.ComputeCapabilityFactoryFn,
+			consensuscap.OCR3CapabilityFactoryFn,
+			croncap.CronCapabilityFactoryFn,
+			chainwritercap.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))),
+		},
+		jobSpecFactoryFuncs,
+		nil,
+	)
 
 	// Log extra information that might help debugging
 	t.Cleanup(func() {
