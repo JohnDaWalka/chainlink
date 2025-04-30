@@ -16,11 +16,12 @@ import (
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
-	processor "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds/processor"
+	dfprocessor "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds/processor"
+	processor "github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/report/platform/processor"
 
-	monitor "github.com/smartcontractkit/chainlink-evm/pkg/monitor/beholder"
 	"github.com/smartcontractkit/chainlink-evm/pkg/monitoring/pb/data-feeds/on-chain/registry"
-	"github.com/smartcontractkit/chainlink-evm/pkg/writetarget"
+	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget"
+	monitor "github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/beholder/monitor"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
@@ -112,9 +113,15 @@ func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain
 		return nil, fmt.Errorf("failed to create new registry metrics: %w", err)
 	}
 
-	dfProcessor := processor.NewDataFeedsProcessor(registryMetrics)
+	emitter := writetarget.NewMonitorEmitter(lggr)
+	dfProcessor := dfprocessor.NewDataFeedsProcessor(registryMetrics, emitter)
 
-	beholder, err := writetarget.NewMonitor(lggr, []writetarget.ProductSpecificProcessor{dfProcessor})
+	evmProcessors, err := processor.NewEVMPlatformProcessors(emitter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create EVM platform processors: %w", err)
+	}
+
+	beholder, err := writetarget.NewMonitor(lggr, evmProcessors, []writetarget.ProductSpecificProcessor{dfProcessor}, emitter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Aptos WT monitor client: %+w", err)
 	}
@@ -130,7 +137,7 @@ func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain
 		Beholder:         beholder,
 		ChainService:     chain,
 		ContractReader:   cr,
-		ChainWriter:      cw,
+		EVMService:       evm,
 		ConfigValidateFn: evaluate,
 		NodeAddress:      config.FromAddress().String(),
 		ForwarderAddress: config.ForwarderAddress().String(),

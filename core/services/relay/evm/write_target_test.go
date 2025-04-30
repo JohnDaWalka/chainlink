@@ -24,7 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/client/clienttest"
 	gasmocks "github.com/smartcontractkit/chainlink-evm/pkg/gas/mocks"
 	dftypes "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds"
-	"github.com/smartcontractkit/chainlink-evm/pkg/report/platform"
+	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/report/platform"
 
 	evmtypes "github.com/smartcontractkit/chainlink-evm/pkg/types"
 
