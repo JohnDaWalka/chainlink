@@ -4,17 +4,34 @@ import (
 	"crypto"
 	"crypto/ed25519"
 	cryptorand "crypto/rand"
+	"encoding/hex"
 	"fmt"
+	"golang.org/x/crypto/blake2b"
 	"io"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/internal"
 )
+
+// Ed25519Scheme Ed25519 signature scheme flag
+// https://docs.sui.io/concepts/cryptography/transaction-auth/keys-addresses#address-format
+const Ed25519Scheme byte = 0x00
 
 // Key represents a Sui account
 type Key struct {
 	raw    internal.Raw
 	signFn func(io.Reader, []byte, crypto.SignerOpts) ([]byte, error)
 	pubKey ed25519.PublicKey
+}
+
+// KeyFor creates an Account from a raw key
+func KeyFor(raw internal.Raw) Key {
+	privKey := ed25519.NewKeyFromSeed(internal.Bytes(raw))
+	pubKey := privKey.Public().(ed25519.PublicKey)
+	return Key{
+		raw:    raw,
+		signFn: privKey.Sign,
+		pubKey: pubKey,
+	}
 }
 
 // New creates new Key
@@ -50,8 +67,23 @@ func (s Key) ID() string {
 }
 
 // Address returns the Sui address
+// https://docs.sui.io/concepts/cryptography/transaction-auth/keys-addresses#address-format
 func (s Key) Address() string {
-	return fmt.Sprintf("%064x", s.pubKey)
+	// Prepend the Ed25519 scheme flag to the public key
+	flaggedPubKey := make([]byte, 1+len(s.pubKey))
+	flaggedPubKey[0] = Ed25519Scheme
+	copy(flaggedPubKey[1:], s.pubKey)
+
+	// Hash the flagged public key with Blake2b-256
+	addressBytes := blake2b.Sum256(flaggedPubKey)
+
+	// Return the full 32-byte address with 0x prefix
+	return "0x" + hex.EncodeToString(addressBytes[:])
+}
+
+// Account is an alias for Address
+func (s Key) Account() string {
+	return s.Address()
 }
 
 // GetPublic gets Account's public key
@@ -70,30 +102,4 @@ func (s Key) Raw() internal.Raw { return s.raw }
 // Sign is used to sign a message
 func (s Key) Sign(msg []byte) ([]byte, error) {
 	return s.signFn(cryptorand.Reader, msg, crypto.Hash(0)) // no specific hash function used
-}
-
-// KeyFor creates an Account from a raw key
-func KeyFor(raw internal.Raw) Key {
-	privKey := ed25519.NewKeyFromSeed(internal.Bytes(raw))
-	pubKey := privKey.Public().(ed25519.PublicKey)
-	return Key{
-		raw:    raw,
-		signFn: privKey.Sign,
-		pubKey: pubKey,
-	}
-}
-
-// String returns the public key as a hex string
-func (s Key) String() string {
-	return s.ID()
-}
-
-// GoString returns the public key as a hex string
-func (s Key) GoString() string {
-	return s.String()
-}
-
-// ToV2 returns the key as a Raw
-func (s Key) ToV2() internal.Raw {
-	return s.Raw()
 }

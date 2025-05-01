@@ -1,67 +1,19 @@
 package suikey
 
 import (
-	"context"
+	"encoding/hex"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/internal"
 )
 
-func Test_SuiKeystore(t *testing.T) {
-	ctx := context.Background()
-	ks := keystore.NewInMemory()
-	suiKs := New(ks)
-
-	t.Run("Create", func(t *testing.T) {
-		account, err := suiKs.Create(ctx)
-		require.NoError(t, err)
-		assert.NotNil(t, account)
-		assert.NotEmpty(t, account.ID())
-	})
-
-	t.Run("Get", func(t *testing.T) {
-		account, err := suiKs.Create(ctx)
-		require.NoError(t, err)
-
-		got, err := suiKs.Get(account.ID())
-		require.NoError(t, err)
-		assert.Equal(t, account.ID(), got.ID())
-	})
-
-	t.Run("GetAll", func(t *testing.T) {
-		_, err := suiKs.Create(ctx)
-		require.NoError(t, err)
-		_, err = suiKs.Create(ctx)
-		require.NoError(t, err)
-
-		accounts, err := suiKs.GetAll()
-		require.NoError(t, err)
-		assert.Len(t, accounts, 2)
-	})
-
-	t.Run("Delete", func(t *testing.T) {
-		account, err := suiKs.Create(ctx)
-		require.NoError(t, err)
-
-		err = suiKs.Delete(account.ID())
-		require.NoError(t, err)
-
-		_, err = suiKs.Get(account.ID())
-		assert.Error(t, err)
-	})
-
-	t.Run("Import/Export", func(t *testing.T) {
-		account, err := suiKs.Create(ctx)
-		require.NoError(t, err)
-
-		exported, err := suiKs.Export(account.ID(), "password")
-		require.NoError(t, err)
-
-		imported, err := suiKs.Import(exported, "password")
-		require.NoError(t, err)
-		assert.Equal(t, account.ID(), imported.ID())
-	})
+func TestSuiKey(t *testing.T) {
+	bytes, err := hex.DecodeString("f0d07ab448018b2754475f9a3b580218b0675a1456aad96ad607c7bbd7d9237b")
+	require.NoError(t, err)
+	k := KeyFor(internal.NewRaw(bytes))
+	assert.Equal(t, "2acd605efc181e2af8a0b8c0686a5e12578efa1253d15a235fa5e5ad970c4b29", k.PublicKeyStr())
+	assert.Equal(t, "0x28ebc047741ac19f2ff459d4ddb8f0c688415650edb103a22e4c66350dbcaff9", k.Account())
 }

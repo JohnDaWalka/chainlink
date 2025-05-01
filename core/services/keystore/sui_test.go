@@ -136,9 +136,3 @@ func Test_SuiKeyStore_E2E(t *testing.T) {
 		assert.Equal(t, directSig, sig)
 	})
 }
-
-func requireEqualKeys(t *testing.T, k1, k2 suikey.Account) {
-	require.Equal(t, k1.ID(), k2.ID())
-	require.Equal(t, k1.PublicKey, k2.PublicKey)
-	require.Equal(t, k1.PrivateKey, k2.PrivateKey)
-}
