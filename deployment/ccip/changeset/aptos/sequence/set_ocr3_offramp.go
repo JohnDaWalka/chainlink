@@ -6,6 +6,7 @@ import (
 	"github.com/aptos-labs/aptos-go-sdk"
 
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp"
+	aptosutils "github.com/smartcontractkit/chainlink-aptos/relayer/utils"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/operation"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/utils"
@@ -73,7 +74,10 @@ func setOCR3OfframpSequence(b operations.Bundle, deps operation.AptosDeps, in Se
 		if len(transmitter) != 32 {
 			return mcmstypes.BatchOperation{}, fmt.Errorf("invalid transmitter length: expected 32 bytes, got %d", len(transmitter))
 		}
-		address := aptos.AccountAddress(transmitter)
+		address, err := aptosutils.PublicKeyBytesToAddress(transmitter)
+		if err != nil {
+			return mcmstypes.BatchOperation{}, fmt.Errorf("failed to convert transmitter to address: %w", err)
+		}
 		commitTransmitters = append(commitTransmitters, address)
 	}
 	moduleInfo, function, _, args, err := offRampBind.Offramp().Encoder().SetOcr3Config(
@@ -102,7 +106,10 @@ func setOCR3OfframpSequence(b operations.Bundle, deps operation.AptosDeps, in Se
 		if len(transmitter) != 32 {
 			return mcmstypes.BatchOperation{}, fmt.Errorf("invalid transmitter length: expected 32 bytes, got %d", len(transmitter))
 		}
-		address := aptos.AccountAddress(transmitter)
+		address, err := aptosutils.PublicKeyBytesToAddress(transmitter)
+		if err != nil {
+			return mcmstypes.BatchOperation{}, fmt.Errorf("failed to convert transmitter to address: %w", err)
+		}
 		execTransmitters = append(execTransmitters, address)
 	}
 	moduleInfo, function, _, args, err = offRampBind.Offramp().Encoder().SetOcr3Config(
