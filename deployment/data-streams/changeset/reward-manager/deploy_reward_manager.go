@@ -6,15 +6,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
-	"github.com/smartcontractkit/mcms"
-
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
-
 	rewardManager "github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/reward_manager_v0_5_0"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 )
 
 var DeployRewardManagerChangeset = deployment.CreateChangeSet(deployRewardManagerLogic, deployRewardManagerPrecondition)
@@ -26,6 +23,10 @@ type DeployRewardManager struct {
 type DeployRewardManagerConfig struct {
 	ChainsToDeploy map[uint64]DeployRewardManager
 	Ownership      types.OwnershipSettings
+}
+
+func (cc DeployRewardManagerConfig) GetOwnershipConfig() types.OwnershipSettings {
+	return cc.Ownership
 }
 
 func (cc DeployRewardManagerConfig) Validate() error {
@@ -41,24 +42,16 @@ func (cc DeployRewardManagerConfig) Validate() error {
 }
 
 func deployRewardManagerLogic(e deployment.Environment, cc DeployRewardManagerConfig) (deployment.ChangesetOutput, error) {
-	dataStore := ds.NewMemoryDataStore[
-		metadata.SerializedContractMetadata,
-		ds.DefaultMetadata,
-	]()
+	dataStore := ds.NewMemoryDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata]()
 	err := deployRewardManager(e, dataStore, cc)
 	if err != nil {
 		e.Logger.Errorw("Failed to deploy RewardManager", "err", err)
 		return deployment.ChangesetOutput{}, deployment.MaybeDataErr(err)
 	}
 
-	var proposals []mcms.TimelockProposal
-	if cc.Ownership.ShouldTransfer && cc.Ownership.MCMSProposalConfig != nil {
-		filter := deployment.NewTypeAndVersion(types.RewardManager, deployment.Version0_5_0)
-		res, err := mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, dataStore, filter, *cc.Ownership.MCMSProposalConfig)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
-		}
-		proposals = res.MCMSTimelockProposals
+	proposals, err := mcmsutil.GetTransferOwnershipProposals(e, cc, dataStore, deployment.NewTypeAndVersion(types.RewardManager, deployment.Version0_5_0))
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
 	}
 
 	sealedDs, err := ds.ToDefault(dataStore.Seal())
@@ -96,8 +89,8 @@ func deployRewardManager(e deployment.Environment,
 		if err != nil {
 			return fmt.Errorf("failed to serialize verifier proxy metadata: %w", err)
 		}
-
-		_, err = changeset.DeployContractV2(e, dataStore, serialized, chain, RewardManagerDeployFn(chainCfg.LinkTokenAddress))
+		options := &changeset.DeployOptions{ContractMetadata: serialized}
+		_, err = changeset.DeployContract(e, dataStore, chain, RewardManagerDeployFn(chainCfg.LinkTokenAddress), options)
 		if err != nil {
 			return err
 		}

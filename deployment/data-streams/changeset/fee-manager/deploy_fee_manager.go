@@ -6,15 +6,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
-	"github.com/smartcontractkit/mcms"
-
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
-
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/fee_manager_v0_5_0"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 )
 
 var DeployFeeManagerChangeset = deployment.CreateChangeSet(deployFeeManagerLogic, deployFeeManagerPrecondition)
@@ -31,6 +28,10 @@ type DeployFeeManagerConfig struct {
 	Ownership      types.OwnershipSettings
 }
 
+func (cc DeployFeeManagerConfig) GetOwnershipConfig() types.OwnershipSettings {
+	return cc.Ownership
+}
+
 func (cc DeployFeeManagerConfig) Validate() error {
 	if len(cc.ChainsToDeploy) == 0 {
 		return errors.New("ChainsToDeploy is empty")
@@ -44,24 +45,16 @@ func (cc DeployFeeManagerConfig) Validate() error {
 }
 
 func deployFeeManagerLogic(e deployment.Environment, cc DeployFeeManagerConfig) (deployment.ChangesetOutput, error) {
-	dataStore := ds.NewMemoryDataStore[
-		metadata.SerializedContractMetadata,
-		ds.DefaultMetadata,
-	]()
+	dataStore := ds.NewMemoryDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata]()
 	err := deployFeeManager(e, dataStore, cc)
 	if err != nil {
 		e.Logger.Errorw("Failed to deploy FeeManager", "err", err)
 		return deployment.ChangesetOutput{}, deployment.MaybeDataErr(err)
 	}
 
-	var proposals []mcms.TimelockProposal
-	if cc.Ownership.ShouldTransfer && cc.Ownership.MCMSProposalConfig != nil {
-		filter := deployment.NewTypeAndVersion(types.FeeManager, deployment.Version0_5_0)
-		res, err := mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, dataStore, filter, *cc.Ownership.MCMSProposalConfig)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
-		}
-		proposals = res.MCMSTimelockProposals
+	proposals, err := mcmsutil.GetTransferOwnershipProposals(e, cc, dataStore, deployment.NewTypeAndVersion(types.FeeManager, deployment.Version0_5_0))
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
 	}
 
 	sealedDs, err := ds.ToDefault(dataStore.Seal())
@@ -109,7 +102,8 @@ func deployFeeManager(e deployment.Environment,
 		if err != nil {
 			return fmt.Errorf("failed to serialize verifier proxy metadata: %w", err)
 		}
-		_, err = changeset.DeployContractV2(e, dataStore, serialized, chain, FeeManagerDeployFn(chainCfg))
+		options := &changeset.DeployOptions{ContractMetadata: serialized}
+		_, err = changeset.DeployContract(e, dataStore, chain, FeeManagerDeployFn(chainCfg), options)
 		if err != nil {
 			return fmt.Errorf("failed to deploy FeeManager: %w", err)
 		}

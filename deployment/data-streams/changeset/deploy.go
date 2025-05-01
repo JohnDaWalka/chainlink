@@ -9,6 +9,7 @@ import (
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
+	"github.com/smartcontractkit/mcms"
 )
 
 type (
@@ -31,18 +32,26 @@ type (
 		Tx       *types.Transaction
 		Tv       deployment.TypeAndVersion
 		Err      error
+		Block    uint64
 	}
 )
 
-var _ deployment.ChangeSetV2[DeployChannelConfigStoreConfig] = DeployChannelConfigStore{}
+type DeployOptions struct {
+	ContractMetadata *metadata.SerializedContractMetadata
+}
 
-// DeployContractV2 deploys a contract and saves the address to datastore.
-func DeployContractV2[C Contract](
+type DeploymentOutput[C Contract] struct {
+	Deployments       []*ContractDeployment[C]
+	TimelockProposals []mcms.TimelockProposal
+}
+
+// DeployContract deploys a contract and saves the address to datastore.
+func DeployContract[C Contract](
 	e deployment.Environment,
 	dataStore ds.MutableDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata],
-	contractMetadata metadata.SerializedContractMetadata,
 	chain deployment.Chain,
 	deployFn ContractDeployFn[C],
+	options *DeployOptions,
 ) (*ContractDeployment[C], error) {
 	contractDeployment := deployFn(chain)
 	if contractDeployment.Err != nil {
@@ -69,44 +78,18 @@ func DeployContractV2[C Contract](
 		return nil, err
 	}
 
-	// Add a new ContractMetadata entry for the newly deployed contract
-	if err = dataStore.ContractMetadata().Add(
-		ds.ContractMetadata[metadata.SerializedContractMetadata]{
-			ChainSelector: chain.Selector,
-			Address:       contractDeployment.Address.String(),
-			Metadata:      contractMetadata,
-		},
-	); err != nil {
-		return nil, fmt.Errorf("failed to save contract metadata: %w", err)
+	if options != nil && options.ContractMetadata != nil {
+		// Add a new ContractMetadata entry for the newly deployed contract
+		if err = dataStore.ContractMetadata().Add(
+			ds.ContractMetadata[metadata.SerializedContractMetadata]{
+				ChainSelector: chain.Selector,
+				Address:       contractDeployment.Address.String(),
+				Metadata:      *options.ContractMetadata,
+			},
+		); err != nil {
+			return nil, fmt.Errorf("failed to save contract metadata: %w", err)
+		}
 	}
 
-	return contractDeployment, nil
-}
-
-// DeployContract deploys a contract and saves the address to the address book.
-//
-// Note that this function modifies the given address book variable, so it should be passed by reference.
-func DeployContract[C Contract](
-	e deployment.Environment,
-	ab deployment.AddressBook,
-	chain deployment.Chain,
-	deployFn ContractDeployFn[C],
-) (*ContractDeployment[C], error) {
-	contractDeployment := deployFn(chain)
-	if contractDeployment.Err != nil {
-		e.Logger.Errorw("Failed to deploy contract", "err", contractDeployment.Err, "chain", chain.Selector)
-		return nil, contractDeployment.Err
-	}
-	_, err := chain.Confirm(contractDeployment.Tx)
-	if err != nil {
-		e.Logger.Errorw("Failed to confirm deployment", "err", err)
-		return nil, err
-	}
-	e.Logger.Infow("Deployed contract", "Contract", contractDeployment.Tv.String(), "addr", contractDeployment.Address.String(), "chain", chain.String())
-	err = ab.Save(chain.Selector, contractDeployment.Address.String(), contractDeployment.Tv)
-	if err != nil {
-		e.Logger.Errorw("Failed to save contract address", "err", err)
-		return nil, err
-	}
 	return contractDeployment, nil
 }

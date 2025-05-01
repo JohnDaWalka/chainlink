@@ -26,7 +26,6 @@ func maybeLoadVerifierProxyState(e deployment.Environment, chainSel uint64, cont
 	if !ok {
 		return nil, fmt.Errorf("chain %d not found", chainSel) // This should never happen due to validation
 	}
-
 	vp, err := verifier_proxy_v0_5_0.NewVerifierProxy(common.HexToAddress(contractAddr), chain.Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load VerifierProxy contract on chain %s (chain selector %d): %w", chain.Name(), chain.Selector, err)

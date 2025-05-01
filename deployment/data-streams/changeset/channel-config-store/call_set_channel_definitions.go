@@ -1,4 +1,4 @@
-package changeset
+package channel_config_store
 
 import (
 	"errors"
@@ -12,6 +12,7 @@ import (
 	owner_helpers "github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/mcms"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/channel_config_store"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -173,25 +174,16 @@ func transferOrBuildTx(
 }
 
 func maybeLoadChannelConfigStoreState(e deployment.Environment, chainSel uint64, contractAddr string) (*ChannelConfigStoreState, error) {
+	if err := utils.ValidateContract(e, chainSel, contractAddr, types.ChannelConfigStore, deployment.Version1_0_0); err != nil {
+		return nil, err
+	}
 	chain, ok := e.Chains[chainSel]
 	if !ok {
 		return nil, fmt.Errorf("chain %d not found", chainSel)
 	}
-	addresses, err := e.ExistingAddresses.AddressesForChain(chainSel)
-	if err != nil {
-		return nil, err
-	}
-	tv, ok := addresses[contractAddr]
-	if !ok {
-		return nil, fmt.Errorf("unable to find channlConfigStore contract on chain %s (chain selector %d)", chain.Name(), chain.Selector)
-	}
-
-	if tv.Type != types.ChannelConfigStore || tv.Version != deployment.Version1_0_0 {
-		return nil, fmt.Errorf("unexpected contract type %s for channlConfigStore on chain %s (chain selector %d)", tv, chain.Name(), chain.Selector)
-	}
 	ccs, err := channel_config_store.NewChannelConfigStore(common.HexToAddress(contractAddr), chain.Client)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load ChannelConfigStore contract: %w", err)
 	}
 
 	return &ChannelConfigStoreState{

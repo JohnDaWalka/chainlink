@@ -31,10 +31,7 @@ type DeployDataStreams struct {
 }
 
 func deployDataStreamsLogic(e deployment.Environment, cc DeployDataStreamsConfig) (deployment.ChangesetOutput, error) {
-	deployedAddresses := ds.NewMemoryDataStore[
-		metadata.SerializedContractMetadata,
-		ds.DefaultMetadata,
-	]()
+	deployedAddresses := ds.NewMemoryDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata]()
 
 	// Prevents mutating environment state - injected environment is not expected to be updated during changeset Apply
 	cloneEnv := e.Clone()

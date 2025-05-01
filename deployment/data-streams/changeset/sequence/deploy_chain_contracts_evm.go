@@ -5,12 +5,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	mcms2 "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/mcms"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/mcms"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	feemanager "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/fee-manager"
 	rewardmanager "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/reward-manager"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
@@ -331,13 +331,13 @@ type DeployOutput struct {
 
 // deployMCMS deploys the MCMS contracts
 func deployMCMS(env *deployment.Environment, chain uint64, cfg DeployDataStreams, cumulativeAddresses metadata.DataStreamsMutableDataStore) ([]mcms.TimelockProposal, error) {
-	mcmsDeployCfg := changeset.DeployMCMSConfig{
+	mcmsDeployCfg := mcms2.DeployMCMSConfig{
 		ChainsToDeploy: []uint64{chain},
 		Ownership:      cfg.Ownership.AsSettings(),
 		Config:         *cfg.Ownership.DeployMCMSConfig,
 	}
 
-	mcmsDeployOut, err := changeset.DeployAndTransferMCMSChangeset.Apply(*env, mcmsDeployCfg)
+	mcmsDeployOut, err := mcms2.DeployAndTransferMCMSChangeset.Apply(*env, mcmsDeployCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy MCMS on chain %d: %w", chain, err)
 	}

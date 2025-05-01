@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
-	"github.com/smartcontractkit/mcms"
 )
 
 var DeployConfiguratorChangeset = deployment.CreateChangeSet(deployConfiguratorLogic, deployConfiguratorPrecondition)
@@ -19,6 +18,10 @@ var DeployConfiguratorChangeset = deployment.CreateChangeSet(deployConfiguratorL
 type DeployConfiguratorConfig struct {
 	ChainsToDeploy []uint64
 	Ownership      types.OwnershipSettings
+}
+
+func (cc DeployConfiguratorConfig) GetOwnershipConfig() types.OwnershipSettings {
+	return cc.Ownership
 }
 
 func (cc DeployConfiguratorConfig) Validate() error {
@@ -44,14 +47,10 @@ func deployConfiguratorLogic(e deployment.Environment, cc DeployConfiguratorConf
 		e.Logger.Errorw("Failed to deploy Configurator", "err", err)
 		return deployment.ChangesetOutput{}, deployment.MaybeDataErr(err)
 	}
-	var proposals []mcms.TimelockProposal
-	if cc.Ownership.ShouldTransfer && cc.Ownership.MCMSProposalConfig != nil {
-		filter := deployment.NewTypeAndVersion(types.Configurator, deployment.Version0_5_0)
-		res, err := mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, dataStore, filter, *cc.Ownership.MCMSProposalConfig)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
-		}
-		proposals = res.MCMSTimelockProposals
+
+	proposals, err := mcmsutil.GetTransferOwnershipProposals(e, cc, dataStore, deployment.NewTypeAndVersion(types.Configurator, deployment.Version0_5_0))
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
 	}
 
 	sealedDs, err := ds.ToDefault(dataStore.Seal())
@@ -80,13 +79,15 @@ func deploy(e deployment.Environment, dataStore ds.MutableDataStore[metadata.Ser
 			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}
 		md, err := metadata.NewConfiguratorMetadata(metadata.ConfiguratorMetadata{})
-		_, err = changeset.DeployContractV2(e, dataStore, md, chain, DeployFn())
+		if err != nil {
+			return fmt.Errorf("failed to create metadata: %w", err)
+		}
+		options := &changeset.DeployOptions{ContractMetadata: md}
+		_, err = changeset.DeployContract(e, dataStore, chain, DeployFn(), options)
 		if err != nil {
 			return fmt.Errorf("failed to deploy configurator: %w", err)
 		}
-
 	}
-
 	return nil
 }
 

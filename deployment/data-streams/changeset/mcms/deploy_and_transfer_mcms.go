@@ -1,4 +1,4 @@
-package changeset
+package mcms
 
 import (
 	"errors"

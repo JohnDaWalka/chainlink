@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+	dsCs "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/mcms"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
@@ -23,7 +24,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
-	dsCs "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	dsTypes "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	commonstate "github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
@@ -15,6 +14,7 @@ import (
 	mcmslib "github.com/smartcontractkit/mcms"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
+	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -234,4 +234,22 @@ func proposalsEqualForMerge(p1, p2 mcms.TimelockProposal) (bool, error) {
 	}
 
 	return true, nil
+}
+
+type HasOwnershipConfig interface {
+	GetOwnershipConfig() dsTypes.OwnershipSettings
+}
+
+func GetTransferOwnershipProposals[T HasOwnershipConfig](
+	e deployment.Environment, cfg T, addresses *ds.MemoryDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata],
+	typeAndVersion deployment.TypeAndVersion) ([]mcms.TimelockProposal, error) {
+	var proposals []mcms.TimelockProposal
+	if cfg.GetOwnershipConfig().ShouldTransfer && cfg.GetOwnershipConfig().MCMSProposalConfig != nil {
+		res, err := TransferToMCMSWithTimelockForTypeAndVersion(e, addresses, typeAndVersion, *cfg.GetOwnershipConfig().MCMSProposalConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
+		}
+		proposals = res.MCMSTimelockProposals
+	}
+	return proposals, nil
 }

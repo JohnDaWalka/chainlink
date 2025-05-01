@@ -7,14 +7,12 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
-	"github.com/smartcontractkit/mcms"
-
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/verifier_proxy_v0_5_0"
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 )
 
 // DeployVerifierProxyChangeset deploys VerifierProxy to the chains specified in the config.
@@ -26,6 +24,10 @@ type DeployVerifierProxyConfig struct {
 	ChainsToDeploy map[uint64]DeployVerifierProxy
 	Ownership      types.OwnershipSettings
 	Version        semver.Version
+}
+
+func (cfg DeployVerifierProxyConfig) GetOwnershipConfig() types.OwnershipSettings {
+	return cfg.Ownership
 }
 
 type DeployVerifierProxy struct {
@@ -51,26 +53,16 @@ func (cfg DeployVerifierProxyConfig) Validate() error {
 }
 
 func (v *verifierProxyDeploy) Apply(e deployment.Environment, cc DeployVerifierProxyConfig) (deployment.ChangesetOutput, error) {
-	// Create an in-memory data store to store the address references, contract metadata fow newly deployed contracts
-	dataStore := ds.NewMemoryDataStore[
-		metadata.SerializedContractMetadata,
-		ds.DefaultMetadata,
-	]()
-
+	dataStore := ds.NewMemoryDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata]()
 	err := deploy(e, dataStore, cc)
 	if err != nil {
 		e.Logger.Errorw("Failed to deploy VerifierProxy", "err", err)
 		return deployment.ChangesetOutput{}, deployment.MaybeDataErr(err)
 	}
 
-	var proposals []mcms.TimelockProposal
-	if cc.Ownership.ShouldTransfer && cc.Ownership.MCMSProposalConfig != nil {
-		filter := deployment.NewTypeAndVersion(types.VerifierProxy, deployment.Version0_5_0)
-		res, err := mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, dataStore, filter, *cc.Ownership.MCMSProposalConfig)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
-		}
-		proposals = res.MCMSTimelockProposals
+	proposals, err := mcmsutil.GetTransferOwnershipProposals(e, cc, dataStore, deployment.NewTypeAndVersion(types.VerifierProxy, cc.Version))
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
 	}
 
 	sealedDs, err := ds.ToDefault(dataStore.Seal())
@@ -82,6 +74,10 @@ func (v *verifierProxyDeploy) Apply(e deployment.Environment, cc DeployVerifierP
 		DataStore:             sealedDs,
 		MCMSTimelockProposals: proposals,
 	}, nil
+}
+
+type HasOwnershipConfig interface {
+	GetOwnershipConfig() types.OwnershipSettings
 }
 
 func (v *verifierProxyDeploy) VerifyPreconditions(_ deployment.Environment, cc DeployVerifierProxyConfig) error {
@@ -110,7 +106,8 @@ func deploy(e deployment.Environment,
 		if err != nil {
 			return fmt.Errorf("failed to serialize verifier proxy metadata: %w", err)
 		}
-		_, err = changeset.DeployContractV2(e, dataStore, serialized, chain, verifyProxyDeployFn(chainCfg))
+		options := &changeset.DeployOptions{ContractMetadata: serialized}
+		_, err = changeset.DeployContract(e, dataStore, chain, verifyProxyDeployFn(chainCfg), options)
 		if err != nil {
 			return fmt.Errorf("failed to deploy verifier proxy: %w", err)
 		}

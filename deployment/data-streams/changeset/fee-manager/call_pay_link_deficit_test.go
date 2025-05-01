@@ -49,7 +49,8 @@ func TestPayLinkDeficit(t *testing.T) {
 				if err != nil {
 					return deployment.ChangesetOutput{}, fmt.Errorf("failed to create metadata: %w", err)
 				}
-				_, err = changeset.DeployContractV2[*mock_fee_manager_v0_5_0.MockFeeManager](e, dataStore, md, chain, MockFeeManagerDeployFn(cc))
+				options := &changeset.DeployOptions{ContractMetadata: md}
+				_, err = changeset.DeployContract[*mock_fee_manager_v0_5_0.MockFeeManager](e, dataStore, chain, MockFeeManagerDeployFn(cc), options)
 				if err != nil {
 					return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy MockFeeManager: %w", err)
 				}

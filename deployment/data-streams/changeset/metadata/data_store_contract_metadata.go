@@ -52,6 +52,9 @@ type SubscriberDiscount struct {
 }
 
 type ConfiguratorMetadata struct{}
+type ChannelConfigStoreMetadata struct {
+	Block uint64
+}
 
 type FeeManagerMetadata struct {
 	FeeTokens            []FeeToken
@@ -157,64 +160,76 @@ func (s SerializedContractMetadata) ToFeeManagerMetadata() (FeeManagerMetadata, 
 }
 
 // NewVerifierMetadata creates a new SerializedContractMetadata from a VerifierMetadata
-func NewVerifierMetadata(metadata VerifierMetadata) (SerializedContractMetadata, error) {
+func NewVerifierMetadata(metadata VerifierMetadata) (*SerializedContractMetadata, error) {
 	content, err := json.Marshal(metadata)
 	if err != nil {
-		return SerializedContractMetadata{}, err
+		return &SerializedContractMetadata{}, err
 	}
 
-	return SerializedContractMetadata{
+	return &SerializedContractMetadata{
 		Type:    dstypes.Verifier.String(),
 		Content: content,
 	}, nil
 }
 
 // NewVerifierProxyMetadata creates a new SerializedContractMetadata from a VerifierProxyMetadata
-func NewVerifierProxyMetadata(metadata VerifierProxyMetadata) (SerializedContractMetadata, error) {
+func NewVerifierProxyMetadata(metadata VerifierProxyMetadata) (*SerializedContractMetadata, error) {
 	content, err := json.Marshal(metadata)
 	if err != nil {
-		return SerializedContractMetadata{}, err
+		return &SerializedContractMetadata{}, err
 	}
 
-	return SerializedContractMetadata{
+	return &SerializedContractMetadata{
 		Type: dstypes.VerifierProxy.String(), Content: content,
 	}, nil
 }
 
 // NewRewardManagerMetadata creates a new SerializedContractMetadata from a RewardManagerMetadata
-func NewRewardManagerMetadata(metadata RewardManagerMetadata) (SerializedContractMetadata, error) {
+func NewRewardManagerMetadata(metadata RewardManagerMetadata) (*SerializedContractMetadata, error) {
 	content, err := json.Marshal(metadata)
 	if err != nil {
-		return SerializedContractMetadata{}, err
+		return &SerializedContractMetadata{}, err
 	}
 
-	return SerializedContractMetadata{
+	return &SerializedContractMetadata{
 		Type:    dstypes.RewardManager.String(),
 		Content: content,
 	}, nil
 }
 
 // NewFeeManagerMetadata creates a new SerializedContractMetadata from a FeeManagerMetadata
-func NewFeeManagerMetadata(metadata FeeManagerMetadata) (SerializedContractMetadata, error) {
+func NewFeeManagerMetadata(metadata FeeManagerMetadata) (*SerializedContractMetadata, error) {
 	content, err := json.Marshal(metadata)
 	if err != nil {
-		return SerializedContractMetadata{}, err
+		return &SerializedContractMetadata{}, err
 	}
 
-	return SerializedContractMetadata{
+	return &SerializedContractMetadata{
 		Type:    dstypes.FeeManager.String(),
 		Content: content,
 	}, nil
 }
 
-func NewConfiguratorMetadata(metadata ConfiguratorMetadata) (SerializedContractMetadata, error) {
+func NewConfiguratorMetadata(metadata ConfiguratorMetadata) (*SerializedContractMetadata, error) {
 	content, err := json.Marshal(metadata)
 	if err != nil {
-		return SerializedContractMetadata{}, err
+		return &SerializedContractMetadata{}, err
 	}
 
-	return SerializedContractMetadata{
+	return &SerializedContractMetadata{
 		Type:    dstypes.Configurator.String(),
+		Content: content,
+	}, nil
+}
+
+func NewChannelConfigStoreMetadata(metadata ChannelConfigStoreMetadata) (*SerializedContractMetadata, error) {
+	content, err := json.Marshal(metadata)
+	if err != nil {
+		return &SerializedContractMetadata{}, err
+	}
+
+	return &SerializedContractMetadata{
+		Type:    dstypes.ChannelConfigStore.String(),
 		Content: content,
 	}, nil
 }

@@ -1,9 +1,12 @@
-package changeset
+package channel_config_store
 
 import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -16,28 +19,24 @@ func TestCallSetChannelDefinitions(t *testing.T) {
 
 	e := testutil.NewMemoryEnv(t, false, 0)
 
-	// Deploy a contract
-	deployConf := DeployChannelConfigStoreConfig{
-		ChainsToDeploy: []uint64{testutil.TestChain.Selector},
-	}
-	out, err := DeployChannelConfigStore{}.Apply(e, deployConf)
+	e, err := commonChangesets.Apply(t, e, nil,
+		commonChangesets.Configure(
+			DeployChannelConfigStoreChangeset,
+			DeployChannelConfigStoreConfig{
+				ChainsToDeploy: []uint64{testutil.TestChain.Selector},
+			},
+		),
+	)
 	require.NoError(t, err)
 
-	ab, err := out.AddressBook.Addresses()
+	envDatastore, err := datastore.FromDefault[metadata.SerializedContractMetadata, datastore.DefaultMetadata](e.DataStore)
 	require.NoError(t, err)
-	require.Len(t, ab, 1)
 
-	var channelConfigStoreAddr common.Address
-	for addr, tv := range ab[testutil.TestChain.Selector] {
-		require.Equal(t, types.ChannelConfigStore, tv.Type)
-		require.Equal(t, deployment.Version1_0_0, tv.Version)
-
-		channelConfigStoreAddr = common.HexToAddress(addr)
-	}
-
-	// Update the environment with the newly deployed contract address.
-	err = e.ExistingAddresses.Merge(out.AddressBook)
+	record, err := envDatastore.Addresses().Get(
+		datastore.NewAddressRefKey(testutil.TestChain.Selector, datastore.ContractType(types.ChannelConfigStore), &deployment.Version1_0_0, ""),
+	)
 	require.NoError(t, err)
+	channelConfigStoreAddr := common.HexToAddress(record.Address)
 
 	// Call the contract.
 	callConf := SetChannelDefinitionsConfig{

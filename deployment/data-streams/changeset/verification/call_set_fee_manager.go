@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/channel-config-store"
 	mcmslib "github.com/smartcontractkit/mcms"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/txutil"
@@ -21,7 +21,7 @@ type verifierProxySetFeeManager struct{}
 
 type VerifierProxySetFeeManagerConfig struct {
 	ConfigPerChain map[uint64][]SetFeeManagerConfig
-	MCMSConfig     *changeset.MCMSConfig
+	MCMSConfig     *channel_config_store.MCMSConfig
 }
 
 type SetFeeManagerConfig struct {
