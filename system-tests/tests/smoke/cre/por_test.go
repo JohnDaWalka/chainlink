@@ -587,7 +587,15 @@ func setupPoRTestEnvironment(
 	mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet,
 	capabilityFactoryFns []func([]string) []keystone_changeset.DONCapabilityWithConfig,
 	jobSpecFactoryFuncs []keystonetypes.JobSpecFactoryFn,
-	rcti *ReadContractTestInput,
+	buildWorkflowRegistrationInput func(
+		testLogger zerolog.Logger,
+		idx int,
+		bo *creenv.BlockchainOutput,
+		homeChainOutput *creenv.BlockchainOutput,
+		universalSetupOutput *creenv.SetupOutput,
+		in *TestConfig,
+		priceProvider PriceProvider,
+	) (*registerPoRWorkflowInput, error),
 ) *porSetupOutput {
 	universalSetupInput := creenv.SetupInput{
 		CapabilitiesAwareNodeSets:            mustSetCapabilitiesFn(in.NodeSets),
@@ -630,106 +638,18 @@ func setupPoRTestEnvironment(
 		chainSelectorToSethClient[bo.ChainSelector] = bo.SethClient
 		chainSelectorToBlockchainOutput[bo.ChainSelector] = bo.BlockchainOutput
 
-		deployConfig := df_changeset_types.DeployConfig{
-			ChainsToDeploy: []uint64{bo.ChainSelector},
-			Labels:         []string{"data-feeds"}, // label required by the changeset
-		}
+		registerInput, err := buildWorkflowRegistrationInput(
+			testLogger,
+			idx,
+			bo,
+			homeChainOutput,
+			universalSetupOutput,
+			in,
+			priceProvider,
+		)
+		require.NoError(t, err, "failed to build workflow registration input")
 
-		dfOutput, dfErr := df_changeset.RunChangeset(df_changeset.DeployCacheChangeset, *universalSetupOutput.CldEnvironment, deployConfig)
-		require.NoError(t, dfErr, "failed to deploy data feed cache contract")
-
-		mergeErr := universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(dfOutput.AddressBook) //nolint:staticcheck // won't migrate now
-		require.NoError(t, mergeErr, "failed to merge address book")
-
-		var creCLIAbsPath string
-		var creCLISettingsFile *os.File
-		if in.WorkflowConfigs[idx].UseCRECLI {
-			// make sure that path is indeed absolute
-			var pathErr error
-			creCLIAbsPath, pathErr = filepath.Abs(in.DependenciesConfig.CRECLIBinaryPath)
-			require.NoError(t, pathErr, "failed to get absolute path for CRE CLI")
-
-			// create CRE CLI settings file
-			var settingsErr error
-			creCLISettingsFile, settingsErr = libcrecli.PrepareCRECLISettingsFile(
-				bo.SethClient.MustGetRootKeyAddress(),
-				universalSetupOutput.CldEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
-				universalSetupOutput.DonTopology.WorkflowDonID,
-				homeChainOutput.ChainSelector,
-				map[uint64]string{
-					homeChainOutput.ChainSelector: homeChainOutput.BlockchainOutput.Nodes[0].ExternalHTTPUrl,
-					bo.ChainSelector:              bo.BlockchainOutput.Nodes[0].ExternalHTTPUrl,
-				},
-			)
-			require.NoError(t, settingsErr, "failed to create CRE CLI settings file")
-		}
-
-		dfConfigInput := &configureDataFeedsCacheInput{
-			useCRECLI:          in.WorkflowConfigs[idx].UseCRECLI,
-			chainSelector:      bo.ChainSelector,
-			fullCldEnvironment: universalSetupOutput.CldEnvironment,
-			workflowName:       in.WorkflowConfigs[idx].WorkflowName,
-			feedID:             in.WorkflowConfigs[idx].FeedID,
-			sethClient:         bo.SethClient,
-			blockchain:         bo.BlockchainOutput,
-			creCLIAbsPath:      creCLIAbsPath,
-			settingsFile:       creCLISettingsFile,
-			deployerPrivateKey: bo.DeployerPrivateKey,
-		}
-		dfConfigErr := configureDataFeedsCacheContract(testLogger, dfConfigInput)
-		require.NoError(t, dfConfigErr, "failed to configure data feeds cache")
-
-		var rci *readContractInput
-		if rcti != nil {
-			// Deploy a balance reader and merge to address book
-			br, err := keystone_changeset.DeployBalanceReader(*universalSetupOutput.CldEnvironment, keystone_changeset.DeployBalanceReaderRequest{
-				ChainSelectors: []uint64{bo.ChainSelector},
-			})
-			require.NoError(t, err, "failed to deploy balance reader contract")
-
-			require.NoError(t,
-				universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(br.AddressBook), //nolint:staticcheck // won't migrate yet
-				"failed to merge address book with balance reader",
-			)
-
-			// create a new address and fund it
-			pub, _, err := seth.NewAddress()
-			require.NoError(t, err, "failed to generate new address")
-			fundedAddress := common.HexToAddress(pub)
-
-			_, fundingErr := libfunding.SendFunds(zerolog.Logger{}, bo.SethClient, libtypes.FundsToSend{
-				ToAddress:  fundedAddress,
-				Amount:     rcti.ExpectedFundingAmount,
-				PrivateKey: bo.SethClient.MustGetRootPrivateKey(),
-			})
-
-			require.NoError(t, fundingErr, "failed to fund address %s", fundedAddress)
-			rci = &readContractInput{
-				fundedAddress:        fundedAddress.Hex(),
-				readTargetName:       fmt.Sprintf("read-contract-%s-%d@1.0.0", "evm", bo.ChainID),
-				contractReaderConfig: `{"contracts":{"BalanceReader":{"contractABI":"[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"addresses\",\"type\":\"address[]\"}],\"name\":\"getNativeBalances\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]","contractPollingFilter":{"genericEventNames":null,"pollingFilter":{"topic2":null,"topic3":null,"topic4":null,"retention":"0s","maxLogsKept":0,"logsPerBlock":0}},"configs":{"getNativeBalances":"{  \"chainSpecificName\": \"getNativeBalances\"}"}}}}`,
-				contractName:         "BalanceReader",
-				contractMethod:       "getNativeBalances",
-			}
-		}
-
-		registerInput := registerPoRWorkflowInput{
-			WorkflowConfig:     in.WorkflowConfigs[idx],
-			homeChainSelector:  homeChainOutput.ChainSelector,
-			chainSelector:      bo.ChainSelector,
-			workflowDonID:      universalSetupOutput.DonTopology.WorkflowDonID,
-			feedID:             in.WorkflowConfigs[idx].FeedID,
-			addressBook:        universalSetupOutput.CldEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
-			priceProvider:      priceProvider,
-			sethClient:         bo.SethClient,
-			deployerPrivateKey: bo.DeployerPrivateKey,
-			creCLIAbsPath:      creCLIAbsPath,
-			creCLIsettingsFile: creCLISettingsFile,
-			writeTargetName:    corevm.GenerateWriteTargetName(bo.ChainID),
-			readContractInput:  rci,
-		}
-
-		workflowErr := registerWorkflow(registerInput, configBuilder)
+		workflowErr := registerWorkflow(*registerInput, configBuilder)
 		require.NoError(t, workflowErr, "failed to register PoR workflow")
 	}
 	// Workflow-specific configuration -- END
@@ -745,6 +665,90 @@ func setupPoRTestEnvironment(
 		addressBook:                     universalSetupOutput.CldEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
 		chainSelectorToWorkflowConfig:   chainSelectorToWorkflowConfig,
 	}
+}
+
+func buildWorkflowRegistrationInput(
+	testLogger zerolog.Logger,
+	idx int,
+	bo *creenv.BlockchainOutput,
+	homeChainOutput *creenv.BlockchainOutput,
+	universalSetupOutput *creenv.SetupOutput,
+	in *TestConfig,
+	priceProvider PriceProvider,
+) (*registerPoRWorkflowInput, error) {
+	deployConfig := df_changeset_types.DeployConfig{
+		ChainsToDeploy: []uint64{bo.ChainSelector},
+		Labels:         []string{"data-feeds"}, // label required by the changeset
+	}
+
+	dfOutput, dfErr := df_changeset.RunChangeset(df_changeset.DeployCacheChangeset, *universalSetupOutput.CldEnvironment, deployConfig)
+	if dfErr != nil {
+		return nil, errors.Wrap(dfErr, "failed to deploy data feed cache contract")
+	}
+
+	if err := universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(dfOutput.AddressBook); err != nil { //nolint:staticcheck // won't migrate now
+		return nil, errors.Wrap(err, "failed to merge address book")
+	}
+
+	var creCLIAbsPath string
+	var creCLISettingsFile *os.File
+	if in.WorkflowConfigs[idx].UseCRECLI {
+		// make sure that path is indeed absolute
+		var pathErr error
+		creCLIAbsPath, pathErr = filepath.Abs(in.DependenciesConfig.CRECLIBinaryPath)
+		if pathErr != nil {
+			return nil, errors.Wrap(pathErr, "failed to get absolute path for CRE CLI")
+		}
+
+		// create CRE CLI settings file
+		var settingsErr error
+		creCLISettingsFile, settingsErr = libcrecli.PrepareCRECLISettingsFile(
+			bo.SethClient.MustGetRootKeyAddress(),
+			universalSetupOutput.CldEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
+			universalSetupOutput.DonTopology.WorkflowDonID,
+			homeChainOutput.ChainSelector,
+			map[uint64]string{
+				homeChainOutput.ChainSelector: homeChainOutput.BlockchainOutput.Nodes[0].ExternalHTTPUrl,
+				bo.ChainSelector:              bo.BlockchainOutput.Nodes[0].ExternalHTTPUrl,
+			},
+		)
+		if settingsErr != nil {
+			return nil, errors.Wrap(settingsErr, "failed to create CRE CLI settings file")
+		}
+	}
+
+	dfConfigInput := &configureDataFeedsCacheInput{
+		useCRECLI:          in.WorkflowConfigs[idx].UseCRECLI,
+		chainSelector:      bo.ChainSelector,
+		fullCldEnvironment: universalSetupOutput.CldEnvironment,
+		workflowName:       in.WorkflowConfigs[idx].WorkflowName,
+		feedID:             in.WorkflowConfigs[idx].FeedID,
+		sethClient:         bo.SethClient,
+		blockchain:         bo.BlockchainOutput,
+		creCLIAbsPath:      creCLIAbsPath,
+		settingsFile:       creCLISettingsFile,
+		deployerPrivateKey: bo.DeployerPrivateKey,
+	}
+	if dfConfigErr := configureDataFeedsCacheContract(testLogger, dfConfigInput); dfConfigErr != nil {
+		return nil, errors.Wrap(dfConfigErr, "failed to configure data feeds cache")
+	}
+
+	registerInput := &registerPoRWorkflowInput{
+		WorkflowConfig:     in.WorkflowConfigs[idx],
+		homeChainSelector:  homeChainOutput.ChainSelector,
+		chainSelector:      bo.ChainSelector,
+		workflowDonID:      universalSetupOutput.DonTopology.WorkflowDonID,
+		feedID:             in.WorkflowConfigs[idx].FeedID,
+		addressBook:        universalSetupOutput.CldEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
+		priceProvider:      priceProvider,
+		sethClient:         bo.SethClient,
+		deployerPrivateKey: bo.DeployerPrivateKey,
+		creCLIAbsPath:      creCLIAbsPath,
+		creCLIsettingsFile: creCLISettingsFile,
+		writeTargetName:    corevm.GenerateWriteTargetName(bo.ChainID),
+	}
+
+	return registerInput, nil
 }
 
 // config file to use: environment-one-don-multichain.toml
@@ -810,7 +814,7 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice(t *testing.
 			chainwritercap.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(targetChainID))),
 		},
 		jobSpecFactoryFuncs,
-		nil,
+		buildWorkflowRegistrationInput,
 	)
 
 	// Log extra information that might help debugging
@@ -875,6 +879,62 @@ func TestCRE_OCR3_ReadBalance_Workflow_SingleDon_MockedPrice(t *testing.T) {
 		crechainreader.ChainReaderJobSpecFactoryFn(libc.MustSafeUint64(int64(chainIDInt)), "evm", "", readContractBinaryPathInTheContainer),
 	)
 
+	// extend the default workflow registration input
+	buildReadContractWorkflowRegistrationInput := func(
+		testLogger zerolog.Logger,
+		idx int,
+		bo *creenv.BlockchainOutput,
+		homeChainOutput *creenv.BlockchainOutput,
+		universalSetupOutput *creenv.SetupOutput,
+		in *TestConfig,
+		priceProvider PriceProvider,
+	) (*registerPoRWorkflowInput, error) {
+		registerInput, err := buildWorkflowRegistrationInput(testLogger, idx, bo, homeChainOutput, universalSetupOutput, in, priceProvider)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get default registration input")
+		}
+
+		// Deploy a balance reader and merge to address book
+		br, err := keystone_changeset.DeployBalanceReader(*universalSetupOutput.CldEnvironment, keystone_changeset.DeployBalanceReaderRequest{
+			ChainSelectors: []uint64{bo.ChainSelector},
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to deploy balance reader contract")
+		}
+
+		if err := universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(br.AddressBook); err != nil { //nolint:staticcheck // won't migrate yet
+			return nil, errors.Wrap(err, "failed to merge address book with balance reader")
+		}
+
+		// create a new address and fund it
+		pub, _, err := seth.NewAddress()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to generate new address")
+		}
+
+		fundedAddress := common.HexToAddress(pub)
+
+		_, fundingErr := libfunding.SendFunds(zerolog.Logger{}, bo.SethClient, libtypes.FundsToSend{
+			ToAddress:  fundedAddress,
+			Amount:     expectedReadAmount,
+			PrivateKey: bo.SethClient.MustGetRootPrivateKey(),
+		})
+
+		if fundingErr != nil {
+			return nil, errors.Wrap(fundingErr, fmt.Sprintf("failed to fund address %s", fundedAddress))
+		}
+
+		registerInput.readContractInput = &readContractInput{
+			fundedAddress:        fundedAddress.Hex(),
+			readTargetName:       fmt.Sprintf("read-contract-%s-%d@1.0.0", "evm", bo.ChainID),
+			contractReaderConfig: `{"contracts":{"BalanceReader":{"contractABI":"[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"addresses\",\"type\":\"address[]\"}],\"name\":\"getNativeBalances\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]","contractPollingFilter":{"genericEventNames":null,"pollingFilter":{"topic2":null,"topic3":null,"topic4":null,"retention":"0s","maxLogsKept":0,"logsPerBlock":0}},"configs":{"getNativeBalances":"{  \"chainSpecificName\": \"getNativeBalances\"}"}}}}`,
+			contractName:         "BalanceReader",
+			contractMethod:       "getNativeBalances",
+		}
+
+		return registerInput, nil
+	}
+
 	setupOutput := setupPoRTestEnvironment(
 		t,
 		testLogger,
@@ -890,9 +950,7 @@ func TestCRE_OCR3_ReadBalance_Workflow_SingleDon_MockedPrice(t *testing.T) {
 			crecontracts.ChainReaderCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"),
 		},
 		jobSpecFactoryFuncs,
-		&ReadContractTestInput{
-			ExpectedFundingAmount: expectedReadAmount,
-		},
+		buildReadContractWorkflowRegistrationInput,
 	)
 
 	// Log extra information that might help debugging
@@ -963,7 +1021,7 @@ func TestCRE_OCR3_PoR_Workflow_GatewayDon_MockedPrice(t *testing.T) {
 			chainwritercap.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))),
 		},
 		jobSpecFactoryFuncs,
-		nil,
+		buildWorkflowRegistrationInput,
 	)
 
 	// Log extra information that might help debugging
@@ -1036,7 +1094,7 @@ func TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice(t *testing.T) {
 			chainwritercap.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))),
 		},
 		jobSpecFactoryFuncs,
-		nil,
+		buildWorkflowRegistrationInput,
 	)
 
 	// Log extra information that might help debugging
