@@ -14,6 +14,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	soltestutils "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
@@ -124,7 +125,7 @@ func Test_CCIPMessaging_EVM2EVM(t *testing.T) {
 				Nonce:                  out.Nonce,
 				Receiver:               state.Chains[destChain].FeeQuoter.Address().Bytes(),
 				MsgData:                []byte("hello FeeQuoter"),
-				ExtraArgs:              nil,                                 // default extraArgs
+				ExtraArgs:              nil,                                 // default extraArg
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS, // success because offRamp won't call a contract not implementing CCIPReceiver
 			},
 		)
