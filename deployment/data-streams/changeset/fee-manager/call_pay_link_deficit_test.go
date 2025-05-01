@@ -5,9 +5,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/mock_fee_manager_v0_5_0"
 	"github.com/smartcontractkit/chainlink/deployment"

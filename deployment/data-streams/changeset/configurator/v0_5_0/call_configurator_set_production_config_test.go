@@ -5,8 +5,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/stretchr/testify/require"
+
+	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/testutil"

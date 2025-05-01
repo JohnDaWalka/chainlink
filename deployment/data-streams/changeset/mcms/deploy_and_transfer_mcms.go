@@ -45,7 +45,7 @@ func deployAndTransferMcmsLogic(e deployment.Environment, cc DeployMCMSConfig) (
 	}
 
 	// DeployMCMSWithTimelockV2 currently does not use the DataStore
-	ds, err := utils.AddressBookToNewDataStore[metadata.SerializedContractMetadata, datastore.DefaultMetadata](mcmsOut.AddressBook)
+	ds, err := utils.AddressBookToNewDataStore[metadata.SerializedContractMetadata, datastore.DefaultMetadata](mcmsOut.AddressBook) //nolint:staticcheck // won't migrate now
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to address book: %w", err)
 	}
@@ -82,7 +82,7 @@ func deployAndTransferMcmsLogic(e deployment.Environment, cc DeployMCMSConfig) (
 	}
 
 	return deployment.ChangesetOutput{
-		AddressBook:           mcmsOut.AddressBook, // kept for backwards compatibility until AddressBook is removed
+		AddressBook:           mcmsOut.AddressBook, //nolint:staticcheck // won't migrate now - kept for backwards compatibility until AddressBook is removed
 		DataStore:             sealedDs,
 		MCMSTimelockProposals: proposals}, nil
 }

@@ -3,8 +3,9 @@ package v0_5_0
 import (
 	"testing"
 
-	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/stretchr/testify/require"
+
+	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/testutil"
@@ -26,5 +27,4 @@ func TestDeployConfigurator(t *testing.T) {
 
 	_, err = dsutil.GetContractAddress(e.DataStore.Addresses(), types.Configurator)
 	require.NoError(t, err)
-
 }

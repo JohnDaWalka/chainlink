@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/fee_manager_v0_5_0"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -111,9 +112,7 @@ func deployFeeManager(e deployment.Environment,
 		if err != nil {
 			return fmt.Errorf("failed to deploy FeeManager: %w", err)
 		}
-
 	}
-
 	return nil
 }
 

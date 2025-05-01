@@ -4,8 +4,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
+
+	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"

@@ -9,8 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/stretchr/testify/require"
+
+	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/configurator"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"

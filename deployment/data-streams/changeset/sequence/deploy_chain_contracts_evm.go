@@ -4,11 +4,12 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/mcms"
+
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	mcms2 "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/mcms"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
-	"github.com/smartcontractkit/mcms"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	feemanager "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/fee-manager"
@@ -355,7 +356,6 @@ func deployMCMS(env *deployment.Environment, chain uint64, cfg DeployDataStreams
 func mergeNewAddresses(env *deployment.Environment,
 	cumulativeAddrs metadata.DataStreamsMutableDataStore,
 	newAddrs ds.DataStore[ds.DefaultMetadata, ds.DefaultMetadata]) error {
-
 	// Step 1 is update the existing environment to reflect newly deployed addresses
 	updatedEnvironmentAddrs, err := ds.ToDefault(newAddrs)
 	if err != nil {

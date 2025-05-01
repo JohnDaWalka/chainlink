@@ -15,8 +15,6 @@ func runPayRecipientsTest(t *testing.T, useMCMS bool) {
 		ShouldDeployMCMS:      useMCMS,
 		ShouldDeployLinkToken: true,
 	})
-	e := testEnv.Environment
-
 	chainSelector := testutil.TestChain.Selector
 
 	e, rewardManagerAddr := RewardManagerDeploy(t, testEnv)

@@ -3,8 +3,9 @@ package metadata
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 )
 
 func TestEnvMetadata(t *testing.T) {
@@ -35,6 +36,5 @@ func TestEnvMetadata(t *testing.T) {
 
 	don, err := metadata.Metadata.GetDonById("don1")
 	require.NoError(t, err)
-	require.Equal(t, 2, len(don.Streams))
-
+	require.Len(t, don.Streams, 2)
 }

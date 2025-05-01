@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
-	dsCs "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/mcms"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
+
+	dsCs "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/mcms"
 
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
@@ -139,7 +140,7 @@ func NewMemoryEnvV2(t *testing.T, cfg MemoryEnvConfig) MemoryEnv {
 			),
 		)
 		require.NoError(t, err)
-		addresses, err := updatedEnv.ExistingAddresses.AddressesForChain(chainSelector)
+		addresses, err := updatedEnv.ExistingAddresses.AddressesForChain(chainSelector) //nolint:staticcheck // won't migrate now
 		require.NoError(t, err)
 		env = updatedEnv
 		linkState, err := commonstate.MaybeLoadLinkTokenChainState(chain, addresses)
@@ -210,7 +211,7 @@ func DeployMCMS(
 
 	require.NoError(t, err)
 
-	addresses, err := e.ExistingAddresses.AddressesForChain(TestChain.Selector)
+	addresses, err := e.ExistingAddresses.AddressesForChain(TestChain.Selector) //nolint:staticcheck // won't migrate now
 	require.NoError(t, err)
 
 	chain := e.Chains[chainSelector]

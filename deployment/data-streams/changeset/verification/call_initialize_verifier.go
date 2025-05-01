@@ -5,7 +5,8 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/channel-config-store"
+
+	channel_config_store "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/channel-config-store"
 
 	mcmslib "github.com/smartcontractkit/mcms"
 

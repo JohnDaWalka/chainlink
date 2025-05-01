@@ -3,8 +3,9 @@ package verification
 import (
 	"testing"
 
-	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
+
+	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	dsTypes "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 

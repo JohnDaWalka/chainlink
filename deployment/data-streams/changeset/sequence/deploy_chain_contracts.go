@@ -5,10 +5,11 @@ import (
 	"fmt"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/mcms"
+
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
-	"github.com/smartcontractkit/mcms"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"

@@ -2,11 +2,12 @@ package metadata
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
+
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	dstypes "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 type DataStreamsMutableDataStore = ds.MutableDataStore[SerializedContractMetadata, ds.DefaultMetadata]
@@ -106,7 +107,7 @@ func (s SerializedContractMetadata) Clone() SerializedContractMetadata {
 // ToVerifierMetadata converts the serialized metadata to VerifierMetadata
 func (s SerializedContractMetadata) ToVerifierMetadata() (VerifierMetadata, error) {
 	if s.Type != dstypes.Verifier.String() {
-		return VerifierMetadata{}, fmt.Errorf("metadata is not of type verifier")
+		return VerifierMetadata{}, errors.New("metadata is not of type verifier")
 	}
 
 	var metadata VerifierMetadata
@@ -120,7 +121,7 @@ func (s SerializedContractMetadata) ToVerifierMetadata() (VerifierMetadata, erro
 // ToVerifierProxyMetadata converts the serialized metadata to VerifierProxyMetadata
 func (s SerializedContractMetadata) ToVerifierProxyMetadata() (VerifierProxyMetadata, error) {
 	if s.Type != dstypes.VerifierProxy.String() {
-		return VerifierProxyMetadata{}, fmt.Errorf("metadata is not of type verifier_proxy")
+		return VerifierProxyMetadata{}, errors.New("metadata is not of type verifier_proxy")
 	}
 
 	var metadata VerifierProxyMetadata
@@ -134,7 +135,7 @@ func (s SerializedContractMetadata) ToVerifierProxyMetadata() (VerifierProxyMeta
 // ToRewardManagerMetadata converts the serialized metadata to RewardManagerMetadata
 func (s SerializedContractMetadata) ToRewardManagerMetadata() (RewardManagerMetadata, error) {
 	if s.Type != dstypes.RewardManager.String() {
-		return RewardManagerMetadata{}, fmt.Errorf("metadata is not of type reward_manager")
+		return RewardManagerMetadata{}, errors.New("metadata is not of type reward_manager")
 	}
 
 	var metadata RewardManagerMetadata
@@ -148,7 +149,7 @@ func (s SerializedContractMetadata) ToRewardManagerMetadata() (RewardManagerMeta
 // ToFeeManagerMetadata converts the serialized metadata to FeeManagerMetadata
 func (s SerializedContractMetadata) ToFeeManagerMetadata() (FeeManagerMetadata, error) {
 	if s.Type != dstypes.FeeManager.String() {
-		return FeeManagerMetadata{}, fmt.Errorf("metadata is not of type fee_manager")
+		return FeeManagerMetadata{}, errors.New("metadata is not of type fee_manager")
 	}
 
 	var metadata FeeManagerMetadata

@@ -129,7 +129,7 @@ func TransferToMCMSWithTimelock(e deployment.Environment, newAddresses []ds.Addr
 	if err := newAndExistingAddresses.Merge(existingAddrs); err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed merging existing addresses into temp addresses: %w", err)
 	}
-	e.ExistingAddresses = newAndExistingAddresses
+	e.ExistingAddresses = newAndExistingAddresses //nolint:staticcheck // won't migrate now
 
 	transferCs := deployment.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelockV2)
 	transferCfg := commonchangeset.TransferToMCMSWithTimelockConfig{

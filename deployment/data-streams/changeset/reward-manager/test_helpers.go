@@ -3,9 +3,10 @@ package reward_manager
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
-	"github.com/stretchr/testify/require"
 
 	dsTypes "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 

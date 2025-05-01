@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	rewardManager "github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/reward_manager_v0_5_0"
 	"github.com/smartcontractkit/chainlink/deployment"
