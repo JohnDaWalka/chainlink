@@ -49,7 +49,11 @@ func deployVerifierLogic(e deployment.Environment, cc DeployVerifierConfig) (dep
 		return deployment.ChangesetOutput{}, deployment.MaybeDataErr(err)
 	}
 
-	proposals, err := mcmsutil.GetTransferOwnershipProposals(e, cc, dataStore, deployment.NewTypeAndVersion(types.Verifier, deployment.Version0_5_0))
+	records, err := dataStore.Addresses().Fetch()
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to fetch addresses: %w", err)
+	}
+	proposals, err := mcmsutil.GetTransferOwnershipProposals(e, cc, records)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
 	}

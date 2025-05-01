@@ -4,15 +4,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
-	"github.com/smartcontractkit/mcms"
-
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 )
 
@@ -22,6 +20,10 @@ type DeployMCMSConfig struct {
 	ChainsToDeploy []uint64
 	Ownership      types.OwnershipSettings
 	Config         commontypes.MCMSWithTimelockConfigV2
+}
+
+func (cc DeployMCMSConfig) GetOwnershipConfig() types.OwnershipSettings {
+	return cc.Ownership
 }
 
 func deployAndTransferMcmsLogic(e deployment.Environment, cc DeployMCMSConfig) (deployment.ChangesetOutput, error) {
@@ -48,17 +50,30 @@ func deployAndTransferMcmsLogic(e deployment.Environment, cc DeployMCMSConfig) (
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to address book: %w", err)
 	}
 
-	var proposals []mcms.TimelockProposal
-	if cc.Ownership.ShouldTransfer && cc.Ownership.MCMSProposalConfig != nil {
-		for _, contractType := range transferContracts {
-			// all MCMS contracts are version 1.0.0 right now
-			contractFilter := deployment.NewTypeAndVersion(contractType, deployment.Version1_0_0)
-			contractTransfer, err := mcmsutil.TransferToMCMSWithTimelockForTypeAndVersion(e, ds, contractFilter, *cc.Ownership.MCMSProposalConfig)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer %s to MCMS: %w", contractType, err)
-			}
-			proposals = append(proposals, contractTransfer.MCMSTimelockProposals...)
+	var transferAddresses []datastore.AddressRef
+	for _, contractType := range transferContracts {
+		addrs := ds.Addresses().Filter(datastore.AddressRefByType(datastore.ContractType(contractType)))
+		transferAddresses = append(transferAddresses, addrs...)
+	}
+
+	// environment needs the timelock MCMS address to propose the transfer - but it's excluded from the transfer itself
+	requiredAddrs := datastore.NewMemoryDataStore[metadata.SerializedContractMetadata, datastore.DefaultMetadata]()
+	addrs := ds.Addresses().Filter(datastore.AddressRefByType(datastore.ContractType(commontypes.RBACTimelock)))
+	for _, addr := range addrs {
+		err := requiredAddrs.Addresses().Add(addr)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to add address to data store: %w", err)
 		}
+	}
+	requiredAddrsDs, err := datastore.ToDefault(requiredAddrs.Seal())
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to default format: %w", err)
+	}
+	e.DataStore = requiredAddrsDs.Seal()
+
+	proposals, err := mcmsutil.GetTransferOwnershipProposals(e, cc, transferAddresses)
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
 	}
 
 	sealedDs, err := datastore.ToDefault(ds.Seal())

@@ -104,3 +104,22 @@ func AddressBookToNewDataStore[CM datastore.Cloneable[CM], EM datastore.Cloneabl
 
 	return ds, nil
 }
+
+func AddressRefsToAddressBook(addressRefs []datastore.AddressRef) (deployment.AddressBook, error) {
+	ab := deployment.NewMemoryAddressBook()
+
+	for _, addressRef := range addressRefs {
+		tv := deployment.TypeAndVersion{
+			Type:    deployment.ContractType(addressRef.Type),
+			Version: *addressRef.Version,
+			Labels:  deployment.NewLabelSet(addressRef.Labels.List()...),
+		}
+
+		err := ab.Save(addressRef.ChainSelector, addressRef.Address, tv)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return ab, nil
+}
