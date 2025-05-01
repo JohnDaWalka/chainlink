@@ -891,27 +891,27 @@ func TestCRE_OCR3_ReadBalance_Workflow_SingleDon_MockedPrice(t *testing.T) {
 		in *TestConfig,
 		priceProvider PriceProvider,
 	) (*registerPoRWorkflowInput, error) {
-		registerInput, err := buildWorkflowRegistrationInput(testLogger, idx, bo, homeChainOutput, universalSetupOutput, in, priceProvider)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get default registration input")
+		registerInput, buildErr := buildWorkflowRegistrationInput(testLogger, idx, bo, homeChainOutput, universalSetupOutput, in, priceProvider)
+		if buildErr != nil {
+			return nil, errors.Wrap(buildErr, "failed to get default registration input")
 		}
 
 		// Deploy a balance reader and merge to address book
-		br, err := keystone_changeset.DeployBalanceReader(*universalSetupOutput.CldEnvironment, keystone_changeset.DeployBalanceReaderRequest{
+		br, deployErr := keystone_changeset.DeployBalanceReader(*universalSetupOutput.CldEnvironment, keystone_changeset.DeployBalanceReaderRequest{
 			ChainSelectors: []uint64{bo.ChainSelector},
 		})
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to deploy balance reader contract")
+		if deployErr != nil {
+			return nil, errors.Wrap(deployErr, "failed to deploy balance reader contract")
 		}
 
-		if err := universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(br.AddressBook); err != nil { //nolint:staticcheck // won't migrate yet
-			return nil, errors.Wrap(err, "failed to merge address book with balance reader")
+		if mergeErr := universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(br.AddressBook); mergeErr != nil { //nolint:staticcheck // won't migrate yet
+			return nil, errors.Wrap(mergeErr, "failed to merge address book with balance reader")
 		}
 
 		// create a new address and fund it
-		pub, _, err := seth.NewAddress()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to generate new address")
+		pub, _, newAddrErr := seth.NewAddress()
+		if newAddrErr != nil {
+			return nil, errors.Wrap(newAddrErr, "failed to generate new address")
 		}
 
 		fundedAddress := common.HexToAddress(pub)
