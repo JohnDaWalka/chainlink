@@ -59,15 +59,4 @@ user_config_overrides = """
       [Log]
       Level = 'debug'
       JSONConsole = true
-
-      [Feature]
-			LogPoller = true
-
-			[OCR2]
-			Enabled = true
-			DatabaseTimeout = '1s'
-
-			[P2P.V2]
-			Enabled = true
-			ListenAddresses = ['0.0.0.0:5001']
       """
