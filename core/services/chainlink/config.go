@@ -45,6 +45,8 @@ type Config struct {
 	Aptos RawConfigs `toml:",omitempty"`
 
 	Tron RawConfigs `toml:",omitempty"`
+
+	Sui RawConfigs `toml:",omitempty"`
 }
 
 // RawConfigs is a list of RawConfig.

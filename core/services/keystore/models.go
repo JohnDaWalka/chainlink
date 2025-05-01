@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/solkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/starkkey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/tronkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/vrfkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/workflowkey"
@@ -161,6 +162,7 @@ type keyRing struct {
 	StarkNet   map[string]starkkey.Key
 	Aptos      map[string]aptoskey.Key
 	Tron       map[string]tronkey.Key
+	Sui        map[string]suikey.Key
 	VRF        map[string]vrfkey.KeyV2
 	Workflow   map[string]workflowkey.Key
 	LegacyKeys LegacyKeyStorage
@@ -178,6 +180,7 @@ func newKeyRing() *keyRing {
 		StarkNet: make(map[string]starkkey.Key),
 		Aptos:    make(map[string]aptoskey.Key),
 		Tron:     make(map[string]tronkey.Key),
+		Sui:      make(map[string]suikey.Key),
 		VRF:      make(map[string]vrfkey.KeyV2),
 		Workflow: make(map[string]workflowkey.Key),
 	}
@@ -243,6 +246,9 @@ func (kr *keyRing) raw() (rawKeys rawKeyRing) {
 	for _, tronkey := range kr.Tron {
 		rawKeys.Tron = append(rawKeys.Tron, internal.RawBytes(tronkey))
 	}
+	for _, suikey := range kr.Sui {
+		rawKeys.Sui = append(rawKeys.Sui, internal.RawBytes(suikey))
+	}
 	for _, vrfKey := range kr.VRF {
 		rawKeys.VRF = append(rawKeys.VRF, internal.RawBytes(vrfKey))
 	}
@@ -294,6 +300,10 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 	for _, tronKey := range kr.Tron {
 		tronIDs = append(tronIDs, tronKey.ID())
 	}
+	var suiIDs []string
+	for _, suiKey := range kr.Sui {
+		suiIDs = append(suiIDs, suiKey.ID())
+	}
 	var vrfIDs []string
 	for _, VRFKey := range kr.VRF {
 		vrfIDs = append(vrfIDs, VRFKey.ID())
@@ -334,6 +344,9 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 	if len(tronIDs) > 0 {
 		lggr.Infow(fmt.Sprintf("Unlocked %d Tron keys", len(tronIDs)), "keys", tronIDs)
 	}
+	if len(suiIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d Sui keys", len(suiIDs)), "keys", suiIDs)
+	}
 	if len(vrfIDs) > 0 {
 		lggr.Infow(fmt.Sprintf("Unlocked %d VRF keys", len(vrfIDs)), "keys", vrfIDs)
 	}
@@ -359,6 +372,7 @@ type rawKeyRing struct {
 	StarkNet   [][]byte
 	Aptos      [][]byte
 	Tron       [][]byte
+	Sui        [][]byte
 	VRF        [][]byte
 	Workflow   [][]byte
 	LegacyKeys LegacyKeyStorage `json:"-"`
@@ -406,6 +420,10 @@ func (rawKeys rawKeyRing) keys() (*keyRing, error) {
 	for _, rawTronKey := range rawKeys.Tron {
 		tronKey := tronkey.KeyFor(internal.NewRaw(rawTronKey))
 		keyRing.Tron[tronKey.ID()] = tronKey
+	}
+	for _, rawSuiKey := range rawKeys.Sui {
+		suiKey := suikey.KeyFor(internal.NewRaw(rawSuiKey))
+		keyRing.Sui[suiKey.ID()] = suiKey
 	}
 	for _, rawVRFKey := range rawKeys.VRF {
 		vrfKey := vrfkey.KeyFor(internal.NewRaw(rawVRFKey))
