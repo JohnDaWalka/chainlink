@@ -107,10 +107,6 @@ type WorkflowConfig struct {
 	FeedID                 string          `toml:"feed_id" validate:"required,startsnotwith=0x"`
 }
 
-type ReadContractTestInput struct {
-	ExpectedFundingAmount *big.Int
-}
-
 type readContractInput struct {
 	readTargetName       string
 	contractReaderConfig string
