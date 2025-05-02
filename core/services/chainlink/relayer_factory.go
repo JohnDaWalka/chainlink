@@ -197,6 +197,10 @@ func (r *RelayerFactory) NewAptos(ks coretypes.Keystore, chainCfgs RawConfigs) (
 	return r.NewLOOPRelayer("Aptos", relay.NetworkAptos, env.AptosPlugin, ks, chainCfgs)
 }
 
+func (r *RelayerFactory) NewSui(ks coretypes.Keystore, chainCfgs RawConfigs) (map[types.RelayID]loop.Relayer, error) {
+	return r.NewLOOPRelayer("Sui", relay.NetworkSui, env.SuiPlugin, ks, chainCfgs)
+}
+
 func (r *RelayerFactory) NewLOOPRelayer(name string, network string, plugin env.Plugin, ks coretypes.Keystore, chainCfgs RawConfigs) (map[types.RelayID]loop.Relayer, error) {
 	relayers := make(map[types.RelayID]loop.Relayer)
 	lggr := r.Logger.Named(name)

@@ -224,6 +224,24 @@ func InitTron(factory RelayerFactory, ks keystore.Tron, chainCfgs RawConfigs) Co
 	}
 }
 
+// InitSui is a option for instantiating Sui relayers
+func InitSui(factory RelayerFactory, ks keystore.Sui, chainCfgs RawConfigs) CoreRelayerChainInitFunc {
+	return func(op *CoreRelayerChainInteroperators) (err error) {
+		loopKs := &keystore.SuiLoopSinger{Sui: ks}
+		relayers, err := factory.NewSui(loopKs, chainCfgs)
+		if err != nil {
+			return fmt.Errorf("failed to setup aptos relayer: %w", err)
+		}
+
+		for id, relayer := range relayers {
+			op.srvs = append(op.srvs, relayer)
+			op.loopRelayers[id] = relayer
+		}
+
+		return nil
+	}
+}
+
 // Get a [loop.Relayer] by id
 func (rs *CoreRelayerChainInteroperators) Get(id types.RelayID) (loop.Relayer, error) {
 	rs.mu.Lock()
