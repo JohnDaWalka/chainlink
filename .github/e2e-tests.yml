@@ -1121,7 +1121,7 @@ runner-test-matrix:
       - Merge Queue E2E Core Tests
       - Nightly E2E Tests
       - Push E2E Core Tests
-    test_cmd: cd smoke/ccip && go test github.com/smartcontractkit/chainlink/integration-tests/smoke/ccip -v -run '^(Test_CCIPTokenPriceUpdates|Test_CCIPMultiTokenPriceUpdatesSolanaDest)$' -timeout 18m -count=1 -test.parallel=1 -json
+    test_cmd: cd smoke/ccip && go test github.com/smartcontractkit/chainlink/integration-tests/smoke/ccip -v -run '^Test_CCIPTokenPriceUpdates|Test_CCIPMultiTokenPriceUpdatesSolanaDest$' -timeout 18m -count=1 -test.parallel=1 -json
     pyroscope_env: ci-smoke-ccipv1_6-evm-simulated
     test_env_vars:
       E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
