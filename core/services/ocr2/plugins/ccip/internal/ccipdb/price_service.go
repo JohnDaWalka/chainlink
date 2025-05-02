@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"runtime/debug"
 	"slices"
 	"sort"
 	"sync"
@@ -113,6 +114,7 @@ func (p *priceService) Start(context.Context) error {
 }
 
 func (p *priceService) Close() error {
+	p.lggr.Infow("Close() called on price_service", "Stack", debug.Stack())
 	return p.StateMachine.StopOnce("PriceService", func() error {
 		p.lggr.Info("Closing PriceService")
 		close(p.stopChan)
@@ -133,17 +135,23 @@ func (p *priceService) run() {
 		defer gasUpdateTicker.Stop()
 		defer tokenUpdateTicker.Stop()
 
+		p.lggr.Info("Starting PriceService background updates", "gasUpdateInterval", p.gasUpdateInterval, "tokenUpdateInterval", p.tokenUpdateInterval)
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-gasUpdateTicker.C:
+				p.lggr.Info("Updating gas prices in the background")
 				err := p.runGasPriceUpdate(ctx)
+				p.lggr.Info("Gas prices updated in the background")
 				if err != nil {
 					p.lggr.Errorw("Error when updating gas prices in the background", "err", err)
 				}
 			case <-tokenUpdateTicker.C:
+				p.lggr.Info("Updating token prices in the background")
 				err := p.runTokenPriceUpdate(ctx)
+				p.lggr.Info("Token prices updated in the background")
 				if err != nil {
 					p.lggr.Errorw("Error when updating token prices in the background", "err", err)
 				}
@@ -160,6 +168,7 @@ func (p *priceService) UpdateDynamicConfig(ctx context.Context, gasPriceEstimato
 
 	// Config update may substantially change the prices, refresh the prices immediately, this also makes testing easier
 	// for not having to wait to the full update interval.
+	p.lggr.Info("Updating gas prices after dynamic config update")
 	if err := p.runGasPriceUpdate(ctx); err != nil {
 		p.lggr.Errorw("Error when updating gas prices after dynamic config update", "err", err)
 	}
@@ -224,22 +233,27 @@ func (p *priceService) runGasPriceUpdate(ctx context.Context) error {
 	p.dynamicConfigMu.RLock()
 	defer p.dynamicConfigMu.RUnlock()
 
+	p.lggr.Info("Running gas price update")
+
 	// There may be a period of time between service is started and dynamic config is updated
 	if p.gasPriceEstimator == nil {
 		p.lggr.Info("Skipping gas price update due to gasPriceEstimator not ready")
 		return nil
 	}
 
+	p.lggr.Info("Observing gas price updates")
 	sourceGasPriceUSD, err := p.observeGasPriceUpdates(ctx, p.lggr)
 	if err != nil {
 		return fmt.Errorf("failed to observe gas price updates: %w", err)
 	}
 
+	p.lggr.Info("Writing gas prices to db")
 	err = p.writeGasPricesToDB(ctx, sourceGasPriceUSD)
 	if err != nil {
 		return fmt.Errorf("failed to write gas prices to db: %w", err)
 	}
 
+	p.lggr.Info("Gas prices written to db")
 	return nil
 }
 
@@ -249,21 +263,27 @@ func (p *priceService) runTokenPriceUpdate(ctx context.Context) error {
 	p.dynamicConfigMu.RLock()
 	defer p.dynamicConfigMu.RUnlock()
 
+	p.lggr.Info("Running token price update")
+
 	// There may be a period of time between service is started and dynamic config is updated
 	if p.destPriceRegistryReader == nil {
 		p.lggr.Info("Skipping token price update due to destPriceRegistry not ready")
 		return nil
 	}
 
+	p.lggr.Info("Observing token price updates")
 	tokenPricesUSD, err := p.observeTokenPriceUpdates(ctx, p.lggr)
 	if err != nil {
 		return fmt.Errorf("failed to observe token price updates: %w", err)
 	}
 
+	p.lggr.Info("Writing token prices to db")
 	err = p.writeTokenPricesToDB(ctx, tokenPricesUSD)
 	if err != nil {
 		return fmt.Errorf("failed to write token prices to db: %w", err)
 	}
+
+	p.lggr.Info("Token prices written to db")
 
 	return nil
 }
@@ -281,6 +301,7 @@ func (p *priceService) observeGasPriceUpdates(
 		ChainSelector: p.sourceChainSelector,
 	}
 
+	lggr.Infow("Observing gas price updates", "sourceNativeTokenID", sourceNativeTokenID)
 	// Include wrapped native to identify the source native USD price, notice USD is in 1e18 scale, i.e. $1 = 1e18
 	rawTokenPricesUSD, err := p.priceGetter.GetTokenPricesUSD(ctx, []ccipcommon.TokenID{sourceNativeTokenID})
 	if err != nil {
@@ -292,6 +313,7 @@ func (p *priceService) observeGasPriceUpdates(
 		return nil, fmt.Errorf("missing source native (%v) price", sourceNativeTokenID)
 	}
 
+	lggr.Infow("Fetching gas price", "sourceNativePriceUSD", sourceNativePriceUSD)
 	sourceGasPrice, err := p.gasPriceEstimator.GetGasPrice(ctx)
 	if err != nil {
 		return nil, err
@@ -299,6 +321,8 @@ func (p *priceService) observeGasPriceUpdates(
 	if sourceGasPrice == nil {
 		return nil, errors.New("missing gas price")
 	}
+
+	lggr.Infow("Denoting gas price in USD", "sourceGasPrice", sourceGasPrice, "sourceNativePriceUSD", sourceNativePriceUSD)
 	sourceGasPriceUSD, err = p.gasPriceEstimator.DenoteInUSD(ctx, sourceGasPrice, sourceNativePriceUSD)
 	if err != nil {
 		return nil, err
@@ -330,23 +354,27 @@ func (p *priceService) observeTokenPriceUpdates(
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch token prices: %w", err)
 	}
+	lggr.Infow("Fetched token prices", "rawTokenPricesUSD", rawTokenPricesUSD)
 
 	missingDestNativePrice, err := p.findMissingDestNativeTokenPrice(ctx, rawTokenPricesUSD)
 	if err != nil {
 		return nil, fmt.Errorf("find missing dest native token price: %w", err)
 	}
+	lggr.Infow("Found missing dest native token price", "missingDestNativePrice", missingDestNativePrice)
 	if missingDestNativePrice != nil {
 		destNativeTokenID := ccipcommon.TokenID{TokenAddress: p.sourceNative, ChainSelector: p.destChainSelector}
 		rawTokenPricesUSD[destNativeTokenID] = missingDestNativePrice
 	}
 
+	lggr.Infow("Verifying no price returned by price getter is nil")
 	// Verify no price returned by price getter is nil
 	for tokenID, price := range rawTokenPricesUSD {
 		if price == nil {
 			return nil, fmt.Errorf("token price is nil for token %v", tokenID)
 		}
-		lggr.Infow("fetched raw token price", "tokenID", tokenID, "price", price)
 	}
+
+	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
 
 	// at this point the rawTokenPricesUSD contains both source native and dest tokens, we only want to observe
 	// destination chain tokens.
@@ -357,16 +385,23 @@ func (p *priceService) observeTokenPriceUpdates(
 			destTokens = append(destTokens, tokenID.TokenAddress)
 		}
 	}
+
+	lggr.Infow("Sorting destination tokens", "destTokens", destTokens)
 	sort.Slice(destTokens, func(i, j int) bool { return destTokens[i] < destTokens[j] })
+	lggr.Infow("Sorted destination tokens", "destTokens", destTokens)
+
+	lggr.Infow("Getting tokens decimals")
 	destTokensDecimals, err := p.destPriceRegistryReader.GetTokensDecimals(ctx, destTokens)
 	if err != nil {
 		return nil, fmt.Errorf("get tokens decimals: %w", err)
 	}
+	lggr.Infow("Got tokens decimals", "destTokensDecimals", destTokensDecimals)
 
 	if len(destTokensDecimals) != len(destTokens) {
 		return nil, errors.New("mismatched token decimals and tokens")
 	}
 
+	lggr.Infow("Calculating token prices per 1e18")
 	tokenPricesUSDPer1e18 := make(map[cciptypes.Address]*big.Int, len(rawTokenPricesUSD))
 	for i, token := range destTokens {
 		tokenID := ccipcommon.TokenID{TokenAddress: token, ChainSelector: p.destChainSelector}
@@ -376,7 +411,7 @@ func (p *priceService) observeTokenPriceUpdates(
 		}
 		tokenPricesUSDPer1e18[token] = calculateUsdPer1e18TokenAmount(tokenPriceUSD, destTokensDecimals[i])
 	}
-
+	lggr.Infow("Calculated token prices per 1e18", "tokenPricesUSDPer1e18", tokenPricesUSDPer1e18)
 	lggr.Infow("PriceService observed latest token prices",
 		"sourceChainSelector", p.sourceChainSelector,
 		"destChainSelector", p.destChainSelector,
