@@ -53,8 +53,7 @@ const (
 	EVMFamilySelector   = "2812d52c"
 	SVMFamilySelector   = "1e10bdc4"
 	AptosFamilySelector = "ac77ffec"
-	//TODO(ton): Add TON support to FeeQuoter
-	TVMFamilySelector = ""
+	TVMFamilySelector   = "647e2ba9"
 )
 
 var (
@@ -1779,8 +1778,7 @@ func DefaultFeeQuoterDestChainConfig(configEnabled bool, destChainSelector ...ui
 			familySelector, _ = hex.DecodeString(SVMFamilySelector) // solana
 		} else if destFamily == chain_selectors.FamilyAptos {
 			familySelector, _ = hex.DecodeString(AptosFamilySelector) // aptos
-		}
-		if destFamily == chain_selectors.FamilyTon {
+		} else if destFamily == chain_selectors.FamilyTon {
 			familySelector, _ = hex.DecodeString(TVMFamilySelector) // ton
 		}
 	}
