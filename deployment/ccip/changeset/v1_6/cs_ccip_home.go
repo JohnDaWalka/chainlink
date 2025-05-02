@@ -27,6 +27,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+
+	"github.com/smartcontractkit/chainlink/deployment/ccip"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -671,7 +673,7 @@ func newDonWithCandidateOp(
 		nodes.PeerIDs(),
 		[]capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
 			{
-				CapabilityId: internal.CCIPCapabilityID,
+				CapabilityId: ccip.CCIPCapabilityID,
 				Config:       encodedSetCandidateCall,
 			},
 		},
@@ -889,7 +891,7 @@ func setCandidateOnExistingDon(
 		nodes.PeerIDs(),
 		[]capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
 			{
-				CapabilityId: internal.CCIPCapabilityID,
+				CapabilityId: ccip.CCIPCapabilityID,
 				Config:       encodedSetCandidateCall,
 			},
 		},
@@ -952,7 +954,7 @@ func promoteCandidateOp(
 		nodes.PeerIDs(),
 		[]capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
 			{
-				CapabilityId: internal.CCIPCapabilityID,
+				CapabilityId: ccip.CCIPCapabilityID,
 				Config:       encodedPromotionCall,
 			},
 		},
@@ -1183,7 +1185,7 @@ func revokeCandidateOps(
 		nodes.PeerIDs(),
 		[]capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
 			{
-				CapabilityId: internal.CCIPCapabilityID,
+				CapabilityId: ccip.CCIPCapabilityID,
 				Config:       encodedRevokeCandidateCall,
 			},
 		},
