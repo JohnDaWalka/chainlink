@@ -298,6 +298,7 @@ func (p *PriceRegistry) GetTokensDecimals(ctx context.Context, tokenAddresses []
 		return rpclib.ParseOutput[uint8](d, 0)
 	})
 	if err != nil {
+		p.lggr.Error("failed to parse decimals outputs", "error", err, "batchCalls", evmCalls, "results", results)
 		return nil, fmt.Errorf("parse outputs: %w", err)
 	}
 
