@@ -104,7 +104,12 @@ func NewPriceService(
 	return pw
 }
 
-func (p *priceService) Start(context.Context) error {
+func (p *priceService) Start(ctx context.Context) error {
+	p.lggr.Infow("Start() called on price_service", "Stack", debug.Stack())
+	go func() {
+		<-ctx.Done()
+		p.lggr.Errorf("Start() context done: %v\nStack trace:\n%s", ctx.Err(), debug.Stack())
+	}()
 	return p.StateMachine.StartOnce("PriceService", func() error {
 		p.lggr.Info("Starting PriceService")
 		p.wg.Add(1)
@@ -125,6 +130,11 @@ func (p *priceService) Close() error {
 
 func (p *priceService) run() {
 	ctx, cancel := p.stopChan.NewCtx()
+	go func() {
+		<-ctx.Done()
+		p.lggr.Errorf("run() NewCtx() context done: %v\nStack trace:\n%s", ctx.Err(), debug.Stack())
+	}()
+
 	defer cancel()
 
 	gasUpdateTicker := time.NewTicker(utils.WithJitter(p.gasUpdateInterval))
@@ -140,6 +150,7 @@ func (p *priceService) run() {
 		for {
 			select {
 			case <-ctx.Done():
+				p.lggr.Infow("PriceService background context done", "Stack", debug.Stack())
 				return
 			case <-gasUpdateTicker.C:
 				p.lggr.Info("Updating gas prices in the background")
@@ -161,6 +172,10 @@ func (p *priceService) run() {
 }
 
 func (p *priceService) UpdateDynamicConfig(ctx context.Context, gasPriceEstimator prices.GasPriceEstimatorCommit, destPriceRegistryReader ccipdata.PriceRegistryReader) error {
+	go func() {
+		<-ctx.Done()
+		p.lggr.Errorf("UpdateDynamicConfig() context done: %v\nStack trace:\n%s", ctx.Err(), debug.Stack())
+	}()
 	p.dynamicConfigMu.Lock()
 	p.gasPriceEstimator = gasPriceEstimator
 	p.destPriceRegistryReader = destPriceRegistryReader
@@ -180,6 +195,10 @@ func (p *priceService) UpdateDynamicConfig(ctx context.Context, gasPriceEstimato
 }
 
 func (p *priceService) GetGasAndTokenPrices(ctx context.Context, destChainSelector uint64) (map[uint64]*big.Int, map[cciptypes.Address]*big.Int, error) {
+	go func() {
+		<-ctx.Done()
+		p.lggr.Errorf("GetGasAndTokenPrices() context done: %v\nStack trace:\n%s", ctx.Err(), debug.Stack())
+	}()
 	eg := new(errgroup.Group)
 
 	var gasPricesInDB []cciporm.GasPrice
@@ -226,6 +245,11 @@ func (p *priceService) GetGasAndTokenPrices(ctx context.Context, destChainSelect
 }
 
 func (p *priceService) runGasPriceUpdate(ctx context.Context) error {
+	go func() {
+		<-ctx.Done()
+		p.lggr.Errorf("runGasPriceUpdate() context done: %v\nStack trace:\n%s", ctx.Err(), debug.Stack())
+	}()
+
 	// Protect against concurrent updates of `gasPriceEstimator` and `destPriceRegistryReader`
 	// Price updates happen infrequently - once every `gasPriceUpdateInterval` seconds.
 	// It does not happen on any code path that is performance sensitive.
@@ -258,6 +282,11 @@ func (p *priceService) runGasPriceUpdate(ctx context.Context) error {
 }
 
 func (p *priceService) runTokenPriceUpdate(ctx context.Context) error {
+	go func() {
+		<-ctx.Done()
+		p.lggr.Errorf("runTokenPriceUpdate() context done: %v\nStack trace:\n%s", ctx.Err(), debug.Stack())
+	}()
+
 	// Protect against concurrent updates of `tokenPriceEstimator` and `destPriceRegistryReader`
 	// Price updates happen infrequently - once every `tokenPriceUpdateInterval` seconds.
 	p.dynamicConfigMu.RLock()
@@ -292,6 +321,11 @@ func (p *priceService) observeGasPriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
 ) (sourceGasPriceUSD *big.Int, err error) {
+	go func() {
+		<-ctx.Done()
+		p.lggr.Errorf("observeGasPriceUpdates() context done: %v\nStack trace:\n%s", ctx.Err(), debug.Stack())
+	}()
+
 	if p.gasPriceEstimator == nil {
 		return nil, errors.New("gasPriceEstimator is not set yet")
 	}
@@ -346,6 +380,10 @@ func (p *priceService) observeTokenPriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
 ) (map[cciptypes.Address]*big.Int, error) {
+	go func() {
+		<-ctx.Done()
+		p.lggr.Errorf("observeTokenPriceUpdates() context done: %v\nStack trace:\n%s", ctx.Err(), debug.Stack())
+	}()
 	if p.destPriceRegistryReader == nil {
 		return nil, errors.New("destPriceRegistry is not set yet")
 	}
@@ -429,6 +467,10 @@ func (p *priceService) findMissingDestNativeTokenPrice(
 	ctx context.Context,
 	tokenPrices map[ccipcommon.TokenID]*big.Int,
 ) (*big.Int, error) {
+	go func() {
+		<-ctx.Done()
+		p.lggr.Errorf("findMissingDestNativeTokenPrice() context done: %v\nStack trace:\n%s", ctx.Err(), debug.Stack())
+	}()
 	lggr := logger.With(p.lggr,
 		"func", "findMissingDestNativeTokenPrice",
 		"sourceNative", p.sourceNative,
@@ -468,6 +510,11 @@ func (p *priceService) findMissingDestNativeTokenPrice(
 }
 
 func (p *priceService) writeGasPricesToDB(ctx context.Context, sourceGasPriceUSD *big.Int) error {
+	go func() {
+		<-ctx.Done()
+		p.lggr.Errorf("writeGasPricesToDB() context done: %v\nStack trace:\n%s", ctx.Err(), debug.Stack())
+	}()
+
 	if sourceGasPriceUSD == nil {
 		return nil
 	}
@@ -482,6 +529,11 @@ func (p *priceService) writeGasPricesToDB(ctx context.Context, sourceGasPriceUSD
 }
 
 func (p *priceService) writeTokenPricesToDB(ctx context.Context, tokenPricesUSD map[cciptypes.Address]*big.Int) error {
+	go func() {
+		<-ctx.Done()
+		p.lggr.Errorf("writeTokenPricesToDB() context done: %v\nStack trace:\n%s", ctx.Err(), debug.Stack())
+	}()
+
 	if tokenPricesUSD == nil {
 		return nil
 	}
