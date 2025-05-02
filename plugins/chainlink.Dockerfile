@@ -89,7 +89,6 @@ COPY --from=buildgo /gobins/ /usr/local/bin/
 # Copy shared libraries from the build stage.
 COPY --from=buildgo /tmp/lib /usr/lib/
 
-USER ${CHAINLINK_USER}
 WORKDIR /home/${CHAINLINK_USER}
 
 # Explicitly set the cache dir. Needed so both root and non-root user has an explicit location.
