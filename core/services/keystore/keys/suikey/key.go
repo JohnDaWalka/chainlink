@@ -78,7 +78,7 @@ func (s Key) Address() string {
 	addressBytes := blake2b.Sum256(flaggedPubKey)
 
 	// Return the full 32-byte address with 0x prefix
-	return "0x" + hex.EncodeToString(addressBytes[:])
+	return hex.EncodeToString(addressBytes[:])
 }
 
 // Account is an alias for Address
