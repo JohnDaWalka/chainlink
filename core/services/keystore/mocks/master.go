@@ -42,6 +42,26 @@ func (_m *Master) Aptos() keystore.Aptos {
 	return r0
 }
 
+// Sui provides a mock function with no fields
+func (_m *Master) Sui() keystore.Sui {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Sui")
+	}
+
+	var r0 keystore.Sui
+	if rf, ok := ret.Get(0).(func() keystore.Sui); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(keystore.Sui)
+		}
+	}
+
+	return r0
+}
+
 // Master_Aptos_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Aptos'
 type Master_Aptos_Call struct {
 	*mock.Call
