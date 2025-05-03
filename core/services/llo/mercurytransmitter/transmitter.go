@@ -351,7 +351,9 @@ func (mt *transmitter) spawnCommitLoops() {
 			defer mt.wg.Done()
 
 			var err error
-			ctx := context.Background()
+			ctx, cancel := mt.stopCh.NewCtx()
+			defer cancel()
+
 			buff := cap(mt.commitCh) / 10
 			transmissions := make([]*Transmission, 0, buff)
 			ticker := time.NewTicker(commitInterval)
@@ -359,10 +361,12 @@ func (mt *transmitter) spawnCommitLoops() {
 
 			for {
 				select {
-				case <-mt.stopCh:
+				case <-ctx.Done():
 					if len(transmissions) >= buff {
-						if err = mt.transmit(ctx, transmissions); err != nil {
-							mt.lggr.Error("Error transmitting records", "error", err)
+						closeCtx, closeCancel := context.WithTimeout(context.Background(), time.Second)
+						defer closeCancel()
+						if err = mt.transmit(closeCtx, transmissions); err != nil {
+							mt.lggr.Error("Error transmitting records when stopping", "error", err)
 						}
 					}
 					return
