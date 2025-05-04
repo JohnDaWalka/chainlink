@@ -53,7 +53,7 @@ func TestCallPromoteStagingConfig(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, onchainConfigProd, 64)
 
-	prodCfg := SetProductionConfig{
+	prodCfg := ConfiguratorConfig{
 		ConfiguratorAddress:   configuratorAddr,
 		ConfigID:              [32]byte{},
 		Signers:               [][]byte{{0x01}, {0x02}, {0x03}, {0x04}},
@@ -65,7 +65,7 @@ func TestCallPromoteStagingConfig(t *testing.T) {
 	}
 
 	callProd := SetProductionConfigConfig{
-		ConfigurationsByChain: map[uint64][]SetProductionConfig{
+		ConfigurationsByChain: map[uint64][]ConfiguratorConfig{
 			testutil.TestChain.Selector: {prodCfg},
 		},
 		MCMSConfig: nil,
@@ -110,7 +110,7 @@ func TestCallPromoteStagingConfig(t *testing.T) {
 	stgConfig[31] = 1 // version = 1
 	copy(stgConfig[32:64], productionDigest[:])
 
-	stagingCfg := SetStagingConfig{
+	stagingCfg := ConfiguratorConfig{
 		ConfiguratorAddress:   configuratorAddr,
 		ConfigID:              [32]byte{},
 		Signers:               [][]byte{{0x01}, {0x02}, {0x03}, {0x04}},
@@ -122,7 +122,7 @@ func TestCallPromoteStagingConfig(t *testing.T) {
 	}
 
 	callStaging := SetStagingConfigConfig{
-		ConfigurationsByChain: map[uint64][]SetStagingConfig{
+		ConfigurationsByChain: map[uint64][]ConfiguratorConfig{
 			testutil.TestChain.Selector: {stagingCfg},
 		},
 		MCMSConfig: nil,

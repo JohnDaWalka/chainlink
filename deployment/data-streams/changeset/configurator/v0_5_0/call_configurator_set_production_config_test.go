@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/configurator"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	"github.com/stretchr/testify/require"
 
 	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
@@ -41,7 +43,7 @@ func TestCallSetProductionConfig(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, onchainConfig, 64)
 
-	prodCfg := SetProductionConfig{
+	prodCfg := ConfiguratorConfig{
 		ConfiguratorAddress: configuratorAddr,
 		ConfigID:            [32]byte{},
 		Signers: [][]byte{
@@ -57,7 +59,7 @@ func TestCallSetProductionConfig(t *testing.T) {
 	}
 
 	callConf := SetProductionConfigConfig{
-		ConfigurationsByChain: map[uint64][]SetProductionConfig{
+		ConfigurationsByChain: map[uint64][]ConfiguratorConfig{
 			chainSelector: {prodCfg},
 		},
 		MCMSConfig: nil,
@@ -71,4 +73,43 @@ func TestCallSetProductionConfig(t *testing.T) {
 	)
 
 	require.NoError(t, err)
+
+	t.Run("VerifyMetadata", func(t *testing.T) {
+		// Use View To Confirm Data
+		_, outputs, err := commonChangesets.ApplyChangesetsV2(t, e,
+			[]commonChangesets.ConfiguredChangeSet{
+				commonChangesets.Configure(
+					changeset.SaveContractViews,
+					changeset.SaveContractViewsConfig{
+						Chains: []uint64{testutil.TestChain.Selector},
+					},
+				),
+			},
+		)
+		require.NoError(t, err)
+		require.Len(t, outputs, 1)
+		output := outputs[0]
+
+		client := e.Chains[testutil.TestChain.Selector].Client
+		contract, err := configurator.NewConfigurator(configuratorAddr, client)
+
+		stagingIter, err := contract.FilterProductionConfigSet(nil, nil)
+		require.NoError(t, err)
+		defer stagingIter.Close()
+
+		var digest [32]byte
+		for stagingIter.Next() {
+			event := stagingIter.Event
+			digest = event.ConfigDigest
+		}
+
+		VerifyConfiguratorState(t,
+			output.DataStore,
+			testutil.TestChain.Selector,
+			configuratorAddr,
+			digest,
+			prodCfg,
+			1)
+
+	})
 }

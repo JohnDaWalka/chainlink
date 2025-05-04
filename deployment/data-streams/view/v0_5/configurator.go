@@ -1,34 +1,241 @@
 package v0_5
 
 import (
-	"errors"
+	"context"
+	"encoding/json"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/interfaces"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/configurator"
 )
 
-type ConfiguratorView struct {
-	TypeAndVersion string         `json:"typeAndVersion,omitempty"`
-	Address        common.Address `json:"address,omitempty"`
-	Owner          common.Address `json:"owner,omitempty"`
+// ConfigState represents a single configuration state
+type ConfigState struct {
+	ConfigCount           uint64   `json:"configCount"`
+	EncodedOffchainConfig string   `json:"encodedOffchainConfig"`
+	EncodedOnchainConfig  string   `json:"encodedOnchainConfig"`
+	F                     uint8    `json:"f"`
+	OffchainConfigVersion uint64   `json:"offchainConfigVersion"`
+	OffchainTransmitters  []string `json:"offchainTransmitters"`
+	Signers               []string `json:"signers"`
+	IsGreenProduction     bool     `json:"isGreenProduction"`
+	BlockNumber           uint32   `json:"blockNumber"`
 }
 
-// GenerateConfiguratorView generates a ConfiguratorView from a Configurator contract.
-func GenerateConfiguratorView(configurator *configurator.Configurator) (ConfiguratorView, error) {
-	if configurator == nil {
-		return ConfiguratorView{}, errors.New("cannot generate view for nil Configurator")
+// ConfiguratorView represents a simplified view of the contract state
+type ConfiguratorView struct {
+	// Maps: configId -> configDigest -> ConfigState
+	Configs        map[string]map[string]*ConfigState `json:"configs"`
+	TypeAndVersion string                             `json:"typeAndVersion,omitempty"`
+	Owner          common.Address                     `json:"owner,omitempty"`
+}
+
+// NewContractView creates a new empty ConfiguratorView
+func NewContractView() *ConfiguratorView {
+	return &ConfiguratorView{
+		Configs: make(map[string]map[string]*ConfigState),
+	}
+}
+
+type ConfiguratorViewBuilder struct{}
+
+// BuildView scans builds a view of the contract state from logs and calls
+func (b *ConfiguratorViewBuilder) BuildView(ctx context.Context, configurator configurator.ConfiguratorInterface, chainParams interfaces.ChainParams) (ConfiguratorView, error) {
+	view := NewContractView()
+
+	// Type assert to get Ethereum-specific parameters
+	ethParams, ok := chainParams.(interfaces.EthereumParams)
+	if !ok {
+		return ConfiguratorView{}, fmt.Errorf("invalid chain params type: %T", chainParams)
 	}
 
-	owner, err := configurator.Owner(nil)
+	fromBlock := ethParams.FromBlock
+	toBlock := ethParams.ToBlock
+
+	// Define the filter options
+	filterOpts := &bind.FilterOpts{
+		Start:   fromBlock,
+		End:     toBlock,
+		Context: ctx,
+	}
+
+	// Process both production and staging config events
+	if err := b.processConfigEvents(filterOpts, configurator, view); err != nil {
+		return ConfiguratorView{}, err
+	}
+
+	// Process all promote staging config events
+	if err := b.processPromotions(filterOpts, configurator, view); err != nil {
+		return ConfiguratorView{}, err
+	}
+
+	owner, err := configurator.Owner(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return ConfiguratorView{}, fmt.Errorf("failed to get owner for Configurator: %w", err)
+		return ConfiguratorView{}, fmt.Errorf("failed to get contract owner: %w", err)
 	}
 
-	return ConfiguratorView{
-		Address:        configurator.Address(),
-		Owner:          owner,
-		TypeAndVersion: "Configurator 0.5.0",
-	}, nil
+	view.Owner = owner
+
+	return *view, nil
+}
+
+// SerializeView serializes the ConfiguratorView to JSON
+func (v *ConfiguratorView) SerializeView() (string, error) {
+	bytes, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal contract view: %w", err)
+	}
+	return string(bytes), nil
+}
+
+// processConfigEvents processes both ProductionConfigSet and StagingConfigSet events
+func (b *ConfiguratorViewBuilder) processConfigEvents(opts *bind.FilterOpts, configurator configurator.ConfiguratorInterface, view *ConfiguratorView) error {
+	// Process production configs
+	prodIter, err := configurator.FilterProductionConfigSet(opts, nil)
+	if err != nil {
+		return fmt.Errorf("failed to filter production config events: %w", err)
+	}
+	defer prodIter.Close()
+
+	for prodIter.Next() {
+		event := prodIter.Event
+		b.processConfigEvent(event.ConfigId, event.ConfigDigest, event, view)
+	}
+
+	// Process staging configs
+	stagingIter, err := configurator.FilterStagingConfigSet(opts, nil)
+	if err != nil {
+		return fmt.Errorf("failed to filter staging config events: %w", err)
+	}
+	defer stagingIter.Close()
+
+	for stagingIter.Next() {
+		event := stagingIter.Event
+		b.processConfigEvent(event.ConfigId, event.ConfigDigest, event, view)
+	}
+
+	return nil
+}
+
+// processConfigEvent processes either a ProductionConfigSet or StagingConfigSet event
+func (b *ConfiguratorViewBuilder) processConfigEvent(configId [32]byte, configDigest [32]byte, event interface{}, view *ConfiguratorView) {
+	var (
+		configCount           uint64
+		offchainConfig        []byte
+		onchainConfig         []byte
+		f                     uint8
+		offchainConfigVersion uint64
+		offchainTransmitters  [][32]byte
+		signers               [][]byte
+		isGreenProduction     bool
+		blockNumber           uint32
+	)
+
+	switch e := event.(type) {
+	case *configurator.ConfiguratorProductionConfigSet:
+		configCount = e.ConfigCount
+		offchainConfig = e.OffchainConfig
+		onchainConfig = e.OnchainConfig
+		f = e.F
+		offchainConfigVersion = e.OffchainConfigVersion
+		offchainTransmitters = e.OffchainTransmitters
+		signers = e.Signers
+		isGreenProduction = e.IsGreenProduction
+		blockNumber = e.PreviousConfigBlockNumber
+	case *configurator.ConfiguratorStagingConfigSet:
+		configCount = e.ConfigCount
+		offchainConfig = e.OffchainConfig
+		onchainConfig = e.OnchainConfig
+		f = e.F
+		offchainConfigVersion = e.OffchainConfigVersion
+		offchainTransmitters = e.OffchainTransmitters
+		signers = e.Signers
+		isGreenProduction = e.IsGreenProduction
+		blockNumber = e.PreviousConfigBlockNumber
+	default:
+		panic("unknown event type")
+	}
+
+	configIdHex := dsutil.HexEncodeBytes32(configId)
+	configDigestHex := dsutil.HexEncodeBytes32(configDigest)
+
+	if _, ok := view.Configs[configIdHex]; !ok {
+		view.Configs[configIdHex] = make(map[string]*ConfigState)
+	}
+
+	// Convert types to readable hex strings
+	signersHex := make([]string, len(signers))
+	for i, signer := range signers {
+		signersHex[i] = dsutil.HexEncodeBytes(signer)
+	}
+
+	// Convert types to readable hex strings
+	transmittersHex := make([]string, len(offchainTransmitters))
+	for i, transmitter := range offchainTransmitters {
+		transmittersHex[i] = dsutil.HexEncodeBytes32(transmitter)
+	}
+
+	view.Configs[configIdHex][configDigestHex] = &ConfigState{
+		ConfigCount:           configCount,
+		EncodedOffchainConfig: dsutil.HexEncodeBytes(offchainConfig),
+		EncodedOnchainConfig:  dsutil.HexEncodeBytes(onchainConfig),
+		F:                     f,
+		OffchainConfigVersion: offchainConfigVersion,
+		OffchainTransmitters:  transmittersHex,
+		Signers:               signersHex,
+		IsGreenProduction:     isGreenProduction,
+		BlockNumber:           blockNumber,
+	}
+}
+
+// processPromotions processes all PromoteStagingConfig events
+func (b *ConfiguratorViewBuilder) processPromotions(opts *bind.FilterOpts, configurator configurator.ConfiguratorInterface, view *ConfiguratorView) error {
+	iter, err := configurator.FilterPromoteStagingConfig(opts, nil, nil)
+	if err != nil {
+		return fmt.Errorf("failed to filter promote staging config events: %w", err)
+	}
+	defer iter.Close()
+
+	for iter.Next() {
+		event := iter.Event
+		configIdHex := dsutil.HexEncodeBytes32(event.ConfigId)
+
+		// Skip if this configId doesn't exist
+		if configs, ok := view.Configs[configIdHex]; ok {
+			// Update isGreenProduction for all configs with this configId
+			for digest, config := range configs {
+				config.IsGreenProduction = event.IsGreenProduction
+				configs[digest] = config
+			}
+		}
+	}
+
+	return nil
+}
+
+// LoadLatestView loads the contract state from genesis to the latest block
+func LoadLatestView(ctx context.Context, client *ethclient.Client, contractAddress common.Address) (ConfiguratorView, error) {
+	contract, err := configurator.NewConfigurator(contractAddress, client)
+	if err != nil {
+		return ConfiguratorView{}, fmt.Errorf("failed to create configurator contract instance: %w", err)
+	}
+	builder := &ConfiguratorViewBuilder{}
+	return builder.BuildView(ctx, contract, interfaces.EthereumParams{FromBlock: 0, ToBlock: nil})
+}
+
+func (v *ConfiguratorView) GetConfigState(configId, configDigest string) (*ConfigState, error) {
+	configs, ok := v.Configs[configId]
+	if !ok {
+		return nil, fmt.Errorf("configId %s not found", configId)
+	}
+	configState, ok := configs[configDigest]
+	if !ok {
+		return nil, fmt.Errorf("configDigest %s not found for configId %s", configDigest, configId)
+	}
+	return configState, nil
 }

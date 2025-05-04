@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/channel_config_store"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
@@ -41,7 +42,7 @@ func (cc DeployChannelConfigStoreConfig) Validate() error {
 
 func deployChannelConfigStoreLogic(e deployment.Environment, cc DeployChannelConfigStoreConfig) (deployment.ChangesetOutput, error) {
 	dataStore := ds.NewMemoryDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata]()
-	err := performDeployment(e, dataStore, cc)
+	err := deploy(e, dataStore, cc)
 	if err != nil {
 		e.Logger.Errorw("Failed to deploy ChannelConfigStore", "err", err)
 		return deployment.ChangesetOutput{}, deployment.MaybeDataErr(err)
@@ -74,23 +75,31 @@ func deployChannelConfigStorePrecondition(_ deployment.Environment, cc DeployCha
 	return nil
 }
 
-func performDeployment(e deployment.Environment, dataStore ds.MutableDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata], cc DeployChannelConfigStoreConfig) error {
+func deploy(e deployment.Environment, dataStore ds.MutableDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata], cc DeployChannelConfigStoreConfig) error {
 	if err := cc.Validate(); err != nil {
 		return fmt.Errorf("invalid DeployChannelConfigStoreConfig: %w", err)
 	}
 	for _, chainSel := range cc.ChainsToDeploy {
 		chain, ok := e.Chains[chainSel]
 		if !ok {
-			return fmt.Errorf("Chain not found for chain selector %d", chainSel)
+			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}
-		res, err := changeset.DeployContract[*channel_config_store.ChannelConfigStore](e, dataStore, chain, channelConfigStoreDeployFn(), nil)
+		res, err := changeset.DeployContract(e, dataStore, chain, channelConfigStoreDeployFn(), nil)
 		if err != nil {
 			return err
 		}
-		serialized, err := metadata.NewChannelConfigStoreMetadata(metadata.ChannelConfigStoreMetadata{Block: res.Block})
-		if err != nil {
-			return fmt.Errorf("failed to serialize verifier metadata: %w", err)
+
+		contractMetadata := metadata.GenericContractMetadata[v0_5.ChannelConfigStoreView]{
+			Metadata: metadata.ContractMetadata{
+				DeployBlock: res.Block,
+			},
 		}
+
+		serialized, err := metadata.NewSerializedContractMetadata(contractMetadata)
+		if err != nil {
+			return fmt.Errorf("failed to serialize contract metadata: %w", err)
+		}
+
 		// Store ContractMetadata entry for the newly deployed contract
 		if err = dataStore.ContractMetadata().Upsert(
 			ds.ContractMetadata[metadata.SerializedContractMetadata]{

@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
 )
 
 var DeployConfiguratorChangeset = deployment.CreateChangeSet(deployConfiguratorLogic, deployConfiguratorPrecondition)
@@ -82,15 +83,33 @@ func deploy(e deployment.Environment, dataStore ds.MutableDataStore[metadata.Ser
 		if !ok {
 			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}
-		md, err := metadata.NewConfiguratorMetadata(metadata.ConfiguratorMetadata{})
-		if err != nil {
-			return fmt.Errorf("failed to create metadata: %w", err)
-		}
-		options := &changeset.DeployOptions{ContractMetadata: md}
-		_, err = changeset.DeployContract(e, dataStore, chain, DeployFn(), options)
+
+		res, err := changeset.DeployContract(e, dataStore, chain, DeployFn(), nil)
 		if err != nil {
 			return fmt.Errorf("failed to deploy configurator: %w", err)
 		}
+
+		contractMetadata := metadata.GenericContractMetadata[v0_5.ConfiguratorView]{
+			Metadata: metadata.ContractMetadata{
+				DeployBlock: res.Block,
+			},
+		}
+
+		serialized, err := metadata.NewSerializedContractMetadata(contractMetadata)
+		if err != nil {
+			return fmt.Errorf("failed to serialize contract metadata: %w", err)
+		}
+
+		if err = dataStore.ContractMetadata().Upsert(
+			ds.ContractMetadata[metadata.SerializedContractMetadata]{
+				ChainSelector: chain.Selector,
+				Address:       res.Address.String(),
+				Metadata:      *serialized,
+			},
+		); err != nil {
+			return fmt.Errorf("failed to upser contract metadata: %w", err)
+		}
+
 	}
 	return nil
 }

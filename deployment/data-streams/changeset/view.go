@@ -14,7 +14,7 @@ func ViewDataStreams(e deployment.Environment) (json.Marshaler, error) {
 	if err != nil {
 		return nil, err
 	}
-	chainView, err := state.View(e.AllChainSelectors())
+	chainView, err := state.View(e.GetContext(), e.AllChainSelectors())
 	if err != nil {
 		return nil, err
 	}

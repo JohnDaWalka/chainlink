@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
@@ -19,23 +18,9 @@ var SetProductionConfigChangeset = deployment.CreateChangeSet(setProductionConfi
 
 // SetProductionConfigConfig contains the parameters needed to set a production config.
 type SetProductionConfigConfig struct {
-	ConfigurationsByChain map[uint64][]SetProductionConfig
+	ConfigurationsByChain map[uint64][]ConfiguratorConfig
 	MCMSConfig            *types.MCMSConfig
 }
-
-// SetProductionConfig groups the parameters for a production config call.
-type SetProductionConfig struct {
-	ConfiguratorAddress   common.Address
-	ConfigID              [32]byte
-	Signers               [][]byte
-	OffchainTransmitters  [][32]byte
-	F                     uint8
-	OnchainConfig         []byte
-	OffchainConfigVersion uint64
-	OffchainConfig        []byte
-}
-
-func (pc SetProductionConfig) GetContractAddress() common.Address { return pc.ConfiguratorAddress }
 
 func (cfg SetProductionConfigConfig) Validate() error {
 	if len(cfg.ConfigurationsByChain) == 0 {
@@ -69,7 +54,7 @@ func setProductionConfigLogic(e deployment.Environment, cfg SetProductionConfigC
 
 func doSetProductionConfig(
 	c *configurator.Configurator,
-	prodCfg SetProductionConfig,
+	prodCfg ConfiguratorConfig,
 ) (*ethTypes.Transaction, error) {
 	return c.SetProductionConfig(deployment.SimTransactOpts(),
 		prodCfg.ConfigID,

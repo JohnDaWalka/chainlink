@@ -22,22 +22,9 @@ type Config interface {
 }
 
 type SetStagingConfigConfig struct {
-	ConfigurationsByChain map[uint64][]SetStagingConfig
+	ConfigurationsByChain map[uint64][]ConfiguratorConfig
 	MCMSConfig            *types.MCMSConfig
 }
-
-type SetStagingConfig struct {
-	ConfiguratorAddress   common.Address
-	ConfigID              [32]byte
-	Signers               [][]byte
-	OffchainTransmitters  [][32]byte
-	F                     uint8
-	OnchainConfig         []byte
-	OffchainConfigVersion uint64
-	OffchainConfig        []byte
-}
-
-func (sc SetStagingConfig) GetContractAddress() common.Address { return sc.ConfiguratorAddress }
 
 func setStagingConfigPrecondition(_ deployment.Environment, ss SetStagingConfigConfig) error {
 	if err := ss.Validate(); err != nil {
@@ -71,7 +58,7 @@ func setStagingConfigLogic(e deployment.Environment, cfg SetStagingConfigConfig)
 
 func doSetStagingConfig(
 	c *configurator.Configurator,
-	cfg SetStagingConfig,
+	cfg ConfiguratorConfig,
 ) (*ethTypes.Transaction, error) {
 	return c.SetStagingConfig(deployment.SimTransactOpts(),
 		cfg.ConfigID,

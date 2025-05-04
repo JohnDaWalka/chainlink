@@ -42,10 +42,7 @@ func TestDeployVerifierProxy(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	envDatastore, err := datastore.FromDefault[
-		metadata.SerializedContractMetadata,
-		datastore.DefaultMetadata,
-	](e.DataStore)
+	envDatastore, err := datastore.FromDefault[metadata.SerializedContractMetadata, datastore.DefaultMetadata](e.DataStore)
 	require.NoError(t, err)
 
 	// Verify Contract Is Deployed

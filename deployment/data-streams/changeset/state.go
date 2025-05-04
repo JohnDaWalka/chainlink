@@ -1,11 +1,12 @@
 package changeset
 
 import (
+	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/interfaces"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -142,51 +143,60 @@ func LoadChainState(logger logger.Logger, chain deployment.Chain, addresses map[
 	return &cc, nil
 }
 
-func (s DataStreamsOnChainState) View(chains []uint64) (map[string]view.ChainView, error) {
-	m := make(map[string]view.ChainView)
+func (s DataStreamsOnChainState) View(ctx context.Context, chains []uint64) (map[uint64]view.ChainView, error) {
+	m := make(map[uint64]view.ChainView)
 	for _, chainSelector := range chains {
-		chainInfo, err := deployment.ChainInfo(chainSelector)
-		if err != nil {
-			return m, err
-		}
 		if _, ok := s.Chains[chainSelector]; !ok {
 			return m, fmt.Errorf("chain not supported %d", chainSelector)
 		}
 		chainState := s.Chains[chainSelector]
-		chainView, err := chainState.GenerateView()
+		chainView, err := chainState.GenerateView(ctx)
 		if err != nil {
 			return m, err
 		}
-		name := chainInfo.ChainName
-		if chainInfo.ChainName == "" {
-			name = strconv.FormatUint(chainSelector, 10)
-		}
-		m[name] = chainView
+		m[chainSelector] = chainView
 	}
 	return m, nil
 }
 
-func (c DataStreamsChainState) GenerateView() (view.ChainView, error) {
+func (s DataStreamsChainState) GenerateView(ctx context.Context) (view.ChainView, error) {
 	chainView := view.NewChain()
-	if c.Configurators != nil {
-		for _, configurator := range c.Configurators {
-			configuratorView, err := v0_5.GenerateConfiguratorView(configurator)
+	if s.Configurators != nil {
+		for _, contract := range s.Configurators {
+			builder := &v0_5.ConfiguratorViewBuilder{}
+			configuratorView, err := builder.BuildView(ctx, contract, interfaces.EthereumParams{FromBlock: 0, ToBlock: nil})
 			if err != nil {
-				return chainView, errors.Wrapf(err, "failed to generate configurator view %s", configurator.Address().String())
+				return chainView, errors.Wrapf(err, "failed to generate configurator view %s", contract.Address().String())
 			}
-			chainView.Configurator[configurator.Address().Hex()] = configuratorView
-		}
-	}
-	if c.RewardManagers != nil {
-		for _, rm := range c.RewardManagers {
-			rmView, err := v0_5.GenerateRewardManagerView(rm)
-			if err != nil {
-				return chainView, errors.Wrapf(err, "failed to generate RewardManager view %s", rm.Address().String())
-			}
-			chainView.RewardManager[rm.Address().Hex()] = rmView
+			chainView.Configurator[contract.Address().Hex()] = configuratorView
 		}
 	}
 	return chainView, nil
+}
+
+// GenerateConfiguratorViews generates configurator views for the given configurator contracts.
+func (s DataStreamsChainState) GenerateConfiguratorViews(ctx context.Context, contexts map[view.Address]*ConfiguratorContext) (map[view.Address]v0_5.ConfiguratorView, error) {
+	result := make(map[view.Address]v0_5.ConfiguratorView)
+	for address, configuratorContract := range s.Configurators {
+		contractContext, ok := contexts[address.String()]
+		if !ok {
+			// default context
+			contractContext = &ConfiguratorContext{FromBlock: 0}
+		}
+		chainParams := interfaces.EthereumParams{
+			FromBlock: contractContext.FromBlock,
+			ToBlock:   contractContext.ToBlock,
+		}
+
+		builder := &v0_5.ConfiguratorViewBuilder{}
+		configuratorView, err := builder.BuildView(ctx, configuratorContract, chainParams)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address.Hex(), err)
+		}
+		result[address.Hex()] = configuratorView
+	}
+
+	return result, nil
 }
 
 // Helper function to determine if an address belongs to the MCMS contracts, and should be loaded in a separated way
@@ -209,4 +219,9 @@ func belongsToMCMS(addr string, mcmsWithTimelock *commonchangeset.MCMSWithTimelo
 		return true
 	}
 	return false
+}
+
+type ConfiguratorContext struct {
+	FromBlock uint64
+	ToBlock   *uint64
 }

@@ -3,6 +3,7 @@ package metadata
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -52,9 +53,15 @@ type SubscriberDiscount struct {
 	StreamDiscounts   []StreamDiscounts
 }
 
-type ConfiguratorMetadata struct{}
+type ConfiguratorConfig struct{}
+
+type DonId = string
+type ConfiguratorMetadata struct {
+	Configs         map[DonId]ConfiguratorConfig
+	DeploymentBlock uint64
+}
 type ChannelConfigStoreMetadata struct {
-	Block uint64
+	DeploymentBlock uint64
 }
 
 type FeeManagerMetadata struct {
@@ -211,26 +218,40 @@ func NewFeeManagerMetadata(metadata FeeManagerMetadata) (*SerializedContractMeta
 	}, nil
 }
 
-func NewConfiguratorMetadata(metadata ConfiguratorMetadata) (*SerializedContractMetadata, error) {
+// NewSerializedContractMetadata serializes any contract metadata
+func NewSerializedContractMetadata[T any](metadata GenericContractMetadata[T]) (*SerializedContractMetadata, error) {
 	content, err := json.Marshal(metadata)
 	if err != nil {
-		return &SerializedContractMetadata{}, err
+		return nil, err
 	}
 
 	return &SerializedContractMetadata{
-		Type:    dstypes.Configurator.String(),
 		Content: content,
 	}, nil
 }
 
-func NewChannelConfigStoreMetadata(metadata ChannelConfigStoreMetadata) (*SerializedContractMetadata, error) {
-	content, err := json.Marshal(metadata)
-	if err != nil {
-		return &SerializedContractMetadata{}, err
+// DeserializeMetadata converts a SerializedContractMetadata to a GenericContractMetadata of type T
+func DeserializeMetadata[T any](serialized SerializedContractMetadata) (*GenericContractMetadata[T], error) {
+	if len(serialized.Content) == 0 {
+		return nil, fmt.Errorf("empty content in serialized metadata")
 	}
 
-	return &SerializedContractMetadata{
-		Type:    dstypes.ChannelConfigStore.String(),
-		Content: content,
-	}, nil
+	var result GenericContractMetadata[T]
+	if err := json.Unmarshal(serialized.Content, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal contract metadata: %w", err)
+	}
+
+	return &result, nil
+}
+
+type ContractMetadata struct {
+	DeployBlock uint64 `json:"deployBlock"`
+}
+
+// GenericContractMetadata is a generic container for any view type
+// Use as Content for SerializedContractMetadata
+type GenericContractMetadata[T any] struct {
+	Metadata ContractMetadata `json:"metadata"`
+	// View is intended to be populated with the contract's view usually after state change to have an off chain representation of the contract
+	View T `json:"view"`
 }
