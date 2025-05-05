@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	channel_config_store "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/channel-config-store"
 
@@ -17,9 +18,7 @@ import (
 )
 
 // InitializeVerifierChangeset sets registers an expected Verifier contract on the proxy contract
-var InitializeVerifierChangeset deployment.ChangeSetV2[VerifierProxyInitializeVerifierConfig] = &verifierProxyInitializeVerifier{}
-
-type verifierProxyInitializeVerifier struct{}
+var InitializeVerifierChangeset = cldf.CreateChangeSet(verifierProxyInitializeVerifierLogic, verifierProxyInitializeVerifierPrecondition)
 
 type VerifierProxyInitializeVerifierConfig struct {
 	ConfigPerChain map[uint64][]InitializeVerifierConfig
@@ -31,7 +30,7 @@ type InitializeVerifierConfig struct {
 	VerifierAddress      common.Address
 }
 
-func (v verifierProxyInitializeVerifier) Apply(e deployment.Environment, cfg VerifierProxyInitializeVerifierConfig) (deployment.ChangesetOutput, error) {
+func verifierProxyInitializeVerifierLogic(e deployment.Environment, cfg VerifierProxyInitializeVerifierConfig) (deployment.ChangesetOutput, error) {
 	txs, err := GetInitializeVerifierTxs(e, cfg)
 	if err != nil {
 		return deployment.ChangesetOutput{}, err
@@ -76,7 +75,7 @@ func GetInitializeVerifierTxs(e deployment.Environment, cfg VerifierProxyInitial
 	return preparedTxs, nil
 }
 
-func (v verifierProxyInitializeVerifier) VerifyPreconditions(e deployment.Environment, cfg VerifierProxyInitializeVerifierConfig) error {
+func verifierProxyInitializeVerifierPrecondition(e deployment.Environment, cfg VerifierProxyInitializeVerifierConfig) error {
 	if len(cfg.ConfigPerChain) == 0 {
 		return errors.New("ConfigPerChain is empty")
 	}

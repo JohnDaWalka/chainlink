@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 )
 
 var DeployRewardManagerChangeset = cldf.CreateChangeSet(deployRewardManagerLogic, deployRewardManagerPrecondition)

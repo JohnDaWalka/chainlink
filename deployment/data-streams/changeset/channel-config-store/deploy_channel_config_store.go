@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
@@ -16,7 +17,7 @@ import (
 )
 
 // DeployChannelConfigStoreChangeset deploys ChannelConfigStore to the chains specified in the config.
-var DeployChannelConfigStoreChangeset = deployment.CreateChangeSet(deployChannelConfigStoreLogic, deployChannelConfigStorePrecondition)
+var DeployChannelConfigStoreChangeset = cldf.CreateChangeSet(deployChannelConfigStoreLogic, deployChannelConfigStorePrecondition)
 
 func (cc DeployChannelConfigStoreConfig) GetOwnershipConfig() types.OwnershipSettings {
 	return cc.Ownership

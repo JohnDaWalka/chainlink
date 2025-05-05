@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	mcmslib "github.com/smartcontractkit/mcms"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -15,9 +16,7 @@ import (
 )
 
 // SetFeeManagerChangeset sets the active FeeManager contract on the proxy contract
-var SetFeeManagerChangeset deployment.ChangeSetV2[VerifierProxySetFeeManagerConfig] = &verifierProxySetFeeManager{}
-
-type verifierProxySetFeeManager struct{}
+var SetFeeManagerChangeset = cldf.CreateChangeSet(verifierProxySetFeeManagerLogic, verifierProxySetFeeManagerPrecondition)
 
 type VerifierProxySetFeeManagerConfig struct {
 	ConfigPerChain map[uint64][]SetFeeManagerConfig
@@ -29,7 +28,7 @@ type SetFeeManagerConfig struct {
 	FeeManagerAddress common.Address
 }
 
-func (v verifierProxySetFeeManager) Apply(e deployment.Environment, cfg VerifierProxySetFeeManagerConfig) (deployment.ChangesetOutput, error) {
+func verifierProxySetFeeManagerLogic(e deployment.Environment, cfg VerifierProxySetFeeManagerConfig) (deployment.ChangesetOutput, error) {
 	txs, err := GetSetFeeManagerTxs(e, cfg)
 	if err != nil {
 		return deployment.ChangesetOutput{}, err
@@ -74,7 +73,7 @@ func GetSetFeeManagerTxs(e deployment.Environment, cfg VerifierProxySetFeeManage
 	return preparedTxs, nil
 }
 
-func (v verifierProxySetFeeManager) VerifyPreconditions(e deployment.Environment, cfg VerifierProxySetFeeManagerConfig) error {
+func verifierProxySetFeeManagerPrecondition(e deployment.Environment, cfg VerifierProxySetFeeManagerConfig) error {
 	if len(cfg.ConfigPerChain) == 0 {
 		return errors.New("ConfigPerChain is empty")
 	}

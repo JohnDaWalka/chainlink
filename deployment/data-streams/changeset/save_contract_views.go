@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/testutil"
@@ -14,7 +15,7 @@ import (
 )
 
 // SaveContractViews saves the contract views to the datastore.
-var SaveContractViews = deployment.CreateChangeSet(saveViewsLogic, saveViewsPrecondition)
+var SaveContractViews = cldf.CreateChangeSet(saveViewsLogic, saveViewsPrecondition)
 
 type SaveContractViewsConfig struct {
 	Chains []uint64

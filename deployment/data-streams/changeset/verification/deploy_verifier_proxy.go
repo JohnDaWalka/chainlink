@@ -6,6 +6,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/verifier_proxy_v0_5_0"
@@ -17,9 +18,8 @@ import (
 )
 
 // DeployVerifierProxyChangeset deploys VerifierProxy to the chains specified in the config.
-var DeployVerifierProxyChangeset deployment.ChangeSetV2[DeployVerifierProxyConfig] = &verifierProxyDeploy{}
+var DeployVerifierProxyChangeset = cldf.CreateChangeSet(verifierProxyDeployLogic, verifierProxyDeployPrecondition)
 
-type verifierProxyDeploy struct{}
 type DeployVerifierProxyConfig struct {
 	// ChainsToDeploy is a list of chain selectors to deploy the contract to.
 	ChainsToDeploy map[uint64]DeployVerifierProxy
@@ -53,7 +53,7 @@ func (cfg DeployVerifierProxyConfig) Validate() error {
 	return nil
 }
 
-func (v *verifierProxyDeploy) Apply(e deployment.Environment, cc DeployVerifierProxyConfig) (deployment.ChangesetOutput, error) {
+func verifierProxyDeployLogic(e deployment.Environment, cc DeployVerifierProxyConfig) (deployment.ChangesetOutput, error) {
 	dataStore := ds.NewMemoryDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata]()
 	err := deploy(e, dataStore, cc)
 	if err != nil {
@@ -85,7 +85,7 @@ type HasOwnershipConfig interface {
 	GetOwnershipConfig() types.OwnershipSettings
 }
 
-func (v *verifierProxyDeploy) VerifyPreconditions(_ deployment.Environment, cc DeployVerifierProxyConfig) error {
+func verifierProxyDeployPrecondition(_ deployment.Environment, cc DeployVerifierProxyConfig) error {
 	if err := cc.Validate(); err != nil {
 		return fmt.Errorf("invalid DeployVerifierProxyConfig: %w", err)
 	}
