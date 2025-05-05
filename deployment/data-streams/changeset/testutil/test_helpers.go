@@ -15,6 +15,7 @@ import (
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	commonstate "github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/pointer"
@@ -64,7 +65,7 @@ func NewMemoryEnv(t *testing.T, deployMCMS bool, optionalNumNodes ...int) deploy
 		// Deploy MCMS and Timelock
 		_, err := commonChangesets.Apply(t, env, nil,
 			commonChangesets.Configure(
-				deployment.CreateLegacyChangeSet(commonChangesets.DeployMCMSWithTimelockV2),
+				cldf.CreateLegacyChangeSet(commonChangesets.DeployMCMSWithTimelockV2),
 				map[uint64]types.MCMSWithTimelockConfigV2{
 					chainSelector: config,
 				},
@@ -135,7 +136,7 @@ func NewMemoryEnvV2(t *testing.T, cfg MemoryEnvConfig) MemoryEnv {
 	if cfg.ShouldDeployLinkToken {
 		updatedEnv, err := commonChangesets.Apply(t, env, nil,
 			commonChangesets.Configure(
-				deployment.CreateLegacyChangeSet(commonChangesets.DeployLinkToken),
+				cldf.CreateLegacyChangeSet(commonChangesets.DeployLinkToken),
 				[]uint64{chainSelector},
 			),
 		)
@@ -197,7 +198,7 @@ func DeployMCMS(
 
 	env, err := commonChangesets.Apply(t, e, nil,
 		commonChangesets.Configure(
-			deployment.CreateLegacyChangeSet(commonChangesets.DeployMCMSWithTimelockV2),
+			cldf.CreateLegacyChangeSet(commonChangesets.DeployMCMSWithTimelockV2),
 			map[uint64]types.MCMSWithTimelockConfigV2{
 				chainSelector: {
 					Canceller:        config,
@@ -230,7 +231,7 @@ func DeployMCMS(
 		env, err = commonChangesets.Apply(
 			t, env, timelocks,
 			commonChangesets.Configure(
-				deployment.CreateLegacyChangeSet(commonChangesets.TransferToMCMSWithTimelockV2),
+				cldf.CreateLegacyChangeSet(commonChangesets.TransferToMCMSWithTimelockV2),
 				commonChangesets.TransferToMCMSWithTimelockConfig{
 					ContractsByChain: addressesToTransfer[0],
 					MCMSConfig:       proposalutils.TimelockConfig{MinDelay: 0},

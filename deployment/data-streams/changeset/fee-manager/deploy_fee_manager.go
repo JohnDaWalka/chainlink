@@ -6,8 +6,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
+
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/fee_manager_v0_5_0"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
@@ -15,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 )
 
-var DeployFeeManagerChangeset = deployment.CreateChangeSet(deployFeeManagerLogic, deployFeeManagerPrecondition)
+var DeployFeeManagerChangeset = cldf.CreateChangeSet(deployFeeManagerLogic, deployFeeManagerPrecondition)
 
 type DeployFeeManager struct {
 	LinkTokenAddress     common.Address

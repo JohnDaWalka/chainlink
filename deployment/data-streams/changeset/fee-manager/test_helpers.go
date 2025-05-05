@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -47,7 +48,23 @@ func DeployTestEnvironment(t *testing.T, opts DataStreamsTestEnvOptions) (DataSt
 
 	linkTokenAddress := common.Address{}
 	if opts.DeployLinkToken {
-		linkTokenAddress = testEnv.LinkTokenState.LinkToken.Address()
+		env, err := commonchangesets.Apply(t, e, nil,
+			commonchangesets.Configure(
+				cldf.CreateLegacyChangeSet(commonchangesets.DeployLinkToken),
+				[]uint64{testutil.TestChain.Selector},
+			),
+		)
+		require.NoError(t, err)
+
+		addresses, err := env.ExistingAddresses.AddressesForChain(testutil.TestChain.Selector)
+		require.NoError(t, err)
+
+		chain := env.Chains[testutil.TestChain.Selector]
+		linkState, err := commonstate.MaybeLoadLinkTokenChainState(chain, addresses)
+		require.NoError(t, err)
+		require.NotNil(t, linkState.LinkToken)
+		linkTokenAddress = linkState.LinkToken.Address()
+		e = env
 	}
 
 	if opts.DeployFeeManager {

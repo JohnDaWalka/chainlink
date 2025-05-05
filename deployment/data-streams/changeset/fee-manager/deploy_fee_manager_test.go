@@ -10,10 +10,14 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	commonstate "github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
+
+	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
+	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 
@@ -27,7 +31,7 @@ func TestDeployFeeManager(t *testing.T) {
 	// Need the Link Token
 	e, err := commonChangesets.Apply(t, testEnv.Environment, nil,
 		commonChangesets.Configure(
-			deployment.CreateLegacyChangeSet(commonChangesets.DeployLinkToken),
+			cldf.CreateLegacyChangeSet(commonChangesets.DeployLinkToken),
 			[]uint64{testutil.TestChain.Selector},
 		),
 	)

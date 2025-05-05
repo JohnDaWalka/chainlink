@@ -12,11 +12,13 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/txutil"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/configurator"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 )
 
-var PromoteStagingConfigChangeset = deployment.CreateChangeSet(promoteStagingConfigLogic, promoteStagingConfigPrecondition)
+var PromoteStagingConfigChangeset = cldf.CreateChangeSet(promoteStagingConfigLogic, promoteStagingConfigPrecondition)
 
 type PromoteStagingConfigConfig struct {
 	PromotionsByChain map[uint64][]PromoteStagingConfig

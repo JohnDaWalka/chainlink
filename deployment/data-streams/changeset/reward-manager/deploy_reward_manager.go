@@ -6,8 +6,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
+
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	rewardManager "github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/reward_manager_v0_5_0"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
@@ -15,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 )
 
-var DeployRewardManagerChangeset = deployment.CreateChangeSet(deployRewardManagerLogic, deployRewardManagerPrecondition)
+var DeployRewardManagerChangeset = cldf.CreateChangeSet(deployRewardManagerLogic, deployRewardManagerPrecondition)
 
 type DeployRewardManager struct {
 	LinkTokenAddress common.Address
