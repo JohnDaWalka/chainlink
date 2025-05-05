@@ -167,19 +167,6 @@ func (s SerializedContractMetadata) ToFeeManagerMetadata() (FeeManagerMetadata, 
 	return metadata, nil
 }
 
-// NewVerifierMetadata creates a new SerializedContractMetadata from a VerifierMetadata
-func NewVerifierMetadata(metadata VerifierMetadata) (*SerializedContractMetadata, error) {
-	content, err := json.Marshal(metadata)
-	if err != nil {
-		return &SerializedContractMetadata{}, err
-	}
-
-	return &SerializedContractMetadata{
-		Type:    dstypes.Verifier.String(),
-		Content: content,
-	}, nil
-}
-
 // NewVerifierProxyMetadata creates a new SerializedContractMetadata from a VerifierProxyMetadata
 func NewVerifierProxyMetadata(metadata VerifierProxyMetadata) (*SerializedContractMetadata, error) {
 	content, err := json.Marshal(metadata)

@@ -60,8 +60,10 @@ func saveViewsLogic(e deployment.Environment, cfg SaveContractViewsConfig) (depl
 		}
 		state.Chains[chainSelector] = *chainState
 
+		// Configurator
 		existingConfiguratorMetadata := make(map[view.Address]*metadata.GenericContractMetadata[v0_5.ConfiguratorView])
 		configuratorContexts := make(map[view.Address]*ConfiguratorContext)
+		// Collect stuff from the chain state and the datastore
 		for _, c := range chainState.Configurators {
 			cm, err := envDatastore.ContractMetadata().Get(
 				ds.NewContractMetadataKey(testutil.TestChain.Selector, c.Address().String()),
@@ -84,6 +86,7 @@ func saveViewsLogic(e deployment.Environment, cfg SaveContractViewsConfig) (depl
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate configurator view: %w", err)
 		}
 
+		// Update Existing Configurator Metadata
 		for address, contractView := range configuratorViews {
 			existingMetadata := existingConfiguratorMetadata[address]
 			contractMetadata := metadata.GenericContractMetadata[v0_5.ConfiguratorView]{
@@ -106,6 +109,57 @@ func saveViewsLogic(e deployment.Environment, cfg SaveContractViewsConfig) (depl
 				return deployment.ChangesetOutput{}, fmt.Errorf("failed to upsert contract metadata: %w", err)
 			}
 		}
+
+		// Verifier
+		// Collect stuff from the chain state and the datastore
+		existingVerifierMetadata := make(map[view.Address]*metadata.GenericContractMetadata[v0_5.VerifierView])
+		verifierContexts := make(map[view.Address]*VerifierContext)
+		for _, c := range chainState.Verifiers {
+			cm, err := envDatastore.ContractMetadata().Get(
+				ds.NewContractMetadataKey(testutil.TestChain.Selector, c.Address().String()),
+			)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get contract metadata: %w", err)
+			}
+			contractMetadata, err := metadata.DeserializeMetadata[v0_5.VerifierView](cm.Metadata)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert contract metadata: %w", err)
+			}
+			verifierContexts[c.Address().String()] = &VerifierContext{
+				FromBlock: contractMetadata.Metadata.DeployBlock,
+			}
+			existingVerifierMetadata[c.Address().String()] = contractMetadata
+		}
+
+		verifierViews, err := chainState.GenerateVerifierViews(e.GetContext(), verifierContexts)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate verifier view: %w", err)
+		}
+
+		// Update Existing Verifier Metadata
+		for address, contractView := range verifierViews {
+			existingMetadata := existingVerifierMetadata[address]
+			contractMetadata := metadata.GenericContractMetadata[v0_5.VerifierView]{
+				Metadata: existingMetadata.Metadata,
+				View:     contractView,
+			}
+
+			serialized, err := metadata.NewSerializedContractMetadata(contractMetadata)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to serialize contract metadata: %w", err)
+			}
+
+			if err = dataStore.ContractMetadata().Upsert(
+				ds.ContractMetadata[metadata.SerializedContractMetadata]{
+					ChainSelector: chain.Selector,
+					Address:       address,
+					Metadata:      *serialized,
+				},
+			); err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to upsert contract metadata: %w", err)
+			}
+		}
+
 	}
 
 	defaultDs, err := ds.ToDefault(dataStore.Seal())

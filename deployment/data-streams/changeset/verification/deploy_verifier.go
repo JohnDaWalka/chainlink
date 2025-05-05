@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
 
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	verifier "github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/verifier_v0_5_0"
@@ -90,18 +91,33 @@ func deployVerifier(e deployment.Environment, dataStore ds.MutableDataStore[meta
 		if !ok {
 			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}
-		verifierMetadata := metadata.VerifierMetadata{
-			VerifierProxyAddress: chainCfg.VerifierProxyAddress.String(),
-		}
-		serialized, err := metadata.NewVerifierMetadata(verifierMetadata)
-		if err != nil {
-			return fmt.Errorf("failed to serialize verifier metadata: %w", err)
-		}
-		options := &changeset.DeployOptions{ContractMetadata: serialized}
-		_, err = changeset.DeployContract(e, dataStore, chain, VerifierDeployFn(chainCfg.VerifierProxyAddress), options)
+
+		res, err := changeset.DeployContract(e, dataStore, chain, VerifierDeployFn(chainCfg.VerifierProxyAddress), nil)
 		if err != nil {
 			return fmt.Errorf("failed to deploy verifier: %w", err)
 		}
+
+		contractMetadata := metadata.GenericContractMetadata[v0_5.VerifierView]{
+			Metadata: metadata.ContractMetadata{
+				DeployBlock: res.Block,
+			},
+		}
+
+		serialized, err := metadata.NewSerializedContractMetadata(contractMetadata)
+		if err != nil {
+			return fmt.Errorf("failed to serialize contract metadata: %w", err)
+		}
+
+		if err = dataStore.ContractMetadata().Upsert(
+			ds.ContractMetadata[metadata.SerializedContractMetadata]{
+				ChainSelector: chain.Selector,
+				Address:       res.Address.String(),
+				Metadata:      *serialized,
+			},
+		); err != nil {
+			return fmt.Errorf("failed to upser contract metadata: %w", err)
+		}
+
 	}
 
 	return nil

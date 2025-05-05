@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/interfaces"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/verifier_v0_5_0"
@@ -118,7 +119,7 @@ func (b *VerifierViewBuilder) processConfigSetEvents(opts *bind.FilterOpts, veri
 
 	for iter.Next() {
 		event := iter.Event
-		configDigestHex := common.Bytes2Hex(event.ConfigDigest[:])
+		configDigestHex := dsutil.HexEncodeBytes(event.ConfigDigest[:])
 
 		// Get block number for this config
 		blockNumber, err := verifier.LatestConfigDetails(&bind.CallOpts{}, event.ConfigDigest)
@@ -155,7 +156,7 @@ func (b *VerifierViewBuilder) processConfigUpdatedEvents(opts *bind.FilterOpts, 
 
 	for iter.Next() {
 		event := iter.Event
-		configDigestHex := common.Bytes2Hex(event.ConfigDigest[:])
+		configDigestHex := dsutil.HexEncodeBytes(event.ConfigDigest[:])
 
 		// Skip if this configDigest doesn't exist yet
 		state, exists := view.Configs[configDigestHex]
@@ -198,7 +199,7 @@ func (b *VerifierViewBuilder) processConfigActivatedEvents(opts *bind.FilterOpts
 
 	for iter.Next() {
 		event := iter.Event
-		configDigestHex := common.Bytes2Hex(event.ConfigDigest[:])
+		configDigestHex := dsutil.HexEncodeBytes(event.ConfigDigest[:])
 
 		// Skip if this configDigest doesn't exist yet
 		state, exists := view.Configs[configDigestHex]
@@ -222,7 +223,7 @@ func (b *VerifierViewBuilder) processConfigDeactivatedEvents(opts *bind.FilterOp
 
 	for iter.Next() {
 		event := iter.Event
-		configDigestHex := common.Bytes2Hex(event.ConfigDigest[:])
+		configDigestHex := dsutil.HexEncodeBytes(event.ConfigDigest[:])
 
 		// Skip if this configDigest doesn't exist yet
 		state, exists := view.Configs[configDigestHex]
