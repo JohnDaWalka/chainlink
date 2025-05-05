@@ -35,6 +35,9 @@ type ConfiguratorView struct {
 	Owner          common.Address                     `json:"owner,omitempty"`
 }
 
+// ConfiguratorView implements the ContractView interface
+var _ interfaces.ContractView = (*ConfiguratorView)(nil)
+
 // NewContractView creates a new empty ConfiguratorView
 func NewContractView() *ConfiguratorView {
 	return &ConfiguratorView{

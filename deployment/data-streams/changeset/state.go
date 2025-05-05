@@ -159,6 +159,7 @@ func (s DataStreamsOnChainState) View(ctx context.Context, chains []uint64) (map
 	return m, nil
 }
 
+// GenerateView generates a view for the DataStreamsChainState
 func (s DataStreamsChainState) GenerateView(ctx context.Context) (view.ChainView, error) {
 	chainView := view.NewChain()
 	if s.Configurators != nil {
@@ -199,6 +200,31 @@ func (s DataStreamsChainState) GenerateConfiguratorViews(ctx context.Context, co
 	return result, nil
 }
 
+// GenerateVerifierViews generates verifier views for the given verifier contracts.
+func (s DataStreamsChainState) GenerateVerifierViews(ctx context.Context, contexts map[view.Address]*VerifierContext) (map[view.Address]v0_5.VerifierView, error) {
+	result := make(map[view.Address]v0_5.VerifierView)
+	for address, verifierContract := range s.Verifiers {
+		contractContext, ok := contexts[address.String()]
+		if !ok {
+			// default context
+			contractContext = &VerifierContext{FromBlock: 0}
+		}
+		chainParams := interfaces.EthereumParams{
+			FromBlock: contractContext.FromBlock,
+			ToBlock:   contractContext.ToBlock,
+		}
+
+		builder := &v0_5.VerifierViewBuilder{}
+		configuratorView, err := builder.BuildView(ctx, verifierContract, chainParams)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address.Hex(), err)
+		}
+		result[address.Hex()] = configuratorView
+	}
+
+	return result, nil
+}
+
 // Helper function to determine if an address belongs to the MCMS contracts, and should be loaded in a separated way
 func belongsToMCMS(addr string, mcmsWithTimelock *commonchangeset.MCMSWithTimelockState) bool {
 	if mcmsWithTimelock == nil || mcmsWithTimelock.MCMSWithTimelockContracts == nil {
@@ -222,6 +248,11 @@ func belongsToMCMS(addr string, mcmsWithTimelock *commonchangeset.MCMSWithTimelo
 }
 
 type ConfiguratorContext struct {
+	FromBlock uint64
+	ToBlock   *uint64
+}
+
+type VerifierContext struct {
 	FromBlock uint64
 	ToBlock   *uint64
 }

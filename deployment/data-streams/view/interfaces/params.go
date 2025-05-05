@@ -1,6 +1,8 @@
 package interfaces
 
 import (
+	"context"
+
 	"github.com/ethereum/go-ethereum/common"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 )
@@ -21,5 +23,18 @@ func (p EthereumParams) GetChainType() string {
 	return chainselectors.FamilyEVM
 }
 
-// Ensure EthereumParams implements ChainParams
+// EthereumParams implements ChainParams
 var _ ChainParams = (*EthereumParams)(nil)
+
+// ContractView defines the base interface for any contract view
+type ContractView interface {
+	// SerializeView converts the view to a JSON string
+	SerializeView() (string, error)
+}
+
+// ViewBuilder defines the interface for building contract views
+type ViewBuilder interface {
+	// BuildView constructs a view from blockchain data
+	// Note the generic contract parameter - implement for specific contract types
+	BuildView(ctx context.Context, contract interface{}, params ChainParams) (ContractView, error)
+}
