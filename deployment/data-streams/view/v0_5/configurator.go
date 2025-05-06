@@ -44,15 +44,18 @@ func NewContractView() *ConfiguratorView {
 	}
 }
 
-type ConfiguratorViewBuilder struct{}
+type ConfiguratorViewGenerator struct{}
 
 type ConfiguratorContext struct {
 	FromBlock uint64
 	ToBlock   *uint64
 }
 
-// BuildView scans builds a view of the contract state from logs and calls
-func (b *ConfiguratorViewBuilder) BuildView(ctx context.Context, configurator configurator.ConfiguratorInterface,
+// ConfiguratorViewGenerator implements ContractViewGenerator
+var _ interfaces.ContractViewGenerator[configurator.ConfiguratorInterface, ConfiguratorContext, ConfiguratorView] = (*ConfiguratorViewGenerator)(nil)
+
+// Generate scans builds a view of the contract state from logs and calls
+func (b *ConfiguratorViewGenerator) Generate(ctx context.Context, configurator configurator.ConfiguratorInterface,
 	chainParams ConfiguratorContext) (ConfiguratorView, error) {
 	view := NewContractView()
 
@@ -84,7 +87,7 @@ func (b *ConfiguratorViewBuilder) BuildView(ctx context.Context, configurator co
 }
 
 // SerializeView serializes the ConfiguratorView to JSON
-func (v *ConfiguratorView) SerializeView() (string, error) {
+func (v ConfiguratorView) SerializeView() (string, error) {
 	bytes, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal contract view: %w", err)
@@ -93,7 +96,7 @@ func (v *ConfiguratorView) SerializeView() (string, error) {
 }
 
 // processConfigEvents processes both ProductionConfigSet and StagingConfigSet events
-func (b *ConfiguratorViewBuilder) processConfigEvents(opts *bind.FilterOpts, configurator configurator.ConfiguratorInterface, view *ConfiguratorView) error {
+func (b *ConfiguratorViewGenerator) processConfigEvents(opts *bind.FilterOpts, configurator configurator.ConfiguratorInterface, view *ConfiguratorView) error {
 	// Process production configs
 	prodIter, err := configurator.FilterProductionConfigSet(opts, nil)
 	if err != nil {
@@ -122,7 +125,7 @@ func (b *ConfiguratorViewBuilder) processConfigEvents(opts *bind.FilterOpts, con
 }
 
 // processConfigEvent processes either a ProductionConfigSet or StagingConfigSet event
-func (b *ConfiguratorViewBuilder) processConfigEvent(configId [32]byte, configDigest [32]byte, event interface{}, view *ConfiguratorView) {
+func (b *ConfiguratorViewGenerator) processConfigEvent(configId [32]byte, configDigest [32]byte, event interface{}, view *ConfiguratorView) {
 	var (
 		configCount           uint64
 		offchainConfig        []byte
@@ -193,7 +196,7 @@ func (b *ConfiguratorViewBuilder) processConfigEvent(configId [32]byte, configDi
 }
 
 // processPromotions processes all PromoteStagingConfig events
-func (b *ConfiguratorViewBuilder) processPromotions(opts *bind.FilterOpts, configurator configurator.ConfiguratorInterface, view *ConfiguratorView) error {
+func (b *ConfiguratorViewGenerator) processPromotions(opts *bind.FilterOpts, configurator configurator.ConfiguratorInterface, view *ConfiguratorView) error {
 	iter, err := configurator.FilterPromoteStagingConfig(opts, nil, nil)
 	if err != nil {
 		return fmt.Errorf("failed to filter promote staging config events: %w", err)
@@ -217,7 +220,7 @@ func (b *ConfiguratorViewBuilder) processPromotions(opts *bind.FilterOpts, confi
 	return nil
 }
 
-func (v *ConfiguratorView) GetConfigState(configId, configDigest string) (*ConfigState, error) {
+func (v ConfiguratorView) GetConfigState(configId, configDigest string) (*ConfigState, error) {
 	configs, ok := v.Configs[configId]
 	if !ok {
 		return nil, fmt.Errorf("configId %s not found", configId)

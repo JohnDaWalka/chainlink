@@ -18,7 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/channel_config_store"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/configurator"
-	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/fee_manager"
+	fee_manager "github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/fee_manager_v0_5_0"
 
 	rewardManager "github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/reward_manager_v0_5_0"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/verifier_proxy_v0_5_0"
@@ -37,7 +37,7 @@ type DataStreamsEVMChainState struct {
 
 type ContractAndMetadata[C any, M any] struct {
 	Contract C
-	Metadata M
+	Metadata M // retrieved from datastore contract metadata
 }
 
 type DataStreamsOnChainState struct {
@@ -217,7 +217,7 @@ func (s DataStreamsOnChainState) View(ctx context.Context, chains []uint64) (map
 func (s DataStreamsEVMChainState) GenerateView(ctx context.Context) (view.EVMChainView, error) {
 	chainView := view.NewChain()
 	// TODO generate in goroutines
-	configuratorViews, err := s.GenerateConfiguratorViewsV2(ctx)
+	configuratorViews, err := s.GenerateConfiguratorViews(ctx)
 	if err != nil {
 		return chainView, fmt.Errorf("failed to generate configurator views: %w", err)
 	}
@@ -225,7 +225,7 @@ func (s DataStreamsEVMChainState) GenerateView(ctx context.Context) (view.EVMCha
 		chainView.Configurator[address] = contractView
 	}
 
-	verifierViews, err := s.GenerateVerifierViewsV2(ctx)
+	verifierViews, err := s.GenerateVerifierViews(ctx)
 	if err != nil {
 		return chainView, fmt.Errorf("failed to generate verifier views: %w", err)
 	}
@@ -233,18 +233,26 @@ func (s DataStreamsEVMChainState) GenerateView(ctx context.Context) (view.EVMCha
 		chainView.Verifier[address] = contractView
 	}
 
+	feeManagerViews, err := s.GenerateFeeManagerViews(ctx)
+	if err != nil {
+		return chainView, fmt.Errorf("failed to generate fee manager views: %w", err)
+	}
+	for address, contractView := range feeManagerViews {
+		chainView.FeeManager[address] = contractView
+	}
+
 	return chainView, nil
 }
 
-func (s DataStreamsEVMChainState) GenerateConfiguratorViewsV2(ctx context.Context) (map[view.Address]v0_5.ConfiguratorView, error) {
+func (s DataStreamsEVMChainState) GenerateConfiguratorViews(ctx context.Context) (map[view.Address]v0_5.ConfiguratorView, error) {
 	result := make(map[view.Address]v0_5.ConfiguratorView)
 	for address, contractAndMeta := range s.Configurators {
 		contractContext := v0_5.ConfiguratorContext{
 			FromBlock: contractAndMeta.Metadata.Metadata.DeployBlock,
 		}
 
-		builder := &v0_5.ConfiguratorViewBuilder{}
-		configuratorView, err := builder.BuildView(ctx, contractAndMeta.Contract, contractContext)
+		generator := &v0_5.ConfiguratorViewGenerator{}
+		configuratorView, err := generator.Generate(ctx, contractAndMeta.Contract, contractContext)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)
 		}
@@ -254,15 +262,33 @@ func (s DataStreamsEVMChainState) GenerateConfiguratorViewsV2(ctx context.Contex
 	return result, nil
 }
 
-func (s DataStreamsEVMChainState) GenerateVerifierViewsV2(ctx context.Context) (map[view.Address]v0_5.VerifierView, error) {
+func (s DataStreamsEVMChainState) GenerateVerifierViews(ctx context.Context) (map[view.Address]v0_5.VerifierView, error) {
 	result := make(map[view.Address]v0_5.VerifierView)
 	for address, contractAndMeta := range s.Verifiers {
 		contractContext := v0_5.VerifierContext{
 			FromBlock: contractAndMeta.Metadata.Metadata.DeployBlock,
 		}
 
-		builder := &v0_5.VerifierViewBuilder{}
-		contractView, err := builder.BuildView(ctx, contractAndMeta.Contract, contractContext)
+		generator := &v0_5.VerifierViewGenerator{}
+		contractView, err := generator.Generate(ctx, contractAndMeta.Contract, contractContext)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)
+		}
+		result[address] = contractView
+	}
+
+	return result, nil
+}
+
+func (s DataStreamsEVMChainState) GenerateFeeManagerViews(ctx context.Context) (map[view.Address]v0_5.FeeManagerView, error) {
+	result := make(map[view.Address]v0_5.FeeManagerView)
+	for address, contractAndMeta := range s.FeeManagers {
+		contractContext := v0_5.FeeManagerContext{
+			FromBlock: contractAndMeta.Metadata.Metadata.DeployBlock,
+		}
+
+		generator := &v0_5.FeeManagerViewGenerator{}
+		contractView, err := generator.Generate(ctx, contractAndMeta.Contract, contractContext)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)
 		}

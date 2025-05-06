@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/assert"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -15,9 +15,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
-
-	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
-	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 
@@ -63,16 +60,13 @@ func TestDeployFeeManager(t *testing.T) {
 		},
 	}
 
-	resp, err := commonChangesets.Apply(t, e, nil,
+	e, err = commonChangesets.Apply(t, e, nil,
 		commonChangesets.Configure(DeployFeeManagerChangeset, cc),
 	)
 
 	require.NoError(t, err)
 
-	envDatastore, err := datastore.FromDefault[
-		metadata.SerializedContractMetadata,
-		datastore.DefaultMetadata,
-	](resp.DataStore)
+	envDatastore, err := datastore.FromDefault[metadata.SerializedContractMetadata, datastore.DefaultMetadata](e.DataStore)
 	require.NoError(t, err)
 
 	// Verify Contract Is Deployed
@@ -83,37 +77,35 @@ func TestDeployFeeManager(t *testing.T) {
 	require.NotNil(t, record)
 
 	// Store address for other tests
+	feeManagerAddress := common.HexToAddress(record.Address)
+
 	t.Run("VerifyMetadata", func(t *testing.T) {
-		cm, err := envDatastore.ContractMetadata().Get(
-			datastore.NewContractMetadataKey(record.ChainSelector, record.Address),
+		// Use View To Confirm Data
+		_, outputs, err := commonChangesets.ApplyChangesetsV2(t, e,
+			[]commonChangesets.ConfiguredChangeSet{
+				commonChangesets.Configure(
+					changeset.SaveContractViews,
+					changeset.SaveContractViewsConfig{
+						Chains: []uint64{testutil.TestChain.Selector},
+					},
+				),
+			},
 		)
 		require.NoError(t, err)
+		require.Len(t, outputs, 1)
+		output := outputs[0]
 
-		md, err := cm.Metadata.ToFeeManagerMetadata()
-		require.NoError(t, err)
+		contractMetadata := GetState(t, output.DataStore, testutil.TestChain.Selector, feeManagerAddress)
 
-		expectedMetadata := metadata.FeeManagerMetadata{
-			RewardManagerAddress: rewardManagerAddr.String(),
-			VerifierProxyAddress: verifierProxyAddr.String(),
-			FeeTokens: []metadata.FeeToken{
-				{
-					TokenType: metadata.Link,
-					Address:   linkState.LinkToken.Address().String(),
-				},
-				{
-					TokenType: metadata.Native,
-					Address:   nativeAddr.String(),
-				},
-			},
-		}
+		t.Run("VerifyDeploymentParameters", func(t *testing.T) {
+			require.Equal(t, rewardManagerAddr.Hex(), contractMetadata.View.RewardManager)
+			require.Equal(t, verifierProxyAddr.Hex(), contractMetadata.View.ProxyAddress)
+			require.Equal(t, nativeAddr.Hex(), contractMetadata.View.NativeAddress)
+			require.Equal(t, linkState.LinkToken.Address().Hex(), contractMetadata.View.LinkAddress)
+		})
 
-		assert.Equal(t, expectedMetadata, md)
-	})
-
-	t.Run("VerifyOwnershipTransferred", func(t *testing.T) {
-		chain := e.Chains[testutil.TestChain.Selector]
-		owner, _, err := commonChangesets.LoadOwnableContract(common.HexToAddress(record.Address), chain.Client)
-		require.NoError(t, err)
-		assert.Equal(t, testEnv.Timelocks[testutil.TestChain.Selector].Timelock.Address(), owner)
+		t.Run("VerifyOwnershipTransferred", func(t *testing.T) {
+			require.Equal(t, testEnv.Timelocks[testutil.TestChain.Selector].Timelock.Address(), contractMetadata.View.Owner)
+		})
 	})
 }

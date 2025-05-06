@@ -40,7 +40,7 @@ func NewVerifierView() *VerifierView {
 }
 
 // SerializeView serializes the VerifierView to JSON
-func (v *VerifierView) SerializeView() (string, error) {
+func (v VerifierView) SerializeView() (string, error) {
 	bytes, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal verifier view: %w", err)
@@ -49,7 +49,7 @@ func (v *VerifierView) SerializeView() (string, error) {
 }
 
 // GetVerifierState returns the VerifierState for a specific configDigest
-func (v *VerifierView) GetVerifierState(configDigest string) (*VerifierState, error) {
+func (v VerifierView) GetVerifierState(configDigest string) (*VerifierState, error) {
 	state, ok := v.Configs[configDigest]
 	if !ok {
 		return nil, fmt.Errorf("configDigest %s not found", configDigest)
@@ -57,16 +57,19 @@ func (v *VerifierView) GetVerifierState(configDigest string) (*VerifierState, er
 	return state, nil
 }
 
-// VerifierViewBuilder builds views for the Verifier contract
-type VerifierViewBuilder struct{}
+// VerifierViewGenerator builds views for the Verifier contract
+type VerifierViewGenerator struct{}
+
+// ConfiguratorViewGenerator implements ContractViewGenerator
+var _ interfaces.ContractViewGenerator[verifier_v0_5_0.VerifierInterface, VerifierContext, VerifierView] = (*VerifierViewGenerator)(nil)
 
 type VerifierContext struct {
 	FromBlock uint64
 	ToBlock   *uint64
 }
 
-// BuildView builds a view of the Verifier contract state from logs and calls
-func (b *VerifierViewBuilder) BuildView(ctx context.Context, verifier *verifier_v0_5_0.Verifier, chainParams VerifierContext) (VerifierView, error) {
+// Generate builds a view of the Verifier contract state from logs and calls
+func (b *VerifierViewGenerator) Generate(ctx context.Context, verifier verifier_v0_5_0.VerifierInterface, chainParams VerifierContext) (VerifierView, error) {
 	view := NewVerifierView()
 
 	// Get contract owner
@@ -107,7 +110,7 @@ func (b *VerifierViewBuilder) BuildView(ctx context.Context, verifier *verifier_
 }
 
 // processConfigSetEvents processes ConfigSet events
-func (b *VerifierViewBuilder) processConfigSetEvents(opts *bind.FilterOpts, verifier *verifier_v0_5_0.Verifier, view *VerifierView) error {
+func (b *VerifierViewGenerator) processConfigSetEvents(opts *bind.FilterOpts, verifier verifier_v0_5_0.VerifierInterface, view *VerifierView) error {
 	iter, err := verifier.FilterConfigSet(opts, nil)
 	if err != nil {
 		return fmt.Errorf("failed to filter ConfigSet events: %w", err)
@@ -144,7 +147,7 @@ func (b *VerifierViewBuilder) processConfigSetEvents(opts *bind.FilterOpts, veri
 }
 
 // processConfigUpdatedEvents processes ConfigUpdated events
-func (b *VerifierViewBuilder) processConfigUpdatedEvents(opts *bind.FilterOpts, verifier *verifier_v0_5_0.Verifier, view *VerifierView) error {
+func (b *VerifierViewGenerator) processConfigUpdatedEvents(opts *bind.FilterOpts, verifier verifier_v0_5_0.VerifierInterface, view *VerifierView) error {
 	iter, err := verifier.FilterConfigUpdated(opts, nil)
 	if err != nil {
 		return fmt.Errorf("failed to filter ConfigUpdated events: %w", err)
@@ -187,7 +190,7 @@ func (b *VerifierViewBuilder) processConfigUpdatedEvents(opts *bind.FilterOpts, 
 }
 
 // processConfigActivatedEvents processes ConfigActivated events
-func (b *VerifierViewBuilder) processConfigActivatedEvents(opts *bind.FilterOpts, verifier *verifier_v0_5_0.Verifier, view *VerifierView) error {
+func (b *VerifierViewGenerator) processConfigActivatedEvents(opts *bind.FilterOpts, verifier verifier_v0_5_0.VerifierInterface, view *VerifierView) error {
 	iter, err := verifier.FilterConfigActivated(opts, nil)
 	if err != nil {
 		return fmt.Errorf("failed to filter ConfigActivated events: %w", err)
@@ -211,7 +214,7 @@ func (b *VerifierViewBuilder) processConfigActivatedEvents(opts *bind.FilterOpts
 }
 
 // processConfigDeactivatedEvents processes ConfigDeactivated events
-func (b *VerifierViewBuilder) processConfigDeactivatedEvents(opts *bind.FilterOpts, verifier *verifier_v0_5_0.Verifier, view *VerifierView) error {
+func (b *VerifierViewGenerator) processConfigDeactivatedEvents(opts *bind.FilterOpts, verifier verifier_v0_5_0.VerifierInterface, view *VerifierView) error {
 	iter, err := verifier.FilterConfigDeactivated(opts, nil)
 	if err != nil {
 		return fmt.Errorf("failed to filter ConfigDeactivated events: %w", err)

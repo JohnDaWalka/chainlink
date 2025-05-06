@@ -84,6 +84,13 @@ func saveViewsLogic(e deployment.Environment, cfg SaveContractViewsConfig) (depl
 				}
 			}
 
+			for address, contractView := range chainView.FeeManager {
+				err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
+				if err != nil {
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to save metadata to datastore: %w", err)
+				}
+			}
+
 		default:
 			return deployment.ChangesetOutput{}, fmt.Errorf("unsupported chain selector: %d", chainSelector)
 		}

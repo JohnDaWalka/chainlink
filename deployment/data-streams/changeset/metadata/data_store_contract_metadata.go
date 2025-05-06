@@ -34,25 +34,6 @@ func (t TokenType) String() string {
 	return string(t)
 }
 
-type FeeToken struct {
-	TokenType TokenType
-	Address   string
-	Surcharge string
-}
-
-type StreamDiscounts struct {
-	Stream       string
-	DiscountType string
-	TokenType    TokenType
-	Value        string
-}
-
-type SubscriberDiscount struct {
-	SubscriberAddress string
-	SubscriberName    string
-	StreamDiscounts   []StreamDiscounts
-}
-
 type ConfiguratorConfig struct{}
 
 type DonId = string
@@ -62,12 +43,6 @@ type ConfiguratorMetadata struct {
 }
 type ChannelConfigStoreMetadata struct {
 	DeploymentBlock uint64
-}
-
-type FeeManagerMetadata struct {
-	FeeTokens            []FeeToken
-	RewardManagerAddress string
-	VerifierProxyAddress string
 }
 
 type VerifierProxyMetadata struct {
@@ -153,20 +128,6 @@ func (s SerializedContractMetadata) ToRewardManagerMetadata() (RewardManagerMeta
 	return metadata, nil
 }
 
-// ToFeeManagerMetadata converts the serialized metadata to FeeManagerMetadata
-func (s SerializedContractMetadata) ToFeeManagerMetadata() (FeeManagerMetadata, error) {
-	if s.Type != dstypes.FeeManager.String() {
-		return FeeManagerMetadata{}, errors.New("metadata is not of type fee_manager")
-	}
-
-	var metadata FeeManagerMetadata
-	if err := json.Unmarshal(s.Content, &metadata); err != nil {
-		return FeeManagerMetadata{}, err
-	}
-
-	return metadata, nil
-}
-
 // NewVerifierProxyMetadata creates a new SerializedContractMetadata from a VerifierProxyMetadata
 func NewVerifierProxyMetadata(metadata VerifierProxyMetadata) (*SerializedContractMetadata, error) {
 	content, err := json.Marshal(metadata)
@@ -188,19 +149,6 @@ func NewRewardManagerMetadata(metadata RewardManagerMetadata) (*SerializedContra
 
 	return &SerializedContractMetadata{
 		Type:    dstypes.RewardManager.String(),
-		Content: content,
-	}, nil
-}
-
-// NewFeeManagerMetadata creates a new SerializedContractMetadata from a FeeManagerMetadata
-func NewFeeManagerMetadata(metadata FeeManagerMetadata) (*SerializedContractMetadata, error) {
-	content, err := json.Marshal(metadata)
-	if err != nil {
-		return &SerializedContractMetadata{}, err
-	}
-
-	return &SerializedContractMetadata{
-		Type:    dstypes.FeeManager.String(),
 		Content: content,
 	}, nil
 }

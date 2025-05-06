@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/stretchr/testify/require"
 
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -39,19 +40,14 @@ func TestPayLinkDeficit(t *testing.T) {
 	}
 
 	deployMockCs := []commonChangesets.ConfiguredChangeSet{
-		commonChangesets.Configure(deployment.CreateChangeSet(
+		commonChangesets.Configure(cldf.CreateChangeSet(
 			func(e deployment.Environment, config uint32) (deployment.ChangesetOutput, error) {
 				dataStore := ds.NewMemoryDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata]()
 				// This uses a MockFeeManager. The subject under test here is the PayLinkDeficit changeset.
 				// This is modeled as a client/server test where the "client" is the PayLinkDeficit changeset
 				// and the "server" is the MockFeeManager. The PayLinkDeficit changeset will call the MockFeeManager using
 				// the real FeeManager interface. The MockFeeManager will then validate the call and return a response.
-				md, err := metadata.NewFeeManagerMetadata(metadata.FeeManagerMetadata{})
-				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to create metadata: %w", err)
-				}
-				options := &changeset.DeployOptions{ContractMetadata: md}
-				_, err = changeset.DeployContract[*mock_fee_manager_v0_5_0.MockFeeManager](e, dataStore, chain, MockFeeManagerDeployFn(cc), options)
+				_, err = changeset.DeployContract[*mock_fee_manager_v0_5_0.MockFeeManager](e, dataStore, chain, MockFeeManagerDeployFn(cc), nil)
 				if err != nil {
 					return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy MockFeeManager: %w", err)
 				}

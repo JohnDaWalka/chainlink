@@ -1,9 +1,10 @@
 package fee_manager
 
 import (
-	"math/big"
+	"strconv"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	"github.com/stretchr/testify/require"
 
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -40,7 +41,26 @@ func TestSetNativeSurcharge(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, feeManager)
 
-	actualNativeSurcharge, err := feeManager.SNativeSurcharge(nil)
-	require.NoError(t, err)
-	require.Equal(t, actualNativeSurcharge, big.NewInt(5000))
+	t.Run("VerifyMetadata", func(t *testing.T) {
+		// Use View To Confirm Data
+		_, outputs, err := commonChangesets.ApplyChangesetsV2(t, e,
+			[]commonChangesets.ConfiguredChangeSet{
+				commonChangesets.Configure(
+					changeset.SaveContractViews,
+					changeset.SaveContractViewsConfig{
+						Chains: []uint64{testutil.TestChain.Selector},
+					},
+				),
+			},
+		)
+		require.NoError(t, err)
+		require.Len(t, outputs, 1)
+		output := outputs[0]
+
+		contractMetadata := GetState(t, output.DataStore, testutil.TestChain.Selector, feeManagerAddress)
+
+		require.Equal(t, strconv.Itoa(5000), contractMetadata.View.NativeSurcharge)
+
+	})
+
 }
