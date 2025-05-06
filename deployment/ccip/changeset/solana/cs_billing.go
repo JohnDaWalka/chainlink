@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	solBinary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/mcms"
@@ -19,6 +20,12 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 	ccipChangeset "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 )
+
+// use this changeset to add a billing token to solana
+var _ deployment.ChangeSet[BillingTokenConfig] = AddBillingTokenChangeset
+
+// use this changeset to add a token transfer fee for a remote chain to solana
+var _ deployment.ChangeSet[TokenTransferFeeForRemoteChainConfig] = AddTokenTransferFeeForRemoteChain
 
 // ADD BILLING TOKEN
 type BillingTokenConfig struct {
@@ -190,15 +197,7 @@ func (cfg TokenTransferFeeForRemoteChainConfig) Validate(e deployment.Environmen
 	if err := validateFeeQuoterConfig(chain, chainState); err != nil {
 		return fmt.Errorf("fee quoter validation failed: %w", err)
 	}
-	// check if desired state already exists
-	remoteBillingPDA, _, err := solState.FindFqPerChainPerTokenConfigPDA(cfg.RemoteChainSelector, tokenPubKey, chainState.FeeQuoter)
-	if err != nil {
-		return fmt.Errorf("failed to find remote billing token config pda for (remoteSelector: %d, mint: %s, feeQuoter: %s): %w", cfg.RemoteChainSelector, tokenPubKey.String(), chainState.FeeQuoter.String(), err)
-	}
-	var remoteBillingAccount solFeeQuoter.PerChainPerTokenConfig
-	if err := chain.GetAccountDataBorshInto(context.Background(), remoteBillingPDA, &remoteBillingAccount); err == nil {
-		return fmt.Errorf("billing token config already exists for (remoteSelector: %d, mint: %s, feeQuoter: %s)", cfg.RemoteChainSelector, tokenPubKey.String(), chainState.FeeQuoter.String())
-	}
+
 	return nil
 }
 
@@ -228,6 +227,7 @@ func AddTokenTransferFeeForRemoteChain(e deployment.Environment, cfg TokenTransf
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get authority for ixn: %w", err)
 	}
+	solFeeQuoter.SetProgramID(chainState.FeeQuoter)
 	ix, err := solFeeQuoter.NewSetTokenTransferFeeConfigInstruction(
 		cfg.RemoteChainSelector,
 		tokenPubKey,
@@ -581,5 +581,82 @@ func WithdrawBilledFunds(e deployment.Environment, cfg WithdrawBilledFundsConfig
 	if err = chain.Confirm([]solana.Instruction{ix}); err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
+	return deployment.ChangesetOutput{}, nil
+}
+
+type SetMaxFeeJuelsPerMsgConfig struct {
+	ChainSelector     uint64
+	MaxFeeJuelsPerMsg solBinary.Uint128
+	MCMSSolana        *MCMSConfigSolana
+}
+
+func (cfg SetMaxFeeJuelsPerMsgConfig) Validate(e deployment.Environment) error {
+	state, err := ccipChangeset.LoadOnchainState(e)
+	if err != nil {
+		return fmt.Errorf("failed to load onchain state: %w", err)
+	}
+	chainState, chainExists := state.SolChains[cfg.ChainSelector]
+	if !chainExists {
+		return fmt.Errorf("chain %d not found in existing state", cfg.ChainSelector)
+	}
+	chain := e.SolChains[cfg.ChainSelector]
+
+	if err := validateFeeQuoterConfig(chain, chainState); err != nil {
+		return err
+	}
+
+	return ValidateMCMSConfigSolana(e, cfg.MCMSSolana, chain, chainState, solana.PublicKey{})
+}
+
+func SetMaxFeeJuelsPerMsg(e deployment.Environment, cfg SetMaxFeeJuelsPerMsgConfig) (deployment.ChangesetOutput, error) {
+	if err := cfg.Validate(e); err != nil {
+		return deployment.ChangesetOutput{}, err
+	}
+
+	state, _ := ccipChangeset.LoadOnchainState(e)
+	chainState := state.SolChains[cfg.ChainSelector]
+	chain := e.SolChains[cfg.ChainSelector]
+
+	fqConfig, _, _ := solState.FindConfigPDA(chainState.FeeQuoter)
+	fqUsingMCMS := cfg.MCMSSolana != nil && cfg.MCMSSolana.FeeQuoterOwnedByTimelock
+
+	solFeeQuoter.SetProgramID(chainState.FeeQuoter)
+	authority, err := GetAuthorityForIxn(
+		&e,
+		chain,
+		cfg.MCMSSolana,
+		ccipChangeset.FeeQuoter,
+		solana.PublicKey{})
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to get authority for ixn: %w", err)
+	}
+	instruction, err := solFeeQuoter.NewSetMaxFeeJuelsPerMsgInstruction(
+		cfg.MaxFeeJuelsPerMsg,
+		fqConfig,
+		authority,
+	).ValidateAndBuild()
+	if err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to build instruction: %w", err)
+	}
+
+	if fqUsingMCMS {
+		tx, err := BuildMCMSTxn(instruction, chainState.FeeQuoter.String(), ccipChangeset.FeeQuoter)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to create transaction: %w", err)
+		}
+		proposal, err := BuildProposalsForTxns(
+			e, cfg.ChainSelector, "proposal to SetMaxFeeJuelsPerMsg in Solana", cfg.MCMSSolana.MCMS.MinDelay, []mcmsTypes.Transaction{*tx})
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to build proposal: %w", err)
+		}
+		return deployment.ChangesetOutput{
+			MCMSTimelockProposals: []mcms.TimelockProposal{*proposal},
+		}, nil
+	}
+
+	if err := chain.Confirm([]solana.Instruction{instruction}); err != nil {
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
+	}
+
 	return deployment.ChangesetOutput{}, nil
 }

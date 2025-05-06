@@ -93,7 +93,7 @@ func newMockedEncodeTransmissionInfo() ([]byte, error) {
 	padSuccess := make([]byte, 31)
 	buffer.Write(padSuccess)
 
-	// Encode TransmissionId (as bytes32)
+	// Encode TransmissionID (as bytes32)
 	buffer.Write(info.TransmissionID[:])
 
 	// Encode Transmitter (as address)

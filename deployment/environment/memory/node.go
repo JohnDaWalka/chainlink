@@ -21,6 +21,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -36,6 +38,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/llo/retirement"
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/assets"
 	"github.com/smartcontractkit/chainlink-evm/pkg/client"
@@ -63,12 +66,15 @@ import (
 )
 
 type Node struct {
-	App chainlink.Application
+	ID   string
+	Name string
+	App  chainlink.Application
 	// Transmitter key/OCR keys for this node
 	Chains     []uint64 // chain selectors
 	Keys       Keys
 	Addr       net.TCPAddr
 	IsBoostrap bool
+	Labels     []*ptypes.Label
 }
 
 func (n Node) MultiAddr() string {
@@ -176,6 +182,7 @@ func (n Node) JDChainConfigs() ([]*nodev1.ChainConfig, error) {
 		transmitter := n.Keys.Transmitters[selector]
 
 		chainConfigs = append(chainConfigs, &nodev1.ChainConfig{
+			NodeId: n.ID,
 			Chain: &nodev1.Chain{
 				Id:   chainID,
 				Type: ctype,
@@ -225,9 +232,11 @@ func NewNode(
 	port int, // Port for the P2P V2 listener.
 	chains map[uint64]deployment.Chain,
 	solchains map[uint64]deployment.SolChain,
+	aptoschains map[uint64]deployment.AptosChain,
 	logLevel zapcore.Level,
 	bootstrap bool,
 	registryConfig deployment.CapabilityRegistryConfig,
+	customDBSetup []string, // SQL queries to run after DB creation
 	configOpts ...ConfigOpt,
 ) *Node {
 	evmchains := make(map[uint64]EVMChain)
@@ -294,10 +303,28 @@ func NewNode(
 		}
 		c.Solana = solConfigs
 
+		var aptosConfigs chainlink.RawConfigs
+		for chainID, chain := range aptoschains {
+			aptosChainID, err := chainsel.GetChainIDFromSelector(chainID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			aptosConfigs = append(aptosConfigs, createAptosChainConfig(aptosChainID, chain))
+		}
+		c.Aptos = aptosConfigs
+
 		for _, opt := range configOpts {
 			opt(c)
 		}
 	})
+
+	// Execute custom DB setup queries. This allows us to set the state of the DB without using fixtures.
+	for _, query := range customDBSetup {
+		_, err := db.Exec(query)
+		if err != nil {
+			t.Fatal("Failed to execute custom DB setup query:", err)
+		}
+	}
 
 	// Set logging.
 	lggr := logger.NewSingleFileLogger(t)
@@ -341,9 +368,23 @@ func NewNode(
 		UnrestrictedHTTPClient:   &http.Client{},
 		RestrictedHTTPClient:     &http.Client{},
 		AuditLogger:              audit.NoopLogger,
+		RetirementReportCache:    retirement.NewRetirementReportCache(lggr, db),
 	})
 	require.NoError(t, err)
-	keys := CreateKeys(t, app, chains, solchains)
+	keys := CreateKeys(t, app, chains, solchains, aptoschains)
+
+	nodeLabels := make([]*ptypes.Label, 1)
+	if bootstrap {
+		nodeLabels[0] = &ptypes.Label{
+			Key:   "type",
+			Value: ptr("bootstrap"),
+		}
+	} else {
+		nodeLabels[0] = &ptypes.Label{
+			Key:   "type",
+			Value: ptr("plugin"),
+		}
+	}
 
 	// JD
 
@@ -353,10 +394,12 @@ func NewNode(
 		Chains: slices.Concat(
 			maps.Keys(chains),
 			maps.Keys(solchains),
+			maps.Keys(aptoschains),
 		),
 		Keys:       keys,
 		Addr:       net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 		IsBoostrap: bootstrap,
+		Labels:     nodeLabels,
 	}
 }
 
@@ -372,6 +415,7 @@ func CreateKeys(t *testing.T,
 	app chainlink.Application,
 	chains map[uint64]deployment.Chain,
 	solchains map[uint64]deployment.SolChain,
+	aptoschains map[uint64]deployment.AptosChain,
 ) Keys {
 	ctx := t.Context()
 	_, err := app.GetKeyStore().P2P().Create(ctx)
@@ -496,6 +540,28 @@ func CreateKeys(t *testing.T,
 		transmitters[chainSelector] = transmitter.ID()
 
 		FundSolAccounts(ctx, []solana.PublicKey{transmitter.PublicKey()}, chain.Client, t)
+	}
+
+	if len(aptoschains) > 0 {
+		ctype := chaintype.Aptos
+		err = app.GetKeyStore().OCR2().EnsureKeys(ctx, ctype)
+		require.NoError(t, err)
+		keys, err := app.GetKeyStore().OCR2().GetAllOfType(ctype)
+		require.NoError(t, err)
+		require.Len(t, keys, 1)
+		keybundle := keys[0]
+		keybundles[ctype] = keybundle
+
+		err = app.GetKeyStore().Aptos().EnsureKey(ctx)
+		require.NoError(t, err, "failed to create key for Aptos")
+
+		aptoskeys, err := app.GetKeyStore().Aptos().GetAll()
+		require.NoError(t, err)
+		require.Len(t, aptoskeys, 1)
+		transmitter := aptoskeys[0]
+		for chainSelector := range aptoschains {
+			transmitters[chainSelector] = transmitter.ID()
+		}
 	}
 
 	return Keys{

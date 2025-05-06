@@ -14,8 +14,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/mcms"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 	"golang.org/x/exp/maps"
@@ -26,6 +24,8 @@ import (
 
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	kf "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 )
@@ -122,7 +122,7 @@ type DonInfo struct {
 	Capabilities []DONCapabilityWithConfig // every capability is hosted on each node
 }
 
-func DonInfos(dons []DonCapabilities, jd deployment.OffchainClient) ([]DonInfo, error) {
+func DonInfos(dons []DonCapabilities, jd cldf.OffchainClient) ([]DonInfo, error) {
 	var donInfos []DonInfo
 	for _, don := range dons {
 		var nodeIDs []string
@@ -143,10 +143,10 @@ func DonInfos(dons []DonCapabilities, jd deployment.OffchainClient) ([]DonInfo, 
 	return donInfos, nil
 }
 
-func GetRegistryContract(e *deployment.Environment, registryChainSel uint64) (*capabilities_registry.CapabilitiesRegistry, deployment.Chain, error) {
+func getRegistryContract(e *deployment.Environment, registryChainSel uint64) (*capabilities_registry.CapabilitiesRegistry, *deployment.Chain, error) {
 	registryChain, ok := e.Chains[registryChainSel]
 	if !ok {
-		return nil, deployment.Chain{}, fmt.Errorf("chain %d not found in environment", registryChainSel)
+		return nil, nil, fmt.Errorf("chain %d not found in environment", registryChainSel)
 	}
 
 	contractSetsResp, err := GetContractSets(e.Logger, &GetContractSetsRequest{
@@ -154,21 +154,21 @@ func GetRegistryContract(e *deployment.Environment, registryChainSel uint64) (*c
 		AddressBook: e.ExistingAddresses,
 	})
 	if err != nil {
-		return nil, deployment.Chain{}, fmt.Errorf("failed to get contract sets: %w", err)
+		return nil, nil, fmt.Errorf("failed to get contract sets: %w", err)
 	}
 
 	// ensure registry is deployed and get the registry contract and chain
 	var registry *capabilities_registry.CapabilitiesRegistry
 	registryChainContracts, ok := contractSetsResp.ContractSets[registryChainSel]
 	if !ok {
-		return nil, deployment.Chain{}, fmt.Errorf("failed to deploy registry chain contracts. expected chain %d", registryChainSel)
+		return nil, nil, fmt.Errorf("failed to deploy registry chain contracts. expected chain %d", registryChainSel)
 	}
 	registry = registryChainContracts.CapabilitiesRegistry
 	if registry == nil {
-		return nil, deployment.Chain{}, errors.New("no registry contract found")
+		return nil, nil, errors.New("no registry contract found")
 	}
 	e.Logger.Debugf("registry contract address: %s, chain %d", registry.Address().String(), registryChainSel)
-	return registry, registryChain, nil
+	return registry, &registryChain, nil
 }
 
 type ConfigureRegistryRequest struct {
@@ -409,19 +409,23 @@ type RegisteredCapability struct {
 }
 
 func FromCapabilitiesRegistryCapability(capReg *capabilities_registry.CapabilitiesRegistryCapability, cfg *capabilitiespb.CapabilityConfig, e deployment.Environment, registryChainSelector uint64) (*RegisteredCapability, error) {
-	registry, _, err := GetRegistryContract(&e, registryChainSelector)
+	registry, _, err := getRegistryContract(&e, registryChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get registry: %w", err)
 	}
-	id, err := registry.GetHashedCapabilityId(&bind.CallOpts{}, capReg.LabelledName, capReg.Version)
+	return NewRegisteredCapability(registry, capReg, cfg)
+}
+
+func NewRegisteredCapability(registry *capabilities_registry.CapabilitiesRegistry, capability *capabilities_registry.CapabilitiesRegistryCapability, cfg *capabilitiespb.CapabilityConfig) (*RegisteredCapability, error) {
+	id, err := registry.GetHashedCapabilityId(&bind.CallOpts{}, capability.LabelledName, capability.Version)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call GetHashedCapabilityId for capability %v: %w", capReg, err)
+		return nil, fmt.Errorf("failed to call GetHashedCapabilityId for capability %v: %w", capability, err)
 	}
 	if cfg == nil {
-		return nil, fmt.Errorf("config is required for capability %v", capReg)
+		return nil, fmt.Errorf("config is required for capability %v", capability)
 	}
 	return &RegisteredCapability{
-		CapabilitiesRegistryCapability: *capReg,
+		CapabilitiesRegistryCapability: *capability,
 		ID:                             id,
 		Config:                         cfg,
 	}, nil
@@ -436,11 +440,11 @@ type RegisterNOPSRequest struct {
 
 type RegisterNOPSResponse struct {
 	Nops []*capabilities_registry.CapabilitiesRegistryNodeOperatorAdded // if UseMCMS is false, a list of added node operators is returned
-	Ops  *timelock.BatchChainOperation                                  // if UseMCMS is true, a batch proposal is returned and no transaction is confirmed on chain.
+	Ops  *mcmstypes.BatchOperation                                      // if UseMCMS is true, a batch proposal is returned and no transaction is confirmed on chain.
 }
 
 func RegisterNOPS(ctx context.Context, lggr logger.Logger, req RegisterNOPSRequest) (*RegisterNOPSResponse, error) {
-	registry, registryChain, err := GetRegistryContract(req.Env, req.RegistryChainSelector)
+	registry, registryChain, err := getRegistryContract(req.Env, req.RegistryChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get registry: %w", err)
 	}
@@ -476,7 +480,7 @@ func RegisterNOPS(ctx context.Context, lggr logger.Logger, req RegisterNOPSReque
 	}
 
 	if req.UseMCMS {
-		ops, err := addNOPsMCMSProposal(registry, nops, registryChain)
+		ops, err := addNOPsMCMSProposal(registry, nops, *registryChain)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate proposal to add node operators: %w", err)
 		}
@@ -516,23 +520,19 @@ func RegisterNOPS(ctx context.Context, lggr logger.Logger, req RegisterNOPSReque
 	return resp, nil
 }
 
-func addNOPsMCMSProposal(registry *capabilities_registry.CapabilitiesRegistry, nops []capabilities_registry.CapabilitiesRegistryNodeOperator, regChain deployment.Chain) (*timelock.BatchChainOperation, error) {
+func addNOPsMCMSProposal(registry *capabilities_registry.CapabilitiesRegistry, nops []capabilities_registry.CapabilitiesRegistryNodeOperator, regChain deployment.Chain) (*mcmstypes.BatchOperation, error) {
 	tx, err := registry.AddNodeOperators(deployment.SimTransactOpts(), nops)
 	if err != nil {
 		err = deployment.DecodeErr(capabilities_registry.CapabilitiesRegistryABI, err)
 		return nil, fmt.Errorf("failed to call AddNodeOperators: %w", err)
 	}
 
-	return &timelock.BatchChainOperation{
-		ChainIdentifier: mcms.ChainIdentifier(regChain.Selector),
-		Batch: []mcms.Operation{
-			{
-				To:    registry.Address(),
-				Data:  tx.Data(),
-				Value: big.NewInt(0),
-			},
-		},
-	}, nil
+	ops, err := proposalutils.BatchOperationForChain(regChain.Selector, registry.Address().Hex(), tx.Data(), big.NewInt(0), string(CapabilitiesRegistry), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create batch operation: %w", err)
+	}
+
+	return &ops, nil
 }
 
 // register nodes
@@ -554,7 +554,7 @@ type RegisterNodesResponse struct {
 // registerNodes registers the nodes with the registry. it assumes that the deployer key in the Chain
 // can sign the transactions update the contract state
 func RegisterNodes(lggr logger.Logger, req *RegisterNodesRequest) (*RegisterNodesResponse, error) {
-	registry, registryChain, err := GetRegistryContract(req.Env, req.RegistryChainSelector)
+	registry, registryChain, err := getRegistryContract(req.Env, req.RegistryChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get registry: %w", err)
 	}
@@ -606,7 +606,7 @@ func RegisterNodes(lggr logger.Logger, req *RegisterNodesRequest) (*RegisterNode
 			params, ok := nodeIDToParams[n.NodeID]
 
 			if !ok {
-				signer, enc, err := extractSignerEncryptionKeys(n, registryChain.Selector)
+				signer, enc, err := ExtractSignerEncryptionKeys(n, registryChain.Selector)
 				if err != nil {
 					return nil, fmt.Errorf("failed to extract signer and encryption keys for node %s: %w", n.NodeID, err)
 				}
@@ -638,7 +638,7 @@ func RegisterNodes(lggr logger.Logger, req *RegisterNodesRequest) (*RegisterNode
 		}
 	}
 	addResp, err := AddNodes(lggr, &AddNodesRequest{
-		RegistryChain:        registryChain,
+		RegistryChain:        *registryChain,
 		NodeParams:           nodeIDToParams,
 		UseMCMS:              req.UseMCMS,
 		CapabilitiesRegistry: registry,
@@ -657,7 +657,7 @@ func RegisterNodes(lggr logger.Logger, req *RegisterNodesRequest) (*RegisterNode
 // chainSel must be an evm chain; it ought to be the registry chain
 // the signer is the onchain public key
 // the enc is the encryption public key
-func extractSignerEncryptionKeys(n deployment.Node, chainSel uint64) (signer [32]byte, enc [32]byte, err error) {
+func ExtractSignerEncryptionKeys(n deployment.Node, chainSel uint64) (signer [32]byte, enc [32]byte, err error) {
 	wfKey, err := hex.DecodeString(n.WorkflowKey)
 	if err != nil {
 		return signer, enc, fmt.Errorf("error decoding workflow key: %w", err)
@@ -798,10 +798,31 @@ type RegisterDonsRequest struct {
 	Env                   *deployment.Environment
 	RegistryChainSelector uint64
 
+	Registry      *capabilities_registry.CapabilitiesRegistry
+	RegistryChain *deployment.Chain
+
 	NodeIDToP2PID     map[string][32]byte
 	DonToCapabilities map[string][]RegisteredCapability
 	DonsToRegister    []DONToRegister
 	UseMCMS           bool
+}
+
+func (r *RegisterDonsRequest) Validate() error {
+	if r.Registry != nil {
+		if r.RegistryChain == nil {
+			return errors.New("registry chain is nil")
+		}
+	}
+	if len(r.DonsToRegister) == 0 {
+		return errors.New("no dons to register")
+	}
+	if len(r.NodeIDToP2PID) == 0 {
+		return errors.New("no node ids to p2p ids mapping")
+	}
+	if len(r.DonToCapabilities) == 0 {
+		return errors.New("no dons to capabilities mapping")
+	}
+	return nil
 }
 
 type RegisterDonsResponse struct {
@@ -821,9 +842,19 @@ func sortedHash(p2pids [][32]byte) string {
 }
 
 func RegisterDons(lggr logger.Logger, req RegisterDonsRequest) (*RegisterDonsResponse, error) {
-	registry, registryChain, err := GetRegistryContract(req.Env, req.RegistryChainSelector)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get registry: %w", err)
+	if err := req.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid request: %w", err)
+	}
+	var (
+		err           error
+		registry      = req.Registry
+		registryChain = req.RegistryChain
+	)
+	if registry == nil {
+		registry, registryChain, err = getRegistryContract(req.Env, req.RegistryChainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get registry: %w", err)
+		}
 	}
 	lggr.Infow("registering DONs...", "len", len(req.DonsToRegister))
 	// track hash of sorted p2pids to don name because the registry return value does not include the don name
@@ -985,12 +1016,12 @@ func containsAllDONs(donInfos []capabilities_registry.CapabilitiesRegistryDONInf
 
 // configureForwarder sets the config for the forwarder contract on the chain for all Dons that accept workflows
 // dons that don't accept workflows are not registered with the forwarder
-func configureForwarder(lggr logger.Logger, chain deployment.Chain, fwdr *kf.KeystoneForwarder, dons []RegisteredDon, useMCMS bool) (map[uint64]timelock.BatchChainOperation, error) {
+func configureForwarder(lggr logger.Logger, chain deployment.Chain, fwdr *kf.KeystoneForwarder, dons []RegisteredDon, useMCMS bool) (map[uint64]mcmstypes.BatchOperation, error) {
 	if fwdr == nil {
 		return nil, errors.New("nil forwarder contract")
 	}
 	var (
-		opMap = make(map[uint64]timelock.BatchChainOperation)
+		opMap = make(map[uint64]mcmstypes.BatchOperation)
 	)
 	for _, dn := range dons {
 		if !dn.Info.AcceptsWorkflows {
@@ -1015,15 +1046,9 @@ func configureForwarder(lggr logger.Logger, chain deployment.Chain, fwdr *kf.Key
 			}
 		} else {
 			// create the mcms proposals
-			ops := timelock.BatchChainOperation{
-				ChainIdentifier: mcms.ChainIdentifier(chain.Selector),
-				Batch: []mcms.Operation{
-					{
-						To:    fwdr.Address(),
-						Data:  tx.Data(),
-						Value: big.NewInt(0),
-					},
-				},
+			ops, err := proposalutils.BatchOperationForChain(chain.Selector, fwdr.Address().Hex(), tx.Data(), big.NewInt(0), string(KeystoneForwarder), nil)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create proposal batch operation for chain %d: %w", chain.Selector, err)
 			}
 			opMap[chain.Selector] = ops
 		}

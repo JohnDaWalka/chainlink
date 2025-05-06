@@ -6,9 +6,10 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
+	mcmssdk "github.com/smartcontractkit/mcms/sdk"
+	mcmstypes "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -24,7 +25,8 @@ type DeployForwarderRequest struct {
 // DeployForwarder deploys the KeystoneForwarder contract to all chains in the environment
 // callers must merge the output addressbook with the existing one
 // TODO: add selectors to deploy only to specific chains
-func DeployForwarder(env deployment.Environment, cfg DeployForwarderRequest) (deployment.ChangesetOutput, error) {
+// Deprecated: use DeployForwarderV2 instead
+func DeployForwarderX(env deployment.Environment, cfg DeployForwarderRequest) (deployment.ChangesetOutput, error) {
 	lggr := env.Logger
 	ab := deployment.NewMemoryAddressBook()
 	selectors := cfg.ChainSelectors
@@ -43,8 +45,44 @@ func DeployForwarder(env deployment.Environment, cfg DeployForwarderRequest) (de
 		}
 		lggr.Infof("Deployed %s chain selector %d addr %s", forwarderResp.Tv.String(), chain.Selector, forwarderResp.Address.String())
 	}
-
+	// convert all the addresses to t
 	return deployment.ChangesetOutput{AddressBook: ab}, nil
+}
+
+func DeployForwarder(env deployment.Environment, cfg DeployForwarderRequest) (deployment.ChangesetOutput, error) {
+	var out deployment.ChangesetOutput
+	out.AddressBook = deployment.NewMemoryAddressBook() //nolint:staticcheck // TODO CRE-400
+	out.DataStore = datastore.NewMemoryDataStore[datastore.DefaultMetadata, datastore.DefaultMetadata]()
+
+	selectors := cfg.ChainSelectors
+	if len(selectors) == 0 {
+		selectors = slices.Collect(maps.Keys(env.Chains))
+	}
+
+	for _, sel := range selectors {
+		req := &DeployRequestV2{
+			ChainSel: sel,
+			deployFn: internal.DeployForwarder,
+		}
+		csOut, err := deploy(env, req)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy KeystoneForwarder to chain selector %d: %w", sel, err)
+		}
+		if err := out.AddressBook.Merge(csOut.AddressBook); err != nil { //nolint:staticcheck // TODO CRE-400
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge address book for chain selector %d: %w", sel, err)
+		}
+		if err := out.DataStore.Merge(csOut.DataStore.Seal()); err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge datastore for chain selector %d: %w", sel, err)
+		}
+	}
+	// convert all the addresses to t
+	return out, nil
+}
+
+// DeployForwarderV2 deploys the KeystoneForwarder contract to the specified chain
+func DeployForwarderV2(env deployment.Environment, req *DeployRequestV2) (deployment.ChangesetOutput, error) {
+	req.deployFn = internal.DeployForwarder
+	return deploy(env, req)
 }
 
 var _ deployment.ChangeSet[ConfigureForwardContractsRequest] = ConfigureForwardContracts
@@ -90,7 +128,7 @@ func ConfigureForwardContracts(env deployment.Environment, req ConfigureForwardC
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to configure forward contracts: %w", err)
 	}
 
-	cresp, err := GetContractSetsV2(env.Logger, GetContractSetsRequestV2{
+	cresp, err := getContractSetsV2(env.Logger, getContractSetsRequestV2{
 		Chains:      env.Chains,
 		AddressBook: env.ExistingAddresses,
 	})
@@ -105,25 +143,35 @@ func ConfigureForwardContracts(env deployment.Environment, req ConfigureForwardC
 		}
 		for chainSelector, op := range r.OpsPerChain {
 			contracts := cresp.ContractSets[chainSelector]
-			timelocksPerChain := map[uint64]common.Address{
-				chainSelector: contracts.Forwarder.McmsContracts.Timelock.Address(),
+			timelocksPerChain := map[uint64]string{
+				chainSelector: contracts.Forwarder.McmsContracts.Timelock.Address().Hex(),
 			}
-			proposerMCMSes := map[uint64]*gethwrappers.ManyChainMultiSig{
-				chainSelector: contracts.Forwarder.McmsContracts.ProposerMcm,
+			proposerMCMSes := map[uint64]string{
+				chainSelector: contracts.Forwarder.McmsContracts.ProposerMcm.Address().Hex(),
+			}
+			inspector, err := proposalutils.McmsInspectorForChain(env, chainSelector)
+			if err != nil {
+				return deployment.ChangesetOutput{}, err
+			}
+			inspectorPerChain := map[uint64]mcmssdk.Inspector{
+				chainSelector: inspector,
 			}
 
-			proposal, err := proposalutils.BuildProposalFromBatches(
+			proposal, err := proposalutils.BuildProposalFromBatchesV2(
+				env,
 				timelocksPerChain,
 				proposerMCMSes,
-				[]timelock.BatchChainOperation{op},
+				inspectorPerChain,
+				[]mcmstypes.BatchOperation{op},
 				"proposal to set forwarder config",
-				req.MCMSConfig.MinDuration,
+				proposalutils.TimelockConfig{
+					MinDelay: req.MCMSConfig.MinDuration,
+				},
 			)
 			if err != nil {
 				return out, fmt.Errorf("failed to build proposal: %w", err)
 			}
-			//nolint:staticcheck // migration will be done in a separate PR
-			out.Proposals = append(out.Proposals, *proposal)
+			out.MCMSTimelockProposals = append(out.MCMSTimelockProposals, *proposal)
 		}
 	}
 	return out, nil

@@ -25,8 +25,8 @@ import (
 )
 
 var (
-	_           capabilities.TargetCapability = &WriteTarget{}
-	ErrTxFailed                               = errors.New("submitted transaction failed")
+	_           capabilities.ExecutableCapability = &WriteTarget{}
+	ErrTxFailed                                   = errors.New("submitted transaction failed")
 )
 
 const transactionStatusCheckInterval = 2 * time.Second
@@ -276,6 +276,7 @@ func (cap *WriteTarget) Execute(ctx context.Context, rawRequest capabilities.Cap
 			return capabilities.CapabilityResponse{}, ErrTxFailed
 		}
 		cap.lggr.Infow("non-empty report - retrying a failed transmission - attempting to push to txmgr", "request", request, "reportLen", len(request.Inputs.SignedReport.Report), "reportContextLen", len(request.Inputs.SignedReport.Context), "nSignatures", len(request.Inputs.SignedReport.Signatures), "executionID", request.Metadata.WorkflowExecutionID, "receiverGasMinimum", receiverGasMinimum, "transmissionGasLimit", transmissionInfo.GasLimit)
+
 	default:
 		return capabilities.CapabilityResponse{}, fmt.Errorf("unexpected transmission state: %v", transmissionInfo.State)
 	}
@@ -372,6 +373,7 @@ func (cap *WriteTarget) Execute(ctx context.Context, rawRequest capabilities.Cap
 				// TransmissionStateNotAttempted is not expected here, but we'll log it just in case
 				cap.lggr.Debugw("Transaction confirmed but transmission not attempted, this should never happen", "request", request, "transaction", txID)
 				return capabilities.CapabilityResponse{}, errors.New("transmission not attempted")
+
 			case commontypes.Finalized:
 				cap.lggr.Debugw("Transaction finalized", "request", request, "transaction", txID)
 				return capabilities.CapabilityResponse{}, nil
