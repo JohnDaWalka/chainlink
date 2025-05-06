@@ -81,6 +81,7 @@ type TestCase struct {
 	TestSetup
 	ValidationType         ValidationType
 	Replayed               bool
+	ExpectedRevert         string // the hex string of the revert reason if any
 	Nonce                  *uint64
 	Receiver               []byte
 	MsgData                []byte
@@ -169,14 +170,25 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 	default:
 		tc.T.Errorf("unsupported source chain: %v", family)
 	}
-	msgSentEvent := testhelpers.TestSendRequest(
-		tc.T,
-		tc.Env,
-		tc.OnchainState,
-		tc.SourceChain,
-		tc.DestChain,
-		tc.TestRouter,
-		msg)
+	baseOpts := []testhelpers.SendReqOpts{
+		testhelpers.WithSourceChain(tc.SourceChain),
+		testhelpers.WithDestChain(tc.DestChain),
+		testhelpers.WithTestRouter(tc.TestRouter),
+		testhelpers.WithMessage(msg),
+		func(c *testhelpers.CCIPSendReqConfig) {
+			c.MaxRetries = 1
+		},
+	}
+
+	msgSentEvent, err := testhelpers.SendRequest(tc.Env, tc.OnchainState, baseOpts...)
+
+	if err != nil {
+		tc.T.Logf("error sending message: %v", err)
+		if tc.ExpectedRevert != "" {
+			require.Contains(tc.T, err.Error(), tc.ExpectedRevert)
+		}
+		return out
+	}
 	sourceDest := testhelpers.SourceDestPair{
 		SourceChainSelector: tc.SourceChain,
 		DestChainSelector:   tc.DestChain,
@@ -188,6 +200,9 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 		sourceDest: {msgSentEvent.SequenceNumber},
 	}
 	out.MsgSentEvent = msgSentEvent
+
+	msgID := common.Bytes2Hex(out.MsgSentEvent.Message.Header.MessageId[:])
+	tc.T.Logf("https://ccip-ui-staging.vercel.app/#/side-drawer/msg/%s", msgID)
 
 	// HACK: if the node booted or the logpoller filters got registered after ccipSend,
 	// we need to replay missed logs
@@ -201,6 +216,7 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 	switch tc.ValidationType {
 	case ValidationTypeCommit:
 		commitStart := time.Now()
+		tc.T.Logf("waiting for commit of seq nums %+v", expectedSeqNum)
 		testhelpers.ConfirmCommitForAllWithExpectedSeqNums(tc.T, tc.Env, tc.OnchainState, expectedSeqNum, startBlocks)
 		tc.T.Logf("confirmed commit of seq nums %+v in %s", expectedSeqNum, time.Since(commitStart).String())
 		// Explicitly log that only commit was validated if only Commit was requested
@@ -214,6 +230,7 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 
 		// Then, validate execution
 		execStart := time.Now()
+		tc.T.Logf("waiting for exec of seq nums %+v", expectedSeqNumExec)
 		execStates := testhelpers.ConfirmExecWithSeqNrsForAll(tc.T, tc.Env, tc.OnchainState, expectedSeqNumExec, startBlocks)
 		tc.T.Logf("confirmed exec of seq nums %+v in %s", expectedSeqNumExec, time.Since(execStart).String())
 
