@@ -5,8 +5,6 @@ import (
 	//"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	//"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"context"
-	"crypto/ed25519"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"strconv"
@@ -18,7 +16,6 @@ import (
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
-	tonaddress "github.com/xssnick/tonutils-go/address"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
@@ -39,34 +36,14 @@ func getTestTonChainSelectors() []uint64 {
 	return []uint64{chainsel.TON_LOCALNET.Selector}
 }
 
-func createTonWallet(t *testing.T, useDefault bool) *wallet.Wallet {
-	// TON wallet contract version
-	ver := wallet.V3R2
-
-	if useDefault {
-		addressStr := blockchain.DefaultTonAccount
-		defaultAddress, err := tonaddress.ParseAddr(addressStr)
-		_ = defaultAddress
-		require.NoError(t, err)
-
-		privateKeyStr := blockchain.DefaultTonPrivateKey
-		privateKeyBytes, err := hex.DecodeString(privateKeyStr)
-		require.NoError(t, err)
-		privateKey := ed25519.NewKeyFromSeed(privateKeyBytes)
-
-		t.Logf("Using default Ton account: %s %+v", addressStr, privateKeyBytes)
-
-		wallet, err := wallet.FromPrivateKey(nil, privateKey, ver)
-		//account, err := ton.NewAccountFromSigner(&crypto.Secp256k1PrivateKey{Inner: privateKey}, defaultAddress)
-		require.NoError(t, err)
-		return wallet
-	} else {
-		_, privateKey, err := ed25519.GenerateKey(nil)
-		require.NoError(t, err)
-		wallet, err := wallet.FromPrivateKey(nil, privateKey, ver)
-		require.NoError(t, err)
-		return wallet
-	}
+func createTonWallet(t *testing.T, client ton.APIClientWrapped, version wallet.Version, option wallet.Option) *wallet.Wallet {
+	seed := wallet.NewSeed()
+	rw, err := wallet.FromSeed(client, seed, version)
+	require.NoError(t, err, fmt.Errorf("Failed to generate random wallet: %v", err))
+	pw, perr := wallet.FromPrivateKeyWithOptions(client, rw.PrivateKey(), version, option)
+	require.NoError(t, perr)
+	require.NoError(t, perr, fmt.Errorf("Failed to generate random wallet: %v", err))
+	return pw
 }
 
 func GenerateChainsTon(t *testing.T, numChains int) map[uint64]deployment.TonChain {
@@ -77,9 +54,11 @@ func GenerateChainsTon(t *testing.T, numChains int) map[uint64]deployment.TonCha
 	chains := make(map[uint64]deployment.TonChain)
 	for i := 0; i < numChains; i++ {
 		chainID := testTonChainSelectors[i]
-		wallet := createTonWallet(t, true)
 
-		nodeClient := tonChain(t, chainID, *wallet.Address())
+		nodeClient := tonChain(t, chainID)
+		// todo: configurable wallet version, we might need to use Highload wallet for some tests
+		// todo: configurable wallet options
+		wallet := createTonWallet(t, nodeClient, wallet.V3R2, nil)
 		chains[chainID] = deployment.TonChain{
 			Client: nodeClient,
 			Wallet: wallet,
@@ -89,7 +68,7 @@ func GenerateChainsTon(t *testing.T, numChains int) map[uint64]deployment.TonCha
 	return chains
 }
 
-func tonChain(t *testing.T, chainID uint64, adminAddress tonaddress.Address) *ton.APIClient {
+func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 	t.Helper()
 	ctx := context.Background()
 
@@ -106,11 +85,12 @@ func tonChain(t *testing.T, chainID uint64, adminAddress tonaddress.Address) *to
 		port = uint16(freeport.GetOne(t))
 
 		bcInput := &blockchain.Input{
-			Image:     "", // filled out by defaultTon function
-			Type:      "ton",
-			ChainID:   strconv.FormatUint(chainID, 10),
-			PublicKey: adminAddress.String(),
-			Port:      fmt.Sprintf("%d", port),
+			Image:   "", // filled out by defaultTon function
+			Type:    "ton",
+			ChainID: strconv.FormatUint(chainID, 10),
+			// todo: remove this, solana specific public key field
+			// PublicKey: adminAddress.String(),
+			Port: fmt.Sprintf("%d", port),
 		}
 		output, err := blockchain.NewBlockchainNetwork(bcInput)
 		if err != nil {
@@ -121,8 +101,10 @@ func tonChain(t *testing.T, chainID uint64, adminAddress tonaddress.Address) *to
 		}
 		require.NoError(t, err)
 		containerName = output.ContainerName
+
+		// todo: ctf-configured clean up?
 		testcontainers.CleanupContainer(t, output.Container)
-		url = output.Nodes[0].ExternalHTTPUrl + "/localhost.global.config.json"
+		url = output.NetworkSpecificData.TonGlobalConfigURL
 		break
 	}
 	_ = containerName
@@ -130,13 +112,6 @@ func tonChain(t *testing.T, chainID uint64, adminAddress tonaddress.Address) *to
 	fmt.Printf("DEBUG: ton chain url: %s\n", url)
 
 	connectionPool := liteclient.NewConnectionPool()
-
-	// move this to a ton config module
-	var (
-	// FaucetWalletSeed  = "viable model canvas decade neck soap turtle asthma bench crouch bicycle grief history envelope valid intact invest like offer urban adjust popular draft coral"
-	// FaucetSubWalletID = 42
-	// FaucetWalletVer   = wallet.V3R2
-	)
 
 	// get config
 	cfg, err := liteclient.GetConfigFromUrl(context.Background(), url)

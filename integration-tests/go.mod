@@ -177,6 +177,7 @@ require (
 	github.com/cometbft/cometbft-db v1.0.1 // indirect
 	github.com/consensys/bavard v0.1.27 // indirect
 	github.com/consensys/gnark-crypto v0.16.0 // indirect
+	github.com/containerd/continuity v0.4.5 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v1.0.0-rc.1 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
