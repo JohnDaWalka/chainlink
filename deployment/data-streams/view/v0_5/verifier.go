@@ -60,8 +60,13 @@ func (v *VerifierView) GetVerifierState(configDigest string) (*VerifierState, er
 // VerifierViewBuilder builds views for the Verifier contract
 type VerifierViewBuilder struct{}
 
+type VerifierContext struct {
+	FromBlock uint64
+	ToBlock   *uint64
+}
+
 // BuildView builds a view of the Verifier contract state from logs and calls
-func (b *VerifierViewBuilder) BuildView(ctx context.Context, verifier *verifier_v0_5_0.Verifier, chainParams interfaces.ChainParams) (VerifierView, error) {
+func (b *VerifierViewBuilder) BuildView(ctx context.Context, verifier *verifier_v0_5_0.Verifier, chainParams VerifierContext) (VerifierView, error) {
 	view := NewVerifierView()
 
 	// Get contract owner
@@ -71,18 +76,10 @@ func (b *VerifierViewBuilder) BuildView(ctx context.Context, verifier *verifier_
 	}
 	view.Owner = owner
 
-	ethParams, ok := chainParams.(interfaces.EthereumParams)
-	if !ok {
-		return VerifierView{}, fmt.Errorf("invalid chain params type: %T", chainParams)
-	}
-
-	fromBlock := ethParams.FromBlock
-	toBlock := ethParams.ToBlock
-
 	// Define the filter options
 	filterOpts := &bind.FilterOpts{
-		Start:   fromBlock,
-		End:     toBlock,
+		Start:   chainParams.FromBlock,
+		End:     chainParams.ToBlock,
 		Context: ctx,
 	}
 

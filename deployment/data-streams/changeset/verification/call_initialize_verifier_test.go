@@ -16,6 +16,7 @@ import (
 )
 
 func TestInitializeVerifier(t *testing.T) {
+	t.Parallel()
 	e := testutil.NewMemoryEnv(t, true, 0)
 
 	chainSelector := e.AllChainSelectors()[0]

@@ -4,14 +4,15 @@ import (
 	"errors"
 	"fmt"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/testutil"
+	dsstate "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/state"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/interfaces"
 )
 
 // SaveContractViews saves the contract views to the datastore.
@@ -33,8 +34,7 @@ func saveViewsPrecondition(_ deployment.Environment, cc SaveContractViewsConfig)
 }
 
 func saveViewsLogic(e deployment.Environment, cfg SaveContractViewsConfig) (deployment.ChangesetOutput, error) {
-	dataStore := ds.NewMemoryDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata]()
-	state := DataStreamsOnChainState{Chains: make(map[uint64]DataStreamsChainState)}
+	updatedDataStore := ds.NewMemoryDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata]()
 	records, err := e.DataStore.Addresses().Fetch()
 	if err != nil {
 		return deployment.ChangesetOutput{}, errors.New("failed to fetch addresses")
@@ -54,119 +54,87 @@ func saveViewsLogic(e deployment.Environment, cfg SaveContractViewsConfig) (depl
 			continue
 		}
 		chain := e.Chains[chainSelector]
-		chainState, err := LoadChainState(e.Logger, chain, chainAddresses)
+
+		family, err := chain_selectors.GetSelectorFamily(chainSelector)
 		if err != nil {
-			return deployment.ChangesetOutput{}, err
-		}
-		state.Chains[chainSelector] = *chainState
-
-		// Configurator
-		existingConfiguratorMetadata := make(map[view.Address]*metadata.GenericContractMetadata[v0_5.ConfiguratorView])
-		configuratorContexts := make(map[view.Address]*ConfiguratorContext)
-		// Collect stuff from the chain state and the datastore
-		for _, c := range chainState.Configurators {
-			cm, err := envDatastore.ContractMetadata().Get(
-				ds.NewContractMetadataKey(testutil.TestChain.Selector, c.Address().String()),
-			)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get contract metadata: %w", err)
-			}
-			contractMetadata, err := metadata.DeserializeMetadata[v0_5.ConfiguratorView](cm.Metadata)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert contract metadata: %w", err)
-			}
-			configuratorContexts[c.Address().String()] = &ConfiguratorContext{
-				FromBlock: contractMetadata.Metadata.DeployBlock,
-			}
-			existingConfiguratorMetadata[c.Address().String()] = contractMetadata
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get selector family: %w", err)
 		}
 
-		configuratorViews, err := chainState.GenerateConfiguratorViews(e.GetContext(), configuratorContexts)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate configurator view: %w", err)
-		}
-
-		// Update Existing Configurator Metadata
-		for address, contractView := range configuratorViews {
-			existingMetadata := existingConfiguratorMetadata[address]
-			contractMetadata := metadata.GenericContractMetadata[v0_5.ConfiguratorView]{
-				Metadata: existingMetadata.Metadata,
-				View:     contractView,
-			}
-
-			serialized, err := metadata.NewSerializedContractMetadata(contractMetadata)
+		switch family {
+		case chain_selectors.FamilyEVM:
+			cmStore := envDatastore.ContractMetadata()
+			chainState, err := dsstate.LoadChainState(e.Logger, chain, chainAddresses, cmStore)
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to serialize contract metadata: %w", err)
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to load chain state: %w", err)
 			}
 
-			if err = dataStore.ContractMetadata().Upsert(
-				ds.ContractMetadata[metadata.SerializedContractMetadata]{
-					ChainSelector: chain.Selector,
-					Address:       address,
-					Metadata:      *serialized,
-				},
-			); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to upsert contract metadata: %w", err)
-			}
-		}
+			chainView, _ := chainState.GenerateView(e.GetContext())
 
-		// Verifier
-		// Collect stuff from the chain state and the datastore
-		existingVerifierMetadata := make(map[view.Address]*metadata.GenericContractMetadata[v0_5.VerifierView])
-		verifierContexts := make(map[view.Address]*VerifierContext)
-		for _, c := range chainState.Verifiers {
-			cm, err := envDatastore.ContractMetadata().Get(
-				ds.NewContractMetadataKey(testutil.TestChain.Selector, c.Address().String()),
-			)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get contract metadata: %w", err)
-			}
-			contractMetadata, err := metadata.DeserializeMetadata[v0_5.VerifierView](cm.Metadata)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert contract metadata: %w", err)
-			}
-			verifierContexts[c.Address().String()] = &VerifierContext{
-				FromBlock: contractMetadata.Metadata.DeployBlock,
-			}
-			existingVerifierMetadata[c.Address().String()] = contractMetadata
-		}
-
-		verifierViews, err := chainState.GenerateVerifierViews(e.GetContext(), verifierContexts)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to generate verifier view: %w", err)
-		}
-
-		// Update Existing Verifier Metadata
-		for address, contractView := range verifierViews {
-			existingMetadata := existingVerifierMetadata[address]
-			contractMetadata := metadata.GenericContractMetadata[v0_5.VerifierView]{
-				Metadata: existingMetadata.Metadata,
-				View:     contractView,
+			for address, contractView := range chainView.Configurator {
+				err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
+				if err != nil {
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to save metadata to datastore: %w", err)
+				}
 			}
 
-			serialized, err := metadata.NewSerializedContractMetadata(contractMetadata)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to serialize contract metadata: %w", err)
+			for address, contractView := range chainView.Verifier {
+				err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
+				if err != nil {
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to save metadata to datastore: %w", err)
+				}
 			}
 
-			if err = dataStore.ContractMetadata().Upsert(
-				ds.ContractMetadata[metadata.SerializedContractMetadata]{
-					ChainSelector: chain.Selector,
-					Address:       address,
-					Metadata:      *serialized,
-				},
-			); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to upsert contract metadata: %w", err)
-			}
+		default:
+			return deployment.ChangesetOutput{}, fmt.Errorf("unsupported chain selector: %d", chainSelector)
 		}
 
 	}
 
-	defaultDs, err := ds.ToDefault(dataStore.Seal())
+	defaultDs, err := ds.ToDefault(updatedDataStore.Seal())
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to default format: %w", err)
 	}
 
 	return deployment.ChangesetOutput{DataStore: defaultDs}, nil
 
+}
+
+func saveContractViewToDataStore[T interfaces.ContractView](
+	existingMdStore ds.ContractMetadataStore[metadata.SerializedContractMetadata],
+	mutableDatastore ds.MutableDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata],
+	chainSelector uint64,
+	address view.Address,
+	view T,
+) error {
+
+	cm, err := existingMdStore.Get(ds.NewContractMetadataKey(chainSelector, address))
+	if err != nil {
+		return fmt.Errorf("failed to get contract metadata: %w", err)
+	}
+	existingMd, err := metadata.DeserializeMetadata[T](cm.Metadata)
+	if err != nil {
+		return fmt.Errorf("failed to convert contract metadata: %w", err)
+	}
+
+	contractMetadata := metadata.GenericContractMetadata[T]{
+		Metadata: existingMd.Metadata,
+		View:     view,
+	}
+
+	serialized, err := metadata.NewSerializedContractMetadata(contractMetadata)
+	if err != nil {
+		return fmt.Errorf("failed to serialize contract metadata: %w", err)
+	}
+
+	if err = mutableDatastore.ContractMetadata().Upsert(
+		ds.ContractMetadata[metadata.SerializedContractMetadata]{
+			ChainSelector: chainSelector,
+			Address:       address,
+			Metadata:      *serialized,
+		},
+	); err != nil {
+		return fmt.Errorf("failed to upsert contract metadata: %w", err)
+	}
+
+	return nil
 }

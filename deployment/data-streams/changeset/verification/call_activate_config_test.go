@@ -14,6 +14,7 @@ import (
 )
 
 func TestCallActivateConfig(t *testing.T) {
+	t.Parallel()
 	testEnv := testutil.NewMemoryEnvV2(t, testutil.MemoryEnvConfig{
 		ShouldDeployMCMS: true,
 	})

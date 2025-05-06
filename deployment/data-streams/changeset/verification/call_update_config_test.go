@@ -14,6 +14,7 @@ import (
 )
 
 func TestCallUpdateConfig(t *testing.T) {
+	t.Parallel()
 	e := testutil.NewMemoryEnv(t, true)
 	chainSelector := testutil.TestChain.Selector
 

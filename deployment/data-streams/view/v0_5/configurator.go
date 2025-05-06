@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/interfaces"
 
@@ -47,23 +46,20 @@ func NewContractView() *ConfiguratorView {
 
 type ConfiguratorViewBuilder struct{}
 
+type ConfiguratorContext struct {
+	FromBlock uint64
+	ToBlock   *uint64
+}
+
 // BuildView scans builds a view of the contract state from logs and calls
-func (b *ConfiguratorViewBuilder) BuildView(ctx context.Context, configurator configurator.ConfiguratorInterface, chainParams interfaces.ChainParams) (ConfiguratorView, error) {
+func (b *ConfiguratorViewBuilder) BuildView(ctx context.Context, configurator configurator.ConfiguratorInterface,
+	chainParams ConfiguratorContext) (ConfiguratorView, error) {
 	view := NewContractView()
-
-	// Type assert to get Ethereum-specific parameters
-	ethParams, ok := chainParams.(interfaces.EthereumParams)
-	if !ok {
-		return ConfiguratorView{}, fmt.Errorf("invalid chain params type: %T", chainParams)
-	}
-
-	fromBlock := ethParams.FromBlock
-	toBlock := ethParams.ToBlock
 
 	// Define the filter options
 	filterOpts := &bind.FilterOpts{
-		Start:   fromBlock,
-		End:     toBlock,
+		Start:   chainParams.FromBlock,
+		End:     chainParams.ToBlock,
 		Context: ctx,
 	}
 
@@ -219,16 +215,6 @@ func (b *ConfiguratorViewBuilder) processPromotions(opts *bind.FilterOpts, confi
 	}
 
 	return nil
-}
-
-// LoadLatestView loads the contract state from genesis to the latest block
-func LoadLatestView(ctx context.Context, client *ethclient.Client, contractAddress common.Address) (ConfiguratorView, error) {
-	contract, err := configurator.NewConfigurator(contractAddress, client)
-	if err != nil {
-		return ConfiguratorView{}, fmt.Errorf("failed to create configurator contract instance: %w", err)
-	}
-	builder := &ConfiguratorViewBuilder{}
-	return builder.BuildView(ctx, contract, interfaces.EthereumParams{FromBlock: 0, ToBlock: nil})
 }
 
 func (v *ConfiguratorView) GetConfigState(configId, configDigest string) (*ConfigState, error) {

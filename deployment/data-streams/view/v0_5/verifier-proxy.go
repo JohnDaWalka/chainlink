@@ -1,10 +1,12 @@
 package v0_5
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/interfaces"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/verifier_proxy_v0_5_0"
 )
@@ -13,6 +15,18 @@ type VerifierProxyView struct {
 	TypeAndVersion string         `json:"typeAndVersion,omitempty"`
 	Address        common.Address `json:"address,omitempty"`
 	Owner          common.Address `json:"owner,omitempty"`
+}
+
+// VerifierProxyView implements the ContractView interface
+var _ interfaces.ContractView = (*VerifierProxyView)(nil)
+
+// SerializeView serializes view to JSON
+func (v VerifierProxyView) SerializeView() (string, error) {
+	bytes, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal contract view: %w", err)
+	}
+	return string(bytes), nil
 }
 
 // GenerateVerifierProxyView generates a VerifierProxyView from a VerifierProxy contract.
