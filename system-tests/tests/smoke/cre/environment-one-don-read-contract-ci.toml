@@ -44,11 +44,7 @@ volume_name = "workflow_volume"
 [[nodesets.node_specs]]
 
 [nodesets.node_specs.node]
-docker_ctx = "../../../.."
-docker_file = "plugins/chainlink.Dockerfile"
-# image = "public.ecr.aws/chainlink/chainlink:v2.22.1-por-beta.6-plugins"
-# omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
-# capabilities = ['./cron']
+image = "injected-at-runtime"
 user_config_overrides = """
       [Telemetry]
       Enabled = true
