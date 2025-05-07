@@ -58,7 +58,7 @@ func GenerateChainsTon(t *testing.T, numChains int) map[uint64]deployment.TonCha
 		nodeClient := tonChain(t, chainID)
 		// todo: configurable wallet version, we might need to use Highload wallet for some tests
 		// todo: configurable wallet options
-		wallet := createTonWallet(t, nodeClient, wallet.V3R2, nil)
+		wallet := createTonWallet(t, nodeClient, wallet.V3R2, wallet.WithWorkchain(0))
 		chains[chainID] = deployment.TonChain{
 			Client: nodeClient,
 			Wallet: wallet,
