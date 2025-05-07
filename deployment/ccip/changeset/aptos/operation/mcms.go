@@ -2,7 +2,6 @@ package operation
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -94,30 +93,37 @@ var AcceptOwnershipOp = operations.NewOperation(
 	acceptOwnership,
 )
 
-func acceptOwnership(b operations.Bundle, deps AptosDeps, mcmsAddress aptos.AccountAddress) (mcmstypes.BatchOperation, error) {
+func acceptOwnership(b operations.Bundle, deps AptosDeps, mcmsAddress aptos.AccountAddress) (mcmstypes.Transaction, error) {
 	contractMCMS := mcmsbind.Bind(mcmsAddress, deps.AptosChain.Client)
 	moduleInfo, function, _, args, err := contractMCMS.MCMSAccount().Encoder().AcceptOwnership()
 	if err != nil {
-		return mcmstypes.BatchOperation{}, fmt.Errorf("failed to encode AcceptOwnership: %w", err)
-	}
-	additionalFields := aptosmcms.AdditionalFields{
-		PackageName: moduleInfo.PackageName,
-		ModuleName:  moduleInfo.ModuleName,
-		Function:    function,
-	}
-	callOneAdditionalFields, err := json.Marshal(additionalFields)
-	if err != nil {
-		return mcmstypes.BatchOperation{}, fmt.Errorf("failed to marshal additionalFields: %w", err)
+		return mcmstypes.Transaction{}, fmt.Errorf("failed to encode AcceptOwnership: %w", err)
 	}
 
-	return mcmstypes.BatchOperation{
-		ChainSelector: mcmstypes.ChainSelector(deps.AptosChain.Selector),
-		Transactions: []mcmstypes.Transaction{{
-			To:               mcmsAddress.StringLong(),
-			Data:             aptosmcms.ArgsToData(args),
-			AdditionalFields: callOneAdditionalFields,
-		}},
-	}, err
+	return utils.GenerateMCMSTx(mcmsAddress, moduleInfo, function, args)
+}
+
+// OP: SetMinDelay
+type TimelockMinDelayInput struct {
+	MCMSAddress      aptos.AccountAddress
+	TimelockMinDelay uint64
+}
+
+var SetMinDelayOP = operations.NewOperation(
+	"set-timelock-min-delay-op",
+	Version1_0_0,
+	"Generate set timelock min delay MCMS BatchOperations",
+	setMinDelay,
+)
+
+func setMinDelay(b operations.Bundle, deps AptosDeps, in TimelockMinDelayInput) (mcmstypes.Transaction, error) {
+	contractMCMS := mcmsbind.Bind(in.MCMSAddress, deps.AptosChain.Client)
+	moduleInfo, function, _, args, err := contractMCMS.MCMS().Encoder().TimelockUpdateMinDelay(in.TimelockMinDelay)
+	if err != nil {
+		return mcmstypes.Transaction{}, fmt.Errorf("failed to encode AcceptOwnership: %w", err)
+	}
+
+	return utils.GenerateMCMSTx(in.MCMSAddress, moduleInfo, function, args)
 }
 
 // OP: CleanupStagingAreaOp generates a batch operation to clean up the staging area
@@ -147,22 +153,13 @@ func cleanupStagingArea(b operations.Bundle, deps AptosDeps, mcmsAddress aptos.A
 	if err != nil {
 		return types.BatchOperation{}, fmt.Errorf("failed to EncodeCleanupStagingArea: %w", err)
 	}
-	additionalFields := aptosmcms.AdditionalFields{
-		PackageName: moduleInfo.PackageName,
-		ModuleName:  moduleInfo.ModuleName,
-		Function:    function,
-	}
-	afBytes, err := json.Marshal(additionalFields)
+	mcmsTx, err := utils.GenerateMCMSTx(mcmsAddress, moduleInfo, function, args)
 	if err != nil {
-		return types.BatchOperation{}, fmt.Errorf("failed to marshal additional fields: %w", err)
+		return types.BatchOperation{}, fmt.Errorf("failed to generate MCMS operations for FeeQuoter Initialize: %w", err)
 	}
 
 	return types.BatchOperation{
 		ChainSelector: types.ChainSelector(deps.AptosChain.Selector),
-		Transactions: []types.Transaction{{
-			To:               mcmsAddress.StringLong(),
-			Data:             aptosmcms.ArgsToData(args),
-			AdditionalFields: afBytes,
-		}},
+		Transactions:  []types.Transaction{mcmsTx},
 	}, nil
 }

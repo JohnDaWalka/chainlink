@@ -63,20 +63,34 @@ func deployMCMSSequence(b operations.Bundle, deps operation.AptosDeps, configMCM
 	if err != nil {
 		return DeployMCMSSeqOutput{}, err
 	}
-	// TODO: Should set MinDelay to timelock
 	// Transfer ownership to self
 	_, err = operations.ExecuteOperation(b, operation.TransferOwnershipToSelfOp, deps, deployMCMSReport.Output)
 	if err != nil {
 		return DeployMCMSSeqOutput{}, err
 	}
-	// Generate proposal to accept ownership
-	gaopReport, err := operations.ExecuteOperation(b, operation.AcceptOwnershipOp, deps, deployMCMSReport.Output)
+	// Accept ownership
+	aoReport, err := operations.ExecuteOperation(b, operation.AcceptOwnershipOp, deps, deployMCMSReport.Output)
+	if err != nil {
+		return DeployMCMSSeqOutput{}, err
+	}
+	// Set MinDelay
+	timelockMinDelayInput := operation.TimelockMinDelayInput{
+		MCMSAddress:      deployMCMSReport.Output,
+		TimelockMinDelay: (*configMCMS.TimelockMinDelay).Uint64(),
+	}
+	mdReport, err := operations.ExecuteOperation(b, operation.SetMinDelayOP, deps, timelockMinDelayInput)
 	if err != nil {
 		return DeployMCMSSeqOutput{}, err
 	}
 
+	// Generate MCMS Batch Operation
+	mcmsOps := mcmstypes.BatchOperation{
+		ChainSelector: mcmstypes.ChainSelector(deps.AptosChain.Selector),
+		Transactions:  []mcmstypes.Transaction{aoReport.Output, mdReport.Output},
+	}
+
 	return DeployMCMSSeqOutput{
 		MCMSAddress:   deployMCMSReport.Output,
-		MCMSOperation: gaopReport.Output,
+		MCMSOperation: mcmsOps,
 	}, nil
 }
