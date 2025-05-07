@@ -129,18 +129,17 @@ func (p *priceService) Close() error {
 }
 
 func (p *priceService) run() {
-	ctx, cancel := p.stopChan.NewCtx()
-	go func() {
-		<-ctx.Done()
-		p.lggr.Errorw("PriceService run() NewCtx() context done", "Stack trace", debug.Stack(), "error", ctx.Err())
-	}()
-
-	defer cancel()
+	//go func() {
+	//	<-ctx.Done()
+	//	p.lggr.Errorw("PriceService run() NewCtx() context done", "Stack trace", debug.Stack(), "error", ctx.Err())
+	//}()
 
 	gasUpdateTicker := time.NewTicker(utils.WithJitter(p.gasUpdateInterval))
 	tokenUpdateTicker := time.NewTicker(utils.WithJitter(p.tokenUpdateInterval))
 
 	go func() {
+		ctx, cancel := p.stopChan.NewCtx()
+		defer cancel()
 		defer p.wg.Done()
 		defer gasUpdateTicker.Stop()
 		defer tokenUpdateTicker.Stop()
