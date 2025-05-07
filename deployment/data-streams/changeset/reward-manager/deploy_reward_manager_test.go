@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -67,18 +68,6 @@ func TestDeployRewardManager(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, record)
-
-	// Store address for other tests
-	t.Run("VerifyMetadata", func(t *testing.T) {
-		cm, err := envDatastore.ContractMetadata().Get(
-			datastore.NewContractMetadataKey(record.ChainSelector, record.Address),
-		)
-		require.NoError(t, err)
-
-		md, err := cm.Metadata.ToRewardManagerMetadata()
-		require.NoError(t, err)
-		assert.NotNil(t, md)
-	})
 
 	t.Run("VerifyOwnershipTransferred", func(t *testing.T) {
 		chain := e.Chains[testutil.TestChain.Selector]

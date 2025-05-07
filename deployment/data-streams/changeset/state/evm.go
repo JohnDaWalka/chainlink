@@ -216,7 +216,7 @@ func (s DataStreamsOnChainState) View(ctx context.Context, chains []uint64) (map
 // GenerateView generates a view for the DataStreamsEVMChainState
 func (s DataStreamsEVMChainState) GenerateView(ctx context.Context) (view.EVMChainView, error) {
 	chainView := view.NewChain()
-	// TODO generate in goroutines
+	// It would be a nice improvement to generate in goroutines & abstract this & use the ViewGenerator interface so that we don't have to repeat
 	configuratorViews, err := s.GenerateConfiguratorViews(ctx)
 	if err != nil {
 		return chainView, fmt.Errorf("failed to generate configurator views: %w", err)
@@ -241,18 +241,42 @@ func (s DataStreamsEVMChainState) GenerateView(ctx context.Context) (view.EVMCha
 		chainView.FeeManager[address] = contractView
 	}
 
+	rewardManagerViews, err := s.GenerateRewardManagerViews(ctx)
+	if err != nil {
+		return chainView, fmt.Errorf("failed to generate reward manager views: %w", err)
+	}
+	for address, contractView := range rewardManagerViews {
+		chainView.RewardManager[address] = contractView
+	}
+
+	verifierProxyViews, err := s.GenerateVerifierProxyViews(ctx)
+	if err != nil {
+		return chainView, fmt.Errorf("failed to generate verifier proxy views: %w", err)
+	}
+	for address, contractView := range verifierProxyViews {
+		chainView.VerifierProxy[address] = contractView
+	}
+
+	channelConfigStoreViews, err := s.GenerateChannelConfigStoreViews(ctx)
+	if err != nil {
+		return chainView, fmt.Errorf("failed to generate channel config store views: %w", err)
+	}
+	for address, contractView := range channelConfigStoreViews {
+		chainView.ChannelConfigStore[address] = contractView
+	}
+
 	return chainView, nil
 }
 
 func (s DataStreamsEVMChainState) GenerateConfiguratorViews(ctx context.Context) (map[view.Address]v0_5.ConfiguratorView, error) {
 	result := make(map[view.Address]v0_5.ConfiguratorView)
 	for address, contractAndMeta := range s.Configurators {
-		contractContext := v0_5.ConfiguratorContext{
+		contractContext := v0_5.ConfiguratorViewParams{
 			FromBlock: contractAndMeta.Metadata.Metadata.DeployBlock,
 		}
 
-		generator := &v0_5.ConfiguratorViewGenerator{}
-		configuratorView, err := generator.Generate(ctx, contractAndMeta.Contract, contractContext)
+		generator := v0_5.NewConfiguratorViewGenerator(contractAndMeta.Contract)
+		configuratorView, err := generator.Generate(ctx, contractContext)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)
 		}
@@ -265,12 +289,12 @@ func (s DataStreamsEVMChainState) GenerateConfiguratorViews(ctx context.Context)
 func (s DataStreamsEVMChainState) GenerateVerifierViews(ctx context.Context) (map[view.Address]v0_5.VerifierView, error) {
 	result := make(map[view.Address]v0_5.VerifierView)
 	for address, contractAndMeta := range s.Verifiers {
-		contractContext := v0_5.VerifierContext{
+		contractContext := v0_5.VerifierViewParams{
 			FromBlock: contractAndMeta.Metadata.Metadata.DeployBlock,
 		}
 
-		generator := &v0_5.VerifierViewGenerator{}
-		contractView, err := generator.Generate(ctx, contractAndMeta.Contract, contractContext)
+		generator := v0_5.NewVerifierViewGenerator(contractAndMeta.Contract)
+		contractView, err := generator.Generate(ctx, contractContext)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)
 		}
@@ -283,12 +307,60 @@ func (s DataStreamsEVMChainState) GenerateVerifierViews(ctx context.Context) (ma
 func (s DataStreamsEVMChainState) GenerateFeeManagerViews(ctx context.Context) (map[view.Address]v0_5.FeeManagerView, error) {
 	result := make(map[view.Address]v0_5.FeeManagerView)
 	for address, contractAndMeta := range s.FeeManagers {
-		contractContext := v0_5.FeeManagerContext{
+		contractContext := v0_5.FeeManagerViewParams{
 			FromBlock: contractAndMeta.Metadata.Metadata.DeployBlock,
 		}
 
-		generator := &v0_5.FeeManagerViewGenerator{}
-		contractView, err := generator.Generate(ctx, contractAndMeta.Contract, contractContext)
+		generator := v0_5.NewFeeManagerViewGenerator(contractAndMeta.Contract)
+		contractView, err := generator.Generate(ctx, contractContext)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)
+		}
+		result[address] = contractView
+	}
+
+	return result, nil
+}
+
+func (s DataStreamsEVMChainState) GenerateRewardManagerViews(ctx context.Context) (map[view.Address]v0_5.RewardManagerView, error) {
+	result := make(map[view.Address]v0_5.RewardManagerView)
+	for address, contractAndMeta := range s.RewardManagers {
+		contractContext := v0_5.RewardManagerViewParams{}
+
+		generator := v0_5.NewRewardManagerViewGenerator(contractAndMeta.Contract)
+		contractView, err := generator.Generate(ctx, contractContext)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)
+		}
+		result[address] = contractView
+	}
+
+	return result, nil
+}
+
+func (s DataStreamsEVMChainState) GenerateVerifierProxyViews(ctx context.Context) (map[view.Address]v0_5.VerifierProxyView, error) {
+	result := make(map[view.Address]v0_5.VerifierProxyView)
+	for address, contractAndMeta := range s.VerifierProxys {
+		contractContext := v0_5.VerifierProxyViewParams{}
+
+		generator := v0_5.NewVerifierProxyViewGenerator(contractAndMeta.Contract)
+		contractView, err := generator.Generate(ctx, contractContext)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)
+		}
+		result[address] = contractView
+	}
+
+	return result, nil
+}
+
+func (s DataStreamsEVMChainState) GenerateChannelConfigStoreViews(ctx context.Context) (map[view.Address]v0_5.ChannelConfigStoreView, error) {
+	result := make(map[view.Address]v0_5.ChannelConfigStoreView)
+	for address, contractAndMeta := range s.ChannelConfigStores {
+		contractContext := v0_5.ChannelConfigStoreViewParams{}
+
+		generator := v0_5.NewChannelConfigStoreViewGenerator(contractAndMeta.Contract)
+		contractView, err := generator.Generate(ctx, contractContext)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)
 		}

@@ -80,7 +80,7 @@ func DeployContract[C Contract](
 	}
 
 	if options != nil && options.ContractMetadata != nil {
-		// Add a new ContractMetadata entry for the newly deployed contract
+		// Add a new CommonContractMetadata entry for the newly deployed contract
 		if err = dataStore.ContractMetadata().Add(
 			ds.ContractMetadata[metadata.SerializedContractMetadata]{
 				ChainSelector: chain.Selector,

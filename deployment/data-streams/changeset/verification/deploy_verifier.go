@@ -98,7 +98,7 @@ func deployVerifier(e deployment.Environment, dataStore ds.MutableDataStore[meta
 		}
 
 		contractMetadata := metadata.GenericContractMetadata[v0_5.VerifierView]{
-			Metadata: metadata.ContractMetadata{
+			Metadata: metadata.CommonContractMetadata{
 				DeployBlock: res.Block,
 			},
 		}

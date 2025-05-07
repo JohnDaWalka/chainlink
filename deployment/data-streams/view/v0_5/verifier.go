@@ -15,11 +15,10 @@ import (
 
 // VerifierState represents a single verifier configuration state
 type VerifierState struct {
-	ConfigDigest            string   `json:"configDigest"`
-	LatestConfigBlockNumber uint32   `json:"latestConfigBlockNumber"`
-	IsActive                bool     `json:"isActive"`
-	F                       uint8    `json:"f"`
-	Signers                 []string `json:"signers"`
+	ConfigDigest string   `json:"configDigest"`
+	IsActive     bool     `json:"isActive"`
+	F            uint8    `json:"f"`
+	Signers      []string `json:"signers"`
 }
 
 // VerifierView represents a simplified view of the verifier contract state
@@ -58,22 +57,30 @@ func (v VerifierView) GetVerifierState(configDigest string) (*VerifierState, err
 }
 
 // VerifierViewGenerator builds views for the Verifier contract
-type VerifierViewGenerator struct{}
+type VerifierViewGenerator struct {
+	contract verifier_v0_5_0.VerifierInterface
+}
 
-// ConfiguratorViewGenerator implements ContractViewGenerator
-var _ interfaces.ContractViewGenerator[verifier_v0_5_0.VerifierInterface, VerifierContext, VerifierView] = (*VerifierViewGenerator)(nil)
+func NewVerifierViewGenerator(contract verifier_v0_5_0.VerifierInterface) *VerifierViewGenerator {
+	return &VerifierViewGenerator{
+		contract: contract,
+	}
+}
 
-type VerifierContext struct {
+// VerifierViewGenerator implements ContractViewGenerator
+var _ interfaces.ContractViewGenerator[VerifierViewParams, VerifierView] = (*VerifierViewGenerator)(nil)
+
+type VerifierViewParams struct {
 	FromBlock uint64
 	ToBlock   *uint64
 }
 
 // Generate builds a view of the Verifier contract state from logs and calls
-func (b *VerifierViewGenerator) Generate(ctx context.Context, verifier verifier_v0_5_0.VerifierInterface, chainParams VerifierContext) (VerifierView, error) {
+func (b *VerifierViewGenerator) Generate(ctx context.Context, verifierContext VerifierViewParams) (VerifierView, error) {
 	view := NewVerifierView()
 
 	// Get contract owner
-	owner, err := verifier.Owner(&bind.CallOpts{Context: ctx})
+	owner, err := b.contract.Owner(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return VerifierView{}, fmt.Errorf("failed to get contract owner: %w", err)
 	}
@@ -81,28 +88,28 @@ func (b *VerifierViewGenerator) Generate(ctx context.Context, verifier verifier_
 
 	// Define the filter options
 	filterOpts := &bind.FilterOpts{
-		Start:   chainParams.FromBlock,
-		End:     chainParams.ToBlock,
+		Start:   verifierContext.FromBlock,
+		End:     verifierContext.ToBlock,
 		Context: ctx,
 	}
 
 	// Process all ConfigSet events
-	if err := b.processConfigSetEvents(filterOpts, verifier, view); err != nil {
+	if err := b.processConfigSetEvents(filterOpts, view); err != nil {
 		return VerifierView{}, err
 	}
 
 	// Process all ConfigUpdated events
-	if err := b.processConfigUpdatedEvents(filterOpts, verifier, view); err != nil {
+	if err := b.processConfigUpdatedEvents(filterOpts, view); err != nil {
 		return VerifierView{}, err
 	}
 
 	// Process all ConfigActivated events
-	if err := b.processConfigActivatedEvents(filterOpts, verifier, view); err != nil {
+	if err := b.processConfigActivatedEvents(filterOpts, view); err != nil {
 		return VerifierView{}, err
 	}
 
 	// Process all ConfigDeactivated events
-	if err := b.processConfigDeactivatedEvents(filterOpts, verifier, view); err != nil {
+	if err := b.processConfigDeactivatedEvents(filterOpts, view); err != nil {
 		return VerifierView{}, err
 	}
 
@@ -110,8 +117,8 @@ func (b *VerifierViewGenerator) Generate(ctx context.Context, verifier verifier_
 }
 
 // processConfigSetEvents processes ConfigSet events
-func (b *VerifierViewGenerator) processConfigSetEvents(opts *bind.FilterOpts, verifier verifier_v0_5_0.VerifierInterface, view *VerifierView) error {
-	iter, err := verifier.FilterConfigSet(opts, nil)
+func (b *VerifierViewGenerator) processConfigSetEvents(opts *bind.FilterOpts, view *VerifierView) error {
+	iter, err := b.contract.FilterConfigSet(opts, nil)
 	if err != nil {
 		return fmt.Errorf("failed to filter ConfigSet events: %w", err)
 	}
@@ -121,18 +128,11 @@ func (b *VerifierViewGenerator) processConfigSetEvents(opts *bind.FilterOpts, ve
 		event := iter.Event
 		configDigestHex := dsutil.HexEncodeBytes(event.ConfigDigest[:])
 
-		// Get block number for this config
-		blockNumber, err := verifier.LatestConfigDetails(&bind.CallOpts{}, event.ConfigDigest)
-		if err != nil {
-			return fmt.Errorf("failed to get latest config details: %w", err)
-		}
-
 		state := &VerifierState{
-			ConfigDigest:            configDigestHex,
-			LatestConfigBlockNumber: blockNumber,
-			IsActive:                true, // New configs are active by default
-			F:                       event.F,
-			Signers:                 make([]string, 0, len(event.Signers)),
+			ConfigDigest: configDigestHex,
+			IsActive:     true, // New configs are active by default
+			F:            event.F,
+			Signers:      make([]string, 0, len(event.Signers)),
 		}
 
 		// Add signers
@@ -147,8 +147,8 @@ func (b *VerifierViewGenerator) processConfigSetEvents(opts *bind.FilterOpts, ve
 }
 
 // processConfigUpdatedEvents processes ConfigUpdated events
-func (b *VerifierViewGenerator) processConfigUpdatedEvents(opts *bind.FilterOpts, verifier verifier_v0_5_0.VerifierInterface, view *VerifierView) error {
-	iter, err := verifier.FilterConfigUpdated(opts, nil)
+func (b *VerifierViewGenerator) processConfigUpdatedEvents(opts *bind.FilterOpts, view *VerifierView) error {
+	iter, err := b.contract.FilterConfigUpdated(opts, nil)
 	if err != nil {
 		return fmt.Errorf("failed to filter ConfigUpdated events: %w", err)
 	}
@@ -168,12 +168,6 @@ func (b *VerifierViewGenerator) processConfigUpdatedEvents(opts *bind.FilterOpts
 				Signers:      make([]string, 0),
 			}
 
-			// Get block number for this config
-			blockNumber, err := verifier.LatestConfigDetails(&bind.CallOpts{}, event.ConfigDigest)
-			if err != nil {
-				return fmt.Errorf("failed to get latest config details: %w", err)
-			}
-			state.LatestConfigBlockNumber = blockNumber
 			view.Configs[configDigestHex] = state
 		}
 
@@ -190,8 +184,8 @@ func (b *VerifierViewGenerator) processConfigUpdatedEvents(opts *bind.FilterOpts
 }
 
 // processConfigActivatedEvents processes ConfigActivated events
-func (b *VerifierViewGenerator) processConfigActivatedEvents(opts *bind.FilterOpts, verifier verifier_v0_5_0.VerifierInterface, view *VerifierView) error {
-	iter, err := verifier.FilterConfigActivated(opts, nil)
+func (b *VerifierViewGenerator) processConfigActivatedEvents(opts *bind.FilterOpts, view *VerifierView) error {
+	iter, err := b.contract.FilterConfigActivated(opts, nil)
 	if err != nil {
 		return fmt.Errorf("failed to filter ConfigActivated events: %w", err)
 	}
@@ -214,8 +208,8 @@ func (b *VerifierViewGenerator) processConfigActivatedEvents(opts *bind.FilterOp
 }
 
 // processConfigDeactivatedEvents processes ConfigDeactivated events
-func (b *VerifierViewGenerator) processConfigDeactivatedEvents(opts *bind.FilterOpts, verifier verifier_v0_5_0.VerifierInterface, view *VerifierView) error {
-	iter, err := verifier.FilterConfigDeactivated(opts, nil)
+func (b *VerifierViewGenerator) processConfigDeactivatedEvents(opts *bind.FilterOpts, view *VerifierView) error {
+	iter, err := b.contract.FilterConfigDeactivated(opts, nil)
 	if err != nil {
 		return fmt.Errorf("failed to filter ConfigDeactivated events: %w", err)
 	}

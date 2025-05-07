@@ -44,93 +44,104 @@ func (v FeeManagerView) SerializeView() (string, error) {
 	return string(bytes), nil
 }
 
-// FeeManagerContext represents parameters for generating a FeeManager view
+// FeeManagerViewParams represents parameters for generating a FeeManager view
 // In this simple case, we might not need parameters, but including as an example
-type FeeManagerContext struct {
+type FeeManagerViewParams struct {
 	FromBlock uint64
 	ToBlock   *uint64
 }
 
 // FeeManagerViewGenerator implements ContractViewGenerator for FeeManager
-type FeeManagerViewGenerator struct{}
-
-// FeeManagerViewGenerator implements ContractViewGenerator
-var _ interfaces.ContractViewGenerator[fee_manager.FeeManagerInterface, FeeManagerContext, FeeManagerView] = (*FeeManagerViewGenerator)(nil)
-
-func NewFeeManagerViewGenerator() *FeeManagerViewGenerator {
-	return &FeeManagerViewGenerator{}
+type FeeManagerViewGenerator struct {
+	contract fee_manager.FeeManagerInterface
 }
 
-func (f *FeeManagerViewGenerator) Generate(ctx context.Context, contract fee_manager.FeeManagerInterface, params FeeManagerContext) (FeeManagerView, error) {
-	callOpts := &bind.CallOpts{Context: ctx}
+// FeeManagerViewGenerator implements ContractViewGenerator
+var _ interfaces.ContractViewGenerator[FeeManagerViewParams, FeeManagerView] = (*FeeManagerViewGenerator)(nil)
 
-	owner, err := contract.Owner(callOpts)
-	if err != nil {
-		return FeeManagerView{}, fmt.Errorf("failed to get owner: %w", err)
+func NewFeeManagerViewGenerator(contract fee_manager.FeeManagerInterface) *FeeManagerViewGenerator {
+	return &FeeManagerViewGenerator{
+		contract: contract,
+	}
+}
+
+func (f *FeeManagerViewGenerator) Generate(ctx context.Context, params FeeManagerViewParams) (FeeManagerView, error) {
+	// Create and return the view
+	view := &FeeManagerView{}
+	if err := f.fetchContractState(ctx, view); err != nil {
+		return *view, fmt.Errorf("failed to fetch contract state: %w", err)
 	}
 
-	linkAddress, err := contract.ILinkAddress(callOpts)
+	discounts, err := f.gatherOrganizedDiscounts(ctx, params, view)
 	if err != nil {
-		return FeeManagerView{}, fmt.Errorf("failed to get link address: %w", err)
-	}
-
-	nativeAddress, err := contract.INativeAddress(callOpts)
-	if err != nil {
-		return FeeManagerView{}, fmt.Errorf("failed to get native address: %w", err)
-	}
-
-	proxyAddress, err := contract.IProxyAddress(callOpts)
-	if err != nil {
-		return FeeManagerView{}, fmt.Errorf("failed to get proxy address: %w", err)
-	}
-
-	rewardManager, err := contract.IRewardManager(callOpts)
-	if err != nil {
-		return FeeManagerView{}, fmt.Errorf("failed to get reward manager: %w", err)
-	}
-
-	nativeSurcharge, err := contract.SNativeSurcharge(callOpts)
-	if err != nil {
-		return FeeManagerView{}, fmt.Errorf("failed to get native surcharge: %w", err)
-	}
-
-	linkAvailable, err := contract.LinkAvailableForPayment(callOpts)
-	if err != nil {
-		return FeeManagerView{}, fmt.Errorf("failed to get link available: %w", err)
-	}
-
-	typeAndVersion, err := contract.TypeAndVersion(callOpts)
-	if err != nil {
-		return FeeManagerView{}, fmt.Errorf("failed to get type and version: %w", err)
-	}
-
-	discounts, err := f.gatherOrganizedDiscounts(ctx, contract, params, linkAddress.Hex(), nativeAddress.Hex())
-	if err != nil {
-		return FeeManagerView{}, fmt.Errorf("failed to gather organized discounts: %w", err)
+		return *view, fmt.Errorf("failed to gather organized discounts: %w", err)
 	}
 
 	// Create and return the view
-	view := &FeeManagerView{
-		Owner:               owner,
-		LinkAddress:         linkAddress.Hex(),
-		NativeAddress:       nativeAddress.Hex(),
-		ProxyAddress:        proxyAddress.Hex(),
-		RewardManager:       rewardManager.Hex(),
-		NativeSurcharge:     nativeSurcharge.String(),
-		LinkAvailable:       linkAvailable.String(),
-		TypeAndVersion:      typeAndVersion,
-		SubscriberDiscounts: discounts,
-	}
+	view.SubscriberDiscounts = discounts
 
 	return *view, nil
 }
 
+func (f *FeeManagerViewGenerator) fetchContractState(ctx context.Context, view *FeeManagerView) error {
+	callOpts := &bind.CallOpts{Context: ctx}
+
+	owner, err := f.contract.Owner(callOpts)
+	if err != nil {
+		return fmt.Errorf("failed to get owner: %w", err)
+	}
+	view.Owner = owner
+
+	linkAddress, err := f.contract.ILinkAddress(callOpts)
+	if err != nil {
+		return fmt.Errorf("failed to get link address: %w", err)
+	}
+	view.LinkAddress = linkAddress.Hex()
+
+	nativeAddress, err := f.contract.INativeAddress(callOpts)
+	if err != nil {
+		return fmt.Errorf("failed to get native address: %w", err)
+	}
+	view.NativeAddress = nativeAddress.Hex()
+
+	proxyAddress, err := f.contract.IProxyAddress(callOpts)
+	if err != nil {
+		return fmt.Errorf("failed to get proxy address: %w", err)
+	}
+	view.ProxyAddress = proxyAddress.Hex()
+
+	rewardManager, err := f.contract.IRewardManager(callOpts)
+	if err != nil {
+		return fmt.Errorf("failed to get reward manager: %w", err)
+	}
+	view.RewardManager = rewardManager.Hex()
+
+	nativeSurcharge, err := f.contract.SNativeSurcharge(callOpts)
+	if err != nil {
+		return fmt.Errorf("failed to get native surcharge: %w", err)
+	}
+	view.NativeSurcharge = nativeSurcharge.String()
+
+	linkAvailable, err := f.contract.LinkAvailableForPayment(callOpts)
+	if err != nil {
+		return fmt.Errorf("failed to get link available: %w", err)
+	}
+	view.LinkAvailable = linkAvailable.String()
+
+	typeAndVersion, err := f.contract.TypeAndVersion(callOpts)
+	if err != nil {
+		return fmt.Errorf("failed to get type and version: %w", err)
+	}
+	view.TypeAndVersion = typeAndVersion
+
+	return nil
+
+}
+
 // Function to gather all discounts and organize them by subscriber and feedId
 func (f *FeeManagerViewGenerator) gatherOrganizedDiscounts(ctx context.Context,
-	contract fee_manager.FeeManagerInterface,
-	params FeeManagerContext,
-	linkAddress string,
-	nativeAddress string) (map[string]map[string]TokenDiscounts, error) {
+	params FeeManagerViewParams,
+	view *FeeManagerView) (map[string]map[string]TokenDiscounts, error) {
 
 	// Create filter options
 	filterOpts := &bind.FilterOpts{
@@ -140,7 +151,7 @@ func (f *FeeManagerViewGenerator) gatherOrganizedDiscounts(ctx context.Context,
 	}
 
 	// Get all subscriber discount events
-	iterator, err := contract.FilterSubscriberDiscountUpdated(filterOpts, nil, nil)
+	iterator, err := f.contract.FilterSubscriberDiscountUpdated(filterOpts, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to filter subscriber discount events: %w", err)
 	}
@@ -203,18 +214,18 @@ func (f *FeeManagerViewGenerator) gatherOrganizedDiscounts(ctx context.Context,
 		var err error
 
 		if isGlobalDiscount {
-			discount, err = contract.SGlobalDiscounts(callOpts, combo.subscriber, combo.token)
+			discount, err = f.contract.SGlobalDiscounts(callOpts, combo.subscriber, combo.token)
 		} else {
-			discount, err = contract.SSubscriberDiscounts(callOpts, combo.subscriber, combo.feedId, combo.token)
+			discount, err = f.contract.SSubscriberDiscounts(callOpts, combo.subscriber, combo.feedId, combo.token)
 		}
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to query discount: %w", err)
 		}
 
-		if combo.token.String() == linkAddress {
+		if combo.token.String() == view.LinkAddress {
 			tokenDiscounts.Link = discount.String()
-		} else if combo.token.String() == nativeAddress {
+		} else if combo.token.String() == view.NativeAddress {
 			tokenDiscounts.Native = discount.String()
 		}
 

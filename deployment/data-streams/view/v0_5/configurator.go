@@ -44,19 +44,26 @@ func NewContractView() *ConfiguratorView {
 	}
 }
 
-type ConfiguratorViewGenerator struct{}
-
-type ConfiguratorContext struct {
+type ConfiguratorViewParams struct {
 	FromBlock uint64
 	ToBlock   *uint64
 }
 
+type ConfiguratorViewGenerator struct {
+	contract configurator.ConfiguratorInterface
+}
+
+func NewConfiguratorViewGenerator(contract configurator.ConfiguratorInterface) *ConfiguratorViewGenerator {
+	return &ConfiguratorViewGenerator{
+		contract: contract,
+	}
+}
+
 // ConfiguratorViewGenerator implements ContractViewGenerator
-var _ interfaces.ContractViewGenerator[configurator.ConfiguratorInterface, ConfiguratorContext, ConfiguratorView] = (*ConfiguratorViewGenerator)(nil)
+var _ interfaces.ContractViewGenerator[ConfiguratorViewParams, ConfiguratorView] = (*ConfiguratorViewGenerator)(nil)
 
 // Generate scans builds a view of the contract state from logs and calls
-func (b *ConfiguratorViewGenerator) Generate(ctx context.Context, configurator configurator.ConfiguratorInterface,
-	chainParams ConfiguratorContext) (ConfiguratorView, error) {
+func (b *ConfiguratorViewGenerator) Generate(ctx context.Context, chainParams ConfiguratorViewParams) (ConfiguratorView, error) {
 	view := NewContractView()
 
 	// Define the filter options
@@ -67,16 +74,16 @@ func (b *ConfiguratorViewGenerator) Generate(ctx context.Context, configurator c
 	}
 
 	// Process both production and staging config events
-	if err := b.processConfigEvents(filterOpts, configurator, view); err != nil {
+	if err := b.processConfigEvents(filterOpts, view); err != nil {
 		return ConfiguratorView{}, err
 	}
 
 	// Process all promote staging config events
-	if err := b.processPromotions(filterOpts, configurator, view); err != nil {
+	if err := b.processPromotions(filterOpts, view); err != nil {
 		return ConfiguratorView{}, err
 	}
 
-	owner, err := configurator.Owner(&bind.CallOpts{Context: ctx})
+	owner, err := b.contract.Owner(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return ConfiguratorView{}, fmt.Errorf("failed to get contract owner: %w", err)
 	}
@@ -96,9 +103,9 @@ func (v ConfiguratorView) SerializeView() (string, error) {
 }
 
 // processConfigEvents processes both ProductionConfigSet and StagingConfigSet events
-func (b *ConfiguratorViewGenerator) processConfigEvents(opts *bind.FilterOpts, configurator configurator.ConfiguratorInterface, view *ConfiguratorView) error {
+func (b *ConfiguratorViewGenerator) processConfigEvents(opts *bind.FilterOpts, view *ConfiguratorView) error {
 	// Process production configs
-	prodIter, err := configurator.FilterProductionConfigSet(opts, nil)
+	prodIter, err := b.contract.FilterProductionConfigSet(opts, nil)
 	if err != nil {
 		return fmt.Errorf("failed to filter production config events: %w", err)
 	}
@@ -110,7 +117,7 @@ func (b *ConfiguratorViewGenerator) processConfigEvents(opts *bind.FilterOpts, c
 	}
 
 	// Process staging configs
-	stagingIter, err := configurator.FilterStagingConfigSet(opts, nil)
+	stagingIter, err := b.contract.FilterStagingConfigSet(opts, nil)
 	if err != nil {
 		return fmt.Errorf("failed to filter staging config events: %w", err)
 	}
@@ -196,8 +203,8 @@ func (b *ConfiguratorViewGenerator) processConfigEvent(configId [32]byte, config
 }
 
 // processPromotions processes all PromoteStagingConfig events
-func (b *ConfiguratorViewGenerator) processPromotions(opts *bind.FilterOpts, configurator configurator.ConfiguratorInterface, view *ConfiguratorView) error {
-	iter, err := configurator.FilterPromoteStagingConfig(opts, nil, nil)
+func (b *ConfiguratorViewGenerator) processPromotions(opts *bind.FilterOpts, view *ConfiguratorView) error {
+	iter, err := b.contract.FilterPromoteStagingConfig(opts, nil, nil)
 	if err != nil {
 		return fmt.Errorf("failed to filter promote staging config events: %w", err)
 	}

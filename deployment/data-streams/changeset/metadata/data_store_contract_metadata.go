@@ -114,20 +114,6 @@ func (s SerializedContractMetadata) ToVerifierProxyMetadata() (VerifierProxyMeta
 	return metadata, nil
 }
 
-// ToRewardManagerMetadata converts the serialized metadata to RewardManagerMetadata
-func (s SerializedContractMetadata) ToRewardManagerMetadata() (RewardManagerMetadata, error) {
-	if s.Type != dstypes.RewardManager.String() {
-		return RewardManagerMetadata{}, errors.New("metadata is not of type reward_manager")
-	}
-
-	var metadata RewardManagerMetadata
-	if err := json.Unmarshal(s.Content, &metadata); err != nil {
-		return RewardManagerMetadata{}, err
-	}
-
-	return metadata, nil
-}
-
 // NewVerifierProxyMetadata creates a new SerializedContractMetadata from a VerifierProxyMetadata
 func NewVerifierProxyMetadata(metadata VerifierProxyMetadata) (*SerializedContractMetadata, error) {
 	content, err := json.Marshal(metadata)
@@ -179,14 +165,17 @@ func DeserializeMetadata[T any](serialized SerializedContractMetadata) (*Generic
 	return &result, nil
 }
 
-type ContractMetadata struct {
+type CommonContractMetadata struct {
 	DeployBlock uint64 `json:"deployBlock"`
 }
 
 // GenericContractMetadata is a generic container for any view type
 // Use as Content for SerializedContractMetadata
 type GenericContractMetadata[T any] struct {
-	Metadata ContractMetadata `json:"metadata"`
+	Metadata CommonContractMetadata `json:"metadata"`
 	// View is intended to be populated with the contract's view usually after state change to have an off chain representation of the contract
+	// Tip: The view generated should only depend on the contract state retrieved on-chain and not any external information.
+	// This will keep the view generation deterministic and consistent. Any external information not available in the contract
+	// but useful should be stored in some other way which makes re-generating a view independent of external information.
 	View T `json:"view"`
 }

@@ -70,6 +70,7 @@ func saveViewsLogic(e deployment.Environment, cfg SaveContractViewsConfig) (depl
 
 			chainView, _ := chainState.GenerateView(e.GetContext())
 
+			// It would be a good improvement to use a single function to save all contract views
 			for address, contractView := range chainView.Configurator {
 				err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
 				if err != nil {
@@ -85,6 +86,27 @@ func saveViewsLogic(e deployment.Environment, cfg SaveContractViewsConfig) (depl
 			}
 
 			for address, contractView := range chainView.FeeManager {
+				err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
+				if err != nil {
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to save metadata to datastore: %w", err)
+				}
+			}
+
+			for address, contractView := range chainView.RewardManager {
+				err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
+				if err != nil {
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to save metadata to datastore: %w", err)
+				}
+			}
+
+			for address, contractView := range chainView.VerifierProxy {
+				err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
+				if err != nil {
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to save metadata to datastore: %w", err)
+				}
+			}
+
+			for address, contractView := range chainView.ChannelConfigStore {
 				err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
 				if err != nil {
 					return deployment.ChangesetOutput{}, fmt.Errorf("failed to save metadata to datastore: %w", err)

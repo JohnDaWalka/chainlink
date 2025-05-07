@@ -100,7 +100,7 @@ func deployFeeManager(e deployment.Environment,
 		}
 
 		contractMetadata := metadata.GenericContractMetadata[v0_5.FeeManagerView]{
-			Metadata: metadata.ContractMetadata{
+			Metadata: metadata.CommonContractMetadata{
 				DeployBlock: res.Block,
 			},
 		}

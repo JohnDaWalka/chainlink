@@ -92,7 +92,7 @@ func deploy(e deployment.Environment, dataStore ds.MutableDataStore[metadata.Ser
 		}
 
 		contractMetadata := metadata.GenericContractMetadata[v0_5.ConfiguratorView]{
-			Metadata: metadata.ContractMetadata{
+			Metadata: metadata.CommonContractMetadata{
 				DeployBlock: res.Block,
 			},
 		}

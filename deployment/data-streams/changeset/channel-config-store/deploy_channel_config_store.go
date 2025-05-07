@@ -91,7 +91,7 @@ func deploy(e deployment.Environment, dataStore ds.MutableDataStore[metadata.Ser
 		}
 
 		contractMetadata := metadata.GenericContractMetadata[v0_5.ChannelConfigStoreView]{
-			Metadata: metadata.ContractMetadata{
+			Metadata: metadata.CommonContractMetadata{
 				DeployBlock: res.Block,
 			},
 		}
@@ -101,7 +101,7 @@ func deploy(e deployment.Environment, dataStore ds.MutableDataStore[metadata.Ser
 			return fmt.Errorf("failed to serialize contract metadata: %w", err)
 		}
 
-		// Store ContractMetadata entry for the newly deployed contract
+		// Store CommonContractMetadata entry for the newly deployed contract
 		if err = dataStore.ContractMetadata().Upsert(
 			ds.ContractMetadata[metadata.SerializedContractMetadata]{
 				ChainSelector: chain.Selector,

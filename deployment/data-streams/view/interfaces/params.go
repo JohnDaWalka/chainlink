@@ -8,7 +8,13 @@ type ContractView interface {
 	SerializeView() (string, error)
 }
 
-// ContractViewGenerator is an interface type used mostly to standardize the view generator implementations
-type ContractViewGenerator[C, P any, V ContractView] interface {
-	Generate(ctx context.Context, contract C, params P) (V, error)
+// ContractViewGenerator
+// It is not strictly necessary, but it helps to have a common interface for all view generators
+// Tip: The view generated should only depend on the contract state retrieved on-chain and not any external information.
+// This will keep the view generation deterministic and consistent.
+//
+// P is an optional set of parameters needed to generate the view
+// V is the type of the contract view
+type ContractViewGenerator[P any, V ContractView] interface {
+	Generate(ctx context.Context, params P) (V, error)
 }
