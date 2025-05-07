@@ -72,9 +72,7 @@ type master struct {
 }
 
 func New(ds sqlutil.DataSource, scryptParams utils.ScryptParams, lggr logger.Logger) Master {
-	lggr.Info("New Master")
 	master := newMaster(ds, scryptParams, lggr)
-	lggr.Info("Master created")
 	return master
 }
 
