@@ -40,7 +40,7 @@ type TransmissionInfo struct {
 	InvalidReceiver bool
 	State           uint8
 	Success         bool
-	TransmissionId  [32]byte
+	TransmissionID  [32]byte
 	Transmitter     common.Address
 }
 

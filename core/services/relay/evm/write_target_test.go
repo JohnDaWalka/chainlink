@@ -60,7 +60,7 @@ func newMockedEncodeTransmissionInfo(state uint8) ([]byte, error) {
 	var buffer bytes.Buffer
 
 	// 1. Encode TransmissionId (bytes32)
-	buffer.Write(info.TransmissionId[:])
+	buffer.Write(info.TransmissionID[:])
 
 	// 2. Encode State (uint8, ABI pads to 32 bytes: 31 zeros + 1 byte)
 	stateSlot := make([]byte, 31)
