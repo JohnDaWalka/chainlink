@@ -3,16 +3,14 @@ mockname: "{{ .InterfaceName }}"
 outpkg: mocks
 filename: "{{ .InterfaceName | snakecase }}.go"
 packages:
-  github.com/smartcontractkit/chainlink-deployments-framework/deployment:
-    config:
-      srcpkg: github.com/smartcontractkit/chainlink-deployments-framework/deployment
-      mockname: "Mock{{ .InterfaceName }}"
-      filename: offchain_client_mock.go
-      inpackage: true
-      dir: ./mocks/
+  github.com/smartcontractkit/chainlink/deployment:
     interfaces:
       OffchainClient:
-
+        config:
+          mockname: "Mock{{ .InterfaceName }}"
+          filename: offchain_client_mock.go
+          inpackage: true
+          dir: "{{ .InterfaceDir }}/mocks"
   github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/workflow_registry_wrapper:
     config:
       dir: common/view/v1_0/mocks/
@@ -20,11 +18,3 @@ packages:
       outpkg: mocks
     interfaces:
       WorkflowRegistryInterface:
-
-  github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/llo-feeds/generated/fee_manager_v0_5_0/fee_manager_v0_5_0:
-    config:
-      dir: data-streams/view/v0_5/mocks/
-      filename: fee_manager_mock.go
-      outpkg: mocks
-    interfaces:
-      FeeManagerInterface:
