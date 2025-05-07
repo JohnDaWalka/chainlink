@@ -9,9 +9,9 @@ defaults:
 
 plugins:
   aptos:
-    - moduleURI: "github.com/smartcontractkit/chainlink-internal-integrations/aptos/relayer"
+    - moduleURI: "github.com/smartcontractkit/chainlink-aptos"
       gitRef: "c5a28c80a66c03fc52f6f894eb9de63c8feb3270"
-      installPath: "github.com/smartcontractkit/chainlink-internal-integrations/aptos/relayer/cmd/chainlink-aptos"
+      installPath: "github.com/smartcontractkit/chainlink-aptos/cmd/chainlink-aptos"
   cron:
     - moduleURI: "github.com/smartcontractkit/capabilities/cron"
       gitRef: "6bb81bba0e44efbca20a1ba7a3d2fb4a4be575d5"

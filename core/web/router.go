@@ -35,6 +35,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel"
 
+	"github.com/smartcontractkit/chainlink/v2/core/build"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/web/auth"
@@ -417,7 +418,7 @@ func v2Routes(app chainlink.Application, r *gin.RouterGroup) {
 		authv2.GET("/build_info", buildInfo.Show)
 
 		// Debug routes accessible via authentication
-		metricRoutes(authv2, true) // force heap pprof
+		metricRoutes(authv2, app.GetConfig().InsecurePPROFHeap() || build.IsDev())
 	}
 
 	ping := PingController{app}
