@@ -33,31 +33,31 @@ var UpdateAptosLanesSequence = operations.NewSequence(
 func updateAptosLanesSequence(b operations.Bundle, deps operation.AptosDeps, in UpdateAptosLanesSeqInput) (types.BatchOperation, error) {
 	var mcmsTxs []types.Transaction
 
-	// 1. Update FeeQuoters with destination configs
-	b.Logger.Info("Updating destination configs on FeeQuoters")
-	feeQuoterDestReport, err := operations.ExecuteOperation(b, operation.UpdateFeeQuoterDestsOp, deps, in.UpdateFeeQuoterDestsConfig)
-	if err != nil {
-		return types.BatchOperation{}, fmt.Errorf("failed to update FeeQuoter destinations: %w", err)
-	}
-	mcmsTxs = append(mcmsTxs, feeQuoterDestReport.Output...)
+	// // 1. Update FeeQuoters with destination configs
+	// b.Logger.Info("Updating destination configs on FeeQuoters")
+	// feeQuoterDestReport, err := operations.ExecuteOperation(b, operation.UpdateFeeQuoterDestsOp, deps, in.UpdateFeeQuoterDestsConfig)
+	// if err != nil {
+	// 	return types.BatchOperation{}, fmt.Errorf("failed to update FeeQuoter destinations: %w", err)
+	// }
+	// mcmsTxs = append(mcmsTxs, feeQuoterDestReport.Output...)
 
-	// 2. Configure destinations on OnRamps
-	b.Logger.Info("Updating destination configs on OnRamps")
-	onRampReport, err := operations.ExecuteOperation(b, operation.UpdateOnRampDestsOp, deps, in.UpdateOnRampDestsConfig)
-	if err != nil {
-		return types.BatchOperation{}, fmt.Errorf("failed to update OnRamp destinations: %w", err)
-	}
-	mcmsTxs = append(mcmsTxs, onRampReport.Output...)
+	// // 2. Configure destinations on OnRamps
+	// b.Logger.Info("Updating destination configs on OnRamps")
+	// onRampReport, err := operations.ExecuteOperation(b, operation.UpdateOnRampDestsOp, deps, in.UpdateOnRampDestsConfig)
+	// if err != nil {
+	// 	return types.BatchOperation{}, fmt.Errorf("failed to update OnRamp destinations: %w", err)
+	// }
+	// mcmsTxs = append(mcmsTxs, onRampReport.Output...)
 
-	// 3. Configure sources on OffRamps
-	b.Logger.Info("Updating source configs on OffRamps")
-	offRampReport, err := operations.ExecuteOperation(b, operation.UpdateOffRampSourcesOp, deps, in.UpdateOffRampSourcesConfig)
-	if err != nil {
-		return types.BatchOperation{}, fmt.Errorf("failed to update OffRamp sources: %w", err)
-	}
-	mcmsTxs = append(mcmsTxs, offRampReport.Output...)
+	// // 3. Configure sources on OffRamps
+	// b.Logger.Info("Updating source configs on OffRamps")
+	// offRampReport, err := operations.ExecuteOperation(b, operation.UpdateOffRampSourcesOp, deps, in.UpdateOffRampSourcesConfig)
+	// if err != nil {
+	// 	return types.BatchOperation{}, fmt.Errorf("failed to update OffRamp sources: %w", err)
+	// }
+	// mcmsTxs = append(mcmsTxs, offRampReport.Output...)
 
-	// TODO: This is not working
+	// TODO: UPDATE APTOS TOKEN PRICES ACCORDINGLY
 	// 4. Update FeeQuoters with gas prices
 	b.Logger.Info("Updating gas prices on FeeQuoters")
 	feeQuoterPricesReport, err := operations.ExecuteOperation(b, operation.UpdateFeeQuoterPricesOp, deps, in.UpdateFeeQuoterPricesConfig)
@@ -65,6 +65,15 @@ func updateAptosLanesSequence(b operations.Bundle, deps operation.AptosDeps, in 
 		return types.BatchOperation{}, fmt.Errorf("failed to update FeeQuoter prices: %w", err)
 	}
 	mcmsTxs = append(mcmsTxs, feeQuoterPricesReport.Output...)
+
+	// // 5. Update Router with OnRamp version
+	// // TODO: Add configs for this!!
+	// b.Logger.Info("Updating Router")
+	// routerReport, err := operations.ExecuteOperation(b, operation.UpdateRouterOp, deps, in.UpdateFeeQuoterDestsConfig)
+	// if err != nil {
+	// 	return types.BatchOperation{}, fmt.Errorf("failed to update FeeQuoter prices: %w", err)
+	// }
+	// mcmsTxs = append(mcmsTxs, routerReport.Output...)
 
 	return types.BatchOperation{
 		ChainSelector: types.ChainSelector(deps.AptosChain.Selector),

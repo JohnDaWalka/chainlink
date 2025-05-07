@@ -1790,7 +1790,7 @@ func DefaultFeeQuoterDestChainConfig(configEnabled bool, destChainSelector ...ui
 		DestDataAvailabilityMultiplierBps: 1,
 		DefaultTokenDestGasOverhead:       90_000,
 		DefaultTxGasLimit:                 200_000,
-		GasMultiplierWeiPerEth:            11e17, // Gas multiplier in wei per eth is scaled by 1e18, so 11e17 is 1.1 = 110%
+		GasMultiplierWeiPerEth:            1e7, // Gas multiplier in wei per eth is scaled by 1e18, so 11e17 is 1.1 = 110%
 		NetworkFeeUSDCents:                10,
 		ChainFamilySelector:               [4]byte(familySelector),
 	}
