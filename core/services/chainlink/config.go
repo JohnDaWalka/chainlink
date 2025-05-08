@@ -343,6 +343,8 @@ func (c *Config) setDefaults() {
 	c.Starknet.SetDefaults()
 
 	c.Tron.SetDefaults()
+
+	c.Sui.SetDefaults()
 }
 
 func (c *Config) SetFrom(f *Config) (err error) {
@@ -370,6 +372,10 @@ func (c *Config) SetFrom(f *Config) (err error) {
 
 	if err6 := c.Tron.SetFrom(f.Tron); err6 != nil {
 		err = multierr.Append(err, commonconfig.NamedMultiErrorList(err6, "Tron"))
+	}
+
+	if err7 := c.Sui.SetFrom(f.Sui); err7 != nil {
+		err = multierr.Append(err, commonconfig.NamedMultiErrorList(err7, "Sui"))
 	}
 
 	_, err = commonconfig.MultiErrorList(err)
