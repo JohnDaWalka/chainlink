@@ -8,6 +8,10 @@ defaults:
   goflags: "-ldflags=-s"
 
 plugins:
+  sui:
+    - moduleURI: "github.com/smartcontractkit/chainlink-sui"
+      gitRef: "696a163e7fd3cc618b56c54e6c6f88dfb88795e3"
+      installPath: "github.com/smartcontractkit/chainlink-sui/relayer/cmd/chainlink-sui"
   cron:
     - moduleURI: "github.com/smartcontractkit/capabilities/cron"
       gitRef: "86191e815fb879118fb303bfd974a120c1945daa"
@@ -26,4 +30,3 @@ plugins:
       moduleURI: "github.com/smartcontractkit/capabilities/workflowevent"
       gitRef: "86191e815fb879118fb303bfd974a120c1945daa"
       installPath: "github.com/smartcontractkit/capabilities/workflowevent"
-
