@@ -39,6 +39,7 @@ URL = "postgresql://doesnotexist:justtopassvalidationtests@localhost:5432/chainl
 	assert.Equal(t, pgcommon.DriverPostgres, db.DriverName())
 	url := db.URL()
 	assert.NotEqual(t, "", url.String())
+	assert.False(t, db.SkipVersionCheck())
 
 	lock := db.Lock()
 	assert.Equal(t, "none", lock.LockingMode())

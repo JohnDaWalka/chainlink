@@ -39,4 +39,5 @@ type Database interface {
 	MaxOpenConns() int
 	MigrateDatabase() bool
 	URL() url.URL
+	SkipVersionCheck() bool
 }

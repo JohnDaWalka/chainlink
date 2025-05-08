@@ -301,7 +301,7 @@ func handleNodeVersioning(ctx context.Context, db *sqlx.DB, appLggr logger.Logge
 	// Update to latest version
 	if static.Version != static.Unset {
 		version := versioning.NewNodeVersion(static.Version)
-		if err = verORM.UpsertNodeVersion(ctx, version); err != nil {
+		if err = verORM.UpsertNodeVersion(ctx, version, cfg.SkipVersionCheck()); err != nil {
 			return fmt.Errorf("UpsertNodeVersion: %w", err)
 		}
 	}

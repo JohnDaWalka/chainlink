@@ -93,6 +93,7 @@ func (m mockCfgDatabase) MigrateDatabase() bool { panic("unimplemented") }
 func (m mockCfgDatabase) URL() url.URL {
 	return url.URL{Scheme: "fake", Host: "database.url"}
 }
+func (m mockCfgDatabase) SkipVersionCheck() bool { return false }
 
 func TestLoopRegistry_Register(t *testing.T) {
 	mockCfgDatabase := &mockCfgDatabase{}

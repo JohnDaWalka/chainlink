@@ -477,6 +477,10 @@ type Database struct {
 	MaxIdleConns                  *int64
 	MaxOpenConns                  *int64
 	MigrateOnStartup              *bool
+	// SkipVersionCheck is used to skip the version check when running migrations
+	// This can very dangerous and can lead to data loss if the database is not compatible
+	// Use with caution.
+	SkipVersionCheck *bool
 
 	Backup   DatabaseBackup   `toml:",omitempty"`
 	Listener DatabaseListener `toml:",omitempty"`
@@ -504,6 +508,9 @@ func (d *Database) setFrom(f *Database) {
 	}
 	if v := f.MaxOpenConns; v != nil {
 		d.MaxOpenConns = v
+	}
+	if v := f.SkipVersionCheck; v != nil {
+		d.SkipVersionCheck = v
 	}
 
 	d.Backup.setFrom(&f.Backup)

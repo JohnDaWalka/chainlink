@@ -18,7 +18,7 @@ func TestORM_NodeVersion_UpsertNodeVersion(t *testing.T) {
 	db := pgtest.NewSqlxDB(t)
 	orm := NewORM(db, logger.TestLogger(t))
 
-	err := orm.UpsertNodeVersion(ctx, NewNodeVersion("9.9.8"))
+	err := orm.UpsertNodeVersion(ctx, NewNodeVersion("9.9.8"), false)
 	require.NoError(t, err)
 
 	ver, err := orm.FindLatestNodeVersion(ctx)
@@ -29,13 +29,20 @@ func TestORM_NodeVersion_UpsertNodeVersion(t *testing.T) {
 	require.NotZero(t, ver.CreatedAt)
 
 	// Testing Upsert
-	require.NoError(t, orm.UpsertNodeVersion(ctx, NewNodeVersion("9.9.8")))
+	require.NoError(t, orm.UpsertNodeVersion(ctx, NewNodeVersion("9.9.8"), false))
 
-	err = orm.UpsertNodeVersion(ctx, NewNodeVersion("9.9.7"))
-	require.Error(t, err)
+	err = orm.UpsertNodeVersion(ctx, NewNodeVersion("9.9.7"), false)
+	require.ErrorIs(t, err, ErrDBVersionStale)
 	assert.Contains(t, err.Error(), "Application version (9.9.7) is lower than database version (9.9.8). Only Chainlink 9.9.8 or higher can be run on this database")
+	// Testing Upsert with skipVersionCheck
+	err = orm.UpsertNodeVersion(ctx, NewNodeVersion("9.9.7"), true)
+	require.NoError(t, err)
+	ver, err = orm.FindLatestNodeVersion(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, ver)
+	require.Equal(t, "9.9.7", ver.Version)
 
-	require.NoError(t, orm.UpsertNodeVersion(ctx, NewNodeVersion("9.9.9")))
+	require.NoError(t, orm.UpsertNodeVersion(ctx, NewNodeVersion("9.9.9"), false))
 
 	var count int
 	err = db.QueryRowx(`SELECT count(*) FROM node_versions`).Scan(&count)
@@ -49,7 +56,12 @@ func TestORM_NodeVersion_UpsertNodeVersion(t *testing.T) {
 	require.Equal(t, "9.9.9", ver.Version)
 
 	// invalid semver returns error
-	err = orm.UpsertNodeVersion(ctx, NewNodeVersion("random_12345"))
+	for _, doVersionCheck := range []bool{true, false} {
+		err = orm.UpsertNodeVersion(ctx, NewNodeVersion("random_12345"), doVersionCheck)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "\"random_12345\" is not valid semver: Invalid Semantic Version")
+	}
+	err = orm.UpsertNodeVersion(ctx, NewNodeVersion("random_12345"), false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "\"random_12345\" is not valid semver: Invalid Semantic Version")
 
@@ -67,7 +79,7 @@ func Test_Version_CheckVersion(t *testing.T) {
 
 	orm := NewORM(db, lggr)
 
-	err := orm.UpsertNodeVersion(ctx, NewNodeVersion("9.9.8"))
+	err := orm.UpsertNodeVersion(ctx, NewNodeVersion("9.9.8"), false)
 	require.NoError(t, err)
 
 	// invalid app version semver returns error
@@ -166,7 +178,7 @@ func TestORM_CheckVersion_CCIP(t *testing.T) {
 			_, err := db.ExecContext(ctx, `TRUNCATE node_versions;`)
 			require.NoError(t, err)
 
-			require.NoError(t, orm.UpsertNodeVersion(ctx, NewNodeVersion(test.currentVersion)))
+			require.NoError(t, orm.UpsertNodeVersion(ctx, NewNodeVersion(test.currentVersion), false))
 			_, _, err = CheckVersion(ctx, db, lggr, test.newVersion)
 			if test.expectedError {
 				require.Error(t, err)
@@ -186,7 +198,7 @@ func TestORM_NodeVersion_FindLatestNodeVersion(t *testing.T) {
 	_, err := orm.FindLatestNodeVersion(ctx)
 	require.Error(t, err)
 
-	err = orm.UpsertNodeVersion(ctx, NewNodeVersion("9.9.8"))
+	err = orm.UpsertNodeVersion(ctx, NewNodeVersion("9.9.8"), false)
 	require.NoError(t, err)
 
 	ver, err := orm.FindLatestNodeVersion(ctx)

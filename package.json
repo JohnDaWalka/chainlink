@@ -30,5 +30,8 @@
     "@changesets/cli": "~2.28.1",
     "@changesets/get-github-info": "^0.6.0",
     "semver": "^7.7.1"
+  },
+  "dependencies": {
+    "changeset": "^0.2.6"
   }
 }

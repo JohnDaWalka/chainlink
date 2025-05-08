@@ -130,3 +130,7 @@ func (d *databaseConfig) MaxOpenConns() int {
 func (d *databaseConfig) LogSQL() (sql bool) {
 	return d.logSQL()
 }
+
+func (d *databaseConfig) SkipVersionCheck() bool {
+	return *d.c.SkipVersionCheck
+}

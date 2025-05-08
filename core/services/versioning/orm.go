@@ -3,6 +3,7 @@ package versioning
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -38,7 +39,7 @@ func NewORM(ds sqlutil.DataSource, lggr logger.Logger) *orm {
 // version is newer than the current one
 // NOTE: If you just need the current application version, consider using static.Version instead
 // The database version is ONLY useful for managing versioning specific to the database e.g. for backups or migrations
-func (o *orm) UpsertNodeVersion(ctx context.Context, version NodeVersion) error {
+func (o *orm) UpsertNodeVersion(ctx context.Context, version NodeVersion, skipVersionCheck bool) error {
 	now := time.Now()
 
 	if _, err := semver.NewVersion(version.Version); err != nil {
@@ -46,7 +47,9 @@ func (o *orm) UpsertNodeVersion(ctx context.Context, version NodeVersion) error 
 	}
 
 	return sqlutil.TransactDataSource(ctx, o.ds, nil, func(tx sqlutil.DataSource) error {
-		if _, _, err := CheckVersion(ctx, tx, logger.NullLogger, version.Version); err != nil {
+		if skipVersionCheck {
+			o.lggr.Debugw("Skipping version check", "appVersion", version.Version)
+		} else if _, _, err := CheckVersion(ctx, tx, o.lggr, version.Version); err != nil {
 			return err
 		}
 
@@ -62,6 +65,8 @@ created_at = EXCLUDED.created_at
 		return err
 	})
 }
+
+var ErrDBVersionStale = errors.New("provided database version is stale")
 
 // CheckVersion returns an error if there is a valid semver version in the
 // node_versions table that is higher than the current app version
@@ -92,7 +97,7 @@ func CheckVersion(ctx context.Context, ds sqlutil.DataSource, lggr logger.Logger
 		return nil, nil, errors.Errorf("Application version %q is not valid semver", appVersion)
 	}
 	if dbv.GreaterThan(appv) {
-		return nil, nil, errors.Errorf("Application version (%s) is lower than database version (%s). Only Chainlink %s or higher can be run on this database", appv, dbv, dbv)
+		return nil, nil, fmt.Errorf("%w: Application version (%s) is lower than database version (%s). Only Chainlink %s or higher can be run on this database", ErrDBVersionStale, appv, dbv, dbv)
 	}
 	return appv, dbv, nil
 }
