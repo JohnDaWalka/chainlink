@@ -7,7 +7,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -33,12 +33,12 @@ func TestChangeSetLegacyFunction_PassingCase(t *testing.T) {
 			return nil
 		},
 	)
-	assert.False(t, executedCs, "Not expected to have executed the changeset yet")
-	assert.False(t, executedValidator, "Not expected to have executed the validator yet")
+	require.False(t, executedCs, "Not expected to have executed the changeset yet")
+	require.False(t, executedValidator, "Not expected to have executed the validator yet")
 	_, err := Apply(t, e, nil, Configure(csv2, 1))
-	assert.True(t, executedCs, "Validator should have returned nil, allowing changeset execution")
-	assert.True(t, executedValidator, "Not expected to have executed the validator yet")
-	assert.NoError(t, err)
+	require.True(t, executedCs, "Validator should have returned nil, allowing changeset execution")
+	require.True(t, executedValidator, "Not expected to have executed the validator yet")
+	require.NoError(t, err)
 }
 
 func TestChangeSetLegacyFunction_ErrorCase(t *testing.T) {
@@ -58,12 +58,12 @@ func TestChangeSetLegacyFunction_ErrorCase(t *testing.T) {
 			return errors.New("you shall not pass")
 		},
 	)
-	assert.False(t, executedCs, "Not expected to have executed the changeset yet")
-	assert.False(t, executedValidator, "Not expected to have executed the validator yet")
+	require.False(t, executedCs, "Not expected to have executed the changeset yet")
+	require.False(t, executedValidator, "Not expected to have executed the validator yet")
 	_, err := Apply(t, e, nil, Configure(csv2, 1))
-	assert.False(t, executedCs, "Validator should have fired, preventing changeset execution")
-	assert.True(t, executedValidator, "Not expected to have executed the validator yet")
-	assert.Equal(t, "failed to apply changeset at index 0: you shall not pass", err.Error())
+	require.False(t, executedCs, "Validator should have fired, preventing changeset execution")
+	require.True(t, executedValidator, "Not expected to have executed the validator yet")
+	require.Equal(t, "failed to apply changeset at index 0: you shall not pass", err.Error())
 }
 
 func NewNoopEnvironment(t *testing.T) deployment.Environment {
@@ -151,15 +151,15 @@ func TestApplyChangesetsHelpers(t *testing.T) {
 						"qualifier1",
 					),
 				)
-				assert.NoError(t, err)
-				assert.Equal(t, "0x1234567890abcdef", record.Address)
+				require.NoError(t, err)
+				require.Equal(t, "0x1234567890abcdef", record.Address)
 
 				// Check metadata was stored correctly
 				metadata, err := e.DataStore.ContractMetadata().Get(
 					datastore.NewContractMetadataKey(1, "0x1234567890abcdef"),
 				)
-				assert.NoError(t, err)
-				assert.Equal(t, "test", metadata.Metadata.Data)
+				require.NoError(t, err)
+				require.Equal(t, "test", metadata.Metadata.Data)
 			},
 			wantError: false,
 		},
@@ -177,15 +177,15 @@ func TestApplyChangesetsHelpers(t *testing.T) {
 						"qualifier1",
 					),
 				)
-				assert.NoError(t, err)
-				assert.Equal(t, "0x1234567890abcdef", record.Address)
+				require.NoError(t, err)
+				require.Equal(t, "0x1234567890abcdef", record.Address)
 
 				// Check metadata was stored correctly
 				metadata, err := e.DataStore.ContractMetadata().Get(
 					datastore.NewContractMetadataKey(1, "0x1234567890abcdef"),
 				)
-				assert.NoError(t, err)
-				assert.Equal(t, "test", metadata.Metadata.Data)
+				require.NoError(t, err)
+				require.Equal(t, "test", metadata.Metadata.Data)
 			},
 			wantError: false,
 		},
@@ -197,19 +197,19 @@ func TestApplyChangesetsHelpers(t *testing.T) {
 				e := NewNoopEnvironment(t)
 				e, _, err := ApplyChangesetsV2(t, e, tt.changesets)
 				if tt.wantError {
-					assert.Error(t, err)
+					require.Error(t, err)
 					return
 				}
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				tt.validate(t, e)
 			} else if tt.changesetApplyFunction == "V1" {
 				e := NewNoopEnvironment(t)
 				e, err := ApplyChangesets(t, e, nil, tt.changesets)
 				if tt.wantError {
-					assert.Error(t, err)
+					require.Error(t, err)
 					return
 				}
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				tt.validate(t, e)
 			} else {
 				t.Fatalf("unknown changeset apply function: %s", tt.changesetApplyFunction)
