@@ -76,7 +76,7 @@ type AddTokenE2EConfig struct {
 	// internal fields - To be populated from the PoolConfig.
 	// User do not need to populate these fields.
 	deployPool             DeployTokenPoolContractsConfig
-	configurePools         ConfigureTokenPoolContractsConfig
+	ConfigurePools         ConfigureTokenPoolContractsConfig
 	configureTokenAdminReg changeset.TokenAdminRegistryChangesetConfig
 }
 
@@ -89,23 +89,23 @@ func (c *AddTokenE2EConfig) newConfigurePoolAndTokenAdminRegConfig(e deployment.
 		NewPools:     make(map[uint64]DeployTokenPoolInput),
 		IsTestRouter: c.IsTestRouter,
 	}
-	c.configurePools = ConfigureTokenPoolContractsConfig{
-		TokenSymbol: symbol,
-		MCMS:        nil, // as token pools are deployed as part of the changeset, the pools will still be owned by the deployer key
-		PoolUpdates: make(map[uint64]TokenPoolConfig),
-	}
+	// c.configurePools = ConfigureTokenPoolContractsConfig{
+	// 	TokenSymbol: symbol,
+	// 	MCMS:        nil, // as token pools are deployed as part of the changeset, the pools will still be owned by the deployer key
+	// 	PoolUpdates: make(map[uint64]TokenPoolConfig),
+	// }
 	c.configureTokenAdminReg = changeset.TokenAdminRegistryChangesetConfig{
 		MCMS:  timelockCfg,
 		Pools: make(map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo),
 	}
 	for chain, poolCfg := range c.PoolConfig {
 		c.deployPool.NewPools[chain] = *poolCfg.DeployPoolConfig
-		c.configurePools.PoolUpdates[chain] = TokenPoolConfig{
-			ChainUpdates:        poolCfg.RateLimiterConfig,
-			Type:                poolCfg.DeployPoolConfig.Type,
-			Version:             poolCfg.PoolVersion,
-			OverrideTokenSymbol: poolCfg.OverrideTokenSymbol,
-		}
+		// c.configurePools.PoolUpdates[chain] = TokenPoolConfig{
+		// 	ChainUpdates:        poolCfg.RateLimiterConfig,
+		// 	Type:                poolCfg.DeployPoolConfig.Type,
+		// 	Version:             poolCfg.PoolVersion,
+		// 	OverrideTokenSymbol: poolCfg.OverrideTokenSymbol,
+		// }
 
 		// Populate the TokenAdminRegistryChangesetConfig for each chain.
 		if _, ok := c.configureTokenAdminReg.Pools[chain]; !ok {
@@ -280,7 +280,7 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (de
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get addresses from address book: %w", err)
 		}
 		e.Logger.Infow("deployed token pool", "token", token, "addresses", newAddresses)
-		if err := cfg.configurePools.Validate(e); err != nil {
+		if err := cfg.ConfigurePools.Validate(e); err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to validate configure pool config: %w", err)
 		}
 		// Validate the configure token admin reg config.
@@ -289,7 +289,8 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (de
 		if err := cfg.configureTokenAdminReg.Validate(e, true, validateProposeAdminRole); err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to validate configure token admin reg config: %w", err)
 		}
-		output, err = ConfigureTokenPoolContractsChangeset(e, cfg.configurePools)
+
+		output, err = ConfigureTokenPoolContractsChangeset(e, cfg.ConfigurePools)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to configure token pool for token %s: %w", token, err)
 		}
