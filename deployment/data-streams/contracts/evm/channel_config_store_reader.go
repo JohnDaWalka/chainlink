@@ -26,8 +26,8 @@ type ChannelConfigStoreReader struct {
 // FilterNewChannelDefinition wraps the original method to return our interface
 func (w *ChannelConfigStoreReader) FilterNewChannelDefinition(
 	opts *bind.FilterOpts,
-	donId []*big.Int) (LogIterator[channel_config_store.ChannelConfigStoreNewChannelDefinition], error) {
-	iter, err := w.ChannelConfigStoreFilterer.FilterNewChannelDefinition(opts, donId)
+	donID []*big.Int) (LogIterator[channel_config_store.ChannelConfigStoreNewChannelDefinition], error) {
+	iter, err := w.ChannelConfigStoreFilterer.FilterNewChannelDefinition(opts, donID)
 	if err != nil {
 		return nil, err
 	}

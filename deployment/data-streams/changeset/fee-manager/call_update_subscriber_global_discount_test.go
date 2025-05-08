@@ -63,7 +63,7 @@ func TestUpdateSubscriberGlobalDiscount(t *testing.T) {
 		require.NotNil(t, contractMetadata)
 		discountRecord, ok := contractMetadata.View.SubscriberDiscounts[subscriber.String()]["global"]
 		require.True(t, ok)
-		require.Equal(t, discountRecord.Link, "2000")
+		require.Equal(t, "2000", discountRecord.Link)
 		require.True(t, discountRecord.IsGlobal)
 
 	})

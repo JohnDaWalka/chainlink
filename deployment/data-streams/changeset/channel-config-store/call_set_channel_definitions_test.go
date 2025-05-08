@@ -91,9 +91,7 @@ func TestCallSetChannelDefinitions(t *testing.T) {
 		serialized, err := contractMetadata.View.SerializeView()
 		require.NoError(t, err, "Failed to serialize view")
 		fmt.Println(serialized)
-
 	})
-
 }
 
 func hexToByte32(s string) [32]byte {

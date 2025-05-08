@@ -26,9 +26,9 @@ type RewardManagerReader struct {
 // FilterRewardRecipientsUpdated wraps the original method to return our interface
 func (r *RewardManagerReader) FilterRewardRecipientsUpdated(
 	opts *bind.FilterOpts,
-	poolId [][32]byte,
+	poolID [][32]byte,
 ) (LogIterator[reward_manager_v0_5_0.RewardManagerRewardRecipientsUpdated], error) {
-	iter, err := r.RewardManagerFilterer.FilterRewardRecipientsUpdated(opts, poolId)
+	iter, err := r.RewardManagerFilterer.FilterRewardRecipientsUpdated(opts, poolID)
 	if err != nil {
 		return nil, err
 	}

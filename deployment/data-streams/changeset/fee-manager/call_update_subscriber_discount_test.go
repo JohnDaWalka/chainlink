@@ -68,7 +68,7 @@ func TestUpdateSubscriberDiscount(t *testing.T) {
 		feedIDHex := dsutil.HexEncodeBytes32(feedID)
 		discountRecord, ok := contractMetadata.View.SubscriberDiscounts[subscriber.String()][feedIDHex]
 		require.True(t, ok)
-		require.Equal(t, discountRecord.Link, "1000")
+		require.Equal(t, "1000", discountRecord.Link)
 		require.False(t, discountRecord.IsGlobal)
 
 	})

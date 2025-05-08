@@ -103,7 +103,6 @@ func VerifyVerifierState(
 	expectedConfig SetConfig,
 	shouldConfigBeActive bool,
 ) {
-
 	contractMetadata := testutil.MustGetContractMetaData[v0_5.VerifierView](t, inDs, chainSelector, contractAddress.Hex())
 
 	configDigestString := dsutil.HexEncodeBytes32(expectedConfig.ConfigDigest)

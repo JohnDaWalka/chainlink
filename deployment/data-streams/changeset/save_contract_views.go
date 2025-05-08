@@ -79,7 +79,6 @@ func saveViewsLogic(e deployment.Environment, cfg SaveContractViewsConfig) (depl
 		default:
 			return deployment.ChangesetOutput{}, fmt.Errorf("unsupported chain selector: %d", chainSelector)
 		}
-
 	}
 
 	defaultDs, err := ds.ToDefault(updatedDataStore.Seal())
@@ -146,7 +145,6 @@ func saveContractViewToDataStore[T interfaces.ContractView](
 	address view.Address,
 	view T,
 ) error {
-
 	cm, err := existingMdStore.Get(ds.NewContractMetadataKey(chainSelector, address))
 	if err != nil {
 		return fmt.Errorf("failed to get contract metadata: %w", err)

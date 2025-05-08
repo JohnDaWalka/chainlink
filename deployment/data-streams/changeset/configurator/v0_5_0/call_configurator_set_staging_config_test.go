@@ -149,6 +149,7 @@ func TestCallSetStagingConfig(t *testing.T) {
 
 		client := e.Chains[testutil.TestChain.Selector].Client
 		contract, err := configurator.NewConfigurator(configuratorAddr, client)
+		require.NoError(t, err)
 
 		stagingIter, err := contract.FilterStagingConfigSet(nil, nil)
 		require.NoError(t, err)

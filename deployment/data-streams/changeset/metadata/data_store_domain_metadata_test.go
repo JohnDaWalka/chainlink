@@ -34,7 +34,7 @@ func TestEnvMetadata(t *testing.T) {
 	metadata, err := ds.EnvMetadataStore.Get()
 	require.NoError(t, err)
 
-	don, err := metadata.Metadata.GetDonById("don1")
+	don, err := metadata.Metadata.GetDonByID("don1")
 	require.NoError(t, err)
 	require.Len(t, don.Streams, 2)
 }

@@ -21,7 +21,6 @@ func VerifyConfiguratorState(
 	expectedConfig ConfiguratorConfig,
 	expectedConfigCount uint64,
 ) {
-
 	contractMetadata := testutil.MustGetContractMetaData[v0_5.ConfiguratorView](t, inDs, chainSelector, configuratorAddr.Hex())
 
 	configIDString := dsutil.HexEncodeBytes(expectedConfig.ConfigID[:])

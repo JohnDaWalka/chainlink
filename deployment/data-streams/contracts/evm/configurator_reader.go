@@ -42,9 +42,9 @@ type ConfiguratorReader struct {
 
 func (r *ConfiguratorReader) FilterProductionConfigSet(
 	opts *bind.FilterOpts,
-	configId [][32]byte,
+	configID [][32]byte,
 ) (LogIterator[configurator.ConfiguratorProductionConfigSet], error) {
-	iter, err := r.ConfiguratorFilterer.FilterProductionConfigSet(opts, configId)
+	iter, err := r.ConfiguratorFilterer.FilterProductionConfigSet(opts, configID)
 	if err != nil {
 		return nil, err
 	}
@@ -54,9 +54,9 @@ func (r *ConfiguratorReader) FilterProductionConfigSet(
 
 func (r *ConfiguratorReader) FilterStagingConfigSet(
 	opts *bind.FilterOpts,
-	configId [][32]byte,
+	configID [][32]byte,
 ) (LogIterator[configurator.ConfiguratorStagingConfigSet], error) {
-	iter, err := r.ConfiguratorFilterer.FilterStagingConfigSet(opts, configId)
+	iter, err := r.ConfiguratorFilterer.FilterStagingConfigSet(opts, configID)
 	if err != nil {
 		return nil, err
 	}
@@ -66,10 +66,10 @@ func (r *ConfiguratorReader) FilterStagingConfigSet(
 
 func (r *ConfiguratorReader) FilterPromoteStagingConfig(
 	opts *bind.FilterOpts,
-	configId [][32]byte,
+	configID [][32]byte,
 	retiredConfigDigest [][32]byte,
 ) (LogIterator[configurator.ConfiguratorPromoteStagingConfig], error) {
-	iter, err := r.ConfiguratorFilterer.FilterPromoteStagingConfig(opts, configId, retiredConfigDigest)
+	iter, err := r.ConfiguratorFilterer.FilterPromoteStagingConfig(opts, configID, retiredConfigDigest)
 	if err != nil {
 		return nil, err
 	}

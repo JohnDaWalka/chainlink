@@ -58,7 +58,7 @@ func (m *MockChannelConfigStore) Owner(opts *bind.CallOpts) (common.Address, err
 
 func (m *MockChannelConfigStore) FilterNewChannelDefinition(
 	opts *bind.FilterOpts,
-	donId []*big.Int,
+	donID []*big.Int,
 ) (evm.LogIterator[channel_config_store.ChannelConfigStoreNewChannelDefinition], error) {
 	if m.err != nil {
 		return nil, m.err

@@ -58,9 +58,9 @@ type ConfiguratorContract interface {
 	Owner(opts *bind.CallOpts) (common.Address, error)
 
 	// Filter methods
-	FilterProductionConfigSet(opts *bind.FilterOpts, configId [][32]byte) (evm.LogIterator[configurator.ConfiguratorProductionConfigSet], error)
-	FilterStagingConfigSet(opts *bind.FilterOpts, configId [][32]byte) (evm.LogIterator[configurator.ConfiguratorStagingConfigSet], error)
-	FilterPromoteStagingConfig(opts *bind.FilterOpts, configId [][32]byte, retiredConfigDigest [][32]byte) (evm.LogIterator[configurator.ConfiguratorPromoteStagingConfig], error)
+	FilterProductionConfigSet(opts *bind.FilterOpts, configID [][32]byte) (evm.LogIterator[configurator.ConfiguratorProductionConfigSet], error)
+	FilterStagingConfigSet(opts *bind.FilterOpts, configID [][32]byte) (evm.LogIterator[configurator.ConfiguratorStagingConfigSet], error)
+	FilterPromoteStagingConfig(opts *bind.FilterOpts, configID [][32]byte, retiredConfigDigest [][32]byte) (evm.LogIterator[configurator.ConfiguratorPromoteStagingConfig], error)
 }
 
 type ConfiguratorViewGenerator struct {
@@ -184,11 +184,11 @@ func (b *ConfiguratorViewGenerator) processConfigEvent(configId [32]byte, config
 		panic("unknown event type")
 	}
 
-	configIdHex := dsutil.HexEncodeBytes32(configId)
+	configIDHex := dsutil.HexEncodeBytes32(configId)
 	configDigestHex := dsutil.HexEncodeBytes32(configDigest)
 
-	if _, ok := view.Configs[configIdHex]; !ok {
-		view.Configs[configIdHex] = make(map[string]*ConfigState)
+	if _, ok := view.Configs[configIDHex]; !ok {
+		view.Configs[configIDHex] = make(map[string]*ConfigState)
 	}
 
 	// Convert types to readable hex strings
@@ -203,7 +203,7 @@ func (b *ConfiguratorViewGenerator) processConfigEvent(configId [32]byte, config
 		transmittersHex[i] = dsutil.HexEncodeBytes32(transmitter)
 	}
 
-	view.Configs[configIdHex][configDigestHex] = &ConfigState{
+	view.Configs[configIDHex][configDigestHex] = &ConfigState{
 		ConfigCount:           configCount,
 		EncodedOffchainConfig: dsutil.HexEncodeBytes(offchainConfig),
 		EncodedOnchainConfig:  dsutil.HexEncodeBytes(onchainConfig),
@@ -226,10 +226,10 @@ func (b *ConfiguratorViewGenerator) processPromotions(opts *bind.FilterOpts, vie
 
 	for iter.Next() {
 		event := iter.GetEvent()
-		configIdHex := dsutil.HexEncodeBytes32(event.ConfigId)
+		configIDHex := dsutil.HexEncodeBytes32(event.ConfigId)
 
 		// Skip if this configId doesn't exist
-		if configs, ok := view.Configs[configIdHex]; ok {
+		if configs, ok := view.Configs[configIDHex]; ok {
 			// Update isGreenProduction for all configs with this configId
 			for digest, config := range configs {
 				config.IsGreenProduction = event.IsGreenProduction

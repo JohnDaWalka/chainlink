@@ -14,6 +14,7 @@ type DonMetadata struct {
 }
 
 // DataStreamsMetadata is a struct that can be used as a default metadata type.
+// This is just a placeholder for the actual metadata structure to show how it can be used.
 type DataStreamsMetadata struct {
 	DONs []DonMetadata
 }
@@ -21,7 +22,7 @@ type DataStreamsMetadata struct {
 // DefaultMetadata implements the Cloneable interface
 func (d DataStreamsMetadata) Clone() DataStreamsMetadata { return d }
 
-func (d DataStreamsMetadata) GetDonById(id string) (DonMetadata, error) {
+func (d DataStreamsMetadata) GetDonByID(id string) (DonMetadata, error) {
 	for _, don := range d.DONs {
 		if don.ID == id {
 			return don, nil

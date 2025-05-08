@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -42,7 +43,7 @@ func NewSerializedContractMetadata[T any](metadata GenericContractMetadata[T]) (
 // DeserializeMetadata converts a SerializedContractMetadata to a GenericContractMetadata of type T
 func DeserializeMetadata[T any](serialized SerializedContractMetadata) (*GenericContractMetadata[T], error) {
 	if len(serialized.Content) == 0 {
-		return nil, fmt.Errorf("empty content in serialized metadata")
+		return nil, errors.New("empty content in serialized metadata")
 	}
 
 	var result GenericContractMetadata[T]

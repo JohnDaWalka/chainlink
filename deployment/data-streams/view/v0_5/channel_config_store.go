@@ -51,7 +51,7 @@ type ChannelConfigStoreContract interface {
 	TypeAndVersion(opts *bind.CallOpts) (string, error)
 	Owner(opts *bind.CallOpts) (common.Address, error)
 
-	FilterNewChannelDefinition(opts *bind.FilterOpts, donId []*big.Int) (evm.LogIterator[channel_config_store.ChannelConfigStoreNewChannelDefinition], error)
+	FilterNewChannelDefinition(opts *bind.FilterOpts, donID []*big.Int) (evm.LogIterator[channel_config_store.ChannelConfigStoreNewChannelDefinition], error)
 }
 
 // ChannelConfigStoreViewGenerator generates views of ChannelConfigStore contracts

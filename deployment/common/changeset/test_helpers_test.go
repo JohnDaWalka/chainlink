@@ -193,7 +193,8 @@ func TestApplyChangesetsHelpers(t *testing.T) {
 
 	for _, tt := range csTests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.changesetApplyFunction == "V2" {
+			switch tt.changesetApplyFunction {
+			case "V2":
 				e := NewNoopEnvironment(t)
 				e, _, err := ApplyChangesetsV2(t, e, tt.changesets)
 				if tt.wantError {
@@ -202,7 +203,7 @@ func TestApplyChangesetsHelpers(t *testing.T) {
 				}
 				require.NoError(t, err)
 				tt.validate(t, e)
-			} else if tt.changesetApplyFunction == "V1" {
+			case "V1":
 				e := NewNoopEnvironment(t)
 				e, err := ApplyChangesets(t, e, nil, tt.changesets)
 				if tt.wantError {
@@ -211,7 +212,7 @@ func TestApplyChangesetsHelpers(t *testing.T) {
 				}
 				require.NoError(t, err)
 				tt.validate(t, e)
-			} else {
+			default:
 				t.Fatalf("unknown changeset apply function: %s", tt.changesetApplyFunction)
 			}
 		})

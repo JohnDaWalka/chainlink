@@ -141,7 +141,7 @@ func NewMemoryEnvV2(t *testing.T, cfg MemoryEnvConfig) MemoryEnv {
 			),
 		)
 		require.NoError(t, err)
-		addresses, err := updatedEnv.ExistingAddresses.AddressesForChain(chainSelector) //nolint:staticcheck // won't migrate now
+		addresses, err := updatedEnv.ExistingAddresses.AddressesForChain(chainSelector)
 		require.NoError(t, err)
 		env = updatedEnv
 		linkState, err := commonstate.MaybeLoadLinkTokenChainState(chain, addresses)
@@ -166,6 +166,7 @@ func NewMemoryEnvV2(t *testing.T, cfg MemoryEnvConfig) MemoryEnv {
 		require.NoError(t, err)
 
 		addresses, err := utils.EnvironmentAddresses(updatedEnv)
+		require.NoError(t, err)
 		mcmsState, err := commonstate.MaybeLoadMCMSWithTimelockChainState(chain, addresses)
 		require.NoError(t, err)
 
@@ -212,7 +213,7 @@ func DeployMCMS(
 
 	require.NoError(t, err)
 
-	addresses, err := e.ExistingAddresses.AddressesForChain(TestChain.Selector) //nolint:staticcheck // won't migrate now
+	addresses, err := e.ExistingAddresses.AddressesForChain(TestChain.Selector)
 	require.NoError(t, err)
 
 	chain := e.Chains[chainSelector]

@@ -25,8 +25,8 @@ type FeeManagerReader struct {
 func (w *FeeManagerReader) FilterSubscriberDiscountUpdated(
 	opts *bind.FilterOpts,
 	subscriber []common.Address,
-	feedId [][32]byte) (LogIterator[fee_manager.FeeManagerSubscriberDiscountUpdated], error) {
-	iter, err := w.FeeManagerFilterer.FilterSubscriberDiscountUpdated(opts, subscriber, feedId)
+	feedID [][32]byte) (LogIterator[fee_manager.FeeManagerSubscriberDiscountUpdated], error) {
+	iter, err := w.FeeManagerFilterer.FilterSubscriberDiscountUpdated(opts, subscriber, feedID)
 	if err != nil {
 		return nil, err
 	}

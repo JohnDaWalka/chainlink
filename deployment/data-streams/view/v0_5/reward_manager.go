@@ -56,7 +56,7 @@ type RewardManagerContract interface {
 	SRewardRecipientWeightsSet(opts *bind.CallOpts, arg0 [32]byte) (bool, error)
 
 	// Event filtering methods
-	FilterRewardRecipientsUpdated(opts *bind.FilterOpts, poolId [][32]byte) (evm.LogIterator[reward_manager_v0_5_0.RewardManagerRewardRecipientsUpdated], error)
+	FilterRewardRecipientsUpdated(opts *bind.FilterOpts, poolID [][32]byte) (evm.LogIterator[reward_manager_v0_5_0.RewardManagerRewardRecipientsUpdated], error)
 }
 
 // RewardManagerViewGenerator generates views for reward manager contracts
@@ -75,7 +75,11 @@ func NewRewardManagerViewGenerator(contract RewardManagerContract) *RewardManage
 func (g *RewardManagerViewGenerator) Generate(ctx context.Context, params RewardManagerViewParams) (RewardManagerView, error) {
 	view := RewardManagerView{}
 
-	// First, collect registered pool IDs
+	if err := g.fetchContractState(ctx, &view); err != nil {
+		return view, fmt.Errorf("failed to fetch contract state: %w", err)
+	}
+
+	// We need the pool IDs to get the recipient weights
 	poolIDs, err := g.getPoolIDs(ctx)
 	if err != nil {
 		return view, fmt.Errorf("failed to get registered pool IDs: %w", err)
@@ -92,14 +96,12 @@ func (g *RewardManagerViewGenerator) Generate(ctx context.Context, params Reward
 }
 
 func (g *RewardManagerViewGenerator) fetchContractState(ctx context.Context, view *RewardManagerView) error {
-	// Fetch contract owner
 	owner, err := g.contract.Owner(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return fmt.Errorf("failed to get contract owner: %w", err)
 	}
 	view.Owner = owner.Hex()
 
-	// Fetch contract type and version
 	typeAndVersion, err := g.contract.TypeAndVersion(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return fmt.Errorf("failed to get contract type and version: %w", err)
@@ -109,7 +111,7 @@ func (g *RewardManagerViewGenerator) fetchContractState(ctx context.Context, vie
 	return nil
 }
 
-func (g *RewardManagerViewGenerator) getRecipientWeights(ctx context.Context, poolIds [][32]byte, params RewardManagerViewParams) (map[string]map[string]RecipientInfo, error) {
+func (g *RewardManagerViewGenerator) getRecipientWeights(ctx context.Context, poolIDs [][32]byte, params RewardManagerViewParams) (map[string]map[string]RecipientInfo, error) {
 	filterOpts := &bind.FilterOpts{
 		Context: ctx,
 		Start:   params.FromBlock,
@@ -118,13 +120,13 @@ func (g *RewardManagerViewGenerator) getRecipientWeights(ctx context.Context, po
 
 	recipientWeights := make(map[string]map[string]RecipientInfo)
 
-	updateIterator, err := g.contract.FilterRewardRecipientsUpdated(filterOpts, poolIds)
+	updateIterator, err := g.contract.FilterRewardRecipientsUpdated(filterOpts, poolIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to filter reward recipients updated events: %w", err)
 	}
 	defer updateIterator.Close()
 
-	// Process update events to collect all recipients and their weights
+	// Collect events to collect all recipients and their weights
 	for updateIterator.Next() {
 		event := updateIterator.GetEvent()
 
@@ -165,13 +167,11 @@ func (g *RewardManagerViewGenerator) getPoolIDs(ctx context.Context) ([][32]byte
 			break
 		}
 
-		// Check if the weights have been set for this pool
 		weightsSet, err := g.contract.SRewardRecipientWeightsSet(&bind.CallOpts{Context: ctx}, poolID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if weights are set for pool %x: %w", poolID, err)
 		}
 
-		// Only include pools that have weights set
 		if weightsSet {
 			poolIDs = append(poolIDs, poolID)
 		}

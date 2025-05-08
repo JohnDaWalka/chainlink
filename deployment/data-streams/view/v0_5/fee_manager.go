@@ -73,10 +73,10 @@ type FeeManagerReader interface {
 	SNativeSurcharge(opts *bind.CallOpts) (*big.Int, error)
 	LinkAvailableForPayment(opts *bind.CallOpts) (*big.Int, error)
 	SGlobalDiscounts(opts *bind.CallOpts, subscriber common.Address, token common.Address) (*big.Int, error)
-	SSubscriberDiscounts(opts *bind.CallOpts, subscriber common.Address, feedId [32]byte, token common.Address) (*big.Int, error)
+	SSubscriberDiscounts(opts *bind.CallOpts, subscriber common.Address, feedID [32]byte, token common.Address) (*big.Int, error)
 
 	// Filter methods
-	FilterSubscriberDiscountUpdated(opts *bind.FilterOpts, subscriber []common.Address, feedId [][32]byte) (evm.LogIterator[fee_manager.FeeManagerSubscriberDiscountUpdated], error)
+	FilterSubscriberDiscountUpdated(opts *bind.FilterOpts, subscriber []common.Address, feedID [][32]byte) (evm.LogIterator[fee_manager.FeeManagerSubscriberDiscountUpdated], error)
 }
 
 func NewFeeManagerViewGenerator(contract FeeManagerReader) *FeeManagerViewGenerator {
@@ -182,7 +182,7 @@ func (f *FeeManagerViewGenerator) gatherOrganizedDiscounts(ctx context.Context,
 
 	type discountKey struct {
 		subscriber common.Address
-		feedId     [32]byte
+		feedID     [32]byte
 		token      common.Address
 	}
 
@@ -191,15 +191,15 @@ func (f *FeeManagerViewGenerator) gatherOrganizedDiscounts(ctx context.Context,
 	for iterator.Next() {
 		event := iterator.GetEvent()
 
-		feedIdStr := dsutil.HexEncodeBytes32(event.FeedId)
+		feedIDStr := dsutil.HexEncodeBytes32(event.FeedId)
 
 		// Create a unique key for this combination
-		key := fmt.Sprintf("%s-%s-%s", event.Subscriber.Hex(), feedIdStr, event.Token.Hex())
+		key := fmt.Sprintf("%s-%s-%s", event.Subscriber.Hex(), feedIDStr, event.Token.Hex())
 
 		// Store the combination
 		discountMap[key] = discountKey{
 			subscriber: event.Subscriber,
-			feedId:     event.FeedId,
+			feedID:     event.FeedId,
 			token:      event.Token,
 		}
 	}
@@ -213,21 +213,21 @@ func (f *FeeManagerViewGenerator) gatherOrganizedDiscounts(ctx context.Context,
 
 	for _, combo := range discountMap {
 		subscriberAddr := combo.subscriber.Hex()
-		feedIdHex := dsutil.HexEncodeBytes32(combo.feedId)
+		feedIDHex := dsutil.HexEncodeBytes32(combo.feedID)
 
 		// global discount is set using feedId of all zeros
 		isGlobalDiscount := false
 		var zeroBytes [32]byte
-		if combo.feedId == zeroBytes {
+		if combo.feedID == zeroBytes {
 			isGlobalDiscount = true
-			feedIdHex = "global"
+			feedIDHex = "global"
 		}
 
 		if result[subscriberAddr] == nil {
 			result[subscriberAddr] = make(map[string]TokenDiscounts)
 		}
 
-		tokenDiscounts := result[subscriberAddr][feedIdHex]
+		tokenDiscounts := result[subscriberAddr][feedIDHex]
 		tokenDiscounts.IsGlobal = isGlobalDiscount
 
 		var discount *big.Int
@@ -236,7 +236,7 @@ func (f *FeeManagerViewGenerator) gatherOrganizedDiscounts(ctx context.Context,
 		if isGlobalDiscount {
 			discount, err = f.contract.SGlobalDiscounts(callOpts, combo.subscriber, combo.token)
 		} else {
-			discount, err = f.contract.SSubscriberDiscounts(callOpts, combo.subscriber, combo.feedId, combo.token)
+			discount, err = f.contract.SSubscriberDiscounts(callOpts, combo.subscriber, combo.feedID, combo.token)
 		}
 
 		if err != nil {
@@ -249,7 +249,7 @@ func (f *FeeManagerViewGenerator) gatherOrganizedDiscounts(ctx context.Context,
 			tokenDiscounts.Native = discount.String()
 		}
 
-		result[subscriberAddr][feedIdHex] = tokenDiscounts
+		result[subscriberAddr][feedIDHex] = tokenDiscounts
 	}
 
 	return result, nil
