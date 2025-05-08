@@ -15,7 +15,8 @@ func TestEnvMetadata(t *testing.T) {
 	]()
 
 	metaData, err := ds.EnvMetadataStore.Get()
-	require.NoError(t, err)
+	require.NotNil(t, err)
+	require.EqualError(t, datastore.ErrEnvMetadataNotSet, err.Error())
 
 	metaData.Metadata.DONs = []DonMetadata{
 		{
