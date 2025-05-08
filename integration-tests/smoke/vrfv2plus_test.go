@@ -18,7 +18,6 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/generated/blockhash_store"
 	"github.com/smartcontractkit/chainlink-evm/pkg/assets"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
@@ -1898,7 +1897,7 @@ func TestVRFv2PlusPendingBlockSimulationAndZeroConfirmationDelays(t *testing.T) 
 }
 
 func TestVRFv2PlusNodeReorg(t *testing.T) {
-	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DEVSVCS-829")
+	//tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DEVSVCS-829")
 	t.Parallel()
 	var (
 		env                          *test_env.CLClusterTestEnv

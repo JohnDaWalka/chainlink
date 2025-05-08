@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
@@ -46,7 +45,7 @@ func TestOCRBasic(t *testing.T) {
 }
 
 func TestOCRJobReplacement(t *testing.T) {
-	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-528")
+	//tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-528")
 
 	t.Parallel()
 	l := logging.GetTestLogger(t)

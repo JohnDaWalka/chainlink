@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink/integration-tests/utils"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -170,7 +169,7 @@ func TestKeeperBlockCountPerTurn(t *testing.T) {
 		registryVersion := rv
 		t.Run(fmt.Sprintf("registry_1_%d", registryVersion), func(t *testing.T) {
 			if registryVersion == ethereum.RegistryVersion_1_2 {
-				tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-556")
+				//tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-556")
 			}
 
 			t.Parallel()
@@ -705,10 +704,10 @@ func TestKeeperRemove(t *testing.T) {
 		registryVersion := rv
 		t.Run(fmt.Sprintf("registry_1_%d", registryVersion), func(t *testing.T) {
 			if registryVersion == ethereum.RegistryVersion_1_2 {
-				tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-435")
+				//tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-435")
 			}
 			if registryVersion == ethereum.RegistryVersion_1_3 {
-				tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-557")
+				//tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-557")
 			}
 			t.Parallel()
 			l := logging.GetTestLogger(t)
@@ -966,7 +965,7 @@ func TestKeeperNodeDown(t *testing.T) {
 		registryVersion := rv
 		t.Run(fmt.Sprintf("registry_1_%d", registryVersion), func(t *testing.T) {
 			if t.Name() == "TestKeeperNodeDown/registry_1_3" {
-				tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-398")
+				//tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-398")
 			}
 
 			t.Parallel()

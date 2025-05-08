@@ -28,7 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	clcommontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-evm/pkg/assets"
 	"github.com/smartcontractkit/chainlink-evm/pkg/client"
 	"github.com/smartcontractkit/chainlink-evm/pkg/heads/headstest"
@@ -229,7 +228,7 @@ func TestChainReader_HealthReport(t *testing.T) {
 }
 
 func TestChainComponents(t *testing.T) {
-	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-401")
+	//tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-401")
 
 	t.Parallel()
 	// shared helper so all tests can run efficiently in parallel

@@ -8,8 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
@@ -127,10 +125,10 @@ func TestValidateSyncUSDCDomainsWithChainsConfig(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.Msg, func(t *testing.T) {
 			if t.Name() == "TestValidateSyncUSDCDomainsWithChainsConfig/Domain_mapping_not_defined" {
-				tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-113")
+				//tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-113")
 			}
 			if t.Name() == "TestValidateSyncUSDCDomainsWithChainsConfig/Chain_selector_is_not_valid" {
-				tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-195")
+				//tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-195")
 			}
 			deployedEnvironment, _ := testhelpers.NewMemoryEnvironment(t, func(testCfg *testhelpers.TestConfigs) {
 				testCfg.Chains = 2
@@ -189,7 +187,7 @@ func TestSyncUSDCDomainsWithChainsChangeset(t *testing.T) {
 
 		t.Run(msg, func(t *testing.T) {
 			if t.Name() == "TestSyncUSDCDomainsWithChainsChangeset/Sync_domains_without_MCMS" {
-				tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-112")
+				//tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-112")
 			}
 			deployedEnvironment, _ := testhelpers.NewMemoryEnvironment(t, func(testCfg *testhelpers.TestConfigs) {
 				testCfg.Chains = 2

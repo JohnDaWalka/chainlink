@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink/integration-tests/utils"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -22,7 +21,7 @@ import (
 )
 
 func TestForwarderOCRBasic(t *testing.T) {
-	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-564")
+	//tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-564")
 
 	t.Parallel()
 	l := logging.GetTestLogger(t)

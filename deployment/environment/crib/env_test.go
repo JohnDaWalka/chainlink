@@ -5,12 +5,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 func TestShouldProvideEnvironmentConfig(t *testing.T) {
-	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-291")
+	//tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-291")
 
 	t.Parallel()
 	env := NewDevspaceEnvFromStateDir(nil, "testdata/lanes-deployed-state")

@@ -12,7 +12,6 @@ import (
 	commoncap "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable"
@@ -33,7 +32,7 @@ const (
 )
 
 func Test_Client_DonTopologies(t *testing.T) {
-	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/CAPPL-322")
+	//tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/CAPPL-322")
 
 	ctx := testutils.Context(t)
 
