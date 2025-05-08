@@ -111,7 +111,6 @@ func deploy(e deployment.Environment, dataStore ds.MutableDataStore[metadata.Ser
 		); err != nil {
 			return fmt.Errorf("failed to upser contract metadata: %w", err)
 		}
-
 	}
 	return nil
 }

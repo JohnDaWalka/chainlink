@@ -168,7 +168,5 @@ func TestCallSetStagingConfig(t *testing.T) {
 			stagingDigest,
 			stagingCfg,
 			2)
-
 	})
-
 }

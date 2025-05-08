@@ -146,7 +146,7 @@ func (b *ConfiguratorViewGenerator) processConfigEvents(opts *bind.FilterOpts, v
 }
 
 // processConfigEvent processes either a ProductionConfigSet or StagingConfigSet event
-func (b *ConfiguratorViewGenerator) processConfigEvent(configId [32]byte, configDigest [32]byte, event interface{}, view *ConfiguratorView) {
+func (b *ConfiguratorViewGenerator) processConfigEvent(configID [32]byte, configDigest [32]byte, event interface{}, view *ConfiguratorView) {
 	var (
 		configCount           uint64
 		offchainConfig        []byte
@@ -184,7 +184,7 @@ func (b *ConfiguratorViewGenerator) processConfigEvent(configId [32]byte, config
 		panic("unknown event type")
 	}
 
-	configIDHex := dsutil.HexEncodeBytes32(configId)
+	configIDHex := dsutil.HexEncodeBytes32(configID)
 	configDigestHex := dsutil.HexEncodeBytes32(configDigest)
 
 	if _, ok := view.Configs[configIDHex]; !ok {
@@ -241,14 +241,14 @@ func (b *ConfiguratorViewGenerator) processPromotions(opts *bind.FilterOpts, vie
 	return nil
 }
 
-func (v ConfiguratorView) GetConfigState(configId, configDigest string) (*ConfigState, error) {
-	configs, ok := v.Configs[configId]
+func (v ConfiguratorView) GetConfigState(configID, configDigest string) (*ConfigState, error) {
+	configs, ok := v.Configs[configID]
 	if !ok {
-		return nil, fmt.Errorf("configId %s not found", configId)
+		return nil, fmt.Errorf("configID %s not found", configID)
 	}
 	configState, ok := configs[configDigest]
 	if !ok {
-		return nil, fmt.Errorf("configDigest %s not found for configId %s", configDigest, configId)
+		return nil, fmt.Errorf("configDigest %s not found for configID %s", configDigest, configID)
 	}
 	return configState, nil
 }

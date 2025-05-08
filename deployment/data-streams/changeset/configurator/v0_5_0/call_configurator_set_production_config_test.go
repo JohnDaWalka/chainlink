@@ -112,6 +112,5 @@ func TestCallSetProductionConfig(t *testing.T) {
 			digest,
 			prodCfg,
 			1)
-
 	})
 }

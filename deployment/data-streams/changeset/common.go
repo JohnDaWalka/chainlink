@@ -27,7 +27,7 @@ func chainAndAddresses(e deployment.Environment, chainSel uint64) (chainID strin
 		return "", nil, fmt.Errorf("failed to get chain ID from selector: %w", err)
 	}
 
-	addresses, err = e.ExistingAddresses.AddressesForChain(chainSel) //nolint:staticcheck // won't migrate now
+	addresses, err = e.ExistingAddresses.AddressesForChain(chainSel)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to get existing addresses: %w", err)
 	}

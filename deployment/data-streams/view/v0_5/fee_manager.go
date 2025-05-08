@@ -162,7 +162,6 @@ func (f *FeeManagerViewGenerator) fetchContractState(ctx context.Context, view *
 func (f *FeeManagerViewGenerator) gatherOrganizedDiscounts(ctx context.Context,
 	params FeeManagerViewParams,
 	view *FeeManagerView) (map[string]map[string]TokenDiscounts, error) {
-
 	// Create filter options
 	filterOpts := &bind.FilterOpts{
 		Start:   params.FromBlock,
