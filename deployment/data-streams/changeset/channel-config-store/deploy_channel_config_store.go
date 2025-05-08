@@ -128,6 +128,11 @@ func channelConfigStoreDeployFn() changeset.ContractDeployFn[*channel_config_sto
 			}
 		}
 		bn, err := chain.Confirm(ccsTx)
+		if err != nil {
+			return &changeset.ContractDeployment[*channel_config_store.ChannelConfigStore]{
+				Err: err,
+			}
+		}
 		return &changeset.ContractDeployment[*channel_config_store.ChannelConfigStore]{
 			Address:  ccsAddr,
 			Block:    bn,

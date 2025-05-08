@@ -149,8 +149,15 @@ func verifyProxyDeployFn(cfg DeployVerifierProxy) changeset.ContractDeployFn[*ve
 				Err: err,
 			}
 		}
+		bn, err := chain.Confirm(tx)
+		if err != nil {
+			return &changeset.ContractDeployment[*verifier_proxy_v0_5_0.VerifierProxy]{
+				Err: err,
+			}
+		}
 		return &changeset.ContractDeployment[*verifier_proxy_v0_5_0.VerifierProxy]{
 			Address:  addr,
+			Block:    bn,
 			Contract: contract,
 			Tx:       tx,
 			Tv:       deployment.NewTypeAndVersion(types.VerifierProxy, deployment.Version0_5_0),

@@ -136,8 +136,15 @@ func VerifierDeployFn(verifierProxyAddress common.Address) changeset.ContractDep
 				Err: err,
 			}
 		}
+		bn, err := chain.Confirm(ccsTx)
+		if err != nil {
+			return &changeset.ContractDeployment[*verifier.Verifier]{
+				Err: err,
+			}
+		}
 		return &changeset.ContractDeployment[*verifier.Verifier]{
 			Address:  ccsAddr,
+			Block:    bn,
 			Contract: ccs,
 			Tx:       ccsTx,
 			Tv:       deployment.NewTypeAndVersion(types.Verifier, deployment.Version0_5_0),

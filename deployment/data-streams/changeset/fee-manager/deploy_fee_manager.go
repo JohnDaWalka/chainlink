@@ -140,8 +140,15 @@ func FeeManagerDeployFn(cfg DeployFeeManager) changeset.ContractDeployFn[*fee_ma
 				Err: err,
 			}
 		}
+		bn, err := chain.Confirm(ccsTx)
+		if err != nil {
+			return &changeset.ContractDeployment[*fee_manager_v0_5_0.FeeManager]{
+				Err: err,
+			}
+		}
 		return &changeset.ContractDeployment[*fee_manager_v0_5_0.FeeManager]{
 			Address:  ccsAddr,
+			Block:    bn,
 			Contract: ccs,
 			Tx:       ccsTx,
 			Tv:       deployment.NewTypeAndVersion(types.FeeManager, deployment.Version0_5_0),

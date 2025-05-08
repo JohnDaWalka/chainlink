@@ -137,8 +137,15 @@ func RewardManagerDeployFn(linkAddress common.Address) changeset.ContractDeployF
 				Err: err,
 			}
 		}
+		bn, err := chain.Confirm(ccsTx)
+		if err != nil {
+			return &changeset.ContractDeployment[*rewardManager.RewardManager]{
+				Err: err,
+			}
+		}
 		return &changeset.ContractDeployment[*rewardManager.RewardManager]{
 			Address:  ccsAddr,
+			Block:    bn,
 			Contract: ccs,
 			Tx:       ccsTx,
 			Tv:       deployment.NewTypeAndVersion(types.RewardManager, deployment.Version0_5_0),

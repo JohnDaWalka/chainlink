@@ -127,8 +127,17 @@ func DeployFn() changeset.ContractDeployFn[*configurator.Configurator] {
 				Err: err,
 			}
 		}
+
+		bn, err := chain.Confirm(ccsTx)
+		if err != nil {
+			return &changeset.ContractDeployment[*configurator.Configurator]{
+				Err: err,
+			}
+		}
+
 		return &changeset.ContractDeployment[*configurator.Configurator]{
 			Address:  ccsAddr,
+			Block:    bn,
 			Contract: ccs,
 			Tx:       ccsTx,
 			Tv:       deployment.NewTypeAndVersion(types.Configurator, deployment.Version0_5_0),
