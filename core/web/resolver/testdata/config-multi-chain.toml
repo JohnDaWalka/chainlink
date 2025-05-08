@@ -44,11 +44,7 @@ PerOwner = 200
 ChainID = '1'
 FinalityDepth = 26
 FinalityTagEnabled = true
-FinalizedBlockOffset = 0
-
-[EVM.OCR2]
-[EVM.OCR2.Automation]
-GasLimit = 10500000
+FinalizedBlockOffset = 12
 
 [[EVM.Nodes]]
 Name = 'primary'
@@ -91,6 +87,7 @@ SelectionMode = 'HighestHead'
 SyncThreshold = 5
 NodeIsSyncingEnabled = false
 LeaseDuration = '1m0s'
+NewHeadsPollInterval = '1s'
 FinalizedBlockPollInterval = '1s'
 EnforceRepeatableRead = true
 DeathDeclarationDelay = '1m0s'
@@ -105,6 +102,7 @@ FinalizedBlockOffset = 0
 Name = 'primary'
 URL = 'http://mainnet.solana.com'
 SendOnly = false
+Order = 1
 
 [[Solana]]
 ChainID = 'testnet'
@@ -118,6 +116,7 @@ SelectionMode = 'HighestHead'
 SyncThreshold = 5
 NodeIsSyncingEnabled = false
 LeaseDuration = '1m0s'
+NewHeadsPollInterval = '1s'
 FinalizedBlockPollInterval = '1s'
 EnforceRepeatableRead = true
 DeathDeclarationDelay = '1m0s'
@@ -132,3 +131,4 @@ FinalizedBlockOffset = 0
 Name = 'secondary'
 URL = 'http://testnet.solana.com'
 SendOnly = false
+Order = 2

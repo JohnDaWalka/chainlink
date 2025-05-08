@@ -18,6 +18,7 @@ LogQueries = false
 MaxIdleConns = 10
 MaxOpenConns = 100
 MigrateOnStartup = true
+SkipVersionCheck = false
 
 [Database.Backup]
 Dir = ''
@@ -337,7 +338,7 @@ OperatorFactoryAddress = '0x3E64Cd889482443324F91bFA9c84fE72A511f48A'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
+FinalizedBlockOffset = 12
 NoNewFinalizedHeadsThreshold = '9m0s'
 
 [EVM.Transactions]
@@ -685,6 +686,7 @@ SelectionMode = 'HighestHead'
 SyncThreshold = 5
 NodeIsSyncingEnabled = false
 LeaseDuration = '1m0s'
+NewHeadsPollInterval = '1s'
 FinalizedBlockPollInterval = '1s'
 EnforceRepeatableRead = true
 DeathDeclarationDelay = '1m0s'
@@ -699,6 +701,7 @@ FinalizedBlockOffset = 0
 Name = 'primary'
 URL = 'http://mainnet.solana.com'
 SendOnly = false
+Order = 1
 
 [[Solana]]
 ChainID = 'testnet'
@@ -735,6 +738,7 @@ SelectionMode = 'HighestHead'
 SyncThreshold = 5
 NodeIsSyncingEnabled = false
 LeaseDuration = '1m0s'
+NewHeadsPollInterval = '1s'
 FinalizedBlockPollInterval = '1s'
 EnforceRepeatableRead = true
 DeathDeclarationDelay = '1m0s'
@@ -749,3 +753,4 @@ FinalizedBlockOffset = 0
 Name = 'secondary'
 URL = 'http://testnet.solana.com'
 SendOnly = false
+Order = 2

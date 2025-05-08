@@ -40,6 +40,10 @@ MaxIdleConns = 10 # Default
 MaxOpenConns = 100 # Default
 # MigrateOnStartup controls whether a Chainlink node will attempt to automatically migrate the database on boot. If you want more control over your database migration process, set this variable to `false` and manually migrate the database using the CLI `migrate` command instead.
 MigrateOnStartup = true # Default
+# SkipVersionCheck controls whether a Chainlink node will check the application version on startup. 
+# 
+# This is useful for testing purposes, but it is not recommended to disable this check in production. If you disable this check, the Chainlink node will not be able to determine if the database schema is compatible with the current version of the application, which could lead to unexpected behavior or data loss.
+SkipVersionCheck = false # Default
 
 # As a best practice, take regular database backups in case of accidental data loss. This best practice is especially important when you upgrade your Chainlink node to a new version. Chainlink nodes support automated database backups to make this process easier.
 #

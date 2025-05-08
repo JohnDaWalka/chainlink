@@ -18,6 +18,7 @@ LogQueries = true
 MaxIdleConns = 7
 MaxOpenConns = 13
 MigrateOnStartup = true
+SkipVersionCheck = false
 
 [Database.Backup]
 Dir = 'test/backup/dir'

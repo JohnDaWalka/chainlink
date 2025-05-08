@@ -293,6 +293,7 @@ func TestConfig_Marshal(t *testing.T) {
 		MigrateOnStartup:              ptr(true),
 		MaxIdleConns:                  ptr[int64](7),
 		MaxOpenConns:                  ptr[int64](13),
+		SkipVersionCheck:              ptr(false),
 		Listener: toml.DatabaseListener{
 			MaxReconnectDuration: commoncfg.MustNewDuration(time.Minute),
 			MinReconnectInterval: commoncfg.MustNewDuration(5 * time.Minute),
@@ -870,6 +871,7 @@ LogQueries = true
 MaxIdleConns = 7
 MaxOpenConns = 13
 MigrateOnStartup = true
+SkipVersionCheck = false
 
 [Database.Backup]
 Dir = 'test/backup/dir'
