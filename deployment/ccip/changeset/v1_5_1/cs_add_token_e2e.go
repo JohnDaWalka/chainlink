@@ -524,17 +524,6 @@ func grantAccessToPool(
 	return nil
 }
 
-func getBurnMintToken(chain deployment.Chain, tokenType deployment.ContractType, tokenAddress common.Address) (any, error) {
-	switch tokenType {
-	case changeset.ERC677TokenHelper:
-		return burn_mint_erc677_helper.NewBurnMintERC677Helper(tokenAddress, chain.Client)
-	case changeset.ERC677Token:
-		return burn_mint_erc677.NewBurnMintERC677(tokenAddress, chain.Client)
-	default:
-		return nil, fmt.Errorf("unsupported token type: %v", tokenType)
-	}
-}
-
 // addMinterAndMintTokenERC677 adds the minter role to the recipient and mints the specified amount of tokens to the recipient's address.
 func addMinterAndMintTokenERC677(env deployment.Environment, selector uint64, token *burn_mint_erc677.BurnMintERC677, recipient common.Address, amount *big.Int) error {
 	return addMinterAndMintTokenHelper(env, selector, token, recipient, amount)

@@ -2029,6 +2029,22 @@ func LoadChainState(ctx context.Context, chain deployment.Chain, addresses map[s
 			}
 			state.DonIDClaimer = donIDClaimer
 			state.ABIByAddress[address] = don_id_claimer.DonIDClaimerABI
+		case deployment.NewTypeAndVersion(ERC677TokenHelper, deployment.Version1_0_0).String():
+			ERC677HelperToken, err := burn_mint_erc677_helper.NewBurnMintERC677Helper(common.HexToAddress(address), chain.Client)
+			if err != nil {
+				return state, err
+			}
+
+			if state.BurnMintTokens677Helper == nil {
+				state.BurnMintTokens677Helper = make(map[TokenSymbol]*burn_mint_erc677_helper.BurnMintERC677Helper)
+			}
+			symbol, err := ERC677HelperToken.Symbol(nil)
+			if err != nil {
+				return state, fmt.Errorf("failed to get token symbol of token at %s: %w", address, err)
+			}
+			state.BurnMintTokens677Helper[TokenSymbol(symbol)] = ERC677HelperToken
+			state.ABIByAddress[address] = burn_mint_erc677_helper.BurnMintERC677HelperABI
+
 		default:
 			// ManyChainMultiSig 1.0.0 can have any of these labels, it can have either 1,2 or 3 of these -
 			// bypasser, proposer and canceller

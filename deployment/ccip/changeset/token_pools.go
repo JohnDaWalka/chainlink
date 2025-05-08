@@ -22,9 +22,10 @@ import (
 var CurrentTokenPoolVersion semver.Version = deployment.Version1_5_1
 
 var TokenTypes = map[deployment.ContractType]struct{}{
-	BurnMintToken: {},
-	ERC20Token:    {},
-	ERC677Token:   {},
+	BurnMintToken:     {},
+	ERC20Token:        {},
+	ERC677Token:       {},
+	ERC677TokenHelper: {},
 }
 
 var TokenPoolTypes = map[deployment.ContractType]struct{}{
