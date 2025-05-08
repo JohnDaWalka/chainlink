@@ -250,7 +250,6 @@ func (f *FeeManagerViewGenerator) gatherOrganizedDiscounts(ctx context.Context,
 		}
 
 		result[subscriberAddr][feedIdHex] = tokenDiscounts
-
 	}
 
 	return result, nil
