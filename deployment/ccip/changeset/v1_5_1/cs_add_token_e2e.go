@@ -9,10 +9,13 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/mcms"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/burn_mint_erc677_helper"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/erc20"
@@ -24,6 +27,11 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 )
+
+type BurnMintERC677Interface interface {
+	AddMinter(opts *bind.TransactOpts, minter common.Address) (*types.Transaction, error)
+	Mint(opts *bind.TransactOpts, to common.Address, amount *big.Int) (*types.Transaction, error)
+}
 
 // AddTokensE2E is a changeset that deploys and configures token pools for multiple tokens across multiple chains in a single changeset.
 // AddTokensE2E does the following:
@@ -387,14 +395,14 @@ func deployTokens(e deployment.Environment, tokenDeployCfg map[uint64]DeployToke
 				return nil, ab, fmt.Errorf("failed to deploy BurnMintERC677 token "+
 					"%s on chain %d: %w", cfg.TokenName, selector, err)
 			}
-			if err := addMinterAndMintToken(e, selector, token.Contract, e.Chains[selector].DeployerKey.From,
+			if err := addMinterAndMintToken(e, selector, changeset.ERC677Token, e.Chains[selector].DeployerKey.From,
 				new(big.Int).Mul(big.NewInt(1_000), big.NewInt(1_000_000_000))); err != nil {
 				return nil, ab, fmt.Errorf("failed to add minter and mint token "+
 					"%s on chain %d: %w", cfg.TokenName, selector, err)
 			}
 			if len(cfg.MintTokenForRecipients) > 0 {
 				for recipient, amount := range cfg.MintTokenForRecipients {
-					if err := addMinterAndMintToken(e, selector, token.Contract, recipient,
+					if err := addMinterAndMintToken(e, selector, changeset.ERC677Token, recipient,
 						amount); err != nil {
 						return nil, ab, fmt.Errorf("failed to add minter and mint "+
 							"token %s on chain %d: %w", cfg.TokenName, selector, err)
@@ -448,6 +456,43 @@ func deployTokens(e deployment.Environment, tokenDeployCfg map[uint64]DeployToke
 				return nil, ab, fmt.Errorf("failed to deploy ERC677 token %s on chain %d: %w", cfg.TokenName, selector, err)
 			}
 			tokenAddresses[selector] = token.Address
+		case changeset.ERC677TokenHelper:
+			token, err := cldf.DeployContract(e.Logger, e.Chains[selector], ab,
+				func(chain deployment.Chain) cldf.ContractDeploy[*burn_mint_erc677_helper.BurnMintERC677Helper] {
+					tokenAddress, tx, token, err := burn_mint_erc677_helper.DeployBurnMintERC677Helper(
+						e.Chains[selector].DeployerKey,
+						e.Chains[selector].Client,
+						cfg.TokenName,
+						string(cfg.TokenSymbol),
+					)
+					return cldf.ContractDeploy[*burn_mint_erc677_helper.BurnMintERC677Helper]{
+						Address:  tokenAddress,
+						Contract: token,
+						Tv:       deployment.NewTypeAndVersion(changeset.ERC677TokenHelper, deployment.Version1_0_0),
+						Tx:       tx,
+						Err:      err,
+					}
+				},
+			)
+			if err != nil {
+				return nil, ab, fmt.Errorf("failed to deploy ERC677 token %s on chain %d: %w", cfg.TokenName, selector, err)
+			}
+
+			if err := addMinterAndMintTokenERC677Helper(e, selector, burn_mint_erc677_helper.BurnMintERC677Helper, e.Chains[selector].DeployerKey.From,
+				new(big.Int).Mul(big.NewInt(1_000), big.NewInt(1_000_000_000))); err != nil {
+				return nil, ab, fmt.Errorf("failed to add minter and mint token "+
+					"%s on chain %d: %w", cfg.TokenName, selector, err)
+			}
+			if len(cfg.MintTokenForRecipients) > 0 {
+				for recipient, amount := range cfg.MintTokenForRecipients {
+					if err := addMinterAndMintTokenERC677Helper(e, selector, burn_mint_erc677_helper.BurnMintERC677Helper, recipient,
+						amount); err != nil {
+						return nil, ab, fmt.Errorf("failed to add minter and mint "+
+							"token %s on chain %d: %w", cfg.TokenName, selector, err)
+					}
+				}
+			}
+			tokenAddresses[selector] = token.Address
 		default:
 			return nil, ab, fmt.Errorf("unsupported token %s type %s for deployment on chain %d", cfg.TokenName, cfg.Type, selector)
 		}
@@ -485,8 +530,32 @@ func grantAccessToPool(
 	return nil
 }
 
-// addMinterAndMintToken adds the minter role to the recipient and mints the specified amount of tokens to the recipient's address.
-func addMinterAndMintToken(env deployment.Environment, selector uint64, token *burn_mint_erc677.BurnMintERC677, recipient common.Address, amount *big.Int) error {
+func getBurnMintToken(chain deployment.Chain, tokenType deployment.ContractType, tokenAddress common.Address) (any, error) {
+	switch tokenType {
+	case changeset.ERC677TokenHelper:
+		return burn_mint_erc677_helper.NewBurnMintERC677Helper(tokenAddress, chain.Client)
+	case changeset.ERC677Token:
+		return burn_mint_erc677.NewBurnMintERC677(tokenAddress, chain.Client)
+	default:
+		return nil, fmt.Errorf("unsupported token type: %v", tokenType)
+	}
+}
+
+// addMinterAndMintTokenERC677 adds the minter role to the recipient and mints the specified amount of tokens to the recipient's address.
+func addMinterAndMintTokenERC677(env deployment.Environment, selector uint64, token *burn_mint_erc677.BurnMintERC677, recipient common.Address, amount *big.Int) error {
+	return addMinterAndMintTokenHelper(env, selector, token, recipient, amount)
+}
+
+// addMinterAndMintTokenERC677Helper adds the minter role to the recipient and mints the specified amount of tokens to the recipient's address.
+func addMinterAndMintTokenERC677Helper(env deployment.Environment, selector uint64, token *burn_mint_erc677_helper.BurnMintERC677Helper, recipient common.Address, amount *big.Int) error {
+	baseToken, err := burn_mint_erc677.NewBurnMintERC677(token.Address(), env.Chains[selector].Client)
+	if err != nil {
+		return fmt.Errorf("failed to cast helper to base token: %w", err)
+	}
+	return addMinterAndMintTokenHelper(env, selector, baseToken, recipient, amount)
+}
+
+func addMinterAndMintTokenHelper(env deployment.Environment, selector uint64, token *burn_mint_erc677.BurnMintERC677, recipient common.Address, amount *big.Int) error {
 	deployerKey := env.Chains[selector].DeployerKey
 	ctx := env.GetContext()
 	// check if owner is the deployer key

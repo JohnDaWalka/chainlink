@@ -88,6 +88,8 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/multicall3"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/weth9"
+
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/burn_mint_erc677_helper"
 )
 
 var (
@@ -127,6 +129,7 @@ var (
 	FactoryBurnMintERC20Token      deployment.ContractType = "FactoryBurnMintERC20Token"
 	ERC20Token                     deployment.ContractType = "ERC20Token"
 	ERC677Token                    deployment.ContractType = "ERC677Token"
+	ERC677TokenHelper              deployment.ContractType = "ERC677TokenHelper"
 	BurnMintTokenPool              deployment.ContractType = "BurnMintTokenPool"
 	BurnWithFromMintTokenPool      deployment.ContractType = "BurnWithFromMintTokenPool"
 	BurnFromMintTokenPool          deployment.ContractType = "BurnFromMintTokenPool"
@@ -170,6 +173,7 @@ type CCIPChainState struct {
 	FactoryBurnMintERC20Token  *factory_burn_mint_erc20.FactoryBurnMintERC20
 	ERC677Tokens               map[TokenSymbol]*erc677.ERC677
 	BurnMintTokens677          map[TokenSymbol]*burn_mint_erc677.BurnMintERC677
+	BurnMintTokens677Helper    map[TokenSymbol]*burn_mint_erc677_helper.BurnMintERC677Helper
 	BurnMintTokenPools         map[TokenSymbol]map[semver.Version]*burn_mint_token_pool.BurnMintTokenPool
 	BurnWithFromMintTokenPools map[TokenSymbol]map[semver.Version]*burn_with_from_mint_token_pool.BurnWithFromMintTokenPool
 	BurnFromMintTokenPools     map[TokenSymbol]map[semver.Version]*burn_from_mint_token_pool.BurnFromMintTokenPool
