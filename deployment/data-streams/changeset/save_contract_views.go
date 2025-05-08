@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"

@@ -5,8 +5,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 
 	verifier "github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/verifier_v0_5_0"
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"

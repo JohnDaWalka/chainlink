@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
 
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"

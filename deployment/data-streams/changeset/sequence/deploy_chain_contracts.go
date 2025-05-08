@@ -7,8 +7,8 @@ import (
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/mcms"
 
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 

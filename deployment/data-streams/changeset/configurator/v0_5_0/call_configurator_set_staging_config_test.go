@@ -9,8 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 
 	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 

@@ -3,10 +3,11 @@ package testutil
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/interfaces"
-	"github.com/stretchr/testify/require"
 )
 
 func MustGetContractMetaData[T interfaces.ContractView](

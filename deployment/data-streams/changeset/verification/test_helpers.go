@@ -3,9 +3,10 @@ package verification
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
-	"github.com/stretchr/testify/require"
 
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
