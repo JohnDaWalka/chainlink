@@ -30,7 +30,7 @@ func CreateMCMSProposal(e deployment.Environment, preparedTxs []*txutil.Prepared
 		chainSelectors = append(chainSelectors, tx.ChainSelector)
 	}
 
-	mcmsStatePerChain, err := commonstate.MaybeLoadMCMSWithTimelockState(e, chainSelectors)
+	mcmsStatePerChain, err := commonstate.MaybeLoadMCMSWithTimelockStateDataStore(e, chainSelectors)
 	if err != nil {
 		return nil, err
 	}
