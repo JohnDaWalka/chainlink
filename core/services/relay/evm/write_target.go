@@ -35,7 +35,7 @@ import (
 	relayevmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
-func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain, gasLimitDefault uint64, lggr logger.Logger) (capabilities.TargetCapability, error) {
+func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain, gasLimitDefault uint64, lggr logger.Logger) (capabilities.ExecutableCapability, error) {
 	// generate ID based on chain selector
 	id, err := GenerateWriteTargetName(chain.ID())
 	if err != nil {
@@ -114,14 +114,16 @@ func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain
 	}
 
 	emitter := writetarget.NewMonitorEmitter(lggr)
-	dfProcessor := dfprocessor.NewDataFeedsProcessor(registryMetrics, emitter)
+
+	dfProcessor := dfprocessor.NewDataFeedsProcessor(registryMetrics, emitter, false)
+	ccipDfProcessor := dfprocessor.NewDataFeedsProcessor(registryMetrics, emitter, true)
 
 	evmProcessors, err := processor.NewEVMPlatformProcessors(emitter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create EVM platform processors: %w", err)
 	}
 
-	beholder, err := writetarget.NewMonitor(lggr, evmProcessors, []writetarget.ProductSpecificProcessor{dfProcessor}, emitter)
+	beholder, err := writetarget.NewMonitor(lggr, evmProcessors, []writetarget.ProductSpecificProcessor{dfProcessor, ccipDfProcessor}, emitter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Aptos WT monitor client: %+w", err)
 	}

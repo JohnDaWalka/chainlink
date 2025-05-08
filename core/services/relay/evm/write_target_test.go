@@ -4,13 +4,18 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/big"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
@@ -24,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/client/clienttest"
 	gasmocks "github.com/smartcontractkit/chainlink-evm/pkg/gas/mocks"
 	dftypes "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds"
+
 	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/report/platform"
 
 	evmtypes "github.com/smartcontractkit/chainlink-evm/pkg/types"
@@ -108,16 +114,6 @@ func TestEvmWrite(t *testing.T) {
 	evmClient := clienttest.NewClient(t)
 	poller := pollermocks.NewLogPoller(t)
 
-	// This is a very error-prone way to mock an on-chain response to a GetLatestValue("getTransmissionInfo") call
-	// It's a bit of a hack, but it's the best way to do it without a lot of refactoring
-	mockCall, err := newMockedEncodeTransmissionInfo(0)
-	require.NoError(t, err)
-
-	evmClient.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(mockCall, nil).Times(3)
-	evmClient.On("CodeAt", mock.Anything, mock.Anything, mock.Anything).Return([]byte("test"), nil)
-
-	txManager.On("GetTransactionStatus", mock.Anything, mock.Anything).Return(commontypes.Finalized, nil).Maybe()
-
 	chain.On("Start", mock.Anything).Return(nil)
 	chain.On("Close").Return(nil)
 	chain.On("ID").Return(big.NewInt(11155111))
@@ -151,7 +147,7 @@ func TestEvmWrite(t *testing.T) {
 	db := pgtest.NewSqlxDB(t)
 	keyStore := cltest.NewKeyStore(t, db)
 
-	lggr := logger.TestLogger(t)
+	lggr := logger.TestLogger(t, zapcore.DebugLevel)
 	cRegistry := evmcapabilities.NewRegistry(lggr)
 	relayer, err := relayevm.NewRelayer(lggr, chain, relayevm.RelayerOpts{
 		DS:                   db,
@@ -179,36 +175,68 @@ func TestEvmWrite(t *testing.T) {
 		ReportID:         hex.EncodeToString(reportID[:]),
 	}
 
-	feedReports := dftypes.Reports{
-		{
-			FeedID:    [32]byte{0x01},
-			Price:     big.NewInt(1234567890123456789),
-			Timestamp: 1620000000,
-		},
+	generateReportEncoded := func(ccip bool) []byte {
+		feedReports := dftypes.Reports{
+			{
+				FeedID:    [32]byte{0x01},
+				Price:     big.NewInt(1234567890123456789),
+				Timestamp: 1620000000,
+			},
+		}
+
+		feedReportsEncoded, err := dftypes.GetSchema(ccip).Pack(feedReports)
+		require.NoError(t, err)
+
+		report := platform.Report{
+			Metadata: reportMetadata,
+			Data:     feedReportsEncoded,
+		}
+
+		reportEncoded, err := report.Encode()
+		require.NoError(t, err)
+
+		return reportEncoded
 	}
-
-	feedReportsEncoded, err := dftypes.GetSchema().Pack(feedReports)
-	require.NoError(t, err)
-
-	report := platform.Report{
-		Metadata: reportMetadata,
-		Data:     feedReportsEncoded,
-	}
-
-	reportEncoded, err := report.Encode()
-	require.NoError(t, err)
 
 	signatures := [][]byte{}
 
-	validInputs, err := values.NewMap(map[string]any{
-		"signed_report": map[string]any{
-			"report":     reportEncoded,
-			"signatures": signatures,
-			"context":    []byte{4, 5},
-			"id":         reportID[:],
-		},
-	})
-	require.NoError(t, err)
+	mockSuccessfulTransmission := func(ccip bool) {
+		// This is a very error-prone way to mock an on-chain response to a GetLatestValue("getTransmissionInfo") call
+		// It's a bit of a hack, but it's the best way to do it without a lot of refactoring
+		mockCall, err := newMockedEncodeTransmissionInfo(0)
+		require.NoError(t, err)
+
+		evmClient.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(mockCall, nil).Twice()
+		evmClient.On("CodeAt", mock.Anything, mock.Anything, mock.Anything).Return([]byte("test"), nil)
+
+		txManager.On("GetTransactionStatus", mock.Anything, mock.Anything).Return(commontypes.Finalized, nil).Maybe()
+
+		txManager.On("CreateTransaction", mock.Anything, mock.Anything).Return(txmgr.Tx{}, nil).Run(func(args mock.Arguments) {
+			req := args.Get(1).(txmgr.TxRequest)
+			payload := make(map[string]any)
+			method := forwardABI.Methods["report"]
+			err = method.Inputs.UnpackIntoMap(payload, req.EncodedPayload[4:])
+			require.NoError(t, err)
+			require.Equal(t, generateReportEncoded(ccip), payload["rawReport"])
+			require.Equal(t, signatures, payload["signatures"])
+		}).Once()
+	}
+
+	generateValidInputs := func(ccip bool) *values.Map {
+		validInputs, err := values.NewMap(map[string]any{
+			"signed_report": map[string]any{
+				"report":     generateReportEncoded(ccip),
+				"signatures": signatures,
+				"context":    []byte{4, 5},
+				"id":         reportID[:],
+			},
+		})
+		require.NoError(t, err)
+		return validInputs
+	}
+
+	// default inputs/report are not CCIP
+	validInputs := generateValidInputs(false)
 
 	validMetadata := capabilities.RequestMetadata{
 		WorkflowID:          reportMetadata.WorkflowID,
@@ -219,23 +247,92 @@ func TestEvmWrite(t *testing.T) {
 
 	validConfig, err := values.NewMap(map[string]any{
 		"address":   evmCfg.EVM().Workflow().ForwarderAddress().String(),
-		"processor": "EVMDF",
+		"processor": "evm-data-feeds",
 	})
 	require.NoError(t, err)
-
-	txManager.On("CreateTransaction", mock.Anything, mock.Anything).Return(txmgr.Tx{}, nil).Run(func(args mock.Arguments) {
-		req := args.Get(1).(txmgr.TxRequest)
-		payload := make(map[string]any)
-		method := forwardABI.Methods["report"]
-		err = method.Inputs.UnpackIntoMap(payload, req.EncodedPayload[4:])
-		require.NoError(t, err)
-		require.Equal(t, reportEncoded, payload["rawReport"])
-		require.Equal(t, signatures, payload["signatures"])
-	}).Once()
 
 	gasLimitDefault := uint64(400_000)
 
 	t.Run("succeeds with valid report", func(t *testing.T) {
+		mockSuccessfulTransmission(false)
+		ctx := testutils.Context(t)
+		lggr, observed := logger.TestLoggerObserved(t, zapcore.DebugLevel)
+
+		capability, err := evm.NewWriteTarget(ctx, relayer, chain, gasLimitDefault, lggr)
+		require.NoError(t, err)
+
+		req := capabilities.CapabilityRequest{
+			Metadata: validMetadata,
+			Config:   validConfig,
+			Inputs:   validInputs,
+		}
+
+		_, err = capability.Execute(ctx, req)
+		require.NoError(t, err)
+
+		findLogMatch(t, observed, "[Beholder.emit]", "attributes", "FeedUpdated")
+	})
+
+	t.Run("succeeds with valid CCIP report", func(t *testing.T) {
+		mockSuccessfulTransmission(true)
+		ctx := testutils.Context(t)
+		lggr, observed := logger.TestLoggerObserved(t, zapcore.DebugLevel)
+
+		capability, err := evm.NewWriteTarget(ctx, relayer, chain, gasLimitDefault, lggr)
+		require.NoError(t, err)
+
+		config, err := values.NewMap(map[string]any{
+			"address":   evmCfg.EVM().Workflow().ForwarderAddress().String(),
+			"processor": "evm-data-feeds-ccip",
+		})
+		require.NoError(t, err)
+
+		// special request with properly encoded CCIP report using ccip processor
+		req := capabilities.CapabilityRequest{
+			Metadata: validMetadata,
+			Config:   config,
+			Inputs:   generateValidInputs(true),
+		}
+
+		_, err = capability.Execute(ctx, req)
+		require.NoError(t, err)
+
+		findLogMatch(t, observed, "[Beholder.emit]", "attributes", "FeedUpdated")
+	})
+
+	t.Run("succeeds with valid report, but logs error for missing processor", func(t *testing.T) {
+		mockSuccessfulTransmission(false)
+
+		ctx := testutils.Context(t)
+		lggr, observed := logger.TestLoggerObserved(t, zapcore.DebugLevel)
+
+		capability, err := evm.NewWriteTarget(ctx, relayer, chain, gasLimitDefault, lggr)
+		require.NoError(t, err)
+
+		config, err := values.NewMap(map[string]any{
+			"address":   evmCfg.EVM().Workflow().ForwarderAddress().String(),
+			"processor": "invalid-name",
+		})
+		require.NoError(t, err)
+
+		req := capabilities.CapabilityRequest{
+			Metadata: validMetadata,
+			Config:   config,
+			Inputs:   validInputs,
+		}
+
+		_, err = capability.Execute(ctx, req)
+		require.NoError(t, err)
+
+		findLogMatch(t, observed, "failed to emit write confirmed", "err", "no matching processor for MetaCapabilityProcessor")
+	})
+
+	t.Run("succeeds when report already succeeded", func(t *testing.T) {
+		mockCall, err := newMockedEncodeTransmissionInfo(1)
+		require.NoError(t, err)
+
+		evmClient.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(mockCall, nil).Once()
+
 		ctx := testutils.Context(t)
 		capability, err := evm.NewWriteTarget(ctx, relayer, chain, gasLimitDefault, lggr)
 		require.NoError(t, err)
@@ -246,7 +343,6 @@ func TestEvmWrite(t *testing.T) {
 			Inputs:   validInputs,
 		}
 
-		// TODO: This successfully makes sure a tx is created and submitted, but it doesn't check if the tx is actually sent. Is there a E2E test?
 		_, err = capability.Execute(ctx, req)
 		require.NoError(t, err)
 	})
@@ -281,8 +377,10 @@ func TestEvmWrite(t *testing.T) {
 			Config:   validConfig,
 			Inputs:   validInputs,
 		}
-
-		txManager.On("CreateTransaction", mock.Anything, mock.Anything).Return(txmgr.Tx{}, errors.New("TXM error"))
+		mockCall, err := newMockedEncodeTransmissionInfo(0)
+		require.NoError(t, err)
+		evmClient.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(mockCall, nil).Once()
+		txManager.On("CreateTransaction", mock.Anything, mock.Anything).Return(txmgr.Tx{}, errors.New("TXM error")).Once()
 
 		_, err = capability.Execute(ctx, req)
 		require.Error(t, err)
@@ -318,28 +416,26 @@ func TestEvmWrite(t *testing.T) {
 
 		assert.Empty(t, l)
 	})
-
-	t.Run("succeeds when report already succeeded", func(t *testing.T) {
-		mockCall, err = newMockedEncodeTransmissionInfo(1)
-		require.NoError(t, err)
-
-		evmClient.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(mockCall, nil).Once()
-
-		ctx := testutils.Context(t)
-		capability, err := evm.NewWriteTarget(ctx, relayer, chain, gasLimitDefault, lggr)
-		require.NoError(t, err)
-
-		req := capabilities.CapabilityRequest{
-			Metadata: validMetadata,
-			Config:   validConfig,
-			Inputs:   validInputs,
-		}
-
-		_, err = capability.Execute(ctx, req)
-		require.NoError(t, err)
-	})
 }
 
+func findLogMatch(t *testing.T, observed *observer.ObservedLogs, msg string, key string, value string) {
+	require.Eventually(t, func() bool {
+		filteredByMsg := observed.FilterMessage(msg)
+		matches := filteredByMsg.
+			Filter(func(le observer.LoggedEntry) bool {
+				for _, field := range le.Context {
+					if field.Key == key &&
+						strings.Contains(fmt.Sprint(field.Interface),
+							value) {
+						return true
+					}
+				}
+				return false
+			}).
+			All() // => []observer.LoggedEntry
+		return len(matches) > 0
+	}, 30*time.Second, 1*time.Second)
+}
 func TestExtractNetwork(t *testing.T) {
 	testCases := []struct {
 		networkName  string
