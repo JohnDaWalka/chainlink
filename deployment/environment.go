@@ -164,6 +164,7 @@ func (e Environment) Clone() Environment {
 		Chains:            e.Chains,
 		SolChains:         e.SolChains,
 		AptosChains:       e.AptosChains,
+		TonChains:         e.TonChains,
 		NodeIDs:           e.NodeIDs,
 		Offchain:          e.Offchain,
 		GetContext:        e.GetContext,
@@ -237,7 +238,7 @@ func (e Environment) AllChainSelectorsTon() []uint64 {
 }
 
 func (e Environment) AllChainSelectorsAllFamilies() []uint64 {
-	selectors := make([]uint64, 0, len(e.Chains)+len(e.SolChains)+len(e.AptosChains))
+	selectors := make([]uint64, 0, len(e.Chains)+len(e.SolChains)+len(e.AptosChains)+len(e.TonChains))
 	for sel := range e.Chains {
 		selectors = append(selectors, sel)
 	}
@@ -245,6 +246,9 @@ func (e Environment) AllChainSelectorsAllFamilies() []uint64 {
 		selectors = append(selectors, sel)
 	}
 	for sel := range e.AptosChains {
+		selectors = append(selectors, sel)
+	}
+	for sel := range e.TonChains {
 		selectors = append(selectors, sel)
 	}
 	sort.Slice(selectors, func(i, j int) bool {
