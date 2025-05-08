@@ -728,6 +728,9 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		require.NoError(t, err)
 		apps = append(apps, solCs...)
 	}
+
+	// TODO(ton): If environment has tonChains, append Ton DeployHomeChainConfig and DeployChainContractsConfig changesets
+
 	e.Env, err = commonchangeset.ApplyChangesets(t, e.Env, nil, apps)
 	require.NoError(t, err)
 
@@ -841,6 +844,8 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 			},
 		}
 	}
+
+	// TODO(ton): Set Ton chains plugin configs
 
 	// Apply second set of changesets to configure the CCIP contracts.
 	var mcmsConfig *proposalutils.TimelockConfig
@@ -962,6 +967,9 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		require.NotNil(t, state.Chains[chain].OnRamp)
 	}
 	ValidateSolanaState(t, e.Env, solChains)
+
+	// TODO(ton): Validate Ton state
+
 	tEnv.UpdateDeployedEnvironment(e)
 	return e
 }
