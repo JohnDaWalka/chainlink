@@ -9,7 +9,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/mcms"
 	"golang.org/x/exp/maps"
 
@@ -27,11 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 )
-
-type BurnMintERC677Interface interface {
-	AddMinter(opts *bind.TransactOpts, minter common.Address) (*types.Transaction, error)
-	Mint(opts *bind.TransactOpts, to common.Address, amount *big.Int) (*types.Transaction, error)
-}
 
 // AddTokensE2E is a changeset that deploys and configures token pools for multiple tokens across multiple chains in a single changeset.
 // AddTokensE2E does the following:
@@ -395,14 +389,14 @@ func deployTokens(e deployment.Environment, tokenDeployCfg map[uint64]DeployToke
 				return nil, ab, fmt.Errorf("failed to deploy BurnMintERC677 token "+
 					"%s on chain %d: %w", cfg.TokenName, selector, err)
 			}
-			if err := addMinterAndMintToken(e, selector, changeset.ERC677Token, e.Chains[selector].DeployerKey.From,
+			if err := addMinterAndMintTokenERC677(e, selector, token.Contract, e.Chains[selector].DeployerKey.From,
 				new(big.Int).Mul(big.NewInt(1_000), big.NewInt(1_000_000_000))); err != nil {
 				return nil, ab, fmt.Errorf("failed to add minter and mint token "+
 					"%s on chain %d: %w", cfg.TokenName, selector, err)
 			}
 			if len(cfg.MintTokenForRecipients) > 0 {
 				for recipient, amount := range cfg.MintTokenForRecipients {
-					if err := addMinterAndMintToken(e, selector, changeset.ERC677Token, recipient,
+					if err := addMinterAndMintTokenERC677(e, selector, token.Contract, recipient,
 						amount); err != nil {
 						return nil, ab, fmt.Errorf("failed to add minter and mint "+
 							"token %s on chain %d: %w", cfg.TokenName, selector, err)
@@ -478,14 +472,14 @@ func deployTokens(e deployment.Environment, tokenDeployCfg map[uint64]DeployToke
 				return nil, ab, fmt.Errorf("failed to deploy ERC677 token %s on chain %d: %w", cfg.TokenName, selector, err)
 			}
 
-			if err := addMinterAndMintTokenERC677Helper(e, selector, burn_mint_erc677_helper.BurnMintERC677Helper, e.Chains[selector].DeployerKey.From,
+			if err := addMinterAndMintTokenERC677Helper(e, selector, token.Contract, e.Chains[selector].DeployerKey.From,
 				new(big.Int).Mul(big.NewInt(1_000), big.NewInt(1_000_000_000))); err != nil {
 				return nil, ab, fmt.Errorf("failed to add minter and mint token "+
 					"%s on chain %d: %w", cfg.TokenName, selector, err)
 			}
 			if len(cfg.MintTokenForRecipients) > 0 {
 				for recipient, amount := range cfg.MintTokenForRecipients {
-					if err := addMinterAndMintTokenERC677Helper(e, selector, burn_mint_erc677_helper.BurnMintERC677Helper, recipient,
+					if err := addMinterAndMintTokenERC677Helper(e, selector, token.Contract, recipient,
 						amount); err != nil {
 						return nil, ab, fmt.Errorf("failed to add minter and mint "+
 							"token %s on chain %d: %w", cfg.TokenName, selector, err)
