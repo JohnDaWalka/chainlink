@@ -1119,6 +1119,15 @@ func (c CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType deployment
 			return fmt.Errorf("ccip package does not exist on aptos chain %d", chainSelector)
 		}
 
+	case chain_selectors.FamilyTon:
+		chainState, exists := c.TonChains[chainSelector]
+		if !exists {
+			return fmt.Errorf("chain %d does not exist", chainSelector)
+		}
+		if chainState.CCIPAddress.IsAddrNone() {
+			return fmt.Errorf("ccip package does not exist on ton chain %d", chainSelector)
+		}
+
 	default:
 		return fmt.Errorf("unknown chain family %s", family)
 	}
