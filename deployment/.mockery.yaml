@@ -4,14 +4,14 @@ outpkg: mocks
 filename: "{{ .InterfaceName | snakecase }}.go"
 packages:
   github.com/smartcontractkit/chainlink-deployments-framework/deployment:
-    config:
-      srcpkg: github.com/smartcontractkit/chainlink-deployments-framework/deployment
-      mockname: "Mock{{ .InterfaceName }}"
-      filename: offchain_client_mock.go
-      inpackage: true
-      dir: ./mocks/
-    interfaces:
-      OffchainClient:
+      config:
+        srcpkg: github.com/smartcontractkit/chainlink-deployments-framework/deployment
+        mockname: "Mock{{ .InterfaceName }}"
+        filename: offchain_client_mock.go
+        inpackage: true
+        dir: ./mocks/
+      interfaces:
+        OffchainClient:
 
   github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/workflow_registry_wrapper:
     config:
