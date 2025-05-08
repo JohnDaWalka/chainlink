@@ -60,8 +60,9 @@ func GenerateChainsTon(t *testing.T, numChains int) map[uint64]deployment.TonCha
 		// todo: configurable wallet options
 		wallet := createTonWallet(t, nodeClient, wallet.V3R2, wallet.WithWorkchain(0))
 		chains[chainID] = deployment.TonChain{
-			Client: nodeClient,
-			Wallet: wallet,
+			Client:        nodeClient,
+			Wallet:        wallet,
+			WalletAddress: wallet.Address(),
 		}
 	}
 	t.Logf("Created %d Ton chains: %+v", len(chains), chains)
