@@ -62,7 +62,5 @@ func TestSetNativeSurcharge(t *testing.T) {
 		contractMetadata := testutil.MustGetContractMetaData[v0_5.FeeManagerView](t, output.DataStore, testutil.TestChain.Selector, feeManagerAddress.Hex())
 
 		require.Equal(t, strconv.Itoa(5000), contractMetadata.View.NativeSurcharge)
-
 	})
-
 }

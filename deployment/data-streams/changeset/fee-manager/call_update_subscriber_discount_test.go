@@ -70,7 +70,5 @@ func TestUpdateSubscriberDiscount(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, "1000", discountRecord.Link)
 		require.False(t, discountRecord.IsGlobal)
-
 	})
-
 }
