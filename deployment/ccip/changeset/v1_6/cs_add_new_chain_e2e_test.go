@@ -13,6 +13,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/don_id_claimer"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
@@ -23,9 +27,6 @@ import (
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/common/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 )
 
@@ -150,7 +151,7 @@ func TestConnectNewChain(t *testing.T) {
 				}
 				e, err = commonchangeset.Apply(t, e, timelockContracts,
 					commonchangeset.Configure(
-						deployment.CreateLegacyChangeSet(commoncs.TransferToMCMSWithTimelock),
+						cldf.CreateLegacyChangeSet(commoncs.TransferToMCMSWithTimelock),
 						commoncs.TransferToMCMSWithTimelockConfig{
 							ContractsByChain: contractsToTransfer,
 							MCMSConfig: proposalutils.TimelockConfig{
@@ -241,14 +242,19 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 	t.Parallel()
 
 	type test struct {
-		Msg  string
-		MCMS *proposalutils.TimelockConfig
+		Msg         string
+		MCMS        *proposalutils.TimelockConfig
+		DonIDOffSet *uint32
 	}
+
+	offset := uint32(0)
 
 	mcmsConfig := &proposalutils.TimelockConfig{
 		MinDelay:   0 * time.Second,
 		MCMSAction: mcmstypes.TimelockActionSchedule,
 	}
+
+	testRouter := true
 
 	tests := []test{
 		{
@@ -258,6 +264,10 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 		{
 			Msg:  "Remote chains not owned by MCMS",
 			MCMS: nil,
+		},
+		{
+			Msg:         "Remote chains with donID offset (Sync with capReg reg after wrong donIDClaim)",
+			DonIDOffSet: &offset,
 		},
 	}
 
@@ -355,7 +365,7 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 				)
 				e, err = commonchangeset.Apply(t, e, timelockContracts,
 					commonchangeset.Configure(
-						deployment.CreateLegacyChangeSet(commoncs.TransferToMCMSWithTimelock),
+						cldf.CreateLegacyChangeSet(commoncs.TransferToMCMSWithTimelock),
 						commoncs.TransferToMCMSWithTimelockConfig{
 							ContractsByChain: contractsToTransfer,
 							MCMSConfig: proposalutils.TimelockConfig{
@@ -424,6 +434,25 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 				// RMNRemoteConfig:   &v1_6.RMNRemoteConfig{...}, // TODO: Enable?
 			}
 
+			// deploy donIDClaimer
+			e, err = commonchangeset.Apply(t, e, nil,
+				commonchangeset.Configure(
+					v1_6.DeployDonIDClaimerChangeset,
+					v1_6.DeployDonIDClaimerConfig{},
+				))
+			require.NoError(t, err, "must deploy donIDClaimer contract")
+
+			state, err = changeset.LoadOnchainState(e)
+			require.NoError(t, err, "must load onchain state")
+
+			if test.DonIDOffSet != nil {
+				tx, err := state.Chains[deployedEnvironment.HomeChainSel].DonIDClaimer.ClaimNextDONId(e.Chains[deployedEnvironment.HomeChainSel].DeployerKey)
+				require.NoError(t, err)
+
+				_, err = deployment.ConfirmIfNoErrorWithABI(e.Chains[deployedEnvironment.HomeChainSel], tx, don_id_claimer.DonIDClaimerABI, err)
+				require.NoError(t, err)
+			}
+
 			// Apply AddCandidatesForNewChainChangeset
 			e, err = commonchangeset.Apply(t, e, timelockContracts,
 				commonchangeset.Configure(
@@ -435,6 +464,7 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 						RemoteChains:         remoteChains,
 						MCMSDeploymentConfig: &mcmsDeploymentCfg,
 						MCMSConfig:           test.MCMS,
+						DonIDOffSet:          test.DonIDOffSet,
 					},
 				),
 			)
@@ -470,19 +500,20 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 				require.Equal(t, remoteChain.GasPrice.String(), gasPrice.Value.String(), "gas price must equal expected")
 			}
 
-			// Apply PromoteNewChainForTestingChangeset
+			// Apply PromoteNewChainForConfigChangeset
 			e, err = commonchangeset.Apply(t, e, timelockContracts,
 				commonchangeset.Configure(
-					v1_6.PromoteNewChainForTestingChangeset,
-					v1_6.PromoteNewChainForTestingConfig{
+					v1_6.PromoteNewChainForConfigChangeset,
+					v1_6.PromoteNewChainForConfig{
 						HomeChainSelector: deployedEnvironment.HomeChainSel,
 						NewChain:          newChain,
 						RemoteChains:      remoteChains,
+						TestRouter:        &testRouter,
 						MCMSConfig:        test.MCMS,
 					},
 				),
 			)
-			require.NoError(t, err, "must apply PromoteNewChainForTestingChangeset")
+			require.NoError(t, err, "must apply PromoteNewChainForConfigChangeset")
 
 			digests, err = ccipHome.GetConfigDigests(nil, donID, uint8(cctypes.PluginTypeCCIPCommit))
 			require.NoError(t, err, "must get config digests")

@@ -13,6 +13,8 @@ import (
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
@@ -164,14 +166,14 @@ func TestEnforceMCMSUsageIfProd(t *testing.T) {
 			homeChainSelector := e.AllChainSelectors()[0]
 
 			if test.DeployCCIPHome {
-				_, err = deployment.DeployContract(e.Logger, e.Chains[homeChainSelector], e.ExistingAddresses,
-					func(chain deployment.Chain) deployment.ContractDeploy[*ccip_home.CCIPHome] {
+				_, err = cldf.DeployContract(e.Logger, e.Chains[homeChainSelector], e.ExistingAddresses,
+					func(chain deployment.Chain) cldf.ContractDeploy[*ccip_home.CCIPHome] {
 						address, tx2, contract, err2 := ccip_home.DeployCCIPHome(
 							chain.DeployerKey,
 							chain.Client,
 							utils.RandomAddress(), // We don't need a real contract address here, just a random one to satisfy the constructor.
 						)
-						return deployment.ContractDeploy[*ccip_home.CCIPHome]{
+						return cldf.ContractDeploy[*ccip_home.CCIPHome]{
 							Address: address, Contract: contract, Tx: tx2, Tv: deployment.NewTypeAndVersion(changeset.CCIPHome, deployment.Version1_6_0), Err: err2,
 						}
 					})
@@ -179,13 +181,13 @@ func TestEnforceMCMSUsageIfProd(t *testing.T) {
 			}
 
 			if test.DeployCapReg {
-				_, err = deployment.DeployContract(e.Logger, e.Chains[homeChainSelector], e.ExistingAddresses,
-					func(chain deployment.Chain) deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry] {
+				_, err = cldf.DeployContract(e.Logger, e.Chains[homeChainSelector], e.ExistingAddresses,
+					func(chain deployment.Chain) cldf.ContractDeploy[*capabilities_registry.CapabilitiesRegistry] {
 						address, tx2, contract, err2 := capabilities_registry.DeployCapabilitiesRegistry(
 							chain.DeployerKey,
 							chain.Client,
 						)
-						return deployment.ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
+						return cldf.ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
 							Address: address, Contract: contract, Tx: tx2, Tv: deployment.NewTypeAndVersion(changeset.CapabilitiesRegistry, deployment.Version1_0_0), Err: err2,
 						}
 					})
@@ -194,7 +196,7 @@ func TestEnforceMCMSUsageIfProd(t *testing.T) {
 
 			if test.DeployMCMS {
 				e, err = commonchangeset.Apply(t, e, nil,
-					commonchangeset.Configure(deployment.CreateLegacyChangeSet(commonchangeset.DeployMCMSWithTimelockV2), map[uint64]types.MCMSWithTimelockConfigV2{
+					commonchangeset.Configure(cldf.CreateLegacyChangeSet(commonchangeset.DeployMCMSWithTimelockV2), map[uint64]types.MCMSWithTimelockConfigV2{
 						homeChainSelector: proposalutils.SingleGroupTimelockConfigV2(t),
 					}),
 				)
@@ -218,7 +220,7 @@ func TestEnforceMCMSUsageIfProd(t *testing.T) {
 							},
 						},
 						commonchangeset.Configure(
-							deployment.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelockV2),
+							cldf.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelockV2),
 							commonchangeset.TransferToMCMSWithTimelockConfig{
 								ContractsByChain: map[uint64][]common.Address{
 									homeChainSelector: addrs,
