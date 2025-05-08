@@ -6,11 +6,13 @@ import (
 
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/config"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/common/types"
-	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -22,11 +24,12 @@ const (
 	sepMockOnRampAddress = "0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59"
 )
 
-func getTestAddressBook(addrByChain map[uint64]map[string]deployment.TypeAndVersion) deployment.AddressBook {
+func getTestAddressBook(t *testing.T, addrByChain map[uint64]map[string]deployment.TypeAndVersion) deployment.AddressBook {
 	ab := deployment.NewMemoryAddressBook()
 	for chain, addrTypeAndVersion := range addrByChain {
 		for addr, typeAndVersion := range addrTypeAndVersion {
-			ab.Save(chain, addr, typeAndVersion)
+			err := ab.Save(chain, addr, typeAndVersion)
+			require.NoError(t, err)
 		}
 	}
 	return ab

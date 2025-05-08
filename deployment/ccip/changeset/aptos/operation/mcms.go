@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/aptos-labs/aptos-go-sdk"
-	"github.com/smartcontractkit/chainlink-aptos/bindings/bind"
-	mcmsbind "github.com/smartcontractkit/chainlink-aptos/bindings/mcms"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/utils"
 	aptosmcms "github.com/smartcontractkit/mcms/sdk/aptos"
 	"github.com/smartcontractkit/mcms/types"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-aptos/bindings/bind"
+	mcmsbind "github.com/smartcontractkit/chainlink-aptos/bindings/mcms"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/utils"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -28,10 +29,10 @@ func deployMCMS(b operations.Bundle, deps AptosDeps, _ operations.EmptyInput) (a
 	mcmsSeed := mcmsbind.DefaultSeed + time.Now().String()
 	mcmsAddress, mcmsDeployTx, _, err := mcmsbind.DeployToResourceAccount(deps.AptosChain.DeployerSigner, deps.AptosChain.Client, mcmsSeed)
 	if err != nil {
-		return aptos.AccountAddress{}, fmt.Errorf("failed to deploy MCMS contract: %v", err)
+		return aptos.AccountAddress{}, fmt.Errorf("failed to deploy MCMS contract: %w", err)
 	}
 	if err := deps.AptosChain.Confirm(mcmsDeployTx.Hash); err != nil {
-		return aptos.AccountAddress{}, fmt.Errorf("failed to confirm MCMS deployment transaction: %v", err)
+		return aptos.AccountAddress{}, fmt.Errorf("failed to confirm MCMS deployment transaction: %w", err)
 	}
 
 	return mcmsAddress, nil
@@ -78,7 +79,7 @@ func transferOwnershipToSelf(b operations.Bundle, deps AptosDeps, mcmsAddress ap
 	if err != nil {
 		return nil, fmt.Errorf("failed to TransferOwnershipToSelf in MCMS contract: %w", err)
 	}
-	_, err = deps.AptosChain.Client.WaitForTransaction(tx.Hash)
+	err = deps.AptosChain.Confirm(tx.Hash)
 	if err != nil {
 		return nil, fmt.Errorf("MCMS TransferOwnershipToSelf transaction failed: %w", err)
 	}

@@ -3,18 +3,21 @@ package utils
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
 	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/smartcontractkit/mcms"
+	aptosmcms "github.com/smartcontractkit/mcms/sdk/aptos"
+	"github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-aptos/bindings/bind"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/compile"
 	mcmsbind "github.com/smartcontractkit/chainlink-aptos/bindings/mcms"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
-	"github.com/smartcontractkit/mcms"
-	aptosmcms "github.com/smartcontractkit/mcms/sdk/aptos"
-	"github.com/smartcontractkit/mcms/types"
 )
 
 const MCMSProposalVersion = "v1"
@@ -47,6 +50,10 @@ func GenerateProposal(
 
 	// Create proposal builder
 	validUntil := time.Now().Unix() + int64(proposalutils.DefaultValidUntil.Seconds())
+	if validUntil < 0 || validUntil > math.MaxUint32 {
+		return nil, fmt.Errorf("validUntil value out of range for uint32: %d", validUntil)
+	}
+
 	proposalBuilder := mcms.NewTimelockProposalBuilder().
 		SetVersion(MCMSProposalVersion).
 		SetValidUntil(uint32(validUntil)).
@@ -128,7 +135,7 @@ func CreateChunksAndStage(
 	mcmsAddress := mcmsContract.Address()
 	// Validate seed XOR codeObjectAddress, one and only one must be provided
 	if (seed != "") == (codeObjectAddress != nil) {
-		return nil, fmt.Errorf("either provide seed to publishToObject or objectAddress to upgradeObjectCode")
+		return nil, errors.New("either provide seed to publishToObject or objectAddress to upgradeObjectCode")
 	}
 
 	var operations []types.Operation
@@ -149,20 +156,21 @@ func CreateChunksAndStage(
 		)
 
 		// First chunks get staged, the last one gets published or upgraded
-		if i != len(chunks)-1 {
+		switch {
+		case i != len(chunks)-1:
 			moduleInfo, function, _, args, err = mcmsContract.MCMSDeployer().Encoder().StageCodeChunk(
 				chunk.Metadata,
 				chunk.CodeIndices,
 				chunk.Chunks,
 			)
-		} else if seed != "" {
+		case seed != "":
 			moduleInfo, function, _, args, err = mcmsContract.MCMSDeployer().Encoder().StageCodeChunkAndPublishToObject(
 				chunk.Metadata,
 				chunk.CodeIndices,
 				chunk.Chunks,
 				[]byte(seed),
 			)
-		} else {
+		default:
 			moduleInfo, function, _, args, err = mcmsContract.MCMSDeployer().Encoder().StageCodeChunkAndUpgradeObjectCode(
 				chunk.Metadata,
 				chunk.CodeIndices,

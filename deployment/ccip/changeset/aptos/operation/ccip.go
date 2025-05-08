@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_onramp"
@@ -12,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	aptoscfg "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/config"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/utils"
-	"github.com/smartcontractkit/mcms/types"
 )
 
 // OP: DeployCCIPOp deploys the CCIP package on Aptos chain
@@ -40,10 +41,9 @@ func deployCCIP(b operations.Bundle, deps AptosDeps, in DeployCCIPInput) (Deploy
 		if in.IsUpdate {
 			b.Logger.Infow("Trying to update a non-deployed package", "addr", onChainState.CCIPAddress.String())
 			return DeployCCIPOutput{}, fmt.Errorf("CCIP package not deployed on Aptos chain %d", deps.AptosChain.Selector)
-		} else {
-			b.Logger.Infow("CCIP Package already deployed", "addr", onChainState.CCIPAddress.String())
-			return DeployCCIPOutput{CCIPAddress: onChainState.CCIPAddress}, nil
 		}
+		b.Logger.Infow("CCIP Package already deployed", "addr", onChainState.CCIPAddress.String())
+		return DeployCCIPOutput{CCIPAddress: onChainState.CCIPAddress}, nil
 	}
 
 	// Compile, chunk and get CCIP deploy operations

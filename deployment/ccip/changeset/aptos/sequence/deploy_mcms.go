@@ -3,11 +3,12 @@ package sequence
 import (
 	"github.com/aptos-labs/aptos-go-sdk"
 
+	aptosmcms "github.com/smartcontractkit/mcms/sdk/aptos"
+	mcmstypes "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/operation"
 	"github.com/smartcontractkit/chainlink/deployment/common/types"
-	aptosmcms "github.com/smartcontractkit/mcms/sdk/aptos"
-	mcmstypes "github.com/smartcontractkit/mcms/types"
 )
 
 // Deploy MCMS Sequence

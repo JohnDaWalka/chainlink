@@ -5,6 +5,11 @@ import (
 	"testing"
 	"time"
 
+	mcmstypes "github.com/smartcontractkit/mcms/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
@@ -14,10 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	mcmstypes "github.com/smartcontractkit/mcms/types"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
 )
 
 func TestDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
@@ -61,6 +62,7 @@ func TestDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 					4457093679053095497: {},
 				},
 				ExistingAddresses: getTestAddressBook(
+					t,
 					map[uint64]map[string]deployment.TypeAndVersion{
 						4457093679053095497: {
 							mockMCMSAddress: {Type: changeset.AptosMCMSType},
@@ -88,6 +90,7 @@ func TestDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 					4457093679053095497: {},
 				},
 				ExistingAddresses: getTestAddressBook(
+					t,
 					map[uint64]map[string]deployment.TypeAndVersion{
 						4457093679053095497: {
 							mockMCMSAddress: {Type: changeset.AptosMCMSType},
@@ -132,6 +135,7 @@ func TestDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 					4457093679053095497: {},
 				},
 				ExistingAddresses: getTestAddressBook(
+					t,
 					map[uint64]map[string]deployment.TypeAndVersion{
 						4457093679053095497: {}, // No MCMS address in state
 					},
@@ -155,6 +159,7 @@ func TestDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 					4457093679053095497: {},
 				},
 				ExistingAddresses: getTestAddressBook(
+					t,
 					map[uint64]map[string]deployment.TypeAndVersion{
 						4457093679053095497: {
 							mockMCMSAddress: {Type: changeset.AptosMCMSType}, // MCMS already deployed
@@ -181,11 +186,11 @@ func TestDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 			cs := DeployAptosChain{}
 			err := cs.VerifyPreconditions(tt.env, tt.config)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				errStr := err.Error()
 				assert.Regexp(t, tt.wantErrRe, errStr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -201,7 +206,7 @@ func TestDeployAptosChain_Apply(t *testing.T) {
 
 	// Get chain selectors
 	aptosChainSelectors := env.AllChainSelectorsAptos()
-	require.Equal(t, 1, len(aptosChainSelectors), "Expected exactly 1 Aptos chain")
+	require.Len(t, aptosChainSelectors, 1, "Expected exactly 1 Aptos chain")
 	chainSelector := aptosChainSelectors[0]
 	t.Log("Deployer: ", env.AptosChains[chainSelector].DeployerSigner)
 
@@ -244,5 +249,5 @@ func TestDeployAptosChain_Apply(t *testing.T) {
 	offrampBind := ccip_offramp.Bind(ccipAddr, env.AptosChains[chainSelector].Client)
 	offRampSourceConfig, err := offrampBind.Offramp().GetSourceChainConfig(nil, mockCCIPParams.OffRampParams.SourceChainSelectors[0])
 	require.NoError(t, err)
-	require.Equal(t, true, offRampSourceConfig.IsEnabled, "contracts were not initialized correctly")
+	require.True(t, offRampSourceConfig.IsEnabled, "contracts were not initialized correctly")
 }

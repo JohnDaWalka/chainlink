@@ -6,6 +6,9 @@ import (
 
 	"github.com/aptos-labs/aptos-go-sdk"
 
+	"github.com/smartcontractkit/mcms"
+	mcmstypes "github.com/smartcontractkit/mcms/types"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
@@ -13,8 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/operation"
 	seq "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/sequence"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/utils"
-	"github.com/smartcontractkit/mcms"
-	mcmstypes "github.com/smartcontractkit/mcms/types"
 )
 
 var _ deployment.ChangeSetV2[config.DeployAptosChainConfig] = DeployAptosChain{}
@@ -86,8 +87,10 @@ func (cs DeployAptosChain) Apply(env deployment.Environment, config config.Deplo
 
 		// Save MCMS address
 		typeAndVersion := deployment.NewTypeAndVersion(changeset.AptosMCMSType, deployment.Version1_6_0)
-		deps.AB.Save(deps.AptosChain.Selector, mcmsSeqReport.Output.MCMSAddress.String(), typeAndVersion)
-
+		err = deps.AB.Save(deps.AptosChain.Selector, mcmsSeqReport.Output.MCMSAddress.String(), typeAndVersion)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to save MCMS address %s for Aptos chain %d: %w", mcmsSeqReport.Output.MCMSAddress.String(), chainSel, err)
+		}
 		// CCIP Deploy operations
 		ccipSeqInput := seq.DeployCCIPSeqInput{
 			MCMSAddress: mcmsSeqReport.Output.MCMSAddress,
@@ -102,7 +105,10 @@ func (cs DeployAptosChain) Apply(env deployment.Environment, config config.Deplo
 
 		// Save the address of the CCIP object
 		typeAndVersion = deployment.NewTypeAndVersion(changeset.AptosCCIPType, deployment.Version1_6_0)
-		deps.AB.Save(deps.AptosChain.Selector, ccipSeqReport.Output.CCIPAddress.String(), typeAndVersion)
+		err = deps.AB.Save(deps.AptosChain.Selector, ccipSeqReport.Output.CCIPAddress.String(), typeAndVersion)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to save CCIP address %s for Aptos chain %d: %w", ccipSeqReport.Output.CCIPAddress.String(), chainSel, err)
+		}
 
 		// Generate MCMS proposals
 		proposal, err := utils.GenerateProposal(
