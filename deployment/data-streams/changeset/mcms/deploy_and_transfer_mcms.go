@@ -77,14 +77,14 @@ func deployAndTransferMcmsLogic(e deployment.Environment, cc DeployMCMSConfig) (
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
 	}
 
-	sealedDs, err := datastore.ToDefault(ds.Seal())
+	sealedDS, err := datastore.ToDefault(ds.Seal())
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to default format: %w", err)
 	}
 
 	return deployment.ChangesetOutput{
 		AddressBook:           mcmsOut.AddressBook, //nolint:staticcheck // won't migrate now - kept for backwards compatibility until AddressBook is removed
-		DataStore:             sealedDs,
+		DataStore:             sealedDS,
 		MCMSTimelockProposals: proposals}, nil
 }
 

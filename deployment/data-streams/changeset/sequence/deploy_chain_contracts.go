@@ -65,19 +65,19 @@ func deployDataStreamsLogic(e deployment.Environment, cc DeployDataStreamsConfig
 		timelockProposals = []mcms.TimelockProposal{mergedTimelockProposal}
 	}
 
-	sealedDs, err := ds.ToDefault(deployedAddresses.Seal())
+	sealedDS, err := ds.ToDefault(deployedAddresses.Seal())
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to default format: %w", err)
 	}
 
-	ab, err := utils.DataStoreToAddressBook(sealedDs.Seal())
+	ab, err := utils.DataStoreToAddressBook(sealedDS.Seal())
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to address book: %w", err)
 	}
 
 	return deployment.ChangesetOutput{
 		AddressBook:           ab, // backwards compatibility. This will be removed in the future.
-		DataStore:             sealedDs,
+		DataStore:             sealedDS,
 		MCMSTimelockProposals: timelockProposals,
 	}, nil
 }

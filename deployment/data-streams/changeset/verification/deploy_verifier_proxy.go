@@ -72,13 +72,13 @@ func verifierProxyDeployLogic(e deployment.Environment, cc DeployVerifierProxyCo
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership to MCMS: %w", err)
 	}
 
-	sealedDs, err := ds.ToDefault(dataStore.Seal())
+	sealedDS, err := ds.ToDefault(dataStore.Seal())
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to convert data store to default format: %w", err)
 	}
 
 	return deployment.ChangesetOutput{
-		DataStore:             sealedDs,
+		DataStore:             sealedDS,
 		MCMSTimelockProposals: proposals,
 	}, nil
 }

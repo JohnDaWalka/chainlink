@@ -107,7 +107,7 @@ func TestDeployFeeManager(t *testing.T) {
 		})
 
 		t.Run("VerifyOwnershipTransferred", func(t *testing.T) {
-			require.Equal(t, testEnv.Timelocks[testutil.TestChain.Selector].Timelock.Address(), contractMetadata.View.Owner)
+			require.Equal(t, testEnv.Timelocks[testutil.TestChain.Selector].Timelock.Address().Hex(), contractMetadata.View.Owner)
 		})
 	})
 }
