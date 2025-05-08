@@ -31,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
+	commonstate "github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
@@ -2316,7 +2317,7 @@ func DeployLinkTokenTest(t *testing.T, solChains int) {
 	require.NoError(t, err)
 	addrs, err := e.ExistingAddresses.AddressesForChain(chain1)
 	require.NoError(t, err)
-	state, err := commoncs.MaybeLoadLinkTokenChainState(e.Chains[chain1], addrs)
+	state, err := commonstate.MaybeLoadLinkTokenChainState(e.Chains[chain1], addrs)
 	require.NoError(t, err)
 	// View itself already unit tested
 	_, err = state.GenerateLinkView()
@@ -2328,4 +2329,34 @@ func DeployLinkTokenTest(t *testing.T, solChains int) {
 		require.NoError(t, err)
 		require.NotEmpty(t, addrs)
 	}
+}
+
+func TransferToTimelock(
+	t *testing.T,
+	tenv DeployedEnv,
+	state changeset.CCIPOnChainState,
+	chains []uint64,
+) {
+	timelockContracts := make(map[uint64]*proposalutils.TimelockExecutionContracts, len(chains)+1)
+	for _, chain := range chains {
+		timelockContracts[chain] = &proposalutils.TimelockExecutionContracts{
+			Timelock:  state.Chains[chain].Timelock,
+			CallProxy: state.Chains[chain].CallProxy,
+		}
+	}
+	// Add the home chain to the timelock contracts.
+	timelockContracts[tenv.HomeChainSel] = &proposalutils.TimelockExecutionContracts{
+		Timelock:  state.Chains[tenv.HomeChainSel].Timelock,
+		CallProxy: state.Chains[tenv.HomeChainSel].CallProxy,
+	}
+	// Transfer ownership to timelock so that we can promote the zero digest later down the line.
+	_, err := commoncs.Apply(t, tenv.Env,
+		timelockContracts,
+		commoncs.Configure(
+			cldf.CreateLegacyChangeSet(commoncs.TransferToMCMSWithTimelockV2),
+			GenTestTransferOwnershipConfig(tenv, chains, state),
+		),
+	)
+	require.NoError(t, err)
+	AssertTimelockOwnership(t, tenv, chains, state)
 }

@@ -348,7 +348,7 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (de
 	// if there are multiple proposals, aggregate them so that we don't have to propose them separately
 	if len(finalCSOut.MCMSTimelockProposals) > 1 {
 		aggregatedProposals, err := proposalutils.AggregateProposals(
-			e, state.EVMMCMSStateByChain(), finalCSOut.MCMSTimelockProposals, nil,
+			e, state.EVMMCMSStateByChain(), nil, finalCSOut.MCMSTimelockProposals, nil,
 			"Add Tokens E2E", config.MCMS)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to aggregate proposals: %w", err)
