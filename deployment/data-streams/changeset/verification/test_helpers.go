@@ -3,7 +3,6 @@ package verification
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
 	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
 	"github.com/stretchr/testify/require"
@@ -95,7 +94,7 @@ func DeployVerifierProxyAndVerifier(
 	return env, verifierProxyAddr, verifierAddr
 }
 
-func VerifyState(
+func VerifyVerifierState(
 	t *testing.T,
 	inDs ds.MutableDataStore[ds.DefaultMetadata, ds.DefaultMetadata],
 	chainSelector uint64,
@@ -104,17 +103,7 @@ func VerifyState(
 	shouldConfigBeActive bool,
 ) {
 
-	envDatastore, err := ds.FromDefault[metadata.SerializedContractMetadata, ds.DefaultMetadata](inDs.Seal())
-	require.NoError(t, err)
-
-	// Retrieve contract metadata from datastore
-	cm, err := envDatastore.ContractMetadata().Get(
-		ds.NewContractMetadataKey(chainSelector, contractAddress.String()),
-	)
-	require.NoError(t, err, "Failed to get contract metadata")
-
-	contractMetadata, err := metadata.DeserializeMetadata[v0_5.VerifierView](cm.Metadata)
-	require.NoError(t, err, "Failed to convert contract metadata")
+	contractMetadata := testutil.MustGetContractMetaData[v0_5.VerifierView](t, inDs, chainSelector, contractAddress.Hex())
 
 	configDigestString := dsutil.HexEncodeBytes32(expectedConfig.ConfigDigest)
 

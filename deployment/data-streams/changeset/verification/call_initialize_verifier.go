@@ -7,8 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	channel_config_store "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/channel-config-store"
-
 	mcmslib "github.com/smartcontractkit/mcms"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -22,7 +20,7 @@ var InitializeVerifierChangeset = cldf.CreateChangeSet(verifierProxyInitializeVe
 
 type VerifierProxyInitializeVerifierConfig struct {
 	ConfigPerChain map[uint64][]InitializeVerifierConfig
-	MCMSConfig     *channel_config_store.MCMSConfig
+	MCMSConfig     *types.MCMSConfig
 }
 
 type InitializeVerifierConfig struct {

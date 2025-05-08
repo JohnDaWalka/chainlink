@@ -9,7 +9,6 @@ import (
 	mcmslib "github.com/smartcontractkit/mcms"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	channel_config_store "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/channel-config-store"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/txutil"
@@ -22,7 +21,7 @@ type verifierProxySetAccessController struct{}
 
 type VerifierProxySetAccessControllerConfig struct {
 	ConfigPerChain map[uint64][]SetAccessControllerConfig
-	MCMSConfig     *channel_config_store.MCMSConfig
+	MCMSConfig     *types.MCMSConfig
 }
 
 type SetAccessControllerConfig struct {

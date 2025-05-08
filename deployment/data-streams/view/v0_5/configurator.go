@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/contracts/evm"
 	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/interfaces"
 
@@ -49,11 +50,23 @@ type ConfiguratorViewParams struct {
 	ToBlock   *uint64
 }
 
-type ConfiguratorViewGenerator struct {
-	contract configurator.ConfiguratorInterface
+// ConfiguratorContract defines the minimal interface needed for ConfiguratorViewGenerator
+type ConfiguratorContract interface {
+	// Call methods
+	TypeAndVersion(opts *bind.CallOpts) (string, error)
+	Owner(opts *bind.CallOpts) (common.Address, error)
+
+	// Filter methods
+	FilterProductionConfigSet(opts *bind.FilterOpts, configId [][32]byte) (evm.LogIterator[configurator.ConfiguratorProductionConfigSet], error)
+	FilterStagingConfigSet(opts *bind.FilterOpts, configId [][32]byte) (evm.LogIterator[configurator.ConfiguratorStagingConfigSet], error)
+	FilterPromoteStagingConfig(opts *bind.FilterOpts, configId [][32]byte, retiredConfigDigest [][32]byte) (evm.LogIterator[configurator.ConfiguratorPromoteStagingConfig], error)
 }
 
-func NewConfiguratorViewGenerator(contract configurator.ConfiguratorInterface) *ConfiguratorViewGenerator {
+type ConfiguratorViewGenerator struct {
+	contract ConfiguratorContract
+}
+
+func NewConfiguratorViewGenerator(contract ConfiguratorContract) *ConfiguratorViewGenerator {
 	return &ConfiguratorViewGenerator{
 		contract: contract,
 	}
@@ -112,7 +125,7 @@ func (b *ConfiguratorViewGenerator) processConfigEvents(opts *bind.FilterOpts, v
 	defer prodIter.Close()
 
 	for prodIter.Next() {
-		event := prodIter.Event
+		event := prodIter.GetEvent()
 		b.processConfigEvent(event.ConfigId, event.ConfigDigest, event, view)
 	}
 
@@ -124,7 +137,7 @@ func (b *ConfiguratorViewGenerator) processConfigEvents(opts *bind.FilterOpts, v
 	defer stagingIter.Close()
 
 	for stagingIter.Next() {
-		event := stagingIter.Event
+		event := stagingIter.GetEvent()
 		b.processConfigEvent(event.ConfigId, event.ConfigDigest, event, view)
 	}
 
@@ -211,7 +224,7 @@ func (b *ConfiguratorViewGenerator) processPromotions(opts *bind.FilterOpts, vie
 	defer iter.Close()
 
 	for iter.Next() {
-		event := iter.Event
+		event := iter.GetEvent()
 		configIdHex := dsutil.HexEncodeBytes32(event.ConfigId)
 
 		// Skip if this configId doesn't exist

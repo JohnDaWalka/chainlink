@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
 	"github.com/stretchr/testify/assert"
@@ -96,17 +95,8 @@ func TestDeployVerifier(t *testing.T) {
 		require.Len(t, outputs, 1)
 		output := outputs[0]
 
-		envDatastore, err := ds.FromDefault[metadata.SerializedContractMetadata, ds.DefaultMetadata](output.DataStore.Seal())
-		require.NoError(t, err)
+		contractMetadata := testutil.MustGetContractMetaData[v0_5.VerifierView](t, output.DataStore, testutil.TestChain.Selector, record.Address)
 
-		cm, err := envDatastore.ContractMetadata().Get(
-			ds.NewContractMetadataKey(testutil.TestChain.Selector, record.Address),
-		)
-		require.NoError(t, err, "Failed to get contract metadata")
-
-		contractMetadata, err := metadata.DeserializeMetadata[v0_5.VerifierView](cm.Metadata)
-		require.NoError(t, err, "Failed to convert contract metadata")
-
-		assert.Equal(t, testEnv.Timelocks[testutil.TestChain.Selector].Timelock.Address(), contractMetadata.View.Owner)
+		assert.Equal(t, testEnv.Timelocks[testutil.TestChain.Selector].Timelock.Address().Hex(), contractMetadata.View.Owner)
 	})
 }

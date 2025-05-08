@@ -110,7 +110,7 @@ func TestCallUpdateConfig(t *testing.T) {
 			F:               updateConfigPayload.F,
 		}
 
-		VerifyState(t,
+		VerifyVerifierState(t,
 			output.DataStore,
 			testutil.TestChain.Selector,
 			verifierAddr,

@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
 	"github.com/stretchr/testify/require"
 
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -76,24 +74,4 @@ func DeployTestEnvironment(t *testing.T, opts DataStreamsTestEnvOptions) (DataSt
 		LinkTokenAddress:  testEnv.LinkTokenState.LinkToken.Address(),
 		FeeManagerAddress: feeManagerAddress,
 	}, nil
-}
-
-func GetState(
-	t *testing.T,
-	inDs ds.MutableDataStore[ds.DefaultMetadata, ds.DefaultMetadata],
-	chainSelector uint64,
-	contractAddress common.Address,
-) *metadata.GenericContractMetadata[v0_5.FeeManagerView] {
-	envDatastore, err := ds.FromDefault[metadata.SerializedContractMetadata, ds.DefaultMetadata](inDs.Seal())
-	require.NoError(t, err)
-
-	cm, err := envDatastore.ContractMetadata().Get(
-		ds.NewContractMetadataKey(chainSelector, contractAddress.String()),
-	)
-	require.NoError(t, err, "Failed to get contract metadata")
-
-	contractMetadata, err := metadata.DeserializeMetadata[v0_5.FeeManagerView](cm.Metadata)
-	require.NoError(t, err, "Failed to convert contract metadata")
-	require.NotNil(t, contractMetadata, "Failed to get contract metadata")
-	return contractMetadata
 }

@@ -3,30 +3,25 @@ package channel_config_store
 import (
 	"errors"
 	"fmt"
-	"math/big"
-	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	owner_helpers "github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/mcms"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/proposal/timelock"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/txutil"
 
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/channel_config_store"
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/common/changeset"
-	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 )
 
 type (
 	SetChannelDefinitionsConfig struct {
-		// DefinitionsByChain is a map of chain selectors -> ChannelConfigStore addresses -> ChannelDefinitions to deploy.
-		DefinitionsByChain map[uint64]map[string]ChannelDefinition // Use string for address because of future non-EVM chains.
-		MCMSConfig         *MCMSConfig
+		// DefinitionsByChain is a map of chain selectors -> ChannelDefinitions to deploy.
+		DefinitionsByChain map[uint64][]ChannelDefinition
+		MCMSConfig         *types.MCMSConfig
 	}
 
 	ChannelDefinition struct {
@@ -37,15 +32,17 @@ type (
 		Hash  [32]byte
 	}
 
-	MCMSConfig struct {
-		MinDelay     time.Duration
-		OverrideRoot bool
-	}
-
 	ChannelConfigStoreState struct {
 		ChannelConfigStore *channel_config_store.ChannelConfigStore
 	}
 )
+
+func (a ChannelDefinition) GetContractAddress() common.Address {
+	return a.ChannelConfigStore
+}
+
+// SetChannelDefinitionChangeset sets the channel definitions on the ChannelConfigStore contract
+var SetChannelDefinitionChangeset = cldf.CreateChangeSet(callSetChannelDefinitions, callSetChannelDefinitionsPrecondition)
 
 func (cfg SetChannelDefinitionsConfig) Validate() error {
 	if len(cfg.DefinitionsByChain) == 0 {
@@ -54,127 +51,34 @@ func (cfg SetChannelDefinitionsConfig) Validate() error {
 	return nil
 }
 
-func CallSetChannelDefinitions(e deployment.Environment, cfg SetChannelDefinitionsConfig) (deployment.ChangesetOutput, error) {
-	err := cfg.Validate()
+func callSetChannelDefinitionsPrecondition(e deployment.Environment, cfg SetChannelDefinitionsConfig) error {
+	if len(cfg.DefinitionsByChain) == 0 {
+		return errors.New("DefinitionsByChain cannot be empty")
+	}
+	for chainSel := range cfg.DefinitionsByChain {
+		if err := deployment.IsValidChainSelector(chainSel); err != nil {
+			return fmt.Errorf("invalid chain selector: %d - %w", chainSel, err)
+		}
+	}
+	return nil
+}
+
+func callSetChannelDefinitions(e deployment.Environment, cfg SetChannelDefinitionsConfig) (deployment.ChangesetOutput, error) {
+	txs, err := txutil.GetTxs(
+		e,
+		types.ChannelConfigStore.String(),
+		cfg.DefinitionsByChain,
+		maybeLoadChannelConfigStoreState,
+		doSetChannelDefinitions,
+	)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("invalid SetChannelDefinitionsConfig: %w", err)
+		return deployment.ChangesetOutput{}, fmt.Errorf("failed building SetNativeSurcharge txs: %w", err)
 	}
 
-	chainSelectors := []uint64{}
-	for chainSelector := range cfg.DefinitionsByChain {
-		chainSelectors = append(chainSelectors, chainSelector)
-	}
-
-	// Initialize state for each chain
-	var mcmsStatePerChain map[uint64]*changeset.MCMSWithTimelockState
-	if cfg.MCMSConfig != nil {
-		mcmsStatePerChain, err = changeset.MaybeLoadMCMSWithTimelockState(e, chainSelectors)
-		if err != nil {
-			return deployment.ChangesetOutput{}, err
-		}
-	}
-
-	mcmsPerChain := map[uint64]*owner_helpers.ManyChainMultiSig{}
-	timelockAddresses := map[uint64]common.Address{}
-	allBatches := []timelock.BatchChainOperation{}
-	for chainSelector := range cfg.DefinitionsByChain {
-		chainID := mcms.ChainIdentifier(chainSelector)
-
-		batch := timelock.BatchChainOperation{
-			ChainIdentifier: chainID,
-			Batch:           []mcms.Operation{},
-		}
-
-		chain, ok := e.Chains[chainSelector]
-		if !ok {
-			return deployment.ChangesetOutput{}, fmt.Errorf("chain %d not found", chainSelector)
-		}
-
-		if cfg.MCMSConfig != nil {
-			mcmsState := mcmsStatePerChain[chainSelector]
-			timelockAddress := mcmsState.Timelock.Address()
-			mcmsPerChain[uint64(chainID)] = mcmsState.ProposerMcm
-			timelockAddresses[chainSelector] = timelockAddress
-		}
-
-		opts := getTransactOpts(e, chainSelector, cfg.MCMSConfig)
-
-		for contractAddr, definition := range cfg.DefinitionsByChain[chainSelector] {
-			ccsState, err := maybeLoadChannelConfigStoreState(e, chainSelector, contractAddr)
-			if err != nil {
-				return deployment.ChangesetOutput{}, err
-			}
-
-			tx, err := transferOrBuildTx(e, ccsState.ChannelConfigStore, definition, opts, chain, cfg.MCMSConfig)
-			if err != nil {
-				return deployment.ChangesetOutput{}, err
-			}
-			op := mcms.Operation{
-				To:           common.HexToAddress(contractAddr),
-				Data:         tx.Data(),
-				Value:        big.NewInt(0),
-				ContractType: string(types.ChannelConfigStore),
-			}
-			batch.Batch = append(batch.Batch, op)
-		}
-
-		allBatches = append(allBatches, batch)
-	}
-
-	if cfg.MCMSConfig != nil {
-		proposal, err := proposalutils.BuildProposalFromBatches(
-			timelockAddresses,
-			mcmsPerChain,
-			allBatches,
-			"ChannelConfigStore setChannelDefinitions proposal",
-			cfg.MCMSConfig.MinDelay,
-		)
-		if err != nil {
-			return deployment.ChangesetOutput{}, err
-		}
-
-		return deployment.ChangesetOutput{
-			Proposals: []timelock.MCMSWithTimelockProposal{*proposal},
-		}, nil
-	}
-
-	return deployment.ChangesetOutput{}, nil
+	return mcmsutil.ExecuteOrPropose(e, txs, cfg.MCMSConfig, "SetNativeSurcharge proposal")
 }
 
-func getTransactOpts(e deployment.Environment, chainSel uint64, mcmsConfig *MCMSConfig) *bind.TransactOpts {
-	if mcmsConfig == nil {
-		return e.Chains[chainSel].DeployerKey
-	}
-
-	return deployment.SimTransactOpts()
-}
-
-func transferOrBuildTx(
-	e deployment.Environment,
-	ccs *channel_config_store.ChannelConfigStore,
-	definition ChannelDefinition,
-	opts *bind.TransactOpts,
-	chain deployment.Chain,
-	mcmsConfig *MCMSConfig,
-) (*ethTypes.Transaction, error) {
-	if ccs == nil {
-		return nil, errors.New("provided ChannelConfigStore is nil")
-	}
-	tx, err := ccs.ChannelConfigStoreTransactor.SetChannelDefinitions(opts, definition.DonID, definition.S3URL, definition.Hash)
-	if err != nil {
-		return nil, fmt.Errorf("error packing transfer tx data: %w", err)
-	}
-	// only wait for tx if we are not using MCMS
-	if mcmsConfig == nil {
-		if _, err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
-			e.Logger.Errorw("Failed to confirm transfer tx", "chain", chain.String(), "err", err)
-			return nil, err
-		}
-	}
-	return tx, nil
-}
-
-func maybeLoadChannelConfigStoreState(e deployment.Environment, chainSel uint64, contractAddr string) (*ChannelConfigStoreState, error) {
+func maybeLoadChannelConfigStoreState(e deployment.Environment, chainSel uint64, contractAddr string) (*channel_config_store.ChannelConfigStore, error) {
 	if err := utils.ValidateContract(e, chainSel, contractAddr, types.ChannelConfigStore, deployment.Version1_0_0); err != nil {
 		return nil, err
 	}
@@ -187,7 +91,17 @@ func maybeLoadChannelConfigStoreState(e deployment.Environment, chainSel uint64,
 		return nil, fmt.Errorf("failed to load ChannelConfigStore contract: %w", err)
 	}
 
-	return &ChannelConfigStoreState{
-		ChannelConfigStore: ccs,
-	}, nil
+	return ccs, nil
+}
+
+func doSetChannelDefinitions(
+	ccs *channel_config_store.ChannelConfigStore,
+	c ChannelDefinition,
+) (*ethTypes.Transaction, error) {
+	return ccs.SetChannelDefinitions(
+		deployment.SimTransactOpts(),
+		c.DonID,
+		c.S3URL,
+		c.Hash,
+	)
 }

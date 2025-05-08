@@ -9,7 +9,6 @@ import (
 	mcmslib "github.com/smartcontractkit/mcms"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	channel_config_store "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/channel-config-store"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/txutil"
@@ -20,12 +19,12 @@ var SetFeeManagerChangeset = cldf.CreateChangeSet(verifierProxySetFeeManagerLogi
 
 type VerifierProxySetFeeManagerConfig struct {
 	ConfigPerChain map[uint64][]SetFeeManagerConfig
-	MCMSConfig     *channel_config_store.MCMSConfig
+	MCMSConfig     *types.MCMSConfig
 }
 
 type SetFeeManagerConfig struct {
-	ContractAddress   common.Address
-	FeeManagerAddress common.Address
+	VerifierProxyAddress common.Address
+	FeeManagerAddress    common.Address
 }
 
 func verifierProxySetFeeManagerLogic(e deployment.Environment, cfg VerifierProxySetFeeManagerConfig) (deployment.ChangesetOutput, error) {
@@ -54,7 +53,7 @@ func GetSetFeeManagerTxs(e deployment.Environment, cfg VerifierProxySetFeeManage
 	var preparedTxs []*txutil.PreparedTx
 	for chainSelector, configs := range cfg.ConfigPerChain {
 		for _, config := range configs {
-			state, err := maybeLoadVerifierProxyState(e, chainSelector, config.ContractAddress.String())
+			state, err := maybeLoadVerifierProxyState(e, chainSelector, config.VerifierProxyAddress.String())
 			if err != nil {
 				return nil, fmt.Errorf("failed to load verifier proxy state: %w", err)
 			}

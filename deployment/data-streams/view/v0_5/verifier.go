@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/contracts/evm"
 	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/interfaces"
 
@@ -25,7 +26,7 @@ type VerifierState struct {
 type VerifierView struct {
 	Configs        map[string]*VerifierState `json:"configs"`
 	TypeAndVersion string                    `json:"typeAndVersion,omitempty"`
-	Owner          common.Address            `json:"owner,omitempty"`
+	Owner          string                    `json:"owner,omitempty"`
 }
 
 // Ensure VerifierView implements the ContractView interface
@@ -58,10 +59,23 @@ func (v VerifierView) GetVerifierState(configDigest string) (*VerifierState, err
 
 // VerifierViewGenerator builds views for the Verifier contract
 type VerifierViewGenerator struct {
-	contract verifier_v0_5_0.VerifierInterface
+	contract VerifierContractReader
 }
 
-func NewVerifierViewGenerator(contract verifier_v0_5_0.VerifierInterface) *VerifierViewGenerator {
+// VerifierContract defines a minimal interface
+type VerifierContractReader interface {
+	// Call methods
+	Owner(opts *bind.CallOpts) (common.Address, error)
+	TypeAndVersion(opts *bind.CallOpts) (string, error)
+
+	// Filter methods
+	FilterConfigSet(opts *bind.FilterOpts, configDigest [][32]byte) (evm.LogIterator[verifier_v0_5_0.VerifierConfigSet], error)
+	FilterConfigUpdated(opts *bind.FilterOpts, configDigest [][32]byte) (evm.LogIterator[verifier_v0_5_0.VerifierConfigUpdated], error)
+	FilterConfigActivated(opts *bind.FilterOpts, configDigest [][32]byte) (evm.LogIterator[verifier_v0_5_0.VerifierConfigActivated], error)
+	FilterConfigDeactivated(opts *bind.FilterOpts, configDigest [][32]byte) (evm.LogIterator[verifier_v0_5_0.VerifierConfigDeactivated], error)
+}
+
+func NewVerifierViewGenerator(contract VerifierContractReader) *VerifierViewGenerator {
 	return &VerifierViewGenerator{
 		contract: contract,
 	}
@@ -84,7 +98,7 @@ func (b *VerifierViewGenerator) Generate(ctx context.Context, verifierContext Ve
 	if err != nil {
 		return VerifierView{}, fmt.Errorf("failed to get contract owner: %w", err)
 	}
-	view.Owner = owner
+	view.Owner = owner.Hex()
 
 	// Define the filter options
 	filterOpts := &bind.FilterOpts{
@@ -125,7 +139,7 @@ func (b *VerifierViewGenerator) processConfigSetEvents(opts *bind.FilterOpts, vi
 	defer iter.Close()
 
 	for iter.Next() {
-		event := iter.Event
+		event := iter.GetEvent()
 		configDigestHex := dsutil.HexEncodeBytes(event.ConfigDigest[:])
 
 		state := &VerifierState{
@@ -155,7 +169,7 @@ func (b *VerifierViewGenerator) processConfigUpdatedEvents(opts *bind.FilterOpts
 	defer iter.Close()
 
 	for iter.Next() {
-		event := iter.Event
+		event := iter.GetEvent()
 		configDigestHex := dsutil.HexEncodeBytes(event.ConfigDigest[:])
 
 		// Skip if this configDigest doesn't exist yet
@@ -192,7 +206,7 @@ func (b *VerifierViewGenerator) processConfigActivatedEvents(opts *bind.FilterOp
 	defer iter.Close()
 
 	for iter.Next() {
-		event := iter.Event
+		event := iter.GetEvent()
 		configDigestHex := dsutil.HexEncodeBytes(event.ConfigDigest[:])
 
 		// Skip if this configDigest doesn't exist yet
@@ -216,7 +230,7 @@ func (b *VerifierViewGenerator) processConfigDeactivatedEvents(opts *bind.Filter
 	defer iter.Close()
 
 	for iter.Next() {
-		event := iter.Event
+		event := iter.GetEvent()
 		configDigestHex := dsutil.HexEncodeBytes(event.ConfigDigest[:])
 
 		// Skip if this configDigest doesn't exist yet

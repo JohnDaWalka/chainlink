@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/channel_config_store"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/contracts/evm"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/interfaces"
 )
 
@@ -49,8 +50,7 @@ type ChannelConfigStoreContract interface {
 	TypeAndVersion(opts *bind.CallOpts) (string, error)
 	Owner(opts *bind.CallOpts) (common.Address, error)
 
-	// Event filters
-	FilterNewChannelDefinition(opts *bind.FilterOpts, donId []*big.Int) (*channel_config_store.ChannelConfigStoreNewChannelDefinitionIterator, error)
+	FilterNewChannelDefinition(opts *bind.FilterOpts, donId []*big.Int) (evm.LogIterator[channel_config_store.ChannelConfigStoreNewChannelDefinition], error)
 }
 
 // ChannelConfigStoreViewGenerator generates views of ChannelConfigStore contracts
@@ -122,7 +122,7 @@ func (g *ChannelConfigStoreViewGenerator) processChannelDefinitionEvents(
 	latestVersions := make(map[uint64]uint32)
 
 	for iter.Next() {
-		event := iter.Event
+		event := iter.GetEvent()
 
 		donID := event.DonId.Uint64()
 

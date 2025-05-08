@@ -8,17 +8,19 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	verifier_proxy "github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/verifier_proxy_v0_5_0"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/contracts/evm"
+	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/interfaces"
 )
 
 // VerifierProxyView represents the state of a VerifierProxy contract
 type VerifierProxyView struct {
-	Owner                common.Address              `json:"owner,omitempty"` // Make readable
-	FeeManager           common.Address              `json:"feeManager,omitempty"`
-	AccessController     common.Address              `json:"accessController,omitempty"`
-	TypeAndVersion       string                      `json:"typeAndVersion,omitempty"`
-	InitializedVerifiers map[common.Address]bool     `json:"initializedVerifiers"`
-	VerifiersByDigest    map[[32]byte]common.Address `json:"verifiersByDigest"`
+	Owner                string            `json:"owner,omitempty"`
+	FeeManager           string            `json:"feeManager,omitempty"`
+	AccessController     string            `json:"accessController,omitempty"`
+	TypeAndVersion       string            `json:"typeAndVersion,omitempty"`
+	InitializedVerifiers []string          `json:"initializedVerifiers"`
+	VerifiersByDigest    map[string]string `json:"verifiersByDigest"`
 }
 
 // VerifierProxyView implements the ContractView interface
@@ -50,9 +52,9 @@ type VerifierProxyContract interface {
 	TypeAndVersion(opts *bind.CallOpts) (string, error)
 
 	// Event filters
-	FilterVerifierInitialized(opts *bind.FilterOpts) (*verifier_proxy.VerifierProxyVerifierInitializedIterator, error)
-	FilterVerifierSet(opts *bind.FilterOpts) (*verifier_proxy.VerifierProxyVerifierSetIterator, error)
-	FilterVerifierUnset(opts *bind.FilterOpts) (*verifier_proxy.VerifierProxyVerifierUnsetIterator, error)
+	FilterVerifierInitialized(opts *bind.FilterOpts) (evm.LogIterator[verifier_proxy.VerifierProxyVerifierInitialized], error)
+	FilterVerifierSet(opts *bind.FilterOpts) (evm.LogIterator[verifier_proxy.VerifierProxyVerifierSet], error)
+	FilterVerifierUnset(opts *bind.FilterOpts) (evm.LogIterator[verifier_proxy.VerifierProxyVerifierUnset], error)
 }
 
 // VerifierProxyViewGenerator generates views of VerifierProxy contracts
@@ -71,8 +73,8 @@ func NewVerifierProxyViewGenerator(verifierProxy VerifierProxyContract) *Verifie
 func (v *VerifierProxyViewGenerator) Generate(ctx context.Context, params VerifierProxyViewParams) (VerifierProxyView, error) {
 	// Initialize the view with empty maps
 	view := VerifierProxyView{
-		InitializedVerifiers: make(map[common.Address]bool),
-		VerifiersByDigest:    make(map[[32]byte]common.Address),
+		InitializedVerifiers: []string{},
+		VerifiersByDigest:    make(map[string]string),
 	}
 
 	// Create filter options
@@ -107,23 +109,25 @@ func (v *VerifierProxyViewGenerator) fetchContractState(ctx context.Context, vie
 	callOpts := &bind.CallOpts{Context: ctx}
 	var err error
 
-	// Get the owner
-	view.Owner, err = v.verifierProxy.Owner(callOpts)
+	owner, err := v.verifierProxy.Owner(callOpts)
 	if err != nil {
 		return fmt.Errorf("failed to get owner: %w", err)
 	}
+	view.Owner = owner.Hex()
 
 	// Get the AccessController
-	view.AccessController, err = v.verifierProxy.SAccessController(callOpts)
+	ac, err := v.verifierProxy.SAccessController(callOpts)
 	if err != nil {
 		return fmt.Errorf("failed to get access controller: %w", err)
 	}
+	view.AccessController = ac.Hex()
 
 	// Get the FeeManager
-	view.FeeManager, err = v.verifierProxy.SFeeManager(callOpts)
+	fm, err := v.verifierProxy.SFeeManager(callOpts)
 	if err != nil {
 		return fmt.Errorf("failed to get fee manager: %w", err)
 	}
+	view.FeeManager = fm.Hex()
 
 	// Get TypeAndVersion
 	view.TypeAndVersion, err = v.verifierProxy.TypeAndVersion(callOpts)
@@ -143,7 +147,8 @@ func (v *VerifierProxyViewGenerator) processInitializedVerifiers(filterOpts *bin
 	defer initializedIter.Close()
 
 	for initializedIter.Next() {
-		view.InitializedVerifiers[initializedIter.Event.VerifierAddress] = true
+		event := initializedIter.GetEvent()
+		view.InitializedVerifiers = append(view.InitializedVerifiers, event.VerifierAddress.Hex())
 	}
 
 	return nil
@@ -158,8 +163,9 @@ func (v *VerifierProxyViewGenerator) processVerifierSetEvents(filterOpts *bind.F
 	defer setIter.Close()
 
 	for setIter.Next() {
-		event := setIter.Event
-		view.VerifiersByDigest[event.NewConfigDigest] = event.VerifierAddress
+		event := setIter.GetEvent()
+		digest := dsutil.HexEncodeBytes32(event.NewConfigDigest)
+		view.VerifiersByDigest[digest] = event.VerifierAddress.Hex()
 	}
 
 	return nil
@@ -174,8 +180,9 @@ func (v *VerifierProxyViewGenerator) processVerifierUnsetEvents(filterOpts *bind
 	defer unsetIter.Close()
 
 	for unsetIter.Next() {
-		event := unsetIter.Event
-		delete(view.VerifiersByDigest, event.ConfigDigest)
+		event := unsetIter.GetEvent()
+		digest := dsutil.HexEncodeBytes32(event.ConfigDigest)
+		delete(view.VerifiersByDigest, digest)
 	}
 
 	return nil

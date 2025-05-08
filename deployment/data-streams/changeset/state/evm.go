@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/contracts/evm"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -275,7 +276,8 @@ func (s DataStreamsEVMChainState) GenerateConfiguratorViews(ctx context.Context)
 			FromBlock: contractAndMeta.Metadata.Metadata.DeployBlock,
 		}
 
-		generator := v0_5.NewConfiguratorViewGenerator(contractAndMeta.Contract)
+		contractWrapper := evm.NewConfiguratorReader(contractAndMeta.Contract)
+		generator := v0_5.NewConfiguratorViewGenerator(contractWrapper)
 		configuratorView, err := generator.Generate(ctx, contractContext)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)
@@ -293,7 +295,8 @@ func (s DataStreamsEVMChainState) GenerateVerifierViews(ctx context.Context) (ma
 			FromBlock: contractAndMeta.Metadata.Metadata.DeployBlock,
 		}
 
-		generator := v0_5.NewVerifierViewGenerator(contractAndMeta.Contract)
+		contractWrapper := evm.NewVerifierReader(contractAndMeta.Contract)
+		generator := v0_5.NewVerifierViewGenerator(contractWrapper)
 		contractView, err := generator.Generate(ctx, contractContext)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)
@@ -311,7 +314,8 @@ func (s DataStreamsEVMChainState) GenerateFeeManagerViews(ctx context.Context) (
 			FromBlock: contractAndMeta.Metadata.Metadata.DeployBlock,
 		}
 
-		generator := v0_5.NewFeeManagerViewGenerator(contractAndMeta.Contract)
+		contractWrapper := evm.NewFeeManagerReader(contractAndMeta.Contract)
+		generator := v0_5.NewFeeManagerViewGenerator(contractWrapper)
 		contractView, err := generator.Generate(ctx, contractContext)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)
@@ -327,7 +331,8 @@ func (s DataStreamsEVMChainState) GenerateRewardManagerViews(ctx context.Context
 	for address, contractAndMeta := range s.RewardManagers {
 		contractContext := v0_5.RewardManagerViewParams{}
 
-		generator := v0_5.NewRewardManagerViewGenerator(contractAndMeta.Contract)
+		contractWrapper := evm.NewRewardManagerReader(contractAndMeta.Contract)
+		generator := v0_5.NewRewardManagerViewGenerator(contractWrapper)
 		contractView, err := generator.Generate(ctx, contractContext)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)
@@ -343,7 +348,8 @@ func (s DataStreamsEVMChainState) GenerateVerifierProxyViews(ctx context.Context
 	for address, contractAndMeta := range s.VerifierProxys {
 		contractContext := v0_5.VerifierProxyViewParams{}
 
-		generator := v0_5.NewVerifierProxyViewGenerator(contractAndMeta.Contract)
+		contractWrapper := evm.NewVerifierProxyReader(contractAndMeta.Contract)
+		generator := v0_5.NewVerifierProxyViewGenerator(contractWrapper)
 		contractView, err := generator.Generate(ctx, contractContext)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)
@@ -359,7 +365,8 @@ func (s DataStreamsEVMChainState) GenerateChannelConfigStoreViews(ctx context.Co
 	for address, contractAndMeta := range s.ChannelConfigStores {
 		contractContext := v0_5.ChannelConfigStoreViewParams{}
 
-		generator := v0_5.NewChannelConfigStoreViewGenerator(contractAndMeta.Contract)
+		contractWrapper := evm.NewChannelConfigStoreWrapper(contractAndMeta.Contract)
+		generator := v0_5.NewChannelConfigStoreViewGenerator(contractWrapper)
 		contractView, err := generator.Generate(ctx, contractContext)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build view for configurator %s: %w", address, err)

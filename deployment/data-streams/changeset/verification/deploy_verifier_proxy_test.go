@@ -53,18 +53,6 @@ func TestDeployVerifierProxy(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, record)
 
-	// Store address for other tests
-	t.Run("VerifyMetadata", func(t *testing.T) {
-		cm, err := envDatastore.ContractMetadata().Get(
-			datastore.NewContractMetadataKey(record.ChainSelector, record.Address),
-		)
-		require.NoError(t, err)
-
-		vpm, err := cm.Metadata.ToVerifierProxyMetadata()
-		require.NoError(t, err)
-		assert.Equal(t, common.HexToAddress("0x001"), common.HexToAddress(vpm.AccessControllerAddress))
-	})
-
 	t.Run("VerifyOwnershipTransferred", func(t *testing.T) {
 		chain := e.Chains[testutil.TestChain.Selector]
 		owner, _, err := commonChangesets.LoadOwnableContract(common.HexToAddress(record.Address), chain.Client)

@@ -4,13 +4,13 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	feemanager "github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/fee-manager"
-
-	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/verifier_proxy_v0_5_0"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -59,7 +59,7 @@ func TestSetFeeManager(t *testing.T) {
 	cfg := VerifierProxySetFeeManagerConfig{
 		ConfigPerChain: map[uint64][]SetFeeManagerConfig{
 			testChain: {
-				{FeeManagerAddress: feeManagerAddr, ContractAddress: verifierProxyAddr},
+				{FeeManagerAddress: feeManagerAddr, VerifierProxyAddress: verifierProxyAddr},
 			},
 		},
 	}
@@ -71,12 +71,26 @@ func TestSetFeeManager(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	client := e.Chains[testChain].Client
-	verifierProxy, err := verifier_proxy_v0_5_0.NewVerifierProxy(verifierProxyAddr, client)
-	require.NoError(t, err)
+	t.Run("VerifyMetadata", func(t *testing.T) {
+		// Use View To Confirm Data
+		_, outputs, err := commonchangeset.ApplyChangesetsV2(t, e,
+			[]commonchangeset.ConfiguredChangeSet{
+				commonchangeset.Configure(
+					changeset.SaveContractViews,
+					changeset.SaveContractViewsConfig{
+						Chains: []uint64{testutil.TestChain.Selector},
+					},
+				),
+			},
+		)
+		require.NoError(t, err)
+		require.Len(t, outputs, 1)
+		output := outputs[0]
 
-	// Check VerifierProxy has the correct FeeManager set
-	feeManager, err := verifierProxy.SFeeManager(nil)
-	require.NoError(t, err)
-	require.Equal(t, feeManagerAddr, feeManager)
+		contractMetadata := testutil.MustGetContractMetaData[v0_5.VerifierProxyView](t, output.DataStore, testutil.TestChain.Selector, verifierProxyAddr.Hex())
+		require.NotNil(t, contractMetadata)
+		require.Equal(t, feeManagerAddr.Hex(), contractMetadata.View.FeeManager)
+
+	})
+
 }

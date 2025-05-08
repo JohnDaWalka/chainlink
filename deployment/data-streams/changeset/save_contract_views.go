@@ -70,47 +70,9 @@ func saveViewsLogic(e deployment.Environment, cfg SaveContractViewsConfig) (depl
 
 			chainView, _ := chainState.GenerateView(e.GetContext())
 
-			// It would be a good improvement to use a single function to save all contract views
-			for address, contractView := range chainView.Configurator {
-				err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
-				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to save metadata to datastore: %w", err)
-				}
-			}
-
-			for address, contractView := range chainView.Verifier {
-				err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
-				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to save metadata to datastore: %w", err)
-				}
-			}
-
-			for address, contractView := range chainView.FeeManager {
-				err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
-				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to save metadata to datastore: %w", err)
-				}
-			}
-
-			for address, contractView := range chainView.RewardManager {
-				err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
-				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to save metadata to datastore: %w", err)
-				}
-			}
-
-			for address, contractView := range chainView.VerifierProxy {
-				err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
-				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to save metadata to datastore: %w", err)
-				}
-			}
-
-			for address, contractView := range chainView.ChannelConfigStore {
-				err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
-				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to save metadata to datastore: %w", err)
-				}
+			err = saveEvmViewsToDataStore(chainView, cmStore, updatedDataStore, chainSelector)
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to save views to datastore: %w", err)
 			}
 
 		default:
@@ -125,7 +87,55 @@ func saveViewsLogic(e deployment.Environment, cfg SaveContractViewsConfig) (depl
 	}
 
 	return deployment.ChangesetOutput{DataStore: defaultDs}, nil
+}
 
+func saveEvmViewsToDataStore(chainView view.EVMChainView,
+	cmStore ds.ContractMetadataStore[metadata.SerializedContractMetadata],
+	updatedDataStore ds.MutableDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata],
+	chainSelector uint64) error {
+	for address, contractView := range chainView.Configurator {
+		err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
+		if err != nil {
+			return fmt.Errorf("failed to save metadata to datastore: %w", err)
+		}
+	}
+
+	for address, contractView := range chainView.Verifier {
+		err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
+		if err != nil {
+			return fmt.Errorf("failed to save metadata to datastore: %w", err)
+		}
+	}
+
+	for address, contractView := range chainView.FeeManager {
+		err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
+		if err != nil {
+			return fmt.Errorf("failed to save metadata to datastore: %w", err)
+		}
+	}
+
+	for address, contractView := range chainView.RewardManager {
+		err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
+		if err != nil {
+			return fmt.Errorf("failed to save metadata to datastore: %w", err)
+		}
+	}
+
+	for address, contractView := range chainView.VerifierProxy {
+		err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
+		if err != nil {
+			return fmt.Errorf("failed to save metadata to datastore: %w", err)
+		}
+	}
+
+	for address, contractView := range chainView.ChannelConfigStore {
+		err := saveContractViewToDataStore(cmStore, updatedDataStore, chainSelector, address, &contractView)
+		if err != nil {
+			return fmt.Errorf("failed to save metadata to datastore: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func saveContractViewToDataStore[T interfaces.ContractView](

@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/testutil"
 	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
 	"github.com/stretchr/testify/require"
@@ -21,17 +21,7 @@ func VerifyConfiguratorState(
 	expectedConfigCount uint64,
 ) {
 
-	envDatastore, err := ds.FromDefault[metadata.SerializedContractMetadata, ds.DefaultMetadata](inDs.Seal())
-	require.NoError(t, err)
-
-	// Retrieve contract metadata from datastore
-	cm, err := envDatastore.ContractMetadata().Get(
-		ds.NewContractMetadataKey(chainSelector, configuratorAddr.String()),
-	)
-	require.NoError(t, err, "Failed to get contract metadata")
-
-	contractMetadata, err := metadata.DeserializeMetadata[v0_5.ConfiguratorView](cm.Metadata)
-	require.NoError(t, err, "Failed to convert contract metadata")
+	contractMetadata := testutil.MustGetContractMetaData[v0_5.ConfiguratorView](t, inDs, chainSelector, configuratorAddr)
 
 	configIDString := dsutil.HexEncodeBytes(expectedConfig.ConfigID[:])
 	configDigestString := dsutil.HexEncodeBytes(configDigest[:])

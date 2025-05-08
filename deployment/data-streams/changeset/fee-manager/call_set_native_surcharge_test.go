@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
 	"github.com/stretchr/testify/require"
 
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -57,7 +58,7 @@ func TestSetNativeSurcharge(t *testing.T) {
 		require.Len(t, outputs, 1)
 		output := outputs[0]
 
-		contractMetadata := GetState(t, output.DataStore, testutil.TestChain.Selector, feeManagerAddress)
+		contractMetadata := testutil.MustGetContractMetaData[v0_5.FeeManagerView](t, output.DataStore, testutil.TestChain.Selector, feeManagerAddress.Hex())
 
 		require.Equal(t, strconv.Itoa(5000), contractMetadata.View.NativeSurcharge)
 

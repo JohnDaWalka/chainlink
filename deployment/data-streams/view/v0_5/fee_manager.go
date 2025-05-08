@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	fee_manager "github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/fee_manager_v0_5_0"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/contracts/evm"
 	dsutil "github.com/smartcontractkit/chainlink/deployment/data-streams/utils"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/interfaces"
 )
@@ -22,7 +23,7 @@ type FeeManagerView struct {
 	NativeSurcharge     string                               `json:"nativeSurcharge"`
 	LinkAvailable       string                               `json:"linkAvailable"`
 	TypeAndVersion      string                               `json:"typeAndVersion,omitempty"`
-	Owner               common.Address                       `json:"owner,omitempty"`
+	Owner               string                               `json:"owner,omitempty"`
 	SubscriberDiscounts map[string]map[string]TokenDiscounts `json:"subscriberDiscounts"` // Map[subscriberAddress][feedId]TokenDiscounts
 }
 
@@ -53,13 +54,31 @@ type FeeManagerViewParams struct {
 
 // FeeManagerViewGenerator implements ContractViewGenerator for FeeManager
 type FeeManagerViewGenerator struct {
-	contract fee_manager.FeeManagerInterface
+	contract FeeManagerReader
 }
 
 // FeeManagerViewGenerator implements ContractViewGenerator
 var _ interfaces.ContractViewGenerator[FeeManagerViewParams, FeeManagerView] = (*FeeManagerViewGenerator)(nil)
 
-func NewFeeManagerViewGenerator(contract fee_manager.FeeManagerInterface) *FeeManagerViewGenerator {
+// FeeManagerReader defines the minimal interface needed for FeeManagerViewGenerator
+type FeeManagerReader interface {
+	// Call methods
+	TypeAndVersion(opts *bind.CallOpts) (string, error)
+	Owner(opts *bind.CallOpts) (common.Address, error)
+	ILinkAddress(opts *bind.CallOpts) (common.Address, error)
+	INativeAddress(opts *bind.CallOpts) (common.Address, error)
+	IProxyAddress(opts *bind.CallOpts) (common.Address, error)
+	IRewardManager(opts *bind.CallOpts) (common.Address, error)
+	SNativeSurcharge(opts *bind.CallOpts) (*big.Int, error)
+	LinkAvailableForPayment(opts *bind.CallOpts) (*big.Int, error)
+	SGlobalDiscounts(opts *bind.CallOpts, subscriber common.Address, token common.Address) (*big.Int, error)
+	SSubscriberDiscounts(opts *bind.CallOpts, subscriber common.Address, feedId [32]byte, token common.Address) (*big.Int, error)
+
+	// Filter methods
+	FilterSubscriberDiscountUpdated(opts *bind.FilterOpts, subscriber []common.Address, feedId [][32]byte) (evm.LogIterator[fee_manager.FeeManagerSubscriberDiscountUpdated], error)
+}
+
+func NewFeeManagerViewGenerator(contract FeeManagerReader) *FeeManagerViewGenerator {
 	return &FeeManagerViewGenerator{
 		contract: contract,
 	}
@@ -90,7 +109,7 @@ func (f *FeeManagerViewGenerator) fetchContractState(ctx context.Context, view *
 	if err != nil {
 		return fmt.Errorf("failed to get owner: %w", err)
 	}
-	view.Owner = owner
+	view.Owner = owner.Hex()
 
 	linkAddress, err := f.contract.ILinkAddress(callOpts)
 	if err != nil {
@@ -169,7 +188,7 @@ func (f *FeeManagerViewGenerator) gatherOrganizedDiscounts(ctx context.Context,
 	// Find all combinations of subscriber, feedId, and token
 	discountMap := make(map[string]discountKey)
 	for iterator.Next() {
-		event := iterator.Event
+		event := iterator.GetEvent()
 
 		feedIdStr := dsutil.HexEncodeBytes32(event.FeedId)
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
@@ -93,14 +94,30 @@ func deployRewardManager(e deployment.Environment,
 		if !ok {
 			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}
-		serialized, err := metadata.NewRewardManagerMetadata(metadata.RewardManagerMetadata{})
-		if err != nil {
-			return fmt.Errorf("failed to serialize verifier proxy metadata: %w", err)
-		}
-		options := &changeset.DeployOptions{ContractMetadata: serialized}
-		_, err = changeset.DeployContract(e, dataStore, chain, RewardManagerDeployFn(chainCfg.LinkTokenAddress), options)
+
+		res, err := changeset.DeployContract(e, dataStore, chain, RewardManagerDeployFn(chainCfg.LinkTokenAddress), nil)
 		if err != nil {
 			return err
+		}
+		contractMetadata := metadata.GenericContractMetadata[v0_5.RewardManagerView]{
+			Metadata: metadata.CommonContractMetadata{
+				DeployBlock: res.Block,
+			},
+		}
+
+		serialized, err := metadata.NewSerializedContractMetadata(contractMetadata)
+		if err != nil {
+			return fmt.Errorf("failed to serialize contract metadata: %w", err)
+		}
+
+		if err = dataStore.ContractMetadata().Upsert(
+			ds.ContractMetadata[metadata.SerializedContractMetadata]{
+				ChainSelector: chain.Selector,
+				Address:       res.Address.String(),
+				Metadata:      *serialized,
+			},
+		); err != nil {
+			return fmt.Errorf("failed to upser contract metadata: %w", err)
 		}
 	}
 

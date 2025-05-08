@@ -288,8 +288,8 @@ func setFeeManagerOnVerifierProxy(env *deployment.Environment, chain uint64, ver
 		ConfigPerChain: map[uint64][]verification.SetFeeManagerConfig{
 			chain: {
 				verification.SetFeeManagerConfig{
-					ContractAddress:   verifierProxyAddr,
-					FeeManagerAddress: feeManagerAddr,
+					VerifierProxyAddress: verifierProxyAddr,
+					FeeManagerAddress:    feeManagerAddr,
 				},
 			},
 		},

@@ -71,7 +71,7 @@ func TestCallSetConfig(t *testing.T) {
 		require.Len(t, outputs, 1)
 		output := outputs[0]
 
-		VerifyState(t,
+		VerifyVerifierState(t,
 			output.DataStore,
 			testutil.TestChain.Selector,
 			verifierAddr,

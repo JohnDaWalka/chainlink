@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -95,7 +96,7 @@ func TestDeployFeeManager(t *testing.T) {
 		require.Len(t, outputs, 1)
 		output := outputs[0]
 
-		contractMetadata := GetState(t, output.DataStore, testutil.TestChain.Selector, feeManagerAddress)
+		contractMetadata := testutil.MustGetContractMetaData[v0_5.FeeManagerView](t, output.DataStore, testutil.TestChain.Selector, feeManagerAddress.Hex())
 
 		t.Run("VerifyDeploymentParameters", func(t *testing.T) {
 			require.Equal(t, rewardManagerAddr.Hex(), contractMetadata.View.RewardManager)
