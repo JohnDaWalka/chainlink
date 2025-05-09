@@ -18,7 +18,7 @@ const (
 
 // TonCCIPChainState holds a Go binding for all the currently deployed CCIP contracts
 // on a chain. If a binding is nil, it means here is no such contract on the chain.
-type or struct {
+type TonCCIPChainState struct {
 	LinkTokenAddress *tonaddress.Address
 	CCIPAddress      *tonaddress.Address
 	OffRamp          *tonaddress.Address
