@@ -2129,6 +2129,10 @@ func ValidateSolanaState(t *testing.T, e deployment.Environment, solChainSelecto
 	}
 }
 
+func ValidateTONState(t *testing.T, e deployment.Environment, solChainSelectors []uint64) {
+
+}
+
 func DeploySolanaCcipReceiver(t *testing.T, e deployment.Environment) {
 	state, err := changeset.LoadOnchainStateSolana(e)
 	require.NoError(t, err)

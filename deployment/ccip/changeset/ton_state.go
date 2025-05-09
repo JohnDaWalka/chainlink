@@ -18,14 +18,14 @@ const (
 
 // TonCCIPChainState holds a Go binding for all the currently deployed CCIP contracts
 // on a chain. If a binding is nil, it means here is no such contract on the chain.
-type TonCCIPChainState struct {
-	LinkTokenAddress tonaddress.Address
-	CCIPAddress      tonaddress.Address
-	OffRamp          tonaddress.Address
-	Router           tonaddress.Address
+type or struct {
+	LinkTokenAddress *tonaddress.Address
+	CCIPAddress      *tonaddress.Address
+	OffRamp          *tonaddress.Address
+	Router           *tonaddress.Address
 
 	// dummy receiver address
-	ReceiverAddress tonaddress.Address
+	ReceiverAddress *tonaddress.Address
 }
 
 func SaveOnchainStateTon(chainSelector uint64, tonState TonCCIPChainState, e deployment.Environment) error {
@@ -79,15 +79,15 @@ func LoadChainStateTon(chain deployment.TonChain, addresses map[string]deploymen
 
 		switch tvStr.Type {
 		case commontypes.LinkToken:
-			state.LinkTokenAddress = *address
+			state.LinkTokenAddress = address
 		case TonCCIP:
-			state.CCIPAddress = *address
+			state.CCIPAddress = address
 		case TonReceiver:
-			state.ReceiverAddress = *address
+			state.ReceiverAddress = address
 		case OffRamp:
-			state.OffRamp = *address
+			state.OffRamp = address
 		case Router:
-			state.Router = *address
+			state.Router = address
 		default:
 			log.Warn().Str("address", addressStr).Str("type", string(tvStr.Type)).Msg("Unknown Ton address type")
 			continue

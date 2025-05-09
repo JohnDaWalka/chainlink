@@ -670,6 +670,11 @@ func deployChainContractsToSolChainCS(e DeployedEnv, solChainSelector uint64) ([
 		)}, nil
 }
 
+func deployChainContractsToTonChainCS(e DeployedEnv, tonChainSelector uint64) ([]commonchangeset.ConfiguredChangeSet, error) {
+	// TODO(ton): Implement this function to deploy chain contracts to Ton chain
+	return nil, errors.New("not implemented")
+}
+
 func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEnvironment, mcmsEnabled bool) DeployedEnv {
 	tc := tEnv.TestConfigs()
 	e := tEnv.DeployedEnvironment()
@@ -681,17 +686,24 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	var apps []commonchangeset.ConfiguredChangeSet
 	evmContractParams := make(map[uint64]v1_6.ChainContractParams)
 
-	evmChains := []uint64{}
+	var evmChains []uint64
 	for _, chain := range allChains {
 		if _, ok := e.Env.Chains[chain]; ok {
 			evmChains = append(evmChains, chain)
 		}
 	}
 
-	solChains := []uint64{}
+	var solChains []uint64
 	for _, chain := range allChains {
 		if _, ok := e.Env.SolChains[chain]; ok {
 			solChains = append(solChains, chain)
+		}
+	}
+
+	var tonChains []uint64
+	for _, chain := range allChains {
+		if _, ok := e.Env.TonChains[chain]; ok {
+			tonChains = append(tonChains, chain)
 		}
 	}
 
@@ -727,6 +739,12 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		solCs, err := deployChainContractsToSolChainCS(e, solChains[0])
 		require.NoError(t, err)
 		apps = append(apps, solCs...)
+	}
+
+	if len(tonChains) != 0 {
+		tonCs, err := deployChainContractsToTonChainCS(e, tonChains[0])
+		require.NoError(t, err)
+		apps = append(apps, tonCs...)
 	}
 
 	// TODO(ton): If environment has tonChains, append Ton DeployHomeChainConfig and DeployChainContractsConfig changesets
@@ -846,6 +864,26 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	}
 
 	// TODO(ton): Set Ton chains plugin configs
+	for _, chain := range tonChains {
+		tokenInfo := map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{}
+		tokenInfo[cciptypes.UnknownEncodedAddress(state.TonChains[chain].LinkTokenAddress.String())] = tokenConfig.TokenSymbolToInfo[changeset.LinkSymbol]
+		// TODO check if TON WETH is needed for TokenSymbolInfo?
+		//tokenInfo[cciptypes.UnknownEncodedAddress()] = tokenConfig.TokenSymbolToInfo[changeset.WethSymbol]
+		ocrOverride := tc.OCRConfigOverride
+		commitOCRConfigs[chain] = v1_6.DeriveOCRParamsForCommit(v1_6.SimulationTest, e.FeedChainSel, tokenInfo, ocrOverride)
+		execOCRConfigs[chain] = v1_6.DeriveOCRParamsForExec(v1_6.SimulationTest, tokenDataProviders, ocrOverride)
+		chainConfigs[chain] = v1_6.ChainConfig{
+			Readers: nodeInfo.NonBootstraps().PeerIDs(),
+			// #nosec G115 - Overflow is not a concern in this test scenario
+			FChain: uint8(len(nodeInfo.NonBootstraps().PeerIDs()) / 3),
+			EncodableChainConfig: chainconfig.ChainConfig{
+				GasPriceDeviationPPB:      cciptypes.BigInt{Int: big.NewInt(globals.GasPriceDeviationPPB)},
+				DAGasPriceDeviationPPB:    cciptypes.BigInt{Int: big.NewInt(globals.DAGasPriceDeviationPPB)},
+				OptimisticConfirmations:   globals.OptimisticConfirmations,
+				ChainFeeDeviationDisabled: true,
+			},
+		}
+	}
 
 	// Apply second set of changesets to configure the CCIP contracts.
 	var mcmsConfig *proposalutils.TimelockConfig
