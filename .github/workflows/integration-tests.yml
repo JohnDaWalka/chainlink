@@ -558,7 +558,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'pull_request' && (needs.changes.outputs.ccip_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@31ea968c2fff6582e95cd51b0f7f95932a3bf25f # june 2, 2025 # june 2, 2025
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@31ea968c2fff6582e95cd51b0f7f95932a3bf25f # june 2, 2025
     with:
       workflow_name: Run CCIP E2E Tests For PR
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
