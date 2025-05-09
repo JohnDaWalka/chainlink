@@ -21,6 +21,8 @@ const (
 type TonCCIPChainState struct {
 	LinkTokenAddress tonaddress.Address
 	CCIPAddress      tonaddress.Address
+	OffRamp          tonaddress.Address
+	Router           tonaddress.Address
 
 	// dummy receiver address
 	ReceiverAddress tonaddress.Address
@@ -82,6 +84,10 @@ func LoadChainStateTon(chain deployment.TonChain, addresses map[string]deploymen
 			state.CCIPAddress = *address
 		case TonReceiver:
 			state.ReceiverAddress = *address
+		case OffRamp:
+			state.OffRamp = *address
+		case Router:
+			state.Router = *address
 		default:
 			log.Warn().Str("address", addressStr).Str("type", string(tvStr.Type)).Msg("Unknown Ton address type")
 			continue

@@ -629,8 +629,17 @@ func (c CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType cldf.Contr
 		if !exists {
 			return fmt.Errorf("chain %d does not exist", chainSelector)
 		}
-		if chainState.CCIPAddress.IsAddrNone() {
-			return fmt.Errorf("ccip package does not exist on ton chain %d", chainSelector)
+		switch rampType {
+		case OffRamp:
+			if chainState.OffRamp.IsAddrNone() {
+				return fmt.Errorf("offramp contract does not exist on ton chain %d", chainSelector)
+			}
+		case OnRamp:
+			if chainState.Router.IsAddrNone() {
+				return fmt.Errorf("router contract does not exist on ton chain %d", chainSelector)
+			}
+		default:
+			return fmt.Errorf("unknown ramp type %s", rampType)
 		}
 
 	default:
