@@ -31,7 +31,7 @@ var _ deployment.ChangeSet[AddRemoteChainToFeeQuoterConfig] = AddRemoteChainToFe
 type AddRemoteChainToRouterConfig struct {
 	ChainSelector uint64
 	// UpdatesByChain is a mapping of SVM chain selector -> remote chain selector -> remote chain config update
-	UpdatesByChain map[uint64]RouterConfig
+	UpdatesByChain map[uint64]*RouterConfig
 	// Disallow mixing MCMS/non-MCMS per chain for simplicity.
 	// (can still be achieved by calling this function multiple times)
 	MCMSSolana *MCMSConfigSolana
@@ -47,7 +47,7 @@ type RouterConfig struct {
 	IsUpdate bool
 }
 
-func (cfg AddRemoteChainToRouterConfig) Validate(e deployment.Environment) error {
+func (cfg *AddRemoteChainToRouterConfig) Validate(e deployment.Environment) error {
 	state, err := ccipChangeset.LoadOnchainState(e)
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
@@ -70,7 +70,7 @@ func (cfg AddRemoteChainToRouterConfig) Validate(e deployment.Environment) error
 	_ = chain.GetAccountDataBorshInto(context.Background(), routerConfigPDA, &routerConfigAccount)
 
 	supportedChains := state.SupportedChains()
-	for remote := range cfg.UpdatesByChain {
+	for remote, remoteConfig := range cfg.UpdatesByChain {
 		if _, ok := supportedChains[remote]; !ok {
 			return fmt.Errorf("remote chain %d is not supported", remote)
 		}
@@ -84,12 +84,11 @@ func (cfg AddRemoteChainToRouterConfig) Validate(e deployment.Environment) error
 		if err != nil {
 			return fmt.Errorf("failed to find dest chain state pda for remote chain %d: %w", remote, err)
 		}
-		if !cfg.UpdatesByChain[remote].IsUpdate {
-			var destChainStateAccount solRouter.DestChain
-			err = chain.GetAccountDataBorshInto(context.Background(), routerDestChainPDA, &destChainStateAccount)
-			if err == nil {
-				return fmt.Errorf("remote %d is already configured on solana chain router %d", remote, cfg.ChainSelector)
-			}
+		var destChainStateAccount solRouter.DestChain
+		err = chain.GetAccountDataBorshInto(context.Background(), routerDestChainPDA, &destChainStateAccount)
+		if err == nil {
+			e.Logger.Infow("remote chain already configured. setting as update", "remoteChainSel", remote)
+			remoteConfig.IsUpdate = true
 		}
 	}
 	return nil
@@ -254,7 +253,7 @@ func doAddRemoteChainToRouter(
 type AddRemoteChainToFeeQuoterConfig struct {
 	ChainSelector uint64
 	// UpdatesByChain is a mapping of SVM chain selector -> remote chain selector -> remote chain config update
-	UpdatesByChain map[uint64]FeeQuoterConfig
+	UpdatesByChain map[uint64]*FeeQuoterConfig
 	// Disallow mixing MCMS/non-MCMS per chain for simplicity.
 	// (can still be achieved by calling this function multiple times)
 	MCMSSolana *MCMSConfigSolana
@@ -266,7 +265,7 @@ type FeeQuoterConfig struct {
 	IsUpdate bool
 }
 
-func (cfg AddRemoteChainToFeeQuoterConfig) Validate(e deployment.Environment) error {
+func (cfg *AddRemoteChainToFeeQuoterConfig) Validate(e deployment.Environment) error {
 	state, err := ccipChangeset.LoadOnchainState(e)
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
@@ -284,7 +283,7 @@ func (cfg AddRemoteChainToFeeQuoterConfig) Validate(e deployment.Environment) er
 		return err
 	}
 	supportedChains := state.SupportedChains()
-	for remote := range cfg.UpdatesByChain {
+	for remote, remoteConfig := range cfg.UpdatesByChain {
 		if _, ok := supportedChains[remote]; !ok {
 			return fmt.Errorf("remote chain %d is not supported", remote)
 		}
@@ -295,12 +294,11 @@ func (cfg AddRemoteChainToFeeQuoterConfig) Validate(e deployment.Environment) er
 		if err != nil {
 			return fmt.Errorf("failed to find dest chain state pda for remote chain %d: %w", remote, err)
 		}
-		if !cfg.UpdatesByChain[remote].IsUpdate {
-			var destChainStateAccount solFeeQuoter.DestChain
-			err = chain.GetAccountDataBorshInto(context.Background(), fqRemoteChainPDA, &destChainStateAccount)
-			if err == nil {
-				return fmt.Errorf("remote %d is already configured on solana chain feequoter %d", remote, cfg.ChainSelector)
-			}
+		var destChainStateAccount solFeeQuoter.DestChain
+		err = chain.GetAccountDataBorshInto(context.Background(), fqRemoteChainPDA, &destChainStateAccount)
+		if err == nil {
+			e.Logger.Infow("remote chain already configured. setting as update", "remoteChainSel", remote)
+			remoteConfig.IsUpdate = true
 		}
 	}
 	return nil
@@ -421,7 +419,7 @@ func doAddRemoteChainToFeeQuoter(
 type AddRemoteChainToOffRampConfig struct {
 	ChainSelector uint64
 	// UpdatesByChain is a mapping of SVM chain selector -> remote chain selector -> remote chain config update
-	UpdatesByChain map[uint64]OffRampConfig
+	UpdatesByChain map[uint64]*OffRampConfig
 	// Disallow mixing MCMS/non-MCMS per chain for simplicity.
 	// (can still be achieved by calling this function multiple times)
 	MCMSSolana *MCMSConfigSolana
@@ -434,7 +432,7 @@ type OffRampConfig struct {
 	IsUpdate bool
 }
 
-func (cfg AddRemoteChainToOffRampConfig) Validate(e deployment.Environment) error {
+func (cfg *AddRemoteChainToOffRampConfig) Validate(e deployment.Environment) error {
 	state, err := ccipChangeset.LoadOnchainState(e)
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
@@ -453,7 +451,7 @@ func (cfg AddRemoteChainToOffRampConfig) Validate(e deployment.Environment) erro
 	}
 
 	supportedChains := state.SupportedChains()
-	for remote := range cfg.UpdatesByChain {
+	for remote, remoteConfig := range cfg.UpdatesByChain {
 		if _, ok := supportedChains[remote]; !ok {
 			return fmt.Errorf("remote chain %d is not supported", remote)
 		}
@@ -464,12 +462,11 @@ func (cfg AddRemoteChainToOffRampConfig) Validate(e deployment.Environment) erro
 		if err != nil {
 			return fmt.Errorf("failed to find dest chain state pda for remote chain %d: %w", remote, err)
 		}
-		if !cfg.UpdatesByChain[remote].IsUpdate {
-			var destChainStateAccount solOffRamp.SourceChain
-			err = chain.GetAccountDataBorshInto(context.Background(), offRampRemoteStatePDA, &destChainStateAccount)
-			if err == nil {
-				return fmt.Errorf("remote %d is already configured on solana chain offramp %d", remote, cfg.ChainSelector)
-			}
+		var destChainStateAccount solOffRamp.SourceChain
+		err = chain.GetAccountDataBorshInto(context.Background(), offRampRemoteStatePDA, &destChainStateAccount)
+		if err == nil {
+			e.Logger.Infow("remote chain already configured. setting as update", "remoteChainSel", remote)
+			remoteConfig.IsUpdate = true
 		}
 	}
 	return nil

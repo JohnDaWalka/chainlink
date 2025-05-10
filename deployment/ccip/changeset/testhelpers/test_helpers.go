@@ -884,7 +884,7 @@ func addLaneSolanaChangesets(t *testing.T, e *DeployedEnv, solChainSelector, rem
 			cldf.CreateLegacyChangeSet(ccipChangeSetSolana.AddRemoteChainToRouter),
 			ccipChangeSetSolana.AddRemoteChainToRouterConfig{
 				ChainSelector: solChainSelector,
-				UpdatesByChain: map[uint64]ccipChangeSetSolana.RouterConfig{
+				UpdatesByChain: map[uint64]*ccipChangeSetSolana.RouterConfig{
 					remoteChainSelector: {
 						RouterDestinationConfig: solRouter.DestChainConfig{
 							AllowListEnabled: true,
@@ -898,7 +898,7 @@ func addLaneSolanaChangesets(t *testing.T, e *DeployedEnv, solChainSelector, rem
 			cldf.CreateLegacyChangeSet(ccipChangeSetSolana.AddRemoteChainToFeeQuoter),
 			ccipChangeSetSolana.AddRemoteChainToFeeQuoterConfig{
 				ChainSelector: solChainSelector,
-				UpdatesByChain: map[uint64]ccipChangeSetSolana.FeeQuoterConfig{
+				UpdatesByChain: map[uint64]*ccipChangeSetSolana.FeeQuoterConfig{
 					remoteChainSelector: {
 						FeeQuoterDestinationConfig: solFeeQuoter.DestChainConfig{
 							IsEnabled:                   true,
@@ -918,7 +918,7 @@ func addLaneSolanaChangesets(t *testing.T, e *DeployedEnv, solChainSelector, rem
 			cldf.CreateLegacyChangeSet(ccipChangeSetSolana.AddRemoteChainToOffRamp),
 			ccipChangeSetSolana.AddRemoteChainToOffRampConfig{
 				ChainSelector: solChainSelector,
-				UpdatesByChain: map[uint64]ccipChangeSetSolana.OffRampConfig{
+				UpdatesByChain: map[uint64]*ccipChangeSetSolana.OffRampConfig{
 					remoteChainSelector: {
 						EnabledAsSource: true,
 					},

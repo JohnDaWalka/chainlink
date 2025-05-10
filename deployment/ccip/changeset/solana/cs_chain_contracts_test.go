@@ -111,23 +111,23 @@ func doTestAddRemoteChain(t *testing.T, mcms bool) {
 			},
 		}
 	}
-	routerUpdates := make(map[uint64]ccipChangesetSolana.RouterConfig)
+	routerUpdates := make(map[uint64]*ccipChangesetSolana.RouterConfig)
 	for _, evmChain := range evmChains {
-		routerUpdates[evmChain] = ccipChangesetSolana.RouterConfig{
+		routerUpdates[evmChain] = &ccipChangesetSolana.RouterConfig{
 			RouterDestinationConfig: solRouter.DestChainConfig{
 				AllowListEnabled: true,
 			},
 		}
 	}
-	offRampUpdates := make(map[uint64]ccipChangesetSolana.OffRampConfig)
+	offRampUpdates := make(map[uint64]*ccipChangesetSolana.OffRampConfig)
 	for _, evmChain := range evmChains {
-		offRampUpdates[evmChain] = ccipChangesetSolana.OffRampConfig{
+		offRampUpdates[evmChain] = &ccipChangesetSolana.OffRampConfig{
 			EnabledAsSource: true,
 		}
 	}
-	feeQuoterUpdates := make(map[uint64]ccipChangesetSolana.FeeQuoterConfig)
+	feeQuoterUpdates := make(map[uint64]*ccipChangesetSolana.FeeQuoterConfig)
 	for _, evmChain := range evmChains {
-		feeQuoterUpdates[evmChain] = ccipChangesetSolana.FeeQuoterConfig{
+		feeQuoterUpdates[evmChain] = &ccipChangesetSolana.FeeQuoterConfig{
 			FeeQuoterDestinationConfig: solFeeQuoter.DestChainConfig{
 				IsEnabled:                   true,
 				DefaultTxGasLimit:           200000,
@@ -234,25 +234,23 @@ func doTestAddRemoteChain(t *testing.T, mcms bool) {
 
 	// Re-enable the chain
 
-	routerUpdates = make(map[uint64]ccipChangesetSolana.RouterConfig)
+	routerUpdates = make(map[uint64]*ccipChangesetSolana.RouterConfig)
 	for _, evmChain := range evmChains {
-		routerUpdates[evmChain] = ccipChangesetSolana.RouterConfig{
+		routerUpdates[evmChain] = &ccipChangesetSolana.RouterConfig{
 			RouterDestinationConfig: solRouter.DestChainConfig{
 				AllowListEnabled: false,
 			},
-			IsUpdate: true,
 		}
 	}
-	offRampUpdates = make(map[uint64]ccipChangesetSolana.OffRampConfig)
+	offRampUpdates = make(map[uint64]*ccipChangesetSolana.OffRampConfig)
 	for _, evmChain := range evmChains {
-		offRampUpdates[evmChain] = ccipChangesetSolana.OffRampConfig{
+		offRampUpdates[evmChain] = &ccipChangesetSolana.OffRampConfig{
 			EnabledAsSource: true,
-			IsUpdate:        true,
 		}
 	}
-	feeQuoterUpdates = make(map[uint64]ccipChangesetSolana.FeeQuoterConfig)
+	feeQuoterUpdates = make(map[uint64]*ccipChangesetSolana.FeeQuoterConfig)
 	for _, evmChain := range evmChains {
-		feeQuoterUpdates[evmChain] = ccipChangesetSolana.FeeQuoterConfig{
+		feeQuoterUpdates[evmChain] = &ccipChangesetSolana.FeeQuoterConfig{
 			FeeQuoterDestinationConfig: solFeeQuoter.DestChainConfig{
 				IsEnabled:                   true,
 				DefaultTxGasLimit:           200000,
@@ -262,7 +260,6 @@ func doTestAddRemoteChain(t *testing.T, mcms bool) {
 				DefaultTokenDestGasOverhead: 5000,
 				ChainFamilySelector:         [4]uint8{40, 18, 213, 44},
 			},
-			IsUpdate: true,
 		}
 	}
 
@@ -419,7 +416,6 @@ func doTestBilling(t *testing.T, mcms bool) {
 					PremiumMultiplierWeiPerEth: 200,
 				},
 				MCMSSolana: mcmsConfig,
-				IsUpdate:   true,
 			},
 		),
 	})
@@ -435,7 +431,7 @@ func doTestBilling(t *testing.T, mcms bool) {
 			cldf.CreateLegacyChangeSet(ccipChangesetSolana.AddRemoteChainToRouter),
 			ccipChangesetSolana.AddRemoteChainToRouterConfig{
 				ChainSelector: solChain,
-				UpdatesByChain: map[uint64]ccipChangesetSolana.RouterConfig{
+				UpdatesByChain: map[uint64]*ccipChangesetSolana.RouterConfig{
 					evmChain: {
 						RouterDestinationConfig: solRouter.DestChainConfig{
 							AllowListEnabled: true,
@@ -449,7 +445,7 @@ func doTestBilling(t *testing.T, mcms bool) {
 			cldf.CreateLegacyChangeSet(ccipChangesetSolana.AddRemoteChainToFeeQuoter),
 			ccipChangesetSolana.AddRemoteChainToFeeQuoterConfig{
 				ChainSelector: solChain,
-				UpdatesByChain: map[uint64]ccipChangesetSolana.FeeQuoterConfig{
+				UpdatesByChain: map[uint64]*ccipChangesetSolana.FeeQuoterConfig{
 					evmChain: {
 						FeeQuoterDestinationConfig: solFeeQuoter.DestChainConfig{
 							IsEnabled:                   true,
@@ -469,7 +465,7 @@ func doTestBilling(t *testing.T, mcms bool) {
 			cldf.CreateLegacyChangeSet(ccipChangesetSolana.AddRemoteChainToOffRamp),
 			ccipChangesetSolana.AddRemoteChainToOffRampConfig{
 				ChainSelector: solChain,
-				UpdatesByChain: map[uint64]ccipChangesetSolana.OffRampConfig{
+				UpdatesByChain: map[uint64]*ccipChangesetSolana.OffRampConfig{
 					evmChain: {
 						EnabledAsSource: true,
 					},
