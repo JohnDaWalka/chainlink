@@ -20,6 +20,8 @@
 
 ### Patch Changes
 
+- [#17628](https://github.com/smartcontractkit/chainlink/pull/17628) [`3b46213`](https://github.com/smartcontractkit/chainlink/commit/3b462133e068b5aadb5d9540040fb45f46f9c51a) - #bugfix PriceService context fix
+
 - [#17601](https://github.com/smartcontractkit/chainlink/pull/17601) [`1347d91`](https://github.com/smartcontractkit/chainlink/commit/1347d9125a814a2b8748141617cef3c65f982677) - #updated Bump chainlink-solana
 
 - [#17480](https://github.com/smartcontractkit/chainlink/pull/17480) [`b3e8cca`](https://github.com/smartcontractkit/chainlink/commit/b3e8ccac9609b860436bb7828279efd6268c451c) - Integrated framework metrics with beholder. #Added
