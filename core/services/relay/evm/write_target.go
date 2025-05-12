@@ -118,7 +118,7 @@ func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain
 	dfProcessor := dfprocessor.NewDataFeedsProcessor(registryMetrics, emitter, false)
 	ccipDfProcessor := dfprocessor.NewDataFeedsProcessor(registryMetrics, emitter, true)
 
-	evmProcessors, err := processor.NewEVMPlatformProcessors(emitter)
+	evmProcessors, err := processor.NewPlatformProcessors(emitter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create EVM platform processors: %w", err)
 	}

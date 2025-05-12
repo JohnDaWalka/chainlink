@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/heads/headstest"
@@ -203,13 +204,17 @@ func TestEvmWrite(t *testing.T) {
 	mockSuccessfulTransmission := func(ccip bool) {
 		// This is a very error-prone way to mock an on-chain response to a GetLatestValue("getTransmissionInfo") call
 		// It's a bit of a hack, but it's the best way to do it without a lot of refactoring
-		mockCall, err := newMockedEncodeTransmissionInfo(0)
+		mockNotStarted, err := newMockedEncodeTransmissionInfo(0)
 		require.NoError(t, err)
 
-		evmClient.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(mockCall, nil).Twice()
+		evmClient.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(mockNotStarted, nil).Once()
 		evmClient.On("CodeAt", mock.Anything, mock.Anything, mock.Anything).Return([]byte("test"), nil)
 
 		txManager.On("GetTransactionStatus", mock.Anything, mock.Anything).Return(commontypes.Finalized, nil).Maybe()
+
+		mockSucceeded, err := newMockedEncodeTransmissionInfo(1)
+		require.NoError(t, err)
+		evmClient.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(mockSucceeded, nil).Maybe().Once()
 
 		txManager.On("CreateTransaction", mock.Anything, mock.Anything).Return(txmgr.Tx{}, nil).Run(func(args mock.Arguments) {
 			req := args.Get(1).(txmgr.TxRequest)
@@ -324,7 +329,7 @@ func TestEvmWrite(t *testing.T) {
 		_, err = capability.Execute(ctx, req)
 		require.NoError(t, err)
 
-		findLogMatch(t, observed, "failed to emit write confirmed", "err", "no matching processor for MetaCapabilityProcessor")
+		tests.RequireLogMessage(t, observed, "no matching processor for MetaCapabilityProcessor=invalid-name")
 	})
 
 	t.Run("succeeds when report already succeeded", func(t *testing.T) {
