@@ -238,15 +238,26 @@ func (r *Relayer) Start(ctx context.Context) error {
 		if wCfg.GasLimitDefault() == nil {
 			return fmt.Errorf("unable to instantiate write target as default gas limit is not set")
 		}
-		capability, err := NewWriteTarget(ctx, r, r.chain, *wCfg.GasLimitDefault(), r.lggr)
+		wtCapability, err := NewWriteTarget(ctx, r, r.chain, *wCfg.GasLimitDefault(), r.lggr)
 		if err != nil {
 			return fmt.Errorf("failed to initialize write target: %w", err)
 		}
-		if err = r.capabilitiesRegistry.Add(ctx, capability); err != nil {
-			return fmt.Errorf("failed to register capability: %w", err)
+		if err = r.capabilitiesRegistry.Add(ctx, wtCapability); err != nil {
+			return fmt.Errorf("failed to register write target capability: %w", err)
 		}
+
+		evmCapability, err := NewEVMService(ctx, r)
+		if err != nil {
+			return fmt.Errorf("failed to initalize EVM chain capability: %w", err)
+		}
+
+		if err = r.capabilitiesRegistry.Add(ctx, evmCapability); err != nil {
+			return fmt.Errorf("failed to register evm capability: %w", err)
+		}
+
 		r.lggr.Infow("Registered write target", "chain_id", r.chain.ID())
 	}
+
 	return r.chain.Start(ctx)
 }
 
