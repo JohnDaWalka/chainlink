@@ -88,27 +88,27 @@ func AnyGateway(bootstrapNodeID string, chainID uint64, donID uint32, extraAllow
 	HeartbeatIntervalSec = 20
 	%s
 	[gatewayConfig.NodeServerConfig]
-	HandshakeTimeoutMillis = 1_000
-	MaxRequestBytes = 100_000
+	HandshakeTimeoutMillis = 10_000
+	MaxRequestBytes = 10_000_000
 	# this is the path other nodes will use to connect to the gateway
 	Path = "%s"
 	# this is the port other nodes will use to connect to the gateway
 	Port = %d
-	ReadTimeoutMillis = 1_000
-	RequestTimeoutMillis = 10_000
-	WriteTimeoutMillis = 1_000
+	ReadTimeoutMillis = 10_000
+	RequestTimeoutMillis = 30_000
+	WriteTimeoutMillis = 10_000
 	[gatewayConfig.UserServerConfig]
 	ContentTypeHeader = "application/jsonrpc"
-	MaxRequestBytes = 100_000
+	MaxRequestBytes = 10_000_000
 	Path = "/"
 	Port = 5_002
-	ReadTimeoutMillis = 1_000
-	RequestTimeoutMillis = 10_000
-	WriteTimeoutMillis = 1_000
+	ReadTimeoutMillis = 10_000
+	RequestTimeoutMillis = 30_000
+	WriteTimeoutMillis = 10_000
 	CORSEnabled = false
 	CORSAllowedOrigins = []
 	[gatewayConfig.HTTPClientConfig]
-	MaxResponseBytes = 100_000_000
+	MaxResponseBytes = 10_000_000
 `,
 		uuid,
 		types.GatewayJobName,
