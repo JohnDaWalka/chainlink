@@ -105,7 +105,7 @@ func TestValidateDeployTokenPoolInput(t *testing.T) {
 			TokenAddress:       tokens[selectorA].Address,
 			LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 		},
-	}, true)
+	}, true, false)
 
 	tests := []struct {
 		Msg    string

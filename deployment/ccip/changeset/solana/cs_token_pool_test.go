@@ -70,7 +70,7 @@ func deployEVMTokenPool(t *testing.T, e deployment.Environment, evmChain uint64)
 			TokenAddress:       evmToken.Address,
 			LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 		},
-	}, false)
+	}, false, false)
 	return e, evmToken.Address, nil
 }
 

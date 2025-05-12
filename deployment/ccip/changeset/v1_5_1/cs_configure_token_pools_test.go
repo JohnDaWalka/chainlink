@@ -199,7 +199,7 @@ func TestValidateTokenPoolConfig(t *testing.T) {
 			TokenAddress:       tokens[selectorA].Address,
 			LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 		},
-	}, true)
+	}, true, false)
 
 	state, err := changeset.LoadOnchainState(e)
 	require.NoError(t, err)
@@ -431,7 +431,7 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 						TokenAddress:       tokens[selectorB].Address,
 						LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 					},
-				}, mcmsConfig != nil)
+				}, mcmsConfig != nil, false)
 
 				e = testhelpers.DeployTestTokenPools(t, e, map[uint64]v1_5_1.DeployTokenPoolInput{
 					selectorA: {
@@ -446,7 +446,7 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 						LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 						AcceptLiquidity:    &acceptLiquidity,
 					},
-				}, mcmsConfig != nil)
+				}, mcmsConfig != nil, false)
 
 				state, err := changeset.LoadOnchainState(e)
 				require.NoError(t, err)
@@ -717,7 +717,7 @@ func TestValidateConfigureTokenPoolContractsForSolana(t *testing.T) {
 				TokenAddress:       token.Address,
 				LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 			},
-		}, false)
+		}, false, false)
 	}
 
 	//////////////////////////////

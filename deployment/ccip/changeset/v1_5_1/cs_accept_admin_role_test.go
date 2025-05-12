@@ -27,7 +27,7 @@ func TestAcceptAdminRoleChangeset_Validations(t *testing.T) {
 			TokenAddress:       tokens[selectorA].Address,
 			LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 		},
-	}, true)
+	}, true, false)
 
 	mcmsConfig := &proposalutils.TimelockConfig{
 		MinDelay: 0 * time.Second,
@@ -138,7 +138,7 @@ func TestAcceptAdminRoleChangeset_Execution(t *testing.T) {
 					TokenAddress:       tokens[selectorB].Address,
 					LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 				},
-			}, mcmsConfig != nil)
+			}, mcmsConfig != nil, false)
 
 			state, err := changeset.LoadOnchainState(e)
 			require.NoError(t, err)

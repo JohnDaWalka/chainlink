@@ -167,6 +167,7 @@ func DeployTestTokenPools(
 	e deployment.Environment,
 	newPools map[uint64]v1_5_1.DeployTokenPoolInput,
 	transferToTimelock bool,
+	isTestRouter bool,
 ) deployment.Environment {
 	selectors := e.AllChainSelectors()
 
@@ -174,8 +175,9 @@ func DeployTestTokenPools(
 		commoncs.Configure(
 			cldf.CreateLegacyChangeSet(v1_5_1.DeployTokenPoolContractsChangeset),
 			v1_5_1.DeployTokenPoolContractsConfig{
-				TokenSymbol: TestTokenSymbol,
-				NewPools:    newPools,
+				TokenSymbol:  TestTokenSymbol,
+				NewPools:     newPools,
+				IsTestRouter: isTestRouter,
 			},
 		),
 	)
