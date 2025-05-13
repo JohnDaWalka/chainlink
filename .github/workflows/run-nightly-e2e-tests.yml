@@ -42,7 +42,7 @@ jobs:
   # build image if schedule, which will be tagged as 'manual-<short-sha>'
   call-docker-build-workflow:
     name: Call Docker Build Workflow
-    if: ${{ github.event_name == 'schedule' }}
+    # if: ${{ github.event_name == 'schedule' }}
     uses: smartcontractkit/chainlink/.github/workflows/docker-build.yml@e6df49c2a579d41c6c4a28eb3c70a3f440578956
     with:
       git-ref: ${{ github.sha }}
