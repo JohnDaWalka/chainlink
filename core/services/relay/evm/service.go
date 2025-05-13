@@ -20,8 +20,8 @@ func NewEVMService(_ context.Context, relayer *Relayer) (capabilities.Executable
 	opts := service.EVMCapabilityOpts{
 		ID:         GenerateEVMCapabilityName(relayer.chain.ID().Uint64()),
 		EVMService: evmRelayer,
+		LP:         relayer.chain.LogPoller(),
 	}
-
 	return service.NewEVMCapablity(opts), nil
 }
 
