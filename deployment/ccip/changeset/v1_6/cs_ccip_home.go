@@ -60,6 +60,11 @@ func findTokenInfo(tokens []shared.TokenDetails, address common.Address) (string
 			if err != nil {
 				return "", 0, fmt.Errorf("fetch token symbol for token %s: %w", address, err)
 			}
+			// TODO think of better solution
+			// there are tokens which have diff symbols in testnet and mainnet
+			if symbol, ok := shared.TokenSymbolSubstitute[tokenSymbol]; ok {
+				tokenSymbol = symbol
+			}
 			tokenDecimals, err := token.Decimals(nil)
 			if err != nil {
 				return "", 0, fmt.Errorf("fetch token decimals for token %s: %w", address, err)
