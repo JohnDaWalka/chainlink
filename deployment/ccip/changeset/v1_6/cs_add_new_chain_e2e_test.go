@@ -17,12 +17,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
+
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -33,7 +35,7 @@ import (
 func checkConnectivity(
 	t *testing.T,
 	e deployment.Environment,
-	state changeset.CCIPOnChainState,
+	state stateview.CCIPOnChainState,
 	selector uint64,
 	remoteChainSelector uint64,
 	expectedRouter *router.Router,
@@ -116,7 +118,7 @@ func TestConnectNewChain(t *testing.T) {
 			})
 			e := deployedEnvironment.Env
 
-			state, err := changeset.LoadOnchainState(e)
+			state, err := stateview.LoadOnchainState(e)
 			require.NoError(t, err, "must load onchain state")
 
 			selectors := e.AllChainSelectors()
@@ -283,14 +285,14 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 				testCfg.ChainIDs = chainIDs
 			})
 			e := deployedEnvironment.Env
-			state, err := changeset.LoadOnchainState(e)
+			state, err := stateview.LoadOnchainState(e)
 			require.NoError(t, err, "must load onchain state")
 
 			// Identify and delete addresses from the new chain
 			var newChainSelector uint64
 			var linkAddress common.Address
 			remoteChainSelectors := make([]uint64, 0, len(chainIDs)-1)
-			addressesByChain := make(map[uint64]map[string]deployment.TypeAndVersion, len(chainIDs)-1)
+			addressesByChain := make(map[uint64]map[string]cldf.TypeAndVersion, len(chainIDs)-1)
 			for _, selector := range e.AllChainSelectors() {
 				if selector != deployedEnvironment.HomeChainSel && newChainSelector == 0 {
 					newChainSelector = selector
@@ -302,8 +304,8 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 					addressesByChain[selector] = addrs
 				}
 			}
-			e.ExistingAddresses = deployment.NewMemoryAddressBookFromMap(addressesByChain)
-			state, err = changeset.LoadOnchainState(e)
+			e.ExistingAddresses = cldf.NewMemoryAddressBookFromMap(addressesByChain)
+			state, err = stateview.LoadOnchainState(e)
 			require.NoError(t, err, "must load onchain state")
 
 			// Identify and delete the DON ID for the new chain
@@ -415,7 +417,7 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 					ExistingContracts: []commoncs.Contract{
 						{
 							Address:        linkAddress.Hex(),
-							TypeAndVersion: deployment.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0),
+							TypeAndVersion: cldf.NewTypeAndVersion(types.LinkToken, deployment.Version1_0_0),
 							ChainSelector:  newChainSelector,
 						},
 					},
@@ -442,7 +444,7 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 				))
 			require.NoError(t, err, "must deploy donIDClaimer contract")
 
-			state, err = changeset.LoadOnchainState(e)
+			state, err = stateview.LoadOnchainState(e)
 			require.NoError(t, err, "must load onchain state")
 
 			if test.DonIDOffSet != nil {
@@ -469,7 +471,7 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 				),
 			)
 			require.NoError(t, err, "must apply AddCandidatesForNewChainChangeset")
-			state, err = changeset.LoadOnchainState(e)
+			state, err = stateview.LoadOnchainState(e)
 			require.NoError(t, err, "must load onchain state")
 
 			capReg := state.Chains[deployedEnvironment.HomeChainSel].CapabilityRegistry

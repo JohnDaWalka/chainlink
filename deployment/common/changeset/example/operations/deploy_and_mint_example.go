@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -17,7 +18,7 @@ DeployAndMintExampleChangeset demonstrates how to use Operations API to deploy a
 a sequence of operations.
 */
 
-var _ deployment.ChangeSetV2[SqDeployLinkInput] = DeployAndMintExampleChangeset{}
+var _ cldf.ChangeSetV2[SqDeployLinkInput] = DeployAndMintExampleChangeset{}
 
 // SqDeployLinkInput must be JSON Serializable with no private fields
 type SqDeployLinkInput struct {
@@ -35,7 +36,7 @@ type SqDeployLinkOutput struct {
 type EthereumDeps struct {
 	Auth  *bind.TransactOpts
 	Chain deployment.Chain
-	AB    deployment.AddressBook
+	AB    cldf.AddressBook
 }
 
 type DeployAndMintExampleChangeset struct{}
@@ -45,9 +46,9 @@ func (l DeployAndMintExampleChangeset) VerifyPreconditions(e deployment.Environm
 	return nil
 }
 
-func (l DeployAndMintExampleChangeset) Apply(e deployment.Environment, config SqDeployLinkInput) (deployment.ChangesetOutput, error) {
+func (l DeployAndMintExampleChangeset) Apply(e deployment.Environment, config SqDeployLinkInput) (cldf.ChangesetOutput, error) {
 	auth := e.Chains[config.ChainID].DeployerKey
-	ab := deployment.NewMemoryAddressBook()
+	ab := cldf.NewMemoryAddressBook()
 
 	// build your custom dependencies needed in the sequence/operation
 	deps := EthereumDeps{
@@ -58,10 +59,10 @@ func (l DeployAndMintExampleChangeset) Apply(e deployment.Environment, config Sq
 
 	seqReport, err := operations.ExecuteSequence(e.OperationsBundle, DeployAndMintSequence, deps, config)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 
-	return deployment.ChangesetOutput{
+	return cldf.ChangesetOutput{
 		AddressBook: ab,
 		Reports:     seqReport.ExecutionReports,
 	}, nil

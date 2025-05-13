@@ -11,8 +11,10 @@ import (
 	"regexp"
 	"strings"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink/deployment"
-	cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 )
@@ -27,24 +29,24 @@ const (
 
 // Map program names to their Rust file paths (relative to the Anchor project root)
 // Needed for upgrades in place
-var programToFileMap = map[deployment.ContractType]string{
-	cs.Router:                      "programs/ccip-router/src/lib.rs",
-	cs.CCIPCommon:                  "programs/ccip-common/src/lib.rs",
-	cs.FeeQuoter:                   "programs/fee-quoter/src/lib.rs",
-	cs.OffRamp:                     "programs/ccip-offramp/src/lib.rs",
-	cs.BurnMintTokenPool:           "programs/burnmint-token-pool/src/lib.rs",
-	cs.LockReleaseTokenPool:        "programs/lockrelease-token-pool/src/lib.rs",
-	cs.RMNRemote:                   "programs/rmn-remote/src/lib.rs",
+var programToFileMap = map[cldf.ContractType]string{
+	shared.Router:                  "programs/ccip-router/src/lib.rs",
+	shared.CCIPCommon:              "programs/ccip-common/src/lib.rs",
+	shared.FeeQuoter:               "programs/fee-quoter/src/lib.rs",
+	shared.OffRamp:                 "programs/ccip-offramp/src/lib.rs",
+	shared.BurnMintTokenPool:       "programs/burnmint-token-pool/src/lib.rs",
+	shared.LockReleaseTokenPool:    "programs/lockrelease-token-pool/src/lib.rs",
+	shared.RMNRemote:               "programs/rmn-remote/src/lib.rs",
 	types.AccessControllerProgram:  "programs/access-controller/src/lib.rs",
 	types.ManyChainMultisigProgram: "programs/mcm/src/lib.rs",
 	types.RBACTimelockProgram:      "programs/timelock/src/lib.rs",
 }
 
-var programToVanityKey = map[deployment.ContractType]string{
-	cs.Router:    "Ccip",
-	cs.FeeQuoter: "FeeQ",
-	cs.OffRamp:   "off",
-	cs.RMNRemote: "Rmn",
+var programToVanityKey = map[cldf.ContractType]string{
+	shared.Router:    "Ccip",
+	shared.FeeQuoter: "FeeQ",
+	shared.OffRamp:   "off",
+	shared.RMNRemote: "Rmn",
 }
 
 type LocalBuildConfig struct {
@@ -55,7 +57,7 @@ type LocalBuildConfig struct {
 	CleanGitDir bool
 	// When building locally, this will be used to replace the keys in the Rust files
 	GenerateVanityKeys bool
-	UpgradeKeys        map[deployment.ContractType]string
+	UpgradeKeys        map[cldf.ContractType]string
 }
 
 type BuildSolanaConfig struct {
@@ -131,7 +133,7 @@ func replaceKeys(e deployment.Environment) error {
 	return nil
 }
 
-func replaceKeysForUpgrade(e deployment.Environment, keys map[deployment.ContractType]string) error {
+func replaceKeysForUpgrade(e deployment.Environment, keys map[cldf.ContractType]string) error {
 	e.Logger.Debug("Replacing keys in Rust files...")
 	for program, key := range keys {
 		programStr := string(program)
@@ -158,8 +160,8 @@ func replaceKeysForUpgrade(e deployment.Environment, keys map[deployment.Contrac
 }
 
 func syncRouterAndCommon() error {
-	routerFileName := programToFileMap[cs.Router]
-	commonFileName := programToFileMap[cs.CCIPCommon]
+	routerFileName := programToFileMap[shared.Router]
+	commonFileName := programToFileMap[shared.CCIPCommon]
 	routerFile := filepath.Join(cloneDir, anchorDir, routerFileName)
 	commonFile := filepath.Join(cloneDir, anchorDir, commonFileName)
 	file, err := os.Open(routerFile)
@@ -194,7 +196,7 @@ func syncRouterAndCommon() error {
 	return os.WriteFile(commonFile, []byte(updatedContent), 0600)
 }
 
-func generateVanityKeys(e deployment.Environment, keys map[deployment.ContractType]string) error {
+func generateVanityKeys(e deployment.Environment, keys map[cldf.ContractType]string) error {
 	e.Logger.Debug("Generating vanity keys...")
 	for program, prefix := range programToVanityKey {
 		_, exists := keys[program]
@@ -283,7 +285,7 @@ func buildLocally(e deployment.Environment, config BuildSolanaConfig) error {
 
 	if config.LocalBuild.GenerateVanityKeys {
 		if len(config.LocalBuild.UpgradeKeys) == 0 {
-			config.LocalBuild.UpgradeKeys = make(map[deployment.ContractType]string)
+			config.LocalBuild.UpgradeKeys = make(map[cldf.ContractType]string)
 		}
 		if err := generateVanityKeys(e, config.LocalBuild.UpgradeKeys); err != nil {
 			return fmt.Errorf("error generating vanity keys: %w", err)

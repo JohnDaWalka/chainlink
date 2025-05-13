@@ -13,11 +13,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
 	ccipChangesetSolana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/deployergroup"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commonSolana "github.com/smartcontractkit/chainlink/deployment/common/changeset/solana"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -156,6 +158,17 @@ var testCases = []CurseTestCase{
 			{chainID: Evm2, subject: Sol1, cursed: true},
 			{chainID: Sol1, subject: Evm1, cursed: true},
 			{chainID: Sol1, subject: Evm2, cursed: true},
+		},
+	},
+	{
+		name: "all chain",
+		curseActionsBuilder: func(mapIDToSelector mapIDToSelectorFunc) []v1_6.CurseAction {
+			return []v1_6.CurseAction{v1_6.CurseGloballyAllChains()}
+		},
+		curseAssertions: []curseAssertion{
+			{chainID: Evm1, globalCurse: true, cursed: true},
+			{chainID: Evm2, globalCurse: true, cursed: true},
+			{chainID: Sol1, globalCurse: true, cursed: true},
 		},
 	},
 }
@@ -407,7 +420,7 @@ func TestRMNCurseOneConnectedLanesSolana(t *testing.T) {
 
 	_, err := ccipChangesetSolana.AddRemoteChainToOffRamp(e.Env, ccipChangesetSolana.AddRemoteChainToOffRampConfig{
 		ChainSelector: mapIDToSelector(Sol1),
-		UpdatesByChain: map[uint64]ccipChangesetSolana.OffRampConfig{
+		UpdatesByChain: map[uint64]*ccipChangesetSolana.OffRampConfig{
 			mapIDToSelector(Evm1): {
 				EnabledAsSource: true,
 				IsUpdate:        false,
@@ -468,7 +481,7 @@ func runRmnUncurseTest(t *testing.T, tc CurseTestCase) {
 	verifyNoActiveCurseOnAllChains(t, &e)
 }
 
-func transferRMNContractToMCMS(t *testing.T, e *testhelpers.DeployedEnv, state changeset.CCIPOnChainState) {
+func transferRMNContractToMCMS(t *testing.T, e *testhelpers.DeployedEnv, state stateview.CCIPOnChainState) {
 	contractsByChain := make(map[uint64][]common.Address)
 	rmnRemotePerChain := v1_6.BuildRMNRemotePerChain(e.Env, state)
 	rmnRemoteAddressesByChain := make(map[uint64]common.Address)
@@ -483,7 +496,7 @@ func transferRMNContractToMCMS(t *testing.T, e *testhelpers.DeployedEnv, state c
 	}
 
 	contractsByChain[e.HomeChainSel] = append(contractsByChain[e.HomeChainSel], state.Chains[e.HomeChainSel].RMNHome.Address())
-	timelocksPerChain := changeset.BuildTimelockPerChain(e.Env, state)
+	timelocksPerChain := deployergroup.BuildTimelockPerChain(e.Env, state)
 	// This is required because RMN Contracts is initially owned by the deployer
 	_, err := commonchangeset.Apply(t, e.Env, timelocksPerChain,
 		commonchangeset.Configure(
@@ -547,7 +560,7 @@ func runRmnUncurseMCMSTest(t *testing.T, tc CurseTestCase, action types.Timelock
 		IncludeNotConnectedLanes: true,
 	}
 
-	state, err := changeset.LoadOnchainState(e.Env)
+	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
 	verifyNoActiveCurseOnAllChains(t, &e)
@@ -685,7 +698,7 @@ func runRmnCurseMCMSTest(t *testing.T, tc CurseTestCase, action types.TimelockAc
 		IncludeNotConnectedLanes: true,
 	}
 
-	state, err := changeset.LoadOnchainState(e.Env)
+	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
 	verifyNoActiveCurseOnAllChains(t, &e)
@@ -816,6 +829,29 @@ var forceOptionTestCases = []ForceOptionTestCase{
 	},
 }
 
+func TestGetAllCursableChainsEmptyWhenNoRMNRemote(t *testing.T) {
+	e, _ := testhelpers.NewMemoryEnvironment(
+		t, testhelpers.WithNumOfChains(2), testhelpers.WithSolChains(1),
+		testhelpers.WithPrerequisiteDeploymentOnly(nil),
+	)
+
+	cursableChains, err := v1_6.GetCursableChains(e.Env)
+	require.NoError(t, err)
+	require.NotNil(t, cursableChains)
+	require.Empty(t, cursableChains)
+}
+
+func TestGetAllCursableChainsWithRMNRemote(t *testing.T) {
+	e, _ := testhelpers.NewMemoryEnvironment(
+		t, testhelpers.WithNumOfChains(2), testhelpers.WithSolChains(1),
+	)
+
+	cursableChains, err := v1_6.GetCursableChains(e.Env)
+	require.NoError(t, err)
+	require.NotNil(t, cursableChains)
+	require.Len(t, cursableChains, 3)
+}
+
 func TestRMNUncurseForceOption(t *testing.T) {
 	for _, tc := range forceOptionTestCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -825,7 +861,7 @@ func TestRMNUncurseForceOption(t *testing.T) {
 				return v1_6.GetAllCursableChainsSelector(e.Env)[id]
 			}
 
-			state, err := changeset.LoadOnchainState(e.Env)
+			state, err := stateview.LoadOnchainState(e.Env)
 			require.NoError(t, err)
 
 			transferRMNContractToMCMS(t, &e, state)

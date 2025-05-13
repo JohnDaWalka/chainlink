@@ -14,16 +14,18 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/evm"
 )
 
-var _ deployment.ChangeSet[DeployLanesConfig] = DeployLanesChangeset
+var _ cldf.ChangeSet[DeployLanesConfig] = DeployLanesChangeset
 
 type DeployLanesConfig struct {
 	Configs []DeployLaneConfig
 }
 
-func (c *DeployLanesConfig) Validate(e deployment.Environment, state changeset.CCIPOnChainState) error {
+func (c *DeployLanesConfig) Validate(e deployment.Environment, state stateview.CCIPOnChainState) error {
 	for _, cfg := range c.Configs {
 		if err := cfg.Validate(e, state); err != nil {
 			return err
@@ -52,7 +54,7 @@ type DeployLaneConfig struct {
 	GasPriceUpdates    []price_registry_1_2_0.InternalGasPriceUpdate
 }
 
-func (c *DeployLaneConfig) Validate(e deployment.Environment, state changeset.CCIPOnChainState) error {
+func (c *DeployLaneConfig) Validate(e deployment.Environment, state stateview.CCIPOnChainState) error {
 	if err := deployment.IsValidChainSelector(c.SourceChainSelector); err != nil {
 		return err
 	}
@@ -86,7 +88,7 @@ func (c *DeployLaneConfig) Validate(e deployment.Environment, state changeset.CC
 	return nil
 }
 
-func (c *DeployLaneConfig) populateAddresses(state changeset.CCIPOnChainState) error {
+func (c *DeployLaneConfig) populateAddresses(state stateview.CCIPOnChainState) error {
 	sourceChainState := state.Chains[c.SourceChainSelector]
 	srcLink, err := sourceChainState.LinkTokenAddress()
 	if err != nil {
@@ -101,34 +103,34 @@ func (c *DeployLaneConfig) populateAddresses(state changeset.CCIPOnChainState) e
 	return nil
 }
 
-func DeployLanesChangeset(env deployment.Environment, c DeployLanesConfig) (deployment.ChangesetOutput, error) {
-	state, err := changeset.LoadOnchainState(env)
+func DeployLanesChangeset(env deployment.Environment, c DeployLanesConfig) (cldf.ChangesetOutput, error) {
+	state, err := stateview.LoadOnchainState(env)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to load CCIP onchain state: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load CCIP onchain state: %w", err)
 	}
 	if err := c.Validate(env, state); err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("invalid DeployChainContractsConfig: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("invalid DeployChainContractsConfig: %w", err)
 	}
 	// populate addresses from the state
 	for i := range c.Configs {
 		if err := c.Configs[i].populateAddresses(state); err != nil {
-			return deployment.ChangesetOutput{}, err
+			return cldf.ChangesetOutput{}, err
 		}
 	}
-	newAddresses := deployment.NewMemoryAddressBook()
+	newAddresses := cldf.NewMemoryAddressBook()
 	for _, cfg := range c.Configs {
 		if err := deployLane(env, state, newAddresses, cfg); err != nil {
-			return deployment.ChangesetOutput{
+			return cldf.ChangesetOutput{
 				AddressBook: newAddresses,
 			}, err
 		}
 	}
-	return deployment.ChangesetOutput{
+	return cldf.ChangesetOutput{
 		AddressBook: newAddresses,
 	}, nil
 }
 
-func deployLane(e deployment.Environment, state changeset.CCIPOnChainState, ab deployment.AddressBook, cfg DeployLaneConfig) error {
+func deployLane(e deployment.Environment, state stateview.CCIPOnChainState, ab cldf.AddressBook, cfg DeployLaneConfig) error {
 	// update prices on the source price registry
 	sourceChainState := state.Chains[cfg.SourceChainSelector]
 	destChainState := state.Chains[cfg.DestinationChainSelector]
@@ -166,7 +168,7 @@ func deployLane(e deployment.Environment, state changeset.CCIPOnChainState, ab d
 				)
 				return cldf.ContractDeploy[*evm_2_evm_onramp.EVM2EVMOnRamp]{
 					Address: onRampAddress, Contract: onRampC, Tx: tx2,
-					Tv: deployment.NewTypeAndVersion(changeset.OnRamp, deployment.Version1_5_0), Err: err2,
+					Tv: cldf.NewTypeAndVersion(shared.OnRamp, deployment.Version1_5_0), Err: err2,
 				}
 			})
 		if err != nil {
@@ -197,7 +199,7 @@ func deployLane(e deployment.Environment, state changeset.CCIPOnChainState, ab d
 				)
 				return cldf.ContractDeploy[*commit_store.CommitStore]{
 					Address: commitStoreAddress, Contract: commitStoreC, Tx: tx2,
-					Tv: deployment.NewTypeAndVersion(changeset.CommitStore, deployment.Version1_5_0), Err: err2,
+					Tv: cldf.NewTypeAndVersion(shared.CommitStore, deployment.Version1_5_0), Err: err2,
 				}
 			})
 		if err != nil {
@@ -232,7 +234,7 @@ func deployLane(e deployment.Environment, state changeset.CCIPOnChainState, ab d
 				)
 				return cldf.ContractDeploy[*evm_2_evm_offramp.EVM2EVMOffRamp]{
 					Address: offRampAddress, Contract: offRampC, Tx: tx2,
-					Tv: deployment.NewTypeAndVersion(changeset.OffRamp, deployment.Version1_5_0), Err: err2,
+					Tv: cldf.NewTypeAndVersion(shared.OffRamp, deployment.Version1_5_0), Err: err2,
 				}
 			})
 		if err != nil {
@@ -286,7 +288,7 @@ func deployLane(e deployment.Environment, state changeset.CCIPOnChainState, ab d
 	return nil
 }
 
-func arePrerequisitesMet(chainState changeset.CCIPChainState, chain deployment.Chain) error {
+func arePrerequisitesMet(chainState evm.CCIPChainState, chain deployment.Chain) error {
 	if chainState.Router == nil {
 		return fmt.Errorf("router not found for chain %s", chain.String())
 	}
