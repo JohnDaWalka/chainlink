@@ -13,6 +13,12 @@ on:
       git-ref:
         description: "The git ref to check out"
         required: true
+  workflow_call:
+    inputs:
+      git-ref:
+        description: "The git ref to check out"
+        required: true
+        type: string
 
 concurrency:
   group: "docker-build-${{ github.ref_name }}"
@@ -36,7 +42,7 @@ jobs:
             echo "build-type=branch" | tee -a "$GITHUB_OUTPUT"
           elif [[ "${BUILD_TRIGGER}" == 'pull_request' ]]; then
             echo "build-type=pr" | tee -a "$GITHUB_OUTPUT"
-          elif [[ "${BUILD_TRIGGER}" == 'workflow_dispatch' ]]; then
+          elif [[ "${BUILD_TRIGGER}" == 'workflow_dispatch' || "${BUILD_TRIGGER}" == 'workflow_call' ]]; then
             echo "build-type=manual" | tee -a "$GITHUB_OUTPUT"
           else
             echo "::error::Unsupported build trigger: ${BUILD_TRIGGER}"
