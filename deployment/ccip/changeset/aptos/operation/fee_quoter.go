@@ -263,3 +263,67 @@ func updateFeeQuoterPrices(b operations.Bundle, deps AptosDeps, in UpdateFeeQuot
 
 	return txs, nil
 }
+
+// AddTokenTransferFeeInput
+type AddTokenTransferFeeInput struct {
+	MCMSAddress aptos.AccountAddress
+	FeeConfigs  map[uint64]FeeConfigs
+}
+
+type FeeConfigs struct {
+	TokenAddress aptos.AccountAddress
+	aptos_fee_quoter.TokenTransferFeeConfig
+}
+
+// AddTokenTransferFeeOp operation to update FeeQuoter prices
+var AddTokenTransferFeeOp = operations.NewOperation(
+	"add-token-transfer-fee-op",
+	Version1_0_0,
+	"Add token transfer fee",
+	addTokenTransferFee,
+)
+
+func addTokenTransferFee(b operations.Bundle, deps AptosDeps, in AddTokenTransferFeeInput) ([]types.Transaction, error) {
+	var txs []types.Transaction
+
+	// Bind CCIP Package
+	ccipAddress := deps.OnChainState.CCIPAddress
+	ccipBind := ccip.Bind(ccipAddress, deps.AptosChain.Client)
+
+	// Encode the update tx
+	for destSel, configs := range in.FeeConfigs {
+		moduleInfo, function, _, args, err := ccipBind.FeeQuoter().Encoder().ApplyTokenTransferFeeConfigUpdates(
+			destSel,
+			[]aptos.AccountAddress{configs.TokenAddress},
+			[]uint32{configs.MinFeeUsdCents},    // addMinFeeUsdCents
+			[]uint32{configs.MaxFeeUsdCents},    // addMaxFeeUsdCents
+			[]uint16{configs.DeciBps},           // addDeciBps
+			[]uint32{configs.DestGasOverhead},   // addDestGasOverhead
+			[]uint32{configs.DestBytesOverhead}, // addDestBytesOverhead
+			[]bool{configs.IsEnabled},           // addIsEnabled
+			[]aptos.AccountAddress{},            // TODO: enable token removal
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode UpdatePrices: %w", err)
+		}
+
+		additionalFields := aptosmcms.AdditionalFields{
+			PackageName: moduleInfo.PackageName,
+			ModuleName:  moduleInfo.ModuleName,
+			Function:    function,
+		}
+
+		afBytes, err := json.Marshal(additionalFields)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal additional fields: %w", err)
+		}
+
+		txs = append(txs, types.Transaction{
+			To:               ccipAddress.StringLong(),
+			Data:             aptosmcms.ArgsToData(args),
+			AdditionalFields: afBytes,
+		})
+	}
+
+	return txs, nil
+}
