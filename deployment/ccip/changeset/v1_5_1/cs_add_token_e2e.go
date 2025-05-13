@@ -381,7 +381,6 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (cl
 		}
 		// if there are no tokens for which there is no external admin, continue to next token
 		if len(updatedConfigureTokenAdminReg.Pools) == 0 {
-			fmt.Println("NO UPDATE CONFIGURE OTKEN ADMIN REG")
 			continue
 		}
 		output, err = AcceptAdminRoleChangeset(e, updatedConfigureTokenAdminReg)
