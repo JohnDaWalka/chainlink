@@ -128,6 +128,11 @@ func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain
 		return nil, fmt.Errorf("failed to create Aptos WT monitor client: %+w", err)
 	}
 
+	evm, err := relayer.EVM()
+	if err != nil {
+		return nil, fmt.Errorf("failed to upgrade to evm relayer: %w", err)
+	}
+
 	opts := writetarget.WriteTargetOpts{
 		ID:     id,
 		Logger: lggr,
