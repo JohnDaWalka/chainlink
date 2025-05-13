@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"reflect"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -25,6 +26,8 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
+
+	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 )
 
 // AddTokensE2E is a changeset that deploys and configures token pools for multiple tokens across multiple chains in a single changeset.
@@ -117,9 +120,9 @@ func (c *AddTokenE2EConfig) newConfigurePoolAndTokenAdminRegConfig(e deployment.
 			Type:          poolCfg.DeployPoolConfig.Type,
 		}
 	}
-	if err := c.deployPool.Validate(e); err != nil {
-		return fmt.Errorf("failed to validate deploy pool config: %w", err)
-	}
+	// if err := c.deployPool.Validate(e); err != nil {
+	// 	return fmt.Errorf("failed to validate deploy pool config: %w", err)
+	// }
 	// rest of the validation should be done after token pools are deployed
 	return nil
 }
@@ -268,6 +271,7 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (de
 					"deploying and configuring token pools and token admin registry: %w", err)
 			}
 		}
+
 		output, err := DeployTokenPoolContractsChangeset(e, cfg.deployPool)
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy token pool for token %s: %w", token, err)
@@ -275,14 +279,13 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (de
 		if err := deployment.MergeChangesetOutput(e, finalCSOut, output); err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge address book for token %s: %w", token, err)
 		}
+
 		newAddresses, err := output.AddressBook.Addresses()
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get addresses from address book: %w", err)
 		}
+
 		e.Logger.Infow("deployed token pool", "token", token, "addresses", newAddresses)
-		if err := cfg.ConfigurePools.Validate(e); err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to validate configure pool config: %w", err)
-		}
 		// Validate the configure token admin reg config.
 		// As we will perform proposing admin, accepting admin and setting pool on same changeset
 		// we are only validating the propose admin role.
@@ -290,14 +293,30 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (de
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to validate configure token admin reg config: %w", err)
 		}
 
-		output, err = ConfigureTokenPoolContractsChangeset(e, cfg.ConfigurePools)
-		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to configure token pool for token %s: %w", token, err)
+		// for each chain in pool config, trigger transfer ownership of the deployed poolAddress
+		for chaiSel, _ := range cfg.PoolConfig {
+			var deployedPoolAddr common.Address
+			for _, addrMap := range newAddresses {
+				for addressStr := range addrMap {
+					deployedPoolAddr = common.HexToAddress(addressStr)
+				}
+			}
+
+			// transfer ownership of the deployed token Pool
+			transferOwnershipProposalOutput, err := commoncs.TransferToMCMSWithTimelockV2(e, commoncs.TransferToMCMSWithTimelockConfig{
+				ContractsByChain: map[uint64][]common.Address{
+					chaiSel: {deployedPoolAddr},
+				},
+				MCMSConfig: *config.MCMS,
+			})
+			if err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to run TransferToMCMSWithTimelock on chain with selector %d: %w", chaiSel, err)
+			}
+
+			if err := deployment.MergeChangesetOutput(e, finalCSOut, transferOwnershipProposalOutput); err != nil {
+				return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output after transferring ownershi of pool %s: %w", newAddresses, err)
+			}
 		}
-		if err := deployment.MergeChangesetOutput(e, finalCSOut, output); err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output after configuring token pool for token %s: %w", token, err)
-		}
-		e.Logger.Infow("configured token pool", "token", token)
 
 		output, err = ProposeAdminRoleChangeset(e, cfg.configureTokenAdminReg)
 		if err != nil {
@@ -308,7 +327,6 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (de
 				token, err)
 		}
 		e.Logger.Infow("proposed admin role", "token", token, "config", cfg.configureTokenAdminReg)
-
 		// find all tokens for which there is no external admin
 		// for those tokens, accept the admin role and set the pool
 		updatedConfigureTokenAdminReg := changeset.TokenAdminRegistryChangesetConfig{
@@ -329,6 +347,7 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (de
 		}
 		// if there are no tokens for which there is no external admin, continue to next token
 		if len(updatedConfigureTokenAdminReg.Pools) == 0 {
+			fmt.Println("NO UPDATE CONFIGURE OTKEN ADMIN REG")
 			continue
 		}
 		output, err = AcceptAdminRoleChangeset(e, updatedConfigureTokenAdminReg)
@@ -347,7 +366,30 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (de
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge address book for token %s: %w", token, err)
 		}
 		e.Logger.Infow("set pool", "token", token, "config", updatedConfigureTokenAdminReg)
+
+		// skip if there is no configuration needed
+		if reflect.DeepEqual(
+			cfg.ConfigurePools,
+			ConfigureTokenPoolContractsConfig{},
+		) {
+			e.Logger.Infow("only deployment done, the pools haven't been configured")
+			continue
+		}
+
+		if err := cfg.ConfigurePools.Validate(e); err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to validate configure pool config: %w", err)
+		}
+
+		output, err = ConfigureTokenPoolContractsChangeset(e, cfg.ConfigurePools)
+		if err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to configure token pool for token %s: %w", token, err)
+		}
+		if err := deployment.MergeChangesetOutput(e, finalCSOut, output); err != nil {
+			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output after configuring token pool for token %s: %w", token, err)
+		}
+		e.Logger.Infow("configured token pool", "token", token)
 	}
+
 	// if there are multiple proposals, aggregate them so that we don't have to propose them separately
 	if len(finalCSOut.MCMSTimelockProposals) > 1 {
 		aggregatedProposals, err := proposalutils.AggregateProposals(
