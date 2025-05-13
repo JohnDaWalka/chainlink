@@ -37,9 +37,10 @@ var _ deployment.ChangeSet[ConfigureTokenPoolContractsConfig] = ConfigureTokenPo
 // RateLimiterConfig defines the inbound and outbound rate limits for a remote chain.
 type RateLimiterConfig struct {
 	// Inbound is the rate limiter config for inbound transfers from a remote chain.
-	Inbound token_pool.RateLimiterConfig
+	Inbound token_pool.RateLimiterConfig `json:"inbound"`
+
 	// Outbound is the rate limiter config for outbound transfers to a remote chain.
-	Outbound token_pool.RateLimiterConfig
+	Outbound token_pool.RateLimiterConfig `json:"outbound"`
 }
 
 // validateRateLimterConfig validates rate and capacity in accordance with on-chain code.
@@ -76,11 +77,13 @@ func (c RateLimiterPerChain) Validate() error {
 // SolChainUpdate defines the rate limits and token address for a Solana chain.
 type SolChainUpdate struct {
 	// RateLimiterConfig defines the rate limits for the Solana chain.
-	RateLimiterConfig RateLimiterConfig
+	RateLimiterConfig RateLimiterConfig `json:"rateLimiterConfig"`
+
 	// TokenAddress is the address of the token on the Solana chain.
-	TokenAddress string
+	TokenAddress string `json:"tokenAddress"`
+
 	// Type is the type of the token pool.
-	Type deployment.ContractType
+	Type deployment.ContractType `json:"type"`
 }
 
 func (c SolChainUpdate) GetSolanaTokenAndTokenPool(state changeset.SolCCIPChainState) (token solana.PublicKey, tokenPool solana.PublicKey, err error) {
@@ -127,18 +130,24 @@ func (c SolChainUpdate) Validate(state changeset.SolCCIPChainState) error {
 // TokenPoolConfig defines all the information required of the user to configure a token pool.
 type TokenPoolConfig struct {
 	// ChainUpdates defines the chains and corresponding rate limits that should be defined on the token pool.
-	ChainUpdates RateLimiterPerChain
-	// SolChainUpdates defines the Solana chains and corresponding rate limits that should be defined on the token pool.
-	SolChainUpdates map[uint64]SolChainUpdate
-	// Type is the type of the token pool.
-	Type deployment.ContractType
-	// Version is the version of the token pool.
-	Version semver.Version
-	// OverrideTokenSymbol is the token symbol to use to override against main symbol (ex: override to clCCIP-LnM when the main token symbol is CCIP-LnM)
-	// WARNING: This should only be used in exceptional cases where the token symbol on a particular chain differs from the main tokenSymbol
-	OverrideTokenSymbol changeset.TokenSymbol
+	ChainUpdates RateLimiterPerChain `json:"chainUpdates"`
 
-	SkipOwnershipValidation bool
+	// SolChainUpdates defines the Solana chains and corresponding rate limits that should be defined on the token pool.
+	SolChainUpdates map[uint64]SolChainUpdate `json:"solChainUpdates"`
+
+	// Type is the type of the token pool.
+	Type deployment.ContractType `json:"type"`
+
+	// Version is the version of the token pool.
+	Version semver.Version `json:"version"`
+
+	// OverrideTokenSymbol is the token symbol to use to override against main symbol
+	// (ex: override to clCCIP-LnM when the main token symbol is CCIP-LnM)
+	// WARNING: This should only be used in exceptional cases where the token symbol on a particular chain differs from the main tokenSymbol
+	OverrideTokenSymbol changeset.TokenSymbol `json:"overrideTokenSymbol,omitempty"`
+
+	// SkipOwnershipValidation, if true, skips validation of ownership on the token pool. Optional, defaults to false.
+	SkipOwnershipValidation bool `json:"skipOwnershipValidation,omitempty"`
 }
 
 func (c TokenPoolConfig) Validate(ctx context.Context, chain deployment.Chain, ccipState changeset.CCIPOnChainState, useMcms bool, tokenSymbol changeset.TokenSymbol) error {
@@ -163,6 +172,7 @@ func (c TokenPoolConfig) Validate(ctx context.Context, chain deployment.Chain, c
 		return fmt.Errorf("token pool does not exist on %s with symbol %s, type %s, and version %s", chain.String(), tokenSymbol, c.Type, c.Version)
 	}
 
+	// skips ownership check while running e2e token pool deployment + configuration, as the pool isn't yet owned by timelock
 	if !c.SkipOwnershipValidation {
 		tokenPool, err := token_pool.NewTokenPool(tokenPoolAddress, chain.Client)
 		if err != nil {
@@ -197,11 +207,13 @@ func (c TokenPoolConfig) Validate(ctx context.Context, chain deployment.Chain, c
 // ConfigureTokenPoolContractsConfig is the configuration for the ConfigureTokenPoolContractsConfig changeset.
 type ConfigureTokenPoolContractsConfig struct {
 	// MCMS defines the delay to use for Timelock (if absent, the changeset will attempt to use the deployer key).
-	MCMS *proposalutils.TimelockConfig
-	// PoolUpdates defines the changes that we want to make to the token pool on a chain
-	PoolUpdates map[uint64]TokenPoolConfig
-	// Symbol is the symbol of the token of interest.
-	TokenSymbol changeset.TokenSymbol
+	MCMS *proposalutils.TimelockConfig `json:"mcms,omitempty"`
+
+	// PoolUpdates defines the changes that we want to make to the token pool on a chain.
+	PoolUpdates map[uint64]TokenPoolConfig `json:"poolUpdates"`
+
+	// TokenSymbol is the symbol of the token of interest.
+	TokenSymbol changeset.TokenSymbol `json:"tokenSymbol"`
 }
 
 func (c ConfigureTokenPoolContractsConfig) Validate(env deployment.Environment) error {

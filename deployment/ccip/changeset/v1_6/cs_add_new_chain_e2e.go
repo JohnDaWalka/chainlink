@@ -626,14 +626,12 @@ type ConnectNewChainConfig struct {
 	TestRouter *bool `json:"testRouter,omitempty"`
 	// MCMSConfig is the MCMS configuration, omit to use deployer key only.
 	MCMSConfig *proposalutils.TimelockConfig `json:"mcmsConfig,omitempty"`
-	// Optional, if true allow changeset run even if NewChain contracts are owned by timelock
-	IsNewChainMCMSOwned bool `json:"isNewChainMCMSOwned,omitempty"`
 }
 
 func (c ConnectNewChainConfig) validateNewChain(env deployment.Environment, state changeset.CCIPOnChainState) error {
 	// When running this changeset, there is no case in which the new chain contract should be owned by MCMS,
 	// which is why we do not use MCMSConfig to determine the ownedByMCMS variable.
-	err := c.validateChain(env, state, c.NewChainSelector, c.IsNewChainMCMSOwned)
+	err := c.validateChain(env, state, c.NewChainSelector, false)
 	if err != nil {
 		return fmt.Errorf("failed to validate chain with selector %d: %w", c.NewChainSelector, err)
 	}

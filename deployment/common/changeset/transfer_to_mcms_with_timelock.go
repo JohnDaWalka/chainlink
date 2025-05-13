@@ -57,7 +57,7 @@ func (t TransferToMCMSWithTimelockConfig) Validate(e deployment.Environment) err
 			// Note this also assures non-zero addresses.
 			if exists, err := deployment.AddressBookContains(e.ExistingAddresses, chainSelector, contract.String()); err != nil || !exists {
 				if err != nil {
-					return fmt.Errorf("failed to check address book: %w", err)
+					return fmt.Errorf("failed to check address book SISHIR: %w", err)
 				}
 				return fmt.Errorf("contract %s not found in address book", contract)
 			}

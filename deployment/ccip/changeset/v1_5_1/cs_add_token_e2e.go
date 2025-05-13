@@ -62,24 +62,43 @@ import (
 var AddTokensE2E = cldf.CreateChangeSet(addTokenE2ELogic, addTokenE2EPreconditionValidation)
 
 type E2ETokenAndPoolConfig struct {
-	TokenDeploymentConfig *DeployTokenConfig    // TokenDeploymentConfig is optional. If provided, it will be used to deploy the token and populate the pool deployment configuration.
-	DeployPoolConfig      *DeployTokenPoolInput // Deployment configuration for pools is not needed if tokenDeploymentConfig is provided. This will be populated from the tokenDeploymentConfig if it is provided.
-	PoolVersion           semver.Version
-	ExternalAdmin         common.Address // ExternalAdmin is the external administrator of the token pool on the registry.
-	RateLimiterConfig     RateLimiterPerChain
-	// OverrideTokenSymbol is the token symbol to use to override against main symbol (ex: override to clCCIP-LnM when the main token symbol is CCIP-LnM)
-	// WARNING: This should only be used in exceptional cases where the token symbol on a particular chain differs from the main tokenSymbol
-	OverrideTokenSymbol changeset.TokenSymbol
+	// TokenDeploymentConfig is optional. If provided, it will be used to deploy the token
+	// and populate the pool deployment configuration.
+	TokenDeploymentConfig *DeployTokenConfig `json:"tokenDeploymentConfig,omitempty"`
+
+	// Deployment configuration for pools is not needed if tokenDeploymentConfig is provided.
+	// This will be populated from the tokenDeploymentConfig if it is provided.
+	DeployPoolConfig *DeployTokenPoolInput `json:"deployPoolConfig,omitempty"`
+
+	// Version of the pool being deployed.
+	PoolVersion semver.Version `json:"poolVersion"`
+
+	// ExternalAdmin is the external administrator of the token pool on the registry.
+	ExternalAdmin common.Address `json:"externalAdmin"`
+
+	// Configuration for the rate limiter per chain.
+	RateLimiterConfig RateLimiterPerChain `json:"rateLimiterConfig"`
+
+	// OverrideTokenSymbol is the token symbol to use to override against main symbol
+	// (ex: override to clCCIP-LnM when the main token symbol is CCIP-LnM)
+	// WARNING: This should only be used in exceptional cases where the token symbol on
+	// a particular chain differs from the main tokenSymbol
+	OverrideTokenSymbol changeset.TokenSymbol `json:"overrideTokenSymbol,omitempty"`
 }
 
 type AddTokenE2EConfig struct {
-	PoolConfig   map[uint64]E2ETokenAndPoolConfig
-	IsTestRouter bool
+	// Map of chain ID to E2ETokenAndPoolConfig.
+	PoolConfig map[uint64]E2ETokenAndPoolConfig `json:"poolConfig"`
+
+	// Whether this is a test router configuration.
+	IsTestRouter bool `json:"isTestRouter"`
+
+	// Configures the pools, if empty deployed pools aren't configured.
+	ConfigurePools ConfigureTokenPoolContractsConfig `json:"configurePools"`
 
 	// internal fields - To be populated from the PoolConfig.
-	// User do not need to populate these fields.
+	// User does not need to populate these fields.
 	deployPool             DeployTokenPoolContractsConfig
-	ConfigurePools         ConfigureTokenPoolContractsConfig
 	configureTokenAdminReg changeset.TokenAdminRegistryChangesetConfig
 }
 
@@ -92,23 +111,12 @@ func (c *AddTokenE2EConfig) newConfigurePoolAndTokenAdminRegConfig(e deployment.
 		NewPools:     make(map[uint64]DeployTokenPoolInput),
 		IsTestRouter: c.IsTestRouter,
 	}
-	// c.configurePools = ConfigureTokenPoolContractsConfig{
-	// 	TokenSymbol: symbol,
-	// 	MCMS:        nil, // as token pools are deployed as part of the changeset, the pools will still be owned by the deployer key
-	// 	PoolUpdates: make(map[uint64]TokenPoolConfig),
-	// }
 	c.configureTokenAdminReg = changeset.TokenAdminRegistryChangesetConfig{
 		MCMS:  timelockCfg,
 		Pools: make(map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo),
 	}
 	for chain, poolCfg := range c.PoolConfig {
 		c.deployPool.NewPools[chain] = *poolCfg.DeployPoolConfig
-		// c.configurePools.PoolUpdates[chain] = TokenPoolConfig{
-		// 	ChainUpdates:        poolCfg.RateLimiterConfig,
-		// 	Type:                poolCfg.DeployPoolConfig.Type,
-		// 	Version:             poolCfg.PoolVersion,
-		// 	OverrideTokenSymbol: poolCfg.OverrideTokenSymbol,
-		// }
 
 		// Populate the TokenAdminRegistryChangesetConfig for each chain.
 		if _, ok := c.configureTokenAdminReg.Pools[chain]; !ok {
@@ -120,9 +128,9 @@ func (c *AddTokenE2EConfig) newConfigurePoolAndTokenAdminRegConfig(e deployment.
 			Type:          poolCfg.DeployPoolConfig.Type,
 		}
 	}
-	// if err := c.deployPool.Validate(e); err != nil {
-	// 	return fmt.Errorf("failed to validate deploy pool config: %w", err)
-	// }
+	if err := c.deployPool.Validate(e); err != nil {
+		return fmt.Errorf("failed to validate deploy pool config: %w", err)
+	}
 	// rest of the validation should be done after token pools are deployed
 	return nil
 }
@@ -153,15 +161,35 @@ func (c *AddTokenE2EConfig) newDeployTokenPoolConfigAfterTokenDeployment(tokenAd
 }
 
 type DeployTokenConfig struct {
-	TokenName              string
-	TokenSymbol            changeset.TokenSymbol
-	TokenDecimals          uint8    // needed for BurnMintToken only
-	MaxSupply              *big.Int // needed for BurnMintToken only
-	Type                   deployment.ContractType
-	PoolType               deployment.ContractType // This is the type of the token pool that will be deployed for this token.
-	PoolAllowList          []common.Address
-	AcceptLiquidity        *bool
-	MintTokenForRecipients map[common.Address]*big.Int // MintTokenForRecipients is a map of recipient address to amount to be transferred or minted and provided minting role after token deployment.
+	// TokenName is the full name of the token.
+	TokenName string `json:"tokenName"`
+
+	// TokenSymbol is the symbol for the token (e.g., LINK, USDC).
+	TokenSymbol changeset.TokenSymbol `json:"tokenSymbol"`
+
+	// TokenDecimals specifies how many decimals the token uses.
+	// Needed for BurnMintToken only.
+	TokenDecimals uint8 `json:"tokenDecimals,omitempty"`
+
+	// MaxSupply defines the maximum supply for the token.
+	// Needed for BurnMintToken only.
+	MaxSupply *big.Int `json:"maxSupply,omitempty"`
+
+	// Type is the contract type of the token (e.g., BurnMintToken, StandardERC20).
+	Type deployment.ContractType `json:"type"`
+
+	// PoolType is the type of the token pool that will be deployed for this token.
+	PoolType deployment.ContractType `json:"poolType"`
+
+	// PoolAllowList is a list of addresses allowed to interact with the pool.
+	PoolAllowList []common.Address `json:"poolAllowList,omitempty"`
+
+	// AcceptLiquidity defines whether the pool should accept liquidity.
+	AcceptLiquidity *bool `json:"acceptLiquidity,omitempty"`
+
+	// MintTokenForRecipients is a map of recipient address to amount to be transferred or minted
+	// and provided minting role after token deployment.
+	MintTokenForRecipients map[common.Address]*big.Int `json:"mintTokenForRecipients,omitempty"`
 }
 
 func (c *DeployTokenConfig) Validate() error {
@@ -184,8 +212,11 @@ func (c *DeployTokenConfig) Validate() error {
 }
 
 type AddTokensE2EConfig struct {
-	Tokens map[changeset.TokenSymbol]AddTokenE2EConfig
-	MCMS   *proposalutils.TimelockConfig
+	// Tokens is a map from token symbol to its E2E configuration.
+	Tokens map[changeset.TokenSymbol]AddTokenE2EConfig `json:"tokens"`
+
+	// MCMS is the optional TimelockConfig used for governance proposals.
+	MCMS *proposalutils.TimelockConfig `json:"mcms,omitempty"`
 }
 
 func addTokenE2EPreconditionValidation(e deployment.Environment, config AddTokensE2EConfig) error {
@@ -294,29 +325,30 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (de
 		}
 
 		// for each chain in pool config, trigger transfer ownership of the deployed poolAddress
-		for chaiSel, _ := range cfg.PoolConfig {
-			var deployedPoolAddr common.Address
-			for _, addrMap := range newAddresses {
-				for addressStr := range addrMap {
-					deployedPoolAddr = common.HexToAddress(addressStr)
+		if config.MCMS != nil {
+			for chainID, addrMap := range newAddresses {
+				var addresses []common.Address
+				for addr := range addrMap {
+					addresses = append(addresses, common.HexToAddress(addr))
+				}
+
+				transferOwnershipProposalOutput, err := commoncs.TransferToMCMSWithTimelockV2(e, commoncs.TransferToMCMSWithTimelockConfig{
+					ContractsByChain: map[uint64][]common.Address{
+						chainID: addresses,
+					},
+					MCMSConfig: *config.MCMS,
+				})
+				if err != nil {
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to run TransferToMCMSWithTimelock on chain with selector %d: %w", chainID, err)
+				}
+
+				if err := deployment.MergeChangesetOutput(e, finalCSOut, transferOwnershipProposalOutput); err != nil {
+					return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output after transferring ownership of pool(s): %w", err)
 				}
 			}
-
-			// transfer ownership of the deployed token Pool
-			transferOwnershipProposalOutput, err := commoncs.TransferToMCMSWithTimelockV2(e, commoncs.TransferToMCMSWithTimelockConfig{
-				ContractsByChain: map[uint64][]common.Address{
-					chaiSel: {deployedPoolAddr},
-				},
-				MCMSConfig: *config.MCMS,
-			})
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to run TransferToMCMSWithTimelock on chain with selector %d: %w", chaiSel, err)
-			}
-
-			if err := deployment.MergeChangesetOutput(e, finalCSOut, transferOwnershipProposalOutput); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output after transferring ownershi of pool %s: %w", newAddresses, err)
-			}
 		}
+
+		e.Logger.Infow("configured token pool", "token", token)
 
 		output, err = ProposeAdminRoleChangeset(e, cfg.configureTokenAdminReg)
 		if err != nil {
