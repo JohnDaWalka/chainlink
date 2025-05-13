@@ -210,6 +210,9 @@ jobs:
       contents: read
       actions: read
     steps:
+      - name: Collect Workflow Telemetry
+        uses: catchpoint/workflow-telemetry-action@f974e0c5942f8f37973c4cc395704165fbe629ba
+
       - name: Enable S3 Cache for Self-Hosted Runners
         if: ${{ matrix.type.is-self-hosted == 'true' }}
         uses: runs-on/action@66d4449b717b5462159659523d1241051ff470b9 # v1
@@ -640,6 +643,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SH_TEST_RUNNER: runs-on=${{ github.run_id }}/cpu=32+64/ram=64+128/family=c6id+m6id+m6idn/spot=false/extras=s3-cache
+      SH_DEPLOYMENT_TEST_RUNNER: runs-on=${{ github.run_id }}/cpu=32+64/ram=128+256/family=m6id+m6idn/spot=false/extras=s3-cache
       SH_FUZZ_RUNNER: runs-on=${{ github.run_id}}/cpu=8+16/ram=32+64/family=c6id+m6id+m6idn/spot=false/extras=s3-cache
       SH_RACE_TEST_RUNNER: runs-on=${{ github.run_id}}/cpu=64+128/ram=128+128/family=c7+m7/disk=large/spot=false/extras=s3-cache
       GH_TEST_RUNNER: ubuntu22.04-32cores-128GB
@@ -716,7 +720,7 @@ jobs:
 
           echo "Opt-out is false for current run. Using self-hosted runner for deployment tests."
           echo "deployment-tests-is-self-hosted=true" | tee -a $GITHUB_OUTPUT
-          echo "deployment-tests-runner=${SH_TEST_RUNNER}" | tee -a $GITHUB_OUTPUT
+          echo "deployment-tests-runner=${SH_DEPLOYMENT_TEST_RUNNER}" | tee -a $GITHUB_OUTPUT
 
       - name: Select runners for core tests
         id: core-tests
