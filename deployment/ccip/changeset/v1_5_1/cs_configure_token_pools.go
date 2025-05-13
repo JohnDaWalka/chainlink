@@ -452,7 +452,6 @@ func configureTokenPool(
 		}
 	}
 
-	fmt.Println("CHAIN ADDITIONS: ", chainAdditions)
 	// Handle new chain support
 	if len(chainAdditions) > 0 {
 		_, err := tokenPool.ApplyChainUpdates(opts, chainRemovals, chainAdditions)

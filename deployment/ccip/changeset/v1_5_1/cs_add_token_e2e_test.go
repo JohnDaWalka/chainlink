@@ -1,7 +1,6 @@
 package v1_5_1_test
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -191,7 +190,6 @@ func TestAddTokenE2E(t *testing.T) {
 					RateLimiterConfig:     rateLimiterPerChain,
 				}
 			}
-			fmt.Println("INPUT CONFIG: ", addTokenE2EConfig)
 			// apply the changeset
 			e, err = commonchangeset.Apply(t, e, timelockContracts,
 				commonchangeset.Configure(v1_5_1.AddTokensE2E, addTokenE2EConfig))
