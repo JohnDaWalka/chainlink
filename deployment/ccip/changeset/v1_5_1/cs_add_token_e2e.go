@@ -85,7 +85,7 @@ type E2ETokenAndPoolConfig struct {
 	// (ex: override to clCCIP-LnM when the main token symbol is CCIP-LnM)
 	// WARNING: This should only be used in exceptional cases where the token symbol on
 	// a particular chain differs from the main tokenSymbol
-	OverrideTokenSymbol changeset.TokenSymbol `json:"overrideTokenSymbol,omitempty"`
+	OverrideTokenSymbol shared.TokenSymbol `json:"overrideTokenSymbol,omitempty"`
 }
 
 type AddTokenE2EConfig struct {
@@ -101,7 +101,7 @@ type AddTokenE2EConfig struct {
 	// internal fields - To be populated from the PoolConfig.
 	// User does not need to populate these fields.
 	deployPool             DeployTokenPoolContractsConfig
-	configureTokenAdminReg changeset.TokenAdminRegistryChangesetConfig
+	configureTokenAdminReg TokenAdminRegistryChangesetConfig
 }
 
 // newConfigurePoolAndTokenAdminRegConfig populated internal fields in AddTokenE2EConfig.
@@ -113,7 +113,7 @@ func (c *AddTokenE2EConfig) newConfigurePoolAndTokenAdminRegConfig(e deployment.
 		NewPools:     make(map[uint64]DeployTokenPoolInput),
 		IsTestRouter: c.IsTestRouter,
 	}
-	c.configureTokenAdminReg = changeset.TokenAdminRegistryChangesetConfig{
+	c.configureTokenAdminReg = TokenAdminRegistryChangesetConfig{
 		MCMS:  timelockCfg,
 		Pools: make(map[uint64]map[shared.TokenSymbol]TokenPoolInfo),
 	}
@@ -167,7 +167,7 @@ type DeployTokenConfig struct {
 	TokenName string `json:"tokenName"`
 
 	// TokenSymbol is the symbol for the token (e.g., LINK, USDC).
-	TokenSymbol changeset.TokenSymbol `json:"tokenSymbol"`
+	TokenSymbol shared.TokenSymbol `json:"tokenSymbol"`
 
 	// TokenDecimals specifies how many decimals the token uses.
 	// Needed for BurnMintToken only.
@@ -178,10 +178,10 @@ type DeployTokenConfig struct {
 	MaxSupply *big.Int `json:"maxSupply,omitempty"`
 
 	// Type is the contract type of the token (e.g., BurnMintToken, StandardERC20).
-	Type deployment.ContractType `json:"type"`
+	Type cldf.ContractType `json:"type"`
 
 	// PoolType is the type of the token pool that will be deployed for this token.
-	PoolType deployment.ContractType `json:"poolType"`
+	PoolType cldf.ContractType `json:"poolType"`
 
 	// PoolAllowList is a list of addresses allowed to interact with the pool.
 	PoolAllowList []common.Address `json:"poolAllowList,omitempty"`
@@ -215,7 +215,7 @@ func (c *DeployTokenConfig) Validate() error {
 
 type AddTokensE2EConfig struct {
 	// Tokens is a map from token symbol to its E2E configuration.
-	Tokens map[changeset.TokenSymbol]AddTokenE2EConfig `json:"tokens"`
+	Tokens map[shared.TokenSymbol]AddTokenE2EConfig `json:"tokens"`
 
 	// MCMS is the optional TimelockConfig used for governance proposals.
 	MCMS *proposalutils.TimelockConfig `json:"mcms,omitempty"`
@@ -341,11 +341,11 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (cl
 					MCMSConfig: *config.MCMS,
 				})
 				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to run TransferToMCMSWithTimelock on chain with selector %d: %w", chainID, err)
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to run TransferToMCMSWithTimelock on chain with selector %d: %w", chainID, err)
 				}
 
-				if err := deployment.MergeChangesetOutput(e, finalCSOut, transferOwnershipProposalOutput); err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output after transferring ownership of pool(s): %w", err)
+				if err := cldf.MergeChangesetOutput(e, finalCSOut, transferOwnershipProposalOutput); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output after transferring ownership of pool(s): %w", err)
 				}
 			}
 		}
@@ -411,15 +411,15 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (cl
 		}
 
 		if err := cfg.ConfigurePools.Validate(e); err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to validate configure pool config: %w", err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to validate configure pool config: %w", err)
 		}
 
 		output, err = ConfigureTokenPoolContractsChangeset(e, cfg.ConfigurePools)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to configure token pool for token %s: %w", token, err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool for token %s: %w", token, err)
 		}
-		if err := deployment.MergeChangesetOutput(e, finalCSOut, output); err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output after configuring token pool for token %s: %w", token, err)
+		if err := cldf.MergeChangesetOutput(e, finalCSOut, output); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output after configuring token pool for token %s: %w", token, err)
 		}
 		e.Logger.Infow("configured token pool", "token", token)
 	}
@@ -527,7 +527,7 @@ func deployTokens(e deployment.Environment, tokenDeployCfg map[uint64]DeployToke
 				return nil, ab, fmt.Errorf("failed to deploy ERC677 token %s on chain %d: %w", cfg.TokenName, selector, err)
 			}
 			tokenAddresses[selector] = token.Address
-		case changeset.ERC677TokenHelper:
+		case shared.ERC677TokenHelper:
 			token, err := cldf.DeployContract(e.Logger, e.Chains[selector], ab,
 				func(chain deployment.Chain) cldf.ContractDeploy[*burn_mint_erc677_helper.BurnMintERC677Helper] {
 					tokenAddress, tx, token, err := burn_mint_erc677_helper.DeployBurnMintERC677Helper(
@@ -539,7 +539,7 @@ func deployTokens(e deployment.Environment, tokenDeployCfg map[uint64]DeployToke
 					return cldf.ContractDeploy[*burn_mint_erc677_helper.BurnMintERC677Helper]{
 						Address:  tokenAddress,
 						Contract: token,
-						Tv:       deployment.NewTypeAndVersion(changeset.ERC677TokenHelper, deployment.Version1_0_0),
+						Tv:       cldf.NewTypeAndVersion(shared.ERC677TokenHelper, deployment.Version1_0_0),
 						Tx:       tx,
 						Err:      err,
 					}

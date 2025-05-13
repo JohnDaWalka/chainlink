@@ -89,7 +89,12 @@ type SolChainUpdate struct {
 	TokenAddress string `json:"tokenAddress"`
 
 	// Type is the type of the token pool.
-	Type deployment.ContractType `json:"type"`
+	Type cldf.ContractType `json:"type"`
+
+	// Metadata is an identifier for which instance of the token pool this is.
+	// This is used to differentiate between multiple token pools on the same chain.
+	// e.g. "CLL" for the CLL token pool, "Partner1" for the partner token pool, etc.
+	Metadata string `json:"metadata"`
 }
 
 func (c SolChainUpdate) GetSolanaTokenAndTokenPool(state solanastateview.CCIPChainState) (token solana.PublicKey, tokenPool solana.PublicKey, err error) {
@@ -147,7 +152,7 @@ type TokenPoolConfig struct {
 	SolChainUpdates map[uint64]SolChainUpdate `json:"solChainUpdates"`
 
 	// Type is the type of the token pool.
-	Type deployment.ContractType `json:"type"`
+	Type cldf.ContractType `json:"type"`
 
 	// Version is the version of the token pool.
 	Version semver.Version `json:"version"`
@@ -155,7 +160,7 @@ type TokenPoolConfig struct {
 	// OverrideTokenSymbol is the token symbol to use to override against main symbol
 	// (ex: override to clCCIP-LnM when the main token symbol is CCIP-LnM)
 	// WARNING: This should only be used in exceptional cases where the token symbol on a particular chain differs from the main tokenSymbol
-	OverrideTokenSymbol changeset.TokenSymbol `json:"overrideTokenSymbol,omitempty"`
+	OverrideTokenSymbol shared.TokenSymbol `json:"overrideTokenSymbol,omitempty"`
 
 	// SkipOwnershipValidation, if true, skips validation of ownership on the token pool. Optional, defaults to false.
 	SkipOwnershipValidation bool `json:"skipOwnershipValidation,omitempty"`
@@ -224,7 +229,7 @@ type ConfigureTokenPoolContractsConfig struct {
 	PoolUpdates map[uint64]TokenPoolConfig `json:"poolUpdates"`
 
 	// TokenSymbol is the symbol of the token of interest.
-	TokenSymbol changeset.TokenSymbol `json:"tokenSymbol"`
+	TokenSymbol shared.TokenSymbol `json:"tokenSymbol"`
 }
 
 func (c ConfigureTokenPoolContractsConfig) Validate(env deployment.Environment) error {

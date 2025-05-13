@@ -693,10 +693,10 @@ func (c ConnectNewChainConfig) validateChain(e deployment.Environment, state sta
 	}
 
 	// Test router should always be owned by deployer key
-	// err = commoncs.ValidateOwnership(e.GetContext(), false, deployerKey, chainState.Timelock.Address(), chainState.TestRouter)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to validate ownership of test router: %w", err)
-	// }
+	err = commoncs.ValidateOwnership(e.GetContext(), false, deployerKey, chainState.Timelock.Address(), chainState.TestRouter)
+	if err != nil {
+		return fmt.Errorf("failed to validate ownership of test router: %w", err)
+	}
 
 	return nil
 }
