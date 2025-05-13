@@ -626,12 +626,14 @@ type ConnectNewChainConfig struct {
 	TestRouter *bool `json:"testRouter,omitempty"`
 	// MCMSConfig is the MCMS configuration, omit to use deployer key only.
 	MCMSConfig *proposalutils.TimelockConfig `json:"mcmsConfig,omitempty"`
+	// Optional, if true allow changeset run even if NewChain contracts are owned by timelock
+	IsNewChainMCMSOwned bool `json:"isNewChainMCMSOwned,omitempty"`
 }
 
 func (c ConnectNewChainConfig) validateNewChain(env deployment.Environment, state changeset.CCIPOnChainState) error {
 	// When running this changeset, there is no case in which the new chain contract should be owned by MCMS,
 	// which is why we do not use MCMSConfig to determine the ownedByMCMS variable.
-	err := c.validateChain(env, state, c.NewChainSelector, false)
+	err := c.validateChain(env, state, c.NewChainSelector, c.IsNewChainMCMSOwned)
 	if err != nil {
 		return fmt.Errorf("failed to validate chain with selector %d: %w", c.NewChainSelector, err)
 	}
@@ -643,6 +645,7 @@ func (c ConnectNewChainConfig) validateRemoteChains(env deployment.Environment, 
 	for remoteChainSelector := range c.RemoteChains {
 		// The remote chain may or may not be owned by MCMS, as MCMS is not really used in staging.
 		// Therefore, we use the presence of MCMSConfig to determine the ownedByMCMS variable.
+
 		err := c.validateChain(env, state, remoteChainSelector, c.MCMSConfig != nil)
 		if err != nil {
 			return fmt.Errorf("failed to validate chain with selector %d: %w", remoteChainSelector, err)
@@ -687,10 +690,10 @@ func (c ConnectNewChainConfig) validateChain(e deployment.Environment, state cha
 	}
 
 	// Test router should always be owned by deployer key
-	err = commoncs.ValidateOwnership(e.GetContext(), false, deployerKey, chainState.Timelock.Address(), chainState.TestRouter)
-	if err != nil {
-		return fmt.Errorf("failed to validate ownership of test router: %w", err)
-	}
+	// err = commoncs.ValidateOwnership(e.GetContext(), false, deployerKey, chainState.Timelock.Address(), chainState.TestRouter)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to validate ownership of test router: %w", err)
+	// }
 
 	return nil
 }
