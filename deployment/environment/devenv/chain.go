@@ -41,16 +41,18 @@ type CribRPCs struct {
 
 // ChainConfig holds the configuration for a with a deployer key which can be used to send transactions to the chain.
 type ChainConfig struct {
-	ChainID            string                         // chain id as per EIP-155
-	ChainName          string                         // name of the chain populated from chainselector repo
-	PreferredURLScheme deployment.URLSchemePreference // preferred url scheme for the chain
-	WSRPCs             []CribRPCs                     // websocket rpcs to connect to the chain
-	HTTPRPCs           []CribRPCs                     // http rpcs to connect to the chain
-	DeployerKey        *bind.TransactOpts             // key to deploy and configure contracts on the chain
+	ChainID            string                   // chain id as per EIP-155
+	ChainName          string                   // name of the chain populated from chainselector repo
+	ChainType          string                   // should denote the chain family. Acceptable values are EVM, COSMOS, SOLANA, STARKNET, APTOS etc
+	PreferredURLScheme cldf.URLSchemePreference // preferred url scheme for the chain
+	WSRPCs             []CribRPCs               // websocket rpcs to connect to the chain
+	HTTPRPCs           []CribRPCs               // http rpcs to connect to the chain
+	DeployerKey        *bind.TransactOpts       // key to deploy and configure contracts on the chain
 	SolDeployerKey     solana.PrivateKey
 	Users              []*bind.TransactOpts // map of addresses to their transact opts to interact with the chain as users
 }
 
+func (c *ChainConfig) SetUsers(pvtkeys []string) error {
 	if pvtkeys == nil {
 		// if no private keys are provided, set deployer key as the user
 		if c.DeployerKey != nil {
@@ -131,9 +133,9 @@ func (c *ChainConfig) ToRPCs() []cldf.RPC {
 	return rpcs
 }
 
-func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]deployment.Chain, map[uint64]deployment.SolChain, error) {
-	evmChains := make(map[uint64]deployment.Chain)
-	solChains := make(map[uint64]deployment.SolChain)
+func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf.Chain, map[uint64]cldf.SolChain, error) {
+	evmChains := make(map[uint64]cldf.Chain)
+	solChains := make(map[uint64]cldf.SolChain)
 	var evmSyncMap sync.Map
 	var solSyncMap sync.Map
 
@@ -146,22 +148,22 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]deployme
 				return fmt.Errorf("failed to get selector from chain id %d: %w", chainCfg.ChainID, err)
 			}
 
-			rpcConf := deployment.RPCConfig{
+			rpcConf := cldf.RPCConfig{
 				ChainSelector: chainDetails.ChainSelector,
 				RPCs:          chainCfg.ToRPCs(),
 			}
 
 			if chainCfg.ChainType == EVMChainType {
-				ec, err := deployment.NewMultiClient(logger, rpcConf)
+				ec, err := cldf.NewMultiClient(logger, rpcConf)
 				if err != nil {
 					return fmt.Errorf("failed to create multi client: %w", err)
 				}
 
-				chainInfo, err := deployment.ChainInfo(chainDetails.ChainSelector)
+				chainInfo, err := cldf.ChainInfo(chainDetails.ChainSelector)
 				if err != nil {
 					return fmt.Errorf("failed to get chain info for chain %s: %w", chainCfg.ChainName, err)
 				}
-				evmSyncMap.Store(chainDetails.ChainSelector, deployment.Chain{
+				evmSyncMap.Store(chainDetails.ChainSelector, cldf.Chain{
 					Selector:    chainDetails.ChainSelector,
 					Client:      ec,
 					DeployerKey: chainCfg.DeployerKey,
@@ -212,7 +214,7 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]deployme
 					return err
 				}
 				sc := solRpc.New(chainCfg.HTTPRPCs[0].External)
-				solSyncMap.Store(chainDetails.ChainSelector, deployment.SolChain{
+				solSyncMap.Store(chainDetails.ChainSelector, cldf.SolChain{
 					Selector:    chainDetails.ChainSelector,
 					Client:      sc,
 					DeployerKey: &chainCfg.SolDeployerKey,
@@ -237,22 +239,17 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]deployme
 		})
 	}
 
-<<<<<<< HEAD
-	syncMap.Range(func(sel, value interface{}) bool {
-		chains[sel.(uint64)] = value.(cldf.Chain)
-=======
 	if err := g.Wait(); err != nil {
 		return nil, nil, err
 	}
 
 	evmSyncMap.Range(func(sel, value interface{}) bool {
-		evmChains[sel.(uint64)] = value.(deployment.Chain)
->>>>>>> 82c7d44459 (Added solana support to CRIB environment)
+		evmChains[sel.(uint64)] = value.(cldf.Chain)
 		return true
 	})
 
 	solSyncMap.Range(func(sel, value interface{}) bool {
-		solChains[sel.(uint64)] = value.(deployment.SolChain)
+		solChains[sel.(uint64)] = value.(cldf.SolChain)
 		return true
 	})
 
