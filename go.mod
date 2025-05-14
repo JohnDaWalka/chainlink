@@ -76,12 +76,12 @@ require (
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250513174048-af3e6b6d21fb
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250513174048-af3e6b6d21fb
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250513192730-b60cf427d1a8
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250514171116-a973d22fbfc5
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250417193446-eeb0a7d1e049
-	github.com/smartcontractkit/chainlink-evm v0.0.0-20250514151532-00a66c8bdb1e
+	github.com/smartcontractkit/chainlink-evm v0.0.0-20250514180240-1eedfc5b5bb4
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135
-	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250513225843-18b3914961a5
-	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250513225843-18b3914961a5
+	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250514175738-d591c907dec4
+	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250514175738-d591c907dec4
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250502210357-2df484128afa
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250502210357-2df484128afa
 	github.com/smartcontractkit/chainlink-protos/billing/go v0.0.0-20250501150903-3e93089d9ad5
@@ -326,7 +326,6 @@ require (
 	github.com/supranational/blst v0.3.14 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d // indirect
 	github.com/tendermint/go-amino v0.16.0 // indirect
-	github.com/test-go/testify v1.1.4 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.15 // indirect

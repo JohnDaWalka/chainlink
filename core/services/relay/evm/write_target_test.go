@@ -123,7 +123,7 @@ func TestEvmWrite(t *testing.T) {
 	chain.On("LogPoller").Return(poller)
 	chain.On("LatestHead", mock.Anything).Return(commontypes.Head{Height: "99"}, nil)
 
-	ht := headstest.NewTracker[*evmtypes.Head, common.Hash](t)
+	ht := headstest.NewTracker[*evmtypes.Head](t)
 	ht.On("LatestAndFinalizedBlock", mock.Anything).Return(&evmtypes.Head{Number: 99}, &evmtypes.Head{}, nil)
 	chain.On("HeadTracker").Return(ht)
 
