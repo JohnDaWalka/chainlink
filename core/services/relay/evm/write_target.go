@@ -18,6 +18,7 @@ import (
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	dfprocessor "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds/processor"
+	porprocessor "github.com/smartcontractkit/chainlink-evm/pkg/report/por/processor"
 	processor "github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/report/platform/processor"
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/monitoring/pb/data-feeds/on-chain/registry"
@@ -117,13 +118,14 @@ func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain
 
 	dfProcessor := dfprocessor.NewDataFeedsProcessor(registryMetrics, emitter, false)
 	ccipDfProcessor := dfprocessor.NewDataFeedsProcessor(registryMetrics, emitter, true)
+	porProcessor := porprocessor.NewPORFeedsProcessor(registryMetrics, emitter)
 
 	evmProcessors, err := processor.NewPlatformProcessors(emitter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create EVM platform processors: %w", err)
 	}
 
-	beholder, err := writetarget.NewMonitor(lggr, evmProcessors, []writetarget.ProductSpecificProcessor{dfProcessor, ccipDfProcessor}, emitter)
+	beholder, err := writetarget.NewMonitor(lggr, evmProcessors, []writetarget.ProductSpecificProcessor{dfProcessor, ccipDfProcessor, porProcessor}, emitter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Aptos WT monitor client: %+w", err)
 	}

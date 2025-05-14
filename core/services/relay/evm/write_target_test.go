@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/client/clienttest"
 	gasmocks "github.com/smartcontractkit/chainlink-evm/pkg/gas/mocks"
 	dftypes "github.com/smartcontractkit/chainlink-evm/pkg/report/datafeeds"
+	portypes "github.com/smartcontractkit/chainlink-evm/pkg/report/por"
 
 	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/report/platform"
 
@@ -176,7 +177,7 @@ func TestEvmWrite(t *testing.T) {
 		ReportID:         hex.EncodeToString(reportID[:]),
 	}
 
-	generateReportEncoded := func(ccip bool) []byte {
+	generateReportEncoded := func(reportType string) []byte {
 		feedReports := dftypes.Reports{
 			{
 				FeedID:    [32]byte{0x01},
@@ -185,8 +186,28 @@ func TestEvmWrite(t *testing.T) {
 			},
 		}
 
-		feedReportsEncoded, err := dftypes.GetSchema(ccip).Pack(feedReports)
-		require.NoError(t, err)
+		porFeedReports := portypes.Reports{
+			{
+				DataId:    [32]byte{0x01},
+				Timestamp: 1620000000,
+				Bundle:    []byte{0x01, 0x02, 0x03},
+			},
+		}
+
+		var feedReportsEncoded []byte
+
+		switch reportType {
+		case "ccip":
+			feedReportsEncoded, err = dftypes.GetSchema(true).Pack(feedReports)
+			require.NoError(t, err)
+		case "por":
+			feedReportsEncoded, err = portypes.GetSchema().Pack(porFeedReports)
+			require.NoError(t, err)
+		// normal non-ccip / POR report
+		default:
+			feedReportsEncoded, err = dftypes.GetSchema(false).Pack(feedReports)
+			require.NoError(t, err)
+		}
 
 		report := platform.Report{
 			Metadata: reportMetadata,
@@ -201,7 +222,7 @@ func TestEvmWrite(t *testing.T) {
 
 	signatures := [][]byte{}
 
-	mockSuccessfulTransmission := func(ccip bool) {
+	mockSuccessfulTransmission := func(reportType string) {
 		// This is a very error-prone way to mock an on-chain response to a GetLatestValue("getTransmissionInfo") call
 		// It's a bit of a hack, but it's the best way to do it without a lot of refactoring
 		mockNotStarted, err := newMockedEncodeTransmissionInfo(0)
@@ -222,15 +243,15 @@ func TestEvmWrite(t *testing.T) {
 			method := forwardABI.Methods["report"]
 			err = method.Inputs.UnpackIntoMap(payload, req.EncodedPayload[4:])
 			require.NoError(t, err)
-			require.Equal(t, generateReportEncoded(ccip), payload["rawReport"])
+			require.Equal(t, generateReportEncoded(reportType), payload["rawReport"])
 			require.Equal(t, signatures, payload["signatures"])
 		}).Once()
 	}
 
-	generateValidInputs := func(ccip bool) *values.Map {
+	generateValidInputs := func(reportType string) *values.Map {
 		validInputs, err := values.NewMap(map[string]any{
 			"signed_report": map[string]any{
-				"report":     generateReportEncoded(ccip),
+				"report":     generateReportEncoded(reportType),
 				"signatures": signatures,
 				"context":    []byte{4, 5},
 				"id":         reportID[:],
@@ -240,8 +261,8 @@ func TestEvmWrite(t *testing.T) {
 		return validInputs
 	}
 
-	// default inputs/report are not CCIP
-	validInputs := generateValidInputs(false)
+	// default inputs/report are not CCIP / POR
+	validInputs := generateValidInputs("")
 
 	validMetadata := capabilities.RequestMetadata{
 		WorkflowID:          reportMetadata.WorkflowID,
@@ -259,7 +280,7 @@ func TestEvmWrite(t *testing.T) {
 	gasLimitDefault := uint64(400_000)
 
 	t.Run("succeeds with valid report", func(t *testing.T) {
-		mockSuccessfulTransmission(false)
+		mockSuccessfulTransmission("")
 		ctx := testutils.Context(t)
 		lggr, observed := logger.TestLoggerObserved(t, zapcore.DebugLevel)
 
@@ -279,7 +300,7 @@ func TestEvmWrite(t *testing.T) {
 	})
 
 	t.Run("succeeds with valid CCIP report", func(t *testing.T) {
-		mockSuccessfulTransmission(true)
+		mockSuccessfulTransmission("ccip")
 		ctx := testutils.Context(t)
 		lggr, observed := logger.TestLoggerObserved(t, zapcore.DebugLevel)
 
@@ -296,7 +317,34 @@ func TestEvmWrite(t *testing.T) {
 		req := capabilities.CapabilityRequest{
 			Metadata: validMetadata,
 			Config:   config,
-			Inputs:   generateValidInputs(true),
+			Inputs:   generateValidInputs("ccip"),
+		}
+
+		_, err = capability.Execute(ctx, req)
+		require.NoError(t, err)
+
+		findLogMatch(t, observed, "[Beholder.emit]", "attributes", "FeedUpdated")
+	})
+
+	t.Run("succeeds with valid POR report", func(t *testing.T) {
+		mockSuccessfulTransmission("por")
+		ctx := testutils.Context(t)
+		lggr, observed := logger.TestLoggerObserved(t, zapcore.DebugLevel)
+
+		capability, err := evm.NewWriteTarget(ctx, relayer, chain, gasLimitDefault, lggr)
+		require.NoError(t, err)
+
+		config, err := values.NewMap(map[string]any{
+			"address":   evmCfg.EVM().Workflow().ForwarderAddress().String(),
+			"processor": "evm-por-feeds",
+		})
+		require.NoError(t, err)
+
+		// special request with properly encoded CCIP report using ccip processor
+		req := capabilities.CapabilityRequest{
+			Metadata: validMetadata,
+			Config:   config,
+			Inputs:   generateValidInputs("por"),
 		}
 
 		_, err = capability.Execute(ctx, req)
@@ -306,7 +354,7 @@ func TestEvmWrite(t *testing.T) {
 	})
 
 	t.Run("succeeds with valid report, but logs error for missing processor", func(t *testing.T) {
-		mockSuccessfulTransmission(false)
+		mockSuccessfulTransmission("")
 
 		ctx := testutils.Context(t)
 		lggr, observed := logger.TestLoggerObserved(t, zapcore.DebugLevel)
