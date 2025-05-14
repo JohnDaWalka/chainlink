@@ -2,6 +2,7 @@ package cre
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -601,6 +602,9 @@ func setupPoRTestEnvironment(
 		require.NoError(t, syncerErr, "failed to wait for workflow registry syncer")
 		testLogger.Info().Msg("Proceeding to register PoR workflow...")
 
+		wtName, err := corevm.GenerateWriteTargetName(big.NewInt(int64(bo.ChainID)))
+		require.NoError(t, err, "failed to generate write target name")
+
 		registerInput := registerPoRWorkflowInput{
 			WorkflowConfig:     in.WorkflowConfigs[idx],
 			homeChainSelector:  homeChainOutput.ChainSelector,
@@ -613,7 +617,7 @@ func setupPoRTestEnvironment(
 			deployerPrivateKey: bo.DeployerPrivateKey,
 			creCLIAbsPath:      creCLIAbsPath,
 			creCLIsettingsFile: creCLISettingsFile,
-			writeTargetName:    corevm.GenerateWriteTargetName(bo.ChainID),
+			writeTargetName:    wtName,
 			creCLIProfile:      libcrecli.CRECLIProfile,
 		}
 
