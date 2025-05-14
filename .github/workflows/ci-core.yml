@@ -198,7 +198,7 @@ jobs:
             should-run: ${{ needs.filter.outputs.should-run-deployment-tests }}
             setup-solana: "true"
             setup-aptos: "true"
-            use-flakeguard: ${{ github.event_name == 'merge_group' && 'true' || 'false' }}
+            use-flakeguard: "true"
 
     name: Core Tests (${{ matrix.type.cmd }})
     # We don't directly merge dependabot PRs, so let's not waste the resources
