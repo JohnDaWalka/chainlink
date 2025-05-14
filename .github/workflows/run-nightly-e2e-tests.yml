@@ -1,15 +1,46 @@
 name: Run Nightly E2E Tests
 
 on:
-  schedule:
-    # Run every night at midnight UTC (0:00 AM)
-    - cron: '0 0 * * *'
+  # Runs on schedule every night at midnight UTC (3:00 AM), but triggered by Docker Build workflow
   workflow_dispatch:
     # Useful when running the workflow manually
     inputs:
       chainlink_version:
         description: 'Enter Chainlink version to use for the tests. Example: "v2.10.0" or sha'
+        required: true
+        type: string
+        default: develop
+      slack_notification_after_tests:
+        description: 'Notify on Slack after tests'
         required: false
+        type: string
+      require_chainlink_image_versions_in_qa_ecr:
+        description:
+          'Check Chainlink image versions to be present in QA ECR. If not, build
+          and push the image to QA ECR. Takes comma separated list of Chainlink
+          image versions. Example:
+          "5733cdcda9a9fc6da6343798b119b2ae136146cd,0b7d2c497a508efa5a827714780d908b7b8eda19"'
+        required: false
+        type: string
+      require_chainlink_plugin_versions_in_qa_ecr:
+        description:
+          'Check Chainlink plugins versions to be present in QA ECR. If not,
+          build and push the image to QA ECR. Takes comma separated list of
+          Chainlink image versions. Example:
+          "5733cdcda9a9fc6da6343798b119b2ae136146cd,0b7d2c497a508efa5a827714780d908b7b8eda19"'
+        required: false
+        type: string
+      extraArgs:
+        required: false
+        type: string
+        default: '{ "flakeguard_enable": "true", "flakeguard_run_count": "5" }'
+        description: 'JSON of extra arguments for the workflow.'
+  workflow_call:
+    # Used by Docker Build to trigger it once nightly image has been built
+    inputs:
+      chainlink_version:
+        description: 'Enter Chainlink version to use for the tests. Example: "v2.10.0" or sha'
+        required: true
         type: string
         default: develop
       slack_notification_after_tests:
@@ -39,21 +70,12 @@ on:
         description: 'JSON of extra arguments for the workflow.'
 
 jobs:
-  # build image if schedule, which will be tagged as 'manual-<short-sha>'
-  call-docker-build-workflow:
-    name: Call Docker Build Workflow
-    # if: ${{ github.event_name == 'schedule' }}
-    uses: smartcontractkit/chainlink/.github/workflows/docker-build.yml@e6df49c2a579d41c6c4a28eb3c70a3f440578956
-    with:
-      git-ref: ${{ github.sha }}
-
   call-run-e2e-tests-workflow:
     name: Run E2E Tests
     if: always()
-    needs: call-docker-build-workflow
     uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@639ad9c899df967dc44b86520db48e19c8abeaca
     with:
-      chainlink_version: ${{ inputs.chainlink_version || format('manual-{0}', github.sha) }}
+      chainlink_version: ${{ inputs.chainlink_version }}
       test_path: .github/e2e-tests.yml
       test_trigger: Nightly E2E Tests
       slack_notification_after_tests: ${{ inputs.slack_notification_after_tests || 'always' }}
