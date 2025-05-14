@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	solRpc "github.com/gagliardetto/solana-go/rpc"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -26,6 +27,7 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/gagliardetto/solana-go"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 )
 
