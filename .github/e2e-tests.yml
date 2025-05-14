@@ -181,7 +181,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ocr2_test.go
     test_env_type: docker
     runs_on: ubuntu22.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu22-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu22-full-x64/extras=s3-cache
     triggers:
       - PR E2E Core Tests
       - Merge Queue E2E Core Tests
@@ -197,7 +197,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ocr2_test.go
     test_env_type: docker
     runs_on: ubuntu22.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu22-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu22-full-x64/extras=s3-cache
     triggers:
       - PR E2E Core Tests
       - Merge Queue E2E Core Tests
@@ -215,7 +215,7 @@ runner-test-matrix:
     path: system-tests/tests/smoke/cre/por_test.go
     test_env_type: docker
     runs_on: ubuntu-latest
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - PR CRE E2E Core Tests
       - Merge Queue CRE E2E Core Tests
@@ -237,7 +237,7 @@ runner-test-matrix:
     path: system-tests/tests/smoke/cre/por_test.go
     test_env_type: docker
     runs_on: ubuntu-latest
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - PR CRE E2E Core Tests
       - Merge Queue CRE E2E Core Tests
@@ -259,7 +259,7 @@ runner-test-matrix:
     path: system-tests/tests/smoke/cre/por_test.go
     test_env_type: docker
     runs_on: ubuntu-latest
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - PR CRE E2E Core Tests
       - Merge Queue CRE E2E Core Tests
@@ -1234,7 +1234,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
     test_env_type: docker
     runs_on: ubuntu24.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - PR E2E Core Tests
       - Merge Queue E2E Core Tests
@@ -1255,7 +1255,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
     test_env_type: docker
     runs_on: ubuntu24.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - Nightly E2E Tests
       - Push E2E CCIP Tests
@@ -1274,7 +1274,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
     test_env_type: docker
     runs_on: ubuntu24.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - Nightly E2E Tests
       - Push E2E CCIP Tests
@@ -1293,7 +1293,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
     test_env_type: docker
     runs_on: ubuntu24.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - Nightly E2E Tests
       - Push E2E CCIP Tests
@@ -1312,7 +1312,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
     test_env_type: docker
     runs_on: ubuntu24.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - Nightly E2E Tests
       - Push E2E CCIP Tests
@@ -1331,7 +1331,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
     test_env_type: docker
     runs_on: ubuntu24.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - Nightly E2E Tests
       - Push E2E CCIP Tests
@@ -1350,7 +1350,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
     test_env_type: docker
     runs_on: ubuntu24.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - Nightly E2E Tests
       - Push E2E CCIP Tests
@@ -1369,7 +1369,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
     test_env_type: docker
     runs_on: ubuntu24.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - PR E2E Core Tests
       - Nightly E2E Tests
@@ -1389,7 +1389,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
     test_env_type: docker
     runs_on: ubuntu24.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - Nightly E2E Tests
       - Push E2E CCIP Tests
@@ -1408,7 +1408,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
     test_env_type: docker
     runs_on: ubuntu24.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - Nightly E2E Tests
       - Push E2E CCIP Tests
@@ -1427,7 +1427,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
     test_env_type: docker
     runs_on: ubuntu24.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - Nightly E2E Tests
       - Push E2E CCIP Tests
@@ -1446,7 +1446,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
     test_env_type: docker
     runs_on: ubuntu24.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - Nightly E2E Tests
       - Push E2E CCIP Tests
@@ -1465,7 +1465,7 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_rmn_test.go
     test_env_type: docker
     runs_on: ubuntu24.04-16cores-64GB
-    runs_on_self_hosted: runs-on/cpu=16+32/ram=32+64/family=c6id+m6id+m6idn/spot=false/image=ubuntu24-full-x64/extras=s3-cache
+    runs_on_self_hosted: runs-on/cpu=16/ram=32/family=c6id/spot=false/image=ubuntu24-full-x64/extras=s3-cache
     triggers:
       - Nightly E2E Tests
       - Push E2E CCIP Tests
