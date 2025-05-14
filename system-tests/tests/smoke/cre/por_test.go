@@ -2,7 +2,6 @@ package cre
 
 import (
 	"fmt"
-	"math/big"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -601,8 +600,7 @@ func setupPoRTestEnvironment(
 		require.NoError(t, syncerErr, "failed to wait for workflow registry syncer")
 		testLogger.Info().Msg("Proceeding to register PoR workflow...")
 
-		wtName, err := corevm.GenerateWriteTargetName(big.NewInt(int64(bo.ChainID)))
-		require.NoError(t, err, "failed to generate write target name")
+		wtName := corevm.GenerateWriteTargetName(bo.ChainID)
 
 		registerInput := registerPoRWorkflowInput{
 			WorkflowConfig:     in.WorkflowConfigs[idx],

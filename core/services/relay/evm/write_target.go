@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
@@ -38,10 +37,7 @@ import (
 
 func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain, gasLimitDefault uint64, lggr logger.Logger) (capabilities.ExecutableCapability, error) {
 	// generate ID based on chain selector
-	id, err := GenerateWriteTargetName(chain.ID())
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate write target name: %w", err)
-	}
+	id := GenerateWriteTargetName(chain.ID().Uint64())
 
 	// EVM-specific init
 	config := chain.Config().EVM().Workflow()
@@ -289,14 +285,16 @@ func ExtractNetwork(selector string) (string, error) {
 	return name, nil
 }
 
-func GenerateWriteTargetName(chainID *big.Int) (string, error) {
-	chainName, err := chainselectors.NameFromChainId(chainID.Uint64())
-	if err != nil {
-		return "", fmt.Errorf("failed to get chain name from chain ID: %w", err)
+func GenerateWriteTargetName(chainID uint64) string {
+	id := fmt.Sprintf("write_%v@1.0.0", chainID)
+
+	chainName, err := chainselectors.NameFromChainId(chainID)
+	if err == nil {
+		wtID, err := writetarget.NewWriteTargetID("", chainName, strconv.FormatUint(chainID, 10), "1.0.0")
+		if err == nil {
+			id = wtID
+		}
 	}
-	id, err := writetarget.NewWriteTargetID("", chainName, chainID.String(), "1.0.0")
-	if err != nil {
-		return "", fmt.Errorf("failed to create write target ID: %w", err)
-	}
-	return id, nil
+
+	return id
 }
