@@ -89,9 +89,9 @@ func (l *DeployedLocalDevEnvironment) StartChains(t *testing.T) {
 	l.devEnvCfg = envConfig
 	users := make(map[uint64][]*bind.TransactOpts)
 	for _, chain := range envConfig.Chains {
-		chainId, err := strconv.ParseUint(chain.ChainID, 10, 64)
+		chainID, err := strconv.ParseUint(chain.ChainID, 10, 64)
 		require.NoError(t, err)
-		details, found := chainsel.ChainByEvmChainID(chainId)
+		details, found := chainsel.ChainByEvmChainID(chainID)
 		require.Truef(t, found, "chain not found")
 		users[details.Selector] = chain.Users
 	}
