@@ -147,7 +147,7 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf.Cha
 		g.Go(func() error {
 			chainDetails, err := chainselectors.GetChainDetailsByChainIDAndFamily(chainCfg.ChainID, strings.ToLower(chainCfg.ChainType))
 			if err != nil {
-				return fmt.Errorf("failed to get selector from chain id %d: %w", chainCfg.ChainID, err)
+				return fmt.Errorf("failed to get selector from chain id %s: %w", chainCfg.ChainID, err)
 			}
 
 			rpcConf := cldf.RPCConfig{
