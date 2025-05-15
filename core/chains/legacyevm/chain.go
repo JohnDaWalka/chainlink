@@ -463,7 +463,7 @@ func (c *chain) LatestHead(_ context.Context) (types.Head, error) {
 	return types.Head{
 		Height:    strconv.FormatInt(latestChain.BlockNumber(), 10),
 		Hash:      latestChain.Hash.Bytes(),
-		Timestamp: uint64(latestChain.Timestamp.Unix()),
+		Timestamp: uint64(latestChain.Timestamp.UnixMilli()),
 	}, nil
 }
 
