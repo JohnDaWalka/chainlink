@@ -143,7 +143,7 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf.Cha
 
 	g := new(errgroup.Group)
 	for _, chainCfg := range configs {
-		chainCfg := chainCfg
+		chainCfg := chainCfg // capture loop variable
 		g.Go(func() error {
 			chainDetails, err := chainselectors.GetChainDetailsByChainIDAndFamily(chainCfg.ChainID, strings.ToLower(chainCfg.ChainType))
 			if err != nil {
@@ -155,7 +155,8 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf.Cha
 				RPCs:          chainCfg.ToRPCs(),
 			}
 
-			if chainCfg.ChainType == EVMChainType {
+			switch chainCfg.ChainType {
+			case EVMChainType:
 				ec, err := cldf.NewMultiClient(logger, rpcConf)
 				if err != nil {
 					return fmt.Errorf("failed to create multi client: %w", err)
@@ -165,39 +166,41 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf.Cha
 				if err != nil {
 					return fmt.Errorf("failed to get chain info for chain %s: %w", chainCfg.ChainName, err)
 				}
+
+				confirmFn := func(tx *types.Transaction) (uint64, error) {
+					var blockNumber uint64
+					if tx == nil {
+						return 0, fmt.Errorf("tx was nil, nothing to confirm chain %s", chainInfo.ChainName)
+					}
+					ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+					defer cancel()
+					receipt, err := bind.WaitMined(ctx, ec, tx)
+					if err != nil {
+						return blockNumber, fmt.Errorf("failed to get confirmed receipt for chain %s: %w", chainInfo.ChainName, err)
+					}
+					if receipt == nil {
+						return blockNumber, fmt.Errorf("receipt was nil for tx %s chain %s", tx.Hash().Hex(), chainInfo.ChainName)
+					}
+					blockNumber = receipt.BlockNumber.Uint64()
+					if receipt.Status == 0 {
+						errReason, err := deployment.GetErrorReasonFromTx(ec, chainCfg.DeployerKey.From, tx, receipt)
+						if err == nil && errReason != "" {
+							return blockNumber, fmt.Errorf("tx %s reverted,error reason: %s chain %s", tx.Hash().Hex(), errReason, chainInfo.ChainName)
+						}
+						return blockNumber, fmt.Errorf("tx %s reverted, could not decode error reason chain %s", tx.Hash().Hex(), chainInfo.ChainName)
+					}
+					return blockNumber, nil
+				}
+
 				evmSyncMap.Store(chainDetails.ChainSelector, cldf.Chain{
 					Selector:    chainDetails.ChainSelector,
 					Client:      ec,
 					DeployerKey: chainCfg.DeployerKey,
-					Confirm: func(tx *types.Transaction) (uint64, error) {
-						var blockNumber uint64
-						if tx == nil {
-							return 0, fmt.Errorf("tx was nil, nothing to confirm chain %s", chainInfo.ChainName)
-						}
-						ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-						defer cancel()
-						receipt, err := bind.WaitMined(ctx, ec, tx)
-						if err != nil {
-							return blockNumber, fmt.Errorf("failed to get confirmed receipt for chain %s: %w", chainInfo.ChainName, err)
-						}
-						if receipt == nil {
-							return blockNumber, fmt.Errorf("receipt was nil for tx %s chain %s", tx.Hash().Hex(), chainInfo.ChainName)
-						}
-						blockNumber = receipt.BlockNumber.Uint64()
-						if receipt.Status == 0 {
-							errReason, err := deployment.GetErrorReasonFromTx(ec, chainCfg.DeployerKey.From, tx, receipt)
-							if err == nil && errReason != "" {
-								return blockNumber, fmt.Errorf("tx %s reverted,error reason: %s chain %s", tx.Hash().Hex(), errReason, chainInfo.ChainName)
-							}
-							return blockNumber, fmt.Errorf("tx %s reverted, could not decode error reason chain %s", tx.Hash().Hex(), chainInfo.ChainName)
-						}
-						return blockNumber, nil
-					},
+					Confirm:     confirmFn,
 				})
 				return nil
-			}
 
-			if chainCfg.ChainType == SolChainType {
+			case SolChainType:
 				logger.Info("Creating solana programs tmp dir")
 				programsPath, err := os.MkdirTemp("", "solana-programs")
 				logger.Infof("Solana programs tmp dir at %s", programsPath)
@@ -215,6 +218,7 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf.Cha
 				if err != nil {
 					return err
 				}
+
 				sc := solRpc.New(chainCfg.HTTPRPCs[0].External)
 				solSyncMap.Store(chainDetails.ChainSelector, cldf.SolChain{
 					Selector:    chainDetails.ChainSelector,
@@ -227,17 +231,15 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf.Cha
 						_, err := solCommonUtil.SendAndConfirm(
 							context.Background(), sc, instructions, chainCfg.SolDeployerKey, solRpc.CommitmentConfirmed, opts...,
 						)
-						if err != nil {
-							return err
-						}
-						return nil
+						return err
 					},
 					ProgramsPath: programsPath,
 				})
 				return nil
-			}
 
-			return fmt.Errorf("chain type %s is not supported", chainCfg.ChainType)
+			default:
+				return fmt.Errorf("chain type %s is not supported", chainCfg.ChainType)
+			}
 		})
 	}
 
