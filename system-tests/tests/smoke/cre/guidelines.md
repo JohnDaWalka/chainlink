@@ -727,7 +727,7 @@ If the workflow is not configurable, pass an empty byte slice `[]byte{}` during 
 
 Workflows can be registered using:
 ```go
-input := keystonetypes.RegisterWorkflowWithCRECLIInput{
+input := keystonetypes.ManageWorkflowWithCRECLIInput{
   NewWorkflow: workflow,
   ShouldCompileNewWorkflow: true,
 }
@@ -776,7 +776,7 @@ newWorkflow := keystonetypes.NewWorkflow{
 
 Register it:
 ```go
-input := keystonetypes.RegisterWorkflowWithCRECLIInput{
+input := keystonetypes.ManageWorkflowWithCRECLIInput{
   NewWorkflow: newWorkflow,
   ShouldCompileNewWorkflow: true,
 }
