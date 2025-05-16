@@ -128,3 +128,38 @@ func generateAcceptOwnershipProposal(b operations.Bundle, deps AptosDeps, in Gen
 		}},
 	}, err
 }
+
+type CreateOwnerInput struct {
+	AddressMCMS   aptos.AccountAddress
+	ObjectAddress aptos.AccountAddress
+}
+
+var CreateOwnerOp = operations.NewOperation(
+	"generate-accept-ownership-proposal-op",
+	Version1_0_0,
+	"Generate Accept Ownership Proposal for MCMS Contract",
+	createOwner,
+)
+
+func createOwner(b operations.Bundle, deps AptosDeps, in CreateOwnerInput) (mcmstypes.Transaction, error) {
+	mcmsContract := mcmsbind.Bind(deps.OnChainState.MCMSAddress, deps.AptosChain.Client)
+	moduleInfo, function, _, args, err := mcmsContract.MCMSRegistry().Encoder().CreateOwnerForPreexistingCodeObject(in.ObjectAddress)
+	if err != nil {
+		return mcmstypes.Transaction{}, fmt.Errorf("failed to encode AcceptOwnership: %w", err)
+	}
+	additionalFields := aptosmcms.AdditionalFields{
+		PackageName: moduleInfo.PackageName,
+		ModuleName:  moduleInfo.ModuleName,
+		Function:    function,
+	}
+	callOneAdditionalFields, err := json.Marshal(additionalFields)
+	if err != nil {
+		return mcmstypes.Transaction{}, fmt.Errorf("failed to marshal additionalFields: %w", err)
+	}
+
+	return mcmstypes.Transaction{
+		To:               in.AddressMCMS.StringLong(),
+		Data:             aptosmcms.ArgsToData(args),
+		AdditionalFields: callOneAdditionalFields,
+	}, err
+}

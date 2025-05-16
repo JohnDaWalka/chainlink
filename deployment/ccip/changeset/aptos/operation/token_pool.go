@@ -6,12 +6,13 @@ import (
 
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/bind"
-	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_token_pools/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_token_pools/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_token_pools/token_pool"
 	mcmsbind "github.com/smartcontractkit/chainlink-aptos/bindings/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/config"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/utils"
 	aptosmcms "github.com/smartcontractkit/mcms/sdk/aptos"
@@ -19,9 +20,9 @@ import (
 )
 
 type DeployTokenPoolInput struct {
-	MCMSAddress  aptos.AccountAddress
-	PoolType     string // TODO: should be a typed const
-	TokenAddress aptos.AccountAddress
+	PoolType        deployment.ContractType
+	TokenAddress    aptos.AccountAddress
+	TokenObjAddress aptos.AccountAddress
 }
 
 type DeployTokenPoolOutput struct {
@@ -41,60 +42,57 @@ var DeployTokenPoolOp = operations.NewOperation(
 func deployTokenPool(b operations.Bundle, deps AptosDeps, in DeployTokenPoolInput) (DeployTokenPoolOutput, error) {
 	// TODO: check if token pool already deployed
 	var mcmsOps []types.Operation
-	var poolAddress aptos.AccountAddress
 	// Bind MCMS Package
-	mcmsContract := mcmsbind.Bind(in.MCMSAddress, deps.AptosChain.Client)
+	mcmsContract := mcmsbind.Bind(deps.OnChainState.MCMSAddress, deps.AptosChain.Client)
 
 	// Deploy token pool package
-	// TODO: Maybe deploy this to CCIP package? Can we do that?
-	seed := "token_pool"
-	poolPackageAddress, err := mcmsContract.MCMSRegistry().GetNewCodeObjectAddress(nil, []byte(seed))
-	payload, err := token_pool.Compile(poolPackageAddress, deps.OnChainState.CCIPAddress, mcmsContract.Address())
+	// seed := "token_pool_package"
+	// poolPackageAddress, err := mcmsContract.MCMSRegistry().GetNewCodeObjectAddress(nil, []byte(seed))
+	// if err != nil {
+	// 	return DeployTokenPoolOutput{}, fmt.Errorf("failed to GetNewCodeObjectAddress: %w", err)
+	// }
+	// TODO: for now, deploy token pool to the same address as the token
+	payload, err := token_pool.Compile(in.TokenObjAddress, deps.OnChainState.CCIPAddress, mcmsContract.Address())
 	if err != nil {
 		return DeployTokenPoolOutput{}, fmt.Errorf("failed to compile token pool: %w", err)
 	}
-	ops, err := utils.CreateChunksAndStage(payload, mcmsContract, deps.AptosChain.Selector, ccip.DefaultSeed, nil)
+	ops, err := utils.CreateChunksAndStage(payload, mcmsContract, deps.AptosChain.Selector, "", &in.TokenObjAddress)
 	if err != nil {
 		return DeployTokenPoolOutput{}, fmt.Errorf("failed to create chunks for token pool: %w", err)
 	}
 	mcmsOps = append(mcmsOps, ops...)
 
 	switch in.PoolType {
-	case "bnm_token_pool":
-		// TODO: should `address` be different from `ccipTokenPoolAddress`??
-		seed := "bnm_token_pool"
-		poolAddress, err = mcmsContract.MCMSRegistry().GetNewCodeObjectAddress(nil, []byte(seed))
+	case changeset.BurnMintTokenPool:
 		payload, err = burn_mint_token_pool.Compile(
-			poolAddress,
+			in.TokenObjAddress,
 			deps.OnChainState.CCIPAddress,
 			deps.OnChainState.MCMSAddress,
-			poolPackageAddress,
+			in.TokenObjAddress,
 			in.TokenAddress,
 			true,
 		)
 		if err != nil {
 			return DeployTokenPoolOutput{}, fmt.Errorf("failed to compile token pool: %w", err)
 		}
-		ops, err := utils.CreateChunksAndStage(payload, mcmsContract, deps.AptosChain.Selector, "", &poolAddress)
+		ops, err := utils.CreateChunksAndStage(payload, mcmsContract, deps.AptosChain.Selector, "", &in.TokenObjAddress)
 		if err != nil {
 			return DeployTokenPoolOutput{}, fmt.Errorf("failed to create chunks for token pool: %w", err)
 		}
 		mcmsOps = append(mcmsOps, ops...)
-	case "lr_token_pool":
-		seed := "lr_token_pool"
-		poolAddress, err = mcmsContract.MCMSRegistry().GetNewCodeObjectAddress(nil, []byte(seed))
+	case changeset.LockReleaseTokenPool:
 		payload, err = lock_release_token_pool.Compile(
-			poolAddress,
+			in.TokenObjAddress,
 			deps.OnChainState.CCIPAddress,
 			deps.OnChainState.MCMSAddress,
-			poolPackageAddress,
+			in.TokenObjAddress,
 			in.TokenAddress,
 			true,
 		)
 		if err != nil {
 			return DeployTokenPoolOutput{}, fmt.Errorf("failed to compile token pool: %w", err)
 		}
-		ops, err := utils.CreateChunksAndStage(payload, mcmsContract, deps.AptosChain.Selector, "", &poolAddress)
+		ops, err := utils.CreateChunksAndStage(payload, mcmsContract, deps.AptosChain.Selector, "", &in.TokenObjAddress)
 		if err != nil {
 			return DeployTokenPoolOutput{}, fmt.Errorf("failed to create chunks for token pool: %w", err)
 		}
@@ -104,15 +102,15 @@ func deployTokenPool(b operations.Bundle, deps AptosDeps, in DeployTokenPoolInpu
 		return DeployTokenPoolOutput{}, fmt.Errorf("invalid token pool type: %s", in.PoolType)
 	}
 	return DeployTokenPoolOutput{
-		MCMSOps:              ops,
-		CCIPTokenPoolAddress: poolAddress,
-		TokenPoolAddress:     poolAddress,
+		MCMSOps:              mcmsOps,
+		CCIPTokenPoolAddress: in.TokenObjAddress,
+		TokenPoolAddress:     in.TokenObjAddress,
 	}, nil
 }
 
 type SetupTokenPoolInput struct {
 	TokenPoolAddress aptos.AccountAddress
-	PoolType         string // TODO: should be a typed const
+	PoolType         deployment.ContractType
 	RemotePools      map[uint64]RemotePool
 }
 
@@ -133,7 +131,7 @@ var SetupTokenPoolOp = operations.NewOperation(
 func setupTokenPool(b operations.Bundle, deps AptosDeps, in SetupTokenPoolInput) ([]types.Transaction, error) {
 	txs := []types.Transaction{}
 	switch in.PoolType {
-	case "bnm_token_pool":
+	case changeset.BurnMintTokenPool:
 		bnmBind := burn_mint_token_pool.Bind(in.TokenPoolAddress, deps.AptosChain.Client)
 		var remoteChainSelectors []uint64
 		var remotePoolAddresses [][][]byte
@@ -190,7 +188,7 @@ func setupTokenPool(b operations.Bundle, deps AptosDeps, in SetupTokenPoolInput)
 		}
 		txs = append(txs, tx)
 
-	case "lr_token_pool":
+	case changeset.LockReleaseTokenPool:
 		lrBind := lock_release_token_pool.Bind(in.TokenPoolAddress, deps.AptosChain.Client)
 
 		var remoteChainSelectors []uint64

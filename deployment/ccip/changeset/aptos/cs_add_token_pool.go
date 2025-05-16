@@ -42,29 +42,41 @@ func (cs AddTokenPool) Apply(env deployment.Environment, cfg config.AddTokenPool
 		AB:               ab,
 		AptosChain:       aptosChain,
 		CCIPOnChainState: state,
+		OnChainState:     state.AptosChains[cfg.ChainSelector],
 	}
 
 	// Deploy Aptos token and pool
-	depInput := seq.DeployTokenPoolSeqInput{}
+	depInput := seq.DeployTokenPoolSeqInput{
+		TokenAddress:    cfg.TokenAddress,
+		TokenObjAddress: cfg.TokenObjAddress,
+		TokenAdmin:      deps.OnChainState.MCMSAddress,
+		PoolType:        cfg.PoolType,
+		TokenParams:     cfg.TokenParams,
+	}
 	deploySeq, err := operations.ExecuteSequence(env.OperationsBundle, seq.DeployAptosTokenPoolSequence, deps, depInput)
 	if err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
 	seqReports = append(seqReports, deploySeq.ExecutionReports...)
 	mcmsOperations = append(mcmsOperations, deploySeq.Output.MCMSOperations...)
-
+	typeAndVersion := deployment.NewTypeAndVersion(deployment.ContractType(fmt.Sprintf("%s-%s", cfg.PoolType, cfg.TokenSymbol)), deployment.Version1_6_0)
+	ab.Save(cfg.ChainSelector, deploySeq.Output.TokenPoolAddress.String(), typeAndVersion)
+	typeAndVersion = deployment.NewTypeAndVersion(deployment.ContractType("TokenObjAddress"), deployment.Version1_6_0)
+	ab.Save(cfg.ChainSelector, deploySeq.Output.TokenObjAddress.String(), typeAndVersion)
+	typeAndVersion = deployment.NewTypeAndVersion(deployment.ContractType("TokenAddress"), deployment.Version1_6_0)
+	ab.Save(cfg.ChainSelector, deploySeq.Output.TokenAddress.String(), typeAndVersion)
 	// Connect token pools EVM -> Aptos
 	connInput := seq.ConnectTokenPoolSeqInput{
 		TokenPoolAddress: deploySeq.Output.TokenPoolAddress,
 		PoolType:         cfg.PoolType,
-		RemotePools:      toRemotePools(cfg.RemoteChainTokenPoolConfig),
+		RemotePools:      toRemotePools(cfg.EVMRemoteConfigs),
 	}
 	connectSeq, err := operations.ExecuteSequence(env.OperationsBundle, seq.ConnectTokenPoolSequence, deps, connInput)
 	if err != nil {
 		return deployment.ChangesetOutput{}, err
 	}
 	seqReports = append(seqReports, connectSeq.ExecutionReports...)
-	mcmsOperations = append(mcmsOperations, deploySeq.Output.MCMSOperations...)
+	mcmsOperations = append(mcmsOperations, connectSeq.Output)
 
 	// Generate Aptos MCMS proposals
 	proposal, err := utils.GenerateProposal(
@@ -87,9 +99,9 @@ func (cs AddTokenPool) Apply(env deployment.Environment, cfg config.AddTokenPool
 	}, nil
 }
 
-func toRemotePools(cfg config.RemoteChainTokenPoolConfig) map[uint64]operation.RemotePool {
+func toRemotePools(evmRemoteCfg map[uint64]config.EVMRemoteConfig) map[uint64]operation.RemotePool {
 	remotePools := make(map[uint64]operation.RemotePool)
-	for chainSelector, remoteConfig := range cfg.EVMRemoteConfigs {
+	for chainSelector, remoteConfig := range evmRemoteCfg {
 		remotePools[chainSelector] = operation.RemotePool{
 			RemotePoolAddress:  remoteConfig.TokenPoolAddress.Bytes(),
 			RemoteTokenAddress: remoteConfig.TokenAddress.Bytes(),

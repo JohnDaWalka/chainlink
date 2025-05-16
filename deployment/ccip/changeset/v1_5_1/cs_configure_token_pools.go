@@ -8,6 +8,7 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
@@ -124,12 +125,44 @@ func (c SolChainUpdate) Validate(state changeset.SolCCIPChainState) error {
 	return nil
 }
 
+// AptosChainUpdate defines the rate limits and token address for an Aptos chain.
+type AptosChainUpdate struct {
+	RateLimiterConfig RateLimiterConfig
+	TokenAddress      string
+	Type              deployment.ContractType
+}
+
+func (c AptosChainUpdate) GetAptosTokenAndTokenPool(state changeset.AptosCCIPChainState) (token aptos.AccountAddress, tokenPoolAddress aptos.AccountAddress, err error) {
+	err = token.ParseStringRelaxed(c.TokenAddress)
+	if err != nil {
+		err = fmt.Errorf("failed to parse token address %s: %w", c.TokenAddress, err)
+		return
+	}
+	switch c.Type {
+	case changeset.BurnMintTokenPool:
+		tokenPoolAddress = state.BurnMintTokenPools[token]
+	case changeset.LockReleaseTokenPool:
+		tokenPoolAddress = state.LockReleaseTokenPools[token]
+	default:
+		err = fmt.Errorf("unknown Aptos token pool type %s", c.Type)
+		return
+	}
+	if c.TokenAddress == "" {
+		err = errors.New("token address must be defined")
+		return
+	}
+	return
+}
+
 // TokenPoolConfig defines all the information required of the user to configure a token pool.
 type TokenPoolConfig struct {
 	// ChainUpdates defines the chains and corresponding rate limits that should be defined on the token pool.
 	ChainUpdates RateLimiterPerChain
 	// SolChainUpdates defines the Solana chains and corresponding rate limits that should be defined on the token pool.
 	SolChainUpdates map[uint64]SolChainUpdate
+	// Type is the type of the token pool.
+	// AptosChainUpdates defines the Aptos chains and corresponding rate limits that should be defined on the token pool.
+	AptosChainUpdates map[uint64]AptosChainUpdate
 	// Type is the type of the token pool.
 	Type deployment.ContractType
 	// Version is the version of the token pool.
@@ -343,6 +376,32 @@ func configureTokenPool(
 				OutboundRateLimiterConfig: chainUpdate.RateLimiterConfig.Outbound,
 				RemoteTokenAddress:        remoteTokenAddress.Bytes(),
 				RemotePoolAddresses:       [][]byte{remotePoolAddress.Bytes()},
+			})
+		}
+	}
+
+	for remoteChainSelector, chainUpdate := range poolUpdate.AptosChainUpdates {
+		remoteTokenAddress, remotePoolAddress, err := chainUpdate.GetAptosTokenAndTokenPool(state.AptosChains[remoteChainSelector])
+		if err != nil {
+			return fmt.Errorf("failed to get solana token and token pool for chain with selector %d: %w", remoteChainSelector, err)
+		}
+		isSupportedChain, err := tokenPool.IsSupportedChain(&bind.CallOpts{Context: ctx}, remoteChainSelector)
+		if err != nil {
+			return fmt.Errorf("failed to check if %d is supported on pool with address %s on %s: %w", remoteChainSelector, tokenPool.Address(), chain.String(), err)
+		}
+		if isSupportedChain {
+			// Just update the rate limits if the chain is already supported
+			remoteChainSelectorsToUpdate = append(remoteChainSelectorsToUpdate, remoteChainSelector)
+			updatedOutboundConfigs = append(updatedOutboundConfigs, chainUpdate.RateLimiterConfig.Outbound)
+			updatedInboundConfigs = append(updatedInboundConfigs, chainUpdate.RateLimiterConfig.Inbound)
+			// we dont need to add a new remote pool because solana only supports one remote pool per token
+		} else {
+			chainAdditions = append(chainAdditions, token_pool.TokenPoolChainUpdate{
+				RemoteChainSelector:       remoteChainSelector,
+				InboundRateLimiterConfig:  chainUpdate.RateLimiterConfig.Inbound,
+				OutboundRateLimiterConfig: chainUpdate.RateLimiterConfig.Outbound,
+				RemoteTokenAddress:        remoteTokenAddress[:],
+				RemotePoolAddresses:       [][]byte{remotePoolAddress[:]},
 			})
 		}
 	}

@@ -1,21 +1,34 @@
 package config
 
 import (
+	"math/big"
+
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/ethereum/go-ethereum/common"
 	fee_quoter "github.com/smartcontractkit/chainlink-aptos/bindings/ccip/fee_quoter"
-	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
+	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 )
 
 type AddTokenPoolConfig struct {
 	// DeployAptosTokenConfig
-	ChainSelector uint64
-	TokenAddress  aptos.AccountAddress
-	DeployAptosTokenPoolConfig
-	TransferAdminRoleConfig
+	ChainSelector                       uint64
+	TokenAddress                        aptos.AccountAddress
+	TokenObjAddress                     aptos.AccountAddress
+	TokenSymbol                         changeset.TokenSymbol
+	PoolType                            deployment.ContractType
 	TokenTransferFeeByRemoteChainConfig map[uint64]fee_quoter.TokenTransferFeeConfig
-	AptosMCMS                           *proposalutils.TimelockConfig
-	RemoteChainTokenPoolConfig
+	EVMRemoteConfigs                    map[uint64]EVMRemoteConfig
+	TokenParams                         TokenParams
+}
+
+type TokenParams struct {
+	MaxSupply *big.Int
+	Name      string
+	Symbol    string
+	Decimals  byte
+	Icon      string
+	Project   string
 }
 
 // // TODO: gather requirements for Aptos token deployment
@@ -23,21 +36,6 @@ type AddTokenPoolConfig struct {
 // 	TokenDecimals uint8
 // 	TokenSymbol   string
 // }
-
-type DeployAptosTokenPoolConfig struct {
-	ChainSelector uint64
-	PoolType      string // TODO: is there a standard or just string?
-}
-
-type TransferAdminRoleConfig struct {
-	NewAdminAddress aptos.AccountAddress
-}
-
-type RemoteChainTokenPoolConfig struct {
-	EVMRemoteConfigs map[uint64]EVMRemoteConfig
-	MCMS             *proposalutils.TimelockConfig
-	Metadata         string
-}
 
 // TODO: use this to get the correct token pool address
 // type EVMRemoteConfig struct {

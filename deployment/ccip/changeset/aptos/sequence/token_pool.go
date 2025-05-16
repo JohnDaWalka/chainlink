@@ -3,6 +3,8 @@ package sequence
 import (
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/config"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/operation"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/utils"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
@@ -10,13 +12,17 @@ import (
 
 // Deploy Token Pool sequence input
 type DeployTokenPoolSeqInput struct {
-	TokenAddress aptos.AccountAddress
-	TokenAdmin   aptos.AccountAddress
-	PoolType     string
+	TokenParams     config.TokenParams
+	TokenAddress    aptos.AccountAddress
+	TokenObjAddress aptos.AccountAddress
+	TokenAdmin      aptos.AccountAddress
+	PoolType        deployment.ContractType
 }
 
 type DeployTokenPoolSeqOutput struct {
 	TokenPoolAddress     aptos.AccountAddress
+	TokenAddress         aptos.AccountAddress
+	TokenObjAddress      aptos.AccountAddress
 	CCIPTokenPoolAddress aptos.AccountAddress
 	MCMSOperations       []mcmstypes.BatchOperation
 }
@@ -30,14 +36,44 @@ var DeployAptosTokenPoolSequence = operations.NewSequence(
 
 func deployAptosTokenPoolSequence(b operations.Bundle, deps operation.AptosDeps, in DeployTokenPoolSeqInput) (DeployTokenPoolSeqOutput, error) {
 	mcmsOperations := []mcmstypes.BatchOperation{}
+	// 0 - Cleanup staging area
+	cleanupInput := operation.CleanupStagingAreaInput{
+		MCMSAddress: deps.OnChainState.MCMSAddress,
+	}
+	cleanupReport, err := operations.ExecuteOperation(b, operation.CleanupStagingAreaOp, deps, cleanupInput)
+	if err != nil {
+		return DeployTokenPoolSeqOutput{}, err
+	}
+	if len(cleanupReport.Output.Transactions) > 0 {
+		mcmsOperations = append(mcmsOperations, cleanupReport.Output)
+	}
+
+	tokenAddress := in.TokenAddress
+	tokenObjAddres := in.TokenObjAddress
 	// 1 - Deploy token (if not deployed)
-	// TODO: Deploy token
+	if in.TokenAddress == (aptos.AccountAddress{}) {
+		deployTInput := operation.DeployTokenInput{
+			MaxSupply: in.TokenParams.MaxSupply,
+			Name:      in.TokenParams.Name,
+			Symbol:    in.TokenParams.Symbol,
+			Decimals:  in.TokenParams.Decimals,
+			Icon:      in.TokenParams.Icon,
+			Project:   in.TokenParams.Project,
+		}
+		deployTReport, err := operations.ExecuteOperation(b, operation.DeployTokenOp, deps, deployTInput)
+		if err != nil {
+			return DeployTokenPoolSeqOutput{}, err
+		}
+		mcmsOperations = append(mcmsOperations, utils.ToBatchOperations(deployTReport.Output.MCMSOps)...)
+		tokenAddress = deployTReport.Output.TokenAddress
+		tokenObjAddres = deployTReport.Output.TokenObjAddress
+	}
 
 	// 2 - Deploy token pool (if not deployed)
 	deployInput := operation.DeployTokenPoolInput{
-		MCMSAddress:  deps.OnChainState.MCMSAddress,
-		PoolType:     in.PoolType,
-		TokenAddress: in.TokenAddress,
+		PoolType:        in.PoolType,
+		TokenAddress:    tokenAddress,
+		TokenObjAddress: tokenObjAddres,
 	}
 	deployReport, err := operations.ExecuteOperation(b, operation.DeployTokenPoolOp, deps, deployInput)
 	if err != nil {
@@ -48,8 +84,8 @@ func deployAptosTokenPoolSequence(b operations.Bundle, deps operation.AptosDeps,
 	// 3 - Transfer admin role
 	txs := []mcmstypes.Transaction{}
 	transferInput := operation.TransferAdminRoleInput{
-		Token:    in.TokenAddress,
-		NewAdmin: in.TokenAdmin,
+		Token:    tokenAddress,
+		NewAdmin: tokenObjAddres,
 	}
 	transferReport, err := operations.ExecuteOperation(b, operation.TransferAdminRoleOp, deps, transferInput)
 	if err != nil {
@@ -58,7 +94,7 @@ func deployAptosTokenPoolSequence(b operations.Bundle, deps operation.AptosDeps,
 	txs = append(txs, transferReport.Output)
 
 	// 4 - Accept admin role
-	acceptReport, err := operations.ExecuteOperation(b, operation.AcceptAdminRoleOp, deps, in.TokenAddress)
+	acceptReport, err := operations.ExecuteOperation(b, operation.AcceptAdminRoleOp, deps, tokenAddress)
 	if err != nil {
 		return DeployTokenPoolSeqOutput{}, err
 	}
@@ -66,7 +102,7 @@ func deployAptosTokenPoolSequence(b operations.Bundle, deps operation.AptosDeps,
 
 	// 5 - Set Pool (token admin registry)
 	setPoolInput := operation.SetPoolInput{
-		TokenAddress: in.TokenAddress,
+		TokenAddress: tokenAddress,
 		PoolAddress:  deployReport.Output.TokenPoolAddress,
 	}
 
@@ -82,6 +118,8 @@ func deployAptosTokenPoolSequence(b operations.Bundle, deps operation.AptosDeps,
 	})
 	return DeployTokenPoolSeqOutput{
 		TokenPoolAddress:     deployReport.Output.TokenPoolAddress,
+		TokenAddress:         tokenAddress,
+		TokenObjAddress:      tokenObjAddres,
 		CCIPTokenPoolAddress: deployReport.Output.CCIPTokenPoolAddress,
 		MCMSOperations:       mcmsOperations,
 	}, nil
@@ -90,7 +128,7 @@ func deployAptosTokenPoolSequence(b operations.Bundle, deps operation.AptosDeps,
 // Connect Token Pool sequence input
 type ConnectTokenPoolSeqInput struct {
 	TokenPoolAddress aptos.AccountAddress
-	PoolType         string // TODO: should be a typed const
+	PoolType         deployment.ContractType // TODO: should be a typed const
 	RemotePools      map[uint64]operation.RemotePool
 }
 

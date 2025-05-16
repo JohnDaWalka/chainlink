@@ -21,6 +21,9 @@ type AptosCCIPChainState struct {
 	CCIPAddress      aptos.AccountAddress
 	LinkTokenAddress aptos.AccountAddress
 
+	BurnMintTokenPools    map[aptos.AccountAddress]aptos.AccountAddress // TokenAddress -> TokenPoolAddress
+	LockReleaseTokenPools map[aptos.AccountAddress]aptos.AccountAddress // TokenAddress -> TokenPoolAddress
+
 	// Test contracts
 	TestRouterAddress aptos.AccountAddress
 	ReceiverAddress   aptos.AccountAddress
