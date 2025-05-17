@@ -190,7 +190,7 @@ func setIdlAuthority(e cldf.Environment, newAuthority, programsPath, programID, 
 
 	data, err := json.MarshalIndent(params, "", " ")
 	if err != nil {
-		e.Logger.Warnf("Failed to pretty print params - falling back to unformatted version, (err = %v)", err)
+		e.Logger.Warnf("Failed to pretty print params - falling back to unformatted version (err = %v)", err)
 		e.Logger.Infow("Setting IDL authority")
 		for k, v := range params {
 			e.Logger.Infof("%s = %s", k, v)
