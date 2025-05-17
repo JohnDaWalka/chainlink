@@ -68,6 +68,7 @@ type BuildSolanaConfig struct {
 
 // Run a command in a specific directory
 func runCommand(command string, args []string, workDir string) (string, error) {
+	fmt.Printf("Executing command: %s\n", command)
 	cmd := exec.Command(command, args...)
 	cmd.Dir = workDir
 	var stdout, stderr bytes.Buffer

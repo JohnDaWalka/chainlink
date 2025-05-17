@@ -180,14 +180,31 @@ func idlInit(e cldf.Environment, programsPath, programID, programName string) er
 
 // set IDL authority for a program
 func setIdlAuthority(e cldf.Environment, newAuthority, programsPath, programID, programName, bufferAccount string) error {
-	e.Logger.Infow("Setting IDL authority", "programName", programName, "newAuthority", newAuthority)
+	params := map[string]string{
+		"New Authority":  newAuthority,
+		"Programs Path":  programsPath,
+		"Program ID":     programID,
+		"Program Name":   programName,
+		"Buffer Account": bufferAccount,
+	}
+
+	data, err := json.MarshalIndent(params, "", " ")
+	if err != nil {
+		e.Logger.Infof("Setting IDL authority:\n%s", string(data))
+	} else {
+		e.Logger.Infow("Setting IDL authority")
+		for k, v := range params {
+			e.Logger.Infof("%s = %s", k, v)
+		}
+	}
+
 	args := []string{"idl", "set-authority", "-n", newAuthority, "-p", programID}
 	if bufferAccount != "" {
 		e.Logger.Infow("Setting IDL authority for buffer", "bufferAccount", bufferAccount)
 		args = append(args, bufferAccount)
 	}
 	e.Logger.Info(args)
-	_, err := runCommand("anchor", args, programsPath)
+	_, err = runCommand("anchor", args, programsPath)
 	if err != nil {
 		return fmt.Errorf("error setting idl authority: %w", err)
 	}
