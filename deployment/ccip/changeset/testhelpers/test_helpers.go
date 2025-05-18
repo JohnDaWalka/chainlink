@@ -665,7 +665,12 @@ func SendRequestSol(
 			return nil, err
 		}
 
-		tokenPool, err := soltokens.NewTokenPool(solana.Token2022ProgramID, tokenPoolPubKey, tokenPubKey)
+		tokenProgramID, err := s.TokenToTokenProgram(tokenPubKey)
+		if err != nil {
+			return nil, err
+		}
+
+		tokenPool, err := soltokens.NewTokenPool(tokenProgramID, tokenPoolPubKey, tokenPubKey)
 		if err != nil {
 			return nil, err
 		}
@@ -695,7 +700,7 @@ func SendRequestSol(
 
 		tokenPool.Billing[cfg.DestChain] = billingPDA
 
-		userTokenAccount, _, err := soltokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, tokenPubKey, sender.PublicKey())
+		userTokenAccount, _, err := soltokens.FindAssociatedTokenAddress(tokenProgramID, tokenPubKey, sender.PublicKey())
 		if err != nil {
 			return nil, err
 		}
