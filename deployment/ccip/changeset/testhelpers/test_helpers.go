@@ -665,11 +665,11 @@ func SendRequestSol(
 			return nil, err
 		}
 
-		tokenAcctInfo, err := client.GetAccountInfo(ctx, tokenPubKey)
+		// NOTE: we use a fallback value of Token2022ProgramID to maintain backwards compatibility with the Solana tests
+		tokenProgramID, err := InferTokenProgramID(ctx, client, tokenPubKey, solana.Token2022ProgramID)
 		if err != nil {
 			return nil, err
 		}
-		tokenProgramID := tokenAcctInfo.Value.Owner
 
 		tokenPool, err := soltokens.NewTokenPool(tokenProgramID, tokenPoolPubKey, tokenPubKey)
 		if err != nil {
@@ -797,6 +797,17 @@ func ConvertSolanaCrossChainAmountToBigInt(amount ccip_router.CrossChainAmount) 
 	bytes := amount.LeBytes[:]
 	slices.Reverse(bytes) // convert to big-endian
 	return big.NewInt(0).SetBytes(bytes)
+}
+
+func InferTokenProgramID(ctx context.Context, client *rpc.Client, tokenPubKey solana.PublicKey, fallbackTokenProgramID solana.PublicKey) (solana.PublicKey, error) {
+	tokenAcctInfo, err := client.GetAccountInfo(ctx, tokenPubKey)
+	if errors.Is(err, rpc.ErrNotFound) {
+		return fallbackTokenProgramID, nil
+	}
+	if err != nil {
+		return solana.PublicKey{}, err
+	}
+	return tokenAcctInfo.Value.Owner, nil
 }
 
 func MatchTokenToTokenPool(ctx context.Context, client *rpc.Client, tokenPubKey solana.PublicKey, tokenPoolPubKeys solana.PublicKeySlice) (solana.PublicKey, error) {
