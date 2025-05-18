@@ -663,10 +663,17 @@ func SendRequestSol(
 		allTokenPools := solana.PublicKeySlice{}
 		allTokenPools = slices.AppendSeq(allTokenPools, maps.Values(s.LockReleaseTokenPools))
 		allTokenPools = slices.AppendSeq(allTokenPools, maps.Values(s.BurnMintTokenPools))
+
+		e.Logger.Infof("Found %d token pools in state - searching for matching token pool", len(allTokenPools))
 		tokenPoolPubKey, err := MatchTokenToTokenPool(ctx, client, tokenPubKey, allTokenPools)
 		if err != nil {
 			return nil, err
 		}
+
+		e.Logger.Infof("Token '%s' was matched to token pool '%s'",
+			tokenPubKey.String(),
+			tokenPoolPubKey.String(),
+		)
 
 		// NOTE: we use a fallback value of Token2022ProgramID to maintain backwards compatibility with the Solana tests
 		tokenProgramID, err := InferTokenProgramID(ctx, client, tokenPubKey, solana.Token2022ProgramID)
