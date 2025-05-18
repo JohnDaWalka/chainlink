@@ -660,7 +660,10 @@ func SendRequestSol(
 	for _, tokenAmount := range message.TokenAmounts {
 		tokenPubKey := tokenAmount.Token
 
-		tokenPoolPubKey, err := MatchTokenToTokenPool(ctx, client, tokenPubKey, []solana.PublicKey{s.LockReleaseTokenPools[shared.CLLMetadata], s.BurnMintTokenPools[shared.CLLMetadata]})
+		allTokenPools := solana.PublicKeySlice{}
+		allTokenPools = slices.AppendSeq(allTokenPools, maps.Values(s.LockReleaseTokenPools))
+		allTokenPools = slices.AppendSeq(allTokenPools, maps.Values(s.BurnMintTokenPools))
+		tokenPoolPubKey, err := MatchTokenToTokenPool(ctx, client, tokenPubKey, allTokenPools)
 		if err != nil {
 			return nil, err
 		}
