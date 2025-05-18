@@ -665,10 +665,11 @@ func SendRequestSol(
 			return nil, err
 		}
 
-		tokenProgramID, err := s.TokenToTokenProgram(tokenPubKey)
+		tokenAcctInfo, err := client.GetAccountInfo(ctx, tokenPubKey)
 		if err != nil {
 			return nil, err
 		}
+		tokenProgramID := tokenAcctInfo.Value.Owner
 
 		tokenPool, err := soltokens.NewTokenPool(tokenProgramID, tokenPoolPubKey, tokenPubKey)
 		if err != nil {
