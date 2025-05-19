@@ -36,7 +36,7 @@ type standardCapabilities struct {
 	startTimeout time.Duration
 }
 
-func newStandardCapabilities(
+func NewStandardCapabilities(
 	log logger.Logger,
 	spec *job.StandardCapabilitiesSpec,
 	pluginRegistrar plugins.RegistrarConfig,
