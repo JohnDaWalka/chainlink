@@ -157,7 +157,7 @@ func WorkerWorkflowRegistry(workflowRegistryAddr common.Address, homeChainID uin
 	Address = "%s"
 	NetworkID = "evm"
 	ChainID = "%d"
-	# SyncStrategy = "reconciliation"
+	SyncStrategy = "reconciliation"
 `,
 		workflowRegistryAddr.Hex(),
 		homeChainID,
