@@ -1313,6 +1313,7 @@ func DeployTransferableTokenSolana(
 				ChainSelector: solChainSel,
 				TokenPubKey:   solTokenAddress,
 				PoolType:      &bnm,
+				Metadata:      shared.CLLMetadata,
 			},
 		),
 	)
@@ -1343,6 +1344,7 @@ func DeployTransferableTokenSolana(
 				SolChainSelector: solChainSel,
 				SolTokenPubKey:   solTokenAddress,
 				SolPoolType:      &bnm,
+				Metadata:         shared.CLLMetadata,
 				EVMRemoteConfigs: map[uint64]ccipChangeSetSolana.EVMRemoteConfig{
 					evmChainSel: {
 						TokenSymbol: shared.TokenSymbol(evmTokenName),
@@ -1395,6 +1397,7 @@ func DeployTransferableTokenSolana(
 				PoolType:        &bnm,
 				TokenPubKey:     solTokenAddress,
 				WritableIndexes: []uint8{3, 4, 7},
+				Metadata:        shared.CLLMetadata,
 			},
 		),
 	)
