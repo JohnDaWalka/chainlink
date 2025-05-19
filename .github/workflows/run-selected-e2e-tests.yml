@@ -14,7 +14,7 @@ on:
           Chainlink image versions. Example:
           "5733cdcda9a9fc6da6343798b119b2ae136146cd,0b7d2c497a508efa5a827714780d908b7b8eda19"'
         required: false
-        type: string            
+        type: string
       test_ids:
         description: 'Run all tests "*" by default. Or, enter test IDs to run separated by commas. Example: "run_all_in_ocr_tests_go,run_TestOCRv2Request_in_ocr2_test_go". Check all test IDs in .github/e2e-tests.yml'
         default: "*"
@@ -58,6 +58,7 @@ jobs:
       with_existing_remote_runner_version: ${{ github.event.inputs.with_existing_remote_runner_version }}
       test_secrets_override_key: ${{ github.event.inputs.test_secrets_override_key }}
       extraArgs: ${{ github.event.inputs.extraArgs }}
+      team: none
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
