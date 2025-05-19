@@ -113,3 +113,8 @@ contracts/out/
 # Used by plugins/chianlink.prebuilt.Dockerfile
 bin/
 lib/
+
+# artifacts of CRE environment creatio or CRE CLI usage
+core/scripts/cre/environment/*.yaml
+core/scripts/cre/environment/*.yml
+core/scripts/cre/environment/logs/
