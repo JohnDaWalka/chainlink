@@ -812,7 +812,7 @@ func ConvertSolanaCrossChainAmountToBigInt(amount ccip_router.CrossChainAmount) 
 func InferSolanaTokenProgramID(ctx context.Context, client *rpc.Client, tokenPubKey solana.PublicKey) (solana.PublicKey, error) {
 	_, err := GetSolanaTokenMintInfo(tokenPubKey)
 	if err != nil {
-		return solana.PublicKey{}, fmt.Errorf("expected '%s' to be a token public key: %w", err)
+    return solana.PublicKey{}, fmt.Errorf("expected '%s' to be a token public key: (err = %w)", tokenPubKey, err)
 	}
 
 	tokenAcctInfo, err := client.GetAccountInfo(ctx, tokenPubKey)
