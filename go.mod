@@ -28,6 +28,7 @@ require (
 	github.com/gin-contrib/sessions v0.0.5
 	github.com/gin-contrib/size v0.0.0-20230212012657-e14a14094dc4
 	github.com/gin-gonic/gin v1.10.0
+	github.com/go-co-op/gocron/v2 v2.16.1
 	github.com/go-ldap/ldap/v3 v3.4.6
 	github.com/go-viper/mapstructure/v2 v2.2.1
 	github.com/go-webauthn/webauthn v0.9.4
@@ -47,7 +48,7 @@ require (
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/jonboulle/clockwork v0.4.0
+	github.com/jonboulle/clockwork v0.5.0
 	github.com/jpillora/backoff v1.0.0
 	github.com/kylelemons/godebug v1.1.0
 	github.com/leanovate/gopter v0.2.11
@@ -76,7 +77,7 @@ require (
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250515091132-6c08936b29ab
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250515132731-ad40fab9b75e
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250515101002-90b1d1b66ce4
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250516163504-5d5e3379929b
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250417193446-eeb0a7d1e049
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250515125821-cae192cd18bb
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135
