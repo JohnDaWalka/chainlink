@@ -676,7 +676,7 @@ func SendRequestSol(
 			tokenPoolPubKey.String(),
 		)
 
-		tokenProgramID, err := InferTokenProgramID(ctx, client, tokenPubKey)
+		tokenProgramID, err := InferSolanaTokenProgramID(ctx, client, tokenPubKey)
 		if err != nil {
 			return nil, err
 		}
@@ -809,7 +809,7 @@ func ConvertSolanaCrossChainAmountToBigInt(amount ccip_router.CrossChainAmount) 
 	return big.NewInt(0).SetBytes(bytes)
 }
 
-func InferTokenProgramID(ctx context.Context, client *rpc.Client, tokenPubKey solana.PublicKey) (solana.PublicKey, error) {
+func InferSolanaTokenProgramID(ctx context.Context, client *rpc.Client, tokenPubKey solana.PublicKey) (solana.PublicKey, error) {
 	_, err := GetSolanaTokenMintInfo(tokenPubKey)
 	if err != nil {
 		return solana.PublicKey{}, fmt.Errorf("expected '%s' to be a token public key: %w", err)
