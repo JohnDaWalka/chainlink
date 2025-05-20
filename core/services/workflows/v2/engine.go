@@ -190,6 +190,8 @@ func (e *Engine) runTriggerSubscriptionPhase(ctx context.Context) error {
 		registrationID := fmt.Sprintf("trigger_reg_%s_%d", e.cfg.WorkflowID, i)
 		// TODO(CAPPL-737): run with a timeout
 		e.cfg.Lggr.Debugw("Registering trigger", "triggerID", sub.Id, "method", sub.Method)
+		deadline, ok := ctx.Deadline()
+		e.cfg.Lggr.Debugw("read parent ctx", "deadline", deadline, "deadline exists?", ok)
 		triggerEventCh, err := triggerCap.RegisterTrigger(ctx, capabilities.TriggerRegistrationRequest{
 			TriggerID: registrationID,
 			Metadata: capabilities.RequestMetadata{
@@ -228,8 +230,13 @@ func (e *Engine) runTriggerSubscriptionPhase(ctx context.Context) error {
 					return
 				case event, isOpen := <-triggerEventCh:
 					if !isOpen {
+						d, ok := srvcCtx.Deadline()
+						e.cfg.Lggr.Debug("trigger channel is closed", "ctx err", srvcCtx.Err(), "ctx deadline", d, "ctx d ok", ok)
 						return
 					}
+
+					e.cfg.Lggr.Debugw("got an event to queue", "event", event)
+
 					select {
 					case e.allTriggerEventsQueueCh <- enqueuedTriggerEvent{
 						triggerCapID: subs.Subscriptions[idx].Id,
@@ -255,12 +262,15 @@ func (e *Engine) handleAllTriggerEvents(ctx context.Context) {
 			return
 		case queueHead, isOpen := <-e.allTriggerEventsQueueCh:
 			if !isOpen {
+				e.cfg.Lggr.Debug("trigger event channel is closed")
 				return
 			}
 			// TODO(CAPPL-737): check if expired
+			e.cfg.Lggr.Debugw("handling trigger event", "event", queueHead.event.Event, "id", queueHead.triggerCapID)
 			select {
 			case e.executionsSemaphore <- struct{}{}: // block if too many concurrent workflow executions
 				e.srvcEng.Go(func(srvcCtx context.Context) {
+					e.cfg.Lggr.Debugw("starting execution", "head", queueHead.event, "id", queueHead.triggerCapID)
 					e.startExecution(srvcCtx, queueHead)
 					<-e.executionsSemaphore
 				})
@@ -288,6 +298,8 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 		// TODO(CAPPL-736): observability
 		return
 	}
+
+	e.cfg.Lggr.Debugw("executing request", "tid", tid, "payload", triggerEvent.Payload)
 
 	result, err := e.cfg.Module.Execute(subCtx, &wasmpb.ExecuteRequest{
 		Id: executionID,
@@ -327,6 +339,8 @@ func (e *Engine) CallCapability(ctx context.Context, request *sdkpb.CapabilityRe
 		return nil, fmt.Errorf("trigger capability not found: %w", err)
 	}
 
+	e.cfg.Lggr.Debugw("got executable", "req", request)
+
 	capReq := capabilities.CapabilityRequest{
 		Payload:      request.Payload,
 		Method:       request.Method,
@@ -341,6 +355,9 @@ func (e *Engine) CallCapability(ctx context.Context, request *sdkpb.CapabilityRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute capability: %w", err)
 	}
+
+	e.cfg.Lggr.Debugw("called execute", "resp", capResp)
+
 	return &sdkpb.CapabilityResponse{
 		Response: &sdkpb.CapabilityResponse_Payload{
 			Payload: capResp.Payload,
@@ -362,6 +379,7 @@ func (e *Engine) close() error {
 
 // NOTE: needs to be called under the triggersRegMu lock
 func (e *Engine) unregisterAllTriggers(ctx context.Context) {
+	e.cfg.Lggr.Debug("engine has asked to unregister all triggers")
 	for registrationID, trigger := range e.triggers {
 		err := trigger.UnregisterTrigger(ctx, capabilities.TriggerRegistrationRequest{
 			TriggerID: registrationID,

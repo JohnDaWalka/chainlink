@@ -7,10 +7,10 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"go.uber.org/zap/zapcore"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
@@ -57,6 +57,15 @@ func main() {
 	logCfg := logger.Config{LogLevel: logLevel}
 	lggr, _ := logCfg.New()
 
+	run(ctx, lggr, binary, config)
+}
+
+// run instantiates the engine, starts it and blocks until the context is canceled.
+func run(
+	ctx context.Context,
+	lggr logger.Logger,
+	binary, config []byte,
+) {
 	// Create the registry and fake capabilities
 	registry := capabilities.NewRegistry(lggr)
 	registry.SetLocalRegistry(&capabilities.TestMetadataRegistry{})
@@ -66,28 +75,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	run(ctx, lggr, registry, capabilities, binary, config)
-}
-
-// run instantiates the engine, starts it and blocks until the context is canceled.
-func run(
-	ctx context.Context,
-	lggr logger.Logger,
-	registry *capabilities.Registry,
-	capabilities []services.Service,
-	binary, config []byte) {
-	engine, err := NewStandaloneEngine(ctx, lggr, registry, binary, config)
-	if err != nil {
-		fmt.Printf("Failed to create engine: %v\n", err)
-		os.Exit(1)
-	}
-
 	for _, cap := range capabilities {
 		if err2 := cap.Start(ctx); err2 != nil {
 			fmt.Printf("Failed to start capability: %v\n", err2)
 			os.Exit(1)
 		}
 	}
+
+	lggr.Debug("waiting for 5 seconds to let cron spin up")
+	<-time.After(5 * time.Second)
+
+	lggr.Debug("about to initialize the engine")
+	engine, err := NewStandaloneEngine(ctx, lggr, registry, binary, config)
+	if err != nil {
+		fmt.Printf("Failed to create engine: %v\n", err)
+		os.Exit(1)
+	}
+
 	err = engine.Start(ctx)
 	if err != nil {
 		fmt.Printf("Failed to start engine: %v\n", err)
