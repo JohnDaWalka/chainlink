@@ -50,7 +50,7 @@ func (c TonTestDeployPrerequisitesChangeSet) Apply(e deployment.Environment) (de
 	for _, chainSelector := range c.TonChainSelectors {
 		tonChainState := onchainState.TonChains[chainSelector]
 		// TODO: replace with a real token address instead of none
-		tonChainState.LinkTokenAddress = tonaddress.NewAddressNone()
+		tonChainState.LinkTokenAddress = *tonaddress.NewAddressNone()
 		err = changeset.SaveOnchainStateTon(chainSelector, tonChainState, e)
 		require.NoError(t, err)
 	}
@@ -134,7 +134,7 @@ func (c TonTestDeployContractsChangeSet) deployTonContracts(t *testing.T, e depl
 	//TODO(ton): Deploy Ton CCIP Dummy Receiver and set the contract address
 	ccipDummyReceiverAddress := tonaddress.NewAddressNone()
 
-	tonChainState.ReceiverAddress = ccipDummyReceiverAddress
+	tonChainState.ReceiverAddress = *ccipDummyReceiverAddress
 	//tonChainState.ReceiverAddress = ton.AccountOne
 
 	//TODO(ton): Initialize Onramp

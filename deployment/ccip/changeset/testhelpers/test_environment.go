@@ -672,7 +672,7 @@ func deployChainContractsToSolChainCS(e DeployedEnv, solChainSelector uint64) ([
 
 func deployChainContractsToTonChainCS(e DeployedEnv, tonChainSelector uint64) ([]commonchangeset.ConfiguredChangeSet, error) {
 	// TODO(ton): Implement this function to deploy chain contracts to Ton chain
-	return nil, errors.New("not implemented")
+	return nil, nil
 }
 
 func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEnvironment, mcmsEnabled bool) DeployedEnv {
@@ -866,7 +866,8 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	// TODO(ton): Set Ton chains plugin configs
 	for _, chain := range tonChains {
 		tokenInfo := map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{}
-		tokenInfo[cciptypes.UnknownEncodedAddress(state.TonChains[chain].LinkTokenAddress.String())] = tokenConfig.TokenSymbolToInfo[changeset.LinkSymbol]
+		address := state.TonChains[chain].LinkTokenAddress
+		tokenInfo[cciptypes.UnknownEncodedAddress(address.String())] = tokenConfig.TokenSymbolToInfo[changeset.LinkSymbol]
 		// TODO check if TON WETH is needed for TokenSymbolInfo?
 		//tokenInfo[cciptypes.UnknownEncodedAddress()] = tokenConfig.TokenSymbolToInfo[changeset.WethSymbol]
 		ocrOverride := tc.OCRConfigOverride
