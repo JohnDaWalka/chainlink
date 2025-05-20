@@ -68,6 +68,7 @@ var (
 func GenerateKeystoneChainView(
 	ctx context.Context,
 	lggr logger.Logger,
+	chain cldf.Chain,
 	prevView KeystoneChainView,
 	contracts viewContracts,
 ) (KeystoneChainView, error) {
@@ -191,7 +192,7 @@ func GenerateKeystoneChainView(
 					errCh <- ctx.Err()
 					return
 				default:
-					fwrView, fwrErr := GenerateForwarderView(ctx, fwrCopy, prevViews)
+					fwrView, fwrErr := GenerateForwarderView(ctx, chain.Client, fwrCopy, prevViews)
 					if fwrErr != nil {
 						// don't block view on single forwarder not being configured
 						switch {
@@ -323,16 +324,29 @@ func GenerateOCR3ConfigView(ctx context.Context, ocr3Cap ocr3_capability.OCR3Cap
 	}, nil
 }
 
-func GenerateForwarderView(ctx context.Context, f *forwarder.KeystoneForwarder, prevViews []ForwarderView) ([]ForwarderView, error) {
+func GenerateForwarderView(ctx context.Context, client cldf.OnchainClient, f *forwarder.KeystoneForwarder, prevViews []ForwarderView) ([]ForwarderView, error) {
 	startBlock := uint64(0)
 
+	// Track seen transactions to avoid duplicates
+	seenTxs := make(map[string]struct{})
+	var seenTxsMu sync.Mutex
+
+	// Initialize with previous views
+	forwarderViews := make([]ForwarderView, 0, len(prevViews))
 	if len(prevViews) > 0 {
 		// Sort `prevViews` by block number in ascending order, we make sure the last item has the highest block number
 		sort.Slice(prevViews, func(i, j int) bool {
 			return prevViews[i].BlockNumber < prevViews[j].BlockNumber
 		})
 
-		// If we have previous views, we will start from the last block number +1 of the previous views
+		// Add previous events to the seen map and result list
+		for _, prevView := range prevViews {
+			if prevView.TxHash != "" {
+				seenTxs[prevView.TxHash] = struct{}{}
+			}
+			forwarderViews = append(forwarderViews, prevView)
+		}
+
 		startBlock = prevViews[len(prevViews)-1].BlockNumber + 1
 	} else {
 		// If we don't have previous views, we will start from the deployment block number
@@ -364,56 +378,214 @@ func GenerateForwarderView(ctx context.Context, f *forwarder.KeystoneForwarder, 
 		}
 	}
 
-	// Let's fetch the `SetConfig` events since the deployment block, since we don't have specific block numbers
-	// for the `SetConfig` events.
-	// If no deployment block is available, it will start from 0.
-	configIterator, err := f.FilterConfigSet(&bind.FilterOpts{
-		Start:   startBlock,
-		End:     nil,
-		Context: ctx,
-	}, nil, nil)
+	header, err := client.HeaderByNumber(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error filtering ConfigSet events: %w", err)
+		return nil, fmt.Errorf("error getting latest block header: %w", err)
+	}
+	currentBlock := header.Number.Uint64()
+
+	// Early exit if no new blocks to process
+	if startBlock > currentBlock {
+		return forwarderViews, nil
 	}
 
-	configSets := make([]*forwarder.KeystoneForwarderConfigSet, 0)
-	for configIterator.Next() {
-		// We wait for the iterator to receive an event
-		if configIterator.Event == nil {
-			// We cannot return an error, since we are capturing all `SetConfig` events, so if there's a nil event,
-			// we ignore it.
-			continue
-		}
-		configSets = append(configSets, configIterator.Event)
-	}
-	if len(configSets) == 0 {
-		// Forwarder is not configured only if we don't have any previous configuration events.
-		if len(prevViews) == 0 {
-			return nil, ErrForwarderNotConfigured
-		}
+	// Create a context with timeout for the pagination process
+	paginationCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
 
-		// If we don't have any new config sets, we return the previous views as is.
-		return prevViews, nil
+	const pageSize = uint64(100000)
+	const maxConcurrentWorkers = 5 // Limit concurrent RPC calls
+
+	// Calculate the number of pages
+	totalPages := (currentBlock - startBlock + pageSize) / pageSize
+	if totalPages == 0 {
+		totalPages = 1
 	}
 
-	// We now create a slice with all previous views and the new views, so they get all added to the final view.
-	forwarderViews := append([]ForwarderView{}, prevViews...)
-	for _, configSet := range configSets {
-		var readableSigners []string
-		for _, s := range configSet.Signers {
-			readableSigners = append(readableSigners, s.String())
+	// Create work channels
+	type pageRange struct {
+		start, end uint64
+	}
+	workCh := make(chan pageRange, totalPages)
+	resultCh := make(chan []ForwarderView, totalPages)
+	errorCh := make(chan error, totalPages)
+
+	// Fill a work channel with page ranges
+	for pageStart := startBlock; pageStart <= currentBlock; pageStart += pageSize {
+		pageEnd := pageStart + pageSize - 1
+		if pageEnd > currentBlock {
+			pageEnd = currentBlock
 		}
-		forwarderViews = append(forwarderViews, ForwarderView{
-			DonID:         configSet.DonId,
-			ConfigVersion: configSet.ConfigVersion,
-			F:             configSet.F,
-			Signers:       readableSigners,
-			TxHash:        configSet.Raw.TxHash.String(),
-			BlockNumber:   configSet.Raw.BlockNumber,
-		})
+		workCh <- pageRange{start: pageStart, end: pageEnd}
+	}
+	close(workCh)
+
+	// Start workers (limited to maxConcurrentWorkers)
+	var wg sync.WaitGroup
+	workerCount := int(math.Min(float64(totalPages), float64(maxConcurrentWorkers)))
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for page := range workCh {
+				// Check context before starting work
+				if paginationCtx.Err() != nil {
+					return
+				}
+
+				views, fvErr := processForwarderViewBlockRange(paginationCtx, f, page.start, page.end, seenTxs, &seenTxsMu)
+				if fvErr != nil {
+					errorCh <- fvErr
+					continue
+				}
+
+				if len(views) > 0 {
+					resultCh <- views
+				}
+			}
+		}()
+	}
+
+	// Wait for all workers and close channels
+	go func() {
+		wg.Wait()
+		close(resultCh)
+		close(errorCh)
+	}()
+
+	// Collect results and errors
+	var newViews []ForwarderView
+	var partialErrors []error
+
+	for views := range resultCh {
+		newViews = append(newViews, views...)
+	}
+
+	for err := range errorCh {
+		partialErrors = append(partialErrors, err)
+	}
+
+	// Add new views to result
+	forwarderViews = append(forwarderViews, newViews...)
+
+	// Return error if no data and not continuing previous views
+	if len(forwarderViews) == 0 && len(prevViews) == 0 {
+		return nil, ErrForwarderNotConfigured
+	}
+
+	// Sort results by block number
+	sort.Slice(forwarderViews, func(i, j int) bool {
+		return forwarderViews[i].BlockNumber < forwarderViews[j].BlockNumber
+	})
+
+	// Return partial results with error if applicable
+	if len(partialErrors) > 0 {
+		return forwarderViews, fmt.Errorf("partial results with errors: %w", errors.Join(partialErrors...))
 	}
 
 	return forwarderViews, nil
+}
+
+func processForwarderViewBlockRange(ctx context.Context, f *forwarder.KeystoneForwarder, startBlock, endBlock uint64,
+	seenTxs map[string]struct{}, seenTxsMu *sync.Mutex) ([]ForwarderView, error) {
+	const maxRetries = 3
+	var views []ForwarderView
+
+	// Try with retries for transient errors
+	var configIterator *forwarder.KeystoneForwarderConfigSetIterator
+	var iterErr error
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(time.Duration(1<<attempt) * 200 * time.Millisecond):
+				// Continue with retry
+			}
+		}
+
+		// Check if the context is still valid
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
+		// Create request context with timeout for this specific page
+		pageCtx, pageCancel := context.WithTimeout(ctx, 30*time.Second)
+
+		configIterator, iterErr = f.FilterConfigSet(&bind.FilterOpts{
+			Start:   startBlock,
+			End:     &endBlock,
+			Context: pageCtx,
+		}, nil, nil)
+
+		pageCancel() // Cancel the page context
+
+		if iterErr == nil || errors.Is(iterErr, context.Canceled) {
+			break // Success or intended cancellation
+		}
+	}
+
+	if iterErr != nil {
+		return nil, fmt.Errorf("error filtering blocks %d-%d: %w", startBlock, endBlock, iterErr)
+	}
+
+	// Process events
+	func() {
+		defer configIterator.Close()
+
+		for configIterator.Next() {
+			// Check for context cancellation
+			if ctx.Err() != nil {
+				return
+			}
+
+			event := configIterator.Event
+			if event == nil {
+				continue
+			}
+
+			txHash := event.Raw.TxHash.String()
+
+			// Thread-safe check of seen transactions
+			seenTxsMu.Lock()
+			seen := false
+			if _, exists := seenTxs[txHash]; exists {
+				seen = true
+			} else {
+				seenTxs[txHash] = struct{}{}
+			}
+			seenTxsMu.Unlock()
+
+			if seen {
+				continue
+			}
+
+			var readableSigners []string
+			for _, s := range event.Signers {
+				readableSigners = append(readableSigners, s.String())
+			}
+
+			views = append(views, ForwarderView{
+				DonID:         event.DonId,
+				ConfigVersion: event.ConfigVersion,
+				F:             event.F,
+				Signers:       readableSigners,
+				BlockNumber:   event.Raw.BlockNumber,
+				TxHash:        txHash,
+			})
+		}
+
+		if err := configIterator.Error(); err != nil {
+			iterErr = fmt.Errorf("iterator error for blocks %d-%d: %w", startBlock, endBlock, err)
+		}
+	}()
+
+	if iterErr != nil {
+		return views, iterErr
+	}
+
+	return views, nil
 }
 
 func millisecondsToUint32(dur time.Duration) uint32 {

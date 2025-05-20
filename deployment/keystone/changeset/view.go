@@ -66,7 +66,7 @@ func ViewKeystone(e deployment.Environment, previousView json.Marshaler) (json.M
 			viewErrs = errors.Join(viewErrs, err2)
 			continue
 		}
-		v, err := GenerateKeystoneChainView(e.GetContext(), e.Logger, prevView.Chains[chainName], contracts)
+		v, err := GenerateKeystoneChainView(e.GetContext(), e.Logger, e.Chains[chainSel], prevView.Chains[chainName], contracts)
 		if err != nil {
 			err2 := fmt.Errorf("failed to view chain %s: %w", chainName, err)
 			lggr.Error(err2)
