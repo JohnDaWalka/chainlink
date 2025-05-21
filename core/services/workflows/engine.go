@@ -173,6 +173,8 @@ func (e *Engine) Start(_ context.Context) error {
 
 		e.wg.Add(e.maxWorkerLimit)
 		for i := 0; i < e.maxWorkerLimit; i++ {
+			deadline, exists := ctx.Deadline()
+			e.logger.Debugw("context for worker", "deadline", deadline, "exists", exists)
 			go e.worker(ctx)
 		}
 
@@ -705,6 +707,8 @@ func (e *Engine) worker(ctx context.Context) {
 	for {
 		select {
 		case pendingStepRequest := <-e.pendingStepRequests:
+			deadline, exists := ctx.Deadline()
+			e.logger.Debugw("context for step request", "deadline", deadline, "exists", exists)
 			e.workerForStepRequest(ctx, pendingStepRequest)
 		case resp, isOpen := <-e.triggerEvents:
 			if !isOpen {
@@ -779,6 +783,8 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 	logCustMsg(ctx, cma, "executing step", l)
 
 	stepExecutionStartTime := time.Now()
+	deadline, exists := ctx.Deadline()
+	l.Debugw("context deadline for step", "deadline", deadline, "exists", exists)
 	inputs, response, sErr := e.executeStep(ctx, l, msg)
 	stepExecutionDuration := time.Since(stepExecutionStartTime).Seconds()
 
@@ -997,6 +1003,8 @@ func (e *Engine) executeStep(ctx context.Context, lggr logger.Logger, msg stepRe
 			stepTimeoutDuration = time.Duration(desiredTimeout) * time.Second
 		}
 	}
+
+	e.logger.Debugw("computed step timeout duration", "stepTimeoutDuration", stepTimeoutDuration, "original timeout for step", e.stepTimeoutDuration)
 
 	ln := e.localNode.Load()
 	tr := capabilities.CapabilityRequest{

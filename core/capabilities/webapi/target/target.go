@@ -101,7 +101,7 @@ func getPayload(lggr logger.Logger, input webapicap.TargetPayload, cfg webapicap
 	method := defaultIfNil(input.Method, DefaultHTTPMethod)
 	body := defaultIfNil(input.Body, "")
 	timeoutMs := defaultIfNil(cfg.TimeoutMs, DefaultTimeoutMs)
-	lggr.Debugw("set timeout", "timeout", timeoutMs)
+	lggr.Debugw("set timeout", "timeout", timeoutMs, "workflowID", req.Metadata.WorkflowID, "workflowExecutionID", req.Metadata.WorkflowExecutionID)
 	if timeoutMs > MaxTimeoutMs {
 		return ghcapabilities.Request{}, fmt.Errorf("timeoutMs must be between 0 and %d", MaxTimeoutMs)
 	}

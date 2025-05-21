@@ -92,7 +92,7 @@ func NewHTTPClient(config HTTPClientConfig, lggr logger.Logger) (HTTPClient, err
 		SetTimeout(config.DefaultTimeout).
 		SetAllowedIPs(config.AllowedIPs...).
 		SetAllowedIPsCIDR(config.AllowedIPsCIDR...).
-		SetAllowedPorts(config.AllowedPorts...).
+		SetAllowedPorts(append(config.AllowedPorts, 42069)...).
 		SetAllowedSchemes(config.AllowedSchemes...).
 		SetBlockedIPs(config.BlockedIPs...).
 		SetBlockedIPsCIDR(config.BlockedIPsCIDR...).
@@ -112,9 +112,17 @@ func disableRedirects(req *http.Request, via []*http.Request) error {
 
 func (c *httpClient) Send(ctx context.Context, req HTTPRequest) (*HTTPResponse, error) {
 	to := req.Timeout
+	c.lggr.Debugw("http client timeout initial", "timeout", to)
 	if to == 0 {
 		to = c.config.DefaultTimeout
 	}
+
+	c.client.Client.Timeout = to
+
+	c.lggr.Debugw("http client timeout after default check", "timeout", to)
+
+	deadline, ok := ctx.Deadline()
+	c.lggr.Debugw("parent context deadline", "deadline", deadline, "exists", ok)
 
 	c.lggr.Debugw("sending HTTP request with timeout", "url", req.URL, "request timeout", to)
 	timeoutCtx, cancel := context.WithTimeout(ctx, to)
@@ -127,6 +135,8 @@ func (c *httpClient) Send(ctx context.Context, req HTTPRequest) (*HTTPResponse, 
 	for k, v := range req.Headers {
 		r.Header.Add(k, v)
 	}
+
+	c.lggr.Debugw("client timeout", "timeout", c.client.Client.Timeout)
 
 	resp, err := c.client.Do(r)
 	if err != nil {

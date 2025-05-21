@@ -355,7 +355,7 @@ func (f *outgoingConnectorFetcherFactory) NewFetcher(log logger.Logger, emitter 
 			f.idGenerator(),
 		}, "/")
 
-		log.Debugw("passing request timeout in fetcher", "timeout", req.TimeoutMs)
+		log.Debugw("passing request timeout in fetcher", "timeout", req.TimeoutMs, "workflowID", req.Metadata.WorkflowID, "workflowExecutionID", req.Metadata.WorkflowExecutionID)
 		resp, err := f.outgoingConnectorHandler.HandleSingleNodeRequest(ctx, messageID, ghcapabilities.Request{
 			URL:        req.URL,
 			Method:     req.Method,
