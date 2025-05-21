@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	CRECLISettingsFileName     = "cre.yaml"
+	CRECLISettingsFileName     = "project.yaml"
 	CRECLIWorkflowSettingsFile = "workflow.yaml"
 	CRECLIProfile              = "test"
 )

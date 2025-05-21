@@ -17,5 +17,5 @@ cre_v*
 crib-configs/
 cache/
 
-cre.yaml
+project.yaml
 *.state.yaml
