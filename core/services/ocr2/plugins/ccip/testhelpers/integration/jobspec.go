@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"text/template"
+	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -234,14 +235,10 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*OCR2TaskJobSpec, error) {
 		"offRamp": fmt.Sprintf(`"%s"`, params.OffRamp.Hex()),
 	}
 	if params.TokenPricesUSDPipeline != "" {
-		pluginConfig["tokenPricesUSDPipeline"] = fmt.Sprintf(`"""
-%s
-"""`, params.TokenPricesUSDPipeline)
+		pluginConfig["tokenPricesUSDPipeline"] = strconv.Quote(params.TokenPricesUSDPipeline)
 	}
 	if params.PriceGetterConfig != "" {
-		pluginConfig["priceGetterConfig"] = fmt.Sprintf(`"""
-%s
-"""`, params.PriceGetterConfig)
+		pluginConfig["priceGetterConfig"] = strconv.Quote(params.PriceGetterConfig)
 	}
 
 	ocrSpec := job.OCR2OracleSpec{
