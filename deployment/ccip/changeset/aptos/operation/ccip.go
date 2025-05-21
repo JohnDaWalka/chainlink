@@ -103,7 +103,7 @@ func generateDeployCCIPProposal(b operations.Bundle, deps AptosDeps, in DeployCC
 
 	// Compile, chunk and get CCIP deploy operations
 	mcmsContract := mcmsbind.Bind(in.MCMSAddress, deps.AptosChain.Client)
-	ccipObjectAddress, operations, err := getCCIPDeployMCMSOps(mcmsContract, deps.AptosChain.Selector, &deps.OnChainState.CCIPAddress)
+	ccipObjectAddress, operations, err := getCCIPDeployMCMSOps(mcmsContract, deps.AptosChain.Selector, deps.OnChainState.CCIPAddress)
 	if err != nil {
 		return DeployCCIPOutput{}, fmt.Errorf("failed to compile and create deploy operations: %w", err)
 	}
@@ -124,27 +124,28 @@ func generateDeployCCIPProposal(b operations.Bundle, deps AptosDeps, in DeployCC
 	}, nil
 }
 
-func getCCIPDeployMCMSOps(mcmsContract mcmsbind.MCMS, chainSel uint64, ccipAddress *aptos.AccountAddress) (aptos.AccountAddress, []types.Operation, error) {
+func getCCIPDeployMCMSOps(mcmsContract mcmsbind.MCMS, chainSel uint64, ccipAddress aptos.AccountAddress) (aptos.AccountAddress, []types.Operation, error) {
 	// Calculate addresses of the owner and the object
 	var ccipObjectAddress aptos.AccountAddress
-	if ccipAddress != nil {
-		ccipObjectAddress = *ccipAddress
+	var err error
+	if ccipAddress != (aptos.AccountAddress{}) {
+		ccipObjectAddress = ccipAddress
 	} else {
-		ccipObjectAddress, err := mcmsContract.MCMSRegistry().GetNewCodeObjectAddress(nil, []byte(ccip.DefaultSeed))
+		ccipObjectAddress, err = mcmsContract.MCMSRegistry().GetNewCodeObjectAddress(nil, []byte(ccip.DefaultSeed))
 		if err != nil {
 			return ccipObjectAddress, []types.Operation{}, fmt.Errorf("failed to calculate object address: %w", err)
 		}
 	}
 
 	// Compile Package
-	payload, err := ccip.Compile(ccipObjectAddress, mcmsContract.Address(), ccipAddress == nil)
+	payload, err := ccip.Compile(ccipObjectAddress, mcmsContract.Address(), ccipAddress == aptos.AccountAddress{})
 	if err != nil {
 		return ccipObjectAddress, []types.Operation{}, fmt.Errorf("failed to compile: %w", err)
 	}
 
 	// Create chunks and stage operations
 	var operations []types.Operation
-	if ccipAddress == nil {
+	if ccipAddress == (aptos.AccountAddress{}) {
 		operations, err = utils.CreateChunksAndStage(payload, mcmsContract, chainSel, ccip.DefaultSeed, nil)
 	} else {
 		operations, err = utils.CreateChunksAndStage(payload, mcmsContract, chainSel, "", &ccipObjectAddress)

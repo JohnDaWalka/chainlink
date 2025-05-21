@@ -76,14 +76,14 @@ func deployTokenOp(b operations.Bundle, deps AptosDeps, in DeployTokenInput) (De
 	mcmsContract := mcmsbind.Bind(deps.OnChainState.MCMSAddress, deps.AptosChain.Client)
 
 	// Deploy LINK token
-	linkTokenSeed := "LINK_TOKEN_2"
+	linkTokenSeed := "BNM_TOKEN_8"
 	linkTokenObjectAddress, err := mcmsContract.MCMSRegistry().GetNewCodeObjectAddress(nil, []byte(linkTokenSeed))
 	if err != nil {
 		return DeployTokenOutput{}, fmt.Errorf("failed to GetNewCodeObjectAddress: %w", err)
 	}
 
 	linkTokenStateAddress := linkTokenObjectAddress.NamedObjectAddress([]byte("link::link_token::token_state"))
-	linkTokenMetadataAddress := linkTokenStateAddress.NamedObjectAddress([]byte("LINK"))
+	linkTokenMetadataAddress := linkTokenStateAddress.NamedObjectAddress([]byte(in.Symbol))
 	fmt.Printf("LINK Token Metadata address: %v\n", linkTokenMetadataAddress.StringLong())
 
 	linkTokenPayload, err := link_token.Compile(linkTokenObjectAddress)
@@ -131,7 +131,7 @@ func deployTokenOp(b operations.Bundle, deps AptosDeps, in DeployTokenInput) (De
 	mcmsOps = append(mcmsOps, types.Operation{
 		ChainSelector: types.ChainSelector(deps.AptosChain.Selector),
 		Transaction: types.Transaction{
-			To:               deps.OnChainState.MCMSAddress.StringLong(),
+			To:               linkTokenObjectAddress.StringLong(),
 			Data:             aptosmcms.ArgsToData(args),
 			AdditionalFields: afBytes,
 		},

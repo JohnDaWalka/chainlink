@@ -15,6 +15,7 @@ type AddTokenPoolConfig struct {
 	ChainSelector                       uint64
 	TokenAddress                        aptos.AccountAddress
 	TokenObjAddress                     aptos.AccountAddress
+	TokenPoolAddress                    aptos.AccountAddress
 	TokenSymbol                         changeset.TokenSymbol
 	PoolType                            deployment.ContractType
 	TokenTransferFeeByRemoteChainConfig map[uint64]fee_quoter.TokenTransferFeeConfig

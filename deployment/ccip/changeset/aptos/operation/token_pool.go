@@ -45,12 +45,13 @@ func deployTokenPool(b operations.Bundle, deps AptosDeps, in DeployTokenPoolInpu
 	// Bind MCMS Package
 	mcmsContract := mcmsbind.Bind(deps.OnChainState.MCMSAddress, deps.AptosChain.Client)
 
-	// Deploy token pool package
 	// seed := "token_pool_package"
 	// poolPackageAddress, err := mcmsContract.MCMSRegistry().GetNewCodeObjectAddress(nil, []byte(seed))
 	// if err != nil {
 	// 	return DeployTokenPoolOutput{}, fmt.Errorf("failed to GetNewCodeObjectAddress: %w", err)
 	// }
+
+	// Deploy token pool package
 	// TODO: for now, deploy token pool to the same address as the token
 	payload, err := token_pool.Compile(in.TokenObjAddress, deps.OnChainState.CCIPAddress, mcmsContract.Address())
 	if err != nil {
@@ -62,6 +63,11 @@ func deployTokenPool(b operations.Bundle, deps AptosDeps, in DeployTokenPoolInpu
 	}
 	mcmsOps = append(mcmsOps, ops...)
 
+	ccipOwnerAddr, err := mcmsContract.MCMSRegistry().GetRegisteredOwnerAddress(nil, deps.OnChainState.CCIPAddress)
+	if err != nil {
+		return DeployTokenPoolOutput{}, fmt.Errorf("failed to get preexisting code object owner address: %w", err)
+	}
+
 	switch in.PoolType {
 	case changeset.BurnMintTokenPool:
 		payload, err = burn_mint_token_pool.Compile(
@@ -70,6 +76,7 @@ func deployTokenPool(b operations.Bundle, deps AptosDeps, in DeployTokenPoolInpu
 			deps.OnChainState.MCMSAddress,
 			in.TokenObjAddress,
 			in.TokenAddress,
+			ccipOwnerAddr,
 			true,
 		)
 		if err != nil {
@@ -87,6 +94,7 @@ func deployTokenPool(b operations.Bundle, deps AptosDeps, in DeployTokenPoolInpu
 			deps.OnChainState.MCMSAddress,
 			in.TokenObjAddress,
 			in.TokenAddress,
+			deps.OnChainState.MCMSAddress,
 			true,
 		)
 		if err != nil {

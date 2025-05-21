@@ -47,11 +47,12 @@ func (cs AddTokenPool) Apply(env deployment.Environment, cfg config.AddTokenPool
 
 	// Deploy Aptos token and pool
 	depInput := seq.DeployTokenPoolSeqInput{
-		TokenAddress:    cfg.TokenAddress,
-		TokenObjAddress: cfg.TokenObjAddress,
-		TokenAdmin:      deps.OnChainState.MCMSAddress,
-		PoolType:        cfg.PoolType,
-		TokenParams:     cfg.TokenParams,
+		TokenAddress:     cfg.TokenAddress,
+		TokenObjAddress:  cfg.TokenObjAddress,
+		TokenPoolAddress: cfg.TokenPoolAddress,
+		TokenAdmin:       deps.OnChainState.MCMSAddress,
+		PoolType:         cfg.PoolType,
+		TokenParams:      cfg.TokenParams,
 	}
 	deploySeq, err := operations.ExecuteSequence(env.OperationsBundle, seq.DeployAptosTokenPoolSequence, deps, depInput)
 	if err != nil {
