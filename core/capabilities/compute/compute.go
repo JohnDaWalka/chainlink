@@ -195,6 +195,9 @@ func (c *Compute) initModule(id string, cfg *host.ModuleConfig, binary []byte, r
 	cfg.Fetch = c.fetcherFactory.NewFetcher(c.log, c.emitter)
 
 	cfg.MaxResponseSizeBytes = c.maxResponseSizeBytes
+
+	dur := 2 * time.Minute
+	cfg.Timeout = &dur
 	mod, err := host.NewModule(cfg, binary)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate WASM module: %w", err)
