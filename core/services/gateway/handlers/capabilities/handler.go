@@ -140,6 +140,7 @@ func (h *handler) handleWebAPIOutgoingMessage(ctx context.Context, msg *api.Mess
 	}
 
 	timeout := time.Duration(payload.TimeoutMs) * time.Millisecond
+	h.lggr.Debugw("setting timeout on req", "timeout", timeout)
 	req := network.HTTPRequest{
 		Method:           payload.Method,
 		URL:              payload.URL,

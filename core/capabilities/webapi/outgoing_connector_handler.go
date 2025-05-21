@@ -120,7 +120,9 @@ func (c *OutgoingConnectorHandler) handleSingleNodeRequest(ctx context.Context, 
 	// Create a subcontext with the timeout plus some margin for the gateway to process the request
 	timeoutDuration := time.Duration(req.TimeoutMs) * time.Millisecond
 	margin := 100 * time.Millisecond
-	ctx, cancel := context.WithTimeout(ctx, timeoutDuration+margin)
+	to := timeoutDuration + margin
+	lggr.Debugw("calculated timeout", "timeout", to)
+	ctx, cancel := context.WithTimeout(ctx, to)
 	defer cancel()
 
 	payload, err := json.Marshal(req)
