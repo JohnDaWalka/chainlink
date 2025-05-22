@@ -13,7 +13,6 @@ import (
 
 	"github.com/xssnick/tonutils-go/ton/wallet"
 
-	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 
@@ -80,18 +79,12 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 
 	maxRetries := 10
 	var networkConfigUrl string
-	var port uint16
 	var containerName string
 	for i := 0; i < maxRetries; i++ {
-		port = uint16(freeport.GetOne(t))
-
 		bcInput := &blockchain.Input{
-			Image:   "", // filled out by defaultTon function
+			Image:   "ghcr.io/neodix42/mylocalton-docker:latest", // filled out by defaultTon function
 			Type:    "ton",
 			ChainID: strconv.FormatUint(chainID, 10),
-			// todo: remove this, solana specific public key field
-			// PublicKey: adminAddress.String(),
-			Port: fmt.Sprintf("%d", port),
 		}
 		output, err := blockchain.NewBlockchainNetwork(bcInput)
 		if err != nil {
