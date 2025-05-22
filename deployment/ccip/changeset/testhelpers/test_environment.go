@@ -341,8 +341,7 @@ type MemoryEnvironment struct {
 	Chains      map[uint64]cldf.Chain
 	SolChains   map[uint64]cldf.SolChain
 	AptosChains map[uint64]cldf.AptosChain
-	// TODO: bump CLDF and fix this
-	TonChains map[uint64]cldf.TonChain
+	TonChains   map[uint64]cldf.TonChain
 }
 
 func (m *MemoryEnvironment) TestConfigs() *TestConfigs {
@@ -380,6 +379,7 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 	m.Chains = chains
 	m.SolChains = memory.NewMemoryChainsSol(t, tc.SolChains)
 	m.AptosChains = memory.NewMemoryChainsAptos(t, tc.AptosChains)
+	m.TonChains = memory.NewMemoryChainsTon(t, tc.TonChains)
 	env := cldf.Environment{
 		Chains:      m.Chains,
 		SolChains:   m.SolChains,
@@ -403,11 +403,11 @@ func (m *MemoryEnvironment) StartNodes(t *testing.T, crConfig deployment.Capabil
 	require.NotNil(t, m.DeployedEnv, "start chains and initiate deployed env first before starting nodes")
 	tc := m.TestConfig
 	c := memory.NewNodesConfig{
-		LogLevel:    zapcore.InfoLevel,
-		Chains:      m.Chains,
-		SolChains:   m.SolChains,
-		AptosChains: m.AptosChains,
-		// TODO: add support for Ton
+		LogLevel:       zapcore.InfoLevel,
+		Chains:         m.Chains,
+		SolChains:      m.SolChains,
+		AptosChains:    m.AptosChains,
+		TonChains:      m.TonChains,
 		NumNodes:       tc.Nodes,
 		NumBootstraps:  tc.Bootstraps,
 		RegistryConfig: crConfig,
@@ -521,7 +521,6 @@ func NewEnvironmentWithPrerequisitesContracts(t *testing.T, tEnv TestEnvironment
 	e := NewEnvironment(t, tEnv)
 	evmChains := e.Env.AllChainSelectors()
 	solChains := e.Env.AllChainSelectorsSolana()
-	// TODO: fix this
 	tonChains := e.Env.AllChainSelectorsTon()
 	//nolint:gocritic // we need to segregate EVM and Solana chains
 	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfigV2)
@@ -599,7 +598,6 @@ func NewEnvironmentWithPrerequisitesContracts(t *testing.T, tEnv TestEnvironment
 			})
 		require.NoError(t, err)
 	}
-
 	tEnv.UpdateDeployedEnvironment(e)
 	return e
 }

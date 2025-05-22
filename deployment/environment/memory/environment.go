@@ -210,11 +210,11 @@ func NewNodes(
 	// chainlink node in production.
 	for i := 0; i < cfg.NumBootstraps; i++ {
 		c := NewNodeConfig{
-			Port:        ports[i],
-			Chains:      cfg.Chains,
-			Solchains:   cfg.SolChains,
-			Aptoschains: cfg.AptosChains,
-			// TODO: add Ton chains
+			Port:           ports[i],
+			Chains:         cfg.Chains,
+			Solchains:      cfg.SolChains,
+			Aptoschains:    cfg.AptosChains,
+			Tonchains:      cfg.TonChains,
 			LogLevel:       cfg.LogLevel,
 			Bootstrap:      true,
 			RegistryConfig: cfg.RegistryConfig,
@@ -249,7 +249,6 @@ func NewMemoryEnvironmentFromChainsNodes(
 	chains map[uint64]cldf.Chain,
 	solChains map[uint64]cldf.SolChain,
 	aptosChains map[uint64]cldf.AptosChain,
-	// TODO: bump CLDF and fix this
 	tonChains map[uint64]cldf.TonChain,
 	nodes map[string]Node,
 ) cldf.Environment {
