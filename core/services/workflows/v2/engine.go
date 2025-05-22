@@ -15,6 +15,7 @@ import (
 	sdkpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb"
 	wasmpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/v2/pb"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/internal"
+	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/metering"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/types"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/safe"
 )
@@ -48,6 +49,8 @@ type Engine struct {
 	allTriggerEventsQueueCh chan enqueuedTriggerEvent
 	executionsSemaphore     chan struct{}
 	capCallsSemaphore       chan struct{}
+
+	meterReports *metering.Reports
 }
 
 type enqueuedTriggerEvent struct {
@@ -68,6 +71,7 @@ func NewEngine(ctx context.Context, cfg *EngineConfig) (*Engine, error) {
 		allTriggerEventsQueueCh: make(chan enqueuedTriggerEvent, cfg.LocalLimits.TriggerEventQueueSize),
 		executionsSemaphore:     make(chan struct{}, cfg.LocalLimits.MaxConcurrentWorkflowExecutions),
 		capCallsSemaphore:       make(chan struct{}, cfg.LocalLimits.MaxConcurrentCapabilityCallsPerWorkflow),
+		meterReports:            metering.NewReports(),
 	}
 	engine.Service, engine.srvcEng = services.Config{
 		Name:  "WorkflowEngineV2",
@@ -276,6 +280,8 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 		return
 	}
 
+	e.meterReports.Add(executionID, metering.NewReport(e.cfg.Lggr))
+
 	result, err := e.cfg.Module.Execute(subCtx, &wasmpb.ExecuteRequest{
 		Request: &wasmpb.ExecuteRequest_Trigger{
 			Trigger: &sdkpb.Trigger{
@@ -289,10 +295,14 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 	if err != nil {
 		e.cfg.Lggr.Errorw("Workflow execution failed", "err", err)
 		// TODO(CAPPL-736): observability
+		e.meterReports.Delete(executionID)
 		return
 	}
 
 	// TODO(CAPPL-736): handle execution result
+
+	e.meterReports.Delete(executionID)
+
 	e.cfg.Lggr.Infow("Workflow execution finished", "executionID", executionID, "result", result)
 	e.cfg.Hooks.OnResultReceived(result)
 	e.cfg.Hooks.OnExecutionFinished(executionID)
