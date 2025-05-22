@@ -661,10 +661,6 @@ func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
 	if err != nil {
 		return CCIPOnChainState{}, err
 	}
-	tonState, err := LoadOnchainStateTon(e)
-	if err != nil {
-		return CCIPOnChainState{}, err
-	}
 	state := CCIPOnChainState{
 		Chains:      make(map[uint64]evm.CCIPChainState),
 		SolChains:   solanaState.SolChains,
