@@ -14,6 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	// "github.com/smartcontractkit/chainlink-ton/bindings/bind"
 	// "github.com/smartcontractkit/chainlink-ton/bindings/ccip"
@@ -24,8 +26,7 @@ import (
 	// "github.com/smartcontractkit/chainlink-ton/bindings/mcms"
 	// "github.com/smartcontractkit/chainlink-ton/relayer/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
-	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	tonstate "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/ton"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	tonaddress "github.com/xssnick/tonutils-go/address"
 	"github.com/xssnick/tonutils-go/liteclient"
@@ -40,18 +41,18 @@ type TonTestDeployPrerequisitesChangeSet struct {
 
 var _ commoncs.ConfiguredChangeSet = TonTestDeployPrerequisitesChangeSet{}
 
-func (c TonTestDeployPrerequisitesChangeSet) Apply(e deployment.Environment) (deployment.ChangesetOutput, error) {
+func (c TonTestDeployPrerequisitesChangeSet) Apply(e cldf.Environment) (cldf.ChangesetOutput, error) {
 	t := c.T
 
-	onchainState, err := changeset.LoadOnchainState(e)
+	tonChains, err := tonstate.LoadOnchainStateTon(e)
 	require.NoError(t, err)
 
 	fmt.Printf("DEBUG: TonTestDeployPrerequisitesChangeSet: chain selectors: %+v\n", c.TonChainSelectors)
 	for _, chainSelector := range c.TonChainSelectors {
-		tonChainState := onchainState.TonChains[chainSelector]
+		tonChainState := tonChains[chainSelector]
 		// TODO: replace with a real token address instead of none
 		tonChainState.LinkTokenAddress = *tonaddress.NewAddressNone()
-		err = changeset.SaveOnchainStateTon(chainSelector, tonChainState, e)
+		err = tonstate.SaveOnchainStateTon(chainSelector, tonChainState, e)
 		require.NoError(t, err)
 	}
 	return deployment.ChangesetOutput{}, nil
@@ -70,20 +71,20 @@ func (c TonTestDeployContractsChangeSet) Apply(e deployment.Environment) (deploy
 
 	t := c.T
 
-	onchainState, err := changeset.LoadOnchainState(e)
+	tonChains, err := tonstate.LoadOnchainStateTon(e)
 	require.NoError(t, err)
 
 	fmt.Printf("DEBUG: TonTestDeployContractsChangeSet: chain selectors: %+v\n", c.TonChainSelectors)
 
 	for _, chainSelector := range c.TonChainSelectors {
 		tonChain := e.TonChains[chainSelector]
-		tonChainState := onchainState.TonChains[chainSelector]
-		c.deployTonContracts(t, e, chainSelector, tonChain, tonChainState, onchainState)
+		tonChainState := tonChains[chainSelector]
+		c.deployTonContracts(t, e, chainSelector, tonChain, tonChainState, tonChains)
 	}
 	return deployment.ChangesetOutput{}, nil
 }
 
-func (c TonTestDeployContractsChangeSet) deployTonContracts(t *testing.T, e deployment.Environment, chainSelector uint64, tonChain deployment.TonChain, tonChainState changeset.TonCCIPChainState, onchainState changeset.CCIPOnChainState) {
+func (c TonTestDeployContractsChangeSet) deployTonContracts(t *testing.T, e deployment.Environment, chainSelector uint64, tonChain deployment.TonChain, tonChainState tonstate.CCIPChainState, onchainState map[uint64]tonstate.CCIPChainState) {
 	logger := logger.Test(t)
 
 	connectionPool := liteclient.NewConnectionPool()
@@ -147,7 +148,7 @@ func (c TonTestDeployContractsChangeSet) deployTonContracts(t *testing.T, e depl
 
 	logger.Infow("All Ton contracts deployed")
 
-	err = changeset.SaveOnchainStateTon(chainSelector, tonChainState, e)
+	err = tonstate.SaveOnchainStateTon(chainSelector, tonChainState, e)
 	require.NoError(t, err)
 }
 
@@ -164,20 +165,20 @@ func (c TonTestConfigureContractsChangeSet) Apply(e deployment.Environment) (dep
 
 	t := c.T
 
-	onchainState, err := changeset.LoadOnchainState(e)
+	tonChains, err := tonstate.LoadOnchainStateTon(e)
 	require.NoError(t, err)
 
 	fmt.Printf("DEBUG: TonTestConfigureContractsChangeSet: chain selectors: %+v\n", c.TonChainSelectors)
 
 	for _, chainSelector := range c.TonChainSelectors {
 		tonChain := e.TonChains[chainSelector]
-		tonChainState := onchainState.TonChains[chainSelector]
-		c.configureTonContracts(t, e, chainSelector, tonChain, tonChainState, onchainState)
+		tonChainState := tonChains[chainSelector]
+		c.configureTonContracts(t, e, chainSelector, tonChain, tonChainState, tonChains)
 	}
 	return deployment.ChangesetOutput{}, nil
 }
 
-func (c TonTestConfigureContractsChangeSet) configureTonContracts(t *testing.T, e deployment.Environment, chainSelector uint64, tonChain deployment.TonChain, tonChainState changeset.TonCCIPChainState, onchainState changeset.CCIPOnChainState) {
+func (c TonTestConfigureContractsChangeSet) configureTonContracts(t *testing.T, e deployment.Environment, chainSelector uint64, tonChain deployment.TonChain, tonChainState tonstate.CCIPChainState, onchainState map[uint64]tonstate.CCIPChainState) {
 	// logger := logger.Test(t)
 
 	// offrampBindings := ccip_offramp.Bind(tonChainState.CCIPAddress, tonChain.Client)
@@ -354,7 +355,7 @@ type Ton2AnyTokenAmount struct {
 func SendRequestTon(
 	t *testing.T,
 	e deployment.Environment,
-	state changeset.CCIPOnChainState,
+	state tonstate.CCIPChainState,
 	cfg *CCIPSendReqConfig,
 ) (*onramp.OnRampCCIPMessageSent, error) { // TODO: chain independent return vailue
 	//sourceSelector := cfg.SourceChain
@@ -367,7 +368,7 @@ func ConfirmCommitWithExpectedSeqNumRangeTon(
 	t *testing.T,
 	srcSelector uint64,
 	dest deployment.TonChain,
-	ccipChainState changeset.TonCCIPChainState,
+	ccipChainState tonstate.CCIPChainState,
 	startBlock *uint64,
 	expectedSeqNumRange ccipocr3.SeqNumRange,
 	enforceSingleCommit bool,

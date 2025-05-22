@@ -11,9 +11,13 @@ import (
 	"github.com/rs/zerolog"
 	xerrgroup "golang.org/x/sync/errgroup"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_5_1"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 
@@ -31,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -43,7 +48,7 @@ import (
 
 // DeployHomeChainContracts deploys the home chain contracts so that the chainlink nodes can use the CR address in Capabilities.ExternalRegistry
 // Afterward, we call DeployHomeChainChangeset changeset with nodeinfo ( the peer id and all)
-func DeployHomeChainContracts(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel uint64, feedChainSel uint64) (deployment.CapabilityRegistryConfig, deployment.AddressBook, error) {
+func DeployHomeChainContracts(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel uint64, feedChainSel uint64) (deployment.CapabilityRegistryConfig, cldf.AddressBook, error) {
 	e, _, err := devenv.NewEnvironment(func() context.Context { return ctx }, lggr, envConfig)
 	if err != nil {
 		return deployment.CapabilityRegistryConfig{}, nil, err
@@ -72,11 +77,11 @@ func DeployHomeChainContracts(ctx context.Context, lggr logger.Logger, envConfig
 	}
 	*e, err = commonchangeset.Apply(nil, *e, nil,
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(commonchangeset.DeployMCMSWithTimelockV2),
+			cldf.CreateLegacyChangeSet(commonchangeset.DeployMCMSWithTimelockV2),
 			cfg,
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.DeployHomeChainChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.DeployHomeChainChangeset),
 			v1_6.DeployHomeChainConfig{
 				HomeChainSel:             homeChainSel,
 				RMNStaticConfig:          testhelpers.NewTestRMNStaticConfig(),
@@ -89,7 +94,7 @@ func DeployHomeChainContracts(ctx context.Context, lggr logger.Logger, envConfig
 	if err != nil {
 		return deployment.CapabilityRegistryConfig{}, e.ExistingAddresses, fmt.Errorf("changeset sequence execution failed with error: %w", err)
 	}
-	state, err := changeset.LoadOnchainState(*e)
+	state, err := stateview.LoadOnchainState(*e)
 	if err != nil {
 		return deployment.CapabilityRegistryConfig{}, e.ExistingAddresses, fmt.Errorf("failed to load on chain state: %w", err)
 	}
@@ -106,7 +111,7 @@ func DeployHomeChainContracts(ctx context.Context, lggr logger.Logger, envConfig
 }
 
 // DeployCCIPAndAddLanes is the actual ccip setup once the nodes are initialized.
-func DeployCCIPAndAddLanes(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook, rmnEnabled bool) (DeployCCIPOutput, error) {
+func DeployCCIPAndAddLanes(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab cldf.AddressBook, rmnEnabled bool) (DeployCCIPOutput, error) {
 	e, don, err := devenv.NewEnvironment(func() context.Context { return ctx }, lggr, envConfig)
 	if err != nil {
 		return DeployCCIPOutput{}, fmt.Errorf("failed to initiate new environment: %w", err)
@@ -121,7 +126,7 @@ func DeployCCIPAndAddLanes(ctx context.Context, lggr logger.Logger, envConfig de
 		return DeployCCIPOutput{}, fmt.Errorf("failed to apply changesets for setting up chain: %w", err)
 	}
 
-	state, err := changeset.LoadOnchainState(*e)
+	state, err := stateview.LoadOnchainState(*e)
 	if err != nil {
 		return DeployCCIPOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
@@ -155,14 +160,14 @@ func DeployCCIPAndAddLanes(ctx context.Context, lggr logger.Logger, envConfig de
 		return DeployCCIPOutput{}, fmt.Errorf("failed to convert address book to address book map: %w", err)
 	}
 	return DeployCCIPOutput{
-		AddressBook: *deployment.NewMemoryAddressBookFromMap(addresses),
+		AddressBook: *cldf.NewMemoryAddressBookFromMap(addresses),
 		NodeIDs:     e.NodeIDs,
 	}, nil
 }
 
 // DeployCCIPChains is a group of changesets used from CRIB to set up new chains
 // It sets up CCIP contracts on all chains. We expect that MCMS has already been deployed and set up
-func DeployCCIPChains(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook) (DeployCCIPOutput, error) {
+func DeployCCIPChains(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab cldf.AddressBook) (DeployCCIPOutput, error) {
 	e, _, err := devenv.NewEnvironment(func() context.Context { return ctx }, lggr, envConfig)
 	if err != nil {
 		return DeployCCIPOutput{}, fmt.Errorf("failed to initiate new environment: %w", err)
@@ -180,21 +185,21 @@ func DeployCCIPChains(ctx context.Context, lggr logger.Logger, envConfig devenv.
 		return DeployCCIPOutput{}, fmt.Errorf("failed to get convert address book to address book map: %w", err)
 	}
 	return DeployCCIPOutput{
-		AddressBook: *deployment.NewMemoryAddressBookFromMap(addresses),
+		AddressBook: *cldf.NewMemoryAddressBookFromMap(addresses),
 		NodeIDs:     e.NodeIDs,
 	}, nil
 }
 
 // ConnectCCIPLanes is a group of changesets used from CRIB to set up new lanes
 // It creates a fully connected mesh where all chains are connected to all chains
-func ConnectCCIPLanes(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook) (DeployCCIPOutput, error) {
+func ConnectCCIPLanes(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab cldf.AddressBook) (DeployCCIPOutput, error) {
 	e, _, err := devenv.NewEnvironment(func() context.Context { return ctx }, lggr, envConfig)
 	if err != nil {
 		return DeployCCIPOutput{}, fmt.Errorf("failed to initiate new environment: %w", err)
 	}
 	e.ExistingAddresses = ab
 
-	state, err := changeset.LoadOnchainState(*e)
+	state, err := stateview.LoadOnchainState(*e)
 	if err != nil {
 		return DeployCCIPOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
@@ -211,13 +216,13 @@ func ConnectCCIPLanes(ctx context.Context, lggr logger.Logger, envConfig devenv.
 		return DeployCCIPOutput{}, fmt.Errorf("failed to get convert address book to address book map: %w", err)
 	}
 	return DeployCCIPOutput{
-		AddressBook: *deployment.NewMemoryAddressBookFromMap(addresses),
+		AddressBook: *cldf.NewMemoryAddressBookFromMap(addresses),
 		NodeIDs:     e.NodeIDs,
 	}, nil
 }
 
 // ConfigureCCIPOCR is a group of changesets used from CRIB to redeploy the chainlink don on an existing setup
-func ConfigureCCIPOCR(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook, rmnEnabled bool) (DeployCCIPOutput, error) {
+func ConfigureCCIPOCR(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab cldf.AddressBook, rmnEnabled bool) (DeployCCIPOutput, error) {
 	e, don, err := devenv.NewEnvironment(func() context.Context { return ctx }, lggr, envConfig)
 	if err != nil {
 		return DeployCCIPOutput{}, fmt.Errorf("failed to initiate new environment: %w", err)
@@ -239,14 +244,14 @@ func ConfigureCCIPOCR(ctx context.Context, lggr logger.Logger, envConfig devenv.
 		return DeployCCIPOutput{}, fmt.Errorf("failed to get convert address book to address book map: %w", err)
 	}
 	return DeployCCIPOutput{
-		AddressBook: *deployment.NewMemoryAddressBookFromMap(addresses),
+		AddressBook: *cldf.NewMemoryAddressBookFromMap(addresses),
 		NodeIDs:     e.NodeIDs,
 	}, nil
 }
 
 // FundCCIPTransmitters is used from CRIB to provide funds to the node transmitters
 // This function sends funds from the deployer key to the chainlink node transmitters
-func FundCCIPTransmitters(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, ab deployment.AddressBook) (DeployCCIPOutput, error) {
+func FundCCIPTransmitters(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, ab cldf.AddressBook) (DeployCCIPOutput, error) {
 	e, don, err := devenv.NewEnvironment(func() context.Context { return ctx }, lggr, envConfig)
 	if err != nil {
 		return DeployCCIPOutput{}, fmt.Errorf("failed to initiate new environment: %w", err)
@@ -267,12 +272,12 @@ func FundCCIPTransmitters(ctx context.Context, lggr logger.Logger, envConfig dev
 		return DeployCCIPOutput{}, fmt.Errorf("failed to get convert address book to address book map: %w", err)
 	}
 	return DeployCCIPOutput{
-		AddressBook: *deployment.NewMemoryAddressBookFromMap(addresses),
+		AddressBook: *cldf.NewMemoryAddressBookFromMap(addresses),
 		NodeIDs:     e.NodeIDs,
 	}, nil
 }
 
-func setupChains(lggr logger.Logger, e *deployment.Environment, homeChainSel uint64) (deployment.Environment, error) {
+func setupChains(lggr logger.Logger, e *cldf.Environment, homeChainSel uint64) (cldf.Environment, error) {
 	chainSelectors := e.AllChainSelectors()
 	chainConfigs := make(map[uint64]v1_6.ChainConfig)
 	nodeInfo, err := deployment.NodeInfo(e.NodeIDs, e.Offchain)
@@ -304,37 +309,37 @@ func setupChains(lggr logger.Logger, e *deployment.Environment, homeChainSel uin
 	}
 	env, err := commonchangeset.Apply(nil, *e, nil,
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateChainConfigChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateChainConfigChangeset),
 			v1_6.UpdateChainConfigConfig{
 				HomeChainSelector: homeChainSel,
 				RemoteChainAdds:   chainConfigs,
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(commonchangeset.DeployLinkToken),
+			cldf.CreateLegacyChangeSet(commonchangeset.DeployLinkToken),
 			chainSelectors,
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(changeset.DeployPrerequisitesChangeset),
+			cldf.CreateLegacyChangeSet(changeset.DeployPrerequisitesChangeset),
 			changeset.DeployPrerequisiteConfig{
 				Configs: prereqCfgs,
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.DeployChainContractsChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.DeployChainContractsChangeset),
 			v1_6.DeployChainContractsConfig{
 				HomeChainSelector:      homeChainSel,
 				ContractParamsPerChain: contractParams,
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.SetRMNRemoteOnRMNProxyChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.SetRMNRemoteOnRMNProxyChangeset),
 			v1_6.SetRMNRemoteOnRMNProxyConfig{
 				ChainSelectors: chainSelectors,
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.CCIPCapabilityJobspecChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.CCIPCapabilityJobspecChangeset),
 			nil, // ChangeSet does not use a config.
 		),
 	)
@@ -345,24 +350,24 @@ func setupChains(lggr logger.Logger, e *deployment.Environment, homeChainSel uin
 	return setupLinkPools(&env)
 }
 
-func setupLinkPools(e *deployment.Environment) (deployment.Environment, error) {
-	state, err := changeset.LoadOnchainState(*e)
+func setupLinkPools(e *cldf.Environment) (cldf.Environment, error) {
+	state, err := stateview.LoadOnchainState(*e)
 	if err != nil {
 		return *e, fmt.Errorf("failed to load onchain state: %w", err)
 	}
 	chainSelectors := e.AllChainSelectors()
 	poolInput := make(map[uint64]v1_5_1.DeployTokenPoolInput)
-	pools := make(map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo)
+	pools := make(map[uint64]map[shared.TokenSymbol]v1_5_1.TokenPoolInfo)
 	for _, chain := range chainSelectors {
 		poolInput[chain] = v1_5_1.DeployTokenPoolInput{
-			Type:               changeset.BurnMintTokenPool,
+			Type:               shared.BurnMintTokenPool,
 			LocalTokenDecimals: 18,
 			AllowList:          []common.Address{},
 			TokenAddress:       state.Chains[chain].LinkToken.Address(),
 		}
-		pools[chain] = map[changeset.TokenSymbol]changeset.TokenPoolInfo{
-			changeset.LinkSymbol: {
-				Type:          changeset.BurnMintTokenPool,
+		pools[chain] = map[shared.TokenSymbol]v1_5_1.TokenPoolInfo{
+			shared.LinkSymbol: {
+				Type:          shared.BurnMintTokenPool,
 				Version:       deployment.Version1_5_1,
 				ExternalAdmin: e.Chains[chain].DeployerKey.From,
 			},
@@ -370,27 +375,27 @@ func setupLinkPools(e *deployment.Environment) (deployment.Environment, error) {
 	}
 	env, err := commonchangeset.Apply(nil, *e, nil,
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_5_1.DeployTokenPoolContractsChangeset),
+			cldf.CreateLegacyChangeSet(v1_5_1.DeployTokenPoolContractsChangeset),
 			v1_5_1.DeployTokenPoolContractsConfig{
-				TokenSymbol: changeset.LinkSymbol,
+				TokenSymbol: shared.LinkSymbol,
 				NewPools:    poolInput,
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_5_1.ProposeAdminRoleChangeset),
-			changeset.TokenAdminRegistryChangesetConfig{
+			cldf.CreateLegacyChangeSet(v1_5_1.ProposeAdminRoleChangeset),
+			v1_5_1.TokenAdminRegistryChangesetConfig{
 				Pools: pools,
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_5_1.AcceptAdminRoleChangeset),
-			changeset.TokenAdminRegistryChangesetConfig{
+			cldf.CreateLegacyChangeSet(v1_5_1.AcceptAdminRoleChangeset),
+			v1_5_1.TokenAdminRegistryChangesetConfig{
 				Pools: pools,
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_5_1.SetPoolChangeset),
-			changeset.TokenAdminRegistryChangesetConfig{
+			cldf.CreateLegacyChangeSet(v1_5_1.SetPoolChangeset),
+			v1_5_1.TokenAdminRegistryChangesetConfig{
 				Pools: pools,
 			},
 		),
@@ -400,16 +405,16 @@ func setupLinkPools(e *deployment.Environment) (deployment.Environment, error) {
 		return *e, fmt.Errorf("failed to apply changesets: %w", err)
 	}
 
-	state, err = changeset.LoadOnchainState(env)
+	state, err = stateview.LoadOnchainState(env)
 	if err != nil {
 		return *e, fmt.Errorf("failed to load onchain state: %w", err)
 	}
 
 	for _, chain := range chainSelectors {
-		linkPool := state.Chains[chain].BurnMintTokenPools[changeset.LinkSymbol][deployment.Version1_5_1]
+		linkPool := state.Chains[chain].BurnMintTokenPools[shared.LinkSymbol][deployment.Version1_5_1]
 		linkToken := state.Chains[chain].LinkToken
 		tx, err := linkToken.GrantMintAndBurnRoles(e.Chains[chain].DeployerKey, linkPool.Address())
-		_, err = deployment.ConfirmIfNoError(e.Chains[chain], tx, err)
+		_, err = cldf.ConfirmIfNoError(e.Chains[chain], tx, err)
 		if err != nil {
 			return *e, fmt.Errorf("failed to grant mint and burn roles for link pool: %w", err)
 		}
@@ -417,7 +422,7 @@ func setupLinkPools(e *deployment.Environment) (deployment.Environment, error) {
 	return env, err
 }
 
-func setupLanes(e *deployment.Environment, state changeset.CCIPOnChainState) (deployment.Environment, error) {
+func setupLanes(e *cldf.Environment, state stateview.CCIPOnChainState) (cldf.Environment, error) {
 	eg := xerrgroup.Group{}
 	poolUpdates := make(map[uint64]v1_5_1.TokenPoolConfig)
 	rateLimitPerChain := make(v1_5_1.RateLimiterPerChain)
@@ -479,7 +484,7 @@ func setupLanes(e *deployment.Environment, state changeset.CCIPOnChainState) (de
 			}
 			mu.Lock()
 			poolUpdates[src] = v1_5_1.TokenPoolConfig{
-				Type:         changeset.BurnMintTokenPool,
+				Type:         shared.BurnMintTokenPool,
 				Version:      deployment.Version1_5_1,
 				ChainUpdates: rateLimitPerChain,
 			}
@@ -487,31 +492,31 @@ func setupLanes(e *deployment.Environment, state changeset.CCIPOnChainState) (de
 
 			_, err := commonchangeset.Apply(nil, *e, nil,
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateOnRampsDestsChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateOnRampsDestsChangeset),
 					v1_6.UpdateOnRampDestsConfig{
 						UpdatesByChain: onRampUpdatesByChain,
 					},
 				),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterPricesChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterPricesChangeset),
 					v1_6.UpdateFeeQuoterPricesConfig{
 						PricesByChain: pricesByChain,
 					},
 				),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterDestsChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterDestsChangeset),
 					v1_6.UpdateFeeQuoterDestsConfig{
 						UpdatesByChain: feeQuoterDestsUpdatesByChain,
 					},
 				),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateOffRampSourcesChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateOffRampSourcesChangeset),
 					v1_6.UpdateOffRampSourcesConfig{
 						UpdatesByChain: updateOffRampSources,
 					},
 				),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateRouterRampsChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateRouterRampsChangeset),
 					v1_6.UpdateRouterRampsConfig{
 						UpdatesByChain: updateRouterChanges,
 					},
@@ -527,9 +532,9 @@ func setupLanes(e *deployment.Environment, state changeset.CCIPOnChainState) (de
 	}
 
 	_, err = commonchangeset.Apply(nil, *e, nil, commonchangeset.Configure(
-		deployment.CreateLegacyChangeSet(v1_5_1.ConfigureTokenPoolContractsChangeset),
+		cldf.CreateLegacyChangeSet(v1_5_1.ConfigureTokenPoolContractsChangeset),
 		v1_5_1.ConfigureTokenPoolContractsConfig{
-			TokenSymbol: changeset.LinkSymbol,
+			TokenSymbol: shared.LinkSymbol,
 			PoolUpdates: poolUpdates,
 		},
 	))
@@ -537,7 +542,7 @@ func setupLanes(e *deployment.Environment, state changeset.CCIPOnChainState) (de
 	return *e, err
 }
 
-func mustOCR(e *deployment.Environment, homeChainSel uint64, feedChainSel uint64, newDons bool, rmnEnabled bool) (deployment.Environment, error) {
+func mustOCR(e *cldf.Environment, homeChainSel uint64, feedChainSel uint64, newDons bool, rmnEnabled bool) (cldf.Environment, error) {
 	chainSelectors := e.AllChainSelectors()
 	var commitOCRConfigPerSelector = make(map[uint64]v1_6.CCIPOCRParams)
 	var execOCRConfigPerSelector = make(map[uint64]v1_6.CCIPOCRParams)
@@ -561,7 +566,7 @@ func mustOCR(e *deployment.Environment, homeChainSel uint64, feedChainSel uint64
 	if newDons {
 		commitChangeset = commonchangeset.Configure(
 			// Add the DONs and candidate commit OCR instances for the chain
-			deployment.CreateLegacyChangeSet(v1_6.AddDonAndSetCandidateChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.AddDonAndSetCandidateChangeset),
 			v1_6.AddDonAndSetCandidateChangesetConfig{
 				SetCandidateConfigBase: v1_6.SetCandidateConfigBase{
 					HomeChainSelector: homeChainSel,
@@ -576,7 +581,7 @@ func mustOCR(e *deployment.Environment, homeChainSel uint64, feedChainSel uint64
 	} else {
 		commitChangeset = commonchangeset.Configure(
 			// Update commit OCR instances for existing chains
-			deployment.CreateLegacyChangeSet(v1_6.SetCandidateChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.SetCandidateChangeset),
 			v1_6.SetCandidateChangesetConfig{
 				SetCandidateConfigBase: v1_6.SetCandidateConfigBase{
 					HomeChainSelector: homeChainSel,
@@ -596,7 +601,7 @@ func mustOCR(e *deployment.Environment, homeChainSel uint64, feedChainSel uint64
 		commitChangeset,
 		commonchangeset.Configure(
 			// Add the exec OCR instances for the new chains
-			deployment.CreateLegacyChangeSet(v1_6.SetCandidateChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.SetCandidateChangeset),
 			v1_6.SetCandidateChangesetConfig{
 				SetCandidateConfigBase: v1_6.SetCandidateConfigBase{
 					HomeChainSelector: homeChainSel,
@@ -612,7 +617,7 @@ func mustOCR(e *deployment.Environment, homeChainSel uint64, feedChainSel uint64
 		),
 		commonchangeset.Configure(
 			// Promote everything
-			deployment.CreateLegacyChangeSet(v1_6.PromoteCandidateChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.PromoteCandidateChangeset),
 			v1_6.PromoteCandidateChangesetConfig{
 				HomeChainSelector: homeChainSel,
 				PluginInfo: []v1_6.PromoteCandidatePluginInfo{
@@ -629,7 +634,7 @@ func mustOCR(e *deployment.Environment, homeChainSel uint64, feedChainSel uint64
 		),
 		commonchangeset.Configure(
 			// Enable the OCR config on the remote chains
-			deployment.CreateLegacyChangeSet(v1_6.SetOCR3OffRampChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.SetOCR3OffRampChangeset),
 			v1_6.SetOCR3OffRampConfig{
 				HomeChainSel:       homeChainSel,
 				RemoteChainSels:    chainSelectors,
@@ -646,7 +651,7 @@ type RMNNodeConfig struct {
 	Passphrase        string
 }
 
-func SetupRMNNodeOnAllChains(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab deployment.AddressBook, nodes []RMNNodeConfig) (DeployCCIPOutput, error) {
+func SetupRMNNodeOnAllChains(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel, feedChainSel uint64, ab cldf.AddressBook, nodes []RMNNodeConfig) (DeployCCIPOutput, error) {
 	e, _, err := devenv.NewEnvironment(func() context.Context { return ctx }, lggr, envConfig)
 	if err != nil {
 		return DeployCCIPOutput{}, fmt.Errorf("failed to create environment: %w", err)
@@ -702,7 +707,7 @@ func SetupRMNNodeOnAllChains(ctx context.Context, lggr logger.Logger, envConfig 
 	env, err := commonchangeset.Apply(nil, *e, nil,
 		commonchangeset.Configure(
 			// Enable the OCR config on the remote chains
-			deployment.CreateLegacyChangeSet(v1_6.SetRMNHomeCandidateConfigChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.SetRMNHomeCandidateConfigChangeset),
 			v1_6.SetRMNHomeCandidateConfig{
 				HomeChainSelector: homeChainSel,
 				RMNStaticConfig: rmn_home.RMNHomeStaticConfig{
@@ -720,7 +725,7 @@ func SetupRMNNodeOnAllChains(ctx context.Context, lggr logger.Logger, envConfig 
 		return DeployCCIPOutput{}, fmt.Errorf("failed to set rmn node candidate: %w", err)
 	}
 
-	state, err := changeset.LoadOnchainState(env)
+	state, err := stateview.LoadOnchainState(env)
 	if err != nil {
 		return DeployCCIPOutput{}, fmt.Errorf("failed to load chain state: %w", err)
 	}
@@ -733,7 +738,7 @@ func SetupRMNNodeOnAllChains(ctx context.Context, lggr logger.Logger, envConfig 
 
 	env, err = commonchangeset.Apply(nil, *e, nil,
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.PromoteRMNHomeCandidateConfigChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.PromoteRMNHomeCandidateConfigChangeset),
 			v1_6.PromoteRMNHomeCandidateConfig{
 				HomeChainSelector: homeChainSel,
 				DigestToPromote:   configDigest,
@@ -775,7 +780,7 @@ func SetupRMNNodeOnAllChains(ctx context.Context, lggr logger.Logger, envConfig 
 		return DeployCCIPOutput{}, fmt.Errorf("failed to get existing addresses: %w", err)
 	}
 	return DeployCCIPOutput{
-		AddressBook: *deployment.NewMemoryAddressBookFromMap(addresses),
+		AddressBook: *cldf.NewMemoryAddressBookFromMap(addresses),
 		NodeIDs:     e.NodeIDs,
 	}, nil
 }

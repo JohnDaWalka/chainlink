@@ -10,7 +10,8 @@ import (
 
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/aptos-labs/aptos-go-sdk/crypto"
-	"github.com/hashicorp/consul/sdk/freeport"
+
+	"github.com/smartcontractkit/freeport"
 
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -20,7 +21,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
-	"github.com/smartcontractkit/chainlink/deployment"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 )
 
@@ -53,12 +55,12 @@ func createAptosAccount(t *testing.T, useDefault bool) *aptos.Account {
 	}
 }
 
-func GenerateChainsAptos(t *testing.T, numChains int) map[uint64]deployment.AptosChain {
+func GenerateChainsAptos(t *testing.T, numChains int) map[uint64]cldf.AptosChain {
 	testAptosChainSelectors := getTestAptosChainSelectors()
 	if len(testAptosChainSelectors) < numChains {
 		t.Fatalf("not enough test aptos chain selectors available")
 	}
-	chains := make(map[uint64]deployment.AptosChain)
+	chains := make(map[uint64]cldf.AptosChain)
 	for i := 0; i < numChains; i++ {
 		selector := testAptosChainSelectors[i]
 		chainID, err := chainsel.GetChainIDFromSelector(selector)
@@ -66,7 +68,7 @@ func GenerateChainsAptos(t *testing.T, numChains int) map[uint64]deployment.Apto
 		account := createAptosAccount(t, true)
 
 		url, nodeClient := aptosChain(t, chainID, account.Address)
-		chains[selector] = deployment.AptosChain{
+		chains[selector] = cldf.AptosChain{
 			Selector:       selector,
 			Client:         nodeClient,
 			DeployerSigner: account,
@@ -98,18 +100,20 @@ func aptosChain(t *testing.T, chainID string, adminAddress aptos.AccountAddress)
 	var url string
 	var containerName string
 	for i := 0; i < maxRetries; i++ {
-		port := freeport.GetOne(t)
+		// reserve all the ports we need explicitly to avoid port conflicts in other tests
+		ports := freeport.GetN(t, 2)
 
 		bcInput := &blockchain.Input{
 			Image:       "", // filled out by defaultAptos function
 			Type:        "aptos",
 			ChainID:     chainID,
 			PublicKey:   adminAddress.String(),
-			CustomPorts: []string{fmt.Sprintf("%d:8080", port), fmt.Sprintf("%d:8081", port+1)},
+			CustomPorts: []string{fmt.Sprintf("%d:8080", ports[0]), fmt.Sprintf("%d:8081", ports[1])},
 		}
 		output, err := blockchain.NewBlockchainNetwork(bcInput)
 		if err != nil {
 			t.Logf("Error creating Aptos network: %v", err)
+			freeport.Return(ports)
 			time.Sleep(time.Second)
 			maxRetries -= 1
 			continue
@@ -147,7 +151,7 @@ func aptosChain(t *testing.T, chainID string, adminAddress aptos.AccountAddress)
 	return url, client
 }
 
-func createAptosChainConfig(chainID string, chain deployment.AptosChain) chainlink.RawConfig {
+func createAptosChainConfig(chainID string, chain cldf.AptosChain) chainlink.RawConfig {
 	chainConfig := chainlink.RawConfig{}
 
 	chainConfig["Enabled"] = true

@@ -9,11 +9,12 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	forwarder "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
-	"github.com/smartcontractkit/chainlink/deployment"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
@@ -23,7 +24,6 @@ import (
 )
 
 func TestDeployForwarder(t *testing.T) {
-	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-111")
 	t.Parallel()
 
 	lggr := logger.Test(t)
@@ -36,7 +36,7 @@ func TestDeployForwarder(t *testing.T) {
 	registrySel := env.AllChainSelectors()[0]
 
 	t.Run("should deploy forwarder", func(t *testing.T) {
-		ab := deployment.NewMemoryAddressBook()
+		ab := cldf.NewMemoryAddressBook()
 
 		// deploy forwarder
 		env.ExistingAddresses = ab
@@ -51,19 +51,13 @@ func TestDeployForwarder(t *testing.T) {
 		addrs, err := resp.AddressBook.AddressesForChain(registrySel)
 		require.NoError(t, err)
 		require.Len(t, addrs, 1)
-		require.Len(t, resp.DataStore.Addresses().Filter(datastore.AddressRefByQualifier("my-test-forwarder")), 1, "expected to find 'my-test-forwarder' qualifier")
-		chainSel := env.AllChainSelectors()[1]
-		// only forwarder on chain 1
-		require.NotEqual(t, registrySel, chainSel)
-		oaddrs, err := resp.AddressBook.AddressesForChain(chainSel)
-		require.NoError(t, err)
-		require.Len(t, oaddrs, 1)
-		for _, tv := range oaddrs {
-			labelsList := tv.Labels.List()
-			require.Len(t, labelsList, 2, "expected exactly 2 labels")
-			require.Contains(t, labelsList[0], internal.DeploymentBlockLabel)
-			require.Contains(t, labelsList[1], internal.DeploymentHashLabel)
-		}
+		fa := resp.DataStore.Addresses().Filter(datastore.AddressRefByQualifier("my-test-forwarder"))
+		require.Len(t, fa, 1, "expected to find 'my-test-forwarder' qualifier")
+		l := fa[0].Labels.List()
+		require.Len(t, l, 2, "expected exactly 2 labels")
+		require.Contains(t, l[0], internal.DeploymentBlockLabel)
+		require.Contains(t, l[1], internal.DeploymentHashLabel)
+
 	})
 }
 
@@ -83,7 +77,7 @@ func TestConfigureForwarders(t *testing.T) {
 		},
 	}
 
-	excludeChainsIfNeeded := func(excludeChains bool, env deployment.Environment) (uint64, map[uint64]struct{}) {
+	excludeChainsIfNeeded := func(excludeChains bool, env cldf.Environment) (uint64, map[uint64]struct{}) {
 		if !excludeChains {
 			return 0, nil
 		}
@@ -156,7 +150,7 @@ func TestConfigureForwarders(t *testing.T) {
 				csOut, err := changeset.ConfigureForwardContracts(te.Env, cfg)
 				require.NoError(t, err)
 				require.Nil(t, csOut.AddressBook)
-				require.Empty(t, csOut.Proposals)
+				require.Empty(t, csOut.MCMSTimelockProposals)
 				// check that forwarder
 				// TODO set up a listener to check that the forwarder is configured
 				forwardersByChain := te.OwnedForwarders()
@@ -224,7 +218,7 @@ func TestConfigureForwarders(t *testing.T) {
 				}
 				_, err = commonchangeset.Apply(t, te.Env, timelockContracts,
 					commonchangeset.Configure(
-						deployment.CreateLegacyChangeSet(changeset.ConfigureForwardContracts),
+						cldf.CreateLegacyChangeSet(changeset.ConfigureForwardContracts),
 						cfg,
 					),
 				)

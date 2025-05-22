@@ -16,8 +16,12 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_onramp"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -25,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	v1_5testhelpers "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/v1_5"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_5"
@@ -65,7 +70,7 @@ func TestV1_5_Message_RMNRemote(t *testing.T) {
 				},
 			}),
 	)
-	state, err := changeset.LoadOnchainState(e.Env)
+	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	allChains := e.Env.AllChainSelectors()
 	src1, dest := allChains[0], allChains[1]
@@ -79,7 +84,7 @@ func TestV1_5_Message_RMNRemote(t *testing.T) {
 	// permabless the commit stores
 	e.Env, err = commonchangeset.Apply(t, e.Env, e.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_5.PermaBlessCommitStoreChangeset),
+			cldf.CreateLegacyChangeSet(v1_5.PermaBlessCommitStoreChangeset),
 			v1_5.PermaBlessCommitStoreConfig{
 				Configs: map[uint64]v1_5.PermaBlessCommitStoreConfigPerDest{
 					dest: {
@@ -95,7 +100,7 @@ func TestV1_5_Message_RMNRemote(t *testing.T) {
 		),
 	)
 	require.NoError(t, err)
-	oldState, err := changeset.LoadOnchainState(e.Env)
+	oldState, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	envNodes, err := deployment.NodeInfo(e.Env.NodeIDs, e.Env.Offchain)
 	require.NoError(t, err)
@@ -115,7 +120,7 @@ func TestV1_5_Message_RMNRemote(t *testing.T) {
 	var apps []commonchangeset.ConfiguredChangeSet
 	apps = append(apps, []commonchangeset.ConfiguredChangeSet{
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.DeployHomeChainChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.DeployHomeChainChangeset),
 			v1_6.DeployHomeChainConfig{
 				HomeChainSel:     e.HomeChainSel,
 				RMNDynamicConfig: testhelpers.NewTestRMNDynamicConfig(),
@@ -127,7 +132,7 @@ func TestV1_5_Message_RMNRemote(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.DeployChainContractsChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.DeployChainContractsChangeset),
 			v1_6.DeployChainContractsConfig{
 				HomeChainSelector:      e.HomeChainSel,
 				ContractParamsPerChain: evmContractParams,
@@ -139,7 +144,7 @@ func TestV1_5_Message_RMNRemote(t *testing.T) {
 	require.NoError(t, err)
 	tEnv.UpdateDeployedEnvironment(e)
 
-	_, err = deployment.CreateLegacyChangeSet(v1_6.SetRMNRemoteOnRMNProxyChangeset).Apply(e.Env,
+	_, err = cldf.CreateLegacyChangeSet(v1_6.SetRMNRemoteOnRMNProxyChangeset).Apply(e.Env,
 		v1_6.SetRMNRemoteOnRMNProxyConfig{
 			ChainSelectors: e.Env.AllChainSelectors(),
 		})
@@ -191,7 +196,7 @@ func TestV1_5_Message_RMNRemote_Curse(t *testing.T) {
 				},
 			}),
 	)
-	state, err := changeset.LoadOnchainState(e.Env)
+	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	allChains := e.Env.AllChainSelectors()
 	src1, dest := allChains[0], allChains[1]
@@ -205,7 +210,7 @@ func TestV1_5_Message_RMNRemote_Curse(t *testing.T) {
 	// permabless the commit stores
 	e.Env, err = commonchangeset.Apply(t, e.Env, e.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_5.PermaBlessCommitStoreChangeset),
+			cldf.CreateLegacyChangeSet(v1_5.PermaBlessCommitStoreChangeset),
 			v1_5.PermaBlessCommitStoreConfig{
 				Configs: map[uint64]v1_5.PermaBlessCommitStoreConfigPerDest{
 					dest: {
@@ -221,7 +226,7 @@ func TestV1_5_Message_RMNRemote_Curse(t *testing.T) {
 		),
 	)
 	require.NoError(t, err)
-	oldState, err := changeset.LoadOnchainState(e.Env)
+	oldState, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	envNodes, err := deployment.NodeInfo(e.Env.NodeIDs, e.Env.Offchain)
 	require.NoError(t, err)
@@ -241,7 +246,7 @@ func TestV1_5_Message_RMNRemote_Curse(t *testing.T) {
 	var apps []commonchangeset.ConfiguredChangeSet
 	apps = append(apps, []commonchangeset.ConfiguredChangeSet{
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.DeployHomeChainChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.DeployHomeChainChangeset),
 			v1_6.DeployHomeChainConfig{
 				HomeChainSel:     e.HomeChainSel,
 				RMNDynamicConfig: testhelpers.NewTestRMNDynamicConfig(),
@@ -253,7 +258,7 @@ func TestV1_5_Message_RMNRemote_Curse(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.DeployChainContractsChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.DeployChainContractsChangeset),
 			v1_6.DeployChainContractsConfig{
 				HomeChainSelector:      e.HomeChainSel,
 				ContractParamsPerChain: evmContractParams,
@@ -267,7 +272,7 @@ func TestV1_5_Message_RMNRemote_Curse(t *testing.T) {
 	// reload state after adding lanes
 	tEnv.UpdateDeployedEnvironment(e)
 
-	_, err = deployment.CreateLegacyChangeSet(v1_6.SetRMNRemoteOnRMNProxyChangeset).Apply(e.Env,
+	_, err = cldf.CreateLegacyChangeSet(v1_6.SetRMNRemoteOnRMNProxyChangeset).Apply(e.Env,
 		v1_6.SetRMNRemoteOnRMNProxyConfig{
 			ChainSelectors: e.Env.AllChainSelectors(),
 		})
@@ -289,7 +294,7 @@ func TestV1_5_Message_RMNRemote_Curse(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = deployment.CreateLegacyChangeSet(v1_6.RMNCurseChangeset).Apply(e.Env, v1_6.RMNCurseConfig{
+	_, err = cldf.CreateLegacyChangeSet(v1_6.RMNCurseChangeset).Apply(e.Env, v1_6.RMNCurseConfig{
 		CurseActions: []v1_6.CurseAction{v1_6.CurseChain(e.Env.AllChainSelectors()[0])},
 		Reason:       "Curse test",
 	})
@@ -327,7 +332,7 @@ func TestV1_5_Message_RMNRemote_Curse_Uncurse(t *testing.T) {
 				},
 			}),
 	)
-	state, err := changeset.LoadOnchainState(e.Env)
+	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	allChains := e.Env.AllChainSelectors()
 	src1, dest := allChains[0], allChains[1]
@@ -341,7 +346,7 @@ func TestV1_5_Message_RMNRemote_Curse_Uncurse(t *testing.T) {
 	// permabless the commit stores
 	e.Env, err = commonchangeset.Apply(t, e.Env, e.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_5.PermaBlessCommitStoreChangeset),
+			cldf.CreateLegacyChangeSet(v1_5.PermaBlessCommitStoreChangeset),
 			v1_5.PermaBlessCommitStoreConfig{
 				Configs: map[uint64]v1_5.PermaBlessCommitStoreConfigPerDest{
 					dest: {
@@ -357,7 +362,7 @@ func TestV1_5_Message_RMNRemote_Curse_Uncurse(t *testing.T) {
 		),
 	)
 	require.NoError(t, err)
-	oldState, err := changeset.LoadOnchainState(e.Env)
+	oldState, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	envNodes, err := deployment.NodeInfo(e.Env.NodeIDs, e.Env.Offchain)
 	require.NoError(t, err)
@@ -377,7 +382,7 @@ func TestV1_5_Message_RMNRemote_Curse_Uncurse(t *testing.T) {
 	var apps []commonchangeset.ConfiguredChangeSet
 	apps = append(apps, []commonchangeset.ConfiguredChangeSet{
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.DeployHomeChainChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.DeployHomeChainChangeset),
 			v1_6.DeployHomeChainConfig{
 				HomeChainSel:     e.HomeChainSel,
 				RMNDynamicConfig: testhelpers.NewTestRMNDynamicConfig(),
@@ -389,7 +394,7 @@ func TestV1_5_Message_RMNRemote_Curse_Uncurse(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.DeployChainContractsChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.DeployChainContractsChangeset),
 			v1_6.DeployChainContractsConfig{
 				HomeChainSelector:      e.HomeChainSel,
 				ContractParamsPerChain: evmContractParams,
@@ -400,11 +405,11 @@ func TestV1_5_Message_RMNRemote_Curse_Uncurse(t *testing.T) {
 	require.NoError(t, err)
 	// reload state after adding lanes
 
-	state, err = changeset.LoadOnchainState(e.Env)
+	state, err = stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	tEnv.UpdateDeployedEnvironment(e)
 
-	_, err = deployment.CreateLegacyChangeSet(v1_6.SetRMNRemoteOnRMNProxyChangeset).Apply(e.Env,
+	_, err = cldf.CreateLegacyChangeSet(v1_6.SetRMNRemoteOnRMNProxyChangeset).Apply(e.Env,
 		v1_6.SetRMNRemoteOnRMNProxyConfig{
 			ChainSelectors: e.Env.AllChainSelectors(),
 		})
@@ -426,7 +431,7 @@ func TestV1_5_Message_RMNRemote_Curse_Uncurse(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = deployment.CreateLegacyChangeSet(v1_6.RMNCurseChangeset).Apply(e.Env, v1_6.RMNCurseConfig{
+	_, err = cldf.CreateLegacyChangeSet(v1_6.RMNCurseChangeset).Apply(e.Env, v1_6.RMNCurseConfig{
 		CurseActions: []v1_6.CurseAction{v1_6.CurseChain(e.Env.AllChainSelectors()[0])},
 		Reason:       "Curse test",
 	})
@@ -444,7 +449,7 @@ func TestV1_5_Message_RMNRemote_Curse_Uncurse(t *testing.T) {
 		commitFound <- struct{}{}
 	}()
 
-	_, err = deployment.CreateLegacyChangeSet(v1_6.RMNUncurseChangeset).Apply(e.Env, v1_6.RMNCurseConfig{
+	_, err = cldf.CreateLegacyChangeSet(v1_6.RMNUncurseChangeset).Apply(e.Env, v1_6.RMNCurseConfig{
 		CurseActions: []v1_6.CurseAction{v1_6.CurseChain(e.Env.AllChainSelectors()[0])},
 		Reason:       "Uncurse test",
 	})
@@ -512,7 +517,7 @@ func TestMigrateFromV1_5ToV1_6(t *testing.T) {
 		// between nodes' calculated digest and the digest set on the contract
 		testhelpers.WithChainIDs([]uint64{chainselectors.GETH_TESTNET.EvmChainID}),
 	)
-	state, err := changeset.LoadOnchainState(e.Env)
+	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	allChainsExcept1337 := e.Env.AllChainSelectorsExcluding([]uint64{chainselectors.GETH_TESTNET.Selector})
 	require.Contains(t, e.Env.AllChainSelectors(), chainselectors.GETH_TESTNET.Selector)
@@ -530,7 +535,7 @@ func TestMigrateFromV1_5ToV1_6(t *testing.T) {
 	// permabless the commit stores
 	e.Env, err = commonchangeset.Apply(t, e.Env, e.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_5.PermaBlessCommitStoreChangeset),
+			cldf.CreateLegacyChangeSet(v1_5.PermaBlessCommitStoreChangeset),
 			v1_5.PermaBlessCommitStoreConfig{
 				Configs: map[uint64]v1_5.PermaBlessCommitStoreConfigPerDest{
 					dest: {
@@ -551,7 +556,7 @@ func TestMigrateFromV1_5ToV1_6(t *testing.T) {
 	)
 	require.NoError(t, err)
 	// reload state after adding lanes
-	state, err = changeset.LoadOnchainState(e.Env)
+	state, err = stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	tEnv.UpdateDeployedEnvironment(e)
 	// ensure that all lanes are functional
@@ -616,7 +621,7 @@ func TestMigrateFromV1_5ToV1_6(t *testing.T) {
 
 	e.Env, err = commonchangeset.Apply(t, e.Env, e.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelock),
+			cldf.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelockV2),
 			commonchangeset.TransferToMCMSWithTimelockConfig{
 				ContractsByChain: contractsByChain,
 				MCMSConfig: proposalutils.TimelockConfig{
@@ -635,7 +640,7 @@ func TestMigrateFromV1_5ToV1_6(t *testing.T) {
 	e.Env, err = commonchangeset.Apply(t, e.Env, e.TimelockContracts(t),
 		commonchangeset.Configure(
 			// as we have already transferred ownership for RMNProxy to MCMS, it needs to be done via MCMS proposal
-			deployment.CreateLegacyChangeSet(v1_6.SetRMNRemoteOnRMNProxyChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.SetRMNRemoteOnRMNProxyChangeset),
 			v1_6.SetRMNRemoteOnRMNProxyConfig{
 				ChainSelectors: e.Env.AllChainSelectors(),
 				MCMSConfig: &proposalutils.TimelockConfig{
@@ -644,7 +649,7 @@ func TestMigrateFromV1_5ToV1_6(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateNonceManagersChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateNonceManagersChangeset),
 			v1_6.UpdateNonceManagerConfig{
 				// we only have lanes between src1 --> dest
 				UpdatesByChain: map[uint64]v1_6.NonceManagerUpdate{
@@ -681,7 +686,7 @@ func TestMigrateFromV1_5ToV1_6(t *testing.T) {
 		),
 	)
 	require.NoError(t, err)
-	state, err = changeset.LoadOnchainState(e.Env)
+	state, err = stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
 	// Enable a single 1.6 lane with test router
@@ -733,7 +738,7 @@ func TestMigrateFromV1_5ToV1_6(t *testing.T) {
 	// now that the 1.6 lane is working, we can enable the real router
 	e.Env, err = commonchangeset.Apply(t, e.Env, e.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateOnRampsDestsChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateOnRampsDestsChangeset),
 			v1_6.UpdateOnRampDestsConfig{
 				UpdatesByChain: map[uint64]map[uint64]v1_6.OnRampDestinationUpdate{
 					src1: {
@@ -747,7 +752,7 @@ func TestMigrateFromV1_5ToV1_6(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateOffRampSourcesChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateOffRampSourcesChangeset),
 			v1_6.UpdateOffRampSourcesConfig{
 				UpdatesByChain: map[uint64]map[uint64]v1_6.OffRampSourceUpdate{
 					dest: {
@@ -762,7 +767,7 @@ func TestMigrateFromV1_5ToV1_6(t *testing.T) {
 		),
 		commonchangeset.Configure(
 			// this needs to be MCMS proposal as the router contract is owned by MCMS
-			deployment.CreateLegacyChangeSet(v1_6.UpdateRouterRampsChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateRouterRampsChangeset),
 			v1_6.UpdateRouterRampsConfig{
 				TestRouter: false,
 				MCMS: &proposalutils.TimelockConfig{
@@ -840,7 +845,7 @@ func TestMigrateFromV1_5ToV1_6(t *testing.T) {
 func sendContinuousMessages(
 	t *testing.T,
 	e *testhelpers.DeployedEnv,
-	state *changeset.CCIPOnChainState,
+	state *stateview.CCIPOnChainState,
 	src, dest uint64,
 	done chan bool,
 ) (uint64, []*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, []*onramp.OnRampCCIPMessageSent) {
@@ -883,7 +888,7 @@ func sendContinuousMessages(
 func sendMessageInRealRouter(
 	t *testing.T,
 	e *testhelpers.DeployedEnv,
-	state *changeset.CCIPOnChainState,
+	state *stateview.CCIPOnChainState,
 	src, dest uint64,
 ) any {
 	cfg := &testhelpers.CCIPSendReqConfig{

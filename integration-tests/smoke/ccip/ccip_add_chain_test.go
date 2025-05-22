@@ -10,13 +10,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
-	"github.com/smartcontractkit/chainlink/deployment"
-	ccipcs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 
@@ -54,7 +56,7 @@ func Test_AddChain(t *testing.T) {
 	/////////////////////////////////////
 	e = setupChain(t, e, tEnv, toDeploy, false)
 
-	state, err := ccipcs.LoadOnchainState(e.Env)
+	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	tEnv.UpdateDeployedEnvironment(e)
 	// check RMNRemote is up and RMNProxy is correctly wired.
@@ -174,7 +176,7 @@ func Test_AddChain(t *testing.T) {
 	// transferred to MCMS.
 	e = setupChain(t, e, tEnv, []uint64{remainingChain}, true)
 
-	state, err = ccipcs.LoadOnchainState(e.Env)
+	state, err = stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	tEnv.UpdateDeployedEnvironment(e)
 
@@ -198,7 +200,7 @@ func Test_AddChain(t *testing.T) {
 		true, // mcmsEnabled
 	)
 
-	state, err = ccipcs.LoadOnchainState(e.Env)
+	state, err = stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
 	assertChainWiringOutbound(
@@ -316,7 +318,7 @@ func Test_AddChain(t *testing.T) {
 		true,  // mcmsEnabled
 	)
 
-	state, err = ccipcs.LoadOnchainState(e.Env)
+	state, err = stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
 	assertChainWiringOutbound(
@@ -434,14 +436,14 @@ func setupInboundWiring(
 	var err error
 	e.Env, err = commonchangeset.Apply(t, e.Env, e.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateOffRampSourcesChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateOffRampSourcesChangeset),
 			v1_6.UpdateOffRampSourcesConfig{
 				UpdatesByChain: offRampSourceUpdates(t, newChains, sources, testRouterEnabled),
 				MCMS:           mcmsConfig,
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateRouterRampsChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateRouterRampsChangeset),
 			v1_6.UpdateRouterRampsConfig{
 				TestRouter:     testRouterEnabled,
 				UpdatesByChain: routerOffRampUpdates(t, newChains, sources),
@@ -475,28 +477,28 @@ func setupOutboundWiring(
 	var err error
 	e.Env, err = commonchangeset.Apply(t, e.Env, e.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateOnRampsDestsChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateOnRampsDestsChangeset),
 			v1_6.UpdateOnRampDestsConfig{
 				UpdatesByChain: onRampDestUpdates(t, newChains, sources, testRouterEnabled),
 				MCMS:           mcmsConfig,
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterPricesChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterPricesChangeset),
 			v1_6.UpdateFeeQuoterPricesConfig{
 				PricesByChain: feeQuoterPricesByChain(t, newChains, sources),
 				MCMS:          mcmsConfig,
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterDestsChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterDestsChangeset),
 			v1_6.UpdateFeeQuoterDestsConfig{
 				UpdatesByChain: feeQuoterDestUpdates(t, newChains, sources),
 				MCMS:           mcmsConfig,
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateRouterRampsChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateRouterRampsChangeset),
 			v1_6.UpdateRouterRampsConfig{
 				TestRouter:     testRouterEnabled,
 				UpdatesByChain: routerOnRampUpdates(t, newChains, sources),
@@ -519,7 +521,7 @@ func setupChain(t *testing.T, e testhelpers.DeployedEnv, tEnv testhelpers.TestEn
 	var err error
 	e.Env, err = commonchangeset.Apply(t, e.Env, e.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.SetRMNRemoteOnRMNProxyChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.SetRMNRemoteOnRMNProxyChangeset),
 			v1_6.SetRMNRemoteOnRMNProxyConfig{
 				ChainSelectors: chains,
 			},
@@ -535,7 +537,7 @@ func setupChain(t *testing.T, e testhelpers.DeployedEnv, tEnv testhelpers.TestEn
 // It doesn't check that the existingChains have the newChain enabled as a dest.
 func assertChainWiringInbound(
 	t *testing.T,
-	state ccipcs.CCIPOnChainState,
+	state stateview.CCIPOnChainState,
 	newChain uint64,
 	existingChains []uint64,
 	testRouterEnabled bool,
@@ -581,7 +583,7 @@ func assertChainWiringInbound(
 // It doesn't check that the newChain can process the requests.
 func assertChainWiringOutbound(
 	t *testing.T,
-	state ccipcs.CCIPOnChainState,
+	state stateview.CCIPOnChainState,
 	newChain uint64,
 	existingChains []uint64,
 	testRouterEnabled bool,
@@ -731,7 +733,7 @@ func offRampSourceUpdates(t *testing.T, dests []uint64, sources []uint64, testRo
 	return
 }
 
-func assertRMNRemoteAndProxyState(t *testing.T, chains []uint64, state ccipcs.CCIPOnChainState) {
+func assertRMNRemoteAndProxyState(t *testing.T, chains []uint64, state stateview.CCIPOnChainState) {
 	for _, chain := range chains {
 		require.NotEqual(t, common.Address{}, state.Chains[chain].RMNRemote.Address())
 		_, err := state.Chains[chain].RMNRemote.GetCursedSubjects(&bind.CallOpts{
@@ -755,11 +757,11 @@ func transferToMCMSAndRenounceTimelockDeployer(
 	t *testing.T,
 	e testhelpers.DeployedEnv,
 	chains []uint64,
-	state ccipcs.CCIPOnChainState,
+	state stateview.CCIPOnChainState,
 	onlyChainContracts bool,
 ) {
 	apps := make([]commonchangeset.ConfiguredChangeSet, 0, len(chains)+1)
-	cfg := testhelpers.GenTestTransferOwnershipConfig(e, chains, state)
+	cfg := testhelpers.GenTestTransferOwnershipConfig(e, chains, state, true)
 	if onlyChainContracts {
 		// filter out the home chain contracts from e.HomeChainSel
 		var homeChainContracts = map[common.Address]struct{}{
@@ -776,12 +778,12 @@ func transferToMCMSAndRenounceTimelockDeployer(
 		cfg.ContractsByChain[e.HomeChainSel] = chainContracts
 	}
 	apps = append(apps, commonchangeset.Configure(
-		deployment.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelock),
+		cldf.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelockV2),
 		cfg,
 	))
 	for _, chain := range chains {
 		apps = append(apps, commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(commonchangeset.RenounceTimelockDeployer),
+			cldf.CreateLegacyChangeSet(commonchangeset.RenounceTimelockDeployer),
 			commonchangeset.RenounceTimelockDeployerConfig{
 				ChainSel: chain,
 			},

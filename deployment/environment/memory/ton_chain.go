@@ -13,17 +13,16 @@ import (
 
 	"github.com/xssnick/tonutils-go/ton/wallet"
 
-	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/xssnick/tonutils-go/liteclient"
 	"github.com/xssnick/tonutils-go/ton"
 
-	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 )
 
@@ -46,12 +45,12 @@ func createTonWallet(t *testing.T, client ton.APIClientWrapped, version wallet.V
 	return pw
 }
 
-func GenerateChainsTon(t *testing.T, numChains int) map[uint64]deployment.TonChain {
+func GenerateChainsTon(t *testing.T, numChains int) map[uint64]cldf.TonChain {
 	testTonChainSelectors := getTestTonChainSelectors()
 	if len(testTonChainSelectors) < numChains {
 		t.Fatalf("not enough test ton chain selectors available")
 	}
-	chains := make(map[uint64]deployment.TonChain)
+	chains := make(map[uint64]cldf.TonChain)
 	for i := 0; i < numChains; i++ {
 		chainID := testTonChainSelectors[i]
 
@@ -59,7 +58,7 @@ func GenerateChainsTon(t *testing.T, numChains int) map[uint64]deployment.TonCha
 		// todo: configurable wallet version, we might need to use Highload wallet for some tests
 		// todo: configurable wallet options
 		wallet := createTonWallet(t, nodeClient, wallet.V3R2, wallet.WithWorkchain(0))
-		chains[chainID] = deployment.TonChain{
+		chains[chainID] = cldf.TonChain{
 			Client:        nodeClient,
 			Wallet:        wallet,
 			WalletAddress: wallet.Address(),
@@ -79,19 +78,13 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 	require.NoError(t, err)
 
 	maxRetries := 10
-	var url string
-	var port uint16
+	var networkConfigUrl string
 	var containerName string
 	for i := 0; i < maxRetries; i++ {
-		port = uint16(freeport.GetOne(t))
-
 		bcInput := &blockchain.Input{
-			Image:   "", // filled out by defaultTon function
+			Image:   "ghcr.io/neodix42/mylocalton-docker:latest", // filled out by defaultTon function
 			Type:    "ton",
 			ChainID: strconv.FormatUint(chainID, 10),
-			// todo: remove this, solana specific public key field
-			// PublicKey: adminAddress.String(),
-			Port: fmt.Sprintf("%d", port),
 		}
 		output, err := blockchain.NewBlockchainNetwork(bcInput)
 		if err != nil {
@@ -105,17 +98,17 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 
 		// todo: ctf-configured clean up?
 		testcontainers.CleanupContainer(t, output.Container)
-		url = output.NetworkSpecificData.TonGlobalConfigURL
+		networkConfigUrl = fmt.Sprintf("http://%s/localhost.global.config.json", output.Nodes[0].ExternalHTTPUrl)
 		break
 	}
 	_ = containerName
 
-	fmt.Printf("DEBUG: ton chain url: %s\n", url)
+	fmt.Printf("DEBUG: Mylocalton config url: %s\n", networkConfigUrl)
 
 	connectionPool := liteclient.NewConnectionPool()
 
 	// get config
-	cfg, err := liteclient.GetConfigFromUrl(context.Background(), url)
+	cfg, err := liteclient.GetConfigFromUrl(context.Background(), networkConfigUrl)
 	if err != nil {
 		log.Fatalln("get config err: ", err.Error())
 		return nil
@@ -151,7 +144,7 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 	return client
 }
 
-func createTonChainConfig(chainID string, chain deployment.TonChain) chainlink.RawConfig {
+func createTonChainConfig(chainID string, chain cldf.TonChain) chainlink.RawConfig {
 	chainConfig := chainlink.RawConfig{}
 
 	chainConfig["Enabled"] = true

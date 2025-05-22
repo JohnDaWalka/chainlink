@@ -12,7 +12,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink/deployment"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
@@ -32,9 +33,9 @@ func TestUpdateAuthorizedAddresses(t *testing.T) {
 
 	assert.Empty(t, authorizedAddresses)
 
-	env := deployment.Environment{
+	env := cldf.Environment{
 		Logger: lggr,
-		Chains: map[uint64]deployment.Chain{
+		Chains: map[uint64]cldf.Chain{
 			chainSel: resp.Chain,
 		},
 		ExistingAddresses: resp.AddressBook,
@@ -105,7 +106,7 @@ func Test_UpdateAuthorizedAddresses_WithMCMS(t *testing.T) {
 
 	_, err = commonchangeset.Apply(t, te.Env, timelockContracts,
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(workflowregistry.UpdateAuthorizedAddresses),
+			cldf.CreateLegacyChangeSet(workflowregistry.UpdateAuthorizedAddresses),
 			req,
 		),
 	)

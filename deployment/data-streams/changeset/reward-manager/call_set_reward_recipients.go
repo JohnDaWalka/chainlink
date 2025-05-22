@@ -9,13 +9,15 @@ import (
 	goEthTypes "github.com/ethereum/go-ethereum/core/types"
 
 	rewardManager "github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/reward_manager_v0_5_0"
-	"github.com/smartcontractkit/chainlink/deployment"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/types"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/mcmsutil"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/txutil"
 )
 
-var SetRewardRecipientsChangeset = deployment.CreateChangeSet(setRewardRecipientsLogic, setRewardRecipientsPrecondition)
+var SetRewardRecipientsChangeset = cldf.CreateChangeSet(setRewardRecipientsLogic, setRewardRecipientsPrecondition)
 
 type SetRewardRecipientsConfig struct {
 	ConfigsByChain map[uint64][]SetRewardRecipients
@@ -40,14 +42,14 @@ func (cfg SetRewardRecipientsConfig) Validate() error {
 	return nil
 }
 
-func setRewardRecipientsPrecondition(_ deployment.Environment, cc SetRewardRecipientsConfig) error {
+func setRewardRecipientsPrecondition(_ cldf.Environment, cc SetRewardRecipientsConfig) error {
 	if err := cc.Validate(); err != nil {
 		return fmt.Errorf("invalid SetRewardRecipients config: %w", err)
 	}
 	return nil
 }
 
-func setRewardRecipientsLogic(e deployment.Environment, cfg SetRewardRecipientsConfig) (deployment.ChangesetOutput, error) {
+func setRewardRecipientsLogic(e cldf.Environment, cfg SetRewardRecipientsConfig) (cldf.ChangesetOutput, error) {
 	txs, err := txutil.GetTxs(
 		e,
 		types.RewardManager.String(),
@@ -56,7 +58,7 @@ func setRewardRecipientsLogic(e deployment.Environment, cfg SetRewardRecipientsC
 		doSetRewardRecipients,
 	)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed building SetRewardRecipients txs: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed building SetRewardRecipients txs: %w", err)
 	}
 
 	return mcmsutil.ExecuteOrPropose(e, txs, cfg.MCMSConfig, "SetRewardRecipients proposal")
@@ -64,7 +66,7 @@ func setRewardRecipientsLogic(e deployment.Environment, cfg SetRewardRecipientsC
 
 func doSetRewardRecipients(vs *rewardManager.RewardManager, sr SetRewardRecipients) (*goEthTypes.Transaction, error) {
 	return vs.SetRewardRecipients(
-		deployment.SimTransactOpts(),
+		cldf.SimTransactOpts(),
 		sr.PoolID,
 		sr.RewardRecipientAndWeights,
 	)

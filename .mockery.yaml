@@ -27,7 +27,8 @@ packages:
       OracleCreator:
   github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common:
     interfaces:
-      ExtraDataCodec:
+      SourceChainExtraDataCodec:
+      ChainSpecificAddressCodec:
   github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types:
     interfaces:
       Dispatcher:
@@ -39,26 +40,13 @@ packages:
       AbigenContract:
   github.com/smartcontractkit/chainlink-evm/pkg/logpoller:
     config:
-      dir: core/chains/evm/logpoller/mocks
+      dir: common/logpoller/mocks
     interfaces:
       LogPoller:
-  github.com/smartcontractkit/chainlink/v2/core/chains/evm/txm:
+  github.com/smartcontractkit/chainlink-evm/pkg/txmgr:
     config:
-      dir: core/chains/evm/txm
-      outpkg: txm
-      mockname: "mock{{ .InterfaceName }}"
-      filename: "mock_{{ .InterfaceName | snakecase }}_test.go"
+      dir: common/txmgr/mocks
     interfaces:
-      Client:
-      TxStore:
-      AttemptBuilder:
-      Keystore:
-  github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr:
-    interfaces:
-      ChainConfig:
-        config:
-          mockname: Config
-          filename: config.go
       EvmTxStore:
   github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm:
     interfaces:
@@ -283,6 +271,16 @@ packages:
     interfaces:
       LDAPClient:
       LDAPConn:
+  github.com/smartcontractkit/chainlink-common/pkg/capabilities:
+    config:
+      dir: core/capabilities/mocks
+    interfaces:
+      BaseCapability:
+      TriggerCapability:
+      ExecutableCapability:
+      ExecutableAndTriggerCapability:
+      Executable:
+      TriggerExecutable:
   github.com/smartcontractkit/chainlink-common/pkg/types:
     config:
       dir: core/capabilities/targets/mocks
@@ -403,3 +401,6 @@ packages:
   github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncer:
     interfaces:
       ORM:
+  github.com/smartcontractkit/chainlink/v2/core/capabilities/targets:
+    interfaces:
+      ContractValueGetter:

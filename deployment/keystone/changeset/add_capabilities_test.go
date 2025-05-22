@@ -7,7 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
-	"github.com/smartcontractkit/chainlink/deployment"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/test"
@@ -42,7 +43,7 @@ func TestAddCapabilities(t *testing.T) {
 			RegistryRef:      te.CapabilityRegistryAddressRef(),
 		})
 		require.NoError(t, err)
-		require.Empty(t, csOut.Proposals)
+		require.Empty(t, csOut.MCMSTimelockProposals)
 		require.Nil(t, csOut.AddressBook)
 		assertCapabilitiesExist(t, te.CapabilitiesRegistry(), capabilitiesToAdd...)
 	})
@@ -68,7 +69,7 @@ func TestAddCapabilities(t *testing.T) {
 		require.Nil(t, csOut.AddressBook)
 
 		// now apply the changeset such that the proposal is signed and execed
-		err = applyProposal(t, te, commonchangeset.Configure(deployment.CreateLegacyChangeSet(changeset.AddCapabilities), req))
+		err = applyProposal(t, te, commonchangeset.Configure(cldf.CreateLegacyChangeSet(changeset.AddCapabilities), req))
 		require.NoError(t, err)
 
 		assertCapabilitiesExist(t, te.CapabilitiesRegistry(), capabilitiesToAdd...)

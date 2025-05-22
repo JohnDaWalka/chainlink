@@ -18,17 +18,24 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/burn_mint_erc677"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/v1_5"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
+
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 )
@@ -52,7 +59,7 @@ func TestUpdateOnRampsDests(t *testing.T) {
 			// Default env just has 2 chains with all contracts
 			// deployed but no lanes.
 			tenv, _ := testhelpers.NewMemoryEnvironment(t)
-			state, err := changeset.LoadOnchainState(tenv.Env)
+			state, err := stateview.LoadOnchainState(tenv.Env)
 			require.NoError(t, err)
 
 			allChains := maps.Keys(tenv.Env.Chains)
@@ -61,7 +68,7 @@ func TestUpdateOnRampsDests(t *testing.T) {
 
 			if tc.mcmsEnabled {
 				// Transfer ownership to timelock so that we can promote the zero digest later down the line.
-				transferToTimelock(t, tenv, state, []uint64{source, dest})
+				testhelpers.TransferToTimelock(t, tenv, state, []uint64{source, dest}, true)
 			}
 
 			var mcmsConfig *proposalutils.TimelockConfig
@@ -72,7 +79,7 @@ func TestUpdateOnRampsDests(t *testing.T) {
 			}
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateOnRampsDestsChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateOnRampsDestsChangeset),
 					v1_6.UpdateOnRampDestsConfig{
 						UpdatesByChain: map[uint64]map[uint64]v1_6.OnRampDestinationUpdate{
 							source: {
@@ -128,7 +135,7 @@ func TestUpdateOnRampDynamicConfig(t *testing.T) {
 			// Default env just has 2 chains with all contracts
 			// deployed but no lanes.
 			tenv, _ := testhelpers.NewMemoryEnvironment(t)
-			state, err := changeset.LoadOnchainState(tenv.Env)
+			state, err := stateview.LoadOnchainState(tenv.Env)
 			require.NoError(t, err)
 
 			allChains := maps.Keys(tenv.Env.Chains)
@@ -137,7 +144,7 @@ func TestUpdateOnRampDynamicConfig(t *testing.T) {
 
 			if tc.mcmsEnabled {
 				// Transfer ownership to timelock so that we can promote the zero digest later down the line.
-				transferToTimelock(t, tenv, state, []uint64{source, dest})
+				testhelpers.TransferToTimelock(t, tenv, state, []uint64{source, dest}, true)
 			}
 
 			var mcmsConfig *proposalutils.TimelockConfig
@@ -148,7 +155,7 @@ func TestUpdateOnRampDynamicConfig(t *testing.T) {
 			}
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateOnRampDynamicConfigChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateOnRampDynamicConfigChangeset),
 					v1_6.UpdateOnRampDynamicConfig{
 						UpdatesByChain: map[uint64]v1_6.OnRampDynamicConfigUpdate{
 							source: {
@@ -196,7 +203,7 @@ func TestUpdateOnRampAllowList(t *testing.T) {
 			// Default env just has 2 chains with all contracts
 			// deployed but no lanes.
 			tenv, _ := testhelpers.NewMemoryEnvironment(t)
-			state, err := changeset.LoadOnchainState(tenv.Env)
+			state, err := stateview.LoadOnchainState(tenv.Env)
 			require.NoError(t, err)
 
 			allChains := maps.Keys(tenv.Env.Chains)
@@ -205,7 +212,7 @@ func TestUpdateOnRampAllowList(t *testing.T) {
 
 			if tc.mcmsEnabled {
 				// Transfer ownership to timelock so that we can promote the zero digest later down the line.
-				transferToTimelock(t, tenv, state, []uint64{source, dest})
+				testhelpers.TransferToTimelock(t, tenv, state, []uint64{source, dest}, true)
 			}
 
 			var mcmsConfig *proposalutils.TimelockConfig
@@ -216,7 +223,7 @@ func TestUpdateOnRampAllowList(t *testing.T) {
 			}
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateOnRampAllowListChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateOnRampAllowListChangeset),
 					v1_6.UpdateOnRampAllowListConfig{
 						UpdatesByChain: map[uint64]map[uint64]v1_6.OnRampAllowListUpdate{
 							source: {
@@ -272,7 +279,7 @@ func TestWithdrawOnRampFeeTokens(t *testing.T) {
 			// Default env just has 2 chains with all contracts
 			// deployed but no lanes.
 			tenv, _ := testhelpers.NewMemoryEnvironment(t)
-			state, err := changeset.LoadOnchainState(tenv.Env)
+			state, err := stateview.LoadOnchainState(tenv.Env)
 			require.NoError(t, err)
 
 			allChains := maps.Keys(tenv.Env.Chains)
@@ -284,7 +291,7 @@ func TestWithdrawOnRampFeeTokens(t *testing.T) {
 
 			if tc.mcmsEnabled {
 				// Transfer ownership to timelock so that we can promote the zero digest later down the line.
-				transferToTimelock(t, tenv, state, []uint64{source, dest})
+				testhelpers.TransferToTimelock(t, tenv, state, []uint64{source, dest}, true)
 			}
 
 			var mcmsConfig *proposalutils.TimelockConfig
@@ -346,7 +353,7 @@ func TestWithdrawOnRampFeeTokens(t *testing.T) {
 
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.WithdrawOnRampFeeTokensChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.WithdrawOnRampFeeTokensChangeset),
 					v1_6.WithdrawOnRampFeeTokensConfig{
 						FeeTokensByChain: map[uint64][]common.Address{
 							source: {linkToken.Address(), weth9.Address()},
@@ -386,7 +393,7 @@ func TestUpdateOffRampsSources(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := testcontext.Get(t)
 			tenv, _ := testhelpers.NewMemoryEnvironment(t)
-			state, err := changeset.LoadOnchainState(tenv.Env)
+			state, err := stateview.LoadOnchainState(tenv.Env)
 			require.NoError(t, err)
 
 			allChains := maps.Keys(tenv.Env.Chains)
@@ -395,7 +402,7 @@ func TestUpdateOffRampsSources(t *testing.T) {
 
 			if tc.mcmsEnabled {
 				// Transfer ownership to timelock so that we can promote the zero digest later down the line.
-				transferToTimelock(t, tenv, state, []uint64{source, dest})
+				testhelpers.TransferToTimelock(t, tenv, state, []uint64{source, dest}, true)
 			}
 
 			var mcmsConfig *proposalutils.TimelockConfig
@@ -406,7 +413,7 @@ func TestUpdateOffRampsSources(t *testing.T) {
 			}
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateOffRampSourcesChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateOffRampSourcesChangeset),
 					v1_6.UpdateOffRampSourcesConfig{
 						UpdatesByChain: map[uint64]map[uint64]v1_6.OffRampSourceUpdate{
 							source: {
@@ -462,7 +469,7 @@ func TestUpdateFQDests(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := testcontext.Get(t)
 			tenv, _ := testhelpers.NewMemoryEnvironment(t)
-			state, err := changeset.LoadOnchainState(tenv.Env)
+			state, err := stateview.LoadOnchainState(tenv.Env)
 			require.NoError(t, err)
 
 			allChains := maps.Keys(tenv.Env.Chains)
@@ -471,7 +478,7 @@ func TestUpdateFQDests(t *testing.T) {
 
 			if tc.mcmsEnabled {
 				// Transfer ownership to timelock so that we can promote the zero digest later down the line.
-				transferToTimelock(t, tenv, state, []uint64{source, dest})
+				testhelpers.TransferToTimelock(t, tenv, state, []uint64{source, dest}, true)
 			}
 
 			var mcmsConfig *proposalutils.TimelockConfig
@@ -486,7 +493,7 @@ func TestUpdateFQDests(t *testing.T) {
 			fqCfg2.DestGasOverhead = 1000
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterDestsChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterDestsChangeset),
 					v1_6.UpdateFeeQuoterDestsConfig{
 						UpdatesByChain: map[uint64]map[uint64]fee_quoter.FeeQuoterDestChainConfig{
 							source: {
@@ -551,7 +558,7 @@ func TestUpdateRouterRamps(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := testcontext.Get(t)
 			tenv, _ := testhelpers.NewMemoryEnvironment(t)
-			state, err := changeset.LoadOnchainState(tenv.Env)
+			state, err := stateview.LoadOnchainState(tenv.Env)
 			require.NoError(t, err)
 
 			allChains := maps.Keys(tenv.Env.Chains)
@@ -564,7 +571,7 @@ func TestUpdateRouterRamps(t *testing.T) {
 					chains = []uint64{source, dest}
 				}
 				// Transfer ownership to timelock so that we can promote the zero digest later down the line.
-				transferToTimelock(t, tenv, state, chains)
+				testhelpers.TransferToTimelock(t, tenv, state, chains, true)
 			}
 
 			var mcmsConfig *proposalutils.TimelockConfig
@@ -576,7 +583,7 @@ func TestUpdateRouterRamps(t *testing.T) {
 
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateRouterRampsChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateRouterRampsChangeset),
 					v1_6.UpdateRouterRampsConfig{
 						UpdatesByChain: map[uint64]v1_6.RouterUpdates{
 							source: {
@@ -634,7 +641,7 @@ func TestUpdateDynamicConfigOffRampChangeset(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tenv, _ := testhelpers.NewMemoryEnvironment(t)
-			state, err := changeset.LoadOnchainState(tenv.Env)
+			state, err := stateview.LoadOnchainState(tenv.Env)
 			require.NoError(t, err)
 
 			allChains := maps.Keys(tenv.Env.Chains)
@@ -643,7 +650,7 @@ func TestUpdateDynamicConfigOffRampChangeset(t *testing.T) {
 
 			if tc.mcmsEnabled {
 				// Transfer ownership to timelock so that we can promote the zero digest later down the line.
-				transferToTimelock(t, tenv, state, []uint64{source, dest})
+				testhelpers.TransferToTimelock(t, tenv, state, []uint64{source, dest}, true)
 			}
 
 			var mcmsConfig *proposalutils.TimelockConfig
@@ -655,7 +662,7 @@ func TestUpdateDynamicConfigOffRampChangeset(t *testing.T) {
 			msgInterceptor := utils.RandomAddress()
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateDynamicConfigOffRampChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateDynamicConfigOffRampChangeset),
 					v1_6.UpdateDynamicConfigOffRampConfig{
 						Updates: map[uint64]v1_6.OffRampParams{
 							source: {
@@ -694,7 +701,7 @@ func TestUpdateNonceManagersCS(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tenv, _ := testhelpers.NewMemoryEnvironment(t)
-			state, err := changeset.LoadOnchainState(tenv.Env)
+			state, err := stateview.LoadOnchainState(tenv.Env)
 			require.NoError(t, err)
 
 			allChains := maps.Keys(tenv.Env.Chains)
@@ -703,7 +710,7 @@ func TestUpdateNonceManagersCS(t *testing.T) {
 
 			if tc.mcmsEnabled {
 				// Transfer ownership to timelock so that we can promote the zero digest later down the line.
-				transferToTimelock(t, tenv, state, []uint64{source, dest})
+				testhelpers.TransferToTimelock(t, tenv, state, []uint64{source, dest}, true)
 			}
 
 			var mcmsConfig *proposalutils.TimelockConfig
@@ -715,7 +722,7 @@ func TestUpdateNonceManagersCS(t *testing.T) {
 
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateNonceManagersChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateNonceManagersChangeset),
 					v1_6.UpdateNonceManagerConfig{
 						UpdatesByChain: map[uint64]v1_6.NonceManagerUpdate{
 							source: {
@@ -757,7 +764,7 @@ func TestUpdateNonceManagersCSApplyPreviousRampsUpdates(t *testing.T) {
 		}),
 		testhelpers.WithNumOfChains(3),
 		testhelpers.WithChainIDs([]uint64{chainselectors.GETH_TESTNET.EvmChainID}))
-	state, err := changeset.LoadOnchainState(e.Env)
+	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	allChains := e.Env.AllChainSelectorsExcluding([]uint64{chainselectors.GETH_TESTNET.Selector})
 	require.Contains(t, e.Env.AllChainSelectors(), chainselectors.GETH_TESTNET.Selector)
@@ -773,7 +780,7 @@ func TestUpdateNonceManagersCSApplyPreviousRampsUpdates(t *testing.T) {
 	// it should fail
 	_, err = commonchangeset.Apply(t, e.Env, e.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateNonceManagersChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateNonceManagersChangeset),
 			v1_6.UpdateNonceManagerConfig{
 				UpdatesByChain: map[uint64]v1_6.NonceManagerUpdate{
 					srcChain.Selector: {
@@ -794,7 +801,7 @@ func TestUpdateNonceManagersCSApplyPreviousRampsUpdates(t *testing.T) {
 	// it should fail again as there is no offramp for the source chain
 	_, err = commonchangeset.Apply(t, e.Env, e.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateNonceManagersChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateNonceManagersChangeset),
 			v1_6.UpdateNonceManagerConfig{
 				UpdatesByChain: map[uint64]v1_6.NonceManagerUpdate{
 					srcChain.Selector: {
@@ -813,7 +820,7 @@ func TestUpdateNonceManagersCSApplyPreviousRampsUpdates(t *testing.T) {
 	// Now apply the update with AllowEmptyOffRamp and it should pass
 	_, err = commonchangeset.Apply(t, e.Env, e.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateNonceManagersChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateNonceManagersChangeset),
 			v1_6.UpdateNonceManagerConfig{
 				UpdatesByChain: map[uint64]v1_6.NonceManagerUpdate{
 					srcChain.Selector: {
@@ -849,7 +856,7 @@ func TestSetOCR3ConfigValidations(t *testing.T) {
 	// now deploy contracts
 	apps = append(apps, []commonchangeset.ConfiguredChangeSet{
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.DeployHomeChainChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.DeployHomeChainChangeset),
 			v1_6.DeployHomeChainConfig{
 				HomeChainSel:     e.HomeChainSel,
 				RMNDynamicConfig: testhelpers.NewTestRMNDynamicConfig(),
@@ -861,7 +868,7 @@ func TestSetOCR3ConfigValidations(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.DeployChainContractsChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.DeployChainContractsChangeset),
 			v1_6.DeployChainContractsConfig{
 				HomeChainSelector:      e.HomeChainSel,
 				ContractParamsPerChain: evmContractParams,
@@ -874,7 +881,7 @@ func TestSetOCR3ConfigValidations(t *testing.T) {
 	_, err = commonchangeset.Apply(t, e.Env, e.TimelockContracts(t),
 		commonchangeset.Configure(
 			// Enable the OCR config on the remote chains.
-			deployment.CreateLegacyChangeSet(v1_6.SetOCR3OffRampChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.SetOCR3OffRampChangeset),
 			v1_6.SetOCR3OffRampConfig{
 				HomeChainSel:       e.HomeChainSel,
 				RemoteChainSels:    allChains,
@@ -897,8 +904,8 @@ func TestSetOCR3ConfigValidations(t *testing.T) {
 			//nolint:gosec // disable G115
 			FChain: uint8(len(envNodes.NonBootstraps().PeerIDs())),
 			EncodableChainConfig: chainconfig.ChainConfig{
-				GasPriceDeviationPPB:    cciptypes.BigInt{Int: big.NewInt(globals.GasPriceDeviationPPB)},
-				DAGasPriceDeviationPPB:  cciptypes.BigInt{Int: big.NewInt(globals.DAGasPriceDeviationPPB)},
+				GasPriceDeviationPPB:    cciptypes.BigInt{Int: big.NewInt(testhelpers.DefaultGasPriceDeviationPPB)},
+				DAGasPriceDeviationPPB:  cciptypes.BigInt{Int: big.NewInt(testhelpers.DefaultDAGasPriceDeviationPPB)},
 				OptimisticConfirmations: globals.OptimisticConfirmations,
 			},
 		}
@@ -908,7 +915,7 @@ func TestSetOCR3ConfigValidations(t *testing.T) {
 	e.Env, err = commonchangeset.ApplyChangesets(t, e.Env, nil, []commonchangeset.ConfiguredChangeSet{
 		commonchangeset.Configure(
 			// Add the chain configs for the new chains.
-			deployment.CreateLegacyChangeSet(v1_6.UpdateChainConfigChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateChainConfigChangeset),
 			v1_6.UpdateChainConfigConfig{
 				HomeChainSelector: e.HomeChainSel,
 				RemoteChainAdds:   wrongChainConfigs,
@@ -916,7 +923,7 @@ func TestSetOCR3ConfigValidations(t *testing.T) {
 		),
 		commonchangeset.Configure(
 			// Add the DONs and candidate commit OCR instances for the chain.
-			deployment.CreateLegacyChangeSet(v1_6.AddDonAndSetCandidateChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.AddDonAndSetCandidateChangeset),
 			v1_6.AddDonAndSetCandidateChangesetConfig{
 				SetCandidateConfigBase: v1_6.SetCandidateConfigBase{
 					HomeChainSelector: e.HomeChainSel,
@@ -951,10 +958,10 @@ func TestApplyFeeTokensUpdatesFeeQuoterChangeset(t *testing.T) {
 			tenv, _ := testhelpers.NewMemoryEnvironment(t)
 			allChains := maps.Keys(tenv.Env.Chains)
 			// deploy a new token
-			ab := deployment.NewMemoryAddressBook()
+			ab := cldf.NewMemoryAddressBook()
 			for _, selector := range allChains {
-				_, err := deployment.DeployContract(tenv.Env.Logger, tenv.Env.Chains[selector], ab,
-					func(chain deployment.Chain) deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
+				_, err := cldf.DeployContract(tenv.Env.Logger, tenv.Env.Chains[selector], ab,
+					func(chain cldf.Chain) cldf.ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
 						tokenAddress, tx, token, err := burn_mint_erc677.DeployBurnMintERC677(
 							tenv.Env.Chains[selector].DeployerKey,
 							tenv.Env.Chains[selector].Client,
@@ -963,10 +970,10 @@ func TestApplyFeeTokensUpdatesFeeQuoterChangeset(t *testing.T) {
 							testhelpers.LocalTokenDecimals,
 							big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
 						)
-						return deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
+						return cldf.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
 							Address:  tokenAddress,
 							Contract: token,
-							Tv:       deployment.NewTypeAndVersion(changeset.BurnMintToken, deployment.Version1_0_0),
+							Tv:       cldf.NewTypeAndVersion(shared.BurnMintToken, deployment.Version1_0_0),
 							Tx:       tx,
 							Err:      err,
 						}
@@ -975,14 +982,14 @@ func TestApplyFeeTokensUpdatesFeeQuoterChangeset(t *testing.T) {
 				require.NoError(t, err)
 			}
 			require.NoError(t, tenv.Env.ExistingAddresses.Merge(ab))
-			state, err := changeset.LoadOnchainState(tenv.Env)
+			state, err := stateview.LoadOnchainState(tenv.Env)
 			require.NoError(t, err)
 			source := allChains[0]
 			dest := allChains[1]
 
 			if tc.mcmsEnabled {
 				// Transfer ownership to timelock so that we can promote the zero digest later down the line.
-				transferToTimelock(t, tenv, state, []uint64{source, dest})
+				testhelpers.TransferToTimelock(t, tenv, state, []uint64{source, dest}, true)
 			}
 
 			var mcmsConfig *proposalutils.TimelockConfig
@@ -994,12 +1001,12 @@ func TestApplyFeeTokensUpdatesFeeQuoterChangeset(t *testing.T) {
 
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.ApplyFeeTokensUpdatesFeeQuoterChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.ApplyFeeTokensUpdatesFeeQuoterChangeset),
 					v1_6.ApplyFeeTokensUpdatesConfig{
 						UpdatesByChain: map[uint64]v1_6.ApplyFeeTokensUpdatesConfigPerChain{
 							source: {
-								TokensToAdd:    []changeset.TokenSymbol{testhelpers.TestTokenSymbol},
-								TokensToRemove: []changeset.TokenSymbol{changeset.LinkSymbol},
+								TokensToAdd:    []shared.TokenSymbol{testhelpers.TestTokenSymbol},
+								TokensToRemove: []shared.TokenSymbol{shared.LinkSymbol},
 							},
 						},
 						MCMSConfig: mcmsConfig,
@@ -1013,7 +1020,7 @@ func TestApplyFeeTokensUpdatesFeeQuoterChangeset(t *testing.T) {
 			tokenAddresses, err := state.Chains[source].TokenAddressBySymbol()
 			require.NoError(t, err)
 			require.Contains(t, feeTokens, tokenAddresses[testhelpers.TestTokenSymbol])
-			require.NotContains(t, feeTokens, tokenAddresses[changeset.LinkSymbol])
+			require.NotContains(t, feeTokens, tokenAddresses[shared.LinkSymbol])
 		})
 	}
 }
@@ -1037,11 +1044,11 @@ func TestApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset(t *testing.T) 
 			allChains := maps.Keys(tenv.Env.Chains)
 			source := allChains[0]
 			dest := allChains[1]
-			state, err := changeset.LoadOnchainState(tenv.Env)
+			state, err := stateview.LoadOnchainState(tenv.Env)
 			require.NoError(t, err)
 			if tc.mcmsEnabled {
 				// Transfer ownership to timelock so that we can promote the zero digest later down the line.
-				transferToTimelock(t, tenv, state, []uint64{source, dest})
+				testhelpers.TransferToTimelock(t, tenv, state, []uint64{source, dest}, true)
 			}
 
 			var mcmsConfig *proposalutils.TimelockConfig
@@ -1054,7 +1061,7 @@ func TestApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset(t *testing.T) 
 			// try to update PremiumMultiplierWeiPerEth for a token that does not exist
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.ApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.ApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset),
 					v1_6.PremiumMultiplierWeiPerEthUpdatesConfig{
 						Updates: map[uint64][]v1_6.PremiumMultiplierWeiPerEthUpdatesConfigPerChain{
 							source: {
@@ -1070,10 +1077,10 @@ func TestApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset(t *testing.T) 
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "token TEST not found in state for chain")
 			// deploy test new token
-			ab := deployment.NewMemoryAddressBook()
+			ab := cldf.NewMemoryAddressBook()
 			for _, selector := range allChains {
-				_, err := deployment.DeployContract(tenv.Env.Logger, tenv.Env.Chains[selector], ab,
-					func(chain deployment.Chain) deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
+				_, err := cldf.DeployContract(tenv.Env.Logger, tenv.Env.Chains[selector], ab,
+					func(chain cldf.Chain) cldf.ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
 						tokenAddress, tx, token, err := burn_mint_erc677.DeployBurnMintERC677(
 							tenv.Env.Chains[selector].DeployerKey,
 							tenv.Env.Chains[selector].Client,
@@ -1082,10 +1089,10 @@ func TestApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset(t *testing.T) 
 							testhelpers.LocalTokenDecimals,
 							big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
 						)
-						return deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
+						return cldf.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
 							Address:  tokenAddress,
 							Contract: token,
-							Tv:       deployment.NewTypeAndVersion(changeset.BurnMintToken, deployment.Version1_0_0),
+							Tv:       cldf.NewTypeAndVersion(shared.BurnMintToken, deployment.Version1_0_0),
 							Tx:       tx,
 							Err:      err,
 						}
@@ -1094,12 +1101,12 @@ func TestApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset(t *testing.T) 
 				require.NoError(t, err)
 			}
 			require.NoError(t, tenv.Env.ExistingAddresses.Merge(ab))
-			state, err = changeset.LoadOnchainState(tenv.Env)
+			state, err = stateview.LoadOnchainState(tenv.Env)
 			require.NoError(t, err)
 			// now try to apply the changeset for TEST token
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.ApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.ApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset),
 					v1_6.PremiumMultiplierWeiPerEthUpdatesConfig{
 						Updates: map[uint64][]v1_6.PremiumMultiplierWeiPerEthUpdatesConfigPerChain{
 							source: {
@@ -1150,9 +1157,9 @@ func TestUpdateTokenPriceFeedsFeeQuoterChangeset(t *testing.T) {
 			source := allChains[0]
 			dest := allChains[1]
 			// deploy a new token
-			ab := deployment.NewMemoryAddressBook()
-			_, err := deployment.DeployContract(tenv.Env.Logger, tenv.Env.Chains[source], ab,
-				func(chain deployment.Chain) deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
+			ab := cldf.NewMemoryAddressBook()
+			_, err := cldf.DeployContract(tenv.Env.Logger, tenv.Env.Chains[source], ab,
+				func(chain cldf.Chain) cldf.ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
 					tokenAddress, tx, token, err := burn_mint_erc677.DeployBurnMintERC677(
 						tenv.Env.Chains[source].DeployerKey,
 						tenv.Env.Chains[source].Client,
@@ -1161,10 +1168,10 @@ func TestUpdateTokenPriceFeedsFeeQuoterChangeset(t *testing.T) {
 						testhelpers.LocalTokenDecimals,
 						big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
 					)
-					return deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
+					return cldf.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
 						Address:  tokenAddress,
 						Contract: token,
-						Tv:       deployment.NewTypeAndVersion(changeset.BurnMintToken, deployment.Version1_0_0),
+						Tv:       cldf.NewTypeAndVersion(shared.BurnMintToken, deployment.Version1_0_0),
 						Tx:       tx,
 						Err:      err,
 					}
@@ -1172,12 +1179,12 @@ func TestUpdateTokenPriceFeedsFeeQuoterChangeset(t *testing.T) {
 			)
 			require.NoError(t, err)
 			require.NoError(t, tenv.Env.ExistingAddresses.Merge(ab))
-			state, err := changeset.LoadOnchainState(tenv.Env)
+			state, err := stateview.LoadOnchainState(tenv.Env)
 			require.NoError(t, err)
 
 			if tc.mcmsEnabled {
 				// Transfer ownership to timelock so that we can promote the zero digest later down the line.
-				transferToTimelock(t, tenv, state, []uint64{source, dest})
+				testhelpers.TransferToTimelock(t, tenv, state, []uint64{source, dest}, true)
 			}
 
 			var mcmsConfig *proposalutils.TimelockConfig
@@ -1190,7 +1197,7 @@ func TestUpdateTokenPriceFeedsFeeQuoterChangeset(t *testing.T) {
 			// try to update price feed for this it will fail as there is no price feed deployed for this token
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateTokenPriceFeedsFeeQuoterChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateTokenPriceFeedsFeeQuoterChangeset),
 					v1_6.UpdateTokenPriceFeedsConfig{
 						Updates: map[uint64][]v1_6.UpdateTokenPriceFeedsConfigPerChain{
 							source: {
@@ -1209,18 +1216,18 @@ func TestUpdateTokenPriceFeedsFeeQuoterChangeset(t *testing.T) {
 			// now try to apply the changeset for link token, there is already a price feed deployed for link token
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.UpdateTokenPriceFeedsFeeQuoterChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.UpdateTokenPriceFeedsFeeQuoterChangeset),
 					v1_6.UpdateTokenPriceFeedsConfig{
 						Updates: map[uint64][]v1_6.UpdateTokenPriceFeedsConfigPerChain{
 							source: {
 								{
-									SourceToken: changeset.LinkSymbol,
+									SourceToken: shared.LinkSymbol,
 									IsEnabled:   true,
 								},
 							},
 							dest: {
 								{
-									SourceToken: changeset.LinkSymbol,
+									SourceToken: shared.LinkSymbol,
 									IsEnabled:   true,
 								},
 							},
@@ -1234,14 +1241,14 @@ func TestUpdateTokenPriceFeedsFeeQuoterChangeset(t *testing.T) {
 			require.NoError(t, err)
 			tokenDetails, err := state.Chains[source].TokenDetailsBySymbol()
 			require.NoError(t, err)
-			decimals, err := tokenDetails[changeset.LinkSymbol].Decimals(&bind.CallOpts{Context: testcontext.Get(t)})
+			decimals, err := tokenDetails[shared.LinkSymbol].Decimals(&bind.CallOpts{Context: testcontext.Get(t)})
 			require.NoError(t, err)
 			config, err := state.Chains[source].FeeQuoter.GetTokenPriceFeedConfig(&bind.CallOpts{
 				Context: testcontext.Get(t),
-			}, tokenAddress[changeset.LinkSymbol])
+			}, tokenAddress[shared.LinkSymbol])
 			require.NoError(t, err)
 			require.True(t, config.IsEnabled)
-			require.Equal(t, state.Chains[tenv.FeedChainSel].USDFeeds[changeset.LinkSymbol].Address(), config.DataFeedAddress)
+			require.Equal(t, state.Chains[tenv.FeedChainSel].USDFeeds[shared.LinkSymbol].Address(), config.DataFeedAddress)
 			require.Equal(t, decimals, config.TokenDecimals)
 		})
 	}
@@ -1266,11 +1273,11 @@ func TestApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset(t *testing.T) {
 			allChains := maps.Keys(tenv.Env.Chains)
 			source := allChains[0]
 			dest := allChains[1]
-			state, err := changeset.LoadOnchainState(tenv.Env)
+			state, err := stateview.LoadOnchainState(tenv.Env)
 			require.NoError(t, err)
 			if tc.mcmsEnabled {
 				// Transfer ownership to timelock so that we can promote the zero digest later down the line.
-				transferToTimelock(t, tenv, state, []uint64{source, dest})
+				testhelpers.TransferToTimelock(t, tenv, state, []uint64{source, dest}, true)
 			}
 
 			var mcmsConfig *proposalutils.TimelockConfig
@@ -1282,14 +1289,14 @@ func TestApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset(t *testing.T) {
 
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.ApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.ApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset),
 					v1_6.ApplyTokenTransferFeeConfigUpdatesConfig{
 						UpdatesByChain: map[uint64]v1_6.ApplyTokenTransferFeeConfigUpdatesConfigPerChain{
 							source: {
 								TokenTransferFeeConfigRemoveArgs: []v1_6.TokenTransferFeeConfigRemoveArg{
 									{
 										DestChain: dest,
-										Token:     changeset.LinkSymbol,
+										Token:     shared.LinkSymbol,
 									},
 								},
 							},
@@ -1297,8 +1304,8 @@ func TestApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset(t *testing.T) {
 								TokenTransferFeeConfigArgs: []v1_6.TokenTransferFeeConfigArg{
 									{
 										DestChain: source,
-										TokenTransferFeeConfigPerToken: map[changeset.TokenSymbol]fee_quoter.FeeQuoterTokenTransferFeeConfig{
-											changeset.LinkSymbol: {
+										TokenTransferFeeConfigPerToken: map[shared.TokenSymbol]fee_quoter.FeeQuoterTokenTransferFeeConfig{
+											shared.LinkSymbol: {
 												MinFeeUSDCents:    1,
 												MaxFeeUSDCents:    1,
 												DeciBps:           1,
@@ -1318,14 +1325,14 @@ func TestApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset(t *testing.T) {
 			require.Contains(t, err.Error(), "min fee must be less than max fee for token")
 			_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_6.ApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset),
+					cldf.CreateLegacyChangeSet(v1_6.ApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset),
 					v1_6.ApplyTokenTransferFeeConfigUpdatesConfig{
 						UpdatesByChain: map[uint64]v1_6.ApplyTokenTransferFeeConfigUpdatesConfigPerChain{
 							source: {
 								TokenTransferFeeConfigRemoveArgs: []v1_6.TokenTransferFeeConfigRemoveArg{
 									{
 										DestChain: dest,
-										Token:     changeset.LinkSymbol,
+										Token:     shared.LinkSymbol,
 									},
 								},
 							},
@@ -1333,8 +1340,8 @@ func TestApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset(t *testing.T) {
 								TokenTransferFeeConfigArgs: []v1_6.TokenTransferFeeConfigArg{
 									{
 										DestChain: source,
-										TokenTransferFeeConfigPerToken: map[changeset.TokenSymbol]fee_quoter.FeeQuoterTokenTransferFeeConfig{
-											changeset.LinkSymbol: {
+										TokenTransferFeeConfigPerToken: map[shared.TokenSymbol]fee_quoter.FeeQuoterTokenTransferFeeConfig{
+											shared.LinkSymbol: {
 												MinFeeUSDCents:    1,
 												MaxFeeUSDCents:    2,
 												DeciBps:           1,

@@ -98,6 +98,9 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, peeringData 
 	ForwarderAddress = '%s'
 	GasLimitDefault = 400_000
 
+	[EVM.Transactions]
+	ForwardersEnabled = true
+
 `,
 			chain.ChainID,
 			chain.Name,
@@ -147,10 +150,14 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, peeringData 
 
 func WorkerWorkflowRegistry(workflowRegistryAddr common.Address, homeChainID uint64) string {
 	return fmt.Sprintf(`
+	# there are two strategies for syncing workflow registry:
+	# - reconciliation: poll the contract for events
+	# - event: watch events on the contract
 	[Capabilities.WorkflowRegistry]
 	Address = "%s"
 	NetworkID = "evm"
 	ChainID = "%d"
+	# SyncStrategy = "reconciliation"
 `,
 		workflowRegistryAddr.Hex(),
 		homeChainID,

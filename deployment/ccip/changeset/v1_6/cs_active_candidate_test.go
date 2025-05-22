@@ -11,16 +11,19 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
-	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
@@ -34,7 +37,7 @@ func Test_ActiveCandidate(t *testing.T) {
 	tenv, _ := testhelpers.NewMemoryEnvironment(t,
 		testhelpers.WithNumOfChains(2),
 		testhelpers.WithNumOfNodes(4))
-	state, err := changeset.LoadOnchainState(tenv.Env)
+	state, err := stateview.LoadOnchainState(tenv.Env)
 	require.NoError(t, err)
 
 	// Deploy to all chains.
@@ -46,7 +49,7 @@ func Test_ActiveCandidate(t *testing.T) {
 	sourceState := state.Chains[source]
 	tenv.Env, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateOnRampsDestsChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateOnRampsDestsChangeset),
 			v1_6.UpdateOnRampDestsConfig{
 				UpdatesByChain: map[uint64]map[uint64]v1_6.OnRampDestinationUpdate{
 					source: {
@@ -59,7 +62,7 @@ func Test_ActiveCandidate(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterPricesChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterPricesChangeset),
 			v1_6.UpdateFeeQuoterPricesConfig{
 				PricesByChain: map[uint64]v1_6.FeeQuoterPriceUpdatePerSource{
 					source: {
@@ -75,7 +78,7 @@ func Test_ActiveCandidate(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterDestsChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterDestsChangeset),
 			v1_6.UpdateFeeQuoterDestsConfig{
 				UpdatesByChain: map[uint64]map[uint64]fee_quoter.FeeQuoterDestChainConfig{
 					source: {
@@ -85,7 +88,7 @@ func Test_ActiveCandidate(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateOffRampSourcesChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateOffRampSourcesChangeset),
 			v1_6.UpdateOffRampSourcesConfig{
 				UpdatesByChain: map[uint64]map[uint64]v1_6.OffRampSourceUpdate{
 					dest: {
@@ -98,7 +101,7 @@ func Test_ActiveCandidate(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.UpdateRouterRampsChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.UpdateRouterRampsChangeset),
 			v1_6.UpdateRouterRampsConfig{
 				UpdatesByChain: map[uint64]v1_6.RouterUpdates{
 					// onRamp update on source chain
@@ -130,12 +133,12 @@ func Test_ActiveCandidate(t *testing.T) {
 	// and set new config digest on the offramp.
 	_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelock),
-			testhelpers.GenTestTransferOwnershipConfig(tenv, allChains, state),
+			cldf.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelockV2),
+			testhelpers.GenTestTransferOwnershipConfig(tenv, allChains, state, true),
 		),
 	)
 	require.NoError(t, err)
-	testhelpers.AssertTimelockOwnership(t, tenv, allChains, state)
+	testhelpers.AssertTimelockOwnership(t, tenv, allChains, state, true)
 
 	sendMsg := func() {
 		block, err := testhelpers.LatestBlock(testcontext.Get(t), tenv.Env, dest)
@@ -193,10 +196,10 @@ func Test_ActiveCandidate(t *testing.T) {
 
 	// Now we can add a candidate config, send another request, and observe behavior.
 	// The candidate config should not be able to execute messages.
-	tokenConfig := changeset.NewTestTokenConfig(state.Chains[tenv.FeedChainSel].USDFeeds)
+	tokenConfig := shared.NewTestTokenConfig(state.Chains[tenv.FeedChainSel].USDFeeds)
 	_, err = commonchangeset.Apply(t, tenv.Env, tenv.TimelockContracts(t),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_6.SetCandidateChangeset),
+			cldf.CreateLegacyChangeSet(v1_6.SetCandidateChangeset),
 			v1_6.SetCandidateChangesetConfig{
 				SetCandidateConfigBase: v1_6.SetCandidateConfigBase{
 					HomeChainSelector: tenv.HomeChainSel,

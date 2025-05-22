@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	mt "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagingtest"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	testsetups "github.com/smartcontractkit/chainlink/integration-tests/testsetups/ccip"
 )
 
@@ -18,7 +18,7 @@ func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
 	// ctx := testhelpers.Context(t)
 	e, _, _ := testsetups.NewIntegrationEnvironment(t, testhelpers.WithTonChains(1))
 
-	state, err := changeset.LoadOnchainState(e.Env)
+	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
 	allChainSelectors := maps.Keys(e.Env.Chains)
@@ -48,7 +48,6 @@ func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
 			destChain,
 			sender,
 			false, // testRouter
-			true,  // validateResp
 		)
 	)
 
@@ -57,10 +56,11 @@ func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
 
 		require.NoError(t, err)
 		out = mt.Run(
+			t,
 			mt.TestCase{
 				TestSetup: setup,
 				Replayed:  replayed,
-				Nonce:     nonce,
+				Nonce:     &nonce,
 				Receiver:  ccipChainState.ReceiverAddress.Data(),
 				MsgData:   []byte("hello CCIPReceiver"),
 				//TODO(ton): Do we need to enforce OOO for TON?

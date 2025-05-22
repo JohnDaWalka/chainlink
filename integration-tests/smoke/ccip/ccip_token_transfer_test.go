@@ -3,6 +3,7 @@ package ccip
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"golang.org/x/exp/maps"
@@ -15,29 +16,38 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	solstate "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	soltokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	testsetups "github.com/smartcontractkit/chainlink/integration-tests/testsetups/ccip"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/message_hasher"
+
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
+// duplicated from messagingtest
+func sleepAndReplay(t *testing.T, e testhelpers.DeployedEnv, chainSelectors ...uint64) {
+	time.Sleep(30 * time.Second)
+	replayBlocks := make(map[uint64]uint64)
+	for _, selector := range chainSelectors {
+		replayBlocks[selector] = 1
+	}
+	testhelpers.ReplayLogs(t, e.Env.Offchain, replayBlocks)
+}
+
 func TestTokenTransfer_EVM2EVM(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	tenv, _, _ := testsetups.NewIntegrationEnvironment(t,
 		testhelpers.WithNumOfUsersPerChain(3))
 
 	e := tenv.Env
-	state, err := changeset.LoadOnchainState(e)
+	state, err := stateview.LoadOnchainState(e)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(e.Chains), 2)
 
@@ -238,7 +248,7 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 		testhelpers.WithSolChains(1))
 
 	e := tenv.Env
-	state, err := changeset.LoadOnchainState(e)
+	state, err := stateview.LoadOnchainState(e)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(e.Chains), 2)
 
@@ -372,7 +382,7 @@ func TestTokenTransfer_Solana2EVM(t *testing.T) {
 		testhelpers.WithSolChains(1))
 
 	e := tenv.Env
-	state, err := changeset.LoadOnchainState(e)
+	state, err := stateview.LoadOnchainState(e)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(e.Chains), 2)
 
@@ -467,6 +477,7 @@ func TestTokenTransfer_Solana2EVM(t *testing.T) {
 			Name:        "Send token to contract",
 			SourceChain: sourceChain,
 			DestChain:   destChain,
+			FeeToken:    wSOL.String(),
 			SolTokens: []ccip_router.SVMTokenAmount{
 				{
 					Token:  srcToken,
@@ -511,6 +522,9 @@ func TestTokenTransfer_Solana2EVM(t *testing.T) {
 
 	startBlocks, expectedSeqNums, expectedExecutionStates, expectedTokenBalances :=
 		testhelpers.TransferMultiple(ctx, t, e, state, tcs)
+
+	// HACK: we need to replay blocks only after the CCIP plugin has already properly booted
+	sleepAndReplay(t, tenv, sourceChain, destChain)
 
 	err = testhelpers.ConfirmMultipleCommits(
 		t,
