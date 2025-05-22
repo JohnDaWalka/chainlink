@@ -73,4 +73,8 @@ var (
 	AptosMCMSType     deployment.ContractType = "AptosManyChainMultisig"
 	AptosCCIPType     deployment.ContractType = "AptosCCIP"
 	AptosReceiverType deployment.ContractType = "AptosReceiver"
+
+	// Ton
+	TonCCIP     deployment.ContractType = "TonCCIP"
+	TonReceiver deployment.ContractType = "TonReceiver"
 )

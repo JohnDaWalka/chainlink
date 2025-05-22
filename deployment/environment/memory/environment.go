@@ -69,7 +69,8 @@ type NewNodesConfig struct {
 	SolChains map[uint64]cldf.SolChain
 	// Aptos chains to be configured. Optional.
 	AptosChains map[uint64]cldf.AptosChain
-	// TODO: add Ton chains
+	// Ton chains to be configured. Optional.
+	TonChains      map[uint64]cldf.TonChain
 	NumNodes       int
 	NumBootstraps  int
 	RegistryConfig deployment.CapabilityRegistryConfig
@@ -115,11 +116,11 @@ func NewMemoryChainsZk(t *testing.T, numChains int) map[uint64]cldf.Chain {
 	return GenerateChainsZk(t, numChains)
 }
 
-func NewMemoryChainsTon(t *testing.T, numChains int) map[uint64]deployment.TonChain {
+func NewMemoryChainsTon(t *testing.T, numChains int) map[uint64]cldf.TonChain {
 	return GenerateChainsTon(t, numChains)
 }
 
-func NewMemoryChainsWithChainIDs(t *testing.T, chainIDs []uint64, numUsers int) (map[uint64]deployment.Chain, map[uint64][]*bind.TransactOpts) {
+func NewMemoryChainsWithChainIDs(t *testing.T, chainIDs []uint64, numUsers int) (map[uint64]cldf.Chain, map[uint64][]*bind.TransactOpts) {
 	mchains := GenerateChainsWithIds(t, chainIDs, numUsers)
 	users := make(map[uint64][]*bind.TransactOpts)
 	for id, chain := range mchains {
@@ -281,15 +282,16 @@ func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Lev
 	solChains := NewMemoryChainsSol(t, config.SolChains)
 	aptosChains := NewMemoryChainsAptos(t, config.AptosChains)
 	zkChains := NewMemoryChainsZk(t, config.ZkChains)
+	tonChains := NewMemoryChainsTon(t, config.TonChains)
 	for chainSel, chain := range zkChains {
 		chains[chainSel] = chain
 	}
 	c := NewNodesConfig{
-		LogLevel:    logLevel,
-		Chains:      chains,
-		SolChains:   solChains,
-		AptosChains: aptosChains,
-		// TODO: add Ton chains
+		LogLevel:       logLevel,
+		Chains:         chains,
+		SolChains:      solChains,
+		AptosChains:    aptosChains,
+		TonChains:      tonChains,
 		NumNodes:       config.Nodes,
 		NumBootstraps:  config.Bootstraps,
 		RegistryConfig: config.RegistryConfig,

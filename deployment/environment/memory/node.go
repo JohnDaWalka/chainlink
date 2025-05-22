@@ -333,7 +333,7 @@ func NewNode(
 		c.Aptos = aptosConfigs
 
 		var tonConfigs chainlink.RawConfigs
-		for chainID, chain := range tonchains {
+		for chainID, chain := range nodecfg.Tonchains {
 			tonChainID, err := chainsel.GetChainIDFromSelector(chainID)
 			if err != nil {
 				t.Fatal(err)

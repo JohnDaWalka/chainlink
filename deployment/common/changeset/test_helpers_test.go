@@ -75,6 +75,7 @@ func NewNoopEnvironment(t *testing.T) cldf.Environment {
 		map[uint64]cldf.Chain{},
 		map[uint64]cldf.SolChain{},
 		map[uint64]cldf.AptosChain{},
+		map[uint64]cldf.TonChain{},
 		[]string{},
 		nil,
 		t.Context,

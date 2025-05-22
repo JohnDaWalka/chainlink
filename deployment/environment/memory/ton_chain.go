@@ -17,12 +17,12 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/xssnick/tonutils-go/liteclient"
 	"github.com/xssnick/tonutils-go/ton"
 
-	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 )
 
@@ -45,12 +45,12 @@ func createTonWallet(t *testing.T, client ton.APIClientWrapped, version wallet.V
 	return pw
 }
 
-func GenerateChainsTon(t *testing.T, numChains int) map[uint64]deployment.TonChain {
+func GenerateChainsTon(t *testing.T, numChains int) map[uint64]cldf.TonChain {
 	testTonChainSelectors := getTestTonChainSelectors()
 	if len(testTonChainSelectors) < numChains {
 		t.Fatalf("not enough test ton chain selectors available")
 	}
-	chains := make(map[uint64]deployment.TonChain)
+	chains := make(map[uint64]cldf.TonChain)
 	for i := 0; i < numChains; i++ {
 		chainID := testTonChainSelectors[i]
 
@@ -58,7 +58,7 @@ func GenerateChainsTon(t *testing.T, numChains int) map[uint64]deployment.TonCha
 		// todo: configurable wallet version, we might need to use Highload wallet for some tests
 		// todo: configurable wallet options
 		wallet := createTonWallet(t, nodeClient, wallet.V3R2, wallet.WithWorkchain(0))
-		chains[chainID] = deployment.TonChain{
+		chains[chainID] = cldf.TonChain{
 			Client:        nodeClient,
 			Wallet:        wallet,
 			WalletAddress: wallet.Address(),
@@ -144,7 +144,7 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 	return client
 }
 
-func createTonChainConfig(chainID string, chain deployment.TonChain) chainlink.RawConfig {
+func createTonChainConfig(chainID string, chain cldf.TonChain) chainlink.RawConfig {
 	chainConfig := chainlink.RawConfig{}
 
 	chainConfig["Enabled"] = true

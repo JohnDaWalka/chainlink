@@ -25,6 +25,7 @@ import (
 	aptosstate "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/aptos"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/evm"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/solana"
+	tonstate "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/ton"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/commit_store"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/evm_2_evm_offramp"
@@ -95,8 +96,7 @@ type CCIPOnChainState struct {
 	Chains      map[uint64]evm.CCIPChainState
 	SolChains   map[uint64]solana.CCIPChainState
 	AptosChains map[uint64]aptosstate.CCIPChainState
-	// TODO: fix, add ton stateview
-	TonChains map[uint64]TonCCIPChainState
+	TonChains   map[uint64]tonstate.CCIPChainState
 }
 
 // ValidatePostDeploymentState should be called after the deployment and configuration for all contracts
@@ -630,11 +630,11 @@ func (c CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType cldf.Contr
 			return fmt.Errorf("chain %d does not exist", chainSelector)
 		}
 		switch rampType {
-		case OffRamp:
+		case ccipshared.OffRamp:
 			if chainState.OffRamp.IsAddrNone() {
 				return fmt.Errorf("offramp contract does not exist on ton chain %d", chainSelector)
 			}
-		case OnRamp:
+		case ccipshared.OnRamp:
 			if chainState.Router.IsAddrNone() {
 				return fmt.Errorf("router contract does not exist on ton chain %d", chainSelector)
 			}
@@ -657,7 +657,7 @@ func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
 	if err != nil {
 		return CCIPOnChainState{}, err
 	}
-	tonState, err := LoadOnchainStateTon(e)
+	tonChains, err := tonstate.LoadOnchainStateTon(e)
 	if err != nil {
 		return CCIPOnChainState{}, err
 	}
@@ -665,7 +665,7 @@ func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
 		Chains:      make(map[uint64]evm.CCIPChainState),
 		SolChains:   solanaState.SolChains,
 		AptosChains: aptosChains,
-		TonChains:   tonState.TonChains,
+		TonChains:   tonChains,
 	}
 	for chainSelector, chain := range e.Chains {
 		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)

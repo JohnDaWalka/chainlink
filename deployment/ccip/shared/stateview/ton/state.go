@@ -1,4 +1,4 @@
-package changeset
+package ton
 
 import (
 	"errors"
@@ -6,19 +6,17 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/rs/zerolog/log"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
+
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	tonaddress "github.com/xssnick/tonutils-go/address"
 )
 
-const (
-	TonCCIP     deployment.ContractType = "TonCCIP"
-	TonReceiver deployment.ContractType = "TonReceiver"
-)
-
 // TonCCIPChainState holds a Go binding for all the currently deployed CCIP contracts
 // on a chain. If a binding is nil, it means here is no such contract on the chain.
-type TonCCIPChainState struct {
+type CCIPChainState struct {
 	LinkTokenAddress tonaddress.Address
 	CCIPAddress      tonaddress.Address
 	OffRamp          tonaddress.Address
@@ -28,49 +26,48 @@ type TonCCIPChainState struct {
 	ReceiverAddress tonaddress.Address
 }
 
-func SaveOnchainStateTon(chainSelector uint64, tonState TonCCIPChainState, e deployment.Environment) error {
+func SaveOnchainStateTon(chainSelector uint64, tonState CCIPChainState, e cldf.Environment) error {
 	ab := e.ExistingAddresses
 	if !tonState.LinkTokenAddress.IsAddrNone() {
-		ab.Save(chainSelector, tonState.LinkTokenAddress.String(), deployment.NewTypeAndVersion(commontypes.LinkToken, deployment.Version1_6_0))
+		ab.Save(chainSelector, tonState.LinkTokenAddress.String(), cldf.NewTypeAndVersion(commontypes.LinkToken, deployment.Version1_6_0))
 	}
 	if !tonState.CCIPAddress.IsAddrNone() {
-		ab.Save(chainSelector, tonState.CCIPAddress.String(), deployment.NewTypeAndVersion(TonCCIP, deployment.Version1_6_0))
+		ab.Save(chainSelector, tonState.CCIPAddress.String(), cldf.NewTypeAndVersion(shared.TonCCIP, deployment.Version1_6_0))
 	}
 	if !tonState.ReceiverAddress.IsAddrNone() {
-		ab.Save(chainSelector, tonState.ReceiverAddress.String(), deployment.NewTypeAndVersion(TonReceiver, deployment.Version1_6_0))
+		ab.Save(chainSelector, tonState.ReceiverAddress.String(), cldf.NewTypeAndVersion(shared.TonReceiver, deployment.Version1_6_0))
 	}
 	return nil
 }
 
-func LoadOnchainStateTon(e deployment.Environment) (CCIPOnChainState, error) {
-	state := CCIPOnChainState{
-		TonChains: make(map[uint64]TonCCIPChainState),
-	}
+func LoadOnchainStateTon(e cldf.Environment) (map[uint64]CCIPChainState, error) {
+	tonChains := make(map[uint64]CCIPChainState)
+
 	for chainSelector, chain := range e.TonChains {
 		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)
 		if err != nil {
 			// Chain not found in address book, initialize empty
-			if !errors.Is(err, deployment.ErrChainNotFound) {
-				return state, err
+			if !errors.Is(err, cldf.ErrChainNotFound) {
+				return tonChains, err
 			}
-			addresses = make(map[string]deployment.TypeAndVersion)
+			addresses = make(map[string]cldf.TypeAndVersion)
 		}
 		chainState, err := LoadChainStateTon(chain, addresses)
 		if err != nil {
-			return state, err
+			return tonChains, err
 		}
-		state.TonChains[chainSelector] = chainState
+		tonChains[chainSelector] = chainState
 	}
-	return state, nil
+	return tonChains, nil
 }
 
 // LoadChainStateTon Loads all state for a TonChain into state
-func LoadChainStateTon(chain deployment.TonChain, addresses map[string]deployment.TypeAndVersion) (TonCCIPChainState, error) {
-	state := TonCCIPChainState{}
+func LoadChainStateTon(chain cldf.TonChain, addresses map[string]cldf.TypeAndVersion) (CCIPChainState, error) {
+	state := CCIPChainState{}
 
 	// Most programs upgraded in place, but some are not so we always want to
 	// load the latest version
-	versions := make(map[deployment.ContractType]semver.Version)
+	versions := make(map[cldf.ContractType]semver.Version)
 	for addressStr, tvStr := range addresses {
 		address, err := tonaddress.ParseAddr(addressStr)
 		if err != nil {
@@ -80,13 +77,13 @@ func LoadChainStateTon(chain deployment.TonChain, addresses map[string]deploymen
 		switch tvStr.Type {
 		case commontypes.LinkToken:
 			state.LinkTokenAddress = *address
-		case TonCCIP:
+		case shared.TonCCIP:
 			state.CCIPAddress = *address
-		case TonReceiver:
+		case shared.TonReceiver:
 			state.ReceiverAddress = *address
-		case OffRamp:
+		case shared.OffRamp:
 			state.OffRamp = *address
-		case Router:
+		case shared.Router:
 			state.Router = *address
 		default:
 			log.Warn().Str("address", addressStr).Str("type", string(tvStr.Type)).Msg("Unknown Ton address type")
