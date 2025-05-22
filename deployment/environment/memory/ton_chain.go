@@ -79,7 +79,7 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 	require.NoError(t, err)
 
 	maxRetries := 10
-	var url string
+	var networkConfigUrl string
 	var port uint16
 	var containerName string
 	for i := 0; i < maxRetries; i++ {
@@ -105,17 +105,17 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 
 		// todo: ctf-configured clean up?
 		testcontainers.CleanupContainer(t, output.Container)
-		url = output.NetworkSpecificData.TonGlobalConfigURL
+		networkConfigUrl = fmt.Sprintf("http://%s/localhost.global.config.json", output.Nodes[0].ExternalHTTPUrl)
 		break
 	}
 	_ = containerName
 
-	fmt.Printf("DEBUG: ton chain url: %s\n", url)
+	fmt.Printf("DEBUG: Mylocalton config url: %s\n", networkConfigUrl)
 
 	connectionPool := liteclient.NewConnectionPool()
 
 	// get config
-	cfg, err := liteclient.GetConfigFromUrl(context.Background(), url)
+	cfg, err := liteclient.GetConfigFromUrl(context.Background(), networkConfigUrl)
 	if err != nil {
 		log.Fatalln("get config err: ", err.Error())
 		return nil
