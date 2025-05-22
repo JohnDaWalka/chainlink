@@ -1,8 +1,6 @@
 module github.com/smartcontractkit/chainlink/deployment
 
-go 1.24.1
-
-toolchain go1.24.2
+go 1.24.2
 
 // Make sure we're working with the latest chainlink libs
 replace github.com/smartcontractkit/chainlink/v2 => ../
@@ -43,7 +41,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.5.0
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250429214959-baa3b4c6812d
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.7.8-0.20250506172013-5b2c9eb9ee71
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.8.4
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.4
 	github.com/smartcontractkit/libocr v0.0.0-20250408131511-c90716988ee0
 	github.com/smartcontractkit/mcms v0.18.0
