@@ -12,44 +12,22 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	commonhex "github.com/smartcontractkit/chainlink-common/pkg/utils/hex"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
-	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
-// GatewayConnector is a component run by Nodes to connect to a set of Gateways.
-type GatewayConnector interface {
-	services.Service
-	network.ConnectionInitiator
+var _ core.GatewayConnector = (*gatewayConnector)(nil)
+var _ network.ConnectionInitiator = (*gatewayConnector)(nil)
 
-	AddHandler(methods []string, handler GatewayConnectorHandler) error
-	// SendToGateway takes a signed message as argument and sends it to the specified gateway
-	SendToGateway(ctx context.Context, gatewayID string, msg *api.Message) error
-	// SignAndSendToGateway signs the message and sends the message to the specified gateway
-	SignAndSendToGateway(ctx context.Context, gatewayID string, msg *api.MessageBody) error
-	// GatewayIDs returns the list of Gateway IDs
-	GatewayIDs() []string
-	// DonID returns the DON ID
-	DonID() string
-	AwaitConnection(ctx context.Context, gatewayID string) error
-}
-
-// Signer implementation needs to be provided by a GatewayConnector user (node)
-// in order to sign handshake messages with node's private key.
 type Signer interface {
 	// Sign keccak256 hash of data.
 	Sign(data ...[]byte) ([]byte, error)
-}
-
-// GatewayConnector user (node) implements application logic in the Handler interface.
-type GatewayConnectorHandler interface {
-	job.ServiceCtx
-
-	HandleGatewayMessage(ctx context.Context, gatewayId string, msg *api.Message)
 }
 
 type gatewayConnector struct {
@@ -60,7 +38,7 @@ type gatewayConnector struct {
 	clock       clockwork.Clock
 	nodeAddress []byte
 	signer      Signer
-	handlers    map[string]GatewayConnectorHandler
+	handlers    map[string]core.GatewayConnectorHandler
 	gateways    map[string]*gatewayState
 	urlToId     map[string]string
 	closeWait   sync.WaitGroup
@@ -103,7 +81,7 @@ func (gs *gatewayState) awaitConn(ctx context.Context) error {
 	}
 }
 
-func NewGatewayConnector(config *ConnectorConfig, signer Signer, clock clockwork.Clock, lggr logger.Logger) (GatewayConnector, error) {
+func NewGatewayConnector(config *ConnectorConfig, signer Signer, clock clockwork.Clock, lggr logger.Logger) (*gatewayConnector, error) {
 	if config == nil || signer == nil || clock == nil || lggr == nil {
 		return nil, errors.New("nil dependency")
 	}
@@ -120,7 +98,7 @@ func NewGatewayConnector(config *ConnectorConfig, signer Signer, clock clockwork
 		clock:       clock,
 		nodeAddress: addressBytes,
 		signer:      signer,
-		handlers:    make(map[string]GatewayConnectorHandler),
+		handlers:    make(map[string]core.GatewayConnectorHandler),
 		shutdownCh:  make(chan struct{}),
 		lggr:        lggr.Named("GatewayConnector"),
 	}
@@ -154,7 +132,7 @@ func NewGatewayConnector(config *ConnectorConfig, signer Signer, clock clockwork
 	return connector, nil
 }
 
-func (c *gatewayConnector) AddHandler(methods []string, handler GatewayConnectorHandler) error {
+func (c *gatewayConnector) AddHandler(methods []string, handler core.GatewayConnectorHandler) error {
 	if handler == nil {
 		return errors.New("cannot add a nil handler")
 	}
@@ -178,7 +156,7 @@ func (c *gatewayConnector) AwaitConnection(ctx context.Context, gatewayID string
 	return gateway.awaitConn(ctx)
 }
 
-func (c *gatewayConnector) SendToGateway(ctx context.Context, gatewayID string, msg *api.Message) error {
+func (c *gatewayConnector) SendToGateway(ctx context.Context, gatewayID string, msg *gateway.Message) error {
 	data, err := c.codec.EncodeResponse(msg)
 	if err != nil {
 		return fmt.Errorf("error encoding response for gateway %s: %w", gatewayID, err)
@@ -193,13 +171,13 @@ func (c *gatewayConnector) SendToGateway(ctx context.Context, gatewayID string, 
 	return gateway.conn.Write(ctx, websocket.BinaryMessage, data)
 }
 
-func (c *gatewayConnector) SignAndSendToGateway(ctx context.Context, gatewayID string, body *api.MessageBody) error {
-	signature, err := c.signer.Sign(api.GetRawMessageBody(body)...)
+func (c *gatewayConnector) SignAndSendToGateway(ctx context.Context, gatewayID string, body *gateway.MessageBody) error {
+	signature, err := c.signer.Sign(gateway.GetRawMessageBody(body)...)
 	if err != nil {
 		return err
 	}
-	msg := &api.Message{
-		Body: api.MessageBody{
+	msg := &gateway.Message{
+		Body: gateway.MessageBody{
 			MessageId: body.MessageId,
 			DonId:     body.DonId,
 			Method:    body.Method,
@@ -217,16 +195,16 @@ func (c *gatewayConnector) SignAndSendToGateway(ctx context.Context, gatewayID s
 	return nil
 }
 
-func (c *gatewayConnector) GatewayIDs() []string {
+func (c *gatewayConnector) GatewayIDs() ([]string, error) {
 	var gids []string
 	for gid := range c.gateways {
 		gids = append(gids, gid)
 	}
-	return gids
+	return gids, nil
 }
 
-func (c *gatewayConnector) DonID() string {
-	return c.config.DonId
+func (c *gatewayConnector) DonID() (string, error) {
+	return c.config.DonId, nil
 }
 
 func (c *gatewayConnector) readLoop(gatewayState *gatewayState) {

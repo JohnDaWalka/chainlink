@@ -28,6 +28,7 @@ type standardCapabilities struct {
 	pipelineRunner       core.PipelineRunnerService
 	relayerSet           core.RelayerSet
 	oracleFactory        core.OracleFactory
+	gatewayConnector     core.GatewayConnector
 
 	capabilitiesLoop *loop.StandardCapabilitiesService
 
@@ -47,6 +48,7 @@ func newStandardCapabilities(
 	pipelineRunner core.PipelineRunnerService,
 	relayerSet core.RelayerSet,
 	oracleFactory core.OracleFactory,
+	gatewayConnector core.GatewayConnector,
 ) *standardCapabilities {
 	return &standardCapabilities{
 		log:                  log,
@@ -59,6 +61,7 @@ func newStandardCapabilities(
 		pipelineRunner:       pipelineRunner,
 		relayerSet:           relayerSet,
 		oracleFactory:        oracleFactory,
+		gatewayConnector:     gatewayConnector,
 		stopChan:             make(chan struct{}),
 	}
 }
@@ -98,7 +101,7 @@ func (s *standardCapabilities) Start(ctx context.Context) error {
 			}
 
 			if err = s.capabilitiesLoop.Service.Initialise(cctx, s.spec.Config, s.telemetryService, s.store, s.CapabilitiesRegistry, s.errorLog,
-				s.pipelineRunner, s.relayerSet, s.oracleFactory); err != nil {
+				s.pipelineRunner, s.relayerSet, s.oracleFactory, s.gatewayConnector); err != nil {
 				s.log.Errorf("error initialising standard capabilities service: %v", err)
 				return
 			}

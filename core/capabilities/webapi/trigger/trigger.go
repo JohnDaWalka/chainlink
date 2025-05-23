@@ -13,12 +13,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 )
@@ -46,7 +45,7 @@ type triggerConnectorHandler struct {
 
 	capabilities.CapabilityInfo
 	capabilities.Validator[webapicap.TriggerConfig, struct{}, webapicap.TriggerRequestPayload]
-	connector           connector.GatewayConnector
+	connector           core.GatewayConnector
 	lggr                logger.Logger
 	mu                  sync.Mutex
 	registeredWorkflows map[string]webapiTrigger
@@ -56,7 +55,7 @@ type triggerConnectorHandler struct {
 var _ capabilities.TriggerCapability = (*triggerConnectorHandler)(nil)
 var _ services.Service = &triggerConnectorHandler{}
 
-func NewTrigger(config string, registry core.CapabilitiesRegistry, connector connector.GatewayConnector, lggr logger.Logger) (*triggerConnectorHandler, error) {
+func NewTrigger(config string, registry core.CapabilitiesRegistry, connector core.GatewayConnector, lggr logger.Logger) (*triggerConnectorHandler, error) {
 	if connector == nil {
 		return nil, errors.New("missing connector")
 	}
@@ -73,7 +72,7 @@ func NewTrigger(config string, registry core.CapabilitiesRegistry, connector con
 }
 
 // processTrigger iterates over each topic, checking against senders and rateLimits, then starting event processing and responding
-func (h *triggerConnectorHandler) processTrigger(ctx context.Context, gatewayID string, body *api.MessageBody, sender ethCommon.Address, payload webapicap.TriggerRequestPayload) error {
+func (h *triggerConnectorHandler) processTrigger(ctx context.Context, gatewayID string, body *gateway.MessageBody, sender ethCommon.Address, payload webapicap.TriggerRequestPayload) error {
 	// Pass on the payload with the expectation that it's in an acceptable format for the executor
 	wrappedPayload, err := values.WrapMap(payload)
 	if err != nil {
@@ -132,7 +131,7 @@ func (h *triggerConnectorHandler) processTrigger(ctx context.Context, gatewayID 
 	return err
 }
 
-func (h *triggerConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, msg *api.Message) {
+func (h *triggerConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, msg *gateway.Message) error {
 	// TODO: Validate Signature
 	body := &msg.Body
 	sender := ethCommon.HexToAddress(body.Sender)
@@ -144,7 +143,7 @@ func (h *triggerConnectorHandler) HandleGatewayMessage(ctx context.Context, gate
 		if err != nil {
 			h.lggr.Errorw("error sending response", "err", err)
 		}
-		return
+		return nil
 	}
 
 	switch body.Method {
@@ -161,7 +160,7 @@ func (h *triggerConnectorHandler) HandleGatewayMessage(ctx context.Context, gate
 		if err != nil {
 			h.lggr.Errorw("Error sending response", "body", body, "response", response, "err", err)
 		}
-		return
+		return nil
 
 	default:
 		h.lggr.Errorw("unsupported method", "id", gatewayID, "method", body.Method)
@@ -170,6 +169,7 @@ func (h *triggerConnectorHandler) HandleGatewayMessage(ctx context.Context, gate
 			h.lggr.Errorw("error sending response", "err", err)
 		}
 	}
+	return nil
 }
 
 func (h *triggerConnectorHandler) RegisterTrigger(ctx context.Context, req capabilities.TriggerRegistrationRequest) (<-chan capabilities.TriggerResponse, error) {
@@ -247,6 +247,10 @@ func (h *triggerConnectorHandler) Info(ctx context.Context) (capabilities.Capabi
 	return h.CapabilityInfo, nil
 }
 
+func (h *triggerConnectorHandler) ID() (string, error) {
+	return h.CapabilityInfo.ID, nil
+}
+
 func (h *triggerConnectorHandler) Start(ctx context.Context) error {
 	if err := h.registry.Add(ctx, h); err != nil {
 		return err
@@ -259,7 +263,7 @@ func (h *triggerConnectorHandler) Close() error {
 	return h.StopOnce("GatewayConnectorServiceWrapper", func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		err := h.registry.Remove(ctx, h.ID)
+		err := h.registry.Remove(ctx, h.CapabilityInfo.ID)
 		if err != nil {
 			return err
 		}
@@ -275,14 +279,14 @@ func (h *triggerConnectorHandler) Name() string {
 	return h.lggr.Name()
 }
 
-func (h *triggerConnectorHandler) sendResponse(ctx context.Context, gatewayID string, requestBody *api.MessageBody, payload any) error {
+func (h *triggerConnectorHandler) sendResponse(ctx context.Context, gatewayID string, requestBody *gateway.MessageBody, payload any) error {
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
 		h.lggr.Errorw("error marshalling payload", "err", err)
 		payloadJSON, _ = json.Marshal(ghcapabilities.TriggerResponsePayload{Status: "ERROR", ErrorMessage: fmt.Errorf("error %s marshalling payload", err.Error()).Error()})
 	}
 
-	body := &api.MessageBody{
+	body := &gateway.MessageBody{
 		MessageId: requestBody.MessageId,
 		DonId:     requestBody.DonId,
 		Method:    requestBody.Method,

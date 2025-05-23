@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
@@ -55,9 +56,9 @@ func newFunctionsHandlerForATestDON(t *testing.T, nodes []gc.TestNode, requestTi
 	return handler, don, allowlist, subscriptions
 }
 
-func newSignedMessage(t *testing.T, id string, method string, donId string, privateKey *ecdsa.PrivateKey) api.Message {
-	msg := api.Message{
-		Body: api.MessageBody{
+func newSignedMessage(t *testing.T, id string, method string, donId string, privateKey *ecdsa.PrivateKey) gateway.Message {
+	msg := gateway.Message{
+		Body: gateway.MessageBody{
 			MessageId: id,
 			Method:    method,
 			DonId:     donId,
@@ -67,7 +68,7 @@ func newSignedMessage(t *testing.T, id string, method string, donId string, priv
 	return msg
 }
 
-func sendNodeReponses(t *testing.T, handler handlers.Handler, userRequestMsg api.Message, nodes []gc.TestNode, responses []bool) {
+func sendNodeReponses(t *testing.T, handler handlers.Handler, userRequestMsg gateway.Message, nodes []gc.TestNode, responses []bool) {
 	for id, resp := range responses {
 		nodeResponseMsg := userRequestMsg
 		nodeResponseMsg.Body.Receiver = userRequestMsg.Body.Sender
@@ -88,7 +89,7 @@ func TestFunctionsHandler_Minimal(t *testing.T) {
 	require.NoError(t, err)
 
 	// empty message should always error out
-	msg := &api.Message{}
+	msg := &gateway.Message{}
 	err = handler.HandleUserMessage(testutils.Context(t), msg, nil)
 	require.Error(t, err)
 }

@@ -195,13 +195,13 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) ([]job.Ser
 			return nil, fmt.Errorf("failed to create oracle factory: %w", err)
 		}
 	}
+	connector := d.gatewayConnectorWrapper.GetGatewayConnector()
 
 	// NOTE: special cases for built-in capabilities (to be moved into LOOPPs in the future)
 	if spec.StandardCapabilitiesSpec.Command == commandOverrideForWebAPITrigger {
 		if d.gatewayConnectorWrapper == nil {
 			return nil, errors.New("gateway connector is required for web API Trigger capability")
 		}
-		connector := d.gatewayConnectorWrapper.GetGatewayConnector()
 		triggerSrvc, err := trigger.NewTrigger(spec.StandardCapabilitiesSpec.Config, d.registry, connector, log)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create a Web API Trigger service: %w", err)
@@ -213,7 +213,6 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) ([]job.Ser
 		if d.gatewayConnectorWrapper == nil {
 			return nil, errors.New("gateway connector is required for web API Target capability")
 		}
-		connector := d.gatewayConnectorWrapper.GetGatewayConnector()
 		if len(spec.StandardCapabilitiesSpec.Config) == 0 {
 			return nil, errors.New("config is empty")
 		}
@@ -253,7 +252,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) ([]job.Ser
 
 			lggr := d.logger.Named("ComputeAction")
 
-			handler, err := webapi.NewOutgoingConnectorHandler(d.gatewayConnectorWrapper.GetGatewayConnector(), cfg.ServiceConfig, capabilities.MethodComputeAction, lggr, d.selectorOpts...)
+			handler, err := webapi.NewOutgoingConnectorHandler(connector, cfg.ServiceConfig, capabilities.MethodComputeAction, lggr, d.selectorOpts...)
 			if err != nil {
 				return nil, err
 			}
@@ -283,7 +282,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) ([]job.Ser
 	}
 
 	standardCapability := newStandardCapabilities(log, spec.StandardCapabilitiesSpec, d.cfg, telemetryService, kvStore, d.registry, errorLog,
-		pr, relayerSet, oracleFactory)
+		pr, relayerSet, oracleFactory, connector)
 
 	return []job.ServiceCtx{standardCapability}, nil
 }

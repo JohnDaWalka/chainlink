@@ -104,12 +104,12 @@ type client struct {
 	done       atomic.Bool
 }
 
-func (c *client) HandleGatewayMessage(ctx context.Context, gatewayId string, msg *api.Message) {
+func (c *client) HandleGatewayMessage(ctx context.Context, gatewayId string, msg *gateway.Message) {
 	c.done.Store(true)
 	// send back user's message without re-signing - should be ignored by the Gateway
 	_ = c.connector.SendToGateway(ctx, gatewayId, msg)
 	// send back a correct response
-	responseMsg := &api.Message{Body: api.MessageBody{
+	responseMsg := &gateway.Message{Body: gateway.MessageBody{
 		MessageId: msg.Body.MessageId,
 		Method:    "test",
 		DonId:     "test_don",
@@ -195,7 +195,7 @@ func TestIntegration_Gateway_NoFullNodes_BasicConnectionAndMessage(t *testing.T)
 }
 
 func newHttpRequestObject(t *testing.T, messageId string, userUrl string, signerKey *ecdsa.PrivateKey) *http.Request {
-	msg := &api.Message{Body: api.MessageBody{MessageId: messageId, Method: "test", DonId: "test_don"}}
+	msg := &gateway.Message{Body: gateway.MessageBody{MessageId: messageId, Method: "test", DonId: "test_don"}}
 	require.NoError(t, msg.Sign(signerKey))
 	codec := api.JsonRPCCodec{}
 	rawMsg, err := codec.EncodeRequest(msg)

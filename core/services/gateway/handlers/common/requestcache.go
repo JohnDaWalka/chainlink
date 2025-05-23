@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
 )
@@ -15,13 +16,13 @@ import (
 // Additionally, each request has a timeout, after which the netry will be removed from the cache and an error sent to the callback channel.
 // All methods are thread-safe.
 type RequestCache[T any] interface {
-	NewRequest(request *api.Message, callbackCh chan<- handlers.UserCallbackPayload, responseData *T) error
-	ProcessResponse(response *api.Message, process ResponseProcessor[T]) error
+	NewRequest(request *gateway.Message, callbackCh chan<- handlers.UserCallbackPayload, responseData *T) error
+	ProcessResponse(response *gateway.Message, process ResponseProcessor[T]) error
 }
 
 // If aggregated != nil then the aggregated response is ready and the entry will be deleted from RequestCache.
 // Otherwise, state will be updated to newState and the entry will remain in cache, awaiting more responses from nodes.
-type ResponseProcessor[T any] func(response *api.Message, state *T) (aggregated *handlers.UserCallbackPayload, newState *T, err error)
+type ResponseProcessor[T any] func(response *gateway.Message, state *T) (aggregated *handlers.UserCallbackPayload, newState *T, err error)
 
 type requestCache[T any] struct {
 	cache        map[globalId]*pendingRequest[T]
@@ -46,7 +47,7 @@ func NewRequestCache[T any](timeout time.Duration, maxCacheSize uint32) RequestC
 	return &requestCache[T]{cache: make(map[globalId]*pendingRequest[T]), timeout: timeout, maxCacheSize: maxCacheSize}
 }
 
-func (c *requestCache[T]) NewRequest(request *api.Message, callbackCh chan<- handlers.UserCallbackPayload, responseData *T) error {
+func (c *requestCache[T]) NewRequest(request *gateway.Message, callbackCh chan<- handlers.UserCallbackPayload, responseData *T) error {
 	if request == nil {
 		return errors.New("request is nil")
 	}
@@ -75,7 +76,7 @@ func (c *requestCache[T]) NewRequest(request *api.Message, callbackCh chan<- han
 //
 //	(a) remove request from cache and send aggregated response to the user
 //	(b) update request's responseData and keep it in cache, awaiting more responses from nodes
-func (c *requestCache[T]) ProcessResponse(response *api.Message, process ResponseProcessor[T]) error {
+func (c *requestCache[T]) ProcessResponse(response *gateway.Message, process ResponseProcessor[T]) error {
 	if response == nil {
 		return errors.New("response is nil")
 	}

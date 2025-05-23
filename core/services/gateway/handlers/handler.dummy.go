@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/multierr"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
@@ -36,7 +37,7 @@ func NewDummyHandler(donConfig *config.DONConfig, don DON, lggr logger.Logger) (
 	}, nil
 }
 
-func (d *dummyHandler) HandleUserMessage(ctx context.Context, msg *api.Message, callbackCh chan<- UserCallbackPayload) error {
+func (d *dummyHandler) HandleUserMessage(ctx context.Context, msg *gateway.Message, callbackCh chan<- UserCallbackPayload) error {
 	d.mu.Lock()
 	d.savedCallbacks[msg.Body.MessageId] = &savedCallback{msg.Body.MessageId, callbackCh}
 	don := d.don
@@ -50,7 +51,7 @@ func (d *dummyHandler) HandleUserMessage(ctx context.Context, msg *api.Message, 
 	return err
 }
 
-func (d *dummyHandler) HandleNodeMessage(ctx context.Context, msg *api.Message, nodeAddr string) error {
+func (d *dummyHandler) HandleNodeMessage(ctx context.Context, msg *gateway.Message, nodeAddr string) error {
 	d.mu.Lock()
 	savedCb, found := d.savedCallbacks[msg.Body.MessageId]
 	delete(d.savedCallbacks, msg.Body.MessageId)

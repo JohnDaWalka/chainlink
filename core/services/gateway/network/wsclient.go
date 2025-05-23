@@ -12,6 +12,25 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
+// The handshake works as follows:
+//
+//	  Client (Initiator)                  Server (Acceptor)
+//
+//	 NewAuthHeader()
+//	             -------auth header-------->
+//	                                       StartHandshake()
+//	             <-------challenge----------
+//	ChallengeResponse()
+//	             ---------response--------->
+//	                                     FinalizeHandshake()
+type ConnectionInitiator interface {
+	// Generate authentication header value specific to node and gateway
+	NewAuthHeader(url *url.URL) ([]byte, error)
+
+	// Sign challenge to prove identity.
+	ChallengeResponse(url *url.URL, challenge []byte) ([]byte, error)
+}
+
 type WebSocketClient interface {
 	Connect(ctx context.Context, url *url.URL) (*websocket.Conn, error)
 }

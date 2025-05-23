@@ -18,6 +18,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/tdh2/go/tdh2/tdh2easy"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions"
 	"github.com/smartcontractkit/chainlink/v2/core/services/s4"
@@ -84,8 +86,8 @@ func UploadS4Secrets(rc *resty.Client, s4Cfg *S4SecretsCfg) (uint8, uint64, erro
 		return 0, 0, err
 	}
 
-	msg := &api.Message{
-		Body: api.MessageBody{
+	msg := &gateway.Message{
+		Body: gateway.MessageBody{
 			MessageId: s4Cfg.MessageID,
 			Method:    s4Cfg.Method,
 			DonId:     s4Cfg.DonID,
@@ -133,8 +135,8 @@ func ListS4Secrets(rc *resty.Client, s4Cfg *S4SecretsCfg) error {
 		return err
 	}
 
-	msg := &api.Message{
-		Body: api.MessageBody{
+	msg := &gateway.Message{
+		Body: gateway.MessageBody{
 			MessageId: s4Cfg.MessageID,
 			Method:    s4Cfg.Method,
 			DonId:     s4Cfg.DonID,

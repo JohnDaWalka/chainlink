@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
@@ -91,10 +92,10 @@ type functionsHandler struct {
 }
 
 type PendingRequest struct {
-	request    *api.Message
-	responses  map[string]*api.Message
-	successful []*api.Message
-	errors     []*api.Message
+	request    *gateway.Message
+	responses  map[string]*gateway.Message
+	successful []*gateway.Message
+	errors     []*gateway.Message
 }
 
 var _ handlers.Handler = (*functionsHandler)(nil)
@@ -188,7 +189,7 @@ func NewFunctionsHandler(
 	}
 }
 
-func (h *functionsHandler) HandleUserMessage(ctx context.Context, msg *api.Message, callbackCh chan<- handlers.UserCallbackPayload) error {
+func (h *functionsHandler) HandleUserMessage(ctx context.Context, msg *gateway.Message, callbackCh chan<- handlers.UserCallbackPayload) error {
 	sender := common.HexToAddress(msg.Body.Sender)
 	if h.allowlist != nil && !h.allowlist.Allow(sender) {
 		h.lggr.Debugw("received a message from a non-allowlisted address", "sender", msg.Body.Sender)
@@ -230,9 +231,9 @@ func (h *functionsHandler) HandleUserMessage(ctx context.Context, msg *api.Messa
 	}
 }
 
-func (h *functionsHandler) handleRequest(ctx context.Context, msg *api.Message, callbackCh chan<- handlers.UserCallbackPayload) error {
+func (h *functionsHandler) handleRequest(ctx context.Context, msg *gateway.Message, callbackCh chan<- handlers.UserCallbackPayload) error {
 	h.lggr.Debugw("handleRequest: processing message", "sender", msg.Body.Sender, "messageId", msg.Body.MessageId)
-	err := h.pendingRequests.NewRequest(msg, callbackCh, &PendingRequest{request: msg, responses: make(map[string]*api.Message)})
+	err := h.pendingRequests.NewRequest(msg, callbackCh, &PendingRequest{request: msg, responses: make(map[string]*gateway.Message)})
 	if err != nil {
 		h.lggr.Warnw("handleRequest: error adding new request", "sender", msg.Body.Sender, "err", err)
 		promHandlerError.WithLabelValues(h.donConfig.DonId, err.Error()).Inc()
@@ -248,7 +249,7 @@ func (h *functionsHandler) handleRequest(ctx context.Context, msg *api.Message, 
 	return nil
 }
 
-func (h *functionsHandler) HandleNodeMessage(ctx context.Context, msg *api.Message, nodeAddr string) error {
+func (h *functionsHandler) HandleNodeMessage(ctx context.Context, msg *gateway.Message, nodeAddr string) error {
 	h.lggr.Debugw("HandleNodeMessage: processing message", "nodeAddr", nodeAddr, "receiver", msg.Body.Receiver, "id", msg.Body.MessageId)
 	if h.nodeRateLimiter != nil && !h.nodeRateLimiter.Allow(nodeAddr) {
 		h.lggr.Debugw("rate-limited", "sender", nodeAddr)
@@ -266,7 +267,7 @@ func (h *functionsHandler) HandleNodeMessage(ctx context.Context, msg *api.Messa
 }
 
 // Conforms to ResponseProcessor[*PendingRequest]
-func (h *functionsHandler) processSecretsResponse(response *api.Message, responseData *PendingRequest) (*handlers.UserCallbackPayload, *PendingRequest, error) {
+func (h *functionsHandler) processSecretsResponse(response *gateway.Message, responseData *PendingRequest) (*handlers.UserCallbackPayload, *PendingRequest, error) {
 	if _, exists := responseData.responses[response.Body.Sender]; exists {
 		return nil, nil, errors.New("duplicate response")
 	}
@@ -300,7 +301,7 @@ func (h *functionsHandler) processSecretsResponse(response *api.Message, respons
 	return nil, responseData, nil
 }
 
-func newSecretsResponse(request *api.Message, success bool, responses []*api.Message) (*handlers.UserCallbackPayload, error) {
+func newSecretsResponse(request *gateway.Message, success bool, responses []*gateway.Message) (*handlers.UserCallbackPayload, error) {
 	payload := CombinedResponse{ResponseBase: ResponseBase{Success: success}, NodeResponses: responses}
 	payloadJson, err := json.Marshal(payload)
 	if err != nil {
@@ -328,7 +329,7 @@ func newSecretsResponse(request *api.Message, success bool, responses []*api.Mes
 }
 
 // Conforms to ResponseProcessor[*PendingRequest]
-func (h *functionsHandler) processHeartbeatResponse(response *api.Message, responseData *PendingRequest) (*handlers.UserCallbackPayload, *PendingRequest, error) {
+func (h *functionsHandler) processHeartbeatResponse(response *gateway.Message, responseData *PendingRequest) (*handlers.UserCallbackPayload, *PendingRequest, error) {
 	if _, exists := responseData.responses[response.Body.Sender]; exists {
 		return nil, nil, errors.New("duplicate response")
 	}
@@ -339,7 +340,7 @@ func (h *functionsHandler) processHeartbeatResponse(response *api.Message, respo
 
 	// user response is ready with F+1 node responses
 	if len(responseData.responses) >= h.donConfig.F+1 {
-		var responseList []*api.Message
+		var responseList []*gateway.Message
 		for _, response := range responseData.responses {
 			responseList = append(responseList, response)
 		}

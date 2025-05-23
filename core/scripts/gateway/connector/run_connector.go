@@ -12,8 +12,8 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/pelletier/go-toml/v2"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 )
@@ -29,7 +29,7 @@ type client struct {
 	lggr       logger.Logger
 }
 
-func (h *client) HandleGatewayMessage(ctx context.Context, gatewayId string, msg *api.Message) {
+func (h *client) HandleGatewayMessage(ctx context.Context, gatewayId string, msg *gateway.Message) {
 	h.lggr.Infof("received message from gateway %s. Echoing back.", gatewayId)
 	err := h.connector.SendToGateway(ctx, gatewayId, msg)
 	if err != nil {

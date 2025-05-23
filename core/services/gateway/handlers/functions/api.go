@@ -1,6 +1,6 @@
 package functions
 
-import "github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
+import "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 
 const (
 	MethodSecretsSet  = "secrets_set"
@@ -41,5 +41,5 @@ type SecretsListRow struct {
 // Gateway -> User response, which combines responses from several nodes
 type CombinedResponse struct {
 	ResponseBase
-	NodeResponses []*api.Message `json:"node_responses"`
+	NodeResponses []*gateway.Message `json:"node_responses"`
 }

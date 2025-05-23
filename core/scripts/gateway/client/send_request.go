@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/joho/godotenv"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions"
 	"github.com/smartcontractkit/chainlink/v2/core/services/s4"
@@ -88,8 +89,8 @@ func main() {
 		}
 	}
 
-	msg := &api.Message{
-		Body: api.MessageBody{
+	msg := &gateway.Message{
+		Body: gateway.MessageBody{
 			MessageId: *messageId,
 			Method:    *methodName,
 			DonId:     *donId,

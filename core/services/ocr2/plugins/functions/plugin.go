@@ -13,6 +13,7 @@ import (
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
 
@@ -205,7 +206,7 @@ type Keystore interface {
 	keys.MessageSigner
 }
 
-func NewConnector(ctx context.Context, pluginConfig *config.PluginConfig, ethKeystore Keystore, s4Storage s4.Storage, allowlist gwAllowlist.OnchainAllowlist, rateLimiter *hc.RateLimiter, subscriptions gwSubscriptions.OnchainSubscriptions, listener functions.FunctionsListener, offchainTransmitter functions.OffchainTransmitter, lggr logger.Logger) (connector.GatewayConnector, connector.GatewayConnectorHandler, error) {
+func NewConnector(ctx context.Context, pluginConfig *config.PluginConfig, ethKeystore Keystore, s4Storage s4.Storage, allowlist gwAllowlist.OnchainAllowlist, rateLimiter *hc.RateLimiter, subscriptions gwSubscriptions.OnchainSubscriptions, listener functions.FunctionsListener, offchainTransmitter functions.OffchainTransmitter, lggr logger.Logger) (core.GatewayConnector, core.GatewayConnectorHandler, error) {
 	configuredNodeAddress := common.HexToAddress(pluginConfig.GatewayConnectorConfig.NodeAddress)
 	err := ethKeystore.CheckEnabled(ctx, configuredNodeAddress)
 	if err != nil {

@@ -12,6 +12,7 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
@@ -85,7 +86,7 @@ func NewHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don 
 
 // sendHTTPMessageToClient is an outgoing message from the gateway to external endpoints
 // returns message to be sent back to the capability node
-func (h *handler) sendHTTPMessageToClient(ctx context.Context, req network.HTTPRequest, msg *api.Message) (*api.Message, error) {
+func (h *handler) sendHTTPMessageToClient(ctx context.Context, req network.HTTPRequest, msg *gateway.Message) (*gateway.Message, error) {
 	var payload Response
 	resp, err := h.httpClient.Send(ctx, req)
 	if err != nil {
@@ -102,8 +103,8 @@ func (h *handler) sendHTTPMessageToClient(ctx context.Context, req network.HTTPR
 		return nil, err
 	}
 
-	return &api.Message{
-		Body: api.MessageBody{
+	return &gateway.Message{
+		Body: gateway.MessageBody{
 			MessageId: msg.Body.MessageId,
 			Method:    msg.Body.Method,
 			DonId:     msg.Body.DonId,
@@ -112,7 +113,7 @@ func (h *handler) sendHTTPMessageToClient(ctx context.Context, req network.HTTPR
 	}, nil
 }
 
-func (h *handler) handleWebAPITriggerMessage(ctx context.Context, msg *api.Message, nodeAddr string) error {
+func (h *handler) handleWebAPITriggerMessage(ctx context.Context, msg *gateway.Message, nodeAddr string) error {
 	h.mu.Lock()
 	savedCb, found := h.savedCallbacks[msg.Body.MessageId]
 	delete(h.savedCallbacks, msg.Body.MessageId)
@@ -128,7 +129,7 @@ func (h *handler) handleWebAPITriggerMessage(ctx context.Context, msg *api.Messa
 	return nil
 }
 
-func (h *handler) handleWebAPIOutgoingMessage(ctx context.Context, msg *api.Message, nodeAddr string) error {
+func (h *handler) handleWebAPIOutgoingMessage(ctx context.Context, msg *gateway.Message, nodeAddr string) error {
 	h.lggr.Debugw("handling webAPI outgoing message", "messageId", msg.Body.MessageId, "nodeAddr", nodeAddr)
 	if !h.nodeRateLimiter.Allow(nodeAddr) {
 		return fmt.Errorf("rate limit exceeded for node %s", nodeAddr)
@@ -172,8 +173,8 @@ func (h *handler) handleWebAPIOutgoingMessage(ctx context.Context, msg *api.Mess
 				l.Errorw("error while marshalling payload", "err", err2)
 				return
 			}
-			respMsg = &api.Message{
-				Body: api.MessageBody{
+			respMsg = &gateway.Message{
+				Body: gateway.MessageBody{
 					MessageId: msg.Body.MessageId,
 					Method:    msg.Body.Method,
 					DonId:     msg.Body.DonId,
@@ -201,7 +202,7 @@ func (h *handler) handleWebAPIOutgoingMessage(ctx context.Context, msg *api.Mess
 	return nil
 }
 
-func (h *handler) HandleNodeMessage(ctx context.Context, msg *api.Message, nodeAddr string) error {
+func (h *handler) HandleNodeMessage(ctx context.Context, msg *gateway.Message, nodeAddr string) error {
 	start := time.Now()
 	var err error
 	switch msg.Body.Method {
@@ -225,7 +226,7 @@ func (h *handler) Close() error {
 	return nil
 }
 
-func (h *handler) HandleUserMessage(ctx context.Context, msg *api.Message, callbackCh chan<- handlers.UserCallbackPayload) error {
+func (h *handler) HandleUserMessage(ctx context.Context, msg *gateway.Message, callbackCh chan<- handlers.UserCallbackPayload) error {
 	h.mu.Lock()
 	h.savedCallbacks[msg.Body.MessageId] = &savedCallback{msg.Body.MessageId, callbackCh}
 	don := h.don

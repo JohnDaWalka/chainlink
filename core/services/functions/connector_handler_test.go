@@ -14,12 +14,12 @@ import (
 	"github.com/onsi/gomega"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys/keystest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/functions"
 	sfmocks "github.com/smartcontractkit/chainlink/v2/core/services/functions/mocks"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	gwconnector "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
@@ -35,7 +35,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newOffchainRequest(t *testing.T, sender []byte, ageSec uint64) (*api.Message, functions.RequestID) {
+func newOffchainRequest(t *testing.T, sender []byte, ageSec uint64) (*gateway.Message, functions.RequestID) {
 	requestId := make([]byte, 32)
 	_, err := rand.Read(requestId)
 	require.NoError(t, err)
@@ -50,8 +50,8 @@ func newOffchainRequest(t *testing.T, sender []byte, ageSec uint64) (*api.Messag
 	internalId := functions.InternalId(request.RequestInitiator, request.RequestId)
 	req, err := json.Marshal(request)
 	require.NoError(t, err)
-	msg := &api.Message{
-		Body: api.MessageBody{
+	msg := &gateway.Message{
+		Body: gateway.MessageBody{
 			DonId:     "fun4",
 			MessageId: "1",
 			Method:    "heartbeat",
@@ -112,8 +112,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 
 	t.Run("HandleGatewayMessage", func(t *testing.T) {
 		t.Run("secrets_list", func(t *testing.T) {
-			msg := api.Message{
-				Body: api.MessageBody{
+			msg := gateway.Message{
+				Body: gateway.MessageBody{
 					DonId:     "fun4",
 					MessageId: "1",
 					Method:    "secrets_list",
@@ -130,7 +130,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 			storage.On("List", ctx, addr).Return(snapshot, nil).Once()
 			allowlist.On("Allow", addr).Return(true).Once()
 			connector.On("SendToGateway", ctx, "gw1", mock.Anything).Run(func(args mock.Arguments) {
-				msg, ok := args[2].(*api.Message)
+				msg, ok := args[2].(*gateway.Message)
 				require.True(t, ok)
 				require.JSONEq(t, `{"success":true,"rows":[{"slot_id":1,"version":1,"expiration":1},{"slot_id":2,"version":2,"expiration":2}]}`, string(msg.Body.Payload))
 			}).Return(nil).Once()
@@ -141,7 +141,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 				storage.On("List", ctx, addr).Return(nil, errors.New("boom")).Once()
 				allowlist.On("Allow", addr).Return(true).Once()
 				connector.On("SendToGateway", ctx, "gw1", mock.Anything).Run(func(args mock.Arguments) {
-					msg, ok := args[2].(*api.Message)
+					msg, ok := args[2].(*gateway.Message)
 					require.True(t, ok)
 					require.JSONEq(t, `{"success":false,"error_message":"Failed to list secrets: boom"}`, string(msg.Body.Payload))
 				}).Return(nil).Once()
@@ -170,8 +170,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 			signatureB64 := base64.StdEncoding.EncodeToString(signature)
 			require.NoError(t, err)
 
-			msg := api.Message{
-				Body: api.MessageBody{
+			msg := gateway.Message{
+				Body: gateway.MessageBody{
 					DonId:     "fun4",
 					MessageId: "1",
 					Method:    "secrets_set",
@@ -185,7 +185,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 			allowlist.On("Allow", addr).Return(true).Once()
 			subscriptions.On("GetMaxUserBalance", mock.Anything).Return(big.NewInt(100), nil).Once()
 			connector.On("SendToGateway", ctx, "gw1", mock.Anything).Run(func(args mock.Arguments) {
-				msg, ok := args[2].(*api.Message)
+				msg, ok := args[2].(*gateway.Message)
 				require.True(t, ok)
 				require.Equal(t, `{"success":true}`, string(msg.Body.Payload))
 			}).Return(nil).Once()
@@ -197,7 +197,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 				allowlist.On("Allow", addr).Return(true).Once()
 				subscriptions.On("GetMaxUserBalance", mock.Anything).Return(big.NewInt(100), nil).Once()
 				connector.On("SendToGateway", ctx, "gw1", mock.Anything).Run(func(args mock.Arguments) {
-					msg, ok := args[2].(*api.Message)
+					msg, ok := args[2].(*gateway.Message)
 					require.True(t, ok)
 					require.JSONEq(t, `{"success":false,"error_message":"Failed to set secret: boom"}`, string(msg.Body.Payload))
 				}).Return(nil).Once()
@@ -212,7 +212,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 				allowlist.On("Allow", addr).Return(true).Once()
 				subscriptions.On("GetMaxUserBalance", mock.Anything).Return(big.NewInt(100), nil).Once()
 				connector.On("SendToGateway", ctx, "gw1", mock.Anything).Run(func(args mock.Arguments) {
-					msg, ok := args[2].(*api.Message)
+					msg, ok := args[2].(*gateway.Message)
 					require.True(t, ok)
 					require.JSONEq(t, `{"success":false,"error_message":"Failed to set secret: wrong signature"}`, string(msg.Body.Payload))
 				}).Return(nil).Once()
@@ -226,7 +226,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 				allowlist.On("Allow", addr).Return(true).Once()
 				subscriptions.On("GetMaxUserBalance", mock.Anything).Return(big.NewInt(100), nil).Once()
 				connector.On("SendToGateway", ctx, "gw1", mock.Anything).Run(func(args mock.Arguments) {
-					msg, ok := args[2].(*api.Message)
+					msg, ok := args[2].(*gateway.Message)
 					require.True(t, ok)
 					require.JSONEq(t, `{"success":false,"error_message":"Bad request to set secret: invalid character 's' looking for beginning of object key string"}`, string(msg.Body.Payload))
 				}).Return(nil).Once()
@@ -238,7 +238,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 				allowlist.On("Allow", addr).Return(true).Once()
 				subscriptions.On("GetMaxUserBalance", mock.Anything).Return(big.NewInt(0), nil).Once()
 				connector.On("SendToGateway", ctx, "gw1", mock.Anything).Run(func(args mock.Arguments) {
-					msg, ok := args[2].(*api.Message)
+					msg, ok := args[2].(*gateway.Message)
 					require.True(t, ok)
 					require.JSONEq(t, `{"success":false,"error_message":"user subscription has insufficient balance"}`, string(msg.Body.Payload))
 				}).Return(nil).Once()
@@ -248,8 +248,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 		})
 
 		t.Run("unsupported method", func(t *testing.T) {
-			msg := api.Message{
-				Body: api.MessageBody{
+			msg := gateway.Message{
+				Body: gateway.MessageBody{
 					DonId:     "fun4",
 					MessageId: "1",
 					Method:    "foobar",
@@ -277,7 +277,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 			handlerCalled <- struct{}{}
 		}).Return(nil).Once()
 		connector.On("SendToGateway", mock.Anything, "gw1", mock.Anything).Run(func(args mock.Arguments) {
-			respMsg, ok := args[2].(*api.Message)
+			respMsg, ok := args[2].(*gateway.Message)
 			require.True(t, ok)
 			require.NoError(t, json.Unmarshal(respMsg.Body.Payload, &response))
 			require.Equal(t, functions.RequestStatePending, response.Status)
@@ -295,7 +295,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 		// second call to collect the response
 		allowlist.On("Allow", addr).Return(true).Once()
 		connector.On("SendToGateway", mock.Anything, "gw1", mock.Anything).Run(func(args mock.Arguments) {
-			respMsg, ok := args[2].(*api.Message)
+			respMsg, ok := args[2].(*gateway.Message)
 			require.True(t, ok)
 			require.NoError(t, json.Unmarshal(respMsg.Body.Payload, &response))
 			require.Equal(t, functions.RequestStateComplete, response.Status)
@@ -324,7 +324,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 			returnedState := 0
 			allowlist.On("Allow", addr).Return(true).Once()
 			connector.On("SendToGateway", mock.Anything, "gw1", mock.Anything).Run(func(args mock.Arguments) {
-				respMsg, ok := args[2].(*api.Message)
+				respMsg, ok := args[2].(*gateway.Message)
 				require.True(t, ok)
 				require.NoError(t, json.Unmarshal(respMsg.Body.Payload, &response))
 				returnedState = response.Status
@@ -342,7 +342,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 		var response functions.HeartbeatResponse
 		allowlist.On("Allow", addr).Return(true).Once()
 		connector.On("SendToGateway", mock.Anything, "gw1", mock.Anything).Run(func(args mock.Arguments) {
-			respMsg, ok := args[2].(*api.Message)
+			respMsg, ok := args[2].(*gateway.Message)
 			require.True(t, ok)
 			require.NoError(t, json.Unmarshal(respMsg.Body.Payload, &response))
 			require.Equal(t, functions.RequestStateInternalError, response.Status)
@@ -358,7 +358,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 		var response functions.HeartbeatResponse
 		allowlist.On("Allow", addr).Return(true).Once()
 		connector.On("SendToGateway", mock.Anything, "gw1", mock.Anything).Run(func(args mock.Arguments) {
-			respMsg, ok := args[2].(*api.Message)
+			respMsg, ok := args[2].(*gateway.Message)
 			require.True(t, ok)
 			require.NoError(t, json.Unmarshal(respMsg.Body.Payload, &response))
 			require.Equal(t, functions.RequestStateInternalError, response.Status)

@@ -7,6 +7,7 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -26,7 +27,7 @@ type ServiceWrapper struct {
 
 	config    config.GatewayConnector
 	keystore  Keystore
-	connector connector.GatewayConnector
+	connector core.GatewayConnector
 	lggr      logger.Logger
 	clock     clockwork.Clock
 }
@@ -101,6 +102,6 @@ func (e *ServiceWrapper) Name() string {
 	return e.lggr.Name()
 }
 
-func (e *ServiceWrapper) GetGatewayConnector() connector.GatewayConnector {
+func (e *ServiceWrapper) GetGatewayConnector() core.GatewayConnector {
 	return e.connector
 }

@@ -17,6 +17,7 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	gc "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
@@ -260,7 +261,7 @@ func (m *donConnectionManager) SetHandler(handler handlers.Handler) {
 	m.handler = handler
 }
 
-func (m *donConnectionManager) SendToNode(ctx context.Context, nodeAddress string, msg *api.Message) error {
+func (m *donConnectionManager) SendToNode(ctx context.Context, nodeAddress string, msg *gc.Message) error {
 	if msg == nil {
 		return errors.New("nil message")
 	}

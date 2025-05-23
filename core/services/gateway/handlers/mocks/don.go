@@ -5,7 +5,7 @@ package mocks
 import (
 	context "context"
 
-	api "github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
+	gateway "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -24,7 +24,7 @@ func (_m *DON) EXPECT() *DON_Expecter {
 }
 
 // SendToNode provides a mock function with given fields: ctx, nodeAddress, msg
-func (_m *DON) SendToNode(ctx context.Context, nodeAddress string, msg *api.Message) error {
+func (_m *DON) SendToNode(ctx context.Context, nodeAddress string, msg *gateway.Message) error {
 	ret := _m.Called(ctx, nodeAddress, msg)
 
 	if len(ret) == 0 {
@@ -32,7 +32,7 @@ func (_m *DON) SendToNode(ctx context.Context, nodeAddress string, msg *api.Mess
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *api.Message) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, *gateway.Message) error); ok {
 		r0 = rf(ctx, nodeAddress, msg)
 	} else {
 		r0 = ret.Error(0)
@@ -49,14 +49,14 @@ type DON_SendToNode_Call struct {
 // SendToNode is a helper method to define mock.On call
 //   - ctx context.Context
 //   - nodeAddress string
-//   - msg *api.Message
+//   - msg *gateway.Message
 func (_e *DON_Expecter) SendToNode(ctx interface{}, nodeAddress interface{}, msg interface{}) *DON_SendToNode_Call {
 	return &DON_SendToNode_Call{Call: _e.mock.On("SendToNode", ctx, nodeAddress, msg)}
 }
 
-func (_c *DON_SendToNode_Call) Run(run func(ctx context.Context, nodeAddress string, msg *api.Message)) *DON_SendToNode_Call {
+func (_c *DON_SendToNode_Call) Run(run func(ctx context.Context, nodeAddress string, msg *gateway.Message)) *DON_SendToNode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(*api.Message))
+		run(args[0].(context.Context), args[1].(string), args[2].(*gateway.Message))
 	})
 	return _c
 }
@@ -66,7 +66,7 @@ func (_c *DON_SendToNode_Call) Return(_a0 error) *DON_SendToNode_Call {
 	return _c
 }
 
-func (_c *DON_SendToNode_Call) RunAndReturn(run func(context.Context, string, *api.Message) error) *DON_SendToNode_Call {
+func (_c *DON_SendToNode_Call) RunAndReturn(run func(context.Context, string, *gateway.Message) error) *DON_SendToNode_Call {
 	_c.Call.Return(run)
 	return _c
 }

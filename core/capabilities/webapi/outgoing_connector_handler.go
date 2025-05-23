@@ -14,8 +14,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 )
@@ -35,11 +36,11 @@ const (
 	errorIncomingRatelimitSender   = "message from gateway exceeded per sender rate limit"
 )
 
-var _ connector.GatewayConnectorHandler = &OutgoingConnectorHandler{}
+var _ core.GatewayConnectorHandler = &OutgoingConnectorHandler{}
 
 type OutgoingConnectorHandler struct {
 	services.StateMachine
-	gc                  connector.GatewayConnector
+	gc                  core.GatewayConnector
 	method              string
 	lggr                logger.Logger
 	incomingRateLimiter *common.RateLimiter
@@ -49,7 +50,7 @@ type OutgoingConnectorHandler struct {
 	metrics             *metrics
 }
 
-func NewOutgoingConnectorHandler(gc connector.GatewayConnector, config ServiceConfig, method string, lgger logger.Logger, opts ...func(*RoundRobinSelector)) (*OutgoingConnectorHandler, error) {
+func NewOutgoingConnectorHandler(gc core.GatewayConnector, config ServiceConfig, method string, lgger logger.Logger, opts ...func(*RoundRobinSelector)) (*OutgoingConnectorHandler, error) {
 	outgoingRLCfg := outgoingRateLimiterConfigDefaults(config.OutgoingRateLimiter)
 	outgoingRateLimiter, err := common.NewRateLimiter(outgoingRLCfg)
 	if err != nil {
@@ -84,7 +85,7 @@ func NewOutgoingConnectorHandler(gc connector.GatewayConnector, config ServiceCo
 
 // HandleSingleNodeRequest sends a request to first available gateway node and blocks until response is received
 // TODO: handle retries
-func (c *OutgoingConnectorHandler) HandleSingleNodeRequest(ctx context.Context, messageID string, req capabilities.Request) (*api.Message, error) {
+func (c *OutgoingConnectorHandler) HandleSingleNodeRequest(ctx context.Context, messageID string, req capabilities.Request) (*gateway.Message, error) {
 	start := time.Now()
 
 	m, err := c.handleSingleNodeRequest(ctx, messageID, req)
@@ -102,7 +103,7 @@ func (c *OutgoingConnectorHandler) HandleSingleNodeRequest(ctx context.Context, 
 	return m, err
 }
 
-func (c *OutgoingConnectorHandler) handleSingleNodeRequest(ctx context.Context, messageID string, req capabilities.Request) (*api.Message, error) {
+func (c *OutgoingConnectorHandler) handleSingleNodeRequest(ctx context.Context, messageID string, req capabilities.Request) (*gateway.Message, error) {
 	lggr := logger.With(c.lggr, "messageID", messageID, "workflowID", req.WorkflowID)
 	workflowAllow, globalAllow := c.outgoingRateLimiter.AllowVerbose(req.WorkflowID)
 	if !workflowAllow {
@@ -134,11 +135,16 @@ func (c *OutgoingConnectorHandler) handleSingleNodeRequest(ctx context.Context, 
 	}
 	defer c.responses.cleanup(messageID)
 
+	donID, err := c.gc.DonID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get DON ID: %w", err)
+	}
+
 	lggr.Debugw("sending request to gateway")
 
-	body := &api.MessageBody{
+	body := &gateway.MessageBody{
 		MessageId: messageID,
-		DonId:     c.gc.DonID(),
+		DonId:     donID,
 		Method:    c.method,
 		Payload:   payload,
 	}
@@ -160,7 +166,7 @@ func (c *OutgoingConnectorHandler) handleSingleNodeRequest(ctx context.Context, 
 	select {
 	case resp := <-ch:
 		switch resp.Body.Method {
-		case api.MethodInternalError:
+		case gateway.MethodInternalError:
 			var errPayload api.JsonRPCError
 			err := json.Unmarshal(resp.Body.Payload, &errPayload)
 			if err != nil {
@@ -189,7 +195,11 @@ type awaitContext struct {
 // cancellation or timeout.
 func (c *OutgoingConnectorHandler) awaitConnection(ctx context.Context, md awaitContext) (string, error) {
 	lggr := logger.With(c.lggr, "messageID", md.messageID, "workflowID", md.workflowID)
-	selector := NewRoundRobinSelector(c.gc.GatewayIDs(), c.selectorOpts...)
+	gatewayIDs, err := c.gc.GatewayIDs()
+	if err != nil {
+		return "", fmt.Errorf("failed to get gateway IDs: %w", err)
+	}
+	selector := NewRoundRobinSelector(gatewayIDs, c.selectorOpts...)
 	attempts := make(map[string]int)
 	backoff := 10 * time.Millisecond
 
@@ -264,14 +274,14 @@ func (c *OutgoingConnectorHandler) attemptGatewayConnection(ctx context.Context,
 
 // HandleGatewayMessage processes incoming messages from the Gateway,
 // which are in response to a HandleSingleNodeRequest call.
-func (c *OutgoingConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, msg *api.Message) {
+func (c *OutgoingConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, msg *gateway.Message) error {
 	body := &msg.Body
 	l := logger.With(c.lggr, "gatewayID", gatewayID, "method", body.Method, "messageID", msg.Body.MessageId)
 
 	ch, ok := c.responses.get(body.MessageId)
 	if !ok {
 		l.Warnw("no response channel found; this may indicate that the node timed out the request")
-		return
+		return nil
 	}
 
 	senderAllow, globalAllow := c.incomingRateLimiter.AllowVerbose(body.Sender)
@@ -296,15 +306,15 @@ func (c *OutgoingConnectorHandler) HandleGatewayMessage(ctx context.Context, gat
 		if err != nil {
 			l.Errorw("failed to marshal err payload", "err", err)
 		}
-		errMsg := api.Message{
-			Body: api.MessageBody{
+		errMsg := gateway.Message{
+			Body: gateway.MessageBody{
 				MessageId: body.MessageId,
-				Method:    api.MethodInternalError,
+				Method:    gateway.MethodInternalError,
 				Payload:   errPayload,
 			},
 		}
 		ch <- &errMsg
-		return
+		return nil
 	}
 
 	l.Debugw("handling gateway request")
@@ -315,17 +325,22 @@ func (c *OutgoingConnectorHandler) HandleGatewayMessage(ctx context.Context, gat
 		err := json.Unmarshal(body.Payload, &payload)
 		if err != nil {
 			l.Errorw("failed to unmarshal payload", "err", err)
-			return
+			return nil
 		}
 		select {
 		case ch <- msg:
-			return
+			return nil
 		case <-ctx.Done():
-			return
+			return nil
 		}
 	default:
 		l.Errorw("unsupported method")
 	}
+	return nil
+}
+
+func (c *OutgoingConnectorHandler) ID() (string, error) {
+	return c.Name(), nil
 }
 
 func (c *OutgoingConnectorHandler) Start(ctx context.Context) error {
@@ -390,16 +405,16 @@ func validMethod(method string) bool {
 
 func newResponses() *responses {
 	return &responses{
-		chs: map[string]chan *api.Message{},
+		chs: map[string]chan *gateway.Message{},
 	}
 }
 
 type responses struct {
-	chs map[string]chan *api.Message
+	chs map[string]chan *gateway.Message
 	mu  sync.RWMutex
 }
 
-func (r *responses) new(id string) (chan *api.Message, error) {
+func (r *responses) new(id string) (chan *gateway.Message, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -409,7 +424,7 @@ func (r *responses) new(id string) (chan *api.Message, error) {
 	}
 
 	// Buffered so we don't wait if sending
-	ch := make(chan *api.Message, 1)
+	ch := make(chan *gateway.Message, 1)
 	r.chs[id] = ch
 	return ch, nil
 }
@@ -421,7 +436,7 @@ func (r *responses) cleanup(id string) {
 	delete(r.chs, id)
 }
 
-func (r *responses) get(id string) (chan *api.Message, bool) {
+func (r *responses) get(id string) (chan *gateway.Message, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	ch, ok := r.chs[id]

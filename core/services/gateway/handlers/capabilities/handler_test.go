@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -85,8 +86,8 @@ func TestHandler_SendHTTPMessageToClient(t *testing.T) {
 	}
 	payloadBytes, err := json.Marshal(payload)
 	require.NoError(t, err)
-	msg := &api.Message{
-		Body: api.MessageBody{
+	msg := &gateway.Message{
+		Body: gateway.MessageBody{
 			MessageId: "123",
 			Method:    MethodWebAPITarget,
 			DonId:     "testDonId",
@@ -101,7 +102,7 @@ func TestHandler_SendHTTPMessageToClient(t *testing.T) {
 			Body:       []byte("response body"),
 		}, nil).Once()
 
-		don.EXPECT().SendToNode(mock.Anything, nodes[0].Address, mock.MatchedBy(func(m *api.Message) bool {
+		don.EXPECT().SendToNode(mock.Anything, nodes[0].Address, mock.MatchedBy(func(m *gateway.Message) bool {
 			var payload Response
 			err2 := json.Unmarshal(m.Body.Payload, &payload)
 			if err2 != nil {
@@ -134,7 +135,7 @@ func TestHandler_SendHTTPMessageToClient(t *testing.T) {
 			Body:       []byte("access denied"),
 		}, nil).Once()
 
-		don.EXPECT().SendToNode(mock.Anything, nodes[0].Address, mock.MatchedBy(func(m *api.Message) bool {
+		don.EXPECT().SendToNode(mock.Anything, nodes[0].Address, mock.MatchedBy(func(m *gateway.Message) bool {
 			var payload Response
 			err2 := json.Unmarshal(m.Body.Payload, &payload)
 			if err2 != nil {
@@ -163,7 +164,7 @@ func TestHandler_SendHTTPMessageToClient(t *testing.T) {
 	t.Run("http client non-HTTP error", func(t *testing.T) {
 		httpClient.EXPECT().Send(mock.Anything, mock.Anything).Return(nil, errors.New("error while marshalling")).Once()
 
-		don.EXPECT().SendToNode(mock.Anything, nodes[0].Address, mock.MatchedBy(func(m *api.Message) bool {
+		don.EXPECT().SendToNode(mock.Anything, nodes[0].Address, mock.MatchedBy(func(m *gateway.Message) bool {
 			var payload Response
 			err2 := json.Unmarshal(m.Body.Payload, &payload)
 			if err2 != nil {
@@ -188,7 +189,7 @@ func TestHandler_SendHTTPMessageToClient(t *testing.T) {
 	})
 }
 
-func triggerRequest(t *testing.T, privateKey string, topics string, methodName string, timestamp string, payload string) *api.Message {
+func triggerRequest(t *testing.T, privateKey string, topics string, methodName string, timestamp string, payload string) *gateway.Message {
 	messageID := "12345"
 	if methodName == "" {
 		methodName = MethodWebAPITrigger
@@ -214,8 +215,8 @@ func triggerRequest(t *testing.T, privateKey string, topics string, methodName s
 		`
 	}
 	payloadJSON := []byte(payload)
-	msg := &api.Message{
-		Body: api.MessageBody{
+	msg := &gateway.Message{
+		Body: gateway.MessageBody{
 			MessageId: messageID,
 			Method:    methodName,
 			DonId:     donID,
@@ -325,8 +326,8 @@ func TestHandleComputeActionMessage(t *testing.T) {
 	}
 	payloadBytes, err := json.Marshal(payload)
 	require.NoError(t, err)
-	msg := &api.Message{
-		Body: api.MessageBody{
+	msg := &gateway.Message{
+		Body: gateway.MessageBody{
 			MessageId: "123",
 			Method:    MethodComputeAction,
 			DonId:     "testDonId",
@@ -341,7 +342,7 @@ func TestHandleComputeActionMessage(t *testing.T) {
 			Body:       []byte("response body"),
 		}, nil).Once()
 
-		don.EXPECT().SendToNode(mock.Anything, nodes[0].Address, mock.MatchedBy(func(m *api.Message) bool {
+		don.EXPECT().SendToNode(mock.Anything, nodes[0].Address, mock.MatchedBy(func(m *gateway.Message) bool {
 			var payload Response
 			err2 := json.Unmarshal(m.Body.Payload, &payload)
 			if err2 != nil {
@@ -374,7 +375,7 @@ func TestHandleComputeActionMessage(t *testing.T) {
 			Body:       []byte("access denied"),
 		}, nil).Once()
 
-		don.EXPECT().SendToNode(mock.Anything, nodes[0].Address, mock.MatchedBy(func(m *api.Message) bool {
+		don.EXPECT().SendToNode(mock.Anything, nodes[0].Address, mock.MatchedBy(func(m *gateway.Message) bool {
 			var payload Response
 			err2 := json.Unmarshal(m.Body.Payload, &payload)
 			if err2 != nil {
@@ -403,7 +404,7 @@ func TestHandleComputeActionMessage(t *testing.T) {
 	t.Run("NOK-error_outside_payload", func(t *testing.T) {
 		httpClient.EXPECT().Send(mock.Anything, mock.Anything).Return(nil, errors.New("error while marshalling")).Once()
 
-		don.EXPECT().SendToNode(mock.Anything, nodes[0].Address, mock.MatchedBy(func(m *api.Message) bool {
+		don.EXPECT().SendToNode(mock.Anything, nodes[0].Address, mock.MatchedBy(func(m *gateway.Message) bool {
 			var payload Response
 			err2 := json.Unmarshal(m.Body.Payload, &payload)
 			if err2 != nil {

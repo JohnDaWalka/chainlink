@@ -154,8 +154,8 @@ func newGatewayWithMockHandler(t *testing.T) (gateway.Gateway, *handler_mocks.Ha
 }
 
 func newSignedRequest(t *testing.T, messageId string, method string, donID string, payload []byte) []byte {
-	msg := &api.Message{
-		Body: api.MessageBody{
+	msg := &gateway.Message{
+		Body: gateway.MessageBody{
 			MessageId: messageId,
 			Method:    method,
 			DonId:     donID,
@@ -205,7 +205,7 @@ func TestGateway_ProcessRequest_HandlerResponse(t *testing.T) {
 
 	gw, handler := newGatewayWithMockHandler(t)
 	handler.On("HandleUserMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		msg := args.Get(1).(*api.Message)
+		msg := args.Get(1).(*gateway.Message)
 		callbackCh := args.Get(2).(chan<- handlers.UserCallbackPayload)
 		// echo back to sender with attached payload
 		msg.Body.Payload = []byte(`{"result":"OK"}`)

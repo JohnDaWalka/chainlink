@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/metering"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/wasmtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -25,7 +26,6 @@ import (
 
 	corecapabilities "github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
@@ -214,7 +214,7 @@ func TestComputeFetch(t *testing.T) {
 	th.connector.EXPECT().
 		SignAndSendToGateway(mock.Anything, "gateway1", mock.Anything).
 		Return(nil).
-		Run(func(ctx context.Context, gatewayID string, msg *api.MessageBody) {
+		Run(func(ctx context.Context, gatewayID string, msg *gateway.MessageBody) {
 			th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 		}).
 		Once()
@@ -326,7 +326,7 @@ func TestCompute_SpendValueRelativeToComputeTime(t *testing.T) {
 			th.connector.EXPECT().
 				SignAndSendToGateway(mock.Anything, "gateway1", mock.Anything).
 				Return(nil).
-				Run(func(ctx context.Context, gatewayID string, msg *api.MessageBody) {
+				Run(func(ctx context.Context, gatewayID string, msg *gateway.MessageBody) {
 					th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 				}).
 				Once().
@@ -398,7 +398,7 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 	require.ErrorContains(t, err, fmt.Sprintf("response size %d exceeds maximum allowed size %d", 2092, 1*1024))
 }
 
-func gatewayResponse(t *testing.T, msgID string, body []byte) *api.Message {
+func gatewayResponse(t *testing.T, msgID string, body []byte) *gateway.Message {
 	headers := map[string]string{"Content-Type": "application/json"}
 	responsePayload, err := json.Marshal(ghcapabilities.Response{
 		StatusCode:     200,
@@ -407,8 +407,8 @@ func gatewayResponse(t *testing.T, msgID string, body []byte) *api.Message {
 		ExecutionError: false,
 	})
 	require.NoError(t, err)
-	return &api.Message{
-		Body: api.MessageBody{
+	return &gateway.Message{
+		Body: gateway.MessageBody{
 			MessageId: msgID,
 			Method:    ghcapabilities.MethodComputeAction,
 			Payload:   responsePayload,
