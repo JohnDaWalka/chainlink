@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
@@ -80,6 +81,14 @@ func run(
 	binary, config []byte,
 	billingClientAddr string,
 ) {
+	_ = setupBeholder(lggr.Named("Fake_Beholder"))
+
+	if billingClientAddr == "" {
+		billingClientAddr = "localhost:4319"
+
+		RunBillingListener(ctx, lggr.Named("Fake_Billing_Service"))
+	}
+
 	engine, err := NewStandaloneEngine(ctx, lggr, registry, binary, config, billingClientAddr)
 	if err != nil {
 		fmt.Printf("Failed to create engine: %v\n", err)
