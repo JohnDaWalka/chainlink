@@ -17,15 +17,19 @@ import (
 )
 
 func main() {
-	var wasmPath string
-	var configPath string
-	var debugMode bool
-	var billingClientAddr string
+	var (
+		wasmPath          string
+		configPath        string
+		debugMode         bool
+		billingClientAddr string
+		enableBeholder    bool
+	)
 
 	flag.StringVar(&wasmPath, "wasm", "", "Path to the WASM binary file")
 	flag.StringVar(&configPath, "config", "", "Path to the Config file")
 	flag.BoolVar(&debugMode, "debug", false, "Enable debug-level logging")
-	flag.StringVar(&billingClientAddr, "billing-client-address", "", "Billing client address; Leave empty for no client.")
+	flag.StringVar(&billingClientAddr, "billing-client-address", "", "Billing client address; Leave empty to run a local client that prints to the standard log.")
+	flag.BoolVar(&enableBeholder, "beholder", false, "Enable printing beholder messages to standard log")
 	flag.Parse()
 
 	if wasmPath == "" {
@@ -69,7 +73,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	run(ctx, lggr, registry, capabilities, binary, config, billingClientAddr)
+	run(ctx, lggr, registry, capabilities, binary, config, billingClientAddr, enableBeholder)
 }
 
 // run instantiates the engine, starts it and blocks until the context is canceled.
@@ -80,8 +84,11 @@ func run(
 	capabilities []services.Service,
 	binary, config []byte,
 	billingClientAddr string,
+	enableBeholder bool,
 ) {
-	_ = setupBeholder(lggr.Named("Fake_Beholder"))
+	if enableBeholder {
+		_ = setupBeholder(lggr.Named("Fake_Beholder"))
+	}
 
 	if billingClientAddr == "" {
 		billingClientAddr = "localhost:4319"

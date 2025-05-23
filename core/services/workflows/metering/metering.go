@@ -19,6 +19,7 @@ const (
 	consensusCreditType = "CONSENSUS"
 	triggerCreditType   = "TRIGGER"
 	computeCreditType   = "COMPUTE"
+	gasCreditType       = "GAS"
 )
 
 type BillingClient interface {
@@ -196,13 +197,19 @@ func (r *Report) ReserveStep(ref ReportStepRef, capInfo capabilities.CapabilityI
 		req.Credits = []*billing.AccountCreditsInput{
 			{Credits: 100_000, CreditType: consensusCreditType}, // TODO: reserve the maximum byte size
 		}
+	case "write_aptos-testnet@1.0.0":
+		req.Credits = []*billing.AccountCreditsInput{
+			{Credits: 100_000_000, CreditType: gasCreditType}, // TODO: reserve the maximum byte size
+		}
 	default:
 		r.lggr.Infof("unexpected capability type: %s", capInfo.CapabilityType)
 	}
 
 	// TODO: handle error by indicating that a billing reserve failed
 	// but do not halt the workflow
-	_, _ = r.client.ReserveCredits(context.TODO(), &req)
+	if _, err := r.client.ReserveCredits(context.TODO(), &req); err != nil {
+		r.lggr.Warnf("failed to reserve credits: %s", err)
+	}
 
 	// TODO: handle extra reserves for write step
 
