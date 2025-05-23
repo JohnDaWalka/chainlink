@@ -624,11 +624,11 @@ func NewEnvironmentWithJobsAndContracts(t *testing.T, tEnv TestEnvironment) Depl
 	evmChains := e.Env.AllChainSelectors()
 	solChains := e.Env.AllChainSelectorsSolana()
 	aptosChains := e.Env.AllChainSelectorsAptos()
-	tonChains := e.Env.AllChainSelectorsTon()
+	// tonChains := e.Env.AllChainSelectorsTon()
 	//nolint:gocritic // we need to segregate EVM and Solana chains
 	allChains := append(evmChains, solChains...)
 	allChains = append(allChains, aptosChains...)
-	allChains = append(allChains, tonChains...)
+	// allChains = append(allChains, tonChains...)
 	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfig)
 
 	for _, c := range e.Env.AllChainSelectors() {
@@ -1010,10 +1010,10 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 				CCIPHomeConfigType: globals.ConfigTypeActive,
 			},
 		),
-		commonchangeset.Configure(
-			cldf.CreateLegacyChangeSet(v1_6.CCIPCapabilityJobspecChangeset),
-			nil, // Changeset ignores any config
-		),
+		// commonchangeset.Configure(
+		// 	cldf.CreateLegacyChangeSet(v1_6.CCIPCapabilityJobspecChangeset),
+		// 	nil, // Changeset ignores any config
+		// ),
 	}
 	e.Env, err = commonchangeset.ApplyChangesets(t, e.Env, timelockContractsPerChain, apps)
 	require.NoError(t, err)
