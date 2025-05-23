@@ -80,25 +80,38 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 	maxRetries := 10
 	var networkConfigUrl string
 	var containerName string
+
+	// TODO: SKIP for now, taking too much time, remove when we get enough understanding in test environment
+	// wget https://raw.githubusercontent.com/neodix42/mylocalton-docker/refs/heads/main/docker-compose.yaml
+	// docker-compose up
+	// if existing network error happens, run `docker network rm ton`
+	useExistingTonlocalnet := true
+
 	for i := 0; i < maxRetries; i++ {
 		bcInput := &blockchain.Input{
 			Image:   "ghcr.io/neodix42/mylocalton-docker:latest", // filled out by defaultTon function
 			Type:    "ton",
 			ChainID: strconv.FormatUint(chainID, 10),
 		}
-		output, err := blockchain.NewBlockchainNetwork(bcInput)
-		if err != nil {
-			t.Logf("Error creating Ton network: %v", err)
-			time.Sleep(time.Second)
-			maxRetries -= 1
-			continue
-		}
-		require.NoError(t, err)
-		containerName = output.ContainerName
+		// TODO: SKIP for now, taking too much time
+		if !useExistingTonlocalnet {
 
-		// todo: ctf-configured clean up?
-		testcontainers.CleanupContainer(t, output.Container)
-		networkConfigUrl = fmt.Sprintf("http://%s/localhost.global.config.json", output.Nodes[0].ExternalHTTPUrl)
+			output, err := blockchain.NewBlockchainNetwork(bcInput)
+			if err != nil {
+				t.Logf("Error creating Ton network: %v", err)
+				time.Sleep(time.Second)
+				maxRetries -= 1
+				continue
+			}
+			require.NoError(t, err)
+			containerName = output.ContainerName
+
+			// todo: ctf-configured clean up?
+			testcontainers.CleanupContainer(t, output.Container)
+			networkConfigUrl = fmt.Sprintf("http://%s/localhost.global.config.json", output.Nodes[0].ExternalHTTPUrl)
+		} else {
+			networkConfigUrl = fmt.Sprintf("http://%s/localhost.global.config.json", "localhost:8000")
+		}
 		break
 	}
 	_ = containerName
