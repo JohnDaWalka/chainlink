@@ -3,6 +3,8 @@ package ccip
 import (
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+	mt "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagingtest"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
@@ -32,48 +34,48 @@ func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
 		", source chain selector:", sourceChain,
 		", dest chain selector:", destChain,
 	)
-	// connect a single lane, source to dest
-	// testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
+	//connect a single lane, source to dest
+	//testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
 
-	// var (
-	// 	replayed bool
-	// 	nonce    uint64
-	// 	sender   = common.LeftPadBytes(e.Env.Chains[sourceChain].DeployerKey.From.Bytes(), 32)
-	// 	out      mt.TestCaseOutput
-	// 	setup    = mt.NewTestSetupWithDeployedEnv(
-	// 		t,
-	// 		e,
-	// 		state,
-	// 		sourceChain,
-	// 		destChain,
-	// 		sender,
-	// 		false, // testRouter
-	// 	)
-	// )
+	var (
+		replayed bool
+		nonce    uint64
+		sender   = common.LeftPadBytes(e.Env.Chains[sourceChain].DeployerKey.From.Bytes(), 32)
+		out      mt.TestCaseOutput
+		setup    = mt.NewTestSetupWithDeployedEnv(
+			t,
+			e,
+			state,
+			sourceChain,
+			destChain,
+			sender,
+			false, // testRouter
+		)
+	)
 
-	// t.Run("message to contract implementing CCIPReceiver", func(t *testing.T) {
-	// 	ccipChainState := state.TonChains[destChain]
+	t.Run("message to contract implementing CCIPReceiver", func(t *testing.T) {
+		ccipChainState := state.TonChains[destChain]
 
-	// 	require.NoError(t, err)
-	// 	out = mt.Run(
-	// 		t,
-	// 		mt.TestCase{
-	// 			TestSetup: setup,
-	// 			Replayed:  replayed,
-	// 			Nonce:     &nonce,
-	// 			Receiver:  ccipChainState.ReceiverAddress.Data(),
-	// 			MsgData:   []byte("hello CCIPReceiver"),
-	// 			//TODO(ton): Do we need to enforce OOO for TON?
-	// 			ExtraArgs:              testhelpers.MakeEVMExtraArgsV2(100000, false),
-	// 			ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
-	// 			ExtraAssertions: []func(t *testing.T){
-	// 				func(t *testing.T) {
-	// 					// TODO: check dummy receiver events
-	// 				},
-	// 			},
-	// 		},
-	// 	)
-	// })
+		require.NoError(t, err)
+		out = mt.Run(
+			t,
+			mt.TestCase{
+				TestSetup: setup,
+				Replayed:  replayed,
+				Nonce:     &nonce,
+				Receiver:  ccipChainState.ReceiverAddress.Data(),
+				MsgData:   []byte("hello CCIPReceiver"),
+				//TODO(ton): Do we need to enforce OOO for TON?
+				ExtraArgs:              testhelpers.MakeEVMExtraArgsV2(100000, false),
+				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
+				ExtraAssertions: []func(t *testing.T){
+					func(t *testing.T) {
+						// TODO: check dummy receiver events
+					},
+				},
+			},
+		)
+	})
 
-	// _ = out
+	_ = out
 }
