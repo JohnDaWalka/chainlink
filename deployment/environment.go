@@ -384,18 +384,25 @@ func ChainConfigsToOCRConfig(chainConfigs []*nodev1.ChainConfig) (map[chain_sele
 
 func chainToDetails(c *nodev1.Chain) (chain_selectors.ChainDetails, error) {
 	var family string
-	switch c.Type {
-	case nodev1.ChainType_CHAIN_TYPE_EVM:
-		family = chain_selectors.FamilyEVM
-	case nodev1.ChainType_CHAIN_TYPE_APTOS:
-		family = chain_selectors.FamilyAptos
-	case nodev1.ChainType_CHAIN_TYPE_SOLANA:
-		family = chain_selectors.FamilySolana
-	case nodev1.ChainType_CHAIN_TYPE_STARKNET:
-		family = chain_selectors.FamilyStarknet
-	default:
-		return chain_selectors.ChainDetails{}, fmt.Errorf("unsupported chain type %s", c.Type)
+
+	// TODO this is a hack to support the ton chain, remove after we support chain type properly with chainlink-proto
+	if c.Id == "-217" {
+		family = chain_selectors.FamilyTon
+	} else {
+		switch c.Type {
+		case nodev1.ChainType_CHAIN_TYPE_EVM:
+			family = chain_selectors.FamilyEVM
+		case nodev1.ChainType_CHAIN_TYPE_APTOS:
+			family = chain_selectors.FamilyAptos
+		case nodev1.ChainType_CHAIN_TYPE_SOLANA:
+			family = chain_selectors.FamilySolana
+		case nodev1.ChainType_CHAIN_TYPE_STARKNET:
+			family = chain_selectors.FamilyStarknet
+		default:
+			return chain_selectors.ChainDetails{}, fmt.Errorf("unsupported chain type %s", c.Type)
+		}
 	}
+
 	if family == chain_selectors.FamilySolana {
 		// Temporary workaround to handle cases when solana chainId was not using the standard genesis hash,
 		// but using old strings mainnet/testnet/devnet.
