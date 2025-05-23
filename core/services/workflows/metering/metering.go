@@ -1,6 +1,7 @@
 package metering
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -9,9 +10,21 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
+	billing "github.com/smartcontractkit/chainlink-protos/billing/go"
 	"github.com/smartcontractkit/chainlink-protos/workflows/go/events"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
+
+const (
+	consensusCreditType = "CONSENSUS"
+	triggerCreditType   = "TRIGGER"
+	computeCreditType   = "COMPUTE"
+)
+
+type BillingClient interface {
+	SubmitWorkflowReceipt(context.Context, *billing.SubmitWorkflowReceiptRequest) (*billing.SubmitWorkflowReceiptResponse, error)
+	ReserveCredits(context.Context, *billing.ReserveCreditsRequest) (*billing.ReserveCreditsResponse, error)
+}
 
 type ReportStepRef string
 
@@ -86,21 +99,33 @@ type ReportStepDetail struct {
 }
 
 type Report struct {
-	balance  *balanceStore
+	// descriptive properties
+	accountId           string
+	workflowId          string
+	workflowExecutionId string
+
+	// dependencies
+	balance *balanceStore
+	client  BillingClient
+	lggr    logger.Logger
+
+	// internal state
 	mu       sync.RWMutex
 	steps    map[ReportStepRef]ReportStep
-	lggr     logger.Logger
 	refCount map[ReportStepRef]uint64
 }
 
-func NewReport(lggr logger.Logger) *Report {
+func NewReport(accountId, workflowId, workflowExecutionId string, lggr logger.Logger) *Report {
 	logger := lggr.Named("Metering")
-	balanceStore := NewBalanceStore(0, map[string]decimal.Decimal{}, logger)
+
 	return &Report{
-		balance:  balanceStore,
-		steps:    make(map[ReportStepRef]ReportStep),
-		lggr:     logger,
-		refCount: make(map[ReportStepRef]uint64),
+		accountId:           accountId,
+		workflowId:          workflowId,
+		workflowExecutionId: workflowExecutionId,
+		balance:             NewBalanceStore(0, map[string]decimal.Decimal{}, logger),
+		lggr:                logger,
+		steps:               make(map[ReportStepRef]ReportStep),
+		refCount:            make(map[ReportStepRef]uint64),
 	}
 }
 
@@ -150,6 +175,34 @@ func (r *Report) ReserveStep(ref ReportStepRef, capInfo capabilities.CapabilityI
 	if _, ok := r.steps[ref]; ok {
 		return errors.New("step reserve already exists")
 	}
+
+	req := billing.ReserveCreditsRequest{
+		AccountId:           r.accountId,
+		WorkflowId:          r.workflowId,
+		WorkflowExecutionId: r.workflowExecutionId,
+	}
+
+	// TODO: checking capability type to know ahead of time what to reserve is brittle
+	switch capInfo.CapabilityType {
+	case "streams-trigger@1.0.0":
+		req.Credits = []*billing.AccountCreditsInput{
+			{Credits: 1, CreditType: triggerCreditType},
+		}
+	case "cron-trigger@1.0.0":
+		req.Credits = []*billing.AccountCreditsInput{
+			{Credits: 1, CreditType: triggerCreditType},
+		}
+	case "offchain_reporting@1.0.0":
+		req.Credits = []*billing.AccountCreditsInput{
+			{Credits: 100_000, CreditType: consensusCreditType}, // TODO: reserve the maximum byte size
+		}
+	default:
+		r.lggr.Infof("unexpected capability type: %s", capInfo.CapabilityType)
+	}
+
+	// TODO: handle error by indicating that a billing reserve failed
+	// but do not halt the workflow
+	_, _ = r.client.ReserveCredits(context.TODO(), &req)
 
 	// TODO: handle extra reserves for write step
 
@@ -224,6 +277,29 @@ func (r *Report) Message() *events.MeteringReport {
 	return protoReport
 }
 
+func (r *Report) SendReceipt(ctx context.Context) error {
+	// send metering report to billing if billing client is not nil
+	if r.client != nil {
+		req := billing.SubmitWorkflowReceiptRequest{
+			AccountId:           r.accountId,
+			WorkflowId:          r.workflowId,
+			WorkflowExecutionId: r.workflowExecutionId,
+			Metering:            r.Message(),
+		}
+
+		resp, err := r.client.SubmitWorkflowReceipt(ctx, &req)
+		if err != nil {
+			return err
+		}
+
+		if resp == nil || !resp.Success {
+			return errors.New("failed to submit workflow receipt")
+		}
+	}
+
+	return nil
+}
+
 // IncrementRefCount returns a count of the time the ref has been seen.
 // Used to build unique refs in EngineV2 until there are deterministic capability call IDs available
 // TODO: Remove with CAPPL-881
@@ -240,12 +316,14 @@ func (r *Report) IncrementRefCount(ref ReportStepRef) uint64 {
 type Reports struct {
 	mu      sync.RWMutex
 	reports map[string]*Report
+	client  BillingClient
 }
 
 // NewReports initializes and returns a new Reports.
-func NewReports() *Reports {
+func NewReports(client BillingClient) *Reports {
 	return &Reports{
 		reports: make(map[string]*Report),
+		client:  client,
 	}
 }
 
@@ -263,6 +341,7 @@ func (s *Reports) Add(key string, report *Report) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	report.client = s.client
 	s.reports[key] = report
 }
 

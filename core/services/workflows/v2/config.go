@@ -1,7 +1,6 @@
 package v2
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -10,18 +9,14 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
 	wasmpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/v2/pb"
-	billing "github.com/smartcontractkit/chainlink-protos/billing/go"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/metering"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/ratelimiter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/store"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncerlimiter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/types"
 )
-
-type BillingClient interface {
-	SubmitWorkflowReceipt(context.Context, *billing.SubmitWorkflowReceiptRequest) (*billing.SubmitWorkflowReceiptResponse, error)
-}
 
 type EngineConfig struct {
 	Lggr            logger.Logger
@@ -39,7 +34,7 @@ type EngineConfig struct {
 	ExecutionRateLimiter *ratelimiter.RateLimiter // global + per owner
 
 	Hooks         LifecycleHooks
-	BillingClient BillingClient
+	BillingClient metering.BillingClient
 }
 
 const (

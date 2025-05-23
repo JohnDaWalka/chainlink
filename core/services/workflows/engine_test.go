@@ -41,6 +41,7 @@ import (
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/events"
+	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/metering/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/ratelimiter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/store"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncerlimiter"
@@ -344,7 +345,7 @@ func TestEngineWithHardcodedWorkflow(t *testing.T) {
 	ctx := testutils.Context(t)
 	reg := coreCap.NewRegistry(logger.TestLogger(t))
 	beholderTester := tests.Beholder(t)
-	mBillingClient := new(mockBillingClient)
+	mBillingClient := new(mocks.BillingClient)
 
 	trigger, cr := mockTrigger(t)
 
@@ -377,9 +378,11 @@ func TestEngineWithHardcodedWorkflow(t *testing.T) {
 		},
 	)
 
-	mBillingClient.On("SubmitWorkflowReceipt", mock.Anything, mock.MatchedBy(func(req *billing.SubmitWorkflowReceiptRequest) bool {
-		return req != nil && req.WorkflowId != "" && req.WorkflowExecutionId != ""
-	})).Return(&billing.SubmitWorkflowReceiptResponse{Success: true}, nil)
+	mBillingClient.EXPECT().
+		SubmitWorkflowReceipt(mock.Anything, mock.MatchedBy(func(req *billing.SubmitWorkflowReceiptRequest) bool {
+			return req != nil && req.WorkflowId != "" && req.WorkflowExecutionId != ""
+		})).
+		Return(&billing.SubmitWorkflowReceiptResponse{Success: true}, nil)
 
 	servicetest.Run(t, eng)
 
@@ -2416,19 +2419,4 @@ func TestEngine_ConcurrentExecutions(t *testing.T) {
 	assert.Equal(t, 2, beholderTester.Len(t, "beholder_entity", fmt.Sprintf("%s.%s", events.ProtoPkg, events.MeteringReportEntity)))
 	assert.Equal(t, 1, beholderTester.Len(t, platform.KeyWorkflowExecutionID, eid))
 	assert.Equal(t, 1, beholderTester.Len(t, platform.KeyWorkflowExecutionID, eid2))
-}
-
-type mockBillingClient struct {
-	mock.Mock
-}
-
-func (_m *mockBillingClient) SubmitWorkflowReceipt(ctx context.Context, req *billing.SubmitWorkflowReceiptRequest) (*billing.SubmitWorkflowReceiptResponse, error) {
-	args := _m.Called(ctx, req)
-
-	var a0 *billing.SubmitWorkflowReceiptResponse
-	if arg, ok := args.Get(0).(*billing.SubmitWorkflowReceiptResponse); ok {
-		a0 = arg
-	}
-
-	return a0, args.Error(1)
 }

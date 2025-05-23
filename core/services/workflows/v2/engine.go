@@ -71,7 +71,7 @@ func NewEngine(ctx context.Context, cfg *EngineConfig) (*Engine, error) {
 		allTriggerEventsQueueCh: make(chan enqueuedTriggerEvent, cfg.LocalLimits.TriggerEventQueueSize),
 		executionsSemaphore:     make(chan struct{}, cfg.LocalLimits.MaxConcurrentWorkflowExecutions),
 		capCallsSemaphore:       make(chan struct{}, cfg.LocalLimits.MaxConcurrentCapabilityCallsPerWorkflow),
-		meterReports:            metering.NewReports(),
+		meterReports:            metering.NewReports(cfg.BillingClient),
 	}
 	engine.Service, engine.srvcEng = services.Config{
 		Name:  "WorkflowEngineV2",
@@ -280,7 +280,7 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 		return
 	}
 
-	e.meterReports.Add(executionID, metering.NewReport(e.cfg.Lggr))
+	e.meterReports.Add(executionID, metering.NewReport(e.cfg.WorkflowOwner, e.cfg.WorkflowID, executionID, e.cfg.Lggr))
 
 	result, err := e.cfg.Module.Execute(subCtx, &wasmpb.ExecuteRequest{
 		Request: &wasmpb.ExecuteRequest_Trigger{

@@ -2,7 +2,6 @@ package workflows
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -21,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/exec"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk"
-	billing "github.com/smartcontractkit/chainlink-protos/billing/go"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/transmission"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -100,10 +98,6 @@ func (sucm *stepUpdateManager) len() int64 {
 
 type SecretsFor func(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName, workflowID string) (map[string]string, error)
 
-type BillingClient interface {
-	SubmitWorkflowReceipt(context.Context, *billing.SubmitWorkflowReceiptRequest) (*billing.SubmitWorkflowReceiptResponse, error)
-}
-
 // Engine handles the lifecycle of a single workflow and its executions.
 type Engine struct {
 	services.StateMachine
@@ -125,7 +119,6 @@ type Engine struct {
 	maxExecutionDuration time.Duration
 	heartbeatCadence     time.Duration
 	stepTimeoutDuration  time.Duration
-	billingClient        BillingClient
 
 	// testing lifecycle hook to signal when an execution is finished.
 	onExecutionFinished func(string)
@@ -495,7 +488,7 @@ func (e *Engine) stepUpdateLoop(ctx context.Context, executionID string, stepUpd
 
 // startExecution kicks off a new workflow execution when a trigger event is received.
 func (e *Engine) startExecution(ctx context.Context, executionID string, triggerID string, event *values.Map) error {
-	e.meterReports.Add(executionID, metering.NewReport(e.logger))
+	e.meterReports.Add(executionID, metering.NewReport(e.workflow.owner, e.workflow.id, executionID, e.logger))
 
 	err := events.EmitExecutionStartedEvent(ctx, e.cma, triggerID, executionID)
 	if err != nil {
@@ -586,7 +579,7 @@ func (e *Engine) handleStepUpdate(ctx context.Context, stepUpdate store.Workflow
 
 		// this case is only for resuming executions and should be updated when metering is added to save execution state
 		if _, ok := e.meterReports.Get(stepUpdate.ExecutionID); !ok {
-			e.meterReports.Add(stepUpdate.ExecutionID, metering.NewReport(e.logger))
+			e.meterReports.Add(stepUpdate.ExecutionID, metering.NewReport(e.workflow.owner, e.workflow.id, state.ExecutionID, e.logger))
 		}
 
 		return e.finishExecution(ctx, cma, state.ExecutionID, status)
@@ -654,8 +647,8 @@ func (e *Engine) finishExecution(ctx context.Context, cma custmsg.MessageEmitter
 			l.Warn(fmt.Sprintf("metering report send to beholder error %s", err))
 		}
 
-		// send metering report to billing if billing client is not nil
-		if err = e.sendReportToBilling(ctx, report, e.workflow.id, executionID); err != nil {
+		// send metering report to billing
+		if err = report.SendReceipt(ctx); err != nil {
 			e.metrics.incrementWorkflowMissingMeteringReport(ctx)
 			l.Warn(fmt.Sprintf("metering report send to billing error %s", err))
 		}
@@ -1188,28 +1181,6 @@ func (e *Engine) heartbeat(ctx context.Context) {
 	}
 }
 
-func (e *Engine) sendReportToBilling(ctx context.Context, report *metering.Report, workflowID string, executionID string) error {
-	if e.billingClient != nil {
-		req := billing.SubmitWorkflowReceiptRequest{
-			AccountId:           e.workflow.owner,
-			WorkflowId:          workflowID,
-			WorkflowExecutionId: executionID,
-			Metering:            report.Message(),
-		}
-
-		resp, err := e.billingClient.SubmitWorkflowReceipt(ctx, &req)
-		if err != nil {
-			return err
-		}
-
-		if resp == nil || !resp.Success {
-			return errors.New("failed to submit workflow receipt")
-		}
-	}
-
-	return nil
-}
-
 func (e *Engine) Close() error {
 	return e.StopOnce("Engine", func() error {
 		e.logger.Info("shutting down engine")
@@ -1307,7 +1278,7 @@ type Config struct {
 	SecretsFetcher       SecretsFor
 	HeartbeatCadence     time.Duration
 	StepTimeout          time.Duration
-	BillingClient        BillingClient
+	BillingClient        metering.BillingClient
 
 	// RateLimiter limits the workflow execution steps globally and per
 	// second that a workflow owner can make
@@ -1484,8 +1455,7 @@ func NewEngine(ctx context.Context, cfg Config) (engine *Engine, err error) {
 		clock:                cfg.clock,
 		ratelimiter:          cfg.RateLimiter,
 		workflowLimits:       cfg.WorkflowLimits,
-		meterReports:         metering.NewReports(),
-		billingClient:        cfg.BillingClient,
+		meterReports:         metering.NewReports(cfg.BillingClient),
 	}
 
 	return engine, nil
