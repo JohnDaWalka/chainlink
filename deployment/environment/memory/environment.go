@@ -230,6 +230,7 @@ func NewNodes(
 			Chains:         cfg.Chains,
 			Solchains:      cfg.SolChains,
 			Aptoschains:    cfg.AptosChains,
+			Tonchains:      cfg.TonChains,
 			LogLevel:       cfg.LogLevel,
 			Bootstrap:      false,
 			RegistryConfig: cfg.RegistryConfig,

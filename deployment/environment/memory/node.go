@@ -142,6 +142,7 @@ func (n Node) JDChainConfigs() ([]*nodev1.ChainConfig, error) {
 			return nil, err
 		}
 
+		var keyBundle *nodev1.OCR2Config_OCRKeyBundle
 		var ocrtype chaintype.ChainType
 		switch family {
 		case chainsel.FamilyEVM:
@@ -154,19 +155,25 @@ func (n Node) JDChainConfigs() ([]*nodev1.ChainConfig, error) {
 			ocrtype = chaintype.Cosmos
 		case chainsel.FamilyAptos:
 			ocrtype = chaintype.Aptos
+		case chainsel.FamilyTon:
+			ocrtype = chaintype.Ton
 		default:
 			return nil, fmt.Errorf("Unsupported chain family %v", family)
 		}
 
-		bundle := n.Keys.OCRKeyBundles[ocrtype]
-		offpk := bundle.OffchainPublicKey()
-		cpk := bundle.ConfigEncryptionPublicKey()
-
-		keyBundle := &nodev1.OCR2Config_OCRKeyBundle{
-			BundleId:              bundle.ID(),
-			ConfigPublicKey:       common.Bytes2Hex(cpk[:]),
-			OffchainPublicKey:     common.Bytes2Hex(offpk[:]),
-			OnchainSigningAddress: bundle.OnChainPublicKey(),
+		// TODO remove this, and have OCR key bundle supported for TON, this is a temporary hack
+		if ocrtype != chaintype.Ton {
+			bundle := n.Keys.OCRKeyBundles[ocrtype]
+			offpk := bundle.OffchainPublicKey()
+			cpk := bundle.ConfigEncryptionPublicKey()
+			keyBundle = &nodev1.OCR2Config_OCRKeyBundle{
+				BundleId:              bundle.ID(),
+				ConfigPublicKey:       common.Bytes2Hex(cpk[:]),
+				OffchainPublicKey:     common.Bytes2Hex(offpk[:]),
+				OnchainSigningAddress: bundle.OnChainPublicKey(),
+			}
+		} else {
+			keyBundle = &nodev1.OCR2Config_OCRKeyBundle{}
 		}
 
 		var ctype nodev1.ChainType
@@ -179,6 +186,9 @@ func (n Node) JDChainConfigs() ([]*nodev1.ChainConfig, error) {
 			ctype = nodev1.ChainType_CHAIN_TYPE_STARKNET
 		case chainsel.FamilyAptos:
 			ctype = nodev1.ChainType_CHAIN_TYPE_APTOS
+		case chainsel.FamilyTon:
+			// TODO need to add this to the proto
+
 		default:
 			panic(fmt.Sprintf("Unsupported chain family %v", family))
 		}
@@ -402,7 +412,7 @@ func NewNode(
 		RetirementReportCache:    retirement.NewRetirementReportCache(lggr, db),
 	})
 	require.NoError(t, err)
-	keys := CreateKeys(t, app, nodecfg.Chains, nodecfg.Solchains, nodecfg.Aptoschains)
+	keys := CreateKeys(t, app, nodecfg.Chains, nodecfg.Solchains, nodecfg.Aptoschains, nodecfg.Tonchains)
 
 	nodeLabels := make([]*ptypes.Label, 1)
 	if nodecfg.Bootstrap {
@@ -428,6 +438,7 @@ func NewNode(
 			maps.Keys(nodecfg.Chains),
 			maps.Keys(nodecfg.Solchains),
 			maps.Keys(nodecfg.Aptoschains),
+			maps.Keys(nodecfg.Tonchains),
 		),
 		Keys:       keys,
 		Addr:       net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: nodecfg.Port},
@@ -449,6 +460,7 @@ func CreateKeys(t *testing.T,
 	chains map[uint64]cldf.Chain,
 	solchains map[uint64]cldf.SolChain,
 	aptoschains map[uint64]cldf.AptosChain,
+	tonchains map[uint64]cldf.TonChain,
 ) Keys {
 	ctx := t.Context()
 	_, err := app.GetKeyStore().P2P().Create(ctx)
@@ -482,6 +494,9 @@ func CreateKeys(t *testing.T,
 			ctype = chaintype.Cosmos
 		case chainsel.FamilyAptos:
 			ctype = chaintype.Aptos
+		case chainsel.FamilyTon:
+			ctype = chaintype.Ton
+
 		default:
 			panic(fmt.Sprintf("Unsupported chain family %v", family))
 		}
@@ -597,6 +612,10 @@ func CreateKeys(t *testing.T,
 		for chainSelector := range aptoschains {
 			transmitters[chainSelector] = transmitter.ID()
 		}
+	}
+
+	if len(tonchains) > 0 {
+		// TODO keystore for TON needs to be supported. transmitter for TON need to be supported
 	}
 
 	return Keys{
