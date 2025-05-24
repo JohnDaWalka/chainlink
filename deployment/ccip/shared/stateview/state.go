@@ -721,8 +721,8 @@ func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
 				return state, err
 			}
 			// Chain not found in address book, initialize empty
-			addresses = make(map[string]cldf.TypeAndVersion)
 		}
+		addresses := make(map[string]cldf.TypeAndVersion)
 		chainState, err := LoadChainState(e.GetContext(), chain, addresses)
 		if err != nil {
 			return state, err
