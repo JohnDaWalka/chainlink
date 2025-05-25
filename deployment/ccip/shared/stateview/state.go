@@ -369,7 +369,6 @@ func (c CCIPOnChainState) SupportedChains() map[uint64]struct{} {
 	for chain := range c.AptosChains {
 		chains[chain] = struct{}{}
 	}
-
 	for chain := range c.TonChains {
 		chains[chain] = struct{}{}
 	}
@@ -709,20 +708,24 @@ func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
 	}
 
 	state := CCIPOnChainState{
-		Chains:      make(map[uint64]evm.CCIPChainState),
+		Chains: make(map[uint64]evm.CCIPChainState),
+		// TODO: Related to 0b71b59f3d938161de349fb62e82e71ce7cf480c, but evmMu was never initialized
+		evmMu:       new(sync.RWMutex),
 		SolChains:   solanaState.SolChains,
 		AptosChains: aptosChains,
 		TonChains:   tonChains,
 	}
 
 	for chainSelector, chain := range e.Chains {
+		// TODO: find a way to remove this, addressbook deprecated
+		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)
 		if err != nil {
 			if !errors.Is(err, cldf.ErrChainNotFound) {
 				return state, err
 			}
 			// Chain not found in address book, initialize empty
+			addresses = make(map[string]cldf.TypeAndVersion)
 		}
-		addresses := make(map[string]cldf.TypeAndVersion)
 		chainState, err := LoadChainState(e.GetContext(), chain, addresses)
 		if err != nil {
 			return state, err

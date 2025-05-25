@@ -1151,7 +1151,6 @@ func RevokeCandidateChangeset(e cldf.Environment, cfg RevokeCandidateChangesetCo
 	if err != nil {
 		return cldf.ChangesetOutput{}, err
 	}
-
 	donID, err := cfg.Validate(e, state)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("%w: %w", cldf.ErrInvalidConfig, err)

@@ -269,6 +269,9 @@ func NewMemoryEnvironmentFromChainsNodes(
 	for _, c := range aptosChains {
 		blockChains[c.Selector] = c
 	}
+	for _, c := range tonChains {
+		blockChains[c.Selector] = c
+	}
 
 	return *cldf.NewCLDFEnvironment(
 		Memory,

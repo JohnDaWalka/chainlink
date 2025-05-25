@@ -185,11 +185,15 @@ func NewIntegrationEnvironment(t *testing.T, opts ...testhelpers.TestOps) (testh
 	for _, opt := range opts {
 		opt(testCfg)
 	}
+	// TODO: remove this once we have a proper test config, TON specific
+	fmt.Printf("Using test config: %+v\n", testCfg)
+	fmt.Printf("Using testCfg.Type: %+v\n", testCfg.Type)
 	// check for EnvType env var
 	testCfg.MustSetEnvTypeOrDefault(t)
 	require.NoError(t, testCfg.Validate(), "invalid test config")
 	switch testCfg.Type {
 	case testhelpers.Memory:
+		fmt.Printf("[TON-E2E] Creating memory environment with test config: %+v\n", testCfg)
 		dEnv, memEnv := testhelpers.NewMemoryEnvironment(t, opts...)
 		return dEnv, devenv.RMNCluster{}, memEnv
 	case testhelpers.Docker:

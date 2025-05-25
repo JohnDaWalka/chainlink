@@ -389,9 +389,11 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 		AptosChains: m.AptosChains,
 		TonChains:   m.TonChains,
 	}
+	t.Logf("[TON-E2E] Created %d EVM chains, %d Solana chains, %d Aptos chains, %d Ton chains", len(m.Chains), len(m.SolChains), len(m.AptosChains), len(m.TonChains))
 	homeChainSel, feedSel := allocateCCIPChainSelectors(chains)
 	replayBlocks, err := LatestBlocksByChain(ctx, env)
 	require.NoError(t, err)
+
 	m.DeployedEnv = DeployedEnv{
 		Env:          env,
 		HomeChainSel: homeChainSel,
@@ -505,12 +507,14 @@ func NewMemoryEnvironment(t *testing.T, opts ...TestOps) (DeployedEnv, TestEnvir
 	case testCfg.PrerequisiteDeploymentOnly:
 		dEnv = NewEnvironmentWithPrerequisitesContracts(t, env)
 	case testCfg.CreateJobAndContracts:
+		fmt.Println("[TON-E2E] NewEnvironmentWithJobsAndContracts")
 		dEnv = NewEnvironmentWithJobsAndContracts(t, env)
 	case testCfg.CreateJob:
 		dEnv = NewEnvironmentWithJobs(t, env)
 	default:
 		dEnv = NewEnvironment(t, env)
 	}
+	fmt.Printf("[TON-E2E] NewMemoryEnvironment:Deployed environment: %+v\n", dEnv)
 	env.UpdateDeployedEnvironment(dEnv)
 	if testCfg.BlockTime > 0 {
 		env.MineBlocks(t, testCfg.BlockTime)
@@ -522,9 +526,12 @@ func NewEnvironmentWithPrerequisitesContracts(t *testing.T, tEnv TestEnvironment
 	var err error
 	tc := tEnv.TestConfigs()
 	e := NewEnvironment(t, tEnv)
+	// TODO: This returned "e" should have Ton in e.Env.TonChains, but it doesn't.
+	fmt.Printf("[TON-E2E] AFTER NewEnvironment, no ton chain(seems evm basics only?), %+v\n", e)
 	evmChains := e.Env.AllChainSelectors()
 	solChains := e.Env.AllChainSelectorsSolana()
 	tonChains := e.Env.AllChainSelectorsTon()
+	fmt.Printf("[TON-E2E] AFTER AllChainSelectorsTon, tonChains = %+v\n", tonChains)
 	//nolint:gocritic // we need to segregate EVM and Solana chains
 	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfigV2)
 	for _, c := range e.Env.AllChainSelectors() {
@@ -593,6 +600,7 @@ func NewEnvironmentWithPrerequisitesContracts(t *testing.T, tEnv TestEnvironment
 		require.NoError(t, err)
 	}
 
+	fmt.Printf("[TON-E2E] IN NewEnvironmentWithPrerequisitesContracts, len(tonChains) > 0, LEN: %d\n", len(tonChains))
 	if len(tonChains) > 0 {
 		e.Env, err = commonchangeset.Apply(t, e.Env, nil,
 			TonTestDeployPrerequisitesChangeSet{
@@ -610,28 +618,38 @@ func NewEnvironment(t *testing.T, tEnv TestEnvironment) DeployedEnv {
 	tc := tEnv.TestConfigs()
 	tEnv.StartChains(t)
 	dEnv := tEnv.DeployedEnvironment()
+	fmt.Printf("[TON-E2E] NewEnvironment:tEnv.DeployedEnvironment 1 %+v\n", dEnv)
 	require.NotEmpty(t, dEnv.FeedChainSel)
 	require.NotEmpty(t, dEnv.HomeChainSel)
 	require.NotEmpty(t, dEnv.Env.Chains)
 	ab := cldf.NewMemoryAddressBook()
 	crConfig := DeployTestContracts(t, lggr, ab, dEnv.HomeChainSel, dEnv.FeedChainSel, dEnv.Env.Chains, tc.LinkPrice, tc.WethPrice)
+	fmt.Printf("[TON-E2E] Populated Address Book: %+v\n", ab)
+	fmt.Printf("[TON-E2E] Starting nodes with config: %+v\n", crConfig)
+	fmt.Printf("[TON-E2E] NewEnvironment:tEnv 1 %+v\n", tEnv)
+	// TODO: This overwrites the DeployedEnvironment, excluding TON
 	tEnv.StartNodes(t, crConfig)
+	fmt.Printf("[TON-E2E] NewEnvironment:tEnv 2 %+v\n", tEnv)
 	dEnv = tEnv.DeployedEnvironment()
+	fmt.Printf("[TON-E2E] NewEnvironment:tEnv.DeployedEnvironment 2 -- OVERWRITTEN %+v\n", dEnv)
 	dEnv.Env.ExistingAddresses = ab
 	return dEnv
 }
 
 func NewEnvironmentWithJobsAndContracts(t *testing.T, tEnv TestEnvironment) DeployedEnv {
+	fmt.Println("[TON-E2E] NewEnvironmentWithJobsAndContracts")
 	var err error
 	e := NewEnvironmentWithPrerequisitesContracts(t, tEnv)
+	fmt.Printf("[TON-E2E] AFTER NewEnvironmentWithPrerequisitesContracts: %+v\n", e)
 	evmChains := e.Env.AllChainSelectors()
 	solChains := e.Env.AllChainSelectorsSolana()
 	aptosChains := e.Env.AllChainSelectorsAptos()
-	// tonChains := e.Env.AllChainSelectorsTon()
+	tonChains := e.Env.AllChainSelectorsTon()
+	fmt.Printf("[TON-E2E] AllChainSelectorsTon: %+v\n", tonChains)
 	//nolint:gocritic // we need to segregate EVM and Solana chains
 	allChains := append(evmChains, solChains...)
 	allChains = append(allChains, aptosChains...)
-	// allChains = append(allChains, tonChains...)
+	allChains = append(allChains, tonChains...)
 	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfig)
 
 	for _, c := range e.Env.AllChainSelectors() {
@@ -639,8 +657,10 @@ func NewEnvironmentWithJobsAndContracts(t *testing.T, tEnv TestEnvironment) Depl
 	}
 
 	tEnv.UpdateDeployedEnvironment(e)
+	fmt.Printf("[TON-E2E] NewEnvironmentWithJobsAndContracts:AFTER UpdateDeployedEnvironment %+v\n", tEnv)
 
 	e = AddCCIPContractsToEnvironment(t, allChains, tEnv, false)
+	fmt.Printf("[TON-E2E] NewEnvironmentWithJobsAndContracts:AFTER AddCCIPContractsToEnvironment %+v\n", e)
 	// now we update RMNProxy to point to RMNRemote
 	e.Env, err = commonchangeset.Apply(t, e.Env, nil,
 		commonchangeset.Configure(
@@ -905,25 +925,28 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 
 	// TODO(ton): Set Ton chains plugin configs
 	for _, chain := range tonChains {
-		tokenInfo := map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{}
-		address := state.TonChains[chain].LinkTokenAddress
-		tokenInfo[cciptypes.UnknownEncodedAddress(address.String())] = tokenConfig.TokenSymbolToInfo[shared.LinkSymbol]
-		// TODO check if TON WETH is needed for TokenSymbolInfo?
-		//tokenInfo[cciptypes.UnknownEncodedAddress()] = tokenConfig.TokenSymbolToInfo[shared.WethSymbol]
-		ocrOverride := tc.OCRConfigOverride
-		commitOCRConfigs[chain] = v1_6.DeriveOCRParamsForCommit(v1_6.SimulationTest, e.FeedChainSel, tokenInfo, ocrOverride)
-		execOCRConfigs[chain] = v1_6.DeriveOCRParamsForExec(v1_6.SimulationTest, tokenDataProviders, ocrOverride)
-		chainConfigs[chain] = v1_6.ChainConfig{
-			Readers: nodeInfo.NonBootstraps().PeerIDs(),
-			// #nosec G115 - Overflow is not a concern in this test scenario
-			FChain: uint8(len(nodeInfo.NonBootstraps().PeerIDs()) / 3),
-			EncodableChainConfig: chainconfig.ChainConfig{
-				GasPriceDeviationPPB:      cciptypes.BigInt{Int: big.NewInt(DefaultGasPriceDeviationPPB)},
-				DAGasPriceDeviationPPB:    cciptypes.BigInt{Int: big.NewInt(DefaultDAGasPriceDeviationPPB)},
-				OptimisticConfirmations:   globals.OptimisticConfirmations,
-				ChainFeeDeviationDisabled: true,
-			},
-		}
+		t.Logf("[TON-E2E] AddCCIPContractsToEnvironment: Setting up Ton chain %d", chain)
+		t.Log("[TON-E2E] Skip everything since we don't have any CCIP contracts in TON yet")
+		_ = chain // TODO: Implement this for Ton chains
+		// tokenInfo := map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{}
+		// address := state.TonChains[chain].LinkTokenAddress
+		// tokenInfo[cciptypes.UnknownEncodedAddress(address.String())] = tokenConfig.TokenSymbolToInfo[shared.LinkSymbol]
+		// // TODO check if TON WETH is needed for TokenSymbolInfo?
+		// //tokenInfo[cciptypes.UnknownEncodedAddress()] = tokenConfig.TokenSymbolToInfo[shared.WethSymbol]
+		// ocrOverride := tc.OCRConfigOverride
+		// commitOCRConfigs[chain] = v1_6.DeriveOCRParamsForCommit(v1_6.SimulationTest, e.FeedChainSel, tokenInfo, ocrOverride)
+		// execOCRConfigs[chain] = v1_6.DeriveOCRParamsForExec(v1_6.SimulationTest, tokenDataProviders, ocrOverride)
+		// chainConfigs[chain] = v1_6.ChainConfig{
+		// 	Readers: nodeInfo.NonBootstraps().PeerIDs(),
+		// 	// #nosec G115 - Overflow is not a concern in this test scenario
+		// 	FChain: uint8(len(nodeInfo.NonBootstraps().PeerIDs()) / 3),
+		// 	EncodableChainConfig: chainconfig.ChainConfig{
+		// 		GasPriceDeviationPPB:      cciptypes.BigInt{Int: big.NewInt(DefaultGasPriceDeviationPPB)},
+		// 		DAGasPriceDeviationPPB:    cciptypes.BigInt{Int: big.NewInt(DefaultDAGasPriceDeviationPPB)},
+		// 		OptimisticConfirmations:   globals.OptimisticConfirmations,
+		// 		ChainFeeDeviationDisabled: true,
+		// 	},
+		// }
 	}
 
 	// Apply second set of changesets to configure the CCIP contracts.
@@ -1013,10 +1036,10 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 				CCIPHomeConfigType: globals.ConfigTypeActive,
 			},
 		),
-		// commonchangeset.Configure(
-		// 	cldf.CreateLegacyChangeSet(v1_6.CCIPCapabilityJobspecChangeset),
-		// 	nil, // Changeset ignores any config
-		// ),
+		commonchangeset.Configure(
+			cldf.CreateLegacyChangeSet(v1_6.CCIPCapabilityJobspecChangeset),
+			nil, // Changeset ignores any config
+		),
 	}
 	e.Env, err = commonchangeset.ApplyChangesets(t, e.Env, timelockContractsPerChain, apps)
 	require.NoError(t, err)
