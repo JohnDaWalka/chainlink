@@ -927,6 +927,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	for _, chain := range tonChains {
 		t.Logf("[TON-E2E] AddCCIPContractsToEnvironment: Setting up Ton chain %d", chain)
 		t.Log("[TON-E2E] Skip everything since we don't have any CCIP contracts in TON yet")
+		t.Log("[TON-E2E] Actually we need this")
 		_ = chain // TODO: Implement this for Ton chains
 		// tokenInfo := map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{}
 		// address := state.TonChains[chain].LinkTokenAddress
@@ -936,17 +937,17 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		// ocrOverride := tc.OCRConfigOverride
 		// commitOCRConfigs[chain] = v1_6.DeriveOCRParamsForCommit(v1_6.SimulationTest, e.FeedChainSel, tokenInfo, ocrOverride)
 		// execOCRConfigs[chain] = v1_6.DeriveOCRParamsForExec(v1_6.SimulationTest, tokenDataProviders, ocrOverride)
-		// chainConfigs[chain] = v1_6.ChainConfig{
-		// 	Readers: nodeInfo.NonBootstraps().PeerIDs(),
-		// 	// #nosec G115 - Overflow is not a concern in this test scenario
-		// 	FChain: uint8(len(nodeInfo.NonBootstraps().PeerIDs()) / 3),
-		// 	EncodableChainConfig: chainconfig.ChainConfig{
-		// 		GasPriceDeviationPPB:      cciptypes.BigInt{Int: big.NewInt(DefaultGasPriceDeviationPPB)},
-		// 		DAGasPriceDeviationPPB:    cciptypes.BigInt{Int: big.NewInt(DefaultDAGasPriceDeviationPPB)},
-		// 		OptimisticConfirmations:   globals.OptimisticConfirmations,
-		// 		ChainFeeDeviationDisabled: true,
-		// 	},
-		// }
+		chainConfigs[chain] = v1_6.ChainConfig{
+			Readers: nodeInfo.NonBootstraps().PeerIDs(),
+			// #nosec G115 - Overflow is not a concern in this test scenario
+			FChain: uint8(len(nodeInfo.NonBootstraps().PeerIDs()) / 3),
+			EncodableChainConfig: chainconfig.ChainConfig{
+				GasPriceDeviationPPB:      cciptypes.BigInt{Int: big.NewInt(DefaultGasPriceDeviationPPB)},
+				DAGasPriceDeviationPPB:    cciptypes.BigInt{Int: big.NewInt(DefaultDAGasPriceDeviationPPB)},
+				OptimisticConfirmations:   globals.OptimisticConfirmations,
+				ChainFeeDeviationDisabled: true,
+			},
+		}
 	}
 
 	// Apply second set of changesets to configure the CCIP contracts.
@@ -1000,6 +1001,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 				},
 			},
 		),
+		// TODO: This fails at index 3
 		commonchangeset.Configure(
 			// Promote everything
 			cldf.CreateLegacyChangeSet(v1_6.PromoteCandidateChangeset),
@@ -1036,6 +1038,16 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 				CCIPHomeConfigType: globals.ConfigTypeActive,
 			},
 		),
+		// TODO(ton): We need OCR3OffRamp Changeset for Ton
+		// commonchangeset.Configure(
+		// 	// Enable the OCR config on the remote chains.
+		// 	cldf.CreateLegacyChangeSet(v1_6.SetOCR3OffRampChangeset),
+		// 	v1_6.SetOCR3OffRampConfig{
+		// 		HomeChainSel:       e.HomeChainSel,
+		// 		RemoteChainSels:    tonChains,
+		// 		CCIPHomeConfigType: globals.ConfigTypeActive,
+		// 	},
+		// ),
 		commonchangeset.Configure(
 			cldf.CreateLegacyChangeSet(v1_6.CCIPCapabilityJobspecChangeset),
 			nil, // Changeset ignores any config
