@@ -19,6 +19,7 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -257,7 +258,22 @@ func NewMemoryEnvironmentFromChainsNodes(
 	for id := range nodes {
 		nodeIDs = append(nodeIDs, id)
 	}
-	return *cldf.NewEnvironment(
+
+	blockChains := map[uint64]chain.BlockChain{}
+	for _, c := range chains {
+		blockChains[c.Selector] = c
+	}
+	for _, c := range solChains {
+		blockChains[c.Selector] = c
+	}
+	for _, c := range aptosChains {
+		blockChains[c.Selector] = c
+	}
+	for _, c := range tonChains {
+		blockChains[c.Selector] = c
+	}
+
+	return *cldf.NewCLDFEnvironment(
 		Memory,
 		lggr,
 		cldf.NewMemoryAddressBook(),
@@ -273,6 +289,7 @@ func NewMemoryEnvironmentFromChainsNodes(
 		NewMemoryJobClient(nodes),
 		ctx,
 		cldf.XXXGenerateTestOCRSecrets(),
+		chain.NewBlockChains(blockChains),
 	)
 }
 
@@ -306,7 +323,18 @@ func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Lev
 		})
 		nodeIDs = append(nodeIDs, id)
 	}
-	return *cldf.NewEnvironment(
+
+	blockChains := map[uint64]chain.BlockChain{}
+	for _, c := range chains {
+		blockChains[c.Selector] = c
+	}
+	for _, c := range solChains {
+		blockChains[c.Selector] = c
+	}
+	for _, c := range aptosChains {
+		blockChains[c.Selector] = c
+	}
+	return *cldf.NewCLDFEnvironment(
 		Memory,
 		lggr,
 		cldf.NewMemoryAddressBook(),
@@ -322,5 +350,6 @@ func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Lev
 		NewMemoryJobClient(nodes),
 		t.Context,
 		cldf.XXXGenerateTestOCRSecrets(),
+		chain.NewBlockChains(blockChains),
 	)
 }

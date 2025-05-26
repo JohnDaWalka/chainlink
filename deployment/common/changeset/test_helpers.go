@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	mcmsTypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -144,7 +146,7 @@ func ApplyChangesets(t *testing.T, e cldf.Environment, timelockContractsPerChain
 			Offchain:          e.Offchain,
 			OCRSecrets:        e.OCRSecrets,
 			GetContext:        e.GetContext,
-			OperationsBundle:  e.OperationsBundle,
+			OperationsBundle:  operations.NewBundle(e.GetContext, e.Logger, operations.NewMemoryReporter()), // to ensure that each migration is run in a clean environment
 		}
 	}
 	return currentEnv, nil
@@ -212,7 +214,7 @@ func ApplyChangesetsV2(t *testing.T, e cldf.Environment, changesetApplications [
 			Offchain:          e.Offchain,
 			OCRSecrets:        e.OCRSecrets,
 			GetContext:        e.GetContext,
-			OperationsBundle:  e.OperationsBundle,
+			OperationsBundle:  operations.NewBundle(e.GetContext, e.Logger, operations.NewMemoryReporter()), // to ensure that each migration is run in a clean environment
 		}
 
 		if out.MCMSTimelockProposals != nil {

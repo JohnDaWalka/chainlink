@@ -311,6 +311,8 @@ func (p PromoteCandidateChangesetConfig) Validate(e cldf.Environment) (map[uint6
 				state.Chains[p.HomeChainSelector].CCIPHome,
 				chainSelector,
 			)
+			fmt.Println("[TON-E2E] Validating PromoteCandidateChangesetConfig for HomeChainSelector:", p.HomeChainSelector, "RemoteChainSelector:", chainSelector, "PluginType:", plugin.PluginType)
+
 			if err != nil {
 				return nil, fmt.Errorf("fetch don id for chain: %w", err)
 			}
@@ -1151,7 +1153,6 @@ func RevokeCandidateChangeset(e cldf.Environment, cfg RevokeCandidateChangesetCo
 	if err != nil {
 		return cldf.ChangesetOutput{}, err
 	}
-
 	donID, err := cfg.Validate(e, state)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("%w: %w", cldf.ErrInvalidConfig, err)
