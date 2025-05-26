@@ -16,11 +16,10 @@ import (
 	"testing"
 	"time"
 
-	evmcrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/smartcontractkit/chainlink/v2/core/utils/crypto"
-
 	"github.com/ethereum/go-ethereum/common"
+	evmcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink/v2/core/utils/crypto"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -633,9 +632,12 @@ func CreateKeys(t *testing.T,
 
 	if len(tonchains) > 0 {
 		// TODO keystore for TON needs to be supported. transmitter for TON need to be supported, PR: https://github.com/smartcontractkit/chainlink/pull/17666
-		//ctype := chaintype.Ton
-		//err = app.GetKeyStore().OCR2().EnsureKeys(ctx, ctype)
-		//require.NoError(t, err)
+		//for chainSelector := range tonchains {
+		//	math.Seed(time.Now().UnixNano())
+		//	// Generate a random integer between 0 and 99
+		//	randomInt := math.Intn(100)
+		//	transmitters[chainSelector] = fmt.Sprintf("dummy transmitter %d", randomInt)
+		//}
 	}
 
 	return Keys{

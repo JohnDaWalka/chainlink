@@ -194,7 +194,11 @@ func (c CCIPChainState) validateCCIPHomeVersionedActiveConfig(e cldf.Environment
 		return errors.New("active config digest is empty")
 	}
 	chainSel := homeCfg.Config.ChainSelector
+	// TODO simplify this for non-evm chains
 	if _, exists := e.SolChains[chainSel]; exists {
+		return nil
+	}
+	if _, exist := e.TonChains[chainSel]; exist {
 		return nil
 	}
 	offRamp, ok := offRampsByChain[chainSel]

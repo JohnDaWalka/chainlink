@@ -410,6 +410,9 @@ func BuildOCR3ConfigForCCIPHome(
 					return nil, fmt.Errorf("failed to decode SVM address '%s': %w", transmitter, err)
 				}
 				parsed = pk.Bytes()
+			// TODO : remove the dummy value and add support for TON public key serialization
+			case chain_selectors.FamilyTon:
+				parsed = []byte(transmitter)
 			}
 			transmittersBytes[i] = parsed
 		}
