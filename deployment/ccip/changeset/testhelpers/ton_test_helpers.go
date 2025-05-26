@@ -50,8 +50,13 @@ func (c TonTestDeployPrerequisitesChangeSet) Apply(e cldf.Environment) (cldf.Cha
 	fmt.Printf("DEBUG: TonTestDeployPrerequisitesChangeSet: chain selectors: %+v\n", c.TonChainSelectors)
 	for _, chainSelector := range c.TonChainSelectors {
 		tonChainState := tonChains[chainSelector]
-		// TODO: replace with a real token address instead of none
-		tonChainState.LinkTokenAddress = *tonaddress.NewAddressNone()
+		// TODO: replace with a real token address instead of hardcoded ones
+
+		tonChainState.LinkTokenAddress = *tonaddress.MustParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
+		tonChainState.OffRamp = *tonaddress.MustParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
+		tonChainState.ReceiverAddress = *tonaddress.MustParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
+		tonChainState.CCIPAddress = *tonaddress.MustParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
+		tonChainState.Router = *tonaddress.MustParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
 		err = tonstate.SaveOnchainStateTon(chainSelector, tonChainState, e)
 		require.NoError(t, err)
 	}
@@ -133,7 +138,7 @@ func (c TonTestDeployContractsChangeSet) deployTonContracts(t *testing.T, e depl
 	//TODO(ton): Deploy Ton CCIP Router
 
 	//TODO(ton): Deploy Ton CCIP Dummy Receiver and set the contract address
-	ccipDummyReceiverAddress := tonaddress.NewAddressNone()
+	ccipDummyReceiverAddress := tonaddress.MustParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
 
 	tonChainState.ReceiverAddress = *ccipDummyReceiverAddress
 	//tonChainState.ReceiverAddress = ton.AccountOne
