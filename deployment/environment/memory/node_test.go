@@ -22,6 +22,7 @@ func TestNode(t *testing.T) {
 		Chains:         chains,
 		Solchains:      nil,
 		Aptoschains:    nil,
+		Suichains:      nil,
 		LogLevel:       zapcore.DebugLevel,
 		Bootstrap:      false,
 		RegistryConfig: deployment.CapabilityRegistryConfig{},
