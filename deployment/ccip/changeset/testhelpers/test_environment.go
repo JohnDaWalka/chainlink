@@ -929,14 +929,14 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		t.Log("[TON-E2E] Skip everything since we don't have any CCIP contracts in TON yet")
 		t.Log("[TON-E2E] Actually we need this")
 		_ = chain // TODO: Implement this for Ton chains
-		// tokenInfo := map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{}
-		// address := state.TonChains[chain].LinkTokenAddress
-		// tokenInfo[cciptypes.UnknownEncodedAddress(address.String())] = tokenConfig.TokenSymbolToInfo[shared.LinkSymbol]
-		// // TODO check if TON WETH is needed for TokenSymbolInfo?
-		// //tokenInfo[cciptypes.UnknownEncodedAddress()] = tokenConfig.TokenSymbolToInfo[shared.WethSymbol]
-		// ocrOverride := tc.OCRConfigOverride
-		// commitOCRConfigs[chain] = v1_6.DeriveOCRParamsForCommit(v1_6.SimulationTest, e.FeedChainSel, tokenInfo, ocrOverride)
-		// execOCRConfigs[chain] = v1_6.DeriveOCRParamsForExec(v1_6.SimulationTest, tokenDataProviders, ocrOverride)
+		tokenInfo := map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{}
+		address := state.TonChains[chain].LinkTokenAddress
+		tokenInfo[cciptypes.UnknownEncodedAddress(address.String())] = tokenConfig.TokenSymbolToInfo[shared.LinkSymbol]
+		// TODO check if TON WETH is needed for TokenSymbolInfo?
+		//tokenInfo[cciptypes.UnknownEncodedAddress()] = tokenConfig.TokenSymbolToInfo[shared.WethSymbol]
+		ocrOverride := tc.OCRConfigOverride
+		commitOCRConfigs[chain] = v1_6.DeriveOCRParamsForCommit(v1_6.SimulationTest, e.FeedChainSel, tokenInfo, ocrOverride)
+		execOCRConfigs[chain] = v1_6.DeriveOCRParamsForExec(v1_6.SimulationTest, tokenDataProviders, ocrOverride)
 		chainConfigs[chain] = v1_6.ChainConfig{
 			Readers: nodeInfo.NonBootstraps().PeerIDs(),
 			// #nosec G115 - Overflow is not a concern in this test scenario
