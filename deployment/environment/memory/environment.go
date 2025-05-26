@@ -20,6 +20,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -53,6 +54,7 @@ type MemoryEnvironmentConfig struct {
 	Chains             int
 	SolChains          int
 	AptosChains        int
+	SuiChains          int
 	ZkChains           int
 	NumOfUsersPerChain int
 	Nodes              int
@@ -69,6 +71,7 @@ type NewNodesConfig struct {
 	SolChains map[uint64]cldf.SolChain
 	// Aptos chains to be configured. Optional.
 	AptosChains    map[uint64]cldf.AptosChain
+	SuiChains      map[uint64]suichain.Chain
 	NumNodes       int
 	NumBootstraps  int
 	RegistryConfig deployment.CapabilityRegistryConfig
@@ -108,6 +111,10 @@ func NewMemoryChainsSol(t *testing.T, numChains int) map[uint64]cldf.SolChain {
 
 func NewMemoryChainsAptos(t *testing.T, numChains int) map[uint64]cldf.AptosChain {
 	return GenerateChainsAptos(t, numChains)
+}
+
+func NewMemoryChainsSui(t *testing.T, numChains int) map[uint64]suichain.Chain {
+	return GenerateChainsSui(t, numChains)
 }
 
 func NewMemoryChainsZk(t *testing.T, numChains int) map[uint64]cldf.Chain {
@@ -208,6 +215,7 @@ func NewNodes(
 			Chains:         cfg.Chains,
 			Solchains:      cfg.SolChains,
 			Aptoschains:    cfg.AptosChains,
+			Suichains:      cfg.SuiChains,
 			LogLevel:       cfg.LogLevel,
 			Bootstrap:      true,
 			RegistryConfig: cfg.RegistryConfig,
@@ -223,6 +231,7 @@ func NewNodes(
 			Chains:         cfg.Chains,
 			Solchains:      cfg.SolChains,
 			Aptoschains:    cfg.AptosChains,
+			Suichains:      cfg.SuiChains,
 			LogLevel:       cfg.LogLevel,
 			Bootstrap:      false,
 			RegistryConfig: cfg.RegistryConfig,
@@ -242,6 +251,7 @@ func NewMemoryEnvironmentFromChainsNodes(
 	chains map[uint64]cldf.Chain,
 	solChains map[uint64]cldf.SolChain,
 	aptosChains map[uint64]cldf.AptosChain,
+	suiChains map[uint64]suichain.Chain,
 	nodes map[string]Node,
 ) cldf.Environment {
 	var nodeIDs []string
@@ -257,6 +267,9 @@ func NewMemoryEnvironmentFromChainsNodes(
 		blockChains[c.Selector] = c
 	}
 	for _, c := range aptosChains {
+		blockChains[c.Selector] = c
+	}
+	for _, c := range suiChains {
 		blockChains[c.Selector] = c
 	}
 
@@ -284,6 +297,7 @@ func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Lev
 	chains, _ := NewMemoryChains(t, config.Chains, config.NumOfUsersPerChain)
 	solChains := NewMemoryChainsSol(t, config.SolChains)
 	aptosChains := NewMemoryChainsAptos(t, config.AptosChains)
+	suiChains := NewMemoryChainsSui(t, config.SuiChains)
 	zkChains := NewMemoryChainsZk(t, config.ZkChains)
 	for chainSel, chain := range zkChains {
 		chains[chainSel] = chain
@@ -293,6 +307,7 @@ func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Lev
 		Chains:         chains,
 		SolChains:      solChains,
 		AptosChains:    aptosChains,
+		SuiChains:      suiChains,
 		NumNodes:       config.Nodes,
 		NumBootstraps:  config.Bootstraps,
 		RegistryConfig: config.RegistryConfig,
@@ -316,6 +331,9 @@ func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Lev
 		blockChains[c.Selector] = c
 	}
 	for _, c := range aptosChains {
+		blockChains[c.Selector] = c
+	}
+	for _, c := range suiChains {
 		blockChains[c.Selector] = c
 	}
 	return *cldf.NewCLDFEnvironment(
