@@ -36,6 +36,7 @@ import (
 
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 
+	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -236,6 +237,7 @@ type NewNodeConfig struct {
 	Solchains map[uint64]cldf.SolChain
 	// Aptos chains to be configured. Optional.
 	Aptoschains    map[uint64]cldf.AptosChain
+	Suichains      map[uint64]suichain.Chain
 	LogLevel       zapcore.Level
 	Bootstrap      bool
 	RegistryConfig deployment.CapabilityRegistryConfig
@@ -330,6 +332,16 @@ func NewNode(
 		}
 		c.Aptos = aptosConfigs
 
+		var suiConfigs chainlink.RawConfigs
+		for chainID, chain := range nodecfg.Suichains {
+			suiChainID, err := chainsel.GetChainIDFromSelector(chainID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			suiConfigs = append(suiConfigs, createSuiChainConfig(suiChainID, chain))
+		}
+		c.Sui = suiConfigs
+
 		for _, opt := range configOpts {
 			opt(c)
 		}
@@ -390,7 +402,7 @@ func NewNode(
 		RetirementReportCache:    retirement.NewRetirementReportCache(lggr, db),
 	})
 	require.NoError(t, err)
-	keys := CreateKeys(t, app, nodecfg.Chains, nodecfg.Solchains, nodecfg.Aptoschains)
+	keys := CreateKeys(t, app, nodecfg.Chains, nodecfg.Solchains, nodecfg.Aptoschains, nodecfg.Suichains)
 
 	nodeLabels := make([]*ptypes.Label, 1)
 	if nodecfg.Bootstrap {
@@ -416,6 +428,7 @@ func NewNode(
 			maps.Keys(nodecfg.Chains),
 			maps.Keys(nodecfg.Solchains),
 			maps.Keys(nodecfg.Aptoschains),
+			maps.Keys(nodecfg.Suichains),
 		),
 		Keys:       keys,
 		Addr:       net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: nodecfg.Port},
@@ -437,6 +450,7 @@ func CreateKeys(t *testing.T,
 	chains map[uint64]cldf.Chain,
 	solchains map[uint64]cldf.SolChain,
 	aptoschains map[uint64]cldf.AptosChain,
+	suichains map[uint64]suichain.Chain,
 ) Keys {
 	ctx := t.Context()
 	_, err := app.GetKeyStore().P2P().Create(ctx)
@@ -470,6 +484,8 @@ func CreateKeys(t *testing.T,
 			ctype = chaintype.Cosmos
 		case chainsel.FamilyAptos:
 			ctype = chaintype.Aptos
+		case chainsel.FamilySui:
+			ctype = chaintype.Sui
 		default:
 			panic(fmt.Sprintf("Unsupported chain family %v", family))
 		}
@@ -516,6 +532,19 @@ func CreateKeys(t *testing.T,
 			keystore := app.GetKeyStore().Aptos()
 			err = keystore.EnsureKey(ctx)
 			require.NoError(t, err, "failed to create key for aptos")
+
+			keys, err := keystore.GetAll()
+			require.NoError(t, err)
+			require.Len(t, keys, 1)
+
+			transmitter := keys[0]
+			transmitters[chain.Selector] = transmitter.ID()
+
+			// TODO: funding
+		case chainsel.FamilySui:
+			keystore := app.GetKeyStore().Sui()
+			err = keystore.EnsureKey(ctx)
+			require.NoError(t, err, "failed to create key for sui")
 
 			keys, err := keystore.GetAll()
 			require.NoError(t, err)
