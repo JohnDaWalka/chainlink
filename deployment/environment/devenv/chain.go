@@ -2,6 +2,7 @@ package devenv
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,9 +25,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/gagliardetto/solana-go"
+
+	"github.com/pattonkan/sui-go/suiclient"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 )
@@ -34,6 +38,7 @@ import (
 const (
 	EVMChainType = "EVM"
 	SolChainType = "SOLANA"
+	SuiChainType = "SUI"
 )
 
 type CribRPCs struct {
@@ -136,11 +141,14 @@ func (c *ChainConfig) ToRPCs() []cldf.RPC {
 	return rpcs
 }
 
-func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf.Chain, map[uint64]cldf.SolChain, error) {
+func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf.Chain, map[uint64]cldf.SolChain, map[uint64]suichain.Chain, error) {
 	evmChains := make(map[uint64]cldf.Chain)
 	solChains := make(map[uint64]cldf.SolChain)
+	suiChains := make(map[uint64]suichain.Chain)
+
 	var evmSyncMap sync.Map
 	var solSyncMap sync.Map
+	var suiSyncMap sync.Map
 
 	g := new(errgroup.Group)
 	for _, chainCfg := range configs {
@@ -238,6 +246,23 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf.Cha
 				})
 				return nil
 
+			case SuiChainType:
+				_, privateKey, err := ed25519.GenerateKey(nil)
+				if err != nil {
+					return err
+				}
+				client := suiclient.NewClient(chainCfg.HTTPRPCs[0].External)
+				suiSyncMap.Store(chainDetails.ChainSelector, suichain.Chain{
+					Selector:    chainDetails.ChainSelector,
+					Client:      client,
+					DeployerKey: privateKey,
+					URL:         chainCfg.HTTPRPCs[0].External,
+					Confirm: func(txHash string, opts ...any) error {
+						return errors.New("TODO sui Confirm")
+					},
+				})
+				return nil
+
 			default:
 				return fmt.Errorf("chain type %s is not supported", chainCfg.ChainType)
 			}
@@ -245,7 +270,7 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf.Cha
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	evmSyncMap.Range(func(sel, value interface{}) bool {
@@ -258,7 +283,12 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf.Cha
 		return true
 	})
 
-	return evmChains, solChains, nil
+	suiSyncMap.Range(func(sel, value interface{}) bool {
+		suiChains[sel.(uint64)] = value.(suichain.Chain)
+		return true
+	})
+
+	return evmChains, solChains, suiChains, nil
 }
 
 func (c *ChainConfig) SetSolDeployerKey(keyString *string) error {
