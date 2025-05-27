@@ -62,7 +62,8 @@ func GenerateChainsTon(t *testing.T, numChains int) map[uint64]cldf_ton.Chain {
 		// todo: configurable wallet options
 		wallet := createTonWallet(t, nodeClient, wallet.V3R2, wallet.WithWorkchain(0))
 		ton := cldf_ton.Chain{
-			Selector:      chainID,
+
+			ChainMetadata: cldf_ton.ChainMetadata{Selector: chainID},
 			Client:        nodeClient,
 			Wallet:        wallet,
 			WalletAddress: wallet.Address(),
@@ -92,7 +93,7 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 	// wget https://raw.githubusercontent.com/neodix42/mylocalton-docker/refs/heads/main/docker-compose.yaml
 	// docker-compose up
 	// if existing network error happens, run `docker network rm ton`
-	useExistingTonlocalnet := false
+	useExistingTonlocalnet := true
 
 	for i := 0; i < maxRetries; i++ {
 		bcInput := &blockchain.Input{

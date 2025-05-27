@@ -1018,7 +1018,6 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 				},
 			},
 		),
-		// TODO: This fails at index 3
 		commonchangeset.Configure(
 			// Promote everything
 			cldf.CreateLegacyChangeSet(v1_6.PromoteCandidateChangeset),
