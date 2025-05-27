@@ -707,6 +707,7 @@ func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
 	}
 
 	for chainSelector, chain := range e.Chains {
+		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)
 		if err != nil {
 			if !errors.Is(err, cldf.ErrChainNotFound) {
 				return state, err

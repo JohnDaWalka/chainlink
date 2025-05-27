@@ -14,7 +14,7 @@ import (
 )
 
 func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
-	// Setup 2 chains (EVM and Ton) and a single lane.
+	// Setup 2 chains (EVM and TON) and a single lane.
 	// ctx := testhelpers.Context(t)
 	e, _, _ := testsetups.NewIntegrationEnvironment(t, testhelpers.WithTonChains(1))
 
@@ -22,11 +22,11 @@ func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
 	require.NoError(t, err)
 
 	allChainSelectors := maps.Keys(e.Env.Chains)
-	allTonChainSelectors := maps.Keys(e.Env.TonChains)
+	allTonChainSelectors := maps.Keys(e.Env.BlockChains.TonChains())
 	sourceChain := allChainSelectors[0]
 	destChain := allTonChainSelectors[0]
 	t.Log("All chain selectors:", allChainSelectors,
-		", Ton chain selectors:", allTonChainSelectors,
+		", TON chain selectors:", allTonChainSelectors,
 		", home chain selector:", e.HomeChainSel,
 		", feed chain selector:", e.FeedChainSel,
 		", source chain selector:", sourceChain,

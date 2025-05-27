@@ -1141,7 +1141,7 @@ func AddLanesForAll(t *testing.T, e *DeployedEnv, state stateview.CCIPOnChainSta
 	chains := []uint64{}
 	allEvmChainSelectors := maps.Keys(e.Env.Chains)
 	allSolChainSelectors := maps.Keys(e.Env.SolChains)
-	allTonChainSelectors := maps.Keys(e.Env.TonChains)
+	allTonChainSelectors := maps.Keys(e.Env.BlockChains.TonChains())
 	chains = slices.AppendSeq(chains, allEvmChainSelectors)
 	chains = slices.AppendSeq(chains, allSolChainSelectors)
 	chains = slices.AppendSeq(chains, allTonChainSelectors)
