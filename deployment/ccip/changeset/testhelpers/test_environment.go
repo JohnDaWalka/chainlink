@@ -390,6 +390,10 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 	m.AptosChains = memory.NewMemoryChainsAptos(t, tc.AptosChains)
 	m.TonChains = memory.NewMemoryChainsTon(t, tc.TonChains)
 
+	fmt.Printf("[TON-E2E] Starting %d EVM chains, %d Solana chains, %d Aptos chains, %d Ton chains\n", len(m.Chains), len(m.SolChains), len(m.AptosChains), len(m.TonChains))
+	fmt.Printf("[TON-E2E] m.Chains: %v\n", m.Chains)
+	fmt.Printf("[TON-E2E] m.TonChains: %v\n", m.TonChains)
+
 	blockChains := map[uint64]cldf_chain.BlockChain{}
 	for selector, ch := range m.Chains {
 		blockChains[selector] = ch
@@ -403,6 +407,7 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 	for selector, ch := range m.TonChains {
 		blockChains[selector] = ch
 	}
+	fmt.Printf("[TON-E2E] blockChains: %+v\n", blockChains)
 
 	env := cldf.Environment{
 		Chains:      m.Chains,

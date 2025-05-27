@@ -702,10 +702,12 @@ func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
 	if err != nil {
 		return CCIPOnChainState{}, err
 	}
+	fmt.Println("[TON-E2E] BEFORE tonstate.LoadOnchainStateTon(e)")
 	tonChains, err := tonstate.LoadOnchainStateTon(e)
 	if err != nil {
 		return CCIPOnChainState{}, err
 	}
+	fmt.Printf("[TON-E2E] tonChains: %+v\n", tonChains)
 
 	state := CCIPOnChainState{
 		Chains: make(map[uint64]evm.CCIPChainState),
@@ -715,6 +717,8 @@ func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
 		AptosChains: aptosChains,
 		TonChains:   tonChains,
 	}
+
+	fmt.Println("[TON-E2E] 1. Loading onchain state for EVM chains...")
 
 	for chainSelector, chain := range e.Chains {
 		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)

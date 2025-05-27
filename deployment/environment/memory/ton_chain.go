@@ -18,6 +18,7 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	cldf_ton "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/xssnick/tonutils-go/liteclient"
@@ -51,20 +52,27 @@ func GenerateChainsTon(t *testing.T, numChains int) map[uint64]cldf_ton.Chain {
 		t.Fatalf("not enough test ton chain selectors available")
 	}
 	chains := make(map[uint64]cldf_ton.Chain)
+	t.Logf("[TON-E2E] Generating %d TON chains", numChains)
 	for i := 0; i < numChains; i++ {
 		chainID := testTonChainSelectors[i]
 
 		nodeClient := tonChain(t, chainID)
+		t.Logf("[TON-E2E] NodeClient %+v", nodeClient)
 		// todo: configurable wallet version, we might need to use Highload wallet for some tests
 		// todo: configurable wallet options
 		wallet := createTonWallet(t, nodeClient, wallet.V3R2, wallet.WithWorkchain(0))
-		chains[chainID] = cldf_ton.Chain{
+		ton := cldf_ton.Chain{
+			Selector:      chainID,
 			Client:        nodeClient,
 			Wallet:        wallet,
 			WalletAddress: wallet.Address(),
 		}
+		t.Log(ton)
+		t.Logf("[TON-E2E] chains[chainID].String() %+v", chains[chainID].String())
+		chains[chainID] = ton
+
 	}
-	t.Logf("Created %d TON chains: %+v", len(chains), chains)
+	t.Logf("[TON-E2E] Created %d TON chains: %+v", len(chains), chains)
 	return chains
 }
 
@@ -72,7 +80,6 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 	t.Helper()
 	ctx := context.Background()
 
-	// TODO(ton): integrate TON into CTF (https://smartcontract-it.atlassian.net/browse/NONEVM-1685)
 	// initialize the docker network used by CTF
 	err := framework.DefaultNetwork(once)
 	require.NoError(t, err)

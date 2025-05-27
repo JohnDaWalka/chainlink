@@ -2,6 +2,7 @@ package ton
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/rs/zerolog/log"
@@ -44,9 +45,13 @@ func SaveOnchainStateTon(chainSelector uint64, tonState CCIPChainState, e cldf.E
 func LoadOnchainStateTon(e cldf.Environment) (map[uint64]CCIPChainState, error) {
 	tonChains := make(map[uint64]CCIPChainState)
 
+	fmt.Printf("Loading state for TON chains...\n")
+	fmt.Printf("Found %+v TON chains in the environment\n", e.BlockChains.TonChains())
 	for chainSelector, chain := range e.BlockChains.TonChains() {
+		fmt.Println("Loading state for chain:", chainSelector, "(", chain.Name, ")")
 		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)
 		if err != nil {
+			fmt.Printf("Error loading addresses for chain %d: %v\n", chainSelector, err)
 			// Chain not found in address book, initialize empty
 			if !errors.Is(err, cldf.ErrChainNotFound) {
 				return tonChains, err
