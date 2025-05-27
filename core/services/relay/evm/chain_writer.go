@@ -126,8 +126,8 @@ func (w *chainWriter) SubmitTransaction(ctx context.Context, contract, method st
 	} else {
 		// TODO: change it to else if with something like this check "if meta != nil && meta.estimationSender != nil"
 		w.logger.Infof("ESTIMATING GASLIMIT AND USING IT FROM ESTIMATIONSENDER")
-		// 🔁 Dynamically estimate gas using the custom estimation sender
 
+		//  Dynamically estimate gas using the custom estimation sender
 		// TODO: this value should come from contract_transmitter.go txMeta (chainlink-common)
 		estimationSender := common.HexToAddress("0xC11C11C11C11C11C11C11C11C11C11C11C11C1")
 		to := common.HexToAddress(toAddress)
