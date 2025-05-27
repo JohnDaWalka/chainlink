@@ -32,5 +32,5 @@ func CreateWasmBinary(t *testing.T, goFile string, wasmFile string) {
 	cmd.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
 
 	output, err := cmd.CombinedOutput()
-You 	require.NoError(t, err, string(output))
+	require.NoError(t, err, string(output))
 }
