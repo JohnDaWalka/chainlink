@@ -674,6 +674,7 @@ func (c CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType cldf.Contr
 			return fmt.Errorf("chain %d does not exist", chainSelector)
 		}
 		fmt.Printf("chainState: %+v, skipping offramp/onramp address validation check for now \n", chainState)
+		// TODO - Uncomment and add validation for TON offramp and onramp addresses back once the TON contracts are supported.
 		//switch rampType {
 		//case ccipshared.OffRamp:
 		//	if chainState.OffRamp.IsAddrNone() {
@@ -702,23 +703,18 @@ func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
 	if err != nil {
 		return CCIPOnChainState{}, err
 	}
-	fmt.Println("[TON-E2E] BEFORE tonstate.LoadOnchainStateTon(e)")
 	tonChains, err := tonstate.LoadOnchainStateTon(e)
 	if err != nil {
 		return CCIPOnChainState{}, err
 	}
-	fmt.Printf("[TON-E2E] tonChains: %+v\n", tonChains)
 
 	state := CCIPOnChainState{
-		Chains: make(map[uint64]evm.CCIPChainState),
-		// TODO: Related to 0b71b59f3d938161de349fb62e82e71ce7cf480c, but evmMu was never initialized
+		Chains:      make(map[uint64]evm.CCIPChainState),
 		evmMu:       new(sync.RWMutex),
 		SolChains:   solanaState.SolChains,
 		AptosChains: aptosChains,
 		TonChains:   tonChains,
 	}
-
-	fmt.Println("[TON-E2E] 1. Loading onchain state for EVM chains...")
 
 	for chainSelector, chain := range e.Chains {
 		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)

@@ -51,13 +51,22 @@ func (c TonTestDeployPrerequisitesChangeSet) Apply(e cldf.Environment) (cldf.Cha
 	fmt.Printf("DEBUG: TonTestDeployPrerequisitesChangeSet: chain selectors: %+v\n", c.TonChainSelectors)
 	for _, chainSelector := range c.TonChainSelectors {
 		tonChainState := tonChains[chainSelector]
-		// TODO: replace with a real token address instead of hardcoded ones
 
-		tonChainState.LinkTokenAddress = *tonaddress.MustParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
-		tonChainState.OffRamp = *tonaddress.MustParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
-		tonChainState.ReceiverAddress = *tonaddress.MustParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
-		tonChainState.CCIPAddress = *tonaddress.MustParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
-		tonChainState.Router = *tonaddress.MustParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
+		// TODO: replace with actual TON addresses after contracts are supported
+		address, _ := tonaddress.ParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
+		tonChainState.OffRamp = *address
+
+		address, _ = tonaddress.ParseAddr("UQCfQRaJr2vxgZr5NHc0CTx6tAb0jverj9QQFirNfoCkGcUy")
+		tonChainState.Router = *address
+
+		address, _ = tonaddress.ParseAddr("EQADa3W6G0nSiTV4a6euRA42fU9QxSEnb-WeDpcrtWzA2jM8")
+		tonChainState.LinkTokenAddress = *address
+
+		address, _ = tonaddress.ParseAddr("UQDgFwiokL1ojVwXa3Ac7xCLfGB0Ti0foSw5NZ48Aj_vhs_6")
+		tonChainState.CCIPAddress = *address
+
+		address, _ = tonaddress.ParseAddr("UQCk4967vNM_V46Dn8I0x-gB_QE2KkdW1GQ7mWz1DtYGLEd8")
+		tonChainState.ReceiverAddress = *address
 		err = tonstate.SaveOnchainStateTon(chainSelector, tonChainState, e)
 		require.NoError(t, err)
 	}
@@ -139,9 +148,7 @@ func (c TonTestDeployContractsChangeSet) deployTonContracts(t *testing.T, e depl
 	//TODO(ton): Deploy TON CCIP Router
 
 	//TODO(ton): Deploy Ton CCIP Dummy Receiver and set the contract address
-	ccipDummyReceiverAddress := tonaddress.MustParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
 
-	tonChainState.ReceiverAddress = *ccipDummyReceiverAddress
 	//tonChainState.ReceiverAddress = ton.AccountOne
 
 	//TODO(ton): Initialize Onramp

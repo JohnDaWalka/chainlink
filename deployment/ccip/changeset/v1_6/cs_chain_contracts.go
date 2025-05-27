@@ -1497,7 +1497,7 @@ func (c SetOCR3OffRampConfig) validateRemoteChain(e *cldf.Environment, state *st
 		if !ok {
 			return fmt.Errorf("remote chain %d not found in onchain state", chainSelector)
 		}
-		// TODO validate the chain state with validate ownership later
+		// TODO add chain state validation later
 		return nil
 	default:
 		return fmt.Errorf("unsupported chain family %s", family)

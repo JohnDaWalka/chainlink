@@ -2,7 +2,6 @@ package ton
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/rs/zerolog/log"
@@ -39,19 +38,20 @@ func SaveOnchainStateTon(chainSelector uint64, tonState CCIPChainState, e cldf.E
 	if !tonState.ReceiverAddress.IsAddrNone() {
 		ab.Save(chainSelector, tonState.ReceiverAddress.String(), cldf.NewTypeAndVersion(shared.TonReceiver, deployment.Version1_6_0))
 	}
+	if !tonState.OffRamp.IsAddrNone() {
+		ab.Save(chainSelector, tonState.OffRamp.String(), cldf.NewTypeAndVersion(shared.OffRamp, deployment.Version1_6_0))
+	}
+	if !tonState.Router.IsAddrNone() {
+		ab.Save(chainSelector, tonState.Router.String(), cldf.NewTypeAndVersion(shared.Router, deployment.Version1_6_0))
+	}
 	return nil
 }
 
 func LoadOnchainStateTon(e cldf.Environment) (map[uint64]CCIPChainState, error) {
 	tonChains := make(map[uint64]CCIPChainState)
-
-	fmt.Printf("Loading state for TON chains...\n")
-	fmt.Printf("Found %+v TON chains in the environment\n", e.BlockChains.TonChains())
 	for chainSelector, chain := range e.BlockChains.TonChains() {
-		fmt.Println("Loading state for chain:", chainSelector, "(", chain.Name, ")")
 		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)
 		if err != nil {
-			fmt.Printf("Error loading addresses for chain %d: %v\n", chainSelector, err)
 			// Chain not found in address book, initialize empty
 			if !errors.Is(err, cldf.ErrChainNotFound) {
 				return tonChains, err
@@ -103,20 +103,5 @@ func LoadChainStateTon(chain cldf_ton.Chain, addresses map[string]cldf.TypeAndVe
 		versions[tvStr.Type] = tvStr.Version
 	}
 
-	// TODO temporary hard coding TON OffRamp and Router addresses, remove once we have them in the address book
-	address, _ := tonaddress.ParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
-	state.OffRamp = *address
-
-	address, _ = tonaddress.ParseAddr("UQCfQRaJr2vxgZr5NHc0CTx6tAb0jverj9QQFirNfoCkGcUy")
-	state.Router = *address
-
-	address, _ = tonaddress.ParseAddr("EQADa3W6G0nSiTV4a6euRA42fU9QxSEnb-WeDpcrtWzA2jM8")
-	state.LinkTokenAddress = *address
-
-	address, _ = tonaddress.ParseAddr("UQDgFwiokL1ojVwXa3Ac7xCLfGB0Ti0foSw5NZ48Aj_vhs_6")
-	state.CCIPAddress = *address
-
-	address, _ = tonaddress.ParseAddr("UQCk4967vNM_V46Dn8I0x-gB_QE2KkdW1GQ7mWz1DtYGLEd8")
-	state.ReceiverAddress = *address
 	return state, nil
 }

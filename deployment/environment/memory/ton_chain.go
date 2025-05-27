@@ -52,7 +52,6 @@ func GenerateChainsTon(t *testing.T, numChains int) map[uint64]cldf_ton.Chain {
 		t.Fatalf("not enough test ton chain selectors available")
 	}
 	chains := make(map[uint64]cldf_ton.Chain)
-	t.Logf("[TON-E2E] Generating %d TON chains", numChains)
 	for i := 0; i < numChains; i++ {
 		chainID := testTonChainSelectors[i]
 
@@ -69,11 +68,9 @@ func GenerateChainsTon(t *testing.T, numChains int) map[uint64]cldf_ton.Chain {
 			WalletAddress: wallet.Address(),
 		}
 		t.Log(ton)
-		t.Logf("[TON-E2E] chains[chainID].String() %+v", chains[chainID].String())
 		chains[chainID] = ton
 
 	}
-	t.Logf("[TON-E2E] Created %d TON chains: %+v", len(chains), chains)
 	return chains
 }
 

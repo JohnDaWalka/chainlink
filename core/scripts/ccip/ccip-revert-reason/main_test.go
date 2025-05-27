@@ -14,6 +14,5 @@ func TestRevertReason(t *testing.T) {
 		fmt.Printf("Error decoding error string: %v\n", err)
 		return
 	}
-
 	fmt.Println(decodedError)
 }

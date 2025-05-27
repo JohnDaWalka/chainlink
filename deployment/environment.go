@@ -272,8 +272,7 @@ func NodeInfo(nodeIDs []string, oc NodeChainConfigsLister) (Nodes, error) {
 	var nodes []Node
 	onlyMissingEVMChain := true
 	var xerr error
-	n := nodesFromJD.GetNodes()
-	for _, node := range n {
+	for _, node := range nodesFromJD.GetNodes() {
 		// TODO: Filter should accept multiple nodes
 		nodeChainConfigs, err := oc.ListNodeChainConfigs(context.Background(), &nodev1.ListNodeChainConfigsRequest{Filter: &nodev1.ListNodeChainConfigsRequest_Filter{
 			NodeIds: []string{node.Id},
@@ -384,23 +383,19 @@ func ChainConfigsToOCRConfig(chainConfigs []*nodev1.ChainConfig) (map[chain_sele
 
 func chainToDetails(c *nodev1.Chain) (chain_selectors.ChainDetails, error) {
 	var family string
-
-	// TODO this is a hack to support the ton chain, remove after we support chain type properly with chainlink-proto
-	if c.Id == "-217" {
+	switch c.Type {
+	case nodev1.ChainType_CHAIN_TYPE_EVM:
+		family = chain_selectors.FamilyEVM
+	case nodev1.ChainType_CHAIN_TYPE_APTOS:
+		family = chain_selectors.FamilyAptos
+	case nodev1.ChainType_CHAIN_TYPE_SOLANA:
+		family = chain_selectors.FamilySolana
+	case nodev1.ChainType_CHAIN_TYPE_STARKNET:
+		family = chain_selectors.FamilyStarknet
+	case nodev1.ChainType_CHAIN_TYPE_TON:
 		family = chain_selectors.FamilyTon
-	} else {
-		switch c.Type {
-		case nodev1.ChainType_CHAIN_TYPE_EVM:
-			family = chain_selectors.FamilyEVM
-		case nodev1.ChainType_CHAIN_TYPE_APTOS:
-			family = chain_selectors.FamilyAptos
-		case nodev1.ChainType_CHAIN_TYPE_SOLANA:
-			family = chain_selectors.FamilySolana
-		case nodev1.ChainType_CHAIN_TYPE_STARKNET:
-			family = chain_selectors.FamilyStarknet
-		default:
-			return chain_selectors.ChainDetails{}, fmt.Errorf("unsupported chain type %s", c.Type)
-		}
+	default:
+		return chain_selectors.ChainDetails{}, fmt.Errorf("unsupported chain type %s", c.Type)
 	}
 
 	if family == chain_selectors.FamilySolana {

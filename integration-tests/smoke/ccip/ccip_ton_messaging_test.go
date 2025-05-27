@@ -4,9 +4,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	mt "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagingtest"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
+
+	mt "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagingtest"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"

@@ -390,10 +390,6 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 	m.AptosChains = memory.NewMemoryChainsAptos(t, tc.AptosChains)
 	m.TonChains = memory.NewMemoryChainsTon(t, tc.TonChains)
 
-	fmt.Printf("[TON-E2E] Starting %d EVM chains, %d Solana chains, %d Aptos chains, %d Ton chains\n", len(m.Chains), len(m.SolChains), len(m.AptosChains), len(m.TonChains))
-	fmt.Printf("[TON-E2E] m.Chains: %v\n", m.Chains)
-	fmt.Printf("[TON-E2E] m.TonChains: %v\n", m.TonChains)
-
 	blockChains := map[uint64]cldf_chain.BlockChain{}
 	for selector, ch := range m.Chains {
 		blockChains[selector] = ch
@@ -407,14 +403,12 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 	for selector, ch := range m.TonChains {
 		blockChains[selector] = ch
 	}
-	fmt.Printf("[TON-E2E] blockChains: %+v\n", blockChains)
 
 	env := cldf.Environment{
 		Chains:      m.Chains,
 		SolChains:   m.SolChains,
 		BlockChains: cldf_chain.NewBlockChains(blockChains),
 	}
-	t.Logf("[TON-E2E] Created %d EVM chains, %d Solana chains, %d Aptos chains, %d Ton chains", len(m.Chains), len(m.SolChains), len(m.AptosChains), len(m.TonChains))
 	homeChainSel, feedSel := allocateCCIPChainSelectors(chains)
 	replayBlocks, err := LatestBlocksByChain(ctx, env)
 	require.NoError(t, err)
@@ -532,14 +526,12 @@ func NewMemoryEnvironment(t *testing.T, opts ...TestOps) (DeployedEnv, TestEnvir
 	case testCfg.PrerequisiteDeploymentOnly:
 		dEnv = NewEnvironmentWithPrerequisitesContracts(t, env)
 	case testCfg.CreateJobAndContracts:
-		fmt.Println("[TON-E2E] NewEnvironmentWithJobsAndContracts")
 		dEnv = NewEnvironmentWithJobsAndContracts(t, env)
 	case testCfg.CreateJob:
 		dEnv = NewEnvironmentWithJobs(t, env)
 	default:
 		dEnv = NewEnvironment(t, env)
 	}
-	fmt.Printf("[TON-E2E] NewMemoryEnvironment:Deployed environment: %+v\n", dEnv)
 	env.UpdateDeployedEnvironment(dEnv)
 	if testCfg.BlockTime > 0 {
 		env.MineBlocks(t, testCfg.BlockTime)
@@ -622,7 +614,6 @@ func NewEnvironmentWithPrerequisitesContracts(t *testing.T, tEnv TestEnvironment
 		require.NoError(t, err)
 	}
 
-	fmt.Printf("[TON-E2E] IN NewEnvironmentWithPrerequisitesContracts, len(tonChains) > 0, LEN: %d\n", len(tonChains))
 	if len(tonChains) > 0 {
 		e.Env, err = commonchangeset.Apply(t, e.Env, nil,
 			TonTestDeployPrerequisitesChangeSet{
@@ -640,26 +631,18 @@ func NewEnvironment(t *testing.T, tEnv TestEnvironment) DeployedEnv {
 	tc := tEnv.TestConfigs()
 	tEnv.StartChains(t)
 	dEnv := tEnv.DeployedEnvironment()
-	fmt.Printf("[TON-E2E] NewEnvironment:tEnv.DeployedEnvironment 1 %+v\n", dEnv)
 	require.NotEmpty(t, dEnv.FeedChainSel)
 	require.NotEmpty(t, dEnv.HomeChainSel)
 	require.NotEmpty(t, dEnv.Env.Chains)
 	ab := cldf.NewMemoryAddressBook()
 	crConfig := DeployTestContracts(t, lggr, ab, dEnv.HomeChainSel, dEnv.FeedChainSel, dEnv.Env.Chains, tc.LinkPrice, tc.WethPrice)
-	fmt.Printf("[TON-E2E] Populated Address Book: %+v\n", ab)
-	fmt.Printf("[TON-E2E] Starting nodes with config: %+v\n", crConfig)
-	fmt.Printf("[TON-E2E] NewEnvironment:tEnv 1 %+v\n", tEnv)
-	// TODO: This overwrites the DeployedEnvironment, excluding TON
 	tEnv.StartNodes(t, crConfig)
-	fmt.Printf("[TON-E2E] NewEnvironment:tEnv 2 %+v\n", tEnv)
 	dEnv = tEnv.DeployedEnvironment()
-	fmt.Printf("[TON-E2E] NewEnvironment:tEnv.DeployedEnvironment 2 -- OVERWRITTEN %+v\n", dEnv)
 	dEnv.Env.ExistingAddresses = ab
 	return dEnv
 }
 
 func NewEnvironmentWithJobsAndContracts(t *testing.T, tEnv TestEnvironment) DeployedEnv {
-	fmt.Println("[TON-E2E] NewEnvironmentWithJobsAndContracts")
 	var err error
 	e := NewEnvironmentWithPrerequisitesContracts(t, tEnv)
 	evmChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))
@@ -677,10 +660,7 @@ func NewEnvironmentWithJobsAndContracts(t *testing.T, tEnv TestEnvironment) Depl
 	}
 
 	tEnv.UpdateDeployedEnvironment(e)
-	fmt.Printf("[TON-E2E] NewEnvironmentWithJobsAndContracts:AFTER UpdateDeployedEnvironment %+v\n", tEnv)
-
 	e = AddCCIPContractsToEnvironment(t, allChains, tEnv, false)
-	fmt.Printf("[TON-E2E] NewEnvironmentWithJobsAndContracts:AFTER AddCCIPContractsToEnvironment %+v\n", e)
 	// now we update RMNProxy to point to RMNRemote
 	e.Env, err = commonchangeset.Apply(t, e.Env, nil,
 		commonchangeset.Configure(
@@ -826,8 +806,6 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		require.NoError(t, err)
 		apps = append(apps, tonCs...)
 	}
-
-	// TODO(ton): If environment has tonChains, append Ton DeployHomeChainConfig and DeployChainContractsConfig changesets
 
 	e.Env, err = commonchangeset.ApplyChangesets(t, e.Env, nil, apps)
 	require.NoError(t, err)
