@@ -163,12 +163,12 @@ func (n Node) JDChainConfigs() ([]*nodev1.ChainConfig, error) {
 		case chainsel.FamilyAptos:
 			ocrtype = chaintype.Aptos
 		case chainsel.FamilyTon:
-			ocrtype = chaintype.Ton
+			ocrtype = chaintype.TON
 		default:
 			return nil, fmt.Errorf("Unsupported chain family %v", family)
 		}
 
-		if ocrtype != chaintype.Ton {
+		if ocrtype != chaintype.TON {
 			bundle := n.Keys.OCRKeyBundles[ocrtype]
 			offpk := bundle.OffchainPublicKey()
 			cpk := bundle.ConfigEncryptionPublicKey()
@@ -477,7 +477,7 @@ func CreateKeys(t *testing.T,
 	chains map[uint64]cldf.Chain,
 	solchains map[uint64]cldf.SolChain,
 	aptoschains map[uint64]cldf.AptosChain,
-	tonchains map[uint64]cldf.TonChain,
+	tonchains map[uint64]cldf_ton.Chain,
 ) Keys {
 	ctx := t.Context()
 	_, err := app.GetKeyStore().P2P().Create(ctx)
@@ -512,7 +512,7 @@ func CreateKeys(t *testing.T,
 		case chainsel.FamilyAptos:
 			ctype = chaintype.Aptos
 		case chainsel.FamilyTon:
-			ctype = chaintype.Ton
+			ctype = chaintype.TON
 
 		default:
 			panic(fmt.Sprintf("Unsupported chain family %v", family))
@@ -635,9 +635,9 @@ func CreateKeys(t *testing.T,
 
 	if len(tonchains) > 0 {
 		for chainSelector := range tonchains {
-			math.Seed(time.Now().UnixNano())
-			// Generate a random integer between 0 and 99
-			randomInt := math.Intn(100)
+			n, err := rand.Int(rand.Reader, big.NewInt(100))
+			require.NoError(t, err)
+			randomInt := n.Int64()
 			transmitters[chainSelector] = fmt.Sprintf("dummy transmitter %d", randomInt)
 		}
 	}

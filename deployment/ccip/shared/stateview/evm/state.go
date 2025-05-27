@@ -198,7 +198,7 @@ func (c CCIPChainState) validateCCIPHomeVersionedActiveConfig(e cldf.Environment
 	if _, exists := e.SolChains[chainSel]; exists {
 		return nil
 	}
-	if _, exist := e.TonChains[chainSel]; exist {
+	if _, exist := e.BlockChains.TonChains()[chainSel]; exist {
 		return nil
 	}
 	offRamp, ok := offRampsByChain[chainSel]
