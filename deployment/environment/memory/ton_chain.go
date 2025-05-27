@@ -93,7 +93,7 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 	// wget https://raw.githubusercontent.com/neodix42/mylocalton-docker/refs/heads/main/docker-compose.yaml
 	// docker-compose up
 	// if existing network error happens, run `docker network rm ton`
-	useExistingTonlocalnet := true
+	useExistingTonlocalnet := false
 
 	for i := 0; i < maxRetries; i++ {
 		bcInput := &blockchain.Input{
