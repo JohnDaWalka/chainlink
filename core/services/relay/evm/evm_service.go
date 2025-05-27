@@ -2,6 +2,7 @@ package evm
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum"
@@ -21,9 +22,38 @@ import (
 	"github.com/smartcontractkit/chainlink-framework/chains"
 )
 
+// resolveBlock converts readAt into an explicit block number.
+// readAt may be either:
+//   - a decimal-encoded big int block number (e.g. "17")
+//   - a confidence level enum
+func (r *Relayer) resolveBlock(ctx context.Context, readAt string) (*big.Int, error) {
+	if blockNum, ok := new(big.Int).SetString(readAt, 10); ok {
+		return blockNum, nil
+	}
+
+	latest, finalized, err := r.LatestAndFinalizedHead(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch block number for readAt: %q, err: %w", readAt, err)
+	}
+
+	switch primitives.ConfidenceLevel(readAt) {
+	case primitives.Finalized:
+		return finalized.Number, nil
+	case primitives.Unconfirmed:
+		return latest.Number, nil
+	default:
+		return nil, fmt.Errorf("unsupported confidence level for readAt: %q", readAt)
+	}
+}
+
 // Direct RPC
-func (r *Relayer) CallContract(ctx context.Context, msg *evmtypes.CallMsg, blockNumber *big.Int) ([]byte, error) {
-	return r.chain.Client().CallContract(ctx, toEthMsg(msg), blockNumber)
+func (r *Relayer) CallContract(ctx context.Context, msg *evmtypes.CallMsg, readAt string) ([]byte, error) {
+	block, err := r.resolveBlock(ctx, readAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.chain.Client().CallContract(ctx, toEthMsg(msg), block)
 }
 
 func (r *Relayer) FilterLogs(ctx context.Context, filterQuery evmtypes.FilterQuery) ([]*evmtypes.Log, error) {

@@ -12,6 +12,7 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
 	evmtypes "github.com/smartcontractkit/chainlink-common/pkg/types/chains/evm"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-evm/pkg/client/clienttest"
 	"github.com/smartcontractkit/chainlink-evm/pkg/heads/headstest"
 	"github.com/smartcontractkit/chainlink-evm/pkg/logpoller"
@@ -91,6 +92,32 @@ func TestEVMService(t *testing.T) {
 		require.Equal(t, transaction.Data(), tx.Data)
 		require.Equal(t, transaction.Gas(), tx.Gas)
 		require.Equal(t, transaction.To().Bytes(), tx.To[:])
+	})
+
+	t.Run("resolveBlock", func(t *testing.T) {
+		latestHead := &types.Head{Number: 200}
+		finalizedHead := &types.Head{Number: 150}
+		ht.On("LatestAndFinalizedBlock", mock.Anything).Return(latestHead, finalizedHead, nil)
+
+		// numbers are resolved properly
+		out, err := relayer.resolveBlock(ctx, "123")
+		require.NoError(t, err)
+		require.Equal(t, big.NewInt(123), out)
+
+		// finalized confidence is resolved properly
+		out, err = relayer.resolveBlock(ctx, string(primitives.Finalized))
+		require.NoError(t, err)
+		require.Equal(t, big.NewInt(finalizedHead.Number), out)
+
+		// unconfirmed confidence is resolved properly
+		out, err = relayer.resolveBlock(ctx, string(primitives.Unconfirmed))
+		require.NoError(t, err)
+		require.Equal(t, big.NewInt(latestHead.Number), out)
+
+		// unsupported value is resolved properly
+		out, err = relayer.resolveBlock(ctx, "bad-value")
+		require.Error(t, err)
+		require.Nil(t, out)
 	})
 }
 
