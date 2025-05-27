@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	testAccountId           = "accountId"
-	testWorkflowId          = "workflowId"
-	testWorkflowExecutionId = "workflowExecutionId"
+	testAccountID           = "accountId"
+	testWorkflowID          = "workflowId"
+	testWorkflowExecutionID = "workflowExecutionId"
 )
 
 func TestReport(t *testing.T) {
@@ -31,7 +31,7 @@ func TestReport(t *testing.T) {
 	t.Run("MedianSpend returns median for multiple spend units", func(t *testing.T) {
 		t.Parallel()
 
-		report := NewReport(testAccountId, testWorkflowId, testWorkflowExecutionId, logger.TestLogger(t))
+		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
 		steps := []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "abc", SpendUnit: testA, SpendValue: "1"},
 			{Peer2PeerID: "xyz", SpendUnit: testA, SpendValue: "2"},
@@ -64,7 +64,7 @@ func TestReport(t *testing.T) {
 	t.Run("MedianSpend returns median single spend value", func(t *testing.T) {
 		t.Parallel()
 
-		report := NewReport(testAccountId, testWorkflowId, testWorkflowExecutionId, logger.TestLogger(t))
+		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
 		steps := []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "abc", SpendUnit: "a", SpendValue: "1"},
 		}
@@ -89,7 +89,7 @@ func TestReport(t *testing.T) {
 	t.Run("MedianSpend returns median odd number of spend values", func(t *testing.T) {
 		t.Parallel()
 
-		report := NewReport(testAccountId, testWorkflowId, testWorkflowExecutionId, logger.TestLogger(t))
+		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
 		steps := []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "abc", SpendUnit: testA, SpendValue: "1"},
 			{Peer2PeerID: "abc", SpendUnit: testA, SpendValue: "3"},
@@ -116,7 +116,7 @@ func TestReport(t *testing.T) {
 	t.Run("MedianSpend returns median as average for even number of spend values", func(t *testing.T) {
 		t.Parallel()
 
-		report := NewReport(testAccountId, testWorkflowId, testWorkflowExecutionId, logger.TestLogger(t))
+		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
 		steps := []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "xyz", SpendUnit: testA, SpendValue: "42"},
 			{Peer2PeerID: "abc", SpendUnit: testA, SpendValue: "1"},
@@ -143,14 +143,14 @@ func TestReport(t *testing.T) {
 
 	t.Run("ReserveStep returns error if step already exists", func(t *testing.T) {
 		t.Parallel()
-		report := NewReport(testAccountId, testWorkflowId, testWorkflowExecutionId, logger.TestLogger(t))
+		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
 		require.NoError(t, report.ReserveStep(ReportStepRef("ref1"), capabilities.CapabilityInfo{}))
 		require.Error(t, report.ReserveStep(ReportStepRef("ref1"), capabilities.CapabilityInfo{}))
 	})
 
 	t.Run("SetStep returns error if reserve is not called first", func(t *testing.T) {
 		t.Parallel()
-		report := NewReport(testAccountId, testWorkflowId, testWorkflowExecutionId, logger.TestLogger(t))
+		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
 		steps := []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "xyz", SpendUnit: testA, SpendValue: "42"},
 			{Peer2PeerID: "abc", SpendUnit: testA, SpendValue: "1"},
@@ -161,7 +161,7 @@ func TestReport(t *testing.T) {
 
 	t.Run("SetStep returns error if step already exists", func(t *testing.T) {
 		t.Parallel()
-		report := NewReport(testAccountId, testWorkflowId, testWorkflowExecutionId, logger.TestLogger(t))
+		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
 		steps := []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "xyz", SpendUnit: testA, SpendValue: "42"},
 			{Peer2PeerID: "abc", SpendUnit: testA, SpendValue: "1"},
@@ -182,7 +182,7 @@ func Test_MeterReports(t *testing.T) {
 	wg.Add(3)
 	go func() {
 		defer wg.Done()
-		mr.Add("exec1", NewReport(testAccountId, testWorkflowId, testWorkflowExecutionId, logger.TestLogger(t)))
+		mr.Add("exec1", NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t)))
 		r, ok := mr.Get("exec1")
 		assert.True(t, ok)
 		//nolint:errcheck // depending on the concurrent timing, this may or may not err
@@ -193,7 +193,7 @@ func Test_MeterReports(t *testing.T) {
 	}()
 	go func() {
 		defer wg.Done()
-		mr.Add("exec2", NewReport(testAccountId, testWorkflowId, testWorkflowExecutionId, logger.TestLogger(t)))
+		mr.Add("exec2", NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t)))
 		r, ok := mr.Get("exec2")
 		assert.True(t, ok)
 		err := r.ReserveStep(ReportStepRef("ref1"), capabilities.CapabilityInfo{})
@@ -204,7 +204,7 @@ func Test_MeterReports(t *testing.T) {
 	}()
 	go func() {
 		defer wg.Done()
-		mr.Add("exec1", NewReport(testAccountId, testWorkflowId, testWorkflowExecutionId, logger.TestLogger(t)))
+		mr.Add("exec1", NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t)))
 		r, ok := mr.Get("exec1")
 		assert.True(t, ok)
 		//nolint:errcheck // depending on the concurrent timing, this may or may not err
@@ -221,9 +221,9 @@ func Test_MeterReports(t *testing.T) {
 func Test_MeterReportsLength(t *testing.T) {
 	mr := NewReports(nil)
 
-	mr.Add("exec1", NewReport(testAccountId, testWorkflowId, testWorkflowExecutionId, logger.TestLogger(t)))
-	mr.Add("exec2", NewReport(testAccountId, testWorkflowId, testWorkflowExecutionId, logger.TestLogger(t)))
-	mr.Add("exec3", NewReport(testAccountId, testWorkflowId, testWorkflowExecutionId, logger.TestLogger(t)))
+	mr.Add("exec1", NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t)))
+	mr.Add("exec2", NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t)))
+	mr.Add("exec3", NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t)))
 	assert.Equal(t, 3, mr.Len())
 
 	mr.Delete("exec2")

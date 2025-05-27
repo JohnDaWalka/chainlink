@@ -38,7 +38,7 @@ func (s *BillingService) WorkflowReceipt(
 }
 
 func RunBillingListener(ctx context.Context, lggr logger.Logger) {
-	lis, err := net.Listen("tcp", ":4319")
+	lis, err := net.Listen("tcp", "localhost:4319")
 	if err != nil {
 		log.Fatalf("billing failed to listen: %v", err)
 	}
