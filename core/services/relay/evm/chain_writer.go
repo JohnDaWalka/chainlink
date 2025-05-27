@@ -120,7 +120,32 @@ func (w *chainWriter) SubmitTransaction(ctx context.Context, contract, method st
 
 	gasLimit := methodConfig.GasLimit
 	if meta != nil && meta.GasLimit != nil {
+		w.logger.Infof("USING GASLIMIT FROM META GAS LIMIT")
+
 		gasLimit = meta.GasLimit.Uint64()
+	} else {
+		// TODO: change it to else if with something like this check "if meta != nil && meta.estimationSender != nil"
+		w.logger.Infof("ESTIMATING GASLIMIT AND USING IT FROM ESTIMATIONSENDER")
+		// 🔁 Dynamically estimate gas using the custom estimation sender
+
+		// TODO: this value should come from contract_transmitter.go txMeta (chainlink-common)
+		estimationSender := common.HexToAddress("0xC11C11C11C11C11C11C11C11C11C11C11C11C1")
+		to := common.HexToAddress(toAddress)
+		callMsg := ethereum.CallMsg{
+			From:  estimationSender, // e.g., GAS_ESTIMATION_SENDER
+			To:    &to,
+			Gas:   0, // Let geth determine the amount
+			Data:  calldata,
+			Value: v,
+		}
+
+		estimatedGas, err := w.client.EstimateGas(ctx, callMsg)
+		if err != nil {
+			return fmt.Errorf("failed to estimate gas: %w", err)
+		}
+
+		// Add buffer (optional but recommended)
+		gasLimit = estimatedGas + 10_000 // Static buffer to account for post-inner-call code
 	}
 
 	req := evmtxmgr.TxRequest{
