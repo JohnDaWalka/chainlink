@@ -926,9 +926,6 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	// TODO(ton): Set Ton chains plugin configs
 	for _, chain := range tonChains {
 		t.Logf("[TON-E2E] AddCCIPContractsToEnvironment: Setting up Ton chain %d", chain)
-		t.Log("[TON-E2E] Skip everything since we don't have any CCIP contracts in TON yet")
-		t.Log("[TON-E2E] Actually we need this")
-		_ = chain // TODO: Implement this for Ton chains
 		tokenInfo := map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{}
 		address := state.TonChains[chain].LinkTokenAddress
 		tokenInfo[cciptypes.UnknownEncodedAddress(address.String())] = tokenConfig.TokenSymbolToInfo[shared.LinkSymbol]
