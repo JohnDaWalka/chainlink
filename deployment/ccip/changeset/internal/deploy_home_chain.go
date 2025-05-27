@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/xssnick/tonutils-go/address"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/bytes"
 
@@ -414,10 +415,14 @@ func BuildOCR3ConfigForCCIPHome(
 					return nil, fmt.Errorf("failed to decode SVM address '%s': %w", transmitter, err)
 				}
 				parsed = pk.Bytes()
-			// TODO : remove the dummy value and add support for TON public key serialization
 			case chain_selectors.FamilyTon:
 				fmt.Printf("[TON-E2E]: parsed transmitter %s\n", transmitter)
-				parsed = []byte(transmitter)
+				fmt.Println(string(transmitter))
+				pk := address.MustParseAddr(string(transmitter))
+				if pk == nil || pk.IsAddrNone() {
+					return nil, fmt.Errorf("failed to parse TON address '%s'", transmitter)
+				}
+				parsed = pk.Data()
 			}
 			transmittersBytes[i] = parsed
 		}

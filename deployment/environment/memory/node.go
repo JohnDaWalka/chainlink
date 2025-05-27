@@ -2,7 +2,6 @@ package memory
 
 import (
 	"context"
-	"crypto/ecdsa"
 
 	"crypto/rand"
 	"encoding/hex"
@@ -17,7 +16,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	evmcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/crypto"
 	"github.com/stretchr/testify/mock"
@@ -168,30 +166,14 @@ func (n Node) JDChainConfigs() ([]*nodev1.ChainConfig, error) {
 			return nil, fmt.Errorf("Unsupported chain family %v", family)
 		}
 
-		if ocrtype != chaintype.TON {
-			bundle := n.Keys.OCRKeyBundles[ocrtype]
-			offpk := bundle.OffchainPublicKey()
-			cpk := bundle.ConfigEncryptionPublicKey()
-			keyBundle = &nodev1.OCR2Config_OCRKeyBundle{
-				BundleId:              bundle.ID(),
-				ConfigPublicKey:       common.Bytes2Hex(cpk[:]),
-				OffchainPublicKey:     common.Bytes2Hex(offpk[:]),
-				OnchainSigningAddress: bundle.OnChainPublicKey(),
-			}
-		} else {
-			// TODO remove this, and have OCR key bundle supported for TON, this is a temporary hack
-			privateKey, err := ecdsa.GenerateKey(evmcrypto.S256(), rand.Reader)
-			if err != nil {
-				return nil, err
-			}
-			publicKey := privateKey.Public().(*ecdsa.PublicKey)
-			address := evmcrypto.PubkeyToAddress(*publicKey).Hex()[2:]
-			keyBundle = &nodev1.OCR2Config_OCRKeyBundle{
-				BundleId:              "ton-key-bundle",
-				ConfigPublicKey:       address,
-				OffchainPublicKey:     address,
-				OnchainSigningAddress: address,
-			}
+		bundle := n.Keys.OCRKeyBundles[ocrtype]
+		offpk := bundle.OffchainPublicKey()
+		cpk := bundle.ConfigEncryptionPublicKey()
+		keyBundle = &nodev1.OCR2Config_OCRKeyBundle{
+			BundleId:              bundle.ID(),
+			ConfigPublicKey:       common.Bytes2Hex(cpk[:]),
+			OffchainPublicKey:     common.Bytes2Hex(offpk[:]),
+			OnchainSigningAddress: bundle.OnChainPublicKey(),
 		}
 
 		var ctype nodev1.ChainType
@@ -205,7 +187,7 @@ func (n Node) JDChainConfigs() ([]*nodev1.ChainConfig, error) {
 		case chainsel.FamilyAptos:
 			ctype = nodev1.ChainType_CHAIN_TYPE_APTOS
 		case chainsel.FamilyTon:
-			// TODO need to add this to the proto, PR: https://github.com/smartcontractkit/chainlink-protos/pull/75
+			ctype = nodev1.ChainType_CHAIN_TYPE_TON
 		default:
 			panic(fmt.Sprintf("Unsupported chain family %v", family))
 		}
@@ -580,8 +562,7 @@ func CreateKeys(t *testing.T,
 
 			transmitter := keys[0]
 			transmitters[chain.Selector] = transmitter.ID()
-		case chainsel.FamilyTon:
-			// TODO keystore for TON needs to be supported. transmitter for TON need to be supported. PR: https://github.com/smartcontractkit/chainlink/pull/17666/files
+
 		default:
 			// TODO: other transmission keys unsupported for now
 		}
@@ -634,11 +615,24 @@ func CreateKeys(t *testing.T,
 	}
 
 	if len(tonchains) > 0 {
+		ctype := chaintype.TON
+		err = app.GetKeyStore().OCR2().EnsureKeys(ctx, ctype)
+		require.NoError(t, err)
+		keys, err := app.GetKeyStore().OCR2().GetAllOfType(ctype)
+		require.NoError(t, err)
+		require.Len(t, keys, 1)
+		keybundle := keys[0]
+		keybundles[ctype] = keybundle
+
+		err = app.GetKeyStore().TON().EnsureKey(ctx)
+		require.NoError(t, err, "failed to create key for TON")
+
+		tonkeys, err := app.GetKeyStore().TON().GetAll()
+		require.NoError(t, err)
+		require.Len(t, tonkeys, 1)
+		transmitter := tonkeys[0]
 		for chainSelector := range tonchains {
-			n, err := rand.Int(rand.Reader, big.NewInt(100))
-			require.NoError(t, err)
-			randomInt := n.Int64()
-			transmitters[chainSelector] = fmt.Sprintf("dummy transmitter %d", randomInt)
+			transmitters[chainSelector] = transmitter.AddressBase64()
 		}
 	}
 
