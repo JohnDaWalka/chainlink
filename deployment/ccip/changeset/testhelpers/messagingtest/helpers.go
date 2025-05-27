@@ -46,7 +46,7 @@ func NewTestSetupWithDeployedEnv(
 	}
 }
 
-// Use this when testhelpers.DeployedEnv is not available (usually in long-running test environments like staging).
+// Use this when testhelpers.DeployedEnv is not available (usually in long-running test environments like staging). a
 func NewTestSetup(
 	t *testing.T,
 	env cldf.Environment,
