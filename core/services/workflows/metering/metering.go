@@ -101,9 +101,9 @@ type ReportStepDetail struct {
 
 type Report struct {
 	// descriptive properties
-	accountId           string
-	workflowId          string
-	workflowExecutionId string
+	accountID           string
+	workflowID          string
+	workflowExecutionID string
 
 	// dependencies
 	balance *balanceStore
@@ -116,13 +116,13 @@ type Report struct {
 	refCount map[ReportStepRef]uint64
 }
 
-func NewReport(accountId, workflowId, workflowExecutionId string, lggr logger.Logger) *Report {
+func NewReport(accountID, workflowID, workflowExecutionID string, lggr logger.Logger) *Report {
 	logger := lggr.Named("Metering")
 
 	return &Report{
-		accountId:           accountId,
-		workflowId:          workflowId,
-		workflowExecutionId: workflowExecutionId,
+		accountID:           accountID,
+		workflowID:          workflowID,
+		workflowExecutionID: workflowExecutionID,
 		balance:             NewBalanceStore(0, map[string]decimal.Decimal{}, logger),
 		lggr:                logger,
 		steps:               make(map[ReportStepRef]ReportStep),
@@ -178,9 +178,9 @@ func (r *Report) ReserveStep(ref ReportStepRef, capInfo capabilities.CapabilityI
 	}
 
 	req := billing.ReserveCreditsRequest{
-		AccountId:           r.accountId,
-		WorkflowId:          r.workflowId,
-		WorkflowExecutionId: r.workflowExecutionId,
+		AccountId:           r.accountID,
+		WorkflowId:          r.workflowID,
+		WorkflowExecutionId: r.workflowExecutionID,
 	}
 
 	// TODO: checking capability type to know ahead of time what to reserve is brittle
@@ -288,9 +288,9 @@ func (r *Report) SendReceipt(ctx context.Context) error {
 	// send metering report to billing if billing client is not nil
 	if r.client != nil {
 		req := billing.SubmitWorkflowReceiptRequest{
-			AccountId:           r.accountId,
-			WorkflowId:          r.workflowId,
-			WorkflowExecutionId: r.workflowExecutionId,
+			AccountId:           r.accountID,
+			WorkflowId:          r.workflowID,
+			WorkflowExecutionId: r.workflowExecutionID,
 			Metering:            r.Message(),
 		}
 
