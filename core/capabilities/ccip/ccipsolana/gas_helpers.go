@@ -29,7 +29,7 @@ func (gp EstimateProvider) CalculateMerkleTreeGas(numRequests int) uint64 {
 	return 1
 }
 
-// CalculateMessageMaxGas calculates the maximum gas required for a message.
+// CalculateMessageMaxGas is not implemented.
 func (gp EstimateProvider) CalculateMessageMaxGas(msg cciptypes.Message) uint64 {
 	maxGas, err := gp.CalculateMessageMaxGasWithError(msg)
 	if err != nil {
