@@ -359,6 +359,10 @@ func BuildOCR3ConfigForCCIPHome(
 		if err2 != nil {
 			return nil, err2
 		}
+		// TODO: oracle.TransmitAccount is empty
+		for _, oracle := range oracles {
+			fmt.Printf("[TON-E2E]: Oracle identity: %+v\n", oracle)
+		}
 		signers, transmitters, configF, onchainConfig, offchainConfigVersion, offchainConfig, err2 := ocr3confighelper.ContractSetConfigArgsDeterministic(
 			ocrSecrets.EphemeralSk,
 			ocrSecrets.SharedSecret,
@@ -412,6 +416,7 @@ func BuildOCR3ConfigForCCIPHome(
 				parsed = pk.Bytes()
 			// TODO : remove the dummy value and add support for TON public key serialization
 			case chain_selectors.FamilyTon:
+				fmt.Printf("[TON-E2E]: parsed transmitter %s\n", transmitter)
 				parsed = []byte(transmitter)
 			}
 			transmittersBytes[i] = parsed
