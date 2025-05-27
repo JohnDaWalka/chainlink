@@ -158,6 +158,7 @@ func RunFeeTokenTestCase(tc FeeTokenTestCase) {
 			FeeToken:     tc.feeToken,
 			ExtraArgs:    nil,
 		},
+		"",
 	)
 
 	expectedSeqNum[testhelpers.SourceDestPair{

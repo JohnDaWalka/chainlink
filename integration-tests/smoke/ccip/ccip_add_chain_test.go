@@ -130,7 +130,7 @@ func Test_AddChain(t *testing.T) {
 					TokenAmounts: nil,
 					FeeToken:     common.HexToAddress("0x0"),
 					ExtraArgs:    nil,
-				})
+				}, "")
 
 				startBlocks[dest] = &block
 				expectedSeqNum[testhelpers.SourceDestPair{

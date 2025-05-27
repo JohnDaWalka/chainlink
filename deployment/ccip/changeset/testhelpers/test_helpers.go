@@ -389,6 +389,7 @@ func TestSendRequest(
 	src, dest uint64,
 	testRouter bool,
 	msg any,
+	expectedSendRequestErr string,
 	opts ...SendReqOpts,
 ) (msgSentEvent *onramp.OnRampCCIPMessageSent) {
 	baseOpts := []SendReqOpts{
@@ -400,6 +401,10 @@ func TestSendRequest(
 	baseOpts = append(baseOpts, opts...)
 
 	msgSentEvent, err := SendRequest(e, state, baseOpts...)
+	if err != nil {
+		require.Equal(t, expectedSendRequestErr, err.Error())
+		return msgSentEvent
+	}
 	require.NoError(t, err)
 	return msgSentEvent
 }
@@ -1788,6 +1793,7 @@ func Transfer(
 	useTestRouter bool,
 	data, extraArgs []byte,
 	feeToken string,
+	expectedSendRequestErr string,
 ) (*onramp.OnRampCCIPMessageSent, map[uint64]*uint64) {
 	startBlocks := make(map[uint64]*uint64)
 
@@ -1831,7 +1837,7 @@ func Transfer(
 		t.Errorf("unsupported source chain: %v", family)
 	}
 
-	msgSentEvent := TestSendRequest(t, env, state, sourceChain, destChain, useTestRouter, msg)
+	msgSentEvent := TestSendRequest(t, env, state, sourceChain, destChain, useTestRouter, msg, expectedSendRequestErr)
 	return msgSentEvent, startBlocks
 }
 
@@ -1917,7 +1923,7 @@ func TransferMultiple(
 			}
 
 			msg, blocks := Transfer(
-				ctx, t, env, state, tt.SourceChain, tt.DestChain, tokens, tt.Receiver, tt.UseTestRouter, tt.Data, tt.ExtraArgs, tt.FeeToken)
+				ctx, t, env, state, tt.SourceChain, tt.DestChain, tokens, tt.Receiver, tt.UseTestRouter, tt.Data, tt.ExtraArgs, tt.FeeToken, "")
 			if _, ok := expectedExecutionStates[pairId]; !ok {
 				expectedExecutionStates[pairId] = make(map[uint64]int)
 			}

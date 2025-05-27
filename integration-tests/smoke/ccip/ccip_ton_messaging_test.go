@@ -58,8 +58,6 @@ func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
 
 	t.Run("message to contract implementing CCIPReceiver", func(t *testing.T) {
 		ccipChainState := state.TonChains[destChain]
-
-		require.NoError(t, err)
 		out = mt.Run(
 			t,
 			mt.TestCase{
@@ -68,14 +66,9 @@ func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
 				Nonce:     &nonce,
 				Receiver:  ccipChainState.ReceiverAddress.Data(),
 				MsgData:   []byte("hello CCIPReceiver"),
-				//TODO(ton): Do we need to enforce OOO for TON?
-				ExtraArgs:              testhelpers.MakeEVMExtraArgsV2(100000, false),
-				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
-				ExtraAssertions: []func(t *testing.T){
-					func(t *testing.T) {
-						// TODO: check dummy receiver events
-					},
-				},
+				ExtraArgs: testhelpers.MakeEVMExtraArgsV2(100000, false),
+				//ExpectedExecutionState: testhelpers.EXECUTION_STATE_FAILURE, // state would be failed onchain due to lack of onchain getFee support in EVM for TON
+				ExpectedSendRequestErr: "failed to get fee: execution reverted: 0x373b0e4400000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000020a4e3debbbcd33f578e839fc234c7e801fd01362a4756d4643b996cf50ed6062c",
 			},
 		)
 	})

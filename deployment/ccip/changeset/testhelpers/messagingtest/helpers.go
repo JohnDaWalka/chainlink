@@ -90,6 +90,7 @@ type TestCase struct {
 	FeeToken               string
 	ExpectedExecutionState int
 	ExtraAssertions        []func(t *testing.T)
+	ExpectedSendRequestErr string
 }
 
 type ValidationType int
@@ -191,7 +192,13 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 		tc.SourceChain,
 		tc.DestChain,
 		tc.TestRouter,
-		msg)
+		msg,
+		tc.ExpectedSendRequestErr)
+	if tc.ExpectedSendRequestErr != "" {
+		// If we expect an error, we should not proceed further
+		return
+	}
+
 	sourceDest := testhelpers.SourceDestPair{
 		SourceChainSelector: tc.SourceChain,
 		DestChainSelector:   tc.DestChain,
