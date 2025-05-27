@@ -20,6 +20,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_ton "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -71,7 +72,7 @@ type NewNodesConfig struct {
 	// Aptos chains to be configured. Optional.
 	AptosChains map[uint64]cldf.AptosChain
 	// Ton chains to be configured. Optional.
-	TonChains      map[uint64]cldf.TonChain
+	TonChains      map[uint64]cldf_ton.Chain
 	NumNodes       int
 	NumBootstraps  int
 	RegistryConfig deployment.CapabilityRegistryConfig
@@ -117,7 +118,7 @@ func NewMemoryChainsZk(t *testing.T, numChains int) map[uint64]cldf.Chain {
 	return GenerateChainsZk(t, numChains)
 }
 
-func NewMemoryChainsTon(t *testing.T, numChains int) map[uint64]cldf.TonChain {
+func NewMemoryChainsTon(t *testing.T, numChains int) map[uint64]cldf_ton.Chain {
 	return GenerateChainsTon(t, numChains)
 }
 
@@ -251,7 +252,7 @@ func NewMemoryEnvironmentFromChainsNodes(
 	chains map[uint64]cldf.Chain,
 	solChains map[uint64]cldf.SolChain,
 	aptosChains map[uint64]cldf.AptosChain,
-	tonChains map[uint64]cldf.TonChain,
+	tonChains map[uint64]cldf_ton.Chain,
 	nodes map[string]Node,
 ) cldf.Environment {
 	var nodeIDs []string
@@ -284,7 +285,6 @@ func NewMemoryEnvironmentFromChainsNodes(
 		chains,
 		solChains,
 		aptosChains,
-		tonChains,
 		nodeIDs, // Note these have the p2p_ prefix.
 		NewMemoryJobClient(nodes),
 		ctx,
@@ -345,7 +345,6 @@ func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Lev
 		chains,
 		solChains,
 		aptosChains,
-		tonChains,
 		nodeIDs,
 		NewMemoryJobClient(nodes),
 		t.Context,

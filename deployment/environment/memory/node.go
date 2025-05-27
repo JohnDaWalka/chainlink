@@ -25,6 +25,9 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/maps"
 
+	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
+	cldf_ton "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton"
+
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -259,9 +262,9 @@ type NewNodeConfig struct {
 	// Solana chains to be configured. Optional.
 	Solchains map[uint64]cldf.SolChain
 	// Aptos chains to be configured. Optional.
-	Aptoschains map[uint64]cldf.AptosChain
-	// TODO: bump CLDF and fix this
-	Tonchains      map[uint64]cldf.TonChain
+	Aptoschains map[uint64]cldf_aptos.Chain
+	// TON chains to be configured. Optional.
+	Tonchains      map[uint64]cldf_ton.Chain
 	LogLevel       zapcore.Level
 	Bootstrap      bool
 	RegistryConfig deployment.CapabilityRegistryConfig
@@ -364,7 +367,7 @@ func NewNode(
 			}
 			tonConfigs = append(tonConfigs, createTonChainConfig(tonChainID, chain))
 		}
-		c.Ton = tonConfigs
+		c.TON = tonConfigs
 
 		for _, opt := range configOpts {
 			opt(c)
@@ -631,13 +634,12 @@ func CreateKeys(t *testing.T,
 	}
 
 	if len(tonchains) > 0 {
-		// TODO keystore for TON needs to be supported. transmitter for TON need to be supported, PR: https://github.com/smartcontractkit/chainlink/pull/17666
-		//for chainSelector := range tonchains {
-		//	math.Seed(time.Now().UnixNano())
-		//	// Generate a random integer between 0 and 99
-		//	randomInt := math.Intn(100)
-		//	transmitters[chainSelector] = fmt.Sprintf("dummy transmitter %d", randomInt)
-		//}
+		for chainSelector := range tonchains {
+			math.Seed(time.Now().UnixNano())
+			// Generate a random integer between 0 and 99
+			randomInt := math.Intn(100)
+			transmitters[chainSelector] = fmt.Sprintf("dummy transmitter %d", randomInt)
+		}
 	}
 
 	return Keys{

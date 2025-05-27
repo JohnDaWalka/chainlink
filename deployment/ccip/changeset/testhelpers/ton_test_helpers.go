@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	cldf_ton "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -82,14 +83,14 @@ func (c TonTestDeployContractsChangeSet) Apply(e deployment.Environment) (deploy
 	fmt.Printf("DEBUG: TonTestDeployContractsChangeSet: chain selectors: %+v\n", c.TonChainSelectors)
 
 	for _, chainSelector := range c.TonChainSelectors {
-		tonChain := e.TonChains[chainSelector]
+		tonChain := e.BlockChains.TonChains()[chainSelector]
 		tonChainState := tonChains[chainSelector]
 		c.deployTonContracts(t, e, chainSelector, tonChain, tonChainState, tonChains)
 	}
 	return deployment.ChangesetOutput{}, nil
 }
 
-func (c TonTestDeployContractsChangeSet) deployTonContracts(t *testing.T, e deployment.Environment, chainSelector uint64, tonChain deployment.TonChain, tonChainState tonstate.CCIPChainState, onchainState map[uint64]tonstate.CCIPChainState) {
+func (c TonTestDeployContractsChangeSet) deployTonContracts(t *testing.T, e deployment.Environment, chainSelector uint64, tonChain cldf_ton.Chain, tonChainState tonstate.CCIPChainState, onchainState map[uint64]tonstate.CCIPChainState) {
 	logger := logger.Test(t)
 
 	connectionPool := liteclient.NewConnectionPool()
@@ -127,15 +128,15 @@ func (c TonTestDeployContractsChangeSet) deployTonContracts(t *testing.T, e depl
 		return
 	}
 
-	//TODO(ton): Deploy Ton MCMS
+	//TODO(ton): Deploy TON MCMS
 
-	//TODO(ton): Deploy Ton CCIP
+	//TODO(ton): Deploy TON CCIP
 
-	//TODO(ton): Deploy Ton CCIP Offramp
+	//TODO(ton): Deploy TON CCIP Offramp
 
-	//TODO(ton): Deploy Ton CCIP Onramp
+	//TODO(ton): Deploy TON CCIP Onramp
 
-	//TODO(ton): Deploy Ton CCIP Router
+	//TODO(ton): Deploy TON CCIP Router
 
 	//TODO(ton): Deploy Ton CCIP Dummy Receiver and set the contract address
 	ccipDummyReceiverAddress := tonaddress.MustParseAddr("EQDtFpEwcFAEcRe5mLVh2N6C0x-_hJEM7W61_JLnSF74p4q2")
@@ -151,7 +152,7 @@ func (c TonTestDeployContractsChangeSet) deployTonContracts(t *testing.T, e depl
 
 	//TODO(ton): Initialize RMNRemote
 
-	logger.Infow("All Ton contracts deployed")
+	logger.Infow("All TON contracts deployed")
 
 	err = tonstate.SaveOnchainStateTon(chainSelector, tonChainState, e)
 	require.NoError(t, err)
@@ -176,14 +177,14 @@ func (c TonTestConfigureContractsChangeSet) Apply(e deployment.Environment) (dep
 	fmt.Printf("DEBUG: TonTestConfigureContractsChangeSet: chain selectors: %+v\n", c.TonChainSelectors)
 
 	for _, chainSelector := range c.TonChainSelectors {
-		tonChain := e.TonChains[chainSelector]
+		tonChain := e.BlockChains.TonChains()[chainSelector]
 		tonChainState := tonChains[chainSelector]
 		c.configureTonContracts(t, e, chainSelector, tonChain, tonChainState, tonChains)
 	}
 	return deployment.ChangesetOutput{}, nil
 }
 
-func (c TonTestConfigureContractsChangeSet) configureTonContracts(t *testing.T, e deployment.Environment, chainSelector uint64, tonChain deployment.TonChain, tonChainState tonstate.CCIPChainState, onchainState map[uint64]tonstate.CCIPChainState) {
+func (c TonTestConfigureContractsChangeSet) configureTonContracts(t *testing.T, e deployment.Environment, chainSelector uint64, tonChain cldf_ton.Chain, tonChainState tonstate.CCIPChainState, onchainState map[uint64]tonstate.CCIPChainState) {
 	// logger := logger.Test(t)
 
 	// offrampBindings := ccip_offramp.Bind(tonChainState.CCIPAddress, tonChain.Client)
@@ -198,7 +199,7 @@ func (c TonTestConfigureContractsChangeSet) configureTonContracts(t *testing.T, 
 	// 	chainSelector,
 	// )
 	// require.NoError(t, err)
-	// fmt.Printf("Ton DON ID: %+v\n", donID)
+	// fmt.Printf("TON DON ID: %+v\n", donID)
 
 	// allCommitConfigs, err := onchainState.Chains[c.HomeChainSelector].CCIPHome.GetAllConfigs(&ethbind.CallOpts{
 	// 	Context: context.Background(),
@@ -258,7 +259,7 @@ func (c TonTestConfigureContractsChangeSet) configureTonContracts(t *testing.T, 
 	// require.NoError(t, err)
 	// waitForTx(t, tonChain.Client, pendingTx.TxnHash(), time.Minute*1)
 
-	// logger.Infow("Ton contracts configured")
+	// logger.Infow("TON contracts configured")
 
 	// for _, transmitter := range append(commitTransmitters, execTransmitters...) {
 	// 	// 10 TON
@@ -305,7 +306,7 @@ func (c TonTestAddLaneChangeSet) Apply(e deployment.Environment) (deployment.Cha
 	// t := c.T
 	// TODO: support other paths
 	// require.Equal(t, c.fromFamily, chainsel.FamilyEVM, "must be from EVM")
-	// require.Equal(t, c.toFamily, chainsel.FamilyTon, "must be to Ton")
+	// require.Equal(t, c.toFamily, chainsel.FamilyTon, "must be to TON")
 
 	// tonSelector := c.toChainSelector
 	// tonChain := e.TonChains[tonSelector]
@@ -372,7 +373,7 @@ func SendRequestTon(
 func ConfirmCommitWithExpectedSeqNumRangeTon(
 	t *testing.T,
 	srcSelector uint64,
-	dest deployment.TonChain,
+	dest cldf_ton.Chain,
 	ccipChainState tonstate.CCIPChainState,
 	startBlock *uint64,
 	expectedSeqNumRange ccipocr3.SeqNumRange,
@@ -384,6 +385,7 @@ func ConfirmCommitWithExpectedSeqNumRangeTon(
 	return nil, errors.New("TODO(ton): ConfirmCommitWithExpectedSeqNumRangeTon")
 }
 
+// TODO: what is the usage of this function? can we remove this?
 func waitForTx(t *testing.T, client *ton.APIClient, txHash string, duration time.Duration) {
 	// userTx, err := client.WaitForTransaction(txHash, ton.PollTimeout(duration))
 	// require.NoError(t, err)
@@ -393,7 +395,7 @@ func waitForTx(t *testing.T, client *ton.APIClient, txHash string, duration time
 func ConfirmExecWithSeqNrsTon(
 	t *testing.T,
 	sourceChain uint64,
-	dest deployment.TonChain,
+	dest cldf_ton.Chain,
 	offRampAddress tonaddress.Address,
 	startBlock *uint64,
 	expectedSeqNrs []uint64,

@@ -14,12 +14,18 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	solanago "github.com/gagliardetto/solana-go"
+	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
+	cldf_ton "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton"
+
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
@@ -343,8 +349,8 @@ type MemoryEnvironment struct {
 	TestConfig  *TestConfigs
 	Chains      map[uint64]cldf.Chain
 	SolChains   map[uint64]cldf.SolChain
-	AptosChains map[uint64]cldf.AptosChain
-	TonChains   map[uint64]cldf.TonChain
+	AptosChains map[uint64]cldf_aptos.Chain
+	TonChains   map[uint64]cldf_ton.Chain
 }
 
 func (m *MemoryEnvironment) TestConfigs() *TestConfigs {
@@ -383,11 +389,25 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 	m.SolChains = memory.NewMemoryChainsSol(t, tc.SolChains)
 	m.AptosChains = memory.NewMemoryChainsAptos(t, tc.AptosChains)
 	m.TonChains = memory.NewMemoryChainsTon(t, tc.TonChains)
+
+	blockChains := map[uint64]cldf_chain.BlockChain{}
+	for selector, ch := range m.Chains {
+		blockChains[selector] = ch
+	}
+	for selector, ch := range m.SolChains {
+		blockChains[selector] = ch
+	}
+	for selector, ch := range m.AptosChains {
+		blockChains[selector] = ch
+	}
+	for selector, ch := range m.TonChains {
+		blockChains[selector] = ch
+	}
+
 	env := cldf.Environment{
 		Chains:      m.Chains,
 		SolChains:   m.SolChains,
-		AptosChains: m.AptosChains,
-		TonChains:   m.TonChains,
+		BlockChains: cldf_chain.NewBlockChains(blockChains),
 	}
 	t.Logf("[TON-E2E] Created %d EVM chains, %d Solana chains, %d Aptos chains, %d Ton chains", len(m.Chains), len(m.SolChains), len(m.AptosChains), len(m.TonChains))
 	homeChainSel, feedSel := allocateCCIPChainSelectors(chains)
@@ -526,15 +546,12 @@ func NewEnvironmentWithPrerequisitesContracts(t *testing.T, tEnv TestEnvironment
 	var err error
 	tc := tEnv.TestConfigs()
 	e := NewEnvironment(t, tEnv)
-	// TODO: This returned "e" should have Ton in e.Env.TonChains, but it doesn't.
-	fmt.Printf("[TON-E2E] AFTER NewEnvironment, no ton chain(seems evm basics only?), %+v\n", e)
-	evmChains := e.Env.AllChainSelectors()
-	solChains := e.Env.AllChainSelectorsSolana()
-	tonChains := e.Env.AllChainSelectorsTon()
-	fmt.Printf("[TON-E2E] AFTER AllChainSelectorsTon, tonChains = %+v\n", tonChains)
+	evmChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))
+	solChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilySolana))
+	tonChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyTon))
 	//nolint:gocritic // we need to segregate EVM and Solana chains
 	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfigV2)
-	for _, c := range e.Env.AllChainSelectors() {
+	for _, c := range e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM)) {
 		mcmsCfg[c] = proposalutils.SingleGroupTimelockConfigV2(t)
 	}
 	prereqCfg := make([]changeset.DeployPrerequisiteConfigPerChain, 0)
@@ -640,19 +657,17 @@ func NewEnvironmentWithJobsAndContracts(t *testing.T, tEnv TestEnvironment) Depl
 	fmt.Println("[TON-E2E] NewEnvironmentWithJobsAndContracts")
 	var err error
 	e := NewEnvironmentWithPrerequisitesContracts(t, tEnv)
-	fmt.Printf("[TON-E2E] AFTER NewEnvironmentWithPrerequisitesContracts: %+v\n", e)
-	evmChains := e.Env.AllChainSelectors()
-	solChains := e.Env.AllChainSelectorsSolana()
-	aptosChains := e.Env.AllChainSelectorsAptos()
-	tonChains := e.Env.AllChainSelectorsTon()
-	fmt.Printf("[TON-E2E] AllChainSelectorsTon: %+v\n", tonChains)
+	evmChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))
+	solChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilySolana))
+	aptosChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyAptos))
+	tonChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyTon))
 	//nolint:gocritic // we need to segregate EVM and Solana chains
 	allChains := append(evmChains, solChains...)
 	allChains = append(allChains, aptosChains...)
 	allChains = append(allChains, tonChains...)
 	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfig)
 
-	for _, c := range e.Env.AllChainSelectors() {
+	for _, c := range e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM)) {
 		mcmsCfg[c] = proposalutils.SingleGroupTimelockConfig(t)
 	}
 
@@ -1080,7 +1095,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	}
 	ValidateSolanaState(t, e.Env, solChains)
 
-	// TODO(ton): Validate Ton state
+	// TODO(ton): Validate TON state
 
 	tEnv.UpdateDeployedEnvironment(e)
 	return e

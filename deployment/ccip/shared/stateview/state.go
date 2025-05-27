@@ -301,7 +301,7 @@ func (c CCIPOnChainState) OffRampPermissionLessExecutionThresholdSeconds(ctx con
 		if !ok {
 			return 0, fmt.Errorf("chain %d does not exist in state", selector)
 		}
-		chain, ok := env.AptosChains[selector]
+		chain, ok := env.BlockChains.AptosChains()[selector]
 		if !ok {
 			return 0, fmt.Errorf("chain %d does not exist in env", selector)
 		}
@@ -717,7 +717,6 @@ func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
 	}
 
 	for chainSelector, chain := range e.Chains {
-		// TODO: find a way to remove this, addressbook deprecated
 		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)
 		if err != nil {
 			if !errors.Is(err, cldf.ErrChainNotFound) {

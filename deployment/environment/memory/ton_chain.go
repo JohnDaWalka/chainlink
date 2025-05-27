@@ -17,7 +17,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf_ton "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/xssnick/tonutils-go/liteclient"
@@ -45,12 +45,12 @@ func createTonWallet(t *testing.T, client ton.APIClientWrapped, version wallet.V
 	return pw
 }
 
-func GenerateChainsTon(t *testing.T, numChains int) map[uint64]cldf.TonChain {
+func GenerateChainsTon(t *testing.T, numChains int) map[uint64]cldf_ton.Chain {
 	testTonChainSelectors := getTestTonChainSelectors()
 	if len(testTonChainSelectors) < numChains {
 		t.Fatalf("not enough test ton chain selectors available")
 	}
-	chains := make(map[uint64]cldf.TonChain)
+	chains := make(map[uint64]cldf_ton.Chain)
 	for i := 0; i < numChains; i++ {
 		chainID := testTonChainSelectors[i]
 
@@ -58,13 +58,13 @@ func GenerateChainsTon(t *testing.T, numChains int) map[uint64]cldf.TonChain {
 		// todo: configurable wallet version, we might need to use Highload wallet for some tests
 		// todo: configurable wallet options
 		wallet := createTonWallet(t, nodeClient, wallet.V3R2, wallet.WithWorkchain(0))
-		chains[chainID] = cldf.TonChain{
+		chains[chainID] = cldf_ton.Chain{
 			Client:        nodeClient,
 			Wallet:        wallet,
 			WalletAddress: wallet.Address(),
 		}
 	}
-	t.Logf("Created %d Ton chains: %+v", len(chains), chains)
+	t.Logf("Created %d TON chains: %+v", len(chains), chains)
 	return chains
 }
 
@@ -72,7 +72,7 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 	t.Helper()
 	ctx := context.Background()
 
-	// TODO(ton): integrate Ton into CTF (https://smartcontract-it.atlassian.net/browse/NONEVM-1685)
+	// TODO(ton): integrate TON into CTF (https://smartcontract-it.atlassian.net/browse/NONEVM-1685)
 	// initialize the docker network used by CTF
 	err := framework.DefaultNetwork(once)
 	require.NoError(t, err)
@@ -93,12 +93,12 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 			Type:    "ton",
 			ChainID: strconv.FormatUint(chainID, 10),
 		}
+
 		// TODO: SKIP for now, taking too much time
 		if !useExistingTonlocalnet {
-
 			output, err := blockchain.NewBlockchainNetwork(bcInput)
 			if err != nil {
-				t.Logf("Error creating Ton network: %v", err)
+				t.Logf("Error creating TON network: %v", err)
 				time.Sleep(time.Second)
 				maxRetries -= 1
 				continue
@@ -147,7 +147,7 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 		ready = true
 		break
 	}
-	require.True(t, ready, "Ton network not ready")
+	require.True(t, ready, "TON network not ready")
 	time.Sleep(15 * time.Second) // we have slot errors that force retries if the chain is not given enough time to boot
 
 	// TODO(ton): fund transmitter and default wallets
@@ -157,7 +157,7 @@ func tonChain(t *testing.T, chainID uint64) *ton.APIClient {
 	return client
 }
 
-func createTonChainConfig(chainID string, chain cldf.TonChain) chainlink.RawConfig {
+func createTonChainConfig(chainID string, chain cldf_ton.Chain) chainlink.RawConfig {
 	chainConfig := chainlink.RawConfig{}
 
 	chainConfig["Enabled"] = true

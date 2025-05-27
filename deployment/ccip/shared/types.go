@@ -74,7 +74,7 @@ var (
 	AptosCCIPType     deployment.ContractType = "AptosCCIP"
 	AptosReceiverType deployment.ContractType = "AptosReceiver"
 
-	// Ton
+	// TON
 	TonCCIP     deployment.ContractType = "TonCCIP"
 	TonReceiver deployment.ContractType = "TonReceiver"
 )

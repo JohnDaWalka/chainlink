@@ -6,6 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/rs/zerolog/log"
 
+	cldf_ton "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
 
@@ -43,8 +44,7 @@ func SaveOnchainStateTon(chainSelector uint64, tonState CCIPChainState, e cldf.E
 func LoadOnchainStateTon(e cldf.Environment) (map[uint64]CCIPChainState, error) {
 	tonChains := make(map[uint64]CCIPChainState)
 
-	for chainSelector, chain := range e.TonChains {
-		// TODO adding address book support for Ton
+	for chainSelector, chain := range e.BlockChains.TonChains() {
 		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)
 		if err != nil {
 			// Chain not found in address book, initialize empty
@@ -63,7 +63,7 @@ func LoadOnchainStateTon(e cldf.Environment) (map[uint64]CCIPChainState, error) 
 }
 
 // LoadChainStateTon Loads all state for a TonChain into state
-func LoadChainStateTon(chain cldf.TonChain, addresses map[string]cldf.TypeAndVersion) (CCIPChainState, error) {
+func LoadChainStateTon(chain cldf_ton.Chain, addresses map[string]cldf.TypeAndVersion) (CCIPChainState, error) {
 	state := CCIPChainState{}
 
 	// Most programs upgraded in place, but some are not so we always want to
@@ -87,7 +87,7 @@ func LoadChainStateTon(chain cldf.TonChain, addresses map[string]cldf.TypeAndVer
 		case shared.Router:
 			state.Router = *address
 		default:
-			log.Warn().Str("address", addressStr).Str("type", string(tvStr.Type)).Msg("Unknown Ton address type")
+			log.Warn().Str("address", addressStr).Str("type", string(tvStr.Type)).Msg("Unknown TON address type")
 			continue
 		}
 
