@@ -453,9 +453,9 @@ func setupPoRTestEnvironment(
 	mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet,
 	capabilityFactoryFns []func([]string) []keystone_changeset.DONCapabilityWithConfig,
 ) *porSetupOutput {
-	extraAllowedPorts := []int{}
+	extraAllowedGatewayPorts := []int{}
 	if _, ok := priceProvider.(*FakePriceProvider); ok {
-		extraAllowedPorts = append(extraAllowedPorts, in.Fake.Port)
+		extraAllowedGatewayPorts = append(extraAllowedGatewayPorts, in.Fake.Port)
 	}
 
 	customBinariesPaths := map[string]string{}
@@ -485,11 +485,10 @@ func setupPoRTestEnvironment(
 		JdInput:                              *in.JD,
 		InfraInput:                           *in.Infra,
 		CustomBinariesPaths:                  customBinariesPaths,
-		ExtraAllowedPorts:                    extraAllowedPorts,
 		JobSpecFactoryFunctions: []keystonetypes.JobSpecFactoryFn{
 			creconsensus.ConsensusJobSpecFactoryFn(chainIDUint64),
 			crecron.CronJobSpecFactoryFn(cronBinaryPathInTheContainer),
-			cregateway.GatewayJobSpecFactoryFn(extraAllowedPorts, []string{}, []string{"0.0.0.0/0"}),
+			cregateway.GatewayJobSpecFactoryFn(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
 			crecompute.ComputeJobSpecFactoryFn,
 		},
 		ConfigFactoryFunctions: []keystonetypes.ConfigFactoryFn{

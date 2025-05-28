@@ -80,7 +80,6 @@ type SetupOutput struct {
 }
 
 type SetupInput struct {
-	ExtraAllowedPorts                    []int
 	CapabilitiesAwareNodeSets            []*cretypes.CapabilitiesAwareNodeSet
 	CapabilitiesContractFactoryFunctions []func([]cretypes.CapabilityFlag) []keystone_changeset.DONCapabilityWithConfig
 	ConfigFactoryFunctions               []cretypes.ConfigFactoryFn
