@@ -571,7 +571,7 @@ func (cfg UpdateOnRampAllowListConfig) Validate(env cldf.Environment) error {
 		}
 		var signer common.Address
 		if cfg.MCMS == nil {
-			signer = env.Chains[srcSel].DeployerKey.From
+			signer = env.BlockChains.EVMChains()[srcSel].DeployerKey.From
 			if signer != config.AllowlistAdmin && signer != owner {
 				return fmt.Errorf("deployer key is not onramp's %s owner nor allowlist admin", onRamp.Address())
 			}

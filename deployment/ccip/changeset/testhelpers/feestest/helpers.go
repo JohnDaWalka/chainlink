@@ -70,8 +70,8 @@ func RunFeeTokenTestCase(tc FeeTokenTestCase) {
 	expectedSeqNum := make(map[testhelpers.SourceDestPair]uint64)
 	expectedSeqNumExec := make(map[testhelpers.SourceDestPair][]uint64)
 
-	srcChain := tc.env.Chains[tc.src]
-	dstChain := tc.env.Chains[tc.dst]
+	srcChain := tc.env.BlockChains.EVMChains()[tc.src]
+	dstChain := tc.env.BlockChains.EVMChains()[tc.dst]
 
 	state, err := stateview.LoadOnchainState(tc.env)
 	require.NoError(tc.t, err)

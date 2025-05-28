@@ -750,7 +750,7 @@ func connectNewChainLogic(env cldf.Environment, c ConnectNewChainConfig) (cldf.C
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get owner of contract %s: %w", contract.Address().Hex(), err)
 			}
-			if owner == env.Chains[c.NewChainSelector].DeployerKey.From {
+			if owner == env.BlockChains.EVMChains()[c.NewChainSelector].DeployerKey.From {
 				addressesToTransfer = append(addressesToTransfer, contract.Address())
 			}
 		}
@@ -770,7 +770,7 @@ func connectNewChainLogic(env cldf.Environment, c ConnectNewChainConfig) (cldf.C
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to get admin role of timelock on chain with selector %d: %w", c.NewChainSelector, err)
 		}
-		hasRole, err := state.Chains[c.NewChainSelector].Timelock.HasRole(readOpts, adminRole, env.Chains[c.NewChainSelector].DeployerKey.From)
+		hasRole, err := state.Chains[c.NewChainSelector].Timelock.HasRole(readOpts, adminRole, env.BlockChains.EVMChains()[c.NewChainSelector].DeployerKey.From)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to check if deployer key has admin role on timelock on chain with selector %d: %w", c.NewChainSelector, err)
 		}

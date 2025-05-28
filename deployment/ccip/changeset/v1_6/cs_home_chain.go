@@ -69,7 +69,7 @@ func DeployHomeChainChangeset(env cldf.Environment, cfg DeployHomeChainConfig) (
 	}
 	ab := cldf.NewMemoryAddressBook()
 	// Note we also deploy the cap reg.
-	_, err = deployHomeChain(env.Logger, env, ab, env.Chains[cfg.HomeChainSel], cfg.RMNStaticConfig, cfg.RMNDynamicConfig, cfg.NodeOperators, cfg.NodeP2PIDsPerNodeOpAdmin)
+	_, err = deployHomeChain(env.Logger, env, ab, env.BlockChains.EVMChains()[cfg.HomeChainSel], cfg.RMNStaticConfig, cfg.RMNDynamicConfig, cfg.NodeOperators, cfg.NodeP2PIDsPerNodeOpAdmin)
 	if err != nil {
 		env.Logger.Errorw("Failed to deploy cap reg", "err", err, "addresses", env.ExistingAddresses)
 		return cldf.ChangesetOutput{
@@ -594,7 +594,7 @@ func removeNodesPrecondition(env cldf.Environment, c RemoveNodesConfig) error {
 		return fmt.Errorf("timelock does not exist for home chain %d", c.HomeChainSel)
 	}
 	err = commoncs.ValidateOwnership(env.GetContext(), c.MCMSCfg != nil,
-		env.Chains[c.HomeChainSel].DeployerKey.From, state.Chains[c.HomeChainSel].Timelock.Address(),
+		env.BlockChains.EVMChains()[c.HomeChainSel].DeployerKey.From, state.Chains[c.HomeChainSel].Timelock.Address(),
 		state.Chains[c.HomeChainSel].CapabilityRegistry)
 	if err != nil {
 		return fmt.Errorf("failed to validate ownership: %w", err)
@@ -612,7 +612,7 @@ func removeNodesPrecondition(env cldf.Environment, c RemoveNodesConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to get owner of Capreg %s: %w", capReg.Address().String(), err)
 	}
-	txSender := env.Chains[c.HomeChainSel].DeployerKey.From
+	txSender := env.BlockChains.EVMChains()[c.HomeChainSel].DeployerKey.From
 	if c.MCMSCfg != nil {
 		txSender = state.Chains[c.HomeChainSel].Timelock.Address()
 	}
@@ -650,7 +650,7 @@ func removeNodesLogic(env cldf.Environment, c RemoveNodesConfig) (cldf.Changeset
 		return cldf.ChangesetOutput{}, err
 	}
 	homeChainState := state.Chains[c.HomeChainSel]
-	homeChain := env.Chains[c.HomeChainSel]
+	homeChain := env.BlockChains.EVMChains()[c.HomeChainSel]
 	txOpts := homeChain.DeployerKey
 	if c.MCMSCfg != nil {
 		txOpts = cldf.SimTransactOpts()
@@ -745,7 +745,7 @@ func addUpdateOrRemoveNopsPrecondition(env cldf.Environment, c AddOrUpdateNopsCo
 		return fmt.Errorf("timelock does not exist for home chain %d", c.homeChainSel)
 	}
 	err = commoncs.ValidateOwnership(env.GetContext(), c.MCMSConfig != nil,
-		env.Chains[c.homeChainSel].DeployerKey.From, state.Chains[c.homeChainSel].Timelock.Address(),
+		env.BlockChains.EVMChains()[c.homeChainSel].DeployerKey.From, state.Chains[c.homeChainSel].Timelock.Address(),
 		state.Chains[c.homeChainSel].CapabilityRegistry)
 	if err != nil {
 		return fmt.Errorf("failed to validate ownership: %w", err)
@@ -780,7 +780,7 @@ func updateNopsLogic(env cldf.Environment, c AddOrUpdateNopsConfig) (cldf.Change
 	}
 	// ensure that all node operators exist
 	homeChainState := state.Chains[c.homeChainSel]
-	homeChain := env.Chains[c.homeChainSel]
+	homeChain := env.BlockChains.EVMChains()[c.homeChainSel]
 	if len(c.NopUpdates) != len(c.ExistingNops) {
 		return cldf.ChangesetOutput{}, errors.New("number of existing node operators and node operators to update must be same and should follow same order")
 	}
@@ -914,7 +914,7 @@ func addNopsLogic(env cldf.Environment, c AddOrUpdateNopsConfig) (cldf.Changeset
 	}
 	// ensure that all node operators exist
 	homeChainState := state.Chains[c.homeChainSel]
-	homeChain := env.Chains[c.homeChainSel]
+	homeChain := env.BlockChains.EVMChains()[c.homeChainSel]
 	if len(c.NopUpdates) == 0 {
 		return cldf.ChangesetOutput{}, errors.New("no node operators to add")
 	}
@@ -968,7 +968,7 @@ func removeNopsLogic(env cldf.Environment, c AddOrUpdateNopsConfig) (cldf.Change
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get home chain selector: %w", err)
 	}
 	homeChainState := state.Chains[c.homeChainSel]
-	homeChain := env.Chains[c.homeChainSel]
+	homeChain := env.BlockChains.EVMChains()[c.homeChainSel]
 	if len(c.ExistingNops) == 0 {
 		return cldf.ChangesetOutput{}, errors.New("no node operators to remove")
 	}

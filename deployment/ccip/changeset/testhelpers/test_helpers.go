@@ -213,7 +213,7 @@ func LatestBlock(ctx context.Context, env cldf.Environment, chainSelector uint64
 
 	switch family {
 	case chainsel.FamilyEVM:
-		latesthdr, err := env.Chains[chainSelector].Client.HeaderByNumber(ctx, nil)
+		latesthdr, err := env.BlockChains.EVMChains()[chainSelector].Client.HeaderByNumber(ctx, nil)
 		if err != nil {
 			return 0, errors.Wrapf(err, "failed to get latest header for chain %d", chainSelector)
 		}
@@ -230,7 +230,7 @@ func LatestBlocksByChain(ctx context.Context, env cldf.Environment) (map[uint64]
 	latestBlocks := make(map[uint64]uint64)
 
 	chains := []uint64{}
-	chains = slices.AppendSeq(chains, maps.Keys(env.Chains))
+	chains = slices.AppendSeq(chains, maps.Keys(env.BlockChains.EVMChains()))
 	chains = slices.AppendSeq(chains, maps.Keys(env.SolChains))
 	for _, selector := range chains {
 		block, err := LatestBlock(ctx, env, selector)
@@ -1136,7 +1136,7 @@ func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, st
 // is connected to every other chain except itself.
 func AddLanesForAll(t *testing.T, e *DeployedEnv, state stateview.CCIPOnChainState) {
 	chains := []uint64{}
-	allEvmChainSelectors := maps.Keys(e.Env.Chains)
+	allEvmChainSelectors := maps.Keys(e.Env.BlockChains.EVMChains())
 	allSolChainSelectors := maps.Keys(e.Env.SolChains)
 	chains = slices.AppendSeq(chains, allEvmChainSelectors)
 	chains = slices.AppendSeq(chains, allSolChainSelectors)
@@ -2006,7 +2006,7 @@ func WaitForTokenBalances(
 				case chainsel.FamilyEVM:
 					token := common.BytesToAddress(id.token)
 					receiver := common.BytesToAddress(id.receiver)
-					WaitForTheTokenBalance(ctx, t, token, receiver, env.Chains[chainSelector], balance)
+					WaitForTheTokenBalance(ctx, t, token, receiver, env.BlockChains.EVMChains()[chainSelector], balance)
 				case chainsel.FamilySolana:
 					expectedBalance := balance.Uint64()
 					// TODO: need to pass env rather than chains

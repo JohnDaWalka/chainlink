@@ -614,7 +614,7 @@ func addMinterAndMintTokenERC677(env cldf.Environment, selector uint64, token *b
 
 // addMinterAndMintTokenERC677Helper adds the minter role to the recipient and mints the specified amount of tokens to the recipient's address.
 func addMinterAndMintTokenERC677Helper(env cldf.Environment, selector uint64, token *burn_mint_erc677_helper.BurnMintERC677Helper, recipient common.Address, amount *big.Int) error {
-	baseToken, err := burn_mint_erc677.NewBurnMintERC677(token.Address(), env.Chains[selector].Client)
+	baseToken, err := burn_mint_erc677.NewBurnMintERC677(token.Address(), env.BlockChains.EVMChains()[selector].Client)
 	if err != nil {
 		return fmt.Errorf("failed to cast helper to base token: %w", err)
 	}
@@ -622,7 +622,7 @@ func addMinterAndMintTokenERC677Helper(env cldf.Environment, selector uint64, to
 }
 
 func addMinterAndMintTokenHelper(env cldf.Environment, selector uint64, token *burn_mint_erc677.BurnMintERC677, recipient common.Address, amount *big.Int) error {
-	deployerKey := env.Chains[selector].DeployerKey
+	deployerKey := env.BlockChains.EVMChains()[selector].DeployerKey
 	ctx := env.GetContext()
 	// check if owner is the deployer key
 	owner, err := token.Owner(&bind.CallOpts{Context: ctx})
@@ -637,7 +637,7 @@ func addMinterAndMintTokenHelper(env cldf.Environment, selector uint64, token *b
 	if err != nil {
 		return fmt.Errorf("failed to grant mint role to %s on chain %d: %w", recipient.Hex(), selector, err)
 	}
-	if _, err := env.Chains[selector].Confirm(tx); err != nil {
+	if _, err := env.BlockChains.EVMChains()[selector].Confirm(tx); err != nil {
 		return fmt.Errorf("failed to wait for transaction %s on chain %d: %w", tx.Hash().Hex(), selector, err)
 	}
 	env.Logger.Infow("Transaction granting mint role mined successfully",
@@ -649,7 +649,7 @@ func addMinterAndMintTokenHelper(env cldf.Environment, selector uint64, token *b
 		return fmt.Errorf("failed to mint %s tokens to %s on chain %d: %w",
 			token.Address().Hex(), recipient.Hex(), selector, err)
 	}
-	if _, err := env.Chains[selector].Confirm(tx); err != nil {
+	if _, err := env.BlockChains.EVMChains()[selector].Confirm(tx); err != nil {
 		return fmt.Errorf("failed to wait for transaction %s on chain %d: %w",
 			tx.Hash().Hex(), selector, err)
 	}

@@ -124,7 +124,7 @@ func (c DeployTokenPoolContractsConfig) Validate(env cldf.Environment) error {
 		if err != nil {
 			return fmt.Errorf("failed to validate chain selector %d: %w", chainSelector, err)
 		}
-		chain, ok := env.Chains[chainSelector]
+		chain, ok := env.BlockChains.EVMChains()[chainSelector]
 		if !ok {
 			return fmt.Errorf("chain with selector %d does not exist in environment", chainSelector)
 		}
@@ -169,7 +169,7 @@ func DeployTokenPoolContractsChangeset(env cldf.Environment, c DeployTokenPoolCo
 	for chainSelector, poolConfig := range c.NewPools {
 		chainSelector, poolConfig := chainSelector, poolConfig
 		deployGrp.Go(func() error {
-			chain := env.Chains[chainSelector]
+			chain := env.BlockChains.EVMChains()[chainSelector]
 			chainState := state.Chains[chainSelector]
 			_, err := deployTokenPool(env.Logger, chain, chainState, newAddresses, poolConfig, c.IsTestRouter)
 			if err != nil {

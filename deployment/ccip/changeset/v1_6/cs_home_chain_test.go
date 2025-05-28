@@ -86,7 +86,7 @@ func TestDeployHomeChainIdempotent(t *testing.T) {
 		HomeChainSel:     e.HomeChainSel,
 		RMNStaticConfig:  testhelpers.NewTestRMNStaticConfig(),
 		RMNDynamicConfig: testhelpers.NewTestRMNDynamicConfig(),
-		NodeOperators:    testhelpers.NewTestNodeOperator(e.Env.Chains[e.HomeChainSel].DeployerKey.From),
+		NodeOperators:    testhelpers.NewTestNodeOperator(e.Env.BlockChains.EVMChains()[e.HomeChainSel].DeployerKey.From),
 		NodeP2PIDsPerNodeOpAdmin: map[string][][32]byte{
 			"NodeOperator": nodes.NonBootstraps().PeerIDs(),
 		},
@@ -374,7 +374,7 @@ func TestAddUpdateAndRemoveNops(t *testing.T) {
 						HomeChainSel:     e.HomeChainSel,
 						RMNDynamicConfig: testhelpers.NewTestRMNDynamicConfig(),
 						RMNStaticConfig:  testhelpers.NewTestRMNStaticConfig(),
-						NodeOperators:    testhelpers.NewTestNodeOperator(e.Env.Chains[e.HomeChainSel].DeployerKey.From),
+						NodeOperators:    testhelpers.NewTestNodeOperator(e.Env.BlockChains.EVMChains()[e.HomeChainSel].DeployerKey.From),
 						NodeP2PIDsPerNodeOpAdmin: map[string][][32]byte{
 							testhelpers.TestNodeOperator: nodes.NonBootstraps().PeerIDs(),
 						},
@@ -531,7 +531,7 @@ func TestRemoveNodes(t *testing.T) {
 						HomeChainSel:     e.HomeChainSel,
 						RMNDynamicConfig: testhelpers.NewTestRMNDynamicConfig(),
 						RMNStaticConfig:  testhelpers.NewTestRMNStaticConfig(),
-						NodeOperators:    testhelpers.NewTestNodeOperator(e.Env.Chains[e.HomeChainSel].DeployerKey.From),
+						NodeOperators:    testhelpers.NewTestNodeOperator(e.Env.BlockChains.EVMChains()[e.HomeChainSel].DeployerKey.From),
 						NodeP2PIDsPerNodeOpAdmin: map[string][][32]byte{
 							testhelpers.TestNodeOperator: nodes.NonBootstraps().PeerIDs(),
 						},

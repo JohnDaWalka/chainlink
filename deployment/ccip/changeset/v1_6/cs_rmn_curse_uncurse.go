@@ -663,7 +663,7 @@ type EvmCursableChain struct {
 }
 
 func (c EvmCursableChain) Name() string {
-	return c.env.Chains[c.selector].Name()
+	return c.env.BlockChains.EVMChains()[c.selector].Name()
 }
 
 func (c EvmCursableChain) IsConnectedToSourceChain(sourceSelector uint64) (bool, error) {

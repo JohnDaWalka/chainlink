@@ -81,7 +81,7 @@ func LaneConfigsForChains(t *testing.T, env cldf.Environment, state stateview.CC
 		require.NotNil(t, destChainState.RMNProxy)
 		require.NotNil(t, destChainState.TokenAdminRegistry)
 		priceGetterConfig := CreatePriceGetterConfig(t, state, src, dest)
-		block, err := env.Chains[dest].Client.HeaderByNumber(context.Background(), nil)
+		block, err := env.BlockChains.EVMChains()[dest].Client.HeaderByNumber(context.Background(), nil)
 		require.NoError(t, err)
 		destEVMChainIdStr, err := chain_selectors.GetChainIDFromSelector(dest)
 		require.NoError(t, err)

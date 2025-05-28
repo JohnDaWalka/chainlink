@@ -43,7 +43,7 @@ func AcceptAdminRoleChangeset(env cldf.Environment, c TokenAdminRegistryChangese
 	deployerGroup := deployergroup.NewDeployerGroup(env, state, c.MCMS).WithDeploymentContext("accept admin role for tokens on token admin registries")
 
 	for chainSelector, tokenSymbolToPoolInfo := range c.Pools {
-		chain := env.Chains[chainSelector]
+		chain := env.BlockChains.EVMChains()[chainSelector]
 		chainState := state.MustGetEVMChainState(chainSelector)
 		opts, err := deployerGroup.GetDeployer(chainSelector)
 		if err != nil {
