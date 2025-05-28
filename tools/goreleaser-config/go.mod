@@ -1,6 +1,8 @@
 module github.com/smartcontractkit/chainlink/tools/goreleaser-config
 
-go 1.22.8
+go 1.24
+
+toolchain go1.24.1
 
 require (
 	github.com/goreleaser/goreleaser-pro/v2 v2.3.2-pro
