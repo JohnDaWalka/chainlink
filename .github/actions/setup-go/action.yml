@@ -4,6 +4,9 @@ inputs:
   only-modules:
     description: Set to 'true' to only cache modules
     default: "false"
+  skip-all-caches:
+    description: Set to 'true' to only setup go, but do not restore or create any module or build caches.
+    default: "false"
   cache-version:
     description: Set this to cache bust
     default: "1"
@@ -65,7 +68,7 @@ runs:
     # We will only restore the cache by default (by calling actions/cache/restore) and let the
     # `go-mod-cache.yml` workflow handle the creation.
     - uses: actions/cache/restore@v4
-      if: ${{ inputs.restore-module-cache-only == 'true' }}
+      if: ${{ inputs.restore-module-cache-only == 'true' && inputs.skip-all-caches == 'false' }}
       name: Cache Go Modules
       with:
         path: |
@@ -79,7 +82,7 @@ runs:
     # If this is called, then it will create the cache entry upon a cache miss.
     # The cache is created after a cache miss, and after job completes successfully.
     - uses: actions/cache@v4
-      if: ${{ inputs.restore-module-cache-only != 'true' }}
+      if: ${{ inputs.restore-module-cache-only != 'true' && inputs.skip-all-caches == 'false'}}
       name: Cache Go Modules
       with:
         path: |
@@ -124,7 +127,7 @@ runs:
     #     - These "checkpoints" are always being created from scratch, rather than upserted.
     #     - Upserting increases the size of the cache over time, which is fine for PR branches, but not for develop.
     - name: Build Cache Key
-      if: ${{ inputs.only-modules == 'false' }}
+      if: ${{ inputs.only-modules == 'false' && inputs.skip-all-caches == 'false' }}
       id: build-cache-keys
       shell: bash
       env:
@@ -159,8 +162,7 @@ runs:
     #   2. If inputs.restore-build-cache-only == 'true'
     - uses: actions/cache/restore@v4
       name: Cache Go Build Outputs (restore)
-
-      if: ${{ inputs.only-modules == 'false' && (github.event_name == 'merge_group' || inputs.restore-build-cache-only == 'true') }}
+      if: ${{ inputs.only-modules == 'false' && (github.event_name == 'merge_group' || inputs.restore-build-cache-only == 'true') && inputs.skip-all-caches == 'false' }}
       with:
         path: |
           ${{ steps.go-cache-dir.outputs.gobuildcache }}
@@ -174,7 +176,7 @@ runs:
     # A negation of the above actions/cache/restore call.
     # This will create the cache entry upon a cache miss for the primary key.
     - uses: actions/cache@v4
-      if: ${{ inputs.only-modules == 'false' && (github.event_name != 'merge_group' && inputs.restore-build-cache-only == 'false') }}
+      if: ${{ inputs.only-modules == 'false' && (github.event_name != 'merge_group' && inputs.restore-build-cache-only == 'false') && inputs.skip-all-caches == 'false'}}
       id: build-cache
       name: Cache Go Build Outputs
       with:
