@@ -6,16 +6,18 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/don_id_claimer"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -23,6 +25,8 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
+	ccipops "github.com/smartcontractkit/chainlink/deployment/ccip/operation/evm/v1_6"
+	ccipseq "github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -121,7 +125,7 @@ func TestConnectNewChain(t *testing.T) {
 			state, err := stateview.LoadOnchainState(e)
 			require.NoError(t, err, "must load onchain state")
 
-			selectors := e.AllChainSelectors()
+			selectors := e.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))
 			var newSelector uint64
 			remoteChainSelectors := make([]uint64, 0, len(selectors)-1)
 			for _, selector := range selectors {
@@ -293,7 +297,7 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 			var linkAddress common.Address
 			remoteChainSelectors := make([]uint64, 0, len(chainIDs)-1)
 			addressesByChain := make(map[uint64]map[string]cldf.TypeAndVersion, len(chainIDs)-1)
-			for _, selector := range e.AllChainSelectors() {
+			for _, selector := range e.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM)) {
 				if selector != deployedEnvironment.HomeChainSel && newChainSelector == 0 {
 					newChainSelector = selector
 					linkAddress = state.Chains[selector].LinkToken.Address()
@@ -409,9 +413,9 @@ func TestAddAndPromoteCandidatesForNewChain(t *testing.T) {
 					TokenPrices:              map[common.Address]*big.Int{},
 					FeeQuoterDestChainConfig: v1_6.DefaultFeeQuoterDestChainConfig(true),
 				},
-				ChainContractParams: v1_6.ChainContractParams{
-					FeeQuoterParams: v1_6.DefaultFeeQuoterParams(),
-					OffRampParams:   v1_6.DefaultOffRampParams(),
+				ChainContractParams: ccipseq.ChainContractParams{
+					FeeQuoterParams: ccipops.DefaultFeeQuoterParams(),
+					OffRampParams:   ccipops.DefaultOffRampParams(),
 				},
 				ExistingContracts: commoncs.ExistingContractsConfig{
 					ExistingContracts: []commoncs.Contract{

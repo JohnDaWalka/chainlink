@@ -7,8 +7,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/maps"
+
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -21,6 +24,8 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
+	ccipops "github.com/smartcontractkit/chainlink/deployment/ccip/operation/evm/v1_6"
+	ccipseq "github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
@@ -35,7 +40,7 @@ import (
 func TestInvalidOCR3Params(t *testing.T) {
 	e, _ := testhelpers.NewMemoryEnvironment(t,
 		testhelpers.WithPrerequisiteDeploymentOnly(nil))
-	chain1 := e.Env.AllChainSelectors()[0]
+	chain1 := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))[0]
 	envNodes, err := deployment.NodeInfo(e.Env.NodeIDs, e.Env.Offchain)
 	require.NoError(t, err)
 	// Need to deploy prerequisites first so that we can form the USDC config
@@ -55,12 +60,12 @@ func TestInvalidOCR3Params(t *testing.T) {
 		),
 		commonchangeset.Configure(
 			cldf.CreateLegacyChangeSet(v1_6.DeployChainContractsChangeset),
-			v1_6.DeployChainContractsConfig{
+			ccipseq.DeployChainContractsConfig{
 				HomeChainSelector: e.HomeChainSel,
-				ContractParamsPerChain: map[uint64]v1_6.ChainContractParams{
+				ContractParamsPerChain: map[uint64]ccipseq.ChainContractParams{
 					chain1: {
-						FeeQuoterParams: v1_6.DefaultFeeQuoterParams(),
-						OffRampParams:   v1_6.DefaultOffRampParams(),
+						FeeQuoterParams: ccipops.DefaultFeeQuoterParams(),
+						OffRampParams:   ccipops.DefaultOffRampParams(),
 					},
 				},
 			},

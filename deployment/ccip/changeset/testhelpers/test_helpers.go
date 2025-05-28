@@ -16,6 +16,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
@@ -24,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/message_hasher"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry"
 
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	ccipChangeSetSolana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
@@ -219,7 +222,7 @@ func LatestBlock(ctx context.Context, env cldf.Environment, chainSelector uint64
 		block := latesthdr.Number.Uint64()
 		return block, nil
 	case chainsel.FamilySolana:
-		return env.SolChains[chainSelector].Client.GetSlot(ctx, solconfig.DefaultCommitment)
+		return env.BlockChains.SolanaChains()[chainSelector].Client.GetSlot(ctx, solconfig.DefaultCommitment)
 	default:
 		return 0, errors.New("unsupported chain family")
 	}
@@ -230,7 +233,7 @@ func LatestBlocksByChain(ctx context.Context, env cldf.Environment) (map[uint64]
 
 	chains := []uint64{}
 	chains = slices.AppendSeq(chains, maps.Keys(env.Chains))
-	chains = slices.AppendSeq(chains, maps.Keys(env.SolChains))
+	chains = slices.AppendSeq(chains, maps.Keys(env.BlockChains.SolanaChains()))
 	for _, selector := range chains {
 		block, err := LatestBlock(ctx, env, selector)
 		if err != nil {
@@ -285,9 +288,9 @@ func CCIPSendRequest(
 	cfg *CCIPSendReqConfig,
 ) (*types.Transaction, uint64, error) {
 	msg := cfg.Message.(router.ClientEVM2AnyMessage)
-	r := state.Chains[cfg.SourceChain].Router
+	r := state.MustGetEVMChainState(cfg.SourceChain).Router
 	if cfg.IsTestRouter {
-		r = state.Chains[cfg.SourceChain].TestRouter
+		r = state.MustGetEVMChainState(cfg.SourceChain).TestRouter
 	}
 
 	if msg.FeeToken == common.HexToAddress("0x0") { // fee is in native token
@@ -501,7 +504,7 @@ func SendRequestEVM(
 		return nil, err
 	}
 
-	it, err := state.Chains[cfg.SourceChain].OnRamp.FilterCCIPMessageSent(&bind.FilterOpts{
+	it, err := state.MustGetEVMChainState(cfg.SourceChain).OnRamp.FilterCCIPMessageSent(&bind.FilterOpts{
 		Start:   blockNum,
 		End:     &blockNum,
 		Context: context.Background(),
@@ -535,7 +538,7 @@ func SendRequestSol(
 	ctx := e.GetContext()
 
 	s := state.SolChains[cfg.SourceChain]
-	c := e.SolChains[cfg.SourceChain]
+	c := e.BlockChains.SolanaChains()[cfg.SourceChain]
 
 	destinationChainSelector := cfg.DestChain
 	message := cfg.Message.(ccip_router.SVM2AnyMessage)
@@ -561,8 +564,8 @@ func SendRequestSol(
 		}
 		feeTokenProgramID = feeTokenInfo.Value.Owner
 
-		var mint token.Mint
-		if err := solbinary.NewBinDecoder(feeTokenInfo.Bytes()).Decode(&mint); err != nil {
+		_, err = GetSolanaTokenMintInfo(feeTokenInfo)
+		if err != nil {
 			return nil, fmt.Errorf("the provided fee token is not a valid token: (err = %w)", err)
 		}
 
@@ -570,6 +573,7 @@ func SendRequestSol(
 		if err != nil {
 			return nil, err
 		}
+
 		feeTokenUserATA = ata
 	}
 
@@ -657,12 +661,27 @@ func SendRequestSol(
 	for _, tokenAmount := range message.TokenAmounts {
 		tokenPubKey := tokenAmount.Token
 
-		tokenPoolPubKey, err := MatchTokenToTokenPool(ctx, client, tokenPubKey, []solana.PublicKey{s.LockReleaseTokenPools[shared.CLLMetadata], s.BurnMintTokenPools[shared.CLLMetadata]})
+		allTokenPools := solana.PublicKeySlice{}
+		allTokenPools = slices.AppendSeq(allTokenPools, maps.Values(s.LockReleaseTokenPools))
+		allTokenPools = slices.AppendSeq(allTokenPools, maps.Values(s.BurnMintTokenPools))
+
+		e.Logger.Infof("Found %d token pools in state - searching for matching token pool", len(allTokenPools))
+		tokenPoolPubKey, err := MatchTokenToTokenPool(ctx, client, tokenPubKey, allTokenPools)
 		if err != nil {
 			return nil, err
 		}
 
-		tokenPool, err := soltokens.NewTokenPool(solana.Token2022ProgramID, tokenPoolPubKey, tokenPubKey)
+		e.Logger.Infof("Token '%s' was matched to token pool '%s'",
+			tokenPubKey.String(),
+			tokenPoolPubKey.String(),
+		)
+
+		tokenProgramID, err := InferSolanaTokenProgramID(ctx, client, tokenPubKey)
+		if err != nil {
+			return nil, err
+		}
+
+		tokenPool, err := soltokens.NewTokenPool(tokenProgramID, tokenPoolPubKey, tokenPubKey)
 		if err != nil {
 			return nil, err
 		}
@@ -692,7 +711,7 @@ func SendRequestSol(
 
 		tokenPool.Billing[cfg.DestChain] = billingPDA
 
-		userTokenAccount, _, err := soltokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, tokenPubKey, sender.PublicKey())
+		userTokenAccount, _, err := soltokens.FindAssociatedTokenAddress(tokenProgramID, tokenPubKey, sender.PublicKey())
 		if err != nil {
 			return nil, err
 		}
@@ -790,6 +809,35 @@ func ConvertSolanaCrossChainAmountToBigInt(amount ccip_router.CrossChainAmount) 
 	return big.NewInt(0).SetBytes(bytes)
 }
 
+func InferSolanaTokenProgramID(ctx context.Context, client *rpc.Client, tokenPubKey solana.PublicKey) (solana.PublicKey, error) {
+	tokenAcctInfo, err := client.GetAccountInfo(ctx, tokenPubKey)
+	if errors.Is(err, rpc.ErrNotFound) {
+		// NOTE: we use a fallback value of Token2022ProgramID to maintain backwards compatibility with the Solana tests
+		return solana.Token2022ProgramID, nil
+	}
+	if err != nil {
+		return solana.PublicKey{}, err
+	}
+
+	_, err = GetSolanaTokenMintInfo(tokenAcctInfo)
+	if err != nil {
+		return solana.PublicKey{}, fmt.Errorf("expected '%s' to be a token public key: (err = %w)", tokenPubKey, err)
+	}
+
+	return tokenAcctInfo.Value.Owner, nil
+}
+
+func GetSolanaTokenMintInfo(tokenAcctInfo *rpc.GetAccountInfoResult) (token.Mint, error) {
+	var mint token.Mint
+
+	err := solbinary.NewBinDecoder(tokenAcctInfo.Bytes()).Decode(&mint)
+	if err != nil {
+		return token.Mint{}, fmt.Errorf("failed to decode token mint data: (err = %w)", err)
+	}
+
+	return mint, nil
+}
+
 func MatchTokenToTokenPool(ctx context.Context, client *rpc.Client, tokenPubKey solana.PublicKey, tokenPoolPubKeys solana.PublicKeySlice) (solana.PublicKey, error) {
 	for _, tokenPoolPubKey := range tokenPoolPubKeys {
 		tokenPoolConfigAddress, err := soltokens.TokenPoolConfigAddress(tokenPubKey, tokenPoolPubKey)
@@ -885,7 +933,7 @@ func addLaneSolanaChangesets(t *testing.T, e *DeployedEnv, solChainSelector, rem
 					remoteChainSelector: {
 						RouterDestinationConfig: solRouter.DestChainConfig{
 							AllowListEnabled: true,
-							AllowedSenders:   []solana.PublicKey{e.Env.SolChains[solChainSelector].DeployerKey.PublicKey()},
+							AllowedSenders:   []solana.PublicKey{e.Env.BlockChains.SolanaChains()[solChainSelector].DeployerKey.PublicKey()},
 						},
 					},
 				},
@@ -1068,7 +1116,7 @@ func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, st
 	fromFamily, _ := chainsel.GetSelectorFamily(from)
 	tokenPrices := map[common.Address]*big.Int{}
 	if fromFamily == chainsel.FamilyEVM {
-		stateChainFrom := state.Chains[from]
+		stateChainFrom := state.MustGetEVMChainState(from)
 		tokenPrices = map[common.Address]*big.Int{
 			stateChainFrom.LinkToken.Address(): DefaultLinkPrice,
 			stateChainFrom.Weth9.Address():     DefaultWethPrice,
@@ -1091,7 +1139,7 @@ func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, st
 func AddLanesForAll(t *testing.T, e *DeployedEnv, state stateview.CCIPOnChainState) {
 	chains := []uint64{}
 	allEvmChainSelectors := maps.Keys(e.Env.Chains)
-	allSolChainSelectors := maps.Keys(e.Env.SolChains)
+	allSolChainSelectors := maps.Keys(e.Env.BlockChains.SolanaChains())
 	chains = slices.AppendSeq(chains, allEvmChainSelectors)
 	chains = slices.AppendSeq(chains, allSolChainSelectors)
 
@@ -1271,10 +1319,10 @@ func DeployTransferableTokenSolana(
 		return nil, nil, solana.PublicKey{}, err
 	}
 	// attach token and pool to the registry
-	if err := attachTokenToTheRegistry(e.Chains[evmChainSel], state.Chains[evmChainSel], evmDeployer, evmToken.Address(), evmPool.Address()); err != nil {
+	if err := attachTokenToTheRegistry(e.Chains[evmChainSel], state.MustGetEVMChainState(evmChainSel), evmDeployer, evmToken.Address(), evmPool.Address()); err != nil {
 		return nil, nil, solana.PublicKey{}, err
 	}
-	solDeployerKey := e.SolChains[solChainSel].DeployerKey.PublicKey()
+	solDeployerKey := e.BlockChains.SolanaChains()[solChainSel].DeployerKey.PublicKey()
 
 	// deploy solana token
 	solTokenName := evmTokenName
@@ -1429,10 +1477,8 @@ func deployTokenPoolsInParallel(
 		if err != nil {
 			return err
 		}
-		if err := attachTokenToTheRegistry(chains[src], state.Chains[src], srcActor, srcToken.Address(), srcPool.Address()); err != nil {
-			return err
-		}
-		return nil
+		err = attachTokenToTheRegistry(chains[src], state.MustGetEVMChainState(src), srcActor, srcToken.Address(), srcPool.Address())
+		return err
 	})
 	deployGrp.Go(func() error {
 		var err error
@@ -1440,10 +1486,8 @@ func deployTokenPoolsInParallel(
 		if err != nil {
 			return err
 		}
-		if err := attachTokenToTheRegistry(chains[dst], state.Chains[dst], dstActor, dstToken.Address(), dstPool.Address()); err != nil {
-			return err
-		}
-		return nil
+		err = attachTokenToTheRegistry(chains[dst], state.MustGetEVMChainState(dst), dstActor, dstToken.Address(), dstPool.Address())
+		return err
 	})
 	if err := deployGrp.Wait(); err != nil {
 		return nil, nil, nil, nil, err
@@ -1715,7 +1759,7 @@ func MintAndAllow(
 					_, err = e.Chains[chain].Confirm(tx)
 					require.NoError(t, err)
 
-					tx, err = token.Approve(sender, state.Chains[chain].Router.Address(), tenCoins)
+					tx, err = token.Approve(sender, state.MustGetEVMChainState(chain).Router.Address(), tenCoins)
 					require.NoError(t, err)
 					_, err = e.Chains[chain].Confirm(tx)
 					require.NoError(t, err)
@@ -1976,7 +2020,7 @@ func WaitForTokenBalances(
 					if err != nil {
 						return err
 					}
-					WaitForTheTokenBalanceSol(ctx, t, token, tokenReceiver, env.SolChains[chainSelector], expectedBalance)
+					WaitForTheTokenBalanceSol(ctx, t, token, tokenReceiver, env.BlockChains.SolanaChains()[chainSelector], expectedBalance)
 				default:
 				}
 				return nil
@@ -2017,7 +2061,7 @@ func WaitForTheTokenBalanceSol(
 	t *testing.T,
 	token solana.PublicKey,
 	receiver solana.PublicKey,
-	chain cldf.SolChain,
+	chain cldf_solana.Chain,
 	expected uint64,
 ) {
 	require.Eventually(t, func() bool {
@@ -2118,30 +2162,30 @@ func ValidateSolanaState(t *testing.T, e cldf.Environment, solChainSelectors []u
 
 		// Get router config
 		var routerConfigAccount solRouter.Config
-		err = e.SolChains[sel].GetAccountDataBorshInto(testcontext.Get(t), chainState.RouterConfigPDA, &routerConfigAccount)
+		err = e.BlockChains.SolanaChains()[sel].GetAccountDataBorshInto(testcontext.Get(t), chainState.RouterConfigPDA, &routerConfigAccount)
 		require.NoError(t, err, "Failed to deserialize router config for chain %d", sel)
 
 		// Get fee quoter config
 		var feeQuoterConfigAccount solFeeQuoter.Config
-		err = e.SolChains[sel].GetAccountDataBorshInto(testcontext.Get(t), chainState.FeeQuoterConfigPDA, &feeQuoterConfigAccount)
+		err = e.BlockChains.SolanaChains()[sel].GetAccountDataBorshInto(testcontext.Get(t), chainState.FeeQuoterConfigPDA, &feeQuoterConfigAccount)
 		require.NoError(t, err, "Failed to deserialize fee quoter config for chain %d", sel)
 
 		// Get offramp config
 		var offRampConfigAccount solOffRamp.Config
-		err = e.SolChains[sel].GetAccountDataBorshInto(testcontext.Get(t), chainState.OffRampConfigPDA, &offRampConfigAccount)
+		err = e.BlockChains.SolanaChains()[sel].GetAccountDataBorshInto(testcontext.Get(t), chainState.OffRampConfigPDA, &offRampConfigAccount)
 		require.NoError(t, err, "Failed to deserialize offramp config for chain %d", sel)
 
 		// Get rmn remote config
 		var rmnRemoteConfigAccount solRmnRemote.Config
-		err = e.SolChains[sel].GetAccountDataBorshInto(testcontext.Get(t), chainState.RMNRemoteConfigPDA, &rmnRemoteConfigAccount)
+		err = e.BlockChains.SolanaChains()[sel].GetAccountDataBorshInto(testcontext.Get(t), chainState.RMNRemoteConfigPDA, &rmnRemoteConfigAccount)
 		require.NoError(t, err, "Failed to deserialize rmn remote config for chain %d", sel)
 
-		addressLookupTable, err := solanastateview.FetchOfframpLookupTable(e.GetContext(), e.SolChains[sel], chainState.OffRamp)
+		addressLookupTable, err := solanastateview.FetchOfframpLookupTable(e.GetContext(), e.BlockChains.SolanaChains()[sel], chainState.OffRamp)
 		require.NoError(t, err, "Failed to get offramp lookup table for chain %d", sel)
 
 		addresses, err := solcommon.GetAddressLookupTable(
 			e.GetContext(),
-			e.SolChains[sel].Client,
+			e.BlockChains.SolanaChains()[sel].Client,
 			addressLookupTable)
 		require.NoError(t, err, "Failed to get address lookup table for chain %d", sel)
 		require.GreaterOrEqual(t, len(addresses), 22, "Not enough addresses found in lookup table for chain %d", sel)
@@ -2158,11 +2202,11 @@ func DeploySolanaCcipReceiver(t *testing.T, e cldf.Environment) {
 			chainState.Router,
 			solanastateview.FindReceiverTargetAccount(chainState.Receiver),
 			externalExecutionConfigPDA,
-			e.SolChains[solSelector].DeployerKey.PublicKey(),
+			e.BlockChains.SolanaChains()[solSelector].DeployerKey.PublicKey(),
 			solana.SystemProgramID,
 		).ValidateAndBuild()
 		require.NoError(t, ixErr)
-		err = e.SolChains[solSelector].Confirm([]solana.Instruction{instruction})
+		err = e.BlockChains.SolanaChains()[solSelector].Confirm([]solana.Instruction{instruction})
 		require.NoError(t, err)
 	}
 }
@@ -2194,7 +2238,7 @@ func TransferOwnershipSolana(
 
 	addresses, err := e.ExistingAddresses.AddressesForChain(solChain)
 	require.NoError(t, err)
-	mcmState, err := state.MaybeLoadMCMSWithTimelockChainStateSolana(e.SolChains[solChain], addresses)
+	mcmState, err := state.MaybeLoadMCMSWithTimelockChainStateSolana(e.BlockChains.SolanaChains()[solChain], addresses)
 	require.NoError(t, err)
 
 	// Fund signer PDAs for timelock and mcm
@@ -2202,7 +2246,7 @@ func TransferOwnershipSolana(
 	timelockSignerPDA = state.GetTimelockSignerPDA(mcmState.TimelockProgram, mcmState.TimelockSeed)
 	mcmSignerPDA = state.GetMCMSignerPDA(mcmState.McmProgram, mcmState.ProposerMcmSeed)
 	err = memory.FundSolanaAccounts(e.GetContext(), []solana.PublicKey{timelockSignerPDA, mcmSignerPDA},
-		100, e.SolChains[solChain].Client)
+		100, e.BlockChains.SolanaChains()[solChain].Client)
 	require.NoError(t, err)
 	t.Logf("funded timelock signer PDA: %s", timelockSignerPDA.String())
 	t.Logf("funded mcm signer PDA: %s", mcmSignerPDA.String())
@@ -2235,29 +2279,29 @@ func GenTestTransferOwnershipConfig(
 
 	// chain contracts
 	for _, chain := range chains {
-		timelocksPerChain[chain] = state.Chains[chain].Timelock.Address()
+		timelocksPerChain[chain] = state.MustGetEVMChainState(chain).Timelock.Address()
 		contracts[chain] = []common.Address{
-			state.Chains[chain].OnRamp.Address(),
-			state.Chains[chain].OffRamp.Address(),
-			state.Chains[chain].FeeQuoter.Address(),
-			state.Chains[chain].NonceManager.Address(),
-			state.Chains[chain].RMNRemote.Address(),
-			state.Chains[chain].Router.Address(),
-			state.Chains[chain].TokenAdminRegistry.Address(),
-			state.Chains[chain].RMNProxy.Address(),
+			state.MustGetEVMChainState(chain).OnRamp.Address(),
+			state.MustGetEVMChainState(chain).OffRamp.Address(),
+			state.MustGetEVMChainState(chain).FeeQuoter.Address(),
+			state.MustGetEVMChainState(chain).NonceManager.Address(),
+			state.MustGetEVMChainState(chain).RMNRemote.Address(),
+			state.MustGetEVMChainState(chain).Router.Address(),
+			state.MustGetEVMChainState(chain).TokenAdminRegistry.Address(),
+			state.MustGetEVMChainState(chain).RMNProxy.Address(),
 		}
 		if withTestRouterTransfer {
-			contracts[chain] = append(contracts[chain], state.Chains[chain].TestRouter.Address())
+			contracts[chain] = append(contracts[chain], state.MustGetEVMChainState(chain).TestRouter.Address())
 		}
 	}
 
 	// home chain
-	homeChainTimelockAddress := state.Chains[e.HomeChainSel].Timelock.Address()
+	homeChainTimelockAddress := state.MustGetEVMChainState(e.HomeChainSel).Timelock.Address()
 	timelocksPerChain[e.HomeChainSel] = homeChainTimelockAddress
 	contracts[e.HomeChainSel] = append(contracts[e.HomeChainSel],
-		state.Chains[e.HomeChainSel].CapabilityRegistry.Address(),
-		state.Chains[e.HomeChainSel].CCIPHome.Address(),
-		state.Chains[e.HomeChainSel].RMNHome.Address(),
+		state.MustGetEVMChainState(e.HomeChainSel).CapabilityRegistry.Address(),
+		state.MustGetEVMChainState(e.HomeChainSel).CCIPHome.Address(),
+		state.MustGetEVMChainState(e.HomeChainSel).RMNHome.Address(),
 	)
 
 	return commoncs.TransferToMCMSWithTimelockConfig{
@@ -2270,7 +2314,11 @@ func DeployCCIPContractsTest(t *testing.T, solChains int) {
 	// Deploy all the CCIP contracts.
 	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
-	allChains := append(e.Env.AllChainSelectors(), e.Env.AllChainSelectorsSolana()...)
+	evmChainSelectors := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chainsel.FamilyEVM))
+	solChainSelectors := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chainsel.FamilySolana))
+	var allChains []uint64
+	allChains = append(allChains, evmChainSelectors...)
+	allChains = append(allChains, solChainSelectors...)
 	snap, solana, err := state.View(&e.Env, allChains)
 	require.NoError(t, err)
 	if solChains > 0 {
@@ -2297,14 +2345,14 @@ func TransferToTimelock(
 	timelockContracts := make(map[uint64]*proposalutils.TimelockExecutionContracts, len(chains)+1)
 	for _, chain := range chains {
 		timelockContracts[chain] = &proposalutils.TimelockExecutionContracts{
-			Timelock:  state.Chains[chain].Timelock,
-			CallProxy: state.Chains[chain].CallProxy,
+			Timelock:  state.MustGetEVMChainState(chain).Timelock,
+			CallProxy: state.MustGetEVMChainState(chain).CallProxy,
 		}
 	}
 	// Add the home chain to the timelock contracts.
 	timelockContracts[tenv.HomeChainSel] = &proposalutils.TimelockExecutionContracts{
-		Timelock:  state.Chains[tenv.HomeChainSel].Timelock,
-		CallProxy: state.Chains[tenv.HomeChainSel].CallProxy,
+		Timelock:  state.MustGetEVMChainState(tenv.HomeChainSel).Timelock,
+		CallProxy: state.MustGetEVMChainState(tenv.HomeChainSel).CallProxy,
 	}
 	// Transfer ownership to timelock so that we can promote the zero digest later down the line.
 	_, err := commoncs.Apply(t, tenv.Env,
