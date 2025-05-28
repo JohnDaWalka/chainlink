@@ -23,7 +23,7 @@ import (
 
 const (
 	solFundingLamports = 100000
-	evmFundingEth      = 100
+	evmFundingEth      = 1
 )
 
 func distributeTransmitterFunds(lggr logger.Logger, nodeInfo []devenv.Node, env cldf.Environment) error {
