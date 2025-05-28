@@ -6,8 +6,9 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	"golang.org/x/sync/errgroup"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"math/big"
 
@@ -18,7 +19,7 @@ import (
 
 func distributeTransmitterFunds(lggr logger.Logger, nodeInfo []devenv.Node, env deployment.Environment) error {
 	transmittersStr := make([]common.Address, 0)
-	fundingAmount := new(big.Int).Mul(deployment.UBigInt(100), deployment.UBigInt(1e18)) // 100 ETH
+	fundingAmount := new(big.Int).Mul(deployment.UBigInt(1), deployment.UBigInt(1e18)) // 100 ETH
 
 	g := new(errgroup.Group)
 	for sel, chain := range env.Chains {
