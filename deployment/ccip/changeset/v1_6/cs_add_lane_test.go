@@ -41,7 +41,7 @@ func TestAddLanesWithTestRouter(t *testing.T) {
 		TokenAmounts: nil,
 		FeeToken:     common.HexToAddress("0x0"),
 		ExtraArgs:    nil,
-	}, false)
+	})
 	expectedSeqNumExec[testhelpers.SourceDestPair{
 		SourceChainSelector: chain1,
 		DestChainSelector:   chain2,

@@ -74,8 +74,11 @@ func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
 				Receiver:               receiverBase64Bytes,
 				MsgData:                []byte("hello CCIPReceiver"),
 				ExtraArgs:              testhelpers.MakeEVMExtraArgsV2(100000, false),
-				ExpectedExecutionState: testhelpers.EXECUTION_STATE_FAILURE, // state would be failed
-				AssertionOnError:       false,                               // Relayer is not implemented yet for TON
+				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS, // state would be failed
+				ExtraAssertions: []func(t *testing.T){
+					func(t *testing.T) {
+					},
+				},
 			},
 		)
 	})

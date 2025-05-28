@@ -12,10 +12,10 @@ type NoopChainRWProvider struct{}
 
 // GetChainWriter NoopChainRWProvider returns a new ContractWriter for Solana chains.
 func (g NoopChainRWProvider) GetChainWriter(ctx context.Context, pararms ccipcommon.ChainWriterProviderOpts) (types.ContractWriter, error) {
-	return nil, nil
+	return pararms.Relayer.NewContractWriter(ctx, nil)
 }
 
 // GetChainReader returns a new ContractReader for Solana chains.
 func (g NoopChainRWProvider) GetChainReader(ctx context.Context, params ccipcommon.ChainReaderProviderOpts) (types.ContractReader, error) {
-	return nil, nil
+	return params.Relayer.NewContractReader(ctx, nil)
 }

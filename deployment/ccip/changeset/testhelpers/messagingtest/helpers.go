@@ -69,15 +69,14 @@ func NewTestSetup(
 }
 
 type TestSetup struct {
-	T                *testing.T
-	Sender           []byte
-	Env              cldf.Environment
-	DeployedEnv      testhelpers.DeployedEnv
-	OnchainState     stateview.CCIPOnChainState
-	SourceChain      uint64
-	DestChain        uint64
-	TestRouter       bool
-	AssertionOnError bool
+	T            *testing.T
+	Sender       []byte
+	Env          cldf.Environment
+	DeployedEnv  testhelpers.DeployedEnv
+	OnchainState stateview.CCIPOnChainState
+	SourceChain  uint64
+	DestChain    uint64
+	TestRouter   bool
 }
 
 type TestCase struct {
@@ -91,7 +90,6 @@ type TestCase struct {
 	FeeToken               string
 	ExpectedExecutionState int
 	ExtraAssertions        []func(t *testing.T)
-	AssertionOnError       bool
 }
 
 type ValidationType int
@@ -108,13 +106,13 @@ type TestCaseOutput struct {
 	MsgSentEvent *onramp.OnRampCCIPMessageSent
 }
 
-func sleepAndReplay(t *testing.T, e testhelpers.DeployedEnv, assertOnError bool, chainSelectors ...uint64) {
+func sleepAndReplay(t *testing.T, e testhelpers.DeployedEnv, chainSelectors ...uint64) {
 	time.Sleep(30 * time.Second)
 	replayBlocks := make(map[uint64]uint64)
 	for _, selector := range chainSelectors {
 		replayBlocks[selector] = 1
 	}
-	testhelpers.ReplayLogs(t, e.Env.Offchain, replayBlocks, testhelpers.WithAssertOnError(assertOnError))
+	testhelpers.ReplayLogs(t, e.Env.Offchain, replayBlocks)
 }
 
 func getLatestNonce(tc TestCase) uint64 {
@@ -199,7 +197,6 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 		tc.DestChain,
 		tc.TestRouter,
 		msg,
-		tc.AssertionOnError,
 	)
 
 	sourceDest := testhelpers.SourceDestPair{
@@ -218,7 +215,7 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 	// we need to replay missed logs
 	if !tc.Replayed {
 		require.NotNil(tc.T, tc.DeployedEnv)
-		sleepAndReplay(tc.T, tc.DeployedEnv, tc.AssertionOnError, tc.SourceChain, tc.DestChain)
+		sleepAndReplay(tc.T, tc.DeployedEnv, tc.SourceChain, tc.DestChain)
 		out.Replayed = true
 	}
 

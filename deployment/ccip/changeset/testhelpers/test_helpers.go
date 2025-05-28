@@ -389,7 +389,6 @@ func TestSendRequest(
 	src, dest uint64,
 	testRouter bool,
 	msg any,
-	assertError bool,
 	opts ...SendReqOpts,
 ) (msgSentEvent *onramp.OnRampCCIPMessageSent) {
 	baseOpts := []SendReqOpts{
@@ -397,7 +396,6 @@ func TestSendRequest(
 		WithDestChain(dest),
 		WithTestRouter(testRouter),
 		WithMessage(msg),
-		WithAssertError(assertError),
 	}
 	baseOpts = append(baseOpts, opts...)
 
@@ -417,12 +415,6 @@ type CCIPSendReqConfig struct {
 }
 
 type SendReqOpts func(*CCIPSendReqConfig)
-
-func WithAssertError(assertError bool) SendReqOpts {
-	return func(c *CCIPSendReqConfig) {
-		c.AssertError = assertError
-	}
-}
 
 // WithMaxRetries sets the maximum number of retries for the CCIP send request.
 func WithMaxRetries(maxRetries int) SendReqOpts {
@@ -1840,7 +1832,7 @@ func Transfer(
 		t.Errorf("unsupported source chain: %v", family)
 	}
 
-	msgSentEvent := TestSendRequest(t, env, state, sourceChain, destChain, useTestRouter, msg, false)
+	msgSentEvent := TestSendRequest(t, env, state, sourceChain, destChain, useTestRouter, msg)
 	return msgSentEvent, startBlocks
 }
 

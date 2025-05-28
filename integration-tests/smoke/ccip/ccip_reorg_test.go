@@ -392,7 +392,7 @@ func sendCCIPMessage(
 		TokenAmounts: nil,
 		FeeToken:     common.HexToAddress("0x0"),
 		ExtraArgs:    nil,
-	}, false)
+	})
 
 	l.Info().
 		Str("messageID", hexutil.Encode(msgEvent.Message.Header.MessageId[:])).
