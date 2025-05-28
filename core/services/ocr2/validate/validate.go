@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	lloconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/llo/config"
 	mercuryconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/mercury/config"
+	securemintconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/securemint/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
@@ -126,6 +127,8 @@ func validateSpec(ctx context.Context, tree *toml.Tree, spec job.Job, rc plugins
 		return validateOCR2LLOSpec(spec.OCR2OracleSpec.PluginConfig)
 	case types.GenericPlugin:
 		return validateGenericPluginSpec(ctx, spec.OCR2OracleSpec, rc)
+	case types.SecureMint:
+		return validateSecureMintSpec(spec.OCR2OracleSpec.PluginConfig)
 	case "":
 		return errors.New("no plugin specified")
 	default:
@@ -376,4 +379,17 @@ func validateOCR2LLOSpec(jsonConfig job.JSONConfig) error {
 		return pkgerrors.Wrap(err, "error while unmarshaling plugin config")
 	}
 	return pkgerrors.Wrap(pluginConfig.Validate(), "LLO PluginConfig is invalid")
+}
+
+// TODO(gg): update this if needed
+func validateSecureMintSpec(jsonConfig job.JSONConfig) error {
+	if jsonConfig == nil {
+		return errors.New("pluginConfig is empty")
+	}
+	var pluginConfig securemintconfig.PluginConfig
+	err := json.Unmarshal(jsonConfig.Bytes(), &pluginConfig)
+	if err != nil {
+		return pkgerrors.Wrap(err, "error while unmarshalling plugin config")
+	}
+	return pkgerrors.Wrap(pluginConfig.Validate(), "SecureMint PluginConfig is invalid")
 }
