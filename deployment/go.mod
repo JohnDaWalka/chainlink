@@ -16,7 +16,7 @@ require (
 	github.com/aptos-labs/aptos-go-sdk v1.6.3-0.20250331001805-0680b714db6d
 	github.com/aws/aws-sdk-go v1.55.6
 	github.com/deckarep/golang-set/v2 v2.6.0
-	github.com/ethereum/go-ethereum v1.15.7
+	github.com/ethereum/go-ethereum v1.15.11
 	github.com/gagliardetto/binary v0.8.0
 	github.com/gagliardetto/solana-go v1.12.0
 	github.com/go-resty/resty/v2 v2.16.3
@@ -26,7 +26,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/mr-tron/base58 v1.2.0
 	github.com/pelletier/go-toml v1.9.5
-	github.com/pelletier/go-toml/v2 v2.2.3
+	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.33.0
 	github.com/sethvargo/go-retry v0.2.4
@@ -164,8 +164,8 @@ require (
 	github.com/cosmos/ledger-cosmos-go v0.14.0 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
+	github.com/crate-crypto/go-eth-kzg v1.3.0 // indirect
 	github.com/crate-crypto/go-ipa v0.0.0-20240724233137-53bbb0ceb27a // indirect
-	github.com/crate-crypto/go-kzg-4844 v1.1.0 // indirect
 	github.com/creack/pty v1.1.24 // indirect
 	github.com/danieljoos/wincred v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -183,7 +183,7 @@ require (
 	github.com/ebitengine/purego v0.8.2 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/esote/minmaxheap v1.0.0 // indirect
-	github.com/ethereum/c-kzg-4844 v1.0.3 // indirect
+	github.com/ethereum/c-kzg-4844/v2 v2.1.0 // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
