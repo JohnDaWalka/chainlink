@@ -20,7 +20,7 @@ func CompileWorkflow(creCLICommandPath, workflowFolder, workflowFileName string,
 	var outputBuffer bytes.Buffer
 
 	// the CLI expects the workflow code to be located in the same directory as its `go.mod`` file. That's why we assume that the file, which
-	// the CLI also expects `cre.yaml` settings file to be present either in the present directory or any of its parent tree directories.
+	// the CLI also expects `project.yaml` settings file to be present either in the present directory or any of its parent tree directories.
 
 	cliFile, err := os.Create(filepath.Join(workflowFolder, CRECLISettingsFileName))
 	if err != nil {
