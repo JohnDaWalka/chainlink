@@ -49,8 +49,9 @@ func ConfirmGasPriceUpdatedForAll(
 	gasPrice *big.Int,
 ) {
 	var wg errgroup.Group
-	for src, srcChain := range e.BlockChains.EVMChains() {
-		for dest, dstChain := range e.BlockChains.EVMChains() {
+	evmChains := e.BlockChains.EVMChains()
+	for src, srcChain := range evmChains {
+		for dest, dstChain := range evmChains {
 			if src == dest {
 				continue
 			}
