@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/registry_module_owner_custom"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -110,7 +111,7 @@ func TestDeployTokenPoolFactoryChangeset(t *testing.T) {
 				for _, selector := range selectors {
 					// Deploy token admin registry
 					tokenAdminRegistry, err := cldf.DeployContract(e.Logger, e.BlockChains.EVMChains()[selector], e.ExistingAddresses,
-						func(chain cldf.Chain) cldf.ContractDeploy[*token_admin_registry.TokenAdminRegistry] {
+						func(chain cldf_evm.Chain) cldf.ContractDeploy[*token_admin_registry.TokenAdminRegistry] {
 							tokenAdminRegistryAddr, tx2, tokenAdminRegistry, err2 := token_admin_registry.DeployTokenAdminRegistry(
 								chain.DeployerKey,
 								chain.Client)
@@ -121,7 +122,7 @@ func TestDeployTokenPoolFactoryChangeset(t *testing.T) {
 					require.NoError(t, err, "failed to deploy token admin registry")
 					// Deploy RMN proxy
 					rmnProxy, err := cldf.DeployContract(lggr, e.BlockChains.EVMChains()[selector], e.ExistingAddresses,
-						func(chain cldf.Chain) cldf.ContractDeploy[*rmn_proxy_contract.RMNProxy] {
+						func(chain cldf_evm.Chain) cldf.ContractDeploy[*rmn_proxy_contract.RMNProxy] {
 							rmnProxyAddr, tx2, rmnProxy2, err2 := rmn_proxy_contract.DeployRMNProxy(
 								chain.DeployerKey,
 								chain.Client,
@@ -136,7 +137,7 @@ func TestDeployTokenPoolFactoryChangeset(t *testing.T) {
 					require.NoError(t, err, "failed to deploy RMN proxy")
 					// Deploy router
 					_, err = cldf.DeployContract(e.Logger, e.BlockChains.EVMChains()[selector], e.ExistingAddresses,
-						func(chain cldf.Chain) cldf.ContractDeploy[*router.Router] {
+						func(chain cldf_evm.Chain) cldf.ContractDeploy[*router.Router] {
 							routerAddr, tx2, routerC, err2 := router.DeployRouter(
 								chain.DeployerKey,
 								chain.Client,
@@ -152,7 +153,7 @@ func TestDeployTokenPoolFactoryChangeset(t *testing.T) {
 					require.NoError(t, err, "failed to deploy router")
 					// Deploy registry module
 					_, err = cldf.DeployContract(e.Logger, e.BlockChains.EVMChains()[selector], e.ExistingAddresses,
-						func(chain cldf.Chain) cldf.ContractDeploy[*registry_module_owner_custom.RegistryModuleOwnerCustom] {
+						func(chain cldf_evm.Chain) cldf.ContractDeploy[*registry_module_owner_custom.RegistryModuleOwnerCustom] {
 							regModAddr, tx2, regMod, err2 := registry_module_owner_custom.DeployRegistryModuleOwnerCustom(
 								chain.DeployerKey,
 								chain.Client,
@@ -172,7 +173,7 @@ func TestDeployTokenPoolFactoryChangeset(t *testing.T) {
 				require.NoError(t, err, "failed to load onchain state")
 				for _, selector := range selectors {
 					_, err := cldf.DeployContract(e.Logger, e.BlockChains.EVMChains()[selector], e.ExistingAddresses,
-						func(chain cldf.Chain) cldf.ContractDeploy[*registry_module_owner_custom.RegistryModuleOwnerCustom] {
+						func(chain cldf_evm.Chain) cldf.ContractDeploy[*registry_module_owner_custom.RegistryModuleOwnerCustom] {
 							regModAddr, tx2, regMod, err2 := registry_module_owner_custom.DeployRegistryModuleOwnerCustom(
 								chain.DeployerKey,
 								chain.Client,

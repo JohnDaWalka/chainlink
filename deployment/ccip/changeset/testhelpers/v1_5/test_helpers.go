@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
@@ -319,8 +320,8 @@ func SendRequest(
 
 func WaitForCommit(
 	t *testing.T,
-	src cldf.Chain,
-	dest cldf.Chain,
+	src cldf_evm.Chain,
+	dest cldf_evm.Chain,
 	commitStore *commit_store.CommitStore,
 	seqNr uint64,
 ) {
@@ -347,8 +348,8 @@ func WaitForCommit(
 
 func WaitForNoCommit(
 	t *testing.T,
-	src cldf.Chain,
-	dest cldf.Chain,
+	src cldf_evm.Chain,
+	dest cldf_evm.Chain,
 	commitStore *commit_store.CommitStore,
 	seqNr uint64,
 ) {
@@ -375,8 +376,8 @@ func WaitForNoCommit(
 
 func WaitForExecute(
 	t *testing.T,
-	src cldf.Chain,
-	dest cldf.Chain,
+	src cldf_evm.Chain,
+	dest cldf_evm.Chain,
 	offRamp *evm_2_evm_offramp.EVM2EVMOffRamp,
 	seqNrs []uint64,
 	blockNum uint64,

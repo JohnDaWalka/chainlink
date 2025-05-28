@@ -27,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -709,7 +710,7 @@ func AddDonAndSetCandidateChangeset(
 // This proposes to set up OCR3 config for the commit plugin for the DON
 func newDonWithCandidateOp(
 	txOpts *bind.TransactOpts,
-	homeChain cldf.Chain,
+	homeChain cldf_evm.Chain,
 	donID uint32,
 	pluginConfig ccip_home.CCIPHomeOCR3Config,
 	capReg *capabilities_registry.CapabilitiesRegistry,
@@ -911,7 +912,7 @@ func SetCandidateChangeset(
 func setCandidateOnExistingDon(
 	e cldf.Environment,
 	txOpts *bind.TransactOpts,
-	homeChain cldf.Chain,
+	homeChain cldf_evm.Chain,
 	capReg *capabilities_registry.CapabilitiesRegistry,
 	ccipHome *ccip_home.CCIPHome,
 	nodes deployment.Nodes,
@@ -983,7 +984,7 @@ func setCandidateOnExistingDon(
 // promoteCandidateOp will create the MCMS Operation for `promoteCandidateAndRevokeActive` directed towards the capabilityRegistry
 func promoteCandidateOp(
 	txOpts *bind.TransactOpts,
-	homeChain cldf.Chain,
+	homeChain cldf_evm.Chain,
 	capReg *capabilities_registry.CapabilitiesRegistry,
 	ccipHome *ccip_home.CCIPHome,
 	nodes deployment.Nodes,
@@ -1048,7 +1049,7 @@ func promoteCandidateOp(
 func promoteCandidateForChainOps(
 	lggr logger.Logger,
 	txOpts *bind.TransactOpts,
-	homeChain cldf.Chain,
+	homeChain cldf_evm.Chain,
 	capReg *capabilities_registry.CapabilitiesRegistry,
 	ccipHome *ccip_home.CCIPHome,
 	nodes deployment.Nodes,
@@ -1211,7 +1212,7 @@ func RevokeCandidateChangeset(e cldf.Environment, cfg RevokeCandidateChangesetCo
 
 func revokeCandidateOps(
 	txOpts *bind.TransactOpts,
-	homeChain cldf.Chain,
+	homeChain cldf_evm.Chain,
 	capReg *capabilities_registry.CapabilitiesRegistry,
 	ccipHome *ccip_home.CCIPHome,
 	nodes deployment.Nodes,
@@ -1519,7 +1520,7 @@ func deployDonIDClaimerChangesetLogic(e cldf.Environment, _ DeployDonIDClaimerCo
 	}, nil
 }
 
-func deployDonIDClaimerContract(e cldf.Environment, ab cldf.AddressBook, state stateview.CCIPOnChainState, chain cldf.Chain) error {
+func deployDonIDClaimerContract(e cldf.Environment, ab cldf.AddressBook, state stateview.CCIPOnChainState, chain cldf_evm.Chain) error {
 	chainState, chainExists := state.Chains[chain.Selector]
 	if !chainExists {
 		return fmt.Errorf("chain %s not found in existing state, deploy the prerequisites first", chain.String())
@@ -1527,7 +1528,7 @@ func deployDonIDClaimerContract(e cldf.Environment, ab cldf.AddressBook, state s
 
 	if state.Chains[chain.Selector].DonIDClaimer == nil {
 		_, err := cldf.DeployContract(e.Logger, chain, ab,
-			func(chain cldf.Chain) cldf.ContractDeploy[*don_id_claimer.DonIDClaimer] {
+			func(chain cldf_evm.Chain) cldf.ContractDeploy[*don_id_claimer.DonIDClaimer] {
 				donIDClaimerAddr, tx2, donIDClaimerC, err2 := don_id_claimer.DeployDonIDClaimer(
 					chain.DeployerKey,
 					chain.Client,

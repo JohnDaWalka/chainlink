@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
@@ -124,7 +125,7 @@ func deployCapReg(
 	lggr logger.Logger,
 	state stateview.CCIPOnChainState,
 	ab cldf.AddressBook,
-	chain cldf.Chain,
+	chain cldf_evm.Chain,
 ) (*cldf.ContractDeploy[*capabilities_registry.CapabilitiesRegistry], error) {
 	homeChainState, exists := state.Chains[chain.Selector]
 	if exists {
@@ -137,7 +138,7 @@ func deployCapReg(
 		}
 	}
 	capReg, err := cldf.DeployContract(lggr, chain, ab,
-		func(chain cldf.Chain) cldf.ContractDeploy[*capabilities_registry.CapabilitiesRegistry] {
+		func(chain cldf_evm.Chain) cldf.ContractDeploy[*capabilities_registry.CapabilitiesRegistry] {
 			crAddr, tx, cr, err2 := capabilities_registry.DeployCapabilitiesRegistry(
 				chain.DeployerKey,
 				chain.Client,
@@ -157,7 +158,7 @@ func deployHomeChain(
 	lggr logger.Logger,
 	e cldf.Environment,
 	ab cldf.AddressBook,
-	chain cldf.Chain,
+	chain cldf_evm.Chain,
 	rmnHomeStatic rmn_home.RMNHomeStaticConfig,
 	rmnHomeDynamic rmn_home.RMNHomeDynamicConfig,
 	nodeOps []capabilities_registry.CapabilitiesRegistryNodeOperator,
@@ -182,7 +183,7 @@ func deployHomeChain(
 	} else {
 		ccipHome, err := cldf.DeployContract(
 			lggr, chain, ab,
-			func(chain cldf.Chain) cldf.ContractDeploy[*ccip_home.CCIPHome] {
+			func(chain cldf_evm.Chain) cldf.ContractDeploy[*ccip_home.CCIPHome] {
 				ccAddr, tx, cc, err2 := ccip_home.DeployCCIPHome(
 					chain.DeployerKey,
 					chain.Client,
@@ -204,7 +205,7 @@ func deployHomeChain(
 	} else {
 		rmnHomeContract, err := cldf.DeployContract(
 			lggr, chain, ab,
-			func(chain cldf.Chain) cldf.ContractDeploy[*rmn_home.RMNHome] {
+			func(chain cldf_evm.Chain) cldf.ContractDeploy[*rmn_home.RMNHome] {
 				rmnAddr, tx, rmn, err2 := rmn_home.DeployRMNHome(
 					chain.DeployerKey,
 					chain.Client,
@@ -418,7 +419,7 @@ func isEqualCapabilitiesRegistryNodeParams(a, b capabilities_registry.Capabiliti
 func addNodes(
 	lggr logger.Logger,
 	capReg *capabilities_registry.CapabilitiesRegistry,
-	chain cldf.Chain,
+	chain cldf_evm.Chain,
 	p2pIDsByNodeOpId map[uint32][][32]byte,
 ) error {
 	var nodeParams []capabilities_registry.CapabilitiesRegistryNodeParams
@@ -841,7 +842,7 @@ func updateNopsLogic(env cldf.Environment, c AddOrUpdateNopsConfig) (cldf.Change
 //	    if the sender is the owner of the CapabilitiesRegistry, if onlyOwner is true
 func validateAccess(
 	ctx context.Context,
-	chain cldf.Chain,
+	chain cldf_evm.Chain,
 	chainState evm.CCIPChainState,
 	capReg *capabilities_registry.CapabilitiesRegistry,
 	nop capabilities_registry.CapabilitiesRegistryNodeOperator,

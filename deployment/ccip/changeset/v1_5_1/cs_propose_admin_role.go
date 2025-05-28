@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
@@ -26,7 +27,7 @@ func validateProposeAdminRole(
 	sender common.Address,
 	externalAdmin common.Address,
 	symbol shared.TokenSymbol,
-	chain cldf.Chain,
+	chain cldf_evm.Chain,
 ) error {
 	// To propose ourselves as admin of the token, two things must be true.
 	//   1. We own the token admin registry
