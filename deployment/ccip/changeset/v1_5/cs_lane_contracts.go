@@ -61,11 +61,11 @@ func (c *DeployLaneConfig) Validate(e cldf.Environment, state stateview.CCIPOnCh
 	if err := cldf.IsValidChainSelector(c.DestinationChainSelector); err != nil {
 		return err
 	}
-	sourceChain, exists := e.Chains[c.SourceChainSelector]
+	sourceChain, exists := e.BlockChains.EVMChains()[c.SourceChainSelector]
 	if !exists {
 		return fmt.Errorf("source chain %d not found in environment", c.SourceChainSelector)
 	}
-	destChain, exists := e.Chains[c.DestinationChainSelector]
+	destChain, exists := e.BlockChains.EVMChains()[c.DestinationChainSelector]
 	if !exists {
 		return fmt.Errorf("destination chain %d not found in environment", c.DestinationChainSelector)
 	}
@@ -134,8 +134,8 @@ func deployLane(e cldf.Environment, state stateview.CCIPOnChainState, ab cldf.Ad
 	// update prices on the source price registry
 	sourceChainState := state.MustGetEVMChainState(cfg.SourceChainSelector)
 	destChainState := state.MustGetEVMChainState(cfg.DestinationChainSelector)
-	sourceChain := e.Chains[cfg.SourceChainSelector]
-	destChain := e.Chains[cfg.DestinationChainSelector]
+	sourceChain := e.BlockChains.EVMChains()[cfg.SourceChainSelector]
+	destChain := e.BlockChains.EVMChains()[cfg.DestinationChainSelector]
 	sourcePriceReg := sourceChainState.PriceRegistry
 	tx, err := sourcePriceReg.UpdatePrices(sourceChain.DeployerKey, price_registry_1_2_0.InternalPriceUpdates{
 		TokenPriceUpdates: cfg.InitialTokenPrices,

@@ -48,8 +48,8 @@ func ConfirmGasPriceUpdatedForAll(
 	gasPrice *big.Int,
 ) {
 	var wg errgroup.Group
-	for src, srcChain := range e.Chains {
-		for dest, dstChain := range e.Chains {
+	for src, srcChain := range e.BlockChains.EVMChains() {
+		for dest, dstChain := range e.BlockChains.EVMChains() {
 			if src == dest {
 				continue
 			}
@@ -102,7 +102,7 @@ func ConfirmTokenPriceUpdatedForAll(
 	wethPrice *big.Int,
 ) {
 	var wg errgroup.Group
-	for _, chain := range e.Chains {
+	for _, chain := range e.BlockChains.EVMChains() {
 		chain := chain
 		wg.Go(func() error {
 			var startBlock *uint64
@@ -207,7 +207,7 @@ func ConfirmCommitForAllWithExpectedSeqNums(
 				return commonutils.JustError(ConfirmCommitWithExpectedSeqNumRange(
 					t,
 					srcChain,
-					e.Chains[dstChain],
+					e.BlockChains.EVMChains()[dstChain],
 					state.MustGetEVMChainState(dstChain).OffRamp,
 					startBlock,
 					ccipocr3.SeqNumRange{
@@ -629,7 +629,7 @@ func ConfirmExecWithSeqNrsForAll(
 				innerExecutionStates, err = ConfirmExecWithSeqNrs(
 					t,
 					srcChain,
-					e.Chains[dstChain],
+					e.BlockChains.EVMChains()[dstChain],
 					state.MustGetEVMChainState(dstChain).OffRamp,
 					startBlock,
 					seqRange,

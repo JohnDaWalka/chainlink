@@ -507,7 +507,7 @@ func RemoveDONs(e cldf.Environment, cfg RemoveDONsConfig) (cldf.ChangesetOutput,
 	if err != nil {
 		return cldf.ChangesetOutput{}, err
 	}
-	homeChain, ok := e.Chains[cfg.HomeChainSel]
+	homeChain, ok := e.BlockChains.EVMChains()[cfg.HomeChainSel]
 	if !ok {
 		return cldf.ChangesetOutput{}, fmt.Errorf("home chain %d not found", cfg.HomeChainSel)
 	}

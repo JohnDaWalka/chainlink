@@ -113,7 +113,7 @@ func (c RMNCurseConfig) Validate(e cldf.Environment) error {
 					return fmt.Errorf("invalid subject %x", action.SubjectToCurse)
 				}
 
-				targetChain := e.Chains[action.ChainSelector]
+				targetChain := e.BlockChains.EVMChains()[action.ChainSelector]
 				targetChainState, ok := state.Chains[action.ChainSelector]
 				if !ok {
 					return fmt.Errorf("chain %s not found in onchain state", targetChain.String())

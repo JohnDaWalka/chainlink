@@ -244,7 +244,7 @@ func addTokenE2EPreconditionValidation(e cldf.Environment, config AddTokensE2ECo
 				if poolCfg.DeployPoolConfig == nil {
 					return fmt.Errorf("must provide pool DeploymentConfig for token %s when TokenDeploymentConfig is not provided", token)
 				}
-				if err := poolCfg.DeployPoolConfig.Validate(e.GetContext(), e.Chains[chain], state.MustGetEVMChainState(chain), token); err != nil {
+				if err := poolCfg.DeployPoolConfig.Validate(e.GetContext(), e.BlockChains.EVMChains()[chain], state.MustGetEVMChainState(chain), token); err != nil {
 					return fmt.Errorf("failed to validate token pool config for token %s: %w", token, err)
 				}
 				// populate the internal fields for deploying and configuring token pools and token admin registry and validate them
@@ -449,11 +449,11 @@ func deployTokens(e cldf.Environment, tokenDeployCfg map[uint64]DeployTokenConfi
 	for selector, cfg := range tokenDeployCfg {
 		switch cfg.Type {
 		case shared.BurnMintToken:
-			token, err := cldf.DeployContract(e.Logger, e.Chains[selector], ab,
+			token, err := cldf.DeployContract(e.Logger, e.BlockChains.EVMChains()[selector], ab,
 				func(chain cldf.Chain) cldf.ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
 					tokenAddress, tx, token, err := burn_mint_erc677.DeployBurnMintERC677(
-						e.Chains[selector].DeployerKey,
-						e.Chains[selector].Client,
+						e.BlockChains.EVMChains()[selector].DeployerKey,
+						e.BlockChains.EVMChains()[selector].Client,
 						cfg.TokenName,
 						string(cfg.TokenSymbol),
 						cfg.TokenDecimals,
@@ -472,7 +472,7 @@ func deployTokens(e cldf.Environment, tokenDeployCfg map[uint64]DeployTokenConfi
 				return nil, ab, fmt.Errorf("failed to deploy BurnMintERC677 token "+
 					"%s on chain %d: %w", cfg.TokenName, selector, err)
 			}
-			if err := addMinterAndMintTokenERC677(e, selector, token.Contract, e.Chains[selector].DeployerKey.From,
+			if err := addMinterAndMintTokenERC677(e, selector, token.Contract, e.BlockChains.EVMChains()[selector].DeployerKey.From,
 				new(big.Int).Mul(big.NewInt(1_000), big.NewInt(1_000_000_000))); err != nil {
 				return nil, ab, fmt.Errorf("failed to add minter and mint token "+
 					"%s on chain %d: %w", cfg.TokenName, selector, err)
@@ -489,11 +489,11 @@ func deployTokens(e cldf.Environment, tokenDeployCfg map[uint64]DeployTokenConfi
 
 			tokenAddresses[selector] = token.Address
 		case shared.ERC20Token:
-			token, err := cldf.DeployContract(e.Logger, e.Chains[selector], ab,
+			token, err := cldf.DeployContract(e.Logger, e.BlockChains.EVMChains()[selector], ab,
 				func(chain cldf.Chain) cldf.ContractDeploy[*erc20.ERC20] {
 					tokenAddress, tx, token, err := erc20.DeployERC20(
-						e.Chains[selector].DeployerKey,
-						e.Chains[selector].Client,
+						e.BlockChains.EVMChains()[selector].DeployerKey,
+						e.BlockChains.EVMChains()[selector].Client,
 						cfg.TokenName,
 						string(cfg.TokenSymbol),
 					)
@@ -512,11 +512,11 @@ func deployTokens(e cldf.Environment, tokenDeployCfg map[uint64]DeployTokenConfi
 			}
 			tokenAddresses[selector] = token.Address
 		case shared.ERC677Token:
-			token, err := cldf.DeployContract(e.Logger, e.Chains[selector], ab,
+			token, err := cldf.DeployContract(e.Logger, e.BlockChains.EVMChains()[selector], ab,
 				func(chain cldf.Chain) cldf.ContractDeploy[*erc677.ERC677] {
 					tokenAddress, tx, token, err := erc677.DeployERC677(
-						e.Chains[selector].DeployerKey,
-						e.Chains[selector].Client,
+						e.BlockChains.EVMChains()[selector].DeployerKey,
+						e.BlockChains.EVMChains()[selector].Client,
 						cfg.TokenName,
 						string(cfg.TokenSymbol),
 					)
@@ -534,11 +534,11 @@ func deployTokens(e cldf.Environment, tokenDeployCfg map[uint64]DeployTokenConfi
 			}
 			tokenAddresses[selector] = token.Address
 		case shared.ERC677TokenHelper:
-			token, err := cldf.DeployContract(e.Logger, e.Chains[selector], ab,
+			token, err := cldf.DeployContract(e.Logger, e.BlockChains.EVMChains()[selector], ab,
 				func(chain cldf.Chain) cldf.ContractDeploy[*burn_mint_erc677_helper.BurnMintERC677Helper] {
 					tokenAddress, tx, token, err := burn_mint_erc677_helper.DeployBurnMintERC677Helper(
-						e.Chains[selector].DeployerKey,
-						e.Chains[selector].Client,
+						e.BlockChains.EVMChains()[selector].DeployerKey,
+						e.BlockChains.EVMChains()[selector].Client,
 						cfg.TokenName,
 						string(cfg.TokenSymbol),
 					)
@@ -555,7 +555,7 @@ func deployTokens(e cldf.Environment, tokenDeployCfg map[uint64]DeployTokenConfi
 				return nil, ab, fmt.Errorf("failed to deploy ERC677 token %s on chain %d: %w", cfg.TokenName, selector, err)
 			}
 
-			if err := addMinterAndMintTokenERC677Helper(e, selector, token.Contract, e.Chains[selector].DeployerKey.From,
+			if err := addMinterAndMintTokenERC677Helper(e, selector, token.Contract, e.BlockChains.EVMChains()[selector].DeployerKey.From,
 				new(big.Int).Mul(big.NewInt(1_000), big.NewInt(1_000_000_000))); err != nil {
 				return nil, ab, fmt.Errorf("failed to add minter and mint token "+
 					"%s on chain %d: %w", cfg.TokenName, selector, err)

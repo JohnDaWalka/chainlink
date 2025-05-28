@@ -239,7 +239,7 @@ func TestValidateTokenPoolConfig(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Msg, func(t *testing.T) {
-			err := test.TokenPoolConfig.Validate(e.GetContext(), e.Chains[selectorA], state, test.UseMcms, testhelpers.TestTokenSymbol)
+			err := test.TokenPoolConfig.Validate(e.GetContext(), e.BlockChains.EVMChains()[selectorA], state, test.UseMcms, testhelpers.TestTokenSymbol)
 			require.Error(t, err)
 			require.ErrorContains(t, err, test.ErrStr)
 		})
@@ -471,11 +471,11 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 				state, err := stateview.LoadOnchainState(e)
 				require.NoError(t, err)
 
-				lockReleaseA, _ := token_pool.NewTokenPool(state.Chains[selectorA].LockReleaseTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.Chains[selectorA].Client)
-				burnMintA, _ := token_pool.NewTokenPool(state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.Chains[selectorA].Client)
+				lockReleaseA, _ := token_pool.NewTokenPool(state.Chains[selectorA].LockReleaseTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.BlockChains.EVMChains()[selectorA].Client)
+				burnMintA, _ := token_pool.NewTokenPool(state.Chains[selectorA].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.BlockChains.EVMChains()[selectorA].Client)
 
-				lockReleaseB, _ := token_pool.NewTokenPool(state.Chains[selectorB].LockReleaseTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.Chains[selectorB].Client)
-				burnMintB, _ := token_pool.NewTokenPool(state.Chains[selectorB].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.Chains[selectorB].Client)
+				lockReleaseB, _ := token_pool.NewTokenPool(state.Chains[selectorB].LockReleaseTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.BlockChains.EVMChains()[selectorB].Client)
+				burnMintB, _ := token_pool.NewTokenPool(state.Chains[selectorB].BurnMintTokenPools[testhelpers.TestTokenSymbol][deployment.Version1_5_1].Address(), e.BlockChains.EVMChains()[selectorB].Client)
 
 				pools := map[uint64]tokenPools{
 					selectorA: tokenPools{
@@ -492,8 +492,8 @@ func TestValidateConfigureTokenPoolContracts(t *testing.T) {
 					expectedOwners[selectorA] = state.Chains[selectorA].Timelock.Address()
 					expectedOwners[selectorB] = state.Chains[selectorB].Timelock.Address()
 				} else {
-					expectedOwners[selectorA] = e.Chains[selectorA].DeployerKey.From
-					expectedOwners[selectorB] = e.Chains[selectorB].DeployerKey.From
+					expectedOwners[selectorA] = e.BlockChains.EVMChains()[selectorA].DeployerKey.From
+					expectedOwners[selectorB] = e.BlockChains.EVMChains()[selectorB].DeployerKey.From
 				}
 
 				if test.RegistrationPass != nil {
@@ -743,11 +743,11 @@ func TestValidateConfigureTokenPoolContractsForSolana(t *testing.T) {
 	// DEPLOY EVM TOKEN POOL //
 	///////////////////////////
 	for _, selector := range evmSelectors {
-		token, err := cldf.DeployContract(e.Logger, e.Chains[selector], addressBook,
+		token, err := cldf.DeployContract(e.Logger, e.BlockChains.EVMChains()[selector], addressBook,
 			func(chain cldf.Chain) cldf.ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
 				tokenAddress, tx, token, err := burn_mint_erc677.DeployBurnMintERC677(
-					e.Chains[selector].DeployerKey,
-					e.Chains[selector].Client,
+					e.BlockChains.EVMChains()[selector].DeployerKey,
+					e.BlockChains.EVMChains()[selector].Client,
 					string(testhelpers.TestTokenSymbol),
 					string(testhelpers.TestTokenSymbol),
 					testhelpers.LocalTokenDecimals,
@@ -857,7 +857,7 @@ func TestValidateConfigureTokenPoolContractsForSolana(t *testing.T) {
 				Metadata:          shared.CLLMetadata,
 			}
 		}
-		e.Chains[selector].DeployerKey.GasLimit = 1_000_000 // Hack: Increase gas limit to avoid out of gas error (could this be a cause for test flakiness?)
+		e.BlockChains.EVMChains()[selector].DeployerKey.GasLimit = 1_000_000 // Hack: Increase gas limit to avoid out of gas error (could this be a cause for test flakiness?)
 		e, err = commonchangeset.Apply(t, e, nil,
 			commonchangeset.Configure(
 				cldf.CreateLegacyChangeSet(v1_5_1.ConfigureTokenPoolContractsChangeset),

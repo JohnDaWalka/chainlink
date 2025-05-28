@@ -147,7 +147,7 @@ func TestValidateDeployUSDCTokenPoolInput(t *testing.T) {
 		Chains: 2,
 	})
 	selector := e.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))[0]
-	chain := e.Chains[selector]
+	chain := e.BlockChains.EVMChains()[selector]
 	addressBook := cldf.NewMemoryAddressBook()
 
 	usdcToken, tokenMessenger := deployUSDCPrerequisites(t, lggr, chain, addressBook)
@@ -270,7 +270,7 @@ func TestDeployUSDCTokenPoolContracts(t *testing.T) {
 
 			newUSDCTokenPools := make(map[uint64]v1_5_1.DeployUSDCTokenPoolInput, len(selectors))
 			for _, selector := range selectors {
-				usdcToken, tokenMessenger := deployUSDCPrerequisites(t, lggr, e.Chains[selector], addressBook)
+				usdcToken, tokenMessenger := deployUSDCPrerequisites(t, lggr, e.BlockChains.EVMChains()[selector], addressBook)
 
 				newUSDCTokenPools[selector] = v1_5_1.DeployUSDCTokenPoolInput{
 					TokenAddress:   usdcToken.Address,
@@ -301,7 +301,7 @@ func TestDeployUSDCTokenPoolContracts(t *testing.T) {
 						require.Len(t, usdcTokenPools, 1)
 						owner, err := usdcTokenPools[deployment.Version1_5_1].Owner(nil)
 						require.NoError(t, err)
-						require.Equal(t, e.Chains[selector].DeployerKey.From, owner)
+						require.Equal(t, e.BlockChains.EVMChains()[selector].DeployerKey.From, owner)
 					}
 				}
 			}

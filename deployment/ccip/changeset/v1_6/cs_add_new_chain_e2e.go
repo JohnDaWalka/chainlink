@@ -191,7 +191,7 @@ func addCandidatesForNewChainPrecondition(e cldf.Environment, c AddCandidatesFor
 		return fmt.Errorf("failed to validate update chain config: %w", err)
 	}
 
-	txOpts := e.Chains[c.HomeChainSelector].DeployerKey
+	txOpts := e.BlockChains.EVMChains()[c.HomeChainSelector].DeployerKey
 	// ensure deployer key is authorized as precondition
 	isAuthorizedDeployer, err := state.Chains[c.HomeChainSelector].DonIDClaimer.IsAuthorizedDeployer(&bind.CallOpts{
 		Context: e.GetContext(),
@@ -387,10 +387,10 @@ func addCandidatesForNewChainLogic(e cldf.Environment, c AddCandidatesForNewChai
 	}
 
 	// Claim donID using donIDClaimer at the end of the changeset run
-	txOpts := e.Chains[c.HomeChainSelector].DeployerKey
+	txOpts := e.BlockChains.EVMChains()[c.HomeChainSelector].DeployerKey
 
 	tx, err := state.Chains[c.HomeChainSelector].DonIDClaimer.ClaimNextDONId(txOpts)
-	if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[c.HomeChainSelector], tx, don_id_claimer.DonIDClaimerABI, err); err != nil {
+	if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[c.HomeChainSelector], tx, don_id_claimer.DonIDClaimerABI, err); err != nil {
 		return cldf.ChangesetOutput{}, err
 	}
 
@@ -661,7 +661,7 @@ func (c ConnectNewChainConfig) validateChain(e cldf.Environment, state stateview
 		return fmt.Errorf("failed to validate chain with selector %d: %w", chainSelector, err)
 	}
 	chainState := state.Chains[chainSelector]
-	deployerKey := e.Chains[chainSelector].DeployerKey.From
+	deployerKey := e.BlockChains.EVMChains()[chainSelector].DeployerKey.From
 
 	if chainState.OnRamp == nil {
 		return errors.New("onRamp contract not found")

@@ -296,7 +296,7 @@ func CCIPSendRequest(
 	}
 
 	tx, err := r.CcipSend(cfg.Sender, cfg.DestChain, msg)
-	blockNum, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[cfg.SourceChain], tx, router.RouterABI, err)
+	blockNum, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[cfg.SourceChain], tx, router.RouterABI, err)
 	if err != nil {
 		return tx, 0, errors.Wrap(err, "failed to confirm CCIP message")
 	}
@@ -333,7 +333,7 @@ func retryCcipSendUntilNativeFeeIsSufficient(
 			return nil, 0, fmt.Errorf("failed to send CCIP message: %w", err)
 		}
 
-		blockNum, err := e.Chains[cfg.SourceChain].Confirm(tx)
+		blockNum, err := e.BlockChains.EVMChains()[cfg.SourceChain].Confirm(tx)
 		if err != nil {
 			if strings.Contains(err.Error(), errCodeInsufficientFee) {
 				// Don't count insufficient fee as part of the retry count
@@ -491,7 +491,7 @@ func SendRequestEVM(
 ) (*onramp.OnRampCCIPMessageSent, error) {
 	// Set default sender if not provided
 	if cfg.Sender == nil {
-		cfg.Sender = e.Chains[cfg.SourceChain].DeployerKey
+		cfg.Sender = e.BlockChains.EVMChains()[cfg.SourceChain].DeployerKey
 	}
 
 	e.Logger.Infof("Sending CCIP request from chain selector %d to chain selector %d from sender %s",
@@ -1312,12 +1312,12 @@ func DeployTransferableTokenSolana(
 
 	addresses := e.ExistingAddresses //nolint:staticcheck // addressbook still valid
 	// deploy evm token and pool
-	evmToken, evmPool, err := deployTransferTokenOneEnd(lggr, e.Chains[evmChainSel], evmDeployer, addresses, evmTokenName)
+	evmToken, evmPool, err := deployTransferTokenOneEnd(lggr, e.BlockChains.EVMChains()[evmChainSel], evmDeployer, addresses, evmTokenName)
 	if err != nil {
 		return nil, nil, solana.PublicKey{}, err
 	}
 	// attach token and pool to the registry
-	if err := attachTokenToTheRegistry(e.Chains[evmChainSel], state.MustGetEVMChainState(evmChainSel), evmDeployer, evmToken.Address(), evmPool.Address()); err != nil {
+	if err := attachTokenToTheRegistry(e.BlockChains.EVMChains()[evmChainSel], state.MustGetEVMChainState(evmChainSel), evmDeployer, evmToken.Address(), evmPool.Address()); err != nil {
 		return nil, nil, solana.PublicKey{}, err
 	}
 	solDeployerKey := e.BlockChains.SolanaChains()[solChainSel].DeployerKey.PublicKey()
@@ -1434,12 +1434,12 @@ func DeployTransferableTokenSolana(
 	if err != nil {
 		return nil, nil, solana.PublicKey{}, err
 	}
-	err = setTokenPoolCounterPart(e.Chains[evmChainSel], evmPool, evmDeployer, solChainSel, solTokenAddress.Bytes(), poolConfigPDA.Bytes())
+	err = setTokenPoolCounterPart(e.BlockChains.EVMChains()[evmChainSel], evmPool, evmDeployer, solChainSel, solTokenAddress.Bytes(), poolConfigPDA.Bytes())
 	if err != nil {
 		return nil, nil, solana.PublicKey{}, err
 	}
 
-	err = grantMintBurnPermissions(lggr, e.Chains[evmChainSel], evmToken, evmDeployer, evmPool.Address())
+	err = grantMintBurnPermissions(lggr, e.BlockChains.EVMChains()[evmChainSel], evmToken, evmDeployer, evmPool.Address())
 	if err != nil {
 		return nil, nil, solana.PublicKey{}, err
 	}
@@ -1744,7 +1744,7 @@ func MintAndAllow(
 			for _, mintTokenInfo := range mintTokenInfos {
 				sender := mintTokenInfo.sender
 				if sender == nil {
-					sender = e.Chains[chain].DeployerKey
+					sender = e.BlockChains.EVMChains()[chain].DeployerKey
 				}
 
 				for _, token := range mintTokenInfo.tokens {
@@ -1754,12 +1754,12 @@ func MintAndAllow(
 						new(big.Int).Mul(tenCoins, big.NewInt(10)),
 					)
 					require.NoError(t, err)
-					_, err = e.Chains[chain].Confirm(tx)
+					_, err = e.BlockChains.EVMChains()[chain].Confirm(tx)
 					require.NoError(t, err)
 
 					tx, err = token.Approve(sender, state.MustGetEVMChainState(chain).Router.Address(), tenCoins)
 					require.NoError(t, err)
-					_, err = e.Chains[chain].Confirm(tx)
+					_, err = e.BlockChains.EVMChains()[chain].Confirm(tx)
 					require.NoError(t, err)
 				}
 			}

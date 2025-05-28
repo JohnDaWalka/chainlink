@@ -51,11 +51,11 @@ func TestAddTokenPoolWithMcms(t *testing.T) {
 
 func deployEVMTokenPool(t *testing.T, e cldf.Environment, evmChain uint64) (cldf.Environment, common.Address, error) {
 	addressBook := cldf.NewMemoryAddressBook()
-	evmToken, err := cldf.DeployContract(e.Logger, e.Chains[evmChain], addressBook,
+	evmToken, err := cldf.DeployContract(e.Logger, e.BlockChains.EVMChains()[evmChain], addressBook,
 		func(chain cldf.Chain) cldf.ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
 			tokenAddress, tx, token, err := burn_mint_erc677.DeployBurnMintERC677(
-				e.Chains[evmChain].DeployerKey,
-				e.Chains[evmChain].Client,
+				e.BlockChains.EVMChains()[evmChain].DeployerKey,
+				e.BlockChains.EVMChains()[evmChain].Client,
 				string(testhelpers.TestTokenSymbol),
 				string(testhelpers.TestTokenSymbol),
 				testhelpers.LocalTokenDecimals,

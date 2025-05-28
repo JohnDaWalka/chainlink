@@ -135,7 +135,7 @@ func deployPrerequisiteChainContracts(e cldf.Environment, ab cldf.AddressBook, c
 	}
 	deployGrp := errgroup.Group{}
 	for _, c := range cfg.Configs {
-		chain := e.Chains[c.ChainSelector]
+		chain := e.BlockChains.EVMChains()[c.ChainSelector]
 		deployGrp.Go(func() error {
 			err := deployPrerequisiteContracts(e, ab, state, chain, c.Opts...)
 			if err != nil {

@@ -39,7 +39,7 @@ func deployTokenPoolFactoryPrecondition(e cldf.Environment, config DeployTokenPo
 		if err != nil {
 			return fmt.Errorf("failed to validate chain with selector %d: %w", chainSel, err)
 		}
-		chain := e.Chains[chainSel]
+		chain := e.BlockChains.EVMChains()[chainSel]
 		state := state.Chains[chainSel]
 		if state.TokenPoolFactory != nil {
 			return fmt.Errorf("token pool factory already deployed on %s", chain.String())
@@ -88,7 +88,7 @@ func deployTokenPoolFactoryLogic(e cldf.Environment, config DeployTokenPoolFacto
 	}
 
 	for _, chainSel := range config.Chains {
-		chain := e.Chains[chainSel]
+		chain := e.BlockChains.EVMChains()[chainSel]
 		chainState := state.Chains[chainSel]
 
 		registryModuleAddress, ok := config.RegistryModule1_6Addresses[chainSel]
