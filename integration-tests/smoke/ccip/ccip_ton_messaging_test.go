@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"encoding/base64"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -59,17 +60,22 @@ func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
 
 	t.Run("message to contract implementing CCIPReceiver", func(t *testing.T) {
 		ccipChainState := state.TonChains[destChain]
+		receiver := ccipChainState.ReceiverAddress
+		receiverBase64Bytes, err := base64.RawURLEncoding.DecodeString(receiver.String())
+		require.NoError(t, err)
+		// Prepare 36-byte raw address
+		receiver.FlagsToByte()
 		out = mt.Run(
 			t,
 			mt.TestCase{
-				TestSetup: setup,
-				Replayed:  replayed,
-				Nonce:     &nonce,
-				Receiver:  ccipChainState.ReceiverAddress.Data(),
-				MsgData:   []byte("hello CCIPReceiver"),
-				ExtraArgs: testhelpers.MakeEVMExtraArgsV2(100000, false),
-				//ExpectedExecutionState: testhelpers.EXECUTION_STATE_FAILURE, // state would be failed onchain due to lack of onchain getFee support in EVM for TON
-				ExpectedSendRequestErr: "failed to get fee: execution reverted: 0x373b0e4400000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000020a4e3debbbcd33f578e839fc234c7e801fd01362a4756d4643b996cf50ed6062c",
+				TestSetup:              setup,
+				Replayed:               replayed,
+				Nonce:                  &nonce,
+				Receiver:               receiverBase64Bytes,
+				MsgData:                []byte("hello CCIPReceiver"),
+				ExtraArgs:              testhelpers.MakeEVMExtraArgsV2(100000, false),
+				ExpectedExecutionState: testhelpers.EXECUTION_STATE_FAILURE, // state would be failed
+				AssertionOnError:       false,                               // Relayer is not implemented yet for TON
 			},
 		)
 	})

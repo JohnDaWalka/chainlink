@@ -149,7 +149,7 @@ func Test_ActiveCandidate(t *testing.T) {
 			TokenAmounts: nil,
 			FeeToken:     common.HexToAddress("0x0"),
 			ExtraArgs:    nil,
-		})
+		}, false)
 
 		var (
 			startBlocks = map[uint64]*uint64{

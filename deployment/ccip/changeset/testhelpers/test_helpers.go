@@ -389,7 +389,7 @@ func TestSendRequest(
 	src, dest uint64,
 	testRouter bool,
 	msg any,
-	expectedSendRequestErr string,
+	assertError bool,
 	opts ...SendReqOpts,
 ) (msgSentEvent *onramp.OnRampCCIPMessageSent) {
 	baseOpts := []SendReqOpts{
@@ -397,14 +397,11 @@ func TestSendRequest(
 		WithDestChain(dest),
 		WithTestRouter(testRouter),
 		WithMessage(msg),
+		WithAssertError(assertError),
 	}
 	baseOpts = append(baseOpts, opts...)
 
 	msgSentEvent, err := SendRequest(e, state, baseOpts...)
-	if err != nil {
-		require.Equal(t, expectedSendRequestErr, err.Error())
-		return msgSentEvent
-	}
 	require.NoError(t, err)
 	return msgSentEvent
 }
@@ -416,9 +413,16 @@ type CCIPSendReqConfig struct {
 	Sender       *bind.TransactOpts
 	Message      any
 	MaxRetries   int // Number of retries for errors (excluding insufficient fee errors)
+	AssertError  bool
 }
 
 type SendReqOpts func(*CCIPSendReqConfig)
+
+func WithAssertError(assertError bool) SendReqOpts {
+	return func(c *CCIPSendReqConfig) {
+		c.AssertError = assertError
+	}
+}
 
 // WithMaxRetries sets the maximum number of retries for the CCIP send request.
 func WithMaxRetries(maxRetries int) SendReqOpts {
@@ -1793,7 +1797,6 @@ func Transfer(
 	useTestRouter bool,
 	data, extraArgs []byte,
 	feeToken string,
-	expectedSendRequestErr string,
 ) (*onramp.OnRampCCIPMessageSent, map[uint64]*uint64) {
 	startBlocks := make(map[uint64]*uint64)
 
@@ -1837,7 +1840,7 @@ func Transfer(
 		t.Errorf("unsupported source chain: %v", family)
 	}
 
-	msgSentEvent := TestSendRequest(t, env, state, sourceChain, destChain, useTestRouter, msg, expectedSendRequestErr)
+	msgSentEvent := TestSendRequest(t, env, state, sourceChain, destChain, useTestRouter, msg, false)
 	return msgSentEvent, startBlocks
 }
 
@@ -1923,7 +1926,7 @@ func TransferMultiple(
 			}
 
 			msg, blocks := Transfer(
-				ctx, t, env, state, tt.SourceChain, tt.DestChain, tokens, tt.Receiver, tt.UseTestRouter, tt.Data, tt.ExtraArgs, tt.FeeToken, "")
+				ctx, t, env, state, tt.SourceChain, tt.DestChain, tokens, tt.Receiver, tt.UseTestRouter, tt.Data, tt.ExtraArgs, tt.FeeToken)
 			if _, ok := expectedExecutionStates[pairId]; !ok {
 				expectedExecutionStates[pairId] = make(map[uint64]int)
 			}

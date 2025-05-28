@@ -161,6 +161,7 @@ func (c TonTestDeployContractsChangeSet) deployTonContracts(t *testing.T, e depl
 
 	logger.Infow("All TON contracts deployed")
 
+	// TODO(ton): once all contracts are deployed, we can remove the hardcoded addresses from the TonTestDeployPrerequisitesChangeSet
 	err = tonstate.SaveOnchainStateTon(chainSelector, tonChainState, e)
 	require.NoError(t, err)
 }
@@ -289,7 +290,7 @@ func (c TonTestConfigureContractsChangeSet) configureTonContracts(t *testing.T, 
 }
 
 func addLaneTonChangesets(t *testing.T, e *DeployedEnv, from, to uint64, fromFamily, toFamily string) []commoncs.ConfiguredChangeSet {
-	fmt.Printf("DEBUG: addLaneTonChangesets %d to %d / %s to %s", from, to, fromFamily, toFamily)
+	fmt.Printf("DEBUG: addLaneTonChangesets %d to %d / %s to %s\n", from, to, fromFamily, toFamily)
 	return []commoncs.ConfiguredChangeSet{TonTestAddLaneChangeSet{
 		T:                 t,
 		fromChainSelector: from,

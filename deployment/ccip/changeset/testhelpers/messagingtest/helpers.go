@@ -69,14 +69,15 @@ func NewTestSetup(
 }
 
 type TestSetup struct {
-	T            *testing.T
-	Sender       []byte
-	Env          cldf.Environment
-	DeployedEnv  testhelpers.DeployedEnv
-	OnchainState stateview.CCIPOnChainState
-	SourceChain  uint64
-	DestChain    uint64
-	TestRouter   bool
+	T                *testing.T
+	Sender           []byte
+	Env              cldf.Environment
+	DeployedEnv      testhelpers.DeployedEnv
+	OnchainState     stateview.CCIPOnChainState
+	SourceChain      uint64
+	DestChain        uint64
+	TestRouter       bool
+	AssertionOnError bool
 }
 
 type TestCase struct {
@@ -90,7 +91,7 @@ type TestCase struct {
 	FeeToken               string
 	ExpectedExecutionState int
 	ExtraAssertions        []func(t *testing.T)
-	ExpectedSendRequestErr string
+	AssertionOnError       bool
 }
 
 type ValidationType int
@@ -107,13 +108,13 @@ type TestCaseOutput struct {
 	MsgSentEvent *onramp.OnRampCCIPMessageSent
 }
 
-func sleepAndReplay(t *testing.T, e testhelpers.DeployedEnv, chainSelectors ...uint64) {
+func sleepAndReplay(t *testing.T, e testhelpers.DeployedEnv, assertOnError bool, chainSelectors ...uint64) {
 	time.Sleep(30 * time.Second)
 	replayBlocks := make(map[uint64]uint64)
 	for _, selector := range chainSelectors {
 		replayBlocks[selector] = 1
 	}
-	testhelpers.ReplayLogs(t, e.Env.Offchain, replayBlocks)
+	testhelpers.ReplayLogs(t, e.Env.Offchain, replayBlocks, testhelpers.WithAssertOnError(assertOnError))
 }
 
 func getLatestNonce(tc TestCase) uint64 {
@@ -152,6 +153,11 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 	family, err := chain_selectors.GetSelectorFamily(tc.SourceChain)
 	require.NoError(tc.T, err)
 
+	receiver := tc.Receiver
+	if len(tc.Receiver) < 32 {
+		receiver = common.LeftPadBytes(tc.Receiver, 32)
+	}
+
 	var msg any
 	switch family {
 	case chain_selectors.FamilyEVM:
@@ -161,7 +167,7 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 		}
 
 		msg = router.ClientEVM2AnyMessage{
-			Receiver:     common.LeftPadBytes(tc.Receiver, 32),
+			Receiver:     receiver,
 			Data:         tc.MsgData,
 			TokenAmounts: nil,
 			FeeToken:     feeToken,
@@ -175,7 +181,7 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 		}
 
 		msg = ccip_router.SVM2AnyMessage{
-			Receiver:     common.LeftPadBytes(tc.Receiver, 32),
+			Receiver:     receiver,
 			TokenAmounts: nil,
 			Data:         tc.MsgData,
 			FeeToken:     feeToken,
@@ -193,11 +199,8 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 		tc.DestChain,
 		tc.TestRouter,
 		msg,
-		tc.ExpectedSendRequestErr)
-	if tc.ExpectedSendRequestErr != "" {
-		// If we expect an error, we should not proceed further
-		return
-	}
+		tc.AssertionOnError,
+	)
 
 	sourceDest := testhelpers.SourceDestPair{
 		SourceChainSelector: tc.SourceChain,
@@ -215,7 +218,7 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 	// we need to replay missed logs
 	if !tc.Replayed {
 		require.NotNil(tc.T, tc.DeployedEnv)
-		sleepAndReplay(tc.T, tc.DeployedEnv, tc.SourceChain, tc.DestChain)
+		sleepAndReplay(tc.T, tc.DeployedEnv, tc.AssertionOnError, tc.SourceChain, tc.DestChain)
 		out.Replayed = true
 	}
 
