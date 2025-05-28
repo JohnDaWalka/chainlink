@@ -46,11 +46,7 @@ func RunBillingListener(ctx context.Context, lggr logger.Logger) {
 	s := grpc.NewServer()
 
 	billing.RegisterWorkflowServiceServer(s, &BillingService{lggr: lggr})
-
-	go func() {
-		<-ctx.Done()
-		s.Stop()
-	}()
+	context.AfterFunc(ctx, s.Stop)
 
 	go func() {
 		if err := s.Serve(lis); err != nil {
