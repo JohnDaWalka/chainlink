@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/mcms"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -27,7 +28,7 @@ type (
 		TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
 	}
 
-	ContractDeployFn[C Contract] func(chain cldf.Chain) *ContractDeployment[C]
+	ContractDeployFn[C Contract] func(chain cldf_evm.Chain) *ContractDeployment[C]
 
 	ContractDeployment[C Contract] struct {
 		Address  common.Address
@@ -52,7 +53,7 @@ type DeploymentOutput[C Contract] struct {
 func DeployContract[C Contract](
 	e cldf.Environment,
 	dataStore ds.MutableDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata],
-	chain cldf.Chain,
+	chain cldf_evm.Chain,
 	deployFn ContractDeployFn[C],
 	options *DeployOptions,
 ) (*ContractDeployment[C], error) {

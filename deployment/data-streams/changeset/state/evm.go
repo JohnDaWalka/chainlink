@@ -57,7 +57,7 @@ func LoadOnchainState(e cldf.Environment) (DataStreamsOnChainState, error) {
 	if err != nil {
 		return state, fmt.Errorf("failed to convert datastore: %w", err)
 	}
-	for chainSelector, chain := range e.Chains {
+	for chainSelector, chain := range e.BlockChains.EVMChains() {
 		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)
 		if err != nil {
 			if !errors.Is(err, cldf.ErrChainNotFound) {

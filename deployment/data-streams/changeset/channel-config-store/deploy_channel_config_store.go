@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -83,7 +84,7 @@ func deploy(e cldf.Environment, dataStore ds.MutableDataStore[metadata.Serialize
 		return fmt.Errorf("invalid DeployChannelConfigStoreConfig: %w", err)
 	}
 	for _, chainSel := range cc.ChainsToDeploy {
-		chain, ok := e.Chains[chainSel]
+		chain, ok := e.BlockChains.EVMChains()[chainSel]
 		if !ok {
 			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}
@@ -119,7 +120,7 @@ func deploy(e cldf.Environment, dataStore ds.MutableDataStore[metadata.Serialize
 
 // channelConfigStoreDeployFn returns a function that deploys a ChannelConfigStore contract.
 func channelConfigStoreDeployFn() changeset.ContractDeployFn[*channel_config_store.ChannelConfigStore] {
-	return func(chain cldf.Chain) *changeset.ContractDeployment[*channel_config_store.ChannelConfigStore] {
+	return func(chain cldf_evm.Chain) *changeset.ContractDeployment[*channel_config_store.ChannelConfigStore] {
 		ccsAddr, ccsTx, ccs, err := channel_config_store.DeployChannelConfigStore(
 			chain.DeployerKey,
 			chain.Client,

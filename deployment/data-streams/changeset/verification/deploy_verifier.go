@@ -90,7 +90,7 @@ func deployVerifier(e cldf.Environment, dataStore ds.MutableDataStore[metadata.S
 	}
 
 	for chainSel, chainCfg := range cc.ChainsToDeploy {
-		chain, ok := e.Chains[chainSel]
+		chain, ok := e.BlockChains.EVMChains()[chainSel]
 		if !ok {
 			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}

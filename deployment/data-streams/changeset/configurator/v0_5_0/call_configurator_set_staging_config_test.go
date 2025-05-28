@@ -88,7 +88,7 @@ func TestCallSetStagingConfig(t *testing.T) {
 		Addresses: []common.Address{configuratorAddr},
 		Topics:    [][]common.Hash{{configAbi.Events["ProductionConfigSet"].ID}},
 	}
-	prodLogs, err := e.Chains[testutil.TestChain.Selector].Client.FilterLogs(ctx, filterQuery)
+	prodLogs, err := e.BlockChains.EVMChains()[testutil.TestChain.Selector].Client.FilterLogs(ctx, filterQuery)
 	require.NoError(t, err)
 	require.NotEmpty(t, prodLogs)
 
@@ -148,7 +148,7 @@ func TestCallSetStagingConfig(t *testing.T) {
 		require.Len(t, outputs, 1)
 		output := outputs[0]
 
-		client := e.Chains[testutil.TestChain.Selector].Client
+		client := e.BlockChains.EVMChains()[testutil.TestChain.Selector].Client
 		contract, err := configurator.NewConfigurator(configuratorAddr, client)
 		require.NoError(t, err)
 

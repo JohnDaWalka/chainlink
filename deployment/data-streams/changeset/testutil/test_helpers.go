@@ -121,7 +121,7 @@ func NewMemoryEnvV2(t *testing.T, cfg MemoryEnvConfig) MemoryEnv {
 
 	env := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memEnvConf)
 	chainSelector := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chainselectors.FamilyEVM))[0]
-	chain := env.Chains[chainSelector]
+	chain := env.BlockChains.EVMChains()[chainSelector]
 
 	// Apply node labels:
 	resp, err := env.Offchain.ListNodes(t.Context(), &nodev1.ListNodesRequest{})
@@ -230,7 +230,7 @@ func DeployMCMS(
 	addresses, err := e.ExistingAddresses.AddressesForChain(TestChain.Selector)
 	require.NoError(t, err)
 
-	chain := e.Chains[chainSelector]
+	chain := e.BlockChains.EVMChains()[chainSelector]
 
 	mcmsState, err = commonChangesets.MaybeLoadMCMSWithTimelockChainState(chain, addresses)
 	require.NoError(t, err)

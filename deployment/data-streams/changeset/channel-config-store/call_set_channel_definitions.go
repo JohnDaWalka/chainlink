@@ -85,7 +85,7 @@ func maybeLoadChannelConfigStoreState(e cldf.Environment, chainSel uint64, contr
 	if err := utils.ValidateContract(e, chainSel, contractAddr, types.ChannelConfigStore, deployment.Version1_0_0); err != nil {
 		return nil, err
 	}
-	chain, ok := e.Chains[chainSel]
+	chain, ok := e.BlockChains.EVMChains()[chainSel]
 	if !ok {
 		return nil, fmt.Errorf("chain %d not found", chainSel)
 	}

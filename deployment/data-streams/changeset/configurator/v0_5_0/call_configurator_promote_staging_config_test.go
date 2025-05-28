@@ -90,7 +90,7 @@ func TestCallPromoteStagingConfig(t *testing.T) {
 		Addresses: []common.Address{configuratorAddr},
 		Topics:    [][]common.Hash{{configAbi.Events["ProductionConfigSet"].ID}},
 	}
-	prodLogs, err := e.Chains[testutil.TestChain.Selector].Client.FilterLogs(ctx, prodFilterQuery)
+	prodLogs, err := e.BlockChains.EVMChains()[testutil.TestChain.Selector].Client.FilterLogs(ctx, prodFilterQuery)
 	require.NoError(t, err)
 	require.NotEmpty(t, prodLogs)
 
@@ -167,7 +167,7 @@ func TestCallPromoteStagingConfig(t *testing.T) {
 		Addresses: []common.Address{configuratorAddr},
 		Topics:    [][]common.Hash{{configAbi.Events["PromoteStagingConfig"].ID}},
 	}
-	promoLogs, err := e.Chains[testutil.TestChain.Selector].Client.FilterLogs(ctx, promoFilterQuery)
+	promoLogs, err := e.BlockChains.EVMChains()[testutil.TestChain.Selector].Client.FilterLogs(ctx, promoFilterQuery)
 	require.NoError(t, err)
 	require.NotEmpty(t, promoLogs)
 

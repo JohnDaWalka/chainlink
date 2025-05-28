@@ -20,7 +20,7 @@ func loadRewardManagerState(
 	chainSel uint64,
 	contractAddr string,
 ) (*rewardManager.RewardManager, error) {
-	chain, ok := e.Chains[chainSel]
+	chain, ok := e.BlockChains.EVMChains()[chainSel]
 	if !ok {
 		return nil, fmt.Errorf("chain %d not found", chainSel)
 	}

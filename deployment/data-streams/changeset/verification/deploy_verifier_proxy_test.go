@@ -54,7 +54,7 @@ func TestDeployVerifierProxy(t *testing.T) {
 	require.NotNil(t, record)
 
 	t.Run("VerifyOwnershipTransferred", func(t *testing.T) {
-		chain := e.Chains[testutil.TestChain.Selector]
+		chain := e.BlockChains.EVMChains()[testutil.TestChain.Selector]
 		owner, _, err := commonChangesets.LoadOwnableContract(common.HexToAddress(record.Address), chain.Client)
 		require.NoError(t, err)
 		assert.Equal(t, testEnv.Timelocks[testutil.TestChain.Selector].Timelock.Address(), owner)

@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
@@ -30,7 +31,7 @@ func SignAndExecute(e cldf.Environment, preparedTxs []*PreparedTx) ([]ExecuteTxR
 	var executeTxResults []ExecuteTxResult
 	// To execute the txs in parallel this would need to batch up the txs by chain to avoid nonce issues
 	for _, tx := range preparedTxs {
-		chain, exists := e.Chains[tx.ChainSelector]
+		chain, exists := e.BlockChains.EVMChains()[tx.ChainSelector]
 		if !exists {
 			return executeTxResults, fmt.Errorf("chain not found in env %d", tx.ChainSelector)
 		}
@@ -60,7 +61,7 @@ func SignAndExecute(e cldf.Environment, preparedTxs []*PreparedTx) ([]ExecuteTxR
 }
 
 // reconfigureTx takes the tx `call data` and reconfigures the transaction to use valid nonce, gas price and gas limit
-func reconfigureTx(ctx context.Context, chain cldf.Chain, preparedTx *PreparedTx) (*gethtypes.Transaction, error) {
+func reconfigureTx(ctx context.Context, chain cldf_evm.Chain, preparedTx *PreparedTx) (*gethtypes.Transaction, error) {
 	nonce, err := chain.Client.NonceAt(ctx, chain.DeployerKey.From, nil)
 	if err != nil {
 		return nil, fmt.Errorf("chain %d: failed to get nonce: %w", chain.Selector, err)

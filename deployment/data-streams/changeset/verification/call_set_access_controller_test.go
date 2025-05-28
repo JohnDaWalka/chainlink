@@ -43,7 +43,7 @@ func TestSetAccessController(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	client := e.Chains[testChain].Client
+	client := e.BlockChains.EVMChains()[testChain].Client
 	verifierProxy, err := verifier_proxy_v0_5_0.NewVerifierProxy(verifierProxyAddr, client)
 	require.NoError(t, err)
 

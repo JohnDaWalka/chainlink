@@ -24,7 +24,7 @@ func runSetRewardRecipientsTest(t *testing.T, useMCMS bool) {
 	})
 	chainSelector := testutil.TestChain.Selector
 	e, rewardManagerAddr := RewardManagerDeploy(t, testEnv)
-	chain := e.Chains[chainSelector]
+	chain := e.BlockChains.EVMChains()[chainSelector]
 
 	var poolID [32]byte
 	copy(poolID[:], []byte("poolId"))

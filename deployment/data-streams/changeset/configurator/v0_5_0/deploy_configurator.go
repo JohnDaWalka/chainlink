@@ -8,6 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/configurator"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -83,7 +84,7 @@ func deployConfiguratorPrecondition(_ cldf.Environment, cc DeployConfiguratorCon
 
 func deploy(e cldf.Environment, dataStore ds.MutableDataStore[metadata.SerializedContractMetadata, ds.DefaultMetadata], cc DeployConfiguratorConfig) error {
 	for _, chainSel := range cc.ChainsToDeploy {
-		chain, ok := e.Chains[chainSel]
+		chain, ok := e.BlockChains.EVMChains()[chainSel]
 		if !ok {
 			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}
@@ -118,7 +119,7 @@ func deploy(e cldf.Environment, dataStore ds.MutableDataStore[metadata.Serialize
 }
 
 func DeployFn() changeset.ContractDeployFn[*configurator.Configurator] {
-	return func(chain cldf.Chain) *changeset.ContractDeployment[*configurator.Configurator] {
+	return func(chain cldf_evm.Chain) *changeset.ContractDeployment[*configurator.Configurator] {
 		ccsAddr, ccsTx, ccs, err := configurator.DeployConfigurator(
 			chain.DeployerKey,
 			chain.Client,

@@ -24,7 +24,7 @@ func runSetFeeManagerTest(t *testing.T, useMCMS bool) {
 	e := testEnv.Environment
 
 	chainSelector := testutil.TestChain.Selector
-	chain := e.Chains[chainSelector]
+	chain := e.BlockChains.EVMChains()[chainSelector]
 
 	e, rewardManagerAddr := RewardManagerDeploy(t, testEnv)
 

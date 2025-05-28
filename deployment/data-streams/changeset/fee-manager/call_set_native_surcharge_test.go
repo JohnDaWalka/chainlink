@@ -20,7 +20,7 @@ func TestSetNativeSurcharge(t *testing.T) {
 	feeManagerAddress := res.FeeManagerAddress
 	e := res.Env
 
-	chain := e.Chains[testutil.TestChain.Selector]
+	chain := e.BlockChains.EVMChains()[testutil.TestChain.Selector]
 	require.NotNil(t, chain)
 
 	e, err = commonChangesets.Apply(t, e, nil,

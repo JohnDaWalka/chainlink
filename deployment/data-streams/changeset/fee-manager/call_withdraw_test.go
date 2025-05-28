@@ -20,7 +20,7 @@ func TestWithdraw(t *testing.T) {
 	feeManagerAddress := res.FeeManagerAddress
 	e := res.Env
 
-	chain := e.Chains[testutil.TestChain.Selector]
+	chain := e.BlockChains.EVMChains()[testutil.TestChain.Selector]
 	require.NotNil(t, chain)
 
 	recipient := common.HexToAddress("0x0fd8b81e3d1143ec7f1ce474827ab93c43523ea2")

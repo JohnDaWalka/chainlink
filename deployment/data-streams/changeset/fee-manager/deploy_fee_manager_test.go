@@ -39,7 +39,7 @@ func TestDeployFeeManager(t *testing.T) {
 	addresses, err := e.ExistingAddresses.AddressesForChain(testutil.TestChain.Selector)
 	require.NoError(t, err)
 
-	chain := e.Chains[testutil.TestChain.Selector]
+	chain := e.BlockChains.EVMChains()[testutil.TestChain.Selector]
 	linkState, err := commonstate.MaybeLoadLinkTokenChainState(chain, addresses)
 	require.NoError(t, err)
 

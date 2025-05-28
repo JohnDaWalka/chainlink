@@ -75,7 +75,7 @@ func TestInitializeVerifier(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	chain := e.Chains[chainSelector]
+	chain := e.BlockChains.EVMChains()[chainSelector]
 
 	vp, err := verifier_proxy_v0_5_0.NewVerifierProxy(verifierProxyAddr, chain.Client)
 	require.NoError(t, err)

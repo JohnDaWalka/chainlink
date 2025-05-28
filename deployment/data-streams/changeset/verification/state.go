@@ -25,7 +25,7 @@ func maybeLoadVerifierProxyState(e cldf.Environment, chainSel uint64, contractAd
 	if err := utils.ValidateContract(e, chainSel, contractAddr, types.VerifierProxy, deployment.Version0_5_0); err != nil {
 		return nil, err
 	}
-	chain, ok := e.Chains[chainSel]
+	chain, ok := e.BlockChains.EVMChains()[chainSel]
 	if !ok {
 		return nil, fmt.Errorf("chain %d not found", chainSel) // This should never happen due to validation
 	}
@@ -39,7 +39,7 @@ func maybeLoadVerifierProxyState(e cldf.Environment, chainSel uint64, contractAd
 	}, nil
 }
 func loadVerifierState(e cldf.Environment, chainSel uint64, contractAddr string) (*verifier_v0_5_0.Verifier, error) {
-	chain, ok := e.Chains[chainSel]
+	chain, ok := e.BlockChains.EVMChains()[chainSel]
 	if !ok {
 		return nil, fmt.Errorf("chain %d not found", chainSel)
 	}

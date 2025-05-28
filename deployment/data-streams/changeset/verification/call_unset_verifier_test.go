@@ -26,9 +26,9 @@ func TestUnsetVerifier(t *testing.T) {
 	e, verifierProxyAddr, verifierAddr := DeployVerifierProxyAndVerifier(t, e)
 
 	chainSelector := e.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chainselectors.FamilyEVM))[0]
-	chain := e.Chains[chainSelector]
+	chain := e.BlockChains.EVMChains()[chainSelector]
 
-	verifier, err := verifier_v0_5_0.NewVerifier(verifierAddr, e.Chains[chainSelector].Client)
+	verifier, err := verifier_v0_5_0.NewVerifier(verifierAddr, chain.Client)
 	require.NoError(t, err)
 	require.NotNil(t, verifier)
 

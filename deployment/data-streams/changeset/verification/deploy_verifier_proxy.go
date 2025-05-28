@@ -105,7 +105,7 @@ func deploy(e cldf.Environment,
 	}
 
 	for chainSel, chainCfg := range cfg.ChainsToDeploy {
-		chain, ok := e.Chains[chainSel]
+		chain, ok := e.BlockChains.EVMChains()[chainSel]
 		if !ok {
 			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}

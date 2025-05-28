@@ -19,7 +19,7 @@ func runCallUpdateRewardRecipients(t *testing.T, useMCMS bool) {
 	})
 	e, rewardManagerAddr := RewardManagerDeploy(t, testEnv)
 	chainSelector := testutil.TestChain.Selector
-	chain := e.Chains[chainSelector]
+	chain := e.BlockChains.EVMChains()[chainSelector]
 
 	recipients := []rewardManager.CommonAddressAndWeight{
 		{

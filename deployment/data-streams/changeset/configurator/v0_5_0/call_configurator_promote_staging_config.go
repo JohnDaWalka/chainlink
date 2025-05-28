@@ -77,7 +77,7 @@ func doPromoteStagingConfig(
 }
 
 func LoadConfigurator(e cldf.Environment, chainSel uint64, contractAddr string) (*configurator.Configurator, error) {
-	chain, ok := e.Chains[chainSel]
+	chain, ok := e.BlockChains.EVMChains()[chainSel]
 	if !ok {
 		return nil, fmt.Errorf("chain %d not found", chainSel)
 	}

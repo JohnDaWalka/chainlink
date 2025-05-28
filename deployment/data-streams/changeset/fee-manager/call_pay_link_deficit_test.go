@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -33,7 +34,7 @@ func TestPayLinkDeficit(t *testing.T) {
 	require.NoError(t, err)
 
 	e := res.Env
-	chain := e.Chains[testutil.TestChain.Selector]
+	chain := e.BlockChains.EVMChains()[testutil.TestChain.Selector]
 
 	cc := DeployFeeManager{
 		LinkTokenAddress:     res.LinkTokenAddress,
@@ -50,7 +51,7 @@ func TestPayLinkDeficit(t *testing.T) {
 				// This is modeled as a client/server test where the "client" is the PayLinkDeficit changeset
 				// and the "server" is the MockFeeManager. The PayLinkDeficit changeset will call the MockFeeManager using
 				// the real FeeManager interface. The MockFeeManager will then validate the call and return a response.
-				_, err = changeset.DeployContract[*mock_fee_manager_v0_5_0.MockFeeManager](e, dataStore, chain, MockFeeManagerDeployFn(cc), nil)
+				_, err = changeset.DeployContract(e, dataStore, chain, MockFeeManagerDeployFn(cc), nil)
 				if err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy MockFeeManager: %w", err)
 				}
@@ -118,7 +119,7 @@ func TestPayLinkDeficit(t *testing.T) {
 }
 
 func MockFeeManagerDeployFn(cfg DeployFeeManager) changeset.ContractDeployFn[*mock_fee_manager_v0_5_0.MockFeeManager] {
-	return func(chain cldf.Chain) *changeset.ContractDeployment[*mock_fee_manager_v0_5_0.MockFeeManager] {
+	return func(chain cldf_evm.Chain) *changeset.ContractDeployment[*mock_fee_manager_v0_5_0.MockFeeManager] {
 		ccsAddr, ccsTx, ccs, err := mock_fee_manager_v0_5_0.DeployMockFeeManager(
 			chain.DeployerKey,
 			chain.Client,

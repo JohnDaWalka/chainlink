@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	ds "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonChangesets "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/changeset/metadata"
@@ -76,12 +75,12 @@ func TestCallSetChannelDefinitions(t *testing.T) {
 		require.Len(t, outputs, 1)
 		output := outputs[0]
 
-		envDatastore, err := ds.FromDefault[metadata.SerializedContractMetadata, ds.DefaultMetadata](output.DataStore.Seal())
+		envDatastore, err := datastore.FromDefault[metadata.SerializedContractMetadata, datastore.DefaultMetadata](output.DataStore.Seal())
 		require.NoError(t, err)
 
 		// Retrieve contract metadata from datastore
 		cm, err := envDatastore.ContractMetadata().Get(
-			ds.NewContractMetadataKey(testutil.TestChain.Selector, channelConfigStoreAddr.String()),
+			datastore.NewContractMetadataKey(testutil.TestChain.Selector, channelConfigStoreAddr.String()),
 		)
 		require.NoError(t, err, "Failed to get contract metadata")
 

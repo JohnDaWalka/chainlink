@@ -93,7 +93,7 @@ func TestCallSetProductionConfig(t *testing.T) {
 		require.Len(t, outputs, 1)
 		output := outputs[0]
 
-		client := e.Chains[testutil.TestChain.Selector].Client
+		client := e.BlockChains.EVMChains()[testutil.TestChain.Selector].Client
 		contract, err := configurator.NewConfigurator(configuratorAddr, client)
 		require.NoError(t, err)
 

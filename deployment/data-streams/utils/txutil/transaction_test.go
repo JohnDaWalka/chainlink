@@ -31,7 +31,7 @@ func TestSignAndExecute_ETHTransfer(t *testing.T) {
 	})
 
 	testChain := e.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chainselectors.FamilyEVM))[0]
-	chain := e.Chains[testChain]
+	chain := e.BlockChains.EVMChains()[testChain]
 
 	recipient := common.HexToAddress("0x742d35Cc6634C0532925a3b844Bc454e4438f44e")
 
@@ -73,7 +73,7 @@ func TestSignAndExecute_ContractInteraction(t *testing.T) {
 	})
 
 	testChain := e.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chainselectors.FamilyEVM))[0]
-	chain := e.Chains[testChain]
+	chain := e.BlockChains.EVMChains()[testChain]
 
 	e, err := commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(

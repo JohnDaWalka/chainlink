@@ -54,7 +54,7 @@ func saveViewsLogic(e cldf.Environment, cfg SaveContractViewsConfig) (cldf.Chang
 		if !ok {
 			continue
 		}
-		chain := e.Chains[chainSelector]
+		chain := e.BlockChains.EVMChains()[chainSelector]
 
 		family, err := chain_selectors.GetSelectorFamily(chainSelector)
 		if err != nil {

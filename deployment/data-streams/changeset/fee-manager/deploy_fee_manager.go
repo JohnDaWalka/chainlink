@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment/data-streams/view/v0_5"
@@ -92,7 +93,7 @@ func deployFeeManager(e cldf.Environment,
 	}
 
 	for chainSel, chainCfg := range cc.ChainsToDeploy {
-		chain, ok := e.Chains[chainSel]
+		chain, ok := e.BlockChains.EVMChains()[chainSel]
 		if !ok {
 			return fmt.Errorf("chain not found for chain selector %d", chainSel)
 		}
@@ -128,7 +129,7 @@ func deployFeeManager(e cldf.Environment,
 
 // FeeManagerDeployFn returns a function that deploys a FeeManager contract.
 func FeeManagerDeployFn(cfg DeployFeeManager) changeset.ContractDeployFn[*fee_manager_v0_5_0.FeeManager] {
-	return func(chain cldf.Chain) *changeset.ContractDeployment[*fee_manager_v0_5_0.FeeManager] {
+	return func(chain cldf_evm.Chain) *changeset.ContractDeployment[*fee_manager_v0_5_0.FeeManager] {
 		ccsAddr, ccsTx, ccs, err := fee_manager_v0_5_0.DeployFeeManager(
 			chain.DeployerKey,
 			chain.Client,
