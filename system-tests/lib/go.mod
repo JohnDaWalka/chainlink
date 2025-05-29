@@ -18,7 +18,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chain-selectors v1.0.59
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250522183927-44d96a7ad0e5
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250527164052-5a4fb8e255ff
 	github.com/smartcontractkit/chainlink-deployments-framework v0.5.2-0.20250527114449-a7f7742e9fa3
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250522161404-27a8f7e1cc6c
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.11.0
@@ -375,6 +375,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250501150903-3e93089d9ad5 // indirect
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250526153105-8fdccfe1181b // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
+	github.com/smartcontractkit/chainlink-ton v0.0.0-00010101000000-000000000000 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250422175525-b7575d96bd4d // indirect
 	github.com/smartcontractkit/freeport v0.1.0 // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
@@ -491,3 +492,5 @@ require (
 
 // gotron-sdk is not longer maintained
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20250422175525-b7575d96bd4d
+
+replace github.com/smartcontractkit/chainlink-ton => ../../../chainlink-ton
