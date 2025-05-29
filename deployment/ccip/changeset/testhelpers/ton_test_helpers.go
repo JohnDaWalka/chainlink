@@ -137,27 +137,27 @@ func (c TonTestDeployContractsChangeSet) deployTonContracts(t *testing.T, e depl
 		return
 	}
 
-	//TODO(ton): Deploy TON MCMS
+	// TODO(ton): Deploy TON MCMS
 
-	//TODO(ton): Deploy TON CCIP
+	// TODO(ton): Deploy TON CCIP
 
-	//TODO(ton): Deploy TON CCIP Offramp
+	// TODO(ton): Deploy TON CCIP Offramp
 
-	//TODO(ton): Deploy TON CCIP Onramp
+	// TODO(ton): Deploy TON CCIP Onramp
 
-	//TODO(ton): Deploy TON CCIP Router
+	// TODO(ton): Deploy TON CCIP Router
 
-	//TODO(ton): Deploy Ton CCIP Dummy Receiver and set the contract address
+	// TODO(ton): Deploy Ton CCIP Dummy Receiver and set the contract address
 
-	//tonChainState.ReceiverAddress = ton.AccountOne
+	// tonChainState.ReceiverAddress = ton.AccountOne
 
-	//TODO(ton): Initialize Onramp
+	// TODO(ton): Initialize Onramp
 
-	//TODO(ton): Initialize Offramp
+	// TODO(ton): Initialize Offramp
 
-	//TODO(ton): Initialize FeeQuoter
+	// TODO(ton): Initialize FeeQuoter
 
-	//TODO(ton): Initialize RMNRemote
+	// TODO(ton): Initialize RMNRemote
 
 	logger.Infow("All TON contracts deployed")
 

@@ -577,7 +577,7 @@ func (c CCIPOnChainState) GetOffRampAddressBytes(chainSelector uint64) ([]byte, 
 		offRampAddress = ccipAddress[:]
 	case chain_selectors.FamilyTon:
 		or := c.TonChains[chainSelector].OffRamp
-		offRampAddress = or.Data()[:]
+		offRampAddress = or.Data()
 
 	default:
 		return nil, fmt.Errorf("unsupported chain family %s", family)
@@ -675,18 +675,18 @@ func (c CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType cldf.Contr
 		}
 		fmt.Printf("chainState: %+v, skipping offramp/onramp address validation check for now \n", chainState)
 		// TODO - Uncomment and add validation for TON offramp and onramp addresses back once the TON contracts are supported.
-		//switch rampType {
-		//case ccipshared.OffRamp:
-		//	if chainState.OffRamp.IsAddrNone() {
-		//		return fmt.Errorf("offramp contract does not exist on ton chain %d", chainSelector)
-		//	}
-		//case ccipshared.OnRamp:
-		//	if chainState.Router.IsAddrNone() {
-		//		return fmt.Errorf("router contract does not exist on ton chain %d", chainSelector)
-		//	}
-		//default:
-		//	return fmt.Errorf("unknown ramp type %s", rampType)
-		//}
+		// switch rampType {
+		// case ccipshared.OffRamp:
+		//	 if chainState.OffRamp.IsAddrNone() {
+		//	 	return fmt.Errorf("offramp contract does not exist on ton chain %d", chainSelector)
+		//	 }
+		// case ccipshared.OnRamp:
+		//	 if chainState.Router.IsAddrNone() {
+		//	 	return fmt.Errorf("router contract does not exist on ton chain %d", chainSelector)
+		//	 }
+		// default:
+		//	 return fmt.Errorf("unknown ramp type %s", rampType)
+		// }
 
 	default:
 		return fmt.Errorf("unknown chain family %s", family)

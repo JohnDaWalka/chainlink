@@ -928,7 +928,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		address := state.TonChains[chain].LinkTokenAddress
 		tokenInfo[cciptypes.UnknownEncodedAddress(address.String())] = tokenConfig.TokenSymbolToInfo[shared.LinkSymbol]
 		// TODO check if TON WETH is needed for TokenSymbolInfo?
-		//tokenInfo[cciptypes.UnknownEncodedAddress()] = tokenConfig.TokenSymbolToInfo[shared.WethSymbol]
+		// tokenInfo[cciptypes.UnknownEncodedAddress()] = tokenConfig.TokenSymbolToInfo[shared.WethSymbol]
 		ocrOverride := tc.OCRConfigOverride
 		commitOCRConfigs[chain] = v1_6.DeriveOCRParamsForCommit(v1_6.SimulationTest, e.FeedChainSel, tokenInfo, ocrOverride)
 		execOCRConfigs[chain] = v1_6.DeriveOCRParamsForExec(v1_6.SimulationTest, tokenDataProviders, ocrOverride)

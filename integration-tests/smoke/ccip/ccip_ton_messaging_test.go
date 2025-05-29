@@ -39,7 +39,7 @@ func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
 		", source chain selector:", sourceChain,
 		", dest chain selector:", destChain,
 	)
-	//connect a single lane, source to dest
+	// connect a single lane, source to dest
 	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
 
 	var (
