@@ -20,7 +20,7 @@ func Test_NewAcceptOwnershipChangeset(t *testing.T) {
 	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
-	allChains := maps.Keys(e.Env.BlockChains.EVMChains())
+	allChains := maps.Keys(e.Env.Chains)
 	source := allChains[0]
 	dest := allChains[1]
 

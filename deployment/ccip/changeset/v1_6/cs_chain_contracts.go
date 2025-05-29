@@ -21,7 +21,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 
-	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	ccipops "github.com/smartcontractkit/chainlink/deployment/ccip/operation/evm/v1_6"
@@ -109,7 +108,7 @@ func (cfg UpdateNonceManagerConfig) Validate(e cldf.Environment) error {
 		if sourceChainState.NonceManager == nil {
 			return fmt.Errorf("missing nonce manager for chain %d", sourceSel)
 		}
-		sourceChain, ok := e.BlockChains.EVMChains()[sourceSel]
+		sourceChain, ok := e.Chains[sourceSel]
 		if !ok {
 			return fmt.Errorf("missing chain %d in environment", sourceSel)
 		}
@@ -162,7 +161,7 @@ func UpdateNonceManagersChangeset(e cldf.Environment, cfg UpdateNonceManagerConf
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
 	for chainSel, updates := range cfg.UpdatesByChain {
-		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
+		txOpts := e.Chains[chainSel].DeployerKey
 		if cfg.MCMS != nil {
 			txOpts = cldf.SimTransactOpts()
 		}
@@ -174,13 +173,13 @@ func UpdateNonceManagersChangeset(e cldf.Environment, cfg UpdateNonceManagerConf
 				RemovedCallers: updates.RemovedAuthCallers,
 			})
 			if cfg.MCMS == nil {
-				if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], authTx, nonce_manager.NonceManagerABI, err); err != nil {
+				if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[chainSel], authTx, nonce_manager.NonceManagerABI, err); err != nil {
 					return cldf.ChangesetOutput{}, fmt.Errorf("error updating authorized callers for chain %s: %w",
-						e.BlockChains.EVMChains()[chainSel].String(), err)
+						e.Chains[chainSel].String(), err)
 				}
 			} else {
 				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("error updating previous ramps for chain %s: %w", e.BlockChains.EVMChains()[chainSel].String(), err)
+					return cldf.ChangesetOutput{}, fmt.Errorf("error updating previous ramps for chain %s: %w", e.Chains[chainSel].String(), err)
 				}
 			}
 		}
@@ -205,12 +204,12 @@ func UpdateNonceManagersChangeset(e cldf.Environment, cfg UpdateNonceManagerConf
 			}
 			prevRampsTx, err = nm.ApplyPreviousRampsUpdates(txOpts, previousRampsArgs)
 			if cfg.MCMS == nil {
-				if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], prevRampsTx, nonce_manager.NonceManagerABI, err); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("error updating previous ramps for chain %s: %w", e.BlockChains.EVMChains()[chainSel].String(), err)
+				if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[chainSel], prevRampsTx, nonce_manager.NonceManagerABI, err); err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("error updating previous ramps for chain %s: %w", e.Chains[chainSel].String(), err)
 				}
 			} else {
 				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("error updating previous ramps for chain %s: %w", e.BlockChains.EVMChains()[chainSel].String(), err)
+					return cldf.ChangesetOutput{}, fmt.Errorf("error updating previous ramps for chain %s: %w", e.Chains[chainSel].String(), err)
 				}
 			}
 		}
@@ -316,7 +315,7 @@ func (cfg UpdateOnRampDestsConfig) Validate(e cldf.Environment) error {
 			return fmt.Errorf("missing onramp onramp for chain %d", chainSel)
 		}
 		if !cfg.SkipOwnershipCheck {
-			if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.OnRamp); err != nil {
+			if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.OnRamp); err != nil {
 				return err
 			}
 		}
@@ -354,7 +353,7 @@ func UpdateOnRampsDestsChangeset(e cldf.Environment, cfg UpdateOnRampDestsConfig
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
 	for chainSel, updates := range cfg.UpdatesByChain {
-		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
+		txOpts := e.Chains[chainSel].DeployerKey
 		txOpts.Context = e.GetContext()
 		if cfg.MCMS != nil {
 			txOpts = cldf.SimTransactOpts()
@@ -379,8 +378,8 @@ func UpdateOnRampsDestsChangeset(e cldf.Environment, cfg UpdateOnRampDestsConfig
 		}
 		tx, err := onRamp.ApplyDestChainConfigUpdates(txOpts, args)
 		if cfg.MCMS == nil {
-			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, onramp.OnRampABI, err); err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("error updating onramp destinations for chain %s: %w", e.BlockChains.EVMChains()[chainSel].String(), err)
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, onramp.OnRampABI, err); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error updating onramp destinations for chain %s: %w", e.Chains[chainSel].String(), err)
 			}
 		} else {
 			if err != nil {
@@ -443,7 +442,7 @@ func (cfg UpdateOnRampDynamicConfig) Validate(e cldf.Environment, state statevie
 		if err := stateview.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
 			return err
 		}
-		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, state.Chains[chainSel].Timelock.Address(), state.Chains[chainSel].OnRamp); err != nil {
+		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, state.Chains[chainSel].Timelock.Address(), state.Chains[chainSel].OnRamp); err != nil {
 			return err
 		}
 		if state.Chains[chainSel].FeeQuoter == nil {
@@ -470,7 +469,7 @@ func UpdateOnRampDynamicConfigChangeset(e cldf.Environment, cfg UpdateOnRampDyna
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
 	for chainSel, update := range cfg.UpdatesByChain {
-		txOps := e.BlockChains.EVMChains()[chainSel].DeployerKey
+		txOps := e.Chains[chainSel].DeployerKey
 		if cfg.MCMS != nil {
 			txOps = cldf.SimTransactOpts()
 		}
@@ -495,8 +494,8 @@ func UpdateOnRampDynamicConfigChangeset(e cldf.Environment, cfg UpdateOnRampDyna
 		})
 
 		if cfg.MCMS == nil {
-			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, onramp.OnRampABI, err); err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("error updating onramp dynamic config for chain %s: %w", e.BlockChains.EVMChains()[chainSel].String(), err)
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, onramp.OnRampABI, err); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error updating onramp dynamic config for chain %s: %w", e.Chains[chainSel].String(), err)
 			}
 		} else {
 			if err != nil {
@@ -572,7 +571,7 @@ func (cfg UpdateOnRampAllowListConfig) Validate(env cldf.Environment) error {
 		}
 		var signer common.Address
 		if cfg.MCMS == nil {
-			signer = env.BlockChains.EVMChains()[srcSel].DeployerKey.From
+			signer = env.Chains[srcSel].DeployerKey.From
 			if signer != config.AllowlistAdmin && signer != owner {
 				return fmt.Errorf("deployer key is not onramp's %s owner nor allowlist admin", onRamp.Address())
 			}
@@ -613,7 +612,7 @@ func UpdateOnRampAllowListChangeset(e cldf.Environment, cfg UpdateOnRampAllowLis
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
 	for srcSel, updates := range cfg.UpdatesByChain {
-		txOps := e.BlockChains.EVMChains()[srcSel].DeployerKey
+		txOps := e.Chains[srcSel].DeployerKey
 		if cfg.MCMS != nil {
 			txOps = cldf.SimTransactOpts()
 		}
@@ -654,7 +653,7 @@ func UpdateOnRampAllowListChangeset(e cldf.Environment, cfg UpdateOnRampAllowLis
 		}
 		tx, err := onRamp.ApplyAllowlistUpdates(txOps, args)
 		if cfg.MCMS == nil {
-			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[srcSel], tx, onramp.OnRampABI, err); err != nil {
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[srcSel], tx, onramp.OnRampABI, err); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error updating allowlist for chain %d: %w", srcSel, err)
 			}
 		} else {
@@ -709,7 +708,7 @@ func (cfg WithdrawOnRampFeeTokensConfig) Validate(e cldf.Environment, state stat
 		if err := stateview.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
 			return err
 		}
-		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, state.Chains[chainSel].Timelock.Address(), state.Chains[chainSel].OnRamp); err != nil {
+		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, state.Chains[chainSel].Timelock.Address(), state.Chains[chainSel].OnRamp); err != nil {
 			return err
 		}
 		feeQuoter := state.Chains[chainSel].FeeQuoter
@@ -753,12 +752,12 @@ func WithdrawOnRampFeeTokensChangeset(e cldf.Environment, cfg WithdrawOnRampFeeT
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
 	for chainSel, feeTokens := range cfg.FeeTokensByChain {
-		txOps := e.BlockChains.EVMChains()[chainSel].DeployerKey
+		txOps := e.Chains[chainSel].DeployerKey
 		onRamp := state.Chains[chainSel].OnRamp
 		tx, err := onRamp.WithdrawFeeTokens(txOps, feeTokens)
 		if cfg.MCMS == nil {
-			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, onramp.OnRampABI, err); err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("error withdrawing fee tokens for chain %s: %w", e.BlockChains.EVMChains()[chainSel].String(), err)
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, onramp.OnRampABI, err); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error withdrawing fee tokens for chain %s: %w", e.Chains[chainSel].String(), err)
 			}
 		} else {
 			if err != nil {
@@ -829,7 +828,7 @@ func (cfg UpdateFeeQuoterPricesConfig) Validate(e cldf.Environment) error {
 		if fq == nil {
 			return fmt.Errorf("missing fee quoter for chain %d", chainSel)
 		}
-		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.FeeQuoter); err != nil {
+		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.FeeQuoter); err != nil {
 			return err
 		}
 		// check that whether price updaters are set
@@ -840,7 +839,7 @@ func (cfg UpdateFeeQuoterPricesConfig) Validate(e cldf.Environment) error {
 		if len(authCallers) == 0 {
 			return fmt.Errorf("no authorized callers for chain %d", chainSel)
 		}
-		expectedAuthCaller := e.BlockChains.EVMChains()[chainSel].DeployerKey.From
+		expectedAuthCaller := e.Chains[chainSel].DeployerKey.From
 		if cfg.MCMS != nil {
 			expectedAuthCaller = chainState.Timelock.Address()
 		}
@@ -901,7 +900,7 @@ func UpdateFeeQuoterPricesChangeset(e cldf.Environment, cfg UpdateFeeQuoterPrice
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
 	for chainSel, initialPrice := range cfg.PricesByChain {
-		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
+		txOpts := e.Chains[chainSel].DeployerKey
 		if cfg.MCMS != nil {
 			txOpts = cldf.SimTransactOpts()
 		}
@@ -925,12 +924,12 @@ func UpdateFeeQuoterPricesChangeset(e cldf.Environment, cfg UpdateFeeQuoterPrice
 			GasPriceUpdates:   gasPricesArgs,
 		})
 		if cfg.MCMS == nil {
-			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("error confirming transaction for chain %s: %w", e.BlockChains.EVMChains()[chainSel].String(), err)
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error confirming transaction for chain %s: %w", e.Chains[chainSel].String(), err)
 			}
 		} else {
 			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("error updating prices for chain %s: %w", e.BlockChains.EVMChains()[chainSel].String(), err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("error updating prices for chain %s: %w", e.Chains[chainSel].String(), err)
 			}
 
 			batchOperation, err := proposalutils.BatchOperationForChain(chainSel, fq.Address().Hex(), tx.Data(),
@@ -998,7 +997,7 @@ func (cfg UpdateFeeQuoterDestsConfig) Validate(e cldf.Environment) error {
 		if chainState.OnRamp == nil {
 			return fmt.Errorf("missing onramp onramp for chain %d", chainSel)
 		}
-		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.FeeQuoter); err != nil {
+		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.FeeQuoter); err != nil {
 			return err
 		}
 
@@ -1033,7 +1032,7 @@ func UpdateFeeQuoterDestsChangeset(e cldf.Environment, cfg UpdateFeeQuoterDestsC
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
 	for chainSel, updates := range cfg.UpdatesByChain {
-		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
+		txOpts := e.Chains[chainSel].DeployerKey
 		txOpts.Context = e.GetContext()
 		if cfg.MCMS != nil {
 			txOpts = cldf.SimTransactOpts()
@@ -1048,7 +1047,7 @@ func UpdateFeeQuoterDestsChangeset(e cldf.Environment, cfg UpdateFeeQuoterDestsC
 		}
 		tx, err := fq.ApplyDestChainConfigUpdates(txOpts, args)
 		if cfg.MCMS == nil {
-			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
 		} else {
@@ -1127,7 +1126,7 @@ func (cfg UpdateOffRampSourcesConfig) Validate(e cldf.Environment, state statevi
 			return fmt.Errorf("missing onramp onramp for chain %d", chainSel)
 		}
 		if !cfg.SkipOwnershipCheck {
-			if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.OffRamp); err != nil {
+			if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.OffRamp); err != nil {
 				return err
 			}
 		}
@@ -1165,7 +1164,7 @@ func UpdateOffRampSourcesChangeset(e cldf.Environment, cfg UpdateOffRampSourcesC
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
 	for chainSel, updates := range cfg.UpdatesByChain {
-		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
+		txOpts := e.Chains[chainSel].DeployerKey
 		txOpts.Context = e.GetContext()
 		if cfg.MCMS != nil {
 			txOpts = cldf.SimTransactOpts()
@@ -1194,7 +1193,7 @@ func UpdateOffRampSourcesChangeset(e cldf.Environment, cfg UpdateOffRampSourcesC
 		tx, err := offRamp.ApplySourceChainConfigUpdates(txOpts, args)
 
 		if cfg.MCMS == nil {
-			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, offramp.OffRampABI, err); err != nil {
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, offramp.OffRampABI, err); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error applying source chain config updates for chain %d: %w", chainSel, err)
 			}
 		} else {
@@ -1285,14 +1284,14 @@ func (cfg UpdateRouterRampsConfig) Validate(e cldf.Environment, state stateview.
 		if !cfg.SkipOwnershipCheck {
 			if cfg.TestRouter {
 				// If activating on the test router, we don't need the other CCIP contracts to have proper ownership.
-				if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.TestRouter); err != nil {
+				if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.TestRouter); err != nil {
 					return err
 				}
 			} else if cfg.MCMS == nil {
 				// If we are not using MCMS, then we know we aren't in a production environment given the EnforceMCMSUsageIfProd check above.
 				// In this case, we only need to validate that the router contract is owned by the deployer key.
 				// We don't care about uniform ownership in non-production environments.
-				if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.Router); err != nil {
+				if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.Router); err != nil {
 					return err
 				}
 			} else {
@@ -1303,7 +1302,7 @@ func (cfg UpdateRouterRampsConfig) Validate(e cldf.Environment, state stateview.
 				// Calling this function will ensure that both these checks are done.
 				err := state.ValidateOwnershipOfChain(e, chainSel, cfg.MCMS)
 				if err != nil {
-					return fmt.Errorf("failed to validate ownership of contracts on %s: %w", e.BlockChains.EVMChains()[chainSel], err)
+					return fmt.Errorf("failed to validate ownership of contracts on %s: %w", e.Chains[chainSel], err)
 				}
 			}
 		}
@@ -1357,7 +1356,7 @@ func UpdateRouterRampsChangeset(e cldf.Environment, cfg UpdateRouterRampsConfig)
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
 	for chainSel, update := range cfg.UpdatesByChain {
-		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
+		txOpts := e.Chains[chainSel].DeployerKey
 		txOpts.Context = e.GetContext()
 		if cfg.MCMS != nil {
 			txOpts = cldf.SimTransactOpts()
@@ -1402,7 +1401,7 @@ func UpdateRouterRampsChangeset(e cldf.Environment, cfg UpdateRouterRampsConfig)
 		}
 		tx, err := routerC.ApplyRampUpdates(txOpts, onRampUpdates, removes, adds)
 		if cfg.MCMS == nil {
-			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, router.RouterABI, err); err != nil {
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, router.RouterABI, err); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error applying ramp updates for chain %d: %w", chainSel, err)
 			}
 		} else {
@@ -1489,7 +1488,7 @@ func (c SetOCR3OffRampConfig) validateRemoteChain(e *cldf.Environment, state *st
 		if !ok {
 			return fmt.Errorf("remote chain %d not found in onchain state", chainSelector)
 		}
-		if err := commoncs.ValidateOwnership(e.GetContext(), c.MCMS != nil, e.BlockChains.EVMChains()[chainSelector].DeployerKey.From, chainState.Timelock.Address(), chainState.OffRamp); err != nil {
+		if err := commoncs.ValidateOwnership(e.GetContext(), c.MCMS != nil, e.Chains[chainSelector].DeployerKey.From, chainState.Timelock.Address(), chainState.OffRamp); err != nil {
 			return err
 		}
 	default:
@@ -1530,7 +1529,7 @@ func SetOCR3OffRampChangeset(e cldf.Environment, cfg SetOCR3OffRampConfig) (cldf
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}
-		set, err := isOCR3ConfigSetOnOffRamp(e.Logger, e.BlockChains.EVMChains()[remote], state.Chains[remote].OffRamp, args)
+		set, err := isOCR3ConfigSetOnOffRamp(e.Logger, e.Chains[remote], state.Chains[remote].OffRamp, args)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}
@@ -1538,14 +1537,14 @@ func SetOCR3OffRampChangeset(e cldf.Environment, cfg SetOCR3OffRampConfig) (cldf
 			e.Logger.Infof("OCR3 config already set on offramp for chain %d", remote)
 			continue
 		}
-		txOpts := e.BlockChains.EVMChains()[remote].DeployerKey
+		txOpts := e.Chains[remote].DeployerKey
 		if cfg.MCMS != nil {
 			txOpts = cldf.SimTransactOpts()
 		}
 		offRamp := state.Chains[remote].OffRamp
 		tx, err := offRamp.SetOCR3Configs(txOpts, args)
 		if cfg.MCMS == nil {
-			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[remote], tx, offramp.OffRampABI, err); err != nil {
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[remote], tx, offramp.OffRampABI, err); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error setting OCR3 config for chain %d: %w", remote, err)
 			}
 			e.Logger.Infow("Set OCR3 config on offramp", "chain", remote,
@@ -1622,7 +1621,7 @@ func (cfg UpdateDynamicConfigOffRampConfig) Validate(e cldf.Environment) error {
 		if err := commoncs.ValidateOwnership(
 			e.GetContext(),
 			cfg.MCMS != nil,
-			e.BlockChains.EVMChains()[chainSel].DeployerKey.From,
+			e.Chains[chainSel].DeployerKey.From,
 			state.Chains[chainSel].Timelock.Address(),
 			state.Chains[chainSel].OffRamp,
 		); err != nil {
@@ -1649,8 +1648,8 @@ func UpdateDynamicConfigOffRampChangeset(e cldf.Environment, cfg UpdateDynamicCo
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
 	for chainSel, params := range cfg.Updates {
-		chain := e.BlockChains.EVMChains()[chainSel]
-		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
+		chain := e.Chains[chainSel]
+		txOpts := e.Chains[chainSel].DeployerKey
 		if cfg.MCMS != nil {
 			txOpts = cldf.SimTransactOpts()
 		}
@@ -1662,7 +1661,7 @@ func UpdateDynamicConfigOffRampChangeset(e cldf.Environment, cfg UpdateDynamicCo
 		}
 		tx, err := offRamp.SetDynamicConfig(txOpts, dCfg)
 		if cfg.MCMS == nil {
-			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, offramp.OffRampABI, err); err != nil {
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, offramp.OffRampABI, err); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error updating offramp dynamic config for chain %d: %w", chainSel, err)
 			}
 			e.Logger.Infow("Updated offramp dynamic config", "chain", chain.String(), "config", dCfg)
@@ -1711,7 +1710,7 @@ func UpdateDynamicConfigOffRampChangeset(e cldf.Environment, cfg UpdateDynamicCo
 
 func isOCR3ConfigSetOnOffRamp(
 	lggr logger.Logger,
-	chain cldf_evm.Chain,
+	chain cldf.Chain,
 	offRamp offramp.OffRampInterface,
 	offrampOCR3Configs []offramp.MultiOCR3BaseOCRConfigArgs,
 ) (bool, error) {
@@ -1842,7 +1841,7 @@ func (cfg ApplyFeeTokensUpdatesConfig) Validate(e cldf.Environment) error {
 		if err := commoncs.ValidateOwnership(
 			e.GetContext(),
 			cfg.MCMSConfig != nil,
-			e.BlockChains.EVMChains()[chainSel].DeployerKey.From,
+			e.Chains[chainSel].DeployerKey.From,
 			state.Chains[chainSel].Timelock.Address(),
 			state.Chains[chainSel].FeeQuoter,
 		); err != nil {
@@ -1867,7 +1866,7 @@ func ApplyFeeTokensUpdatesFeeQuoterChangeset(e cldf.Environment, cfg ApplyFeeTok
 	timelocks := make(map[uint64]string)
 	inspectorPerChain := map[uint64]mcmssdk.Inspector{}
 	for chainSel, updates := range cfg.UpdatesByChain {
-		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
+		txOpts := e.Chains[chainSel].DeployerKey
 		if cfg.MCMSConfig != nil {
 			txOpts = cldf.SimTransactOpts()
 		}
@@ -1885,7 +1884,7 @@ func ApplyFeeTokensUpdatesFeeQuoterChangeset(e cldf.Environment, cfg ApplyFeeTok
 		}
 		tx, err := fq.ApplyFeeTokensUpdates(txOpts, tokensToRemove, tokensToAdd)
 		if cfg.MCMSConfig == nil {
-			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error applying token updates for chain %d: %w", chainSel, err)
 			}
 		} else {
@@ -1976,7 +1975,7 @@ func (cfg UpdateTokenPriceFeedsConfig) Validate(e cldf.Environment) error {
 		if err := commoncs.ValidateOwnership(
 			e.GetContext(),
 			cfg.MCMS != nil,
-			e.BlockChains.EVMChains()[chainSel].DeployerKey.From,
+			e.Chains[chainSel].DeployerKey.From,
 			state.Chains[chainSel].Timelock.Address(),
 			state.Chains[chainSel].FeeQuoter,
 		); err != nil {
@@ -2003,7 +2002,7 @@ func UpdateTokenPriceFeedsFeeQuoterChangeset(e cldf.Environment, cfg UpdateToken
 	timelocks := make(map[uint64]string)
 	inspectorPerChain := map[uint64]mcmssdk.Inspector{}
 	for chainSel, updates := range cfg.Updates {
-		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
+		txOpts := e.Chains[chainSel].DeployerKey
 		if cfg.MCMS != nil {
 			txOpts = cldf.SimTransactOpts()
 		}
@@ -2040,7 +2039,7 @@ func UpdateTokenPriceFeedsFeeQuoterChangeset(e cldf.Environment, cfg UpdateToken
 		}
 		tx, err := fq.UpdateTokenPriceFeeds(txOpts, priceFeedUpdates)
 		if cfg.MCMS == nil {
-			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error applying token price feed update for chain %d: %w", chainSel, err)
 			}
 		} else {
@@ -2118,7 +2117,7 @@ func (cfg PremiumMultiplierWeiPerEthUpdatesConfig) Validate(e cldf.Environment) 
 		if err := commoncs.ValidateOwnership(
 			e.GetContext(),
 			cfg.MCMS != nil,
-			e.BlockChains.EVMChains()[chainSel].DeployerKey.From,
+			e.Chains[chainSel].DeployerKey.From,
 			state.Chains[chainSel].Timelock.Address(),
 			state.Chains[chainSel].FeeQuoter,
 		); err != nil {
@@ -2148,7 +2147,7 @@ func ApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset(e cldf.Environment
 	timelocks := make(map[uint64]string)
 	inspectorPerChain := map[uint64]mcmssdk.Inspector{}
 	for chainSel, updates := range cfg.Updates {
-		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
+		txOpts := e.Chains[chainSel].DeployerKey
 		if cfg.MCMS != nil {
 			txOpts = cldf.SimTransactOpts()
 		}
@@ -2166,7 +2165,7 @@ func ApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset(e cldf.Environment
 		}
 		tx, err := fq.ApplyPremiumMultiplierWeiPerEthUpdates(txOpts, premiumMultiplierUpdates)
 		if cfg.MCMS == nil {
-			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error applying premium multiplier updates for chain %d: %w", chainSel, err)
 			}
 		} else {
@@ -2273,7 +2272,7 @@ func (cfg ApplyTokenTransferFeeConfigUpdatesConfig) Validate(e cldf.Environment)
 		if err := commoncs.ValidateOwnership(
 			e.GetContext(),
 			cfg.MCMS != nil,
-			e.BlockChains.EVMChains()[chainSel].DeployerKey.From,
+			e.Chains[chainSel].DeployerKey.From,
 			chainState.Timelock.Address(),
 			chainState.FeeQuoter,
 		); err != nil {
@@ -2316,7 +2315,7 @@ func ApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset(e cldf.Environment, cf
 	timelocks := make(map[uint64]string)
 	inspectorPerChain := map[uint64]mcmssdk.Inspector{}
 	for chainSel, updates := range cfg.UpdatesByChain {
-		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
+		txOpts := e.Chains[chainSel].DeployerKey
 		if cfg.MCMS != nil {
 			txOpts = cldf.SimTransactOpts()
 		}
@@ -2348,7 +2347,7 @@ func ApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset(e cldf.Environment, cf
 		}
 		tx, err := fq.ApplyTokenTransferFeeConfigUpdates(txOpts, tokenTransferFeeConfigs, tokenTransferFeeConfigsRemove)
 		if cfg.MCMS == nil {
-			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("error applying token transfer fee config updates for chain %d: %w", chainSel, err)
 			}
 		} else {

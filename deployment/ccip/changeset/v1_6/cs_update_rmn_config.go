@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	mcmslib "github.com/smartcontractkit/mcms"
@@ -63,7 +62,7 @@ func (c SetRMNRemoteOnRMNProxyConfig) Validate(e cldf.Environment, state statevi
 			return fmt.Errorf("RMNProxy not found for chain %d", chain)
 		}
 
-		chainEnv := e.BlockChains.EVMChains()[chain]
+		chainEnv := e.Chains[chain]
 		if err := commoncs.ValidateOwnership(e.GetContext(), c.MCMSConfig != nil, chainEnv.DeployerKey.From, chainState.Timelock.Address(), chainState.RMNProxy); err != nil {
 			return fmt.Errorf("failed to validate ownership of RMNProxy on %s: %w", chainEnv, err)
 		}
@@ -85,7 +84,7 @@ func SetRMNRemoteOnRMNProxyChangeset(e cldf.Environment, cfg SetRMNRemoteOnRMNPr
 	inspectors := map[uint64]mcmssdk.Inspector{}
 	timelockBatch := []mcmstypes.BatchOperation{}
 	for _, sel := range cfg.ChainSelectors {
-		chain, exists := e.BlockChains.EVMChains()[sel]
+		chain, exists := e.Chains[sel]
 		if !exists {
 			return cldf.ChangesetOutput{}, fmt.Errorf("chain %d not found", sel)
 		}
@@ -136,7 +135,7 @@ func SetRMNRemoteOnRMNProxyChangeset(e cldf.Environment, cfg SetRMNRemoteOnRMNPr
 }
 
 func setRMNRemoteOnRMNProxyOp(
-	txOpts *bind.TransactOpts, chain cldf_evm.Chain, chainState evm.CCIPChainState, mcmsEnabled bool,
+	txOpts *bind.TransactOpts, chain cldf.Chain, chainState evm.CCIPChainState, mcmsEnabled bool,
 ) (mcmstypes.BatchOperation, error) {
 	rmnProxy := chainState.RMNProxy
 	rmnRemoteAddr := chainState.RMNRemote.Address()
@@ -192,7 +191,7 @@ func (c RMNNopConfig) SetBit(bitmap *big.Int, value bool) {
 
 func getDeployer(e cldf.Environment, chain uint64, mcmConfig *proposalutils.TimelockConfig) *bind.TransactOpts {
 	if mcmConfig == nil {
-		return e.BlockChains.EVMChains()[chain].DeployerKey
+		return e.Chains[chain].DeployerKey
 	}
 
 	return cldf.SimTransactOpts()
@@ -357,7 +356,7 @@ func SetRMNHomeCandidateConfigChangeset(e cldf.Environment, config SetRMNHomeCan
 		return cldf.ChangesetOutput{}, err
 	}
 
-	homeChain, ok := e.BlockChains.EVMChains()[config.HomeChainSelector]
+	homeChain, ok := e.Chains[config.HomeChainSelector]
 	if !ok {
 		return cldf.ChangesetOutput{}, fmt.Errorf("chain %d not found", config.HomeChainSelector)
 	}
@@ -374,7 +373,7 @@ func SetRMNHomeCandidateConfigChangeset(e cldf.Environment, config SetRMNHomeCan
 	}
 
 	if config.MCMSConfig == nil {
-		chain := e.BlockChains.EVMChains()[config.HomeChainSelector]
+		chain := e.Chains[config.HomeChainSelector]
 		_, err := chain.Confirm(setCandidateTx)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to confirm tx for chain %s: %w", homeChain.String(), cldf.MaybeDataErr(err))
@@ -426,7 +425,7 @@ func PromoteRMNHomeCandidateConfigChangeset(e cldf.Environment, config PromoteRM
 		return cldf.ChangesetOutput{}, err
 	}
 
-	homeChain, ok := e.BlockChains.EVMChains()[config.HomeChainSelector]
+	homeChain, ok := e.Chains[config.HomeChainSelector]
 
 	if !ok {
 		return cldf.ChangesetOutput{}, fmt.Errorf("chain %d not found", config.HomeChainSelector)
@@ -454,7 +453,7 @@ func PromoteRMNHomeCandidateConfigChangeset(e cldf.Environment, config PromoteRM
 	}
 
 	if config.MCMSConfig == nil {
-		chain := e.BlockChains.EVMChains()[config.HomeChainSelector]
+		chain := e.Chains[config.HomeChainSelector]
 		_, err := chain.Confirm(promoteCandidateTx)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to confirm tx for chain %s: %w", homeChain.String(), cldf.MaybeDataErr(err))
@@ -501,7 +500,7 @@ func PromoteRMNHomeCandidateConfigChangeset(e cldf.Environment, config PromoteRM
 
 func BuildRMNRemotePerChain(e cldf.Environment, state stateview.CCIPOnChainState) map[uint64]*rmn_remote.RMNRemote {
 	timelocksPerChain := make(map[uint64]*rmn_remote.RMNRemote)
-	for _, chain := range e.BlockChains.EVMChains() {
+	for _, chain := range e.Chains {
 		timelocksPerChain[chain.Selector] = state.Chains[chain.Selector].RMNRemote
 	}
 	return timelocksPerChain
@@ -527,12 +526,12 @@ func (c SetRMNHomeDynamicConfigConfig) Validate(e cldf.Environment) error {
 
 	rmnHome := state.Chains[c.HomeChainSelector].RMNHome
 	if rmnHome == nil {
-		return fmt.Errorf("RMNHome not found for chain %s", e.BlockChains.EVMChains()[c.HomeChainSelector].String())
+		return fmt.Errorf("RMNHome not found for chain %s", e.Chains[c.HomeChainSelector].String())
 	}
 
 	currentDigest, err := rmnHome.GetActiveDigest(nil)
 	if err != nil {
-		return fmt.Errorf("failed to get RMNHome candidate digest for chain %s: %w", e.BlockChains.EVMChains()[c.HomeChainSelector].String(), err)
+		return fmt.Errorf("failed to get RMNHome candidate digest for chain %s: %w", e.Chains[c.HomeChainSelector].String(), err)
 	}
 
 	if currentDigest != c.ActiveDigest {
@@ -559,7 +558,7 @@ func SetRMNHomeDynamicConfigChangeset(e cldf.Environment, cfg SetRMNHomeDynamicC
 
 	deployerGroup := deployergroup.NewDeployerGroup(e, state, cfg.MCMS).WithDeploymentContext("set RMNHome dynamic config")
 
-	chain, exists := e.BlockChains.EVMChains()[cfg.HomeChainSelector]
+	chain, exists := e.Chains[cfg.HomeChainSelector]
 	if !exists {
 		return cldf.ChangesetOutput{}, fmt.Errorf("chain %d not found", cfg.HomeChainSelector)
 	}
@@ -602,12 +601,12 @@ func (c RevokeCandidateConfig) Validate(e cldf.Environment) error {
 
 	rmnHome := state.Chains[c.HomeChainSelector].RMNHome
 	if rmnHome == nil {
-		return fmt.Errorf("RMNHome not found for chain %s", e.BlockChains.EVMChains()[c.HomeChainSelector].String())
+		return fmt.Errorf("RMNHome not found for chain %s", e.Chains[c.HomeChainSelector].String())
 	}
 
 	currentDigest, err := rmnHome.GetCandidateDigest(nil)
 	if err != nil {
-		return fmt.Errorf("failed to get RMNHome candidate digest for chain %s: %w", e.BlockChains.EVMChains()[c.HomeChainSelector].String(), err)
+		return fmt.Errorf("failed to get RMNHome candidate digest for chain %s: %w", e.Chains[c.HomeChainSelector].String(), err)
 	}
 
 	if currentDigest != c.CandidateDigest {
@@ -630,7 +629,7 @@ func RevokeRMNHomeCandidateConfigChangeset(e cldf.Environment, cfg RevokeCandida
 
 	deployerGroup := deployergroup.NewDeployerGroup(e, state, cfg.MCMS).WithDeploymentContext("revoke candidate config")
 
-	chain, exists := e.BlockChains.EVMChains()[cfg.HomeChainSelector]
+	chain, exists := e.Chains[cfg.HomeChainSelector]
 	if !exists {
 		return cldf.ChangesetOutput{}, fmt.Errorf("chain %d not found", cfg.HomeChainSelector)
 	}
