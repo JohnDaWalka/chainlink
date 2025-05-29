@@ -22,7 +22,7 @@
 /core/services/feeds @smartcontractkit/deployment-automation @smartcontractkit/core
 /core/services/synchronization/telem @smartcontractkit/data-tooling @smartcontractkit/core
 /core/capabilities/ @smartcontractkit/keystone @smartcontractkit/capabilities-team
-/core/capabilities/ccip @smartcontractkit/ccip-offchain
+/core/capabilities/ccip @smartcontractkit/ccip-offchain @smartcontractkit/bix-build
 
 # To be deprecated in Chainlink V3
 /core/services/fluxmonitorv2 @smartcontractkit/foundations @smartcontractkit/core
@@ -136,7 +136,7 @@ core/scripts/gateway @smartcontractkit/dev-services
 /integration-tests/ccip-tests @smartcontractkit/ccip-offchain @smartcontractkit/core @smartcontractkit/ccip
 /integration-tests/**/*keeper* @smartcontractkit/dev-services @smartcontractkit/core
 /integration-tests/**/*automation* @smartcontractkit/dev-services @smartcontractkit/core
-/integration-tests/**/*ccip* @smartcontractkit/ccip-offchain @smartcontractkit/core @smartcontractkit/ccip
+/integration-tests/**/*ccip* @smartcontractkit/ccip-offchain @smartcontractkit/core @smartcontractkit/ccip @smartcontractskit/bix-build
 
 # Deployment tooling
 /deployment @smartcontractkit/ccip-tooling @smartcontractkit/ccip-offchain @smartcontractkit/keystone @smartcontractkit/core @smartcontractkit/deployment-automation @smartcontractkit/cld-team
