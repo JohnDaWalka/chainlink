@@ -61,7 +61,6 @@ func GenerateChainsTon(t *testing.T, numChains int) map[uint64]cldf_ton.Chain {
 		// todo: configurable wallet options
 		wallet := createTonWallet(t, nodeClient, wallet.V3R2, wallet.WithWorkchain(0))
 		ton := cldf_ton.Chain{
-
 			ChainMetadata: cldf_ton.ChainMetadata{Selector: chainID},
 			Client:        nodeClient,
 			Wallet:        wallet,

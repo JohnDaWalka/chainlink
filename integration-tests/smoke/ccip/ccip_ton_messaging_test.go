@@ -43,11 +43,10 @@ func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
 	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
 
 	var (
-		replayed bool
-		nonce    uint64
-		sender   = common.LeftPadBytes(e.Env.Chains[sourceChain].DeployerKey.From.Bytes(), 32)
-		out      mt.TestCaseOutput
-		setup    = mt.NewTestSetupWithDeployedEnv(
+		nonce  uint64
+		sender = common.LeftPadBytes(e.Env.Chains[sourceChain].DeployerKey.From.Bytes(), 32)
+		out    mt.TestCaseOutput
+		setup  = mt.NewTestSetupWithDeployedEnv(
 			t,
 			e,
 			state,
@@ -69,7 +68,7 @@ func Test_CCIPMessaging_EVM2Ton(t *testing.T) {
 			t,
 			mt.TestCase{
 				TestSetup:              setup,
-				Replayed:               replayed,
+				Replayed:               true,
 				Nonce:                  &nonce,
 				Receiver:               receiverBase64Bytes,
 				MsgData:                []byte("hello CCIPReceiver"),
