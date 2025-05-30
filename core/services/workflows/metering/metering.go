@@ -10,9 +10,9 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	billing "github.com/smartcontractkit/chainlink-protos/billing/go"
 	"github.com/smartcontractkit/chainlink-protos/workflows/go/events"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 const (
@@ -111,9 +111,8 @@ type Report struct {
 	lggr    logger.Logger
 
 	// internal state
-	mu       sync.RWMutex
-	steps    map[ReportStepRef]ReportStep
-	refCount map[ReportStepRef]uint64
+	mu    sync.RWMutex
+	steps map[ReportStepRef]ReportStep
 }
 
 func NewReport(accountID, workflowID, workflowExecutionID string, lggr logger.Logger) *Report {
@@ -305,18 +304,6 @@ func (r *Report) SendReceipt(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-// IncrementRefCount returns a count of the time the ref has been seen.
-// Used to build unique refs in EngineV2 until there are deterministic capability call IDs available
-// TODO: Remove with CAPPL-881
-func (r *Report) IncrementRefCount(ref ReportStepRef) uint64 {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	count := r.refCount[ref]
-	r.refCount[ref]++
-	return count
 }
 
 // Reports is a concurrency-safe wrapper around map[string]*Report.

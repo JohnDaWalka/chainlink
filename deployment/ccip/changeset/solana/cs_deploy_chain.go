@@ -144,7 +144,7 @@ func (c DeployChainContractsConfig) Validate(e cldf.Environment, existingState s
 
 	// In memory tests:
 	// programs and state are pre-loaded, so we pass nil mcms config as router will be present in state
-	// take a look at test_helpers.go/deployChainContractsToSolChainCS
+	// take a look at test_helpers.go/DeployChainContractsToSolChainCS
 	// initialisation of the mcms contracts then happens via testhelpers.TransferOwnershipSolana
 	if chainState.Router.IsZero() {
 		if c.MCMSWithTimelockConfig == nil {
@@ -248,7 +248,7 @@ func DeployAndMaybeSaveToAddressBook(
 	if metadata != "" && metadata != shared.CLLMetadata {
 		overallocate = false
 	}
-	programID, err := chain.DeployProgram(e.Logger, cldf.SolProgramInfo{
+	programID, err := chain.DeployProgram(e.Logger, cldf_solana.ProgramInfo{
 		Name:  programName,
 		Bytes: deployment.SolanaProgramBytes[programName],
 	}, isUpgrade, overallocate)
@@ -1051,7 +1051,7 @@ func generateCloseBufferIxn(
 // HELPER FUNCTIONS
 func GetSolProgramSize(e *cldf.Environment, chain cldf_solana.Chain, programID solana.PublicKey) (int, error) {
 	accountInfo, err := chain.Client.GetAccountInfoWithOpts(e.GetContext(), programID, &rpc.GetAccountInfoOpts{
-		Commitment: cldf.SolDefaultCommitment,
+		Commitment: cldf_solana.SolDefaultCommitment,
 	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to get account info: %w", err)
