@@ -381,7 +381,6 @@ func validateOCR2LLOSpec(jsonConfig job.JSONConfig) error {
 	return pkgerrors.Wrap(pluginConfig.Validate(), "LLO PluginConfig is invalid")
 }
 
-// TODO(gg): update this if needed
 func validateSecureMintSpec(jsonConfig job.JSONConfig) error {
 	if jsonConfig == nil {
 		return errors.New("pluginConfig is empty")
@@ -392,8 +391,9 @@ func validateSecureMintSpec(jsonConfig job.JSONConfig) error {
 		return pkgerrors.Wrap(err, "error while unmarshalling plugin config")
 	}
 
-	// TODO(gg): 
+	// TODO(gg): is there a config.Validate()?
 	// return pkgerrors.Wrap(pluginConfig.Validate(), "SecureMint PluginConfig is invalid")
+
 	return nil
-	
+
 }
