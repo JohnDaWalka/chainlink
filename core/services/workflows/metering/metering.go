@@ -18,19 +18,13 @@ import (
 const (
 	consensusCreditType = "CONSENSUS"
 	triggerCreditType   = "TRIGGER"
-	computeCreditType   = "COMPUTE"
+	ComputeCreditType   = "COMPUTE"
 	gasCreditType       = "GAS"
 )
 
 type BillingClient interface {
 	SubmitWorkflowReceipt(context.Context, *billing.SubmitWorkflowReceiptRequest) (*billing.SubmitWorkflowReceiptResponse, error)
 	ReserveCredits(context.Context, *billing.ReserveCreditsRequest) (*billing.ReserveCreditsResponse, error)
-}
-
-type ReportStepRef string
-
-func (s ReportStepRef) String() string {
-	return string(s)
 }
 
 type SpendUnit string
@@ -83,6 +77,11 @@ func (v SpendValue) String() string {
 	return v.value.StringFixedBank(int32(v.roundingPlace))
 }
 
+type SpendTuple struct {
+	Unit  string
+	Value int64
+}
+
 type ProtoDetail struct {
 	Schema string
 	Domain string
@@ -90,8 +89,10 @@ type ProtoDetail struct {
 }
 
 type ReportStep struct {
-	Reserve map[SpendUnit]SpendValue
-	Spend   map[SpendUnit][]ReportStepDetail
+	// The maximum amount of universal credits that should be used in this step
+	Reserve int64
+	// The actual spend of this step
+	Spend map[SpendUnit][]ReportStepDetail
 }
 
 type ReportStepDetail struct {
@@ -111,22 +112,62 @@ type Report struct {
 	lggr    logger.Logger
 
 	// internal state
+	ready bool
 	mu    sync.RWMutex
-	steps map[ReportStepRef]ReportStep
+	steps map[string]ReportStep
 }
 
 func NewReport(accountID, workflowID, workflowExecutionID string, lggr logger.Logger) *Report {
-	logger := lggr.Named("Metering")
-
+	sugaredLggr := logger.Sugared(lggr).Named("WorkflowEngine").With("workflowID", workflowID, "workflowExecutionID", workflowExecutionID)
 	return &Report{
 		accountID:           accountID,
 		workflowID:          workflowID,
 		workflowExecutionID: workflowExecutionID,
-		balance:             NewBalanceStore(0, map[string]decimal.Decimal{}, logger),
-		lggr:                logger,
-		steps:               make(map[ReportStepRef]ReportStep),
-		refCount:            make(map[ReportStepRef]uint64),
+
+		balance: NewBalanceStore(0, map[string]decimal.Decimal{}, sugaredLggr),
+		lggr:    sugaredLggr,
+
+		ready: false,
+		steps: make(map[string]ReportStep),
 	}
+}
+
+func (r *Report) Initialize(ctx context.Context) error {
+	if r.client == nil {
+		// TODO: more robust check of billing service health
+		return errors.New("no billing client configured")
+	}
+
+	// TODO: get rate card from billing service
+	rateCard := map[string]decimal.Decimal{}
+
+	balanceStore := NewBalanceStore(0, rateCard, r.lggr)
+
+	// If there is no credit limit defined in the workflow, then open an empty reservation
+	// TODO: consume user defined workflow execution limit
+	req := billing.ReserveCreditsRequest{
+		AccountId:           r.accountID,
+		WorkflowId:          r.workflowID,
+		WorkflowExecutionId: r.workflowExecutionID,
+		Credits:             []*billing.AccountCreditsInput{}, // TODO: send the credit balance, not resource types
+	}
+
+	resp, err := r.client.ReserveCredits(ctx, &req)
+	// If there is an error communicating with the billing service, fail openly
+	if err != nil {
+		// TODO: track failure
+		balanceStore.AllowNegative()
+		r.lggr.Warnf("failed to reserve credits: %s", err)
+	} else {
+		success := resp.GetSuccess()
+		// TODO: once response contains balance set using balanceStore.Add
+		if !success {
+			return errors.New("insufficient balance funding")
+		}
+	}
+
+	r.ready = true
+	return nil
 }
 
 func (r *Report) MedianSpend() map[SpendUnit]SpendValue {
@@ -166,66 +207,92 @@ func (r *Report) MedianSpend() map[SpendUnit]SpendValue {
 	return medians
 }
 
-// ReserveStep earmarks the maximum spend for a given capability invocation in the engine.
+// ReserveByLimits earmarks an amount of local universal credit balance and then returns that amount
+// The amount reserved is determined by the upper limit of resource credits that can be used
 // We expect to only set this value once - an error is returned if a step would be overwritten
-func (r *Report) ReserveStep(ref ReportStepRef, capInfo capabilities.CapabilityInfo) error {
+func (r *Report) ReserveByLimits(ref string, capInfo capabilities.CapabilityInfo, limits []SpendTuple) (int64, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if !r.ready {
+		return 0, errors.New("metering report has not been initialized")
+	}
+
 	if _, ok := r.steps[ref]; ok {
-		return errors.New("step reserve already exists")
+		return 0, errors.New("step reserve already exists")
 	}
 
-	req := billing.ReserveCreditsRequest{
-		AccountId:           r.accountID,
-		WorkflowId:          r.workflowID,
-		WorkflowExecutionId: r.workflowExecutionID,
-	}
+	// TODO: consume CapabilityInfo resource types
 
-	// TODO: checking capability type to know ahead of time what to reserve is brittle
-	switch capInfo.CapabilityType {
-	case "streams-trigger@1.0.0":
-		req.Credits = []*billing.AccountCreditsInput{
-			{Credits: 1, CreditType: triggerCreditType},
-		}
-	case "cron-trigger@1.0.0":
-		req.Credits = []*billing.AccountCreditsInput{
-			{Credits: 1, CreditType: triggerCreditType},
-		}
-	case "offchain_reporting@1.0.0":
-		req.Credits = []*billing.AccountCreditsInput{
-			{Credits: 100_000, CreditType: consensusCreditType}, // TODO: reserve the maximum byte size
-		}
-	case "write_aptos-testnet@1.0.0":
-		req.Credits = []*billing.AccountCreditsInput{
-			{Credits: 100_000_000, CreditType: gasCreditType}, // TODO: reserve the maximum byte size
-		}
-	default:
-		r.lggr.Infof("unexpected capability type: %s", capInfo.CapabilityType)
+	amount := int64(0)
+	for _, spendTuple := range limits {
+		amount += r.balance.ConvertToBalance(spendTuple.Unit, spendTuple.Value)
 	}
-
-	// TODO: handle error by indicating that a billing reserve failed
-	// but do not halt the workflow
-	if _, err := r.client.ReserveCredits(context.TODO(), &req); err != nil {
-		r.lggr.Warnf("failed to reserve credits: %s", err)
+	err := r.balance.Minus(amount)
+	if err != nil {
+		return 0, err
 	}
-
-	// TODO: handle extra reserves for write step
 
 	r.steps[ref] = ReportStep{
-		Reserve: make(map[SpendUnit]SpendValue),
+		Reserve: amount,
 		Spend:   nil,
 	}
 
-	return nil
+	return amount, nil
 }
 
-// SetStep sets the recorded spends for a given capability invocation in the engine.
-// ReserveStep must be called before SetStep
+// ReserveByAvailability earmarks an amount of local universal credit balance and then returns that amount
+// The amount reserved is determined splitting the total open balance by how many remaining concurrent calls can be made
 // We expect to only set this value once - an error is returned if a step would be overwritten
-func (r *Report) SetStep(ref ReportStepRef, steps []capabilities.MeteringNodeDetail) error {
+func (r *Report) ReserveByAvailability(ref string, capInfo capabilities.CapabilityInfo, openConcurrentCallSlots int) (int64, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	if !r.ready {
+		return 0, errors.New("metering report has not been initialized")
+	}
+
+	if _, ok := r.steps[ref]; ok {
+		return 0, errors.New("step reserve already exists")
+	}
+
+	if openConcurrentCallSlots == 0 {
+		return 0, errors.New("openConcurrentCallSlots must be greater than 0")
+	}
+
+	// TODO: consume CapabilityInfo resource types
+
+	// Split the available local balance between the number of concurrent calls that can still be made
+	available := r.balance.Get()
+	share := decimal.NewFromInt(available).Div(decimal.NewFromInt(int64(openConcurrentCallSlots)))
+	roundedShare := share.RoundUp(0).IntPart()
+
+	// TODO: take minimum of available concurrent balance versus step defined max spend
+
+	err := r.balance.Minus(roundedShare)
+	if err != nil {
+		// invariant: engine manages concurrent calls
+		return 0, fmt.Errorf("insufficient balance to reserve: %w", err)
+	}
+
+	r.steps[ref] = ReportStep{
+		Reserve: roundedShare,
+		Spend:   nil,
+	}
+
+	return roundedShare, nil
+}
+
+// SetStep records the actual spend for a given capability invocation in the engine.
+// ReserveStep must be called before SetStep
+// We expect to only set this value once - an error is returned if a step would be overwritten
+func (r *Report) SetStep(ref string, steps []capabilities.MeteringNodeDetail) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if !r.ready {
+		return errors.New("metering report has not been initialized")
+	}
 
 	step, ok := r.steps[ref]
 	if !ok {
@@ -236,7 +303,8 @@ func (r *Report) SetStep(ref ReportStepRef, steps []capabilities.MeteringNodeDet
 		return errors.New("step spend already exists")
 	}
 
-	spend := make(map[SpendUnit][]ReportStepDetail)
+	spent := int64(0)
+	spends := make(map[SpendUnit][]ReportStepDetail)
 
 	for _, detail := range steps {
 		unit := SpendUnit(detail.SpendUnit)
@@ -244,14 +312,22 @@ func (r *Report) SetStep(ref ReportStepRef, steps []capabilities.MeteringNodeDet
 		if err != nil {
 			r.lggr.Error(fmt.Sprintf("failed to get spend value from %s: %s", detail.SpendValue, err))
 		}
-		spend[unit] = append(spend[unit], ReportStepDetail{
+		spends[unit] = append(spends[unit], ReportStepDetail{
 			Peer2PeerID: detail.Peer2PeerID,
 			SpendValue:  value,
 		})
+		spent += r.balance.ConvertToBalance(detail.SpendUnit, value.value.IntPart())
 	}
 
-	step.Spend = spend
+	step.Spend = spends
 	r.steps[ref] = step
+
+	// Refund unused local reserve
+	err := r.balance.Add(step.Reserve - spent)
+	if err != nil {
+		// invariant: capability should not let spend exceed reserve
+		r.lggr.Error("invariant: spend exceeded reserve")
+	}
 
 	return nil
 }
@@ -275,7 +351,7 @@ func (r *Report) Message() *events.MeteringReport {
 			}
 		}
 
-		protoReport.Steps[key.String()] = &events.MeteringReportStep{
+		protoReport.Steps[key] = &events.MeteringReportStep{
 			Nodes: nodeDetails,
 		}
 	}
@@ -284,23 +360,24 @@ func (r *Report) Message() *events.MeteringReport {
 }
 
 func (r *Report) SendReceipt(ctx context.Context) error {
-	// send metering report to billing if billing client is not nil
-	if r.client != nil {
-		req := billing.SubmitWorkflowReceiptRequest{
-			AccountId:           r.accountID,
-			WorkflowId:          r.workflowID,
-			WorkflowExecutionId: r.workflowExecutionID,
-			Metering:            r.Message(),
-		}
+	if !r.ready {
+		return errors.New("metering report has not been initialized")
+	}
 
-		resp, err := r.client.SubmitWorkflowReceipt(ctx, &req)
-		if err != nil {
-			return err
-		}
+	req := billing.SubmitWorkflowReceiptRequest{
+		AccountId:           r.accountID,
+		WorkflowId:          r.workflowID,
+		WorkflowExecutionId: r.workflowExecutionID,
+		Metering:            r.Message(),
+	}
 
-		if resp == nil || !resp.Success {
-			return errors.New("failed to submit workflow receipt")
-		}
+	resp, err := r.client.SubmitWorkflowReceipt(ctx, &req)
+	if err != nil {
+		return err
+	}
+
+	if resp == nil || !resp.Success {
+		return errors.New("failed to submit workflow receipt")
 	}
 
 	return nil

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -281,8 +282,30 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 		return
 	}
 
-	e.meterReports.Add(executionID, metering.NewReport(e.cfg.WorkflowOwner, e.cfg.WorkflowID, executionID, e.cfg.Lggr))
+	meteringReport := metering.NewReport(e.cfg.WorkflowOwner, e.cfg.WorkflowID, executionID, e.cfg.Lggr)
+	err = meteringReport.Initialize(ctx)
+	if err != nil {
+		e.cfg.Lggr.Errorw("Workflow execution could not be started", "err", err)
+		return
+	}
+	e.meterReports.Add(executionID, meteringReport)
+	// V2Engine runs the entirety of a module's execution as compute. Ensure that the max execution time can run.
+	_, err = meteringReport.ReserveByLimits(
+		metering.ComputeCreditType,
+		capabilities.CapabilityInfo{ID: "compute@1.0.0"},
+		[]metering.SpendTuple{
+			{
+				Unit:  metering.ComputeCreditType,
+				Value: int64(e.cfg.LocalLimits.WorkflowExecutionTimeoutMs),
+			},
+		},
+	)
+	if err != nil {
+		e.cfg.Lggr.Errorw("Workflow execution could not be started", "err", err)
+		return
+	}
 
+	startTime := time.Now()
 	result, err := e.cfg.Module.Execute(subCtx, &wasmpb.ExecuteRequest{
 		Request: &wasmpb.ExecuteRequest_Trigger{
 			Trigger: &sdkpb.Trigger{
@@ -293,16 +316,28 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 		MaxResponseSize: uint64(e.cfg.LocalLimits.ModuleExecuteMaxResponseSizeBytes),
 		// TODO(CAPPL-729): pass workflow config
 	}, &CapabilityExecutor{Engine: e, ID: executionID})
+	endTime := time.Now()
+
+	executionMS := strconv.Itoa(int(endTime.Sub(startTime).Milliseconds()))
+	mrErr := meteringReport.SetStep(metering.ComputeCreditType, []capabilities.MeteringNodeDetail{{Peer2PeerID: e.localNode.PeerID.String(), SpendUnit: metering.ComputeCreditType, SpendValue: executionMS}})
+	if mrErr != nil {
+		e.cfg.Lggr.Errorw("could not set metering for compute", "err", err)
+		return
+	}
+	mrErr = meteringReport.SendReceipt(ctx)
+	if mrErr != nil {
+		e.cfg.Lggr.Errorw("could not send metering report", "err", err)
+		return
+	}
+	e.meterReports.Delete(executionID)
+
 	if err != nil {
 		e.cfg.Lggr.Errorw("Workflow execution failed", "err", err)
 		// TODO(CAPPL-736): observability
-		e.meterReports.Delete(executionID)
 		return
 	}
 
 	// TODO(CAPPL-736): handle execution result
-
-	e.meterReports.Delete(executionID)
 
 	e.cfg.Lggr.Infow("Workflow execution finished", "executionID", executionID, "result", result)
 	e.cfg.Hooks.OnResultReceived(result)

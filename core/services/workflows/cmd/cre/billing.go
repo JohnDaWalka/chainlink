@@ -32,7 +32,7 @@ func (s *BillingService) WorkflowReceipt(
 	_ context.Context,
 	request *billing.SubmitWorkflowReceiptRequest,
 ) (*billing.SubmitWorkflowReceiptResponse, error) {
-	s.lggr.Info("WorkflowReceipt")
+	s.lggr.Infof("WorkflowReceipt: %v", request.Metering)
 
 	return &billing.SubmitWorkflowReceiptResponse{Success: true}, nil
 }

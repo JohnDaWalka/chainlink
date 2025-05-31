@@ -1,6 +1,7 @@
 package metering
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
+	billing "github.com/smartcontractkit/chainlink-protos/billing/go"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
@@ -19,6 +21,18 @@ const (
 	testWorkflowID          = "workflowId"
 	testWorkflowExecutionID = "workflowExecutionId"
 )
+
+type mockBillingClient struct{}
+
+func (m *mockBillingClient) SubmitWorkflowReceipt(context.Context, *billing.SubmitWorkflowReceiptRequest) (*billing.SubmitWorkflowReceiptResponse, error) {
+	return &billing.SubmitWorkflowReceiptResponse{Success: true}, nil
+}
+func (m *mockBillingClient) ReserveCredits(context.Context, *billing.ReserveCreditsRequest) (*billing.ReserveCreditsResponse, error) {
+	return &billing.ReserveCreditsResponse{Success: true}, nil
+}
+func newMockBillingClient() BillingClient {
+	return &mockBillingClient{}
+}
 
 func TestReport(t *testing.T) {
 	t.Parallel()
@@ -31,7 +45,14 @@ func TestReport(t *testing.T) {
 	t.Run("MedianSpend returns median for multiple spend units", func(t *testing.T) {
 		t.Parallel()
 
+		billingClient := newMockBillingClient()
 		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
+		report.client = billingClient
+		err := report.Initialize(t.Context())
+		require.NoError(t, err)
+		err = report.balance.Add(100)
+		require.NoError(t, err)
+
 		steps := []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "abc", SpendUnit: testA, SpendValue: "1"},
 			{Peer2PeerID: "xyz", SpendUnit: testA, SpendValue: "2"},
@@ -42,8 +63,9 @@ func TestReport(t *testing.T) {
 		}
 
 		for idx := range steps {
-			require.NoError(t, report.ReserveStep(ReportStepRef(strconv.Itoa(idx)), capabilities.CapabilityInfo{}))
-			require.NoError(t, report.SetStep(ReportStepRef(strconv.Itoa(idx)), steps))
+			_, err := report.ReserveByLimits(strconv.Itoa(idx), capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+			require.NoError(t, err)
+			require.NoError(t, report.SetStep(strconv.Itoa(idx), steps))
 		}
 
 		expected := map[SpendUnit]SpendValue{
@@ -64,14 +86,22 @@ func TestReport(t *testing.T) {
 	t.Run("MedianSpend returns median single spend value", func(t *testing.T) {
 		t.Parallel()
 
+		billingClient := newMockBillingClient()
 		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
+		report.client = billingClient
+		err := report.Initialize(t.Context())
+		require.NoError(t, err)
+		err = report.balance.Add(100)
+		require.NoError(t, err)
+
 		steps := []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "abc", SpendUnit: "a", SpendValue: "1"},
 		}
 
 		for idx := range steps {
-			require.NoError(t, report.ReserveStep(ReportStepRef(strconv.Itoa(idx)), capabilities.CapabilityInfo{}))
-			require.NoError(t, report.SetStep(ReportStepRef(strconv.Itoa(idx)), steps))
+			_, err := report.ReserveByLimits(strconv.Itoa(idx), capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+			require.NoError(t, err)
+			require.NoError(t, report.SetStep(strconv.Itoa(idx), steps))
 		}
 
 		expected := map[SpendUnit]SpendValue{
@@ -89,7 +119,14 @@ func TestReport(t *testing.T) {
 	t.Run("MedianSpend returns median odd number of spend values", func(t *testing.T) {
 		t.Parallel()
 
+		billingClient := newMockBillingClient()
 		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
+		report.client = billingClient
+		err := report.Initialize(t.Context())
+		require.NoError(t, err)
+		err = report.balance.Add(100)
+		require.NoError(t, err)
+
 		steps := []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "abc", SpendUnit: testA, SpendValue: "1"},
 			{Peer2PeerID: "abc", SpendUnit: testA, SpendValue: "3"},
@@ -97,8 +134,9 @@ func TestReport(t *testing.T) {
 		}
 
 		for idx := range steps {
-			require.NoError(t, report.ReserveStep(ReportStepRef(strconv.Itoa(idx)), capabilities.CapabilityInfo{}))
-			require.NoError(t, report.SetStep(ReportStepRef(strconv.Itoa(idx)), steps))
+			_, err := report.ReserveByLimits(strconv.Itoa(idx), capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+			require.NoError(t, err)
+			require.NoError(t, report.SetStep(strconv.Itoa(idx), steps))
 		}
 
 		expected := map[SpendUnit]SpendValue{
@@ -116,7 +154,14 @@ func TestReport(t *testing.T) {
 	t.Run("MedianSpend returns median as average for even number of spend values", func(t *testing.T) {
 		t.Parallel()
 
+		billingClient := newMockBillingClient()
 		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
+		report.client = billingClient
+		err := report.Initialize(t.Context())
+		require.NoError(t, err)
+		err = report.balance.Add(100)
+		require.NoError(t, err)
+
 		steps := []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "xyz", SpendUnit: testA, SpendValue: "42"},
 			{Peer2PeerID: "abc", SpendUnit: testA, SpendValue: "1"},
@@ -125,8 +170,9 @@ func TestReport(t *testing.T) {
 		}
 
 		for idx := range steps {
-			require.NoError(t, report.ReserveStep(ReportStepRef(strconv.Itoa(idx)), capabilities.CapabilityInfo{}))
-			require.NoError(t, report.SetStep(ReportStepRef(strconv.Itoa(idx)), steps))
+			_, err := report.ReserveByLimits(strconv.Itoa(idx), capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+			require.NoError(t, err)
+			require.NoError(t, report.SetStep(strconv.Itoa(idx), steps))
 		}
 
 		expected := map[SpendUnit]SpendValue{
@@ -143,14 +189,29 @@ func TestReport(t *testing.T) {
 
 	t.Run("ReserveStep returns error if step already exists", func(t *testing.T) {
 		t.Parallel()
+		billingClient := newMockBillingClient()
 		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
-		require.NoError(t, report.ReserveStep(ReportStepRef("ref1"), capabilities.CapabilityInfo{}))
-		require.Error(t, report.ReserveStep(ReportStepRef("ref1"), capabilities.CapabilityInfo{}))
+		report.client = billingClient
+		err := report.Initialize(t.Context())
+		require.NoError(t, err)
+		err = report.balance.Add(100)
+		require.NoError(t, err)
+		_, err = report.ReserveByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+		require.NoError(t, err)
+		_, err = report.ReserveByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+		require.Error(t, err)
 	})
 
 	t.Run("SetStep returns error if reserve is not called first", func(t *testing.T) {
 		t.Parallel()
+		billingClient := newMockBillingClient()
 		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
+		report.client = billingClient
+		err := report.Initialize(t.Context())
+		require.NoError(t, err)
+		err = report.balance.Add(100)
+		require.NoError(t, err)
+
 		steps := []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "xyz", SpendUnit: testA, SpendValue: "42"},
 			{Peer2PeerID: "abc", SpendUnit: testA, SpendValue: "1"},
@@ -161,13 +222,21 @@ func TestReport(t *testing.T) {
 
 	t.Run("SetStep returns error if step already exists", func(t *testing.T) {
 		t.Parallel()
+		billingClient := newMockBillingClient()
 		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
+		report.client = billingClient
+		err := report.Initialize(t.Context())
+		require.NoError(t, err)
+		err = report.balance.Add(100)
+		require.NoError(t, err)
+
 		steps := []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "xyz", SpendUnit: testA, SpendValue: "42"},
 			{Peer2PeerID: "abc", SpendUnit: testA, SpendValue: "1"},
 		}
 
-		require.NoError(t, report.ReserveStep(ReportStepRef("ref1"), capabilities.CapabilityInfo{}))
+		_, err = report.ReserveByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+		require.NoError(t, err)
 		require.NoError(t, report.SetStep("ref1", steps))
 		require.Error(t, report.SetStep("ref1", steps))
 	})
@@ -182,11 +251,12 @@ func Test_MeterReports(t *testing.T) {
 	wg.Add(3)
 	go func() {
 		defer wg.Done()
-		mr.Add("exec1", NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t)))
+		report := NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t))
+		mr.Add("exec1", report)
 		r, ok := mr.Get("exec1")
 		assert.True(t, ok)
 		//nolint:errcheck // depending on the concurrent timing, this may or may not err
-		r.ReserveStep(ReportStepRef("ref1"), capabilities.CapabilityInfo{})
+		report.ReserveByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 		//nolint:errcheck // depending on the concurrent timing, this may or may not err
 		r.SetStep("ref1", []capabilities.MeteringNodeDetail{})
 		mr.Delete("exec1")
@@ -196,7 +266,7 @@ func Test_MeterReports(t *testing.T) {
 		mr.Add("exec2", NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestLogger(t)))
 		r, ok := mr.Get("exec2")
 		assert.True(t, ok)
-		err := r.ReserveStep(ReportStepRef("ref1"), capabilities.CapabilityInfo{})
+		_, err := r.ReserveByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 		assert.NoError(t, err)
 		err = r.SetStep("ref1", []capabilities.MeteringNodeDetail{})
 		assert.NoError(t, err)
@@ -208,7 +278,7 @@ func Test_MeterReports(t *testing.T) {
 		r, ok := mr.Get("exec1")
 		assert.True(t, ok)
 		//nolint:errcheck // depending on the concurrent timing, this may or may not err
-		r.ReserveStep(ReportStepRef("ref1"), capabilities.CapabilityInfo{})
+		r.ReserveByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 		//nolint:errcheck // depending on the concurrent timing, this may or may not err
 		r.SetStep("ref1", []capabilities.MeteringNodeDetail{})
 		mr.Delete("exec1")

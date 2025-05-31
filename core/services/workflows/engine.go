@@ -488,9 +488,14 @@ func (e *Engine) stepUpdateLoop(ctx context.Context, executionID string, stepUpd
 
 // startExecution kicks off a new workflow execution when a trigger event is received.
 func (e *Engine) startExecution(ctx context.Context, executionID string, triggerID string, event *values.Map) error {
-	e.meterReports.Add(executionID, metering.NewReport(e.workflow.owner, e.workflow.id, executionID, e.logger))
+	meteringReport := metering.NewReport(e.workflow.owner, e.workflow.id, executionID, e.logger)
+	e.meterReports.Add(executionID, meteringReport)
+	err := meteringReport.Initialize(ctx)
+	if err != nil {
+		e.logger.Errorf("failed to initialize: %+v", err)
+	}
 
-	err := events.EmitExecutionStartedEvent(ctx, e.cma, triggerID, executionID)
+	err = events.EmitExecutionStartedEvent(ctx, e.cma, triggerID, executionID)
 	if err != nil {
 		e.logger.Errorf("failed to emit execution started event: %+v", err)
 	}
@@ -779,7 +784,7 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 		if err != nil {
 			l.Error(fmt.Sprintf("failed to get capability info for %s: %s", stepState.Ref, err))
 		}
-		err = meteringReport.ReserveStep(metering.ReportStepRef(stepState.Ref), capInfo)
+		_, err = meteringReport.ReserveByAvailability(stepState.Ref, capInfo, e.maxWorkerLimit)
 		if err != nil {
 			l.Error(fmt.Sprintf("failed to reserve on metering report for %s: %s", stepState.Ref, err))
 		}
@@ -825,7 +830,7 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 	}
 
 	if mrOK {
-		err := meteringReport.SetStep(metering.ReportStepRef(stepState.Ref), response.Metadata.Metering)
+		err := meteringReport.SetStep(stepState.Ref, response.Metadata.Metering)
 		if err != nil {
 			l.Error(fmt.Sprintf("failed to set metering report step for ref %s: %s", stepState.Ref, err))
 		}

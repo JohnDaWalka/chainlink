@@ -19,8 +19,8 @@ type balanceStore struct {
 	allowNegative bool
 	// A balance of credits
 	balance int64
-	// Conversion rates of resource type to number of credits
-	conversions map[string]decimal.Decimal
+	// Conversion rates of resource type to number of units per credit
+	conversions map[string]decimal.Decimal // TODO flip this
 	lggr        logger.Logger
 	mu          sync.RWMutex
 }
@@ -67,6 +67,13 @@ func (bs *balanceStore) convertToBalance(fromUnit string, amount int64) (credits
 	return decimal.NewFromInt(amount).Mul(rate).RoundUp(0).IntPart()
 }
 
+// ConvertToBalance converts a resource type amount to a credit amount
+func (bs *balanceStore) ConvertToBalance(fromUnit string, amount int64) (credits int64) {
+	bs.mu.RLock()
+	defer bs.mu.RUnlock()
+	return bs.convertToBalance(fromUnit, amount)
+}
+
 // convertFromBalance converts a credit amount to a resource type amount
 // This method should only be used under a read lock
 func (bs *balanceStore) convertFromBalance(toUnit string, amount int64) (resources int64) {
@@ -77,6 +84,13 @@ func (bs *balanceStore) convertFromBalance(toUnit string, amount int64) (resourc
 		rate = decimal.NewFromInt(1)
 	}
 	return decimal.NewFromInt(amount).Div(rate).RoundUp(0).IntPart()
+}
+
+// ConvertFromBalance converts a credit amount to a resource type amount
+func (bs *balanceStore) ConvertFromBalance(toUnit string, amount int64) (resources int64) {
+	bs.mu.RLock()
+	defer bs.mu.RUnlock()
+	return bs.convertFromBalance(toUnit, amount)
 }
 
 // Get returns the current credit balance

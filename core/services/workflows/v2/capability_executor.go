@@ -3,11 +3,11 @@ package v2
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	sdkpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
-	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/metering"
 )
 
 var _ host.CapabilityExecutor = (*CapabilityExecutor)(nil)
@@ -49,8 +49,8 @@ func (c *CapabilityExecutor) CallCapability(ctx context.Context, request *sdkpb.
 	if !ok {
 		c.cfg.Lggr.Errorf("no metering report found for %v", c.ID)
 	}
-	meteringRef := metering.ReportStepRef(request.CallbackId)
-	err = meterReport.ReserveStep(meteringRef, capInfo)
+	meteringRef := strconv.Itoa(int(request.CallbackId))
+	_, err = meterReport.ReserveByAvailability(meteringRef, capInfo, len(c.capCallsSemaphore))
 	if err != nil {
 		c.cfg.Lggr.Errorw("could not reserve for capability request", "capReq", request.Id, "capReqCallbackID", request.CallbackId, "err", err)
 	}
