@@ -25,14 +25,10 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
-	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
-	libcaps "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
 	libdevenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/devenv"
 	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
-	creconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config"
-	cresecrets "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	libformat "github.com/smartcontractkit/chainlink/system-tests/lib/format"
@@ -151,153 +147,17 @@ func SketchSetupTestEnvironment(
 	}
 
 	fmt.Print(libformat.PurpleText("\n[Stage 2/10] Contracts deployed in %.2f seconds\n", time.Since(startTime).Seconds()))
-	startTime = time.Now()
-	fmt.Print(libformat.PurpleText("[Stage 3/10] Configuring Workflow Registry contract\n\n"))
 
 	// Translate node input to structure required further down the road and put as much information
 	// as we have at this point in labels. It will be used to generate node configs
-	topology, topoErr := libdon.BuildTopology(input.CapabilitiesAwareNodeSets, input.InfraInput, homeChainOutput.ChainSelector)
-	if topoErr != nil {
-		return nil, pkgerrors.Wrap(topoErr, "failed to build topology")
+	topologyReport, topologyErr := operations.ExecuteOperation(allChainsCLDEnvironment.OperationsBundle, BuildTopologyOp, BuildTopologyOpDeps{}, BuildTopologyOpInput{})
+	if topologyErr != nil {
+		return nil, pkgerrors.Wrap(topologyErr, "failed to build topology")
 	}
+	topology := topologyReport.Output.Topology
 
-	// Configure Workflow Registry contract
-	workflowRegistryInput := &cretypes.WorkflowRegistryInput{
-		ChainSelector:  homeChainOutput.ChainSelector,
-		CldEnv:         allChainsCLDEnvironment,
-		AllowedDonIDs:  []uint32{topology.WorkflowDONID},
-		WorkflowOwners: []common.Address{homeChainOutput.SethClient.MustGetRootKeyAddress()},
-	}
-
-	fmt.Print(libformat.PurpleText("\n[Stage 3/10] Workflow Registry configured in %.2f seconds\n", time.Since(startTime).Seconds()))
 	startTime = time.Now()
 	fmt.Print(libformat.PurpleText("[Stage 4/10] Preparing DON(s) configuration\n\n"))
-
-	// Generate EVM and P2P keys or read them from the config
-	// That way we can pass them final configs and do away with restarting the nodes
-	var keys *cretypes.GenerateKeysOutput
-
-	keysOutput, keysOutputErr := cresecrets.KeysOutputFromConfig(input.CapabilitiesAwareNodeSets)
-	if keysOutputErr != nil {
-		return nil, pkgerrors.Wrap(keysOutputErr, "failed to generate keys output")
-	}
-
-	// get chainIDs, they'll be used for identifying ETH keys and Forwarder addresses
-	// and also for creating the CLD environment
-	chainIDs := make([]int, 0)
-	bcOuts := make(map[uint64]*blockchain.Output)
-	sethClients := make(map[uint64]*seth.Client)
-	for _, bcOut := range blockchainsOutput {
-		chainIDs = append(chainIDs, libc.MustSafeInt(bcOut.ChainID))
-		bcOuts[bcOut.ChainSelector] = bcOut.BlockchainOutput
-		sethClients[bcOut.ChainSelector] = bcOut.SethClient
-	}
-
-	generateKeysInput := &cretypes.GenerateKeysInput{
-		GenerateEVMKeysForChainIDs: chainIDs,
-		GenerateP2PKeys:            true,
-		Topology:                   topology,
-		Password:                   "", // since the test runs on private ephemeral blockchain we don't use real keys and do not care a lot about the password
-		Out:                        keysOutput,
-	}
-	keys, keysErr := cresecrets.GenereteKeys(generateKeysInput)
-	if keysErr != nil {
-		return nil, pkgerrors.Wrap(keysErr, "failed to generate keys")
-	}
-
-	topology, addKeysErr := cresecrets.AddKeysToTopology(topology, keys)
-	if addKeysErr != nil {
-		return nil, pkgerrors.Wrap(addKeysErr, "failed to add keys to topology")
-	}
-
-	peeringData, peeringErr := libdon.FindPeeringData(topology)
-	if peeringErr != nil {
-		return nil, pkgerrors.Wrap(peeringErr, "failed to find peering data")
-	}
-
-	for i, donMetadata := range topology.DonsMetadata {
-		configsFound := 0
-		secretsFound := 0
-		for _, nodeSpec := range input.CapabilitiesAwareNodeSets[i].NodeSpecs {
-			if nodeSpec.Node.TestConfigOverrides != "" {
-				configsFound++
-			}
-			if nodeSpec.Node.TestSecretsOverrides != "" {
-				secretsFound++
-			}
-		}
-		if configsFound != 0 && configsFound != len(input.CapabilitiesAwareNodeSets[i].NodeSpecs) {
-			return nil, fmt.Errorf("%d out of %d node specs have config overrides. Either provide overrides for all nodes or none at all", configsFound, len(input.CapabilitiesAwareNodeSets[i].NodeSpecs))
-		}
-
-		if secretsFound != 0 && secretsFound != len(input.CapabilitiesAwareNodeSets[i].NodeSpecs) {
-			return nil, fmt.Errorf("%d out of %d node specs have secrets overrides. Either provide overrides for all nodes or none at all", secretsFound, len(input.CapabilitiesAwareNodeSets[i].NodeSpecs))
-		}
-
-		// Allow providing only secrets, because we can decode them and use them to generate configs
-		// We can't allow providing only configs, because we can't replace secret-related values in the configs
-		// If both are provided, we assume that the user knows what they are doing and we don't need to validate anything
-		// And that configs match the secrets
-		if configsFound > 0 && secretsFound == 0 {
-			return nil, fmt.Errorf("nodese config overrides are provided for DON %d, but not secrets. You need to either provide both, only secrets or nothing at all", donMetadata.ID)
-		}
-
-		// generate configs only if they are not provided
-		if configsFound == 0 {
-			config, configErr := creconfig.Generate(
-				cretypes.GenerateConfigsInput{
-					DonMetadata:            donMetadata,
-					BlockchainOutput:       bcOuts,
-					Flags:                  donMetadata.Flags,
-					PeeringData:            peeringData,
-					AddressBook:            allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
-					HomeChainSelector:      topology.HomeChainSelector,
-					GatewayConnectorOutput: topology.GatewayConnectorOutput,
-				},
-				input.ConfigFactoryFunctions,
-			)
-			if configErr != nil {
-				return nil, pkgerrors.Wrap(configErr, "failed to generate config")
-			}
-
-			for j := range donMetadata.NodesMetadata {
-				input.CapabilitiesAwareNodeSets[i].NodeSpecs[j].Node.TestConfigOverrides = config[j]
-			}
-		}
-
-		// generate secrets only if they are not provided
-		if secretsFound == 0 {
-			secretsInput := &cretypes.GenerateSecretsInput{
-				DonMetadata: donMetadata,
-			}
-
-			if evmKeys, ok := keys.EVMKeys[donMetadata.ID]; ok {
-				secretsInput.EVMKeys = evmKeys
-			}
-
-			if p2pKeys, ok := keys.P2PKeys[donMetadata.ID]; ok {
-				secretsInput.P2PKeys = p2pKeys
-			}
-
-			// EVM and P2P keys will be provided to nodes as secrets
-			secrets, secretsErr := cresecrets.GenerateSecrets(
-				secretsInput,
-			)
-			if secretsErr != nil {
-				return nil, pkgerrors.Wrap(secretsErr, "failed to generate secrets")
-			}
-
-			for j := range donMetadata.NodesMetadata {
-				input.CapabilitiesAwareNodeSets[i].NodeSpecs[j].Node.TestSecretsOverrides = secrets[j]
-			}
-		}
-
-		var appendErr error
-		input.CapabilitiesAwareNodeSets[i], appendErr = libcaps.AppendBinariesPathsNodeSpec(input.CapabilitiesAwareNodeSets[i], donMetadata, input.CustomBinariesPaths)
-		if appendErr != nil {
-			return nil, pkgerrors.Wrapf(appendErr, "failed to append binaries paths to node spec for DON %d", donMetadata.ID)
-		}
-	}
 
 	// Deploy the DONs
 	// Hack for CI that allows us to dynamically set the chainlink image and version
@@ -311,6 +171,13 @@ func SketchSetupTestEnvironment(
 				input.CapabilitiesAwareNodeSets[i].NodeSpecs[j].Node.Image = image
 			}
 		}
+	}
+
+	bcOuts := make(map[uint64]*blockchain.Output)
+	sethClients := make(map[uint64]*seth.Client)
+	for _, bcOut := range blockchainsOutput {
+		bcOuts[bcOut.ChainSelector] = bcOut.BlockchainOutput
+		sethClients[bcOut.ChainSelector] = bcOut.SethClient
 	}
 
 	fmt.Print(libformat.PurpleText("\n[Stage 4/10] DONs configuration prepared in %.2f seconds\n", time.Since(startTime).Seconds()))
@@ -507,6 +374,19 @@ func SketchSetupTestEnvironment(
 	fmt.Print(libformat.PurpleText("\n[Stage 9/10] Log Poller started in %.2f seconds\n", time.Since(startTime).Seconds()))
 	startTime = time.Now()
 	fmt.Print(libformat.PurpleText("[Stage 10/10] Configuring OCR3 and Keystone contracts\n\n"))
+
+	// Configure Workflow Registry contract
+	workflowRegistryInput := &cretypes.WorkflowRegistryInput{
+		ChainSelector:  homeChainOutput.ChainSelector,
+		CldEnv:         allChainsCLDEnvironment,
+		AllowedDonIDs:  []uint32{topology.WorkflowDONID},
+		WorkflowOwners: []common.Address{homeChainOutput.SethClient.MustGetRootKeyAddress()},
+		Out: &cretypes.WorkflowRegistryOutput{
+			ChainSelector:  homeChainOutput.ChainSelector,
+			AllowedDonIDs:  []uint32{topology.WorkflowDONID},
+			WorkflowOwners: []common.Address{homeChainOutput.SethClient.MustGetRootKeyAddress()},
+		},
+	}
 
 	// TODO: properly setup the config reqs to config keystone contracts
 	// TODO: make sure that the config seq fully replaces `libcontracts.ConfigureKeystone` here

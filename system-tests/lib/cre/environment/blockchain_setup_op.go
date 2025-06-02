@@ -15,7 +15,7 @@ import (
 )
 
 type StartBlockchainsOutput struct {
-	Outputs     []*BlockchainOutput
+	Outputs     []*BlockchainOutput // TODO: This cannot be an output... It contains a private key, and we don't want to serialize it
 	Blockchains map[uint64]chain.BlockChain
 }
 

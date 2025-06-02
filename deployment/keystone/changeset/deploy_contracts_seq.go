@@ -118,6 +118,7 @@ var DeployKeystoneContractsSequence = operations.NewSequence[DeployKeystoneContr
 	"Deploy Keystone Contracts (OCR3, Capabilities Registry, Workflow Registry, Keystone Forwarder)",
 	func(b operations.Bundle, deps DeployKeystoneContractsSequenceDeps, input DeployKeystoneContractsSequenceInput) (output DeployKeystoneContractsSequenceOutput, err error) {
 		// TODO: add logging
+		// TODO: make it parallelizable
 
 		ab := deployment.NewMemoryAddressBook()
 
