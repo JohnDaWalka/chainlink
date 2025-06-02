@@ -282,7 +282,7 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 		return
 	}
 
-	meteringReport := metering.NewReport(e.cfg.WorkflowOwner, e.cfg.WorkflowID, executionID, e.cfg.Lggr)
+	meteringReport := metering.NewReport(e.cfg.WorkflowOwner, e.cfg.WorkflowID, executionID, e.srvcEng.SugaredLogger)
 	err = meteringReport.Initialize(ctx)
 	if err != nil {
 		e.cfg.Lggr.Errorw("Workflow execution could not be started", "err", err)

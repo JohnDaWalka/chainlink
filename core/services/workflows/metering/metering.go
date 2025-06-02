@@ -22,6 +22,17 @@ const (
 	gasCreditType       = "GAS"
 )
 
+var (
+	ErrNoBillingClient     = errors.New("no billing client configured")
+	ErrInsufficientFunding = errors.New("insufficient balance funding")
+	ErrReceiptFailed       = errors.New("failed to submit workflow receipt")
+	ErrUninitializedReport = errors.New("metering report has not been initialized")
+	ErrStepReserveExists   = errors.New("step reserve already exists")
+	ErrNoOpenCalls         = errors.New("openConcurrentCallSlots must be greater than 0")
+	ErrNoReserve           = errors.New("must call Report.ReserveStep first")
+	ErrStepSpendExists     = errors.New("step spend already exists")
+)
+
 type BillingClient interface {
 	SubmitWorkflowReceipt(context.Context, *billing.SubmitWorkflowReceiptRequest) (*billing.SubmitWorkflowReceiptResponse, error)
 	ReserveCredits(context.Context, *billing.ReserveCreditsRequest) (*billing.ReserveCreditsResponse, error)
@@ -117,8 +128,8 @@ type Report struct {
 	steps map[string]ReportStep
 }
 
-func NewReport(accountID, workflowID, workflowExecutionID string, lggr logger.Logger) *Report {
-	sugaredLggr := logger.Sugared(lggr).Named("WorkflowEngine").With("workflowID", workflowID, "workflowExecutionID", workflowExecutionID)
+func NewReport(accountID, workflowID, workflowExecutionID string, lggr logger.SugaredLogger) *Report {
+	sugaredLggr := lggr.Named("Metering").With("workflowExecutionID", workflowExecutionID)
 	return &Report{
 		accountID:           accountID,
 		workflowID:          workflowID,
@@ -135,7 +146,7 @@ func NewReport(accountID, workflowID, workflowExecutionID string, lggr logger.Lo
 func (r *Report) Initialize(ctx context.Context) error {
 	if r.client == nil {
 		// TODO: more robust check of billing service health
-		return errors.New("no billing client configured")
+		return ErrNoBillingClient
 	}
 
 	// TODO: get rate card from billing service
@@ -162,7 +173,7 @@ func (r *Report) Initialize(ctx context.Context) error {
 		success := resp.GetSuccess()
 		// TODO: once response contains balance set using balanceStore.Add
 		if !success {
-			return errors.New("insufficient balance funding")
+			return ErrInsufficientFunding
 		}
 	}
 
@@ -215,11 +226,11 @@ func (r *Report) ReserveByLimits(ref string, capInfo capabilities.CapabilityInfo
 	defer r.mu.Unlock()
 
 	if !r.ready {
-		return 0, errors.New("metering report has not been initialized")
+		return 0, ErrUninitializedReport
 	}
 
 	if _, ok := r.steps[ref]; ok {
-		return 0, errors.New("step reserve already exists")
+		return 0, ErrStepReserveExists
 	}
 
 	// TODO: consume CapabilityInfo resource types
@@ -249,15 +260,15 @@ func (r *Report) ReserveByAvailability(ref string, capInfo capabilities.Capabili
 	defer r.mu.Unlock()
 
 	if !r.ready {
-		return 0, errors.New("metering report has not been initialized")
+		return 0, ErrUninitializedReport
 	}
 
 	if _, ok := r.steps[ref]; ok {
-		return 0, errors.New("step reserve already exists")
+		return 0, ErrStepReserveExists
 	}
 
 	if openConcurrentCallSlots == 0 {
-		return 0, errors.New("openConcurrentCallSlots must be greater than 0")
+		return 0, ErrNoOpenCalls
 	}
 
 	// TODO: consume CapabilityInfo resource types
@@ -265,14 +276,14 @@ func (r *Report) ReserveByAvailability(ref string, capInfo capabilities.Capabili
 	// Split the available local balance between the number of concurrent calls that can still be made
 	available := r.balance.Get()
 	share := decimal.NewFromInt(available).Div(decimal.NewFromInt(int64(openConcurrentCallSlots)))
-	roundedShare := share.RoundUp(0).IntPart()
+	roundedShare := share.RoundDown(0).IntPart()
 
 	// TODO: take minimum of available concurrent balance versus step defined max spend
 
 	err := r.balance.Minus(roundedShare)
 	if err != nil {
 		// invariant: engine manages concurrent calls
-		return 0, fmt.Errorf("insufficient balance to reserve: %w", err)
+		return 0, ErrInsufficientBalance
 	}
 
 	r.steps[ref] = ReportStep{
@@ -291,16 +302,16 @@ func (r *Report) SetStep(ref string, steps []capabilities.MeteringNodeDetail) er
 	defer r.mu.Unlock()
 
 	if !r.ready {
-		return errors.New("metering report has not been initialized")
+		return ErrUninitializedReport
 	}
 
 	step, ok := r.steps[ref]
 	if !ok {
-		return errors.New("must call Report.ReserveStep first")
+		return ErrNoReserve
 	}
 
 	if step.Spend != nil {
-		return errors.New("step spend already exists")
+		return ErrStepSpendExists
 	}
 
 	spent := int64(0)
@@ -361,7 +372,7 @@ func (r *Report) Message() *events.MeteringReport {
 
 func (r *Report) SendReceipt(ctx context.Context) error {
 	if !r.ready {
-		return errors.New("metering report has not been initialized")
+		return ErrUninitializedReport
 	}
 
 	req := billing.SubmitWorkflowReceiptRequest{
@@ -377,7 +388,7 @@ func (r *Report) SendReceipt(ctx context.Context) error {
 	}
 
 	if resp == nil || !resp.Success {
-		return errors.New("failed to submit workflow receipt")
+		return ErrReceiptFailed
 	}
 
 	return nil
