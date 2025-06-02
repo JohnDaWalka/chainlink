@@ -290,7 +290,7 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 	}
 	e.meterReports.Add(executionID, meteringReport)
 	// V2Engine runs the entirety of a module's execution as compute. Ensure that the max execution time can run.
-	_, err = meteringReport.ReserveByLimits(
+	_, err = meteringReport.DeductByLimits(
 		metering.ComputeCreditType,
 		capabilities.CapabilityInfo{ID: "compute@1.0.0"},
 		[]metering.SpendTuple{

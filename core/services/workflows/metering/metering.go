@@ -218,10 +218,10 @@ func (r *Report) MedianSpend() map[SpendUnit]SpendValue {
 	return medians
 }
 
-// ReserveByLimits earmarks an amount of local universal credit balance and then returns that amount
+// DeductByLimits earmarks an amount of local universal credit balance and then returns that amount
 // The amount reserved is determined by the upper limit of resource credits that can be used
 // We expect to only set this value once - an error is returned if a step would be overwritten
-func (r *Report) ReserveByLimits(ref string, capInfo capabilities.CapabilityInfo, limits []SpendTuple) (int64, error) {
+func (r *Report) DeductByLimits(ref string, capInfo capabilities.CapabilityInfo, limits []SpendTuple) (int64, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -252,10 +252,10 @@ func (r *Report) ReserveByLimits(ref string, capInfo capabilities.CapabilityInfo
 	return amount, nil
 }
 
-// ReserveByAvailability earmarks an amount of local universal credit balance and then returns that amount
+// DeductByAvailability earmarks an amount of local universal credit balance and then returns that amount
 // The amount reserved is determined splitting the total open balance by how many remaining concurrent calls can be made
 // We expect to only set this value once - an error is returned if a step would be overwritten
-func (r *Report) ReserveByAvailability(ref string, capInfo capabilities.CapabilityInfo, openConcurrentCallSlots int) (int64, error) {
+func (r *Report) DeductByAvailability(ref string, capInfo capabilities.CapabilityInfo, openConcurrentCallSlots int) (int64, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

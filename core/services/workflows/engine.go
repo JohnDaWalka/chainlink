@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/aggregation"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/custmsg"
+	clggr "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/metrics"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -488,7 +489,7 @@ func (e *Engine) stepUpdateLoop(ctx context.Context, executionID string, stepUpd
 
 // startExecution kicks off a new workflow execution when a trigger event is received.
 func (e *Engine) startExecution(ctx context.Context, executionID string, triggerID string, event *values.Map) error {
-	meteringReport := metering.NewReport(e.workflow.owner, e.workflow.id, executionID, e.logger)
+	meteringReport := metering.NewReport(e.workflow.owner, e.workflow.id, executionID, clggr.Sugared(e.logger))
 	e.meterReports.Add(executionID, meteringReport)
 	err := meteringReport.Initialize(ctx)
 	if err != nil {
@@ -584,7 +585,7 @@ func (e *Engine) handleStepUpdate(ctx context.Context, stepUpdate store.Workflow
 
 		// this case is only for resuming executions and should be updated when metering is added to save execution state
 		if _, ok := e.meterReports.Get(stepUpdate.ExecutionID); !ok {
-			e.meterReports.Add(stepUpdate.ExecutionID, metering.NewReport(e.workflow.owner, e.workflow.id, state.ExecutionID, e.logger))
+			e.meterReports.Add(stepUpdate.ExecutionID, metering.NewReport(e.workflow.owner, e.workflow.id, state.ExecutionID, clggr.Sugared(e.logger)))
 		}
 
 		return e.finishExecution(ctx, cma, state.ExecutionID, status)
@@ -784,7 +785,7 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 		if err != nil {
 			l.Error(fmt.Sprintf("failed to get capability info for %s: %s", stepState.Ref, err))
 		}
-		_, err = meteringReport.ReserveByAvailability(stepState.Ref, capInfo, e.maxWorkerLimit)
+		_, err = meteringReport.DeductByAvailability(stepState.Ref, capInfo, e.maxWorkerLimit)
 		if err != nil {
 			l.Error(fmt.Sprintf("failed to reserve on metering report for %s: %s", stepState.Ref, err))
 		}

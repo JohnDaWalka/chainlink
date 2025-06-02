@@ -50,7 +50,7 @@ func (c *CapabilityExecutor) CallCapability(ctx context.Context, request *sdkpb.
 		c.cfg.Lggr.Errorf("no metering report found for %v", c.ID)
 	}
 	meteringRef := strconv.Itoa(int(request.CallbackId))
-	_, err = meterReport.ReserveByAvailability(meteringRef, capInfo, len(c.capCallsSemaphore))
+	_, err = meterReport.DeductByAvailability(meteringRef, capInfo, len(c.capCallsSemaphore))
 	if err != nil {
 		c.cfg.Lggr.Errorw("could not reserve for capability request", "capReq", request.Id, "capReqCallbackID", request.CallbackId, "err", err)
 	}

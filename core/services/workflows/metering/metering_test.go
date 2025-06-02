@@ -63,7 +63,7 @@ func TestReport(t *testing.T) {
 		}
 
 		for idx := range steps {
-			_, err := report.ReserveByLimits(strconv.Itoa(idx), capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+			_, err := report.DeductByLimits(strconv.Itoa(idx), capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 			require.NoError(t, err)
 			require.NoError(t, report.SetStep(strconv.Itoa(idx), steps))
 		}
@@ -99,7 +99,7 @@ func TestReport(t *testing.T) {
 		}
 
 		for idx := range steps {
-			_, err := report.ReserveByLimits(strconv.Itoa(idx), capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+			_, err := report.DeductByLimits(strconv.Itoa(idx), capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 			require.NoError(t, err)
 			require.NoError(t, report.SetStep(strconv.Itoa(idx), steps))
 		}
@@ -134,7 +134,7 @@ func TestReport(t *testing.T) {
 		}
 
 		for idx := range steps {
-			_, err := report.ReserveByLimits(strconv.Itoa(idx), capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+			_, err := report.DeductByLimits(strconv.Itoa(idx), capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 			require.NoError(t, err)
 			require.NoError(t, report.SetStep(strconv.Itoa(idx), steps))
 		}
@@ -170,7 +170,7 @@ func TestReport(t *testing.T) {
 		}
 
 		for idx := range steps {
-			_, err := report.ReserveByLimits(strconv.Itoa(idx), capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+			_, err := report.DeductByLimits(strconv.Itoa(idx), capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 			require.NoError(t, err)
 			require.NoError(t, report.SetStep(strconv.Itoa(idx), steps))
 		}
@@ -196,9 +196,9 @@ func TestReport(t *testing.T) {
 		require.NoError(t, err)
 		err = report.balance.Add(100)
 		require.NoError(t, err)
-		_, err = report.ReserveByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+		_, err = report.DeductByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 		require.NoError(t, err)
-		_, err = report.ReserveByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+		_, err = report.DeductByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 		require.Error(t, err)
 	})
 
@@ -235,7 +235,7 @@ func TestReport(t *testing.T) {
 			{Peer2PeerID: "abc", SpendUnit: testA, SpendValue: "1"},
 		}
 
-		_, err = report.ReserveByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+		_, err = report.DeductByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 		require.NoError(t, err)
 		require.NoError(t, report.SetStep("ref1", steps))
 		require.Error(t, report.SetStep("ref1", steps))
@@ -256,7 +256,7 @@ func Test_MeterReports(t *testing.T) {
 		r, ok := mr.Get("exec1")
 		assert.True(t, ok)
 		//nolint:errcheck // depending on the concurrent timing, this may or may not err
-		report.ReserveByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+		report.DeductByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 		//nolint:errcheck // depending on the concurrent timing, this may or may not err
 		r.SetStep("ref1", []capabilities.MeteringNodeDetail{})
 		mr.Delete("exec1")
@@ -266,7 +266,7 @@ func Test_MeterReports(t *testing.T) {
 		mr.Add("exec2", NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestSugared(t)))
 		r, ok := mr.Get("exec2")
 		assert.True(t, ok)
-		_, err := r.ReserveByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+		_, err := r.DeductByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 		assert.NoError(t, err)
 		err = r.SetStep("ref1", []capabilities.MeteringNodeDetail{})
 		assert.NoError(t, err)
@@ -278,7 +278,7 @@ func Test_MeterReports(t *testing.T) {
 		r, ok := mr.Get("exec1")
 		assert.True(t, ok)
 		//nolint:errcheck // depending on the concurrent timing, this may or may not err
-		r.ReserveByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
+		r.DeductByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 		//nolint:errcheck // depending on the concurrent timing, this may or may not err
 		r.SetStep("ref1", []capabilities.MeteringNodeDetail{})
 		mr.Delete("exec1")
