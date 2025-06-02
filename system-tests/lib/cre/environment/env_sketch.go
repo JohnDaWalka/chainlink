@@ -23,7 +23,6 @@ import (
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
@@ -79,6 +78,15 @@ func SketchSetupTestEnvironment(
 		}
 	}()
 
+	allChainsCLDEnvironment := &cldf.Environment{
+		Logger:            singeFileLogger,
+		ExistingAddresses: cldf.NewMemoryAddressBook(),
+		GetContext: func() context.Context {
+			return ctx
+		},
+		// TODO: init operations bundle
+	}
+
 	bi := BlockchainsInput{
 		infra:    &input.InfraInput,
 		nixShell: nixShell,
@@ -88,50 +96,17 @@ func SketchSetupTestEnvironment(
 	startTime := time.Now()
 	fmt.Print(libformat.PurpleText("\n[Stage 1/10] Starting %d blockchain(s)\n\n", len(bi.blockchainsInput)))
 
-	blockchainsOutput, bcOutErr := CreateBlockchains(testLogger, bi)
+	// TODO: should this really be an operation?
+	blkR, bcOutErr := operations.ExecuteOperation(allChainsCLDEnvironment.OperationsBundle, StartBlockchainsOp, StartBlockchainsDeps{
+		logger:          zerolog.Logger{},
+		singeFileLogger: singeFileLogger,
+	}, bi)
 	if bcOutErr != nil {
 		return nil, pkgerrors.Wrap(bcOutErr, "failed to create blockchains")
 	}
-
+	blockchainsOutput := blkR.Output.Outputs
 	homeChainOutput := blockchainsOutput[0]
-	chainsConfigs := []devenv.ChainConfig{}
-
-	for _, bcOut := range blockchainsOutput {
-		chainsConfigs = append(chainsConfigs, devenv.ChainConfig{
-			ChainID:   strconv.FormatUint(bcOut.SethClient.Cfg.Network.ChainID, 10),
-			ChainName: bcOut.SethClient.Cfg.Network.Name,
-			ChainType: strings.ToUpper(bcOut.BlockchainOutput.Family),
-			WSRPCs: []devenv.CribRPCs{{
-				External: bcOut.BlockchainOutput.Nodes[0].ExternalWSUrl,
-				Internal: bcOut.BlockchainOutput.Nodes[0].InternalWSUrl,
-			}},
-			HTTPRPCs: []devenv.CribRPCs{{
-				External: bcOut.BlockchainOutput.Nodes[0].ExternalHTTPUrl,
-				Internal: bcOut.BlockchainOutput.Nodes[0].InternalHTTPUrl,
-			}},
-			DeployerKey: bcOut.SethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the RPC node
-		})
-	}
-
-	allChains, _, allChainsErr := devenv.NewChains(singeFileLogger, chainsConfigs)
-	if allChainsErr != nil {
-		return nil, pkgerrors.Wrap(allChainsErr, "failed to create chains")
-	}
-
-	blockChains := map[uint64]chain.BlockChain{}
-	for selector, ch := range allChains {
-		blockChains[selector] = ch
-	}
-
-	allChainsCLDEnvironment := &cldf.Environment{
-		Logger:            singeFileLogger,
-		ExistingAddresses: cldf.NewMemoryAddressBook(),
-		GetContext: func() context.Context {
-			return ctx
-		},
-		BlockChains: chain.NewBlockChains(blockChains),
-		// TODO: init operations bundle
-	}
+	allChainsCLDEnvironment.BlockChains = chain.NewBlockChains(blkR.Output.Blockchains)
 
 	fmt.Print(libformat.PurpleText("\n[Stage 1/10] Blockchains started in %.2f seconds\n", time.Since(startTime).Seconds()))
 	startTime = time.Now()
@@ -161,7 +136,6 @@ func SketchSetupTestEnvironment(
 		}
 		fwrChains = append(fwrChains, bcOut.ChainSelector)
 	}
-
 	frwR, err := operations.ExecuteSequence(
 		allChainsCLDEnvironment.OperationsBundle,
 		keystone_changeset.DeployKeystoneForwardersSequence,
@@ -193,11 +167,6 @@ func SketchSetupTestEnvironment(
 		CldEnv:         allChainsCLDEnvironment,
 		AllowedDonIDs:  []uint32{topology.WorkflowDONID},
 		WorkflowOwners: []common.Address{homeChainOutput.SethClient.MustGetRootKeyAddress()},
-	}
-
-	_, workflowErr := libcontracts.ConfigureWorkflowRegistry(testLogger, workflowRegistryInput)
-	if workflowErr != nil {
-		return nil, pkgerrors.Wrap(workflowErr, "failed to configure workflow registry")
 	}
 
 	fmt.Print(libformat.PurpleText("\n[Stage 3/10] Workflow Registry configured in %.2f seconds\n", time.Since(startTime).Seconds()))
@@ -539,6 +508,9 @@ func SketchSetupTestEnvironment(
 	startTime = time.Now()
 	fmt.Print(libformat.PurpleText("[Stage 10/10] Configuring OCR3 and Keystone contracts\n\n"))
 
+	// TODO: properly setup the config reqs to config keystone contracts
+	// TODO: make sure that the config seq fully replaces `libcontracts.ConfigureKeystone` here
+
 	// Configure the Forwarder, OCR3 and Capabilities contracts
 	configureKeystoneInput := cretypes.ConfigureKeystoneInput{
 		ChainSelector: homeChainOutput.ChainSelector,
@@ -556,7 +528,12 @@ func SketchSetupTestEnvironment(
 		configureKeystoneInput.OCR3Config = *ocr3Config
 	}
 
-	keystoneErr := libcontracts.ConfigureKeystone(configureKeystoneInput, input.CapabilitiesContractFactoryFunctions)
+	_, keystoneErr := operations.ExecuteSequence(
+		fullCldOutput.Environment.OperationsBundle,
+		keystone_changeset.ConfigureKeystoneContractsSeq,
+		keystone_changeset.ConfigureKeystoneContractsSequenceDeps{},
+		keystone_changeset.ConfigureKeystoneContractsSequenceInput{},
+	)
 	if keystoneErr != nil {
 		return nil, pkgerrors.Wrap(keystoneErr, "failed to configure keystone contracts")
 	}
