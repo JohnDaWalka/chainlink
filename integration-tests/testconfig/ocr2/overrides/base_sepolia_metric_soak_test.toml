@@ -1,0 +1,39 @@
+[Network]
+selected_networks = ["BASE_SEPOLIA"]
+
+[Soak.Common]
+chainlink_node_funding = 1
+
+[Soak.OCR2]
+[Soak.OCR2.Common]
+test_duration = "10m"
+
+[Soak.OCR2.Soak]
+time_between_rounds = "2m"
+
+[OCR2.Common]
+number_of_contracts = 2
+
+[Seth]
+experiments_enabled = ["slow_funds_return"]
+
+# override config toml related to EVMNode configs for chainlink nodes; applicable to all EVM node configs in chainlink toml
+CommonChainConfigTOML = """
+
+[GasEstimator]
+EIP1559DynamicFees = true
+PriceMin = '1 wei'
+BumpMin = '100 wei'
+
+[GasEstimator.BlockHistory]
+BlockHistorySize = 60
+
+[Transactions]
+ResendAfterThreshold = '30s'
+
+[HeadTracker]
+HistoryDepth = 300
+
+[NodePool]
+SyncThreshold = 10
+"""
