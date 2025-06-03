@@ -144,7 +144,8 @@ func filterDon2Don(
 	if !belongsToACapabilityDON && !belongsToAWorkflowDON {
 		// as none of workflow & capability DON don't use bandwidth
 		lggr.Warn("filterDon2Don: node does not belong to workflow or capability DON; misconfiguration")
-		return true // filter out
+		// should be filtered out; let's keep until clarified -- to be investigated
+		return false // keep
 	}
 	if belongsToAWorkflowDON && !candidatePeerBelongsToCapabilityDON {
 		lggr.Debugw(
