@@ -29,6 +29,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cl_deployment "github.com/smartcontractkit/chainlink/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
@@ -184,72 +185,138 @@ func SetupTestEnvironment(
 	}
 
 	fmt.Print(libformat.PurpleText("\n[Stage 1/8] Blockchains started in %.2f seconds\n", time.Since(startTime).Seconds()))
-	startTime = time.Now()
-	fmt.Print(libformat.PurpleText("[Stage 2/8 Deploying Keystone contracts\n\n"))
 
-	// we could try to parallelise deployment of these contracts, but it's difficult, because there's no way to make chain.DeployerKey dynamic
-	// in order to manually increment the nonce for each contract
-	ocr3Output, ocr3Err := keystone_changeset.DeployOCR3V2(*allChainsCLDEnvironment, &keystone_changeset.DeployRequestV2{
-		ChainSel: homeChainOutput.ChainSelector,
-	})
-	if ocr3Err != nil {
-		return nil, pkgerrors.Wrap(ocr3Err, "failed to deploy OCR3 contract")
+	type keystoneDeploymentResult struct {
+		addressBook cldf.AddressBook
+		err         error
 	}
 
-	mergeErr := allChainsCLDEnvironment.ExistingAddresses.Merge(ocr3Output.AddressBook) //nolint:staticcheck // won't migrate now
-	if mergeErr != nil {
-		return nil, pkgerrors.Wrap(mergeErr, "failed to merge address book")
-	}
-	testLogger.Info().Msgf("Deployed OCR3 contract on chain %d at %s", homeChainOutput.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.OCR3Capability.String())) //nolint:staticcheck // won't migrate now
+	keystoneContractsCh := make(chan keystoneDeploymentResult)
+	deployKeystoneContracts := func() {
+		keystoneAddressBook := cldf.NewMemoryAddressBook()
 
-	capabilitiesRegistryOutput, capabilitiesRegistryErr := keystone_changeset.DeployCapabilityRegistry(*allChainsCLDEnvironment, homeChainOutput.ChainSelector)
-	if capabilitiesRegistryErr != nil {
-		return nil, pkgerrors.Wrap(capabilitiesRegistryErr, "failed to deploy Capabilities Registry contract")
-	}
+		startTime = time.Now()
+		fmt.Print(libformat.PurpleText("[Stage 2/8 Deploying Keystone contracts\n\n"))
 
-	mergeErr = allChainsCLDEnvironment.ExistingAddresses.Merge(capabilitiesRegistryOutput.AddressBook) //nolint:staticcheck // won't migrate now
-	if mergeErr != nil {
-		return nil, pkgerrors.Wrap(mergeErr, "failed to merge address book")
-	}
-	testLogger.Info().Msgf("Deployed Capabilities Registry contract on chain %d at %s", homeChainOutput.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.CapabilitiesRegistry.String())) //nolint:staticcheck // won't migrate now
-
-	workflowRegistryOutput, workflowRegistryErr := workflow_registry_changeset.Deploy(*allChainsCLDEnvironment, homeChainOutput.ChainSelector)
-	if workflowRegistryErr != nil {
-		return nil, pkgerrors.Wrap(workflowRegistryErr, "failed to deploy workflow registry contract")
-	}
-
-	mergeErr = allChainsCLDEnvironment.ExistingAddresses.Merge(workflowRegistryOutput.AddressBook) //nolint:staticcheck // won't migrate now
-	if mergeErr != nil {
-		return nil, pkgerrors.Wrap(mergeErr, "failed to merge address book")
-	}
-	testLogger.Info().Msgf("Deployed Workflow Registry contract on chain %d at %s", homeChainOutput.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.WorkflowRegistry.String())) //nolint:staticcheck // won't migrate now
-
-	// Deploy forwarders for all chains
-	contractErrGroup := &errgroup.Group{}
-	for _, bcOut := range blockchainsOutput {
-		contractErrGroup.Go(func() error {
-			output, err := keystone_changeset.DeployForwarder(*allChainsCLDEnvironment, keystone_changeset.DeployForwarderRequest{
-				ChainSelectors: []uint64{bcOut.ChainSelector},
-			})
-			if err != nil {
-				return pkgerrors.Wrap(err, "failed to deploy forwarder contract")
-			}
-
-			mergeErr := allChainsCLDEnvironment.ExistingAddresses.Merge(output.AddressBook) //nolint:staticcheck // won't migrate now
-			if mergeErr != nil {
-				return pkgerrors.Wrap(mergeErr, "failed to merge address book")
-			}
-			testLogger.Info().Msgf("Deployed Forwarder contract on chain %d at %s", bcOut.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, bcOut.ChainSelector, keystone_changeset.KeystoneForwarder.String())) //nolint:staticcheck // won't migrate now
-
-			return nil
+		// we could try to parallelise deployment of these contracts, but it's difficult, because there's no way to make chain.DeployerKey dynamic
+		// in order to manually increment the nonce for each contract
+		ocr3Output, ocr3Err := keystone_changeset.DeployOCR3V2(*allChainsCLDEnvironment, &keystone_changeset.DeployRequestV2{
+			ChainSel: homeChainOutput.ChainSelector,
 		})
+		if ocr3Err != nil {
+			keystoneContractsCh <- keystoneDeploymentResult{err: pkgerrors.Wrap(ocr3Err, "failed to deploy OCR3 contract")}
+			return
+		}
+
+		mergeErr := keystoneAddressBook.Merge(ocr3Output.AddressBook) //nolint:staticcheck // won't migrate now
+		if mergeErr != nil {
+			keystoneContractsCh <- keystoneDeploymentResult{err: pkgerrors.Wrap(mergeErr, "failed to merge address book")}
+			return
+		}
+		testLogger.Info().Msgf("Deployed OCR3 contract on chain %d at %s", homeChainOutput.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.OCR3Capability.String())) //nolint:staticcheck // won't migrate now
+
+		capabilitiesRegistryOutput, capabilitiesRegistryErr := keystone_changeset.DeployCapabilityRegistry(*allChainsCLDEnvironment, homeChainOutput.ChainSelector)
+		if capabilitiesRegistryErr != nil {
+			keystoneContractsCh <- keystoneDeploymentResult{err: pkgerrors.Wrap(capabilitiesRegistryErr, "failed to deploy Capabilities Registry contract")}
+			return
+		}
+
+		mergeErr = keystoneAddressBook.Merge(capabilitiesRegistryOutput.AddressBook) //nolint:staticcheck // won't migrate now
+		if mergeErr != nil {
+			keystoneContractsCh <- keystoneDeploymentResult{err: pkgerrors.Wrap(mergeErr, "failed to merge address book")}
+			return
+		}
+		testLogger.Info().Msgf("Deployed Capabilities Registry contract on chain %d at %s", homeChainOutput.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.CapabilitiesRegistry.String())) //nolint:staticcheck // won't migrate now
+
+		workflowRegistryOutput, workflowRegistryErr := workflow_registry_changeset.Deploy(*allChainsCLDEnvironment, homeChainOutput.ChainSelector)
+		if workflowRegistryErr != nil {
+			keystoneContractsCh <- keystoneDeploymentResult{err: pkgerrors.Wrap(workflowRegistryErr, "failed to deploy workflow registry contract")}
+			return
+		}
+
+		mergeErr = keystoneAddressBook.Merge(workflowRegistryOutput.AddressBook) //nolint:staticcheck // won't migrate now
+		if mergeErr != nil {
+			keystoneContractsCh <- keystoneDeploymentResult{err: pkgerrors.Wrap(mergeErr, "failed to merge address book")}
+			return
+		}
+		testLogger.Info().Msgf("Deployed Workflow Registry contract on chain %d at %s", homeChainOutput.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.WorkflowRegistry.String())) //nolint:staticcheck // won't migrate now
+
+		// Deploy forwarders for all chains
+		contractErrGroup := &errgroup.Group{}
+		for _, bcOut := range blockchainsOutput {
+			contractErrGroup.Go(func() error {
+				output, err := keystone_changeset.DeployForwarder(*allChainsCLDEnvironment, keystone_changeset.DeployForwarderRequest{
+					ChainSelectors: []uint64{bcOut.ChainSelector},
+				})
+				if err != nil {
+					return pkgerrors.Wrap(err, "failed to deploy forwarder contract")
+				}
+
+				mergeErr := keystoneAddressBook.Merge(output.AddressBook) //nolint:staticcheck // won't migrate now
+				if mergeErr != nil {
+					return pkgerrors.Wrap(mergeErr, "failed to merge address book")
+				}
+				testLogger.Info().Msgf("Deployed Forwarder contract on chain %d at %s", bcOut.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, bcOut.ChainSelector, keystone_changeset.KeystoneForwarder.String())) //nolint:staticcheck // won't migrate now
+
+				return nil
+			})
+		}
+
+		if err := contractErrGroup.Wait(); err != nil {
+			keystoneContractsCh <- keystoneDeploymentResult{err: pkgerrors.Wrap(err, "failed to deploy Keystone Forwarder contracts")}
+			return
+		}
+
+		fmt.Print(libformat.PurpleText("\n[Stage 2/8] Contracts deployed in %.2f seconds\n", time.Since(startTime).Seconds()))
+		keystoneContractsCh <- keystoneDeploymentResult{addressBook: keystoneAddressBook}
 	}
 
-	if err := contractErrGroup.Wait(); err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to deploy Keystone contracts")
+	// deployer public address -> contract_name[address]
+	knownHomeChainKeystoneAddresses := map[string]map[string]cldf.TypeAndVersion{
+		"0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266": {
+			"0x5FbDB2315678afecb367f032d93F642f64180aa3": {Type: keystone_changeset.OCR3Capability, Version: cl_deployment.Version1_0_0},
+			"0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512": {Type: keystone_changeset.CapabilitiesRegistry, Version: cl_deployment.Version1_1_0},
+			"0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0": {Type: keystone_changeset.WorkflowRegistry, Version: cl_deployment.Version1_0_0},
+			"0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9": {Type: keystone_changeset.KeystoneForwarder, Version: cl_deployment.Version1_0_0},
+		},
 	}
 
-	fmt.Print(libformat.PurpleText("\n[Stage 2/8] Contracts deployed in %.2f seconds\n", time.Since(startTime).Seconds()))
+	isLocalHomeChain := func() bool {
+		// this alone can be deceiving, if local chain is a shadow fork, we should also check nonce for the deployer key and make sure it's 0 before we start any on-chain transactions
+		result := strings.Contains(homeChainOutput.BlockchainOutput.Nodes[0].ExternalHTTPUrl, "localhost") || strings.Contains(homeChainOutput.BlockchainOutput.Nodes[0].ExternalHTTPUrl, "127.0.0.1")
+		return result
+	}
+
+	isKnownDeployerKey := func() bool {
+		for addr := range knownHomeChainKeystoneAddresses {
+			if strings.EqualFold(homeChainOutput.SethClient.MustGetRootKeyAddress().String(), addr) {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	// if we are using only 1 local ephemeral chain, using PK for, which we know Keystone contract addresses we can deploy contracts in the background
+	if isKnownDeployerKey() && isLocalHomeChain() && len(blockchainsOutput) == 1 {
+		go func() {
+			// TODO add here some context cancellation, so that we can stop this goroutine if deployment errors
+			deployKeystoneContracts()
+		}()
+
+		//prepare address book with known addresses
+		homeChainAddresses := map[uint64]map[string]cldf.TypeAndVersion{
+			homeChainOutput.ChainSelector: knownHomeChainKeystoneAddresses["0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"],
+		}
+
+		tmpMap := cldf.NewMemoryAddressBookFromMap(homeChainAddresses)
+		mergeErr := allChainsCLDEnvironment.ExistingAddresses.Merge(tmpMap) //nolint:staticcheck // won't migrate now
+		if mergeErr != nil {
+			return nil, pkgerrors.Wrap(mergeErr, "failed to merge address book")
+		}
+	} else {
+		deployKeystoneContracts()
+	}
 
 	// Translate node input to structure required further down the road and put as much information
 	// as we have at this point in labels. It will be used to generate node configs
@@ -257,36 +324,6 @@ func SetupTestEnvironment(
 	if topoErr != nil {
 		return nil, pkgerrors.Wrap(topoErr, "failed to build topology")
 	}
-
-	// start 3 tasks in the background
-	backgroundStagesCount := 3
-	backgroundStagesWaitGroup := &sync.WaitGroup{}
-	backgroundStagesCh := make(chan backgroundStageResult, backgroundStagesCount)
-	backgroundStagesWaitGroup.Add(1)
-
-	// configure workflow registry contract in the background, so that we can continue with the next stage
-	var workflowRegistryInput *cretypes.WorkflowRegistryInput
-	go func() {
-		defer backgroundStagesWaitGroup.Done()
-		startTime = time.Now()
-		fmt.Print(libformat.PurpleText("---> [BACKGROUND 1/3] Configuring Workflow Registry contract\n"))
-
-		// Configure Workflow Registry contract
-		workflowRegistryInput = &cretypes.WorkflowRegistryInput{
-			ChainSelector:  homeChainOutput.ChainSelector,
-			CldEnv:         allChainsCLDEnvironment,
-			AllowedDonIDs:  []uint32{topology.WorkflowDONID},
-			WorkflowOwners: []common.Address{homeChainOutput.SethClient.MustGetRootKeyAddress()},
-		}
-
-		_, workflowErr := libcontracts.ConfigureWorkflowRegistry(testLogger, workflowRegistryInput)
-		if workflowErr != nil {
-			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(workflowErr, "failed to configure workflow registry"), successMessage: libformat.PurpleText("\n<--- [BACKGROUND 1/3] Workflow Registry configured in %.2f seconds\n", time.Since(startTime).Seconds())}
-			return
-		}
-
-		backgroundStagesCh <- backgroundStageResult{successMessage: libformat.PurpleText("\n<--- [BACKGROUND 1/3] Workflow Registry configured in %.2f seconds\n", time.Since(startTime).Seconds())}
-	}()
 
 	startTime = time.Now()
 	fmt.Print(libformat.PurpleText("[Stage 3/8] Preparing DON(s) configuration\n\n"))
@@ -513,6 +550,19 @@ func SetupTestEnvironment(
 		return nil, pkgerrors.Wrap(jdAndDonErr, "failed to start Job Distributor or DONs")
 	}
 
+	// here we need to have complete address book, so let's wait for the keystone contracts to be deployed
+	keystoneContractsResult := <-keystoneContractsCh
+	close(keystoneContractsCh)
+	if keystoneContractsResult.err != nil {
+		// do not wrap, as it already contains the error message
+		return nil, keystoneContractsResult.err
+	}
+
+	addressBook := keystoneContractsResult.addressBook
+
+	// TODO
+	// compare whether saved and actual address books are the same
+
 	// Prepare the CLD environment that's required by the keystone changeset
 	// Ugly glue hack ¯\_(ツ)_/¯
 	fullCldInput := &cretypes.FullCLDEnvironmentInput{
@@ -520,7 +570,7 @@ func SetupTestEnvironment(
 		BlockchainOutputs: bcOuts,
 		SethClients:       sethClients,
 		NodeSetOutput:     nodeSetOutput,
-		ExistingAddresses: allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
+		ExistingAddresses: addressBook, //nolint:staticcheck // won't migrate now
 		Topology:          topology,
 	}
 
@@ -541,13 +591,51 @@ func SetupTestEnvironment(
 
 	fmt.Print(libformat.PurpleText("\n[Stage 5/8] DONs started in %.2f seconds\n", time.Since(startTime).Seconds()))
 
+	// start some tasks in the background
+	backgroundStagesCount := 3
+	backgroundStagesWaitGroup := &sync.WaitGroup{}
+	backgroundStagesCh := make(chan backgroundStageResult, backgroundStagesCount)
+	backgroundStagesWaitGroup.Add(1)
+
+	// configure workflow registry contract in the background, so that we can continue with the next stage
+	var workflowRegistryInput *cretypes.WorkflowRegistryInput
+	// node funding goroutine and workflow registry goroutine need to be synchronized, because they use the same PK for on-chain transaction
+	syncChainWritingGoRoutinesCh := make(chan struct{})
+	go func() {
+		defer func() {
+			// signal to node funding goroutine that it can start
+			syncChainWritingGoRoutinesCh <- struct{}{}
+			backgroundStagesWaitGroup.Done()
+		}()
+		startTime = time.Now()
+		fmt.Print(libformat.PurpleText("---> [BACKGROUND 1/3] Configuring Workflow Registry contract\n"))
+
+		// Configure Workflow Registry contract
+		workflowRegistryInput = &cretypes.WorkflowRegistryInput{
+			ChainSelector:  homeChainOutput.ChainSelector,
+			CldEnv:         allChainsCLDEnvironment,
+			AllowedDonIDs:  []uint32{topology.WorkflowDONID},
+			WorkflowOwners: []common.Address{homeChainOutput.SethClient.MustGetRootKeyAddress()},
+		}
+
+		_, workflowErr := libcontracts.ConfigureWorkflowRegistry(testLogger, workflowRegistryInput)
+		if workflowErr != nil {
+			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(workflowErr, "failed to configure workflow registry"), successMessage: libformat.PurpleText("\n<--- [BACKGROUND 1/3] Workflow Registry configured in %.2f seconds\n", time.Since(startTime).Seconds())}
+			return
+		}
+
+		backgroundStagesCh <- backgroundStageResult{successMessage: libformat.PurpleText("\n<--- [BACKGROUND 1/3] Workflow Registry configured in %.2f seconds\n", time.Since(startTime).Seconds())}
+	}()
+
 	// Fund nodes in the background, so that we can continue with the next stage
 	backgroundStagesWaitGroup.Add(1)
 	go func() {
+		// wait for workflow registry to be continued (it's an onchain transaction and we could get nonce mismatch otherwise)
+		<-syncChainWritingGoRoutinesCh
+		defer close(syncChainWritingGoRoutinesCh)
 		defer backgroundStagesWaitGroup.Done()
 
 		startTime = time.Now()
-		fmt.Print(libformat.PurpleText("---> [BACKGROUND 2/3] Funding Chainlink nodes\n\n"))
 
 		// Fund the nodes
 		concurrentNonceMap, concurrentNonceMapErr := NewConcurrentNonceMap(ctx, blockchainsOutput)
@@ -720,29 +808,6 @@ func SetupTestEnvironment(
 			fmt.Print(result.successMessage)
 		}
 	}
-	// we cannot start registering workflows until the workflow registry is configured
-	// workflowRegistryConfigResult := <-workflowRegistryConfigCh
-	// defer close(workflowRegistryConfigCh)
-	// if workflowRegistryConfigResult.err != nil {
-	// 	return nil, pkgerrors.Wrap(workflowRegistryConfigResult.err, "failed to configure workflow registry")
-	// }
-	// fmt.Print(libformat.PurpleText("\n<--- [BACKGROUND 1/3] Workflow Registry configured in %.2f seconds\n", workflowRegistryConfigResult.duration.Seconds()))
-
-	// // nodes need to be funded before we can continue to execute workflows
-	// nodeFundingResult := <-fundingErrCh
-	// defer close(fundingErrCh)
-	// if nodeFundingResult.err != nil {
-	// 	return nil, pkgerrors.Wrap(nodeFundingResult.err, "failed to fund nodes")
-	// }
-	// fmt.Print(libformat.PurpleText("\n<--- [BACKGROUND 2/3] Chainlink nodes funded in %.2f seconds\033[0m\n", nodeFundingResult.duration.Seconds()))
-
-	// // wait for log poller filters to be registered, we cannot proceed with workflow registration until this is done
-	// logPollerFiltersResult := <-logPollerFiltersCh
-	// defer close(logPollerFiltersCh)
-	// if logPollerFiltersResult.err != nil {
-	// 	return nil, pkgerrors.Wrap(logPollerFiltersResult.err, "failed to wait for LogPoller filters")
-	// }
-	// fmt.Print(libformat.PurpleText("\n<--- [BACKGROUND 3/3] Waiting for LogPoller filters to be registered finished in %.2f seconds\n\n", logPollerFiltersResult.duration.Seconds()))
 
 	return &SetupOutput{
 		WorkflowRegistryConfigurationOutput: workflowRegistryInput.Out, // pass to caller, so that it can be optionally attached to TestConfig and saved to disk
