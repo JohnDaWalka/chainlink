@@ -281,8 +281,6 @@ func (r *Report) DeductByAvailability(
 		return 0, ErrNoOpenCalls
 	}
 
-	// TODO: consume CapabilityInfo spend types
-
 	// if a limit exists, we don't need to do a calculation on the concurrent calls
 	// Split the available local balance between the number of concurrent calls that can still be made
 	capSpendLimit := r.balance.Get()
@@ -293,6 +291,7 @@ func (r *Report) DeductByAvailability(
 		value, err := strconv.ParseInt(override, 10, 64)
 		if err != nil {
 			r.lggr.Errorf("failed to parse override value as int64: %s", err)
+			// TODO: switch to metering mode?
 		} else {
 			hasUserOverride = true
 
@@ -316,6 +315,7 @@ func (r *Report) DeductByAvailability(
 		rate, ok := r.rateCard[string(spendType)]
 		if !ok {
 			r.lggr.Errorf("no rate exists in rate card for %s", spendType)
+			// TODO: switch to metering mode
 		} else {
 			spendLimit := decimal.NewFromInt(capSpendLimit).Div(rate)                                                // TODO: should we use Div or Mul here?
 			req.Metadata.SpendLimits = []capabilities.SpendLimit{{SpendType: spendType, Limit: spendLimit.String()}} // TODO: should we apply rounding? maybe take only the int part?
