@@ -307,7 +307,7 @@ func (r *Report) DeductByAvailability(
 		capSpendLimit = share.RoundDown(0).IntPart()
 	}
 
-	// TODO: split spend limit between multiple spend types; currently the entire spend limit goes to a single type
+	// TODO: [CRE-463] split spend limit between multiple spend types; currently the entire spend limit goes to a single type
 	if len(capInfo.SpendTypes) > 0 {
 		spendType := capInfo.SpendTypes[0]
 
