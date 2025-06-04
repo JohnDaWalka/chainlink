@@ -255,6 +255,7 @@ func Test_MeterReports(t *testing.T) {
 		mr.Add("exec1", report)
 		r, ok := mr.Get("exec1")
 		assert.True(t, ok)
+
 		//nolint:errcheck // depending on the concurrent timing, this may or may not err
 		report.DeductByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 		//nolint:errcheck // depending on the concurrent timing, this may or may not err
@@ -277,6 +278,7 @@ func Test_MeterReports(t *testing.T) {
 		mr.Add("exec1", NewReport(testAccountID, testWorkflowID, testWorkflowExecutionID, logger.TestSugared(t)))
 		r, ok := mr.Get("exec1")
 		assert.True(t, ok)
+
 		//nolint:errcheck // depending on the concurrent timing, this may or may not err
 		r.DeductByLimits("ref1", capabilities.CapabilityInfo{}, []SpendTuple{{Value: 1, Unit: "SomeUnit"}})
 		//nolint:errcheck // depending on the concurrent timing, this may or may not err

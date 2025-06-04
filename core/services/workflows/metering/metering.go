@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"sync"
 
 	"github.com/shopspring/decimal"
@@ -118,9 +119,11 @@ type Report struct {
 	workflowExecutionID string
 
 	// dependencies
-	balance *balanceStore
-	client  BillingClient
-	lggr    logger.Logger
+	balance        *balanceStore
+	client         BillingClient
+	limitOverrides map[string]string
+	rateCard       map[string]decimal.Decimal
+	lggr           logger.Logger
 
 	// internal state
 	ready bool
@@ -135,8 +138,10 @@ func NewReport(accountID, workflowID, workflowExecutionID string, lggr logger.Su
 		workflowID:          workflowID,
 		workflowExecutionID: workflowExecutionID,
 
-		balance: NewBalanceStore(0, map[string]decimal.Decimal{}, sugaredLggr),
-		lggr:    sugaredLggr,
+		balance:        NewBalanceStore(0, map[string]decimal.Decimal{}, sugaredLggr),
+		limitOverrides: make(map[string]string),
+		rateCard:       make(map[string]decimal.Decimal),
+		lggr:           sugaredLggr,
 
 		ready: false,
 		steps: make(map[string]ReportStep),
@@ -255,7 +260,12 @@ func (r *Report) DeductByLimits(ref string, capInfo capabilities.CapabilityInfo,
 // DeductByAvailability earmarks an amount of local universal credit balance and then returns that amount
 // The amount reserved is determined splitting the total open balance by how many remaining concurrent calls can be made
 // We expect to only set this value once - an error is returned if a step would be overwritten
-func (r *Report) DeductByAvailability(ref string, capInfo capabilities.CapabilityInfo, openConcurrentCallSlots int) (int64, error) {
+func (r *Report) DeductByAvailability(
+	ref string,
+	capInfo capabilities.CapabilityInfo,
+	openConcurrentCallSlots int,
+	req *capabilities.CapabilityRequest,
+) (int64, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -271,27 +281,59 @@ func (r *Report) DeductByAvailability(ref string, capInfo capabilities.Capabilit
 		return 0, ErrNoOpenCalls
 	}
 
-	// TODO: consume CapabilityInfo resource types
+	// TODO: consume CapabilityInfo spend types
 
+	// if a limit exists, we don't need to do a calculation on the concurrent calls
 	// Split the available local balance between the number of concurrent calls that can still be made
-	available := r.balance.Get()
-	share := decimal.NewFromInt(available).Div(decimal.NewFromInt(int64(openConcurrentCallSlots)))
-	roundedShare := share.RoundDown(0).IntPart()
+	capSpendLimit := r.balance.Get()
+	var hasUserOverride bool
 
-	// TODO: take minimum of available concurrent balance versus step defined max spend
+	// spend limit overrides are for the entire capability
+	if override, ok := r.limitOverrides[ref]; ok {
+		value, err := strconv.ParseInt(override, 10, 64)
+		if err != nil {
+			r.lggr.Errorf("failed to parse override value as int64: %s", err)
+		} else {
+			hasUserOverride = true
 
-	err := r.balance.Minus(roundedShare)
+			if value < capSpendLimit {
+				capSpendLimit = value
+			}
+		}
+	}
+
+	if !hasUserOverride {
+		// if no user specified spend limit exists, calculate spend limit on concurrent calls
+		share := decimal.NewFromInt(capSpendLimit).Div(decimal.NewFromInt(int64(openConcurrentCallSlots)))
+		capSpendLimit = share.RoundDown(0).IntPart()
+	}
+
+	// TODO: split spend limit between multiple spend types; currently the entire spend limit goes to a single type
+	if len(capInfo.SpendTypes) > 0 {
+		spendType := capInfo.SpendTypes[0]
+
+		// use rate card to convert capSpendLimit to native units
+		rate, ok := r.rateCard[string(spendType)]
+		if !ok {
+			r.lggr.Errorf("no rate exists in rate card for %s", spendType)
+		} else {
+			spendLimit := decimal.NewFromInt(capSpendLimit).Div(rate)                                                // TODO: should we use Div or Mul here?
+			req.Metadata.SpendLimits = []capabilities.SpendLimit{{SpendType: spendType, Limit: spendLimit.String()}} // TODO: should we apply rounding? maybe take only the int part?
+		}
+	}
+
+	err := r.balance.Minus(capSpendLimit)
 	if err != nil {
 		// invariant: engine manages concurrent calls
 		return 0, ErrInsufficientBalance
 	}
 
 	r.steps[ref] = ReportStep{
-		Reserve: roundedShare,
+		Reserve: capSpendLimit,
 		Spend:   nil,
 	}
 
-	return roundedShare, nil
+	return capSpendLimit, nil
 }
 
 // SetStep records the actual spend for a given capability invocation in the engine.

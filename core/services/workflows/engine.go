@@ -775,6 +775,11 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 		Ref:         msg.stepRef,
 	}
 
+	// there is a fundamental difference between v1 and v2 where in the logic a capability request is constructed
+	// the logic for the reserve step is to directly support v2, but to accommodate the difference a request is
+	// constructed ahead of the reserve step here and spend limits are then provided to executeStep.
+	req := &capabilities.CapabilityRequest{}
+
 	meteringReport, mrOK := e.meterReports.Get(msg.state.ExecutionID)
 	if mrOK {
 		curStep, err := e.workflow.Vertex(msg.stepRef)
@@ -785,7 +790,7 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 		if err != nil {
 			l.Error(fmt.Sprintf("failed to get capability info for %s: %s", stepState.Ref, err))
 		}
-		_, err = meteringReport.DeductByAvailability(stepState.Ref, capInfo, e.maxWorkerLimit)
+		_, err = meteringReport.DeductByAvailability(stepState.Ref, capInfo, e.maxWorkerLimit, req)
 		if err != nil {
 			l.Error(fmt.Sprintf("failed to reserve on metering report for %s: %s", stepState.Ref, err))
 		}
@@ -798,7 +803,7 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 	logCustMsg(ctx, cma, "executing step", l)
 
 	stepExecutionStartTime := time.Now()
-	inputs, response, sErr := e.executeStep(ctx, l, msg)
+	inputs, response, sErr := e.executeStep(ctx, l, msg, req.Metadata.SpendLimits)
 	stepExecutionDuration := time.Since(stepExecutionStartTime).Seconds()
 
 	curStepID := "UNSET"
@@ -953,7 +958,12 @@ func (e *Engine) configForStep(ctx context.Context, lggr logger.Logger, step *st
 }
 
 // executeStep executes the referenced capability within a step and returns the result.
-func (e *Engine) executeStep(ctx context.Context, lggr logger.Logger, msg stepRequest) (*values.Map, capabilities.CapabilityResponse, error) {
+func (e *Engine) executeStep(
+	ctx context.Context,
+	lggr logger.Logger,
+	msg stepRequest,
+	spendLimits []capabilities.SpendLimit,
+) (*values.Map, capabilities.CapabilityResponse, error) {
 	curStep, err := e.workflow.Vertex(msg.stepRef)
 	if err != nil {
 		return nil, capabilities.CapabilityResponse{}, err
@@ -1010,6 +1020,7 @@ func (e *Engine) executeStep(ctx context.Context, lggr logger.Logger, msg stepRe
 			WorkflowDonConfigVersion: ln.WorkflowDON.ConfigVersion,
 			ReferenceID:              msg.stepRef,
 			DecodedWorkflowName:      e.workflow.name.String(),
+			SpendLimits:              spendLimits,
 		},
 	}
 
