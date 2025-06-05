@@ -77,10 +77,14 @@ func SetProgramIDsSafe(state solState.CCIPChainState) {
 			ccip_offramp.SetProgramID(state.OffRamp)
 		},
 		func() {
-			lockrelease_token_pool.SetProgramID(state.LockReleaseTokenPool)
+			for _, key := range state.LockReleaseTokenPools {
+				lockrelease_token_pool.SetProgramID(key)
+			}
 		},
 		func() {
-			burnmint_token_pool.SetProgramID(state.BurnMintTokenPool)
+			for _, key := range state.BurnMintTokenPools {
+				burnmint_token_pool.SetProgramID(key)
+			}
 		},
 	)
 }
