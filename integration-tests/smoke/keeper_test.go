@@ -29,51 +29,51 @@ import (
 )
 
 const (
-	keeperDefaultUpkeepGasLimit       = uint32(2500000)
-	keeperDefaultLinkFunds            = int64(9e18)
-	keeperDefaultUpkeepsToDeploy      = 2
-	numUpkeepsAllowedForStragglingTxs = 6
-	keeperExpectedData                = "abcdef"
+	keeperDefaultUpkeepGasLimit	= uint32(2500000)
+	keeperDefaultLinkFunds	= int64(9e18)
+	keeperDefaultUpkeepsToDeploy	= 2
+	numUpkeepsAllowedForStragglingTxs	= 6
+	keeperExpectedData	= "abcdef"
 )
 
 var (
-	keeperDefaultRegistryConfig = contracts.KeeperRegistrySettings{
-		PaymentPremiumPPB:    uint32(200000000),
-		FlatFeeMicroLINK:     uint32(0),
-		BlockCountPerTurn:    big.NewInt(10),
-		CheckGasLimit:        uint32(2500000),
-		StalenessSeconds:     big.NewInt(90000),
-		GasCeilingMultiplier: uint16(1),
-		MinUpkeepSpend:       big.NewInt(0),
-		MaxPerformGas:        uint32(5000000),
-		FallbackGasPrice:     big.NewInt(2e11),
-		FallbackLinkPrice:    big.NewInt(2e18),
-		MaxCheckDataSize:     uint32(5000),
-		MaxPerformDataSize:   uint32(5000),
+	keeperDefaultRegistryConfig	= contracts.KeeperRegistrySettings{
+		PaymentPremiumPPB:	uint32(200000000),
+		FlatFeeMicroLINK:	uint32(0),
+		BlockCountPerTurn:	big.NewInt(10),
+		CheckGasLimit:	uint32(2500000),
+		StalenessSeconds:	big.NewInt(90000),
+		GasCeilingMultiplier:	uint16(1),
+		MinUpkeepSpend:	big.NewInt(0),
+		MaxPerformGas:	uint32(5000000),
+		FallbackGasPrice:	big.NewInt(2e11),
+		FallbackLinkPrice:	big.NewInt(2e18),
+		MaxCheckDataSize:	uint32(5000),
+		MaxPerformDataSize:	uint32(5000),
 	}
-	lowBCPTRegistryConfig = contracts.KeeperRegistrySettings{
-		PaymentPremiumPPB:    uint32(200000000),
-		FlatFeeMicroLINK:     uint32(0),
-		BlockCountPerTurn:    big.NewInt(4),
-		CheckGasLimit:        uint32(2500000),
-		StalenessSeconds:     big.NewInt(90000),
-		GasCeilingMultiplier: uint16(1),
-		MinUpkeepSpend:       big.NewInt(0),
-		MaxPerformGas:        uint32(5000000),
-		FallbackGasPrice:     big.NewInt(2e11),
-		FallbackLinkPrice:    big.NewInt(2e18),
+	lowBCPTRegistryConfig	= contracts.KeeperRegistrySettings{
+		PaymentPremiumPPB:	uint32(200000000),
+		FlatFeeMicroLINK:	uint32(0),
+		BlockCountPerTurn:	big.NewInt(4),
+		CheckGasLimit:	uint32(2500000),
+		StalenessSeconds:	big.NewInt(90000),
+		GasCeilingMultiplier:	uint16(1),
+		MinUpkeepSpend:	big.NewInt(0),
+		MaxPerformGas:	uint32(5000000),
+		FallbackGasPrice:	big.NewInt(2e11),
+		FallbackLinkPrice:	big.NewInt(2e18),
 	}
-	highBCPTRegistryConfig = contracts.KeeperRegistrySettings{
-		PaymentPremiumPPB:    uint32(200000000),
-		FlatFeeMicroLINK:     uint32(0),
-		BlockCountPerTurn:    big.NewInt(10000),
-		CheckGasLimit:        uint32(2500000),
-		StalenessSeconds:     big.NewInt(90000),
-		GasCeilingMultiplier: uint16(1),
-		MinUpkeepSpend:       big.NewInt(0),
-		MaxPerformGas:        uint32(5000000),
-		FallbackGasPrice:     big.NewInt(2e11),
-		FallbackLinkPrice:    big.NewInt(2e18),
+	highBCPTRegistryConfig	= contracts.KeeperRegistrySettings{
+		PaymentPremiumPPB:	uint32(200000000),
+		FlatFeeMicroLINK:	uint32(0),
+		BlockCountPerTurn:	big.NewInt(10000),
+		CheckGasLimit:	uint32(2500000),
+		StalenessSeconds:	big.NewInt(90000),
+		GasCeilingMultiplier:	uint16(1),
+		MinUpkeepSpend:	big.NewInt(0),
+		MaxPerformGas:	uint32(5000000),
+		FallbackGasPrice:	big.NewInt(2e11),
+		FallbackLinkPrice:	big.NewInt(2e18),
 	}
 )
 
@@ -336,10 +336,10 @@ func TestKeeperSimulation(t *testing.T) {
 				linkToken,
 				&keeperDefaultRegistryConfig,
 				big.NewInt(keeperDefaultLinkFunds),
-				10000,   // How many blocks this upkeep will be eligible from first upkeep block
-				5,       // Interval of blocks that upkeeps are expected to be performed
-				100000,  // How much gas should be burned on checkUpkeep() calls
-				4000000, // How much gas should be burned on performUpkeep() calls. Initially set higher than defaultUpkeepGasLimit
+				10000,	// How many blocks this upkeep will be eligible from first upkeep block
+				5,	// Interval of blocks that upkeeps are expected to be performed
+				100000,	// How much gas should be burned on checkUpkeep() calls
+				4000000,	// How much gas should be burned on performUpkeep() calls. Initially set higher than defaultUpkeepGasLimit
 			)
 
 			_, err = actions.CreateKeeperJobsLocal(l, chainlinkNodes, registry, contracts.OCRv2Config{}, strconv.FormatInt(chainClient.ChainID, 10))
@@ -415,10 +415,10 @@ func TestKeeperCheckPerformGasLimit(t *testing.T) {
 				linkToken,
 				&keeperDefaultRegistryConfig,
 				big.NewInt(keeperDefaultLinkFunds),
-				10000,   // How many blocks this upkeep will be eligible from first upkeep block
-				5,       // Interval of blocks that upkeeps are expected to be performed
-				100000,  // How much gas should be burned on checkUpkeep() calls
-				4000000, // How much gas should be burned on performUpkeep() calls. Initially set higher than defaultUpkeepGasLimit
+				10000,	// How many blocks this upkeep will be eligible from first upkeep block
+				5,	// Interval of blocks that upkeeps are expected to be performed
+				100000,	// How much gas should be burned on checkUpkeep() calls
+				4000000,	// How much gas should be burned on performUpkeep() calls. Initially set higher than defaultUpkeepGasLimit
 			)
 
 			_, err = actions.CreateKeeperJobsLocal(l, chainlinkNodes, registry, contracts.OCRv2Config{}, strconv.FormatInt(chainClient.ChainID, 10))
@@ -1074,8 +1074,8 @@ func TestKeeperNodeDown(t *testing.T) {
 }
 
 type nodeAndJob struct {
-	node *nodeclient.ChainlinkClient
-	job  *nodeclient.Job
+	node	*nodeclient.ChainlinkClient
+	job	*nodeclient.Job
 }
 
 func TestKeeperPauseUnPauseUpkeep(t *testing.T) {
@@ -1276,6 +1276,7 @@ func setupKeeperTest(l zerolog.Logger, t *testing.T, config *tc.TestConfig) (
 }
 
 func TestKeeperJobReplacement(t *testing.T) {
+	t.Skip("Skipped by flakeguard: https://smartcontract-it.atlassian.net/issues/DX-624")
 	t.Parallel()
 	l := logging.GetTestLogger(t)
 	registryVersion := ethereum.RegistryVersion_1_3

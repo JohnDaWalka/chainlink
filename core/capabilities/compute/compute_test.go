@@ -29,34 +29,34 @@ import (
 )
 
 const (
-	fetchBinaryCmd   = "core/capabilities/compute/test/fetch/cmd"
-	validRequestUUID = "d2fe6db9-beb4-47c9-b2d6-d3065ace111e"
+	fetchBinaryCmd	= "core/capabilities/compute/test/fetch/cmd"
+	validRequestUUID	= "d2fe6db9-beb4-47c9-b2d6-d3065ace111e"
 )
 
 var defaultConfig = Config{
 	ServiceConfig: webapi.ServiceConfig{
 		OutgoingRateLimiter: common.RateLimiterConfig{
-			GlobalRPS:      100.0,
-			GlobalBurst:    100,
-			PerSenderRPS:   100.0,
-			PerSenderBurst: 100,
+			GlobalRPS:	100.0,
+			GlobalBurst:	100,
+			PerSenderRPS:	100.0,
+			PerSenderBurst:	100,
 		},
 		RateLimiter: common.RateLimiterConfig{
-			GlobalRPS:      100.0,
-			GlobalBurst:    100,
-			PerSenderRPS:   100.0,
-			PerSenderBurst: 100,
+			GlobalRPS:	100.0,
+			GlobalBurst:	100,
+			PerSenderRPS:	100.0,
+			PerSenderBurst:	100,
 		},
 	},
 }
 
 type testHarness struct {
-	registry         *capabilities.Registry
-	connector        *gcmocks.GatewayConnector
-	log              logger.Logger
-	config           Config
-	connectorHandler *webapi.OutgoingConnectorHandler
-	compute          *Compute
+	registry	*capabilities.Registry
+	connector	*gcmocks.GatewayConnector
+	log	logger.Logger
+	config	Config
+	connectorHandler	*webapi.OutgoingConnectorHandler
+	compute	*Compute
 }
 
 func setup(t *testing.T, config Config) testHarness {
@@ -74,12 +74,12 @@ func setup(t *testing.T, config Config) testHarness {
 	compute.modules.clock = clockwork.NewFakeClock()
 
 	return testHarness{
-		registry:         registry,
-		connector:        connector,
-		log:              log,
-		config:           config,
-		connectorHandler: connectorHandler,
-		compute:          compute,
+		registry:	registry,
+		connector:	connector,
+		log:	log,
+		config:	config,
+		connectorHandler:	connectorHandler,
+		compute:	compute,
 	}
 }
 
@@ -105,8 +105,8 @@ func TestComputeExecuteMissingConfig(t *testing.T) {
 	})
 	require.NoError(t, err)
 	req := cappkg.CapabilityRequest{
-		Inputs: values.EmptyMap(),
-		Config: config,
+		Inputs:	values.EmptyMap(),
+		Config:	config,
 		Metadata: cappkg.RequestMetadata{
 			ReferenceID: "compute",
 		},
@@ -125,8 +125,8 @@ func TestComputeExecuteMissingBinary(t *testing.T) {
 	})
 	require.NoError(t, err)
 	req := cappkg.CapabilityRequest{
-		Inputs: values.EmptyMap(),
-		Config: config,
+		Inputs:	values.EmptyMap(),
+		Config:	config,
 		Metadata: cappkg.RequestMetadata{
 			ReferenceID: "compute",
 		},
@@ -144,8 +144,8 @@ func TestComputeExecute(t *testing.T) {
 	binary := wasmtest.CreateTestBinary(simpleBinaryCmd, true, t)
 
 	config, err := values.WrapMap(map[string]any{
-		"config": []byte(""),
-		"binary": binary,
+		"config":	[]byte(""),
+		"binary":	binary,
 	})
 	require.NoError(t, err)
 	inputs, err := values.WrapMap(map[string]any{
@@ -155,11 +155,11 @@ func TestComputeExecute(t *testing.T) {
 	})
 	require.NoError(t, err)
 	req := cappkg.CapabilityRequest{
-		Inputs: inputs,
-		Config: config,
+		Inputs:	inputs,
+		Config:	config,
 		Metadata: cappkg.RequestMetadata{
-			WorkflowID:  "workflowID",
-			ReferenceID: "compute",
+			WorkflowID:	"workflowID",
+			ReferenceID:	"compute",
 		},
 	}
 	resp, err := th.compute.Execute(t.Context(), req)
@@ -173,13 +173,13 @@ func TestComputeExecute(t *testing.T) {
 	})
 	require.NoError(t, err)
 	config, err = values.WrapMap(map[string]any{
-		"config": []byte(""),
-		"binary": binary,
+		"config":	[]byte(""),
+		"binary":	binary,
 	})
 	require.NoError(t, err)
 	req = cappkg.CapabilityRequest{
-		Inputs: inputs,
-		Config: config,
+		Inputs:	inputs,
+		Config:	config,
 		Metadata: cappkg.RequestMetadata{
 			ReferenceID: "compute",
 		},
@@ -221,17 +221,17 @@ func TestComputeFetch(t *testing.T) {
 	binary := wasmtest.CreateTestBinary(fetchBinaryCmd, true, t)
 
 	config, err := values.WrapMap(map[string]any{
-		"config": []byte(""),
-		"binary": binary,
+		"config":	[]byte(""),
+		"binary":	binary,
 	})
 	require.NoError(t, err)
 
 	req := cappkg.CapabilityRequest{
-		Config: config,
+		Config:	config,
 		Metadata: cappkg.RequestMetadata{
-			WorkflowID:          workflowID,
-			WorkflowExecutionID: workflowExecutionID,
-			ReferenceID:         "compute",
+			WorkflowID:	workflowID,
+			WorkflowExecutionID:	workflowExecutionID,
+			ReferenceID:	"compute",
 		},
 	}
 
@@ -244,11 +244,11 @@ func TestComputeFetch(t *testing.T) {
 			Underlying: map[string]values.Value{
 				"Value": &values.Map{
 					Underlying: map[string]values.Value{
-						"Body":           values.NewBytes([]byte("response body")),
-						"Headers":        headers,
-						"StatusCode":     values.NewInt64(200),
-						"ErrorMessage":   values.NewString(""),
-						"ExecutionError": values.NewBool(false),
+						"Body":	values.NewBytes([]byte("response body")),
+						"Headers":	headers,
+						"StatusCode":	values.NewInt64(200),
+						"ErrorMessage":	values.NewString(""),
+						"ExecutionError":	values.NewBool(false),
 					},
 				},
 			},
@@ -256,9 +256,9 @@ func TestComputeFetch(t *testing.T) {
 		Metadata: cappkg.ResponseMetadata{
 			Metering: []cappkg.MeteringNodeDetail{
 				{
-					Peer2PeerID: "",
-					SpendUnit:   metering.ComputeUnit.Name,
-					SpendValue:  "0",
+					Peer2PeerID:	"",
+					SpendUnit:	metering.ComputeUnit.Name,
+					SpendValue:	"0",
 				},
 			},
 		},
@@ -273,8 +273,8 @@ func TestCompute_SpendValueRelativeToComputeTime(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		time               time.Duration
-		expectedSpendValue string
+		time	time.Duration
+		expectedSpendValue	string
 	}{
 		{time.Duration(0), "0"},
 		{time.Second, "1"},
@@ -294,17 +294,17 @@ func TestCompute_SpendValueRelativeToComputeTime(t *testing.T) {
 	binary := wasmtest.CreateTestBinary(fetchBinaryCmd, true, t)
 
 	config, err := values.WrapMap(map[string]any{
-		"config": []byte(""),
-		"binary": binary,
+		"config":	[]byte(""),
+		"binary":	binary,
 	})
 	require.NoError(t, err)
 
 	req := cappkg.CapabilityRequest{
-		Config: config,
+		Config:	config,
 		Metadata: cappkg.RequestMetadata{
-			WorkflowID:          workflowID,
-			WorkflowExecutionID: workflowExecutionID,
-			ReferenceID:         "compute",
+			WorkflowID:	workflowID,
+			WorkflowExecutionID:	workflowExecutionID,
+			ReferenceID:	"compute",
 		},
 	}
 
@@ -341,6 +341,7 @@ func TestCompute_SpendValueRelativeToComputeTime(t *testing.T) {
 }
 
 func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
+	t.Skip("Skipped by flakeguard: https://smartcontract-it.atlassian.net/issues/DX-626")
 	t.Parallel()
 	workflowID := "15c631d295ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0"
 	workflowExecutionID := "95ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0abbadeed"
@@ -348,13 +349,13 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 	th := setup(t, Config{
 		ServiceConfig: webapi.ServiceConfig{
 			RateLimiter: common.RateLimiterConfig{
-				GlobalRPS:      100.0,
-				GlobalBurst:    100,
-				PerSenderRPS:   100.0,
-				PerSenderBurst: 100,
+				GlobalRPS:	100.0,
+				GlobalBurst:	100,
+				PerSenderRPS:	100.0,
+				PerSenderBurst:	100,
 			},
 		},
-		MaxResponseSizeBytes: 1 * 1024,
+		MaxResponseSizeBytes:	1 * 1024,
 	})
 
 	th.connector.EXPECT().DonID().Return("don-id")
@@ -377,17 +378,17 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 	binary := wasmtest.CreateTestBinary(fetchBinaryCmd, true, t)
 
 	config, err := values.WrapMap(map[string]any{
-		"config": []byte(""),
-		"binary": binary,
+		"config":	[]byte(""),
+		"binary":	binary,
 	})
 	require.NoError(t, err)
 
 	req := cappkg.CapabilityRequest{
-		Config: config,
+		Config:	config,
 		Metadata: cappkg.RequestMetadata{
-			WorkflowID:          workflowID,
-			WorkflowExecutionID: workflowExecutionID,
-			ReferenceID:         "compute",
+			WorkflowID:	workflowID,
+			WorkflowExecutionID:	workflowExecutionID,
+			ReferenceID:	"compute",
 		},
 	}
 
@@ -398,17 +399,17 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 func gatewayResponse(t *testing.T, msgID string, body []byte) *api.Message {
 	headers := map[string]string{"Content-Type": "application/json"}
 	responsePayload, err := json.Marshal(ghcapabilities.Response{
-		StatusCode:     200,
-		Headers:        headers,
-		Body:           body,
-		ExecutionError: false,
+		StatusCode:	200,
+		Headers:	headers,
+		Body:	body,
+		ExecutionError:	false,
 	})
 	require.NoError(t, err)
 	return &api.Message{
 		Body: api.MessageBody{
-			MessageId: msgID,
-			Method:    ghcapabilities.MethodComputeAction,
-			Payload:   responsePayload,
+			MessageId:	msgID,
+			Method:	ghcapabilities.MethodComputeAction,
+			Payload:	responsePayload,
 		},
 	}
 }

@@ -92,12 +92,12 @@ var vrfv2CleanUpFn = func(
 func TestVRFv2Basic(t *testing.T) {
 	t.Parallel()
 	var (
-		testEnv                      *test_env.CLClusterTestEnv
-		vrfContracts                 *vrfcommon.VRFContracts
-		subIDsForCancellingAfterTest []uint64
-		vrfKey                       *vrfcommon.VRFKeyData
-		nodeTypeToNodeMap            map[vrfcommon.VRFNodeType]*vrfcommon.VRFNode
-		sethClient                   *seth.Client
+		testEnv	*test_env.CLClusterTestEnv
+		vrfContracts	*vrfcommon.VRFContracts
+		subIDsForCancellingAfterTest	[]uint64
+		vrfKey	*vrfcommon.VRFKeyData
+		nodeTypeToNodeMap	map[vrfcommon.VRFNodeType]*vrfcommon.VRFNode
+		sethClient	*seth.Client
 	)
 	l := logging.GetTestLogger(t)
 
@@ -107,16 +107,16 @@ func TestVRFv2Basic(t *testing.T) {
 
 	configPtr := &config
 	vrfEnvConfig := vrfcommon.VRFEnvConfig{
-		TestConfig: config,
-		ChainID:    chainID,
-		CleanupFn:  vrfv2CleanUpFn(&t, &sethClient, &configPtr, &testEnv, &vrfContracts, &subIDsForCancellingAfterTest, nil),
+		TestConfig:	config,
+		ChainID:	chainID,
+		CleanupFn:	vrfv2CleanUpFn(&t, &sethClient, &configPtr, &testEnv, &vrfContracts, &subIDsForCancellingAfterTest, nil),
 	}
 	newEnvConfig := vrfcommon.NewEnvConfig{
-		NodesToCreate:                   []vrfcommon.VRFNodeType{vrfcommon.VRF},
-		NumberOfTxKeysToCreate:          0,
-		UseVRFOwner:                     false,
-		UseTestCoordinator:              false,
-		ChainlinkNodeLogScannerSettings: test_env.DefaultChainlinkNodeLogScannerSettings,
+		NodesToCreate:	[]vrfcommon.VRFNodeType{vrfcommon.VRF},
+		NumberOfTxKeysToCreate:	0,
+		UseVRFOwner:	false,
+		UseTestCoordinator:	false,
+		ChainlinkNodeLogScannerSettings:	test_env.DefaultChainlinkNodeLogScannerSettings,
 	}
 	testEnv, vrfContracts, vrfKey, nodeTypeToNodeMap, sethClient, err = vrfv2.SetupVRFV2Universe(testcontext.Get(t), t, vrfEnvConfig, newEnvConfig, l)
 	require.NoError(t, err, "Error setting up VRFV2 universe")
@@ -344,6 +344,7 @@ func TestVRFv2Basic(t *testing.T) {
 			Msg("Random Words Fulfilment Details For Link Billing")
 	})
 	t.Run("Oracle Withdraw", func(t *testing.T) {
+		t.Skip("Skipped by flakeguard: https://smartcontract-it.atlassian.net/issues/DX-527")
 		tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-527")
 
 		configCopy := config.MustCopy().(tc.TestConfig)
@@ -594,12 +595,12 @@ func TestVRFv2Basic(t *testing.T) {
 func TestVRFv2MultipleSendingKeys(t *testing.T) {
 	t.Parallel()
 	var (
-		testEnv                      *test_env.CLClusterTestEnv
-		vrfContracts                 *vrfcommon.VRFContracts
-		subIDsForCancellingAfterTest []uint64
-		vrfKey                       *vrfcommon.VRFKeyData
-		nodeTypeToNodeMap            map[vrfcommon.VRFNodeType]*vrfcommon.VRFNode
-		sethClient                   *seth.Client
+		testEnv	*test_env.CLClusterTestEnv
+		vrfContracts	*vrfcommon.VRFContracts
+		subIDsForCancellingAfterTest	[]uint64
+		vrfKey	*vrfcommon.VRFKeyData
+		nodeTypeToNodeMap	map[vrfcommon.VRFNodeType]*vrfcommon.VRFNode
+		sethClient	*seth.Client
 	)
 	l := logging.GetTestLogger(t)
 
@@ -611,16 +612,16 @@ func TestVRFv2MultipleSendingKeys(t *testing.T) {
 
 	configPtr := &config
 	vrfEnvConfig := vrfcommon.VRFEnvConfig{
-		TestConfig: config,
-		ChainID:    chainID,
-		CleanupFn:  vrfv2CleanUpFn(&t, &sethClient, &configPtr, &testEnv, &vrfContracts, &subIDsForCancellingAfterTest, nil),
+		TestConfig:	config,
+		ChainID:	chainID,
+		CleanupFn:	vrfv2CleanUpFn(&t, &sethClient, &configPtr, &testEnv, &vrfContracts, &subIDsForCancellingAfterTest, nil),
 	}
 	newEnvConfig := vrfcommon.NewEnvConfig{
-		NodesToCreate:                   []vrfcommon.VRFNodeType{vrfcommon.VRF},
-		NumberOfTxKeysToCreate:          2,
-		UseVRFOwner:                     false,
-		UseTestCoordinator:              false,
-		ChainlinkNodeLogScannerSettings: test_env.DefaultChainlinkNodeLogScannerSettings,
+		NodesToCreate:	[]vrfcommon.VRFNodeType{vrfcommon.VRF},
+		NumberOfTxKeysToCreate:	2,
+		UseVRFOwner:	false,
+		UseTestCoordinator:	false,
+		ChainlinkNodeLogScannerSettings:	test_env.DefaultChainlinkNodeLogScannerSettings,
 	}
 	testEnv, vrfContracts, vrfKey, nodeTypeToNodeMap, sethClient, err = vrfv2.SetupVRFV2Universe(testcontext.Get(t), t, vrfEnvConfig, newEnvConfig, l)
 	require.NoError(t, err, "Error setting up VRFV2 universe")
@@ -688,11 +689,11 @@ func TestVRFOwner(t *testing.T) {
 
 	t.Parallel()
 	var (
-		testEnv                      *test_env.CLClusterTestEnv
-		vrfContracts                 *vrfcommon.VRFContracts
-		subIDsForCancellingAfterTest []uint64
-		vrfKey                       *vrfcommon.VRFKeyData
-		sethClient                   *seth.Client
+		testEnv	*test_env.CLClusterTestEnv
+		vrfContracts	*vrfcommon.VRFContracts
+		subIDsForCancellingAfterTest	[]uint64
+		vrfKey	*vrfcommon.VRFKeyData
+		sethClient	*seth.Client
 	)
 	l := logging.GetTestLogger(t)
 
@@ -702,16 +703,16 @@ func TestVRFOwner(t *testing.T) {
 
 	configPtr := &config
 	vrfEnvConfig := vrfcommon.VRFEnvConfig{
-		TestConfig: config,
-		ChainID:    chainID,
-		CleanupFn:  vrfv2CleanUpFn(&t, &sethClient, &configPtr, &testEnv, &vrfContracts, &subIDsForCancellingAfterTest, nil),
+		TestConfig:	config,
+		ChainID:	chainID,
+		CleanupFn:	vrfv2CleanUpFn(&t, &sethClient, &configPtr, &testEnv, &vrfContracts, &subIDsForCancellingAfterTest, nil),
 	}
 	newEnvConfig := vrfcommon.NewEnvConfig{
-		NodesToCreate:                   []vrfcommon.VRFNodeType{vrfcommon.VRF},
-		NumberOfTxKeysToCreate:          0,
-		UseVRFOwner:                     true,
-		UseTestCoordinator:              true,
-		ChainlinkNodeLogScannerSettings: test_env.DefaultChainlinkNodeLogScannerSettings,
+		NodesToCreate:	[]vrfcommon.VRFNodeType{vrfcommon.VRF},
+		NumberOfTxKeysToCreate:	0,
+		UseVRFOwner:	true,
+		UseTestCoordinator:	true,
+		ChainlinkNodeLogScannerSettings:	test_env.DefaultChainlinkNodeLogScannerSettings,
 	}
 	testEnv, vrfContracts, vrfKey, _, sethClient, err = vrfv2.SetupVRFV2Universe(testcontext.Get(t), t, vrfEnvConfig, newEnvConfig, l)
 	require.NoError(t, err, "Error setting up VRFV2 universe")
@@ -806,12 +807,12 @@ func TestVRFOwner(t *testing.T) {
 func TestVRFV2WithBHS(t *testing.T) {
 	t.Parallel()
 	var (
-		testEnv                      *test_env.CLClusterTestEnv
-		vrfContracts                 *vrfcommon.VRFContracts
-		subIDsForCancellingAfterTest []uint64
-		vrfKey                       *vrfcommon.VRFKeyData
-		nodeTypeToNodeMap            map[vrfcommon.VRFNodeType]*vrfcommon.VRFNode
-		sethClient                   *seth.Client
+		testEnv	*test_env.CLClusterTestEnv
+		vrfContracts	*vrfcommon.VRFContracts
+		subIDsForCancellingAfterTest	[]uint64
+		vrfKey	*vrfcommon.VRFKeyData
+		nodeTypeToNodeMap	map[vrfcommon.VRFNodeType]*vrfcommon.VRFNode
+		sethClient	*seth.Client
 	)
 	l := logging.GetTestLogger(t)
 
@@ -825,16 +826,16 @@ func TestVRFV2WithBHS(t *testing.T) {
 	vrfv2Config.General.BHSJobWaitBlocks = ptr.Ptr(2)
 	vrfv2Config.General.BHSJobLookBackBlocks = ptr.Ptr(20)
 	vrfEnvConfig := vrfcommon.VRFEnvConfig{
-		TestConfig: config,
-		ChainID:    chainID,
-		CleanupFn:  vrfv2CleanUpFn(&t, &sethClient, &configPtr, &testEnv, &vrfContracts, &subIDsForCancellingAfterTest, nil),
+		TestConfig:	config,
+		ChainID:	chainID,
+		CleanupFn:	vrfv2CleanUpFn(&t, &sethClient, &configPtr, &testEnv, &vrfContracts, &subIDsForCancellingAfterTest, nil),
 	}
 	newEnvConfig := vrfcommon.NewEnvConfig{
-		NodesToCreate:                   []vrfcommon.VRFNodeType{vrfcommon.VRF, vrfcommon.BHS},
-		NumberOfTxKeysToCreate:          0,
-		UseVRFOwner:                     false,
-		UseTestCoordinator:              false,
-		ChainlinkNodeLogScannerSettings: test_env.DefaultChainlinkNodeLogScannerSettings,
+		NodesToCreate:	[]vrfcommon.VRFNodeType{vrfcommon.VRF, vrfcommon.BHS},
+		NumberOfTxKeysToCreate:	0,
+		UseVRFOwner:	false,
+		UseTestCoordinator:	false,
+		ChainlinkNodeLogScannerSettings:	test_env.DefaultChainlinkNodeLogScannerSettings,
 	}
 	testEnv, vrfContracts, vrfKey, nodeTypeToNodeMap, sethClient, err = vrfv2.SetupVRFV2Universe(testcontext.Get(t), t, vrfEnvConfig, newEnvConfig, l)
 	require.NoError(t, err, "Error setting up VRFV2 universe")
@@ -1021,11 +1022,11 @@ func TestVRFV2NodeReorg(t *testing.T) {
 	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DEVSVCS-829")
 	t.Parallel()
 	var (
-		env                          *test_env.CLClusterTestEnv
-		vrfContracts                 *vrfcommon.VRFContracts
-		subIDsForCancellingAfterTest []uint64
-		vrfKey                       *vrfcommon.VRFKeyData
-		sethClient                   *seth.Client
+		env	*test_env.CLClusterTestEnv
+		vrfContracts	*vrfcommon.VRFContracts
+		subIDsForCancellingAfterTest	[]uint64
+		vrfKey	*vrfcommon.VRFKeyData
+		sethClient	*seth.Client
 	)
 	l := logging.GetTestLogger(t)
 
@@ -1051,16 +1052,16 @@ func TestVRFV2NodeReorg(t *testing.T) {
 			testreporters.WarnAboutAllowedMsgs_No),
 	)
 	vrfEnvConfig := vrfcommon.VRFEnvConfig{
-		TestConfig: config,
-		ChainID:    chainID,
-		CleanupFn:  vrfv2CleanUpFn(&t, &sethClient, &configPtr, &env, &vrfContracts, &subIDsForCancellingAfterTest, nil),
+		TestConfig:	config,
+		ChainID:	chainID,
+		CleanupFn:	vrfv2CleanUpFn(&t, &sethClient, &configPtr, &env, &vrfContracts, &subIDsForCancellingAfterTest, nil),
 	}
 	newEnvConfig := vrfcommon.NewEnvConfig{
-		NodesToCreate:                   []vrfcommon.VRFNodeType{vrfcommon.VRF},
-		NumberOfTxKeysToCreate:          0,
-		UseVRFOwner:                     false,
-		UseTestCoordinator:              false,
-		ChainlinkNodeLogScannerSettings: chainlinkNodeLogScannerSettings,
+		NodesToCreate:	[]vrfcommon.VRFNodeType{vrfcommon.VRF},
+		NumberOfTxKeysToCreate:	0,
+		UseVRFOwner:	false,
+		UseTestCoordinator:	false,
+		ChainlinkNodeLogScannerSettings:	chainlinkNodeLogScannerSettings,
 	}
 	env, vrfContracts, vrfKey, _, sethClient, err = vrfv2.SetupVRFV2Universe(testcontext.Get(t), t, vrfEnvConfig, newEnvConfig, l)
 	require.NoError(t, err, "Error setting up VRFv2 universe")
@@ -1182,12 +1183,12 @@ func TestVRFV2NodeReorg(t *testing.T) {
 func TestVRFv2BatchFulfillmentEnabledDisabled(t *testing.T) {
 	t.Parallel()
 	var (
-		env                          *test_env.CLClusterTestEnv
-		vrfContracts                 *vrfcommon.VRFContracts
-		subIDsForCancellingAfterTest []uint64
-		vrfKey                       *vrfcommon.VRFKeyData
-		nodeTypeToNodeMap            map[vrfcommon.VRFNodeType]*vrfcommon.VRFNode
-		sethClient                   *seth.Client
+		env	*test_env.CLClusterTestEnv
+		vrfContracts	*vrfcommon.VRFContracts
+		subIDsForCancellingAfterTest	[]uint64
+		vrfKey	*vrfcommon.VRFKeyData
+		nodeTypeToNodeMap	map[vrfcommon.VRFNodeType]*vrfcommon.VRFNode
+		sethClient	*seth.Client
 	)
 	l := logging.GetTestLogger(t)
 
@@ -1198,16 +1199,16 @@ func TestVRFv2BatchFulfillmentEnabledDisabled(t *testing.T) {
 
 	configPtr := &config
 	vrfEnvConfig := vrfcommon.VRFEnvConfig{
-		TestConfig: config,
-		ChainID:    chainID,
-		CleanupFn:  vrfv2CleanUpFn(&t, &sethClient, &configPtr, &env, &vrfContracts, &subIDsForCancellingAfterTest, nil),
+		TestConfig:	config,
+		ChainID:	chainID,
+		CleanupFn:	vrfv2CleanUpFn(&t, &sethClient, &configPtr, &env, &vrfContracts, &subIDsForCancellingAfterTest, nil),
 	}
 	newEnvConfig := vrfcommon.NewEnvConfig{
-		NodesToCreate:                   []vrfcommon.VRFNodeType{vrfcommon.VRF},
-		NumberOfTxKeysToCreate:          0,
-		UseVRFOwner:                     false,
-		UseTestCoordinator:              false,
-		ChainlinkNodeLogScannerSettings: test_env.DefaultChainlinkNodeLogScannerSettings,
+		NodesToCreate:	[]vrfcommon.VRFNodeType{vrfcommon.VRF},
+		NumberOfTxKeysToCreate:	0,
+		UseVRFOwner:	false,
+		UseTestCoordinator:	false,
+		ChainlinkNodeLogScannerSettings:	test_env.DefaultChainlinkNodeLogScannerSettings,
 	}
 	env, vrfContracts, vrfKey, nodeTypeToNodeMap, sethClient, err = vrfv2.SetupVRFV2Universe(testcontext.Get(t), t, vrfEnvConfig, newEnvConfig, l)
 	require.NoError(t, err, "Error setting up VRFv2 universe")
@@ -1235,19 +1236,19 @@ func TestVRFv2BatchFulfillmentEnabledDisabled(t *testing.T) {
 		batchFullfillmentEnabled := true
 		// create job with batch fulfillment enabled
 		vrfJobSpecConfig := vrfcommon.VRFJobSpecConfig{
-			ForwardingAllowed:             *configCopy.VRFv2.General.VRFJobForwardingAllowed,
-			CoordinatorAddress:            vrfContracts.CoordinatorV2.Address(),
-			BatchCoordinatorAddress:       vrfContracts.BatchCoordinatorV2.Address(),
-			FromAddresses:                 vrfNode.TXKeyAddressStrings,
-			EVMChainID:                    fmt.Sprint(chainID),
-			MinIncomingConfirmations:      int(*configCopy.VRFv2.General.MinimumConfirmations),
-			PublicKey:                     vrfKey.PubKeyCompressed,
-			EstimateGasMultiplier:         *configCopy.VRFv2.General.VRFJobEstimateGasMultiplier,
-			BatchFulfillmentEnabled:       batchFullfillmentEnabled,
-			BatchFulfillmentGasMultiplier: *configCopy.VRFv2.General.VRFJobBatchFulfillmentGasMultiplier,
-			PollPeriod:                    configCopy.VRFv2.General.VRFJobPollPeriod.Duration,
-			RequestTimeout:                configCopy.VRFv2.General.VRFJobRequestTimeout.Duration,
-			SimulationBlock:               configCopy.VRFv2.General.VRFJobSimulationBlock,
+			ForwardingAllowed:	*configCopy.VRFv2.General.VRFJobForwardingAllowed,
+			CoordinatorAddress:	vrfContracts.CoordinatorV2.Address(),
+			BatchCoordinatorAddress:	vrfContracts.BatchCoordinatorV2.Address(),
+			FromAddresses:	vrfNode.TXKeyAddressStrings,
+			EVMChainID:	fmt.Sprint(chainID),
+			MinIncomingConfirmations:	int(*configCopy.VRFv2.General.MinimumConfirmations),
+			PublicKey:	vrfKey.PubKeyCompressed,
+			EstimateGasMultiplier:	*configCopy.VRFv2.General.VRFJobEstimateGasMultiplier,
+			BatchFulfillmentEnabled:	batchFullfillmentEnabled,
+			BatchFulfillmentGasMultiplier:	*configCopy.VRFv2.General.VRFJobBatchFulfillmentGasMultiplier,
+			PollPeriod:	configCopy.VRFv2.General.VRFJobPollPeriod.Duration,
+			RequestTimeout:	configCopy.VRFv2.General.VRFJobRequestTimeout.Duration,
+			SimulationBlock:	configCopy.VRFv2.General.VRFJobSimulationBlock,
 			VRFOwnerConfig: &vrfcommon.VRFOwnerConfig{
 				UseVRFOwner: false,
 			},
@@ -1359,19 +1360,19 @@ func TestVRFv2BatchFulfillmentEnabledDisabled(t *testing.T) {
 
 		//create job with batchFulfillmentEnabled = false
 		vrfJobSpecConfig := vrfcommon.VRFJobSpecConfig{
-			ForwardingAllowed:             *configCopy.VRFv2.General.VRFJobForwardingAllowed,
-			CoordinatorAddress:            vrfContracts.CoordinatorV2.Address(),
-			BatchCoordinatorAddress:       vrfContracts.BatchCoordinatorV2.Address(),
-			FromAddresses:                 vrfNode.TXKeyAddressStrings,
-			EVMChainID:                    fmt.Sprint(chainID),
-			MinIncomingConfirmations:      int(*configCopy.VRFv2.General.MinimumConfirmations),
-			PublicKey:                     vrfKey.PubKeyCompressed,
-			EstimateGasMultiplier:         *configCopy.VRFv2.General.VRFJobEstimateGasMultiplier,
-			BatchFulfillmentEnabled:       batchFullfillmentEnabled,
-			BatchFulfillmentGasMultiplier: *configCopy.VRFv2.General.VRFJobBatchFulfillmentGasMultiplier,
-			PollPeriod:                    configCopy.VRFv2.General.VRFJobPollPeriod.Duration,
-			RequestTimeout:                configCopy.VRFv2.General.VRFJobRequestTimeout.Duration,
-			SimulationBlock:               configCopy.VRFv2.General.VRFJobSimulationBlock,
+			ForwardingAllowed:	*configCopy.VRFv2.General.VRFJobForwardingAllowed,
+			CoordinatorAddress:	vrfContracts.CoordinatorV2.Address(),
+			BatchCoordinatorAddress:	vrfContracts.BatchCoordinatorV2.Address(),
+			FromAddresses:	vrfNode.TXKeyAddressStrings,
+			EVMChainID:	fmt.Sprint(chainID),
+			MinIncomingConfirmations:	int(*configCopy.VRFv2.General.MinimumConfirmations),
+			PublicKey:	vrfKey.PubKeyCompressed,
+			EstimateGasMultiplier:	*configCopy.VRFv2.General.VRFJobEstimateGasMultiplier,
+			BatchFulfillmentEnabled:	batchFullfillmentEnabled,
+			BatchFulfillmentGasMultiplier:	*configCopy.VRFv2.General.VRFJobBatchFulfillmentGasMultiplier,
+			PollPeriod:	configCopy.VRFv2.General.VRFJobPollPeriod.Duration,
+			RequestTimeout:	configCopy.VRFv2.General.VRFJobRequestTimeout.Duration,
+			SimulationBlock:	configCopy.VRFv2.General.VRFJobSimulationBlock,
 			VRFOwnerConfig: &vrfcommon.VRFOwnerConfig{
 				UseVRFOwner: false,
 			},
@@ -1405,7 +1406,7 @@ func TestVRFv2BatchFulfillmentEnabledDisabled(t *testing.T) {
 		if randRequestCount > math.MaxUint16 {
 			t.Fatalf("rand request count overflows uint16: %d", randRequestCount)
 		}
-		configCopy.VRFv2.General.RandomnessRequestCountPerRequest = ptr.Ptr(uint16(randRequestCount)) //nolint:gosec // G115 false positive
+		configCopy.VRFv2.General.RandomnessRequestCountPerRequest = ptr.Ptr(uint16(randRequestCount))	//nolint:gosec // G115 false positive
 
 		// test and assert
 		_, randomWordsFulfilledEvent, err := vrfv2.RequestRandomnessAndWaitForFulfillment(

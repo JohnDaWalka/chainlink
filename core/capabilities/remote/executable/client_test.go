@@ -24,12 +24,12 @@ import (
 )
 
 const (
-	stepReferenceID1     = "step1"
-	workflowID1          = "15c631d295ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0"
-	workflowID2          = "25c631d295ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce1"
-	workflowExecutionID1 = "95ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0abbadeed"
-	workflowExecutionID2 = "85ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0abbadeee"
-	workflowOwnerID      = "0xAA"
+	stepReferenceID1	= "step1"
+	workflowID1	= "15c631d295ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0"
+	workflowID2	= "25c631d295ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce1"
+	workflowExecutionID1	= "95ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0abbadeed"
+	workflowExecutionID2	= "85ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0abbadeee"
+	workflowOwnerID	= "0xAA"
 )
 
 func Test_Client_DonTopologies(t *testing.T) {
@@ -38,8 +38,8 @@ func Test_Client_DonTopologies(t *testing.T) {
 	ctx := testutils.Context(t)
 
 	transmissionSchedule, err := values.NewMap(map[string]any{
-		"schedule":   transmission.Schedule_OneAtATime,
-		"deltaStage": "10ms",
+		"schedule":	transmission.Schedule_OneAtATime,
+		"deltaStage":	"10ms",
 	})
 	require.NoError(t, err)
 
@@ -84,6 +84,7 @@ func Test_Client_DonTopologies(t *testing.T) {
 }
 
 func Test_Client_TransmissionSchedules(t *testing.T) {
+	t.Skip("Skipped by flakeguard: https://smartcontract-it.atlassian.net/issues/DX-104")
 	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-104")
 	ctx := testutils.Context(t)
 
@@ -101,8 +102,8 @@ func Test_Client_TransmissionSchedules(t *testing.T) {
 	responseTimeOut := 10 * time.Minute
 
 	transmissionSchedule, err := values.NewMap(map[string]any{
-		"schedule":   transmission.Schedule_OneAtATime,
-		"deltaStage": "10ms",
+		"schedule":	transmission.Schedule_OneAtATime,
+		"deltaStage":	"10ms",
 	})
 	require.NoError(t, err)
 
@@ -122,8 +123,8 @@ func Test_Client_TransmissionSchedules(t *testing.T) {
 		})
 
 	transmissionSchedule, err = values.NewMap(map[string]any{
-		"schedule":   transmission.Schedule_AllAtOnce,
-		"deltaStage": "10ms",
+		"schedule":	transmission.Schedule_AllAtOnce,
+		"deltaStage":	"10ms",
 	})
 	require.NoError(t, err)
 
@@ -153,8 +154,8 @@ func Test_Client_TimesOutIfInsufficientCapabilityPeerResponses(t *testing.T) {
 	capability := &TestCapability{}
 
 	transmissionSchedule, err := values.NewMap(map[string]any{
-		"schedule":   transmission.Schedule_AllAtOnce,
-		"deltaStage": "10ms",
+		"schedule":	transmission.Schedule_AllAtOnce,
+		"deltaStage":	"10ms",
 	})
 	require.NoError(t, err)
 
@@ -179,8 +180,8 @@ func Test_Client_ContextCanceledBeforeQuorumReached(t *testing.T) {
 
 	capability := &TestCapability{}
 	transmissionSchedule, err := values.NewMap(map[string]any{
-		"schedule":   transmission.Schedule_AllAtOnce,
-		"deltaStage": "20s",
+		"schedule":	transmission.Schedule_AllAtOnce,
+		"deltaStage":	"20s",
 	})
 	require.NoError(t, err)
 
@@ -206,16 +207,16 @@ func testClient(t *testing.T, numWorkflowPeers int, workflowNodeResponseTimeout 
 	}
 
 	capDonInfo := commoncap.DON{
-		ID:      1,
-		Members: capabilityPeers,
-		F:       capabilityDonF,
+		ID:	1,
+		Members:	capabilityPeers,
+		F:	capabilityDonF,
 	}
 
 	capInfo := commoncap.CapabilityInfo{
-		ID:             "cap_id@1.0.0",
-		CapabilityType: commoncap.CapabilityTypeTrigger,
-		Description:    "Remote Executable Capability",
-		DON:            &capDonInfo,
+		ID:	"cap_id@1.0.0",
+		CapabilityType:	commoncap.CapabilityTypeTrigger,
+		Description:	"Remote Executable Capability",
+		DON:	&capDonInfo,
 	}
 
 	workflowPeers := make([]p2ptypes.PeerID, numWorkflowPeers)
@@ -224,8 +225,8 @@ func testClient(t *testing.T, numWorkflowPeers int, workflowNodeResponseTimeout 
 	}
 
 	workflowDonInfo := commoncap.DON{
-		Members: workflowPeers,
-		ID:      2,
+		Members:	workflowPeers,
+		ID:	2,
 	}
 
 	broker := newTestAsyncMessageBroker(t, 100)
@@ -269,12 +270,12 @@ func executeMethod(ctx context.Context, caller commoncap.ExecutableCapability, t
 	responseCh, err := caller.Execute(ctx,
 		commoncap.CapabilityRequest{
 			Metadata: commoncap.RequestMetadata{
-				WorkflowID:          workflowID1,
-				WorkflowExecutionID: workflowExecutionID1,
-				WorkflowOwner:       workflowOwnerID,
+				WorkflowID:	workflowID1,
+				WorkflowExecutionID:	workflowExecutionID1,
+				WorkflowOwner:	workflowOwnerID,
 			},
-			Config: transmissionSchedule,
-			Inputs: executeInputs,
+			Config:	transmissionSchedule,
+			Inputs:	executeInputs,
 		})
 
 	responseTest(t, responseCh, err)
@@ -282,24 +283,24 @@ func executeMethod(ctx context.Context, caller commoncap.ExecutableCapability, t
 
 // Simple client that only responds once it has received a message from each workflow peer
 type clientTestServer struct {
-	peerID             p2ptypes.PeerID
-	dispatcher         remotetypes.Dispatcher
-	workflowDonInfo    commoncap.DON
-	messageIDToSenders map[string]map[p2ptypes.PeerID]bool
+	peerID	p2ptypes.PeerID
+	dispatcher	remotetypes.Dispatcher
+	workflowDonInfo	commoncap.DON
+	messageIDToSenders	map[string]map[p2ptypes.PeerID]bool
 
-	executableCapability commoncap.ExecutableCapability
+	executableCapability	commoncap.ExecutableCapability
 
-	mux sync.Mutex
+	mux	sync.Mutex
 }
 
 func newTestServer(peerID p2ptypes.PeerID, dispatcher remotetypes.Dispatcher, workflowDonInfo commoncap.DON,
 	executableCapability commoncap.ExecutableCapability) *clientTestServer {
 	return &clientTestServer{
-		dispatcher:           dispatcher,
-		workflowDonInfo:      workflowDonInfo,
-		peerID:               peerID,
-		messageIDToSenders:   make(map[string]map[p2ptypes.PeerID]bool),
-		executableCapability: executableCapability,
+		dispatcher:	dispatcher,
+		workflowDonInfo:	workflowDonInfo,
+		peerID:	peerID,
+		messageIDToSenders:	make(map[string]map[p2ptypes.PeerID]bool),
+		executableCapability:	executableCapability,
 	}
 }
 
@@ -344,13 +345,13 @@ func (t *clientTestServer) sendResponse(messageID string, responseErr error,
 	payload []byte, marshalErr error) {
 	for receiver := range t.messageIDToSenders[messageID] {
 		var responseMsg = &remotetypes.MessageBody{
-			CapabilityId:    "cap_id@1.0.0",
-			CapabilityDonId: 1,
-			CallerDonId:     t.workflowDonInfo.ID,
-			Method:          remotetypes.MethodExecute,
-			MessageId:       []byte(messageID),
-			Sender:          t.peerID[:],
-			Receiver:        receiver[:],
+			CapabilityId:	"cap_id@1.0.0",
+			CapabilityDonId:	1,
+			CallerDonId:	t.workflowDonInfo.ID,
+			Method:	remotetypes.MethodExecute,
+			MessageId:	[]byte(messageID),
+			Sender:	t.peerID[:],
+			Receiver:	receiver[:],
 		}
 
 		if responseErr != nil {

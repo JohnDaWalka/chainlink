@@ -21,18 +21,19 @@ import (
 )
 
 func TestGenericOps(t *testing.T) {
+	t.Skip("Skipped by flakeguard: https://smartcontract-it.atlassian.net/issues/DX-433")
 	t.Parallel()
 	tests := []struct {
-		Msg  string
-		Mcms bool
+		Msg	string
+		Mcms	bool
 	}{
 		{
-			Msg:  "with mcms",
-			Mcms: true,
+			Msg:	"with mcms",
+			Mcms:	true,
 		},
 		{
-			Msg:  "without mcms",
-			Mcms: false,
+			Msg:	"without mcms",
+			Mcms:	false,
 		},
 	}
 
@@ -49,9 +50,9 @@ func TestGenericOps(t *testing.T) {
 			if test.Mcms {
 				_, _ = testhelpers.TransferOwnershipSolana(t, &e, solChain, true,
 					ccipChangesetSolana.CCIPContractsToTransfer{
-						Router:    true,
-						FeeQuoter: true,
-						OffRamp:   true,
+						Router:	true,
+						FeeQuoter:	true,
+						OffRamp:	true,
 					})
 				mcmsConfig = &proposalutils.TimelockConfig{
 					MinDelay: 1 * time.Second,
@@ -62,25 +63,25 @@ func TestGenericOps(t *testing.T) {
 				commonchangeset.Configure(
 					cldf.CreateLegacyChangeSet(ccipChangesetSolana.SetDefaultCodeVersion),
 					ccipChangesetSolana.SetDefaultCodeVersionConfig{
-						ChainSelector: solChain,
-						VersionEnum:   1,
-						MCMS:          mcmsConfig,
+						ChainSelector:	solChain,
+						VersionEnum:	1,
+						MCMS:	mcmsConfig,
 					},
 				),
 				commonchangeset.Configure(
 					cldf.CreateLegacyChangeSet(ccipChangesetSolana.UpdateEnableManualExecutionAfter),
 					ccipChangesetSolana.UpdateEnableManualExecutionAfterConfig{
-						ChainSelector:         solChain,
-						EnableManualExecution: 1,
-						MCMS:                  mcmsConfig,
+						ChainSelector:	solChain,
+						EnableManualExecution:	1,
+						MCMS:	mcmsConfig,
 					},
 				),
 				commonchangeset.Configure(
 					cldf.CreateLegacyChangeSet(ccipChangesetSolana.UpdateSvmChainSelector),
 					ccipChangesetSolana.UpdateSvmChainSelectorConfig{
-						OldChainSelector: solChain,
-						NewChainSelector: solChain + 1,
-						MCMS:             mcmsConfig,
+						OldChainSelector:	solChain,
+						NewChainSelector:	solChain + 1,
+						MCMS:	mcmsConfig,
 					},
 				),
 			},

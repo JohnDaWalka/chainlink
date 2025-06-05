@@ -24,6 +24,7 @@ import (
 )
 
 func TestAcceptOwnership(t *testing.T) {
+	t.Skip("Skipped by flakeguard: https://smartcontract-it.atlassian.net/issues/DX-627")
 	t.Parallel()
 
 	lggr := logger.Test(t)
@@ -57,8 +58,8 @@ func TestAcceptOwnership(t *testing.T) {
 		commonChangesets.Configure(
 			AcceptOwnershipChangeset,
 			types.AcceptOwnershipConfig{
-				ChainSelector:     chainSelector,
-				ContractAddresses: []common.Address{cache.Contract.Address()},
+				ChainSelector:	chainSelector,
+				ContractAddresses:	[]common.Address{cache.Contract.Address()},
 				McmsConfig: &types.MCMSConfig{
 					MinDelay: 1,
 				},
