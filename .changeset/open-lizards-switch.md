@@ -1,8 +1,8 @@
 ---
 "chainlink": minor
 tags:
-  - core
-  - release
+  - "#added"
+  - "#internal"
 ---
 
 Bump version and update CHANGELOG for core v2.25.0
