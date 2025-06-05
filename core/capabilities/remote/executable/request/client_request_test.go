@@ -528,7 +528,7 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 	// will not cause the identical response calculation to break;
 	// also locks in no validation of SpendUnit/SpendValue at that layer.
 	t.Run("with metering metadata", func(t *testing.T) {
-		capabilityPeers, capDonInfo, capInfo := capabilityDon(t, 4, 1)
+		capabilityPeers, capDonInfo, capInfo := capabilityDon(t, 4, 3)
 
 		capabilityResponseWithMetering1 := commoncap.CapabilityResponse{
 			Value: m,
@@ -581,6 +581,16 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 		err = req.OnMessage(ctx, msg)
 		require.NoError(t, err)
 
+		msg.Sender = capabilityPeers[2][:]
+		msg.Payload = payload1
+		err = req.OnMessage(ctx, msg)
+		require.NoError(t, err)
+
+		msg.Sender = capabilityPeers[3][:]
+		msg.Payload = payload2
+		err = req.OnMessage(ctx, msg)
+		require.NoError(t, err)
+
 		response := <-req.ResponseChan()
 		capResponse, err := pb.UnmarshalCapabilityResponse(response.Result)
 		require.NoError(t, err)
@@ -588,7 +598,7 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 		resp := capResponse.Value.Underlying["response"]
 		assert.Equal(t, resp, values.NewString("response1"))
 
-		assert.Len(t, capResponse.Metadata.Metering, 2)
+		assert.Len(t, capResponse.Metadata.Metering, 4)
 		spendUnit := capResponse.Metadata.Metering[0].SpendUnit
 		spendValue := capResponse.Metadata.Metering[0].SpendValue
 		p2pID := capResponse.Metadata.Metering[0].Peer2PeerID
@@ -604,6 +614,22 @@ func Test_ClientRequest_MessageValidation(t *testing.T) {
 		assert.Equal(t, "testunit_b", spendUnit)
 		assert.Equal(t, "17", spendValue)
 		assert.Equal(t, capabilityPeers[1].String(), p2pID)
+
+		spendUnit = capResponse.Metadata.Metering[2].SpendUnit
+		spendValue = capResponse.Metadata.Metering[2].SpendValue
+		p2pID = capResponse.Metadata.Metering[2].Peer2PeerID
+
+		assert.Equal(t, "testunit_a", spendUnit)
+		assert.Equal(t, "15", spendValue)
+		assert.Equal(t, capabilityPeers[2].String(), p2pID)
+
+		spendUnit = capResponse.Metadata.Metering[3].SpendUnit
+		spendValue = capResponse.Metadata.Metering[3].SpendValue
+		p2pID = capResponse.Metadata.Metering[3].Peer2PeerID
+
+		assert.Equal(t, "testunit_b", spendUnit)
+		assert.Equal(t, "17", spendValue)
+		assert.Equal(t, capabilityPeers[3].String(), p2pID)
 	})
 }
 

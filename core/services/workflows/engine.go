@@ -288,11 +288,11 @@ func (e *Engine) initializeCapability(ctx context.Context, step *step) error {
 	// If the DON is nil, this is a local target.
 	if info.CapabilityType == capabilities.CapabilityTypeTarget && info.IsLocal {
 		l.Debug("wrapping capability in local transmission protocol")
-		cp = transmission.NewLocalTargetCapability(
+		cp = transmission.NewLocalExecutableCapability(
 			e.logger,
 			step.ID,
 			*e.localNode.Load(),
-			cp.(capabilities.TargetCapability),
+			cp.(capabilities.ExecutableCapability),
 		)
 	}
 
@@ -301,6 +301,17 @@ func (e *Engine) initializeCapability(ctx context.Context, step *step) error {
 	cc, ok := cp.(capabilities.ExecutableCapability)
 	if !ok {
 		return newCPErr("capability does not satisfy CallbackCapability")
+	}
+
+	// Wrap local executable capabilities to set peer2peerID
+	if info.IsLocal {
+		l.Debug("wrapping local executable capability")
+		cc = transmission.NewLocalExecutableCapability(
+			e.logger,
+			step.ID,
+			*e.localNode.Load(),
+			cc,
+		)
 	}
 
 	stepConfig, err := e.configForStep(ctx, l, step)

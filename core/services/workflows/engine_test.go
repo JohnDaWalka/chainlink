@@ -363,6 +363,15 @@ func TestEngineWithHardcodedWorkflow(t *testing.T) {
 			m := req.Inputs.Underlying["report"].(*values.Map)
 			return capabilities.CapabilityResponse{
 				Value: m,
+				Metadata: capabilities.ResponseMetadata{
+					Metering: []capabilities.MeteringNodeDetail{
+						{
+							Peer2PeerID: "local",
+							SpendUnit:   "Gas",
+							SpendValue:  "100",
+						},
+					},
+				},
 			}, nil
 		},
 	)
@@ -413,6 +422,9 @@ func TestEngineWithHardcodedWorkflow(t *testing.T) {
 			assert.Equal(t, testWorkflowID, report.Metadata.WorkflowID)
 			assert.NotEmpty(t, report.Metadata.WorkflowExecutionID)
 			assert.Equal(t, testWorkflowOwner, report.Metadata.WorkflowOwner)
+			assert.Equal(t, "local", report.Steps["write_ethereum-testnet-sepolia@1.0.0"].Nodes[0].Peer_2PeerId)
+			assert.Equal(t, "Gas", report.Steps["write_ethereum-testnet-sepolia@1.0.0"].Nodes[0].SpendUnit)
+			assert.Equal(t, "100", report.Steps["write_ethereum-testnet-sepolia@1.0.0"].Nodes[0].SpendValue)
 
 		case fmt.Sprintf("%s.%s", events.ProtoPkg, events.WorkflowExecutionStarted):
 			var started eventspb.WorkflowExecutionStarted
