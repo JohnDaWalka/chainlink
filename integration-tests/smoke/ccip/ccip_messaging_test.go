@@ -309,9 +309,8 @@ func Test_CCIPMessaging_EVM2SolanaMultiExecReports(t *testing.T) {
 	defer close(done)
 	offrampAddress := state.SolChains[destChain].OffRamp
 	sink, errCh := testhelpers.SolEventEmitter[solccip.EventTransmitted](
-		t,
 		solChains[destChain].Client,
-		offrampAddress, "Transmitted", 0, done)
+		offrampAddress, "Transmitted", 0, done, time.NewTicker(2*time.Second))
 	timeout := time.NewTimer(tests.WaitTimeout(t) - 5*time.Second) // 5 seconds buffer for cleanup
 	defer timeout.Stop()
 
@@ -320,7 +319,8 @@ func Test_CCIPMessaging_EVM2SolanaMultiExecReports(t *testing.T) {
 
 	for {
 		select {
-		case transmittedEvent := <-sink:
+		case eventWithTxn := <-sink:
+			transmittedEvent := eventWithTxn.Event
 			if transmittedEvent.OcrPluginType == uint8(cctypes.PluginTypeCCIPExec) {
 				ocrSeqNr := transmittedEvent.SequenceNumber
 				_, exists := sequenceNumbers[ocrSeqNr]
