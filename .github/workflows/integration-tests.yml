@@ -179,12 +179,6 @@ jobs:
         if: ${{ env.RUNS_ON_INSTANCE_ID != '' && env.ACTIONS_CACHE_URL != '' }}
         uses: runs-on/action@66d4449b717b5462159659523d1241051ff470b9 # v1
 
-      - name: Debug env
-        run: |
-          # output all env vars
-          echo "Environment variables:"
-          env
-
       - name: Checkout the repo
         uses: actions/checkout@v4
         with:
@@ -204,14 +198,19 @@ jobs:
 
       - name: Build Chainlink Image
         if: needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.cre_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true' || github.event_name == 'workflow_dispatch'
-        uses: ./.github/actions/build-chainlink-image
+        uses: smartcontractkit/.github/actions/ctf-build-image@feat/refactor-ctf-build-image
         with:
-          tag_suffix: ${{ matrix.image.tag-suffix }}
+          image-tag: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}${{ matrix.image.tag-suffix }}
           dockerfile: ${{ matrix.image.dockerfile }}
-          git_commit_sha: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
-          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          dep_evm_sha: ${{ inputs.evm-ref }}
+          docker-registry-url: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
+          docker-repository-name: 'chainlink'
+          aws-account-number: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+          aws-region: ${{ secrets.QA_AWS_REGION }}
+          aws-role-arn: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          docker-additional-build-args: |
+            GO_COVER_FLAG=true
+          go-get-overrides: |
+            github.com/smartcontractkit/chainlink-evm=${{ inputs.evm-ref }}
 
   run-core-cre-e2e-tests-for-pr:
     name: Run Core CRE E2E Tests For PR
