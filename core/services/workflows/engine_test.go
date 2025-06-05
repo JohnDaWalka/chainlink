@@ -48,9 +48,9 @@ import (
 )
 
 const (
-	testWorkflowID    = "<workflow-id>"
-	testWorkflowOwner = "testowner"
-	testWorkflowName  = "testworkflow"
+	testWorkflowID		= "<workflow-id>"
+	testWorkflowOwner	= "testowner"
+	testWorkflowName	= "testworkflow"
 )
 const hardcodedWorkflow = `
 triggers:
@@ -157,15 +157,15 @@ targets:
 `
 
 type testHooks struct {
-	initFailed        chan struct{}
-	initSuccessful    chan struct{}
-	executionFinished chan string
-	rateLimited       chan string
+	initFailed		chan struct{}
+	initSuccessful		chan struct{}
+	executionFinished	chan string
+	rateLimited		chan string
 }
 
 type testConfigProvider struct {
-	localNode           func(ctx context.Context) (capabilities.Node, error)
-	configForCapability func(ctx context.Context, capabilityID string, donID uint32) (registrysyncer.CapabilityConfiguration, error)
+	localNode		func(ctx context.Context) (capabilities.Node, error)
+	configForCapability	func(ctx context.Context, capabilityID string, donID uint32) (registrysyncer.CapabilityConfiguration, error)
 }
 
 func (t testConfigProvider) LocalNode(ctx context.Context) (capabilities.Node, error) {
@@ -178,7 +178,7 @@ func (t testConfigProvider) LocalNode(ctx context.Context) (capabilities.Node, e
 		WorkflowDON: capabilities.DON{
 			ID: 1,
 		},
-		PeerID: &peerID,
+		PeerID:	&peerID,
 	}, nil
 }
 
@@ -192,8 +192,8 @@ func (t testConfigProvider) ConfigForCapability(ctx context.Context, capabilityI
 
 func newTestEngineWithYAMLSpec(t *testing.T, reg *coreCap.Registry, spec string, opts ...func(c *Config)) (*Engine, *testHooks) {
 	sdkSpec, err := (&job.WorkflowSpec{
-		Workflow: spec,
-		SpecType: job.YamlSpec,
+		Workflow:	spec,
+		SpecType:	job.YamlSpec,
 	}).SDKSpec(testutils.Context(t))
 	require.NoError(t, err)
 
@@ -211,31 +211,31 @@ func newTestEngine(t *testing.T, reg *coreCap.Registry, sdkSpec sdk.WorkflowSpec
 	rateLimited := make(chan string)
 	clock := clockwork.NewFakeClock()
 	rl, err := ratelimiter.NewRateLimiter(ratelimiter.Config{
-		GlobalRPS:      1000.0,
-		GlobalBurst:    1000,
-		PerSenderRPS:   100.0,
-		PerSenderBurst: 100,
+		GlobalRPS:	1000.0,
+		GlobalBurst:	1000,
+		PerSenderRPS:	100.0,
+		PerSenderBurst:	100,
 	})
 	require.NoError(t, err)
 
 	lggr := logger.TestLogger(t)
 
 	sl, err := syncerlimiter.NewWorkflowLimits(lggr, syncerlimiter.Config{
-		Global:   200,
-		PerOwner: 200,
+		Global:		200,
+		PerOwner:	200,
 	})
 	require.NoError(t, err)
 
 	reg.SetLocalRegistry(&testConfigProvider{})
 	cfg := Config{
-		WorkflowID:    testWorkflowID,
-		WorkflowOwner: testWorkflowOwner,
-		WorkflowName:  NewLegacyWorkflowName(testWorkflowName),
-		Lggr:          logger.TestLogger(t),
-		Registry:      reg,
-		Workflow:      sdkSpec,
-		maxRetries:    1,
-		retryMs:       100,
+		WorkflowID:	testWorkflowID,
+		WorkflowOwner:	testWorkflowOwner,
+		WorkflowName:	NewLegacyWorkflowName(testWorkflowName),
+		Lggr:		logger.TestLogger(t),
+		Registry:	reg,
+		Workflow:	sdkSpec,
+		maxRetries:	1,
+		retryMs:	100,
 		afterInit: func(success bool) {
 			if success {
 				close(initSuccessful)
@@ -252,9 +252,9 @@ func newTestEngine(t *testing.T, reg *coreCap.Registry, sdkSpec sdk.WorkflowSpec
 		SecretsFetcher: func(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName, workflowID string) (map[string]string, error) {
 			return map[string]string{}, nil
 		},
-		clock:          clock,
-		RateLimiter:    rl,
-		WorkflowLimits: sl,
+		clock:		clock,
+		RateLimiter:	rl,
+		WorkflowLimits:	sl,
 	}
 	for _, o := range opts {
 		o(&cfg)
@@ -286,15 +286,15 @@ func getExecutionID(t *testing.T, _ *Engine, hooks *testHooks) string {
 type mockCapability struct {
 	capabilities.CapabilityInfo
 	capabilities.Executable
-	response  chan capabilities.CapabilityResponse
-	transform func(capabilities.CapabilityRequest) (capabilities.CapabilityResponse, error)
+	response	chan capabilities.CapabilityResponse
+	transform	func(capabilities.CapabilityRequest) (capabilities.CapabilityResponse, error)
 }
 
 func newMockCapability(info capabilities.CapabilityInfo, transform func(capabilities.CapabilityRequest) (capabilities.CapabilityResponse, error)) *mockCapability {
 	return &mockCapability{
-		transform:      transform,
-		CapabilityInfo: info,
-		response:       make(chan capabilities.CapabilityResponse, 10),
+		transform:	transform,
+		CapabilityInfo:	info,
+		response:	make(chan capabilities.CapabilityResponse, 10),
 	}
 }
 
@@ -318,9 +318,9 @@ func (m *mockCapability) UnregisterFromWorkflow(ctx context.Context, request cap
 
 type mockTriggerCapability struct {
 	capabilities.CapabilityInfo
-	triggerEvent               *capabilities.TriggerResponse
-	ch                         chan capabilities.TriggerResponse
-	registerTriggerCallCounter map[string]int
+	triggerEvent			*capabilities.TriggerResponse
+	ch				chan capabilities.TriggerResponse
+	registerTriggerCallCounter	map[string]int
 }
 
 var _ capabilities.TriggerCapability = (*mockTriggerCapability)(nil)
@@ -498,7 +498,7 @@ func TestEngine_WriteStepHasZeroStepTimeout(t *testing.T) {
 		ctx,
 		&host.ModuleConfig{Logger: log},
 		binaryB,
-		nil, // config
+		nil,	// config
 	)
 	require.NoError(t, err)
 
@@ -590,20 +590,20 @@ func mockTriggerWithName(t *testing.T, name string) (capabilities.TriggerCapabil
 			capabilities.CapabilityTypeTrigger,
 			"issues a trigger when a mercury report is received.",
 		),
-		ch:                         make(chan capabilities.TriggerResponse, 10),
-		registerTriggerCallCounter: make(map[string]int),
+		ch:				make(chan capabilities.TriggerResponse, 10),
+		registerTriggerCallCounter:	make(map[string]int),
 	}
 	resp, err := values.NewMap(map[string]any{
-		"123": decimal.NewFromFloat(1.00),
-		"456": decimal.NewFromFloat(1.25),
-		"789": decimal.NewFromFloat(1.50),
+		"123":	decimal.NewFromFloat(1.00),
+		"456":	decimal.NewFromFloat(1.25),
+		"789":	decimal.NewFromFloat(1.50),
 	})
 	require.NoError(t, err)
 	tr := capabilities.TriggerResponse{
 		Event: capabilities.TriggerEvent{
-			TriggerType: mt.ID,
-			ID:          fmt.Sprintf("%v:%v", name, time.Now().UTC().Format(time.RFC3339)),
-			Outputs:     resp,
+			TriggerType:	mt.ID,
+			ID:		fmt.Sprintf("%v:%v", name, time.Now().UTC().Format(time.RFC3339)),
+			Outputs:	resp,
 		},
 	}
 	mt.triggerEvent = &tr
@@ -721,10 +721,10 @@ func TestEngine_RateLimit(t *testing.T) {
 
 		setRateLimiter := func(c *Config) {
 			rl, err := ratelimiter.NewRateLimiter(ratelimiter.Config{
-				GlobalRPS:      1000.0,
-				GlobalBurst:    1000,
-				PerSenderRPS:   1.0,
-				PerSenderBurst: 1,
+				GlobalRPS:	1000.0,
+				GlobalBurst:	1000,
+				PerSenderRPS:	1.0,
+				PerSenderBurst:	1,
 			})
 			require.NoError(t, err)
 			c.RateLimiter = rl
@@ -777,10 +777,10 @@ func TestEngine_RateLimit(t *testing.T) {
 
 		setRateLimiter := func(c *Config) {
 			rl, err := ratelimiter.NewRateLimiter(ratelimiter.Config{
-				GlobalRPS:      1.0,
-				GlobalBurst:    1,
-				PerSenderRPS:   100.0,
-				PerSenderBurst: 100,
+				GlobalRPS:	1.0,
+				GlobalBurst:	1,
+				PerSenderRPS:	100.0,
+				PerSenderBurst:	100,
 			})
 			require.NoError(t, err)
 			c.RateLimiter = rl
@@ -832,8 +832,8 @@ func TestEngine_RateLimit(t *testing.T) {
 		require.NoError(t, reg.Add(ctx, target2))
 
 		workflowLimits, err := syncerlimiter.NewWorkflowLimits(lggr, syncerlimiter.Config{
-			Global:   1,
-			PerOwner: 5,
+			Global:		1,
+			PerOwner:	5,
 		})
 		require.NoError(t, err)
 
@@ -884,8 +884,8 @@ func TestEngine_RateLimit(t *testing.T) {
 		require.NoError(t, reg.Add(ctx, target2))
 
 		workflowLimits, err := syncerlimiter.NewWorkflowLimits(lggr, syncerlimiter.Config{
-			Global:   10,
-			PerOwner: 1,
+			Global:		10,
+			PerOwner:	1,
 		})
 		require.NoError(t, err)
 
@@ -944,9 +944,9 @@ func TestEngine_RateLimit(t *testing.T) {
 		require.NoError(t, reg.Add(ctx, target2))
 
 		workflowLimits, err := syncerlimiter.NewWorkflowLimits(lggr, syncerlimiter.Config{
-			Global:            10,
-			PerOwner:          1,
-			PerOwnerOverrides: overrides,
+			Global:			10,
+			PerOwner:		1,
+			PerOwnerOverrides:	overrides,
 		})
 		require.NoError(t, err)
 
@@ -1245,7 +1245,7 @@ func TestEngine_GetsNodeInfoDuringInitialization(t *testing.T) {
 
 	var peerID p2ptypes.PeerID
 	node := capabilities.Node{
-		PeerID: &peerID,
+		PeerID:	&peerID,
 		WorkflowDON: capabilities.DON{
 			ID: 1,
 		},
@@ -1373,62 +1373,62 @@ func TestEngine_PassthroughInterpolation(t *testing.T) {
 func TestEngine_Error(t *testing.T) {
 	err := errors.New("some error")
 	tests := []struct {
-		name   string
-		labels map[string]string
-		err    error
-		reason string
-		want   string
+		name	string
+		labels	map[string]string
+		err	error
+		reason	string
+		want	string
 	}{
 		{
-			name:   "Error with error and reason",
-			labels: map[string]string{platform.KeyWorkflowID: "my-workflow-id"},
-			err:    err,
-			reason: "some reason",
-			want:   "workflowID my-workflow-id: some reason: some error",
+			name:	"Error with error and reason",
+			labels:	map[string]string{platform.KeyWorkflowID: "my-workflow-id"},
+			err:	err,
+			reason:	"some reason",
+			want:	"workflowID my-workflow-id: some reason: some error",
 		},
 		{
-			name:   "Error with error and no reason",
-			labels: map[string]string{platform.KeyWorkflowExecutionID: "dd3708ac7d8dd6fa4fae0fb87b73f318a4da2526c123e159b72435e3b2fe8751"},
-			err:    err,
-			want:   "workflowExecutionID dd3708ac7d8dd6fa4fae0fb87b73f318a4da2526c123e159b72435e3b2fe8751: some error",
+			name:	"Error with error and no reason",
+			labels:	map[string]string{platform.KeyWorkflowExecutionID: "dd3708ac7d8dd6fa4fae0fb87b73f318a4da2526c123e159b72435e3b2fe8751"},
+			err:	err,
+			want:	"workflowExecutionID dd3708ac7d8dd6fa4fae0fb87b73f318a4da2526c123e159b72435e3b2fe8751: some error",
 		},
 		{
-			name:   "Error with no error and reason",
-			labels: map[string]string{platform.KeyCapabilityID: "streams-trigger:network_eth@1.0.0"},
-			reason: "some reason",
-			want:   "capabilityID streams-trigger:network_eth@1.0.0: some reason",
+			name:	"Error with no error and reason",
+			labels:	map[string]string{platform.KeyCapabilityID: "streams-trigger:network_eth@1.0.0"},
+			reason:	"some reason",
+			want:	"capabilityID streams-trigger:network_eth@1.0.0: some reason",
 		},
 		{
-			name:   "Error with no error and no reason",
-			labels: map[string]string{platform.KeyTriggerID: "wf_123_trigger_456"},
-			want:   "triggerID wf_123_trigger_456: ",
+			name:	"Error with no error and no reason",
+			labels:	map[string]string{platform.KeyTriggerID: "wf_123_trigger_456"},
+			want:	"triggerID wf_123_trigger_456: ",
 		},
 		{
-			name:   "Error with no labels",
-			labels: map[string]string{},
-			err:    err,
-			reason: "some reason",
-			want:   "some reason: some error",
+			name:	"Error with no labels",
+			labels:	map[string]string{},
+			err:	err,
+			reason:	"some reason",
+			want:	"some reason: some error",
 		},
 		{
-			name: "Multiple labels",
+			name:	"Multiple labels",
 			labels: map[string]string{
-				platform.KeyWorkflowID:          "my-workflow-id",
-				platform.KeyWorkflowExecutionID: "dd3708ac7d8dd6fa4fae0fb87b73f318a4da2526c123e159b72435e3b2fe8751",
-				platform.KeyCapabilityID:        "streams-trigger:network_eth@1.0.0",
+				platform.KeyWorkflowID:			"my-workflow-id",
+				platform.KeyWorkflowExecutionID:	"dd3708ac7d8dd6fa4fae0fb87b73f318a4da2526c123e159b72435e3b2fe8751",
+				platform.KeyCapabilityID:		"streams-trigger:network_eth@1.0.0",
 			},
-			err:    err,
-			reason: "some reason",
-			want:   "workflowID my-workflow-id: workflowExecutionID dd3708ac7d8dd6fa4fae0fb87b73f318a4da2526c123e159b72435e3b2fe8751: capabilityID streams-trigger:network_eth@1.0.0: some reason: some error",
+			err:	err,
+			reason:	"some reason",
+			want:	"workflowID my-workflow-id: workflowExecutionID dd3708ac7d8dd6fa4fae0fb87b73f318a4da2526c123e159b72435e3b2fe8751: capabilityID streams-trigger:network_eth@1.0.0: some reason: some error",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := &workflowError{
-				labels: tt.labels,
-				err:    tt.err,
-				reason: tt.reason,
+				labels:	tt.labels,
+				err:	tt.err,
+				reason:	tt.reason,
 			}
 			if got := e.Error(); got != tt.want {
 				t.Errorf("err string mismatch\ngot = %v\nwant = %v", got, tt.want)
@@ -1439,15 +1439,15 @@ func TestEngine_Error(t *testing.T) {
 
 func TestEngine_MergesWorkflowConfigAndCRConfig(t *testing.T) {
 	var (
-		ctx            = testutils.Context(t)
-		writeID        = "write_polygon-testnet-mumbai@1.0.0"
-		gotConfig      = values.EmptyMap()
-		wantConfigKeys = []string{"deltaStage", "schedule", "address", "params", "abi"}
+		ctx		= testutils.Context(t)
+		writeID		= "write_polygon-testnet-mumbai@1.0.0"
+		gotConfig	= values.EmptyMap()
+		wantConfigKeys	= []string{"deltaStage", "schedule", "address", "params", "abi"}
 	)
 
 	giveRegistryConfig, err := values.WrapMap(map[string]any{
-		"deltaStage": "1s",
-		"schedule":   "allAtOnce",
+		"deltaStage":	"1s",
+		"schedule":	"allAtOnce",
 	})
 	require.NoError(t, err, "failed to wrap map of registry config")
 
@@ -1573,16 +1573,16 @@ targets:
 // workflow config with the CR config correctly, with the CR config taking precedence.
 func TestEngine_MergesWorkflowConfigAndCRConfig_CRConfigPrecedence(t *testing.T) {
 	var (
-		ctx              = testutils.Context(t)
-		actionID         = "custom-compute@1.0.0"
-		giveTimeout      = 300 * time.Millisecond
-		giveTickInterval = 100 * time.Millisecond
-		registryConfig   = map[string]any{
-			"maxMemoryMBs": int64(64),
-			"timeout":      giveTimeout.String(),
-			"tickInterval": giveTickInterval.String(),
+		ctx			= testutils.Context(t)
+		actionID		= "custom-compute@1.0.0"
+		giveTimeout		= 300 * time.Millisecond
+		giveTickInterval	= 100 * time.Millisecond
+		registryConfig		= map[string]any{
+			"maxMemoryMBs":	int64(64),
+			"timeout":	giveTimeout.String(),
+			"tickInterval":	giveTickInterval.String(),
 		}
-		gotConfig = values.EmptyMap()
+		gotConfig	= values.EmptyMap()
 	)
 
 	giveRegistryConfig, err := values.WrapMap(registryConfig)
@@ -1630,8 +1630,8 @@ func TestEngine_MergesWorkflowConfigAndCRConfig_CRConfigPrecedence(t *testing.T)
 
 			var cb []byte
 			cb, err = proto.Marshal(&capabilitiespb.CapabilityConfig{
-				RestrictedConfig: values.ProtoMap(giveRegistryConfig),
-				RestrictedKeys:   []string{"maxMemoryMBs", "tickInterval", "timeout"},
+				RestrictedConfig:	values.ProtoMap(giveRegistryConfig),
+				RestrictedKeys:		[]string{"maxMemoryMBs", "tickInterval", "timeout"},
 			})
 			return registrysyncer.CapabilityConfiguration{
 				Config: cb,
@@ -1806,8 +1806,8 @@ func basicTestTrigger(t *testing.T) *mockTriggerCapability {
 			capabilities.CapabilityTypeTrigger,
 			"basic test trigger",
 		),
-		ch:                         make(chan capabilities.TriggerResponse, 10),
-		registerTriggerCallCounter: make(map[string]int),
+		ch:				make(chan capabilities.TriggerResponse, 10),
+		registerTriggerCallCounter:	make(map[string]int),
 	}
 
 	resp, err := values.NewMap(map[string]any{
@@ -1816,9 +1816,9 @@ func basicTestTrigger(t *testing.T) *mockTriggerCapability {
 	require.NoError(t, err)
 	tr := capabilities.TriggerResponse{
 		Event: capabilities.TriggerEvent{
-			TriggerType: mt.ID,
-			ID:          time.Now().UTC().Format(time.RFC3339),
-			Outputs:     resp,
+			TriggerType:	mt.ID,
+			ID:		time.Now().UTC().Format(time.RFC3339),
+			Outputs:	resp,
 		},
 	}
 	mt.triggerEvent = &tr
@@ -1834,16 +1834,16 @@ func TestEngine_WithCustomComputeStep(t *testing.T) {
 	cfg := compute.Config{
 		ServiceConfig: webapi.ServiceConfig{
 			OutgoingRateLimiter: common.RateLimiterConfig{
-				GlobalRPS:      100.0,
-				GlobalBurst:    100,
-				PerSenderRPS:   100.0,
-				PerSenderBurst: 100,
+				GlobalRPS:	100.0,
+				GlobalBurst:	100,
+				PerSenderRPS:	100.0,
+				PerSenderBurst:	100,
 			},
 			RateLimiter: common.RateLimiterConfig{
-				GlobalRPS:      100.0,
-				GlobalBurst:    100,
-				PerSenderRPS:   100.0,
-				PerSenderBurst: 100,
+				GlobalRPS:	100.0,
+				GlobalBurst:	100,
+				PerSenderRPS:	100.0,
+				PerSenderBurst:	100,
 			},
 		},
 	}
@@ -1872,7 +1872,7 @@ func TestEngine_WithCustomComputeStep(t *testing.T) {
 		ctx,
 		&host.ModuleConfig{Logger: log},
 		binaryB,
-		nil, // config
+		nil,	// config
 	)
 	require.NoError(t, err)
 	eng, testHooks, err := newTestEngine(
@@ -1909,16 +1909,16 @@ func TestEngine_CustomComputePropagatesBreaks(t *testing.T) {
 	cfg := compute.Config{
 		ServiceConfig: webapi.ServiceConfig{
 			OutgoingRateLimiter: common.RateLimiterConfig{
-				GlobalRPS:      100.0,
-				GlobalBurst:    100,
-				PerSenderRPS:   100.0,
-				PerSenderBurst: 100,
+				GlobalRPS:	100.0,
+				GlobalBurst:	100,
+				PerSenderRPS:	100.0,
+				PerSenderBurst:	100,
 			},
 			RateLimiter: common.RateLimiterConfig{
-				GlobalRPS:      100.0,
-				GlobalBurst:    100,
-				PerSenderRPS:   100.0,
-				PerSenderBurst: 100,
+				GlobalRPS:	100.0,
+				GlobalBurst:	100,
+				PerSenderRPS:	100.0,
+				PerSenderBurst:	100,
 			},
 		},
 	}
@@ -1946,7 +1946,7 @@ func TestEngine_CustomComputePropagatesBreaks(t *testing.T) {
 		ctx,
 		&host.ModuleConfig{Logger: log},
 		binaryB,
-		nil, // config
+		nil,	// config
 	)
 	require.NoError(t, err)
 	eng, testHooks, err := newTestEngine(
@@ -2021,8 +2021,8 @@ targets:
 `
 
 type mockFetcher struct {
-	retval map[string]string
-	retErr error
+	retval	map[string]string
+	retErr	error
 }
 
 func (m *mockFetcher) SecretsFor(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName, workflowID string) (map[string]string, error) {
@@ -2203,7 +2203,7 @@ func TestEngine_CloseUnregisterFails_NotFound(t *testing.T) {
 }
 
 type mockRuntimeTrigger struct {
-	c capabilities.TriggerCapability
+	c	capabilities.TriggerCapability
 	*mock.Mock
 }
 
@@ -2226,26 +2226,26 @@ func (t mockRuntimeTrigger) UnregisterTrigger(ctx context.Context, request capab
 
 func TestMerge(t *testing.T) {
 	tests := []struct {
-		name             string
-		baseConfig       map[string]any
-		expectedConfig   map[string]any
-		capabilityConfig capabilities.CapabilityConfiguration
+		name			string
+		baseConfig		map[string]any
+		expectedConfig		map[string]any
+		capabilityConfig	capabilities.CapabilityConfiguration
 	}{
 		{
-			name: "no remote config",
+			name:	"no remote config",
 			baseConfig: map[string]any{
 				"foo": "bar",
 			},
 			expectedConfig: map[string]any{
 				"foo": "bar",
 			},
-			capabilityConfig: capabilities.CapabilityConfiguration{},
+			capabilityConfig:	capabilities.CapabilityConfiguration{},
 		},
 		{
-			name: "user provides restricted config",
+			name:	"user provides restricted config",
 			baseConfig: map[string]any{
-				"restrictedXXX": "restrictedYYY",
-				"foo":           "bar",
+				"restrictedXXX":	"restrictedYYY",
+				"foo":			"bar",
 			},
 			expectedConfig: map[string]any{
 				"foo": "bar",
@@ -2255,17 +2255,17 @@ func TestMerge(t *testing.T) {
 			},
 		},
 		{
-			name: "user provides restricted config; capability contains restricted",
+			name:	"user provides restricted config; capability contains restricted",
 			baseConfig: map[string]any{
-				"restrictedXXX": "restrictedYYY",
-				"foo":           "bar",
+				"restrictedXXX":	"restrictedYYY",
+				"foo":			"bar",
 			},
 			expectedConfig: map[string]any{
-				"foo":           "bar",
-				"restrictedXXX": "restrictedXXXSetRemotely",
+				"foo":			"bar",
+				"restrictedXXX":	"restrictedXXXSetRemotely",
 			},
 			capabilityConfig: capabilities.CapabilityConfiguration{
-				RestrictedKeys: []string{"restrictedXXX"},
+				RestrictedKeys:	[]string{"restrictedXXX"},
 				RestrictedConfig: &values.Map{
 					Underlying: map[string]values.Value{
 						"restrictedXXX": values.NewString("restrictedXXXSetRemotely"),
@@ -2274,18 +2274,18 @@ func TestMerge(t *testing.T) {
 			},
 		},
 		{
-			name: "default overridden by what user provides",
+			name:	"default overridden by what user provides",
 			baseConfig: map[string]any{
-				"restrictedXXX": "restrictedYYY",
-				"foo":           "bar",
-				"baz":           "overridden",
+				"restrictedXXX":	"restrictedYYY",
+				"foo":			"bar",
+				"baz":			"overridden",
 			},
 			expectedConfig: map[string]any{
-				"foo": "bar",
-				"baz": "overridden",
+				"foo":	"bar",
+				"baz":	"overridden",
 			},
 			capabilityConfig: capabilities.CapabilityConfiguration{
-				RestrictedKeys: []string{"restrictedXXX"},
+				RestrictedKeys:	[]string{"restrictedXXX"},
 				DefaultConfig: &values.Map{
 					Underlying: map[string]values.Value{
 						"baz": values.NewString("qux"),
@@ -2311,11 +2311,11 @@ func TestMerge(t *testing.T) {
 // requests to send and remove a given execution ID.
 func Test_stepUpdateManager(t *testing.T) {
 	var (
-		wg             sync.WaitGroup
-		ctx            = testutils.Context(t)
-		wantExecutions = 99
-		wantSends      = wantExecutions * 2
-		buffLen        = wantSends // worst case scenario all sends go to one channel
+		wg		sync.WaitGroup
+		ctx		= testutils.Context(t)
+		wantExecutions	= 99
+		wantSends	= wantExecutions * 2
+		buffLen		= wantSends	// worst case scenario all sends go to one channel
 	)
 
 	// Setup the step update manager
@@ -2326,10 +2326,10 @@ func Test_stepUpdateManager(t *testing.T) {
 	stepUpdateChs := make([]stepUpdateChannel, wantExecutions)
 	for i := range wantExecutions {
 		executionIDs[i] = fmt.Sprintf("execution-%d", i+1)
-		stepUpdateCh := make(chan store.WorkflowExecutionStep, buffLen) // buffered channel so we don't have to read
+		stepUpdateCh := make(chan store.WorkflowExecutionStep, buffLen)	// buffered channel so we don't have to read
 		stepUpdateChs[i] = stepUpdateChannel{
-			executionID: executionIDs[i],
-			ch:          stepUpdateCh,
+			executionID:	executionIDs[i],
+			ch:		stepUpdateCh,
 		}
 		mgr.add(executionIDs[i], stepUpdateChs[i])
 	}
@@ -2359,6 +2359,7 @@ func Test_stepUpdateManager(t *testing.T) {
 }
 
 func TestEngine_ConcurrentExecutions(t *testing.T) {
+	t.Skip("Skipped by flakeguard: https://smartcontract-it.atlassian.net/issues/DX-397")
 	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-397")
 
 	ctx := testutils.Context(t)

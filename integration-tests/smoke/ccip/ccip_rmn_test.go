@@ -48,10 +48,10 @@ import (
 
 func TestRMN_IncorrectSig(t *testing.T) {
 	runRmnTestCase(t, rmnTestCase{
-		nodesWithIncorrectSigner: []int{0, 1},
-		name:                     "messages with incorrect RMN signature",
-		waitForExec:              true,
-		passIfNoCommitAfter:      15 * time.Second,
+		nodesWithIncorrectSigner:	[]int{0, 1},
+		name:				"messages with incorrect RMN signature",
+		waitForExec:			true,
+		passIfNoCommitAfter:		15 * time.Second,
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
@@ -72,8 +72,8 @@ func TestRMN_IncorrectSig(t *testing.T) {
 
 func TestRMN_TwoMessagesOnTwoLanesIncludingBatching(t *testing.T) {
 	runRmnTestCase(t, rmnTestCase{
-		name:        "messages on two lanes including batching one lane RMN-enabled the other RMN-disabled",
-		waitForExec: true,
+		name:		"messages on two lanes including batching one lane RMN-enabled the other RMN-disabled",
+		waitForExec:	true,
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{
 				chain0: 1,
@@ -98,8 +98,8 @@ func TestRMN_TwoMessagesOnTwoLanesIncludingBatching(t *testing.T) {
 
 func TestRMN_SimpleVerificationDisabledOnDestination(t *testing.T) {
 	runRmnTestCase(t, rmnTestCase{
-		name:        "messages on two lanes one lane RMN-enabled the other RMN-disabled",
-		waitForExec: true,
+		name:		"messages on two lanes one lane RMN-enabled the other RMN-disabled",
+		waitForExec:	true,
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{
 				chain1: 1,
@@ -122,8 +122,8 @@ func TestRMN_SimpleVerificationDisabledOnDestination(t *testing.T) {
 
 func TestRMN_TwoMessagesOnTwoLanesIncludingBatchingWithTemporaryPause(t *testing.T) {
 	runRmnTestCase(t, rmnTestCase{
-		name:        "messages on two lanes including batching",
-		waitForExec: true,
+		name:		"messages on two lanes including batching",
+		waitForExec:	true,
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
@@ -144,9 +144,10 @@ func TestRMN_TwoMessagesOnTwoLanesIncludingBatchingWithTemporaryPause(t *testing
 }
 
 func TestRMN_MultipleMessagesOnOneLaneNoWaitForExec(t *testing.T) {
+	t.Skip("Skipped by flakeguard: https://smartcontract-it.atlassian.net/issues/DX-201")
 	runRmnTestCase(t, rmnTestCase{
-		name:        "multiple messages for rmn batching inspection and one rmn node down",
-		waitForExec: false, // do not wait for execution reports
+		name:		"multiple messages for rmn batching inspection and one rmn node down",
+		waitForExec:	false,	// do not wait for execution reports
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
@@ -157,7 +158,7 @@ func TestRMN_MultipleMessagesOnOneLaneNoWaitForExec(t *testing.T) {
 		rmnNodes: []rmnNode{
 			{id: 0, isSigner: true, observedChainIdxs: []int{chain0, chain1}},
 			{id: 1, isSigner: true, observedChainIdxs: []int{chain0, chain1}},
-			{id: 2, isSigner: true, observedChainIdxs: []int{chain0, chain1}, forceExit: true}, // one rmn node is down
+			{id: 2, isSigner: true, observedChainIdxs: []int{chain0, chain1}, forceExit: true},	// one rmn node is down
 		},
 		messagesToSend: []messageToSend{
 			{fromChainIdx: chain1, toChainIdx: chain0, count: 10},
@@ -167,8 +168,8 @@ func TestRMN_MultipleMessagesOnOneLaneNoWaitForExec(t *testing.T) {
 
 func TestRMN_NotEnoughObservers(t *testing.T) {
 	runRmnTestCase(t, rmnTestCase{
-		name:                "one message but not enough observers, should not get a commit report",
-		passIfNoCommitAfter: 15 * time.Second,
+		name:			"one message but not enough observers, should not get a commit report",
+		passIfNoCommitAfter:	15 * time.Second,
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
@@ -189,7 +190,7 @@ func TestRMN_NotEnoughObservers(t *testing.T) {
 
 func TestRMN_DifferentSigners(t *testing.T) {
 	runRmnTestCase(t, rmnTestCase{
-		name: "different signers and different observers",
+		name:	"different signers and different observers",
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
@@ -213,8 +214,8 @@ func TestRMN_DifferentSigners(t *testing.T) {
 
 func TestRMN_NotEnoughSigners(t *testing.T) {
 	runRmnTestCase(t, rmnTestCase{
-		name:                "different signers and different observers",
-		passIfNoCommitAfter: 15 * time.Second,
+		name:			"different signers and different observers",
+		passIfNoCommitAfter:	15 * time.Second,
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
@@ -227,8 +228,8 @@ func TestRMN_NotEnoughSigners(t *testing.T) {
 			{id: 1, isSigner: false, observedChainIdxs: []int{chain0, chain1}},
 			{id: 2, isSigner: false, observedChainIdxs: []int{chain0, chain1}},
 			{id: 3, isSigner: true, observedChainIdxs: []int{}},
-			{id: 4, isSigner: true, observedChainIdxs: []int{}, forceExit: true}, // signer is down
-			{id: 5, isSigner: true, observedChainIdxs: []int{}, forceExit: true}, // signer is down
+			{id: 4, isSigner: true, observedChainIdxs: []int{}, forceExit: true},	// signer is down
+			{id: 5, isSigner: true, observedChainIdxs: []int{}, forceExit: true},	// signer is down
 		},
 		messagesToSend: []messageToSend{
 			{fromChainIdx: chain0, toChainIdx: chain1, count: 1},
@@ -238,8 +239,8 @@ func TestRMN_NotEnoughSigners(t *testing.T) {
 
 func TestRMN_DifferentRmnNodesForDifferentChains(t *testing.T) {
 	runRmnTestCase(t, rmnTestCase{
-		name:        "different rmn nodes support different chains",
-		waitForExec: false,
+		name:		"different rmn nodes support different chains",
+		waitForExec:	false,
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
@@ -264,13 +265,13 @@ func TestRMN_DifferentRmnNodesForDifferentChains(t *testing.T) {
 
 func TestRMN_TwoMessagesOneSourceChainCursed(t *testing.T) {
 	runRmnTestCase(t, rmnTestCase{
-		name:                "two messages, one source chain is cursed the other chain was cursed but curse is revoked",
-		passIfNoCommitAfter: 15 * time.Second,
+		name:			"two messages, one source chain is cursed the other chain was cursed but curse is revoked",
+		passIfNoCommitAfter:	15 * time.Second,
 		cursedSubjectsPerChain: map[int][]int{
 			chain1: {chain0},
 		},
 		revokedCursedSubjectsPerChain: map[int]map[int]time.Duration{
-			chain0: {globalCurse: 5 * time.Second}, // chain0 will be globally cursed and curse will be revoked later
+			chain0: {globalCurse: 5 * time.Second},	// chain0 will be globally cursed and curse will be revoked later
 		},
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
@@ -285,7 +286,7 @@ func TestRMN_TwoMessagesOneSourceChainCursed(t *testing.T) {
 			{id: 2, isSigner: true, observedChainIdxs: []int{chain0, chain1}},
 		},
 		messagesToSend: []messageToSend{
-			{fromChainIdx: chain0, toChainIdx: chain1, count: 1}, // <----- this message should not be committed
+			{fromChainIdx: chain0, toChainIdx: chain1, count: 1},	// <----- this message should not be committed
 			{fromChainIdx: chain1, toChainIdx: chain0, count: 1},
 		},
 	})
@@ -293,8 +294,8 @@ func TestRMN_TwoMessagesOneSourceChainCursed(t *testing.T) {
 
 func TestRMN_GlobalCurseTwoMessagesOnTwoLanes(t *testing.T) {
 	runRmnTestCase(t, rmnTestCase{
-		name:        "global curse messages on two lanes",
-		waitForExec: false,
+		name:		"global curse messages on two lanes",
+		waitForExec:	false,
 		homeChainConfig: homeChainConfig{
 			f: map[int]int{chain0: 1, chain1: 1},
 		},
@@ -312,18 +313,18 @@ func TestRMN_GlobalCurseTwoMessagesOnTwoLanes(t *testing.T) {
 			{fromChainIdx: chain1, toChainIdx: chain0, count: 5},
 		},
 		cursedSubjectsPerChain: map[int][]int{
-			chain1: {globalCurse},
-			chain0: {globalCurse},
+			chain1:	{globalCurse},
+			chain0:	{globalCurse},
 		},
-		passIfNoCommitAfter: 15 * time.Second,
+		passIfNoCommitAfter:	15 * time.Second,
 	})
 }
 
 const (
-	chain0      = 0
-	chain1      = 1
-	chain2      = 2
-	globalCurse = 1000
+	chain0		= 0
+	chain1		= 1
+	chain2		= 2
+	globalCurse	= 1000
 )
 
 func runRmnTestCase(t *testing.T, tc rmnTestCase) {
@@ -358,10 +359,10 @@ func runRmnTestCase(t *testing.T, tc rmnTestCase) {
 	require.NoError(t, err)
 
 	_, err = v1_6.SetRMNHomeCandidateConfigChangeset(envWithRMN.Env, v1_6.SetRMNHomeCandidateConfig{
-		HomeChainSelector: envWithRMN.HomeChainSel,
-		RMNStaticConfig:   staticConfig,
-		RMNDynamicConfig:  dynamicConfig,
-		DigestToOverride:  candidateDigest,
+		HomeChainSelector:	envWithRMN.HomeChainSel,
+		RMNStaticConfig:	staticConfig,
+		RMNDynamicConfig:	dynamicConfig,
+		DigestToOverride:	candidateDigest,
 	})
 	require.NoError(t, err)
 
@@ -372,8 +373,8 @@ func runRmnTestCase(t *testing.T, tc rmnTestCase) {
 	t.Logf("Promoting RMNHome candidate with candidateDigest: %x", candidateDigest[:])
 
 	_, err = v1_6.PromoteRMNHomeCandidateConfigChangeset(envWithRMN.Env, v1_6.PromoteRMNHomeCandidateConfig{
-		HomeChainSelector: envWithRMN.HomeChainSel,
-		DigestToPromote:   candidateDigest,
+		HomeChainSelector:	envWithRMN.HomeChainSel,
+		DigestToPromote:	candidateDigest,
 	})
 	require.NoError(t, err)
 
@@ -391,8 +392,8 @@ func runRmnTestCase(t *testing.T, tc rmnTestCase) {
 			t.Fatalf("remoteCfg.f is negative: %d", remoteCfg.f)
 		}
 		rmnRemoteConfig[selector] = ccipops.RMNRemoteConfig{
-			F:       uint64(remoteCfg.f),
-			Signers: tc.alterSigners(t, tc.pf.rmnRemoteSigners),
+			F:		uint64(remoteCfg.f),
+			Signers:	tc.alterSigners(t, tc.pf.rmnRemoteSigners),
 		}
 	}
 
@@ -485,7 +486,7 @@ func runRmnTestCase(t *testing.T, tc rmnTestCase) {
 		}
 	}()
 
-	if tc.passIfNoCommitAfter > 0 { // wait for a duration and assert that commit reports were not delivered
+	if tc.passIfNoCommitAfter > 0 {	// wait for a duration and assert that commit reports were not delivered
 		if len(expectedSeqNum) > 0 && len(seqNumCommit) > len(expectedSeqNum) {
 			t.Logf("⌛ Waiting for commit reports of non-cursed chains...")
 			<-commitReportReceived
@@ -505,7 +506,7 @@ func runRmnTestCase(t *testing.T, tc rmnTestCase) {
 	}
 
 	t.Logf("⌛ Waiting for commit reports...")
-	<-commitReportReceived // wait for commit reports
+	<-commitReportReceived	// wait for commit reports
 	hasCommitReportBeenReceived = true
 	t.Logf("✅ Commit report")
 
@@ -541,50 +542,50 @@ type homeChainConfig struct {
 }
 
 type remoteChainConfig struct {
-	chainIdx int
-	f        int
+	chainIdx	int
+	f		int
 }
 
 type rmnNode struct {
-	id                int
-	isSigner          bool
-	observedChainIdxs []int
-	forceExit         bool // force exit will simply force exit the rmn node to simulate failure scenarios
-	restart           bool // restart will restart the rmn node to simulate failure scenarios
+	id			int
+	isSigner		bool
+	observedChainIdxs	[]int
+	forceExit		bool	// force exit will simply force exit the rmn node to simulate failure scenarios
+	restart			bool	// restart will restart the rmn node to simulate failure scenarios
 }
 
 type messageToSend struct {
-	fromChainIdx int
-	toChainIdx   int
-	count        int
+	fromChainIdx	int
+	toChainIdx	int
+	count		int
 }
 
 type rmnTestCase struct {
-	name string
+	name	string
 	// If set to 0, the test will wait for commit reports.
 	// If set to a positive value, the test will wait for that duration and will assert that commit report was not delivered.
-	passIfNoCommitAfter    time.Duration
-	cursedSubjectsPerChain map[int][]int
+	passIfNoCommitAfter	time.Duration
+	cursedSubjectsPerChain	map[int][]int
 	// revokedCursedSubjectsPerChain is used to revoke this specific curses after a timer expires
-	revokedCursedSubjectsPerChain map[int]map[int]time.Duration // chainIdx -> subjectIdx -> timer to revoke
-	waitForExec                   bool
-	homeChainConfig               homeChainConfig
-	remoteChainsConfig            []remoteChainConfig
-	rmnNodes                      []rmnNode
-	messagesToSend                []messageToSend
-	nodesWithIncorrectSigner      []int
+	revokedCursedSubjectsPerChain	map[int]map[int]time.Duration	// chainIdx -> subjectIdx -> timer to revoke
+	waitForExec			bool
+	homeChainConfig			homeChainConfig
+	remoteChainsConfig		[]remoteChainConfig
+	rmnNodes			[]rmnNode
+	messagesToSend			[]messageToSend
+	nodesWithIncorrectSigner	[]int
 
 	// populated fields after environment setup
-	pf testCasePopulatedFields
+	pf	testCasePopulatedFields
 }
 
 type testCasePopulatedFields struct {
-	chainSelectors                   []uint64
-	rmnHomeNodes                     []rmn_home.RMNHomeNode
-	rmnRemoteSigners                 []rmn_remote.RMNRemoteSigner
-	rmnHomeSourceChains              []rmn_home.RMNHomeSourceChain
-	cursedSubjectsPerChainSel        map[uint64][]uint64
-	revokedCursedSubjectsPerChainSel map[uint64]map[uint64]time.Duration
+	chainSelectors				[]uint64
+	rmnHomeNodes				[]rmn_home.RMNHomeNode
+	rmnRemoteSigners			[]rmn_remote.RMNRemoteSigner
+	rmnHomeSourceChains			[]rmn_home.RMNHomeSourceChain
+	cursedSubjectsPerChainSel		map[uint64][]uint64
+	revokedCursedSubjectsPerChainSel	map[uint64]map[uint64]time.Duration
 }
 
 func (tc *rmnTestCase) alterSigners(t *testing.T, signers []rmn_remote.RMNRemoteSigner) []rmn_remote.RMNRemoteSigner {
@@ -623,8 +624,8 @@ func (tc *rmnTestCase) populateFields(t *testing.T, envWithRMN testhelpers.Deplo
 		copy(offchainPublicKey[:], rmn.RMN.OffchainPublicKey)
 
 		tc.pf.rmnHomeNodes = append(tc.pf.rmnHomeNodes, rmn_home.RMNHomeNode{
-			PeerId:            rmn.Proxy.PeerID,
-			OffchainPublicKey: offchainPublicKey,
+			PeerId:			rmn.Proxy.PeerID,
+			OffchainPublicKey:	offchainPublicKey,
 		})
 
 		if rmnNodeInfo.isSigner {
@@ -632,8 +633,8 @@ func (tc *rmnTestCase) populateFields(t *testing.T, envWithRMN testhelpers.Deplo
 				t.Fatalf("node id is negative: %d", rmnNodeInfo.id)
 			}
 			tc.pf.rmnRemoteSigners = append(tc.pf.rmnRemoteSigners, rmn_remote.RMNRemoteSigner{
-				OnchainPublicKey: rmn.RMN.EVMOnchainPublicKey,
-				NodeIndex:        uint64(rmnNodeInfo.id),
+				OnchainPublicKey:	rmn.RMN.EVMOnchainPublicKey,
+				NodeIndex:		uint64(rmnNodeInfo.id),
 			})
 		}
 	}
@@ -644,9 +645,9 @@ func (tc *rmnTestCase) populateFields(t *testing.T, envWithRMN testhelpers.Deplo
 		}
 		// configure remote chain details on the home contract
 		tc.pf.rmnHomeSourceChains = append(tc.pf.rmnHomeSourceChains, rmn_home.RMNHomeSourceChain{
-			ChainSelector:       tc.pf.chainSelectors[remoteChainIdx],
-			FObserve:            uint64(remoteF),
-			ObserverNodesBitmap: createObserverNodesBitmap(tc.pf.chainSelectors[remoteChainIdx], tc.rmnNodes, tc.pf.chainSelectors),
+			ChainSelector:		tc.pf.chainSelectors[remoteChainIdx],
+			FObserve:		uint64(remoteF),
+			ObserverNodesBitmap:	createObserverNodesBitmap(tc.pf.chainSelectors[remoteChainIdx], tc.rmnNodes, tc.pf.chainSelectors),
 		})
 	}
 
@@ -761,19 +762,19 @@ func (tc rmnTestCase) sendMessages(t *testing.T, onChainState stateview.CCIPOnCh
 
 		for i := 0; i < msg.count; i++ {
 			msgSentEvent := testhelpers.TestSendRequest(t, envWithRMN.Env, onChainState, fromChain, toChain, false, router.ClientEVM2AnyMessage{
-				Receiver:     common.LeftPadBytes(onChainState.MustGetEVMChainState(toChain).Receiver.Address().Bytes(), 32),
-				Data:         []byte("hello world"),
-				TokenAmounts: nil,
-				FeeToken:     common.HexToAddress("0x0"),
-				ExtraArgs:    nil,
+				Receiver:	common.LeftPadBytes(onChainState.MustGetEVMChainState(toChain).Receiver.Address().Bytes(), 32),
+				Data:		[]byte("hello world"),
+				TokenAmounts:	nil,
+				FeeToken:	common.HexToAddress("0x0"),
+				ExtraArgs:	nil,
 			}, testhelpers.WithMaxRetries(5))
 			seqNumCommit[testhelpers.SourceDestPair{
-				SourceChainSelector: fromChain,
-				DestChainSelector:   toChain,
+				SourceChainSelector:	fromChain,
+				DestChainSelector:	toChain,
 			}] = msgSentEvent.SequenceNumber
 			seqNumExec[testhelpers.SourceDestPair{
-				SourceChainSelector: fromChain,
-				DestChainSelector:   toChain,
+				SourceChainSelector:	fromChain,
+				DestChainSelector:	toChain,
 			}] = []uint64{msgSentEvent.SequenceNumber}
 			t.Logf("Sent message from chain %d to chain %d with seqNum %d", fromChain, toChain, msgSentEvent.SequenceNumber)
 		}
@@ -795,7 +796,7 @@ func (tc rmnTestCase) callContractsToCurseChains(ctx context.Context, t *testing
 
 		cursedSubjects, ok := tc.cursedSubjectsPerChain[remoteCfg.chainIdx]
 		if !ok {
-			continue // nothing to curse on this chain
+			continue	// nothing to curse on this chain
 		}
 
 		for _, subjectDescription := range cursedSubjects {
@@ -808,8 +809,8 @@ func (tc rmnTestCase) callContractsToCurseChains(ctx context.Context, t *testing
 			}
 
 			_, err := v1_6.RMNCurseChangeset(envWithRMN.Env, v1_6.RMNCurseConfig{
-				CurseActions: curseActions,
-				Reason:       "test curse",
+				CurseActions:	curseActions,
+				Reason:		"test curse",
 			})
 			require.NoError(t, err)
 		}
@@ -840,8 +841,8 @@ func (tc rmnTestCase) callContractsToCurseAndRevokeCurse(ctx context.Context, eg
 			}
 
 			_, err := v1_6.RMNCurseChangeset(envWithRMN.Env, v1_6.RMNCurseConfig{
-				CurseActions: curseActions,
-				Reason:       "test curse",
+				CurseActions:	curseActions,
+				Reason:		"test curse",
 			})
 			require.NoError(t, err)
 
@@ -850,8 +851,8 @@ func (tc rmnTestCase) callContractsToCurseAndRevokeCurse(ctx context.Context, eg
 				t.Logf("revoking curse on subject %d (%d)", subjectDescription, subjectDescription)
 
 				_, err := v1_6.RMNUncurseChangeset(envWithRMN.Env, v1_6.RMNCurseConfig{
-					CurseActions: curseActions,
-					Reason:       "test uncurse",
+					CurseActions:	curseActions,
+					Reason:		"test uncurse",
 				})
 				if err != nil {
 					return err
@@ -916,10 +917,10 @@ func configureAndPromoteRMNHome(
 	require.NoError(t, err)
 
 	_, err = v1_6.SetRMNHomeCandidateConfigChangeset(envWithRMN.Env, v1_6.SetRMNHomeCandidateConfig{
-		HomeChainSelector: envWithRMN.HomeChainSel,
-		RMNStaticConfig:   staticConfig,
-		RMNDynamicConfig:  dynamicConfig,
-		DigestToOverride:  candidateDigest,
+		HomeChainSelector:	envWithRMN.HomeChainSel,
+		RMNStaticConfig:	staticConfig,
+		RMNDynamicConfig:	dynamicConfig,
+		DigestToOverride:	candidateDigest,
 	})
 	require.NoError(t, err)
 
@@ -930,8 +931,8 @@ func configureAndPromoteRMNHome(
 
 	// Promote candidate
 	_, err = v1_6.PromoteRMNHomeCandidateConfigChangeset(envWithRMN.Env, v1_6.PromoteRMNHomeCandidateConfig{
-		HomeChainSelector: envWithRMN.HomeChainSel,
-		DigestToPromote:   candidateDigest,
+		HomeChainSelector:	envWithRMN.HomeChainSel,
+		DigestToPromote:	candidateDigest,
 	})
 	require.NoError(t, err)
 
@@ -950,8 +951,8 @@ func configureAndPromoteRMNHome(
 			t.Fatalf("remoteCfg.f is negative: %d", remoteCfg.f)
 		}
 		rmnRemoteConfig[selector] = ccipops.RMNRemoteConfig{
-			F:       uint64(remoteCfg.f),
-			Signers: tc.pf.rmnRemoteSigners,
+			F:		uint64(remoteCfg.f),
+			Signers:	tc.pf.rmnRemoteSigners,
 		}
 	}
 	_, err = v1_6.SetRMNRemoteConfigChangeset(envWithRMN.Env, ccipseq.SetRMNRemoteConfig{
@@ -999,9 +1000,9 @@ func performReorgTest(t *testing.T, e testhelpers.DeployedEnv, l logging.Logger,
 		getHeadTrackerService(t, sourceSelector),
 		getLogPollerService(t, sourceSelector),
 		l,
-		0,              // no nodes reporting finality violation
-		1*time.Minute,  // timeout
-		10*time.Second, // interval
+		0,		// no nodes reporting finality violation
+		1*time.Minute,	// timeout
+		10*time.Second,	// interval
 	)
 
 	return sourceSelector, destSelector
@@ -1019,7 +1020,7 @@ func Test_CCIPReorg_BelowFinality_OnSource_WithRMN(t *testing.T) {
 		rmnNodes: []rmnNode{
 			{id: 0, isSigner: true, observedChainIdxs: []int{chain0, chain1}},
 			{id: 1, isSigner: true, observedChainIdxs: []int{chain0, chain1}},
-			{id: 2, isSigner: true, observedChainIdxs: []int{chain0, chain1}}, // one rmn node is down
+			{id: 2, isSigner: true, observedChainIdxs: []int{chain0, chain1}},	// one rmn node is down
 		},
 	}
 	e, l, dockerEnv, nonBootstrapP2PIDs, state, rmnCluster := setupReorgTest(t,
@@ -1043,9 +1044,9 @@ func Test_CCIPReorg_BelowFinality_OnSource_WithRMN(t *testing.T) {
 		sourceSelector,
 		e.Env.BlockChains.EVMChains()[destSelector],
 		state.MustGetEVMChainState(destSelector).OffRamp,
-		nil, // startBlock
+		nil,	// startBlock
 		ccipocr3.NewSeqNumRange(1, 1),
-		false, // enforceSingleCommit
+		false,	// enforceSingleCommit
 	)
 	require.NoError(t, err)
 }
@@ -1062,7 +1063,7 @@ func Test_CCIPReorg_BelowFinality_OnSource_WithRMN_Recover(t *testing.T) {
 		rmnNodes: []rmnNode{
 			{id: 0, isSigner: true, observedChainIdxs: []int{chain0, chain1}},
 			{id: 1, isSigner: true, observedChainIdxs: []int{chain0, chain1}},
-			{id: 2, isSigner: true, observedChainIdxs: []int{chain0, chain1}}, // one rmn node is down
+			{id: 2, isSigner: true, observedChainIdxs: []int{chain0, chain1}},	// one rmn node is down
 		},
 	}
 	e, l, dockerEnv, nonBootstrapP2PIDs, state, rmnCluster := setupReorgTest(t,
@@ -1091,9 +1092,9 @@ func Test_CCIPReorg_BelowFinality_OnSource_WithRMN_Recover(t *testing.T) {
 		sourceSelector,
 		e.Env.BlockChains.EVMChains()[destSelector],
 		state.MustGetEVMChainState(destSelector).OffRamp,
-		nil, // startBlock
+		nil,	// startBlock
 		ccipocr3.NewSeqNumRange(1, 1),
-		false, // enforceSingleCommit
+		false,	// enforceSingleCommit
 	)
 	require.NoError(t, err)
 }
@@ -1110,7 +1111,7 @@ func Test_CCIPReorg_BelowFinality_OnSource_WithRMN_Block(t *testing.T) {
 		rmnNodes: []rmnNode{
 			{id: 0, isSigner: true, observedChainIdxs: []int{chain0, chain1}},
 			{id: 1, isSigner: true, observedChainIdxs: []int{chain0, chain1}},
-			{id: 2, isSigner: true, observedChainIdxs: []int{chain0, chain1}}, // one rmn node is down
+			{id: 2, isSigner: true, observedChainIdxs: []int{chain0, chain1}},	// one rmn node is down
 		},
 	}
 	e, l, dockerEnv, nonBootstrapP2PIDs, state, rmnCluster := setupReorgTest(t,
@@ -1140,9 +1141,9 @@ func Test_CCIPReorg_BelowFinality_OnSource_WithRMN_Block(t *testing.T) {
 			sourceSelector,
 			e.Env.BlockChains.EVMChains()[destSelector],
 			state.MustGetEVMChainState(destSelector).OffRamp,
-			nil, // startBlock
+			nil,	// startBlock
 			ccipocr3.NewSeqNumRange(1, 1),
-			false, // enforceSingleCommit
+			false,	// enforceSingleCommit
 		)
 
 		if err != nil {
