@@ -824,7 +824,8 @@ jobs:
 
   cleanup:
     name: Clean up integration environment deployments
-    if: always()
+    # TODO: undo
+    if: ${{ github.event_name == 'never' }}
     needs:
       [
         run-core-e2e-tests-for-pr,
