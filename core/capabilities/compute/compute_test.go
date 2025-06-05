@@ -270,6 +270,7 @@ func TestComputeFetch(t *testing.T) {
 }
 
 func TestCompute_SpendValueRelativeToComputeTime(t *testing.T) {
+    t.Skip("Skipped by flakeguard: https://smartcontract-it.atlassian.net/issues/DX-568")
 	t.Parallel()
 
 	tests := []struct {

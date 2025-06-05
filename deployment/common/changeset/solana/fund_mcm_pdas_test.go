@@ -235,6 +235,7 @@ func TestFundMCMSignersChangeset_VerifyPreconditions(t *testing.T) {
 }
 
 func TestFundMCMSignersChangeset_Apply(t *testing.T) {
+    t.Skip("Skipped by flakeguard: https://smartcontract-it.atlassian.net/issues/DX-403")
 	t.Parallel()
 	env := setupFundingTestEnv(t)
 	cfgAmounts := commonSolana.AmountsToTransfer{

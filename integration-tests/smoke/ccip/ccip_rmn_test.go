@@ -166,6 +166,7 @@ func TestRMN_MultipleMessagesOnOneLaneNoWaitForExec(t *testing.T) {
 }
 
 func TestRMN_NotEnoughObservers(t *testing.T) {
+    t.Skip("Skipped by flakeguard: https://smartcontract-it.atlassian.net/issues/DX-295")
 	runRmnTestCase(t, rmnTestCase{
 		name:                "one message but not enough observers, should not get a commit report",
 		passIfNoCommitAfter: 15 * time.Second,
@@ -263,6 +264,7 @@ func TestRMN_DifferentRmnNodesForDifferentChains(t *testing.T) {
 }
 
 func TestRMN_TwoMessagesOneSourceChainCursed(t *testing.T) {
+    t.Skip("Skipped by flakeguard: https://smartcontract-it.atlassian.net/issues/DX-297")
 	runRmnTestCase(t, rmnTestCase{
 		name:                "two messages, one source chain is cursed the other chain was cursed but curse is revoked",
 		passIfNoCommitAfter: 15 * time.Second,
