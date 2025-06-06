@@ -2,13 +2,12 @@ package ccip
 
 import (
 	"fmt"
-	"golang.org/x/exp/maps"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	testsetups "github.com/smartcontractkit/chainlink/integration-tests/testsetups/ccip"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 )
 
 func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
@@ -16,6 +15,7 @@ func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
 		t,
 		testhelpers.WithNumOfChains(2),
 		testhelpers.WithSuiChains(1),
+		testhelpers.WithNoJobsAndContracts(),
 	)
 
 	evmChainSelectors := maps.Keys(e.Env.Chains)

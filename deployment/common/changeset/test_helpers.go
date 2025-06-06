@@ -136,6 +136,7 @@ func ApplyChangesets(t *testing.T, e cldf.Environment, timelockContractsPerChain
 		currentEnv = cldf.Environment{
 			Name:              e.Name,
 			Logger:            e.Logger,
+			BlockChains:       e.BlockChains,
 			ExistingAddresses: addresses,
 			DataStore:         ds,
 			Chains:            e.Chains,

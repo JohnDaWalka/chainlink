@@ -386,9 +386,14 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 	m.AptosChains = memory.NewMemoryChainsAptos(t, tc.AptosChains)
 	suiChains := memory.NewMemoryChainsSui(t, tc.SuiChains)
 	blockChains := map[uint64]chain.BlockChain{}
-	for _, c := range suiChains {
-		blockChains[c.Selector] = c
+
+	for selector, ch := range m.Chains {
+		blockChains[selector] = ch
 	}
+	for selector, ch := range suiChains {
+		blockChains[selector] = ch
+	}
+
 	env := cldf.Environment{
 		Chains:      m.Chains,
 		SolChains:   m.SolChains,
@@ -432,7 +437,11 @@ func (m *MemoryEnvironment) StartNodes(t *testing.T, crConfig deployment.Capabil
 		})
 	}
 	m.nodes = nodes
-	m.DeployedEnv.Env = memory.NewMemoryEnvironmentFromChainsNodes(func() context.Context { return ctx }, lggr, m.Chains, m.SolChains, m.AptosChains, m.SuiChains, nodes)
+
+	suiChains, err := m.DeployedEnvironment().Env.BlockChains.SuiChains()
+	require.NoError(t, err)
+
+	m.DeployedEnv.Env = memory.NewMemoryEnvironmentFromChainsNodes(func() context.Context { return ctx }, lggr, m.Chains, m.SolChains, m.AptosChains, suiChains, nodes)
 }
 
 func (m *MemoryEnvironment) DeleteJobs(ctx context.Context, jobIDs map[string][]string) error {
@@ -623,9 +632,16 @@ func NewEnvironmentWithJobsAndContracts(t *testing.T, tEnv TestEnvironment) Depl
 	evmChains := e.Env.AllChainSelectors()
 	solChains := e.Env.AllChainSelectorsSolana()
 	aptosChains := e.Env.AllChainSelectorsAptos()
+	suiChains, err := e.Env.BlockChains.SuiChains()
+	require.NoError(t, err)
 	//nolint:gocritic // we need to segregate EVM and Solana chains
 	allChains := append(evmChains, solChains...)
 	allChains = append(allChains, aptosChains...)
+
+	for sel, _ := range suiChains {
+		allChains = append(allChains, sel)
+	}
+
 	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfig)
 
 	for _, c := range e.Env.AllChainSelectors() {
@@ -651,6 +667,7 @@ func NewEnvironmentWithJobsAndContracts(t *testing.T, tEnv TestEnvironment) Depl
 	require.NoError(t, err)
 	err = state.ValidatePostDeploymentState(e.Env)
 	require.NoError(t, err)
+
 	return e
 }
 

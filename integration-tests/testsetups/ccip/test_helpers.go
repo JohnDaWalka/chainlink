@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/stretchr/testify/require"
 	"github.com/subosito/gotenv"
 	"go.uber.org/zap/zapcore"
@@ -103,6 +104,12 @@ func (l *DeployedLocalDevEnvironment) StartChains(t *testing.T) {
 	require.NoError(t, err)
 	replayBlocks, err := testhelpers.LatestBlocksByChain(ctx, l.DeployedEnv.Env)
 	require.NoError(t, err)
+
+	blockChains := make(map[uint64]chain.BlockChain)
+	for sel, c := range chains {
+		blockChains[sel] = c
+	}
+
 	l.DeployedEnv.Users = users
 	l.DeployedEnv.Env.Chains = chains
 	l.DeployedEnv.FeedChainSel = feedSel
@@ -191,6 +198,7 @@ func NewIntegrationEnvironment(t *testing.T, opts ...testhelpers.TestOps) (testh
 	switch testCfg.Type {
 	case testhelpers.Memory:
 		dEnv, memEnv := testhelpers.NewMemoryEnvironment(t, opts...)
+		fmt.Println("DEPLOYED ENV, ", dEnv.Env.BlockChains, "MEMORY", memEnv.DeployedEnvironment().Env.BlockChains)
 		return dEnv, devenv.RMNCluster{}, memEnv
 	case testhelpers.Docker:
 		dockerEnv := &DeployedLocalDevEnvironment{
