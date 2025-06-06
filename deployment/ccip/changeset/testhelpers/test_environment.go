@@ -622,6 +622,7 @@ func NewEnvironment(t *testing.T, tEnv TestEnvironment) DeployedEnv {
 	crConfig := DeployTestContracts(t, lggr, ab, dEnv.HomeChainSel, dEnv.FeedChainSel, dEnv.Env.Chains, tc.LinkPrice, tc.WethPrice)
 	tEnv.StartNodes(t, crConfig)
 	dEnv = tEnv.DeployedEnvironment()
+	fmt.Println("ADDRESSBOOK: ", ab)
 	dEnv.Env.ExistingAddresses = ab
 	return dEnv
 }

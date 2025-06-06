@@ -209,6 +209,7 @@ func ApplyChangesetsV2(t *testing.T, e cldf.Environment, changesetApplications [
 			Chains:            e.Chains,
 			SolChains:         e.SolChains,
 			AptosChains:       e.AptosChains,
+			BlockChains:       e.BlockChains,
 			NodeIDs:           e.NodeIDs,
 			Offchain:          e.Offchain,
 			OCRSecrets:        e.OCRSecrets,

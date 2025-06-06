@@ -313,6 +313,11 @@ func (c CCIPOnChainState) OffRampPermissionLessExecutionThresholdSeconds(ctx con
 			return 0, fmt.Errorf("failed to get offramp dynamic config for Aptos chain %d: %w", selector, err)
 		}
 		return offrampDynamicConfig.PermissionlessExecutionThresholdSeconds, nil
+
+	case chain_selectors.FamilySui:
+
+		// TODO: fetch this value from offRamp getOffRampDynamicConfig
+		return (uint32(2 * 60 * 60)), nil
 	}
 	return 0, fmt.Errorf("unsupported chain family %s", family)
 }
@@ -665,13 +670,13 @@ func (c CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType cldf.Contr
 		}
 
 	case chain_selectors.FamilySui:
-		chainState, exists := c.SuiChains[chainSelector]
+		_, exists := c.SuiChains[chainSelector]
 		if !exists {
 			return fmt.Errorf("chain %d does not exist", chainSelector)
 		}
-		if chainState.CCIPAddress == (aptos.AccountAddress{}) {
-			return fmt.Errorf("ccip package does not exist on sui chain %d", chainSelector)
-		}
+		// if chainState.CCIPAddress == (sui.Address{}) {
+		// 	return fmt.Errorf("ccip package does not exist on sui chain %d", chainSelector)
+		// }
 	default:
 		return fmt.Errorf("unknown chain family %s", family)
 	}

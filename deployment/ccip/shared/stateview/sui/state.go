@@ -4,14 +4,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/pattonkan/sui-go/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 )
 
 type CCIPChainState struct {
-	CCIPAddress      aptos.AccountAddress
-	LinkTokenAddress aptos.AccountAddress
+	CCIPAddress      sui.Address
+	LinkTokenAddress sui.Address
 }
 
 // LoadOnchainStatesui loads chain state for sui chains from env
@@ -48,14 +48,14 @@ func loadsuiChainStateFromAddresses(addresses map[string]cldf.TypeAndVersion) (C
 	chainState := CCIPChainState{}
 	for addrStr, typeAndVersion := range addresses {
 		// Parse address
-		address := &aptos.AccountAddress{}
-		err := address.ParseStringRelaxed(addrStr)
-		if err != nil {
-			return chainState, fmt.Errorf("failed to parse address %s for %s: %w", addrStr, typeAndVersion.Type, err)
-		}
+		suiAddr := sui.MustAddressFromHex(addrStr)
+		// err := address.ParseStringRelaxed(addrStr)
+		// if err != nil {
+		// 	return chainState, fmt.Errorf("failed to parse address %s for %s: %w", addrStr, typeAndVersion.Type, err)
+		// }
 		switch typeAndVersion.Type {
 		case shared.AptosCCIPType:
-			chainState.CCIPAddress = *address
+			chainState.CCIPAddress = *suiAddr
 		}
 		// Set address based on type
 

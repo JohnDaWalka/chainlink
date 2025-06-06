@@ -542,17 +542,18 @@ func CreateKeys(t *testing.T,
 
 			// TODO: funding
 		case chainsel.FamilySui:
-			keystore := app.GetKeyStore().Sui()
-			err = keystore.EnsureKey(ctx)
-			require.NoError(t, err, "failed to create key for sui")
+			if len(suichains) > 0 {
+				keystore := app.GetKeyStore().Sui()
+				err = keystore.EnsureKey(ctx)
+				require.NoError(t, err, "failed to create key for sui")
 
-			keys, err := keystore.GetAll()
-			require.NoError(t, err)
-			require.Len(t, keys, 1)
+				keys, err := keystore.GetAll()
+				require.NoError(t, err)
+				require.Len(t, keys, 1)
 
-			transmitter := keys[0]
-			transmitters[chain.Selector] = transmitter.ID()
-
+				transmitter := keys[0]
+				transmitters[chain.Selector] = transmitter.ID()
+			}
 			// TODO: funding
 		case chainsel.FamilyStarknet:
 			keystore := app.GetKeyStore().StarkNet()

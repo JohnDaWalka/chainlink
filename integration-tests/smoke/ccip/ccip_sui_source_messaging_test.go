@@ -15,7 +15,6 @@ func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
 		t,
 		testhelpers.WithNumOfChains(2),
 		testhelpers.WithSuiChains(1),
-		testhelpers.WithNoJobsAndContracts(),
 	)
 
 	evmChainSelectors := maps.Keys(e.Env.Chains)
