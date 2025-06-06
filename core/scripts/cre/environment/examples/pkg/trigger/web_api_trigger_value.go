@@ -17,6 +17,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
+
 	libformat "github.com/smartcontractkit/chainlink/system-tests/lib/format"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"

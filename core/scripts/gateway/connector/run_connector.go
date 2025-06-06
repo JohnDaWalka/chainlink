@@ -13,8 +13,8 @@ import (
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 )
@@ -26,16 +26,17 @@ import (
 //	go run run_connector.go --config sample_config.toml
 type client struct {
 	privateKey *ecdsa.PrivateKey
-	connector  connector.GatewayConnector
+	connector  core.GatewayConnector
 	lggr       logger.Logger
 }
 
-func (h *client) HandleGatewayMessage(ctx context.Context, gatewayId string, msg *gateway.Message) {
+func (h *client) HandleGatewayMessage(ctx context.Context, gatewayId string, msg *gateway.Message) error {
 	h.lggr.Infof("received message from gateway %s. Echoing back.", gatewayId)
 	err := h.connector.SendToGateway(ctx, gatewayId, msg)
 	if err != nil {
 		h.lggr.Errorw("failed to send to gateway", "id", gatewayId, "err", err)
 	}
+	return nil
 }
 
 func (h *client) Sign(data ...[]byte) ([]byte, error) {
@@ -44,6 +45,10 @@ func (h *client) Sign(data ...[]byte) ([]byte, error) {
 
 func (h *client) Start(ctx context.Context) error {
 	return nil
+}
+
+func (h *client) ID() (string, error) {
+	return "test_client", nil
 }
 
 func (h *client) Close() error {
