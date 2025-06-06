@@ -8,6 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	gc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
@@ -20,14 +21,14 @@ type FetcherService struct {
 	lggr         logger.Logger
 	och          *webapi.OutgoingConnectorHandler
 	wrapper      gatewayConnector
-	selectorOpts []func(*webapi.RoundRobinSelector)
+	selectorOpts []func(*gateway.RoundRobinSelector)
 }
 
 type gatewayConnector interface {
 	GetGatewayConnector() core.GatewayConnector
 }
 
-func NewFetcherService(lggr logger.Logger, wrapper gatewayConnector, selectorOpts ...func(*webapi.RoundRobinSelector)) *FetcherService {
+func NewFetcherService(lggr logger.Logger, wrapper gatewayConnector, selectorOpts ...func(*gateway.RoundRobinSelector)) *FetcherService {
 	return &FetcherService{
 		lggr:         lggr.Named("FetcherService"),
 		wrapper:      wrapper,

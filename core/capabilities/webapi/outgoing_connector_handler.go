@@ -46,11 +46,11 @@ type OutgoingConnectorHandler struct {
 	incomingRateLimiter *common.RateLimiter
 	outgoingRateLimiter *common.RateLimiter
 	responses           *responses
-	selectorOpts        []func(*RoundRobinSelector)
+	selectorOpts        []func(*gateway.RoundRobinSelector)
 	metrics             *metrics
 }
 
-func NewOutgoingConnectorHandler(gc core.GatewayConnector, config ServiceConfig, method string, lgger logger.Logger, opts ...func(*RoundRobinSelector)) (*OutgoingConnectorHandler, error) {
+func NewOutgoingConnectorHandler(gc core.GatewayConnector, config ServiceConfig, method string, lgger logger.Logger, opts ...func(*gateway.RoundRobinSelector)) (*OutgoingConnectorHandler, error) {
 	outgoingRLCfg := outgoingRateLimiterConfigDefaults(config.OutgoingRateLimiter)
 	outgoingRateLimiter, err := common.NewRateLimiter(outgoingRLCfg)
 	if err != nil {
@@ -199,7 +199,7 @@ func (c *OutgoingConnectorHandler) awaitConnection(ctx context.Context, md await
 	if err != nil {
 		return "", fmt.Errorf("failed to get gateway IDs: %w", err)
 	}
-	selector := NewRoundRobinSelector(gatewayIDs, c.selectorOpts...)
+	selector := gateway.NewRoundRobinSelector(gatewayIDs, c.selectorOpts...)
 	attempts := make(map[string]int)
 	backoff := 10 * time.Millisecond
 
