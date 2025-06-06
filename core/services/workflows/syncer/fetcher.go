@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	gc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 )
 
 type FetcherService struct {
@@ -43,13 +42,13 @@ func (s *FetcherService) Start(ctx context.Context) error {
 		outgoingConnectorLggr := s.lggr.Named("OutgoingConnectorHandler")
 
 		webAPIConfig := webapi.ServiceConfig{
-			OutgoingRateLimiter: common.RateLimiterConfig{
+			OutgoingRateLimiter: gateway.RateLimiterConfig{
 				GlobalRPS:      webapi.DefaultGlobalRPS,
 				GlobalBurst:    webapi.DefaultGlobalBurst,
 				PerSenderRPS:   webapi.DefaultWorkflowRPS,
 				PerSenderBurst: webapi.DefaultWorkflowBurst,
 			},
-			RateLimiter: common.RateLimiterConfig{
+			RateLimiter: gateway.RateLimiterConfig{
 				GlobalRPS:      100.0,
 				GlobalBurst:    100,
 				PerSenderRPS:   100.0,

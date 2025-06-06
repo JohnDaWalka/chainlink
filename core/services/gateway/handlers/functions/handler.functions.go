@@ -67,11 +67,11 @@ type FunctionsHandlerConfig struct {
 	OnchainSubscriptions       *fsub.OnchainSubscriptionsConfig `json:"onchainSubscriptions"`
 	MinimumSubscriptionBalance *assets.Link                     `json:"minimumSubscriptionBalance"`
 	// Not specifying RateLimiter config disables rate limiting
-	UserRateLimiter            *hc.RateLimiterConfig `json:"userRateLimiter"`
-	NodeRateLimiter            *hc.RateLimiterConfig `json:"nodeRateLimiter"`
-	MaxPendingRequests         uint32                `json:"maxPendingRequests"`
-	RequestTimeoutMillis       int64                 `json:"requestTimeoutMillis"`
-	AllowedHeartbeatInitiators []string              `json:"allowedHeartbeatInitiators"`
+	UserRateLimiter            *gateway.RateLimiterConfig `json:"userRateLimiter"`
+	NodeRateLimiter            *gateway.RateLimiterConfig `json:"nodeRateLimiter"`
+	MaxPendingRequests         uint32                     `json:"maxPendingRequests"`
+	RequestTimeoutMillis       int64                      `json:"requestTimeoutMillis"`
+	AllowedHeartbeatInitiators []string                   `json:"allowedHeartbeatInitiators"`
 }
 
 type functionsHandler struct {
@@ -84,8 +84,8 @@ type functionsHandler struct {
 	allowlist                  fallow.OnchainAllowlist
 	subscriptions              fsub.OnchainSubscriptions
 	minimumBalance             *assets.Link
-	userRateLimiter            *hc.RateLimiter
-	nodeRateLimiter            *hc.RateLimiter
+	userRateLimiter            *gateway.RateLimiter
+	nodeRateLimiter            *gateway.RateLimiter
 	allowedHeartbeatInitiators map[string]struct{}
 	chStop                     services.StopChan
 	lggr                       logger.Logger
@@ -123,15 +123,15 @@ func NewFunctionsHandlerFromConfig(handlerConfig json.RawMessage, donConfig *con
 			return nil, err2
 		}
 	}
-	var userRateLimiter, nodeRateLimiter *hc.RateLimiter
+	var userRateLimiter, nodeRateLimiter *gateway.RateLimiter
 	if cfg.UserRateLimiter != nil {
-		userRateLimiter, err = hc.NewRateLimiter(*cfg.UserRateLimiter)
+		userRateLimiter, err = gateway.NewRateLimiter(*cfg.UserRateLimiter)
 		if err != nil {
 			return nil, err
 		}
 	}
 	if cfg.NodeRateLimiter != nil {
-		nodeRateLimiter, err = hc.NewRateLimiter(*cfg.NodeRateLimiter)
+		nodeRateLimiter, err = gateway.NewRateLimiter(*cfg.NodeRateLimiter)
 		if err != nil {
 			return nil, err
 		}
@@ -169,8 +169,8 @@ func NewFunctionsHandler(
 	allowlist fallow.OnchainAllowlist,
 	subscriptions fsub.OnchainSubscriptions,
 	minimumBalance *assets.Link,
-	userRateLimiter *hc.RateLimiter,
-	nodeRateLimiter *hc.RateLimiter,
+	userRateLimiter *gateway.RateLimiter,
+	nodeRateLimiter *gateway.RateLimiter,
 	allowedHeartbeatInitiators map[string]struct{},
 	lggr logger.Logger) handlers.Handler {
 	return &functionsHandler{

@@ -24,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	gc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
-	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions"
 	fallow "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions/allowlist"
 	fsub "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions/subscriptions"
@@ -42,7 +41,7 @@ type functionsConnectorHandler struct {
 	nodeAddress                string
 	storage                    s4.Storage
 	allowlist                  fallow.OnchainAllowlist
-	rateLimiter                *hc.RateLimiter
+	rateLimiter                *gateway.RateLimiter
 	subscriptions              fsub.OnchainSubscriptions
 	minimumBalance             assets.Link
 	listener                   FunctionsListener
@@ -83,7 +82,7 @@ func NewFunctionsConnectorHandler(
 	keystore keys.MessageSigner,
 	storage s4.Storage,
 	allowlist fallow.OnchainAllowlist,
-	rateLimiter *hc.RateLimiter,
+	rateLimiter *gateway.RateLimiter,
 	subscriptions fsub.OnchainSubscriptions,
 	listener FunctionsListener,
 	offchainTransmitter OffchainTransmitter,

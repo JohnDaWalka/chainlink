@@ -46,9 +46,9 @@ func newFunctionsHandlerForATestDON(t *testing.T, nodes []gc.TestNode, requestTi
 	allowlist := allowlist_mocks.NewOnchainAllowlist(t)
 	subscriptions := subscriptions_mocks.NewOnchainSubscriptions(t)
 	minBalance := assets.NewLinkFromJuels(100)
-	userRateLimiter, err := hc.NewRateLimiter(hc.RateLimiterConfig{GlobalRPS: 100.0, GlobalBurst: 100, PerSenderRPS: 100.0, PerSenderBurst: 100})
+	userRateLimiter, err := gateway.NewRateLimiter(gateway.RateLimiterConfig{GlobalRPS: 100.0, GlobalBurst: 100, PerSenderRPS: 100.0, PerSenderBurst: 100})
 	require.NoError(t, err)
-	nodeRateLimiter, err := hc.NewRateLimiter(hc.RateLimiterConfig{GlobalRPS: 100.0, GlobalBurst: 100, PerSenderRPS: 100.0, PerSenderBurst: 100})
+	nodeRateLimiter, err := gateway.NewRateLimiter(gateway.RateLimiterConfig{GlobalRPS: 100.0, GlobalBurst: 100, PerSenderRPS: 100.0, PerSenderBurst: 100})
 	require.NoError(t, err)
 	pendingRequestsCache := hc.NewRequestCache[functions.PendingRequest](requestTimeout, 1000)
 	allowedHeartbeatInititors := map[string]struct{}{heartbeatSender: {}}

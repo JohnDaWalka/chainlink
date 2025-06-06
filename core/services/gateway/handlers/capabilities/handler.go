@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 )
 
@@ -38,14 +37,14 @@ type handler struct {
 	mu              sync.Mutex
 	lggr            logger.Logger
 	httpClient      network.HTTPClient
-	nodeRateLimiter *common.RateLimiter
+	nodeRateLimiter *gateway.RateLimiter
 	wg              sync.WaitGroup
 	metrics         *metrics
 }
 
 type HandlerConfig struct {
-	NodeRateLimiter         common.RateLimiterConfig `json:"nodeRateLimiter"`
-	MaxAllowedMessageAgeSec uint                     `json:"maxAllowedMessageAgeSec"`
+	NodeRateLimiter         gateway.RateLimiterConfig `json:"nodeRateLimiter"`
+	MaxAllowedMessageAgeSec uint                      `json:"maxAllowedMessageAgeSec"`
 }
 
 type savedCallback struct {
@@ -61,7 +60,7 @@ func NewHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don 
 	if err != nil {
 		return nil, err
 	}
-	nodeRateLimiter, err := common.NewRateLimiter(cfg.NodeRateLimiter)
+	nodeRateLimiter, err := gateway.NewRateLimiter(cfg.NodeRateLimiter)
 	if err != nil {
 		return nil, err
 	}

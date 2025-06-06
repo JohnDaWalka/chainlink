@@ -19,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 )
 
 const (
@@ -30,13 +29,13 @@ const (
 )
 
 var defaultConfig = webapi.ServiceConfig{
-	OutgoingRateLimiter: common.RateLimiterConfig{
+	OutgoingRateLimiter: gateway.RateLimiterConfig{
 		GlobalRPS:      100.0,
 		GlobalBurst:    100,
 		PerSenderRPS:   100.0,
 		PerSenderBurst: 100,
 	},
-	RateLimiter: common.RateLimiterConfig{
+	RateLimiter: gateway.RateLimiterConfig{
 		GlobalRPS:      100.0,
 		GlobalBurst:    100,
 		PerSenderRPS:   100.0,

@@ -15,10 +15,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 )
 
@@ -34,7 +34,7 @@ type dispatcher struct {
 	peerID      p2ptypes.PeerID
 	signer      p2ptypes.Signer
 	registry    core.CapabilitiesRegistry
-	rateLimiter *common.RateLimiter
+	rateLimiter *gateway.RateLimiter
 	receivers   map[key]*receiver
 	mu          sync.RWMutex
 	stopCh      services.StopChan
@@ -50,7 +50,7 @@ type key struct {
 var _ services.Service = &dispatcher{}
 
 func NewDispatcher(cfg config.Dispatcher, peerWrapper p2ptypes.PeerWrapper, signer p2ptypes.Signer, registry core.CapabilitiesRegistry, lggr logger.Logger) (*dispatcher, error) {
-	rl, err := common.NewRateLimiter(common.RateLimiterConfig{
+	rl, err := gateway.NewRateLimiter(gateway.RateLimiterConfig{
 		GlobalRPS:      cfg.RateLimit().GlobalRPS(),
 		GlobalBurst:    cfg.RateLimit().GlobalBurst(),
 		PerSenderRPS:   cfg.RateLimit().PerSenderRPS(),

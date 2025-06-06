@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 )
 
 const (
@@ -43,8 +42,8 @@ type OutgoingConnectorHandler struct {
 	gc                  core.GatewayConnector
 	method              string
 	lggr                logger.Logger
-	incomingRateLimiter *common.RateLimiter
-	outgoingRateLimiter *common.RateLimiter
+	incomingRateLimiter *gateway.RateLimiter
+	outgoingRateLimiter *gateway.RateLimiter
 	responses           *responses
 	selectorOpts        []func(*gateway.RoundRobinSelector)
 	metrics             *metrics
@@ -52,12 +51,12 @@ type OutgoingConnectorHandler struct {
 
 func NewOutgoingConnectorHandler(gc core.GatewayConnector, config ServiceConfig, method string, lgger logger.Logger, opts ...func(*gateway.RoundRobinSelector)) (*OutgoingConnectorHandler, error) {
 	outgoingRLCfg := outgoingRateLimiterConfigDefaults(config.OutgoingRateLimiter)
-	outgoingRateLimiter, err := common.NewRateLimiter(outgoingRLCfg)
+	outgoingRateLimiter, err := gateway.NewRateLimiter(outgoingRLCfg)
 	if err != nil {
 		return nil, err
 	}
 	incomingRLCfg := incomingRateLimiterConfigDefaults(config.RateLimiter)
-	incomingRateLimiter, err := common.NewRateLimiter(incomingRLCfg)
+	incomingRateLimiter, err := gateway.NewRateLimiter(incomingRLCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +362,7 @@ func (c *OutgoingConnectorHandler) Name() string {
 	return c.lggr.Name()
 }
 
-func incomingRateLimiterConfigDefaults(config common.RateLimiterConfig) common.RateLimiterConfig {
+func incomingRateLimiterConfigDefaults(config gateway.RateLimiterConfig) gateway.RateLimiterConfig {
 	if config.GlobalBurst == 0 {
 		config.GlobalBurst = DefaultGlobalBurst
 	}
@@ -378,7 +377,7 @@ func incomingRateLimiterConfigDefaults(config common.RateLimiterConfig) common.R
 	}
 	return config
 }
-func outgoingRateLimiterConfigDefaults(config common.RateLimiterConfig) common.RateLimiterConfig {
+func outgoingRateLimiterConfigDefaults(config gateway.RateLimiterConfig) gateway.RateLimiterConfig {
 	if config.GlobalBurst == 0 {
 		config.GlobalBurst = DefaultGlobalBurst
 	}

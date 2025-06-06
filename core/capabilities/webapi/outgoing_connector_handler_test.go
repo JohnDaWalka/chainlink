@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/matches"
 )
 
@@ -266,13 +265,13 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		msgID := "msgID"
 		testURL := "http://localhost:8080"
 		var config = ServiceConfig{
-			OutgoingRateLimiter: common.RateLimiterConfig{
+			OutgoingRateLimiter: gateway.RateLimiterConfig{
 				GlobalRPS:      2.0,
 				GlobalBurst:    2,
 				PerSenderRPS:   1.0,
 				PerSenderBurst: 1,
 			},
-			RateLimiter: common.RateLimiterConfig{
+			RateLimiter: gateway.RateLimiterConfig{
 				GlobalRPS:      100.0,
 				GlobalBurst:    100,
 				PerSenderRPS:   100.0,
@@ -338,13 +337,13 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 
 func newFunctionWithDefaultConfig(t *testing.T, mockFn func(*gcmocks.GatewayConnector)) (*gcmocks.GatewayConnector, *OutgoingConnectorHandler) {
 	var defaultConfig = ServiceConfig{
-		OutgoingRateLimiter: common.RateLimiterConfig{
+		OutgoingRateLimiter: gateway.RateLimiterConfig{
 			GlobalRPS:      100.0,
 			GlobalBurst:    100,
 			PerSenderRPS:   100.0,
 			PerSenderBurst: 100,
 		},
-		RateLimiter: common.RateLimiterConfig{
+		RateLimiter: gateway.RateLimiterConfig{
 			GlobalRPS:      100.0,
 			GlobalBurst:    100,
 			PerSenderRPS:   100.0,
