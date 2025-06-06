@@ -66,7 +66,7 @@ import (
 	ocr2keeper21core "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/core"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/securemint"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
-	sm_adapter "github.com/smartcontractkit/chainlink/v2/core/services/ocr3/securemint/adapters"
+	sm_adapter "github.com/smartcontractkit/chainlink/v2/core/services/ocr3/securemint/onchain_keyring_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
