@@ -93,6 +93,7 @@ func run(
 	}
 	bs := NewBillingService(lggr.Named("Fake_Billing_Client"))
 	err = bs.Start(ctx)
+
 	if err != nil {
 		fmt.Printf("Failed to start billing service: %v\n", err)
 		os.Exit(1)
