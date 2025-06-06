@@ -64,7 +64,7 @@ func newSignedMessage(t *testing.T, id string, method string, donId string, priv
 			DonId:     donId,
 		},
 	}
-	require.NoError(t, msg.Sign(privateKey))
+	require.NoError(t, gc.Sign(&msg, privateKey))
 	return msg
 }
 
@@ -77,7 +77,7 @@ func sendNodeReponses(t *testing.T, handler handlers.Handler, userRequestMsg gat
 		} else {
 			nodeResponseMsg.Body.Payload = []byte(`{"success":false}`)
 		}
-		require.NoError(t, nodeResponseMsg.Sign(nodes[id].PrivateKey))
+		require.NoError(t, gc.Sign(&nodeResponseMsg, nodes[id].PrivateKey))
 		_ = handler.HandleNodeMessage(testutils.Context(t), &nodeResponseMsg, nodes[id].Address)
 	}
 }

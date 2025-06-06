@@ -14,6 +14,7 @@ import (
 	"github.com/onsi/gomega"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
+	gcmocks "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys/keystest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -22,7 +23,6 @@ import (
 	sfmocks "github.com/smartcontractkit/chainlink/v2/core/services/functions/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	gwconnector "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
-	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	fallowMocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions/allowlist/mocks"
 	fsubMocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions/subscriptions/mocks"
@@ -120,7 +120,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 					Sender:    addr.Hex(),
 				},
 			}
-			require.NoError(t, msg.Sign(privateKey))
+			require.NoError(t, common.Sign(&msg, privateKey))
 
 			ctx := testutils.Context(t)
 			snapshot := []*s4.SnapshotRow{
@@ -179,7 +179,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 					Payload:   json.RawMessage(`{"slot_id":3,"version":4,"expiration":5,"payload":"dGVzdA==","signature":"` + signatureB64 + `"}`),
 				},
 			}
-			require.NoError(t, msg.Sign(privateKey))
+			require.NoError(t, common.Sign(&msg, privateKey))
 
 			storage.On("Put", ctx, &key, &record, signature).Return(nil).Once()
 			allowlist.On("Allow", addr).Return(true).Once()
@@ -207,7 +207,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 
 			t.Run("missing signature", func(t *testing.T) {
 				msg.Body.Payload = json.RawMessage(`{"slot_id":3,"version":4,"expiration":5,"payload":"dGVzdA=="}`)
-				require.NoError(t, msg.Sign(privateKey))
+				require.NoError(t, common.Sign(&msg, privateKey))
 				storage.On("Put", ctx, mock.Anything, mock.Anything, mock.Anything).Return(s4.ErrWrongSignature).Once()
 				allowlist.On("Allow", addr).Return(true).Once()
 				subscriptions.On("GetMaxUserBalance", mock.Anything).Return(big.NewInt(100), nil).Once()
@@ -222,7 +222,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 
 			t.Run("malformed request", func(t *testing.T) {
 				msg.Body.Payload = json.RawMessage(`{sdfgdfgoscsicosd:sdf:::sdf ::; xx}`)
-				require.NoError(t, msg.Sign(privateKey))
+				require.NoError(t, common.Sign(&msg, privateKey))
 				allowlist.On("Allow", addr).Return(true).Once()
 				subscriptions.On("GetMaxUserBalance", mock.Anything).Return(big.NewInt(100), nil).Once()
 				connector.On("SendToGateway", ctx, "gw1", mock.Anything).Run(func(args mock.Arguments) {
@@ -257,7 +257,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 					Payload:   []byte("whatever"),
 				},
 			}
-			require.NoError(t, msg.Sign(privateKey))
+			require.NoError(t, common.Sign(&msg, privateKey))
 
 			allowlist.On("Allow", addr).Return(true).Once()
 			handler.HandleGatewayMessage(testutils.Context(t), "gw1", &msg)
@@ -267,7 +267,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 	t.Run("heartbeat success", func(t *testing.T) {
 		ctx := testutils.Context(t)
 		msg, internalId := newOffchainRequest(t, addr.Bytes(), 0)
-		require.NoError(t, msg.Sign(privateKey))
+		require.NoError(t, common.Sign(msg, privateKey))
 
 		// first call to trigger the request
 		var response functions.HeartbeatResponse
@@ -306,7 +306,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 	t.Run("heartbeat internal error", func(t *testing.T) {
 		ctx := testutils.Context(t)
 		msg, _ := newOffchainRequest(t, addr.Bytes(), 0)
-		require.NoError(t, msg.Sign(privateKey))
+		require.NoError(t, common.Sign(msg, privateKey))
 
 		// first call to trigger the request
 		var response functions.HeartbeatResponse
@@ -337,7 +337,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 	t.Run("heartbeat sender address doesn't match", func(t *testing.T) {
 		ctx := testutils.Context(t)
 		msg, _ := newOffchainRequest(t, geth_common.BytesToAddress([]byte("0x1234")).Bytes(), 0)
-		require.NoError(t, msg.Sign(privateKey))
+		require.NoError(t, common.Sign(msg, privateKey))
 
 		var response functions.HeartbeatResponse
 		allowlist.On("Allow", addr).Return(true).Once()
@@ -353,7 +353,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 	t.Run("heartbeat request too old", func(t *testing.T) {
 		ctx := testutils.Context(t)
 		msg, _ := newOffchainRequest(t, addr.Bytes(), 10_000)
-		require.NoError(t, msg.Sign(privateKey))
+		require.NoError(t, common.Sign(msg, privateKey))
 
 		var response functions.HeartbeatResponse
 		allowlist.On("Allow", addr).Return(true).Once()

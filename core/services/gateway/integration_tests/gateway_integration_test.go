@@ -18,11 +18,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	gatewaytypes "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
+	gctypes "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
+	gc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
@@ -100,31 +104,36 @@ func parseConnectorConfig(t *testing.T, tomlConfig string, nodeAddress string, n
 
 type client struct {
 	privateKey *ecdsa.PrivateKey
-	connector  connector.GatewayConnector
+	connector  core.GatewayConnector
 	done       atomic.Bool
 }
 
-func (c *client) HandleGatewayMessage(ctx context.Context, gatewayId string, msg *gateway.Message) {
+func (c *client) HandleGatewayMessage(ctx context.Context, gatewayId string, msg *gatewaytypes.Message) error {
 	c.done.Store(true)
 	// send back user's message without re-signing - should be ignored by the Gateway
 	_ = c.connector.SendToGateway(ctx, gatewayId, msg)
 	// send back a correct response
-	responseMsg := &gateway.Message{Body: gateway.MessageBody{
+	responseMsg := &gctypes.Message{Body: gctypes.MessageBody{
 		MessageId: msg.Body.MessageId,
 		Method:    "test",
 		DonId:     "test_don",
 		Receiver:  msg.Body.Sender,
 		Payload:   []byte(nodeResponsePayload),
 	}}
-	err := responseMsg.Sign(c.privateKey)
+	err := gc.Sign(responseMsg, c.privateKey)
 	if err != nil {
 		panic(err)
 	}
 	_ = c.connector.SendToGateway(ctx, gatewayId, responseMsg)
+	return nil
 }
 
 func (c *client) Sign(data ...[]byte) ([]byte, error) {
 	return common.SignData(c.privateKey, data...)
+}
+
+func (c *client) ID() (string, error) {
+	return "test_client", nil
 }
 
 func (*client) Start(ctx context.Context) error {
@@ -188,15 +197,15 @@ func TestIntegration_Gateway_NoFullNodes_BasicConnectionAndMessage(t *testing.T)
 	codec := api.JsonRPCCodec{}
 	respMsg, err := codec.DecodeResponse(rawResp)
 	require.NoError(t, err)
-	require.NoError(t, respMsg.Validate())
+	require.NoError(t, gc.ValidateMessageAndSetSigner(respMsg))
 	require.Equal(t, strings.ToLower(nodeKeys.Address), respMsg.Body.Sender)
 	require.Equal(t, messageId2, respMsg.Body.MessageId)
 	require.JSONEq(t, nodeResponsePayload, string(respMsg.Body.Payload))
 }
 
 func newHttpRequestObject(t *testing.T, messageId string, userUrl string, signerKey *ecdsa.PrivateKey) *http.Request {
-	msg := &gateway.Message{Body: gateway.MessageBody{MessageId: messageId, Method: "test", DonId: "test_don"}}
-	require.NoError(t, msg.Sign(signerKey))
+	msg := &gctypes.Message{Body: gctypes.MessageBody{MessageId: messageId, Method: "test", DonId: "test_don"}}
+	require.NoError(t, gc.ValidateMessageAndSetSigner(msg))
 	codec := api.JsonRPCCodec{}
 	rawMsg, err := codec.EncodeRequest(msg)
 	require.NoError(t, err)

@@ -18,6 +18,7 @@ import (
 	commonhex "github.com/smartcontractkit/chainlink-common/pkg/utils/hex"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
+	gc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
@@ -25,6 +26,8 @@ import (
 var _ core.GatewayConnector = (*gatewayConnector)(nil)
 var _ network.ConnectionInitiator = (*gatewayConnector)(nil)
 
+// Signer implementation needs to be provided by a GatewayConnector user (node)
+// in order to sign handshake messages with node's private key.
 type Signer interface {
 	// Sign keccak256 hash of data.
 	Sign(data ...[]byte) ([]byte, error)
@@ -222,7 +225,7 @@ func (c *gatewayConnector) readLoop(gatewayState *gatewayState) {
 				c.lggr.Errorw("parse error when reading from Gateway", "id", gatewayState.config.Id, "err", err)
 				break
 			}
-			if err = msg.Validate(); err != nil {
+			if err = gc.ValidateMessageAndSetSigner(msg); err != nil {
 				c.lggr.Errorw("failed to validate message signature", "id", gatewayState.config.Id, "err", err)
 				break
 			}

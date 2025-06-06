@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	gcmocks "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/matches"
@@ -38,7 +38,7 @@ func TestOutgoingConnectorHandler_AwaitConnection(t *testing.T) {
 			name: "successful connection on first try",
 			gatewayConnectorSetup: func(mockConnector *gcmocks.GatewayConnector) {
 				mockConnector.EXPECT().AwaitConnection(mock.Anything, "gateway1").Return(nil).Once()
-				mockConnector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+				mockConnector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 			},
 			ctxSetup:        context.Background,
 			expectedGateway: "gateway1",
@@ -48,7 +48,7 @@ func TestOutgoingConnectorHandler_AwaitConnection(t *testing.T) {
 			gatewayConnectorSetup: func(mockConnector *gcmocks.GatewayConnector) {
 				mockConnector.EXPECT().AwaitConnection(mock.Anything, "gateway1").Return(errors.New("timeout")).Once()
 				mockConnector.EXPECT().AwaitConnection(mock.Anything, "gateway2").Return(nil).Once()
-				mockConnector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+				mockConnector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 			},
 			ctxSetup:        context.Background,
 			expectedGateway: "gateway2",
@@ -56,7 +56,7 @@ func TestOutgoingConnectorHandler_AwaitConnection(t *testing.T) {
 		{
 			name: "connection timeout then success after backoff",
 			gatewayConnectorSetup: func(mockConnector *gcmocks.GatewayConnector) {
-				mockConnector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+				mockConnector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 				mockConnector.EXPECT().AwaitConnection(mock.Anything, "gateway1").Return(errors.New("gateway connection failed: timeout")).Once()
 				mockConnector.EXPECT().AwaitConnection(mock.Anything, "gateway2").Return(errors.New("gateway connection failed: timeout")).Once()
 
@@ -70,7 +70,7 @@ func TestOutgoingConnectorHandler_AwaitConnection(t *testing.T) {
 			name: "all gateways fail and context canceled",
 			gatewayConnectorSetup: func(mockConnector *gcmocks.GatewayConnector) {
 				callCount := 0
-				mockConnector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+				mockConnector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 				mockConnector.EXPECT().AwaitConnection(mock.Anything, mock.Anything).Return(errors.New("gateway connection failed: timeout")).Run(func(ctx context.Context, gatewayID string) {
 					callCount++
 					if callCount == len(gateways) {
@@ -90,7 +90,7 @@ func TestOutgoingConnectorHandler_AwaitConnection(t *testing.T) {
 		{
 			name: "context canceled",
 			gatewayConnectorSetup: func(mockConnector *gcmocks.GatewayConnector) {
-				mockConnector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+				mockConnector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 			},
 			ctxSetup: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -142,9 +142,9 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		connector, connectorHandler := newFunctionWithDefaultConfig(
 			t,
 			func(gc *gcmocks.GatewayConnector) {
-				gc.EXPECT().DonID().Return("donID")
+				gc.EXPECT().DonID().Return("donID", nil)
 				gc.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
-				gc.EXPECT().GatewayIDs().Return([]string{"gateway1"})
+				gc.EXPECT().GatewayIDs().Return([]string{"gateway1"}, nil)
 			},
 		)
 
@@ -155,10 +155,12 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		}
 		payload, err := json.Marshal(req)
 		require.NoError(t, err)
+		donID, err := connector.DonID()
+		require.NoError(t, err)
 
 		expectedBody := &gateway.MessageBody{
 			MessageId: msgID,
-			DonId:     connector.DonID(),
+			DonId:     donID,
 			Method:    ghcapabilities.MethodComputeAction,
 			Payload:   payload,
 		}
@@ -180,9 +182,9 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		connector, connectorHandler := newFunctionWithDefaultConfig(
 			t,
 			func(gc *gcmocks.GatewayConnector) {
-				gc.EXPECT().DonID().Return("donID")
+				gc.EXPECT().DonID().Return("donID", nil)
 				gc.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
-				gc.EXPECT().GatewayIDs().Return([]string{"gateway1"})
+				gc.EXPECT().GatewayIDs().Return([]string{"gateway1"}, nil)
 			},
 		)
 
@@ -193,10 +195,12 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		}
 		payload, err := json.Marshal(req)
 		require.NoError(t, err)
+		donID, err := connector.DonID()
+		require.NoError(t, err)
 
 		expectedBody := &gateway.MessageBody{
 			MessageId: msgID,
-			DonId:     connector.DonID(),
+			DonId:     donID,
 			Method:    ghcapabilities.MethodComputeAction,
 			Payload:   payload,
 		}
@@ -221,9 +225,9 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		connector, connectorHandler := newFunctionWithDefaultConfig(
 			t,
 			func(gc *gcmocks.GatewayConnector) {
-				gc.EXPECT().DonID().Return("donID")
+				gc.EXPECT().DonID().Return("donID", nil)
 				gc.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
-				gc.EXPECT().GatewayIDs().Return([]string{"gateway1"})
+				gc.EXPECT().GatewayIDs().Return([]string{"gateway1"}, nil)
 			},
 		)
 
@@ -234,10 +238,12 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		}
 		payload, err := json.Marshal(req)
 		require.NoError(t, err)
+		donID, err := connector.DonID()
+		require.NoError(t, err)
 
 		expectedBody := &gateway.MessageBody{
 			MessageId: msgID,
-			DonId:     connector.DonID(),
+			DonId:     donID,
 			Method:    ghcapabilities.MethodComputeAction,
 			Payload:   payload,
 		}
@@ -276,9 +282,9 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		connector, connectorHandler := newFunction(
 			t,
 			func(gc *gcmocks.GatewayConnector) {
-				gc.EXPECT().DonID().Return("donID")
+				gc.EXPECT().DonID().Return("donID", nil)
 				gc.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
-				gc.EXPECT().GatewayIDs().Return([]string{"gateway1"})
+				gc.EXPECT().GatewayIDs().Return([]string{"gateway1"}, nil)
 			},
 			config,
 		)
@@ -291,10 +297,12 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		}
 		payload, err := json.Marshal(req)
 		require.NoError(t, err)
+		donID, err := connector.DonID()
+		require.NoError(t, err)
 
 		expectedBody := &gateway.MessageBody{
 			MessageId: msgID,
-			DonId:     connector.DonID(),
+			DonId:     donID,
 			Method:    ghcapabilities.MethodComputeAction,
 			Payload:   payload,
 		}

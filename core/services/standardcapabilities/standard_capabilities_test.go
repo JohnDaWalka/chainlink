@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
@@ -36,7 +37,7 @@ func TestStandardCapabilityStart(t *testing.T) {
 				Network:            "evm",
 			}}
 
-		standardCapability := newStandardCapabilities(lggr, spec, pluginRegistrar, &telemetryServiceMock{}, &kvstoreMock{}, registry, &errorLogMock{}, &pipelineRunnerServiceMock{}, &relayerSetMock{}, &oracleFactoryMock{})
+		standardCapability := newStandardCapabilities(lggr, spec, pluginRegistrar, &telemetryServiceMock{}, &kvstoreMock{}, registry, &errorLogMock{}, &pipelineRunnerServiceMock{}, &relayerSetMock{}, &oracleFactoryMock{}, &gatewayConnectorMock{})
 		standardCapability.startTimeout = 1 * time.Second
 		err := standardCapability.Start(ctx)
 		require.NoError(t, err)
@@ -93,5 +94,39 @@ func (o *oracleMock) Start(ctx context.Context) error {
 	return nil
 }
 func (o *oracleMock) Close(ctx context.Context) error {
+	return nil
+}
+
+type gatewayConnectorMock struct{}
+
+func (g *gatewayConnectorMock) Start(context.Context) error {
+	return nil
+}
+
+func (g *gatewayConnectorMock) Close() error {
+	return nil
+}
+
+func (g *gatewayConnectorMock) AddHandler(methods []string, handler core.GatewayConnectorHandler) error {
+	return nil
+}
+
+func (g *gatewayConnectorMock) SendToGateway(ctx context.Context, gatewayID string, msg *gateway.Message) error {
+	return nil
+}
+
+func (g *gatewayConnectorMock) SignAndSendToGateway(ctx context.Context, gatewayID string, msg *gateway.MessageBody) error {
+	return nil
+}
+
+func (g *gatewayConnectorMock) GatewayIDs() ([]string, error) {
+	return nil, nil
+}
+
+func (g *gatewayConnectorMock) DonID() (string, error) {
+	return "", nil
+}
+
+func (g *gatewayConnectorMock) AwaitConnection(ctx context.Context, gatewayID string) error {
 	return nil
 }

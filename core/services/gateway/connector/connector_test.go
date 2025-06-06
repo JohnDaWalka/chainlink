@@ -1,4 +1,4 @@
-package connector_test
+package connector
 
 import (
 	"errors"
@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
+	gatewaymocks "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 )
@@ -37,18 +37,18 @@ URL = "wss://example.com:8090/node_endpoint"
 	testMethod2 = "test_method_2"
 )
 
-func parseTOMLConfig(t *testing.T, tomlConfig string) *connector.ConnectorConfig {
-	var cfg connector.ConnectorConfig
+func parseTOMLConfig(t *testing.T, tomlConfig string) *ConnectorConfig {
+	var cfg ConnectorConfig
 	err := toml.Unmarshal([]byte(tomlConfig), &cfg)
 	require.NoError(t, err)
 	return &cfg
 }
 
-func newTestConnector(t *testing.T, config *connector.ConnectorConfig) (connector.GatewayConnector, *mocks.Signer, *mocks.GatewayConnectorHandler) {
+func newTestConnector(t *testing.T, config *ConnectorConfig) (*gatewayConnector, *mocks.Signer, *gatewaymocks.GatewayConnectorHandler) {
 	signer := mocks.NewSigner(t)
-	handler := mocks.NewGatewayConnectorHandler(t)
+	handler := gatewaymocks.NewGatewayConnectorHandler(t)
 	clock := clockwork.NewFakeClock()
-	connector, err := connector.NewGatewayConnector(config, signer, clock, logger.TestLogger(t))
+	connector, err := NewGatewayConnector(config, signer, clock, logger.TestLogger(t))
 	require.NoError(t, err)
 	require.NoError(t, connector.AddHandler([]string{testMethod1}, handler))
 	return connector, signer, handler
@@ -112,7 +112,7 @@ URL = "ws://localhost:8081/node"
 	for name, config := range invalidCases {
 		config := config
 		t.Run(name, func(t *testing.T) {
-			_, err := connector.NewGatewayConnector(parseTOMLConfig(t, config), signer, clock, logger.TestLogger(t))
+			_, err := NewGatewayConnector(parseTOMLConfig(t, config), signer, clock, logger.TestLogger(t))
 			require.Error(t, err)
 		})
 	}
@@ -199,6 +199,6 @@ func TestGatewayConnector_AddHandler(t *testing.T) {
 
 	connector, _, _ := newTestConnector(t, parseTOMLConfig(t, defaultConfig))
 	// testMethod1 already exists
-	require.Error(t, connector.AddHandler([]string{testMethod1}, mocks.NewGatewayConnectorHandler(t)))
-	require.NoError(t, connector.AddHandler([]string{testMethod2}, mocks.NewGatewayConnectorHandler(t)))
+	require.Error(t, connector.AddHandler([]string{testMethod1}, gatewaymocks.NewGatewayConnectorHandler(t)))
+	require.NoError(t, connector.AddHandler([]string{testMethod2}, gatewaymocks.NewGatewayConnectorHandler(t)))
 }

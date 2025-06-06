@@ -16,29 +16,28 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	gcmocks "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
-	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/matches"
 )
 
 type wrapper struct {
-	c connector.GatewayConnector
+	c core.GatewayConnector
 }
 
-func newConnectorWrapper(c connector.GatewayConnector) *wrapper {
+func newConnectorWrapper(c core.GatewayConnector) *wrapper {
 	return &wrapper{
 		c: c,
 	}
 }
 
-func (w *wrapper) GetGatewayConnector() connector.GatewayConnector {
+func (w *wrapper) GetGatewayConnector() core.GatewayConnector {
 	return w.c
 }
 
@@ -57,7 +56,7 @@ func TestNewFetcherService(t *testing.T) {
 
 	t.Run("OK-valid_request", func(t *testing.T) {
 		connector.EXPECT().AddHandler([]string{ghcapabilities.MethodWorkflowSyncer}, mock.Anything).Return(nil)
-		connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+		connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 
 		fetcher := NewFetcherService(lggr, wrapper, webapi.WithFixedStart())
 		require.NoError(t, fetcher.Start(ctx))
@@ -67,7 +66,7 @@ func TestNewFetcherService(t *testing.T) {
 		connector.EXPECT().SignAndSendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, msg *gateway.MessageBody) {
 			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 		}).Return(nil).Times(1)
-		connector.EXPECT().DonID().Return(donID)
+		connector.EXPECT().DonID().Return(donID, nil)
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
 
 		req := ghcapabilities.Request{
@@ -94,9 +93,9 @@ func TestNewFetcherService(t *testing.T) {
 		connector.EXPECT().SignAndSendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, msg *gateway.MessageBody) {
 			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 		}).Return(nil).Times(1)
-		connector.EXPECT().DonID().Return(donID)
+		connector.EXPECT().DonID().Return(donID, nil)
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
-		connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+		connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 
 		req := ghcapabilities.Request{
 			URL:              url,
@@ -119,9 +118,9 @@ func TestNewFetcherService(t *testing.T) {
 		connector.EXPECT().SignAndSendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, msg *gateway.MessageBody) {
 			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 		}).Return(nil).Times(1)
-		connector.EXPECT().DonID().Return(donID)
+		connector.EXPECT().DonID().Return(donID, nil)
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
-		connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+		connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 
 		req := ghcapabilities.Request{
 			URL:              url,
@@ -159,9 +158,9 @@ func TestNewFetcherService(t *testing.T) {
 		connector.EXPECT().SignAndSendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, msg *gateway.MessageBody) {
 			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResponse)
 		}).Return(nil).Times(1)
-		connector.EXPECT().DonID().Return(donID)
+		connector.EXPECT().DonID().Return(donID, nil)
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
-		connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+		connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 
 		req := ghcapabilities.Request{
 			URL:              url,
@@ -175,7 +174,7 @@ func TestNewFetcherService(t *testing.T) {
 
 	t.Run("NOK-bad_request", func(t *testing.T) {
 		connector.EXPECT().AddHandler([]string{ghcapabilities.MethodWorkflowSyncer}, mock.Anything).Return(nil)
-		connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+		connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 
 		fetcher := NewFetcherService(lggr, wrapper, webapi.WithFixedStart())
 		require.NoError(t, fetcher.Start(ctx))
@@ -185,7 +184,7 @@ func TestNewFetcherService(t *testing.T) {
 		connector.EXPECT().SignAndSendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, msg *gateway.MessageBody) {
 			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 		}).Return(nil).Times(1)
-		connector.EXPECT().DonID().Return(donID)
+		connector.EXPECT().DonID().Return(donID, nil)
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
 
 		req := ghcapabilities.Request{
@@ -206,13 +205,13 @@ func TestNewFetcherService(t *testing.T) {
 		connector := gcmocks.NewGatewayConnector(t)
 		wrapper := newConnectorWrapper(connector)
 		connector.EXPECT().AddHandler([]string{ghcapabilities.MethodWorkflowSyncer}, mock.Anything).Return(nil)
-		connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+		connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 
 		fetcher := NewFetcherService(lggr, wrapper, webapi.WithFixedStart())
 		require.NoError(t, fetcher.Start(ctx))
 		defer fetcher.Close()
 
-		connector.EXPECT().DonID().Return(donID)
+		connector.EXPECT().DonID().Return(donID, nil)
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(assert.AnError).Maybe()
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway2").Return(assert.AnError).Maybe()
 
@@ -234,13 +233,13 @@ func TestNewFetcherService(t *testing.T) {
 		connector := gcmocks.NewGatewayConnector(t)
 		wrapper := newConnectorWrapper(connector)
 		connector.EXPECT().AddHandler([]string{ghcapabilities.MethodWorkflowSyncer}, mock.Anything).Return(nil)
-		connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+		connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 
 		fetcher := NewFetcherService(lggr, wrapper, webapi.WithFixedStart())
 		require.NoError(t, fetcher.Start(ctx))
 		defer fetcher.Close()
 
-		connector.EXPECT().DonID().Return(donID)
+		connector.EXPECT().DonID().Return(donID, nil)
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(assert.AnError).Once()
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway2").Return(nil).Once()
 
@@ -305,11 +304,12 @@ func inconsistentPayload(t *testing.T, msgID string, donID string) *gateway.Mess
 func signGatewayResponse(t *testing.T, msg *gateway.Message) *gateway.Message {
 	nodeKeys := common.NewTestNodes(t, 1)
 	s := &signer{pk: nodeKeys[0].PrivateKey}
-	signature, err := s.Sign(api.GetRawMessageBody(&msg.Body)...)
+	msgToSign := gateway.GetRawMessageBody(&msg.Body)
+	signature, err := s.Sign(msgToSign...)
 	require.NoError(t, err)
 	msg.Signature = utils.StringToHex(string(signature))
 
-	signerBytes, err := msg.ExtractSigner()
+	signerBytes, err := common.ExtractSigner(signature, msgToSign...)
 	require.NoError(t, err)
 
 	msg.Body.Receiver = utils.StringToHex(string(signerBytes))

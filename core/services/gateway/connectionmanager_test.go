@@ -8,6 +8,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 
+	gatewaytypes "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway"
@@ -221,7 +222,7 @@ func TestConnectionManager_SendToNode_Failures(t *testing.T) {
 	err = donMgr.SendToNode(testutils.Context(t), nodes[0].Address, nil)
 	require.Error(t, err)
 
-	message := &gateway.Message{}
+	message := &gatewaytypes.Message{}
 	err = donMgr.SendToNode(testutils.Context(t), "some_other_node", message)
 	require.Error(t, err)
 }

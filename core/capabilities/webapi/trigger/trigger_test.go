@@ -18,10 +18,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
+	gcmocks "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	corelogger "github.com/smartcontractkit/chainlink/v2/core/logger"
-	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 )
 
@@ -113,7 +114,7 @@ func gatewayRequest(t *testing.T, privateKey string, topics string, methodName s
 			Payload:   json.RawMessage(payloadJSON),
 		},
 	}
-	err = msg.Sign(key)
+	err = common.Sign(msg, key)
 	require.NoError(t, err)
 	return msg
 }

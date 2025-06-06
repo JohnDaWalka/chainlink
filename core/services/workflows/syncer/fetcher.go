@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	gc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 )
@@ -94,7 +95,7 @@ func (s *FetcherService) Fetch(ctx context.Context, messageID string, req ghcapa
 		return nil, err
 	}
 
-	if err = resp.Validate(); err != nil {
+	if err = gc.ValidateMessageAndSetSigner(resp); err != nil {
 		return nil, fmt.Errorf("invalid response from gateway: %w", err)
 	}
 

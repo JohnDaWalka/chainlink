@@ -13,10 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
+	gatewaytypes "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
 	handler_mocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/mocks"
@@ -154,8 +156,8 @@ func newGatewayWithMockHandler(t *testing.T) (gateway.Gateway, *handler_mocks.Ha
 }
 
 func newSignedRequest(t *testing.T, messageId string, method string, donID string, payload []byte) []byte {
-	msg := &gateway.Message{
-		Body: gateway.MessageBody{
+	msg := &gatewaytypes.Message{
+		Body: gatewaytypes.MessageBody{
 			MessageId: messageId,
 			Method:    method,
 			DonId:     donID,
@@ -164,7 +166,7 @@ func newSignedRequest(t *testing.T, messageId string, method string, donID strin
 	}
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
-	require.NoError(t, msg.Sign(privateKey))
+	require.NoError(t, common.Sign(msg, privateKey))
 	codec := api.JsonRPCCodec{}
 	rawRequest, err := codec.EncodeRequest(msg)
 	require.NoError(t, err)
@@ -205,7 +207,7 @@ func TestGateway_ProcessRequest_HandlerResponse(t *testing.T) {
 
 	gw, handler := newGatewayWithMockHandler(t)
 	handler.On("HandleUserMessage", mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		msg := args.Get(1).(*gateway.Message)
+		msg := args.Get(1).(*gatewaytypes.Message)
 		callbackCh := args.Get(2).(chan<- handlers.UserCallbackPayload)
 		// echo back to sender with attached payload
 		msg.Body.Payload = []byte(`{"result":"OK"}`)

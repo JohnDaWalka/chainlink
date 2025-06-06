@@ -223,7 +223,7 @@ func triggerRequest(t *testing.T, privateKey string, topics string, methodName s
 			Payload:   json.RawMessage(payloadJSON),
 		},
 	}
-	err = msg.Sign(key)
+	err = gwcommon.Sign(msg, key)
 	require.NoError(t, err)
 	return msg
 }

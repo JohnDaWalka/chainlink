@@ -13,22 +13,17 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/metering"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/wasmtest"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/utils/matches"
 
 	cappkg "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/metering"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
+	gcmocks "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/wasmtest"
-	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/matches"
@@ -203,9 +198,9 @@ func TestComputeFetch(t *testing.T) {
 	workflowExecutionID := "95ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0abbadeed"
 	th := setup(t, defaultConfig)
 
-	th.connector.EXPECT().DonID().Return("don-id")
+	th.connector.EXPECT().DonID().Return("don-id", nil)
 	th.connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
-	th.connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+	th.connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 
 	msgID := strings.Join([]string{
 		workflowExecutionID,
@@ -322,9 +317,9 @@ func TestCompute_SpendValueRelativeToComputeTime(t *testing.T) {
 
 			th := setup(t, defaultConfig)
 
-			th.connector.EXPECT().DonID().Return("don-id")
+			th.connector.EXPECT().DonID().Return("don-id", nil)
 			th.connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
-			th.connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+			th.connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 
 			th.connector.EXPECT().
 				SignAndSendToGateway(mock.Anything, "gateway1", mock.Anything).
@@ -363,9 +358,9 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 		MaxResponseSizeBytes: 1 * 1024,
 	})
 
-	th.connector.EXPECT().DonID().Return("don-id")
+	th.connector.EXPECT().DonID().Return("don-id", nil)
 	th.connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
-	th.connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"})
+	th.connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
 
 	msgID := strings.Join([]string{
 		workflowExecutionID,

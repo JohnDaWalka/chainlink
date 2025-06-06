@@ -289,7 +289,7 @@ func (m *donConnectionManager) readLoop(nodeAddress string, nodeState *nodeState
 				m.lggr.Errorw("parse error when reading from node", "nodeAddress", nodeAddress, "err", err)
 				break
 			}
-			if err = msg.Validate(); err != nil {
+			if err = common.ValidateMessageAndSetSigner(msg); err != nil {
 				m.lggr.Errorw("message validation error when reading from node", "nodeAddress", nodeAddress, "err", err)
 				break
 			}

@@ -20,7 +20,9 @@ import (
 	libformat "github.com/smartcontractkit/chainlink/system-tests/lib/format"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 )
 
 const (
@@ -63,8 +65,8 @@ func WebAPITriggerValue(gatewayURL, sender, receiver, privateKey string, timeout
 
 	publicAddress := crypto.PubkeyToAddress(key.PublicKey)
 
-	msg := &api.Message{
-		Body: api.MessageBody{
+	msg := &gateway.Message{
+		Body: gateway.MessageBody{
 			MessageId: uuid.New().String(),
 			Method:    Method,
 			DonId:     "1",
@@ -72,7 +74,7 @@ func WebAPITriggerValue(gatewayURL, sender, receiver, privateKey string, timeout
 			Sender:    publicAddress.String(),
 		},
 	}
-	if err = msg.Sign(key); err != nil {
+	if err = common.Sign(msg, key); err != nil {
 		return errors.Wrap(err, "error signing message")
 	}
 

@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions"
 	"github.com/smartcontractkit/chainlink/v2/core/services/s4"
 )
@@ -95,7 +96,7 @@ func UploadS4Secrets(rc *resty.Client, s4Cfg *S4SecretsCfg) (uint8, uint64, erro
 		},
 	}
 
-	err = msg.Sign(key)
+	err = common.Sign(msg, key)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -144,7 +145,7 @@ func ListS4Secrets(rc *resty.Client, s4Cfg *S4SecretsCfg) error {
 		},
 	}
 
-	err = msg.Sign(key)
+	err = common.Sign(msg, key)
 	if err != nil {
 		return err
 	}

@@ -128,8 +128,6 @@ packages:
       ORM:
   github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector:
     interfaces:
-      GatewayConnector:
-      GatewayConnectorHandler:
       Signer:
   github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers:
     interfaces:
