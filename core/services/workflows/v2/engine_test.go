@@ -2,6 +2,8 @@ package v2_test
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"sync"
@@ -10,20 +12,27 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
+	ragetypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	beholderpb "github.com/smartcontractkit/chainlink-common/pkg/beholder/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/protoc/pkg/test_capabilities/basicaction"
 	basicactionmock "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/protoc/pkg/test_capabilities/basicaction/basic_actionmock"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/protoc/pkg/test_capabilities/basictrigger"
 	basictriggermock "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/protoc/pkg/test_capabilities/basictrigger/basic_triggermock"
+	"github.com/smartcontractkit/chainlink-common/pkg/custmsg"
 	regmocks "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	sdkpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb"
-	"github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/testutils"
+	"github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/testutils/registry"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
 	modulemocks "github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host/mocks"
 	wasmpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/v2/pb"
 	capmocks "github.com/smartcontractkit/chainlink/v2/core/capabilities/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/wasmtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncerlimiter"
@@ -37,6 +46,7 @@ func TestEngine_Init(t *testing.T) {
 
 	module := modulemocks.NewModuleV2(t)
 	capreg := regmocks.NewCapabilitiesRegistry(t)
+	capreg.EXPECT().LocalNode(matches.AnyContext).Return(newNode(t), nil).Once()
 
 	initDoneCh := make(chan error)
 
@@ -49,13 +59,11 @@ func TestEngine_Init(t *testing.T) {
 		},
 	}
 
-	engine, err := v2.NewEngine(t.Context(), cfg)
+	engine, err := v2.NewEngine(testutils.Context(t), cfg)
 	require.NoError(t, err)
 
 	module.EXPECT().Start().Once()
-	module.EXPECT().SetCapabilityExecutor(mock.Anything).Return(nil).Once()
-	module.EXPECT().Execute(matches.AnyContext, mock.Anything).Return(newTriggerSubs(0), nil).Once()
-	capreg.EXPECT().LocalNode(matches.AnyContext).Return(capabilities.Node{}, nil).Once()
+	module.EXPECT().Execute(matches.AnyContext, mock.Anything, mock.Anything).Return(newTriggerSubs(0), nil).Once()
 	require.NoError(t, engine.Start(t.Context()))
 
 	require.NoError(t, <-initDoneCh)
@@ -74,11 +82,10 @@ func TestEngine_Start_RateLimited(t *testing.T) {
 
 	module := modulemocks.NewModuleV2(t)
 	module.EXPECT().Start()
-	module.EXPECT().SetCapabilityExecutor(mock.Anything).Return(nil)
-	module.EXPECT().Execute(matches.AnyContext, mock.Anything).Return(newTriggerSubs(0), nil).Times(2)
+	module.EXPECT().Execute(matches.AnyContext, mock.Anything, mock.Anything).Return(newTriggerSubs(0), nil).Times(2)
 	module.EXPECT().Close()
 	capreg := regmocks.NewCapabilitiesRegistry(t)
-	capreg.EXPECT().LocalNode(matches.AnyContext).Return(capabilities.Node{}, nil)
+	capreg.EXPECT().LocalNode(matches.AnyContext).Return(newNode(t), nil)
 	initDoneCh := make(chan error)
 	hooks := v2.LifecycleHooks{
 		OnInitialized: func(err error) {
@@ -94,14 +101,14 @@ func TestEngine_Start_RateLimited(t *testing.T) {
 	var engine1, engine2, engine3, engine4 *v2.Engine
 
 	t.Run("engine 1 inits successfully", func(t *testing.T) {
-		engine1, err = v2.NewEngine(t.Context(), cfg)
+		engine1, err = v2.NewEngine(testutils.Context(t), cfg)
 		require.NoError(t, err)
 		require.NoError(t, engine1.Start(t.Context()))
 		require.NoError(t, <-initDoneCh)
 	})
 
 	t.Run("engine 2 gets rate-limited by per-owner limit", func(t *testing.T) {
-		engine2, err = v2.NewEngine(t.Context(), cfg)
+		engine2, err = v2.NewEngine(testutils.Context(t), cfg)
 		require.NoError(t, err)
 		require.NoError(t, engine2.Start(t.Context()))
 		initErr := <-initDoneCh
@@ -110,7 +117,7 @@ func TestEngine_Start_RateLimited(t *testing.T) {
 
 	t.Run("engine 3 inits successfully", func(t *testing.T) {
 		cfg.WorkflowOwner = testWorkflowOwnerB
-		engine3, err = v2.NewEngine(t.Context(), cfg)
+		engine3, err = v2.NewEngine(testutils.Context(t), cfg)
 		require.NoError(t, err)
 		require.NoError(t, engine3.Start(t.Context()))
 		require.NoError(t, <-initDoneCh)
@@ -118,7 +125,7 @@ func TestEngine_Start_RateLimited(t *testing.T) {
 
 	t.Run("engine 4 gets rate-limited by global limit", func(t *testing.T) {
 		cfg.WorkflowOwner = testWorkflowOwnerC
-		engine4, err = v2.NewEngine(t.Context(), cfg)
+		engine4, err = v2.NewEngine(testutils.Context(t), cfg)
 		require.NoError(t, err)
 		require.NoError(t, engine4.Start(t.Context()))
 		initErr := <-initDoneCh
@@ -136,10 +143,9 @@ func TestEngine_TriggerSubscriptions(t *testing.T) {
 
 	module := modulemocks.NewModuleV2(t)
 	module.EXPECT().Start()
-	module.EXPECT().SetCapabilityExecutor(mock.Anything).Return(nil)
 	module.EXPECT().Close()
 	capreg := regmocks.NewCapabilitiesRegistry(t)
-	capreg.EXPECT().LocalNode(matches.AnyContext).Return(capabilities.Node{}, nil)
+	capreg.EXPECT().LocalNode(matches.AnyContext).Return(newNode(t), nil)
 
 	initDoneCh := make(chan error)
 	subscribedToTriggersCh := make(chan []string, 1)
@@ -158,9 +164,9 @@ func TestEngine_TriggerSubscriptions(t *testing.T) {
 
 	t.Run("too many triggers", func(t *testing.T) {
 		cfg.LocalLimits.MaxTriggerSubscriptions = 1
-		engine, err := v2.NewEngine(t.Context(), cfg)
+		engine, err := v2.NewEngine(testutils.Context(t), cfg)
 		require.NoError(t, err)
-		module.EXPECT().Execute(matches.AnyContext, mock.Anything).Return(newTriggerSubs(2), nil).Once()
+		module.EXPECT().Execute(matches.AnyContext, mock.Anything, mock.Anything).Return(newTriggerSubs(2), nil).Once()
 		require.NoError(t, engine.Start(t.Context()))
 		require.ErrorContains(t, <-initDoneCh, "too many trigger subscriptions")
 		require.NoError(t, engine.Close())
@@ -168,9 +174,9 @@ func TestEngine_TriggerSubscriptions(t *testing.T) {
 	})
 
 	t.Run("trigger capability not found in the registry", func(t *testing.T) {
-		engine, err := v2.NewEngine(t.Context(), cfg)
+		engine, err := v2.NewEngine(testutils.Context(t), cfg)
 		require.NoError(t, err)
-		module.EXPECT().Execute(matches.AnyContext, mock.Anything).Return(newTriggerSubs(2), nil).Once()
+		module.EXPECT().Execute(matches.AnyContext, mock.Anything, mock.Anything).Return(newTriggerSubs(2), nil).Once()
 		capreg.EXPECT().GetTrigger(matches.AnyContext, "id_0").Return(nil, errors.New("not found")).Once()
 		require.NoError(t, engine.Start(t.Context()))
 		require.ErrorContains(t, <-initDoneCh, "trigger capability not found")
@@ -178,9 +184,9 @@ func TestEngine_TriggerSubscriptions(t *testing.T) {
 	})
 
 	t.Run("successful trigger registration", func(t *testing.T) {
-		engine, err := v2.NewEngine(t.Context(), cfg)
+		engine, err := v2.NewEngine(testutils.Context(t), cfg)
 		require.NoError(t, err)
-		module.EXPECT().Execute(matches.AnyContext, mock.Anything).Return(newTriggerSubs(2), nil).Once()
+		module.EXPECT().Execute(matches.AnyContext, mock.Anything, mock.Anything).Return(newTriggerSubs(2), nil).Once()
 		trigger0, trigger1 := capmocks.NewTriggerCapability(t), capmocks.NewTriggerCapability(t)
 		capreg.EXPECT().GetTrigger(matches.AnyContext, "id_0").Return(trigger0, nil).Once()
 		capreg.EXPECT().GetTrigger(matches.AnyContext, "id_1").Return(trigger1, nil).Once()
@@ -196,9 +202,9 @@ func TestEngine_TriggerSubscriptions(t *testing.T) {
 	})
 
 	t.Run("failed trigger registration and rollback", func(t *testing.T) {
-		engine, err := v2.NewEngine(t.Context(), cfg)
+		engine, err := v2.NewEngine(testutils.Context(t), cfg)
 		require.NoError(t, err)
-		module.EXPECT().Execute(matches.AnyContext, mock.Anything).Return(newTriggerSubs(2), nil).Once()
+		module.EXPECT().Execute(matches.AnyContext, mock.Anything, mock.Anything).Return(newTriggerSubs(2), nil).Once()
 		trigger0, trigger1 := capmocks.NewTriggerCapability(t), capmocks.NewTriggerCapability(t)
 		capreg.EXPECT().GetTrigger(matches.AnyContext, "id_0").Return(trigger0, nil).Once()
 		capreg.EXPECT().GetTrigger(matches.AnyContext, "id_1").Return(trigger1, nil).Once()
@@ -216,7 +222,6 @@ func newTriggerSubs(n int) *wasmpb.ExecutionResult {
 	subs := make([]*sdkpb.TriggerSubscription, 0, n)
 	for i := range n {
 		subs = append(subs, &sdkpb.TriggerSubscription{
-			ExecId: fmt.Sprintf("execId_%d", i),
 			Id:     fmt.Sprintf("id_%d", i),
 			Method: "method",
 		})
@@ -231,14 +236,11 @@ func newTriggerSubs(n int) *wasmpb.ExecutionResult {
 }
 
 func TestEngine_Execution(t *testing.T) {
-	t.Parallel()
-
 	module := modulemocks.NewModuleV2(t)
 	module.EXPECT().Start()
-	module.EXPECT().SetCapabilityExecutor(mock.Anything).Return(nil)
 	module.EXPECT().Close()
 	capreg := regmocks.NewCapabilitiesRegistry(t)
-	capreg.EXPECT().LocalNode(matches.AnyContext).Return(capabilities.Node{}, nil)
+	capreg.EXPECT().LocalNode(matches.AnyContext).Return(newNode(t), nil)
 
 	initDoneCh := make(chan error)
 	subscribedToTriggersCh := make(chan []string, 1)
@@ -258,11 +260,13 @@ func TestEngine_Execution(t *testing.T) {
 			executionFinishedCh <- executionID
 		},
 	}
+	beholderTester := tests.Beholder(t)
+	cfg.BeholderEmitter = custmsg.NewLabeler()
 
 	t.Run("successful execution with no capability calls", func(t *testing.T) {
-		engine, err := v2.NewEngine(t.Context(), cfg)
+		engine, err := v2.NewEngine(testutils.Context(t), cfg)
 		require.NoError(t, err)
-		module.EXPECT().Execute(matches.AnyContext, mock.Anything).Return(newTriggerSubs(1), nil).Once()
+		module.EXPECT().Execute(matches.AnyContext, mock.Anything, mock.Anything).Return(newTriggerSubs(1), nil).Once()
 		trigger := capmocks.NewTriggerCapability(t)
 		capreg.EXPECT().GetTrigger(matches.AnyContext, "id_0").Return(trigger, nil).Once()
 		eventCh := make(chan capabilities.TriggerResponse)
@@ -280,12 +284,14 @@ func TestEngine_Execution(t *testing.T) {
 			Payload:     nil,
 		}
 
-		module.EXPECT().Execute(matches.AnyContext, mock.Anything).
+		module.EXPECT().Execute(matches.AnyContext, mock.Anything, mock.Anything).
 			Run(
-				func(_ context.Context, request *wasmpb.ExecuteRequest) {
+				func(_ context.Context, request *wasmpb.ExecuteRequest, executor host.CapabilityExecutor) {
 					wantExecID, err := types.GenerateExecutionID(cfg.WorkflowID, mockTriggerEvent.ID)
 					require.NoError(t, err)
-					require.Equal(t, wantExecID, request.Id)
+					capExec, ok := executor.(*v2.CapabilityExecutor)
+					require.True(t, ok)
+					require.Equal(t, wantExecID, capExec.WorkflowExecutionID)
 					require.Equal(t, uint64(0), request.Request.(*wasmpb.ExecuteRequest_Trigger).Trigger.Id)
 				},
 			).
@@ -298,6 +304,19 @@ func TestEngine_Execution(t *testing.T) {
 		<-executionFinishedCh
 
 		require.NoError(t, engine.Close())
+
+		requireEventsLabels(t, &beholderTester, map[string]string{
+			"workflowID":    cfg.WorkflowID,
+			"workflowOwner": cfg.WorkflowOwner,
+			"workflowName":  cfg.WorkflowName.String(),
+		})
+		requireEventsMessages(t, &beholderTester, []string{
+			"Started",
+			"Registering trigger",
+			"All triggers registered successfully",
+			"Workflow Engine initialized",
+			"Workflow execution finished successfully",
+		})
 	})
 }
 
@@ -312,10 +331,13 @@ func TestEngine_MockCapabilityRegistry_NoDAGBinary(t *testing.T) {
 	require.NoError(t, err)
 
 	capreg := regmocks.NewCapabilitiesRegistry(t)
+	capreg.EXPECT().LocalNode(matches.AnyContext).Return(newNode(t), nil).Once()
 
 	cfg := defaultTestConfig(t)
 	cfg.Module = module
 	cfg.CapRegistry = capreg
+	cfg.BillingClient = new(mockBillingClient)
+
 	initDoneCh := make(chan error, 1)
 	subscribedToTriggersCh := make(chan []string, 1)
 	resultReceivedCh := make(chan *wasmpb.ExecutionResult, 1)
@@ -336,22 +358,17 @@ func TestEngine_MockCapabilityRegistry_NoDAGBinary(t *testing.T) {
 	}
 
 	triggerMock, basicActionMock := setupExpectedCalls(t)
-	wrappedTriggerMock := &testutils.CapabilityWrapper{
+	wrappedTriggerMock := &registry.CapabilityWrapper{
 		Capability: triggerMock,
 	}
-	wrappedActionMock := &testutils.CapabilityWrapper{
+	wrappedActionMock := &registry.CapabilityWrapper{
 		Capability: basicActionMock,
 	}
 
 	t.Run("OK happy path", func(t *testing.T) {
 		wantResponse := "Hello, world!"
-		engine, err := v2.NewEngine(t.Context(), cfg)
+		engine, err := v2.NewEngine(testutils.Context(t), cfg)
 		require.NoError(t, err)
-
-		capreg.EXPECT().
-			LocalNode(matches.AnyContext).
-			Return(capabilities.Node{}, nil).
-			Once()
 
 		capreg.EXPECT().
 			GetTrigger(matches.AnyContext, wrappedTriggerMock.ID()).
@@ -420,4 +437,48 @@ func setupExpectedCalls(t *testing.T) (
 		return &basicaction.Outputs{AdaptedThing: "world"}, nil
 	}
 	return triggerMock, basicAction
+}
+
+func requireEventsLabels(t *testing.T, beholderTester *tests.BeholderTester, want map[string]string) {
+	msgs := beholderTester.Messages(t)
+	for _, msg := range msgs {
+		if msg.Attrs["beholder_entity"] == "BaseMessage" {
+			var payload beholderpb.BaseMessage
+			require.NoError(t, proto.Unmarshal(msg.Body, &payload))
+			for k, v := range want {
+				require.Equal(t, v, payload.Labels[k], "label %s does not match", k)
+			}
+		}
+	}
+}
+
+func requireEventsMessages(t *testing.T, beholderTester *tests.BeholderTester, expected []string) {
+	msgs := beholderTester.Messages(t)
+	nextToFind := 0
+	for _, msg := range msgs {
+		if msg.Attrs["beholder_entity"] == "BaseMessage" {
+			var payload beholderpb.BaseMessage
+			require.NoError(t, proto.Unmarshal(msg.Body, &payload))
+			if nextToFind >= len(expected) {
+				return
+			}
+			if payload.Msg == expected[nextToFind] {
+				nextToFind++
+			}
+		}
+	}
+
+	if nextToFind < len(expected) {
+		t.Errorf("log message not found: %s", expected[nextToFind])
+	}
+}
+
+func newNode(t *testing.T) capabilities.Node {
+	_, privKey, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	peerID, err := ragetypes.PeerIDFromPrivateKey(privKey)
+	require.NoError(t, err)
+	return capabilities.Node{
+		PeerID: &peerID,
+	}
 }

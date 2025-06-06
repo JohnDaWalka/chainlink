@@ -11,13 +11,13 @@ import (
 	ethCommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 )
@@ -65,7 +65,7 @@ func NewTrigger(config string, registry core.CapabilitiesRegistry, connector cor
 		connector:           connector,
 		registeredWorkflows: map[string]webapiTrigger{},
 		registry:            registry,
-		lggr:                lggr.Named("WorkflowConnectorHandler"),
+		lggr:                logger.Named(lggr, "WorkflowConnectorHandler"),
 	}
 
 	return handler, nil
