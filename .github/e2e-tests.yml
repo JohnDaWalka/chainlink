@@ -1543,6 +1543,7 @@ runner-test-matrix:
     path: integration-tests/ccip-tests/smoke/ccip_test.go
     test_env_type: docker
     runs_on: ubuntu-latest
+    runs_on_self_hosted: runs-on/cpu=8/ram=32/family=m6i/spot=false/image=ubuntu24-full-x64/extras=s3-cache+tmpfs
     triggers:
       - PR E2E CCIP Tests
       - Merge Queue E2E CCIP Tests
@@ -1559,6 +1560,7 @@ runner-test-matrix:
     path: integration-tests/ccip-tests/smoke/ccip_test.go
     test_env_type: docker
     runs_on: ubuntu-latest
+    runs_on_self_hosted: runs-on/cpu=8/ram=32/family=m6i/spot=false/image=ubuntu24-full-x64/extras=s3-cache+tmpfs
     triggers:
       - PR E2E CCIP Tests
       - Merge Queue E2E CCIP Tests
@@ -1576,6 +1578,7 @@ runner-test-matrix:
     path: integration-tests/ccip-tests/smoke/ccip_test.go
     test_env_type: docker
     runs_on: ubuntu-latest
+    runs_on_self_hosted: runs-on/cpu=8/ram=32/family=m6i/spot=false/image=ubuntu24-full-x64/extras=s3-cache+tmpfs
     triggers:
       - PR E2E CCIP Tests
       - Merge Queue E2E CCIP Tests
@@ -1676,6 +1679,7 @@ runner-test-matrix:
     path: integration-tests/ccip-tests/smoke/ccip_test.go
     test_env_type: docker
     runs_on: ubuntu-latest
+    runs_on_self_hosted: runs-on/cpu=8/ram=32/family=m6i/spot=false/image=ubuntu24-full-x64/extras=s3-cache+tmpfs
     triggers:
       - PR E2E CCIP Tests
       - Merge Queue E2E CCIP Tests
