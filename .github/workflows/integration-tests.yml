@@ -108,8 +108,8 @@ jobs:
           steps.changes.outputs.core_changes == 'true' ||
           steps.changes.outputs.github_ci_changes == 'true'
         }}
-      builder-runner-label: ${{ steps.runner-labels.outputs.runner-label }}
-      should-use-self-hosted-runners: ${{ steps.label-runs-on-opt-out.outputs.check-label-found == 'true' }}
+      builder-runner-label: ${{ steps.image-build-runner-labels.outputs.runner-label }}
+      should-use-self-hosted-runners: ${{ steps.label-runs-on-opt-out.outputs.check-label-found == 'false' }}
     steps:
       - name: Get PR Labels (run-e2e-tests)
         id: label-run-e2e-tests
@@ -163,8 +163,8 @@ jobs:
         with:
           check-label: "runs-on-opt-out"
 
-      - name: Set Runner Labels
-        id: runner-labels
+      - name: Set image builder runner labels
+        id: image-build-runner-labels
         env:
           OPT_OUT: ${{ steps.label-runs-on-opt-out.outputs.check-label-found || 'false' }}
           GH_BUILDER_RUNNER: ubuntu22.04-8cores-32GB
@@ -248,7 +248,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
-      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners == 'true' }}
+      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners }}
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -292,6 +292,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
+      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners }}
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -335,6 +336,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
+      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners }}
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -378,6 +380,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
+      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners }}
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -421,7 +424,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
-      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners == 'true' }}
+      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners }}
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -465,6 +468,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
+      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners }}
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -508,6 +512,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
+      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners }}
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -550,6 +555,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
+      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners }}
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -591,7 +597,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
-      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners == 'true' }}
+      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners }}
       team: "CCIP"
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
@@ -638,6 +644,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
+      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners }}
       team: "CCIP"
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
@@ -684,6 +691,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
+      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners }}
       team: "CCIP"
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
@@ -729,6 +737,7 @@ jobs:
       upload_cl_node_coverage_artifact: true
       upload_cl_node_coverage_artifact_prefix: cl_node_coverage_data_
       enable_otel_traces_for_ocr2_plugins: ${{ contains(join(github.event.pull_request.labels.*.name, ' '), 'enable tracing') }}
+      use-self-hosted-runners: ${{ needs.changes.outputs.should-use-self-hosted-runners }}
       team: "CCIP"
     secrets:
       QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
