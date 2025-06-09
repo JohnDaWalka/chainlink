@@ -7,7 +7,9 @@ replace github.com/smartcontractkit/chainlink/v2 => ../
 
 replace github.com/smartcontractkit/chainlink/deployment => ../deployment
 
-replace github.com/smartcontractkit/chainlink-deployments-framework => ../../chainlink-deployments-framework
+replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
+
+replace github.com/smartcontractkit/chainlink-protos/job-distributor v0.10.0 => ../../chainlink-protos/job-distributor
 
 // Using a separate `require` here to avoid surrounding line changes
 // creating potential merge conflicts.
@@ -471,6 +473,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250501150903-3e93089d9ad5 // indirect
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250520235549-14888563ec87 // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-00010101000000-000000000000 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.8.1 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250422175525-b7575d96bd4d // indirect
 	github.com/smartcontractkit/freeport v0.1.0 // indirect

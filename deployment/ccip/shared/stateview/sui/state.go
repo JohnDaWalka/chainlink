@@ -10,17 +10,18 @@ import (
 )
 
 type CCIPChainState struct {
-	CCIPAddress      sui.Address
-	LinkTokenAddress sui.Address
+	CCIPAddress          sui.Address
+	OnRampAddress        sui.Address
+	OnRampStateObjectId  sui.Address
+	OffRampAddress       sui.Address
+	OffRampOwnerCapId    sui.Address
+	OffRampStateObjectId sui.Address
+	LinkTokenAddress     sui.Address
 }
 
 // LoadOnchainStatesui loads chain state for sui chains from env
 func LoadOnchainStatesui(env cldf.Environment) (map[uint64]CCIPChainState, error) {
-	rawChains, err := env.BlockChains.SuiChains()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get SuiChains: %w", err)
-	}
-
+	rawChains := env.BlockChains.SuiChains()
 	suiChains := make(map[uint64]CCIPChainState)
 
 	for chainSelector := range rawChains {
@@ -46,16 +47,27 @@ func LoadOnchainStatesui(env cldf.Environment) (map[uint64]CCIPChainState, error
 
 func loadsuiChainStateFromAddresses(addresses map[string]cldf.TypeAndVersion) (CCIPChainState, error) {
 	chainState := CCIPChainState{}
-	for addrStr, typeAndVersion := range addresses {
+	for addr, typeAndVersion := range addresses {
 		// Parse address
-		suiAddr := sui.MustAddressFromHex(addrStr)
-		// err := address.ParseStringRelaxed(addrStr)
-		// if err != nil {
-		// 	return chainState, fmt.Errorf("failed to parse address %s for %s: %w", addrStr, typeAndVersion.Type, err)
-		// }
+		suiAddr := sui.MustAddressFromHex(addr)
 		switch typeAndVersion.Type {
-		case shared.AptosCCIPType:
+		case shared.SuiCCIPType:
 			chainState.CCIPAddress = *suiAddr
+
+		case shared.SuiOnRampType:
+			chainState.OnRampAddress = *suiAddr
+
+		case shared.SuiOnRampStateObjectIdType:
+			chainState.OnRampStateObjectId = *suiAddr
+
+		case shared.SuiOffRampType:
+			chainState.OffRampAddress = *suiAddr
+
+		case shared.SuiOffRampStateObjectIdType:
+			chainState.OffRampStateObjectId = *suiAddr
+
+		case shared.SuiOffRampOwnerCapObjectIdType:
+			chainState.OffRampOwnerCapId = *suiAddr
 		}
 		// Set address based on type
 

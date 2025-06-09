@@ -27,7 +27,7 @@ type DeployCCIPInput struct {
 	McmsPackageId string
 }
 
-var deployHandler = func(b cld_ops.Bundle, deps sui_ops.OpTxDeps, input DeployCCIPInput) (output sui_ops.OpTxResult[DeployCCIPObjects], err error) {
+var deployHandlerCCIP = func(b cld_ops.Bundle, deps sui_ops.OpTxDeps, input DeployCCIPInput) (output sui_ops.OpTxResult[DeployCCIPObjects], err error) {
 	ccipPackage, tx, err := ccip.PublishCCIP(
 		b.GetContext(),
 		deps.GetTxOpts(),
@@ -69,5 +69,5 @@ var DeployCCIPOp = cld_ops.NewOperation(
 	sui_ops.NewSuiOperationName("ccip", "package", "deploy"),
 	semver.MustParse("0.1.0"),
 	"Deploys the CCIP package",
-	deployHandler,
+	deployHandlerCCIP,
 )

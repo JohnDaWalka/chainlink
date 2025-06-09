@@ -73,4 +73,12 @@ var (
 	AptosMCMSType     deployment.ContractType = "AptosManyChainMultisig"
 	AptosCCIPType     deployment.ContractType = "AptosCCIP"
 	AptosReceiverType deployment.ContractType = "AptosReceiver"
+
+	SuiCCIPType                    deployment.ContractType = "SuiCCIP"
+	SuiOnRampType                  deployment.ContractType = "SuiOnRamp"
+	SuiOnRampStateObjectIdType     deployment.ContractType = "SuiOnRampStateObjectId"
+	SuiOffRampType                 deployment.ContractType = "SuiOffRamp"
+	SuiOffRampOwnerCapObjectIdType deployment.ContractType = "SuiOffRampOwnerCapObjectId"
+	SuiOffRampStateObjectIdType    deployment.ContractType = "SuiOffRampStateObjectId"
+	SuiMCMSType                    deployment.ContractType = "SuiManyChainMultisig"
 )

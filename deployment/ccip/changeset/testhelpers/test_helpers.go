@@ -220,6 +220,10 @@ func LatestBlock(ctx context.Context, env cldf.Environment, chainSelector uint64
 		return block, nil
 	case chainsel.FamilySolana:
 		return env.SolChains[chainSelector].Client.GetSlot(ctx, solconfig.DefaultCommitment)
+	case chainsel.FamilySui:
+		chainInfo := env.BlockChains.SuiChains()
+		return chainInfo[chainSelector].Selector, nil
+
 	default:
 		return 0, errors.New("unsupported chain family")
 	}
@@ -231,6 +235,9 @@ func LatestBlocksByChain(ctx context.Context, env cldf.Environment) (map[uint64]
 	chains := []uint64{}
 	chains = slices.AppendSeq(chains, maps.Keys(env.Chains))
 	chains = slices.AppendSeq(chains, maps.Keys(env.SolChains))
+	suiChains := env.BlockChains.SuiChains()
+	chains = slices.AppendSeq(chains, maps.Keys(suiChains))
+
 	for _, selector := range chains {
 		block, err := LatestBlock(ctx, env, selector)
 		if err != nil {

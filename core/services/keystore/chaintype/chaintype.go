@@ -54,6 +54,8 @@ func NewChainType(typ uint8) (ChainType, error) {
 		return Aptos, nil
 	case 6:
 		return Tron, nil
+	case 7:
+		return Sui, nil
 	default:
 		return "", fmt.Errorf("unexpected chaintype.ChainType: %#v", typ)
 	}
@@ -73,13 +75,15 @@ func (c ChainType) Type() (uint8, error) {
 		return 5, nil
 	case Tron:
 		return 6, nil
+	case Sui:
+		return 6, nil
 	default:
 		return 0, fmt.Errorf("unexpected chaintype.ChainType: %#v", c)
 	}
 }
 
 // SupportedChainTypes contain all chains that are supported
-var SupportedChainTypes = ChainTypes{EVM, Cosmos, Solana, StarkNet, Aptos, Tron}
+var SupportedChainTypes = ChainTypes{EVM, Cosmos, Solana, StarkNet, Aptos, Tron, Sui}
 
 // ErrInvalidChainType is an error to indicate an unsupported chain type
 var ErrInvalidChainType error

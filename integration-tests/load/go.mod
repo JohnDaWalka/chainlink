@@ -9,6 +9,12 @@ replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
 replace github.com/smartcontractkit/chainlink/integration-tests => ../
 
+replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
+
+replace github.com/smartcontractkit/chainlink-protos => ../../../chainlink-protos
+
+replace github.com/smartcontractkit/chainlink-protos/job-distributor v0.10.0 => ../../../chainlink-protos/job-distributor
+
 // Using a separate `require` here to avoid surrounding line changes
 // creating potential merge conflicts.
 require (
@@ -30,7 +36,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250523142134-2057cda8d221
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250520123946-6aaf88e0848a
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250522183927-44d96a7ad0e5
-	github.com/smartcontractkit/chainlink-deployments-framework v0.5.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.5.1
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250522161404-27a8f7e1cc6c
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.8.1
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.5
@@ -194,7 +200,7 @@ require (
 	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb // indirect
-	github.com/fardream/go-bcs v0.7.0 // indirect
+	github.com/fardream/go-bcs v0.8.7 // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b // indirect
@@ -399,7 +405,7 @@ require (
 	github.com/otiai10/copy v1.14.1 // indirect
 	github.com/otiai10/mint v1.6.3 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
-	github.com/pattonkan/sui-go v0.1.0 // indirect
+	github.com/pattonkan/sui-go v0.1.1 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/petermattis/goid v0.0.0-20240813172612-4fcff4a6cae7 // indirect
@@ -459,6 +465,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250501150903-3e93089d9ad5 // indirect
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250520235549-14888563ec87 // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-00010101000000-000000000000 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.51.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250422175525-b7575d96bd4d // indirect

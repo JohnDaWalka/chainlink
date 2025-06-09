@@ -1,0 +1,156 @@
+package sui
+
+import (
+	"fmt"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
+	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
+	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
+	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui/operation"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui/sequence"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
+)
+
+var _ cldf.ChangeSetV2[DeploySuiChainConfig] = DeploySuiChain{}
+
+// DeployAptosChain deploys Aptos chain packages and modules
+type DeploySuiChain struct{}
+
+// Apply implements deployment.ChangeSetV2.
+func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (cldf.ChangesetOutput, error) {
+	state, err := stateview.LoadOnchainState(e)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load Sui onchain state: %w", err)
+	}
+
+	ab := cldf.NewMemoryAddressBook()
+	seqReports := make([]operations.Report[any, any], 0)
+
+	for chainSel := range config.ContractParamsPerChain {
+		suiChains := e.BlockChains.SuiChains()
+
+		suiChain := suiChains[chainSel]
+		suiSigner := rel.NewPrivateKeySigner(suiChain.DeployerKey)
+
+		deps := operation.SuiDeps{
+			AB: ab,
+			SuiChain: sui_ops.OpTxDeps{
+				Client: *suiChain.Client,
+				Signer: suiSigner,
+				GetTxOpts: func() bind.TxOpts {
+					b := uint64(300_000_000)
+					return bind.TxOpts{
+						GasBudget: &b,
+					}
+				},
+			},
+			CCIPOnChainState: state,
+		}
+
+		// Run DeployAndInitCCIpSequence
+		ccipSeqInput := sequence.DeployAndInitCCIPSeqInput{
+			LinkTokenCoinMetadataObjectId: "",
+			LocalChainSelector:            1,
+			DestChainSelector:             2,
+			DeployCCIPInput: operation.DeployCCIPInput{
+				McmsPackageId: "0x2",
+			},
+		}
+
+		ccipSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, sequence.DeployAndInitCCIPSequence, deps.SuiChain, ccipSeqInput)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP for Sui chain %d: %w", chainSel, err)
+		}
+		seqReports = append(seqReports, ccipSeqReport.ExecutionReports...)
+
+		// save CCIP address to the addressbook
+		typeAndVersionCCIP := cldf.NewTypeAndVersion(shared.SuiCCIPType, deployment.Version1_6_0)
+		err = deps.AB.Save(chainSel, ccipSeqReport.Output.CCIPPackageId, typeAndVersionCCIP)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save CCIP address %s for Sui chain %d: %w", ccipSeqReport.Output.CCIPPackageId, chainSel, err)
+		}
+
+		// Run DeployAndInitCCIPOnRampSequence
+		ccipOnRampSeqInput := sequence.DeployAndInitCCIPOnRampSeqInput{
+			DeployCCIPOnRampInput: operation.DeployCCIPOnRampInput{
+				CCIPPackageId: ccipSeqReport.Output.CCIPPackageId,
+			},
+		}
+
+		ccipOnRampSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, sequence.DeployAndInitCCIPOnRampSequence, deps.SuiChain, ccipOnRampSeqInput)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP for Sui chain %d: %w", chainSel, err)
+		}
+		seqReports = append(seqReports, ccipOnRampSeqReport.ExecutionReports...)
+
+		// save onRamp address to the addressbook
+		typeAndVersionOnRamp := cldf.NewTypeAndVersion(shared.SuiOnRampType, deployment.Version1_6_0)
+		err = deps.AB.Save(chainSel, ccipOnRampSeqReport.Output.CCIPOnRampPackageId, typeAndVersionOnRamp)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save onRamp address %s for Sui chain %d: %w", ccipOnRampSeqReport.Output.CCIPOnRampPackageId, chainSel, err)
+		}
+
+		// Run DeployMCMSSequence
+		mcmsReport, err := operations.ExecuteSequence(e.OperationsBundle, sequence.DeployMCMSSequence, deps.SuiChain, cld_ops.EmptyInput{})
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP for Sui chain %d: %w", chainSel, err)
+		}
+		seqReports = append(seqReports, mcmsReport.ExecutionReports...)
+
+		// save onRamp address to the addressbook
+		typeAndVersionMCMs := cldf.NewTypeAndVersion(shared.SuiMCMSType, deployment.Version1_6_0)
+		err = deps.AB.Save(chainSel, mcmsReport.Output.PackageId, typeAndVersionMCMs)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save MCMs address %s for Sui chain %d: %w", mcmsReport.Output.PackageId, chainSel, err)
+		}
+
+		// Run DeployAndInitCCIPOffRampSequence
+		ccipOffRampSeqInput := sequence.DeployAndInitCCIPOffRampSeqInput{
+			DeployCCIPOffRampInput: operation.DeployCCIPOffRampInput{
+				CCIPPackageId: ccipSeqReport.Output.CCIPPackageId,
+				MCMSPackageId: mcmsReport.Output.PackageId,
+			},
+		}
+		ccipOffRampSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, sequence.DeployAndInitCCIPOffRampSequence, deps.SuiChain, ccipOffRampSeqInput)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP for Sui chain %d: %w", chainSel, err)
+		}
+		seqReports = append(seqReports, ccipOffRampSeqReport.ExecutionReports...)
+
+		// save offRamp address to the addressbook
+		typeAndVersionOffRamp := cldf.NewTypeAndVersion(shared.SuiOffRampType, deployment.Version1_6_0)
+		err = deps.AB.Save(chainSel, ccipOffRampSeqReport.Output.CCIPOffRampPackageId, typeAndVersionOffRamp)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save offRamp address %s for Sui chain %d: %w", ccipOffRampSeqReport.Output.CCIPOffRampPackageId, chainSel, err)
+		}
+
+		// save offRamp ownerCapId to the addressbook
+		typeAndVersionOffRampOwnerCapId := cldf.NewTypeAndVersion(shared.SuiOffRampOwnerCapObjectIdType, deployment.Version1_6_0)
+		err = deps.AB.Save(chainSel, ccipOffRampSeqReport.Output.Objects.ObjectCapId, typeAndVersionOffRampOwnerCapId)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save offRamp ObjectCapId address %s for Sui chain %d: %w", ccipOffRampSeqReport.Output.CCIPOffRampPackageId, chainSel, err)
+		}
+
+		// save offRamp stateObjectId to the addressbook
+		typeAndVersionOffRampObjectStateId := cldf.NewTypeAndVersion(shared.SuiOffRampStateObjectIdType, deployment.Version1_6_0)
+		err = deps.AB.Save(chainSel, ccipOffRampSeqReport.Output.Objects.StateObjectId, typeAndVersionOffRampObjectStateId)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save offRamp StateObjectId %s for Sui chain %d: %w", ccipOffRampSeqReport.Output.Objects.StateObjectId, chainSel, err)
+		}
+
+	}
+	return cldf.ChangesetOutput{
+		AddressBook: ab,
+		Reports:     seqReports,
+	}, nil
+}
+
+// VerifyPreconditions implements deployment.ChangeSetV2.
+func (d DeploySuiChain) VerifyPreconditions(e cldf.Environment, config DeploySuiChainConfig) error {
+	return nil
+}

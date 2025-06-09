@@ -223,7 +223,7 @@ func McmsInspectorForChain(env cldf.Environment, chain uint64) (mcmssdk.Inspecto
 	case chain_selectors.FamilySolana:
 		return mcmssolanasdk.NewInspector(env.SolChains[chain].Client), nil
 	default:
-		return nil, fmt.Errorf("unsupported chain family %s", chainFamily)
+		return nil, fmt.Errorf("unsupported chain family MCMS1%s", chainFamily)
 	}
 }
 
@@ -272,7 +272,7 @@ func TransactionForChain(
 		}
 
 	default:
-		return mcmstypes.Transaction{}, fmt.Errorf("unsupported chain family %s", chainFamily)
+		return mcmstypes.Transaction{}, fmt.Errorf("unsupported chain family MCMS2%s", chainFamily)
 	}
 
 	return tx, nil

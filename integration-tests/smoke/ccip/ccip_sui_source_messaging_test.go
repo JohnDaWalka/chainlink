@@ -18,8 +18,7 @@ func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
 	)
 
 	evmChainSelectors := maps.Keys(e.Env.Chains)
-	suiChains, err := e.Env.BlockChains.SuiChains()
-	require.NoError(t, err)
+	suiChains := e.Env.BlockChains.SuiChains()
 	suiChainSelectors := maps.Keys(suiChains)
 	require.Equal(t, len(suiChainSelectors), 1)
 

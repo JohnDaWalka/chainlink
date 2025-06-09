@@ -21,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
 	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
-
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 )
 
@@ -43,7 +42,9 @@ func GenerateChainsSui(t *testing.T, numChains int) map[uint64]suichain.Chain {
 
 		url, _, privateKey, client := suiChain(t, chainID)
 		chains[selector] = suichain.Chain{
-			Selector:    selector,
+			ChainMetadata: suichain.ChainMetadata{
+				Selector: selector,
+			},
 			Client:      client,
 			DeployerKey: privateKey,
 			URL:         url,

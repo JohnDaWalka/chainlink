@@ -1491,6 +1491,11 @@ func (c SetOCR3OffRampConfig) validateRemoteChain(e *cldf.Environment, state *st
 		if err := commoncs.ValidateOwnership(e.GetContext(), c.MCMS != nil, e.Chains[chainSelector].DeployerKey.From, chainState.Timelock.Address(), chainState.OffRamp); err != nil {
 			return err
 		}
+	case chain_selectors.FamilySui:
+		_, ok := state.SuiChains[chainSelector]
+		if !ok {
+			return fmt.Errorf("remote chain %d not found in onchain state", chainSelector)
+		}
 	default:
 		return fmt.Errorf("unsupported chain family %s", family)
 	}

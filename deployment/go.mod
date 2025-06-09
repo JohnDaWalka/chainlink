@@ -7,7 +7,9 @@ replace github.com/smartcontractkit/chainlink/v2 => ../
 
 replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
 
-replace github.com/smartcontractkit/chainlink-deployments-framework => ../../chainlink-deployments-framework
+replace github.com/smartcontractkit/chainlink-protos => ../../chainlink-protos
+
+replace github.com/smartcontractkit/chainlink-protos/job-distributor v0.10.0 => ../../chainlink-protos/job-distributor
 
 // Using a separate inline `require` here to avoid surrounding line changes
 // creating potential merge conflicts.

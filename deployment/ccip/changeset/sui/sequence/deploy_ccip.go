@@ -1,4 +1,4 @@
-package operation
+package sequence
 
 import (
 	"github.com/Masterminds/semver/v3"
@@ -43,7 +43,6 @@ var DeployAndInitCCIPSequence = cld_ops.NewSequence(
 		if err != nil {
 			return DeployCCIPSeqOutput{}, err
 		}
-
 		return DeployCCIPSeqOutput{
 			CCIPPackageId: deployReport.Output.PackageId,
 			Objects: DeployCCIPSeqObjects{

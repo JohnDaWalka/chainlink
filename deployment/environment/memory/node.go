@@ -155,6 +155,8 @@ func (n Node) JDChainConfigs() ([]*nodev1.ChainConfig, error) {
 			ocrtype = chaintype.Cosmos
 		case chainsel.FamilyAptos:
 			ocrtype = chaintype.Aptos
+		case chainsel.FamilySui:
+			ocrtype = chaintype.Sui
 		default:
 			return nil, fmt.Errorf("Unsupported chain family %v", family)
 		}
@@ -180,6 +182,8 @@ func (n Node) JDChainConfigs() ([]*nodev1.ChainConfig, error) {
 			ctype = nodev1.ChainType_CHAIN_TYPE_STARKNET
 		case chainsel.FamilyAptos:
 			ctype = nodev1.ChainType_CHAIN_TYPE_APTOS
+		case chainsel.FamilySui:
+			ctype = nodev1.ChainType_CHAIN_TYPE_SUI
 		default:
 			panic(fmt.Sprintf("Unsupported chain family %v", family))
 		}
@@ -542,18 +546,17 @@ func CreateKeys(t *testing.T,
 
 			// TODO: funding
 		case chainsel.FamilySui:
-			if len(suichains) > 0 {
-				keystore := app.GetKeyStore().Sui()
-				err = keystore.EnsureKey(ctx)
-				require.NoError(t, err, "failed to create key for sui")
+			keystore := app.GetKeyStore().Sui()
+			err = keystore.EnsureKey(ctx)
+			require.NoError(t, err, "failed to create key for sui")
 
-				keys, err := keystore.GetAll()
-				require.NoError(t, err)
-				require.Len(t, keys, 1)
+			keys, err := keystore.GetAll()
+			require.NoError(t, err)
+			require.Len(t, keys, 1)
 
-				transmitter := keys[0]
-				transmitters[chain.Selector] = transmitter.ID()
-			}
+			transmitter := keys[0]
+			transmitters[chain.Selector] = transmitter.ID()
+			t.Logf("Created Sui Key: ID %v, Account %v", transmitter.ID(), transmitter.Account())
 			// TODO: funding
 		case chainsel.FamilyStarknet:
 			keystore := app.GetKeyStore().StarkNet()
@@ -568,6 +571,33 @@ func CreateKeys(t *testing.T,
 			transmitters[chain.Selector] = transmitter.ID()
 		default:
 			// TODO: other transmission keys unsupported for now
+		}
+	}
+
+	if len(suichains) > 0 {
+
+		ctype := chaintype.Sui
+		err = app.GetKeyStore().OCR2().EnsureKeys(ctx, ctype)
+		require.NoError(t, err)
+		keys, err := app.GetKeyStore().OCR2().GetAllOfType(ctype)
+		require.NoError(t, err)
+		require.Len(t, keys, 1)
+		keybundle := keys[0]
+
+		keybundles[ctype] = keybundle
+
+		for sel, _ := range suichains {
+			keystore := app.GetKeyStore().Sui()
+			err = keystore.EnsureKey(ctx)
+			require.NoError(t, err, "failed to create key for sui")
+
+			keys, err := keystore.GetAll()
+			require.NoError(t, err)
+			require.Len(t, keys, 1)
+
+			transmitter := keys[0]
+			transmitters[sel] = transmitter.ID()
+			t.Logf("Created Sui Key: ID %v, Account %v", transmitter.ID(), transmitter.Account())
 		}
 	}
 

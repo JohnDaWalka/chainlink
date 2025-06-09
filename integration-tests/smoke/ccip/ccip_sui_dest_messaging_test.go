@@ -2,8 +2,9 @@ package ccip
 
 import (
 	"fmt"
-	"golang.org/x/exp/maps"
 	"testing"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/stretchr/testify/require"
 
@@ -19,8 +20,7 @@ func Test_CCIPMessaging_EVM2Sui(t *testing.T) {
 	)
 
 	evmChainSelectors := maps.Keys(e.Env.Chains)
-	suiChains, err := e.Env.BlockChains.SuiChains()
-	require.NoError(t, err)
+	suiChains := e.Env.BlockChains.SuiChains()
 	suiChainSelectors := maps.Keys(suiChains)
 	require.Equal(t, len(suiChainSelectors), 1)
 

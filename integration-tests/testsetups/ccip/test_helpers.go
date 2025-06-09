@@ -112,6 +112,7 @@ func (l *DeployedLocalDevEnvironment) StartChains(t *testing.T) {
 
 	l.DeployedEnv.Users = users
 	l.DeployedEnv.Env.Chains = chains
+	l.DeployedEnv.Env.BlockChains = chain.NewBlockChains(blockChains)
 	l.DeployedEnv.FeedChainSel = feedSel
 	l.DeployedEnv.HomeChainSel = homeChainSel
 	l.DeployedEnv.ReplayBlocks = replayBlocks
@@ -198,7 +199,6 @@ func NewIntegrationEnvironment(t *testing.T, opts ...testhelpers.TestOps) (testh
 	switch testCfg.Type {
 	case testhelpers.Memory:
 		dEnv, memEnv := testhelpers.NewMemoryEnvironment(t, opts...)
-		fmt.Println("DEPLOYED ENV, ", dEnv.Env.BlockChains, "MEMORY", memEnv.DeployedEnvironment().Env.BlockChains)
 		return dEnv, devenv.RMNCluster{}, memEnv
 	case testhelpers.Docker:
 		dockerEnv := &DeployedLocalDevEnvironment{

@@ -325,6 +325,8 @@ func (d *Delegate) getTransmitterKeys(ctx context.Context, relayIDs []types.Rela
 			keys, err = getKeys(d.keystore.Cosmos())
 		case relay.NetworkStarkNet:
 			keys, err = getKeys(d.keystore.StarkNet())
+		case relay.NetworkSui:
+			keys, err = getKeys(d.keystore.Sui())
 		default:
 			return nil, fmt.Errorf("unsupported network: %s", relayID.Network)
 		}

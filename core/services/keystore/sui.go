@@ -3,6 +3,7 @@ package keystore
 import (
 	"context"
 	"fmt"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
 )
@@ -129,8 +130,15 @@ func (ks *sui) EnsureKey(ctx context.Context) error {
 	if len(ks.keyRing.Sui) > 0 {
 		return nil
 	}
-	_, err := ks.Create(ctx)
-	return err
+
+	key, err := suikey.New()
+	if err != nil {
+		return err
+	}
+
+	ks.logger.Infof("Created Sui key with ID %s", key.ID())
+
+	return ks.safeAddKey(ctx, key)
 }
 
 func (ks *sui) Sign(_ context.Context, id string, msg []byte) ([]byte, error) {

@@ -2,7 +2,6 @@ package devenv
 
 import (
 	"context"
-	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,8 +28,6 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/gagliardetto/solana-go"
-
-	"github.com/pattonkan/sui-go/suiclient"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 )
@@ -243,23 +240,6 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf.Cha
 						return err
 					},
 					ProgramsPath: programsPath,
-				})
-				return nil
-
-			case SuiChainType:
-				_, privateKey, err := ed25519.GenerateKey(nil)
-				if err != nil {
-					return err
-				}
-				client := suiclient.NewClient(chainCfg.HTTPRPCs[0].External)
-				suiSyncMap.Store(chainDetails.ChainSelector, suichain.Chain{
-					Selector:    chainDetails.ChainSelector,
-					Client:      client,
-					DeployerKey: privateKey,
-					URL:         chainCfg.HTTPRPCs[0].External,
-					Confirm: func(txHash string, opts ...any) error {
-						return errors.New("TODO sui Confirm")
-					},
 				})
 				return nil
 
