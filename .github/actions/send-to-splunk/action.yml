@@ -4,6 +4,15 @@ inputs:
   matrix-cmd:
     description: 'The ci-core matrix command associated with the run'
     required: true
+  github-token:
+    description: 'GitHub token to access the repository'
+    required: true
+  splunk-endpoint:
+    description: 'Flakeguards splunk endpoint'
+    required: true
+  splunk-hec:
+    description: 'Flakeguards splunk hec token'
+    required: true
 
 runs:
   using: 'composite'
@@ -59,13 +68,13 @@ runs:
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
         MATRIX_TYPE_CMD: ${{ inputs.matrix-cmd }}
         GITHUB_WORKSPACE: ${{ github.workspace }}
         GITHUB_REPOSITORY: ${{ github.repository }}
         GITHUB_RUN_ID: ${{ github.run_id }}
         GITHUB_EVENT_NAME: ${{ github.event_name }}
-        FLAKEGUARD_SPLUNK_ENDPOINT: ${{ secrets.FLAKEGUARD_SPLUNK_ENDPOINT }}
-        FLAKEGUARD_SPLUNK_HEC: ${{ secrets.FLAKEGUARD_SPLUNK_HEC }}
+        FLAKEGUARD_SPLUNK_ENDPOINT: ${{ inputs.splunk-endpoint }}
+        FLAKEGUARD_SPLUNK_HEC: ${{ inputs.splunk-hec }}
       run: ${ACTION_PATH}/flakeguard-send-report-to-splunk.sh
 

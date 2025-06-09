@@ -300,6 +300,9 @@ jobs:
         uses: ./.github/actions/send-to-splunk
         with:
           matrix-cmd: ${{ matrix.type.cmd }}
+          github-token: ${{ github.token }}
+          splunk-endpoint: ${{ secrets.FLAKEGUARD_SPLUNK_ENDPOINT }}
+          splunk-hec: ${{ secrets.FLAKEGUARD_SPLUNK_HEC }}
 
       - name: Print Races
         id: print-races
