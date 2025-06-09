@@ -6,8 +6,7 @@ SCRIPT_PATH=`dirname "$0"`; SCRIPT_PATH=`eval "cd \"$SCRIPT_PATH\" && pwd"`
 OUTPUT_FILE=${OUTPUT_FILE:-"./output.txt"}
 EXTRA_FLAGS="-timeout 16m"
 
-
-if [[ -n "$USE_FLAKEGUARD" ]]; then
+if [[ "$USE_FLAKEGUARD" == 'true' ]]; then
   # Install flakeguard
   go install github.com/smartcontractkit/chainlink-testing-framework/tools/flakeguard@bc66d27e3325a1fecedc0fc932d13d3e54ff6f25
   # Install gotestsum to parse JSON test outputs from flakeguard to console outputs
