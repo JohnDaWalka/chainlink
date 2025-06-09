@@ -9,6 +9,7 @@ runs:
   using: 'composite'
   steps:
     - name: Generate Flakeguard Test Reports
+      shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
         MATRIX_TYPE_CMD: ${{ inputs.matrix-cmd }}
