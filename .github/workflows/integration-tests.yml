@@ -177,7 +177,7 @@ jobs:
             echo "builder-runner-label=${GH_BUILDER_RUNNER}" | tee -a "$GITHUB_OUTPUT"
             echo "solana-runner-label=${GH_SOLANA_RUNNER}" | tee -a "$GITHUB_OUTPUT"
           else
-            echo "builder-runner-labe=${SH_BUILDER_RUNNER}" | tee -a "$GITHUB_OUTPUT"
+            echo "builder-runner-label=${SH_BUILDER_RUNNER}" | tee -a "$GITHUB_OUTPUT"
             echo "solana-runner-label=${SH_SOLANA_RUNNER}" | tee -a "$GITHUB_OUTPUT"
           fi
 
