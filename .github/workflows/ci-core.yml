@@ -225,12 +225,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Change Modtime of Files (cache optimization)
-        if: ${{ matrix.type.should-run == 'true' }}
-        shell: bash
-        run: |
-          find . -type f,d -exec touch -r {} -d '1970-01-01T00:00:01' {} \; || true
-
       - name: Setup Go
         if: ${{ matrix.type.should-run == 'true' }}
         uses: ./.github/actions/setup-go
@@ -298,8 +292,8 @@ jobs:
           USE_FLAKEGUARD: ${{ matrix.type.use-flakeguard || 'false'}}
         run: |
           # See: https://github.com/golang/go/issues/69179
-          echo "Using Flakeguard: ${USE_FLAKGUARD}"
-          GODEBUG=goindex=0 ./tools/bin/${{ matrix.type.cmd }} ./...
+          echo "Using Flakeguard: ${USE_FLAKEGUARD}"
+          ./tools/bin/${{ matrix.type.cmd }} ./...
 
       - name: Generate and Send Flakeguard Test Reports to Splunk
         if: ${{ always() && steps.run-tests.outcome != 'skipped' && matrix.type.should-run == 'true' && matrix.type.use-flakeguard }}
