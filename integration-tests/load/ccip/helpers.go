@@ -10,9 +10,6 @@ import (
 	"sync"
 	"time"
 
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
-
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
@@ -22,7 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 
-	evmChain "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
@@ -35,6 +33,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	"github.com/smartcontractkit/chainlink/deployment/environment/crib"
 )
 
@@ -63,7 +62,7 @@ func subscribeTransmitEvents(
 	startBlock *uint64,
 	srcChainSel uint64,
 	loadFinished chan struct{},
-	client evmChain.OnchainClient,
+	client cldf_evm.OnchainClient,
 	wg *sync.WaitGroup,
 	metricPipe chan messageData,
 	finalSeqNrCommitChannels map[uint64]chan finalSeqNrReport,
@@ -172,7 +171,7 @@ func subscribeCommitEvents(
 	srcChains []uint64,
 	startBlock *uint64,
 	chainSelector uint64,
-	client evmChain.OnchainClient,
+	client cldf_evm.OnchainClient,
 	finalSeqNrs chan finalSeqNrReport,
 	wg *sync.WaitGroup,
 	metricPipe chan messageData,
@@ -301,7 +300,7 @@ func subscribeExecutionEvents(
 	srcChains []uint64,
 	startBlock *uint64,
 	chainSelector uint64,
-	client evmChain.OnchainClient,
+	client cldf_evm.OnchainClient,
 	finalSeqNrs chan finalSeqNrReport,
 	wg *sync.WaitGroup,
 	metricPipe chan messageData,
@@ -527,7 +526,7 @@ func fundAdditionalKeys(lggr logger.Logger, e cldf.Environment, destChains []uin
 	return deployerMap, nil
 }
 func reclaimFunds(lggr logger.Logger, e cldf.Environment, addressesByChain map[uint64][]*bind.TransactOpts, returnAddress common.Address) error {
-	removeFundsFromAccounts := func(ctx context.Context, lggr logger.Logger, chain evmChain.Chain, addresses []*bind.TransactOpts, returnAddress common.Address, sel uint64) error {
+	removeFundsFromAccounts := func(ctx context.Context, lggr logger.Logger, chain cldf_evm.Chain, addresses []*bind.TransactOpts, returnAddress common.Address, sel uint64) error {
 		for _, deployer := range addresses {
 			balance, err := chain.Client.BalanceAt(ctx, deployer.From, nil)
 			if err != nil {
