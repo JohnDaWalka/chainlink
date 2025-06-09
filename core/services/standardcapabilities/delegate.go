@@ -196,7 +196,10 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) ([]job.Ser
 			return nil, fmt.Errorf("failed to create oracle factory: %w", err)
 		}
 	}
-	connector := d.gatewayConnectorWrapper.GetGatewayConnector()
+	var connector core.GatewayConnector
+	if d.gatewayConnectorWrapper != nil {
+		connector = d.gatewayConnectorWrapper.GetGatewayConnector()
+	}
 
 	// NOTE: special cases for built-in capabilities (to be moved into LOOPPs in the future)
 	if spec.StandardCapabilitiesSpec.Command == commandOverrideForWebAPITrigger {
