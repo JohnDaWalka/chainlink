@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
+	"github.com/pattonkan/sui-go/sui"
 	"github.com/stretchr/testify/require"
 
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
@@ -16,10 +17,9 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-
+	module_onramp_sui "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_onramp/onramp"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 )
@@ -103,7 +103,7 @@ const (
 type TestCaseOutput struct {
 	Replayed     bool
 	Nonce        uint64
-	MsgSentEvent *onramp.OnRampCCIPMessageSent
+	MsgSentEvent *testhelpers.AnyMsgSentEvent
 }
 
 func sleepAndReplay(t *testing.T, e testhelpers.DeployedEnv, chainSelectors ...uint64) {
@@ -181,6 +181,16 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 			ExtraArgs:    tc.ExtraArgs,
 		}
 
+	case chain_selectors.FamilySui:
+		feeToken := sui.Address{}
+
+		msg = module_onramp_sui.Sui2AnyRampMessage{
+			Data:         tc.MsgData,
+			Receiver:     common.LeftPadBytes(tc.Receiver, 32),
+			ExtraArgs:    tc.ExtraArgs,
+			FeeToken:     feeToken.String(),
+			TokenAmounts: nil,
+		}
 	default:
 		tc.T.Errorf("unsupported source chain: %v", family)
 	}

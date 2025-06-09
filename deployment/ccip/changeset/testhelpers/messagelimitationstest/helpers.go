@@ -8,7 +8,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -82,7 +81,7 @@ type TestCase struct {
 }
 
 type TestCaseOutput struct {
-	MsgSentEvent *onramp.OnRampCCIPMessageSent
+	MsgSentEvent *testhelpers.AnyMsgSentEvent
 }
 
 func Run(tc TestCase) TestCaseOutput {
