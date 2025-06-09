@@ -17,12 +17,12 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	gatewaytypes "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	gctypes "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
@@ -154,7 +154,7 @@ func TestIntegration_Gateway_NoFullNodes_BasicConnectionAndMessage(t *testing.T)
 	nodeKeys.Address = strings.ToUpper(nodeKeys.Address)
 
 	// Launch Gateway
-	lggr := logger.TestLogger(t)
+	lggr := logger.Test(t)
 	gatewayConfig := fmt.Sprintf(gatewayConfigTemplate, nodeKeys.Address)
 	c, err := network.NewHTTPClient(network.HTTPClientConfig{
 		DefaultTimeout:   5 * time.Second,
@@ -205,6 +205,7 @@ func TestIntegration_Gateway_NoFullNodes_BasicConnectionAndMessage(t *testing.T)
 
 func newHttpRequestObject(t *testing.T, messageId string, userUrl string, signerKey *ecdsa.PrivateKey) *http.Request {
 	msg := &gctypes.Message{Body: gctypes.MessageBody{MessageId: messageId, Method: "test", DonId: "test_don"}}
+	require.NoError(t, gc.Sign(msg, signerKey))
 	require.NoError(t, gc.ValidateMessageAndSetSigner(msg))
 	codec := api.JsonRPCCodec{}
 	rawMsg, err := codec.EncodeRequest(msg)

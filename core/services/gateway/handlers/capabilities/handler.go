@@ -12,9 +12,9 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
@@ -74,7 +74,7 @@ func NewHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don 
 		config:          cfg,
 		don:             don,
 		donConfig:       donConfig,
-		lggr:            lggr.Named("WebAPIHandler." + donConfig.DonId),
+		lggr:            logger.Named(lggr, "WebAPIHandler."+donConfig.DonId),
 		httpClient:      httpClient,
 		nodeRateLimiter: nodeRateLimiter,
 		wg:              sync.WaitGroup{},
@@ -157,7 +157,7 @@ func (h *handler) handleWebAPIOutgoingMessage(ctx context.Context, msg *gateway.
 		newCtx := context.WithoutCancel(ctx)
 		newCtx, cancel := context.WithTimeout(newCtx, timeout)
 		defer cancel()
-		l := h.lggr.With("url", payload.URL, "messageId", msg.Body.MessageId, "method", payload.Method, "timeout", payload.TimeoutMs)
+		l := logger.With(h.lggr, "url", payload.URL, "messageId", msg.Body.MessageId, "method", payload.Method, "timeout", payload.TimeoutMs)
 		l.Debug("Sending request to client")
 		respMsg, err := h.sendHTTPMessageToClient(newCtx, req, msg)
 		if err != nil {
@@ -207,7 +207,7 @@ func (h *handler) HandleNodeMessage(ctx context.Context, msg *gateway.Message, n
 	switch msg.Body.Method {
 	case MethodWebAPITrigger:
 		err = h.handleWebAPITriggerMessage(ctx, msg, nodeAddr)
-	case MethodWebAPITarget, MethodComputeAction, MethodWorkflowSyncer:
+	case MethodWebAPITarget, MethodComputeAction, MethodWorkflowSyncer, gateway.MethodHTTPAction:
 		err = h.handleWebAPIOutgoingMessage(ctx, msg, nodeAddr)
 	default:
 		err = fmt.Errorf("unsupported method: %s", msg.Body.Method)

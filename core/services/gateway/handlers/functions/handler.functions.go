@@ -15,11 +15,11 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
@@ -106,7 +106,7 @@ func NewFunctionsHandlerFromConfig(handlerConfig json.RawMessage, donConfig *con
 	if err != nil {
 		return nil, err
 	}
-	lggr = lggr.Named("FunctionsHandler:" + donConfig.DonId)
+	lggr = logger.Named(lggr, "FunctionsHandler:"+donConfig.DonId)
 	var allowlist fallow.OnchainAllowlist
 	if cfg.OnchainAllowlist != nil {
 		chain, err2 := legacyChains.Get(cfg.ChainID)

@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	gc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
@@ -52,7 +52,7 @@ func newFunctionsHandlerForATestDON(t *testing.T, nodes []gc.TestNode, requestTi
 	require.NoError(t, err)
 	pendingRequestsCache := hc.NewRequestCache[functions.PendingRequest](requestTimeout, 1000)
 	allowedHeartbeatInititors := map[string]struct{}{heartbeatSender: {}}
-	handler := functions.NewFunctionsHandler(cfg, donConfig, don, pendingRequestsCache, allowlist, subscriptions, minBalance, userRateLimiter, nodeRateLimiter, allowedHeartbeatInititors, logger.TestLogger(t))
+	handler := functions.NewFunctionsHandler(cfg, donConfig, don, pendingRequestsCache, allowlist, subscriptions, minBalance, userRateLimiter, nodeRateLimiter, allowedHeartbeatInititors, logger.Test(t))
 	return handler, don, allowlist, subscriptions
 }
 
@@ -85,7 +85,7 @@ func sendNodeReponses(t *testing.T, handler handlers.Handler, userRequestMsg gat
 func TestFunctionsHandler_Minimal(t *testing.T) {
 	t.Parallel()
 
-	handler, err := functions.NewFunctionsHandlerFromConfig(json.RawMessage("{}"), &config.DONConfig{}, nil, nil, nil, logger.TestLogger(t))
+	handler, err := functions.NewFunctionsHandlerFromConfig(json.RawMessage("{}"), &config.DONConfig{}, nil, nil, nil, logger.Test(t))
 	require.NoError(t, err)
 
 	// empty message should always error out
@@ -97,7 +97,7 @@ func TestFunctionsHandler_Minimal(t *testing.T) {
 func TestFunctionsHandler_CleanStartAndClose(t *testing.T) {
 	t.Parallel()
 
-	handler, err := functions.NewFunctionsHandlerFromConfig(json.RawMessage("{}"), &config.DONConfig{}, nil, nil, nil, logger.TestLogger(t))
+	handler, err := functions.NewFunctionsHandlerFromConfig(json.RawMessage("{}"), &config.DONConfig{}, nil, nil, nil, logger.Test(t))
 	require.NoError(t, err)
 
 	servicetest.Run(t, handler)

@@ -16,8 +16,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	gwcommon "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
@@ -40,7 +40,7 @@ const (
 )
 
 func setupHandler(t *testing.T) (*handler, *mocks.HTTPClient, *handlermocks.DON, []gwcommon.TestNode) {
-	lggr := logger.TestLogger(t)
+	lggr := logger.Test(t)
 	httpClient := mocks.NewHTTPClient(t)
 	don := handlermocks.NewDON(t)
 	nodeRateLimiterConfig := gateway.RateLimiterConfig{

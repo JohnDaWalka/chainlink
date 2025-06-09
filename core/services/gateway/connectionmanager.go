@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	gc "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
@@ -123,7 +123,7 @@ func NewConnectionManager(gwConfig *config.GatewayConfig, clock clockwork.Clock,
 			codec:      codec,
 			nodes:      nodes,
 			shutdownCh: make(chan struct{}),
-			lggr:       lggr.Named("DONConnectionManager." + donConfig.DonId),
+			lggr:       logger.Named(lggr, "DONConnectionManager."+donConfig.DonId),
 		}
 	}
 	connMgr := &connectionManager{
@@ -131,7 +131,7 @@ func NewConnectionManager(gwConfig *config.GatewayConfig, clock clockwork.Clock,
 		dons:         dons,
 		connAttempts: make(map[string]*connAttempt),
 		clock:        clock,
-		lggr:         lggr.Named("ConnectionManager"),
+		lggr:         logger.Named(lggr, "ConnectionManager"),
 	}
 	wsServer := network.NewWebSocketServer(&gwConfig.NodeServerConfig, connMgr, lggr)
 	connMgr.wsServer = wsServer
