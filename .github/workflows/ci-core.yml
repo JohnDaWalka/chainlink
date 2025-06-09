@@ -181,7 +181,7 @@ jobs:
           - cmd: go_core_tests
             os: ${{ needs.runner-config.outputs.core-tests-runner }}
             should-run: ${{ needs.filter.outputs.should-run-core-tests }}
-            use-flakeguard: ${{ github.event_name != 'pull_request' }}
+            use-flakeguard: ${{ github.event_name == 'pull_request' }}
 
           - cmd: go_core_tests_integration
             os: ${{ needs.runner-config.outputs.core-tests-integration-runner }}
@@ -201,7 +201,7 @@ jobs:
             should-run: ${{ needs.filter.outputs.should-run-deployment-tests }}
             setup-solana: "true"
             setup-aptos: "true"
-            use-flakeguard: ${{ github.event_name != 'pull_request' }}
+            use-flakeguard: ${{ github.event_name == 'pull_request' }}
 
     name: Core Tests (${{ matrix.type.cmd }})
     # We don't directly merge dependabot PRs, so let's not waste the resources
