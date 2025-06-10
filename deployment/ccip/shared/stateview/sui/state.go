@@ -10,13 +10,16 @@ import (
 )
 
 type CCIPChainState struct {
-	CCIPAddress          sui.Address
-	OnRampAddress        sui.Address
-	OnRampStateObjectId  sui.Address
-	OffRampAddress       sui.Address
-	OffRampOwnerCapId    sui.Address
-	OffRampStateObjectId sui.Address
-	LinkTokenAddress     sui.Address
+	CCIPAddress             sui.Address
+	CCIPObjectRef           sui.Address
+	OnRampAddress           sui.Address
+	OnRampStateObjectId     sui.Address
+	OffRampAddress          sui.Address
+	OffRampOwnerCapId       sui.Address
+	OffRampStateObjectId    sui.Address
+	LinkTokenAddress        sui.Address
+	LinkTokenCoinMetadataId sui.Address
+	LinkTokenTreasuryCapId  sui.Address
 }
 
 // LoadOnchainStatesui loads chain state for sui chains from env
@@ -54,6 +57,9 @@ func loadsuiChainStateFromAddresses(addresses map[string]cldf.TypeAndVersion) (C
 		case shared.SuiCCIPType:
 			chainState.CCIPAddress = *suiAddr
 
+		case shared.SuiCCIPObjectRefType:
+			chainState.CCIPObjectRef = *suiAddr
+
 		case shared.SuiOnRampType:
 			chainState.OnRampAddress = *suiAddr
 
@@ -68,6 +74,15 @@ func loadsuiChainStateFromAddresses(addresses map[string]cldf.TypeAndVersion) (C
 
 		case shared.SuiOffRampOwnerCapObjectIdType:
 			chainState.OffRampOwnerCapId = *suiAddr
+
+		case shared.SuiLinkTokenType:
+			chainState.LinkTokenAddress = *suiAddr
+
+		case shared.SuiLinkTokenObjectMetadataId:
+			chainState.LinkTokenCoinMetadataId = *suiAddr
+
+		case shared.SuiLinkTokenTreasuryCapId:
+			chainState.LinkTokenTreasuryCapId = *suiAddr
 		}
 		// Set address based on type
 

@@ -7,9 +7,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pattonkan/sui-go/sui"
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
+	sui_cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagingtest"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
+	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	testsetups "github.com/smartcontractkit/chainlink/integration-tests/testsetups/ccip"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
@@ -38,13 +40,22 @@ func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
 
 	t.Log("Source chain (Sui): ", sourceChain, "Dest chain (EVM): ", destChain)
 
+	// Deploy Link Token
+	e.Env, _, err = commonchangeset.ApplyChangesetsV2(t, e.Env, []commonchangeset.ConfiguredChangeSet{
+		commonchangeset.Configure(sui_cs.DeployLinkToken{}, sui_cs.DeployLinkTokenConfig{
+			ChainSelector: sourceChain,
+		}),
+	})
+	require.NoError(t, err)
+
+	// Mint Token
+
 	// testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
 
 	suiSenderAddr, err := rel.NewPrivateKeySigner(e.Env.BlockChains.SuiChains()[sourceChain].DeployerKey).GetAddress()
 	require.NoError(t, err)
 
 	suiSenderByte := sui.MustAddressFromHex(suiSenderAddr)
-
 	var (
 		replayed bool
 		nonce    uint64

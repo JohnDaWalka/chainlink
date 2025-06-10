@@ -2,7 +2,6 @@ module github.com/smartcontractkit/chainlink/v2
 
 go 1.24.2
 
-
 replace github.com/smartcontractkit/chainlink-protos => ../chainlink-protos
 
 require (

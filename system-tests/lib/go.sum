@@ -422,8 +422,8 @@ github.com/evanphx/json-patch/v5 v5.9.0 h1:kcBlZQbplgElYIlo/n1hJbls2z/1awpXxpRi0
 github.com/evanphx/json-patch/v5 v5.9.0/go.mod h1:VNkHZ/282BpEyt/tObQO8s5CMPmYYq14uClGH4abBuQ=
 github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f h1:Wl78ApPPB2Wvf/TIe2xdyJxTlb6obmF18d8QdkxNDu4=
 github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f/go.mod h1:OSYXu++VVOHnXeitef/D8n/6y4QV8uLHSFXX4NeXMGc=
-github.com/fardream/go-bcs v0.7.0 h1:4YIiCXrtUFiRT86TsvUx+tIennZBRXQCzrgt8xC2g0c=
-github.com/fardream/go-bcs v0.7.0/go.mod h1:UsoxhIoe2GsVexX0s5NDLIChxeb/JUbjw7IWzzgF3Xk=
+github.com/fardream/go-bcs v0.8.7 h1:Wi6Kd54zTXl+eNf08RNui+7/qy6tP7S4fq4vUtUchXk=
+github.com/fardream/go-bcs v0.8.7/go.mod h1:8xND2wUkBFUpfbxOe9iiso7jQEYeZPkn0crLfR7IRw4=
 github.com/fatih/camelcase v1.0.0 h1:hxNvNX/xYBp0ovncs8WyWZrOrpBNub/JfaMvbURyft8=
 github.com/fatih/camelcase v1.0.0/go.mod h1:yN2Sb0lFhZJUdVvtELVWefmrXpuZESvPmqwoZc+/fpc=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
@@ -1086,8 +1086,8 @@ github.com/pascaldekloe/goe v0.1.0 h1:cBOtyMzM9HTpWjXfbbunk26uA6nG3a8n06Wieeh0Mw
 github.com/pascaldekloe/goe v0.1.0/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/patrickmn/go-cache v2.1.0+incompatible h1:HRMgzkcYKYpi3C8ajMPV8OFXaaRUnok+kx1WdO15EQc=
 github.com/patrickmn/go-cache v2.1.0+incompatible/go.mod h1:3Qf8kWWT7OJRJbdiICTKqZju1ZixQ/KpMGzzAfe6+WQ=
-github.com/pattonkan/sui-go v0.1.0 h1:95re846OafM6erXSqk53UASESQocavRT/g418ic198E=
-github.com/pattonkan/sui-go v0.1.0/go.mod h1:E07Cqy27cBNcef90eXnfi/1T5t4Hyn6RxxeK3+NxQ2A=
+github.com/pattonkan/sui-go v0.1.1 h1:AxyqO7K+ij9McC0yHd5sw+DRodZz1G5ciRS/826XSCg=
+github.com/pattonkan/sui-go v0.1.1/go.mod h1:R++KSg229S+rX2Lwz+LmtxEVKnnwmHPjQ+c20TLUg2w=
 github.com/pelletier/go-toml v1.9.3/go.mod h1:u1nR/EPcESfeI/szUZKdtJ0xRNbUoANCkoOuaOx1Y+c=
 github.com/pelletier/go-toml v1.9.5 h1:4yBQzkHv+7BHq2PQUZF3Mx0IYxG7LsP222s7Agd3ve8=
 github.com/pelletier/go-toml v1.9.5/go.mod h1:u1nR/EPcESfeI/szUZKdtJ0xRNbUoANCkoOuaOx1Y+c=
@@ -1246,8 +1246,8 @@ github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-2025041523564
 github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7/go.mod h1:yaDOAZF6MNB+NGYpxGCUc+owIdKrjvFW0JODdTcQ3V0=
 github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250417193446-eeb0a7d1e049 h1:7HwYt8rDz1ehTcB28oNipdTZUtV17F2sfkLTLtMJC4c=
 github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250417193446-eeb0a7d1e049/go.mod h1:2MggrMtbhqr0u4U2pcYa21lvAtvaeSawjxdIy1ytHWE=
-github.com/smartcontractkit/chainlink-deployments-framework v0.5.0 h1:0ZaI9vNyPwVwldYYFWld1XM4SBgGa/MvjlxHu1S1bWI=
-github.com/smartcontractkit/chainlink-deployments-framework v0.5.0/go.mod h1:bJ/qkKuQWVAUl5S50GlLGp1MMZHaj6C+kgSi0q++biI=
+github.com/smartcontractkit/chainlink-deployments-framework v0.5.1 h1:7kAx5XXBSYhpvPa3n3yLnwl57+3B7gsZcXmKz2rqStQ=
+github.com/smartcontractkit/chainlink-deployments-framework v0.5.1/go.mod h1:OlKntARV8pQV9EU5jyoDv/Fosf7WwFMWKjf3jfzuQnw=
 github.com/smartcontractkit/chainlink-evm v0.0.0-20250522161404-27a8f7e1cc6c h1:5QkR2dEPTapo8rwA1VD7205tOaCUHtPso4zTg/wHsdM=
 github.com/smartcontractkit/chainlink-evm v0.0.0-20250522161404-27a8f7e1cc6c/go.mod h1:Vg5OKxmLm3TQtyd0fZtWU2UJwALF8uiPEzrtK+ccWL0=
 github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 h1:8u9xUrC+yHrTDexOKDd+jrA6LCzFFHeX1G82oj2fsSI=

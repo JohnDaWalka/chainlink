@@ -1,4 +1,4 @@
-package operation
+package sui
 
 import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"

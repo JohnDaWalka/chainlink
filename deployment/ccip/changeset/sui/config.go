@@ -6,6 +6,14 @@ type DeploySuiChainConfig struct {
 	ContractParamsPerChain map[uint64]ChainContractParams
 }
 
+type DeployLinkTokenConfig struct {
+	ChainSelector uint64
+}
+
+type MintLinkTokenConfig struct {
+	ChainSelector uint64
+}
+
 // ChainContractParams stores configuration to call initialize in CCIP contracts
 type ChainContractParams struct {
 	FeeQuoterParams FeeQuoterParams

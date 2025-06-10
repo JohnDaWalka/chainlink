@@ -18,6 +18,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/pattonkan/sui-go/sui"
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
@@ -25,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	ccipChangeSetSolana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
@@ -57,6 +59,13 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
+
+	sui_bind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
+	module_onramp "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_onramp/onramp"
+	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
+	linkops "github.com/smartcontractkit/chainlink-sui/ops/link"
+	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
+	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
 	solCommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
@@ -829,90 +838,318 @@ func SendRequestSui(
 	cfg *CCIPSendReqConfig,
 ) (*AnyMsgSentEvent, error) {
 
-	fmt.Println("CCIP SEND REQUESTED")
-	// sender := e.BlockChains.SuiChains()[cfg.SourceChain].DeployerSigner
-	// senderAddress := sender.AccountAddress()
-	// client := e.BlockChains.SuiChains()[cfg.SourceChain].Client
+	return SendSuiRequestViaBindings(e, cfg)
 
-	// e.Logger.Infof("(Sui) Sending CCIP request from chain selector %d to chain selector %d from sender %s",
-	// 	cfg.SourceChain, cfg.DestChain, senderAddress.StringLong())
+	// SendSuiRequestViaChainWriter(e, cfg)
 
-	// msg := cfg.Message.(module_onramp.Aptos2AnyRampMessage)
-	// r := state.AptosChains[cfg.SourceChain].CCIPAddress
-	// if cfg.IsTestRouter {
-	// 	r = state.AptosChains[cfg.DestChain].TestRouterAddress
-	// }
-
-	// tokenAddresses := make([]aptos.AccountAddress, len(msg.TokenAmounts))
-	// tokenAmounts := make([]uint64, len(msg.TokenAmounts))
-	// tokenStoreAddresses := make([]aptos.AccountAddress, len(msg.TokenAmounts))
-	// for i, v := range msg.TokenAmounts {
-	// 	// TODO - struct missing input data
-	// 	tokenAddresses[i] = v.SourcePoolAddress
-	// 	tokenAmounts[i] = v.Amount
-	// 	tokenStoreAddresses[i] = aptos.AccountAddress{}
-	// }
-
-	// router := aptos_router.Bind(r, client)
-	// fee, err := router.Router().GetFee(
-	// 	nil,
-	// 	cfg.DestChain,
-	// 	msg.Receiver,
-	// 	msg.Data,
-	// 	tokenAddresses,
-	// 	tokenAmounts,
-	// 	tokenStoreAddresses,
-	// 	msg.FeeToken,
-	// 	aptos.AccountAddress{}, // TODO missing parameter
-	// 	msg.ExtraArgs,
-	// )
-	// if err != nil {
-	// 	e.Logger.Errorf("Estimating fee: %v", err)
-	// }
-	// e.Logger.Infof("Estimated fee: %v", fee)
-
-	// opts := &aptosBind.TransactOpts{
-	// 	Signer: sender,
-	// }
-	// tx, err := router.Router().CCIPSend(
-	// 	opts,
-	// 	cfg.DestChain,
-	// 	msg.Receiver,
-	// 	msg.Data,
-	// 	tokenAddresses,
-	// 	tokenAmounts,
-	// 	tokenStoreAddresses,
-	// 	msg.FeeToken,
-	// 	aptos.AccountAddress{}, // TODO missing parameter
-	// 	msg.ExtraArgs,
-	// )
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to send fee: %w", err)
-	// }
-	// data, err := client.WaitForTransaction(tx.Hash)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to wait for transaction: %w", err)
-	// }
-	// if !data.Success {
-	// 	return nil, fmt.Errorf("transaction reverted: %v", data.VmStatus)
-	// }
-	// e.Logger.Infof("(Aptos) CCIP message sent (tx %s) from chain selector %d to chain selector %d", tx.Hash, cfg.SourceChain, cfg.DestChain)
-	// for _, event := range data.Events {
-	// 	e.Logger.Infof("Event type: %v", event.Type)
-	// 	if event.Type == fmt.Sprintf("%s::onramp::CCIPMessageSent", r.StringLong()) {
-	// 		var msgSentEvent module_onramp.CCIPMessageSent
-	// 		if err := codec.DecodeAptosJsonValue(event.Data, &msgSentEvent); err != nil {
-	// 			return nil, fmt.Errorf("failed to decode CCIPMessageSentEvent: %w", err)
-	// 		}
-	// 		e.Logger.Debugf("CCIPMessageSentEvent: %v", msgSentEvent)
-	// 		return &AnyMsgSentEvent{
-	// 			SequenceNumber: msgSentEvent.SequenceNumber,
-	// 			RawEvent:       msgSentEvent,
-	// 		}, nil
-	// 	}
-	// }
-	return nil, nil
 }
+
+func SendSuiRequestViaBindings(e cldf.Environment, cfg *CCIPSendReqConfig) (*AnyMsgSentEvent, error) {
+	senderAddress, err := rel.NewPrivateKeySigner(e.BlockChains.SuiChains()[cfg.SourceChain].DeployerKey).GetAddress()
+	if err != nil {
+		return &AnyMsgSentEvent{}, err
+	}
+
+	state, err := stateview.LoadOnchainState(e)
+	if err != nil {
+		return &AnyMsgSentEvent{}, err
+	}
+
+	suiChains := e.BlockChains.SuiChains()
+	suiChain := suiChains[cfg.SourceChain]
+	suiSigner := rel.NewPrivateKeySigner(suiChain.DeployerKey)
+
+	deps := suideps.SuiDeps{
+		SuiChain: sui_ops.OpTxDeps{
+			Client: *suiChain.Client,
+			Signer: suiSigner,
+			GetTxOpts: func() sui_bind.TxOpts {
+				b := uint64(300_000_000)
+				return sui_bind.TxOpts{
+					GasBudget: &b,
+				}
+			},
+		},
+	}
+
+	e.Logger.Infof("(Sui) Sending CCIP request from chain selector %d to chain selector %d from sender %s",
+		cfg.SourceChain, cfg.DestChain, senderAddress)
+
+	fee := uint64(1234)
+	e.Logger.Infof("Estimated fee: %v", fee)
+
+	ccipObjectRefId := state.SuiChains[cfg.SourceChain].CCIPObjectRef.String()
+	// ccipContractAddr := state.SuiChains[cfg.SourceChain].CCIPAddress.String()
+	onRampContractAddr := state.SuiChains[cfg.SourceChain].OnRampAddress.String()
+	onRampStateObjectId := state.SuiChains[cfg.SourceChain].OnRampStateObjectId.String()
+	linkTokenPkgId := state.SuiChains[cfg.SourceChain].LinkTokenAddress.String()
+	linkTokenObjectMetadataId := state.SuiChains[cfg.SourceChain].LinkTokenCoinMetadataId.String()
+	linkTokenTreasuryCapId := state.SuiChains[cfg.SourceChain].LinkTokenTreasuryCapId.String()
+
+	onRampContract, err := module_onramp.NewOnramp(onRampContractAddr, *suiChain.Client)
+	if err != nil {
+		return &AnyMsgSentEvent{}, err
+	}
+
+	fmt.Println("MINT TOKEN: ", linkTokenPkgId, linkTokenTreasuryCapId)
+	// mint link token to use as feeToken
+	mintLinkTokenReport, err := operations.ExecuteOperation(e.OperationsBundle, linkops.MintLinkOp, deps.SuiChain,
+		linkops.MintLinkTokenInput{
+			LinkTokenPackageId: linkTokenPkgId,
+			TreasuryCapId:      linkTokenTreasuryCapId,
+			Amount:             10,
+		})
+	if err != nil {
+		return &AnyMsgSentEvent{}, fmt.Errorf("failed to mint LinkToken for Sui chain %d: %w", cfg.SourceChain, err)
+	}
+
+	call := onRampContract.CcipSend(
+		linkTokenPkgId+"::link_token::LINK_TOKEN", // typeArgs
+		sui_bind.Object{Id: ccipObjectRefId},
+		sui_bind.Object{Id: onRampStateObjectId},
+		sui_bind.Object{Id: sui.SuiObjectIdClock.String()},
+		uint64(cfg.DestChain),
+		[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		[]byte("Hello EVM, from Sui!"),
+		sui_bind.Object{Id: ""}, // THIS IS A HOT POTATO CALL
+		sui_bind.Object{Id: linkTokenObjectMetadataId},
+		sui_bind.Object{Id: mintLinkTokenReport.Output.Objects.MintedLinkTokenObjectId},
+		[]byte{},
+	)
+
+	tx, err := call.Execute(e.GetContext(), deps.SuiChain.GetTxOpts(), suiSigner, *suiChain.Client)
+	if err != nil {
+		return &AnyMsgSentEvent{}, err
+	}
+
+	fmt.Println("CCIP SEND REQUSTED: ", tx.Digest.String())
+
+	return &AnyMsgSentEvent{}, nil
+}
+
+// func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*AnyMsgSentEvent, error) {
+// 	state, err := stateview.LoadOnchainState(e)
+// 	if err != nil {
+// 		return &AnyMsgSentEvent{}, err
+// 	}
+
+// 	suiChains := e.BlockChains.SuiChains()
+// 	suiChain := suiChains[cfg.SourceChain]
+// 	suiSigner := rel.NewPrivateKeySigner(suiChain.DeployerKey)
+// 	signerAddr, err := suiSigner.GetAddress()
+// 	if err != nil {
+// 		return &AnyMsgSentEvent{}, err
+// 	}
+
+// 	publicKey := suiChain.DeployerKey.Public().(ed25519.PublicKey)
+// 	publicKeyBytes := []byte(publicKey)
+
+// 	deps := suideps.SuiDeps{
+// 		SuiChain: sui_ops.OpTxDeps{
+// 			Client: *suiChain.Client,
+// 			Signer: suiSigner,
+// 			GetTxOpts: func() sui_bind.TxOpts {
+// 				b := uint64(300_000_000)
+// 				return sui_bind.TxOpts{
+// 					GasBudget: &b,
+// 				}
+// 			},
+// 		},
+// 	}
+
+// 	ccipObjectRefId := state.SuiChains[cfg.SourceChain].CCIPObjectRef.String()
+// 	ccipPackageId := state.SuiChains[cfg.SourceChain].CCIPAddress.String()
+// 	onRampPackageId := state.SuiChains[cfg.SourceChain].OnRampAddress.String()
+// 	onRampStateObjectId := state.SuiChains[cfg.SourceChain].OnRampStateObjectId.String()
+// 	linkTokenPkgId := state.SuiChains[cfg.SourceChain].LinkTokenAddress.String()
+// 	linkTokenObjectMetadataId := state.SuiChains[cfg.SourceChain].LinkTokenCoinMetadataId.String()
+// 	linkTokenTreasuryCapId := state.SuiChains[cfg.SourceChain].LinkTokenTreasuryCapId.String()
+
+// 	fmt.Println("MINT TOKEN: ", linkTokenPkgId, linkTokenTreasuryCapId)
+// 	// mint link token to use as feeToken
+// 	mintLinkTokenReport, err := operations.ExecuteOperation(e.OperationsBundle, linkops.MintLinkOp, deps.SuiChain,
+// 		linkops.MintLinkTokenInput{
+// 			LinkTokenPackageId: linkTokenPkgId,
+// 			TreasuryCapId:      linkTokenTreasuryCapId,
+// 			Amount:             10,
+// 		})
+// 	if err != nil {
+// 		return &AnyMsgSentEvent{}, fmt.Errorf("failed to mint LinkToken for Sui chain %d: %w", cfg.SourceChain, err)
+// 	}
+
+// 	ptbArgs := chainwriter.Arguments{
+// 		Args: map[string]any{
+// 			"ref":                   ccipObjectRefId,
+// 			"clock":                 sui.SuiObjectIdClock.String(),
+// 			"remote_chain_selector": cfg.DestChain,
+// 			"dest_chain_selector":   cfg.DestChain,
+// 			"onramp_state":          onRampStateObjectId,
+// 			"receiver":              []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+// 			"data":                  []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+// 			"fee_token_metadata":    linkTokenObjectMetadataId,
+// 			"fee_token":             mintLinkTokenReport.Output.Objects.MintedLinkTokenObjectId,
+// 			"extra_args":            []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+// 		},
+// 		ArgTypes: map[string]string{
+// 			"fee_token": linkTokenPkgId + "::link_token::LINK_TOKEN",
+// 		},
+// 	}
+
+// 	keystoreInstance, err := keystore.NewSuiKeystore(e.Logger, "")
+// 	if err != nil {
+// 		return &AnyMsgSentEvent{}, err
+// 	}
+// 	// Setup new PTB client
+
+// 	relayerClient, err := client.NewPTBClient(e.Logger, "http://127.0.0.1:9000", nil, 10*time.Second, keystoreInstance, 5, "WaitForEffectsCert")
+// 	if err != nil {
+// 		return &AnyMsgSentEvent{}, err
+// 	}
+
+// 	e.Logger.Info("relayerClient", relayerClient)
+
+// 	store := txm.NewTxmStoreImpl()
+// 	conf := txm.DefaultConfigSet
+
+// 	retryManager := txm.NewDefaultRetryManager(5)
+// 	gasLimit := big.NewInt(30000000)
+// 	gasManager := txm.NewSuiGasManager(e.Logger, relayerClient, *gasLimit, 0)
+
+// 	txManager, err := txm.NewSuiTxm(e.Logger, relayerClient, keystoreInstance, conf, store, retryManager, gasManager)
+// 	if err != nil {
+// 		return &AnyMsgSentEvent{}, fmt.Errorf("Failed to create SuiTxm: %v", err)
+// 	}
+
+// 	chainWriterConfig := configureChainWriterForMultipleTokens(ccipPackageId, onRampPackageId, publicKeyBytes)
+// 	chainWriter, err := chainwriter.NewSuiChainWriter(e.Logger, txManager, chainWriterConfig, false)
+// 	if err != nil {
+// 		return &AnyMsgSentEvent{}, err
+// 	}
+
+// 	err = chainWriter.Start(e.GetContext())
+// 	if err != nil {
+// 		return &AnyMsgSentEvent{}, err
+// 	}
+
+// 	err = chainWriter.SubmitTransaction(e.GetContext(),
+// 		chainwriter.PTBChainWriterModuleName,
+// 		"ccip_send",
+// 		&ptbArgs,
+// 		"ccip_send_test_arb_msg",
+// 		signerAddr,
+// 		&commonTypes.TxMeta{GasLimit: big.NewInt(30000000)},
+// 		nil,
+// 	)
+// 	if err != nil {
+// 		return &AnyMsgSentEvent{}, err
+// 	}
+
+// 	status, statusErr := chainWriter.GetTransactionStatus(e.GetContext(), "ccip_send_test_arb_msg")
+// 	if statusErr != nil {
+// 		return &AnyMsgSentEvent{}, err
+// 	}
+
+// 	fmt.Println("TX STATUS: ", status)
+
+// 	return nil, nil
+// }
+
+// func configureChainWriterForMultipleTokens(CCIPPackageAdress string, OnRampPackageId string, publicKeyBytes []byte) chainwriter.ChainWriterConfig {
+// 	return chainwriter.ChainWriterConfig{
+// 		Modules: map[string]*chainwriter.ChainWriterModule{
+// 			chainwriter.PTBChainWriterModuleName: {
+// 				Name:     chainwriter.PTBChainWriterModuleName,
+// 				ModuleID: "0x123",
+// 				Functions: map[string]*chainwriter.ChainWriterFunction{
+// 					"ccip_send": {
+// 						Name:      "ccip_send",
+// 						PublicKey: publicKeyBytes,
+// 						Params:    []codec.SuiFunctionParam{},
+// 						PTBCommands: []chainwriter.ChainWriterPTBCommand{
+// 							// First command: create token params
+// 							{
+// 								Type:      codec.SuiPTBCommandMoveCall,
+// 								PackageId: strPtr(CCIPPackageAdress),
+// 								ModuleId:  strPtr("dynamic_dispatcher"),
+// 								Function:  strPtr("create_token_params"),
+// 								Params:    []codec.SuiFunctionParam{},
+// 							},
+// 							{
+// 								Type:      codec.SuiPTBCommandMoveCall,
+// 								PackageId: strPtr(OnRampPackageId),
+// 								ModuleId:  strPtr("onramp"),
+// 								Function:  strPtr("ccip_send"),
+// 								Params: []codec.SuiFunctionParam{
+// 									{
+// 										Name:     "ref",
+// 										Type:     "object_id",
+// 										Required: true,
+// 									},
+// 									{
+// 										Name:     "onramp_state",
+// 										Type:     "object_id",
+// 										Required: true,
+// 									},
+// 									{
+// 										Name:      "clock",
+// 										Type:      "object_id",
+// 										Required:  true,
+// 										IsMutable: testutils.BoolPointer(false),
+// 									},
+// 									{
+// 										Name:     "dest_chain_selector",
+// 										Type:     "u64",
+// 										Required: true,
+// 									},
+// 									{
+// 										Name:     "receiver",
+// 										Type:     "vector<u8>",
+// 										Required: true,
+// 									},
+// 									{
+// 										Name:     "data",
+// 										Type:     "vector<u8>",
+// 										Required: true,
+// 									},
+// 									{
+// 										Name:     "token_params",
+// 										Type:     "ptb_dependency",
+// 										Required: true,
+// 										PTBDependency: &codec.PTBCommandDependency{
+// 											CommandIndex: 1,
+// 										},
+// 									},
+// 									{
+// 										Name:      "fee_token_metadata",
+// 										Type:      "object_id",
+// 										Required:  true,
+// 										IsMutable: testutils.BoolPointer(false),
+// 									},
+// 									{
+// 										Name:      "fee_token",
+// 										Type:      "object_id",
+// 										Required:  true,
+// 										IsGeneric: true,
+// 									},
+// 									{
+// 										Name:     "extra_args",
+// 										Type:     "vector<u8>",
+// 										Required: true,
+// 									},
+// 								},
+// 							},
+// 						},
+// 					},
+// 				},
+// 			},
+// 		},
+// 	}
+// }
+
+// // Helper function to convert a string to a string pointer
+// func strPtr(s string) *string {
+// 	return &s
+// }
 
 func ConvertSolanaCrossChainAmountToBigInt(amount ccip_router.CrossChainAmount) *big.Int {
 	bytes := amount.LeBytes[:]

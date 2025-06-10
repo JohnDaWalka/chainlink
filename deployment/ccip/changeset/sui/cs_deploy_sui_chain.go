@@ -8,10 +8,12 @@ import (
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
+	ccipops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
+	offrampops "github.com/smartcontractkit/chainlink-sui/ops/ccip_offramp"
+	onrampops "github.com/smartcontractkit/chainlink-sui/ops/ccip_onramp"
+	mcmsops "github.com/smartcontractkit/chainlink-sui/ops/mcms"
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui/operation"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui/sequence"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 )
@@ -37,7 +39,7 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		suiChain := suiChains[chainSel]
 		suiSigner := rel.NewPrivateKeySigner(suiChain.DeployerKey)
 
-		deps := operation.SuiDeps{
+		deps := SuiDeps{
 			AB: ab,
 			SuiChain: sui_ops.OpTxDeps{
 				Client: *suiChain.Client,
@@ -53,16 +55,16 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		}
 
 		// Run DeployAndInitCCIpSequence
-		ccipSeqInput := sequence.DeployAndInitCCIPSeqInput{
+		ccipSeqInput := ccipops.DeployAndInitCCIPSeqInput{
 			LinkTokenCoinMetadataObjectId: "",
 			LocalChainSelector:            1,
 			DestChainSelector:             2,
-			DeployCCIPInput: operation.DeployCCIPInput{
+			DeployCCIPInput: ccipops.DeployCCIPInput{
 				McmsPackageId: "0x2",
 			},
 		}
 
-		ccipSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, sequence.DeployAndInitCCIPSequence, deps.SuiChain, ccipSeqInput)
+		ccipSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, ccipops.DeployAndInitCCIPSequence, deps.SuiChain, ccipSeqInput)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP for Sui chain %d: %w", chainSel, err)
 		}
@@ -75,14 +77,21 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save CCIP address %s for Sui chain %d: %w", ccipSeqReport.Output.CCIPPackageId, chainSel, err)
 		}
 
+		// save CCIP ObjectRef address to the addressbook
+		typeAndVersionCCIPObjectRef := cldf.NewTypeAndVersion(shared.SuiCCIPObjectRefType, deployment.Version1_6_0)
+		err = deps.AB.Save(chainSel, ccipSeqReport.Output.Objects.CCIPObjectRefObjectId, typeAndVersionCCIPObjectRef)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save CCIP objectRef Id %s for Sui chain %d: %w", ccipSeqReport.Output.Objects.CCIPObjectRefObjectId, chainSel, err)
+		}
+
 		// Run DeployAndInitCCIPOnRampSequence
-		ccipOnRampSeqInput := sequence.DeployAndInitCCIPOnRampSeqInput{
-			DeployCCIPOnRampInput: operation.DeployCCIPOnRampInput{
+		ccipOnRampSeqInput := onrampops.DeployAndInitCCIPOnRampSeqInput{
+			DeployCCIPOnRampInput: onrampops.DeployCCIPOnRampInput{
 				CCIPPackageId: ccipSeqReport.Output.CCIPPackageId,
 			},
 		}
 
-		ccipOnRampSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, sequence.DeployAndInitCCIPOnRampSequence, deps.SuiChain, ccipOnRampSeqInput)
+		ccipOnRampSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, onrampops.DeployAndInitCCIPOnRampSequence, deps.SuiChain, ccipOnRampSeqInput)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP for Sui chain %d: %w", chainSel, err)
 		}
@@ -96,7 +105,7 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		}
 
 		// Run DeployMCMSSequence
-		mcmsReport, err := operations.ExecuteSequence(e.OperationsBundle, sequence.DeployMCMSSequence, deps.SuiChain, cld_ops.EmptyInput{})
+		mcmsReport, err := operations.ExecuteSequence(e.OperationsBundle, mcmsops.DeployMCMSSequence, deps.SuiChain, cld_ops.EmptyInput{})
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP for Sui chain %d: %w", chainSel, err)
 		}
@@ -110,13 +119,13 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		}
 
 		// Run DeployAndInitCCIPOffRampSequence
-		ccipOffRampSeqInput := sequence.DeployAndInitCCIPOffRampSeqInput{
-			DeployCCIPOffRampInput: operation.DeployCCIPOffRampInput{
+		ccipOffRampSeqInput := offrampops.DeployAndInitCCIPOffRampSeqInput{
+			DeployCCIPOffRampInput: offrampops.DeployCCIPOffRampInput{
 				CCIPPackageId: ccipSeqReport.Output.CCIPPackageId,
 				MCMSPackageId: mcmsReport.Output.PackageId,
 			},
 		}
-		ccipOffRampSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, sequence.DeployAndInitCCIPOffRampSequence, deps.SuiChain, ccipOffRampSeqInput)
+		ccipOffRampSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, offrampops.DeployAndInitCCIPOffRampSequence, deps.SuiChain, ccipOffRampSeqInput)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP for Sui chain %d: %w", chainSel, err)
 		}

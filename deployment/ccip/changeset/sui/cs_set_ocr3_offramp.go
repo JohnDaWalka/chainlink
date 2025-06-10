@@ -9,8 +9,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
+	offrampops "github.com/smartcontractkit/chainlink-sui/ops/ccip_offramp"
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui/operation"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 )
@@ -33,7 +33,7 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 		suiChain := suiChains[remoteSelector]
 		suiSigner := rel.NewPrivateKeySigner(suiChain.DeployerKey)
 
-		deps := operation.SuiDeps{
+		deps := SuiDeps{
 			AB: ab,
 			SuiChain: sui_ops.OpTxDeps{
 				Client: *suiChain.Client,
@@ -69,8 +69,8 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 			signerAddrBytes = append(signerAddrBytes, addrBytes)
 		}
 
-		// TODO: THIS INPUT NEEDS TO BE REVISITER
-		setOCR3ConfigInput := operation.SetOCR3ConfigInput{
+		// TODO: THIS INPUT NEEDS TO BE ACC
+		setOCR3ConfigInput := offrampops.SetOCR3ConfigInput{
 			OffRampPackageId: state.SuiChains[remoteSelector].OffRampAddress.String(),
 			OffRampStateId:   state.SuiChains[remoteSelector].OffRampStateObjectId.String(),
 			OwnerCapObjectId: state.SuiChains[remoteSelector].OffRampOwnerCapId.String(),
@@ -88,7 +88,7 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 			Transmitters:                   signerAddresses,
 		}
 
-		_, err := operations.ExecuteOperation(e.OperationsBundle, operation.SetOCR3ConfigOp, deps.SuiChain, setOCR3ConfigInput)
+		_, err := operations.ExecuteOperation(e.OperationsBundle, offrampops.SetOCR3ConfigOp, deps.SuiChain, setOCR3ConfigInput)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}

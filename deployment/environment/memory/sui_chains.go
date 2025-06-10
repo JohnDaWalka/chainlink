@@ -119,7 +119,6 @@ func suiChain(t *testing.T, chainID string) (string, string, ed25519.PrivateKey,
 	}
 	require.True(t, ready, "Sui network not ready")
 	time.Sleep(15 * time.Second) // we have slot errors that force retries if the chain is not given enough time to boot
-
 	return url, suiAddress, suiPrivateKey, client
 }
 
