@@ -766,7 +766,6 @@ func setupEVM2EVMLanes(e *cldf.Environment, state stateview.CCIPOnChainState) (c
 					},
 				}
 				mu.Unlock()
-
 			}
 
 			appliedChangesets := []commonchangeset.ConfiguredChangeSet{

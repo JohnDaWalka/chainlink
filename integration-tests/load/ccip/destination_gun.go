@@ -339,9 +339,7 @@ func GetEVMExtraArgsV2(gasLimit *big.Int, allowOutOfOrder bool) ([]byte, error) 
 }
 
 func (m *DestinationGun) sendSOLSourceMessage(src uint64) error {
-	sourceKey := m.solanaSourceKeys[src]
-
-	msg, err := m.getSolanaMessage(src, sourceKey)
+	msg, err := m.getSolanaMessage(src)
 	if err != nil {
 		return err
 	}
@@ -363,7 +361,7 @@ func (m *DestinationGun) sendSOLSourceMessage(src uint64) error {
 	return err
 }
 
-func (m *DestinationGun) getSolanaMessage(src uint64, account *solana.PrivateKey) (ccip_router.SVM2AnyMessage, error) {
+func (m *DestinationGun) getSolanaMessage(src uint64) (ccip_router.SVM2AnyMessage, error) {
 	// Select a message type based on ratio
 	randomValue := mathrand.Intn(100)
 	accumulatedRatio := 0
