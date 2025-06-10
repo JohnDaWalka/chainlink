@@ -8,12 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
-
+	// Third-party imports
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/gagliardetto/solana-go"
 	solrpc "github.com/gagliardetto/solana-go/rpc"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
+
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	solState "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/solana"
