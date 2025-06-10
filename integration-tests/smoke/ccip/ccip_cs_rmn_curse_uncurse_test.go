@@ -11,6 +11,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/mcms/types"
 
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -18,7 +19,6 @@ import (
 	ccipChangesetSolana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/deployergroup"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commonSolana "github.com/smartcontractkit/chainlink/deployment/common/changeset/solana"
@@ -178,6 +178,11 @@ func TestRMNCurse(t *testing.T) {
 		t.Run(tc.name+"_NO_MCMS", func(t *testing.T) {
 			runRmnCurseTest(t, tc)
 		})
+	}
+}
+
+func TestRMNCurseMCMS(t *testing.T) {
+	for _, tc := range testCases {
 		t.Run(tc.name+"_MCMS", func(t *testing.T) {
 			runRmnCurseMCMSTest(t, tc, types.TimelockActionSchedule)
 		})
@@ -213,6 +218,11 @@ func TestRMNUncurse(t *testing.T) {
 		t.Run(tc.name+"_UNCURSE", func(t *testing.T) {
 			runRmnUncurseTest(t, tc)
 		})
+	}
+}
+
+func TestRMNUncurseMCMS(t *testing.T) {
+	for _, tc := range testCases {
 		t.Run(tc.name+"_UNCURSE_MCMS", func(t *testing.T) {
 			runRmnUncurseMCMSTest(t, tc, types.TimelockActionSchedule)
 		})
@@ -496,9 +506,8 @@ func transferRMNContractToMCMS(t *testing.T, e *testhelpers.DeployedEnv, state s
 	}
 
 	contractsByChain[e.HomeChainSel] = append(contractsByChain[e.HomeChainSel], state.MustGetEVMChainState(e.HomeChainSel).RMNHome.Address())
-	timelocksPerChain := deployergroup.BuildTimelockPerChain(e.Env, state)
 	// This is required because RMN Contracts is initially owned by the deployer
-	_, err := commonchangeset.Apply(t, e.Env, timelocksPerChain,
+	_, err := commonchangeset.Apply(t, e.Env,
 		commonchangeset.Configure(
 			cldf.CreateLegacyChangeSet(commonchangeset.TransferToMCMSWithTimelockV2),
 			commonchangeset.TransferToMCMSWithTimelockConfig{
@@ -511,7 +520,8 @@ func transferRMNContractToMCMS(t *testing.T, e *testhelpers.DeployedEnv, state s
 	)
 	require.NoError(t, err)
 
-	for _, solChain := range e.Env.AllChainSelectorsSolana() {
+	chainSelectorSolana := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilySolana))
+	for _, solChain := range chainSelectorSolana {
 		_, _ = testhelpers.TransferOwnershipSolana(t, &e.Env, solChain, true,
 			ccipChangesetSolana.CCIPContractsToTransfer{
 				Router:    true,
@@ -528,7 +538,7 @@ func transferRMNContractToMCMS(t *testing.T, e *testhelpers.DeployedEnv, state s
 		Timelock:     83 * solana.LAMPORTS_PER_SOL,
 	}
 	amountsPerChain := make(map[uint64]commonSolana.AmountsToTransfer)
-	for chainSelector := range e.Env.SolChains {
+	for _, chainSelector := range e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilySolana)) {
 		amountsPerChain[chainSelector] = cfgAmounts
 	}
 	config := commonSolana.FundMCMSignerConfig{
@@ -537,7 +547,7 @@ func transferRMNContractToMCMS(t *testing.T, e *testhelpers.DeployedEnv, state s
 
 	changesetInstance := commonSolana.FundMCMSignersChangeset{}
 
-	_, _, err = commonchangeset.ApplyChangesetsV2(t, e.Env, []commonchangeset.ConfiguredChangeSet{
+	_, _, err = commonchangeset.ApplyChangesets(t, e.Env, []commonchangeset.ConfiguredChangeSet{
 		commonchangeset.Configure(changesetInstance, config),
 	})
 	require.NoError(t, err)
@@ -567,7 +577,7 @@ func runRmnUncurseMCMSTest(t *testing.T, tc CurseTestCase, action types.Timelock
 
 	transferRMNContractToMCMS(t, &e, state)
 
-	_, _, err = commonchangeset.ApplyChangesetsV2(t, e.Env,
+	_, _, err = commonchangeset.ApplyChangesets(t, e.Env,
 		[]commonchangeset.ConfiguredChangeSet{
 			commonchangeset.Configure(
 				cldf.CreateLegacyChangeSet(v1_6.RMNCurseChangeset),
@@ -578,7 +588,7 @@ func runRmnUncurseMCMSTest(t *testing.T, tc CurseTestCase, action types.Timelock
 
 	verifyTestCaseAssertions(t, &e, tc, mapIDToSelector)
 
-	_, _, err = commonchangeset.ApplyChangesetsV2(t, e.Env,
+	_, _, err = commonchangeset.ApplyChangesets(t, e.Env,
 		[]commonchangeset.ConfiguredChangeSet{
 			commonchangeset.Configure(
 				cldf.CreateLegacyChangeSet(v1_6.RMNUncurseChangeset),
@@ -705,7 +715,7 @@ func runRmnCurseMCMSTest(t *testing.T, tc CurseTestCase, action types.TimelockAc
 
 	transferRMNContractToMCMS(t, &e, state)
 
-	_, _, err = commonchangeset.ApplyChangesetsV2(t, e.Env,
+	_, _, err = commonchangeset.ApplyChangesets(t, e.Env,
 		[]commonchangeset.ConfiguredChangeSet{
 			commonchangeset.Configure(
 				cldf.CreateLegacyChangeSet(v1_6.RMNCurseChangeset),
@@ -778,7 +788,7 @@ var forceOptionTestCases = []ForceOptionTestCase{
 	{
 		name: "RMNCurseForceOptionFalse",
 		applyChangeset: func(env *testhelpers.DeployedEnv, config v1_6.RMNCurseConfig, t *testing.T) deployment.ChangesetOutput {
-			_, _, err := commonchangeset.ApplyChangesetsV2(t, env.Env,
+			_, _, err := commonchangeset.ApplyChangesets(t, env.Env,
 				[]commonchangeset.ConfiguredChangeSet{
 					commonchangeset.Configure(
 						cldf.CreateLegacyChangeSet(v1_6.RMNCurseChangeset),
@@ -809,7 +819,7 @@ var forceOptionTestCases = []ForceOptionTestCase{
 	{
 		name: "RMNCurseForceOptionTrue",
 		applyChangeset: func(env *testhelpers.DeployedEnv, config v1_6.RMNCurseConfig, t *testing.T) deployment.ChangesetOutput {
-			_, _, err := commonchangeset.ApplyChangesetsV2(t, env.Env,
+			_, _, err := commonchangeset.ApplyChangesets(t, env.Env,
 				[]commonchangeset.ConfiguredChangeSet{
 					commonchangeset.Configure(
 						cldf.CreateLegacyChangeSet(v1_6.RMNCurseChangeset),
