@@ -178,5 +178,3 @@ formatters:
     goimports:
       local-prefixes:
         - github.com/smartcontractkit/chainlink
-        - github.com/smartcontractkit/integration-tests
-output: 
