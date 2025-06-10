@@ -9,10 +9,9 @@ import (
 	mathrand "math/rand"
 	"time"
 
+	selectors "github.com/smartcontractkit/chain-selectors"
 	"go.uber.org/atomic"
 
-	selectors "github.com/smartcontractkit/chain-selectors"
-	
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
