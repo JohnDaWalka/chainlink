@@ -35,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	commonevmtypes "github.com/smartcontractkit/chainlink-common/pkg/types/chains/evm"
 	coretypes "github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-evm/pkg/config/chaintype"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
@@ -1001,7 +1002,7 @@ func (r *Relayer) EVM() (commontypes.EVMService, error) {
 	return r, nil
 }
 
-func (r *Relayer) GetTransactionFee(ctx context.Context, transactionID string) (*commontypes.TransactionFee, error) {
+func (r *Relayer) GetTransactionFee(ctx context.Context, transactionID string) (*commonevmtypes.TransactionFee, error) {
 	return r.chain.TxManager().GetTransactionFee(ctx, transactionID)
 }
 
