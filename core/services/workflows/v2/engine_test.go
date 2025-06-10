@@ -280,7 +280,7 @@ func TestEngine_Execution(t *testing.T) {
 				func(_ context.Context, request *wasmpb.ExecuteRequest, executor host.CapabilityExecutor) {
 					wantExecID, err := types.GenerateExecutionID(cfg.WorkflowID, mockTriggerEvent.ID)
 					require.NoError(t, err)
-					capExec, ok := executor.(*v2.CapabilityExecutor)
+					capExec, ok := executor.(*v2.ExecutionHelper)
 					require.True(t, ok)
 					require.Equal(t, wantExecID, capExec.ID)
 					require.Equal(t, uint64(0), request.Request.(*wasmpb.ExecuteRequest_Trigger).Trigger.Id)
