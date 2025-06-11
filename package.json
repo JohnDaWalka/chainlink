@@ -1,6 +1,10 @@
 {
   "name": "chainlink",
+<<<<<<< HEAD
   "version": "2.25.0",
+=======
+  "version": "v2.24.0-hyperliquid-hotfix1",
+>>>>>>> d334334c8e3dc19f06a8f0116a4ca49305c3f5b8
   "description": "node of the decentralized oracle network, bridging on and off-chain computation",
   "main": "index.js",
   "scripts": {
