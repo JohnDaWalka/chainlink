@@ -5,9 +5,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pattonkan/sui-go/sui"
-	"github.com/stretchr/testify/require"
-
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	ccip_ops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 )
 
 const (
@@ -19,35 +19,21 @@ const (
 	sepMockOnRampAddress = "0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59"
 )
 
-func getTestAddressBook(t *testing.T, addrByChain map[uint64]map[string]cldf.TypeAndVersion) cldf.AddressBook {
-	ab := cldf.NewMemoryAddressBook()
-	for chain, addrTypeAndVersion := range addrByChain {
-		for addr, typeAndVersion := range addrTypeAndVersion {
-			err := ab.Save(chain, addr, typeAndVersion)
-			require.NoError(t, err)
-		}
-	}
-	return ab
-}
-
-// func mustParseAddress(t *testing.T, addr string) sui.Address {
-// 	t.Helper()
-// 	var address sui.Address
-// 	err := address.ParseStringRelaxed(addr)
-// 	assert.NoError(t, err)s
-// 	return address
-// }
-
-func GetMockChainContractParams(t *testing.T, chainSelector uint64) ChainContractParams {
+func GetMockChainContractParams(t *testing.T, e cldf.Environment, chainSelector uint64) (ChainContractParams, error) {
 	mockParsedAddress := sui.MustAddressFromHex(mockAddress)
-	mockParsedLinkAddress := sui.MustAddressFromHex(mockLinkAddress)
+	state, err := stateview.LoadOnchainState(e)
+	if err != nil {
+		return ChainContractParams{}, err
+	}
+
+	linkTokenObjectMetadataId := state.SuiChains[chainSelector].LinkTokenCoinMetadataId.String()
 
 	return ChainContractParams{
-		FeeQuoterParams: FeeQuoterParams{
-			MaxFeeJuelsPerMsg:            1000000,
-			TokenPriceStalenessThreshold: 1000000,
-			LinkToken:                    *mockParsedLinkAddress,
-			FeeTokens:                    []sui.Address{*mockParsedLinkAddress},
+		FeeQuoterParams: ccip_ops.InitFeeQuoterInput{
+			MaxFeeJuelsPerMsg:             "100000000",
+			TokenPriceStalenessThreshold:  1000000,
+			LinkTokenCoinMetadataObjectId: linkTokenObjectMetadataId,           // CoinMetadataObjectId
+			FeeTokens:                     []string{linkTokenObjectMetadataId}, // CoinMetadataObjectId
 		},
 		OffRampParams: OffRampParams{
 			ChainSelector:                    chainSelector,
@@ -62,5 +48,5 @@ func GetMockChainContractParams(t *testing.T, chainSelector uint64) ChainContrac
 			AllowlistAdmin: *mockParsedAddress,
 			FeeAggregator:  *mockParsedAddress,
 		},
-	}
+	}, nil
 }

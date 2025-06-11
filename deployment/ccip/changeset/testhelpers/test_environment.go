@@ -26,6 +26,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
+	sui_cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
 	ccipops "github.com/smartcontractkit/chainlink/deployment/ccip/operation/evm/v1_6"
 	ccipseq "github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6"
@@ -789,10 +790,27 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	e.Env, err = commonchangeset.ApplyChangesets(t, e.Env, nil, apps)
 	require.NoError(t, err)
 
+	// Currently only one sui chain is supported in test environment
 	if len(suiChains) != 0 {
-		// Currently only one sui chain is supported in test environment
-		suiCs := DeployChainContractsToSuiCS(t, e, suiChains[0])
-		e.Env, _, err = commonchangeset.ApplyChangesetsV2(t, e.Env, []commonchangeset.ConfiguredChangeSet{suiCs})
+		// Deploy Link Token
+		e.Env, _, err = commonchangeset.ApplyChangesetsV2(t, e.Env, []commonchangeset.ConfiguredChangeSet{
+			commonchangeset.Configure(sui_cs.DeployLinkToken{}, sui_cs.DeployLinkTokenConfig{
+				ChainSelector: suiChains[0],
+			}),
+		})
+		require.NoError(t, err)
+
+		// Deploy CCIP, initialize feeQuoter
+		mockContractParamsPerChain, err := sui.GetMockChainContractParams(t, e.Env, suiChains[0])
+		require.NoError(t, err)
+
+		e.Env, _, err = commonchangeset.ApplyChangesetsV2(t, e.Env, []commonchangeset.ConfiguredChangeSet{
+			commonchangeset.Configure(sui.DeploySuiChain{}, sui.DeploySuiChainConfig{
+				ContractParamsPerChain: map[uint64]sui.ChainContractParams{
+					suiChains[0]: mockContractParamsPerChain,
+				},
+			}),
+		})
 		require.NoError(t, err)
 	}
 

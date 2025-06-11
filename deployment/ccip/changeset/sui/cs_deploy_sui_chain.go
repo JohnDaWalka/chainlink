@@ -39,6 +39,11 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		suiChain := suiChains[chainSel]
 		suiSigner := rel.NewPrivateKeySigner(suiChain.DeployerKey)
 
+		suiSignerAddr, err := suiSigner.GetAddress()
+		if err != nil {
+			return cldf.ChangesetOutput{}, err
+		}
+
 		deps := SuiDeps{
 			AB: ab,
 			SuiChain: sui_ops.OpTxDeps{
@@ -56,9 +61,11 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 
 		// Run DeployAndInitCCIpSequence
 		ccipSeqInput := ccipops.DeployAndInitCCIPSeqInput{
-			LinkTokenCoinMetadataObjectId: "",
-			LocalChainSelector:            1,
-			DestChainSelector:             2,
+			LinkTokenCoinMetadataObjectId: config.ContractParamsPerChain[chainSel].FeeQuoterParams.LinkTokenCoinMetadataObjectId,
+			LocalChainSelector:            config.ContractParamsPerChain[chainSel].OnRampParams.ChainSelector,
+			DestChainSelector:             suiChain.Selector,
+			MaxFeeJuelsPerMsg:             config.ContractParamsPerChain[chainSel].FeeQuoterParams.MaxFeeJuelsPerMsg,
+			TokenPriceStalenessThreshold:  config.ContractParamsPerChain[chainSel].FeeQuoterParams.TokenPriceStalenessThreshold,
 			DeployCCIPInput: ccipops.DeployCCIPInput{
 				McmsPackageId: "0x2",
 			},
@@ -84,10 +91,36 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save CCIP objectRef Id %s for Sui chain %d: %w", ccipSeqReport.Output.Objects.CCIPObjectRefObjectId, chainSel, err)
 		}
 
+		// No need to store rn
+		// // save CCIP TransferCapId address to the addressbook
+		// typeAndVersionTransferCapId := cldf.NewTypeAndVersion(shared.SuiCCIPTransferCapIdType, deployment.Version1_6_0)
+		// err = deps.AB.Save(chainSel, ccipSeqReport.Output.Objects.SourceTransferCapObjectId, typeAndVersionTransferCapId)
+		// if err != nil {
+		// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to save CCIP TransferCapId Id %s for Sui chain %d: %w", ccipSeqReport.Output.Objects.SourceTransferCapObjectId, chainSel, err)
+		// }
+
+		// // save CCIP NonceManagerCapObjectId address to the addressbook
+		// typeAndVersionNonceManagerCapObjectId := cldf.NewTypeAndVersion(shared.SuiCCIPObjectRefType, deployment.Version1_6_0)
+		// err = deps.AB.Save(chainSel, ccipSeqReport.Output.Objects.NonceManagerCapObjectId, typeAndVersionNonceManagerCapObjectId)
+		// if err != nil {
+		// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to save CCIP objectRef Id %s for Sui chain %d: %w", ccipSeqReport.Output.Objects.CCIPObjectRefObjectId, chainSel, err)
+		// }
+
 		// Run DeployAndInitCCIPOnRampSequence
 		ccipOnRampSeqInput := onrampops.DeployAndInitCCIPOnRampSeqInput{
 			DeployCCIPOnRampInput: onrampops.DeployCCIPOnRampInput{
 				CCIPPackageId: ccipSeqReport.Output.CCIPPackageId,
+			},
+
+			OnRampInitializeInput: onrampops.OnRampInitializeInput{
+				NonceManagerCapId:         ccipSeqReport.Output.Objects.NonceManagerCapObjectId,   // this is from NonceManager init Op
+				SourceTransferCapId:       ccipSeqReport.Output.Objects.SourceTransferCapObjectId, // this is from CCIP package publish
+				ChainSelector:             suiChain.Selector,
+				FeeAggregator:             suiSignerAddr,
+				AllowListAdmin:            suiSignerAddr,
+				DestChainSelectors:        []uint64{909606746561742123},
+				DestChainEnabled:          []bool{true},
+				DestChainAllowListEnabled: []bool{true},
 			},
 		}
 
@@ -102,6 +135,13 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		err = deps.AB.Save(chainSel, ccipOnRampSeqReport.Output.CCIPOnRampPackageId, typeAndVersionOnRamp)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save onRamp address %s for Sui chain %d: %w", ccipOnRampSeqReport.Output.CCIPOnRampPackageId, chainSel, err)
+		}
+
+		// save onRampStateId address to the addressbook
+		typeAndVersionOnRampStateId := cldf.NewTypeAndVersion(shared.SuiOnRampStateObjectIdType, deployment.Version1_6_0)
+		err = deps.AB.Save(chainSel, ccipOnRampSeqReport.Output.Objects.StateObjectId, typeAndVersionOnRampStateId)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save onRamp state object Id  %s for Sui chain %d: %w", ccipOnRampSeqReport.Output.Objects.StateObjectId, chainSel, err)
 		}
 
 		// Run DeployMCMSSequence
@@ -140,7 +180,7 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 
 		// save offRamp ownerCapId to the addressbook
 		typeAndVersionOffRampOwnerCapId := cldf.NewTypeAndVersion(shared.SuiOffRampOwnerCapObjectIdType, deployment.Version1_6_0)
-		err = deps.AB.Save(chainSel, ccipOffRampSeqReport.Output.Objects.ObjectCapId, typeAndVersionOffRampOwnerCapId)
+		err = deps.AB.Save(chainSel, ccipOffRampSeqReport.Output.Objects.OwnerCapId, typeAndVersionOffRampOwnerCapId)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save offRamp ObjectCapId address %s for Sui chain %d: %w", ccipOffRampSeqReport.Output.CCIPOffRampPackageId, chainSel, err)
 		}

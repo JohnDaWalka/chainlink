@@ -1,6 +1,9 @@
 package sui
 
-import "github.com/pattonkan/sui-go/sui"
+import (
+	"github.com/pattonkan/sui-go/sui"
+	ccip_ops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
+)
 
 type DeploySuiChainConfig struct {
 	ContractParamsPerChain map[uint64]ChainContractParams
@@ -16,16 +19,9 @@ type MintLinkTokenConfig struct {
 
 // ChainContractParams stores configuration to call initialize in CCIP contracts
 type ChainContractParams struct {
-	FeeQuoterParams FeeQuoterParams
+	FeeQuoterParams ccip_ops.InitFeeQuoterInput
 	OffRampParams   OffRampParams
 	OnRampParams    OnRampParams
-}
-
-type FeeQuoterParams struct {
-	MaxFeeJuelsPerMsg            uint64
-	LinkToken                    sui.Address
-	TokenPriceStalenessThreshold uint64
-	FeeTokens                    []sui.Address
 }
 
 type OffRampParams struct {
