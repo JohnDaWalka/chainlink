@@ -8,7 +8,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/zksync-sdk/zksync2-go/accounts"
 	"github.com/zksync-sdk/zksync2-go/clients"
@@ -48,7 +47,7 @@ func (s *ZkSyncECDSASigner) SignTypedData(_ context.Context, typedData *apitypes
 		return nil, fmt.Errorf("failed to get hash of typed data: %w", err)
 	}
 
-	sig, err := s.c.SignHash(hash, s.pubKeyBytes)
+	sig, err := s.kmsClient.SignHash(hash, s.pubKeyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign hash of typed data: %w", err)
 	}
@@ -58,16 +57,12 @@ func (s *ZkSyncECDSASigner) SignTypedData(_ context.Context, typedData *apitypes
 	return sig, nil
 }
 
-func CreateZkSyncWalletWithKMS(kmsClient *EVMKMSClient, address common.Address, chainID *big.Int, pubKeyBytes []byte, ethClient *ethclient.Client) (*accounts.Wallet, error) {
+func CreateZkSyncWalletWithKMS(kmsClient *EVMKMSClient, address common.Address, chainID *big.Int, pubKeyBytes []byte, client *clients.Client) (*accounts.Wallet, error) {
 	signer := &ZkSyncECDSASigner{
 		kmsClient:   kmsClient,
 		pubKeyBytes: pubKeyBytes,
+		address:     address,
+		chainID:     chainID,
 	}
-	clientZk := clients.NewClient(ethClient.Client())
-	wallet, err := accounts.NewWalletFromSigner(signer, clientZk, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create zkSync wallet from signer: %w", err)
-	}
-
-	return wallet, nil
+	return accounts.NewWalletFromSigner(signer, client, nil)
 }
