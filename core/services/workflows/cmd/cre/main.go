@@ -16,15 +16,19 @@ import (
 )
 
 func main() {
-	var wasmPath string
-	var configPath string
-	var debugMode bool
-	var billingClientAddr string
+	var (
+		wasmPath          string
+		configPath        string
+		debugMode         bool
+		billingClientAddr string
+		enableBeholder    bool
+	)
 
 	flag.StringVar(&wasmPath, "wasm", "", "Path to the WASM binary file")
 	flag.StringVar(&configPath, "config", "", "Path to the Config file")
 	flag.BoolVar(&debugMode, "debug", false, "Enable debug-level logging")
-	flag.StringVar(&billingClientAddr, "billing-client-address", "", "Billing client address; Leave empty for no client.")
+	flag.StringVar(&billingClientAddr, "billing-client-address", "", "Billing client address; Leave empty to run a local client that prints to the standard log.")
+	flag.BoolVar(&enableBeholder, "beholder", false, "Enable printing beholder messages to standard log")
 	flag.Parse()
 
 	if wasmPath == "" {
@@ -59,7 +63,7 @@ func main() {
 	logCfg := logger.Config{LogLevel: logLevel}
 	lggr, _ := logCfg.New()
 
-	run(ctx, lggr, binary, config, billingClientAddr)
+	run(ctx, lggr, binary, config, billingClientAddr, enableBeholder)
 }
 
 // run instantiates the engine, starts it and blocks until the context is canceled.
@@ -68,6 +72,7 @@ func run(
 	lggr logger.Logger,
 	binary, config []byte,
 	billingClientAddr string,
+	enableBeholder bool,
 ) {
 	lggr.Infof("executing engine in process: %d", os.Getpid())
 
@@ -77,6 +82,20 @@ func run(
 	capabilities, err := NewFakeCapabilities(ctx, lggr, registry)
 	if err != nil {
 		fmt.Printf("Failed to create capabilities: %v\n", err)
+		os.Exit(1)
+	}
+
+	if enableBeholder {
+		_ = setupBeholder(lggr.Named("Fake_Stdlog_Beholder"))
+	}
+
+	if billingClientAddr == "" {
+		billingClientAddr = "localhost:4319"
+	}
+	bs := NewBillingService(lggr.Named("Fake_Billing_Client"))
+	err = bs.Start(ctx)
+	if err != nil {
+		fmt.Printf("Failed to start billing service: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -115,4 +134,5 @@ func run(
 		lggr.Infow("Shutting down capability", "id", cap.Name())
 		_ = cap.Close()
 	}
+	_ = bs.Close()
 }
