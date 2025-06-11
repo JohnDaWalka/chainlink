@@ -1,6 +1,6 @@
 {
   "name": "chainlink",
-  "version": "v2.24.0-hyperliquid-hotfix1",
+  "version": "2.24.0-hyperliquid-hotfix-1s",
   "description": "node of the decentralized oracle network, bridging on and off-chain computation",
   "main": "index.js",
   "scripts": {
