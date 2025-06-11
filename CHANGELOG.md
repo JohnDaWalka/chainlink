@@ -1,5 +1,23 @@
 # Changelog Chainlink Core
 
+## 2.25.0
+
+### Minor Changes
+
+- [#17836](https://github.com/smartcontractkit/chainlink/pull/17836) [`6ff0023`](https://github.com/smartcontractkit/chainlink/commit/6ff0023bcc6b7afb6abff49dd1b46b48c644743e) - Release 2.24.0 - Next Version
+
+- [#17795](https://github.com/smartcontractkit/chainlink/pull/17795) [`3f806ac`](https://github.com/smartcontractkit/chainlink/commit/3f806ac780eb7cc83ff631acca73e938e575ffd3) - #updated chain selectors
+
+### Patch Changes
+
+- [#17647](https://github.com/smartcontractkit/chainlink/pull/17647) [`61a58fe`](https://github.com/smartcontractkit/chainlink/commit/61a58fe987db72da6830fb5bf27f603e90cb8b86) - #bugfix Fixed canceled context inside of PriceService
+
+- [#17831](https://github.com/smartcontractkit/chainlink/pull/17831) [`ec73149`](https://github.com/smartcontractkit/chainlink/commit/ec73149b3ee6b1055adbbf416ccfab1ed71b1b0a) - #updated chain selectors
+
+- [#17869](https://github.com/smartcontractkit/chainlink/pull/17869) [`220507a`](https://github.com/smartcontractkit/chainlink/commit/220507af64db57ac150b767ef4125342c1d163a1) - #updated chain selectors
+
+- [#17805](https://github.com/smartcontractkit/chainlink/pull/17805) [`551a510`](https://github.com/smartcontractkit/chainlink/commit/551a510450e2589477a4d892fbaea816c4c5cbc9) - #bugfix for high CPU usage on TRON
+
 ## 2.24.0 - 2025-05-21
 
 ### Minor Changes
