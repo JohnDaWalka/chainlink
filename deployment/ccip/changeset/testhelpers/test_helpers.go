@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -22,6 +23,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pattonkan/sui-go/sui"
 	"github.com/pkg/errors"
+
+	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
+	"github.com/scylladb/go-reflectx"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/message_hasher"
@@ -90,6 +95,9 @@ import (
 	solRmnRemote "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
 	solTestReceiver "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
 	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
@@ -992,6 +1000,14 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 	// Query the CCIPSend Event via chainReader
 	chainReaderConfig := chainreader.ChainReaderConfig{
 		IsLoopPlugin: false,
+		EventsIndexer: chainreader.EventsIndexerConfig{
+			PollingInterval: 10 * time.Second,
+			SyncTimeout:     10 * time.Second,
+		},
+		TransactionsIndexer: chainreader.TransactionsIndexerConfig{
+			PollingInterval: 10 * time.Second,
+			SyncTimeout:     10 * time.Second,
+		},
 		Modules: map[string]*chainreader.ChainReaderModule{
 			"onramp": {
 				Name: "onramp",
@@ -999,6 +1015,11 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 					"ccip_send": {
 						Name:      "ccip_send",
 						EventType: "CCIPMessageSent",
+						EventSelector: client.EventSelector{
+							Package: onRampPackageId,
+							Module:  "onramp",
+							Event:   "CCIPMessageSent",
+						},
 					},
 				},
 			},
@@ -1010,7 +1031,30 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		Address: onRampPackageId, // Package ID of the deployed counter contract
 	}
 
-	chainReader := chainreader.NewChainReader(e.Logger, *relayerClient, chainReaderConfig)
+	dbURL := os.Getenv("CL_DATABASE_URL")
+
+	err = sqltest.RegisterTxDB(dbURL)
+	if err != nil {
+		return &AnyMsgSentEvent{}, err
+	}
+
+	db, err := sqlx.Open(pg.DriverTxWrappedPostgres, uuid.New().String())
+	if err != nil {
+		return &AnyMsgSentEvent{}, err
+	}
+
+	db.MapperFunc(reflectx.CamelToSnakeASCII)
+
+	// attempt to connect
+	_, err = db.Connx(ctx)
+	if err != nil {
+		return &AnyMsgSentEvent{}, err
+	}
+
+	chainReader, err := chainreader.NewChainReader(ctx, e.Logger, relayerClient, chainReaderConfig, db)
+	if err != nil {
+		return &AnyMsgSentEvent{}, err
+	}
 	err = chainReader.Bind(context.Background(), []chain_reader_types.BoundContract{counterBinding})
 	if err != nil {
 		return &AnyMsgSentEvent{}, fmt.Errorf("failed to bind onramp contract with chainReader")

@@ -118,9 +118,20 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 				ChainSelector:             suiChain.Selector,
 				FeeAggregator:             suiSignerAddr,
 				AllowListAdmin:            suiSignerAddr,
-				DestChainSelectors:        []uint64{909606746561742123},
+				DestChainSelectors:        []uint64{909606746561742123}, // TODOD add this in input instead of hardcoding
 				DestChainEnabled:          []bool{true},
 				DestChainAllowListEnabled: []bool{true},
+			},
+			ApplyDestChainConfigureOnRampInput: onrampops.ApplyDestChainConfigureOnRampInput{
+				DestChainSelector:         []uint64{909606746561742123},
+				DestChainEnabled:          []bool{true},
+				DestChainAllowListEnabled: []bool{false},
+			},
+			ApplyAllowListUpdatesInput: onrampops.ApplyAllowListUpdatesInput{
+				DestChainSelector:             []uint64{909606746561742123},
+				DestChainAllowListEnabled:     []bool{false},
+				DestChainAddAllowedSenders:    [][]string{{}},
+				DestChainRemoveAllowedSenders: [][]string{{}},
 			},
 		}
 
