@@ -34,7 +34,7 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *type
 	var allNodesInfo []devenv.NodeInfo
 	chains := make([]devenv.ChainConfig, 0)
 	for chainSelector, bcOut := range input.BlockchainOutputs {
-		cID, err := strconv.ParseUint(bcOut.ChainID, 10, 64)
+		cID, err := strconv.ParseUint(bcOut.BlockchainOutput.ChainID, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse chain ID: %w", err)
 		}
@@ -47,14 +47,14 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *type
 		chains = append(chains, devenv.ChainConfig{
 			ChainID:   strconv.FormatUint(cID, 10),
 			ChainName: sethClient.Cfg.Network.Name,
-			ChainType: strings.ToUpper(bcOut.Family),
+			ChainType: strings.ToUpper(bcOut.BlockchainOutput.Family),
 			WSRPCs: []devenv.CribRPCs{{
-				External: bcOut.Nodes[0].ExternalWSUrl,
-				Internal: bcOut.Nodes[0].InternalWSUrl,
+				External: bcOut.BlockchainOutput.Nodes[0].ExternalWSUrl,
+				Internal: bcOut.BlockchainOutput.Nodes[0].InternalWSUrl,
 			}},
 			HTTPRPCs: []devenv.CribRPCs{{
-				External: bcOut.Nodes[0].ExternalHTTPUrl,
-				Internal: bcOut.Nodes[0].InternalHTTPUrl,
+				External: bcOut.BlockchainOutput.Nodes[0].ExternalHTTPUrl,
+				Internal: bcOut.BlockchainOutput.Nodes[0].InternalHTTPUrl,
 			}},
 			DeployerKey: sethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the chain
 		})

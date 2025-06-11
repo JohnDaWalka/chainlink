@@ -28,7 +28,7 @@ import (
 
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
@@ -73,7 +73,7 @@ const (
 type SetupOutput struct {
 	WorkflowRegistryConfigurationOutput *cretypes.WorkflowRegistryOutput
 	CldEnvironment                      *cldf.Environment
-	BlockchainOutput                    []*BlockchainOutput
+	BlockchainOutput                    []*cretypes.WrappedBlockchainOutput
 	DonTopology                         *cretypes.DonTopology
 	NodeOutput                          []*cretypes.WrappedNodeOutput
 }
@@ -83,7 +83,7 @@ type SetupInput struct {
 	CapabilitiesContractFactoryFunctions []func([]cretypes.CapabilityFlag) []keystone_changeset.DONCapabilityWithConfig
 	ConfigFactoryFunctions               []cretypes.ConfigFactoryFn
 	JobSpecFactoryFunctions              []cretypes.JobSpecFactoryFn
-	BlockchainsInput                     []*blockchain.Input
+	BlockchainsInput                     []*cretypes.WrappedBlockchainInput
 	JdInput                              jd.Input
 	InfraInput                           libtypes.InfraInput
 	CustomBinariesPaths                  map[cretypes.CapabilityFlag]string
@@ -168,7 +168,7 @@ func SetupTestEnvironment(
 		return nil, pkgerrors.Wrap(allChainsErr, "failed to create chains")
 	}
 
-	blockChains := map[uint64]chain.BlockChain{}
+	blockChains := map[uint64]cldf_chain.BlockChain{}
 	for selector, ch := range allChains {
 		blockChains[selector] = ch
 	}
@@ -179,7 +179,7 @@ func SetupTestEnvironment(
 		GetContext: func() context.Context {
 			return ctx
 		},
-		BlockChains: chain.NewBlockChains(blockChains),
+		BlockChains: cldf_chain.NewBlockChains(blockChains),
 	}
 
 	fmt.Print(libformat.PurpleText("\n[Stage 1/8] Blockchains started in %.2f seconds\n", time.Since(startTime).Seconds()))
@@ -226,6 +226,9 @@ func SetupTestEnvironment(
 	// Deploy forwarders for all chains
 	contractErrGroup := &errgroup.Group{}
 	for _, bcOut := range blockchainsOutput {
+		if bcOut.ReadOnly {
+			continue
+		}
 		contractErrGroup.Go(func() error {
 			output, err := keystone_changeset.DeployForwarder(*allChainsCLDEnvironment, keystone_changeset.DeployForwarderRequest{
 				ChainSelectors: []uint64{bcOut.ChainSelector},
@@ -270,10 +273,37 @@ func SetupTestEnvironment(
 		startTime = time.Now()
 		fmt.Print(libformat.PurpleText("---> [BACKGROUND 1/3] Configuring Workflow Registry contract\n"))
 
+		allAddresses, addrErr := allChainsCLDEnvironment.ExistingAddresses.Addresses()
+		if addrErr != nil {
+			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(addrErr, "failed to get addresses from address book")}
+			return
+		}
+
+		chainsWithContracts := make(map[uint64]bool)
+		for chainSelector, addresses := range allAddresses {
+			chainsWithContracts[chainSelector] = len(addresses) > 0
+		}
+
+		nonEmptyBlockchains := make(map[uint64]cldf_chain.BlockChain, 0)
+		for chainSelector, chain := range allChainsCLDEnvironment.BlockChains.EVMChains() {
+			if chainsWithContracts[chain.Selector] {
+				nonEmptyBlockchains[chainSelector] = chain
+			}
+		}
+
+		nonEmptyChainsCLDEnvironment := &cldf.Environment{
+			Logger:            singeFileLogger,
+			ExistingAddresses: allChainsCLDEnvironment.ExistingAddresses,
+			GetContext: func() context.Context {
+				return ctx
+			},
+			BlockChains: cldf_chain.NewBlockChains(nonEmptyBlockchains),
+		}
+
 		// Configure Workflow Registry contract
 		workflowRegistryInput = &cretypes.WorkflowRegistryInput{
 			ChainSelector:  homeChainOutput.ChainSelector,
-			CldEnv:         allChainsCLDEnvironment,
+			CldEnv:         nonEmptyChainsCLDEnvironment,
 			AllowedDonIDs:  []uint32{topology.WorkflowDONID},
 			WorkflowOwners: []common.Address{homeChainOutput.SethClient.MustGetRootKeyAddress()},
 		}
@@ -302,11 +332,11 @@ func SetupTestEnvironment(
 	// get chainIDs, they'll be used for identifying ETH keys and Forwarder addresses
 	// and also for creating the CLD environment
 	chainIDs := make([]int, 0)
-	bcOuts := make(map[uint64]*blockchain.Output)
+	bcOuts := make(map[uint64]*cretypes.WrappedBlockchainOutput)
 	sethClients := make(map[uint64]*seth.Client)
 	for _, bcOut := range blockchainsOutput {
 		chainIDs = append(chainIDs, libc.MustSafeInt(bcOut.ChainID))
-		bcOuts[bcOut.ChainSelector] = bcOut.BlockchainOutput
+		bcOuts[bcOut.ChainSelector] = bcOut
 		sethClients[bcOut.ChainSelector] = bcOut.SethClient
 	}
 
@@ -563,6 +593,9 @@ func SetupTestEnvironment(
 		errGroup := &errgroup.Group{}
 		for _, metaDon := range fullCldOutput.DonTopology.DonsWithMetadata {
 			for _, bcOut := range blockchainsOutput {
+				if bcOut.ReadOnly {
+					continue
+				}
 				for _, node := range metaDon.DON.Nodes {
 					errGroup.Go(func() error {
 						nodeAddress := node.AccountAddr[strconv.FormatUint(bcOut.ChainID, 10)]
@@ -729,56 +762,50 @@ func SetupTestEnvironment(
 }
 
 type BlockchainsInput struct {
-	blockchainsInput []*blockchain.Input
+	blockchainsInput []*cretypes.WrappedBlockchainInput
 	infra            *libtypes.InfraInput
 	nixShell         *libnix.Shell
-}
-
-type BlockchainOutput struct {
-	ChainSelector      uint64
-	ChainID            uint64
-	BlockchainOutput   *blockchain.Output
-	SethClient         *seth.Client
-	DeployerPrivateKey string
-
-	// private data depending crib vs docker
-	c *blockchain.Output // non-nil if running in docker
 }
 
 func CreateBlockchains(
 	testLogger zerolog.Logger,
 	input BlockchainsInput,
-) ([]*BlockchainOutput, error) {
+) ([]*cretypes.WrappedBlockchainOutput, error) {
 	if len(input.blockchainsInput) == 0 {
 		return nil, pkgerrors.New("blockchain input is nil")
 	}
 
-	blockchainOutput := make([]*BlockchainOutput, 0)
+	blockchainOutput := make([]*cretypes.WrappedBlockchainOutput, 0)
 	for _, bi := range input.blockchainsInput {
 		var bcOut *blockchain.Output
 		var bcErr error
-		if input.infra.InfraType == libtypes.CRIB {
-			if input.nixShell == nil {
-				return nil, pkgerrors.New("nix shell is nil")
-			}
 
-			deployCribBlockchainInput := &cretypes.DeployCribBlockchainInput{
-				BlockchainInput: bi,
-				NixShell:        input.nixShell,
-				CribConfigsDir:  cribConfigsDir,
-			}
-			bcOut, bcErr = crib.DeployBlockchain(deployCribBlockchainInput)
-			if bcErr != nil {
-				return nil, pkgerrors.Wrap(bcErr, "failed to deploy blockchain")
-			}
-			err := libinfra.WaitForRPCEndpoint(testLogger, bcOut.Nodes[0].ExternalHTTPUrl, 10*time.Minute)
-			if err != nil {
-				return nil, pkgerrors.Wrap(err, "RPC endpoint is not available")
-			}
+		if bi.Out != nil && bi.Out.UseCache {
+			bcOut = bi.Out
 		} else {
-			bcOut, bcErr = blockchain.NewBlockchainNetwork(bi)
-			if bcErr != nil {
-				return nil, pkgerrors.Wrap(bcErr, "failed to deploy blockchain")
+			if input.infra.InfraType == libtypes.CRIB {
+				if input.nixShell == nil {
+					return nil, pkgerrors.New("nix shell is nil")
+				}
+
+				deployCribBlockchainInput := &cretypes.DeployCribBlockchainInput{
+					BlockchainInput: &bi.Input,
+					NixShell:        input.nixShell,
+					CribConfigsDir:  cribConfigsDir,
+				}
+				bcOut, bcErr = crib.DeployBlockchain(deployCribBlockchainInput)
+				if bcErr != nil {
+					return nil, pkgerrors.Wrap(bcErr, "failed to deploy blockchain")
+				}
+				err := libinfra.WaitForRPCEndpoint(testLogger, bcOut.Nodes[0].ExternalHTTPUrl, 10*time.Minute)
+				if err != nil {
+					return nil, pkgerrors.Wrap(err, "RPC endpoint is not available")
+				}
+			} else {
+				bcOut, bcErr = blockchain.NewBlockchainNetwork(&bi.Input)
+				if bcErr != nil {
+					return nil, pkgerrors.Wrap(bcErr, "failed to deploy blockchain")
+				}
 			}
 		}
 
@@ -806,13 +833,13 @@ func CreateBlockchains(
 			return nil, pkgerrors.Wrapf(err, "failed to parse chain id %s", bcOut.ChainID)
 		}
 
-		blockchainOutput = append(blockchainOutput, &BlockchainOutput{
+		blockchainOutput = append(blockchainOutput, &cretypes.WrappedBlockchainOutput{
 			ChainSelector:      chainSelector,
 			ChainID:            chainID,
 			BlockchainOutput:   bcOut,
 			SethClient:         sethClient,
 			DeployerPrivateKey: pkey,
-			c:                  bcOut,
+			ReadOnly:           bi.ReadOnly,
 		})
 	}
 
@@ -848,7 +875,7 @@ type ConcurrentNonceMap struct {
 	nonceByChainID map[uint64]uint64
 }
 
-func NewConcurrentNonceMap(ctx context.Context, blockchainOutputs []*BlockchainOutput) (*ConcurrentNonceMap, error) {
+func NewConcurrentNonceMap(ctx context.Context, blockchainOutputs []*cretypes.WrappedBlockchainOutput) (*ConcurrentNonceMap, error) {
 	nonceByChainID := make(map[uint64]uint64)
 	for _, bcOut := range blockchainOutputs {
 		var err error

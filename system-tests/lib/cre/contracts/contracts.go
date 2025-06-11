@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/data-feeds/generated/data_feeds_cache"
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -276,7 +277,28 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput, capabilityFactoryFns 
 		OCR3Config:       &oracleConfig,
 	}
 
-	_, err := keystone_changeset.ConfigureInitialContractsChangeset(*input.CldEnv, cfg)
+	// remove chains that do not require any configurations
+	configurableEnv := *input.CldEnv
+
+	allAddresses, addrErr := configurableEnv.ExistingAddresses.Addresses()
+	if addrErr != nil {
+		return errors.Wrap(addrErr, "failed to get addresses from address book")
+	}
+	chainsWithContracts := make(map[uint64]bool)
+	for chainSelector, addresses := range allAddresses {
+		chainsWithContracts[chainSelector] = len(addresses) > 0
+	}
+
+	blockChainsToConfigure := make(map[uint64]cldf_chain.BlockChain, 0)
+	for chainSelector, chain := range configurableEnv.BlockChains.EVMChains() {
+		if chainsWithContracts[chain.Selector] {
+			blockChainsToConfigure[chainSelector] = chain
+		}
+	}
+
+	configurableEnv.BlockChains = cldf_chain.NewBlockChains(blockChainsToConfigure)
+
+	_, err := keystone_changeset.ConfigureInitialContractsChangeset(configurableEnv, cfg)
 	if err != nil {
 		return errors.Wrap(err, "failed to configure initial contracts")
 	}

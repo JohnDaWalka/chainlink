@@ -78,15 +78,15 @@ type CustomAnvilMiner struct {
 }
 
 type TestConfig struct {
-	Blockchains                   []*blockchain.Input                  `toml:"blockchains" validate:"required"`
-	CustomAnvilMiner              *CustomAnvilMiner                    `toml:"custom_anvil_miner"`
-	NodeSets                      []*ns.Input                          `toml:"nodesets" validate:"required"`
-	WorkflowConfigs               []WorkflowConfig                     `toml:"workflow_configs" validate:"required"`
-	JD                            *jd.Input                            `toml:"jd" validate:"required"`
-	Fake                          *fake.Input                          `toml:"fake"`
-	WorkflowRegistryConfiguration *keystonetypes.WorkflowRegistryInput `toml:"workflow_registry_configuration"`
-	Infra                         *libtypes.InfraInput                 `toml:"infra" validate:"required"`
-	DependenciesConfig            *DependenciesConfig                  `toml:"dependencies" validate:"required"`
+	Blockchains                   []*keystonetypes.WrappedBlockchainInput `toml:"blockchains" validate:"required"`
+	CustomAnvilMiner              *CustomAnvilMiner                       `toml:"custom_anvil_miner"`
+	NodeSets                      []*ns.Input                             `toml:"nodesets" validate:"required"`
+	WorkflowConfigs               []WorkflowConfig                        `toml:"workflow_configs" validate:"required"`
+	JD                            *jd.Input                               `toml:"jd" validate:"required"`
+	Fake                          *fake.Input                             `toml:"fake"`
+	WorkflowRegistryConfiguration *keystonetypes.WorkflowRegistryInput    `toml:"workflow_registry_configuration"`
+	Infra                         *libtypes.InfraInput                    `toml:"infra" validate:"required"`
+	DependenciesConfig            *DependenciesConfig                     `toml:"dependencies" validate:"required"`
 }
 
 type WorkflowConfig struct {

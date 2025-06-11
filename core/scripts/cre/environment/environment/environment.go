@@ -54,7 +54,6 @@ import (
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 )
@@ -121,11 +120,11 @@ const (
 )
 
 type Config struct {
-	Blockchains       []*blockchain.Input     `toml:"blockchains" validate:"required"`
-	NodeSets          []*ns.Input             `toml:"nodesets" validate:"required"`
-	JD                *jd.Input               `toml:"jd" validate:"required"`
-	Infra             *libtypes.InfraInput    `toml:"infra" validate:"required"`
-	ExtraCapabilities ExtraCapabilitiesConfig `toml:"extra_capabilities"`
+	Blockchains       []*cretypes.WrappedBlockchainInput `toml:"blockchains" validate:"required"`
+	NodeSets          []*ns.Input                        `toml:"nodesets" validate:"required"`
+	JD                *jd.Input                          `toml:"jd" validate:"required"`
+	Infra             *libtypes.InfraInput               `toml:"infra" validate:"required"`
+	ExtraCapabilities ExtraCapabilitiesConfig            `toml:"extra_capabilities"`
 }
 
 type ExtraCapabilitiesConfig struct {
@@ -498,7 +497,10 @@ func startCLIEnvironment(cmdContext context.Context, topologyFlag string, workfl
 		if chainErr != nil {
 			return nil, fmt.Errorf("failed to convert chain ID to int: %w", chainErr)
 		}
-		capabilityFactoryFns = append(capabilityFactoryFns, writeevmcap.WriteEVMCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))))
+
+		if !blockchain.ReadOnly {
+			capabilityFactoryFns = append(capabilityFactoryFns, writeevmcap.WriteEVMCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))))
+		}
 		capabilityFactoryFns = append(capabilityFactoryFns, readcontractcap.ReadContractCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
 		capabilityFactoryFns = append(capabilityFactoryFns, logeventtriggercap.LogEventTriggerCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
 
