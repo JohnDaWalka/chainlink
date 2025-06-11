@@ -106,22 +106,9 @@ func (c *EVMKMSClient) GetKMSTransactOpts(ctx context.Context, chainID *big.Int)
 
 		txHashBytes := signer.Hash(tx).Bytes()
 
-		mType := kms.MessageTypeDigest
-		algo := kms.SigningAlgorithmSpecEcdsaSha256
-		signOutput, err := c.Client.Sign(
-			&kms.SignInput{
-				KeyId:            &c.KeyID,
-				SigningAlgorithm: &algo,
-				MessageType:      &mType,
-				Message:          txHashBytes,
-			})
+		ethSig, err := c.SignHash(txHashBytes, pubKeyBytes)
 		if err != nil {
-			return nil, fmt.Errorf("failed to call kms.Sign() on transaction: %w", err)
-		}
-
-		ethSig, err := kmsToEthSig(signOutput.Signature, pubKeyBytes, txHashBytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert KMS signature to Ethereum signature: %w", err)
+			return nil, err
 		}
 
 		return tx.WithSignature(signer, ethSig)
@@ -132,6 +119,27 @@ func (c *EVMKMSClient) GetKMSTransactOpts(ctx context.Context, chainID *big.Int)
 		Signer:  signerFn,
 		Context: ctx,
 	}, nil
+}
+
+func (c *EVMKMSClient) SignHash(txHashBytes []byte, pubKeyBytes []byte) ([]byte, error) {
+	mType := kms.MessageTypeDigest
+	algo := kms.SigningAlgorithmSpecEcdsaSha256
+	signOutput, err := c.Client.Sign(
+		&kms.SignInput{
+			KeyId:            &c.KeyID,
+			SigningAlgorithm: &algo,
+			MessageType:      &mType,
+			Message:          txHashBytes,
+		})
+	if err != nil {
+		return nil, fmt.Errorf("failed to call kms.Sign() on transaction: %w", err)
+	}
+
+	ethSig, err := kmsToEthSig(signOutput.Signature, pubKeyBytes, txHashBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert KMS signature to Ethereum signature: %w", err)
+	}
+	return ethSig, nil
 }
 
 // GetECDSAPublicKey retrieves the public key from KMS and converts it to its ECDSA representation.
