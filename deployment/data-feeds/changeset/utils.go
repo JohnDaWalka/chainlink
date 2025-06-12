@@ -7,6 +7,7 @@ import (
 	"io/fs"
 
 	workflowUtils "github.com/smartcontractkit/chainlink-common/pkg/workflows"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -100,10 +101,19 @@ func GetDecimalsFromFeedID(feedID string) (uint8, error) {
 	return 0, nil
 }
 
-func GetDataFeedsCacheAddress(ab cldf.AddressBook, chainSelector uint64, label *string) string {
+func GetDataFeedsCacheAddress(ab cldf.AddressBook, dataStore datastore.AddressRefStore, chainSelector uint64, label *string) string {
+	// try to find the address in datastore, fallback to addressbook
+	record, err := dataStore.Get(
+		datastore.NewAddressRefKey(chainSelector, DataFeedsCache, &deployment.Version1_0_0, *label),
+	)
+	if err == nil {
+		return record.Address
+	}
+
+	// legacy addressbook
 	dataFeedsCacheAddress := ""
-	cacheTV := cldf.NewTypeAndVersion(DataFeedsCache, deployment.Version1_0_0)
-	if label != nil {
+	cacheTV := cldf.NewTypeAndVersion("DataFeedsCache", deployment.Version1_0_0)
+	if &label != nil {
 		cacheTV.Labels.Add(*label)
 	} else {
 		cacheTV.Labels.Add("data-feeds")
