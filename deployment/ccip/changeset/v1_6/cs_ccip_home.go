@@ -89,6 +89,39 @@ func validateExecOffchainConfig(e cldf.Environment, c *pluginconfig.ExecuteOffch
 		return fmt.Errorf("validate offRamp: %w", err)
 	}
 
+	if c.MultipleReportsEnabled {
+		// Get the FeeQuoter for this chain
+		chainState, exists := state.Chains[selector]
+		if !exists {
+			return fmt.Errorf("chain %d does not exist in state", selector)
+		}
+
+		if chainState.FeeQuoter == nil {
+			return fmt.Errorf("FeeQuoter not found for chain %d", selector)
+		}
+
+		// Check all destination chains for this source chain
+		// We need to ensure ALL destinations have EnforceOutOfOrder = true
+		for destChainSelector := range state.Chains {
+			if destChainSelector == selector {
+				continue // Skip self
+			}
+
+			destChainConfig, err := chainState.FeeQuoter.GetDestChainConfig(nil, destChainSelector)
+			if err != nil {
+				// Destination might not be configured yet, which is okay
+				continue
+			}
+
+			// If the destination is configured but EnforceOutOfOrder is false, that's an error
+			if !destChainConfig.EnforceOutOfOrder {
+				return fmt.Errorf("MultipleReportsEnabled is set to true for chain %d, but destination chain %d has EnforceOutOfOrder=false. "+
+					"Multiple reports are only supported for out-of-order execution to prevent bottlenecks",
+					selector, destChainSelector)
+			}
+		}
+	}
+
 	for _, observerConfig := range c.TokenDataObservers {
 		switch observerConfig.Type {
 		case pluginconfig.USDCCCTPHandlerType:

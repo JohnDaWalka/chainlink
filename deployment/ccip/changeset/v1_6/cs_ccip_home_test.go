@@ -33,6 +33,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 )
@@ -548,4 +549,251 @@ func Test_UpdateChainConfigs(t *testing.T) {
 			assert.Equal(t, chainConfigAfter2.Config, otherChainConfig.Config)
 		})
 	}
+}
+
+func Test_ValidateMultipleReportsVsEnforceOutOfOrder(t *testing.T) {
+	// Set up environment with 3 chains (home + 2 others)
+	tenv, _ := testhelpers.NewMemoryEnvironment(t,
+		testhelpers.WithNumOfChains(3),
+		testhelpers.WithNumOfNodes(4))
+
+	state, err := stateview.LoadOnchainState(tenv.Env)
+	require.NoError(t, err)
+
+	allChains := maps.Keys(tenv.Env.BlockChains.EVMChains())
+	source := allChains[0]
+	dest1 := allChains[1]
+	dest2 := allChains[2]
+
+	// First, set up lanes between source and both destinations
+	// By default, EnforceOutOfOrder is false
+	_, err = commonchangeset.Apply(t, tenv.Env,
+		commonchangeset.Configure(
+			v1_6.UpdateBidirectionalLanesChangeset,
+			v1_6.UpdateBidirectionalLanesConfig{
+				Lanes: []v1_6.BidirectionalLaneDefinition{
+					{
+						Chains: [2]v1_6.ChainDefinition{
+							{
+								Selector:                 source,
+								ConnectionConfig:         v1_6.ConnectionConfig{},
+								GasPrice:                 testhelpers.DefaultGasPrice,
+								FeeQuoterDestChainConfig: v1_6.DefaultFeeQuoterDestChainConfig(true),
+							},
+							{
+								Selector:                 dest1,
+								ConnectionConfig:         v1_6.ConnectionConfig{},
+								GasPrice:                 testhelpers.DefaultGasPrice,
+								FeeQuoterDestChainConfig: v1_6.DefaultFeeQuoterDestChainConfig(true),
+							},
+						},
+					},
+					{
+						Chains: [2]v1_6.ChainDefinition{
+							{
+								Selector:                 source,
+								ConnectionConfig:         v1_6.ConnectionConfig{},
+								GasPrice:                 testhelpers.DefaultGasPrice,
+								FeeQuoterDestChainConfig: v1_6.DefaultFeeQuoterDestChainConfig(true),
+							},
+							{
+								Selector:                 dest2,
+								ConnectionConfig:         v1_6.ConnectionConfig{},
+								GasPrice:                 testhelpers.DefaultGasPrice,
+								FeeQuoterDestChainConfig: v1_6.DefaultFeeQuoterDestChainConfig(true),
+							},
+						},
+					},
+				},
+			},
+		),
+	)
+	require.NoError(t, err)
+
+	// Verify that EnforceOutOfOrder is false by default
+	feeQuoter := state.Chains[source].FeeQuoter
+	destConfig1, err := feeQuoter.GetDestChainConfig(nil, dest1)
+	require.NoError(t, err)
+	require.False(t, destConfig1.EnforceOutOfOrder, "EnforceOutOfOrder should be false by default")
+
+	destConfig2, err := feeQuoter.GetDestChainConfig(nil, dest2)
+	require.NoError(t, err)
+	require.False(t, destConfig2.EnforceOutOfOrder, "EnforceOutOfOrder should be false by default")
+
+	// Test Case 1: MultipleReportsEnabled=true with EnforceOutOfOrder=false should fail
+	t.Run("MultipleReportsEnabled with EnforceOutOfOrder false should fail", func(t *testing.T) {
+		execParams := v1_6.DeriveOCRParamsForExec(v1_6.SimulationTest, nil, func(params v1_6.CCIPOCRParams) v1_6.CCIPOCRParams {
+			params.ExecuteOffChainConfig.MultipleReportsEnabled = true
+			return params
+		})
+
+		_, err = commonchangeset.Apply(t, tenv.Env,
+			commonchangeset.Configure(
+				cldf.CreateLegacyChangeSet(v1_6.SetCandidateChangeset),
+				v1_6.SetCandidateChangesetConfig{
+					SetCandidateConfigBase: v1_6.SetCandidateConfigBase{
+						HomeChainSelector: tenv.HomeChainSel,
+						FeedChainSelector: tenv.FeedChainSel,
+					},
+					PluginInfo: []v1_6.SetCandidatePluginInfo{
+						{
+							OCRConfigPerRemoteChainSelector: map[uint64]v1_6.CCIPOCRParams{
+								source: execParams,
+							},
+							PluginType: types.PluginTypeCCIPExec,
+						},
+					},
+				},
+			),
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "MultipleReportsEnabled is set to true")
+		require.Contains(t, err.Error(), "EnforceOutOfOrder=false")
+	})
+
+	// Test Case 2: Update one destination to have EnforceOutOfOrder=true, should still fail
+	t.Run("MultipleReportsEnabled with mixed EnforceOutOfOrder should fail", func(t *testing.T) {
+		// Update only dest1 to have EnforceOutOfOrder=true
+		feeQuoterDestConfig := v1_6.DefaultFeeQuoterDestChainConfig(true)
+		feeQuoterDestConfig.EnforceOutOfOrder = true
+
+		_, err = commonchangeset.Apply(t, tenv.Env,
+			commonchangeset.Configure(
+				cldf.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterDestsChangeset),
+				v1_6.UpdateFeeQuoterDestsConfig{
+					UpdatesByChain: map[uint64]map[uint64]fee_quoter.FeeQuoterDestChainConfig{
+						source: {
+							dest1: feeQuoterDestConfig,
+						},
+					},
+				},
+			),
+		)
+		require.NoError(t, err)
+
+		// Try to set MultipleReportsEnabled=true again, should still fail because dest2 has EnforceOutOfOrder=false
+		execParams := v1_6.DeriveOCRParamsForExec(v1_6.SimulationTest, nil, func(params v1_6.CCIPOCRParams) v1_6.CCIPOCRParams {
+			params.ExecuteOffChainConfig.MultipleReportsEnabled = true
+			return params
+		})
+
+		_, err = commonchangeset.Apply(t, tenv.Env,
+			commonchangeset.Configure(
+				cldf.CreateLegacyChangeSet(v1_6.SetCandidateChangeset),
+				v1_6.SetCandidateChangesetConfig{
+					SetCandidateConfigBase: v1_6.SetCandidateConfigBase{
+						HomeChainSelector: tenv.HomeChainSel,
+						FeedChainSelector: tenv.FeedChainSel,
+					},
+					PluginInfo: []v1_6.SetCandidatePluginInfo{
+						{
+							OCRConfigPerRemoteChainSelector: map[uint64]v1_6.CCIPOCRParams{
+								source: execParams,
+							},
+							PluginType: types.PluginTypeCCIPExec,
+						},
+					},
+				},
+			),
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "destination chain")
+		require.Contains(t, err.Error(), "EnforceOutOfOrder=false")
+	})
+
+	// Test Case 3: Update all destinations to have EnforceOutOfOrder=true, should succeed
+	t.Run("MultipleReportsEnabled with all EnforceOutOfOrder true should succeed", func(t *testing.T) {
+		// Update dest2 to also have EnforceOutOfOrder=true
+		feeQuoterDestConfig := v1_6.DefaultFeeQuoterDestChainConfig(true)
+		feeQuoterDestConfig.EnforceOutOfOrder = true
+
+		_, err = commonchangeset.Apply(t, tenv.Env,
+			commonchangeset.Configure(
+				cldf.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterDestsChangeset),
+				v1_6.UpdateFeeQuoterDestsConfig{
+					UpdatesByChain: map[uint64]map[uint64]fee_quoter.FeeQuoterDestChainConfig{
+						source: {
+							dest2: feeQuoterDestConfig,
+						},
+					},
+				},
+			),
+		)
+		require.NoError(t, err)
+
+		// Now setting MultipleReportsEnabled=true should succeed
+		execParams := v1_6.DeriveOCRParamsForExec(v1_6.SimulationTest, nil, func(params v1_6.CCIPOCRParams) v1_6.CCIPOCRParams {
+			params.ExecuteOffChainConfig.MultipleReportsEnabled = true
+			return params
+		})
+
+		_, err = commonchangeset.Apply(t, tenv.Env,
+			commonchangeset.Configure(
+				cldf.CreateLegacyChangeSet(v1_6.SetCandidateChangeset),
+				v1_6.SetCandidateChangesetConfig{
+					SetCandidateConfigBase: v1_6.SetCandidateConfigBase{
+						HomeChainSelector: tenv.HomeChainSel,
+						FeedChainSelector: tenv.FeedChainSel,
+					},
+					PluginInfo: []v1_6.SetCandidatePluginInfo{
+						{
+							OCRConfigPerRemoteChainSelector: map[uint64]v1_6.CCIPOCRParams{
+								source: execParams,
+							},
+							PluginType: types.PluginTypeCCIPExec,
+						},
+					},
+				},
+			),
+		)
+		require.NoError(t, err, "Should succeed when all destinations have EnforceOutOfOrder=true")
+	})
+
+	// Test Case 4: MultipleReportsEnabled=false should always work regardless of EnforceOutOfOrder
+	t.Run("MultipleReportsEnabled false should always succeed", func(t *testing.T) {
+		// Reset dest2 back to EnforceOutOfOrder=false
+		feeQuoterDestConfig := v1_6.DefaultFeeQuoterDestChainConfig(true)
+		feeQuoterDestConfig.EnforceOutOfOrder = false
+
+		_, err = commonchangeset.Apply(t, tenv.Env,
+			commonchangeset.Configure(
+				cldf.CreateLegacyChangeSet(v1_6.UpdateFeeQuoterDestsChangeset),
+				v1_6.UpdateFeeQuoterDestsConfig{
+					UpdatesByChain: map[uint64]map[uint64]fee_quoter.FeeQuoterDestChainConfig{
+						source: {
+							dest2: feeQuoterDestConfig,
+						},
+					},
+				},
+			),
+		)
+		require.NoError(t, err)
+
+		// Setting MultipleReportsEnabled=false should work
+		execParams := v1_6.DeriveOCRParamsForExec(v1_6.SimulationTest, nil, func(params v1_6.CCIPOCRParams) v1_6.CCIPOCRParams {
+			params.ExecuteOffChainConfig.MultipleReportsEnabled = false
+			return params
+		})
+
+		_, err = commonchangeset.Apply(t, tenv.Env,
+			commonchangeset.Configure(
+				cldf.CreateLegacyChangeSet(v1_6.SetCandidateChangeset),
+				v1_6.SetCandidateChangesetConfig{
+					SetCandidateConfigBase: v1_6.SetCandidateConfigBase{
+						HomeChainSelector: tenv.HomeChainSel,
+						FeedChainSelector: tenv.FeedChainSel,
+					},
+					PluginInfo: []v1_6.SetCandidatePluginInfo{
+						{
+							OCRConfigPerRemoteChainSelector: map[uint64]v1_6.CCIPOCRParams{
+								source: execParams,
+							},
+							PluginType: types.PluginTypeCCIPExec,
+						},
+					},
+				},
+			),
+		)
+		require.NoError(t, err, "Should succeed when MultipleReportsEnabled=false regardless of EnforceOutOfOrder")
+	})
 }
