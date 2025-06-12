@@ -105,10 +105,6 @@ func proposeWFJobsToJDV2Logic(env cldf.Environment, c types.ProposeWFJobsV2Confi
 }
 
 func proposeWFJobsToJDV2Precondition(env cldf.Environment, c types.ProposeWFJobsV2Config) error {
-	if c.MigrationName == "" {
-		return errors.New("migration name is required")
-	}
-
 	if c.WorkflowJobName == "" {
 		return errors.New("workflow job name is required")
 	}
