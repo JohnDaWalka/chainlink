@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	lloconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/llo/config"
 	mercuryconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/mercury/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/vault"
 	sm_config "github.com/smartcontractkit/chainlink/v2/core/services/ocr3/securemint/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
@@ -125,8 +126,11 @@ func validateSpec(ctx context.Context, tree *toml.Tree, spec job.Job, rc plugins
 		return validateOCR2LLOSpec(spec.OCR2OracleSpec.PluginConfig)
 	case types.GenericPlugin:
 		return validateGenericPluginSpec(ctx, spec.OCR2OracleSpec, rc)
+	case types.VaultPlugin:
+		return validateVaultPluginSpec(spec.OCR2OracleSpec.PluginConfig)
 	case types.SecureMint:
 		return validateSecureMintSpec(spec.OCR2OracleSpec.PluginConfig)
+
 	case "":
 		return errors.New("no plugin specified")
 	default:
@@ -134,6 +138,16 @@ func validateSpec(ctx context.Context, tree *toml.Tree, spec job.Job, rc plugins
 	}
 
 	return nil
+}
+
+func validateVaultPluginSpec(jsonConfig job.JSONConfig) error {
+	cfg := &vault.Config{}
+	err := json.Unmarshal(jsonConfig.Bytes(), cfg)
+	if err != nil {
+		return fmt.Errorf("failed to validation plugin config: could not unmarshal config: %w", err)
+	}
+
+	return cfg.Validate()
 }
 
 type PipelineSpec struct {
