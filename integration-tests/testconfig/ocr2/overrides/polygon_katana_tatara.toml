@@ -27,7 +27,6 @@ experiments_enabled = ["slow_funds_return"]
 [NodeConfig.ChainConfigTOMLByChainID]
 # Polygon Katana Tatara 
 129399 = """
-ChainID = 129399
 ChainType = "optimismBedrock"
 FinalityTagEnabled = true
 LogPollInterval = "2s"
