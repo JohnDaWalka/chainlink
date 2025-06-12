@@ -1013,6 +1013,7 @@ func AddLaneSolanaChangesets(e *DeployedEnv, solChainSelector, remoteChainSelect
 							DefaultTokenDestGasOverhead: 90000,
 							DestGasOverhead:             90000,
 							ChainFamilySelector:         chainFamilySelector,
+							EnforceOutOfOrder:           true,
 						},
 					},
 				},
