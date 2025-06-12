@@ -180,6 +180,12 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 		return nil, fmt.Errorf("failed to create readers and writers: %w", err)
 	}
 
+	// Create chain accessors
+	chainAccessors, err := i.createChainAccessors(contractReaders, chainWriters, pluginServices)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create chain accessors: %w", err)
+	}
+
 	// build the onchain keyring. it will be the signing key for the destination chain family.
 	keybundle, ok := i.ocrKeyBundles[destChainFamily]
 	if !ok {
@@ -204,7 +210,7 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 
 	// TODO: Extract the correct transmitter address from the destsFromAccount
 	factory, transmitter, err := i.createFactoryAndTransmitter(
-		donID, config, destRelayID, contractReaders, chainWriters, destChainWriter, destFromAccounts, publicConfig, destChainID, pluginServices.PluginConfig, offrampAddrStr)
+		donID, config, destRelayID, chainAccessors /* contractReaders, chainWriters,*/, destChainWriter, destFromAccounts, publicConfig, destChainID, pluginServices.PluginConfig, offrampAddrStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create factory and transmitter: %w", err)
 	}
@@ -261,8 +267,9 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 	donID uint32,
 	config cctypes.OCR3ConfigWithMeta,
 	destRelayID types.RelayID,
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
-	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
+	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
+//contractReaders map[cciptypes.ChainSelector]types.ContractReader,
+//chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChainWriter types.ContractWriter,
 	destFromAccounts []string,
 	publicConfig ocr3confighelper.PublicConfig,
@@ -302,10 +309,12 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 				AddrCodec:         i.addressCodec,
 				HomeChainReader:   i.homeChainReader,
 				HomeChainSelector: i.homeChainSelector,
-				ContractReaders:   contractReaders,
-				ContractWriters:   chainWriters,
-				RmnPeerClient:     rmnPeerClient,
-				RmnCrypto:         pluginConfig.RMNCrypto})
+				ChainAccessors:    chainAccessors, // TODO: add to plugin factory params in chainlink-ccip
+				// TODO: remove CR and CW
+				//ContractReaders:   contractReaders,
+				//ContractWriters:   chainWriters,
+				RmnPeerClient: rmnPeerClient,
+				RmnCrypto:     pluginConfig.RMNCrypto})
 		factory = promwrapper.NewReportingPluginFactory(factory, i.lggr, destChainID, "CCIPCommit")
 		if destChainWriter == nil {
 			i.lggr.Infow("no chain writer found for dest chain, creating nil transmitter",
@@ -407,6 +416,36 @@ func (i *pluginOracleCreator) getTransmitterFromPublicConfig(publicConfig ocr3co
 	}
 
 	return publicConfig.OracleIdentities[myIndex].TransmitAccount, nil
+}
+
+func (i *pluginOracleCreator) createChainAccessors(
+	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
+	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
+	pluginServices ccipcommon.PluginServices,
+) (map[cciptypes.ChainSelector]cciptypes.ChainAccessor, error) {
+	if len(contractReaders) == 0 || len(chainWriters) == 0 {
+		return nil, fmt.Errorf("no contract readers or writers found for the plugin oracle creator")
+	}
+
+	chainAccessors := make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
+	for chainSelector, reader := range contractReaders {
+		if reader == nil {
+			return nil, fmt.Errorf("no contract reader found for chain selector %d", chainSelector)
+		}
+		// get chain writer for the same chain selector
+		if _, ok := chainWriters[chainSelector]; !ok {
+			return nil, fmt.Errorf("no contract writer found for chain selector %d", chainSelector)
+		}
+		// create accessor
+		chainAccessor, err := pluginServices.PluginConfig.ChainAccessorFactory.NewChainAccessor(
+			i.lggr,
+			chainSelector,
+			reader, // TODO: looks like this needs to be a contract reader extended...
+			chainWriters[chainSelector],
+			pluginServices.AddrCodec,
+		)
+	}
+	return chainAccessors, nil
 }
 
 // createReadersAndWriters creates the contract readers and writers for the relayers
