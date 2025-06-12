@@ -190,8 +190,7 @@ type ProposeWFJobsConfig struct {
 
 type ProposeWFJobsV2Config struct {
 	ChainSelector      uint64                `json:"chainSelector"`
-	CacheLabel         string                `json:"cacheLabel"`      // Label for the DataFeedsCache contract in AB
-	MigrationName      string                `json:"migrationName"`   // Name of the migration in CLD
+	CacheLabel         string                `json:"cacheLabel"`      // Label for the DataFeedsCache contract in AB, or qualifier in DataStore
 	Domain             string                `json:"domain"`          // default to data-feeds
 	WorkflowJobName    string                `json:"workflowJobName"` // Required
 	WorkflowSpecConfig WorkflowSpecConfig    `json:"workflowSpecConfig"`
