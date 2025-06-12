@@ -45,14 +45,26 @@ var (
 	)
 
 	NonceManagerUpdateAuthorizedCallerOp = opsutil.NewEVMCallOperation(
-		"NonceManagerUpdateAuthorizedCaller",
+		"NonceManagerUpdateAuthorizedCallerOp",
 		semver.MustParse("1.0.0"),
-		"Update authorized callers in NonceManager 1.6 contract on the specified evm chain",
+		"Updates authorized callers in NonceManager 1.6 contract on the specified evm chain",
 		nonce_manager.NonceManagerABI,
 		shared.NonceManager,
 		nonce_manager.NewNonceManager,
-		func(contract *nonce_manager.NonceManager, opts *bind.TransactOpts, input nonce_manager.AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
-			return contract.ApplyAuthorizedCallerUpdates(opts, input)
+		func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, input nonce_manager.AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
+			return nonceManager.ApplyAuthorizedCallerUpdates(opts, input)
+		},
+	)
+
+	NonceManagerPreviousRampsUpdatesOp = opsutil.NewEVMCallOperation(
+		"NonceManagerPreviousRampsUpdatesOp",
+		semver.MustParse("1.0.0"),
+		"Applies previous ramps updates in NonceManager 1.6 contract on the specified evm chain",
+		nonce_manager.NonceManagerABI,
+		shared.NonceManager,
+		nonce_manager.NewNonceManager,
+		func(nonceManager *nonce_manager.NonceManager, opts *bind.TransactOpts, input []nonce_manager.NonceManagerPreviousRampsArgs) (*types.Transaction, error) {
+			return nonceManager.ApplyPreviousRampsUpdates(opts, input)
 		},
 	)
 )

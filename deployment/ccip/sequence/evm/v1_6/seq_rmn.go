@@ -5,7 +5,9 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
+
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -39,7 +41,32 @@ var (
 
 			return out, nil
 		})
+
+	SetRMNRemoteOnRMNProxySequence = operations.NewSequence(
+		"SetRMNRemoteOnRMNProxySequece",
+		semver.MustParse("1.0.0"),
+		"Setting SetRMNRemote on RMNProxy across multiple EVM chains",
+		func(b operations.Bundle, chains map[uint64]cldf_evm.Chain, input SetRMNRemoteOnRMNProxySequenceInput) (map[uint64][]opsutil.EVMCallOutput, error) {
+			opOutputs := make(map[uint64][]opsutil.EVMCallOutput, len(input.UpdatesByChain))
+
+			for chainSel, update := range input.UpdatesByChain {
+				chain, ok := chains[chainSel]
+				if !ok {
+					return nil, fmt.Errorf("chain with selector %d not defined", chainSel)
+				}
+				report, err := operations.ExecuteOperation(b, ccipops.SetRMNRemoteOnRMNProxyOp, chain, update)
+				if err != nil {
+					return nil, fmt.Errorf("failed to execute SetRMNRemoteOnRMNProxyOp on %s: %w", chain, err)
+				}
+				opOutputs[chainSel] = []opsutil.EVMCallOutput{report.Output}
+			}
+			return opOutputs, nil
+		})
 )
+
+type SetRMNRemoteOnRMNProxySequenceInput struct {
+	UpdatesByChain map[uint64]opsutil.EVMCallInput[common.Address] `json:"updatesByChain"`
+}
 
 type SetRMNRemoteConfig struct {
 	RMNRemoteConfigs map[uint64]ccipops.RMNRemoteConfig `json:"rmnRemoteConfigs"`

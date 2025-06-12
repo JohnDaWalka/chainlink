@@ -8,6 +8,7 @@ import (
 	"github.com/zksync-sdk/zksync2-go/accounts"
 	"github.com/zksync-sdk/zksync2-go/clients"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -72,4 +73,16 @@ var (
 		func(rmnRemote *rmn_remote.RMNRemote, opts *bind.TransactOpts, input rmn_remote.RMNRemoteConfig) (*types.Transaction, error) {
 			return rmnRemote.SetConfig(opts, input)
 		})
+
+	SetRMNRemoteOnRMNProxyOp = opsutil.NewEVMCallOperation(
+		"SetRMNRemoteOnRMNProxyOp",
+		semver.MustParse("1.0.0"),
+		"Sets SetRMNRemote on RMNProxy contract on the specified evm chain",
+		rmn_proxy_contract.RMNProxyABI,
+		shared.ARMProxy,
+		rmn_proxy_contract.NewRMNProxy,
+		func(rmnProxy *rmn_proxy_contract.RMNProxy, opts *bind.TransactOpts, input common.Address) (*types.Transaction, error) {
+			return rmnProxy.SetARM(opts, input)
+		},
+	)
 )
