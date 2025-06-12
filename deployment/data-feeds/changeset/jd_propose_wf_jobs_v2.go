@@ -51,7 +51,7 @@ func proposeWFJobsToJDV2Logic(env cldf.Environment, c types.ProposeWFJobsV2Confi
 	workflowSpecConfig := c.WorkflowSpecConfig
 	workflowState := feedState.Workflows[workflowSpecConfig.WorkflowName]
 
-	//nolint:staticcheck // Addressbook is deprecated, but we still use it for the time being
+	// Addressbook is deprecated, but we still use it for the time being
 	cacheAddress := GetDataFeedsCacheAddress(env.ExistingAddresses, env.DataStore.Addresses(), c.ChainSelector, &c.CacheLabel)
 
 	// default values
@@ -94,7 +94,7 @@ func proposeWFJobsToJDV2Logic(env cldf.Environment, c types.ProposeWFJobsV2Confi
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to create workflow job spec: %w", err)
 	}
 
-	//propose workflow jobs to JD
+	// propose workflow jobs to JD
 	out, err := offchain.ProposeJobs(ctx, env, workflowJobSpec, &workflowSpecConfig.WorkflowName, c.NodeFilter)
 	if err != nil {
 		env.Logger.Debugf("%s", workflowJobSpec)
@@ -156,7 +156,7 @@ func proposeWFJobsToJDV2Precondition(env cldf.Environment, c types.ProposeWFJobs
 		return fmt.Errorf("no workflow found for hash %s in %s", c.WorkflowSpecConfig.WorkflowName, feedStatePath)
 	}
 
-	//nolint:staticcheck // Addressbook is deprecated, but we still use it for the time being
+	// Addressbook is deprecated, but we still use it for the time being
 	cacheAddress := GetDataFeedsCacheAddress(env.ExistingAddresses, env.DataStore.Addresses(), c.ChainSelector, &c.CacheLabel)
 	if cacheAddress == "" {
 		return errors.New("failed to get data feeds cache address")
@@ -198,6 +198,9 @@ func readFeedStateFile(inputFileName string) (*v1_0.FeedState, error) {
 	var feedState *v1_0.FeedState
 
 	err = json.Unmarshal(content, &feedState)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal feed state from %s: %w", inputFileName, err)
+	}
 	return feedState, nil
 }
 

@@ -113,7 +113,7 @@ func GetDataFeedsCacheAddress(ab cldf.AddressBook, dataStore datastore.AddressRe
 	// legacy addressbook
 	dataFeedsCacheAddress := ""
 	cacheTV := cldf.NewTypeAndVersion("DataFeedsCache", deployment.Version1_0_0)
-	if &label != nil {
+	if *label != "" {
 		cacheTV.Labels.Add(*label)
 	} else {
 		cacheTV.Labels.Add("data-feeds")
