@@ -102,9 +102,16 @@ func GetDecimalsFromFeedID(feedID string) (uint8, error) {
 }
 
 func GetDataFeedsCacheAddress(ab cldf.AddressBook, dataStore datastore.AddressRefStore, chainSelector uint64, label *string) string {
+	var qualifier string
+	if label != nil {
+		qualifier = *label
+	} else {
+		qualifier = "data-feeds"
+	}
+
 	// try to find the address in datastore, fallback to addressbook
 	record, err := dataStore.Get(
-		datastore.NewAddressRefKey(chainSelector, DataFeedsCache, &deployment.Version1_0_0, *label),
+		datastore.NewAddressRefKey(chainSelector, DataFeedsCache, &deployment.Version1_0_0, qualifier),
 	)
 	if err == nil {
 		return record.Address
@@ -113,11 +120,7 @@ func GetDataFeedsCacheAddress(ab cldf.AddressBook, dataStore datastore.AddressRe
 	// legacy addressbook
 	dataFeedsCacheAddress := ""
 	cacheTV := cldf.NewTypeAndVersion("DataFeedsCache", deployment.Version1_0_0)
-	if *label != "" {
-		cacheTV.Labels.Add(*label)
-	} else {
-		cacheTV.Labels.Add("data-feeds")
-	}
+	cacheTV.Labels.Add(qualifier)
 
 	address, err := ab.AddressesForChain(chainSelector)
 	if err != nil {
