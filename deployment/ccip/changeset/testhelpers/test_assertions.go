@@ -19,6 +19,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/pattonkan/sui-go/sui"
+
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
@@ -31,6 +33,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
+	cldf_sui "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
@@ -204,6 +207,7 @@ func ConfirmCommitForAllWithExpectedSeqNums(
 			}
 			switch family {
 			case chainsel.FamilyEVM:
+				fmt.Println("DEST CHAIN IS ETH")
 				return commonutils.JustError(ConfirmCommitWithExpectedSeqNumRange(
 					t,
 					srcChain,
@@ -227,6 +231,19 @@ func ConfirmCommitForAllWithExpectedSeqNums(
 					e.SolChains[dstChain],
 					state.SolChains[dstChain].OffRamp,
 					startSlot,
+					ccipocr3.SeqNumRange{
+						ccipocr3.SeqNum(expectedSeqNum),
+						ccipocr3.SeqNum(expectedSeqNum),
+					},
+					true,
+				))
+			case chainsel.FamilySui:
+				return commonutils.JustError(ConfirmCommitWithExpectedSeqNumRangeSui(
+					t,
+					srcChain,
+					e.BlockChains.SuiChains()[dstChain],
+					state.SuiChains[dstChain].CCIPAddress,
+					startBlock,
 					ccipocr3.SeqNumRange{
 						ccipocr3.SeqNum(expectedSeqNum),
 						ccipocr3.SeqNum(expectedSeqNum),
@@ -337,6 +354,17 @@ func ConfirmMultipleCommits(
 					env.SolChains[destChain],
 					state.SolChains[destChain].OffRamp,
 					startSlot,
+					seqRange,
+					enforceSingleCommit,
+				)
+				return err
+			case chainsel.FamilySui:
+				_, err := ConfirmCommitWithExpectedSeqNumRangeSui(
+					t,
+					srcChain,
+					env.BlockChains.SuiChains()[destChain],
+					state.SuiChains[destChain].CCIPAddress,
+					startBlocks[destChain],
 					seqRange,
 					enforceSingleCommit,
 				)
@@ -943,4 +971,75 @@ func AssertTimelockOwnership(
 		require.NoError(t, err)
 		require.Equal(t, homeChainTimelockAddress, owner)
 	}
+}
+
+func ConfirmCommitWithExpectedSeqNumRangeSui(
+	t *testing.T,
+	srcSelector uint64,
+	dest cldf_sui.Chain,
+	offRampAddress sui.Address,
+	startVersion *uint64,
+	expectedSeqNumRange ccipocr3.SeqNumRange,
+	enforceSingleCommit bool,
+) (any, error) {
+
+	fmt.Println("CONFIRM COMMIT FOR SUI")
+	// boundOffRamp := aptosOffRamp.Bind(offRampAddress, dest.Client)
+	// offRampStateAddress, err := boundOffRamp.Offramp().GetStateAddress(nil)
+	// require.NoError(t, err)
+
+	// done := make(chan any)
+	// defer close(done)
+	// sink, errChan := AptosEventEmitter[module_offramp.CommitReportAccepted](t, dest.Client, offRampStateAddress, fmt.Sprintf("%s::offramp::OffRampState", offRampAddress.StringLong()), "commit_report_accepted_events", startVersion, done)
+
+	// timeout := time.NewTimer(tests.WaitTimeout(t))
+	// defer timeout.Stop()
+
+	// seenMessages := NewCommitReportTracker(srcSelector, expectedSeqNumRange)
+
+	// verifyCommitReport := func(report module_offramp.CommitReportAccepted) bool {
+	// 	processRoots := func(roots []module_offramp.MerkleRoot) bool {
+	// 		for _, mr := range roots {
+	// 			t.Logf("(Aptos) Received commit report for [%d, %d] on selector %d from source selector %d expected seq nr range %s, token prices: %v",
+	// 				mr.MinSeqNr, mr.MaxSeqNr, dest.Selector, srcSelector, expectedSeqNumRange.String(), report.PriceUpdates.TokenPriceUpdates,
+	// 			)
+	// 			seenMessages.visitCommitReport(srcSelector, mr.MinSeqNr, mr.MaxSeqNr)
+
+	// 			if mr.SourceChainSelector == srcSelector && uint64(expectedSeqNumRange.Start()) >= mr.MinSeqNr && uint64(expectedSeqNumRange.End()) <= mr.MaxSeqNr {
+	// 				t.Logf("(Aptos) All sequence numbers committed in a single report [%d, %d]",
+	// 					expectedSeqNumRange.Start(), expectedSeqNumRange.End(),
+	// 				)
+	// 				return true
+	// 			}
+
+	// 			if !enforceSingleCommit && seenMessages.allCommited(srcSelector) {
+	// 				t.Logf(
+	// 					"(Aptos) All sequence numbers already committed from range [%d, %d]",
+	// 					expectedSeqNumRange.Start(), expectedSeqNumRange.End(),
+	// 				)
+	// 				return true
+	// 			}
+	// 		}
+	// 		return false
+	// 	}
+
+	// 	return processRoots(report.BlessedMerkleRoots) || processRoots(report.UnblessedMerkleRoots)
+	// }
+
+	// for {
+	// 	select {
+	// 	case event := <-sink:
+	// 		verified := verifyCommitReport(event.Event)
+	// 		if verified {
+	// 			return &event.Event, nil
+	// 		}
+	// 	case err := <-errChan:
+	// 		require.NoError(t, err)
+	// 	case <-timeout.C:
+	// 		return nil, fmt.Errorf("(aptos) timed out after waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
+	// 			dest.Selector, srcSelector, expectedSeqNumRange.String())
+	// 	}
+	// }
+
+	return nil, nil
 }

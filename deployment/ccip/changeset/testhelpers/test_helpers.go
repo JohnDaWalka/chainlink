@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pattonkan/sui-go/sui"
+	"github.com/pattonkan/sui-go/suiclient"
 	"github.com/pkg/errors"
 
 	"github.com/google/uuid"
@@ -252,9 +253,23 @@ func LatestBlock(ctx context.Context, env cldf.Environment, chainSelector uint64
 	case chainsel.FamilySolana:
 		return env.SolChains[chainSelector].Client.GetSlot(ctx, solconfig.DefaultCommitment)
 	case chainsel.FamilySui:
-		chainInfo := env.BlockChains.SuiChains()
-		return chainInfo[chainSelector].Selector, nil
+		suiClient := env.BlockChains.SuiChains()[chainSelector].Client
+		req, err := suiClient.GetCheckpoints(ctx, &suiclient.GetCheckpointsRequest{
+			Limit:           testutils.Uint64Pointer(1),
+			DescendingOrder: true,
+		})
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to get sui latest checkpoint")
+		}
+		if len(req.Data) == 0 {
+			return 0, errors.New("no checkpoints returned for sui chain")
+		}
 
+		// Extract sequence number (which is sui.BigInt) and convert to uint64
+		seqNum := req.Data[0].SequenceNumber
+
+		fmt.Println("LATEST BLOCK ON SUI: ", seqNum.Int.Uint64())
+		return seqNum.Int.Uint64(), nil
 	default:
 		return 0, errors.New("unsupported chain family")
 	}
@@ -1123,13 +1138,12 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		return &AnyMsgSentEvent{}, fmt.Errorf("failed to fetch event sequence")
 	}
 	e.Logger.Debugw("Query results", "sequences", sequences)
-	_ = sequences[0].Data.(*CCIPMessageSent)
+	rawevent := sequences[0].Data.(*CCIPMessageSent)
 
-	return nil, nil
-	//	return &AnyMsgSentEvent{
-	//		SequenceNumber: rawevent.SequenceNumber,
-	//		RawEvent:       rawevent,
-	//	}, nil
+	return &AnyMsgSentEvent{
+		SequenceNumber: rawevent.SequenceNumber,
+		RawEvent:       rawevent,
+	}, nil
 }
 
 func configureChainWriterForMultipleTokens(CCIPPackageAdress string, OnRampPackageId string, publicKeyBytes []byte) chainwriter.ChainWriterConfig {

@@ -8,12 +8,12 @@ export TEST_LOG_LEVEL=debug
 export LOG_LEVEL=debug
 export SETH_LOG_LEVEL=debug
 export TEST_SETH_LOG_LEVEL=debug
-export CL_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/chainlink_test?sslmode=disable"
+export CL_DATABASE_URL="postgresql://chainlink_dev:insecurepassword@localhost:5432/chainlink_development_test?sslmode=disable"
 export CL_SUI_CMD="$SUI_DIR/chainlink-sui"
 
 rm -vf $HOME/ram/sui.txt $HOME/ram/sui-log.txt $HOME/ram/loop_*
 
-pushd $CL_DIR/integration-tests/smoke/ccip/logs
+pushd $CL_DIR/integration-tests/smoke/ccip/logs/
 rm -vf *.log
 popd
 
