@@ -6,11 +6,14 @@ import (
 	"strconv"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
+	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/secrets"
 	sdkpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
 	"github.com/smartcontractkit/chainlink/v2/core/platform"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/workflowkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/events"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/store"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 var _ host.ExecutionHelper = (*ExecutionHelper)(nil)
@@ -18,6 +21,8 @@ var _ host.ExecutionHelper = (*ExecutionHelper)(nil)
 type ExecutionHelper struct {
 	*Engine
 	WorkflowExecutionID string
+	WorkflowOwner       string
+	Key                 workflowkey.Key
 	TimeProvider
 }
 
@@ -30,6 +35,34 @@ func (c *ExecutionHelper) CallCapability(ctx context.Context, request *sdkpb.Cap
 	}
 	defer func() { <-c.capCallsSemaphore }()
 
+	// TODO: if this needs to be extended to cover more extensions, consider
+	// something more elegant like a middleware layer or a handler dispatcher.
+	if request.Id == secrets.VaultCapabilityID && request.Method == "GetSecrets" {
+		return c.executeVaultCapability(ctx, request)
+	}
+
+	return c.executeCapability(ctx, request)
+}
+
+func (c *ExecutionHelper) executeVaultCapability(ctx context.Context, request *sdkpb.CapabilityRequest) (*sdkpb.CapabilityResponse, error) {
+	p := &secrets.GetSecretRequest{}
+	err := request.Payload.UnmarshalTo(p)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected secrets payload for vault.GetSecrets: %w", err)
+	}
+
+	p.EncryptionPublicKey = c.Key.PublicKeyString()
+	p.Owner = c.WorkflowOwner
+
+	request.Payload, err = anypb.New(p)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal GetSecretRequest to request.Payload: %w", err)
+	}
+
+	return c.executeCapability(ctx, request)
+}
+
+func (c *ExecutionHelper) executeCapability(ctx context.Context, request *sdkpb.CapabilityRequest) (*sdkpb.CapabilityResponse, error) {
 	// TODO (CAPPL-735): use request.Metadata.WorkflowExecutionId to associate the call with a specific execution
 	capability, err := c.cfg.CapRegistry.GetExecutable(ctx, request.Id)
 	if err != nil {
