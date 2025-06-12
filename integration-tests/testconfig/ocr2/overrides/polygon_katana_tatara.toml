@@ -1,0 +1,73 @@
+[Network]
+selected_networks = ["Polygon_Katana_Tatara_testnet"]
+
+# soak test specific configuration
+[Soak.Common]
+chainlink_node_funding = 0.2 # Funding per node
+
+# Note this is for when you are running OCR2 tests
+# To run OCR1 tests use [Soak.OCR] instead
+[Soak.OCR2]
+
+# To run OCR1 tests use [Soak.OCR.Common] instead
+[Soak.OCR2.Common]
+test_duration = "24h" # Full duration the test will run 1440 - 1 day, 7200 - 5 days
+
+# To run OCR1 tests use [Soak.OCR.Soak] instead
+[Soak.OCR2.Soak]
+time_between_rounds = "5m" # Default 5 mins for a 1 day, 10 mins for a 5 day
+
+[OCR2.Common]
+number_of_contracts = 2
+
+[Seth]
+experiments_enabled = ["slow_funds_return"]
+
+
+[NodeConfig.ChainConfigTOMLByChainID]
+# Polygon Katana Tatara 
+129399 = """
+ChainID = 129399
+ChainType = "optimismBedrock"
+FinalityTagEnabled = true
+LogPollInterval = "2s"
+MinIncomingConfirmations = 1
+NoNewHeadsThreshold = '1m'
+NoNewFinalizedHeadsThreshold = '45m'
+
+[GasEstimator]
+EIP1559DynamicFees = true
+Mode = 'FeeHistory'
+PriceMax = '120 gwei'
+
+[GasEstimator.DAOracle]
+OracleType = 'opstack'
+OracleAddress = '0x420000000000000000000000000000000000000F'
+
+[GasEstimator.FeeHistory]
+# Blocks rate is on anverage of 1s
+CacheTimeout = '4s'
+
+[GasEstimator.BlockHistory]
+BlockHistorySize = 60
+
+[NodePool]
+SyncThreshold = 10
+
+[OCR]
+ContractConfirmations = 1
+
+[Transactions]
+ResendAfterThreshold = "30s"
+"""
+
+[Network.EVMNetworks.Polygon_Katana_Tatara_testnet]
+evm_name = "Polygon_Katana_Tatara_testnet"
+evm_chain_id = 129399
+client_implementation = "Ethereum"
+evm_simulated = false
+evm_chainlink_transaction_limit = 5000
+evm_minimum_confirmations = 1
+evm_gas_estimation_buffer = 10000
+evm_supports_eip1559 = true
+evm_default_gas_limit = 6000000
