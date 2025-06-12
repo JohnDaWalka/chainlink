@@ -50,7 +50,7 @@ func deployAptosTokenPoolSequence(b operations.Bundle, deps operation.AptosDeps,
 
 	// 2 - Set token Registrar
 	// Get a deterministic seed using token address and pool type
-	tokenPoolSeed := fmt.Sprintf("%s::%s", in.TokenAddress.String(), in.PoolType.String())
+	tokenPoolSeed := fmt.Sprintf("%s::%s", in.TokenAddress.StringLong(), in.PoolType.String())
 	// Calculate token pool owner address and set token registrar
 	mcmsContract := mcmsbind.Bind(mcmsAddress, deps.AptosChain.Client)
 	tokenPoolOwnerAddress, err := mcmsContract.MCMSRegistry().GetNewCodeObjectOwnerAddress(nil, []byte(tokenPoolSeed))

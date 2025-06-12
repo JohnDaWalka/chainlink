@@ -3,6 +3,7 @@ package aptos
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/smartcontractkit/mcms"
@@ -53,6 +54,9 @@ func (cs DeployAptosChain) VerifyPreconditions(env cldf.Environment, config conf
 				if err := cfg.Validate(); err != nil {
 					errs = append(errs, fmt.Errorf("invalid mcms configs for Aptos chain %d: %w", chainSel, err))
 				}
+			}
+			if mcmsConfig.TimelockMinDelay == nil || mcmsConfig.TimelockMinDelay.Cmp(big.NewInt(0)) <= 0 {
+				errs = append(errs, fmt.Errorf("invalid MCMS timelock min delay for Aptos chain %d: %s", chainSel, mcmsConfig.TimelockMinDelay))
 			}
 		}
 	}

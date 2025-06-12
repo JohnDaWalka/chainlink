@@ -1,6 +1,8 @@
 package config
 
 import (
+	"errors"
+
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/ethereum/go-ethereum/common"
 
@@ -27,6 +29,17 @@ type EVMRemoteConfig struct {
 	// TODO: EVM has a way of picking up Pool by token address and type, use this instead of passing PoolAddress
 	TokenPoolAddress common.Address
 	RateLimiterConfig
+}
+
+func (erc EVMRemoteConfig) Validate() error {
+	if erc.TokenAddress == (common.Address{}) {
+		return errors.New("TokenAddress cannot be empty")
+	}
+	if erc.TokenPoolAddress == (common.Address{}) {
+		return errors.New("TokenPoolAddress cannot be empty")
+	}
+
+	return nil
 }
 
 type RateLimiterConfig struct {
