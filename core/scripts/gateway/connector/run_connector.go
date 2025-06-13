@@ -39,7 +39,7 @@ func (h *client) HandleGatewayMessage(ctx context.Context, gatewayId string, msg
 	return nil
 }
 
-func (h *client) Sign(data ...[]byte) ([]byte, error) {
+func (h *client) Sign(ctx context.Context, data ...[]byte) ([]byte, error) {
 	return common.SignData(h.privateKey, data...)
 }
 

@@ -1,13 +1,34 @@
 package network
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net/url"
 
 	"github.com/gorilla/websocket"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 )
+
+// The handshake works as follows:
+//
+//	  Client (Initiator)                  Server (Acceptor)
+//
+//	 NewAuthHeader()
+//	             -------auth header-------->
+//	                                       StartHandshake()
+//	             <-------challenge----------
+//	ChallengeResponse()
+//	             ---------response--------->
+//	                                     FinalizeHandshake()
+type ConnectionInitiator interface {
+	// Generate authentication header value specific to node and gateway
+	NewAuthHeader(ctx context.Context, url *url.URL) ([]byte, error)
+
+	// Sign challenge to prove identity.
+	ChallengeResponse(ctx context.Context, url *url.URL, challenge []byte) ([]byte, error)
+}
 
 type ConnectionAcceptor interface {
 	// Verify auth header, save state of the attempt and generate a challenge for the node.

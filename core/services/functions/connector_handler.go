@@ -118,9 +118,7 @@ func (h *functionsConnectorHandler) SetConnector(connector core.GatewayConnector
 	h.connector = connector
 }
 
-func (h *functionsConnectorHandler) Sign(data ...[]byte) ([]byte, error) {
-	ctx, cancel := h.chStop.NewCtx()
-	defer cancel()
+func (h *functionsConnectorHandler) Sign(ctx context.Context, data ...[]byte) ([]byte, error) {
 	return h.keystore.SignMessage(ctx, h.signAddr, gc.Flatten(data...))
 }
 
