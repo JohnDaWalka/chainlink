@@ -296,7 +296,9 @@ jobs:
         run: |
           # See: https://github.com/golang/go/issues/69179
           echo "Using Flakeguard: ${USE_FLAKEGUARD}"
-          GODEBUG=goindex=0 ./tools/bin/${{ matrix.type.cmd }} ./...
+          # GODEBUG=goindex=0 ./tools/bin/${{ matrix.type.cmd }} ./...
+          ./tools/bin/${{ matrix.type.cmd }} ./...
+
 
       - name: Generate and Send Flakeguard Test Reports to Splunk
         if: ${{ always() && steps.run-tests.outcome != 'skipped' && matrix.type.should-run == 'true' && ( matrix.type.use-flakeguard || matrix.type.use-flakeguard == 'true' ) }}
