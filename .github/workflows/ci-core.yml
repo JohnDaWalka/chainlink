@@ -179,7 +179,7 @@ jobs:
       matrix:
         type:
           - cmd: go_core_tests
-            os: ${{ needs.runner-config.outputs.core-tests-runner }}
+            os: runs-on=${{ github.run_id }}/cpu=48/ram=384/family=r7iz/spot=false/extras=s3-cache+tmpfs
             should-run: ${{ needs.filter.outputs.should-run-core-tests }}
             use-flakeguard: ${{ github.event_name == 'pull_request' }}
 
@@ -207,7 +207,7 @@ jobs:
     # We don't directly merge dependabot PRs, so let's not waste the resources
     if: ${{ github.actor != 'dependabot[bot]' }}
     needs: [filter, run-frequency, runner-config]
-    timeout-minutes: ${{ github.event_name == 'schedule' && 40 || 25 }} # 40 minute timeout for scheduled events (race tests)
+    timeout-minutes: 60
     runs-on: ${{ matrix.type.os }}
     permissions:
       id-token: write
@@ -286,7 +286,7 @@ jobs:
 
       - name: Run tests
         if: ${{ matrix.type.should-run == 'true' }}
-        timeout-minutes: ${{ github.event_name == 'schedule' && 37 || 22 }} # leave  minute for remaining steps
+        timeout-minutes: 55
         id: run-tests
         shell: bash
         env:
@@ -296,7 +296,7 @@ jobs:
         run: |
           # See: https://github.com/golang/go/issues/69179
           echo "Using Flakeguard: ${USE_FLAKEGUARD}"
-          ./tools/bin/${{ matrix.type.cmd }} ./...
+          GODEBUG=goindex=0 ./tools/bin/${{ matrix.type.cmd }} ./...
 
       - name: Generate and Send Flakeguard Test Reports to Splunk
         if: ${{ always() && steps.run-tests.outcome != 'skipped' && matrix.type.should-run == 'true' && ( matrix.type.use-flakeguard || matrix.type.use-flakeguard == 'true' ) }}

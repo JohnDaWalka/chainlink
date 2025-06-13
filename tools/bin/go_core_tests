@@ -8,7 +8,7 @@ EXTRA_FLAGS="-timeout 16m"
 
 if [[ "$USE_FLAKEGUARD" == 'true' ]]; then
   # Install flakeguard
-  GOMODCACHE=$(mktemp -d -t 'gomodcache.XXXXXXXXXXXXX') go install github.com/smartcontractkit/chainlink-testing-framework/tools/flakeguard@2ffffd5088fa14d0e941ee3a2e4cd4d256e06a07
+  go install github.com/smartcontractkit/chainlink-testing-framework/tools/flakeguard@2ffffd5088fa14d0e941ee3a2e4cd4d256e06a07
   # Install gotestsum to parse JSON test outputs from flakeguard to console outputs
   go install gotest.tools/gotestsum@v1.12.2
   # Make sure bins are in PATH
@@ -20,9 +20,9 @@ if [[ "$USE_FLAKEGUARD" == 'true' ]]; then
     --test-packages "./..." \
     --project-path="." \
     --run-count=1 \
-    --rerun-failed-count=3 \
+    --rerun-failed-count=0 \
     --min-pass-ratio=1 \
-    --go-test-timeout=16m \
+    --go-test-timeout=45m \
     --main-results-path="go_core_tests_flakeguard_results/main/test_results.json" \
     --rerun-results-path="go_core_tests_flakeguard_results/rerun/test_results.json"
   EXITCODE=${PIPESTATUS[0]}
