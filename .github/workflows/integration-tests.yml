@@ -239,7 +239,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'pull_request' && needs.changes.outputs.should-run-cre-tests == 'true'
-    uses: smartcontractkit/chainlink/.github/workflows/cre-system-tests.yaml@bbf0ed21178e8d4c54de6e8bebfbcee748903544
+    uses: smartcontractkit/chainlink/.github/workflows/cre-system-tests.yaml@c7d4d98ea3d8a06d23979000f00ce6576c592278
     with:
       chainlink_image_tag:  ${{ inputs.evm-ref && format('{0}-plugins', inputs.evm-ref) || inputs.cl_ref && format('{0}-plugins', inputs.cl_ref) || format('{0}-plugins', github.sha) }}
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
