@@ -229,7 +229,7 @@ func UpdateNonceManagersChangeset(e cldf.Environment, cfg UpdateNonceManagerConf
 		e.BlockChains.EVMChains(),
 		cfg.ToSequenceInput(s),
 	)
-	return opsutil.AddEVMCallSequenceToCSOutput(e, s, output, report, err, cfg.MCMS, "Call ApplyAuthorizedCallerUpdates and ApplyPreviousRampsUpdates on NonceManagers")
+	return opsutil.AddEVMCallSequenceToCSOutput(e, output, report, err, s.EVMMCMSStateByChain(), cfg.MCMS, "Call ApplyAuthorizedCallerUpdates and ApplyPreviousRampsUpdates on NonceManagers")
 }
 
 type OnRampDestinationUpdate struct {
@@ -347,7 +347,7 @@ func UpdateOnRampsDestsChangeset(e cldf.Environment, cfg UpdateOnRampDestsConfig
 		e.BlockChains.EVMChains(),
 		cfg.ToSequenceInput(s),
 	)
-	return opsutil.AddEVMCallSequenceToCSOutput(e, s, cldf.ChangesetOutput{}, report, err, cfg.MCMS, "Call ApplyDestChainConfigUpdates on OnRamps")
+	return opsutil.AddEVMCallSequenceToCSOutput(e, cldf.ChangesetOutput{}, report, err, s.EVMMCMSStateByChain(), cfg.MCMS, "Call ApplyDestChainConfigUpdates on OnRamps")
 }
 
 type OnRampDynamicConfigUpdate struct {
@@ -865,7 +865,7 @@ func UpdateFeeQuoterPricesChangeset(e cldf.Environment, cfg UpdateFeeQuoterPrice
 		e.BlockChains.EVMChains(),
 		cfg.ToSequenceInput(s),
 	)
-	return opsutil.AddEVMCallSequenceToCSOutput(e, s, cldf.ChangesetOutput{}, report, err, cfg.MCMS, "Call UpdatePrices on FeeQuoters")
+	return opsutil.AddEVMCallSequenceToCSOutput(e, cldf.ChangesetOutput{}, report, err, s.EVMMCMSStateByChain(), cfg.MCMS, "Call UpdatePrices on FeeQuoters")
 }
 
 type UpdateFeeQuoterDestsConfig struct {
@@ -959,7 +959,7 @@ func UpdateFeeQuoterDestsChangeset(e cldf.Environment, cfg UpdateFeeQuoterDestsC
 		e.BlockChains.EVMChains(),
 		cfg.ToSequenceInput(s),
 	)
-	return opsutil.AddEVMCallSequenceToCSOutput(e, s, output, report, err, cfg.MCMS, "Call ApplyDestChainConfigUpdates on FeeQuoters")
+	return opsutil.AddEVMCallSequenceToCSOutput(e, output, report, err, s.EVMMCMSStateByChain(), cfg.MCMS, "Call ApplyDestChainConfigUpdates on FeeQuoters")
 }
 
 type OffRampSourceUpdate struct {
@@ -1073,7 +1073,7 @@ func UpdateOffRampSourcesChangeset(e cldf.Environment, cfg UpdateOffRampSourcesC
 		cfg.ToSequenceInput(state),
 	)
 
-	return opsutil.AddEVMCallSequenceToCSOutput(e, state, cldf.ChangesetOutput{}, report, err, cfg.MCMS, "Call ApplySourceChainConfigUpdates on OffRamps")
+	return opsutil.AddEVMCallSequenceToCSOutput(e, cldf.ChangesetOutput{}, report, err, state.EVMMCMSStateByChain(), cfg.MCMS, "Call ApplySourceChainConfigUpdates on OffRamps")
 }
 
 type RouterUpdates struct {
@@ -1253,7 +1253,7 @@ func UpdateRouterRampsChangeset(e cldf.Environment, cfg UpdateRouterRampsConfig)
 		e.BlockChains.EVMChains(),
 		cfg.ToSequenceInput(state),
 	)
-	return opsutil.AddEVMCallSequenceToCSOutput(e, state, cldf.ChangesetOutput{}, report, err, cfg.MCMS, "Call ApplyRampUpdates on Routers")
+	return opsutil.AddEVMCallSequenceToCSOutput(e, cldf.ChangesetOutput{}, report, err, state.EVMMCMSStateByChain(), cfg.MCMS, "Call ApplyRampUpdates on Routers")
 }
 
 type SetOCR3OffRampConfig struct {
