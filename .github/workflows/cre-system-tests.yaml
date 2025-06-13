@@ -39,7 +39,7 @@ jobs:
           cat <<EOF > matrix.json
           [
             { "test_name": "TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice", "test_config": "environment-one-don-multichain-ci.toml"},
-            { "test_name": "TestCRE_OCR3_PoR_Workflow_GatewayDon_MockedPrice", "test_config": "environment-gateway-don-ci.toml"},
+            { "test_name": "TestCRE_OCR3_PoR_Workflow_GatewayDon_MockedPrice", "test_config": "environment-gateway-don-ci.toml"}
           ]
           EOF
 
