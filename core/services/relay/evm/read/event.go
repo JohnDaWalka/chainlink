@@ -824,7 +824,7 @@ func isTypeHardcoded(t any) bool {
 		return true
 	case *chainaccessor.SendRequestedEvent:
 		return true
-	case *reader.ExecutionStateChangedEvent:
+	case *chainaccessor.ExecutionStateChangedEvent:
 		return true
 	}
 
@@ -853,7 +853,7 @@ func decodeHardcodedType(out any, log *logpoller.Log) error {
 		populateSendRequestFromEvent(out, internalEvent)
 
 		return nil
-	case *reader.ExecutionStateChangedEvent:
+	case *chainaccessor.ExecutionStateChangedEvent:
 		var internalEvent offramp.OffRampExecutionStateChanged
 		err := unpackLog(&internalEvent, executionStateChangedEvent, log, offrampABI)
 		if err != nil {
@@ -901,7 +901,7 @@ func unpackLog(out any, event string, log *logpoller.Log, hcabi abi.ABI) error {
 	return abi.ParseTopics(out, indexed, log.GetTopics()[1:])
 }
 
-func populateExecutionStateChangedFromEvent(out *reader.ExecutionStateChangedEvent, internalEvent offramp.OffRampExecutionStateChanged) {
+func populateExecutionStateChangedFromEvent(out *chainaccessor.ExecutionStateChangedEvent, internalEvent offramp.OffRampExecutionStateChanged) {
 	out.SourceChainSelector = ccipocr3.ChainSelector(internalEvent.SourceChainSelector)
 	out.SequenceNumber = ccipocr3.SeqNum(internalEvent.SequenceNumber)
 	out.MessageID = internalEvent.MessageId

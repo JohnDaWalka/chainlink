@@ -56,7 +56,7 @@ func Test_DecodeHardcodedType(t *testing.T) {
 		log, err := generateOffRampStateChangeLog(fixtLog)
 		require.NoError(t, err)
 
-		var out reader.ExecutionStateChangedEvent
+		var out chainaccessor.ExecutionStateChangedEvent
 		err = decodeHardcodedType(&out, log)
 		require.NoError(t, err)
 
