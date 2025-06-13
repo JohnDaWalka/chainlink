@@ -75,7 +75,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.60
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250612205233-2103b4b0449f
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250613133448-b60b40e73c58
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250611104723-26e78071ce46
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250604171706-a98fa6515eae
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250611201213-5cf2cf1807bf
@@ -85,7 +85,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/billing/go v0.0.0-20250604191313-8f161cf29ad5
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.7.0
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250501150903-3e93089d9ad5
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250611193111-99542a0c5d58
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250613204947-9d328ca101ac
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250528121202-292529af39df
 	github.com/smartcontractkit/freeport v0.1.1
 	github.com/smartcontractkit/libocr v0.0.0-20250604151357-2fe8c61bbf2e
