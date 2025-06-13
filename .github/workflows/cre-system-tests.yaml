@@ -39,7 +39,8 @@ jobs:
           cat <<EOF > matrix.json
           [
             { "test_name": "TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice", "test_config": "environment-one-don-multichain-ci.toml"},
-            { "test_name": "TestCRE_OCR3_PoR_Workflow_GatewayDon_MockedPrice", "test_config": "environment-gateway-don-ci.toml"}
+            { "test_name": "TestCRE_OCR3_PoR_Workflow_GatewayDon_MockedPrice", "test_config": "environment-gateway-don-ci.toml"},
+            { "test_name": "TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice", "test_config": "environment-capabilities-don-ci.toml"}
           ]
           EOF
 
@@ -55,10 +56,17 @@ jobs:
       matrix:
         tests: ${{fromJson(needs.define-test-matrix.outputs.matrix)}}
     needs: [define-test-matrix]
+    # TODO at some point we might want to use self-hosted runners
+    # E.g. by using: "uns-on/cpu=32/ram=128/family=m6i/spot=false/image=ubuntu22-full-x64/extras=s3-cache+tmpfs"
     runs-on: ubuntu-latest
     environment: "integration"
     timeout-minutes: 30
     steps:
+      - name: Enable S3 Cache for Self-Hosted Runners
+        # these env vars are set (and exposed) when it is a self-hosted runner with extras=s3-cache
+        if: ${{ env.RUNS_ON_INSTANCE_ID != '' && env.ACTIONS_CACHE_URL != '' }}
+        uses: runs-on/action@66d4449b717b5462159659523d1241051ff470b9 # v1
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -97,6 +105,13 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
           aws-role-duration-seconds: "1800"
 
+      # gotestloghelper gives us pretty test output
+      - name: Set Up gotestloghelper
+        shell: bash
+        run:
+          go install
+          github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@v1.1.1
+
       - name: Download test dependencies
         shell: bash
         working-directory: system-tests/tests/smoke/cre/cmd
@@ -104,7 +119,7 @@ jobs:
           GITHUB_API_TOKEN: ${{ steps.setup-gati-token.outputs.access-token }}
         run: ./download_cre_ci_deps.sh 3
 
-      - name: Run system test
+      - name: Run CRE system test
         shell: bash
         working-directory: system-tests/tests
         env:
@@ -119,6 +134,16 @@ jobs:
         run: |
           { go test github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre -v -run "^(${TEST_NAME})$" -timeout 30m -count=1 -test.parallel=1 -json; exit_code=$?; ../../tools/ci/wait-for-containers-to-stop.sh 30; exit $exit_code; } # Sleep to allow testcontainers to stop
 
+      - name: Upload all artifacts as single package
+        if: failure()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name:
+            test-logs-${{ matrix.tests.test_name }}
+          path: |
+            ./system-tests/tests/smoke/cre/logs/
+            ./system-tests/tests/load/cre/logs/
+             /tmp/gotest.log
+
         # TODO
-        # Add artifcats (logs) upload
-        # Add Flakeguard
+        # Add Flakeguard?
