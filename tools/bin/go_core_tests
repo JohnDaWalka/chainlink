@@ -8,7 +8,7 @@ EXTRA_FLAGS="-timeout 16m"
 
 if [[ "$USE_FLAKEGUARD" == 'true' ]]; then
   # Install flakeguard
-  go install github.com/smartcontractkit/chainlink-testing-framework/tools/flakeguard@16d2471b52ed5a8d7eaff5c9e0f1507f0a575ee3
+  GOMODCACHE=$(mktemp -d -t 'gomodcache.XXXXXXXXXXXXX') go install github.com/smartcontractkit/chainlink-testing-framework/tools/flakeguard@f4e3a0c06b4c531686c9092f6e0ac6592b880edf
   # Install gotestsum to parse JSON test outputs from flakeguard to console outputs
   go install gotest.tools/gotestsum@v1.12.2
   # Make sure bins are in PATH
