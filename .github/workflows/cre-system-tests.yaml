@@ -101,7 +101,7 @@ jobs:
         shell: bash
         working-directory: system-tests/tests/smoke/cre/cmd
         env:
-          GITHUB_READ_TOKEN: ${{ steps.setup-gati-token.outputs.access-token }}
+          GITHUB_API_TOKEN: ${{ steps.setup-gati-token.outputs.access-token }}
         run: ./download_cre_ci_deps.sh 3
 
       - name: Run system test
@@ -117,3 +117,7 @@ jobs:
           PRIVATE_KEY: "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
           TEST_NAME: ${{ matrix.tests.test_name }}
         run: go test github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre -v -run "^(${TEST_NAME})$" -timeout 30m -count=1 -test.parallel=1 -json; exit_code=$?; ../../tools/ci/wait-for-containers-to-stop.sh 30; exit $exit_code; } # Sleep to allow testcontainers to stop
+
+        # TODO
+        # Add artifcats (logs) upload
+        # Add Flakeguard
