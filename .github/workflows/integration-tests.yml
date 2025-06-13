@@ -243,6 +243,7 @@ jobs:
     with:
       chainlink_image_tag:  ${{ inputs.evm-ref && format('{0}-plugins', inputs.evm-ref) || inputs.cl_ref && format('{0}-plugins', inputs.cl_ref) || format('{0}-plugins', github.sha) }}
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
+    secrets: inherit
     # uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@c734fdbb7feec263c481af58ac562d6c0544abae # june 6, 2025
     # with:
     #   workflow_name: Run Core CRE Tests For PR
