@@ -110,7 +110,7 @@ func (r *Report) Reserve(ctx context.Context) error {
 		AccountId:           r.owner,
 		WorkflowId:          r.workflowID,
 		WorkflowExecutionId: r.workflowExecutionID,
-		Credits:             []*billing.AccountCreditsInput{}, // TODO: https://smartcontract-it.atlassian.net/browse/CRE-290 send the credit balance, not resource types
+		Credits:             10000000000000000000, // TODO: https://smartcontract-it.atlassian.net/browse/CRE-290 send the credit balance, not resource types
 	}
 
 	resp, err := r.client.ReserveCredits(ctx, &req)
