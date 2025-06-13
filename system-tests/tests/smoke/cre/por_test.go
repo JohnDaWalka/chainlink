@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	chainwritercap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/chainwriter"
@@ -157,12 +156,13 @@ type registerPoRWorkflowInput struct {
 	writeTargetName    string
 	workflowDonID      uint32
 	feedID             string
-	addressBook        deployment.AddressBook
+	addressBook        cldf.AddressBook
 	priceProvider      PriceProvider
 	sethClient         *seth.Client
 	deployerPrivateKey string
 	creCLIAbsPath      string
 	creCLIsettingsFile *os.File
+	creCLIProfile      string
 	authKey            string
 	readContractInput  *readContractInput
 }
@@ -240,7 +240,7 @@ func buildReadContractConfig(input registerPoRWorkflowInput) (*os.File, error) {
 	return workflowConfigFile, nil
 }
 
-func registerWorkflow(input registerPoRWorkflowInput, configBuilder ConfigBuilderFunc) error {
+func registerWorkflow(ctx context.Context, input registerPoRWorkflowInput, configBuilder ConfigBuilderFunc) error {
 	// Register workflow directly using the provided binary URL and optionally config and secrets URLs
 	// This is a legacy solution, probably we can remove it soon, but there's still quite a lot of people
 	// who have no access to dev-platform repo, so they cannot use the CRE CLI
@@ -251,7 +251,7 @@ func registerWorkflow(input registerPoRWorkflowInput, configBuilder ConfigBuilde
 		}
 
 		err := creworkflow.RegisterWithContract(
-			context.Background(),
+			ctx,
 			input.sethClient,
 			workflowRegistryAddress,
 			input.workflowDonID,
@@ -313,7 +313,7 @@ func registerWorkflow(input registerPoRWorkflowInput, configBuilder ConfigBuilde
 		ChainSelector:            input.chainSelector,
 		WorkflowDonID:            input.workflowDonID,
 		WorkflowName:             input.WorkflowConfig.WorkflowName,
-		CRECLIProfile:            libcrecli.CRECLIProfile, // TODO: get from input
+		CRECLIProfile:            input.creCLIProfile,
 		WorkflowOwnerAddress:     input.sethClient.MustGetRootKeyAddress(),
 	}
 
@@ -485,163 +485,6 @@ func configureDataFeedsCacheContract(testLogger zerolog.Logger, input *configure
 	return configErr
 }
 
-func buildManageWorkflowInput(input managePoRWorkflowInput) (types.ManageWorkflowWithCRECLIInput, error) {
-	return types.ManageWorkflowWithCRECLIInput{
-		ChainSelector:            input.chainSelector,
-		WorkflowDonID:            input.workflowDonID,
-		WorkflowOwnerAddress:     input.sethClient.MustGetRootKeyAddress(),
-		CRECLIPrivateKey:         input.deployerPrivateKey,
-		CRECLIAbsPath:            input.creCLIAbsPath,
-		CRESettingsFile:          input.creCLIsettingsFile,
-		WorkflowName:             input.WorkflowName,
-		ShouldCompileNewWorkflow: input.ShouldCompileNewWorkflow,
-		CRECLIProfile:            input.creCLIProfile,
-	}, nil
-}
-
-func pausePoRWorkflow(input managePoRWorkflowInput) error {
-	workflowInput, err := buildManageWorkflowInput(input)
-	if err != nil {
-		return err
-	}
-
-	pauseErr := creworkflow.PauseWithCRECLI(workflowInput)
-	if pauseErr != nil {
-		return errors.Wrap(pauseErr, "failed to pause workflow with CRE CLI")
-	}
-
-	return nil
-}
-
-func activatePoRWorkflow(input managePoRWorkflowInput) error {
-	workflowInput, err := buildManageWorkflowInput(input)
-	if err != nil {
-		return err
-	}
-
-	activateErr := creworkflow.ActivateWithCRECLI(workflowInput)
-	if activateErr != nil {
-		return errors.Wrap(activateErr, "failed to activate workflow with CRE CLI")
-	}
-
-	return nil
-}
-
-func registerPoRWorkflow(ctx context.Context, input managePoRWorkflowInput) error {
-	// Register workflow directly using the provided binary URL and optionally config and secrets URLs
-	// This is a legacy solution, probably we can remove it soon, but there's still quite a lot of people
-	// who have no access to dev-platform repo, so they cannot use the CRE CLI
-	if !input.ShouldCompileNewWorkflow && !input.UseCRECLI {
-		workflowRegistryAddress, workflowRegistryErr := crecontracts.FindAddressesForChain(input.addressBook, input.chainSelector, keystone_changeset.WorkflowRegistry.String())
-		if workflowRegistryErr != nil {
-			return errors.Wrapf(workflowRegistryErr, "failed to find workflow registry address for chain %d", input.chainSelector)
-		}
-
-		err := creworkflow.RegisterWithContract(
-			ctx,
-			input.sethClient,
-			workflowRegistryAddress,
-			input.workflowDonID,
-			input.WorkflowName,
-			input.CompiledWorkflowConfig.BinaryURL,
-			&input.CompiledWorkflowConfig.ConfigURL,
-			&input.CompiledWorkflowConfig.SecretsURL,
-		)
-		if err != nil {
-			return errors.Wrap(err, "failed to register workflow")
-		}
-
-		return nil
-	}
-
-	// This env var is required by the CRE CLI
-	err := os.Setenv("CRE_ETH_PRIVATE_KEY", input.deployerPrivateKey)
-	if err != nil {
-		return errors.Wrap(err, "failed to set CRE_ETH_PRIVATE_KEY")
-	}
-
-	// create workflow-specific config file
-	var secretNameToUse *string
-	if input.authKey != "" {
-		secretNameToUse = ptr.Ptr(AuthorizationKeySecretName)
-	}
-
-	dataFeedsCacheAddress, dataFeedsCacheErr := crecontracts.FindAddressesForChain(input.addressBook, input.chainSelector, df_changeset.DataFeedsCache.String())
-	if dataFeedsCacheErr != nil {
-		return errors.Wrapf(dataFeedsCacheErr, "failed to find data feeds cache address for chain %d", input.chainSelector)
-	}
-
-	// pass nil if no secrets are used, otherwise workflow will fail if it cannot find the secret
-	inp := &libcrecli.PoRWorkflowConfig{
-		FeedID:            input.feedID,
-		AuthKeySecretName: secretNameToUse,
-		ConsumerAddress:   dataFeedsCacheAddress.Hex(),
-		URL:               input.priceProvider.URL(),
-		WriteTargetName:   input.writeTargetName,
-	}
-	workflowConfigFile, configErr := keystoneporcrecli.CreateConfigFile(inp)
-	if configErr != nil {
-		return errors.Wrap(configErr, "failed to create workflow config file")
-	}
-	workflowConfigFilePath := workflowConfigFile.Name()
-
-	// indicate to the CRE CLI that the secret will be shared between all nodes in the workflow by using specific suffix
-	authKeyEnvVarName := AuthorizationKeySecretName + libcrecli.SharedSecretEnvVarSuffix
-
-	var secretsFilePath *string
-	if input.authKey != "" {
-		// create workflow-specific secrets file using the CRE CLI, which contains a mapping of secret names to environment variables that hold them
-		// secrets will be read from the environment variables by the CRE CLI and encoded using nodes' public keys and when workflow executes it will
-		// be able to read all secrets, which after decoding will be set as environment variables with names specified in the secrets file
-		secrets := map[string][]string{
-			AuthorizationKeySecretName: {authKeyEnvVarName},
-		}
-
-		secretsFile, secretsErr := libcrecli.CreateSecretsFile(secrets)
-		if secretsErr != nil {
-			return errors.Wrap(secretsErr, "failed to create secrets file")
-		}
-		secretsFilePath = ptr.Ptr(secretsFile.Name())
-	}
-
-	registerWorkflowInput := types.ManageWorkflowWithCRECLIInput{
-		ChainSelector:            input.chainSelector,
-		WorkflowDonID:            input.workflowDonID,
-		WorkflowOwnerAddress:     input.sethClient.MustGetRootKeyAddress(),
-		CRECLIPrivateKey:         input.deployerPrivateKey,
-		CRECLIAbsPath:            input.creCLIAbsPath,
-		CRESettingsFile:          input.creCLIsettingsFile,
-		WorkflowName:             input.WorkflowName,
-		ShouldCompileNewWorkflow: input.ShouldCompileNewWorkflow,
-		CRECLIProfile:            input.creCLIProfile,
-	}
-
-	if input.ShouldCompileNewWorkflow {
-		registerWorkflowInput.NewWorkflow = &types.NewWorkflow{
-			FolderLocation:   *input.WorkflowFolderLocation,
-			WorkflowFileName: "main.go",
-			ConfigFilePath:   &workflowConfigFilePath,
-			SecretsFilePath:  secretsFilePath,
-			Secrets: map[string]string{
-				authKeyEnvVarName: input.authKey,
-			},
-		}
-	} else {
-		registerWorkflowInput.ExistingWorkflow = &types.ExistingWorkflow{
-			BinaryURL:  input.CompiledWorkflowConfig.BinaryURL,
-			ConfigURL:  &input.CompiledWorkflowConfig.ConfigURL,
-			SecretsURL: &input.CompiledWorkflowConfig.SecretsURL,
-		}
-	}
-
-	registerErr := creworkflow.RegisterWithCRECLI(registerWorkflowInput)
-	if registerErr != nil {
-		return errors.Wrap(registerErr, "failed to register workflow with CRE CLI")
-	}
-
-	return nil
-}
-
 func logTestInfo(l zerolog.Logger, feedID, workflowName, dataFeedsCacheAddr, forwarderAddr string) {
 	l.Info().Msg("------ Test configuration:")
 	l.Info().Msgf("Feed ID: %s", feedID)
@@ -719,6 +562,7 @@ func setupPoRTestEnvironment(
 	capabilityFactoryFns []func([]string) []keystone_changeset.DONCapabilityWithConfig,
 	jobSpecFactoryFuncs []keystonetypes.JobSpecFactoryFn,
 	buildWorkflowRegistrationInput func(
+		t *testing.T,
 		testLogger zerolog.Logger,
 		idx int,
 		bo *creenv.BlockchainOutput,
@@ -726,7 +570,7 @@ func setupPoRTestEnvironment(
 		universalSetupOutput *creenv.SetupOutput,
 		in *TestConfig,
 		priceProvider PriceProvider,
-	) (*registerPoRWorkflowInput, error),
+	) *registerPoRWorkflowInput,
 ) *porSetupOutput {
 	universalSetupInput := creenv.SetupInput{
 		CapabilitiesAwareNodeSets:            mustSetCapabilitiesFn(in.NodeSets),
@@ -769,7 +613,8 @@ func setupPoRTestEnvironment(
 		chainSelectorToSethClient[bo.ChainSelector] = bo.SethClient
 		chainSelectorToBlockchainOutput[bo.ChainSelector] = bo.BlockchainOutput
 
-		registerInput, err := buildWorkflowRegistrationInput(
+		registerInput := buildWorkflowRegistrationInput(
+			t,
 			testLogger,
 			idx,
 			bo,
@@ -778,10 +623,17 @@ func setupPoRTestEnvironment(
 			in,
 			priceProvider,
 		)
-		require.NoError(t, err, "failed to build workflow registration input")
 
-		workflowErr := registerWorkflow(*registerInput, configBuilder)
+		workflowErr := registerWorkflow(t.Context(), *registerInput, configBuilder)
 		require.NoError(t, workflowErr, "failed to register PoR workflow")
+
+		workflowInput := convertRegisterPoRWorkflowInput(*registerInput)
+
+		workflowPauseErr := pausePoRWorkflow(workflowInput)
+		require.NoError(t, workflowPauseErr, "failed to pause PoR workflow")
+
+		workflowActivateErr := activatePoRWorkflow(workflowInput)
+		require.NoError(t, workflowActivateErr, "failed to activate PoR workflow")
 	}
 	// Workflow-specific configuration -- END
 
@@ -799,6 +651,7 @@ func setupPoRTestEnvironment(
 }
 
 func buildWorkflowRegistrationInput(
+	t *testing.T,
 	testLogger zerolog.Logger,
 	idx int,
 	bo *creenv.BlockchainOutput,
@@ -806,20 +659,18 @@ func buildWorkflowRegistrationInput(
 	universalSetupOutput *creenv.SetupOutput,
 	in *TestConfig,
 	priceProvider PriceProvider,
-) (*registerPoRWorkflowInput, error) {
+) *registerPoRWorkflowInput {
+	t.Helper()
+
 	deployConfig := df_changeset_types.DeployConfig{
 		ChainsToDeploy: []uint64{bo.ChainSelector},
 		Labels:         []string{"data-feeds"}, // label required by the changeset
 	}
 
 	dfOutput, dfErr := changeset.RunChangeset(df_changeset.DeployCacheChangeset, *universalSetupOutput.CldEnvironment, deployConfig)
-	if dfErr != nil {
-		return nil, errors.Wrap(dfErr, "failed to deploy data feed cache contract")
-	}
+	require.NoError(t, dfErr, "failed to deploy data feed cache contract")
 
-	if err := universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(dfOutput.AddressBook); err != nil { //nolint:staticcheck // won't migrate now
-		return nil, errors.Wrap(err, "failed to merge address book")
-	}
+	require.NoError(t, universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(dfOutput.AddressBook), "failed to merge address book") //nolint:staticcheck // won't migrate now
 
 	var creCLIAbsPath string
 	var creCLISettingsFile *os.File
@@ -827,9 +678,7 @@ func buildWorkflowRegistrationInput(
 		// make sure that path is indeed absolute
 		var pathErr error
 		creCLIAbsPath, pathErr = filepath.Abs(in.DependenciesConfig.CRECLIBinaryPath)
-		if pathErr != nil {
-			return nil, errors.Wrap(pathErr, "failed to get absolute path for CRE CLI")
-		}
+		require.NoError(t, pathErr, "failed to get absolute path for CRE CLI")
 
 		// create CRE CLI settings file
 		var settingsErr error
@@ -844,9 +693,7 @@ func buildWorkflowRegistrationInput(
 				bo.ChainSelector:              bo.BlockchainOutput.Nodes[0].ExternalHTTPUrl,
 			},
 		)
-		if settingsErr != nil {
-			return nil, errors.Wrap(settingsErr, "failed to create CRE CLI settings file")
-		}
+		require.NoError(t, settingsErr, "failed to create CRE CLI settings file")
 	}
 
 	dfConfigInput := &configureDataFeedsCacheInput{
@@ -861,9 +708,12 @@ func buildWorkflowRegistrationInput(
 		settingsFile:       creCLISettingsFile,
 		deployerPrivateKey: bo.DeployerPrivateKey,
 	}
-	if dfConfigErr := configureDataFeedsCacheContract(testLogger, dfConfigInput); dfConfigErr != nil {
-		return nil, errors.Wrap(dfConfigErr, "failed to configure data feeds cache")
-	}
+	require.NoError(t, configureDataFeedsCacheContract(testLogger, dfConfigInput), "failed to configure data feeds cache")
+
+	testLogger.Info().Msg("Waiting for RegistrySyncer health checks...")
+	syncerErr := waitForWorkflowRegistrySyncer(universalSetupOutput.NodeOutput, universalSetupOutput.DonTopology)
+	require.NoError(t, syncerErr, "failed to wait for workflow registry syncer")
+	testLogger.Info().Msg("Proceeding to register PoR workflow...")
 
 	registerInput := &registerPoRWorkflowInput{
 		WorkflowConfig:     in.WorkflowConfigs[idx],
@@ -877,10 +727,75 @@ func buildWorkflowRegistrationInput(
 		deployerPrivateKey: bo.DeployerPrivateKey,
 		creCLIAbsPath:      creCLIAbsPath,
 		creCLIsettingsFile: creCLISettingsFile,
+		creCLIProfile:      libcrecli.CRECLIProfile,
 		writeTargetName:    corevm.GenerateWriteTargetName(bo.ChainID),
 	}
 
-	return registerInput, nil
+	return registerInput
+}
+
+func convertRegisterPoRWorkflowInput(
+	regInput registerPoRWorkflowInput,
+) managePoRWorkflowInput {
+	return managePoRWorkflowInput{
+		WorkflowConfig:     regInput.WorkflowConfig,
+		chainSelector:      regInput.chainSelector,
+		homeChainSelector:  regInput.homeChainSelector,
+		writeTargetName:    regInput.writeTargetName,
+		workflowDonID:      regInput.workflowDonID,
+		addressBook:        regInput.addressBook,
+		feedID:             regInput.feedID,
+		priceProvider:      regInput.priceProvider,
+		sethClient:         regInput.sethClient,
+		deployerPrivateKey: regInput.deployerPrivateKey,
+		creCLIAbsPath:      regInput.creCLIAbsPath,
+		creCLIsettingsFile: regInput.creCLIsettingsFile,
+		authKey:            regInput.authKey,
+		creCLIProfile:      regInput.creCLIProfile,
+		// readContractInput is intentionally omitted as it's not in managePoRWorkflowInput
+	}
+}
+
+func buildManageWorkflowInput(input managePoRWorkflowInput) (types.ManageWorkflowWithCRECLIInput, error) {
+	return types.ManageWorkflowWithCRECLIInput{
+		ChainSelector:            input.chainSelector,
+		WorkflowDonID:            input.workflowDonID,
+		WorkflowOwnerAddress:     input.sethClient.MustGetRootKeyAddress(),
+		CRECLIPrivateKey:         input.deployerPrivateKey,
+		CRECLIAbsPath:            input.creCLIAbsPath,
+		CRESettingsFile:          input.creCLIsettingsFile,
+		WorkflowName:             input.WorkflowName,
+		ShouldCompileNewWorkflow: input.ShouldCompileNewWorkflow,
+		CRECLIProfile:            input.creCLIProfile,
+	}, nil
+}
+
+func pausePoRWorkflow(input managePoRWorkflowInput) error {
+	workflowInput, err := buildManageWorkflowInput(input)
+	if err != nil {
+		return err
+	}
+
+	pauseErr := creworkflow.PauseWithCRECLI(workflowInput)
+	if pauseErr != nil {
+		return errors.Wrap(pauseErr, "failed to pause workflow with CRE CLI")
+	}
+
+	return nil
+}
+
+func activatePoRWorkflow(input managePoRWorkflowInput) error {
+	workflowInput, err := buildManageWorkflowInput(input)
+	if err != nil {
+		return err
+	}
+
+	activateErr := creworkflow.ActivateWithCRECLI(workflowInput)
+	if activateErr != nil {
+		return errors.Wrap(activateErr, "failed to activate workflow with CRE CLI")
+	}
+
+	return nil
 }
 
 // config file to use: environment-one-don-multichain.toml
@@ -1016,6 +931,7 @@ func TestCRE_OCR3_ReadBalance_Workflow_SingleDon_MockedPrice(t *testing.T) {
 
 	// extend the default workflow registration input
 	buildReadContractWorkflowRegistrationInput := func(
+		t *testing.T,
 		testLogger zerolog.Logger,
 		idx int,
 		bo *creenv.BlockchainOutput,
@@ -1023,29 +939,20 @@ func TestCRE_OCR3_ReadBalance_Workflow_SingleDon_MockedPrice(t *testing.T) {
 		universalSetupOutput *creenv.SetupOutput,
 		in *TestConfig,
 		priceProvider PriceProvider,
-	) (*registerPoRWorkflowInput, error) {
-		registerInput, buildErr := buildWorkflowRegistrationInput(testLogger, idx, bo, homeChainOutput, universalSetupOutput, in, priceProvider)
-		if buildErr != nil {
-			return nil, errors.Wrap(buildErr, "failed to get default registration input")
-		}
+	) *registerPoRWorkflowInput {
+		registerInput := buildWorkflowRegistrationInput(t, testLogger, idx, bo, homeChainOutput, universalSetupOutput, in, priceProvider)
 
 		// Deploy a balance reader and merge to address book
 		br, deployErr := keystone_changeset.DeployBalanceReader(*universalSetupOutput.CldEnvironment, keystone_changeset.DeployBalanceReaderRequest{
 			ChainSelectors: []uint64{bo.ChainSelector},
 		})
-		if deployErr != nil {
-			return nil, errors.Wrap(deployErr, "failed to deploy balance reader contract")
-		}
+		require.NoError(t, deployErr, "failed to deploy balance reader contract")
 
-		if mergeErr := universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(br.AddressBook); mergeErr != nil { //nolint:staticcheck // won't migrate yet
-			return nil, errors.Wrap(mergeErr, "failed to merge address book with balance reader")
-		}
+		require.NoError(t, universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(br.AddressBook), "failed to merge address book with balance reader")
 
 		// create a new address and fund it
 		pub, _, newAddrErr := seth.NewAddress()
-		if newAddrErr != nil {
-			return nil, errors.Wrap(newAddrErr, "failed to generate new address")
-		}
+		require.NoError(t, newAddrErr, "failed to generate new address")
 
 		fundedAddress := common.HexToAddress(pub)
 
@@ -1056,10 +963,7 @@ func TestCRE_OCR3_ReadBalance_Workflow_SingleDon_MockedPrice(t *testing.T) {
 				Amount:     expectedReadAmount,
 				PrivateKey: bo.SethClient.MustGetRootPrivateKey(),
 			})
-
-		if fundingErr != nil {
-			return nil, errors.Wrap(fundingErr, fmt.Sprintf("failed to fund address %s", fundedAddress))
-		}
+		require.NoError(t, fundingErr, fmt.Sprintf("failed to fund address %s", fundedAddress))
 
 		registerInput.readContractInput = &readContractInput{
 			fundedAddress:        fundedAddress.Hex(),
@@ -1069,7 +973,7 @@ func TestCRE_OCR3_ReadBalance_Workflow_SingleDon_MockedPrice(t *testing.T) {
 			contractMethod:       "getNativeBalances",
 		}
 
-		return registerInput, nil
+		return registerInput
 	}
 
 	setupOutput := setupPoRTestEnvironment(
@@ -1214,7 +1118,10 @@ func TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice(t *testing.T) {
 	cronBinaryPathInTheContainer, err := setBinaryPath(in, customBinaryPaths, keystonetypes.CronCapability, "cron")
 	require.NoError(t, err, "failed to set cron path")
 
-	jobSpecFactoryFuncs, extraAllowedPorts, err := getDefaultJobSpecFactoryFuncs(in, secondChainIDInt, cronBinaryPathInTheContainer)
+	firstChain := in.Blockchains[0]
+	firstChainIDInt, firstChainErr := strconv.Atoi(firstChain.ChainID)
+	require.NoError(t, firstChainErr, "failed to convert chain ID to int")
+	jobSpecFactoryFuncs, extraAllowedPorts, err := getDefaultJobSpecFactoryFuncs(in, firstChainIDInt, cronBinaryPathInTheContainer)
 	require.NoError(t, err, "failed to get default job spec factory funcs")
 
 	priceProvider := NewTrueUSDPriceProvider(testLogger, []string{in.WorkflowConfigs[0].FeedID})
@@ -1226,12 +1133,14 @@ func TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice(t *testing.T) {
 		buildPoRConfig,
 		customBinaryPaths,
 		extraAllowedPorts,
-		mustSetCapabilitiesFn, []keystonetypes.DONCapabilityWithConfigFactoryFn{
-			webapicap.WebAPICapabilityFactoryFn,
+		mustSetCapabilitiesFn,
+		[]types.DONCapabilityWithConfigFactoryFn{
+			webapicap.WebAPITriggerCapabilityFactoryFn,
+			webapicap.WebAPITargetCapabilityFactoryFn,
 			computecap.ComputeCapabilityFactoryFn,
 			consensuscap.OCR3CapabilityFactoryFn,
 			croncap.CronCapabilityFactoryFn,
-			chainwritercap.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(secondChainIDInt))),
+			writeevmcap.WriteEVMCapabilityFactory(libc.MustSafeUint64(int64(secondChainIDInt))),
 		},
 		jobSpecFactoryFuncs,
 		buildWorkflowRegistrationInput,
