@@ -23,19 +23,6 @@ on:
         type: string
         description: "The version of Chainlink repository to use for the tests."
         default: "develop"
-    secrets:
-      GITHUB_READ_TOKEN:
-        required: true
-        description: "The token to use to read from the GitHub API."
-  # # TODO: Uncomment once this has soaked for a while
-  # # merge_group:
-  # pull_request:
-  #   types: [opened, synchronize, reopened, labeled]
-  # push:
-  #   tags:
-  #     - "*"
-  #   branches:
-  #     - develop
 
 jobs:
   define-test-matrix:
