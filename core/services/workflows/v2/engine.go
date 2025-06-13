@@ -20,6 +20,7 @@ import (
 	sdkpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb"
 	wasmpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/v2/pb"
 	"github.com/smartcontractkit/chainlink/v2/core/platform"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/workflowkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/events"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/metering"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/monitoring"
@@ -167,7 +168,7 @@ func (e *Engine) runTriggerSubscriptionPhase(ctx context.Context) error {
 		Request:         &wasmpb.ExecuteRequest_Subscribe{},
 		MaxResponseSize: uint64(e.cfg.LocalLimits.ModuleExecuteMaxResponseSizeBytes),
 		// no Config needed
-	}, &DisallowedExecutionHelper{})
+	}, NewVaultOnlyExecutionHelper(e, e.cfg.WorkflowOwner, workflowkey.Key{}))
 	if err != nil {
 		return fmt.Errorf("failed to execute subscribe: %w", err)
 	}
@@ -349,7 +350,7 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 		},
 		MaxResponseSize: uint64(e.cfg.LocalLimits.ModuleExecuteMaxResponseSizeBytes),
 		// TODO(CAPPL-729): pass workflow config
-	}, &ExecutionHelper{Engine: e, WorkflowExecutionID: executionID, WorkflowOwner: e.cfg.WorflowOwner)})
+	}, NewExecutionHelper(e, executionID, e.cfg.WorkflowOwner, workflowkey.Key{}))
 
 	endTime := time.Now()
 	executionMS := strconv.Itoa(int(endTime.Sub(startTime).Milliseconds()))
