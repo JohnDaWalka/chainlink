@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/deployment"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/test"
@@ -46,7 +46,7 @@ func TestUpdateNodes(t *testing.T) {
 
 		csOut, err := changeset.UpdateNodes(te.Env, &cfg)
 		require.NoError(t, err)
-		require.Empty(t, csOut.Proposals)
+		require.Empty(t, csOut.MCMSTimelockProposals)
 		require.Nil(t, csOut.AddressBook)
 
 		validateUpdate(t, te, updates)
@@ -87,7 +87,7 @@ func TestUpdateNodes(t *testing.T) {
 		require.Nil(t, csOut.AddressBook)
 
 		err = applyProposal(t, te, commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(changeset.UpdateNodes),
+			cldf.CreateLegacyChangeSet(changeset.UpdateNodes),
 			&changeset.UpdateNodesRequest{
 				RegistryChainSel: te.RegistrySelector,
 				P2pToUpdates:     updates,
@@ -113,14 +113,4 @@ func validateUpdate(t *testing.T, te test.EnvWrapper, expected map[p2pkey.PeerID
 		assert.Equal(t, expected[node.P2pId].EncryptionPublicKey, hex.EncodeToString(node.EncryptionPublicKey[:]))
 		assert.Equal(t, expected[node.P2pId].Signer, node.Signer)
 	}
-}
-
-func p2pIDs(t *testing.T, vals []string) [][32]byte {
-	var out [][32]byte
-	for _, v := range vals {
-		id, err := p2pkey.MakePeerID(v)
-		require.NoError(t, err)
-		out = append(out, id)
-	}
-	return out
 }

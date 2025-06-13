@@ -22,6 +22,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Flag to control installation of private plugins (default: false).
 ARG CL_INSTALL_PRIVATE_PLUGINS=false
+# Flag to control installation of testing plugins (default: false).
+ARG CL_INSTALL_TESTING_PLUGINS=false
 # Flags for Go Delve debugger
 ARG GO_GCFLAGS
 # Env vars needed for chainlink build
@@ -37,6 +39,9 @@ RUN --mount=type=secret,id=GIT_AUTH_TOKEN \
     GOBIN=/gobins CL_LOOPINSTALL_OUTPUT_DIR=${CL_LOOPINSTALL_OUTPUT_DIR} make install-plugins-local install-plugins-public && \
     if [ "${CL_INSTALL_PRIVATE_PLUGINS}" = "true" ]; then \
         GOBIN=/gobins CL_LOOPINSTALL_OUTPUT_DIR=${CL_LOOPINSTALL_OUTPUT_DIR} make install-plugins-private; \
+    fi && \
+    if [ "${CL_INSTALL_TESTING_PLUGINS}" = "true" ]; then \
+        GOBIN=/gobins CL_LOOPINSTALL_OUTPUT_DIR=${CL_LOOPINSTALL_OUTPUT_DIR} make install-plugins-testing; \
     fi
 
 # Copy any shared libraries.
@@ -75,7 +80,8 @@ COPY --from=buildgo /go/bin/dlv /usr/local/bin/dlv
 # Set plugin environment variable configuration.
 ENV CL_MEDIAN_CMD=chainlink-feeds
 ENV CL_MERCURY_CMD=chainlink-mercury
-ENV CL_SOLANA_CMD=chainlink-solana
+ARG CL_SOLANA_CMD=chainlink-solana
+ENV CL_SOLANA_CMD=${CL_SOLANA_CMD}
 ARG CL_APTOS_CMD
 ENV CL_APTOS_CMD=${CL_APTOS_CMD}
 
@@ -89,7 +95,6 @@ COPY --from=buildgo /gobins/ /usr/local/bin/
 # Copy shared libraries from the build stage.
 COPY --from=buildgo /tmp/lib /usr/lib/
 
-USER ${CHAINLINK_USER}
 WORKDIR /home/${CHAINLINK_USER}
 
 # Explicitly set the cache dir. Needed so both root and non-root user has an explicit location.

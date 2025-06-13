@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcmslib "github.com/smartcontractkit/mcms"
 
@@ -21,14 +22,22 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	ccipops "github.com/smartcontractkit/chainlink/deployment/ccip/operation/evm/v1_6"
+	ccipseqs "github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/deployergroup"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/opsutil"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/nonce_manager"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 
-	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -53,21 +62,21 @@ const (
 )
 
 var (
-	_ deployment.ChangeSet[UpdateOnRampDestsConfig]                  = UpdateOnRampsDestsChangeset
-	_ deployment.ChangeSet[UpdateOnRampDynamicConfig]                = UpdateOnRampDynamicConfigChangeset
-	_ deployment.ChangeSet[UpdateOnRampAllowListConfig]              = UpdateOnRampAllowListChangeset
-	_ deployment.ChangeSet[WithdrawOnRampFeeTokensConfig]            = WithdrawOnRampFeeTokensChangeset
-	_ deployment.ChangeSet[UpdateOffRampSourcesConfig]               = UpdateOffRampSourcesChangeset
-	_ deployment.ChangeSet[UpdateRouterRampsConfig]                  = UpdateRouterRampsChangeset
-	_ deployment.ChangeSet[UpdateFeeQuoterDestsConfig]               = UpdateFeeQuoterDestsChangeset
-	_ deployment.ChangeSet[SetOCR3OffRampConfig]                     = SetOCR3OffRampChangeset
-	_ deployment.ChangeSet[UpdateDynamicConfigOffRampConfig]         = UpdateDynamicConfigOffRampChangeset
-	_ deployment.ChangeSet[UpdateFeeQuoterPricesConfig]              = UpdateFeeQuoterPricesChangeset
-	_ deployment.ChangeSet[UpdateNonceManagerConfig]                 = UpdateNonceManagersChangeset
-	_ deployment.ChangeSet[ApplyFeeTokensUpdatesConfig]              = ApplyFeeTokensUpdatesFeeQuoterChangeset
-	_ deployment.ChangeSet[UpdateTokenPriceFeedsConfig]              = UpdateTokenPriceFeedsFeeQuoterChangeset
-	_ deployment.ChangeSet[PremiumMultiplierWeiPerEthUpdatesConfig]  = ApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset
-	_ deployment.ChangeSet[ApplyTokenTransferFeeConfigUpdatesConfig] = ApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset
+	_ cldf.ChangeSet[UpdateOnRampDestsConfig]                  = UpdateOnRampsDestsChangeset
+	_ cldf.ChangeSet[UpdateOnRampDynamicConfig]                = UpdateOnRampDynamicConfigChangeset
+	_ cldf.ChangeSet[UpdateOnRampAllowListConfig]              = UpdateOnRampAllowListChangeset
+	_ cldf.ChangeSet[WithdrawOnRampFeeTokensConfig]            = WithdrawOnRampFeeTokensChangeset
+	_ cldf.ChangeSet[UpdateOffRampSourcesConfig]               = UpdateOffRampSourcesChangeset
+	_ cldf.ChangeSet[UpdateRouterRampsConfig]                  = UpdateRouterRampsChangeset
+	_ cldf.ChangeSet[UpdateFeeQuoterDestsConfig]               = UpdateFeeQuoterDestsChangeset
+	_ cldf.ChangeSet[SetOCR3OffRampConfig]                     = SetOCR3OffRampChangeset
+	_ cldf.ChangeSet[UpdateDynamicConfigOffRampConfig]         = UpdateDynamicConfigOffRampChangeset
+	_ cldf.ChangeSet[UpdateFeeQuoterPricesConfig]              = UpdateFeeQuoterPricesChangeset
+	_ cldf.ChangeSet[UpdateNonceManagerConfig]                 = UpdateNonceManagersChangeset
+	_ cldf.ChangeSet[ApplyFeeTokensUpdatesConfig]              = ApplyFeeTokensUpdatesFeeQuoterChangeset
+	_ cldf.ChangeSet[UpdateTokenPriceFeedsConfig]              = UpdateTokenPriceFeedsFeeQuoterChangeset
+	_ cldf.ChangeSet[PremiumMultiplierWeiPerEthUpdatesConfig]  = ApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset
+	_ cldf.ChangeSet[ApplyTokenTransferFeeConfigUpdatesConfig] = ApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset
 )
 
 type UpdateNonceManagerConfig struct {
@@ -91,8 +100,8 @@ type PreviousRampCfg struct {
 	AllowEmptyOffRamp bool // If true, the prevOffRamp address can be 0x0.
 }
 
-func (cfg UpdateNonceManagerConfig) Validate(e deployment.Environment) error {
-	state, err := changeset.LoadOnchainState(e)
+func (cfg UpdateNonceManagerConfig) Validate(e cldf.Environment) error {
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
 		return err
 	}
@@ -104,7 +113,7 @@ func (cfg UpdateNonceManagerConfig) Validate(e deployment.Environment) error {
 		if sourceChainState.NonceManager == nil {
 			return fmt.Errorf("missing nonce manager for chain %d", sourceSel)
 		}
-		sourceChain, ok := e.Chains[sourceSel]
+		sourceChain, ok := e.BlockChains.EVMChains()[sourceSel]
 		if !ok {
 			return fmt.Errorf("missing chain %d in environment", sourceSel)
 		}
@@ -143,53 +152,37 @@ func (cfg UpdateNonceManagerConfig) Validate(e deployment.Environment) error {
 	return nil
 }
 
-func UpdateNonceManagersChangeset(e deployment.Environment, cfg UpdateNonceManagerConfig) (deployment.ChangesetOutput, error) {
-	if err := cfg.Validate(e); err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-	s, err := changeset.LoadOnchainState(e)
-	if err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
+func (cfg UpdateNonceManagerConfig) ToSequenceInput(state stateview.CCIPOnChainState) ccipseqs.NonceManagerUpdatesSequenceInput {
+	updatesByChain := make(map[uint64]ccipseqs.NonceManagerUpdateInput, len(cfg.UpdatesByChain))
 
-	batches := []mcmstypes.BatchOperation{}
-	timelocks := make(map[uint64]string)
-	inspectors := make(map[uint64]mcmssdk.Inspector)
-
-	for chainSel, updates := range cfg.UpdatesByChain {
-		txOpts := e.Chains[chainSel].DeployerKey
-		if cfg.MCMS != nil {
-			txOpts = deployment.SimTransactOpts()
-		}
-		nm := s.Chains[chainSel].NonceManager
-		var authTx, prevRampsTx *types.Transaction
-		if len(updates.AddedAuthCallers) > 0 || len(updates.RemovedAuthCallers) > 0 {
-			authTx, err = nm.ApplyAuthorizedCallerUpdates(txOpts, nonce_manager.AuthorizedCallersAuthorizedCallerArgs{
-				AddedCallers:   updates.AddedAuthCallers,
-				RemovedCallers: updates.RemovedAuthCallers,
-			})
-			if cfg.MCMS == nil {
-				if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], authTx, nonce_manager.NonceManagerABI, err); err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("error updating authorized callers for chain %s: %w",
-						e.Chains[chainSel].String(), err)
-				}
-			} else {
-				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("error updating previous ramps for chain %s: %w", e.Chains[chainSel].String(), err)
-				}
+	for chainSel, update := range cfg.UpdatesByChain {
+		var callerOpInput *opsutil.EVMCallInput[nonce_manager.AuthorizedCallersAuthorizedCallerArgs]
+		if len(update.AddedAuthCallers) > 0 || len(update.RemovedAuthCallers) > 0 {
+			callerOpInputArgs := nonce_manager.AuthorizedCallersAuthorizedCallerArgs{
+				AddedCallers:   update.AddedAuthCallers,
+				RemovedCallers: update.RemovedAuthCallers,
 			}
+			callerOpInput = &(opsutil.EVMCallInput[nonce_manager.AuthorizedCallersAuthorizedCallerArgs]{
+				Address:       state.Chains[chainSel].NonceManager.Address(),
+				ChainSelector: chainSel,
+				CallInput:     callerOpInputArgs,
+				NoSend:        cfg.MCMS != nil, // If MCMS exists, we do not want to send the transaction.
+			})
 		}
-		if len(updates.PreviousRampsArgs) > 0 {
-			previousRampsArgs := make([]nonce_manager.NonceManagerPreviousRampsArgs, 0)
-			for _, prevRamp := range updates.PreviousRampsArgs {
+
+		// construct this input
+		var rampUpdatesOpInput *opsutil.EVMCallInput[[]nonce_manager.NonceManagerPreviousRampsArgs]
+		if len(update.PreviousRampsArgs) > 0 {
+			rampUpdatesOpInputArgs := make([]nonce_manager.NonceManagerPreviousRampsArgs, 0)
+			for _, prevRamp := range update.PreviousRampsArgs {
 				var onRamp, offRamp common.Address
 				if !prevRamp.AllowEmptyOnRamp {
-					onRamp = s.Chains[chainSel].EVM2EVMOnRamp[prevRamp.RemoteChainSelector].Address()
+					onRamp = state.Chains[chainSel].EVM2EVMOnRamp[prevRamp.RemoteChainSelector].Address()
 				}
 				if !prevRamp.AllowEmptyOffRamp {
-					offRamp = s.Chains[chainSel].EVM2EVMOffRamp[prevRamp.RemoteChainSelector].Address()
+					offRamp = state.Chains[chainSel].EVM2EVMOffRamp[prevRamp.RemoteChainSelector].Address()
 				}
-				previousRampsArgs = append(previousRampsArgs, nonce_manager.NonceManagerPreviousRampsArgs{
+				rampUpdatesOpInputArgs = append(rampUpdatesOpInputArgs, nonce_manager.NonceManagerPreviousRampsArgs{
 					RemoteChainSelector:   prevRamp.RemoteChainSelector,
 					OverrideExistingRamps: prevRamp.OverrideExisting,
 					PrevRamps: nonce_manager.NonceManagerPreviousRamps{
@@ -198,74 +191,44 @@ func UpdateNonceManagersChangeset(e deployment.Environment, cfg UpdateNonceManag
 					},
 				})
 			}
-			prevRampsTx, err = nm.ApplyPreviousRampsUpdates(txOpts, previousRampsArgs)
-			if cfg.MCMS == nil {
-				if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], prevRampsTx, nonce_manager.NonceManagerABI, err); err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("error updating previous ramps for chain %s: %w", e.Chains[chainSel].String(), err)
-				}
-			} else {
-				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("error updating previous ramps for chain %s: %w", e.Chains[chainSel].String(), err)
-				}
-			}
-		}
-		if cfg.MCMS != nil {
-			mcmsTransactions := make([]mcmstypes.Transaction, 0)
-			if authTx != nil {
-				mcmsTx, err := proposalutils.TransactionForChain(chainSel, nm.Address().Hex(), authTx.Data(), big.NewInt(0),
-					string(changeset.NonceManager), []string{})
-				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to create transaction for chain %d: %w", chainSel, err)
-				}
-
-				mcmsTransactions = append(mcmsTransactions, mcmsTx)
-			}
-			if prevRampsTx != nil {
-				mcmsTx, err := proposalutils.TransactionForChain(chainSel, nm.Address().Hex(), prevRampsTx.Data(), big.NewInt(0),
-					string(changeset.NonceManager), []string{})
-				if err != nil {
-					return deployment.ChangesetOutput{}, fmt.Errorf("failed to create transaction for chain %d: %w", chainSel, err)
-				}
-
-				mcmsTransactions = append(mcmsTransactions, mcmsTx)
-			}
-			if len(mcmsTransactions) == 0 {
-				return deployment.ChangesetOutput{}, errors.New("no operations to batch")
-			}
-
-			batches = append(batches, mcmstypes.BatchOperation{
-				ChainSelector: mcmstypes.ChainSelector(chainSel),
-				Transactions:  mcmsTransactions,
+			rampUpdatesOpInput = &(opsutil.EVMCallInput[[]nonce_manager.NonceManagerPreviousRampsArgs]{
+				Address:       state.Chains[chainSel].NonceManager.Address(),
+				ChainSelector: chainSel,
+				CallInput:     rampUpdatesOpInputArgs,
+				NoSend:        cfg.MCMS != nil, // If MCMS exists, we do not want to send the transaction.
 			})
+		}
 
-			timelocks[chainSel] = s.Chains[chainSel].Timelock.Address().Hex()
-			inspectors[chainSel], err = proposalutils.McmsInspectorForChain(e, chainSel)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", chainSel, err)
+		if callerOpInput != nil || rampUpdatesOpInput != nil {
+			updatesByChain[chainSel] = ccipseqs.NonceManagerUpdateInput{
+				AuthorizedCallerArgs: callerOpInput,
+				PreviousRampsArgs:    rampUpdatesOpInput,
 			}
 		}
 	}
-	if cfg.MCMS == nil {
-		return deployment.ChangesetOutput{}, nil
+
+	return ccipseqs.NonceManagerUpdatesSequenceInput{
+		UpdatesByChain: updatesByChain,
 	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, s, cfg.MCMS)
-	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
+}
+
+func UpdateNonceManagersChangeset(e cldf.Environment, cfg UpdateNonceManagerConfig) (cldf.ChangesetOutput, error) {
+	output := cldf.ChangesetOutput{}
+	if err := cfg.Validate(e); err != nil {
+		return output, err
 	}
-	proposal, err := proposalutils.BuildProposalFromBatchesV2(
-		e,
-		timelocks,
-		mcmsContractByChain,
-		inspectors,
-		batches,
-		"Update nonce manager for previous ramps and authorized callers",
-		*cfg.MCMS,
-	)
+	s, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return output, fmt.Errorf("failed to load onchain state: %w", err)
 	}
 
-	return deployment.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		ccipseqs.UpdateNonceManagerSequence,
+		e.BlockChains.EVMChains(),
+		cfg.ToSequenceInput(s),
+	)
+	return opsutil.AddEVMCallSequenceToCSOutput(e, s, output, report, err, cfg.MCMS, "Call ApplyAuthorizedCallerUpdates and ApplyPreviousRampsUpdates on NonceManagers")
 }
 
 type OnRampDestinationUpdate struct {
@@ -287,14 +250,14 @@ type UpdateOnRampDestsConfig struct {
 	SkipOwnershipCheck bool
 }
 
-func (cfg UpdateOnRampDestsConfig) Validate(e deployment.Environment) error {
-	state, err := changeset.LoadOnchainState(e)
+func (cfg UpdateOnRampDestsConfig) Validate(e cldf.Environment) error {
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
 		return err
 	}
 	supportedChains := state.SupportedChains()
 	for chainSel, updates := range cfg.UpdatesByChain {
-		if err := changeset.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
+		if err := stateview.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
 			return err
 		}
 		chainState, ok := state.Chains[chainSel]
@@ -311,7 +274,7 @@ func (cfg UpdateOnRampDestsConfig) Validate(e deployment.Environment) error {
 			return fmt.Errorf("missing onramp onramp for chain %d", chainSel)
 		}
 		if !cfg.SkipOwnershipCheck {
-			if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.OnRamp); err != nil {
+			if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.OnRamp); err != nil {
 				return err
 			}
 		}
@@ -332,38 +295,18 @@ func (cfg UpdateOnRampDestsConfig) Validate(e deployment.Environment) error {
 	return nil
 }
 
-// UpdateOnRampsDestsChangeset updates the onramp destinations for each onramp
-// in the chains specified. Multichain support is important - consider when we add a new chain
-// and need to update the onramp destinations for all chains to support the new chain.
-func UpdateOnRampsDestsChangeset(e deployment.Environment, cfg UpdateOnRampDestsConfig) (deployment.ChangesetOutput, error) {
-	if err := cfg.Validate(e); err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-	s, err := changeset.LoadOnchainState(e)
-	if err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-
-	batches := []mcmstypes.BatchOperation{}
-	timelocks := make(map[uint64]string)
-	inspectors := make(map[uint64]mcmssdk.Inspector)
-
+func (cfg UpdateOnRampDestsConfig) ToSequenceInput(state stateview.CCIPOnChainState) ccipseqs.OnRampApplyDestChainConfigUpdatesSequenceInput {
+	updatesByChain := make(map[uint64]opsutil.EVMCallInput[[]onramp.OnRampDestChainConfigArgs], len(cfg.UpdatesByChain))
 	for chainSel, updates := range cfg.UpdatesByChain {
-		txOpts := e.Chains[chainSel].DeployerKey
-		txOpts.Context = e.GetContext()
-		if cfg.MCMS != nil {
-			txOpts = deployment.SimTransactOpts()
-		}
-		onRamp := s.Chains[chainSel].OnRamp
 		var args []onramp.OnRampDestChainConfigArgs
 		for destination, update := range updates {
 			router := common.HexToAddress("0x0")
 			// If not enabled, set router to 0x0.
 			if update.IsEnabled {
 				if update.TestRouter {
-					router = s.Chains[chainSel].TestRouter.Address()
+					router = state.Chains[chainSel].TestRouter.Address()
 				} else {
-					router = s.Chains[chainSel].Router.Address()
+					router = state.Chains[chainSel].Router.Address()
 				}
 			}
 			args = append(args, onramp.OnRampDestChainConfigArgs{
@@ -372,51 +315,38 @@ func UpdateOnRampsDestsChangeset(e deployment.Environment, cfg UpdateOnRampDests
 				AllowlistEnabled:  update.AllowListEnabled,
 			})
 		}
-		tx, err := onRamp.ApplyDestChainConfigUpdates(txOpts, args)
-		if cfg.MCMS == nil {
-			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, onramp.OnRampABI, err); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error updating onramp destinations for chain %s: %w", e.Chains[chainSel].String(), err)
-			}
-		} else {
-			if err != nil {
-				return deployment.ChangesetOutput{}, err
-			}
-
-			batchOperation, err := proposalutils.BatchOperationForChain(chainSel, onRamp.Address().Hex(), tx.Data(),
-				big.NewInt(0), string(changeset.OnRamp), []string{})
-			if err != nil {
-				return deployment.ChangesetOutput{}, err
-			}
-			batches = append(batches, batchOperation)
-
-			timelocks[chainSel] = s.Chains[chainSel].Timelock.Address().Hex()
-			inspectors[chainSel], err = proposalutils.McmsInspectorForChain(e, chainSel)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", chainSel, err)
-			}
+		updatesByChain[chainSel] = opsutil.EVMCallInput[[]onramp.OnRampDestChainConfigArgs]{
+			Address:       state.Chains[chainSel].OnRamp.Address(),
+			ChainSelector: chainSel,
+			CallInput:     args,
+			NoSend:        cfg.MCMS != nil,
 		}
 	}
-	if cfg.MCMS == nil {
-		return deployment.ChangesetOutput{}, nil
+
+	return ccipseqs.OnRampApplyDestChainConfigUpdatesSequenceInput{
+		UpdatesByChain: updatesByChain,
 	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, s, cfg.MCMS)
-	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
+}
+
+// UpdateOnRampsDestsChangeset updates the onramp destinations for each onramp
+// in the chains specified. Multichain support is important - consider when we add a new chain
+// and need to update the onramp destinations for all chains to support the new chain.
+func UpdateOnRampsDestsChangeset(e cldf.Environment, cfg UpdateOnRampDestsConfig) (cldf.ChangesetOutput, error) {
+	if err := cfg.Validate(e); err != nil {
+		return cldf.ChangesetOutput{}, err
 	}
-	proposal, err := proposalutils.BuildProposalFromBatchesV2(
-		e,
-		timelocks,
-		mcmsContractByChain,
-		inspectors,
-		batches,
-		"Update onramp destinations",
-		*cfg.MCMS,
-	)
+	s, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 
-	return deployment.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		ccipseqs.OnRampApplyDestChainConfigUpdatesSequence,
+		e.BlockChains.EVMChains(),
+		cfg.ToSequenceInput(s),
+	)
+	return opsutil.AddEVMCallSequenceToCSOutput(e, s, cldf.ChangesetOutput{}, report, err, cfg.MCMS, "Call ApplyDestChainConfigUpdates on OnRamps")
 }
 
 type OnRampDynamicConfigUpdate struct {
@@ -433,12 +363,12 @@ type UpdateOnRampDynamicConfig struct {
 	MCMS *proposalutils.TimelockConfig
 }
 
-func (cfg UpdateOnRampDynamicConfig) Validate(e deployment.Environment, state changeset.CCIPOnChainState) error {
+func (cfg UpdateOnRampDynamicConfig) Validate(e cldf.Environment, state stateview.CCIPOnChainState) error {
 	for chainSel, config := range cfg.UpdatesByChain {
-		if err := changeset.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
+		if err := stateview.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
 			return err
 		}
-		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, state.Chains[chainSel].Timelock.Address(), state.Chains[chainSel].OnRamp); err != nil {
+		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, state.Chains[chainSel].Timelock.Address(), state.Chains[chainSel].OnRamp); err != nil {
 			return err
 		}
 		if state.Chains[chainSel].FeeQuoter == nil {
@@ -451,13 +381,13 @@ func (cfg UpdateOnRampDynamicConfig) Validate(e deployment.Environment, state ch
 	return nil
 }
 
-func UpdateOnRampDynamicConfigChangeset(e deployment.Environment, cfg UpdateOnRampDynamicConfig) (deployment.ChangesetOutput, error) {
-	state, err := changeset.LoadOnchainState(e)
+func UpdateOnRampDynamicConfigChangeset(e cldf.Environment, cfg UpdateOnRampDynamicConfig) (cldf.ChangesetOutput, error) {
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 	if err := cfg.Validate(e, state); err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 
 	batches := []mcmstypes.BatchOperation{}
@@ -465,14 +395,14 @@ func UpdateOnRampDynamicConfigChangeset(e deployment.Environment, cfg UpdateOnRa
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
 	for chainSel, update := range cfg.UpdatesByChain {
-		txOps := e.Chains[chainSel].DeployerKey
+		txOps := e.BlockChains.EVMChains()[chainSel].DeployerKey
 		if cfg.MCMS != nil {
-			txOps = deployment.SimTransactOpts()
+			txOps = cldf.SimTransactOpts()
 		}
 		onRamp := state.Chains[chainSel].OnRamp
 		dynamicConfig, err := onRamp.GetDynamicConfig(nil)
 		if err != nil {
-			return deployment.ChangesetOutput{}, err
+			return cldf.ChangesetOutput{}, err
 		}
 		// Do not update dynamic config if it is already in desired state
 		if dynamicConfig.FeeQuoter == state.Chains[chainSel].FeeQuoter.Address() &&
@@ -490,44 +420,44 @@ func UpdateOnRampDynamicConfigChangeset(e deployment.Environment, cfg UpdateOnRa
 		})
 
 		if cfg.MCMS == nil {
-			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, onramp.OnRampABI, err); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error updating onramp dynamic config for chain %s: %w", e.Chains[chainSel].String(), err)
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, onramp.OnRampABI, err); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error updating onramp dynamic config for chain %s: %w", e.BlockChains.EVMChains()[chainSel].String(), err)
 			}
 		} else {
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 
 			batchOperation, err := proposalutils.BatchOperationForChain(chainSel, onRamp.Address().Hex(), tx.Data(),
-				big.NewInt(0), string(changeset.OnRamp), []string{})
+				big.NewInt(0), string(shared.OnRamp), []string{})
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 			batches = append(batches, batchOperation)
 
 			timelocks[chainSel] = state.Chains[chainSel].Timelock.Address().Hex()
 			inspectors[chainSel], err = proposalutils.McmsInspectorForChain(e, chainSel)
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", chainSel, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", chainSel, err)
 			}
 		}
 	}
 	if cfg.MCMS == nil {
-		return deployment.ChangesetOutput{}, nil
+		return cldf.ChangesetOutput{}, nil
 	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
+	mcmsContractByChain, err := deployergroup.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
 	}
 	proposal, err := proposalutils.BuildProposalFromBatchesV2(
 		e, timelocks, mcmsContractByChain, inspectors, batches,
 		"update onramp dynamic config",
 		*cfg.MCMS)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 
-	return deployment.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
+	return cldf.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
 }
 
 type OnRampAllowListUpdate struct {
@@ -544,13 +474,13 @@ type UpdateOnRampAllowListConfig struct {
 	MCMS *proposalutils.TimelockConfig
 }
 
-func (cfg UpdateOnRampAllowListConfig) Validate(env deployment.Environment) error {
-	state, err := changeset.LoadOnchainState(env)
+func (cfg UpdateOnRampAllowListConfig) Validate(env cldf.Environment) error {
+	state, err := stateview.LoadOnchainState(env)
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
 	}
 	for srcSel, updates := range cfg.UpdatesByChain {
-		if err := changeset.ValidateChain(env, state, srcSel, cfg.MCMS); err != nil {
+		if err := stateview.ValidateChain(env, state, srcSel, cfg.MCMS); err != nil {
 			return err
 		}
 		onRamp := state.Chains[srcSel].OnRamp
@@ -567,7 +497,7 @@ func (cfg UpdateOnRampAllowListConfig) Validate(env deployment.Environment) erro
 		}
 		var signer common.Address
 		if cfg.MCMS == nil {
-			signer = env.Chains[srcSel].DeployerKey.From
+			signer = env.BlockChains.EVMChains()[srcSel].DeployerKey.From
 			if signer != config.AllowlistAdmin && signer != owner {
 				return fmt.Errorf("deployer key is not onramp's %s owner nor allowlist admin", onRamp.Address())
 			}
@@ -578,7 +508,7 @@ func (cfg UpdateOnRampAllowListConfig) Validate(env deployment.Environment) erro
 			}
 		}
 		for destSel, update := range updates {
-			if err := changeset.ValidateChain(env, state, srcSel, cfg.MCMS); err != nil {
+			if err := stateview.ValidateChain(env, state, srcSel, cfg.MCMS); err != nil {
 				return err
 			}
 			if len(update.AddedAllowlistedSenders) > 0 && !update.AllowListEnabled {
@@ -594,13 +524,13 @@ func (cfg UpdateOnRampAllowListConfig) Validate(env deployment.Environment) erro
 	return nil
 }
 
-func UpdateOnRampAllowListChangeset(e deployment.Environment, cfg UpdateOnRampAllowListConfig) (deployment.ChangesetOutput, error) {
+func UpdateOnRampAllowListChangeset(e cldf.Environment, cfg UpdateOnRampAllowListConfig) (cldf.ChangesetOutput, error) {
 	if err := cfg.Validate(e); err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
-	onchain, err := changeset.LoadOnchainState(e)
+	onchain, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 
 	batches := []mcmstypes.BatchOperation{}
@@ -608,16 +538,16 @@ func UpdateOnRampAllowListChangeset(e deployment.Environment, cfg UpdateOnRampAl
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
 	for srcSel, updates := range cfg.UpdatesByChain {
-		txOps := e.Chains[srcSel].DeployerKey
+		txOps := e.BlockChains.EVMChains()[srcSel].DeployerKey
 		if cfg.MCMS != nil {
-			txOps = deployment.SimTransactOpts()
+			txOps = cldf.SimTransactOpts()
 		}
 		onRamp := onchain.Chains[srcSel].OnRamp
 		args := make([]onramp.OnRampAllowlistConfigArgs, len(updates))
 		for destSel, update := range updates {
 			allowedSendersResp, err := onRamp.GetAllowedSendersList(nil, destSel)
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 			if allowedSendersResp.IsEnabled == update.AllowListEnabled {
 				desiredState := make(map[common.Address]bool)
@@ -649,34 +579,34 @@ func UpdateOnRampAllowListChangeset(e deployment.Environment, cfg UpdateOnRampAl
 		}
 		tx, err := onRamp.ApplyAllowlistUpdates(txOps, args)
 		if cfg.MCMS == nil {
-			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[srcSel], tx, onramp.OnRampABI, err); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error updating allowlist for chain %d: %w", srcSel, err)
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[srcSel], tx, onramp.OnRampABI, err); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error updating allowlist for chain %d: %w", srcSel, err)
 			}
 		} else {
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 
 			batchOperation, err := proposalutils.BatchOperationForChain(srcSel, onRamp.Address().Hex(), tx.Data(),
-				big.NewInt(0), string(changeset.OnRamp), []string{})
+				big.NewInt(0), string(shared.OnRamp), []string{})
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 			batches = append(batches, batchOperation)
 
 			timelocks[srcSel] = onchain.Chains[srcSel].Timelock.Address().Hex()
 			inspectors[srcSel], err = proposalutils.McmsInspectorForChain(e, srcSel)
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", srcSel, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", srcSel, err)
 			}
 		}
 	}
 	if cfg.MCMS == nil {
-		return deployment.ChangesetOutput{}, nil
+		return cldf.ChangesetOutput{}, nil
 	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, onchain, cfg.MCMS)
+	mcmsContractByChain, err := deployergroup.BuildMcmAddressesPerChainByAction(e, onchain, cfg.MCMS)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
 	}
 	proposal, err := proposalutils.BuildProposalFromBatchesV2(
 		e,
@@ -688,10 +618,10 @@ func UpdateOnRampAllowListChangeset(e deployment.Environment, cfg UpdateOnRampAl
 		*cfg.MCMS,
 	)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 
-	return deployment.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
+	return cldf.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
 }
 
 type WithdrawOnRampFeeTokensConfig struct {
@@ -699,12 +629,12 @@ type WithdrawOnRampFeeTokensConfig struct {
 	MCMS             *proposalutils.TimelockConfig
 }
 
-func (cfg WithdrawOnRampFeeTokensConfig) Validate(e deployment.Environment, state changeset.CCIPOnChainState) error {
+func (cfg WithdrawOnRampFeeTokensConfig) Validate(e cldf.Environment, state stateview.CCIPOnChainState) error {
 	for chainSel, feeTokens := range cfg.FeeTokensByChain {
-		if err := changeset.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
+		if err := stateview.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
 			return err
 		}
-		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, state.Chains[chainSel].Timelock.Address(), state.Chains[chainSel].OnRamp); err != nil {
+		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, state.Chains[chainSel].Timelock.Address(), state.Chains[chainSel].OnRamp); err != nil {
 			return err
 		}
 		feeQuoter := state.Chains[chainSel].FeeQuoter
@@ -734,13 +664,13 @@ func (cfg WithdrawOnRampFeeTokensConfig) Validate(e deployment.Environment, stat
 	return nil
 }
 
-func WithdrawOnRampFeeTokensChangeset(e deployment.Environment, cfg WithdrawOnRampFeeTokensConfig) (deployment.ChangesetOutput, error) {
-	state, err := changeset.LoadOnchainState(e)
+func WithdrawOnRampFeeTokensChangeset(e cldf.Environment, cfg WithdrawOnRampFeeTokensConfig) (cldf.ChangesetOutput, error) {
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 	if err := cfg.Validate(e, state); err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 
 	batches := []mcmstypes.BatchOperation{}
@@ -748,38 +678,38 @@ func WithdrawOnRampFeeTokensChangeset(e deployment.Environment, cfg WithdrawOnRa
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
 	for chainSel, feeTokens := range cfg.FeeTokensByChain {
-		txOps := e.Chains[chainSel].DeployerKey
+		txOps := e.BlockChains.EVMChains()[chainSel].DeployerKey
 		onRamp := state.Chains[chainSel].OnRamp
 		tx, err := onRamp.WithdrawFeeTokens(txOps, feeTokens)
 		if cfg.MCMS == nil {
-			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, onramp.OnRampABI, err); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error withdrawing fee tokens for chain %s: %w", e.Chains[chainSel].String(), err)
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, onramp.OnRampABI, err); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error withdrawing fee tokens for chain %s: %w", e.BlockChains.EVMChains()[chainSel].String(), err)
 			}
 		} else {
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 
 			batchOperation, err := proposalutils.BatchOperationForChain(chainSel, onRamp.Address().Hex(), tx.Data(),
-				big.NewInt(0), string(changeset.OnRamp), []string{})
+				big.NewInt(0), string(shared.OnRamp), []string{})
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 			batches = append(batches, batchOperation)
 
 			timelocks[chainSel] = state.Chains[chainSel].Timelock.Address().Hex()
 			inspectors[chainSel], err = proposalutils.McmsInspectorForChain(e, chainSel)
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", chainSel, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", chainSel, err)
 			}
 		}
 	}
 	if cfg.MCMS == nil {
-		return deployment.ChangesetOutput{}, nil
+		return cldf.ChangesetOutput{}, nil
 	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
+	mcmsContractByChain, err := deployergroup.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
 	}
 	proposal, err := proposalutils.BuildProposalFromBatchesV2(
 		e,
@@ -791,10 +721,10 @@ func WithdrawOnRampFeeTokensChangeset(e deployment.Environment, cfg WithdrawOnRa
 		*cfg.MCMS,
 	)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 
-	return deployment.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
+	return cldf.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
 }
 
 type UpdateFeeQuoterPricesConfig struct {
@@ -807,13 +737,13 @@ type FeeQuoterPriceUpdatePerSource struct {
 	GasPrices   map[uint64]*big.Int         // dest chain -> gas price
 }
 
-func (cfg UpdateFeeQuoterPricesConfig) Validate(e deployment.Environment) error {
-	state, err := changeset.LoadOnchainState(e)
+func (cfg UpdateFeeQuoterPricesConfig) Validate(e cldf.Environment) error {
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
 		return err
 	}
 	for chainSel, initialPrice := range cfg.PricesByChain {
-		if err := deployment.IsValidChainSelector(chainSel); err != nil {
+		if err := cldf.IsValidChainSelector(chainSel); err != nil {
 			return fmt.Errorf("invalid chain selector: %w", err)
 		}
 		chainState, ok := state.Chains[chainSel]
@@ -824,7 +754,7 @@ func (cfg UpdateFeeQuoterPricesConfig) Validate(e deployment.Environment) error 
 		if fq == nil {
 			return fmt.Errorf("missing fee quoter for chain %d", chainSel)
 		}
-		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.FeeQuoter); err != nil {
+		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.FeeQuoter); err != nil {
 			return err
 		}
 		// check that whether price updaters are set
@@ -835,7 +765,7 @@ func (cfg UpdateFeeQuoterPricesConfig) Validate(e deployment.Environment) error 
 		if len(authCallers) == 0 {
 			return fmt.Errorf("no authorized callers for chain %d", chainSel)
 		}
-		expectedAuthCaller := e.Chains[chainSel].DeployerKey.From
+		expectedAuthCaller := e.BlockChains.EVMChains()[chainSel].DeployerKey.From
 		if cfg.MCMS != nil {
 			expectedAuthCaller = chainState.Timelock.Address()
 		}
@@ -855,7 +785,7 @@ func (cfg UpdateFeeQuoterPricesConfig) Validate(e deployment.Environment) error 
 			if token == (common.Address{}) {
 				return fmt.Errorf("token address for chain %d is empty", chainSel)
 			}
-			contains, err := deployment.AddressBookContains(e.ExistingAddresses, chainSel, token.String())
+			contains, err := cldf.AddressBookContains(e.ExistingAddresses, chainSel, token.String())
 			if err != nil {
 				return fmt.Errorf("error checking address book for token %s: %w", token.String(), err)
 			}
@@ -867,7 +797,7 @@ func (cfg UpdateFeeQuoterPricesConfig) Validate(e deployment.Environment) error 
 			if chainSel == dest {
 				return errors.New("source and dest chain cannot be the same")
 			}
-			if err := deployment.IsValidChainSelector(dest); err != nil {
+			if err := cldf.IsValidChainSelector(dest); err != nil {
 				return fmt.Errorf("invalid dest chain selector: %w", err)
 			}
 			if price == nil {
@@ -882,87 +812,59 @@ func (cfg UpdateFeeQuoterPricesConfig) Validate(e deployment.Environment) error 
 	return nil
 }
 
-func UpdateFeeQuoterPricesChangeset(e deployment.Environment, cfg UpdateFeeQuoterPricesConfig) (deployment.ChangesetOutput, error) {
-	if err := cfg.Validate(e); err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-	s, err := changeset.LoadOnchainState(e)
-	if err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-
-	batches := []mcmstypes.BatchOperation{}
-	timelocks := make(map[uint64]string)
-	inspectors := make(map[uint64]mcmssdk.Inspector)
-
-	for chainSel, initialPrice := range cfg.PricesByChain {
-		txOpts := e.Chains[chainSel].DeployerKey
-		if cfg.MCMS != nil {
-			txOpts = deployment.SimTransactOpts()
-		}
-		fq := s.Chains[chainSel].FeeQuoter
-		var tokenPricesArgs []fee_quoter.InternalTokenPriceUpdate
-		for token, price := range initialPrice.TokenPrices {
-			tokenPricesArgs = append(tokenPricesArgs, fee_quoter.InternalTokenPriceUpdate{
-				SourceToken: token,
+func (cfg UpdateFeeQuoterPricesConfig) ToSequenceInput(state stateview.CCIPOnChainState) ccipseqs.FeeQuoterUpdatePricesSequenceInput {
+	updates := make(map[uint64]opsutil.EVMCallInput[fee_quoter.InternalPriceUpdates], len(cfg.PricesByChain))
+	for chainSel, prices := range cfg.PricesByChain {
+		tokenPriceUpdates := make([]fee_quoter.InternalTokenPriceUpdate, len(prices.TokenPrices))
+		i := 0
+		for tokenAddress, price := range prices.TokenPrices {
+			tokenPriceUpdates[i] = fee_quoter.InternalTokenPriceUpdate{
+				SourceToken: tokenAddress,
 				UsdPerToken: price,
-			})
+			}
+			i++
 		}
-		var gasPricesArgs []fee_quoter.InternalGasPriceUpdate
-		for dest, price := range initialPrice.GasPrices {
-			gasPricesArgs = append(gasPricesArgs, fee_quoter.InternalGasPriceUpdate{
-				DestChainSelector: dest,
+		gasPriceUpdates := make([]fee_quoter.InternalGasPriceUpdate, len(prices.GasPrices))
+		i = 0
+		for destChainSelector, price := range prices.GasPrices {
+			gasPriceUpdates[i] = fee_quoter.InternalGasPriceUpdate{
+				DestChainSelector: destChainSelector,
 				UsdPerUnitGas:     price,
-			})
+			}
+			i++
 		}
-		tx, err := fq.UpdatePrices(txOpts, fee_quoter.InternalPriceUpdates{
-			TokenPriceUpdates: tokenPricesArgs,
-			GasPriceUpdates:   gasPricesArgs,
-		})
-		if cfg.MCMS == nil {
-			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error confirming transaction for chain %s: %w", e.Chains[chainSel].String(), err)
-			}
-		} else {
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error updating prices for chain %s: %w", e.Chains[chainSel].String(), err)
-			}
-
-			batchOperation, err := proposalutils.BatchOperationForChain(chainSel, fq.Address().Hex(), tx.Data(),
-				big.NewInt(0), string(changeset.FeeQuoter), []string{})
-			if err != nil {
-				return deployment.ChangesetOutput{}, err
-			}
-			batches = append(batches, batchOperation)
-
-			timelocks[chainSel] = s.Chains[chainSel].Timelock.Address().Hex()
-			inspectors[chainSel], err = proposalutils.McmsInspectorForChain(e, chainSel)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", chainSel, err)
-			}
+		updates[chainSel] = opsutil.EVMCallInput[fee_quoter.InternalPriceUpdates]{
+			ChainSelector: chainSel,
+			Address:       state.Chains[chainSel].FeeQuoter.Address(),
+			CallInput: fee_quoter.InternalPriceUpdates{
+				TokenPriceUpdates: tokenPriceUpdates,
+				GasPriceUpdates:   gasPriceUpdates,
+			},
+			NoSend: cfg.MCMS != nil, // If MCMS exists, we do not want to send the transaction.
 		}
 	}
-	if cfg.MCMS == nil {
-		return deployment.ChangesetOutput{}, nil
+
+	return ccipseqs.FeeQuoterUpdatePricesSequenceInput{
+		UpdatesByChain: updates,
 	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, s, cfg.MCMS)
+}
+
+func UpdateFeeQuoterPricesChangeset(e cldf.Environment, cfg UpdateFeeQuoterPricesConfig) (cldf.ChangesetOutput, error) {
+	if err := cfg.Validate(e); err != nil {
+		return cldf.ChangesetOutput{}, err
+	}
+	s, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
+		return cldf.ChangesetOutput{}, err
 	}
-	proposal, err := proposalutils.BuildProposalFromBatchesV2(
-		e,
-		timelocks,
-		mcmsContractByChain,
-		inspectors,
-		batches,
-		"Update fq prices",
-		*cfg.MCMS,
+
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		ccipseqs.FeeQuoterUpdatePricesSequence,
+		e.BlockChains.EVMChains(),
+		cfg.ToSequenceInput(s),
 	)
-	if err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-
-	return deployment.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
+	return opsutil.AddEVMCallSequenceToCSOutput(e, s, cldf.ChangesetOutput{}, report, err, cfg.MCMS, "Call UpdatePrices on FeeQuoters")
 }
 
 type UpdateFeeQuoterDestsConfig struct {
@@ -973,8 +875,8 @@ type UpdateFeeQuoterDestsConfig struct {
 	MCMS *proposalutils.TimelockConfig
 }
 
-func (cfg UpdateFeeQuoterDestsConfig) Validate(e deployment.Environment) error {
-	state, err := changeset.LoadOnchainState(e)
+func (cfg UpdateFeeQuoterDestsConfig) Validate(e cldf.Environment) error {
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
 		return err
 	}
@@ -993,7 +895,7 @@ func (cfg UpdateFeeQuoterDestsConfig) Validate(e deployment.Environment) error {
 		if chainState.OnRamp == nil {
 			return fmt.Errorf("missing onramp onramp for chain %d", chainSel)
 		}
-		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.FeeQuoter); err != nil {
+		if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.FeeQuoter); err != nil {
 			return err
 		}
 
@@ -1014,77 +916,49 @@ func (cfg UpdateFeeQuoterDestsConfig) Validate(e deployment.Environment) error {
 	return nil
 }
 
-func UpdateFeeQuoterDestsChangeset(e deployment.Environment, cfg UpdateFeeQuoterDestsConfig) (deployment.ChangesetOutput, error) {
+func (cfg UpdateFeeQuoterDestsConfig) ToSequenceInput(state stateview.CCIPOnChainState) ccipseqs.FeeQuoterApplyDestChainConfigUpdatesSequenceInput {
+	updates := make(map[uint64]opsutil.EVMCallInput[[]fee_quoter.FeeQuoterDestChainConfigArgs], len(cfg.UpdatesByChain))
+	for chainSel, destChainUpdates := range cfg.UpdatesByChain {
+		args := make([]fee_quoter.FeeQuoterDestChainConfigArgs, len(destChainUpdates))
+		i := 0
+		for destChainSel, destChainUpdate := range destChainUpdates {
+			args[i] = fee_quoter.FeeQuoterDestChainConfigArgs{
+				DestChainSelector: destChainSel,
+				DestChainConfig:   destChainUpdate,
+			}
+			i++
+		}
+		updates[chainSel] = opsutil.EVMCallInput[[]fee_quoter.FeeQuoterDestChainConfigArgs]{
+			Address:       state.Chains[chainSel].FeeQuoter.Address(),
+			ChainSelector: chainSel,
+			CallInput:     args,
+			NoSend:        cfg.MCMS != nil, // If MCMS exists, we do not want to send the transaction.
+		}
+	}
+
+	return ccipseqs.FeeQuoterApplyDestChainConfigUpdatesSequenceInput{
+		UpdatesByChain: updates,
+	}
+}
+
+func UpdateFeeQuoterDestsChangeset(e cldf.Environment, cfg UpdateFeeQuoterDestsConfig) (cldf.ChangesetOutput, error) {
+	output := cldf.ChangesetOutput{}
+
 	if err := cfg.Validate(e); err != nil {
-		return deployment.ChangesetOutput{}, err
+		return output, err
 	}
-	s, err := changeset.LoadOnchainState(e)
+	s, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return output, err
 	}
 
-	batches := []mcmstypes.BatchOperation{}
-	timelocks := make(map[uint64]string)
-	inspectors := make(map[uint64]mcmssdk.Inspector)
-
-	for chainSel, updates := range cfg.UpdatesByChain {
-		txOpts := e.Chains[chainSel].DeployerKey
-		txOpts.Context = e.GetContext()
-		if cfg.MCMS != nil {
-			txOpts = deployment.SimTransactOpts()
-		}
-		fq := s.Chains[chainSel].FeeQuoter
-		var args []fee_quoter.FeeQuoterDestChainConfigArgs
-		for destination, dc := range updates {
-			args = append(args, fee_quoter.FeeQuoterDestChainConfigArgs{
-				DestChainSelector: destination,
-				DestChainConfig:   dc,
-			})
-		}
-		tx, err := fq.ApplyDestChainConfigUpdates(txOpts, args)
-		if cfg.MCMS == nil {
-			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
-				return deployment.ChangesetOutput{}, err
-			}
-		} else {
-			if err != nil {
-				return deployment.ChangesetOutput{}, err
-			}
-			batchOperation, err := proposalutils.BatchOperationForChain(chainSel, fq.Address().Hex(), tx.Data(),
-				big.NewInt(0), string(changeset.FeeQuoter), []string{})
-			if err != nil {
-				return deployment.ChangesetOutput{}, err
-			}
-			batches = append(batches, batchOperation)
-
-			timelocks[chainSel] = s.Chains[chainSel].Timelock.Address().Hex()
-			inspectors[chainSel], err = proposalutils.McmsInspectorForChain(e, chainSel)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", chainSel, err)
-			}
-		}
-	}
-	if cfg.MCMS == nil {
-		return deployment.ChangesetOutput{}, nil
-	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, s, cfg.MCMS)
-	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
-	}
-	proposal, err := proposalutils.BuildProposalFromBatchesV2(
-		e,
-		timelocks,
-		mcmsContractByChain,
-		inspectors,
-		batches,
-		"Update fq destinations",
-		*cfg.MCMS,
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		ccipseqs.FeeQuoterApplyDestChainConfigUpdatesSequence,
+		e.BlockChains.EVMChains(),
+		cfg.ToSequenceInput(s),
 	)
-	if err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-
-	return deployment.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
+	return opsutil.AddEVMCallSequenceToCSOutput(e, s, output, report, err, cfg.MCMS, "Call ApplyDestChainConfigUpdates on FeeQuoters")
 }
 
 type OffRampSourceUpdate struct {
@@ -1105,7 +979,7 @@ type UpdateOffRampSourcesConfig struct {
 	SkipOwnershipCheck bool
 }
 
-func (cfg UpdateOffRampSourcesConfig) Validate(e deployment.Environment, state changeset.CCIPOnChainState) error {
+func (cfg UpdateOffRampSourcesConfig) Validate(e cldf.Environment, state stateview.CCIPOnChainState) error {
 	supportedChains := state.SupportedChains()
 	for chainSel, updates := range cfg.UpdatesByChain {
 		chainState, ok := state.Chains[chainSel]
@@ -1122,7 +996,7 @@ func (cfg UpdateOffRampSourcesConfig) Validate(e deployment.Environment, state c
 			return fmt.Errorf("missing onramp onramp for chain %d", chainSel)
 		}
 		if !cfg.SkipOwnershipCheck {
-			if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.OffRamp); err != nil {
+			if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.OffRamp); err != nil {
 				return err
 			}
 		}
@@ -1137,7 +1011,7 @@ func (cfg UpdateOffRampSourcesConfig) Validate(e deployment.Environment, state c
 				return fmt.Errorf("cannot update offramp source to the same chain %d", source)
 			}
 
-			if err := state.ValidateRamp(source, changeset.OnRamp); err != nil {
+			if err := state.ValidateRamp(source, shared.OnRamp); err != nil {
 				return err
 			}
 		}
@@ -1145,30 +1019,12 @@ func (cfg UpdateOffRampSourcesConfig) Validate(e deployment.Environment, state c
 	return nil
 }
 
-// UpdateOffRampSourcesChangeset updates the offramp sources for each offramp.
-func UpdateOffRampSourcesChangeset(e deployment.Environment, cfg UpdateOffRampSourcesConfig) (deployment.ChangesetOutput, error) {
-	state, err := changeset.LoadOnchainState(e)
-	if err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-	if err := cfg.Validate(e, state); err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-
-	batches := []mcmstypes.BatchOperation{}
-	timelocks := make(map[uint64]string)
-	inspectors := make(map[uint64]mcmssdk.Inspector)
-
+func (cfg UpdateOffRampSourcesConfig) ToSequenceInput(state stateview.CCIPOnChainState) ccipseqs.OffRampApplySourceChainConfigUpdatesSequenceInput {
+	updatesByChain := make(map[uint64]opsutil.EVMCallInput[[]offramp.OffRampSourceChainConfigArgs], len(cfg.UpdatesByChain))
 	for chainSel, updates := range cfg.UpdatesByChain {
-		txOpts := e.Chains[chainSel].DeployerKey
-		txOpts.Context = e.GetContext()
-		if cfg.MCMS != nil {
-			txOpts = deployment.SimTransactOpts()
-		}
-		offRamp := state.Chains[chainSel].OffRamp
 		var args []offramp.OffRampSourceChainConfigArgs
 		for source, update := range updates {
-			router := common.HexToAddress("0x0")
+			var router common.Address
 			if update.TestRouter {
 				router = state.Chains[chainSel].TestRouter.Address()
 			} else {
@@ -1186,52 +1042,37 @@ func UpdateOffRampSourcesChangeset(e deployment.Environment, cfg UpdateOffRampSo
 				IsRMNVerificationDisabled: update.IsRMNVerificationDisabled,
 			})
 		}
-		tx, err := offRamp.ApplySourceChainConfigUpdates(txOpts, args)
-
-		if cfg.MCMS == nil {
-			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, offramp.OffRampABI, err); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error applying source chain config updates for chain %d: %w", chainSel, err)
-			}
-		} else {
-			if err != nil {
-				return deployment.ChangesetOutput{}, err
-			}
-
-			batchOperation, err := proposalutils.BatchOperationForChain(chainSel, offRamp.Address().Hex(), tx.Data(),
-				big.NewInt(0), string(changeset.OffRamp), []string{})
-			if err != nil {
-				return deployment.ChangesetOutput{}, err
-			}
-			batches = append(batches, batchOperation)
-
-			timelocks[chainSel] = state.Chains[chainSel].Timelock.Address().Hex()
-			inspectors[chainSel], err = proposalutils.McmsInspectorForChain(e, chainSel)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", chainSel, err)
-			}
+		updatesByChain[chainSel] = opsutil.EVMCallInput[[]offramp.OffRampSourceChainConfigArgs]{
+			ChainSelector: chainSel,
+			Address:       state.Chains[chainSel].OffRamp.Address(),
+			CallInput:     args,
+			NoSend:        cfg.MCMS != nil,
 		}
 	}
-	if cfg.MCMS == nil {
-		return deployment.ChangesetOutput{}, nil
+
+	return ccipseqs.OffRampApplySourceChainConfigUpdatesSequenceInput{
+		UpdatesByChain: updatesByChain,
 	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
+}
+
+// UpdateOffRampSourcesChangeset updates the offramp sources for each offramp.
+func UpdateOffRampSourcesChangeset(e cldf.Environment, cfg UpdateOffRampSourcesConfig) (cldf.ChangesetOutput, error) {
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
+		return cldf.ChangesetOutput{}, err
 	}
-	proposal, err := proposalutils.BuildProposalFromBatchesV2(
-		e,
-		timelocks,
-		mcmsContractByChain,
-		inspectors,
-		batches,
-		"Update offramp sources",
-		*cfg.MCMS,
-	)
-	if err != nil {
-		return deployment.ChangesetOutput{}, err
+	if err := cfg.Validate(e, state); err != nil {
+		return cldf.ChangesetOutput{}, err
 	}
 
-	return deployment.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		ccipseqs.OffRampApplySourceChainConfigUpdatesSequence,
+		e.BlockChains.EVMChains(),
+		cfg.ToSequenceInput(state),
+	)
+
+	return opsutil.AddEVMCallSequenceToCSOutput(e, state, cldf.ChangesetOutput{}, report, err, cfg.MCMS, "Call ApplySourceChainConfigUpdates on OffRamps")
 }
 
 type RouterUpdates struct {
@@ -1251,7 +1092,7 @@ type UpdateRouterRampsConfig struct {
 	SkipOwnershipCheck bool
 }
 
-func (cfg UpdateRouterRampsConfig) Validate(e deployment.Environment, state changeset.CCIPOnChainState) error {
+func (cfg UpdateRouterRampsConfig) Validate(e cldf.Environment, state stateview.CCIPOnChainState) error {
 	if !cfg.TestRouter {
 		// If not using the test router, we need to enforce MCMS usage if the state calls for it.
 		err := state.EnforceMCMSUsageIfProd(e.GetContext(), cfg.MCMS)
@@ -1261,7 +1102,7 @@ func (cfg UpdateRouterRampsConfig) Validate(e deployment.Environment, state chan
 	}
 	supportedChains := state.SupportedChains()
 	for chainSel, update := range cfg.UpdatesByChain {
-		if err := changeset.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
+		if err := stateview.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
 			return err
 		}
 		chainState, ok := state.Chains[chainSel]
@@ -1280,14 +1121,14 @@ func (cfg UpdateRouterRampsConfig) Validate(e deployment.Environment, state chan
 		if !cfg.SkipOwnershipCheck {
 			if cfg.TestRouter {
 				// If activating on the test router, we don't need the other CCIP contracts to have proper ownership.
-				if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.TestRouter); err != nil {
+				if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.TestRouter); err != nil {
 					return err
 				}
 			} else if cfg.MCMS == nil {
 				// If we are not using MCMS, then we know we aren't in a production environment given the EnforceMCMSUsageIfProd check above.
 				// In this case, we only need to validate that the router contract is owned by the deployer key.
 				// We don't care about uniform ownership in non-production environments.
-				if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.Chains[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.Router); err != nil {
+				if err := commoncs.ValidateOwnership(e.GetContext(), cfg.MCMS != nil, e.BlockChains.EVMChains()[chainSel].DeployerKey.From, chainState.Timelock.Address(), chainState.Router); err != nil {
 					return err
 				}
 			} else {
@@ -1298,7 +1139,7 @@ func (cfg UpdateRouterRampsConfig) Validate(e deployment.Environment, state chan
 				// Calling this function will ensure that both these checks are done.
 				err := state.ValidateOwnershipOfChain(e, chainSel, cfg.MCMS)
 				if err != nil {
-					return fmt.Errorf("failed to validate ownership of contracts on %s: %w", e.Chains[chainSel], err)
+					return fmt.Errorf("failed to validate ownership of contracts on %s: %w", e.BlockChains.EVMChains()[chainSel], err)
 				}
 			}
 		}
@@ -1311,7 +1152,7 @@ func (cfg UpdateRouterRampsConfig) Validate(e deployment.Environment, state chan
 			if source == chainSel {
 				return fmt.Errorf("cannot update offramp source to the same chain %d", source)
 			}
-			if err := state.ValidateRamp(source, changeset.OnRamp); err != nil {
+			if err := state.ValidateRamp(source, shared.OnRamp); err != nil {
 				return err
 			}
 		}
@@ -1323,7 +1164,7 @@ func (cfg UpdateRouterRampsConfig) Validate(e deployment.Environment, state chan
 			if destination == chainSel {
 				return fmt.Errorf("cannot update onRamp dest to the same chain %d", destination)
 			}
-			if err := state.ValidateRamp(destination, changeset.OffRamp); err != nil {
+			if err := state.ValidateRamp(destination, shared.OffRamp); err != nil {
 				return err
 			}
 		}
@@ -1331,32 +1172,9 @@ func (cfg UpdateRouterRampsConfig) Validate(e deployment.Environment, state chan
 	return nil
 }
 
-// UpdateRouterRampsChangeset updates the on/offramps
-// in either the router or test router for a series of chains. Use cases include:
-// - Ramp upgrade. After deploying new ramps you can enable them on the test router and
-// ensure it works e2e. Then enable the ramps on the real router.
-// - New chain support. When adding a new chain, you can enable the new destination
-// on all chains to support the new chain through the test router first. Once tested,
-// Enable the new destination on the real router.
-func UpdateRouterRampsChangeset(e deployment.Environment, cfg UpdateRouterRampsConfig) (deployment.ChangesetOutput, error) {
-	state, err := changeset.LoadOnchainState(e)
-	if err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-	if err := cfg.Validate(e, state); err != nil {
-		return deployment.ChangesetOutput{}, err
-	}
-
-	batches := []mcmstypes.BatchOperation{}
-	timelocks := make(map[uint64]string)
-	inspectors := make(map[uint64]mcmssdk.Inspector)
-
+func (cfg UpdateRouterRampsConfig) ToSequenceInput(state stateview.CCIPOnChainState) ccipseqs.RouterApplyRampUpdatesSequenceInput {
+	input := make(map[uint64]opsutil.EVMCallInput[ccipops.RouterApplyRampUpdatesOpInput], len(cfg.UpdatesByChain))
 	for chainSel, update := range cfg.UpdatesByChain {
-		txOpts := e.Chains[chainSel].DeployerKey
-		txOpts.Context = e.GetContext()
-		if cfg.MCMS != nil {
-			txOpts = deployment.SimTransactOpts()
-		}
 		routerC := state.Chains[chainSel].Router
 		if cfg.TestRouter {
 			routerC = state.Chains[chainSel].TestRouter
@@ -1395,51 +1213,46 @@ func UpdateRouterRampsChangeset(e deployment.Environment, cfg UpdateRouterRampsC
 				})
 			}
 		}
-		tx, err := routerC.ApplyRampUpdates(txOpts, onRampUpdates, removes, adds)
-		if cfg.MCMS == nil {
-			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, router.RouterABI, err); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error applying ramp updates for chain %d: %w", chainSel, err)
-			}
-		} else {
-			if err != nil {
-				return deployment.ChangesetOutput{}, err
-			}
-
-			batchOperation, err := proposalutils.BatchOperationForChain(chainSel, routerC.Address().Hex(), tx.Data(),
-				big.NewInt(0), string(changeset.Router), []string{})
-			if err != nil {
-				return deployment.ChangesetOutput{}, err
-			}
-			batches = append(batches, batchOperation)
-
-			timelocks[chainSel] = state.Chains[chainSel].Timelock.Address().Hex()
-			inspectors[chainSel], err = proposalutils.McmsInspectorForChain(e, chainSel)
-			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", chainSel, err)
-			}
+		input[chainSel] = opsutil.EVMCallInput[ccipops.RouterApplyRampUpdatesOpInput]{
+			ChainSelector: chainSel,
+			Address:       routerC.Address(),
+			CallInput: ccipops.RouterApplyRampUpdatesOpInput{
+				OnRampUpdates:  onRampUpdates,
+				OffRampRemoves: removes,
+				OffRampAdds:    adds,
+			},
+			NoSend: cfg.MCMS != nil, // If MCMS exists, we do not want to send the transaction.
 		}
 	}
-	if cfg.MCMS == nil {
-		return deployment.ChangesetOutput{}, nil
+
+	return ccipseqs.RouterApplyRampUpdatesSequenceInput{
+		UpdatesByChain: input,
 	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
+}
+
+// UpdateRouterRampsChangeset updates the on/offramps
+// in either the router or test router for a series of chains. Use cases include:
+// - Ramp upgrade. After deploying new ramps you can enable them on the test router and
+// ensure it works e2e. Then enable the ramps on the real router.
+// - New chain support. When adding a new chain, you can enable the new destination
+// on all chains to support the new chain through the test router first. Once tested,
+// Enable the new destination on the real router.
+func UpdateRouterRampsChangeset(e cldf.Environment, cfg UpdateRouterRampsConfig) (cldf.ChangesetOutput, error) {
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
+		return cldf.ChangesetOutput{}, err
 	}
-	proposal, err := proposalutils.BuildProposalFromBatchesV2(
-		e,
-		timelocks,
-		mcmsContractByChain,
-		inspectors,
-		batches,
-		"Update router offramps",
-		*cfg.MCMS,
-	)
-	if err != nil {
-		return deployment.ChangesetOutput{}, err
+	if err := cfg.Validate(e, state); err != nil {
+		return cldf.ChangesetOutput{}, err
 	}
 
-	return deployment.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
+	report, err := operations.ExecuteSequence(
+		e.OperationsBundle,
+		ccipseqs.RouterApplyRampUpdatesSequence,
+		e.BlockChains.EVMChains(),
+		cfg.ToSequenceInput(state),
+	)
+	return opsutil.AddEVMCallSequenceToCSOutput(e, state, cldf.ChangesetOutput{}, report, err, cfg.MCMS, "Call ApplyRampUpdates on Routers")
 }
 
 type SetOCR3OffRampConfig struct {
@@ -1449,8 +1262,8 @@ type SetOCR3OffRampConfig struct {
 	MCMS               *proposalutils.TimelockConfig
 }
 
-func (c SetOCR3OffRampConfig) Validate(e deployment.Environment, state changeset.CCIPOnChainState) error {
-	if err := changeset.ValidateChain(e, state, c.HomeChainSel, c.MCMS); err != nil {
+func (c SetOCR3OffRampConfig) Validate(e cldf.Environment, state stateview.CCIPOnChainState) error {
+	if err := stateview.ValidateChain(e, state, c.HomeChainSel, c.MCMS); err != nil {
 		return err
 	}
 	if c.CCIPHomeConfigType != globals.ConfigTypeActive &&
@@ -1465,7 +1278,7 @@ func (c SetOCR3OffRampConfig) Validate(e deployment.Environment, state changeset
 	return nil
 }
 
-func (c SetOCR3OffRampConfig) validateRemoteChain(e *deployment.Environment, state *changeset.CCIPOnChainState, chainSelector uint64) error {
+func (c SetOCR3OffRampConfig) validateRemoteChain(e *cldf.Environment, state *stateview.CCIPOnChainState, chainSelector uint64) error {
 	family, err := chain_selectors.GetSelectorFamily(chainSelector)
 	if err != nil {
 		return err
@@ -1484,7 +1297,7 @@ func (c SetOCR3OffRampConfig) validateRemoteChain(e *deployment.Environment, sta
 		if !ok {
 			return fmt.Errorf("remote chain %d not found in onchain state", chainSelector)
 		}
-		if err := commoncs.ValidateOwnership(e.GetContext(), c.MCMS != nil, e.Chains[chainSelector].DeployerKey.From, chainState.Timelock.Address(), chainState.OffRamp); err != nil {
+		if err := commoncs.ValidateOwnership(e.GetContext(), c.MCMS != nil, e.BlockChains.EVMChains()[chainSelector].DeployerKey.From, chainState.Timelock.Address(), chainState.OffRamp); err != nil {
 			return err
 		}
 	default:
@@ -1499,18 +1312,20 @@ func (c SetOCR3OffRampConfig) validateRemoteChain(e *deployment.Environment, sta
 // run after the candidate is confirmed to be working correctly.
 // Multichain is especially helpful for NOP rotations where we have
 // to touch all the chain to change signers.
-func SetOCR3OffRampChangeset(e deployment.Environment, cfg SetOCR3OffRampConfig) (deployment.ChangesetOutput, error) {
-	state, err := changeset.LoadOnchainState(e)
+func SetOCR3OffRampChangeset(e cldf.Environment, cfg SetOCR3OffRampConfig) (cldf.ChangesetOutput, error) {
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 	if err := cfg.Validate(e, state); err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 
 	batches := []mcmstypes.BatchOperation{}
 	timelocks := make(map[uint64]string)
 	inspectors := make(map[uint64]mcmssdk.Inspector)
+
+	xg := new(errgroup.Group)
 
 	for _, remote := range cfg.RemoteChainSels {
 		donID, err := internal.DonIDForChain(
@@ -1518,56 +1333,67 @@ func SetOCR3OffRampChangeset(e deployment.Environment, cfg SetOCR3OffRampConfig)
 			state.Chains[cfg.HomeChainSel].CCIPHome,
 			remote)
 		if err != nil {
-			return deployment.ChangesetOutput{}, err
+			return cldf.ChangesetOutput{}, err
 		}
 		args, err := internal.BuildSetOCR3ConfigArgs(
 			donID, state.Chains[cfg.HomeChainSel].CCIPHome, remote, cfg.CCIPHomeConfigType)
 		if err != nil {
-			return deployment.ChangesetOutput{}, err
+			return cldf.ChangesetOutput{}, err
 		}
-		set, err := isOCR3ConfigSetOnOffRamp(e.Logger, e.Chains[remote], state.Chains[remote].OffRamp, args)
+		set, err := isOCR3ConfigSetOnOffRamp(e.Logger, e.BlockChains.EVMChains()[remote], state.Chains[remote].OffRamp, args)
 		if err != nil {
-			return deployment.ChangesetOutput{}, err
+			return cldf.ChangesetOutput{}, err
 		}
 		if set {
 			e.Logger.Infof("OCR3 config already set on offramp for chain %d", remote)
 			continue
 		}
-		txOpts := e.Chains[remote].DeployerKey
+		txOpts := e.BlockChains.EVMChains()[remote].DeployerKey
 		if cfg.MCMS != nil {
-			txOpts = deployment.SimTransactOpts()
+			txOpts = cldf.SimTransactOpts()
 		}
 		offRamp := state.Chains[remote].OffRamp
 		tx, err := offRamp.SetOCR3Configs(txOpts, args)
 		if cfg.MCMS == nil {
-			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[remote], tx, offramp.OffRampABI, err); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error setting OCR3 config for chain %d: %w", remote, err)
-			}
+			remote := remote
+			xg.Go(func() error {
+				if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[remote], tx, offramp.OffRampABI, err); err != nil {
+					return fmt.Errorf("error setting OCR3 config for chain %d: %w", remote, err)
+				}
+				e.Logger.Infow("Set OCR3 config on offramp", "chain", remote,
+					"offRamp", offRamp.Address().Hex(), "donID", donID,
+					"config", args)
+				return nil
+			})
 		} else {
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 
 			batchOperation, err := proposalutils.BatchOperationForChain(remote, offRamp.Address().Hex(), tx.Data(),
-				big.NewInt(0), string(changeset.OffRamp), []string{})
+				big.NewInt(0), string(shared.OffRamp), []string{})
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 			batches = append(batches, batchOperation)
 
 			timelocks[remote] = state.Chains[remote].Timelock.Address().Hex()
 			inspectors[remote], err = proposalutils.McmsInspectorForChain(e, remote)
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", remote, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", remote, err)
 			}
 		}
 	}
-	if cfg.MCMS == nil {
-		return deployment.ChangesetOutput{}, nil
+
+	if err := xg.Wait(); err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("error confirming OCR3 config: %w", err)
 	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
+	if cfg.MCMS == nil {
+		return cldf.ChangesetOutput{}, nil
+	}
+	mcmsContractByChain, err := deployergroup.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
 	}
 	proposal, err := proposalutils.BuildProposalFromBatchesV2(
 		e,
@@ -1579,25 +1405,25 @@ func SetOCR3OffRampChangeset(e deployment.Environment, cfg SetOCR3OffRampConfig)
 		*cfg.MCMS,
 	)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 
 	e.Logger.Info("Proposing OCR3 config update for", cfg.RemoteChainSels)
-	return deployment.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
+	return cldf.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
 }
 
 type UpdateDynamicConfigOffRampConfig struct {
-	Updates map[uint64]OffRampParams
+	Updates map[uint64]ccipops.OffRampParams
 	MCMS    *proposalutils.TimelockConfig
 }
 
-func (cfg UpdateDynamicConfigOffRampConfig) Validate(e deployment.Environment) error {
-	state, err := changeset.LoadOnchainState(e)
+func (cfg UpdateDynamicConfigOffRampConfig) Validate(e cldf.Environment) error {
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
 		return err
 	}
 	for chainSel, params := range cfg.Updates {
-		if err := changeset.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
+		if err := stateview.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
 			return fmt.Errorf("chain %d: %w", chainSel, err)
 		}
 		if state.Chains[chainSel].OffRamp == nil {
@@ -1614,7 +1440,7 @@ func (cfg UpdateDynamicConfigOffRampConfig) Validate(e deployment.Environment) e
 		if err := commoncs.ValidateOwnership(
 			e.GetContext(),
 			cfg.MCMS != nil,
-			e.Chains[chainSel].DeployerKey.From,
+			e.BlockChains.EVMChains()[chainSel].DeployerKey.From,
 			state.Chains[chainSel].Timelock.Address(),
 			state.Chains[chainSel].OffRamp,
 		); err != nil {
@@ -1627,13 +1453,13 @@ func (cfg UpdateDynamicConfigOffRampConfig) Validate(e deployment.Environment) e
 	return nil
 }
 
-func UpdateDynamicConfigOffRampChangeset(e deployment.Environment, cfg UpdateDynamicConfigOffRampConfig) (deployment.ChangesetOutput, error) {
+func UpdateDynamicConfigOffRampChangeset(e cldf.Environment, cfg UpdateDynamicConfigOffRampConfig) (cldf.ChangesetOutput, error) {
 	if err := cfg.Validate(e); err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
-	state, err := changeset.LoadOnchainState(e)
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 
 	batches := []mcmstypes.BatchOperation{}
@@ -1641,10 +1467,10 @@ func UpdateDynamicConfigOffRampChangeset(e deployment.Environment, cfg UpdateDyn
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
 	for chainSel, params := range cfg.Updates {
-		chain := e.Chains[chainSel]
-		txOpts := e.Chains[chainSel].DeployerKey
+		chain := e.BlockChains.EVMChains()[chainSel]
+		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
 		if cfg.MCMS != nil {
-			txOpts = deployment.SimTransactOpts()
+			txOpts = cldf.SimTransactOpts()
 		}
 		offRamp := state.Chains[chainSel].OffRamp
 		dCfg := offramp.OffRampDynamicConfig{
@@ -1654,35 +1480,35 @@ func UpdateDynamicConfigOffRampChangeset(e deployment.Environment, cfg UpdateDyn
 		}
 		tx, err := offRamp.SetDynamicConfig(txOpts, dCfg)
 		if cfg.MCMS == nil {
-			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, offramp.OffRampABI, err); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error updating offramp dynamic config for chain %d: %w", chainSel, err)
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, offramp.OffRampABI, err); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error updating offramp dynamic config for chain %d: %w", chainSel, err)
 			}
 			e.Logger.Infow("Updated offramp dynamic config", "chain", chain.String(), "config", dCfg)
 		} else {
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 
 			batchOperation, err := proposalutils.BatchOperationForChain(chainSel, offRamp.Address().Hex(), tx.Data(),
-				big.NewInt(0), string(changeset.OffRamp), []string{})
+				big.NewInt(0), string(shared.OffRamp), []string{})
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 			batches = append(batches, batchOperation)
 
 			timelocks[chainSel] = state.Chains[chainSel].Timelock.Address().Hex()
 			inspectors[chainSel], err = proposalutils.McmsInspectorForChain(e, chainSel)
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", chainSel, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %d: %w", chainSel, err)
 			}
 		}
 	}
 	if cfg.MCMS == nil {
-		return deployment.ChangesetOutput{}, nil
+		return cldf.ChangesetOutput{}, nil
 	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
+	mcmsContractByChain, err := deployergroup.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
 	}
 	proposal, err := proposalutils.BuildProposalFromBatchesV2(
 		e,
@@ -1694,16 +1520,16 @@ func UpdateDynamicConfigOffRampChangeset(e deployment.Environment, cfg UpdateDyn
 		*cfg.MCMS,
 	)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 
 	e.Logger.Infow("Proposing offramp dynamic config update", "config", cfg.Updates)
-	return deployment.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
+	return cldf.ChangesetOutput{MCMSTimelockProposals: []mcmslib.TimelockProposal{*proposal}}, nil
 }
 
 func isOCR3ConfigSetOnOffRamp(
 	lggr logger.Logger,
-	chain deployment.Chain,
+	chain cldf_evm.Chain,
 	offRamp offramp.OffRampInterface,
 	offrampOCR3Configs []offramp.MultiOCR3BaseOCRConfigArgs,
 ) (bool, error) {
@@ -1800,17 +1626,17 @@ type ApplyFeeTokensUpdatesConfig struct {
 }
 
 type ApplyFeeTokensUpdatesConfigPerChain struct {
-	TokensToRemove []changeset.TokenSymbol
-	TokensToAdd    []changeset.TokenSymbol
+	TokensToRemove []shared.TokenSymbol
+	TokensToAdd    []shared.TokenSymbol
 }
 
-func (cfg ApplyFeeTokensUpdatesConfig) Validate(e deployment.Environment) error {
-	state, err := changeset.LoadOnchainState(e)
+func (cfg ApplyFeeTokensUpdatesConfig) Validate(e cldf.Environment) error {
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
 		return err
 	}
 	for chainSel, updates := range cfg.UpdatesByChain {
-		if err := changeset.ValidateChain(e, state, chainSel, cfg.MCMSConfig); err != nil {
+		if err := stateview.ValidateChain(e, state, chainSel, cfg.MCMSConfig); err != nil {
 			return err
 		}
 		chainState := state.Chains[chainSel]
@@ -1834,7 +1660,7 @@ func (cfg ApplyFeeTokensUpdatesConfig) Validate(e deployment.Environment) error 
 		if err := commoncs.ValidateOwnership(
 			e.GetContext(),
 			cfg.MCMSConfig != nil,
-			e.Chains[chainSel].DeployerKey.From,
+			e.BlockChains.EVMChains()[chainSel].DeployerKey.From,
 			state.Chains[chainSel].Timelock.Address(),
 			state.Chains[chainSel].FeeQuoter,
 		); err != nil {
@@ -1847,26 +1673,26 @@ func (cfg ApplyFeeTokensUpdatesConfig) Validate(e deployment.Environment) error 
 // ApplyFeeTokensUpdatesFeeQuoterChangeset applies the token updates to the fee quoter to add or remove fee tokens.
 // If MCMSConfig is provided, it will create a proposal to apply the changes assuming the fee quoter is owned by the timelock.
 // If MCMSConfig is nil, it will apply the changes directly using the deployer key for each chain.
-func ApplyFeeTokensUpdatesFeeQuoterChangeset(e deployment.Environment, cfg ApplyFeeTokensUpdatesConfig) (deployment.ChangesetOutput, error) {
+func ApplyFeeTokensUpdatesFeeQuoterChangeset(e cldf.Environment, cfg ApplyFeeTokensUpdatesConfig) (cldf.ChangesetOutput, error) {
 	if err := cfg.Validate(e); err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
-	state, err := changeset.LoadOnchainState(e)
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 	var batches []mcmstypes.BatchOperation
 	timelocks := make(map[uint64]string)
 	inspectorPerChain := map[uint64]mcmssdk.Inspector{}
 	for chainSel, updates := range cfg.UpdatesByChain {
-		txOpts := e.Chains[chainSel].DeployerKey
+		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
 		if cfg.MCMSConfig != nil {
-			txOpts = deployment.SimTransactOpts()
+			txOpts = cldf.SimTransactOpts()
 		}
 		fq := state.Chains[chainSel].FeeQuoter
 		tokenAddresses, err := state.Chains[chainSel].TokenAddressBySymbol()
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("error getting token addresses for chain %d: %w", chainSel, err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("error getting token addresses for chain %d: %w", chainSel, err)
 		}
 		var tokensToRemove, tokensToAdd []common.Address
 		for _, token := range updates.TokensToRemove {
@@ -1877,33 +1703,33 @@ func ApplyFeeTokensUpdatesFeeQuoterChangeset(e deployment.Environment, cfg Apply
 		}
 		tx, err := fq.ApplyFeeTokensUpdates(txOpts, tokensToRemove, tokensToAdd)
 		if cfg.MCMSConfig == nil {
-			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error applying token updates for chain %d: %w", chainSel, err)
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error applying token updates for chain %d: %w", chainSel, err)
 			}
 		} else {
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 			op, err := proposalutils.BatchOperationForChain(
-				chainSel, fq.Address().String(), tx.Data(), big.NewInt(0), changeset.FeeQuoter.String(), nil)
+				chainSel, fq.Address().String(), tx.Data(), big.NewInt(0), shared.FeeQuoter.String(), nil)
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error creating batch operation for chain %d: %w", chainSel, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("error creating batch operation for chain %d: %w", chainSel, err)
 			}
 			batches = append(batches, op)
 			timelocks[chainSel] = state.Chains[chainSel].Timelock.Address().String()
 			inspector, err := proposalutils.McmsInspectorForChain(e, chainSel)
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error creating inspector for chain %d: %w", chainSel, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("error creating inspector for chain %d: %w", chainSel, err)
 			}
 			inspectorPerChain[chainSel] = inspector
 		}
 	}
 	if cfg.MCMSConfig == nil {
-		return deployment.ChangesetOutput{}, nil
+		return cldf.ChangesetOutput{}, nil
 	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMSConfig)
+	mcmsContractByChain, err := deployergroup.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMSConfig)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
 	}
 	p, err := proposalutils.BuildProposalFromBatchesV2(
 		e,
@@ -1915,9 +1741,9 @@ func ApplyFeeTokensUpdatesFeeQuoterChangeset(e deployment.Environment, cfg Apply
 		*cfg.MCMSConfig,
 	)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error building proposal: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("error building proposal: %w", err)
 	}
-	return deployment.ChangesetOutput{
+	return cldf.ChangesetOutput{
 		MCMSTimelockProposals: []mcmslib.TimelockProposal{*p},
 	}, nil
 }
@@ -1929,12 +1755,12 @@ type UpdateTokenPriceFeedsConfig struct {
 }
 
 type UpdateTokenPriceFeedsConfigPerChain struct {
-	SourceToken changeset.TokenSymbol
+	SourceToken shared.TokenSymbol
 	IsEnabled   bool
 }
 
-func (cfg UpdateTokenPriceFeedsConfig) Validate(e deployment.Environment) error {
-	state, err := changeset.LoadOnchainState(e)
+func (cfg UpdateTokenPriceFeedsConfig) Validate(e cldf.Environment) error {
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
 		return err
 	}
@@ -1943,7 +1769,7 @@ func (cfg UpdateTokenPriceFeedsConfig) Validate(e deployment.Environment) error 
 		return fmt.Errorf("feed chain %d not found in state", cfg.FeedChainSelector)
 	}
 	for chainSel, updates := range cfg.Updates {
-		if err := changeset.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
+		if err := stateview.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
 			return err
 		}
 		chainState := state.Chains[chainSel]
@@ -1968,7 +1794,7 @@ func (cfg UpdateTokenPriceFeedsConfig) Validate(e deployment.Environment) error 
 		if err := commoncs.ValidateOwnership(
 			e.GetContext(),
 			cfg.MCMS != nil,
-			e.Chains[chainSel].DeployerKey.From,
+			e.BlockChains.EVMChains()[chainSel].DeployerKey.From,
 			state.Chains[chainSel].Timelock.Address(),
 			state.Chains[chainSel].FeeQuoter,
 		); err != nil {
@@ -1982,43 +1808,43 @@ func (cfg UpdateTokenPriceFeedsConfig) Validate(e deployment.Environment) error 
 // Before applying the changeset, ensure that the environment state/addressbook is up to date with latest token and price feed addresses.
 // If MCMS is provided, it will create a proposal to apply the changes assuming the fee quoter is owned by the timelock.
 // If MCMS is nil, it will apply the changes directly using the deployer key for each chain.
-func UpdateTokenPriceFeedsFeeQuoterChangeset(e deployment.Environment, cfg UpdateTokenPriceFeedsConfig) (deployment.ChangesetOutput, error) {
+func UpdateTokenPriceFeedsFeeQuoterChangeset(e cldf.Environment, cfg UpdateTokenPriceFeedsConfig) (cldf.ChangesetOutput, error) {
 	if err := cfg.Validate(e); err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 
-	state, err := changeset.LoadOnchainState(e)
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 	var batches []mcmstypes.BatchOperation
 	timelocks := make(map[uint64]string)
 	inspectorPerChain := map[uint64]mcmssdk.Inspector{}
 	for chainSel, updates := range cfg.Updates {
-		txOpts := e.Chains[chainSel].DeployerKey
+		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
 		if cfg.MCMS != nil {
-			txOpts = deployment.SimTransactOpts()
+			txOpts = cldf.SimTransactOpts()
 		}
 		fq := state.Chains[chainSel].FeeQuoter
 		tokenAddresses, err := state.Chains[chainSel].TokenAddressBySymbol()
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("error getting token addresses for chain %d: %w", chainSel, err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("error getting token addresses for chain %d: %w", chainSel, err)
 		}
 		tokenDetails, err := state.Chains[chainSel].TokenDetailsBySymbol()
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("error getting token decimal for chain %d: %w", chainSel, err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("error getting token decimal for chain %d: %w", chainSel, err)
 		}
 		var priceFeedUpdates []fee_quoter.FeeQuoterTokenPriceFeedUpdate
 		for _, update := range updates {
 			_, ok := tokenDetails[update.SourceToken]
 			if !ok {
-				return deployment.ChangesetOutput{}, fmt.Errorf("token details %s not found in state for chain %d", update.SourceToken, chainSel)
+				return cldf.ChangesetOutput{}, fmt.Errorf("token details %s not found in state for chain %d", update.SourceToken, chainSel)
 			}
 			decimal, err := tokenDetails[update.SourceToken].Decimals(&bind.CallOpts{
 				Context: e.GetContext(),
 			})
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error getting token decimal for chain %d: %w", chainSel, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("error getting token decimal for chain %d: %w", chainSel, err)
 			}
 			feed := state.Chains[cfg.FeedChainSelector].USDFeeds[update.SourceToken]
 			priceFeedUpdates = append(priceFeedUpdates, fee_quoter.FeeQuoterTokenPriceFeedUpdate{
@@ -2032,33 +1858,33 @@ func UpdateTokenPriceFeedsFeeQuoterChangeset(e deployment.Environment, cfg Updat
 		}
 		tx, err := fq.UpdateTokenPriceFeeds(txOpts, priceFeedUpdates)
 		if cfg.MCMS == nil {
-			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error applying token price feed update for chain %d: %w", chainSel, err)
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error applying token price feed update for chain %d: %w", chainSel, err)
 			}
 		} else {
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 			op, err := proposalutils.BatchOperationForChain(
-				chainSel, fq.Address().String(), tx.Data(), big.NewInt(0), changeset.FeeQuoter.String(), nil)
+				chainSel, fq.Address().String(), tx.Data(), big.NewInt(0), shared.FeeQuoter.String(), nil)
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error creating batch operation for chain %d: %w", chainSel, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("error creating batch operation for chain %d: %w", chainSel, err)
 			}
 			batches = append(batches, op)
 			timelocks[chainSel] = state.Chains[chainSel].Timelock.Address().String()
 			inspector, err := proposalutils.McmsInspectorForChain(e, chainSel)
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error getting inspector for chain %d: %w", chainSel, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("error getting inspector for chain %d: %w", chainSel, err)
 			}
 			inspectorPerChain[chainSel] = inspector
 		}
 	}
 	if cfg.MCMS == nil {
-		return deployment.ChangesetOutput{}, nil
+		return cldf.ChangesetOutput{}, nil
 	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
+	mcmsContractByChain, err := deployergroup.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
 	}
 	p, err := proposalutils.BuildProposalFromBatchesV2(
 		e,
@@ -2070,9 +1896,9 @@ func UpdateTokenPriceFeedsFeeQuoterChangeset(e deployment.Environment, cfg Updat
 		*cfg.MCMS,
 	)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error building proposal: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("error building proposal: %w", err)
 	}
-	return deployment.ChangesetOutput{
+	return cldf.ChangesetOutput{
 		MCMSTimelockProposals: []mcmslib.TimelockProposal{*p},
 	}, nil
 }
@@ -2082,13 +1908,13 @@ type PremiumMultiplierWeiPerEthUpdatesConfig struct {
 	MCMS    *proposalutils.TimelockConfig
 }
 
-func (cfg PremiumMultiplierWeiPerEthUpdatesConfig) Validate(e deployment.Environment) error {
-	state, err := changeset.LoadOnchainState(e)
+func (cfg PremiumMultiplierWeiPerEthUpdatesConfig) Validate(e cldf.Environment) error {
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
 		return err
 	}
 	for chainSel, updates := range cfg.Updates {
-		if err := changeset.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
+		if err := stateview.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
 			return err
 		}
 		chainState := state.Chains[chainSel]
@@ -2110,7 +1936,7 @@ func (cfg PremiumMultiplierWeiPerEthUpdatesConfig) Validate(e deployment.Environ
 		if err := commoncs.ValidateOwnership(
 			e.GetContext(),
 			cfg.MCMS != nil,
-			e.Chains[chainSel].DeployerKey.From,
+			e.BlockChains.EVMChains()[chainSel].DeployerKey.From,
 			state.Chains[chainSel].Timelock.Address(),
 			state.Chains[chainSel].FeeQuoter,
 		); err != nil {
@@ -2121,33 +1947,33 @@ func (cfg PremiumMultiplierWeiPerEthUpdatesConfig) Validate(e deployment.Environ
 }
 
 type PremiumMultiplierWeiPerEthUpdatesConfigPerChain struct {
-	Token                      changeset.TokenSymbol
+	Token                      shared.TokenSymbol
 	PremiumMultiplierWeiPerEth uint64
 }
 
 // ApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset applies the premium multiplier updates for mentioned tokens to the fee quoter.
 // If MCMS is provided, it will create a proposal to apply the changes assuming the fee quoter is owned by the timelock.
 // If MCMS is nil, it will apply the changes directly using the deployer key for each chain.
-func ApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset(e deployment.Environment, cfg PremiumMultiplierWeiPerEthUpdatesConfig) (deployment.ChangesetOutput, error) {
+func ApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset(e cldf.Environment, cfg PremiumMultiplierWeiPerEthUpdatesConfig) (cldf.ChangesetOutput, error) {
 	if err := cfg.Validate(e); err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
-	state, err := changeset.LoadOnchainState(e)
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 	var batches []mcmstypes.BatchOperation
 	timelocks := make(map[uint64]string)
 	inspectorPerChain := map[uint64]mcmssdk.Inspector{}
 	for chainSel, updates := range cfg.Updates {
-		txOpts := e.Chains[chainSel].DeployerKey
+		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
 		if cfg.MCMS != nil {
-			txOpts = deployment.SimTransactOpts()
+			txOpts = cldf.SimTransactOpts()
 		}
 		fq := state.Chains[chainSel].FeeQuoter
 		tokenAddresses, err := state.Chains[chainSel].TokenAddressBySymbol()
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("error getting token addresses for chain %d: %w", chainSel, err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("error getting token addresses for chain %d: %w", chainSel, err)
 		}
 		var premiumMultiplierUpdates []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs
 		for _, update := range updates {
@@ -2158,33 +1984,33 @@ func ApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset(e deployment.Envir
 		}
 		tx, err := fq.ApplyPremiumMultiplierWeiPerEthUpdates(txOpts, premiumMultiplierUpdates)
 		if cfg.MCMS == nil {
-			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error applying premium multiplier updates for chain %d: %w", chainSel, err)
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error applying premium multiplier updates for chain %d: %w", chainSel, err)
 			}
 		} else {
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 			op, err := proposalutils.BatchOperationForChain(
-				chainSel, fq.Address().String(), tx.Data(), big.NewInt(0), changeset.FeeQuoter.String(), nil)
+				chainSel, fq.Address().String(), tx.Data(), big.NewInt(0), shared.FeeQuoter.String(), nil)
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error creating batch operation for chain %d: %w", chainSel, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("error creating batch operation for chain %d: %w", chainSel, err)
 			}
 			batches = append(batches, op)
 			timelocks[chainSel] = state.Chains[chainSel].Timelock.Address().String()
 			inspector, err := proposalutils.McmsInspectorForChain(e, chainSel)
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error getting inspector for chain %d: %w", chainSel, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("error getting inspector for chain %d: %w", chainSel, err)
 			}
 			inspectorPerChain[chainSel] = inspector
 		}
 	}
 	if cfg.MCMS == nil {
-		return deployment.ChangesetOutput{}, nil
+		return cldf.ChangesetOutput{}, nil
 	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
+	mcmsContractByChain, err := deployergroup.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
 	}
 	p, err := proposalutils.BuildProposalFromBatchesV2(
 		e,
@@ -2196,9 +2022,9 @@ func ApplyPremiumMultiplierWeiPerEthUpdatesFeeQuoterChangeset(e deployment.Envir
 		*cfg.MCMS,
 	)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error building proposal: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("error building proposal: %w", err)
 	}
-	return deployment.ChangesetOutput{
+	return cldf.ChangesetOutput{
 		MCMSTimelockProposals: []mcmslib.TimelockProposal{*p},
 	}, nil
 }
@@ -2208,13 +2034,13 @@ type ApplyTokenTransferFeeConfigUpdatesConfig struct {
 	MCMS           *proposalutils.TimelockConfig
 }
 
-func (cfg ApplyTokenTransferFeeConfigUpdatesConfig) Validate(e deployment.Environment) error {
-	state, err := changeset.LoadOnchainState(e)
+func (cfg ApplyTokenTransferFeeConfigUpdatesConfig) Validate(e cldf.Environment) error {
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
 		return err
 	}
 	for chainSel, updates := range cfg.UpdatesByChain {
-		if err := changeset.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
+		if err := stateview.ValidateChain(e, state, chainSel, cfg.MCMS); err != nil {
 			return err
 		}
 		chainState := state.Chains[chainSel]
@@ -2240,7 +2066,7 @@ func (cfg ApplyTokenTransferFeeConfigUpdatesConfig) Validate(e deployment.Enviro
 					return fmt.Errorf("dest bytes overhead must be at least %d for token %s in chain %d", globals.CCIPLockOrBurnV1RetBytes, token, chainSel)
 				}
 			}
-			if err := changeset.ValidateChain(e, state, update.DestChain, nil); err != nil {
+			if err := stateview.ValidateChain(e, state, update.DestChain, nil); err != nil {
 				return fmt.Errorf("dest chain %d: %w", update.DestChain, err)
 			}
 		}
@@ -2251,7 +2077,7 @@ func (cfg ApplyTokenTransferFeeConfigUpdatesConfig) Validate(e deployment.Enviro
 			if _, ok := tokenAddresses[remove.Token]; !ok {
 				return fmt.Errorf("token %s not found in state for chain %d", remove.Token, chainSel)
 			}
-			if err := changeset.ValidateChain(e, state, remove.DestChain, nil); err != nil {
+			if err := stateview.ValidateChain(e, state, remove.DestChain, nil); err != nil {
 				return fmt.Errorf("dest chain %d: %w", remove.DestChain, err)
 			}
 			_, err := chainState.FeeQuoter.GetTokenTransferFeeConfig(&bind.CallOpts{
@@ -2265,7 +2091,7 @@ func (cfg ApplyTokenTransferFeeConfigUpdatesConfig) Validate(e deployment.Enviro
 		if err := commoncs.ValidateOwnership(
 			e.GetContext(),
 			cfg.MCMS != nil,
-			e.Chains[chainSel].DeployerKey.From,
+			e.BlockChains.EVMChains()[chainSel].DeployerKey.From,
 			chainState.Timelock.Address(),
 			chainState.FeeQuoter,
 		); err != nil {
@@ -2282,12 +2108,12 @@ type ApplyTokenTransferFeeConfigUpdatesConfigPerChain struct {
 
 type TokenTransferFeeConfigArg struct {
 	DestChain                      uint64
-	TokenTransferFeeConfigPerToken map[changeset.TokenSymbol]fee_quoter.FeeQuoterTokenTransferFeeConfig
+	TokenTransferFeeConfigPerToken map[shared.TokenSymbol]fee_quoter.FeeQuoterTokenTransferFeeConfig
 }
 
 type TokenTransferFeeConfigRemoveArg struct {
 	DestChain uint64
-	Token     changeset.TokenSymbol
+	Token     shared.TokenSymbol
 }
 
 // ApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset applies the token transfer fee config updates for provided tokens to the fee quoter.
@@ -2296,26 +2122,26 @@ type TokenTransferFeeConfigRemoveArg struct {
 // Use this changeset whenever there is a need to update custom token transfer fee config for a chain, dest chain and token.
 // If MCMS is provided, it will create a proposal to apply the changes assuming the fee quoter is owned by the timelock.
 // If MCMS is nil, it will apply the changes directly using the deployer key for each chain.
-func ApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset(e deployment.Environment, cfg ApplyTokenTransferFeeConfigUpdatesConfig) (deployment.ChangesetOutput, error) {
+func ApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset(e cldf.Environment, cfg ApplyTokenTransferFeeConfigUpdatesConfig) (cldf.ChangesetOutput, error) {
 	if err := cfg.Validate(e); err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
-	state, err := changeset.LoadOnchainState(e)
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, err
+		return cldf.ChangesetOutput{}, err
 	}
 	var batches []mcmstypes.BatchOperation
 	timelocks := make(map[uint64]string)
 	inspectorPerChain := map[uint64]mcmssdk.Inspector{}
 	for chainSel, updates := range cfg.UpdatesByChain {
-		txOpts := e.Chains[chainSel].DeployerKey
+		txOpts := e.BlockChains.EVMChains()[chainSel].DeployerKey
 		if cfg.MCMS != nil {
-			txOpts = deployment.SimTransactOpts()
+			txOpts = cldf.SimTransactOpts()
 		}
 		fq := state.Chains[chainSel].FeeQuoter
 		tokenAddresses, err := state.Chains[chainSel].TokenAddressBySymbol()
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("error getting token addresses for chain %d: %w", chainSel, err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("error getting token addresses for chain %d: %w", chainSel, err)
 		}
 		var tokenTransferFeeConfigs []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs
 		for _, update := range updates.TokenTransferFeeConfigArgs {
@@ -2340,33 +2166,33 @@ func ApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset(e deployment.Environme
 		}
 		tx, err := fq.ApplyTokenTransferFeeConfigUpdates(txOpts, tokenTransferFeeConfigs, tokenTransferFeeConfigsRemove)
 		if cfg.MCMS == nil {
-			if _, err := deployment.ConfirmIfNoErrorWithABI(e.Chains[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error applying token transfer fee config updates for chain %d: %w", chainSel, err)
+			if _, err := cldf.ConfirmIfNoErrorWithABI(e.BlockChains.EVMChains()[chainSel], tx, fee_quoter.FeeQuoterABI, err); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("error applying token transfer fee config updates for chain %d: %w", chainSel, err)
 			}
 		} else {
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 			op, err := proposalutils.BatchOperationForChain(
-				chainSel, fq.Address().String(), tx.Data(), big.NewInt(0), changeset.FeeQuoter.String(), nil)
+				chainSel, fq.Address().String(), tx.Data(), big.NewInt(0), shared.FeeQuoter.String(), nil)
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error creating batch operation for chain %d: %w", chainSel, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("error creating batch operation for chain %d: %w", chainSel, err)
 			}
 			batches = append(batches, op)
 			timelocks[chainSel] = state.Chains[chainSel].Timelock.Address().String()
 			inspector, err := proposalutils.McmsInspectorForChain(e, chainSel)
 			if err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("error getting inspector for chain %d: %w", chainSel, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("error getting inspector for chain %d: %w", chainSel, err)
 			}
 			inspectorPerChain[chainSel] = inspector
 		}
 	}
 	if cfg.MCMS == nil {
-		return deployment.ChangesetOutput{}, nil
+		return cldf.ChangesetOutput{}, nil
 	}
-	mcmsContractByChain, err := changeset.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
+	mcmsContractByChain, err := deployergroup.BuildMcmAddressesPerChainByAction(e, state, cfg.MCMS)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("error getting mcms contract by chain: %w", err)
 	}
 	p, err := proposalutils.BuildProposalFromBatchesV2(
 		e,
@@ -2378,9 +2204,9 @@ func ApplyTokenTransferFeeConfigUpdatesFeeQuoterChangeset(e deployment.Environme
 		*cfg.MCMS,
 	)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("error building proposal: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("error building proposal: %w", err)
 	}
-	return deployment.ChangesetOutput{
+	return cldf.ChangesetOutput{
 		MCMSTimelockProposals: []mcmslib.TimelockProposal{*p},
 	}, nil
 }
