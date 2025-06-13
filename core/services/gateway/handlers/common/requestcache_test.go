@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
@@ -24,13 +23,13 @@ func TestRequestCache_Simple(t *testing.T) {
 	cache := common.NewRequestCache[requestState](time.Hour, 1000)
 	callbackCh := make(chan handlers.UserCallbackPayload)
 
-	req := &gateway.Message{Body: gateway.MessageBody{MessageId: "aa", Sender: "0x1234"}}
+	req := &api.Message{Body: api.MessageBody{MessageId: "aa", Sender: "0x1234"}}
 	initialState := &requestState{}
 	require.NoError(t, cache.NewRequest(req, callbackCh, initialState))
 
-	nodeResp := &gateway.Message{Body: gateway.MessageBody{MessageId: "aa", Receiver: "0x1234"}}
+	nodeResp := &api.Message{Body: api.MessageBody{MessageId: "aa", Receiver: "0x1234"}}
 	go func() {
-		require.NoError(t, cache.ProcessResponse(nodeResp, func(response *gateway.Message, responseData *requestState) (aggregated *handlers.UserCallbackPayload, newResponseData *requestState, err error) {
+		require.NoError(t, cache.ProcessResponse(nodeResp, func(response *api.Message, responseData *requestState) (aggregated *handlers.UserCallbackPayload, newResponseData *requestState, err error) {
 			// ready after first response
 			return &handlers.UserCallbackPayload{Msg: response}, nil, nil
 		}))
@@ -48,22 +47,22 @@ func TestRequestCache_MultiResponse(t *testing.T) {
 
 	cache := common.NewRequestCache[requestState](time.Hour, 1000)
 	chans := make([]chan handlers.UserCallbackPayload, nRequests)
-	reqs := make([]*gateway.Message, nRequests)
+	reqs := make([]*api.Message, nRequests)
 	for i := 0; i < nRequests; i++ {
 		chans[i] = make(chan handlers.UserCallbackPayload)
-		reqs[i] = &gateway.Message{Body: gateway.MessageBody{MessageId: "abcd", Sender: fmt.Sprintf("sender_%d", i)}}
+		reqs[i] = &api.Message{Body: api.MessageBody{MessageId: "abcd", Sender: fmt.Sprintf("sender_%d", i)}}
 		initialState := &requestState{counter: 0}
 		require.NoError(t, cache.NewRequest(reqs[i], chans[i], initialState))
 	}
 
 	for i := 0; i < nRequests; i++ {
-		resp := &gateway.Message{Body: gateway.MessageBody{MessageId: "abcd"}}
+		resp := &api.Message{Body: api.MessageBody{MessageId: "abcd"}}
 		resp.Body.Receiver = reqs[i].Body.Sender
 		for j := 0; j < nResponsesPerRequest; j++ {
 			go func() {
 				n := rand.Intn(maxDelayMillis) + 1
 				time.Sleep(time.Duration(n) * time.Millisecond)
-				require.NoError(t, cache.ProcessResponse(resp, func(response *gateway.Message, responseData *requestState) (aggregated *handlers.UserCallbackPayload, newResponseData *requestState, err error) {
+				require.NoError(t, cache.ProcessResponse(resp, func(response *api.Message, responseData *requestState) (aggregated *handlers.UserCallbackPayload, newResponseData *requestState, err error) {
 					responseData.counter++
 					if responseData.counter == nResponsesPerRequest {
 						return &handlers.UserCallbackPayload{Msg: response}, nil, nil
@@ -87,7 +86,7 @@ func TestRequestCache_Timeout(t *testing.T) {
 	cache := common.NewRequestCache[requestState](time.Millisecond*10, 1000)
 	callbackCh := make(chan handlers.UserCallbackPayload)
 
-	req := &gateway.Message{Body: gateway.MessageBody{MessageId: "aa", Sender: "0x1234"}}
+	req := &api.Message{Body: api.MessageBody{MessageId: "aa", Sender: "0x1234"}}
 	initialState := &requestState{}
 	require.NoError(t, cache.NewRequest(req, callbackCh, initialState))
 
@@ -103,7 +102,7 @@ func TestRequestCache_MaxSize(t *testing.T) {
 	callbackCh := make(chan handlers.UserCallbackPayload)
 	initialState := &requestState{}
 
-	req := &gateway.Message{Body: gateway.MessageBody{MessageId: "aa", Sender: "0x1234"}}
+	req := &api.Message{Body: api.MessageBody{MessageId: "aa", Sender: "0x1234"}}
 	require.NoError(t, cache.NewRequest(req, callbackCh, initialState))
 
 	req.Body.MessageId = "bb"

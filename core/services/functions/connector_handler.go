@@ -10,11 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -29,7 +30,6 @@ import (
 	fsub "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions/subscriptions"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/functions/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/s4"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 type functionsConnectorHandler struct {
@@ -54,14 +54,15 @@ type functionsConnectorHandler struct {
 	chStop                     services.StopChan
 	shutdownWaitGroup          sync.WaitGroup
 	lggr                       logger.Logger
+	codec                      api.Codec
 }
 
 const HeartbeatCacheSize = 1000
 const Name = "FunctionsConnectorHandler"
 
 var (
-	_ connector.Signer             = &functionsConnectorHandler{}
-	_ core.GatewayConnectorHandler = &functionsConnectorHandler{}
+	_ connector.Signer                  = &functionsConnectorHandler{}
+	_ connector.GatewayConnectorHandler = &functionsConnectorHandler{}
 )
 
 var (
@@ -111,6 +112,7 @@ func NewFunctionsConnectorHandler(
 		requestTimeoutSec:          pluginConfig.RequestTimeoutSec,
 		chStop:                     make(services.StopChan),
 		lggr:                       lggr.Named(Name),
+		codec:                      &api.JsonRPCCodec{},
 	}, nil
 }
 
@@ -122,7 +124,12 @@ func (h *functionsConnectorHandler) Sign(ctx context.Context, data ...[]byte) ([
 	return h.keystore.SignMessage(ctx, h.signAddr, gc.Flatten(data...))
 }
 
-func (h *functionsConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayId string, msg *gateway.Message) error {
+func (h *functionsConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayId string, data []byte) error {
+	msg, err := h.codec.DecodeRequest(data)
+	if err != nil {
+		h.lggr.Errorw("failed to decode message", "id", gatewayId, "err", err)
+		return nil
+	}
 	body := &msg.Body
 	fromAddr := ethCommon.HexToAddress(body.Sender)
 	if !h.allowlist.Allow(fromAddr) {
@@ -181,11 +188,11 @@ func (h *functionsConnectorHandler) Close() error {
 	})
 }
 
-func (h *functionsConnectorHandler) ID() (string, error) {
+func (h *functionsConnectorHandler) ID(context.Context) (string, error) {
 	return Name, nil
 }
 
-func (h *functionsConnectorHandler) handleSecretsList(ctx context.Context, gatewayId string, body *gateway.MessageBody, fromAddr ethCommon.Address) {
+func (h *functionsConnectorHandler) handleSecretsList(ctx context.Context, gatewayId string, body *api.MessageBody, fromAddr ethCommon.Address) {
 	var response functions.SecretsListResponse
 	snapshot, err := h.storage.List(ctx, fromAddr)
 	if err == nil {
@@ -204,7 +211,7 @@ func (h *functionsConnectorHandler) handleSecretsList(ctx context.Context, gatew
 	h.sendResponseAndLog(ctx, gatewayId, body, response)
 }
 
-func (h *functionsConnectorHandler) handleSecretsSet(ctx context.Context, gatewayId string, body *gateway.MessageBody, fromAddr ethCommon.Address) {
+func (h *functionsConnectorHandler) handleSecretsSet(ctx context.Context, gatewayId string, body *api.MessageBody, fromAddr ethCommon.Address) {
 	var request functions.SecretsSetRequest
 	var response functions.SecretsSetResponse
 	err := json.Unmarshal(body.Payload, &request)
@@ -232,7 +239,7 @@ func (h *functionsConnectorHandler) handleSecretsSet(ctx context.Context, gatewa
 	h.sendResponseAndLog(ctx, gatewayId, body, response)
 }
 
-func (h *functionsConnectorHandler) handleHeartbeat(ctx context.Context, gatewayId string, requestBody *gateway.MessageBody, fromAddr ethCommon.Address) {
+func (h *functionsConnectorHandler) handleHeartbeat(ctx context.Context, gatewayId string, requestBody *api.MessageBody, fromAddr ethCommon.Address) {
 	var request *OffchainRequest
 	err := json.Unmarshal(requestBody.Payload, &request)
 	if err != nil {
@@ -346,7 +353,7 @@ func (h *functionsConnectorHandler) cacheNewRequestLocked(requestId RequestID, r
 	h.orderedRequests = append(h.orderedRequests, requestId)
 }
 
-func (h *functionsConnectorHandler) sendResponseAndLog(ctx context.Context, gatewayId string, requestBody *gateway.MessageBody, payload any) {
+func (h *functionsConnectorHandler) sendResponseAndLog(ctx context.Context, gatewayId string, requestBody *api.MessageBody, payload any) {
 	err := h.sendResponse(ctx, gatewayId, requestBody, payload)
 	if err != nil {
 		h.lggr.Errorw("failed to send response to gateway", "id", gatewayId, "err", err)
@@ -355,14 +362,14 @@ func (h *functionsConnectorHandler) sendResponseAndLog(ctx context.Context, gate
 	}
 }
 
-func (h *functionsConnectorHandler) sendResponse(ctx context.Context, gatewayId string, requestBody *gateway.MessageBody, payload any) error {
+func (h *functionsConnectorHandler) sendResponse(ctx context.Context, gatewayId string, requestBody *api.MessageBody, payload any) error {
 	payloadJson, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
 
-	msg := &gateway.Message{
-		Body: gateway.MessageBody{
+	msg := &api.Message{
+		Body: api.MessageBody{
 			MessageId: requestBody.MessageId,
 			DonId:     requestBody.DonId,
 			Method:    requestBody.Method,
@@ -370,22 +377,14 @@ func (h *functionsConnectorHandler) sendResponse(ctx context.Context, gatewayId 
 			Payload:   payloadJson,
 		},
 	}
-	if err = signKS(ctx, msg, h.keystore, h.signAddr); err != nil {
+	if err = msg.SignKS(ctx, h.keystore, h.signAddr); err != nil {
 		return err
 	}
-	return h.connector.SendToGateway(ctx, gatewayId, msg)
-}
 
-func signKS(ctx context.Context, m *gateway.Message, ks keys.MessageSigner, signer common.Address) error {
-	if m == nil {
-		return errors.New("nil message")
-	}
-	rawData := gateway.GetRawMessageBody(&m.Body)
-	signature, err := ks.SignMessage(ctx, signer, gc.Flatten(rawData...))
+	resp, err := h.codec.EncodeResponse(msg)
 	if err != nil {
 		return err
 	}
-	m.Signature = utils.StringToHex(string(signature))
-	m.Body.Sender = strings.ToLower(signer.Hex())
-	return nil
+
+	return h.connector.SendToGateway(ctx, gatewayId, resp)
 }

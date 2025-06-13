@@ -5,8 +5,6 @@ import (
 	"encoding/binary"
 	"slices"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/hex"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -48,24 +46,6 @@ func flatten(data ...[]byte) []byte {
 
 func SignData(privateKey *ecdsa.PrivateKey, data ...[]byte) ([]byte, error) {
 	return utils.GenerateEthSignature(privateKey, flatten(data...))
-}
-
-func ValidateMessageAndSetSigner(m *gateway.Message) (err error) {
-	err = m.Validate()
-	if err != nil {
-		return err
-	}
-	rawData := gateway.GetRawMessageBody(&m.Body)
-	signatureBytes, err := hex.DecodeString(m.Signature)
-	if err != nil {
-		return err
-	}
-	signer, err := ExtractSigner(signatureBytes, rawData...)
-	if err != nil {
-		return err
-	}
-	m.Body.Sender = utils.StringToHex(string(signer))
-	return nil
 }
 
 func ExtractSigner(signature []byte, data ...[]byte) (signerAddress []byte, err error) {

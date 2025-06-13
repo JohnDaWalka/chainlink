@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
-	gc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
 	gw_net "github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
@@ -137,7 +136,7 @@ func (g *gateway) ProcessRequest(ctx context.Context, rawRequest []byte) (rawRes
 	if msg == nil {
 		return newError(g.codec, "", api.UserMessageParseError, "nil message")
 	}
-	if err = gc.ValidateMessageAndSetSigner(msg); err != nil {
+	if err = msg.Validate(); err != nil {
 		return newError(g.codec, msg.Body.MessageId, api.UserMessageParseError, err.Error())
 	}
 	// find correct handler

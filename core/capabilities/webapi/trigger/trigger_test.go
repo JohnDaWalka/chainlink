@@ -15,14 +15,13 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	registrymock "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 
-	gcmocks "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	corelogger "github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
+	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 )
 
@@ -84,7 +83,7 @@ func setup(t *testing.T) testHarness {
 	}
 }
 
-func gatewayRequest(t *testing.T, privateKey string, topics string, methodName string) *gateway.Message {
+func gatewayRequest(t *testing.T, privateKey string, topics string, methodName string) []byte {
 	messageID := "12345"
 	if methodName == "" {
 		methodName = ghcapabilities.MethodWebAPITrigger
@@ -106,22 +105,25 @@ func gatewayRequest(t *testing.T, privateKey string, topics string, methodName s
         }
 `
 	payloadJSON := []byte(payload)
-	msg := &gateway.Message{
-		Body: gateway.MessageBody{
+	msg := &api.Message{
+		Body: api.MessageBody{
 			MessageId: messageID,
 			Method:    methodName,
 			DonId:     donID,
 			Payload:   json.RawMessage(payloadJSON),
 		},
 	}
-	err = common.Sign(msg, key)
+	err = msg.Sign(key)
 	require.NoError(t, err)
-	return msg
+	apiCodec := api.JsonRPCCodec{}
+	rawRequest, err := apiCodec.EncodeRequest(msg)
+	require.NoError(t, err)
+	return rawRequest
 }
 
 func getResponseFromArg(arg interface{}) (ghcapabilities.TriggerResponsePayload, error) {
 	var response ghcapabilities.TriggerResponsePayload
-	msgBody := arg.(*gateway.MessageBody)
+	msgBody := arg.(*api.MessageBody)
 	err := json.Unmarshal(msgBody.Payload, &response)
 	return response, err
 }

@@ -14,8 +14,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
-	gatewaymocks "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
+	gatewaymocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 )
 
@@ -51,7 +51,7 @@ func newTestConnector(t *testing.T, config *ConnectorConfig) (*gatewayConnector,
 	clock := clockwork.NewFakeClock()
 	connector, err := NewGatewayConnector(config, signer, clock, logger.Test(t))
 	require.NoError(t, err)
-	require.NoError(t, connector.AddHandler([]string{testMethod1}, handler))
+	require.NoError(t, connector.AddHandler(t.Context(), []string{testMethod1}, handler))
 	return connector, signer, handler
 }
 
@@ -200,6 +200,6 @@ func TestGatewayConnector_AddHandler(t *testing.T) {
 
 	connector, _, _ := newTestConnector(t, parseTOMLConfig(t, defaultConfig))
 	// testMethod1 already exists
-	require.Error(t, connector.AddHandler([]string{testMethod1}, gatewaymocks.NewGatewayConnectorHandler(t)))
-	require.NoError(t, connector.AddHandler([]string{testMethod2}, gatewaymocks.NewGatewayConnectorHandler(t)))
+	require.Error(t, connector.AddHandler(t.Context(), []string{testMethod1}, gatewaymocks.NewGatewayConnectorHandler(t)))
+	require.NoError(t, connector.AddHandler(t.Context(), []string{testMethod2}, gatewaymocks.NewGatewayConnectorHandler(t)))
 }

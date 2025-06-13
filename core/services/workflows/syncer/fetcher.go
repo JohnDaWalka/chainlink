@@ -7,11 +7,10 @@ import (
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	gc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 )
 
@@ -24,7 +23,7 @@ type FetcherService struct {
 }
 
 type gatewayConnector interface {
-	GetGatewayConnector() core.GatewayConnector
+	GetGatewayConnector() connector.GatewayConnector
 }
 
 func NewFetcherService(lggr logger.Logger, wrapper gatewayConnector, selectorOpts ...func(*gateway.RoundRobinSelector)) *FetcherService {
@@ -95,7 +94,7 @@ func (s *FetcherService) Fetch(ctx context.Context, messageID string, req ghcapa
 		return nil, err
 	}
 
-	if err = gc.ValidateMessageAndSetSigner(resp); err != nil {
+	if err = resp.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid response from gateway: %w", err)
 	}
 

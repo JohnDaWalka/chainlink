@@ -5,7 +5,8 @@ package mocks
 import (
 	context "context"
 
-	gateway "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
+	api "github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
+
 	handlers "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
 
 	mock "github.com/stretchr/testify/mock"
@@ -70,7 +71,7 @@ func (_c *Handler_Close_Call) RunAndReturn(run func() error) *Handler_Close_Call
 }
 
 // HandleNodeMessage provides a mock function with given fields: ctx, msg, nodeAddr
-func (_m *Handler) HandleNodeMessage(ctx context.Context, msg *gateway.Message, nodeAddr string) error {
+func (_m *Handler) HandleNodeMessage(ctx context.Context, msg *api.Message, nodeAddr string) error {
 	ret := _m.Called(ctx, msg, nodeAddr)
 
 	if len(ret) == 0 {
@@ -78,7 +79,7 @@ func (_m *Handler) HandleNodeMessage(ctx context.Context, msg *gateway.Message, 
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *gateway.Message, string) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *api.Message, string) error); ok {
 		r0 = rf(ctx, msg, nodeAddr)
 	} else {
 		r0 = ret.Error(0)
@@ -94,15 +95,15 @@ type Handler_HandleNodeMessage_Call struct {
 
 // HandleNodeMessage is a helper method to define mock.On call
 //   - ctx context.Context
-//   - msg *gateway.Message
+//   - msg *api.Message
 //   - nodeAddr string
 func (_e *Handler_Expecter) HandleNodeMessage(ctx interface{}, msg interface{}, nodeAddr interface{}) *Handler_HandleNodeMessage_Call {
 	return &Handler_HandleNodeMessage_Call{Call: _e.mock.On("HandleNodeMessage", ctx, msg, nodeAddr)}
 }
 
-func (_c *Handler_HandleNodeMessage_Call) Run(run func(ctx context.Context, msg *gateway.Message, nodeAddr string)) *Handler_HandleNodeMessage_Call {
+func (_c *Handler_HandleNodeMessage_Call) Run(run func(ctx context.Context, msg *api.Message, nodeAddr string)) *Handler_HandleNodeMessage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*gateway.Message), args[2].(string))
+		run(args[0].(context.Context), args[1].(*api.Message), args[2].(string))
 	})
 	return _c
 }
@@ -112,13 +113,13 @@ func (_c *Handler_HandleNodeMessage_Call) Return(_a0 error) *Handler_HandleNodeM
 	return _c
 }
 
-func (_c *Handler_HandleNodeMessage_Call) RunAndReturn(run func(context.Context, *gateway.Message, string) error) *Handler_HandleNodeMessage_Call {
+func (_c *Handler_HandleNodeMessage_Call) RunAndReturn(run func(context.Context, *api.Message, string) error) *Handler_HandleNodeMessage_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // HandleUserMessage provides a mock function with given fields: ctx, msg, callbackCh
-func (_m *Handler) HandleUserMessage(ctx context.Context, msg *gateway.Message, callbackCh chan<- handlers.UserCallbackPayload) error {
+func (_m *Handler) HandleUserMessage(ctx context.Context, msg *api.Message, callbackCh chan<- handlers.UserCallbackPayload) error {
 	ret := _m.Called(ctx, msg, callbackCh)
 
 	if len(ret) == 0 {
@@ -126,7 +127,7 @@ func (_m *Handler) HandleUserMessage(ctx context.Context, msg *gateway.Message, 
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *gateway.Message, chan<- handlers.UserCallbackPayload) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *api.Message, chan<- handlers.UserCallbackPayload) error); ok {
 		r0 = rf(ctx, msg, callbackCh)
 	} else {
 		r0 = ret.Error(0)
@@ -142,15 +143,15 @@ type Handler_HandleUserMessage_Call struct {
 
 // HandleUserMessage is a helper method to define mock.On call
 //   - ctx context.Context
-//   - msg *gateway.Message
+//   - msg *api.Message
 //   - callbackCh chan<- handlers.UserCallbackPayload
 func (_e *Handler_Expecter) HandleUserMessage(ctx interface{}, msg interface{}, callbackCh interface{}) *Handler_HandleUserMessage_Call {
 	return &Handler_HandleUserMessage_Call{Call: _e.mock.On("HandleUserMessage", ctx, msg, callbackCh)}
 }
 
-func (_c *Handler_HandleUserMessage_Call) Run(run func(ctx context.Context, msg *gateway.Message, callbackCh chan<- handlers.UserCallbackPayload)) *Handler_HandleUserMessage_Call {
+func (_c *Handler_HandleUserMessage_Call) Run(run func(ctx context.Context, msg *api.Message, callbackCh chan<- handlers.UserCallbackPayload)) *Handler_HandleUserMessage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*gateway.Message), args[2].(chan<- handlers.UserCallbackPayload))
+		run(args[0].(context.Context), args[1].(*api.Message), args[2].(chan<- handlers.UserCallbackPayload))
 	})
 	return _c
 }
@@ -160,7 +161,7 @@ func (_c *Handler_HandleUserMessage_Call) Return(_a0 error) *Handler_HandleUserM
 	return _c
 }
 
-func (_c *Handler_HandleUserMessage_Call) RunAndReturn(run func(context.Context, *gateway.Message, chan<- handlers.UserCallbackPayload) error) *Handler_HandleUserMessage_Call {
+func (_c *Handler_HandleUserMessage_Call) RunAndReturn(run func(context.Context, *api.Message, chan<- handlers.UserCallbackPayload) error) *Handler_HandleUserMessage_Call {
 	_c.Call.Return(run)
 	return _c
 }

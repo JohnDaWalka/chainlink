@@ -28,7 +28,6 @@ import (
 	billing "github.com/smartcontractkit/chainlink-protos/billing/go"
 	eventspb "github.com/smartcontractkit/chainlink-protos/workflows/go/events"
 
-	gcmocks "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 	coreCap "github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi"
@@ -36,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/wasmtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/platform"
+	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"

@@ -5,7 +5,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 )
 
 type TelemetryServiceMock struct{}
@@ -65,26 +64,26 @@ func (g *GatewayConnectorMock) Close() error {
 	return nil
 }
 
-func (g *GatewayConnectorMock) AddHandler(methods []string, handler core.GatewayConnectorHandler) error {
+func (g *GatewayConnectorMock) AddHandler(context.Context, []string, core.GatewayConnectorHandler) error {
 	return nil
 }
 
-func (g *GatewayConnectorMock) SendToGateway(ctx context.Context, gatewayID string, msg *gateway.Message) error {
+func (g *GatewayConnectorMock) SendToGateway(context.Context, string, []byte) error {
 	return nil
 }
 
-func (g *GatewayConnectorMock) SignAndSendToGateway(ctx context.Context, gatewayID string, msg *gateway.MessageBody) error {
-	return nil
-}
-
-func (g *GatewayConnectorMock) GatewayIDs() ([]string, error) {
+func (g *GatewayConnectorMock) Sign(context.Context, []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (g *GatewayConnectorMock) DonID() (string, error) {
+func (g *GatewayConnectorMock) GatewayIDs(context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (g *GatewayConnectorMock) DonID(context.Context) (string, error) {
 	return "", nil
 }
 
-func (g *GatewayConnectorMock) AwaitConnection(ctx context.Context, gatewayID string) error {
+func (g *GatewayConnectorMock) AwaitConnection(context.Context, string) error {
 	return nil
 }

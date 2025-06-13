@@ -4,23 +4,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 )
 
 // Wrapping/unwrapping Message objects into JSON RPC ones folllowing https://www.jsonrpc.org/specification
 type JsonRPCRequest struct {
-	Version string           `json:"jsonrpc"`
-	Id      string           `json:"id"`
-	Method  string           `json:"method"`
-	Params  *gateway.Message `json:"params,omitempty"`
+	Version string   `json:"jsonrpc"`
+	Id      string   `json:"id"`
+	Method  string   `json:"method"`
+	Params  *Message `json:"params,omitempty"`
 }
 
 type JsonRPCResponse struct {
-	Version string           `json:"jsonrpc"`
-	Id      string           `json:"id"`
-	Result  *gateway.Message `json:"result,omitempty"`
-	Error   *JsonRPCError    `json:"error,omitempty"`
+	Version string        `json:"jsonrpc"`
+	Id      string        `json:"id"`
+	Result  *Message      `json:"result,omitempty"`
+	Error   *JsonRPCError `json:"error,omitempty"`
 }
 
 // JSON-RPC error can only be sent to users. It is not used for messages between Gateways and Nodes.
@@ -35,7 +33,7 @@ type JsonRPCCodec struct {
 
 var _ Codec = (*JsonRPCCodec)(nil)
 
-func (*JsonRPCCodec) DecodeRequest(msgBytes []byte) (*gateway.Message, error) {
+func (*JsonRPCCodec) DecodeRequest(msgBytes []byte) (*Message, error) {
 	var request JsonRPCRequest
 	err := json.Unmarshal(msgBytes, &request)
 	if err != nil {
@@ -55,7 +53,7 @@ func (*JsonRPCCodec) DecodeRequest(msgBytes []byte) (*gateway.Message, error) {
 	return request.Params, nil
 }
 
-func (*JsonRPCCodec) EncodeRequest(msg *gateway.Message) ([]byte, error) {
+func (*JsonRPCCodec) EncodeRequest(msg *Message) ([]byte, error) {
 	request := JsonRPCRequest{
 		Version: "2.0",
 		Id:      msg.Body.MessageId,
@@ -65,7 +63,7 @@ func (*JsonRPCCodec) EncodeRequest(msg *gateway.Message) ([]byte, error) {
 	return json.Marshal(request)
 }
 
-func (*JsonRPCCodec) DecodeResponse(msgBytes []byte) (*gateway.Message, error) {
+func (*JsonRPCCodec) DecodeResponse(msgBytes []byte) (*Message, error) {
 	var response JsonRPCResponse
 	err := json.Unmarshal(msgBytes, &response)
 	if err != nil {
@@ -80,7 +78,7 @@ func (*JsonRPCCodec) DecodeResponse(msgBytes []byte) (*gateway.Message, error) {
 	return response.Result, nil
 }
 
-func (*JsonRPCCodec) EncodeResponse(msg *gateway.Message) ([]byte, error) {
+func (*JsonRPCCodec) EncodeResponse(msg *Message) ([]byte, error) {
 	response := JsonRPCResponse{
 		Version: "2.0",
 		Id:      msg.Body.MessageId,

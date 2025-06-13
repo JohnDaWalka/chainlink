@@ -56,19 +56,19 @@ func newFunctionsHandlerForATestDON(t *testing.T, nodes []gc.TestNode, requestTi
 	return handler, don, allowlist, subscriptions
 }
 
-func newSignedMessage(t *testing.T, id string, method string, donId string, privateKey *ecdsa.PrivateKey) gateway.Message {
-	msg := gateway.Message{
-		Body: gateway.MessageBody{
+func newSignedMessage(t *testing.T, id string, method string, donId string, privateKey *ecdsa.PrivateKey) api.Message {
+	msg := api.Message{
+		Body: api.MessageBody{
 			MessageId: id,
 			Method:    method,
 			DonId:     donId,
 		},
 	}
-	require.NoError(t, gc.Sign(&msg, privateKey))
+	require.NoError(t, msg.Sign(privateKey))
 	return msg
 }
 
-func sendNodeReponses(t *testing.T, handler handlers.Handler, userRequestMsg gateway.Message, nodes []gc.TestNode, responses []bool) {
+func sendNodeReponses(t *testing.T, handler handlers.Handler, userRequestMsg api.Message, nodes []gc.TestNode, responses []bool) {
 	for id, resp := range responses {
 		nodeResponseMsg := userRequestMsg
 		nodeResponseMsg.Body.Receiver = userRequestMsg.Body.Sender
@@ -77,7 +77,7 @@ func sendNodeReponses(t *testing.T, handler handlers.Handler, userRequestMsg gat
 		} else {
 			nodeResponseMsg.Body.Payload = []byte(`{"success":false}`)
 		}
-		require.NoError(t, gc.Sign(&nodeResponseMsg, nodes[id].PrivateKey))
+		require.NoError(t, nodeResponseMsg.Sign(nodes[id].PrivateKey))
 		_ = handler.HandleNodeMessage(testutils.Context(t), &nodeResponseMsg, nodes[id].Address)
 	}
 }
@@ -89,7 +89,7 @@ func TestFunctionsHandler_Minimal(t *testing.T) {
 	require.NoError(t, err)
 
 	// empty message should always error out
-	msg := &gateway.Message{}
+	msg := &api.Message{}
 	err = handler.HandleUserMessage(testutils.Context(t), msg, nil)
 	require.Error(t, err)
 }

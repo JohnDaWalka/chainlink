@@ -14,10 +14,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 const (
@@ -35,11 +37,11 @@ const (
 	errorIncomingRatelimitSender   = "message from gateway exceeded per sender rate limit"
 )
 
-var _ core.GatewayConnectorHandler = &OutgoingConnectorHandler{}
+var _ connector.GatewayConnectorHandler = &OutgoingConnectorHandler{}
 
 type OutgoingConnectorHandler struct {
 	services.StateMachine
-	gc                  core.GatewayConnector
+	gc                  connector.GatewayConnector
 	method              string
 	lggr                logger.Logger
 	incomingRateLimiter *gateway.RateLimiter
@@ -47,9 +49,10 @@ type OutgoingConnectorHandler struct {
 	responses           *responses
 	selectorOpts        []func(*gateway.RoundRobinSelector)
 	metrics             *metrics
+	codec               api.Codec
 }
 
-func NewOutgoingConnectorHandler(gc core.GatewayConnector, config ServiceConfig, method string, lgger logger.Logger, opts ...func(*gateway.RoundRobinSelector)) (*OutgoingConnectorHandler, error) {
+func NewOutgoingConnectorHandler(gc connector.GatewayConnector, config ServiceConfig, method string, lgger logger.Logger, opts ...func(*gateway.RoundRobinSelector)) (*OutgoingConnectorHandler, error) {
 	outgoingRLCfg := outgoingRateLimiterConfigDefaults(config.OutgoingRateLimiter)
 	outgoingRateLimiter, err := gateway.NewRateLimiter(outgoingRLCfg)
 	if err != nil {
@@ -79,12 +82,13 @@ func NewOutgoingConnectorHandler(gc core.GatewayConnector, config ServiceConfig,
 		lggr:                lgger,
 		selectorOpts:        opts,
 		metrics:             m,
+		codec:               &api.JsonRPCCodec{},
 	}, nil
 }
 
 // HandleSingleNodeRequest sends a request to first available gateway node and blocks until response is received
 // TODO: handle retries
-func (c *OutgoingConnectorHandler) HandleSingleNodeRequest(ctx context.Context, messageID string, req capabilities.Request) (*gateway.Message, error) {
+func (c *OutgoingConnectorHandler) HandleSingleNodeRequest(ctx context.Context, messageID string, req capabilities.Request) (*api.Message, error) {
 	start := time.Now()
 
 	m, err := c.handleSingleNodeRequest(ctx, messageID, req)
@@ -102,7 +106,7 @@ func (c *OutgoingConnectorHandler) HandleSingleNodeRequest(ctx context.Context, 
 	return m, err
 }
 
-func (c *OutgoingConnectorHandler) handleSingleNodeRequest(ctx context.Context, messageID string, req capabilities.Request) (*gateway.Message, error) {
+func (c *OutgoingConnectorHandler) handleSingleNodeRequest(ctx context.Context, messageID string, req capabilities.Request) (*api.Message, error) {
 	lggr := logger.With(c.lggr, "messageID", messageID, "workflowID", req.WorkflowID)
 	workflowAllow, globalAllow := c.outgoingRateLimiter.AllowVerbose(req.WorkflowID)
 	if !workflowAllow {
@@ -134,14 +138,14 @@ func (c *OutgoingConnectorHandler) handleSingleNodeRequest(ctx context.Context, 
 	}
 	defer c.responses.cleanup(messageID)
 
-	donID, err := c.gc.DonID()
+	donID, err := c.gc.DonID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get DON ID: %w", err)
 	}
 
 	lggr.Debugw("sending request to gateway")
 
-	body := &gateway.MessageBody{
+	body := &api.MessageBody{
 		MessageId: messageID,
 		DonId:     donID,
 		Method:    c.method,
@@ -158,14 +162,36 @@ func (c *OutgoingConnectorHandler) handleSingleNodeRequest(ctx context.Context, 
 		return nil, err
 	}
 
-	if err := c.gc.SignAndSendToGateway(ctx, selectedGateway, body); err != nil {
-		return nil, errors.Wrap(err, "failed to send request to gateway")
+	signature, err := c.gc.Sign(ctx, common.Flatten(api.GetRawMessageBody(body)...))
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign request: %w", err)
+	}
+
+	msg := &api.Message{
+		Body: api.MessageBody{
+			MessageId: body.MessageId,
+			DonId:     body.DonId,
+			Method:    body.Method,
+			Payload:   body.Payload,
+			Receiver:  body.Receiver,
+		},
+		Signature: utils.StringToHex(string(signature)),
+	}
+
+	resp, err := c.codec.EncodeRequest(msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode request: %w", err)
+	}
+
+	err = c.gc.SendToGateway(ctx, selectedGateway, resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request to gateway %s: %w", selectedGateway, err)
 	}
 
 	select {
 	case resp := <-ch:
 		switch resp.Body.Method {
-		case gateway.MethodInternalError:
+		case api.MethodInternalError:
 			var errPayload api.JsonRPCError
 			err := json.Unmarshal(resp.Body.Payload, &errPayload)
 			if err != nil {
@@ -194,7 +220,7 @@ type awaitContext struct {
 // cancellation or timeout.
 func (c *OutgoingConnectorHandler) awaitConnection(ctx context.Context, md awaitContext) (string, error) {
 	lggr := logger.With(c.lggr, "messageID", md.messageID, "workflowID", md.workflowID)
-	gatewayIDs, err := c.gc.GatewayIDs()
+	gatewayIDs, err := c.gc.GatewayIDs(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get gateway IDs: %w", err)
 	}
@@ -273,7 +299,11 @@ func (c *OutgoingConnectorHandler) attemptGatewayConnection(ctx context.Context,
 
 // HandleGatewayMessage processes incoming messages from the Gateway,
 // which are in response to a HandleSingleNodeRequest call.
-func (c *OutgoingConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, msg *gateway.Message) error {
+func (c *OutgoingConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, data []byte) error {
+	msg, err := c.codec.DecodeRequest(data)
+	if err != nil {
+		return fmt.Errorf("failed to decode request: %w", err)
+	}
 	body := &msg.Body
 	l := logger.With(c.lggr, "gatewayID", gatewayID, "method", body.Method, "messageID", msg.Body.MessageId)
 
@@ -305,10 +335,10 @@ func (c *OutgoingConnectorHandler) HandleGatewayMessage(ctx context.Context, gat
 		if err != nil {
 			l.Errorw("failed to marshal err payload", "err", err)
 		}
-		errMsg := gateway.Message{
-			Body: gateway.MessageBody{
+		errMsg := api.Message{
+			Body: api.MessageBody{
 				MessageId: body.MessageId,
-				Method:    gateway.MethodInternalError,
+				Method:    api.MethodInternalError,
 				Payload:   errPayload,
 			},
 		}
@@ -338,13 +368,13 @@ func (c *OutgoingConnectorHandler) HandleGatewayMessage(ctx context.Context, gat
 	return nil
 }
 
-func (c *OutgoingConnectorHandler) ID() (string, error) {
+func (c *OutgoingConnectorHandler) ID(context.Context) (string, error) {
 	return c.Name(), nil
 }
 
 func (c *OutgoingConnectorHandler) Start(ctx context.Context) error {
 	return c.StartOnce("OutgoingConnectorHandler", func() error {
-		return c.gc.AddHandler([]string{c.method}, c)
+		return c.gc.AddHandler(ctx, []string{c.method}, c)
 	})
 }
 
@@ -404,16 +434,16 @@ func validMethod(method string) bool {
 
 func newResponses() *responses {
 	return &responses{
-		chs: map[string]chan *gateway.Message{},
+		chs: map[string]chan *api.Message{},
 	}
 }
 
 type responses struct {
-	chs map[string]chan *gateway.Message
+	chs map[string]chan *api.Message
 	mu  sync.RWMutex
 }
 
-func (r *responses) new(id string) (chan *gateway.Message, error) {
+func (r *responses) new(id string) (chan *api.Message, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -423,7 +453,7 @@ func (r *responses) new(id string) (chan *gateway.Message, error) {
 	}
 
 	// Buffered so we don't wait if sending
-	ch := make(chan *gateway.Message, 1)
+	ch := make(chan *api.Message, 1)
 	r.chs[id] = ch
 	return ch, nil
 }
@@ -435,7 +465,7 @@ func (r *responses) cleanup(id string) {
 	delete(r.chs, id)
 }
 
-func (r *responses) get(id string) (chan *gateway.Message, bool) {
+func (r *responses) get(id string) (chan *api.Message, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	ch, ok := r.chs[id]

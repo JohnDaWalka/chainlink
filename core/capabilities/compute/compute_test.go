@@ -20,10 +20,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/metering"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
-	gcmocks "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/wasmtest"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
+	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/matches"
 )
@@ -197,9 +198,9 @@ func TestComputeFetch(t *testing.T) {
 	workflowExecutionID := "95ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0abbadeed"
 	th := setup(t, defaultConfig)
 
-	th.connector.EXPECT().DonID().Return("don-id", nil)
+	th.connector.EXPECT().DonID(matches.AnyContext).Return("don-id", nil)
 	th.connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
-	th.connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
+	th.connector.EXPECT().GatewayIDs(matches.AnyContext).Return([]string{"gateway1", "gateway2"}, nil)
 
 	msgID := strings.Join([]string{
 		workflowExecutionID,
@@ -209,9 +210,9 @@ func TestComputeFetch(t *testing.T) {
 
 	gatewayResp := gatewayResponse(t, msgID, []byte("response body"))
 	th.connector.EXPECT().
-		SignAndSendToGateway(mock.Anything, "gateway1", mock.Anything).
+		SendToGateway(mock.Anything, "gateway1", mock.Anything).
 		Return(nil).
-		Run(func(ctx context.Context, gatewayID string, msg *gateway.MessageBody) {
+		Run(func(ctx context.Context, gatewayID string, data []byte) {
 			th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 		}).
 		Once()
@@ -316,14 +317,14 @@ func TestCompute_SpendValueRelativeToComputeTime(t *testing.T) {
 
 			th := setup(t, defaultConfig)
 
-			th.connector.EXPECT().DonID().Return("don-id", nil)
+			th.connector.EXPECT().DonID(matches.AnyContext).Return("don-id", nil)
 			th.connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
-			th.connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
+			th.connector.EXPECT().GatewayIDs(matches.AnyContext).Return([]string{"gateway1", "gateway2"}, nil)
 
 			th.connector.EXPECT().
-				SignAndSendToGateway(mock.Anything, "gateway1", mock.Anything).
+				SendToGateway(mock.Anything, "gateway1", mock.Anything).
 				Return(nil).
-				Run(func(ctx context.Context, gatewayID string, msg *gateway.MessageBody) {
+				Run(func(ctx context.Context, gatewayID string, msg []byte) {
 					th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 				}).
 				Once().
@@ -357,9 +358,9 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 		MaxResponseSizeBytes: 1 * 1024,
 	})
 
-	th.connector.EXPECT().DonID().Return("don-id", nil)
+	th.connector.EXPECT().DonID(matches.AnyContext).Return("don-id", nil)
 	th.connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
-	th.connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
+	th.connector.EXPECT().GatewayIDs(matches.AnyContext).Return([]string{"gateway1", "gateway2"}, nil)
 
 	msgID := strings.Join([]string{
 		workflowExecutionID,
@@ -368,7 +369,7 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 	}, "/")
 
 	gatewayResp := gatewayResponse(t, msgID, make([]byte, 2*1024))
-	th.connector.On("SignAndSendToGateway", mock.Anything, "gateway1", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+	th.connector.On("SendToGateway", mock.Anything, "gateway1", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		th.connectorHandler.HandleGatewayMessage(context.Background(), "gateway1", gatewayResp)
 	}).Once()
 
@@ -395,7 +396,7 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 	require.ErrorContains(t, err, fmt.Sprintf("response size %d exceeds maximum allowed size %d", 2092, 1*1024))
 }
 
-func gatewayResponse(t *testing.T, msgID string, body []byte) *gateway.Message {
+func gatewayResponse(t *testing.T, msgID string, body []byte) []byte {
 	headers := map[string]string{"Content-Type": "application/json"}
 	responsePayload, err := json.Marshal(ghcapabilities.Response{
 		StatusCode:     200,
@@ -404,11 +405,15 @@ func gatewayResponse(t *testing.T, msgID string, body []byte) *gateway.Message {
 		ExecutionError: false,
 	})
 	require.NoError(t, err)
-	return &gateway.Message{
-		Body: gateway.MessageBody{
+	m := &api.Message{
+		Body: api.MessageBody{
 			MessageId: msgID,
 			Method:    ghcapabilities.MethodComputeAction,
 			Payload:   responsePayload,
 		},
 	}
+	codec := &api.JsonRPCCodec{}
+	req, err := codec.EncodeRequest(m)
+	require.NoError(t, err)
+	return req
 }

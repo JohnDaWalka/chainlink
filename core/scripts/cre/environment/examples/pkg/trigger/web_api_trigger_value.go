@@ -23,7 +23,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 )
 
@@ -67,8 +66,8 @@ func WebAPITriggerValue(gatewayURL, sender, receiver, privateKey string, timeout
 
 	publicAddress := crypto.PubkeyToAddress(key.PublicKey)
 
-	msg := &gateway.Message{
-		Body: gateway.MessageBody{
+	msg := &api.Message{
+		Body: api.MessageBody{
 			MessageId: uuid.New().String(),
 			Method:    Method,
 			DonId:     "1",

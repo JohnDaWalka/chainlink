@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
@@ -107,23 +106,23 @@ func (g *gatewayConnectorMock) Close() error {
 	return nil
 }
 
-func (g *gatewayConnectorMock) AddHandler(methods []string, handler core.GatewayConnectorHandler) error {
+func (g *gatewayConnectorMock) AddHandler(ctx context.Context, methods []string, handler core.GatewayConnectorHandler) error {
 	return nil
 }
 
-func (g *gatewayConnectorMock) SendToGateway(ctx context.Context, gatewayID string, msg *gateway.Message) error {
+func (g *gatewayConnectorMock) SendToGateway(ctx context.Context, gatewayID string, msg []byte) error {
 	return nil
 }
 
-func (g *gatewayConnectorMock) SignAndSendToGateway(ctx context.Context, gatewayID string, msg *gateway.MessageBody) error {
-	return nil
-}
-
-func (g *gatewayConnectorMock) GatewayIDs() ([]string, error) {
+func (g *gatewayConnectorMock) Sign(ctx context.Context, msg []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (g *gatewayConnectorMock) DonID() (string, error) {
+func (g *gatewayConnectorMock) GatewayIDs(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (g *gatewayConnectorMock) DonID(ctx context.Context) (string, error) {
 	return "", nil
 }
 

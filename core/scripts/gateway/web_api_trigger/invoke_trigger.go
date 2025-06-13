@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/joho/godotenv"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 )
@@ -97,8 +96,8 @@ func main() {
 		fmt.Println("error marshalling JSON payload", err)
 		return
 	}
-	msg := &gateway.Message{
-		Body: gateway.MessageBody{
+	msg := &api.Message{
+		Body: api.MessageBody{
 			MessageId: *messageID,
 			Method:    *methodName,
 			DonId:     *donID,

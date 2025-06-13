@@ -19,6 +19,7 @@ import (
 	webapitarget "github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/target"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/trigger"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
@@ -196,7 +197,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) ([]job.Ser
 			return nil, fmt.Errorf("failed to create oracle factory: %w", err)
 		}
 	}
-	var connector core.GatewayConnector
+	var connector connector.GatewayConnector
 	if d.gatewayConnectorWrapper != nil {
 		connector = d.gatewayConnectorWrapper.GetGatewayConnector()
 	}

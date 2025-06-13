@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 )
 
@@ -42,8 +41,8 @@ func TestJsonRPCRequest_Decode_Incorrect(t *testing.T) {
 func TestJsonRPCRequest_Encode(t *testing.T) {
 	t.Parallel()
 
-	var msg gateway.Message
-	msg.Body = gateway.MessageBody{
+	var msg api.Message
+	msg.Body = api.MessageBody{
 		MessageId: "aA-bB",
 		Receiver:  "0x1234",
 		Method:    "upload",
@@ -74,8 +73,8 @@ func TestJsonRPCResponse_Decode(t *testing.T) {
 func TestJsonRPCResponse_Encode(t *testing.T) {
 	t.Parallel()
 
-	var msg gateway.Message
-	msg.Body = gateway.MessageBody{
+	var msg api.Message
+	msg.Body = api.MessageBody{
 		MessageId: "aA-bB",
 		Receiver:  "0x1234",
 		Method:    "upload",

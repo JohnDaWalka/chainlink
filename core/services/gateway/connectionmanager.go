@@ -17,7 +17,6 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	gc "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
@@ -261,7 +260,7 @@ func (m *donConnectionManager) SetHandler(handler handlers.Handler) {
 	m.handler = handler
 }
 
-func (m *donConnectionManager) SendToNode(ctx context.Context, nodeAddress string, msg *gc.Message) error {
+func (m *donConnectionManager) SendToNode(ctx context.Context, nodeAddress string, msg *api.Message) error {
 	if msg == nil {
 		return errors.New("nil message")
 	}
@@ -289,7 +288,7 @@ func (m *donConnectionManager) readLoop(nodeAddress string, nodeState *nodeState
 				m.lggr.Errorw("parse error when reading from node", "nodeAddress", nodeAddress, "err", err)
 				break
 			}
-			if err = common.ValidateMessageAndSetSigner(msg); err != nil {
+			if err = msg.Validate(); err != nil {
 				m.lggr.Errorw("message validation error when reading from node", "nodeAddress", nodeAddress, "err", err)
 				break
 			}

@@ -8,7 +8,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	gwcommon "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
@@ -27,7 +26,7 @@ type ServiceWrapper struct {
 
 	config    config.GatewayConnector
 	keystore  Keystore
-	connector core.GatewayConnector
+	connector connector.GatewayConnector
 	lggr      logger.Logger
 	clock     clockwork.Clock
 }
@@ -100,6 +99,6 @@ func (e *ServiceWrapper) Name() string {
 	return e.lggr.Name()
 }
 
-func (e *ServiceWrapper) GetGatewayConnector() core.GatewayConnector {
+func (e *ServiceWrapper) GetGatewayConnector() connector.GatewayConnector {
 	return e.connector
 }

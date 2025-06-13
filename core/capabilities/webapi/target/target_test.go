@@ -12,13 +12,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	gcmocks "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 	registrymock "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
+	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
+	"github.com/smartcontractkit/chainlink/v2/core/utils/matches"
 )
 
 const (
@@ -115,7 +117,7 @@ func capabilityRequest(t *testing.T) capabilities.CapabilityRequest {
 	}
 }
 
-func gatewayResponse(t *testing.T, msgID string) *gateway.Message {
+func gatewayResponse(t *testing.T, msgID string) []byte {
 	headers := map[string]string{"Content-Type": "application/json"}
 	body := []byte("response body")
 	responsePayload, err := json.Marshal(ghcapabilities.Response{
@@ -125,13 +127,17 @@ func gatewayResponse(t *testing.T, msgID string) *gateway.Message {
 		ExecutionError: false,
 	})
 	require.NoError(t, err)
-	return &gateway.Message{
-		Body: gateway.MessageBody{
+	m := &api.Message{
+		Body: api.MessageBody{
 			MessageId: msgID,
 			Method:    ghcapabilities.MethodWebAPITarget,
 			Payload:   responsePayload,
 		},
 	}
+	codec := api.JsonRPCCodec{}
+	req, err := codec.EncodeRequest(m)
+	require.NoError(t, err)
+	return req
 }
 
 func TestRegisterUnregister(t *testing.T) {
@@ -182,8 +188,8 @@ func TestRegisterUnregister(t *testing.T) {
 func TestCapability_Execute(t *testing.T) {
 	th := setup(t, defaultConfig)
 	ctx := testutils.Context(t)
-	th.connector.EXPECT().DonID().Return("donID", nil)
-	th.connector.EXPECT().GatewayIDs().Return([]string{"gateway1", "gateway2"}, nil)
+	th.connector.EXPECT().DonID(matches.AnyContext).Return("donID", nil)
+	th.connector.EXPECT().GatewayIDs(matches.AnyContext).Return([]string{"gateway1", "gateway2"}, nil)
 
 	t.Run("happy case", func(t *testing.T) {
 		regReq := capabilities.RegisterToWorkflowRequest{
@@ -201,7 +207,7 @@ func TestCapability_Execute(t *testing.T) {
 
 		gatewayResp := gatewayResponse(t, msgID)
 		th.connector.EXPECT().AwaitConnection(mock.Anything, "gateway1").Return(nil)
-		th.connector.On("SignAndSendToGateway", mock.Anything, "gateway1", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		th.connector.On("SendToGateway", mock.Anything, "gateway1", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 			th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 		}).Once()
 
@@ -335,7 +341,7 @@ func TestCapability_Execute(t *testing.T) {
 		req := capabilityRequest(t)
 		require.NoError(t, err)
 
-		th.connector.EXPECT().SignAndSendToGateway(mock.Anything, "gateway1", mock.Anything).Return(errors.New("gateway error")).Once()
+		th.connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Return(errors.New("gateway error")).Once()
 		_, err = th.capability.Execute(ctx, req)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "gateway error")
@@ -364,7 +370,7 @@ func TestCapability_Execute(t *testing.T) {
 		msgID, err := getMessageID(req)
 		require.NoError(t, err)
 		gatewayResp := gatewayResponse(t, msgID)
-		th.connector.On("SignAndSendToGateway", mock.Anything, "gateway1", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		th.connector.On("SendToGateway", mock.Anything, "gateway1", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 			th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 		}).Once()
 

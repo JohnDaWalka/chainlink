@@ -16,9 +16,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
+	gw_common "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 const defaultSendChannelBufferSize = 1000
@@ -49,6 +52,7 @@ type triggerConnectorHandler struct {
 	mu                  sync.Mutex
 	registeredWorkflows map[string]webapiTrigger
 	registry            core.CapabilitiesRegistry
+	codec               api.Codec
 }
 
 var _ capabilities.TriggerCapability = (*triggerConnectorHandler)(nil)
@@ -65,13 +69,14 @@ func NewTrigger(config string, registry core.CapabilitiesRegistry, connector cor
 		registeredWorkflows: map[string]webapiTrigger{},
 		registry:            registry,
 		lggr:                logger.Named(lggr, "WorkflowConnectorHandler"),
+		codec:               &api.JsonRPCCodec{},
 	}
 
 	return handler, nil
 }
 
 // processTrigger iterates over each topic, checking against senders and rateLimits, then starting event processing and responding
-func (h *triggerConnectorHandler) processTrigger(ctx context.Context, gatewayID string, body *gateway.MessageBody, sender ethCommon.Address, payload webapicap.TriggerRequestPayload) error {
+func (h *triggerConnectorHandler) processTrigger(ctx context.Context, gatewayID string, body *api.MessageBody, sender ethCommon.Address, payload webapicap.TriggerRequestPayload) error {
 	// Pass on the payload with the expectation that it's in an acceptable format for the executor
 	wrappedPayload, err := values.WrapMap(payload)
 	if err != nil {
@@ -130,12 +135,21 @@ func (h *triggerConnectorHandler) processTrigger(ctx context.Context, gatewayID 
 	return err
 }
 
-func (h *triggerConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, msg *gateway.Message) error {
+func (h *triggerConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, data []byte) error {
 	// TODO: Validate Signature
+	msg, err := h.codec.DecodeRequest(data)
+	if err != nil {
+		h.lggr.Errorw("error decoding message", "err", err, "data", data)
+		err = h.sendResponse(ctx, gatewayID, &msg.Body, ghcapabilities.TriggerResponsePayload{Status: "ERROR", ErrorMessage: fmt.Errorf("error %s decoding message", err.Error()).Error()})
+		if err != nil {
+			h.lggr.Errorw("error sending response", "err", err)
+		}
+		return nil
+	}
 	body := &msg.Body
 	sender := ethCommon.HexToAddress(body.Sender)
 	var payload webapicap.TriggerRequestPayload
-	err := json.Unmarshal(body.Payload, &payload)
+	err = json.Unmarshal(body.Payload, &payload)
 	if err != nil {
 		h.lggr.Errorw("error decoding payload", "err", err)
 		err = h.sendResponse(ctx, gatewayID, body, ghcapabilities.TriggerResponsePayload{Status: "ERROR", ErrorMessage: fmt.Errorf("error %s decoding payload", err.Error()).Error()})
@@ -246,7 +260,7 @@ func (h *triggerConnectorHandler) Info(ctx context.Context) (capabilities.Capabi
 	return h.CapabilityInfo, nil
 }
 
-func (h *triggerConnectorHandler) ID() (string, error) {
+func (h *triggerConnectorHandler) ID(ctx context.Context) (string, error) {
 	return h.CapabilityInfo.ID, nil
 }
 
@@ -255,7 +269,7 @@ func (h *triggerConnectorHandler) Start(ctx context.Context) error {
 		return err
 	}
 	return h.StartOnce("GatewayConnectorServiceWrapper", func() error {
-		return h.connector.AddHandler([]string{"web_api_trigger"}, h)
+		return h.connector.AddHandler(ctx, []string{"web_api_trigger"}, h)
 	})
 }
 func (h *triggerConnectorHandler) Close() error {
@@ -278,14 +292,14 @@ func (h *triggerConnectorHandler) Name() string {
 	return h.lggr.Name()
 }
 
-func (h *triggerConnectorHandler) sendResponse(ctx context.Context, gatewayID string, requestBody *gateway.MessageBody, payload any) error {
+func (h *triggerConnectorHandler) sendResponse(ctx context.Context, gatewayID string, requestBody *api.MessageBody, payload any) error {
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
 		h.lggr.Errorw("error marshalling payload", "err", err)
 		payloadJSON, _ = json.Marshal(ghcapabilities.TriggerResponsePayload{Status: "ERROR", ErrorMessage: fmt.Errorf("error %s marshalling payload", err.Error()).Error()})
 	}
 
-	body := &gateway.MessageBody{
+	body := &api.MessageBody{
 		MessageId: requestBody.MessageId,
 		DonId:     requestBody.DonId,
 		Method:    requestBody.Method,
@@ -293,5 +307,26 @@ func (h *triggerConnectorHandler) sendResponse(ctx context.Context, gatewayID st
 		Payload:   payloadJSON,
 	}
 
-	return h.connector.SignAndSendToGateway(ctx, gatewayID, body)
+	signature, err := h.connector.Sign(ctx, gw_common.Flatten(api.GetRawMessageBody(body)...))
+	if err != nil {
+		return err
+	}
+
+	msg := &api.Message{
+		Body: api.MessageBody{
+			MessageId: body.MessageId,
+			DonId:     body.DonId,
+			Method:    body.Method,
+			Payload:   body.Payload,
+			Receiver:  body.Receiver,
+		},
+		Signature: utils.StringToHex(string(signature)),
+	}
+
+	req, err := h.codec.EncodeRequest(msg)
+	if err != nil {
+		return err
+	}
+
+	return h.connector.SendToGateway(ctx, gatewayID, req)
 }
