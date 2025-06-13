@@ -29,6 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.define-matrix.outputs.matrix }}
+    permissions:
+      contents: read
     steps:
       - name: Define test matrix
         id: define-matrix
@@ -45,6 +47,9 @@ jobs:
           echo "matrix=$matrix" >> $GITHUB_OUTPUT
 
   run-system-tests:
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -53,9 +58,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: "integration"
     timeout-minutes: 30
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -115,7 +117,3 @@ jobs:
           PRIVATE_KEY: "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
           TEST_NAME: ${{ matrix.tests.test_name }}
         run: go test github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre -v -run "^(${TEST_NAME})$" -timeout 30m -count=1 -test.parallel=1 -json; exit_code=$?; ../../tools/ci/wait-for-containers-to-stop.sh 30; exit $exit_code; } # Sleep to allow testcontainers to stop
-
-
-
-
