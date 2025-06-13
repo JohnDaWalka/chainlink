@@ -78,8 +78,6 @@ var (
 )
 
 const (
-	CronBinaryVersion          = "v1.0.2-alpha"
-	CRECLIBinaryVersion        = "v0.1.5"
 	AuthorizationKeySecretName = "AUTH_KEY"
 	// TODO: use once we can run these tests in CI (https://smartcontract-it.atlassian.net/browse/DX-589)
 	// AuthorizationKey           = "12a-281j&@91.sj1:_}"
@@ -957,7 +955,7 @@ func TestCRE_OCR3_ReadBalance_Workflow_SingleDon_MockedPrice(t *testing.T) {
 		fundedAddress := common.HexToAddress(pub)
 
 		_, fundingErr := libfunding.SendFunds(
-			context.Background(),
+			t.Context(),
 			zerolog.Logger{}, bo.SethClient, libtypes.FundsToSend{
 				ToAddress:  fundedAddress,
 				Amount:     expectedReadAmount,

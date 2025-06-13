@@ -331,7 +331,13 @@ func (e *Engine) initializeCapability(ctx context.Context, step *step) error {
 func (e *Engine) init(ctx context.Context) {
 	defer e.wg.Done()
 
+	deadline, exists := ctx.Deadline()
+	e.logger.Debugw("checking init context", "deadline", deadline, "exists", exists, "func", "init")
+
 	retryErr := internal.RunWithRetries(ctx, e.logger, time.Millisecond*time.Duration(e.retryMs), e.maxRetries, func() error {
+		deadline, exists = ctx.Deadline()
+		e.logger.Debugw("checking init context", "deadline", deadline, "exists", exists, "func", "anonymous retry")
+
 		// first wait for localDON to return a non-error response; this depends
 		// on the underlying peerWrapper returning the PeerID.
 		node, err := e.registry.LocalNode(ctx)
