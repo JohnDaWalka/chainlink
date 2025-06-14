@@ -185,7 +185,7 @@ func (c *gatewayConnector) SendToGateway(ctx context.Context, gatewayID string, 
 	return gateway.conn.Write(ctx, websocket.BinaryMessage, msg)
 }
 
-func (c *gatewayConnector) Sign(ctx context.Context, msg []byte) ([]byte, error) {
+func (c *gatewayConnector) SignMessage(ctx context.Context, msg []byte) ([]byte, error) {
 	return c.signer.Sign(ctx, msg)
 }
 

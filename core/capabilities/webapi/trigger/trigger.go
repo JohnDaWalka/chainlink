@@ -307,7 +307,7 @@ func (h *triggerConnectorHandler) sendResponse(ctx context.Context, gatewayID st
 		Payload:   payloadJSON,
 	}
 
-	signature, err := h.connector.Sign(ctx, gw_common.Flatten(api.GetRawMessageBody(body)...))
+	signature, err := h.connector.SignMessage(ctx, gw_common.Flatten(api.GetRawMessageBody(body)...))
 	if err != nil {
 		return err
 	}

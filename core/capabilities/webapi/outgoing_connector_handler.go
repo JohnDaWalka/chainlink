@@ -162,7 +162,7 @@ func (c *OutgoingConnectorHandler) handleSingleNodeRequest(ctx context.Context, 
 		return nil, err
 	}
 
-	signature, err := c.gc.Sign(ctx, common.Flatten(api.GetRawMessageBody(body)...))
+	signature, err := c.gc.SignMessage(ctx, common.Flatten(api.GetRawMessageBody(body)...))
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}

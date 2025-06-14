@@ -72,7 +72,7 @@ func (g *GatewayConnectorMock) SendToGateway(context.Context, string, []byte) er
 	return nil
 }
 
-func (g *GatewayConnectorMock) Sign(context.Context, []byte) ([]byte, error) {
+func (g *GatewayConnectorMock) SignMessage(context.Context, []byte) ([]byte, error) {
 	return nil, nil
 }
 

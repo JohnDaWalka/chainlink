@@ -114,7 +114,7 @@ func (g *gatewayConnectorMock) SendToGateway(ctx context.Context, gatewayID stri
 	return nil
 }
 
-func (g *gatewayConnectorMock) Sign(ctx context.Context, msg []byte) ([]byte, error) {
+func (g *gatewayConnectorMock) SignMessage(ctx context.Context, msg []byte) ([]byte, error) {
 	return nil, nil
 }
 
