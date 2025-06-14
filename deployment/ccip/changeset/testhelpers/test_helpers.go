@@ -936,7 +936,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 			"dest_chain_selector": cfg.DestChain,
 			"onramp_state":        onRampStateObjectId,
 			"receiver":            []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-			"data":                []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+			"data":                []byte{104, 101, 108, 108, 111, 32, 101, 118, 109, 32, 102, 114, 111, 109, 32, 115, 117, 105},
 			"fee_token_metadata":  linkTokenObjectMetadataId,
 			"fee_token":           mintLinkTokenReport.Output.Objects.MintedLinkTokenObjectId,
 			"extra_args":          []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},

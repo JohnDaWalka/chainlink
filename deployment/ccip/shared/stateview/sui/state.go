@@ -54,6 +54,7 @@ func loadsuiChainStateFromAddresses(addresses map[string]cldf.TypeAndVersion) (C
 		// Parse address
 		suiAddr := sui.MustAddressFromHex(addr)
 		switch typeAndVersion.Type {
+
 		case shared.SuiCCIPType:
 			chainState.CCIPAddress = *suiAddr
 

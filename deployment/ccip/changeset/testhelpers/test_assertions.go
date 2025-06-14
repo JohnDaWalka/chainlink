@@ -402,7 +402,9 @@ func ConfirmCommitWithExpectedSeqNumRange(
 	seenMessages := NewCommitReportTracker(srcSelector, expectedSeqNumRange)
 
 	verifyCommitReport := func(report *offramp.OffRampCommitReportAccepted) bool {
+		fmt.Println("VERIFYING COMMIT REPORT")
 		processRoots := func(roots []offramp.InternalMerkleRoot) bool {
+			fmt.Println("PROCESSING ROOTS: ", roots)
 			for _, mr := range roots {
 				t.Logf(
 					"Received commit report for [%d, %d] on selector %d from source selector %d expected seq nr range %s, token prices: %v",
@@ -451,12 +453,14 @@ func ConfirmCommitWithExpectedSeqNumRange(
 			iter, err := offRamp.FilterCommitReportAccepted(&bind.FilterOpts{
 				Context: t.Context(),
 			})
+
 			// In some test case the test ends while the filter is still running resulting in a context.Canceled error.
 			if err != nil && !errors.Is(err, context.Canceled) {
 				require.NoError(t, err)
 			}
 			for iter.Next() {
 				event := iter.Event
+				fmt.Println("ITERATOR COMMIT EVENT: ", event)
 				verified := verifyCommitReport(event)
 				if verified {
 					return event, nil

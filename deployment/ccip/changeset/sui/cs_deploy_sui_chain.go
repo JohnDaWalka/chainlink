@@ -50,13 +50,27 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 				Client: *suiChain.Client,
 				Signer: suiSigner,
 				GetTxOpts: func() bind.TxOpts {
-					b := uint64(300_000_000)
+					b := uint64(400_000_000)
 					return bind.TxOpts{
 						GasBudget: &b,
 					}
 				},
 			},
 			CCIPOnChainState: state,
+		}
+
+		// Deploy MCMS
+		mcmsSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, mcmsops.DeployMCMSSequence, deps.SuiChain, cld_ops.EmptyInput{})
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP for Sui chain %d: %w", chainSel, err)
+		}
+		seqReports = append(seqReports, mcmsSeqReport.ExecutionReports...)
+
+		// save MCMs address to the addressbook
+		typeAndVersionMCMS := cldf.NewTypeAndVersion(shared.SuiMCMSType, deployment.Version1_0_0)
+		err = deps.AB.Save(chainSel, mcmsSeqReport.Output.PackageId, typeAndVersionMCMS)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save MCMS address %s for Sui chain %d: %w", mcmsSeqReport.Output.PackageId, chainSel, err)
 		}
 
 		// Run DeployAndInitCCIpSequence
@@ -67,7 +81,8 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 			MaxFeeJuelsPerMsg:             config.ContractParamsPerChain[chainSel].FeeQuoterParams.MaxFeeJuelsPerMsg,
 			TokenPriceStalenessThreshold:  config.ContractParamsPerChain[chainSel].FeeQuoterParams.TokenPriceStalenessThreshold,
 			DeployCCIPInput: ccipops.DeployCCIPInput{
-				McmsPackageId: "0x2",
+				McmsPackageId: mcmsSeqReport.Output.PackageId,
+				McmsOwner:     "0x2",
 			},
 		}
 
@@ -109,9 +124,10 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		// Run DeployAndInitCCIPOnRampSequence
 		ccipOnRampSeqInput := onrampops.DeployAndInitCCIPOnRampSeqInput{
 			DeployCCIPOnRampInput: onrampops.DeployCCIPOnRampInput{
-				CCIPPackageId: ccipSeqReport.Output.CCIPPackageId,
+				CCIPPackageId:      ccipSeqReport.Output.CCIPPackageId,
+				MCMSPackageId:      mcmsSeqReport.Output.PackageId,
+				MCMSOwnerPackageId: "0x2",
 			},
-
 			OnRampInitializeInput: onrampops.OnRampInitializeInput{
 				NonceManagerCapId:         ccipSeqReport.Output.Objects.NonceManagerCapObjectId,   // this is from NonceManager init Op
 				SourceTransferCapId:       ccipSeqReport.Output.Objects.SourceTransferCapObjectId, // this is from CCIP package publish
@@ -155,25 +171,11 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save onRamp state object Id  %s for Sui chain %d: %w", ccipOnRampSeqReport.Output.Objects.StateObjectId, chainSel, err)
 		}
 
-		// Run DeployMCMSSequence
-		mcmsReport, err := operations.ExecuteSequence(e.OperationsBundle, mcmsops.DeployMCMSSequence, deps.SuiChain, cld_ops.EmptyInput{})
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP for Sui chain %d: %w", chainSel, err)
-		}
-		seqReports = append(seqReports, mcmsReport.ExecutionReports...)
-
-		// save onRamp address to the addressbook
-		typeAndVersionMCMs := cldf.NewTypeAndVersion(shared.SuiMCMSType, deployment.Version1_6_0)
-		err = deps.AB.Save(chainSel, mcmsReport.Output.PackageId, typeAndVersionMCMs)
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save MCMs address %s for Sui chain %d: %w", mcmsReport.Output.PackageId, chainSel, err)
-		}
-
 		// Run DeployAndInitCCIPOffRampSequence
 		ccipOffRampSeqInput := offrampops.DeployAndInitCCIPOffRampSeqInput{
 			DeployCCIPOffRampInput: offrampops.DeployCCIPOffRampInput{
 				CCIPPackageId: ccipSeqReport.Output.CCIPPackageId,
-				MCMSPackageId: mcmsReport.Output.PackageId,
+				MCMSPackageId: mcmsSeqReport.Output.PackageId,
 			},
 		}
 		ccipOffRampSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, offrampops.DeployAndInitCCIPOffRampSequence, deps.SuiChain, ccipOffRampSeqInput)
