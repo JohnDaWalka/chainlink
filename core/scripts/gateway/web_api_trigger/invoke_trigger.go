@@ -15,7 +15,6 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 )
 
 // https://gateway-us-1.chain.link/web-api-trigger
@@ -104,7 +103,7 @@ func main() {
 			Payload:   payloadJSON,
 		},
 	}
-	if err = common.Sign(msg, key); err != nil {
+	if err = msg.Sign(key); err != nil {
 		fmt.Println("error signing message", err)
 		return
 	}

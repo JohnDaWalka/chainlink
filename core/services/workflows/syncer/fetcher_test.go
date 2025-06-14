@@ -44,7 +44,7 @@ func (w *wrapper) GetGatewayConnector() connector.GatewayConnector {
 func TestNewFetcherService(t *testing.T) {
 	ctx := context.Background()
 	lggr := logger.TestLogger(t)
-
+	codec := api.JsonRPCCodec{}
 	connector := gcmocks.NewGatewayConnector(t)
 	wrapper := &wrapper{c: connector}
 
@@ -115,7 +115,6 @@ func TestNewFetcherService(t *testing.T) {
 		defer fetcher.Close()
 
 		gatewayResp := gatewayResponse(t, msgID, donID, 500) // gateway response that is not signed
-		codec := api.JsonRPCCodec{}
 		gatewayRespBytes, err := codec.EncodeRequest(gatewayResp)
 		require.NoError(t, err)
 		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
@@ -151,7 +150,6 @@ func TestNewFetcherService(t *testing.T) {
 				Payload:   responsePayload,
 			},
 		}
-		codec := api.JsonRPCCodec{}
 		gatewayResponseBytes, err := codec.EncodeRequest(gatewayResponse)
 		require.NoError(t, err)
 
@@ -315,7 +313,7 @@ func signGatewayResponse(t *testing.T, msg *api.Message) []byte {
 	require.NoError(t, err)
 	msg.Signature = utils.StringToHex(string(signature))
 
-	signerBytes, err := common.ExtractSigner(signature, msgToSign...)
+	signerBytes, err := msg.ExtractSigner()
 	require.NoError(t, err)
 
 	msg.Body.Receiver = utils.StringToHex(string(signerBytes))

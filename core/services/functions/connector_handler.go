@@ -19,7 +19,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -35,7 +34,7 @@ import (
 type functionsConnectorHandler struct {
 	services.StateMachine
 
-	connector                  core.GatewayConnector
+	connector                  connector.GatewayConnector
 	signAddr                   ethCommon.Address
 	keystore                   keys.MessageSigner
 	nodeAddress                string
@@ -116,7 +115,7 @@ func NewFunctionsConnectorHandler(
 	}, nil
 }
 
-func (h *functionsConnectorHandler) SetConnector(connector core.GatewayConnector) {
+func (h *functionsConnectorHandler) SetConnector(connector connector.GatewayConnector) {
 	h.connector = connector
 }
 

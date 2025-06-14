@@ -178,7 +178,7 @@ func (c *OutgoingConnectorHandler) handleSingleNodeRequest(ctx context.Context, 
 		Signature: utils.StringToHex(string(signature)),
 	}
 
-	resp, err := c.codec.EncodeRequest(msg)
+	resp, err := c.codec.EncodeResponse(msg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode request: %w", err)
 	}

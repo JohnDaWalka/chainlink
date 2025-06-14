@@ -13,7 +13,6 @@ import (
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
@@ -26,7 +25,7 @@ import (
 //	go run run_connector.go --config sample_config.toml
 type client struct {
 	privateKey *ecdsa.PrivateKey
-	connector  core.GatewayConnector
+	connector  connector.GatewayConnector
 	lggr       logger.Logger
 }
 

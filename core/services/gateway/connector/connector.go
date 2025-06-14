@@ -28,10 +28,10 @@ var _ GatewayConnector = (*gatewayConnector)(nil)
 type GatewayConnector interface {
 	services.Service
 	network.ConnectionInitiator
+	// core.GatewayConnector is a narrow interface that provides methods to interact with the Gateway.
+	// This interface is used by LOOP plugins to interact with the Gateway over gRPC
 	core.GatewayConnector
 }
-
-var _ network.ConnectionInitiator = (*gatewayConnector)(nil)
 
 // Signer implementation needs to be provided by a GatewayConnector user (node)
 // in order to sign handshake messages with node's private key.
@@ -43,6 +43,8 @@ type Signer interface {
 // GatewayConnector user (node) implements application logic in the Handler interface.
 type GatewayConnectorHandler interface {
 	job.ServiceCtx
+	// core.GatewayConnectorHandler is a narrow interface that provides methods to handle messages from Gateways.
+	// This interface is used by LOOP plugins to handle messages from Gateways over gRPC
 	core.GatewayConnectorHandler
 }
 
@@ -209,7 +211,6 @@ func (c *gatewayConnector) readLoop(gatewayState *gatewayState) {
 			c.closeWait.Done()
 			return
 		case item := <-gatewayState.conn.ReadChannel():
-			// TODO: change to JSON RPC codec
 			msg, err := c.codec.DecodeRequest(item.Data)
 			if err != nil {
 				c.lggr.Errorw("parse error when reading from Gateway", "id", gatewayState.config.Id, "err", err)

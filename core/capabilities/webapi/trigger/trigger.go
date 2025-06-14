@@ -323,7 +323,7 @@ func (h *triggerConnectorHandler) sendResponse(ctx context.Context, gatewayID st
 		Signature: utils.StringToHex(string(signature)),
 	}
 
-	req, err := h.codec.EncodeRequest(msg)
+	req, err := h.codec.EncodeResponse(msg)
 	if err != nil {
 		return err
 	}

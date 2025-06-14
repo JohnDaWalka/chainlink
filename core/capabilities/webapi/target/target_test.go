@@ -231,7 +231,7 @@ func TestCapability_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		newCtx, cancel := context.WithCancel(ctx)
-		th.connector.On("SignAndSendToGateway", mock.Anything, "gateway1", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		th.connector.On("SendToGateway", mock.Anything, "gateway1", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 			cancel()
 		}).Once()
 

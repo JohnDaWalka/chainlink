@@ -137,7 +137,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 				require.JSONEq(t, `{"success":true,"rows":[{"slot_id":1,"version":1,"expiration":1},{"slot_id":2,"version":2,"expiration":2}]}`, string(msg.Body.Payload))
 			}).Return(nil).Once()
 
-			handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+			err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+			require.NoError(t, err)
 
 			t.Run("orm error", func(t *testing.T) {
 				storage.On("List", ctx, addr).Return(nil, errors.New("boom")).Once()
@@ -148,12 +149,14 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 					require.JSONEq(t, `{"success":false,"error_message":"Failed to list secrets: boom"}`, string(msg.Body.Payload))
 				}).Return(nil).Once()
 
-				handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+				err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+				require.NoError(t, err)
 			})
 
 			t.Run("not allowed", func(t *testing.T) {
 				allowlist.On("Allow", addr).Return(false).Once()
-				handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+				err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+				require.NoError(t, err)
 			})
 		})
 
@@ -192,7 +195,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 				require.Equal(t, `{"success":true}`, string(msg.Body.Payload))
 			}).Return(nil).Once()
 
-			handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+			err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+			require.NoError(t, err)
 
 			t.Run("orm error", func(t *testing.T) {
 				storage.On("Put", ctx, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("boom")).Once()
@@ -204,7 +208,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 					require.JSONEq(t, `{"success":false,"error_message":"Failed to set secret: boom"}`, string(msg.Body.Payload))
 				}).Return(nil).Once()
 
-				handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+				err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+				require.NoError(t, err)
 			})
 
 			t.Run("missing signature", func(t *testing.T) {
@@ -219,7 +224,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 					require.JSONEq(t, `{"success":false,"error_message":"Failed to set secret: wrong signature"}`, string(msg.Body.Payload))
 				}).Return(nil).Once()
 
-				handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+				err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+				require.NoError(t, err)
 			})
 
 			t.Run("malformed request", func(t *testing.T) {
@@ -233,7 +239,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 					require.JSONEq(t, `{"success":false,"error_message":"Bad request to set secret: invalid character 's' looking for beginning of object key string"}`, string(msg.Body.Payload))
 				}).Return(nil).Once()
 
-				handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+				err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+				require.NoError(t, err)
 			})
 
 			t.Run("insufficient balance", func(t *testing.T) {
@@ -245,7 +252,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 					require.JSONEq(t, `{"success":false,"error_message":"user subscription has insufficient balance"}`, string(msg.Body.Payload))
 				}).Return(nil).Once()
 
-				handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+				err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg, codec))
+				require.NoError(t, err)
 			})
 		})
 
@@ -284,7 +292,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 			require.NoError(t, json.Unmarshal(respMsg.Body.Payload, &response))
 			require.Equal(t, functions.RequestStatePending, response.Status)
 		}).Return(nil).Once()
-		handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, msg, codec))
+		err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, msg, codec))
+		require.NoError(t, err)
 		<-handlerCalled
 
 		// async response computation
@@ -302,7 +311,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 			require.NoError(t, json.Unmarshal(respMsg.Body.Payload, &response))
 			require.Equal(t, functions.RequestStateComplete, response.Status)
 		}).Return(nil).Once()
-		handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, msg, codec))
+		err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, msg, codec))
+		require.NoError(t, err)
 	})
 
 	t.Run("heartbeat internal error", func(t *testing.T) {
@@ -318,7 +328,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 			handlerCalled <- struct{}{}
 		}).Return(errors.New("boom")).Once()
 		connector.On("SendToGateway", mock.Anything, "gw1", mock.Anything).Return(nil).Once()
-		handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, msg, codec))
+		err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, msg, codec))
+		require.NoError(t, err)
 		<-handlerCalled
 
 		// collect the response - should eventually result in an internal error
@@ -331,7 +342,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 				require.NoError(t, json.Unmarshal(respMsg.Body.Payload, &response))
 				returnedState = response.Status
 			}).Return(nil).Once()
-			handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, msg, codec))
+			err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, msg, codec))
+			require.NoError(t, err)
 			return returnedState == functions.RequestStateInternalError
 		}, testutils.WaitTimeout(t), 50*time.Millisecond).Should(gomega.BeTrue())
 	})
@@ -349,7 +361,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 			require.NoError(t, json.Unmarshal(respMsg.Body.Payload, &response))
 			require.Equal(t, functions.RequestStateInternalError, response.Status)
 		}).Return(nil).Once()
-		handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, msg, codec))
+		err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, msg, codec))
+		require.NoError(t, err)
 	})
 
 	t.Run("heartbeat request too old", func(t *testing.T) {
@@ -365,7 +378,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 			require.NoError(t, json.Unmarshal(respMsg.Body.Payload, &response))
 			require.Equal(t, functions.RequestStateInternalError, response.Status)
 		}).Return(nil).Once()
-		handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, msg, codec))
+		err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, msg, codec))
+		require.NoError(t, err)
 	})
 }
 

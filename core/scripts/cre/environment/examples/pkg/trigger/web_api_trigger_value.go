@@ -17,13 +17,10 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
-
 	libformat "github.com/smartcontractkit/chainlink/system-tests/lib/format"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
-
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 )
 
 const (
@@ -75,7 +72,7 @@ func WebAPITriggerValue(gatewayURL, sender, receiver, privateKey string, timeout
 			Sender:    publicAddress.String(),
 		},
 	}
-	if err = common.Sign(msg, key); err != nil {
+	if err = msg.Sign(key); err != nil {
 		return errors.Wrap(err, "error signing message")
 	}
 

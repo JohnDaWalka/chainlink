@@ -15,7 +15,6 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions"
 	"github.com/smartcontractkit/chainlink/v2/core/services/s4"
 )
@@ -98,7 +97,7 @@ func main() {
 		},
 	}
 
-	if err = common.Sign(msg, key); err != nil {
+	if err = msg.Sign(key); err != nil {
 		fmt.Println("error signing message", err)
 		return
 	}

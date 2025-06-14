@@ -102,13 +102,13 @@ func parseConnectorConfig(t *testing.T, tomlConfig string, nodeAddress string, n
 
 type client struct {
 	privateKey *ecdsa.PrivateKey
+	codec      api.Codec
 	connector  core.GatewayConnector
 	done       atomic.Bool
 }
 
 func (c *client) HandleGatewayMessage(ctx context.Context, gatewayId string, data []byte) error {
-	codec := api.JsonRPCCodec{}
-	msg, err := codec.DecodeRequest(data)
+	msg, err := c.codec.DecodeRequest(data)
 	if err != nil {
 		panic(err)
 	}
@@ -127,7 +127,7 @@ func (c *client) HandleGatewayMessage(ctx context.Context, gatewayId string, dat
 	if err != nil {
 		panic(err)
 	}
-	rawResponse, err := codec.EncodeResponse(responseMsg)
+	rawResponse, err := c.codec.EncodeResponse(responseMsg)
 	if err != nil {
 		panic(err)
 	}
@@ -175,7 +175,7 @@ func TestIntegration_Gateway_NoFullNodes_BasicConnectionAndMessage(t *testing.T)
 	nodeUrl := fmt.Sprintf("ws://localhost:%d/node", nodePort)
 
 	// Launch Connector
-	client := &client{privateKey: nodeKeys.PrivateKey}
+	client := &client{privateKey: nodeKeys.PrivateKey, codec: &api.JsonRPCCodec{}}
 	// client acts as a signer here
 	connector, err := connector.NewGatewayConnector(parseConnectorConfig(t, nodeConfigTemplate, nodeKeys.Address, nodeUrl), client, clockwork.NewRealClock(), lggr)
 	require.NoError(t, err)
