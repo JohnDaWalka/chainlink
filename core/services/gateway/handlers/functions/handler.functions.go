@@ -109,9 +109,13 @@ func NewFunctionsHandlerFromConfig(handlerConfig json.RawMessage, donConfig *con
 	lggr = logger.Named(lggr, "FunctionsHandler:"+donConfig.DonId)
 	var allowlist fallow.OnchainAllowlist
 	if cfg.OnchainAllowlist != nil {
-		chain, err2 := legacyChains.Get(cfg.ChainID)
+		chainService, err2 := legacyChains.Get(cfg.ChainID)
 		if err2 != nil {
 			return nil, err2
+		}
+		chain, ok := chainService.(legacyevm.Chain)
+		if !ok {
+			return nil, fmt.Errorf("allow list is not available in LOOP Plugin mode: %w", errors.ErrUnsupported)
 		}
 
 		orm, err2 := fallow.NewORM(ds, lggr, cfg.OnchainAllowlist.ContractAddress)
@@ -138,9 +142,13 @@ func NewFunctionsHandlerFromConfig(handlerConfig json.RawMessage, donConfig *con
 	}
 	var subscriptions fsub.OnchainSubscriptions
 	if cfg.OnchainSubscriptions != nil {
-		chain, err2 := legacyChains.Get(cfg.ChainID)
+		chainService, err2 := legacyChains.Get(cfg.ChainID)
 		if err2 != nil {
 			return nil, err2
+		}
+		chain, ok := chainService.(legacyevm.Chain)
+		if !ok {
+			return nil, fmt.Errorf("subscriptions are not available in LOOP Plugin mode: %w", errors.ErrUnsupported)
 		}
 
 		orm, err2 := fsub.NewORM(ds, lggr, cfg.OnchainSubscriptions.ContractAddress)
