@@ -3,10 +3,11 @@ package operations
 import (
 	"github.com/Masterminds/semver/v3"
 	pkgerrors "github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"golang.org/x/sync/errgroup"
 )
 
 type DeployKeystoneForwardersSequenceDeps struct {
