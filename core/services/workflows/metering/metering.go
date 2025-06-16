@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"sort"
 	"sync"
 
@@ -18,6 +17,7 @@ import (
 
 const (
 	ComputeResourceDimension = "COMPUTE"
+	defaultDecimalPrecision  = 3 // one thousandth of a dollar
 )
 
 var (
@@ -40,7 +40,7 @@ type BillingClient interface {
 
 type SpendTuple struct {
 	Unit  string
-	Value int64
+	Value decimal.Decimal
 }
 
 type ProtoDetail struct {
@@ -51,7 +51,7 @@ type ProtoDetail struct {
 
 type ReportStep struct {
 	// The maximum amount of universal credits that should be used in this step
-	Deduction int64
+	Deduction decimal.Decimal
 	// The actual resource spend that each node used for this step
 	Spends map[string][]ReportStepDetail
 }
@@ -79,13 +79,16 @@ type Report struct {
 }
 
 func NewReport(owner, workflowID, workflowExecutionID string, lggr logger.Logger, client BillingClient) *Report {
+	sLggr := logger.Sugared(lggr).Named("Metering").With("workflowExecutionID", workflowExecutionID)
+
 	return &Report{
 		owner:               owner,
 		workflowID:          workflowID,
 		workflowExecutionID: workflowExecutionID,
 
-		client: client,
-		lggr:   logger.Sugared(lggr).Named("Metering").With("workflowExecutionID", workflowExecutionID),
+		balance: NewBalanceStore(decimal.Zero, map[string]decimal.Decimal{}, sLggr),
+		client:  client,
+		lggr:    sLggr,
 
 		ready: false,
 		steps: make(map[string]ReportStep),
@@ -99,7 +102,11 @@ func (r *Report) Reserve(ctx context.Context) error {
 	defer r.mu.Unlock()
 
 	if r.client == nil {
-		return ErrNoBillingClient
+		r.lggr.Error("billing client not set; switching to metering mode")
+		r.balance.meteringMode = true
+		r.ready = true
+
+		return nil
 	}
 
 	// TODO: https://smartcontract-it.atlassian.net/browse/CRE-427 more robust check of billing service health
@@ -117,8 +124,10 @@ func (r *Report) Reserve(ctx context.Context) error {
 
 	// If there is an error communicating with the billing service, fail open
 	if err != nil {
-		r.lggr.Warnf("failed to reserve credits: %s", err)
-		r.enterMeteringMode()
+		r.lggr.Warnf("failed to reserve credits; switching to metering mode: %s", err)
+		r.balance.meteringMode = true
+		r.ready = true
+
 		return nil
 	}
 
@@ -128,43 +137,32 @@ func (r *Report) Reserve(ctx context.Context) error {
 
 	rateCard, err := toRateCard(resp.GetRates())
 	if err != nil {
-		r.lggr.Warnf("failed to parse rate card: %s", err)
-		r.enterMeteringMode()
+		r.lggr.Warnf("failed to parse rate card; switching to metering mode: %s", err)
+		r.balance.meteringMode = true
+		r.ready = true
+
 		return nil
 	}
 
 	r.ready = true
-	r.balance = NewBalanceStore(decimal.NewFromFloat32(resp.Credits).IntPart(), rateCard, r.lggr) // TODO remove .IntPart() once balance store uses decimal
+	r.balance = NewBalanceStore(decimal.NewFromFloat32(resp.Credits), rateCard, r.lggr)
+
 	return nil
 }
 
-func (r *Report) enterMeteringMode() {
-	// TODO: https://smartcontract-it.atlassian.net/browse/CRE-453 pass through errors and persist cause of metering mode on to meteringReport
-	balanceStore := NewBalanceStore(0, map[string]decimal.Decimal{}, r.lggr)
-	balanceStore.AllowNegative()
-	r.ready = true
-	r.balance = balanceStore
-}
-
-// ConvertFromBalance converts a credit amount to a resource dimensions amount.
-func (r *Report) ConvertFromBalance(toUnit string, amount int64) (resources int64, err error) {
-	if !r.ready {
-		return 0, ErrNoReserve
-	}
-	return r.balance.ConvertFromBalance(toUnit, amount), nil
-}
-
 // ConvertToBalance converts a resource dimensions amount to a credit amount.
-func (r *Report) ConvertToBalance(fromUnit string, amount int64) (credits int64, err error) {
+func (r *Report) ConvertToBalance(fromUnit string, amount decimal.Decimal) (decimal.Decimal, error) {
 	if !r.ready {
-		return 0, ErrNoReserve
+		return decimal.Zero, ErrNoReserve
 	}
+
 	return r.balance.ConvertToBalance(fromUnit, amount), nil
 }
 
-// Deduct earmarks an amount of local universal credit balance.
-// We expect to only set this value once - an error is returned if a step would be overwritten.
-func (r *Report) Deduct(ref string, amount int64) error {
+// Deduct earmarks an amount of local universal credit balance. We expect to only set this value once - an error is
+// returned if a step would be overwritten. Deduct expects a NullDecimal because GetMaxSpendForInvocation can return
+// a NullDecimal.
+func (r *Report) Deduct(ref string, amount decimal.NullDecimal) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -177,16 +175,16 @@ func (r *Report) Deduct(ref string, amount int64) error {
 	}
 
 	r.steps[ref] = ReportStep{
-		Deduction: amount,
+		Deduction: amount.Decimal,
 		Spends:    nil,
 	}
 
 	// if in metering mode, exit early without modifying local balance
-	if r.balance.allowNegative {
+	if r.balance.meteringMode || !amount.Valid {
 		return nil
 	}
 
-	err := r.balance.Minus(amount)
+	err := r.balance.Minus(amount.Decimal)
 	if err != nil {
 		return err
 	}
@@ -194,31 +192,68 @@ func (r *Report) Deduct(ref string, amount int64) error {
 	return nil
 }
 
-// GetAvailableForInvocation returns the amount of credits that can be used based on the available credit balance.
-// This is determined by dividing unearmarked local credit balance by the number of potential concurrent calls.
-func (r *Report) GetAvailableForInvocation(openConcurrentCallSlots int) (int64, error) {
+func (r *Report) CreditToSpendingLimits(
+	info capabilities.CapabilityInfo,
+	amount decimal.Decimal,
+) []capabilities.SpendLimit {
+	if len(info.SpendTypes) > 0 {
+		spendType := info.SpendTypes[0]
+
+		// use rate card to convert capSpendLimit to native units
+		spendLimit := r.balance.ConvertFromBalance(string(spendType), amount)
+
+		// check to see if metering mode is active
+		if r.balance.meteringMode {
+			r.lggr.Errorf("no rate exists in rate card for %s; entering metering mode", spendType)
+
+			return nil
+		}
+
+		return []capabilities.SpendLimit{{SpendType: spendType, Limit: spendLimit.StringFixed(defaultDecimalPrecision)}} // TODO: should we apply rounding? maybe take only the int part?
+	}
+
+	return nil
+}
+
+// GetMaxSpendForInvocation returns the amount of credits that can be used based on the minimum between and optionally
+// provided max spend by the user or the available credit balance. The available credit balance is determined by
+// dividing unearmarked local credit balance by the number of potential concurrent calls.
+func (r *Report) GetMaxSpendForInvocation(
+	ref string,
+	userSpendLimit decimal.NullDecimal,
+	openConcurrentCallSlots int,
+) (decimal.NullDecimal, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	capSpendLimit := decimal.NewNullDecimal(decimal.Zero)
+	capSpendLimit.Valid = false
+
 	if openConcurrentCallSlots == 0 {
 		// invariant: this should be managed by the consumer (engine)
-		return 0, ErrNoOpenCalls
+		return capSpendLimit, ErrNoOpenCalls
 	}
 
 	if !r.ready {
-		return 0, ErrNoReserve
+		return capSpendLimit, ErrNoReserve
 	}
 
-	if r.balance.allowNegative {
-		return math.MaxInt64, nil
+	if r.balance.meteringMode {
+		return capSpendLimit, nil
 	}
 
-	// Split the available local balance between the potential number of concurrent calls that can be made
-	available := r.balance.Get()
-	share := decimal.NewFromInt(available).Div(decimal.NewFromInt(int64(openConcurrentCallSlots)))
-	roundedShare := share.RoundDown(0).IntPart()
+	decimal.DivisionPrecision = defaultDecimalPrecision
 
-	return roundedShare, nil
+	// Split the available local balance between the number of concurrent calls that can still be made
+	capSpendLimit.Decimal = r.balance.Get().Div(decimal.NewFromInt(int64(openConcurrentCallSlots)))
+
+	if userSpendLimit.Valid {
+		capSpendLimit.Decimal = decimal.Min(capSpendLimit.Decimal, userSpendLimit.Decimal)
+	}
+
+	capSpendLimit.Valid = true
+
+	return capSpendLimit, nil
 }
 
 // Settle handles the actual spends that each node used for a given capability invocation in the engine,
@@ -237,11 +272,12 @@ func (r *Report) Settle(ref string, spendsByNode []capabilities.MeteringNodeDeta
 	if !ok {
 		return ErrNoDeduct
 	}
+
 	if step.Spends != nil {
 		return ErrStepSpendExists
 	}
 
-	spentCredits := int64(0)
+	spentCredits := decimal.NewFromInt(0)
 	resourceSpends := make(map[string][]ReportStepDetail)
 
 	// Group by resource dimension
@@ -262,25 +298,24 @@ func (r *Report) Settle(ref string, spendsByNode []capabilities.MeteringNodeDeta
 				// throw out invalid values for local balance settlement. they will still be included in metering report.
 				continue
 			}
+
 			deciVals = append(deciVals, value)
 		}
 
 		aggregateSpend := medianSpend(deciVals)
-
-		spentCredits += r.balance.ConvertToBalance(unit, aggregateSpend.IntPart())
+		spentCredits = spentCredits.Add(r.balance.ConvertToBalance(unit, aggregateSpend))
 	}
 
 	step.Spends = resourceSpends
 	r.steps[ref] = step
 
 	// if in metering mode, exit early without modifying local balance
-	if r.balance.allowNegative {
+	if r.balance.meteringMode {
 		return nil
 	}
 
 	// Refund the difference between what local balance had been earmarked and the actual spend
-	err := r.balance.Add(step.Deduction - spentCredits)
-	if err != nil {
+	if err := r.balance.Add(step.Deduction.Sub(spentCredits)); err != nil {
 		// invariant: capability should not let spend exceed reserve
 		r.lggr.Error("invariant: spend exceeded reserve")
 	}
@@ -318,6 +353,10 @@ func (r *Report) FormatReport() *events.MeteringReport {
 func (r *Report) SendReceipt(ctx context.Context) error {
 	if !r.ready {
 		return ErrNoReserve
+	}
+
+	if r.client == nil {
+		return ErrNoBillingClient
 	}
 
 	// TODO: https://smartcontract-it.atlassian.net/browse/CRE-427 more robust check of billing service health
@@ -411,10 +450,6 @@ func (s *Reports) Start(ctx context.Context, workflowExecutionID string) (*Repor
 
 	report := NewReport(s.owner, s.workflowID, workflowExecutionID, s.lggr, s.client)
 
-	if s.client == nil {
-		return nil, ErrNoBillingClient
-	}
-
 	s.reports[workflowExecutionID] = report
 
 	return report, nil
@@ -429,6 +464,8 @@ func (s *Reports) End(ctx context.Context, workflowExecutionID string) error {
 	if !ok {
 		return ErrReportNotFound
 	}
+
+	// if in metering mode, send to beholder
 
 	err := report.SendReceipt(ctx)
 

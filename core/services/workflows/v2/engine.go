@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/aggregation"
@@ -322,15 +323,19 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 		// V2Engine runs the entirety of a module's execution as compute. Ensure that the max execution time can run.
 		// Add an extra second of metering padding for context cancel propagation
 		ctxCancelPadding := (time.Millisecond * 1000).Milliseconds()
-		computeAmount, mrErr := meteringReport.ConvertToBalance(metering.ComputeResourceDimension, int64(e.cfg.LocalLimits.WorkflowExecutionTimeoutMs)+ctxCancelPadding)
+		comp := decimal.NewFromInt(int64(e.cfg.LocalLimits.WorkflowExecutionTimeoutMs) + ctxCancelPadding)
+		computeAmount, mrErr := meteringReport.ConvertToBalance(metering.ComputeResourceDimension, comp)
 		if mrErr != nil {
 			e.cfg.Lggr.Errorw("could not determine compute amount to meter", "err", mrErr)
 		}
-		mrErr = meteringReport.Deduct(
+
+		deductAmount := decimal.NewNullDecimal(computeAmount)
+		deductAmount.Valid = true
+
+		if mrErr = meteringReport.Deduct(
 			metering.ComputeResourceDimension,
-			computeAmount,
-		)
-		if mrErr != nil {
+			deductAmount,
+		); mrErr != nil {
 			e.cfg.Lggr.Errorw("could not meter compute", "err", mrErr)
 		}
 	}
