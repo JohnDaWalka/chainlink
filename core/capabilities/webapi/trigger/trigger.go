@@ -137,21 +137,15 @@ func (h *triggerConnectorHandler) processTrigger(ctx context.Context, gatewayID 
 
 func (h *triggerConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, data []byte) error {
 	msg, err := h.codec.DecodeRequest(data)
+	// should never happen because the connector decodes the message before sending it to the handler
 	if err != nil {
 		h.lggr.Errorw("error decoding message", "err", err, "data", data)
-		err = h.sendResponse(ctx, gatewayID, &msg.Body, ghcapabilities.TriggerResponsePayload{Status: "ERROR", ErrorMessage: fmt.Errorf("error %s decoding message", err.Error()).Error()})
-		if err != nil {
-			h.lggr.Errorw("error sending response", "err", err)
-		}
 		return nil
 	}
 
+	// should never happen because the connector validates message before sending it to the handler
 	if err = msg.Validate(); err != nil {
 		h.lggr.Errorw("invalid message", "msg", msg)
-		err = h.sendResponse(ctx, gatewayID, &msg.Body, ghcapabilities.TriggerResponsePayload{Status: "ERROR", ErrorMessage: fmt.Errorf("invalid message %s", err.Error()).Error()})
-		if err != nil {
-			h.lggr.Errorw("error sending response", "err", err)
-		}
 		return nil
 	}
 

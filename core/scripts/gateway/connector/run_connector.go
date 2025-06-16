@@ -30,11 +30,11 @@ type client struct {
 	lggr       logger.Logger
 }
 
-func (h *client) HandleGatewayMessage(ctx context.Context, gatewayId string, data []byte) error {
-	h.lggr.Infof("received message from gateway %s. Echoing back.", gatewayId)
-	err := h.connector.SendToGateway(ctx, gatewayId, data)
+func (h *client) HandleGatewayMessage(ctx context.Context, gatewayID string, data []byte) error {
+	h.lggr.Infof("received message from gateway %s. Echoing back.", gatewayID)
+	err := h.connector.SendToGateway(ctx, gatewayID, data)
 	if err != nil {
-		h.lggr.Errorw("failed to send to gateway", "id", gatewayId, "err", err)
+		h.lggr.Errorw("failed to send to gateway", "id", gatewayID, "err", err)
 	}
 	return nil
 }

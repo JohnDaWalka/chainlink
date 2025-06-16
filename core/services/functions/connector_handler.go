@@ -123,50 +123,48 @@ func (h *functionsConnectorHandler) Sign(ctx context.Context, data ...[]byte) ([
 	return h.keystore.SignMessage(ctx, h.signAddr, gc.Flatten(data...))
 }
 
-func (h *functionsConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayId string, data []byte) error {
+func (h *functionsConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, data []byte) error {
 	msg, err := h.codec.DecodeRequest(data)
+	// should never happen because the connector decodes the message before sending it to the handler
 	if err != nil {
-		h.lggr.Errorw("failed to decode message", "id", gatewayId, "err", err)
+		h.lggr.Errorw("failed to decode message", "id", gatewayID, "err", err)
 		return nil
 	}
 	body := &msg.Body
+	// should never happen because the connector validates message before sending it to the handler
 	if msg.Validate() != nil {
-		response := functions.ResponseBase{
-			Success:      false,
-			ErrorMessage: "invalid message",
-		}
-		h.sendResponseAndLog(ctx, gatewayId, body, response)
+		h.lggr.Errorw("invalid message", "id", gatewayID, "messageId", body.MessageId, "donId", body.DonId, "method", body.Method)
 		return nil
 	}
 	fromAddr := ethCommon.HexToAddress(body.Sender)
 	if !h.allowlist.Allow(fromAddr) {
-		h.lggr.Errorw("allowlist prevented the request from this address", "id", gatewayId, "address", fromAddr)
+		h.lggr.Errorw("allowlist prevented the request from this address", "id", gatewayID, "address", fromAddr)
 		return nil
 	}
 	if !h.rateLimiter.Allow(body.Sender) {
-		h.lggr.Errorw("request rate-limited", "id", gatewayId, "address", fromAddr)
+		h.lggr.Errorw("request rate-limited", "id", gatewayID, "address", fromAddr)
 		return nil
 	}
-	h.lggr.Debugw("handling gateway request", "id", gatewayId, "method", body.Method)
+	h.lggr.Debugw("handling gateway request", "id", gatewayID, "method", body.Method)
 
 	switch body.Method {
 	case functions.MethodSecretsList:
-		h.handleSecretsList(ctx, gatewayId, body, fromAddr)
+		h.handleSecretsList(ctx, gatewayID, body, fromAddr)
 	case functions.MethodSecretsSet:
 		if balance, err := h.subscriptions.GetMaxUserBalance(fromAddr); err != nil || balance.Cmp(h.minimumBalance.ToInt()) < 0 {
-			h.lggr.Errorw("user subscription has insufficient balance", "id", gatewayId, "address", fromAddr, "balance", balance, "minBalance", h.minimumBalance)
+			h.lggr.Errorw("user subscription has insufficient balance", "id", gatewayID, "address", fromAddr, "balance", balance, "minBalance", h.minimumBalance)
 			response := functions.ResponseBase{
 				Success:      false,
 				ErrorMessage: "user subscription has insufficient balance",
 			}
-			h.sendResponseAndLog(ctx, gatewayId, body, response)
+			h.sendResponseAndLog(ctx, gatewayID, body, response)
 			return nil
 		}
-		h.handleSecretsSet(ctx, gatewayId, body, fromAddr)
+		h.handleSecretsSet(ctx, gatewayID, body, fromAddr)
 	case functions.MethodHeartbeat:
-		h.handleHeartbeat(ctx, gatewayId, body, fromAddr)
+		h.handleHeartbeat(ctx, gatewayID, body, fromAddr)
 	default:
-		h.lggr.Errorw("unsupported method", "id", gatewayId, "method", body.Method)
+		h.lggr.Errorw("unsupported method", "id", gatewayID, "method", body.Method)
 	}
 	return nil
 }

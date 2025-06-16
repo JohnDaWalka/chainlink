@@ -302,10 +302,12 @@ func (c *OutgoingConnectorHandler) attemptGatewayConnection(ctx context.Context,
 func (c *OutgoingConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, data []byte) error {
 	msg, err := c.codec.DecodeRequest(data)
 	if err != nil {
-		return fmt.Errorf("failed to decode request: %w", err)
+		c.lggr.Errorw("failed to decode request", "gatewayID", gatewayID, "err", err)
+		return nil
 	}
 	if err := msg.Validate(); err != nil {
-		return fmt.Errorf("invalid message: %w", err)
+		c.lggr.Errorw("invalid message received", "gatewayID", gatewayID, "err", err)
+		return nil
 	}
 	body := &msg.Body
 	l := logger.With(c.lggr, "gatewayID", gatewayID, "method", body.Method, "messageID", msg.Body.MessageId)

@@ -33,7 +33,7 @@ import (
 const gatewayConfigTemplate = `
 [ConnectionManagerConfig]
 AuthChallengeLen = 32
-AuthGatewayId = "test_gateway"
+AuthGatewayID = "test_gateway"
 AuthTimestampToleranceSec = 30
 
 [NodeServerConfig]
@@ -107,17 +107,17 @@ type client struct {
 	done       atomic.Bool
 }
 
-func (c *client) HandleGatewayMessage(ctx context.Context, gatewayId string, data []byte) error {
+func (c *client) HandleGatewayMessage(ctx context.Context, gatewayID string, data []byte) error {
 	msg, err := c.codec.DecodeRequest(data)
 	if err != nil {
 		panic(err)
 	}
-	if err := msg.Validate(); err != nil {
-		panic(err)
+	if err2 := msg.Validate(); err2 != nil {
+		panic(err2)
 	}
 	c.done.Store(true)
 	// send back user's message without re-signing - should be ignored by the Gateway
-	_ = c.connector.SendToGateway(ctx, gatewayId, data)
+	_ = c.connector.SendToGateway(ctx, gatewayID, data)
 	// send back a correct response
 	responseMsg := &api.Message{Body: api.MessageBody{
 		MessageId: msg.Body.MessageId,
@@ -134,7 +134,7 @@ func (c *client) HandleGatewayMessage(ctx context.Context, gatewayId string, dat
 	if err != nil {
 		panic(err)
 	}
-	return c.connector.SendToGateway(ctx, gatewayId, rawResponse)
+	return c.connector.SendToGateway(ctx, gatewayID, rawResponse)
 }
 
 func (c *client) Sign(ctx context.Context, data ...[]byte) ([]byte, error) {

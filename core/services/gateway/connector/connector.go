@@ -225,7 +225,10 @@ func (c *gatewayConnector) readLoop(gatewayState *gatewayState) {
 				c.lggr.Errorw("no handler for method", "id", gatewayState.config.Id, "method", msg.Body.Method)
 				break
 			}
-			handler.HandleGatewayMessage(ctx, gatewayState.config.Id, item.Data)
+			// do not break on error. HandleGatewayMessage handles errors
+			// by sending a response back to the Gateway.
+			err = handler.HandleGatewayMessage(ctx, gatewayState.config.Id, item.Data)
+			c.lggr.Warnw("failed to handle message from Gateway", "id", gatewayState.config.Id, "method", msg.Body.Method, "err", err)
 		}
 	}
 }

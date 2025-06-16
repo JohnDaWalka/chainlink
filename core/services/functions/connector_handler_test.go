@@ -137,8 +137,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 				require.JSONEq(t, `{"success":true,"rows":[{"slot_id":1,"version":1,"expiration":1},{"slot_id":2,"version":2,"expiration":2}]}`, string(decodedMsg.Body.Payload))
 			}).Return(nil).Once()
 
-			err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
-			require.NoError(t, err)
+			err2 := handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
+			require.NoError(t, err2)
 
 			t.Run("orm error", func(t *testing.T) {
 				storage.On("List", ctx, addr).Return(nil, errors.New("boom")).Once()
@@ -150,14 +150,14 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 					require.JSONEq(t, `{"success":false,"error_message":"Failed to list secrets: boom"}`, string(decodedMsg.Body.Payload))
 				}).Return(nil).Once()
 
-				err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
-				require.NoError(t, err)
+				err2 := handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
+				require.NoError(t, err2)
 			})
 
 			t.Run("not allowed", func(t *testing.T) {
 				allowlist.On("Allow", addr).Return(false).Once()
-				err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
-				require.NoError(t, err)
+				err2 := handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
+				require.NoError(t, err2)
 			})
 		})
 
@@ -197,8 +197,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 				require.Equal(t, `{"success":true}`, string(decodedMsg.Body.Payload))
 			}).Return(nil).Once()
 
-			err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
-			require.NoError(t, err)
+			err2 := handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
+			require.NoError(t, err2)
 
 			t.Run("orm error", func(t *testing.T) {
 				storage.On("Put", ctx, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("boom")).Once()
@@ -211,8 +211,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 					require.JSONEq(t, `{"success":false,"error_message":"Failed to set secret: boom"}`, string(decodedMsg.Body.Payload))
 				}).Return(nil).Once()
 
-				err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
-				require.NoError(t, err)
+				err2 := handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
+				require.NoError(t, err2)
 			})
 
 			t.Run("missing signature", func(t *testing.T) {
@@ -228,8 +228,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 					require.JSONEq(t, `{"success":false,"error_message":"Failed to set secret: wrong signature"}`, string(decodedMsg.Body.Payload))
 				}).Return(nil).Once()
 
-				err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
-				require.NoError(t, err)
+				err2 := handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
+				require.NoError(t, err2)
 			})
 
 			t.Run("malformed request", func(t *testing.T) {
@@ -269,8 +269,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 					require.JSONEq(t, `{"success":false,"error_message":"user subscription has insufficient balance"}`, string(decodedMsg.Body.Payload))
 				}).Return(nil).Once()
 
-				err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
-				require.NoError(t, err)
+				err2 := handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
+				require.NoError(t, err2)
 			})
 
 			t.Run("invalid message", func(t *testing.T) {
@@ -279,14 +279,9 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 				storage.AssertNotCalled(t, "Put")
 				allowlist.AssertNotCalled(t, "Allow")
 				subscriptions.AssertNotCalled(t, "GetMaxUserBalance")
-				connector.On("SendToGateway", ctx, "gw1", mock.Anything).Run(func(args mock.Arguments) {
-					msg, ok := args[2].([]byte)
-					require.True(t, ok)
-					decodedMsg := decodeResponse(t, msg)
-					require.JSONEq(t, `{"success":false,"error_message":"invalid message"}`, string(decodedMsg.Body.Payload))
-				}).Return(nil).Once()
-				err = handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
-				require.NoError(t, err)
+				connector.AssertNotCalled(t, "SendToGateway")
+				err2 := handler.HandleGatewayMessage(ctx, "gw1", encodeMessage(t, &msg))
+				require.NoError(t, err2)
 			})
 		})
 

@@ -413,3 +413,33 @@ func TestServiceConfigDefaults(t *testing.T) {
 		require.InDelta(t, DefaultWorkflowRPS, oRLConf.PerSenderRPS, 0.001)
 	})
 }
+func TestOutgoingConnectorHandler_HandleGatewayMessage(t *testing.T) {
+	t.Run("returns on decode error", func(t *testing.T) {
+		_, handler := newFunctionWithDefaultConfig(
+			t,
+			func(gc *gcmocks.GatewayConnector) {},
+		)
+
+		err := handler.HandleGatewayMessage(context.Background(), "gateway1", []byte("not-json"))
+		assert.NoError(t, err)
+	})
+
+	t.Run("returns on invalid message", func(t *testing.T) {
+		_, handler := newFunctionWithDefaultConfig(
+			t,
+			func(gc *gcmocks.GatewayConnector) {},
+		)
+		invalidMsg := api.Message{
+			Body: api.MessageBody{
+				// MessageId is empty, which should fail Validate()
+				Method: "some-method",
+			},
+		}
+		codec := api.JsonRPCCodec{}
+		data, err := codec.EncodeRequest(&invalidMsg)
+		require.NoError(t, err)
+
+		err = handler.HandleGatewayMessage(context.Background(), "gateway1", data)
+		assert.NoError(t, err)
+	})
+}

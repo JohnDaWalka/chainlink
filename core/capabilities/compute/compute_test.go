@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -32,6 +33,8 @@ import (
 const (
 	fetchBinaryCmd   = "core/capabilities/compute/test/fetch/cmd"
 	validRequestUUID = "d2fe6db9-beb4-47c9-b2d6-d3065ace111e"
+	privateKey       = "6c358b4f16344f03cfce12ebf7b768301bbe6a8977c98a2a2d76699f8bc56161"
+	address          = "0xFF48DD50B4EBeD864C9D2df18bf6C931DB5e2Ae7"
 )
 
 var defaultConfig = Config{
@@ -208,7 +211,7 @@ func TestComputeFetch(t *testing.T) {
 		validRequestUUID,
 	}, "/")
 
-	gatewayResp := gatewayResponse(t, msgID, []byte("response body"))
+	gatewayResp := gatewayResponse(t, msgID, []byte("response body"), privateKey)
 	signature := []byte("signature")
 	th.connector.EXPECT().
 		SignMessage(matches.AnyContext, mock.Anything).
@@ -218,7 +221,8 @@ func TestComputeFetch(t *testing.T) {
 		SendToGateway(matches.AnyContext, "gateway1", mock.Anything).
 		Return(nil).
 		Run(func(ctx context.Context, gatewayID string, data []byte) {
-			th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
+			err := th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
+			require.NoError(t, err, "failed to handle gateway message")
 		}).
 		Once()
 
@@ -296,7 +300,7 @@ func TestCompute_SpendValueRelativeToComputeTime(t *testing.T) {
 		ghcapabilities.MethodComputeAction,
 		validRequestUUID,
 	}, "/")
-	gatewayResp := gatewayResponse(t, msgID, []byte("response body"))
+	gatewayResp := gatewayResponse(t, msgID, []byte("response body"), privateKey)
 	binary := wasmtest.CreateTestBinary(fetchBinaryCmd, true, t)
 
 	config, err := values.WrapMap(map[string]any{
@@ -334,7 +338,8 @@ func TestCompute_SpendValueRelativeToComputeTime(t *testing.T) {
 				SendToGateway(mock.Anything, "gateway1", mock.Anything).
 				Return(nil).
 				Run(func(ctx context.Context, gatewayID string, msg []byte) {
-					th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
+					err := th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
+					require.NoError(t, err, "failed to handle gateway message")
 				}).
 				Once().
 				After(test.time)
@@ -377,7 +382,7 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 		validRequestUUID,
 	}, "/")
 
-	gatewayResp := gatewayResponse(t, msgID, make([]byte, 2*1024))
+	gatewayResp := gatewayResponse(t, msgID, make([]byte, 2*1024), privateKey)
 	signature := []byte("signature")
 	th.connector.EXPECT().
 		SignMessage(matches.AnyContext, mock.Anything).
@@ -387,7 +392,8 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 		SendToGateway(matches.AnyContext, "gateway1", mock.Anything).
 		Return(nil).
 		Run(func(ctx context.Context, gatewayID string, data []byte) {
-			th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
+			err := th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
+			require.NoError(t, err, "failed to handle gateway message")
 		}).Once()
 
 	require.NoError(t, th.compute.Start(t.Context()))
@@ -413,7 +419,7 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 	require.ErrorContains(t, err, fmt.Sprintf("response size %d exceeds maximum allowed size %d", 2092, 1*1024))
 }
 
-func gatewayResponse(t *testing.T, msgID string, body []byte) []byte {
+func gatewayResponse(t *testing.T, msgID string, body []byte, privateKey string) []byte {
 	headers := map[string]string{"Content-Type": "application/json"}
 	responsePayload, err := json.Marshal(ghcapabilities.Response{
 		StatusCode:     200,
@@ -424,11 +430,18 @@ func gatewayResponse(t *testing.T, msgID string, body []byte) []byte {
 	require.NoError(t, err)
 	m := &api.Message{
 		Body: api.MessageBody{
+			DonId:     "1",
 			MessageId: msgID,
 			Method:    ghcapabilities.MethodComputeAction,
 			Payload:   responsePayload,
 		},
 	}
+	key, err := crypto.HexToECDSA(privateKey)
+	require.NoError(t, err)
+	err = m.Sign(key)
+	require.NoError(t, err)
+	err = m.Validate()
+	require.NoError(t, err)
 	codec := &api.JsonRPCCodec{}
 	req, err := codec.EncodeRequest(m)
 	require.NoError(t, err)

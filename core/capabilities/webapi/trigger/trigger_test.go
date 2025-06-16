@@ -191,8 +191,8 @@ func TestTriggerExecute(t *testing.T) {
 
 		th.connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return([]byte("signature"), nil).Once()
 		th.connector.On("SendToGateway", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-			resp, err := getResponseFromArg(args.Get(2))
-			require.NoError(t, err)
+			resp, err2 := getResponseFromArg(args.Get(2))
+			require.NoError(t, err2)
 			require.Equal(t, ghcapabilities.TriggerResponsePayload{Status: "ACCEPTED"}, resp)
 		}).Return(nil).Once()
 
@@ -215,8 +215,8 @@ func TestTriggerExecute(t *testing.T) {
 
 		th.connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return([]byte("signature"), nil).Once()
 		th.connector.On("SendToGateway", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-			resp, err := getResponseFromArg(args.Get(2))
-			require.NoError(t, err)
+			resp, err2 := getResponseFromArg(args.Get(2))
+			require.NoError(t, err2)
 			require.Equal(t, ghcapabilities.TriggerResponsePayload{Status: "ACCEPTED"}, resp)
 		}).Return(nil).Once()
 
@@ -244,8 +244,8 @@ func TestTriggerExecute(t *testing.T) {
 
 		th.connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return([]byte("signature"), nil).Once()
 		th.connector.On("SendToGateway", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-			resp, err := getResponseFromArg(args.Get(2))
-			require.NoError(t, err)
+			resp, err2 := getResponseFromArg(args.Get(2))
+			require.NoError(t, err2)
 			require.Equal(t, ghcapabilities.TriggerResponsePayload{Status: "ERROR", ErrorMessage: "empty Workflow Topics"}, resp)
 		}).Return(nil).Once()
 
@@ -259,8 +259,8 @@ func TestTriggerExecute(t *testing.T) {
 		gatewayRequest := gatewayRequest(t, privateKey1, []string{"foo"}, "")
 		th.connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return([]byte("signature"), nil).Once()
 		th.connector.On("SendToGateway", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-			resp, err := getResponseFromArg(args.Get(2))
-			require.NoError(t, err)
+			resp, err2 := getResponseFromArg(args.Get(2))
+			require.NoError(t, err2)
 			require.Equal(t, ghcapabilities.TriggerResponsePayload{Status: "ERROR", ErrorMessage: "no Matching Workflow Topics"}, resp)
 		}).Return(nil).Once()
 
@@ -273,8 +273,8 @@ func TestTriggerExecute(t *testing.T) {
 		gatewayRequest := gatewayRequest(t, privateKey2, []string{"ad_hoc_price_update"}, "")
 		th.connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return([]byte("signature"), nil).Once()
 		th.connector.On("SendToGateway", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-			resp, err := getResponseFromArg(args.Get(2))
-			require.NoError(t, err)
+			resp, err2 := getResponseFromArg(args.Get(2))
+			require.NoError(t, err2)
 
 			require.Equal(t, ghcapabilities.TriggerResponsePayload{Status: "ERROR", ErrorMessage: "unauthorized Sender 0x2dAC9f74Ee66e2D55ea1B8BE284caFedE048dB3A, messageID 12345"}, resp)
 		}).Return(nil).Once()
@@ -288,12 +288,45 @@ func TestTriggerExecute(t *testing.T) {
 		gatewayRequest := gatewayRequest(t, privateKey2, []string{"ad_hoc_price_update"}, "boo")
 		th.connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return([]byte("signature"), nil).Once()
 		th.connector.On("SendToGateway", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-			resp, err := getResponseFromArg(args.Get(2))
-			require.NoError(t, err)
+			resp, err2 := getResponseFromArg(args.Get(2))
+			require.NoError(t, err2)
 			require.Equal(t, ghcapabilities.TriggerResponsePayload{Status: "ERROR", ErrorMessage: "unsupported method boo"}, resp)
 		}).Return(nil).Once()
 
 		th.trigger.HandleGatewayMessage(ctx, "gateway1", gatewayRequest)
+		requireNoChanMsg(t, channel)
+		requireNoChanMsg(t, channel2)
+	})
+
+	t.Run("decoding error", func(t *testing.T) {
+		invalidData := []byte(`{invalid json}`)
+		err := th.trigger.HandleGatewayMessage(ctx, "gateway1", invalidData)
+		th.connector.AssertNotCalled(t, "SignMessage")
+		th.connector.AssertNotCalled(t, "SendToGateway")
+		require.NoError(t, err)
+		requireNoChanMsg(t, channel)
+		requireNoChanMsg(t, channel2)
+	})
+
+	t.Run("invalid message validation", func(t *testing.T) {
+		// Create a valid message, but tamper with it to fail Validate
+		msg := &api.Message{
+			Body: api.MessageBody{
+				MessageId: "id",
+				Method:    ghcapabilities.MethodWebAPITrigger,
+				DonId:     "don",
+				Payload:   json.RawMessage(`{}`),
+			},
+		}
+		// Remove required fields to fail Validate
+		msg.Body.Method = ""
+		apiCodec := api.JsonRPCCodec{}
+		raw, err := apiCodec.EncodeRequest(msg)
+		require.NoError(t, err)
+		th.connector.AssertNotCalled(t, "SignMessage")
+		th.connector.AssertNotCalled(t, "SendToGateway")
+		err = th.trigger.HandleGatewayMessage(ctx, "gateway1", raw)
+		require.NoError(t, err)
 		requireNoChanMsg(t, channel)
 		requireNoChanMsg(t, channel2)
 	})
@@ -359,8 +392,8 @@ func TestTriggerExecute2WorkflowsSameTopicDifferentAllowLists(t *testing.T) {
 
 		th.connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return([]byte("signature"), nil).Once()
 		th.connector.On("SendToGateway", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-			resp, err := getResponseFromArg(args.Get(2))
-			require.NoError(t, err)
+			resp, err2 := getResponseFromArg(args.Get(2))
+			require.NoError(t, err2)
 			require.Equal(t, ghcapabilities.TriggerResponsePayload{Status: "ACCEPTED"}, resp)
 		}).Return(nil).Once()
 

@@ -66,7 +66,8 @@ func TestNewFetcherService(t *testing.T) {
 		gatewayResp := signGatewayResponse(t, gatewayResponse(t, msgID, donID, 200))
 		connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return(signature, nil).Once()
 		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
-			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
+			err2 := fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
+			require.NoError(t, err2)
 		}).Return(nil).Times(1)
 		connector.EXPECT().DonID(matches.AnyContext).Return(donID, nil)
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
@@ -94,7 +95,8 @@ func TestNewFetcherService(t *testing.T) {
 		gatewayResp := signGatewayResponse(t, inconsistentPayload(t, msgID, donID))
 		connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return(signature, nil).Once()
 		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
-			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
+			err2 := fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
+			require.NoError(t, err2)
 		}).Return(nil).Times(1)
 		connector.EXPECT().DonID(matches.AnyContext).Return(donID, nil)
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
@@ -122,7 +124,8 @@ func TestNewFetcherService(t *testing.T) {
 		require.NoError(t, err)
 		connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return(signature, nil).Once()
 		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
-			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayRespBytes)
+			err2 := fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayRespBytes)
+			require.NoError(t, err2)
 		}).Return(nil).Times(1)
 		connector.EXPECT().DonID(matches.AnyContext).Return(donID, nil)
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
@@ -165,7 +168,8 @@ func TestNewFetcherService(t *testing.T) {
 
 		connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return(signature, nil).Once()
 		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
-			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResponseBytes)
+			err2 := fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResponseBytes)
+			require.NoError(t, err2)
 		}).Return(nil).Times(1)
 		connector.EXPECT().DonID(matches.AnyContext).Return(donID, nil)
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
@@ -192,7 +196,8 @@ func TestNewFetcherService(t *testing.T) {
 		gatewayResp := signGatewayResponse(t, gatewayResponse(t, msgID, donID, 500))
 		connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return(signature, nil).Once()
 		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
-			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
+			err2 := fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
+			require.NoError(t, err2)
 		}).Return(nil).Times(1)
 		connector.EXPECT().DonID(matches.AnyContext).Return(donID, nil)
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
@@ -256,7 +261,8 @@ func TestNewFetcherService(t *testing.T) {
 		gatewayResp := signGatewayResponse(t, gatewayResponse(t, msgID, donID, 200))
 		connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return(signature, nil).Once()
 		connector.EXPECT().SendToGateway(matches.AnyContext, "gateway2", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
-			fetcher.och.HandleGatewayMessage(ctx, "gateway2", gatewayResp)
+			err2 := fetcher.och.HandleGatewayMessage(ctx, "gateway2", gatewayResp)
+			require.NoError(t, err2)
 		}).Return(nil).Times(1)
 
 		req := ghcapabilities.Request{
