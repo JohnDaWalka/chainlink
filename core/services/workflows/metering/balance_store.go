@@ -90,6 +90,7 @@ func (bs *balanceStore) convertFromBalance(toUnit string, amount decimal.Decimal
 		// Fail open, continue optimistically
 		bs.lggr.Errorw("could not find conversion rate, continuing as 1:1", "unit", toUnit)
 		rate = decimal.NewFromInt(1)
+		bs.meteringMode = true
 	}
 
 	decimal.DivisionPrecision = defaultDecimalPrecision

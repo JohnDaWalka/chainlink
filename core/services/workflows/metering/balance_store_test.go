@@ -38,12 +38,18 @@ func TestBalanceStore(t *testing.T) {
 		assert.True(t, balanceStore.Get().Equal(eleven), "addition should update the balance")
 
 		require.NoError(t, balanceStore.Minus(two))
+		require.ErrorIs(t, balanceStore.Minus(decimal.NewFromInt(0)), ErrInvalidAmount)
+		require.ErrorIs(t, balanceStore.Minus(decimal.NewFromInt(-1)), ErrInvalidAmount)
 		assert.True(t, balanceStore.Get().Equal(nine), "subtraction should update the balance")
 
 		require.NoError(t, balanceStore.AddAs("resourceA", one))
+		require.ErrorIs(t, balanceStore.AddAs("resourceA", decimal.NewFromInt(0)), ErrInvalidAmount)
+		require.ErrorIs(t, balanceStore.AddAs("resourceA", decimal.NewFromInt(-1)), ErrInvalidAmount)
 		assert.True(t, balanceStore.Get().Equal(eleven), "addition by rate should update balance")
 
 		require.NoError(t, balanceStore.MinusAs("resourceA", two))
+		require.ErrorIs(t, balanceStore.MinusAs("resourceA", decimal.NewFromInt(0)), ErrInvalidAmount)
+		require.ErrorIs(t, balanceStore.MinusAs("resourceA", decimal.NewFromInt(-1)), ErrInvalidAmount)
 		assert.True(t, balanceStore.Get().Equal(seven), "subtraction by rate should update balance")
 	})
 
@@ -78,6 +84,7 @@ func TestBalanceStore(t *testing.T) {
 		balanceStore := NewBalanceStore(decimal.Zero, map[string]decimal.Decimal{"resourceA": decimal.NewFromInt(1)}, logger.Nop())
 
 		require.ErrorIs(t, balanceStore.Minus(one), ErrInsufficientBalance)
+		require.ErrorIs(t, balanceStore.MinusAs("resourceA", one), ErrInsufficientBalance)
 	})
 
 	t.Run("can go negative after allowNegative", func(t *testing.T) {

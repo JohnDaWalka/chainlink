@@ -268,6 +268,22 @@ func Test_Report_Deduct(t *testing.T) {
 		require.ErrorIs(t, report.Deduct("ref1", one), ErrStepDeductExists)
 		billingClient.AssertExpectations(t)
 	})
+
+	t.Run("returns insufficient balance when not in metering mode", func(t *testing.T) {
+		t.Parallel()
+
+		deductValue := decimal.NewNullDecimal(decimal.NewFromInt(11_000))
+		deductValue.Valid = true
+		billingClient := mocks.NewBillingClient(t)
+		report := newTestReport(t, logger.Nop(), billingClient)
+
+		billingClient.EXPECT().ReserveCredits(mock.Anything, mock.Anything).
+			Return(&successReserveResponseWithRates, nil)
+		require.NoError(t, report.Reserve(t.Context()))
+
+		require.ErrorIs(t, report.Deduct("ref1", deductValue), ErrInsufficientBalance)
+		billingClient.AssertExpectations(t)
+	})
 }
 
 func Test_Report_Settle(t *testing.T) {
@@ -477,6 +493,40 @@ func Test_Report_SendReceipt(t *testing.T) {
 		require.ErrorIs(t, report.SendReceipt(t.Context()), ErrReceiptFailed)
 
 		billingClient.AssertExpectations(t)
+	})
+}
+
+func Test_Report_CreditToSpendingLimits(t *testing.T) {
+	t.Parallel()
+
+	t.Run("happy path puts entire balance as first spend type", func(t *testing.T) {
+		t.Parallel()
+
+		billingClient := mocks.NewBillingClient(t)
+		report := newTestReport(t, logger.Nop(), billingClient)
+
+		billingClient.EXPECT().ReserveCredits(mock.Anything, mock.Anything).
+			Return(&successReserveResponseWithRates, nil)
+
+		require.NoError(t, report.Reserve(t.Context()))
+
+		limits := report.CreditToSpendingLimits(capabilities.CapabilityInfo{
+			SpendTypes: []capabilities.CapabilitySpendType{testUnitA, testUnitB},
+		}, decimal.NewFromInt(1_000))
+
+		require.NotNil(t, limits)
+		require.Len(t, limits, 1)
+		assert.Equal(t, testUnitA, string(limits[0].SpendType))
+		assert.Equal(t, "500.000", limits[0].Limit)
+	})
+
+	t.Run("empty limits for empty spend types", func(t *testing.T) {
+		t.Parallel()
+
+		report := newTestReport(t, logger.Nop(), nil)
+		limits := report.CreditToSpendingLimits(capabilities.CapabilityInfo{}, decimal.NewFromInt(1_000))
+
+		assert.Nil(t, limits)
 	})
 }
 
@@ -701,15 +751,17 @@ func Test_Report_MeteringMode(t *testing.T) {
 		t.Run("if rate card contains invalid entry", func(t *testing.T) {
 			t.Parallel()
 
+			lggr, logs := logger.TestObserved(t, zapcore.WarnLevel)
 			billingClient := mocks.NewBillingClient(t)
-			report := newTestReport(t, logger.Nop(), billingClient)
+			report := newTestReport(t, lggr, billingClient)
 
 			billingClient.EXPECT().ReserveCredits(mock.Anything, mock.Anything).
 				Return(&billing.ReserveCreditsResponse{Success: true, Rates: []*billing.ResourceUnitRate{
 					{ResourceUnit: "unit", ConversionRate: "invalid"},
-				}}, errors.New("some err"))
+				}, Credits: 10_000}, nil)
 			require.NoError(t, report.Reserve(t.Context()))
 			require.True(t, report.balance.meteringMode)
+			assert.Len(t, logs.All(), 1)
 			billingClient.AssertExpectations(t)
 		})
 	})
@@ -798,6 +850,28 @@ func Test_Report_MeteringMode(t *testing.T) {
 
 		balanceAfter := report.balance.balance
 		require.Equal(t, balanceBefore, balanceAfter)
+	})
+
+	t.Run("CreditToSpendingLimits switches to metering mode if rate does not exist", func(t *testing.T) {
+		t.Parallel()
+
+		lggr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
+		billingClient := mocks.NewBillingClient(t)
+		report := newTestReport(t, lggr, billingClient)
+
+		// trigger metering mode with a billing reserve error
+		billingClient.EXPECT().ReserveCredits(mock.Anything, mock.Anything).
+			Return(&successReserveResponseWithRates, nil)
+		require.NoError(t, report.Reserve(t.Context()))
+
+		limits := report.CreditToSpendingLimits(capabilities.CapabilityInfo{
+			SpendTypes: []capabilities.CapabilitySpendType{testUnitB},
+		}, decimal.NewFromInt(1_000))
+
+		assert.Nil(t, limits)
+		assert.True(t, report.balance.meteringMode)
+		assert.Len(t, logs.All(), 2)
+		billingClient.AssertExpectations(t)
 	})
 }
 
