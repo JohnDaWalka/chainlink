@@ -26,4 +26,7 @@ plugins:
       moduleURI: "github.com/smartcontractkit/capabilities/workflowevent"
       gitRef: "1b414f8954d071345255fa0ffb3c374b13f18a0d"
       installPath: "github.com/smartcontractkit/capabilities/workflowevent"
-
+  securemint:
+    moduleURI: "github.com/smartcontractkit/por_mock_ocr3plugin"
+    gitRef: "cdd3409730eb2122d118f8324d2d4e7b6b7030ed"
+    installPath: "github.com/smartcontractkit/por_mock_ocr3plugin"
