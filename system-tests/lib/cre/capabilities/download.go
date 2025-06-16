@@ -16,11 +16,11 @@ func DownloadCapabilityFromRelease(ghToken, version, assetFileName string) (stri
 	content, response, err := ghClient.DownloadAssetFromRelease("smartcontractkit", "capabilities", version, assetFileName)
 	if err != nil {
 		if response != nil && response.StatusCode >= 400 {
-			fmt.Printf("Request to GitHub failed with status code: %d\n", response.StatusCode)
-			fmt.Printf("Response headers:\n")
+			fmt.Fprintf(os.Stderr, "Request to GitHub failed with status code: %d\n", response.StatusCode)
+			fmt.Fprintf(os.Stderr, "Response headers:\n")
 			for header, values := range response.Header {
 				valuesStr := strings.Join(values, ", ")
-				fmt.Printf("Header: %s: %s\n", header, valuesStr)
+				fmt.Fprintf(os.Stderr, "Header: %s: %s\n", header, valuesStr)
 			}
 		}
 		return "", err

@@ -17,7 +17,7 @@ do
     exit 1
   fi
   echo "🔁 Retrying ($count/$max_retries) in ${backoff}s..." >&2
-  sleep $backoff
+  sleep "$backoff"
   backoff=$((backoff * 2))
   backoff=$((backoff > 8 ? 8 : backoff))  # Cap at 8 seconds
 done
