@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/clnode"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/client"
@@ -12,8 +13,16 @@ import (
 
 func DownloadCapabilityFromRelease(ghToken, version, assetFileName string) (string, error) {
 	ghClient := client.NewGithubClient(ghToken)
-	content, err := ghClient.DownloadAssetFromRelease("smartcontractkit", "capabilities", version, assetFileName)
+	content, response, err := ghClient.DownloadAssetFromRelease("smartcontractkit", "capabilities", version, assetFileName)
 	if err != nil {
+		if response != nil && response.StatusCode >= 400 {
+			fmt.Printf("Request to GitHub failed with status code: %d\n", response.StatusCode)
+			fmt.Printf("Response headers:\n")
+			for header, values := range response.Header {
+				valuesStr := strings.Join(values, ", ")
+				fmt.Printf("Header: %s: %s\n", header, valuesStr)
+			}
+		}
 		return "", err
 	}
 

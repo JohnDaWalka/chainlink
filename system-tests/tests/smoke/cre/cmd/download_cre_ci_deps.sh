@@ -2,6 +2,7 @@
 
 max_retries=${1:-5} # Default to 5 if not provided
 count=0
+backoff=1  # Start with 1 second
 
 until go run main.go download all \
   --output-dir ../ \
@@ -15,8 +16,10 @@ do
     echo "❌ Failed after $max_retries attempts." >&2
     exit 1
   fi
-  echo "🔁 Retrying ($count/$max_retries)..." >&2
-  sleep 1
+  echo "🔁 Retrying ($count/$max_retries) in ${backoff}s..." >&2
+  sleep $backoff
+  backoff=$((backoff * 2))
+  backoff=$((backoff > 8 ? 8 : backoff))  # Cap at 8 seconds
 done
 
 echo "✅ Download succeeded." >&2

@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -33,8 +34,16 @@ func DownloadAndInstallChainlinkCLI(ghToken, version string) (string, error) {
 	creCLIAssetFile := fmt.Sprintf("cre_%s_%s_%s.tar.gz", version, system, arch)
 
 	ghClient := client.NewGithubClient(ghToken)
-	content, err := ghClient.DownloadAssetFromRelease("smartcontractkit", "dev-platform", version, creCLIAssetFile)
+	content, response, err := ghClient.DownloadAssetFromRelease("smartcontractkit", "dev-platform", version, creCLIAssetFile)
 	if err != nil {
+		if response != nil && response.StatusCode >= 400 {
+			fmt.Printf("Request to GitHub failed with status code: %d\n", response.StatusCode)
+			fmt.Printf("Response headers:\n")
+			for header, values := range response.Header {
+				valuesStr := strings.Join(values, ", ")
+				fmt.Printf("Header: %s: %s\n", header, valuesStr)
+			}
+		}
 		return "", errors.Wrapf(err, "failed to download CRE CLI asset %s", creCLIAssetFile)
 	}
 
