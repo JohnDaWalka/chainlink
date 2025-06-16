@@ -66,7 +66,7 @@ func (bs *balanceStore) convertToBalance(fromUnit string, amount decimal.Decimal
 	rate, ok := bs.conversions[fromUnit]
 	if !ok {
 		// Fail open, continue optimistically
-		bs.lggr.Errorw("could not find conversion rate, continuing as 1:1", "unit", fromUnit)
+		bs.lggr.Errorw("could not find conversion rate, continuing as 1:1; entering metering mode", "unit", fromUnit)
 		rate = decimal.NewFromInt(1)
 		bs.meteringMode = true
 	}
@@ -88,7 +88,7 @@ func (bs *balanceStore) convertFromBalance(toUnit string, amount decimal.Decimal
 	rate, ok := bs.conversions[toUnit]
 	if !ok {
 		// Fail open, continue optimistically
-		bs.lggr.Errorw("could not find conversion rate, continuing as 1:1", "unit", toUnit)
+		bs.lggr.Errorw("could not find conversion rate, continuing as 1:1; entering metering mode", "unit", toUnit)
 		rate = decimal.NewFromInt(1)
 		bs.meteringMode = true
 	}

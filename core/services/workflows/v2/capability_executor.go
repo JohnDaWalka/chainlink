@@ -59,14 +59,13 @@ func (c *ExecutionHelper) CallCapability(ctx context.Context, request *sdkpb.Cap
 	userSpendLimit := decimal.NewNullDecimal(decimal.Zero)
 	userSpendLimit.Valid = false
 
-	availableForCall, err := meterReport.GetMaxSpendForInvocation(meteringRef, userSpendLimit, int(c.cfg.LocalLimits.MaxConcurrentCapabilityCallsPerWorkflow)-len(c.capCallsSemaphore))
+	spendLimit, err := meterReport.GetMaxSpendForInvocation(userSpendLimit, int(c.cfg.LocalLimits.MaxConcurrentCapabilityCallsPerWorkflow)-len(c.capCallsSemaphore))
 	if err != nil {
 		c.lggr.Errorw("could not reserve for capability request", "capReq", request.Id, "capReqCallbackID", request.CallbackId, "err", err)
 	}
 
-	if availableForCall.Valid {
-		// TODO: https://smartcontract-it.atlassian.net/browse/CRE-461 if availability is math.MaxInt64 there is no limit. Possibly flag this in a different way.
-		if err = meterReport.Deduct(meteringRef, availableForCall); err != nil {
+	if spendLimit.Valid {
+		if err = meterReport.Deduct(meteringRef, spendLimit); err != nil {
 			c.cfg.Lggr.Errorw("could not deduct balance for capability request", "capReq", request.Id, "capReqCallbackID", request.CallbackId, "err", err)
 		}
 
@@ -75,7 +74,7 @@ func (c *ExecutionHelper) CallCapability(ctx context.Context, request *sdkpb.Cap
 			c.cfg.Lggr.Error("failed to get info for capability")
 		}
 
-		capReq.Metadata.SpendLimits = meterReport.CreditToSpendingLimits(info, availableForCall.Decimal)
+		capReq.Metadata.SpendLimits = meterReport.CreditToSpendingLimits(info, spendLimit.Decimal)
 	}
 
 	// TODO: https://smartcontract-it.atlassian.net/browse/CRE-461

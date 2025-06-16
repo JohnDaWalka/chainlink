@@ -102,9 +102,7 @@ func (r *Report) Reserve(ctx context.Context) error {
 	defer r.mu.Unlock()
 
 	if r.client == nil {
-		r.lggr.Error("billing client not set; switching to metering mode")
-		r.balance.meteringMode = true
-		r.ready = true
+		r.switchToMeteringMode(ErrNoBillingClient)
 
 		return nil
 	}
@@ -124,9 +122,7 @@ func (r *Report) Reserve(ctx context.Context) error {
 
 	// If there is an error communicating with the billing service, fail open
 	if err != nil {
-		r.lggr.Warnf("failed to reserve credits; switching to metering mode: %s", err)
-		r.balance.meteringMode = true
-		r.ready = true
+		r.switchToMeteringMode(err)
 
 		return nil
 	}
@@ -137,9 +133,7 @@ func (r *Report) Reserve(ctx context.Context) error {
 
 	rateCard, err := toRateCard(resp.GetRates())
 	if err != nil {
-		r.lggr.Warnf("failed to parse rate card; switching to metering mode: %s", err)
-		r.balance.meteringMode = true
-		r.ready = true
+		r.switchToMeteringMode(err)
 
 		return nil
 	}
@@ -160,9 +154,8 @@ func (r *Report) ConvertToBalance(fromUnit string, amount decimal.Decimal) (deci
 }
 
 // Deduct earmarks an amount of local universal credit balance. We expect to only set this value once - an error is
-// returned if a step would be overwritten. Deduct expects a NullDecimal because GetMaxSpendForInvocation can return
-// a NullDecimal.
-func (r *Report) Deduct(ref string, amount decimal.NullDecimal) error {
+// returned if a step would be overwritten.
+func (r *Report) Deduct(ref string, amount decimal.Decimal) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -175,16 +168,16 @@ func (r *Report) Deduct(ref string, amount decimal.NullDecimal) error {
 	}
 
 	r.steps[ref] = ReportStep{
-		Deduction: amount.Decimal,
+		Deduction: amount,
 		Spends:    nil,
 	}
 
 	// if in metering mode, exit early without modifying local balance
-	if r.balance.meteringMode || !amount.Valid {
+	if r.balance.meteringMode {
 		return nil
 	}
 
-	err := r.balance.Minus(amount.Decimal)
+	err := r.balance.Minus(amount)
 	if err != nil {
 		return err
 	}
@@ -196,6 +189,7 @@ func (r *Report) CreditToSpendingLimits(
 	info capabilities.CapabilityInfo,
 	amount decimal.Decimal,
 ) []capabilities.SpendLimit {
+	// TODO: https://smartcontract-it.atlassian.net/browse/CRE-463 handle multiple spend types
 	if len(info.SpendTypes) > 0 {
 		spendType := info.SpendTypes[0]
 
@@ -204,8 +198,6 @@ func (r *Report) CreditToSpendingLimits(
 
 		// check to see if metering mode is active
 		if r.balance.meteringMode {
-			r.lggr.Errorf("no rate exists in rate card for %s; entering metering mode", spendType)
-
 			return nil
 		}
 
@@ -219,41 +211,38 @@ func (r *Report) CreditToSpendingLimits(
 // provided max spend by the user or the available credit balance. The available credit balance is determined by
 // dividing unearmarked local credit balance by the number of potential concurrent calls.
 func (r *Report) GetMaxSpendForInvocation(
-	ref string,
 	userSpendLimit decimal.NullDecimal,
 	openConcurrentCallSlots int,
 ) (decimal.NullDecimal, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	capSpendLimit := decimal.NewNullDecimal(decimal.Zero)
-	capSpendLimit.Valid = false
+	nullCapSpendLimit := decimal.NewNullDecimal(decimal.Zero)
+	nullCapSpendLimit.Valid = false
 
 	if openConcurrentCallSlots == 0 {
 		// invariant: this should be managed by the consumer (engine)
-		return capSpendLimit, ErrNoOpenCalls
+		return nullCapSpendLimit, ErrNoOpenCalls
 	}
 
 	if !r.ready {
-		return capSpendLimit, ErrNoReserve
+		return nullCapSpendLimit, ErrNoReserve
 	}
 
 	if r.balance.meteringMode {
-		return capSpendLimit, nil
+		return nullCapSpendLimit, nil
 	}
 
 	decimal.DivisionPrecision = defaultDecimalPrecision
 
 	// Split the available local balance between the number of concurrent calls that can still be made
-	capSpendLimit.Decimal = r.balance.Get().Div(decimal.NewFromInt(int64(openConcurrentCallSlots)))
+	spendLimit := r.balance.Get().Div(decimal.NewFromInt(int64(openConcurrentCallSlots)))
 
 	if userSpendLimit.Valid {
-		capSpendLimit.Decimal = decimal.Min(capSpendLimit.Decimal, userSpendLimit.Decimal)
+		spendLimit = decimal.Min(spendLimit, userSpendLimit.Decimal)
 	}
 
-	capSpendLimit.Valid = true
-
-	return capSpendLimit, nil
+	return decimal.NewNullDecimal(spendLimit), nil
 }
 
 // Settle handles the actual spends that each node used for a given capability invocation in the engine,
@@ -378,6 +367,12 @@ func (r *Report) SendReceipt(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (r *Report) switchToMeteringMode(err error) {
+	r.lggr.Warnf("failed to parse rate card; switching to metering mode: %s", err)
+	r.balance.meteringMode = true
+	r.ready = true
 }
 
 func toRateCard(rates []*billing.ResourceUnitRate) (map[string]decimal.Decimal, error) {

@@ -796,7 +796,7 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 		userMaxSpend.Valid = false
 
 		// NOTE: e.maxWorkerLimit is a static number leading to the availability always being undercut.
-		availableForCall, err := meteringReport.GetMaxSpendForInvocation(stepState.Ref, userMaxSpend, e.maxWorkerLimit)
+		availableForCall, err := meteringReport.GetMaxSpendForInvocation(userMaxSpend, e.maxWorkerLimit)
 
 		if err != nil {
 			l.Error(fmt.Sprintf("could get available balance for %s: %s", stepState.Ref, err))

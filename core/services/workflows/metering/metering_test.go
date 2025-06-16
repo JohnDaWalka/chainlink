@@ -176,7 +176,7 @@ func Test_Report_GetAvailableForInvocation(t *testing.T) {
 		t.Parallel()
 
 		report := newTestReport(t, logger.Nop(), nil)
-		_, err := report.GetMaxSpendForInvocation("", emptyUserSpendLimit, 0)
+		_, err := report.GetMaxSpendForInvocation(emptyUserSpendLimit, 0)
 
 		require.ErrorIs(t, ErrNoOpenCalls, err)
 	})
@@ -185,7 +185,7 @@ func Test_Report_GetAvailableForInvocation(t *testing.T) {
 		t.Parallel()
 
 		report := newTestReport(t, logger.Nop(), nil)
-		_, err := report.GetMaxSpendForInvocation("", emptyUserSpendLimit, 1)
+		_, err := report.GetMaxSpendForInvocation(emptyUserSpendLimit, 1)
 
 		require.ErrorIs(t, ErrNoReserve, err)
 	})
@@ -202,7 +202,7 @@ func Test_Report_GetAvailableForInvocation(t *testing.T) {
 		require.NoError(t, report.Reserve(t.Context()))
 
 		// 1 slot = all of available balance
-		available, err := report.GetMaxSpendForInvocation("", emptyUserSpendLimit, 1)
+		available, err := report.GetMaxSpendForInvocation(emptyUserSpendLimit, 1)
 		require.NoError(t, err)
 
 		// TODO: https://smartcontract-it.atlassian.net/browse/CRE-290 once billing client response contains balance take out dummy balance
@@ -226,7 +226,7 @@ func Test_Report_GetAvailableForInvocation(t *testing.T) {
 		// 1 slot = all of available balance
 		nonEmptyUserSpendLimit := decimal.NewNullDecimal(decimal.NewFromInt(5_000))
 		nonEmptyUserSpendLimit.Valid = true
-		available, err := report.GetMaxSpendForInvocation("", nonEmptyUserSpendLimit, 1)
+		available, err := report.GetMaxSpendForInvocation(nonEmptyUserSpendLimit, 1)
 		require.NoError(t, err)
 
 		// TODO: https://smartcontract-it.atlassian.net/browse/CRE-290 once billing client response contains balance take out dummy balance
@@ -239,19 +239,15 @@ func Test_Report_GetAvailableForInvocation(t *testing.T) {
 func Test_Report_Deduct(t *testing.T) {
 	t.Parallel()
 
-	one := decimal.NewNullDecimal(decimal.NewFromInt(1))
-	one.Valid = true
-	two := decimal.NewNullDecimal(decimal.NewFromInt(2))
-	two.Valid = true
+	one := decimal.NewFromInt(1)
+	two := decimal.NewFromInt(2)
 
 	t.Run("returns an error if not initialized", func(t *testing.T) {
 		t.Parallel()
 
-		deductValue := decimal.NewNullDecimal(decimal.NewFromInt(1))
-		deductValue.Valid = true
 		report := newTestReport(t, logger.Nop(), nil)
 
-		require.ErrorIs(t, report.Deduct("ref1", deductValue), ErrNoReserve)
+		require.ErrorIs(t, report.Deduct("ref1", one), ErrNoReserve)
 	})
 
 	t.Run("returns an error if step already exists", func(t *testing.T) {
@@ -272,8 +268,7 @@ func Test_Report_Deduct(t *testing.T) {
 	t.Run("returns insufficient balance when not in metering mode", func(t *testing.T) {
 		t.Parallel()
 
-		deductValue := decimal.NewNullDecimal(decimal.NewFromInt(11_000))
-		deductValue.Valid = true
+		deductValue := decimal.NewFromInt(11_000)
 		billingClient := mocks.NewBillingClient(t)
 		report := newTestReport(t, logger.Nop(), billingClient)
 
@@ -324,10 +319,7 @@ func Test_Report_Settle(t *testing.T) {
 			{Peer2PeerID: "abc", SpendUnit: testUnitA, SpendValue: "1"},
 		}
 
-		deduct := decimal.NewNullDecimal(decimal.NewFromInt(2))
-		deduct.Valid = true
-
-		require.NoError(t, report.Deduct("ref1", deduct))
+		require.NoError(t, report.Deduct("ref1", decimal.NewFromInt(2)))
 		require.NoError(t, report.Settle("ref1", steps))
 		require.ErrorIs(t, report.Settle("ref1", steps), ErrStepSpendExists)
 		billingClient.AssertExpectations(t)
@@ -349,10 +341,7 @@ func Test_Report_Settle(t *testing.T) {
 			{Peer2PeerID: "abc", SpendUnit: testUnitA, SpendValue: "1"},
 		}
 
-		deduct := decimal.NewNullDecimal(decimal.NewFromInt(2))
-		deduct.Valid = true
-
-		require.NoError(t, report.Deduct("ref1", deduct))
+		require.NoError(t, report.Deduct("ref1", decimal.NewFromInt(2)))
 		require.NoError(t, report.Settle("ref1", steps))
 		assert.Len(t, logs.All(), 1)
 		billingClient.AssertExpectations(t)
@@ -373,10 +362,7 @@ func Test_Report_Settle(t *testing.T) {
 			{Peer2PeerID: "xyz", SpendUnit: testUnitA, SpendValue: "2"},
 		}
 
-		deduct := decimal.NewNullDecimal(decimal.NewFromInt(1))
-		deduct.Valid = true
-
-		require.NoError(t, report.Deduct("ref1", deduct))
+		require.NoError(t, report.Deduct("ref1", decimal.NewFromInt(1)))
 		require.NoError(t, report.Settle("ref1", steps))
 		assert.Len(t, logs.All(), 1)
 		billingClient.AssertExpectations(t)
@@ -410,14 +396,12 @@ func Test_Report_FormatReport(t *testing.T) {
 		billingClient.EXPECT().ReserveCredits(mock.Anything, mock.Anything).Return(&successReserveResponse, nil)
 		require.NoError(t, report.Reserve(t.Context()))
 
-		deduct := decimal.NewNullDecimal(decimal.NewFromInt(1))
-		deduct.Valid = true
 		expected := map[string]*events.MeteringReportStep{}
 
 		for i := range numSteps {
 			stepRef := strconv.Itoa(i)
 
-			require.NoError(t, report.Deduct(stepRef, deduct))
+			require.NoError(t, report.Deduct(stepRef, decimal.NewFromInt(1)))
 			require.NoError(t, report.Settle(stepRef, []capabilities.MeteringNodeDetail{
 				{Peer2PeerID: "xyz", SpendUnit: "a", SpendValue: "42"},
 			}))
@@ -550,11 +534,8 @@ func Test_MeterReports(t *testing.T) {
 		r, err := mrs.Start(t.Context(), workflowExecutionID1)
 		require.NoError(t, err)
 
-		deduct := decimal.NewNullDecimal(decimal.NewFromInt(1))
-		deduct.Valid = true
-
 		require.NoError(t, r.Reserve(t.Context()))
-		require.NoError(t, r.Deduct(capabilityCall1, deduct))
+		require.NoError(t, r.Deduct(capabilityCall1, decimal.NewFromInt(1)))
 		require.NoError(t, r.Settle(capabilityCall1, []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "1", SpendUnit: testUnitA, SpendValue: "0.8"},
 			{Peer2PeerID: "2", SpendUnit: testUnitA, SpendValue: "0.9"},
@@ -578,11 +559,8 @@ func Test_MeterReports(t *testing.T) {
 		r, err := mrs.Start(t.Context(), workflowExecutionID1)
 		require.NoError(t, err)
 
-		deduct := decimal.NewNullDecimal(decimal.NewFromInt(1))
-		deduct.Valid = true
-
 		require.NoError(t, r.Reserve(t.Context()))
-		require.NoError(t, r.Deduct(capabilityCall1, deduct))
+		require.NoError(t, r.Deduct(capabilityCall1, decimal.NewFromInt(1)))
 		require.NoError(t, r.Settle(capabilityCall1, []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "1", SpendUnit: testUnitA, SpendValue: "1"},
 			{Peer2PeerID: "2", SpendUnit: testUnitA, SpendValue: "1"},
@@ -799,14 +777,13 @@ func Test_Report_MeteringMode(t *testing.T) {
 
 		require.NoError(t, report.Reserve(t.Context()))
 
-		available, err := report.GetMaxSpendForInvocation("", emptyUserSpendLimit, 1)
+		available, err := report.GetMaxSpendForInvocation(emptyUserSpendLimit, 1)
 		require.NoError(t, err)
 		assert.False(t, available.Valid)
 		billingClient.AssertExpectations(t)
 	})
 
-	two := decimal.NewNullDecimal(decimal.NewFromInt(2))
-	two.Valid = true
+	two := decimal.NewFromInt(2)
 
 	t.Run("Deduct does not modify local balance in metering mode", func(t *testing.T) {
 		t.Parallel()
@@ -837,11 +814,9 @@ func Test_Report_MeteringMode(t *testing.T) {
 			Return(nil, errors.New("everything is still on fire"))
 		require.NoError(t, report.Reserve(t.Context()))
 
-		deduct := decimal.NewNullDecimal(decimal.NewFromInt(2))
-		deduct.Valid = true
 		balanceBefore := report.balance.balance
 
-		require.NoError(t, report.Deduct("ref1", deduct))
+		require.NoError(t, report.Deduct("ref1", two))
 
 		steps := []capabilities.MeteringNodeDetail{
 			{Peer2PeerID: "xyz", SpendUnit: testUnitA, SpendValue: "2"},
@@ -870,7 +845,7 @@ func Test_Report_MeteringMode(t *testing.T) {
 
 		assert.Nil(t, limits)
 		assert.True(t, report.balance.meteringMode)
-		assert.Len(t, logs.All(), 2)
+		assert.Len(t, logs.All(), 1)
 		billingClient.AssertExpectations(t)
 	})
 }
