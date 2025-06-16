@@ -3,11 +3,12 @@ package operations
 import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
 type DeployOCR3OpDeps struct {
@@ -37,7 +38,7 @@ var DeployOCR3Op = operations.NewOperation[DeployOCR3OpInput, DeployOCR3OpOutput
 		}
 
 		return DeployOCR3OpOutput{
-			Addresses: ocr3Output.DataStore.Addresses(), AddressBook: ocr3Output.AddressBook, // nolint:staticcheck keeping the address book since not everthing has been migrated to datastore
+			Addresses: ocr3Output.DataStore.Addresses(), AddressBook: ocr3Output.AddressBook, // nolint:staticcheck keeping the address book since not everything has been migrated to datastore
 		}, nil
 	},
 )

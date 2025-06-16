@@ -36,7 +36,7 @@ var DeployCapabilityRegistryOp = operations.NewOperation[DeployCapabilityRegistr
 		}
 		return DeployCapabilityRegistryOutput{
 			Addresses:   capabilityRegistryOutput.DataStore.Addresses(),
-			AddressBook: capabilityRegistryOutput.AddressBook, // nolint:staticcheck keeping the address book since not everything has been migrated to datastore
+			AddressBook: capabilityRegistryOutput.AddressBook, //nolint:staticcheck // keeping the address book since not everything has been migrated to datastore
 		}, nil
 	},
 )
