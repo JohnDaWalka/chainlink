@@ -2,26 +2,28 @@ package operations
 
 import (
 	"github.com/Masterminds/semver/v3"
-	common "github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 type DeployKeystoneContractsSequenceDeps struct {
-	// Any dep (for example, the logger, datastore and the env)
-	lggr common.Logger
+	Env *deployment.Environment
 }
 
 // inputs and outputs have to be serializable, and must not contain sensitive data
 
 type DeployKeystoneContractsSequenceInput struct {
-	HomeChainSelector uint64
+	HomeChainSelector   uint64
+	ForwardersSelectors []uint64
 }
 
 type DeployKeystoneContractsSequenceOutput struct {
 	// Not sure if we can serialize the address book without modifications, but whatever is returned needs to be serializable.
 	// This could also be the address datastore instead.
 	AddressBook deployment.AddressBook
+	Addresses   datastore.AddressRefStore // Keeping the address store for backward compatibility, as not everything has been migrated to address book
 }
 
 // DeployKeystoneContractsSequence is a sequence that deploys the Keystone contracts (OCR3, Capabilities Registry, Workflow Registry, Keystone Forwarder).
@@ -30,53 +32,73 @@ var DeployKeystoneContractsSequence = operations.NewSequence[DeployKeystoneContr
 	semver.MustParse("1.0.0"),
 	"Deploy Keystone Contracts (OCR3, Capabilities Registry, Workflow Registry, Keystone Forwarder)",
 	func(b operations.Bundle, deps DeployKeystoneContractsSequenceDeps, input DeployKeystoneContractsSequenceInput) (output DeployKeystoneContractsSequenceOutput, err error) {
-		// TODO: add logging
-		// TODO: make it parallelizable
-
 		ab := deployment.NewMemoryAddressBook()
+		as := datastore.NewMemoryDataStore()
 
-		// Here we would execute one operation per step.
-		// For example, deploying the OCR3 contract, then the capabilities registry, etc.
-		ocr3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps{}, DeployOCR3OpInput{})
-		if err != nil {
-			return DeployKeystoneContractsSequenceOutput{}, err
-		}
-
-		capabilitiesRegistryDeployReport, err := operations.ExecuteOperation(b, DeployCapabilityRegistryOp, DeployCapabilityRegistryOpDeps{}, DeployCapabilityRegistryInput{})
+		ocr3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps{Env: deps.Env}, DeployOCR3OpInput{ChainSelector: input.HomeChainSelector})
 		if err != nil {
 			return DeployKeystoneContractsSequenceOutput{}, err
 		}
 
-		workflowRegistryDeployReport, err := operations.ExecuteOperation(b, DeployWorkflowRegistryOp, DeployWorkflowRegistryOpDeps{}, DeployWorkflowRegistryInput{})
+		capabilitiesRegistryDeployReport, err := operations.ExecuteOperation(b, DeployCapabilityRegistryOp, DeployCapabilityRegistryOpDeps{Env: deps.Env}, DeployCapabilityRegistryInput{ChainSelector: input.HomeChainSelector})
 		if err != nil {
 			return DeployKeystoneContractsSequenceOutput{}, err
 		}
 
-		keystoneForwarderDeployReport, err := operations.ExecuteOperation(b, DeployKeystoneForwarderOp, DeployForwarderOpDeps{}, DeployForwarderOpInput{})
+		workflowRegistryDeployReport, err := operations.ExecuteOperation(b, DeployWorkflowRegistryOp, DeployWorkflowRegistryOpDeps{Env: deps.Env}, DeployWorkflowRegistryInput{ChainSelector: input.HomeChainSelector})
 		if err != nil {
 			return DeployKeystoneContractsSequenceOutput{}, err
 		}
 
-		err = ab.Save(input.HomeChainSelector, ocr3DeployReport.Output.Address.String(), ocr3DeployReport.Output.Tv)
-		if err != nil {
-			return DeployKeystoneContractsSequenceOutput{}, err
-		}
-		err = ab.Save(input.HomeChainSelector, capabilitiesRegistryDeployReport.Output.Address.String(), capabilitiesRegistryDeployReport.Output.Tv)
-		if err != nil {
-			return DeployKeystoneContractsSequenceOutput{}, err
-		}
-		err = ab.Save(input.HomeChainSelector, workflowRegistryDeployReport.Output.Address.String(), workflowRegistryDeployReport.Output.Tv)
-		if err != nil {
-			return DeployKeystoneContractsSequenceOutput{}, err
-		}
-		err = ab.Save(input.HomeChainSelector, keystoneForwarderDeployReport.Output.Address.String(), keystoneForwarderDeployReport.Output.Tv)
+		keystoneForwarderDeployReport, err := operations.ExecuteSequence(b, DeployKeystoneForwardersSequence, DeployKeystoneForwardersSequenceDeps{Env: deps.Env}, DeployKeystoneForwardersInput{Targets: input.ForwardersSelectors})
 		if err != nil {
 			return DeployKeystoneContractsSequenceOutput{}, err
 		}
 
-		// Here we would collect the addresses of the deployed contracts and return them.
+		// Merge the address book and datastore from the deployed contracts
+		var allResultingAddresses []datastore.AddressRef
+		ocr3Addrs, err := ocr3DeployReport.Output.Addresses.Fetch()
+		if err != nil {
+			return DeployKeystoneContractsSequenceOutput{}, err
+		}
+		allResultingAddresses = append(allResultingAddresses, ocr3Addrs...)
+		capabilitiesRegistryAddrs, err := capabilitiesRegistryDeployReport.Output.Addresses.Fetch()
+		if err != nil {
+			return DeployKeystoneContractsSequenceOutput{}, err
+		}
+		allResultingAddresses = append(allResultingAddresses, capabilitiesRegistryAddrs...)
+		workflowRegistryAddrs, err := workflowRegistryDeployReport.Output.Addresses.Fetch()
+		if err != nil {
+			return DeployKeystoneContractsSequenceOutput{}, err
+		}
+		allResultingAddresses = append(allResultingAddresses, workflowRegistryAddrs...)
+		keystoneForwarderAddrs, err := keystoneForwarderDeployReport.Output.Addresses.Fetch()
+		if err != nil {
+			return DeployKeystoneContractsSequenceOutput{}, err
+		}
+		allResultingAddresses = append(allResultingAddresses, keystoneForwarderAddrs...)
+		for _, addr := range allResultingAddresses {
+			if addrRefErr := as.AddressRefStore.Add(addr); addrRefErr != nil {
+				return DeployKeystoneContractsSequenceOutput{}, addrRefErr
+			}
+		}
+
+		if err := ab.Merge(ocr3DeployReport.Output.AddressBook); err != nil {
+			return DeployKeystoneContractsSequenceOutput{}, err
+		}
+		if err := ab.Merge(capabilitiesRegistryDeployReport.Output.AddressBook); err != nil {
+			return DeployKeystoneContractsSequenceOutput{}, err
+		}
+		if err := ab.Merge(workflowRegistryDeployReport.Output.AddressBook); err != nil {
+			return DeployKeystoneContractsSequenceOutput{}, err
+		}
+		if err := ab.Merge(keystoneForwarderDeployReport.Output.AddressBook); err != nil {
+			return DeployKeystoneContractsSequenceOutput{}, err
+		}
+
 		return DeployKeystoneContractsSequenceOutput{
 			AddressBook: ab,
+			Addresses:   as.Addresses(),
 		}, nil
 	},
 )

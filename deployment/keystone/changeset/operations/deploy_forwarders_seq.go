@@ -1,16 +1,16 @@
 package operations
 
 import (
-	"fmt"
-
 	"github.com/Masterminds/semver/v3"
 	pkgerrors "github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"golang.org/x/sync/errgroup"
 )
 
 type DeployKeystoneForwardersSequenceDeps struct {
+	Env *cldf.Environment // The environment in which the Keystone Forwarders will be deployed
 }
 
 type DeployKeystoneForwardersInput struct {
@@ -18,7 +18,8 @@ type DeployKeystoneForwardersInput struct {
 }
 
 type DeployKeystoneForwardersOutput struct {
-	AddressBook deployment.AddressBook // The address book containing the deployed Keystone Forwarders
+	Addresses   datastore.AddressRefStore
+	AddressBook cldf.AddressBook // The address book containing the deployed Keystone Forwarders
 }
 
 var DeployKeystoneForwardersSequence = operations.NewSequence[DeployKeystoneForwardersInput, DeployKeystoneForwardersOutput, DeployKeystoneForwardersSequenceDeps](
@@ -26,29 +27,37 @@ var DeployKeystoneForwardersSequence = operations.NewSequence[DeployKeystoneForw
 	semver.MustParse("1.0.0"),
 	"Deploy Keystone Forwarders",
 	func(b operations.Bundle, deps DeployKeystoneForwardersSequenceDeps, input DeployKeystoneForwardersInput) (DeployKeystoneForwardersOutput, error) {
-		ab := deployment.NewMemoryAddressBook()
+		ab := cldf.NewMemoryAddressBook()
+		as := datastore.NewMemoryDataStore()
 		contractErrGroup := &errgroup.Group{}
 		for _, target := range input.Targets {
-			fmt.Println(target)
 			contractErrGroup.Go(func() error {
-				// For each target, we would deploy the Keystone Forwarder.
-				// This is a placeholder for the actual deployment logic.
-				// TODO: we would pass here the target as an input to the operation.
-				_, err := operations.ExecuteOperation(b, DeployKeystoneForwarderOp, DeployForwarderOpDeps{}, DeployForwarderOpInput{})
+				r, err := operations.ExecuteOperation(b, DeployKeystoneForwarderOp, DeployForwarderOpDeps{Env: deps.Env}, DeployForwarderOpInput{
+					ChainSelector: target,
+				})
 				if err != nil {
 					return err
 				}
-				//err = ab.Save(target, r.Output.Address.String(), r.Output.Tv)
-				//if err != nil {
-				//	return pkgerrors.Wrapf(err, "failed to save Keystone Forwarder address for target %d", target)
-				//}
+				err = ab.Merge(r.Output.AddressBook)
+				if err != nil {
+					return pkgerrors.Wrapf(err, "failed to save Keystone Forwarder address on address book for target %d", target)
+				}
+				addrs, err := r.Output.Addresses.Fetch()
+				if err != nil {
+					return pkgerrors.Wrapf(err, "failed to fetch Keystone Forwarder addresses for target %d", target)
+				}
+				for _, addr := range addrs {
+					if addrRefErr := as.AddressRefStore.Add(addr); addrRefErr != nil {
+						return pkgerrors.Wrapf(addrRefErr, "failed to save Keystone Forwarder address on datastore for target %d", target)
+					}
+				}
 
 				return nil
 			})
 		}
 		if err := contractErrGroup.Wait(); err != nil {
-			return DeployKeystoneForwardersOutput{AddressBook: ab}, pkgerrors.Wrap(err, "failed to deploy Keystone contracts")
+			return DeployKeystoneForwardersOutput{AddressBook: ab, Addresses: as.Addresses()}, pkgerrors.Wrap(err, "failed to deploy Keystone contracts")
 		}
-		return DeployKeystoneForwardersOutput{AddressBook: ab}, nil
+		return DeployKeystoneForwardersOutput{AddressBook: ab, Addresses: as.Addresses()}, nil
 	},
 )

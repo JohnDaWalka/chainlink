@@ -28,18 +28,18 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/postgres"
+	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
-	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
-	workflow_registry_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/workflowregistry"
-
-	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	keystone_operations "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations"
 
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	libcaps "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
@@ -154,73 +154,42 @@ func SetupTestEnvironment(
 		},
 		BlockChains: chain.NewBlockChains(blockChains),
 	}
+	allChainsCLDEnvironment.OperationsBundle = operations.NewBundle(allChainsCLDEnvironment.GetContext, singeFileLogger, operations.NewMemoryReporter())
 
 	fmt.Print(libformat.PurpleText("\n[Stage 1/8] Blockchains started in %.2f seconds\n", time.Since(startTime).Seconds()))
 	startTime = time.Now()
 	fmt.Print(libformat.PurpleText("[Stage 2/8 Deploying Keystone contracts\n\n"))
 
-	// we could try to parallelise deployment of these contracts, but it's difficult, because there's no way to make chain.DeployerKey dynamic
-	// in order to manually increment the nonce for each contract
-	ocr3Output, ocr3Err := keystone_changeset.DeployOCR3V2(*allChainsCLDEnvironment, &keystone_changeset.DeployRequestV2{
-		ChainSel: homeChainOutput.ChainSelector,
-	})
-	if ocr3Err != nil {
-		return nil, pkgerrors.Wrap(ocr3Err, "failed to deploy OCR3 contract")
-	}
-
-	mergeErr := allChainsCLDEnvironment.ExistingAddresses.Merge(ocr3Output.AddressBook) //nolint:staticcheck // won't migrate now
-	if mergeErr != nil {
-		return nil, pkgerrors.Wrap(mergeErr, "failed to merge address book")
-	}
-	testLogger.Info().Msgf("Deployed OCR3 contract on chain %d at %s", homeChainOutput.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.OCR3Capability.String())) //nolint:staticcheck // won't migrate now
-
-	capabilitiesRegistryOutput, capabilitiesRegistryErr := keystone_changeset.DeployCapabilityRegistry(*allChainsCLDEnvironment, homeChainOutput.ChainSelector)
-	if capabilitiesRegistryErr != nil {
-		return nil, pkgerrors.Wrap(capabilitiesRegistryErr, "failed to deploy Capabilities Registry contract")
-	}
-
-	mergeErr = allChainsCLDEnvironment.ExistingAddresses.Merge(capabilitiesRegistryOutput.AddressBook) //nolint:staticcheck // won't migrate now
-	if mergeErr != nil {
-		return nil, pkgerrors.Wrap(mergeErr, "failed to merge address book")
-	}
-	testLogger.Info().Msgf("Deployed Capabilities Registry contract on chain %d at %s", homeChainOutput.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.CapabilitiesRegistry.String())) //nolint:staticcheck // won't migrate now
-
-	workflowRegistryOutput, workflowRegistryErr := workflow_registry_changeset.Deploy(*allChainsCLDEnvironment, homeChainOutput.ChainSelector)
-	if workflowRegistryErr != nil {
-		return nil, pkgerrors.Wrap(workflowRegistryErr, "failed to deploy workflow registry contract")
-	}
-
-	mergeErr = allChainsCLDEnvironment.ExistingAddresses.Merge(workflowRegistryOutput.AddressBook) //nolint:staticcheck // won't migrate now
-	if mergeErr != nil {
-		return nil, pkgerrors.Wrap(mergeErr, "failed to merge address book")
-	}
-	testLogger.Info().Msgf("Deployed Workflow Registry contract on chain %d at %s", homeChainOutput.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.WorkflowRegistry.String())) //nolint:staticcheck // won't migrate now
-
-	// Deploy forwarders for all chains
-	contractErrGroup := &errgroup.Group{}
+	var forwardersSelectors []uint64
 	for _, bcOut := range blockchainsOutput {
-		contractErrGroup.Go(func() error {
-			output, err := keystone_changeset.DeployForwarder(*allChainsCLDEnvironment, keystone_changeset.DeployForwarderRequest{
-				ChainSelectors: []uint64{bcOut.ChainSelector},
-			})
-			if err != nil {
-				return pkgerrors.Wrap(err, "failed to deploy forwarder contract")
-			}
-
-			mergeErr := allChainsCLDEnvironment.ExistingAddresses.Merge(output.AddressBook) //nolint:staticcheck // won't migrate now
-			if mergeErr != nil {
-				return pkgerrors.Wrap(mergeErr, "failed to merge address book")
-			}
-			testLogger.Info().Msgf("Deployed Forwarder contract on chain %d at %s", bcOut.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, bcOut.ChainSelector, keystone_changeset.KeystoneForwarder.String())) //nolint:staticcheck // won't migrate now
-
-			return nil
-		})
+		forwardersSelectors = append(forwardersSelectors, bcOut.ChainSelector)
 	}
 
-	if err := contractErrGroup.Wait(); err != nil {
+	deployKeystoneReport, err := operations.ExecuteSequence(
+		allChainsCLDEnvironment.OperationsBundle,
+		keystone_operations.DeployKeystoneContractsSequence,
+		keystone_operations.DeployKeystoneContractsSequenceDeps{
+			Env: allChainsCLDEnvironment,
+		},
+		keystone_operations.DeployKeystoneContractsSequenceInput{
+			HomeChainSelector:   homeChainOutput.ChainSelector,
+			ForwardersSelectors: forwardersSelectors,
+		},
+	)
+	if err != nil {
 		return nil, pkgerrors.Wrap(err, "failed to deploy Keystone contracts")
 	}
 
+	if err = allChainsCLDEnvironment.ExistingAddresses.Merge(deployKeystoneReport.Output.AddressBook); err != nil { //nolint:staticcheck // won't migrate now
+		return nil, pkgerrors.Wrap(err, "failed to merge address book with Keystone contracts addresses")
+	}
+
+	testLogger.Info().Msgf("Deployed OCR3 contract on chain %d at %s", homeChainOutput.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.OCR3Capability.String()))                        //nolint:staticcheck // won't migrate now
+	testLogger.Info().Msgf("Deployed Capabilities Registry contract on chain %d at %s", homeChainOutput.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.CapabilitiesRegistry.String())) //nolint:staticcheck // won't migrate now
+	testLogger.Info().Msgf("Deployed Workflow Registry contract on chain %d at %s", homeChainOutput.ChainSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.WorkflowRegistry.String()))         //nolint:staticcheck // won't migrate now
+	for _, forwarderSelector := range forwardersSelectors {
+		testLogger.Info().Msgf("Deployed Forwarder contract on chain %d at %s", forwarderSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, forwarderSelector, keystone_changeset.KeystoneForwarder.String())) //nolint:staticcheck // won't migrate now
+	}
 	fmt.Print(libformat.PurpleText("\n[Stage 2/8] Contracts deployed in %.2f seconds\n", time.Since(startTime).Seconds()))
 
 	// Translate node input to structure required further down the road and put as much information
