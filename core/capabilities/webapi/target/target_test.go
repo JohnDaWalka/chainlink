@@ -207,6 +207,7 @@ func TestCapability_Execute(t *testing.T) {
 
 		gatewayResp := gatewayResponse(t, msgID)
 		th.connector.EXPECT().AwaitConnection(mock.Anything, "gateway1").Return(nil)
+		th.connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return([]byte("signature"), nil)
 		th.connector.On("SendToGateway", mock.Anything, "gateway1", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 			th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 		}).Once()
@@ -231,6 +232,7 @@ func TestCapability_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		newCtx, cancel := context.WithCancel(ctx)
+		th.connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return([]byte("signature"), nil)
 		th.connector.On("SendToGateway", mock.Anything, "gateway1", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 			cancel()
 		}).Once()
@@ -341,6 +343,7 @@ func TestCapability_Execute(t *testing.T) {
 		req := capabilityRequest(t)
 		require.NoError(t, err)
 
+		th.connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return([]byte("signature"), nil)
 		th.connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Return(errors.New("gateway error")).Once()
 		_, err = th.capability.Execute(ctx, req)
 		require.Error(t, err)
@@ -370,6 +373,7 @@ func TestCapability_Execute(t *testing.T) {
 		msgID, err := getMessageID(req)
 		require.NoError(t, err)
 		gatewayResp := gatewayResponse(t, msgID)
+		th.connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return([]byte("signature"), nil)
 		th.connector.On("SendToGateway", mock.Anything, "gateway1", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 			th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 		}).Once()

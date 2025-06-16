@@ -47,6 +47,7 @@ func TestNewFetcherService(t *testing.T) {
 	codec := api.JsonRPCCodec{}
 	connector := gcmocks.NewGatewayConnector(t)
 	wrapper := &wrapper{c: connector}
+	signature := []byte("signature")
 
 	var (
 		url   = "http://example.com"
@@ -63,6 +64,7 @@ func TestNewFetcherService(t *testing.T) {
 		defer fetcher.Close()
 
 		gatewayResp := signGatewayResponse(t, gatewayResponse(t, msgID, donID, 200))
+		connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return(signature, nil).Once()
 		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
 			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 		}).Return(nil).Times(1)
@@ -90,6 +92,7 @@ func TestNewFetcherService(t *testing.T) {
 		defer fetcher.Close()
 
 		gatewayResp := signGatewayResponse(t, inconsistentPayload(t, msgID, donID))
+		connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return(signature, nil).Once()
 		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
 			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 		}).Return(nil).Times(1)
@@ -117,6 +120,7 @@ func TestNewFetcherService(t *testing.T) {
 		gatewayResp := gatewayResponse(t, msgID, donID, 500) // gateway response that is not signed
 		gatewayRespBytes, err := codec.EncodeRequest(gatewayResp)
 		require.NoError(t, err)
+		connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return(signature, nil).Once()
 		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
 			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayRespBytes)
 		}).Return(nil).Times(1)
@@ -159,6 +163,7 @@ func TestNewFetcherService(t *testing.T) {
 		require.NoError(t, fetcher.Start(ctx))
 		defer fetcher.Close()
 
+		connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return(signature, nil).Once()
 		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
 			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResponseBytes)
 		}).Return(nil).Times(1)
@@ -185,6 +190,7 @@ func TestNewFetcherService(t *testing.T) {
 		defer fetcher.Close()
 
 		gatewayResp := signGatewayResponse(t, gatewayResponse(t, msgID, donID, 500))
+		connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return(signature, nil).Once()
 		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
 			fetcher.och.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 		}).Return(nil).Times(1)
@@ -248,6 +254,7 @@ func TestNewFetcherService(t *testing.T) {
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway2").Return(nil).Once()
 
 		gatewayResp := signGatewayResponse(t, gatewayResponse(t, msgID, donID, 200))
+		connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return(signature, nil).Once()
 		connector.EXPECT().SendToGateway(matches.AnyContext, "gateway2", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
 			fetcher.och.HandleGatewayMessage(ctx, "gateway2", gatewayResp)
 		}).Return(nil).Times(1)

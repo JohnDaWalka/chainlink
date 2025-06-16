@@ -209,8 +209,13 @@ func TestComputeFetch(t *testing.T) {
 	}, "/")
 
 	gatewayResp := gatewayResponse(t, msgID, []byte("response body"))
+	signature := []byte("signature")
 	th.connector.EXPECT().
-		SendToGateway(mock.Anything, "gateway1", mock.Anything).
+		SignMessage(matches.AnyContext, mock.Anything).
+		Return(signature, nil).
+		Once()
+	th.connector.EXPECT().
+		SendToGateway(matches.AnyContext, "gateway1", mock.Anything).
 		Return(nil).
 		Run(func(ctx context.Context, gatewayID string, data []byte) {
 			th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
@@ -320,7 +325,11 @@ func TestCompute_SpendValueRelativeToComputeTime(t *testing.T) {
 			th.connector.EXPECT().DonID(matches.AnyContext).Return("don-id", nil)
 			th.connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
 			th.connector.EXPECT().GatewayIDs(matches.AnyContext).Return([]string{"gateway1", "gateway2"}, nil)
-
+			signature := []byte("signature")
+			th.connector.EXPECT().
+				SignMessage(matches.AnyContext, mock.Anything).
+				Return(signature, nil).
+				Once()
 			th.connector.EXPECT().
 				SendToGateway(mock.Anything, "gateway1", mock.Anything).
 				Return(nil).
@@ -369,9 +378,17 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 	}, "/")
 
 	gatewayResp := gatewayResponse(t, msgID, make([]byte, 2*1024))
-	th.connector.On("SendToGateway", mock.Anything, "gateway1", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		th.connectorHandler.HandleGatewayMessage(context.Background(), "gateway1", gatewayResp)
-	}).Once()
+	signature := []byte("signature")
+	th.connector.EXPECT().
+		SignMessage(matches.AnyContext, mock.Anything).
+		Return(signature, nil).
+		Once()
+	th.connector.EXPECT().
+		SendToGateway(matches.AnyContext, "gateway1", mock.Anything).
+		Return(nil).
+		Run(func(ctx context.Context, gatewayID string, data []byte) {
+			th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
+		}).Once()
 
 	require.NoError(t, th.compute.Start(t.Context()))
 

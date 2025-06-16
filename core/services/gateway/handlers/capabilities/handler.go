@@ -207,7 +207,7 @@ func (h *handler) HandleNodeMessage(ctx context.Context, msg *api.Message, nodeA
 	switch msg.Body.Method {
 	case MethodWebAPITrigger:
 		err = h.handleWebAPITriggerMessage(ctx, msg, nodeAddr)
-	case MethodWebAPITarget, MethodComputeAction, MethodWorkflowSyncer, gateway.MethodHTTPAction:
+	case MethodWebAPITarget, MethodComputeAction, MethodWorkflowSyncer:
 		err = h.handleWebAPIOutgoingMessage(ctx, msg, nodeAddr)
 	default:
 		err = fmt.Errorf("unsupported method: %s", msg.Body.Method)

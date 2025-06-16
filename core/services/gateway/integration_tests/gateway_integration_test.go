@@ -112,6 +112,9 @@ func (c *client) HandleGatewayMessage(ctx context.Context, gatewayId string, dat
 	if err != nil {
 		panic(err)
 	}
+	if err := msg.Validate(); err != nil {
+		panic(err)
+	}
 	c.done.Store(true)
 	// send back user's message without re-signing - should be ignored by the Gateway
 	_ = c.connector.SendToGateway(ctx, gatewayId, data)

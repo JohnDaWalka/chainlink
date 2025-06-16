@@ -130,6 +130,14 @@ func (h *functionsConnectorHandler) HandleGatewayMessage(ctx context.Context, ga
 		return nil
 	}
 	body := &msg.Body
+	if msg.Validate() != nil {
+		response := functions.ResponseBase{
+			Success:      false,
+			ErrorMessage: "invalid message",
+		}
+		h.sendResponseAndLog(ctx, gatewayId, body, response)
+		return nil
+	}
 	fromAddr := ethCommon.HexToAddress(body.Sender)
 	if !h.allowlist.Allow(fromAddr) {
 		h.lggr.Errorw("allowlist prevented the request from this address", "id", gatewayId, "address", fromAddr)
@@ -207,6 +215,7 @@ func (h *functionsConnectorHandler) handleSecretsList(ctx context.Context, gatew
 	} else {
 		response.ErrorMessage = fmt.Sprintf("Failed to list secrets: %v", err)
 	}
+	fmt.Println("DEBUG 2 Response:", response)
 	h.sendResponseAndLog(ctx, gatewayId, body, response)
 }
 

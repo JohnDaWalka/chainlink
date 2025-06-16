@@ -136,7 +136,6 @@ func (h *triggerConnectorHandler) processTrigger(ctx context.Context, gatewayID 
 }
 
 func (h *triggerConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, data []byte) error {
-	// TODO: Validate Signature
 	msg, err := h.codec.DecodeRequest(data)
 	if err != nil {
 		h.lggr.Errorw("error decoding message", "err", err, "data", data)
@@ -146,6 +145,16 @@ func (h *triggerConnectorHandler) HandleGatewayMessage(ctx context.Context, gate
 		}
 		return nil
 	}
+
+	if err = msg.Validate(); err != nil {
+		h.lggr.Errorw("invalid message", "msg", msg)
+		err = h.sendResponse(ctx, gatewayID, &msg.Body, ghcapabilities.TriggerResponsePayload{Status: "ERROR", ErrorMessage: fmt.Errorf("invalid message %s", err.Error()).Error()})
+		if err != nil {
+			h.lggr.Errorw("error sending response", "err", err)
+		}
+		return nil
+	}
+
 	body := &msg.Body
 	sender := ethCommon.HexToAddress(body.Sender)
 	var payload webapicap.TriggerRequestPayload

@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/matches"
@@ -166,7 +167,8 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		}
 
 		// expect the request body to contain the default timeout
-		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", expectedBody).Run(func(ctx context.Context, gatewayID string, data []byte) {
+		connector.EXPECT().SignMessage(mock.Anything, common.Flatten(api.GetRawMessageBody(expectedBody)...)).Return([]byte("signature"), nil).Once()
+		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
 			connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResponse(t, msgID))
 		}).Return(nil).Times(1)
 
@@ -206,7 +208,8 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		}
 
 		// expect the request body to contain the defined timeout
-		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", expectedBody).Run(func(ctx context.Context, gatewayID string, msg []byte) {
+		connector.EXPECT().SignMessage(mock.Anything, common.Flatten(api.GetRawMessageBody(expectedBody)...)).Return([]byte("signature"), nil).Once()
+		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, msg []byte) {
 			connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResponse(t, msgID))
 		}).Return(nil).Times(1)
 
@@ -249,7 +252,8 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		}
 
 		// expect the request body to contain the defined timeout
-		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", expectedBody).Run(func(ctx context.Context, gatewayID string, msg []byte) {
+		connector.EXPECT().SignMessage(mock.Anything, common.Flatten(api.GetRawMessageBody(expectedBody)...)).Return([]byte("signature"), nil).Once()
+		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, msg []byte) {
 			// don't call HandleGatewayMessage here; i.e. simulate a failure to receive a response
 		}).Return(nil).Times(1)
 
@@ -308,7 +312,8 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		}
 
 		// expect the request body to contain the default timeout
-		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", expectedBody).Run(func(ctx context.Context, gatewayID string, msg []byte) {
+		connector.EXPECT().SignMessage(mock.Anything, common.Flatten(api.GetRawMessageBody(expectedBody)...)).Return([]byte("signature"), nil).Once()
+		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, msg []byte) {
 			connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResponse(t, msgID))
 		}).Return(nil).Times(1)
 

@@ -304,6 +304,9 @@ func (c *OutgoingConnectorHandler) HandleGatewayMessage(ctx context.Context, gat
 	if err != nil {
 		return fmt.Errorf("failed to decode request: %w", err)
 	}
+	if err := msg.Validate(); err != nil {
+		return fmt.Errorf("invalid message: %w", err)
+	}
 	body := &msg.Body
 	l := logger.With(c.lggr, "gatewayID", gatewayID, "method", body.Method, "messageID", msg.Body.MessageId)
 

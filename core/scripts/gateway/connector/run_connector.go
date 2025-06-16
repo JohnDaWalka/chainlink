@@ -25,13 +25,14 @@ import (
 //	go run run_connector.go --config sample_config.toml
 type client struct {
 	privateKey *ecdsa.PrivateKey
+	codec      api.Codec
 	connector  connector.GatewayConnector
 	lggr       logger.Logger
 }
 
-func (h *client) HandleGatewayMessage(ctx context.Context, gatewayId string, msg *api.Message) error {
+func (h *client) HandleGatewayMessage(ctx context.Context, gatewayId string, data []byte) error {
 	h.lggr.Infof("received message from gateway %s. Echoing back.", gatewayId)
-	err := h.connector.SendToGateway(ctx, gatewayId, msg)
+	err := h.connector.SendToGateway(ctx, gatewayId, data)
 	if err != nil {
 		h.lggr.Errorw("failed to send to gateway", "id", gatewayId, "err", err)
 	}
@@ -46,7 +47,7 @@ func (h *client) Start(ctx context.Context) error {
 	return nil
 }
 
-func (h *client) ID() (string, error) {
+func (h *client) ID(ctx context.Context) (string, error) {
 	return "test_client", nil
 }
 
@@ -77,10 +78,10 @@ func main() {
 		fmt.Println("error creating logger:", err)
 		return
 	}
-	client := &client{privateKey: sampleKey, lggr: lggr}
+	client := &client{privateKey: sampleKey, lggr: lggr, codec: &api.JsonRPCCodec{}}
 	// client acts as a signer here
 	connector, _ := connector.NewGatewayConnector(&cfg, client, clockwork.NewRealClock(), lggr)
-	err = connector.AddHandler([]string{"test_method"}, client)
+	err = connector.AddHandler(context.Background(), []string{"test_method"}, client)
 	if err != nil {
 		fmt.Println("error adding handler:", err)
 		return
