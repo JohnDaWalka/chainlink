@@ -35,22 +35,22 @@ var DeployKeystoneContractsSequence = operations.NewSequence[DeployKeystoneContr
 		ab := deployment.NewMemoryAddressBook()
 		as := datastore.NewMemoryDataStore()
 
-		ocr3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps{Env: deps.Env}, DeployOCR3OpInput{ChainSelector: input.HomeChainSelector})
+		ocr3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps(deps), DeployOCR3OpInput{ChainSelector: input.HomeChainSelector})
 		if err != nil {
 			return DeployKeystoneContractsSequenceOutput{}, err
 		}
 
-		capabilitiesRegistryDeployReport, err := operations.ExecuteOperation(b, DeployCapabilityRegistryOp, DeployCapabilityRegistryOpDeps{Env: deps.Env}, DeployCapabilityRegistryInput{ChainSelector: input.HomeChainSelector})
+		capabilitiesRegistryDeployReport, err := operations.ExecuteOperation(b, DeployCapabilityRegistryOp, DeployCapabilityRegistryOpDeps(deps), DeployCapabilityRegistryInput{ChainSelector: input.HomeChainSelector})
 		if err != nil {
 			return DeployKeystoneContractsSequenceOutput{}, err
 		}
 
-		workflowRegistryDeployReport, err := operations.ExecuteOperation(b, DeployWorkflowRegistryOp, DeployWorkflowRegistryOpDeps{Env: deps.Env}, DeployWorkflowRegistryInput{ChainSelector: input.HomeChainSelector})
+		workflowRegistryDeployReport, err := operations.ExecuteOperation(b, DeployWorkflowRegistryOp, DeployWorkflowRegistryOpDeps(deps), DeployWorkflowRegistryInput{ChainSelector: input.HomeChainSelector})
 		if err != nil {
 			return DeployKeystoneContractsSequenceOutput{}, err
 		}
 
-		keystoneForwarderDeployReport, err := operations.ExecuteSequence(b, DeployKeystoneForwardersSequence, DeployKeystoneForwardersSequenceDeps{Env: deps.Env}, DeployKeystoneForwardersInput{Targets: input.ForwardersSelectors})
+		keystoneForwarderDeployReport, err := operations.ExecuteSequence(b, DeployKeystoneForwardersSequence, DeployKeystoneForwardersSequenceDeps(deps), DeployKeystoneForwardersInput{Targets: input.ForwardersSelectors})
 		if err != nil {
 			return DeployKeystoneContractsSequenceOutput{}, err
 		}

@@ -32,7 +32,7 @@ var DeployKeystoneForwardersSequence = operations.NewSequence[DeployKeystoneForw
 		contractErrGroup := &errgroup.Group{}
 		for _, target := range input.Targets {
 			contractErrGroup.Go(func() error {
-				r, err := operations.ExecuteOperation(b, DeployKeystoneForwarderOp, DeployForwarderOpDeps{Env: deps.Env}, DeployForwarderOpInput{
+				r, err := operations.ExecuteOperation(b, DeployKeystoneForwarderOp, DeployForwarderOpDeps(deps), DeployForwarderOpInput{
 					ChainSelector: target,
 				})
 				if err != nil {

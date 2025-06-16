@@ -38,7 +38,7 @@ var DeployOCR3Op = operations.NewOperation[DeployOCR3OpInput, DeployOCR3OpOutput
 		}
 
 		return DeployOCR3OpOutput{
-			Addresses: ocr3Output.DataStore.Addresses(), AddressBook: ocr3Output.AddressBook, // nolint:staticcheck keeping the address book since not everything has been migrated to datastore
+			Addresses: ocr3Output.DataStore.Addresses(), AddressBook: ocr3Output.AddressBook, //nolint:staticcheck // keeping the address book since not everything has been migrated to datastore
 		}, nil
 	},
 )

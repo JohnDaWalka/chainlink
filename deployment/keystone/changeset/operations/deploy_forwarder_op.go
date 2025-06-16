@@ -35,7 +35,7 @@ var DeployKeystoneForwarderOp = operations.NewOperation[DeployForwarderOpInput, 
 		}
 		return DeployForwarderOpOutput{
 			Addresses:   forwarderOutput.DataStore.Addresses(),
-			AddressBook: forwarderOutput.AddressBook, // nolint:staticcheck keeping the address book since not everything has been migrated to datastore
+			AddressBook: forwarderOutput.AddressBook, //nolint:staticcheck // keeping the address book since not everything has been migrated to datastore
 		}, nil
 	},
 )

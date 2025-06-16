@@ -3,11 +3,12 @@ package operations
 import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	workflow_registry_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/workflowregistry"
-
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	workflow_registry_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/workflowregistry"
 )
 
 type DeployWorkflowRegistryOpDeps struct {
