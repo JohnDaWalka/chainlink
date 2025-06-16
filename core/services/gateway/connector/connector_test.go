@@ -14,7 +14,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	gatewaymocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 )
@@ -45,8 +44,8 @@ func parseTOMLConfig(t *testing.T, tomlConfig string) *ConnectorConfig {
 	return &cfg
 }
 
-func newTestConnector(t *testing.T, config *ConnectorConfig) (*gatewayConnector, *mocks.Signer, *gatewaymocks.GatewayConnectorHandler) {
-	signer := mocks.NewSigner(t)
+func newTestConnector(t *testing.T, config *ConnectorConfig) (*gatewayConnector, *gatewaymocks.Signer, *gatewaymocks.GatewayConnectorHandler) {
+	signer := gatewaymocks.NewSigner(t)
 	handler := gatewaymocks.NewGatewayConnectorHandler(t)
 	clock := clockwork.NewFakeClock()
 	connector, err := NewGatewayConnector(config, signer, clock, logger.Test(t))
@@ -108,7 +107,7 @@ URL = "ws://localhost:8081/node"
 `,
 	}
 
-	signer := mocks.NewSigner(t)
+	signer := gatewaymocks.NewSigner(t)
 	clock := clockwork.NewFakeClock()
 	for name, config := range invalidCases {
 		config := config

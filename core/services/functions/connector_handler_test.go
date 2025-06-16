@@ -297,7 +297,8 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 			}
 			require.NoError(t, msg.Sign(privateKey))
 			allowlist.On("Allow", addr).Return(true).Once()
-			handler.HandleGatewayMessage(testutils.Context(t), "gw1", encodeMessage(t, &msg))
+			err2 := handler.HandleGatewayMessage(testutils.Context(t), "gw1", encodeMessage(t, &msg))
+			require.NoError(t, err2)
 		})
 	})
 

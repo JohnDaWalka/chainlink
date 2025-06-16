@@ -300,10 +300,10 @@ func TestTriggerExecute(t *testing.T) {
 
 	t.Run("decoding error", func(t *testing.T) {
 		invalidData := []byte(`{invalid json}`)
-		err := th.trigger.HandleGatewayMessage(ctx, "gateway1", invalidData)
+		err2 := th.trigger.HandleGatewayMessage(ctx, "gateway1", invalidData)
 		th.connector.AssertNotCalled(t, "SignMessage")
 		th.connector.AssertNotCalled(t, "SendToGateway")
-		require.NoError(t, err)
+		require.NoError(t, err2)
 		requireNoChanMsg(t, channel)
 		requireNoChanMsg(t, channel2)
 	})
@@ -321,8 +321,8 @@ func TestTriggerExecute(t *testing.T) {
 		// Remove required fields to fail Validate
 		msg.Body.Method = ""
 		apiCodec := api.JsonRPCCodec{}
-		raw, err := apiCodec.EncodeRequest(msg)
-		require.NoError(t, err)
+		raw, err2 := apiCodec.EncodeRequest(msg)
+		require.NoError(t, err2)
 		th.connector.AssertNotCalled(t, "SignMessage")
 		th.connector.AssertNotCalled(t, "SendToGateway")
 		err = th.trigger.HandleGatewayMessage(ctx, "gateway1", raw)

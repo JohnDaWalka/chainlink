@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -28,6 +29,7 @@ const (
 	workflowID2          = "44f129ea13948d1c4eaa2bbc0e72319266364cba12b789174732b2f72b57088d"
 	workflowExecutionID1 = "95ef5e32deb99a10ee6804bc4af13855687559d7ff6552ac6dbb2ce0abbadeed"
 	owner1               = "0x00000000000000000000000000000000000000aa"
+	privateKey           = "6c358b4f16344f03cfce12ebf7b768301bbe6a8977c98a2a2d76699f8bc56161"
 )
 
 var defaultConfig = webapi.ServiceConfig{
@@ -117,7 +119,7 @@ func capabilityRequest(t *testing.T) capabilities.CapabilityRequest {
 	}
 }
 
-func gatewayResponse(t *testing.T, msgID string) []byte {
+func gatewayResponse(t *testing.T, msgID string, privateKey string) []byte {
 	headers := map[string]string{"Content-Type": "application/json"}
 	body := []byte("response body")
 	responsePayload, err := json.Marshal(ghcapabilities.Response{
@@ -129,11 +131,18 @@ func gatewayResponse(t *testing.T, msgID string) []byte {
 	require.NoError(t, err)
 	m := &api.Message{
 		Body: api.MessageBody{
+			DonId:     "donID",
 			MessageId: msgID,
 			Method:    ghcapabilities.MethodWebAPITarget,
 			Payload:   responsePayload,
 		},
 	}
+	key, err := crypto.HexToECDSA(privateKey)
+	require.NoError(t, err)
+	err = m.Sign(key)
+	require.NoError(t, err)
+	err = m.Validate()
+	require.NoError(t, err)
 	codec := api.JsonRPCCodec{}
 	req, err := codec.EncodeRequest(m)
 	require.NoError(t, err)
@@ -205,7 +214,7 @@ func TestCapability_Execute(t *testing.T) {
 		msgID, err := getMessageID(req)
 		require.NoError(t, err)
 
-		gatewayResp := gatewayResponse(t, msgID)
+		gatewayResp := gatewayResponse(t, msgID, privateKey)
 		th.connector.EXPECT().AwaitConnection(mock.Anything, "gateway1").Return(nil)
 		th.connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return([]byte("signature"), nil)
 		th.connector.On("SendToGateway", mock.Anything, "gateway1", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -372,7 +381,7 @@ func TestCapability_Execute(t *testing.T) {
 
 		msgID, err := getMessageID(req)
 		require.NoError(t, err)
-		gatewayResp := gatewayResponse(t, msgID)
+		gatewayResp := gatewayResponse(t, msgID, privateKey)
 		th.connector.EXPECT().SignMessage(mock.Anything, mock.Anything).Return([]byte("signature"), nil)
 		th.connector.On("SendToGateway", mock.Anything, "gateway1", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 			th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)

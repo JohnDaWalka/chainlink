@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -21,6 +22,10 @@ import (
 )
 
 type ctxKey string
+
+const (
+	privateKey = "6c358b4f16344f03cfce12ebf7b768301bbe6a8977c98a2a2d76699f8bc56161"
+)
 
 func TestOutgoingConnectorHandler_AwaitConnection(t *testing.T) {
 	gateways := []string{"gateway1", "gateway2"}
@@ -169,7 +174,8 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		// expect the request body to contain the default timeout
 		connector.EXPECT().SignMessage(mock.Anything, common.Flatten(api.GetRawMessageBody(expectedBody)...)).Return([]byte("signature"), nil).Once()
 		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
-			connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResponse(t, msgID))
+			err2 := connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResponse(t, msgID, privateKey))
+			require.NoError(t, err2)
 		}).Return(nil).Times(1)
 
 		_, err = connectorHandler.HandleSingleNodeRequest(t.Context(), msgID, ghcapabilities.Request{
@@ -210,7 +216,8 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		// expect the request body to contain the defined timeout
 		connector.EXPECT().SignMessage(mock.Anything, common.Flatten(api.GetRawMessageBody(expectedBody)...)).Return([]byte("signature"), nil).Once()
 		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, msg []byte) {
-			connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResponse(t, msgID))
+			err2 := connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResponse(t, msgID, privateKey))
+			require.NoError(t, err2)
 		}).Return(nil).Times(1)
 
 		_, err = connectorHandler.HandleSingleNodeRequest(t.Context(), msgID, ghcapabilities.Request{
@@ -314,7 +321,8 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 		// expect the request body to contain the default timeout
 		connector.EXPECT().SignMessage(mock.Anything, common.Flatten(api.GetRawMessageBody(expectedBody)...)).Return([]byte("signature"), nil).Once()
 		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, msg []byte) {
-			connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResponse(t, msgID))
+			err2 := connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResponse(t, msgID, privateKey))
+			require.NoError(t, err2)
 		}).Return(nil).Times(1)
 
 		_, err = connectorHandler.HandleSingleNodeRequest(t.Context(), msgID, ghcapabilities.Request{
@@ -370,7 +378,7 @@ func newFunction(t *testing.T, mockFn func(*gcmocks.GatewayConnector), serviceCo
 	return connector, connectorHandler
 }
 
-func gatewayResponse(t *testing.T, msgID string) []byte {
+func gatewayResponse(t *testing.T, msgID string, privateKey string) []byte {
 	headers := map[string]string{"Content-Type": "application/json"}
 	body := []byte("response body")
 	responsePayload, err := json.Marshal(ghcapabilities.Response{
@@ -382,11 +390,18 @@ func gatewayResponse(t *testing.T, msgID string) []byte {
 	require.NoError(t, err)
 	m := &api.Message{
 		Body: api.MessageBody{
+			DonId:     "donID",
 			MessageId: msgID,
 			Method:    ghcapabilities.MethodWebAPITarget,
 			Payload:   responsePayload,
 		},
 	}
+	key, err := crypto.HexToECDSA(privateKey)
+	require.NoError(t, err)
+	err = m.Sign(key)
+	require.NoError(t, err)
+	err = m.Validate()
+	require.NoError(t, err)
 	codec := api.JsonRPCCodec{}
 	resp, err := codec.EncodeRequest(m)
 	require.NoError(t, err)

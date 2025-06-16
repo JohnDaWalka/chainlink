@@ -130,16 +130,17 @@ func TestNewFetcherService(t *testing.T) {
 		connector.EXPECT().DonID(matches.AnyContext).Return(donID, nil)
 		connector.EXPECT().AwaitConnection(matches.AnyContext, "gateway1").Return(nil)
 		connector.EXPECT().GatewayIDs(matches.AnyContext).Return([]string{"gateway1", "gateway2"}, nil)
-
+		ctxwd, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+		defer cancel()
 		req := ghcapabilities.Request{
 			URL:              url,
 			Method:           http.MethodGet,
 			MaxResponseBytes: 0,
 			WorkflowID:       "foo",
 		}
-		_, err = fetcher.Fetch(ctx, msgID, req)
+		_, err = fetcher.Fetch(ctxwd, msgID, req)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "invalid response from gateway")
+		require.ErrorContains(t, err, "context deadline exceeded")
 	})
 
 	t.Run("NOK-response_payload_too_large", func(t *testing.T) {
