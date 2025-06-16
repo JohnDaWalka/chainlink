@@ -122,6 +122,39 @@ jobs:
       AWS_ROLE_GATI_ARN: ${{ secrets.AWS_OIDC_GLOBAL_READ_ONLY_TOKEN_ISSUER_ROLE_ARN }}
       AWS_LAMBDA_GATI_URL: ${{ secrets.AWS_INFRA_RELENG_TOKEN_ISSUER_LAMBDA_URL }}
 
+  docker-cre:
+    needs: [init]
+    if: ${{ needs.init.outputs.should-run == 'true' }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: smartcontractkit/.github/.github/workflows/reusable-docker-build-publish.yml@c8bc2e3e0b0ba91253d4cfcba830e31302dd1e4c # June 4, 2025
+    with:
+      aws-ecr-name: chainlink
+      aws-region-ecr: us-west-2
+      aws-region-gati: us-west-2
+      dockerfile: core/chainlink.cre.Dockerfile
+      docker-build-context: .
+      docker-build-args: |
+        CHAINLINK_USER=chainlink
+        COMMIT_SHA=${{ github.sha }}
+        CL_INSTALL_PRIVATE_PLUGINS=true
+        CL_APTOS_CMD=chainlink-aptos
+      docker-manifest-sign: true
+      docker-tag-custom-suffix: "-cre"
+      git-sha: ${{ inputs.git-ref || github.sha }}
+      github-event-name: ${{ github.event_name }}
+      github-ref-name: ${{ github.ref_name }}
+      github-ref-type: ${{ github.ref_type}}
+      github-workflow-repository: ${{ github.repository }}
+      github-runner-arm64: ${{ needs.init.outputs.runner-arm64 }}
+      github-runner-amd64: ${{ needs.init.outputs.runner-amd64 }}
+    secrets:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID_SDLC }}
+      AWS_ROLE_PUBLISH_ARN: ${{ secrets.AWS_OIDC_IAM_ROLE_BUILD_PUBLISH_DEVELOP_PR }}
+      AWS_ROLE_GATI_ARN: ${{ secrets.AWS_OIDC_GLOBAL_READ_ONLY_TOKEN_ISSUER_ROLE_ARN }}
+      AWS_LAMBDA_GATI_URL: ${{ secrets.AWS_INFRA_RELENG_TOKEN_ISSUER_LAMBDA_URL }}
+
   docker-core-plugins-testing:
     needs: [init]
     if: ${{ needs.init.outputs.should-run == 'true' }}
