@@ -4,7 +4,7 @@ go 1.24.2
 
 // Using a separate `require` here to avoid surrounding line changes
 // creating potential merge conflicts.
-require github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250430150202-611699e34308
+require github.com/smartcontractkit/chainlink/v2 v2.23.2-por-beta.1.0.20250614104648-4371b3cf314f
 
 // Make sure we're working with the latest chainlink libs
 replace github.com/smartcontractkit/chainlink/v2 => ../../
@@ -27,7 +27,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.3
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.4
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250614104648-4371b3cf314f
 	go.uber.org/ratelimit v0.3.1
 	golang.org/x/sync v0.14.0
 	google.golang.org/grpc v1.72.0
