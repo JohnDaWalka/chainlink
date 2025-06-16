@@ -3,6 +3,7 @@ package operations
 import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
+	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -30,7 +31,9 @@ var DeployWorkflowRegistryOp = operations.NewOperation[DeployWorkflowRegistryInp
 	semver.MustParse("1.0.0"),
 	"Deploy WorkflowRegistry Contract",
 	func(b operations.Bundle, deps DeployWorkflowRegistryOpDeps, input DeployWorkflowRegistryInput) (DeployWorkflowRegistryOutput, error) {
-		workfloRegistryOutput, err := workflow_registry_changeset.Deploy(*deps.Env, input.ChainSelector)
+		workfloRegistryOutput, err := workflow_registry_changeset.DeployV2(*deps.Env, &keystone_changeset.DeployRequestV2{
+			ChainSel: input.ChainSelector,
+		})
 		if err != nil {
 			return DeployWorkflowRegistryOutput{}, errors.Wrap(err, "DeployWorkflowRegistryOp error: failed to deploy Workflow Registry contract")
 		}
