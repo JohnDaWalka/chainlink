@@ -1,5 +1,7 @@
 ##
-# Build image: Chainlink binary with plugins.
+# Build image: Chainlink binary with plugins for testing purposes only.
+# XXX: Experimental -- not to be used to build images for production use.
+# See: ../core/chainlink.Dockerfile for the production Dockerfile.
 ##
 FROM golang:1.24-bullseye AS buildgo
 RUN go version
@@ -36,9 +38,9 @@ RUN --mount=type=secret,id=GIT_AUTH_TOKEN \
     ./plugins/scripts/setup_git_auth.sh && \
     mkdir -p /gobins && mkdir -p "${CL_LOOPINSTALL_OUTPUT_DIR}" && \
     GOBIN=/go/bin make install-loopinstall && \
-    GOBIN=/gobins CL_LOOPINSTALL_OUTPUT_DIR=${CL_LOOPINSTALL_OUTPUT_DIR} make install-plugins-local install-plugins-public && \
+    GOBIN=/gobins CL_LOOPINSTALL_OUTPUT_DIR=${CL_LOOPINSTALL_OUTPUT_DIR} CL_USE_EXPERIMENTAL_PLUGINS=true make install-plugins-local install-plugins-public && \
     if [ "${CL_INSTALL_PRIVATE_PLUGINS}" = "true" ]; then \
-        GOBIN=/gobins CL_LOOPINSTALL_OUTPUT_DIR=${CL_LOOPINSTALL_OUTPUT_DIR} make install-plugins-private; \
+        GOBIN=/gobins CL_LOOPINSTALL_OUTPUT_DIR=${CL_LOOPINSTALL_OUTPUT_DIR} CL_USE_EXPERIMENTAL_PLUGINS=true make install-plugins-private; \
     fi && \
     if [ "${CL_INSTALL_TESTING_PLUGINS}" = "true" ]; then \
         GOBIN=/gobins CL_LOOPINSTALL_OUTPUT_DIR=${CL_LOOPINSTALL_OUTPUT_DIR} make install-plugins-testing; \
