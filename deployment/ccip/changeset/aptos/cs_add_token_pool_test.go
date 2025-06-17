@@ -6,8 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip"
 	fee_quoter "github.com/smartcontractkit/chainlink-aptos/bindings/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_token_pools/managed_token_pool"
+	mcmsbind "github.com/smartcontractkit/chainlink-aptos/bindings/mcms"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -101,16 +104,31 @@ func TestAddTokenPool_Apply(t *testing.T) {
 	require.NoError(t, err, "must load onchain state")
 	require.NotNil(t, state.AptosChains[aptosSelector].AptosManagedTokenPools)
 
-	for _, pool := range state.AptosChains[aptosSelector].AptosManagedTokenPools {
+	client := env.BlockChains.AptosChains()[aptosSelector].Client
+	aptosCCIPAddr := state.AptosChains[aptosSelector].CCIPAddress
+	ccipContract := ccip.Bind(aptosCCIPAddr, client)
+	mcmsAddress := state.AptosChains[aptosSelector].MCMSAddress
+	mcmsContract := mcmsbind.Bind(mcmsAddress, client)
+
+	expectedAdm, err := mcmsContract.MCMSRegistry().GetRegisteredOwnerAddress(nil, aptosCCIPAddr)
+	require.NoError(t, err)
+
+	for tokenAddress, pool := range state.AptosChains[aptosSelector].AptosManagedTokenPools {
 		poolBind := managed_token_pool.Bind(pool, env.BlockChains.AptosChains()[aptosSelector].Client)
 		remotePools, err := poolBind.ManagedTokenPool().GetRemotePools(nil, emvSelector)
 		require.NoError(t, err)
 		require.NotEmpty(t, remotePools)
 		hexString := fmt.Sprintf("0x%x", remotePools[0])
 		assert.Equal(t, hexString, mockEVMPool)
+
+		poolAdd, admin, pendingAdm, err := ccipContract.TokenAdminRegistry().GetTokenConfig(nil, tokenAddress)
+		require.NoError(t, err)
+		require.Equal(t, pool, poolAdd, "Expected the registered pool to match the deployed pool")
+		require.Equal(t, expectedAdm, admin, "Admin should match ccipOwnerAddress")
+		require.Equal(t, aptos.AccountAddress{}, pendingAdm, "Pending admin should be empty")
 	}
 
 	// The output should include MCMS proposals
 	require.Len(t, output[0].MCMSTimelockProposals, 1, "Expected exactly 1 MCMS proposal")
-	require.Len(t, output[0].MCMSTimelockProposals[0].Operations, 8, "Expected exactly 8 MCMS proposal operations, received:", len(output[0].MCMSTimelockProposals[0].Operations))
+	require.Len(t, output[0].MCMSTimelockProposals[0].Operations, 7, "Expected exactly 7 MCMS proposal operations, received:", len(output[0].MCMSTimelockProposals[0].Operations))
 }
