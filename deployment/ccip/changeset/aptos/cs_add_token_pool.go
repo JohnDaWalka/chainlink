@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -116,7 +117,6 @@ func (cs AddTokenPool) Apply(env cldf.Environment, cfg config.AddTokenPoolConfig
 	// Deploy Aptos Token
 	tokenObjectAddress := cfg.TokenObjAddress
 	tokenAddress := cfg.TokenAddress
-	tokenOwnerAddress := aptos.AccountAddress{}
 	if cfg.TokenObjAddress == (aptos.AccountAddress{}) {
 		deployTokenIn := seq.DeployTokenSeqInput{
 			TokenParams: cfg.TokenParams,
@@ -128,7 +128,6 @@ func (cs AddTokenPool) Apply(env cldf.Environment, cfg config.AddTokenPoolConfig
 		}
 		tokenObjectAddress = deploySeq.Output.TokenObjAddress
 		tokenAddress = deploySeq.Output.TokenAddress
-		tokenOwnerAddress = deploySeq.Output.TokenOwnerAddress
 		seqReports = append(seqReports, deploySeq.ExecutionReports...)
 		mcmsOperations = append(mcmsOperations, deploySeq.Output.MCMSOperations...)
 		// Save token object address in address book
@@ -150,10 +149,9 @@ func (cs AddTokenPool) Apply(env cldf.Environment, cfg config.AddTokenPoolConfig
 	tokenPoolAddress := cfg.TokenPoolAddress
 	if cfg.TokenPoolAddress == (aptos.AccountAddress{}) {
 		depInput := seq.DeployTokenPoolSeqInput{
-			TokenObjAddress:   tokenObjectAddress,
-			TokenAddress:      tokenAddress,
-			TokenOwnerAddress: tokenOwnerAddress,
-			PoolType:          cfg.PoolType,
+			TokenObjAddress: tokenObjectAddress,
+			TokenAddress:    tokenAddress,
+			PoolType:        cfg.PoolType,
 		}
 		deploySeq, err := operations.ExecuteSequence(env.OperationsBundle, seq.DeployAptosTokenPoolSequence, deps, depInput)
 		if err != nil {
@@ -209,7 +207,7 @@ func toRemotePools(evmRemoteCfg map[uint64]config.EVMRemoteConfig) map[uint64]se
 	for chainSelector, remoteConfig := range evmRemoteCfg {
 		remotePools[chainSelector] = seq.RemotePool{
 			RemotePoolAddress:  remoteConfig.TokenPoolAddress.Bytes(),
-			RemoteTokenAddress: remoteConfig.TokenAddress.Bytes(),
+			RemoteTokenAddress: common.LeftPadBytes(remoteConfig.TokenAddress.Bytes(), 32),
 			RateLimiterConfig:  remoteConfig.RateLimiterConfig,
 		}
 	}
