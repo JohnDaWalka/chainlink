@@ -85,8 +85,6 @@ ENV CL_MEDIAN_CMD=chainlink-feeds
 ENV CL_MERCURY_CMD=chainlink-mercury
 ARG CL_SOLANA_CMD=chainlink-solana
 ENV CL_SOLANA_CMD=${CL_SOLANA_CMD}
-ARG CL_APTOS_CMD
-ENV CL_APTOS_CMD=${CL_APTOS_CMD}
 
 # CCIP specific
 COPY ./cci[p]/confi[g] /ccip-config
