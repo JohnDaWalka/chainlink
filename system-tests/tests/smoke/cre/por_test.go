@@ -941,8 +941,8 @@ func waitForWorkflowRegistrySyncer(nodeSetOutput []*types.WrappedNodeOutput, top
 
 func setCICtfConfigIfMissing(configName string) error {
 	if os.Getenv("CI") == "true" {
-		if os.Getenv("CTF_CONFIG") == "" {
-			return os.Setenv("CTF_CONFIG", configName)
+		if os.Getenv("CTF_CONFIGS") == "" {
+			return os.Setenv("CTF_CONFIGS", configName)
 		}
 	}
 
