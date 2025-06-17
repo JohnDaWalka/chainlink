@@ -65,7 +65,7 @@ func (c *ExecutionHelper) CallCapability(ctx context.Context, request *sdkpb.Cap
 	}
 
 	if spendLimit.Valid {
-		if err = meterReport.Deduct(meteringRef, spendLimit); err != nil {
+		if err = meterReport.Deduct(meteringRef, spendLimit.Decimal); err != nil {
 			c.cfg.Lggr.Errorw("could not deduct balance for capability request", "capReq", request.Id, "capReqCallbackID", request.CallbackId, "err", err)
 		}
 

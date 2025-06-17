@@ -802,13 +802,13 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 			l.Error(fmt.Sprintf("could get available balance for %s: %s", stepState.Ref, err))
 		}
 
-		// TODO: https://smartcontract-it.atlassian.net/browse/CRE-461 if availability is math.MaxInt64 there is no limit. Possibly flag this in a different way.
-		err = meteringReport.Deduct(stepState.Ref, availableForCall)
-		if err != nil {
-			l.Error(fmt.Sprintf("could not deduct balance for capability request %s: %s", stepState.Ref, err))
-		}
-
 		if availableForCall.Valid {
+			// TODO: https://smartcontract-it.atlassian.net/browse/CRE-461 if availability is math.MaxInt64 there is no limit. Possibly flag this in a different way.
+			err = meteringReport.Deduct(stepState.Ref, availableForCall.Decimal)
+			if err != nil {
+				l.Error(fmt.Sprintf("could not deduct balance for capability request %s: %s", stepState.Ref, err))
+			}
+
 			spendLimits = meteringReport.CreditToSpendingLimits(info, availableForCall.Decimal)
 		}
 	} else {

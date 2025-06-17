@@ -329,11 +329,9 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 			e.cfg.Lggr.Errorw("could not determine compute amount to meter", "err", mrErr)
 		}
 
-		deductAmount := decimal.NewNullDecimal(computeAmount)
-
 		if mrErr = meteringReport.Deduct(
 			metering.ComputeResourceDimension,
-			deductAmount,
+			computeAmount,
 		); mrErr != nil {
 			e.cfg.Lggr.Errorw("could not meter compute", "err", mrErr)
 		}
