@@ -93,8 +93,6 @@ func (bs *balanceStore) convertFromBalance(toUnit string, amount decimal.Decimal
 		bs.meteringMode = true
 	}
 
-	decimal.DivisionPrecision = defaultDecimalPrecision
-
 	return amount.Div(rate)
 }
 

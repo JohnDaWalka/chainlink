@@ -15,6 +15,10 @@ import (
 	"github.com/smartcontractkit/chainlink-protos/workflows/go/events"
 )
 
+func init() {
+	decimal.DivisionPrecision = defaultDecimalPrecision
+}
+
 const (
 	ComputeResourceDimension = "COMPUTE"
 	defaultDecimalPrecision  = 3 // one thousandth of a dollar
@@ -232,8 +236,6 @@ func (r *Report) GetMaxSpendForInvocation(
 	if r.balance.meteringMode {
 		return nullCapSpendLimit, nil
 	}
-
-	decimal.DivisionPrecision = defaultDecimalPrecision
 
 	// Split the available local balance between the number of concurrent calls that can still be made
 	spendLimit := r.balance.Get().Div(decimal.NewFromInt(int64(openConcurrentCallSlots)))
