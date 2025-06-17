@@ -35,17 +35,12 @@ jobs:
       - name: Define test matrix
         id: define-matrix
         shell: bash
+        working-directory: system-tests/tests/smoke/cre
         run: |
-          cat <<EOF > matrix.json
-          [
-            { "test_name": "TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice", "test_config": "environment-one-don-multichain-ci.toml"},
-            { "test_name": "TestCRE_OCR3_PoR_Workflow_GatewayDon_MockedPrice", "test_config": "environment-gateway-don-ci.toml"},
-            { "test_name": "TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice", "test_config": "environment-capabilities-don-ci.toml"}
-          ]
-          EOF
+          # Get the list of tests and convert to JSON format
+          tests=$(go test github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre -list . | grep -v "ok" | grep -v "^$" | jq -R -s 'split("\n")[:-1] | map({"test_name": .})')
 
-          matrix=$(cat matrix.json | jq -c .)
-          echo "matrix=$matrix" >> $GITHUB_OUTPUT
+          echo "matrix=$tests" >> $GITHUB_OUTPUT
 
   run-system-tests:
     permissions:
