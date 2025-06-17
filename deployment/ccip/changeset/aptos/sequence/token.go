@@ -17,10 +17,10 @@ type DeployTokenSeqInput struct {
 }
 
 type DeployTokenSeqOutput struct {
-	TokenAddress      aptos.AccountAddress
-	TokenObjAddress   aptos.AccountAddress
-	TokenOwnerAddress aptos.AccountAddress
-	MCMSOperations    []mcmstypes.BatchOperation
+	TokenAddress        aptos.AccountAddress
+	TokenCodeObjAddress aptos.AccountAddress
+	TokenOwnerAddress   aptos.AccountAddress
+	MCMSOperations      []mcmstypes.BatchOperation
 }
 
 var DeployAptosTokenSequence = operations.NewSequence(
@@ -57,8 +57,8 @@ func deployAptosTokenSequence(b operations.Bundle, deps operation.AptosDeps, in 
 
 	// Deploy token MCMS Registrar
 	deployTokenRegistrarIn := operation.DeployTokenRegistrarInput{
-		TokenObjAddress: deployTReport.Output.TokenObjAddress,
-		MCMSAddress:     in.MCMSAddress,
+		TokenCodeObjAddress: deployTReport.Output.TokenCodeObjAddress,
+		MCMSAddress:         in.MCMSAddress,
 	}
 	deployRegReport, err := operations.ExecuteOperation(b, operation.DeployTokenMCMSRegistrarOp, deps, deployTokenRegistrarIn)
 	if err != nil {
@@ -68,13 +68,13 @@ func deployAptosTokenSequence(b operations.Bundle, deps operation.AptosDeps, in 
 
 	// Initialize token
 	initTokenInput := operation.InitializeTokenInput{
-		TokenObjAddress: deployTReport.Output.TokenObjAddress,
-		MaxSupply:       in.TokenParams.MaxSupply,
-		Name:            in.TokenParams.Name,
-		Symbol:          string(in.TokenParams.Symbol),
-		Decimals:        in.TokenParams.Decimals,
-		Icon:            in.TokenParams.Icon,
-		Project:         in.TokenParams.Project,
+		TokenCodeObjAddress: deployTReport.Output.TokenCodeObjAddress,
+		MaxSupply:           in.TokenParams.MaxSupply,
+		Name:                in.TokenParams.Name,
+		Symbol:              string(in.TokenParams.Symbol),
+		Decimals:            in.TokenParams.Decimals,
+		Icon:                in.TokenParams.Icon,
+		Project:             in.TokenParams.Project,
 	}
 	initTokenReport, err := operations.ExecuteOperation(b, operation.InitializeTokenOp, deps, initTokenInput)
 	if err != nil {
@@ -85,9 +85,9 @@ func deployAptosTokenSequence(b operations.Bundle, deps operation.AptosDeps, in 
 	// Mint test tokens
 	if in.TokenMint != nil {
 		mintTokenInput := operation.MintTokensInput{
-			TokenObjAddress: deployTReport.Output.TokenObjAddress,
-			To:              in.TokenMint.To,
-			Amount:          in.TokenMint.Amount,
+			TokenCodeObjAddress: deployTReport.Output.TokenCodeObjAddress,
+			To:                  in.TokenMint.To,
+			Amount:              in.TokenMint.Amount,
 		}
 		mintTokenReport, err := operations.ExecuteOperation(b, operation.MintTokensOp, deps, mintTokenInput)
 		if err != nil {
@@ -102,9 +102,9 @@ func deployAptosTokenSequence(b operations.Bundle, deps operation.AptosDeps, in 
 	})
 
 	return DeployTokenSeqOutput{
-		TokenAddress:      deployTReport.Output.TokenAddress,
-		TokenObjAddress:   deployTReport.Output.TokenObjAddress,
-		TokenOwnerAddress: deployTReport.Output.TokenOwnerAddress,
-		MCMSOperations:    mcmsOperations,
+		TokenAddress:        deployTReport.Output.TokenAddress,
+		TokenCodeObjAddress: deployTReport.Output.TokenCodeObjAddress,
+		TokenOwnerAddress:   deployTReport.Output.TokenOwnerAddress,
+		MCMSOperations:      mcmsOperations,
 	}, nil
 }

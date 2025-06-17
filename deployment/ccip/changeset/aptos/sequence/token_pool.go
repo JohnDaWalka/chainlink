@@ -17,10 +17,10 @@ import (
 
 // Deploy Token Pool sequence input
 type DeployTokenPoolSeqInput struct {
-	TokenObjAddress   aptos.AccountAddress
-	TokenAddress      aptos.AccountAddress
-	TokenOwnerAddress aptos.AccountAddress
-	PoolType          cldf.ContractType
+	TokenCodeObjAddress aptos.AccountAddress
+	TokenAddress        aptos.AccountAddress
+	TokenOwnerAddress   aptos.AccountAddress
+	PoolType            cldf.ContractType
 }
 type DeployTokenPoolSeqOutput struct {
 	TokenPoolAddress aptos.AccountAddress
@@ -86,7 +86,7 @@ func deployAptosTokenPoolSequence(b operations.Bundle, deps operation.AptosDeps,
 		return DeployTokenPoolSeqOutput{}, fmt.Errorf("failed to get CCIP owner address to be set as an initial administrator: %w", err)
 	}
 	deployTokenPoolModuleInput := operation.DeployTokenPoolModuleInput{
-		TokenObjAddress:      in.TokenObjAddress,
+		TokenCodeObjAddress:  in.TokenCodeObjAddress,
 		TokenPoolObjAddress:  tokenPoolObjectAddress,
 		InitialAdministrator: initialAdministrator,
 		PoolType:             in.PoolType,
@@ -103,7 +103,7 @@ func deployAptosTokenPoolSequence(b operations.Bundle, deps operation.AptosDeps,
 		tokenPoolStateAddress := tokenPoolObjectAddress.ResourceAccount([]byte("CcipManagedTokenPool"))
 		var txs []mcmstypes.Transaction
 		gmReport, err := operations.ExecuteOperation(b, operation.GrantMinterPermissionsOp, deps, operation.GrantRolePermissionsInput{
-			TokenObjAddress:       in.TokenObjAddress,
+			TokenCodeObjAddress:   in.TokenCodeObjAddress,
 			TokenPoolStateAddress: tokenPoolStateAddress,
 		})
 		if err != nil {
@@ -112,7 +112,7 @@ func deployAptosTokenPoolSequence(b operations.Bundle, deps operation.AptosDeps,
 		txs = append(txs, gmReport.Output)
 
 		gbReport, err := operations.ExecuteOperation(b, operation.GrantBurnerPermissionsOp, deps, operation.GrantRolePermissionsInput{
-			TokenObjAddress:       in.TokenObjAddress,
+			TokenCodeObjAddress:   in.TokenCodeObjAddress,
 			TokenPoolStateAddress: tokenPoolStateAddress,
 		})
 		if err != nil {

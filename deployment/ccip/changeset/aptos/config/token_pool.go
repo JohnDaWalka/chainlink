@@ -15,7 +15,7 @@ type AddTokenPoolConfig struct {
 	// DeployAptosTokenConfig
 	ChainSelector                       uint64
 	TokenAddress                        aptos.AccountAddress // if empty, token will be deployed
-	TokenObjAddress                     aptos.AccountAddress // if empty, token will be deployed
+	TokenCodeObjAddress                 aptos.AccountAddress // if empty, token will be deployed
 	TokenPoolAddress                    aptos.AccountAddress // if empty, token pool will be deployed
 	PoolType                            cldf.ContractType
 	TokenTransferFeeByRemoteChainConfig map[uint64]fee_quoter.TokenTransferFeeConfig
