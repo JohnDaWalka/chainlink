@@ -95,9 +95,10 @@ install-plugins-testing: ## Build & install testing LOOPP binaries (plugins).
 	fi
 
 .PHONY: install-plugins-local
-install-plugins-local: ## Build & install local plugins.
+install-plugins-local: ## Build & install local plugins
 	@if [ "$(CL_USE_EXPERIMENTAL_PLUGINS)" = "true" ]; then \
 		go install $(GOFLAGS) ./plugins/cmd/chainlink-evm; \
+		echo "go install $(GOFLAGS) ./plugins/cmd/chainlink-evm"; \
 	fi
 	go install $(GOFLAGS) ./plugins/cmd/chainlink-medianpoc
 	go install $(GOFLAGS) ./plugins/cmd/chainlink-ocr3-capability
