@@ -87,10 +87,11 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_batching_test.go
     test_env_type: in-memory
     runs_on: ubuntu-latest
+    runs_on_self_hosted: runs-on/cpu=8/ram=32/family=m6i/spot=false/image=ubuntu24-full-x64/extras=s3-cache+tmpfs
     triggers:
       - PR Integration CCIP Tests
       - Nightly Integration CCIP Tests
-    test_cmd: cd smoke/ccip && go test -run "Test_CCIPBatching_MaxBatchSizeEVM" -timeout 25m -test.parallel=2 -count=1 -json
+    test_cmd: cd smoke/ccip && go test -run "Test_CCIPBatching_MaxBatchSizeEVM" -timeout 25m -test.parallel=4 -count=1 -json
     test_go_project_path: integration-tests
 
   - id: smoke/ccip/ccip_batching_test.go:Test_CCIPBatching_MultiSource
@@ -127,20 +128,22 @@ runner-test-matrix:
     path: integration-tests/smoke/ccip/ccip_batching_test.go
     test_env_type: in-memory
     runs_on: ubuntu-latest
+    runs_on_self_hosted: runs-on/cpu=8/ram=32/family=m6i/spot=false/image=ubuntu24-full-x64/extras=s3-cache+tmpfs
     triggers:
       - PR Integration CCIP Tests
       - Nightly Integration CCIP Tests
-    test_cmd: cd smoke/ccip && go test -run "^Test_CCIPBatching_SingleSource$" -timeout 25m -test.parallel=2 -count=1 -json
+    test_cmd: cd smoke/ccip && go test -run "^Test_CCIPBatching_SingleSource$" -timeout 25m -test.parallel=4 -count=1 -json
     test_go_project_path: integration-tests
 
   - id: smoke/ccip/ccip_batching_test.go:Test_CCIPBatching_SingleSource_MultiRoot
     path: integration-tests/smoke/ccip/ccip_batching_test.go
     test_env_type: in-memory
     runs_on: ubuntu-latest
+    runs_on_self_hosted: runs-on/cpu=8/ram=32/family=m6i/spot=false/image=ubuntu24-full-x64/extras=s3-cache+tmpfs
     triggers:
       - PR Integration CCIP Tests
       - Nightly Integration CCIP Tests
-    test_cmd: cd smoke/ccip && go test -run "^Test_CCIPBatching_SingleSource_MultiRoot$" -timeout 25m -test.parallel=2 -count=1 -json
+    test_cmd: cd smoke/ccip && go test -run "^Test_CCIPBatching_SingleSource_MultiRoot$" -timeout 25m -test.parallel=4 -count=1 -json
     test_go_project_path: integration-tests
 
   - id: smoke/ccip/ccip_batching_test.go:Test_CCIPBatching_SingleSource_MultiPrice
