@@ -75,7 +75,6 @@ jobs:
       docker-build-args: |
         CHAINLINK_USER=chainlink
         COMMIT_SHA=${{ github.sha }}
-        CL_SOLANA_CMD=chainlink-solana
       docker-manifest-sign: true
       git-sha: ${{ inputs.git-ref || github.sha }}
       github-event-name: ${{ github.event_name }}
@@ -173,9 +172,10 @@ jobs:
       docker-build-context: .
       docker-build-args: |
         CHAINLINK_USER=chainlink
+        COMMIT_SHA=${{ github.sha }}
+        CL_INSTALL_PRIVATE_PLUGINS=false
         CL_CHAIN_DEFAULTS=/ccip-config
         CL_SOLANA_CMD=
-        COMMIT_SHA=${{ github.sha }}
       docker-manifest-sign: true
       git-sha: ${{ inputs.git-ref || github.sha }}
       github-event-name: ${{ github.event_name }}
@@ -203,9 +203,9 @@ jobs:
       docker-build-context: .
       docker-build-args: |
         CHAINLINK_USER=chainlink
-        CL_CHAIN_DEFAULTS=/ccip-config
         COMMIT_SHA=${{ github.sha }}
         CL_INSTALL_PRIVATE_PLUGINS=true
+        CL_CHAIN_DEFAULTS=/ccip-config
         CL_APTOS_CMD=chainlink-aptos
       docker-manifest-sign: true
       docker-tag-custom-suffix: "-plugins"
@@ -233,7 +233,7 @@ jobs:
 
   call-cre-workflow-don-benchmark:
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
-    needs: [ docker-core-plugins-testing ]
+    needs: [docker-core-plugins-testing]
     permissions:
       contents: read
       id-token: write
