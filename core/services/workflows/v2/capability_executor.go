@@ -69,8 +69,8 @@ func (c *ExecutionHelper) CallCapability(ctx context.Context, request *sdkpb.Cap
 			c.cfg.Lggr.Errorw("could not deduct balance for capability request", "capReq", request.Id, "capReqCallbackID", request.CallbackId, "err", err)
 		}
 
-		info, err := capability.Info(ctx)
-		if err != nil {
+		info, iErr := capability.Info(ctx)
+		if iErr != nil {
 			c.cfg.Lggr.Error("failed to get info for capability")
 		}
 
