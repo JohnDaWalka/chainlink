@@ -8,6 +8,8 @@ GCFLAGS = -gcflags "$(GO_GCFLAGS)"
 # Set to true to install private plugins (will require GitHub auth).
 CL_INSTALL_PRIVATE_PLUGINS ?= false
 CL_INSTALL_TESTING_PLUGINS ?= false
+# Set to true to use experimental public plugins instead of stable ones.
+CL_USE_EXPERIMENTAL_PLUGINS ?= false
 # Output directory for loopinstall plugin manifests (set by caller)
 CL_LOOPINSTALL_OUTPUT_DIR ?=
 
@@ -68,18 +70,20 @@ install-loopinstall:
 
 .PHONY: install-plugins-public
 install-plugins-public: ## Build & install public remote LOOPP binaries (plugins).
+	$(eval PUBLIC_PLUGINS_FILE := $(if $(filter true,$(CL_USE_EXPERIMENTAL_PLUGINS)),./plugins/plugins.public.experimental.yaml,./plugins/plugins.public.yaml))
 	@if [ -n "$(CL_LOOPINSTALL_OUTPUT_DIR)" ]; then \
-		loopinstall --concurrency 5 --output-installation-artifacts $(CL_LOOPINSTALL_OUTPUT_DIR)/public.json ./plugins/plugins.public.yaml; \
+		loopinstall --concurrency 5 --output-installation-artifacts $(CL_LOOPINSTALL_OUTPUT_DIR)/public.json $(PUBLIC_PLUGINS_FILE); \
 	else \
-		loopinstall --concurrency 5 ./plugins/plugins.public.yaml; \
+		loopinstall --concurrency 5 $(PUBLIC_PLUGINS_FILE); \
 	fi
 
 .PHONY: install-plugins-private
 install-plugins-private: ## Build & install private remote LOOPP binaries (plugins).
+	$(eval PRIVATE_PLUGINS_FILE := $(if $(filter true,$(CL_USE_EXPERIMENTAL_PLUGINS)),./plugins/plugins.private.experimental.yaml,./plugins/plugins.private.yaml))
 	if [ -n "$(CL_LOOPINSTALL_OUTPUT_DIR)" ]; then \
-		GOPRIVATE=github.com/smartcontractkit/* loopinstall --concurrency 5 --output-installation-artifacts $(CL_LOOPINSTALL_OUTPUT_DIR)/private.json ./plugins/plugins.private.yaml; \
+		GOPRIVATE=github.com/smartcontractkit/* loopinstall --concurrency 5 --output-installation-artifacts $(CL_LOOPINSTALL_OUTPUT_DIR)/private.json $(PRIVATE_PLUGINS_FILE); \
 	else \
-		GOPRIVATE=github.com/smartcontractkit/* loopinstall --concurrency 5 ./plugins/plugins.private.yaml; \
+		GOPRIVATE=github.com/smartcontractkit/* loopinstall --concurrency 5 $(PRIVATE_PLUGINS_FILE); \
 	fi
 
 .PHONY: install-plugins-testing
@@ -92,7 +96,9 @@ install-plugins-testing: ## Build & install testing LOOPP binaries (plugins).
 
 .PHONY: install-plugins-local
 install-plugins-local: ## Build & install local plugins.
-	go install $(GOFLAGS) ./plugins/cmd/chainlink-evm
+	@if [ "$(CL_USE_EXPERIMENTAL_PLUGINS)" = "true" ]; then \
+		go install $(GOFLAGS) ./plugins/cmd/chainlink-evm; \
+	fi
 	go install $(GOFLAGS) ./plugins/cmd/chainlink-medianpoc
 	go install $(GOFLAGS) ./plugins/cmd/chainlink-ocr3-capability
 	go install $(GOFLAGS) ./plugins/cmd/capabilities/log-event-trigger
@@ -118,7 +124,7 @@ docker-ccip:
 
 # Define a comma variable for use in $(eval) (needed for the PRIVATE_PLUGIN_ARGS)
 comma := ,
-.PHONY: docker-plugins ## Build the chainlink-plugins docker image
+.PHONY: docker-plugins ## Build the EXPERIMENTAL chainlink-plugins docker image
 docker-plugins:
 	@if ([ "$(CL_INSTALL_PRIVATE_PLUGINS)" = "true" ] || [ "$(CL_INSTALL_TESTING_PLUGINS)" = "true" ]) && [ -z "$(GITHUB_TOKEN)" ]; then \
 		echo "Error: GITHUB_TOKEN environment variable is required when CL_INSTALL_PRIVATE_PLUGINS=true or CL_INSTALL_TESTING_PLUGINS=true"; \
