@@ -110,12 +110,15 @@ install-plugins: install-loopinstall install-plugins-local install-plugins-publi
 docker:
 	docker buildx build \
 	--build-arg COMMIT_SHA=$(COMMIT_SHA) \
+	--build-arg CL_APTOS_CMD=chainlink-aptos \
+	--build-arg CL_INSTALL_PRIVATE_PLUGINS=$(CL_INSTALL_PRIVATE_PLUGINS) \
 	-f core/chainlink.Dockerfile .
 
 .PHONY: docker-ccip ## Build the chainlink docker image
 docker-ccip:
 	docker buildx build \
 	--build-arg COMMIT_SHA=$(COMMIT_SHA) \
+	--build-arg CL_APTOS_CMD=chainlink-aptos \
 	-f core/chainlink.Dockerfile . -t chainlink-ccip:latest
 
 	docker buildx build \

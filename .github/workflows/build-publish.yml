@@ -75,7 +75,6 @@ jobs:
       docker-build-args: |
         CHAINLINK_USER=chainlink
         COMMIT_SHA=${{ github.sha }}
-        CL_INSTALL_PRIVATE_PLUGINS=true
         CL_APTOS_CMD=chainlink-aptos
       docker-cache-behaviour: "disable"
       docker-manifest-sign: true
@@ -162,7 +161,7 @@ jobs:
           fi
 
       - name: Notify Slack
-        uses: smartcontractkit/.github/actions/slack-notify-git-ref@31e00facdd8f57a2bc7868b5e4c8591bf2aa3727 # slack-notify-git-ref@0.1.2
+        uses: smartcontractkit/.github/actions/slack-notify-git-ref@slack-notify-git-ref/1.0.0
         with:
           slack-channel-id: ${{ secrets.SLACK_CHANNEL_RELEASE_NOTIFICATIONS }}
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN_RELENG }} # Releng Bot
