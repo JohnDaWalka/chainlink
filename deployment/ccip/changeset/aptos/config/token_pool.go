@@ -22,6 +22,7 @@ type AddTokenPoolConfig struct {
 	EVMRemoteConfigs                    map[uint64]EVMRemoteConfig
 	TokenParams                         TokenParams
 	MCMSConfig                          *proposalutils.TimelockConfig
+	TokenMint                           *TokenMint
 }
 
 type EVMRemoteConfig struct {

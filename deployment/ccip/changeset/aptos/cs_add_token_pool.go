@@ -121,6 +121,7 @@ func (cs AddTokenPool) Apply(env cldf.Environment, cfg config.AddTokenPoolConfig
 		deployTokenIn := seq.DeployTokenSeqInput{
 			TokenParams: cfg.TokenParams,
 			MCMSAddress: state.AptosChains[cfg.ChainSelector].MCMSAddress,
+			TokenMint:   cfg.TokenMint,
 		}
 		deploySeq, err := operations.ExecuteSequence(env.OperationsBundle, seq.DeployAptosTokenSequence, deps, deployTokenIn)
 		if err != nil {

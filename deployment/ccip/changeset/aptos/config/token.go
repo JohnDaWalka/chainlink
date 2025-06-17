@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 )
 
@@ -30,4 +31,10 @@ func (tp TokenParams) Validate() error {
 		return errors.New("decimals must be between 1 and 8")
 	}
 	return nil
+}
+
+type TokenMint struct {
+	Amount          uint64
+	To              aptos.AccountAddress
+	TokenObjAddress aptos.AccountAddress
 }

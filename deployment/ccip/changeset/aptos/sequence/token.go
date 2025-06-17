@@ -11,8 +11,9 @@ import (
 )
 
 type DeployTokenSeqInput struct {
-	TokenParams config.TokenParams
 	MCMSAddress aptos.AccountAddress
+	TokenParams config.TokenParams
+	TokenMint   *config.TokenMint
 }
 
 type DeployTokenSeqOutput struct {
@@ -30,7 +31,8 @@ var DeployAptosTokenSequence = operations.NewSequence(
 )
 
 func deployAptosTokenSequence(b operations.Bundle, deps operation.AptosDeps, in DeployTokenSeqInput) (DeployTokenSeqOutput, error) {
-	mcmsOperations := []mcmstypes.BatchOperation{}
+	var mcmsOperations []mcmstypes.BatchOperation
+	var txs []mcmstypes.Transaction
 
 	// Cleanup staging area
 	cleanupReport, err := operations.ExecuteOperation(b, operation.CleanupStagingAreaOp, deps, in.MCMSAddress)
@@ -78,9 +80,25 @@ func deployAptosTokenSequence(b operations.Bundle, deps operation.AptosDeps, in 
 	if err != nil {
 		return DeployTokenSeqOutput{}, err
 	}
+	txs = append(txs, initTokenReport.Output)
+
+	// Mint test tokens
+	if in.TokenMint != nil {
+		mintTokenInput := operation.MintTokensInput{
+			TokenObjAddress: deployTReport.Output.TokenObjAddress,
+			To:              in.TokenMint.To,
+			Amount:          in.TokenMint.Amount,
+		}
+		mintTokenReport, err := operations.ExecuteOperation(b, operation.MintTokensOp, deps, mintTokenInput)
+		if err != nil {
+			return DeployTokenSeqOutput{}, err
+		}
+		txs = append(txs, mintTokenReport.Output)
+	}
+
 	mcmsOperations = append(mcmsOperations, mcmstypes.BatchOperation{
 		ChainSelector: mcmstypes.ChainSelector(deps.AptosChain.Selector),
-		Transactions:  []mcmstypes.Transaction{initTokenReport.Output},
+		Transactions:  txs,
 	})
 
 	return DeployTokenSeqOutput{
