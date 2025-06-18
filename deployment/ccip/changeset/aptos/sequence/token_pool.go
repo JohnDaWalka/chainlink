@@ -63,7 +63,7 @@ func deployAptosTokenPoolSequence(b operations.Bundle, deps operation.AptosDeps,
 	// 3 - Deploy token pool module
 	deployTokenPoolModuleInput := operation.DeployTokenPoolModuleInput{
 		TokenAddress:        in.TokenAddress,
-		TokenObjAddress:     in.TokenObjAddress,
+		TokenCodeObjAddress: in.TokenCodeObjAddress,
 		TokenPoolObjAddress: tokenPoolObjectAddress,
 		PoolType:            in.PoolType,
 	}

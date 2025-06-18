@@ -59,7 +59,7 @@ func deployTokenPoolPackage(b operations.Bundle, deps AptosDeps, poolSeed string
 
 type DeployTokenPoolModuleInput struct {
 	PoolType            cldf.ContractType
-	TokenObjAddress     aptos.AccountAddress
+	TokenCodeObjAddress aptos.AccountAddress
 	TokenAddress        aptos.AccountAddress
 	TokenPoolObjAddress aptos.AccountAddress
 }
@@ -89,7 +89,7 @@ func deployTokenPoolModule(b operations.Bundle, deps AptosDeps, in DeployTokenPo
 			aptosState.CCIPAddress,
 			aptosState.MCMSAddress,
 			in.TokenPoolObjAddress,
-			in.TokenObjAddress,
+			in.TokenCodeObjAddress,
 			true,
 		)
 	case shared.BurnMintTokenPool:
