@@ -47,6 +47,8 @@ jobs:
       - name: Check release tag
         id: release-tag-check
         uses: smartcontractkit/.github/actions/release-tag-check@c5c4a8186da4218cff6cac8184e47dd3dec69ba3 # release-tag-check@0.1.0
+      - name: Install pnpm
+        run: npm install -g pnpm@10.12.1
       - name: Check for VERSION file bump on tags
         # Avoids checking VERSION file bump on forks or from CCIP releases.
         if: ${{ github.repository == 'smartcontractkit/chainlink' && steps.check-git-tag-type.outputs.git-tag-type == 'core' }}
