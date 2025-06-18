@@ -45,6 +45,7 @@ type CCIPChainState struct {
 	WSOL          solana.PublicKey
 	SPL2022Tokens []solana.PublicKey
 	SPLTokens     []solana.PublicKey
+	USDCTokenPool solana.PublicKey
 
 	// ccip programs
 	Router                solana.PublicKey

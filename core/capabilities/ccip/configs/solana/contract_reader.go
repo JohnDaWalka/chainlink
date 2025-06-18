@@ -16,6 +16,7 @@ import (
 var ccipOffRampIDL = idl.FetchCCIPOfframpIDL()
 var ccipFeeQuoterIDL = idl.FetchFeeQuoterIDL()
 var ccipRmnRemoteIDL = idl.FetchRMNRemoteIDL()
+var ccipCCTPTokenPoolIDL = idl.FetchCctpTokenPoolIDL()
 
 func DestContractReaderConfig() (config.ContractReader, error) {
 	var offRampIDL solanacodec.IDL
@@ -31,6 +32,11 @@ func DestContractReaderConfig() (config.ContractReader, error) {
 	var rmnRemoteIDL solanacodec.IDL
 	if err := json.Unmarshal([]byte(ccipRmnRemoteIDL), &rmnRemoteIDL); err != nil {
 		return config.ContractReader{}, fmt.Errorf("unexpected error: invalid CCIP RMN Remote IDL, error: %w", err)
+	}
+
+	var cctpTokenPoolIDL solanacodec.IDL
+	if err := json.Unmarshal([]byte(ccipCCTPTokenPoolIDL), &cctpTokenPoolIDL); err != nil {
+		return config.ContractReader{}, fmt.Errorf("unexpected error: invalid CCIP CCTP Token Pool IDL, error: %w", err)
 	}
 
 	feeQuoterIDL.Accounts = append(feeQuoterIDL.Accounts, solanacodec.IdlTypeDef{
@@ -416,6 +422,26 @@ func DestContractReaderConfig() (config.ContractReader, error) {
 							},
 							&codec.WrapperModifierConfig{
 								Fields: map[string]string{"": "CursedSubjects"},
+							},
+						},
+					},
+				},
+			},
+			consts.ContractNameCCTPMessageTransmitter: {
+				IDL: cctpTokenPoolIDL,
+				Reads: map[string]config.ReadDefinition{
+					consts.EventNameCCTPMessageSent: {
+						ChainSpecificName: "CcipCctpMessageSentEvent",
+						ReadType: config.Event,
+						EventDefinitions: &config.EventDefinitions{
+							PollingFilter: &config.PollingFilter{},
+							IndexedField0: &config.IndexedField{
+								OffChainPath: consts.EventAttributeMsgTotalNonce,
+								OnChainPath:  "MsgTotalNonce",
+							},
+							IndexedField1: &config.IndexedField{
+								OffChainPath: consts.EventAttributeSourceDomain,
+								OnChainPath:  "SourceDomain",
 							},
 						},
 					},
