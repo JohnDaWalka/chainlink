@@ -109,10 +109,18 @@ install-plugins: install-loopinstall install-plugins-local install-plugins-publi
 
 .PHONY: docker ## Build the chainlink docker image
 docker:
+	@if ([ "$(CL_INSTALL_PRIVATE_PLUGINS)" = "true" ] || [ "$(CL_INSTALL_TESTING_PLUGINS)" = "true" ]) && [ -z "$(GITHUB_TOKEN)" ]; then \
+		echo "Error: GITHUB_TOKEN environment variable is required when CL_INSTALL_PRIVATE_PLUGINS=true or CL_INSTALL_TESTING_PLUGINS=true"; \
+		exit 1; \
+	fi
+	$(eval PRIVATE_PLUGIN_ARGS := $(if $(and $(or $(filter true,$(CL_INSTALL_PRIVATE_PLUGINS)),$(filter true,$(CL_INSTALL_TESTING_PLUGINS))),$(GITHUB_TOKEN)),--secret id=GIT_AUTH_TOKEN$(comma)env=GITHUB_TOKEN))
 	docker buildx build \
 	--build-arg COMMIT_SHA=$(COMMIT_SHA) \
 	--build-arg CL_INSTALL_PRIVATE_PLUGINS=$(CL_INSTALL_PRIVATE_PLUGINS) \
-	-f core/chainlink.Dockerfile .
+	$(PRIVATE_PLUGIN_ARGS) \
+	-f core/chainlink.Dockerfile . \
+	-t chainlink:develop \
+	--load
 
 .PHONY: docker-ccip ## Build the chainlink docker image
 docker-ccip:
