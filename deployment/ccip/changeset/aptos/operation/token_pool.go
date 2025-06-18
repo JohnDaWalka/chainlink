@@ -58,10 +58,10 @@ func deployTokenPoolPackage(b operations.Bundle, deps AptosDeps, poolSeed string
 }
 
 type DeployTokenPoolModuleInput struct {
-	PoolType             cldf.ContractType
-	TokenCodeObjAddress  aptos.AccountAddress // TODO change this to metadata address, and determine object if needed
-	TokenPoolObjAddress  aptos.AccountAddress
-	InitialAdministrator aptos.AccountAddress
+	PoolType            cldf.ContractType
+	TokenObjAddress     aptos.AccountAddress
+	TokenAddress        aptos.AccountAddress
+	TokenPoolObjAddress aptos.AccountAddress
 }
 
 // DeployTokenPoolModuleOp deploys token pool module to Token Object Address
@@ -89,8 +89,7 @@ func deployTokenPoolModule(b operations.Bundle, deps AptosDeps, in DeployTokenPo
 			aptosState.CCIPAddress,
 			aptosState.MCMSAddress,
 			in.TokenPoolObjAddress,
-			in.TokenCodeObjAddress,
-			in.InitialAdministrator,
+			in.TokenObjAddress,
 			true,
 		)
 	case shared.BurnMintTokenPool:
@@ -99,8 +98,7 @@ func deployTokenPoolModule(b operations.Bundle, deps AptosDeps, in DeployTokenPo
 			aptosState.CCIPAddress,
 			aptosState.MCMSAddress,
 			in.TokenPoolObjAddress,
-			in.TokenCodeObjAddress, // TODO this should be the metadata address
-			in.InitialAdministrator,
+			in.TokenAddress,
 			true,
 		)
 	case shared.LockReleaseTokenPool:
@@ -109,8 +107,7 @@ func deployTokenPoolModule(b operations.Bundle, deps AptosDeps, in DeployTokenPo
 			aptosState.CCIPAddress,
 			aptosState.MCMSAddress,
 			in.TokenPoolObjAddress,
-			in.TokenCodeObjAddress, // TODO this should be the metadata address
-			in.InitialAdministrator,
+			in.TokenAddress,
 			true,
 		)
 	default:
