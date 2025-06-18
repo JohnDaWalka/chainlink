@@ -127,7 +127,7 @@ jobs:
 
   # Notify Slack channel for new git tags.
   slack-notify:
-    if: github.ref_type == 'tag' && (always() && (needs.docker-core.result == 'success' || needs.docker-ccip.result == 'success'))
+    if: always() && (needs.docker-core.result == 'success' || needs.docker-ccip.result == 'success')
     needs: [checks, docker-core, docker-ccip]
     runs-on: ubuntu-24.04
     environment: build-publish
@@ -168,24 +168,19 @@ jobs:
           git-ref-type: ${{ github.ref_type }}
           changelog-url: >-
             ${{
-              github.ref_type == 'tag' &&
               format(
                 'https://github.com/{0}/blob/{1}/CHANGELOG.md',
                 github.repository,
                 github.ref_name
-              ) || ''
+              )
             }}
           docker-image-name: >-
             ${{
-              github.ref_type == 'tag' &&
               format(
                 '{0}/{1}:{2}',
                 env.ECR_HOSTNAME,
                 needs.checks.outputs.ecr-image-name,
                 steps.docker-outputs.outputs.tag
-              ) || ''
+              )
             }}
-          docker-image-digest: >-
-            ${{
-              github.ref_type == 'tag' && steps.docker-outputs.outputs.digest || ''
-            }}
+          docker-image-digest: ${{ steps.docker-outputs.outputs.digest }}
