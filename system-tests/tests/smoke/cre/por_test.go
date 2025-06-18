@@ -567,7 +567,7 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice(t *testing.
 	cronBinaryPathInTheContainer, err := setBinaryPath(in, customBinaryPaths, types.CronCapability, "cron")
 	require.NoError(t, err, "failed to set cron path")
 
-	jobSpecFactoryFns, err := toJobSpecFactoryFuncs(in, chainIDs, cronBinaryPathInTheContainer)
+	jobSpecFactoryFns, err := toJobSpecFactoryFuncs(in, []int{chainIDs[0]}, cronBinaryPathInTheContainer)
 	require.NoError(t, err, "failed to create job spec factory funcs")
 
 	setupOutput := setupPoRTestEnvironment(
@@ -694,6 +694,10 @@ func TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice(t *testing.T) {
 	}
 
 	// we want to register write EVM capability only for the second blockchain
+	firstBlockchain := in.Blockchains[0]
+	chainIDInt, chainErr := strconv.Atoi(firstBlockchain.ChainID)
+	require.NoError(t, chainErr, "failed to convert chain ID to int")
+
 	secondBlockchain := in.Blockchains[1]
 	secondChainIDInt, secondChainErr := strconv.Atoi(secondBlockchain.ChainID)
 	require.NoError(t, secondChainErr, "failed to convert chain ID to int")
@@ -702,7 +706,7 @@ func TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice(t *testing.T) {
 	cronBinaryPathInTheContainer, err := setBinaryPath(in, customBinaryPaths, types.CronCapability, "cron")
 	require.NoError(t, err, "failed to set cron path")
 
-	jobSpecFactoryFns, err := toJobSpecFactoryFuncs(in, []int{secondChainIDInt}, cronBinaryPathInTheContainer)
+	jobSpecFactoryFns, err := toJobSpecFactoryFuncs(in, []int{chainIDInt}, cronBinaryPathInTheContainer)
 	require.NoError(t, err, "failed to create job spec factory funcs")
 
 	priceProvider := NewTrueUSDPriceProvider(testLogger, []string{in.WorkflowConfigs[0].FeedID})
