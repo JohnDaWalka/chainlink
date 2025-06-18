@@ -39,6 +39,7 @@ import (
 	webapicap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapi"
 	writeevmcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writeevm"
 	gatewayconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/gateway"
+	creattestedhttp "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/attestedhttp"
 	crecompute "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/compute"
 	creconsensus "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/consensus"
 	crecron "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/cron"
@@ -129,9 +130,10 @@ type Config struct {
 }
 
 type ExtraCapabilitiesConfig struct {
-	CronCapabilityBinaryPath  string `toml:"cron_capability_binary_path"`
-	LogEventTriggerBinaryPath string `toml:"log_event_trigger_binary_path"`
-	ReadContractBinaryPath    string `toml:"read_contract_capability_binary_path"`
+	AttestedHttpCapabilityBinaryPath string `toml:"attestedhttp_capability_binary_path"`
+	CronCapabilityBinaryPath         string `toml:"cron_capability_binary_path"`
+	LogEventTriggerBinaryPath        string `toml:"log_event_trigger_binary_path"`
+	ReadContractBinaryPath           string `toml:"read_contract_capability_binary_path"`
 }
 
 var startCmd = &cobra.Command{
@@ -361,6 +363,11 @@ func startCLIEnvironment(cmdContext context.Context, topologyFlag string, workfl
 			capabilitiesBinaryPaths[cretypes.CronCapability] = in.ExtraCapabilities.CronCapabilityBinaryPath
 		}
 
+		if in.ExtraCapabilities.AttestedHttpCapabilityBinaryPath != "" || withPluginsDockerImageFlag != "" {
+			workflowDONCapabilities = append(workflowDONCapabilities, cretypes.AttestedHTTPCapability)
+			capabilitiesBinaryPaths[cretypes.AttestedHTTPCapability] = in.ExtraCapabilities.AttestedHttpCapabilityBinaryPath
+		}
+
 		if in.ExtraCapabilities.LogEventTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
 			workflowDONCapabilities = append(workflowDONCapabilities, cretypes.LogTriggerCapability)
 			capabilitiesBinaryPaths[cretypes.LogTriggerCapability] = in.ExtraCapabilities.LogEventTriggerBinaryPath
@@ -473,6 +480,11 @@ func startCLIEnvironment(cmdContext context.Context, topologyFlag string, workfl
 		cronBinaryName = "cron"
 	}
 
+	attestedhttpBinaryName := filepath.Base(in.ExtraCapabilities.AttestedHttpCapabilityBinaryPath)
+	if withPluginsDockerImageFlag != "" {
+		attestedhttpBinaryName = "attestedhttp"
+	}
+
 	logEventTriggerBinaryName := filepath.Base(in.ExtraCapabilities.LogEventTriggerBinaryPath)
 	if withPluginsDockerImageFlag != "" {
 		logEventTriggerBinaryName = "log-event-trigger"
@@ -489,6 +501,7 @@ func startCLIEnvironment(cmdContext context.Context, topologyFlag string, workfl
 		webapi.WebAPITargetJobSpecFactoryFn,
 		creconsensus.ConsensusJobSpecFactoryFn(libc.MustSafeUint64(int64(homeChainIDInt))),
 		crecron.CronJobSpecFactoryFn(filepath.Join(containerPath, cronBinaryName)),
+		creattestedhttp.AttestedhttpJobSpecFactoryFn(filepath.Join(containerPath, attestedhttpBinaryName)),
 		cregateway.GatewayJobSpecFactoryFn(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
 		crecompute.ComputeJobSpecFactoryFn,
 	}

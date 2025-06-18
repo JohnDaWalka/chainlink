@@ -13,6 +13,7 @@ const (
 const (
 	OCR3Capability          CapabilityFlag = "ocr3"
 	CronCapability          CapabilityFlag = "cron"
+	AttestedHTTPCapability  CapabilityFlag = "attested-http"
 	CustomComputeCapability CapabilityFlag = "custom-compute"
 	WriteEVMCapability      CapabilityFlag = "write-evm"
 
