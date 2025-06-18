@@ -300,7 +300,7 @@ func TestDeployAptosChain_Apply(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, mockCCIPParams.FeeQuoterParams.PremiumMultiplierWeiPerEthByFeeToken[shared.LinkSymbol], mult)
 
-	aptTokenAdd := mustParseAddress(t, "0xa")
+	aptTokenAdd := MustParseAddress(t, "0xa")
 	mult, err = ccipBind.FeeQuoter().GetPremiumMultiplierWeiPerEth(nil, aptTokenAdd)
 	require.NoError(t, err)
 	require.Equal(t, mockCCIPParams.FeeQuoterParams.PremiumMultiplierWeiPerEthByFeeToken[shared.APTSymbol], mult)
