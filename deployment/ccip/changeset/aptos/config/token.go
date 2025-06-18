@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/aptos-labs/aptos-go-sdk"
+
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 )
 
