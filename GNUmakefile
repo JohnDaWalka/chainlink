@@ -111,7 +111,6 @@ install-plugins: install-loopinstall install-plugins-local install-plugins-publi
 docker:
 	docker buildx build \
 	--build-arg COMMIT_SHA=$(COMMIT_SHA) \
-	--build-arg CL_APTOS_CMD=chainlink-aptos \
 	--build-arg CL_INSTALL_PRIVATE_PLUGINS=$(CL_INSTALL_PRIVATE_PLUGINS) \
 	-f core/chainlink.Dockerfile .
 
@@ -119,7 +118,6 @@ docker:
 docker-ccip:
 	docker buildx build \
 	--build-arg COMMIT_SHA=$(COMMIT_SHA) \
-	--build-arg CL_APTOS_CMD=chainlink-aptos \
 	-f core/chainlink.Dockerfile . -t chainlink-ccip:latest
 
 	docker buildx build \
@@ -137,7 +135,6 @@ docker-plugins:
 	$(eval PRIVATE_PLUGIN_ARGS := $(if $(and $(or $(filter true,$(CL_INSTALL_PRIVATE_PLUGINS)),$(filter true,$(CL_INSTALL_TESTING_PLUGINS))),$(GITHUB_TOKEN)),--secret id=GIT_AUTH_TOKEN$(comma)env=GITHUB_TOKEN))
 	docker buildx build \
 	--build-arg COMMIT_SHA=$(COMMIT_SHA) \
-	--build-arg CL_APTOS_CMD=chainlink-aptos \
 	--build-arg CL_INSTALL_TESTING_PLUGINS=$(CL_INSTALL_TESTING_PLUGINS) \
 	--build-arg CL_INSTALL_PRIVATE_PLUGINS=$(CL_INSTALL_PRIVATE_PLUGINS) \
 	$(PRIVATE_PLUGIN_ARGS) \
