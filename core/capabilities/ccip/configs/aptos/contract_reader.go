@@ -8,6 +8,7 @@ import (
 )
 
 
+
 func GetChainReaderConfig() (config.ChainReaderConfig, error) {
 	return config.ChainReaderConfig{
 		IsLoopPlugin: true,
