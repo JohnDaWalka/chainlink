@@ -7,6 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
+
 func GetChainReaderConfig() (config.ChainReaderConfig, error) {
 	return config.ChainReaderConfig{
 		IsLoopPlugin: true,
