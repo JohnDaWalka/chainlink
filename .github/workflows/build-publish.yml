@@ -8,6 +8,8 @@ on:
 env:
   ECR_HOSTNAME: public.ecr.aws
 
+permissions: {}
+
 jobs:
   checks:
     name: "Checks"
@@ -131,6 +133,8 @@ jobs:
     needs: [checks, docker-core, docker-ccip]
     runs-on: ubuntu-24.04
     environment: build-publish
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
