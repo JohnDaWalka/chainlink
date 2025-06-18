@@ -1,6 +1,7 @@
 package ccipaptos
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -14,6 +15,21 @@ func (a AddressCodec) AddressBytesToString(addr []byte) (string, error) {
 
 func (a AddressCodec) AddressStringToBytes(addr string) ([]byte, error) {
 	return addressStringToBytes(addr)
+}
+
+func (a AddressCodec) OracleIDAsAddressBytes(oracleID uint8) ([]byte, error) {
+	addr := make([]byte, 32)
+
+	// write oracleID in big endian as done by BCS for addresses
+	binary.BigEndian.PutUint32(addr[28:], uint32(oracleID))
+
+	return addr, nil
+}
+
+func (a AddressCodec) TransmitterBytesToString(addr []byte) (string, error) {
+	// Transmitter accounts are ed25519 public keys, and encoded as a hex string without
+	// a 0x prefix.
+	return hex.EncodeToString(addr), nil
 }
 
 func addressBytesToString(addr []byte) (string, error) {
@@ -51,17 +67,4 @@ func addressBytesToBytes32(addr []byte) ([32]byte, error) {
 	// Left pad by copying to the end of the 32 byte array
 	copy(result[32-len(addr):], addr)
 	return result, nil
-}
-
-func addressStringToBytes32(addr string) ([32]byte, error) {
-	bytes, err := addressStringToBytes(addr)
-	if err != nil {
-		return [32]byte{}, err
-	}
-	return addressBytesToBytes32(bytes)
-}
-
-func addressIsValid(addr string) bool {
-	_, err := addressStringToBytes(addr)
-	return err == nil
 }
