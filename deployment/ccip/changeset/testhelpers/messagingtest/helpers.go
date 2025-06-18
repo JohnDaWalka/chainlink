@@ -1,7 +1,6 @@
 package messagingtest
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -215,8 +214,6 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 	}
 	out.MsgSentEvent = msgSentEvent
 
-	fmt.Println("MSG EVENT SENT: ", msgSentEvent.RawEvent, msgSentEvent.SequenceNumber)
-
 	// HACK: if the node booted or the logpoller filters got registered after ccipSend,
 	// we need to replay missed logs
 	// if !tc.Replayed {
@@ -235,7 +232,6 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 		tc.T.Logf("only commit validation was performed")
 
 	case ValidationTypeExec: // will validate both commit and exec
-		fmt.Println("VALIDATING EXEC")
 		// First, validate commit
 		commitStart := time.Now()
 		testhelpers.ConfirmCommitForAllWithExpectedSeqNums(tc.T, tc.Env, tc.OnchainState, expectedSeqNum, startBlocks)

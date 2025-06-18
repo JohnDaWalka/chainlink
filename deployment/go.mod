@@ -11,6 +11,8 @@ replace github.com/smartcontractkit/chainlink-protos => ../../chainlink-protos
 
 replace github.com/smartcontractkit/chainlink-protos/job-distributor v0.10.0 => ../../chainlink-protos/job-distributor
 
+replace github.com/smartcontractkit/chainlink-ccip => ../../chainlink-ccip
+
 // Using a separate inline `require` here to avoid surrounding line changes
 // creating potential merge conflicts.
 require github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250430150202-611699e34308
@@ -40,10 +42,10 @@ require (
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/sethvargo/go-retry v0.2.4
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0
-	github.com/smartcontractkit/chain-selectors v1.0.59
-	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250612083123-6ad06411b489
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250530084609-8529b8c89093
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250520123946-6aaf88e0848a
+	github.com/smartcontractkit/chain-selectors v1.0.60
+	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250612232513-06beaec2289c
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250612205233-2103b4b0449f
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250522183927-44d96a7ad0e5
 	github.com/smartcontractkit/chainlink-deployments-framework v0.5.1
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250522161404-27a8f7e1cc6c

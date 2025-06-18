@@ -399,6 +399,8 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			Ofc:           ofc,
 			ChainSelector: chainSelector,
 			ChainFamily:   relayChainFamily,
+
+			Transmitters: i.transmitters,
 		})
 		if err1 != nil {
 			return nil, nil, err1

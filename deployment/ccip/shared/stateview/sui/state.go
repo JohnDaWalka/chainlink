@@ -12,6 +12,7 @@ import (
 type CCIPChainState struct {
 	CCIPAddress             sui.Address
 	CCIPObjectRef           sui.Address
+	FeeQuoterCapId          sui.Address
 	OnRampAddress           sui.Address
 	OnRampStateObjectId     sui.Address
 	OffRampAddress          sui.Address
@@ -60,6 +61,9 @@ func loadsuiChainStateFromAddresses(addresses map[string]cldf.TypeAndVersion) (C
 
 		case shared.SuiCCIPObjectRefType:
 			chainState.CCIPObjectRef = *suiAddr
+
+		case shared.SuiFeeQuoterCapType:
+			chainState.FeeQuoterCapId = *suiAddr
 
 		case shared.SuiOnRampType:
 			chainState.OnRampAddress = *suiAddr

@@ -77,13 +77,36 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		ccipSeqInput := ccipops.DeployAndInitCCIPSeqInput{
 			LinkTokenCoinMetadataObjectId: config.ContractParamsPerChain[chainSel].FeeQuoterParams.LinkTokenCoinMetadataObjectId,
 			LocalChainSelector:            config.ContractParamsPerChain[chainSel].OnRampParams.ChainSelector,
-			DestChainSelector:             suiChain.Selector,
+			DestChainSelector:             uint64(909606746561742123),
 			MaxFeeJuelsPerMsg:             config.ContractParamsPerChain[chainSel].FeeQuoterParams.MaxFeeJuelsPerMsg,
 			TokenPriceStalenessThreshold:  config.ContractParamsPerChain[chainSel].FeeQuoterParams.TokenPriceStalenessThreshold,
 			DeployCCIPInput: ccipops.DeployCCIPInput{
 				McmsPackageId: mcmsSeqReport.Output.PackageId,
 				McmsOwner:     "0x2",
 			},
+			// Fee Quoter destination chain configuration
+			IsEnabled:                         true,
+			MaxNumberOfTokensPerMsg:           2,
+			MaxDataBytes:                      2000,
+			MaxPerMsgGasLimit:                 5000000,
+			DestGasOverhead:                   1000000,
+			DestGasPerPayloadByteBase:         byte(2),
+			DestGasPerPayloadByteHigh:         byte(5),
+			DestGasPerPayloadByteThreshold:    uint16(10),
+			DestDataAvailabilityOverheadGas:   300000,
+			DestGasPerDataAvailabilityByte:    1,
+			DestDataAvailabilityMultiplierBps: 1,
+			ChainFamilySelector:               []byte{40, 18, 213, 44},
+			EnforceOutOfOrder:                 false,
+			DefaultTokenFeeUsdCents:           3,
+			DefaultTokenDestGasOverhead:       100000,
+			DefaultTxGasLimit:                 500000,
+			GasMultiplierWeiPerEth:            100,
+			GasPriceStalenessThreshold:        1000000000,
+			NetworkFeeUsdCents:                10,
+
+			// apply_premium_multiplier_wei_per_eth_updates
+			PremiumMultiplierWeiPerEth: []uint64{10},
 		}
 
 		ccipSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, ccipops.DeployAndInitCCIPSequence, deps.SuiChain, ccipSeqInput)
@@ -104,6 +127,13 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		err = deps.AB.Save(chainSel, ccipSeqReport.Output.Objects.CCIPObjectRefObjectId, typeAndVersionCCIPObjectRef)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save CCIP objectRef Id %s for Sui chain %d: %w", ccipSeqReport.Output.Objects.CCIPObjectRefObjectId, chainSel, err)
+		}
+
+		// save CCIP FeeQuoterCapObjectId address to the addressbook
+		typeAndVersionCCIPFeeQuoterCapIdRef := cldf.NewTypeAndVersion(shared.SuiFeeQuoterCapType, deployment.Version1_6_0)
+		err = deps.AB.Save(chainSel, ccipSeqReport.Output.Objects.FeeQuoterCapObjectId, typeAndVersionCCIPFeeQuoterCapIdRef)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save CCIP FeeQuoter CapId Id %s for Sui chain %d: %w", ccipSeqReport.Output.Objects.FeeQuoterCapObjectId, chainSel, err)
 		}
 
 		// No need to store rn

@@ -15,7 +15,7 @@ const (
 	mockAddress     = "0x13a9f1a109368730f2e355d831ba8fbf5942fb82321863d55de54cb4ebe5d18f"
 	mockLinkAddress = "0xa"
 
-	sepChainSelector     = 11155111
+	sepChainSelector     = 18395503381733958356
 	sepMockOnRampAddress = "0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59"
 )
 
@@ -29,8 +29,8 @@ func GetMockChainContractParams(t *testing.T, e cldf.Environment, chainSelector 
 	linkTokenObjectMetadataId := state.SuiChains[chainSelector].LinkTokenCoinMetadataId.String()
 
 	return ChainContractParams{
-		FeeQuoterParams: ccip_ops.InitFeeQuoterInput{
-			MaxFeeJuelsPerMsg:             "100000000",
+		FeeQuoterParams: ccip_ops.InitFeeQuoterInput{ //1112246792648961560000000
+			MaxFeeJuelsPerMsg:             "1001224679264896156", // 100000 LINK (101 224 679 264 896 156)
 			TokenPriceStalenessThreshold:  1000000,
 			LinkTokenCoinMetadataObjectId: linkTokenObjectMetadataId,           // CoinMetadataObjectId
 			FeeTokens:                     []string{linkTokenObjectMetadataId}, // CoinMetadataObjectId
@@ -38,7 +38,7 @@ func GetMockChainContractParams(t *testing.T, e cldf.Environment, chainSelector 
 		OffRampParams: OffRampParams{
 			ChainSelector:                    chainSelector,
 			PermissionlessExecutionThreshold: uint32(60 * 60 * 8),
-			IsRMNVerificationDisabled:        []bool{false},
+			IsRMNVerificationDisabled:        []bool{true},
 			SourceChainSelectors:             []uint64{sepChainSelector},
 			SourceChainIsEnabled:             []bool{true},
 			SourceChainsOnRamp:               [][]byte{common.HexToAddress(sepMockOnRampAddress).Bytes()},

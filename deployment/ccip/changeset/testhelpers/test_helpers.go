@@ -21,6 +21,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/holiman/uint256"
 	"github.com/pattonkan/sui-go/sui"
 	"github.com/pattonkan/sui-go/suiclient"
 	"github.com/pkg/errors"
@@ -70,6 +71,8 @@ import (
 
 	sui_bind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
+	ccipops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
+	cciponramp_ops "github.com/smartcontractkit/chainlink-sui/ops/ccip_onramp"
 	linkops "github.com/smartcontractkit/chainlink-sui/ops/link"
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
@@ -912,6 +915,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	ccipObjectRefId := state.SuiChains[cfg.SourceChain].CCIPObjectRef.String()
 	ccipPackageId := state.SuiChains[cfg.SourceChain].CCIPAddress.String()
+	feeQuoterCapId := state.SuiChains[cfg.SourceChain].FeeQuoterCapId.String()
 	onRampPackageId := state.SuiChains[cfg.SourceChain].OnRampAddress.String()
 	onRampStateObjectId := state.SuiChains[cfg.SourceChain].OnRampStateObjectId.String()
 	linkTokenPkgId := state.SuiChains[cfg.SourceChain].LinkTokenAddress.String()
@@ -923,10 +927,47 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		linkops.MintLinkTokenInput{
 			LinkTokenPackageId: linkTokenPkgId,
 			TreasuryCapId:      linkTokenTreasuryCapId,
-			Amount:             10,
+			Amount:             201224679264896156,
 		})
 	if err != nil {
 		return &AnyMsgSentEvent{}, fmt.Errorf("failed to mint LinkToken for Sui chain %d: %w", cfg.SourceChain, err)
+	}
+
+	// Update Prices on FeeQuoter with minted LinkToken
+	_, err = operations.ExecuteOperation(e.OperationsBundle, ccipops.FeeQuoterUpdateTokenPricesOp, deps.SuiChain,
+		ccipops.FeeQuoterUpdateTokenPricesInput{
+			CCIPPackageId:         ccipPackageId,
+			CCIPObjectRef:         ccipObjectRefId,
+			FeeQuoterCapId:        feeQuoterCapId,
+			SourceTokens:          []string{linkTokenObjectMetadataId},
+			SourceUsdPerToken:     []uint256.Int{{1}},
+			GasDestChainSelectors: []uint64{cfg.DestChain},
+			GasUsdPerUnitGas:      []uint256.Int{{1}},
+		})
+	if err != nil {
+		return &AnyMsgSentEvent{}, fmt.Errorf("failed to updatePrice for Sui chain %d: %w", cfg.SourceChain, err)
+	}
+
+	// get Fee
+	_, err = operations.ExecuteOperation(e.OperationsBundle, cciponramp_ops.GetFeeOp, deps.SuiChain,
+		cciponramp_ops.GetFeeInput{
+			OnRampPackageId:   onRampPackageId,
+			TypeArgs:          linkTokenPkgId + "::link_token::LINK_TOKEN",
+			CCIPObjectRef:     ccipObjectRefId,
+			DestChainSelector: cfg.DestChain,
+			Receiver: []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0xdd, 0xbb, 0x6f, 0x35,
+				0x8f, 0x29, 0x04, 0x08, 0xd7, 0x68, 0x47, 0xb4,
+				0xf6, 0x02, 0xf0, 0xfd, 0x59, 0x92, 0x95, 0xfd},
+			Data:         []byte{104, 101, 108, 108, 111, 32, 101, 118, 109, 32, 102, 114, 111, 109, 32, 115, 117, 105},
+			TokenAddress: []string{},
+			TokenAmounts: []uint64{},
+			FeeToken:     linkTokenObjectMetadataId,
+			ExtraArgs:    []byte{},
+		},
+	)
+	if err != nil {
+		return &AnyMsgSentEvent{}, fmt.Errorf("failed to getFee for Sui chain %d: %w", cfg.SourceChain, err)
 	}
 
 	ptbArgs := chainwriter.Arguments{
@@ -935,11 +976,15 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 			"clock":               sui.SuiObjectIdClock.String(),
 			"dest_chain_selector": cfg.DestChain,
 			"onramp_state":        onRampStateObjectId,
-			"receiver":            []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-			"data":                []byte{104, 101, 108, 108, 111, 32, 101, 118, 109, 32, 102, 114, 111, 109, 32, 115, 117, 105},
-			"fee_token_metadata":  linkTokenObjectMetadataId,
-			"fee_token":           mintLinkTokenReport.Output.Objects.MintedLinkTokenObjectId,
-			"extra_args":          []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+			"receiver": []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0xdd, 0xbb, 0x6f, 0x35,
+				0x8f, 0x29, 0x04, 0x08, 0xd7, 0x68, 0x47, 0xb4,
+				0xf6, 0x02, 0xf0, 0xfd, 0x59, 0x92, 0x95, 0xfd,
+			},
+			"data":               []byte{104, 101, 108, 108, 111, 32, 101, 118, 109, 32, 102, 114, 111, 109, 32, 115, 117, 105},
+			"fee_token_metadata": linkTokenObjectMetadataId,
+			"fee_token":          mintLinkTokenReport.Output.Objects.MintedLinkTokenObjectId,
+			"extra_args":         []byte{},
 		},
 		ArgTypes: map[string]string{
 			"fee_token": linkTokenPkgId + "::link_token::LINK_TOKEN",
@@ -1344,6 +1389,7 @@ func AddLane(
 		evmDstChangesets := addEVMDestChangesets(e, to, from, isTestRouter)
 		changesets = append(changesets, evmDstChangesets...)
 	}
+
 	if fromFamily == chainsel.FamilySolana {
 		changesets = append(changesets, addLaneSolanaChangesets(t, e, from, to, toFamily)...)
 	}

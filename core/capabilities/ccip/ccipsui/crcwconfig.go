@@ -16,9 +16,16 @@ type ChainCWProvider struct{}
 
 // GetChainReader returns a new ContractReader for EVM chains.
 func (g ChainCWProvider) GetChainReader(ctx context.Context, params ccipcommon.ChainReaderProviderOpts) (types.ContractReader, error) {
-	marshaledConfig, err := json.Marshal(suiconfig.ChainReaderConfig)
+	transmitter := params.Transmitters[types.NewRelayID(params.ChainFamily, params.ChainID)]
+
+	cfg, err := suiconfig.GetChainReaderConfig(transmitter[0])
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal Aptos chain reader config: %w", err)
+		return nil, fmt.Errorf("failed to get SUI config")
+	}
+
+	marshaledConfig, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal SUI chain reader config: %w", err)
 	}
 
 	cr, err := params.Relayer.NewContractReader(ctx, marshaledConfig)

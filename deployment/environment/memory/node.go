@@ -22,6 +22,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
+	sui_testutils "github.com/smartcontractkit/chainlink-sui/relayer/testutils"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
@@ -598,6 +599,11 @@ func CreateKeys(t *testing.T,
 			transmitter := keys[0]
 			transmitters[sel] = transmitter.ID()
 			t.Logf("Created Sui Key: ID %v, Account %v", transmitter.ID(), transmitter.Account())
+
+			lggr := logger.NewSingleFileLogger(t)
+			err = sui_testutils.FundWithFaucet(lggr, "local", "0x"+transmitter.Account())
+			require.NoError(t, err)
+
 		}
 	}
 

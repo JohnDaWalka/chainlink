@@ -77,8 +77,6 @@ func (d DeployLinkToken) Apply(e cldf.Environment, config DeployLinkTokenConfig)
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LinkToken TreasuryCapObjectId address %s for Sui chain %d: %w", linkTokenReport.Output.Objects.TreasuryCapObjectId, config.ChainSelector, err)
 	}
 
-	fmt.Println("LINK TOKEN DEPLOY ON SUI: ", linkTokenReport.Output.Objects)
-
 	return cldf.ChangesetOutput{
 		AddressBook: ab,
 		Reports:     seqReports,

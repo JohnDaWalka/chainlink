@@ -207,7 +207,6 @@ func ConfirmCommitForAllWithExpectedSeqNums(
 			}
 			switch family {
 			case chainsel.FamilyEVM:
-				fmt.Println("DEST CHAIN IS ETH")
 				return commonutils.JustError(ConfirmCommitWithExpectedSeqNumRange(
 					t,
 					srcChain,
@@ -402,9 +401,9 @@ func ConfirmCommitWithExpectedSeqNumRange(
 	seenMessages := NewCommitReportTracker(srcSelector, expectedSeqNumRange)
 
 	verifyCommitReport := func(report *offramp.OffRampCommitReportAccepted) bool {
-		fmt.Println("VERIFYING COMMIT REPORT")
+		fmt.Println("REPORT: ", report)
 		processRoots := func(roots []offramp.InternalMerkleRoot) bool {
-			fmt.Println("PROCESSING ROOTS: ", roots)
+			fmt.Println("ROOTS: ", roots)
 			for _, mr := range roots {
 				t.Logf(
 					"Received commit report for [%d, %d] on selector %d from source selector %d expected seq nr range %s, token prices: %v",
@@ -460,7 +459,7 @@ func ConfirmCommitWithExpectedSeqNumRange(
 			}
 			for iter.Next() {
 				event := iter.Event
-				fmt.Println("ITERATOR COMMIT EVENT: ", event)
+				fmt.Printf("RECEIpVED COMMIT REPORt ACCEPTED: %v", *event)
 				verified := verifyCommitReport(event)
 				if verified {
 					return event, nil
@@ -986,64 +985,8 @@ func ConfirmCommitWithExpectedSeqNumRangeSui(
 	expectedSeqNumRange ccipocr3.SeqNumRange,
 	enforceSingleCommit bool,
 ) (any, error) {
-
-	fmt.Println("CONFIRM COMMIT FOR SUI")
-	// boundOffRamp := aptosOffRamp.Bind(offRampAddress, dest.Client)
-	// offRampStateAddress, err := boundOffRamp.Offramp().GetStateAddress(nil)
-	// require.NoError(t, err)
-
-	// done := make(chan any)
-	// defer close(done)
-	// sink, errChan := AptosEventEmitter[module_offramp.CommitReportAccepted](t, dest.Client, offRampStateAddress, fmt.Sprintf("%s::offramp::OffRampState", offRampAddress.StringLong()), "commit_report_accepted_events", startVersion, done)
-
-	// timeout := time.NewTimer(tests.WaitTimeout(t))
-	// defer timeout.Stop()
-
-	// seenMessages := NewCommitReportTracker(srcSelector, expectedSeqNumRange)
-
-	// verifyCommitReport := func(report module_offramp.CommitReportAccepted) bool {
-	// 	processRoots := func(roots []module_offramp.MerkleRoot) bool {
-	// 		for _, mr := range roots {
-	// 			t.Logf("(Aptos) Received commit report for [%d, %d] on selector %d from source selector %d expected seq nr range %s, token prices: %v",
-	// 				mr.MinSeqNr, mr.MaxSeqNr, dest.Selector, srcSelector, expectedSeqNumRange.String(), report.PriceUpdates.TokenPriceUpdates,
-	// 			)
-	// 			seenMessages.visitCommitReport(srcSelector, mr.MinSeqNr, mr.MaxSeqNr)
-
-	// 			if mr.SourceChainSelector == srcSelector && uint64(expectedSeqNumRange.Start()) >= mr.MinSeqNr && uint64(expectedSeqNumRange.End()) <= mr.MaxSeqNr {
-	// 				t.Logf("(Aptos) All sequence numbers committed in a single report [%d, %d]",
-	// 					expectedSeqNumRange.Start(), expectedSeqNumRange.End(),
-	// 				)
-	// 				return true
-	// 			}
-
-	// 			if !enforceSingleCommit && seenMessages.allCommited(srcSelector) {
-	// 				t.Logf(
-	// 					"(Aptos) All sequence numbers already committed from range [%d, %d]",
-	// 					expectedSeqNumRange.Start(), expectedSeqNumRange.End(),
-	// 				)
-	// 				return true
-	// 			}
-	// 		}
-	// 		return false
-	// 	}
-
-	// 	return processRoots(report.BlessedMerkleRoots) || processRoots(report.UnblessedMerkleRoots)
-	// }
-
-	// for {
-	// 	select {
-	// 	case event := <-sink:
-	// 		verified := verifyCommitReport(event.Event)
-	// 		if verified {
-	// 			return &event.Event, nil
-	// 		}
-	// 	case err := <-errChan:
-	// 		require.NoError(t, err)
-	// 	case <-timeout.C:
-	// 		return nil, fmt.Errorf("(aptos) timed out after waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
-	// 			dest.Selector, srcSelector, expectedSeqNumRange.String())
-	// 	}
-	// }
+	// TODO
+	fmt.Println("CONFIRM COMMIT ON SUI")
 
 	return nil, nil
 }

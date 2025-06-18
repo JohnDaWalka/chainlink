@@ -13,8 +13,6 @@ func GetChainWriterConfig(publicKeyStr string) (map[string]any, error) {
 		return map[string]any{}, fmt.Errorf("failed to parse Sui address from public key %s: %w", publicKeyStr, err)
 	}
 
-	fmt.Printf("DEBUG: Aptos GetChainWriterConfig: fromAddressStr=%s, pubKeyStr=%s\n", fromAddress.String(), publicKeyStr)
-
 	return map[string]any{
 		"modules": map[string]any{
 			consts.ContractNameOffRamp: map[string]any{
