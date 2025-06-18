@@ -185,6 +185,9 @@ func (r *Report) Deduct(ref string, amount decimal.Decimal) error {
 	return nil
 }
 
+// CreditToSpendingLimits returns a slice of spend limits where the amount is applied to the spend types from the
+// provided info. Amount should be specified in universal credits and will be converted to spend type credits within
+// this function.
 func (r *Report) CreditToSpendingLimits(
 	info capabilities.CapabilityInfo,
 	amount decimal.Decimal,
@@ -201,13 +204,13 @@ func (r *Report) CreditToSpendingLimits(
 			return nil
 		}
 
-		return []capabilities.SpendLimit{{SpendType: spendType, Limit: spendLimit.StringFixed(defaultDecimalPrecision)}} // TODO: should we apply rounding? maybe take only the int part?
+		return []capabilities.SpendLimit{{SpendType: spendType, Limit: spendLimit.StringFixed(defaultDecimalPrecision)}}
 	}
 
 	return nil
 }
 
-// GetMaxSpendForInvocation returns the amount of credits that can be used based on the minimum between and optionally
+// GetMaxSpendForInvocation returns the amount of credits that can be used based on the minimum between an optionally
 // provided max spend by the user or the available credit balance. The available credit balance is determined by
 // dividing unearmarked local credit balance by the number of potential concurrent calls.
 func (r *Report) GetMaxSpendForInvocation(
@@ -458,7 +461,7 @@ func (s *Reports) End(ctx context.Context, workflowExecutionID string) error {
 		return ErrReportNotFound
 	}
 
-	// if in metering mode, send to beholder
+	// TODO: https://smartcontract-it.atlassian.net/browse/CRE-500; if in metering mode, send to beholder
 
 	err := report.SendReceipt(ctx)
 

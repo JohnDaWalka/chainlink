@@ -51,6 +51,9 @@ func TestBalanceStore(t *testing.T) {
 		require.ErrorIs(t, balanceStore.MinusAs("resourceA", decimal.NewFromInt(0)), ErrInvalidAmount)
 		require.ErrorIs(t, balanceStore.MinusAs("resourceA", decimal.NewFromInt(-1)), ErrInvalidAmount)
 		assert.True(t, balanceStore.Get().Equal(seven), "subtraction by rate should update balance")
+
+		require.NoError(t, balanceStore.AddAs("unknown", one))
+		assert.True(t, balanceStore.meteringMode, "unknown resource types should turn on metering mode")
 	})
 
 	t.Run("handles unknown resources as 1:1", func(t *testing.T) {
@@ -87,7 +90,7 @@ func TestBalanceStore(t *testing.T) {
 		require.ErrorIs(t, balanceStore.MinusAs("resourceA", one), ErrInsufficientBalance)
 	})
 
-	t.Run("can go negative after allowNegative", func(t *testing.T) {
+	t.Run("can go negative after entering metering mode", func(t *testing.T) {
 		t.Parallel()
 
 		balanceStore := NewBalanceStore(decimal.Zero, map[string]decimal.Decimal{"resourceA": decimal.NewFromInt(1)}, logger.Nop())

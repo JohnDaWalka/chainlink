@@ -796,20 +796,19 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 		userMaxSpend.Valid = false
 
 		// NOTE: e.maxWorkerLimit is a static number leading to the availability always being undercut.
-		availableForCall, err := meteringReport.GetMaxSpendForInvocation(userMaxSpend, e.maxWorkerLimit)
+		spendLimit, err := meteringReport.GetMaxSpendForInvocation(userMaxSpend, e.maxWorkerLimit)
 
 		if err != nil {
 			l.Error(fmt.Sprintf("could get available balance for %s: %s", stepState.Ref, err))
 		}
 
-		if availableForCall.Valid {
-			// TODO: https://smartcontract-it.atlassian.net/browse/CRE-461 if availability is math.MaxInt64 there is no limit. Possibly flag this in a different way.
-			err = meteringReport.Deduct(stepState.Ref, availableForCall.Decimal)
+		if spendLimit.Valid {
+			err = meteringReport.Deduct(stepState.Ref, spendLimit.Decimal)
 			if err != nil {
 				l.Error(fmt.Sprintf("could not deduct balance for capability request %s: %s", stepState.Ref, err))
 			}
 
-			spendLimits = meteringReport.CreditToSpendingLimits(info, availableForCall.Decimal)
+			spendLimits = meteringReport.CreditToSpendingLimits(info, spendLimit.Decimal)
 		}
 	} else {
 		e.metrics.With(platform.KeyWorkflowID, e.workflow.id).IncrementWorkflowMissingMeteringReport(ctx)
