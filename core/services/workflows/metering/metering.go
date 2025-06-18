@@ -15,10 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-protos/workflows/go/events"
 )
 
-func init() {
-	decimal.DivisionPrecision = defaultDecimalPrecision
-}
-
 const (
 	ComputeResourceDimension = "COMPUTE"
 	defaultDecimalPrecision  = 3 // one thousandth of a dollar
