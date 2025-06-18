@@ -24,11 +24,12 @@ var (
 
 // LOOPP commands and vars
 var (
-	MedianPlugin     = NewPlugin("median")
-	SecureMintPlugin = NewPlugin("securemint")
-	MercuryPlugin    = NewPlugin("mercury")
 	AptosPlugin      = NewPlugin("aptos")
 	CosmosPlugin     = NewPlugin("cosmos")
+	EVMPlugin        = NewPlugin("evm")
+	MedianPlugin     = NewPlugin("median")
+	MercuryPlugin    = NewPlugin("mercury")
+	SecureMintPlugin = NewPlugin("securemint")
 	SolanaPlugin     = NewPlugin("solana")
 	StarknetPlugin   = NewPlugin("starknet")
 	TronPlugin       = NewPlugin("tron")
