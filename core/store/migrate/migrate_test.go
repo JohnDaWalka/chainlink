@@ -394,29 +394,29 @@ func TestMigrate_101_GenericOCR2(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	ctx := testutils.Context(t)
+	ctx := t.Context()
 	_, db := heavyweight.FullTestDBEmptyV2(t, nil)
 
-	p, err := migrate.NewProvider(ctx, db.DB)
+	m, err := migrate.NewMigrator(ctx, db.DB)
 	require.NoError(t, err)
-	results, err := p.UpTo(ctx, 100)
+	results, err := m.Provider().UpTo(ctx, 100)
 	require.NoError(t, err)
 	assert.Len(t, results, 100)
 
-	err = migrate.Status(ctx, db.DB)
+	err = m.Status(ctx)
 	require.NoError(t, err)
 
-	ver, err := migrate.Current(ctx, db.DB)
+	ver, err := m.Current(ctx)
 	require.NoError(t, err)
 	require.Equal(t, int64(100), ver)
 
-	err = migrate.Migrate(ctx, db.DB)
+	err = m.Migrate(ctx)
 	require.NoError(t, err)
 
-	err = migrate.Rollback(ctx, db.DB, null.IntFrom(99))
+	err = m.Rollback(ctx, null.IntFrom(99))
 	require.NoError(t, err)
 
-	ver, err = migrate.Current(ctx, db.DB)
+	ver, err = m.Current(ctx)
 	require.NoError(t, err)
 	require.Equal(t, int64(99), ver)
 }

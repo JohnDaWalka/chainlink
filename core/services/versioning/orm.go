@@ -3,10 +3,12 @@ package versioning
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/jackc/pgconn"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
@@ -46,7 +48,7 @@ func (o *orm) UpsertNodeVersion(ctx context.Context, version NodeVersion) error 
 	}
 
 	return sqlutil.TransactDataSource(ctx, o.ds, nil, func(tx sqlutil.DataSource) error {
-		if _, _, err := CheckVersion(ctx, tx, logger.NullLogger, version.Version); err != nil {
+		if _, _, err := checkVersion(ctx, tx, logger.NullLogger, version.Version); err != nil {
 			return err
 		}
 
@@ -65,7 +67,20 @@ created_at = EXCLUDED.created_at
 
 // CheckVersion returns an error if there is a valid semver version in the
 // node_versions table that is higher than the current app version
-func CheckVersion(ctx context.Context, ds sqlutil.DataSource, lggr logger.Logger, appVersion string) (appv, dbv *semver.Version, err error) {
+func CheckVersion(ctx context.Context, ds *sqlx.DB, lggr logger.Logger, appVersion string) (appv, dbv *semver.Version, err error) {
+	appv, dbv, err = checkVersion(ctx, ds, lggr, appVersion)
+	// allow old versions to pass if there are pending migrations
+	// this happens when, say rolling back to 2.24.1 from 2.25.2, and 2.25.2 has set same of migrations as 2.24.1
+
+	return appv, dbv, err
+}
+
+var ErrOldVersion = errors.New("The application version is lower than that persisted in the database")
+
+// CheckVersion returns an error if there is a valid semver version in the
+// node_versions table that is higher than the current app version
+func checkVersion(ctx context.Context, ds sqlutil.DataSource, lggr logger.Logger, appVersion string) (appv, dbv *semver.Version, err error) {
+
 	lggr = lggr.Named("Version")
 	var dbVersion string
 	err = ds.GetContext(ctx, &dbVersion, `SELECT version FROM node_versions ORDER BY created_at DESC LIMIT 1 FOR UPDATE`)
@@ -89,10 +104,10 @@ func CheckVersion(ctx context.Context, ds sqlutil.DataSource, lggr logger.Logger
 		return nil, nil, nil
 	}
 	if apperr != nil {
-		return nil, nil, errors.Errorf("Application version %q is not valid semver", appVersion)
+		return nil, nil, fmt.Errorf("Application version %q is not valid semver", appVersion)
 	}
 	if dbv.GreaterThan(appv) {
-		return nil, nil, errors.Errorf("Application version (%s) is lower than database version (%s). Only Chainlink %s or higher can be run on this database", appv, dbv, dbv)
+		return nil, nil, fmt.Errorf("%w: Application version (%s) is lower than database version (%s). Only Chainlink %s or higher can be run on this database", ErrOldVersion, appv, dbv, dbv)
 	}
 	return appv, dbv, nil
 }

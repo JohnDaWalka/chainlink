@@ -69,7 +69,13 @@ func ResetDatabase(ctx context.Context, lggr logger.Logger, cfg Config, force bo
 		return err
 	}
 	lggr.Debugf("Migrating database: %#v", u.String())
-	if err := migrateDB(ctx, cfg); err != nil {
+	db, err := NewConnection(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("failed to initialize orm: %w", err)
+	}
+
+	migrator, err := migrate.NewMigrator(ctx, db.DB)
+	if err := migrator.Migrate(ctx); err != nil {
 		return err
 	}
 	schema, err := dumpSchema(u)
@@ -78,7 +84,7 @@ func ResetDatabase(ctx context.Context, lggr logger.Logger, cfg Config, force bo
 	}
 	lggr.Debugf("Testing rollback and re-migrate for database: %#v", u.String())
 	var baseVersionID int64 = 54
-	if err := downAndUpDB(ctx, cfg, baseVersionID); err != nil {
+	if err := downAndUpDB2(ctx, migrator, baseVersionID); err != nil {
 		return err
 	}
 	return checkSchema(u, schema)
@@ -101,18 +107,6 @@ func NewConnection(ctx context.Context, cfg Config) (*sqlx.DB, error) {
 		return nil, errDBURLMissing
 	}
 	return pg.NewConnection(ctx, parsed.String(), cfg.DriverName(), cfg)
-}
-
-func migrateDB(ctx context.Context, config Config) error {
-	db, err := NewConnection(ctx, config)
-	if err != nil {
-		return fmt.Errorf("failed to initialize orm: %w", err)
-	}
-
-	if err = migrate.Migrate(ctx, db.DB); err != nil {
-		return fmt.Errorf("migrateDB failed: %w", err)
-	}
-	return db.Close()
 }
 
 func dropAndCreateDB(parsed url.URL, force bool) (err error) {
@@ -159,20 +153,15 @@ func dropAndCreatePristineDB(db *sqlx.DB, template string) (err error) {
 	return nil
 }
 
-func downAndUpDB(ctx context.Context, cfg Config, baseVersionID int64) error {
-	db, err := NewConnection(ctx, cfg)
-	if err != nil {
-		return fmt.Errorf("failed to initialize orm: %w", err)
-	}
-	if err = migrate.Rollback(ctx, db.DB, null.IntFrom(baseVersionID)); err != nil {
+func downAndUpDB2(ctx context.Context, m migrate.Migrator, baseVersionID int64) error {
+	if err := m.Rollback(ctx, null.IntFrom(baseVersionID)); err != nil {
 		return fmt.Errorf("test rollback failed: %w", err)
 	}
-	if err = migrate.Migrate(ctx, db.DB); err != nil {
+	if err := m.Migrate(ctx); err != nil {
 		return fmt.Errorf("second migrateDB failed: %w", err)
 	}
-	return db.Close()
+	return nil
 }
-
 func dumpSchema(dbURL url.URL) (string, error) {
 	args := []string{
 		dbURL.String(),
