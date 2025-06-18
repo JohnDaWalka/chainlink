@@ -317,7 +317,24 @@ func activatePoRWorkflow(input managePoRWorkflowInput) error {
 	return nil
 }
 
-func registerPoRWorkflow(ctx context.Context, input managePoRWorkflowInput) error {
+func toPoRConfig(input managePoRWorkflowInput) (*os.File, error) {
+	var secretNameToUse *string
+	if input.authKey != "" {
+		secretNameToUse = ptr.Ptr(AuthorizationKeySecretName)
+	}
+
+	dataFeedsCacheAddress, dataFeedsCacheErr := crecontracts.FindAddressesForChain(input.addressBook, input.chainSelector, df_changeset.DataFeedsCache.String())
+	if dataFeedsCacheErr != nil {
+		return nil, errors.Wrapf(dataFeedsCacheErr, "failed to find data feeds cache address for chain %d", input.chainSelector)
+	}
+	return keystoneporcrecli.CreateConfigFile(dataFeedsCacheAddress, input.feedID, input.priceProvider.URL(), input.writeTargetName, secretNameToUse)
+}
+
+func registerPoRWorkflow(
+	ctx context.Context,
+	input managePoRWorkflowInput,
+	configBuilder func(managePoRWorkflowInput) (*os.File, error),
+) error {
 	// Register workflow directly using the provided binary URL and optionally config and secrets URLs
 	// This is a legacy solution, probably we can remove it soon, but there's still quite a lot of people
 	// who have no access to dev-platform repo, so they cannot use the CRE CLI
@@ -351,18 +368,9 @@ func registerPoRWorkflow(ctx context.Context, input managePoRWorkflowInput) erro
 	}
 
 	// create workflow-specific config file
-	var secretNameToUse *string
-	if input.authKey != "" {
-		secretNameToUse = ptr.Ptr(AuthorizationKeySecretName)
-	}
-
-	dataFeedsCacheAddress, dataFeedsCacheErr := crecontracts.FindAddressesForChain(input.addressBook, input.chainSelector, df_changeset.DataFeedsCache.String())
-	if dataFeedsCacheErr != nil {
-		return errors.Wrapf(dataFeedsCacheErr, "failed to find data feeds cache address for chain %d", input.chainSelector)
-	}
 
 	// pass nil if no secrets are used, otherwise workflow will fail if it cannot find the secret
-	workflowConfigFile, configErr := keystoneporcrecli.CreateConfigFile(dataFeedsCacheAddress, input.feedID, input.priceProvider.URL(), input.writeTargetName, secretNameToUse)
+	workflowConfigFile, configErr := configBuilder(input)
 	if configErr != nil {
 		return errors.Wrap(configErr, "failed to create workflow config file")
 	}
@@ -451,6 +459,7 @@ func setupPoRTestEnvironment(
 	mustSetCapabilitiesFn func(input []*ns.Input) []*types.CapabilitiesAwareNodeSet,
 	capabilityFactoryFns []func([]string) []keystone_changeset.DONCapabilityWithConfig,
 	buildWorkflowInput func(t *testing.T, bo *creenv.BlockchainOutput, universalSetupOutput *creenv.SetupOutput, in *TestConfig, idx int, homeChainOutput *creenv.BlockchainOutput, testLogger zerolog.Logger, priceProvider PriceProvider) managePoRWorkflowInput,
+	configBuilder func(managePoRWorkflowInput) (*os.File, error),
 ) *porSetupOutput {
 	extraAllowedGatewayPorts := []int{}
 	if _, ok := priceProvider.(*FakePriceProvider); ok {
@@ -524,7 +533,7 @@ func setupPoRTestEnvironment(
 
 		workflowInput := buildWorkflowInput(t, bo, universalSetupOutput, in, idx, homeChainOutput, testLogger, priceProvider)
 
-		workflowRegisterErr := registerPoRWorkflow(t.Context(), workflowInput)
+		workflowRegisterErr := registerPoRWorkflow(t.Context(), workflowInput, configBuilder)
 		require.NoError(t, workflowRegisterErr, "failed to register PoR workflow")
 
 		workflowPauseErr := pausePoRWorkflow(workflowInput)
@@ -677,6 +686,7 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice(t *testing.
 		mustSetCapabilitiesFn,
 		capabilityFactoryFns,
 		toWorkflowInput,
+		toPoRConfig,
 	)
 
 	// Log extra information that might help debugging
@@ -733,6 +743,7 @@ func TestCRE_OCR3_PoR_Workflow_GatewayDon_MockedPrice(t *testing.T) {
 			writeevmcap.WriteEVMCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))),
 		},
 		toWorkflowInput,
+		toPoRConfig,
 	)
 
 	// Log extra information that might help debugging
@@ -795,6 +806,7 @@ func TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice(t *testing.T) {
 			writeevmcap.WriteEVMCapabilityFactory(libc.MustSafeUint64(int64(secondChainIDInt))),
 		},
 		toWorkflowInput,
+		toPoRConfig,
 	)
 
 	// Log extra information that might help debugging
