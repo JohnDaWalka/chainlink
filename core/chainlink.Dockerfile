@@ -7,10 +7,12 @@ COPY GNUmakefile package.json ./
 COPY tools/bin/ldflags ./tools/bin/
 
 ADD go.mod go.sum ./
-COPY ./por_mock_ocr3plugin ./por_mock_ocr3plugin
-# assume we copied the por plugin to the root folder and have this replace in go.mod: `replace github.com/smartcontractkit/por_mock_ocr3plugin => ./por_mock_ocr3plugin`
+
+COPY ./plugins/scripts/setup_git_auth.sh /tmp/
+RUN --mount=type=secret,id=GIT_AUTH_TOKEN /tmp/setup_git_auth.sh
+
 RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download
+  go mod download
 
 # Env vars needed for chainlink build
 ARG COMMIT_SHA
@@ -26,10 +28,10 @@ RUN apt-get update && apt-get install -y jq
 RUN --mount=type=cache,target=/go/pkg/mod \
   --mount=type=cache,target=/root/.cache/go-build \
   if [ "$GO_COVER_FLAG" = "true" ]; then \
-        make install-chainlink-cover; \
-    else \
-        make install-chainlink; \
-    fi
+  make install-chainlink-cover; \
+  else \
+  make install-chainlink; \
+  fi
 
 # Link LOOP Plugin source dirs with simple names
 RUN --mount=type=cache,target=/go/pkg/mod \
