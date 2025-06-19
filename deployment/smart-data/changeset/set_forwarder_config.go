@@ -1,6 +1,7 @@
 package changeset
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -21,14 +22,14 @@ func setForwarderConfigPrecondition(env cldf.Environment, c types.SetForwarderCo
 	}
 
 	if c.F == 0 {
-		return fmt.Errorf("f tolerance must be positive")
+		return errors.New("f tolerance must be positive")
 	}
-	if len(c.Signers) > globals.MAX_ORACLES {
-		return fmt.Errorf("signers excess")
+	if len(c.Signers) > globals.MaxOracles {
+		return errors.New("signers excess")
 	}
 
 	if len(c.Signers) <= int(c.F)*3 {
-		return fmt.Errorf("insufficient signers")
+		return errors.New("insufficient signers")
 	}
 
 	seen := make(map[common.Address]struct{})
