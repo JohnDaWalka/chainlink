@@ -440,12 +440,12 @@ func TestOutgoingConnectorHandler_HandleGatewayMessage_InvalidMessage(t *testing
 		},
 	}
 	params, err := json.Marshal(invalidMsg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req := &jsonrpc.Request{
 		Version: "2.0",
 		Method:  invalidMsg.Body.Method,
 		Params:  params,
 	}
 	err = handler.HandleGatewayMessage(context.Background(), "gateway1", req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }

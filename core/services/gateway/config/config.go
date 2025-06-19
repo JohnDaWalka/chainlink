@@ -6,16 +6,6 @@ import (
 	gw_net "github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 )
 
-const (
-	// LegacyMessageType is for JSON-RPC methods with api.Message as params.
-	// See: [api/message.go](../api/message.go). DonID is used to route the request to the appropriate handler.
-	LegacyMessageType = "Legacy"
-
-	// CustomParamsMessageType is for JSON-RPC methods with custom params.
-	// HandlerName is used to route the request to the appropriate handler.
-	CustomParamsMessageType = "CustomParams"
-)
-
 type GatewayConfig struct {
 	UserServerConfig        gw_net.HTTPServerConfig
 	NodeServerConfig        gw_net.WebSocketServerConfig
@@ -38,7 +28,6 @@ type DONConfig struct {
 	HandlerConfig json.RawMessage
 	Members       []NodeConfig
 	F             int
-	MessageType   string
 }
 
 type NodeConfig struct {

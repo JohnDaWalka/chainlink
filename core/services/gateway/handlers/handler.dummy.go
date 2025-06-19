@@ -74,7 +74,6 @@ func (d *dummyHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Resp
 	if nodeAddr != msg.Body.Sender {
 		return fmt.Errorf("node address %s does not match message sender %s", nodeAddr, msg.Body.Sender)
 	}
-	fmt.Println("handleNodeMessage: msg.Body.Sender", msg.Body.Sender)
 	d.mu.Lock()
 	savedCb, found := d.savedCallbacks[msg.Body.MessageId]
 	delete(d.savedCallbacks, msg.Body.MessageId)

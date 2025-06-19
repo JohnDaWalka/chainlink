@@ -34,6 +34,7 @@ type Handler interface {
 
 	// Handlers should not make any assumptions about goroutines calling HandleNodeMessage.
 	// should be non-blocking
+	// should validate the message inside the response
 	HandleNodeMessage(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error
 }
 

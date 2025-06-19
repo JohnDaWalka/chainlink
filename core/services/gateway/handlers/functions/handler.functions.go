@@ -251,7 +251,8 @@ func (h *functionsHandler) handleRequest(ctx context.Context, msg *api.Message, 
 	}
 	req, err := hc.ValidatedRequestFromMessage(msg)
 	if err != nil {
-		// TODO: how to handle this?
+		h.lggr.Debugw("handleRequest: failed to validate message", "sender", msg.Body.Sender, "err", err)
+		promHandlerError.WithLabelValues(h.donConfig.DonId, err.Error()).Inc()
 		return err
 	}
 	// Send to all nodes.
@@ -268,7 +269,7 @@ func (h *functionsHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.
 	msg, err := hc.ValidatedMessageFromResp(resp)
 	if err != nil {
 		h.lggr.Debugw("HandleNodeMessage: failed to validate message", "error", err, "nodeAddr", nodeAddr)
-		// TODO: how to handle this?
+		return err
 	}
 	if msg.Body.Sender != nodeAddr {
 		return errors.New("message sender mismatch when reading from node ")

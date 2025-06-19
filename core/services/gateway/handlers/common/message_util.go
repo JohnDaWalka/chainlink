@@ -12,7 +12,7 @@ import (
 
 func ValidatedMessageFromResp(resp *jsonrpc.Response) (*api.Message, error) {
 	if resp.Error != nil {
-		return nil, fmt.Errorf("received error in response: %v", resp.Error)
+		return nil, fmt.Errorf("received error, ID: %s", resp.ID)
 	}
 	if resp.Result == nil {
 		return nil, fmt.Errorf("response result is nil, ID: %s", resp.ID)
