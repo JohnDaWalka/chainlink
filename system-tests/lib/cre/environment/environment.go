@@ -39,8 +39,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
-	keystone_operations "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations"
-
+	ks_contracts_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/contracts"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
@@ -164,11 +163,11 @@ func SetupTestEnvironment(
 
 	deployKeystoneReport, err := operations.ExecuteSequence(
 		allChainsCLDEnvironment.OperationsBundle,
-		keystone_operations.DeployKeystoneContractsSequence,
-		keystone_operations.DeployKeystoneContractsSequenceDeps{
+		ks_contracts_op.DeployKeystoneContractsSequence,
+		ks_contracts_op.DeployKeystoneContractsSequenceDeps{
 			Env: allChainsCLDEnvironment,
 		},
-		keystone_operations.DeployKeystoneContractsSequenceInput{
+		ks_contracts_op.DeployKeystoneContractsSequenceInput{
 			HomeChainSelector:   homeChainOutput.ChainSelector,
 			ForwardersSelectors: forwardersSelectors,
 		},
