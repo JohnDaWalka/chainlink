@@ -996,7 +996,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		linkops.MintLinkTokenInput{
 			LinkTokenPackageId: linkTokenPkgId,
 			TreasuryCapId:      linkTokenTreasuryCapId,
-			Amount:             201224679264896156,
+			Amount:             1099999999999999984,
 		})
 	if err != nil {
 		return &AnyMsgSentEvent{}, fmt.Errorf("failed to mint LinkToken for Sui chain %d: %w", cfg.SourceChain, err)

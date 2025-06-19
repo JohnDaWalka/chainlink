@@ -7,6 +7,8 @@ replace github.com/smartcontractkit/chainlink/v2 => ../
 
 replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
 
+replace github.com/smartcontractkit/chainlink-ccip => ../../chainlink-ccip
+
 // Using a separate inline `require` here to avoid surrounding line changes
 // creating potential merge conflicts.
 require github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250430150202-611699e34308

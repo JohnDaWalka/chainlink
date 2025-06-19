@@ -52,7 +52,7 @@ func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
 			t,
 			e,
 			state,
-			sourceChain,
+			sourceChain, 
 			destChain,
 			sender,
 			false, // testRouter
