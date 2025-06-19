@@ -6,13 +6,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pattonkan/sui-go/sui"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagingtest"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	testsetups "github.com/smartcontractkit/chainlink/integration-tests/testsetups/ccip"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/maps"
 )
 
 func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
@@ -23,13 +24,11 @@ func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
 		testhelpers.WithSuiChains(1),
 	)
 
-	evmChainSelectors := maps.Keys(e.Env.Chains)
-	suiChains := e.Env.BlockChains.SuiChains()
-	suiChainSelectors := maps.Keys(suiChains)
-	require.Equal(t, len(suiChainSelectors), 1)
+	evmChainSelectors := e.Env.BlockChains.ListChainSelectors(chain.WithFamily(chain_selectors.FamilyEVM))
+	suiChainSelectors := e.Env.BlockChains.ListChainSelectors(chain.WithFamily(chain_selectors.FamilySui))
 
-	fmt.Println("EVM: ", evmChainSelectors)
-	fmt.Println("Sui: ", suiChainSelectors)
+	fmt.Println("EVM: ", evmChainSelectors[0])
+	fmt.Println("Sui: ", suiChainSelectors[0])
 
 	sourceChain := suiChainSelectors[0]
 	destChain := evmChainSelectors[0]

@@ -15,6 +15,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	solanago "github.com/gagliardetto/solana-go"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/stretchr/testify/require"
@@ -23,7 +24,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+
+	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -348,9 +353,9 @@ type MemoryEnvironment struct {
 	DeployedEnv
 	nodes       map[string]memory.Node
 	TestConfig  *TestConfigs
-	Chains      map[uint64]cldf.Chain
-	SolChains   map[uint64]cldf.SolChain
-	AptosChains map[uint64]cldf.AptosChain
+	Chains      map[uint64]cldf_evm.Chain
+	SolChains   map[uint64]cldf_solana.Chain
+	AptosChains map[uint64]cldf_aptos.Chain
 	SuiChains   map[uint64]suichain.Chain
 }
 
@@ -389,11 +394,12 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 	m.Chains = chains
 	solChains := memory.NewMemoryChainsSol(t, tc.SolChains)
 	aptosChains := memory.NewMemoryChainsAptos(t, tc.AptosChains)
+	suiChains := memory.NewMemoryChainsSui(t, tc.SuiChains)
 	// if we have Aptos and Solana chains, we need to set their chain selectors on the wrapper
 	// environment, so we have to convert it back to the concrete type. This needs to be refactored
 	m.AptosChains = cldf_chain.NewBlockChainsFromSlice(aptosChains).AptosChains()
 	m.SolChains = cldf_chain.NewBlockChainsFromSlice(solChains).SolanaChains()
-	suiChains := memory.NewMemoryChainsSui(t, tc.SuiChains)
+
 	m.SuiChains = suiChains
 
 	blockChains := map[uint64]cldf_chain.BlockChain{}
@@ -831,7 +837,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	// Currently only one sui chain is supported in test environment
 	if len(suiChains) != 0 {
 		// Deploy Link Token
-		e.Env, _, err = commonchangeset.ApplyChangesetsV2(t, e.Env, []commonchangeset.ConfiguredChangeSet{
+		e.Env, _, err = commonchangeset.ApplyChangesets(t, e.Env, []commonchangeset.ConfiguredChangeSet{
 			commonchangeset.Configure(sui_cs.DeployLinkToken{}, sui_cs.DeployLinkTokenConfig{
 				ChainSelector: suiChains[0],
 			}),
@@ -842,7 +848,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		mockContractParamsPerChain, err := sui.GetMockChainContractParams(t, e.Env, suiChains[0])
 		require.NoError(t, err)
 
-		e.Env, _, err = commonchangeset.ApplyChangesetsV2(t, e.Env, []commonchangeset.ConfiguredChangeSet{
+		e.Env, _, err = commonchangeset.ApplyChangesets(t, e.Env, []commonchangeset.ConfiguredChangeSet{
 			commonchangeset.Configure(sui.DeploySuiChain{}, sui.DeploySuiChainConfig{
 				ContractParamsPerChain: map[uint64]sui.ChainContractParams{
 					suiChains[0]: mockContractParamsPerChain,
@@ -1176,7 +1182,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	}
 
 	if len(solChains) > 0 {
-		ValidateSolanaState(t, e.Env, solChains)
+		ValidateSolanaState(e.Env, solChains)
 	}
 	tEnv.UpdateDeployedEnvironment(e)
 	return e

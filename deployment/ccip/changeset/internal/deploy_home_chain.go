@@ -637,7 +637,6 @@ func BuildOCR3ConfigForCCIPHome(
 				}
 				parsed = pk.Bytes()
 			case chain_selectors.FamilySui:
-				fmt.Println("SUI TRANSMITTERS: ", transmitter)
 				parsed, err = hex.DecodeString(strings.TrimPrefix(string(transmitter), "0x"))
 				if err != nil {
 					return nil, fmt.Errorf("failed to decode SUI address '%s': %w", transmitter, err)

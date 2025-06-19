@@ -3,12 +3,11 @@ package ccipaptos
 import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
-
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipsui"
+	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
 )
 
 // initializePluginConfig returns a PluginConfig for Aptos chains.
@@ -24,7 +23,7 @@ func initializePluginConfigFunc(chainselFamily string) ccipcommon.InitFunction {
 		return ccipcommon.PluginConfig{
 			CommitPluginCodec:          NewCommitPluginCodecV1(),
 			ExecutePluginCodec:         NewExecutePluginCodecV1(extraDataCodec),
-			MessageHasher:              NewMessageHasherV1(lggr.Named(chainselFamily).Named("MessageHasherV1"), extraDataCodec),
+			MessageHasher:              NewMessageHasherV1(logger.Sugared(lggr).Named(chainsel.FamilyAptos).Named("MessageHasherV1"), extraDataCodec),
 			TokenDataEncoder:           NewAptosTokenDataEncoder(),
 			GasEstimateProvider:        NewGasEstimateProvider(),
 			RMNCrypto:                  nil,

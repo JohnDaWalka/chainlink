@@ -31,16 +31,18 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
-	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 	pb "github.com/smartcontractkit/chainlink-protos/orchestrator/feedsmanager"
 
 	mnCfg "github.com/smartcontractkit/chainlink-framework/multinode/config"
 
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	sollptesting "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/testing"
 
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
@@ -273,7 +275,7 @@ type NewNodeConfig struct {
 	// Solana chains to be configured. Optional.
 	Solchains map[uint64]cldf_solana.Chain
 	// Aptos chains to be configured. Optional.
-	Aptoschains    map[uint64]cldf.AptosChain
+	Aptoschains    map[uint64]cldf_aptos.Chain
 	Suichains      map[uint64]suichain.Chain
 	LogLevel       zapcore.Level
 	Bootstrap      bool
@@ -484,9 +486,9 @@ type Keys struct {
 
 func CreateKeys(t *testing.T,
 	app chainlink.Application,
-	chains map[uint64]cldf.Chain,
-	solchains map[uint64]cldf.SolChain,
-	aptoschains map[uint64]cldf.AptosChain,
+	chains map[uint64]cldf_evm.Chain,
+	solchains map[uint64]cldf_solana.Chain,
+	aptoschains map[uint64]cldf_aptos.Chain,
 	suichains map[uint64]suichain.Chain,
 ) Keys {
 	ctx := t.Context()

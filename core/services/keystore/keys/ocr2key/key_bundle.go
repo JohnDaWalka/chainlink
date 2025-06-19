@@ -46,7 +46,6 @@ var _ KeyBundle = &keyBundle[*cosmosKeyring]{}
 var _ KeyBundle = &keyBundle[*solanaKeyring]{}
 var _ KeyBundle = &keyBundle[*starkkey.OCR2Key]{}
 var _ KeyBundle = &keyBundle[*ed25519Keyring]{}
-var _ KeyBundle = &keyBundle[*aptosKeyring]{}
 var _ KeyBundle = &keyBundle[*tonKeyring]{}
 
 var curve = secp256k1.S256()

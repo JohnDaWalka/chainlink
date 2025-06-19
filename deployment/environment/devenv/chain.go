@@ -26,6 +26,8 @@ import (
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -144,9 +146,9 @@ func (c *ChainConfig) ToRPCs() []cldf.RPC {
 	return rpcs
 }
 
-func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf.Chain, map[uint64]cldf.SolChain, map[uint64]suichain.Chain, error) {
-	evmChains := make(map[uint64]cldf.Chain)
-	solChains := make(map[uint64]cldf.SolChain)
+func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf_evm.Chain, map[uint64]cldf_solana.Chain, map[uint64]suichain.Chain, error) {
+	evmChains := make(map[uint64]cldf_evm.Chain)
+	solChains := make(map[uint64]cldf_solana.Chain)
 	suiChains := make(map[uint64]suichain.Chain)
 
 	var evmSyncMap sync.Map

@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"golang.org/x/exp/maps"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/stretchr/testify/require"
-
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	testsetups "github.com/smartcontractkit/chainlink/integration-tests/testsetups/ccip"
 )
@@ -19,13 +18,11 @@ func Test_CCIPMessaging_EVM2Sui(t *testing.T) {
 		testhelpers.WithSuiChains(1),
 	)
 
-	evmChainSelectors := maps.Keys(e.Env.Chains)
-	suiChains := e.Env.BlockChains.SuiChains()
-	suiChainSelectors := maps.Keys(suiChains)
-	require.Equal(t, len(suiChainSelectors), 1)
+	evmChainSelectors := e.Env.BlockChains.ListChainSelectors(chain.WithFamily(chain_selectors.FamilyEVM))
+	suiChainSelectors := e.Env.BlockChains.ListChainSelectors(chain.WithFamily(chain_selectors.FamilySui))
 
-	fmt.Println("EVM: ", evmChainSelectors)
-	fmt.Println("Sui: ", suiChainSelectors)
+	fmt.Println("EVM: ", evmChainSelectors[0])
+	fmt.Println("Sui: ", suiChainSelectors[0])
 
 	/*
 

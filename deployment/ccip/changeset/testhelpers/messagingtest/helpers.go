@@ -18,7 +18,6 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -212,19 +211,11 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 
 	expectedSeqNumRange := map[testhelpers.SourceDestPair]ccipocr3.SeqNumRange{}
 	expectedSeqNumExec := map[testhelpers.SourceDestPair][]uint64{}
-	msgSentEvents := make([]*onramp.OnRampCCIPMessageSent, tc.NumberOfMessages)
+	msgSentEvents := make([]*testhelpers.AnyMsgSentEvent, tc.NumberOfMessages)
 	sourceDest := testhelpers.SourceDestPair{
 		SourceChainSelector: tc.SourceChain,
 		DestChainSelector:   tc.DestChain,
 	}
-
-	// HACK: if the node booted or the logpoller filters got registered after ccipSend,
-	// we need to replay missed logs
-	// if !tc.Replayed {
-	// 	require.NotNil(tc.T, tc.DeployedEnv)
-	// 	sleepAndReplay(tc.T, tc.DeployedEnv, tc.SourceChain, tc.DestChain)
-	// 	out.Replayed = true
-	// }
 
 	// send all messages first, then validate them
 	for i := 0; i < tc.NumberOfMessages; i++ {

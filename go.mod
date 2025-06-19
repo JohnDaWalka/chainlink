@@ -2,11 +2,7 @@ module github.com/smartcontractkit/chainlink/v2
 
 go 1.24.2
 
-replace github.com/smartcontractkit/chainlink-protos => ../chainlink-protos
-
 replace github.com/smartcontractkit/chainlink-sui => ../chainlink-sui
-
-replace github.com/smartcontractkit/chainlink-ccip => ../chainlink-ccip
 
 require (
 	github.com/Depado/ginprom v1.8.0

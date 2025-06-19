@@ -45,7 +45,7 @@ func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput)
 		blockChains[c.Selector] = c
 	}
 
-	return cldf.NewCLDFEnvironment(
+	return cldf.NewEnvironment(
 		CRIB_ENV_NAME,
 		lggr,
 		output.AddressBook,

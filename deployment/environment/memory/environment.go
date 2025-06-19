@@ -17,11 +17,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/smartcontractkit/freeport"
-
-	chainsel "github.com/smartcontractkit/chain-selectors"
-
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -66,7 +65,7 @@ type NewNodesConfig struct {
 	// Solana chains to be configured. Optional.
 	SolChains map[uint64]cldf_solana.Chain
 	// Aptos chains to be configured. Optional.
-	AptosChains    map[uint64]cldf.AptosChain
+	AptosChains    map[uint64]cldf_aptos.Chain
 	SuiChains      map[uint64]suichain.Chain
 	NumNodes       int
 	NumBootstraps  int
@@ -112,7 +111,7 @@ func NewMemoryChainsSui(t *testing.T, numChains int) map[uint64]suichain.Chain {
 	return GenerateChainsSui(t, numChains)
 }
 
-func NewMemoryChainsZk(t *testing.T, numChains int) map[uint64]cldf.Chain {
+func NewMemoryChainsZk(t *testing.T, numChains int) map[uint64]cldf_evm.Chain {
 	return GenerateChainsZk(t, numChains)
 }
 
@@ -223,9 +222,9 @@ func NewNodes(
 func NewMemoryEnvironmentFromChainsNodes(
 	ctx func() context.Context,
 	lggr logger.Logger,
-	chains map[uint64]cldf.Chain,
-	solChains map[uint64]cldf.SolChain,
-	aptosChains map[uint64]cldf.AptosChain,
+	chains map[uint64]cldf_evm.Chain,
+	solChains map[uint64]cldf_solana.Chain,
+	aptosChains map[uint64]cldf_aptos.Chain,
 	suiChains map[uint64]suichain.Chain,
 	nodes map[string]Node,
 ) cldf.Environment {
@@ -281,8 +280,8 @@ func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Lev
 	c := NewNodesConfig{
 		LogLevel:       logLevel,
 		Chains:         chains,
-		SolChains:      solChains,
-		AptosChains:    aptosChains,
+		SolChains:      concreteSolanaChains,
+		AptosChains:    concreteAptosChains,
 		SuiChains:      suiChains,
 		NumNodes:       config.Nodes,
 		NumBootstraps:  config.Bootstraps,
@@ -312,7 +311,7 @@ func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Lev
 	for _, c := range suiChains {
 		blockChains[c.Selector] = c
 	}
-	return *cldf.NewCLDFEnvironment(
+	return *cldf.NewEnvironment(
 		Memory,
 		lggr,
 		cldf.NewMemoryAddressBook(),

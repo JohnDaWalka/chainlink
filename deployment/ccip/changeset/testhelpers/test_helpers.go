@@ -243,6 +243,12 @@ func WaitForEventFilterRegistration(t *testing.T, oc cldf.OffchainClient, chainS
 		return fmt.Errorf("failed to find event with name %s in onramp or offramp ABIs", eventName)
 	case chainsel.FamilySolana:
 		eventID = eventName
+	case chainsel.FamilyAptos:
+		// Aptos is not using LogPoller
+		return nil
+	case chainsel.FamilySui:
+		// Sui is not using LogPoller
+		return nil
 	default:
 		return fmt.Errorf("unsupported chain family; %v", family)
 	}
@@ -317,7 +323,7 @@ func LatestBlock(ctx context.Context, env cldf.Environment, chainSelector uint64
 		block := latesthdr.Number.Uint64()
 		return block, nil
 	case chainsel.FamilySolana:
-		return env.SolChains[chainSelector].Client.GetSlot(ctx, solconfig.DefaultCommitment)
+		return env.BlockChains.SolanaChains()[chainSelector].Client.GetSlot(ctx, solconfig.DefaultCommitment)
 	case chainsel.FamilySui:
 		suiClient := env.BlockChains.SuiChains()[chainSelector].Client
 		req, err := suiClient.GetCheckpoints(ctx, &suiclient.GetCheckpointsRequest{
@@ -345,8 +351,8 @@ func LatestBlocksByChain(ctx context.Context, env cldf.Environment) (map[uint64]
 	latestBlocks := make(map[uint64]uint64)
 
 	chains := []uint64{}
-	chains = slices.AppendSeq(chains, maps.Keys(env.Chains))
-	chains = slices.AppendSeq(chains, maps.Keys(env.SolChains))
+	chains = slices.AppendSeq(chains, maps.Keys(env.BlockChains.EVMChains()))
+	chains = slices.AppendSeq(chains, maps.Keys(env.BlockChains.SolanaChains()))
 	suiChains := env.BlockChains.SuiChains()
 	chains = slices.AppendSeq(chains, maps.Keys(suiChains))
 
