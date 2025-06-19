@@ -3,7 +3,7 @@ package fakes
 import (
 	"context"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 )

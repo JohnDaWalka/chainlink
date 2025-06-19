@@ -11,11 +11,11 @@ import (
 	ethCommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
-	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 
@@ -41,7 +41,7 @@ type webapiTrigger struct {
 	allowedTopics  map[string]bool
 	ch             chan<- capabilities.TriggerResponse
 	config         webapicap.TriggerConfig
-	rateLimiter    *gateway.RateLimiter
+	rateLimiter    *ratelimit.RateLimiter
 }
 
 type triggerConnectorHandler struct {
@@ -203,14 +203,14 @@ func (h *triggerConnectorHandler) RegisterTrigger(ctx context.Context, req capab
 	}
 
 	rateLimiterConfig := reqConfig.RateLimiter
-	commonRateLimiter := gateway.RateLimiterConfig{
+	commonRateLimiter := ratelimit.RateLimiterConfig{
 		GlobalRPS:      rateLimiterConfig.GlobalRPS,
 		GlobalBurst:    int(rateLimiterConfig.GlobalBurst),
 		PerSenderRPS:   rateLimiterConfig.PerSenderRPS,
 		PerSenderBurst: int(rateLimiterConfig.PerSenderBurst),
 	}
 
-	rateLimiter, err := gateway.NewRateLimiter(commonRateLimiter)
+	rateLimiter, err := ratelimit.NewRateLimiter(commonRateLimiter)
 	if err != nil {
 		return nil, err
 	}

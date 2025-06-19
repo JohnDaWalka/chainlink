@@ -14,13 +14,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.uber.org/multierr"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
@@ -69,11 +69,11 @@ type FunctionsHandlerConfig struct {
 	OnchainSubscriptions       *fsub.OnchainSubscriptionsConfig `json:"onchainSubscriptions"`
 	MinimumSubscriptionBalance *assets.Link                     `json:"minimumSubscriptionBalance"`
 	// Not specifying RateLimiter config disables rate limiting
-	UserRateLimiter            *gateway.RateLimiterConfig `json:"userRateLimiter"`
-	NodeRateLimiter            *gateway.RateLimiterConfig `json:"nodeRateLimiter"`
-	MaxPendingRequests         uint32                     `json:"maxPendingRequests"`
-	RequestTimeoutMillis       int64                      `json:"requestTimeoutMillis"`
-	AllowedHeartbeatInitiators []string                   `json:"allowedHeartbeatInitiators"`
+	UserRateLimiter            *ratelimit.RateLimiterConfig `json:"userRateLimiter"`
+	NodeRateLimiter            *ratelimit.RateLimiterConfig `json:"nodeRateLimiter"`
+	MaxPendingRequests         uint32                       `json:"maxPendingRequests"`
+	RequestTimeoutMillis       int64                        `json:"requestTimeoutMillis"`
+	AllowedHeartbeatInitiators []string                     `json:"allowedHeartbeatInitiators"`
 }
 
 type functionsHandler struct {
@@ -86,8 +86,8 @@ type functionsHandler struct {
 	allowlist                  fallow.OnchainAllowlist
 	subscriptions              fsub.OnchainSubscriptions
 	minimumBalance             *assets.Link
-	userRateLimiter            *gateway.RateLimiter
-	nodeRateLimiter            *gateway.RateLimiter
+	userRateLimiter            *ratelimit.RateLimiter
+	nodeRateLimiter            *ratelimit.RateLimiter
 	allowedHeartbeatInitiators map[string]struct{}
 	chStop                     services.StopChan
 	lggr                       logger.Logger
@@ -129,15 +129,15 @@ func NewFunctionsHandlerFromConfig(handlerConfig json.RawMessage, donConfig *con
 			return nil, err2
 		}
 	}
-	var userRateLimiter, nodeRateLimiter *gateway.RateLimiter
+	var userRateLimiter, nodeRateLimiter *ratelimit.RateLimiter
 	if cfg.UserRateLimiter != nil {
-		userRateLimiter, err = gateway.NewRateLimiter(*cfg.UserRateLimiter)
+		userRateLimiter, err = ratelimit.NewRateLimiter(*cfg.UserRateLimiter)
 		if err != nil {
 			return nil, err
 		}
 	}
 	if cfg.NodeRateLimiter != nil {
-		nodeRateLimiter, err = gateway.NewRateLimiter(*cfg.NodeRateLimiter)
+		nodeRateLimiter, err = ratelimit.NewRateLimiter(*cfg.NodeRateLimiter)
 		if err != nil {
 			return nil, err
 		}
@@ -179,8 +179,8 @@ func NewFunctionsHandler(
 	allowlist fallow.OnchainAllowlist,
 	subscriptions fsub.OnchainSubscriptions,
 	minimumBalance *assets.Link,
-	userRateLimiter *gateway.RateLimiter,
-	nodeRateLimiter *gateway.RateLimiter,
+	userRateLimiter *ratelimit.RateLimiter,
+	nodeRateLimiter *ratelimit.RateLimiter,
 	allowedHeartbeatInitiators map[string]struct{},
 	lggr logger.Logger) handlers.Handler {
 	return &functionsHandler{
@@ -199,14 +199,7 @@ func NewFunctionsHandler(
 	}
 }
 
-func (h *functionsHandler) HandleUserMessage(ctx context.Context, req *jsonrpc.Request, callbackCh chan<- handlers.UserCallbackPayload) error {
-	msg, err := hc.ValidatedMessageFromReq(req)
-	if err != nil {
-		h.lggr.Debugw("HandleUserMessage: failed to validate message", "error", err)
-		// TODO: what to return here?
-		// promHandlerError.WithLabelValues(h.donConfig.DonId, ErrNotAllowlisted.Error()).Inc()
-		return nil
-	}
+func (h *functionsHandler) HandleUserMessage(ctx context.Context, msg *api.Message, callbackCh chan<- handlers.UserCallbackPayload) error {
 	sender := common.HexToAddress(msg.Body.Sender)
 	if h.allowlist != nil && !h.allowlist.Allow(sender) {
 		h.lggr.Debugw("received a message from a non-allowlisted address", "sender", msg.Body.Sender)
@@ -355,11 +348,7 @@ func newSecretsResponse(request *api.Message, success bool, responses []*api.Mes
 	userResponse := *request
 	userResponse.Body.Receiver = request.Body.Sender
 	userResponse.Body.Payload = payloadJson
-	resp, err := hc.ValidatedResponseFromMessage(&userResponse)
-	if err != nil {
-		return nil, err
-	}
-	return &handlers.UserCallbackPayload{Resp: resp, ErrCode: api.NoError, ErrMsg: ""}, nil
+	return &handlers.UserCallbackPayload{Msg: &userResponse, ErrCode: api.NoError, ErrMsg: ""}, nil
 }
 
 // Conforms to ResponseProcessor[*PendingRequest]
@@ -385,15 +374,10 @@ func (h *functionsHandler) processHeartbeatResponse(response *api.Message, respo
 		payload := CombinedResponse{ResponseBase: ResponseBase{Success: true}, NodeResponses: responseList}
 		payloadJson, err := json.Marshal(payload)
 		if err != nil {
-			// TODO: how to handle this?
-		}
-		resp, err := hc.ValidatedResponseFromMessage(&userResponse)
-		if err != nil {
-			// TODO: how to handle this?
-			return nil, nil, err
+			return &handlers.UserCallbackPayload{Msg: &userResponse, ErrCode: api.NodeReponseEncodingError, ErrMsg: ""}, nil, nil
 		}
 		userResponse.Body.Payload = payloadJson
-		return &handlers.UserCallbackPayload{Resp: resp, ErrCode: api.NoError, ErrMsg: ""}, nil, nil
+		return &handlers.UserCallbackPayload{Msg: &userResponse, ErrCode: api.NoError, ErrMsg: ""}, nil, nil
 	}
 	// not ready to be processed yet
 	return nil, responseData, nil

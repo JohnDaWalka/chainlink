@@ -12,8 +12,8 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
@@ -159,7 +159,7 @@ func NewFunctionsServices(ctx context.Context, functionsOracleArgs, thresholdOra
 		if err2 != nil {
 			return nil, errors.Wrap(err, "failed to create OnchainAllowlist")
 		}
-		rateLimiter, err2 := gateway.NewRateLimiter(*pluginConfig.RateLimiter)
+		rateLimiter, err2 := ratelimit.NewRateLimiter(*pluginConfig.RateLimiter)
 		if err2 != nil {
 			return nil, errors.Wrap(err, "failed to create a RateLimiter")
 		}
@@ -205,7 +205,7 @@ type Keystore interface {
 	keys.MessageSigner
 }
 
-func NewConnector(ctx context.Context, pluginConfig *config.PluginConfig, ethKeystore Keystore, s4Storage s4.Storage, allowlist gwAllowlist.OnchainAllowlist, rateLimiter *gateway.RateLimiter, subscriptions gwSubscriptions.OnchainSubscriptions, listener functions.FunctionsListener, offchainTransmitter functions.OffchainTransmitter, lggr logger.Logger) (connector.GatewayConnector, connector.GatewayConnectorHandler, error) {
+func NewConnector(ctx context.Context, pluginConfig *config.PluginConfig, ethKeystore Keystore, s4Storage s4.Storage, allowlist gwAllowlist.OnchainAllowlist, rateLimiter *ratelimit.RateLimiter, subscriptions gwSubscriptions.OnchainSubscriptions, listener functions.FunctionsListener, offchainTransmitter functions.OffchainTransmitter, lggr logger.Logger) (connector.GatewayConnector, connector.GatewayConnectorHandler, error) {
 	configuredNodeAddress := common.HexToAddress(pluginConfig.GatewayConnectorConfig.NodeAddress)
 	err := ethKeystore.CheckEnabled(ctx, configuredNodeAddress)
 	if err != nil {

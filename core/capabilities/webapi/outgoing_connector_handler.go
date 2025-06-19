@@ -12,8 +12,9 @@ import (
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
-	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
@@ -46,8 +47,8 @@ type OutgoingConnectorHandler struct {
 	gc                  connector.GatewayConnector
 	method              string
 	lggr                logger.Logger
-	incomingRateLimiter *gateway.RateLimiter
-	outgoingRateLimiter *gateway.RateLimiter
+	incomingRateLimiter *ratelimit.RateLimiter
+	outgoingRateLimiter *ratelimit.RateLimiter
 	responses           *responses
 	selectorOpts        []func(*gateway.RoundRobinSelector)
 	metrics             *metrics
@@ -55,12 +56,12 @@ type OutgoingConnectorHandler struct {
 
 func NewOutgoingConnectorHandler(gc connector.GatewayConnector, config ServiceConfig, method string, lgger logger.Logger, opts ...func(*gateway.RoundRobinSelector)) (*OutgoingConnectorHandler, error) {
 	outgoingRLCfg := outgoingRateLimiterConfigDefaults(config.OutgoingRateLimiter)
-	outgoingRateLimiter, err := gateway.NewRateLimiter(outgoingRLCfg)
+	outgoingRateLimiter, err := ratelimit.NewRateLimiter(outgoingRLCfg)
 	if err != nil {
 		return nil, err
 	}
 	incomingRLCfg := incomingRateLimiterConfigDefaults(config.RateLimiter)
-	incomingRateLimiter, err := gateway.NewRateLimiter(incomingRLCfg)
+	incomingRateLimiter, err := ratelimit.NewRateLimiter(incomingRLCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -393,7 +394,7 @@ func (c *OutgoingConnectorHandler) Name() string {
 	return c.lggr.Name()
 }
 
-func incomingRateLimiterConfigDefaults(config gateway.RateLimiterConfig) gateway.RateLimiterConfig {
+func incomingRateLimiterConfigDefaults(config ratelimit.RateLimiterConfig) ratelimit.RateLimiterConfig {
 	if config.GlobalBurst == 0 {
 		config.GlobalBurst = DefaultGlobalBurst
 	}
@@ -408,7 +409,7 @@ func incomingRateLimiterConfigDefaults(config gateway.RateLimiterConfig) gateway
 	}
 	return config
 }
-func outgoingRateLimiterConfigDefaults(config gateway.RateLimiterConfig) gateway.RateLimiterConfig {
+func outgoingRateLimiterConfigDefaults(config ratelimit.RateLimiterConfig) ratelimit.RateLimiterConfig {
 	if config.GlobalBurst == 0 {
 		config.GlobalBurst = DefaultGlobalBurst
 	}

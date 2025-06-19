@@ -7,13 +7,15 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/NethermindEth/juno/jsonrpc"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	registrymock "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
@@ -35,13 +37,13 @@ const (
 )
 
 var defaultConfig = webapi.ServiceConfig{
-	OutgoingRateLimiter: gateway.RateLimiterConfig{
+	OutgoingRateLimiter: ratelimit.RateLimiterConfig{
 		GlobalRPS:      100.0,
 		GlobalBurst:    100,
 		PerSenderRPS:   100.0,
 		PerSenderBurst: 100,
 	},
-	RateLimiter: gateway.RateLimiterConfig{
+	RateLimiter: ratelimit.RateLimiterConfig{
 		GlobalRPS:      100.0,
 		GlobalBurst:    100,
 		PerSenderRPS:   100.0,
@@ -144,7 +146,7 @@ func gatewayResponse(t *testing.T, msgID string, privateKey string) *jsonrpc.Req
 	err = m.Sign(key)
 	req, err := hc.ValidatedRequestFromMessage(m)
 	require.NoError(t, err)
-	return &req
+	return req
 }
 
 func TestRegisterUnregister(t *testing.T) {

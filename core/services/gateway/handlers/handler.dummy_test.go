@@ -6,11 +6,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
+	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 )
 
 type testConnManager struct {
@@ -22,7 +24,7 @@ func (m *testConnManager) SetHandler(handler handlers.Handler) {
 	m.handler = handler
 }
 
-func (m *testConnManager) SendToNode(ctx context.Context, nodeAddress string, msg *api.Message) error {
+func (m *testConnManager) SendToNode(ctx context.Context, nodeAddress string, resp *jsonrpc.Request) error {
 	m.sendCounter++
 	return nil
 }
@@ -51,8 +53,10 @@ func TestDummyHandler_BasicFlow(t *testing.T) {
 	require.Equal(t, 2, connMgr.sendCounter)
 
 	// Responses from both nodes
-	require.NoError(t, handler.HandleNodeMessage(ctx, &msg, "addr_1"))
-	require.NoError(t, handler.HandleNodeMessage(ctx, &msg, "addr_2"))
+	resp, err := hc.ValidatedResponseFromMessage(&msg)
+	require.NoError(t, err)
+	require.NoError(t, handler.HandleNodeMessage(ctx, resp, "addr_1"))
+	require.NoError(t, handler.HandleNodeMessage(ctx, resp, "addr_2"))
 	response := <-callbackCh
 	require.Equal(t, "1234", response.Msg.Body.MessageId)
 }

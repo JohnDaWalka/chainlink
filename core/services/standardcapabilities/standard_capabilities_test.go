@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -110,7 +112,7 @@ func (g *gatewayConnectorMock) AddHandler(ctx context.Context, methods []string,
 	return nil
 }
 
-func (g *gatewayConnectorMock) SendToGateway(ctx context.Context, gatewayID string, msg []byte) error {
+func (g *gatewayConnectorMock) SendToGateway(ctx context.Context, gatewayID string, resp *jsonrpc.Response) error {
 	return nil
 }
 

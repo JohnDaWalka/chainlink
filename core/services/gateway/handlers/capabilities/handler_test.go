@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -22,6 +22,7 @@ import (
 	gwcommon "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
+	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	handlermocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network/mocks"
@@ -43,7 +44,7 @@ func setupHandler(t *testing.T) (*handler, *mocks.HTTPClient, *handlermocks.DON,
 	lggr := logger.Test(t)
 	httpClient := mocks.NewHTTPClient(t)
 	don := handlermocks.NewDON(t)
-	nodeRateLimiterConfig := gateway.RateLimiterConfig{
+	nodeRateLimiterConfig := ratelimit.RateLimiterConfig{
 		GlobalRPS:      100.0,
 		GlobalBurst:    100,
 		PerSenderRPS:   100.0,
@@ -115,8 +116,9 @@ func TestHandler_SendHTTPMessageToClient(t *testing.T) {
 				string(payload.Body) == "response body" &&
 				!payload.ExecutionError
 		})).Return(nil).Once()
-
-		err = handler.HandleNodeMessage(ctx, msg, nodeAddr)
+		resp, err := hc.ValidatedResponseFromMessage(msg)
+		require.NoError(t, err)
+		err = handler.HandleNodeMessage(ctx, resp, nodeAddr)
 		require.NoError(t, err)
 
 		require.Eventually(t, func() bool {
@@ -149,7 +151,9 @@ func TestHandler_SendHTTPMessageToClient(t *testing.T) {
 				!payload.ExecutionError
 		})).Return(nil).Once()
 
-		err = handler.HandleNodeMessage(ctx, msg, nodeAddr)
+		resp, err := hc.ValidatedResponseFromMessage(msg)
+		require.NoError(t, err)
+		err = handler.HandleNodeMessage(ctx, resp, nodeAddr)
 		require.NoError(t, err)
 
 		require.Eventually(t, func() bool {
@@ -176,7 +180,9 @@ func TestHandler_SendHTTPMessageToClient(t *testing.T) {
 				"error while marshalling" == payload.ErrorMessage
 		})).Return(nil).Once()
 
-		err = handler.HandleNodeMessage(ctx, msg, nodeAddr)
+		resp, err := hc.ValidatedResponseFromMessage(msg)
+		require.NoError(t, err)
+		err = handler.HandleNodeMessage(ctx, resp, nodeAddr)
 		require.NoError(t, err)
 
 		require.Eventually(t, func() bool {
@@ -257,11 +263,13 @@ func TestHandlerReceiveHTTPMessageFromClient(t *testing.T) {
 		require.NoError(t, err)
 		requireNoChanMsg(t, ch)
 
-		err = handler.HandleNodeMessage(ctx, msg, "")
+		resp, err := hc.ValidatedResponseFromMessage(msg)
+		require.NoError(t, err)
+		err = handler.HandleNodeMessage(ctx, resp, "")
 		require.NoError(t, err)
 
-		resp := <-ch
-		require.Equal(t, handlers.UserCallbackPayload{Msg: msg, ErrCode: api.NoError, ErrMsg: ""}, resp)
+		userPayload := <-ch
+		require.Equal(t, handlers.UserCallbackPayload{Msg: userPayload.Msg, ErrCode: api.NoError, ErrMsg: ""}, resp)
 		_, open := <-ch
 		require.False(t, open)
 	})
@@ -356,7 +364,9 @@ func TestHandleComputeActionMessage(t *testing.T) {
 				!payload.ExecutionError
 		})).Return(nil).Once()
 
-		err = handler.HandleNodeMessage(ctx, msg, nodeAddr)
+		resp, err := hc.ValidatedResponseFromMessage(msg)
+		require.NoError(t, err)
+		err = handler.HandleNodeMessage(ctx, resp, nodeAddr)
 		require.NoError(t, err)
 
 		require.Eventually(t, func() bool {
@@ -389,7 +399,9 @@ func TestHandleComputeActionMessage(t *testing.T) {
 				!payload.ExecutionError
 		})).Return(nil).Once()
 
-		err = handler.HandleNodeMessage(ctx, msg, nodeAddr)
+		resp, err := hc.ValidatedResponseFromMessage(msg)
+		require.NoError(t, err)
+		err = handler.HandleNodeMessage(ctx, resp, nodeAddr)
 		require.NoError(t, err)
 
 		require.Eventually(t, func() bool {
@@ -416,7 +428,9 @@ func TestHandleComputeActionMessage(t *testing.T) {
 				"error while marshalling" == payload.ErrorMessage
 		})).Return(nil).Once()
 
-		err = handler.HandleNodeMessage(ctx, msg, nodeAddr)
+		resp, err := hc.ValidatedResponseFromMessage(msg)
+		require.NoError(t, err)
+		err = handler.HandleNodeMessage(ctx, resp, nodeAddr)
 		require.NoError(t, err)
 
 		require.Eventually(t, func() bool {

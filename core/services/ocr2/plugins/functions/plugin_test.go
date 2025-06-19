@@ -6,7 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys/keystest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -36,7 +36,7 @@ func TestNewConnector_Success(t *testing.T) {
 	s4Storage := s4mocks.NewStorage(t)
 	allowlist := gfaMocks.NewOnchainAllowlist(t)
 	subscriptions := gfsMocks.NewOnchainSubscriptions(t)
-	rateLimiter, err := gateway.NewRateLimiter(gateway.RateLimiterConfig{GlobalRPS: 100.0, GlobalBurst: 100, PerSenderRPS: 100.0, PerSenderBurst: 100})
+	rateLimiter, err := ratelimit.NewRateLimiter(ratelimit.RateLimiterConfig{GlobalRPS: 100.0, GlobalBurst: 100, PerSenderRPS: 100.0, PerSenderBurst: 100})
 	require.NoError(t, err)
 	listener := sfmocks.NewFunctionsListener(t)
 	offchainTransmitter := sfmocks.NewOffchainTransmitter(t)
@@ -67,7 +67,7 @@ func TestNewConnector_NoKeyForConfiguredAddress(t *testing.T) {
 	s4Storage := s4mocks.NewStorage(t)
 	allowlist := gfaMocks.NewOnchainAllowlist(t)
 	subscriptions := gfsMocks.NewOnchainSubscriptions(t)
-	rateLimiter, err := gateway.NewRateLimiter(gateway.RateLimiterConfig{GlobalRPS: 100.0, GlobalBurst: 100, PerSenderRPS: 100.0, PerSenderBurst: 100})
+	rateLimiter, err := ratelimit.NewRateLimiter(ratelimit.RateLimiterConfig{GlobalRPS: 100.0, GlobalBurst: 100, PerSenderRPS: 100.0, PerSenderBurst: 100})
 	require.NoError(t, err)
 	listener := sfmocks.NewFunctionsListener(t)
 	offchainTransmitter := sfmocks.NewOffchainTransmitter(t)

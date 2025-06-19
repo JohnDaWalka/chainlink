@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -11,7 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jonboulle/clockwork"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -52,7 +53,6 @@ type gatewayConnector struct {
 	services.StateMachine
 
 	config      *ConnectorConfig
-	codec       *jsonrpc.Codec
 	clock       clockwork.Clock
 	nodeAddress []byte
 	signer      Signer
@@ -112,7 +112,6 @@ func NewGatewayConnector(config *ConnectorConfig, signer Signer, clock clockwork
 	}
 	connector := &gatewayConnector{
 		config:      config,
-		codec:       jsonrpc.NewCodec(),
 		clock:       clock,
 		nodeAddress: addressBytes,
 		signer:      signer,
@@ -175,9 +174,9 @@ func (c *gatewayConnector) AwaitConnection(ctx context.Context, gatewayID string
 }
 
 func (c *gatewayConnector) SendToGateway(ctx context.Context, gatewayID string, resp *jsonrpc.Response) error {
-	msg, err := c.codec.EncodeResponse(resp)
+	data, err := json.Marshal(resp)
 	if err != nil {
-		return fmt.Errorf("failed to encode response: %w", err)
+		return fmt.Errorf("failed to marshal response: %w", err)
 	}
 	gateway, ok := c.gateways[gatewayID]
 	if !ok {
@@ -186,7 +185,7 @@ func (c *gatewayConnector) SendToGateway(ctx context.Context, gatewayID string, 
 	if gateway.conn == nil {
 		return errors.New("connector not started")
 	}
-	return gateway.conn.Write(ctx, websocket.BinaryMessage, msg)
+	return gateway.conn.Write(ctx, websocket.BinaryMessage, data)
 }
 
 func (c *gatewayConnector) SignMessage(ctx context.Context, msg []byte) ([]byte, error) {
@@ -215,7 +214,8 @@ func (c *gatewayConnector) readLoop(gatewayState *gatewayState) {
 			c.closeWait.Done()
 			return
 		case item := <-gatewayState.conn.ReadChannel():
-			req, err := c.codec.DecodeRequest(item.Data)
+			var req jsonrpc.Request
+			err := json.Unmarshal(item.Data, &req)
 			if err != nil {
 				c.lggr.Errorw("parse error when reading from Gateway", "id", gatewayState.config.Id, "err", err)
 				break
@@ -227,7 +227,7 @@ func (c *gatewayConnector) readLoop(gatewayState *gatewayState) {
 			}
 			// do not break on error. HandleGatewayMessage handles errors
 			// by sending a response back to the Gateway.
-			err = handler.HandleGatewayMessage(ctx, gatewayState.config.Id, req)
+			err = handler.HandleGatewayMessage(ctx, gatewayState.config.Id, &req)
 			c.lggr.Warnw("failed to handle message from Gateway", "id", gatewayState.config.Id, "method", req.Method, "err", err)
 		}
 	}

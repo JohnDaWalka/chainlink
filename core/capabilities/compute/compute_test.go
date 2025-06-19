@@ -14,7 +14,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 
 	cappkg "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
@@ -41,13 +42,13 @@ const (
 
 var defaultConfig = Config{
 	ServiceConfig: webapi.ServiceConfig{
-		OutgoingRateLimiter: gateway.RateLimiterConfig{
+		OutgoingRateLimiter: ratelimit.RateLimiterConfig{
 			GlobalRPS:      100.0,
 			GlobalBurst:    100,
 			PerSenderRPS:   100.0,
 			PerSenderBurst: 100,
 		},
-		RateLimiter: gateway.RateLimiterConfig{
+		RateLimiter: ratelimit.RateLimiterConfig{
 			GlobalRPS:      100.0,
 			GlobalBurst:    100,
 			PerSenderRPS:   100.0,
@@ -364,7 +365,7 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 
 	th := setup(t, Config{
 		ServiceConfig: webapi.ServiceConfig{
-			RateLimiter: gateway.RateLimiterConfig{
+			RateLimiter: ratelimit.RateLimiterConfig{
 				GlobalRPS:      100.0,
 				GlobalBurst:    100,
 				PerSenderRPS:   100.0,

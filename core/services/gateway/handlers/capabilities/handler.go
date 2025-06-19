@@ -13,9 +13,9 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
-	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
@@ -40,15 +40,15 @@ type handler struct {
 	mu              sync.Mutex
 	lggr            logger.Logger
 	httpClient      network.HTTPClient
-	nodeRateLimiter *gateway.RateLimiter
+	nodeRateLimiter *ratelimit.RateLimiter
 	wg              sync.WaitGroup
 	metrics         *metrics
 	codec           api.Codec
 }
 
 type HandlerConfig struct {
-	NodeRateLimiter         gateway.RateLimiterConfig `json:"nodeRateLimiter"`
-	MaxAllowedMessageAgeSec uint                      `json:"maxAllowedMessageAgeSec"`
+	NodeRateLimiter         ratelimit.RateLimiterConfig `json:"nodeRateLimiter"`
+	MaxAllowedMessageAgeSec uint                        `json:"maxAllowedMessageAgeSec"`
 }
 
 type savedCallback struct {
@@ -64,7 +64,7 @@ func NewHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don 
 	if err != nil {
 		return nil, err
 	}
-	nodeRateLimiter, err := gateway.NewRateLimiter(cfg.NodeRateLimiter)
+	nodeRateLimiter, err := ratelimit.NewRateLimiter(cfg.NodeRateLimiter)
 	if err != nil {
 		return nil, err
 	}
@@ -122,15 +122,12 @@ func (h *handler) handleWebAPITriggerMessage(ctx context.Context, msg *api.Messa
 	savedCb, found := h.savedCallbacks[msg.Body.MessageId]
 	delete(h.savedCallbacks, msg.Body.MessageId)
 	h.mu.Unlock()
-	resp, err := common.ValidatedResponseFromMessage(msg)
-	if err != nil {
-		return err
-	}
+
 	if found {
 		// Send first response from a node back to the user, ignore any other ones.
 		// TODO: in practice, we should wait for at least 2F+1 nodes to respond and then return an aggregated response
 		// back to the user.
-		savedCb.callbackCh <- handlers.UserCallbackPayload{Resp: resp, ErrCode: api.NoError, ErrMsg: ""}
+		savedCb.callbackCh <- handlers.UserCallbackPayload{Msg: msg, ErrCode: api.NoError, ErrMsg: ""}
 		close(savedCb.callbackCh)
 	}
 	return nil
@@ -243,54 +240,47 @@ func (h *handler) Close() error {
 	return nil
 }
 
-func (h *handler) HandleUserMessage(ctx context.Context, req *jsonrpc.Request, callbackCh chan<- handlers.UserCallbackPayload) error {
-	var msg api.Message
-	err := json.Unmarshal(req.Params, &msg)
-	resp, err := common.ValidatedResponseFromMessage(&msg)
-	if err != nil {
-		h.lggr.Errorw("error validating request params", "err", err)
-		return nil
-	}
-	if err != nil {
-		h.lggr.Errorw("error decoding request params", "err", err)
-		callbackCh <- handlers.UserCallbackPayload{Resp: resp, ErrCode: api.UserMessageParseError, ErrMsg: "error decoding payload " + err.Error()}
-		close(callbackCh)
-		return nil
-	}
+func (h *handler) HandleUserMessage(ctx context.Context, msg *api.Message, callbackCh chan<- handlers.UserCallbackPayload) error {
 	h.mu.Lock()
 	h.savedCallbacks[msg.Body.MessageId] = &savedCallback{msg.Body.MessageId, callbackCh}
 	don := h.don
 	h.mu.Unlock()
 	body := msg.Body
 	var payload webapicap.TriggerRequestPayload
-	err = json.Unmarshal(body.Payload, &payload)
+	err := json.Unmarshal(body.Payload, &payload)
 	if err != nil {
 		h.lggr.Errorw("error decoding payload", "err", err)
-		callbackCh <- handlers.UserCallbackPayload{Resp: resp, ErrCode: api.UserMessageParseError, ErrMsg: "error decoding payload " + err.Error()}
+		callbackCh <- handlers.UserCallbackPayload{Msg: msg, ErrCode: api.UserMessageParseError, ErrMsg: "error decoding payload " + err.Error()}
 		close(callbackCh)
 		return nil
 	}
 
 	if payload.Timestamp == 0 {
 		h.lggr.Errorw("error decoding payload")
-		callbackCh <- handlers.UserCallbackPayload{Resp: resp, ErrCode: api.UserMessageParseError, ErrMsg: "error decoding payload"}
+		callbackCh <- handlers.UserCallbackPayload{Msg: msg, ErrCode: api.UserMessageParseError, ErrMsg: "error decoding payload"}
 		close(callbackCh)
 		return nil
 	}
 
 	if uint(time.Now().Unix())-h.config.MaxAllowedMessageAgeSec > uint(payload.Timestamp) {
-		callbackCh <- handlers.UserCallbackPayload{Resp: resp, ErrCode: api.HandlerError, ErrMsg: "stale message"}
+		callbackCh <- handlers.UserCallbackPayload{Msg: msg, ErrCode: api.HandlerError, ErrMsg: "stale message"}
 		close(callbackCh)
 		return nil
 	}
 	// TODO: apply allowlist and rate-limiting here
 	if msg.Body.Method != MethodWebAPITrigger {
 		h.lggr.Errorw("unsupported method", "method", body.Method)
-		callbackCh <- handlers.UserCallbackPayload{Resp: resp, ErrCode: api.HandlerError, ErrMsg: "invalid method " + msg.Body.Method}
+		callbackCh <- handlers.UserCallbackPayload{Msg: msg, ErrCode: api.HandlerError, ErrMsg: "invalid method " + msg.Body.Method}
 		close(callbackCh)
 		return nil
 	}
-
+	req, err := common.ValidatedRequestFromMessage(msg)
+	if err != nil {
+		h.lggr.Errorw("error transforming message to request")
+		callbackCh <- handlers.UserCallbackPayload{Msg: msg, ErrCode: api.UserMessageParseError, ErrMsg: "error transforming message to request"}
+		close(callbackCh)
+		return nil
+	}
 	// Send original request to all nodes
 	for _, member := range h.donConfig.Members {
 		err = multierr.Combine(err, don.SendToNode(ctx, member.Address, req))

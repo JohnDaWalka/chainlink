@@ -18,9 +18,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
-	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	gc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
@@ -42,7 +42,7 @@ type functionsConnectorHandler struct {
 	nodeAddress                string
 	storage                    s4.Storage
 	allowlist                  fallow.OnchainAllowlist
-	rateLimiter                *gateway.RateLimiter
+	rateLimiter                *ratelimit.RateLimiter
 	subscriptions              fsub.OnchainSubscriptions
 	minimumBalance             assets.Link
 	listener                   FunctionsListener
@@ -83,7 +83,7 @@ func NewFunctionsConnectorHandler(
 	keystore keys.MessageSigner,
 	storage s4.Storage,
 	allowlist fallow.OnchainAllowlist,
-	rateLimiter *gateway.RateLimiter,
+	rateLimiter *ratelimit.RateLimiter,
 	subscriptions fsub.OnchainSubscriptions,
 	listener FunctionsListener,
 	offchainTransmitter OffchainTransmitter,

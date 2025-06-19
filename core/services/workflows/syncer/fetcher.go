@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi"
@@ -41,13 +42,13 @@ func (s *FetcherService) Start(ctx context.Context) error {
 		outgoingConnectorLggr := s.lggr.Named("OutgoingConnectorHandler")
 
 		webAPIConfig := webapi.ServiceConfig{
-			OutgoingRateLimiter: gateway.RateLimiterConfig{
+			OutgoingRateLimiter: ratelimit.RateLimiterConfig{
 				GlobalRPS:      webapi.DefaultGlobalRPS,
 				GlobalBurst:    webapi.DefaultGlobalBurst,
 				PerSenderRPS:   webapi.DefaultWorkflowRPS,
 				PerSenderBurst: webapi.DefaultWorkflowBurst,
 			},
-			RateLimiter: gateway.RateLimiterConfig{
+			RateLimiter: ratelimit.RateLimiterConfig{
 				GlobalRPS:      100.0,
 				GlobalBurst:    100,
 				PerSenderRPS:   100.0,

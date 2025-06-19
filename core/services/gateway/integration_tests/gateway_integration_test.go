@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,6 +17,8 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/pelletier/go-toml/v2"
 
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -27,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
+	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 )
 
@@ -102,22 +106,27 @@ func parseConnectorConfig(t *testing.T, tomlConfig string, nodeAddress string, n
 
 type client struct {
 	privateKey *ecdsa.PrivateKey
-	codec      api.Codec
 	connector  core.GatewayConnector
 	done       atomic.Bool
 }
 
-func (c *client) HandleGatewayMessage(ctx context.Context, gatewayID string, data []byte) error {
-	msg, err := c.codec.DecodeRequest(data)
+func (c *client) HandleGatewayMessage(ctx context.Context, gatewayID string, req *jsonrpc.Request) error {
+	msg, err := hc.ValidatedMessageFromReq(req)
 	if err != nil {
 		panic(err)
 	}
-	if err2 := msg.Validate(); err2 != nil {
-		panic(err2)
-	}
 	c.done.Store(true)
+	payload, err := json.Marshal(msg)
+	if err != nil {
+		panic(err)
+	}
+	resp := &jsonrpc.Response{
+		Version: "2.0",
+		ID:      msg.Body.MessageId,
+		Result:  payload,
+	}
 	// send back user's message without re-signing - should be ignored by the Gateway
-	_ = c.connector.SendToGateway(ctx, gatewayID, data)
+	_ = c.connector.SendToGateway(ctx, gatewayID, resp)
 	// send back a correct response
 	responseMsg := &api.Message{Body: api.MessageBody{
 		MessageId: msg.Body.MessageId,
@@ -130,11 +139,11 @@ func (c *client) HandleGatewayMessage(ctx context.Context, gatewayID string, dat
 	if err != nil {
 		panic(err)
 	}
-	rawResponse, err := c.codec.EncodeResponse(responseMsg)
+	resp, err = hc.ValidatedResponseFromMessage(responseMsg) // ensure the message is valid
 	if err != nil {
 		panic(err)
 	}
-	return c.connector.SendToGateway(ctx, gatewayID, rawResponse)
+	return c.connector.SendToGateway(ctx, gatewayID, resp)
 }
 
 func (c *client) Sign(ctx context.Context, data ...[]byte) ([]byte, error) {
@@ -178,7 +187,7 @@ func TestIntegration_Gateway_NoFullNodes_BasicConnectionAndMessage(t *testing.T)
 	nodeUrl := fmt.Sprintf("ws://localhost:%d/node", nodePort)
 
 	// Launch Connector
-	client := &client{privateKey: nodeKeys.PrivateKey, codec: &api.JsonRPCCodec{}}
+	client := &client{privateKey: nodeKeys.PrivateKey}
 	// client acts as a signer here
 	connector, err := connector.NewGatewayConnector(parseConnectorConfig(t, nodeConfigTemplate, nodeKeys.Address, nodeUrl), client, clockwork.NewRealClock(), lggr)
 	require.NoError(t, err)

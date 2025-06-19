@@ -3,12 +3,11 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"sync"
 
 	"go.uber.org/multierr"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
@@ -21,7 +20,6 @@ type dummyHandler struct {
 	savedCallbacks map[string]*savedCallback
 	mu             sync.Mutex
 	lggr           logger.Logger
-	codec          api.JsonRPCCodec
 }
 
 type savedCallback struct {
@@ -37,25 +35,22 @@ func NewDummyHandler(donConfig *config.DONConfig, don DON, lggr logger.Logger) (
 		don:            don,
 		savedCallbacks: make(map[string]*savedCallback),
 		lggr:           logger.Named(lggr, "DummyHandler."+donConfig.DonId),
-		codec:          api.JsonRPCCodec{},
 	}, nil
 }
 
-func (d *dummyHandler) HandleUserMessage(ctx context.Context, req *jsonrpc.Request, callbackCh chan<- UserCallbackPayload) error {
-	if req.Params == nil {
-		return errors.New("missing params attribute")
-	}
-	var msg api.Message
-	err := json.Unmarshal(req.Params, &msg)
-	if err != nil {
-		return err
-	}
+func (d *dummyHandler) HandleUserMessage(ctx context.Context, msg *api.Message, callbackCh chan<- UserCallbackPayload) error {
 	d.mu.Lock()
 	d.savedCallbacks[msg.Body.MessageId] = &savedCallback{msg.Body.MessageId, callbackCh}
 	don := d.don
 	d.mu.Unlock()
-
+	req := &jsonrpc.Request{
+		Version: "2.0",
+		ID:      msg.Body.MessageId,
+		Method:  msg.Body.Method,
+		Params:  msg.Body.Payload,
+	}
 	// Send to all nodes.
+	var err error
 	for _, member := range d.donConfig.Members {
 		err = multierr.Combine(err, don.SendToNode(ctx, member.Address, req))
 	}
@@ -63,7 +58,8 @@ func (d *dummyHandler) HandleUserMessage(ctx context.Context, req *jsonrpc.Reque
 }
 
 func (d *dummyHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error {
-	msg, err := d.codec.DecodeResponse(resp.Result)
+	var msg api.Message
+	err := json.Unmarshal(resp.Result, &msg)
 	if err != nil {
 		return err
 	}
@@ -74,7 +70,7 @@ func (d *dummyHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Resp
 
 	if found {
 		// Send first response from a node back to the user, ignore any other ones.
-		savedCb.callbackCh <- UserCallbackPayload{Resp: resp, ErrCode: api.NoError, ErrMsg: ""}
+		savedCb.callbackCh <- UserCallbackPayload{Msg: &msg, ErrCode: api.NoError, ErrMsg: ""}
 		close(savedCb.callbackCh)
 	}
 	return nil

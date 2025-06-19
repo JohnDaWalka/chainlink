@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -16,7 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.uber.org/multierr"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -70,7 +71,6 @@ type donConnectionManager struct {
 	donConfig  *config.DONConfig
 	nodes      map[string]*nodeState
 	handler    handlers.Handler
-	codec      *jsonrpc.Codec
 	closeWait  sync.WaitGroup
 	shutdownCh services.StopChan
 	lggr       logger.Logger
@@ -118,7 +118,6 @@ func NewConnectionManager(gwConfig *config.GatewayConfig, clock clockwork.Clock,
 		}
 		dons[donConfig.DonId] = &donConnectionManager{
 			donConfig:  &donConfig,
-			codec:      jsonrpc.NewCodec(),
 			nodes:      nodes,
 			shutdownCh: make(chan struct{}),
 			lggr:       logger.Named(lggr, "DONConnectionManager."+donConfig.DonId),
@@ -263,7 +262,7 @@ func (m *donConnectionManager) SendToNode(ctx context.Context, nodeAddress strin
 	if req == nil {
 		return errors.New("nil request")
 	}
-	data, err := m.codec.EncodeRequest(req)
+	data, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("error encoding request for node %s: %w", nodeAddress, err)
 	}
@@ -282,12 +281,13 @@ func (m *donConnectionManager) readLoop(nodeAddress string, nodeState *nodeState
 			m.closeWait.Done()
 			return
 		case item := <-nodeState.conn.ReadChannel():
-			resp, err := m.codec.DecodeResponse(item.Data)
+			var resp jsonrpc.Response
+			err := json.Unmarshal(item.Data, &resp)
 			if err != nil {
 				m.lggr.Errorw("parse error when reading from node", "nodeAddress", nodeAddress, "err", err)
 				break
 			}
-			err = m.handler.HandleNodeMessage(ctx, resp, nodeAddress)
+			err = m.handler.HandleNodeMessage(ctx, &resp, nodeAddress)
 			if err != nil {
 				m.lggr.Error("error when calling HandleNodeMessage ", err)
 			}
