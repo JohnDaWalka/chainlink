@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
+	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
@@ -19,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
+	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -49,7 +51,6 @@ type OutgoingConnectorHandler struct {
 	responses           *responses
 	selectorOpts        []func(*gateway.RoundRobinSelector)
 	metrics             *metrics
-	codec               api.Codec
 }
 
 func NewOutgoingConnectorHandler(gc connector.GatewayConnector, config ServiceConfig, method string, lgger logger.Logger, opts ...func(*gateway.RoundRobinSelector)) (*OutgoingConnectorHandler, error) {
@@ -82,7 +83,6 @@ func NewOutgoingConnectorHandler(gc connector.GatewayConnector, config ServiceCo
 		lggr:                lgger,
 		selectorOpts:        opts,
 		metrics:             m,
-		codec:               &api.JsonRPCCodec{},
 	}, nil
 }
 
@@ -178,9 +178,9 @@ func (c *OutgoingConnectorHandler) handleSingleNodeRequest(ctx context.Context, 
 		Signature: utils.StringToHex(string(signature)),
 	}
 
-	resp, err := c.codec.EncodeResponse(msg)
+	resp, err := hc.ValidatedResponseFromMessage(msg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode request: %w", err)
+		return nil, fmt.Errorf("failed to validate request: %w", err)
 	}
 
 	err = c.gc.SendToGateway(ctx, selectedGateway, resp)
@@ -299,14 +299,10 @@ func (c *OutgoingConnectorHandler) attemptGatewayConnection(ctx context.Context,
 
 // HandleGatewayMessage processes incoming messages from the Gateway,
 // which are in response to a HandleSingleNodeRequest call.
-func (c *OutgoingConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, data []byte) error {
-	msg, err := c.codec.DecodeRequest(data)
+func (c *OutgoingConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, req *jsonrpc.Request) error {
+	msg, err := hc.ValidatedMessageFromReq(req)
 	if err != nil {
-		c.lggr.Errorw("failed to decode request", "gatewayID", gatewayID, "err", err)
-		return nil
-	}
-	if err := msg.Validate(); err != nil {
-		c.lggr.Errorw("invalid message received", "gatewayID", gatewayID, "err", err)
+		c.lggr.Errorw("failed to validate request", "err", err, "gatewayID", gatewayID)
 		return nil
 	}
 	body := &msg.Body

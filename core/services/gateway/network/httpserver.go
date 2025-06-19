@@ -26,7 +26,7 @@ type HttpServer interface {
 }
 
 type HTTPRequestHandler interface {
-	ProcessRequest(ctx context.Context, rawRequest []byte) (rawResponse []byte, httpStatusCode int)
+	ProcessRequest(ctx context.Context, rawRequest []byte, header http.Header) (rawResponse []byte, httpStatusCode int)
 }
 
 type HTTPServerConfig struct {
@@ -179,7 +179,7 @@ func (s *httpServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 		requestCtx, cancel = context.WithTimeout(requestCtx, time.Duration(s.config.RequestTimeoutMillis)*time.Millisecond)
 		defer cancel()
 	}
-	rawResponse, httpStatusCode := s.handler.ProcessRequest(requestCtx, rawMessage)
+	rawResponse, httpStatusCode := s.handler.ProcessRequest(requestCtx, rawMessage, r.Header)
 
 	w.Header().Set("Content-Type", s.config.ContentTypeHeader)
 	w.WriteHeader(httpStatusCode)

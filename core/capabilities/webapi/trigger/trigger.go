@@ -11,6 +11,7 @@ import (
 	ethCommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
+	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -21,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
 	gw_common "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
+	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -52,7 +54,6 @@ type triggerConnectorHandler struct {
 	mu                  sync.Mutex
 	registeredWorkflows map[string]webapiTrigger
 	registry            core.CapabilitiesRegistry
-	codec               api.Codec
 }
 
 var _ capabilities.TriggerCapability = (*triggerConnectorHandler)(nil)
@@ -69,7 +70,6 @@ func NewTrigger(config string, registry core.CapabilitiesRegistry, connector cor
 		registeredWorkflows: map[string]webapiTrigger{},
 		registry:            registry,
 		lggr:                logger.Named(lggr, "WorkflowConnectorHandler"),
-		codec:               &api.JsonRPCCodec{},
 	}
 
 	return handler, nil
@@ -135,20 +135,12 @@ func (h *triggerConnectorHandler) processTrigger(ctx context.Context, gatewayID 
 	return err
 }
 
-func (h *triggerConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, data []byte) error {
-	msg, err := h.codec.DecodeRequest(data)
-	// should never happen because the connector decodes the message before sending it to the handler
+func (h *triggerConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, req *jsonrpc.Request) error {
+	msg, err := hc.ValidatedMessageFromReq(req)
 	if err != nil {
-		h.lggr.Errorw("error decoding message", "err", err, "data", data)
+		h.lggr.Errorw("error validating message from request", "err", err, "request", req)
 		return nil
 	}
-
-	// should never happen because the connector validates message before sending it to the handler
-	if err = msg.Validate(); err != nil {
-		h.lggr.Errorw("invalid message", "msg", msg)
-		return nil
-	}
-
 	body := &msg.Body
 	sender := ethCommon.HexToAddress(body.Sender)
 	var payload webapicap.TriggerRequestPayload
@@ -316,20 +308,14 @@ func (h *triggerConnectorHandler) sendResponse(ctx context.Context, gatewayID st
 	}
 
 	msg := &api.Message{
-		Body: api.MessageBody{
-			MessageId: body.MessageId,
-			DonId:     body.DonId,
-			Method:    body.Method,
-			Payload:   body.Payload,
-			Receiver:  body.Receiver,
-		},
+		Body:      *body,
 		Signature: utils.StringToHex(string(signature)),
 	}
 
-	req, err := h.codec.EncodeResponse(msg)
+	resp, err := hc.ValidatedResponseFromMessage(msg)
 	if err != nil {
 		return err
 	}
 
-	return h.connector.SendToGateway(ctx, gatewayID, req)
+	return h.connector.SendToGateway(ctx, gatewayID, resp)
 }

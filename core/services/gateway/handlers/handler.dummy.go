@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"sync"
 
 	"go.uber.org/multierr"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
@@ -18,6 +21,7 @@ type dummyHandler struct {
 	savedCallbacks map[string]*savedCallback
 	mu             sync.Mutex
 	lggr           logger.Logger
+	codec          api.JsonRPCCodec
 }
 
 type savedCallback struct {
@@ -33,24 +37,36 @@ func NewDummyHandler(donConfig *config.DONConfig, don DON, lggr logger.Logger) (
 		don:            don,
 		savedCallbacks: make(map[string]*savedCallback),
 		lggr:           logger.Named(lggr, "DummyHandler."+donConfig.DonId),
+		codec:          api.JsonRPCCodec{},
 	}, nil
 }
 
-func (d *dummyHandler) HandleUserMessage(ctx context.Context, msg *api.Message, callbackCh chan<- UserCallbackPayload) error {
+func (d *dummyHandler) HandleUserMessage(ctx context.Context, req *jsonrpc.Request, callbackCh chan<- UserCallbackPayload) error {
+	if req.Params == nil {
+		return errors.New("missing params attribute")
+	}
+	var msg api.Message
+	err := json.Unmarshal(req.Params, &msg)
+	if err != nil {
+		return err
+	}
 	d.mu.Lock()
 	d.savedCallbacks[msg.Body.MessageId] = &savedCallback{msg.Body.MessageId, callbackCh}
 	don := d.don
 	d.mu.Unlock()
 
-	var err error
 	// Send to all nodes.
 	for _, member := range d.donConfig.Members {
-		err = multierr.Combine(err, don.SendToNode(ctx, member.Address, msg))
+		err = multierr.Combine(err, don.SendToNode(ctx, member.Address, req))
 	}
 	return err
 }
 
-func (d *dummyHandler) HandleNodeMessage(ctx context.Context, msg *api.Message, nodeAddr string) error {
+func (d *dummyHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error {
+	msg, err := d.codec.DecodeResponse(resp.Result)
+	if err != nil {
+		return err
+	}
 	d.mu.Lock()
 	savedCb, found := d.savedCallbacks[msg.Body.MessageId]
 	delete(d.savedCallbacks, msg.Body.MessageId)
@@ -58,7 +74,7 @@ func (d *dummyHandler) HandleNodeMessage(ctx context.Context, msg *api.Message, 
 
 	if found {
 		// Send first response from a node back to the user, ignore any other ones.
-		savedCb.callbackCh <- UserCallbackPayload{Msg: msg, ErrCode: api.NoError, ErrMsg: ""}
+		savedCb.callbackCh <- UserCallbackPayload{Resp: resp, ErrCode: api.NoError, ErrMsg: ""}
 		close(savedCb.callbackCh)
 	}
 	return nil

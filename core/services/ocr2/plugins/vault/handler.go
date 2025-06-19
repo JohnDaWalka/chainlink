@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 )
@@ -12,7 +13,7 @@ var _ connector.GatewayConnectorHandler = (*Handler)(nil)
 const HandlerName = "VaultHandler"
 
 type gatewaySender interface {
-	SendToGateway(ctx context.Context, gatewayID string, msg []byte) error
+	SendToGateway(ctx context.Context, gatewayID string, resp *jsonrpc.Response) error
 }
 
 type Handler struct {
@@ -43,9 +44,9 @@ func (h *Handler) ID(ctx context.Context) (string, error) {
 	return HandlerName, nil
 }
 
-func (h *Handler) HandleGatewayMessage(ctx context.Context, gatewayID string, msg []byte) error {
+func (h *Handler) HandleGatewayMessage(ctx context.Context, gatewayID string, req *jsonrpc.Request) error {
 	// TODO: do something with the request
-	err := h.gatewaySender.SendToGateway(ctx, gatewayID, msg)
+	err := h.gatewaySender.SendToGateway(ctx, gatewayID, nil)
 	if err != nil {
 		h.lggr.Errorf("Failed to send message to gateway %s: %v", gatewayID, err)
 		return err

@@ -12,12 +12,14 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
+	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/matches"
 )
 
@@ -173,7 +175,7 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 
 		// expect the request body to contain the default timeout
 		connector.EXPECT().SignMessage(mock.Anything, common.Flatten(api.GetRawMessageBody(expectedBody)...)).Return([]byte("signature"), nil).Once()
-		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, data []byte) {
+		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, resp *jsonrpc.Response) {
 			err2 := connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResponse(t, msgID, privateKey))
 			require.NoError(t, err2)
 		}).Return(nil).Times(1)
@@ -215,7 +217,7 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 
 		// expect the request body to contain the defined timeout
 		connector.EXPECT().SignMessage(mock.Anything, common.Flatten(api.GetRawMessageBody(expectedBody)...)).Return([]byte("signature"), nil).Once()
-		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, msg []byte) {
+		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, resp *jsonrpc.Response) {
 			err2 := connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResponse(t, msgID, privateKey))
 			require.NoError(t, err2)
 		}).Return(nil).Times(1)
@@ -260,7 +262,7 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 
 		// expect the request body to contain the defined timeout
 		connector.EXPECT().SignMessage(mock.Anything, common.Flatten(api.GetRawMessageBody(expectedBody)...)).Return([]byte("signature"), nil).Once()
-		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, msg []byte) {
+		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, resp *jsonrpc.Response) {
 			// don't call HandleGatewayMessage here; i.e. simulate a failure to receive a response
 		}).Return(nil).Times(1)
 
@@ -320,7 +322,7 @@ func TestHandleSingleNodeRequest(t *testing.T) {
 
 		// expect the request body to contain the default timeout
 		connector.EXPECT().SignMessage(mock.Anything, common.Flatten(api.GetRawMessageBody(expectedBody)...)).Return([]byte("signature"), nil).Once()
-		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, msg []byte) {
+		connector.EXPECT().SendToGateway(mock.Anything, "gateway1", mock.Anything).Run(func(ctx context.Context, gatewayID string, resp *jsonrpc.Response) {
 			err2 := connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResponse(t, msgID, privateKey))
 			require.NoError(t, err2)
 		}).Return(nil).Times(1)
@@ -378,7 +380,7 @@ func newFunction(t *testing.T, mockFn func(*gcmocks.GatewayConnector), serviceCo
 	return connector, connectorHandler
 }
 
-func gatewayResponse(t *testing.T, msgID string, privateKey string) []byte {
+func gatewayResponse(t *testing.T, msgID string, privateKey string) *jsonrpc.Request {
 	headers := map[string]string{"Content-Type": "application/json"}
 	body := []byte("response body")
 	responsePayload, err := json.Marshal(ghcapabilities.Response{
@@ -400,12 +402,9 @@ func gatewayResponse(t *testing.T, msgID string, privateKey string) []byte {
 	require.NoError(t, err)
 	err = m.Sign(key)
 	require.NoError(t, err)
-	err = m.Validate()
+	req, err := hc.ValidatedRequestFromMessage(m)
 	require.NoError(t, err)
-	codec := api.JsonRPCCodec{}
-	resp, err := codec.EncodeRequest(m)
-	require.NoError(t, err)
-	return resp
+	return req
 }
 
 func TestServiceConfigDefaults(t *testing.T) {
@@ -428,33 +427,23 @@ func TestServiceConfigDefaults(t *testing.T) {
 		require.InDelta(t, DefaultWorkflowRPS, oRLConf.PerSenderRPS, 0.001)
 	})
 }
-func TestOutgoingConnectorHandler_HandleGatewayMessage(t *testing.T) {
-	t.Run("returns on decode error", func(t *testing.T) {
-		_, handler := newFunctionWithDefaultConfig(
-			t,
-			func(gc *gcmocks.GatewayConnector) {},
-		)
-
-		err := handler.HandleGatewayMessage(context.Background(), "gateway1", []byte("not-json"))
-		assert.NoError(t, err)
-	})
-
-	t.Run("returns on invalid message", func(t *testing.T) {
-		_, handler := newFunctionWithDefaultConfig(
-			t,
-			func(gc *gcmocks.GatewayConnector) {},
-		)
-		invalidMsg := api.Message{
-			Body: api.MessageBody{
-				// MessageId is empty, which should fail Validate()
-				Method: "some-method",
-			},
-		}
-		codec := api.JsonRPCCodec{}
-		data, err := codec.EncodeRequest(&invalidMsg)
-		require.NoError(t, err)
-
-		err = handler.HandleGatewayMessage(context.Background(), "gateway1", data)
-		assert.NoError(t, err)
-	})
+func TestOutgoingConnectorHandler_HandleGatewayMessage_InvalidMessage(t *testing.T) {
+	_, handler := newFunctionWithDefaultConfig(
+		t,
+		func(gc *gcmocks.GatewayConnector) {},
+	)
+	invalidMsg := api.Message{
+		Body: api.MessageBody{
+			// MessageId is empty, which should fail Validate()
+			Method: "some-method",
+		},
+	}
+	params, err := json.Marshal(invalidMsg)
+	req := &jsonrpc.Request{
+		Version: "2.0",
+		Method:  invalidMsg.Body.Method,
+		Params:  params,
+	}
+	err = handler.HandleGatewayMessage(context.Background(), "gateway1", req)
+	assert.NoError(t, err)
 }

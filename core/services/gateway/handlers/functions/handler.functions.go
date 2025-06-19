@@ -14,6 +14,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.uber.org/multierr"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -197,7 +199,14 @@ func NewFunctionsHandler(
 	}
 }
 
-func (h *functionsHandler) HandleUserMessage(ctx context.Context, msg *api.Message, callbackCh chan<- handlers.UserCallbackPayload) error {
+func (h *functionsHandler) HandleUserMessage(ctx context.Context, req *jsonrpc.Request, callbackCh chan<- handlers.UserCallbackPayload) error {
+	msg, err := hc.ValidatedMessageFromReq(req)
+	if err != nil {
+		h.lggr.Debugw("HandleUserMessage: failed to validate message", "error", err)
+		// TODO: what to return here?
+		// promHandlerError.WithLabelValues(h.donConfig.DonId, ErrNotAllowlisted.Error()).Inc()
+		return nil
+	}
 	sender := common.HexToAddress(msg.Body.Sender)
 	if h.allowlist != nil && !h.allowlist.Allow(sender) {
 		h.lggr.Debugw("received a message from a non-allowlisted address", "sender", msg.Body.Sender)
@@ -247,9 +256,14 @@ func (h *functionsHandler) handleRequest(ctx context.Context, msg *api.Message, 
 		promHandlerError.WithLabelValues(h.donConfig.DonId, err.Error()).Inc()
 		return err
 	}
+	req, err := hc.ValidatedRequestFromMessage(msg)
+	if err != nil {
+		// TODO: how to handle this?
+		return err
+	}
 	// Send to all nodes.
 	for _, member := range h.donConfig.Members {
-		err := h.don.SendToNode(ctx, member.Address, msg)
+		err := h.don.SendToNode(ctx, member.Address, req)
 		if err != nil {
 			h.lggr.Debugw("handleRequest: failed to send to a node", "node", member.Address, "err", err)
 		}
@@ -257,7 +271,15 @@ func (h *functionsHandler) handleRequest(ctx context.Context, msg *api.Message, 
 	return nil
 }
 
-func (h *functionsHandler) HandleNodeMessage(ctx context.Context, msg *api.Message, nodeAddr string) error {
+func (h *functionsHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error {
+	msg, err := hc.ValidatedMessageFromResp(resp)
+	if err != nil {
+		h.lggr.Debugw("HandleNodeMessage: failed to validate message", "error", err, "nodeAddr", nodeAddr)
+		// TODO: how to handle this?
+	}
+	if msg.Body.Sender != nodeAddr {
+		return errors.New("message sender mismatch when reading from node ")
+	}
 	h.lggr.Debugw("HandleNodeMessage: processing message", "nodeAddr", nodeAddr, "receiver", msg.Body.Receiver, "id", msg.Body.MessageId)
 	if h.nodeRateLimiter != nil && !h.nodeRateLimiter.Allow(nodeAddr) {
 		h.lggr.Debugw("rate-limited", "sender", nodeAddr)
@@ -333,7 +355,11 @@ func newSecretsResponse(request *api.Message, success bool, responses []*api.Mes
 	userResponse := *request
 	userResponse.Body.Receiver = request.Body.Sender
 	userResponse.Body.Payload = payloadJson
-	return &handlers.UserCallbackPayload{Msg: &userResponse, ErrCode: api.NoError, ErrMsg: ""}, nil
+	resp, err := hc.ValidatedResponseFromMessage(&userResponse)
+	if err != nil {
+		return nil, err
+	}
+	return &handlers.UserCallbackPayload{Resp: resp, ErrCode: api.NoError, ErrMsg: ""}, nil
 }
 
 // Conforms to ResponseProcessor[*PendingRequest]
@@ -359,10 +385,15 @@ func (h *functionsHandler) processHeartbeatResponse(response *api.Message, respo
 		payload := CombinedResponse{ResponseBase: ResponseBase{Success: true}, NodeResponses: responseList}
 		payloadJson, err := json.Marshal(payload)
 		if err != nil {
-			return &handlers.UserCallbackPayload{Msg: &userResponse, ErrCode: api.NodeReponseEncodingError, ErrMsg: ""}, nil, nil
+			// TODO: how to handle this?
+		}
+		resp, err := hc.ValidatedResponseFromMessage(&userResponse)
+		if err != nil {
+			// TODO: how to handle this?
+			return nil, nil, err
 		}
 		userResponse.Body.Payload = payloadJson
-		return &handlers.UserCallbackPayload{Msg: &userResponse, ErrCode: api.NoError, ErrMsg: ""}, nil, nil
+		return &handlers.UserCallbackPayload{Resp: resp, ErrCode: api.NoError, ErrMsg: ""}, nil, nil
 	}
 	// not ready to be processed yet
 	return nil, responseData, nil

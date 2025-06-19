@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
+	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	registrymock "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
@@ -23,6 +24,7 @@ import (
 	corelogger "github.com/smartcontractkit/chainlink/v2/core/logger"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
+	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 )
 
 const (
@@ -83,7 +85,7 @@ func setup(t *testing.T) testHarness {
 	}
 }
 
-func gatewayRequest(t *testing.T, privateKey string, topics []string, methodName string) []byte {
+func gatewayRequest(t *testing.T, privateKey string, topics []string, methodName string) *jsonrpc.Request {
 	messageID := "12345"
 	if methodName == "" {
 		methodName = ghcapabilities.MethodWebAPITrigger
@@ -116,21 +118,15 @@ func gatewayRequest(t *testing.T, privateKey string, topics []string, methodName
 	}
 	err = msg.Sign(key)
 	require.NoError(t, err)
-	apiCodec := api.JsonRPCCodec{}
-	rawRequest, err := apiCodec.EncodeRequest(msg)
+	req, err := hc.ValidatedRequestFromMessage(msg)
 	require.NoError(t, err)
-	return rawRequest
+	return req
 }
 
 func getResponseFromArg(arg interface{}) (ghcapabilities.TriggerResponsePayload, error) {
-	codec := api.JsonRPCCodec{}
-	resp := arg.([]byte)
-	msg, err := codec.DecodeResponse(resp)
-	if err != nil {
-		return ghcapabilities.TriggerResponsePayload{}, err
-	}
+	resp := arg.(*jsonrpc.Response)
 	var response ghcapabilities.TriggerResponsePayload
-	err = json.Unmarshal(msg.Body.Payload, &response)
+	err := json.Unmarshal(resp.Result, &response)
 	return response, err
 }
 
@@ -298,34 +294,16 @@ func TestTriggerExecute(t *testing.T) {
 		requireNoChanMsg(t, channel2)
 	})
 
-	t.Run("decoding error", func(t *testing.T) {
-		invalidData := []byte(`{invalid json}`)
-		err2 := th.trigger.HandleGatewayMessage(ctx, "gateway1", invalidData)
-		th.connector.AssertNotCalled(t, "SignMessage")
-		th.connector.AssertNotCalled(t, "SendToGateway")
-		require.NoError(t, err2)
-		requireNoChanMsg(t, channel)
-		requireNoChanMsg(t, channel2)
-	})
-
 	t.Run("invalid message validation", func(t *testing.T) {
-		// Create a valid message, but tamper with it to fail Validate
-		msg := &api.Message{
-			Body: api.MessageBody{
-				MessageId: "id",
-				Method:    ghcapabilities.MethodWebAPITrigger,
-				DonId:     "don",
-				Payload:   json.RawMessage(`{}`),
-			},
+		// request with missing params
+		req := &jsonrpc.Request{
+			Version: "2.0",
+			ID:      "id",
+			Method:  ghcapabilities.MethodWebAPITrigger,
 		}
-		// Remove required fields to fail Validate
-		msg.Body.Method = ""
-		apiCodec := api.JsonRPCCodec{}
-		raw, err2 := apiCodec.EncodeRequest(msg)
-		require.NoError(t, err2)
 		th.connector.AssertNotCalled(t, "SignMessage")
 		th.connector.AssertNotCalled(t, "SendToGateway")
-		err = th.trigger.HandleGatewayMessage(ctx, "gateway1", raw)
+		err = th.trigger.HandleGatewayMessage(ctx, "gateway1", req)
 		require.NoError(t, err)
 		requireNoChanMsg(t, channel)
 		requireNoChanMsg(t, channel2)

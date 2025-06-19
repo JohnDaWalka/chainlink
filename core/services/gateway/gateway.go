@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"go.uber.org/multierr"
@@ -14,10 +15,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
+	gatewaycfg "github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
 	gw_net "github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -39,21 +41,25 @@ type Gateway interface {
 type HandlerType = string
 
 type HandlerFactory interface {
-	NewHandler(handlerType HandlerType, handlerConfig json.RawMessage, donConfig *config.DONConfig, don handlers.DON) (handlers.Handler, error)
+	NewHandler(handlerType HandlerType, handlerConfig json.RawMessage, donConfig *gatewaycfg.DONConfig, don handlers.DON) (handlers.Handler, error)
 }
 
 type gateway struct {
 	services.StateMachine
 
-	codec      api.Codec
-	httpServer gw_net.HttpServer
-	handlers   map[string]handlers.Handler
-	connMgr    ConnectionManager
-	lggr       logger.Logger
+	customParamsCodec *jsonrpc.Codec
+	legacyCodec       *api.JsonRPCCodec
+	httpServer        gw_net.HttpServer
+	// customParamHandlers only contain handlers for 'customParams' message type. It's a subset of handlers
+	// key is the handler name, value is the handler instance.
+	customParamHandlers map[string]handlers.Handler
+	// handlers contains all handlers for different DONs. Key is the DON ID, value is the handler instance.
+	handlers map[string]handlers.Handler
+	connMgr  ConnectionManager
+	lggr     logger.Logger
 }
 
-func NewGatewayFromConfig(config *config.GatewayConfig, handlerFactory HandlerFactory, lggr logger.Logger) (Gateway, error) {
-	codec := &api.JsonRPCCodec{}
+func NewGatewayFromConfig(config *gatewaycfg.GatewayConfig, handlerFactory HandlerFactory, lggr logger.Logger) (Gateway, error) {
 	httpServer := gw_net.NewHttpServer(&config.UserServerConfig, lggr)
 	connMgr, err := NewConnectionManager(config, clockwork.NewRealClock(), lggr)
 	if err != nil {
@@ -61,6 +67,7 @@ func NewGatewayFromConfig(config *config.GatewayConfig, handlerFactory HandlerFa
 	}
 
 	handlerMap := make(map[string]handlers.Handler)
+	customParamHandlers := make(map[string]handlers.Handler)
 	for _, donConfig := range config.Dons {
 		donConfig := donConfig
 		_, ok := handlerMap[donConfig.DonId]
@@ -81,19 +88,24 @@ func NewGatewayFromConfig(config *config.GatewayConfig, handlerFactory HandlerFa
 		if err != nil {
 			return nil, err
 		}
+		if donConfig.MessageType == gatewaycfg.CustomParamsMessageType {
+			customParamHandlers[donConfig.HandlerName] = handler
+		}
 		handlerMap[donConfig.DonId] = handler
 		donConnMgr.SetHandler(handler)
 	}
-	return NewGateway(codec, httpServer, handlerMap, connMgr, lggr), nil
+	return NewGateway(httpServer, handlerMap, customParamHandlers, connMgr, lggr), nil
 }
 
-func NewGateway(codec api.Codec, httpServer gw_net.HttpServer, handlers map[string]handlers.Handler, connMgr ConnectionManager, lggr logger.Logger) Gateway {
+func NewGateway(httpServer gw_net.HttpServer, handlers map[string]handlers.Handler, customParamHandlers map[string]handlers.Handler, connMgr ConnectionManager, lggr logger.Logger) Gateway {
 	gw := &gateway{
-		codec:      codec,
-		httpServer: httpServer,
-		handlers:   handlers,
-		connMgr:    connMgr,
-		lggr:       logger.Named(lggr, "Gateway"),
+		legacyCodec:         &api.JsonRPCCodec{},
+		customParamsCodec:   jsonrpc.NewCodec(),
+		httpServer:          httpServer,
+		handlers:            handlers,
+		customParamHandlers: customParamHandlers,
+		connMgr:             connMgr,
+		lggr:                logger.Named(lggr, "Gateway"),
 	}
 	httpServer.SetHTTPRequestHandler(gw)
 	return gw
@@ -126,58 +138,82 @@ func (g *gateway) Close() error {
 	})
 }
 
+func handlerName(method string) string {
+	return strings.Split(method, ".")[0]
+}
+
 // Called by the server
-func (g *gateway) ProcessRequest(ctx context.Context, rawRequest []byte) (rawResponse []byte, httpStatusCode int) {
-	// decode
-	msg, err := g.codec.DecodeRequest(rawRequest)
+func (g *gateway) ProcessRequest(ctx context.Context, rawRequest []byte, header http.Header) (rawResponse []byte, httpStatusCode int) {
+	req, err := g.customParamsCodec.DecodeRequest(rawRequest)
 	if err != nil {
-		return newError(g.codec, "", api.UserMessageParseError, err.Error())
+		return newError(g.customParamsCodec, "", api.UserMessageParseError, err.Error())
 	}
-	if msg == nil {
-		return newError(g.codec, "", api.UserMessageParseError, "nil message")
+	if req == nil {
+		return newError(g.customParamsCodec, "", api.UserMessageParseError, "nil message")
 	}
-	if err = msg.Validate(); err != nil {
-		return newError(g.codec, msg.Body.MessageId, api.UserMessageParseError, err.Error())
-	}
-	// find correct handler
-	handler, ok := g.handlers[msg.Body.DonId]
+	reqID := req.ID
+	handlerName := handlerName(req.Method)
+	// route request using handler name. If handler name is not found, treat it as a legacy messageType and use donID for routing request
+	var handler handlers.Handler
+	var ok bool
+	handler, ok = g.customParamHandlers[handlerName]
 	if !ok {
-		return newError(g.codec, msg.Body.MessageId, api.UnsupportedDONIdError, "unsupported DON ID")
+		msg, err := g.legacyCodec.DecodeRequest(rawRequest)
+		if err != nil {
+			return newError(g.customParamsCodec, "", api.UserMessageParseError, err.Error())
+		}
+		if msg == nil {
+			return newError(g.customParamsCodec, "", api.UserMessageParseError, "nil message")
+		}
+		reqID = msg.Body.MessageId
+		if err = msg.Validate(); err != nil {
+			return newError(g.customParamsCodec, msg.Body.MessageId, api.UserMessageParseError, err.Error())
+		}
+		handler, ok = g.handlers[msg.Body.DonId]
+		if !ok {
+			return newError(g.customParamsCodec, msg.Body.MessageId, api.UnsupportedDONIdError, "unsupported DON ID")
+		}
 	}
 	// send to the handler
 	responseCh := make(chan handlers.UserCallbackPayload, 1)
-	err = handler.HandleUserMessage(ctx, msg, responseCh)
+	err = handler.HandleUserMessage(ctx, req, responseCh)
 	if err != nil {
-		return newError(g.codec, msg.Body.MessageId, api.HandlerError, err.Error())
+		return newError(g.customParamsCodec, reqID, api.HandlerError, err.Error())
 	}
 	// await response
 	var response handlers.UserCallbackPayload
 	select {
 	case <-ctx.Done():
-		return newError(g.codec, msg.Body.MessageId, api.RequestTimeoutError, "handler timeout")
+		return newError(g.customParamsCodec, reqID, api.RequestTimeoutError, "handler timeout")
 	case response = <-responseCh:
 		break
 	}
 	if response.ErrCode != api.NoError {
-		return newError(g.codec, msg.Body.MessageId, response.ErrCode, response.ErrMsg)
+		return newError(g.customParamsCodec, reqID, response.ErrCode, response.ErrMsg)
 	}
-	// encode
-	rawResponse, err = g.codec.EncodeResponse(response.Msg)
+	rawResponse, err = g.customParamsCodec.EncodeResponse(response.Resp)
 	if err != nil {
-		return newError(g.codec, msg.Body.MessageId, api.NodeReponseEncodingError, "")
+		return newError(g.customParamsCodec, reqID, api.NodeReponseEncodingError, "")
 	}
 	promRequest.WithLabelValues(api.NoError.String()).Inc()
 	return rawResponse, api.ToHttpErrorCode(api.NoError)
 }
 
-func newError(codec api.Codec, id string, errCode api.ErrorCode, errMsg string) ([]byte, int) {
-	rawResponse, err := codec.EncodeNewErrorResponse(id, api.ToJsonRPCErrorCode(errCode), errMsg, nil)
+func newError(codec *jsonrpc.Codec, id string, errCode api.ErrorCode, errMsg string) ([]byte, int) {
+	resp := &jsonrpc.Response{
+		Version: "2.0",
+		ID:      id,
+		Error: &jsonrpc.Error{
+			Code:    api.ToJsonRPCErrorCode(errCode),
+			Message: errMsg,
+		},
+	}
+	rawResponse, err := codec.EncodeResponse(resp)
 	if err != nil {
 		// we're not even able to encode a valid JSON response
 		promRequest.WithLabelValues(api.FatalError.String()).Inc()
 		return []byte("fatal error"), api.ToHttpErrorCode(api.FatalError)
 	}
-	promRequest.WithLabelValues(errCode.String()).Inc()
 	return rawResponse, api.ToHttpErrorCode(errCode)
 }
 

@@ -12,10 +12,11 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/pelletier/go-toml/v2"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
+	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 )
 
 // Script to run Connector outside of the core node.
@@ -25,14 +26,21 @@ import (
 //	go run run_connector.go --config sample_config.toml
 type client struct {
 	privateKey *ecdsa.PrivateKey
-	codec      api.Codec
 	connector  connector.GatewayConnector
 	lggr       logger.Logger
 }
 
-func (h *client) HandleGatewayMessage(ctx context.Context, gatewayID string, data []byte) error {
+func (h *client) HandleGatewayMessage(ctx context.Context, gatewayID string, req *jsonrpc.Request) error {
+	msg, err := hc.ValidatedMessageFromReq(req)
+	if err != nil {
+		return err
+	}
+	resp, err := hc.ValidatedResponseFromMessage(msg)
+	if err != nil {
+		return err
+	}
 	h.lggr.Infof("received message from gateway %s. Echoing back.", gatewayID)
-	err := h.connector.SendToGateway(ctx, gatewayID, data)
+	err = h.connector.SendToGateway(ctx, gatewayID, resp)
 	if err != nil {
 		h.lggr.Errorw("failed to send to gateway", "id", gatewayID, "err", err)
 	}
@@ -78,7 +86,7 @@ func main() {
 		fmt.Println("error creating logger:", err)
 		return
 	}
-	client := &client{privateKey: sampleKey, lggr: lggr, codec: &api.JsonRPCCodec{}}
+	client := &client{privateKey: sampleKey, lggr: lggr}
 	// client acts as a signer here
 	connector, _ := connector.NewGatewayConnector(&cfg, client, clockwork.NewRealClock(), lggr)
 	err = connector.AddHandler(context.Background(), []string{"test_method"}, client)

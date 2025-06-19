@@ -11,12 +11,12 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jonboulle/clockwork"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	commonhex "github.com/smartcontractkit/chainlink-common/pkg/utils/hex"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -52,7 +52,7 @@ type gatewayConnector struct {
 	services.StateMachine
 
 	config      *ConnectorConfig
-	codec       api.Codec
+	codec       *jsonrpc.Codec
 	clock       clockwork.Clock
 	nodeAddress []byte
 	signer      Signer
@@ -112,7 +112,7 @@ func NewGatewayConnector(config *ConnectorConfig, signer Signer, clock clockwork
 	}
 	connector := &gatewayConnector{
 		config:      config,
-		codec:       &api.JsonRPCCodec{},
+		codec:       jsonrpc.NewCodec(),
 		clock:       clock,
 		nodeAddress: addressBytes,
 		signer:      signer,
@@ -174,7 +174,11 @@ func (c *gatewayConnector) AwaitConnection(ctx context.Context, gatewayID string
 	return gateway.awaitConn(ctx)
 }
 
-func (c *gatewayConnector) SendToGateway(ctx context.Context, gatewayID string, msg []byte) error {
+func (c *gatewayConnector) SendToGateway(ctx context.Context, gatewayID string, resp *jsonrpc.Response) error {
+	msg, err := c.codec.EncodeResponse(resp)
+	if err != nil {
+		return fmt.Errorf("failed to encode response: %w", err)
+	}
 	gateway, ok := c.gateways[gatewayID]
 	if !ok {
 		return fmt.Errorf("invalid Gateway ID %s", gatewayID)
@@ -211,24 +215,20 @@ func (c *gatewayConnector) readLoop(gatewayState *gatewayState) {
 			c.closeWait.Done()
 			return
 		case item := <-gatewayState.conn.ReadChannel():
-			msg, err := c.codec.DecodeRequest(item.Data)
+			req, err := c.codec.DecodeRequest(item.Data)
 			if err != nil {
 				c.lggr.Errorw("parse error when reading from Gateway", "id", gatewayState.config.Id, "err", err)
 				break
 			}
-			if err = msg.Validate(); err != nil {
-				c.lggr.Errorw("failed to validate message signature", "id", gatewayState.config.Id, "err", err)
-				break
-			}
-			handler, exists := c.handlers[msg.Body.Method]
+			handler, exists := c.handlers[req.Method]
 			if !exists {
-				c.lggr.Errorw("no handler for method", "id", gatewayState.config.Id, "method", msg.Body.Method)
+				c.lggr.Errorw("no handler for method", "id", gatewayState.config.Id, "method", req.Method)
 				break
 			}
 			// do not break on error. HandleGatewayMessage handles errors
 			// by sending a response back to the Gateway.
-			err = handler.HandleGatewayMessage(ctx, gatewayState.config.Id, item.Data)
-			c.lggr.Warnw("failed to handle message from Gateway", "id", gatewayState.config.Id, "method", msg.Body.Method, "err", err)
+			err = handler.HandleGatewayMessage(ctx, gatewayState.config.Id, req)
+			c.lggr.Warnw("failed to handle message from Gateway", "id", gatewayState.config.Id, "method", req.Method, "err", err)
 		}
 	}
 }

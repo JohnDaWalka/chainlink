@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/NethermindEth/juno/jsonrpc"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -21,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
+	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/matches"
 )
 
@@ -119,7 +121,7 @@ func capabilityRequest(t *testing.T) capabilities.CapabilityRequest {
 	}
 }
 
-func gatewayResponse(t *testing.T, msgID string, privateKey string) []byte {
+func gatewayResponse(t *testing.T, msgID string, privateKey string) *jsonrpc.Request {
 	headers := map[string]string{"Content-Type": "application/json"}
 	body := []byte("response body")
 	responsePayload, err := json.Marshal(ghcapabilities.Response{
@@ -140,13 +142,9 @@ func gatewayResponse(t *testing.T, msgID string, privateKey string) []byte {
 	key, err := crypto.HexToECDSA(privateKey)
 	require.NoError(t, err)
 	err = m.Sign(key)
+	req, err := hc.ValidatedRequestFromMessage(m)
 	require.NoError(t, err)
-	err = m.Validate()
-	require.NoError(t, err)
-	codec := api.JsonRPCCodec{}
-	req, err := codec.EncodeRequest(m)
-	require.NoError(t, err)
-	return req
+	return &req
 }
 
 func TestRegisterUnregister(t *testing.T) {

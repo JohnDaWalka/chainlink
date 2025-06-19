@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 
 	cappkg "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
@@ -27,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
+	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/matches"
 )
 
@@ -220,7 +222,7 @@ func TestComputeFetch(t *testing.T) {
 	th.connector.EXPECT().
 		SendToGateway(matches.AnyContext, "gateway1", mock.Anything).
 		Return(nil).
-		Run(func(ctx context.Context, gatewayID string, data []byte) {
+		Run(func(ctx context.Context, gatewayID string, resp *jsonrpc.Response) {
 			err := th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 			require.NoError(t, err, "failed to handle gateway message")
 		}).
@@ -337,7 +339,7 @@ func TestCompute_SpendValueRelativeToComputeTime(t *testing.T) {
 			th.connector.EXPECT().
 				SendToGateway(mock.Anything, "gateway1", mock.Anything).
 				Return(nil).
-				Run(func(ctx context.Context, gatewayID string, msg []byte) {
+				Run(func(ctx context.Context, gatewayID string, resp *jsonrpc.Response) {
 					err := th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 					require.NoError(t, err, "failed to handle gateway message")
 				}).
@@ -391,7 +393,7 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 	th.connector.EXPECT().
 		SendToGateway(matches.AnyContext, "gateway1", mock.Anything).
 		Return(nil).
-		Run(func(ctx context.Context, gatewayID string, data []byte) {
+		Run(func(ctx context.Context, gatewayID string, resp *jsonrpc.Response) {
 			err := th.connectorHandler.HandleGatewayMessage(ctx, "gateway1", gatewayResp)
 			require.NoError(t, err, "failed to handle gateway message")
 		}).Once()
@@ -419,7 +421,7 @@ func TestComputeFetchMaxResponseSizeBytes(t *testing.T) {
 	require.ErrorContains(t, err, fmt.Sprintf("response size %d exceeds maximum allowed size %d", 2092, 1*1024))
 }
 
-func gatewayResponse(t *testing.T, msgID string, body []byte, privateKey string) []byte {
+func gatewayResponse(t *testing.T, msgID string, body []byte, privateKey string) *jsonrpc.Request {
 	headers := map[string]string{"Content-Type": "application/json"}
 	responsePayload, err := json.Marshal(ghcapabilities.Response{
 		StatusCode:     200,
@@ -439,11 +441,7 @@ func gatewayResponse(t *testing.T, msgID string, body []byte, privateKey string)
 	key, err := crypto.HexToECDSA(privateKey)
 	require.NoError(t, err)
 	err = m.Sign(key)
-	require.NoError(t, err)
-	err = m.Validate()
-	require.NoError(t, err)
-	codec := &api.JsonRPCCodec{}
-	req, err := codec.EncodeRequest(m)
+	req, err := hc.ValidatedRequestFromMessage(m)
 	require.NoError(t, err)
 	return req
 }

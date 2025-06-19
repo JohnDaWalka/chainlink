@@ -18,12 +18,14 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
+	"github.com/smartcontractkit/chainlink-common/pkg/gateway/jsonrpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	gc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
+	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions"
 	fallow "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions/allowlist"
 	fsub "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions/subscriptions"
@@ -53,7 +55,6 @@ type functionsConnectorHandler struct {
 	chStop                     services.StopChan
 	shutdownWaitGroup          sync.WaitGroup
 	lggr                       logger.Logger
-	codec                      api.Codec
 }
 
 const HeartbeatCacheSize = 1000
@@ -111,7 +112,6 @@ func NewFunctionsConnectorHandler(
 		requestTimeoutSec:          pluginConfig.RequestTimeoutSec,
 		chStop:                     make(services.StopChan),
 		lggr:                       lggr.Named(Name),
-		codec:                      &api.JsonRPCCodec{},
 	}, nil
 }
 
@@ -123,19 +123,13 @@ func (h *functionsConnectorHandler) Sign(ctx context.Context, data ...[]byte) ([
 	return h.keystore.SignMessage(ctx, h.signAddr, gc.Flatten(data...))
 }
 
-func (h *functionsConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, data []byte) error {
-	msg, err := h.codec.DecodeRequest(data)
-	// should never happen because the connector decodes the message before sending it to the handler
+func (h *functionsConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, req *jsonrpc.Request) error {
+	msg, err := hc.ValidatedMessageFromReq(req)
 	if err != nil {
-		h.lggr.Errorw("failed to decode message", "id", gatewayID, "err", err)
+		h.lggr.Errorw("failed to decode request", "id", gatewayID, "err", err)
 		return nil
 	}
 	body := &msg.Body
-	// should never happen because the connector validates message before sending it to the handler
-	if msg.Validate() != nil {
-		h.lggr.Errorw("invalid message", "id", gatewayID, "messageId", body.MessageId, "donId", body.DonId, "method", body.Method)
-		return nil
-	}
 	fromAddr := ethCommon.HexToAddress(body.Sender)
 	if !h.allowlist.Allow(fromAddr) {
 		h.lggr.Errorw("allowlist prevented the request from this address", "id", gatewayID, "address", fromAddr)
@@ -213,7 +207,6 @@ func (h *functionsConnectorHandler) handleSecretsList(ctx context.Context, gatew
 	} else {
 		response.ErrorMessage = fmt.Sprintf("Failed to list secrets: %v", err)
 	}
-	fmt.Println("DEBUG 2 Response:", response)
 	h.sendResponseAndLog(ctx, gatewayId, body, response)
 }
 
@@ -387,7 +380,7 @@ func (h *functionsConnectorHandler) sendResponse(ctx context.Context, gatewayId 
 		return err
 	}
 
-	resp, err := h.codec.EncodeResponse(msg)
+	resp, err := hc.ValidatedResponseFromMessage(msg)
 	if err != nil {
 		return err
 	}
