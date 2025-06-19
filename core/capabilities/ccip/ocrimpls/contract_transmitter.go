@@ -12,11 +12,11 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 )
 
 // ToCalldataFunc is a function that takes in the OCR3 report and signature data and processes them.
@@ -31,6 +31,11 @@ type ToCalldataFunc func(
 	codec ccipcommon.ExtraDataCodec,
 ) (contract string, method string, args any, err error)
 
+// ToEd25519CalldataFunc is a function that takes in the OCR3 report and Ed25519 signature data and processes them.
+// It returns the contract name, method name, and arguments for the on-chain contract call.
+// The ReportWithInfo bytes field is also decoded according to the implementation of this function,
+// the commit and execute plugins have different representations for this data.
+// Ed25519 signatures are 96 bytes long (64 bytes signature + 32 bytes public key).
 type ToEd25519CalldataFunc func(
 	rawReportCtx [2][32]byte,
 	report ocr3types.ReportWithInfo[[]byte],
@@ -103,13 +108,14 @@ func (c *ccipTransmitter) Transmit(
 	var args any
 	var err error
 
-	if c.toCalldataFn != nil {
+	switch {
+	case c.toCalldataFn != nil:
 		var rs [][32]byte
 		var ss [][32]byte
 		var vs [32]byte
 		for i, as := range sigs {
-			r, s, v, err := evmutil.SplitSignature(as.Signature)
-			if err != nil {
+			r, s, v, err2 := evmutil.SplitSignature(as.Signature)
+			if err2 != nil {
 				return fmt.Errorf("failed to split signature: %w", err)
 			}
 			rs = append(rs, r)
@@ -122,7 +128,7 @@ func (c *ccipTransmitter) Transmit(
 		if err != nil {
 			return fmt.Errorf("failed to generate ecdsa call data: %w", err)
 		}
-	} else if c.toEd25519CalldataFn != nil {
+	case c.toEd25519CalldataFn != nil:
 		var signatures [][96]byte
 		for _, as := range sigs {
 			sig := as.Signature
@@ -138,15 +144,15 @@ func (c *ccipTransmitter) Transmit(
 		if err != nil {
 			return fmt.Errorf("failed to generate ed25519 call data: %w", err)
 		}
-	} else {
+	default:
 		return errors.New("no calldata function")
 	}
 
 	// TODO: no meta fields yet, what should we add?
 	// probably whats in the info part of the report?
 	meta := commontypes.TxMeta{}
-	txID, err := uuid.NewRandom() // NOTE: CW expects us to generate an ID, rather than return one
-	if err != nil {
+	txID, err2 := uuid.NewRandom() // NOTE: CW expects us to generate an ID, rather than return one
+	if err2 != nil {
 		return fmt.Errorf("failed to generate UUID: %w", err)
 	}
 	zero := big.NewInt(0)

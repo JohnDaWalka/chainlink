@@ -2,342 +2,268 @@ package ccipaptos
 
 import (
 	"context"
-	"fmt"
 	"math/big"
+	"math/rand"
+	"testing"
 
-	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common/mocks"
 )
 
-// ExecutePluginCodecV1 is a codec for encoding and decoding execute plugin reports.
-// Compatible with ccip_offramp::offramp version 1.6.0
-type ExecutePluginCodecV1 struct {
-	extraDataCodec ccipcommon.ExtraDataCodec
+var randomExecuteReport = func(t *testing.T, chainSelector uint64, gasLimit *big.Int, destGasAmount uint32) cciptypes.ExecutePluginReport {
+	const numChainReports = 1
+	const msgsPerReport = 1
+	const numTokensPerMsg = 3
+
+	chainReports := make([]cciptypes.ExecutePluginReportSingleChain, numChainReports)
+	for i := 0; i < numChainReports; i++ {
+		reportMessages := make([]cciptypes.Message, msgsPerReport)
+		for j := 0; j < msgsPerReport; j++ {
+			data, err := cciptypes.NewBytesFromString(utils.RandomAddress().String())
+			require.NoError(t, err)
+
+			tokenAmounts := make([]cciptypes.RampTokenAmount, numTokensPerMsg)
+			for z := 0; z < numTokensPerMsg; z++ {
+				// Use BCS to pack destGasAmount
+				encodedDestExecData, err2 := bcs.SerializeU32(destGasAmount)
+				require.NoError(t, err2)
+
+				tokenAmounts[z] = cciptypes.RampTokenAmount{
+					SourcePoolAddress: utils.RandomAddress().Bytes(),
+					DestTokenAddress:  generateAddressBytes(),
+					ExtraData:         data,
+					Amount:            cciptypes.NewBigInt(utils.RandUint256()),
+					DestExecData:      encodedDestExecData,
+				}
+			}
+
+			// Use BCS to pack EVM V1 fields
+			encodedExtraArgsFields, err := bcs.SerializeU256(*gasLimit)
+			require.NoError(t, err, "failed to pack extra args fields")
+
+			// Prepend the tag
+			extraArgs := append(evmExtraArgsV1Tag, encodedExtraArgsFields...)
+
+			reportMessages[j] = cciptypes.Message{
+				Header: cciptypes.RampMessageHeader{
+					MessageID:           utils.RandomBytes32(),
+					SourceChainSelector: cciptypes.ChainSelector(rand.Uint64()),
+					DestChainSelector:   cciptypes.ChainSelector(rand.Uint64()),
+					SequenceNumber:      cciptypes.SeqNum(rand.Uint64()),
+					Nonce:               rand.Uint64(),
+					MsgHash:             utils.RandomBytes32(),
+					OnRamp:              utils.RandomAddress().Bytes(),
+				},
+				Sender:         common.LeftPadBytes(utils.RandomAddress().Bytes(), 32),
+				Data:           data,
+				Receiver:       generateAddressBytes(),
+				ExtraArgs:      extraArgs,
+				FeeToken:       generateAddressBytes(),
+				FeeTokenAmount: cciptypes.NewBigInt(utils.RandUint256()),
+				TokenAmounts:   tokenAmounts,
+			}
+		}
+
+		tokenData := make([][][]byte, msgsPerReport)
+		for j := 0; j < msgsPerReport; j++ {
+			tokenData[j] = [][]byte{{0x1}, {0x2, 0x3}}
+		}
+
+		chainReports[i] = cciptypes.ExecutePluginReportSingleChain{
+			SourceChainSelector: cciptypes.ChainSelector(chainSelector),
+			Messages:            reportMessages,
+			OffchainTokenData:   tokenData,
+			Proofs:              []cciptypes.Bytes32{utils.RandomBytes32(), utils.RandomBytes32()},
+			ProofFlagBits:       cciptypes.NewBigInt(big.NewInt(0)),
+		}
+	}
+
+	return cciptypes.ExecutePluginReport{ChainReports: chainReports}
 }
 
-func NewExecutePluginCodecV1(extraDataCodec ccipcommon.ExtraDataCodec) *ExecutePluginCodecV1 {
-	return &ExecutePluginCodecV1{
-		extraDataCodec: extraDataCodec,
+func TestExecutePluginCodecV1(t *testing.T) {
+	ctx := t.Context()
+	mockExtraDataCodec := &mocks.SourceChainExtraDataCodec{}
+	destGasAmount := rand.Uint32()
+	gasLimit := utils.RandUint256()
+
+	// Update mock return values to use the correct keys expected by the codec
+	// The codec uses the ExtraDataDecoder internally, which returns maps like these.
+	mockExtraDataCodec.On("DecodeDestExecDataToMap", mock.Anything, mock.Anything).Return(map[string]any{
+		aptosDestExecDataKey: destGasAmount, // Use the constant defined in the decoder
+	}, nil)
+	mockExtraDataCodec.On("DecodeExtraArgsToMap", mock.Anything, mock.Anything).Return(map[string]any{
+		"gasLimit": gasLimit, // Match the key used in the decoder for EVM V1/V2 gasLimit
+		// "allowOutOfOrderExecution": false, // Optionally mock other fields if needed by codec logic
+	}, nil)
+
+	testCases := []struct {
+		name          string
+		report        func(report cciptypes.ExecutePluginReport) cciptypes.ExecutePluginReport
+		expErr        bool
+		chainSelector uint64
+		destGasAmount uint32
+		gasLimit      *big.Int
+	}{
+		{
+			name:          "base report EVM chain",
+			report:        func(report cciptypes.ExecutePluginReport) cciptypes.ExecutePluginReport { return report },
+			expErr:        false,
+			chainSelector: 5009297550715157269, // ETH mainnet chain selector
+			gasLimit:      gasLimit,
+			destGasAmount: destGasAmount,
+		},
+		{
+			name:          "base report non-EVM chain", // Name updated for clarity
+			report:        func(report cciptypes.ExecutePluginReport) cciptypes.ExecutePluginReport { return report },
+			expErr:        false,
+			chainSelector: 124615329519749607, // Solana mainnet chain selector
+			gasLimit:      gasLimit,
+			destGasAmount: destGasAmount,
+		},
+		{
+			name: "reports have empty msgs",
+			report: func(report cciptypes.ExecutePluginReport) cciptypes.ExecutePluginReport {
+				report.ChainReports[0].Messages = []cciptypes.Message{}
+				return report
+			},
+			expErr:        true,
+			chainSelector: 5009297550715157269,
+			gasLimit:      gasLimit,
+			destGasAmount: destGasAmount,
+		},
+		{
+			name: "reports have empty offchain token data",
+			report: func(report cciptypes.ExecutePluginReport) cciptypes.ExecutePluginReport {
+				report.ChainReports[0].OffchainTokenData = [][][]byte{}
+				return report
+			},
+			expErr:        true,
+			chainSelector: 5009297550715157269,
+			gasLimit:      gasLimit,
+			destGasAmount: destGasAmount,
+		},
+	}
+
+	registeredMockExtraDataCodecMap := map[string]ccipcommon.SourceChainExtraDataCodec{
+		chainsel.FamilyEVM:    mockExtraDataCodec,
+		chainsel.FamilySolana: mockExtraDataCodec,
+		chainsel.FamilyAptos:  mockExtraDataCodec,
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			codec := NewExecutePluginCodecV1(registeredMockExtraDataCodecMap)
+			// randomExecuteReport now uses the new encoding internally
+			report := tc.report(randomExecuteReport(t, tc.chainSelector, tc.gasLimit, tc.destGasAmount))
+			bytes, err := codec.Encode(ctx, report)
+			if tc.expErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			// ignore unavailable fields in comparison - This part remains the same
+			for i := range report.ChainReports {
+				for j := range report.ChainReports[i].Messages {
+					report.ChainReports[i].Messages[j].Header.MsgHash = cciptypes.Bytes32{}
+					report.ChainReports[i].Messages[j].Header.OnRamp = cciptypes.UnknownAddress{}
+					report.ChainReports[i].Messages[j].FeeToken = cciptypes.UnknownAddress{}
+					report.ChainReports[i].Messages[j].ExtraArgs = cciptypes.Bytes{}
+					report.ChainReports[i].Messages[j].FeeTokenAmount = cciptypes.BigInt{}
+				}
+			}
+
+			// decode using the codec
+			codecDecoded, err := codec.Decode(ctx, bytes)
+			require.NoError(t, err)
+			require.Equal(t, report, codecDecoded) // Comparison should still work
+		})
 	}
 }
 
-func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.ExecutePluginReport) ([]byte, error) {
-	if len(report.ChainReports) == 0 {
-		return nil, nil
-	}
+// Go equivalent of test_deserialize_execution_report
+// https://github.com/smartcontractkit/chainlink-aptos/blob/4a9525abbbc024af87ed6277c57dcf8aa58dd268/contracts/ccip/ccip_offramp/tests/offramp_test.move#L453
+func TestExecutePluginCodecV1_Decode(t *testing.T) {
+	expectedSender, err := hexutil.Decode("0xd87929a32cf0cbdc9e2d07ffc7c33344079de727")
+	require.NoError(t, err)
+	expectedData, err := hexutil.Decode("0x68656c6c6f20434349505265636569766572") // "hello CCIPReceiver"
+	require.NoError(t, err)
+	expectedReceiver, err := hexutil.Decode("0xbd8a1fb0af25dc8700d2d302cfbae718c3b2c3c61cfe47f58a45b1126c006490")
+	require.NoError(t, err)
+	expectedGasLimit := big.NewInt(100000)
+	expectedMessageIDBytes, err := hexutil.Decode("0x20865dcacbd6afb6a2288daa164caf75517009a289fa3135281fb1e4800b11bc")
+	require.NoError(t, err)
+	var expectedMessageID cciptypes.Bytes32
+	copy(expectedMessageID[:], expectedMessageIDBytes)
 
-	if len(report.ChainReports) != 1 {
-		return nil, fmt.Errorf("ExecutePluginCodecV1 expects exactly one ChainReport, found %d", len(report.ChainReports))
-	}
+	const expectedEVMSourceChainSelector cciptypes.ChainSelector = 909606746561742123
+	const expectedDestChainSelector cciptypes.ChainSelector = 743186221051783445
+	const expectedSequenceNumber cciptypes.SeqNum = 1
+	const expectedNonce uint64 = 0
+	expectedLeafBytes, err := hexutil.Decode("0x258dc7f9ec033388ee50bf3e0debfc841a278054f5b2ce41728f7459267c719e")
+	require.NoError(t, err)
+	var expectedLeafHash cciptypes.Bytes32
+	copy(expectedLeafHash[:], expectedLeafBytes)
 
-	chainReport := report.ChainReports[0]
+	reportBytes, err := hexutil.Decode("0x2b851c4684929f0c20865dcacbd6afb6a2288daa164caf75517009a289fa3135281fb1e4800b11bc2b851c4684929f0c15a9c133ee53500a0100000000000000000000000000000014d87929a32cf0cbdc9e2d07ffc7c33344079de7271268656c6c6f20434349505265636569766572bd8a1fb0af25dc8700d2d302cfbae718c3b2c3c61cfe47f58a45b1126c006490a086010000000000000000000000000000000000000000000000000000000000000000")
+	require.NoError(t, err)
+	onRampBytes, err := hexutil.Decode("0x47a1f0a819457f01153f35c6b6b0d42e2e16e91e")
+	require.NoError(t, err)
 
-	if len(chainReport.Messages) != 1 {
-		return nil, fmt.Errorf("only single report message expected, got %d", len(chainReport.Messages))
-	}
+	// Instantiate the codec. extraDataCodec is not needed for Decode.
+	codec := NewExecutePluginCodecV1(nil)
 
-	if len(chainReport.OffchainTokenData) != 1 {
-		return nil, fmt.Errorf("only single group of offchain token data expected, got %d", len(chainReport.OffchainTokenData))
-	}
+	// Decode the report
+	decodedReport, err := codec.Decode(context.Background(), reportBytes)
+	require.NoError(t, err)
 
-	message := chainReport.Messages[0]
-	offchainTokenData := chainReport.OffchainTokenData[0]
+	require.Len(t, decodedReport.ChainReports, 1, "Expected exactly one chain report")
+	chainReport := decodedReport.ChainReports[0]
+	require.Len(t, chainReport.Messages, 1, "Expected exactly one message")
+	msg := chainReport.Messages[0]
 
-	s := &bcs.Serializer{}
+	require.Equal(t, expectedEVMSourceChainSelector, chainReport.SourceChainSelector)
 
-	// 1. source_chain_selector: u64
-	s.U64(uint64(chainReport.SourceChainSelector))
+	require.Equal(t, expectedSender, []byte(msg.Sender))
+	require.Equal(t, expectedData, []byte(msg.Data))
+	require.Equal(t, expectedReceiver, []byte(msg.Receiver))
+	require.Equal(t, expectedMessageID, msg.Header.MessageID)
+	require.Equal(t, expectedEVMSourceChainSelector, msg.Header.SourceChainSelector)
+	require.Equal(t, expectedDestChainSelector, msg.Header.DestChainSelector)
+	require.Equal(t, expectedSequenceNumber, msg.Header.SequenceNumber)
+	require.Equal(t, expectedNonce, msg.Header.Nonce)
 
-	// --- Start Message Header ---
-	// 2. message_id: fixed_vector_u8(32)
-	if len(message.Header.MessageID) != 32 {
-		return nil, fmt.Errorf("invalid message ID length: expected 32, got %d", len(message.Header.MessageID))
-	}
-	s.FixedBytes(message.Header.MessageID[:])
+	// The decoded report shows no tokens, which is correct based on the input bytes.
+	require.Empty(t, msg.TokenAmounts)
 
-	// 3. header_source_chain_selector: u64
-	s.U64(uint64(message.Header.SourceChainSelector))
+	metadataHash, err := computeMetadataHash(uint64(expectedEVMSourceChainSelector), uint64(expectedDestChainSelector), onRampBytes)
+	require.NoError(t, err)
 
-	// 4. dest_chain_selector: u64
-	s.U64(uint64(message.Header.DestChainSelector))
+	receiverBytes32, err := addressBytesToBytes32(expectedReceiver)
+	require.NoError(t, err)
 
-	// 5. sequence_number: u64
-	s.U64(uint64(message.Header.SequenceNumber))
+	hashedLeaf, err := computeMessageDataHash(
+		metadataHash,
+		expectedMessageID,
+		receiverBytes32,
+		uint64(expectedSequenceNumber),
+		expectedGasLimit,
+		expectedNonce,
+		expectedSender,
+		expectedData,
+		[]any2AptosTokenTransfer{}, // No tokens in this report
+	)
+	require.NoError(t, err)
 
-	// 6. nonce: u64
-	s.U64(message.Header.Nonce)
-	// --- End Message Header ---
-
-	// 7. sender: vector<u8>
-	s.WriteBytes(message.Sender)
-
-	// 8. data: vector<u8>
-	s.WriteBytes(message.Data)
-
-	// 9. receiver: address (Aptos address, 32 bytes)
-	var receiverAddr aptos.AccountAddress
-	if err := receiverAddr.ParseStringRelaxed(message.Receiver.String()); err != nil {
-		return nil, fmt.Errorf("failed to parse receiver address '%s': %w", message.Receiver.String(), err)
-	}
-	s.Struct(&receiverAddr)
-
-	// 10. gas_limit: u256
-	// Extract gas limit from ExtraArgs
-	decodedExtraArgsMap, err := e.extraDataCodec.DecodeExtraArgs(message.ExtraArgs, chainReport.SourceChainSelector)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode ExtraArgs: %w", err)
-	}
-	gasLimit, err := parseExtraDataMap(decodedExtraArgsMap) // Use a helper to extract the gas limit
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract gas limit from decoded ExtraArgs map: %w", err)
-	}
-	s.U256(*gasLimit)
-
-	// 11. token_amounts: vector<Any2AptosTokenTransfer>
-	bcs.SerializeSequenceWithFunction(message.TokenAmounts, s, func(s *bcs.Serializer, item cciptypes.RampTokenAmount) {
-		// 11a. source_pool_address: vector<u8>
-		s.WriteBytes(item.SourcePoolAddress)
-
-		// 11b. dest_token_address: address
-		var destTokenAddr aptos.AccountAddress
-		if err2 := destTokenAddr.ParseStringRelaxed(item.DestTokenAddress.String()); err2 != nil {
-			s.SetError(fmt.Errorf("failed to parse dest_token_address '%s': %w", item.DestTokenAddress.String(), err2))
-		}
-		s.Struct(&destTokenAddr)
-
-		// 11c. dest_gas_amount: u32
-		// Extract dest gas amount from DestExecData
-		destExecDataDecodedMap, err2 := e.extraDataCodec.DecodeTokenAmountDestExecData(item.DestExecData, chainReport.SourceChainSelector)
-		if err2 != nil {
-			s.SetError(fmt.Errorf("failed to decode DestExecData for token %s: %w", destTokenAddr.String(), err2))
-			return
-		}
-		destGasAmount, err3 := extractDestGasAmountFromMap(destExecDataDecodedMap)
-		if err3 != nil {
-			s.SetError(fmt.Errorf("failed to extract dest gas amount from decoded DestExecData map for token %s: %w", destTokenAddr.String(), err3))
-			return
-		}
-		s.U32(destGasAmount)
-
-		// 11d. extra_data: vector<u8>
-		s.WriteBytes(item.ExtraData)
-
-		// 11e. amount: u256
-		if item.Amount.Int == nil {
-			s.SetError(fmt.Errorf("token amount is nil for token %s", destTokenAddr.String()))
-			return
-		}
-		s.U256(*item.Amount.Int)
-	})
-	if err != nil { // Check error from SerializeSequenceWithFunction itself
-		return nil, fmt.Errorf("failed during token_amounts serialization: %w", err)
-	}
-	if s.Error() != nil { // Check error set within the lambda
-		return nil, fmt.Errorf("failed to serialize token_amounts: %w", s.Error())
-	}
-
-	// 12. offchain_token_data: vector<vector<u8>>
-	bcs.SerializeSequenceWithFunction(offchainTokenData, s, func(s *bcs.Serializer, item []byte) {
-		s.WriteBytes(item)
-	})
-	if err != nil { // Check error from SerializeSequenceWithFunction itself
-		return nil, fmt.Errorf("failed during offchain_token_data serialization: %w", err)
-	}
-	if s.Error() != nil { // Check error set within the lambda (though unlikely here)
-		return nil, fmt.Errorf("failed to serialize offchain_token_data: %w", s.Error())
-	}
-
-	// 13. proofs: vector<fixed_vector_u8(32)>
-	bcs.SerializeSequenceWithFunction(chainReport.Proofs, s, func(s *bcs.Serializer, item cciptypes.Bytes32) {
-		if len(item) != 32 {
-			s.SetError(fmt.Errorf("invalid proof length: expected 32, got %d", len(item)))
-			return
-		}
-		s.FixedBytes(item[:])
-	})
-	if err != nil { // Check error from SerializeSequenceWithFunction itself
-		return nil, fmt.Errorf("failed during proofs serialization: %w", err)
-	}
-	if s.Error() != nil { // Check error set within the lambda
-		return nil, fmt.Errorf("failed to serialize proofs: %w", s.Error())
-	}
-
-	// Final check and return
-	if s.Error() != nil {
-		return nil, fmt.Errorf("BCS serialization failed: %w", s.Error())
-	}
-
-	return s.ToBytes(), nil
+	require.Equal(t, expectedLeafHash[:], hashedLeaf[:], "Calculated leaf hash does not match the expected hash from the Move test")
 }
-
-func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte) (cciptypes.ExecutePluginReport, error) {
-	des := bcs.NewDeserializer(encodedReport)
-	report := cciptypes.ExecutePluginReport{}
-	var chainReport cciptypes.ExecutePluginReportSingleChain
-	var message cciptypes.Message
-
-	// 1. source_chain_selector: u64
-	chainReport.SourceChainSelector = cciptypes.ChainSelector(des.U64())
-	if des.Error() != nil {
-		return report, fmt.Errorf("failed to deserialize source_chain_selector: %w", des.Error())
-	}
-
-	// --- Start Message Header ---
-	// 2. message_id: fixed_vector_u8(32)
-	messageIDBytes := des.ReadFixedBytes(32)
-	if des.Error() != nil {
-		return report, fmt.Errorf("failed to deserialize message_id: %w", des.Error())
-	}
-	copy(message.Header.MessageID[:], messageIDBytes)
-
-	// 3. header_source_chain_selector: u64
-	message.Header.SourceChainSelector = cciptypes.ChainSelector(des.U64())
-	if des.Error() != nil {
-		return report, fmt.Errorf("failed to deserialize header_source_chain_selector: %w", des.Error())
-	}
-
-	// 4. dest_chain_selector: u64
-	message.Header.DestChainSelector = cciptypes.ChainSelector(des.U64())
-	if des.Error() != nil {
-		return report, fmt.Errorf("failed to deserialize dest_chain_selector: %w", des.Error())
-	}
-
-	// 5. sequence_number: u64
-	message.Header.SequenceNumber = cciptypes.SeqNum(des.U64())
-	if des.Error() != nil {
-		return report, fmt.Errorf("failed to deserialize sequence_number: %w", des.Error())
-	}
-
-	// 6. nonce: u64
-	message.Header.Nonce = des.U64()
-	if des.Error() != nil {
-		return report, fmt.Errorf("failed to deserialize nonce: %w", des.Error())
-	}
-
-	// --- End Message Header ---
-
-	// 7. sender: vector<u8>
-	message.Sender = des.ReadBytes()
-	if des.Error() != nil {
-		return report, fmt.Errorf("failed to deserialize sender: %w", des.Error())
-	}
-
-	// 8. data: vector<u8>
-	message.Data = des.ReadBytes()
-	if des.Error() != nil {
-		return report, fmt.Errorf("failed to deserialize data: %w", des.Error())
-	}
-
-	// 9. receiver: address
-	var receiverAddr aptos.AccountAddress
-	des.Struct(&receiverAddr)
-	if des.Error() != nil {
-		return report, fmt.Errorf("failed to deserialize receiver: %w", des.Error())
-	}
-	message.Receiver = receiverAddr[:]
-
-	// 10. gas_limit: u256
-	_ = des.U256()
-	if des.Error() != nil {
-		return report, fmt.Errorf("failed to deserialize gas_limit: %w", des.Error())
-	}
-
-	// 11. token_amounts: vector<Any2AptosTokenTransfer>
-	message.TokenAmounts = bcs.DeserializeSequenceWithFunction(des, func(des *bcs.Deserializer, item *cciptypes.RampTokenAmount) {
-		// 11a. source_pool_address: vector<u8>
-		item.SourcePoolAddress = des.ReadBytes()
-		if des.Error() != nil {
-			return // Error handled by caller
-		}
-
-		// 11b. dest_token_address: address
-		var destTokenAddr aptos.AccountAddress
-		des.Struct(&destTokenAddr)
-		if des.Error() != nil {
-			return // Error handled by caller
-		}
-		item.DestTokenAddress = destTokenAddr[:]
-
-		// 11c. dest_gas_amount: u32
-		destGasAmount := des.U32()
-		if des.Error() != nil {
-			return // Error handled by caller
-		}
-		// Encode dest gas amount back into DestExecData
-		destData, err := bcs.SerializeU32(destGasAmount)
-		if err != nil {
-			des.SetError(fmt.Errorf("abi encode dest gas amount: %w", err))
-			return
-		}
-		item.DestExecData = destData
-
-		// 11d. extra_data: vector<u8>
-		item.ExtraData = des.ReadBytes()
-		if des.Error() != nil {
-			return // Error handled by caller
-		}
-
-		// 11e. amount: u256
-		amountU256 := des.U256()
-		if des.Error() != nil {
-			return // Error handled by caller
-		}
-		item.Amount = cciptypes.NewBigInt(&amountU256)
-	})
-	if des.Error() != nil {
-		return report, fmt.Errorf("failed to deserialize token_amounts: %w", des.Error())
-	}
-
-	// 12. offchain_token_data: vector<vector<u8>>
-	offchainTokenDataGroup := bcs.DeserializeSequenceWithFunction(des, func(des *bcs.Deserializer, item *[]byte) {
-		*item = des.ReadBytes()
-	})
-	if des.Error() != nil {
-		return report, fmt.Errorf("failed to deserialize offchain_token_data: %w", des.Error())
-	}
-	// Wrap it in the expected [][][]byte structure
-	chainReport.OffchainTokenData = [][][]byte{offchainTokenDataGroup}
-
-	// 13. proofs: vector<fixed_vector_u8(32)>
-	proofsBytes := bcs.DeserializeSequenceWithFunction(des, func(des *bcs.Deserializer, item *[]byte) {
-		*item = des.ReadFixedBytes(32)
-	})
-	if des.Error() != nil {
-		return report, fmt.Errorf("failed to deserialize proofs: %w", des.Error())
-	}
-	// Convert [][]byte to [][32]byte
-	chainReport.Proofs = make([]cciptypes.Bytes32, len(proofsBytes))
-	for i, proofB := range proofsBytes {
-		if len(proofB) != 32 {
-			// This shouldn't happen if ReadFixedBytes worked correctly
-			return report, fmt.Errorf("internal error: deserialized proof %d has length %d, expected 32", i, len(proofB))
-		}
-		copy(chainReport.Proofs[i][:], proofB)
-	}
-
-	// Check if all bytes were consumed
-	if des.Remaining() > 0 {
-		return report, fmt.Errorf("unexpected remaining bytes after decoding: %d", des.Remaining())
-	}
-
-	// Set empty fields
-	message.Header.MsgHash = cciptypes.Bytes32{}
-	message.Header.OnRamp = cciptypes.UnknownAddress{}
-	message.FeeToken = cciptypes.UnknownAddress{}
-	message.ExtraArgs = cciptypes.Bytes{}
-	message.FeeTokenAmount = cciptypes.BigInt{}
-
-	// Assemble the final report
-	chainReport.Messages = []cciptypes.Message{message}
-	// ProofFlagBits is not part of the Aptos report, initialize it empty/zero.
-	chainReport.ProofFlagBits = cciptypes.NewBigInt(big.NewInt(0))
-	report.ChainReports = []cciptypes.ExecutePluginReportSingleChain{chainReport}
-
-	return report, nil
-}
-
-// Ensure ExecutePluginCodec implements the ExecutePluginCodec interface
-var _ cciptypes.ExecutePluginCodec = (*ExecutePluginCodecV1)(nil)
