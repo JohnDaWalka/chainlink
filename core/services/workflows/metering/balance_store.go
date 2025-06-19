@@ -26,18 +26,6 @@ type balanceStore struct {
 	mu          sync.RWMutex
 }
 
-type BalanceStore interface {
-	Get() (balance int64)
-	GetAs(unit string) (balance int64)
-	Minus(amount int64) error
-	MinusAs(unit string, amount int64) error
-	Add(amount int64) error
-	AddAs(unit string, amount int64) error
-	AllowNegative()
-}
-
-var _ BalanceStore = (BalanceStore)(nil)
-
 func NewBalanceStore(
 	startingBalance decimal.Decimal,
 	conversions map[string]decimal.Decimal,

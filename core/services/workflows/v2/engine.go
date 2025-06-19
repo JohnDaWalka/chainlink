@@ -320,21 +320,7 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 			return
 		}
 
-		// V2Engine runs the entirety of a module's execution as compute. Ensure that the max execution time can run.
-		// Add an extra second of metering padding for context cancel propagation
-		ctxCancelPadding := (time.Millisecond * 1000).Milliseconds()
-		compMs := decimal.NewFromInt(int64(e.cfg.LocalLimits.WorkflowExecutionTimeoutMs) + ctxCancelPadding)
-		computeAmount, mrErr := meteringReport.ConvertToBalance(metering.ComputeResourceDimension, compMs)
-		if mrErr != nil {
-			e.cfg.Lggr.Errorw("could not determine compute amount to meter", "err", mrErr)
-		}
-
-		if mrErr = meteringReport.Deduct(
-			metering.ComputeResourceDimension,
-			computeAmount,
-		); mrErr != nil {
-			e.cfg.Lggr.Errorw("could not meter compute", "err", mrErr)
-		}
+		e.deductStandardBalances(meteringReport)
 	}
 
 	execCtx, execCancel := context.WithTimeout(ctx, time.Millisecond*time.Duration(e.cfg.LocalLimits.WorkflowExecutionTimeoutMs))
@@ -448,5 +434,23 @@ func (e *Engine) heartbeatLoop(ctx context.Context) {
 			e.lggr.Debugw("Engine heartbeat tick", "time", e.cfg.Clock.Now().Format(time.RFC3339))
 			e.metrics.IncrementEngineHeartbeatCounter(ctx)
 		}
+	}
+}
+
+func (e *Engine) deductStandardBalances(meteringReport *metering.Report) {
+	// V2Engine runs the entirety of a module's execution as compute. Ensure that the max execution time can run.
+	// Add an extra second of metering padding for context cancel propagation
+	ctxCancelPadding := (time.Millisecond * 1000).Milliseconds()
+	compMs := decimal.NewFromInt(int64(e.cfg.LocalLimits.WorkflowExecutionTimeoutMs) + ctxCancelPadding)
+	computeAmount, mrErr := meteringReport.ConvertToBalance(metering.ComputeResourceDimension, compMs)
+	if mrErr != nil {
+		e.cfg.Lggr.Errorw("could not determine compute amount to meter", "err", mrErr)
+	}
+
+	if mrErr = meteringReport.Deduct(
+		metering.ComputeResourceDimension,
+		computeAmount,
+	); mrErr != nil {
+		e.cfg.Lggr.Errorw("could not meter compute", "err", mrErr)
 	}
 }
