@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"go.uber.org/multierr"
@@ -14,6 +15,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
@@ -45,23 +47,27 @@ type HandlerFactory interface {
 type gateway struct {
 	services.StateMachine
 
-	codec      api.Codec
-	httpServer gw_net.HttpServer
-	handlers   map[string]handlers.Handler
-	connMgr    ConnectionManager
-	lggr       logger.Logger
+	codec                api.Codec
+	httpServer           gw_net.HttpServer
+	customParamsHandlers map[string]handlers.Handler
+	handlers             map[string]handlers.Handler
+	connMgr              ConnectionManager
+	lggr                 logger.Logger
+	jsonrpcHandler       *jsonrpc.Handler
+	services             map[string]jsonrpc.Service
 }
 
-func NewGatewayFromConfig(config *config.GatewayConfig, handlerFactory HandlerFactory, lggr logger.Logger) (Gateway, error) {
+func NewGatewayFromConfig(cfg *config.GatewayConfig, handlerFactory HandlerFactory, lggr logger.Logger) (Gateway, error) {
 	codec := &api.JsonRPCCodec{}
-	httpServer := gw_net.NewHttpServer(&config.UserServerConfig, lggr)
-	connMgr, err := NewConnectionManager(config, clockwork.NewRealClock(), lggr)
+	httpServer := gw_net.NewHttpServer(&cfg.UserServerConfig, lggr)
+	connMgr, err := NewConnectionManager(cfg, clockwork.NewRealClock(), lggr)
 	if err != nil {
 		return nil, err
 	}
 
 	handlerMap := make(map[string]handlers.Handler)
-	for _, donConfig := range config.Dons {
+	customParamsHandlers := make(map[string]handlers.Handler)
+	for _, donConfig := range cfg.Dons {
 		donConfig := donConfig
 		_, ok := handlerMap[donConfig.DonId]
 		if ok {
@@ -81,19 +87,25 @@ func NewGatewayFromConfig(config *config.GatewayConfig, handlerFactory HandlerFa
 		if err != nil {
 			return nil, err
 		}
-		handlerMap[donConfig.DonId] = handler
+		if donConfig.MessageType == config.CustomParamsMessageType {
+			customParamsHandlers[donConfig.HandlerName] = handler
+		} else {
+			handlerMap[donConfig.DonId] = handler
+		}
 		donConnMgr.SetHandler(handler)
 	}
-	return NewGateway(codec, httpServer, handlerMap, connMgr, lggr), nil
+	return NewGateway(codec, httpServer, handlerMap, customParamsHandlers, connMgr, lggr), nil
 }
 
-func NewGateway(codec api.Codec, httpServer gw_net.HttpServer, handlers map[string]handlers.Handler, connMgr ConnectionManager, lggr logger.Logger) Gateway {
+func NewGateway(codec api.Codec, httpServer gw_net.HttpServer, handlers map[string]handlers.Handler, customParamsHandlers map[string]handlers.Handler,
+	connMgr ConnectionManager, lggr logger.Logger) Gateway {
 	gw := &gateway{
-		codec:      codec,
-		httpServer: httpServer,
-		handlers:   handlers,
-		connMgr:    connMgr,
-		lggr:       logger.Named(lggr, "Gateway"),
+		codec:          codec,
+		httpServer:     httpServer,
+		handlers:       handlers,
+		jsonrpcHandler: &jsonrpc.Handler{},
+		connMgr:        connMgr,
+		lggr:           logger.Named(lggr, "Gateway"),
 	}
 	httpServer.SetHTTPRequestHandler(gw)
 	return gw
@@ -127,44 +139,53 @@ func (g *gateway) Close() error {
 }
 
 // Called by the server
-func (g *gateway) ProcessRequest(ctx context.Context, rawRequest []byte) (rawResponse []byte, httpStatusCode int) {
-	// decode
-	msg, err := g.codec.DecodeRequest(rawRequest)
+func (g *gateway) ProcessRequest(ctx context.Context, rawRequest []byte, header http.Header) (rawResponse []byte, httpStatusCode int) {
+	req, err := g.jsonrpcHandler.DecodeRequest(rawRequest, header.Get("Bearer"))
 	if err != nil {
-		return newError(g.codec, "", api.UserMessageParseError, err.Error())
+		return newError(g.codec, "", api.UserMessageParseError, fmt.Sprintf("invalid JSON request: %s", err.Error()))
 	}
-	if msg == nil {
-		return newError(g.codec, "", api.UserMessageParseError, "nil message")
-	}
-	if err = msg.Validate(); err != nil {
-		return newError(g.codec, msg.Body.MessageId, api.UserMessageParseError, err.Error())
-	}
-	// find correct handler
-	handler, ok := g.handlers[msg.Body.DonId]
+	var handler handlers.Handler
+	// first check if the request is for a custom params handler
+	// if not, assume that the request is legacy message format and find the handler by DON ID
+	handler, ok := g.customParamsHandlers[req.ServiceName()]
 	if !ok {
-		return newError(g.codec, msg.Body.MessageId, api.UnsupportedDONIdError, "unsupported DON ID")
+		msg, err := g.codec.DecodeRequest(rawRequest)
+		if err != nil {
+			return newError(g.codec, "", api.UserMessageParseError, err.Error())
+		}
+		if msg == nil {
+			return newError(g.codec, "", api.UserMessageParseError, "nil message")
+		}
+		if err = msg.Validate(); err != nil {
+			return newError(g.codec, msg.Body.MessageId, api.UserMessageParseError, err.Error())
+		}
+		// find correct handler
+		handler, ok = g.handlers[msg.Body.DonId]
+		if !ok {
+			return newError(g.codec, msg.Body.MessageId, api.UnsupportedDONIdError, "unsupported DON ID")
+		}
 	}
 	// send to the handler
 	responseCh := make(chan handlers.UserCallbackPayload, 1)
-	err = handler.HandleUserMessage(ctx, msg, responseCh)
+	err = handler.HandleUserMessage(ctx, &req, responseCh)
 	if err != nil {
-		return newError(g.codec, msg.Body.MessageId, api.HandlerError, err.Error())
+		return newError(g.codec, req.ID, api.HandlerError, err.Error())
 	}
 	// await response
 	var response handlers.UserCallbackPayload
 	select {
 	case <-ctx.Done():
-		return newError(g.codec, msg.Body.MessageId, api.RequestTimeoutError, "handler timeout")
+		return newError(g.codec, req.ID, api.RequestTimeoutError, "handler timeout")
 	case response = <-responseCh:
 		break
 	}
 	if response.ErrCode != api.NoError {
-		return newError(g.codec, msg.Body.MessageId, response.ErrCode, response.ErrMsg)
+		return newError(g.codec, req.ID, response.ErrCode, response.ErrMsg)
 	}
 	// encode
-	rawResponse, err = g.codec.EncodeResponse(response.Msg)
+	rawResponse, err = json.Marshal(response.Resp)
 	if err != nil {
-		return newError(g.codec, msg.Body.MessageId, api.NodeReponseEncodingError, "")
+		return newError(g.codec, req.ID, api.NodeReponseEncodingError, "")
 	}
 	promRequest.WithLabelValues(api.NoError.String()).Inc()
 	return rawResponse, api.ToHttpErrorCode(api.NoError)

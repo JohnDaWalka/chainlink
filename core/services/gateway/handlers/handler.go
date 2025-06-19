@@ -11,7 +11,7 @@ import (
 // UserCallbackPayload is a response to user request sent to HandleUserMessage().
 // Each message needs to receive at most one response on the provided channel.
 type UserCallbackPayload struct {
-	Msg     *api.Message
+	Resp    *jsonrpc.Response
 	ErrCode api.ErrorCode
 	ErrMsg  string
 }
@@ -30,7 +30,7 @@ type Handler interface {
 	// Each user request is processed by a separate goroutine, which:
 	//   1. calls HandleUserMessage
 	//   2. waits on callbackCh with a timeout
-	HandleUserMessage(ctx context.Context, msg *api.Message, callbackCh chan<- UserCallbackPayload) error
+	HandleUserMessage(ctx context.Context, msg *jsonrpc.Request, callbackCh chan<- UserCallbackPayload) error
 
 	// Handlers should not make any assumptions about goroutines calling HandleNodeMessage.
 	// should be non-blocking
