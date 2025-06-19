@@ -35,7 +35,7 @@ func setForwarderConfigPrecondition(env cldf.Environment, c types.SetForwarderCo
 	seen := make(map[common.Address]struct{})
 	for _, signer := range c.Signers {
 		if signer == utils.ZeroAddress {
-			return fmt.Errorf("invalid signer zero address")
+			return errors.New("invalid signer zero address")
 		}
 
 		if _, exists := seen[signer]; exists {
