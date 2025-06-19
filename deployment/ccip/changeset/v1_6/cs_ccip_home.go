@@ -173,17 +173,28 @@ func validateCommitOffchainConfig(c *pluginconfig.CommitOffchainConfig, selector
 
 func validateUSDCConfig(usdcConfig *pluginconfig.USDCCCTPObserverConfig, state stateview.CCIPOnChainState) error {
 	for sel, token := range usdcConfig.Tokens {
-		onchainState, ok := state.Chains[uint64(sel)]
-		if !ok {
-			return fmt.Errorf("chain %d does not exist in state but provided in USDCCCTPObserverConfig", sel)
+		family, err := chain_selectors.GetSelectorFamily(uint64(sel))
+		if err != nil {
+			return fmt.Errorf("failed to find family for selector %d: %w", sel, err)
 		}
-		if onchainState.USDCTokenPools == nil || onchainState.USDCTokenPools[deployment.Version1_5_1] == nil {
-			return fmt.Errorf("chain %d does not have USDC token pool deployed with version %s", sel, deployment.Version1_5_1)
-		}
-		if common.HexToAddress(token.SourcePoolAddress) != onchainState.USDCTokenPools[deployment.Version1_5_1].Address() {
-			return fmt.Errorf("chain %d has USDC token pool deployed at %s, "+
-				"but SourcePoolAddress %s is provided in USDCCCTPObserverConfig",
-				sel, onchainState.USDCTokenPools[deployment.Version1_5_1].Address().String(), token.SourcePoolAddress)
+		switch family {
+		case chain_selectors.FamilyEVM:
+			onchainState, ok := state.Chains[uint64(sel)]
+			if !ok {
+				return fmt.Errorf("chain %d does not exist in EVM chain state but provided in USDCCCTPObserverConfig", sel)
+			}
+			if onchainState.USDCTokenPools == nil || onchainState.USDCTokenPools[deployment.Version1_5_1] == nil {
+				return fmt.Errorf("chain %d does not have USDC token pool deployed with version %s", sel, deployment.Version1_5_1)
+			}
+			if common.HexToAddress(token.SourcePoolAddress) != onchainState.USDCTokenPools[deployment.Version1_5_1].Address() {
+				return fmt.Errorf("chain %d has USDC token pool deployed at %s, "+
+					"but SourcePoolAddress %s is provided in USDCCCTPObserverConfig",
+					sel, onchainState.USDCTokenPools[deployment.Version1_5_1].Address().String(), token.SourcePoolAddress)
+			}
+		case chain_selectors.FamilySolana:
+			// TODO: Add validations for USDC token pool once they are deployed from CLD
+		default:
+			return fmt.Errorf("USDC configs not supported for chain family %s", family)
 		}
 	}
 	return nil
