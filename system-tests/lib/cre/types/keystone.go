@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
@@ -441,6 +442,7 @@ type FullCLDEnvironmentInput struct {
 	NodeSetOutput     []*WrappedNodeOutput
 	ExistingAddresses cldf.AddressBook
 	Topology          *Topology
+	OperationsBundle  operations.Bundle
 }
 
 func (f *FullCLDEnvironmentInput) Validate() error {

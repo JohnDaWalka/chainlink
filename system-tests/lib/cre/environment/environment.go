@@ -36,7 +36,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/postgres"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	ks_contracts_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/contracts"
@@ -49,7 +48,6 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	libformat "github.com/smartcontractkit/chainlink/system-tests/lib/format"
-	libfunding "github.com/smartcontractkit/chainlink/system-tests/lib/funding"
 	libnix "github.com/smartcontractkit/chainlink/system-tests/lib/nix"
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
@@ -339,6 +337,7 @@ func SetupTestEnvironment(
 		NodeSetOutput:     nodeSetOutput,
 		ExistingAddresses: allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
 		Topology:          topology,
+		OperationsBundle:  allChainsCLDEnvironment.OperationsBundle,
 	}
 
 	// We need to use TLS for CRIB, because it exposes HTTPS endpoints
@@ -366,47 +365,12 @@ func SetupTestEnvironment(
 		startTime = time.Now()
 		fmt.Print(libformat.PurpleText("---> [BACKGROUND 2/3] Funding Chainlink nodes\n\n"))
 
-		// Fund the nodes
-		concurrentNonceMap, concurrentNonceMapErr := NewConcurrentNonceMap(ctx, blockchainOutputs)
-		if concurrentNonceMapErr != nil {
-			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(concurrentNonceMapErr, "failed to create concurrent nonce map")}
-			return
-		}
-
-		// Decrement the nonce for each chain, because we will increment it in the next loop
-		for _, bcOut := range blockchainOutputs {
-			concurrentNonceMap.Decrement(bcOut.ChainID)
-		}
-
-		errGroup := &errgroup.Group{}
-		for _, metaDon := range fullCldOutput.DonTopology.DonsWithMetadata {
-			for _, bcOut := range blockchainOutputs {
-				for _, node := range metaDon.DON.Nodes {
-					errGroup.Go(func() error {
-						nodeAddress := node.AccountAddr[strconv.FormatUint(bcOut.ChainID, 10)]
-						if nodeAddress == "" {
-							return nil
-						}
-
-						nonce := concurrentNonceMap.Increment(bcOut.ChainID)
-
-						_, fundingErr := libfunding.SendFunds(ctx, zerolog.Logger{}, bcOut.SethClient, libtypes.FundsToSend{
-							ToAddress:  common.HexToAddress(nodeAddress),
-							Amount:     big.NewInt(5000000000000000000),
-							PrivateKey: bcOut.SethClient.MustGetRootPrivateKey(),
-							Nonce:      ptr.Ptr(nonce),
-						})
-						if fundingErr != nil {
-							return pkgerrors.Wrapf(fundingErr, "failed to fund node %s", nodeAddress)
-						}
-						return nil
-					})
-				}
-			}
-		}
-
-		if err := errGroup.Wait(); err != nil {
-			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(err, "failed to fund nodes")}
+		_, fundErr := operations.ExecuteOperation(fullCldOutput.Environment.OperationsBundle, FundCLNodesOp, FundCLNodesOpDeps{
+			Env:               fullCldOutput.Environment,
+			BlockchainOutputs: blockchainOutputs,
+		}, FundCLNodesOpInput{DonTopology: fullCldOutput.DonTopology, FundAmount: 5000000000000000000})
+		if fundErr != nil {
+			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(fundErr, "failed to fund CL nodes")}
 			return
 		}
 
