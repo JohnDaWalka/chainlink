@@ -869,8 +869,13 @@ func (s *Shell) RollbackDatabase(c *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize orm: %w", err)
 	}
+	defer db.Close()
+	migrator, err := migrate.NewMigrator(ctx, db.DB)
+	if err != nil {
+		return fmt.Errorf("failed to create migrator: %w", err)
+	}
 
-	if err := migrate.Rollback(ctx, db.DB, version); err != nil {
+	if err := migrator.Rollback(ctx, version); err != nil {
 		return fmt.Errorf("migrateDB failed: %w", err)
 	}
 
@@ -884,8 +889,12 @@ func (s *Shell) VersionDatabase(_ *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize orm: %w", err)
 	}
-
-	version, err := migrate.Current(ctx, db.DB)
+	defer db.Close()
+	migrator, err := migrate.NewMigrator(ctx, db.DB)
+	if err != nil {
+		return fmt.Errorf("failed to create migrator: %w", err)
+	}
+	version, err := migrator.Current(ctx)
 	if err != nil {
 		return fmt.Errorf("migrateDB failed: %w", err)
 	}
@@ -901,8 +910,13 @@ func (s *Shell) StatusDatabase(_ *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize orm: %w", err)
 	}
+	defer db.Close()
+	migrator, err := migrate.NewMigrator(ctx, db.DB)
+	if err != nil {
+		return fmt.Errorf("failed to create migrator: %w", err)
+	}
 
-	if err = migrate.Status(ctx, db.DB); err != nil {
+	if err = migrator.Status(ctx); err != nil {
 		return fmt.Errorf("Status failed: %w", err)
 	}
 	return nil
@@ -992,11 +1006,13 @@ func migrateDB(ctx context.Context, config store.Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize orm: %w", err)
 	}
+	defer db.Close()
 
-	if err = migrate.Migrate(ctx, db.DB); err != nil {
-		return fmt.Errorf("migrateDB failed: %w", err)
+	migrator, err := migrate.NewMigrator(ctx, db.DB)
+	if err != nil {
+		return fmt.Errorf("failed to create migrator: %w", err)
 	}
-	return db.Close()
+	return migrator.Migrate(ctx)
 }
 
 // RemoveBlocks - removes blocks after the specified blocks number

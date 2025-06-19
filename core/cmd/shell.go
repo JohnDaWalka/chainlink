@@ -260,7 +260,11 @@ func (n ChainlinkAppFactory) NewApplication(ctx context.Context, cfg chainlink.G
 
 // handleNodeVersioning is a setup-time helper to encapsulate version changes and db migration
 func handleNodeVersioning(ctx context.Context, db *sqlx.DB, appLggr logger.Logger, rootDir string, cfg config.Database, healthReportPort uint16) error {
-	var err error
+	migrator, err := migrate.NewMigrator(ctx, db.DB)
+	if err != nil {
+		return fmt.Errorf("failed to initialize migrator: %w", err)
+	}
+
 	// Set up the versioning Configs
 	verORM := versioning.NewORM(db, appLggr)
 	ibhr := services.NewStartUpHealthReport(healthReportPort, appLggr)
@@ -293,7 +297,7 @@ func handleNodeVersioning(ctx context.Context, db *sqlx.DB, appLggr logger.Logge
 
 	// Migrate the database
 	if cfg.MigrateDatabase() {
-		if err = migrate.Migrate(ctx, db.DB); err != nil {
+		if err = migrator.Migrate(ctx); err != nil {
 			return fmt.Errorf("initializeORM#Migrate: %w", err)
 		}
 	}
