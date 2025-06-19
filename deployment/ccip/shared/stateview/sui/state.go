@@ -10,8 +10,13 @@ import (
 )
 
 type CCIPChainState struct {
+	CCIPRouterAddress       sui.Address
 	CCIPAddress             sui.Address
 	CCIPObjectRef           sui.Address
+	MCMsAddress             sui.Address
+	TokenPoolAddress        sui.Address
+	LockRelaeseAddress      sui.Address
+	LockReleaseStateId      sui.Address
 	FeeQuoterCapId          sui.Address
 	OnRampAddress           sui.Address
 	OnRampStateObjectId     sui.Address
@@ -56,8 +61,23 @@ func loadsuiChainStateFromAddresses(addresses map[string]cldf.TypeAndVersion) (C
 		suiAddr := sui.MustAddressFromHex(addr)
 		switch typeAndVersion.Type {
 
+		case shared.SuiCCIPRouterType:
+			chainState.CCIPRouterAddress = *suiAddr
+
 		case shared.SuiCCIPType:
 			chainState.CCIPAddress = *suiAddr
+
+		case shared.SuiLockReleaseTPType:
+			chainState.LockRelaeseAddress = *suiAddr
+
+		case shared.SuiLockReleaseTPStateType:
+			chainState.LockReleaseStateId = *suiAddr
+
+		case shared.SuiMCMSType:
+			chainState.MCMsAddress = *suiAddr
+
+		case shared.SuiTokenPoolType:
+			chainState.TokenPoolAddress = *suiAddr
 
 		case shared.SuiCCIPObjectRefType:
 			chainState.CCIPObjectRef = *suiAddr

@@ -9,8 +9,11 @@ import (
 	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
 	ccipops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
+	lockreleasetokenpoolops "github.com/smartcontractkit/chainlink-sui/ops/ccip_lock_release_token_pool"
 	offrampops "github.com/smartcontractkit/chainlink-sui/ops/ccip_offramp"
 	onrampops "github.com/smartcontractkit/chainlink-sui/ops/ccip_onramp"
+	routerops "github.com/smartcontractkit/chainlink-sui/ops/ccip_router"
+	tokenpoolops "github.com/smartcontractkit/chainlink-sui/ops/ccip_token_pool"
 	mcmsops "github.com/smartcontractkit/chainlink-sui/ops/mcms"
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -57,6 +60,20 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 				},
 			},
 			CCIPOnChainState: state,
+		}
+
+		// Deploy Router
+		// TODO: Maybe make this part of CCIP sequence
+		routerReport, err := operations.ExecuteOperation(e.OperationsBundle, routerops.DeployCCIPRouterOp, deps.SuiChain, cld_ops.EmptyInput{})
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP Router for Sui chain %d: %w", chainSel, err)
+		}
+
+		// save Router address to the addressbook
+		typeAndVersionRouter := cldf.NewTypeAndVersion(shared.SuiCCIPRouterType, deployment.Version1_6_0)
+		err = deps.AB.Save(chainSel, routerReport.Output.PackageId, typeAndVersionRouter)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save Router address %s for Sui chain %d: %w", routerReport.Output.PackageId, chainSel, err)
 		}
 
 		// Deploy MCMS
@@ -234,6 +251,99 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save offRamp StateObjectId %s for Sui chain %d: %w", ccipOffRampSeqReport.Output.Objects.StateObjectId, chainSel, err)
 		}
+
+		// NOT NEEDED FOR ARBITRARY MSG PASSING
+		// TODO abstract this into a different function
+		// Deploy CCIP TokenPool
+		deployTp, err := operations.ExecuteOperation(e.OperationsBundle, tokenpoolops.DeployCCIPTokenPoolOp, deps.SuiChain,
+			tokenpoolops.TokenPoolDeployInput{
+				CCIPPackageId:     ccipSeqReport.Output.CCIPPackageId,
+				CCIPRouterAddress: routerReport.Output.PackageId,
+				MCMSAddress:       mcmsSeqReport.Output.PackageId,
+			})
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy TokenPool for Sui chain %d: %w", chainSel, err)
+		}
+
+		// save tokenPool address in addressbook
+		typeAndVersionTokenPoolId := cldf.NewTypeAndVersion(shared.SuiTokenPoolType, deployment.Version1_6_0)
+		err = deps.AB.Save(chainSel, deployTp.Output.PackageId, typeAndVersionTokenPoolId)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save offRamp StateObjectId %s for Sui chain %d: %w", deployTp.Output.PackageId, chainSel, err)
+		}
+
+		linkTokenTreasuryCapId := state.SuiChains[suiChain.Selector].LinkTokenTreasuryCapId.String()
+		linkTokenObjectMetadataId := state.SuiChains[suiChain.Selector].LinkTokenCoinMetadataId.String()
+		linkTokenPkgId := state.SuiChains[suiChain.Selector].LinkTokenAddress.String()
+
+		// Deploy LockRelease TP
+		deployLockReleaseTp, err := operations.ExecuteSequence(e.OperationsBundle, lockreleasetokenpoolops.DeployAndInitLockReleaseTokenPoolSequence, deps.SuiChain,
+			lockreleasetokenpoolops.DeployAndInitLockReleaseTokenPoolInput{
+				LockReleaseTokenPoolDeployInput: lockreleasetokenpoolops.LockReleaseTokenPoolDeployInput{
+					CCIPPackageId:          ccipSeqReport.Output.CCIPPackageId,
+					CCIPRouterAddress:      routerReport.Output.PackageId,
+					CCIPTokenPoolPackageId: deployTp.Output.PackageId,
+					LockReleaseLocalToken:  linkTokenObjectMetadataId,
+					MCMSAddress:            mcmsSeqReport.Output.PackageId,
+				},
+
+				CoinObjectTypeArg:     linkTokenPkgId + "::link_token::LINK_TOKEN",
+				CCIPObjectRefObjectId: ccipSeqReport.Output.Objects.CCIPObjectRefObjectId,
+				CoinMetadataObjectId:  linkTokenObjectMetadataId,
+				TreasuryCapObjectId:   linkTokenTreasuryCapId,
+				TokenPoolPackageId:    deployTp.Output.PackageId,
+				Rebalancer:            "",
+
+				// apply dest chain updates
+				RemoteChainSelectorsToRemove: []uint64{},
+				RemoteChainSelectorsToAdd:    []uint64{909606746561742123},
+				RemotePoolAddressesToAdd: [][][]byte{
+					{
+						[]byte{
+							0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+							0x00, 0x00, 0x00, 0x00, 0xaf, 0x46, 0xbf, 0x6d,
+							0x19, 0x92, 0x1e, 0x30, 0xbc, 0x5c, 0xc0, 0x04,
+							0x3d, 0xc6, 0xde, 0x91, 0xed, 0xf0, 0x0c, 0x98,
+						},
+					},
+				},
+				RemoteTokenAddressesToAdd: [][]byte{
+					[]byte{
+						0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+						0x00, 0x00, 0x00, 0x00, 0x77, 0x98, 0x77, 0xa7,
+						0xb0, 0xd9, 0xe8, 0x60, 0x31, 0x69, 0xdd, 0xbd,
+						0x78, 0x36, 0xe4, 0x78, 0xb4, 0x62, 0x47, 0x89,
+					},
+				},
+
+				// set chain rate limiter configs
+				RemoteChainSelectors: []uint64{909606746561742123},
+				OutboundIsEnableds:   []bool{true},
+				OutboundCapacities:   []uint64{1000},
+				OutboundRates:        []uint64{1000},
+				InboundIsEnableds:    []bool{true},
+				InboundCapacities:    []uint64{100},
+				InboundRates:         []uint64{1000},
+			})
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy TokenPool for Sui chain %d: %w", suiChain.Selector, err)
+		}
+
+		// save LockRelease PackageId to the addressbook
+		typeAndVersionLockReleasePackageId := cldf.NewTypeAndVersion(shared.SuiLockReleaseTPType, deployment.Version1_6_0)
+		err = deps.AB.Save(chainSel, deployLockReleaseTp.Output.LockReleaseTPPackageID, typeAndVersionLockReleasePackageId)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LockRelease PackageId %s for Sui chain %d: %w", deployLockReleaseTp.Output.LockReleaseTPPackageID, chainSel, err)
+		}
+
+		// save LockRelease stateObjectId to the addressbook
+		typeAndVersionLockReleaseStateId := cldf.NewTypeAndVersion(shared.SuiLockReleaseTPStateType, deployment.Version1_6_0)
+		err = deps.AB.Save(chainSel, deployLockReleaseTp.Output.Objects.StateObjectId, typeAndVersionLockReleaseStateId)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LockRelase StateObjectId %s for Sui chain %d: %w", deployLockReleaseTp.Output.Objects.StateObjectId, chainSel, err)
+		}
+
+		seqReports = append(seqReports, deployLockReleaseTp.ExecutionReports...)
 
 	}
 	return cldf.ChangesetOutput{

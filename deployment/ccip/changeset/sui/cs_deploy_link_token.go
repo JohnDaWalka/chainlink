@@ -41,7 +41,7 @@ func (d DeployLinkToken) Apply(e cldf.Environment, config DeployLinkTokenConfig)
 			Client: *suiChain.Client,
 			Signer: suiSigner,
 			GetTxOpts: func() bind.TxOpts {
-				b := uint64(300_000_000)
+				b := uint64(400_000_000)
 				return bind.TxOpts{
 					GasBudget: &b,
 				}
