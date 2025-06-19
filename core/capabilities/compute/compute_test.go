@@ -442,6 +442,7 @@ func gatewayResponse(t *testing.T, msgID string, body []byte, privateKey string)
 	key, err := crypto.HexToECDSA(privateKey)
 	require.NoError(t, err)
 	err = m.Sign(key)
+	require.NoError(t, err)
 	req, err := hc.ValidatedRequestFromMessage(m)
 	require.NoError(t, err)
 	return req

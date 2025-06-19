@@ -217,33 +217,6 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 				require.NoError(t, err2)
 			})
 
-			t.Run("missing signature", func(t *testing.T) {
-				msg.Body.Payload = json.RawMessage(`{"slot_id":3,"version":4,"expiration":5,"payload":"dGVzdA=="}`)
-				require.NoError(t, msg.Sign(privateKey))
-				storage.On("Put", ctx, mock.Anything, mock.Anything, mock.Anything).Return(s4.ErrWrongSignature).Once()
-				allowlist.On("Allow", addr).Return(true).Once()
-				subscriptions.On("GetMaxUserBalance", mock.Anything).Return(big.NewInt(100), nil).Once()
-				connector.On("SendToGateway", ctx, "gw1", mock.Anything).Run(func(args mock.Arguments) {
-					resp, ok := args[2].(*jsonrpc.Response)
-					require.True(t, ok)
-					decodedMsg := fromResponse(t, resp)
-					require.JSONEq(t, `{"success":false,"error_message":"Failed to set secret: wrong signature"}`, string(decodedMsg.Body.Payload))
-				}).Return(nil).Once()
-
-				err2 := handler.HandleGatewayMessage(ctx, "gw1", gatewayRequest(t, &msg))
-				require.NoError(t, err2)
-			})
-
-			t.Run("malformed request", func(t *testing.T) {
-				msg.Body.Payload = json.RawMessage(`{sdfgdfgoscsicosd:sdf:::sdf ::; xx}`)
-				require.NoError(t, msg.Sign(privateKey))
-				allowlist.AssertNotCalled(t, "Allow")
-				subscriptions.AssertNotCalled(t, "GetMaxUserBalance")
-				connector.AssertNotCalled(t, "SendToGateway")
-				err = handler.HandleGatewayMessage(ctx, "gw1", gatewayRequest(t, &msg))
-				require.NoError(t, err)
-			})
-
 			t.Run("insufficient balance", func(t *testing.T) {
 				allowlist.On("Allow", addr).Return(true).Once()
 				subscriptions.On("GetMaxUserBalance", mock.Anything).Return(big.NewInt(0), nil).Once()
@@ -267,6 +240,39 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 				connector.AssertNotCalled(t, "SendToGateway")
 				err2 := handler.HandleGatewayMessage(ctx, "gw1", gatewayRequest(t, &msg))
 				require.NoError(t, err2)
+			})
+
+			t.Run("missing signature", func(t *testing.T) {
+				msg.Body.Payload = json.RawMessage(`{"slot_id":3,"version":4,"expiration":5,"payload":"dGVzdA=="}`)
+				require.NoError(t, msg.Sign(privateKey))
+				storage.On("Put", ctx, mock.Anything, mock.Anything, mock.Anything).Return(s4.ErrWrongSignature).Once()
+				allowlist.On("Allow", addr).Return(true).Once()
+				subscriptions.On("GetMaxUserBalance", mock.Anything).Return(big.NewInt(100), nil).Once()
+				connector.On("SendToGateway", ctx, "gw1", mock.Anything).Run(func(args mock.Arguments) {
+					resp, ok := args[2].(*jsonrpc.Response)
+					require.True(t, ok)
+					decodedMsg := fromResponse(t, resp)
+					require.JSONEq(t, `{"success":false,"error_message":"Failed to set secret: wrong signature"}`, string(decodedMsg.Body.Payload))
+				}).Return(nil).Once()
+
+				err2 := handler.HandleGatewayMessage(ctx, "gw1", gatewayRequest(t, &msg))
+				require.NoError(t, err2)
+			})
+
+			t.Run("malformed request", func(t *testing.T) {
+				msg.Body.Payload = json.RawMessage(`{sdfgdfgoscsicosd:sdf:::sdf ::; xx}`)
+				require.NoError(t, msg.Sign(privateKey))
+				req := &jsonrpc.Request{
+					Version: "2.0",
+					ID:      msg.Body.MessageId,
+					Method:  msg.Body.Method,
+					Params:  msg.Body.Payload,
+				}
+				allowlist.AssertNotCalled(t, "Allow")
+				subscriptions.AssertNotCalled(t, "GetMaxUserBalance")
+				connector.AssertNotCalled(t, "SendToGateway")
+				err = handler.HandleGatewayMessage(ctx, "gw1", req)
+				require.NoError(t, err)
 			})
 		})
 

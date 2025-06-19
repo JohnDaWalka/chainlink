@@ -125,9 +125,17 @@ func gatewayRequest(t *testing.T, privateKey string, topics []string, methodName
 
 func getResponseFromArg(arg interface{}) (ghcapabilities.TriggerResponsePayload, error) {
 	resp := arg.(*jsonrpc.Response)
-	var response ghcapabilities.TriggerResponsePayload
-	err := json.Unmarshal(resp.Result, &response)
-	return response, err
+	var msg api.Message
+	err := json.Unmarshal(resp.Result, &msg)
+	if err != nil {
+		return ghcapabilities.TriggerResponsePayload{}, err
+	}
+	var payload ghcapabilities.TriggerResponsePayload
+	err = json.Unmarshal(msg.Body.Payload, &payload)
+	if err != nil {
+		return ghcapabilities.TriggerResponsePayload{}, err
+	}
+	return payload, nil
 }
 
 func requireNoChanMsg[T any](t *testing.T, ch <-chan T) {

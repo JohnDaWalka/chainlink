@@ -12,10 +12,10 @@ import (
 
 func ValidatedMessageFromResp(resp *jsonrpc.Response) (*api.Message, error) {
 	if resp.Error != nil {
-		return nil, fmt.Errorf("received non-empty error field: %v", resp.Error)
+		return nil, fmt.Errorf("received error in response: %v", resp.Error)
 	}
 	if resp.Result == nil {
-		return nil, fmt.Errorf("received nil result field in response: %v", resp)
+		return nil, fmt.Errorf("response result is nil, ID: %s", resp.ID)
 	}
 	var msg api.Message
 	err := json.Unmarshal(resp.Result, &msg)

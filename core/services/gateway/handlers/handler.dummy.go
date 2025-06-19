@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"go.uber.org/multierr"
@@ -43,14 +44,16 @@ func (d *dummyHandler) HandleUserMessage(ctx context.Context, msg *api.Message, 
 	d.savedCallbacks[msg.Body.MessageId] = &savedCallback{msg.Body.MessageId, callbackCh}
 	don := d.don
 	d.mu.Unlock()
+	params, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
 	req := &jsonrpc.Request{
 		Version: "2.0",
 		ID:      msg.Body.MessageId,
 		Method:  msg.Body.Method,
-		Params:  msg.Body.Payload,
+		Params:  params,
 	}
-	// Send to all nodes.
-	var err error
 	for _, member := range d.donConfig.Members {
 		err = multierr.Combine(err, don.SendToNode(ctx, member.Address, req))
 	}
@@ -63,6 +66,15 @@ func (d *dummyHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Resp
 	if err != nil {
 		return err
 	}
+	msg.Body.MessageId = resp.ID
+	err = msg.Validate()
+	if err != nil {
+		return err
+	}
+	if nodeAddr != msg.Body.Sender {
+		return fmt.Errorf("node address %s does not match message sender %s", nodeAddr, msg.Body.Sender)
+	}
+	fmt.Println("handleNodeMessage: msg.Body.Sender", msg.Body.Sender)
 	d.mu.Lock()
 	savedCb, found := d.savedCallbacks[msg.Body.MessageId]
 	delete(d.savedCallbacks, msg.Body.MessageId)
