@@ -31,18 +31,18 @@ FinalityTagEnabled = false
 FinalityDepth = 10 # instant finality so adding buffer
 NonceAutoSync = false
 
-[EVM.HeadTracker]
+[HeadTracker]
 FinalityTagBypass = false
 
-[EVM.GasEstimator]
+[GasEstimator]
 EIP1559DynamicFees = true
 
-[EVM.GasEstimator.BlockHistory]
+[GasEstimator.BlockHistory]
 # Default is 24, which leads to bumpy gas prices. In CCIP
 # we want to smooth out the gas prices, so we increase the sample size.
 BlockHistorySize = 200
 
-[EVM.NodePool]
+[NodePool]
 NewHeadsPollInterval = '4s'
 """
 
