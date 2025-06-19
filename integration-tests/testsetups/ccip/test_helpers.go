@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"

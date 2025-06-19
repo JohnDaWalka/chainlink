@@ -203,6 +203,7 @@ func NewApp(s *Shell) *cli.App {
 				keysCommand("Aptos", NewAptosKeysClient(s)),
 				keysCommand("Sui", NewSuiKeysClient(s)),
 				keysCommand("Tron", NewTronKeysClient(s)),
+				keysCommand("TON", NewTONKeysClient(s)),
 
 				initVRFKeysSubCmd(s),
 			},

@@ -10,7 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/aptoskey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/cosmoskey"
@@ -22,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/solkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/starkkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/tonkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/tronkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/vrfkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/workflowkey"
@@ -163,6 +165,7 @@ type keyRing struct {
 	Aptos      map[string]aptoskey.Key
 	Tron       map[string]tronkey.Key
 	Sui        map[string]suikey.Key
+	TON        map[string]tonkey.Key
 	VRF        map[string]vrfkey.KeyV2
 	Workflow   map[string]workflowkey.Key
 	LegacyKeys LegacyKeyStorage
@@ -181,6 +184,7 @@ func newKeyRing() *keyRing {
 		Aptos:    make(map[string]aptoskey.Key),
 		Tron:     make(map[string]tronkey.Key),
 		Sui:      make(map[string]suikey.Key),
+		TON:      make(map[string]tonkey.Key),
 		VRF:      make(map[string]vrfkey.KeyV2),
 		Workflow: make(map[string]workflowkey.Key),
 	}
@@ -249,6 +253,9 @@ func (kr *keyRing) raw() (rawKeys rawKeyRing) {
 	for _, suikey := range kr.Sui {
 		rawKeys.Sui = append(rawKeys.Sui, internal.RawBytes(suikey))
 	}
+	for _, tonkey := range kr.TON {
+		rawKeys.TON = append(rawKeys.TON, internal.RawBytes(tonkey))
+	}
 	for _, vrfKey := range kr.VRF {
 		rawKeys.VRF = append(rawKeys.VRF, internal.RawBytes(vrfKey))
 	}
@@ -259,7 +266,7 @@ func (kr *keyRing) raw() (rawKeys rawKeyRing) {
 }
 
 func (kr *keyRing) logPubKeys(lggr logger.Logger) {
-	lggr = lggr.Named("KeyRing")
+	lggr = logger.Named(lggr, "KeyRing")
 	var csaIDs []string
 	for _, CSAKey := range kr.CSA {
 		csaIDs = append(csaIDs, CSAKey.ID())
@@ -304,6 +311,10 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 	for _, suiKey := range kr.Sui {
 		suiIDs = append(suiIDs, suiKey.ID())
 	}
+	tonIDs := []string{}
+	for _, tonKey := range kr.TON {
+		tonIDs = append(tonIDs, tonKey.ID())
+	}
 	var vrfIDs []string
 	for _, VRFKey := range kr.VRF {
 		vrfIDs = append(vrfIDs, VRFKey.ID())
@@ -347,6 +358,9 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 	if len(suiIDs) > 0 {
 		lggr.Infow(fmt.Sprintf("Unlocked %d Sui keys", len(suiIDs)), "keys", suiIDs)
 	}
+	if len(tonIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d TON keys", len(tonIDs)), "keys", tonIDs)
+	}
 	if len(vrfIDs) > 0 {
 		lggr.Infow(fmt.Sprintf("Unlocked %d VRF keys", len(vrfIDs)), "keys", vrfIDs)
 	}
@@ -373,6 +387,7 @@ type rawKeyRing struct {
 	Aptos      [][]byte
 	Tron       [][]byte
 	Sui        [][]byte
+	TON        [][]byte
 	VRF        [][]byte
 	Workflow   [][]byte
 	LegacyKeys LegacyKeyStorage `json:"-"`
@@ -424,6 +439,10 @@ func (rawKeys rawKeyRing) keys() (*keyRing, error) {
 	for _, rawSuiKey := range rawKeys.Sui {
 		suiKey := suikey.KeyFor(internal.NewRaw(rawSuiKey))
 		keyRing.Sui[suiKey.ID()] = suiKey
+	}
+	for _, rawTONKey := range rawKeys.TON {
+		tonKey := tonkey.KeyFor(internal.NewRaw(rawTONKey))
+		keyRing.TON[tonKey.ID()] = tonKey
 	}
 	for _, rawVRFKey := range rawKeys.VRF {
 		vrfKey := vrfkey.KeyFor(internal.NewRaw(rawVRFKey))

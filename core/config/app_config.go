@@ -27,6 +27,7 @@ type AppConfig interface {
 	AptosEnabled() bool
 	TronEnabled() bool
 	SuiEnabled() bool
+	TONEnabled() bool
 
 	Validate() error
 	ValidateDB() error

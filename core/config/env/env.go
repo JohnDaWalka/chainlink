@@ -28,6 +28,7 @@ var (
 	MercuryPlugin  = NewPlugin("mercury")
 	AptosPlugin    = NewPlugin("aptos")
 	SuiPlugin      = NewPlugin("sui")
+	EVMPlugin      = NewPlugin("evm")
 	CosmosPlugin   = NewPlugin("cosmos")
 	SolanaPlugin   = NewPlugin("solana")
 	StarknetPlugin = NewPlugin("starknet")

@@ -52,6 +52,8 @@ func FromEncryptedJSON(keyJSON []byte, password string) (KeyBundle, error) {
 				kb = newKeyBundle(new(ed25519Keyring))
 			case chaintype.Tron:
 				kb = newKeyBundle(new(evmKeyring))
+			case chaintype.TON:
+				kb = newKeyBundle(new(tonKeyring))
 			default:
 				return nil, chaintype.NewErrInvalidChainType(export.ChainType)
 			}

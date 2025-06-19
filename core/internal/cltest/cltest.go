@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
 	"io"
 	"math/big"
 	"math/rand"
@@ -18,6 +17,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -47,6 +48,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/assets"
+	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
 	evmclient "github.com/smartcontractkit/chainlink-evm/pkg/client"
 	"github.com/smartcontractkit/chainlink-evm/pkg/client/clienttest"
 	"github.com/smartcontractkit/chainlink-evm/pkg/txmgr"
@@ -58,7 +60,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/cmd"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/configtest"
@@ -79,6 +80,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/solkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/starkkey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/tonkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/tronkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/vrfkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo"
@@ -135,6 +137,7 @@ var (
 	DefaultAptosKey    = aptoskey.MustNewInsecure(keystest.NewRandReaderFromSeed(KeyBigIntSeed))
 	DefaultTronKey     = tronkey.MustNewInsecure(keystest.NewRandReaderFromSeed(KeyBigIntSeed))
 	DefaultSuiKey      = suikey.MustNewInsecure(keystest.NewRandReaderFromSeed(KeyBigIntSeed))
+	DefaultTONKey      = tonkey.MustNewInsecure(keystest.NewRandReaderFromSeed(KeyBigIntSeed))
 	DefaultVRFKey      = vrfkey.MustNewV2XXXTestingOnly(big.NewInt(KeyBigIntSeed))
 )
 
@@ -450,7 +453,7 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		MercuryPool:              mercuryPool,
 		NewOracleFactoryFn:       newOracleFactoryFn,
 		RetirementReportCache:    retirement.NewRetirementReportCache(lggr, ds),
-		LLOTransmissionReaper:    llo.NewTransmissionReaper(ds, lggr, cfg.Mercury().Transmitter().ReaperFrequency().Duration(), cfg.Mercury().Transmitter().ReaperMaxAge().Duration()),
+		LLOTransmissionReaper:    llo.NewTransmissionReaper(ds, lggr, cfg.Mercury().Transmitter().ReaperFrequency(), cfg.Mercury().Transmitter().ReaperMaxAge()),
 		EVMFactoryConfigFn:       evmFactoryConfigFn,
 	})
 
@@ -771,16 +774,11 @@ func ParseResponseBody(t testing.TB, resp *http.Response) []byte {
 }
 
 // ParseJSONAPIResponse parses the response and returns the JSONAPI resource.
-func ParseJSONAPIResponse(t testing.TB, resp *http.Response, resource interface{}) error {
+func ParseJSONAPIResponse(t testing.TB, resp *http.Response, resource interface{}) {
 	t.Helper()
 
 	input := ParseResponseBody(t, resp)
-	err := jsonapi.Unmarshal(input, resource)
-	if err != nil {
-		return fmt.Errorf("web: unable to unmarshal data, %w", err)
-	}
-
-	return nil
+	require.NoError(t, jsonapi.Unmarshal(input, resource))
 }
 
 // ParseJSONAPIResponseMeta parses the bytes of the root document and returns a
@@ -819,8 +817,7 @@ func CreateJobViaWeb(t testing.TB, app *TestApplication, request []byte) job.Job
 	AssertServerResponse(t, resp, http.StatusOK)
 
 	var createdJob job.Job
-	err := ParseJSONAPIResponse(t, resp, &createdJob)
-	require.NoError(t, err)
+	ParseJSONAPIResponse(t, resp, &createdJob)
 	return createdJob
 }
 
@@ -833,8 +830,7 @@ func CreateJobViaWeb2(t testing.TB, app *TestApplication, spec string) webpresen
 	AssertServerResponse(t, resp, http.StatusOK)
 
 	var jobResponse webpresenters.JobResource
-	err := ParseJSONAPIResponse(t, resp, &jobResponse)
-	require.NoError(t, err)
+	ParseJSONAPIResponse(t, resp, &jobResponse)
 	return jobResponse
 }
 
@@ -874,8 +870,7 @@ func CreateJobRunViaExternalInitiatorV2(
 	defer cleanup()
 	AssertServerResponse(t, resp, 200)
 	var pr webpresenters.PipelineRunResource
-	err := ParseJSONAPIResponse(t, resp, &pr)
-	require.NoError(t, err)
+	ParseJSONAPIResponse(t, resp, &pr)
 
 	// assert.Equal(t, j.ID, pr.JobSpecID)
 	return pr
@@ -895,8 +890,7 @@ func CreateJobRunViaUser(
 	defer cleanup()
 	AssertServerResponse(t, resp, 200)
 	var pr webpresenters.PipelineRunResource
-	err := ParseJSONAPIResponse(t, resp, &pr)
-	require.NoError(t, err)
+	ParseJSONAPIResponse(t, resp, &pr)
 
 	return pr
 }
@@ -914,8 +908,7 @@ func CreateExternalInitiatorViaWeb(
 	defer cleanup()
 	AssertServerResponse(t, resp, http.StatusCreated)
 	ei := &webpresenters.ExternalInitiatorAuthentication{}
-	err := ParseJSONAPIResponse(t, resp, ei)
-	require.NoError(t, err)
+	ParseJSONAPIResponse(t, resp, ei)
 
 	return ei
 }

@@ -16,6 +16,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
+	solrpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -26,32 +27,33 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
-	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	mnCfg "github.com/smartcontractkit/chainlink-framework/multinode/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
-	solrpc "github.com/gagliardetto/solana-go/rpc"
+	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
+	pb "github.com/smartcontractkit/chainlink-protos/orchestrator/feedsmanager"
+
+	mnCfg "github.com/smartcontractkit/chainlink-framework/multinode/config"
 
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/data-streams/utils/pointer"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
+	"github.com/smartcontractkit/chainlink/deployment/helpers/pointer"
 	"github.com/smartcontractkit/chainlink/deployment/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/llo/retirement"
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/assets"
 	"github.com/smartcontractkit/chainlink-evm/pkg/client"
 	v2toml "github.com/smartcontractkit/chainlink-evm/pkg/config/toml"
+	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
+	evmlptesting "github.com/smartcontractkit/chainlink-evm/pkg/logpoller/testing"
 	"github.com/smartcontractkit/chainlink-evm/pkg/testutils"
 	evmutils "github.com/smartcontractkit/chainlink-evm/pkg/utils/big"
-	pb "github.com/smartcontractkit/chainlink-protos/orchestrator/feedsmanager"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	configv2 "github.com/smartcontractkit/chainlink/v2/core/config/toml"
@@ -65,6 +67,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/workflowkey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/llo/retirement"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/crypto"
@@ -72,11 +75,11 @@ import (
 )
 
 type Node struct {
-	ID   string
-	Name string
-	App  chainlink.Application
+	ID     string
+	Name   string
+	App    chainlink.Application
+	Chains []uint64 // chain selectors
 	// Transmitter key/OCR keys for this node
-	Chains     []uint64 // chain selectors
 	Keys       Keys
 	Addr       net.TCPAddr
 	IsBoostrap bool
@@ -95,11 +98,40 @@ func (n Node) ReplayLogs(ctx context.Context, chains map[uint64]uint64) error {
 	for sel, block := range chains {
 		family, _ := chainsel.GetSelectorFamily(sel)
 		chainID, _ := chainsel.GetChainIDFromSelector(sel)
+
 		if err := n.App.ReplayFromBlock(ctx, family, chainID, block, false); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (n Node) IsLogFilterRegistered(ctx context.Context, chainSel uint64, eventName string, address []byte) (bool, error) {
+	family, err := chainsel.GetSelectorFamily(chainSel)
+	if err != nil {
+		return false, err
+	}
+	chainID, err := chainsel.GetChainIDFromSelector(chainSel)
+	if err != nil {
+		return false, err
+	}
+
+	var exists bool
+	switch family {
+	case chainsel.FamilyEVM:
+		orm := evmlptesting.NewTestORM(n.App.GetDB())
+		exists, err = orm.HasFilterByEventSig(ctx, chainID, common.HexToHash(eventName), address)
+	case chainsel.FamilySolana:
+		orm := sollptesting.NewTestORM(n.App.GetDB())
+		exists, err = orm.HasFilterByEventName(ctx, chainID, eventName, address)
+	default:
+		return false, fmt.Errorf("unsupported chain family; %v", family)
+	}
+
+	if err != nil || !exists {
+		return false, err
+	}
+	return true, nil
 }
 
 // DeploymentNode is an adapter for deployment.Node
@@ -237,9 +269,9 @@ type NewNodeConfig struct {
 	// Port for the P2P V2 listener.
 	Port int
 	// EVM chains to be configured. Optional.
-	Chains map[uint64]cldf.Chain
+	Chains map[uint64]cldf_evm.Chain
 	// Solana chains to be configured. Optional.
-	Solchains map[uint64]cldf.SolChain
+	Solchains map[uint64]cldf_solana.Chain
 	// Aptos chains to be configured. Optional.
 	Aptoschains    map[uint64]cldf.AptosChain
 	Suichains      map[uint64]suichain.Chain
@@ -362,7 +394,6 @@ func NewNode(
 
 	// Set logging.
 	lggr := logger.NewSingleFileLogger(t)
-	lggr.SetLogLevel(nodecfg.LogLevel)
 
 	// Create clients for the core node backed by sim.
 	clients := make(map[uint64]client.Client)
@@ -377,6 +408,7 @@ func NewNode(
 	require.NoError(t, master.Unlock(ctx, "password"))
 	require.NoError(t, master.CSA().EnsureKey(ctx))
 	require.NoError(t, master.Workflow().EnsureKey(ctx))
+	require.NoError(t, master.OCR2().EnsureKeys(ctx, chaintype.EVM, chaintype.Solana, chaintype.Aptos))
 
 	app, err := chainlink.NewApplication(ctx, chainlink.ApplicationOpts{
 		CREOpts: chainlink.CREOpts{
@@ -684,7 +716,7 @@ func createConfigV2Chain(chainID uint64) *v2toml.EVMConfig {
 	}
 }
 
-func createSolanaChainConfig(chainID string, chain cldf.SolChain) *solcfg.TOMLConfig {
+func createSolanaChainConfig(chainID string, chain cldf_solana.Chain) *solcfg.TOMLConfig {
 	chainConfig := solcfg.Chain{}
 	chainConfig.SetDefaults()
 
