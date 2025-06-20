@@ -15,6 +15,7 @@ var (
 	ErrResourceTypeNotFound = errors.New("could not find conversion rate, continuing as 1:1")
 )
 
+// the balanceStore is not meant to hold state changes and is intended to only an in-execution credit balance
 type balanceStore struct {
 	// A balance of credits
 	balance decimal.Decimal
@@ -38,7 +39,6 @@ func NewBalanceStore(
 	}
 
 	return &balanceStore{
-		// meteringMode: false,
 		balance:     startingBalance,
 		conversions: conversions,
 	}

@@ -73,8 +73,9 @@ type Report struct {
 	lggr    logger.Logger
 
 	// internal state
-	mu           sync.RWMutex
-	ready        bool
+	mu    sync.RWMutex
+	ready bool
+	// meteringMode determines whether negative balances should return an error. meteringMode == true allows negative
 	meteringMode bool
 	steps        map[string]ReportStep
 }
