@@ -368,7 +368,8 @@ func SetupTestEnvironment(
 		_, fundErr := operations.ExecuteOperation(fullCldOutput.Environment.OperationsBundle, FundCLNodesOp, FundCLNodesOpDeps{
 			Env:               fullCldOutput.Environment,
 			BlockchainOutputs: blockchainOutputs,
-		}, FundCLNodesOpInput{DonTopology: fullCldOutput.DonTopology, FundAmount: 5000000000000000000})
+			DonTopology:       fullCldOutput.DonTopology,
+		}, FundCLNodesOpInput{FundAmount: 5000000000000000000})
 		if fundErr != nil {
 			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(fundErr, "failed to fund CL nodes")}
 			return

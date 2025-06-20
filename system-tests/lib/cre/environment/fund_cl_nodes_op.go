@@ -22,11 +22,11 @@ import (
 type FundCLNodesOpDeps struct {
 	Env               *cldf.Environment
 	BlockchainOutputs []*BlockchainOutput
+	DonTopology       *types.DonTopology
 }
 
 type FundCLNodesOpInput struct {
-	DonTopology *types.DonTopology
-	FundAmount  int64
+	FundAmount int64
 }
 
 type FundCLNodesOpOutput struct {
@@ -50,7 +50,7 @@ var FundCLNodesOp = operations.NewOperation[FundCLNodesOpInput, FundCLNodesOpOut
 		}
 
 		errGroup := &errgroup.Group{}
-		for _, metaDon := range input.DonTopology.DonsWithMetadata {
+		for _, metaDon := range deps.DonTopology.DonsWithMetadata {
 			for _, bcOut := range deps.BlockchainOutputs {
 				for _, node := range metaDon.DON.Nodes {
 					errGroup.Go(func() error {

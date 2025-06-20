@@ -219,6 +219,7 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *type
 			GetContext:        envs[0].GetContext,
 			NodeIDs:           nodeIDs,
 			BlockChains:       cldf_chain.NewBlockChainsFromSlice(cldfChains),
+			OperationsBundle:  input.OperationsBundle,
 		},
 	}
 
