@@ -30,6 +30,7 @@ var (
 	}
 	defaultPluginsPaths = []string{
 		"./plugins/plugins.public.yaml",
+		"./plugins/plugins.public.experimental.yaml",
 	}
 )
 
