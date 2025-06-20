@@ -16,13 +16,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
-	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions"
 	fallow "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions/allowlist"
 	fsub "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions/subscriptions"
@@ -39,7 +39,7 @@ type functionsConnectorHandler struct {
 	nodeAddress                string
 	storage                    s4.Storage
 	allowlist                  fallow.OnchainAllowlist
-	rateLimiter                *hc.RateLimiter
+	rateLimiter                *ratelimit.RateLimiter
 	subscriptions              fsub.OnchainSubscriptions
 	minimumBalance             assets.Link
 	listener                   FunctionsListener
@@ -79,7 +79,7 @@ func NewFunctionsConnectorHandler(
 	keystore keys.MessageSigner,
 	storage s4.Storage,
 	allowlist fallow.OnchainAllowlist,
-	rateLimiter *hc.RateLimiter,
+	rateLimiter *ratelimit.RateLimiter,
 	subscriptions fsub.OnchainSubscriptions,
 	listener FunctionsListener,
 	offchainTransmitter OffchainTransmitter,

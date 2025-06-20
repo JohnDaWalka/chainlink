@@ -12,8 +12,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
@@ -49,7 +49,7 @@ func newTestConnector(t *testing.T, config *connector.ConnectorConfig) (connecto
 	signer := mocks.NewSigner(t)
 	handler := mocks.NewGatewayConnectorHandler(t)
 	clock := clockwork.NewFakeClock()
-	connector, err := connector.NewGatewayConnector(config, signer, clock, logger.TestLogger(t))
+	connector, err := connector.NewGatewayConnector(config, signer, clock, logger.Test(t))
 	require.NoError(t, err)
 	require.NoError(t, connector.AddHandler([]string{testMethod1}, handler))
 	return connector, signer, handler
@@ -113,7 +113,7 @@ URL = "ws://localhost:8081/node"
 	for name, config := range invalidCases {
 		config := config
 		t.Run(name, func(t *testing.T) {
-			_, err := connector.NewGatewayConnector(parseTOMLConfig(t, config), signer, clock, logger.TestLogger(t))
+			_, err := connector.NewGatewayConnector(parseTOMLConfig(t, config), signer, clock, logger.Test(t))
 			require.Error(t, err)
 		})
 	}

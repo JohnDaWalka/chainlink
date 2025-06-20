@@ -12,6 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
@@ -20,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 )
 
 const defaultSendChannelBufferSize = 1000
@@ -38,7 +38,7 @@ type webapiTrigger struct {
 	allowedTopics  map[string]bool
 	ch             chan<- capabilities.TriggerResponse
 	config         webapicap.TriggerConfig
-	rateLimiter    *common.RateLimiter
+	rateLimiter    *ratelimit.RateLimiter
 }
 
 type triggerConnectorHandler struct {
@@ -195,14 +195,14 @@ func (h *triggerConnectorHandler) RegisterTrigger(ctx context.Context, req capab
 	}
 
 	rateLimiterConfig := reqConfig.RateLimiter
-	commonRateLimiter := common.RateLimiterConfig{
+	commonRateLimiter := ratelimit.RateLimiterConfig{
 		GlobalRPS:      rateLimiterConfig.GlobalRPS,
 		GlobalBurst:    int(rateLimiterConfig.GlobalBurst),
 		PerSenderRPS:   rateLimiterConfig.PerSenderRPS,
 		PerSenderBurst: int(rateLimiterConfig.PerSenderBurst),
 	}
 
-	rateLimiter, err := common.NewRateLimiter(commonRateLimiter)
+	rateLimiter, err := ratelimit.NewRateLimiter(commonRateLimiter)
 	if err != nil {
 		return nil, err
 	}

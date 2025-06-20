@@ -13,11 +13,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 )
 
 const (
@@ -42,21 +43,21 @@ type OutgoingConnectorHandler struct {
 	gc                  connector.GatewayConnector
 	method              string
 	lggr                logger.Logger
-	incomingRateLimiter *common.RateLimiter
-	outgoingRateLimiter *common.RateLimiter
+	incomingRateLimiter *ratelimit.RateLimiter
+	outgoingRateLimiter *ratelimit.RateLimiter
 	responses           *responses
-	selectorOpts        []func(*RoundRobinSelector)
+	selectorOpts        []func(*gateway.RoundRobinSelector)
 	metrics             *metrics
 }
 
-func NewOutgoingConnectorHandler(gc connector.GatewayConnector, config ServiceConfig, method string, lgger logger.Logger, opts ...func(*RoundRobinSelector)) (*OutgoingConnectorHandler, error) {
+func NewOutgoingConnectorHandler(gc connector.GatewayConnector, config ServiceConfig, method string, lgger logger.Logger, opts ...func(*gateway.RoundRobinSelector)) (*OutgoingConnectorHandler, error) {
 	outgoingRLCfg := outgoingRateLimiterConfigDefaults(config.OutgoingRateLimiter)
-	outgoingRateLimiter, err := common.NewRateLimiter(outgoingRLCfg)
+	outgoingRateLimiter, err := ratelimit.NewRateLimiter(outgoingRLCfg)
 	if err != nil {
 		return nil, err
 	}
 	incomingRLCfg := incomingRateLimiterConfigDefaults(config.RateLimiter)
-	incomingRateLimiter, err := common.NewRateLimiter(incomingRLCfg)
+	incomingRateLimiter, err := ratelimit.NewRateLimiter(incomingRLCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +190,7 @@ type awaitContext struct {
 // cancellation or timeout.
 func (c *OutgoingConnectorHandler) awaitConnection(ctx context.Context, md awaitContext) (string, error) {
 	lggr := logger.With(c.lggr, "messageID", md.messageID, "workflowID", md.workflowID)
-	selector := NewRoundRobinSelector(c.gc.GatewayIDs(), c.selectorOpts...)
+	selector := gateway.NewRoundRobinSelector(c.gc.GatewayIDs(), c.selectorOpts...)
 	attempts := make(map[string]int)
 	backoff := 10 * time.Millisecond
 
@@ -348,7 +349,7 @@ func (c *OutgoingConnectorHandler) Name() string {
 	return c.lggr.Name()
 }
 
-func incomingRateLimiterConfigDefaults(config common.RateLimiterConfig) common.RateLimiterConfig {
+func incomingRateLimiterConfigDefaults(config ratelimit.RateLimiterConfig) ratelimit.RateLimiterConfig {
 	if config.GlobalBurst == 0 {
 		config.GlobalBurst = DefaultGlobalBurst
 	}
@@ -363,7 +364,7 @@ func incomingRateLimiterConfigDefaults(config common.RateLimiterConfig) common.R
 	}
 	return config
 }
-func outgoingRateLimiterConfigDefaults(config common.RateLimiterConfig) common.RateLimiterConfig {
+func outgoingRateLimiterConfigDefaults(config ratelimit.RateLimiterConfig) ratelimit.RateLimiterConfig {
 	if config.GlobalBurst == 0 {
 		config.GlobalBurst = DefaultGlobalBurst
 	}

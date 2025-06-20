@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
@@ -38,7 +38,7 @@ func TestDummyHandler_BasicFlow(t *testing.T) {
 	}
 
 	connMgr := testConnManager{}
-	handler, err := handlers.NewDummyHandler(&config, &connMgr, logger.TestLogger(t))
+	handler, err := handlers.NewDummyHandler(&config, &connMgr, logger.Test(t))
 	require.NoError(t, err)
 	connMgr.SetHandler(handler)
 

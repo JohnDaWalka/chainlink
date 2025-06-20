@@ -18,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
@@ -36,7 +37,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/platform"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
@@ -1842,13 +1842,13 @@ func TestEngine_WithCustomComputeStep(t *testing.T) {
 	reg := coreCap.NewRegistry(logger.TestLogger(t))
 	cfg := compute.Config{
 		ServiceConfig: webapi.ServiceConfig{
-			OutgoingRateLimiter: common.RateLimiterConfig{
+			OutgoingRateLimiter: ratelimit.RateLimiterConfig{
 				GlobalRPS:      100.0,
 				GlobalBurst:    100,
 				PerSenderRPS:   100.0,
 				PerSenderBurst: 100,
 			},
-			RateLimiter: common.RateLimiterConfig{
+			RateLimiter: ratelimit.RateLimiterConfig{
 				GlobalRPS:      100.0,
 				GlobalBurst:    100,
 				PerSenderRPS:   100.0,
@@ -1917,13 +1917,13 @@ func TestEngine_CustomComputePropagatesBreaks(t *testing.T) {
 	reg := coreCap.NewRegistry(logger.TestLogger(t))
 	cfg := compute.Config{
 		ServiceConfig: webapi.ServiceConfig{
-			OutgoingRateLimiter: common.RateLimiterConfig{
+			OutgoingRateLimiter: ratelimit.RateLimiterConfig{
 				GlobalRPS:      100.0,
 				GlobalBurst:    100,
 				PerSenderRPS:   100.0,
 				PerSenderBurst: 100,
 			},
-			RateLimiter: common.RateLimiterConfig{
+			RateLimiter: ratelimit.RateLimiterConfig{
 				GlobalRPS:      100.0,
 				GlobalBurst:    100,
 				PerSenderRPS:   100.0,
