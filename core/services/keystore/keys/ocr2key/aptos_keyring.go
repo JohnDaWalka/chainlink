@@ -62,9 +62,9 @@ func (akr *aptosKeyring) reportToSigData3(digest types.ConfigDigest, seqNr uint6
 	if err != nil {
 		return nil, err
 	}
-	h.Write(r)
 	h.Write(rawReportContext[0][:])
 	h.Write(rawReportContext[1][:])
+	h.Write(r)
 	return h.Sum(nil), nil
 }
 
