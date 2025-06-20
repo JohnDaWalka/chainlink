@@ -14,6 +14,7 @@ import (
 	"github.com/onsi/gomega"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys/keystest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -23,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	gwconnector "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
-	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	fallowMocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions/allowlist/mocks"
 	fsubMocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions/subscriptions/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/functions/config"
@@ -70,7 +70,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 	storage := s4mocks.NewStorage(t)
 	connector := gcmocks.NewGatewayConnector(t)
 	allowlist := fallowMocks.NewOnchainAllowlist(t)
-	rateLimiter, err := hc.NewRateLimiter(hc.RateLimiterConfig{GlobalRPS: 100.0, GlobalBurst: 100, PerSenderRPS: 100.0, PerSenderBurst: 100})
+	rateLimiter, err := ratelimit.NewRateLimiter(ratelimit.RateLimiterConfig{GlobalRPS: 100.0, GlobalBurst: 100, PerSenderRPS: 100.0, PerSenderBurst: 100})
 	subscriptions := fsubMocks.NewOnchainSubscriptions(t)
 	reportCh := make(chan *functions.OffchainResponse)
 	offchainTransmitter := sfmocks.NewOffchainTransmitter(t)

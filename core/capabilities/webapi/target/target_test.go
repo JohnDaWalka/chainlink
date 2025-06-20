@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	registrymock "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -58,7 +59,7 @@ func setup(t *testing.T, config webapi.ServiceConfig) testHarness {
 	connector := gcmocks.NewGatewayConnector(t)
 	lggr := logger.Test(t)
 
-	connectorHandler, err := webapi.NewOutgoingConnectorHandler(connector, config, ghcapabilities.MethodWebAPITarget, lggr, webapi.WithFixedStart())
+	connectorHandler, err := webapi.NewOutgoingConnectorHandler(connector, config, ghcapabilities.MethodWebAPITarget, lggr, gateway.WithFixedStart())
 	require.NoError(t, err)
 
 	capability, err := NewCapability(config, registry, connectorHandler, lggr)
