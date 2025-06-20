@@ -50,11 +50,11 @@ func NewBalanceStore(
 
 // convertToBalance converts a resource dimension amount to a credit amount.
 // This method should only be used under a read lock.
-func (bs *balanceStore) convertToBalance(fromUnit string, amount decimal.Decimal) decimal.Decimal {
-	rate, ok := bs.conversions[fromUnit]
+func (bs *balanceStore) convertToBalance(fromResourceType string, amount decimal.Decimal) decimal.Decimal {
+	rate, ok := bs.conversions[fromResourceType]
 	if !ok {
 		// Fail open, continue optimistically
-		bs.lggr.Errorw("could not find conversion rate, continuing as 1:1; entering metering mode", "unit", fromUnit)
+		bs.lggr.Errorw("could not find conversion rate, continuing as 1:1; entering metering mode", "unit", fromResourceType)
 		rate = decimal.NewFromInt(1)
 		bs.meteringMode = true
 	}
@@ -63,20 +63,20 @@ func (bs *balanceStore) convertToBalance(fromUnit string, amount decimal.Decimal
 }
 
 // ConvertToBalance converts a resource dimensions amount to a credit amount.
-func (bs *balanceStore) ConvertToBalance(fromUnit string, amount decimal.Decimal) decimal.Decimal {
+func (bs *balanceStore) ConvertToBalance(fromResourceType string, amount decimal.Decimal) decimal.Decimal {
 	bs.mu.RLock()
 	defer bs.mu.RUnlock()
 
-	return bs.convertToBalance(fromUnit, amount)
+	return bs.convertToBalance(fromResourceType, amount)
 }
 
 // convertFromBalance converts a credit amount to a resource dimensions amount.
 // This method should only be used under a read lock.
-func (bs *balanceStore) convertFromBalance(toUnit string, amount decimal.Decimal) decimal.Decimal {
-	rate, ok := bs.conversions[toUnit]
+func (bs *balanceStore) convertFromBalance(toResourceType string, amount decimal.Decimal) decimal.Decimal {
+	rate, ok := bs.conversions[toResourceType]
 	if !ok {
 		// Fail open, continue optimistically
-		bs.lggr.Errorw("could not find conversion rate, continuing as 1:1; entering metering mode", "unit", toUnit)
+		bs.lggr.Errorw("could not find conversion rate, continuing as 1:1; entering metering mode", "unit", toResourceType)
 		rate = decimal.NewFromInt(1)
 		bs.meteringMode = true
 	}
@@ -85,11 +85,11 @@ func (bs *balanceStore) convertFromBalance(toUnit string, amount decimal.Decimal
 }
 
 // ConvertFromBalance converts a credit amount to a resource dimensions amount.
-func (bs *balanceStore) ConvertFromBalance(toUnit string, amount decimal.Decimal) decimal.Decimal {
+func (bs *balanceStore) ConvertFromBalance(toResourceType string, amount decimal.Decimal) decimal.Decimal {
 	bs.mu.RLock()
 	defer bs.mu.RUnlock()
 
-	return bs.convertFromBalance(toUnit, amount)
+	return bs.convertFromBalance(toResourceType, amount)
 }
 
 // Get returns the current credit balance
@@ -105,7 +105,7 @@ func (bs *balanceStore) GetAs(unit string) decimal.Decimal {
 	bs.mu.RLock()
 	defer bs.mu.RUnlock()
 
-	if bs.balance.LessThanOrEqual(decimal.Zero) {
+	if bs.balance.LessThan(decimal.Zero) {
 		return decimal.Zero
 	}
 
@@ -117,7 +117,7 @@ func (bs *balanceStore) Minus(amount decimal.Decimal) error {
 	bs.mu.Lock()
 	defer bs.mu.Unlock()
 
-	if amount.LessThanOrEqual(decimal.Zero) {
+	if amount.LessThan(decimal.Zero) {
 		return ErrInvalidAmount
 	}
 
@@ -131,15 +131,15 @@ func (bs *balanceStore) Minus(amount decimal.Decimal) error {
 }
 
 // MinusAs lowers the current credit balance based on an amount of resource dimensions.
-func (bs *balanceStore) MinusAs(unit string, amount decimal.Decimal) error {
+func (bs *balanceStore) MinusAs(resourceType string, amount decimal.Decimal) error {
 	bs.mu.Lock()
 	defer bs.mu.Unlock()
 
-	if amount.LessThanOrEqual(decimal.Zero) {
+	if amount.LessThan(decimal.Zero) {
 		return ErrInvalidAmount
 	}
 
-	balToMinus := bs.convertToBalance(unit, amount)
+	balToMinus := bs.convertToBalance(resourceType, amount)
 
 	if balToMinus.GreaterThan(bs.balance) && !bs.meteringMode {
 		return ErrInsufficientBalance
@@ -165,15 +165,15 @@ func (bs *balanceStore) Add(amount decimal.Decimal) error {
 }
 
 // AddAs increases the current credit balance based on an amount of resource dimensions.
-func (bs *balanceStore) AddAs(unit string, amount decimal.Decimal) error {
+func (bs *balanceStore) AddAs(resourceType string, amount decimal.Decimal) error {
 	bs.mu.Lock()
 	defer bs.mu.Unlock()
 
-	if amount.LessThanOrEqual(decimal.Zero) {
+	if amount.LessThan(decimal.Zero) {
 		return ErrInvalidAmount
 	}
 
-	bs.balance = bs.balance.Add(bs.convertToBalance(unit, amount))
+	bs.balance = bs.balance.Add(bs.convertToBalance(resourceType, amount))
 
 	return nil
 }
