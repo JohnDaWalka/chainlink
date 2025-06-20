@@ -3,6 +3,7 @@ package capabilities
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -12,12 +13,14 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 )
 
@@ -40,6 +43,7 @@ type handler struct {
 	nodeRateLimiter *ratelimit.RateLimiter
 	wg              sync.WaitGroup
 	metrics         *metrics
+	codec           api.Codec
 }
 
 type HandlerConfig struct {
@@ -80,6 +84,7 @@ func NewHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don 
 		wg:              sync.WaitGroup{},
 		savedCallbacks:  make(map[string]*savedCallback),
 		metrics:         metrics,
+		codec:           &api.JsonRPCCodec{},
 	}, nil
 }
 
@@ -190,8 +195,12 @@ func (h *handler) handleWebAPIOutgoingMessage(ctx context.Context, msg *api.Mess
 		// - the connection between the Gateway and DON Node is already authorized via a DON-side and Gateway-side
 		// allowlist, and secured via TLS.
 		respMsg.Signature = msg.Signature
-
-		err = h.don.SendToNode(newCtx, nodeAddr, respMsg)
+		req, err := common.ValidatedRequestFromMessage(respMsg)
+		if err != nil {
+			l.Errorw("error transforming message to request", "err", err)
+			return
+		}
+		err = h.don.SendToNode(newCtx, nodeAddr, req)
 		if err != nil {
 			l.Errorw("failed to send to node", "err", err, "to", nodeAddr)
 			return
@@ -201,9 +210,15 @@ func (h *handler) handleWebAPIOutgoingMessage(ctx context.Context, msg *api.Mess
 	return nil
 }
 
-func (h *handler) HandleNodeMessage(ctx context.Context, msg *api.Message, nodeAddr string) error {
+func (h *handler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error {
+	msg, err := common.ValidatedMessageFromResp(resp)
+	if err != nil {
+		return err
+	}
+	if msg.Body.Sender != nodeAddr {
+		return errors.New("message sender mismatch when reading from node ")
+	}
 	start := time.Now()
-	var err error
 	switch msg.Body.Method {
 	case MethodWebAPITrigger:
 		err = h.handleWebAPITriggerMessage(ctx, msg, nodeAddr)
@@ -259,10 +274,16 @@ func (h *handler) HandleUserMessage(ctx context.Context, msg *api.Message, callb
 		close(callbackCh)
 		return nil
 	}
-
-	// Send to all nodes.
+	req, err := common.ValidatedRequestFromMessage(msg)
+	if err != nil {
+		h.lggr.Errorw("error transforming message to request")
+		callbackCh <- handlers.UserCallbackPayload{Msg: msg, ErrCode: api.UserMessageParseError, ErrMsg: "error transforming message to request"}
+		close(callbackCh)
+		return nil
+	}
+	// Send original request to all nodes
 	for _, member := range h.donConfig.Members {
-		err = multierr.Combine(err, don.SendToNode(ctx, member.Address, msg))
+		err = multierr.Combine(err, don.SendToNode(ctx, member.Address, req))
 	}
 	return err
 }
