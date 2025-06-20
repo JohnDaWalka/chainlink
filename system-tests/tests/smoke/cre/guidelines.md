@@ -324,7 +324,7 @@ CRIB does **not** support building Docker images from source during test runtime
 `localhost:5001` is the repository name for local Kind registry. In order to push your image there you need:
 
 - **tag a Docker image with prefix**, e.g. `docker tag chainlink-tmp:latest localhost:5001/chainlink:latest`
-- **pushh it to the local registry**, e.g. `docker push localhost:5001/chainlink:latest`
+- **push it to the local registry**, e.g. `docker push localhost:5001/chainlink:latest`
 
 **Also, it is crucial that you use an image, where default user is `chainlink`**. That's because Helm charts used for k8s deployment will start that container as that user and if your image was created using a different default user (e.g. `root`), then Chainlink application won't even start due to incorrect filesystem permissions. If you are building the image locally, use the following command:
 
