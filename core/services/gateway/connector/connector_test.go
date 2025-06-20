@@ -14,7 +14,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	gatewaymocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 )
@@ -49,7 +48,7 @@ func newTestConnector(t *testing.T, config *ConnectorConfig) (*gatewayConnector,
 	signer := gatewaymocks.NewSigner(t)
 	handler := gatewaymocks.NewGatewayConnectorHandler(t)
 	clock := clockwork.NewFakeClock()
-	connector, err := connector.NewGatewayConnector(config, signer, clock, logger.Test(t))
+	connector, err := NewGatewayConnector(config, signer, clock, logger.Test(t))
 	require.NoError(t, err)
 	require.NoError(t, connector.AddHandler(t.Context(), []string{testMethod1}, handler))
 	return connector, signer, handler

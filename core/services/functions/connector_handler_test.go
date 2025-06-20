@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	gwconnector "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
+	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	fallowMocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions/allowlist/mocks"
 	fsubMocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions/subscriptions/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/functions/config"

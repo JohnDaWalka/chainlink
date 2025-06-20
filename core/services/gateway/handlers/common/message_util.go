@@ -10,6 +10,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 )
 
+// ValidatedMessageFromResp validates and extracts legacy Gateway Message
+// from JSON-RPC results field in the response
 func ValidatedMessageFromResp(resp *jsonrpc.Response) (*api.Message, error) {
 	if resp.Error != nil {
 		return nil, fmt.Errorf("received error, ID: %s", resp.ID)
@@ -30,6 +32,8 @@ func ValidatedMessageFromResp(resp *jsonrpc.Response) (*api.Message, error) {
 	return &msg, nil
 }
 
+// ValidatedMessageFromReq validated and extracts a legacy Gateway Message
+// from params field of JSON-RPC request
 func ValidatedMessageFromReq(req *jsonrpc.Request) (*api.Message, error) {
 	if req.Version != "2.0" {
 		return nil, errors.New("incorrect jsonrpc version")
@@ -54,6 +58,7 @@ func ValidatedMessageFromReq(req *jsonrpc.Request) (*api.Message, error) {
 	return &m, nil
 }
 
+// ValidatedResponseFromMessage converts a legacy Gateway Message to a JSON-RPC response
 func ValidatedResponseFromMessage(msg *api.Message) (*jsonrpc.Response, error) {
 	if msg == nil {
 		return nil, errors.New("nil message")
@@ -73,6 +78,7 @@ func ValidatedResponseFromMessage(msg *api.Message) (*jsonrpc.Response, error) {
 	return resp, nil
 }
 
+// ValidatedRequestFromMessage converts a legacy Gateway Message to a JSON-RPC request
 func ValidatedRequestFromMessage(msg *api.Message) (*jsonrpc.Request, error) {
 	if msg == nil {
 		return nil, errors.New("nil message")
