@@ -92,6 +92,9 @@ const (
 	WethDecimals                           = 18
 	UsdcDecimals                           = 6
 
+	// Aptos APT Fungible Asset address
+	AptosAPTAddress = "0xa"
+
 	// Price Feed Descriptions
 	AvaxUSD  = "AVAX / USD"
 	LinkUSD  = "LINK / USD"
