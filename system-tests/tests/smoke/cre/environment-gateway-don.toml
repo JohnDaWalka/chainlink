@@ -19,7 +19,7 @@
   type = "docker"
 
 [[workflow_configs]]
-  workflow_name = "abcdefgasd
+  workflow_name = "abcdefgasd"
   # 0x01 8e16c39e 0000 20 0000000000000000 = ETH/USD Benchmark Price with 0 decimals
   feed_id = "018e16c39e000320000000000000000000000000000000000000000000000000"
 
@@ -57,6 +57,8 @@
       Level = 'debug'
       JSONConsole = true
       """
+      [nodesets.node_specs.node.env_vars]
+      CL_EVM_CMD=""
 
 [[nodesets]]
   nodes = 1
@@ -79,3 +81,5 @@
       Level = 'debug'
       JSONConsole = true
       """
+    [nodesets.node_specs.node.env_vars]
+    CL_EVM_CMD=""

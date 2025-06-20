@@ -555,11 +555,9 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice(t *testing.
 		croncap.CronCapabilityFactoryFn,
 	}
 
-	chainIDs := make([]int, 0)
 	for _, bc := range in.Blockchains {
 		chainID, chainErr := strconv.Atoi(bc.ChainID)
 		require.NoError(t, chainErr, "failed to convert chain ID to int")
-		chainIDs = append(chainIDs, chainID)
 		capabilityFactoryFns = append(capabilityFactoryFns, writeevmcap.WriteEVMCapabilityFactory(libc.MustSafeUint64(int64(chainID))))
 	}
 
@@ -567,8 +565,7 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice(t *testing.
 	cronBinaryPathInTheContainer, err := setBinaryPath(in, customBinaryPaths, types.CronCapability, "cron")
 	require.NoError(t, err, "failed to set cron path")
 
-	jobSpecFactoryFns, err := toJobSpecFactoryFuncs(in, []int{chainIDs[0]}, cronBinaryPathInTheContainer)
-	require.NoError(t, err, "failed to create job spec factory funcs")
+	jobSpecFactoryFns := toJobSpecFactoryFuncs(t, in, cronBinaryPathInTheContainer)
 
 	setupOutput := setupPoRTestEnvironment(
 		t,
@@ -631,8 +628,7 @@ func TestCRE_OCR3_PoR_Workflow_GatewayDon_MockedPrice(t *testing.T) {
 	cronBinaryPathInTheContainer, err := setBinaryPath(in, customBinaryPaths, types.CronCapability, "cron")
 	require.NoError(t, err, "failed to set cron path")
 
-	jobSpecFactoryFns, err := toJobSpecFactoryFuncs(in, []int{chainIDInt}, cronBinaryPathInTheContainer)
-	require.NoError(t, err, "failed to create job spec factory funcs")
+	jobSpecFactoryFns := toJobSpecFactoryFuncs(t, in, cronBinaryPathInTheContainer)
 
 	setupOutput := setupPoRTestEnvironment(t, testLogger, in, priceProvider, mustSetCapabilitiesFn,
 		[]types.DONCapabilityWithConfigFactoryFn{
@@ -694,10 +690,6 @@ func TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice(t *testing.T) {
 	}
 
 	// we want to register write EVM capability only for the second blockchain
-	firstBlockchain := in.Blockchains[0]
-	chainIDInt, chainErr := strconv.Atoi(firstBlockchain.ChainID)
-	require.NoError(t, chainErr, "failed to convert chain ID to int")
-
 	secondBlockchain := in.Blockchains[1]
 	secondChainIDInt, secondChainErr := strconv.Atoi(secondBlockchain.ChainID)
 	require.NoError(t, secondChainErr, "failed to convert chain ID to int")
@@ -706,8 +698,7 @@ func TestCRE_OCR3_PoR_Workflow_CapabilitiesDons_LivePrice(t *testing.T) {
 	cronBinaryPathInTheContainer, err := setBinaryPath(in, customBinaryPaths, types.CronCapability, "cron")
 	require.NoError(t, err, "failed to set cron path")
 
-	jobSpecFactoryFns, err := toJobSpecFactoryFuncs(in, []int{chainIDInt}, cronBinaryPathInTheContainer)
-	require.NoError(t, err, "failed to create job spec factory funcs")
+	jobSpecFactoryFns := toJobSpecFactoryFuncs(t, in, cronBinaryPathInTheContainer)
 
 	priceProvider := NewTrueUSDPriceProvider(testLogger, []string{in.WorkflowConfigs[0].FeedID})
 	setupOutput := setupPoRTestEnvironment(t, testLogger, in, priceProvider, mustSetCapabilitiesFn,
@@ -871,13 +862,14 @@ func waitForWorkflowRegistrySyncer(nodeSetOutput []*types.WrappedNodeOutput, top
 	return nil
 }
 
-func toJobSpecFactoryFuncs(in *TestConfig, chainIDInt []int, cronBinaryPath string, extraFns ...types.JobSpecFactoryFn) ([]types.JobSpecFactoryFn, error) {
+func toJobSpecFactoryFuncs(t *testing.T, in *TestConfig, cronBinaryPath string, extraFns ...types.JobSpecFactoryFn) []types.JobSpecFactoryFn {
 	fns := make([]types.JobSpecFactoryFn, 0)
 
-	for _, id := range chainIDInt {
-		chainIDUint64 := libc.MustSafeUint64(int64(id))
-		fns = append(fns, creconsensus.ConsensusJobSpecFactoryFn(chainIDUint64))
-	}
+	firstBlockchain := in.Blockchains[0]
+	chainIDInt, err := strconv.Atoi(firstBlockchain.ChainID)
+	require.NoError(t, err, "failed to convert chain ID to int")
+	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
+	fns = append(fns, creconsensus.ConsensusJobSpecFactoryFn(chainIDUint64))
 
 	if in.Fake != nil {
 		fns = append(fns, cregateway.GatewayJobSpecFactoryFn([]int{in.Fake.Port}, []string{}, []string{"0.0.0.0/0"}))
@@ -885,7 +877,7 @@ func toJobSpecFactoryFuncs(in *TestConfig, chainIDInt []int, cronBinaryPath stri
 
 	fns = append(fns, crecron.CronJobSpecFactoryFn(cronBinaryPath), crecompute.ComputeJobSpecFactoryFn)
 
-	return append(fns, extraFns...), nil
+	return append(fns, extraFns...)
 }
 
 func toWorkflowInput(t *testing.T, bo *creenv.BlockchainOutput, universalSetupOutput *creenv.SetupOutput, in *TestConfig, idx int, homeChainOutput *creenv.BlockchainOutput, testLogger zerolog.Logger, priceProvider PriceProvider) managePoRWorkflowInput {

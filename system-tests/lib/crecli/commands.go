@@ -53,10 +53,10 @@ func CompileWorkflow(creCLICommandPath, workflowFolder, workflowFileName string,
 	}
 
 	err = compileCmd.Wait()
-	fmt.Println("Compile output:\n", outputBuffer.String())
 	if err != nil {
-		return CompilationResult{}, errors.Wrap(err, "failed to wait for compile command")
+		return CompilationResult{}, errors.Wrap(err, fmt.Sprintf("failed to wait for compile command: %s\n", &outputBuffer))
 	}
+	fmt.Println("Compile output:\n", outputBuffer.String())
 
 	re := regexp.MustCompile(`Gist URL=([^\s]+)`)
 	matches := re.FindAllStringSubmatch(outputBuffer.String(), -1)
