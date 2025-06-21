@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/weth9"
@@ -161,6 +163,7 @@ func RunFeeTokenTestCase(tc FeeTokenTestCase) {
 			ExtraArgs:    nil,
 		},
 	)
+	msgSentEvent := out.RawEvent.(*onramp.OnRampCCIPMessageSent)
 
 	msgSentEvent := out.RawEvent.(*onramp.OnRampCCIPMessageSent)
 

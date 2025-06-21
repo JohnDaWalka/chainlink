@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
@@ -14,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	aptoscs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
@@ -178,10 +180,21 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 		feeToken := sui.Address{}
 
 		msg = module_onramp_sui.Sui2AnyRampMessage{
+			Data:      tc.MsgData,
+			Receiver:  common.LeftPadBytes(tc.Receiver, 32),
+			ExtraArgs: tc.ExtraArgs,
+			FeeToken:  feeToken.String(),
+		}
+	case chain_selectors.FamilyAptos:
+		feeToken := aptos.AccountAddress{}
+		if len(tc.FeeToken) > 0 {
+			feeToken = aptoscs.MustParseAddress(t, tc.FeeToken)
+		}
+		msg = testhelpers.AptosSendRequest{
 			Data:         tc.MsgData,
 			Receiver:     common.LeftPadBytes(tc.Receiver, 32),
 			ExtraArgs:    tc.ExtraArgs,
-			FeeToken:     feeToken.String(),
+			FeeToken:     feeToken,
 			TokenAmounts: nil,
 		}
 	default:
@@ -277,8 +290,15 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 		family, err := chain_selectors.GetSelectorFamily(tc.DestChain)
 		require.NoError(tc.T, err)
 
+		unorderedExec := false
+		switch family {
 		// Solana doesn't support catching CPI errors, so nonces can't be ordered
-		unorderedExec := family == chain_selectors.FamilySolana
+		case chain_selectors.FamilySolana:
+			unorderedExec = true
+		// Aptos does only support out-of-order execution
+		case chain_selectors.FamilyAptos:
+			unorderedExec = true
+		}
 
 		if !unorderedExec {
 			latestNonce := getLatestNonce(tc)

@@ -394,6 +394,7 @@ func sendCCIPMessage(
 		FeeToken:     common.HexToAddress("0x0"),
 		ExtraArgs:    nil,
 	})
+	msgSentEvent := msgEvent.RawEvent.(*onramp.OnRampCCIPMessageSent)
 
 	msgSentEvent := msgEvent.RawEvent.(*onramp.OnRampCCIPMessageSent)
 
