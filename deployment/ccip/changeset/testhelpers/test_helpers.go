@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -76,6 +77,7 @@ import (
 	sui_bind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
 	ccipops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
+	lockreleasetokenpoolops "github.com/smartcontractkit/chainlink-sui/ops/ccip_lock_release_token_pool"
 	cciponramp_ops "github.com/smartcontractkit/chainlink-sui/ops/ccip_onramp"
 	linkops "github.com/smartcontractkit/chainlink-sui/ops/link"
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
@@ -946,6 +948,7 @@ func SendRequestSui(
 	state stateview.CCIPOnChainState,
 	cfg *CCIPSendReqConfig,
 ) (*AnyMsgSentEvent, error) {
+
 	return SendSuiRequestViaChainWriter(e, cfg)
 }
 
@@ -990,8 +993,6 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 	linkTokenPkgId := state.SuiChains[cfg.SourceChain].LinkTokenAddress.String()
 	linkTokenObjectMetadataId := state.SuiChains[cfg.SourceChain].LinkTokenCoinMetadataId.String()
 	linkTokenTreasuryCapId := state.SuiChains[cfg.SourceChain].LinkTokenTreasuryCapId.String()
-	lockReleaseStateId := state.SuiChains[cfg.SourceChain].LockReleaseStateId.String()
-	lockReleaseTPPacakgeAddress := state.SuiChains[cfg.SourceChain].LockRelaeseAddress.String()
 
 	// mint link token to use as feeToken
 	mintLinkTokenReport, err := operations.ExecuteOperation(e.OperationsBundle, linkops.MintLinkOp, deps.SuiChain,
@@ -1072,13 +1073,19 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		},
 	}
 
+	// TOKEN POOL SETUP
+	LockReleaseTP, LockReleaseState, err := handleTokenAndPoolDeploymentForSUI(e, cfg, deps)
+	if err != nil {
+		return &AnyMsgSentEvent{}, fmt.Errorf("failed to setup tokenPool on SUI %d: %w", cfg.SourceChain, err)
+	}
+
 	ptbArgsTokens := chainwriter.Arguments{
 		Args: map[string]any{
 			"ref":                   ccipObjectRefId,
 			"clock":                 sui.SuiObjectIdClock.String(),
 			"remote_chain_selector": cfg.DestChain,
 			"dest_chain_selector":   cfg.DestChain,
-			"state":                 lockReleaseStateId,
+			"state":                 LockReleaseState,
 			"c":                     mintLinkTokenReport1.Output.Objects.MintedLinkTokenObjectId,
 			"onramp_state":          onRampStateObjectId,
 			"receiver": []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -1122,7 +1129,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		return &AnyMsgSentEvent{}, fmt.Errorf("Failed to create SuiTxm: %v", err)
 	}
 
-	chainWriterConfig := configureChainWriterForMultipleTokens(ccipPackageId, onRampPackageId, publicKeyBytes, lockReleaseTPPacakgeAddress)
+	chainWriterConfig := configureChainWriterForMultipleTokens(ccipPackageId, onRampPackageId, publicKeyBytes, LockReleaseTP)
 	chainWriter, err := chainwriter.NewSuiChainWriter(e.Logger, txManager, chainWriterConfig, false)
 	if err != nil {
 		return &AnyMsgSentEvent{}, err
@@ -1295,6 +1302,177 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		SequenceNumber: rawevent.SequenceNumber,
 		RawEvent:       rawevent,
 	}, nil
+}
+
+func handleTokenAndPoolDeploymentForSUI(e cldf.Environment, cfg *CCIPSendReqConfig, deps suideps.SuiDeps) (string, string, error) {
+	evmChain := e.BlockChains.EVMChains()[cfg.DestChain]
+	suiChains := e.BlockChains.SuiChains()
+	suiChain := suiChains[cfg.SourceChain]
+
+	// Deploy Transferrable TOKEN on ETH
+	// EVM
+	evmDeployerKey := evmChain.DeployerKey
+	state, err := stateview.LoadOnchainState(e)
+	if err != nil {
+		return "", "", fmt.Errorf("failed load onstate chains %w", err)
+	}
+
+	tokenPoolAddress := state.SuiChains[cfg.SourceChain].TokenPoolAddress.String()
+	ccipObjectRefId := state.SuiChains[cfg.SourceChain].CCIPObjectRef.String()
+	linkTokenPkgId := state.SuiChains[cfg.SourceChain].LinkTokenAddress.String()
+	linkTokenObjectMetadataId := state.SuiChains[cfg.SourceChain].LinkTokenCoinMetadataId.String()
+	linkTokenTreasuryCapId := state.SuiChains[cfg.SourceChain].LinkTokenTreasuryCapId.String()
+	lockReleaseTokenPoolPackageID := state.SuiChains[cfg.SourceChain].LockRelaeseAddress.String()
+
+	evmToken, evmPool, err := deployTransferTokenOneEnd(e.Logger, evmChain, evmDeployerKey, e.ExistingAddresses, "TOKEN")
+	if err != nil {
+		return "", "", fmt.Errorf("failed to deploy transfer token for evm chain %d: %w", cfg.DestChain, err)
+	}
+
+	err = attachTokenToTheRegistry(evmChain, state.MustGetEVMChainState(evmChain.Selector), evmDeployerKey, evmToken.Address(), evmPool.Address())
+	if err != nil {
+		return "", "", fmt.Errorf("failed to attach token to registry for evm %d: %w", cfg.DestChain, err)
+	}
+
+	// Deploy Transferrable Token on SUI
+	evmTokenAddr := evmToken.Address()
+	evmTokenAddrPadded := common.LeftPadBytes(evmTokenAddr[:], 32)
+
+	evmPoolAddr := evmPool.Address()
+	evmPoolAddrPadded := common.LeftPadBytes(evmPoolAddr[:], 32)
+
+	// deployLockReleaseTp, err := operations.ExecuteSequence(e.OperationsBundle, lockreleasetokenpoolops.DeployAndInitLockReleaseTokenPoolSequence, deps.SuiChain,
+	// 	lockreleasetokenpoolops.DeployAndInitLockReleaseTokenPoolInput{
+	// 		LockReleaseTokenPoolDeployInput: lockreleasetokenpoolops.LockReleaseTokenPoolDeployInput{
+	// 			CCIPPackageId:          ccipPackageId,
+	// 			CCIPRouterAddress:      ccipSUIRouter,
+	// 			CCIPTokenPoolPackageId: tokenPoolAddress,
+	// 			LockReleaseLocalToken:  linkTokenObjectMetadataId,
+	// 			MCMSAddress:            MCMSAddress,
+	// 		},
+
+	// 		CoinObjectTypeArg:     linkTokenPkgId + "::link_token::LINK_TOKEN",
+	// 		CCIPObjectRefObjectId: ccipObjectRefId,
+	// 		CoinMetadataObjectId:  linkTokenObjectMetadataId,
+	// 		TreasuryCapObjectId:   linkTokenTreasuryCapId,
+	// 		TokenPoolPackageId:    tokenPoolAddress,
+	// 		Rebalancer:            "",
+
+	// 		// apply dest chain updates
+	// 		RemoteChainSelectorsToRemove: []uint64{},
+	// 		RemoteChainSelectorsToAdd:    []uint64{909606746561742123},
+	// 		RemotePoolAddressesToAdd: [][][]byte{
+	// 			{
+	// 				evmPoolAddrPadded,
+	// 			},
+	// 		},
+	// 		RemoteTokenAddressesToAdd: [][]byte{
+	// 			evmTokenAddrPadded,
+	// 		},
+
+	// 		// set chain rate limiter configs
+	// 		RemoteChainSelectors: []uint64{909606746561742123},
+	// 		OutboundIsEnableds:   []bool{true},
+	// 		OutboundCapacities:   []uint64{1000},
+	// 		OutboundRates:        []uint64{1000},
+	// 		InboundIsEnableds:    []bool{true},
+	// 		InboundCapacities:    []uint64{100},
+	// 		InboundRates:         []uint64{1000},
+	// 	})
+	// if err != nil {
+	// 	return "", fmt.Errorf("failed to deploy TokenPool for Sui chain %d: %w", suiChain.Selector, err)
+	// }
+
+	// deployReport, err := operations.ExecuteOperation(e.OperationsBundle, lockreleasetokenpoolops.DeployCCIPLockReleaseTokenPoolOp, deps.SuiChain,
+	// 	lockreleasetokenpoolops.LockReleaseTokenPoolDeployInput{
+	// 		CCIPPackageId:          ccipPackageId,
+	// 		CCIPRouterAddress:      ccipSUIRouter,
+	// 		CCIPTokenPoolPackageId: tokenPoolAddress,
+	// 		LockReleaseLocalToken:  linkTokenObjectMetadataId,
+	// 		MCMSAddress:            MCMSAddress,
+	// 	})
+	// if err != nil {
+	// 	return "", "", err
+	// }
+
+	initReport, err := operations.ExecuteOperation(
+		e.OperationsBundle,
+		lockreleasetokenpoolops.LockReleaseTokenPoolInitializeOp,
+		deps.SuiChain,
+		lockreleasetokenpoolops.LockReleaseTokenPoolInitializeInput{
+			CoinObjectTypeArg:    linkTokenPkgId + "::link_token::LINK_TOKEN",
+			CCIPPackageId:        lockReleaseTokenPoolPackageID,
+			StateObjectId:        ccipObjectRefId,
+			CoinMetadataObjectId: linkTokenObjectMetadataId,
+			TreasuryCapObjectId:  linkTokenTreasuryCapId,
+			TokenPoolPackageId:   tokenPoolAddress,
+			Rebalancer:           "",
+		},
+	)
+	if err != nil {
+		return "", "", err
+	}
+
+	_, err = operations.ExecuteOperation(
+		e.OperationsBundle,
+		lockreleasetokenpoolops.LockReleaseTokenPoolApplyChainUpdatesOp,
+		deps.SuiChain,
+		lockreleasetokenpoolops.LockReleaseTokenPoolApplyChainUpdatesInput{
+			CCIPPackageId:                lockReleaseTokenPoolPackageID,
+			StateObjectId:                initReport.Output.Objects.StateObjectId,
+			OwnerCap:                     initReport.Output.Objects.OwnerCapObjectId,
+			RemoteChainSelectorsToRemove: []uint64{},
+			RemoteChainSelectorsToAdd:    []uint64{909606746561742123},
+			RemotePoolAddressesToAdd: [][][]byte{
+				{
+					evmPoolAddrPadded,
+				},
+			},
+			RemoteTokenAddressesToAdd: [][]byte{
+				evmTokenAddrPadded,
+			},
+		},
+	)
+	if err != nil {
+		return "", "", err
+	}
+
+	_, err = operations.ExecuteOperation(
+		e.OperationsBundle,
+		lockreleasetokenpoolops.LockReleaseTokenPoolSetChainRateLimiterOp,
+		deps.SuiChain,
+		lockreleasetokenpoolops.LockReleaseTokenPoolSetChainRateLimiterInput{
+			CCIPPackageId: lockReleaseTokenPoolPackageID,
+			StateObjectId: initReport.Output.Objects.StateObjectId,
+			OwnerCap:      initReport.Output.Objects.OwnerCapObjectId,
+
+			RemoteChainSelectors: []uint64{909606746561742123},
+			OutboundIsEnableds:   []bool{true},
+			OutboundCapacities:   []uint64{1000},
+			OutboundRates:        []uint64{1000},
+			InboundIsEnableds:    []bool{true},
+			InboundCapacities:    []uint64{100},
+			InboundRates:         []uint64{1000},
+		},
+	)
+	if err != nil {
+		return "", "", err
+	}
+
+	suiTokenBytes, _ := hex.DecodeString(linkTokenObjectMetadataId)
+	suiPoolBytes, _ := hex.DecodeString(lockReleaseTokenPoolPackageID)
+
+	err = setTokenPoolCounterPart(e.BlockChains.EVMChains()[evmChain.Selector], evmPool, evmDeployerKey, suiChain.Selector, suiTokenBytes[:], suiPoolBytes[:])
+	if err != nil {
+		return "", "", fmt.Errorf("failed to add token to the counterparty %d: %w", cfg.DestChain, err)
+	}
+
+	err = grantMintBurnPermissions(e.Logger, e.BlockChains.EVMChains()[evmChain.Selector], evmToken, evmDeployerKey, evmPool.Address())
+	if err != nil {
+		return "", "", fmt.Errorf("failed to grant burnMint %d: %w", cfg.DestChain, err)
+	}
+
+	return lockReleaseTokenPoolPackageID, initReport.Output.Objects.StateObjectId, nil
 }
 
 func configureChainWriterForMsg(CCIPPackageAdress string, OnRampPackageId string, publicKeyBytes []byte) chainwriter.ChainWriterConfig {

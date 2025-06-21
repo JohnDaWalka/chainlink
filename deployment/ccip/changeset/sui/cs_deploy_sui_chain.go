@@ -272,78 +272,101 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save offRamp StateObjectId %s for Sui chain %d: %w", deployTp.Output.PackageId, chainSel, err)
 		}
 
-		linkTokenTreasuryCapId := state.SuiChains[suiChain.Selector].LinkTokenTreasuryCapId.String()
+		// linkTokenTreasuryCapId := state.SuiChains[suiChain.Selector].LinkTokenTreasuryCapId.String()
 		linkTokenObjectMetadataId := state.SuiChains[suiChain.Selector].LinkTokenCoinMetadataId.String()
-		linkTokenPkgId := state.SuiChains[suiChain.Selector].LinkTokenAddress.String()
+		// linkTokenPkgId := state.SuiChains[suiChain.Selector].LinkTokenAddress.String()
 
-		// Deploy LockRelease TP
-		deployLockReleaseTp, err := operations.ExecuteSequence(e.OperationsBundle, lockreleasetokenpoolops.DeployAndInitLockReleaseTokenPoolSequence, deps.SuiChain,
-			lockreleasetokenpoolops.DeployAndInitLockReleaseTokenPoolInput{
-				LockReleaseTokenPoolDeployInput: lockreleasetokenpoolops.LockReleaseTokenPoolDeployInput{
-					CCIPPackageId:          ccipSeqReport.Output.CCIPPackageId,
-					CCIPRouterAddress:      routerReport.Output.PackageId,
-					CCIPTokenPoolPackageId: deployTp.Output.PackageId,
-					LockReleaseLocalToken:  linkTokenObjectMetadataId,
-					MCMSAddress:            mcmsSeqReport.Output.PackageId,
-				},
+		// // Deploy LockRelease TP
 
-				CoinObjectTypeArg:     linkTokenPkgId + "::link_token::LINK_TOKEN",
-				CCIPObjectRefObjectId: ccipSeqReport.Output.Objects.CCIPObjectRefObjectId,
-				CoinMetadataObjectId:  linkTokenObjectMetadataId,
-				TreasuryCapObjectId:   linkTokenTreasuryCapId,
-				TokenPoolPackageId:    deployTp.Output.PackageId,
-				Rebalancer:            "",
-
-				// apply dest chain updates
-				RemoteChainSelectorsToRemove: []uint64{},
-				RemoteChainSelectorsToAdd:    []uint64{909606746561742123},
-				RemotePoolAddressesToAdd: [][][]byte{
-					{
-						[]byte{
-							0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-							0x00, 0x00, 0x00, 0x00, 0xaf, 0x46, 0xbf, 0x6d,
-							0x19, 0x92, 0x1e, 0x30, 0xbc, 0x5c, 0xc0, 0x04,
-							0x3d, 0xc6, 0xde, 0x91, 0xed, 0xf0, 0x0c, 0x98,
-						},
-					},
-				},
-				RemoteTokenAddressesToAdd: [][]byte{
-					[]byte{
-						0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-						0x00, 0x00, 0x00, 0x00, 0x77, 0x98, 0x77, 0xa7,
-						0xb0, 0xd9, 0xe8, 0x60, 0x31, 0x69, 0xdd, 0xbd,
-						0x78, 0x36, 0xe4, 0x78, 0xb4, 0x62, 0x47, 0x89,
-					},
-				},
-
-				// set chain rate limiter configs
-				RemoteChainSelectors: []uint64{909606746561742123},
-				OutboundIsEnableds:   []bool{true},
-				OutboundCapacities:   []uint64{1000},
-				OutboundRates:        []uint64{1000},
-				InboundIsEnableds:    []bool{true},
-				InboundCapacities:    []uint64{100},
-				InboundRates:         []uint64{1000},
+		deployLockReleaseTp, err := operations.ExecuteOperation(e.OperationsBundle, lockreleasetokenpoolops.DeployCCIPLockReleaseTokenPoolOp, deps.SuiChain,
+			lockreleasetokenpoolops.LockReleaseTokenPoolDeployInput{
+				CCIPPackageId:          ccipSeqReport.Output.CCIPPackageId,
+				CCIPRouterAddress:      routerReport.Output.PackageId,
+				CCIPTokenPoolPackageId: deployTp.Output.PackageId,
+				LockReleaseLocalToken:  linkTokenObjectMetadataId,
+				MCMSAddress:            mcmsSeqReport.Output.PackageId,
 			})
 		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy TokenPool for Sui chain %d: %w", suiChain.Selector, err)
+			return cldf.ChangesetOutput{}, err
 		}
+
+		// deployLockReleaseTp, err := operations.ExecuteSequence(e.OperationsBundle, lockreleasetokenpoolops.DeployAndInitLockReleaseTokenPoolSequence, deps.SuiChain,
+		// 	lockreleasetokenpoolops.DeployAndInitLockReleaseTokenPoolInput{
+		// 		LockReleaseTokenPoolDeployInput: lockreleasetokenpoolops.LockReleaseTokenPoolDeployInput{
+		// 			CCIPPackageId:          ccipSeqReport.Output.CCIPPackageId,
+		// 			CCIPRouterAddress:      routerReport.Output.PackageId,
+		// 			CCIPTokenPoolPackageId: deployTp.Output.PackageId,
+		// 			LockReleaseLocalToken:  linkTokenObjectMetadataId,
+		// 			MCMSAddress:            mcmsSeqReport.Output.PackageId,
+		// 		},
+
+		// deployLockReleaseTp, err := operations.ExecuteSequence(e.OperationsBundle, lockreleasetokenpoolops.DeployAndInitLockReleaseTokenPoolSequence, deps.SuiChain,
+		// 	lockreleasetokenpoolops.DeployAndInitLockReleaseTokenPoolInput{
+		// 		LockReleaseTokenPoolDeployInput: lockreleasetokenpoolops.LockReleaseTokenPoolDeployInput{
+		// 			CCIPPackageId:          ccipSeqReport.Output.CCIPPackageId,
+		// 			CCIPRouterAddress:      routerReport.Output.PackageId,
+		// 			CCIPTokenPoolPackageId: deployTp.Output.PackageId,
+		// 			LockReleaseLocalToken:  linkTokenObjectMetadataId,
+		// 			MCMSAddress:            mcmsSeqReport.Output.PackageId,
+		// 		},
+
+		// 		CoinObjectTypeArg:     linkTokenPkgId + "::link_token::LINK_TOKEN",
+		// 		CCIPObjectRefObjectId: ccipSeqReport.Output.Objects.CCIPObjectRefObjectId,
+		// 		CoinMetadataObjectId:  linkTokenObjectMetadataId,
+		// 		TreasuryCapObjectId:   linkTokenTreasuryCapId,
+		// 		TokenPoolPackageId:    deployTp.Output.PackageId,
+		// 		Rebalancer:            "",
+
+		// 		// apply dest chain updates
+		// 		RemoteChainSelectorsToRemove: []uint64{},
+		// 		RemoteChainSelectorsToAdd:    []uint64{909606746561742123},
+		// 		RemotePoolAddressesToAdd: [][][]byte{
+		// 			{
+		// 				[]byte{
+		// 					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		// 					0x00, 0x00, 0x00, 0x00, 0xaf, 0x46, 0xbf, 0x6d,
+		// 					0x19, 0x92, 0x1e, 0x30, 0xbc, 0x5c, 0xc0, 0x04,
+		// 					0x3d, 0xc6, 0xde, 0x91, 0xed, 0xf0, 0x0c, 0x98,
+		// 				},
+		// 			},
+		// 		},
+		// 		RemoteTokenAddressesToAdd: [][]byte{
+		// 			[]byte{
+		// 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		// 				0x00, 0x00, 0x00, 0x00, 0x77, 0x98, 0x77, 0xa7,
+		// 				0xb0, 0xd9, 0xe8, 0x60, 0x31, 0x69, 0xdd, 0xbd,
+		// 				0x78, 0x36, 0xe4, 0x78, 0xb4, 0x62, 0x47, 0x89,
+		// 			},
+		// 		},
+
+		// 		// set chain rate limiter configs
+		// 		RemoteChainSelectors: []uint64{909606746561742123},
+		// 		OutboundIsEnableds:   []bool{true},
+		// 		OutboundCapacities:   []uint64{1000},
+		// 		OutboundRates:        []uint64{1000},
+		// 		InboundIsEnableds:    []bool{true},
+		// 		InboundCapacities:    []uint64{100},
+		// 		InboundRates:         []uint64{1000},
+		// 	})
+		// if err != nil {
+		// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy TokenPool for Sui chain %d: %w", suiChain.Selector, err)
+		// }
 
 		// save LockRelease PackageId to the addressbook
 		typeAndVersionLockReleasePackageId := cldf.NewTypeAndVersion(shared.SuiLockReleaseTPType, deployment.Version1_6_0)
-		err = deps.AB.Save(chainSel, deployLockReleaseTp.Output.LockReleaseTPPackageID, typeAndVersionLockReleasePackageId)
+		err = deps.AB.Save(chainSel, deployLockReleaseTp.Output.PackageId, typeAndVersionLockReleasePackageId)
 		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LockRelease PackageId %s for Sui chain %d: %w", deployLockReleaseTp.Output.LockReleaseTPPackageID, chainSel, err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LockRelease PackageId %s for Sui chain %d: %w", deployLockReleaseTp.Output.PackageId, chainSel, err)
 		}
 
-		// save LockRelease stateObjectId to the addressbook
-		typeAndVersionLockReleaseStateId := cldf.NewTypeAndVersion(shared.SuiLockReleaseTPStateType, deployment.Version1_6_0)
-		err = deps.AB.Save(chainSel, deployLockReleaseTp.Output.Objects.StateObjectId, typeAndVersionLockReleaseStateId)
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LockRelase StateObjectId %s for Sui chain %d: %w", deployLockReleaseTp.Output.Objects.StateObjectId, chainSel, err)
-		}
+		// // save LockRelease stateObjectId to the addressbook
+		// typeAndVersionLockReleaseStateId := cldf.NewTypeAndVersion(shared.SuiLockReleaseTPStateType, deployment.Version1_6_0)
+		// err = deps.AB.Save(chainSel, deployLockReleaseTp.Output.Objects.StateObjectId, typeAndVersionLockReleaseStateId)
+		// if err != nil {
+		// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LockRelase StateObjectId %s for Sui chain %d: %w", deployLockReleaseTp.Output.Objects.StateObjectId, chainSel, err)
+		// }
 
-		seqReports = append(seqReports, deployLockReleaseTp.ExecutionReports...)
+		// seqReports = append(seqReports, deployLockReleaseTp.ExecutionReports...)
 
 	}
 	return cldf.ChangesetOutput{
