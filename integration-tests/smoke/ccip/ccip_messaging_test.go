@@ -15,9 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/message_hasher"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -178,8 +175,6 @@ func Test_CCIPMessaging_EVM2EVM(t *testing.T) {
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_FAILURE,      // state would be failed onchain due to low gas
 			},
 		)
-		msgSentEvent := out.MsgSentEvent.RawEvent.(*onramp.OnRampCCIPMessageSent)
-
 		msgSentEvent := out.MsgSentEvent.RawEvent.(*onramp.OnRampCCIPMessageSent)
 
 		err := manualexechelpers.ManuallyExecuteAll(

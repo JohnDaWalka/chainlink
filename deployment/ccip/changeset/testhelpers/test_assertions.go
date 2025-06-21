@@ -25,8 +25,6 @@ import (
 	module_offramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp/offramp"
 	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
 
-	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
-
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
@@ -257,6 +255,9 @@ func ConfirmCommitForAllWithExpectedSeqNums(
 					srcChain,
 					e.BlockChains.SuiChains()[dstChain],
 					state.SuiChains[dstChain].CCIPAddress,
+					startBlock,
+					expectedSeqNum,
+					true,
 				))
 			case chainsel.FamilyAptos:
 				return commonutils.JustError(ConfirmCommitWithExpectedSeqNumRangeAptos(
@@ -382,7 +383,11 @@ func ConfirmMultipleCommits(
 					srcChain,
 					env.BlockChains.SuiChains()[destChain],
 					state.SuiChains[destChain].CCIPAddress,
-				))
+					startBlocks[destChain],
+					seqRange,
+					enforceSingleCommit,
+				)
+				return err
 			case chainsel.FamilyAptos:
 				_, err := ConfirmCommitWithExpectedSeqNumRangeAptos(
 					t,

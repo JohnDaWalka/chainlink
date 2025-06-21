@@ -396,8 +396,6 @@ func sendCCIPMessage(
 	})
 	msgSentEvent := msgEvent.RawEvent.(*onramp.OnRampCCIPMessageSent)
 
-	msgSentEvent := msgEvent.RawEvent.(*onramp.OnRampCCIPMessageSent)
-
 	l.Info().
 		Str("messageID", hexutil.Encode(msgSentEvent.Message.Header.MessageId[:])).
 		Uint64("blockNumber", msgSentEvent.Raw.BlockNumber).

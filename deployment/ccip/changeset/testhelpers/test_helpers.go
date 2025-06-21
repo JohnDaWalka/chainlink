@@ -66,6 +66,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/evm"
 	solanastateview "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/solana"
 
+	suicodec "github.com/smartcontractkit/chainlink-sui/relayer/codec"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -102,7 +103,6 @@ import (
 	sui_query "github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-sui/relayer/chainreader"
 	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
-	"github.com/smartcontractkit/chainlink-sui/relayer/codec"
 	"github.com/smartcontractkit/chainlink-sui/relayer/keystore"
 	"github.com/smartcontractkit/chainlink-sui/relayer/testutils"
 
@@ -523,14 +523,6 @@ func CCIPSendCalldata(
 
 	calldata = append(routerABI.Methods["ccipSend"].ID, calldata...)
 	return calldata, nil
-}
-
-type AnyMsgSentEvent struct {
-	SequenceNumber uint64
-	// RawEvent contains the raw event depending on the chain:
-	//  EVM:   *onramp.OnRampCCIPMessageSent
-	//  Aptos: module_onramp.CCIPMessageSent
-	RawEvent any
 }
 
 // testhelpers.SendRequest(t, e, state, src, dest, msg, opts...)
@@ -1517,22 +1509,22 @@ func configureChainWriterForMsg(CCIPPackageAdress string, OnRampPackageId string
 					"ccip_send": {
 						Name:      "ccip_send",
 						PublicKey: publicKeyBytes,
-						Params:    []codec.SuiFunctionParam{},
+						Params:    []suicodec.SuiFunctionParam{},
 						PTBCommands: []chainwriter.ChainWriterPTBCommand{
 							// First command: create token params
 							{
-								Type:      codec.SuiPTBCommandMoveCall,
+								Type:      suicodec.SuiPTBCommandMoveCall,
 								PackageId: strPtr(CCIPPackageAdress),
 								ModuleId:  strPtr("dynamic_dispatcher"),
 								Function:  strPtr("create_token_params"),
-								Params:    []codec.SuiFunctionParam{},
+								Params:    []suicodec.SuiFunctionParam{},
 							},
 							{
-								Type:      codec.SuiPTBCommandMoveCall,
+								Type:      suicodec.SuiPTBCommandMoveCall,
 								PackageId: strPtr(OnRampPackageId),
 								ModuleId:  strPtr("onramp"),
 								Function:  strPtr("ccip_send"),
-								Params: []codec.SuiFunctionParam{
+								Params: []suicodec.SuiFunctionParam{
 									{
 										Name:     "ref",
 										Type:     "object_id",
@@ -1568,7 +1560,7 @@ func configureChainWriterForMsg(CCIPPackageAdress string, OnRampPackageId string
 										Name:     "token_params",
 										Type:     "ptb_dependency",
 										Required: true,
-										PTBDependency: &codec.PTBCommandDependency{
+										PTBDependency: &suicodec.PTBCommandDependency{
 											CommandIndex: 0,
 										},
 									},
@@ -1609,23 +1601,23 @@ func configureChainWriterForMultipleTokens(CCIPPackageAdress string, OnRampPacka
 					"ccip_send": {
 						Name:      "ccip_send",
 						PublicKey: publicKeyBytes,
-						Params:    []codec.SuiFunctionParam{},
+						Params:    []suicodec.SuiFunctionParam{},
 						PTBCommands: []chainwriter.ChainWriterPTBCommand{
 							// First command: create token params
 							{
-								Type:      codec.SuiPTBCommandMoveCall,
+								Type:      suicodec.SuiPTBCommandMoveCall,
 								PackageId: strPtr(CCIPPackageAdress),
 								ModuleId:  strPtr("dynamic_dispatcher"),
 								Function:  strPtr("create_token_params"),
-								Params:    []codec.SuiFunctionParam{},
+								Params:    []suicodec.SuiFunctionParam{},
 							},
 							// Second command: lock tokens in the token pool
 							{
-								Type:      codec.SuiPTBCommandMoveCall,
+								Type:      suicodec.SuiPTBCommandMoveCall,
 								PackageId: strPtr(lockReleaseTokenPool),
 								ModuleId:  strPtr("lock_release_token_pool"),
 								Function:  strPtr("lock_or_burn"),
-								Params: []codec.SuiFunctionParam{
+								Params: []suicodec.SuiFunctionParam{
 									{
 										Name:     "ref",
 										Type:     "object_id",
@@ -1657,18 +1649,18 @@ func configureChainWriterForMultipleTokens(CCIPPackageAdress string, OnRampPacka
 										Name:     "token_params",
 										Type:     "ptb_dependency",
 										Required: true,
-										PTBDependency: &codec.PTBCommandDependency{
+										PTBDependency: &suicodec.PTBCommandDependency{
 											CommandIndex: 0,
 										},
 									},
 								},
 							},
 							{
-								Type:      codec.SuiPTBCommandMoveCall,
+								Type:      suicodec.SuiPTBCommandMoveCall,
 								PackageId: strPtr(OnRampPackageId),
 								ModuleId:  strPtr("onramp"),
 								Function:  strPtr("ccip_send"),
-								Params: []codec.SuiFunctionParam{
+								Params: []suicodec.SuiFunctionParam{
 									{
 										Name:     "ref",
 										Type:     "object_id",
@@ -1704,7 +1696,7 @@ func configureChainWriterForMultipleTokens(CCIPPackageAdress string, OnRampPacka
 										Name:     "token_params",
 										Type:     "ptb_dependency",
 										Required: true,
-										PTBDependency: &codec.PTBCommandDependency{
+										PTBDependency: &suicodec.PTBCommandDependency{
 											CommandIndex: 1,
 										},
 									},
