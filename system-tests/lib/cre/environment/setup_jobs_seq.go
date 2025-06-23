@@ -55,13 +55,11 @@ var SetupJobsSeq = operations.NewSequence[SetupJobsSeqInput, SetupJobsSeqOutput,
 			startJDInput := StartJDOpInput{
 				InfraType: input.InfraType,
 			}
-
 			startJDDeps := StartJDOpDeps{
 				Logger:   deps.Logger,
 				JdInput:  deps.JdInput,
 				NixShell: deps.NixShell,
 			}
-
 			startJDOutput, startJDErr := operations.ExecuteOperation(b, StartJDOp, startJDDeps, startJDInput)
 			if startJDErr != nil {
 				return pkgerrors.Wrap(startJDErr, "failed to start Job Distributor")
@@ -75,18 +73,13 @@ var SetupJobsSeq = operations.NewSequence[SetupJobsSeqInput, SetupJobsSeqOutput,
 		nodeSetOutput := make([]*cretypes.WrappedNodeOutput, 0, len(input.CapabilitiesAwareNodeSets))
 
 		jdAndDonsErrGroup.Go(func() error {
-			startDONsInput := StartDONsOpInput{
-				InfraType:                 input.InfraType,
-				CapabilitiesAwareNodeSets: input.CapabilitiesAwareNodeSets,
-			}
-
+			startDONsInput := StartDONsOpInput(input)
 			startDONsDeps := StartDONsOpDeps{
 				Logger:                    deps.Logger,
 				Topology:                  deps.Topology,
 				NixShell:                  deps.NixShell,
 				HomeChainBlockchainOutput: deps.HomeChainBlockchainOutput,
 			}
-
 			startDONsOutput, startDonsErr := operations.ExecuteOperation(b, StartDONsOp, startDONsDeps, startDONsInput)
 			if startDonsErr != nil {
 				return pkgerrors.Wrap(startDonsErr, "failed to start DONs")
