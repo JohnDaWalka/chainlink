@@ -27,7 +27,7 @@
 [extra_capabilities]
 # uncomment as needed and adjust paths to enable these capabilities and have them copied to containers/pods
 # these default paths assume that binaries are placed in core/scripts/cre/environment/ folder
-# cron_capability_binary_path = "./cron"
+ cron_capability_binary_path = "/Users/bartektofel/Desktop/repos/capabilities-compiled/cron"
 # log_event_trigger_binary_path = "./logtrigger"
 # read_contract_capability_binary_path = "./readcontract"
 
@@ -57,6 +57,7 @@
       [Telemetry]
       Enabled = true
       Endpoint = 'host.docker.internal:4317'
+      ChipIngressEndpoint = '192.168.65.254:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
       """
@@ -78,6 +79,7 @@
       [Telemetry]
       Enabled = true
       Endpoint = 'host.docker.internal:4317'
+      ChipIngressEndpoint = '192.168.65.254:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
       """
@@ -99,6 +101,7 @@
       [Telemetry]
       Enabled = true
       Endpoint = 'host.docker.internal:4317'
+      ChipIngressEndpoint = '192.168.65.254:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
       """
@@ -120,6 +123,7 @@
       [Telemetry]
       Enabled = true
       Endpoint = 'host.docker.internal:4317'
+      ChipIngressEndpoint = '192.168.65.254:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
       """
@@ -141,6 +145,7 @@
       [Telemetry]
       Enabled = true
       Endpoint = 'host.docker.internal:4317'
+      ChipIngressEndpoint = '192.168.65.254:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
       """
