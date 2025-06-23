@@ -15,7 +15,7 @@ type CCIPChainState struct {
 	CCIPObjectRef           sui.Address
 	MCMsAddress             sui.Address
 	TokenPoolAddress        sui.Address
-	LockRelaeseAddress      sui.Address
+	LockReleaseAddress      sui.Address
 	LockReleaseStateId      sui.Address
 	FeeQuoterCapId          sui.Address
 	OnRampAddress           sui.Address
@@ -68,7 +68,7 @@ func loadsuiChainStateFromAddresses(addresses map[string]cldf.TypeAndVersion) (C
 			chainState.CCIPAddress = *suiAddr
 
 		case shared.SuiLockReleaseTPType:
-			chainState.LockRelaeseAddress = *suiAddr
+			chainState.LockReleaseAddress = *suiAddr
 
 		case shared.SuiLockReleaseTPStateType:
 			chainState.LockReleaseStateId = *suiAddr

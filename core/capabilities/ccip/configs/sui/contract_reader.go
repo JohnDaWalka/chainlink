@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-sui/relayer/chainreader"
+	"github.com/smartcontractkit/chainlink-sui/relayer/client"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
 	"golang.org/x/crypto/blake2b"
 )
@@ -291,7 +293,8 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 						"ResultTupleToStruct": []string{"sequenceNumber", "allowListEnabled", "router"},
 					},
 					"get_expected_next_sequence_number": map[string]any{
-						"Name": "get_expected_next_sequence_number",
+						"Name":          "get_expected_next_sequence_number",
+						"SignerAddress": fromAddress,
 						"Params": []map[string]any{
 							{
 								"Name":     "destChainSelector",
@@ -301,89 +304,13 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 						},
 					},
 				},
-				"Events": map[string]any{
-					consts.EventNameCCIPMessageSent: map[string]any{
-						"EventHandleStructName": "OnRampState",
-						"EventHandleFieldName":  "ccip_message_sent_events",
-						"EventAccountAddress":   "onramp::get_state_address",
-						"EventFieldRenames": map[string]any{
-							"dest_chain_selector": map[string]any{
-								"NewName":         "DestChainSelector",
-								"SubFieldRenames": nil,
-							},
-							"sequence_number": map[string]any{
-								"NewName":         "SequenceNumber",
-								"SubFieldRenames": nil,
-							},
-							"message": map[string]any{
-								"NewName": "Message",
-								"SubFieldRenames": map[string]any{
-									"header": map[string]any{
-										"NewName": "Header",
-										"SubFieldRenames": map[string]any{
-											"source_chain_selector": map[string]any{
-												"NewName": "SourceChainSelector",
-											},
-											"dest_chain_selector": map[string]any{
-												"NewName": "DestChainSelector",
-											},
-											"sequence_number": map[string]any{
-												"NewName": "SequenceNumber",
-											},
-											"message_id": map[string]any{
-												"NewName": "MessageID",
-											},
-											"nonce": map[string]any{
-												"NewName": "Nonce",
-											},
-										},
-									},
-									"sender": map[string]any{
-										"NewName": "Sender",
-									},
-									"data": map[string]any{
-										"NewName": "Data",
-									},
-									"receiver": map[string]any{
-										"NewName": "Receiver",
-									},
-									"extra_args": map[string]any{
-										"NewName": "ExtraArgs",
-									},
-									"fee_token": map[string]any{
-										"NewName": "FeeToken",
-									},
-									"fee_token_amount": map[string]any{
-										"NewName": "FeeTokenAmount",
-									},
-									"fee_value_juels": map[string]any{
-										"NewName": "FeeValueJuels",
-									},
-									"token_amounts": map[string]any{
-										"NewName": "TokenAmounts",
-										"SubFieldRenames": map[string]any{
-											"source_pool_address": map[string]any{
-												"NewName": "SourcePoolAddress",
-											},
-											"dest_token_address": map[string]any{
-												"NewName": "DestTokenAddress",
-											},
-											"extra_data": map[string]any{
-												"NewName": "ExtraData",
-											},
-											"amount": map[string]any{
-												"NewName": "Amount",
-											},
-											"dest_exec_data": map[string]any{
-												"NewName": "DestExecData",
-											},
-										},
-									},
-								},
-							},
-						},
-						"EventFilterRenames": map[string]string{
-							"DestChain": "DestChainSelector",
+				"Events": map[string]*chainreader.ChainReaderEvent{
+					"CCIPMessageSent": {
+						Name:      "CCIPMessageSent",
+						EventType: "CCIPMessageSent",
+						EventSelector: client.EventFilterByMoveEventModule{
+							Module: "onramp",
+							Event:  "CCIPMessageSent",
 						},
 					},
 				},

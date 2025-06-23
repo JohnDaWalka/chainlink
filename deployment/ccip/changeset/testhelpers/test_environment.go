@@ -844,7 +844,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		})
 		require.NoError(t, err)
 
-		// Deploy CCIP, initialize feeQuoter
+		// Deploy CCIP, OnRamp, OffRamp, TP, initialize the contracts
 		mockContractParamsPerChain, err := sui.GetMockChainContractParams(t, e.Env, suiChains[0])
 		require.NoError(t, err)
 

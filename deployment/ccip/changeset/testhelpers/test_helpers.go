@@ -1078,10 +1078,10 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	_ = chainwriter.Arguments{
 		Args: map[string]any{
-			"ref":                 ccipObjectRefId,
-			"clock":               sui.SuiObjectIdClock.String(),
-			"dest_chain_selector": cfg.DestChain,
-			"onramp_state":        onRampStateObjectId,
+			"ref":                        ccipObjectRefId,
+			"clock":                      sui.SuiObjectIdClock.String(),
+			"destination_chain_selector": cfg.DestChain,
+			"onramp_state":               onRampStateObjectId,
 			"receiver": []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0xdd, 0xbb, 0x6f, 0x35,
 				0x8f, 0x29, 0x04, 0x08, 0xd7, 0x68, 0x47, 0xb4,
@@ -1105,13 +1105,12 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	ptbArgsTokens := chainwriter.Arguments{
 		Args: map[string]any{
-			"ref":                   ccipObjectRefId,
-			"clock":                 sui.SuiObjectIdClock.String(),
-			"remote_chain_selector": cfg.DestChain,
-			"dest_chain_selector":   cfg.DestChain,
-			"state":                 LockReleaseState,
-			"c":                     mintLinkTokenReport1.Output.Objects.MintedLinkTokenObjectId,
-			"onramp_state":          onRampStateObjectId,
+			"ref":                        ccipObjectRefId,
+			"clock":                      sui.SuiObjectIdClock.String(),
+			"destination_chain_selector": cfg.DestChain,
+			"state":                      LockReleaseState,
+			"c":                          mintLinkTokenReport1.Output.Objects.MintedLinkTokenObjectId,
+			"onramp_state":               onRampStateObjectId,
 			"receiver": []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0xdd, 0xbb, 0x6f, 0x35,
 				0x8f, 0x29, 0x04, 0x08, 0xd7, 0x68, 0x47, 0xb4,
@@ -1209,8 +1208,8 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 			"onramp": {
 				Name: "onramp",
 				Events: map[string]*chainreader.ChainReaderEvent{
-					"ccip_send": {
-						Name:      "ccip_send",
+					"CCIPMessageSent": {
+						Name:      "CCIPMessageSent",
 						EventType: "CCIPMessageSent",
 						EventSelector: client.EventSelector{
 							Package: onRampPackageId,
@@ -1286,7 +1285,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	// Create a filter for events
 	filter := sui_query.KeyFilter{
-		Key: "ccip_send",
+		Key: "CCIPMessageSent",
 	}
 
 	// Setup limit and sort
@@ -1346,7 +1345,7 @@ func handleTokenAndPoolDeploymentForSUI(e cldf.Environment, cfg *CCIPSendReqConf
 	linkTokenPkgId := state.SuiChains[cfg.SourceChain].LinkTokenAddress.String()
 	linkTokenObjectMetadataId := state.SuiChains[cfg.SourceChain].LinkTokenCoinMetadataId.String()
 	linkTokenTreasuryCapId := state.SuiChains[cfg.SourceChain].LinkTokenTreasuryCapId.String()
-	lockReleaseTokenPoolPackageID := state.SuiChains[cfg.SourceChain].LockRelaeseAddress.String()
+	lockReleaseTokenPoolPackageID := state.SuiChains[cfg.SourceChain].LockReleaseAddress.String()
 
 	evmToken, evmPool, err := deployTransferTokenOneEnd(e.Logger, evmChain, evmDeployerKey, e.ExistingAddresses, "TOKEN")
 	if err != nil {
@@ -1364,60 +1363,6 @@ func handleTokenAndPoolDeploymentForSUI(e cldf.Environment, cfg *CCIPSendReqConf
 
 	evmPoolAddr := evmPool.Address()
 	evmPoolAddrPadded := common.LeftPadBytes(evmPoolAddr[:], 32)
-
-	// deployLockReleaseTp, err := operations.ExecuteSequence(e.OperationsBundle, lockreleasetokenpoolops.DeployAndInitLockReleaseTokenPoolSequence, deps.SuiChain,
-	// 	lockreleasetokenpoolops.DeployAndInitLockReleaseTokenPoolInput{
-	// 		LockReleaseTokenPoolDeployInput: lockreleasetokenpoolops.LockReleaseTokenPoolDeployInput{
-	// 			CCIPPackageId:          ccipPackageId,
-	// 			CCIPRouterAddress:      ccipSUIRouter,
-	// 			CCIPTokenPoolPackageId: tokenPoolAddress,
-	// 			LockReleaseLocalToken:  linkTokenObjectMetadataId,
-	// 			MCMSAddress:            MCMSAddress,
-	// 		},
-
-	// 		CoinObjectTypeArg:     linkTokenPkgId + "::link_token::LINK_TOKEN",
-	// 		CCIPObjectRefObjectId: ccipObjectRefId,
-	// 		CoinMetadataObjectId:  linkTokenObjectMetadataId,
-	// 		TreasuryCapObjectId:   linkTokenTreasuryCapId,
-	// 		TokenPoolPackageId:    tokenPoolAddress,
-	// 		Rebalancer:            "",
-
-	// 		// apply dest chain updates
-	// 		RemoteChainSelectorsToRemove: []uint64{},
-	// 		RemoteChainSelectorsToAdd:    []uint64{909606746561742123},
-	// 		RemotePoolAddressesToAdd: [][][]byte{
-	// 			{
-	// 				evmPoolAddrPadded,
-	// 			},
-	// 		},
-	// 		RemoteTokenAddressesToAdd: [][]byte{
-	// 			evmTokenAddrPadded,
-	// 		},
-
-	// 		// set chain rate limiter configs
-	// 		RemoteChainSelectors: []uint64{909606746561742123},
-	// 		OutboundIsEnableds:   []bool{true},
-	// 		OutboundCapacities:   []uint64{1000},
-	// 		OutboundRates:        []uint64{1000},
-	// 		InboundIsEnableds:    []bool{true},
-	// 		InboundCapacities:    []uint64{100},
-	// 		InboundRates:         []uint64{1000},
-	// 	})
-	// if err != nil {
-	// 	return "", fmt.Errorf("failed to deploy TokenPool for Sui chain %d: %w", suiChain.Selector, err)
-	// }
-
-	// deployReport, err := operations.ExecuteOperation(e.OperationsBundle, lockreleasetokenpoolops.DeployCCIPLockReleaseTokenPoolOp, deps.SuiChain,
-	// 	lockreleasetokenpoolops.LockReleaseTokenPoolDeployInput{
-	// 		CCIPPackageId:          ccipPackageId,
-	// 		CCIPRouterAddress:      ccipSUIRouter,
-	// 		CCIPTokenPoolPackageId: tokenPoolAddress,
-	// 		LockReleaseLocalToken:  linkTokenObjectMetadataId,
-	// 		MCMSAddress:            MCMSAddress,
-	// 	})
-	// if err != nil {
-	// 	return "", "", err
-	// }
 
 	initReport, err := operations.ExecuteOperation(
 		e.OperationsBundle,
@@ -1517,7 +1462,13 @@ func configureChainWriterForMsg(CCIPPackageAdress string, OnRampPackageId string
 								PackageId: strPtr(CCIPPackageAdress),
 								ModuleId:  strPtr("dynamic_dispatcher"),
 								Function:  strPtr("create_token_params"),
-								Params:    []suicodec.SuiFunctionParam{},
+								Params: []suicodec.SuiFunctionParam{
+									{
+										Name:     "destination_chain_selector",
+										Type:     "u64",
+										Required: true,
+									},
+								},
 							},
 							{
 								Type:      suicodec.SuiPTBCommandMoveCall,
@@ -1540,11 +1491,6 @@ func configureChainWriterForMsg(CCIPPackageAdress string, OnRampPackageId string
 										Type:      "object_id",
 										Required:  true,
 										IsMutable: testutils.BoolPointer(false),
-									},
-									{
-										Name:     "dest_chain_selector",
-										Type:     "u64",
-										Required: true,
 									},
 									{
 										Name:     "receiver",
@@ -1609,7 +1555,13 @@ func configureChainWriterForMultipleTokens(CCIPPackageAdress string, OnRampPacka
 								PackageId: strPtr(CCIPPackageAdress),
 								ModuleId:  strPtr("dynamic_dispatcher"),
 								Function:  strPtr("create_token_params"),
-								Params:    []suicodec.SuiFunctionParam{},
+								Params: []suicodec.SuiFunctionParam{
+									{
+										Name:     "destination_chain_selector",
+										Type:     "u64",
+										Required: true,
+									},
+								},
 							},
 							// Second command: lock tokens in the token pool
 							{
@@ -1639,11 +1591,6 @@ func configureChainWriterForMultipleTokens(CCIPPackageAdress string, OnRampPacka
 										Type:      "object_id",
 										Required:  true,
 										IsGeneric: true,
-									},
-									{
-										Name:     "remote_chain_selector",
-										Type:     "u64",
-										Required: true,
 									},
 									{
 										Name:     "token_params",
@@ -1676,11 +1623,6 @@ func configureChainWriterForMultipleTokens(CCIPPackageAdress string, OnRampPacka
 										Type:      "object_id",
 										Required:  true,
 										IsMutable: testutils.BoolPointer(false),
-									},
-									{
-										Name:     "dest_chain_selector",
-										Type:     "u64",
-										Required: true,
 									},
 									{
 										Name:     "receiver",
