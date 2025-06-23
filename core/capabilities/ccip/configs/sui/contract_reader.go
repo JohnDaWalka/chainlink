@@ -106,7 +106,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 							{
 								"Name":     "offramp_state",
 								"Type":     "object_id",
-								"Required": false,
+								"Required": true,
 							},
 							{
 								"Name":     "ocrPluginType",
@@ -125,7 +125,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 							{
 								"Name":     "offramp_state",
 								"Type":     "object_id",
-								"Required": false,
+								"Required": true,
 							},
 						},
 					},
@@ -136,7 +136,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 							{
 								"Name":     "offramp_state",
 								"Type":     "object_id",
-								"Required": false,
+								"Required": true,
 							},
 						},
 					},
@@ -147,7 +147,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 							{
 								"Name":     "offramp_state",
 								"Type":     "object_id",
-								"Required": false,
+								"Required": true,
 							},
 						},
 					},
@@ -158,10 +158,10 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 							{
 								"Name":     "offramp_state",
 								"Type":     "object_id",
-								"Required": false,
+								"Required": true,
 							},
 							{
-								"Name":     "source_chain_selector",
+								"Name":     "sourceChainSelector",
 								"Type":     "u64",
 								"Required": true,
 							},
@@ -302,12 +302,20 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 							{
 								"Name":     "onramp_state",
 								"Type":     "object_id",
-								"Required": false,
+								"Required": true,
 							},
 						},
 					},
 					"get_static_config": map[string]any{
-						"Name": "get_static_config",
+						"Name":          "get_static_config",
+						"SignerAddress": fromAddress,
+						"Params": []map[string]any{
+							{
+								"Name":     "onramp_state",
+								"Type":     "object_id",
+								"Required": true,
+							},
+						},
 					},
 					"get_dest_chain_config": map[string]any{
 						"Name":          "get_dest_chain_config",
@@ -316,7 +324,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 							{
 								"Name":     "onramp_state",
 								"Type":     "object_id",
-								"Required": false,
+								"Required": true,
 							},
 							{
 								"Name":     "dest_chain_selector",
