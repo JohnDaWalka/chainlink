@@ -2,6 +2,8 @@ package v2
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -12,30 +14,41 @@ import (
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
-	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
 
 var _ jsonrpc.Service = (*service)(nil)
 var _ NodeMessageHandler = (*service)(nil)
 
+const (
+	ServiceName = "HTTPService"
+)
+
+const (
+	ErrInvalidRequest          int64  = -32600 // InvalidRequest: invalid JSON, not retryable
+	ValidationErrorCode        int64  = -32602 // ValidationError: invalid fields, not retryable
+	MethodNotFoundErrorCode    int64  = -32601 // MethodNotFound: method does not exist, not retryable
+	UnauthorizedErrorCode      int64  = -32001 // Unauthorized: invalid/missing JWT, not retryable
+	ResourceNotFoundCode       int64  = -32004 // ResourceNotFound: workflowID does not exist, not retryable
+	LimitExceededErrorCode     int64  = -32029 // LimitExceeded: rate limit exceeded, retryable
+	InternalServerErrorCode    int64  = -32603 // InternalServerError: unexpected/unhandled error, retryable
+	InternalServerErrorMessage string = "Internal Server Error"
+)
+
 // NodeMessageHandler implements service-specific logic for managing messages from nodes.
 type NodeMessageHandler interface {
-	job.ServiceCtx
-
 	// Handlers should not make any assumptions about goroutines calling HandleNodeMessage.
 	// should be non-blocking
 	HandleNodeMessage(ctx context.Context, req *jsonrpc.Response, nodeAddr string) error
 }
 
 type service struct {
+	services.StateMachine
 	config          ServiceConfig
 	don             handlers.DON
 	donConfig       *config.DONConfig
@@ -44,16 +57,21 @@ type service struct {
 	lggr            logger.Logger
 	httpClient      network.HTTPClient
 	nodeRateLimiter *ratelimit.RateLimiter
+	userRateLimiter *ratelimit.RateLimiter
 	wg              sync.WaitGroup
+	stopCh          services.StopChan
 }
 
 type ServiceConfig struct {
-	NodeRateLimiter ratelimit.RateLimiterConfig `json:"nodeRateLimiter"`
+	NodeRateLimiter         ratelimit.RateLimiterConfig `json:"nodeRateLimiter"`
+	UserRateLimiter         ratelimit.RateLimiterConfig `json:"userRateLimiter"`
+	ResponseMaxAgeMs        int                         `json:"callbackMaxAgeMs"`
+	ResponseCleanUpPeriodMs int                         `json:"callbackCleanUpPeriodMs"`
 }
-
 type savedCallback struct {
-	id         string
-	callbackCh chan<- handlers.UserCallbackPayload
+	callbackCh    chan<- *jsonrpc.Response
+	nodeResponses []nodeResponse
+	createdAt     time.Time
 }
 
 func NewHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don handlers.DON, httpClient network.HTTPClient, lggr logger.Logger) (*service, error) {
@@ -66,15 +84,21 @@ func NewHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don 
 	if err != nil {
 		return nil, err
 	}
+	userRateLimiter, err := ratelimit.NewRateLimiter(cfg.UserRateLimiter)
+	if err != nil {
+		return nil, err
+	}
 	return &service{
 		config:          cfg,
 		don:             don,
 		donConfig:       donConfig,
-		lggr:            logger.Named(lggr, "HTTPService"+donConfig.DonId),
+		lggr:            logger.Named(lggr, ServiceName+donConfig.DonId),
 		httpClient:      httpClient,
 		nodeRateLimiter: nodeRateLimiter,
+		userRateLimiter: userRateLimiter,
 		wg:              sync.WaitGroup{},
 		savedCallbacks:  make(map[string]*savedCallback),
+		stopCh:          make(services.StopChan),
 	}, nil
 }
 
@@ -108,15 +132,13 @@ func (h *service) handleOutgoingRequest(ctx context.Context, requestID string, r
 		if err != nil {
 			l.Errorw("error while sending HTTP request to external endpoint", "err", err)
 			outboundResp = gateway.OutboundHTTPResponse{
-				ExecutionError: true,
-				ErrorMessage:   err.Error(),
+				ErrorMessage: err.Error(),
 			}
 		} else {
 			outboundResp = gateway.OutboundHTTPResponse{
-				ExecutionError: false,
-				StatusCode:     resp.StatusCode,
-				Headers:        resp.Headers,
-				Body:           resp.Body,
+				StatusCode: resp.StatusCode,
+				Headers:    resp.Headers,
+				Body:       resp.Body,
 			}
 		}
 		params, err := json.Marshal(outboundResp)
@@ -140,12 +162,50 @@ func (h *service) handleOutgoingRequest(ctx context.Context, requestID string, r
 	return nil
 }
 
+func (h *service) handleTriggerResponse(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error {
+	h.lggr.Debugw("handling trigger response", "requestID", resp.ID, "nodeAddr", nodeAddr)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	callback, exists := h.savedCallbacks[resp.ID]
+	if !exists {
+		h.lggr.Errorw("no callback found for request ID", "requestID", resp.ID, "nodeAddr", nodeAddr)
+		return nil
+	}
+	callback.nodeResponses = append(callback.nodeResponses, nodeResponse{
+		nodeAddress: nodeAddr,
+		resp:        resp,
+	})
+	// F + 1 identical responses are required before sending the response to the user
+	if len(callback.nodeResponses) < h.donConfig.F+1 {
+		h.lggr.Debugw("waiting for more node responses", "requestID", resp.ID, "nodeAddr", nodeAddr, "received", len(callback.nodeResponses), "required", h.donConfig.F+1)
+		return nil
+	}
+
+	select {
+	case <-ctx.Done():
+		h.lggr.Warnw("context cancelled while sending response to user", "requestID", resp.ID, "nodeAddr", nodeAddr)
+		return ctx.Err()
+	case callback.callbackCh <- resp:
+		close(callback.callbackCh)
+	}
+	return nil
+}
+
 // TODO: can this return error?
 func (h *service) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error {
-	// TODO: what if error is received? log and do nothing?
 	requestID := resp.ID
 	if requestID == "" {
 		return fmt.Errorf("received response with empty request ID from node %s", nodeAddr)
+	}
+	h.lggr.Debugw("handling incoming node message", "requestID", requestID, "nodeAddr", nodeAddr)
+	h.mu.Lock()
+	_, exists := h.savedCallbacks[requestID]
+	h.mu.Unlock()
+	if exists {
+		err := h.handleTriggerResponse(ctx, resp, nodeAddr)
+		if err != nil {
+			return err
+		}
 	}
 	var outboundReq gateway.OutboundHTTPRequest
 	err := json.Unmarshal(resp.Result, &outboundReq)
@@ -155,75 +215,149 @@ func (h *service) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Response,
 	return h.handleOutgoingRequest(ctx, requestID, outboundReq, nodeAddr)
 }
 
-func (h *service) handleWebAPITriggerMessage(ctx context.Context, msg *api.Message, nodeAddr string) error {
-	h.mu.Lock()
-	savedCb, found := h.savedCallbacks[msg.Body.MessageId]
-	delete(h.savedCallbacks, msg.Body.MessageId)
-	h.mu.Unlock()
-
-	if found {
-		// Send first response from a node back to the user, ignore any other ones.
-		// TODO: in practice, we should wait for at least 2F+1 nodes to respond and then return an aggregated response
-		// back to the user.
-		savedCb.callbackCh <- handlers.UserCallbackPayload{Msg: msg, ErrCode: api.NoError, ErrMsg: ""}
-		close(savedCb.callbackCh)
+func handleUserError(requestID string, code int64, message string, callbackCh chan<- *jsonrpc.Response) {
+	callbackCh <- &jsonrpc.Response{
+		Version: "2.0",
+		ID:      requestID,
+		Error: &jsonrpc.WireError{
+			Code:    code,
+			Message: message,
+		},
 	}
-	return nil
+	close(callbackCh)
 }
 
-func (h *service) HandleUserMessage(ctx context.Context, msg *api.Message, callbackCh chan<- handlers.UserCallbackPayload) error {
-	h.mu.Lock()
-	h.savedCallbacks[msg.Body.MessageId] = &savedCallback{msg.Body.MessageId, callbackCh}
-	don := h.don
-	h.mu.Unlock()
-	body := msg.Body
-	var payload webapicap.TriggerRequestPayload
-	err := json.Unmarshal(body.Payload, &payload)
+func (h *service) validatedTriggerRequest(req *jsonrpc.Request, callbackCh chan<- *jsonrpc.Response) *gateway_common.HTTPTriggerRequest {
+	var triggerReq gateway_common.HTTPTriggerRequest
+	err := json.Unmarshal(req.Params, &triggerReq)
 	if err != nil {
 		h.lggr.Errorw("error decoding payload", "err", err)
-		callbackCh <- handlers.UserCallbackPayload{Msg: msg, ErrCode: api.UserMessageParseError, ErrMsg: "error decoding payload " + err.Error()}
-		close(callbackCh)
+		handleUserError(req.ID, ErrInvalidRequest, "error decoding payload: "+err.Error(), callbackCh)
 		return nil
 	}
+	if req.ID == "" {
+		h.lggr.Errorw("empty request ID", "method", req.Method)
+		handleUserError(req.ID, ErrInvalidRequest, "empty request ID", callbackCh)
+		return nil
+	}
+	if req.Method != gateway_common.MethodWorkflowExecute {
+		h.lggr.Errorw("invalid method", "method", req.Method)
+		handleUserError(req.ID, MethodNotFoundErrorCode, "invalid method: "+req.Method, callbackCh)
+		return nil
+	}
+	if isValidJSON(triggerReq.Input) {
+		h.lggr.Errorw("invalid params JSON", "params", triggerReq.Input)
+		handleUserError(req.ID, ValidationErrorCode, "invalid params JSON", callbackCh)
+		return nil
+	}
+	return &triggerReq
+}
 
-	if payload.Timestamp == 0 {
-		h.lggr.Errorw("error decoding payload")
-		callbackCh <- handlers.UserCallbackPayload{Msg: msg, ErrCode: api.UserMessageParseError, ErrMsg: "error decoding payload"}
-		close(callbackCh)
+func (h *service) HandleUserRequest(ctx context.Context, req *jsonrpc.Request, callbackCh chan<- *jsonrpc.Response) error {
+	// TODO: is returning nil here correct?
+	// TODO: PRODCRE-305 validate JWT against authorized keys
+	triggerReq := h.validatedTriggerRequest(req, callbackCh)
+	if triggerReq == nil {
+		// Error already handled in validatedTriggerRequest
 		return nil
 	}
-
-	if uint(time.Now().Unix())-h.config.MaxAllowedMessageAgeSec > uint(payload.Timestamp) {
-		callbackCh <- handlers.UserCallbackPayload{Msg: msg, ErrCode: api.HandlerError, ErrMsg: "stale message"}
-		close(callbackCh)
-		return nil
-	}
-	// TODO: apply allowlist and rate-limiting here
-	if msg.Body.Method != MethodWebAPITrigger {
-		h.lggr.Errorw("unsupported method", "method", body.Method)
-		callbackCh <- handlers.UserCallbackPayload{Msg: msg, ErrCode: api.HandlerError, ErrMsg: "invalid method " + msg.Body.Method}
-		close(callbackCh)
-		return nil
-	}
-	req, err := common.ValidatedRequestFromMessage(msg)
+	// TODO: PRODCRE-475 support look-up of workflowID using workflowOwner/Label/Name. Rate-limiting using workflowOwner
+	workflowID := triggerReq.Workflow.WorkflowID
+	executionID, err := generateExecutionID(workflowID, req.ID)
 	if err != nil {
-		h.lggr.Errorw("error transforming message to request")
-		callbackCh <- handlers.UserCallbackPayload{Msg: msg, ErrCode: api.UserMessageParseError, ErrMsg: "error transforming message to request"}
-		close(callbackCh)
+		h.lggr.Errorw("error generating execution ID", "err", err)
+		handleUserError(req.ID, InternalServerErrorCode, InternalServerErrorMessage, callbackCh)
 		return nil
 	}
+	h.mu.Lock()
+	_, found := h.savedCallbacks[executionID]
+	if found {
+		h.mu.Unlock()
+		h.lggr.Debugw("callback already exists for execution ID", "executionID", executionID)
+		handleUserError(req.ID, ValidationErrorCode, "request ID already used: "+req.ID, callbackCh)
+	}
+	h.savedCallbacks[executionID] = &savedCallback{
+		callbackCh: callbackCh,
+		createdAt:  time.Now(),
+	}
+	h.mu.Unlock()
 	// Send original request to all nodes
 	for _, member := range h.donConfig.Members {
-		err = multierr.Combine(err, don.SendToNode(ctx, member.Address, req))
+		err = multierr.Combine(err, h.don.SendToNode(ctx, member.Address, req))
 	}
 	return err
 }
 
+// reapExpiredCallbacks removes callbacks that are older than the maximum age
+func (h *service) reapExpiredCallbacks() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	now := time.Now()
+	var expiredCount int
+	for executionID, callback := range h.savedCallbacks {
+		if now.Sub(callback.createdAt) > time.Duration(h.config.ResponseMaxAgeMs)*time.Millisecond {
+			delete(h.savedCallbacks, executionID)
+			expiredCount++
+		}
+	}
+	if expiredCount > 0 {
+		h.lggr.Infow("Removed expired callbacks", "count", expiredCount, "remaining", len(h.savedCallbacks))
+	}
+}
+
+func isValidJSON(data []byte) bool {
+	var val map[string]interface{}
+	return json.Unmarshal(data, &val) == nil
+}
+
+func generateExecutionID(workflowID, triggerEventID string) (string, error) {
+	s := sha256.New()
+	_, err := s.Write([]byte(workflowID))
+	if err != nil {
+		return "", err
+	}
+
+	_, err = s.Write([]byte(triggerEventID))
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(s.Sum(nil)), nil
+}
+
+func (h *service) HealthReport() map[string]error {
+	return map[string]error{ServiceName: h.Healthy()}
+}
+
+func (h *service) Name() string {
+	return ServiceName
+}
+
 func (h *service) Start(context.Context) error {
-	return nil
+	return h.StartOnce(ServiceName, func() error {
+		h.lggr.Info("Starting " + ServiceName)
+		// Start a goroutine to periodically clean up expired callbacks
+		go func() {
+			ticker := time.NewTicker(time.Duration(h.config.ResponseCleanUpPeriodMs) * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					h.reapExpiredCallbacks()
+				case <-h.stopCh:
+					return
+				}
+			}
+		}()
+		return nil
+	})
 }
 
 func (h *service) Close() error {
-	h.wg.Wait()
-	return nil
+	return h.StopOnce(ServiceName, func() error {
+		h.lggr.Info("Closing " + ServiceName)
+		close(h.stopCh)
+		h.wg.Wait()
+		return nil
+	})
 }
