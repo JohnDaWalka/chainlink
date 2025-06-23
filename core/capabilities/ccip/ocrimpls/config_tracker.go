@@ -2,16 +2,11 @@ package ocrimpls
 
 import (
 	"context"
-<<<<<<< HEAD
-	"encoding/hex"
-=======
 	"fmt"
->>>>>>> develop
 
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 

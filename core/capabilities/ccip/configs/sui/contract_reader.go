@@ -96,9 +96,77 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 					},
 				},
 			},
-			consts.ContractNameOffRamp: map[string]any{
+			"offramp": map[string]any{
 				"Name": "offramp",
 				"Functions": map[string]any{
+					consts.MethodNameOffRampLatestConfigDetails: map[string]any{
+						"Name":          "latest_config_details",
+						"SignerAddress": fromAddress,
+						"Params": []map[string]any{
+							{
+								"Name":     "offramp_state",
+								"Type":     "object_id",
+								"Required": false,
+							},
+							{
+								"Name":     "ocrPluginType",
+								"Type":     "u8",
+								"Required": true,
+							},
+						},
+						// wrap the returned OCR config
+						// https://github.com/smartcontractkit/chainlink-ccip/blob/bee7c32c71cf0aec594c051fef328b4a7281a1fc/pkg/reader/ccip.go#L141
+						"ResultTupleToStruct": []string{"ocr_config"},
+					},
+					consts.MethodNameGetLatestPriceSequenceNumber: map[string]any{
+						"Name":          "get_latest_price_sequence_number",
+						"SignerAddress": fromAddress,
+						"Params": []map[string]any{
+							{
+								"Name":     "offramp_state",
+								"Type":     "object_id",
+								"Required": false,
+							},
+						},
+					},
+					consts.MethodNameOffRampGetStaticConfig: map[string]any{
+						"Name":          "get_static_config",
+						"SignerAddress": fromAddress,
+						"Params": []map[string]any{
+							{
+								"Name":     "offramp_state",
+								"Type":     "object_id",
+								"Required": false,
+							},
+						},
+					},
+					consts.MethodNameOffRampGetDynamicConfig: map[string]any{
+						"Name":          "get_dynamic_config",
+						"SignerAddress": fromAddress,
+						"Params": []map[string]any{
+							{
+								"Name":     "offramp_state",
+								"Type":     "object_id",
+								"Required": false,
+							},
+						},
+					},
+					consts.MethodNameGetSourceChainConfig: map[string]any{
+						"Name":          "get_source_chain_config",
+						"SignerAddress": fromAddress,
+						"Params": []map[string]any{
+							{
+								"Name":     "offramp_state",
+								"Type":     "object_id",
+								"Required": false,
+							},
+							{
+								"Name":     "source_chain_selector",
+								"Type":     "u64",
+								"Required": true,
+							},
+						},
+					},
 					consts.MethodNameGetExecutionState: map[string]any{
 						"Name": "get_execution_state",
 						"Params": []map[string]any{
@@ -120,40 +188,6 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 							{
 								"Name":     "root",
 								"Type":     "vector<u8>",
-								"Required": true,
-							},
-						},
-					},
-					consts.MethodNameOffRampLatestConfigDetails: map[string]any{
-						"Name": "latest_config_details",
-						"Params": []map[string]any{
-							{
-								"Name":     "ocrPluginType",
-								"Type":     "u8",
-								"Required": true,
-							},
-						},
-						// wrap the returned OCR config
-						// https://github.com/smartcontractkit/chainlink-ccip/blob/bee7c32c71cf0aec594c051fef328b4a7281a1fc/pkg/reader/ccip.go#L141
-						"ResultTupleToStruct": []string{"ocr_config"},
-					},
-					consts.MethodNameGetLatestPriceSequenceNumber: map[string]any{
-						"Name": "get_latest_price_sequence_number",
-					},
-					consts.MethodNameOffRampGetStaticConfig: map[string]any{
-						"Name": "get_static_config",
-						// TODO: field renames
-					},
-					consts.MethodNameOffRampGetDynamicConfig: map[string]any{
-						"Name": "get_dynamic_config",
-						// TODO: field renames
-					},
-					consts.MethodNameGetSourceChainConfig: map[string]any{
-						"Name": "get_source_chain_config",
-						"Params": []map[string]any{
-							{
-								"Name":     "sourceChainSelector",
-								"Type":     "u64",
 								"Required": true,
 							},
 						},
@@ -282,7 +316,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 							{
 								"Name":     "onramp_state",
 								"Type":     "object_id",
-								"Required": true,
+								"Required": false,
 							},
 							{
 								"Name":     "dest_chain_selector",

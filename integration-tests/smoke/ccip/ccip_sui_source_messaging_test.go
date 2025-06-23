@@ -74,6 +74,7 @@ func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
 				Receiver:               state.Chains[destChain].Receiver.Address().Bytes(),
 				MsgData:                message,
 				ExtraArgs:              nil,
+				Replayed:               true,
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
 				ExtraAssertions: []func(t *testing.T){
 					func(t *testing.T) {
