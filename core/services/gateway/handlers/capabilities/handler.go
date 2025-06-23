@@ -16,6 +16,7 @@ import (
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
+	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
@@ -222,7 +223,7 @@ func (h *handler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Response,
 	switch msg.Body.Method {
 	case MethodWebAPITrigger:
 		err = h.handleWebAPITriggerMessage(ctx, msg, nodeAddr)
-	case MethodWebAPITarget, MethodComputeAction, MethodWorkflowSyncer:
+	case MethodWebAPITarget, MethodComputeAction, MethodWorkflowSyncer, gateway_common.MethodHTTPAction:
 		err = h.handleWebAPIOutgoingMessage(ctx, msg, nodeAddr)
 	default:
 		err = fmt.Errorf("unsupported method: %s", msg.Body.Method)
