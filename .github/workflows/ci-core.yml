@@ -278,7 +278,10 @@ jobs:
 
       - name: Install LOOP Plugins
         if: ${{ matrix.type.should-run == 'true' }}
-        run: make install-plugins
+        run: |
+          make install-loopinstall
+          CL_USE_EXPERIMENTAL_PLUGINS=true make install-plugins-local
+          make install-plugins-public
 
       - name: Increase Timeouts for Fuzz/Race
         # Increase timeouts for scheduled runs only
