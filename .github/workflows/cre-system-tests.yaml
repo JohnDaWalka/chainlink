@@ -32,6 +32,11 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.chainlink_version }}
+
       - name: Define test matrix
         id: define-matrix
         shell: bash
