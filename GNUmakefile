@@ -15,8 +15,13 @@ CL_LOOPINSTALL_OUTPUT_DIR ?=
 install: install-chainlink-autoinstall ## Install chainlink and all its dependencies.
 
 .PHONY: install-git-hooks
-install-git-hooks: ## Install git hooks.
-	git config core.hooksPath .githooks
+install-git-hooks: ## Uninstalls old git hooks and installs lefthook.
+	@if git config --get core.hooksPath | grep -q .githooks; then \
+		echo "Removing old git hooks path..."; \
+		git config --unset core.hooksPath; \
+	fi
+	@echo "Installing lefthook hooks..."
+	@go tool lefthook install
 
 .PHONY: install-chainlink-autoinstall
 install-chainlink-autoinstall: | gomod install-chainlink ## Autoinstall chainlink.
