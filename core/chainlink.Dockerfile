@@ -19,8 +19,6 @@ COPY . .
 ARG CL_INSTALL_PRIVATE_PLUGINS=true
 # Flag to control installation of testing plugins (default: false).
 ARG CL_INSTALL_TESTING_PLUGINS=false
-# Flag to control use of experimental public plugins (default: false).
-ARG CL_USE_EXPERIMENTAL_PLUGINS=false
 # Env vars needed for chainlink build
 ARG COMMIT_SHA
 # Build chainlink bin with cover flag https://go.dev/doc/build-cover#FAQ
@@ -33,7 +31,7 @@ RUN --mount=type=secret,id=GIT_AUTH_TOKEN \
     ./plugins/scripts/setup_git_auth.sh && \
     mkdir -p /gobins && mkdir -p "${CL_LOOPINSTALL_OUTPUT_DIR}" && \
     GOBIN=/go/bin make install-loopinstall && \
-    GOBIN=/gobins CL_LOOPINSTALL_OUTPUT_DIR=${CL_LOOPINSTALL_OUTPUT_DIR} CL_USE_EXPERIMENTAL_PLUGINS=${CL_USE_EXPERIMENTAL_PLUGINS} make install-plugins-local install-plugins-public && \
+    GOBIN=/gobins CL_LOOPINSTALL_OUTPUT_DIR=${CL_LOOPINSTALL_OUTPUT_DIR} make install-plugins-local install-plugins-public && \
     if [ "${CL_INSTALL_PRIVATE_PLUGINS}" = "true" ]; then \
         GOBIN=/gobins CL_LOOPINSTALL_OUTPUT_DIR=${CL_LOOPINSTALL_OUTPUT_DIR} make install-plugins-private; \
     fi && \

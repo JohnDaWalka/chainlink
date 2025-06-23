@@ -53,10 +53,12 @@ To build an unofficial testing-only image from a feature branch or PR. You can d
 
 ### Build Plugins
 
-Plugins are defined in yaml files within the `plugins/` directory. Each plugin file is a yaml file and has a `plugins.` prefix name. Plugins are installed with [loopinstall](https://github.com/smartcontractkit/chainlink-common/tree/main/pkg/loop/cmd/loopinstall). Experimental plugins are used by the `plugins/chainlink.Dockerfile` and they will have the "experimental" in their filename. To install experimental plugins, you can use the `CL_USE_EXPERIMENTAL_PLUGINS` environment variable like:
+Plugins are defined in yaml files within the `plugins/` directory. Each plugin file is a yaml file and has a `plugins.` prefix name. Plugins are installed with [loopinstall](https://github.com/smartcontractkit/chainlink-common/tree/main/pkg/loop/cmd/loopinstall).
 
-```shell
-CL_USE_EXPERIMENTAL_PLUGINS=true make install-plugins install-plugins-private
+To install the plugins, run:
+
+```bash
+make install-plugins
 ```
 
 Some plugins (such as those in `plugins/plugins.private.yaml`) reference private GitHub repositories. To build these plugins, you must have a GITHUB_TOKEN environment variable set, or preferably use the [gh](https://cli.github.com/manual/gh) GitHub CLI tool to use the [GitHub CLI credential helper](https://cli.github.com/manual/gh_auth_setup-git) like:
@@ -69,7 +71,7 @@ gh auth setup-git
 Then you can build the plugins with:
 
 ```shell
-make install-plugins install-plugins-private
+make install-plugins-private
 ```
 
 ### Apple Silicon - ARM64

@@ -8,8 +8,6 @@ GCFLAGS = -gcflags "$(GO_GCFLAGS)"
 # Set to true to install private plugins (will require GitHub auth).
 CL_INSTALL_PRIVATE_PLUGINS ?= false
 CL_INSTALL_TESTING_PLUGINS ?= false
-# Set to true to use experimental public plugins instead of stable ones.
-CL_USE_EXPERIMENTAL_PLUGINS ?= false
 # Output directory for loopinstall plugin manifests (set by caller)
 CL_LOOPINSTALL_OUTPUT_DIR ?=
 
@@ -71,20 +69,18 @@ install-loopinstall:
 
 .PHONY: install-plugins-public
 install-plugins-public: ## Build & install public remote LOOPP binaries (plugins).
-	$(eval PUBLIC_PLUGINS_FILE := $(if $(filter true,$(CL_USE_EXPERIMENTAL_PLUGINS)),./plugins/plugins.public.experimental.yaml,./plugins/plugins.public.yaml))
 	@if [ -n "$(CL_LOOPINSTALL_OUTPUT_DIR)" ]; then \
-		loopinstall --concurrency 5 --output-installation-artifacts $(CL_LOOPINSTALL_OUTPUT_DIR)/public.json $(PUBLIC_PLUGINS_FILE); \
+		loopinstall --concurrency 5 --output-installation-artifacts $(CL_LOOPINSTALL_OUTPUT_DIR)/public.json ./plugins/plugins.public.yaml; \
 	else \
-		loopinstall --concurrency 5 $(PUBLIC_PLUGINS_FILE); \
+		loopinstall --concurrency 5 ./plugins/plugins.public.yaml; \
 	fi
 
 .PHONY: install-plugins-private
 install-plugins-private: ## Build & install private remote LOOPP binaries (plugins).
-	$(eval PRIVATE_PLUGINS_FILE := $(if $(filter true,$(CL_USE_EXPERIMENTAL_PLUGINS)),./plugins/plugins.private.experimental.yaml,./plugins/plugins.private.yaml))
 	@if [ -n "$(CL_LOOPINSTALL_OUTPUT_DIR)" ]; then \
-		GOPRIVATE=github.com/smartcontractkit/* loopinstall --concurrency 5 --output-installation-artifacts $(CL_LOOPINSTALL_OUTPUT_DIR)/private.json $(PRIVATE_PLUGINS_FILE); \
+		GOPRIVATE=github.com/smartcontractkit/* loopinstall --concurrency 5 --output-installation-artifacts $(CL_LOOPINSTALL_OUTPUT_DIR)/private.json ./plugins/plugins.private.yaml; \
 	else \
-		GOPRIVATE=github.com/smartcontractkit/* loopinstall --concurrency 5 $(PRIVATE_PLUGINS_FILE); \
+		GOPRIVATE=github.com/smartcontractkit/* loopinstall --concurrency 5 ./plugins/plugins.private.yaml; \
 	fi
 
 .PHONY: install-plugins-testing
@@ -97,10 +93,7 @@ install-plugins-testing: ## Build & install testing LOOPP binaries (plugins).
 
 .PHONY: install-plugins-local
 install-plugins-local: ## Build & install local plugins
-	@if [ "$(CL_USE_EXPERIMENTAL_PLUGINS)" = "true" ]; then \
-		go install $(GOFLAGS) ./plugins/cmd/chainlink-evm; \
-		echo "go install $(GOFLAGS) ./plugins/cmd/chainlink-evm"; \
-	fi
+	go install $(GOFLAGS) ./plugins/cmd/chainlink-evm
 	go install $(GOFLAGS) ./plugins/cmd/chainlink-medianpoc
 	go install $(GOFLAGS) ./plugins/cmd/chainlink-ocr3-capability
 	go install $(GOFLAGS) ./plugins/cmd/capabilities/log-event-trigger
