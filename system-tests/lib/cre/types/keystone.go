@@ -43,11 +43,12 @@ type NodeIndexToConfigOverride = map[int]string
 type NodeIndexToSecretsOverride = map[int]string
 
 type WorkflowRegistryInput struct {
-	ChainSelector  uint64                  `toml:"-"`
-	CldEnv         *cldf.Environment       `toml:"-"`
-	AllowedDonIDs  []uint32                `toml:"-"`
-	WorkflowOwners []common.Address        `toml:"-"`
-	Out            *WorkflowRegistryOutput `toml:"out"`
+	ContractAddress common.Address          `toml:"_"`
+	ChainSelector   uint64                  `toml:"-"`
+	CldEnv          *cldf.Environment       `toml:"-"`
+	AllowedDonIDs   []uint32                `toml:"-"`
+	WorkflowOwners  []common.Address        `toml:"-"`
+	Out             *WorkflowRegistryOutput `toml:"out"`
 }
 
 func (w *WorkflowRegistryInput) Validate() error {

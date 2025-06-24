@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 
@@ -19,10 +20,9 @@ import (
 	df_changeset "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset"
 	df_changeset_types "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/types"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	ks_contracts_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/contracts"
 
 	corevm "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
-
-	workflow_registry_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/workflowregistry"
 
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -369,37 +369,29 @@ func ConfigureWorkflowRegistry(testLogger zerolog.Logger, input *types.WorkflowR
 		return nil, errors.Wrap(err, "input validation failed")
 	}
 
-	_, err := workflow_registry_changeset.UpdateAllowedDons(*input.CldEnv, &workflow_registry_changeset.UpdateAllowedDonsRequest{
-		RegistryChainSel: input.ChainSelector,
-		DonIDs:           input.AllowedDonIDs,
-		Allowed:          true,
-	})
+	report, err := operations.ExecuteSequence(
+		input.CldEnv.OperationsBundle,
+		ks_contracts_op.ConfigWorkflowRegistrySeq,
+		ks_contracts_op.ConfigWorkflowRegistrySeqDeps{
+			Env: input.CldEnv,
+		},
+		ks_contracts_op.ConfigWorkflowRegistrySeqInput{
+			ContractAddress:       input.ContractAddress,
+			RegistryChainSelector: input.ChainSelector,
+			AllowedDonIDs:         input.AllowedDonIDs,
+			WorkflowOwners:        input.WorkflowOwners,
+		},
+	)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to update allowed Dons")
+		return nil, errors.Wrap(err, "failed to configure workflow registry")
 	}
 
-	addresses := make([]string, 0, len(input.WorkflowOwners))
-	for _, owner := range input.WorkflowOwners {
-		addresses = append(addresses, owner.Hex())
+	input.Out = &types.WorkflowRegistryOutput{
+		ChainSelector:  report.Output.RegistryChainSelector,
+		AllowedDonIDs:  report.Output.AllowedDonIDs,
+		WorkflowOwners: report.Output.WorkflowOwners,
 	}
-
-	_, err = workflow_registry_changeset.UpdateAuthorizedAddresses(*input.CldEnv, &workflow_registry_changeset.UpdateAuthorizedAddressesRequest{
-		RegistryChainSel: input.ChainSelector,
-		Addresses:        addresses,
-		Allowed:          true,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to update authorized addresses")
-	}
-
-	out := &types.WorkflowRegistryOutput{
-		ChainSelector:  input.ChainSelector,
-		AllowedDonIDs:  input.AllowedDonIDs,
-		WorkflowOwners: input.WorkflowOwners,
-	}
-
-	input.Out = out
-	return out, nil
+	return input.Out, nil
 }
 
 func ConfigureDataFeedsCache(testLogger zerolog.Logger, input *types.ConfigureDataFeedsCacheInput) (*types.ConfigureDataFeedsCacheOutput, error) {
