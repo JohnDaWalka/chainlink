@@ -38,9 +38,9 @@ import (
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	keystone_operations "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations"
-
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
@@ -169,8 +169,8 @@ func SetupTestEnvironment(
 			Env: allChainsCLDEnvironment,
 		},
 		keystone_operations.DeployKeystoneContractsSequenceInput{
-			HomeChainSelector:   homeChainOutput.ChainSelector,
-			ForwardersSelectors: forwardersSelectors,
+			RegistryChainSelector: homeChainOutput.ChainSelector,
+			ForwardersSelectors:   forwardersSelectors,
 		},
 	)
 	if err != nil {
