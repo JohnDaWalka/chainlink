@@ -248,29 +248,23 @@ func SetupTestEnvironment(
 
 	fmt.Print(libformat.PurpleText("[Stage 4/6] Starting Job Distributor, DONs and creating Jobs with Job Distributor\n"))
 
-	jobsSeqReport, jobsSeqErr := operations.ExecuteSequence(
-		allChainsCLDEnvironment.OperationsBundle, SetupJobsSeq,
-		SetupJobsSeqDeps{
-			Logger:                    testLogger,
-			JdInput:                   input.JdInput,
-			NixShell:                  nixShell,
-			HomeChainBlockchainOutput: homeChainOutput.BlockchainOutput,
-			Topology:                  topology,
-		},
-		SetupJobsSeqInput{
-			InfraType:                 input.InfraInput.InfraType,
-			CapabilitiesAwareNodeSets: updatedNodeSets,
-		},
+	jdOutput, nodeSetOutput, jobsSeqErr := SetupJobs(
+		testLogger,
+		input.JdInput,
+		nixShell,
+		homeChainOutput.BlockchainOutput,
+		topology,
+		input.InfraInput.InfraType,
+		updatedNodeSets,
 	)
 	if jobsSeqErr != nil {
 		return nil, pkgerrors.Wrap(jobsSeqErr, "failed to execute setup jobs sequence")
 	}
-	nodeSetOutput := jobsSeqReport.Output.NodeSetOutput
 
 	// Prepare the CLD environment that's required by the keystone changeset
 	// Ugly glue hack ¯\_(ツ)_/¯
 	fullCldInput := &cretypes.FullCLDEnvironmentInput{
-		JdOutput:          jobsSeqReport.Output.JdOutput,
+		JdOutput:          jdOutput,
 		BlockchainOutputs: bcOuts,
 		SethClients:       sethClients,
 		NodeSetOutput:     nodeSetOutput,
