@@ -19,7 +19,7 @@ import (
 )
 
 func BuildTopology(
-	homeChainSelector uint64,
+	registryChainSelector uint64,
 	nodeSets []*cretypes.CapabilitiesAwareNodeSet,
 	infraInput libtypes.InfraInput,
 	chainIDs []int,
@@ -35,7 +35,7 @@ func BuildTopology(
 		return nil, nil, errors.Wrap(topologyErr, "failed to validate topology")
 	}
 
-	topology, err := libdon.BuildTopology(localNodeSets, infraInput, homeChainSelector)
+	topology, err := libdon.BuildTopology(localNodeSets, infraInput, registryChainSelector)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to build topology")
 	}

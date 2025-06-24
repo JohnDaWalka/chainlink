@@ -15,8 +15,8 @@ type DeployKeystoneContractsSequenceDeps struct {
 // inputs and outputs have to be serializable, and must not contain sensitive data
 
 type DeployKeystoneContractsSequenceInput struct {
-	HomeChainSelector   uint64
-	ForwardersSelectors []uint64
+	RegistryChainSelector uint64
+	ForwardersSelectors   []uint64
 }
 
 type DeployKeystoneContractsSequenceOutput struct {
@@ -35,17 +35,17 @@ var DeployKeystoneContractsSequence = operations.NewSequence[DeployKeystoneContr
 		ab := deployment.NewMemoryAddressBook()
 		as := datastore.NewMemoryDataStore()
 
-		ocr3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps(deps), DeployOCR3OpInput{ChainSelector: input.HomeChainSelector})
+		ocr3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps(deps), DeployOCR3OpInput{ChainSelector: input.RegistryChainSelector})
 		if err != nil {
 			return DeployKeystoneContractsSequenceOutput{}, err
 		}
 
-		capabilitiesRegistryDeployReport, err := operations.ExecuteOperation(b, DeployCapabilityRegistryOp, DeployCapabilityRegistryOpDeps(deps), DeployCapabilityRegistryInput{ChainSelector: input.HomeChainSelector})
+		capabilitiesRegistryDeployReport, err := operations.ExecuteOperation(b, DeployCapabilityRegistryOp, DeployCapabilityRegistryOpDeps(deps), DeployCapabilityRegistryInput{ChainSelector: input.RegistryChainSelector})
 		if err != nil {
 			return DeployKeystoneContractsSequenceOutput{}, err
 		}
 
-		workflowRegistryDeployReport, err := operations.ExecuteOperation(b, DeployWorkflowRegistryOp, DeployWorkflowRegistryOpDeps(deps), DeployWorkflowRegistryInput{ChainSelector: input.HomeChainSelector})
+		workflowRegistryDeployReport, err := operations.ExecuteOperation(b, DeployWorkflowRegistryOp, DeployWorkflowRegistryOpDeps(deps), DeployWorkflowRegistryInput{ChainSelector: input.RegistryChainSelector})
 		if err != nil {
 			return DeployKeystoneContractsSequenceOutput{}, err
 		}
