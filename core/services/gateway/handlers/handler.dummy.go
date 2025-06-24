@@ -6,7 +6,7 @@ import (
 
 	"go.uber.org/multierr"
 
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 )
@@ -32,7 +32,7 @@ func NewDummyHandler(donConfig *config.DONConfig, don DON, lggr logger.Logger) (
 		donConfig:      donConfig,
 		don:            don,
 		savedCallbacks: make(map[string]*savedCallback),
-		lggr:           lggr.Named("DummyHandler." + donConfig.DonId),
+		lggr:           logger.Named(lggr, "DummyHandler."+donConfig.DonId),
 	}, nil
 }
 

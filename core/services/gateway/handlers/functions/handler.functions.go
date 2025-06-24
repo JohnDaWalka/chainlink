@@ -15,10 +15,11 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/assets"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
@@ -66,11 +67,11 @@ type FunctionsHandlerConfig struct {
 	OnchainSubscriptions       *fsub.OnchainSubscriptionsConfig `json:"onchainSubscriptions"`
 	MinimumSubscriptionBalance *assets.Link                     `json:"minimumSubscriptionBalance"`
 	// Not specifying RateLimiter config disables rate limiting
-	UserRateLimiter            *hc.RateLimiterConfig `json:"userRateLimiter"`
-	NodeRateLimiter            *hc.RateLimiterConfig `json:"nodeRateLimiter"`
-	MaxPendingRequests         uint32                `json:"maxPendingRequests"`
-	RequestTimeoutMillis       int64                 `json:"requestTimeoutMillis"`
-	AllowedHeartbeatInitiators []string              `json:"allowedHeartbeatInitiators"`
+	UserRateLimiter            *ratelimit.RateLimiterConfig `json:"userRateLimiter"`
+	NodeRateLimiter            *ratelimit.RateLimiterConfig `json:"nodeRateLimiter"`
+	MaxPendingRequests         uint32                       `json:"maxPendingRequests"`
+	RequestTimeoutMillis       int64                        `json:"requestTimeoutMillis"`
+	AllowedHeartbeatInitiators []string                     `json:"allowedHeartbeatInitiators"`
 }
 
 type functionsHandler struct {
@@ -83,8 +84,8 @@ type functionsHandler struct {
 	allowlist                  fallow.OnchainAllowlist
 	subscriptions              fsub.OnchainSubscriptions
 	minimumBalance             *assets.Link
-	userRateLimiter            *hc.RateLimiter
-	nodeRateLimiter            *hc.RateLimiter
+	userRateLimiter            *ratelimit.RateLimiter
+	nodeRateLimiter            *ratelimit.RateLimiter
 	allowedHeartbeatInitiators map[string]struct{}
 	chStop                     services.StopChan
 	lggr                       logger.Logger
@@ -105,7 +106,7 @@ func NewFunctionsHandlerFromConfig(handlerConfig json.RawMessage, donConfig *con
 	if err != nil {
 		return nil, err
 	}
-	lggr = lggr.Named("FunctionsHandler:" + donConfig.DonId)
+	lggr = logger.Named(lggr, "FunctionsHandler:"+donConfig.DonId)
 	var allowlist fallow.OnchainAllowlist
 	if cfg.OnchainAllowlist != nil {
 		chainService, err2 := legacyChains.Get(cfg.ChainID)
@@ -126,15 +127,15 @@ func NewFunctionsHandlerFromConfig(handlerConfig json.RawMessage, donConfig *con
 			return nil, err2
 		}
 	}
-	var userRateLimiter, nodeRateLimiter *hc.RateLimiter
+	var userRateLimiter, nodeRateLimiter *ratelimit.RateLimiter
 	if cfg.UserRateLimiter != nil {
-		userRateLimiter, err = hc.NewRateLimiter(*cfg.UserRateLimiter)
+		userRateLimiter, err = ratelimit.NewRateLimiter(*cfg.UserRateLimiter)
 		if err != nil {
 			return nil, err
 		}
 	}
 	if cfg.NodeRateLimiter != nil {
-		nodeRateLimiter, err = hc.NewRateLimiter(*cfg.NodeRateLimiter)
+		nodeRateLimiter, err = ratelimit.NewRateLimiter(*cfg.NodeRateLimiter)
 		if err != nil {
 			return nil, err
 		}
@@ -176,8 +177,8 @@ func NewFunctionsHandler(
 	allowlist fallow.OnchainAllowlist,
 	subscriptions fsub.OnchainSubscriptions,
 	minimumBalance *assets.Link,
-	userRateLimiter *hc.RateLimiter,
-	nodeRateLimiter *hc.RateLimiter,
+	userRateLimiter *ratelimit.RateLimiter,
+	nodeRateLimiter *ratelimit.RateLimiter,
 	allowedHeartbeatInitiators map[string]struct{},
 	lggr logger.Logger) handlers.Handler {
 	return &functionsHandler{

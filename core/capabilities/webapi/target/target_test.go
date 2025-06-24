@@ -12,14 +12,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	registrymock "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
 	ghcapabilities "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 )
 
 const (
@@ -30,13 +31,13 @@ const (
 )
 
 var defaultConfig = webapi.ServiceConfig{
-	OutgoingRateLimiter: common.RateLimiterConfig{
+	OutgoingRateLimiter: ratelimit.RateLimiterConfig{
 		GlobalRPS:      100.0,
 		GlobalBurst:    100,
 		PerSenderRPS:   100.0,
 		PerSenderBurst: 100,
 	},
-	RateLimiter: common.RateLimiterConfig{
+	RateLimiter: ratelimit.RateLimiterConfig{
 		GlobalRPS:      100.0,
 		GlobalBurst:    100,
 		PerSenderRPS:   100.0,
@@ -58,7 +59,7 @@ func setup(t *testing.T, config webapi.ServiceConfig) testHarness {
 	connector := gcmocks.NewGatewayConnector(t)
 	lggr := logger.Test(t)
 
-	connectorHandler, err := webapi.NewOutgoingConnectorHandler(connector, config, ghcapabilities.MethodWebAPITarget, lggr, webapi.WithFixedStart())
+	connectorHandler, err := webapi.NewOutgoingConnectorHandler(connector, config, ghcapabilities.MethodWebAPITarget, lggr, gateway.WithFixedStart())
 	require.NoError(t, err)
 
 	capability, err := NewCapability(config, registry, connectorHandler, lggr)

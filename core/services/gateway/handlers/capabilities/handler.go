@@ -12,12 +12,12 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/webapi/webapicap"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 )
 
@@ -37,14 +37,14 @@ type handler struct {
 	mu              sync.Mutex
 	lggr            logger.Logger
 	httpClient      network.HTTPClient
-	nodeRateLimiter *common.RateLimiter
+	nodeRateLimiter *ratelimit.RateLimiter
 	wg              sync.WaitGroup
 	metrics         *metrics
 }
 
 type HandlerConfig struct {
-	NodeRateLimiter         common.RateLimiterConfig `json:"nodeRateLimiter"`
-	MaxAllowedMessageAgeSec uint                     `json:"maxAllowedMessageAgeSec"`
+	NodeRateLimiter         ratelimit.RateLimiterConfig `json:"nodeRateLimiter"`
+	MaxAllowedMessageAgeSec uint                        `json:"maxAllowedMessageAgeSec"`
 }
 
 type savedCallback struct {
@@ -60,7 +60,7 @@ func NewHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don 
 	if err != nil {
 		return nil, err
 	}
-	nodeRateLimiter, err := common.NewRateLimiter(cfg.NodeRateLimiter)
+	nodeRateLimiter, err := ratelimit.NewRateLimiter(cfg.NodeRateLimiter)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func NewHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don 
 		config:          cfg,
 		don:             don,
 		donConfig:       donConfig,
-		lggr:            lggr.Named("WebAPIHandler." + donConfig.DonId),
+		lggr:            logger.Named(lggr, "WebAPIHandler."+donConfig.DonId),
 		httpClient:      httpClient,
 		nodeRateLimiter: nodeRateLimiter,
 		wg:              sync.WaitGroup{},
@@ -157,7 +157,7 @@ func (h *handler) handleWebAPIOutgoingMessage(ctx context.Context, msg *api.Mess
 		newCtx := context.WithoutCancel(ctx)
 		newCtx, cancel := context.WithTimeout(newCtx, timeout)
 		defer cancel()
-		l := h.lggr.With("url", payload.URL, "messageId", msg.Body.MessageId, "method", payload.Method, "timeout", payload.TimeoutMs)
+		l := logger.With(h.lggr, "url", payload.URL, "messageId", msg.Body.MessageId, "method", payload.Method, "timeout", payload.TimeoutMs)
 		l.Debug("Sending request to client")
 		respMsg, err := h.sendHTTPMessageToClient(newCtx, req, msg)
 		if err != nil {
