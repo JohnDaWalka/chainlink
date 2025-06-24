@@ -433,7 +433,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.60 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250624090157-6b89f926f864 // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250624203844-fc98d790c2c2 // indirect
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250624225903-75d721f1f786 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250617202041-425ed4b7277a // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 // indirect
 	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250623155929-df514c92ffe1 // indirect
