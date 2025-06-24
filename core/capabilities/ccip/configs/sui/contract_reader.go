@@ -7,6 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-sui/relayer/chainreader"
 	"github.com/smartcontractkit/chainlink-sui/relayer/client"
+	"github.com/smartcontractkit/chainlink-sui/relayer/codec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
 	"golang.org/x/crypto/blake2b"
 )
@@ -29,6 +30,9 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 		return map[string]any{}, fmt.Errorf("unable to derive Sui address from public key %s: %w", pubKeyStr, err)
 	}
 	fromAddress = "0x" + fromAddress
+
+	offRampStatePointer := "_::offramp::OffRampStatePointer::off_ramp_state_id"
+	onRampStatePointer := "_::onramp::OnRampStatePointer::on_ramp_state_id"
 
 	return map[string]any{
 		"IsLoopPlugin": true,
@@ -98,100 +102,103 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 			},
 			"offramp": map[string]any{
 				"Name": "offramp",
-				"Functions": map[string]any{
-					consts.MethodNameOffRampLatestConfigDetails: map[string]any{
-						"Name":          "latest_config_details",
-						"SignerAddress": fromAddress,
-						"Params": []map[string]any{
+				"Functions": map[string]*chainreader.ChainReaderFunction{
+					consts.MethodNameOffRampLatestConfigDetails: {
+						Name:          "latest_config_details",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
 							{
-								"Name":     "offramp_state",
-								"Type":     "object_id",
-								"Required": true,
+								Name:       "off_ramp_state_id",
+								PointerTag: &offRampStatePointer,
+								Type:       "object_id",
+								Required:   true,
 							},
 							{
-								"Name":     "ocrPluginType",
-								"Type":     "u8",
-								"Required": true,
-							},
-						},
-						// wrap the returned OCR config
-						// https://github.com/smartcontractkit/chainlink-ccip/blob/bee7c32c71cf0aec594c051fef328b4a7281a1fc/pkg/reader/ccip.go#L141
-						"ResultTupleToStruct": []string{"ocr_config"},
-					},
-					consts.MethodNameGetLatestPriceSequenceNumber: map[string]any{
-						"Name":          "get_latest_price_sequence_number",
-						"SignerAddress": fromAddress,
-						"Params": []map[string]any{
-							{
-								"Name":     "offramp_state",
-								"Type":     "object_id",
-								"Required": true,
+								Name:     "ocrPluginType",
+								Type:     "u8",
+								Required: true,
 							},
 						},
 					},
-					consts.MethodNameOffRampGetStaticConfig: map[string]any{
-						"Name":          "get_static_config",
-						"SignerAddress": fromAddress,
-						"Params": []map[string]any{
+					consts.MethodNameGetLatestPriceSequenceNumber: {
+						Name:          "get_latest_price_sequence_number",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
 							{
-								"Name":     "offramp_state",
-								"Type":     "object_id",
-								"Required": true,
+								Name:       "off_ramp_state_id",
+								PointerTag: &offRampStatePointer,
+								Type:       "object_id",
+								Required:   true,
 							},
 						},
 					},
-					consts.MethodNameOffRampGetDynamicConfig: map[string]any{
-						"Name":          "get_dynamic_config",
-						"SignerAddress": fromAddress,
-						"Params": []map[string]any{
+
+					consts.MethodNameOffRampGetStaticConfig: {
+						Name:          "get_static_config",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
 							{
-								"Name":     "offramp_state",
-								"Type":     "object_id",
-								"Required": true,
+								Name:       "off_ramp_state_id",
+								PointerTag: &offRampStatePointer,
+								Type:       "object_id",
+								Required:   true,
 							},
 						},
 					},
-					consts.MethodNameGetSourceChainConfig: map[string]any{
-						"Name":          "get_source_chain_config",
-						"SignerAddress": fromAddress,
-						"Params": []map[string]any{
+					consts.MethodNameOffRampGetDynamicConfig: {
+						Name:          "get_dynamic_config",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
 							{
-								"Name":     "offramp_state",
-								"Type":     "object_id",
-								"Required": true,
-							},
-							{
-								"Name":     "sourceChainSelector",
-								"Type":     "u64",
-								"Required": true,
+								Name:       "off_ramp_state_id",
+								PointerTag: &offRampStatePointer,
+								Type:       "object_id",
+								Required:   true,
 							},
 						},
 					},
-					consts.MethodNameGetExecutionState: map[string]any{
-						"Name": "get_execution_state",
-						"Params": []map[string]any{
+					consts.MethodNameGetSourceChainConfig: {
+						Name:          "get_source_chain_config",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
 							{
-								"Name":     "sourceChainSelector",
-								"Type":     "u64",
-								"Required": true,
+								Name:       "off_ramp_state_id",
+								PointerTag: &offRampStatePointer,
+								Type:       "object_id",
+								Required:   true,
 							},
 							{
-								"Name":     "sequenceNumber",
-								"Type":     "u64",
-								"Required": true,
-							},
-						},
-					},
-					consts.MethodNameGetMerkleRoot: map[string]any{
-						"Name": "get_merkle_root",
-						"Params": []map[string]any{
-							{
-								"Name":     "root",
-								"Type":     "vector<u8>",
-								"Required": true,
+								Name:     "sourceChainSelector",
+								Type:     "u64",
+								Required: true,
 							},
 						},
 					},
+					// consts.MethodNameGetExecutionState:{
+					// 	"Name": "get_execution_state",
+					// 	"Params": []map[string]any{
+					// 		{
+					// 			"Name":     "sourceChainSelector",
+					// 			"Type":     "u64",
+					// 			"Required": true,
+					// 		},
+					// 		{
+					// 			"Name":     "sequenceNumber",
+					// 			"Type":     "u64",
+					// 			"Required": true,
+					// 		},
+					// 	},
+					// },
+					// consts.MethodNameGetMerkleRoot: map[string]any{
+					// 	"Name": "get_merkle_root",
+					// 	"Params": []map[string]any{
+					// 		{
+					// 			"Name":     "root",
+					// 			"Type":     "vector<u8>",
+					// 			"Required": true,
+					// 		},
+					// 	},
+					// },
 				},
 				"Events": map[string]any{
 					consts.EventNameExecutionStateChanged: map[string]any{
@@ -294,54 +301,62 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 			},
 			"onramp": map[string]any{
 				"Name": "onramp",
-				"Functions": map[string]any{
-					"get_dynamic_config": map[string]any{
-						"Name":          "get_dynamic_config",
-						"SignerAddress": fromAddress,
-						"Params": []map[string]any{
+				"Functions": map[string]*chainreader.ChainReaderFunction{
+					"get_dynamic_config": {
+						Name:          "get_dynamic_config",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
 							{
-								"Name":     "onramp_state",
-								"Type":     "object_id",
-								"Required": true,
+								Name:       "on_ramp_state_id",
+								Type:       "object_id",
+								PointerTag: &onRampStatePointer,
+								Required:   true,
 							},
 						},
 					},
-					"get_static_config": map[string]any{
-						"Name":          "get_static_config",
-						"SignerAddress": fromAddress,
-						"Params": []map[string]any{
+					"get_static_config": {
+						Name:          "get_static_config",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
 							{
-								"Name":     "onramp_state",
-								"Type":     "object_id",
-								"Required": true,
+								Name:       "on_ramp_state_id",
+								Type:       "object_id",
+								PointerTag: &onRampStatePointer,
+								Required:   true,
 							},
 						},
 					},
-					"get_dest_chain_config": map[string]any{
-						"Name":          "get_dest_chain_config",
-						"SignerAddress": fromAddress,
-						"Params": []map[string]any{
+					"get_dest_chain_config": {
+						Name:          "get_dest_chain_config",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
 							{
-								"Name":     "onramp_state",
-								"Type":     "object_id",
-								"Required": true,
+								Name:       "on_ramp_state_id",
+								Type:       "object_id",
+								PointerTag: &onRampStatePointer,
+								Required:   true,
 							},
 							{
-								"Name":     "dest_chain_selector",
-								"Type":     "u64",
-								"Required": true,
+								Name:     "destChainSelector",
+								Type:     "u64",
+								Required: true,
 							},
 						},
-						"ResultTupleToStruct": []string{"sequenceNumber", "allowListEnabled", "router"},
 					},
-					"get_expected_next_sequence_number": map[string]any{
-						"Name":          "get_expected_next_sequence_number",
-						"SignerAddress": fromAddress,
-						"Params": []map[string]any{
+					"get_expected_next_sequence_number": {
+						Name:          "get_expected_next_sequence_number",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
 							{
-								"Name":     "destChainSelector",
-								"Type":     "u64",
-								"Required": true,
+								Name:       "on_ramp_state_id",
+								Type:       "object_id",
+								PointerTag: &onRampStatePointer,
+								Required:   true,
+							},
+							{
+								Name:     "destChainSelector",
+								Type:     "u64",
+								Required: true,
 							},
 						},
 					},

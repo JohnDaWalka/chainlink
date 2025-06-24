@@ -224,6 +224,16 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 				CCIPPackageId: ccipSeqReport.Output.CCIPPackageId,
 				MCMSPackageId: mcmsSeqReport.Output.PackageId,
 			},
+			InitializeOffRampInput: offrampops.InitializeOffRampInput{
+				DestTransferCapId:                     ccipSeqReport.Output.Objects.DestTransferCapObjectId,
+				FeeQuoterCapId:                        ccipSeqReport.Output.Objects.FeeQuoterCapObjectId,
+				ChainSelector:                         18395503381733958356,
+				PremissionExecThresholdSeconds:        1000,
+				SourceChainSelectors:                  []uint64{909606746561742123},
+				SourceChainsIsEnabled:                 []bool{true},
+				SourceChainsIsRMNVerificationDisabled: []bool{true},
+				SourceChainsOnRamp:                    [][]byte{{0x0c, 0x9e, 0x43, 0x98, 0xc5, 0xf6, 0x67, 0x0b}}, // 909606746561742123
+			},
 		}
 		ccipOffRampSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, offrampops.DeployAndInitCCIPOffRampSequence, deps.SuiChain, ccipOffRampSeqInput)
 		if err != nil {

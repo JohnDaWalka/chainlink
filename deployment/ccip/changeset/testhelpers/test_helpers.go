@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/holiman/uint256"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 	"golang.org/x/sync/errgroup"
 
@@ -33,10 +34,10 @@ import (
 	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
 
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
+	ccipops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/holiman/uint256"
 	"github.com/pattonkan/sui-go/sui"
 	"github.com/pattonkan/sui-go/suiclient"
 	"github.com/pkg/errors"
@@ -93,7 +94,6 @@ import (
 
 	sui_bind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
-	ccipops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
 	lockreleasetokenpoolops "github.com/smartcontractkit/chainlink-sui/ops/ccip_lock_release_token_pool"
 	cciponramp_ops "github.com/smartcontractkit/chainlink-sui/ops/ccip_onramp"
 	linkops "github.com/smartcontractkit/chainlink-sui/ops/link"
@@ -1030,7 +1030,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	ccipObjectRefId := state.SuiChains[cfg.SourceChain].CCIPObjectRef.String()
 	ccipPackageId := state.SuiChains[cfg.SourceChain].CCIPAddress.String()
-	feeQuoterCapId := state.SuiChains[cfg.SourceChain].FeeQuoterCapId.String()
+	// feeQuoterCapId := state.SuiChains[cfg.SourceChain].FeeQuoterCapId.String()
 	onRampPackageId := state.SuiChains[cfg.SourceChain].OnRampAddress.String()
 	onRampStateObjectId := state.SuiChains[cfg.SourceChain].OnRampStateObjectId.String()
 	linkTokenPkgId := state.SuiChains[cfg.SourceChain].LinkTokenAddress.String()
@@ -1061,9 +1061,9 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 	// Update Prices on FeeQuoter with minted LinkToken
 	_, err = operations.ExecuteOperation(e.OperationsBundle, ccipops.FeeQuoterUpdateTokenPricesOp, deps.SuiChain,
 		ccipops.FeeQuoterUpdateTokenPricesInput{
-			CCIPPackageId:         ccipPackageId,
-			CCIPObjectRef:         ccipObjectRefId,
-			FeeQuoterCapId:        feeQuoterCapId,
+			CCIPPackageId: ccipPackageId,
+			CCIPObjectRef: ccipObjectRefId,
+			// FeeQuoterCapId:        feeQuoterCapId,
 			SourceTokens:          []string{linkTokenObjectMetadataId},
 			SourceUsdPerToken:     []uint256.Int{{1}},
 			GasDestChainSelectors: []uint64{cfg.DestChain},
