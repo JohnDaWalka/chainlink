@@ -22,6 +22,7 @@ type OCR2Config interface {
 	DefaultTransactionQueueDepth() uint32
 	SimulateTransactions() bool
 	TraceLogging() bool
+	CaptureTransmissionTelemetry() bool
 }
 
 type InsecureConfig interface {
@@ -52,6 +53,7 @@ func ToLocalConfig(ocr2Config OCR2Config, insConf InsecureConfig, spec job.OCR2O
 		ContractConfigTrackerPollInterval:  ccTrackerPollInterval,
 		ContractTransmitterTransmitTimeout: ocr2Config.ContractTransmitterTransmitTimeout(),
 		DatabaseTimeout:                    ocr2Config.DatabaseTimeout(),
+		EnableTransmissionTelemetry:        ocr2Config.CaptureTransmissionTelemetry(),
 	}
 	if spec.Relay == relay.NetworkSolana && env.MedianPlugin.Cmd.Get() != "" {
 		// Work around for Solana Feeds configured with zero values to support LOOP Plugins.

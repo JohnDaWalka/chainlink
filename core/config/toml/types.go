@@ -1077,6 +1077,7 @@ type OCR2 struct {
 	DatabaseTimeout                    *commonconfig.Duration
 	KeyBundleID                        *models.Sha256Hash
 	CaptureEATelemetry                 *bool
+	CaptureTransmissionTelemetry       *bool
 	CaptureAutomationCustomTelemetry   *bool
 	AllowNoBootstrappers               *bool
 	DefaultTransactionQueueDepth       *uint32
@@ -1111,6 +1112,9 @@ func (o *OCR2) setFrom(f *OCR2) {
 	}
 	if v := f.CaptureEATelemetry; v != nil {
 		o.CaptureEATelemetry = v
+	}
+	if v := f.CaptureTransmissionTelemetry; v != nil {
+		o.CaptureTransmissionTelemetry = v
 	}
 	if v := f.CaptureAutomationCustomTelemetry; v != nil {
 		o.CaptureAutomationCustomTelemetry = v

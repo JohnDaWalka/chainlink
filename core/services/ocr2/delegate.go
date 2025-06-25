@@ -183,6 +183,7 @@ type ocr2Config interface {
 	TraceLogging() bool
 	CaptureAutomationCustomTelemetry() bool
 	AllowNoBootstrappers() bool
+	CaptureTransmissionTelemetry() bool
 }
 
 type insecureConfig interface {

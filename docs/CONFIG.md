@@ -909,6 +909,7 @@ ContractTransmitterTransmitTimeout = '10s' # Default
 DatabaseTimeout = '10s' # Default
 KeyBundleID = '7a5f66bbe6594259325bf2b4f5b1a9c900000000000000000000000000000000' # Example
 CaptureEATelemetry = false # Default
+CaptureTransmissionTelemetry = true # Default
 CaptureAutomationCustomTelemetry = true # Default
 AllowNoBootstrappers = false # Default
 DefaultTransactionQueueDepth = 1 # Default
@@ -1004,6 +1005,12 @@ KeyBundleID is a sha256 hexadecimal hash identifier.
 CaptureEATelemetry = false # Default
 ```
 CaptureEATelemetry toggles collecting extra information from External Adaptares
+
+### CaptureTransmissionTelemetry
+```toml
+CaptureTransmissionTelemetry = true # Default
+```
+CaptureTransmissionTelemetry toggles collecting telemetry on transmissions from OCR.
 
 ### CaptureAutomationCustomTelemetry
 ```toml

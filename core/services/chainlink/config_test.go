@@ -417,6 +417,7 @@ func TestConfig_Marshal(t *testing.T) {
 		DatabaseTimeout:                    commoncfg.MustNewDuration(8 * time.Second),
 		KeyBundleID:                        ptr(models.MustSha256HashFromHex("7a5f66bbe6594259325bf2b4f5b1a9c9")),
 		CaptureEATelemetry:                 ptr(false),
+		CaptureTransmissionTelemetry:       ptr(true),
 		CaptureAutomationCustomTelemetry:   ptr(true),
 		AllowNoBootstrappers:               ptr(true),
 		DefaultTransactionQueueDepth:       ptr[uint32](1),
@@ -1023,6 +1024,7 @@ ContractTransmitterTransmitTimeout = '1m0s'
 DatabaseTimeout = '8s'
 KeyBundleID = '7a5f66bbe6594259325bf2b4f5b1a9c900000000000000000000000000000000'
 CaptureEATelemetry = false
+CaptureTransmissionTelemetry = true
 CaptureAutomationCustomTelemetry = true
 AllowNoBootstrappers = true
 DefaultTransactionQueueDepth = 1

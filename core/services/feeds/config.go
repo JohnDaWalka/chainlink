@@ -38,4 +38,5 @@ type OCR2Config interface {
 	DefaultTransactionQueueDepth() uint32
 	SimulateTransactions() bool
 	TraceLogging() bool
+	CaptureTransmissionTelemetry() bool
 }
