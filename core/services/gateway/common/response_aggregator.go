@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -8,11 +9,13 @@ import (
 	"time"
 
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 type NodeResponseAggregator interface {
+	Start(context.Context) error
+	Close() error
 	// CollectAndAggregate appends a node response to existing list of responses if exists
 	// and tries to aggregate them into a single response.
 	CollectAndAggregate(requestID string, resp *jsonrpc.Response, nodeAddress string) (*jsonrpc.Response, error)
@@ -23,29 +26,29 @@ type NodeResponseAggregator interface {
 // to the user.
 // NOT thread-safe.
 type identicalNodeResponseAggregator struct {
-	services.Service
+	services.StateMachine
 	// responses is a map. requestID -> aggregatedResponses
-	responses map[string]aggregatedResponses
-	f         int
-	stopCh    services.StopChan
-	lggr      logger.Logger
-	responseMaxAgeMs int
+	responses               map[string]aggregatedResponses
+	f                       int
+	stopCh                  services.StopChan
+	lggr                    logger.Logger
+	responseMaxAgeMs        int
 	responseCleanUpPeriodMs int
 }
 
 func NewIdenticalNodeResponseAggregator(lggr logger.Logger, f int, responseMaxAgeMs int, responseCleanUpPeriodMs int) *identicalNodeResponseAggregator {
 	return &identicalNodeResponseAggregator{
-		responses: make(map[string]aggregatedResponses),
-		f:         f,
-		stopCh:   make(services.StopChan),
-		lggr: 	logger.Named(lggr, "IdenticalNodeResponseAggregator"),
-		responseMaxAgeMs: responseMaxAgeMs,
+		responses:               make(map[string]aggregatedResponses),
+		f:                       f,
+		stopCh:                  make(services.StopChan),
+		lggr:                    logger.Named(lggr, "IdenticalNodeResponseAggregator"),
+		responseMaxAgeMs:        responseMaxAgeMs,
 		responseCleanUpPeriodMs: responseCleanUpPeriodMs,
 	}
 }
 
 func (a *identicalNodeResponseAggregator) Start(ctx context.Context) error {
-	return h.StartOnce("IdenticalNodeResponseAggregator", func() error {
+	return a.StartOnce("IdenticalNodeResponseAggregator", func() error {
 		a.lggr.Info("Starting IdenticalNodeResponseAggregator")
 		go func() {
 			ticker := time.NewTicker(time.Duration(a.responseCleanUpPeriodMs) * time.Millisecond)
@@ -84,7 +87,7 @@ func (a *identicalNodeResponseAggregator) Close() error {
 }
 
 type aggregatedResponses struct {
-	// nodeResponses is a map. response hash -> node addresses
+	// nodeAddressesByResp is a map. response hash -> node addresses
 	nodeAddressesByResp map[string]stringSet
 	lastUpdated         time.Time
 }
@@ -115,30 +118,24 @@ func (s stringSet) Values() []string {
 
 func (a *identicalNodeResponseAggregator) CollectAndAggregate(requestID string, resp *jsonrpc.Response, nodeAddress string) (*jsonrpc.Response, error) {
 	a.lggr.Debugw("Collecting node response", "requestID", requestID, "nodeAddress", nodeAddress)
-	if _, exists := a.responses[requestID]; !exists {
+	_, exists := a.responses[requestID]
+	if !exists {
 		a.responses[requestID] = aggregatedResponses{
 			nodeAddressesByResp: make(map[string]stringSet),
-
-	}
-	if len(a.responses) < a.f+1 {
-		return nil, fmt.Errorf("not enough responses to aggregate: got %d, need at least %d", len(a.responses), resp.f+1)
-	}
-	responseMap := make(map[string][]*jsonrpc.Response)
-	for _, r := range a.responses {
-		key, err := hashResponse(r)
-		if err != nil {
-			return nil, fmt.Errorf("failed to hash response: %w", err)
-		}
-		if _, exists := responseMap[key]; exists {
-			responseMap[key] = append(responseMap[key], r.resp)
-		} else {
-			responseMap[key] = []*jsonrpc.Response{r.resp}
-		}
-		if len(responseMap[key]) >= a.f+1 {
-			return resp.resp, nil
 		}
 	}
-	return nil, false
+	key, err := hashResponse(resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash response: %w", err)
+	}
+	aggregatedResp := a.responses[requestID]
+	aggregatedResp.nodeAddressesByResp[key].Add(nodeAddress)
+	aggregatedResp.lastUpdated = time.Now()
+	a.responses[requestID] = aggregatedResp
+	if len(aggregatedResp.nodeAddressesByResp[key]) < (2*a.f)+1 {
+		return nil, fmt.Errorf("not enough responses to aggregate: got %d, need at least %d", len(a.responses), (2*a.f)+1)
+	}
+	return resp, nil
 }
 
 func hashResponse(resp *jsonrpc.Response) (string, error) {

@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
@@ -49,17 +50,18 @@ type NodeMessageHandler interface {
 
 type service struct {
 	services.StateMachine
-	config          ServiceConfig
-	don             handlers.DON
-	donConfig       *config.DONConfig
-	savedCallbacks  map[string]*savedCallback
-	mu              sync.Mutex
-	lggr            logger.Logger
-	httpClient      network.HTTPClient
-	nodeRateLimiter *ratelimit.RateLimiter
-	userRateLimiter *ratelimit.RateLimiter
-	wg              sync.WaitGroup
-	stopCh          services.StopChan
+	config             ServiceConfig
+	don                handlers.DON
+	donConfig          *config.DONConfig
+	savedCallbacks     map[string]*savedCallback
+	mu                 sync.Mutex
+	lggr               logger.Logger
+	httpClient         network.HTTPClient
+	nodeRateLimiter    *ratelimit.RateLimiter
+	userRateLimiter    *ratelimit.RateLimiter
+	wg                 sync.WaitGroup
+	stopCh             services.StopChan
+	responseAggregator common.NodeResponseAggregator
 }
 
 type ServiceConfig struct {
@@ -69,9 +71,8 @@ type ServiceConfig struct {
 	ResponseCleanUpPeriodMs int                         `json:"callbackCleanUpPeriodMs"`
 }
 type savedCallback struct {
-	callbackCh    chan<- *jsonrpc.Response
-	nodeResponses []nodeResponse
-	createdAt     time.Time
+	callbackCh chan<- *jsonrpc.Response
+	createdAt  time.Time
 }
 
 func NewHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don handlers.DON, httpClient network.HTTPClient, lggr logger.Logger) (*service, error) {
@@ -88,17 +89,20 @@ func NewHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don 
 	if err != nil {
 		return nil, err
 	}
+	responseAggregator := common.NewIdenticalNodeResponseAggregator(lggr, donConfig.F,
+		cfg.ResponseMaxAgeMs, cfg.ResponseCleanUpPeriodMs)
 	return &service{
-		config:          cfg,
-		don:             don,
-		donConfig:       donConfig,
-		lggr:            logger.Named(lggr, ServiceName+donConfig.DonId),
-		httpClient:      httpClient,
-		nodeRateLimiter: nodeRateLimiter,
-		userRateLimiter: userRateLimiter,
-		wg:              sync.WaitGroup{},
-		savedCallbacks:  make(map[string]*savedCallback),
-		stopCh:          make(services.StopChan),
+		config:             cfg,
+		don:                don,
+		donConfig:          donConfig,
+		lggr:               logger.Named(lggr, ServiceName+donConfig.DonId),
+		httpClient:         httpClient,
+		nodeRateLimiter:    nodeRateLimiter,
+		userRateLimiter:    userRateLimiter,
+		wg:                 sync.WaitGroup{},
+		savedCallbacks:     make(map[string]*savedCallback),
+		stopCh:             make(services.StopChan),
+		responseAggregator: responseAggregator,
 	}, nil
 }
 
@@ -171,16 +175,10 @@ func (h *service) handleTriggerResponse(ctx context.Context, resp *jsonrpc.Respo
 		h.lggr.Errorw("no callback found for request ID", "requestID", resp.ID, "nodeAddr", nodeAddr)
 		return nil
 	}
-	callback.nodeResponses = append(callback.nodeResponses, nodeResponse{
-		nodeAddress: nodeAddr,
-		resp:        resp,
-	})
-	// F + 1 identical responses are required before sending the response to the user
-	if len(callback.nodeResponses) < h.donConfig.F+1 {
-		h.lggr.Debugw("waiting for more node responses", "requestID", resp.ID, "nodeAddr", nodeAddr, "received", len(callback.nodeResponses), "required", h.donConfig.F+1)
-		return nil
+	resp, err := h.responseAggregator.CollectAndAggregate(resp.ID, resp, nodeAddr)
+	if err != nil {
+		h.lggr.Debugw("insufficient number of responses", "requestID", resp.ID, "nodeAddr", nodeAddr, "err", err)
 	}
-
 	select {
 	case <-ctx.Done():
 		h.lggr.Warnw("context cancelled while sending response to user", "requestID", resp.ID, "nodeAddr", nodeAddr)
@@ -333,9 +331,13 @@ func (h *service) Name() string {
 	return ServiceName
 }
 
-func (h *service) Start(context.Context) error {
+func (h *service) Start(ctx context.Context) error {
 	return h.StartOnce(ServiceName, func() error {
 		h.lggr.Info("Starting " + ServiceName)
+		err := h.responseAggregator.Start(ctx)
+		if err != nil {
+			return err
+		}
 		// Start a goroutine to periodically clean up expired callbacks
 		go func() {
 			ticker := time.NewTicker(time.Duration(h.config.ResponseCleanUpPeriodMs) * time.Millisecond)
@@ -356,6 +358,10 @@ func (h *service) Start(context.Context) error {
 func (h *service) Close() error {
 	return h.StopOnce(ServiceName, func() error {
 		h.lggr.Info("Closing " + ServiceName)
+		err := h.responseAggregator.Close()
+		if err != nil {
+			h.lggr.Errorw("error closing response aggregator", "err", err)
+		}
 		close(h.stopCh)
 		h.wg.Wait()
 		return nil
