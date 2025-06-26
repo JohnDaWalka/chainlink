@@ -46,7 +46,6 @@ func (t *NoOpTracker) Track(event string, metadata map[string]any) error {
 type DxTracker struct {
 	mode     Mode
 	testMode bool
-	noOp     bool
 
 	logger zerolog.Logger
 
@@ -55,7 +54,7 @@ type DxTracker struct {
 }
 
 // NewDxTracker initializes a tracker with automatic GitHub CLI integration for authentication.
-func NewDxTracker() (*DxTracker, error) {
+func NewDxTracker() (Tracker, error) {
 	t := &DxTracker{}
 
 	lvlStr := os.Getenv(EnvVarLogLevel)
@@ -70,10 +69,9 @@ func NewDxTracker() (*DxTracker, error) {
 	t.logger.Debug().Msg("Initializing DxTracker")
 
 	if os.Getenv(EnvVarDisableTracking) == "true" {
-		t.noOp = true
 		t.logger.Debug().Msg("Tracking disabled by environment variable")
 
-		return t, nil
+		return &NoOpTracker{}, nil
 	}
 
 	if os.Getenv(EnvVarTestMode) == "true" {
@@ -141,7 +139,7 @@ func (t *DxTracker) buildConfig() error {
 	var apiTokenErr error
 	c.DxAPIToken, apiTokenErr = t.readDXAPIToken()
 	if apiTokenErr != nil {
-		return errors.Wrap(apiTokenErr, "failed to read github api token")
+		return errors.Wrap(apiTokenErr, "failed to read DX API token")
 	}
 
 	saveErr := saveConfig(c)
@@ -154,10 +152,6 @@ func (t *DxTracker) buildConfig() error {
 
 // Track queues or sends an event, automatically handling offline scenarios.
 func (t *DxTracker) Track(event string, metadata map[string]any) error {
-	if t.noOp {
-		return nil
-	}
-
 	if validateErr := validateEvent(event, time.Now().Unix(), metadata); validateErr != nil {
 		return errors.Wrap(validateErr, "failed to validate event")
 	}
