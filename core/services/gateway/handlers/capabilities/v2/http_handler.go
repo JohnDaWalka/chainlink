@@ -55,6 +55,8 @@ type service struct {
 	donConfig          *config.DONConfig
 	savedCallbacks     map[string]*savedCallback
 	mu                 sync.Mutex
+	cachedResponses    map[string]*cachedResponse
+	cacheMu            sync.RWMutex
 	lggr               logger.Logger
 	httpClient         network.HTTPClient
 	nodeRateLimiter    *ratelimit.RateLimiter
@@ -62,6 +64,11 @@ type service struct {
 	wg                 sync.WaitGroup
 	stopCh             services.StopChan
 	responseAggregator common.NodeResponseAggregator
+}
+
+type cachedResponse struct {
+	response gateway.OutboundHTTPResponse
+	expiry   time.Time
 }
 
 type ServiceConfig struct {
@@ -101,9 +108,25 @@ func NewHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don 
 		userRateLimiter:    userRateLimiter,
 		wg:                 sync.WaitGroup{},
 		savedCallbacks:     make(map[string]*savedCallback),
+		cachedResponses:    make(map[string]*cachedResponse),
 		stopCh:             make(services.StopChan),
 		responseAggregator: responseAggregator,
 	}, nil
+}
+
+func generateCacheKey(req gateway.OutboundHTTPRequest) string {
+	s := sha256.New()
+	s.Write([]byte(req.WorkflowID))
+	s.Write([]byte(req.URL))
+	s.Write([]byte(req.Method))
+	s.Write(req.Body)
+
+	for key, val := range req.Headers {
+		s.Write([]byte(key))
+		s.Write([]byte(val))
+	}
+
+	return hex.EncodeToString(s.Sum(nil))
 }
 
 func (h *service) handleOutgoingRequest(ctx context.Context, requestID string, req gateway.OutboundHTTPRequest, nodeAddr string) error {
@@ -111,6 +134,20 @@ func (h *service) handleOutgoingRequest(ctx context.Context, requestID string, r
 	if !h.nodeRateLimiter.Allow(nodeAddr) {
 		return fmt.Errorf("rate limit exceeded for node %s", nodeAddr)
 	}
+
+	var cacheKey string
+	if req.CacheSettings.Enabled {
+		cacheKey = generateCacheKey(req)
+		h.cacheMu.RLock()
+		cached, exists := h.cachedResponses[cacheKey]
+		h.cacheMu.RUnlock()
+
+		if exists && time.Now().Before(cached.expiry) {
+			h.lggr.Debugw("Using cached HTTP response", "requestID", requestID, "nodeAddr", nodeAddr)
+			return h.sendResponseToNode(ctx, requestID, cached.response, nodeAddr)
+		}
+	}
+
 	timeout := time.Duration(req.TimeoutMs) * time.Millisecond
 	httpReq := network.HTTPRequest{
 		Method:           req.Method,
@@ -129,7 +166,7 @@ func (h *service) handleOutgoingRequest(ctx context.Context, requestID string, r
 		newCtx := context.WithoutCancel(ctx)
 		newCtx, cancel := context.WithTimeout(newCtx, timeout)
 		defer cancel()
-		l := logger.With(h.lggr, "url", req.URL, "requestID", requestID, "method", req.Method, "timeout", req.TimeoutMs)
+		l := logger.With(h.lggr, "requestID", requestID, "method", req.Method, "timeout", req.TimeoutMs)
 		l.Debug("Sending request to client")
 		var outboundResp gateway.OutboundHTTPResponse
 		resp, err := h.httpClient.Send(ctx, httpReq)
@@ -144,24 +181,24 @@ func (h *service) handleOutgoingRequest(ctx context.Context, requestID string, r
 				Headers:    resp.Headers,
 				Body:       resp.Body,
 			}
+
+			if req.CacheSettings.Enabled && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+				cacheTTLMs := req.CacheSettings.TTLms
+				if cacheTTLMs > 0 {
+					h.cacheMu.Lock()
+					h.cachedResponses[cacheKey] = &cachedResponse{
+						response: outboundResp,
+						expiry:   time.Now().Add(time.Duration(cacheTTLMs) * time.Millisecond),
+					}
+					h.cacheMu.Unlock()
+					l.Debugw("Cached HTTP response", "ttlMs", cacheTTLMs)
+				}
+			}
 		}
-		params, err := json.Marshal(outboundResp)
+		err = h.sendResponseToNode(newCtx, requestID, outboundResp, nodeAddr)
 		if err != nil {
-			l.Errorw("failed to marshal HTTP response", "err", err)
-			return
+			l.Errorw("error sending response to node", "err", err, "nodeAddr", nodeAddr)
 		}
-		req := &jsonrpc.Request{
-			Version: "2.0",
-			ID:      requestID,
-			Method:  gateway_common.MethodHTTPAction,
-			Params:  params,
-		}
-		err = h.don.SendToNode(newCtx, nodeAddr, req)
-		if err != nil {
-			l.Errorw("failed to send to node", "err", err, "to", nodeAddr)
-			return
-		}
-		l.Debugw("sent response to node", "to", nodeAddr)
 	}()
 	return nil
 }
@@ -303,6 +340,26 @@ func (h *service) reapExpiredCallbacks() {
 	}
 }
 
+// reapExpiredCache removes HTTP responses that have exceeded their TTL
+func (h *service) reapExpiredCache() {
+	h.cacheMu.Lock()
+	defer h.cacheMu.Unlock()
+
+	now := time.Now()
+	var expiredCount int
+
+	for cacheKey, cached := range h.cachedResponses {
+		if now.After(cached.expiry) {
+			delete(h.cachedResponses, cacheKey)
+			expiredCount++
+		}
+	}
+
+	if expiredCount > 0 {
+		h.lggr.Debugw("Removed expired cached HTTP responses", "count", expiredCount, "remaining", len(h.cachedResponses))
+	}
+}
+
 func isValidJSON(data []byte) bool {
 	var val map[string]interface{}
 	return json.Unmarshal(data, &val) == nil
@@ -346,6 +403,7 @@ func (h *service) Start(ctx context.Context) error {
 				select {
 				case <-ticker.C:
 					h.reapExpiredCallbacks()
+					h.reapExpiredCache()
 				case <-h.stopCh:
 					return
 				}
@@ -366,4 +424,26 @@ func (h *service) Close() error {
 		h.wg.Wait()
 		return nil
 	})
+}
+
+func (h *service) sendResponseToNode(ctx context.Context, requestID string, resp gateway.OutboundHTTPResponse, nodeAddr string) error {
+	params, err := json.Marshal(resp)
+	if err != nil {
+		return err
+	}
+
+	req := &jsonrpc.Request{
+		Version: "2.0",
+		ID:      requestID,
+		Method:  gateway_common.MethodHTTPAction,
+		Params:  params,
+	}
+
+	err = h.don.SendToNode(ctx, nodeAddr, req)
+	if err != nil {
+		return err
+	}
+
+	h.lggr.Debugw("sent response to node", "to", nodeAddr)
+	return nil
 }
