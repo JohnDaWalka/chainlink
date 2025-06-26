@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo/cre"
 )
 
+// TODO(gg): maybe we can use this test for testing secure mint on CRE?
 func Test_runLLOWorkflow(t *testing.T) {
 	ctx := t.Context()
 

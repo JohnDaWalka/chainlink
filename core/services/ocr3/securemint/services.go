@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -54,6 +55,9 @@ func (m *smJobConfig) JobPipelineMaxSuccessfulRuns() uint64 {
 func (m *smJobConfig) JobPipelineResultWriteQueueDepth() uint64 {
 	return m.jobPipelineResultWriteQueueDepth
 }
+
+// TODO(gg): this is a hack to allow the integration tests to access the transmitter to assert on the number of transmissions
+var SingletonTransmitter atomic.Value // capabilities.TriggerCapability
 
 // NewSecureMintServices creates all securemint plugin specific services.
 func NewSecureMintServices(ctx context.Context,
@@ -127,11 +131,12 @@ func NewSecureMintServices(ctx context.Context,
 		TriggerSendChannelBufferSize: secureMintPluginConfig.TriggerSendChannelBufferSize,
 	}
 
-	transmitter, err := transmitterConfig.NewTransmitter()
+	transmitter, err := transmitterConfig.NewTransmitter(spec.TransmitterID.String)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create secure mint transmitter: %w", err)
 	}
 	argsNoPlugin.ContractTransmitter = transmitter
+	SingletonTransmitter.Store(transmitter)
 	srvs = append(srvs, transmitter)
 
 	abort := func() {

@@ -20,7 +20,10 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
+	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	datastreamsllo "github.com/smartcontractkit/chainlink-data-streams/llo"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/data-feeds/generated/data_feeds_cache"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/configurator"
@@ -147,6 +150,32 @@ func setupNodes(t *testing.T, nNodes int, backend evmtypes.Backend, clientCSAKey
 
 func validateJobsRunningSuccessfully(t *testing.T, nodes []node, jobIDs map[int]int32) {
 
+	// 0. Add ourselves as a subscriber to the secure mint trigger capability
+	transmissions := atomic.NewInt32(0)
+	transmitter := securemint.SingletonTransmitter.Load().(capabilities.TriggerCapability)
+	triggerConfig, err := values.NewMap(map[string]any{
+		"workflowID":     "securemint-workflow",
+		"maxFrequencyMs": 1000,
+	})
+	require.NoError(t, err)
+	registerCh, err := transmitter.RegisterTrigger(testutils.Context(t), capabilities.TriggerRegistrationRequest{
+		TriggerID: "securemint-trigger",
+		Metadata: capabilities.RequestMetadata{
+			WorkflowID: "securemint-workflow",
+		},
+		Config: triggerConfig,
+	})
+	require.NoError(t, err)
+	go func() {
+		for resp := range registerCh {
+			t.Logf("Received trigger response: %+v", resp)
+			outputs, err := resp.Event.Outputs.Unwrap()
+			require.NoError(t, err)
+			t.Logf("Received trigger response outputs: %+v", outputs)
+			transmissions.Inc()
+		}
+	}()
+
 	// 1. Assert no job spec errors
 	for i, node := range nodes {
 		jobs, _, err := node.app.JobORM().FindJobs(testutils.Context(t), 0, 1000)
@@ -204,7 +233,7 @@ func validateJobsRunningSuccessfully(t *testing.T, nodes []node, jobIDs map[int]
 	// 3. Check that transmissions work
 	expectedNumTransmissions := int32(4)
 	gomega.NewWithT(t).Eventually(func() bool {
-		numTransmissions := securemint.StubTransmissionCounter.Load()
+		numTransmissions := transmissions.Load()
 		t.Logf("Number of (stub) report transmissions: %d", numTransmissions)
 		return numTransmissions >= expectedNumTransmissions
 	}, 30*time.Second, 1*time.Second).Should(

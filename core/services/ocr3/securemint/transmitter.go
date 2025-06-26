@@ -3,23 +3,18 @@ package securemint
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"sync"
-
-	"github.com/smartcontractkit/libocr/offchainreporting2/types"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/values"
-	"github.com/smartcontractkit/por_mock_ocr3plugin/por"
-
-	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	coretypes "github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/securemint/config"
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/smartcontractkit/por_mock_ocr3plugin/por"
 )
 
 const (
@@ -67,14 +62,15 @@ type subscriber struct {
 	config     config.SecureMintTriggerConfig
 }
 
-func (c TransmitterConfig) NewTransmitter() (*transmitter, error) {
-	return c.newTransmitter(c.Logger)
+func (c TransmitterConfig) NewTransmitter(transmitterID string) (*transmitter, error) {
+	return c.newTransmitter(c.Logger, transmitterID)
 }
 
-func (c TransmitterConfig) newTransmitter(lggr logger.Logger) (*transmitter, error) {
+func (c TransmitterConfig) newTransmitter(lggr logger.Logger, transmitterID string) (*transmitter, error) {
+	lggr.Infow("Initializing SecureMintTransmitter", "triggerCapabilityName", c.TriggerCapabilityName, "triggerCapabilityVersion", c.TriggerCapabilityVersion)
 	t := &transmitter{
 		config:      c,
-		fromAccount: ocr2types.Account(lggr.Name() + strconv.FormatUint(uint64(c.DonID), 10)),
+		fromAccount: ocr2types.Account(transmitterID),
 		registry:    c.CapabilitiesRegistry,
 		subscribers: make(map[string]*subscriber),
 	}
@@ -108,18 +104,22 @@ func (c TransmitterConfig) newTransmitter(lggr logger.Logger) (*transmitter, err
 		Close: t.close,
 	}.NewServiceEngine(lggr)
 
+	t.eng.Infow("SecureMintTransmitter initialized", "triggerCapabilityName", t.config.TriggerCapabilityName, "triggerCapabilityVersion", t.config.TriggerCapabilityVersion)
 	return t, nil
 }
 
 func (t *transmitter) start(ctx context.Context) error {
+	t.eng.Infow("Starting SecureMintTransmitter", "triggerCapabilityName", t.config.TriggerCapabilityName, "triggerCapabilityVersion", t.config.TriggerCapabilityVersion)
 	return t.registry.Add(ctx, t)
 }
 
 func (t *transmitter) close() error {
+	t.eng.Infow("Closing SecureMintTransmitter", "triggerCapabilityName", t.config.TriggerCapabilityName, "triggerCapabilityVersion", t.config.TriggerCapabilityVersion)
 	return t.registry.Remove(context.Background(), t.CapabilityInfo.ID)
 }
 
 func (t *transmitter) FromAccount(context.Context) (ocr2types.Account, error) {
+	t.eng.Debugw("FromAccount", "fromAccount", t.fromAccount)
 	return t.fromAccount, nil
 }
 
@@ -130,6 +130,7 @@ func (t *transmitter) Transmit(
 	report ocr3types.ReportWithInfo[por.ChainSelector],
 	sigs []types.AttributedOnchainSignature,
 ) error {
+	t.eng.Debugw("Transmit called", "cd", cd, "seqNr", seqNr, "report", report, "sigs", sigs)
 	// Process the secure mint report and convert it to a trigger event
 	capSigs := make([]capabilities.OCRAttributedOnchainSignature, len(sigs))
 	for i, sig := range sigs {
@@ -138,39 +139,34 @@ func (t *transmitter) Transmit(
 			Signature: sig.Signature,
 		}
 	}
-	ev := &capabilities.OCRTriggerEvent{
-		ConfigDigest: cd[:],
-		SeqNr:        seqNr,
-		Report:       report.Report,
-		Sigs:         capSigs,
+	outputs, err := values.NewMap(map[string]any{
+		"report": report.Report,
+		"sigs":   capSigs,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create outputs map: %w", err)
+	}
+	ev := &capabilities.TriggerEvent{
+		TriggerType: t.CapabilityInfo.ID,
+		ID:          "securemint-trigger",
+		Outputs:     outputs,
 	}
 	return t.processNewEvent(ctx, ev)
 }
 
-func (t *transmitter) processNewEvent(ctx context.Context, event *capabilities.OCRTriggerEvent) error {
-	// unmarshal signed report to extract timestamp and eventID
-	p := &capabilitiespb.OCRTriggerReport{}
-	err := proto.Unmarshal(event.Report, p)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal OCRTriggerReport: %w", err)
-	}
-
+func (t *transmitter) processNewEvent(ctx context.Context, event *capabilities.TriggerEvent) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	o, err := event.ToMap()
-	if err != nil {
-		return fmt.Errorf("failed to convert OCRTriggerEvent to map: %w", err)
-	}
 	capResponse := capabilities.TriggerResponse{
 		Event: capabilities.TriggerEvent{
 			TriggerType: t.CapabilityInfo.ID,
-			ID:          p.EventID,
-			Outputs:     o,
+			ID:          event.ID,
+			Outputs:     event.Outputs,
 		},
 	}
 
-	t.eng.Debugw("ProcessReport pushing event", "eventID", p.EventID)
+	t.eng.Debugw("ProcessReport pushing event", "eventID", event.ID)
 	nIncludedSubscribers := 0
 	for _, sub := range t.subscribers {
 		// include this subscriber (no frequency limiting as requested)
@@ -181,15 +177,16 @@ func (t *transmitter) processNewEvent(ctx context.Context, event *capabilities.O
 			return ctx.Err()
 		default:
 			// drop event if channel is full - processNewEvent() should be non-blocking
-			t.eng.Errorw("subscriber channel full, dropping event", "eventID", p.EventID, "workflowID", sub.workflowID)
+			t.eng.Errorw("subscriber channel full, dropping event", "eventID", event.ID, "workflowID", sub.workflowID)
 		}
 		nIncludedSubscribers++
 	}
-	t.eng.Debugw("ProcessReport done", "eventID", p.EventID, "nIncludedSubscribers", nIncludedSubscribers)
+	t.eng.Debugw("ProcessReport done", "eventID", event.ID, "nIncludedSubscribers", nIncludedSubscribers)
 	return nil
 }
 
 func (t *transmitter) RegisterTrigger(ctx context.Context, req capabilities.TriggerRegistrationRequest) (<-chan capabilities.TriggerResponse, error) {
+	t.eng.Infow("RegisterTrigger", "triggerID", req.TriggerID, "metadata", req.Metadata)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -223,6 +220,7 @@ func validateConfig(registerConfig *values.Map, capabilityConfig *TransmitterCon
 }
 
 func (t *transmitter) UnregisterTrigger(ctx context.Context, req capabilities.TriggerRegistrationRequest) error {
+	t.eng.Infow("UnregisterTrigger", "triggerID", req.TriggerID)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
