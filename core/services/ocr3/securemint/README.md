@@ -73,3 +73,12 @@ Create a launch.json file in the .vscode directory with the following content:
 ```
 
 Then run the test by Cmd+P: "Start Debugging".
+
+
+## Run with local CRE
+
+Follow the instructions in [docs.md](https://github.com/smartcontractkit/chainlink/blob/develop/core/scripts/cre/environment/docs.md). 
+
+Handy commands:
+
+- `DISABLE_DX_TRACKING=true TESTCONTAINERS_RYUK_DISABLED=true go run main.go env start --with-plugins-docker-image 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink:b252282df4b23b05658a0aa35216567d6f25c424-plugins --with-example`
