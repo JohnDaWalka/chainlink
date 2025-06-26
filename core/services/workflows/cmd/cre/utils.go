@@ -3,26 +3,34 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
 	"time"
 
 	"github.com/jonboulle/clockwork"
 
-	cronserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/triggers/cron/server"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/billing"
+	httpserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/actions/http/server"
+	consensusserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/consensus/server"
+	crontrigger "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/triggers/cron/server"
+	httptrigger "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/triggers/http/server"
 	"github.com/smartcontractkit/chainlink-common/pkg/custmsg"
+	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/host"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/fakes"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/standardcapabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/ratelimiter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/store"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncerlimiter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/types"
 	v2 "github.com/smartcontractkit/chainlink/v2/core/services/workflows/v2"
+	"github.com/smartcontractkit/chainlink/v2/plugins"
 )
 
 const (
@@ -34,12 +42,39 @@ const (
 	defaultName                      = "myworkflow"
 )
 
+type standardCapConfig struct {
+	Config string
+
+	// Set enabled to true to run the loop plugin.  Requires the plugin be installed.
+	// Config will be passed to Initialise method of plugin.
+	Enabled bool
+}
+
+type ManualTriggers struct {
+	ManualCronTrigger *fakes.ManualCronTriggerService
+	ManualHTTPTrigger *fakes.ManualHTTPTriggerService
+}
+
+var (
+	goBinPath            = os.Getenv("GOBIN")
+	standardCapabilities = map[string]standardCapConfig{
+		"cron": {
+			Config:  `{"fastestScheduleIntervalSeconds": 1}`,
+			Enabled: true,
+		},
+		"readcontract":  {},
+		"kvstore":       {},
+		"workflowevent": {},
+	}
+)
+
 func NewStandaloneEngine(
 	ctx context.Context,
 	lggr logger.Logger,
 	registry *capabilities.Registry,
-	binary []byte, config []byte,
+	binary, config []byte,
 	billingClientAddr string,
+	lifecycleHooks v2.LifecycleHooks,
 ) (services.Service, error) {
 	labeler := custmsg.NewLabeler()
 	moduleConfig := &host.ModuleConfig{
@@ -77,7 +112,10 @@ func NewStandaloneEngine(
 		return nil, err
 	}
 
-	billingClient, _ := billing.NewWorkflowClient(billingClientAddr)
+	var billingClient billing.WorkflowClient
+	if billingClientAddr != "" {
+		billingClient, _ = billing.NewWorkflowClient(billingClientAddr)
+	}
 
 	if module.IsLegacyDAG() {
 		sdkSpec, err := host.GetWorkflowSpec(ctx, moduleConfig, binary, config)
@@ -109,6 +147,7 @@ func NewStandaloneEngine(
 	cfg := &v2.EngineConfig{
 		Lggr:            lggr,
 		Module:          module,
+		WorkflowConfig:  config,
 		CapRegistry:     registry,
 		ExecutionsStore: store.NewInMemoryStore(lggr, clockwork.NewRealClock()),
 
@@ -123,9 +162,12 @@ func NewStandaloneEngine(
 		BeholderEmitter: custmsg.NewLabeler(),
 
 		BillingClient: billingClient,
+		Hooks:         lifecycleHooks,
+
+		DebugMode: true,
 	}
 
-	return v2.NewEngine(ctx, cfg)
+	return v2.NewEngine(cfg)
 }
 
 // TODO support fetching secrets (from a local file)
@@ -133,21 +175,34 @@ func SecretsFor(ctx context.Context, workflowOwner, hexWorkflowName, decodedWork
 	return map[string]string{}, nil
 }
 
+// NewCapabilities builds capabilities using latest standard capabilities where possible, otherwise filled in with faked capabilities.
+// Capabilities are then registered with the capability registry.
+func NewCapabilities(ctx context.Context, lggr logger.Logger, registry *capabilities.Registry) ([]services.Service, error) {
+	caps, err := NewFakeCapabilities(ctx, lggr, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	caps = append(caps, newStandardCapabilities(standardCapabilities, lggr, registry)...)
+
+	return caps, nil
+}
+
+// NewFakeCapabilities builds faked capabilities, then registers them with the capability registry.
 func NewFakeCapabilities(ctx context.Context, lggr logger.Logger, registry *capabilities.Registry) ([]services.Service, error) {
 	caps := make([]services.Service, 0)
+
 	streamsTrigger := fakes.NewFakeStreamsTrigger(lggr, 6)
 	if err := registry.Add(ctx, streamsTrigger); err != nil {
 		return nil, err
 	}
 	caps = append(caps, streamsTrigger)
 
-	cronTrigger := cronserver.NewCronServer(
-		fakes.NewTriggerService(lggr, nil),
-	)
-	if err := registry.Add(ctx, cronTrigger); err != nil {
-		return nil, fmt.Errorf("failed to add cron trigger to registry : %w", err)
+	httpAction := fakes.NewDirectHTTPAction(lggr)
+	if err := registry.Add(ctx, httpserver.NewClientServer(httpAction)); err != nil {
+		return nil, err
 	}
-	caps = append(caps, cronTrigger)
+	caps = append(caps, httpAction)
 
 	fakeConsensus, err := fakes.NewFakeConsensus(lggr, fakes.DefaultFakeConsensusConfig())
 	if err != nil {
@@ -157,6 +212,12 @@ func NewFakeCapabilities(ctx context.Context, lggr logger.Logger, registry *capa
 		return nil, err
 	}
 	caps = append(caps, fakeConsensus)
+
+	fakeConsensusNoDAG := fakes.NewFakeConsensusNoDAG(lggr)
+	if err := registry.Add(ctx, consensusserver.NewConsensusServer(fakeConsensusNoDAG)); err != nil {
+		return nil, err
+	}
+	caps = append(caps, fakeConsensusNoDAG)
 
 	writers := []string{"write_aptos-testnet@1.0.0"}
 	for _, writer := range writers {
@@ -168,4 +229,72 @@ func NewFakeCapabilities(ctx context.Context, lggr logger.Logger, registry *capa
 	}
 
 	return caps, nil
+}
+
+func NewManualTriggerCapabilities(ctx context.Context, lggr logger.Logger, registry *capabilities.Registry) (ManualTriggers, error) {
+	// Cron
+	manualCronTrigger := fakes.NewManualCronTriggerService(lggr)
+	manualCronTriggerServer := crontrigger.NewCronServer(manualCronTrigger)
+	if err := registry.Add(ctx, manualCronTriggerServer); err != nil {
+		return ManualTriggers{}, err
+	}
+
+	// HTTP
+	manualHTTPTrigger := fakes.NewManualHTTPTriggerService(lggr)
+	manualHTTPTriggerServer := httptrigger.NewHTTPServer(manualHTTPTrigger)
+	if err := registry.Add(ctx, manualHTTPTriggerServer); err != nil {
+		return ManualTriggers{}, err
+	}
+
+	return ManualTriggers{
+		ManualCronTrigger: manualCronTrigger,
+		ManualHTTPTrigger: manualHTTPTrigger,
+	}, nil
+}
+
+// standaloneLoopWrapper wraps a StandardCapabilities to implement services.Service
+type standaloneLoopWrapper struct {
+	*standardcapabilities.StandardCapabilities
+}
+
+func (l *standaloneLoopWrapper) Ready() error { return l.StandardCapabilities.Ready() }
+
+func (l *standaloneLoopWrapper) HealthReport() map[string]error { return make(map[string]error) }
+
+func (l *standaloneLoopWrapper) Name() string { return "wrapped" }
+
+func newStandardCapabilities(
+	standardCapabilities map[string]standardCapConfig,
+	lggr logger.Logger,
+	registry *capabilities.Registry,
+) []services.Service {
+	caps := make([]services.Service, 0)
+
+	pluginRegistrar := plugins.NewRegistrarConfig(
+		loop.GRPCOpts{},
+		func(name string) (*plugins.RegisteredLoop, error) { return &plugins.RegisteredLoop{}, nil },
+		func(loopId string) {})
+
+	for name, config := range standardCapabilities {
+		if !config.Enabled {
+			continue
+		}
+
+		spec := &job.StandardCapabilitiesSpec{
+			Command: path.Join(goBinPath, name),
+			Config:  config.Config,
+		}
+
+		loop := standardcapabilities.NewStandardCapabilities(lggr, spec,
+			pluginRegistrar, &fakes.TelemetryServiceMock{}, &fakes.KVStoreMock{},
+			registry, &fakes.ErrorLogMock{}, &fakes.PipelineRunnerServiceMock{},
+			&fakes.RelayerSetMock{}, &fakes.OracleFactoryMock{}, &fakes.GatewayConnectorMock{})
+
+		service := &standaloneLoopWrapper{
+			StandardCapabilities: loop,
+		}
+		caps = append(caps, service)
+	}
+
+	return caps
 }
