@@ -92,7 +92,9 @@ func NewDxTracker() (Tracker, error) {
 		// if local config is not available check if gh cli is available
 		// try to configure tracker with gh cli
 		if t.checkIfGhCLIAvailable() {
-			if configErr := t.buildConfig(); configErr != nil {
+			var configErr error
+			c, configErr = t.buildConfig()
+			if configErr != nil {
 				t.mode = ModeOffline
 				t.logger.Warn().Msgf("failed to build config: %s", configErr)
 			} else {
@@ -128,26 +130,26 @@ func NewDxTracker() (Tracker, error) {
 	return t, nil
 }
 
-func (t *DxTracker) buildConfig() error {
+func (t *DxTracker) buildConfig() (*config, error) {
 	var userNameErr error
 	c := &config{}
 	c.GithubUsername, userNameErr = t.readGHUsername()
 	if userNameErr != nil {
-		return errors.Wrap(userNameErr, "failed to read github username")
+		return nil, errors.Wrap(userNameErr, "failed to read github username")
 	}
 
 	var apiTokenErr error
 	c.DxAPIToken, apiTokenErr = t.readDXAPIToken()
 	if apiTokenErr != nil {
-		return errors.Wrap(apiTokenErr, "failed to read DX API token")
+		return nil, errors.Wrap(apiTokenErr, "failed to read DX API token")
 	}
 
 	saveErr := saveConfig(c)
 	if saveErr != nil {
-		return errors.Wrap(saveErr, "failed to save config")
+		return nil, errors.Wrap(saveErr, "failed to save config")
 	}
 
-	return nil
+	return c, nil
 }
 
 // Track queues or sends an event, automatically handling offline scenarios.
