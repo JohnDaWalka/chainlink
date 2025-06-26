@@ -196,18 +196,18 @@ func ConfigureRegistry(ctx context.Context, lggr logger.Logger, req *ConfigureRe
 
 	// all the subsequent calls to the registry are in terms of nodes
 	// compute the mapping of dons to their nodes for reuse in various registry calls
-	donToNodes, err := mapDonsToNodes(donInfos, true, req.RegistryChainSel)
+	donToNodes, err := MapDonsToNodes(donInfos, true, req.RegistryChainSel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to map dons to nodes: %w", err)
 	}
 
 	// TODO: we can remove this abstractions and refactor the functions that accept them to accept []DonInfos/DonCapabilities
 	// they are unnecessary indirection
-	donToCapabilities, err := mapDonsToCaps(req.CapabilitiesRegistry, donInfos)
+	donToCapabilities, err := MapDonsToCaps(req.CapabilitiesRegistry, donInfos)
 	if err != nil {
 		return nil, fmt.Errorf("failed to map dons to capabilities: %w", err)
 	}
-	nopsToNodeIDs, err := nopsToNodes(donInfos, req.Dons, req.RegistryChainSel)
+	nopsToNodeIDs, err := NopsToNodes(donInfos, req.Dons, req.RegistryChainSel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to map nops to nodes: %w", err)
 	}
@@ -247,7 +247,7 @@ func ConfigureRegistry(ctx context.Context, lggr logger.Logger, req *ConfigureRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to register nodes: %w", err)
 	}
-	lggr.Infow("registered nodes", "nodes", nodesResp.nodeIDToParams)
+	lggr.Infow("registered nodes", "nodes", nodesResp.NodeIDToParams)
 
 	// TODO: annotate nodes with node_operator_id in JD?
 
@@ -271,7 +271,7 @@ func ConfigureRegistry(ctx context.Context, lggr logger.Logger, req *ConfigureRe
 	}
 
 	nodeIdToP2PID := map[string][32]byte{}
-	for nodeID, params := range nodesResp.nodeIDToParams {
+	for nodeID, params := range nodesResp.NodeIDToParams {
 		nodeIdToP2PID[nodeID] = params.P2pId
 	}
 	// register DONS
@@ -440,6 +440,8 @@ func NewRegisteredCapability(registry *capabilities_registry.CapabilitiesRegistr
 type RegisterNOPSRequest struct {
 	Env                   *cldf.Environment
 	RegistryChainSelector uint64
+	Registry              *capabilities_registry.CapabilitiesRegistry
+	RegistryChain         *cldf_evm.Chain
 	Nops                  []capabilities_registry.CapabilitiesRegistryNodeOperator
 	UseMCMS               bool
 }
@@ -450,9 +452,17 @@ type RegisterNOPSResponse struct {
 }
 
 func RegisterNOPS(ctx context.Context, lggr logger.Logger, req RegisterNOPSRequest) (*RegisterNOPSResponse, error) {
-	registry, registryChain, err := getRegistryContract(req.Env, req.RegistryChainSelector)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get registry: %w", err)
+	var (
+		err           error
+		registry      = req.Registry
+		registryChain = req.RegistryChain
+	)
+
+	if registry == nil {
+		registry, registryChain, err = getRegistryContract(req.Env, req.RegistryChainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get registry: %w", err)
+		}
 	}
 	lggr.Infow("registering node operators...", "len", len(req.Nops))
 	existingNops, err := registry.GetNodeOperators(&bind.CallOpts{})
@@ -544,6 +554,8 @@ func addNOPsMCMSProposal(registry *capabilities_registry.CapabilitiesRegistry, n
 // register nodes
 type RegisterNodesRequest struct {
 	Env                   *cldf.Environment
+	RegistryChain         *cldf_evm.Chain
+	Registry              *capabilities_registry.CapabilitiesRegistry
 	RegistryChainSelector uint64
 	NopToNodeIDs          map[capabilities_registry.CapabilitiesRegistryNodeOperator][]string
 	DonToNodes            map[string][]deployment.Node
@@ -553,16 +565,23 @@ type RegisterNodesRequest struct {
 }
 
 type RegisterNodesResponse struct {
-	nodeIDToParams map[string]capabilities_registry.CapabilitiesRegistryNodeParams
+	NodeIDToParams map[string]capabilities_registry.CapabilitiesRegistryNodeParams
 	Ops            *mcmstypes.BatchOperation
 }
 
 // registerNodes registers the nodes with the registry. it assumes that the deployer key in the Chain
 // can sign the transactions update the contract state
 func RegisterNodes(lggr logger.Logger, req *RegisterNodesRequest) (*RegisterNodesResponse, error) {
-	registry, registryChain, err := getRegistryContract(req.Env, req.RegistryChainSelector)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get registry: %w", err)
+	var (
+		err           error
+		registry      = req.Registry
+		registryChain = req.RegistryChain
+	)
+	if registry == nil {
+		registry, registryChain, err = getRegistryContract(req.Env, req.RegistryChainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get registry: %w", err)
+		}
 	}
 
 	var count int
@@ -655,7 +674,7 @@ func RegisterNodes(lggr logger.Logger, req *RegisterNodesRequest) (*RegisterNode
 	}
 
 	return &RegisterNodesResponse{
-		nodeIDToParams: nodeIDToParams,
+		NodeIDToParams: nodeIDToParams,
 		Ops:            addResp.Ops,
 	}, nil
 }
