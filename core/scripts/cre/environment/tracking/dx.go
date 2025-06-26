@@ -31,6 +31,17 @@ const (
 	EnvVarDisableTracking  = "DISABLE_DX_TRACKING"
 )
 
+type Tracker interface {
+	Track(event string, metadata map[string]any) error
+}
+
+type NoOpTracker struct {
+}
+
+func (t *NoOpTracker) Track(event string, metadata map[string]any) error {
+	return nil
+}
+
 // DxTracker manages event tracking with automatic retry and offline support.
 type DxTracker struct {
 	mode     Mode
