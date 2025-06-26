@@ -54,6 +54,9 @@ var ConfigureCapabilitiesRegistrySeq = operations.NewSequence[ConfigureCapabilit
 		if err != nil {
 			return ConfigureCapabilitiesRegistrySeqOutput{}, fmt.Errorf("failed to get capabilities registry contract: %w", err)
 		}
+		if input.UseMCMS && capabilityRegistry.McmsContracts == nil {
+			return ConfigureCapabilitiesRegistrySeqOutput{}, fmt.Errorf("capabilities registry contract %s is not owned by MCMS", capabilityRegistry.Contract.Address())
+		}
 
 		donInfos, err := internal.DonInfos(input.Dons, deps.Env.Offchain)
 		if err != nil {

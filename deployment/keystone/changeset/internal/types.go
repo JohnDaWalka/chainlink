@@ -252,21 +252,28 @@ type RegisteredDonConfig struct {
 	Name             string
 	NodeIDs          []string // ids in the offchain client
 	RegistryChainSel uint64
+	Registry         *capabilities_registry.CapabilitiesRegistry
 }
 
 func NewRegisteredDon(env cldf.Environment, cfg RegisteredDonConfig) (*RegisteredDon, error) {
-	// load the don info from the capabilities registry
-	r, err := GetContractSets(env.Logger, &GetContractSetsRequest{
-		Chains:      env.BlockChains.EVMChains(),
-		AddressBook: env.ExistingAddresses,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get contract sets: %w", err)
-	}
-	capReg := r.ContractSets[cfg.RegistryChainSel].CapabilitiesRegistry
+	var (
+		err    error
+		capReg = cfg.Registry
+	)
 
-	if capReg == nil {
-		return nil, errors.New("capabilities registry not found in contract sets")
+	if cfg.Registry == nil {
+		// load the don info from the capabilities registry
+		r, err := GetContractSets(env.Logger, &GetContractSetsRequest{
+			Chains:      env.BlockChains.EVMChains(),
+			AddressBook: env.ExistingAddresses,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get contract sets: %w", err)
+		}
+		capReg = r.ContractSets[cfg.RegistryChainSel].CapabilitiesRegistry
+		if capReg == nil {
+			return nil, errors.New("capabilities registry not found in contract sets")
+		}
 	}
 
 	di, err := capReg.GetDONs(nil)
