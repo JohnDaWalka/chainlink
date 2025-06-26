@@ -11,6 +11,8 @@ COPY GNUmakefile package.json ./
 COPY tools/bin/ldflags ./tools/bin/
 
 ADD go.mod go.sum ./
+COPY ./por_mock_ocr3plugin ./por_mock_ocr3plugin
+# assume we copied the por plugin to the root folder and have this replace in go.mod: `replace github.com/smartcontractkit/por_mock_ocr3plugin => ./por_mock_ocr3plugin`
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 COPY . .

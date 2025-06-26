@@ -81,5 +81,5 @@ Follow the instructions in [docs.md](https://github.com/smartcontractkit/chainli
 
 Handy commands:
 
-- `DISABLE_DX_TRACKING=true TESTCONTAINERS_RYUK_DISABLED=true go run main.go env start --with-plugins-docker-image 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink:b252282df4b23b05658a0aa35216567d6f25c424-plugins --with-example`
-- build docker image: `docker build -f core/chainlink.Dockerfile -t chainlink-tmp-sm-plugin:a30031b24b60 .`
+- build docker image: `docker build -f plugins/chainlink.Dockerfile -t chainlink-tmp-sm-plugin-with-plugins:a30031b24b60 .`
+- Run local CRE: `DISABLE_DX_TRACKING=true TESTCONTAINERS_RYUK_DISABLED=true go run main.go env start --with-plugins-docker-image chainlink-tmp-sm-plugin-with-plugins:a30031b24b60 --with-example -w 2m`
