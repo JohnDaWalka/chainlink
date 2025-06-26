@@ -432,7 +432,7 @@ func TestEngineWithHardcodedWorkflow(t *testing.T) {
 			assert.Equal(t, testWorkflowID, report.Metadata.WorkflowID)
 			assert.NotEmpty(t, report.Metadata.WorkflowExecutionID)
 			assert.Equal(t, testWorkflowOwner, report.Metadata.WorkflowOwner)
-			assert.Equal(t, "local", report.Steps["write_ethereum-testnet-sepolia@1.0.0"].Nodes[0].Peer_2PeerId)
+			assert.NotEmpty(t, report.Steps["write_ethereum-testnet-sepolia@1.0.0"].Nodes[0].Peer_2PeerId)
 			assert.Equal(t, "Gas", report.Steps["write_ethereum-testnet-sepolia@1.0.0"].Nodes[0].SpendUnit)
 			assert.Equal(t, "100", report.Steps["write_ethereum-testnet-sepolia@1.0.0"].Nodes[0].SpendValue)
 
@@ -1241,9 +1241,16 @@ func TestEngine_WrapsTargets(t *testing.T) {
 		require.NoError(t, err2)
 
 		if info.CapabilityType == capabilities.CapabilityTypeTarget {
-			assert.Equal(t, "*transmission.LocalTargetCapability", fmt.Sprintf("%T", s.capability))
+			assert.Equal(t, "*transmission.LocalExecutableCapability", fmt.Sprintf("%T", s.capability))
+		}
+
+		// All local executable capabilities should be wrapped with LocalExecutableCapability
+		// to set peer2peerID for metering/billing purposes
+		if info.IsLocal {
+			assert.Equal(t, "*transmission.LocalExecutableCapability", fmt.Sprintf("%T", s.capability))
 		} else {
-			assert.NotEqual(t, "*transmission.LocalTargetCapability", fmt.Sprintf("%T", s.capability))
+			// Non-local capabilities should not be wrapped
+			assert.NotEqual(t, "*transmission.LocalExecutableCapability", fmt.Sprintf("%T", s.capability))
 		}
 
 		return nil
