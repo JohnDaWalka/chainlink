@@ -16,18 +16,18 @@ import (
 )
 
 type RegisterDonsOpDeps struct {
-	Env           *cldf.Environment
-	RegistryChain *evm.Chain
-	Contract      *capabilities_registry.CapabilitiesRegistry
+	Env               *cldf.Environment
+	RegistryChain     *evm.Chain
+	Contract          *capabilities_registry.CapabilitiesRegistry
+	DonToCapabilities map[string][]internal.RegisteredCapability
+	DonToNodes        map[string][]deployment.Node
+	Dons              []internal.DonCapabilities
 }
 
 type RegisterDonsOpInput struct {
-	RegistryChainSel  uint64
-	Dons              []internal.DonCapabilities
-	DonToNodes        map[string][]deployment.Node
-	NodeIDToParams    map[string]capabilities_registry.CapabilitiesRegistryNodeParams
-	DonToCapabilities map[string][]internal.RegisteredCapability
-	UseMCMS           bool
+	RegistryChainSel uint64
+	NodeIDToParams   map[string]capabilities_registry.CapabilitiesRegistryNodeParams
+	UseMCMS          bool
 }
 
 type RegisterDonsOpOutput struct {
@@ -43,8 +43,8 @@ var RegisterDonsOp = operations.NewOperation[RegisterDonsOpInput, RegisterDonsOp
 		// TODO: annotate nodes with node_operator_id in JD?
 
 		var donsToRegister []internal.DONToRegister
-		for _, don := range input.Dons {
-			nodes, ok := input.DonToNodes[don.Name]
+		for _, don := range deps.Dons {
+			nodes, ok := deps.DonToNodes[don.Name]
 			if !ok {
 				return RegisterDonsOpOutput{}, fmt.Errorf("nodes not found for don %s", don.Name)
 			}
@@ -72,7 +72,7 @@ var RegisterDonsOp = operations.NewOperation[RegisterDonsOpInput, RegisterDonsOp
 			Registry:              deps.Contract,
 			RegistryChainSelector: input.RegistryChainSel,
 			NodeIDToP2PID:         nodeIdToP2PID,
-			DonToCapabilities:     input.DonToCapabilities,
+			DonToCapabilities:     deps.DonToCapabilities,
 			DonsToRegister:        donsToRegister,
 			UseMCMS:               input.UseMCMS,
 		})

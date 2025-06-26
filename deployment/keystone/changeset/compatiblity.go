@@ -30,3 +30,6 @@ type DONCapabilityWithConfig = internal.DONCapabilityWithConfig
 
 type DeployRequest = internal.DeployRequest
 type DeployResponse = internal.DeployResponse
+
+var DonInfos = internal.DonInfos
+var JoinInfoAndNodes = internal.JoinInfoAndNodes

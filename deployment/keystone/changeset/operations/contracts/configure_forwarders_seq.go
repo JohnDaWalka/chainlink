@@ -23,24 +23,16 @@ import (
 type ConfigureForwardersSeqDeps struct {
 	Env      *cldf.Environment
 	Registry *capabilities_registry.CapabilitiesRegistry
+	DONs     []internal.RegisteredDon
 }
 
 type ConfigureForwardersSeqInput struct {
-	WFDonName        string
-	WFNodeIDs        []string
 	RegistryChainSel uint64
 
 	// MCMSConfig is optional. If non-nil, the changes will be proposed using MCMS.
 	MCMSConfig *changeset.MCMSConfig
 	// Chains is optional. Defines chains for which request will be executed. If empty, runs for all available chains.
 	Chains map[uint64]struct{}
-}
-
-func (i ConfigureForwardersSeqInput) Validate() error {
-	if len(i.WFNodeIDs) == 0 {
-		return fmt.Errorf("WFNodeIDs must not be empty")
-	}
-	return nil
 }
 
 func (i ConfigureForwardersSeqInput) UseMCMS() bool {
@@ -56,17 +48,6 @@ var ConfigureForwardersSeq = operations.NewSequence[ConfigureForwardersSeqInput,
 	semver.MustParse("1.0.0"),
 	"Configure Keystone Forwarders",
 	func(b operations.Bundle, deps ConfigureForwardersSeqDeps, input ConfigureForwardersSeqInput) (ConfigureForwardersSeqOutput, error) {
-		wfDON, err := internal.NewRegisteredDon(*deps.Env, internal.RegisteredDonConfig{
-			NodeIDs:          input.WFNodeIDs,
-			Name:             input.WFDonName,
-			RegistryChainSel: input.RegistryChainSel,
-			Registry:         deps.Registry,
-		})
-		if err != nil {
-			return ConfigureForwardersSeqOutput{}, fmt.Errorf("configure-forwarders-seq failed: %w", err)
-		}
-
-		// configure forwarders for all EVM chains
 		evmChain := deps.Env.BlockChains.EVMChains()
 		opPerChain := make(map[uint64]mcmstypes.BatchOperation)
 		forwarderContracts := make(map[uint64]*changeset.OwnedContract[*forwarder.KeystoneForwarder])
@@ -94,8 +75,8 @@ var ConfigureForwardersSeq = operations.NewSequence[ConfigureForwardersSeqInput,
 					Env:      deps.Env,
 					Chain:    &chain,
 					Contract: contract.Contract,
+					Dons:     deps.DONs,
 				}, ConfigureForwarderOpInput{
-					Dons:    []internal.RegisteredDon{*wfDON},
 					UseMCMS: input.UseMCMS(),
 				})
 				if err != nil {
@@ -161,10 +142,10 @@ type ConfigureForwarderOpDeps struct {
 	Env      *cldf.Environment
 	Chain    *evm.Chain
 	Contract *forwarder.KeystoneForwarder
+	Dons     []internal.RegisteredDon
 }
 
 type ConfigureForwarderOpInput struct {
-	Dons    []internal.RegisteredDon
 	UseMCMS bool
 }
 
@@ -177,7 +158,7 @@ var ConfigureForwarderOp = operations.NewOperation[ConfigureForwarderOpInput, Co
 	semver.MustParse("1.0.0"),
 	"Configure Keystone Forwarder",
 	func(b operations.Bundle, deps ConfigureForwarderOpDeps, input ConfigureForwarderOpInput) (ConfigureForwarderOpOutput, error) {
-		ops, err := internal.ConfigureForwarder(b.Logger, *deps.Chain, deps.Contract, input.Dons, input.UseMCMS)
+		ops, err := internal.ConfigureForwarder(b.Logger, *deps.Chain, deps.Contract, deps.Dons, input.UseMCMS)
 		if err != nil {
 			return ConfigureForwarderOpOutput{}, fmt.Errorf("configure-forwarder-op failed: failed to configure forwarder for chain selector %d: %w", deps.Chain.Selector, err)
 		}

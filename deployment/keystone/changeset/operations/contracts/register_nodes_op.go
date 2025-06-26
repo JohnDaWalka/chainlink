@@ -16,18 +16,18 @@ import (
 )
 
 type RegisterNodesOpDeps struct {
-	Env           *cldf.Environment
-	RegistryChain *evm.Chain
-	Contract      *capabilities_registry.CapabilitiesRegistry
+	Env               *cldf.Environment
+	RegistryChain     *evm.Chain
+	Contract          *capabilities_registry.CapabilitiesRegistry
+	DonToCapabilities map[string][]internal.RegisteredCapability
+	NopsToNodeIDs     map[capabilities_registry.CapabilitiesRegistryNodeOperator][]string
+	DonToNodes        map[string][]deployment.Node
 }
 
 type RegisterNodesOpInput struct {
-	RegistryChainSel  uint64
-	NopsToNodeIDs     map[capabilities_registry.CapabilitiesRegistryNodeOperator][]string
-	DonToNodes        map[string][]deployment.Node
-	DonToCapabilities map[string][]internal.RegisteredCapability
-	Nops              []*capabilities_registry.CapabilitiesRegistryNodeOperatorAdded
-	UseMCMS           bool
+	RegistryChainSel uint64
+	Nops             []*capabilities_registry.CapabilitiesRegistryNodeOperatorAdded
+	UseMCMS          bool
 }
 
 type RegisterNodesOpOutput struct {
@@ -45,9 +45,9 @@ var RegisterNodesOp = operations.NewOperation[RegisterNodesOpInput, RegisterNode
 			RegistryChainSelector: input.RegistryChainSel,
 			Registry:              deps.Contract,
 			RegistryChain:         deps.RegistryChain,
-			NopToNodeIDs:          input.NopsToNodeIDs,
-			DonToNodes:            input.DonToNodes,
-			DonToCapabilities:     input.DonToCapabilities,
+			NopToNodeIDs:          deps.NopsToNodeIDs,
+			DonToNodes:            deps.DonToNodes,
+			DonToCapabilities:     deps.DonToCapabilities,
 			Nops:                  input.Nops,
 			UseMCMS:               input.UseMCMS,
 		})

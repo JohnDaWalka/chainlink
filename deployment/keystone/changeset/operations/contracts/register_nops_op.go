@@ -19,12 +19,12 @@ type RegisterNopsOpDeps struct {
 	Env           *cldf.Environment
 	RegistryChain *evm.Chain
 	Contract      *capabilities_registry.CapabilitiesRegistry
+	NopsToNodes   map[capabilities_registry.CapabilitiesRegistryNodeOperator][]string
 }
 
 type RegisterNopsOpInput struct {
 	UseMCMS          bool
 	RegistryChainSel uint64
-	NopsToNodes      map[capabilities_registry.CapabilitiesRegistryNodeOperator][]string
 }
 
 type RegisterNopsOpOutput struct {
@@ -33,11 +33,11 @@ type RegisterNopsOpOutput struct {
 }
 
 var RegisterNopsOp = operations.NewOperation[RegisterNopsOpInput, RegisterNopsOpOutput, RegisterNopsOpDeps](
-	"register-nop-op",
+	"register-nops-op",
 	semver.MustParse("1.0.0"),
 	"Register Node Operators in Capabilities Registry",
 	func(b operations.Bundle, deps RegisterNopsOpDeps, input RegisterNopsOpInput) (RegisterNopsOpOutput, error) {
-		nopsList := maps.Keys(input.NopsToNodes)
+		nopsList := maps.Keys(deps.NopsToNodes)
 		nopsResp, err := internal.RegisterNOPS(b.GetContext(), b.Logger, internal.RegisterNOPSRequest{
 			Env:                   deps.Env,
 			RegistryChainSelector: input.RegistryChainSel,
@@ -47,7 +47,7 @@ var RegisterNopsOp = operations.NewOperation[RegisterNopsOpInput, RegisterNopsOp
 			RegistryChain:         deps.RegistryChain,
 		})
 		if err != nil {
-			return RegisterNopsOpOutput{}, fmt.Errorf("register-nop-op failed: %w", err)
+			return RegisterNopsOpOutput{}, fmt.Errorf("register-nops-op failed: %w", err)
 		}
 		b.Logger.Infow("registered node operators", "nops", nopsResp.Nops)
 

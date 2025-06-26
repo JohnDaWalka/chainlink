@@ -6,6 +6,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
@@ -15,21 +17,26 @@ import (
 )
 
 type ConfigureCapabilitiesRegistrySeqDeps struct {
-	Env *cldf.Environment
+	Env  *cldf.Environment
+	Dons []internal.DonCapabilities // externally sourced based on the environment
 }
 
 type ConfigureCapabilitiesRegistrySeqInput struct {
-	ConfigureKeystoneContractsSeqInput
+	RegistryChainSel uint64
 
 	UseMCMS         bool
-	ContractAddress common.Address
+	ContractAddress *common.Address
 }
 
 func (c ConfigureCapabilitiesRegistrySeqInput) Validate() error {
-	if c.ContractAddress == (common.Address{}) {
+	if c.ContractAddress == nil {
 		return errors.New("ContractAddress is not set")
 	}
-	return c.ConfigureKeystoneContractsSeqInput.Validate()
+	_, ok := chainsel.ChainBySelector(c.RegistryChainSel)
+	if !ok {
+		return fmt.Errorf("chain %d not found in environment", c.RegistryChainSel)
+	}
+	return nil
 }
 
 type ConfigureCapabilitiesRegistrySeqOutput struct {
@@ -43,6 +50,11 @@ var ConfigureCapabilitiesRegistrySeq = operations.NewSequence[ConfigureCapabilit
 	func(b operations.Bundle, deps ConfigureCapabilitiesRegistrySeqDeps, input ConfigureCapabilitiesRegistrySeqInput) (ConfigureCapabilitiesRegistrySeqOutput, error) {
 		if err := input.Validate(); err != nil {
 			return ConfigureCapabilitiesRegistrySeqOutput{}, fmt.Errorf("input validation failed: %w", err)
+		}
+		for _, don := range deps.Dons {
+			if err := don.Validate(); err != nil {
+				return ConfigureCapabilitiesRegistrySeqOutput{}, fmt.Errorf("don validation failed for '%s': %w", don.Name, err)
+			}
 		}
 
 		chain, ok := deps.Env.BlockChains.EVMChains()[input.RegistryChainSel]
@@ -58,7 +70,7 @@ var ConfigureCapabilitiesRegistrySeq = operations.NewSequence[ConfigureCapabilit
 			return ConfigureCapabilitiesRegistrySeqOutput{}, fmt.Errorf("capabilities registry contract %s is not owned by MCMS", capabilityRegistry.Contract.Address())
 		}
 
-		donInfos, err := internal.DonInfos(input.Dons, deps.Env.Offchain)
+		donInfos, err := internal.DonInfos(deps.Dons, deps.Env.Offchain)
 		if err != nil {
 			return ConfigureCapabilitiesRegistrySeqOutput{}, fmt.Errorf("failed to get don infos: %w", err)
 		}
@@ -76,17 +88,17 @@ var ConfigureCapabilitiesRegistrySeq = operations.NewSequence[ConfigureCapabilit
 		if err != nil {
 			return ConfigureCapabilitiesRegistrySeqOutput{}, fmt.Errorf("failed to map dons to capabilities: %w", err)
 		}
-		nopsToNodeIDs, err := internal.NopsToNodes(donInfos, input.Dons, input.RegistryChainSel)
+		nopsToNodeIDs, err := internal.NopsToNodes(donInfos, deps.Dons, input.RegistryChainSel)
 		if err != nil {
 			return ConfigureCapabilitiesRegistrySeqOutput{}, fmt.Errorf("failed to map nops to nodes: %w", err)
 		}
 
 		_, err = operations.ExecuteOperation(b, AddCapabilitiesOp, AddCapabilitiesOpDeps{
-			Chain:    chain,
-			Contract: capabilityRegistry.Contract,
-		}, AddCapabilitiesOpInput{
-			UseMCMS:           input.UseMCMS,
+			Chain:             chain,
+			Contract:          capabilityRegistry.Contract,
 			DonToCapabilities: donToCapabilities,
+		}, AddCapabilitiesOpInput{
+			UseMCMS: input.UseMCMS,
 		})
 		if err != nil {
 			return ConfigureCapabilitiesRegistrySeqOutput{}, fmt.Errorf("failed to add capabilities to registry: %w", err)
@@ -96,11 +108,11 @@ var ConfigureCapabilitiesRegistrySeq = operations.NewSequence[ConfigureCapabilit
 		nopsReport, err := operations.ExecuteOperation(b, RegisterNopsOp, RegisterNopsOpDeps{
 			Env:           deps.Env,
 			RegistryChain: &chain,
+			NopsToNodes:   nopsToNodeIDs,
 			Contract:      capabilityRegistry.Contract,
 		}, RegisterNopsOpInput{
 			UseMCMS:          input.UseMCMS,
 			RegistryChainSel: input.RegistryChainSel,
-			NopsToNodes:      nopsToNodeIDs,
 		})
 		if err != nil {
 			return ConfigureCapabilitiesRegistrySeqOutput{}, fmt.Errorf("failed to register node operators: %w", err)
@@ -109,16 +121,16 @@ var ConfigureCapabilitiesRegistrySeq = operations.NewSequence[ConfigureCapabilit
 
 		// register nodes
 		nodesReport, err := operations.ExecuteOperation(b, RegisterNodesOp, RegisterNodesOpDeps{
-			Env:           deps.Env,
-			RegistryChain: &chain,
-			Contract:      capabilityRegistry.Contract,
-		}, RegisterNodesOpInput{
-			RegistryChainSel:  input.RegistryChainSel,
+			Env:               deps.Env,
+			RegistryChain:     &chain,
+			Contract:          capabilityRegistry.Contract,
 			NopsToNodeIDs:     nopsToNodeIDs,
 			DonToNodes:        donToNodes,
 			DonToCapabilities: donToCapabilities,
-			Nops:              nopsResp.Nops,
-			UseMCMS:           input.UseMCMS,
+		}, RegisterNodesOpInput{
+			RegistryChainSel: input.RegistryChainSel,
+			Nops:             nopsResp.Nops,
+			UseMCMS:          input.UseMCMS,
 		})
 		if err != nil {
 			return ConfigureCapabilitiesRegistrySeqOutput{}, fmt.Errorf("failed to register nodes: %w", err)
@@ -126,16 +138,16 @@ var ConfigureCapabilitiesRegistrySeq = operations.NewSequence[ConfigureCapabilit
 		nodesResp := nodesReport.Output
 
 		donsReport, err := operations.ExecuteOperation(b, RegisterDonsOp, RegisterDonsOpDeps{
-			Env:           deps.Env,
-			RegistryChain: &chain,
-			Contract:      capabilityRegistry.Contract,
-		}, RegisterDonsOpInput{
-			RegistryChainSel:  input.RegistryChainSel,
-			Dons:              input.Dons,
+			Env:               deps.Env,
+			RegistryChain:     &chain,
+			Contract:          capabilityRegistry.Contract,
+			Dons:              deps.Dons,
 			DonToNodes:        donToNodes,
-			NodeIDToParams:    nodesResp.NodeIDToParams,
 			DonToCapabilities: donToCapabilities,
-			UseMCMS:           input.UseMCMS,
+		}, RegisterDonsOpInput{
+			RegistryChainSel: input.RegistryChainSel,
+			NodeIDToParams:   nodesResp.NodeIDToParams,
+			UseMCMS:          input.UseMCMS,
 		})
 		if err != nil {
 			return ConfigureCapabilitiesRegistrySeqOutput{}, fmt.Errorf("failed to register DONS: %w", err)

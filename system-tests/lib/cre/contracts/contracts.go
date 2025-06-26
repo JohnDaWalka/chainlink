@@ -7,9 +7,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/data-feeds/generated/data_feeds_cache"
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
@@ -270,15 +270,81 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput, capabilityFactoryFns 
 		UniqueReports:                     true,
 	}
 
-	cfg := keystone_changeset.InitialContractsCfg{
-		RegistryChainSel: input.ChainSelector,
-		Dons:             donCapabilities,
-		OCR3Config:       &oracleConfig,
+	donInfos, err := keystone_changeset.DonInfos(donCapabilities, input.CldEnv.Offchain)
+	if err != nil {
+		return errors.Wrap(err, "failed to get don infos")
 	}
 
-	_, err := keystone_changeset.ConfigureInitialContractsChangeset(*input.CldEnv, cfg)
+	carRegReport, err := operations.ExecuteSequence(
+		input.CldEnv.OperationsBundle,
+		ks_contracts_op.ConfigureCapabilitiesRegistrySeq,
+		ks_contracts_op.ConfigureCapabilitiesRegistrySeqDeps{
+			Env:  input.CldEnv,
+			Dons: donCapabilities,
+		},
+		ks_contracts_op.ConfigureCapabilitiesRegistrySeqInput{
+			RegistryChainSel: input.ChainSelector,
+			UseMCMS:          false,
+			ContractAddress:  input.CapabilitiesRegistryAddress,
+		},
+	)
 	if err != nil {
-		return errors.Wrap(err, "failed to configure initial contracts")
+		return errors.Wrap(err, "failed to configure capabilities registry")
+	}
+
+	dons, err := keystone_changeset.JoinInfoAndNodes(carRegReport.Output.DonInfos, donInfos, input.ChainSelector)
+	if err != nil {
+		return errors.Wrap(err, "failed to join don infos and nodes")
+	}
+
+	capReg, err := keystone_changeset.GetOwnedContractV2[*kcr.CapabilitiesRegistry](
+		input.CldEnv.DataStore.Addresses(),
+		input.CldEnv.BlockChains.EVMChains()[input.ChainSelector],
+		input.CapabilitiesRegistryAddress.Hex(),
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to get capabilities registry contract")
+	}
+
+	_, err = operations.ExecuteSequence(
+		input.CldEnv.OperationsBundle,
+		ks_contracts_op.ConfigureForwardersSeq,
+		ks_contracts_op.ConfigureForwardersSeqDeps{
+			Env:      input.CldEnv,
+			Registry: capReg.Contract,
+			DONs:     dons,
+		},
+		ks_contracts_op.ConfigureForwardersSeqInput{
+			RegistryChainSel: input.ChainSelector,
+		},
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to configure forwarders")
+	}
+
+	var allNodeIDs []string
+	for _, don := range dons {
+		for _, node := range don.Nodes {
+			allNodeIDs = append(allNodeIDs, node.NodeID)
+		}
+	}
+
+	_, err = operations.ExecuteOperation(
+		input.CldEnv.OperationsBundle,
+		ks_contracts_op.ConfigureOCR3Op,
+		ks_contracts_op.ConfigureOCR3OpDeps{
+			Env: input.CldEnv,
+		},
+		ks_contracts_op.ConfigureOCR3OpInput{
+			ContractAddress:  input.OCR3Address,
+			RegistryChainSel: input.ChainSelector,
+			NodeIDs:          allNodeIDs,
+			Config:           &oracleConfig,
+			DryRun:           false,
+		},
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to configure OCR3 contract")
 	}
 
 	return nil

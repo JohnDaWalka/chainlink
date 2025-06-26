@@ -14,13 +14,13 @@ import (
 )
 
 type AddCapabilitiesOpDeps struct {
-	Chain    evm.Chain
-	Contract *capabilities_registry.CapabilitiesRegistry
+	Chain             evm.Chain
+	Contract          *capabilities_registry.CapabilitiesRegistry
+	DonToCapabilities map[string][]internal.RegisteredCapability
 }
 
 type AddCapabilitiesOpInput struct {
-	UseMCMS           bool
-	DonToCapabilities map[string][]internal.RegisteredCapability
+	UseMCMS bool
 }
 
 type AddCapabilitiesOpOutput struct {
@@ -33,7 +33,7 @@ var AddCapabilitiesOp = operations.NewOperation[AddCapabilitiesOpInput, AddCapab
 	"Add Capabilities to Capabilities Registry",
 	func(b operations.Bundle, deps AddCapabilitiesOpDeps, input AddCapabilitiesOpInput) (AddCapabilitiesOpOutput, error) {
 		var capabilities []capabilities_registry.CapabilitiesRegistryCapability
-		for _, don := range input.DonToCapabilities {
+		for _, don := range deps.DonToCapabilities {
 			for _, donCap := range don {
 				capabilities = append(capabilities, donCap.CapabilitiesRegistryCapability)
 			}

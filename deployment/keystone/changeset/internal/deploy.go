@@ -94,7 +94,7 @@ func ConfigureContracts(ctx context.Context, lggr logger.Logger, req ConfigureCo
 	}
 
 	// now we have the capability registry set up we need to configure the forwarder contracts and the OCR3 contract
-	dons, err := joinInfoAndNodes(cfgRegistryResp.DonInfos, donInfos, req.RegistryChainSel)
+	dons, err := JoinInfoAndNodes(cfgRegistryResp.DonInfos, donInfos, req.RegistryChainSel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to assimilate registry to Dons: %w", err)
 	}

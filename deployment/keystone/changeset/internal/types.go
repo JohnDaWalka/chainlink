@@ -335,7 +335,7 @@ func (d RegisteredDon) Signers(chainFamily string) []common.Address {
 	return out
 }
 
-func joinInfoAndNodes(donInfos map[string]kcr.CapabilitiesRegistryDONInfo, dons []DonInfo, registryChainSel uint64) ([]RegisteredDon, error) {
+func JoinInfoAndNodes(donInfos map[string]kcr.CapabilitiesRegistryDONInfo, dons []DonInfo, registryChainSel uint64) ([]RegisteredDon, error) {
 	// all maps should have the same keys
 	nodes, err := MapDonsToNodes(dons, true, registryChainSel)
 	if err != nil {
