@@ -53,10 +53,10 @@
       user_config_overrides = """
       [Log]
       Level = 'debug'
-      JSONConsole = true
+      JSONConsole = false
 
       [Telemetry]
-      Enabled = true
+      Enabled = false
       Endpoint = 'host.docker.internal:4317'
       InsecureConnection = true
       TraceSampleRatio = 1
@@ -74,10 +74,10 @@
       user_config_overrides = """
       [Log]
       Level = 'debug'
-      JSONConsole = true
+      JSONConsole = false
 
       [Telemetry]
-      Enabled = true
+      Enabled = false
       Endpoint = 'host.docker.internal:4317'
       InsecureConnection = true
       TraceSampleRatio = 1
@@ -95,10 +95,10 @@
       user_config_overrides = """
       [Log]
       Level = 'debug'
-      JSONConsole = true
+      JSONConsole = false
 
       [Telemetry]
-      Enabled = true
+      Enabled = false
       Endpoint = 'host.docker.internal:4317'
       InsecureConnection = true
       TraceSampleRatio = 1
@@ -116,10 +116,10 @@
       user_config_overrides = """
       [Log]
       Level = 'debug'
-      JSONConsole = true
+      JSONConsole = false
 
       [Telemetry]
-      Enabled = true
+      Enabled = false
       Endpoint = 'host.docker.internal:4317'
       InsecureConnection = true
       TraceSampleRatio = 1
