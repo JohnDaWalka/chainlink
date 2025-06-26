@@ -9,10 +9,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -29,14 +31,15 @@ const (
 	EnvVarTestMode         = "DX_TEST_MODE"
 	EnvVarForceOfflineMode = "DX_FORCE_OFFLINE_MODE"
 	EnvVarDisableTracking  = "DISABLE_DX_TRACKING"
+
+	MinGHCLIVersion = "v2.50.0"
 )
 
 type Tracker interface {
 	Track(event string, metadata map[string]any) error
 }
 
-type NoOpTracker struct {
-}
+type NoOpTracker struct{}
 
 func (t *NoOpTracker) Track(event string, metadata map[string]any) error {
 	return nil
@@ -89,14 +92,14 @@ func NewDxTracker() (Tracker, error) {
 		t.logger.Debug().Msg("Valid local config found")
 		t.mode = ModeOnline
 	} else {
-		// if local config is not available check if gh cli is available
-		// try to configure tracker with gh cli
+		// if local config is not available check if GH CLI is available
+		// and if so, try to configure tracker with it
 		if t.checkIfGhCLIAvailable() {
 			var configErr error
-			c, configErr = t.buildConfig()
+			c, configErr = t.buildConfigWithGhCLI()
 			if configErr != nil {
 				t.mode = ModeOffline
-				t.logger.Warn().Msgf("failed to build config: %s", configErr)
+				t.logger.Warn().Msgf("Failed to build config with GH CLI: %s", configErr.Error())
 			} else {
 				t.mode = ModeOnline
 				t.logger.Debug().Msg("Config created, setting mode to online")
@@ -120,7 +123,7 @@ func NewDxTracker() (Tracker, error) {
 		go func() {
 			sendErr := t.sendSavedEvents()
 			if sendErr != nil {
-				log.Debug().Msgf("failed to send saved events: %s\n", sendErr)
+				log.Debug().Msgf("Failed to send saved events: %s\n", sendErr)
 			}
 		}()
 	}
@@ -130,7 +133,7 @@ func NewDxTracker() (Tracker, error) {
 	return t, nil
 }
 
-func (t *DxTracker) buildConfig() (*config, error) {
+func (t *DxTracker) buildConfigWithGhCLI() (*config, error) {
 	var userNameErr error
 	c := &config{}
 	c.GithubUsername, userNameErr = t.readGHUsername()
@@ -237,9 +240,41 @@ func (t *DxTracker) sendEvent(name string, timestamp int64, metadata map[string]
 // checkIfGhCLIAvailable determines if GitHub CLI is available for authentication.
 func (t *DxTracker) checkIfGhCLIAvailable() bool {
 	cmd := exec.Command("gh", "auth", "status")
-	_, err := cmd.Output()
+	_, outputErr := cmd.Output()
 
-	return err == nil
+	isAvailable := outputErr == nil
+	if !isAvailable {
+		return false
+	}
+
+	cmd = exec.Command("gh", "--version")
+	output, outputErr := cmd.Output()
+	if outputErr != nil {
+		t.logger.Warn().Msgf("failed to get GH CLI version: %s", outputErr.Error())
+		return false
+	}
+
+	re := regexp.MustCompile(`gh version (\d+\.\d+\.\d+)`)
+	matches := re.FindStringSubmatch(string(output))
+	if len(matches) < 2 {
+		t.logger.Warn().Msgf("failed to parse GH CLI version: %s", string(output))
+		return false
+	}
+
+	version, versionErr := semver.NewVersion(matches[1])
+	if versionErr != nil {
+		t.logger.Warn().Msgf("failed to parse GH CLI version: %s", versionErr.Error())
+		return false
+	}
+
+	isEnoughVersion := version.Compare(semver.MustParse(MinGHCLIVersion)) >= 0
+	if !isEnoughVersion {
+		t.logger.Warn().Msgf("GH CLI version is too old, please update to at least %s", MinGHCLIVersion)
+	}
+
+	t.logger.Debug().Msgf("GH CLI version found: %s", version)
+
+	return true
 }
 
 // readGHUsername fetches the authenticated GitHub username via CLI.
