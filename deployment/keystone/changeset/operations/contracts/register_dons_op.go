@@ -61,9 +61,9 @@ var RegisterDonsOp = operations.NewOperation[RegisterDonsOpInput, RegisterDonsOp
 			})
 		}
 
-		nodeIdToP2PID := map[string][32]byte{}
+		nodeIDToP2PID := map[string][32]byte{}
 		for nodeID, params := range input.NodeIDToParams {
-			nodeIdToP2PID[nodeID] = params.P2pId
+			nodeIDToP2PID[nodeID] = params.P2pId
 		}
 		// register DONS
 		donsResp, err := internal.RegisterDons(b.Logger, internal.RegisterDonsRequest{
@@ -71,7 +71,7 @@ var RegisterDonsOp = operations.NewOperation[RegisterDonsOpInput, RegisterDonsOp
 			RegistryChain:         deps.RegistryChain,
 			Registry:              deps.Contract,
 			RegistryChainSelector: input.RegistryChainSel,
-			NodeIDToP2PID:         nodeIdToP2PID,
+			NodeIDToP2PID:         nodeIDToP2PID,
 			DonToCapabilities:     deps.DonToCapabilities,
 			DonsToRegister:        donsToRegister,
 			UseMCMS:               input.UseMCMS,

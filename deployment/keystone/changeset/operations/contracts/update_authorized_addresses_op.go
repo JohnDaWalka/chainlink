@@ -86,6 +86,9 @@ var UpdateAuthorizedAddressesOp = operations.NewOperation[UpdateAuthorizedAddres
 			}
 			return tx, err
 		})
+		if err != nil {
+			return UpdateAuthorizedAddressesOpOutput{}, fmt.Errorf("failed to update authorized addresses: %w", err)
+		}
 
 		return UpdateAuthorizedAddressesOpOutput{Proposals: proposals}, nil
 	},

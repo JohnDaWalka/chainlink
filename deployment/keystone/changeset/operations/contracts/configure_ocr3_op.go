@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -44,7 +45,7 @@ var ConfigureOCR3Op = operations.NewOperation[ConfigureOCR3OpInput, ConfigureOCR
 	"Configure OCR3 Contract",
 	func(b operations.Bundle, deps ConfigureOCR3OpDeps, input ConfigureOCR3OpInput) (ConfigureOCR3OpOutput, error) {
 		if input.ContractAddress == nil {
-			return ConfigureOCR3OpOutput{}, fmt.Errorf("ContractAddress is required")
+			return ConfigureOCR3OpOutput{}, errors.New("ContractAddress is required")
 		}
 
 		resp, err := changeset.ConfigureOCR3Contract(*deps.Env, changeset.ConfigureOCR3Config{

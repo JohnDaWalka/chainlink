@@ -80,6 +80,9 @@ var UpdateAllowedDonsOp = operations.NewOperation[UpdateAllowedDonsOpInput, Upda
 			}
 			return tx, err
 		})
+		if err != nil {
+			return UpdateAllowedDonsOpOutput{}, fmt.Errorf("failed to update allowed dons: %w", err)
+		}
 
 		return UpdateAllowedDonsOpOutput{Proposals: proposals}, nil
 	},

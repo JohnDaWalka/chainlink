@@ -1,9 +1,14 @@
 package contracts
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+
+	"github.com/smartcontractkit/mcms"
+	mcmssdk "github.com/smartcontractkit/mcms/sdk"
+	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -11,9 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	forwarder "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
-	"github.com/smartcontractkit/mcms"
-	mcmssdk "github.com/smartcontractkit/mcms/sdk"
-	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
@@ -91,7 +93,7 @@ var ConfigureForwardersSeq = operations.NewSequence[ConfigureForwardersSeqInput,
 		var out ConfigureForwardersSeqOutput
 		if input.UseMCMS() {
 			if len(opPerChain) == 0 {
-				return out, fmt.Errorf("configure-forwarders-seq failed: no operations generated for MCMS")
+				return out, errors.New("configure-forwarders-seq failed: no operations generated for MCMS")
 			}
 
 			for chainSelector, op := range opPerChain {
