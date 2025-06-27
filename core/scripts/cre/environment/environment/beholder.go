@@ -10,7 +10,7 @@ import (
 	"github.com/google/go-github/v72/github"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	chipingressset "github.com/smartcontractkit/chainlink-testing-framework/framework/components/chip_ingress_set"
+	chipingressset "github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose/chip_ingress_set"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 )
@@ -26,6 +26,11 @@ var (
 
 type ChipIngressConfig struct {
 	ChipIngress *chipingressset.Input `toml:"chip_ingress"`
+	Kafka       *KafkaConfig          `toml:"kafka"`
+}
+
+type KafkaConfig struct {
+	Topics []string `toml:"topics"`
 }
 
 var startBeholderCmd = &cobra.Command{
@@ -107,12 +112,12 @@ func startBeholder(cmdContext context.Context, protoConfigsFlag []string) (start
 	fmt.Println()
 	framework.L.Info().Msgf("Red Panda Console URL: %s", out.RedPanda.ConsoleExternalURL)
 
-	topicsErr := chipingressset.CreateTopics(cmdContext, out.RedPanda.KafkaExternalURL, in.ChipIngress.Topics)
+	topicsErr := chipingressset.CreateTopics(cmdContext, out.RedPanda.KafkaExternalURL, in.Kafka.Topics)
 	if topicsErr != nil {
 		return errors.Wrap(topicsErr, "failed to create topics")
 	}
 
-	for _, topic := range in.ChipIngress.Topics {
+	for _, topic := range in.Kafka.Topics {
 		framework.L.Info().Msgf("Topic URL: %s", fmt.Sprintf("%s/topics/%s", out.RedPanda.ConsoleExternalURL, topic))
 	}
 	fmt.Println()
@@ -121,34 +126,34 @@ func startBeholder(cmdContext context.Context, protoConfigsFlag []string) (start
 }
 
 func parseConfigsAndRegisterProtos(ctx context.Context, protoConfigsFlag []string, schemaRegistryExternalURL string) error {
-	var reposConfigs []chipingressset.RepoConfiguration
+	var protoSchemaSets []chipingressset.ProtoSchemaSet
 	for _, protoConfig := range protoConfigsFlag {
 		file, fileErr := os.ReadFile(protoConfig)
 		if fileErr != nil {
 			return errors.Wrapf(fileErr, "failed to read proto config file: %s", protoConfig)
 		}
 
-		type repoConfigs struct {
-			Protos []chipingressset.RepoConfiguration `toml:"protos"`
+		type wrappedProtoSchemaSets struct {
+			ProtoSchemaSets []chipingressset.ProtoSchemaSet `toml:"proto_schema_sets"`
 		}
 
-		var rc repoConfigs
-		if err := toml.Unmarshal(file, &rc); err != nil {
+		var schemaSets wrappedProtoSchemaSets
+		if err := toml.Unmarshal(file, &schemaSets); err != nil {
 			return errors.Wrapf(err, "failed to unmarshal proto config file: %s", protoConfig)
 		}
 
-		reposConfigs = append(reposConfigs, rc.Protos...)
+		protoSchemaSets = append(protoSchemaSets, schemaSets.ProtoSchemaSets...)
 	}
 
-	if len(reposConfigs) == 0 {
+	if len(protoSchemaSets) == 0 {
 		framework.L.Warn().Msg("no proto configs provided, skipping proto registration")
 
 		return nil
 	}
 
-	for _, repoConfig := range reposConfigs {
-		framework.L.Info().Msgf("Registering and fetching proto from %s", repoConfig.Repo)
-		framework.L.Info().Msgf("Proto configs: %+v", repoConfig)
+	for _, protoSchemaSet := range protoSchemaSets {
+		framework.L.Info().Msgf("Registering and fetching proto from %s", protoSchemaSet.Repository)
+		framework.L.Info().Msgf("Proto schema set config: %+v", protoSchemaSet)
 	}
 
 	var client *github.Client
@@ -161,7 +166,7 @@ func parseConfigsAndRegisterProtos(ctx context.Context, protoConfigsFlag []strin
 		client = github.NewClient(nil)
 	}
 
-	reposErr := chipingressset.DefaultRegisterAndFetchProtos(ctx, client, reposConfigs, schemaRegistryExternalURL)
+	reposErr := chipingressset.DefaultRegisterAndFetchProtos(ctx, client, protoSchemaSets, schemaRegistryExternalURL)
 	if reposErr != nil {
 		return errors.Wrap(reposErr, "failed to fetch and register protos")
 	}

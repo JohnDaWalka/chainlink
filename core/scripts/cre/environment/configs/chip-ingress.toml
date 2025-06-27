@@ -1,4 +1,6 @@
 # beholder
 [chip_ingress]
   compose_file='https://raw.githubusercontent.com/smartcontractkit/chainlink-testing-framework/571e71ca5ca491f59530929112a7ff194b82e8ec/framework/components/chip_ingress_set/docker-compose.yml'
+
+[kafka]
   topics=['cre']
