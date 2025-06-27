@@ -37,6 +37,7 @@ import (
 	croncap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/cron"
 	logeventtriggercap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/logevent"
 	readcontractcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/readcontract"
+	securemintcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/securemint"
 	webapicap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapi"
 	writeevmcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writeevm"
 	gatewayconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/gateway"
@@ -46,6 +47,7 @@ import (
 	cregateway "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/gateway"
 	crelogevent "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/logevent"
 	crereadcontract "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/readcontract"
+	cresecuremint "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/securemint"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/webapi"
 	creenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
@@ -141,6 +143,7 @@ type ExtraCapabilitiesConfig struct {
 	CronCapabilityBinaryPath  string `toml:"cron_capability_binary_path"`
 	LogEventTriggerBinaryPath string `toml:"log_event_trigger_binary_path"`
 	ReadContractBinaryPath    string `toml:"read_contract_capability_binary_path"`
+	SecureMintBinaryPath      string `toml:"secure_mint_capability_binary_path"`
 }
 
 // DX tracking
@@ -466,6 +469,11 @@ func StartCLIEnvironment(
 			capabilitiesBinaryPaths[cretypes.ReadContractCapability] = in.ExtraCapabilities.ReadContractBinaryPath
 		}
 
+		if in.ExtraCapabilities.SecureMintBinaryPath != "" || withPluginsDockerImageFlag != "" {
+			workflowDONCapabilities = append(workflowDONCapabilities, cretypes.SecureMintCapability)
+			capabilitiesBinaryPaths[cretypes.SecureMintCapability] = in.ExtraCapabilities.SecureMintBinaryPath
+		}
+
 		for capabilityName, binaryPath := range extraBinaries {
 			if binaryPath != "" || withPluginsDockerImageFlag != "" {
 				workflowDONCapabilities = append(workflowDONCapabilities, capabilityName)
@@ -497,6 +505,11 @@ func StartCLIEnvironment(
 		if in.ExtraCapabilities.LogEventTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
 			workflowDONCapabilities = append(workflowDONCapabilities, cretypes.LogTriggerCapability)
 			capabilitiesBinaryPaths[cretypes.LogTriggerCapability] = in.ExtraCapabilities.LogEventTriggerBinaryPath
+		}
+
+		if in.ExtraCapabilities.SecureMintBinaryPath != "" || withPluginsDockerImageFlag != "" {
+			workflowDONCapabilities = append(workflowDONCapabilities, cretypes.SecureMintCapability)
+			capabilitiesBinaryPaths[cretypes.SecureMintCapability] = in.ExtraCapabilities.SecureMintBinaryPath
 		}
 
 		for capabilityName, binaryPath := range extraBinaries {
@@ -565,6 +578,7 @@ func StartCLIEnvironment(
 		computecap.ComputeCapabilityFactoryFn,
 		consensuscap.OCR3CapabilityFactoryFn,
 		croncap.CronCapabilityFactoryFn,
+		securemintcap.SecureMintCapabilityFactoryFn,
 	}
 
 	containerPath, pathErr := crecapabilities.DefaultContainerDirectory(in.Infra.InfraType)
@@ -592,6 +606,11 @@ func StartCLIEnvironment(
 		readContractBinaryName = "readcontract"
 	}
 
+	secureMintBinaryName := filepath.Base(in.ExtraCapabilities.SecureMintBinaryPath)
+	if withPluginsDockerImageFlag != "" {
+		secureMintBinaryName = "secure-mint"
+	}
+
 	jobSpecFactoryFunctions := []cretypes.JobSpecFactoryFn{
 		// add support for more job spec factory functions if needed
 		webapi.WebAPITriggerJobSpecFactoryFn,
@@ -600,6 +619,7 @@ func StartCLIEnvironment(
 		crecron.CronJobSpecFactoryFn(filepath.Join(containerPath, cronBinaryName)),
 		cregateway.GatewayJobSpecFactoryFn(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
 		crecompute.ComputeJobSpecFactoryFn,
+		cresecuremint.SecureMintJobSpecFactoryFn(filepath.Join(containerPath, secureMintBinaryName)),
 	}
 
 	jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, extraJobFactoryFns...)
