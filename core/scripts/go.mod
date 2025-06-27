@@ -46,7 +46,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.15.0
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250625151958-31b61ac8e1d9
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.7
-	github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose v0.1.0
+	github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose v0.1.1
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.3
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2
 	github.com/smartcontractkit/chainlink/system-tests/lib v0.0.0-00010101000000-000000000000
