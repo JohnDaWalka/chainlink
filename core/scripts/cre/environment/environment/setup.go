@@ -144,7 +144,7 @@ func init() {
 	}
 
 	SetupCmd.Flags().StringVarP(&config.ConfigPath, "config", "c", "", "Path to the TOML configuration file")
-	_ = SetupCmd.MarkFlagRequired("config")
+	// _ = SetupCmd.MarkFlagRequired("config")
 
 	EnvironmentCmd.AddCommand(SetupCmd)
 }

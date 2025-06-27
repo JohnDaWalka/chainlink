@@ -70,6 +70,7 @@ var (
 	rpcURLFlag                   string
 	chainIDFlag                  uint64
 	gatewayURLFlag               string
+	withSetupFlag                bool
 )
 
 func init() {
@@ -89,6 +90,7 @@ func init() {
 	startCmd.Flags().StringVarP(&exampleWorkflowTriggerFlag, "example-workflow-trigger", "y", "web-trigger", "Trigger for example workflow to deploy (web-trigger or cron)")
 	startCmd.Flags().BoolVarP(&withBeholderFlag, "with-beholder", "b", false, "Deploy Beholder (Chip Ingress + Red Panda)")
 	startCmd.Flags().StringArrayVarP(&protoConfigsFlag, "with-proto-configs", "c", []string{"./proto-configs/default.toml"}, "Protos configs to use (e.g. './proto-configs/config_one.toml,./proto-configs/config_two.toml')")
+	startCmd.Flags().BoolVarP(&withSetupFlag, "auto-setup", "a", false, "Run setup before starting the environment")
 
 	deployAndVerifyExampleWorkflowCmd.Flags().StringVarP(&rpcURLFlag, "rpc-url", "r", "http://localhost:8545", "RPC URL")
 	deployAndVerifyExampleWorkflowCmd.Flags().Uint64VarP(&chainIDFlag, "chain-id", "c", 1337, "Chain ID")
@@ -277,6 +279,13 @@ var startCmd = &cobra.Command{
 			p := recover()
 			StartCmdRecoverHandlerFunc(p, waitOnErrorTimeoutFlag)
 		}()
+
+		if withSetupFlag {
+			setupErr := RunSetup(cmd.Context(), SetupConfig{})
+			if setupErr != nil {
+				return errors.Wrap(setupErr, "failed to run setup")
+			}
+		}
 
 		if topologyFlag != TopologySimplified && topologyFlag != TopologyFull {
 			return fmt.Errorf("invalid topology: %s. Valid topologies are: %s, %s", topologyFlag, TopologySimplified, TopologyFull)
