@@ -21,6 +21,8 @@ import (
 
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/holiman/uint256"
+	"github.com/pattonkan/sui-go/sui"
+
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 	"golang.org/x/sync/errgroup"
 
@@ -34,6 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
 	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
 
+	"github.com/pattonkan/sui-go/suiclient"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	ccipops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
 
@@ -364,7 +367,7 @@ func LatestBlock(ctx context.Context, env cldf.Environment, chainSelector uint64
 			DescendingOrder: true,
 		})
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get sui latest checkpoint")
+			return 0, fmt.Errorf("failed to get sui latest checkpoint: %w", err)
 		}
 		if len(req.Data) == 0 {
 			return 0, errors.New("no checkpoints returned for sui chain")

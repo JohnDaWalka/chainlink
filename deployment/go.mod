@@ -25,6 +25,8 @@ require (
 	github.com/go-resty/resty/v2 v2.16.3
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
+	github.com/holiman/uint256 v1.3.2
+	github.com/jmoiron/sqlx v1.4.0
 	github.com/mr-tron/base58 v1.2.0
 	github.com/pattonkan/sui-go v0.1.1
 	github.com/pelletier/go-toml v1.9.5
@@ -45,7 +47,15 @@ require (
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.12.0
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.7.0
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250625213849-112165c2aed3
+	github.com/smartcontractkit/chainlink-sui v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.0
+	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.4
+	github.com/smartcontractkit/freeport v0.1.1
+	github.com/smartcontractkit/libocr v0.0.0-20250604151357-2fe8c61bbf2e
+	github.com/smartcontractkit/mcms v0.19.2
+	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945
 	github.com/spf13/cast v1.7.1
+	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.37.0
 	github.com/zksync-sdk/zksync2-go v1.1.1-0.20250620124214-2c742ee399c6
 	go.uber.org/zap v1.27.0
@@ -379,7 +389,6 @@ require (
 	github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go v0.0.0-20250131130834-15e0d4cde2a6 // indirect
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250619160901-79b609b1021c // indirect
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250528121202-292529af39df // indirect
