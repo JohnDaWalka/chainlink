@@ -85,7 +85,6 @@ type BuildConfig struct {
 }
 
 func (c BuildConfig) Build(ctx context.Context) (localImage string, err error) {
-
 	var (
 		repo = c.RepoURL
 		tag  = c.Branch
@@ -97,9 +96,9 @@ func (c BuildConfig) Build(ctx context.Context) (localImage string, err error) {
 
 	// Check if repo is a local directory
 	isLocalRepo := false
-	if _, err := os.Stat(repo); err == nil {
-		fileInfo, err := os.Stat(repo)
-		if err == nil && fileInfo.IsDir() {
+	if _, err2 := os.Stat(repo); err2 == nil {
+		fileInfo, err3 := os.Stat(repo)
+		if err3 == nil && fileInfo.IsDir() {
 			isLocalRepo = true
 			logger.Info().Msgf("Using local repository at %s", repo)
 		}
@@ -112,9 +111,9 @@ func (c BuildConfig) Build(ctx context.Context) (localImage string, err error) {
 		workingDir = repo
 	} else {
 		// Create a temporary directory for cloning the remote repo
-		tempDir, err := os.MkdirTemp("", filepath.Base(repo)+"-*")
-		if err != nil {
-			return "", fmt.Errorf("failed to create temporary directory: %w", err)
+		tempDir, err2 := os.MkdirTemp("", filepath.Base(repo)+"-*")
+		if err2 != nil {
+			return "", fmt.Errorf("failed to create temporary directory: %w", err2)
 		}
 		defer os.RemoveAll(tempDir)
 		workingDir = tempDir
@@ -124,8 +123,8 @@ func (c BuildConfig) Build(ctx context.Context) (localImage string, err error) {
 		cmd := exec.CommandContext(ctx, "git", "clone", repo, tempDir)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return "", fmt.Errorf("failed to clone repository: %w", err)
+		if err2 := cmd.Run(); err2 != nil {
+			return "", fmt.Errorf("failed to clone repository: %w", err2)
 		}
 	}
 
@@ -160,7 +159,7 @@ func (c BuildConfig) Build(ctx context.Context) (localImage string, err error) {
 	}
 
 	// Build Docker image
-	cmd := exec.CommandContext(ctx, "docker", "build", "-t", c.LocalImage, "-f", c.Dockerfile, c.Dir)
+	cmd := exec.CommandContext(ctx, "docker", "build", "-t", c.LocalImage, "-f", c.Dockerfile, c.Dir) //nolint:gosec //G204: Subprocess launched with a potential tainted input or cmd arguments
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	log.Info("Running command:", "cmd", cmd.String(), "dir", workingDir)
