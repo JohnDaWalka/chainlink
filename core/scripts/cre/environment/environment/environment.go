@@ -2,6 +2,9 @@ package environment
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,6 +18,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
@@ -69,22 +73,22 @@ var (
 )
 
 func init() {
-	EnvironmentCmd.AddCommand(startEnvCmd)
+	EnvironmentCmd.AddCommand(startCmd)
 	EnvironmentCmd.AddCommand(stopCmd)
 	EnvironmentCmd.AddCommand(deployAndVerifyExampleWorkflowCmd)
 	EnvironmentCmd.AddCommand(startBeholderCmd)
 	EnvironmentCmd.AddCommand(createKafkaTopicsCmd)
 	EnvironmentCmd.AddCommand(fetchAndRegisterProtosCmd)
 
-	startEnvCmd.Flags().StringVarP(&topologyFlag, "topology", "t", "simplified", "Topology to use for the environment (simiplified or full)")
-	startEnvCmd.Flags().StringVarP(&waitOnErrorTimeoutFlag, "wait-on-error-timeout", "w", "", "Wait on error timeout (e.g. 10s, 1m, 1h)")
-	startEnvCmd.Flags().IntSliceVarP(&extraAllowedGatewayPortsFlag, "extra-allowed-gateway-ports", "e", []int{}, "Extra allowed ports for outgoing connections from the Gateway DON (e.g. 8080,8081)")
-	startEnvCmd.Flags().BoolVarP(&withExampleFlag, "with-example", "x", false, "Deploy and register example workflow")
-	startEnvCmd.Flags().StringVarP(&exampleWorkflowTimeoutFlag, "example-workflow-timeout", "u", "5m", "Time to wait until example workflow succeeds")
-	startEnvCmd.Flags().StringVarP(&withPluginsDockerImageFlag, "with-plugins-docker-image", "p", "", "Docker image to use (must have all capabilities included)")
-	startEnvCmd.Flags().StringVarP(&exampleWorkflowTriggerFlag, "example-workflow-trigger", "y", "web-trigger", "Trigger for example workflow to deploy (web-trigger or cron)")
-	startEnvCmd.Flags().BoolVarP(&withBeholderFlag, "with-beholder", "b", false, "Deploy Beholder (Chip Ingress + Red Panda)")
-	startEnvCmd.Flags().StringArrayVarP(&protoConfigsFlag, "with-proto-configs", "c", []string{"./proto-configs/default.toml"}, "Protos configs to use (e.g. './proto-configs/config_one.toml,./proto-configs/config_two.toml')")
+	startCmd.Flags().StringVarP(&topologyFlag, "topology", "t", "simplified", "Topology to use for the environment (simiplified or full)")
+	startCmd.Flags().StringVarP(&waitOnErrorTimeoutFlag, "wait-on-error-timeout", "w", "", "Wait on error timeout (e.g. 10s, 1m, 1h)")
+	startCmd.Flags().IntSliceVarP(&extraAllowedGatewayPortsFlag, "extra-allowed-gateway-ports", "e", []int{}, "Extra allowed ports for outgoing connections from the Gateway DON (e.g. 8080,8081)")
+	startCmd.Flags().BoolVarP(&withExampleFlag, "with-example", "x", false, "Deploy and register example workflow")
+	startCmd.Flags().StringVarP(&exampleWorkflowTimeoutFlag, "example-workflow-timeout", "u", "5m", "Time to wait until example workflow succeeds")
+	startCmd.Flags().StringVarP(&withPluginsDockerImageFlag, "with-plugins-docker-image", "p", "", "Docker image to use (must have all capabilities included)")
+	startCmd.Flags().StringVarP(&exampleWorkflowTriggerFlag, "example-workflow-trigger", "y", "web-trigger", "Trigger for example workflow to deploy (web-trigger or cron)")
+	startCmd.Flags().BoolVarP(&withBeholderFlag, "with-beholder", "b", false, "Deploy Beholder (Chip Ingress + Red Panda)")
+	startCmd.Flags().StringArrayVarP(&protoConfigsFlag, "with-proto-configs", "c", []string{"./proto-configs/default.toml"}, "Protos configs to use (e.g. './proto-configs/config_one.toml,./proto-configs/config_two.toml')")
 
 	deployAndVerifyExampleWorkflowCmd.Flags().StringVarP(&rpcURLFlag, "rpc-url", "r", "http://localhost:8545", "RPC URL")
 	deployAndVerifyExampleWorkflowCmd.Flags().Uint64VarP(&chainIDFlag, "chain-id", "c", 1337, "Chain ID")
@@ -161,10 +165,11 @@ var (
 var StartCmdPreRunFunc = func(cmd *cobra.Command, args []string) {
 	provisioningStartTime = time.Now()
 
-	var dxErr error
-	dxTracker, dxErr = tracking.NewDxTracker()
-	if dxErr != nil {
-		fmt.Fprintf(os.Stderr, "failed to create DX tracker: %s\n", dxErr)
+	// ensure non-nil dxTracker by default
+	var trackerErr error
+	dxTracker, trackerErr = tracking.NewDxTracker()
+	if trackerErr != nil {
+		fmt.Fprintf(os.Stderr, "failed to create DX tracker: %s\n", trackerErr)
 		dxTracker = &tracking.NoOpTracker{}
 	}
 
@@ -180,7 +185,7 @@ var StartCmdPreRunFunc = func(cmd *cobra.Command, args []string) {
 
 		removeErr := framework.RemoveTestContainers()
 		if removeErr != nil {
-			fmt.Fprint(os.Stderr, removeErr, manualCleanupMsg)
+			fmt.Fprint(os.Stderr, removeErr, manualCtfCleanupMsg)
 		}
 
 		os.Exit(1)
@@ -218,7 +223,7 @@ var StartCmdRecoverHandlerFunc = func(p interface{}, waitOnErrorTimeoutFlag stri
 
 		removeErr := framework.RemoveTestContainers()
 		if removeErr != nil {
-			fmt.Fprint(os.Stderr, errors.Wrap(removeErr, manualCleanupMsg).Error())
+			fmt.Fprint(os.Stderr, errors.Wrap(removeErr, manualCtfCleanupMsg).Error())
 		}
 	}
 }
@@ -231,7 +236,7 @@ var StartCmdGenerateSettingsFile = func(homeChainOut *creenv.BlockchainOutput, o
 	creCLISettingsFile, settingsErr := crecli.PrepareCRECLISettingsFile(
 		crecli.CRECLIProfile,
 		homeChainOut.SethClient.MustGetRootKeyAddress(),
-		output.CldEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
+		output.CldEnvironment.ExistingAddresses, //nolint:staticcheck // ignore SA1019 as ExistingAddresses is deprecated but still used
 		output.DonTopology.WorkflowDonID,
 		homeChainOut.ChainSelector,
 		rpcs,
@@ -307,12 +312,12 @@ var startCmd = &cobra.Command{
 			return errors.Wrap(err, "failed to validate test configuration")
 		}
 
-		output, startErr := StartCLIEnvironment(cmdContext, topologyFlag, exampleWorkflowTriggerFlag, withPluginsDockerImageFlag, withExampleFlag, extraAllowedGatewayPortsFlag, nil, nil)
+		output, startErr := StartCLIEnvironment(cmdContext, in, topologyFlag, exampleWorkflowTriggerFlag, withPluginsDockerImageFlag, withExampleFlag, extraAllowedGatewayPortsFlag, nil, nil)
 		if startErr != nil {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", startErr)
 			fmt.Fprintf(os.Stderr, "Stack trace: %s\n", string(debug.Stack()))
 
-			dxErr := trackStartup(false, output.InfraInput.InfraType, ptr.Ptr(strings.SplitN(startErr.Error(), "\n", 1)[0]), ptr.Ptr(false))
+			dxErr := trackStartup(false, in.Infra.InfraType, ptr.Ptr(strings.SplitN(startErr.Error(), "\n", 1)[0]), ptr.Ptr(false))
 			if dxErr != nil {
 				fmt.Fprintf(os.Stderr, "failed to track startup: %s\n", dxErr)
 			}
@@ -450,6 +455,7 @@ var deployAndVerifyExampleWorkflowCmd = &cobra.Command{
 
 func StartCLIEnvironment(
 	cmdContext context.Context,
+	in *Config,
 	topologyFlag string,
 	workflowTrigger,
 	withPluginsDockerImageFlag string,
@@ -651,6 +657,15 @@ func StartCLIEnvironment(
 		))
 	}
 
+	if in.JD.CSAEncryptionKey == "" {
+		// generate a new key
+		key, keyErr := ecdsa.GenerateKey(crypto.S256(), rand.Reader)
+		if keyErr != nil {
+			return nil, fmt.Errorf("failed to generate CSA encryption key: %w", keyErr)
+		}
+		in.JD.CSAEncryptionKey = hex.EncodeToString(crypto.FromECDSA(key)[:32])
+		fmt.Printf("Generated new CSA encryption key for JD: %s\n", in.JD.CSAEncryptionKey)
+	}
 	universalSetupInput := creenv.SetupInput{
 		CapabilitiesAwareNodeSets:            capabilitiesAwareNodeSets,
 		CapabilitiesContractFactoryFunctions: capabilityFactoryFns,

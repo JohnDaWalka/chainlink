@@ -54,7 +54,7 @@ var startBeholderCmd = &cobra.Command{
 		if startBeholderErr != nil {
 			// remove the stack if the error is not related to proto registration
 			if !strings.Contains(startBeholderErr.Error(), protoRegistrationErrMsg) {
-				waitOnErrorTimeoutDurationFn()
+				WaitOnErrorTimeoutDurationFn(waitOnErrorTimeoutFlag)
 				beholderRemoveErr := framework.RemoveTestStack(chipingressset.DEFAULT_STACK_NAME)
 				if beholderRemoveErr != nil {
 					fmt.Fprint(os.Stderr, errors.Wrap(beholderRemoveErr, manualBeholderCleanupMsg).Error())
@@ -91,7 +91,7 @@ func startBeholder(cmdContext context.Context, protoConfigsFlag []string) (start
 				startupErr = fmt.Errorf("panic: %v", p)
 			}
 
-			waitOnErrorTimeoutDurationFn()
+			WaitOnErrorTimeoutDurationFn(waitOnErrorTimeoutFlag)
 
 			beholderRemoveErr := framework.RemoveTestStack(chipingressset.DEFAULT_STACK_NAME)
 			if beholderRemoveErr != nil {

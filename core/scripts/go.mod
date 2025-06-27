@@ -39,11 +39,11 @@ require (
 	github.com/shopspring/decimal v1.4.0
 	github.com/smartcontractkit/chain-selectors v1.0.60
 	github.com/smartcontractkit/chainlink-automation v0.8.1
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250624142741-45c8e9237804
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250627133416-1d85eec09097
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250626141212-e50b2e7ffe2d
 	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250624161023-93f383781b0a
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250604171706-a98fa6515eae
-	github.com/smartcontractkit/chainlink-deployments-framework v0.14.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.15.0
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250625151958-31b61ac8e1d9
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.7
 	github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose v0.1.0
@@ -54,11 +54,13 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
+	github.com/tidwall/gjson v1.18.0
 	github.com/umbracle/ethgo v0.1.3
 	github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722
 	github.com/urfave/cli v1.22.16
 	go.uber.org/zap v1.27.0
 	golang.org/x/oauth2 v0.27.0
+	golang.org/x/text v0.25.0
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.31.3
@@ -479,7 +481,6 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/compose v0.37.0 // indirect
 	github.com/theodesp/go-heaps v0.0.0-20190520121037-88e35354fe0a // indirect
 	github.com/theupdateframework/notary v0.7.0 // indirect
-	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
@@ -555,7 +556,6 @@ require (
 	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
-	golang.org/x/text v0.25.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
 	golang.org/x/tools v0.32.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
