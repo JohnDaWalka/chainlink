@@ -119,6 +119,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 								Required: true,
 							},
 						},
+						ResultTupleToStruct: []string{"ocr_config"},
 					},
 					consts.MethodNameGetLatestPriceSequenceNumber: {
 						Name:          "get_latest_price_sequence_number",
@@ -144,6 +145,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 								Required:   true,
 							},
 						},
+						ResultTupleToStruct: []string{"static_config"},
 					},
 					consts.MethodNameOffRampGetDynamicConfig: {
 						Name:          "get_dynamic_config",
@@ -156,6 +158,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 								Required:   true,
 							},
 						},
+						ResultTupleToStruct: []string{"dynamic_config"},
 					},
 					consts.MethodNameGetSourceChainConfig: {
 						Name:          "get_source_chain_config",
@@ -173,6 +176,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 								Required: true,
 							},
 						},
+						ResultTupleToStruct: []string{"source_chain_config"},
 					},
 					// consts.MethodNameGetExecutionState:{
 					// 	"Name": "get_execution_state",
@@ -342,6 +346,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 								Required: true,
 							},
 						},
+						ResultTupleToStruct: []string{"isEnabled", "sequenceNumber", "allowlistEnabled", "allowedSenders"},
 					},
 					"get_expected_next_sequence_number": {
 						Name:          "get_expected_next_sequence_number",
