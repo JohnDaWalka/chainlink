@@ -37,6 +37,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/testutils/heavyweight"
+	"github.com/smartcontractkit/freeport"
+	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/wsrpc/credentials"
 )
 
@@ -69,6 +71,7 @@ func setupNode(
 	ocr2kb = ocr2key.MustNewInsecure(rdr, chaintype.EVM)
 
 	p2paddresses := []string{fmt.Sprintf("127.0.0.1:%d", port)}
+	p2pV2Addresses := []string{fmt.Sprintf("127.0.0.1:%d", freeport.GetOne(t))}
 
 	config, _ := heavyweight.FullTestDBV2(t, func(c *chainlink.Config, _ *chainlink.Secrets) {
 		// set finality depth to 1 so we don't have to wait for multiple blocks
@@ -100,6 +103,16 @@ func setupNode(
 		c.P2P.V2.ListenAddresses = &p2paddresses
 		c.P2P.V2.DeltaDial = commonconfig.MustNewDuration(500 * time.Millisecond)
 		c.P2P.V2.DeltaReconcile = commonconfig.MustNewDuration(5 * time.Second)
+
+		// [Capabilities.Peering.V2]
+		c.Capabilities.Peering.V2.Enabled = ptr(true)
+		c.Capabilities.Peering.V2.ListenAddresses = ptr(p2pV2Addresses)
+		c.Capabilities.Peering.V2.DefaultBootstrappers = ptr([]commontypes.BootstrapperLocator{
+			{
+				PeerID: "12D3KooWPjwLJ9TRcDnUCdCdCrfmBN7obzt5jdKQbCHPaC87KdZP",
+				Addrs:  []string{"0.0.0.0:10501"},
+			},
+		})
 
 		// [Log]
 		c.Log.Level = ptr(toml.LogLevel(zapcore.DebugLevel)) // generally speaking we want debug level for logs unless overridden

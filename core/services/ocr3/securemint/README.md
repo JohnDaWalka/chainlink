@@ -75,7 +75,15 @@ Create a launch.json file in the .vscode directory with the following content:
 Then run the test by Cmd+P: "Start Debugging".
 
 
-## Run with local CRE
+
+## Run with local CRE dev en
+
+- `DISABLE_DX_TRACKING=true TESTCONTAINERS_RYUK_DISABLED=true go run main.go env start --with-plugins-docker-image 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink:b252282df4b23b05658a0aa35216567d6f25c424-plugins -t simplified -w 2m`
+- login to CRE CL node if needed: `notreal@fakeemail.ch:fj293fbBnlQ!f9vNs`
+
+
+
+## Run with local CRE with custom docker image
 
 Follow the instructions in [docs.md](https://github.com/smartcontractkit/chainlink/blob/develop/core/scripts/cre/environment/docs.md). 
 
@@ -83,3 +91,6 @@ Handy commands:
 
 - build docker image: `docker build -f plugins/chainlink.Dockerfile -t chainlink-tmp-sm-plugin-with-plugins:a30031b24b60 .`
 - Run local CRE: `DISABLE_DX_TRACKING=true TESTCONTAINERS_RYUK_DISABLED=true go run main.go env start --with-plugins-docker-image chainlink-tmp-sm-plugin-with-plugins:a30031b24b60 --with-example -w 2m`
+
+- Make sure there's a postgres instance for the integration tests, see Prerequisites above.
+- Run integration test: `time CL_DATABASE_URL=postgresql://chainlink_dev:insecurepassword@localhost:5432/chainlink_development_test?sslmode=disable go test -timeout 2m -run ^TestIntegration_SecureMint_happy_path$ github.com/smartcontractkit/chainlink/v2/core/services/ocr3/securemint/integrationtest -v 2>&1 | tee all.log | awk '/DEBUG|INFO|WARN|ERROR/ { print > "node_logs.log"; next }; { print > "other.log" }'; tail all.log`

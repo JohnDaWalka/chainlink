@@ -363,6 +363,7 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 		}
 	}
 
+	globalLogger.Infof("Starting CRE services")
 	creServices, err := newCREServices(ctx, globalLogger, opts.DS, keyStore, cfg.Capabilities(), cfg.Workflows(), relayChainInterops, opts.CREOpts, billingClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initilize CRE: %w", err)
