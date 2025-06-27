@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/google/go-github/v72/github"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	chipingressset "github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose/chip_ingress_set"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	chipingressset "github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose/chip_ingress_set"
 )
 
 var (
@@ -50,10 +52,13 @@ var startBeholderCmd = &cobra.Command{
 
 		startBeholderErr := startBeholder(cmd.Context(), protoConfigsFlag)
 		if startBeholderErr != nil {
-			waitOnErrorTimeoutDurationFn()
-			beholderRemoveErr := framework.RemoveTestStack(chipingressset.DEFAULT_STACK_NAME)
-			if beholderRemoveErr != nil {
-				fmt.Fprint(os.Stderr, errors.Wrap(beholderRemoveErr, manualBeholderCleanupMsg).Error())
+			// remove the stack if the error is not related to proto registration
+			if !strings.Contains(startBeholderErr.Error(), protoRegistrationErrMsg) {
+				waitOnErrorTimeoutDurationFn()
+				beholderRemoveErr := framework.RemoveTestStack(chipingressset.DEFAULT_STACK_NAME)
+				if beholderRemoveErr != nil {
+					fmt.Fprint(os.Stderr, errors.Wrap(beholderRemoveErr, manualBeholderCleanupMsg).Error())
+				}
 			}
 			return errors.Wrap(startBeholderErr, "failed to start Beholder")
 		}
@@ -61,6 +66,8 @@ var startBeholderCmd = &cobra.Command{
 		return nil
 	},
 }
+
+var protoRegistrationErrMsg = "proto registration failed"
 
 func startBeholder(cmdContext context.Context, protoConfigsFlag []string) (startupErr error) {
 	// just in case, remove the stack if it exists
@@ -130,7 +137,7 @@ func parseConfigsAndRegisterProtos(ctx context.Context, protoConfigsFlag []strin
 	for _, protoConfig := range protoConfigsFlag {
 		file, fileErr := os.ReadFile(protoConfig)
 		if fileErr != nil {
-			return errors.Wrapf(fileErr, "failed to read proto config file: %s", protoConfig)
+			return errors.Wrap(fileErr, protoRegistrationErrMsg+"failed to read proto config file: "+protoConfig)
 		}
 
 		type wrappedProtoSchemaSets struct {
@@ -139,7 +146,7 @@ func parseConfigsAndRegisterProtos(ctx context.Context, protoConfigsFlag []strin
 
 		var schemaSets wrappedProtoSchemaSets
 		if err := toml.Unmarshal(file, &schemaSets); err != nil {
-			return errors.Wrapf(err, "failed to unmarshal proto config file: %s", protoConfig)
+			return errors.Wrap(err, protoRegistrationErrMsg+"failed to unmarshal proto config file: "+protoConfig)
 		}
 
 		protoSchemaSets = append(protoSchemaSets, schemaSets.ProtoSchemaSets...)
@@ -168,7 +175,7 @@ func parseConfigsAndRegisterProtos(ctx context.Context, protoConfigsFlag []strin
 
 	reposErr := chipingressset.DefaultRegisterAndFetchProtos(ctx, client, protoSchemaSets, schemaRegistryExternalURL)
 	if reposErr != nil {
-		return errors.Wrap(reposErr, "failed to fetch and register protos")
+		return errors.Wrap(reposErr, protoRegistrationErrMsg+"failed to fetch and register protos")
 	}
 	return nil
 }
@@ -179,11 +186,11 @@ var createKafkaTopicsCmd = &cobra.Command{
 	Long:  `Create Kafka topics (with or without removing existing topics)`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if redPandaKafkaURLFlag == "" {
-			return fmt.Errorf("red-panda-kafka-url cannot be empty")
+			return errors.New("red-panda-kafka-url cannot be empty")
 		}
 
 		if len(kafkaCreateTopicsFlag) == 0 {
-			return fmt.Errorf("kafka topics list cannot be empty")
+			return errors.New("kafka topics list cannot be empty")
 		}
 
 		if kafkaRemoveTopicsFlag {
@@ -208,7 +215,7 @@ var fetchAndRegisterProtosCmd = &cobra.Command{
 	Long:  `Fetch and register protos`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if redPandaSchemaRegistryURLFlag == "" {
-			return fmt.Errorf("red-panda-schema-registry-url cannot be empty")
+			return errors.New("red-panda-schema-registry-url cannot be empty")
 		}
 
 		if len(protoConfigsFlag) == 0 {

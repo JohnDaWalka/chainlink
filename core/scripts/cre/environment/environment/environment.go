@@ -96,12 +96,12 @@ func init() {
 	startBeholderCmd.Flags().StringArrayVarP(&protoConfigsFlag, "with-proto-configs", "c", []string{"./proto-configs/default.toml"}, "Protos configs to use (e.g. './proto-configs/config_one.toml,./proto-configs/config_two.toml')")
 	startBeholderCmd.Flags().StringVarP(&waitOnErrorTimeoutFlag, "wait-on-error-timeout", "w", "", "Wait on error timeout (e.g. 10s, 1m, 1h)")
 
-	createKafkaTopicsCmd.Flags().StringVarP(&redPandaKafkaURLFlag, "red-panda-kafka-url", "k", fmt.Sprintf("localhost:%s", chipingressset.DEFAULT_RED_PANDA_KAFKA_PORT), "Red Panda Kafka URL")
+	createKafkaTopicsCmd.Flags().StringVarP(&redPandaKafkaURLFlag, "red-panda-kafka-url", "k", "localhost:"+chipingressset.DEFAULT_RED_PANDA_KAFKA_PORT, "Red Panda Kafka URL")
 	createKafkaTopicsCmd.Flags().StringArrayVarP(&kafkaCreateTopicsFlag, "topics", "t", []string{}, "Kafka topics to create (e.g. 'topic1,topic2')")
 	createKafkaTopicsCmd.Flags().BoolVarP(&kafkaRemoveTopicsFlag, "purge-topics", "p", false, "Remove existing Kafka topics")
-	createKafkaTopicsCmd.MarkFlagRequired("topics")
+	_ = createKafkaTopicsCmd.MarkFlagRequired("topics")
 
-	fetchAndRegisterProtosCmd.Flags().StringVarP(&redPandaSchemaRegistryURLFlag, "red-panda-schema-registry-url", "s", fmt.Sprintf("http://localhost:%s", chipingressset.DEFAULT_RED_PANDA_SCHEMA_REGISTRY_PORT), "Red Panda Schema Registry URL")
+	fetchAndRegisterProtosCmd.Flags().StringVarP(&redPandaSchemaRegistryURLFlag, "red-panda-schema-registry-url", "s", "http://localhost:"+chipingressset.DEFAULT_RED_PANDA_SCHEMA_REGISTRY_PORT, "Red Panda Schema Registry URL")
 	fetchAndRegisterProtosCmd.Flags().StringArrayVarP(&protoConfigsFlag, "with-proto-configs", "c", []string{"./proto-configs/default.toml"}, "Protos configs to use (e.g. './proto-configs/config_one.toml,./proto-configs/config_two.toml')")
 }
 
@@ -334,9 +334,11 @@ var startEnvCmd = &cobra.Command{
 		if withBeholderFlag {
 			startBeholderErr := startBeholder(cmdContext, protoConfigsFlag)
 			if startBeholderErr != nil {
-				beholderRemoveErr := framework.RemoveTestStack(chipingressset.DEFAULT_STACK_NAME)
-				if beholderRemoveErr != nil {
-					fmt.Fprint(os.Stderr, errors.Wrap(beholderRemoveErr, manualBeholderCleanupMsg).Error())
+				if !strings.Contains(startBeholderErr.Error(), protoRegistrationErrMsg) {
+					beholderRemoveErr := framework.RemoveTestStack(chipingressset.DEFAULT_STACK_NAME)
+					if beholderRemoveErr != nil {
+						fmt.Fprint(os.Stderr, errors.Wrap(beholderRemoveErr, manualBeholderCleanupMsg).Error())
+					}
 				}
 				return errors.Wrap(startBeholderErr, "failed to start Beholder")
 			}
@@ -402,7 +404,7 @@ var stopCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		removeErr := removeAllContainers()
 		if removeErr != nil {
-			return errors.Wrap(removeErr, "failed to remove environment containers. Please remove them manually.")
+			return errors.Wrap(removeErr, "failed to remove environment containers. Please remove them manually")
 		}
 
 		fmt.Println("Environment stopped successfully")
