@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
+	types "github.com/smartcontractkit/chainlink-common/pkg/types/solana"
 )
 
 func TestChainWriterConfigRaw(t *testing.T) {
@@ -38,7 +38,7 @@ func TestChainWriterConfigRaw(t *testing.T) {
 
 				raw, err := json.Marshal(config)
 				require.NoError(t, err)
-				var result chainwriter.ChainWriterConfig
+				var result types.ContractWriterConfig
 				err = json.Unmarshal(raw, &result)
 				require.NoError(t, err)
 				require.Equal(t, config, result)

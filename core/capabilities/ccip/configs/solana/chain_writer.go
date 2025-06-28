@@ -9,14 +9,12 @@ import (
 	"github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
+	soltypes "github.com/smartcontractkit/chainlink-common/pkg/types/solana"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 
 	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
-	solanacodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 var ccipOfframpIDL = idl.FetchCCIPOfframpIDL()
@@ -35,14 +33,14 @@ const (
 	merkleRoot                    = "Info.MerkleRoots.MerkleRoot"
 )
 
-type ExecuteMethodConfigFunc func(string, string) chainwriter.MethodConfig
+type ExecuteMethodConfigFunc func(string, string) soltypes.MethodConfig
 
-func getCommitMethodConfig(fromAddress string, offrampProgramAddress string, priceOnly bool) chainwriter.MethodConfig {
+func getCommitMethodConfig(fromAddress string, offrampProgramAddress string, priceOnly bool) soltypes.MethodConfig {
 	chainSpecificName := "commit"
 	if priceOnly {
 		chainSpecificName = "commitPriceOnly"
 	}
-	return chainwriter.MethodConfig{
+	return soltypes.MethodConfig{
 		FromAddress: fromAddress,
 		InputModifications: []codec.ModifierConfig{
 			&codec.RenameModifierConfig{
@@ -54,8 +52,8 @@ func getCommitMethodConfig(fromAddress string, offrampProgramAddress string, pri
 		},
 		ChainSpecificName: chainSpecificName,
 		ArgsTransform:     "CCIPCommit",
-		LookupTables: chainwriter.LookupTables{
-			DerivedLookupTables: []chainwriter.DerivedLookupTable{
+		LookupTables: soltypes.LookupTables{
+			DerivedLookupTables: []soltypes.DerivedLookupTable{
 				getCommonAddressLookupTableConfig(offrampProgramAddress),
 			},
 		},
@@ -64,34 +62,34 @@ func getCommitMethodConfig(fromAddress string, offrampProgramAddress string, pri
 	}
 }
 
-func buildCommitAccountsList(fromAddress, offrampProgramAddress string, priceOnly bool) []chainwriter.Lookup {
-	accounts := []chainwriter.Lookup{}
+func buildCommitAccountsList(fromAddress, offrampProgramAddress string, priceOnly bool) []soltypes.Lookup {
+	accounts := []soltypes.Lookup{}
 	accounts = append(accounts,
 		getOfframpAccountConfig(offrampProgramAddress),
 		getReferenceAddressesConfig(offrampProgramAddress),
 	)
 	if !priceOnly {
 		accounts = append(accounts,
-			chainwriter.Lookup{
-				PDALookups: &chainwriter.PDALookups{
+			soltypes.Lookup{
+				PDALookups: &soltypes.PDALookups{
 					Name:      "SourceChainState",
 					PublicKey: getAddressConstant(offrampProgramAddress),
-					Seeds: []chainwriter.Seed{
+					Seeds: []soltypes.Seed{
 						{Static: []byte("source_chain_state")},
-						{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: merkleRootSourceChainSelector}}},
+						{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: merkleRootSourceChainSelector}}},
 					},
 					IsSigner:   false,
 					IsWritable: true,
 				},
 			},
-			chainwriter.Lookup{
-				PDALookups: &chainwriter.PDALookups{
+			soltypes.Lookup{
+				PDALookups: &soltypes.PDALookups{
 					Name:      "CommitReport",
 					PublicKey: getAddressConstant(offrampProgramAddress),
-					Seeds: []chainwriter.Seed{
+					Seeds: []soltypes.Seed{
 						{Static: []byte("commit_report")},
-						{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: merkleRootSourceChainSelector}}},
-						{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: merkleRoot}}},
+						{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: merkleRootSourceChainSelector}}},
+						{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: merkleRoot}}},
 					},
 					IsSigner:   false,
 					IsWritable: true,
@@ -117,8 +115,8 @@ func buildCommitAccountsList(fromAddress, offrampProgramAddress string, priceOnl
 	return accounts
 }
 
-func getExecuteMethodConfigV1(fromAddress string, offrampProgramAddress string) chainwriter.MethodConfig {
-	return chainwriter.MethodConfig{
+func getExecuteMethodConfigV1(fromAddress string, offrampProgramAddress string) soltypes.MethodConfig {
+	return soltypes.MethodConfig{
 		FromAddress: fromAddress,
 		InputModifications: []codec.ModifierConfig{
 			&codec.RenameModifierConfig{
@@ -132,21 +130,21 @@ func getExecuteMethodConfigV1(fromAddress string, offrampProgramAddress string) 
 		ArgsTransform:            "CCIPExecute",
 		ComputeUnitLimitOverhead: 150_000,
 		BufferPayloadMethod:      "CCIPExecutionReportBuffer",
-		LookupTables: chainwriter.LookupTables{
-			DerivedLookupTables: []chainwriter.DerivedLookupTable{
+		LookupTables: soltypes.LookupTables{
+			DerivedLookupTables: []soltypes.DerivedLookupTable{
 				{
 					Name: "PoolLookupTable",
-					Accounts: chainwriter.Lookup{
-						PDALookups: &chainwriter.PDALookups{
+					Accounts: soltypes.Lookup{
+						PDALookups: &soltypes.PDALookups{
 							Name:      "TokenAdminRegistry",
 							PublicKey: getRouterProgramAccount(offrampProgramAddress),
-							Seeds: []chainwriter.Seed{
+							Seeds: []soltypes.Seed{
 								{Static: []byte("token_admin_registry")},
-								{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: destTokenAddress}}},
+								{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: destTokenAddress}}},
 							},
 							IsSigner:   false,
 							IsWritable: false,
-							InternalField: chainwriter.InternalField{
+							InternalField: soltypes.InternalField{
 								TypeName: "TokenAdminRegistry",
 								Location: "LookupTable",
 								// TokenAdminRegistry is in the common program so need to provide the IDL
@@ -159,44 +157,44 @@ func getExecuteMethodConfigV1(fromAddress string, offrampProgramAddress string) 
 				getCommonAddressLookupTableConfig(offrampProgramAddress),
 			},
 		},
-		ATAs: []chainwriter.ATALookup{
+		ATAs: []soltypes.ATALookup{
 			{
 				Location:      destTokenAddress,
-				WalletAddress: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: tokenReceiverAddress}},
-				TokenProgram: chainwriter.Lookup{
-					AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+				WalletAddress: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: tokenReceiverAddress}},
+				TokenProgram: soltypes.Lookup{
+					AccountsFromLookupTable: &soltypes.AccountsFromLookupTable{
 						LookupTableName: "PoolLookupTable",
 						IncludeIndexes:  []int{6},
 					},
 				},
-				MintAddress: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: destTokenAddress}},
+				MintAddress: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: destTokenAddress}},
 				Optional:    true, // ATA lookup is optional if DestTokenAddress is not present in report
 			},
 		},
-		Accounts: []chainwriter.Lookup{
+		Accounts: []soltypes.Lookup{
 			getOfframpAccountConfig(offrampProgramAddress),
 			getReferenceAddressesConfig(offrampProgramAddress),
 			{
-				PDALookups: &chainwriter.PDALookups{
+				PDALookups: &soltypes.PDALookups{
 					Name:      "SourceChainState",
 					PublicKey: getAddressConstant(offrampProgramAddress),
-					Seeds: []chainwriter.Seed{
+					Seeds: []soltypes.Seed{
 						{Static: []byte("source_chain_state")},
-						{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: sourceChainSelectorPath}}},
+						{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: sourceChainSelectorPath}}},
 					},
 					IsSigner:   false,
 					IsWritable: false,
 				},
 			},
 			{
-				PDALookups: &chainwriter.PDALookups{
+				PDALookups: &soltypes.PDALookups{
 					Name:      "CommitReport",
 					PublicKey: getAddressConstant(offrampProgramAddress),
-					Seeds: []chainwriter.Seed{
+					Seeds: []soltypes.Seed{
 						{Static: []byte("commit_report")},
-						{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: sourceChainSelectorPath}}},
-						{Dynamic: chainwriter.Lookup{
-							AccountLookup: &chainwriter.AccountLookup{
+						{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: sourceChainSelectorPath}}},
+						{Dynamic: soltypes.Lookup{
+							AccountLookup: &soltypes.AccountLookup{
 								// The seed is the merkle root of the report, as passed into the input params.
 								Location: merkleRoot,
 							}},
@@ -208,12 +206,12 @@ func getExecuteMethodConfigV1(fromAddress string, offrampProgramAddress string) 
 			},
 			getAddressConstant(offrampProgramAddress),
 			{
-				PDALookups: &chainwriter.PDALookups{
+				PDALookups: &soltypes.PDALookups{
 					Name:      "AllowedOfframp",
 					PublicKey: getRouterProgramAccount(offrampProgramAddress),
-					Seeds: []chainwriter.Seed{
+					Seeds: []soltypes.Seed{
 						{Static: []byte("allowed_offramp")},
-						{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: sourceChainSelectorPath}}},
+						{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: sourceChainSelectorPath}}},
 						{Dynamic: getAddressConstant(offrampProgramAddress)},
 					},
 					IsSigner:   false,
@@ -234,8 +232,8 @@ func getExecuteMethodConfigV1(fromAddress string, offrampProgramAddress string) 
 	}
 }
 
-func getExecuteMethodConfigV2(fromAddress string, _ string) chainwriter.MethodConfig {
-	return chainwriter.MethodConfig{
+func getExecuteMethodConfigV2(fromAddress string, _ string) soltypes.MethodConfig {
+	return soltypes.MethodConfig{
 		FromAddress: fromAddress,
 		InputModifications: []codec.ModifierConfig{
 			&codec.RenameModifierConfig{
@@ -249,11 +247,11 @@ func getExecuteMethodConfigV2(fromAddress string, _ string) chainwriter.MethodCo
 		ArgsTransform:            "CCIPExecuteV2",
 		ComputeUnitLimitOverhead: 150_000,
 		BufferPayloadMethod:      "CCIPExecutionReportBuffer",
-		ATAs: []chainwriter.ATALookup{
+		ATAs: []soltypes.ATALookup{
 			{
 				Location:      destTokenAddress,
-				WalletAddress: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: tokenReceiverAddress}},
-				MintAddress:   chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: destTokenAddress}},
+				WalletAddress: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: tokenReceiverAddress}},
+				MintAddress:   soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: destTokenAddress}},
 				Optional:      true, // ATA lookup is optional if DestTokenAddress is not present in report
 			},
 		},
@@ -264,35 +262,35 @@ func getExecuteMethodConfigV2(fromAddress string, _ string) chainwriter.MethodCo
 	}
 }
 
-func GetSolanaChainWriterConfig(offrampProgramAddress string, fromAddress string, configVersion *string) (chainwriter.ChainWriterConfig, error) {
+func GetSolanaChainWriterConfig(offrampProgramAddress string, fromAddress string, configVersion *string) (soltypes.ContractWriterConfig, error) {
 	// check fromAddress
 	pk, err := solana.PublicKeyFromBase58(fromAddress)
 	if err != nil {
-		return chainwriter.ChainWriterConfig{}, fmt.Errorf("invalid from address %s: %w", fromAddress, err)
+		return soltypes.ContractWriterConfig{}, fmt.Errorf("invalid from address %s: %w", fromAddress, err)
 	}
 
 	if pk.IsZero() {
-		return chainwriter.ChainWriterConfig{}, errors.New("from address cannot be empty")
+		return soltypes.ContractWriterConfig{}, errors.New("from address cannot be empty")
 	}
 
 	// validate CCIP Offramp IDL, errors not expected
-	var offrampIDL solanacodec.IDL
+	var offrampIDL soltypes.IDL
 	if err = json.Unmarshal([]byte(ccipOfframpIDL), &offrampIDL); err != nil {
-		return chainwriter.ChainWriterConfig{}, fmt.Errorf("unexpected error: invalid CCIP Offramp IDL, error: %w", err)
+		return soltypes.ContractWriterConfig{}, fmt.Errorf("unexpected error: invalid CCIP Offramp IDL, error: %w", err)
 	}
 	// validate CCIP Router IDL, errors not expected
-	var routerIDL solanacodec.IDL
+	var routerIDL soltypes.IDL
 	if err = json.Unmarshal([]byte(ccipRouterIDL), &routerIDL); err != nil {
-		return chainwriter.ChainWriterConfig{}, fmt.Errorf("unexpected error: invalid CCIP Router IDL, error: %w", err)
+		return soltypes.ContractWriterConfig{}, fmt.Errorf("unexpected error: invalid CCIP Router IDL, error: %w", err)
 	}
 	executeMethodConfigFunc, err := getExecuteMethodConfigByVersion(configVersion)
 	if err != nil {
-		return chainwriter.ChainWriterConfig{}, fmt.Errorf("failed to get execute method config func for version: %w", err)
+		return soltypes.ContractWriterConfig{}, fmt.Errorf("failed to get execute method config func for version: %w", err)
 	}
-	solConfig := chainwriter.ChainWriterConfig{
-		Programs: map[string]chainwriter.ProgramConfig{
+	solConfig := soltypes.ContractWriterConfig{
+		Programs: map[string]soltypes.ProgramConfig{
 			ccipconsts.ContractNameOffRamp: {
-				Methods: map[string]chainwriter.MethodConfig{
+				Methods: map[string]soltypes.MethodConfig{
 					ccipconsts.MethodExecute:         executeMethodConfigFunc(fromAddress, offrampProgramAddress),
 					ccipconsts.MethodCommit:          getCommitMethodConfig(fromAddress, offrampProgramAddress, false),
 					ccipconsts.MethodCommitPriceOnly: getCommitMethodConfig(fromAddress, offrampProgramAddress, true),
@@ -320,16 +318,16 @@ func getExecuteMethodConfigByVersion(version *string) (ExecuteMethodConfigFunc, 
 	}
 }
 
-func getOfframpAccountConfig(offrampProgramAddress string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		PDALookups: &chainwriter.PDALookups{
+func getOfframpAccountConfig(offrampProgramAddress string) soltypes.Lookup {
+	return soltypes.Lookup{
+		PDALookups: &soltypes.PDALookups{
 			Name: "OfframpAccountConfig",
-			PublicKey: chainwriter.Lookup{
-				AccountConstant: &chainwriter.AccountConstant{
+			PublicKey: soltypes.Lookup{
+				AccountConstant: &soltypes.AccountConstant{
 					Address: offrampProgramAddress,
 				},
 			},
-			Seeds: []chainwriter.Seed{
+			Seeds: []soltypes.Seed{
 				{Static: []byte("config")},
 			},
 			IsSigner:   false,
@@ -338,9 +336,9 @@ func getOfframpAccountConfig(offrampProgramAddress string) chainwriter.Lookup {
 	}
 }
 
-func getAddressConstant(address string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		AccountConstant: &chainwriter.AccountConstant{
+func getAddressConstant(address string) soltypes.Lookup {
+	return soltypes.Lookup{
+		AccountConstant: &soltypes.AccountConstant{
 			Address:    address,
 			IsSigner:   false,
 			IsWritable: false,
@@ -348,18 +346,18 @@ func getAddressConstant(address string) chainwriter.Lookup {
 	}
 }
 
-func getFeeQuoterProgramAccount(offrampProgramAddress string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		PDALookups: &chainwriter.PDALookups{
+func getFeeQuoterProgramAccount(offrampProgramAddress string) soltypes.Lookup {
+	return soltypes.Lookup{
+		PDALookups: &soltypes.PDALookups{
 			Name:      ccipconsts.ContractNameFeeQuoter,
 			PublicKey: getAddressConstant(offrampProgramAddress),
-			Seeds: []chainwriter.Seed{
+			Seeds: []soltypes.Seed{
 				{Static: []byte("reference_addresses")},
 			},
 			IsSigner:   false,
 			IsWritable: false,
 			// Reads the address from the reference addresses account
-			InternalField: chainwriter.InternalField{
+			InternalField: soltypes.InternalField{
 				TypeName: "ReferenceAddresses",
 				Location: "FeeQuoter",
 				IDL:      ccipOfframpIDL,
@@ -368,18 +366,18 @@ func getFeeQuoterProgramAccount(offrampProgramAddress string) chainwriter.Lookup
 	}
 }
 
-func getRouterProgramAccount(offrampProgramAddress string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		PDALookups: &chainwriter.PDALookups{
+func getRouterProgramAccount(offrampProgramAddress string) soltypes.Lookup {
+	return soltypes.Lookup{
+		PDALookups: &soltypes.PDALookups{
 			Name:      ccipconsts.ContractNameRouter,
 			PublicKey: getAddressConstant(offrampProgramAddress),
-			Seeds: []chainwriter.Seed{
+			Seeds: []soltypes.Seed{
 				{Static: []byte("reference_addresses")},
 			},
 			IsSigner:   false,
 			IsWritable: false,
 			// Reads the address from the reference addresses account
-			InternalField: chainwriter.InternalField{
+			InternalField: soltypes.InternalField{
 				TypeName: "ReferenceAddresses",
 				Location: "Router",
 				IDL:      ccipOfframpIDL,
@@ -388,12 +386,12 @@ func getRouterProgramAccount(offrampProgramAddress string) chainwriter.Lookup {
 	}
 }
 
-func getReferenceAddressesConfig(offrampProgramAddress string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		PDALookups: &chainwriter.PDALookups{
+func getReferenceAddressesConfig(offrampProgramAddress string) soltypes.Lookup {
+	return soltypes.Lookup{
+		PDALookups: &soltypes.PDALookups{
 			Name:      "ReferenceAddresses",
 			PublicKey: getAddressConstant(offrampProgramAddress),
-			Seeds: []chainwriter.Seed{
+			Seeds: []soltypes.Seed{
 				{Static: []byte("reference_addresses")},
 			},
 			IsSigner:   false,
@@ -402,12 +400,12 @@ func getReferenceAddressesConfig(offrampProgramAddress string) chainwriter.Looku
 	}
 }
 
-func getFeeBillingSignerConfig(offrampProgramAddress string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		PDALookups: &chainwriter.PDALookups{
+func getFeeBillingSignerConfig(offrampProgramAddress string) soltypes.Lookup {
+	return soltypes.Lookup{
+		PDALookups: &soltypes.PDALookups{
 			Name:      "FeeBillingSigner",
 			PublicKey: getAddressConstant(offrampProgramAddress),
-			Seeds: []chainwriter.Seed{
+			Seeds: []soltypes.Seed{
 				{Static: []byte("fee_billing_signer")},
 			},
 			IsSigner:   false,
@@ -416,13 +414,13 @@ func getFeeBillingSignerConfig(offrampProgramAddress string) chainwriter.Lookup 
 	}
 }
 
-func getFeeQuoterAllowedPriceUpdater(offrampProgramAddress string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		PDALookups: &chainwriter.PDALookups{
+func getFeeQuoterAllowedPriceUpdater(offrampProgramAddress string) soltypes.Lookup {
+	return soltypes.Lookup{
+		PDALookups: &soltypes.PDALookups{
 			Name: "FeeQuoterAllowedPriceUpdater",
 			// Fetch fee quoter public key to use as program ID for PDA
 			PublicKey: getFeeQuoterProgramAccount(offrampProgramAddress),
-			Seeds: []chainwriter.Seed{
+			Seeds: []soltypes.Seed{
 				{Static: []byte("allowed_price_updater")},
 				{Dynamic: getFeeBillingSignerConfig(offrampProgramAddress)},
 			},
@@ -432,13 +430,13 @@ func getFeeQuoterAllowedPriceUpdater(offrampProgramAddress string) chainwriter.L
 	}
 }
 
-func getFeeQuoterConfigLookup(offrampProgramAddress string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		PDALookups: &chainwriter.PDALookups{
+func getFeeQuoterConfigLookup(offrampProgramAddress string) soltypes.Lookup {
+	return soltypes.Lookup{
+		PDALookups: &soltypes.PDALookups{
 			Name: "FeeQuoterConfig",
 			// Fetch fee quoter public key to use as program ID for PDA
 			PublicKey: getFeeQuoterProgramAccount(offrampProgramAddress),
-			Seeds: []chainwriter.Seed{
+			Seeds: []soltypes.Seed{
 				{Static: []byte("config")},
 			},
 			IsSigner:   false,
@@ -447,18 +445,18 @@ func getFeeQuoterConfigLookup(offrampProgramAddress string) chainwriter.Lookup {
 	}
 }
 
-func getRMNRemoteProgramAccount(offrampProgramAddress string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		PDALookups: &chainwriter.PDALookups{
+func getRMNRemoteProgramAccount(offrampProgramAddress string) soltypes.Lookup {
+	return soltypes.Lookup{
+		PDALookups: &soltypes.PDALookups{
 			Name:      ccipconsts.ContractNameRMNRemote,
 			PublicKey: getAddressConstant(offrampProgramAddress),
-			Seeds: []chainwriter.Seed{
+			Seeds: []soltypes.Seed{
 				{Static: []byte("reference_addresses")},
 			},
 			IsSigner:   false,
 			IsWritable: false,
 			// Reads the address from the reference addresses account
-			InternalField: chainwriter.InternalField{
+			InternalField: soltypes.InternalField{
 				TypeName: "ReferenceAddresses",
 				Location: "RmnRemote",
 				IDL:      ccipOfframpIDL,
@@ -467,12 +465,12 @@ func getRMNRemoteProgramAccount(offrampProgramAddress string) chainwriter.Lookup
 	}
 }
 
-func getRMNRemoteCursesLookup(offrampProgramAddress string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		PDALookups: &chainwriter.PDALookups{
+func getRMNRemoteCursesLookup(offrampProgramAddress string) soltypes.Lookup {
+	return soltypes.Lookup{
+		PDALookups: &soltypes.PDALookups{
 			Name:      "RMNRemoteCurses",
 			PublicKey: getRMNRemoteProgramAccount(offrampProgramAddress),
-			Seeds: []chainwriter.Seed{
+			Seeds: []soltypes.Seed{
 				{Static: []byte("curses")},
 			},
 			IsSigner:   false,
@@ -481,12 +479,12 @@ func getRMNRemoteCursesLookup(offrampProgramAddress string) chainwriter.Lookup {
 	}
 }
 
-func getRMNRemoteConfigLookup(offrampProgramAddress string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		PDALookups: &chainwriter.PDALookups{
+func getRMNRemoteConfigLookup(offrampProgramAddress string) soltypes.Lookup {
+	return soltypes.Lookup{
+		PDALookups: &soltypes.PDALookups{
 			Name:      "RMNRemoteConfig",
 			PublicKey: getRMNRemoteProgramAccount(offrampProgramAddress),
-			Seeds: []chainwriter.Seed{
+			Seeds: []soltypes.Seed{
 				{Static: []byte("config")},
 			},
 			IsSigner:   false,
@@ -495,12 +493,12 @@ func getRMNRemoteConfigLookup(offrampProgramAddress string) chainwriter.Lookup {
 	}
 }
 
-func getGlobalStateConfig(offrampProgramAddress string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		PDALookups: &chainwriter.PDALookups{
+func getGlobalStateConfig(offrampProgramAddress string) soltypes.Lookup {
+	return soltypes.Lookup{
+		PDALookups: &soltypes.PDALookups{
 			Name:      "GlobalState",
 			PublicKey: getAddressConstant(offrampProgramAddress),
-			Seeds: []chainwriter.Seed{
+			Seeds: []soltypes.Seed{
 				{Static: []byte("state")},
 			},
 			IsSigner:   false,
@@ -510,14 +508,14 @@ func getGlobalStateConfig(offrampProgramAddress string) chainwriter.Lookup {
 	}
 }
 
-func getBillingTokenConfig(offrampProgramAddress string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		PDALookups: &chainwriter.PDALookups{
+func getBillingTokenConfig(offrampProgramAddress string) soltypes.Lookup {
+	return soltypes.Lookup{
+		PDALookups: &soltypes.PDALookups{
 			Name:      "BillingTokenConfig",
 			PublicKey: getFeeQuoterProgramAccount(offrampProgramAddress),
-			Seeds: []chainwriter.Seed{
+			Seeds: []soltypes.Seed{
 				{Static: []byte("fee_billing_token_config")},
-				{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: "Info.TokenPriceUpdates.TokenID"}}},
+				{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: "Info.TokenPriceUpdates.TokenID"}}},
 			},
 			IsSigner:   false,
 			IsWritable: true,
@@ -526,14 +524,14 @@ func getBillingTokenConfig(offrampProgramAddress string) chainwriter.Lookup {
 	}
 }
 
-func getChainConfigGasPriceConfig(offrampProgramAddress string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		PDALookups: &chainwriter.PDALookups{
+func getChainConfigGasPriceConfig(offrampProgramAddress string) soltypes.Lookup {
+	return soltypes.Lookup{
+		PDALookups: &soltypes.PDALookups{
 			Name:      "ChainConfigGasPrice",
 			PublicKey: getFeeQuoterProgramAccount(offrampProgramAddress),
-			Seeds: []chainwriter.Seed{
+			Seeds: []soltypes.Seed{
 				{Static: []byte("dest_chain")},
-				{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: "Info.GasPriceUpdates.ChainSel"}}},
+				{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: "Info.GasPriceUpdates.ChainSel"}}},
 			},
 			IsSigner:   false,
 			IsWritable: true,
@@ -544,17 +542,17 @@ func getChainConfigGasPriceConfig(offrampProgramAddress string) chainwriter.Look
 
 // getCommonAddressLookupTableConfig returns the lookup table config that fetches the lookup table address from a PDA on-chain
 // The offramp contract contains a PDA with a ReferenceAddresses struct that stores the lookup table address in the OfframpLookupTable field
-func getCommonAddressLookupTableConfig(offrampProgramAddress string) chainwriter.DerivedLookupTable {
-	return chainwriter.DerivedLookupTable{
+func getCommonAddressLookupTableConfig(offrampProgramAddress string) soltypes.DerivedLookupTable {
+	return soltypes.DerivedLookupTable{
 		Name: "CommonAddressLookupTable",
-		Accounts: chainwriter.Lookup{
-			PDALookups: &chainwriter.PDALookups{
+		Accounts: soltypes.Lookup{
+			PDALookups: &soltypes.PDALookups{
 				Name:      "OfframpLookupTable",
 				PublicKey: getAddressConstant(offrampProgramAddress),
-				Seeds: []chainwriter.Seed{
+				Seeds: []soltypes.Seed{
 					{Static: []byte("reference_addresses")},
 				},
-				InternalField: chainwriter.InternalField{
+				InternalField: soltypes.InternalField{
 					TypeName: "ReferenceAddresses",
 					Location: "OfframpLookupTable",
 					IDL:      ccipOfframpIDL,
@@ -564,9 +562,9 @@ func getCommonAddressLookupTableConfig(offrampProgramAddress string) chainwriter
 	}
 }
 
-func getAuthorityAccountConstant(fromAddress string) chainwriter.Lookup {
-	return chainwriter.Lookup{
-		AccountConstant: &chainwriter.AccountConstant{
+func getAuthorityAccountConstant(fromAddress string) soltypes.Lookup {
+	return soltypes.Lookup{
+		AccountConstant: &soltypes.AccountConstant{
 			Name:       "Authority",
 			Address:    fromAddress,
 			IsSigner:   true,
@@ -575,9 +573,9 @@ func getAuthorityAccountConstant(fromAddress string) chainwriter.Lookup {
 	}
 }
 
-func getSystemProgramConstant() chainwriter.Lookup {
-	return chainwriter.Lookup{
-		AccountConstant: &chainwriter.AccountConstant{
+func getSystemProgramConstant() soltypes.Lookup {
+	return soltypes.Lookup{
+		AccountConstant: &soltypes.AccountConstant{
 			Name:       "SystemProgram",
 			Address:    solana.SystemProgramID.String(),
 			IsSigner:   false,
@@ -586,9 +584,9 @@ func getSystemProgramConstant() chainwriter.Lookup {
 	}
 }
 
-func getSysVarInstructionConstant() chainwriter.Lookup {
-	return chainwriter.Lookup{
-		AccountConstant: &chainwriter.AccountConstant{
+func getSysVarInstructionConstant() soltypes.Lookup {
+	return soltypes.Lookup{
+		AccountConstant: &soltypes.AccountConstant{
 			Name:       "SysvarInstructions",
 			Address:    solana.SysVarInstructionsPubkey.String(),
 			IsSigner:   false,
