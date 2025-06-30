@@ -1,7 +1,7 @@
 [[blockchains]]
   type = "anvil"
   chain_id = "1337"
-  docker_cmd_params = ["-b", "5"]
+  docker_cmd_params = ["-b", "1"]
 
 # uncomment to start a second blockchain
 #[[blockchains]]
