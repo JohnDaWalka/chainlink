@@ -9,10 +9,6 @@ replace github.com/smartcontractkit/chainlink/v2 => ../../
 
 replace github.com/smartcontractkit/chainlink/system-tests/lib => ../../system-tests/lib
 
-replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
-replace github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
-
-
 // Using a separate `require` here to avoid surrounding line changes
 // creating potential merge conflicts.
 require (
@@ -41,13 +37,13 @@ require (
 	github.com/shopspring/decimal v1.4.0
 	github.com/smartcontractkit/chain-selectors v1.0.60
 	github.com/smartcontractkit/chainlink-automation v0.8.1
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250627133416-1d85eec09097
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250629075708-6968c2f9fb16
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250627002929-2cbb7418aaa5
 	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250626141212-e50b2e7ffe2d
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250604171706-a98fa6515eae
 	github.com/smartcontractkit/chainlink-deployments-framework v0.15.0
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250627135735-93e3b09aec5a
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.3
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.7
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.3
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2
 	github.com/smartcontractkit/chainlink/system-tests/lib v0.0.0-00010101000000-000000000000
@@ -411,6 +407,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250619160901-79b609b1021c // indirect
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250625213849-112165c2aed3 // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20250629075813-d176e94b1094 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250528121202-292529af39df // indirect
 	github.com/smartcontractkit/freeport v0.1.1 // indirect
@@ -430,6 +427,7 @@ require (
 	github.com/supranational/blst v0.3.14 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d // indirect
 	github.com/tendermint/go-amino v0.16.0 // indirect
+	github.com/test-go/testify v1.1.4 // indirect
 	github.com/testcontainers/testcontainers-go v0.37.0 // indirect
 	github.com/theodesp/go-heaps v0.0.0-20190520121037-88e35354fe0a // indirect
 	github.com/tidwall/match v1.1.1 // indirect

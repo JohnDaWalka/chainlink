@@ -11,10 +11,6 @@ replace github.com/smartcontractkit/chainlink/v2 => ../../
 
 replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
-replace github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
-
-replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
-
 require (
 	github.com/ethereum/go-ethereum v1.15.7
 	github.com/google/uuid v1.6.0
@@ -363,7 +359,7 @@ require (
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250624090157-6b89f926f864 // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250627133416-1d85eec09097 // indirect
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250629075708-6968c2f9fb16  // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250604171706-a98fa6515eae // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 // indirect
@@ -377,7 +373,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250619160901-79b609b1021c // indirect
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250625213849-112165c2aed3 // indirect
-	github.com/smartcontractkit/chainlink-sui v0.0.0-00010101000000-000000000000 // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20250629075813-d176e94b1094  // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250528121202-292529af39df // indirect
 	github.com/smartcontractkit/freeport v0.1.1 // indirect

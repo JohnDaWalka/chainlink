@@ -5,10 +5,6 @@ go 1.24.4
 // Make sure we're working with the latest chainlink libs
 replace github.com/smartcontractkit/chainlink/v2 => ../
 
-replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
-
-replace github.com/smartcontractkit/chainlink-ccip => ../../chainlink-ccip
-
 // Using a separate inline `require` here to avoid surrounding line changes
 // creating potential merge conflicts.
 require github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250430150202-611699e34308
@@ -39,7 +35,7 @@ require (
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0
 	github.com/smartcontractkit/chain-selectors v1.0.60
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250624090157-6b89f926f864
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250627133416-1d85eec09097
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250629075708-6968c2f9fb16
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250627002929-2cbb7418aaa5
 	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250626141212-e50b2e7ffe2d
@@ -49,7 +45,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.12.0
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.7.0
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250625213849-112165c2aed3
-	github.com/smartcontractkit/chainlink-sui v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20250629075813-d176e94b1094
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.7
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.4
 	github.com/smartcontractkit/freeport v0.1.1

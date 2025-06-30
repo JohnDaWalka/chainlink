@@ -13,9 +13,6 @@ replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
 replace github.com/smartcontractkit/chainlink/system-tests/lib => ../lib
 
-replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
-
-
 require (
 	github.com/ethereum/go-ethereum v1.15.7
 	github.com/gin-gonic/gin v1.10.0
@@ -437,7 +434,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.60 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250624090157-6b89f926f864 // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250627133416-1d85eec09097 // indirect
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250629075708-6968c2f9fb16  // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 // indirect
 	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250618164021-9b34289a9502 // indirect
