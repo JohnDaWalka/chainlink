@@ -9,6 +9,10 @@ replace github.com/smartcontractkit/chainlink/v2 => ../../
 
 replace github.com/smartcontractkit/chainlink/system-tests/lib => ../../system-tests/lib
 
+replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
+replace github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
+
+
 // Using a separate `require` here to avoid surrounding line changes
 // creating potential merge conflicts.
 require (

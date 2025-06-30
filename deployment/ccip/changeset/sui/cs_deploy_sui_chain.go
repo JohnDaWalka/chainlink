@@ -9,7 +9,6 @@ import (
 	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
 	ccipops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
-	lockreleasetokenpoolops "github.com/smartcontractkit/chainlink-sui/ops/ccip_lock_release_token_pool"
 	offrampops "github.com/smartcontractkit/chainlink-sui/ops/ccip_offramp"
 	onrampops "github.com/smartcontractkit/chainlink-sui/ops/ccip_onramp"
 	routerops "github.com/smartcontractkit/chainlink-sui/ops/ccip_router"
@@ -280,26 +279,6 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		err = deps.AB.Save(chainSel, deployTp.Output.PackageId, typeAndVersionTokenPoolId)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save offRamp StateObjectId %s for Sui chain %d: %w", deployTp.Output.PackageId, chainSel, err)
-		}
-
-		// // // Deploy LockRelease TP
-		deployLockReleaseTp, err := operations.ExecuteOperation(e.OperationsBundle, lockreleasetokenpoolops.DeployCCIPLockReleaseTokenPoolOp, deps.SuiChain,
-			lockreleasetokenpoolops.LockReleaseTokenPoolDeployInput{
-				CCIPPackageId:                 ccipSeqReport.Output.CCIPPackageId,
-				CCIPRouterAddress:             routerReport.Output.PackageId,
-				CCIPTokenPoolPackageId:        deployTp.Output.PackageId,
-				LockReleaseLocalTokenMetadata: state.SuiChains[chainSel].LinkTokenCoinMetadataId.String(),
-				MCMSAddress:                   mcmsSeqReport.Output.PackageId,
-			})
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy LockRelaseTP for Sui chain %d: %w", chainSel, err)
-		}
-
-		// // save LockRelease PackageId to the addressbook
-		typeAndVersionLockReleasePackageId := cldf.NewTypeAndVersion(shared.SuiLockReleaseTPType, deployment.Version1_6_0)
-		err = deps.AB.Save(chainSel, deployLockReleaseTp.Output.PackageId, typeAndVersionLockReleasePackageId)
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LockRelease PackageId %s for Sui chain %d: %w", deployTp.Output.PackageId, chainSel, err)
 		}
 
 	}

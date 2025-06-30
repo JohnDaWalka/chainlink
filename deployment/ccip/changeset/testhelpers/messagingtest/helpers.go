@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
-	"github.com/pattonkan/sui-go/sui"
 	"github.com/stretchr/testify/require"
 
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
@@ -22,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	module_onramp_sui "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_onramp/onramp"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 )
@@ -177,13 +175,11 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 		}
 
 	case chain_selectors.FamilySui:
-		feeToken := sui.Address{}
-
-		msg = module_onramp_sui.Sui2AnyRampMessage{
+		msg = testhelpers.SuiSendRequest{
 			Data:      tc.MsgData,
 			Receiver:  common.LeftPadBytes(tc.Receiver, 32),
 			ExtraArgs: tc.ExtraArgs,
-			FeeToken:  feeToken.String(),
+			FeeToken:  tc.FeeToken,
 		}
 	case chain_selectors.FamilyAptos:
 		feeToken := aptos.AccountAddress{}

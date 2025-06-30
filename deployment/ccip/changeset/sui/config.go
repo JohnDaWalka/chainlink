@@ -9,11 +9,14 @@ type DeploySuiChainConfig struct {
 	ContractParamsPerChain map[uint64]ChainContractParams
 }
 
-type DeployLinkTokenConfig struct {
-	ChainSelector uint64
+type MintSuiTokenConfig struct {
+	ChainSelector  uint64
+	TokenPackageId string
+	TreasuryCapId  string
+	Amount         uint64
 }
 
-type MintLinkTokenConfig struct {
+type DeployLinkTokenConfig struct {
 	ChainSelector uint64
 }
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/pattonkan/sui-go/sui"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -13,15 +12,14 @@ import (
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	sui_cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagingtest"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	testsetups "github.com/smartcontractkit/chainlink/integration-tests/testsetups/ccip"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
-	// ctx := testhelpers.Context(t)
+func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
+	ctx := testhelpers.Context(t)
 	e, _, _ := testsetups.NewIntegrationEnvironment(
 		t,
 		testhelpers.WithNumOfChains(2),
@@ -47,11 +45,11 @@ func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
 	suiSenderAddr, err := rel.NewPrivateKeySigner(e.Env.BlockChains.SuiChains()[sourceChain].DeployerKey).GetAddress()
 	require.NoError(t, err)
 
-	suiSenderByte := sui.MustAddressFromHex(suiSenderAddr)
+	_ = sui.MustAddressFromHex(suiSenderAddr)
 
 	// SUI FeeToken
 	// mint link token to use as feeToken
-	_, output, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+	_, feeTokenOutput, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
 		commoncs.Configure(sui_cs.MintSuiToken{}, sui_cs.MintSuiTokenConfig{
 			ChainSelector:  sourceChain,
 			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress.String(),
@@ -61,54 +59,64 @@ func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	rawOutput := output[0].Reports[0]
+	rawOutput := feeTokenOutput[0].Reports[0]
 	outputMap, ok := rawOutput.Output.(sui_ops.OpTxResult[linkops.MintLinkTokenOutput])
 	require.True(t, ok)
 
-	var (
-		nonce  uint64
-		sender = common.LeftPadBytes(suiSenderByte[:], 32)
-		out    messagingtest.TestCaseOutput
-		setup  = messagingtest.NewTestSetupWithDeployedEnv(
-			t,
-			e,
-			state,
-			sourceChain,
-			destChain,
-			sender,
-			false, // testRouter
-		)
-	)
+	// SUI TransferToken
+	// mint link token to use as Transfer Token
+	_, transferTokenOutput, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.MintSuiToken{}, sui_cs.MintSuiTokenConfig{
+			ChainSelector:  sourceChain,
+			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress.String(),
+			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId.String(),
+			Amount:         10000,
+		}),
+	})
+	require.NoError(t, err)
 
-	t.Run("Message to EVM", func(t *testing.T) {
-		// _, err := testhelpers.LatestBlock(ctx, e.Env, destChain)
-		// require.NoError(t, err)
+	rawOutputTransferToken := transferTokenOutput[0].Reports[0]
+	outputMapTransferToken, ok := rawOutputTransferToken.Output.(sui_ops.OpTxResult[linkops.MintLinkTokenOutput])
+	require.True(t, ok)
 
-		require.NoError(t, err)
-		out = messagingtest.Run(t,
-			messagingtest.TestCase{
-				TestSetup:              setup,
-				Nonce:                  &nonce,
-				ValidationType:         messagingtest.ValidationTypeExec,
-				Receiver:               state.Chains[destChain].Receiver.Address().Bytes(),
-				ExtraArgs:              nil,
-				Replayed:               true,
-				FeeToken:               outputMap.Objects.MintedLinkTokenObjectId,
-				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
-				ExtraAssertions: []func(t *testing.T){
-					func(t *testing.T) {
-						// iter, err := state.Chains[destChain].Receiver.FilterMessageReceived(&bind.FilterOpts{
-						// 	Context: ctx,
-						// 	Start:   latestHead,
-						// })
-						// require.NoError(t, err)
-						// require.True(t, iter.Next())
-						// MessageReceived doesn't emit the data unfortunately, so can't check that.
-					},
+	tcs := []testhelpers.TestTransferRequest{
+		{
+			Name:           "Send token to EOA",
+			SourceChain:    sourceChain,
+			DestChain:      destChain,
+			Receiver:       state.Chains[destChain].Receiver.Address().Bytes(),
+			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
+			FeeToken:       outputMap.Objects.MintedLinkTokenObjectId,
+			SuiTokens: []testhelpers.SuiTokenAmount{
+				{
+					Token:  outputMapTransferToken.Objects.MintedLinkTokenObjectId,
+					Amount: 10,
 				},
 			},
-		)
-	})
+			ExpectedTokenBalances: []testhelpers.ExpectedBalance{},
+		},
+	}
 
-	fmt.Printf("out: %v\n", out)
+	startBlocks, expectedSeqNums, expectedExecutionStates, expectedTokenBalances := testhelpers.TransferMultiple(ctx, t, e.Env, state, tcs)
+
+	err = testhelpers.ConfirmMultipleCommits(
+		t,
+		e.Env,
+		state,
+		startBlocks,
+		false,
+		expectedSeqNums,
+	)
+	require.NoError(t, err)
+
+	execStates := testhelpers.ConfirmExecWithSeqNrsForAll(
+		t,
+		e.Env,
+		state,
+		testhelpers.SeqNumberRangeToSlice(expectedSeqNums),
+		startBlocks,
+	)
+	require.Equal(t, expectedExecutionStates, execStates)
+
+	testhelpers.WaitForTokenBalances(ctx, t, e.Env, expectedTokenBalances)
 }
