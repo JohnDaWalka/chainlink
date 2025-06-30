@@ -20,3 +20,9 @@ var OCR3Cap = kcr.CapabilitiesRegistryCapability{
 	Version:        "1.0.0",
 	CapabilityType: uint8(2), // consensus
 }
+
+var SecureMintTriggerCap = kcr.CapabilitiesRegistryCapability{
+	LabelledName:   "securemint-trigger",
+	Version:        "1.0.0",
+	CapabilityType: uint8(0), // trigger
+}

@@ -94,3 +94,38 @@ Handy commands:
 - build docker image: `docker build -f plugins/chainlink.Dockerfile -t chainlink-tmp-sm-plugin-with-plugins:a30031b24b60 .`
 - Run local CRE: `DISABLE_DX_TRACKING=true TESTCONTAINERS_RYUK_DISABLED=true go run main.go env start --with-plugins-docker-image chainlink-tmp-sm-plugin-with-plugins:a30031b24b60 --with-example -w 2m`
 
+
+
+### To debug CRE dev env with VSCode:
+
+- Create a launch.json file in the .vscode directory with the following content:
+
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "CRE dev env",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/core/scripts/cre/environment/main.go",
+            "args": [
+                "env",
+                "start",
+                "--with-plugins-docker-image",
+                "795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink:b252282df4b23b05658a0aa35216567d6f25c424-plugins",
+                "-t",
+                "simplified",
+                "-w",
+                "2m",
+                "--with-example"
+            ],
+            "env": {
+                "DISABLE_DX_TRACKING": "true",
+                "TESTCONTAINERS_RYUK_DISABLED": "true"
+            }
+        }
+    ]
+}
+```

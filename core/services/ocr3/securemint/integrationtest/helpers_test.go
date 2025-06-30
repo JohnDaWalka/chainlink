@@ -104,6 +104,46 @@ func setupNode(
 		c.P2P.V2.DeltaDial = commonconfig.MustNewDuration(500 * time.Millisecond)
 		c.P2P.V2.DeltaReconcile = commonconfig.MustNewDuration(5 * time.Second)
 
+		// [Capabilities.ExternalRegistry]
+		c.Capabilities.ExternalRegistry.Address = ptr("0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512")
+		c.Capabilities.ExternalRegistry.NetworkID = ptr("evm")
+		c.Capabilities.ExternalRegistry.ChainID = ptr("1337")
+
+		/**
+		[Capabilities.Dispatcher]
+		# SupportedVersion is the version of the version of message schema.
+		SupportedVersion = 1 # Default
+		# ReceiverBufferSize is the size of the buffer for incoming messages.
+		ReceiverBufferSize = 10000 # Default
+
+		[Capabilities.Dispatcher.RateLimit]
+		# GlobalRPS is the global rate limit for the dispatcher.
+		GlobalRPS = 800 # Default
+		# GlobalBurst is the global burst limit for the dispatcher.
+		GlobalBurst = 1000 # Default
+		# PerSenderRPS is the per-sender rate limit for the dispatcher.
+		PerSenderRPS = 10 # Default
+		# PerSenderBurst is the per-sender burst limit for the dispatcher.
+		PerSenderBurst = 50 # Default
+
+		[Capabilities.Peering]
+		# IncomingMessageBufferSize is the per-remote number of incoming
+		# messages to buffer. Any additional messages received on top of those
+		# already in the queue will be dropped.
+		IncomingMessageBufferSize = 10 # Default
+		# OutgoingMessageBufferSize is the per-remote number of outgoing
+		# messages to buffer. Any additional messages send on top of those
+		# already in the queue will displace the oldest.
+		# NOTE: OutgoingMessageBufferSize should be comfortably smaller than remote's
+		# IncomingMessageBufferSize to give the remote enough space to process
+		# them all in case we regained connection and now send a bunch at once
+		OutgoingMessageBufferSize = 10 # Default
+		# PeerID is the default peer ID to use for OCR jobs. If unspecified, uses the first available peer ID.
+		PeerID = '12D3KooWMoejJznyDuEk5aX6GvbjaG12UzeornPCBNzMRqdwrFJw' # Example
+		# TraceLogging enables trace level logging.
+		TraceLogging = false # Default
+		*/
+
 		// [Capabilities.Peering.V2]
 		c.Capabilities.Peering.V2.Enabled = ptr(true)
 		c.Capabilities.Peering.V2.ListenAddresses = ptr(p2pV2Addresses)

@@ -888,9 +888,11 @@ func newCREServices(
 
 		srvcs = append(srvcs, externalPeerWrapper, dispatcher)
 
+		globalLogger.Debugw("Creating ExternalRegistrySyncer", "address", capCfg.ExternalRegistry().Address())
 		if capCfg.ExternalRegistry().Address() != "" {
 			rid := capCfg.ExternalRegistry().RelayID()
 			registryAddress := capCfg.ExternalRegistry().Address()
+			globalLogger.Debugw("Creating ExternalRegistrySyncer", "address", capCfg.ExternalRegistry().Address(), "relayID", rid)
 			relayer, err := relayerChainInterops.Get(rid)
 			if err != nil {
 				return nil, fmt.Errorf("could not fetch relayer %s configured for capabilities registry: %w", rid, err)

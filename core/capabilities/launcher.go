@@ -635,6 +635,7 @@ func (w *launcher) addReceiver(ctx context.Context, capability registrysyncer.Ca
 	if err != nil {
 		return fmt.Errorf("failed to instantiate remote capability for receiver: %w", err)
 	}
+	fmt.Printf("Adding receiver for capability %s %s %d\n", capID, info.ID, info.DON.ID)
 	underlying, err := w.registry.Get(ctx, capability.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get capability from registry: %w", err)
