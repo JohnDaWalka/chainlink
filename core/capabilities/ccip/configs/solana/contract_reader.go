@@ -34,11 +34,6 @@ func DestContractReaderConfig() (config.ContractReader, error) {
 		return config.ContractReader{}, fmt.Errorf("unexpected error: invalid CCIP RMN Remote IDL, error: %w", err)
 	}
 
-	var cctpTokenPoolIDL solanacodec.IDL
-	if err := json.Unmarshal([]byte(ccipCCTPTokenPoolIDL), &cctpTokenPoolIDL); err != nil {
-		return config.ContractReader{}, fmt.Errorf("unexpected error: invalid CCIP CCTP Token Pool IDL, error: %w", err)
-	}
-
 	feeQuoterIDL.Accounts = append(feeQuoterIDL.Accounts, solanacodec.IdlTypeDef{
 		Name: "USDPerToken",
 		Type: solanacodec.IdlTypeDefTy{
@@ -427,26 +422,6 @@ func DestContractReaderConfig() (config.ContractReader, error) {
 					},
 				},
 			},
-			consts.ContractNameUSDCTokenPool: {
-				IDL: cctpTokenPoolIDL,
-				Reads: map[string]config.ReadDefinition{
-					consts.EventNameCCTPMessageSent: {
-						ChainSpecificName: "CcipCctpMessageSentEvent",
-						ReadType: config.Event,
-						EventDefinitions: &config.EventDefinitions{
-							PollingFilter: &config.PollingFilter{},
-							IndexedField0: &config.IndexedField{
-								OffChainPath: consts.EventAttributeMsgTotalNonce,
-								OnChainPath:  "MsgTotalNonce",
-							},
-							IndexedField1: &config.IndexedField{
-								OffChainPath: consts.EventAttributeSourceDomain,
-								OnChainPath:  "SourceDomain",
-							},
-						},
-					},
-				},
-			},
 		},
 	}, nil
 }
@@ -460,6 +435,11 @@ func SourceContractReaderConfig() (config.ContractReader, error) {
 	var feeQuoterIDL solanacodec.IDL
 	if err := json.Unmarshal([]byte(ccipFeeQuoterIDL), &feeQuoterIDL); err != nil {
 		return config.ContractReader{}, fmt.Errorf("unexpected error: invalid CCIP Fee Quoter IDL, error: %w", err)
+	}
+
+	var cctpTokenPoolIDL solanacodec.IDL
+	if err := json.Unmarshal([]byte(ccipCCTPTokenPoolIDL), &cctpTokenPoolIDL); err != nil {
+		return config.ContractReader{}, fmt.Errorf("unexpected error: invalid CCIP CCTP Token Pool IDL, error: %w", err)
 	}
 
 	feeQuoterIDL.Accounts = append(feeQuoterIDL.Accounts, solanacodec.IdlTypeDef{
@@ -670,6 +650,26 @@ func SourceContractReaderConfig() (config.ContractReader, error) {
 							&codec.HardCodeModifierConfig{OffChainValues: map[string]any{"WrappedNative": solana.WrappedSol.String()}},
 							&codec.PropertyExtractorConfig{FieldName: "WrappedNative"},
 							// TODO: error: process Router results: get router wrapped native result: invalid type: '': source data must be an array or slice, got string"
+						},
+					},
+				},
+			},
+			consts.ContractNameUSDCTokenPool: {
+				IDL: cctpTokenPoolIDL,
+				Reads: map[string]config.ReadDefinition{
+					consts.EventNameCCTPMessageSent: {
+						ChainSpecificName: "CcipCctpMessageSentEvent",
+						ReadType: config.Event,
+						EventDefinitions: &config.EventDefinitions{
+							PollingFilter: &config.PollingFilter{},
+							IndexedField0: &config.IndexedField{
+								OffChainPath: consts.EventAttributeMsgTotalNonce,
+								OnChainPath:  "MsgTotalNonce",
+							},
+							IndexedField1: &config.IndexedField{
+								OffChainPath: consts.EventAttributeSourceDomain,
+								OnChainPath:  "SourceDomain",
+							},
 						},
 					},
 				},
