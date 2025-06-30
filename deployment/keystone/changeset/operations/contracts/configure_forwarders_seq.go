@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
-
 	"github.com/smartcontractkit/mcms"
 	mcmssdk "github.com/smartcontractkit/mcms/sdk"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
@@ -25,16 +24,22 @@ import (
 type ConfigureForwardersSeqDeps struct {
 	Env      *cldf.Environment
 	Registry *capabilities_registry.CapabilitiesRegistry
-	DONs     []internal.RegisteredDon
 }
 
 type ConfigureForwardersSeqInput struct {
 	RegistryChainSel uint64
 
+	DONs []ConfigureForwardersSeqDON
+
 	// MCMSConfig is optional. If non-nil, the changes will be proposed using MCMS.
 	MCMSConfig *changeset.MCMSConfig
 	// Chains is optional. Defines chains for which request will be executed. If empty, runs for all available chains.
 	Chains map[uint64]struct{}
+}
+
+type ConfigureForwardersSeqDON struct {
+	Name    string
+	NodeIDs []string
 }
 
 func (i ConfigureForwardersSeqInput) UseMCMS() bool {
@@ -53,6 +58,20 @@ var ConfigureForwardersSeq = operations.NewSequence[ConfigureForwardersSeqInput,
 		evmChain := deps.Env.BlockChains.EVMChains()
 		opPerChain := make(map[uint64]mcmstypes.BatchOperation)
 		forwarderContracts := make(map[uint64]*changeset.OwnedContract[*forwarder.KeystoneForwarder])
+
+		var dons []internal.RegisteredDon
+		for _, don := range input.DONs {
+			donConfig := internal.RegisteredDonConfig{
+				NodeIDs:          don.NodeIDs,
+				Name:             don.Name,
+				RegistryChainSel: input.RegistryChainSel,
+			}
+			d, err := internal.NewRegisteredDon(*deps.Env, donConfig)
+			if err != nil {
+				return ConfigureForwardersSeqOutput{}, fmt.Errorf("configure-forwarders-seq failed: failed to create registered DON %s: %w", don.Name, err)
+			}
+			dons = append(dons, *d)
+		}
 
 		for _, chain := range evmChain {
 			if _, shouldInclude := input.Chains[chain.Selector]; len(input.Chains) > 0 && !shouldInclude {
@@ -77,7 +96,7 @@ var ConfigureForwardersSeq = operations.NewSequence[ConfigureForwardersSeqInput,
 					Env:      deps.Env,
 					Chain:    &chain,
 					Contract: contract.Contract,
-					Dons:     deps.DONs,
+					Dons:     dons,
 				}, ConfigureForwarderOpInput{
 					UseMCMS: input.UseMCMS(),
 				})

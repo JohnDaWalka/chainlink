@@ -270,12 +270,7 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput, capabilityFactoryFns 
 		UniqueReports:                     true,
 	}
 
-	donInfos, err := keystone_changeset.DonInfos(donCapabilities, input.CldEnv.Offchain)
-	if err != nil {
-		return errors.Wrap(err, "failed to get don infos")
-	}
-
-	carRegReport, err := operations.ExecuteSequence(
+	_, err := operations.ExecuteSequence(
 		input.CldEnv.OperationsBundle,
 		ks_contracts_op.ConfigureCapabilitiesRegistrySeq,
 		ks_contracts_op.ConfigureCapabilitiesRegistrySeqDeps{
@@ -292,11 +287,6 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput, capabilityFactoryFns 
 		return errors.Wrap(err, "failed to configure capabilities registry")
 	}
 
-	dons, err := keystone_changeset.JoinInfoAndNodes(carRegReport.Output.DonInfos, donInfos, input.ChainSelector)
-	if err != nil {
-		return errors.Wrap(err, "failed to join don infos and nodes")
-	}
-
 	capReg, err := keystone_changeset.GetOwnedContractV2[*kcr.CapabilitiesRegistry](
 		input.CldEnv.DataStore.Addresses(),
 		input.CldEnv.BlockChains.EVMChains()[input.ChainSelector],
@@ -306,16 +296,26 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput, capabilityFactoryFns 
 		return errors.Wrap(err, "failed to get capabilities registry contract")
 	}
 
+	var seqDons []ks_contracts_op.ConfigureForwardersSeqDON
+	for _, donCap := range donCapabilities {
+		don := ks_contracts_op.ConfigureForwardersSeqDON{
+			Name: donCap.Name,
+		}
+		for _, nop := range donCap.Nops {
+			don.NodeIDs = append(don.NodeIDs, nop.Nodes...)
+		}
+		seqDons = append(seqDons, don)
+	}
 	_, err = operations.ExecuteSequence(
 		input.CldEnv.OperationsBundle,
 		ks_contracts_op.ConfigureForwardersSeq,
 		ks_contracts_op.ConfigureForwardersSeqDeps{
 			Env:      input.CldEnv,
 			Registry: capReg.Contract,
-			DONs:     dons,
 		},
 		ks_contracts_op.ConfigureForwardersSeqInput{
 			RegistryChainSel: input.ChainSelector,
+			DONs:             seqDons,
 		},
 	)
 	if err != nil {
@@ -323,9 +323,9 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput, capabilityFactoryFns 
 	}
 
 	var allNodeIDs []string
-	for _, don := range dons {
-		for _, node := range don.Nodes {
-			allNodeIDs = append(allNodeIDs, node.NodeID)
+	for _, don := range donCapabilities {
+		for _, nop := range don.Nops {
+			allNodeIDs = append(allNodeIDs, nop.Nodes...)
 		}
 	}
 
