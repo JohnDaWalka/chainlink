@@ -138,6 +138,7 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg TokenPoolConfig) (cldf.C
 	tokenprogramID, _ := chainState.TokenToTokenProgram(tokenPubKey)
 	poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
 	poolSigner, _ := solTokenUtil.TokenPoolSignerAddress(tokenPubKey, tokenPool)
+	globalConfigPDA, _ := solTokenUtil.TokenPoolGlobalConfigPDA(tokenPool)
 	routerProgramAddress, _, _ := chainState.GetRouterInfo()
 	rmnRemoteAddress := chainState.RMNRemote
 	// ata for token pool
@@ -169,6 +170,7 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg TokenPoolConfig) (cldf.C
 			solana.SystemProgramID,
 			tokenPool,
 			programData.Address,
+			globalConfigPDA,
 		).ValidateAndBuild()
 	case solTestTokenPool.LockAndRelease_PoolType:
 		// initialize token pool for token
@@ -181,6 +183,7 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg TokenPoolConfig) (cldf.C
 			solana.SystemProgramID,
 			tokenPool,
 			programData.Address,
+			globalConfigPDA,
 		).ValidateAndBuild()
 	default:
 		return cldf.ChangesetOutput{}, fmt.Errorf("invalid pool type: %s", cfg.PoolType)

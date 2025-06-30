@@ -130,7 +130,7 @@ func getLatestNonce(tc TestCase) uint64 {
 		var nonceCounterAccount ccip_router.Nonce
 		// we ignore the error because the account might not exist yet
 		_ = solcommon.GetAccountDataBorshInto(ctx, client, noncePDA, solconfig.DefaultCommitment, &nonceCounterAccount)
-		latestNonce = nonceCounterAccount.Counter
+		latestNonce = nonceCounterAccount.OrderedNonce
 	case chain_selectors.FamilyTon:
 		// TODO investigate TON nonce management, return +1 for now
 		return *tc.Nonce + 1
