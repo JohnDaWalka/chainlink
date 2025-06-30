@@ -427,7 +427,7 @@ func DestContractReaderConfig() (config.ContractReader, error) {
 					},
 				},
 			},
-			consts.ContractNameCCTPMessageTransmitter: {
+			consts.ContractNameUSDCTokenPool: {
 				IDL: cctpTokenPoolIDL,
 				Reads: map[string]config.ReadDefinition{
 					consts.EventNameCCTPMessageSent: {
