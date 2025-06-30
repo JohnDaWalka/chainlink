@@ -14,7 +14,7 @@ COPY tools/bin/ldflags ./tools/bin/
 
 ADD go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download
+    GOPRIVATE=github.com/smartcontractkit/chainlink-sui go mod download
 COPY . .
 
 # Install Delve for debugging with cache mounts
