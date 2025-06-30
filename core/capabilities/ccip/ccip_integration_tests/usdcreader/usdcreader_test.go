@@ -471,7 +471,7 @@ func testSetup(ctx context.Context, t testing.TB, readerChain cciptypes.ChainSel
 		require.NoError(t, db.Close())
 	})
 
-	// Convert to the extended contract reader interface.
+	// Convert to the extended contract reader interface.Add commentMore actions
 	ecr := contractreader.NewExtendedContractReader(
 		(contractreader.ContractReaderFacade)(cr))
 	return &testSetupData{

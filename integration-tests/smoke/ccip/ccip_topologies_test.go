@@ -72,10 +72,9 @@ func Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest(t *tes
 		t, &e, state, sourceChainSel, destChainSel, false)
 
 	var (
-		nonce    uint64
-		replayed bool
-		sender   = common.LeftPadBytes(e.Env.BlockChains.EVMChains()[sourceChainSel].DeployerKey.From.Bytes(), 32)
-		setup    = mt.NewTestSetupWithDeployedEnv(
+		nonce  uint64
+		sender = common.LeftPadBytes(e.Env.BlockChains.EVMChains()[sourceChainSel].DeployerKey.From.Bytes(), 32)
+		setup  = mt.NewTestSetupWithDeployedEnv(
 			t,
 			e,
 			state,
@@ -92,7 +91,6 @@ func Test_CCIPTopologies_EVM2EVM_RoleDON_AllSupportSource_SomeSupportDest(t *tes
 			mt.TestCase{
 				ValidationType:         mt.ValidationTypeExec,
 				TestSetup:              setup,
-				Replayed:               replayed,
 				Nonce:                  &nonce,
 				Receiver:               common.HexToAddress("0xdead").Bytes(),
 				MsgData:                []byte("hello eoa"),
