@@ -1975,6 +1975,26 @@ func (_m *GeneralConfig) SuiConfigs() chainlink.RawConfigs {
 	return r0
 }
 
+// TONConfigs provides a mock function with no fields
+func (_m *GeneralConfig) TONConfigs() chainlink.RawConfigs {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for TONConfigs")
+	}
+
+	var r0 chainlink.RawConfigs
+	if rf, ok := ret.Get(0).(func() chainlink.RawConfigs); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(chainlink.RawConfigs)
+		}
+	}
+
+	return r0
+}
+
 // GeneralConfig_SuiConfigs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SuiConfigs'
 type GeneralConfig_SuiConfigs_Call struct {
 	*mock.Call
@@ -1992,12 +2012,39 @@ func (_c *GeneralConfig_SuiConfigs_Call) Run(run func()) *GeneralConfig_SuiConfi
 	return _c
 }
 
+// GeneralConfig_TONConfigs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TONConfigs'
+type GeneralConfig_TONConfigs_Call struct {
+	*mock.Call
+}
+
+// TONConfigs is a helper method to define mock.On call
+func (_e *GeneralConfig_Expecter) TONConfigs() *GeneralConfig_TONConfigs_Call {
+	return &GeneralConfig_TONConfigs_Call{Call: _e.mock.On("TONConfigs")}
+}
+
+func (_c *GeneralConfig_TONConfigs_Call) Run(run func()) *GeneralConfig_TONConfigs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
 func (_c *GeneralConfig_SuiConfigs_Call) Return(_a0 chainlink.RawConfigs) *GeneralConfig_SuiConfigs_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
+func (_c *GeneralConfig_TONConfigs_Call) Return(_a0 chainlink.RawConfigs) *GeneralConfig_TONConfigs_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
 func (_c *GeneralConfig_SuiConfigs_Call) RunAndReturn(run func() chainlink.RawConfigs) *GeneralConfig_SuiConfigs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+func (_c *GeneralConfig_TONConfigs_Call) RunAndReturn(run func() chainlink.RawConfigs) *GeneralConfig_TONConfigs_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2009,14 +2056,14 @@ func (_m *GeneralConfig) SuiEnabled() bool {
 	if len(ret) == 0 {
 		panic("no return value specified for SuiEnabled")
 	}
-	
+
 	var r0 bool
 	if rf, ok := ret.Get(0).(func() bool); ok {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	
+
 	return r0
 }
 

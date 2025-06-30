@@ -231,6 +231,10 @@ func (r *RelayerFactory) NewSui(ks coretypes.Keystore, ksCSA coretypes.Keystore,
 	return r.NewLOOPRelayer("Sui", relay.NetworkSui, env.SuiPlugin, ks, ksCSA, chainCfgs)
 }
 
+func (r *RelayerFactory) NewTON(ks, ksCSA coretypes.Keystore, chainCfgs RawConfigs) (map[types.RelayID]loop.Relayer, error) {
+	return r.NewLOOPRelayer("TON", relay.NetworkTON, env.TONPlugin, ks, ksCSA, chainCfgs)
+}
+
 func (r *RelayerFactory) NewLOOPRelayer(name string, network string, plugin env.Plugin, ks, ksCSA coretypes.Keystore, chainCfgs RawConfigs) (map[types.RelayID]loop.Relayer, error) {
 	relayers := make(map[types.RelayID]loop.Relayer)
 	lggr := logger.Named(r.Logger, name)

@@ -63,6 +63,7 @@ const (
 	EVMFamilySelector   = "2812d52c"
 	SVMFamilySelector   = "1e10bdc4"
 	AptosFamilySelector = "ac77ffec"
+	TVMFamilySelector   = "647e2ba9"
 )
 
 var (
@@ -1405,6 +1406,15 @@ func (c SetOCR3OffRampConfig) validateRemoteChain(e *cldf.Environment, state *st
 		if !ok {
 			return fmt.Errorf("remote chain %d not found in onchain state", chainSelector)
 		}
+		return nil
+
+	case chain_selectors.FamilyTon:
+		_, ok := state.TonChains[chainSelector]
+		if !ok {
+			return fmt.Errorf("remote chain %d not found in onchain state", chainSelector)
+		}
+		// TODO add chain state validation for ramp addr later, https://smartcontract-it.atlassian.net/browse/NONEVM-1938
+		return nil
 	default:
 		return fmt.Errorf("unsupported chain family %s", family)
 	}
@@ -1702,6 +1712,8 @@ func DefaultFeeQuoterDestChainConfig(configEnabled bool, destChainSelector ...ui
 			familySelector, _ = hex.DecodeString(SVMFamilySelector) // solana
 		} else if destFamily == chain_selectors.FamilyAptos {
 			familySelector, _ = hex.DecodeString(AptosFamilySelector) // aptos
+		} else if destFamily == chain_selectors.FamilyTon {
+			familySelector, _ = hex.DecodeString(TVMFamilySelector) // ton
 		}
 	}
 	return fee_quoter.FeeQuoterDestChainConfig{

@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/xssnick/tonutils-go/address"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/bytes"
 
@@ -642,6 +643,12 @@ func BuildOCR3ConfigForCCIPHome(
 				if err != nil {
 					return nil, fmt.Errorf("failed to decode SUI address '%s': %w", transmitter, err)
 				}
+			case chain_selectors.FamilyTon:
+				pk := address.MustParseAddr(string(transmitter))
+				if pk == nil || pk.IsAddrNone() {
+					return nil, fmt.Errorf("failed to parse TON address '%s'", transmitter)
+				}
+				parsed = pk.Data()
 			case chain_selectors.FamilyAptos:
 				parsed, err = hex.DecodeString(strings.TrimPrefix(string(transmitter), "0x"))
 				if err != nil {
