@@ -110,7 +110,12 @@ func (c TransmitterConfig) newTransmitter(lggr logger.Logger, transmitterID stri
 
 func (t *transmitter) start(ctx context.Context) error {
 	t.eng.Infow("Starting SecureMintTransmitter", "triggerCapabilityName", t.config.TriggerCapabilityName, "triggerCapabilityVersion", t.config.TriggerCapabilityVersion)
-	return t.registry.Add(ctx, t)
+	err := t.registry.Add(ctx, t)
+	if err != nil {
+		return fmt.Errorf("failed to add transmitter to registry: %w", err)
+	}
+	t.eng.Infow("SecureMintTransmitter registered", "triggerCapabilityInfo", t.CapabilityInfo)
+	return nil
 }
 
 func (t *transmitter) close() error {
