@@ -1,4 +1,4 @@
-package v1_5_1_test
+package v1_6_test
 
 import (
 	"fmt"
@@ -21,7 +21,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_5_1"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -48,7 +48,7 @@ func deployUSDCPrerequisites(
 			return cldf.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
 				Address:  tokenAddress,
 				Contract: token,
-				Tv:       cldf.NewTypeAndVersion(shared.USDCTokenPool, deployment.Version1_5_1),
+				Tv:       cldf.NewTypeAndVersion(shared.USDCTokenPool, deployment.Version1_6_0),
 				Tx:       tx,
 				Err:      err,
 			}
@@ -97,32 +97,32 @@ func TestValidateDeployUSDCTokenPoolContractsConfig(t *testing.T) {
 
 	tests := []struct {
 		Msg    string
-		Input  v1_5_1.DeployUSDCTokenPoolContractsConfig
+		Input  v1_6.DeployUSDCTokenPoolContractsConfig
 		ErrStr string
 	}{
 		{
 			Msg: "Chain selector is not valid",
-			Input: v1_5_1.DeployUSDCTokenPoolContractsConfig{
-				USDCPools: map[uint64]v1_5_1.DeployUSDCTokenPoolInput{
-					0: v1_5_1.DeployUSDCTokenPoolInput{},
+			Input: v1_6.DeployUSDCTokenPoolContractsConfig{
+				USDCPools: map[uint64]v1_6.DeployUSDCTokenPoolInput{
+					0: v1_6.DeployUSDCTokenPoolInput{},
 				},
 			},
 			ErrStr: "failed to validate chain selector 0",
 		},
 		{
 			Msg: "Chain selector doesn't exist in environment",
-			Input: v1_5_1.DeployUSDCTokenPoolContractsConfig{
-				USDCPools: map[uint64]v1_5_1.DeployUSDCTokenPoolInput{
-					5009297550715157269: v1_5_1.DeployUSDCTokenPoolInput{},
+			Input: v1_6.DeployUSDCTokenPoolContractsConfig{
+				USDCPools: map[uint64]v1_6.DeployUSDCTokenPoolInput{
+					5009297550715157269: v1_6.DeployUSDCTokenPoolInput{},
 				},
 			},
 			ErrStr: "does not exist in environment",
 		},
 		{
 			Msg: "Missing router",
-			Input: v1_5_1.DeployUSDCTokenPoolContractsConfig{
-				USDCPools: map[uint64]v1_5_1.DeployUSDCTokenPoolInput{
-					e.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))[0]: v1_5_1.DeployUSDCTokenPoolInput{},
+			Input: v1_6.DeployUSDCTokenPoolContractsConfig{
+				USDCPools: map[uint64]v1_6.DeployUSDCTokenPoolInput{
+					e.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))[0]: v1_6.DeployUSDCTokenPoolInput{},
 				},
 			},
 			ErrStr: "missing router",
@@ -131,7 +131,7 @@ func TestValidateDeployUSDCTokenPoolContractsConfig(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Msg, func(t *testing.T) {
-			err := test.Input.Validate(e)
+			err := v1_6.DeployUSDCTokenPoolNew.VerifyPreconditions(e, test.Input)
 			require.Contains(t, err.Error(), test.ErrStr)
 		})
 	}
@@ -163,7 +163,7 @@ func TestValidateDeployUSDCTokenPoolInput(t *testing.T) {
 			return cldf.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
 				Address:  tokenAddress,
 				Contract: token,
-				Tv:       cldf.NewTypeAndVersion(shared.USDCTokenPool, deployment.Version1_5_1),
+				Tv:       cldf.NewTypeAndVersion(shared.USDCTokenPool, deployment.Version1_6_0),
 				Tx:       tx,
 				Err:      err,
 			}
@@ -176,24 +176,24 @@ func TestValidateDeployUSDCTokenPoolInput(t *testing.T) {
 
 	tests := []struct {
 		Msg    string
-		Input  v1_5_1.DeployUSDCTokenPoolInput
+		Input  v1_6.DeployUSDCTokenPoolInput
 		ErrStr string
 	}{
 		{
 			Msg:    "Missing token address",
-			Input:  v1_5_1.DeployUSDCTokenPoolInput{},
+			Input:  v1_6.DeployUSDCTokenPoolInput{},
 			ErrStr: "token address must be defined",
 		},
 		{
 			Msg: "Missing token messenger",
-			Input: v1_5_1.DeployUSDCTokenPoolInput{
+			Input: v1_6.DeployUSDCTokenPoolInput{
 				TokenAddress: utils.RandomAddress(),
 			},
 			ErrStr: "token messenger must be defined",
 		},
 		{
 			Msg: "Can't reach token",
-			Input: v1_5_1.DeployUSDCTokenPoolInput{
+			Input: v1_6.DeployUSDCTokenPoolInput{
 				TokenAddress:   utils.RandomAddress(),
 				TokenMessenger: utils.RandomAddress(),
 			},
@@ -201,7 +201,7 @@ func TestValidateDeployUSDCTokenPoolInput(t *testing.T) {
 		},
 		{
 			Msg: "Symbol is wrong",
-			Input: v1_5_1.DeployUSDCTokenPoolInput{
+			Input: v1_6.DeployUSDCTokenPoolInput{
 				TokenAddress:   nonUsdcToken.Address,
 				TokenMessenger: utils.RandomAddress(),
 			},
@@ -209,7 +209,7 @@ func TestValidateDeployUSDCTokenPoolInput(t *testing.T) {
 		},
 		{
 			Msg: "Can't reach token messenger",
-			Input: v1_5_1.DeployUSDCTokenPoolInput{
+			Input: v1_6.DeployUSDCTokenPoolInput{
 				TokenAddress:   usdcToken.Address,
 				TokenMessenger: utils.RandomAddress(),
 			},
@@ -217,7 +217,7 @@ func TestValidateDeployUSDCTokenPoolInput(t *testing.T) {
 		},
 		{
 			Msg: "No error",
-			Input: v1_5_1.DeployUSDCTokenPoolInput{
+			Input: v1_6.DeployUSDCTokenPoolInput{
 				TokenAddress:   usdcToken.Address,
 				TokenMessenger: tokenMessenger.Address,
 			},
@@ -266,11 +266,11 @@ func TestDeployUSDCTokenPoolContracts(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			newUSDCTokenPools := make(map[uint64]v1_5_1.DeployUSDCTokenPoolInput, len(selectors))
+			newUSDCTokenPools := make(map[uint64]v1_6.DeployUSDCTokenPoolInput, len(selectors))
 			for _, selector := range selectors {
 				usdcToken, tokenMessenger := deployUSDCPrerequisites(t, lggr, e.BlockChains.EVMChains()[selector], addressBook)
 
-				newUSDCTokenPools[selector] = v1_5_1.DeployUSDCTokenPoolInput{
+				newUSDCTokenPools[selector] = v1_6.DeployUSDCTokenPoolInput{
 					TokenAddress:   usdcToken.Address,
 					TokenMessenger: tokenMessenger.Address,
 				}
@@ -279,8 +279,8 @@ func TestDeployUSDCTokenPoolContracts(t *testing.T) {
 			for i := range numRuns {
 				e, err = commoncs.Apply(t, e,
 					commonchangeset.Configure(
-						cldf.CreateLegacyChangeSet(v1_5_1.DeployUSDCTokenPoolContractsChangeset),
-						v1_5_1.DeployUSDCTokenPoolContractsConfig{
+						v1_6.DeployUSDCTokenPoolNew,
+						v1_6.DeployUSDCTokenPoolContractsConfig{
 							USDCPools: newUSDCTokenPools,
 						},
 					),
@@ -297,7 +297,7 @@ func TestDeployUSDCTokenPoolContracts(t *testing.T) {
 					for _, selector := range selectors {
 						usdcTokenPools := state.Chains[selector].USDCTokenPools
 						require.Len(t, usdcTokenPools, 1)
-						owner, err := usdcTokenPools[deployment.Version1_5_1].Owner(nil)
+						owner, err := usdcTokenPools[deployment.Version1_6_0].Owner(nil)
 						require.NoError(t, err)
 						require.Equal(t, e.BlockChains.EVMChains()[selector].DeployerKey.From, owner)
 					}

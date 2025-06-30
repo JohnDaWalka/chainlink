@@ -1,4 +1,4 @@
-package v1_5_1
+package v1_6
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/mock_usdc_token_messenger"
+	// TODO: New token pool contract should be imported from the latest version
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/erc20"
 
@@ -23,10 +24,15 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/evm"
 )
 
-var _ cldf.ChangeSet[DeployUSDCTokenPoolContractsConfig] = DeployUSDCTokenPoolContractsChangeset
+var (
+	DeployUSDCTokenPoolNew = cldf.CreateChangeSet(deployUSDCTokenPoolContractsLogic, deployUSDCTokenPoolContractsPrecondition)
+)
 
 // DeployUSDCTokenPoolInput defines all information required of the user to deploy a new USDC token pool contract.
 type DeployUSDCTokenPoolInput struct {
+	// PreviousPoolAddress is the address of the previous USDC token pool contract, inflight messages
+	// are redirected to the previous pool when needed.
+	PreviousPoolAddress common.Address
 	// TokenMessenger is the address of the USDC token messenger contract.
 	TokenMessenger common.Address
 	// USDCTokenAddress is the address of the USDC token for which we are deploying a token pool.
@@ -90,7 +96,7 @@ type DeployUSDCTokenPoolContractsConfig struct {
 	IsTestRouter bool
 }
 
-func (c DeployUSDCTokenPoolContractsConfig) Validate(env cldf.Environment) error {
+func deployUSDCTokenPoolContractsPrecondition(env cldf.Environment, c DeployUSDCTokenPoolContractsConfig) error {
 	state, err := stateview.LoadOnchainState(env)
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
@@ -121,13 +127,14 @@ func (c DeployUSDCTokenPoolContractsConfig) Validate(env cldf.Environment) error
 		if err != nil {
 			return fmt.Errorf("failed to validate USDC token pool config for chain selector %d: %w", chainSelector, err)
 		}
+		// TODO: Verify if PreviousPoolAddress is required.
 	}
 	return nil
 }
 
 // DeployUSDCTokenPoolContractsChangeset deploys new USDC pools across multiple chains.
-func DeployUSDCTokenPoolContractsChangeset(env cldf.Environment, c DeployUSDCTokenPoolContractsConfig) (cldf.ChangesetOutput, error) {
-	if err := c.Validate(env); err != nil {
+func deployUSDCTokenPoolContractsLogic(env cldf.Environment, c DeployUSDCTokenPoolContractsConfig) (cldf.ChangesetOutput, error) {
+	if err := deployUSDCTokenPoolContractsPrecondition(env, c); err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("invalid DeployUSDCTokenPoolContractsConfig: %w", err)
 	}
 	newAddresses := cldf.NewMemoryAddressBook()
@@ -146,6 +153,7 @@ func DeployUSDCTokenPoolContractsChangeset(env cldf.Environment, c DeployUSDCTok
 		}
 		_, err := cldf.DeployContract(env.Logger, chain, newAddresses,
 			func(chain cldf_evm.Chain) cldf.ContractDeploy[*usdc_token_pool.USDCTokenPool] {
+				// TODO: Include previous pool address in the deployment.
 				poolAddress, tx, usdcTokenPool, err := usdc_token_pool.DeployUSDCTokenPool(
 					chain.DeployerKey, chain.Client, poolConfig.TokenMessenger, poolConfig.TokenAddress,
 					poolConfig.AllowList, chainState.RMNProxy.Address(), router.Address(),
@@ -165,6 +173,6 @@ func DeployUSDCTokenPoolContractsChangeset(env cldf.Environment, c DeployUSDCTok
 	}
 
 	return cldf.ChangesetOutput{
-		AddressBook: newAddresses,
+		AddressBook: newAddresses, // TODO: this is deprecated, how do I use the DataStore instead?
 	}, nil
 }
