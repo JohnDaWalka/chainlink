@@ -12,6 +12,11 @@ WORKDIR /chainlink
 COPY GNUmakefile package.json ./
 COPY tools/bin/ldflags ./tools/bin/
 
+RUN --mount=type=secret,id=GIT_AUTH_TOKEN \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    ./plugins/scripts/setup_git_auth.sh 
+    
 ADD go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     GOPRIVATE=github.com/smartcontractkit/chainlink-sui go mod download
