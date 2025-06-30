@@ -16,7 +16,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,6 +52,53 @@ var (
 	nNodes = 4 // number of nodes (not including bootstrap)
 )
 
+// backendSimulator is an adapter that implements the chainlink-evm/pkg/types/types/Backend interface
+// so that we can have minimal changes in the integration test which depends on an in-memory blockchain, while now we want to use anvil running in Docker (started by CRE dev env).
+type backendSimulator struct {
+	t           *testing.T
+	chainClient clientSimulator
+}
+
+type clientSimulator struct {
+	*ethclient.Client
+}
+
+var _ evmtypes.Backend = &backendSimulator{}
+
+var _ simulated.Client = &clientSimulator{}
+
+func (b *backendSimulator) Commit() common.Hash {
+	b.t.Logf("Commit not implemented")
+	return common.Hash{}
+}
+
+func (b *backendSimulator) Close() error {
+	b.chainClient.Close()
+	return nil
+}
+
+func (b *backendSimulator) Rollback() {
+	b.t.Errorf("Rollback not implemented")
+}
+
+func (b *backendSimulator) Fork(parentHash common.Hash) error {
+	b.t.Errorf("Fork not implemented")
+	return nil
+}
+
+func (b *backendSimulator) AdjustTime(adjustment time.Duration) error {
+	b.t.Errorf("AdjustTime not implemented")
+	return nil
+}
+
+func (b *backendSimulator) Client() simulated.Client {
+	return b.chainClient
+}
+
+func simulateBackend(t *testing.T, chainClient *ethclient.Client) evmtypes.Backend {
+	return &backendSimulator{t: t, chainClient: clientSimulator{Client: chainClient}}
+}
+
 // TestIntegration_SecureMint_happy_path tests runs a small DON which runs the secure mint plugin
 // and verifies that it can successfully create reports.
 //
@@ -67,8 +117,10 @@ func TestIntegration_SecureMint_happy_path(t *testing.T) {
 		clientPubKeys[i] = key.PublicKey
 	}
 
-	steve, backend := setupBlockchain(t)
-	fromBlock, err := backend.Client().BlockNumber(testutils.Context(t))
+	// steve, backend := setupBlockchain(t)
+	steve, chainClient := connectToAnvil(t)
+	backend := simulateBackend(t, chainClient)
+	fromBlock, err := chainClient.BlockNumber(testutils.Context(t))
 	require.NoError(t, err)
 	t.Logf("Starting from block: %d", fromBlock)
 
@@ -120,6 +172,17 @@ func setupBlockchain(t *testing.T) (
 	backend.Commit() // ensure starting block number at least 1
 
 	return steve, backend
+}
+
+// connectToAnvil connects to anvil started by CRE
+func connectToAnvil(t *testing.T) (*bind.TransactOpts, *ethclient.Client) {
+	ctfKey, err := crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+	require.NoError(t, err)
+	steve, err := bind.NewKeyedTransactorWithChainID(ctfKey, big.NewInt(1337))
+	require.NoError(t, err)
+	ethClient, err := ethclient.Dial("http://localhost:8545")
+	require.NoError(t, err)
+	return steve, ethClient
 }
 
 func setupNodes(t *testing.T, nNodes int, backend evmtypes.Backend, clientCSAKeys []csakey.KeyV2, f func(*chainlink.Config)) (oracles []confighelper.OracleIdentityExtra, nodes []node) {
@@ -321,9 +384,18 @@ func setSecureMintOnchainConfigUsingOCR3Configurator(t *testing.T, steve *bind.T
 	var topic common.Hash
 	topic = llo.ProductionConfigSet
 
-	logs, err := backend.Client().FilterLogs(testutils.Context(t), ethereum.FilterQuery{Addresses: []common.Address{configuratorAddress}, Topics: [][]common.Hash{[]common.Hash{topic, configID}}})
-	require.NoError(t, err)
-	require.GreaterOrEqual(t, len(logs), 1)
+	var logs []gethtypes.Log
+	gomega.NewWithT(t).Eventually(func() bool {
+		logs, err = backend.Client().FilterLogs(testutils.Context(t), ethereum.FilterQuery{Addresses: []common.Address{configuratorAddress}, Topics: [][]common.Hash{[]common.Hash{topic, configID}}})
+		return err == nil && len(logs) > 0
+	}, 30*time.Second, 1*time.Second).Should(
+		gomega.BeTrue(),
+		fmt.Sprintf("expected at least 1 log, but got none, got error: %v", err),
+	)
+
+	// logs, err := backend.Client().FilterLogs(testutils.Context(t), ethereum.FilterQuery{Addresses: []common.Address{configuratorAddress}, Topics: [][]common.Hash{[]common.Hash{topic, configID}}})
+	// require.NoError(t, err)
+	// require.GreaterOrEqual(t, len(logs), 1)
 	cfg, err := llo.DecodeProductionConfigSetLog(logs[len(logs)-1].Data)
 	require.NoError(t, err)
 

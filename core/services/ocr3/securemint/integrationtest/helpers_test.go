@@ -178,7 +178,6 @@ func addSecureMintOCRJobs(
 		name := "securemint-ea"
 
 		bmBridge := createSecureMintBridge(t, name, i, node.app.BridgeORM())
-		t.Logf("Created secure mint bridge %s on node %d", bmBridge, i)
 
 		jobID := addSecureMintJob(
 			t,
