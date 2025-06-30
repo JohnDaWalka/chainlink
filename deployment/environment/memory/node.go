@@ -47,12 +47,9 @@ import (
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	sollptesting "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/testing"
 
-	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	 
 	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
-
-	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
-	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
-
+ 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	"github.com/smartcontractkit/chainlink/deployment/helpers/pointer"
