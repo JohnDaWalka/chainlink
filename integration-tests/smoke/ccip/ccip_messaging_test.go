@@ -29,6 +29,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/message_hasher"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	mt "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagingtest"
@@ -183,6 +184,7 @@ func Test_CCIPMessaging_EVM2EVM(t *testing.T) {
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_FAILURE,      // state would be failed onchain due to low gas
 			},
 		)
+		msgSentEvent := out.MsgSentEvent.RawEvent.(*onramp.OnRampCCIPMessageSent)
 
 		err := manualexechelpers.ManuallyExecuteAll(
 			ctx,
@@ -192,7 +194,7 @@ func Test_CCIPMessaging_EVM2EVM(t *testing.T) {
 			sourceChain,
 			destChain,
 			[]int64{
-				int64(out.MsgSentEvent.Message.Header.SequenceNumber), //nolint:gosec // seqNr fits in int64
+				int64(msgSentEvent.Message.Header.SequenceNumber), //nolint:gosec // seqNr fits in int64
 			},
 			24*time.Hour, // lookbackDurationMsgs
 			24*time.Hour, // lookbackDurationCommitReport
@@ -202,7 +204,7 @@ func Test_CCIPMessaging_EVM2EVM(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Logf("successfully manually executed message %x",
-			out.MsgSentEvent.Message.Header.MessageId)
+			msgSentEvent.Message.Header.MessageId)
 	})
 
 	monitorCancel()

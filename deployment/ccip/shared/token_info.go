@@ -86,10 +86,14 @@ const (
 	CCIPBnMSymbol              TokenSymbol = "CCIP-BnM"
 	CCIPLnMSymbol              TokenSymbol = "CCIP-LnM"
 	CLCCIPLnMSymbol            TokenSymbol = "clCCIP-LnM"
+	APTSymbol                  TokenSymbol = "APT"
 	USDCName                   string      = "USD Coin"
 	LinkDecimals                           = 18
 	WethDecimals                           = 18
 	UsdcDecimals                           = 6
+
+	// Aptos APT Fungible Asset address
+	AptosAPTAddress = "0xa"
 
 	// Price Feed Descriptions
 	AvaxUSD  = "AVAX / USD"
