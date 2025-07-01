@@ -205,7 +205,7 @@ func TestToLittleEndian(t *testing.T) {
 
 	var tests = []struct {
 		input    *big.Int
-		expected [32]byte
+		expected []byte
 	}{
 		{
 			input:    mustSetString("93632917990780833250"),
