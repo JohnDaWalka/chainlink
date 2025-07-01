@@ -326,7 +326,7 @@ var startCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "Error: %s\n", startErr)
 			fmt.Fprintf(os.Stderr, "Stack trace: %s\n", string(debug.Stack()))
 
-			dxErr := trackStartup(false, in.Infra.InfraType, ptr.Ptr(strings.SplitN(startErr.Error(), "\n", 1)[0]), ptr.Ptr(false))
+			dxErr := trackStartup(false, hasBuiltDockerImage(in), in.Infra.InfraType, ptr.Ptr(strings.SplitN(startErr.Error(), "\n", 1)[0]), ptr.Ptr(false))
 			if dxErr != nil {
 				fmt.Fprintf(os.Stderr, "failed to track startup: %s\n", dxErr)
 			}
@@ -348,7 +348,7 @@ var startCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "failed to create CRE CLI settings file: %s. You need to create it manually.", sErr)
 		}
 
-		dxErr := trackStartup(true, output.InfraInput.InfraType, nil, nil)
+		dxErr := trackStartup(true, hasBuiltDockerImage(in), output.InfraInput.InfraType, nil, nil)
 		if dxErr != nil {
 			fmt.Fprintf(os.Stderr, "failed to track startup: %s\n", dxErr)
 		}
@@ -387,7 +387,7 @@ var startCmd = &cobra.Command{
 	},
 }
 
-func trackStartup(success bool, infraType string, errorMessage *string, panicked *bool) error {
+func trackStartup(success, hasBuiltDockerImage bool, infraType string, errorMessage *string, panicked *bool) error {
 	metadata := map[string]any{
 		"success": success,
 		"infra":   infraType,
@@ -408,7 +408,8 @@ func trackStartup(success bool, infraType string, errorMessage *string, panicked
 
 	if success {
 		dxTimeErr := dxTracker.Track("cre.local.startup.time", map[string]any{
-			"duration_seconds": time.Since(provisioningStartTime).Seconds(),
+			"duration_seconds":       time.Since(provisioningStartTime).Seconds(),
+			"has_built_docker_image": hasBuiltDockerImage,
 		})
 
 		if dxTimeErr != nil {
@@ -829,4 +830,19 @@ func defaultCtfConfigs(topologyFlag string) error {
 	}
 
 	return nil
+}
+
+func hasBuiltDockerImage(in *Config) bool {
+	hasBuilt := false
+
+	for _, nodeset := range in.NodeSets {
+		for _, nodeSpec := range nodeset.NodeSpecs {
+			if nodeSpec.Node != nil && nodeSpec.Node.DockerFilePath != "" {
+				hasBuilt = true
+				break
+			}
+		}
+	}
+
+	return hasBuilt
 }
