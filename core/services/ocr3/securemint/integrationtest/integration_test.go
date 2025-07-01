@@ -174,6 +174,9 @@ func TestIntegration_SecureMint_happy_path(t *testing.T) {
 
 	t.Logf("jobIDs: %v", jobIDs)
 	validateJobsRunningSuccessfully(t, nodes, jobIDs)
+
+	t.Logf("Waiting for CRE Workflow to register itself as a subscriber to the secure mint trigger (in securemint/transmitter.go) and get triggered")
+	time.Sleep(10 * time.Minute)
 }
 
 func setupBlockchain(t *testing.T) (
@@ -542,6 +545,8 @@ func setupSecureMintCapabilitiesRegistry(t *testing.T, regAddress common.Address
 		}
 	}
 	backend.Commit()
+
+	time.Sleep(1 * time.Second) // wait for one block to be committed
 
 	// Get the node operator ID from the event
 	it, err := capReg.FilterNodeOperatorAdded(nil, nil, nil)

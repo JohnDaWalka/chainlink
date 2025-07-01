@@ -72,6 +72,9 @@ func NewTriggerPublisher(config *commoncap.RemoteTriggerConfig, underlying commo
 		config = &commoncap.RemoteTriggerConfig{}
 	}
 	config.ApplyDefaults()
+
+	lggr.Infof("NewTriggerPublisher config %v and dispatcher %v", config, dispatcher)
+
 	membersCache := make(map[uint32]map[p2ptypes.PeerID]bool)
 	for id, don := range workflowDONs {
 		cache := make(map[p2ptypes.PeerID]bool)
@@ -109,6 +112,7 @@ func (p *triggerPublisher) Start(ctx context.Context) error {
 }
 
 func (p *triggerPublisher) Receive(_ context.Context, msg *types.MessageBody) {
+	p.lggr.Infow("Receive", "capabilityId", p.capInfo.ID, "method", msg.Method, "sender", msg.Sender, "payload", msg.Payload)
 	sender, err := ToPeerID(msg.Sender)
 	if err != nil {
 		p.lggr.Errorw("failed to convert message sender to PeerID", "err", err)
@@ -122,6 +126,7 @@ func (p *triggerPublisher) Receive(_ context.Context, msg *types.MessageBody) {
 
 	switch msg.Method {
 	case types.MethodRegisterTrigger:
+		p.lggr.Infow("received trigger registration MethodRegisterTrigger", "capabilityId", p.capInfo.ID, "method", msg.Method, "sender", sender, "payload", msg.Payload)
 		req, err := pb.UnmarshalTriggerRegistrationRequest(msg.Payload)
 		if err != nil {
 			p.lggr.Errorw("failed to unmarshal trigger registration request", "capabilityId", p.capInfo.ID, "err", err)

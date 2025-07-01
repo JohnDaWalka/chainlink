@@ -185,6 +185,7 @@ func (w *launcher) peers(
 			allPeers[nid] = defaultStreamConfig
 		}
 	}
+	w.lggr.Infof("peers are here %v", allPeers)
 	return allPeers
 }
 
@@ -308,7 +309,7 @@ func (w *launcher) Launch(ctx context.Context, localRegistry *registrysyncer.Loc
 		}
 	}
 
-	// TODO(gg): make this true
+	// TODO(gg): make this true for the worker nodes
 	belongsToACapabilityDON := len(myCapabilityDONs) > 0
 	if belongsToACapabilityDON {
 		for _, myDON := range myCapabilityDONs {
@@ -640,6 +641,7 @@ func (w *launcher) addReceiver(ctx context.Context, capability registrysyncer.Ca
 	fmt.Printf("Adding receiver for capability %s %s %d\n", capID, info.ID, info.DON.ID)
 	underlying, err := w.registry.Get(ctx, capability.ID)
 	if err != nil {
+		// TODO(gg) does it always fail here?
 		return fmt.Errorf("failed to get capability from registry: %w", err)
 	}
 
