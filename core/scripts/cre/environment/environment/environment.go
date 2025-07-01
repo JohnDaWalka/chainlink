@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
@@ -71,6 +72,7 @@ var (
 	chainIDFlag                  uint64
 	gatewayURLFlag               string
 	withSetupFlag                bool
+	stateFilePathFlag            string
 )
 
 func init() {
@@ -78,6 +80,7 @@ func init() {
 	EnvironmentCmd.AddCommand(stopCmd)
 	EnvironmentCmd.AddCommand(deployAndVerifyExampleWorkflowCmd)
 	EnvironmentCmd.AddCommand(startBeholderCmd)
+	EnvironmentCmd.AddCommand(stopBeholderCmd)
 	EnvironmentCmd.AddCommand(createKafkaTopicsCmd)
 	EnvironmentCmd.AddCommand(fetchAndRegisterProtosCmd)
 
@@ -101,6 +104,7 @@ func init() {
 	startBeholderCmd.Flags().StringVarP(&topologyFlag, "topology", "t", "simplified", "Topology to use for the environment (simiplified or full)")
 	startBeholderCmd.Flags().StringArrayVarP(&protoConfigsFlag, "with-proto-configs", "c", []string{"./proto-configs/default.toml"}, "Protos configs to use (e.g. './proto-configs/config_one.toml,./proto-configs/config_two.toml')")
 	startBeholderCmd.Flags().StringVarP(&waitOnErrorTimeoutFlag, "wait-on-error-timeout", "w", "", "Wait on error timeout (e.g. 10s, 1m, 1h)")
+	startBeholderCmd.Flags().StringVarP(&stateFilePathFlag, "state-file-path", "s", "", "Path to the environment state file (if empty state.toml will be used)")
 
 	createKafkaTopicsCmd.Flags().StringVarP(&redPandaKafkaURLFlag, "red-panda-kafka-url", "k", "localhost:"+chipingressset.DEFAULT_RED_PANDA_KAFKA_PORT, "Red Panda Kafka URL")
 	createKafkaTopicsCmd.Flags().StringArrayVarP(&kafkaCreateTopicsFlag, "topics", "t", []string{}, "Kafka topics to create (e.g. 'topic1,topic2')")
@@ -354,7 +358,11 @@ var startCmd = &cobra.Command{
 		}
 
 		if withBeholderFlag {
-			startBeholderErr := startBeholder(cmdContext, protoConfigsFlag)
+			startBeholderErr := startBeholder(
+				cmdContext,
+				protoConfigsFlag,
+				nil, // extra Docker network is not required, since chip-ingress will connect to default Framework network
+			)
 			if startBeholderErr != nil {
 				if !strings.Contains(startBeholderErr.Error(), protoRegistrationErrMsg) {
 					beholderRemoveErr := framework.RemoveTestStack(chipingressset.DEFAULT_STACK_NAME)
@@ -845,4 +853,48 @@ func hasBuiltDockerImage(in *Config) bool {
 	}
 
 	return hasBuilt
+}
+
+func getCtfDockerNetworks() ([]string, error) {
+	dockerClient, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create Docker client")
+	}
+	defer dockerClient.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// List all containers with the "ctf" label
+	containers, err := dockerClient.ContainerList(ctx, container.ListOptions{
+		All:     true,
+		Filters: filters.NewArgs(filters.Arg("label", "framework=ctf")),
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list containers")
+	}
+
+	// Use a map to store unique network names
+	networkMap := make(map[string]bool)
+	var networkNames []string
+
+	for _, container := range containers {
+		// Get container details to access network settings
+		containerDetails, err := dockerClient.ContainerInspect(ctx, container.ID)
+		if err != nil {
+			// Log the error but continue with other containers
+			fmt.Fprintf(os.Stderr, "failed to inspect container %s: %s\n", container.ID, err)
+			continue
+		}
+
+		// Extract network names from container's network settings
+		for networkName := range containerDetails.NetworkSettings.Networks {
+			if !networkMap[networkName] {
+				networkMap[networkName] = true
+				networkNames = append(networkNames, networkName)
+			}
+		}
+	}
+
+	return networkNames, nil
 }

@@ -50,7 +50,12 @@ var startBeholderCmd = &cobra.Command{
 			return fmt.Errorf("failed to set TESTCONTAINERS_RYUK_DISABLED environment variable: %w", setErr)
 		}
 
-		startBeholderErr := startBeholder(cmd.Context(), protoConfigsFlag)
+		dockerNetworks, dockerNetworksErr := getCtfDockerNetworks()
+		if dockerNetworksErr != nil {
+			return errors.Wrap(dockerNetworksErr, "failed to get CTF Docker networks")
+		}
+
+		startBeholderErr := startBeholder(cmd.Context(), protoConfigsFlag, dockerNetworks)
 		if startBeholderErr != nil {
 			// remove the stack if the error is not related to proto registration
 			if !strings.Contains(startBeholderErr.Error(), protoRegistrationErrMsg) {
@@ -67,9 +72,18 @@ var startBeholderCmd = &cobra.Command{
 	},
 }
 
+var stopBeholderCmd = &cobra.Command{
+	Use:   "stop-beholder",
+	Short: "Stop the Beholder",
+	Long:  `Stop the Beholder`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return framework.RemoveTestStack(chipingressset.DEFAULT_STACK_NAME)
+	},
+}
+
 var protoRegistrationErrMsg = "proto registration failed"
 
-func startBeholder(cmdContext context.Context, protoConfigsFlag []string) (startupErr error) {
+func startBeholder(cmdContext context.Context, protoConfigsFlag []string, dockerNetworks []string) (startupErr error) {
 	// just in case, remove the stack if it exists
 	_ = framework.RemoveTestStack(chipingressset.DEFAULT_STACK_NAME)
 
@@ -109,6 +123,11 @@ func startBeholder(cmdContext context.Context, protoConfigsFlag []string) (start
 	in, err := framework.Load[ChipIngressConfig](nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to load test configuration")
+	}
+
+	// connect to existing network if provided, that should only be used, when chip-ingress is started for an already running environment
+	if len(dockerNetworks) > 0 {
+		in.ChipIngress.ExtraDockerNetworks = append(in.ChipIngress.ExtraDockerNetworks, dockerNetworks...)
 	}
 
 	out, startErr := chipingressset.New(in.ChipIngress)
