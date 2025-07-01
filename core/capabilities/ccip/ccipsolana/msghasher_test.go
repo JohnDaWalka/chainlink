@@ -219,7 +219,7 @@ func TestToLittleEndian(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.input.String(), func(t *testing.T) {
-			result := toLittleEndian(test.input)
+			result := encodeBigIntToFixedLengthLE(test.input, 32)
 			assert.Equal(t, test.expected, result, "expected %x, got %x", test.expected, result)
 		})
 	}
