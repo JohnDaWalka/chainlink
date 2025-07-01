@@ -436,8 +436,8 @@ func DestContractReaderConfig() (config.ContractReader, error) {
 						EventDefinitions: &config.EventDefinitions{
 							PollingFilter: &config.PollingFilter{},
 							IndexedField0: &config.IndexedField{
-								OffChainPath: consts.EventAttributeMsgTotalNonce,
-								OnChainPath:  "MsgTotalNonce",
+								OffChainPath: consts.EventAttributeCCTPNonce,
+								OnChainPath:  "CctpNonce",
 							},
 							IndexedField1: &config.IndexedField{
 								OffChainPath: consts.EventAttributeSourceDomain,
@@ -688,8 +688,8 @@ func SourceContractReaderConfig() (config.ContractReader, error) {
 						EventDefinitions: &config.EventDefinitions{
 							PollingFilter: &config.PollingFilter{},
 							IndexedField0: &config.IndexedField{
-								OffChainPath: consts.EventAttributeMsgTotalNonce,
-								OnChainPath:  "MsgTotalNonce",
+								OffChainPath: consts.EventAttributeCCTPNonce,
+								OnChainPath:  "CctpNonce",
 							},
 							IndexedField1: &config.IndexedField{
 								OffChainPath: consts.EventAttributeSourceDomain,
