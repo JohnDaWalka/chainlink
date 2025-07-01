@@ -81,7 +81,7 @@ If you don't want to build Chainlink image from your local branch (default behav
 
 ### Beholder
 
-When environment is started with `--with-beholder` or with `-b` flag after the DON is ready and configured we will boot up `Chip Ingress` and `Red Panda`, create a `cre` topic and download and install workflow-related protobufs from the [chainlink-protos](https://github.com/smartcontractkit/chainlink-protos/tree/main/workflows) repository.
+When environment is started with `--with-beholder` or with `-b` flag after the DON is ready  we will boot up `Chip Ingress` and `Red Panda`, create a `cre` topic and download and install workflow-related protobufs from the [chainlink-protos](https://github.com/smartcontractkit/chainlink-protos/tree/main/workflows) repository.
 
 Once up and running you will be able to access [CRE topic view](http://localhost:8080/topics/cre) to see workflow-emitted events. These include both standard events emitted by the Workflow Engine and custom events emitted from your workflow.
 
@@ -89,6 +89,8 @@ If environment is aready running you can start just the Beholder stack (and regi
 ```bash
 go run . env start-beholder
 ```
+
+> This assumes you have `chip-ingress:qa-latest` Docker image on your local machine. Without it Beholder won't be able to start. If you do not, close the [Atlas](https://github.com/smartcontractkit/atlas) repository, and then in `atlas/chip-ingress` run `docker build -t chip-ingress:qa-latest .`
 
 ## Stop Environment
 ```bash
