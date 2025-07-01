@@ -17,7 +17,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
@@ -30,19 +30,19 @@ func getTestSuiChainSelectors() []uint64 {
 	return []uint64{chainsel.SUI_LOCALNET.Selector}
 }
 
-func GenerateChainsSui(t *testing.T, numChains int) map[uint64]suichain.Chain {
+func GenerateChainsSui(t *testing.T, numChains int) []cldf_chain.BlockChain {
 	testSuiChainSelectors := getTestSuiChainSelectors()
 	if len(testSuiChainSelectors) < numChains {
 		t.Fatalf("not enough test sui chain selectors available")
 	}
-	chains := make(map[uint64]suichain.Chain)
-	for i := 0; i < numChains; i++ {
+	chains := make([]cldf_chain.BlockChain, 0, numChains)
+	for i := range numChains {
 		selector := testSuiChainSelectors[i]
 		chainID, err := chainsel.GetChainIDFromSelector(selector)
 		require.NoError(t, err)
 
 		url, _, privateKey, client := suiChain(t, chainID)
-		chains[selector] = suichain.Chain{
+		sui := suichain.Chain{
 			ChainMetadata: suichain.ChainMetadata{
 				Selector: selector,
 			},
@@ -53,6 +53,7 @@ func GenerateChainsSui(t *testing.T, numChains int) map[uint64]suichain.Chain {
 				return errors.New("TODO: sui Confirm")
 			},
 		}
+		chains = append(chains, sui)
 	}
 	t.Logf("Created %d Sui chains: %+v", len(chains), chains)
 	return chains

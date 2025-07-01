@@ -11,12 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-<<<<<<< HEAD
-	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
-	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
-	cldf_ton "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton"
-=======
->>>>>>> develop
+	
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -88,7 +83,7 @@ func NewMemoryChainsAptos(t *testing.T, numChains int) []cldf_chain.BlockChain {
 	return generateChainsAptos(t, numChains)
 }
 
-func NewMemoryChainsSui(t *testing.T, numChains int) map[uint64]suichain.Chain {
+func NewMemoryChainsSui(t *testing.T, numChains int) []cldf_chain.BlockChain {
 	return GenerateChainsSui(t, numChains)
 }
 
@@ -186,14 +181,13 @@ func NewMemoryEnvironment(
 	tonChains := NewMemoryChainsTon(t, config.TonChains)
 
 	chains := cldf_chain.NewBlockChainsFromSlice(
-		slices.Concat(evmChains, solChains, aptosChains, zkChains, tonChains),
+		slices.Concat(evmChains, solChains, aptosChains, zkChains, suiChains, tonChains),
 	)
 
 	c := NewNodesConfig{
 		LogLevel:       logLevel,
 		BlockChains:    chains,
-		NumNodes:       config.Nodes,
-		SuiChains:      suiChains,
+		NumNodes:       config.Nodes, 
 		NumBootstraps:  config.Bootstraps,
 		RegistryConfig: config.RegistryConfig,
 		CustomDBSetup:  config.CustomDBSetup,

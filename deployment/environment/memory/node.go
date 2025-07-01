@@ -372,7 +372,7 @@ func NewNode(
 		c.Aptos = aptosConfigs
 
 		var suiConfigs chainlink.RawConfigs
-		for chainID, chain := range nodecfg.Suichains {
+		for chainID, chain := range nodecfg.BlockChains.SuiChains() {
 			suiChainID, err := chainsel.GetChainIDFromSelector(chainID)
 			if err != nil {
 				t.Fatal(err)

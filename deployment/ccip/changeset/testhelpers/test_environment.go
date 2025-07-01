@@ -434,8 +434,7 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 	m.AptosChains = cldf_chain.NewBlockChainsFromSlice(aptosChains).AptosChains()
 	m.SolChains = cldf_chain.NewBlockChainsFromSlice(solChains).SolanaChains()
 	m.TonChains = cldf_chain.NewBlockChainsFromSlice(tonChains).TonChains()
-
-	m.SuiChains = suiChains
+	m.SuiChains = cldf_chain.NewBlockChainsFromSlice(suiChains).SuiChains()
 
 	blockChains := map[uint64]cldf_chain.BlockChain{}
 	for selector, ch := range m.Chains {
@@ -451,7 +450,7 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 		blockChains[selector] = ch
 	}
 
-	for selector, ch := range suiChains {
+	for selector, ch := range m.SuiChains {
 		blockChains[selector] = ch
 	}
 
