@@ -2,7 +2,10 @@ package ocrimpls
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
@@ -76,7 +79,7 @@ func contractConfigFromOCRConfig(cfg cctypes.OCR3ConfigWithMeta, addressCodec cc
 
 	transmitterAccounts, err := toOCRAccounts(transmitters, addressCodec, cfg.Config.ChainSelector)
 	if err != nil {
-		return types.ContractConfig{}, fmt.Errorf("failed to get transmitter accounts: %w", err)
+		return types.ContractConfig{}, fmt.Errorf("failed to convert transmitters to OCR accounts: %w", err)
 	}
 
 	return types.ContractConfig{
@@ -108,9 +111,21 @@ func toOnchainPublicKeys(signers [][]byte) []types.OnchainPublicKey {
 func toOCRAccounts(transmitters [][]byte, addressCodec ccipcommon.AddressCodec, chainSelector ccipocr3.ChainSelector) ([]types.Account, error) {
 	accounts := make([]types.Account, len(transmitters))
 	for i, transmitter := range transmitters {
+		family, err := chainsel.GetSelectorFamily(uint64(chainSelector))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get selector family for chain selector %d: %w", chainSelector, err)
+		}
+
+		// Aptos transmitter accounts do not go through the address codec, because they are ed25519 public keys.
+		if family == chainsel.FamilyAptos {
+			s := hex.EncodeToString(transmitter)
+			accounts[i] = types.Account(s)
+			continue
+		}
+
 		address, err := addressCodec.TransmitterBytesToString(transmitter, chainSelector)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get address from transmitter bytes: %w", err)
+			return nil, fmt.Errorf("failed to convert address bytes to string for transmitter %d: %w", i, err)
 		}
 		accounts[i] = types.Account(address)
 	}
