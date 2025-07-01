@@ -10,6 +10,7 @@ Slack: #topic-local-dev-environments
    - [Start Environment](#start-environment)
     - [Using Existing Docker plugins image](#using-existing-docker-plugins-image)
     - [Beholder](#beholder)
+    - [Storage](#storage)
    - [Stop Environment](#stop-environment)
    - [Restart Environment](#restarting-the-environment)
    - [DX Tracing](#dx-tracing)
@@ -91,6 +92,14 @@ go run . env start-beholder
 ```
 
 > This assumes you have `chip-ingress:qa-latest` Docker image on your local machine. Without it Beholder won't be able to start. If you do not, close the [Atlas](https://github.com/smartcontractkit/atlas) repository, and then in `atlas/chip-ingress` run `docker build -t chip-ingress:qa-latest .`
+### Storage
+
+The environment supports two storage backends for workflow uploads:
+- Gist (remote)
+- S3 MinIO (built-in, local)
+
+Configuration details are generated automatically into the `cre.yaml` file
+(path is printed after starting the environment).
 
 ## Stop Environment
 ```bash
