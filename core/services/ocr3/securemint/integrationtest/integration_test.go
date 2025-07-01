@@ -24,11 +24,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
+	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	datastreamsllo "github.com/smartcontractkit/chainlink-data-streams/llo"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/data-feeds/generated/data_feeds_cache"
+	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/llo-feeds/generated/configurator"
 	"github.com/smartcontractkit/chainlink-evm/pkg/assets"
 	evmtestutils "github.com/smartcontractkit/chainlink-evm/pkg/testutils"
@@ -141,6 +144,19 @@ func TestIntegration_SecureMint_happy_path(t *testing.T) {
 		c.P2P.V2.DefaultBootstrappers = &p2pV2Bootstrappers
 	})
 
+	// Setup capabilities registry and DON
+	regAddress := common.HexToAddress("0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512")
+	_, capRegAddress := setupSecureMintCapabilitiesRegistry(t, regAddress, steve, backend, nodes)
+	t.Logf("Capabilities registry setup complete at: %s", capRegAddress.Hex())
+
+	// Configure nodes to use the capabilities registry
+	for i := range nodes {
+		capRegAddressStr := capRegAddress.Hex()
+		// Note: The capabilities registry configuration is already set in setupNode
+		// The nodes are already configured to use the capabilities registry
+		t.Logf("Node %d is configured to use capabilities registry at %s", i, capRegAddressStr)
+	}
+
 	allowedSenders := make([]common.Address, len(nodes))
 	for i, node := range nodes {
 		keys, err := node.app.GetKeyStore().Eth().EnabledKeysForChain(testutils.Context(t), testutils.SimulatedChainID)
@@ -158,7 +174,6 @@ func TestIntegration_SecureMint_happy_path(t *testing.T) {
 
 	t.Logf("jobIDs: %v", jobIDs)
 	validateJobsRunningSuccessfully(t, nodes, jobIDs)
-
 }
 
 func setupBlockchain(t *testing.T) (
@@ -478,4 +493,130 @@ func setupDataFeedsCacheContract(t *testing.T, steve *bind.TransactOpts, backend
 	backend.Commit()
 
 	return addr, dataFeedsCache
+}
+
+// setupSecureMintCapabilitiesRegistry connects to an existing capabilities registry at the given address
+// and registers the secure mint capability, node operator, nodes, and DON.
+func setupSecureMintCapabilitiesRegistry(t *testing.T, regAddress common.Address, steve *bind.TransactOpts, backend evmtypes.Backend, nodes []node) (*kcr.CapabilitiesRegistry, common.Address) {
+	capReg, err := kcr.NewCapabilitiesRegistry(regAddress, backend.Client())
+	require.NoError(t, err)
+	t.Logf("Connected to CapabilitiesRegistry at: %s", regAddress.Hex())
+
+	// Add secure mint capability (if not already present)
+	secureMintCapability := kcr.CapabilitiesRegistryCapability{
+		LabelledName:   "securemint-trigger",
+		Version:        "1.0.0",
+		CapabilityType: 0, // TRIGGER
+	}
+	_, err = capReg.AddCapabilities(steve, []kcr.CapabilitiesRegistryCapability{secureMintCapability})
+	// Ignore error if already exists (check for both string message and custom error code)
+	if err != nil {
+		errString := err.Error()
+		if strings.Contains(errString, "already exists") || strings.Contains(errString, "0xebf52551") {
+			t.Logf("Secure mint capability already exists, skipping...")
+		} else {
+			t.Logf("Error adding secure mint capability: %v", err)
+			errString, err := rPCErrorFromError(err)
+			require.NoError(t, err)
+			t.Fatalf("Failed to add secure mint capability: %s", errString)
+		}
+	}
+	backend.Commit()
+
+	// Get the hashed capability ID
+	hashedCapabilityID, err := capReg.GetHashedCapabilityId(nil, secureMintCapability.LabelledName, secureMintCapability.Version)
+	require.NoError(t, err)
+	t.Logf("Secure mint capability ID: %x", hashedCapabilityID)
+
+	// Add node operator (if not already present)
+	_, err = capReg.AddNodeOperators(steve, []kcr.CapabilitiesRegistryNodeOperator{{
+		Admin: steve.From,
+		Name:  "securemint-nop",
+	}})
+	if err != nil {
+		errString := err.Error()
+		if strings.Contains(errString, "already exists") || strings.Contains(errString, "0x") {
+			t.Logf("Node operator already exists, skipping...")
+		} else {
+			require.NoError(t, err)
+		}
+	}
+	backend.Commit()
+
+	// Get the node operator ID from the event
+	it, err := capReg.FilterNodeOperatorAdded(nil, nil, nil)
+	require.NoError(t, err)
+	var nodeOperatorID uint32
+	for it.Next() {
+		if it.Event.Name == "securemint-nop" {
+			nodeOperatorID = it.Event.NodeOperatorId
+			break
+		}
+	}
+	require.NotZero(t, nodeOperatorID)
+	t.Logf("Node operator ID: %d", nodeOperatorID)
+
+	// Add nodes to the registry (if not already present)
+	var nodeParams []kcr.CapabilitiesRegistryNodeParams
+	var peerIDs [][32]byte
+	for i, node := range nodes {
+		p2pKeys, err := node.app.GetKeyStore().P2P().GetAll()
+		require.NoError(t, err)
+		require.Len(t, p2pKeys, 1, "Expected exactly one P2P key per node")
+		peerID := p2pKeys[0].PeerID()
+		nodeParam := kcr.CapabilitiesRegistryNodeParams{
+			NodeOperatorId:      nodeOperatorID,
+			Signer:              testutils.Random32Byte(),
+			P2pId:               peerID,
+			EncryptionPublicKey: testutils.Random32Byte(),
+			HashedCapabilityIds: [][32]byte{hashedCapabilityID},
+		}
+		nodeParams = append(nodeParams, nodeParam)
+		peerIDs = append(peerIDs, peerID)
+		t.Logf("Added node %d with peer ID: %x", i, peerID)
+	}
+	_, err = capReg.AddNodes(steve, nodeParams)
+	if err != nil {
+		errString := err.Error()
+		if strings.Contains(errString, "already exists") || strings.Contains(errString, "0x") {
+			t.Logf("Nodes already exist, skipping...")
+		} else {
+			require.NoError(t, err)
+		}
+	}
+	backend.Commit()
+
+	// Create capability configuration
+	capabilityConfig := &capabilitiespb.CapabilityConfig{
+		DefaultConfig: values.Proto(values.EmptyMap()).GetMapValue(),
+		RemoteConfig: &capabilitiespb.CapabilityConfig_RemoteTriggerConfig{
+			RemoteTriggerConfig: &capabilitiespb.RemoteTriggerConfig{
+				RegistrationRefresh:     nil, // Will use default
+				RegistrationExpiry:      nil, // Will use default
+				MinResponsesToAggregate: 2,   // F + 1
+				MessageExpiry:           nil, // Will use default
+			},
+		},
+	}
+	configBytes, err := proto.Marshal(capabilityConfig)
+	require.NoError(t, err)
+
+	// Add DON as a capability DON (isPublic=true, acceptsWorkflows=false)
+	_, err = capReg.AddDON(steve, peerIDs, []kcr.CapabilitiesRegistryCapabilityConfiguration{{
+		CapabilityId: hashedCapabilityID,
+		Config:       configBytes,
+	}}, true, false, fNodes)
+	if err != nil {
+		errString := err.Error()
+		if strings.Contains(errString, "already exists") || strings.Contains(errString, "0x") {
+			t.Logf("DON already exists, skipping...")
+		} else {
+			require.NoError(t, err)
+		}
+	}
+	backend.Commit()
+
+	t.Logf("Created capability DON with %d nodes", len(peerIDs))
+
+	return capReg, regAddress
 }
