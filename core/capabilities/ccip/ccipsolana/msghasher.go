@@ -38,21 +38,6 @@ func NewMessageHasherV1(lggr logger.Logger, extraDataCodec common.ExtraDataCodec
 	}
 }
 
-func toLittleEndian(v *big.Int) [32]byte {
-	// Get the big-endian bytes of the big.Int
-	b := v.Bytes()
-
-	// Create a fixed-size buffer filled with zeros
-	var out [32]byte
-
-	// Copy in reverse order to convert to little-endian
-	for i := 0; i < len(b) && i < len(out); i++ {
-		out[i] = b[len(b)-1-i]
-	}
-
-	return out
-}
-
 // Hash implements the MessageHasher interface.
 func (h *MessageHasherV1) Hash(_ context.Context, msg cciptypes.Message) (cciptypes.Bytes32, error) {
 	h.lggr.Debugw("hashing message", "msg", msg)
