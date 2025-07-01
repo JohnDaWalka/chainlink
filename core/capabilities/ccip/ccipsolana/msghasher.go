@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/gagliardetto/solana-go"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -35,6 +37,21 @@ func NewMessageHasherV1(lggr logger.Logger, extraDataCodec common.ExtraDataCodec
 		lggr:           lggr,
 		extraDataCodec: extraDataCodec,
 	}
+}
+
+func toLittleEndian(v *big.Int) [32]byte {
+	// Get the big-endian bytes of the big.Int
+	b := v.Bytes()
+
+	// Create a fixed-size buffer filled with zeros
+	var out [32]byte
+
+	// Copy in reverse order to convert to little-endian
+	for i := 0; i < len(b) && i < len(out); i++ {
+		out[i] = b[len(b)-1-i]
+	}
+
+	return out
 }
 
 // Hash implements the MessageHasher interface.
