@@ -308,6 +308,7 @@ func (w *launcher) Launch(ctx context.Context, localRegistry *registrysyncer.Loc
 		}
 	}
 
+	// TODO(gg): make this true
 	belongsToACapabilityDON := len(myCapabilityDONs) > 0
 	if belongsToACapabilityDON {
 		for _, myDON := range myCapabilityDONs {
@@ -511,6 +512,7 @@ var (
 	defaultMaxParallelCapabilityExecuteRequests = 1000
 )
 
+// TODO(gg): anything to do here?
 func (w *launcher) exposeCapabilities(ctx context.Context, myPeerID p2ptypes.PeerID, don registrysyncer.DON, state *registrysyncer.LocalRegistry, remoteWorkflowDONs []registrysyncer.DON) error {
 	idsToDONs := map[uint32]capabilities.DON{}
 	for _, d := range remoteWorkflowDONs {
