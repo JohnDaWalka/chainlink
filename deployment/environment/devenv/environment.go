@@ -22,7 +22,7 @@ type EnvironmentConfig struct {
 }
 
 func NewEnvironment(ctx func() context.Context, lggr logger.Logger, config EnvironmentConfig) (*cldf.Environment, *DON, error) {
-	chains, solChains, suiChains, err := NewChains(lggr, config.Chains)
+	chains, solChains, err := NewChains(lggr, config.Chains)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create chains: %w", err)
 	}
@@ -57,9 +57,6 @@ func NewEnvironment(ctx func() context.Context, lggr logger.Logger, config Envir
 		blockChains[c.Selector] = c
 	}
 	for _, c := range solChains {
-		blockChains[c.Selector] = c
-	}
-	for _, c := range suiChains {
 		blockChains[c.Selector] = c
 	}
 

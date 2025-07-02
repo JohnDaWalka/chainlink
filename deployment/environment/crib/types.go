@@ -28,7 +28,7 @@ type DeployCCIPOutput struct {
 }
 
 func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput) (*cldf.Environment, error) {
-	chains, solChains, suiChains, err := devenv.NewChains(lggr, output.Chains)
+	chains, solChains, err := devenv.NewChains(lggr, output.Chains)
 	if err != nil {
 		return nil, err
 	}
@@ -40,11 +40,7 @@ func NewDeployEnvironmentFromCribOutput(lggr logger.Logger, output DeployOutput)
 	for _, c := range solChains {
 		blockChains[c.Selector] = c
 	}
-
-	for _, c := range suiChains {
-		blockChains[c.Selector] = c
-	}
-
+ 
 	return cldf.NewEnvironment(
 		CRIB_ENV_NAME,
 		lggr,

@@ -28,7 +28,6 @@ import (
 
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
-	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/zksync-sdk/zksync2-go/accounts"
@@ -146,14 +145,12 @@ func (c *ChainConfig) ToRPCs() []cldf.RPC {
 	return rpcs
 }
 
-func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf_evm.Chain, map[uint64]cldf_solana.Chain, map[uint64]suichain.Chain, error) {
+func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf_evm.Chain, map[uint64]cldf_solana.Chain, error) {
 	evmChains := make(map[uint64]cldf_evm.Chain)
 	solChains := make(map[uint64]cldf_solana.Chain)
-	suiChains := make(map[uint64]suichain.Chain)
-
+ 
 	var evmSyncMap sync.Map
 	var solSyncMap sync.Map
-	var suiSyncMap sync.Map
 
 	g := new(errgroup.Group)
 	for _, chainCfg := range configs {
@@ -266,7 +263,7 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf_evm
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, nil, nil, err
+		return nil, nil,  err
 	}
 
 	evmSyncMap.Range(func(sel, value interface{}) bool {
@@ -279,12 +276,7 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]cldf_evm
 		return true
 	})
 
-	suiSyncMap.Range(func(sel, value interface{}) bool {
-		suiChains[sel.(uint64)] = value.(suichain.Chain)
-		return true
-	})
-
-	return evmChains, solChains, suiChains, nil
+	return evmChains, solChains, nil
 }
 
 func (c *ChainConfig) SetSolDeployerKey(keyString *string) error {
