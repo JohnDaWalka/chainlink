@@ -185,7 +185,6 @@ func CurseGloballyOnlyOnChain(selector uint64) CurseAction {
 // Given 3 chains A, B, C
 // CurseLaneBidirectionally(A, B) will curse A with the curse subject of B and B with the curse subject of A
 func CurseLaneBidirectionally(sourceSelector uint64, destinationSelector uint64) CurseAction {
-
 	// Bidirectional curse between two chains
 	return func(e cldf.Environment) ([]RMNCurseAction, error) {
 		curseActions1, err := CurseLaneOnlyOnSource(sourceSelector, destinationSelector)(e)

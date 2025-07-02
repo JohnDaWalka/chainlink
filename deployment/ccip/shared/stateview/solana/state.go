@@ -14,6 +14,7 @@ import (
 	solBurnMintTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/burnmint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	solLockReleaseTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/lockrelease_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
@@ -121,12 +122,19 @@ func (s CCIPChainState) GetActiveTokenPool(
 
 func (s CCIPChainState) ValidatePoolDeployment(
 	e *cldf.Environment,
-	poolType solTestTokenPool.PoolType,
+	poolType *solTestTokenPool.PoolType,
 	selector uint64,
 	tokenPubKey solana.PublicKey,
 	validatePoolConfig bool,
 	metadata string,
+	usdcPool bool,
 ) error {
+	if poolType == nil && !usdcPool {
+		return errors.New("neither pool type nor usdc pool toggle were set")
+	}
+	if poolType != nil && usdcPool {
+		return errors.New("both pool type and usdc pool toggle are set")
+	}
 	chain := e.BlockChains.SolanaChains()[selector]
 
 	var tokenPool solana.PublicKey
@@ -135,17 +143,22 @@ func (s CCIPChainState) ValidatePoolDeployment(
 	if _, err := s.TokenToTokenProgram(tokenPubKey); err != nil {
 		return fmt.Errorf("token %s not found in existing state, deploy the token first", tokenPubKey.String())
 	}
-	tokenPool, _ = s.GetActiveTokenPool(poolType, metadata)
+	if poolType != nil {
+		tokenPool, _ = s.GetActiveTokenPool(*poolType, metadata)
+		switch *poolType {
+		case solTestTokenPool.BurnAndMint_PoolType:
+			poolConfigAccount = solBurnMintTokenPool.State{}
+		case solTestTokenPool.LockAndRelease_PoolType:
+			poolConfigAccount = solLockReleaseTokenPool.State{}
+		default:
+			return fmt.Errorf("invalid pool type: %s", poolType)
+		}
+	} else if usdcPool {
+		tokenPool = s.USDCTokenPool
+		poolConfigAccount = cctp_token_pool.State{}
+	}
 	if tokenPool.IsZero() {
 		return fmt.Errorf("token pool of type %s not found in existing state, deploy the token pool first for chain %d", poolType, chain.Selector)
-	}
-	switch poolType {
-	case solTestTokenPool.BurnAndMint_PoolType:
-		poolConfigAccount = solBurnMintTokenPool.State{}
-	case solTestTokenPool.LockAndRelease_PoolType:
-		poolConfigAccount = solLockReleaseTokenPool.State{}
-	default:
-		return fmt.Errorf("invalid pool type: %s", poolType)
 	}
 
 	if validatePoolConfig {
@@ -669,6 +682,14 @@ func IsSolanaProgramOwnedByTimelock(
 			metadata = tokenPoolMetadata
 		}
 		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(tokenAddress, chainState.LockReleaseTokenPools[metadata])
+		err = chain.GetAccountDataBorshInto(e.GetContext(), poolConfigPDA, &programData)
+		if err != nil {
+			return false
+		}
+		return programData.Config.Owner.Equals(timelockSignerPDA)
+	case shared.USDCTokenPool:
+		programData := cctp_token_pool.State{}
+		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(tokenAddress, chainState.USDCTokenPool)
 		err = chain.GetAccountDataBorshInto(e.GetContext(), poolConfigPDA, &programData)
 		if err != nil {
 			return false
