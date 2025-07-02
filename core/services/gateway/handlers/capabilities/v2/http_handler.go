@@ -83,7 +83,7 @@ func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfi
 
 func WithDefaults(cfg ServiceConfig) ServiceConfig {
 	if cfg.CleanUpPeriodMs == 0 {
-		cfg.CleanUpPeriodMs = defaultCleanUpPeriodMs // every c0 minutes
+		cfg.CleanUpPeriodMs = defaultCleanUpPeriodMs
 	}
 	return cfg
 }
