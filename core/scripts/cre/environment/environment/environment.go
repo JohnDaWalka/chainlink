@@ -37,7 +37,6 @@ import (
 	croncap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/cron"
 	logeventtriggercap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/logevent"
 	readcontractcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/readcontract"
-	securemintcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/securemint"
 	webapicap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapi"
 	writeevmcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writeevm"
 	gatewayconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/gateway"
@@ -565,7 +564,7 @@ func StartCLIEnvironment(
 		computecap.ComputeCapabilityFactoryFn,
 		consensuscap.OCR3CapabilityFactoryFn,
 		croncap.CronCapabilityFactoryFn,
-		securemintcap.SecureMintCapabilityFactoryFn,
+		// securemintcap.SecureMintCapabilityFactoryFn,
 	}
 
 	containerPath, pathErr := crecapabilities.DefaultContainerDirectory(in.Infra.InfraType)
