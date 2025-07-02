@@ -77,6 +77,9 @@ func setupNode(
 		// set finality depth to 1 so we don't have to wait for multiple blocks
 		c.EVM[0].FinalityDepth = ptr[uint32](1)
 
+		// [Log]
+		c.Log.Level = ptr(toml.LogLevel(zapcore.DebugLevel)) // generally speaking we want debug level for logs unless overridden
+
 		// [JobPipeline]
 		c.JobPipeline.MaxSuccessfulRuns = ptr(uint64(1000))
 		c.JobPipeline.VerboseLogging = ptr(true)
@@ -95,9 +98,10 @@ func setupNode(
 
 		// [P2P]
 		c.P2P.PeerID = ptr(p2pKey.PeerID())
-		c.P2P.TraceLogging = ptr(true)
+		c.P2P.TraceLogging = ptr(true) //TODO(gg): check for logs here
 
 		// [P2P.V2]
+
 		c.P2P.V2.Enabled = ptr(true)
 		c.P2P.V2.AnnounceAddresses = &p2paddresses
 		c.P2P.V2.ListenAddresses = &p2paddresses

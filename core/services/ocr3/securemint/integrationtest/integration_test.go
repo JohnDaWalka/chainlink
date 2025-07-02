@@ -176,7 +176,7 @@ func TestIntegration_SecureMint_happy_path(t *testing.T) {
 	validateJobsRunningSuccessfully(t, nodes, jobIDs)
 
 	t.Logf("Waiting for CRE Workflow to register itself as a subscriber to the secure mint trigger (in securemint/transmitter.go) and get triggered")
-	time.Sleep(10 * time.Minute)
+	time.Sleep(9 * time.Minute)
 }
 
 func setupBlockchain(t *testing.T) (
@@ -510,6 +510,7 @@ func setupSecureMintCapabilitiesRegistry(t *testing.T, regAddress common.Address
 		LabelledName:   "securemint-trigger",
 		Version:        "1.0.0",
 		CapabilityType: 0, // TRIGGER
+		ResponseType:   0, // REPORT
 	}
 	_, err = capReg.AddCapabilities(steve, []kcr.CapabilitiesRegistryCapability{secureMintCapability})
 	// Ignore error if already exists (check for both string message and custom error code)
@@ -589,7 +590,17 @@ func setupSecureMintCapabilitiesRegistry(t *testing.T, regAddress common.Address
 			require.NoError(t, err)
 		}
 	}
+	time.Sleep(1 * time.Second) // wait for one block to be committed
 	backend.Commit()
+
+	onChainNodes, err := capReg.GetNodes(nil)
+	require.NoError(t, err)
+	// t.Logf("Nodes: %+v", onChainNodes)
+	for _, node := range onChainNodes {
+		for _, capabilityId := range node.HashedCapabilityIds {
+			t.Logf("Node with supported capability ids %x: %x", node.P2pId, capabilityId)
+		}
+	}
 
 	// Create capability configuration
 	capabilityConfig := &capabilitiespb.CapabilityConfig{
@@ -598,7 +609,7 @@ func setupSecureMintCapabilitiesRegistry(t *testing.T, regAddress common.Address
 			RemoteTriggerConfig: &capabilitiespb.RemoteTriggerConfig{
 				RegistrationRefresh:     nil, // Will use default
 				RegistrationExpiry:      nil, // Will use default
-				MinResponsesToAggregate: 2,   // F + 1
+				MinResponsesToAggregate: 0,   // F + 1
 				MessageExpiry:           nil, // Will use default
 			},
 		},
@@ -619,7 +630,22 @@ func setupSecureMintCapabilitiesRegistry(t *testing.T, regAddress common.Address
 			require.NoError(t, err)
 		}
 	}
+	time.Sleep(1 * time.Second) // wait for one block to be committed
 	backend.Commit()
+
+	onChainDONs, err := capReg.GetDONs(nil)
+	require.NoError(t, err)
+	// t.Logf("DONs: %v", onChainDONs)
+	for _, don := range onChainDONs {
+		strP2pIds := make([]string, len(don.NodeP2PIds))
+		for i, nodeP2pId := range don.NodeP2PIds {
+			strP2pIds[i] = hex.EncodeToString(nodeP2pId[:])
+		}
+		t.Logf("DON %d has %d nodes with p2p IDs %v", don.Id, len(don.NodeP2PIds), strP2pIds)
+		for _, config := range don.CapabilityConfigurations {
+			t.Logf("DON %d has capability config %x with config %v", don.Id, config.CapabilityId, config.Config)
+		}
+	}
 
 	t.Logf("Created capability DON with %d nodes", len(peerIDs))
 

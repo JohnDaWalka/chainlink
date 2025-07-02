@@ -129,3 +129,13 @@ Handy commands:
     ]
 }
 ```
+
+
+## Troubleshoot peers
+
+- Check a node's peers: `curl -u <admin_user>:<admin_password> http://<node_host>:<admin_port>/admin/peers`
+- Check a node's nodeID: `curl -u <admin_user>:<admin_password> http://<node_host>:<admin_port>/admin/nodeID`
+
+
+
+
