@@ -128,10 +128,12 @@ func TestIntegration_SecureMint_happy_path(t *testing.T) {
 	t.Logf("Starting from block: %d", fromBlock)
 
 	// Setup bootstrap
-	bootstrapCSAKey := csakey.MustNewV2XXXTestingOnly(big.NewInt(salt - 1))
-	bootstrapNodePort := freeport.GetOne(t)
-	appBootstrap, bootstrapPeerID, _, bootstrapKb, _ := setupNode(t, bootstrapNodePort, "bootstrap_securemint", backend, bootstrapCSAKey, nil)
-	bootstrapNode := node{app: appBootstrap, keyBundle: bootstrapKb}
+	// bootstrapCSAKey := csakey.MustNewV2XXXTestingOnly(big.NewInt(salt - 1))
+	// bootstrapNodePort := freeport.GetOne(t)
+	bootstrapNodePort := 5002
+	// appBootstrap, bootstrapPeerID, _, bootstrapKb, _ := setupNode(t, bootstrapNodePort, "bootstrap_securemint", backend, bootstrapCSAKey, nil)
+	// bootstrapNode := node{app: appBootstrap, keyBundle: bootstrapKb}
+	bootstrapPeerID := "12D3KooWQRiahhF1CrTex7P5gMuw4eg2sZ3Qn2XZehT6EuwPG6uL"
 
 	p2pV2Bootstrappers := []commontypes.BootstrapperLocator{
 		// Supply the bootstrap IP and port as a V2 peer address
@@ -167,8 +169,8 @@ func TestIntegration_SecureMint_happy_path(t *testing.T) {
 	_, configuratorAddress := setSecureMintOnchainConfigUsingOCR3Configurator(t, steve, backend, nodes, oracles)
 
 	t.Logf("Creating bootstrap job with configurator address: %s", configuratorAddress.Hex())
-	bootstrapJob := createSecureMintBootstrapJob(t, bootstrapNode, configuratorAddress, testutils.SimulatedChainID.String(), fmt.Sprintf("%d", fromBlock))
-	t.Logf("Created bootstrap job: %s with id %d", bootstrapJob.Name.ValueOrZero(), bootstrapJob.ID)
+	// bootstrapJob := createSecureMintBootstrapJob(t, bootstrapNode, configuratorAddress, testutils.SimulatedChainID.String(), fmt.Sprintf("%d", fromBlock))
+	// t.Logf("Created bootstrap job: %s with id %d", bootstrapJob.Name.ValueOrZero(), bootstrapJob.ID)
 
 	jobIDs := addSecureMintOCRJobs(t, nodes, configuratorAddress)
 

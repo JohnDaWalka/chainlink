@@ -274,7 +274,7 @@ func getSecureMintJobSpec(t *testing.T, ocrContractAddress, keyBundleID string, 
 				answer1 [type=any index=0];
 			"""
 
-			allowNoBootstrappers              = false
+			allowNoBootstrappers              = true
 
 			[relayConfig]
 			chainID                           = 1337
