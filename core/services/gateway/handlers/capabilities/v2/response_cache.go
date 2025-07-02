@@ -1,10 +1,6 @@
 package v2
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -66,35 +62,4 @@ func (rc *responseCache) DeleteExpired() int {
 	}
 	rc.lggr.Debugw("Removed expired cached HTTP responses", "count", expiredCount, "remaining", len(rc.cache))
 	return expiredCount
-}
-
-func generateCacheKey(req gateway.OutboundHTTPRequest) string {
-	s := sha256.New()
-	sep := []byte("/")
-
-	s.Write([]byte(req.WorkflowID))
-	s.Write(sep)
-	s.Write([]byte(req.URL))
-	s.Write(sep)
-	s.Write([]byte(req.Method))
-	s.Write(sep)
-	s.Write(req.Body)
-	s.Write(sep)
-
-	// To ensure deterministic order, iterate headers in sorted order
-	keys := make([]string, 0, len(req.Headers))
-	for k := range req.Headers {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		s.Write([]byte(key))
-		s.Write(sep)
-		s.Write([]byte(req.Headers[key]))
-		s.Write(sep)
-	}
-
-	s.Write([]byte(strconv.FormatUint(uint64(req.MaxResponseBytes), 10)))
-
-	return hex.EncodeToString(s.Sum(nil))
 }
