@@ -45,6 +45,8 @@ type CCIPChainState struct {
 	WSOL          solana.PublicKey
 	SPL2022Tokens []solana.PublicKey
 	SPLTokens     []solana.PublicKey
+	USDCTokenPool solana.PublicKey
+	USDCToken     solana.PublicKey
 
 	// ccip programs
 	Router                solana.PublicKey
@@ -489,6 +491,12 @@ func LoadChainStateSolana(chain cldf_solana.Chain, addresses map[string]cldf.Typ
 				return solState, err
 			}
 			solState.RMNRemoteCursesPDA = rmnRemoteCursesPDA
+		case shared.USDCTokenPool:
+			pub := solana.MustPublicKeyFromBase58(address)
+			solState.USDCTokenPool = pub
+		case shared.USDCToken:
+			pub := solana.MustPublicKeyFromBase58(address)
+			solState.USDCToken = pub
 		default:
 			continue
 		}
