@@ -48,11 +48,14 @@
       # image = "chainlink-tmp:latest"
       # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
       # capabilities = ['./cron']
-      custom_ports = ["10501:5001", "10690:6690", "5002:5002"]
+      custom_ports = ["10690:6690", "5002:5002"]
       user_config_overrides = """
       [Log]
       Level = 'debug'
       JSONConsole = false
+
+      [P2P]
+      TraceLogging = true
 
       [Telemetry]
       Enabled = false
@@ -70,11 +73,14 @@
       # image = "chainlink-tmp:latest"
       # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
       # capabilities = ['./cron']
-      custom_ports = ["10502:5001", "10691:6690"]
+      custom_ports = ["10691:6690"]
       user_config_overrides = """
       [Log]
       Level = 'debug'
       JSONConsole = false
+
+      [P2P]
+      TraceLogging = true
 
       [Telemetry]
       Enabled = false
@@ -92,11 +98,14 @@
       # image = "chainlink-tmp:latest"
       # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
       # capabilities = ['./cron']
-      custom_ports = ["10503:5001", "10692:6690"]
+      custom_ports = ["10692:6690"]
       user_config_overrides = """
       [Log]
       Level = 'debug'
       JSONConsole = false
+
+      [P2P]
+      TraceLogging = true
 
       [Telemetry]
       Enabled = false
@@ -114,11 +123,14 @@
       # image = "chainlink-tmp:latest"
       # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
       # capabilities = ['./cron']
-      custom_ports = ["10504:5001", "10693:6690"]
+      custom_ports = ["10693:6690"]
       user_config_overrides = """
       [Log]
       Level = 'debug'
       JSONConsole = false
+
+      [P2P]
+      TraceLogging = true
 
       [Telemetry]
       Enabled = false
@@ -136,11 +148,14 @@
       # image = "chainlink-tmp:latest"
       # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
       # capabilities = ['./cron']
-      custom_ports = ["10505:5001", "10694:6690"]
+      custom_ports = ["10694:6690"]
       user_config_overrides = """
       [Log]
       Level = 'debug'
       JSONConsole = true
+
+      [P2P]
+      TraceLogging = true
 
       [Telemetry]
       Enabled = true
