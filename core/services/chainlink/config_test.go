@@ -599,6 +599,20 @@ func TestConfig_Marshal(t *testing.T) {
 	}
 	full.JobDistributor = toml.JobDistributor{
 		DisplayName: ptr("test-node"),
+		AllowedJobTransfers: []toml.JobTransferRule{
+			{
+				From: "54227538d9352e0a24550a80ab6a7af6e4f1ffbb8a604e913cbb81c484a7f97d",
+				To:   "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+			},
+			{
+				From: "37346b7ea98af21e1309847e00f772826ac3689fe990b1920d01efc58ad2f250",
+				To:   "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+			},
+			{
+				From: "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+				To:   "54227538d9352e0a24550a80ab6a7af6e4f1ffbb8a604e913cbb81c484a7f97d",
+			},
+		},
 	}
 	full.EVM = []*evmcfg.EVMConfig{
 		{
@@ -1066,6 +1080,18 @@ TraceLogging = false
 `},
 		{"JobDistributor", Config{Core: toml.Core{JobDistributor: full.JobDistributor}}, `[JobDistributor]
 DisplayName = 'test-node'
+
+[[JobDistributor.AllowedJobTransfers]]
+From = '54227538d9352e0a24550a80ab6a7af6e4f1ffbb8a604e913cbb81c484a7f97d'
+To = 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'
+
+[[JobDistributor.AllowedJobTransfers]]
+From = '37346b7ea98af21e1309847e00f772826ac3689fe990b1920d01efc58ad2f250'
+To = 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'
+
+[[JobDistributor.AllowedJobTransfers]]
+From = 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'
+To = '54227538d9352e0a24550a80ab6a7af6e4f1ffbb8a604e913cbb81c484a7f97d'
 `},
 		{"P2P", Config{Core: toml.Core{P2P: full.P2P}}, `[P2P]
 IncomingMessageBufferSize = 13

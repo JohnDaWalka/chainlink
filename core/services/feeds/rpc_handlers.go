@@ -77,3 +77,23 @@ func (h *RPCHandlers) RevokeJob(ctx context.Context, req *pb.RevokeJobRequest) (
 
 	return &pb.RevokeJobResponse{}, nil
 }
+
+// TransferJob transfers a job proposal from one feeds manager to another.
+func (h *RPCHandlers) TransferJob(ctx context.Context, req *pb.TransferJobRequest) (*pb.TransferJobResponse, error) {
+	remoteUUID, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	err = h.svc.TransferJob(ctx, &TransferJobArgs{
+		RemoteUUID:          remoteUUID,
+		TargetManagerID:     h.feedsManagerID,
+		SourceManagerPubKey: req.SourceManagerPubKey,
+		Labels:              req.Labels,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.TransferJobResponse{}, nil
+}

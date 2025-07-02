@@ -79,6 +79,7 @@ const (
 	JobProposalSpecUpdated  EventID = "JOB_PROPOSAL_SPEC_UPDATED"
 	JobProposalSpecCanceled EventID = "JOB_PROPOSAL_SPEC_CANCELED"
 	JobProposalSpecRejected EventID = "JOB_PROPOSAL_SPEC_REJECTED"
+	JobTransferred          EventID = "JOB_TRANSFERRED"
 
 	ConfigUpdated            EventID = "CONFIG_UPDATED"
 	ConfigSqlLoggingEnabled  EventID = "CONFIG_SQL_LOGGING_ENABLED"

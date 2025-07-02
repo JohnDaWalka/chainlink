@@ -258,6 +258,65 @@ func (_c *FeedsManagerClient_RejectedJob_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// TransferedJob provides a mock function with given fields: ctx, in
+func (_m *FeedsManagerClient) TransferedJob(ctx context.Context, in *feedsmanager.TransferedJobRequest) (*feedsmanager.TransferedJobResponse, error) {
+	ret := _m.Called(ctx, in)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TransferedJob")
+	}
+
+	var r0 *feedsmanager.TransferedJobResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *feedsmanager.TransferedJobRequest) (*feedsmanager.TransferedJobResponse, error)); ok {
+		return rf(ctx, in)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *feedsmanager.TransferedJobRequest) *feedsmanager.TransferedJobResponse); ok {
+		r0 = rf(ctx, in)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*feedsmanager.TransferedJobResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *feedsmanager.TransferedJobRequest) error); ok {
+		r1 = rf(ctx, in)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FeedsManagerClient_TransferedJob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TransferedJob'
+type FeedsManagerClient_TransferedJob_Call struct {
+	*mock.Call
+}
+
+// TransferedJob is a helper method to define mock.On call
+//   - ctx context.Context
+//   - in *feedsmanager.TransferedJobRequest
+func (_e *FeedsManagerClient_Expecter) TransferedJob(ctx interface{}, in interface{}) *FeedsManagerClient_TransferedJob_Call {
+	return &FeedsManagerClient_TransferedJob_Call{Call: _e.mock.On("TransferedJob", ctx, in)}
+}
+
+func (_c *FeedsManagerClient_TransferedJob_Call) Run(run func(ctx context.Context, in *feedsmanager.TransferedJobRequest)) *FeedsManagerClient_TransferedJob_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*feedsmanager.TransferedJobRequest))
+	})
+	return _c
+}
+
+func (_c *FeedsManagerClient_TransferedJob_Call) Return(_a0 *feedsmanager.TransferedJobResponse, _a1 error) *FeedsManagerClient_TransferedJob_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *FeedsManagerClient_TransferedJob_Call) RunAndReturn(run func(context.Context, *feedsmanager.TransferedJobRequest) (*feedsmanager.TransferedJobResponse, error)) *FeedsManagerClient_TransferedJob_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateNode provides a mock function with given fields: ctx, in
 func (_m *FeedsManagerClient) UpdateNode(ctx context.Context, in *feedsmanager.UpdateNodeRequest) (*feedsmanager.UpdateNodeResponse, error) {
 	ret := _m.Called(ctx, in)

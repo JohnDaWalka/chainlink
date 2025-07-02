@@ -297,6 +297,16 @@ ListenIP = '0.0.0.0' # Default
 # It should uniquely and unambiguously represent the node for clear communication between Job Distributor maintainers/operators ↔ NOPs.
 DisplayName = "cre-workflow-1-chainlinklabs" # Example
 
+# AllowedJobTransfers defines directional job transfer rules between job distributors.
+# Each rule specifies a "from" and "to" CSA public key pair, allowing secure job transfers.
+# Empty or missing rules block all transfers.
+# CSA public keys must be hex-encoded strings.
+[[JobDistributor.AllowedJobTransfers]] # Example
+# From is the hex-encoded CSA public key of the source Job Distributor whose jobs will be transferred.
+From = "1234567890abcdef1234567890abcdef12345678" # Example
+# To is the hex-encoded CSA public key of the destination job distributor allowed to receive transfers.
+To = "abcdef1234567890abcdef1234567890abcdef12" # Example
+
 [JobPipeline]
 # ExternalInitiatorsEnabled enables the External Initiator feature. If disabled, `webhook` jobs can ONLY be initiated by a logged-in user. If enabled, `webhook` jobs can be initiated by a whitelisted external initiator.
 ExternalInitiatorsEnabled = false # Default

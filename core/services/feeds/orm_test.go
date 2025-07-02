@@ -979,6 +979,44 @@ func Test_ORM_UpsertJobProposal(t *testing.T) {
 	assert.Equal(t, feeds.JobProposalStatusDeleted, actual.Status)
 }
 
+func Test_ORM_TransferJobProposal(t *testing.T) {
+	t.Parallel()
+	ctx := testutils.Context(t)
+
+	orm := setupORM(t)
+
+	// Create two feeds managers with different public keys
+	sourcePublicKey := crypto.PublicKey([]byte("11111111111111111111111111111111"))
+	targetPublicKey := crypto.PublicKey([]byte("22222222222222222222222222222222"))
+	sourceManagerID := createFeedsManagerWithPublicKey(t, orm, sourcePublicKey)
+	targetManagerID := createFeedsManagerWithPublicKey(t, orm, targetPublicKey)
+
+	// Create a job proposal owned by the source manager
+	jp := &feeds.JobProposal{
+		RemoteUUID:     uuid.New(),
+		Status:         feeds.JobProposalStatusPending,
+		FeedsManagerID: sourceManagerID,
+	}
+
+	jpID, err := orm.CreateJobProposal(ctx, jp)
+	require.NoError(t, err)
+
+	actual, err := orm.GetJobProposal(ctx, jpID)
+	require.NoError(t, err)
+	assert.Equal(t, sourceManagerID, actual.FeedsManagerID)
+
+	err = orm.TransferJobProposal(ctx, jpID, targetManagerID)
+	require.NoError(t, err)
+
+	actual, err = orm.GetJobProposal(ctx, jpID)
+	require.NoError(t, err)
+	assert.Equal(t, targetManagerID, actual.FeedsManagerID)
+
+	err = orm.TransferJobProposal(ctx, int64(99999), targetManagerID)
+	require.Error(t, err)
+	assert.Equal(t, sql.ErrNoRows, err)
+}
+
 // Job Proposal Specs
 
 func Test_ORM_ApproveSpec(t *testing.T) {
@@ -1716,6 +1754,23 @@ func createFeedsManager(t *testing.T, orm feeds.ORM) int64 {
 		URI:       uri,
 		Name:      name,
 		PublicKey: publicKey,
+	}
+
+	ctx := testutils.Context(t)
+	id, err := orm.CreateManager(ctx, mgr)
+	require.NoError(t, err)
+
+	return id
+}
+
+// createFeedsManagerWithPublicKey is a test helper to create a feeds manager with a custom public key
+func createFeedsManagerWithPublicKey(t *testing.T, orm feeds.ORM, customPublicKey crypto.PublicKey) int64 {
+	t.Helper()
+
+	mgr := &feeds.FeedsManager{
+		URI:       uri,
+		Name:      name,
+		PublicKey: customPublicKey,
 	}
 
 	ctx := testutils.Context(t)

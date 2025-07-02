@@ -2264,12 +2264,21 @@ func (b *Billing) ValidateConfig() error {
 	return nil
 }
 
+type JobTransferRule struct {
+	From string `toml:"From"`
+	To string `toml:"To"`
+}
+
 type JobDistributor struct {
-	DisplayName *string
+	DisplayName         *string
+	AllowedJobTransfers []JobTransferRule `toml:"AllowedJobTransfers,omitempty"`
 }
 
 func (jd *JobDistributor) setFrom(f *JobDistributor) {
 	if f.DisplayName != nil {
 		jd.DisplayName = f.DisplayName
+	}
+	if f.AllowedJobTransfers != nil {
+		jd.AllowedJobTransfers = f.AllowedJobTransfers
 	}
 }

@@ -886,6 +886,29 @@ DisplayName = "cre-workflow-1-chainlinklabs" # Example
 DisplayName is a friendly, fully qualified name set by the NOP to clearly identify the node in Job Distributor.
 It should uniquely and unambiguously represent the node for clear communication between Job Distributor maintainers/operators ↔ NOPs.
 
+## JobDistributor.AllowedJobTransfers
+```toml
+[[JobDistributor.AllowedJobTransfers]] # Example
+From = "1234567890abcdef1234567890abcdef12345678" # Example
+To = "abcdef1234567890abcdef1234567890abcdef12" # Example
+```
+AllowedJobTransfers defines directional job transfer rules between job distributors.
+Each rule specifies a "from" and "to" CSA public key pair, allowing secure job transfers.
+Empty or missing rules block all transfers.
+CSA public keys must be hex-encoded strings.
+
+### From
+```toml
+From = "1234567890abcdef1234567890abcdef12345678" # Example
+```
+From is the hex-encoded CSA public key of the source Job Distributor whose jobs will be transferred.
+
+### To
+```toml
+To = "abcdef1234567890abcdef1234567890abcdef12" # Example
+```
+To is the hex-encoded CSA public key of the destination job distributor allowed to receive transfers.
+
 ## JobPipeline
 ```toml
 [JobPipeline]

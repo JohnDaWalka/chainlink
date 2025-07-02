@@ -18,6 +18,7 @@ type FeatureConfig interface {
 
 type JobDistributorConfig interface {
 	DisplayName() string
+	AllowedJobTransfers() []coreconfig.JobTransferRule
 }
 
 type JobConfig interface {

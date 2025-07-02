@@ -1214,6 +1214,65 @@ func (_c *ORM_GetManager_Call) RunAndReturn(run func(context.Context, int64) (*f
 	return _c
 }
 
+// GetManagerByPublicKey provides a mock function with given fields: ctx, publicKey
+func (_m *ORM) GetManagerByPublicKey(ctx context.Context, publicKey crypto.PublicKey) (*feeds.FeedsManager, error) {
+	ret := _m.Called(ctx, publicKey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetManagerByPublicKey")
+	}
+
+	var r0 *feeds.FeedsManager
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, crypto.PublicKey) (*feeds.FeedsManager, error)); ok {
+		return rf(ctx, publicKey)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, crypto.PublicKey) *feeds.FeedsManager); ok {
+		r0 = rf(ctx, publicKey)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*feeds.FeedsManager)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, crypto.PublicKey) error); ok {
+		r1 = rf(ctx, publicKey)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ORM_GetManagerByPublicKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetManagerByPublicKey'
+type ORM_GetManagerByPublicKey_Call struct {
+	*mock.Call
+}
+
+// GetManagerByPublicKey is a helper method to define mock.On call
+//   - ctx context.Context
+//   - publicKey crypto.PublicKey
+func (_e *ORM_Expecter) GetManagerByPublicKey(ctx interface{}, publicKey interface{}) *ORM_GetManagerByPublicKey_Call {
+	return &ORM_GetManagerByPublicKey_Call{Call: _e.mock.On("GetManagerByPublicKey", ctx, publicKey)}
+}
+
+func (_c *ORM_GetManagerByPublicKey_Call) Run(run func(ctx context.Context, publicKey crypto.PublicKey)) *ORM_GetManagerByPublicKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(crypto.PublicKey))
+	})
+	return _c
+}
+
+func (_c *ORM_GetManagerByPublicKey_Call) Return(_a0 *feeds.FeedsManager, _a1 error) *ORM_GetManagerByPublicKey_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *ORM_GetManagerByPublicKey_Call) RunAndReturn(run func(context.Context, crypto.PublicKey) (*feeds.FeedsManager, error)) *ORM_GetManagerByPublicKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetSpec provides a mock function with given fields: ctx, id
 func (_m *ORM) GetSpec(ctx context.Context, id int64) (*feeds.JobProposalSpec, error) {
 	ret := _m.Called(ctx, id)
@@ -1818,6 +1877,54 @@ func (_c *ORM_Transact_Call) Return(_a0 error) *ORM_Transact_Call {
 }
 
 func (_c *ORM_Transact_Call) RunAndReturn(run func(context.Context, func(feeds.ORM) error) error) *ORM_Transact_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TransferJobProposal provides a mock function with given fields: ctx, jobProposalID, newManagerID
+func (_m *ORM) TransferJobProposal(ctx context.Context, jobProposalID int64, newManagerID int64) error {
+	ret := _m.Called(ctx, jobProposalID, newManagerID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TransferJobProposal")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int64) error); ok {
+		r0 = rf(ctx, jobProposalID, newManagerID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// ORM_TransferJobProposal_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TransferJobProposal'
+type ORM_TransferJobProposal_Call struct {
+	*mock.Call
+}
+
+// TransferJobProposal is a helper method to define mock.On call
+//   - ctx context.Context
+//   - jobProposalID int64
+//   - newManagerID int64
+func (_e *ORM_Expecter) TransferJobProposal(ctx interface{}, jobProposalID interface{}, newManagerID interface{}) *ORM_TransferJobProposal_Call {
+	return &ORM_TransferJobProposal_Call{Call: _e.mock.On("TransferJobProposal", ctx, jobProposalID, newManagerID)}
+}
+
+func (_c *ORM_TransferJobProposal_Call) Run(run func(ctx context.Context, jobProposalID int64, newManagerID int64)) *ORM_TransferJobProposal_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(int64))
+	})
+	return _c
+}
+
+func (_c *ORM_TransferJobProposal_Call) Return(_a0 error) *ORM_TransferJobProposal_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *ORM_TransferJobProposal_Call) RunAndReturn(run func(context.Context, int64, int64) error) *ORM_TransferJobProposal_Call {
 	_c.Call.Return(run)
 	return _c
 }

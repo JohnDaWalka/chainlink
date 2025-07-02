@@ -21,6 +21,7 @@ type ORM interface {
 	CountManagers(ctx context.Context) (int64, error)
 	CreateManager(ctx context.Context, ms *FeedsManager) (int64, error)
 	GetManager(ctx context.Context, id int64) (*FeedsManager, error)
+	GetManagerByPublicKey(ctx context.Context, publicKey crypto.PublicKey) (*FeedsManager, error)
 	ListManagers(ctx context.Context) (mgrs []FeedsManager, err error)
 	ListManagersByIDs(ctx context.Context, ids []int64) ([]FeedsManager, error)
 	UpdateManager(ctx context.Context, mgr FeedsManager) error
@@ -41,6 +42,7 @@ type ORM interface {
 	GetJobProposal(ctx context.Context, id int64) (*JobProposal, error)
 	GetJobProposalByRemoteUUID(ctx context.Context, uuid uuid.UUID) (*JobProposal, error)
 	ListJobProposalsByManagersIDs(ctx context.Context, ids []int64) ([]JobProposal, error)
+	TransferJobProposal(ctx context.Context, jobProposalID int64, newManagerID int64) error
 	UpdateJobProposalStatus(ctx context.Context, id int64, status JobProposalStatus) error // NEEDED?
 	UpsertJobProposal(ctx context.Context, jp *JobProposal) (int64, error)
 
@@ -286,6 +288,20 @@ WHERE id = $1
 	return mgr, errors.Wrap(err, "GetManager failed")
 }
 
+// GetManagerByPublicKey gets a feeds manager by public key.
+func (o *orm) GetManagerByPublicKey(ctx context.Context, publicKey crypto.PublicKey) (mgr *FeedsManager, err error) {
+	stmt := `
+SELECT id, name, uri, public_key, created_at, updated_at, disabled_at
+FROM feeds_managers
+WHERE public_key = $1
+`
+
+	o.lggr.Infow("getting feeds manager by public key", "publicKey", publicKey)
+	mgr = new(FeedsManager)
+	err = o.ds.GetContext(ctx, mgr, stmt, publicKey)
+	return mgr, errors.Wrap(err, "GetManagerByPublicKey failed")
+}
+
 // ListManager lists all feeds managers.
 func (o *orm) ListManagers(ctx context.Context) (mgrs []FeedsManager, err error) {
 	stmt := `
@@ -387,7 +403,7 @@ func (o *orm) CountJobProposals(ctx context.Context) (count int64, err error) {
 // CountJobProposals counts the number of job proposal records.
 func (o *orm) CountJobProposalsByStatus(ctx context.Context) (counts *JobProposalCounts, err error) {
 	stmt := `
-SELECT 
+SELECT
 	COUNT(*) filter (where job_proposals.status = 'pending' OR job_proposals.pending_update = TRUE) as pending,
 	COUNT(*) filter (where job_proposals.status = 'approved' AND job_proposals.pending_update = FALSE) as approved,
 	COUNT(*) filter (where job_proposals.status = 'rejected' AND job_proposals.pending_update = FALSE) as rejected,
@@ -456,6 +472,32 @@ WHERE id = $2;
 	if err != nil {
 		return err
 	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+// TransferJobProposal transfers ownership of a job proposal to a different feeds manager
+func (o *orm) TransferJobProposal(ctx context.Context, jobProposalID int64, newManagerID int64) error {
+	stmt := `
+UPDATE job_proposals
+SET feeds_manager_id = $2,
+    updated_at = NOW()
+WHERE id = $1;
+`
+
+	result, err := o.ds.ExecContext(ctx, stmt, jobProposalID, newManagerID)
+	if err != nil {
+		return errors.Wrap(err, "TransferJobProposal failed")
+	}
+
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return err
