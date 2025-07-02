@@ -31,8 +31,7 @@ func newResponseCache(lggr logger.Logger) *responseCache {
 func (rc *responseCache) Set(req gateway.OutboundHTTPRequest, response gateway.OutboundHTTPResponse, ttl time.Duration) {
 	rc.cacheMu.Lock()
 	defer rc.cacheMu.Unlock()
-	key := generateCacheKey(req)
-	rc.cache[key] = &cachedResponse{
+	rc.cache[req.Hash()] = &cachedResponse{
 		response: response,
 		expiry:   time.Now().Add(ttl),
 	}
@@ -41,8 +40,7 @@ func (rc *responseCache) Set(req gateway.OutboundHTTPRequest, response gateway.O
 func (rc *responseCache) Get(req gateway.OutboundHTTPRequest) *gateway.OutboundHTTPResponse {
 	rc.cacheMu.RLock()
 	defer rc.cacheMu.RUnlock()
-	key := generateCacheKey(req)
-	cachedResp, exists := rc.cache[key]
+	cachedResp, exists := rc.cache[req.Hash()]
 	if !exists || time.Now().After(cachedResp.expiry) {
 		return nil
 	}
