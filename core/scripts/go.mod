@@ -40,8 +40,8 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.62
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250627133416-1d85eec09097
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250702115140-93959a95eba4
-	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250626141212-e50b2e7ffe2d
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250702201310-07178aa95345
+	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250702175503-91331140edc3
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250604171706-a98fa6515eae
 	github.com/smartcontractkit/chainlink-deployments-framework v0.17.0
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250707113334-93191f4c5ff4
