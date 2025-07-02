@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
@@ -42,8 +41,8 @@ type gatewayHandler struct {
 }
 
 type ResponseCache interface {
-	Set(req gateway.OutboundHTTPRequest, response gateway.OutboundHTTPResponse, ttl time.Duration)
-	Get(req gateway.OutboundHTTPRequest) *gateway.OutboundHTTPResponse
+	Set(req gateway_common.OutboundHTTPRequest, response gateway_common.OutboundHTTPResponse, ttl time.Duration)
+	Get(req gateway_common.OutboundHTTPRequest) *gateway_common.OutboundHTTPResponse
 	DeleteExpired() int
 }
 
@@ -94,7 +93,7 @@ func (h *gatewayHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Re
 		return fmt.Errorf("received response with empty request ID from node %s", nodeAddr)
 	}
 	h.lggr.Debugw("handling incoming node message", "requestID", resp.ID, "nodeAddr", nodeAddr)
-	var outboundReq gateway.OutboundHTTPRequest
+	var outboundReq gateway_common.OutboundHTTPRequest
 	err := json.Unmarshal(resp.Result, &outboundReq)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal HTTP request from node %s: %w", nodeAddr, err)
@@ -111,7 +110,7 @@ func (h *gatewayHandler) HandleJSONRPCUserMessage(context.Context, jsonrpc.Reque
 	return nil
 }
 
-func (h *gatewayHandler) handleOutgoingRequest(ctx context.Context, requestID string, req gateway.OutboundHTTPRequest, nodeAddr string) error {
+func (h *gatewayHandler) handleOutgoingRequest(ctx context.Context, requestID string, req gateway_common.OutboundHTTPRequest, nodeAddr string) error {
 	h.lggr.Debugw("handling webAPI outgoing message", "requestID", requestID, "nodeAddr", nodeAddr)
 	if !h.nodeRateLimiter.Allow(nodeAddr) {
 		return fmt.Errorf("rate limit exceeded for node %s", nodeAddr)
@@ -145,22 +144,22 @@ func (h *gatewayHandler) handleOutgoingRequest(ctx context.Context, requestID st
 		defer cancel()
 		l := logger.With(h.lggr, "requestID", requestID, "method", req.Method, "timeout", req.TimeoutMs)
 		l.Debug("Sending request to client")
-		var outboundResp gateway.OutboundHTTPResponse
+		var outboundResp gateway_common.OutboundHTTPResponse
 		resp, err := h.httpClient.Send(ctx, httpReq)
 		if err != nil {
 			l.Errorw("error while sending HTTP request to external endpoint", "err", err)
-			outboundResp = gateway.OutboundHTTPResponse{
+			outboundResp = gateway_common.OutboundHTTPResponse{
 				ErrorMessage: err.Error(),
 			}
 		} else {
-			outboundResp = gateway.OutboundHTTPResponse{
+			outboundResp = gateway_common.OutboundHTTPResponse{
 				StatusCode: resp.StatusCode,
 				Headers:    resp.Headers,
 				Body:       resp.Body,
 			}
 
 			if req.CacheSettings.StoreInCache && isCacheableStatusCode(resp.StatusCode) {
-				cacheTTLMs := req.CacheSettings.TtlMs
+				cacheTTLMs := req.CacheSettings.TTLMs
 				if cacheTTLMs > 0 {
 					h.responseCache.Set(req, outboundResp, time.Duration(cacheTTLMs)*time.Millisecond)
 					l.Debugw("Cached HTTP response", "ttlMs", cacheTTLMs)
@@ -211,7 +210,7 @@ func (h *gatewayHandler) Close() error {
 	})
 }
 
-func (h *gatewayHandler) sendResponseToNode(ctx context.Context, requestID string, resp gateway.OutboundHTTPResponse, nodeAddr string) error {
+func (h *gatewayHandler) sendResponseToNode(ctx context.Context, requestID string, resp gateway_common.OutboundHTTPResponse, nodeAddr string) error {
 	params, err := json.Marshal(resp)
 	if err != nil {
 		return err

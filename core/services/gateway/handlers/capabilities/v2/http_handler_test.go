@@ -157,7 +157,7 @@ func TestHandleNodeMessage(t *testing.T) {
 			CacheSettings: gateway.CacheSettings{
 				StoreInCache:  true,
 				ReadFromCache: true,
-				TtlMs:         600000, // 10 minute TTL
+				TTLMs:         600000, // 10 minute TTL
 			},
 		}
 		reqBytes, err := json.Marshal(outboundReq)
@@ -186,8 +186,8 @@ func TestHandleNodeMessage(t *testing.T) {
 		// Second call: should return cached response (no HTTP client call)
 		mockDon.EXPECT().SendToNode(mock.Anything, "node1", mock.MatchedBy(func(req *jsonrpc.Request) bool {
 			var cached gateway.OutboundHTTPResponse
-			err := json.Unmarshal(req.Params, &cached)
-			return err == nil && string(cached.Body) == string(httpResp.Body)
+			err2 := json.Unmarshal(req.Params, &cached)
+			return err2 == nil && string(cached.Body) == string(httpResp.Body)
 		})).Return(nil)
 
 		err = handler.HandleNodeMessage(testutils.Context(t), resp, "node1")
@@ -203,7 +203,7 @@ func TestHandleNodeMessage(t *testing.T) {
 			CacheSettings: gateway.CacheSettings{
 				StoreInCache:  true,
 				ReadFromCache: true,
-				TtlMs:         600000,
+				TTLMs:         600000,
 			},
 		}
 		reqBytes, err := json.Marshal(outboundReq)
