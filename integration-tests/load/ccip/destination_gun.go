@@ -9,6 +9,7 @@ import (
 	mathrand "math/rand"
 	"time"
 
+	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -48,6 +49,7 @@ type DestinationGun struct {
 	testConfig       *ccip.LoadConfig
 	evmSourceKeys    map[uint64]*bind.TransactOpts
 	solanaSourceKeys map[uint64]*solana.PrivateKey
+	aptosSourceKeys  map[uint64]map[uint64]*aptos.Account
 	metricPipe       chan messageData
 	availableSources []uint64 // Cache of available source chains for this destination
 }
@@ -60,6 +62,7 @@ func NewDestinationGun(
 	receiver []byte,
 	overrides *ccip.LoadConfig,
 	evmSourceKeys map[uint64]*bind.TransactOpts,
+	aptosSourceKeys map[uint64]map[uint64]*aptos.Account,
 	solanaSourceKeys map[uint64]*solana.PrivateKey,
 	metricPipe chan messageData,
 	availableSources []uint64,
@@ -82,6 +85,7 @@ func NewDestinationGun(
 		receiver:         receiver,
 		testConfig:       overrides,
 		evmSourceKeys:    evmSourceKeys,
+		aptosSourceKeys:  aptosSourceKeys,
 		solanaSourceKeys: solanaSourceKeys,
 		metricPipe:       metricPipe,
 		availableSources: availableSources,
@@ -108,6 +112,8 @@ func (m *DestinationGun) Call(_ *wasp.Generator) *wasp.Response {
 		err = m.sendEVMSourceMessage(src)
 	case selectors.FamilySolana:
 		err = m.sendSOLSourceMessage(src)
+	case selectors.FamilyAptos:
+		err = m.sendAptosSourceMessage(src)
 	}
 
 	if err != nil {
@@ -468,4 +474,13 @@ func (m *DestinationGun) getSolanaMessage(src uint64) (ccip_router.SVM2AnyMessag
 	}
 
 	return message, nil
+}
+
+func (m *DestinationGun) sendAptosSourceMessage(src uint64) error {
+
+	return nil
+}
+
+func (m *DestinationGun) getAptosMessage(src uint64) (ccip_router.SVM2AnyMessage, error) {
+	return ccip_router.SVM2AnyMessage{}, nil
 }

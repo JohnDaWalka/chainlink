@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/aptos-labs/aptos-go-sdk/crypto"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	solState "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/solana"
@@ -47,6 +49,7 @@ var (
 const (
 	simChainTestKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	solTestKey      = "57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC"
+	aptosTestKey    = "0x906b8a983b434318ca67b7eff7300f91b02744c84f87d243d2fbc3e528414366"
 )
 
 func runSafely(ops ...func()) {
@@ -117,6 +120,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 	destinationChains := env.BlockChains.ListChainSelectors()[:*userOverrides.NumDestinationChains]
 	evmChains := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(selectors.FamilyEVM))
 	solChains := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(selectors.FamilySolana))
+	aptosChains := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(selectors.FamilyAptos))
 
 	// initialize the block time for each chain
 	blockTimes := make(map[uint64]uint64)
@@ -141,10 +145,24 @@ func TestCCIPLoad_RPS(t *testing.T) {
 		blockTimes[cs] = 0
 	}
 
-	// initialize additional accounts on EVM, we need more accounts to avoid nonce issues
+	for _, cs := range aptosChains {
+		blockTimes[cs] = 0
+	}
+
+	// initialize additional accounts on EVM and Aptos (optional), we need more accounts to avoid nonce issues
 	// Solana doesn't have a nonce concept so we just use a single account for all chains
 	evmSenders, err := fundAdditionalKeys(lggr, *env, destinationChains)
 	require.NoError(t, err)
+
+	var aptosSenders map[uint64][]aptos.Account
+	if len(aptosChains) > 0 {
+		deployerKey := &crypto.Ed25519PrivateKey{}
+		require.NoError(t, deployerKey.FromHex(aptosTestKey))
+		deployerAccount, err := aptos.NewAccountFromSigner(deployerKey)
+		require.NoError(t, err)
+		aptosSenders, err = fundAdditionalAptosKeys(t, deployerAccount, *env, destinationChains, 100*1e8)
+		require.NoError(t, err)
+	}
 
 	// Keep track of the block number for each chain so that event subscription can be done from that block.
 	startBlocks := make(map[uint64]*uint64)
@@ -223,10 +241,19 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				mm.InputChan,
 				finalSeqNrCommitChannels,
 				finalSeqNrExecChannels)
+		case selectors.FamilyAptos:
+			client := env.BlockChains.AptosChains()[cs].Client
+			info, err := client.Info()
+			require.NoError(t, err)
+			block := info.BlockHeight()
+			startBlocks[cs] = &block
+			// TODO - Add subscription event
+			// go subscribeAptosTransmitEvents()
 		}
 	}
 
 	evmSourceKeys := make(map[uint64]map[uint64]*bind.TransactOpts)
+	aptosSourceKeys := make(map[uint64]map[uint64]*aptos.Account)
 	solSourceKeys := make(map[uint64]*solana.PrivateKey)
 	var mu sync.Mutex
 
@@ -254,6 +281,17 @@ func TestCCIPLoad_RPS(t *testing.T) {
 						"destinationChain", cs,
 						"requiredIndex", ind,
 						"availableSenders", len(evmSenders[src]))
+				}
+			case selectors.FamilyAptos:
+				// Check if we have enough senders for this source chain
+				if ind < len(aptosSenders[src]) {
+					aptosSourceKeys[cs][src] = &aptosSenders[src][ind]
+				} else {
+					lggr.Errorw("Not enough Aptos senders for source chain",
+						"sourceChain", src,
+						"destinationChain", cs,
+						"requiredIndex", ind,
+						"availableSenders", len(aptosSenders[src]))
 				}
 			case selectors.FamilySolana:
 				if _, exists := solSourceKeys[src]; !exists {
@@ -305,6 +343,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				state.Chains[cs].Receiver.Address().Bytes(),
 				userOverrides,
 				evmSourceKeys[cs],
+				aptosSourceKeys,
 				solSourceKeys,
 				mm.InputChan,
 				srcChains,
@@ -349,6 +388,30 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				cs,
 				state.Chains[cs].OffRamp,
 				lggr)
+		case selectors.FamilyAptos:
+			gunMap[cs], err = NewDestinationGun(
+				env.Logger,
+				cs,
+				*env,
+				&state,
+				state.Chains[cs].Receiver.Address().Bytes(),
+				userOverrides,
+				evmSourceKeys[cs],
+				aptosSourceKeys,
+				solSourceKeys,
+				mm.InputChan,
+				srcChains,
+			)
+			if err != nil {
+				lggr.Errorw("Failed to initialize DestinationGun for", "chainSelector", cs, "error", err)
+				t.Fatal(err)
+			}
+			wg.Add(2)
+			// go subscribeCommitEvents()
+			// go subscribeExecutionEvents()
+			// error watchers
+			// go subscribeSkippedIncorrectNonce()
+			// go subscribeAlreadyExecuted()
 		case selectors.FamilySolana:
 
 			gunMap[cs], err = NewDestinationGun(
@@ -359,6 +422,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				state.SolChains[cs].Receiver.Bytes(),
 				userOverrides,
 				evmSourceKeys[cs],
+				aptosSourceKeys,
 				solSourceKeys,
 				mm.InputChan,
 				srcChains,
