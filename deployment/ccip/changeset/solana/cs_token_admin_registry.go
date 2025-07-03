@@ -51,7 +51,6 @@ func (cfg RegisterTokenAdminRegistryConfig) Validate(e cldf.Environment, chainSt
 	if cfg.RegisterType != ViaGetCcipAdminInstruction && cfg.RegisterType != ViaOwnerInstruction {
 		return fmt.Errorf("invalid register type, valid types are %d and %d", ViaGetCcipAdminInstruction, ViaOwnerInstruction)
 	}
-
 	if cfg.TokenAdminRegistryAdmin == "" {
 		return errors.New("token admin registry admin is required")
 	}
@@ -67,7 +66,6 @@ func (cfg RegisterTokenAdminRegistryConfig) Validate(e cldf.Environment, chainSt
 	if err := ValidateMCMSConfigSolana(e, cfg.MCMS, chain, chainState, solana.PublicKey{}, "", map[cldf.ContractType]bool{shared.Router: true}); err != nil {
 		return err
 	}
-
 	routerProgramAddress, _, _ := chainState.GetRouterInfo()
 	tokenAdminRegistryPDA, _, err := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
 	if err != nil {
