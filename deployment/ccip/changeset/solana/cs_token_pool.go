@@ -307,7 +307,7 @@ type RemoteChainTokenPoolConfig struct {
 	// a pool pda is uniquely identified by (solTokenPubKey, poolType, metadata)
 	SolTokenPubKey   solana.PublicKey
 	SolPoolType      *solTestTokenPool.PoolType
-	SolUSDCPool      bool
+	SolCCTPPool      bool
 	Metadata         string // tag to identify which client/cll token pool executable to use
 	EVMRemoteConfigs map[uint64]EVMRemoteConfig
 	MCMS             *proposalutils.TimelockConfig
@@ -319,14 +319,14 @@ func (cfg RemoteChainTokenPoolConfig) Validate(e cldf.Environment, state statevi
 		return err
 	}
 	chain := e.BlockChains.SolanaChains()[cfg.SolChainSelector]
-	if cfg.SolPoolType == nil && !cfg.SolUSDCPool {
+	if cfg.SolPoolType == nil && !cfg.SolCCTPPool {
 		return errors.New("pool type must be defined or USDC pool should be toggled")
 	}
-	if cfg.SolPoolType != nil && cfg.SolUSDCPool {
+	if cfg.SolPoolType != nil && cfg.SolCCTPPool {
 		return errors.New("pool type and USDC pool flag cannot both be set")
 	}
 
-	if err := chainState.ValidatePoolDeployment(&e, cfg.SolPoolType, cfg.SolChainSelector, cfg.SolTokenPubKey, true, cfg.Metadata, cfg.SolUSDCPool); err != nil {
+	if err := chainState.ValidatePoolDeployment(&e, cfg.SolPoolType, cfg.SolChainSelector, cfg.SolTokenPubKey, true, cfg.Metadata, cfg.SolCCTPPool); err != nil {
 		return err
 	}
 
@@ -384,8 +384,8 @@ func SetupTokenPoolForRemoteChain(e cldf.Environment, cfg RemoteChainTokenPoolCo
 	var contractType cldf.ContractType
 	if cfg.SolPoolType != nil {
 		tokenPool, contractType = solChainState.GetActiveTokenPool(*cfg.SolPoolType, cfg.Metadata)
-	} else if cfg.SolUSDCPool {
-		tokenPool = solChainState.USDCTokenPool
+	} else if cfg.SolCCTPPool {
+		tokenPool = solChainState.CCTPTokenPool
 		contractType = shared.USDCTokenPool
 	}
 
@@ -449,7 +449,7 @@ func SetupTokenPoolForRemoteChain(e cldf.Environment, cfg RemoteChainTokenPoolCo
 		default:
 			return cldf.ChangesetOutput{}, fmt.Errorf("invalid pool type: %s", cfg.SolPoolType)
 		}
-	} else if cfg.SolUSDCPool {
+	} else if cfg.SolCCTPPool {
 		cctp_token_pool.SetProgramID(tokenPool)
 		useMcms := solanastateview.IsSolanaProgramOwnedByTimelock(
 			&e,
@@ -461,7 +461,7 @@ func SetupTokenPoolForRemoteChain(e cldf.Environment, cfg RemoteChainTokenPoolCo
 		)
 		for evmChainSelector, evmRemoteConfig := range cfg.EVMRemoteConfigs {
 			e.Logger.Infow("Setting up USDC token pool for remote chain", "remote_chain_selector", evmChainSelector, "token_pubkey", tokenPubKey.String())
-			chainIxs, err := getInstructionsForUSDC(e, chain, envState, solChainState, cfg, evmChainSelector, evmRemoteConfig)
+			chainIxs, err := getInstructionsForCCTP(e, chain, envState, solChainState, cfg, evmChainSelector, evmRemoteConfig)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
 			}
@@ -905,7 +905,7 @@ func getNewSetuptInstructionsForUSDC(
 ) ([]solana.Instruction, error) {
 	e.Logger.Infow("getNewSetuptInstructionsForUSDC", "remote_chain_selector", evmChainSelector, "token_pubkey", cfg.SolTokenPubKey.String())
 	tokenPubKey := cfg.SolTokenPubKey
-	tokenPool := chainState.USDCTokenPool
+	tokenPool := chainState.CCTPTokenPool
 	contractType := shared.USDCTokenPool
 	poolConfigPDA, remoteChainConfigPDA := getPoolPDAs(tokenPubKey, tokenPool, evmChainSelector)
 	ixns := make([]solana.Instruction, 0)
@@ -992,7 +992,7 @@ func getNewSetuptInstructionsForUSDC(
 	return ixns, nil
 }
 
-func getInstructionsForUSDC(
+func getInstructionsForCCTP(
 	e cldf.Environment,
 	chain cldf_solana.Chain,
 	envState stateview.CCIPOnChainState,
@@ -1001,9 +1001,9 @@ func getInstructionsForUSDC(
 	evmChainSelector uint64,
 	evmRemoteConfig EVMRemoteConfig,
 ) ([]solana.Instruction, error) {
-	e.Logger.Infow("getInstructionsForUSDC", "remote_chain_selector", evmChainSelector, "token_pubkey", cfg.SolTokenPubKey.String())
+	e.Logger.Infow("getInstructionsForCCTP", "remote_chain_selector", evmChainSelector, "token_pubkey", cfg.SolTokenPubKey.String())
 	tokenPubKey := cfg.SolTokenPubKey
-	tokenPool := solChainState.USDCTokenPool
+	tokenPool := solChainState.CCTPTokenPool
 	contractType := shared.USDCTokenPool
 	poolConfigPDA, remoteChainConfigPDA := getPoolPDAs(tokenPubKey, tokenPool, evmChainSelector)
 	ixns := make([]solana.Instruction, 0)

@@ -46,7 +46,7 @@ type CCIPChainState struct {
 	WSOL          solana.PublicKey
 	SPL2022Tokens []solana.PublicKey
 	SPLTokens     []solana.PublicKey
-	USDCTokenPool solana.PublicKey
+	CCTPTokenPool solana.PublicKey
 	USDCToken     solana.PublicKey
 
 	// ccip programs
@@ -154,7 +154,7 @@ func (s CCIPChainState) ValidatePoolDeployment(
 			return fmt.Errorf("invalid pool type: %s", poolType)
 		}
 	} else if usdcPool {
-		tokenPool = s.USDCTokenPool
+		tokenPool = s.CCTPTokenPool
 		poolConfigAccount = cctp_token_pool.State{}
 	}
 	if tokenPool.IsZero() {
@@ -504,9 +504,9 @@ func LoadChainStateSolana(chain cldf_solana.Chain, addresses map[string]cldf.Typ
 				return solState, err
 			}
 			solState.RMNRemoteCursesPDA = rmnRemoteCursesPDA
-		case shared.USDCTokenPool:
+		case shared.CCTPTokenPool:
 			pub := solana.MustPublicKeyFromBase58(address)
-			solState.USDCTokenPool = pub
+			solState.CCTPTokenPool = pub
 		case shared.USDCToken:
 			pub := solana.MustPublicKeyFromBase58(address)
 			solState.USDCToken = pub
@@ -687,9 +687,9 @@ func IsSolanaProgramOwnedByTimelock(
 			return false
 		}
 		return programData.Config.Owner.Equals(timelockSignerPDA)
-	case shared.USDCTokenPool:
+	case shared.CCTPTokenPool:
 		programData := cctp_token_pool.State{}
-		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(tokenAddress, chainState.USDCTokenPool)
+		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(tokenAddress, chainState.CCTPTokenPool)
 		err = chain.GetAccountDataBorshInto(e.GetContext(), poolConfigPDA, &programData)
 		if err != nil {
 			return false

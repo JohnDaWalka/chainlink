@@ -199,14 +199,14 @@ func validateUSDCConfig(usdcConfig *pluginconfig.USDCCCTPObserverConfig, state s
 			if !ok {
 				return fmt.Errorf("chain %d does not exist in Solana chain state but provided in USDCCCTPObserverConfig", sel)
 			}
-			if onchainState.USDCTokenPool.IsZero() {
+			if onchainState.CCTPTokenPool.IsZero() {
 				return fmt.Errorf("chain %d does not have a USDC token pool deployed", sel)
 			}
 			if onchainState.USDCToken.IsZero() {
 				return fmt.Errorf("chain %d does not have a USDC token in state", sel)
 			}
 			// Calculate the token pool config address for the USDCTokenPool since Solana expects the source pool to be this PDA instead of the actual pool
-			tokenPoolConfig, err := tokens.TokenPoolConfigAddress(onchainState.USDCToken, onchainState.USDCTokenPool)
+			tokenPoolConfig, err := tokens.TokenPoolConfigAddress(onchainState.USDCToken, onchainState.CCTPTokenPool)
 			if err != nil {
 				return fmt.Errorf("failed to calculate token pool config address: %w", err)
 			}
