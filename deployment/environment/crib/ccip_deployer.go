@@ -503,7 +503,6 @@ func setupSolLinkPools(e *cldf.Environment) (cldf.Environment, error) {
 	}
 	for _, solChainSel := range sels {
 		solTokenAddress := state.SolChains[solChainSel].LinkToken
-		bnm := solTestTokenPool.BurnAndMint_PoolType
 
 		*e, err = commonchangeset.Apply(nil, *e,
 			commonchangeset.Configure(
@@ -534,7 +533,7 @@ func setupSolLinkPools(e *cldf.Environment) (cldf.Environment, error) {
 						{
 							ChainSelector: solChainSel,
 							TokenPubKey:   solTokenAddress,
-							PoolType:      &bnm,
+							PoolType:      shared.BurnMintTokenPool,
 							Metadata:      shared.CLLMetadata,
 						},
 					},
@@ -556,7 +555,7 @@ func setupSolLinkPools(e *cldf.Environment) (cldf.Environment, error) {
 						{
 							ChainSelector:   solChainSel,
 							TokenPubKey:     solTokenAddress,
-							PoolType:        &bnm,
+							PoolType:        shared.BurnMintTokenPool,
 							Metadata:        shared.CLLMetadata,
 							WritableIndexes: []uint8{3, 4, 7},
 						},
@@ -755,14 +754,13 @@ func setupSolEvmLanes(lggr logger.Logger, e *cldf.Environment, state stateview.C
 					laneChangesets = append(laneChangesets, cs...)
 				}
 
-				bnm := solTestTokenPool.BurnAndMint_PoolType
 				laneChangesets = append(laneChangesets,
 					commonchangeset.Configure(
 						cldf.CreateLegacyChangeSet(ccipChangesetSolana.SetupTokenPoolForRemoteChain),
 						ccipChangesetSolana.RemoteChainTokenPoolConfig{
 							SolChainSelector: solSelector.Selector,
 							SolTokenPubKey:   solChainState.LinkToken,
-							SolPoolType:      &bnm,
+							SolPoolType:      shared.BurnMintTokenPool,
 							EVMRemoteConfigs: map[uint64]ccipChangesetSolana.EVMRemoteConfig{
 								evmSelector.Selector: {
 									TokenSymbol: shared.LinkSymbol,

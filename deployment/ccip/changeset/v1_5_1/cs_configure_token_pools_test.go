@@ -17,7 +17,6 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
-	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/burn_mint_erc677"
 
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -787,14 +786,13 @@ func TestValidateConfigureTokenPoolContractsForSolana(t *testing.T) {
 		state, err := stateview.LoadOnchainState(e)
 		require.NoError(t, err)
 		tokenAddress := state.SolChains[selector].SPL2022Tokens[0]
-		bnm := solTestTokenPool.BurnAndMint_PoolType
 		e, _, err = commonchangeset.ApplyChangesets(t, e, []commonchangeset.ConfiguredChangeSet{
 			commonchangeset.Configure(
 				cldf.CreateLegacyChangeSet(changeset_solana.AddTokenPoolAndLookupTable),
 				changeset_solana.TokenPoolConfig{
 					ChainSelector: selector,
 					TokenPubKey:   tokenAddress,
-					PoolType:      &bnm,
+					PoolType:      shared.BurnMintTokenPool,
 					Metadata:      shared.CLLMetadata,
 				},
 			),
@@ -896,7 +894,6 @@ func TestValidateConfigureTokenPoolContractsForSolana(t *testing.T) {
 		require.NoError(t, err)
 		onchainState, err := stateview.LoadOnchainState(e)
 		require.NoError(t, err)
-		bnm := solTestTokenPool.BurnAndMint_PoolType
 		for _, tokenAddress := range onchainState.SolChains[selector].SPL2022Tokens {
 			if slices.Contains(tokensBefore, tokenAddress) {
 				continue
@@ -907,7 +904,7 @@ func TestValidateConfigureTokenPoolContractsForSolana(t *testing.T) {
 					changeset_solana.TokenPoolConfig{
 						ChainSelector: selector,
 						TokenPubKey:   tokenAddress,
-						PoolType:      &bnm,
+						PoolType:      shared.BurnMintTokenPool,
 						Metadata:      shared.CLLMetadata,
 					},
 				),
@@ -956,7 +953,6 @@ func TestValidateConfigureTokenPoolContractsForSolana(t *testing.T) {
 	// DEPLOY NEW SOLANA TOKEN POOL //
 	//////////////////////////////////
 	require.NoError(t, err)
-	lr := solTestTokenPool.LockAndRelease_PoolType
 	for _, selector := range solanaSelectors {
 		for _, tokenAddress := range remoteTokenAddresses {
 			e, _, err = commonchangeset.ApplyChangesets(t, e, []commonchangeset.ConfiguredChangeSet{
@@ -965,7 +961,7 @@ func TestValidateConfigureTokenPoolContractsForSolana(t *testing.T) {
 					changeset_solana.TokenPoolConfig{
 						ChainSelector: selector,
 						TokenPubKey:   tokenAddress,
-						PoolType:      &lr,
+						PoolType:      shared.LockReleaseTokenPool,
 						Metadata:      shared.CLLMetadata,
 					},
 				),

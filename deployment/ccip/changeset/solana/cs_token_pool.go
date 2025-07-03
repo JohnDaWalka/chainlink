@@ -100,20 +100,22 @@ func getPoolPDAs(
 type TokenPoolConfig struct {
 	ChainSelector uint64
 	// a pool pda is uniquely identified by (solTokenPubKey, poolType, metadata)
-	PoolType    *solTestTokenPool.PoolType
-	TokenPubKey solana.PublicKey
-	Metadata    string // tag to identify which client/cll token pool executable to use
+	PoolType                 cldf.ContractType
+	TokenPubKey              solana.PublicKey
+	Metadata                 string // tag to identify which client/cll token pool executable to use
+	CCTPTokenMessengerMinter solana.PublicKey
+	CCTPMessageTransmitter   solana.PublicKey
 }
 
 func (cfg TokenPoolConfig) Validate(e cldf.Environment, chainState solanastateview.CCIPChainState) error {
 	if err := chainState.CommonValidation(e, cfg.ChainSelector, cfg.TokenPubKey); err != nil {
 		return err
 	}
-	if cfg.PoolType == nil {
+	if cfg.PoolType == "" {
 		return errors.New("pool type must be defined")
 	}
 
-	return chainState.ValidatePoolDeployment(&e, cfg.PoolType, cfg.ChainSelector, cfg.TokenPubKey, false, cfg.Metadata, false)
+	return chainState.ValidatePoolDeployment(&e, cfg.PoolType, cfg.ChainSelector, cfg.TokenPubKey, false, cfg.Metadata)
 }
 
 func AddTokenPoolAndLookupTable(e cldf.Environment, cfg TokenPoolConfig) (cldf.ChangesetOutput, error) {
@@ -128,13 +130,17 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg TokenPoolConfig) (cldf.C
 	}
 	chain := e.BlockChains.SolanaChains()[cfg.ChainSelector]
 	tokenPubKey := cfg.TokenPubKey
-	tokenPool, _ := chainState.GetActiveTokenPool(*cfg.PoolType, cfg.Metadata)
 
-	switch *cfg.PoolType {
-	case solTestTokenPool.BurnAndMint_PoolType:
+	var tokenPool solana.PublicKey
+	tokenPool = chainState.GetActiveTokenPool(cfg.PoolType, cfg.Metadata)
+
+	switch cfg.PoolType {
+	case shared.BurnMintTokenPool:
 		solBurnMintTokenPool.SetProgramID(tokenPool)
-	case solTestTokenPool.LockAndRelease_PoolType:
+	case shared.LockReleaseTokenPool:
 		solLockReleaseTokenPool.SetProgramID(tokenPool)
+	case shared.CCTPTokenPool:
+		cctp_token_pool.SetProgramID(tokenPool)
 	}
 
 	// verified
@@ -161,43 +167,55 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg TokenPoolConfig) (cldf.C
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get solana token pool program data: %w", err)
 	}
-	switch *cfg.PoolType {
-	case solTestTokenPool.BurnAndMint_PoolType:
-		// initialize token pool for token
-		poolInitI, err = solBurnMintTokenPool.NewInitializeInstruction(
-			routerProgramAddress,
-			rmnRemoteAddress,
-			poolConfigPDA,
-			tokenPubKey,
-			chain.DeployerKey.PublicKey(), // a token pool will only ever be added by the deployer key.
-			solana.SystemProgramID,
-			tokenPool,
-			programData.Address,
-			globalConfigPDA,
-		).ValidateAndBuild()
-	case solTestTokenPool.LockAndRelease_PoolType:
-		// initialize token pool for token
-		poolInitI, err = solLockReleaseTokenPool.NewInitializeInstruction(
-			routerProgramAddress,
-			rmnRemoteAddress,
-			poolConfigPDA,
-			tokenPubKey,
-			chain.DeployerKey.PublicKey(), // a token pool will only ever be added by the deployer key.
-			solana.SystemProgramID,
-			tokenPool,
-			programData.Address,
-			globalConfigPDA,
-		).ValidateAndBuild()
-	default:
-		return cldf.ChangesetOutput{}, fmt.Errorf("invalid pool type: %s", cfg.PoolType)
-	}
-	if err != nil {
+	var poolInitErr error
+		switch cfg.PoolType {
+		case shared.BurnMintTokenPool:
+			// initialize token pool for token
+			poolInitI, poolInitErr = solBurnMintTokenPool.NewInitializeInstruction(
+				routerProgramAddress,
+				rmnRemoteAddress,
+				poolConfigPDA,
+				tokenPubKey,
+				chain.DeployerKey.PublicKey(), // a token pool will only ever be added by the deployer key.
+				solana.SystemProgramID,
+				tokenPool,
+				programData.Address,
+				globalConfigPDA,
+			).ValidateAndBuild()
+		case shared.LockReleaseTokenPool:
+			// initialize token pool for token
+			poolInitI, poolInitErr = solLockReleaseTokenPool.NewInitializeInstruction(
+				routerProgramAddress,
+				rmnRemoteAddress,
+				poolConfigPDA,
+				tokenPubKey,
+				chain.DeployerKey.PublicKey(), // a token pool will only ever be added by the deployer key.
+				solana.SystemProgramID,
+				tokenPool,
+				programData.Address,
+				globalConfigPDA,
+			).ValidateAndBuild()
+			case shared.CCTPTokenPool:
+				poolInitI, poolInitErr = cctp_token_pool.NewInitializeInstruction(
+				routerProgramAddress,
+				rmnRemoteAddress,
+				poolConfigPDA,
+				tokenPubKey,
+				chain.DeployerKey.PublicKey(), // a token pool will only ever be added by the deployer key.
+				solana.SystemProgramID,
+				tokenPool,
+				programData.Address,
+			).ValidateAndBuild()
+		default:
+			return cldf.ChangesetOutput{}, fmt.Errorf("invalid pool type: %s", cfg.PoolType)
+		}
+	if poolInitErr != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
 	}
 
 	instructions = append(instructions, poolInitI)
 
-	if *cfg.PoolType == solTestTokenPool.BurnAndMint_PoolType && tokenPubKey != solana.SolMint {
+	if (cfg.PoolType == shared.BurnMintTokenPool && tokenPubKey != solana.SolMint) || cfg.PoolType == shared.CCTPTokenPool {
 		// make pool mint_authority for token
 		authI, err := solTokenUtil.SetTokenMintAuthority(
 			tokenprogramID,
@@ -219,10 +237,12 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg TokenPoolConfig) (cldf.C
 	e.Logger.Infow("Created new token pool config", "token_pool_ata", tokenPoolATA.String(), "pool_config", poolConfigPDA.String(), "pool_signer", poolSigner.String())
 
 	csOutput, err := AddTokenPoolLookupTable(e, TokenPoolLookupTableConfig{
-		ChainSelector: cfg.ChainSelector,
-		TokenPubKey:   cfg.TokenPubKey,
-		PoolType:      cfg.PoolType,
-		Metadata:      cfg.Metadata,
+		ChainSelector:          cfg.ChainSelector,
+		TokenPubKey:            cfg.TokenPubKey,
+		PoolType:               cfg.PoolType,
+		Metadata:               cfg.Metadata,
+		CCTPTokenMessengerMinter:     cfg.CCTPTokenMessengerMinter,
+		CCTPMessageTransmitter: cfg.CCTPMessageTransmitter,
 	})
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to add token pool lookup table: %w", err)
@@ -306,8 +326,7 @@ type RemoteChainTokenPoolConfig struct {
 	SolChainSelector uint64
 	// a pool pda is uniquely identified by (solTokenPubKey, poolType, metadata)
 	SolTokenPubKey   solana.PublicKey
-	SolPoolType      *solTestTokenPool.PoolType
-	SolCCTPPool      bool
+	SolPoolType      cldf.ContractType
 	Metadata         string // tag to identify which client/cll token pool executable to use
 	EVMRemoteConfigs map[uint64]EVMRemoteConfig
 	MCMS             *proposalutils.TimelockConfig
@@ -319,14 +338,11 @@ func (cfg RemoteChainTokenPoolConfig) Validate(e cldf.Environment, state statevi
 		return err
 	}
 	chain := e.BlockChains.SolanaChains()[cfg.SolChainSelector]
-	if cfg.SolPoolType == nil && !cfg.SolCCTPPool {
-		return errors.New("pool type must be defined or USDC pool should be toggled")
-	}
-	if cfg.SolPoolType != nil && cfg.SolCCTPPool {
-		return errors.New("pool type and USDC pool flag cannot both be set")
+	if cfg.SolPoolType == "" {
+		return errors.New("pool type must be defined")
 	}
 
-	if err := chainState.ValidatePoolDeployment(&e, cfg.SolPoolType, cfg.SolChainSelector, cfg.SolTokenPubKey, true, cfg.Metadata, cfg.SolCCTPPool); err != nil {
+	if err := chainState.ValidatePoolDeployment(&e, cfg.SolPoolType, cfg.SolChainSelector, cfg.SolTokenPubKey, true, cfg.Metadata); err != nil {
 		return err
 	}
 
@@ -380,27 +396,19 @@ func SetupTokenPoolForRemoteChain(e cldf.Environment, cfg RemoteChainTokenPoolCo
 	}
 	chain := e.BlockChains.SolanaChains()[cfg.SolChainSelector]
 	tokenPubKey := cfg.SolTokenPubKey
-	var tokenPool solana.PublicKey
-	var contractType cldf.ContractType
-	if cfg.SolPoolType != nil {
-		tokenPool, contractType = solChainState.GetActiveTokenPool(*cfg.SolPoolType, cfg.Metadata)
-	} else if cfg.SolCCTPPool {
-		tokenPool = solChainState.CCTPTokenPool
-		contractType = shared.USDCTokenPool
-	}
+	tokenPool := solChainState.GetActiveTokenPool(cfg.SolPoolType, cfg.Metadata)
 
 	var txns []mcmsTypes.Transaction
-	if cfg.SolPoolType != nil {
-		switch *cfg.SolPoolType {
-		case solTestTokenPool.BurnAndMint_PoolType:
-			useMcms := solanastateview.IsSolanaProgramOwnedByTimelock(
+	useMcms := solanastateview.IsSolanaProgramOwnedByTimelock(
 				&e,
 				chain,
 				solChainState,
-				shared.BurnMintTokenPool,
+				cfg.SolPoolType,
 				tokenPubKey,
 				cfg.Metadata,
 			)
+		switch cfg.SolPoolType {
+		case shared.BurnMintTokenPool:
 			solBurnMintTokenPool.SetProgramID(tokenPool)
 			for evmChainSelector, evmRemoteConfig := range cfg.EVMRemoteConfigs {
 				e.Logger.Infow("Setting up bnm token pool for remote chain", "remote_chain_selector", evmChainSelector, "token_pubkey", tokenPubKey.String(), "pool_type", cfg.SolPoolType)
@@ -409,7 +417,7 @@ func SetupTokenPoolForRemoteChain(e cldf.Environment, cfg RemoteChainTokenPoolCo
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
 				}
 				if useMcms {
-					err := appendTxs(chainIxs, tokenPool, contractType, &txns)
+					err := appendTxs(chainIxs, tokenPool, cfg.SolPoolType, &txns)
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate mcms txn: %w", err)
 					}
@@ -419,16 +427,8 @@ func SetupTokenPoolForRemoteChain(e cldf.Environment, cfg RemoteChainTokenPoolCo
 					}
 				}
 			}
-		case solTestTokenPool.LockAndRelease_PoolType:
+		case shared.LockReleaseTokenPool:
 			solLockReleaseTokenPool.SetProgramID(tokenPool)
-			useMcms := solanastateview.IsSolanaProgramOwnedByTimelock(
-				&e,
-				chain,
-				solChainState,
-				shared.LockReleaseTokenPool,
-				tokenPubKey,
-				cfg.Metadata,
-			)
 			for evmChainSelector, evmRemoteConfig := range cfg.EVMRemoteConfigs {
 				e.Logger.Infow("Setting up lnr token pool for remote chain", "remote_chain_selector", evmChainSelector, "token_pubkey", tokenPubKey.String(), "pool_type", cfg.SolPoolType)
 				chainIxs, err := getInstructionsForLockRelease(e, chain, envState, solChainState, cfg, evmChainSelector, evmRemoteConfig)
@@ -436,7 +436,26 @@ func SetupTokenPoolForRemoteChain(e cldf.Environment, cfg RemoteChainTokenPoolCo
 					return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
 				}
 				if useMcms {
-					err := appendTxs(chainIxs, tokenPool, contractType, &txns)
+					err := appendTxs(chainIxs, tokenPool, cfg.SolPoolType, &txns)
+					if err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate mcms txn: %w", err)
+					}
+				} else {
+					if err := chain.Confirm(chainIxs); err != nil {
+						return cldf.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
+					}
+				}
+			}
+		case shared.CCTPTokenPool:
+			cctp_token_pool.SetProgramID(tokenPool)
+			for evmChainSelector, evmRemoteConfig := range cfg.EVMRemoteConfigs {
+				e.Logger.Infow("Setting up CCTP token pool for remote chain", "remote_chain_selector", evmChainSelector, "token_pubkey", tokenPubKey.String())
+				chainIxs, err := getInstructionsForCCTP(e, chain, envState, solChainState, cfg, evmChainSelector, evmRemoteConfig)
+				if err != nil {
+					return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+				}
+				if useMcms {
+					err := appendTxs(chainIxs, tokenPool, cfg.SolPoolType, &txns)
 					if err != nil {
 						return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate mcms txn: %w", err)
 					}
@@ -449,34 +468,6 @@ func SetupTokenPoolForRemoteChain(e cldf.Environment, cfg RemoteChainTokenPoolCo
 		default:
 			return cldf.ChangesetOutput{}, fmt.Errorf("invalid pool type: %s", cfg.SolPoolType)
 		}
-	} else if cfg.SolCCTPPool {
-		cctp_token_pool.SetProgramID(tokenPool)
-		useMcms := solanastateview.IsSolanaProgramOwnedByTimelock(
-			&e,
-			chain,
-			solChainState,
-			shared.USDCTokenPool,
-			tokenPubKey,
-			cfg.Metadata,
-		)
-		for evmChainSelector, evmRemoteConfig := range cfg.EVMRemoteConfigs {
-			e.Logger.Infow("Setting up USDC token pool for remote chain", "remote_chain_selector", evmChainSelector, "token_pubkey", tokenPubKey.String())
-			chainIxs, err := getInstructionsForCCTP(e, chain, envState, solChainState, cfg, evmChainSelector, evmRemoteConfig)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
-			}
-			if useMcms {
-				err := appendTxs(chainIxs, tokenPool, contractType, &txns)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate mcms txn: %w", err)
-				}
-			} else {
-				if err := chain.Confirm(chainIxs); err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
-				}
-			}
-		}
-	}
 
 	if len(txns) > 0 {
 		proposal, err := BuildProposalsForTxns(
@@ -517,7 +508,7 @@ func getNewSetuptInstructionsForBurnMint(
 	onChainEVMPoolConfig solBaseTokenPool.RemoteConfig,
 ) ([]solana.Instruction, error) {
 	e.Logger.Infow("getNewSetuptInstructionsForBurnMint", "remote_chain_selector", evmChainSelector, "token_pubkey", cfg.SolTokenPubKey.String(), "pool_type", cfg.SolPoolType)
-	tokenPool, contractType := chainState.GetActiveTokenPool(*cfg.SolPoolType, cfg.Metadata)
+	tokenPool := chainState.GetActiveTokenPool(cfg.SolPoolType, cfg.Metadata)
 	tokenPubKey := cfg.SolTokenPubKey
 	poolConfigPDA, remoteChainConfigPDA := getPoolPDAs(tokenPubKey, tokenPool, evmChainSelector)
 	ixns := make([]solana.Instruction, 0)
@@ -525,7 +516,7 @@ func getNewSetuptInstructionsForBurnMint(
 		&e,
 		chain,
 		chainState,
-		contractType,
+		cfg.SolPoolType,
 		tokenPubKey,
 		cfg.Metadata,
 	)
@@ -619,14 +610,14 @@ func getInstructionsForBurnMint(
 ) ([]solana.Instruction, error) {
 	e.Logger.Infow("getInstructionsForBurnMint", "remote_chain_selector", evmChainSelector, "token_pubkey", cfg.SolTokenPubKey.String(), "pool_type", cfg.SolPoolType)
 	tokenPubKey := cfg.SolTokenPubKey
-	tokenPool, contractType := solChainState.GetActiveTokenPool(*cfg.SolPoolType, cfg.Metadata)
+	tokenPool := solChainState.GetActiveTokenPool(cfg.SolPoolType, cfg.Metadata)
 	poolConfigPDA, remoteChainConfigPDA := getPoolPDAs(tokenPubKey, tokenPool, evmChainSelector)
 	ixns := make([]solana.Instruction, 0)
 	authority := GetAuthorityForIxn(
 		&e,
 		chain,
 		solChainState,
-		contractType,
+		cfg.SolPoolType,
 		tokenPubKey,
 		cfg.Metadata,
 	)
@@ -715,14 +706,14 @@ func getNewSetuptInstructionsForLockRelease(
 ) ([]solana.Instruction, error) {
 	e.Logger.Infow("getNewSetuptInstructionsForLockRelease", "remote_chain_selector", evmChainSelector, "token_pubkey", cfg.SolTokenPubKey.String(), "pool_type", cfg.SolPoolType)
 	tokenPubKey := cfg.SolTokenPubKey
-	tokenPool, contractType := chainState.GetActiveTokenPool(*cfg.SolPoolType, cfg.Metadata)
+	tokenPool := chainState.GetActiveTokenPool(cfg.SolPoolType, cfg.Metadata)
 	poolConfigPDA, remoteChainConfigPDA := getPoolPDAs(tokenPubKey, tokenPool, evmChainSelector)
 	ixns := make([]solana.Instruction, 0)
 	authority := GetAuthorityForIxn(
 		&e,
 		chain,
 		chainState,
-		contractType,
+		cfg.SolPoolType,
 		tokenPubKey,
 		cfg.Metadata,
 	)
@@ -812,14 +803,14 @@ func getInstructionsForLockRelease(
 ) ([]solana.Instruction, error) {
 	e.Logger.Infow("getInstructionsForLockRelease", "remote_chain_selector", evmChainSelector, "token_pubkey", cfg.SolTokenPubKey.String(), "pool_type", cfg.SolPoolType)
 	tokenPubKey := cfg.SolTokenPubKey
-	tokenPool, contractType := solChainState.GetActiveTokenPool(*cfg.SolPoolType, cfg.Metadata)
+	tokenPool := solChainState.GetActiveTokenPool(cfg.SolPoolType, cfg.Metadata)
 	poolConfigPDA, remoteChainConfigPDA := getPoolPDAs(tokenPubKey, tokenPool, evmChainSelector)
 	ixns := make([]solana.Instruction, 0)
 	authority := GetAuthorityForIxn(
 		&e,
 		chain,
 		solChainState,
-		contractType,
+		cfg.SolPoolType,
 		tokenPubKey,
 		cfg.Metadata,
 	)
@@ -1088,23 +1079,33 @@ func getInstructionsForCCTP(
 
 // ADD TOKEN POOL LOOKUP TABLE
 type TokenPoolLookupTableConfig struct {
-	ChainSelector uint64
-	TokenPubKey   solana.PublicKey
-	PoolType      *solTestTokenPool.PoolType
-	Metadata      string
+	ChainSelector            uint64
+	TokenPubKey              solana.PublicKey
+	PoolType                 cldf.ContractType
+	Metadata                 string
+	CCTPTokenMessengerMinter solana.PublicKey
+	CCTPMessageTransmitter   solana.PublicKey
 }
 
 func (cfg TokenPoolLookupTableConfig) Validate(e cldf.Environment, chainState solanastateview.CCIPChainState) error {
 	if err := chainState.CommonValidation(e, cfg.ChainSelector, cfg.TokenPubKey); err != nil {
 		return err
 	}
-	if cfg.PoolType == nil {
+	if cfg.PoolType == "" {
 		return errors.New("pool type must be defined")
 	}
 	if cfg.Metadata == "" {
 		return errors.New("metadata must be defined")
 	}
-	return chainState.ValidatePoolDeployment(&e, cfg.PoolType, cfg.ChainSelector, cfg.TokenPubKey, false, cfg.Metadata, false)
+	if cfg.PoolType == shared.CCTPTokenPool {
+		if cfg.CCTPMessageTransmitter.IsZero() {
+			return errors.New("cctp message transmitter is empty")
+		}
+		if cfg.CCTPTokenMessengerMinter.IsZero() {
+			return errors.New("cctp messenger minter is empty")
+		}
+	}
+	return chainState.ValidatePoolDeployment(&e, cfg.PoolType, cfg.ChainSelector, cfg.TokenPubKey, false, cfg.Metadata)
 }
 
 // this changeset is called in AddTokenPoolAndLookupTable
@@ -1126,7 +1127,7 @@ func AddTokenPoolLookupTable(e cldf.Environment, cfg TokenPoolLookupTableConfig)
 
 	authorityPrivKey := chain.DeployerKey // assuming the authority is the deployer key
 	tokenPubKey := cfg.TokenPubKey
-	tokenPool, _ := chainState.GetActiveTokenPool(*cfg.PoolType, cfg.Metadata)
+	tokenPool := chainState.GetActiveTokenPool(cfg.PoolType, cfg.Metadata)
 	routerProgramAddress, _, _ := chainState.GetRouterInfo()
 	tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
 	tokenPoolChainConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
@@ -1155,6 +1156,56 @@ func AddTokenPoolLookupTable(e cldf.Environment, cfg TokenPoolLookupTableConfig)
 		feeTokenConfigPDA,       // 8
 		routerPoolSignerPDA,     // 9
 	}
+	typeVersion := cldf.NewTypeAndVersion(shared.TokenPoolLookupTable, deployment.Version1_0_0)
+	typeVersion.Labels.Add(tokenPubKey.String())
+	switch cfg.PoolType {
+	case shared.BurnMintTokenPool:
+		typeVersion.Labels.Add(solTestTokenPool.BurnAndMint_PoolType.String())
+		typeVersion.Labels.Add(cfg.Metadata)
+	case shared.LockReleaseTokenPool:
+		typeVersion.Labels.Add(solTestTokenPool.LockAndRelease_PoolType.String())
+		typeVersion.Labels.Add(cfg.Metadata)
+	case shared.CCTPTokenPool:
+		tokenMessageMinterAuthority, _, err := solana.FindProgramAddress([][]byte{[]byte("sender_authority")}, cfg.CCTPTokenMessengerMinter)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to calculate token message minter authority: %w", err)
+		}
+		messageTransmitterPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("message_transmitter")}, cfg.CCTPMessageTransmitter)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to calculate message transmitter: %w", err)
+		}
+		tokenMessenger, _, err := solana.FindProgramAddress([][]byte{[]byte("token_messenger")}, cfg.CCTPTokenMessengerMinter)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to calculate token messenger: %w", err)
+		}
+		tokenMinter, _, err := solana.FindProgramAddress([][]byte{[]byte("token_minter")}, cfg.CCTPTokenMessengerMinter)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to calculate token minter: %w", err)
+		}
+		minterLocalToken, _, err := solana.FindProgramAddress([][]byte{[]byte("local_token"), tokenPubKey.Bytes()}, cfg.CCTPTokenMessengerMinter)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to calculate minter local token: %w", err)
+		}
+		eventAuthority, _, err := solana.FindProgramAddress([][]byte{[]byte("__event_authority")}, cfg.CCTPTokenMessengerMinter)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to calculate token message minter authority: %w", err)
+		}
+		list = append(list,
+			// -- CCTP custom entries --
+			tokenMessageMinterAuthority,  // 10
+			messageTransmitterPDA,        // 11 - writable
+			tokenMessenger,               // 12
+			tokenMinter,                  // 13
+			minterLocalToken,             // 14 - writable
+			cfg.CCTPMessageTransmitter,   // 15
+			cfg.CCTPTokenMessengerMinter, // 16
+			solana.SystemProgramID,       // 17
+			eventAuthority,               // 18
+		)
+		typeVersion.Labels.Add(cfg.PoolType.String())
+	default:
+		return cldf.ChangesetOutput{}, errors.New("unsupported pool type")
+	}
 	if err = solCommonUtil.ExtendLookupTable(ctx, client, table, *authorityPrivKey, list); err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to extend lookup table for token pool (mint: %s): %w", tokenPubKey.String(), err)
 	}
@@ -1162,11 +1213,7 @@ func AddTokenPoolLookupTable(e cldf.Environment, cfg TokenPoolLookupTableConfig)
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to await slot change while extending lookup table: %w", err)
 	}
 	newAddressBook := cldf.NewMemoryAddressBook()
-	tv := cldf.NewTypeAndVersion(shared.TokenPoolLookupTable, deployment.Version1_0_0)
-	tv.Labels.Add(tokenPubKey.String())
-	tv.Labels.Add(cfg.PoolType.String())
-	tv.Labels.Add(cfg.Metadata)
-	if err := newAddressBook.Save(cfg.ChainSelector, table.String(), tv); err != nil {
+	if err := newAddressBook.Save(cfg.ChainSelector, table.String(), typeVersion); err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save tokenpool address lookup table: %w", err)
 	}
 	e.Logger.Infow("Added token pool lookup table", "token_pubkey", tokenPubKey.String())
@@ -1180,7 +1227,7 @@ type ConfigureTokenPoolAllowListConfig struct {
 	SolChainSelector uint64
 	// a pool pda is uniquely identified by (solTokenPubKey, poolType, metadata)
 	SolTokenPubKey string
-	PoolType       *solTestTokenPool.PoolType
+	PoolType       cldf.ContractType
 	Metadata       string // tag to identify which client/cll token pool executable to use
 	// input only the ones you want to add, onchain throws error when we pass already configured accounts
 	Accounts []solana.PublicKey
@@ -1191,14 +1238,14 @@ type ConfigureTokenPoolAllowListConfig struct {
 func (cfg ConfigureTokenPoolAllowListConfig) Validate(e cldf.Environment, chainState solanastateview.CCIPChainState) error {
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.SolTokenPubKey)
 
-	if cfg.PoolType == nil {
+	if cfg.PoolType == "" {
 		return errors.New("pool type must be defined")
 	}
 	chain := e.BlockChains.SolanaChains()[cfg.SolChainSelector]
 	if err := chainState.CommonValidation(e, cfg.SolChainSelector, tokenPubKey); err != nil {
 		return err
 	}
-	if err := chainState.ValidatePoolDeployment(&e, cfg.PoolType, cfg.SolChainSelector, tokenPubKey, true, cfg.Metadata, false); err != nil {
+	if err := chainState.ValidatePoolDeployment(&e, cfg.PoolType, cfg.SolChainSelector, tokenPubKey, true, cfg.Metadata); err != nil {
 		return err
 	}
 	return ValidateMCMSConfigSolana(e, cfg.MCMS, chain, chainState, tokenPubKey, cfg.Metadata, map[cldf.ContractType]bool{})
@@ -1219,27 +1266,27 @@ func ConfigureTokenPoolAllowList(e cldf.Environment, cfg ConfigureTokenPoolAllow
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.SolTokenPubKey)
 
 	var ix solana.Instruction
-	tokenPool, contractType := chainState.GetActiveTokenPool(*cfg.PoolType, cfg.Metadata)
+	tokenPool := chainState.GetActiveTokenPool(cfg.PoolType, cfg.Metadata)
 	tokenPoolUsingMcms := solanastateview.IsSolanaProgramOwnedByTimelock(
 		&e,
 		chain,
 		chainState,
-		contractType,
+		cfg.PoolType,
 		tokenPubKey,
 		cfg.Metadata,
 	)
-	switch *cfg.PoolType {
-	case solTestTokenPool.BurnAndMint_PoolType:
-		poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
-		solBurnMintTokenPool.SetProgramID(tokenPool)
-		authority := GetAuthorityForIxn(
+	poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
+	authority := GetAuthorityForIxn(
 			&e,
 			chain,
 			chainState,
-			contractType,
+			cfg.PoolType,
 			tokenPubKey,
 			cfg.Metadata,
 		)
+	switch cfg.PoolType {
+	case shared.BurnMintTokenPool:
+		solBurnMintTokenPool.SetProgramID(tokenPool)
 		ix, err = solBurnMintTokenPool.NewConfigureAllowListInstruction(
 			cfg.Accounts,
 			cfg.Enabled,
@@ -1251,18 +1298,22 @@ func ConfigureTokenPoolAllowList(e cldf.Environment, cfg ConfigureTokenPoolAllow
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
 		}
-	case solTestTokenPool.LockAndRelease_PoolType:
-		poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
+	case shared.LockReleaseTokenPool:
 		solLockReleaseTokenPool.SetProgramID(tokenPool)
-		authority := GetAuthorityForIxn(
-			&e,
-			chain,
-			chainState,
-			contractType,
-			tokenPubKey,
-			cfg.Metadata,
-		)
 		ix, err = solLockReleaseTokenPool.NewConfigureAllowListInstruction(
+			cfg.Accounts,
+			cfg.Enabled,
+			poolConfigPDA,
+			tokenPubKey,
+			authority,
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+		}
+	case shared.CCTPTokenPool:
+		cctp_token_pool.SetProgramID(tokenPool)
+		ix, err = cctp_token_pool.NewConfigureAllowListInstruction(
 			cfg.Accounts,
 			cfg.Enabled,
 			poolConfigPDA,
@@ -1277,7 +1328,7 @@ func ConfigureTokenPoolAllowList(e cldf.Environment, cfg ConfigureTokenPoolAllow
 		return cldf.ChangesetOutput{}, fmt.Errorf("invalid pool type: %s", cfg.PoolType)
 	}
 	if tokenPoolUsingMcms {
-		tx, err := BuildMCMSTxn(ix, tokenPool.String(), contractType)
+		tx, err := BuildMCMSTxn(ix, tokenPool.String(), cfg.PoolType)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to create transaction: %w", err)
 		}
@@ -1303,7 +1354,7 @@ type RemoveFromAllowListConfig struct {
 	SolChainSelector uint64
 	// a pool pda is uniquely identified by (solTokenPubKey, poolType, metadata)
 	SolTokenPubKey string
-	PoolType       *solTestTokenPool.PoolType
+	PoolType       cldf.ContractType
 	Metadata       string             // tag to identify which client/cll token pool executable to use
 	Accounts       []solana.PublicKey // accounts to remove from allow list
 	MCMS           *proposalutils.TimelockConfig
@@ -1314,14 +1365,14 @@ func (cfg RemoveFromAllowListConfig) Validate(e cldf.Environment, chainState sol
 	if err := chainState.CommonValidation(e, cfg.SolChainSelector, tokenPubKey); err != nil {
 		return err
 	}
-	if cfg.PoolType == nil {
+	if cfg.PoolType == "" {
 		return errors.New("pool type must be defined")
 	}
 	chain := e.BlockChains.SolanaChains()[cfg.SolChainSelector]
 	if err := ValidateMCMSConfigSolana(e, cfg.MCMS, chain, chainState, tokenPubKey, cfg.Metadata, map[cldf.ContractType]bool{}); err != nil {
 		return err
 	}
-	return chainState.ValidatePoolDeployment(&e, cfg.PoolType, cfg.SolChainSelector, tokenPubKey, true, cfg.Metadata, false)
+	return chainState.ValidatePoolDeployment(&e, cfg.PoolType, cfg.SolChainSelector, tokenPubKey, true, cfg.Metadata)
 }
 
 func RemoveFromTokenPoolAllowList(e cldf.Environment, cfg RemoveFromAllowListConfig) (cldf.ChangesetOutput, error) {
@@ -1336,28 +1387,29 @@ func RemoveFromTokenPoolAllowList(e cldf.Environment, cfg RemoveFromAllowListCon
 	}
 	chain := e.BlockChains.SolanaChains()[cfg.SolChainSelector]
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.SolTokenPubKey)
-	tokenPool, contractType := chainState.GetActiveTokenPool(*cfg.PoolType, cfg.Metadata)
+	tokenPool := chainState.GetActiveTokenPool(cfg.PoolType, cfg.Metadata)
 
 	var ix solana.Instruction
 	tokenPoolUsingMcms := solanastateview.IsSolanaProgramOwnedByTimelock(
 		&e,
 		chain,
 		chainState,
-		contractType,
+		cfg.PoolType,
 		tokenPubKey,
 		cfg.Metadata,
 	)
-	switch *cfg.PoolType {
-	case solTestTokenPool.BurnAndMint_PoolType:
-		poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
-		solBurnMintTokenPool.SetProgramID(tokenPool)
-		authority := GetAuthorityForIxn(
+	poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
+	authority := GetAuthorityForIxn(
 			&e,
 			chain,
 			chainState,
-			contractType,
+			cfg.PoolType,
 			tokenPubKey,
-			cfg.Metadata)
+			cfg.Metadata,
+		)
+	switch cfg.PoolType {
+	case shared.BurnMintTokenPool:
+		solBurnMintTokenPool.SetProgramID(tokenPool)
 		ix, err = solBurnMintTokenPool.NewRemoveFromAllowListInstruction(
 			cfg.Accounts,
 			poolConfigPDA,
@@ -1368,18 +1420,21 @@ func RemoveFromTokenPoolAllowList(e cldf.Environment, cfg RemoveFromAllowListCon
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
 		}
-	case solTestTokenPool.LockAndRelease_PoolType:
-		poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
+	case shared.LockReleaseTokenPool:
 		solLockReleaseTokenPool.SetProgramID(tokenPool)
-		authority := GetAuthorityForIxn(
-			&e,
-			chain,
-			chainState,
-			contractType,
-			tokenPubKey,
-			cfg.Metadata,
-		)
 		ix, err = solLockReleaseTokenPool.NewRemoveFromAllowListInstruction(
+			cfg.Accounts,
+			poolConfigPDA,
+			tokenPubKey,
+			authority,
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+		}
+	case shared.CCTPTokenPool:
+		cctp_token_pool.SetProgramID(tokenPool)
+		ix, err = cctp_token_pool.NewRemoveFromAllowListInstruction(
 			cfg.Accounts,
 			poolConfigPDA,
 			tokenPubKey,
@@ -1393,7 +1448,7 @@ func RemoveFromTokenPoolAllowList(e cldf.Environment, cfg RemoveFromAllowListCon
 		return cldf.ChangesetOutput{}, fmt.Errorf("invalid pool type: %s", cfg.PoolType)
 	}
 	if tokenPoolUsingMcms {
-		tx, err := BuildMCMSTxn(ix, tokenPool.String(), contractType)
+		tx, err := BuildMCMSTxn(ix, tokenPool.String(), cfg.PoolType)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to create transaction: %w", err)
 		}
@@ -1456,8 +1511,8 @@ func (cfg LockReleaseLiquidityOpsConfig) Validate(e cldf.Environment, chainState
 	if err := ValidateMCMSConfigSolana(e, cfg.MCMS, chain, chainState, tokenPubKey, cfg.Metadata, map[cldf.ContractType]bool{}); err != nil {
 		return err
 	}
-	poolType := solTestTokenPool.LockAndRelease_PoolType
-	return chainState.ValidatePoolDeployment(&e, &poolType, cfg.SolChainSelector, tokenPubKey, true, cfg.Metadata, false)
+	poolType := shared.LockReleaseTokenPool
+	return chainState.ValidatePoolDeployment(&e, poolType, cfg.SolChainSelector, tokenPubKey, true, cfg.Metadata)
 }
 
 func LockReleaseLiquidityOps(e cldf.Environment, cfg LockReleaseLiquidityOpsConfig) (cldf.ChangesetOutput, error) {
@@ -1471,7 +1526,8 @@ func LockReleaseLiquidityOps(e cldf.Environment, cfg LockReleaseLiquidityOpsConf
 		return cldf.ChangesetOutput{}, err
 	}
 	chain := e.BlockChains.SolanaChains()[cfg.SolChainSelector]
-	tokenPool, contractType := chainState.GetActiveTokenPool(solTestTokenPool.LockAndRelease_PoolType, cfg.Metadata)
+	poolType := shared.LockReleaseTokenPool
+	tokenPool := chainState.GetActiveTokenPool(poolType, cfg.Metadata)
 	solLockReleaseTokenPool.SetProgramID(tokenPool)
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.SolTokenPubKey)
 	poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
@@ -1479,7 +1535,7 @@ func LockReleaseLiquidityOps(e cldf.Environment, cfg LockReleaseLiquidityOpsConf
 		&e,
 		chain,
 		chainState,
-		contractType,
+		poolType,
 		tokenPubKey,
 		cfg.Metadata,
 	)
@@ -1487,7 +1543,7 @@ func LockReleaseLiquidityOps(e cldf.Environment, cfg LockReleaseLiquidityOpsConf
 		&e,
 		chain,
 		chainState,
-		contractType,
+		poolType,
 		tokenPubKey,
 		cfg.Metadata,
 	)
@@ -1589,7 +1645,7 @@ func LockReleaseLiquidityOps(e cldf.Environment, cfg LockReleaseLiquidityOpsConf
 
 	if tokenPoolUsingMcms {
 		txns := make([]mcmsTypes.Transaction, 0)
-		err := appendTxs(ixns, tokenPool, contractType, &txns)
+		err := appendTxs(ixns, tokenPool, poolType, &txns)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate mcms txn: %w", err)
 		}
@@ -1615,7 +1671,7 @@ type TokenPoolOpsCfg struct {
 	SolChainSelector uint64
 	// a pool pda is uniquely identified by (solTokenPubKey, poolType, metadata)
 	SolTokenPubKey string
-	PoolType       *solTestTokenPool.PoolType
+	PoolType       cldf.ContractType
 	Metadata       string          // tag to identify which client/cll token pool executable to use
 	DeleteChainCfg *DeleteChainCfg // remove remote pool config corresponding to the set (solTokenPubKey, poolType, metadata, remoteChainSelector)
 	SetRouterCfg   *SetRouterCfg   // set router address on token pool config pda
@@ -1632,7 +1688,7 @@ type SetRouterCfg struct {
 
 func (cfg TokenPoolOpsCfg) Validate(e cldf.Environment, state stateview.CCIPOnChainState) error {
 	tokenPubKey := solana.MustPublicKeyFromBase58(cfg.SolTokenPubKey)
-	if cfg.PoolType == nil {
+	if cfg.PoolType == "" {
 		return errors.New("pool type must be defined")
 	}
 	chainState := state.SolChains[cfg.SolChainSelector]
@@ -1640,18 +1696,20 @@ func (cfg TokenPoolOpsCfg) Validate(e cldf.Environment, state stateview.CCIPOnCh
 	if err := chainState.CommonValidation(e, cfg.SolChainSelector, tokenPubKey); err != nil {
 		return err
 	}
-	if err := chainState.ValidatePoolDeployment(&e, cfg.PoolType, cfg.SolChainSelector, tokenPubKey, true, cfg.Metadata, false); err != nil {
+	if err := chainState.ValidatePoolDeployment(&e, cfg.PoolType, cfg.SolChainSelector, tokenPubKey, true, cfg.Metadata); err != nil {
 		return err
 	}
 	if cfg.DeleteChainCfg != nil {
 		var remoteChainConfigAccount interface{}
 
-		tokenPool, _ := chainState.GetActiveTokenPool(*cfg.PoolType, cfg.Metadata)
-		switch *cfg.PoolType {
-		case solTestTokenPool.BurnAndMint_PoolType:
+		tokenPool := chainState.GetActiveTokenPool(cfg.PoolType, cfg.Metadata)
+		switch cfg.PoolType {
+		case shared.BurnMintTokenPool:
 			remoteChainConfigAccount = solBurnMintTokenPool.ChainConfig{}
-		case solTestTokenPool.LockAndRelease_PoolType:
+		case shared.LockReleaseTokenPool:
 			remoteChainConfigAccount = solLockReleaseTokenPool.ChainConfig{}
+		case shared.CCTPTokenPool:
+			remoteChainConfigAccount = cctp_token_pool.ChainConfig{}
 		default:
 			return fmt.Errorf("invalid pool type: %s", cfg.PoolType)
 		}
@@ -1690,28 +1748,28 @@ func TokenPoolOps(e cldf.Environment, cfg TokenPoolOpsCfg) (cldf.ChangesetOutput
 	chainState := state.SolChains[cfg.SolChainSelector]
 	var ix solana.Instruction
 	ixns := make([]solana.Instruction, 0)
-	tokenPool, contractType := chainState.GetActiveTokenPool(*cfg.PoolType, cfg.Metadata)
+	tokenPool := chainState.GetActiveTokenPool(cfg.PoolType, cfg.Metadata)
 	tokenPoolUsingMcms := solanastateview.IsSolanaProgramOwnedByTimelock(
 		&e,
 		chain,
 		chainState,
-		contractType,
+		cfg.PoolType,
 		tokenPubKey,
 		cfg.Metadata,
 	)
-	switch *cfg.PoolType {
-	case solTestTokenPool.BurnAndMint_PoolType:
-		poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
-		remoteChainConfigPDA, _, _ := solTokenUtil.TokenPoolChainConfigPDA(cfg.DeleteChainCfg.RemoteChainSelector, tokenPubKey, tokenPool)
+	poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
+	remoteChainConfigPDA, _, _ := solTokenUtil.TokenPoolChainConfigPDA(cfg.DeleteChainCfg.RemoteChainSelector, tokenPubKey, tokenPool)
+	authority := GetAuthorityForIxn(
+		&e,
+		chain,
+		chainState,
+		cfg.PoolType,
+		tokenPubKey,
+		cfg.Metadata,
+	)
+	switch cfg.PoolType {
+	case shared.BurnMintTokenPool:
 		solBurnMintTokenPool.SetProgramID(tokenPool)
-		authority := GetAuthorityForIxn(
-			&e,
-			chain,
-			chainState,
-			contractType,
-			tokenPubKey,
-			cfg.Metadata,
-		)
 		if cfg.DeleteChainCfg != nil {
 			ix, err = solBurnMintTokenPool.NewDeleteChainConfigInstruction(
 				cfg.DeleteChainCfg.RemoteChainSelector,
@@ -1737,18 +1795,8 @@ func TokenPoolOps(e cldf.Environment, cfg TokenPoolOpsCfg) (cldf.ChangesetOutput
 			}
 			ixns = append(ixns, ix)
 		}
-	case solTestTokenPool.LockAndRelease_PoolType:
-		poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
-		remoteChainConfigPDA, _, _ := solTokenUtil.TokenPoolChainConfigPDA(cfg.DeleteChainCfg.RemoteChainSelector, tokenPubKey, tokenPool)
+	case shared.LockReleaseTokenPool:
 		solLockReleaseTokenPool.SetProgramID(tokenPool)
-		authority := GetAuthorityForIxn(
-			&e,
-			chain,
-			chainState,
-			contractType,
-			tokenPubKey,
-			cfg.Metadata,
-		)
 		if cfg.DeleteChainCfg != nil {
 			ix, err = solLockReleaseTokenPool.NewDeleteChainConfigInstruction(
 				cfg.DeleteChainCfg.RemoteChainSelector,
@@ -1774,11 +1822,38 @@ func TokenPoolOps(e cldf.Environment, cfg TokenPoolOpsCfg) (cldf.ChangesetOutput
 			}
 			ixns = append(ixns, ix)
 		}
+	case shared.CCTPTokenPool:
+		cctp_token_pool.SetProgramID(tokenPool)
+		if cfg.DeleteChainCfg != nil {
+			ix, err = cctp_token_pool.NewDeleteChainConfigInstruction(
+				cfg.DeleteChainCfg.RemoteChainSelector,
+				tokenPubKey,
+				poolConfigPDA,
+				remoteChainConfigPDA,
+				authority,
+			).ValidateAndBuild()
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+			}
+			ixns = append(ixns, ix)
+		}
+		if cfg.SetRouterCfg != nil {
+			ix, err = cctp_token_pool.NewSetRouterInstruction(
+				cfg.SetRouterCfg.Router,
+				poolConfigPDA,
+				tokenPubKey,
+				authority,
+			).ValidateAndBuild()
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+			}
+			ixns = append(ixns, ix)
+		}
 	default:
 		return cldf.ChangesetOutput{}, fmt.Errorf("invalid pool type: %s", cfg.PoolType)
 	}
 	if tokenPoolUsingMcms {
-		tx, err := BuildMCMSTxn(ix, tokenPool.String(), contractType)
+		tx, err := BuildMCMSTxn(ix, tokenPool.String(), cfg.PoolType)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to create transaction: %w", err)
 		}

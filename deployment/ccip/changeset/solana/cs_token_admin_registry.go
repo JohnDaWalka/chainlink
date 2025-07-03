@@ -14,7 +14,6 @@ import (
 
 	solCommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
 	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
-	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
@@ -412,7 +411,7 @@ func AcceptAdminRoleTokenAdminRegistry(e cldf.Environment, cfg AcceptAdminRoleTo
 type SetPoolConfig struct {
 	ChainSelector     uint64
 	TokenPubKey       solana.PublicKey
-	PoolType          *solTestTokenPool.PoolType
+	PoolType          cldf.ContractType
 	Metadata          string
 	WritableIndexes   []uint8
 	MCMS              *proposalutils.TimelockConfig
@@ -424,7 +423,7 @@ func (cfg SetPoolConfig) Validate(e cldf.Environment, chainState solanastateview
 	if err := chainState.CommonValidation(e, cfg.ChainSelector, tokenPubKey); err != nil {
 		return err
 	}
-	if cfg.PoolType == nil {
+	if cfg.PoolType == "" {
 		return errors.New("pool type must be defined")
 	}
 	chain := e.BlockChains.SolanaChains()[cfg.ChainSelector]
@@ -437,7 +436,7 @@ func (cfg SetPoolConfig) Validate(e cldf.Environment, chainState solanastateview
 	if cfg.Metadata == "" {
 		return errors.New("metadata must be defined")
 	}
-	if lut, ok := chainState.TokenPoolLookupTable[tokenPubKey][*cfg.PoolType][cfg.Metadata]; !ok || lut.IsZero() {
+	if lut, ok := chainState.TokenPoolLookupTable[tokenPubKey][cfg.PoolType][cfg.Metadata]; !ok || lut.IsZero() {
 		return fmt.Errorf("token pool lookup table not found for (mint: %s)", tokenPubKey.String())
 	}
 	if !cfg.SkipRegistryCheck {
@@ -472,7 +471,7 @@ func SetPool(e cldf.Environment, cfg SetPoolConfig) (cldf.ChangesetOutput, error
 	solRouter.SetProgramID(routerProgramAddress)
 	tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
 
-	lookupTablePubKey := chainState.TokenPoolLookupTable[tokenPubKey][*cfg.PoolType][cfg.Metadata]
+	lookupTablePubKey := chainState.TokenPoolLookupTable[tokenPubKey][cfg.PoolType][cfg.Metadata]
 	routerUsingMCMS := solanastateview.IsSolanaProgramOwnedByTimelock(
 		&e,
 		chain,

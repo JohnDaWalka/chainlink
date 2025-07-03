@@ -1911,7 +1911,7 @@ func DeployTransferableTokenSolana(
 		},
 		solAddresses,
 	)
-	bnm := solTestTokenPool.BurnAndMint_PoolType
+	bnm := shared.BurnMintTokenPool
 
 	// deploy and configure solana token pool
 	e, err = commoncs.Apply(nil, e,
@@ -1923,7 +1923,7 @@ func DeployTransferableTokenSolana(
 					{
 						ChainSelector: solChainSel,
 						TokenPubKey:   solTokenAddress,
-						PoolType:      &bnm,
+						PoolType:      bnm,
 						Metadata:      shared.CLLMetadata,
 					},
 				},
@@ -1945,7 +1945,7 @@ func DeployTransferableTokenSolana(
 					{
 						ChainSelector:   solChainSel,
 						TokenPubKey:     solTokenAddress,
-						PoolType:        &bnm,
+						PoolType:        bnm,
 						Metadata:        shared.CLLMetadata,
 						WritableIndexes: []uint8{3, 4, 7},
 					},
@@ -1954,7 +1954,7 @@ func DeployTransferableTokenSolana(
 					{
 						SolChainSelector: solChainSel,
 						SolTokenPubKey:   solTokenAddress,
-						SolPoolType:      &bnm,
+						SolPoolType:      bnm,
 						Metadata:         shared.CLLMetadata,
 						EVMRemoteConfigs: map[uint64]ccipChangeSetSolana.EVMRemoteConfig{
 							evmChainSel: {

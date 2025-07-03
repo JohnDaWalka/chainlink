@@ -27,7 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -283,15 +282,13 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T) (cldf.Environment, sta
 	tokenAddressLockRelease := state.SolChains[solChain1].SPL2022Tokens[0]
 	tokenAddressBurnMint := state.SolChains[solChain1].SPLTokens[0]
 
-	lnr := test_token_pool.LockAndRelease_PoolType
-	bnm := test_token_pool.BurnAndMint_PoolType
 	e, _, err = commonchangeset.ApplyChangesets(t, e, []commonchangeset.ConfiguredChangeSet{
 		commonchangeset.Configure(
 			cldf.CreateLegacyChangeSet(solanachangesets.AddTokenPoolAndLookupTable),
 			solanachangesets.TokenPoolConfig{
 				ChainSelector: solChain1,
 				TokenPubKey:   tokenAddressLockRelease,
-				PoolType:      &lnr,
+				PoolType:      shared.LockReleaseTokenPool,
 				Metadata:      shared.CLLMetadata,
 			},
 		),
@@ -300,7 +297,7 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T) (cldf.Environment, sta
 			solanachangesets.TokenPoolConfig{
 				ChainSelector: solChain1,
 				TokenPubKey:   tokenAddressBurnMint,
-				PoolType:      &bnm,
+				PoolType:      shared.BurnMintTokenPool,
 				Metadata:      shared.CLLMetadata,
 			},
 		),

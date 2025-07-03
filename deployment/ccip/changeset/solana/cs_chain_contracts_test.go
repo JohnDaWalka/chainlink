@@ -19,7 +19,6 @@ import (
 	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	solFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
-	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -754,7 +753,7 @@ func doTestPoolLookupTable(t *testing.T, e cldf.Environment, mcms bool, tokenMet
 
 	e, tokenAddress, err := deployTokenAndMint(t, e, solChain, []string{})
 	require.NoError(t, err)
-	pool := solTestTokenPool.LockAndRelease_PoolType
+	pool := shared.LockReleaseTokenPool
 	e, err = commonchangeset.Apply(t, e,
 		commonchangeset.Configure(
 			// add token pool lookup table
@@ -762,7 +761,7 @@ func doTestPoolLookupTable(t *testing.T, e cldf.Environment, mcms bool, tokenMet
 			ccipChangesetSolana.TokenPoolLookupTableConfig{
 				ChainSelector: solChain,
 				TokenPubKey:   tokenAddress,
-				PoolType:      &pool,
+				PoolType:      pool,
 				Metadata:      tokenMetadata,
 			},
 		),
@@ -801,7 +800,7 @@ func doTestPoolLookupTable(t *testing.T, e cldf.Environment, mcms bool, tokenMet
 		ccipChangesetSolana.SetPoolConfig{
 			ChainSelector:   solChain,
 			TokenPubKey:     tokenAddress,
-			PoolType:        &pool,
+			PoolType:        pool,
 			Metadata:        tokenMetadata,
 			WritableIndexes: []uint8{3, 4, 7},
 			MCMS:            mcmsConfig,
