@@ -601,6 +601,16 @@ func ValidateOwnershipSolana(
 		if err := commonchangeset.ValidateOwnershipSolanaCommon(mcms, chain.DeployerKey.PublicKey(), timelockSignerPDA, programData.Owner); err != nil {
 			return fmt.Errorf("failed to validate ownership for rmnremote: %w", err)
 		}
+	case shared.CCTPTokenPool:
+		programData := cctp_token_pool.State{}
+		poolConfigPDA, _ := tokens.TokenPoolConfigAddress(tokenAddress, programID)
+		err = chain.GetAccountDataBorshInto(e.GetContext(), poolConfigPDA, &programData)
+		if err != nil {
+			return nil
+		}
+		if err := commonchangeset.ValidateOwnershipSolanaCommon(mcms, chain.DeployerKey.PublicKey(), timelockSignerPDA, programData.Config.Owner); err != nil {
+			return fmt.Errorf("failed to validate ownership for cctp_token_pool: %w", err)
+		}
 	default:
 		return fmt.Errorf("unsupported contract type: %s", contractType)
 	}

@@ -1157,13 +1157,12 @@ func AddTokenPoolLookupTable(e cldf.Environment, cfg TokenPoolLookupTableConfig)
 	}
 	typeVersion := cldf.NewTypeAndVersion(shared.TokenPoolLookupTable, deployment.Version1_0_0)
 	typeVersion.Labels.Add(tokenPubKey.String())
+	typeVersion.Labels.Add(cfg.Metadata)
 	switch cfg.PoolType {
 	case shared.BurnMintTokenPool:
 		typeVersion.Labels.Add(solTestTokenPool.BurnAndMint_PoolType.String())
-		typeVersion.Labels.Add(cfg.Metadata)
 	case shared.LockReleaseTokenPool:
 		typeVersion.Labels.Add(solTestTokenPool.LockAndRelease_PoolType.String())
-		typeVersion.Labels.Add(cfg.Metadata)
 	case shared.CCTPTokenPool:
 		tokenMessageMinterAuthority, _, err := solana.FindProgramAddress([][]byte{[]byte("sender_authority")}, cfg.CCTPTokenMessengerMinter)
 		if err != nil {
