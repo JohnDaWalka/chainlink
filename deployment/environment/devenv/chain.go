@@ -26,7 +26,6 @@ import (
 	cldf_chain_utils "github.com/smartcontractkit/chainlink-deployments-framework/chain/utils"
 
 	"github.com/aptos-labs/aptos-go-sdk"
-
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
