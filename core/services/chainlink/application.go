@@ -350,9 +350,11 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 	if cfg.TronEnabled() {
 		initOps = append(initOps, InitTron(relayerFactory, keyStore.Tron(), keyStore.CSA(), cfg.TronConfigs()))
 	}
-	if cfg.SuiEnabled() {
-		initOps = append(initOps, InitSui(relayerFactory, keyStore.Sui(), keyStore.CSA(), cfg.SuiConfigs()))
-	}
+	globalLogger.Debug("IS SUI ENABLED?? %v", cfg.SuiEnabled())
+
+	// if cfg.SuiEnabled() {
+	initOps = append(initOps, InitSui(relayerFactory, keyStore.Sui(), keyStore.CSA(), cfg.SuiConfigs()))
+	// }
 
 	if cfg.TONEnabled() {
 		initOps = append(initOps, InitTON(relayerFactory, keyStore.TON(), keyStore.CSA(), cfg.TONConfigs()))
@@ -1268,7 +1270,7 @@ func (app *ChainlinkApplication) RunJobV2(
 					common.BigToHash(big.NewInt(42)).Bytes(), // seed
 					evmutils.NewHash().Bytes(),               // sender
 					evmutils.NewHash().Bytes(),               // fee
-					evmutils.NewHash().Bytes()}, // requestID
+					evmutils.NewHash().Bytes()},              // requestID
 					[]byte{}),
 				Topics:      []common.Hash{{}, jb.ExternalIDEncodeBytesToTopic()}, // jobID BYTES
 				TxHash:      evmutils.NewHash(),

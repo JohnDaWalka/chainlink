@@ -325,6 +325,7 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 		workflowIDs[i] = workflowKey.ID()
 		i++
 	}
+	lggr.Infow(fmt.Sprintf("Unlocked %d SUIII keys", len(suiIDs)), "keys", suiIDs)
 	if len(csaIDs) > 0 {
 		lggr.Infow(fmt.Sprintf("Unlocked %d CSA keys", len(csaIDs)), "keys", csaIDs)
 	}

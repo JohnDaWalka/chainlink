@@ -232,7 +232,7 @@ func InitSui(factory RelayerFactory, ks keystore.Sui, csaKS keystore.CSA, chainC
 		loopKs := &keystore.SuiLoopSinger{Sui: ks}
 		relayers, err := factory.NewSui(loopKs, &keystore.CSASigner{CSA: csaKS}, chainCfgs)
 		if err != nil {
-			return fmt.Errorf("failed to setup aptos relayer: %w", err)
+			return fmt.Errorf("failed to setup sui relayer: %w", err)
 		}
 
 		for id, relayer := range relayers {
