@@ -200,7 +200,7 @@ func validateUSDCConfig(usdcConfig *pluginconfig.USDCCCTPObserverConfig, state s
 				return fmt.Errorf("chain %d does not exist in Solana chain state but provided in USDCCCTPObserverConfig", sel)
 			}
 			if onchainState.CCTPTokenPool.IsZero() {
-				return fmt.Errorf("chain %d does not have a USDC token pool deployed", sel)
+				return fmt.Errorf("chain %d does not have a CCTP token pool deployed", sel)
 			}
 			if onchainState.USDCToken.IsZero() {
 				return fmt.Errorf("chain %d does not have a USDC token in state", sel)
@@ -224,7 +224,7 @@ func validateUSDCConfig(usdcConfig *pluginconfig.USDCCCTPObserverConfig, state s
 
 			sourcePoolPubkey := solana.PublicKeyFromBytes(sourcePoolBytes)
 			if !sourcePoolPubkey.Equals(tokenPoolConfig) {
-				return fmt.Errorf("Solana chain %d has USDC token pool config deployed at %s, "+
+				return fmt.Errorf("Solana chain %d has CCTP token pool config deployed at %s, "+
 					"but SourcePoolAddress provided in USDCCCTPObserverConfig decodes to %s",
 					sel, tokenPoolConfig.String(), sourcePoolPubkey.String())
 			}

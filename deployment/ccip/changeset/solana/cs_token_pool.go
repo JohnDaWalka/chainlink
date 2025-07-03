@@ -103,8 +103,8 @@ type TokenPoolConfig struct {
 	PoolType                 cldf.ContractType
 	TokenPubKey              solana.PublicKey
 	Metadata                 string // tag to identify which client/cll token pool executable to use
-	CCTPTokenMessengerMinter solana.PublicKey
-	CCTPMessageTransmitter   solana.PublicKey
+	CCTPTokenMessengerMinter solana.PublicKey // required if PoolType is CCTPTokenPool
+	CCTPMessageTransmitter   solana.PublicKey // required if PoolType is CCTPTokenPool
 }
 
 func (cfg TokenPoolConfig) Validate(e cldf.Environment, chainState solanastateview.CCIPChainState) error {
@@ -884,7 +884,7 @@ func getInstructionsForLockRelease(
 	return ixns, nil
 }
 
-func getNewSetuptInstructionsForUSDC(
+func getNewSetuptInstructionsForCCTP(
 	e cldf.Environment,
 	chain cldf_solana.Chain,
 	chainState solanastateview.CCIPChainState,
@@ -893,7 +893,7 @@ func getNewSetuptInstructionsForUSDC(
 	rateLimiterConfig RateLimiterConfig,
 	onChainEVMPoolConfig cctp_token_pool.RemoteConfig,
 ) ([]solana.Instruction, error) {
-	e.Logger.Infow("getNewSetuptInstructionsForUSDC", "remote_chain_selector", evmChainSelector, "token_pubkey", cfg.SolTokenPubKey.String())
+	e.Logger.Infow("getNewSetuptInstructionsForCCTP", "remote_chain_selector", evmChainSelector, "token_pubkey", cfg.SolTokenPubKey.String())
 	tokenPubKey := cfg.SolTokenPubKey
 	tokenPool := chainState.CCTPTokenPool
 	contractType := shared.USDCTokenPool
@@ -907,7 +907,7 @@ func getNewSetuptInstructionsForUSDC(
 		tokenPubKey,
 		cfg.Metadata,
 	)
-	e.Logger.Infow("getNewSetuptInstructionsForUSDCe", "authority", authority.String())
+	e.Logger.Infow("getNewSetuptInstructionsForCCTP", "authority", authority.String())
 	onChainEVMPoolConfigWithoutPoolAddress := cctp_token_pool.RemoteConfig{
 		TokenAddress:  onChainEVMPoolConfig.TokenAddress,
 		PoolAddresses: []cctp_token_pool.RemoteAddress{},
@@ -1067,7 +1067,7 @@ func getInstructionsForCCTP(
 			}
 		}
 	} else {
-		ixns, err = getNewSetuptInstructionsForUSDC(e, chain, solChainState, cfg, evmChainSelector, evmRemoteConfig.RateLimiterConfig, onChainEVMPoolConfig)
+		ixns, err = getNewSetuptInstructionsForCCTP(e, chain, solChainState, cfg, evmChainSelector, evmRemoteConfig.RateLimiterConfig, onChainEVMPoolConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate instructions: %w", err)
 		}
