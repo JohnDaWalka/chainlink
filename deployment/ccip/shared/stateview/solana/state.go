@@ -9,6 +9,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	"github.com/rs/zerolog/log"
+
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 
 	solBurnMintTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/burnmint_token_pool"
@@ -72,7 +73,7 @@ type CCIPChainState struct {
 }
 
 func (s CCIPChainState) TokenToTokenProgram(tokenAddress solana.PublicKey) (solana.PublicKey, error) {
-	if tokenAddress.Equals(s.LinkToken) || tokenAddress.Equals(s.WSOL) || tokenAddress.Equals(s.USDCToken){
+	if tokenAddress.Equals(s.LinkToken) || tokenAddress.Equals(s.WSOL) || tokenAddress.Equals(s.USDCToken) {
 		return solana.TokenProgramID, nil
 	}
 	for _, spl2022Token := range s.SPL2022Tokens {
@@ -109,7 +110,7 @@ func (s CCIPChainState) GetActiveTokenPool(
 			return s.BurnMintTokenPools[shared.CLLMetadata]
 		}
 		return s.BurnMintTokenPools[metadata]
-	case  shared.LockReleaseTokenPool:
+	case shared.LockReleaseTokenPool:
 		if metadata == "" {
 			return s.LockReleaseTokenPools[shared.CLLMetadata]
 		}
@@ -140,7 +141,7 @@ func (s CCIPChainState) ValidatePoolDeployment(
 	if _, err := s.TokenToTokenProgram(tokenPubKey); err != nil {
 		return fmt.Errorf("token %s not found in existing state, deploy the token first", tokenPubKey.String())
 	}
-	
+
 	tokenPool = s.GetActiveTokenPool(poolType, metadata)
 	switch poolType {
 	case shared.BurnMintTokenPool:
