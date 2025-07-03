@@ -1545,12 +1545,14 @@ github.com/smartcontractkit/chainlink-protos/svr v1.1.0 h1:79Z9N9dMbMVRGaLoDPAQ+
 github.com/smartcontractkit/chainlink-protos/svr v1.1.0/go.mod h1:TcOliTQU6r59DwG4lo3U+mFM9WWyBHGuFkkxQpvSujo=
 github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250619160901-79b609b1021c h1:o+f69x7YeWAAW3UV1c+T2jSRr0nB8tNyZEEbufDMNi4=
 github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250619160901-79b609b1021c/go.mod h1:HIpGvF6nKCdtZ30xhdkKWGM9+4Z4CVqJH8ZBL1FTEiY=
-github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250701085747-933df81025f3 h1:qJHEtKE0LDQbRQNAbAJhI7o3/2sDcoT1jDQ7HLt8oaM=
-github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250701085747-933df81025f3/go.mod h1:G48fP4rruqdUAWBLjBAYbqBPhlFpQRqYs+tdKpNjSKg=
+github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250702130714-144d99d2d871 h1:yi71YeL8jAGYz7yGA3iiaSwE9em08Pchzp+KApt//2M=
+github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250702130714-144d99d2d871/go.mod h1:G48fP4rruqdUAWBLjBAYbqBPhlFpQRqYs+tdKpNjSKg=
 github.com/smartcontractkit/chainlink-sui v0.0.0-20250701223705-bd9203b2a21d h1:Pkl3poo/8z09sfBId0cALT/9MUvNfiYZ+ZyLooxpk9w=
 github.com/smartcontractkit/chainlink-sui v0.0.0-20250701223705-bd9203b2a21d/go.mod h1:klMzutdnUmqaWjQcbTFJlAPRHUBewtPFnEUt2gajQg4=
 github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.7 h1:haG6hdwUp987TL6UKk6ygeW3hisnGAQXSI+NIh199Kw=
 github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.7/go.mod h1:q99H9vcMJDs6T+zsSI8XJZd6PUkZnyG3iaRbrYNUCTk=
+github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose v0.1.2 h1:uqe6xg+fMb/BRMzEJuzSjXpHnzksk8dlCAvOd1DrQ9k=
+github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose v0.1.2/go.mod h1:yZukGfDjLHynPQgPX/XcwjnYCGt6NCmQ+qavePrrYeQ=
 github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.3 h1:4Bned1rumiWB7A0WI4hcEVuOnBBHIoXpxagZYhPLFNw=
 github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.3/go.mod h1:dgwtcefGr+0i+C2S6V/Xgntzm7E5CPxXMyi2OnQvnHI=
 github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 h1:cWUHB6QETyKbmh0B988f5AKIKb3aBDWugfrZ04jAUUY=
@@ -1843,8 +1845,8 @@ go.uber.org/atomic v1.11.0/go.mod h1:LUxbIzbOniOlMKjJjyPfpl4v+PKK2cNJn91OQbhoJI0
 go.uber.org/goleak v1.1.11/go.mod h1:cwTWslyiVhfpKIDGSZEM2HlOvcqm+tG4zioyIeLoqMQ=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
 go.uber.org/goleak v1.3.0/go.mod h1:CoHD4mav9JJNrW/WLlf7HGZPjdw8EucARQHekz1X6bE=
-go.uber.org/mock v0.5.0 h1:KAMbZvZPyBPWgD14IrIQ38QCyjwpvVVV6K/bHl1IwQU=
-go.uber.org/mock v0.5.0/go.mod h1:ge71pBPLYDk7QIi1LupWxdAykm7KIEFchiOqd6z7qMM=
+go.uber.org/mock v0.5.2 h1:LbtPTcP8A5k9WPXj54PPPbjcI4Y6lhyOZXn+VS7wNko=
+go.uber.org/mock v0.5.2/go.mod h1:wLlUxC2vVTPTaE3UD51E0BGOAElKrILxhVSDYQLld5o=
 go.uber.org/multierr v1.1.0/go.mod h1:wR5kodmAFQ0UK8QlbwjlSNy0Z68gJhDJUG5sjR94q/0=
 go.uber.org/multierr v1.3.0/go.mod h1:VgVr7evmIr6uPjLBxg28wmKNXyqE9akIJ5XnfpiKl+4=
 go.uber.org/multierr v1.5.0/go.mod h1:FeouvMocqHpRaaGuG9EjoKcStLC43Zu/fmqdUMPcKYU=
