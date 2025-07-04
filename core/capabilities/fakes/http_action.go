@@ -8,9 +8,8 @@ import (
 	"strings"
 	"time"
 
+	httpserver "github.com/smartcontractkit/capabilities/http_action/pb"
 	commonCap "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
-	customhttp "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/actions/http"
-	httpserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/actions/http/server"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -48,7 +47,7 @@ func NewDirectHTTPAction(lggr logger.Logger) *DirectHTTPAction {
 	return fc
 }
 
-func (fh *DirectHTTPAction) SendRequest(ctx context.Context, metadata commonCap.RequestMetadata, input *customhttp.Request) (*customhttp.Response, error) {
+func (fh *DirectHTTPAction) SendRequest(ctx context.Context, metadata commonCap.RequestMetadata, input *httpserver.Request) (*httpserver.Response, error) {
 	fh.eng.Infow("HTTP Action SendRequest Started", "input", input)
 
 	// Create HTTP client with timeout
@@ -78,7 +77,7 @@ func (fh *DirectHTTPAction) SendRequest(ctx context.Context, metadata commonCap.
 	req, err := http.NewRequestWithContext(ctx, method, input.GetUrl(), body)
 	if err != nil {
 		fh.eng.Errorw("Failed to create HTTP request", "error", err)
-		return &customhttp.Response{
+		return &httpserver.Response{
 			StatusCode: 0,
 		}, err
 	}
@@ -92,7 +91,7 @@ func (fh *DirectHTTPAction) SendRequest(ctx context.Context, metadata commonCap.
 	resp, err := client.Do(req)
 	if err != nil {
 		fh.eng.Errorw("Failed to execute HTTP request", "error", err)
-		return &customhttp.Response{
+		return &httpserver.Response{
 			StatusCode: 0,
 		}, err
 	}
@@ -102,7 +101,7 @@ func (fh *DirectHTTPAction) SendRequest(ctx context.Context, metadata commonCap.
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fh.eng.Errorw("Failed to read response body", "error", err)
-		return &customhttp.Response{
+		return &httpserver.Response{
 			StatusCode: uint32(resp.StatusCode), //nolint:gosec // status code is always in valid range
 		}, err
 	}
@@ -115,7 +114,7 @@ func (fh *DirectHTTPAction) SendRequest(ctx context.Context, metadata commonCap.
 	}
 
 	// Create response
-	response := &customhttp.Response{
+	response := &httpserver.Response{
 		StatusCode: uint32(resp.StatusCode), //nolint:gosec // status code is always in valid range
 		Headers:    headers,
 		Body:       respBody,

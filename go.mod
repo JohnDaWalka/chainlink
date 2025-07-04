@@ -16,9 +16,9 @@ require (
 	github.com/danielkov/gin-helmet v0.0.0-20171108135313-1387e224435e
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/dominikbraun/graph v0.23.0
-	github.com/doyensec/safeurl v0.2.1
+	github.com/doyensec/safeurl v0.2.2
 	github.com/esote/minmaxheap v1.0.0
-	github.com/ethereum/go-ethereum v1.15.3
+	github.com/ethereum/go-ethereum v1.15.11
 	github.com/fatih/color v1.18.0
 	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b
 	github.com/fxamacker/cbor/v2 v2.7.0
@@ -81,8 +81,8 @@ require (
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250627133416-1d85eec09097
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250702201310-07178aa95345
-	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250702175503-91331140edc3
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250703150508-135b4a985265
+	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250703150508-135b4a985265
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250604171706-a98fa6515eae
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250630192401-d6330473ec6e
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135
@@ -113,10 +113,10 @@ require (
 	go.dedis.ch/fixbuf v1.0.3
 	go.dedis.ch/kyber/v3 v3.1.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin v0.49.0
-	go.opentelemetry.io/otel v1.35.0
-	go.opentelemetry.io/otel/metric v1.35.0
+	go.opentelemetry.io/otel v1.37.0
+	go.opentelemetry.io/otel/metric v1.37.0
 	go.opentelemetry.io/otel/sdk/metric v1.35.0
-	go.opentelemetry.io/otel/trace v1.35.0
+	go.opentelemetry.io/otel/trace v1.37.0
 	go.uber.org/atomic v1.11.0
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.27.0
@@ -208,6 +208,7 @@ require (
 	github.com/cosmos/ics23/go v0.11.0 // indirect
 	github.com/cosmos/ledger-cosmos-go v0.14.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
+	github.com/crate-crypto/go-eth-kzg v1.3.0 // indirect
 	github.com/crate-crypto/go-ipa v0.0.0-20240724233137-53bbb0ceb27a // indirect
 	github.com/crate-crypto/go-kzg-4844 v1.1.0 // indirect
 	github.com/danieljoos/wincred v1.2.1 // indirect
@@ -219,6 +220,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.7.0 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.3 // indirect
+	github.com/ethereum/c-kzg-4844/v2 v2.1.0 // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
@@ -227,12 +229,13 @@ require (
 	github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
+	github.com/go-co-op/gocron/v2 v2.11.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.4 // indirect
 	github.com/go-json-experiment/json v0.0.0-20250223041408-d3c622f1b874 // indirect
 	github.com/go-kit/kit v0.13.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
@@ -244,7 +247,7 @@ require (
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.1 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
@@ -302,7 +305,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mfridman/interpolate v0.0.2 // indirect
-	github.com/miekg/dns v1.1.63 // indirect
+	github.com/miekg/dns v1.1.66 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.1-0.20220423185008-bf980b35cac4 // indirect
@@ -331,6 +334,11 @@ require (
 	github.com/sasha-s/go-deadlock v0.3.5 // indirect
 	github.com/sethvargo/go-retry v0.2.4 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
+	github.com/smartcontractkit/capabilities/chain_capabilities/evm v0.0.0-20250704111250-4d736013363e // indirect
+	github.com/smartcontractkit/capabilities/cron v0.0.2-0.20250704111250-4d736013363e // indirect
+	github.com/smartcontractkit/capabilities/http_action v0.0.0-20250704111250-4d736013363e // indirect
+	github.com/smartcontractkit/capabilities/http_trigger v0.0.0-20250704111250-4d736013363e // indirect
+	github.com/smartcontractkit/capabilities/libs v0.0.0-20250703172529-b99ea55f5826 // indirect
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250618135814-7e3f79ab707e // indirect
 	github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go v0.0.0-20250131130834-15e0d4cde2a6 // indirect
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect

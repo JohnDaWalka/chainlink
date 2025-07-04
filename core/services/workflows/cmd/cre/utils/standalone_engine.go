@@ -10,7 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/billing"
 
-	httpserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/actions/http/server"
+	httpserver "github.com/smartcontractkit/capabilities/http_action/pb"
 	consensusserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/consensus/server"
 	"github.com/smartcontractkit/chainlink-common/pkg/custmsg"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
