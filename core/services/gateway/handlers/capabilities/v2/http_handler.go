@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,22 +26,22 @@ var _ handlers.Handler = (*gatewayHandler)(nil)
 const (
 	handlerName            = "HTTPCapabilityHandler"
 	defaultCleanUpPeriodMs = 1000 * 60 * 10 // 10 minutes
+	internalErrorMessage   = "Internal Server Error"
 )
 
 type gatewayHandler struct {
 	services.StateMachine
-	config             ServiceConfig
-	don                handlers.DON
-	donConfig          *config.DONConfig
-	lggr               logger.Logger
-	httpClient         network.HTTPClient
-	nodeRateLimiter    *ratelimit.RateLimiter // Rate limiter for node requests (e.g. outgoing HTTP requests, HTTP trigger response, auth metadata exchange)
-	userRateLimiter    *ratelimit.RateLimiter // Rate limiter for user requests that trigger workflow executions
-	wg                 sync.WaitGroup
-	stopCh             services.StopChan
-	responseCache      ResponseCache // Caches HTTP responses to avoid redundant requests for outbound HTTP actions
-	responseAggregator common.NodeResponseAggregator
-	triggerCallbacks   RequestCallbacks // Stores callbacks for user trigger requests.
+	config          ServiceConfig
+	don             handlers.DON
+	donConfig       *config.DONConfig
+	lggr            logger.Logger
+	httpClient      network.HTTPClient
+	nodeRateLimiter *ratelimit.RateLimiter // Rate limiter for node requests (e.g. outgoing HTTP requests, HTTP trigger response, auth metadata exchange)
+	userRateLimiter *ratelimit.RateLimiter // Rate limiter for user requests that trigger workflow executions
+	wg              sync.WaitGroup
+	stopCh          services.StopChan
+	responseCache   ResponseCache // Caches HTTP responses to avoid redundant requests for outbound HTTP actions
+	triggerHandler  HTTPTriggerHandler
 }
 
 type ResponseCache interface {
@@ -73,19 +74,19 @@ func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfi
 	}
 	responseAggregator := common.NewIdenticalNodeResponseAggregator(lggr, 2*donConfig.F+1,
 		cfg.TriggerRequestMaxDurationMs, cfg.CleanUpPeriodMs)
+	triggerHandler := NewHTTPTriggerHandler(lggr, cfg, donConfig, don, responseAggregator)
 	return &gatewayHandler{
-		config:             cfg,
-		don:                don,
-		donConfig:          donConfig,
-		lggr:               logger.With(logger.Named(lggr, handlerName), "donId", donConfig.DonId),
-		httpClient:         httpClient,
-		nodeRateLimiter:    nodeRateLimiter,
-		userRateLimiter:    userRateLimiter,
-		wg:                 sync.WaitGroup{},
-		stopCh:             make(services.StopChan),
-		responseCache:      newResponseCache(lggr),
-		triggerCallbacks:   newRequestCallbacks(lggr),
-		responseAggregator: responseAggregator,
+		config:          cfg,
+		don:             don,
+		donConfig:       donConfig,
+		lggr:            logger.With(logger.Named(lggr, handlerName), "donId", donConfig.DonId),
+		httpClient:      httpClient,
+		nodeRateLimiter: nodeRateLimiter,
+		userRateLimiter: userRateLimiter,
+		wg:              sync.WaitGroup{},
+		stopCh:          make(services.StopChan),
+		responseCache:   newResponseCache(lggr),
+		triggerHandler:  triggerHandler,
 	}, nil
 }
 
@@ -102,25 +103,45 @@ func (h *gatewayHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Re
 		return fmt.Errorf("received response with empty request ID from node %s", nodeAddr)
 	}
 	h.lggr.Debugw("handling incoming node message", "requestID", resp.ID, "nodeAddr", nodeAddr)
-	var outboundReq gateway_common.OutboundHTTPRequest
-	err := json.Unmarshal(resp.Result, &outboundReq)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal HTTP request from node %s: %w", nodeAddr, err)
+	// Route node messages, which is a JSON-RPC response, based on the response ID.
+	// Node messages initiated by the node have "/" character as the delimiter
+	// Any messages without "/" are considered user messages initiated by the user
+	if strings.Contains(resp.ID, "/") {
+		parts := strings.Split(resp.ID, "/")
+		methodName := parts[0]
+		switch methodName {
+		case gateway_common.MethodHTTPAction:
+			return h.makeOutgoingRequest(ctx, resp, nodeAddr)
+		default:
+			return fmt.Errorf("Unsupported method %s in node message ID %s", methodName, resp.ID)
+		}
 	}
-	return h.handleOutgoingRequest(ctx, resp.ID, outboundReq, nodeAddr)
+	return h.triggerHandler.HandleNodeTriggerResponse(ctx, resp, nodeAddr)
 }
 
 func (h *gatewayHandler) HandleLegacyUserMessage(context.Context, *api.Message, chan<- handlers.UserCallbackPayload) error {
 	return errors.New("HTTP capability gateway handler does not support legacy messages")
 }
 
-func (h *gatewayHandler) HandleJSONRPCUserMessage(context.Context, jsonrpc.Request, chan<- handlers.UserCallbackPayload) error {
-	// TODO: Implement trigger request handling
+func (h *gatewayHandler) HandleJSONRPCUserMessage(ctx context.Context, req jsonrpc.Request, responseCh chan<- handlers.UserCallbackPayload) error {
+	err := h.triggerHandler.HandleUserTriggerRequest(ctx, &req, responseCh)
+	if err != nil {
+		h.lggr.Errorw("failed to handle user trigger request", "requestID",
+			req.ID, "err", err)
+		// error response is sent to the response channel by the trigger handler
+		// so return nil after logging
+	}
 	return nil
 }
 
-func (h *gatewayHandler) handleOutgoingRequest(ctx context.Context, requestID string, req gateway_common.OutboundHTTPRequest, nodeAddr string) error {
+func (h *gatewayHandler) makeOutgoingRequest(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error {
+	requestID := resp.ID
 	h.lggr.Debugw("handling webAPI outgoing message", "requestID", requestID, "nodeAddr", nodeAddr)
+	var req gateway_common.OutboundHTTPRequest
+	err := json.Unmarshal(resp.Result, &req)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal HTTP request from node %s: %w", nodeAddr, err)
+	}
 	if !h.nodeRateLimiter.Allow(nodeAddr) {
 		return fmt.Errorf("rate limit exceeded for node %s", nodeAddr)
 	}
@@ -181,43 +202,6 @@ func (h *gatewayHandler) handleOutgoingRequest(ctx context.Context, requestID st
 	return nil
 }
 
-// TODO: can it return error?
-func (h *gatewayHandler) handleTriggerResponse(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error {
-	h.lggr.Debugw("handling trigger response", "requestID", resp.ID, "nodeAddr", nodeAddr)
-	resp, err := h.responseAggregator.CollectAndAggregate(resp.ID, resp, nodeAddr)
-	if err != nil {
-		h.lggr.Debugw("insufficient number of responses", "requestID", resp.ID, "nodeAddr", nodeAddr, "err", err)
-		return nil
-	}
-	err = h.triggerCallbacks.SendResponse(ctx, resp.ID, resp)
-	if err != nil {
-		h.lggr.Errorw("error sending trigger response", "err", err, "requestID", resp.ID, "nodeAddr", nodeAddr)
-		handleUserError(resp.ID, InternalServerErrorCode, InternalServerErrorMessage, resp.CallbackCh)
-	}
-	return nil
-}
-
-func (h *gatewayHandler) HandleUserRequest(ctx context.Context, req *jsonrpc.Request, callbackCh chan<- *jsonrpc.Response) error {
-
-}
-
-// reapExpiredCallbacks removes callbacks that are older than the maximum age
-func (h *gatewayHandler) reapExpiredCallbacks() {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	now := time.Now()
-	var expiredCount int
-	for executionID, callback := range h.savedCallbacks {
-		if now.Sub(callback.createdAt) > time.Duration(h.config.ResponseMaxAgeMs)*time.Millisecond {
-			delete(h.savedCallbacks, executionID)
-			expiredCount++
-		}
-	}
-	if expiredCount > 0 {
-		h.lggr.Infow("Removed expired callbacks", "count", expiredCount, "remaining", len(h.savedCallbacks))
-	}
-}
-
 func (h *gatewayHandler) HealthReport() map[string]error {
 	return map[string]error{handlerName: h.Healthy()}
 }
@@ -226,12 +210,12 @@ func (h *gatewayHandler) Name() string {
 	return handlerName
 }
 
-func (h *gatewayHandler) Start(context.Context) error {
+func (h *gatewayHandler) Start(ctx context.Context) error {
 	return h.StartOnce(handlerName, func() error {
 		h.lggr.Info("Starting " + handlerName)
-		err := h.responseAggregator.Start(ctx)
+		err := h.triggerHandler.Start(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to start HTTP trigger handler: %w", err)
 		}
 		go func() {
 			ticker := time.NewTicker(time.Duration(h.config.CleanUpPeriodMs) * time.Millisecond)
@@ -239,8 +223,6 @@ func (h *gatewayHandler) Start(context.Context) error {
 			for {
 				select {
 				case <-ticker.C:
-				TODO:
-					// h.reapExpiredCallbacks()
 					h.responseCache.DeleteExpired()
 				case <-h.stopCh:
 					return
@@ -254,10 +236,6 @@ func (h *gatewayHandler) Start(context.Context) error {
 func (h *gatewayHandler) Close() error {
 	return h.StopOnce(handlerName, func() error {
 		h.lggr.Info("Closing " + handlerName)
-		err := h.responseAggregator.Close()
-		if err != nil {
-			h.lggr.Errorw("error closing response aggregator", "err", err)
-		}
 		close(h.stopCh)
 		h.wg.Wait()
 		return nil

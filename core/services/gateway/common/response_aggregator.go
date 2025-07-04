@@ -11,7 +11,10 @@ import (
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
+
+var _ NodeResponseAggregator = (*identicalNodeResponseAggregator)(nil)
 
 type NodeResponseAggregator interface {
 	job.ServiceCtx
