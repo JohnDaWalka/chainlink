@@ -8,9 +8,8 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	cronserver "github.com/smartcontractkit/capabilities/cron/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
-	crontypedapi "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/triggers/cron"
-	cronserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/triggers/cron/server"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -37,8 +36,8 @@ type ManualCronTriggerService struct {
 	capabilities.CapabilityInfo
 	config           ManualCronConfig
 	lggr             logger.Logger
-	callbackCh       chan capabilities.TriggerAndId[*crontypedapi.Payload]
-	legacyCallbackCh chan capabilities.TriggerAndId[*crontypedapi.LegacyPayload] //nolint:staticcheck // LegacyPayload intentionally used for backward compatibility
+	callbackCh       chan capabilities.TriggerAndId[*cronserver.Payload]
+	legacyCallbackCh chan capabilities.TriggerAndId[*cronserver.LegacyPayload] //nolint:staticcheck // LegacyPayload intentionally used for backward compatibility
 }
 
 func NewManualCronTriggerService(parentLggr logger.Logger) *ManualCronTriggerService {
@@ -48,8 +47,8 @@ func NewManualCronTriggerService(parentLggr logger.Logger) *ManualCronTriggerSer
 		CapabilityInfo:   manualCronTriggerInfo,
 		config:           ManualCronConfig{FastestScheduleIntervalSeconds: 1},
 		lggr:             lggr,
-		callbackCh:       make(chan capabilities.TriggerAndId[*crontypedapi.Payload]),
-		legacyCallbackCh: make(chan capabilities.TriggerAndId[*crontypedapi.LegacyPayload]), //nolint:staticcheck // LegacyPayload intentionally used for backward compatibility
+		callbackCh:       make(chan capabilities.TriggerAndId[*cronserver.Payload]),
+		legacyCallbackCh: make(chan capabilities.TriggerAndId[*cronserver.LegacyPayload]), //nolint:staticcheck // LegacyPayload intentionally used for backward compatibility
 	}
 }
 
@@ -84,19 +83,19 @@ func (f *ManualCronTriggerService) Initialise(ctx context.Context, config string
 	return nil
 }
 
-func (f *ManualCronTriggerService) RegisterTrigger(ctx context.Context, triggerID string, metadata capabilities.RequestMetadata, input *crontypedapi.Config) (<-chan capabilities.TriggerAndId[*crontypedapi.Payload], error) {
+func (f *ManualCronTriggerService) RegisterTrigger(ctx context.Context, triggerID string, metadata capabilities.RequestMetadata, input *cronserver.Config) (<-chan capabilities.TriggerAndId[*cronserver.Payload], error) {
 	return f.callbackCh, nil
 }
 
-func (f *ManualCronTriggerService) UnregisterTrigger(ctx context.Context, triggerID string, metadata capabilities.RequestMetadata, input *crontypedapi.Config) error {
+func (f *ManualCronTriggerService) UnregisterTrigger(ctx context.Context, triggerID string, metadata capabilities.RequestMetadata, input *cronserver.Config) error {
 	return nil
 }
 
-func (f *ManualCronTriggerService) RegisterLegacyTrigger(ctx context.Context, triggerID string, metadata capabilities.RequestMetadata, input *crontypedapi.Config) (<-chan capabilities.TriggerAndId[*crontypedapi.LegacyPayload], error) { //nolint:staticcheck // LegacyPayload intentionally used for backward compatibility
+func (f *ManualCronTriggerService) RegisterLegacyTrigger(ctx context.Context, triggerID string, metadata capabilities.RequestMetadata, input *cronserver.Config) (<-chan capabilities.TriggerAndId[*cronserver.LegacyPayload], error) { //nolint:staticcheck // LegacyPayload intentionally used for backward compatibility
 	return f.legacyCallbackCh, nil
 }
 
-func (f *ManualCronTriggerService) UnregisterLegacyTrigger(ctx context.Context, triggerID string, metadata capabilities.RequestMetadata, input *crontypedapi.Config) error {
+func (f *ManualCronTriggerService) UnregisterLegacyTrigger(ctx context.Context, triggerID string, metadata capabilities.RequestMetadata, input *cronserver.Config) error {
 	return nil
 }
 
@@ -116,7 +115,7 @@ func (f *ManualCronTriggerService) ManualTrigger(ctx context.Context, scheduledE
 	return nil
 }
 
-func (f *ManualCronTriggerService) createManualTriggerEvent(scheduledExecutionTime time.Time) capabilities.TriggerAndId[*crontypedapi.Payload] {
+func (f *ManualCronTriggerService) createManualTriggerEvent(scheduledExecutionTime time.Time) capabilities.TriggerAndId[*cronserver.Payload] {
 	// Ensure UTC time is used for consistency across nodes.
 	scheduledExecutionTimeUTC := scheduledExecutionTime.UTC()
 
@@ -126,8 +125,8 @@ func (f *ManualCronTriggerService) createManualTriggerEvent(scheduledExecutionTi
 	scheduledExecutionTimeFormatted := scheduledExecutionTimeUTC.Format(time.RFC3339)
 	triggerEventID := scheduledExecutionTimeFormatted
 
-	return capabilities.TriggerAndId[*crontypedapi.Payload]{
-		Trigger: &crontypedapi.Payload{
+	return capabilities.TriggerAndId[*cronserver.Payload]{
+		Trigger: &cronserver.Payload{
 			ScheduledExecutionTime: timestamppb.New(scheduledExecutionTimeUTC),
 		},
 		Id: triggerEventID,

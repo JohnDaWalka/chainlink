@@ -3,9 +3,8 @@ package fakes
 import (
 	"context"
 
+	httpserver "github.com/smartcontractkit/capabilities/http_trigger/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
-	httptypedapi "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/triggers/http"
-	httpserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/triggers/http/server"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -26,7 +25,7 @@ var manualHTTPTriggerInfo = capabilities.MustNewCapabilityInfo(
 type ManualHTTPTriggerService struct {
 	capabilities.CapabilityInfo
 	lggr       logger.Logger
-	callbackCh chan capabilities.TriggerAndId[*httptypedapi.Payload]
+	callbackCh chan capabilities.TriggerAndId[*httpserver.Payload]
 }
 
 func NewManualHTTPTriggerService(parentLggr logger.Logger) *ManualHTTPTriggerService {
@@ -35,16 +34,16 @@ func NewManualHTTPTriggerService(parentLggr logger.Logger) *ManualHTTPTriggerSer
 	return &ManualHTTPTriggerService{
 		CapabilityInfo: manualHTTPTriggerInfo,
 		lggr:           lggr,
-		callbackCh:     make(chan capabilities.TriggerAndId[*httptypedapi.Payload]),
+		callbackCh:     make(chan capabilities.TriggerAndId[*httpserver.Payload]),
 	}
 }
 
 // HTTPCapability interface methods
-func (f *ManualHTTPTriggerService) RegisterTrigger(ctx context.Context, triggerID string, metadata capabilities.RequestMetadata, input *httptypedapi.Config) (<-chan capabilities.TriggerAndId[*httptypedapi.Payload], error) {
+func (f *ManualHTTPTriggerService) RegisterTrigger(ctx context.Context, triggerID string, metadata capabilities.RequestMetadata, input *httpserver.Config) (<-chan capabilities.TriggerAndId[*httpserver.Payload], error) {
 	return f.callbackCh, nil
 }
 
-func (f *ManualHTTPTriggerService) UnregisterTrigger(ctx context.Context, triggerID string, metadata capabilities.RequestMetadata, input *httptypedapi.Config) error {
+func (f *ManualHTTPTriggerService) UnregisterTrigger(ctx context.Context, triggerID string, metadata capabilities.RequestMetadata, input *httpserver.Config) error {
 	return nil
 }
 
@@ -61,7 +60,7 @@ func (f *ManualHTTPTriggerService) Initialise(ctx context.Context, config string
 }
 
 // ManualTriggerCapability interface method
-func (f *ManualHTTPTriggerService) ManualTrigger(ctx context.Context, payload *httptypedapi.Payload) error {
+func (f *ManualHTTPTriggerService) ManualTrigger(ctx context.Context, payload *httpserver.Payload) error {
 	// Run in a goroutine to avoid blocking
 	go func() {
 		select {
@@ -76,8 +75,8 @@ func (f *ManualHTTPTriggerService) ManualTrigger(ctx context.Context, payload *h
 	return nil
 }
 
-func (f *ManualHTTPTriggerService) createManualTriggerEvent(payload *httptypedapi.Payload) capabilities.TriggerAndId[*httptypedapi.Payload] {
-	return capabilities.TriggerAndId[*httptypedapi.Payload]{
+func (f *ManualHTTPTriggerService) createManualTriggerEvent(payload *httpserver.Payload) capabilities.TriggerAndId[*httpserver.Payload] {
+	return capabilities.TriggerAndId[*httpserver.Payload]{
 		Trigger: payload,
 		Id:      "manual-http-trigger-id",
 	}
