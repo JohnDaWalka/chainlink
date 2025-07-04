@@ -14,8 +14,7 @@ import (
 )
 
 type NodeResponseAggregator interface {
-	Start(context.Context) error
-	Close() error
+	job.ServiceCtx
 	// CollectAndAggregate appends a node response to existing list of responses if exists
 	// and tries to aggregate them into a single response.
 	CollectAndAggregate(requestID string, resp *jsonrpc.Response, nodeAddress string) (*jsonrpc.Response, error)
