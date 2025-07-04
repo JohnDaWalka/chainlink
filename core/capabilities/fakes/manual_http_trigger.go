@@ -5,14 +5,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	httptypedapi "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/triggers/http"
-	httpserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/triggers/http/server"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 )
 
 var _ services.Service = (*ManualHTTPTriggerService)(nil)
-var _ httpserver.HTTPCapability = (*ManualHTTPTriggerService)(nil)
 
 const HTTPTriggerServiceName = "HttpTriggerService"
 const HTTPTriggerID = "http-trigger@1.0.0"

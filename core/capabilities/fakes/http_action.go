@@ -10,13 +10,11 @@ import (
 
 	commonCap "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	customhttp "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/actions/http"
-	httpserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/actions/http/server"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
-var _ httpserver.ClientCapability = (*DirectHTTPAction)(nil)
 var _ services.Service = (*DirectHTTPAction)(nil)
 var _ commonCap.ExecutableCapability = (*DirectHTTPAction)(nil)
 

@@ -10,14 +10,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	crontypedapi "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/triggers/cron"
-	cronserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/triggers/cron/server"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 )
 
 var _ services.Service = (*ManualCronTriggerService)(nil)
-var _ cronserver.CronCapability = (*ManualCronTriggerService)(nil)
 
 const ServiceName = "CronTriggerService"
 const ID = "cron-trigger@1.0.0"

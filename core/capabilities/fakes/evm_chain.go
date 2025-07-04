@@ -12,7 +12,6 @@ import (
 
 	commonCap "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	evmcappb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/evm"
-	evmserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/evm/server"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/values/pb"
@@ -40,7 +39,6 @@ var evmExecInfo = commonCap.MustNewCapabilityInfo(
 )
 
 var _ services.Service = (*FakeEVMChain)(nil)
-var _ evmserver.ClientCapability = (*FakeEVMChain)(nil)
 var _ commonCap.ExecutableCapability = (*FakeEVMChain)(nil)
 
 func NewFakeEvmChain(lggr logger.Logger, gethClient *ethclient.Client, privateKey *ecdsa.PrivateKey) *FakeEVMChain {

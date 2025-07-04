@@ -8,7 +8,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
-	consensusserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/consensus/server"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -23,7 +22,6 @@ type fakeConsensusNoDAG struct {
 }
 
 var _ services.Service = (*fakeConsensus)(nil)
-var _ consensusserver.ConsensusCapability = (*fakeConsensusNoDAG)(nil)
 
 func NewFakeConsensusNoDAG(lggr logger.Logger) *fakeConsensusNoDAG {
 	fc := &fakeConsensusNoDAG{}
