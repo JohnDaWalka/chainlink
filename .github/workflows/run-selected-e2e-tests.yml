@@ -14,7 +14,7 @@ on:
           Chainlink image versions. Example:
           "5733cdcda9a9fc6da6343798b119b2ae136146cd,0b7d2c497a508efa5a827714780d908b7b8eda19"'
         required: false
-        type: string            
+        type: string
       test_ids:
         description: 'Run all tests "*" by default. Or, enter test IDs to run separated by commas. Example: "run_all_in_ocr_tests_go,run_TestOCRv2Request_in_ocr2_test_go". Check all test IDs in .github/e2e-tests.yml'
         default: "*"
@@ -48,7 +48,7 @@ run-name: ${{ inputs.workflow_run_name }}
 jobs:
   call-run-e2e-tests-workflow:
     name: Run E2E Tests
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@608298f511acfbcfd1099e5907ba1b1b0dda8b14
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@9271f82b74a6dcc92bb66e1363460146897c8637 # 2025-06-27
     with:
       chainlink_version: ${{ github.event.inputs.chainlink_version }}
       require_chainlink_plugin_versions_in_qa_ecr: ${{ inputs.require_chainlink_plugin_versions_in_qa_ecr || '' }}
