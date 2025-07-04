@@ -29,7 +29,7 @@ require (
 	github.com/holiman/uint256 v1.3.2
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mr-tron/base58 v1.2.0
-	github.com/pattonkan/sui-go v0.1.3
+	github.com/pattonkan/sui-go v0.1.1
 	github.com/pelletier/go-toml v1.9.5
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/rs/zerolog v1.33.0
