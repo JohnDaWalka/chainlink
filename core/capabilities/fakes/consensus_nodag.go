@@ -168,7 +168,8 @@ func (fc *fakeConsensusNoDAG) Initialise(
 	_ core.PipelineRunnerService,
 	_ core.RelayerSet,
 	_ core.OracleFactory,
-	_ core.GatewayConnector) error {
+	_ core.GatewayConnector,
+	_ core.Keystore) error {
 	return nil
 }
 
