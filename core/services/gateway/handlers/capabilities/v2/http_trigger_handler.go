@@ -25,19 +25,20 @@ import (
 var _ HTTPTriggerHandler = (*httpTriggerHandler)(nil)
 
 type savedCallback struct {
-	callbackCh chan<- handlers.UserCallbackPayload
-	createdAt  time.Time
+	callbackCh         chan<- handlers.UserCallbackPayload
+	createdAt          time.Time
+	responseAggregator common.NodeResponseAggregator
 }
 
 type httpTriggerHandler struct {
-	config             ServiceConfig
-	don                handlers.DON
-	donConfig          *config.DONConfig
-	lggr               logger.Logger
-	callbacksMu        sync.Mutex
-	callbacks          map[string]savedCallback // requestID -> savedCallback
-	responseAggregator common.NodeResponseAggregator
-	stopCh             services.StopChan
+	services.StateMachine
+	config      ServiceConfig
+	don         handlers.DON
+	donConfig   *config.DONConfig
+	lggr        logger.Logger
+	callbacksMu sync.Mutex
+	callbacks   map[string]savedCallback // requestID -> savedCallback
+	stopCh      services.StopChan
 }
 
 type HTTPTriggerHandler interface {
@@ -46,15 +47,13 @@ type HTTPTriggerHandler interface {
 	HandleNodeTriggerResponse(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error
 }
 
-func NewHTTPTriggerHandler(lggr logger.Logger, cfg ServiceConfig, donConfig *config.DONConfig, don handlers.DON,
-	responseAggregator common.NodeResponseAggregator) *httpTriggerHandler {
+func NewHTTPTriggerHandler(lggr logger.Logger, cfg ServiceConfig, donConfig *config.DONConfig, don handlers.DON) *httpTriggerHandler {
 	return &httpTriggerHandler{
-		lggr:               logger.Named(lggr, "RequestCallbacks"),
-		callbacks:          make(map[string]savedCallback),
-		responseAggregator: responseAggregator,
-		config:             cfg,
-		don:                don,
-		donConfig:          donConfig,
+		lggr:      logger.Named(lggr, "RequestCallbacks"),
+		callbacks: make(map[string]savedCallback),
+		config:    cfg,
+		don:       don,
+		donConfig: donConfig,
 	}
 }
 
@@ -81,8 +80,9 @@ func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *
 		return errors.New("request ID already used: " + req.ID)
 	}
 	h.callbacks[executionID] = savedCallback{
-		callbackCh: callbackCh,
-		createdAt:  time.Now(),
+		callbackCh:         callbackCh,
+		createdAt:          time.Now(),
+		responseAggregator: common.NewIdenticalNodeResponseAggregator(2*h.donConfig.F + 1),
 	}
 	h.callbacksMu.Unlock()
 	// Send original request to all nodes
@@ -125,15 +125,19 @@ func (h *httpTriggerHandler) validatedTriggerRequest(req *jsonrpc.Request, callb
 
 func (h *httpTriggerHandler) HandleNodeTriggerResponse(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error {
 	h.lggr.Debugw("handling trigger response", "requestID", resp.ID, "nodeAddr", nodeAddr)
-	resp, err := h.responseAggregator.CollectAndAggregate(resp.ID, resp, nodeAddr)
-	if err != nil {
-		return err
-	}
 	h.callbacksMu.Lock()
 	defer h.callbacksMu.Unlock()
 	saved, exists := h.callbacks[resp.ID]
 	if !exists {
 		return errors.New("callback not found for request ID: " + resp.ID)
+	}
+	resp, err := saved.responseAggregator.CollectAndAggregate(resp, nodeAddr)
+	if err != nil {
+		return err
+	}
+	if resp == nil {
+		h.lggr.Debugw("Not enough responses to aggregate", "requestID", resp.ID, "nodeAddress", nodeAddr)
+		return nil
 	}
 	rawResp, err := json.Marshal(resp)
 	if err != nil {
@@ -152,34 +156,30 @@ func (h *httpTriggerHandler) HandleNodeTriggerResponse(ctx context.Context, resp
 }
 
 func (h *httpTriggerHandler) Start(ctx context.Context) error {
-	h.lggr.Info("Starting HTTPTriggerHandler")
-	err := h.responseAggregator.Start(ctx)
-	if err != nil {
-		return err
-	}
-	go func() {
-		ticker := time.NewTicker(time.Duration(h.config.CleanUpPeriodMs) * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				h.reapExpiredCallbacks()
-			case <-h.stopCh:
-				return
+	return h.StartOnce("HTTPTriggerHandler", func() error {
+		h.lggr.Info("Starting HTTPTriggerHandler")
+		go func() {
+			ticker := time.NewTicker(time.Duration(h.config.CleanUpPeriodMs) * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					h.reapExpiredCallbacks()
+				case <-h.stopCh:
+					return
+				}
 			}
-		}
-	}()
-	return nil
+		}()
+		return nil
+	})
 }
 
 func (h *httpTriggerHandler) Close() error {
-	h.lggr.Info("Closing HTTPTriggerHandler")
-	err := h.responseAggregator.Close()
-	if err != nil {
-		h.lggr.Errorw("error closing response aggregator", "err", err)
-	}
-	close(h.stopCh)
-	return nil
+	return h.StartOnce("HTTPTriggerHandler", func() error {
+		h.lggr.Info("Closing HTTPTriggerHandler")
+		close(h.stopCh)
+		return nil
+	})
 }
 
 // reapExpiredCallbacks removes callbacks that are older than the maximum age

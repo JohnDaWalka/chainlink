@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
@@ -72,9 +71,7 @@ func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfi
 	if err != nil {
 		return nil, err
 	}
-	responseAggregator := common.NewIdenticalNodeResponseAggregator(lggr, 2*donConfig.F+1,
-		cfg.TriggerRequestMaxDurationMs, cfg.CleanUpPeriodMs)
-	triggerHandler := NewHTTPTriggerHandler(lggr, cfg, donConfig, don, responseAggregator)
+	triggerHandler := NewHTTPTriggerHandler(lggr, cfg, donConfig, don)
 	return &gatewayHandler{
 		config:          cfg,
 		don:             don,
