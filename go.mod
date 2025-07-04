@@ -16,7 +16,7 @@ require (
 	github.com/danielkov/gin-helmet v0.0.0-20171108135313-1387e224435e
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/dominikbraun/graph v0.23.0
-	github.com/doyensec/safeurl v0.2.1
+	github.com/doyensec/safeurl v0.2.2
 	github.com/esote/minmaxheap v1.0.0
 	github.com/ethereum/go-ethereum v1.15.11
 	github.com/fatih/color v1.18.0
@@ -78,6 +78,7 @@ require (
 	github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3
 	github.com/smartcontractkit/capabilities/chain_capabilities/evm v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/capabilities/cron v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/capabilities/http_action v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/capabilities/http_trigger v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chain-selectors v1.0.62-0.20250630182638-8bd9c28cf772
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250626122206-319db248496a
@@ -305,7 +306,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mfridman/interpolate v0.0.2 // indirect
-	github.com/miekg/dns v1.1.63 // indirect
+	github.com/miekg/dns v1.1.66 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.1-0.20220423185008-bf980b35cac4 // indirect
@@ -405,5 +406,6 @@ replace (
 	github.com/smartcontractkit/capabilities => ../capabilities
 	github.com/smartcontractkit/capabilities/chain_capabilities/evm => ../capabilities/chain_capabilities/evm
 	github.com/smartcontractkit/capabilities/cron => ../capabilities/cron
+	github.com/smartcontractkit/capabilities/http_action => ../capabilities/http_action
 	github.com/smartcontractkit/capabilities/http_trigger => ../capabilities/http_trigger
 )
