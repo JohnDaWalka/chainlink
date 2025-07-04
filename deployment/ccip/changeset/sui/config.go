@@ -22,9 +22,10 @@ type DeployLinkTokenConfig struct {
 
 // ChainContractParams stores configuration to call initialize in CCIP contracts
 type ChainContractParams struct {
-	FeeQuoterParams ccip_ops.InitFeeQuoterInput
-	OffRampParams   OffRampParams
-	OnRampParams    OnRampParams
+	DestChainSelector uint64
+	FeeQuoterParams   ccip_ops.InitFeeQuoterInput
+	OffRampParams     OffRampParams
+	OnRampParams      OnRampParams
 }
 
 type OffRampParams struct {

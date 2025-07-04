@@ -9,6 +9,8 @@ replace github.com/smartcontractkit/chainlink/v2 => ../
 // creating potential merge conflicts.
 require github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250430150202-611699e34308
 
+// replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
+
 require (
 	dario.cat/mergo v1.0.1
 	github.com/AlekSi/pointer v1.1.0
@@ -27,7 +29,7 @@ require (
 	github.com/holiman/uint256 v1.3.2
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mr-tron/base58 v1.2.0
-	github.com/pattonkan/sui-go v0.1.1
+	github.com/pattonkan/sui-go v0.1.3
 	github.com/pelletier/go-toml v1.9.5
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/rs/zerolog v1.33.0
@@ -43,8 +45,8 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.16.0
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250630192401-d6330473ec6e
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250522110034-65c54665034a
-	github.com/smartcontractkit/chainlink-protos/job-distributor v0.12.0
-	github.com/smartcontractkit/chainlink-protos/orchestrator v0.7.0
+	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.0
+	github.com/smartcontractkit/chainlink-protos/orchestrator v0.8.0
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250702130714-144d99d2d871
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20250701223705-bd9203b2a21d
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.7

@@ -30,7 +30,7 @@ func GetMockChainContractParams(t *testing.T, e cldf.Environment, chainSelector 
 
 	return ChainContractParams{
 		FeeQuoterParams: ccip_ops.InitFeeQuoterInput{ //1112246792648961560000000
-			MaxFeeJuelsPerMsg:             "1001224679264896156", // 100000 LINK (101 224 679 264 896 156)
+			MaxFeeJuelsPerMsg:             "200000000000000000000", // 1000 LINK (101 224 679 264 896 156)
 			TokenPriceStalenessThreshold:  1000000,
 			LinkTokenCoinMetadataObjectId: linkTokenObjectMetadataId,           // CoinMetadataObjectId
 			FeeTokens:                     []string{linkTokenObjectMetadataId}, // CoinMetadataObjectId

@@ -94,7 +94,6 @@ import (
 	sui_bind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
 	lockreleasetokenpoolops "github.com/smartcontractkit/chainlink-sui/ops/ccip_lock_release_token_pool"
-	cciponramp_ops "github.com/smartcontractkit/chainlink-sui/ops/ccip_onramp"
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 
@@ -1039,35 +1038,35 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 			CCIPObjectRef: ccipObjectRefId,
 			// FeeQuoterCapId:        feeQuoterCapId,
 			SourceTokens:          []string{linkTokenObjectMetadataId},
-			SourceUsdPerToken:     []uint256.Int{{1}},
+			SourceUsdPerToken:     []uint256.Int{{10000000000000000000}},
 			GasDestChainSelectors: []uint64{cfg.DestChain},
-			GasUsdPerUnitGas:      []uint256.Int{{1}},
+			GasUsdPerUnitGas:      []uint256.Int{{7_500_000_000_000}},
 		})
 	if err != nil {
 		return &AnyMsgSentEvent{}, fmt.Errorf("failed to updatePrice for Sui chain %d: %w", cfg.SourceChain, err)
 	}
 
 	// get Fee
-	_, err = operations.ExecuteOperation(e.OperationsBundle, cciponramp_ops.GetFeeOp, deps.SuiChain,
-		cciponramp_ops.GetFeeInput{
-			OnRampPackageId:   onRampPackageId,
-			TypeArgs:          linkTokenPkgId + "::link_token::LINK_TOKEN",
-			CCIPObjectRef:     ccipObjectRefId,
-			DestChainSelector: cfg.DestChain,
-			Receiver: []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00, 0xdd, 0xbb, 0x6f, 0x35,
-				0x8f, 0x29, 0x04, 0x08, 0xd7, 0x68, 0x47, 0xb4,
-				0xf6, 0x02, 0xf0, 0xfd, 0x59, 0x92, 0x95, 0xfd},
-			Data:         []byte{104, 101, 108, 108, 111, 32, 101, 118, 109, 32, 102, 114, 111, 109, 32, 115, 117, 105},
-			TokenAddress: []string{},
-			TokenAmounts: []uint64{},
-			FeeToken:     linkTokenObjectMetadataId,
-			ExtraArgs:    []byte{},
-		},
-	)
-	if err != nil {
-		return &AnyMsgSentEvent{}, fmt.Errorf("failed to getFee for Sui chain %d: %w", cfg.SourceChain, err)
-	}
+	// _, err = operations.ExecuteOperation(e.OperationsBundle, cciponramp_ops.GetFeeOp, deps.SuiChain,
+	// 	cciponramp_ops.GetFeeInput{
+	// 		OnRampPackageId:   onRampPackageId,
+	// 		TypeArgs:          linkTokenPkgId + "::link_token::LINK_TOKEN",
+	// 		CCIPObjectRef:     ccipObjectRefId,
+	// 		DestChainSelector: cfg.DestChain,
+	// 		Receiver: []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	// 			0x00, 0x00, 0x00, 0x00, 0xdd, 0xbb, 0x6f, 0x35,
+	// 			0x8f, 0x29, 0x04, 0x08, 0xd7, 0x68, 0x47, 0xb4,
+	// 			0xf6, 0x02, 0xf0, 0xfd, 0x59, 0x92, 0x95, 0xfd},
+	// 		Data:         []byte{104, 101, 108, 108, 111, 32, 101, 118, 109, 32, 102, 114, 111, 109, 32, 115, 117, 105},
+	// 		TokenAddress: []string{},
+	// 		TokenAmounts: []uint64{},
+	// 		FeeToken:     linkTokenObjectMetadataId,
+	// 		ExtraArgs:    []byte{},
+	// 	},
+	// )
+	// if err != nil {
+	// 	return &AnyMsgSentEvent{}, fmt.Errorf("failed to getFee for Sui chain %d: %w", cfg.SourceChain, err)
+	// }
 
 	msg := cfg.Message.(SuiSendRequest)
 

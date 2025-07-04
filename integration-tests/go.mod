@@ -35,7 +35,7 @@ require (
 	github.com/manifoldco/promptui v0.9.0
 	github.com/montanaflynn/stats v0.7.1
 	github.com/onsi/gomega v1.36.2
-	github.com/pattonkan/sui-go v0.1.1
+	github.com/pattonkan/sui-go v0.1.3
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/common v0.63.0
@@ -51,7 +51,7 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250702201310-07178aa95345
 	github.com/smartcontractkit/chainlink-deployments-framework v0.16.0
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250630192401-d6330473ec6e
-	github.com/smartcontractkit/chainlink-protos/job-distributor v0.12.0
+	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.0
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20250701223705-bd9203b2a21d
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.5
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.4
@@ -471,7 +471,7 @@ require (
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250618135814-7e3f79ab707e // indirect
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250522110034-65c54665034a // indirect
 	github.com/smartcontractkit/chainlink-protos/billing/go v0.0.0-20250701181457-37bd0d618b58 // indirect
-	github.com/smartcontractkit/chainlink-protos/orchestrator v0.7.0 // indirect
+	github.com/smartcontractkit/chainlink-protos/orchestrator v0.8.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go v0.0.0-20250131130834-15e0d4cde2a6 // indirect
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250619160901-79b609b1021c // indirect

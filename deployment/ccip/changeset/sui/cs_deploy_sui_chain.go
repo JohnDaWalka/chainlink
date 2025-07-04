@@ -3,6 +3,7 @@ package sui
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -93,7 +94,7 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		ccipSeqInput := ccipops.DeployAndInitCCIPSeqInput{
 			LinkTokenCoinMetadataObjectId: config.ContractParamsPerChain[chainSel].FeeQuoterParams.LinkTokenCoinMetadataObjectId,
 			LocalChainSelector:            config.ContractParamsPerChain[chainSel].OnRampParams.ChainSelector,
-			DestChainSelector:             uint64(909606746561742123),
+			DestChainSelector:             config.ContractParamsPerChain[chainSel].DestChainSelector,
 			MaxFeeJuelsPerMsg:             config.ContractParamsPerChain[chainSel].FeeQuoterParams.MaxFeeJuelsPerMsg,
 			TokenPriceStalenessThreshold:  config.ContractParamsPerChain[chainSel].FeeQuoterParams.TokenPriceStalenessThreshold,
 			DeployCCIPInput: ccipops.DeployCCIPInput{
@@ -101,28 +102,29 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 				McmsOwner:     "0x2",
 			},
 			// Fee Quoter destination chain configuration
+			// values retried from here: https://github.com/smartcontractkit/chainlink-sui/pull/277/files#diff-5088e21cdbdb4efead9c1142c365a8717bcfe1a912cb0f2b54d0c0b7aad7e3c1R496
 			IsEnabled:                         true,
-			MaxNumberOfTokensPerMsg:           2,
-			MaxDataBytes:                      2000,
-			MaxPerMsgGasLimit:                 5000000,
-			DestGasOverhead:                   1000000,
-			DestGasPerPayloadByteBase:         byte(2),
-			DestGasPerPayloadByteHigh:         byte(5),
-			DestGasPerPayloadByteThreshold:    uint16(10),
-			DestDataAvailabilityOverheadGas:   300000,
-			DestGasPerDataAvailabilityByte:    1,
+			MaxNumberOfTokensPerMsg:           1,
+			MaxDataBytes:                      30_000,
+			MaxPerMsgGasLimit:                 3_000_000,
+			DestGasOverhead:                   300_000,
+			DestGasPerPayloadByteBase:         byte(16),
+			DestGasPerPayloadByteHigh:         byte(40),
+			DestGasPerPayloadByteThreshold:    uint16(3000),
+			DestDataAvailabilityOverheadGas:   100,
+			DestGasPerDataAvailabilityByte:    16,
 			DestDataAvailabilityMultiplierBps: 1,
 			ChainFamilySelector:               []byte{40, 18, 213, 44},
 			EnforceOutOfOrder:                 false,
-			DefaultTokenFeeUsdCents:           3,
-			DefaultTokenDestGasOverhead:       100000,
-			DefaultTxGasLimit:                 500000,
-			GasMultiplierWeiPerEth:            100,
-			GasPriceStalenessThreshold:        1000000000,
+			DefaultTokenFeeUsdCents:           25,
+			DefaultTokenDestGasOverhead:       90_000,
+			DefaultTxGasLimit:                 200_000,
+			GasMultiplierWeiPerEth:            1_000_000_000_000_000_000,
+			GasPriceStalenessThreshold:        1_000_000,
 			NetworkFeeUsdCents:                10,
 
 			// apply_premium_multiplier_wei_per_eth_updates
-			PremiumMultiplierWeiPerEth: []uint64{10},
+			PremiumMultiplierWeiPerEth: []uint64{900_000_000_000_000_000},
 		}
 
 		ccipSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, ccipops.DeployAndInitCCIPSequence, deps.SuiChain, ccipSeqInput)
@@ -180,17 +182,17 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 				ChainSelector:             suiChain.Selector,
 				FeeAggregator:             suiSignerAddr,
 				AllowListAdmin:            suiSignerAddr,
-				DestChainSelectors:        []uint64{909606746561742123}, // TODOD add this in input instead of hardcoding
+				DestChainSelectors:        []uint64{config.ContractParamsPerChain[chainSel].DestChainSelector}, // TODOD add this in input instead of hardcoding
 				DestChainEnabled:          []bool{true},
 				DestChainAllowListEnabled: []bool{true},
 			},
 			ApplyDestChainConfigureOnRampInput: onrampops.ApplyDestChainConfigureOnRampInput{
-				DestChainSelector:         []uint64{909606746561742123},
+				DestChainSelector:         []uint64{config.ContractParamsPerChain[chainSel].DestChainSelector},
 				DestChainEnabled:          []bool{true},
 				DestChainAllowListEnabled: []bool{false},
 			},
 			ApplyAllowListUpdatesInput: onrampops.ApplyAllowListUpdatesInput{
-				DestChainSelector:             []uint64{909606746561742123},
+				DestChainSelector:             []uint64{config.ContractParamsPerChain[chainSel].DestChainSelector},
 				DestChainAllowListEnabled:     []bool{false},
 				DestChainAddAllowedSenders:    [][]string{{}},
 				DestChainRemoveAllowedSenders: [][]string{{}},
@@ -217,6 +219,8 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save onRamp state object Id  %s for Sui chain %d: %w", ccipOnRampSeqReport.Output.Objects.StateObjectId, chainSel, err)
 		}
 
+		onRampBytes := [][]byte{common.HexToAddress(ccipOnRampSeqReport.Output.CCIPOnRampPackageId).Bytes()}
+
 		// Run DeployAndInitCCIPOffRampSequence
 		ccipOffRampSeqInput := offrampops.DeployAndInitCCIPOffRampSeqInput{
 			DeployCCIPOffRampInput: offrampops.DeployCCIPOffRampInput{
@@ -226,12 +230,12 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 			InitializeOffRampInput: offrampops.InitializeOffRampInput{
 				DestTransferCapId:                     ccipSeqReport.Output.Objects.DestTransferCapObjectId,
 				FeeQuoterCapId:                        ccipSeqReport.Output.Objects.FeeQuoterCapObjectId,
-				ChainSelector:                         18395503381733958356,
-				PremissionExecThresholdSeconds:        1000,
-				SourceChainSelectors:                  []uint64{909606746561742123},
+				ChainSelector:                         suiChain.Selector,
+				PremissionExecThresholdSeconds:        uint32(60 * 60 * 8),
+				SourceChainSelectors:                  []uint64{config.ContractParamsPerChain[chainSel].DestChainSelector}, // this is ethereum
 				SourceChainsIsEnabled:                 []bool{true},
 				SourceChainsIsRMNVerificationDisabled: []bool{true},
-				SourceChainsOnRamp:                    [][]byte{{0x0c, 0x9e, 0x43, 0x98, 0xc5, 0xf6, 0x67, 0x0b}}, // 909606746561742123
+				SourceChainsOnRamp:                    onRampBytes,
 			},
 		}
 		ccipOffRampSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, offrampops.DeployAndInitCCIPOffRampSequence, deps.SuiChain, ccipOffRampSeqInput)

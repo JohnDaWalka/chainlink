@@ -2,6 +2,8 @@ module github.com/smartcontractkit/chainlink/v2
 
 go 1.24.4
 
+// replace github.com/smartcontractkit/chainlink-sui => ../chainlink-sui
+
 require (
 	github.com/Depado/ginprom v1.8.0
 	github.com/Masterminds/semver/v3 v3.3.1
@@ -90,7 +92,7 @@ require (
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250627121608-e7b52913fae2
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250522110034-65c54665034a
 	github.com/smartcontractkit/chainlink-protos/billing/go v0.0.0-20250701181457-37bd0d618b58
-	github.com/smartcontractkit/chainlink-protos/orchestrator v0.7.0
+	github.com/smartcontractkit/chainlink-protos/orchestrator v0.8.0
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250619160901-79b609b1021c
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250702130714-144d99d2d871
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20250701223705-bd9203b2a21d
@@ -142,7 +144,7 @@ require (
 	github.com/bytecodealliance/wasmtime-go/v28 v28.0.0 // indirect
 	github.com/fardream/go-bcs v0.8.7 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
-	github.com/pattonkan/sui-go v0.1.1 // indirect
+	github.com/pattonkan/sui-go v0.1.3 // indirect
 	github.com/pion/dtls/v2 v2.2.12 // indirect
 	github.com/pion/logging v0.2.2 // indirect
 	github.com/pion/stun/v2 v2.0.0 // indirect
