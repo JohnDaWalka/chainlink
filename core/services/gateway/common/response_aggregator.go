@@ -1,6 +1,11 @@
 package common
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 )
 
@@ -51,50 +56,34 @@ func (s stringSet) Values() []string {
 	return values
 }
 
-func (a *identicalNodeResponseAggregator) CollectAndAggregate(resp *jsonrpc.Response, nodeAddress string) (*jsonrpc.Response, error) {
-	key := "TODO: USE DIGEST() FROM CHAINLINK-COMMON"
-	a.responses[key].Add(nodeAddress)
-	if len(a.responses[key]) < a.threshold {
+// TODO: use logic from chainlink-common
+func digest(r *jsonrpc.Response) (string, error) {
+	canonicalJSONBytes, err := json.Marshal(r)
+	if err != nil {
+		return "", fmt.Errorf("error marshaling JSON: %w", err)
+	}
+
+	hasher := sha256.New()
+	hasher.Write(canonicalJSONBytes)
+	digestBytes := hasher.Sum(nil)
+
+	return hex.EncodeToString(digestBytes), nil
+}
+
+// CollectAndAggregate tracks responses by response content (hash) and node address.
+// If the number of identical responses reaches the threshold, it returns the response.
+// Otherwise, returns nil and no error.
+func (agg *identicalNodeResponseAggregator) CollectAndAggregate(resp *jsonrpc.Response, nodeAddress string) (*jsonrpc.Response, error) {
+	key, err := digest(resp)
+	if err != nil {
+		return nil, fmt.Errorf("error generating digest for response: %w", err)
+	}
+	if _, ok := agg.responses[key]; !ok {
+		agg.responses[key] = make(stringSet)
+	}
+	agg.responses[key].Add(nodeAddress)
+	if len(agg.responses[key]) < agg.threshold {
 		return nil, nil
 	}
 	return resp, nil
 }
-
-// TODO: Remove:
-// func (a *identicalNodeResponseAggregator) Start(ctx context.Context) error {
-// 	return a.StartOnce("IdenticalNodeResponseAggregator", func() error {
-// 		a.lggr.Info("Starting IdenticalNodeResponseAggregator")
-// 		go func() {
-// 			ticker := time.NewTicker(time.Duration(a.responseCleanUpPeriodMs) * time.Millisecond)
-// 			defer ticker.Stop()
-// 			for {
-// 				select {
-// 				case <-ticker.C:
-// 					a.cleanUpExpiredResponses()
-// 				case <-a.stopCh:
-// 					a.lggr.Info("Stopping IdenticalNodeResponseAggregator")
-// 					return
-// 				}
-// 			}
-// 		}()
-// 		return nil
-// 	})
-// }
-
-// func (a *identicalNodeResponseAggregator) cleanUpExpiredResponses() {
-// 	now := time.Now()
-// 	for requestID, aggregated := range a.responses {
-// 		if now.Sub(aggregated.lastUpdated) > time.Duration(a.responseMaxAgeMs)*time.Millisecond {
-// 			a.lggr.Debugw("Removing expired response", "requestID", requestID, "ageMs", now.Sub(aggregated.lastUpdated).Milliseconds())
-// 			delete(a.responses, requestID)
-// 		}
-// 	}
-// }
-
-// func (a *identicalNodeResponseAggregator) Close() error {
-// 	return a.StopOnce("IdenticalNodeResponseAggregator", func() error {
-// 		a.lggr.Info("Closing IdenticalNodeResponseAggregator")
-// 		close(a.stopCh)
-// 		return nil
-// 	})
-// }

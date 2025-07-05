@@ -25,7 +25,8 @@ var _ handlers.Handler = (*gatewayHandler)(nil)
 const (
 	handlerName            = "HTTPCapabilityHandler"
 	defaultCleanUpPeriodMs = 1000 * 60 * 10 // 10 minutes
-	internalErrorMessage   = "Internal Server Error"
+	defaultMaxTriggerRequestDurationMs
+	internalErrorMessage = "Internal Server Error"
 )
 
 type gatewayHandler struct {
@@ -52,8 +53,8 @@ type ResponseCache interface {
 type ServiceConfig struct {
 	NodeRateLimiter             ratelimit.RateLimiterConfig `json:"nodeRateLimiter"`
 	UserRateLimiter             ratelimit.RateLimiterConfig `json:"userRateLimiter"`
-	TriggerRequestMaxDurationMs int                         `json:"triggerRequestMaxDurationMs"`
-	CleanUpPeriodMs             int                         `json:"cleanUpPeriodMs"`
+	MaxTriggerRequestDurationMs int                         `json:"maxTriggerRequestDurationMs"`
+	CleanUpPeriodMs             int                         `json:"cacheCleanUpPeriodMs"`
 }
 
 func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don handlers.DON, httpClient network.HTTPClient, lggr logger.Logger) (*gatewayHandler, error) {
@@ -80,7 +81,6 @@ func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfi
 		httpClient:      httpClient,
 		nodeRateLimiter: nodeRateLimiter,
 		userRateLimiter: userRateLimiter,
-		wg:              sync.WaitGroup{},
 		stopCh:          make(services.StopChan),
 		responseCache:   newResponseCache(lggr),
 		triggerHandler:  triggerHandler,
@@ -91,7 +91,9 @@ func WithDefaults(cfg ServiceConfig) ServiceConfig {
 	if cfg.CleanUpPeriodMs == 0 {
 		cfg.CleanUpPeriodMs = defaultCleanUpPeriodMs
 	}
-	// TODO:
+	if cfg.MaxTriggerRequestDurationMs == 0 {
+		cfg.MaxTriggerRequestDurationMs = defaultMaxTriggerRequestDurationMs
+	}
 	return cfg
 }
 
@@ -100,9 +102,10 @@ func (h *gatewayHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Re
 		return fmt.Errorf("received response with empty request ID from node %s", nodeAddr)
 	}
 	h.lggr.Debugw("handling incoming node message", "requestID", resp.ID, "nodeAddr", nodeAddr)
-	// Route node messages, which is a JSON-RPC response, based on the response ID.
-	// Node messages initiated by the node have "/" character as the delimiter
-	// Any messages without "/" are considered user messages initiated by the user
+	// Node messages follow the format "<methodName>/<workflowID>/<uuid>" or
+	// "<methodName>/<workflowID>/<workflowExecutionID>/<uuid>". Messages are routed
+	// based on the method in the ID.
+	// Any messages without "/" is assumed to be a trigger response to a prior user request.
 	if strings.Contains(resp.ID, "/") {
 		parts := strings.Split(resp.ID, "/")
 		methodName := parts[0]
@@ -171,7 +174,7 @@ func (h *gatewayHandler) makeOutgoingRequest(ctx context.Context, resp *jsonrpc.
 		l := logger.With(h.lggr, "requestID", requestID, "method", req.Method, "timeout", req.TimeoutMs)
 		l.Debug("Sending request to client")
 		var outboundResp gateway_common.OutboundHTTPResponse
-		resp, err := h.httpClient.Send(ctx, httpReq)
+		resp, err := h.httpClient.Send(newCtx, httpReq)
 		if err != nil {
 			l.Errorw("error while sending HTTP request to external endpoint", "err", err)
 			outboundResp = gateway_common.OutboundHTTPResponse{
@@ -193,7 +196,7 @@ func (h *gatewayHandler) makeOutgoingRequest(ctx context.Context, resp *jsonrpc.
 		}
 		err = h.sendResponseToNode(newCtx, requestID, outboundResp, nodeAddr)
 		if err != nil {
-			l.Errorw("error sending response to node", "err", err, "nodeAddr", nodeAddr)
+			l.Errorw("error sending response to node", "err", err, "nodeAddr", nodeAddr, "requestID", requestID)
 		}
 	}()
 	return nil
@@ -246,7 +249,7 @@ func (h *gatewayHandler) sendResponseToNode(ctx context.Context, requestID strin
 	}
 
 	req := &jsonrpc.Request{
-		Version: "2.0",
+		Version: jsonrpc.JsonRpcVersion,
 		ID:      requestID,
 		Method:  gateway_common.MethodHTTPAction,
 		Params:  params,

@@ -58,7 +58,6 @@ func NewHTTPTriggerHandler(lggr logger.Logger, cfg ServiceConfig, donConfig *con
 }
 
 func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *jsonrpc.Request, callbackCh chan<- handlers.UserCallbackPayload) error {
-	// TODO: is returning nil here correct?
 	// TODO: PRODCRE-305 validate JWT against authorized keys
 	triggerReq, err := h.validatedTriggerRequest(req, callbackCh)
 	if err != nil {
@@ -103,10 +102,8 @@ func (h *httpTriggerHandler) validatedTriggerRequest(req *jsonrpc.Request, callb
 		h.handleUserError(req.ID, jsonrpc.ErrInvalidParams, "empty request ID", callbackCh)
 		return nil, errors.New("empty request ID")
 	}
-	// "/" is used as a special delimiter for messages coming from nodes. As a result, we do not allow
-	// slashes in requests from users.
-	// e.g. "workflow.auth_metadata_push/{workflowID}/a81bc81b-dead-4e5d-abff-90865d1e13b1"
-	// e.g. "http_action/{workflowID}/a81bc81b-dead-4e5d-abff-90865d1e13b1"
+	// Request IDs from users must not contain "/", since this character is reserved
+	// for internal node-to-node message routing (e.g., "http_action/{workflowID}/{uuid}").
 	if strings.Contains(req.ID, "/") {
 		h.handleUserError(req.ID, jsonrpc.ErrInvalidParams, "request ID must not contain '/'", callbackCh)
 		return nil, errors.New("request ID must not contain '/'")
@@ -115,7 +112,7 @@ func (h *httpTriggerHandler) validatedTriggerRequest(req *jsonrpc.Request, callb
 		h.handleUserError(req.ID, jsonrpc.ErrMethodNotFound, "invalid method: "+req.Method, callbackCh)
 		return nil, errors.New("invalid method: " + req.Method)
 	}
-	if isValidJSON(triggerReq.Input) {
+	if !isValidJSON(triggerReq.Input) {
 		h.lggr.Errorw("invalid params JSON", "params", triggerReq.Input)
 		h.handleUserError(req.ID, jsonrpc.ErrInvalidRequest, "invalid params JSON", callbackCh)
 		return nil, errors.New("invalid params JSON")
@@ -175,7 +172,7 @@ func (h *httpTriggerHandler) Start(ctx context.Context) error {
 }
 
 func (h *httpTriggerHandler) Close() error {
-	return h.StartOnce("HTTPTriggerHandler", func() error {
+	return h.StopOnce("HTTPTriggerHandler", func() error {
 		h.lggr.Info("Closing HTTPTriggerHandler")
 		close(h.stopCh)
 		return nil
@@ -189,7 +186,7 @@ func (h *httpTriggerHandler) reapExpiredCallbacks() {
 	now := time.Now()
 	var expiredCount int
 	for executionID, callback := range h.callbacks {
-		if now.Sub(callback.createdAt) > time.Duration(h.config.TriggerRequestMaxDurationMs)*time.Millisecond {
+		if now.Sub(callback.createdAt) > time.Duration(h.config.MaxTriggerRequestDurationMs)*time.Millisecond {
 			delete(h.callbacks, executionID)
 			expiredCount++
 		}
@@ -201,7 +198,7 @@ func (h *httpTriggerHandler) reapExpiredCallbacks() {
 
 func isValidJSON(data []byte) bool {
 	var val map[string]interface{}
-	return json.Unmarshal(data, &val) == nil
+	return json.Unmarshal(data, &val) != nil
 }
 
 func (h *httpTriggerHandler) handleUserError(requestID string, code int64, message string, callbackCh chan<- handlers.UserCallbackPayload) {

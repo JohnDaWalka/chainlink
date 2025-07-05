@@ -47,7 +47,6 @@ type handler struct {
 	nodeRateLimiter *ratelimit.RateLimiter
 	wg              sync.WaitGroup
 	metrics         *metrics
-	codec           api.Codec
 }
 
 type HandlerConfig struct {
@@ -88,7 +87,6 @@ func NewHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don 
 		wg:              sync.WaitGroup{},
 		savedCallbacks:  make(map[string]*savedCallback),
 		metrics:         metrics,
-		codec:           &api.JsonRPCCodec{},
 	}, nil
 }
 
