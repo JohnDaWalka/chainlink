@@ -25,11 +25,14 @@ type identicalNodeResponseAggregator struct {
 	threshold int
 }
 
-func NewIdenticalNodeResponseAggregator(threshold int) NodeResponseAggregator {
+func NewIdenticalNodeResponseAggregator(threshold int) (NodeResponseAggregator, error) {
+	if threshold <= 0 {
+		return nil, fmt.Errorf("threshold must be greater than 0, got %d", threshold)
+	}
 	return &identicalNodeResponseAggregator{
 		responses: make(map[string]stringSet),
 		threshold: threshold,
-	}
+	}, nil
 }
 
 // stringSet is a simple set implementation for strings.
@@ -74,6 +77,12 @@ func digest(r *jsonrpc.Response) (string, error) {
 // If the number of identical responses reaches the threshold, it returns the response.
 // Otherwise, returns nil and no error.
 func (agg *identicalNodeResponseAggregator) CollectAndAggregate(resp *jsonrpc.Response, nodeAddress string) (*jsonrpc.Response, error) {
+	if resp == nil {
+		return nil, fmt.Errorf("response cannot be nil")
+	}
+	if nodeAddress == "" {
+		return nil, fmt.Errorf("node address cannot be empty")
+	}
 	key, err := digest(resp)
 	if err != nil {
 		return nil, fmt.Errorf("error generating digest for response: %w", err)

@@ -1,0 +1,289 @@
+package common
+
+import (
+	"encoding/json"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
+)
+
+func TestStringSet(t *testing.T) {
+	t.Run("add and contains", func(t *testing.T) {
+		s := make(stringSet)
+
+		require.False(t, s.Contains("test"))
+
+		s.Add("test")
+		require.True(t, s.Contains("test"))
+		require.False(t, s.Contains("other"))
+
+		s.Add("other")
+		require.True(t, s.Contains("test"))
+		require.True(t, s.Contains("other"))
+
+		// Adding duplicate should not change anything
+		s.Add("test")
+		require.True(t, s.Contains("test"))
+
+		require.Len(t, s.Values(), 2)
+	})
+
+	t.Run("remove", func(t *testing.T) {
+		s := make(stringSet)
+		s.Add("test")
+		s.Add("other")
+
+		require.True(t, s.Contains("test"))
+		require.True(t, s.Contains("other"))
+
+		s.Remove("test")
+		require.False(t, s.Contains("test"))
+		require.True(t, s.Contains("other"))
+
+		// Removing non-existent element should not panic
+		s.Remove("nonexistent")
+		require.True(t, s.Contains("other"))
+
+		require.Len(t, s.Values(), 1)
+	})
+
+	t.Run("values", func(t *testing.T) {
+		s := make(stringSet)
+
+		// Empty set
+		values := s.Values()
+		require.Empty(t, values)
+
+		// Add elements
+		s.Add("test")
+		s.Add("other")
+		s.Add("third")
+
+		values = s.Values()
+		require.Len(t, values, 3)
+		require.Contains(t, values, "test")
+		require.Contains(t, values, "other")
+		require.Contains(t, values, "third")
+	})
+}
+
+func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
+	t.Run("single node response below threshold", func(t *testing.T) {
+		agg, err := NewIdenticalNodeResponseAggregator(2)
+		require.Nil(t, err)
+
+		resp := &jsonrpc.Response{
+			ID:     "test-id",
+			Result: json.RawMessage(`{"result": "success"}`),
+		}
+
+		result, err := agg.CollectAndAggregate(resp, "node1")
+		require.NoError(t, err)
+		require.Nil(t, result) // Should not return response until threshold is met
+	})
+
+	t.Run("threshold reached with identical responses", func(t *testing.T) {
+		agg, err := NewIdenticalNodeResponseAggregator(2)
+		require.Nil(t, err)
+
+		resp := &jsonrpc.Response{
+			ID:     "test-id",
+			Result: json.RawMessage(`{"result": "success"}`),
+		}
+
+		// First response - should return nil
+		result, err := agg.CollectAndAggregate(resp, "node1")
+		require.NoError(t, err)
+		require.Nil(t, result)
+
+		// Second response with same content - should return aggregated result
+		result, err = agg.CollectAndAggregate(resp, "node2")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, resp.ID, result.ID)
+		require.Equal(t, resp.Result, result.Result)
+	})
+
+	t.Run("threshold reached with same node sending multiple times", func(t *testing.T) {
+		agg, err := NewIdenticalNodeResponseAggregator(2)
+		require.Nil(t, err)
+
+		resp := &jsonrpc.Response{
+			ID:     "test-id",
+			Result: json.RawMessage(`{"result": "success"}`),
+		}
+		result, err := agg.CollectAndAggregate(resp, "node1")
+		require.NoError(t, err)
+		require.Nil(t, result)
+
+		// Same node sends again - should still not nil
+		result, err = agg.CollectAndAggregate(resp, "node1")
+		require.NoError(t, err)
+		require.Nil(t, result)
+
+		// Different node sends - should return aggregated result
+		result, err = agg.CollectAndAggregate(resp, "node2")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+	})
+
+	t.Run("different responses do not aggregate", func(t *testing.T) {
+		agg, err := NewIdenticalNodeResponseAggregator(2)
+		require.Nil(t, err)
+
+		resp1 := &jsonrpc.Response{
+			ID:     "test-id",
+			Result: json.RawMessage(`{"result": "success"}`),
+		}
+
+		resp2 := &jsonrpc.Response{
+			ID:     "test-id",
+			Result: json.RawMessage(`{"result": "failure"}`),
+		}
+
+		result, err := agg.CollectAndAggregate(resp1, "node1")
+		require.NoError(t, err)
+		require.Nil(t, result)
+
+		// Different response content - should not return aggregated result
+		result, err = agg.CollectAndAggregate(resp2, "node2")
+		require.NoError(t, err)
+		require.Nil(t, result)
+	})
+
+	t.Run("threshold 1 immediately returns response", func(t *testing.T) {
+		agg, err := NewIdenticalNodeResponseAggregator(1)
+		require.Nil(t, err)
+
+		resp := &jsonrpc.Response{
+			ID:     "test-id",
+			Result: json.RawMessage(`{"result": "success"}`),
+		}
+
+		result, err := agg.CollectAndAggregate(resp, "node1")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, resp.ID, result.ID)
+		require.Equal(t, resp.Result, result.Result)
+	})
+
+	t.Run("higher threshold requires more nodes", func(t *testing.T) {
+		agg, err := NewIdenticalNodeResponseAggregator(3)
+		require.Nil(t, err)
+
+		resp := &jsonrpc.Response{
+			ID:     "test-id",
+			Result: json.RawMessage(`{"result": "success"}`),
+		}
+
+		result, err := agg.CollectAndAggregate(resp, "node1")
+		require.NoError(t, err)
+		require.Nil(t, result)
+
+		result, err = agg.CollectAndAggregate(resp, "node2")
+		require.NoError(t, err)
+		require.Nil(t, result)
+
+		result, err = agg.CollectAndAggregate(resp, "node3")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+	})
+
+	t.Run("mixed responses with different digests", func(t *testing.T) {
+		agg, err := NewIdenticalNodeResponseAggregator(2)
+		require.Nil(t, err)
+
+		resp1 := &jsonrpc.Response{
+			ID:     "test-id",
+			Result: json.RawMessage(`{"result": "success"}`),
+		}
+
+		resp2 := &jsonrpc.Response{
+			ID:     "test-id",
+			Result: json.RawMessage(`{"result": "failure"}`),
+		}
+
+		resp3 := &jsonrpc.Response{
+			ID:     "test-id",
+			Result: json.RawMessage(`{"result": "success"}`), // Same as resp1
+		}
+
+		result, err := agg.CollectAndAggregate(resp1, "node1")
+		require.NoError(t, err)
+		require.Nil(t, result)
+
+		result, err = agg.CollectAndAggregate(resp2, "node2")
+		require.NoError(t, err)
+		require.Nil(t, result)
+
+		result, err = agg.CollectAndAggregate(resp3, "node3")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, resp1.Result, result.Result)
+	})
+
+	t.Run("error responses are handled correctly", func(t *testing.T) {
+		agg, err := NewIdenticalNodeResponseAggregator(2)
+		require.Nil(t, err)
+
+		resp := &jsonrpc.Response{
+			ID:    "test-id",
+			Error: &jsonrpc.WireError{Code: 500, Message: "Internal error"},
+		}
+
+		result, err := agg.CollectAndAggregate(resp, "node1")
+		require.NoError(t, err)
+		require.Nil(t, result)
+
+		result, err = agg.CollectAndAggregate(resp, "node2")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, resp.Error.Code, result.Error.Code)
+		require.Equal(t, resp.Error.Message, result.Error.Message)
+	})
+}
+
+func TestIdenticalNodeResponseAggregator_EdgeCases(t *testing.T) {
+	t.Run("empty response", func(t *testing.T) {
+		agg, err := NewIdenticalNodeResponseAggregator(1)
+		require.Nil(t, err)
+
+		resp := &jsonrpc.Response{
+			ID: "test-id",
+		}
+
+		result, err := agg.CollectAndAggregate(resp, "node1")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, resp.ID, result.ID)
+	})
+
+	t.Run("invalid threshold", func(t *testing.T) {
+		_, err := NewIdenticalNodeResponseAggregator(0)
+		require.Error(t, err)
+	})
+
+	t.Run("nil response", func(t *testing.T) {
+		agg, err := NewIdenticalNodeResponseAggregator(1)
+		require.Nil(t, err)
+
+		_, err = agg.CollectAndAggregate(nil, "node1")
+		require.Error(t, err)
+	})
+
+	t.Run("empty node address", func(t *testing.T) {
+		agg, err := NewIdenticalNodeResponseAggregator(1)
+		require.Nil(t, err)
+
+		resp := &jsonrpc.Response{
+			ID:     "test-id",
+			Result: json.RawMessage(`{"result": "success"}`),
+		}
+
+		// Empty node address should not work
+		_, err = agg.CollectAndAggregate(resp, "")
+		require.Error(t, err)
+	})
+}
