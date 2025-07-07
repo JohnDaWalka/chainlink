@@ -54,6 +54,7 @@ func NewHTTPTriggerHandler(lggr logger.Logger, cfg ServiceConfig, donConfig *con
 		config:    cfg,
 		don:       don,
 		donConfig: donConfig,
+		stopCh:    make(services.StopChan),
 	}
 }
 
@@ -78,10 +79,15 @@ func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *
 		h.handleUserError(req.ID, jsonrpc.ErrInvalidRequest, "request ID already used: "+req.ID, callbackCh)
 		return errors.New("request ID already used: " + req.ID)
 	}
+
+	agg, err := common.NewIdenticalNodeResponseAggregator(2*h.donConfig.F + 1)
+	if err != nil {
+		return errors.New("failed to create response aggregator: " + err.Error())
+	}
 	h.callbacks[executionID] = savedCallback{
 		callbackCh:         callbackCh,
 		createdAt:          time.Now(),
-		responseAggregator: common.NewIdenticalNodeResponseAggregator(2*h.donConfig.F + 1),
+		responseAggregator: agg,
 	}
 	h.callbacksMu.Unlock()
 	// Send original request to all nodes
@@ -99,13 +105,13 @@ func (h *httpTriggerHandler) validatedTriggerRequest(req *jsonrpc.Request, callb
 		return nil, err
 	}
 	if req.ID == "" {
-		h.handleUserError(req.ID, jsonrpc.ErrInvalidParams, "empty request ID", callbackCh)
+		h.handleUserError(req.ID, jsonrpc.ErrInvalidRequest, "empty request ID", callbackCh)
 		return nil, errors.New("empty request ID")
 	}
 	// Request IDs from users must not contain "/", since this character is reserved
 	// for internal node-to-node message routing (e.g., "http_action/{workflowID}/{uuid}").
 	if strings.Contains(req.ID, "/") {
-		h.handleUserError(req.ID, jsonrpc.ErrInvalidParams, "request ID must not contain '/'", callbackCh)
+		h.handleUserError(req.ID, jsonrpc.ErrInvalidRequest, "request ID must not contain '/'", callbackCh)
 		return nil, errors.New("request ID must not contain '/'")
 	}
 	if req.Method != gateway_common.MethodWorkflowExecute {
@@ -128,15 +134,15 @@ func (h *httpTriggerHandler) HandleNodeTriggerResponse(ctx context.Context, resp
 	if !exists {
 		return errors.New("callback not found for request ID: " + resp.ID)
 	}
-	resp, err := saved.responseAggregator.CollectAndAggregate(resp, nodeAddr)
+	aggResp, err := saved.responseAggregator.CollectAndAggregate(resp, nodeAddr)
 	if err != nil {
 		return err
 	}
-	if resp == nil {
+	if aggResp == nil {
 		h.lggr.Debugw("Not enough responses to aggregate", "requestID", resp.ID, "nodeAddress", nodeAddr)
 		return nil
 	}
-	rawResp, err := json.Marshal(resp)
+	rawResp, err := json.Marshal(aggResp)
 	if err != nil {
 		return errors.New("failed to marshal response: " + err.Error())
 	}
@@ -197,8 +203,17 @@ func (h *httpTriggerHandler) reapExpiredCallbacks() {
 }
 
 func isValidJSON(data []byte) bool {
-	var val map[string]interface{}
-	return json.Unmarshal(data, &val) != nil
+	var val any
+	if err := json.Unmarshal(data, &val); err != nil {
+		return false
+	}
+
+	switch val.(type) {
+	case map[string]any, []any:
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *httpTriggerHandler) handleUserError(requestID string, code int64, message string, callbackCh chan<- handlers.UserCallbackPayload) {

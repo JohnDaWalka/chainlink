@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
+	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	handlermocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/mocks"
@@ -126,8 +129,9 @@ func TestHandleNodeMessage(t *testing.T) {
 		reqBytes, err := json.Marshal(outboundReq)
 		require.NoError(t, err)
 
+		id := fmt.Sprintf("%s/%s", gateway_common.MethodHTTPAction, uuid.New().String())
 		resp := &jsonrpc.Response{
-			ID:     "test-request-id",
+			ID:     id,
 			Result: reqBytes,
 		}
 
@@ -141,7 +145,7 @@ func TestHandleNodeMessage(t *testing.T) {
 		})).Return(httpResp, nil)
 
 		mockDon.EXPECT().SendToNode(mock.Anything, "node1", mock.MatchedBy(func(req *jsonrpc.Request) bool {
-			return req.ID == "test-request-id"
+			return req.ID == id
 		})).Return(nil)
 
 		err = handler.HandleNodeMessage(testutils.Context(t), resp, "node1")
@@ -163,8 +167,9 @@ func TestHandleNodeMessage(t *testing.T) {
 		reqBytes, err := json.Marshal(outboundReq)
 		require.NoError(t, err)
 
+		id := fmt.Sprintf("%s/%s", gateway_common.MethodHTTPAction, uuid.New().String())
 		resp := &jsonrpc.Response{
-			ID:     "test-request-id",
+			ID:     id,
 			Result: reqBytes,
 		}
 
@@ -210,7 +215,7 @@ func TestHandleNodeMessage(t *testing.T) {
 		require.NoError(t, err)
 
 		resp := &jsonrpc.Response{
-			ID:     "test-request-id-500",
+			ID:     fmt.Sprintf("%s/%s", gateway_common.MethodHTTPAction, uuid.New().String()),
 			Result: reqBytes,
 		}
 
@@ -252,7 +257,7 @@ func TestHandleNodeMessage(t *testing.T) {
 
 	t.Run("invalid JSON in response result", func(t *testing.T) {
 		resp := &jsonrpc.Response{
-			ID:     "test-request-id2",
+			ID:     fmt.Sprintf("%s/%s", gateway_common.MethodHTTPAction, uuid.New().String()),
 			Result: []byte(`{invalid json}`),
 		}
 
