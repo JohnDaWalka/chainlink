@@ -74,9 +74,10 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(2)
 		require.Nil(t, err)
 
-		resp := &jsonrpc.Response{
+		rawMsg := json.RawMessage(`{"result": "success"}`)
+		resp := &jsonrpc.Response[json.RawMessage]{
 			ID:     "test-id",
-			Result: json.RawMessage(`{"result": "success"}`),
+			Result: &rawMsg,
 		}
 
 		result, err := agg.CollectAndAggregate(resp, "node1")
@@ -88,9 +89,10 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(2)
 		require.Nil(t, err)
 
-		resp := &jsonrpc.Response{
+		rawMsg := json.RawMessage(`{"result": "success"}`)
+		resp := &jsonrpc.Response[json.RawMessage]{
 			ID:     "test-id",
-			Result: json.RawMessage(`{"result": "success"}`),
+			Result: &rawMsg,
 		}
 
 		// First response - should return nil
@@ -110,9 +112,10 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(2)
 		require.Nil(t, err)
 
-		resp := &jsonrpc.Response{
+		rawMsg := json.RawMessage(`{"result": "success"}`)
+		resp := &jsonrpc.Response[json.RawMessage]{
 			ID:     "test-id",
-			Result: json.RawMessage(`{"result": "success"}`),
+			Result: &rawMsg,
 		}
 		result, err := agg.CollectAndAggregate(resp, "node1")
 		require.NoError(t, err)
@@ -133,14 +136,16 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(2)
 		require.Nil(t, err)
 
-		resp1 := &jsonrpc.Response{
+		rawMsg1 := json.RawMessage(`{"result": "success"}`)
+		resp1 := &jsonrpc.Response[json.RawMessage]{
 			ID:     "test-id",
-			Result: json.RawMessage(`{"result": "success"}`),
+			Result: &rawMsg1,
 		}
 
-		resp2 := &jsonrpc.Response{
+		rawMsg2 := json.RawMessage(`{"result": "failure"}`)
+		resp2 := &jsonrpc.Response[json.RawMessage]{
 			ID:     "test-id",
-			Result: json.RawMessage(`{"result": "failure"}`),
+			Result: &rawMsg2,
 		}
 
 		result, err := agg.CollectAndAggregate(resp1, "node1")
@@ -157,9 +162,10 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(1)
 		require.Nil(t, err)
 
-		resp := &jsonrpc.Response{
+		rawMsg := json.RawMessage(`{"result": "success"}`)
+		resp := &jsonrpc.Response[json.RawMessage]{
 			ID:     "test-id",
-			Result: json.RawMessage(`{"result": "success"}`),
+			Result: &rawMsg,
 		}
 
 		result, err := agg.CollectAndAggregate(resp, "node1")
@@ -173,9 +179,10 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(3)
 		require.Nil(t, err)
 
-		resp := &jsonrpc.Response{
+		rawMsg := json.RawMessage(`{"result": "success"}`)
+		resp := &jsonrpc.Response[json.RawMessage]{
 			ID:     "test-id",
-			Result: json.RawMessage(`{"result": "success"}`),
+			Result: &rawMsg,
 		}
 
 		result, err := agg.CollectAndAggregate(resp, "node1")
@@ -195,19 +202,22 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(2)
 		require.Nil(t, err)
 
-		resp1 := &jsonrpc.Response{
+		rawMsg1 := json.RawMessage(`{"result": "success"}`)
+		resp1 := &jsonrpc.Response[json.RawMessage]{
 			ID:     "test-id",
-			Result: json.RawMessage(`{"result": "success"}`),
+			Result: &rawMsg1,
 		}
 
-		resp2 := &jsonrpc.Response{
+		rawMsg2 := json.RawMessage(`{"result": "failure"}`)
+		resp2 := &jsonrpc.Response[json.RawMessage]{
 			ID:     "test-id",
-			Result: json.RawMessage(`{"result": "failure"}`),
+			Result: &rawMsg2,
 		}
 
-		resp3 := &jsonrpc.Response{
+		rawMsg3 := json.RawMessage(`{"result": "success"}`)
+		resp3 := &jsonrpc.Response[json.RawMessage]{
 			ID:     "test-id",
-			Result: json.RawMessage(`{"result": "success"}`), // Same as resp1
+			Result: &rawMsg3, // Same as resp1
 		}
 
 		result, err := agg.CollectAndAggregate(resp1, "node1")
@@ -228,7 +238,7 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(2)
 		require.Nil(t, err)
 
-		resp := &jsonrpc.Response{
+		resp := &jsonrpc.Response[json.RawMessage]{
 			ID:    "test-id",
 			Error: &jsonrpc.WireError{Code: 500, Message: "Internal error"},
 		}
@@ -250,7 +260,7 @@ func TestIdenticalNodeResponseAggregator_EdgeCases(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(1)
 		require.Nil(t, err)
 
-		resp := &jsonrpc.Response{
+		resp := &jsonrpc.Response[json.RawMessage]{
 			ID: "test-id",
 		}
 
@@ -277,9 +287,10 @@ func TestIdenticalNodeResponseAggregator_EdgeCases(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(1)
 		require.Nil(t, err)
 
-		resp := &jsonrpc.Response{
+		rawMsg := json.RawMessage(`{"result": "success"}`)
+		resp := &jsonrpc.Response[json.RawMessage]{
 			ID:     "test-id",
-			Result: json.RawMessage(`{"result": "success"}`),
+			Result: &rawMsg,
 		}
 
 		// Empty node address should not work
@@ -294,14 +305,16 @@ func TestIdenticalNodeResponseAggregator_NodeChangesResponse(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create two different responses
-		resp1 := &jsonrpc.Response{
+		rawRes1 := json.RawMessage([]byte(`{"key":"value1"}`))
+		resp1 := &jsonrpc.Response[json.RawMessage]{
 			ID:     "test",
-			Result: []byte(`{"key":"value1"}`),
+			Result: &rawRes1,
 		}
 
-		resp2 := &jsonrpc.Response{
+		rawRes2 := json.RawMessage([]byte(`{"key":"value2"}`))
+		resp2 := &jsonrpc.Response[json.RawMessage]{
 			ID:     "test",
-			Result: []byte(`{"key":"value2"}`),
+			Result: &rawRes2,
 		}
 
 		// Node1 submits response1
@@ -318,7 +331,7 @@ func TestIdenticalNodeResponseAggregator_NodeChangesResponse(t *testing.T) {
 		result, err = agg.CollectAndAggregate(resp2, "node1")
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		require.JSONEq(t, string(resp2.Result), string(result.Result))
+		require.JSONEq(t, string(*resp2.Result), string(*result.Result))
 
 		// Verify internal state
 		aggregator := agg.(*identicalNodeResponseAggregator)

@@ -193,7 +193,7 @@ func TestHandleNodeMessage(t *testing.T) {
 		// Second call: should return cached response (no HTTP client call)
 		mockDon.EXPECT().SendToNode(mock.Anything, "node1", mock.MatchedBy(func(req *jsonrpc.Request[json.RawMessage]) bool {
 			var cached gateway.OutboundHTTPResponse
-			err2 := json.Unmarshal(req.Params, &cached)
+			err2 := json.Unmarshal(*req.Params, &cached)
 			return err2 == nil && string(cached.Body) == string(httpResp.Body)
 		})).Return(nil)
 
@@ -217,7 +217,7 @@ func TestHandleNodeMessage(t *testing.T) {
 		require.NoError(t, err)
 
 		rawRequest := json.RawMessage(reqBytes)
-		resp := &jsonrpc.Response{
+		resp := &jsonrpc.Response[json.RawMessage]{
 			ID:     fmt.Sprintf("%s/%s", gateway_common.MethodHTTPAction, uuid.New().String()),
 			Result: &rawRequest,
 		}
@@ -324,9 +324,10 @@ func TestHandleNodeMessage_RoutesToTriggerHandler(t *testing.T) {
 	handler := createTestHandler(t)
 	handler.triggerHandler = mockTriggerHandler
 
-	resp := &jsonrpc.Response{
+	rawRes := json.RawMessage([]byte(`{}`))
+	resp := &jsonrpc.Response[json.RawMessage]{
 		ID:     "triggerResponseID", // No "/" in ID
-		Result: []byte(`{}`),
+		Result: &rawRes,
 	}
 	nodeAddr := "node1"
 
@@ -342,9 +343,10 @@ func TestHandleNodeMessage_RoutesToTriggerHandler(t *testing.T) {
 
 func TestHandleNodeMessage_UnsupportedMethod(t *testing.T) {
 	handler := createTestHandler(t)
-	resp := &jsonrpc.Response{
+	rawRes := json.RawMessage([]byte(`{}`))
+	resp := &jsonrpc.Response[json.RawMessage]{
 		ID:     "unsupportedMethod/123",
-		Result: []byte(`{}`),
+		Result: &rawRes,
 	}
 	nodeAddr := "node1"
 
@@ -355,9 +357,10 @@ func TestHandleNodeMessage_UnsupportedMethod(t *testing.T) {
 
 func TestHandleNodeMessage_EmptyID(t *testing.T) {
 	handler := createTestHandler(t)
-	resp := &jsonrpc.Response{
+	rawRes := json.RawMessage([]byte(`{}`))
+	resp := &jsonrpc.Response[json.RawMessage]{
 		ID:     "",
-		Result: []byte(`{}`),
+		Result: &rawRes,
 	}
 	nodeAddr := "node1"
 

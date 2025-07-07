@@ -41,11 +41,12 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest(t *testing.T) {
 		reqBytes, err := json.Marshal(triggerReq)
 		require.NoError(t, err)
 
-		req := &jsonrpc.Request{
+		rawParams := json.RawMessage(reqBytes)
+		req := &jsonrpc.Request[json.RawMessage]{
 			Version: "2.0",
 			ID:      "test-request-id",
 			Method:  gateway_common.MethodWorkflowExecute,
-			Params:  reqBytes,
+			Params:  &rawParams,
 		}
 
 		// Mock DON to expect sends to all nodes
@@ -73,11 +74,12 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest(t *testing.T) {
 		handler, _ := createTestTriggerHandler(t)
 		callbackCh := make(chan handlers.UserCallbackPayload, 1)
 
-		req := &jsonrpc.Request{
+		rawParams := json.RawMessage(`{invalid json}`)
+		req := &jsonrpc.Request[json.RawMessage]{
 			Version: "2.0",
 			ID:      "test-request-id",
 			Method:  gateway_common.MethodWorkflowExecute,
-			Params:  []byte(`{invalid json}`),
+			Params:  &rawParams,
 		}
 
 		err := handler.HandleUserTriggerRequest(testutils.Context(t), req, callbackCh)
@@ -94,11 +96,12 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest(t *testing.T) {
 		reqBytes, err := json.Marshal(triggerReq)
 		require.NoError(t, err)
 
-		req := &jsonrpc.Request{
+		rawParams := json.RawMessage(reqBytes)
+		req := &jsonrpc.Request[json.RawMessage]{
 			Version: "2.0",
 			ID:      "", // Empty ID
 			Method:  gateway_common.MethodWorkflowExecute,
-			Params:  reqBytes,
+			Params:  &rawParams,
 		}
 
 		err = handler.HandleUserTriggerRequest(testutils.Context(t), req, callbackCh)
@@ -121,11 +124,12 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest(t *testing.T) {
 		reqBytes, err := json.Marshal(triggerReq)
 		require.NoError(t, err)
 
-		req := &jsonrpc.Request{
+		rawParams := json.RawMessage(reqBytes)
+		req := &jsonrpc.Request[json.RawMessage]{
 			Version: "2.0",
 			ID:      "test/request/id", // Contains slashes
 			Method:  gateway_common.MethodWorkflowExecute,
-			Params:  reqBytes,
+			Params:  &rawParams,
 		}
 
 		err = handler.HandleUserTriggerRequest(testutils.Context(t), req, callbackCh)
@@ -148,11 +152,12 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest(t *testing.T) {
 		reqBytes, err := json.Marshal(triggerReq)
 		require.NoError(t, err)
 
-		req := &jsonrpc.Request{
+		rawParams := json.RawMessage(reqBytes)
+		req := &jsonrpc.Request[json.RawMessage]{
 			Version: "2.0",
 			ID:      "test-request-id",
 			Method:  "invalid-method",
-			Params:  reqBytes,
+			Params:  &rawParams,
 		}
 
 		err = handler.HandleUserTriggerRequest(testutils.Context(t), req, callbackCh)
@@ -176,11 +181,12 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest(t *testing.T) {
 		reqBytes, err := json.Marshal(triggerReq)
 		require.NoError(t, err)
 
-		req := &jsonrpc.Request{
+		rawParams := json.RawMessage(reqBytes)
+		req := &jsonrpc.Request[json.RawMessage]{
 			Version: "2.0",
 			ID:      "test-request-id",
 			Method:  gateway_common.MethodWorkflowExecute,
-			Params:  reqBytes,
+			Params:  &rawParams,
 		}
 
 		// First request should succeed
@@ -199,12 +205,12 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest(t *testing.T) {
 		handler, _ := createTestTriggerHandler(t)
 		callbackCh := make(chan handlers.UserCallbackPayload, 1)
 
-		reqBytes := []byte(`{"workflow":{"workflowID":"test-workflow-id"},"input":{"invalid json"}`)
-		req := &jsonrpc.Request{
+		rawParams := json.RawMessage([]byte(`{"workflow":{"workflowID":"test-workflow-id"},"input":{"invalid json"}`))
+		req := &jsonrpc.Request[json.RawMessage]{
 			Version: "2.0",
 			ID:      "test-request-id",
 			Method:  gateway_common.MethodWorkflowExecute,
-			Params:  reqBytes,
+			Params:  &rawParams,
 		}
 
 		err := handler.HandleUserTriggerRequest(testutils.Context(t), req, callbackCh)
@@ -227,11 +233,12 @@ func TestHttpTriggerHandler_HandleNodeTriggerResponse(t *testing.T) {
 		reqBytes, err := json.Marshal(triggerReq)
 		require.NoError(t, err)
 
-		req := &jsonrpc.Request{
+		rawParams := json.RawMessage(reqBytes)
+		req := &jsonrpc.Request[json.RawMessage]{
 			Version: "2.0",
 			ID:      "test-request-id",
 			Method:  gateway_common.MethodWorkflowExecute,
-			Params:  reqBytes,
+			Params:  &rawParams,
 		}
 
 		mockDon.EXPECT().SendToNode(mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(3)
@@ -242,10 +249,11 @@ func TestHttpTriggerHandler_HandleNodeTriggerResponse(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create node responses
-		nodeResp := &jsonrpc.Response{
+		rawRes := json.RawMessage(`{"result":"success"}`)
+		nodeResp := &jsonrpc.Response[json.RawMessage]{
 			Version: "2.0",
 			ID:      executionID,
-			Result:  json.RawMessage(`{"result":"success"}`),
+			Result:  &rawRes,
 		}
 
 		// Send responses from multiple nodes (need 2f+1 = 3 for f=1)
@@ -265,7 +273,7 @@ func TestHttpTriggerHandler_HandleNodeTriggerResponse(t *testing.T) {
 			require.NotEmpty(t, payload.RawResponse)
 			require.Equal(t, api.NoError, payload.ErrorCode)
 
-			var resp jsonrpc.Response
+			var resp jsonrpc.Response[json.RawMessage]
 			err := json.Unmarshal(payload.RawResponse, &resp)
 			require.NoError(t, err)
 			require.Equal(t, nodeResp.Result, resp.Result)
@@ -277,10 +285,11 @@ func TestHttpTriggerHandler_HandleNodeTriggerResponse(t *testing.T) {
 	t.Run("callback not found", func(t *testing.T) {
 		handler, _ := createTestTriggerHandler(t)
 
-		nodeResp := &jsonrpc.Response{
+		rawRes := json.RawMessage(`{"result": "success"}`)
+		nodeResp := &jsonrpc.Response[json.RawMessage]{
 			Version: "2.0",
 			ID:      "nonexistent-execution-id",
-			Result:  json.RawMessage(`{"result": "success"}`),
+			Result:  &rawRes,
 		}
 
 		err := handler.HandleNodeTriggerResponse(testutils.Context(t), nodeResp, "node1")
@@ -338,11 +347,12 @@ func TestHttpTriggerHandler_ReapExpiredCallbacks(t *testing.T) {
 		reqBytes, err := json.Marshal(triggerReq)
 		require.NoError(t, err)
 
-		req := &jsonrpc.Request{
+		rawParams := json.RawMessage(reqBytes)
+		req := &jsonrpc.Request[json.RawMessage]{
 			Version: "2.0",
 			ID:      "test-request-id",
 			Method:  gateway_common.MethodWorkflowExecute,
-			Params:  reqBytes,
+			Params:  &rawParams,
 		}
 
 		mockDon.EXPECT().SendToNode(mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(3)
@@ -388,11 +398,12 @@ func TestHttpTriggerHandler_ReapExpiredCallbacks(t *testing.T) {
 		reqBytes, err := json.Marshal(triggerReq)
 		require.NoError(t, err)
 
-		req := &jsonrpc.Request{
+		rawParams := json.RawMessage(reqBytes)
+		req := &jsonrpc.Request[json.RawMessage]{
 			Version: "2.0",
 			ID:      "test-request-id",
 			Method:  gateway_common.MethodWorkflowExecute,
-			Params:  reqBytes,
+			Params:  &rawParams,
 		}
 
 		mockDon.EXPECT().SendToNode(mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(3)
@@ -488,10 +499,12 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest_Retries(t *testing.T) {
 	handler := NewHTTPTriggerHandler(lggr, cfg, donConfig, mockDon)
 
 	t.Run("retries failed nodes until success", func(t *testing.T) {
-		req := &jsonrpc.Request{
+
+		rawParams := json.RawMessage(`{"input":{},"workflow":{"workflowID":"test-workflow-id"}}`)
+		req := &jsonrpc.Request[json.RawMessage]{
 			ID:      "test-request-id",
 			Method:  gateway_common.MethodWorkflowExecute,
-			Params:  json.RawMessage(`{"input":{},"workflow":{"workflowID":"test-workflow-id"}}`),
+			Params:  &rawParams,
 			Version: "2.0",
 		}
 
