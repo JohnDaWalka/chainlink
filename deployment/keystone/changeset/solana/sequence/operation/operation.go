@@ -16,6 +16,8 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	ks_forwarder "github.com/smartcontractkit/chainlink-solana/contracts/generated/keystone_forwarder"
+	ks_cache "github.com/smartcontractkit/chainlink-solana/contracts/generated/data_feeds_cache"
+
 	commonOps "github.com/smartcontractkit/chainlink/deployment/common/changeset/solana/operations"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/deployment/helpers"
@@ -48,6 +50,18 @@ var (
 		"Configure forwarder for Solana Chain",
 		configureForwarder,
 	)
+	InitCacheOp = operations.NewOperation(
+		"init-cache-op",
+		Version1_0_0,
+		"Initialize DataFeeds Cache for Solana Chain",
+		initCache,
+  )
+	DeployCacheOp = operations.NewOperation(
+		"deploy-cache-op",
+		Version1_0_0,
+		"Deploys the DataFeeds Cache program for Solana Chain",
+		commonOps.Deploy,
+	)
 )
 
 type (
@@ -64,6 +78,16 @@ type (
 
 	InitForwarderOutput struct {
 		StatePubKey solana.PublicKey
+	}
+
+	// For DataFeeds Cache initialization
+	InitCacheInput struct {
+		ProgramID solana.PublicKey
+		ChainSel  uint64
+	}
+
+	InitCacheOutput struct {
+			StatePubKey solana.PublicKey
 	}
 
 	SetUpgradeAuthorityInput struct {
@@ -119,6 +143,37 @@ func initForwarder(b operations.Bundle, deps Deps, in InitForwarderInput) (InitF
 	out.StatePubKey = stateKey.PublicKey()
 
 	return out, nil
+}
+
+func initCache(b operations.Bundle, deps Deps, in InitCacheInput) (InitCacheOutput, error) {
+    var out InitCacheOutput
+    if ks_cache.ProgramID.IsZero() {
+        ks_cache.SetProgramID(in.ProgramID)
+    }
+
+    stateKey, err := solana.NewRandomPrivateKey()
+    if err != nil {
+        return out, fmt.Errorf("failed to create random keys: %w", err)
+    }
+
+		adminStateKey, err := solana.NewRandomPrivateKey()
+		if err != nil {
+			return out, fmt.Errorf("failed to create random admin keys: %w", err)
+		}
+
+    instruction, err := ks_cache.NewInitializeInstruction([]solana.PublicKey{adminStateKey.PublicKey()}, stateKey.PublicKey(), deps.Chain.DeployerKey.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+    if err != nil {
+        return out, fmt.Errorf("failed to build and validate initialize instruction %w", err)
+    }
+
+    instructions := []solana.Instruction{instruction}
+    if err = deps.Chain.Confirm(instructions, solanaUtils.AddSigners(stateKey)); err != nil {
+        return out, errors.New("failed to confirm ")
+    }
+
+    out.StatePubKey = stateKey.PublicKey()
+
+    return out, nil
 }
 
 func setUpgradeAuthority(b operations.Bundle, deps Deps, in SetUpgradeAuthorityInput) (SetUpgradeAuthorityOutput, error) {
