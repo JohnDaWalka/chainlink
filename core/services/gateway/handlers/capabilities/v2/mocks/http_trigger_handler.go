@@ -4,9 +4,11 @@ package mocks
 
 import (
 	context "context"
+	json "encoding/json"
+
+	handlers "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
 
 	jsonrpc2 "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
-	handlers "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -70,7 +72,7 @@ func (_c *HTTPTriggerHandler_Close_Call) RunAndReturn(run func() error) *HTTPTri
 }
 
 // HandleNodeTriggerResponse provides a mock function with given fields: ctx, resp, nodeAddr
-func (_m *HTTPTriggerHandler) HandleNodeTriggerResponse(ctx context.Context, resp *jsonrpc2.Response, nodeAddr string) error {
+func (_m *HTTPTriggerHandler) HandleNodeTriggerResponse(ctx context.Context, resp *jsonrpc2.Response[json.RawMessage], nodeAddr string) error {
 	ret := _m.Called(ctx, resp, nodeAddr)
 
 	if len(ret) == 0 {
@@ -78,7 +80,7 @@ func (_m *HTTPTriggerHandler) HandleNodeTriggerResponse(ctx context.Context, res
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *jsonrpc2.Response, string) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *jsonrpc2.Response[json.RawMessage], string) error); ok {
 		r0 = rf(ctx, resp, nodeAddr)
 	} else {
 		r0 = ret.Error(0)
@@ -94,15 +96,15 @@ type HTTPTriggerHandler_HandleNodeTriggerResponse_Call struct {
 
 // HandleNodeTriggerResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - resp *jsonrpc2.Response
+//   - resp *jsonrpc2.Response[json.RawMessage]
 //   - nodeAddr string
 func (_e *HTTPTriggerHandler_Expecter) HandleNodeTriggerResponse(ctx interface{}, resp interface{}, nodeAddr interface{}) *HTTPTriggerHandler_HandleNodeTriggerResponse_Call {
 	return &HTTPTriggerHandler_HandleNodeTriggerResponse_Call{Call: _e.mock.On("HandleNodeTriggerResponse", ctx, resp, nodeAddr)}
 }
 
-func (_c *HTTPTriggerHandler_HandleNodeTriggerResponse_Call) Run(run func(ctx context.Context, resp *jsonrpc2.Response, nodeAddr string)) *HTTPTriggerHandler_HandleNodeTriggerResponse_Call {
+func (_c *HTTPTriggerHandler_HandleNodeTriggerResponse_Call) Run(run func(ctx context.Context, resp *jsonrpc2.Response[json.RawMessage], nodeAddr string)) *HTTPTriggerHandler_HandleNodeTriggerResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*jsonrpc2.Response), args[2].(string))
+		run(args[0].(context.Context), args[1].(*jsonrpc2.Response[json.RawMessage]), args[2].(string))
 	})
 	return _c
 }
@@ -112,13 +114,13 @@ func (_c *HTTPTriggerHandler_HandleNodeTriggerResponse_Call) Return(_a0 error) *
 	return _c
 }
 
-func (_c *HTTPTriggerHandler_HandleNodeTriggerResponse_Call) RunAndReturn(run func(context.Context, *jsonrpc2.Response, string) error) *HTTPTriggerHandler_HandleNodeTriggerResponse_Call {
+func (_c *HTTPTriggerHandler_HandleNodeTriggerResponse_Call) RunAndReturn(run func(context.Context, *jsonrpc2.Response[json.RawMessage], string) error) *HTTPTriggerHandler_HandleNodeTriggerResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // HandleUserTriggerRequest provides a mock function with given fields: ctx, req, callbackCh
-func (_m *HTTPTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *jsonrpc2.Request, callbackCh chan<- handlers.UserCallbackPayload) error {
+func (_m *HTTPTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *jsonrpc2.Request[json.RawMessage], callbackCh chan<- handlers.UserCallbackPayload) error {
 	ret := _m.Called(ctx, req, callbackCh)
 
 	if len(ret) == 0 {
@@ -126,7 +128,7 @@ func (_m *HTTPTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req 
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *jsonrpc2.Request, chan<- handlers.UserCallbackPayload) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *jsonrpc2.Request[json.RawMessage], chan<- handlers.UserCallbackPayload) error); ok {
 		r0 = rf(ctx, req, callbackCh)
 	} else {
 		r0 = ret.Error(0)
@@ -142,15 +144,15 @@ type HTTPTriggerHandler_HandleUserTriggerRequest_Call struct {
 
 // HandleUserTriggerRequest is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req *jsonrpc2.Request
+//   - req *jsonrpc2.Request[json.RawMessage]
 //   - callbackCh chan<- handlers.UserCallbackPayload
 func (_e *HTTPTriggerHandler_Expecter) HandleUserTriggerRequest(ctx interface{}, req interface{}, callbackCh interface{}) *HTTPTriggerHandler_HandleUserTriggerRequest_Call {
 	return &HTTPTriggerHandler_HandleUserTriggerRequest_Call{Call: _e.mock.On("HandleUserTriggerRequest", ctx, req, callbackCh)}
 }
 
-func (_c *HTTPTriggerHandler_HandleUserTriggerRequest_Call) Run(run func(ctx context.Context, req *jsonrpc2.Request, callbackCh chan<- handlers.UserCallbackPayload)) *HTTPTriggerHandler_HandleUserTriggerRequest_Call {
+func (_c *HTTPTriggerHandler_HandleUserTriggerRequest_Call) Run(run func(ctx context.Context, req *jsonrpc2.Request[json.RawMessage], callbackCh chan<- handlers.UserCallbackPayload)) *HTTPTriggerHandler_HandleUserTriggerRequest_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*jsonrpc2.Request), args[2].(chan<- handlers.UserCallbackPayload))
+		run(args[0].(context.Context), args[1].(*jsonrpc2.Request[json.RawMessage]), args[2].(chan<- handlers.UserCallbackPayload))
 	})
 	return _c
 }
@@ -160,7 +162,7 @@ func (_c *HTTPTriggerHandler_HandleUserTriggerRequest_Call) Return(_a0 error) *H
 	return _c
 }
 
-func (_c *HTTPTriggerHandler_HandleUserTriggerRequest_Call) RunAndReturn(run func(context.Context, *jsonrpc2.Request, chan<- handlers.UserCallbackPayload) error) *HTTPTriggerHandler_HandleUserTriggerRequest_Call {
+func (_c *HTTPTriggerHandler_HandleUserTriggerRequest_Call) RunAndReturn(run func(context.Context, *jsonrpc2.Request[json.RawMessage], chan<- handlers.UserCallbackPayload) error) *HTTPTriggerHandler_HandleUserTriggerRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }

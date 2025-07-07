@@ -14,7 +14,7 @@ var _ NodeResponseAggregator = (*identicalNodeResponseAggregator)(nil)
 type NodeResponseAggregator interface {
 	// CollectAndAggregate appends a node response to existing list of responses if exists
 	// and tries to aggregate them into a single response.
-	CollectAndAggregate(resp *jsonrpc.Response, nodeAddress string) (*jsonrpc.Response, error)
+	CollectAndAggregate(resp *jsonrpc.Response[json.RawMessage], nodeAddress string) (*jsonrpc.Response[json.RawMessage], error)
 }
 
 // identicalNodeResponseAggregator collects node responses and aggregates identical responses.
@@ -63,7 +63,7 @@ func (s stringSet) Values() []string {
 }
 
 // TODO: use logic from chainlink-common
-func digest(r *jsonrpc.Response) (string, error) {
+func digest(r *jsonrpc.Response[json.RawMessage]) (string, error) {
 	canonicalJSONBytes, err := json.Marshal(r)
 	if err != nil {
 		return "", fmt.Errorf("error marshaling JSON: %w", err)
@@ -81,7 +81,9 @@ func digest(r *jsonrpc.Response) (string, error) {
 // Otherwise, returns nil and no error.
 // If a node provides a new response that differs from its previous one, the node is
 // removed from its previous response group and added to the new one.
-func (agg *identicalNodeResponseAggregator) CollectAndAggregate(resp *jsonrpc.Response, nodeAddress string) (*jsonrpc.Response, error) {
+func (agg *identicalNodeResponseAggregator) CollectAndAggregate(
+	resp *jsonrpc.Response[json.RawMessage],
+	nodeAddress string) (*jsonrpc.Response[json.RawMessage], error) {
 	if resp == nil {
 		return nil, fmt.Errorf("response cannot be nil")
 	}

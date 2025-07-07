@@ -131,9 +131,10 @@ func TestHandleNodeMessage(t *testing.T) {
 		require.NoError(t, err)
 
 		id := fmt.Sprintf("%s/%s", gateway_common.MethodHTTPAction, uuid.New().String())
-		resp := &jsonrpc.Response{
+		rawRequest := json.RawMessage(reqBytes)
+		resp := &jsonrpc.Response[json.RawMessage]{
 			ID:     id,
-			Result: reqBytes,
+			Result: &rawRequest,
 		}
 
 		httpResp := &network.HTTPResponse{
@@ -145,7 +146,7 @@ func TestHandleNodeMessage(t *testing.T) {
 			return req.Method == "GET" && req.URL == "https://example.com/api"
 		})).Return(httpResp, nil)
 
-		mockDon.EXPECT().SendToNode(mock.Anything, "node1", mock.MatchedBy(func(req *jsonrpc.Request) bool {
+		mockDon.EXPECT().SendToNode(mock.Anything, "node1", mock.MatchedBy(func(req *jsonrpc.Request[json.RawMessage]) bool {
 			return req.ID == id
 		})).Return(nil)
 
@@ -167,11 +168,11 @@ func TestHandleNodeMessage(t *testing.T) {
 		}
 		reqBytes, err := json.Marshal(outboundReq)
 		require.NoError(t, err)
-
 		id := fmt.Sprintf("%s/%s", gateway_common.MethodHTTPAction, uuid.New().String())
-		resp := &jsonrpc.Response{
+		rawRequest := json.RawMessage(reqBytes)
+		resp := &jsonrpc.Response[json.RawMessage]{
 			ID:     id,
-			Result: reqBytes,
+			Result: &rawRequest,
 		}
 
 		mockDon := handler.don.(*handlermocks.DON)
@@ -190,7 +191,7 @@ func TestHandleNodeMessage(t *testing.T) {
 		handler.wg.Wait()
 
 		// Second call: should return cached response (no HTTP client call)
-		mockDon.EXPECT().SendToNode(mock.Anything, "node1", mock.MatchedBy(func(req *jsonrpc.Request) bool {
+		mockDon.EXPECT().SendToNode(mock.Anything, "node1", mock.MatchedBy(func(req *jsonrpc.Request[json.RawMessage]) bool {
 			var cached gateway.OutboundHTTPResponse
 			err2 := json.Unmarshal(req.Params, &cached)
 			return err2 == nil && string(cached.Body) == string(httpResp.Body)
@@ -215,9 +216,10 @@ func TestHandleNodeMessage(t *testing.T) {
 		reqBytes, err := json.Marshal(outboundReq)
 		require.NoError(t, err)
 
+		rawRequest := json.RawMessage(reqBytes)
 		resp := &jsonrpc.Response{
 			ID:     fmt.Sprintf("%s/%s", gateway_common.MethodHTTPAction, uuid.New().String()),
-			Result: reqBytes,
+			Result: &rawRequest,
 		}
 
 		mockDon := handler.don.(*handlermocks.DON)
@@ -245,9 +247,10 @@ func TestHandleNodeMessage(t *testing.T) {
 	})
 
 	t.Run("empty request ID", func(t *testing.T) {
-		resp := &jsonrpc.Response{
+		rawRes := json.RawMessage([]byte(`{}`))
+		resp := &jsonrpc.Response[json.RawMessage]{
 			ID:     "",
-			Result: []byte(`{}`),
+			Result: &rawRes,
 		}
 
 		err := handler.HandleNodeMessage(testutils.Context(t), resp, "node1")
@@ -257,9 +260,10 @@ func TestHandleNodeMessage(t *testing.T) {
 	})
 
 	t.Run("invalid JSON in response result", func(t *testing.T) {
-		resp := &jsonrpc.Response{
+		rawRes := json.RawMessage([]byte(`{invalid json}`))
+		resp := &jsonrpc.Response[json.RawMessage]{
 			ID:     fmt.Sprintf("%s/%s", gateway_common.MethodHTTPAction, uuid.New().String()),
-			Result: []byte(`{invalid json}`),
+			Result: &rawRes,
 		}
 
 		err := handler.HandleNodeMessage(testutils.Context(t), resp, "node1")
@@ -312,48 +316,6 @@ func TestServiceLifecycle(t *testing.T) {
 		err = handler.Close()
 		require.NoError(t, err)
 	})
-
-	t.Run("cleanup goroutine runs", func(t *testing.T) {
-		// Create handler with short cleanup period
-		cfg := ServiceConfig{
-			NodeRateLimiter: ratelimit.RateLimiterConfig{
-				GlobalRPS:      100,
-				GlobalBurst:    100,
-				PerSenderRPS:   10,
-				PerSenderBurst: 10,
-			},
-			UserRateLimiter: ratelimit.RateLimiterConfig{
-				GlobalRPS:      50,
-				GlobalBurst:    50,
-				PerSenderRPS:   5,
-				PerSenderBurst: 5,
-			},
-			CleanUpPeriodMs: 100, // Very short for testing
-		}
-		quickHandler := createTestHandlerWithConfig(t, cfg)
-
-		ctx := testutils.Context(t)
-		err := quickHandler.Start(ctx)
-		require.NoError(t, err)
-
-		// Add expired entry to cache
-		req := gateway.OutboundHTTPRequest{
-			Method: "GET",
-			URL:    "https://example.com/test",
-		}
-		resp := gateway.OutboundHTTPResponse{StatusCode: 200}
-		quickHandler.responseCache.Set(req, resp, 1*time.Millisecond)
-
-		// Wait for cleanup to run
-		time.Sleep(200 * time.Millisecond)
-
-		// Cache entry should be cleaned up
-		cached := quickHandler.responseCache.Get(req)
-		require.Nil(t, cached)
-
-		err = quickHandler.Close()
-		require.NoError(t, err)
-	})
 }
 func TestHandleNodeMessage_RoutesToTriggerHandler(t *testing.T) {
 	// This test covers the case where the response ID does not contain a "/"
@@ -402,6 +364,64 @@ func TestHandleNodeMessage_EmptyID(t *testing.T) {
 	err := handler.HandleNodeMessage(testutils.Context(t), resp, nodeAddr)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "empty request ID")
+}
+
+type mockResponseCache struct {
+	deleteExpiredCh chan struct{}
+}
+
+func newMockResponseCache() *mockResponseCache {
+	return &mockResponseCache{
+		deleteExpiredCh: make(chan struct{}),
+	}
+}
+
+func (m *mockResponseCache) Set(gateway.OutboundHTTPRequest, gateway.OutboundHTTPResponse, time.Duration) {
+}
+
+func (m *mockResponseCache) Get(gateway.OutboundHTTPRequest) *gateway.OutboundHTTPResponse {
+	return nil
+}
+
+func (m *mockResponseCache) DeleteExpired() int {
+	select {
+	case m.deleteExpiredCh <- struct{}{}:
+	default:
+	}
+	return 0
+}
+
+func TestGatewayHandler_Start_CallsDeleteExpired(t *testing.T) {
+	cfg := serviceCfg()
+	cfg.CleanUpPeriodMs = 100 // fast cleanup for test
+
+	configBytes, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	donConfig := &config.DONConfig{DonId: "test-don"}
+	mockDon := handlermocks.NewDON(t)
+	mockHTTPClient := httpmocks.NewHTTPClient(t)
+	lggr := logger.Test(t)
+
+	handler, err := NewGatewayHandler(configBytes, donConfig, mockDon, mockHTTPClient, lggr)
+	require.NoError(t, err)
+	require.NotNil(t, handler)
+	mockCache := newMockResponseCache()
+	handler.responseCache = mockCache
+
+	ctx := t.Context()
+	err = handler.Start(ctx)
+	require.NoError(t, err)
+
+	// Wait for DeleteExpired to be called at least once
+	select {
+	case <-mockCache.deleteExpiredCh:
+		// Success
+	case <-ctx.Done():
+		t.Fatal("DeleteExpired was not called within context deadline")
+	}
+	err = handler.Close()
+	require.NoError(t, err)
 }
 
 func serviceCfg() ServiceConfig {

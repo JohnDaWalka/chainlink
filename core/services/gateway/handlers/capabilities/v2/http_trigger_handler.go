@@ -44,8 +44,8 @@ type httpTriggerHandler struct {
 
 type HTTPTriggerHandler interface {
 	job.ServiceCtx
-	HandleUserTriggerRequest(ctx context.Context, req *jsonrpc.Request, callbackCh chan<- handlers.UserCallbackPayload) error
-	HandleNodeTriggerResponse(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error
+	HandleUserTriggerRequest(ctx context.Context, req *jsonrpc.Request[json.RawMessage], callbackCh chan<- handlers.UserCallbackPayload) error
+	HandleNodeTriggerResponse(ctx context.Context, resp *jsonrpc.Response[json.RawMessage], nodeAddr string) error
 }
 
 func NewHTTPTriggerHandler(lggr logger.Logger, cfg ServiceConfig, donConfig *config.DONConfig, don handlers.DON) *httpTriggerHandler {
@@ -59,8 +59,8 @@ func NewHTTPTriggerHandler(lggr logger.Logger, cfg ServiceConfig, donConfig *con
 	}
 }
 
-func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *jsonrpc.Request, callbackCh chan<- handlers.UserCallbackPayload) error {
-	// TODO: PRODCRE-305 validate JWT against authorized keys
+func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *jsonrpc.Request[json.RawMessage], callbackCh chan<- handlers.UserCallbackPayload) error {
+	// TODO: PRODCRE-305 validate JWT against authorized keys.
 	triggerReq, err := h.validatedTriggerRequest(req, callbackCh)
 	if err != nil {
 		return err
@@ -95,9 +95,13 @@ func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *
 	return h.sendWithRetries(ctx, executionID, req)
 }
 
-func (h *httpTriggerHandler) validatedTriggerRequest(req *jsonrpc.Request, callbackCh chan<- handlers.UserCallbackPayload) (*gateway_common.HTTPTriggerRequest, error) {
+func (h *httpTriggerHandler) validatedTriggerRequest(req *jsonrpc.Request[json.RawMessage], callbackCh chan<- handlers.UserCallbackPayload) (*gateway_common.HTTPTriggerRequest, error) {
+	if req.Params == nil {
+		h.handleUserError("", jsonrpc.ErrInvalidRequest, "request params is nil", callbackCh)
+		return nil, errors.New("request params is nil")
+	}
 	var triggerReq gateway_common.HTTPTriggerRequest
-	err := json.Unmarshal(req.Params, &triggerReq)
+	err := json.Unmarshal(*req.Params, &triggerReq)
 	if err != nil {
 		h.handleUserError(req.ID, jsonrpc.ErrParse, "error decoding payload: "+err.Error(), callbackCh)
 		return nil, err
@@ -124,7 +128,7 @@ func (h *httpTriggerHandler) validatedTriggerRequest(req *jsonrpc.Request, callb
 	return &triggerReq, nil
 }
 
-func (h *httpTriggerHandler) HandleNodeTriggerResponse(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error {
+func (h *httpTriggerHandler) HandleNodeTriggerResponse(ctx context.Context, resp *jsonrpc.Response[json.RawMessage], nodeAddr string) error {
 	h.lggr.Debugw("handling trigger response", "requestID", resp.ID, "nodeAddr", nodeAddr)
 	h.callbacksMu.Lock()
 	defer h.callbacksMu.Unlock()
@@ -215,7 +219,7 @@ func isValidJSON(data []byte) bool {
 }
 
 func (h *httpTriggerHandler) handleUserError(requestID string, code int64, message string, callbackCh chan<- handlers.UserCallbackPayload) {
-	resp := &jsonrpc.Response{
+	resp := &jsonrpc.Response[json.RawMessage]{
 		Version: "2.0",
 		ID:      requestID,
 		Error: &jsonrpc.WireError{
@@ -236,7 +240,7 @@ func (h *httpTriggerHandler) handleUserError(requestID string, code int64, messa
 
 // sendWithRetries attempts to send the request to all DON members,
 // retrying failed nodes until either all succeed or the max trigger request duration is reached.
-func (h *httpTriggerHandler) sendWithRetries(ctx context.Context, executionID string, req *jsonrpc.Request) error {
+func (h *httpTriggerHandler) sendWithRetries(ctx context.Context, executionID string, req *jsonrpc.Request[json.RawMessage]) error {
 	// Create a context that will be cancelled when the max request duration is reached
 	maxDuration := time.Duration(h.config.MaxTriggerRequestDurationMs) * time.Millisecond
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, maxDuration)

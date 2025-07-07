@@ -116,9 +116,12 @@ func WithDefaults(cfg ServiceConfig) ServiceConfig {
 	return cfg
 }
 
-func (h *gatewayHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error {
+func (h *gatewayHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Response[json.RawMessage], nodeAddr string) error {
 	if resp.ID == "" {
 		return fmt.Errorf("received response with empty request ID from node %s", nodeAddr)
+	}
+	if resp.Result == nil {
+		return fmt.Errorf("received response with nil result from node %s", nodeAddr)
 	}
 	h.lggr.Debugw("handling incoming node message", "requestID", resp.ID, "nodeAddr", nodeAddr)
 	// Node messages follow the format "<methodName>/<workflowID>/<uuid>" or
@@ -142,7 +145,7 @@ func (h *gatewayHandler) HandleLegacyUserMessage(context.Context, *api.Message, 
 	return errors.New("HTTP capability gateway handler does not support legacy messages")
 }
 
-func (h *gatewayHandler) HandleJSONRPCUserMessage(ctx context.Context, req jsonrpc.Request, responseCh chan<- handlers.UserCallbackPayload) error {
+func (h *gatewayHandler) HandleJSONRPCUserMessage(ctx context.Context, req jsonrpc.Request[json.RawMessage], responseCh chan<- handlers.UserCallbackPayload) error {
 	err := h.triggerHandler.HandleUserTriggerRequest(ctx, &req, responseCh)
 	if err != nil {
 		h.lggr.Errorw("failed to handle user trigger request", "requestID",
@@ -153,11 +156,11 @@ func (h *gatewayHandler) HandleJSONRPCUserMessage(ctx context.Context, req jsonr
 	return nil
 }
 
-func (h *gatewayHandler) makeOutgoingRequest(ctx context.Context, resp *jsonrpc.Response, nodeAddr string) error {
+func (h *gatewayHandler) makeOutgoingRequest(ctx context.Context, resp *jsonrpc.Response[json.RawMessage], nodeAddr string) error {
 	requestID := resp.ID
 	h.lggr.Debugw("handling webAPI outgoing message", "requestID", requestID, "nodeAddr", nodeAddr)
 	var req gateway_common.OutboundHTTPRequest
-	err := json.Unmarshal(resp.Result, &req)
+	err := json.Unmarshal(*resp.Result, &req)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal HTTP request from node %s: %w", nodeAddr, err)
 	}
@@ -266,12 +269,12 @@ func (h *gatewayHandler) sendResponseToNode(ctx context.Context, requestID strin
 	if err != nil {
 		return err
 	}
-
-	req := &jsonrpc.Request{
+	rawParams := json.RawMessage(params)
+	req := &jsonrpc.Request[json.RawMessage]{
 		Version: jsonrpc.JsonRpcVersion,
 		ID:      requestID,
 		Method:  gateway_common.MethodHTTPAction,
-		Params:  params,
+		Params:  &rawParams,
 	}
 
 	err = h.don.SendToNode(ctx, nodeAddr, req)
