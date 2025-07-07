@@ -10,20 +10,20 @@ defaults:
 plugins:
   cron:
     - moduleURI: "github.com/smartcontractkit/capabilities/cron"
-      gitRef: "fed08e9ef44646e515c6ce002867abac53740949"
+      gitRef: "d3e73b8303df147a9d01c8d0e1f9008ca94d59f6"
       installPath: "github.com/smartcontractkit/capabilities/cron"
   kvstore:
     - enabled: false
       moduleURI: "github.com/smartcontractkit/capabilities/kvstore"
-      gitRef: "fed08e9ef44646e515c6ce002867abac53740949"
+      gitRef: "d3e73b8303df147a9d01c8d0e1f9008ca94d59f6"
       installPath: "github.com/smartcontractkit/capabilities/kvstore"
   readcontract:
     - moduleURI: "github.com/smartcontractkit/capabilities/readcontract"
-      gitRef: "fed08e9ef44646e515c6ce002867abac53740949"
+      gitRef: "d3e73b8303df147a9d01c8d0e1f9008ca94d59f6"
       installPath: "github.com/smartcontractkit/capabilities/readcontract"
   workflowevent:
     - enabled: false
       moduleURI: "github.com/smartcontractkit/capabilities/workflowevent"
-      gitRef: "fed08e9ef44646e515c6ce002867abac53740949"
+      gitRef: "d3e73b8303df147a9d01c8d0e1f9008ca94d59f6"
       installPath: "github.com/smartcontractkit/capabilities/workflowevent"
 
