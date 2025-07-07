@@ -772,7 +772,7 @@ func NewEnvironmentWithJobsAndContracts(t *testing.T, tEnv TestEnvironment) Depl
 	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
-	err = state.ValidatePostDeploymentState(e.Env)
+	err = state.ValidatePostDeploymentState(e.Env, !tEnv.TestConfigs().SkipDONConfiguration)
 	require.NoError(t, err)
 
 	return e
