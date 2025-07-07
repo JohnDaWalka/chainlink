@@ -85,7 +85,7 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest(t *testing.T) {
 		err := handler.HandleUserTriggerRequest(testutils.Context(t), req, callbackCh)
 		require.Error(t, err)
 
-		requireUserErrorSent(t, callbackCh, int(jsonrpc.ErrParse)) //nolint:gosec // safe to cast
+		requireUserErrorSent(t, callbackCh, int(jsonrpc.ErrParse))
 	})
 
 	t.Run("empty request ID", func(t *testing.T) {
@@ -108,7 +108,7 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "empty request ID")
 
-		requireUserErrorSent(t, callbackCh, int(jsonrpc.ErrInvalidRequest)) //nolint:gosec // safe to cast
+		requireUserErrorSent(t, callbackCh, int(jsonrpc.ErrInvalidRequest))
 	})
 
 	t.Run("request ID contains slash", func(t *testing.T) {
@@ -136,7 +136,7 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "must not contain '/'")
 
-		requireUserErrorSent(t, callbackCh, int(jsonrpc.ErrInvalidRequest)) //nolint:gosec // safe to cast
+		requireUserErrorSent(t, callbackCh, int(jsonrpc.ErrInvalidRequest))
 	})
 
 	t.Run("invalid method", func(t *testing.T) {
@@ -164,7 +164,7 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid method")
 
-		requireUserErrorSent(t, callbackCh, int(jsonrpc.ErrMethodNotFound)) //nolint:gosec // safe to cast
+		requireUserErrorSent(t, callbackCh, int(jsonrpc.ErrMethodNotFound))
 	})
 
 	t.Run("duplicate request ID", func(t *testing.T) {
@@ -198,7 +198,7 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest(t *testing.T) {
 		err = handler.HandleUserTriggerRequest(testutils.Context(t), req, callbackCh2)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "request ID already used")
-		requireUserErrorSent(t, callbackCh2, int(jsonrpc.ErrInvalidRequest)) //nolint:gosec // safe to cast
+		requireUserErrorSent(t, callbackCh2, int(jsonrpc.ErrInvalidRequest))
 	})
 
 	t.Run("invalid input JSON", func(t *testing.T) {
@@ -499,7 +499,6 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest_Retries(t *testing.T) {
 	handler := NewHTTPTriggerHandler(lggr, cfg, donConfig, mockDon)
 
 	t.Run("retries failed nodes until success", func(t *testing.T) {
-
 		rawParams := json.RawMessage(`{"input":{},"workflow":{"workflowID":"test-workflow-id"}}`)
 		req := &jsonrpc.Request[json.RawMessage]{
 			ID:      "test-request-id",
@@ -542,24 +541,6 @@ func createTestTriggerRequest() gateway_common.HTTPTriggerRequest {
 			WorkflowID: "test-workflow-id",
 		},
 		Input: []byte(`{"key": "value"}`),
-	}
-}
-
-func createTestTriggerRequestWithWorkflowID(workflowID string) gateway_common.HTTPTriggerRequest {
-	return gateway_common.HTTPTriggerRequest{
-		Workflow: gateway_common.WorkflowSelector{
-			WorkflowID: workflowID,
-		},
-		Input: []byte(`{"key": "value"}`),
-	}
-}
-
-func createTestTriggerRequestWithInput(input []byte) gateway_common.HTTPTriggerRequest {
-	return gateway_common.HTTPTriggerRequest{
-		Workflow: gateway_common.WorkflowSelector{
-			WorkflowID: "test-workflow-id",
-		},
-		Input: input,
 	}
 }
 

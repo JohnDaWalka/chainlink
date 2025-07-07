@@ -258,6 +258,10 @@ func (h *gatewayHandler) Start(ctx context.Context) error {
 func (h *gatewayHandler) Close() error {
 	return h.StopOnce(handlerName, func() error {
 		h.lggr.Info("Closing " + handlerName)
+		err := h.triggerHandler.Close()
+		if err != nil {
+			h.lggr.Errorw("failed to close HTTP trigger handler", "err", err)
+		}
 		close(h.stopCh)
 		h.wg.Wait()
 		return nil
