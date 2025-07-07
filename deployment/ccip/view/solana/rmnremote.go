@@ -5,10 +5,12 @@ import (
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/mr-tron/base58"
 
 	solRmnRemote "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
-	"github.com/smartcontractkit/chainlink/deployment"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 type RMNRemoteView struct {
@@ -19,7 +21,7 @@ type RMNRemoteView struct {
 	CurseSubjects      []string `json:"curses,omitempty"`
 }
 
-func GenerateRMNRemoteView(chain deployment.SolChain, program solana.PublicKey, remoteChains []uint64, tokens []solana.PublicKey) (RMNRemoteView, error) {
+func GenerateRMNRemoteView(chain cldf.SolChain, program solana.PublicKey, remoteChains []uint64, tokens []solana.PublicKey) (RMNRemoteView, error) {
 	view := RMNRemoteView{}
 	var config solRmnRemote.Config
 	configPDA, _, _ := solState.FindRMNRemoteConfigPDA(program)
@@ -38,7 +40,7 @@ func GenerateRMNRemoteView(chain deployment.SolChain, program solana.PublicKey, 
 	}
 	view.CurseSubjects = make([]string, len(curseAccount.CursedSubjects))
 	for i, curse := range curseAccount.CursedSubjects {
-		view.CurseSubjects[i] = string(curse.Value[:])
+		view.CurseSubjects[i] = base58.Encode(curse.Value[:])
 	}
 	return view, nil
 }

@@ -5,10 +5,12 @@ import (
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
-
 	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
-	"github.com/smartcontractkit/chainlink/deployment"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	"github.com/smartcontractkit/chainlink/deployment/ccip/view/shared"
 )
 
 type OffRampView struct {
@@ -37,7 +39,7 @@ type OffRampSourceChainConfig struct {
 	OnRamp                    string `json:"onRamp,omitempty"`
 }
 
-func GenerateOffRampView(chain deployment.SolChain, program solana.PublicKey, remoteChains []uint64, tokens []solana.PublicKey) (OffRampView, error) {
+func GenerateOffRampView(chain cldf.SolChain, program solana.PublicKey, remoteChains []uint64, tokens []solana.PublicKey) (OffRampView, error) {
 	view := OffRampView{}
 	var config solOffRamp.Config
 	configPDA, _, _ := solState.FindOfframpConfigPDA(program)
@@ -73,11 +75,12 @@ func GenerateOffRampView(chain deployment.SolChain, program solana.PublicKey, re
 		if err = chain.GetAccountDataBorshInto(context.Background(), remoteChainPDA, &chainStateAccount); err != nil {
 			return view, fmt.Errorf("remote %d is not configured on solana chain %d", remote, chain.Selector)
 		}
+		onRamp := chainStateAccount.Config.OnRamp
 		view.SourceChains[remote] = OffRampSourceChainConfig{
 			IsEnabled:                 chainStateAccount.Config.IsEnabled,
 			IsRmnVerificationDisabled: chainStateAccount.Config.IsRmnVerificationDisabled,
 			LaneCodeVersion:           chainStateAccount.Config.LaneCodeVersion.String(),
-			OnRamp:                    string(chainStateAccount.Config.OnRamp.Bytes[:]),
+			OnRamp:                    shared.GetAddressFromBytes(remote, onRamp.Bytes[:onRamp.Len]),
 		}
 	}
 	return view, nil

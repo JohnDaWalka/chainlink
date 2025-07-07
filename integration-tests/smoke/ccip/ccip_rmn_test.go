@@ -20,17 +20,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 	ctf_client "github.com/smartcontractkit/chainlink-testing-framework/lib/client"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/osutil"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
@@ -41,8 +41,6 @@ import (
 )
 
 func TestRMN_IncorrectSig(t *testing.T) {
-	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-396")
-
 	runRmnTestCase(t, rmnTestCase{
 		nodesWithIncorrectSigner: []int{0, 1},
 		name:                     "messages with incorrect RMN signature",
@@ -331,13 +329,10 @@ func runRmnTestCase(t *testing.T, tc rmnTestCase) {
 	envWithRMN, rmnCluster, _ := testsetups.NewIntegrationEnvironment(t,
 		testhelpers.WithRMNEnabled(len(tc.rmnNodes)),
 	)
-	t.Logf("envWithRmn: %#v", envWithRMN)
-
 	tc.populateFields(t, envWithRMN, rmnCluster)
 
-	onChainState, err := changeset.LoadOnchainState(envWithRMN.Env)
+	onChainState, err := stateview.LoadOnchainState(envWithRMN.Env)
 	require.NoError(t, err)
-	t.Logf("onChainState: %#v", onChainState)
 
 	homeChainState, ok := onChainState.Chains[envWithRMN.HomeChainSel]
 	require.True(t, ok)
@@ -455,9 +450,14 @@ func runRmnTestCase(t *testing.T, tc rmnTestCase) {
 				if (hasCommitReportBeenReceived) || tc.passIfNoCommitAfter > 0 {
 					return
 				}
-				t.Logf("replaying logs after waiting for more than 1 minute")
 				// Do not assert on error as we replay logs to avoid race condition where nodes are being shut down and we call replay
-				testhelpers.ReplayLogs(t, envWithRMN.Env.Offchain, envWithRMN.ReplayBlocks, testhelpers.WithAssertOnError(false))
+				replayBlocks := make(map[uint64]uint64)
+				for srcDestPair := range seqNumCommit {
+					replayBlocks[srcDestPair.SourceChainSelector] = 1
+					replayBlocks[srcDestPair.DestChainSelector] = 1
+				}
+				t.Logf("replaying logs after waiting for more than 1 minute (%v)", replayBlocks)
+				testhelpers.ReplayLogs(t, envWithRMN.Env.Offchain, replayBlocks, testhelpers.WithAssertOnError(false))
 			case <-t.Context().Done():
 				return
 			}
@@ -743,7 +743,7 @@ func (tc rmnTestCase) disableOraclesIfThisIsACursingTestCase(ctx context.Context
 	return disabledNodes
 }
 
-func (tc rmnTestCase) sendMessages(t *testing.T, onChainState changeset.CCIPOnChainState, envWithRMN testhelpers.DeployedEnv) (map[uint64]*uint64, map[testhelpers.SourceDestPair]uint64, map[testhelpers.SourceDestPair][]uint64) {
+func (tc rmnTestCase) sendMessages(t *testing.T, onChainState stateview.CCIPOnChainState, envWithRMN testhelpers.DeployedEnv) (map[uint64]*uint64, map[testhelpers.SourceDestPair]uint64, map[testhelpers.SourceDestPair][]uint64) {
 	startBlocks := make(map[uint64]*uint64)
 	seqNumCommit := make(map[testhelpers.SourceDestPair]uint64)
 	seqNumExec := make(map[testhelpers.SourceDestPair][]uint64)
@@ -778,7 +778,7 @@ func (tc rmnTestCase) sendMessages(t *testing.T, onChainState changeset.CCIPOnCh
 	return startBlocks, seqNumCommit, seqNumExec
 }
 
-func (tc rmnTestCase) callContractsToCurseChains(ctx context.Context, t *testing.T, onChainState changeset.CCIPOnChainState, envWithRMN testhelpers.DeployedEnv) {
+func (tc rmnTestCase) callContractsToCurseChains(ctx context.Context, t *testing.T, onChainState stateview.CCIPOnChainState, envWithRMN testhelpers.DeployedEnv) {
 	for _, remoteCfg := range tc.remoteChainsConfig {
 		remoteSel := tc.pf.chainSelectors[remoteCfg.chainIdx]
 		chState, ok := onChainState.Chains[remoteSel]
@@ -813,7 +813,7 @@ func (tc rmnTestCase) callContractsToCurseChains(ctx context.Context, t *testing
 	}
 }
 
-func (tc rmnTestCase) callContractsToCurseAndRevokeCurse(ctx context.Context, eg *errgroup.Group, t *testing.T, onChainState changeset.CCIPOnChainState, envWithRMN testhelpers.DeployedEnv) {
+func (tc rmnTestCase) callContractsToCurseAndRevokeCurse(ctx context.Context, eg *errgroup.Group, t *testing.T, onChainState stateview.CCIPOnChainState, envWithRMN testhelpers.DeployedEnv) {
 	for _, remoteCfg := range tc.remoteChainsConfig {
 		remoteSel := tc.pf.chainSelectors[remoteCfg.chainIdx]
 		chState, ok := onChainState.Chains[remoteSel]
@@ -882,14 +882,13 @@ func configureAndPromoteRMNHome(
 	tc *rmnTestCase,
 	envWithRMN testhelpers.DeployedEnv,
 	rmnCluster devenv.RMNCluster,
-) changeset.CCIPOnChainState {
+) stateview.CCIPOnChainState {
 	ctx := testcontext.Get(t)
 	tc.populateFields(t, envWithRMN, rmnCluster)
 
 	// Load on-chain state
-	onChainState, err := changeset.LoadOnchainState(envWithRMN.Env)
+	onChainState, err := stateview.LoadOnchainState(envWithRMN.Env)
 	require.NoError(t, err)
-	t.Logf("onChainState: %#v", onChainState)
 
 	// Get the home chain state and the candidate/active digests
 	homeChainState, ok := onChainState.Chains[envWithRMN.HomeChainSel]
@@ -957,7 +956,7 @@ func configureAndPromoteRMNHome(
 	return onChainState
 }
 
-func performReorgTest(t *testing.T, e testhelpers.DeployedEnv, l logging.Logger, dockerEnv *testsetups.DeployedLocalDevEnvironment, state changeset.CCIPOnChainState, nonBootstrapP2PIDs []string) (sourceSelector uint64, destSelector uint64) {
+func performReorgTest(t *testing.T, e testhelpers.DeployedEnv, l logging.Logger, dockerEnv *testsetups.DeployedLocalDevEnvironment, state stateview.CCIPOnChainState, nonBootstrapP2PIDs []string) (sourceSelector uint64, destSelector uint64) {
 	// Chain setup
 	allChains := e.Env.AllChainSelectors()
 	require.GreaterOrEqual(t, len(allChains), 2)

@@ -7,8 +7,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 const (
@@ -20,7 +20,7 @@ type EnvironmentConfig struct {
 	JDConfig JDConfig
 }
 
-func NewEnvironment(ctx func() context.Context, lggr logger.Logger, config EnvironmentConfig) (*deployment.Environment, *DON, error) {
+func NewEnvironment(ctx func() context.Context, lggr logger.Logger, config EnvironmentConfig) (*cldf.Environment, *DON, error) {
 	chains, err := NewChains(lggr, config.Chains)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create chains: %w", err)
@@ -51,10 +51,10 @@ func NewEnvironment(ctx func() context.Context, lggr logger.Logger, config Envir
 		nodeIDs = jd.don.NodeIds()
 	}
 
-	return deployment.NewEnvironment(
+	return cldf.NewEnvironment(
 		DevEnv,
 		lggr,
-		deployment.NewMemoryAddressBook(),
+		cldf.NewMemoryAddressBook(),
 		datastore.NewMemoryDataStore[
 			datastore.DefaultMetadata,
 			datastore.DefaultMetadata,
@@ -65,6 +65,6 @@ func NewEnvironment(ctx func() context.Context, lggr logger.Logger, config Envir
 		nodeIDs,
 		offChain,
 		ctx,
-		deployment.XXXGenerateTestOCRSecrets(),
+		cldf.XXXGenerateTestOCRSecrets(),
 	), jd.don, nil
 }

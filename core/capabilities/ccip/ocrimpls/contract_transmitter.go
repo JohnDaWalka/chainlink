@@ -13,6 +13,7 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
@@ -27,7 +28,7 @@ type ToCalldataFunc func(
 	report ocr3types.ReportWithInfo[[]byte],
 	rs, ss [][32]byte,
 	vs [32]byte,
-	codec ccipcommon.ExtraDataCodec,
+	codec *ccipcommon.ExtraDataCodec,
 ) (contract string, method string, args any, err error)
 
 var _ ocr3types.ContractTransmitter[[]byte] = &ccipTransmitter{}
@@ -38,9 +39,11 @@ type ccipTransmitter struct {
 	offrampAddress string
 	toCalldataFn   ToCalldataFunc
 	extraDataCodec ccipcommon.ExtraDataCodec
+	lggr           logger.Logger
 }
 
 func XXXNewContractTransmitterTestsOnly(
+	lggr logger.Logger,
 	cw commontypes.ContractWriter,
 	fromAccount ocrtypes.Account,
 	contractName string,
@@ -52,11 +55,12 @@ func XXXNewContractTransmitterTestsOnly(
 		report ocr3types.ReportWithInfo[[]byte],
 		rs, ss [][32]byte,
 		vs [32]byte,
-		extraDataCodec ccipcommon.ExtraDataCodec) (string, string, any, error) {
+		extraDataCodec *ccipcommon.ExtraDataCodec) (string, string, any, error) {
 		_, _, args, err := toCalldataFn(rawReportCtx, report, rs, ss, vs, extraDataCodec)
 		return contractName, method, args, err
 	}
 	return &ccipTransmitter{
+		lggr:           lggr,
 		cw:             cw,
 		fromAccount:    fromAccount,
 		offrampAddress: offrampAddress,
@@ -103,7 +107,7 @@ func (c *ccipTransmitter) Transmit(
 	}
 
 	// chain writer takes in the raw calldata and packs it on its own.
-	contract, method, args, err := c.toCalldataFn(rawReportCtx, reportWithInfo, rs, ss, vs, c.extraDataCodec)
+	contract, method, args, err := c.toCalldataFn(rawReportCtx, reportWithInfo, rs, ss, vs, &c.extraDataCodec)
 	if err != nil {
 		return fmt.Errorf("failed to generate call data: %w", err)
 	}
@@ -116,6 +120,7 @@ func (c *ccipTransmitter) Transmit(
 		return fmt.Errorf("failed to generate UUID: %w", err)
 	}
 	zero := big.NewInt(0)
+	c.lggr.Infow("Submitting transaction", "tx", txID)
 	if err := c.cw.SubmitTransaction(ctx, contract, method, args,
 		fmt.Sprintf("%s-%s-%s", contract, c.offrampAddress, txID.String()),
 		c.offrampAddress, &meta, zero); err != nil {

@@ -471,13 +471,15 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 	)
 	srvcs = append(srvcs, workflowORM)
 
-	promReporter := headreporter.NewPrometheusReporter(opts.DS, legacyEVMChains)
-	chainIDs := make([]*big.Int, legacyEVMChains.Len())
+	promReporter := headreporter.NewLegacyEVMPrometheusReporter(opts.DS, legacyEVMChains)
+	evmChainIDs := make([]*big.Int, legacyEVMChains.Len())
 	for i, chain := range legacyEVMChains.Slice() {
-		chainIDs[i] = chain.ID()
+		evmChainIDs[i] = chain.ID()
 	}
-	telemReporter := headreporter.NewTelemetryReporter(telemetryManager, globalLogger, chainIDs...)
-	headReporter := headreporter.NewHeadReporterService(opts.DS, globalLogger, promReporter, telemReporter)
+
+	legacyEVMTelemReporter := headreporter.NewLegacyEVMTelemetryReporter(telemetryManager, globalLogger, evmChainIDs...)
+	loopTelemReporter := headreporter.NewTelemetryReporter(telemetryManager, globalLogger, relayChainInterops.GetIDToRelayerMap())
+	headReporter := headreporter.NewHeadReporterService(opts.DS, globalLogger, promReporter, legacyEVMTelemReporter, loopTelemReporter)
 	srvcs = append(srvcs, headReporter)
 	for _, chain := range legacyEVMChains.Slice() {
 		chain.HeadBroadcaster().Subscribe(headReporter)
@@ -928,15 +930,21 @@ func newCREServices(
 						},
 					))
 
-				eventHandler := syncer.NewEventHandler(
+				engineRegistry := syncer.NewEngineRegistry()
+
+				eventHandler, err := syncer.NewEventHandler(
 					lggr,
 					workflowstore.NewInMemoryStore(lggr, clockwork.NewRealClock()),
 					opts.CapabilitiesRegistry,
+					engineRegistry,
 					custmsg.NewLabeler(),
 					workflowRateLimiter,
 					workflowLimits,
 					artifactsStore,
 				)
+				if err != nil {
+					return nil, fmt.Errorf("unable to create workflow registry event handler: %w", err)
+				}
 
 				globalLogger.Debugw("Creating WorkflowRegistrySyncer")
 				wfRegRid := capCfg.WorkflowRegistry().RelayID()
@@ -944,18 +952,23 @@ func newCREServices(
 				if err != nil {
 					return nil, fmt.Errorf("could not fetch relayer %s configured for workflow registry: %w", rid, err)
 				}
-				wfSyncer := syncer.NewWorkflowRegistry(
+				wfSyncer, err := syncer.NewWorkflowRegistry(
 					lggr,
 					func(ctx context.Context, bytes []byte) (syncer.ContractReader, error) {
 						return wfRegRelayer.NewContractReader(ctx, bytes)
 					},
 					capCfg.WorkflowRegistry().Address(),
-					syncer.WorkflowEventPollerConfig{
-						QueryCount: 100,
+					syncer.Config{
+						QueryCount:   100,
+						SyncStrategy: syncer.SyncStrategy(capCfg.WorkflowRegistry().SyncStrategy()),
 					},
 					eventHandler,
 					workflowDonNotifier,
+					engineRegistry,
 				)
+				if err != nil {
+					return nil, fmt.Errorf("unable to create workflow registry syncer: %w", err)
+				}
 
 				srvcs = append(srvcs, wfSyncer)
 			}

@@ -1,11 +1,13 @@
 package v1_5_1
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/mcms"
 	"golang.org/x/exp/maps"
@@ -15,8 +17,13 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/erc20"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/erc677"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
+
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 )
 
@@ -49,7 +56,7 @@ import (
 // If the token admin is not an external address -
 // 5. Accepts admin rights for the token on the token admin registry
 // 6. Sets the pool for the token on the token admin registry
-var AddTokensE2E = deployment.CreateChangeSet(addTokenE2ELogic, addTokenE2EPreconditionValidation)
+var AddTokensE2E = cldf.CreateChangeSet(addTokenE2ELogic, addTokenE2EPreconditionValidation)
 
 type E2ETokenAndPoolConfig struct {
 	TokenDeploymentConfig *DeployTokenConfig    // TokenDeploymentConfig is optional. If provided, it will be used to deploy the token and populate the pool deployment configuration.
@@ -59,7 +66,7 @@ type E2ETokenAndPoolConfig struct {
 	RateLimiterConfig     RateLimiterPerChain
 	// OverrideTokenSymbol is the token symbol to use to override against main symbol (ex: override to clCCIP-LnM when the main token symbol is CCIP-LnM)
 	// WARNING: This should only be used in exceptional cases where the token symbol on a particular chain differs from the main tokenSymbol
-	OverrideTokenSymbol changeset.TokenSymbol
+	OverrideTokenSymbol shared.TokenSymbol
 }
 
 type AddTokenE2EConfig struct {
@@ -70,13 +77,13 @@ type AddTokenE2EConfig struct {
 	// User do not need to populate these fields.
 	deployPool             DeployTokenPoolContractsConfig
 	configurePools         ConfigureTokenPoolContractsConfig
-	configureTokenAdminReg changeset.TokenAdminRegistryChangesetConfig
+	configureTokenAdminReg TokenAdminRegistryChangesetConfig
 }
 
 // newConfigurePoolAndTokenAdminRegConfig populated internal fields in AddTokenE2EConfig.
 // It creates the configuration for deploying and configuring token pools and token admin registry.
 // It then validates the configuration.
-func (c *AddTokenE2EConfig) newConfigurePoolAndTokenAdminRegConfig(e deployment.Environment, symbol changeset.TokenSymbol, timelockCfg *proposalutils.TimelockConfig) error {
+func (c *AddTokenE2EConfig) newConfigurePoolAndTokenAdminRegConfig(e cldf.Environment, symbol shared.TokenSymbol, timelockCfg *proposalutils.TimelockConfig) error {
 	c.deployPool = DeployTokenPoolContractsConfig{
 		TokenSymbol:  symbol,
 		NewPools:     make(map[uint64]DeployTokenPoolInput),
@@ -87,9 +94,9 @@ func (c *AddTokenE2EConfig) newConfigurePoolAndTokenAdminRegConfig(e deployment.
 		MCMS:        nil, // as token pools are deployed as part of the changeset, the pools will still be owned by the deployer key
 		PoolUpdates: make(map[uint64]TokenPoolConfig),
 	}
-	c.configureTokenAdminReg = changeset.TokenAdminRegistryChangesetConfig{
+	c.configureTokenAdminReg = TokenAdminRegistryChangesetConfig{
 		MCMS:  timelockCfg,
-		Pools: make(map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo),
+		Pools: make(map[uint64]map[shared.TokenSymbol]TokenPoolInfo),
 	}
 	for chain, poolCfg := range c.PoolConfig {
 		c.deployPool.NewPools[chain] = *poolCfg.DeployPoolConfig
@@ -102,9 +109,9 @@ func (c *AddTokenE2EConfig) newConfigurePoolAndTokenAdminRegConfig(e deployment.
 
 		// Populate the TokenAdminRegistryChangesetConfig for each chain.
 		if _, ok := c.configureTokenAdminReg.Pools[chain]; !ok {
-			c.configureTokenAdminReg.Pools[chain] = make(map[changeset.TokenSymbol]changeset.TokenPoolInfo)
+			c.configureTokenAdminReg.Pools[chain] = make(map[shared.TokenSymbol]TokenPoolInfo)
 		}
-		c.configureTokenAdminReg.Pools[chain][symbol] = changeset.TokenPoolInfo{
+		c.configureTokenAdminReg.Pools[chain][symbol] = TokenPoolInfo{
 			Version:       poolCfg.PoolVersion,
 			ExternalAdmin: poolCfg.ExternalAdmin,
 			Type:          poolCfg.DeployPoolConfig.Type,
@@ -143,51 +150,52 @@ func (c *AddTokenE2EConfig) newDeployTokenPoolConfigAfterTokenDeployment(tokenAd
 }
 
 type DeployTokenConfig struct {
-	TokenName       string
-	TokenSymbol     changeset.TokenSymbol
-	TokenDecimals   uint8    // needed for BurnMintToken only
-	MaxSupply       *big.Int // needed for BurnMintToken only
-	Type            deployment.ContractType
-	PoolType        deployment.ContractType // This is the type of the token pool that will be deployed for this token.
-	PoolAllowList   []common.Address
-	AcceptLiquidity *bool
+	TokenName              string
+	TokenSymbol            shared.TokenSymbol
+	TokenDecimals          uint8    // needed for BurnMintToken only
+	MaxSupply              *big.Int // needed for BurnMintToken only
+	Type                   cldf.ContractType
+	PoolType               cldf.ContractType // This is the type of the token pool that will be deployed for this token.
+	PoolAllowList          []common.Address
+	AcceptLiquidity        *bool
+	MintTokenForRecipients map[common.Address]*big.Int // MintTokenForRecipients is a map of recipient address to amount to be transferred or minted and provided minting role after token deployment.
 }
 
 func (c *DeployTokenConfig) Validate() error {
 	if c.TokenName == "" {
 		return errors.New("token name must be defined")
 	}
-	if c.TokenDecimals == 0 && c.Type == changeset.BurnMintToken {
+	if c.TokenDecimals == 0 && c.Type == shared.BurnMintToken {
 		return errors.New("token decimals must be defined for BurnMintToken type")
 	}
-	if c.MaxSupply == nil && c.Type == changeset.BurnMintToken {
+	if c.MaxSupply == nil && c.Type == shared.BurnMintToken {
 		return errors.New("max supply must be defined for BurnMintToken type")
 	}
-	if _, ok := changeset.TokenPoolTypes[c.PoolType]; !ok {
+	if _, ok := shared.TokenPoolTypes[c.PoolType]; !ok {
 		return fmt.Errorf("token pool type not supported %s", c.PoolType)
 	}
-	if _, ok := changeset.TokenTypes[c.Type]; !ok {
+	if _, ok := shared.TokenTypes[c.Type]; !ok {
 		return fmt.Errorf("token type not supported %s", c.Type)
 	}
 	return nil
 }
 
 type AddTokensE2EConfig struct {
-	Tokens map[changeset.TokenSymbol]AddTokenE2EConfig
+	Tokens map[shared.TokenSymbol]AddTokenE2EConfig
 	MCMS   *proposalutils.TimelockConfig
 }
 
-func addTokenE2EPreconditionValidation(e deployment.Environment, config AddTokensE2EConfig) error {
+func addTokenE2EPreconditionValidation(e cldf.Environment, config AddTokensE2EConfig) error {
 	if len(config.Tokens) == 0 {
 		return nil
 	}
-	state, err := changeset.LoadOnchainState(e)
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
 	}
 	for token, cfg := range config.Tokens {
 		for chain, poolCfg := range cfg.PoolConfig {
-			if err := changeset.ValidateChain(e, state, chain, config.MCMS); err != nil {
+			if err := stateview.ValidateChain(e, state, chain, config.MCMS); err != nil {
 				return fmt.Errorf("failed to validate chain %d: %w", chain, err)
 			}
 			if (poolCfg.DeployPoolConfig != nil) == (poolCfg.TokenDeploymentConfig != nil) {
@@ -220,18 +228,18 @@ func addTokenE2EPreconditionValidation(e deployment.Environment, config AddToken
 	return nil
 }
 
-func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (deployment.ChangesetOutput, error) {
+func addTokenE2ELogic(env cldf.Environment, config AddTokensE2EConfig) (cldf.ChangesetOutput, error) {
 	if len(config.Tokens) == 0 {
-		return deployment.ChangesetOutput{}, nil
+		return cldf.ChangesetOutput{}, nil
 	}
 	// use a clone of env to avoid modifying the original env
 	e := env.Clone()
-	finalCSOut := &deployment.ChangesetOutput{
-		AddressBook: deployment.NewMemoryAddressBook(),
+	finalCSOut := &cldf.ChangesetOutput{
+		AddressBook: cldf.NewMemoryAddressBook(),
 	}
-	state, err := changeset.LoadOnchainState(e)
+	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return deployment.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
 	for token, cfg := range config.Tokens {
 		e.Logger.Infow("starting token addition operations for", "token", token, "chains", maps.Keys(cfg.PoolConfig))
@@ -243,68 +251,68 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (de
 		}
 		// deploy token pools if token deployment config is provided and populate pool deployment configuration
 		if len(tokenDeployCfg) > 0 {
-			deployedTokens, ab, err := deployTokenPools(e, tokenDeployCfg)
+			deployedTokens, ab, err := deployTokens(e, tokenDeployCfg)
 			if err != nil {
-				return deployment.ChangesetOutput{}, err
+				return cldf.ChangesetOutput{}, err
 			}
 			if err := cfg.newDeployTokenPoolConfigAfterTokenDeployment(deployedTokens); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to populate pool deployment configuration: %w", err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to populate pool deployment configuration: %w", err)
 			}
 			e.Logger.Infow("deployed token and created pool deployment config", "token", token)
 			if err := finalCSOut.AddressBook.Merge(ab); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge address book for token %s: %w", token, err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge address book for token %s: %w", token, err)
 			}
 			// populate the configuration for deploying and configuring token pools and token admin registry
 			if err := cfg.newConfigurePoolAndTokenAdminRegConfig(e, token, config.MCMS); err != nil {
-				return deployment.ChangesetOutput{}, fmt.Errorf("failed to populate configuration for "+
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to populate configuration for "+
 					"deploying and configuring token pools and token admin registry: %w", err)
 			}
 		}
 		output, err := DeployTokenPoolContractsChangeset(e, cfg.deployPool)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy token pool for token %s: %w", token, err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy token pool for token %s: %w", token, err)
 		}
-		if err := deployment.MergeChangesetOutput(e, finalCSOut, output); err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge address book for token %s: %w", token, err)
+		if err := cldf.MergeChangesetOutput(e, finalCSOut, output); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge address book for token %s: %w", token, err)
 		}
 		newAddresses, err := output.AddressBook.Addresses()
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to get addresses from address book: %w", err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to get addresses from address book: %w", err)
 		}
 		e.Logger.Infow("deployed token pool", "token", token, "addresses", newAddresses)
 		if err := cfg.configurePools.Validate(e); err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to validate configure pool config: %w", err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to validate configure pool config: %w", err)
 		}
 		// Validate the configure token admin reg config.
 		// As we will perform proposing admin, accepting admin and setting pool on same changeset
 		// we are only validating the propose admin role.
 		if err := cfg.configureTokenAdminReg.Validate(e, true, validateProposeAdminRole); err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to validate configure token admin reg config: %w", err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to validate configure token admin reg config: %w", err)
 		}
 		output, err = ConfigureTokenPoolContractsChangeset(e, cfg.configurePools)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to configure token pool for token %s: %w", token, err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool for token %s: %w", token, err)
 		}
-		if err := deployment.MergeChangesetOutput(e, finalCSOut, output); err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output after configuring token pool for token %s: %w", token, err)
+		if err := cldf.MergeChangesetOutput(e, finalCSOut, output); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output after configuring token pool for token %s: %w", token, err)
 		}
 		e.Logger.Infow("configured token pool", "token", token)
 
 		output, err = ProposeAdminRoleChangeset(e, cfg.configureTokenAdminReg)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to propose admin role for token %s: %w", token, err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to propose admin role for token %s: %w", token, err)
 		}
-		if err := deployment.MergeChangesetOutput(e, finalCSOut, output); err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to changeset output after configuring token admin reg for token %s: %w",
+		if err := cldf.MergeChangesetOutput(e, finalCSOut, output); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to changeset output after configuring token admin reg for token %s: %w",
 				token, err)
 		}
 		e.Logger.Infow("proposed admin role", "token", token, "config", cfg.configureTokenAdminReg)
 
 		// find all tokens for which there is no external admin
 		// for those tokens, accept the admin role and set the pool
-		updatedConfigureTokenAdminReg := changeset.TokenAdminRegistryChangesetConfig{
+		updatedConfigureTokenAdminReg := TokenAdminRegistryChangesetConfig{
 			MCMS:  config.MCMS,
-			Pools: make(map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo),
+			Pools: make(map[uint64]map[shared.TokenSymbol]TokenPoolInfo),
 			// SkipOwnershipValidation is set to true as we are accepting admin role and setting token pool as part of one changeset
 			SkipOwnershipValidation: true,
 		}
@@ -312,7 +320,7 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (de
 			for symbol, info := range poolInfo {
 				if info.ExternalAdmin == utils.ZeroAddress {
 					if updatedConfigureTokenAdminReg.Pools[chain] == nil {
-						updatedConfigureTokenAdminReg.Pools[chain] = make(map[changeset.TokenSymbol]changeset.TokenPoolInfo)
+						updatedConfigureTokenAdminReg.Pools[chain] = make(map[shared.TokenSymbol]TokenPoolInfo)
 					}
 					updatedConfigureTokenAdminReg.Pools[chain][symbol] = info
 				}
@@ -324,42 +332,42 @@ func addTokenE2ELogic(env deployment.Environment, config AddTokensE2EConfig) (de
 		}
 		output, err = AcceptAdminRoleChangeset(e, updatedConfigureTokenAdminReg)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to accept admin role for token %s: %w", token, err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to accept admin role for token %s: %w", token, err)
 		}
-		if err := deployment.MergeChangesetOutput(e, finalCSOut, output); err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge address book for token %s: %w", token, err)
+		if err := cldf.MergeChangesetOutput(e, finalCSOut, output); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge address book for token %s: %w", token, err)
 		}
 		e.Logger.Infow("accepted admin role", "token", token, "config", updatedConfigureTokenAdminReg)
 		output, err = SetPoolChangeset(e, updatedConfigureTokenAdminReg)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to set pool for token %s: %w", token, err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to set pool for token %s: %w", token, err)
 		}
-		if err := deployment.MergeChangesetOutput(e, finalCSOut, output); err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to merge address book for token %s: %w", token, err)
+		if err := cldf.MergeChangesetOutput(e, finalCSOut, output); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge address book for token %s: %w", token, err)
 		}
 		e.Logger.Infow("set pool", "token", token, "config", updatedConfigureTokenAdminReg)
 	}
 	// if there are multiple proposals, aggregate them so that we don't have to propose them separately
 	if len(finalCSOut.MCMSTimelockProposals) > 1 {
 		aggregatedProposals, err := proposalutils.AggregateProposals(
-			e, state.EVMMCMSStateByChain(), finalCSOut.MCMSTimelockProposals, nil,
+			e, state.EVMMCMSStateByChain(), nil, finalCSOut.MCMSTimelockProposals,
 			"Add Tokens E2E", config.MCMS)
 		if err != nil {
-			return deployment.ChangesetOutput{}, fmt.Errorf("failed to aggregate proposals: %w", err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to aggregate proposals: %w", err)
 		}
 		finalCSOut.MCMSTimelockProposals = []mcms.TimelockProposal{*aggregatedProposals}
 	}
 	return *finalCSOut, nil
 }
 
-func deployTokenPools(e deployment.Environment, tokenDeployCfg map[uint64]DeployTokenConfig) (map[uint64]common.Address, deployment.AddressBook, error) {
-	ab := deployment.NewMemoryAddressBook()
+func deployTokens(e cldf.Environment, tokenDeployCfg map[uint64]DeployTokenConfig) (map[uint64]common.Address, cldf.AddressBook, error) {
+	ab := cldf.NewMemoryAddressBook()
 	tokenAddresses := make(map[uint64]common.Address) // This will hold the token addresses for each chain.
 	for selector, cfg := range tokenDeployCfg {
 		switch cfg.Type {
-		case changeset.BurnMintToken:
-			token, err := deployment.DeployContract(e.Logger, e.Chains[selector], ab,
-				func(chain deployment.Chain) deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
+		case shared.BurnMintToken:
+			token, err := cldf.DeployContract(e.Logger, e.Chains[selector], ab,
+				func(chain cldf.Chain) cldf.ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
 					tokenAddress, tx, token, err := burn_mint_erc677.DeployBurnMintERC677(
 						e.Chains[selector].DeployerKey,
 						e.Chains[selector].Client,
@@ -368,54 +376,71 @@ func deployTokenPools(e deployment.Environment, tokenDeployCfg map[uint64]Deploy
 						cfg.TokenDecimals,
 						cfg.MaxSupply,
 					)
-					return deployment.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
+					return cldf.ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
 						Address:  tokenAddress,
 						Contract: token,
-						Tv:       deployment.NewTypeAndVersion(changeset.BurnMintToken, deployment.Version1_0_0),
+						Tv:       cldf.NewTypeAndVersion(shared.BurnMintToken, deployment.Version1_0_0),
 						Tx:       tx,
 						Err:      err,
 					}
 				},
 			)
 			if err != nil {
-				return nil, ab, fmt.Errorf("failed to deploy BurnMintERC677 token %s on chain %d: %w", cfg.TokenName, selector, err)
+				return nil, ab, fmt.Errorf("failed to deploy BurnMintERC677 token "+
+					"%s on chain %d: %w", cfg.TokenName, selector, err)
 			}
+			if err := addMinterAndMintToken(e, selector, token.Contract, e.Chains[selector].DeployerKey.From,
+				new(big.Int).Mul(big.NewInt(1_000), big.NewInt(1_000_000_000))); err != nil {
+				return nil, ab, fmt.Errorf("failed to add minter and mint token "+
+					"%s on chain %d: %w", cfg.TokenName, selector, err)
+			}
+			if len(cfg.MintTokenForRecipients) > 0 {
+				for recipient, amount := range cfg.MintTokenForRecipients {
+					if err := addMinterAndMintToken(e, selector, token.Contract, recipient,
+						amount); err != nil {
+						return nil, ab, fmt.Errorf("failed to add minter and mint "+
+							"token %s on chain %d: %w", cfg.TokenName, selector, err)
+					}
+				}
+			}
+
 			tokenAddresses[selector] = token.Address
-		case changeset.ERC20Token:
-			token, err := deployment.DeployContract(e.Logger, e.Chains[selector], ab,
-				func(chain deployment.Chain) deployment.ContractDeploy[*erc20.ERC20] {
+		case shared.ERC20Token:
+			token, err := cldf.DeployContract(e.Logger, e.Chains[selector], ab,
+				func(chain cldf.Chain) cldf.ContractDeploy[*erc20.ERC20] {
 					tokenAddress, tx, token, err := erc20.DeployERC20(
 						e.Chains[selector].DeployerKey,
 						e.Chains[selector].Client,
 						cfg.TokenName,
 						string(cfg.TokenSymbol),
 					)
-					return deployment.ContractDeploy[*erc20.ERC20]{
+					return cldf.ContractDeploy[*erc20.ERC20]{
 						Address:  tokenAddress,
 						Contract: token,
-						Tv:       deployment.NewTypeAndVersion(changeset.ERC20Token, deployment.Version1_0_0),
+						Tv:       cldf.NewTypeAndVersion(shared.ERC20Token, deployment.Version1_0_0),
 						Tx:       tx,
 						Err:      err,
 					}
 				},
 			)
+
 			if err != nil {
 				return nil, ab, fmt.Errorf("failed to deploy ERC20 token %s on chain %d: %w", cfg.TokenName, selector, err)
 			}
 			tokenAddresses[selector] = token.Address
-		case changeset.ERC677Token:
-			token, err := deployment.DeployContract(e.Logger, e.Chains[selector], ab,
-				func(chain deployment.Chain) deployment.ContractDeploy[*erc677.ERC677] {
+		case shared.ERC677Token:
+			token, err := cldf.DeployContract(e.Logger, e.Chains[selector], ab,
+				func(chain cldf.Chain) cldf.ContractDeploy[*erc677.ERC677] {
 					tokenAddress, tx, token, err := erc677.DeployERC677(
 						e.Chains[selector].DeployerKey,
 						e.Chains[selector].Client,
 						cfg.TokenName,
 						string(cfg.TokenSymbol),
 					)
-					return deployment.ContractDeploy[*erc677.ERC677]{
+					return cldf.ContractDeploy[*erc677.ERC677]{
 						Address:  tokenAddress,
 						Contract: token,
-						Tv:       deployment.NewTypeAndVersion(changeset.ERC677Token, deployment.Version1_0_0),
+						Tv:       cldf.NewTypeAndVersion(shared.ERC677Token, deployment.Version1_0_0),
 						Tx:       tx,
 						Err:      err,
 					}
@@ -429,5 +454,92 @@ func deployTokenPools(e deployment.Environment, tokenDeployCfg map[uint64]Deploy
 			return nil, ab, fmt.Errorf("unsupported token %s type %s for deployment on chain %d", cfg.TokenName, cfg.Type, selector)
 		}
 	}
+
 	return tokenAddresses, ab, nil
+}
+
+// grantAccessToPool grants the token pool contract access to mint and burn tokens.
+func grantAccessToPool(
+	ctx context.Context,
+	chain cldf.Chain,
+	tpAddress common.Address,
+	tokenAddress common.Address,
+) error {
+	token, err := burn_mint_erc677.NewBurnMintERC677(tokenAddress, chain.Client)
+	if err != nil {
+		return fmt.Errorf("failed to connect address %s with erc677 bindings: %w", tokenAddress, err)
+	}
+	owner, err := token.Owner(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return fmt.Errorf("failed to get owner of token %s: %w", tokenAddress, err)
+	}
+	// check if the owner is the deployer key and in that case grant access to the token pool
+	if owner == chain.DeployerKey.From {
+		tx, err := token.GrantMintAndBurnRoles(chain.DeployerKey, tpAddress)
+		if err != nil {
+			return fmt.Errorf("failed to grant mint and burn roles to token pool address: %s for token: %s %w", tpAddress, tokenAddress, err)
+		}
+		if _, err = chain.Confirm(tx); err != nil {
+			return fmt.Errorf("failed to wait for transaction %s on chain %d: %w", tx.Hash().Hex(), chain.Selector, err)
+		}
+	}
+
+	return nil
+}
+
+// addMinterAndMintToken adds the minter role to the recipient and mints the specified amount of tokens to the recipient's address.
+func addMinterAndMintToken(env cldf.Environment, selector uint64, token *burn_mint_erc677.BurnMintERC677, recipient common.Address, amount *big.Int) error {
+	deployerKey := env.Chains[selector].DeployerKey
+	ctx := env.GetContext()
+	// check if owner is the deployer key
+	owner, err := token.Owner(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return fmt.Errorf("failed to get owner of token %s on chain %d: %w", token.Address().Hex(), selector, err)
+	}
+	if owner != deployerKey.From {
+		return fmt.Errorf("owner of token %s on chain %d is not the deployer key", token.Address().Hex(), selector)
+	}
+	// Grant minter role to the given address
+	tx, err := token.GrantMintRole(deployerKey, recipient)
+	if err != nil {
+		return fmt.Errorf("failed to grant mint role to %s on chain %d: %w", recipient.Hex(), selector, err)
+	}
+	if _, err := env.Chains[selector].Confirm(tx); err != nil {
+		return fmt.Errorf("failed to wait for transaction %s on chain %d: %w", tx.Hash().Hex(), selector, err)
+	}
+	env.Logger.Infow("Transaction granting mint role mined successfully",
+		"Hash", tx.Hash().Hex(), "Selector", selector)
+
+	// Mint tokens to the given address and verify the balance
+	tx, err = token.Mint(deployerKey, recipient, amount)
+	if err != nil {
+		return fmt.Errorf("failed to mint %s tokens to %s on chain %d: %w",
+			token.Address().Hex(), recipient.Hex(), selector, err)
+	}
+	if _, err := env.Chains[selector].Confirm(tx); err != nil {
+		return fmt.Errorf("failed to wait for transaction %s on chain %d: %w",
+			tx.Hash().Hex(), selector, err)
+	}
+	env.Logger.Infow("Transaction minting token mined successfully", "Hash", tx.Hash().Hex())
+
+	balance, err := token.BalanceOf(&bind.CallOpts{Context: ctx}, recipient)
+	if err != nil {
+		return fmt.Errorf("failed to get balance of %s on chain %d: %w",
+			recipient.Hex(), selector, err)
+	}
+	if balance.Cmp(amount) != 0 {
+		return fmt.Errorf("expected balance of %s, got %s",
+			amount.String(), balance.String())
+	}
+	symbol, err := token.Symbol(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return fmt.Errorf("failed to get token symbol for %s on chain %d: %w",
+			token.Address().Hex(), selector, err)
+	}
+	env.Logger.Infow("Recipient added as minter and token minted",
+		"Address", recipient.Hex(),
+		"Balance", balance.String(), "Token Symbol", symbol,
+		"Token address", token.Address().Hex())
+
+	return nil
 }

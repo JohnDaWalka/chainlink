@@ -80,11 +80,6 @@ secrets.toml
 tmp_laneconfig/
 solana_contracts
 
-# goreleaser builds
-cosign.*
-dist/
-MacOSX*
-
 # Test & linter reports
 *report.xml
 *report.json
@@ -100,9 +95,6 @@ go.work*
 # This sometimes shows up for some reason
 tools/flakeytests/coverage.txt
 
-# Fuzz tests can create these files
-**/testdata/fuzz/*
-
 # Runtime test configuration that might contain secrets
 override*.toml
 
@@ -117,3 +109,7 @@ vendor/*
 contracts/lcov.info
 contracts/out/
 /cache
+
+# Used by plugins/chianlink.prebuilt.Dockerfile
+bin/
+lib/

@@ -234,13 +234,26 @@ func (h *Store) GetSecrets(ctx context.Context, secretsURL string, workflowID [3
 		return nil, fmt.Errorf("failed to fetch secrets from %s : %w", secretsURL, fetchErr)
 	}
 
-	// sanity check by decoding the secrets
-	_, decryptErr := h.decryptSecrets(fetchedSecrets, hex.EncodeToString(workflowOwner))
-	if decryptErr != nil {
-		return nil, fmt.Errorf("failed to decrypt secrets %s: %w", secretsURL, decryptErr)
+	return fetchedSecrets, nil
+}
+
+func (h *Store) ValidateSecrets(ctx context.Context, workflowID, workflowOwner string) error {
+	_, secretsPayload, err := h.orm.GetContentsByWorkflowID(ctx, workflowID)
+	if err != nil {
+		// The workflow record was found, but secrets_id was empty.
+		if errors.Is(err, ErrEmptySecrets) {
+			return nil
+		}
+
+		return fmt.Errorf("failed to retrieve secrets by workflow ID: %w", err)
 	}
 
-	return fetchedSecrets, nil
+	_, decryptErr := h.decryptSecrets([]byte(secretsPayload), workflowOwner)
+	if decryptErr != nil {
+		return fmt.Errorf("failed to decrypt secrets: %w", decryptErr)
+	}
+
+	return nil
 }
 
 func (h *Store) ForceUpdateSecrets(
@@ -353,11 +366,12 @@ func (h *Store) GetSecretsURLHash(workflowOwner []byte, secretsURL []byte) ([]by
 	return urlHash, nil
 }
 
+// DeleteWorkflowArtifacts removes the workflow spec from the database. If not found, returns nil.
 func (h *Store) DeleteWorkflowArtifacts(ctx context.Context, workflowOwner string, workflowName string, workflowID string) error {
 	err := h.orm.DeleteWorkflowSpec(ctx, workflowOwner, workflowName)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			h.lggr.Warnw("workflow spec not found", "workflowID", workflowID)
+			h.lggr.Warnw("failed to delete workflow spec: not found", "workflowID", workflowID)
 			return nil
 		}
 		return fmt.Errorf("failed to delete workflow spec: %w", err)

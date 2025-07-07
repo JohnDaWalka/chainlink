@@ -8,10 +8,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_5_1"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -24,7 +27,7 @@ func TestProposeAdminRoleChangeset_Validations(t *testing.T) {
 
 	e = testhelpers.DeployTestTokenPools(t, e, map[uint64]v1_5_1.DeployTokenPoolInput{
 		selectorA: {
-			Type:               changeset.BurnMintTokenPool,
+			Type:               shared.BurnMintTokenPool,
 			TokenAddress:       tokens[selectorA].Address,
 			LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 		},
@@ -37,13 +40,13 @@ func TestProposeAdminRoleChangeset_Validations(t *testing.T) {
 	// We want an administrator to exist to force failure in the last test
 	e, err := commonchangeset.Apply(t, e, timelockContracts,
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_5_1.ProposeAdminRoleChangeset),
-			changeset.TokenAdminRegistryChangesetConfig{
+			cldf.CreateLegacyChangeSet(v1_5_1.ProposeAdminRoleChangeset),
+			v1_5_1.TokenAdminRegistryChangesetConfig{
 				MCMS: mcmsConfig,
-				Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+				Pools: map[uint64]map[shared.TokenSymbol]v1_5_1.TokenPoolInfo{
 					selectorA: {
 						testhelpers.TestTokenSymbol: {
-							Type:    changeset.BurnMintTokenPool,
+							Type:    shared.BurnMintTokenPool,
 							Version: deployment.Version1_5_1,
 						},
 					},
@@ -51,13 +54,13 @@ func TestProposeAdminRoleChangeset_Validations(t *testing.T) {
 			},
 		),
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(v1_5_1.AcceptAdminRoleChangeset),
-			changeset.TokenAdminRegistryChangesetConfig{
+			cldf.CreateLegacyChangeSet(v1_5_1.AcceptAdminRoleChangeset),
+			v1_5_1.TokenAdminRegistryChangesetConfig{
 				MCMS: mcmsConfig,
-				Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+				Pools: map[uint64]map[shared.TokenSymbol]v1_5_1.TokenPoolInfo{
 					selectorA: {
 						testhelpers.TestTokenSymbol: {
-							Type:    changeset.BurnMintTokenPool,
+							Type:    shared.BurnMintTokenPool,
 							Version: deployment.Version1_5_1,
 						},
 					},
@@ -68,14 +71,14 @@ func TestProposeAdminRoleChangeset_Validations(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		Config changeset.TokenAdminRegistryChangesetConfig
+		Config v1_5_1.TokenAdminRegistryChangesetConfig
 		ErrStr string
 		Msg    string
 	}{
 		{
 			Msg: "Chain selector is invalid",
-			Config: changeset.TokenAdminRegistryChangesetConfig{
-				Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+			Config: v1_5_1.TokenAdminRegistryChangesetConfig{
+				Pools: map[uint64]map[shared.TokenSymbol]v1_5_1.TokenPoolInfo{
 					0: {},
 				},
 			},
@@ -83,8 +86,8 @@ func TestProposeAdminRoleChangeset_Validations(t *testing.T) {
 		},
 		{
 			Msg: "Chain selector doesn't exist in environment",
-			Config: changeset.TokenAdminRegistryChangesetConfig{
-				Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+			Config: v1_5_1.TokenAdminRegistryChangesetConfig{
+				Pools: map[uint64]map[shared.TokenSymbol]v1_5_1.TokenPoolInfo{
 					5009297550715157269: {},
 				},
 			},
@@ -92,8 +95,8 @@ func TestProposeAdminRoleChangeset_Validations(t *testing.T) {
 		},
 		{
 			Msg: "Ownership validation failure",
-			Config: changeset.TokenAdminRegistryChangesetConfig{
-				Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+			Config: v1_5_1.TokenAdminRegistryChangesetConfig{
+				Pools: map[uint64]map[shared.TokenSymbol]v1_5_1.TokenPoolInfo{
 					selectorA: {},
 				},
 			},
@@ -101,9 +104,9 @@ func TestProposeAdminRoleChangeset_Validations(t *testing.T) {
 		},
 		{
 			Msg: "Invalid pool type",
-			Config: changeset.TokenAdminRegistryChangesetConfig{
+			Config: v1_5_1.TokenAdminRegistryChangesetConfig{
 				MCMS: mcmsConfig,
-				Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+				Pools: map[uint64]map[shared.TokenSymbol]v1_5_1.TokenPoolInfo{
 					selectorA: {
 						testhelpers.TestTokenSymbol: {
 							Type:    "InvalidType",
@@ -116,12 +119,12 @@ func TestProposeAdminRoleChangeset_Validations(t *testing.T) {
 		},
 		{
 			Msg: "Invalid pool version",
-			Config: changeset.TokenAdminRegistryChangesetConfig{
+			Config: v1_5_1.TokenAdminRegistryChangesetConfig{
 				MCMS: mcmsConfig,
-				Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+				Pools: map[uint64]map[shared.TokenSymbol]v1_5_1.TokenPoolInfo{
 					selectorA: {
 						testhelpers.TestTokenSymbol: {
-							Type:    changeset.BurnMintTokenPool,
+							Type:    shared.BurnMintTokenPool,
 							Version: deployment.Version1_0_0,
 						},
 					},
@@ -131,12 +134,12 @@ func TestProposeAdminRoleChangeset_Validations(t *testing.T) {
 		},
 		{
 			Msg: "Admin already exists",
-			Config: changeset.TokenAdminRegistryChangesetConfig{
+			Config: v1_5_1.TokenAdminRegistryChangesetConfig{
 				MCMS: mcmsConfig,
-				Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+				Pools: map[uint64]map[shared.TokenSymbol]v1_5_1.TokenPoolInfo{
 					selectorA: {
 						testhelpers.TestTokenSymbol: {
-							Type:    changeset.BurnMintTokenPool,
+							Type:    shared.BurnMintTokenPool,
 							Version: deployment.Version1_5_1,
 						},
 					},
@@ -150,7 +153,7 @@ func TestProposeAdminRoleChangeset_Validations(t *testing.T) {
 		t.Run(test.Msg, func(t *testing.T) {
 			_, err = commonchangeset.Apply(t, e, timelockContracts,
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_5_1.ProposeAdminRoleChangeset),
+					cldf.CreateLegacyChangeSet(v1_5_1.ProposeAdminRoleChangeset),
 					test.Config,
 				),
 			)
@@ -172,18 +175,18 @@ func TestProposeAdminRoleChangeset_ExecutionWithoutExternalAdmin(t *testing.T) {
 
 			e = testhelpers.DeployTestTokenPools(t, e, map[uint64]v1_5_1.DeployTokenPoolInput{
 				selectorA: {
-					Type:               changeset.BurnMintTokenPool,
+					Type:               shared.BurnMintTokenPool,
 					TokenAddress:       tokens[selectorA].Address,
 					LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 				},
 				selectorB: {
-					Type:               changeset.BurnMintTokenPool,
+					Type:               shared.BurnMintTokenPool,
 					TokenAddress:       tokens[selectorB].Address,
 					LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 				},
 			}, mcmsConfig != nil)
 
-			state, err := changeset.LoadOnchainState(e)
+			state, err := stateview.LoadOnchainState(e)
 			require.NoError(t, err)
 
 			registryOnA := state.Chains[selectorA].TokenAdminRegistry
@@ -191,19 +194,19 @@ func TestProposeAdminRoleChangeset_ExecutionWithoutExternalAdmin(t *testing.T) {
 
 			e, err = commonchangeset.Apply(t, e, timelockContracts,
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_5_1.ProposeAdminRoleChangeset),
-					changeset.TokenAdminRegistryChangesetConfig{
+					cldf.CreateLegacyChangeSet(v1_5_1.ProposeAdminRoleChangeset),
+					v1_5_1.TokenAdminRegistryChangesetConfig{
 						MCMS: mcmsConfig,
-						Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+						Pools: map[uint64]map[shared.TokenSymbol]v1_5_1.TokenPoolInfo{
 							selectorA: {
 								testhelpers.TestTokenSymbol: {
-									Type:    changeset.BurnMintTokenPool,
+									Type:    shared.BurnMintTokenPool,
 									Version: deployment.Version1_5_1,
 								},
 							},
 							selectorB: {
 								testhelpers.TestTokenSymbol: {
-									Type:    changeset.BurnMintTokenPool,
+									Type:    shared.BurnMintTokenPool,
 									Version: deployment.Version1_5_1,
 								},
 							},
@@ -246,18 +249,18 @@ func TestProposeAdminRoleChangeset_ExecutionWithExternalAdmin(t *testing.T) {
 
 			e = testhelpers.DeployTestTokenPools(t, e, map[uint64]v1_5_1.DeployTokenPoolInput{
 				selectorA: {
-					Type:               changeset.BurnMintTokenPool,
+					Type:               shared.BurnMintTokenPool,
 					TokenAddress:       tokens[selectorA].Address,
 					LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 				},
 				selectorB: {
-					Type:               changeset.BurnMintTokenPool,
+					Type:               shared.BurnMintTokenPool,
 					TokenAddress:       tokens[selectorB].Address,
 					LocalTokenDecimals: testhelpers.LocalTokenDecimals,
 				},
 			}, mcmsConfig != nil)
 
-			state, err := changeset.LoadOnchainState(e)
+			state, err := stateview.LoadOnchainState(e)
 			require.NoError(t, err)
 
 			registryOnA := state.Chains[selectorA].TokenAdminRegistry
@@ -265,20 +268,20 @@ func TestProposeAdminRoleChangeset_ExecutionWithExternalAdmin(t *testing.T) {
 
 			_, err = commonchangeset.Apply(t, e, timelockContracts,
 				commonchangeset.Configure(
-					deployment.CreateLegacyChangeSet(v1_5_1.ProposeAdminRoleChangeset),
-					changeset.TokenAdminRegistryChangesetConfig{
+					cldf.CreateLegacyChangeSet(v1_5_1.ProposeAdminRoleChangeset),
+					v1_5_1.TokenAdminRegistryChangesetConfig{
 						MCMS: mcmsConfig,
-						Pools: map[uint64]map[changeset.TokenSymbol]changeset.TokenPoolInfo{
+						Pools: map[uint64]map[shared.TokenSymbol]v1_5_1.TokenPoolInfo{
 							selectorA: {
 								testhelpers.TestTokenSymbol: {
-									Type:          changeset.BurnMintTokenPool,
+									Type:          shared.BurnMintTokenPool,
 									Version:       deployment.Version1_5_1,
 									ExternalAdmin: externalAdminA,
 								},
 							},
 							selectorB: {
 								testhelpers.TestTokenSymbol: {
-									Type:          changeset.BurnMintTokenPool,
+									Type:          shared.BurnMintTokenPool,
 									Version:       deployment.Version1_5_1,
 									ExternalAdmin: externalAdminB,
 								},

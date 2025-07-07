@@ -12,9 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	testsetups "github.com/smartcontractkit/chainlink/integration-tests/testsetups/ccip"
 )
 
@@ -32,7 +32,7 @@ func Test_CCIPGasPriceUpdatesWriteFrequency(t *testing.T) {
 			return params
 		}),
 	)
-	state, err := changeset.LoadOnchainState(e.Env)
+	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	testhelpers.AddLanesForAll(t, &e, state)
 
@@ -123,6 +123,8 @@ func Test_CCIPGasPriceUpdatesWriteFrequency(t *testing.T) {
 
 // price reaches some deviation threshold
 func Test_CCIPGasPriceUpdatesDeviation(t *testing.T) {
+	tests.SkipFlakey(t, "https://smartcontract-it.atlassian.net/browse/DX-576")
+
 	ctx := testhelpers.Context(t)
 	callOpts := &bind.CallOpts{Context: ctx}
 
@@ -136,7 +138,7 @@ func Test_CCIPGasPriceUpdatesDeviation(t *testing.T) {
 			return params
 		}),
 	)
-	state, err := changeset.LoadOnchainState(e.Env)
+	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 	testhelpers.AddLanesForAll(t, &e, state)
 

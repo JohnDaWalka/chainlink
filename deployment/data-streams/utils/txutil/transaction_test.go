@@ -11,9 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	commonstate "github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 
-	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
@@ -73,7 +74,7 @@ func TestSignAndExecute_ContractInteraction(t *testing.T) {
 
 	e, err := commonchangeset.Apply(t, e, nil,
 		commonchangeset.Configure(
-			deployment.CreateLegacyChangeSet(commonchangeset.DeployLinkToken),
+			cldf.CreateLegacyChangeSet(commonchangeset.DeployLinkToken),
 			[]uint64{testChain},
 		),
 	)
@@ -89,13 +90,13 @@ func TestSignAndExecute_ContractInteraction(t *testing.T) {
 	// grant minter permissions
 	tx, err := linkState.LinkToken.GrantMintRole(chain.DeployerKey, chain.DeployerKey.From)
 	require.NoError(t, err)
-	_, err = deployment.ConfirmIfNoError(chain, tx, err)
+	_, err = cldf.ConfirmIfNoError(chain, tx, err)
 	require.NoError(t, err)
 
 	// Mint the deployer address some tokens
 	tx, err = linkState.LinkToken.Mint(chain.DeployerKey, chain.DeployerKey.From, big.NewInt(500))
 	require.NoError(t, err)
-	_, err = deployment.ConfirmIfNoError(chain, tx, err)
+	_, err = cldf.ConfirmIfNoError(chain, tx, err)
 	require.NoError(t, err)
 
 	// Deployer should have the tokens
@@ -113,7 +114,7 @@ func TestSignAndExecute_ContractInteraction(t *testing.T) {
 	// Transfer some tokens to multiple receivers
 	for _, receiver := range receivers {
 		// This is the key part - generate a transaction with call data / arguments but do not send it
-		tx, err = linkState.LinkToken.Transfer(deployment.SimTransactOpts(), receiver, big.NewInt(100))
+		tx, err = linkState.LinkToken.Transfer(cldf.SimTransactOpts(), receiver, big.NewInt(100))
 		require.NoError(t, err)
 		preparedTxs = append(preparedTxs, &PreparedTx{
 			Tx:            tx,

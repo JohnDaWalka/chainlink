@@ -122,13 +122,12 @@ func (p *priceService) Close() error {
 }
 
 func (p *priceService) run() {
-	ctx, cancel := p.stopChan.NewCtx()
-	defer cancel()
-
 	gasUpdateTicker := time.NewTicker(utils.WithJitter(p.gasUpdateInterval))
 	tokenUpdateTicker := time.NewTicker(utils.WithJitter(p.tokenUpdateInterval))
 
 	go func() {
+		ctx, cancel := p.stopChan.NewCtx()
+		defer cancel()
 		defer p.wg.Done()
 		defer gasUpdateTicker.Stop()
 		defer tokenUpdateTicker.Stop()
@@ -345,9 +344,8 @@ func (p *priceService) observeTokenPriceUpdates(
 		if price == nil {
 			return nil, fmt.Errorf("token price is nil for token %v", tokenID)
 		}
+		lggr.Infow("fetched raw token price", "tokenID", tokenID, "price", price)
 	}
-
-	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
 
 	// at this point the rawTokenPricesUSD contains both source native and dest tokens, we only want to observe
 	// destination chain tokens.
