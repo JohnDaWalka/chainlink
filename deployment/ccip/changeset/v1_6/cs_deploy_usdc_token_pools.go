@@ -12,7 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/mock_usdc_token_messenger"
 	// TODO: New token pool contract should be imported from the latest version
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/usdc_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/erc20"
 
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -30,6 +30,8 @@ var (
 
 // DeployUSDCTokenPoolInput defines all information required of the user to deploy a new USDC token pool contract.
 type DeployUSDCTokenPoolInput struct {
+	// CCTPMessageTransmitterProxy is the address of the CCTP message transmitter proxy contract.
+	CCTPMessageTransmitterProxy common.Address
 	// PreviousPoolAddress is the address of the previous USDC token pool contract, inflight messages
 	// are redirected to the previous pool when needed.
 	PreviousPoolAddress common.Address
@@ -49,6 +51,12 @@ func (i DeployUSDCTokenPoolInput) Validate(ctx context.Context, chain cldf_evm.C
 	}
 	if i.TokenMessenger == utils.ZeroAddress {
 		return errors.New("token messenger must be defined")
+	}
+	if i.CCTPMessageTransmitterProxy == utils.ZeroAddress {
+		return errors.New("message transmitter proxy must be defined")
+	}
+	if i.PreviousPoolAddress == utils.ZeroAddress {
+		return errors.New("previous pool address must be defined")
 	}
 
 	// Validate the token exists and matches the USDC symbol
@@ -153,11 +161,10 @@ func deployUSDCTokenPoolContractsLogic(env cldf.Environment, c DeployUSDCTokenPo
 		}
 		_, err := cldf.DeployContract(env.Logger, chain, newAddresses,
 			func(chain cldf_evm.Chain) cldf.ContractDeploy[*usdc_token_pool.USDCTokenPool] {
-				// TODO: Include previous pool address in the deployment.
-				poolAddress, tx, usdcTokenPool, err := usdc_token_pool.DeployUSDCTokenPool(
-					chain.DeployerKey, chain.Client, poolConfig.TokenMessenger, poolConfig.TokenAddress,
-					poolConfig.AllowList, chainState.RMNProxy.Address(), router.Address(),
-				)
+				poolAddress, tx, usdcTokenPool, err := usdc_token_pool.DeployUSDCTokenPool(chain.DeployerKey,
+					chain.Client, poolConfig.TokenMessenger, poolConfig.CCTPMessageTransmitterProxy,
+					poolConfig.TokenAddress, poolConfig.AllowList, chainState.RMNProxy.Address(), router.Address(),
+					poolConfig.PreviousPoolAddress)
 				return cldf.ContractDeploy[*usdc_token_pool.USDCTokenPool]{
 					Address:  poolAddress,
 					Contract: usdcTokenPool,
