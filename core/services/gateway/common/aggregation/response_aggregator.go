@@ -22,6 +22,7 @@ type NodeResponseAggregator interface {
 // (Usually 2f+1, where f is the number of faulty nodes).
 // NOT thread-safe.
 type identicalNodeResponseAggregator struct {
+	// responses is a map from response digest to a set of node addresses
 	responses map[string]stringSet
 	// nodeToResponse tracks which response key each node address is currently associated with
 	nodeToResponse map[string]string
