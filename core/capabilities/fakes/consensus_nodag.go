@@ -3,6 +3,8 @@ package fakes
 import (
 	"context"
 
+	"github.com/smartcontractkit/cre-sdk-go/sdk"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	consensusserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/consensus/server"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
