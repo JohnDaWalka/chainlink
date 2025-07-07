@@ -4,3 +4,5 @@ import cldf "github.com/smartcontractkit/chainlink-deployments-framework/deploym
 
 var Forwarder cldf.ContractType = "Forwarder"
 var ForwarderState cldf.ContractType = "ForwarderState"
+var Cache cldf.ContractType = "DataFeedsCache"
+var CacheState cldf.ContractType = "DataFeedsCacheState"

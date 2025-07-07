@@ -28,6 +28,8 @@ var keystoneBuildParams = helpers.DomainParams{
 // Map program names to their Rust file paths (relative to the Anchor project root)
 // Needed for upgrades in place
 var keystoneForwarder = cldf.ContractType("keystone_forwarder")
+var cacheProgram = cldf.ContractType("data_feeds_cache")
 var programToFileMap = map[cldf.ContractType]string{
 	keystoneForwarder: "programs/keystone-forwarder/src/lib.rs",
+	cacheProgram:     "programs/data-feeds-cache/src/lib.rs",
 }

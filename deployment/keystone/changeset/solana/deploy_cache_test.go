@@ -65,6 +65,21 @@ func TestDeployCache(t *testing.T) {
         require.NoError(t, err)
         require.NotEmpty(t, cacheStateAddr.Address)
     })
+
+		t.Run("should pass upgrade authority", func(t *testing.T) {
+        configuredChangeset := commonchangeset.Configure(SetCacheUpgradeAuthority{},
+            &SetCacheUpgradeAuthorityRequest{
+                ChainSel:            solSel,
+                Qualifier:           testQualifier,
+                Version:             "1.0.0",
+                NewUpgradeAuthority: chain.DeployerKey.PublicKey().String(),
+            },
+        )
+
+        var err error
+        _, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{configuredChangeset})
+        require.NoError(t, err)
+    })
 }
 
 func ParseSemver(v string) *semver.Version {

@@ -114,3 +114,99 @@ func (cs TransferOwnershipForwarder) Apply(env cldf.Environment, req *TransferOw
 
 	return out, nil
 }
+
+type TransferOwnershipCacheRequest struct {
+    ChainSel                    uint64
+    CurrentOwner, ProposedOwner solana.PublicKey
+    Version                     string
+    Qualifier                   string
+
+    // MCMSCfg is for the accept ownership proposal
+    MCMSCfg proposalutils.TimelockConfig
+}
+
+var _ cldf.ChangeSetV2[*TransferOwnershipCacheRequest] = TransferOwnershipCache{}
+
+type TransferOwnershipCache struct{}
+
+func (cs TransferOwnershipCache) VerifyPreconditions(env cldf.Environment, req *TransferOwnershipCacheRequest) error {
+    sel := req.ChainSel
+
+    version, err := semver.NewVersion(req.Version)
+    if err != nil {
+        return err
+    }
+
+    if _, ok := env.BlockChains.SolanaChains()[sel]; !ok {
+        return fmt.Errorf("solana chain not found for chain selector %d", sel)
+    }
+
+    cacheKey := datastore.NewAddressRefKey(sel, CacheContract, version, req.Qualifier)
+    _, err = env.DataStore.Addresses().Get(cacheKey)
+    if err != nil {
+        return fmt.Errorf("failed get cache for chain selector %d: %w", sel, err)
+    }
+    return nil
+}
+
+func (cs TransferOwnershipCache) Apply(env cldf.Environment, req *TransferOwnershipCacheRequest) (cldf.ChangesetOutput, error) {
+    var out cldf.ChangesetOutput
+    version := semver.MustParse(req.Version)
+    cacheStateRef := datastore.NewAddressRefKey(req.ChainSel, CacheState, version, req.Qualifier)
+    cacheRef := datastore.NewAddressRefKey(req.ChainSel, CacheContract, version, req.Qualifier)
+
+    cache, _ := env.DataStore.Addresses().Get(cacheRef)
+    cacheState, _ := env.DataStore.Addresses().Get(cacheStateRef)
+
+    mcmsState, err := state.MaybeLoadMCMSWithTimelockChainStateSolanaV2(env.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(req.ChainSel)))
+    if err != nil {
+        return out, err
+    }
+
+    solChain := env.BlockChains.SolanaChains()[req.ChainSel]
+
+    execOut, err := operations.ExecuteOperation(env.OperationsBundle,
+        operations.NewOperation(
+            "transfer-ownership-cache",
+            version,
+            "transfers ownership of cache to mcms",
+            commonchangeset.TransferToTimelockSolanaOp,
+        ),
+        commonchangeset.Deps{
+            Env:   env,
+            State: mcmsState,
+            Chain: solChain,
+        },
+        commonchangeset.TransferToTimelockInput{
+            Contract: commonchangeset.OwnableContract{
+                Type:      cldf.ContractType(CacheContract),
+                ProgramID: solana.MustPublicKeyFromBase58(cache.Address),
+                OwnerPDA:  solana.MustPublicKeyFromBase58(cacheState.Address),
+            },
+            MCMSCfg: req.MCMSCfg,
+        },
+    )
+    if err != nil {
+        return out, err
+    }
+
+    timelocks := map[uint64]string{}
+    proposers := map[uint64]string{}
+    inspectors := map[uint64]mcmssdk.Inspector{}
+
+    inspectors[req.ChainSel] = mcmssolanasdk.NewInspector(solChain.Client)
+    timelocks[req.ChainSel] = mcmssolanasdk.ContractAddress(mcmsState.TimelockProgram, mcmssolanasdk.PDASeed(mcmsState.TimelockSeed))
+    proposers[req.ChainSel] = mcmssolanasdk.ContractAddress(mcmsState.McmProgram, mcmssolanasdk.PDASeed(mcmsState.ProposerMcmSeed))
+
+    // create timelock proposal with accept transactions
+    proposal, err := proposalutils.BuildProposalFromBatchesV2(env, timelocks, proposers, inspectors,
+        execOut.Output.Batches, "proposal to transfer ownership of cache to timelock", req.MCMSCfg)
+    if err != nil {
+        return out, fmt.Errorf("failed to build proposal: %w", err)
+    }
+    env.Logger.Debugw("created timelock proposal", "# batches", len(execOut.Output.Batches))
+
+    out.MCMSTimelockProposals = []mcms.TimelockProposal{*proposal}
+
+    return out, nil
+}
