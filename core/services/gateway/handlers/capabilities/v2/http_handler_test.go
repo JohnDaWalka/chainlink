@@ -18,6 +18,7 @@ import (
 	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
+	triggermocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities/v2/mocks"
 	handlermocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 	httpmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/network/mocks"
@@ -353,6 +354,54 @@ func TestServiceLifecycle(t *testing.T) {
 		err = quickHandler.Close()
 		require.NoError(t, err)
 	})
+}
+func TestHandleNodeMessage_RoutesToTriggerHandler(t *testing.T) {
+	// This test covers the case where the response ID does not contain a "/"
+	// and should be routed to the triggerHandler.HandleNodeTriggerResponse.
+	mockTriggerHandler := triggermocks.NewHTTPTriggerHandler(t)
+	handler := createTestHandler(t)
+	handler.triggerHandler = mockTriggerHandler
+
+	resp := &jsonrpc.Response{
+		ID:     "triggerResponseID", // No "/" in ID
+		Result: []byte(`{}`),
+	}
+	nodeAddr := "node1"
+
+	mockTriggerHandler.
+		On("HandleNodeTriggerResponse", mock.Anything, resp, nodeAddr).
+		Return(nil).
+		Once()
+
+	err := handler.HandleNodeMessage(testutils.Context(t), resp, nodeAddr)
+	require.NoError(t, err)
+	mockTriggerHandler.AssertExpectations(t)
+}
+
+func TestHandleNodeMessage_UnsupportedMethod(t *testing.T) {
+	handler := createTestHandler(t)
+	resp := &jsonrpc.Response{
+		ID:     "unsupportedMethod/123",
+		Result: []byte(`{}`),
+	}
+	nodeAddr := "node1"
+
+	err := handler.HandleNodeMessage(testutils.Context(t), resp, nodeAddr)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Unsupported method unsupportedMethod")
+}
+
+func TestHandleNodeMessage_EmptyID(t *testing.T) {
+	handler := createTestHandler(t)
+	resp := &jsonrpc.Response{
+		ID:     "",
+		Result: []byte(`{}`),
+	}
+	nodeAddr := "node1"
+
+	err := handler.HandleNodeMessage(testutils.Context(t), resp, nodeAddr)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "empty request ID")
 }
 
 func serviceCfg() ServiceConfig {
