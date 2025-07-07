@@ -23,10 +23,13 @@ import (
 var _ handlers.Handler = (*gatewayHandler)(nil)
 
 const (
-	handlerName            = "HTTPCapabilityHandler"
-	defaultCleanUpPeriodMs = 1000 * 60 * 10 // 10 minutes
-	defaultMaxTriggerRequestDurationMs
-	internalErrorMessage = "Internal Server Error"
+	handlerName                        = "HTTPCapabilityHandler"
+	defaultCleanUpPeriodMs             = 1000 * 60 * 10 // 10 minutes
+	defaultMaxTriggerRequestDurationMs = 1000 * 60      // 1 minute
+	defaultInitialIntervalMs           = 100
+	defaultMaxIntervalTimeMs           = 1000 * 30 // 30 seconds
+	defaultMultiplier                  = 2.0
+	internalErrorMessage               = "Internal server error occurred while processing the request"
 )
 
 type gatewayHandler struct {
@@ -54,7 +57,14 @@ type ServiceConfig struct {
 	NodeRateLimiter             ratelimit.RateLimiterConfig `json:"nodeRateLimiter"`
 	UserRateLimiter             ratelimit.RateLimiterConfig `json:"userRateLimiter"`
 	MaxTriggerRequestDurationMs int                         `json:"maxTriggerRequestDurationMs"`
+	RetryConfig                 RetryConfig                 `json:"retryConfig"`
 	CleanUpPeriodMs             int                         `json:"cacheCleanUpPeriodMs"`
+}
+
+type RetryConfig struct {
+	InitialIntervalMs int     `json:"initialIntervalMs"`
+	MaxIntervalTimeMs int     `json:"maxIntervalTimeMs"`
+	Multiplier        float64 `json:"multiplier"`
 }
 
 func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don handlers.DON, httpClient network.HTTPClient, lggr logger.Logger) (*gatewayHandler, error) {
@@ -93,6 +103,15 @@ func WithDefaults(cfg ServiceConfig) ServiceConfig {
 	}
 	if cfg.MaxTriggerRequestDurationMs == 0 {
 		cfg.MaxTriggerRequestDurationMs = defaultMaxTriggerRequestDurationMs
+	}
+	if cfg.RetryConfig.InitialIntervalMs == 0 {
+		cfg.RetryConfig.InitialIntervalMs = defaultInitialIntervalMs
+	}
+	if cfg.RetryConfig.MaxIntervalTimeMs == 0 {
+		cfg.RetryConfig.MaxIntervalTimeMs = defaultMaxIntervalTimeMs
+	}
+	if cfg.RetryConfig.Multiplier == 0 {
+		cfg.RetryConfig.Multiplier = defaultMultiplier
 	}
 	return cfg
 }

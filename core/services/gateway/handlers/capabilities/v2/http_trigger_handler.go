@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
 
-	"go.uber.org/multierr"
+	"github.com/jpillora/backoff"
 
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -68,9 +69,8 @@ func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *
 	workflowID := triggerReq.Workflow.WorkflowID
 	executionID, err := workflows.EncodeExecutionID(workflowID, req.ID)
 	if err != nil {
-		h.lggr.Errorw("error generating execution ID", "err", err)
 		h.handleUserError(req.ID, jsonrpc.ErrInternal, internalErrorMessage, callbackCh)
-		return nil
+		return errors.New("error generating execution ID: " + err.Error())
 	}
 	h.callbacksMu.Lock()
 	_, found := h.callbacks[executionID]
@@ -80,6 +80,7 @@ func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *
 		return errors.New("request ID already used: " + req.ID)
 	}
 
+	// 2f + 1 is chosen to ensure that majority of honest nodes are executing the request
 	agg, err := common.NewIdenticalNodeResponseAggregator(2*h.donConfig.F + 1)
 	if err != nil {
 		return errors.New("failed to create response aggregator: " + err.Error())
@@ -90,11 +91,8 @@ func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *
 		responseAggregator: agg,
 	}
 	h.callbacksMu.Unlock()
-	// Send original request to all nodes
-	for _, member := range h.donConfig.Members {
-		err = multierr.Combine(err, h.don.SendToNode(ctx, member.Address, req))
-	}
-	return err
+
+	return h.sendWithRetries(ctx, executionID, req)
 }
 
 func (h *httpTriggerHandler) validatedTriggerRequest(req *jsonrpc.Request, callbackCh chan<- handlers.UserCallbackPayload) (*gateway_common.HTTPTriggerRequest, error) {
@@ -233,5 +231,67 @@ func (h *httpTriggerHandler) handleUserError(requestID string, code int64, messa
 	callbackCh <- handlers.UserCallbackPayload{
 		RawResponse: rawResp,
 		ErrorCode:   api.ErrorCode(code),
+	}
+}
+
+// sendWithRetries attempts to send the request to all DON members,
+// retrying failed nodes until either all succeed or the max trigger request duration is reached.
+func (h *httpTriggerHandler) sendWithRetries(ctx context.Context, executionID string, req *jsonrpc.Request) error {
+	// Create a context that will be cancelled when the max request duration is reached
+	maxDuration := time.Duration(h.config.MaxTriggerRequestDurationMs) * time.Millisecond
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, maxDuration)
+	defer cancel()
+
+	successfulNodes := make(map[string]bool)
+	b := backoff.Backoff{
+		Min:    time.Duration(h.config.RetryConfig.InitialIntervalMs) * time.Millisecond,
+		Max:    time.Duration(h.config.RetryConfig.MaxIntervalTimeMs) * time.Millisecond,
+		Factor: h.config.RetryConfig.Multiplier,
+		Jitter: true,
+	}
+
+	for {
+		// Retry sending to nodes that haven't received the message
+		allNodesSucceeded := true
+		var combinedErr error
+
+		for _, member := range h.donConfig.Members {
+			if successfulNodes[member.Address] {
+				continue
+			}
+			err := h.don.SendToNode(ctxWithTimeout, member.Address, req)
+			if err != nil {
+				allNodesSucceeded = false
+				err = errors.Join(combinedErr, err)
+				h.lggr.Debugw("Failed to send trigger request to node, will retry",
+					"node", member.Address,
+					"executionID", executionID,
+					"error", err)
+			} else {
+				// Mark this node as successful
+				successfulNodes[member.Address] = true
+			}
+		}
+
+		if allNodesSucceeded {
+			h.lggr.Infow("Successfully sent trigger request to all nodes",
+				"executionID", executionID,
+				"nodeCount", len(h.donConfig.Members))
+			return nil
+		}
+
+		// Not all nodes succeeded, wait and retry
+		h.lggr.Debugw("Retrying failed nodes for trigger request",
+			"executionID", executionID,
+			"failedCount", len(h.donConfig.Members)-len(successfulNodes),
+			"errors", combinedErr)
+
+		select {
+		case <-time.After(b.Duration()):
+			continue
+		case <-ctxWithTimeout.Done():
+			return fmt.Errorf("request retry time exceeded, some nodes may not have received the request: executionID=%s, successNodes=%d, totalNodes=%d",
+				executionID, len(successfulNodes), len(h.donConfig.Members))
+		}
 	}
 }

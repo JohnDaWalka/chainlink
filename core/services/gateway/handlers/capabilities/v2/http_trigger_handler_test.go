@@ -195,36 +195,6 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest(t *testing.T) {
 		requireUserErrorSent(t, callbackCh2, int(jsonrpc.ErrInvalidRequest)) //nolint:gosec // safe to cast
 	})
 
-	t.Run("DON send failure", func(t *testing.T) {
-		handler, mockDon := createTestTriggerHandler(t)
-		callbackCh := make(chan handlers.UserCallbackPayload, 1)
-
-		triggerReq := gateway_common.HTTPTriggerRequest{
-			Workflow: gateway_common.WorkflowSelector{
-				WorkflowID: "test-workflow-id",
-			},
-			Input: []byte(`{"key": "value"}`),
-		}
-		reqBytes, err := json.Marshal(triggerReq)
-		require.NoError(t, err)
-
-		req := &jsonrpc.Request{
-			Version: "2.0",
-			ID:      "test-request-id",
-			Method:  gateway_common.MethodWorkflowExecute,
-			Params:  reqBytes,
-		}
-
-		// Mock one node to fail
-		mockDon.EXPECT().SendToNode(mock.Anything, "node1", req).Return(nil)
-		mockDon.EXPECT().SendToNode(mock.Anything, "node2", req).Return(errors.New("send failed"))
-		mockDon.EXPECT().SendToNode(mock.Anything, "node3", req).Return(nil)
-
-		err = handler.HandleUserTriggerRequest(testutils.Context(t), req, callbackCh)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "send failed")
-	})
-
 	t.Run("invalid input JSON", func(t *testing.T) {
 		handler, _ := createTestTriggerHandler(t)
 		callbackCh := make(chan handlers.UserCallbackPayload, 1)
@@ -495,6 +465,60 @@ func TestIsValidJSON(t *testing.T) {
 			require.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestHttpTriggerHandler_HandleUserTriggerRequest_Retries(t *testing.T) {
+	lggr := logger.Test(t)
+	cfg := ServiceConfig{
+		MaxTriggerRequestDurationMs: 2000, // 2 seconds for test
+		CleanUpPeriodMs:             10000,
+	}
+
+	donConfig := &config.DONConfig{
+		DonId: "test-don",
+		F:     1, // 1 faulty node, so 2*1+1=3 for threshold
+		Members: []config.NodeConfig{
+			{Address: "node1"},
+			{Address: "node2"},
+			{Address: "node3"},
+		},
+	}
+
+	mockDon := handlermocks.NewDON(t)
+	handler := NewHTTPTriggerHandler(lggr, cfg, donConfig, mockDon)
+
+	t.Run("retries failed nodes until success", func(t *testing.T) {
+		req := &jsonrpc.Request{
+			ID:      "test-request-id",
+			Method:  gateway_common.MethodWorkflowExecute,
+			Params:  json.RawMessage(`{"input":{},"workflow":{"workflowID":"test-workflow-id"}}`),
+			Version: "2.0",
+		}
+
+		callbackCh := make(chan handlers.UserCallbackPayload, 1)
+
+		// First attempt: node1 succeeds, node2 and node3 fail
+		mockDon.On("SendToNode", mock.Anything, "node1", mock.Anything).Return(nil).Once()
+		mockDon.On("SendToNode", mock.Anything, "node2", mock.Anything).Return(errors.New("connection error")).Once()
+		mockDon.On("SendToNode", mock.Anything, "node3", mock.Anything).Return(errors.New("connection error")).Once()
+
+		// Retry: node2 succeeds, node3 still fails
+		mockDon.On("SendToNode", mock.Anything, "node2", mock.Anything).Return(nil).Once()
+		mockDon.On("SendToNode", mock.Anything, "node3", mock.Anything).Return(errors.New("still failing")).Once()
+
+		// Final retry: node3 succeeds
+		mockDon.On("SendToNode", mock.Anything, "node3", mock.Anything).Return(nil).Once()
+
+		err := handler.Start(testutils.Context(t))
+		require.NoError(t, err)
+
+		err = handler.HandleUserTriggerRequest(testutils.Context(t), req, callbackCh)
+		require.NoError(t, err)
+
+		mockDon.AssertExpectations(t)
+		err = handler.Close()
+		require.NoError(t, err)
+	})
 }
 
 // Helper functions
