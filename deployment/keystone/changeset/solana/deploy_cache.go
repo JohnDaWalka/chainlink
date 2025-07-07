@@ -2,6 +2,7 @@ package solana
 
 import (
     "fmt"
+		"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 
     "github.com/Masterminds/semver/v3"
     "github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -59,7 +60,7 @@ func (cs DeployCache) Apply(env cldf.Environment, req *DeployCacheRequest) (cldf
 
     deploySeqInput := seq.DeployCacheSeqInput{
         ChainSel:    req.ChainSel,
-        ProgramName: "data_feeds_cache", // Update if the program name is different
+        ProgramName: "data_feeds_cache",
     }
 
     deps := operation.Deps{
@@ -101,6 +102,83 @@ func (cs DeployCache) Apply(env cldf.Environment, req *DeployCacheRequest) (cldf
     if err != nil {
         return out, err
     }
+
+    return out, nil
+}
+
+type SetCacheUpgradeAuthorityRequest struct {
+    ChainSel            uint64
+    NewUpgradeAuthority string // Use string for consistency with solana.PublicKey.String()
+    Qualifier           string
+    Version             string
+    MCMS                *proposalutils.TimelockConfig // if set, assumes current upgrade authority is the timelock
+}
+
+var _ cldf.ChangeSetV2[*SetCacheUpgradeAuthorityRequest] = SetCacheUpgradeAuthority{}
+
+type SetCacheUpgradeAuthority struct{}
+
+func (cs SetCacheUpgradeAuthority) VerifyPreconditions(env cldf.Environment, req *SetCacheUpgradeAuthorityRequest) error {
+    if _, ok := env.BlockChains.SolanaChains()[req.ChainSel]; !ok {
+        return fmt.Errorf("solana chain not found for chain selector %d", req.ChainSel)
+    }
+
+    version, err := semver.NewVersion(req.Version)
+    if err != nil {
+        return err
+    }
+
+    cacheKey := datastore.NewAddressRefKey(req.ChainSel, CacheContract, version, req.Qualifier)
+    _, err = env.DataStore.Addresses().Get(cacheKey)
+    if err != nil {
+        return fmt.Errorf("failed to load cache contract: %w", err)
+    }
+
+    if req.MCMS != nil {
+        refs := env.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(req.ChainSel))
+        _, err := helpers.FetchTimelockSigner(refs)
+        if err != nil {
+            return fmt.Errorf("failed fetch timelock signer: %w", err)
+        }
+    }
+
+    return nil
+}
+
+func (cs SetCacheUpgradeAuthority) Apply(env cldf.Environment, req *SetCacheUpgradeAuthorityRequest) (cldf.ChangesetOutput, error) {
+    var out cldf.ChangesetOutput
+
+    version := semver.MustParse(req.Version)
+    ch, ok := env.BlockChains.SolanaChains()[req.ChainSel]
+    if !ok {
+        return out, fmt.Errorf("solana chain not found for chain selector %d", req.ChainSel)
+    }
+
+    cacheKey := datastore.NewAddressRefKey(req.ChainSel, CacheContract, version, req.Qualifier)
+    addr, err := env.DataStore.Addresses().Get(cacheKey)
+    if err != nil {
+        return out, fmt.Errorf("failed to load cache contract: %w", err)
+    }
+
+    setAuthorityInput := operation.SetUpgradeAuthorityInput{
+        ChainSel:            req.ChainSel,
+        NewUpgradeAuthority: req.NewUpgradeAuthority,
+        MCMS:                req.MCMS,
+        ProgramID:           addr.Address,
+    }
+
+    deps := operation.Deps{
+        Datastore: env.DataStore,
+        Env:       env,
+        Chain:     ch,
+    }
+
+    execSetAuthOut, err := operations.ExecuteOperation(env.OperationsBundle, operation.SetUpgradeAuthorityOp, deps, setAuthorityInput)
+    if err != nil {
+        return out, err
+    }
+
+    out.MCMSTimelockProposals = execSetAuthOut.Output.Proposals
 
     return out, nil
 }
